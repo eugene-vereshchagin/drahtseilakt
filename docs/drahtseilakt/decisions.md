@@ -87,3 +87,9 @@ Documentation is written in English, Russian and German. English is the primary 
 code, comments and commits); the others mirror its structure under `docs/<lang>/` and in `README.<lang>.md`.
 All versions change in the same change. The site is built from `docs/` with one locale per language. German
 because the game and the name are German. (Replaces the entry on two languages.)
+
+## Open: OpenBallance or Ballanced as the base
+
+Found after the fork was made: [Ballanced](https://github.com/doyaGu/Ballanced) rebuilds the complete Virtools
+runtime natively on SDL3 and may already do much of phase 1. The choice between staying, moving and borrowing is
+made after phase 0 has actually run it on Linux, not from its README. Until then this entry stays open.

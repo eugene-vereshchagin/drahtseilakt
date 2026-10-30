@@ -4,7 +4,31 @@ What this fork is going to do, in order, and how we know each step is done. The 
 are in [decisions.md](decisions.md). Start here if you are picking the work up.
 
 State on 2026-10-30: the fork is the upstream OpenBallance 0.1.3 plus project rules (`CLAUDE.md`) and these
-documents. No engine code has been changed yet.
+documents. No engine code has been changed yet; the next step is phase 0.
+
+## Phase 0 — evaluate Ballanced before writing a backend
+
+[Ballanced](https://github.com/doyaGu/Ballanced) (by doyaGu, the author of BallanceModLoaderPlus) rebuilds the whole
+Virtools runtime from source, module for module like the original: `CK2`, `VxMath`, a `RenderEngine` on SDL_GPU,
+complete Building Block libraries including `physics_RT`, plugins, SDL3 input and sound managers, and the
+`Player`. MIT (the repository) and Apache-2.0 (the Building Blocks), so its code may be used in this GPL project.
+It has CMake presets for Linux, Windows and macOS (x64 and ARM64) and CI that runs its tests on Linux, but the
+only release (0.1.0) is Windows-only. If its Linux build works, phase 1 may already be done there, and its full
+Building Block libraries suit community maps better than our game-only set. Nobody has run it on Linux for us yet.
+
+On the owner's machine, with his copy of the game:
+
+1. Build the default `sdl` branch with `cmake --preset linux-x64-runtime` (submodules recursively; SDL3 from the
+   distribution or built from a pinned release).
+2. Run it and check: it starts; a level can be finished; the ball feels like the original; what it does with
+   widescreen and high resolutions; whether a few community maps load.
+3. Write down what was run and what was seen, in this file.
+
+Then decide, and record the decision in decisions.md:
+
+- **stay** on OpenBallance and continue with phase 1 as written;
+- **move** the fork onto Ballanced — the plan stays, phase 1 shrinks to what is missing there;
+- **borrow**: stay on OpenBallance and take parts of Ballanced (Building Blocks for maps, the SDL3 host).
 
 ## Phase 1 — native backend
 

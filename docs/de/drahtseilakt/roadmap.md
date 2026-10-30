@@ -4,7 +4,34 @@ Was dieser Fork vorhat, in welcher Reihenfolge und woran man erkennt, dass ein S
 für die Entscheidungen stehen in [decisions.md](decisions.md). Wer die Arbeit übernimmt, fängt hier an.
 
 Stand 30.10.2026: Der Fork ist das OpenBallance 0.1.3 des Upstreams plus Projektregeln (`CLAUDE.md`) und diese
-Dokumente. Am Engine-Code wurde noch nichts geändert.
+Dokumente. Am Engine-Code wurde noch nichts geändert; der nächste Schritt ist Phase 0.
+
+## Phase 0 — Ballanced prüfen, bevor ein Backend geschrieben wird
+
+[Ballanced](https://github.com/doyaGu/Ballanced) (von doyaGu, dem Autor von BallanceModLoaderPlus) baut die ganze
+Virtools-Laufzeitumgebung aus dem Quellcode nach, Modul für Modul wie das Original: `CK2`, `VxMath`, eine
+`RenderEngine` auf SDL_GPU, vollständige Building-Block-Bibliotheken einschließlich `physics_RT`, Plugins,
+Eingabe- und Ton-Manager auf SDL3 und den `Player`. MIT (das Repository) und Apache-2.0 (die Building Blocks), also
+darf sein Code in diesem GPL-Projekt verwendet werden. Es hat CMake-Presets für Linux, Windows und macOS (x64 und
+ARM64) und eine CI, die seine Tests unter Linux ausführt, aber das einzige Release (0.1.0) ist nur für Windows.
+Wenn sein Linux-Build funktioniert, ist Phase 1 dort womöglich schon erledigt, und seine vollständigen
+Building-Block-Bibliotheken passen besser zu Community-Karten als unser auf das Spiel beschränkter Satz. Unter
+Linux hat es für uns noch niemand gestartet.
+
+Auf dem Rechner des Inhabers, mit seiner Kopie des Spiels:
+
+1. Den Standardzweig `sdl` mit `cmake --preset linux-x64-runtime` bauen (Submodule rekursiv; SDL3 aus der
+   Distribution oder aus einem festgelegten Release gebaut).
+2. Starten und prüfen: Startet es; lässt sich ein Level beenden; fühlt sich die Kugel wie im Original an; was es
+   mit Breitbild und hohen Auflösungen macht; ob sich einige Community-Karten laden lassen.
+3. In dieser Datei festhalten, was ausgeführt wurde und was zu sehen war.
+
+Dann entscheiden und die Entscheidung in decisions.md festhalten:
+
+- **bleiben** bei OpenBallance und mit Phase 1 wie beschrieben weitermachen;
+- **umziehen** mit dem Fork auf Ballanced — der Plan bleibt, Phase 1 schrumpft auf das, was dort fehlt;
+- **übernehmen**: bei OpenBallance bleiben und Teile von Ballanced nehmen (Building Blocks für Karten, den
+  SDL3-Host).
 
 ## Phase 1 — nativer Backend
 

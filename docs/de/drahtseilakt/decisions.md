@@ -83,3 +83,10 @@ Die Dokumentation wird auf Englisch, Russisch und Deutsch geschrieben. Englisch 
 Sprache von Code, Kommentaren und Commits); die anderen spiegeln deren Struktur unter `docs/<sprache>/` und in
 `README.<sprache>.md`. Alle Versionen ändern sich in derselben Änderung. Die Website wird aus `docs/` mit einer
 Locale pro Sprache gebaut. (Ersetzt den früheren Eintrag zu zwei Sprachen.)
+
+## Offen: OpenBallance oder Ballanced als Basis
+
+Gefunden, nachdem der Fork angelegt war: [Ballanced](https://github.com/doyaGu/Ballanced) baut die komplette
+Virtools-Laufzeitumgebung nativ auf SDL3 nach und erledigt womöglich schon einen Großteil von Phase 1. Die Wahl
+zwischen Bleiben, Umziehen und Übernehmen fällt, nachdem Phase 0 es tatsächlich unter Linux gestartet hat, nicht
+anhand seines README. Bis dahin bleibt dieser Eintrag offen.
