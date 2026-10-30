@@ -78,7 +78,9 @@ Ballanced: Branch `sdl`, Commit `ececf94`, Preset `linux-x64-runtime`.
   muss noch auf echter Hardware laufen. GoogleTest wird per Tag geladen, nicht per Commit.
 - **Offline-Build.** Mit `VXMATH_FONT_DIR` auf unsere mitgelieferten Schriften (`assets/fonts`) und
   `FETCHCONTENT_FULLY_DISCONNECTED` konfiguriert und baut Ballanced ohne Netzzugang.
-- **Noch nicht geprüft:** `--unlock-framerate`, spätere Level, der ganze Kartensatz.
+- **Originallevel.** Jedes der zwölf, an die Stelle von Level 1 gesetzt, lädt und läuft ohne Einträge im Log
+  (nur Laden: durchgespielt hat sie niemand).
+- **Noch nicht geprüft:** `--unlock-framerate`, der ganze Kartensatz.
 
 ## Phase 1 — nativer Backend
 

@@ -73,7 +73,9 @@ branch `sdl` at commit `ececf94`, preset `linux-x64-runtime`.
   to be run on real hardware. GoogleTest is fetched by tag, not by commit.
 - **Offline build.** With `VXMATH_FONT_DIR` pointing at our bundled fonts (`assets/fonts`) and
   `FETCHCONTENT_FULLY_DISCONNECTED`, Ballanced configures and builds without network access.
-- **Not yet checked:** `--unlock-framerate`, later levels, the full map set.
+- **Original levels.** Each of the twelve, put in place of level 1, loads and runs with nothing in the log
+  (load only: nobody played them through).
+- **Not yet checked:** `--unlock-framerate`, the full map set.
 
 ## Phase 1 — native backend
 
