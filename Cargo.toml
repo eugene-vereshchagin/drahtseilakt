@@ -3,11 +3,11 @@
 
 [workspace]
 resolver = "3"
-members = ["crates/nmo", "crates/level"]
+members = ["crates/nmo", "crates/level", "crates/game"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 license = "GPL-3.0-only"
 repository = "https://github.com/eugene-vereshchagin/drahtseilakt"
 

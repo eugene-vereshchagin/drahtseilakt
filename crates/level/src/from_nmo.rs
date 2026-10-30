@@ -168,6 +168,7 @@ fn material(name: String, m: &scene::Material, textures: &HashMap<usize, usize>)
         alpha_cutoff: m.alpha_test.then(|| f32::from(m.alpha_ref) / 255.0),
         z_write: m.z_write,
         two_sided: m.two_sided,
+        unlit: false,
     }
 }
 

@@ -12,6 +12,7 @@ const MAX_NAME: usize = 4_096;
 /// Class ids of the objects a level is made of (Virtools CKCID values).
 pub mod class {
     pub const LEVEL: u32 = 21;
+    pub const DATA_ARRAY: u32 = 52;
     pub const GROUP: u32 = 23;
     pub const MATERIAL: u32 = 30;
     pub const TEXTURE: u32 = 31;

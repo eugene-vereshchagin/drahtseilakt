@@ -305,3 +305,68 @@ pub fn group(chunk: &Chunk) -> Result<Vec<usize>> {
     let refs = w.take(n)?;
     Ok(refs.iter().filter_map(|&r| reference(chunk, r)).collect())
 }
+
+/// A cell of a data array (a Virtools table such as `AllLevel`, which lists each level's sky and ball).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Cell {
+    Int(i32),
+    Float(f32),
+    String(Vec<u8>),
+    /// An object, or a parameter object holding the value (by index in the file).
+    Object(Option<usize>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DataArray {
+    /// Column names as stored.
+    pub columns: Vec<Vec<u8>>,
+    pub rows: Vec<Vec<Cell>>,
+}
+
+impl DataArray {
+    pub fn column(&self, name: &str) -> Option<usize> {
+        self.columns
+            .iter()
+            .position(|c| c.eq_ignore_ascii_case(name.as_bytes()))
+    }
+}
+
+const MAX_COLUMNS: usize = 1_024;
+
+pub fn data_array(chunk: &Chunk) -> Result<DataArray> {
+    let mut w = chunk.section(0x1000).ok_or(missing("data array columns"))?;
+    let n = w.u32()? as usize;
+    if n > MAX_COLUMNS {
+        return Err(malformed("column count"));
+    }
+    let mut columns = Vec::with_capacity(n);
+    let mut kinds = Vec::with_capacity(n);
+    for _ in 0..n {
+        columns.push(w.string()?);
+        let kind = w.u32()?;
+        if kind == 5 {
+            w.take(2)?; // parameter type GUID
+        }
+        kinds.push(kind);
+    }
+    let mut rows = Vec::new();
+    if let Some(mut w) = chunk.section(0x2000) {
+        let count = w.u32()? as usize;
+        if count > w.remaining() {
+            return Err(malformed("row count"));
+        }
+        for _ in 0..count {
+            let mut row = Vec::with_capacity(kinds.len());
+            for &kind in &kinds {
+                row.push(match kind {
+                    1 => Cell::Int(w.u32()? as i32),
+                    2 => Cell::Float(w.f32()?),
+                    3 => Cell::String(w.string()?),
+                    _ => Cell::Object(reference(chunk, w.u32()?)),
+                });
+            }
+            rows.push(row);
+        }
+    }
+    Ok(DataArray { columns, rows })
+}

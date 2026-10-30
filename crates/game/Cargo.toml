@@ -1,0 +1,25 @@
+[package]
+name = "drahtseilakt"
+version = "0.1.0"
+description = "The game: window, renderer, physics, rules and replays"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "drahtseilakt"
+path = "src/main.rs"
+
+[dependencies]
+level = { path = "../level" }
+nmo = { path = "../nmo" }
+wgpu = "=30.0.1"
+winit = "=0.30.13"
+glam = { version = "=0.34.1", features = ["bytemuck"] }
+bytemuck = { version = "1", features = ["derive"] }
+pollster = "0.4"
+image = { version = "=0.25.10", default-features = false, features = ["bmp", "tga", "png", "jpeg"] }
+
+[lints]
+workspace = true

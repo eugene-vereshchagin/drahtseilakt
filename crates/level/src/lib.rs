@@ -31,7 +31,7 @@ pub struct Part {
     pub indices: Vec<u32>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Blend {
     Zero,
     One,
@@ -59,6 +59,8 @@ pub struct Material {
     pub alpha_cutoff: Option<f32>,
     pub z_write: bool,
     pub two_sided: bool,
+    /// Drawn with its own colour only, without lighting (skies).
+    pub unlit: bool,
 }
 
 #[derive(Debug, Clone)]
