@@ -4,8 +4,12 @@
 
 mod bytes;
 mod checksum;
+pub mod chunk;
+pub mod document;
 pub mod error;
 pub mod file;
+pub mod scene;
 
+pub use document::{Document, Object, class};
 pub use error::{Error, Part, Result};
 pub use file::{File, Header, IncludedFile, read};

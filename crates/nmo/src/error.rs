@@ -37,6 +37,8 @@ pub enum Error {
     },
     /// A compressed part does not inflate to its declared size.
     Decompress { part: Part },
+    /// A structure inside a part does not fit its own declared shape.
+    Malformed { part: Part, what: &'static str },
 }
 
 impl fmt::Display for Error {
@@ -65,6 +67,7 @@ impl fmt::Display for Error {
                 write!(f, "{part:?}: {what} is {value}, above the limit of {limit}")
             }
             Error::Decompress { part } => write!(f, "{part:?}: compressed data is invalid"),
+            Error::Malformed { part, what } => write!(f, "{part:?}: malformed {what}"),
         }
     }
 }
