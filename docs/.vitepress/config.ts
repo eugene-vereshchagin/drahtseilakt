@@ -10,6 +10,41 @@ export default defineConfig({
   // The browser player is a static page in public/play/, not a Markdown page.
   ignoreDeadLinks: [/^\/play\//],
 
+  // English is the root locale; Russian mirrors the same paths under /ru/ (see CLAUDE.md).
+  locales: {
+    root: { label: "English", lang: "en" },
+    ru: {
+      label: "Русский",
+      lang: "ru",
+      link: "/ru/",
+      themeConfig: {
+        nav: [
+          { text: "План работ", link: "/ru/drahtseilakt/roadmap" },
+          { text: "Решения", link: "/ru/drahtseilakt/decisions" },
+          { text: "Документация (англ.)", link: "/guide/" },
+        ],
+        sidebar: {
+          "/ru/": [
+            {
+              text: "Drahtseilakt",
+              items: [
+                { text: "План работ", link: "/ru/drahtseilakt/roadmap" },
+                { text: "Решения", link: "/ru/drahtseilakt/decisions" },
+              ],
+            },
+          ],
+        },
+        outline: { level: [2, 3], label: "На этой странице" },
+        docFooter: { prev: "Назад", next: "Далее" },
+        lastUpdated: { text: "Обновлено" },
+        darkModeSwitchLabel: "Тема",
+        sidebarMenuLabel: "Меню",
+        returnToTopLabel: "Наверх",
+        langMenuLabel: "Язык",
+      },
+    },
+  },
+
   head: [
     ["link", { rel: "icon", href: "/favicon.png", type: "image/png" }],
     ["meta", { name: "theme-color", content: "#e8835a" }],
@@ -66,6 +101,13 @@ export default defineConfig({
         },
       ],
       "/": [
+        {
+          text: "Drahtseilakt",
+          items: [
+            { text: "Roadmap", link: "/drahtseilakt/roadmap" },
+            { text: "Decisions", link: "/drahtseilakt/decisions" },
+          ],
+        },
         {
           text: "Internals",
           items: [

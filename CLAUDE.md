@@ -50,6 +50,10 @@ The active profile for this project:
 - No game data in the repository, ever — not in tests, fixtures or examples (see `.gitignore`). Tests that need
   the game read it from `OPENBALLANCE_DATA`.
 - Docs are updated in the same change as the behaviour they describe.
+- **Docs exist in English and Russian.** English is primary; the Russian version mirrors the same path under
+  `docs/ru/` (e.g. `docs/drahtseilakt/roadmap.md` ↔ `docs/ru/drahtseilakt/roadmap.md`) and `README.ru.md`.
+  A change to one updates the other in the same commit. The site (VitePress, `docs/.vitepress/config.ts`)
+  has an `en` root locale and a `ru` locale; a new page gets its sidebar entry in both.
 
 ## Tests
 

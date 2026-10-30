@@ -1,5 +1,7 @@
 # Drahtseilakt
 
+**English** · [Русский](README.ru.md)
+
 *Drahtseilakt* (German, "tightrope act") is what the Germans call any balancing act where one step aside
 means a fall. Ballance — made in 2004 by Cyparade, a small German studio — is exactly that: a ball on a rail
 over an abyss. The name is our nod to the game and to the people who made it.

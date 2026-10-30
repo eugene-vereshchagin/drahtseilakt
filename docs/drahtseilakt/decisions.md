@@ -72,3 +72,9 @@ without the owner's explicit command.
 *Drahtseilakt* is German for a tightrope act, and figuratively for any balancing act where one step aside
 means a fall — which is what rolling a ball along a rail over an abyss is. German as a nod to Cyparade, the
 German studio that made Ballance.
+
+## Documentation in two languages
+
+Documentation is written in English and Russian. English is the primary version (it is the language of the
+code, comments and commits); the Russian one mirrors its structure under `docs/ru/` and in `README.ru.md`.
+Both change in the same change. The site is built from `docs/` with two locales.
