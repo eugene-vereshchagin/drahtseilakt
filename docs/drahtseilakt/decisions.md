@@ -104,3 +104,11 @@ are used is open until they have been tried; this constraint is not.
 
 Nothing is shown publicly — repository, site, videos — until all original levels (the twelve and level 13)
 are playable natively. Raw code is not shown. Going public is the owner's command, as with any release.
+
+## The game never goes online
+
+The finished game makes no network connections: nothing is downloaded at start or while playing — no fonts,
+shaders or other resources on demand, no update checks, no telemetry. Everything it needs ships with it (fonts
+included, with their licences) or comes from the player's own copy of Ballance. Community maps and mods are
+files the player puts in place; the game does not fetch them. Build-time dependencies are a separate matter:
+the build may download them, pinned and checked against a checksum, and must also work offline from local copies.

@@ -52,6 +52,8 @@ The active profile for this project:
   from `OPENBALLANCE_MODS` (see `docs/drahtseilakt/community-maps.md`). Map files never enter the repository.
 - **Mods are never executed.** BML mods are Windows DLLs: a source of feature requirements, read only, never
   loaded, never run — not even under Wine.
+- **The game never goes online.** No network code in the game: fonts and every other resource ship with it or
+  come from the player's copy. Only the build may download, pinned and checksummed, and it must also build offline.
 - Docs are updated in the same change as the behaviour they describe.
 - **Docs exist in English, Russian and German.** English is primary; every other language mirrors the same
   path under `docs/<lang>/` (e.g. `docs/drahtseilakt/roadmap.md` ↔ `docs/ru/drahtseilakt/roadmap.md` ↔

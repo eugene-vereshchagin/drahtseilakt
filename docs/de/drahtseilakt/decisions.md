@@ -102,3 +102,12 @@ Welche Glättungstechniken eingesetzt werden, ist offen, bis sie ausprobiert sin
 Nichts wird öffentlich gezeigt — weder Repository noch Website noch Videos —, bis alle Originallevel (die zwölf
 und Level 13) nativ spielbar sind. Roher Code wird nicht gezeigt. Veröffentlicht wird auf Anweisung des
 Inhabers, wie jedes Release.
+
+## Das Spiel geht nie online
+
+Das fertige Spiel baut keine Netzwerkverbindungen auf: Weder beim Start noch während des Spiels wird etwas
+heruntergeladen — keine Schriften, Shader oder andere Ressourcen bei Bedarf, keine Update-Prüfung, keine
+Telemetrie. Alles Nötige wird mit dem Spiel ausgeliefert (Schriften samt Lizenzen) oder stammt aus der eigenen
+Ballance-Kopie des Spielers. Community-Karten und Mods legt der Spieler selbst ab; das Spiel lädt sie nicht
+herunter. Build-Abhängigkeiten sind eine andere Frage: Der Build darf sie herunterladen, in festen Versionen und
+mit Prüfsummenabgleich, muss aber auch offline aus lokalen Kopien funktionieren.
