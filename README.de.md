@@ -13,7 +13,8 @@ des Forks ist ein vollwertiges natives Spiel: ein echtes Fenster unter Linux, Wi
 und jedes Seitenverhältnis bis 8K, eine wirklich runde Kugel, Level 13 und ein Menü für Community-Karten — und
 später ein offenes, dokumentiertes Levelformat.
 
-Stand: in Arbeit, keines der eigenen Ziele des Forks ist bisher erreicht. Siehe den
+Stand: in Arbeit, keines der eigenen Ziele des Forks ist bisher erreicht. Warum das Spiel das überhaupt
+brauchte: [Geschichte](docs/de/drahtseilakt/history.md). Wie es weitergeht: der
 [Fahrplan](docs/de/drahtseilakt/roadmap.md) und die [Entscheidungen](docs/de/drahtseilakt/decisions.md) dahinter.
 
 ## Wie es funktioniert

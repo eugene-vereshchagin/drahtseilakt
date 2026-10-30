@@ -12,8 +12,9 @@ on a new runtime, with a port of its Ipion physics engine. This fork aims at a p
 window on Linux, Windows and macOS, any resolution and aspect ratio up to 8K, a really round ball, level 13
 and a menu for community maps — and later an open, documented level format.
 
-Status: work in progress, nothing of the fork's own goals is done yet. See the
-[roadmap](docs/drahtseilakt/roadmap.md) and the [decisions](docs/drahtseilakt/decisions.md) behind it.
+Status: work in progress, nothing of the fork's own goals is done yet. Why the game needed this at all:
+[history](docs/drahtseilakt/history.md). What comes next: the [roadmap](docs/drahtseilakt/roadmap.md) and the
+[decisions](docs/drahtseilakt/decisions.md) behind it.
 
 ## How it works
 
