@@ -34,12 +34,26 @@ pub enum BallKind {
 }
 
 impl BallKind {
-    /// Mass, push acceleration, linear damping per second, bounce, rolling friction.
-    fn params(self) -> (f32, f32, f32, f32) {
+    fn params(self) -> Params {
         match self {
-            BallKind::Wood => (14.0, 0.35, 0.25, 0.6),
-            BallKind::Stone => (10.0, 0.30, 0.10, 0.8),
-            BallKind::Paper => (24.0, 1.80, 0.40, 0.4),
+            BallKind::Wood => Params {
+                push: 22.0,
+                damping: 0.25,
+                bounce: 0.6,
+                roll: 0.8,
+            },
+            BallKind::Stone => Params {
+                push: 18.0,
+                damping: 0.10,
+                bounce: 0.8,
+                roll: 0.5,
+            },
+            BallKind::Paper => Params {
+                push: 30.0,
+                damping: 0.40,
+                bounce: 0.4,
+                roll: 1.2,
+            },
         }
     }
 
@@ -55,6 +69,16 @@ impl BallKind {
             None
         }
     }
+}
+
+/// Per-kind tuning, in metres and seconds: push acceleration, linear damping per second, bounce restitution,
+/// rolling resistance per second against the surface.
+#[derive(Clone, Copy)]
+struct Params {
+    push: f32,
+    damping: f32,
+    bounce: f32,
+    roll: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -265,7 +289,12 @@ impl Sim {
         }
         let push = push.normalize_or_zero();
 
-        let (accel, damping, bounce, roll) = self.ball.kind.params();
+        let Params {
+            push: accel,
+            damping,
+            bounce,
+            roll,
+        } = self.ball.kind.params();
         let dt = TICK / SUBSTEPS as f32;
         for _ in 0..SUBSTEPS {
             self.ball.velocity += push * accel * dt;
