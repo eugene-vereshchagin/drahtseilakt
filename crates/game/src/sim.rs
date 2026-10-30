@@ -454,3 +454,136 @@ fn collision_triangles(level: &Level) -> Vec<Triangle> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use level::{Group, Level, Material, Mesh, Object, Part};
+
+    /// A flat 200×200 floor at y = 0 in Phys_Floors, a start at the origin, a reset point a ball's radius up.
+    fn flat_level() -> Level {
+        let s = 100.0;
+        let floor = Mesh {
+            name: "floor".into(),
+            positions: vec![[-s, 0.0, -s], [s, 0.0, -s], [s, 0.0, s], [-s, 0.0, s]],
+            normals: vec![[0.0, 1.0, 0.0]; 4],
+            uvs: vec![[0.0; 2]; 4],
+            parts: vec![Part {
+                material: Some(0),
+                indices: vec![0, 2, 1, 0, 3, 2],
+            }],
+        };
+        let at = |x: f32, y: f32, z: f32| {
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [x, y, z, 1.0],
+            ]
+        };
+        let object = |name: &str, mesh: Option<usize>, m| Object {
+            name: name.into(),
+            matrix: m,
+            mesh,
+            visible: true,
+        };
+        Level {
+            meshes: vec![floor],
+            materials: vec![Material {
+                name: "m".into(),
+                diffuse: [1.0; 4],
+                ambient: [0.0; 3],
+                emissive: [0.0; 3],
+                texture: None,
+                blend: None,
+                alpha_cutoff: None,
+                z_write: true,
+                two_sided: false,
+                unlit: false,
+            }],
+            textures: vec![],
+            objects: vec![
+                object("floor", Some(0), at(0.0, 0.0, 0.0)),
+                object("PS_FourFlames_01", None, at(0.0, 0.0, 0.0)),
+                object("PR_Resetpoint_01", None, at(0.0, BALL_RADIUS, 0.0)),
+            ],
+            groups: vec![
+                Group {
+                    name: "Phys_Floors".into(),
+                    members: vec![0],
+                },
+                Group {
+                    name: "PS_Levelstart".into(),
+                    members: vec![1],
+                },
+                Group {
+                    name: "PR_Resetpoints".into(),
+                    members: vec![2],
+                },
+            ],
+            sky: None,
+            start_ball: None,
+        }
+    }
+
+    #[test]
+    fn forward_rolls_the_ball_forward_on_the_floor() {
+        let level = flat_level();
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        let forward = sim.camera.forward();
+        for _ in 0..120 {
+            sim.step(input::UP);
+        }
+        let moved = sim.ball.position - Vec3::new(0.0, BALL_RADIUS, 0.0);
+        assert!(
+            moved.dot(forward) > 5.0,
+            "ball moved {moved:?}, forward {forward:?}"
+        );
+        assert!(
+            (sim.ball.position.y - BALL_RADIUS).abs() < 0.05,
+            "ball left the floor: {:?}",
+            sim.ball.position
+        );
+        assert!(sim.ball.on_ground);
+    }
+
+    #[test]
+    fn same_input_same_run() {
+        let level = flat_level();
+        let run = || {
+            let mut sim = Sim::new(&level, BallKind::Stone);
+            for t in 0..600u32 {
+                let input = match t / 60 % 4 {
+                    0 => input::UP,
+                    1 => input::UP | input::RIGHT,
+                    2 => input::SHIFT | input::LEFT,
+                    _ => input::DOWN,
+                };
+                sim.step(input);
+            }
+            (
+                sim.ball.position,
+                sim.ball.velocity,
+                sim.camera.yaw,
+                sim.tick,
+            )
+        };
+        assert_eq!(run(), run());
+    }
+
+    #[test]
+    fn falling_off_costs_a_life_and_respawns() {
+        let level = flat_level();
+        let mut sim = Sim::new(&level, BallKind::Paper);
+        sim.ball.position = Vec3::new(500.0, 10.0, 0.0);
+        for _ in 0..600 {
+            sim.step(0);
+            if sim.lives < 3 {
+                break;
+            }
+        }
+        assert_eq!(sim.lives, 2);
+        assert!(sim.events.iter().any(|e| e.1 == Event::Died));
+        assert!(sim.ball.position.distance(Vec3::new(0.0, BALL_RADIUS, 0.0)) < 1.0);
+    }
+}
