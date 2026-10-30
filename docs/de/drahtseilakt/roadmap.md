@@ -60,6 +60,28 @@ spielt, ohne gasm.
 Fertig, wenn: der native Build alle zwölf Level unter Linux, Windows und macOS in Originalgeschwindigkeit
 spielt, auf einem 60-Hz- wie auf einem 144-Hz-Bildschirm, und der gasm-Build weiterhin baut und läuft.
 
+## Phase 1b — aufgezeichnete Durchläufe (Replays)
+
+Ziel: Niemand muss Level von Hand nachspielen, um zu prüfen, dass eine Änderung nichts kaputt gemacht hat.
+
+- Mit dem festen 60-Hz-Takt ist das Spiel deterministisch: Dieselbe Eingabe ab demselben Takt ergibt dieselbe
+  Bahn. Ein **Replay** ist ein Protokoll der Eingabe pro Takt, aus echtem Spielen aufgezeichnet, in einem
+  dokumentierten Textformat (versioniert; das Level ist darin per Hash seiner Datei benannt, sodass ein Replay
+  nie mit falschen Daten läuft).
+- Wiedergabe ohne Fenster in voller Geschwindigkeit (`run_test` aus dem Upstream steuert das Spiel bereits ohne
+  Fenster mit geskripteter Eingabe). Ein Replay prüft: Checkpoints in den erwarteten Takten erreicht, das Ziel,
+  die Punkte.
+- Gleitkommaergebnisse können sich zwischen CPU-Architekturen und Compilern unterscheiden, und kleine
+  Abweichungen wachsen über Hunderte Takte. Replays werden an Schlüsselpunkten mit Toleranz geprüft; für exakte
+  Übereinstimmung hat jede Plattform eine eigene Referenz.
+- Woher Replays kommen: Der Inhaber spielt jedes Level einmal; das Originalspiel unter Wine (Phase 5);
+  Speedrun-Aufzeichnungen, falls sich die Formate der Community umwandeln lassen.
+- Replays enthalten nur unsere Eingabe und keine Spieldaten, daher liegen sie im Repository (`tests/replays/`)
+  und laufen in der CI.
+
+Fertig, wenn: ein Replay jedes der zwölf Level aufgezeichnet ist, ohne Fenster abgespielt wird und fehlschlägt,
+wenn die Physik absichtlich verändert wird.
+
 ## Phase 2 — jede Auflösung und jedes Seitenverhältnis, bis 8K
 
 - 3D: Die Projektion ist in `src/render/render.c` fest auf 4:3 verdrahtet (die drei Stellen mit
@@ -107,8 +129,29 @@ Hauch eingesunken oder angehoben) nicht auffällt.
 
 Fertig, wenn: die gewählten Techniken umgesetzt sind; die drei Kugeln in 8K und aus nächster Nähe vollkommen
 rund sind und ansonsten wie die Originale aussehen; Schienen und andere gekrümmte Teile bei den Auflösungen
-aus Phase 2 keine Facetten mehr zeigen; die Replays aus Phase 5 dieselben Bahnen wie zuvor ergeben (nichts
+aus Phase 2 keine Facetten mehr zeigen; die Replays (Phase 1b) dieselben Bahnen wie zuvor ergeben (nichts
 Physikalisches hat sich bewegt).
+
+## Phase 3b — Replays als Video gerendert
+
+Ziel: ein 8K-Video eines perfekten Durchlaufs des neu aussehenden Ballance für einen YouTube-Kanal.
+
+- Ein Replay offline Bild für Bild rendern, in beliebiger Auflösung (bis 7680×4320) und mit fester Bildrate,
+  unabhängig von der Echtzeit — auch ein langsamer Rechner liefert ein vollkommen flüssiges 8K-Video. Der Ton
+  wird aus demselben deterministischen Lauf gerendert. Die Bilder gehen als Strom an einen Encoder (z. B.
+  ffmpeg), nicht als Dateien auf die Platte.
+- Kameras: zuerst die Spielkamera; eine filmische Kamera (weiche Verfolgung, Totalen eines Levels) später, als
+  Daten im Replay oder daneben, nicht als Code pro Level.
+- „Perfekte“ Durchläufe: zuerst die besten menschlichen (Inhaber, Speedrunner). Eine automatische Suche nach
+  schneller Eingabe — ein TAS-artiger Optimierer, der Eingabefolgen durchprobiert, bis die Kugel den nächsten
+  Checkpoint früher erreicht — ist ein späteres Zusatzziel: Er braucht keinen Menschen, ist aber ein eigenes
+  Forschungsprojekt.
+- Hochladen ist Veröffentlichen: Nichts geht ohne Anweisung des Inhabers auf YouTube. Material aus den
+  Original-Assets ist Inhalt des Rechteinhabers; Videos einer Veröffentlichung mit eigenen Texturen (siehe
+  decisions.md) werfen diese Frage nicht auf.
+
+Fertig, wenn: das Replay eines Levels zu einem 8K-Video mit Ton gerendert wird, das der Inhaber veröffentlichen
+möchte.
 
 ## Phase 4 — Level 13 und Community-Karten
 

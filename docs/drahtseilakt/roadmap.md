@@ -55,6 +55,25 @@ Goal: a normal native executable (Linux, Windows, macOS) that opens a window and
 Done when: the native build plays all twelve levels on Linux, Windows and macOS at the original speed on a
 60 Hz and on a 144 Hz display, and the gasm build still builds and runs.
 
+## Phase 1b — recorded replays
+
+Goal: nobody replays levels by hand to check that a change broke nothing.
+
+- With the fixed 60 Hz step the game is deterministic: the same input from the same tick gives the same
+  trajectory. A **replay** is a log of input per tick, recorded from live play, in a documented text format
+  (versioned; it names the level by a hash of its file, so a replay never runs against the wrong data).
+- Headless playback at full speed (upstream's `run_test` already drives the game headless with scripted
+  input). A replay checks: checkpoints reached on the expected ticks, the finish, the score.
+- Floating-point results can differ between CPU architectures and compilers, and small differences grow over
+  hundreds of ticks. Replays are checked at key points with a tolerance; exact matching keeps one reference
+  per platform.
+- Where replays come from: the owner plays each level once; the original game under Wine (phase 5); speedrun
+  recordings, if the community's formats can be converted.
+- Replays contain only our input, no game data, so they live in the repository (`tests/replays/`) and run in CI.
+
+Done when: a replay of each of the twelve levels is recorded, plays back headless, and fails when the physics
+is deliberately changed.
+
 ## Phase 2 — any resolution and aspect ratio, up to 8K
 
 - 3D: the projection is hard-wired to 4:3 in `src/render/render.c` (the three `4.0f / 3.0f` call sites:
@@ -97,7 +116,25 @@ noticeable.
 
 Done when: the chosen techniques are in; the three balls are perfectly round at 8K and close up and otherwise
 look like the originals; rails and other curved parts no longer show facets at the resolutions of phase 2;
-replays of phase 5 give the same trajectories as before (nothing physical moved).
+the replays (phase 1b) give the same trajectories as before (nothing physical moved).
+
+## Phase 3b — replays rendered to video
+
+Goal: an 8K video of a perfect run of the new-looking Ballance, for a YouTube channel.
+
+- Render a replay offline, frame by frame, at any resolution (up to 7680×4320) and a fixed frame rate,
+  independent of real time — a slow machine still produces a perfectly smooth 8K video. Audio is rendered from
+  the same deterministic run. Frames go to an encoder (e.g. ffmpeg) as a stream, not as files on disk.
+- Cameras: the game camera first; a cinematic camera (smooth follow, wide shots of a level) later, as data
+  in the replay or beside it, not as code per level.
+- "Perfect" runs: the best human runs (owner, speedrunners) first. An automatic search for fast input — a
+  TAS-style optimiser that tries input sequences until the ball reaches the next checkpoint sooner — is a
+  later stretch goal; it needs no human, but it is a research project of its own.
+- Uploading is publishing: nothing goes to YouTube without the owner's command. Footage made from the original
+  assets is the rights holder's content; videos of a release with our own textures (see decisions.md) carry
+  no such question.
+
+Done when: one level's replay renders to an 8K video with sound that the owner is happy to publish.
 
 ## Phase 4 — level 13 and community maps
 
