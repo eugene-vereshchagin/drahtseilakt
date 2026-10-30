@@ -4,7 +4,7 @@ Was dieser Fork vorhat, in welcher Reihenfolge und woran man erkennt, dass ein S
 für die Entscheidungen stehen in [decisions.md](decisions.md). Wer die Arbeit übernimmt, fängt hier an.
 
 Stand 30.10.2026: Der Fork ist das OpenBallance 0.1.3 des Upstreams plus Projektregeln (`CLAUDE.md`) und diese
-Dokumente. Am Engine-Code wurde noch nichts geändert; der nächste Schritt ist Phase 0.
+Dokumente. Am Engine-Code wurde noch nichts geändert; Phase 0 läuft.
 
 ## Phase 0 — Ballanced prüfen, bevor ein Backend geschrieben wird
 
@@ -32,6 +32,29 @@ Dann entscheiden und die Entscheidung in decisions.md festhalten:
 - **umziehen** mit dem Fork auf Ballanced — der Plan bleibt, Phase 1 schrumpft auf das, was dort fehlt;
 - **übernehmen**: bei OpenBallance bleiben und Teile von Ballanced nehmen (Building Blocks für Karten, den
   SDL3-Host).
+
+### Bisherige Ergebnisse (30.10.2026)
+
+Rechner des Inhabers: Debian 13, GCC 14.2, CMake 3.31, Ninja, NVIDIA RTX 3060 (Treiber 550), KDE unter X11.
+Ballanced: Branch `sdl`, Commit `ececf94`, Preset `linux-x64-runtime`.
+
+- **SDL3.** Debian 13 liefert 3.2.10; Ballanced verlangt 3.4.8 oder neuer. 3.4.8 aus dem Release-Archiv gebaut,
+  GPG-Signatur (Sam Lantinga) geprüft, sha256 `e9fff7467fb60f037e6708da18b25560649e4c63edc2a69bb871b960d9cbfbba`.
+- **Build.** Konfiguration und Build sind sauber; eine GCC-Warnung (`-Wfree-nonheap-object` in `XClassArray.h`,
+  in `CKSkin.cpp` eingebettet), vermutlich ein Fehlalarm. Das Stage-Verzeichnis hat 25 MB, mit den Spieldaten
+  über `BALLANCE_ASSETS_ROOT` 162 MB.
+- **Netzwerk.** Die Laufzeit enthält keinen Netzwerkcode. Der Build lädt die Noto-Schriften aus den
+  `main`-Branches der notofonts-Repositories: per sha256 geprüft, aber nicht auf einen Commit festgelegt, sodass
+  ein Schrift-Update upstream den Build bricht. `VXMATH_FONT_DIR` baut offline aus lokalen Kopien.
+- **Start.** SDL_GPU auf Vulkan. Hauptmenü, Level 1 geschafft; die Kugel fühlt sich wie im Original an (Urteil
+  des Inhabers). Das Fenster wurde im Betrieb von 1280×720 auf 3840×2069 vergrößert, ohne Probleme; das Bild
+  bleibt 4:3 mit Balken (die Breitbild-Option wurde noch nicht probiert). Zwei Sitzungen, 1,5 und 7 Minuten,
+  endeten sauber, ohne Einträge im Log.
+- **Fehler.** Die Klammer des Lebenszählers im HUD wird weit links gezeichnet und wandert während des Spiels.
+  Upstream nicht gemeldet.
+- `Player --help` ist keine Option: Es wird ignoriert, und das Spiel startet.
+- **Noch nicht geprüft:** `--unlock-widescreen`, `--unlock-high-resolution`, `--unlock-framerate`, spätere Level,
+  Community-Karten, ein Clang-Build, das Test-Preset.
 
 ## Phase 1 — nativer Backend
 

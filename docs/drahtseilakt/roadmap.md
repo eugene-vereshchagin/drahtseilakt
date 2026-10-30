@@ -4,7 +4,7 @@ What this fork is going to do, in order, and how we know each step is done. The 
 are in [decisions.md](decisions.md). Start here if you are picking the work up.
 
 State on 2026-10-30: the fork is the upstream OpenBallance 0.1.3 plus project rules (`CLAUDE.md`) and these
-documents. No engine code has been changed yet; the next step is phase 0.
+documents. No engine code has been changed yet; phase 0 is under way.
 
 ## Phase 0 — evaluate Ballanced before writing a backend
 
@@ -29,6 +29,29 @@ Then decide, and record the decision in decisions.md:
 - **stay** on OpenBallance and continue with phase 1 as written;
 - **move** the fork onto Ballanced — the plan stays, phase 1 shrinks to what is missing there;
 - **borrow**: stay on OpenBallance and take parts of Ballanced (Building Blocks for maps, the SDL3 host).
+
+### Results so far (2026-10-30)
+
+Owner's machine: Debian 13, GCC 14.2, CMake 3.31, Ninja, NVIDIA RTX 3060 (driver 550), KDE on X11. Ballanced
+branch `sdl` at commit `ececf94`, preset `linux-x64-runtime`.
+
+- **SDL3.** Debian 13 ships 3.2.10; Ballanced requires 3.4.8 or later. Built 3.4.8 from the release tarball,
+  GPG signature (Sam Lantinga) verified, sha256 `e9fff7467fb60f037e6708da18b25560649e4c63edc2a69bb871b960d9cbfbba`.
+- **Build.** Configure and build are clean; one GCC warning (`-Wfree-nonheap-object` in `XClassArray.h`,
+  inlined into `CKSkin.cpp`), probably a false positive. The stage is 25 MB, 162 MB with the game data copied
+  in through `BALLANCE_ASSETS_ROOT`.
+- **Network.** The runtime has no network code. The build downloads the Noto fonts from the `main` branches
+  of the notofonts repositories: checked by sha256, but not pinned to a commit, so an upstream font update
+  breaks the build. `VXMATH_FONT_DIR` builds offline from local copies.
+- **Running.** SDL_GPU on Vulkan. Main menu, level 1 finished; the ball feels like the original (owner's
+  judgement). The window was resized live from 1280×720 to 3840×2069 without trouble; the picture stays 4:3
+  with bars (the widescreen option has not been tried yet). Two sessions, 1.5 and 7 minutes, ended cleanly with
+  nothing in the log.
+- **Bug.** The bracket of the life counter in the HUD is drawn far to the left and drifts during play. Not
+  reported upstream.
+- `Player --help` is not an option: it is ignored and the game starts.
+- **Not yet checked:** `--unlock-widescreen`, `--unlock-high-resolution`, `--unlock-framerate`, later levels,
+  community maps, a Clang build, the tests preset.
 
 ## Phase 1 — native backend
 
