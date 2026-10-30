@@ -42,3 +42,8 @@ __pycache__/
 *.swp
 .vscode/
 .idea/
+
+# Original levels kept as a private backup (decisions.md, "The private repository is a backup").
+# Never carried into the public repository.
+!/levels/**/*.nmo
+!/levels/**/*.NMO
