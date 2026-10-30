@@ -50,10 +50,12 @@ The active profile for this project:
 - No game data in the repository, ever — not in tests, fixtures or examples (see `.gitignore`). Tests that need
   the game read it from `OPENBALLANCE_DATA`.
 - Docs are updated in the same change as the behaviour they describe.
-- **Docs exist in English and Russian.** English is primary; the Russian version mirrors the same path under
-  `docs/ru/` (e.g. `docs/drahtseilakt/roadmap.md` ↔ `docs/ru/drahtseilakt/roadmap.md`) and `README.ru.md`.
-  A change to one updates the other in the same commit. The site (VitePress, `docs/.vitepress/config.ts`)
-  has an `en` root locale and a `ru` locale; a new page gets its sidebar entry in both.
+- **Docs exist in English, Russian and German.** English is primary; every other language mirrors the same
+  path under `docs/<lang>/` (e.g. `docs/drahtseilakt/roadmap.md` ↔ `docs/ru/drahtseilakt/roadmap.md` ↔
+  `docs/de/drahtseilakt/roadmap.md`) and has `README.<lang>.md`. A change to one updates all of them in the
+  same commit. The site (VitePress, `docs/.vitepress/config.ts`) has an English root locale and one locale
+  per other language; a new page gets its sidebar entry in every locale. Adding a language means: a
+  `docs/<lang>/` mirror, a `README.<lang>.md`, a locale in the config, the switcher line in every README.
 
 ## Tests
 

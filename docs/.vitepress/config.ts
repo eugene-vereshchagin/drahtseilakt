@@ -10,7 +10,7 @@ export default defineConfig({
   // The browser player is a static page in public/play/, not a Markdown page.
   ignoreDeadLinks: [/^\/play\//],
 
-  // English is the root locale; Russian mirrors the same paths under /ru/ (see CLAUDE.md).
+  // English is the root locale; every other language mirrors the same paths under /<lang>/ (see CLAUDE.md).
   locales: {
     root: { label: "English", lang: "en" },
     ru: {
@@ -41,6 +41,36 @@ export default defineConfig({
         sidebarMenuLabel: "Меню",
         returnToTopLabel: "Наверх",
         langMenuLabel: "Язык",
+      },
+    },
+    de: {
+      label: "Deutsch",
+      lang: "de",
+      link: "/de/",
+      themeConfig: {
+        nav: [
+          { text: "Fahrplan", link: "/de/drahtseilakt/roadmap" },
+          { text: "Entscheidungen", link: "/de/drahtseilakt/decisions" },
+          { text: "Dokumentation (engl.)", link: "/guide/" },
+        ],
+        sidebar: {
+          "/de/": [
+            {
+              text: "Drahtseilakt",
+              items: [
+                { text: "Fahrplan", link: "/de/drahtseilakt/roadmap" },
+                { text: "Entscheidungen", link: "/de/drahtseilakt/decisions" },
+              ],
+            },
+          ],
+        },
+        outline: { level: [2, 3], label: "Auf dieser Seite" },
+        docFooter: { prev: "Zurück", next: "Weiter" },
+        lastUpdated: { text: "Aktualisiert" },
+        darkModeSwitchLabel: "Darstellung",
+        sidebarMenuLabel: "Menü",
+        returnToTopLabel: "Nach oben",
+        langMenuLabel: "Sprache",
       },
     },
   },

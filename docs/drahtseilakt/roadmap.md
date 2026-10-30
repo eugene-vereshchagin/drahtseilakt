@@ -109,6 +109,6 @@ The upstream port has not been compared numerically with the original game (`doc
   no hardening flags in CMake; two `strcpy` of constants in `src/app.c`.
 - Data-free tests run everywhere (unit, synthetic `.nmo`, fuzzing, sanitizers); game-data tests run locally
   against `OPENBALLANCE_DATA`.
-- Documentation in two languages (see `CLAUDE.md`). Upstream's documentation (user guide, internals) exists
-  only in English for now; before the official site goes live it needs a Russian translation, and the site
-  has to be renamed from OpenBallance to Drahtseilakt.
+- Documentation in three languages (see `CLAUDE.md`). Upstream's documentation (user guide, internals)
+  exists only in English for now; before the official site goes live it needs Russian and German
+  translations, and the site has to be renamed from OpenBallance to Drahtseilakt.
