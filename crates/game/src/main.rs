@@ -33,6 +33,7 @@ usage: drahtseilakt [options]
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
   --size WxH          window or screenshot size (default 1600x900)
+  --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
 keys: arrows roll the ball (relative to the camera), Shift+Left/Right turn the camera,
       Space lifts the camera, R restarts, F11 full screen, Esc quits";
@@ -48,6 +49,7 @@ pub struct Options {
     pub ticks: Option<u64>,
     pub trace: Option<u64>,
     pub size: (u32, u32),
+    pub look: Option<[f32; 6]>,
 }
 
 fn parse_args() -> Result<Options, String> {
@@ -62,8 +64,15 @@ fn parse_args() -> Result<Options, String> {
         ticks: None,
         trace: None,
         size: (1600, 900),
+        look: None,
     };
-    let mut args = std::env::args().skip(1);
+    // `--name=value` is the same as `--name value` (handy for values that start with a minus).
+    let mut args = std::env::args()
+        .skip(1)
+        .flat_map(|a| match a.split_once('=') {
+            Some((k, v)) if k.starts_with("--") => vec![k.to_owned(), v.to_owned()],
+            _ => vec![a],
+        });
     while let Some(a) = args.next() {
         let mut value = || args.next().ok_or_else(|| format!("{a} needs a value"));
         match a.as_str() {
@@ -97,6 +106,16 @@ fn parse_args() -> Result<Options, String> {
                         .parse()
                         .map_err(|_| "--trace needs a number".to_owned())?,
                 )
+            }
+            "--look" => {
+                let v: Vec<f32> = value()?
+                    .split(',')
+                    .filter_map(|s| s.trim().parse().ok())
+                    .collect();
+                let a: [f32; 6] = v
+                    .try_into()
+                    .map_err(|_| "--look needs six numbers".to_owned())?;
+                o.look = Some(a);
             }
             "--size" => {
                 let v = value()?;

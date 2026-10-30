@@ -6,7 +6,6 @@ use crate::sim::{BallKind, Sim};
 use glam::{Mat4, Quat, Vec3};
 use level::Level;
 
-
 pub const LEVEL_MODEL: usize = 0;
 pub const BALLS_MODEL: usize = 1;
 pub const SKY_MODEL: usize = 2;
@@ -91,7 +90,10 @@ pub struct Modules {
 pub const FIRST_MODULE_MODEL: usize = 3;
 
 fn has_material(level: &Level, mesh: usize) -> bool {
-    level.meshes.get(mesh).is_some_and(|m| m.parts.iter().any(|p| p.material.is_some()))
+    level
+        .meshes
+        .get(mesh)
+        .is_some_and(|m| m.parts.iter().any(|p| p.material.is_some()))
 }
 
 /// A placeholder's module: its object name without the trailing `_NN` (`P_Box_03` → `P_Box`).
@@ -105,7 +107,8 @@ fn module_name(object: &str) -> &str {
 pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>, Modules) {
     let mut out = Vec::new();
     let mut modules = Modules { models: Vec::new() };
-    let mut loaded: std::collections::HashMap<String, Option<usize>> = std::collections::HashMap::new();
+    let mut loaded: std::collections::HashMap<String, Option<usize>> =
+        std::collections::HashMap::new();
     for (i, o) in level.objects.iter().enumerate() {
         let Some(mesh) = o.mesh else { continue };
         if !o.visible {
@@ -113,12 +116,29 @@ pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>,
         }
         let matrix = Mat4::from_cols_array_2d(&o.matrix);
         if has_material(level, mesh) {
-            out.push(Placement { model: LEVEL_MODEL, mesh, matrix, marker: None, object: i });
+            out.push(Placement {
+                model: LEVEL_MODEL,
+                mesh,
+                matrix,
+                marker: None,
+                object: i,
+            });
             continue;
         }
         // A mesh without any material is an editor stand-in: the original replaces it with its module.
-        if let Some(color) = level.groups_of(i).find_map(|g| MARKERS.iter().find(|m| m.0.eq_ignore_ascii_case(g)).map(|m| m.1)) {
-            out.push(Placement { model: LEVEL_MODEL, mesh, matrix, marker: Some(color), object: i });
+        if let Some(color) = level.groups_of(i).find_map(|g| {
+            MARKERS
+                .iter()
+                .find(|m| m.0.eq_ignore_ascii_case(g))
+                .map(|m| m.1)
+        }) {
+            out.push(Placement {
+                model: LEVEL_MODEL,
+                mesh,
+                matrix,
+                marker: Some(color),
+                object: i,
+            });
             continue;
         }
         let name = module_name(&o.name).to_owned();
@@ -129,10 +149,14 @@ pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>,
             Some(modules.models.len() - 1)
         });
         let Some(index) = index else { continue };
-        let Some(module) = modules.models.get(index) else { continue };
+        let Some(module) = modules.models.get(index) else {
+            continue;
+        };
         // Every textured mesh of the module: the files keep them hidden and the original's scripts show them.
         for mo in &module.objects {
-            let Some(mm) = mo.mesh.filter(|&m| has_material(module, m)) else { continue };
+            let Some(mm) = mo.mesh.filter(|&m| has_material(module, m)) else {
+                continue;
+            };
             out.push(Placement {
                 model: FIRST_MODULE_MODEL + index,
                 mesh: mm,
@@ -145,14 +169,29 @@ pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>,
     (out, modules)
 }
 
-pub fn instances(placements: &[Placement], taken: &[usize], balls: &BallMeshes, s: &Snapshot) -> Vec<Instance> {
+pub fn instances(
+    placements: &[Placement],
+    taken: &[usize],
+    balls: &BallMeshes,
+    s: &Snapshot,
+) -> Vec<Instance> {
     let mut out: Vec<Instance> = placements
         .iter()
         .filter(|p| !taken.contains(&p.object))
-        .map(|p| Instance { model: p.model, mesh: p.mesh, matrix: p.matrix, marker: p.marker })
+        .map(|p| Instance {
+            model: p.model,
+            mesh: p.mesh,
+            matrix: p.matrix,
+            marker: p.marker,
+        })
         .collect();
     for mesh in 0..crate::sky::FACE_COUNT {
-        out.push(Instance { model: SKY_MODEL, mesh, matrix: Mat4::from_translation(s.eye), marker: None });
+        out.push(Instance {
+            model: SKY_MODEL,
+            mesh,
+            matrix: Mat4::from_translation(s.eye),
+            marker: None,
+        });
     }
     let mesh = match s.kind {
         BallKind::Wood => balls.wood,

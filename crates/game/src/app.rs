@@ -320,7 +320,11 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         prev = Snapshot::of(&game.sim);
         game.tick(0);
     }
-    let snap = Snapshot::lerp(&prev, &Snapshot::of(&game.sim), 1.0);
+    let mut snap = Snapshot::lerp(&prev, &Snapshot::of(&game.sim), 1.0);
+    if let Some([x, y, z, tx, ty, tz]) = o.look {
+        snap.eye = glam::Vec3::new(x, y, z);
+        snap.target = glam::Vec3::new(tx, ty, tz);
+    }
     let (_, device, queue) = pollster::block_on(device(None))?;
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = Renderer::new(device, queue, format);
