@@ -1,34 +1,29 @@
-# OpenBallance
+# Drahtseilakt
 
-A faithful reimplementation of **Ballance** (Cyparade / Atari, 2004), running the original game's own
-Virtools scripts on a new runtime, with a port of its Ipion physics engine. It uses the data from your own
-copy of the game and runs on [gasm](https://gasm.emdzej.pl): natively on macOS, Linux and Windows, and in
-the browser.
+*Drahtseilakt* (German, "tightrope act") is what the Germans call any balancing act where one step aside
+means a fall. Ballance — made in 2004 by Cyparade, a small German studio — is exactly that: a ball on a rail
+over an abyss. The name is our nod to the game and to the people who made it.
 
-**Website, docs and the browser player: https://openballance.emdzej.pl**
+Drahtseilakt is a fork of [OpenBallance](https://github.com/emdzej/openballance) by emdzej, a faithful
+reimplementation of **Ballance** (Cyparade / Atari, 2004) that runs the original game's own Virtools scripts
+on a new runtime, with a port of its Ipion physics engine. This fork aims at a proper native game: a real
+window on Linux, Windows and macOS, any resolution and aspect ratio up to 8K, a really round ball, level 13
+and a menu for community maps — and later an open, documented level format.
 
-![Level 1](docs/public/screenshots/level01.jpg)
-
-## Quick start
-
-```sh
-gasm-run openballance.wasm --rom Ballance.iso          # a disc image
-gasm-run openballance.wasm --asset-dir /path/to/game   # the CD or an installed copy
-```
-
-Or download a bundle from the [releases](https://github.com/emdzej/openballance/releases), or
-[play in the browser](https://openballance.emdzej.pl/play/).
-Controls, launch parameters and troubleshooting: [the user guide](https://openballance.emdzej.pl/guide/).
+Status: work in progress, nothing of the fork's own goals is done yet. See the
+[roadmap](docs/drahtseilakt/roadmap.md) and the [decisions](docs/drahtseilakt/decisions.md) behind it.
 
 ## How it works
 
 Ballance keeps almost all of its game logic in Virtools behaviour graphs inside its `.cmo` / `.nmo` files.
-OpenBallance loads those files into a CK2-compatible object model and executes the graphs; the Building
-Blocks they call are ported from the original DLLs, and the physics is a port of the Ipion (IVP) engine
-from `physics_RT.dll`. See [Architecture](https://openballance.emdzej.pl/internals/architecture) and the
-specifications in [`docs/`](docs/).
+The engine loads those files into a CK2-compatible object model and executes the graphs; the Building Blocks
+they call are ported from the original DLLs, and the physics is a port of the Ipion (IVP) engine from
+`physics_RT.dll`. The internals are documented in [`docs/`](docs/) (upstream's documentation site:
+https://openballance.emdzej.pl).
 
 ## Building
+
+Today the build is upstream's (the native backend is phase 1 of the roadmap):
 
 ```sh
 tools/fetch-gasm-sdk.sh
@@ -36,10 +31,11 @@ cmake -S . -B build-gasm -DOPENBALLANCE_PLATFORM=gasm -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_TOOLCHAIN_FILE=.deps/gasm-c-sdk/cmake/gasm-toolchain.cmake -DWASI_SDK_PREFIX="$PWD/.deps/wasi-sdk"
 cmake --build build-gasm -j        # build-gasm/openballance.wasm
 
-cmake -S . -B build && cmake --build build -j   # native engine library + tests (need your game data)
+cmake -S . -B build && cmake --build build -j   # engine library + tests (need your game data)
 ```
 
 ## Legal
 
-OpenBallance is licensed under the GPL-3.0. It contains no code or assets from Ballance: it needs your own
-copy of the game. Ballance is © 2004 Cyparade / Atari. This project is not affiliated with them.
+Drahtseilakt is licensed under the GPL-3.0, like OpenBallance it is forked from. It contains no code or
+assets from Ballance: it needs your own copy of the game. Ballance is © 2004 Cyparade / Atari. This project
+is not affiliated with them.

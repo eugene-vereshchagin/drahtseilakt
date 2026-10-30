@@ -7,6 +7,10 @@ level 13, a menu for community maps, and later a converter from the original dat
 
 Owner: Veresk. Chat with him in Russian; code, comments, docs and commit messages are in English.
 
+**Start here:** [docs/drahtseilakt/roadmap.md](docs/drahtseilakt/roadmap.md) — the agreed plan, in order, with
+what "done" means for each phase — and [docs/drahtseilakt/decisions.md](docs/drahtseilakt/decisions.md) — why.
+Work goes phase by phase; a change of plan is recorded there, not only in a chat.
+
 ## Security rules
 
 Every change follows the secure-codegen rules from https://github.com/eugene-vereshchagin/secure-codegen-rules
@@ -56,6 +60,8 @@ The active profile for this project:
 
 ## Process
 
+- Development runs on the owner's machine, which has the game data. A change is committed after it has
+  been built and tested there; say what was run and on which targets.
 - **Never start a release, tag or publish without the owner's explicit command.**
 - CI runs on demand and on pull requests, not on every push. Batch changes; don't trigger CI per small fix.
   Sometimes the owner wants to look before CI runs — ask when unsure.
