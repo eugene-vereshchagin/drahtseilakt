@@ -163,7 +163,8 @@ möchte.
   (`CustomMapList.md`: Autor, Schwierigkeit, Typ, Videos). Heruntergeladen werden sie vom Mega-Laufwerk der
   Community, ein ausgewähltes Paket liegt auf MediaFire, neue Karten erscheinen im Kanal `#new` des
   Ballance-Discords ([FAQ](https://yyc12345.github.io/ballance-discord-rules/en/faq/)). Eine Karte ist eine
-  `.NMO` im selben Format wie `Level_XX.NMO`.
+  `.NMO` im selben Format wie `Level_XX.NMO`. Quellen, Format des Katalogs und seine Nutzung:
+    [community-maps.md](community-maps.md).
   - Ein Kartenordner im Benutzerdatenverzeichnis und ein Menü im Spiel zur Auswahl. Originaldateien werden
     nie angefasst (die anderen Konventionen der Community sind das Ersetzen von `Level_XX.NMO` oder der
     Ordner `ModLoader/Maps` des Mod-Loaders BML).

@@ -146,7 +146,7 @@ Done when: one level's replay renders to an 8K video with sound that the owner i
   author, difficulty, type, videos); downloads are on the community's Mega drive, a curated pack on
   MediaFire, recent ones in the Ballance Discord `#new` channel
   ([FAQ](https://yyc12345.github.io/ballance-discord-rules/en/faq/)). A map is a `.NMO` in the same format as
-  `Level_XX.NMO`.
+  `Level_XX.NMO`. Sources, the catalogue's format and how to use it: [community-maps.md](community-maps.md).
   - A maps folder in the per-user data directory and an in-game menu to pick one. Original files are never
     touched (the community's other conventions are replacing `Level_XX.NMO` or BML's `ModLoader/Maps`).
   - A map that uses a Building Block we don't implement does not crash: the game reports which block is

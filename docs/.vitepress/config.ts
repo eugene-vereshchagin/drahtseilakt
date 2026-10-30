@@ -31,6 +31,7 @@ export default defineConfig({
                 { text: "История", link: "/ru/drahtseilakt/history" },
                 { text: "План работ", link: "/ru/drahtseilakt/roadmap" },
                 { text: "Решения", link: "/ru/drahtseilakt/decisions" },
+                { text: "Любительские карты", link: "/ru/drahtseilakt/community-maps" },
               ],
             },
           ],
@@ -62,6 +63,7 @@ export default defineConfig({
                 { text: "Geschichte", link: "/de/drahtseilakt/history" },
                 { text: "Fahrplan", link: "/de/drahtseilakt/roadmap" },
                 { text: "Entscheidungen", link: "/de/drahtseilakt/decisions" },
+                { text: "Community-Karten", link: "/de/drahtseilakt/community-maps" },
               ],
             },
           ],
@@ -139,6 +141,7 @@ export default defineConfig({
             { text: "History", link: "/drahtseilakt/history" },
             { text: "Roadmap", link: "/drahtseilakt/roadmap" },
             { text: "Decisions", link: "/drahtseilakt/decisions" },
+            { text: "Community maps", link: "/drahtseilakt/community-maps" },
           ],
         },
         {
