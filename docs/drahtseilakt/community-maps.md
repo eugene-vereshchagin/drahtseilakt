@@ -58,6 +58,30 @@ malformed ones instead of guessing.
 How maps are made: Blender 3.6 with [BallanceBlenderHelper](https://github.com/yyc12345/BallanceBlenderHelper),
 exported through Virtools 3.5; older maps through 3ds Max plugins.
 
+## Local copies on the owner's machine
+
+The owner has downloaded the maps and the mods. They live **outside the repository**, like the game data, and
+are found through environment variables:
+
+| Variable | Points at | Used by |
+|---|---|---|
+| `OPENBALLANCE_DATA` | the game: installed folder, CD folder or disc image | game-data tests, the game |
+| `OPENBALLANCE_MAPS` | a folder of community maps (`.nmo`, as downloaded, archives unpacked) | map tests, the missing-Building-Block report |
+| `OPENBALLANCE_MODS` | a folder of downloaded mods | reading only, see below |
+
+Unpacking the downloads is part of the work and follows the archive rules (`modules/input.md`): every path
+inside an archive is checked (no `..`, no absolute paths, no links), with limits on file count and unpacked
+size. The engine's own maps folder for players (phase 4) is separate from this development corpus.
+
+**Maps** are data. They are what phase 4 loads and what the tests run over: a headless pass over the whole
+folder that loads each map, plays it for a while and reports crashes and missing Building Blocks.
+
+**Mods are code.** BML mods are Windows DLLs that the original player loads into its own process. They are
+never executed — not by the engine, not by a test, not "just to see" under Wine on the owner's machine. They
+are useful only as a source of requirements: what the community added to the game (speedometers, map menus,
+camera options, fixes) tells us which features players want. Such a feature is reimplemented in our engine from
+its observable behaviour, the same way as any other; nothing is loaded from a mod.
+
 ## Rules for this project
 
 - **Maps are untrusted input**: files from strangers' drives. They go through the hardened, fuzzed parsers only

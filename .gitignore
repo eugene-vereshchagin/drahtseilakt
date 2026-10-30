@@ -2,6 +2,12 @@
 /cd/
 /game/
 /data
+/maps/
+/mods/
+*.nmo
+*.NMO
+*.cmo
+*.CMO
 /re/
 /out/
 *.iso

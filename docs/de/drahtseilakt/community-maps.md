@@ -59,6 +59,32 @@ prüfen und fehlerhafte melden, statt zu raten.
 Wie Karten gebaut werden: Blender 3.6 mit [BallanceBlenderHelper](https://github.com/yyc12345/BallanceBlenderHelper),
 exportiert über Virtools 3.5; ältere Karten über 3ds-Max-Plugins.
 
+## Lokale Kopien auf dem Rechner des Inhabers
+
+Der Inhaber hat die Karten und die Mods heruntergeladen. Sie liegen **außerhalb des Repositorys**, wie die
+Spieldaten, und werden über Umgebungsvariablen gefunden:
+
+| Variable | Zeigt auf | Genutzt von |
+|---|---|---|
+| `OPENBALLANCE_DATA` | das Spiel: installierter Ordner, CD-Ordner oder Disc-Image | Tests mit Spieldaten, das Spiel |
+| `OPENBALLANCE_MAPS` | einen Ordner mit Community-Karten (`.nmo` wie heruntergeladen, Archive entpackt) | Kartentests, der Bericht über fehlende Building Blocks |
+| `OPENBALLANCE_MODS` | einen Ordner mit heruntergeladenen Mods | nur Lesen, siehe unten |
+
+Das Entpacken der Downloads gehört zur Arbeit und folgt den Regeln für Archive (`modules/input.md`): Jeder Pfad
+im Archiv wird geprüft (kein `..`, keine absoluten Pfade, keine Links), mit Grenzen für Dateianzahl und
+entpackte Größe. Der eigene Kartenordner der Engine für Spieler (Phase 4) ist von diesem Entwicklungsbestand
+getrennt.
+
+**Karten** sind Daten. Sie lädt Phase 4, und über sie laufen die Tests: ein Durchlauf ohne Fenster über den
+ganzen Ordner, der jede Karte lädt, eine Weile spielt und Abstürze und fehlende Building Blocks meldet.
+
+**Mods sind Code.** BML-Mods sind Windows-DLLs, die der Original-Player in seinen eigenen Prozess lädt. Sie
+werden nie ausgeführt — nicht von der Engine, nicht von einem Test, nicht „nur mal ansehen“ unter Wine auf dem
+Rechner des Inhabers. Nützlich sind sie nur als Quelle von Anforderungen: Was die Community dem Spiel
+hinzugefügt hat (Tachometer, Kartenmenüs, Kameraoptionen, Korrekturen), zeigt, welche Funktionen Spieler wollen.
+Eine solche Funktion wird in unserer Engine nach ihrem beobachtbaren Verhalten neu umgesetzt, wie jede andere;
+aus einem Mod wird nichts geladen.
+
 ## Regeln für dieses Projekt
 
 - **Karten sind nicht vertrauenswürdige Eingaben**: Dateien von fremden Laufwerken. Sie gehen nur durch die

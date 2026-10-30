@@ -48,7 +48,10 @@ The active profile for this project:
 - Style follows the existing code: 4 spaces, opening brace of a function on its own line, short
   `snake_case` names, a comment at the top of each file saying what it is for, comments that say *why*.
 - No game data in the repository, ever — not in tests, fixtures or examples (see `.gitignore`). Tests that need
-  the game read it from `OPENBALLANCE_DATA`.
+  the game read it from `OPENBALLANCE_DATA`; community maps come from `OPENBALLANCE_MAPS`, downloaded mods
+  from `OPENBALLANCE_MODS` (see `docs/drahtseilakt/community-maps.md`). Map files never enter the repository.
+- **Mods are never executed.** BML mods are Windows DLLs: a source of feature requirements, read only, never
+  loaded, never run — not even under Wine.
 - Docs are updated in the same change as the behaviour they describe.
 - **Docs exist in English, Russian and German.** English is primary; every other language mirrors the same
   path under `docs/<lang>/` (e.g. `docs/drahtseilakt/roadmap.md` ↔ `docs/ru/drahtseilakt/roadmap.md` ↔
