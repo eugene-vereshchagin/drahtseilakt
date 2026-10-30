@@ -99,3 +99,8 @@ made after phase 0 has actually run it on Linux, not from its README. Until then
 Making curved geometry look round (phase 3) is a rendering matter only. Collision geometry stays exactly the
 original's, because the ball's behaviour and every community map are tuned to it. Which smoothing techniques
 are used is open until they have been tried; this constraint is not.
+
+## The repository stays private until the game is playable
+
+Nothing is shown publicly — repository, site, videos — until all original levels (the twelve and level 13)
+are playable natively. Raw code is not shown. Going public is the owner's command, as with any release.

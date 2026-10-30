@@ -96,3 +96,9 @@ anhand seines README. Bis dahin bleibt dieser Eintrag offen.
 Gekrümmte Geometrie rund aussehen zu lassen (Phase 3) ist allein Sache des Renderings. Die Kollisionsgeometrie
 bleibt exakt die des Originals, weil das Verhalten der Kugel und jede Community-Karte darauf abgestimmt sind.
 Welche Glättungstechniken eingesetzt werden, ist offen, bis sie ausprobiert sind; diese Einschränkung nicht.
+
+## Das Repository bleibt privat, bis das Spiel spielbar ist
+
+Nichts wird öffentlich gezeigt — weder Repository noch Website noch Videos —, bis alle Originallevel (die zwölf
+und Level 13) nativ spielbar sind. Roher Code wird nicht gezeigt. Veröffentlicht wird auf Anweisung des
+Inhabers, wie jedes Release.
