@@ -155,6 +155,16 @@ Done when: one level's replay renders to an 8K video with sound that the owner i
   - **Maps are untrusted input** (strangers' file shares). Before the maps menu exists, every parser that
     reads `.nmo` / `.cmo` has fuzz targets, runs under ASan + UBSan, and fails closed on malformed data.
 
+- **Game profiles**: one setting with two values.
+  - *Classic* — the original game and nothing else: the twelve levels and level 13, original rules, no
+    third-party content. Replays, records and comparisons with the original are only meaningful here.
+  - *Extended* — third-party content allowed, at the player's own risk, with a clear warning when switching:
+    community maps, texture packs, and later mods. **Mods here means our own mod system** — data and scripts
+    run in a sandbox (no file or network access), the same on every platform. The community's BML mods are
+    Windows DLLs for the original runtime and cannot be loaded by this engine at all.
+  - Graphics improvements (resolution, round geometry, filtering) are separate settings and available in both
+    profiles: they change how the game looks, not what it is.
+
 Done when: level 13 plays; a folder of community maps is listed and playable; the missing-block report
 exists; the parsers have been fuzzed without findings for a meaningful run.
 

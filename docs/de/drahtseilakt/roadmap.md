@@ -175,6 +175,17 @@ möchte.
     gibt, hat jeder Parser, der `.nmo` / `.cmo` liest, Fuzzing-Ziele, läuft unter ASan + UBSan und lehnt
     fehlerhafte Daten ab, statt abzustürzen.
 
+- **Spielprofile**: eine Einstellung mit zwei Werten.
+  - *Klassisch* — das Originalspiel und sonst nichts: die zwölf Level und Level 13, die Originalregeln, keine
+    Inhalte Dritter. Nur hier haben Replays, Rekorde und Vergleiche mit dem Original einen Sinn.
+  - *Erweitert* — Inhalte Dritter erlaubt, auf eigene Verantwortung des Spielers, mit einer klaren Warnung beim
+    Umschalten: Community-Karten, Texturpakete, später Mods. **Mods heißt hier unser eigenes Mod-System** —
+    Daten und Skripte, die in einer Sandbox laufen (ohne Datei- oder Netzwerkzugriff), auf jeder Plattform
+    gleich. Die BML-Mods der Community sind Windows-DLLs für die Original-Laufzeitumgebung und können von
+    dieser Engine überhaupt nicht geladen werden.
+  - Grafikverbesserungen (Auflösung, runde Geometrie, Filterung) sind eigene Einstellungen und in beiden
+    Profilen verfügbar: Sie ändern, wie das Spiel aussieht, nicht was es ist.
+
 Fertig, wenn: Level 13 spielbar ist; ein Ordner mit Community-Karten im Menü erscheint und die Karten
 spielbar sind; der Bericht über fehlende Blöcke existiert; die Parser ein Fuzzing nennenswerter Dauer ohne
 Befund überstanden haben.
