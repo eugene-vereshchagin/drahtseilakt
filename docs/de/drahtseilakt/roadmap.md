@@ -48,13 +48,20 @@ Ballanced: Branch `sdl`, Commit `ececf94`, Preset `linux-x64-runtime`.
   ein Schrift-Update upstream den Build bricht. `VXMATH_FONT_DIR` baut offline aus lokalen Kopien.
 - **Start.** SDL_GPU auf Vulkan. Hauptmenü, Level 1 geschafft; die Kugel fühlt sich wie im Original an (Urteil
   des Inhabers). Das Fenster wurde im Betrieb von 1280×720 auf 3840×2069 vergrößert, ohne Probleme; das Bild
-  bleibt 4:3 mit Balken (die Breitbild-Option wurde noch nicht probiert). Zwei Sitzungen, 1,5 und 7 Minuten,
-  endeten sauber, ohne Einträge im Log.
-- **Fehler.** Die Klammer des Lebenszählers im HUD wird weit links gezeichnet und wandert während des Spiels.
-  Upstream nicht gemeldet.
+  bleibt 4:3 mit Balken. Zwei Sitzungen, 1,5 und 7 Minuten, endeten sauber, ohne Einträge im Log.
+- **Breitbild.** `--unlock-widescreen --unlock-high-resolution` fügen nur breite Modi zur Auflösungsliste der
+  Spielskripte hinzu; 1920×1080 wird angenommen, aber die Kameras der Level bleiben 4:3, und der Renderer setzt
+  sie mit Balken ein. Das HUD wird dagegen über das ganze Fenster verteilt und steht im breiten Fenster neben dem
+  Bild, teils auf den schwarzen Balken. Echtes Breitbild gibt es nicht; im Original brauchte es dafür einen BML-Mod.
+- **Community-Karten.** Ein Teststand (außerhalb der Repositories) legt eine Karte an die Stelle von Level 1 in
+  einer Wegwerfkopie des Spielverzeichnisses, startet Player auf einem eigenen Xvfb-Display mit Software-Vulkan
+  (lavapipe), geht per xdotool durchs Menü und nimmt das Spielfenster auf. Fünf Probekarten, 74 KB bis 4 MB,
+  luden und liefen ohne Einträge im Log. Der ganze Satz (579 `.nmo` und 19 Archive) steht noch aus.
+- **Fehler.** Die Klammer des Lebenszählers im HUD wird weit links gezeichnet und wandert während des Spiels
+  (gesehen im maximierten Fenster 3840×2069). In kurzen Skriptläufen noch nicht reproduziert; womöglich die
+  HUD-Anordnung oben. Upstream nicht gemeldet.
 - `Player --help` ist keine Option: Es wird ignoriert, und das Spiel startet.
-- **Noch nicht geprüft:** `--unlock-widescreen`, `--unlock-high-resolution`, `--unlock-framerate`, spätere Level,
-  Community-Karten, ein Clang-Build, das Test-Preset.
+- **Noch nicht geprüft:** `--unlock-framerate`, spätere Level, der ganze Kartensatz, ein Clang-Build, das Test-Preset.
 
 ## Phase 1 — nativer Backend
 

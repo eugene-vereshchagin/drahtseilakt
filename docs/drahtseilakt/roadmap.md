@@ -45,13 +45,20 @@ branch `sdl` at commit `ececf94`, preset `linux-x64-runtime`.
   breaks the build. `VXMATH_FONT_DIR` builds offline from local copies.
 - **Running.** SDL_GPU on Vulkan. Main menu, level 1 finished; the ball feels like the original (owner's
   judgement). The window was resized live from 1280×720 to 3840×2069 without trouble; the picture stays 4:3
-  with bars (the widescreen option has not been tried yet). Two sessions, 1.5 and 7 minutes, ended cleanly with
-  nothing in the log.
-- **Bug.** The bracket of the life counter in the HUD is drawn far to the left and drifts during play. Not
-  reported upstream.
+  with bars. Two sessions, 1.5 and 7 minutes, ended cleanly with nothing in the log.
+- **Widescreen.** `--unlock-widescreen --unlock-high-resolution` only adds wide modes to the resolution list
+  the game scripts offer; 1920×1080 is accepted, but the level cameras stay 4:3 and the renderer letterboxes
+  them. The HUD, however, is laid out against the whole window, so on a wide window it sits beside the picture,
+  partly on the black bars. Real widescreen is not implemented; in the original it took a BML mod.
+- **Community maps.** A test harness (outside the repositories) puts a map in place of level 1 in a throwaway
+  copy of the game root, runs Player on a private Xvfb display with software Vulkan (lavapipe), walks the menu
+  with xdotool and captures the game window. Five sample maps, 74 KB to 4 MB, all loaded and ran with nothing
+  in the log. The full set (579 `.nmo` and 19 archives) is still to be run.
+- **Bug.** The bracket of the life counter in the HUD is drawn far to the left and drifts during play (seen
+  in a maximised 3840×2069 window). Not reproduced yet in short scripted runs; possibly the HUD layout above.
+  Not reported upstream.
 - `Player --help` is not an option: it is ignored and the game starts.
-- **Not yet checked:** `--unlock-widescreen`, `--unlock-high-resolution`, `--unlock-framerate`, later levels,
-  community maps, a Clang build, the tests preset.
+- **Not yet checked:** `--unlock-framerate`, later levels, the full map set, a Clang build, the tests preset.
 
 ## Phase 1 — native backend
 
