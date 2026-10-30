@@ -7,15 +7,8 @@ name: Pages
 # steps as the CI wasm job) and copied in by docs/scripts/copy-wasm.sh. Only the engine goes into the site:
 # the game data always comes from the player's own copy of Ballance, in their browser.
 
+# Drahtseilakt: no site of our own yet; the upstream one lives on emdzej's domain. Manual only.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'docs/**'
-      - 'src/**'
-      - 'CMakeLists.txt'
-      - 'tools/fetch-gasm-sdk.sh'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 concurrency:

@@ -5,9 +5,9 @@ name: CI
 # The tests need the original game data (not redistributable), so CI only compiles them; run them locally
 # with your copy of Ballance (OPENBALLANCE_DATA, default ./data).
 
+# Drahtseilakt: run on demand (Actions → CI → Run workflow) and on pull requests, not on every push.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
   pull_request:
 
 concurrency:
