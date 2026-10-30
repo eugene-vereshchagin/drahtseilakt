@@ -96,11 +96,10 @@ Goal: a normal native executable (Linux, Windows, macOS) that opens a window and
   the data-free `ob_core` library. Dependencies at exact, pinned versions; anything downloaded is checked
   against a checksum. Hardening flags from the secure-codegen C rules in release builds; ASan + UBSan in
   debug builds.
-- The gasm backend stays and keeps building: the browser build is a target too.
 - Packaging basics: `.desktop` file and icon on Linux.
 
 Done when: the native build plays all twelve levels on Linux, Windows and macOS at the original speed on a
-60 Hz and on a 144 Hz display, and the gasm build still builds and runs.
+60 Hz and on a 144 Hz display. (The browser build is no longer a target: decisions.md, "No browser build".)
 
 ## Phase 1b — recorded replays
 

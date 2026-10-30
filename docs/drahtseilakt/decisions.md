@@ -12,6 +12,8 @@ physics. The hard parts are done; what is missing (native host, resolutions, lev
 
 ## Keep C for the engine
 
+*Replaced 2026-10-31 by "The language serves the code" below.*
+
 Rewriting working code in another language buys nothing for the player and costs months. C is also the most
 portable choice for the targets we have.
 
@@ -139,3 +141,15 @@ included, as a backup. The public release is never this repository: it is a new 
 cleaned tree without this history, checked for game data before the first push. Until then the rule from
 "No game data in the repository" still applies to everything meant to be published: code, tests and docs
 do not depend on game data being in the repository.
+
+## No browser build
+
+The browser (gasm/WebAssembly) build came with upstream and is not a goal of this project. It is no longer a
+target: no change has to keep it building, and it goes when the code it needs is replaced. The targets are
+native Linux, Windows and macOS.
+
+## The language serves the code
+
+Replaces "Keep C for the engine". C and C++ are both fine — whatever the code we build on is written in, and
+whatever keeps the sources clear. What matters is that everything is in source form and the project is in
+order, not the language.

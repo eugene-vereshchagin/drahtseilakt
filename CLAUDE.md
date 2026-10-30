@@ -31,7 +31,7 @@ The active profile for this project:
 
 - `src/` — the portable core in C11. It talks to the host only through `src/platform.h` (input, audio,
   storage, parameters) and `src/render/gpu.h` (a WebGPU-style graphics API with WGSL shaders).
-- Backends implement those two headers: `platform_gasm.c` (upstream, runs in gasm and the browser) and the
+- Backends implement those two headers: `platform_gasm.c` (upstream, browser; no longer a target) and the
   native backend (SDL3 + wgpu-native). The core never includes a backend or OS header.
 - `src/ck` the Virtools runtime, `src/bb` the Building Blocks (one file per original DLL), `src/phys` the Ipion
   port, `src/render` the renderer, `src/vfs*` + `src/iscab.c` reading the player's own copy of the game.
@@ -43,7 +43,7 @@ The active profile for this project:
 
 - **One systemic approach.** No special cases for one level, one map or one platform. A new need is solved
   once, in the layer it belongs to, for every target.
-- **Every target platform.** Linux, Windows and macOS for the native build, plus the gasm/browser build.
+- **Every target platform.** Linux, Windows and macOS, native. The browser (gasm) build is not a target.
   A change covers all of them; what could not be built or tested on some target is said explicitly.
 - Style follows the existing code: 4 spaces, opening brace of a function on its own line, short
   `snake_case` names, a comment at the top of each file saying what it is for, comments that say *why*.

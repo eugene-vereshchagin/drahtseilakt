@@ -103,11 +103,10 @@ spielt, ohne gasm.
   `gasm` und der datenfreien Bibliothek `ob_core`. Abhängigkeiten in exakten, festgelegten Versionen; alles
   Heruntergeladene wird gegen eine Prüfsumme geprüft. In Release-Builds die Härtungs-Flags aus den
   secure-codegen-Regeln für C, in Debug-Builds ASan + UBSan.
-- Der gasm-Backend bleibt und wird weiter gebaut: Der Browser-Build ist ebenfalls ein Ziel.
 - Grundlagen der Paketierung: `.desktop`-Datei und Icon unter Linux.
 
 Fertig, wenn: der native Build alle zwölf Level unter Linux, Windows und macOS in Originalgeschwindigkeit
-spielt, auf einem 60-Hz- wie auf einem 144-Hz-Bildschirm, und der gasm-Build weiterhin baut und läuft.
+spielt, auf einem 60-Hz- wie auf einem 144-Hz-Bildschirm. (Der Browser-Build ist kein Ziel mehr: decisions.md, „Kein Browser-Build“.)
 
 ## Phase 1b — aufgezeichnete Durchläufe (Replays)
 

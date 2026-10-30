@@ -13,6 +13,8 @@ Karten), setzt obendrauf auf.
 
 ## Die Engine bleibt in C
 
+*Ersetzt am 31.10.2026 durch „Die Sprache dient dem Code“ unten.*
+
 Funktionierenden Code in einer anderen Sprache neu zu schreiben bringt dem Spieler nichts und kostet Monate.
 C ist außerdem die portabelste Wahl für unsere Zielplattformen.
 
@@ -138,3 +140,15 @@ Spieldaten eingeschlossen, als Backup. Die öffentliche Veröffentlichung ist ni
 neues, aus einem bereinigten Stand ohne diese Historie erstellt und vor dem ersten Push auf Spieldaten
 geprüft. Bis dahin gilt die Regel „Keine Spieldaten im Repository“ für alles, was veröffentlicht werden soll:
 Code, Tests und Dokumentation hängen nicht davon ab, dass Spieldaten im Repository liegen.
+
+## Kein Browser-Build
+
+Der Browser-Build (gasm/WebAssembly) kam mit Upstream und ist kein Ziel dieses Projekts. Er ist kein Ziel
+mehr: Keine Änderung muss ihn baubar halten, und er entfällt, wenn der Code, den er braucht, ersetzt wird.
+Ziele sind natives Linux, Windows und macOS.
+
+## Die Sprache dient dem Code
+
+Ersetzt „Die Engine bleibt in C“. C und C++ sind beide recht — worin der Code geschrieben ist, auf dem wir
+aufbauen, und was die Quellen verständlich hält. Wichtig ist, dass alles als Quelltext vorliegt und das
+Projekt in Ordnung ist, nicht die Sprache.
