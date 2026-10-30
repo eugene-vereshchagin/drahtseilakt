@@ -24,6 +24,8 @@ usage: drahtseilakt [options]
   --data DIR          the Ballance folder (default: $OPENBALLANCE_DATA, then ./data)
   --level N           play original level N (1-13; default 1)
   --map FILE.nmo      play a level file: a community map or any .nmo
+  --open DIR          play a level in the open format (a folder with level.gltf)
+  --export DIR        convert the chosen level to the open format in DIR (textures as PNG) and exit
   --record FILE       write a replay of the run (also written automatically on finishing a level)
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
@@ -39,6 +41,7 @@ pub struct Options {
     pub data: Option<PathBuf>,
     pub source: Source,
     pub record: Option<PathBuf>,
+    pub export: Option<PathBuf>,
     pub replay: Option<PathBuf>,
     pub headless: bool,
     pub screenshot: Option<PathBuf>,
@@ -52,6 +55,7 @@ fn parse_args() -> Result<Options, String> {
         data: None,
         source: Source::Original(1),
         record: None,
+        export: None,
         replay: None,
         headless: false,
         screenshot: None,
@@ -74,6 +78,8 @@ fn parse_args() -> Result<Options, String> {
                 o.source = Source::Original(n);
             }
             "--map" => o.source = Source::Nmo(value()?.into()),
+            "--open" => o.source = Source::Open(value()?.into()),
+            "--export" => o.export = Some(value()?.into()),
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,

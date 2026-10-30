@@ -5,6 +5,7 @@
 // Coordinates stay as Virtools has them: left-handed, Y up, units as in the original.
 
 pub mod from_nmo;
+pub mod open;
 
 #[derive(Debug, Clone, Default)]
 pub struct Level {
@@ -13,6 +14,10 @@ pub struct Level {
     pub textures: Vec<Texture>,
     pub objects: Vec<Object>,
     pub groups: Vec<Group>,
+    /// Letter of the sky (`Sky_<letter>_*.bmp` in the game's textures), when the level names one.
+    pub sky: Option<String>,
+    /// Name of the ball the level starts with (`Ball_Wood`, ...), when the level names one.
+    pub start_ball: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]

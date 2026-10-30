@@ -19,7 +19,6 @@ use winit::window::{Fullscreen, Window, WindowId};
 
 struct Game {
     level: LoadedLevel,
-    settings: crate::assets::Settings,
     start_ball: crate::sim::BallKind,
     balls: LoadedLevel,
     ball_meshes: BallMeshes,
@@ -55,8 +54,8 @@ impl Game {
             }
             None => None,
         };
-        let settings = data.settings(&level.name);
-        let start_ball = settings
+        let start_ball = level
+            .level
             .start_ball
             .as_deref()
             .and_then(crate::sim::BallKind::from_name)
@@ -64,7 +63,6 @@ impl Game {
         Ok(Game {
             ball_meshes: BallMeshes::find(&balls.level),
             sim: Sim::new(&level.level, start_ball),
-            settings,
             start_ball,
             replay_out: Replay::new(&level.name, level.hash),
             record: o.record.clone(),
@@ -153,6 +151,10 @@ fn replay_dir() -> PathBuf {
 }
 
 pub fn run(o: Options, data: Data) -> Result<(), String> {
+    if let Some(dir) = &o.export {
+        let loaded = data.load(&o.source)?;
+        return crate::assets::export(&data, &loaded, dir);
+    }
     let mut game = Game::new(&o, &data)?;
     if let Some(path) = &o.screenshot {
         return screenshot(&mut game, &data, &o, path);
@@ -253,7 +255,7 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     let loader = |t: &level::Texture| data.texture(t);
     renderer.add_model(&game.level.level, &loader);
     renderer.add_model(&game.balls.level, &loader);
-    let letter = game.settings.sky.clone().unwrap_or_else(|| "A".into());
+    let letter = game.level.level.sky.clone().unwrap_or_else(|| "A".into());
     let sky = crate::sky::model(&letter);
     renderer.add_model(&sky, &loader);
     // The zenith colour: the top row of the front texture, averaged.

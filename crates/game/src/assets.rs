@@ -13,6 +13,8 @@ pub enum Source {
     Original(u32),
     /// A `.nmo` file: a community map, or any level file.
     Nmo(PathBuf),
+    /// A level in the open format: a folder with level.gltf and level.bin.
+    Open(PathBuf),
 }
 
 pub struct LoadedLevel {
@@ -51,8 +53,14 @@ impl Data {
                 .file(&format!("3D Entities/Level/Level_{n:02}.NMO"))
                 .ok_or_else(|| format!("Level_{n:02}.NMO is not in {}", self.root.display()))?,
             Source::Nmo(p) => p.clone(),
+            Source::Open(dir) => return load_open(dir),
         };
-        load_nmo(&path)
+        let mut loaded = load_nmo(&path)?;
+        // Levels of the game name their sky and ball in the game's own table, not in the level file.
+        let s = self.settings(&loaded.name);
+        loaded.level.sky = loaded.level.sky.take().or(s.sky);
+        loaded.level.start_ball = loaded.level.start_ball.take().or(s.start_ball);
+        Ok(loaded)
     }
 
     /// RGBA pixels of a texture: its own pixels, or its file from the game's texture folders.
@@ -63,6 +71,10 @@ impl Data {
                 height,
                 rgba,
             } => Some((*width, *height, rgba.clone())),
+            level::TextureSource::File(name) if Path::new(name).is_absolute() => {
+                let img = image::open(name).ok()?.to_rgba8();
+                Some((img.width(), img.height(), img.into_raw()))
+            }
             level::TextureSource::File(name) => {
                 let file = Path::new(name).file_name()?.to_str()?.to_owned();
                 let path = ["Textures", "Textures/Sky", "Textures/Particles"]
@@ -126,6 +138,50 @@ impl Data {
             start_ball: text(row, "StartBall"),
         }
     }
+}
+
+pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {
+    let level = level::open::import(dir)?;
+    let mut bytes = std::fs::read(dir.join("level.gltf")).map_err(|e| e.to_string())?;
+    bytes.extend(std::fs::read(dir.join("level.bin")).map_err(|e| e.to_string())?);
+    Ok(LoadedLevel {
+        level,
+        name: dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        hash: crate::replay::fnv1a(&bytes),
+        warnings: Vec::new(),
+    })
+}
+
+/// Writes a level in the open format into `dir`, with its textures as PNG files (from the player's copy).
+pub fn export(data: &Data, loaded: &LoadedLevel, dir: &Path) -> Result<(), String> {
+    level::open::export(&loaded.level, dir)?;
+    let mut missing = 0;
+    for (i, t) in loaded.level.textures.iter().enumerate() {
+        let path = dir.join(level::open::texture_file(i, &t.name));
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        match data.texture(t) {
+            Some((w, h, rgba)) => {
+                image::save_buffer(&path, &rgba, w, h, image::ExtendedColorType::Rgba8)
+                    .map_err(|e| e.to_string())?
+            }
+            None => missing += 1,
+        }
+    }
+    println!(
+        "{} written: {} objects, {} meshes, {} materials, {} textures ({missing} not found), {} groups",
+        dir.display(),
+        loaded.level.objects.len(),
+        loaded.level.meshes.len(),
+        loaded.level.materials.len(),
+        loaded.level.textures.len(),
+        loaded.level.groups.len()
+    );
+    Ok(())
 }
 
 pub fn load_nmo(path: &Path) -> Result<LoadedLevel, String> {

@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 nmo = { path = "../nmo" }
+serde_json = "=1.0.154"
 
 [lints]
 workspace = true
