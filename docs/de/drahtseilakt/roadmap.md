@@ -77,17 +77,38 @@ spielt, auf einem 60-Hz- wie auf einem 144-Hz-Bildschirm, und der gasm-Build wei
 Fertig, wenn: Fenster in 16:9, 21:9, 16:10 und 4:3 ein unverzerrtes Bild mit brauchbarem HUD und Menü zeigen,
 von 1280×720 bis 7680×4320, und das Fenster sich während des Spiels in der Größe ändern lässt.
 
-## Phase 3 — die Kugel ist wirklich rund
+## Phase 3 — Rundes sieht rund aus
 
-- Ein Render-Primitiv „analytische Kugel“: pro Pixel über den Schnitt von Strahl und Kugel gezeichnet,
-  mit Beleuchtung pro Pixel und exakter Tiefe, daher rund bei jeder Auflösung und Entfernung.
-- Welche Meshes Kugeln sind, sagen die Daten (eine Tabelle der drei Kugel-Meshes nach ihren Namen in den
-  Spieldateien; im offenen Format eine Eigenschaft des Objekts), nie ein Sonderfall im Renderer.
-- Die Textur behält die Originalabwicklung, sodass jede Kugel aussieht wie sie selbst, nur ohne Facetten.
-- Die Physik bleibt unberührt: Dort ist die Kugel bereits eine Kugel.
+Die gekrümmte Geometrie des Originals — die Kugel, Schienen, Rohre, abgerundete Plattformkanten, gebogene
+Rinnen — besteht aus groben Polygonen, und bei heutigen Auflösungen sieht man jede Facette. Diese Phase macht
+sie glatt. **Welche Techniken eingesetzt werden und wie weit jede geht, wird nach dem Ausprobieren mit dem
+Inhaber entschieden**; die Kandidaten:
 
-Fertig, wenn: alle drei Kugeln in 8K und aus nächster Nähe vollkommen rund sind und ansonsten wie die
-Originale aussehen.
+- **Die Kugel, analytisch.** Ein Render-Primitiv „analytische Kugel“: pro Pixel über den Schnitt von Strahl
+  und Kugel gezeichnet, mit Beleuchtung pro Pixel und exakter Tiefe, daher rund bei jeder Auflösung und
+  Entfernung. Welche Meshes Kugeln sind, sagen die Daten (eine Tabelle der drei Kugel-Meshes nach Namen; im
+  offenen Format eine Eigenschaft des Objekts), nie ein Sonderfall im Renderer. Die Textur behält die
+  Originalabwicklung.
+- **Beleuchtung pro Pixel mit geglätteten Normalen** für die gesamte Geometrie. Ein guter Teil des facettierten
+  Aussehens ist die Vertex-Beleuchtung des Originals, die über die Flächen verschmiert wird; mit Beleuchtung
+  pro Pixel wirken gekrümmte Flächen gekrümmt, ohne dass sich ein Vertex bewegt. Am billigsten, größter Gewinn.
+- **Phong-Tessellation** (oder eine ähnliche normalengeführte Verfeinerung): Dreiecke werden unterteilt und
+  entlang der Vertex-Normalen gewölbt. Wo benachbarte Flächen Normalen teilen (Schienen, Rohre), wird die
+  Fläche rund; wo eine Kante getrennte Normalen hat (Kistenecken, Plattformkanten), bleibt sie scharf. Eine
+  Regel für die ganze Geometrie, Community-Karten eingeschlossen — der Umriss einer Schiene wird ein Kreis.
+- **Erkannte Grundformen neu aufbauen** (eine Schiene als entlang eines Pfads gezogener Kreis, in beliebiger
+  Detailstufe neu erzeugt): das sauberste Ergebnis, aber schwieriger und anfälliger; gehört in den Konverter
+  (Phase 6), nicht in die Laufzeit.
+
+Fest, egal wie gewählt wird: **die Physik bleibt auf der Originalgeometrie.** Das Glätten ist rein optisch; die
+Kugel rollt auf denselben Polygonen wie 2004, sonst ändern sich ihr Verhalten und jede Community-Karte.
+Prüfen, dass der kleine Abstand zwischen sichtbarer und physikalischer Oberfläche (die Kugel wirkt einen
+Hauch eingesunken oder angehoben) nicht auffällt.
+
+Fertig, wenn: die gewählten Techniken umgesetzt sind; die drei Kugeln in 8K und aus nächster Nähe vollkommen
+rund sind und ansonsten wie die Originale aussehen; Schienen und andere gekrümmte Teile bei den Auflösungen
+aus Phase 2 keine Facetten mehr zeigen; die Replays aus Phase 5 dieselben Bahnen wie zuvor ergeben (nichts
+Physikalisches hat sich bewegt).
 
 ## Phase 4 — Level 13 und Community-Karten
 

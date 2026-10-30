@@ -90,3 +90,9 @@ Gefunden, nachdem der Fork angelegt war: [Ballanced](https://github.com/doyaGu/B
 Virtools-Laufzeitumgebung nativ auf SDL3 nach und erledigt womöglich schon einen Großteil von Phase 1. Die Wahl
 zwischen Bleiben, Umziehen und Übernehmen fällt, nachdem Phase 0 es tatsächlich unter Linux gestartet hat, nicht
 anhand seines README. Bis dahin bleibt dieser Eintrag offen.
+
+## Optisches Glätten berührt nie die Physik
+
+Gekrümmte Geometrie rund aussehen zu lassen (Phase 3) ist allein Sache des Renderings. Die Kollisionsgeometrie
+bleibt exakt die des Originals, weil das Verhalten der Kugel und jede Community-Karte darauf abgestimmt sind.
+Welche Glättungstechniken eingesetzt werden, ist offen, bis sie ausprobiert sind; diese Einschränkung nicht.

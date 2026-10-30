@@ -93,3 +93,9 @@ because the game and the name are German. (Replaces the entry on two languages.)
 Found after the fork was made: [Ballanced](https://github.com/doyaGu/Ballanced) rebuilds the complete Virtools
 runtime natively on SDL3 and may already do much of phase 1. The choice between staying, moving and borrowing is
 made after phase 0 has actually run it on Linux, not from its README. Until then this entry stays open.
+
+## Visual smoothing never touches physics
+
+Making curved geometry look round (phase 3) is a rendering matter only. Collision geometry stays exactly the
+original's, because the ball's behaviour and every community map are tuned to it. Which smoothing techniques
+are used is open until they have been tried; this constraint is not.

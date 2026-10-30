@@ -70,16 +70,34 @@ Done when: the native build plays all twelve levels on Linux, Windows and macOS 
 Done when: 16:9, 21:9, 16:10 and 4:3 windows show an undistorted picture and a usable HUD and menu, from
 1280×720 to 7680×4320, and resizing the window works.
 
-## Phase 3 — the ball is really round
+## Phase 3 — round things look round
 
-- A render primitive "analytic sphere": drawn by ray–sphere intersection per pixel, with per-pixel lighting
-  and exact depth, so it is round at any resolution and distance.
-- Which meshes are spheres comes from data (a table of the three ball meshes by their names in the game
-  files; in the open format it is a property of the object), never from a special case in the renderer.
-- The texture keeps the original mapping, so each ball looks like itself, without facets.
-- Physics is untouched: the ball is already a sphere there.
+The original's curved geometry — the ball, rails, pipes, rounded platform edges, curved chutes — is coarse
+polygons, and at modern resolutions every facet shows. This phase makes it look smooth. **Which techniques
+are used, and how far each goes, is decided with the owner after trying them**; the candidates:
 
-Done when: the three balls are perfectly round at 8K and close up, and look like the originals otherwise.
+- **The ball, analytically.** A render primitive "analytic sphere": drawn by ray–sphere intersection per
+  pixel, with per-pixel lighting and exact depth, so it is round at any resolution and distance. Which meshes
+  are spheres comes from data (a table of the three ball meshes by name; in the open format a property of the
+  object), never from a special case in the renderer. The texture keeps the original mapping.
+- **Per-pixel lighting with smooth normals** for all geometry. Much of the faceted look is the original's
+  per-vertex lighting smeared across faces; lighting per pixel makes curved surfaces read as curved without
+  changing a vertex. Cheapest, largest win.
+- **Phong tessellation** (or a similar normal-guided refinement): triangles are subdivided and bent along the
+  vertex normals. Where neighbouring faces share normals (rails, pipes) the surface rounds; where an edge has
+  split normals (box corners, platform edges) it stays sharp. One rule for all geometry, community maps
+  included — the silhouette of a rail becomes a circle.
+- **Rebuilding recognised primitives** (a rail as a circle swept along a path, regenerated at any detail):
+  the cleanest result but harder and brittler; belongs in the converter (phase 6), not the runtime.
+
+Fixed regardless of the choice: **physics stays on the original geometry.** Smoothing is visual only; the
+ball rolls on the same polygons as in 2004, or its behaviour and every community map would change. Check that
+the small gap between the visible and the physical surface (the ball looking a hair sunk or lifted) is not
+noticeable.
+
+Done when: the chosen techniques are in; the three balls are perfectly round at 8K and close up and otherwise
+look like the originals; rails and other curved parts no longer show facets at the resolutions of phase 2;
+replays of phase 5 give the same trajectories as before (nothing physical moved).
 
 ## Phase 4 — level 13 and community maps
 
