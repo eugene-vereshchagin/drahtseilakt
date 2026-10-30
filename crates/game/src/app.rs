@@ -96,24 +96,46 @@ impl Game {
         }
     }
 
+    /// Saves a finished run: to --record if given, always among the runs of this level, and as the level's best
+    /// run when it is faster than the best so far (the replay of a perfect run for later rendering).
     fn save_run(&self) {
-        let text = self.replay_out.to_text();
-        let path = self.record.clone().unwrap_or_else(|| {
-            replay_dir().join(format!(
-                "{}-{}.replay",
-                self.level
-                    .name
-                    .trim_end_matches(".NMO")
-                    .trim_end_matches(".nmo"),
-                self.sim.tick
-            ))
-        });
-        if let Some(dir) = path.parent() {
-            let _ = std::fs::create_dir_all(dir);
+        // Replays recorded from a replay are not new runs.
+        if self.replay_in.is_some() && self.record.is_none() {
+            return;
         }
-        match std::fs::write(&path, text) {
-            Ok(()) => println!("run saved to {}", path.display()),
-            Err(e) => eprintln!("could not save the run to {}: {e}", path.display()),
+        let text = self.replay_out.to_text();
+        let stem = self
+            .level
+            .name
+            .trim_end_matches(".NMO")
+            .trim_end_matches(".nmo")
+            .to_owned();
+        let dir = replay_dir().join(&stem);
+        let mut targets = vec![dir.join(format!("{}-{}.replay", stem, self.sim.tick))];
+        if let Some(r) = &self.record {
+            targets.push(r.clone());
+        }
+        let best = dir.join("best.replay");
+        let best_ticks = std::fs::read_to_string(&best)
+            .ok()
+            .and_then(|t| Replay::parse(&t).ok())
+            .map(|r| r.end);
+        if best_ticks.is_none_or(|b| self.sim.tick < b) {
+            targets.push(best.clone());
+            println!(
+                "best run of {} so far: {}",
+                self.level.name,
+                clock(self.sim.tick)
+            );
+        }
+        for path in targets {
+            if let Some(d) = path.parent() {
+                let _ = std::fs::create_dir_all(d);
+            }
+            match std::fs::write(&path, &text) {
+                Ok(()) => println!("run saved to {}", path.display()),
+                Err(e) => eprintln!("could not save the run to {}: {e}", path.display()),
+            }
         }
     }
 
@@ -271,17 +293,10 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
                 / n
                 / 255.0
         };
-        let lin = |v: f64| {
-            if v <= 0.04045 {
-                v / 12.92
-            } else {
-                ((v + 0.055) / 1.055).powf(2.4)
-            }
-        };
         renderer.clear = wgpu::Color {
-            r: lin(avg(0)),
-            g: lin(avg(1)),
-            b: lin(avg(2)),
+            r: avg(0),
+            g: avg(1),
+            b: avg(2),
             a: 1.0,
         };
     }
@@ -299,7 +314,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     }
     let snap = Snapshot::lerp(&prev, &Snapshot::of(&game.sim), 1.0);
     let (_, device, queue) = pollster::block_on(device(None))?;
-    let format = wgpu::TextureFormat::Rgba8UnormSrgb;
+    let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = Renderer::new(device, queue, format);
     upload(&mut r, game, data);
     let (w, h) = o.size;
@@ -411,11 +426,12 @@ impl App {
         let (adapter, device, queue) =
             pollster::block_on(adapter_device(&instance, Some(&surface)))?;
         let caps = surface.get_capabilities(&adapter);
+        // Gamma-space output, as the original (see render.rs).
         let format = caps
             .formats
             .iter()
             .copied()
-            .find(|f| f.is_srgb())
+            .find(|f| !f.is_srgb())
             .or(caps.formats.first().copied())
             .ok_or("no surface format")?;
         let size = window.inner_size();
