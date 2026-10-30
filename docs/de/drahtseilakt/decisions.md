@@ -32,6 +32,8 @@ sind zugleich ein Test des Konverters.
 
 ## Keine Spieldaten im Repository, weder original noch hochskaliert
 
+*Geändert am 31.10.2026: siehe „Das private Repository ist ein Backup“ unten.*
+
 Die Rechte an Ballance sind nicht mit Cyparade gestorben: Im Januar 2024 erschien das Spiel neu auf Steam
 (Ziggurat Interactive), es wird bei GOG verkauft. Originale Assets und alles, was daraus gemacht ist
 (hochskaliert, retuschiert), kommen nicht ins Repository. Neben dem Recht gibt es die Praxis: Eine
@@ -42,6 +44,8 @@ Das Repository ist vorerst privat (30.10.2026), was das Sperrrisiko während der
 Regel bleibt, weil der Code zur Veröffentlichung gedacht ist.
 
 ## Eine öffentliche Veröffentlichung hat eigene Inhalte
+
+*Ersetzt am 31.10.2026 durch „Das Spiel spielt nur die Daten des Spielers“ unten.*
 
 Eine Veröffentlichung für alle liefert die Engine mit neu gemachten Texturen und Leveln — im Geist des
 Originals gezeichnet, nicht aus seinen Pixeln — und nutzt die Daten des Originalspiels, wenn der Spieler eine
@@ -111,3 +115,26 @@ Telemetrie. Alles Nötige wird mit dem Spiel ausgeliefert (Schriften samt Lizenz
 Ballance-Kopie des Spielers. Community-Karten und Mods legt der Spieler selbst ab; das Spiel lädt sie nicht
 herunter. Build-Abhängigkeiten sind eine andere Frage: Der Build darf sie herunterladen, in festen Versionen und
 mit Prüfsummenabgleich, muss aber auch offline aus lokalen Kopien funktionieren.
+
+## Das Spiel spielt nur die Daten des Spielers
+
+Ersetzt „Eine öffentliche Veröffentlichung hat eigene Inhalte“. Wir erstellen keine Ersatzinhalte: Das Spiel
+spielt die Daten der eigenen Ballance-Kopie des Spielers, Originallevel wie Community-Karten. Verbesserungen
+dieser Daten — etwa auf bis zu 8K hochskalierte Texturen — entstehen durch Skripte, die der Spieler lokal auf
+seiner Kopie ausführt; das Ergebnis bleibt auf seinem Rechner und wird von uns nie verbreitet.
+
+## Eigene Level und originale `.nmo` — beides spielbar
+
+Das Spiel ist neu und hat ein eigenes Levelformat; Karten werden darin umgewandelt. Trotzdem lässt sich jede
+`.nmo` unverändert spielen — die zwölf Level, Level 13 und jede Community-Karte —, sodass eine misslungene
+oder unvollständige Umwandlung niemandem eine Karte nimmt. So passt das Spiel zu denen, die das Original
+exakt wollen, wie zu denen, die Neues ausprobieren. Das präzisiert „Zwei Levelformate, nebeneinander und
+dauerhaft“: Beide Formate werden gespielt, nicht nur gelesen.
+
+## Das private Repository ist ein Backup; das öffentliche beginnt sauber
+
+Solange das Repository privat ist, darf es alles enthalten, was die Arbeit braucht, Originallevel und andere
+Spieldaten eingeschlossen, als Backup. Die öffentliche Veröffentlichung ist nie dieses Repository, sondern ein
+neues, aus einem bereinigten Stand ohne diese Historie erstellt und vor dem ersten Push auf Spieldaten
+geprüft. Bis dahin gilt die Regel „Keine Spieldaten im Repository“ für alles, was veröffentlicht werden soll:
+Code, Tests und Dokumentation hängen nicht davon ab, dass Spieldaten im Repository liegen.

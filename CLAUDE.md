@@ -47,9 +47,13 @@ The active profile for this project:
   A change covers all of them; what could not be built or tested on some target is said explicitly.
 - Style follows the existing code: 4 spaces, opening brace of a function on its own line, short
   `snake_case` names, a comment at the top of each file saying what it is for, comments that say *why*.
-- No game data in the repository, ever — not in tests, fixtures or examples (see `.gitignore`). Tests that need
-  the game read it from `OPENBALLANCE_DATA`; community maps come from `OPENBALLANCE_MAPS`, downloaded mods
-  from `OPENBALLANCE_MODS` (see `docs/drahtseilakt/community-maps.md`). Map files never enter the repository.
+- Code, tests, fixtures and examples never depend on game data in the repository (see `.gitignore`). Tests
+  that need the game read it from `OPENBALLANCE_DATA`; community maps come from `OPENBALLANCE_MAPS`, downloaded
+  mods from `OPENBALLANCE_MODS` (see `docs/drahtseilakt/community-maps.md`). While the repository is private it
+  may hold game data as a backup, only where the owner says; the public release is a new, clean repository
+  (decisions.md, "The private repository is a backup").
+- **The game plays only the player's own data.** No substitute content; enhancements (e.g. upscaled
+  textures) are scripts the player runs on their own copy. Both our native format and original `.nmo` play.
 - **Mods are never executed.** BML mods are Windows DLLs: a source of feature requirements, read only, never
   loaded, never run — not even under Wine.
 - **The game never goes online.** No network code in the game: fonts and every other resource ship with it or

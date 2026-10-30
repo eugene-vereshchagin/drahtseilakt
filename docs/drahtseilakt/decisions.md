@@ -30,6 +30,8 @@ converter.
 
 ## No game data in the repository, upscaled or not
 
+*Amended 2026-10-31: see "The private repository is a backup" below.*
+
 Ballance's rights did not die with Cyparade: the game was re-released on Steam in January 2024 (Ziggurat
 Interactive) and is sold on GOG. Original assets and anything derived from them (upscaled, retouched) stay
 out of the repository. Besides the law, a DMCA notice on GitHub disables the whole repository, not a folder.
@@ -39,6 +41,8 @@ The repository is private for now (2026-10-30), which removes the takedown risk 
 rule stays because the code is meant to be published.
 
 ## A public release has its own content
+
+*Replaced 2026-10-31 by "The game plays only the player's own data" below.*
 
 A release for everyone ships the engine with newly made textures and levels — drawn anew in the spirit of
 the original, not derived from its pixels — and uses the original game's data when the player has a copy
@@ -112,3 +116,26 @@ shaders or other resources on demand, no update checks, no telemetry. Everything
 included, with their licences) or comes from the player's own copy of Ballance. Community maps and mods are
 files the player puts in place; the game does not fetch them. Build-time dependencies are a separate matter:
 the build may download them, pinned and checked against a checksum, and must also work offline from local copies.
+
+## The game plays only the player's own data
+
+Replaces "A public release has its own content". We make no substitute content: the game plays the data of
+the player's own copy of Ballance, original levels and community maps alike. Improvements to that data —
+textures upscaled up to 8K, for instance — come from scripts the player runs locally on their own copy; the
+results stay on their machine and are never distributed by us.
+
+## Native levels and original `.nmo`, both playable
+
+The game is new and has its own level format; maps are converted into it. Players can still play any `.nmo`
+as it is — the twelve levels, level 13 and every community map — so a conversion that fails or falls short
+never takes a map away from anyone. This serves both those who want the original exactly and those who want
+something new. It sharpens "Two level formats, side by side, permanently": both formats are played, not only
+read.
+
+## The private repository is a backup; the public one starts clean
+
+While the repository is private it may hold whatever the work needs, original levels and other game data
+included, as a backup. The public release is never this repository: it is a new repository, created from a
+cleaned tree without this history, checked for game data before the first push. Until then the rule from
+"No game data in the repository" still applies to everything meant to be published: code, tests and docs
+do not depend on game data being in the repository.
