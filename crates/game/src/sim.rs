@@ -124,6 +124,7 @@ pub enum Event {
 }
 
 /// What the rules need from the level, resolved once.
+#[derive(Clone)]
 struct Rules {
     start: Vec3,
     checkpoints: Vec<(usize, Vec3)>,
@@ -135,8 +136,9 @@ struct Rules {
     death_y: f32,
 }
 
+#[derive(Clone)]
 pub struct Sim {
-    collider: Collider,
+    collider: std::sync::Arc<Collider>,
     rules: Rules,
     pub ball: Ball,
     pub camera: Camera,
@@ -157,7 +159,7 @@ const GATE_RADIUS: f32 = 7.0;
 
 impl Sim {
     pub fn new(level: &Level, start_ball: BallKind) -> Sim {
-        let collider = Collider::new(collision_triangles(level));
+        let collider = std::sync::Arc::new(Collider::new(collision_triangles(level)));
         let pos = |name: &str| -> Vec<(usize, Vec3)> {
             level
                 .members(name)
@@ -247,6 +249,20 @@ impl Sim {
             events: Vec::new(),
             prev_input: 0,
         }
+    }
+
+    /// The physical geometry, for planning.
+    pub fn collider(&self) -> &Collider {
+        &self.collider
+    }
+
+    /// Where the ball should go next: the next checkpoint in order, then the end of the level.
+    pub fn next_target(&self) -> Option<Vec3> {
+        self.rules
+            .checkpoints
+            .get(self.sector)
+            .map(|c| c.1)
+            .or(self.rules.end)
     }
 
     pub fn step(&mut self, input: u8) {

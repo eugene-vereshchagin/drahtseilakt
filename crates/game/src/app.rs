@@ -193,6 +193,41 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     if let Some(path) = &o.screenshot {
         return screenshot(&mut game, &data, &o, path);
     }
+    if o.autopilot {
+        let limit = o.ticks.unwrap_or(60 * 600);
+        let mut route = None;
+        let mut route_for = None;
+        while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
+            // A new route whenever the target changes (after each checkpoint).
+            let target = game.sim.next_target();
+            if route_for != target {
+                route = target.map(|t| crate::autopilot::Route::new(game.sim.collider(), t));
+                route_for = target;
+            }
+            let keys = match &route {
+                Some(r) => crate::autopilot::choose(&game.sim, r),
+                None => 0,
+            };
+            game.tick(keys);
+        }
+        let s = &game.sim;
+        println!(
+            "autopilot: {} after {} ticks ({}), points {}, lives {}, sector {}",
+            if s.finished {
+                "finished"
+            } else if s.game_over {
+                "game over"
+            } else {
+                "stopped at the limit"
+            },
+            s.tick,
+            clock(s.tick),
+            s.points,
+            s.lives,
+            s.sector + 1
+        );
+        return Ok(());
+    }
     if o.headless {
         let end = game
             .replay_in

@@ -23,6 +23,7 @@ pub struct Triangle {
     pub surface: Surface,
 }
 
+#[derive(Clone)]
 pub struct Collider {
     pub triangles: Vec<Triangle>,
     cells: HashMap<(i32, i32, i32), Vec<u32>>,
@@ -62,6 +63,25 @@ impl Collider {
             cell,
             min_y: if min_y.is_finite() { min_y } else { 0.0 },
         }
+    }
+
+    /// Indices of the triangles whose cells touch a box around `p` of half-size `radius`.
+    pub fn nearby(&self, p: Vec3, radius: f32) -> Vec<u32> {
+        let r = Vec3::splat(radius);
+        let (l, h) = (key(p - r, self.cell), key(p + r, self.cell));
+        let mut seen: Vec<u32> = Vec::new();
+        for x in l.0..=h.0 {
+            for y in l.1..=h.1 {
+                for z in l.2..=h.2 {
+                    if let Some(list) = self.cells.get(&(x, y, z)) {
+                        seen.extend_from_slice(list);
+                    }
+                }
+            }
+        }
+        seen.sort_unstable();
+        seen.dedup();
+        seen
     }
 
     /// Every triangle the sphere touches, deepest first.
