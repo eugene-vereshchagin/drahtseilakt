@@ -1,0 +1,25 @@
+# Drahtseilakt: the cargo workspace. Crates live in crates/; dependencies are pinned in Cargo.lock and
+# vendored, so a build never needs the network (docs/drahtseilakt/decisions.md, "The game never goes online").
+
+[workspace]
+resolver = "3"
+members = ["crates/nmo"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-only"
+repository = "https://github.com/eugene-vereshchagin/drahtseilakt"
+
+[workspace.dependencies]
+miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"

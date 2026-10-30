@@ -47,3 +47,6 @@ __pycache__/
 # Never carried into the public repository.
 !/levels/**/*.nmo
 !/levels/**/*.NMO
+
+# Cargo build output
+/target/
