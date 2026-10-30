@@ -166,13 +166,24 @@ impl Sim {
             trafos,
             death_y: collider.min_y - 60.0,
         };
-        // The start object's Z axis points back at the camera: the camera sits on that side and looks the other
-        // way, down the way out of the start. Quarter turns, as the original camera does.
-        let start_axis = level
-            .members("PS_Levelstart")
-            .next()
-            .map(|(_, o)| -Vec3::new(o.matrix[2][0], 0.0, o.matrix[2][2]))
-            .unwrap_or(Vec3::Z);
+        // The camera starts looking the way out of the start: where the physical floor around the start leads
+        // (the mean direction to floor vertices in a ring around it), in quarter turns as the original camera
+        // turns. The start object's axes do not tell this reliably (they agree in 7 of 13 levels). Without a
+        // clear way out: +X, the most common in the original levels.
+        let ring = collider
+            .triangles
+            .iter()
+            .flat_map(|t| [t.a, t.b, t.c])
+            .fold(Vec3::ZERO, |acc, v| {
+                let d = Vec3::new(v.x - start.x, 0.0, v.z - start.z);
+                let len = d.length();
+                if (14.0..45.0).contains(&len) && (v.y - start.y).abs() < 20.0 {
+                    acc + d / len
+                } else {
+                    acc
+                }
+            });
+        let start_axis = if ring.length() > 1.0 { ring } else { Vec3::X };
         let quarter =
             (start_axis.x.atan2(start_axis.z) / std::f32::consts::FRAC_PI_2).round() as i32;
         let yaw = quarter as f32 * std::f32::consts::FRAC_PI_2;
