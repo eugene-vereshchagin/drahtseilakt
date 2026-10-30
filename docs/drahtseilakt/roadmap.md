@@ -3,8 +3,10 @@
 What this fork is going to do, in order, and how we know each step is done. The reasons behind the choices
 are in [decisions.md](decisions.md). Start here if you are picking the work up.
 
-State on 2026-10-30: the fork is the upstream OpenBallance 0.1.3 plus project rules (`CLAUDE.md`) and these
-documents. No engine code has been changed yet; phase 0 is under way.
+State on 2026-10-31: phase 0 is closed. Its outcome (decisions.md, "Everything from scratch, in Rust"): the
+engine, the game and the tools are written anew; OpenBallance, Ballanced and the original game under Wine
+are references and test benches. The repository still holds upstream's C code until phase 1 replaces it.
+Next: phase 1.
 
 ## Phase 0 — evaluate Ballanced before writing a backend
 
@@ -77,173 +79,103 @@ branch `sdl` at commit `ececf94`, preset `linux-x64-runtime`.
   (load only: nobody played them through).
 - **Not yet checked:** `--unlock-framerate`, the full map set.
 
-## Phase 1 — native backend
+## Phase 1 — foundation and the Virtools file reader
 
-Goal: a normal native executable (Linux, Windows, macOS) that opens a window and plays the game, with no gasm.
+Goal: a clean Rust codebase that reads every `.nmo` / `.cmo` the game and the community have produced, safely.
 
-- New backend implementing `src/platform.h` with **SDL3**: window, keyboard (the core wants DirectInput key
-  codes, `plat_dik_keys`), mouse, gamepads, audio output, user files (saves, settings) in the platform's
-  standard per-user data directory, launch parameters from the command line.
-- New implementation of `src/render/gpu.h` on **wgpu-native**. `gpu.h` is already WebGPU-shaped with WGSL
-  shaders and JSON descriptors, so this is a translation layer, not a new renderer. `gpu.h` and
-  `platform_gasm.c` (`gpu_*` forwarding) show the exact contract.
-- **Fixed 60 Hz simulation.** `src/app.c` calls `ck_process(&ctx, 1000.0f / 60)` once per rendered frame,
-  which is only correct because gasm calls the game exactly 60 times a second. Natively the simulation must
-  tick at a fixed 60 Hz from an accumulator, whatever the display does; the renderer draws at the display's
-  rate and interpolates entity transforms between the last two ticks. Logic and physics never see a
-  variable step (the physics and every community map are tuned to 60 Hz).
-- CMake: a `native` platform target producing the game executable, next to the existing `gasm` target and
-  the data-free `ob_core` library. Dependencies at exact, pinned versions; anything downloaded is checked
-  against a checksum. Hardening flags from the secure-codegen C rules in release builds; ASan + UBSan in
-  debug builds.
-- Packaging basics: `.desktop` file and icon on Linux.
+- A cargo workspace in this repository (`Cargo.toml` at the root, crates in `crates/`). Dependencies are
+  pinned in `Cargo.lock` and vendored, so the build works offline; each crate is checked before it is added
+  (exists, maintained, licence compatible with GPL-3.0).
+- The reader: file header, compressed parts, object table, state chunks, manager data, embedded files. The
+  input is hostile: every read is bounds-checked, sizes, counts and nesting are capped, and a malformed file
+  fails with an error that names the offset — never a panic. No `unsafe` in the reader.
+- `nmo-dump`, a command-line tool that prints what a file holds: objects, groups, meshes, materials, textures,
+  behaviour graphs.
+- Tests: synthetic files built by the tests themselves; fuzz targets (cargo-fuzz); local tests over the
+  player's copy (`OPENBALLANCE_DATA`), the thirteen levels in `levels/` and the map collection
+  (`OPENBALLANCE_MAPS`).
+- **Inventory**: across all maps, which object classes, group names, Building Blocks and parameter types occur
+  and how often. It sets the order of phases 4 and 5.
+- The upstream C code leaves the build (history keeps it); `docs/` stays as reference.
 
-Done when: the native build plays all twelve levels on Linux, Windows and macOS at the original speed on a
-60 Hz and on a 144 Hz display. (The browser build is no longer a target: decisions.md, "No browser build".)
+Done when: every file of the game and all ~600 maps either parse completely or fail with a clean error;
+fuzzing has run for a meaningful time without findings; the inventory exists.
 
-## Phase 1b — recorded replays
+## Phase 2 — the first level on screen
 
-Goal: nobody replays levels by hand to check that a change broke nothing.
+- Window, input and audio host; renderer on wgpu (Vulkan, Metal, Direct3D 12). Whether the window comes from
+  an SDL3 binding or from pure-Rust crates (winit, gilrs, cpal) is decided at the start and recorded.
+- Level 1 drawn from its `.nmo` with the player's textures: meshes, materials, transparency, sky, lights.
+- Any resolution and aspect ratio from the first frame, no 4:3: the 3D view uses the real aspect ratio; the
+  2D layout keeps 640×480 at 4:3 in the middle and anchors edge elements to the edges; HiDPI; 8K checked.
+- The fixed 60 Hz simulation tick with interpolated rendering from the start.
+- A free camera to fly through any level.
 
-- With the fixed 60 Hz step the game is deterministic: the same input from the same tick gives the same
-  trajectory. A **replay** is a log of input per tick, recorded from live play, in a documented text format
-  (versioned; it names the level by a hash of its file, so a replay never runs against the wrong data).
-- Headless playback at full speed (upstream's `run_test` already drives the game headless with scripted
-  input). A replay checks: checkpoints reached on the expected ticks, the finish, the score.
-- Floating-point results can differ between CPU architectures and compilers, and small differences grow over
-  hundreds of ticks. Replays are checked at key points with a tolerance; exact matching keeps one reference
-  per platform.
-- Where replays come from: the owner plays each level once; the original game under Wine (phase 5); speedrun
-  recordings, if the community's formats can be converted.
-- Replays contain only our input, no game data, so they live in the repository (`tests/replays/`) and run in CI.
+Done when: all thirteen levels can be flown through and look like the original (owner's judgement, frames
+compared with the original under Wine).
 
-Done when: a replay of each of the twelve levels is recorded, plays back headless, and fails when the physics
-is deliberately changed.
+## Phase 3 — the ball
 
-## Phase 2 — any resolution and aspect ratio, up to 8K
+- **Reference**: the original game under Wine as a measuring instrument — scripted input, the ball's position
+  and velocity per tick read from the running game without changing its files (the method is worked out in
+  this phase). Recorded scenarios become reference trajectories.
+- **Own physics**, from scratch: the three balls on static geometry with friction, damping and gravity as
+  measured; boxes and moving objects follow in phase 4. The collision geometry is the original's, polygon for
+  polygon.
+- Ball control and the game camera, as in the original.
 
-- 3D: the projection is hard-wired to 4:3 in `src/render/render.c` (the three `4.0f / 3.0f` call sites:
-  game camera, default camera, sky) and the picture is letterboxed. Use the real drawable aspect ratio.
-- 2D: menus and the HUD live in a 640×480 coordinate space (`src/app.c` maps the mouse into it,
-  `render.c` draws the foreground in it). Scale it to the drawable with one rule: the 640×480 layout is kept
-  at 4:3 in the middle, and elements anchored to an edge stay on that edge. Mouse mapping uses the same rule.
-- HiDPI: render at the real pixel size of the window (SDL3 pixel density), not logical points.
-- 8K (7680×4320) fits WebGPU's default 8192 texture/framebuffer limit; verify, don't assume.
-- Image quality: anisotropic filtering on world textures (most of a Ballance level is seen at a grazing
-  angle), MSAA. Both configurable.
+Done when: the reference scenarios stay within tolerance, and the owner rolls through level 1 and says the
+ball feels right.
 
-Done when: 16:9, 21:9, 16:10 and 4:3 windows show an undistorted picture and a usable HUD and menu, from
-1280×720 to 7680×4320, and resizing the window works.
+## Phase 4 — the game
 
-## Phase 3 — round things look round
+- The rules natively, driven by the level's data (its group conventions): start, sectors, checkpoints and
+  resets, lives, score, extra points and lives, ball transformers, the physical and moving objects, the
+  finish. Menu, HUD (laid out for any aspect ratio), sound, music.
+- **Replays**: a per-tick input log in a documented, versioned text format, the level identified by its hash.
+  Headless playback checks checkpoints, finish and score. Replays hold only our input, so they live in the
+  repository (`tests/replays/`) and run in CI.
+- Level 13.
 
-The original's curved geometry — the ball, rails, pipes, rounded platform edges, curved chutes — is coarse
-polygons, and at modern resolutions every facet shows. This phase makes it look smooth. **Which techniques
-are used, and how far each goes, is decided with the owner after trying them**; the candidates:
+Done when: all thirteen levels can be finished, and each has a replay that passes.
 
-- **The ball, analytically.** A render primitive "analytic sphere": drawn by ray–sphere intersection per
-  pixel, with per-pixel lighting and exact depth, so it is round at any resolution and distance. Which meshes
-  are spheres comes from data (a table of the three ball meshes by name; in the open format a property of the
-  object), never from a special case in the renderer. The texture keeps the original mapping.
-- **Per-pixel lighting with smooth normals** for all geometry. Much of the faceted look is the original's
-  per-vertex lighting smeared across faces; lighting per pixel makes curved surfaces read as curved without
-  changing a vertex. Cheapest, largest win.
-- **Phong tessellation** (or a similar normal-guided refinement): triangles are subdivided and bent along the
-  vertex normals. Where neighbouring faces share normals (rails, pipes) the surface rounds; where an edge has
-  split normals (box corners, platform edges) it stays sharp. One rule for all geometry, community maps
-  included — the silhouette of a rail becomes a circle.
-- **Rebuilding recognised primitives** (a rail as a circle swept along a path, regenerated at any detail):
-  the cleanest result but harder and brittler; belongs in the converter (phase 6), not the runtime.
+## Phase 5 — community maps
 
-Fixed regardless of the choice: **physics stays on the original geometry.** Smoothing is visual only; the
-ball rolls on the same polygons as in 2004, or its behaviour and every community map would change. Check that
-the small gap between the visible and the physical surface (the ball looking a hair sunk or lifted) is not
-noticeable.
+- A maps folder in the per-user data directory and an in-game list (title, author, difficulty from the
+  catalogue).
+- Maps that follow the standard conventions play through phase 4's native rules.
+- Maps with their own Virtools scripts: an interpreter for behaviour graphs, with Building Blocks implemented
+  in the order the inventory gives. A map that needs a block we lack is not run half-way: it is reported by
+  block name and GUID and marked unsupported.
+- **Game profiles**: *Classic* — the original game only (twelve levels and level 13, original rules; replays
+  and records count only here); *Extended* — third-party content at the player's own risk, with a clear
+  warning: community maps, texture packs, later mods. Mods means our own system — data and scripts in a
+  sandbox without file or network access; BML mods are Windows DLLs and are never loaded.
 
-Done when: the chosen techniques are in; the three balls are perfectly round at 8K and close up and otherwise
-look like the originals; rails and other curved parts no longer show facets at the resolutions of phase 2;
-the replays (phase 1b) give the same trajectories as before (nothing physical moved).
-
-## Phase 3b — replays rendered to video
-
-Goal: an 8K video of a perfect run of the new-looking Ballance, for a YouTube channel.
-
-- Render a replay offline, frame by frame, at any resolution (up to 7680×4320) and a fixed frame rate,
-  independent of real time — a slow machine still produces a perfectly smooth 8K video. Audio is rendered from
-  the same deterministic run. Frames go to an encoder (e.g. ffmpeg) as a stream, not as files on disk.
-- Cameras: the game camera first; a cinematic camera (smooth follow, wide shots of a level) later, as data
-  in the replay or beside it, not as code per level.
-- "Perfect" runs: the best human runs (owner, speedrunners) first. An automatic search for fast input — a
-  TAS-style optimiser that tries input sequences until the ball reaches the next checkpoint sooner — is a
-  later stretch goal; it needs no human, but it is a research project of its own.
-- Uploading is publishing: nothing goes to YouTube without the owner's command. Footage made from the original
-  assets is the rights holder's content; videos of a release with our own textures (see decisions.md) carry
-  no such question.
-
-Done when: one level's replay renders to an 8K video with sound that the owner is happy to publish.
-
-## Phase 4 — level 13 and community maps
-
-- **Level 13** ("Speed"): a free add-on released by Cyparade in 2004, not on the original disc. Loading is
-  hard-wired to 12 levels (`src/app.c`, `Level_%02d.NMO`; the viewer accepts 1–12). Support 13 when the file
-  is present, through the same path as the others.
-- **Community maps**: ~425 maps (2009–today) are listed in
-  [pseudoacetyl/BallanceCustomMaps](https://github.com/pseudoacetyl/BallanceCustomMaps) (`CustomMapList.md`:
-  author, difficulty, type, videos); downloads are on the community's Mega drive, a curated pack on
-  MediaFire, recent ones in the Ballance Discord `#new` channel
-  ([FAQ](https://yyc12345.github.io/ballance-discord-rules/en/faq/)). A map is a `.NMO` in the same format as
-  `Level_XX.NMO`. Sources, the catalogue's format and how to use it: [community-maps.md](community-maps.md).
-  - A maps folder in the per-user data directory and an in-game menu to pick one. Original files are never
-    touched (the community's other conventions are replacing `Level_XX.NMO` or BML's `ModLoader/Maps`).
-  - A map that uses a Building Block we don't implement does not crash: the game reports which block is
-    missing, by name and GUID. A headless run over the whole collection produces a frequency list of
-    missing blocks; implement them in that order.
-  - **Maps are untrusted input** (strangers' file shares). Before the maps menu exists, every parser that
-    reads `.nmo` / `.cmo` has fuzz targets, runs under ASan + UBSan, and fails closed on malformed data.
-
-- **Game profiles**: one setting with two values.
-  - *Classic* — the original game and nothing else: the twelve levels and level 13, original rules, no
-    third-party content. Replays, records and comparisons with the original are only meaningful here.
-  - *Extended* — third-party content allowed, at the player's own risk, with a clear warning when switching:
-    community maps, texture packs, and later mods. **Mods here means our own mod system** — data and scripts
-    run in a sandbox (no file or network access), the same on every platform. The community's BML mods are
-    Windows DLLs for the original runtime and cannot be loaded by this engine at all.
-  - Graphics improvements (resolution, round geometry, filtering) are separate settings and available in both
-    profiles: they change how the game looks, not what it is.
-
-Done when: level 13 plays; a folder of community maps is listed and playable; the missing-block report
-exists; the parsers have been fuzzed without findings for a meaningful run.
-
-## Phase 5 — physics checked against the original
-
-The upstream port has not been compared numerically with the original game (`docs/guide/status.md`).
-
-- Record reference trajectories from the original game (run once under Wine purely as a measuring
-  instrument): ball type, start, input sequence → position and velocity per tick.
-- Replay the same scenarios headless in our engine and compare automatically. A mismatch points at a tick
-  and a contact, not at a feeling.
-- These become regression tests.
+Done when: most maps play; the report lists the rest, each with its reason.
 
 ## Phase 6 — open level format and converter
 
-- An open, documented level format: geometry glTF 2.0, textures PNG, sounds Opus, object placement and
-  properties in a text file. The spec lives in `docs/`.
-- A converter from `.nmo` to it, as a separate tool.
-- The engine understands both formats side by side, permanently: `.nmo` stays because the community maps
-  exist only in it.
-- Making converted levels play without the Virtools graphs means moving game logic from graphs to typed
-  entities in the engine — an architecture change, done after phases 1–5.
-- Test: each original level and its converted copy must produce the same trajectories for the same input.
-- Texture upscaling is a step of this pipeline: the repository holds the pipeline and its parameters (model
-  with an open licence, per-texture settings and masks), never upscaled original textures. See decisions.md.
+- An open, documented level format: geometry glTF 2.0, textures PNG, sounds Opus, placement and properties in
+  a text file. The spec lives in `docs/`.
+- A converter from `.nmo`, run by the player on their own files. The engine plays both formats permanently
+  (decisions.md).
+- Test: each original level and its converted copy give the same trajectories for the same replay.
+
+## Phase 7 — looks and extras
+
+- **Round things look round**: the ball drawn analytically; per-pixel lighting with smooth normals;
+  normal-guided tessellation for rails and pipes. Visual only: physics stays on the original polygons. Which
+  techniques, and how far, is decided with the owner after trying them.
+- **Local texture enhancement**: scripts the player runs on their own copy to upscale textures (up to 8K);
+  the repository holds the pipeline and its parameters, never the results.
+- **Replays rendered to video**: offline, frame by frame, at any resolution up to 8K with sound. Nothing is
+  uploaded without the owner's command.
 
 ## Throughout
 
-- Fix the findings from applying the secure-codegen rules to upstream code as the touched code comes up:
-  CI actions are pinned by tag (`actions/checkout@v7`) instead of by commit SHA and have no `permissions:`;
-  no hardening flags in CMake; two `strcpy` of constants in `src/app.c`.
-- Data-free tests run everywhere (unit, synthetic `.nmo`, fuzzing, sanitizers); game-data tests run locally
-  against `OPENBALLANCE_DATA`.
-- Documentation in three languages (see `CLAUDE.md`). Upstream's documentation (user guide, internals)
-  exists only in English for now; before the official site goes live it needs Russian and German
-  translations, and the site has to be renamed from OpenBallance to Drahtseilakt.
+- The security rules (`CLAUDE.md`): hostile input, pinned and vendored dependencies, CI actions pinned by
+  commit SHA with minimal `permissions:` (upstream's workflows pin by tag and must be fixed or replaced).
+- Data-free tests run everywhere (unit, synthetic files, fuzzing); game-data tests run locally.
+- Documentation in three languages. Upstream's English-only documentation is reference material and is not
+  translated unless it becomes ours.

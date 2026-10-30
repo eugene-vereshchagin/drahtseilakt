@@ -5,6 +5,8 @@ Entscheidungen kommen ans Ende; eine ersetzte Entscheidung wird als ersetzt mark
 
 ## OpenBallance forken, nicht neu schreiben
 
+*Ersetzt am 31.10.2026 durch „Alles von Grund auf, in Rust“ unten.*
+
 Der Upstream-Code ist sauberes C11 (~27 000 Zeilen) mit einer ehrlichen Trennung zwischen portablem Kern und
 Host: Der Kern braucht nur `src/platform.h` und `src/render/gpu.h`, die ganze gasm-Anbindung ist eine Datei.
 Er führt bereits die originalen Virtools-Graphen aus, setzt die ~180 Building Blocks um, die das Spiel nutzt,
@@ -19,6 +21,8 @@ Funktionierenden Code in einer anderen Sprache neu zu schreiben bringt dem Spiel
 C ist außerdem die portabelste Wahl für unsere Zielplattformen.
 
 ## SDL3 für den Host, wgpu-native für die Grafik
+
+*Ersetzt am 31.10.2026 durch „Alles von Grund auf, in Rust“ unten (die Grafik bleibt bei wgpu, als Rust-Bibliothek).*
 
 SDL3 ist der De-facto-Standard für Fenster, Eingabe, Gamepads und Ton unter Linux, Windows und macOS und in
 den Distributionen paketiert. wgpu-native ist WebGPU als native Bibliothek mit C-Schnittstelle, die auf
@@ -92,6 +96,8 @@ Locale pro Sprache gebaut. (Ersetzt den früheren Eintrag zu zwei Sprachen.)
 
 ## Offen: OpenBallance oder Ballanced als Basis
 
+*Geschlossen am 31.10.2026 durch „Alles von Grund auf, in Rust“ unten: keins von beiden.*
+
 Gefunden, nachdem der Fork angelegt war: [Ballanced](https://github.com/doyaGu/Ballanced) baut die komplette
 Virtools-Laufzeitumgebung nativ auf SDL3 nach und erledigt womöglich schon einen Großteil von Phase 1. Die Wahl
 zwischen Bleiben, Umziehen und Übernehmen fällt, nachdem Phase 0 es tatsächlich unter Linux gestartet hat, nicht
@@ -149,6 +155,34 @@ Ziele sind natives Linux, Windows und macOS.
 
 ## Die Sprache dient dem Code
 
+*Ersetzt am 31.10.2026 durch „Alles von Grund auf, in Rust“ unten.*
+
 Ersetzt „Die Engine bleibt in C“. C und C++ sind beide recht — worin der Code geschrieben ist, auf dem wir
 aufbauen, und was die Quellen verständlich hält. Wichtig ist, dass alles als Quelltext vorliegt und das
 Projekt in Ordnung ist, nicht die Sprache.
+
+## Alles von Grund auf, in Rust
+
+Schließt Phase 0 ab und ersetzt „OpenBallance forken, nicht neu schreiben“, „SDL3 für den Host, wgpu-native
+für die Grafik“ und „Die Sprache dient dem Code“. Engine, Spiel, Konverter und Werkzeuge werden neu
+geschrieben; Code anderer Projekte wird nicht übernommen.
+
+Der Grund ist die Herkunft. Die Physik von Ballanced ist der geleakte Ipion-Quelltext aus der Source-Engine
+(„All rights reserved“, ohne Lizenz), und zwei seiner Module haben gar keine Lizenz; die Physik von
+OpenBallance wurde nach unserer eigenen Dekompilierung der Original-DLL portiert. Teile zu übernehmen hieße,
+diese Fragen zu erben, und eine Übersetzung in eine andere Sprache klärt sie nicht: Eine Übersetzung ist ein
+abgeleitetes Werk. Von Grund auf geschrieben hat jede Zeile eine klare Herkunft.
+
+Warum Rust: Das Hauptrisiko der Engine sind feindliche Eingaben (Community-Karten von fremden Filesharern),
+und Parser in sicherem Rust können weder außerhalb von Puffern lesen noch Speicher beschädigen — eine ganze
+Fehlerklasse, die die Sicherheitsregeln sonst von Hand bekämpfen, fällt weg. wgpu (Vulkan, Metal, Direct3D 12)
+ist dort heimisch, und cargo liefert festgelegte, vendorte Offline-Builds und Fuzzing auf allen drei
+Plattformen.
+
+## Andere Projekte sind Vorbilder und Prüfstände
+
+OpenBallance, Ballanced und das Originalspiel unter Wine dienen dazu, Verhalten zu studieren und damit zu
+vergleichen: ausführen, ihre Dokumentation lesen, messen. Code wird daraus nicht kopiert. Der geleakte
+Ipion-Quelltext wird gar nicht geöffnet: Die Physik entsteht aus dem gemessenen Verhalten des Originalspiels.
+Die Reverse-Engineering-Notizen in `docs/` (Dateiformate, Building Blocks, Verhalten des Spiels) bleiben als
+Nachschlagewerk.

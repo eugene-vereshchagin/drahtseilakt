@@ -3,8 +3,10 @@
 Was dieser Fork vorhat, in welcher Reihenfolge und woran man erkennt, dass ein Schritt fertig ist. Die Gründe
 für die Entscheidungen stehen in [decisions.md](decisions.md). Wer die Arbeit übernimmt, fängt hier an.
 
-Stand 30.10.2026: Der Fork ist das OpenBallance 0.1.3 des Upstreams plus Projektregeln (`CLAUDE.md`) und diese
-Dokumente. Am Engine-Code wurde noch nichts geändert; Phase 0 läuft.
+Stand 31.10.2026: Phase 0 ist abgeschlossen. Ihr Ergebnis (decisions.md, „Alles von Grund auf, in Rust“):
+Engine, Spiel und Werkzeuge werden neu geschrieben; OpenBallance, Ballanced und das Originalspiel unter Wine
+sind Vorbilder und Prüfstände. Das Repository enthält noch den C-Code des Upstreams, bis Phase 1 ihn ersetzt.
+Als Nächstes: Phase 1.
 
 ## Phase 0 — Ballanced prüfen, bevor ein Backend geschrieben wird
 
@@ -82,194 +84,107 @@ Ballanced: Branch `sdl`, Commit `ececf94`, Preset `linux-x64-runtime`.
   (nur Laden: durchgespielt hat sie niemand).
 - **Noch nicht geprüft:** `--unlock-framerate`, der ganze Kartensatz.
 
-## Phase 1 — nativer Backend
+## Phase 1 — Grundlage und Leser für Virtools-Dateien
 
-Ziel: eine ganz normale native ausführbare Datei (Linux, Windows, macOS), die ein Fenster öffnet und das Spiel
-spielt, ohne gasm.
+Ziel: eine saubere Rust-Codebasis, die jede `.nmo` / `.cmo` des Spiels und der Community sicher liest.
 
-- Ein neuer Backend, der `src/platform.h` mit **SDL3** umsetzt: Fenster, Tastatur (der Kern erwartet
-  DirectInput-Tastencodes, `plat_dik_keys`), Maus, Gamepads, Tonausgabe, Benutzerdateien (Spielstände,
-  Einstellungen) im üblichen Benutzerdatenverzeichnis der Plattform, Startparameter von der Kommandozeile.
-- Eine neue Umsetzung von `src/render/gpu.h` auf **wgpu-native**. `gpu.h` ist bereits wie WebGPU aufgebaut,
-  mit WGSL-Shadern und JSON-Deskriptoren, also ist das eine Übersetzungsschicht und kein neuer Renderer.
-  Den genauen Vertrag zeigen `gpu.h` und die `gpu_*`-Funktionen in `platform_gasm.c`.
-- **Simulation mit festem 60-Hz-Takt.** `src/app.c` ruft `ck_process(&ctx, 1000.0f / 60)` einmal pro
-  gezeichnetem Bild auf. Das stimmt nur, weil gasm das Spiel genau 60-mal pro Sekunde aufruft. Nativ muss die
-  Simulation aus einem Zeitakkumulator mit festen 60 Hz takten, egal was der Bildschirm macht; der Renderer
-  zeichnet mit der Bildwiederholrate des Bildschirms und interpoliert die Lage der Objekte zwischen den beiden
-  letzten Takten. Logik und Physik bekommen nie einen variablen Schritt: Die Physik und jede Community-Karte
-  sind auf 60 Hz abgestimmt.
-- CMake: ein Plattformziel `native`, das die ausführbare Datei des Spiels baut, neben dem vorhandenen Ziel
-  `gasm` und der datenfreien Bibliothek `ob_core`. Abhängigkeiten in exakten, festgelegten Versionen; alles
-  Heruntergeladene wird gegen eine Prüfsumme geprüft. In Release-Builds die Härtungs-Flags aus den
-  secure-codegen-Regeln für C, in Debug-Builds ASan + UBSan.
-- Grundlagen der Paketierung: `.desktop`-Datei und Icon unter Linux.
+- Ein Cargo-Workspace in diesem Repository (`Cargo.toml` im Wurzelverzeichnis, Crates in `crates/`).
+  Abhängigkeiten sind in `Cargo.lock` festgelegt und vendort, sodass der Build offline funktioniert; jedes Crate
+  wird vor der Aufnahme geprüft (existiert, wird gepflegt, Lizenz mit GPL-3.0 verträglich).
+- Der Leser: Dateikopf, komprimierte Teile, Objekttabelle, State Chunks, Managerdaten, eingebettete Dateien.
+  Die Eingabe ist feindlich: Jeder Lesezugriff wird auf Grenzen geprüft, Größen, Anzahlen und Verschachtelung
+  sind begrenzt, und eine fehlerhafte Datei endet mit einem Fehler samt Offset — nie mit einer Panik. Kein
+  `unsafe` im Leser.
+- `nmo-dump`, ein Kommandozeilenwerkzeug, das zeigt, was eine Datei enthält: Objekte, Gruppen, Meshes,
+  Materialien, Texturen, Verhaltensgraphen.
+- Tests: synthetische Dateien, die die Tests selbst bauen; Fuzz-Ziele (cargo-fuzz); lokale Tests auf der Kopie
+  des Spielers (`OPENBALLANCE_DATA`), den dreizehn Leveln in `levels/` und der Kartensammlung
+  (`OPENBALLANCE_MAPS`).
+- **Bestandsaufnahme**: welche Objektklassen, Gruppennamen, Building Blocks und Parametertypen in allen Karten
+  vorkommen und wie oft. Sie bestimmt die Reihenfolge der Phasen 4 und 5.
+- Der C-Code des Upstreams verlässt den Build (die Historie bewahrt ihn); `docs/` bleibt als Nachschlagewerk.
 
-Fertig, wenn: der native Build alle zwölf Level unter Linux, Windows und macOS in Originalgeschwindigkeit
-spielt, auf einem 60-Hz- wie auf einem 144-Hz-Bildschirm. (Der Browser-Build ist kein Ziel mehr: decisions.md, „Kein Browser-Build“.)
+Fertig, wenn: jede Datei des Spiels und alle ~600 Karten entweder vollständig gelesen werden oder mit einem
+klaren Fehler abbrechen; das Fuzzing lief ausreichend lange ohne Befund; die Bestandsaufnahme liegt vor.
 
-## Phase 1b — aufgezeichnete Durchläufe (Replays)
+## Phase 2 — das erste Level auf dem Bildschirm
 
-Ziel: Niemand muss Level von Hand nachspielen, um zu prüfen, dass eine Änderung nichts kaputt gemacht hat.
+- Host für Fenster, Eingabe und Ton; Renderer auf wgpu (Vulkan, Metal, Direct3D 12). Ob das Fenster aus einer
+  SDL3-Anbindung oder aus reinen Rust-Crates (winit, gilrs, cpal) kommt, wird zu Beginn entschieden und
+  festgehalten.
+- Level 1 aus seiner `.nmo` mit den Texturen des Spielers: Meshes, Materialien, Transparenz, Himmel, Licht.
+- Jede Auflösung und jedes Seitenverhältnis ab dem ersten Bild, kein 4:3: Die 3D-Ansicht nutzt das echte
+  Seitenverhältnis; das 2D-Layout hält 640×480 in 4:3 in der Mitte und verankert Randelemente an den Rändern;
+  HiDPI; 8K wird geprüft.
+- Der feste Simulationstakt von 60 Hz mit interpoliertem Rendern von Anfang an.
+- Eine freie Kamera, um durch jedes Level zu fliegen.
 
-- Mit dem festen 60-Hz-Takt ist das Spiel deterministisch: Dieselbe Eingabe ab demselben Takt ergibt dieselbe
-  Bahn. Ein **Replay** ist ein Protokoll der Eingabe pro Takt, aus echtem Spielen aufgezeichnet, in einem
-  dokumentierten Textformat (versioniert; das Level ist darin per Hash seiner Datei benannt, sodass ein Replay
-  nie mit falschen Daten läuft).
-- Wiedergabe ohne Fenster in voller Geschwindigkeit (`run_test` aus dem Upstream steuert das Spiel bereits ohne
-  Fenster mit geskripteter Eingabe). Ein Replay prüft: Checkpoints in den erwarteten Takten erreicht, das Ziel,
-  die Punkte.
-- Gleitkommaergebnisse können sich zwischen CPU-Architekturen und Compilern unterscheiden, und kleine
-  Abweichungen wachsen über Hunderte Takte. Replays werden an Schlüsselpunkten mit Toleranz geprüft; für exakte
-  Übereinstimmung hat jede Plattform eine eigene Referenz.
-- Woher Replays kommen: Der Inhaber spielt jedes Level einmal; das Originalspiel unter Wine (Phase 5);
-  Speedrun-Aufzeichnungen, falls sich die Formate der Community umwandeln lassen.
-- Replays enthalten nur unsere Eingabe und keine Spieldaten, daher liegen sie im Repository (`tests/replays/`)
-  und laufen in der CI.
+Fertig, wenn: sich alle dreizehn Level durchfliegen lassen und wie das Original aussehen (Urteil des
+Inhabers, Bilder verglichen mit dem Original unter Wine).
 
-Fertig, wenn: ein Replay jedes der zwölf Level aufgezeichnet ist, ohne Fenster abgespielt wird und fehlschlägt,
-wenn die Physik absichtlich verändert wird.
+## Phase 3 — die Kugel
 
-## Phase 2 — jede Auflösung und jedes Seitenverhältnis, bis 8K
+- **Referenz**: das Originalspiel unter Wine als Messinstrument — skriptgesteuerte Eingabe, Position und
+  Geschwindigkeit der Kugel je Takt aus dem laufenden Spiel gelesen, ohne seine Dateien zu ändern (die Methode
+  wird in dieser Phase erarbeitet). Aufgezeichnete Szenarien werden zu Referenzbahnen.
+- **Eigene Physik**, von Grund auf: die drei Kugeln auf statischer Geometrie mit Reibung, Dämpfung und
+  Schwerkraft wie gemessen; Kisten und bewegte Objekte folgen in Phase 4. Die Kollisionsgeometrie ist die des
+  Originals, Polygon für Polygon.
+- Kugelsteuerung und Spielkamera wie im Original.
 
-- 3D: Die Projektion ist in `src/render/render.c` fest auf 4:3 verdrahtet (die drei Stellen mit
-  `4.0f / 3.0f`: Spielkamera, Standardkamera, Himmel), das Bild hat schwarze Balken. Das echte
-  Seitenverhältnis der Zeichenfläche verwenden.
-- 2D: Menüs und HUD leben in einem 640×480-Koordinatenraum (`src/app.c` rechnet die Maus darauf um,
-  `render.c` zeichnet den Vordergrund darin). Nach einer einzigen Regel skalieren: Das 640×480-Layout bleibt
-  4:3 in der Mitte, an einem Rand verankerte Elemente bleiben an diesem Rand. Die Mausumrechnung folgt
-  derselben Regel.
-- HiDPI: in den echten Pixeln des Fensters zeichnen (Pixeldichte von SDL3), nicht in logischen Punkten.
-- 8K (7680×4320) passt in das Standardlimit von WebGPU von 8192 pro Textur und Bild; prüfen, nicht annehmen.
-- Bildqualität: anisotrope Filterung der Welttexturen (fast jedes Ballance-Level sieht man unter flachem
-  Winkel), MSAA. Beides einstellbar.
+Fertig, wenn: die Referenzszenarien innerhalb der Toleranz bleiben und der Inhaber durch Level 1 rollt und
+sagt, dass sich die Kugel richtig anfühlt.
 
-Fertig, wenn: Fenster in 16:9, 21:9, 16:10 und 4:3 ein unverzerrtes Bild mit brauchbarem HUD und Menü zeigen,
-von 1280×720 bis 7680×4320, und das Fenster sich während des Spiels in der Größe ändern lässt.
+## Phase 4 — das Spiel
 
-## Phase 3 — Rundes sieht rund aus
+- Die Regeln nativ, gesteuert von den Daten des Levels (seinen Gruppenkonventionen): Start, Sektoren,
+  Checkpoints und Rücksetzpunkte, Leben, Punkte, Bonuspunkte und -leben, Kugelwandler, physikalische und
+  bewegte Objekte, Ziel. Menü, HUD (für jedes Seitenverhältnis angeordnet), Ton, Musik.
+- **Replays**: ein Eingabeprotokoll je Takt in einem dokumentierten, versionierten Textformat, das Level per
+  Hash bezeichnet. Die Wiedergabe ohne Fenster prüft Checkpoints, Ziel und Punkte. Replays enthalten nur
+  unsere Eingaben, liegen daher im Repository (`tests/replays/`) und laufen in der CI.
+- Level 13.
 
-Die gekrümmte Geometrie des Originals — die Kugel, Schienen, Rohre, abgerundete Plattformkanten, gebogene
-Rinnen — besteht aus groben Polygonen, und bei heutigen Auflösungen sieht man jede Facette. Diese Phase macht
-sie glatt. **Welche Techniken eingesetzt werden und wie weit jede geht, wird nach dem Ausprobieren mit dem
-Inhaber entschieden**; die Kandidaten:
+Fertig, wenn: sich alle dreizehn Level beenden lassen und jedes ein bestehendes Replay hat.
 
-- **Die Kugel, analytisch.** Ein Render-Primitiv „analytische Kugel“: pro Pixel über den Schnitt von Strahl
-  und Kugel gezeichnet, mit Beleuchtung pro Pixel und exakter Tiefe, daher rund bei jeder Auflösung und
-  Entfernung. Welche Meshes Kugeln sind, sagen die Daten (eine Tabelle der drei Kugel-Meshes nach Namen; im
-  offenen Format eine Eigenschaft des Objekts), nie ein Sonderfall im Renderer. Die Textur behält die
-  Originalabwicklung.
-- **Beleuchtung pro Pixel mit geglätteten Normalen** für die gesamte Geometrie. Ein guter Teil des facettierten
-  Aussehens ist die Vertex-Beleuchtung des Originals, die über die Flächen verschmiert wird; mit Beleuchtung
-  pro Pixel wirken gekrümmte Flächen gekrümmt, ohne dass sich ein Vertex bewegt. Am billigsten, größter Gewinn.
-- **Phong-Tessellation** (oder eine ähnliche normalengeführte Verfeinerung): Dreiecke werden unterteilt und
-  entlang der Vertex-Normalen gewölbt. Wo benachbarte Flächen Normalen teilen (Schienen, Rohre), wird die
-  Fläche rund; wo eine Kante getrennte Normalen hat (Kistenecken, Plattformkanten), bleibt sie scharf. Eine
-  Regel für die ganze Geometrie, Community-Karten eingeschlossen — der Umriss einer Schiene wird ein Kreis.
-- **Erkannte Grundformen neu aufbauen** (eine Schiene als entlang eines Pfads gezogener Kreis, in beliebiger
-  Detailstufe neu erzeugt): das sauberste Ergebnis, aber schwieriger und anfälliger; gehört in den Konverter
-  (Phase 6), nicht in die Laufzeit.
+## Phase 5 — Community-Karten
 
-Fest, egal wie gewählt wird: **die Physik bleibt auf der Originalgeometrie.** Das Glätten ist rein optisch; die
-Kugel rollt auf denselben Polygonen wie 2004, sonst ändern sich ihr Verhalten und jede Community-Karte.
-Prüfen, dass der kleine Abstand zwischen sichtbarer und physikalischer Oberfläche (die Kugel wirkt einen
-Hauch eingesunken oder angehoben) nicht auffällt.
+- Ein Kartenordner im Benutzerdatenverzeichnis und eine Liste im Spiel (Titel, Autor, Schwierigkeit aus dem
+  Katalog).
+- Karten nach den Standardkonventionen laufen über die nativen Regeln aus Phase 4.
+- Karten mit eigenen Virtools-Skripten: ein Interpreter für Verhaltensgraphen, Building Blocks in der
+  Reihenfolge der Bestandsaufnahme. Eine Karte, die einen fehlenden Block braucht, wird nicht halb gestartet:
+  Sie wird mit Name und GUID des Blocks gemeldet und als nicht unterstützt markiert.
+- **Spielprofile**: *Klassisch* — nur das Originalspiel (zwölf Level und Level 13, Originalregeln; Replays und
+  Rekorde zählen nur hier); *Erweitert* — Inhalte Dritter auf eigenes Risiko mit deutlicher Warnung:
+  Community-Karten, Texturpakete, später Mods. Mods heißt unser eigenes System — Daten und Skripte in einer
+  Sandbox ohne Datei- oder Netzzugriff; BML-Mods sind Windows-DLLs und werden nie geladen.
 
-Fertig, wenn: die gewählten Techniken umgesetzt sind; die drei Kugeln in 8K und aus nächster Nähe vollkommen
-rund sind und ansonsten wie die Originale aussehen; Schienen und andere gekrümmte Teile bei den Auflösungen
-aus Phase 2 keine Facetten mehr zeigen; die Replays (Phase 1b) dieselben Bahnen wie zuvor ergeben (nichts
-Physikalisches hat sich bewegt).
-
-## Phase 3b — Replays als Video gerendert
-
-Ziel: ein 8K-Video eines perfekten Durchlaufs des neu aussehenden Ballance für einen YouTube-Kanal.
-
-- Ein Replay offline Bild für Bild rendern, in beliebiger Auflösung (bis 7680×4320) und mit fester Bildrate,
-  unabhängig von der Echtzeit — auch ein langsamer Rechner liefert ein vollkommen flüssiges 8K-Video. Der Ton
-  wird aus demselben deterministischen Lauf gerendert. Die Bilder gehen als Strom an einen Encoder (z. B.
-  ffmpeg), nicht als Dateien auf die Platte.
-- Kameras: zuerst die Spielkamera; eine filmische Kamera (weiche Verfolgung, Totalen eines Levels) später, als
-  Daten im Replay oder daneben, nicht als Code pro Level.
-- „Perfekte“ Durchläufe: zuerst die besten menschlichen (Inhaber, Speedrunner). Eine automatische Suche nach
-  schneller Eingabe — ein TAS-artiger Optimierer, der Eingabefolgen durchprobiert, bis die Kugel den nächsten
-  Checkpoint früher erreicht — ist ein späteres Zusatzziel: Er braucht keinen Menschen, ist aber ein eigenes
-  Forschungsprojekt.
-- Hochladen ist Veröffentlichen: Nichts geht ohne Anweisung des Inhabers auf YouTube. Material aus den
-  Original-Assets ist Inhalt des Rechteinhabers; Videos einer Veröffentlichung mit eigenen Texturen (siehe
-  decisions.md) werfen diese Frage nicht auf.
-
-Fertig, wenn: das Replay eines Levels zu einem 8K-Video mit Ton gerendert wird, das der Inhaber veröffentlichen
-möchte.
-
-## Phase 4 — Level 13 und Community-Karten
-
-- **Level 13** („Speed“): eine kostenlose Erweiterung, die Cyparade 2004 veröffentlicht hat; auf der
-  Original-CD ist sie nicht. Das Laden ist fest auf 12 Level verdrahtet (`src/app.c`, `Level_%02d.NMO`; der
-  Viewer nimmt 1–12). Level 13 unterstützen, wenn die Datei vorhanden ist, auf demselben Weg wie die anderen.
-- **Community-Karten**: Rund 425 Karten (von 2009 bis heute) sind im Katalog
-  [pseudoacetyl/BallanceCustomMaps](https://github.com/pseudoacetyl/BallanceCustomMaps) verzeichnet
-  (`CustomMapList.md`: Autor, Schwierigkeit, Typ, Videos). Heruntergeladen werden sie vom Mega-Laufwerk der
-  Community, ein ausgewähltes Paket liegt auf MediaFire, neue Karten erscheinen im Kanal `#new` des
-  Ballance-Discords ([FAQ](https://yyc12345.github.io/ballance-discord-rules/en/faq/)). Eine Karte ist eine
-  `.NMO` im selben Format wie `Level_XX.NMO`. Quellen, Format des Katalogs und seine Nutzung:
-    [community-maps.md](community-maps.md).
-  - Ein Kartenordner im Benutzerdatenverzeichnis und ein Menü im Spiel zur Auswahl. Originaldateien werden
-    nie angefasst (die anderen Konventionen der Community sind das Ersetzen von `Level_XX.NMO` oder der
-    Ordner `ModLoader/Maps` des Mod-Loaders BML).
-  - Eine Karte, die einen Building Block nutzt, den wir nicht umsetzen, stürzt nicht ab: Das Spiel meldet,
-    welcher Block fehlt, mit Namen und GUID. Ein Lauf ohne Fenster über die ganze Sammlung ergibt eine
-    Häufigkeitsliste der fehlenden Blöcke; umgesetzt wird in dieser Reihenfolge.
-  - **Karten sind nicht vertrauenswürdige Eingaben** (Dateiablagen von Fremden). Bevor es das Kartenmenü
-    gibt, hat jeder Parser, der `.nmo` / `.cmo` liest, Fuzzing-Ziele, läuft unter ASan + UBSan und lehnt
-    fehlerhafte Daten ab, statt abzustürzen.
-
-- **Spielprofile**: eine Einstellung mit zwei Werten.
-  - *Klassisch* — das Originalspiel und sonst nichts: die zwölf Level und Level 13, die Originalregeln, keine
-    Inhalte Dritter. Nur hier haben Replays, Rekorde und Vergleiche mit dem Original einen Sinn.
-  - *Erweitert* — Inhalte Dritter erlaubt, auf eigene Verantwortung des Spielers, mit einer klaren Warnung beim
-    Umschalten: Community-Karten, Texturpakete, später Mods. **Mods heißt hier unser eigenes Mod-System** —
-    Daten und Skripte, die in einer Sandbox laufen (ohne Datei- oder Netzwerkzugriff), auf jeder Plattform
-    gleich. Die BML-Mods der Community sind Windows-DLLs für die Original-Laufzeitumgebung und können von
-    dieser Engine überhaupt nicht geladen werden.
-  - Grafikverbesserungen (Auflösung, runde Geometrie, Filterung) sind eigene Einstellungen und in beiden
-    Profilen verfügbar: Sie ändern, wie das Spiel aussieht, nicht was es ist.
-
-Fertig, wenn: Level 13 spielbar ist; ein Ordner mit Community-Karten im Menü erscheint und die Karten
-spielbar sind; der Bericht über fehlende Blöcke existiert; die Parser ein Fuzzing nennenswerter Dauer ohne
-Befund überstanden haben.
-
-## Phase 5 — Physik am Original geprüft
-
-Der Port des Upstreams wurde nie zahlenmäßig mit dem Originalspiel verglichen (`docs/guide/status.md`).
-
-- Referenzbahnen aus dem Originalspiel aufzeichnen (einmal unter Wine gestartet, nur als Messinstrument):
-  Kugeltyp, Start, Eingabefolge → Position und Geschwindigkeit pro Takt.
-- Dieselben Szenarien ohne Fenster in unserer Engine abspielen und automatisch vergleichen. Eine Abweichung
-  zeigt auf einen Takt und einen Kontakt, nicht auf ein Gefühl.
-- Daraus werden Regressionstests.
+Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen auf, jede mit Grund.
 
 ## Phase 6 — offenes Levelformat und Konverter
 
-- Ein offenes, dokumentiertes Levelformat: Geometrie in glTF 2.0, Texturen in PNG, Klänge in Opus, Platzierung
-  und Eigenschaften der Objekte in einer Textdatei. Die Spezifikation liegt in `docs/`.
-- Ein Konverter von `.nmo` dorthin, als eigenes Werkzeug.
-- Die Engine versteht beide Formate nebeneinander und dauerhaft: `.nmo` bleibt, weil die Community-Karten
-  nur darin existieren.
-- Damit konvertierte Level ohne die Virtools-Graphen spielbar sind, muss die Spiellogik aus den Graphen in
-  typisierte Entitäten der Engine wandern — eine Architekturänderung, die nach den Phasen 1–5 kommt.
-- Test: Jedes Originallevel und seine konvertierte Kopie müssen bei gleicher Eingabe dieselben Bahnen ergeben.
-- Das Hochskalieren der Texturen ist ein Schritt dieser Pipeline: Im Repository liegen die Pipeline und ihre
-  Parameter (ein Modell mit offener Lizenz, Einstellungen und Masken pro Textur), niemals hochskalierte
-  Originaltexturen. Siehe decisions.md.
+- Ein offenes, dokumentiertes Levelformat: Geometrie glTF 2.0, Texturen PNG, Klänge Opus, Platzierung und
+  Eigenschaften in einer Textdatei. Die Spezifikation liegt in `docs/`.
+- Ein Konverter aus `.nmo`, den der Spieler auf seinen eigenen Dateien ausführt. Die Engine spielt beide
+  Formate dauerhaft (decisions.md).
+- Test: Jedes Originallevel und seine umgewandelte Kopie ergeben mit demselben Replay dieselben Bahnen.
+
+## Phase 7 — Aussehen und Extras
+
+- **Rundes sieht rund aus**: die Kugel analytisch gezeichnet; Pro-Pixel-Licht mit glatten Normalen;
+  normalengeführte Tessellierung für Schienen und Rohre. Nur optisch: Die Physik bleibt auf den
+  Originalpolygonen. Welche Techniken und wie weit, wird mit dem Inhaber nach dem Ausprobieren entschieden.
+- **Lokale Texturverbesserung**: Skripte, die der Spieler auf seiner Kopie ausführt, um Texturen
+  hochzuskalieren (bis 8K); das Repository enthält die Pipeline und ihre Parameter, nie die Ergebnisse.
+- **Replays als Video**: offline, Bild für Bild, in jeder Auflösung bis 8K, mit Ton. Hochgeladen wird nichts
+  ohne Anweisung des Inhabers.
 
 ## Durchgehend
 
-- Die Befunde aus der Anwendung der secure-codegen-Regeln auf den Upstream-Code beheben, sobald der betroffene
-  Code an die Reihe kommt: CI-Actions sind per Tag (`actions/checkout@v7`) statt per Commit-SHA festgelegt und
-  haben kein `permissions:`; keine Härtungs-Flags in CMake; zwei `strcpy` von Konstanten in `src/app.c`.
-- Datenfreie Tests laufen überall (Unit-Tests, synthetische `.nmo`, Fuzzing, Sanitizer); Tests mit Spieldaten
-  laufen lokal mit `OPENBALLANCE_DATA`.
-- Dokumentation in drei Sprachen (siehe `CLAUDE.md`). Die Dokumentation des Upstreams (Benutzerhandbuch,
-  Interna) gibt es bisher nur auf Englisch; bevor die offizielle Website online geht, braucht sie eine
-  russische und eine deutsche Übersetzung, und die Website muss von OpenBallance in Drahtseilakt umbenannt
-  werden.
+- Die Sicherheitsregeln (`CLAUDE.md`): feindliche Eingaben, festgelegte und vendorte Abhängigkeiten,
+  CI-Actions per Commit-SHA festgelegt mit minimalen `permissions:` (die Workflows des Upstreams legen per Tag
+  fest und müssen korrigiert oder ersetzt werden).
+- Datenfreie Tests laufen überall (Unit, synthetische Dateien, Fuzzing); Tests mit Spieldaten lokal.
+- Dokumentation in drei Sprachen. Die nur englische Dokumentation des Upstreams ist Nachschlagematerial und
+  wird nicht übersetzt, solange sie nicht unsere wird.

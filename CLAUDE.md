@@ -1,9 +1,11 @@
 # Drahtseilakt — working rules
 
-Drahtseilakt is a fork of [OpenBallance](https://github.com/emdzej/openballance): a reimplementation of Ballance
-(Cyparade / Atari, 2004) that runs the original Virtools scripts on its own runtime, with a port of the Ipion
-physics engine. The fork's goal is a proper native desktop game: a real window, any resolution and aspect ratio,
-level 13, a menu for community maps, and later a converter from the original data to open formats.
+Drahtseilakt is a new engine for Ballance (Cyparade / Atari, 2004), written from scratch in Rust. It plays the
+data of the player's own copy — the original levels as they are, community maps natively or through their
+Virtools scripts — and later its own open level format. A proper native desktop game: any resolution and aspect
+ratio, level 13, a menu for community maps, a converter. The repository began as a fork of
+[OpenBallance](https://github.com/emdzej/openballance); its C code is reference until phase 1 replaces it, and
+no code of other projects is taken (decisions.md, "Everything from scratch, in Rust").
 
 Owner: Veresk. Chat with him in Russian; code, comments, docs and commit messages are in English.
 
@@ -17,7 +19,8 @@ Every change follows the secure-codegen rules from https://github.com/eugene-ver
 (entry point `skills/secure-codegen/SKILL.md`; read it and the modules it routes to before writing code).
 The active profile for this project:
 
-- **C** (`lang/c-cpp.md`): no `strcpy`/`sprintf`/`strcat`; overflow-checked sizes; every allocation checked.
+- **Rust** (`lang/rust.md`): no `unsafe` in parsers or anything that touches file data; no `unwrap`/`expect`
+  on input-derived values; checked arithmetic for sizes and offsets.
 - **Untrusted input** (`modules/input.md`, `modules/inject.md`): `.nmo` / `.cmo` files are untrusted. Community
   maps come from strangers' file shares, so every parser treats its input as hostile: bounds-check every
   read, cap sizes, counts and recursion depth, fail closed on a malformed file — never crash, never
@@ -29,15 +32,12 @@ The active profile for this project:
 
 ## Architecture in one screen
 
-- `src/` — the portable core in C11. It talks to the host only through `src/platform.h` (input, audio,
-  storage, parameters) and `src/render/gpu.h` (a WebGPU-style graphics API with WGSL shaders).
-- Backends implement those two headers: `platform_gasm.c` (upstream, browser; no longer a target) and the
-  native backend (SDL3 + wgpu-native). The core never includes a backend or OS header.
-- `src/ck` the Virtools runtime, `src/bb` the Building Blocks (one file per original DLL), `src/phys` the Ipion
-  port, `src/render` the renderer, `src/vfs*` + `src/iscab.c` reading the player's own copy of the game.
-- Levels exist in two forms the engine will understand side by side: the original `.nmo` (permanent — the
-  ~425 community maps exist only in it) and, later, the open format produced by the converter.
-- Details: `docs/internals/`.
+- A cargo workspace: `Cargo.toml` at the root, crates in `crates/` (the `.nmo` reader first; engine, game and
+  tools follow the roadmap). Dependencies pinned in `Cargo.lock` and vendored; the build never needs the network.
+- Rendering on wgpu (Vulkan, Metal, Direct3D 12); the window/input/audio host is chosen in phase 2.
+- Levels in two forms, both playable permanently: the original `.nmo` and, later, our open format.
+- `src/`, `tools/` (C, upstream OpenBallance) — reference only, leaving with phase 1. Never copy from them, from
+  Ballanced, or from any leaked source; `docs/` holds the reverse-engineering notes (formats, behaviour).
 
 ## Conventions
 
@@ -45,8 +45,8 @@ The active profile for this project:
   once, in the layer it belongs to, for every target.
 - **Every target platform.** Linux, Windows and macOS, native. The browser (gasm) build is not a target.
   A change covers all of them; what could not be built or tested on some target is said explicitly.
-- Style follows the existing code: 4 spaces, opening brace of a function on its own line, short
-  `snake_case` names, a comment at the top of each file saying what it is for, comments that say *why*.
+- Style: `rustfmt` and `clippy` clean; a comment at the top of each file saying what it is for; comments that
+  say *why*.
 - Code, tests, fixtures and examples never depend on game data in the repository (see `.gitignore`). Tests
   that need the game read it from `OPENBALLANCE_DATA`; community maps come from `OPENBALLANCE_MAPS`, downloaded
   mods from `OPENBALLANCE_MODS` (see `docs/drahtseilakt/community-maps.md`). While the repository is private it
