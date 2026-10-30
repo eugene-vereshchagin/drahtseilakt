@@ -77,6 +77,49 @@ pub struct View {
     pub fov_y: f32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct OverlayVertex {
+    pos: [f32; 2],
+    color: [f32; 4],
+}
+
+fn overlay_pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("overlay"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("overlay.wgsl").into()),
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("overlay"),
+        layout: None,
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs"),
+            compilation_options: Default::default(),
+            buffers: &[Some(wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<OverlayVertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4],
+            })],
+        },
+        primitive: Default::default(),
+        depth_stencil: None,
+        multisample: Default::default(),
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs"),
+            compilation_options: Default::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
 pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -94,6 +137,7 @@ pub struct Renderer {
     sampler: wgpu::Sampler,
     white: wgpu::TextureView,
     pub models: Vec<Model>,
+    overlay_pipeline: wgpu::RenderPipeline,
     markers: HashMap<[u32; 4], GpuMaterial>,
     /// The colour behind everything (the sky's zenith).
     pub clear: wgpu::Color,
@@ -185,6 +229,7 @@ impl Renderer {
             anisotropy_clamp: 16,
             ..Default::default()
         });
+        let overlay_pipeline = overlay_pipeline(&device, format);
         let white = upload_texture(&device, &queue, 1, 1, vec![255; 4]);
         Renderer {
             device,
@@ -203,6 +248,7 @@ impl Renderer {
             sampler,
             white,
             models: Vec::new(),
+            overlay_pipeline,
             markers: HashMap::new(),
             clear: wgpu::Color {
                 r: 0.4,
@@ -450,6 +496,66 @@ impl Renderer {
             self.depth = Some((tex, view, width, height));
         }
         self.depth.as_ref().map(|d| d.1.clone())
+    }
+
+    /// Draws flat rectangles (pixels, top left origin) over `target`, which keeps its content.
+    pub fn draw_overlay(
+        &self,
+        target: &wgpu::TextureView,
+        width: u32,
+        height: u32,
+        rects: &[crate::hud::Rect],
+    ) {
+        if rects.is_empty() {
+            return;
+        }
+        let (w, h) = (width.max(1) as f32, height.max(1) as f32);
+        let to_clip = |x: f32, y: f32| [x / w * 2.0 - 1.0, 1.0 - y / h * 2.0];
+        let mut verts = Vec::with_capacity(rects.len() * 6);
+        for r in rects {
+            let (a, b, c, d) = (
+                to_clip(r.x, r.y),
+                to_clip(r.x + r.w, r.y),
+                to_clip(r.x + r.w, r.y + r.h),
+                to_clip(r.x, r.y + r.h),
+            );
+            for pos in [a, b, c, a, c, d] {
+                verts.push(OverlayVertex {
+                    pos,
+                    color: r.color,
+                });
+            }
+        }
+        let buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("overlay vertices"),
+                contents: bytemuck::cast_slice(&verts),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let mut enc = self.device.create_command_encoder(&Default::default());
+        {
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("overlay"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.overlay_pipeline);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.draw(0..verts.len() as u32, 0..1);
+        }
+        self.queue.submit([enc.finish()]);
     }
 
     /// Draws one frame into `target` of the given size.

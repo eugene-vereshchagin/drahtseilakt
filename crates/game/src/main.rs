@@ -8,6 +8,7 @@
 mod app;
 mod assets;
 mod collide;
+mod hud;
 mod render;
 mod replay;
 mod scene;

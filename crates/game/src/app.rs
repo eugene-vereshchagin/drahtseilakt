@@ -28,6 +28,8 @@ struct Game {
     replay_in: Option<Replay>,
     replay_out: Replay,
     record: Option<PathBuf>,
+    /// The tick the ball was last lost, for the "ball lost" message.
+    ball_lost_at: Option<u64>,
 }
 
 impl Game {
@@ -71,6 +73,7 @@ impl Game {
             start_ball,
             replay_out: Replay::new(&level.name, level.hash),
             record: o.record.clone(),
+            ball_lost_at: None,
             replay_in,
             level,
             balls,
@@ -79,6 +82,7 @@ impl Game {
 
     fn restart(&mut self) {
         self.sim = Sim::new(&self.level.level, self.start_ball);
+        self.ball_lost_at = None;
         self.replay_out = Replay::new(&self.level.name, self.level.hash);
     }
 
@@ -94,6 +98,9 @@ impl Game {
         self.sim.step(input);
         self.replay_out.record(self.sim.tick, input);
         for (t, e) in self.sim.events.iter().skip(events_before) {
+            if *e == Event::Died {
+                self.ball_lost_at = Some(*t);
+            }
             println!("{} {e:?}", clock(*t));
             if *e == Event::Finished {
                 self.save_run();
@@ -347,6 +354,12 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     let view = target.create_view(&Default::default());
     let inst = scene::instances(&game.placements, &game.sim.taken, &game.ball_meshes, &snap);
     r.draw(&view, w, h, &scene::view(&snap), &inst);
+    r.draw_overlay(
+        &view,
+        w,
+        h,
+        &crate::hud::overlay(&game.sim, w, h, game.ball_lost_at),
+    );
 
     let row = (4 * w).div_ceil(256) * 256;
     let buf = r.device.create_buffer(&wgpu::BufferDescriptor {
@@ -545,6 +558,17 @@ impl App {
             gpu.config.height,
             &scene::view(&snap),
             &inst,
+        );
+        gpu.renderer.draw_overlay(
+            &view,
+            gpu.config.width,
+            gpu.config.height,
+            &crate::hud::overlay(
+                &self.game.sim,
+                gpu.config.width,
+                gpu.config.height,
+                self.game.ball_lost_at,
+            ),
         );
         gpu.renderer.queue.present(frame);
         if let Some(w) = &self.window {

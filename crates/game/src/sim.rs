@@ -397,12 +397,13 @@ impl Sim {
 
     fn die(&mut self) {
         self.events.push((self.tick, Event::Died));
+        // Lives are balls: the last ball lost ends the run.
+        self.lives = self.lives.saturating_sub(1);
         if self.lives == 0 {
             self.game_over = true;
             self.events.push((self.tick, Event::GameOver));
             return;
         }
-        self.lives -= 1;
         let spawn = self
             .rules
             .resets
@@ -614,5 +615,22 @@ mod tests {
         assert_eq!(sim.lives, 2);
         assert!(sim.events.iter().any(|e| e.1 == Event::Died));
         assert!(sim.ball.position.distance(Vec3::new(0.0, BALL_RADIUS, 0.0)) < 1.0);
+    }
+
+    #[test]
+    fn last_ball_lost_ends_the_run() {
+        let level = flat_level();
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        for lost in 1..=3 {
+            sim.ball.position = Vec3::new(500.0, 10.0, 0.0);
+            for _ in 0..600 {
+                sim.step(0);
+                if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost {
+                    break;
+                }
+            }
+        }
+        assert_eq!(sim.lives, 0);
+        assert!(sim.game_over, "three balls lost, the run must be over");
     }
 }
