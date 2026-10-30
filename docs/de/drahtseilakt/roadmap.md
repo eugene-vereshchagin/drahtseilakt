@@ -58,8 +58,16 @@ Ballanced: Branch `sdl`, Commit `ececf94`, Preset `linux-x64-runtime`.
   (lavapipe), geht per xdotool durchs Menü und nimmt das Spielfenster auf. Fünf Probekarten, 74 KB bis 4 MB,
   luden und liefen ohne Einträge im Log. Der ganze Satz (579 `.nmo` und 19 Archive) steht noch aus.
 - **Fehler.** Die Klammer des Lebenszählers im HUD wird weit links gezeichnet und wandert während des Spiels
-  (gesehen im maximierten Fenster 3840×2069). In kurzen Skriptläufen noch nicht reproduziert; womöglich die
+  (gesehen im maximierten Fenster 3840×2069). Bei 640×480 stimmt das HUD genau mit dem Original überein,
+  einschließlich der kleinen linken Klammer; der Fehler gehört also zu Fenstern, die nicht 4:3 sind, und zur
   HUD-Anordnung oben. Upstream nicht gemeldet.
+- **Textumbruch.** Der Tutorial-Text bricht anders um als im Original (eine Zeile, die das Original ganz
+  druckt, ist zweigeteilt): Glyphenmetriken oder die Breite des Textrahmens weichen ab.
+- **Referenz.** Das Originalspiel des Inhabers läuft unter Wine (Wine 10, eigenes Prefix, eigene Kopie des
+  Spiels, eingebautes `ddraw`/`d3dimm` statt des mitgelieferten dgVoodoo) auf einem eigenen Xvfb-Display, per
+  Skript gesteuert wie oben. Zwei Fallen: Xvfb hat genau einen Videomodus, also muss der Bildschirm dem Modus
+  des Spiels entsprechen, sonst fragt das Spiel per Dialog; und Software-OpenGL braucht
+  `WINE_LARGE_ADDRESS_AWARE=1`, sonst geht dem 32-Bit-Prozess der Adressraum aus und `base.cmo` lädt nicht.
 - `Player --help` ist keine Option: Es wird ignoriert, und das Spiel startet.
 - **Tests** (`linux-x64-tests`, 967 Tests, ausgeführt auf Xvfb mit lavapipe). GCC: alle bestehen, aber 36
   CK2-Tests schlagen bei paralleler Ausführung fehl und bestehen nacheinander — sie teilen sich eine Ressource;

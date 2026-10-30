@@ -55,8 +55,15 @@ branch `sdl` at commit `ececf94`, preset `linux-x64-runtime`.
   with xdotool and captures the game window. Five sample maps, 74 KB to 4 MB, all loaded and ran with nothing
   in the log. The full set (579 `.nmo` and 19 archives) is still to be run.
 - **Bug.** The bracket of the life counter in the HUD is drawn far to the left and drifts during play (seen
-  in a maximised 3840×2069 window). Not reproduced yet in short scripted runs; possibly the HUD layout above.
-  Not reported upstream.
+  in a maximised 3840×2069 window). At 640×480 the HUD matches the original exactly, small left bracket
+  included, so the fault belongs to non-4:3 windows and the HUD layout above. Not reported upstream.
+- **Text layout.** The tutorial text wraps differently from the original (a line the original prints whole is
+  broken in two): glyph metrics or the text frame width differ.
+- **Reference.** The owner's original game runs under Wine (Wine 10, its own prefix, a private copy of the
+  game, the built-in `ddraw`/`d3dimm` instead of the bundled dgVoodoo) on a private Xvfb display, scripted the
+  same way. Two traps: Xvfb has exactly one video mode, so the screen must be the game's mode, or the game
+  asks for one in a dialog; and software OpenGL needs `WINE_LARGE_ADDRESS_AWARE=1`, otherwise the 32-bit
+  process runs out of address space and `base.cmo` fails to load.
 - `Player --help` is not an option: it is ignored and the game starts.
 - **Tests** (`linux-x64-tests`, 967 tests, run on Xvfb with lavapipe). GCC: all pass, but 36 CK2 tests fail
   when run in parallel and pass serially — they share some resource; a test-isolation issue, not an engine
