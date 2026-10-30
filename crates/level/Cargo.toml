@@ -1,0 +1,14 @@
+[package]
+name = "level"
+version = "0.1.0"
+description = "The engine's level model, independent of the file format it came from"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+nmo = { path = "../nmo" }
+
+[lints]
+workspace = true

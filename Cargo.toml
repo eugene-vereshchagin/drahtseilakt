@@ -3,7 +3,7 @@
 
 [workspace]
 resolver = "3"
-members = ["crates/nmo"]
+members = ["crates/nmo", "crates/level"]
 
 [workspace.package]
 edition = "2024"
