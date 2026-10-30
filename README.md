@@ -18,10 +18,23 @@ is being replaced (the [decisions](docs/drahtseilakt/decisions.md) say why).
 Status: work in progress — phase 1 of the [roadmap](docs/drahtseilakt/roadmap.md), the reader for Virtools
 files. Why the game needed this at all: [history](docs/drahtseilakt/history.md).
 
-## Building
+## Building and playing
 
-Rust (stable) and cargo. Dependencies are vendored; the build needs no network. Build instructions follow
-with the first code of phase 1.
+Rust (stable, 1.87 or newer) and cargo; on Linux a Vulkan driver. You need your own copy of Ballance.
+
+```sh
+cargo build --release
+target/release/drahtseilakt --data /path/to/Ballance --level 1
+```
+
+`--data` (or `OPENBALLANCE_DATA`) is the Ballance folder. `--level N` plays original level N, `--map FILE.nmo`
+any level file or community map, `--open DIR` a level in the [open format](docs/drahtseilakt/open-format.md);
+`--export DIR` converts the chosen level to it. Arrows roll the ball relative to the camera, Shift+Left/Right
+turn the camera, Space lifts it, R restarts, F11 is full screen, Esc quits.
+
+Every finished run is saved as a replay (on Linux in `~/.local/share/drahtseilakt/replays/<level>/`, the
+fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it without a window, `--screenshot
+FILE.png` renders a frame. `drahtseilakt --help` lists everything.
 
 ## Legal
 

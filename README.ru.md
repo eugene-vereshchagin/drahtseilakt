@@ -18,10 +18,25 @@ Windows и macOS, в любом разрешении и соотношении �
 Состояние: в работе — фаза 1 [плана](docs/ru/drahtseilakt/roadmap.md), читатель файлов Virtools. Зачем игре это
 вообще понадобилось: [история](docs/ru/drahtseilakt/history.md).
 
-## Сборка
+## Сборка и игра
 
-Rust (stable) и cargo. Зависимости вендорены; сборке не нужна сеть. Инструкции появятся вместе с первым кодом
-фазы 1.
+Rust (stable, 1.87 или новее) и cargo; на Linux — драйвер Vulkan. Нужна ваша собственная копия Ballance.
+
+```sh
+cargo build --release
+target/release/drahtseilakt --data /путь/к/Ballance --level 1
+```
+
+`--data` (или `OPENBALLANCE_DATA`) — папка Ballance. `--level N` играет оригинальный уровень N, `--map
+FILE.nmo` — любой файл уровня или любительскую карту, `--open DIR` — уровень в
+[открытом формате](docs/ru/drahtseilakt/open-format.md); `--export DIR` конвертирует выбранный уровень в него.
+Стрелки катят шар относительно камеры, Shift+влево/вправо поворачивают камеру, пробел поднимает её, R —
+заново, F11 — полный экран, Esc — выход.
+
+Каждое пройденное прохождение сохраняется как реплей (на Linux в
+`~/.local/share/drahtseilakt/replays/<уровень>/`, самое быстрое — как `best.replay`); `--replay FILE` его
+проигрывает, `--headless` проверяет без окна, `--screenshot FILE.png` рисует кадр. `drahtseilakt --help`
+перечисляет всё.
 
 ## Правовое
 

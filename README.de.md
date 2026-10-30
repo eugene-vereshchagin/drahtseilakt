@@ -19,10 +19,26 @@ bleiben erhalten, sein Code wird ersetzt (warum, steht in den [Entscheidungen](d
 Stand: in Arbeit — Phase 1 des [Fahrplans](docs/de/drahtseilakt/roadmap.md), der Leser für Virtools-Dateien.
 Warum das Spiel das überhaupt brauchte: [Geschichte](docs/de/drahtseilakt/history.md).
 
-## Bauen
+## Bauen und spielen
 
-Rust (stable) und cargo. Abhängigkeiten sind vendort; der Build braucht kein Netz. Die Anleitung folgt mit dem
-ersten Code von Phase 1.
+Rust (stable, 1.87 oder neuer) und cargo; unter Linux ein Vulkan-Treiber. Du brauchst deine eigene Kopie von
+Ballance.
+
+```sh
+cargo build --release
+target/release/drahtseilakt --data /pfad/zu/Ballance --level 1
+```
+
+`--data` (oder `OPENBALLANCE_DATA`) ist der Ballance-Ordner. `--level N` spielt Originallevel N, `--map
+FILE.nmo` jede Leveldatei oder Community-Karte, `--open DIR` ein Level im
+[offenen Format](docs/de/drahtseilakt/open-format.md); `--export DIR` wandelt das gewählte Level darin um.
+Pfeiltasten rollen die Kugel relativ zur Kamera, Shift+Links/Rechts drehen die Kamera, Leertaste hebt sie, R
+startet neu, F11 ist Vollbild, Esc beendet.
+
+Jeder beendete Lauf wird als Replay gespeichert (unter Linux in
+`~/.local/share/drahtseilakt/replays/<Level>/`, der schnellste als `best.replay`); `--replay FILE` spielt eines
+ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bild. `drahtseilakt --help` zeigt
+alles.
 
 ## Rechtliches
 

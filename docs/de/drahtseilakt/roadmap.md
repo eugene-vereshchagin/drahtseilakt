@@ -3,10 +3,21 @@
 Was dieser Fork vorhat, in welcher Reihenfolge und woran man erkennt, dass ein Schritt fertig ist. Die Gründe
 für die Entscheidungen stehen in [decisions.md](decisions.md). Wer die Arbeit übernimmt, fängt hier an.
 
-Stand 31.10.2026: Phase 0 ist abgeschlossen. Ihr Ergebnis (decisions.md, „Alles von Grund auf, in Rust“):
-Engine, Spiel und Werkzeuge werden neu geschrieben; OpenBallance, Ballanced und das Originalspiel unter Wine
-sind Vorbilder und Prüfstände. Das Repository enthält noch den C-Code des Upstreams, bis Phase 1 ihn ersetzt.
-Als Nächstes: Phase 1.
+Stand 31.10.2026: Phase 0 ist abgeschlossen (decisions.md, „Alles von Grund auf, in Rust“). Eine erste Nacht
+der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
+
+- **Phase 1**: Der Leser liest jede Datei des Spiels und alle ~600 Karten, jedes Szenenobjekt wird dekodiert.
+  Fehlt: Fuzz-Ziele, die Bestandsaufnahme der Building Blocks, das Entfernen des C-Codes des Upstreams.
+- **Phase 2**: Level auf dem Bildschirm mit ihrem Himmel, jede Größe und jedes Seitenverhältnis, Licht im
+  Gamma-Raum wie im Original. Fehlt: freie Kamera, HUD und Menü (Punkte, Leben und Zeit stehen im
+  Fenstertitel), 8K-Prüfung.
+- **Phase 3**: eigene Kugelphysik, von Hand eingestellt und noch von niemandem beurteilt; keine Referenzbahnen.
+- **Phase 4**: Regeln aus den Gruppen des Levels (Start, Rücksetzpunkte, Checkpoints, Bonuspunkte und -leben,
+  Kugelwandler, Absturz, Ziel); Replays werden aufgezeichnet, das beste je Level behalten. Fehlt: das eigene
+  Verhalten der Module (Kisten, bewegte Teile, deren Platzhalter vorerst fest sind), Klänge, Musik, die
+  Erweiterung von Level 13.
+- **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
+
 
 ## Phase 0 — Ballanced prüfen, bevor ein Backend geschrieben wird
 
