@@ -67,6 +67,8 @@ pub struct Instance {
     pub model: usize,
     pub mesh: usize,
     pub matrix: Mat4,
+    /// Draw the mesh as a translucent, unlit marker of this colour instead of its own materials.
+    pub marker: Option<[f32; 4]>,
 }
 
 pub struct View {
@@ -92,6 +94,7 @@ pub struct Renderer {
     sampler: wgpu::Sampler,
     white: wgpu::TextureView,
     pub models: Vec<Model>,
+    markers: HashMap<[u32; 4], GpuMaterial>,
     /// The colour behind everything (the sky's zenith).
     pub clear: wgpu::Color,
     depth: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
@@ -200,6 +203,7 @@ impl Renderer {
             sampler,
             white,
             models: Vec::new(),
+            markers: HashMap::new(),
             clear: wgpu::Color {
                 r: 0.4,
                 g: 0.45,
@@ -281,7 +285,7 @@ impl Renderer {
         // A part without a material is drawn with a plain white one, kept at the end.
         let default_material = materials.len();
         let mut materials = materials;
-        materials.push(self.plain_material());
+        materials.push(self.flat_material([0.8, 0.8, 0.8, 1.0], false));
 
         let meshes = level
             .meshes
@@ -327,11 +331,12 @@ impl Renderer {
         self.models.len() - 1
     }
 
-    fn plain_material(&self) -> GpuMaterial {
+    /// A material of one colour: lit and opaque, or (for markers) unlit and blended.
+    fn flat_material(&self, color: [f32; 4], marker: bool) -> GpuMaterial {
         let uniform = MaterialUniform {
-            diffuse: [0.8, 0.8, 0.8, 1.0],
+            diffuse: color,
             emissive: [0.0; 4],
-            params: [-1.0, 0.0, 0.0, 0.0],
+            params: [-1.0, if marker { 1.0 } else { 0.0 }, 0.0, 0.0],
         };
         let buf = self
             .device
@@ -361,8 +366,8 @@ impl Renderer {
         GpuMaterial {
             bind,
             key: PipelineKey {
-                blend: None,
-                z_write: true,
+                blend: marker.then_some((Blend::SrcAlpha, Blend::InvSrcAlpha)),
+                z_write: !marker,
             },
         }
     }
@@ -485,6 +490,15 @@ impl Renderer {
         self.queue.write_buffer(&self.models_buf, 0, &matrices);
 
         // Opaque first, then blended back to front.
+        for inst in instances {
+            if let Some(c) = inst.marker {
+                let k = c.map(f32::to_bits);
+                if !self.markers.contains_key(&k) {
+                    let m = self.flat_material(c, true);
+                    self.markers.insert(k, m);
+                }
+            }
+        }
         let mut opaque = Vec::new();
         let mut blended = Vec::new();
         for (i, inst) in instances.iter().enumerate() {
@@ -497,11 +511,14 @@ impl Renderer {
                 continue;
             };
             for (p, part) in mesh.parts.iter().enumerate() {
-                let key = self
-                    .models
-                    .get(inst.model)
-                    .and_then(|m| m.materials.get(part.material))
-                    .map(|m| m.key);
+                let key = match inst.marker {
+                    Some(c) => self.markers.get(&c.map(f32::to_bits)).map(|m| m.key),
+                    None => self
+                        .models
+                        .get(inst.model)
+                        .and_then(|m| m.materials.get(part.material))
+                        .map(|m| m.key),
+                };
                 match key {
                     Some(k) if k.blend.is_some() => {
                         let d = inst.matrix.w_axis.truncate().distance_squared(view.eye);
@@ -561,7 +578,11 @@ impl Renderer {
                 let Some(part) = mesh.parts.get(p) else {
                     continue;
                 };
-                let Some(mat) = model.materials.get(part.material) else {
+                let mat = match inst.marker {
+                    Some(c) => self.markers.get(&c.map(f32::to_bits)),
+                    None => model.materials.get(part.material),
+                };
+                let Some(mat) = mat else {
                     continue;
                 };
                 let Some(pipeline) = self.pipelines.get(&key) else {

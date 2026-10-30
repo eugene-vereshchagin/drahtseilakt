@@ -22,6 +22,8 @@ struct Game {
     start_ball: crate::sim::BallKind,
     balls: LoadedLevel,
     ball_meshes: BallMeshes,
+    placements: Vec<scene::Placement>,
+    modules: scene::Modules,
     sim: Sim,
     replay_in: Option<Replay>,
     replay_out: Replay,
@@ -60,7 +62,10 @@ impl Game {
             .as_deref()
             .and_then(crate::sim::BallKind::from_name)
             .unwrap_or(crate::sim::BallKind::Wood);
+        let (placements, modules) = scene::placements(&level.level, data);
         Ok(Game {
+            placements,
+            modules,
             ball_meshes: BallMeshes::find(&balls.level),
             sim: Sim::new(&level.level, start_ball),
             start_ball,
@@ -280,6 +285,9 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     let letter = game.level.level.sky.clone().unwrap_or_else(|| "A".into());
     let sky = crate::sky::model(&letter);
     renderer.add_model(&sky, &loader);
+    for m in &game.modules.models {
+        renderer.add_model(m, &loader);
+    }
     // The zenith colour: the top row of the front texture, averaged.
     if let Some((w, _, rgba)) = sky.textures.first().and_then(|t| data.texture(t)) {
         let row = rgba.get(..(w as usize * 4)).unwrap_or_default();
@@ -333,7 +341,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         view_formats: &[],
     });
     let view = target.create_view(&Default::default());
-    let inst = scene::instances(&game.level.level, &game.sim.taken, &game.ball_meshes, &snap);
+    let inst = scene::instances(&game.placements, &game.sim.taken, &game.ball_meshes, &snap);
     r.draw(&view, w, h, &scene::view(&snap), &inst);
 
     let row = (4 * w).div_ceil(256) * 256;
@@ -522,7 +530,7 @@ impl App {
         };
         let view = frame.texture.create_view(&Default::default());
         let inst = scene::instances(
-            &self.game.level.level,
+            &self.game.placements,
             &self.game.sim.taken,
             &self.game.ball_meshes,
             &snap,
