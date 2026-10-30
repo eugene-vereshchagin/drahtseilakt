@@ -61,7 +61,16 @@ Ballanced: Branch `sdl`, Commit `ececf94`, Preset `linux-x64-runtime`.
   (gesehen im maximierten Fenster 3840×2069). In kurzen Skriptläufen noch nicht reproduziert; womöglich die
   HUD-Anordnung oben. Upstream nicht gemeldet.
 - `Player --help` ist keine Option: Es wird ignoriert, und das Spiel startet.
-- **Noch nicht geprüft:** `--unlock-framerate`, spätere Level, der ganze Kartensatz, ein Clang-Build, das Test-Preset.
+- **Tests** (`linux-x64-tests`, 967 Tests, ausgeführt auf Xvfb mit lavapipe). GCC: alle bestehen, aber 36
+  CK2-Tests schlagen bei paralleler Ausführung fehl und bestehen nacheinander — sie teilen sich eine Ressource;
+  ein Problem der Testisolation, kein Engine-Fehler. Clang 19: baut nur mit `lld` (RenderEngine nutzt LTO, und
+  GNU ld kann Clangs Bitcode nicht lesen); zwei Fälle von `RectTransformReferenceTest` scheitern an
+  Gleitkomma-Ausnahmeflags (FE_INVALID in ungenutzten SIMD-Lanes), unter GCC bestehen sie. Die explizit
+  einzuschaltenden GPU-Tests bestehen bis auf einen Pixeltest mit exaktem Tiefenvergleich auf lavapipe; der
+  muss noch auf echter Hardware laufen. GoogleTest wird per Tag geladen, nicht per Commit.
+- **Offline-Build.** Mit `VXMATH_FONT_DIR` auf unsere mitgelieferten Schriften (`assets/fonts`) und
+  `FETCHCONTENT_FULLY_DISCONNECTED` konfiguriert und baut Ballanced ohne Netzzugang.
+- **Noch nicht geprüft:** `--unlock-framerate`, spätere Level, der ganze Kartensatz.
 
 ## Phase 1 — nativer Backend
 

@@ -58,7 +58,15 @@ branch `sdl` at commit `ececf94`, preset `linux-x64-runtime`.
   in a maximised 3840×2069 window). Not reproduced yet in short scripted runs; possibly the HUD layout above.
   Not reported upstream.
 - `Player --help` is not an option: it is ignored and the game starts.
-- **Not yet checked:** `--unlock-framerate`, later levels, the full map set, a Clang build, the tests preset.
+- **Tests** (`linux-x64-tests`, 967 tests, run on Xvfb with lavapipe). GCC: all pass, but 36 CK2 tests fail
+  when run in parallel and pass serially — they share some resource; a test-isolation issue, not an engine
+  bug. Clang 19: builds only with `lld` (RenderEngine uses LTO, and GNU ld cannot read Clang's bitcode); two
+  `RectTransformReferenceTest` cases fail on floating-point exception flags (FE_INVALID raised in unused SIMD
+  lanes), which pass under GCC. The opt-in GPU tests pass except one exact-depth pixel test on lavapipe, still
+  to be run on real hardware. GoogleTest is fetched by tag, not by commit.
+- **Offline build.** With `VXMATH_FONT_DIR` pointing at our bundled fonts (`assets/fonts`) and
+  `FETCHCONTENT_FULLY_DISCONNECTED`, Ballanced configures and builds without network access.
+- **Not yet checked:** `--unlock-framerate`, later levels, the full map set.
 
 ## Phase 1 — native backend
 
