@@ -25,3 +25,9 @@ impl World {
     /// After the PSI's integration: the end hook. 0x1001ea50 tail.
     pub(crate) fn psi_end(&mut self) {}
 }
+
+impl World {
+    /// A mindist event of the time list fired (`0x100181b0`). Not ported yet: mindist events are never scheduled
+    /// by this port, so this is unreachable until the collision port lands.
+    pub(crate) fn mindist_simulate_event(&mut self, _payload: u32) {}
+}

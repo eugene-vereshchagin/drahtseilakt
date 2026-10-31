@@ -11,3 +11,4 @@ pub mod core;
 pub mod hull;
 pub mod math;
 pub mod minlist;
+pub mod time;

@@ -163,6 +163,9 @@ pub struct World {
     /// Cores waiting to be revived at the start of the next PSI.
     pub revive: Vec<usize>,
     pub rng: Rng,
+    pub time: crate::time::TimeManager,
+    /// Bumped on every change of the current time (the upstream's time code).
+    pub time_code: u32,
 }
 
 fn v3(a: [f32; 3]) -> [f64; 3] {
