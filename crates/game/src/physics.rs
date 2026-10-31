@@ -198,6 +198,14 @@ impl World {
         self.add(Shape::Sphere(radius), m, pos, rot)
     }
 
+    /// The original's "Physics WakeUp": a sleeping body comes back into the simulation, an awake one restarts its
+    /// sleep timers.
+    pub fn wake(&mut self, i: usize) {
+        if let Some(&Some(id)) = self.handles.get(i) {
+            self.physics.wake_body(id);
+        }
+    }
+
     /// A box with the given half sizes: a convex surface of its eight corners. A box with positive half sizes always
     /// has a hull and a surface, so the two lookups cannot fail for the game's boxes.
     #[allow(clippy::expect_used)]

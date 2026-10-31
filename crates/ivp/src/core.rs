@@ -192,6 +192,8 @@ pub struct Env {
     pub state: i32,
 }
 
+/// The environment as the world's constructor leaves it (`phys_world_create`, the IVP environment ctor `0x10012a60`):
+/// the first sleep test after 10 PSIs, a freeze check time of 0.3 s, the state after a PSI.
 impl Default for Env {
     fn default() -> Self {
         Env {
@@ -199,13 +201,13 @@ impl Default for Env {
             delta_psi: 1.0 / 66.0,
             inv_delta_psi: 66.0,
             current_time: 0.0,
-            time_of_next_psi: 0.0,
+            time_of_next_psi: 1.0 / 66.0,
             time_of_last_psi: 0.0,
-            freeze_check_time: 0.0,
+            freeze_check_time: 0.3,
             max_velocity: MAX_VELOCITY_DEFAULT,
             max_angular_velocity_per_psi: 1.570_796_37,
-            sleep_countdown: 0,
-            state: 0,
+            sleep_countdown: 10,
+            state: 5,
         }
     }
 }
@@ -247,8 +249,13 @@ fn dot3(a: &[f32; 3]) -> f64 {
 }
 
 impl World {
+    /// A world as `phys_world_create` makes it: the environment's defaults, and the time code at 1, so that a new
+    /// collision cache or mindist (stamped 0) is computed at the first time step.
     pub fn new() -> World {
-        World::default()
+        World {
+            time_code: 1,
+            ..World::default()
+        }
     }
 
     /// Adds a gravity controller (the world's own, attached to every new core).

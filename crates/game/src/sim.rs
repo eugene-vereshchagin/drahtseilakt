@@ -218,6 +218,8 @@ pub struct Sim {
     hold: Option<TrafoHold>,
     /// The tick the ball fell off the level, until the new ball is in.
     dying: Option<u64>,
+    /// The arrows that pushed at the last tick, to wake the ball when they change.
+    push_keys: u8,
 }
 
 const PICK_RADIUS: f32 = 3.5;
@@ -364,6 +366,7 @@ impl Sim {
             prev_input: 0,
             hold: None,
             dying: None,
+            push_keys: 0,
         }
     }
 
@@ -409,6 +412,11 @@ impl Sim {
         // The push: the original's "Ball Navigation" has one force per arrow, each along a world axis chosen by the
         // camera's heading (Left / Right only when Shift is not held). Arrows held together add their forces, so a
         // diagonal push is the force times the square root of two.
+        let push_keys = if input & input::SHIFT == 0 {
+            input & (input::UP | input::DOWN | input::LEFT | input::RIGHT)
+        } else {
+            input & (input::UP | input::DOWN)
+        };
         let mut push = Vec3::ZERO;
         if input & input::UP != 0 {
             push += self.camera.push_forward();
@@ -431,6 +439,13 @@ impl Sim {
         // transformer) puts a new body in, as the original does.
         // A ball that has fallen off is no longer steered.
         let push = if self.dying.is_some() { Vec3::ZERO } else { push };
+        // Every change of the arrows (a press or a release) wakes the ball, as the original's navigation runs
+        // "Physics WakeUp" (measured in the C game): a ball left alone falls asleep, and a force does nothing to a
+        // sleeping body; a ball resting against a slope while pushed rolls back once the push is let go.
+        if self.push_keys != push_keys && self.dying.is_none() && self.hold.is_none() {
+            self.world.wake(0);
+        }
+        self.push_keys = push_keys;
         let p = self.ball.kind.params();
         self.world.set_push(0, push * p.force);
         self.world.step(None);
@@ -992,6 +1007,22 @@ mod tests {
         assert_eq!(cam.push_right(), Vec3::NEG_X);
         cam.quarter = -1;
         assert_eq!(cam.push_forward(), Vec3::NEG_X);
+    }
+
+    #[test]
+    fn a_ball_that_fell_asleep_wakes_when_pushed() {
+        // Left alone, the ball's core goes calm and is frozen; the original's navigation wakes it on every press.
+        let level = flat_level();
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        for _ in 0..1200 {
+            sim.step(0);
+        }
+        assert_eq!(sim.world.movement_state(0), Some(8), "the ball is asleep after 20 s");
+        let start = sim.ball.position;
+        for _ in 0..30 {
+            sim.step(input::UP);
+        }
+        assert!(sim.ball.position.distance(start) > 1.0, "the push did not move a sleeping ball");
     }
 
     #[test]
