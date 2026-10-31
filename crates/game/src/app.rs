@@ -64,12 +64,13 @@ impl Game {
             .as_deref()
             .and_then(crate::sim::BallKind::from_name)
             .unwrap_or(crate::sim::BallKind::Wood);
-        let (placements, modules) = scene::placements(&level.level, data);
+        let sim = Sim::new(&level.level, start_ball);
+        let (placements, modules) = scene::placements(&level.level, data, sim.loose());
         Ok(Game {
             placements,
             modules,
             ball_meshes: BallMeshes::find(&balls.level),
-            sim: Sim::new(&level.level, start_ball),
+            sim,
             start_ball,
             replay_out: Replay::new(&level.name, level.hash),
             record: o.record.clone(),
@@ -414,7 +415,13 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         view_formats: &[],
     });
     let view = target.create_view(&Default::default());
-    let inst = scene::instances(&game.placements, &game.sim.taken, &game.ball_meshes, &snap);
+    let inst = scene::instances(
+        &game.placements,
+        &game.sim.taken,
+        &game.sim.world().bodies,
+        &game.ball_meshes,
+        &snap,
+    );
     r.draw(&view, w, h, &scene::view(&snap), &inst);
     r.draw_overlay(
         &view,
@@ -611,6 +618,7 @@ impl App {
         let inst = scene::instances(
             &self.game.placements,
             &self.game.sim.taken,
+            &self.game.sim.world().bodies,
             &self.game.ball_meshes,
             &snap,
         );

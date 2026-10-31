@@ -6,13 +6,13 @@
 // and fits these numbers to reference trajectories.
 
 use crate::collide::{Collider, Triangle};
-use glam::{Quat, Vec3};
+use crate::physics::{Body, PSI_PER_SECOND, World};
+use glam::{Mat3, Quat, Vec3};
 use level::Level;
+use std::sync::Arc;
 
 pub const TICK: f32 = 1.0 / 60.0;
-const SUBSTEPS: u32 = 4;
 pub const BALL_RADIUS: f32 = 2.0;
-const GRAVITY: f32 = 20.0;
 
 /// Input of one tick, as bits (this is what replays store).
 pub mod input {
@@ -34,27 +34,30 @@ pub enum BallKind {
 }
 
 impl BallKind {
-    /// The original game's balls (its `Physicalize_GameBall` table, see docs/physics.md): the control force, mass,
-    /// linear damping per second and elasticity of the ball's own material.
+    /// The original game's balls (its `Physicalize_GameBall` table, see docs/physics.md, section 3): the control
+    /// force, mass, friction, elasticity and linear damping per second of the ball's material.
     fn params(self) -> Params {
         match self {
             BallKind::Wood => Params {
                 force: 0.43,
                 mass: 1.9,
-                lin_damp: 0.9,
+                friction: 0.8,
                 elasticity: 0.2,
+                lin_damp: 0.9,
             },
             BallKind::Stone => Params {
                 force: 0.92,
                 mass: 10.0,
-                lin_damp: 0.3,
+                friction: 0.5,
                 elasticity: 0.1,
+                lin_damp: 0.3,
             },
             BallKind::Paper => Params {
                 force: 0.065,
                 mass: 0.2,
-                lin_damp: 1.5,
+                friction: 0.5,
                 elasticity: 0.4,
+                lin_damp: 1.5,
             },
         }
     }
@@ -78,25 +81,43 @@ impl BallKind {
 struct Params {
     force: f32,
     mass: f32,
-    lin_damp: f32,
+    friction: f32,
     elasticity: f32,
+    lin_damp: f32,
 }
 
-/// The original simulation runs 66 steps per second of its own time (its "PSI"); control forces are impulses per
-/// step, so the push is a force times 66 (docs/physics.md, section 4).
-const PSI_PER_SECOND: f32 = 66.0;
-/// A solid sphere rolling without slipping has effective inertia 1.4 m (0.4 m r² rotation plus m).
-const ROLLING_MASS_FACTOR: f32 = 1.4;
-/// Elasticity of the level's floors and rails (`Physicalize_Floors`); a pair multiplies the two materials'.
-const FLOOR_ELASTICITY: f32 = 0.3;
+/// The rotational damping of the original's balls (docs/physics.md, section 3).
+const BALL_ROT_DAMP: f32 = 0.1;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Ball {
     pub position: Vec3,
     pub velocity: Vec3,
     pub rotation: Quat,
+    /// World angular velocity: the ball's spin, which friction with the floor changes.
+    pub spin: Vec3,
     pub kind: BallKind,
     pub on_ground: bool,
+}
+
+impl Ball {
+    /// The ball as a rigid body of the physics world.
+    fn body(&self) -> Body {
+        let p = self.kind.params();
+        let mut b = Body::sphere(
+            BALL_RADIUS,
+            p.mass,
+            p.friction,
+            p.elasticity,
+            p.lin_damp,
+            BALL_ROT_DAMP,
+        );
+        b.pos = self.position;
+        b.vel = self.velocity;
+        b.rot = self.rotation;
+        b.ang = self.spin;
+        b
+    }
 }
 
 /// The game camera: behind the ball, turned in quarter turns, optionally lifted.
@@ -147,8 +168,11 @@ struct Rules {
 
 #[derive(Clone)]
 pub struct Sim {
-    collider: std::sync::Arc<Collider>,
+    collider: Arc<Collider>,
     rules: Rules,
+    world: World,
+    /// The loose bodies (boxes and loose balls): (level object index, body index in the world).
+    loose: Vec<(usize, usize)>,
     pub ball: Ball,
     pub camera: Camera,
     pub tick: u64,
@@ -168,7 +192,7 @@ const GATE_RADIUS: f32 = 7.0;
 
 impl Sim {
     pub fn new(level: &Level, start_ball: BallKind) -> Sim {
-        let collider = std::sync::Arc::new(Collider::new(collision_triangles(level)));
+        let collider = Arc::new(Collider::new(collision_triangles(level)));
         let pos = |name: &str| -> Vec<(usize, Vec3)> {
             level
                 .members(name)
@@ -232,9 +256,54 @@ impl Sim {
             position: spawn,
             velocity: Vec3::ZERO,
             rotation: Quat::IDENTITY,
+            spin: Vec3::ZERO,
             kind: start_ball,
             on_ground: false,
         };
+        let mut world = World::new(Arc::clone(&collider));
+        // Body 0 is the ball; it is rebuilt from `ball` before every step.
+        world.bodies.push(ball.body());
+        // Loose objects that move: boxes and the loose balls (their material table in docs/physics.md, section 3).
+        let mut loose = Vec::new();
+        for (i, o) in level.objects.iter().enumerate() {
+            let Some(mesh) = o.mesh.and_then(|m| level.meshes.get(m)) else {
+                continue;
+            };
+            let name = o.name.to_ascii_lowercase();
+            let body = if level.members("P_Box").any(|(k, _)| k == i) {
+                let half = mesh
+                    .positions
+                    .iter()
+                    .fold(Vec3::ZERO, |h, p| h.max(Vec3::from(*p).abs()));
+                Body::cuboid(half, 1.0, 0.7, 0.3, 0.1, 0.1)
+            } else if let Some(kind) = name
+                .strip_prefix("p_ball_")
+                .and_then(|_| BallKind::from_name(&name))
+            {
+                let radius = mesh
+                    .positions
+                    .iter()
+                    .fold(0.0f32, |r, p| r.max(Vec3::from(*p).length()));
+                let (mass, friction, elasticity, lin) = match kind {
+                    BallKind::Wood => (2.0, 0.6, 0.2, 0.6),
+                    BallKind::Stone => (10.0, 0.7, 0.1, 0.2),
+                    BallKind::Paper => (0.2, 0.5, 0.4, 1.5),
+                };
+                Body::sphere(radius, mass, friction, elasticity, lin, 0.1)
+            } else {
+                continue;
+            };
+            let m = Mat3::from_cols(
+                Vec3::new(o.matrix[0][0], o.matrix[0][1], o.matrix[0][2]),
+                Vec3::new(o.matrix[1][0], o.matrix[1][1], o.matrix[1][2]),
+                Vec3::new(o.matrix[2][0], o.matrix[2][1], o.matrix[2][2]),
+            );
+            let mut body = body;
+            body.pos = Vec3::from(o.position());
+            body.rot = Quat::from_mat3(&m).normalize();
+            loose.push((i, world.bodies.len()));
+            world.bodies.push(body);
+        }
         let mut camera = Camera {
             quarter,
             yaw,
@@ -246,6 +315,8 @@ impl Sim {
         Sim {
             collider,
             rules,
+            world,
+            loose,
             ball,
             camera,
             tick: 0,
@@ -258,6 +329,15 @@ impl Sim {
             events: Vec::new(),
             prev_input: 0,
         }
+    }
+
+    /// The rigid bodies: index 0 is the ball, then the loose ones. Each is (level object index, body index).
+    pub fn world(&self) -> &World {
+        &self.world
+    }
+
+    pub fn loose(&self) -> &[(usize, usize)] {
+        &self.loose
     }
 
     /// The physical geometry, for planning.
@@ -314,48 +394,22 @@ impl Sim {
         }
         let push = push.normalize_or_zero();
 
+        // The push is the original's control force: an impulse per step, 66 steps per second of its time.
         let p = self.ball.kind.params();
-        let accel = PSI_PER_SECOND * p.force / (ROLLING_MASS_FACTOR * p.mass);
-        let dt = TICK / SUBSTEPS as f32;
-        for _ in 0..SUBSTEPS {
-            self.ball.velocity += push * accel * dt;
-            self.ball.velocity.y -= GRAVITY * dt;
-            self.ball.velocity *= (-p.lin_damp * dt).exp();
-            self.ball.position += self.ball.velocity * dt;
-            self.resolve(p.elasticity * FLOOR_ELASTICITY);
-        }
-        // Rolling look: spin about the axis perpendicular to motion and the ground.
-        let horizontal = Vec3::new(self.ball.velocity.x, 0.0, self.ball.velocity.z);
-        let axis = Vec3::Y.cross(horizontal);
-        if axis.length_squared() > 1e-8 {
-            let angle = horizontal.length() * TICK / BALL_RADIUS;
-            // Rolling without slipping: the spin is Y × v / r, so a ball rolling forward turns forward.
-            self.ball.rotation =
-                (Quat::from_axis_angle(axis.normalize(), angle) * self.ball.rotation).normalize();
-        }
+        let drive = (push != Vec3::ZERO).then(|| (0, push * PSI_PER_SECOND * p.force / p.mass));
+        self.world.bodies[0] = self.ball.body();
+        self.world.step(TICK, drive);
+        let b = self.world.bodies[0];
+        self.ball.position = b.pos;
+        self.ball.velocity = b.vel;
+        self.ball.rotation = b.rot;
+        self.ball.spin = b.ang;
+        self.ball.on_ground = self.world.grounded;
 
         self.follow_camera();
         self.apply_rules();
         if self.tick.is_multiple_of(30) && self.points > 0 {
             self.points -= 1;
-        }
-    }
-
-    /// Pushes the ball out of the floor and reflects its normal velocity with the pair's elasticity. Rolling has no
-    /// resistance of its own: in the original it slows through damping and the contact's friction.
-    fn resolve(&mut self, elasticity: f32) {
-        self.ball.on_ground = false;
-        for _ in 0..4 {
-            let contacts = self.collider.contacts(self.ball.position, BALL_RADIUS);
-            let Some(c) = contacts.first() else { break };
-            self.ball.position += c.normal * c.depth;
-            let vn = self.ball.velocity.dot(c.normal);
-            if vn < 0.0 {
-                self.ball.velocity -= c.normal * vn * (1.0 + elasticity);
-            }
-            if c.normal.y > 0.3 {
-                self.ball.on_ground = true;
-            }
         }
     }
 
@@ -456,8 +510,8 @@ fn collision_triangles(level: &Level) -> Vec<Triangle> {
         let solid = match g.name.to_ascii_lowercase().as_str() {
             "phys_floors" | "phys_floorrails" => true,
             "phys_floorstopper" => false,
-            // Modules and boxes are solid for now; their own behaviour comes with phase 4.
-            n if n.starts_with("p_modul") || n == "p_box" => true,
+            // Modules are solid for now; their own behaviour comes with phase 4. Boxes are bodies (see `Sim::new`).
+            n if n.starts_with("p_modul") => true,
             _ => false,
         };
         if !solid {

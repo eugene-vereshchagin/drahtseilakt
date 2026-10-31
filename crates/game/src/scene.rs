@@ -80,6 +80,8 @@ pub struct Placement {
     pub marker: Option<[f32; 4]>,
     /// The level object it stands for (hidden when the object is taken).
     pub object: usize,
+    /// A rigid body of the physics world that moves this placement: `matrix` is then relative to the body.
+    pub body: Option<usize>,
 }
 
 /// Module models (`3D Entities/PH/<name>.nmo`), uploaded after the fixed models.
@@ -104,7 +106,11 @@ fn module_name(object: &str) -> &str {
     }
 }
 
-pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>, Modules) {
+pub fn placements(
+    level: &Level,
+    data: &crate::assets::Data,
+    boxes: &[(usize, usize)],
+) -> (Vec<Placement>, Modules) {
     let mut out = Vec::new();
     let mut modules = Modules { models: Vec::new() };
     let mut loaded: std::collections::HashMap<String, Option<usize>> =
@@ -122,6 +128,7 @@ pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>,
                 matrix,
                 marker: None,
                 object: i,
+                body: None,
             });
             continue;
         }
@@ -138,6 +145,7 @@ pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>,
                 matrix,
                 marker: Some(color),
                 object: i,
+                body: None,
             });
             continue;
         }
@@ -152,17 +160,30 @@ pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>,
         let Some(module) = modules.models.get(index) else {
             continue;
         };
-        // Every textured mesh of the module: the files keep them hidden and the original's scripts show them.
-        for mo in &module.objects {
+        // The module's textured meshes. Hidden ones are shown by the original's scripts, which we do not run; a box
+        // is a body that exists from the start, so its mesh is shown whatever the file says.
+        let body = boxes.iter().find(|b| b.0 == i).map(|b| b.1);
+        for mo in module
+            .objects
+            .iter()
+            .filter(|mo| mo.visible || body.is_some())
+        {
             let Some(mm) = mo.mesh.filter(|&m| has_material(module, m)) else {
                 continue;
             };
+            // A body moves its module: the matrix is then relative to the body, which starts at the placeholder.
+            let local = Mat4::from_cols_array_2d(&mo.matrix);
             out.push(Placement {
                 model: FIRST_MODULE_MODEL + index,
                 mesh: mm,
-                matrix: matrix * Mat4::from_cols_array_2d(&mo.matrix),
+                matrix: if body.is_some() {
+                    local
+                } else {
+                    matrix * local
+                },
                 marker: None,
                 object: i,
+                body,
             });
         }
     }
@@ -172,6 +193,7 @@ pub fn placements(level: &Level, data: &crate::assets::Data) -> (Vec<Placement>,
 pub fn instances(
     placements: &[Placement],
     taken: &[usize],
+    bodies: &[crate::physics::Body],
     balls: &BallMeshes,
     s: &Snapshot,
 ) -> Vec<Instance> {
@@ -181,7 +203,10 @@ pub fn instances(
         .map(|p| Instance {
             model: p.model,
             mesh: p.mesh,
-            matrix: p.matrix,
+            matrix: match p.body.and_then(|b| bodies.get(b)) {
+                Some(b) => Mat4::from_rotation_translation(b.rot, b.pos) * p.matrix,
+                None => p.matrix,
+            },
             marker: p.marker,
         })
         .collect();

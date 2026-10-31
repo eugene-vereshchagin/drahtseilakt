@@ -10,6 +10,7 @@ mod assets;
 mod autopilot;
 mod collide;
 mod hud;
+mod physics;
 mod render;
 mod replay;
 mod scene;
