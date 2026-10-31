@@ -770,12 +770,15 @@ impl World {
         }
     }
 
-    /// Contact system hook: the recovery of a penetrating pair after a failed solve. Not ported yet (see the module
-    /// comment); empty until the contact port lands.
-    fn contact_inter_penetration(&mut self, _m: usize) {}
+    /// The recovery of a penetrating pair after a failed solve (the contact system's, `crate::impact`).
+    fn contact_inter_penetration(&mut self, m: usize) {
+        self.inter_penetration(m);
+    }
 
-    /// Contact system hook: the impact of a mindist whose gap closed. Not ported yet; empty until the contact port.
-    fn contact_do_impact(&mut self, _m: usize) {}
+    /// The impact of a mindist whose gap closed (the contact system's, `crate::impact`).
+    fn contact_do_impact(&mut self, m: usize) {
+        self.do_impact_mindist(m);
+    }
 }
 
 #[cfg(test)]

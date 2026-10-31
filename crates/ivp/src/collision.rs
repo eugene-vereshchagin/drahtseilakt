@@ -76,6 +76,11 @@ pub struct CollWorld {
     pub fss: Vec<crate::friction::FrictionSystem>,
     pub free_fss: Vec<usize>,
     pub fis: Vec<crate::friction::FrictionInfo>,
+    /// The impact counter (env +0x13c) and the number of impacts (env +0x88).
+    pub impact_counter: u32,
+    pub impacts: u32,
+    /// The post-collision events of the impacts, for the glue to read.
+    pub impact_events: Vec<crate::impact::ImpactEvent>,
     pub free_fis: Vec<usize>,
     pub watchers: Vec<crate::watcher::Watcher>,
     pub free_watchers: Vec<usize>,

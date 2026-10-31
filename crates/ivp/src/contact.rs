@@ -52,6 +52,11 @@ pub struct ContactInfo {
     pub gap: f32,
     /// The friction infos of the two sides in the system being solved.
     pub fi: [Option<usize>; 2],
+    /// The velocity of the point's relative motion before the impact (the impact's output).
+    pub rel: P3,
+    /// The rescue speed of the point and its predicted gap at the next PSI (the impact system's).
+    pub rescue: f32,
+    pub pred_gap: f32,
 }
 
 /// A contact point (`IvpContactPoint`, 2.6): its two friction synapses, the spring state and the geometry.
@@ -89,7 +94,7 @@ fn dotd(a: &P3, b: &P3) -> f64 {
 }
 
 /// The triangle normal (P1 - P0) x (P2 - P0) of an edge's triangle, object space (`tri_normal`, 0x10021280).
-fn tri_normal(l: &Ledge, e: Edge) -> V3 {
+pub(crate) fn tri_normal(l: &Ledge, e: Edge) -> V3 {
     let p0 = l.p(e);
     let p1 = l.p(Ledge::next(e));
     let p2 = l.p(Ledge::prev(e));

@@ -21,7 +21,7 @@ pub const SET_MAX_DIST_FOR_FRICTION: f32 = f32::from_bits(0x3d38_51eb);
 const C_1E6F: f64 = 9.999_999_974_752_427e-7;
 const C_1E38: f64 = 1e-38;
 const C_001F: f64 = 0.001_000_000_047_497_451_3;
-const C_01F: f64 = 0.100_000_001_490_116_12;
+pub(crate) const C_01F: f64 = 0.100_000_001_490_116_12;
 const C_1E19: f64 = 1e-19;
 const C_1E5F: f64 = 9.999_999_747_378_752e-6;
 const C_981F: f32 = 9.81;
@@ -295,7 +295,7 @@ impl World {
     }
 
     /// The pair of two cores in either order (`0x1001d380`), searched from the end.
-    fn fs_find_pair(&self, fs: usize, a: usize, b: usize) -> Option<usize> {
+    pub(crate) fn fs_find_pair(&self, fs: usize, a: usize, b: usize) -> Option<usize> {
         let pairs = &self.coll.fss[fs].pairs;
         (0..pairs.len()).rev().find(|&i| {
             let p = &pairs[i];
@@ -361,7 +361,7 @@ impl World {
     /// Recomputes a pair's points at this time, dropping those that left their feature; returns how many are left
     /// (`ivp_fs_recalc_pair`, 0x1001cc20).
     #[allow(dead_code)] // the impact pre-pass, ported next, calls it
-    fn fs_recalc_pair(&mut self, fs: usize, pair: usize) -> usize {
+    pub(crate) fn fs_recalc_pair(&mut self, fs: usize, pair: usize) -> usize {
         let mut n = self.coll.fss[fs].pairs[pair].cps.len();
         let mut i = n;
         while i > 0 {

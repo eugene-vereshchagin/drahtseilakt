@@ -80,6 +80,13 @@ pub struct Core {
     pub body: usize,
     pub temporarily_unmovable: u8,
     pub impacts_psi: i16,
+    /// The synchronized state of an impact: the pose and rotation to restore, and whether it pushed.
+    pub synced: bool,
+    pub sync_pushed: bool,
+    pub sync_rot_speed: [f32; 3],
+    pub sync_q: Quat,
+    /// The impact counter of the last impact this core took part in.
+    pub impact_stamp: u32,
     /// The object's origin in core coordinates (`shift_core_f_object`); zero for most bodies.
     pub shift: [f32; 3],
 }
@@ -380,6 +387,11 @@ impl World {
             body,
             temporarily_unmovable: 0,
             impacts_psi: 0,
+            synced: false,
+            sync_pushed: false,
+            sync_rot_speed: [0.0; 3],
+            sync_q: q,
+            impact_stamp: 0,
             shift: [0.0; 3],
         });
         let su = self.new_unit();
