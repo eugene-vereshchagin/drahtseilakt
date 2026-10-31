@@ -36,20 +36,24 @@ pub enum BallKind {
 impl BallKind {
     fn params(self) -> Params {
         match self {
+            // Heavier balls accelerate less but carry more momentum (mass × speed), which is what moves boxes.
             BallKind::Wood => Params {
-                push: 22.0,
+                force: 20.0,
+                mass: 1.0,
                 damping: 0.25,
                 bounce: 0.6,
                 roll: 0.8,
             },
             BallKind::Stone => Params {
-                push: 18.0,
+                force: 24.0,
+                mass: 2.0,
                 damping: 0.10,
                 bounce: 0.8,
                 roll: 0.5,
             },
             BallKind::Paper => Params {
-                push: 30.0,
+                force: 14.0,
+                mass: 0.5,
                 damping: 0.40,
                 bounce: 0.4,
                 roll: 1.2,
@@ -75,7 +79,9 @@ impl BallKind {
 /// rolling resistance per second against the surface.
 #[derive(Clone, Copy)]
 struct Params {
-    push: f32,
+    /// Push force of the arrow keys; acceleration is force / mass.
+    force: f32,
+    mass: f32,
     damping: f32,
     bounce: f32,
     roll: f32,
@@ -306,11 +312,13 @@ impl Sim {
         let push = push.normalize_or_zero();
 
         let Params {
-            push: accel,
+            force,
+            mass,
             damping,
             bounce,
             roll,
         } = self.ball.kind.params();
+        let accel = force / mass;
         let dt = TICK / SUBSTEPS as f32;
         for _ in 0..SUBSTEPS {
             self.ball.velocity += push * accel * dt;
@@ -324,9 +332,9 @@ impl Sim {
         let axis = Vec3::Y.cross(horizontal);
         if axis.length_squared() > 1e-8 {
             let angle = horizontal.length() * TICK / BALL_RADIUS;
-            // Left-handed coordinates turn the other way round.
+            // Rolling without slipping: the spin is Y × v / r, so a ball rolling forward turns forward.
             self.ball.rotation =
-                (Quat::from_axis_angle(axis.normalize(), -angle) * self.ball.rotation).normalize();
+                (Quat::from_axis_angle(axis.normalize(), angle) * self.ball.rotation).normalize();
         }
 
         self.follow_camera();
@@ -591,6 +599,38 @@ mod tests {
             sim.ball.position
         );
         assert!(sim.ball.on_ground);
+    }
+
+    #[test]
+    fn a_rolling_ball_turns_the_way_it_rolls() {
+        let level = flat_level();
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        for _ in 0..30 {
+            sim.step(input::UP);
+        }
+        let forward = sim.camera.forward();
+        // Rolling without slipping, the top of the ball moves at twice the ball's speed in the direction of travel.
+        // Over one tick the top point's displacement must point the same way as the ball.
+        let before = sim.ball.rotation * Vec3::Y;
+        sim.step(input::UP);
+        let after = sim.ball.rotation * Vec3::Y;
+        assert!(
+            (after - before).dot(forward) > 0.0,
+            "top point moves {:?}, the ball moves along {forward:?}",
+            after - before
+        );
+    }
+
+    #[test]
+    fn paper_carries_less_momentum_than_wood_and_stone() {
+        let p = |k: BallKind| {
+            let q = k.params();
+            q.force / q.mass
+        };
+        // Speed reached on the same push, and momentum per unit speed (mass): paper is the lightest.
+        assert!(BallKind::Paper.params().mass < BallKind::Wood.params().mass);
+        assert!(BallKind::Wood.params().mass < BallKind::Stone.params().mass);
+        assert!(p(BallKind::Paper) > p(BallKind::Stone));
     }
 
     #[test]
