@@ -144,9 +144,22 @@ impl Camera {
     pub fn forward(&self) -> Vec3 {
         Vec3::new(self.yaw.sin(), 0.0, self.yaw.cos())
     }
-    pub fn right(&self) -> Vec3 {
-        // Left-handed, Y up: right is forward turned a quarter clockwise seen from above.
-        Vec3::new(self.yaw.cos(), 0.0, -self.yaw.sin())
+    /// The world axis "up" pushes along: the camera's heading in whole quarters, at once, even while the view is
+    /// still turning (the original's four navigation forces are along world axes).
+    pub fn push_forward(&self) -> Vec3 {
+        match self.quarter.rem_euclid(4) {
+            0 => Vec3::Z,
+            1 => Vec3::X,
+            2 => Vec3::NEG_Z,
+            _ => Vec3::NEG_X,
+        }
+    }
+
+    /// The world axis "right" pushes along: `push_forward` turned a quarter clockwise seen from above (left-handed,
+    /// Y up).
+    pub fn push_right(&self) -> Vec3 {
+        let f = self.push_forward();
+        Vec3::new(f.z, 0.0, -f.x)
     }
 }
 
@@ -393,23 +406,24 @@ impl Sim {
         let lift_goal = if input & input::LIFT != 0 { 1.0 } else { 0.0 };
         self.camera.lift += (lift_goal - self.camera.lift) * (1.0 - (-TICK * 6.0f32).exp());
 
-        // The push: arrows relative to the camera (Left / Right only when Shift is not held).
+        // The push: the original's "Ball Navigation" has one force per arrow, each along a world axis chosen by the
+        // camera's heading (Left / Right only when Shift is not held). Arrows held together add their forces, so a
+        // diagonal push is the force times the square root of two.
         let mut push = Vec3::ZERO;
         if input & input::UP != 0 {
-            push += self.camera.forward();
+            push += self.camera.push_forward();
         }
         if input & input::DOWN != 0 {
-            push -= self.camera.forward();
+            push -= self.camera.push_forward();
         }
         if input & input::SHIFT == 0 {
             if input & input::RIGHT != 0 {
-                push += self.camera.right();
+                push += self.camera.push_right();
             }
             if input & input::LEFT != 0 {
-                push -= self.camera.right();
+                push -= self.camera.push_right();
             }
         }
-        let push = push.normalize_or_zero();
 
         // The push is the original's control force, a SetPhysicsForce: the physics applies an impulse of the force at
         // every PSI (66 a second of its time), while the ball is awake. The ball's force is its material's.
@@ -943,6 +957,41 @@ mod tests {
         }
         assert!(sim.world.state(0).is_some());
         assert!(sim.ball.position.distance(Vec3::new(0.0, BALL_RADIUS, 0.0)) < 0.5);
+    }
+
+    #[test]
+    fn two_arrows_push_with_both_forces_along_world_axes() {
+        // Each arrow is a force of its own along a world axis: Up and Right together push diagonally with the force
+        // times sqrt(2), so the ball gets about sqrt(2) times as fast as with Up alone.
+        let level = flat_level();
+        let run = |input: u8| {
+            let mut sim = Sim::new(&level, BallKind::Wood);
+            for _ in 0..60 {
+                sim.step(0);
+            }
+            for _ in 0..30 {
+                sim.step(input);
+            }
+            sim.ball.velocity * Vec3::new(1.0, 0.0, 1.0)
+        };
+        let (up, diag) = (run(input::UP), run(input::UP | input::RIGHT));
+        let ratio = diag.length() / up.length();
+        assert!((ratio - 2f32.sqrt()).abs() < 0.05, "diagonal {diag:?} against up {up:?}: {ratio}");
+        let along = diag.normalize();
+        assert!((along.x - along.z.abs()).abs() < 0.02, "not diagonal: {along:?}");
+    }
+
+    #[test]
+    fn a_camera_turn_changes_the_push_axis_at_once() {
+        let mut cam = Sim::new(&flat_level(), BallKind::Wood).camera;
+        assert_eq!(cam.push_forward(), Vec3::X);
+        cam.quarter += 1;
+        // the view is still where it was, the push already along the next axis
+        assert!((cam.forward() - Vec3::X).length() < 1e-6);
+        assert_eq!(cam.push_forward(), Vec3::NEG_Z);
+        assert_eq!(cam.push_right(), Vec3::NEG_X);
+        cam.quarter = -1;
+        assert_eq!(cam.push_forward(), Vec3::NEG_X);
     }
 
     #[test]
