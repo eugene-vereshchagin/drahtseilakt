@@ -178,8 +178,11 @@ impl World {
             core.rot_speed = [0.0; 3];
             core.movement_state = if desc.fixed { MT_STATIC } else { MT_NOT_SIM };
         }
-        // the inverses, the equal-inertia flag and the inverse diameter (`calc_calc`, as the upstream's init does)
+        // the inverses, the equal-inertia flag and the inverse diameter (`calc_calc`), then the core ready for the
+        // next PSI, as the upstream's init ends (0x10009f00)
         self.calc_calc(c);
+        let next = self.env.time_of_next_psi - self.env.current_time;
+        self.init_core_for_simulation(c, Self::inv_dt(next));
         self.set_object_geometry(c, kind, surface, extra);
         self.set_object_material(c, desc.friction, desc.elasticity);
         if desc.collide && (kind == ObjKind::Ball || self.coll.objs[c].surface.is_some()) {
