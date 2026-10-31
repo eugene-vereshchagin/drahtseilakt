@@ -9,6 +9,7 @@
 pub mod collision;
 pub mod convex;
 pub mod core;
+pub mod event;
 pub mod hull;
 pub mod ledge;
 pub mod math;

@@ -218,6 +218,43 @@ pub fn rsqrt(n: f64) -> f64 {
     rsqrt_steps(n, 5)
 }
 
+/// `1/sqrt(x)` of an f32 argument, four steps (`ivp_isqrt4`, 0x1000dae0).
+pub fn isqrt4(x: f32) -> f64 {
+    rsqrt_steps(f64::from(x), 4)
+}
+
+/// `1/sqrt(x)` with five steps (`ivp_isqrt5`, 0x1000db80).
+pub fn isqrt5(x: f64) -> f64 {
+    rsqrt_steps(x, 5)
+}
+
+/// Unit vector with four Newton steps (`ivp_normalize4`, 0x1000dd50); false and unchanged for a near-zero vector.
+pub fn normalize4(v: &mut [f64; 3]) -> bool {
+    let n = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+    if n < 1e-19 {
+        return false;
+    }
+    let y = rsqrt_steps(n, 4);
+    for c in v.iter_mut() {
+        *c *= y;
+    }
+    true
+}
+
+/// Unit vector with five steps, returning the length it had (`ivp_normalize_len`, 0x1000de30); 0 and unchanged when
+/// near zero.
+pub fn normalize_len(v: &mut [f64; 3]) -> f64 {
+    let n = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+    if n < 1e-19 {
+        return 0.0;
+    }
+    let y = rsqrt_steps(n, 5);
+    for c in v.iter_mut() {
+        *c *= y;
+    }
+    n * y
+}
+
 /// Normalises a double vector; false (unchanged) for a near-zero one (`ivp_normalize_d`, 0x1000e120).
 pub fn normalize_d(v: &mut [f64; 3]) -> bool {
     let n = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];

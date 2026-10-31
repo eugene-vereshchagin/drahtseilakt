@@ -13,7 +13,7 @@
 // f32 and f64 steps, where those steps are what the numbers depend on.
 
 use crate::ledge::{Edge, Ledge, Surface};
-use crate::math;
+use crate::math::{self, isqrt4, isqrt5, normalize4, normalize_len};
 use crate::mindist::{Feat, Mindist, ObjCache, MDF_SORT, ST_BACKSIDE, ST_BALL, ST_EDGE, ST_FACE, ST_POINT};
 
 type V3 = [f64; 3];
@@ -36,40 +36,6 @@ fn fsub_d(a: P3, b: P3) -> V3 {
 fn flen2(q: P3, p: P3) -> f32 {
     let d = fsub_d(q, p);
     (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) as f32
-}
-
-fn isqrt4(x: f32) -> f64 {
-    math::rsqrt_steps(f64::from(x), 4)
-}
-
-fn isqrt5(x: f64) -> f64 {
-    math::rsqrt_steps(x, 5)
-}
-
-/// `ivp_normalize4`: unit vector with four Newton steps; false (unchanged) for a near-zero vector.
-fn normalize4(v: &mut V3) -> bool {
-    let n = dot3(*v, *v);
-    if n < 1e-19 {
-        return false;
-    }
-    let y = math::rsqrt_steps(n, 4);
-    for c in v.iter_mut() {
-        *c *= y;
-    }
-    true
-}
-
-/// `ivp_normalize_len`: the unit vector, returning the length it had (0 and unchanged when near zero).
-fn normalize_len(v: &mut V3) -> f64 {
-    let n = dot3(*v, *v);
-    if n < 1e-19 {
-        return 0.0;
-    }
-    let y = isqrt5(n);
-    for c in v.iter_mut() {
-        *c *= y;
-    }
-    n * y
 }
 
 fn all_inside(w: &[f32; 4]) -> bool {
