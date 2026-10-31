@@ -174,6 +174,15 @@ impl World {
         self.add(Shape::Sphere(radius), m, pos, rot)
     }
 
+    /// The triangles of the level's floor near a point, as the physics sees them (the floor is body 0).
+    pub fn floor_near(&self, p: Vec3, r: f32) -> Vec<[Vec3; 3]> {
+        self.physics
+            .surface_triangles_near(0, [f64::from(p.x), f64::from(p.y), f64::from(p.z)], f64::from(r))
+            .into_iter()
+            .map(|t| t.map(|v| Vec3::new(v[0] as f32, v[1] as f32, v[2] as f32)))
+            .collect()
+    }
+
     /// The contact points the ball takes part in, for the watch log: those whose entities include the ball (entity 1).
     pub fn ball_contacts(&self) -> Vec<ivp::glue::ContactReadout> {
         self.physics.contacts_of(1)

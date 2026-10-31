@@ -75,6 +75,8 @@ pub struct ContactReadout {
     pub entities: [u32; 2],
     pub types: [i16; 2],
     pub gap: f32,
+    /// The normal pressure the friction system holds on the point.
+    pub pressure: f32,
     pub normal: P3,
     pub point: V3,
 }
@@ -259,6 +261,7 @@ impl World {
             entities: [self.cores[p.syn[0].obj].entity, self.cores[p.syn[1].obj].entity],
             types: [p.syn[0].typ, p.syn[1].typ],
             gap: p.gap,
+            pressure: p.pressure,
             normal: p.info.n,
             point: p.info.cp_ws,
         })
@@ -276,11 +279,36 @@ impl World {
                     entities,
                     types: [p.syn[0].typ, p.syn[1].typ],
                     gap: p.gap,
+            pressure: p.pressure,
                     normal: p.info.n,
                     point: p.info.cp_ws,
                 })
             })
             .collect()
+    }
+
+    /// The triangles of a body's surface that have a corner within `r` of `p` (for diagnosing contacts; the upstream
+    /// has no such readout).
+    pub fn surface_triangles_near(&self, obj: usize, p: V3, r: f64) -> Vec<[V3; 3]> {
+        let Some(surface) = self.coll.objs.get(obj).and_then(|o| o.surface.as_ref()) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for l in &surface.ledges {
+            for t in 0..l.tris.len() {
+                let e = crate::ledge::Edge { tri: t, slot: 0 };
+                let corners = [l.p(e), l.p(crate::ledge::Ledge::next(e)), l.p(crate::ledge::Ledge::prev(e))];
+                let c: Vec<V3> = corners.iter().map(|v| to_v3(*v)).collect();
+                let near = c.iter().any(|v| {
+                    let d = [v[0] - p[0], v[1] - p[1], v[2] - p[2]];
+                    d[0] * d[0] + d[1] * d[1] + d[2] * d[2] <= r * r
+                });
+                if near {
+                    out.push([c[0], c[1], c[2]]);
+                }
+            }
+        }
+        out
     }
 
     /// The collision counters (`phys_debug_collision`): live mindists, mindists created, OV rechecks, watcher checks,

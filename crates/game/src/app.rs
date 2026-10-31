@@ -58,6 +58,8 @@ struct Game {
     ball_lost_at: Option<u64>,
     /// Looks for stuck balls and launches; see `watch.rs`.
     watch: Watch,
+    /// The ball's spin magnitude at the last tick (for the spin-loss dump in `log_tick`).
+    prev_spin: f32,
     /// The session log of a windowed run: the ball and its contacts at every tick (see `start_session`).
     session: Option<std::io::BufWriter<std::fs::File>>,
 }
@@ -107,6 +109,7 @@ impl Game {
             ball_lost_at: None,
             watch: Watch::default(),
             session: None,
+            prev_spin: 0.0,
             replay_in,
             level,
             balls,
@@ -215,13 +218,50 @@ impl Game {
         for c in self.sim.world().ball_contacts() {
             let _ = writeln!(
                 w,
-                "  contact {:?} types {:?} gap {:.4} normal {:.3} {:.3} {:.3} point {:.3} {:.3} {:.3}",
-                c.entities, c.types, c.gap, c.normal[0], c.normal[1], c.normal[2], c.point[0], c.point[1], c.point[2]
+                "  contact {:?} types {:?} gap {:.4} pressure {:.3} normal {:.3} {:.3} {:.3} point {:.3} {:.3} {:.3}",
+                c.entities, c.types, c.gap, c.pressure, c.normal[0], c.normal[1], c.normal[2], c.point[0], c.point[1], c.point[2]
             );
         }
         if self.sim.tick.is_multiple_of(60) {
             let _ = w.flush();
         }
+
+    }
+
+    /// A landing that takes more than 3 rad/s of spin in one tick: the floor around the ball is written to the level's
+    /// folder, so that the case can be rebuilt exactly (the replay reproduces the tick).
+    fn dump_spin_loss(&mut self) {
+        let (position, velocity, spin_v, on_ground) = {
+            let b = &self.sim.ball;
+            (b.position, b.velocity, b.spin, b.on_ground)
+        };
+        let spin = spin_v.length();
+        if on_ground && self.prev_spin - spin > 3.0 {
+            let floor = self.sim.world().floor_near(position, 6.0);
+            let mut text = format!(
+                "# tick {} {} ball position {:?} velocity {:?} spin {:?} (spin {:.3} before, {:.3} now)\n",
+                self.sim.tick,
+                clock(self.sim.tick),
+                position,
+                velocity,
+                spin_v,
+                self.prev_spin,
+                spin
+            );
+            for t in floor {
+                text.push_str(&format!(
+                    "tri {} {} {} {} {} {} {} {} {}\n",
+                    t[0].x, t[0].y, t[0].z, t[1].x, t[1].y, t[1].z, t[2].x, t[2].y, t[2].z
+                ));
+            }
+            let dir = self.run_dir();
+            let _ = std::fs::create_dir_all(&dir);
+            let path = dir.join(format!("spin-loss-{}.txt", self.sim.tick));
+            if let Err(e) = std::fs::write(&path, text) {
+                eprintln!("could not write {}: {e}", path.display());
+            }
+        }
+        self.prev_spin = spin;
     }
 
     /// Plays the replay up to a tick without a window, then gives the keys to the player (`--from`). The replay's
@@ -271,6 +311,7 @@ impl Game {
         self.sim.step(input);
         self.replay_out.record(self.sim.tick, input);
         self.log_tick(input);
+        self.dump_spin_loss();
         let ball = &self.sim.ball;
         let found = self.watch.observe(self.sim.tick, ball.position, ball.velocity, input, ball.on_ground);
         if !found.is_empty() {
@@ -376,6 +417,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         return screenshot(&mut game, &data, &o, path);
     }
     if o.headless {
+        game.start_session();
         let end = game
             .replay_in
             .as_ref()
