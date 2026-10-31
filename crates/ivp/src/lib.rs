@@ -7,6 +7,7 @@
 #![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 
 pub mod collision;
+pub mod constraint;
 pub mod contact;
 pub mod convex;
 pub mod core;

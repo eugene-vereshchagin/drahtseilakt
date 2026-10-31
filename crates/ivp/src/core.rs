@@ -131,6 +131,9 @@ pub enum Controller {
     Gravity { g: [f32; 3] },
     /// One of a friction system's three controllers (`crate::friction`).
     Friction { fs: usize, kind: FrictionKind },
+    /// A spring (`crate::constraint`, priority 1500) and a constraint (priority 405) acting on a joint.
+    Spring { joint: usize },
+    Constraint { joint: usize },
 }
 
 /// The controllers of a friction system: the normal force (0), the tangential spring (600), the contact update (2000).
@@ -146,6 +149,8 @@ impl Controller {
     pub fn priority(&self) -> i32 {
         match self {
             Controller::Gravity { .. } => 1000,
+            Controller::Spring { .. } => 1500,
+            Controller::Constraint { .. } => 405,
             Controller::Friction { kind, .. } => match kind {
                 FrictionKind::Normal => 0,
                 FrictionKind::Spring => 600,
@@ -159,6 +164,7 @@ impl Controller {
         match self {
             Controller::Gravity { .. } => false,
             Controller::Friction { kind, .. } => *kind == FrictionKind::Spring,
+            Controller::Spring { .. } | Controller::Constraint { .. } => true,
         }
     }
 }
@@ -213,6 +219,8 @@ pub struct World {
     pub time: crate::time::TimeManager,
     /// Bumped on every change of the current time (the upstream's time code).
     pub time_code: u32,
+    /// The joints (springs and constraints) of the world (`crate::constraint`).
+    pub joints: Vec<crate::constraint::Joint>,
     /// The collision state: the broadphase, the hull managers and the collision records (`crate::collision`).
     pub coll: crate::collision::CollWorld,
 }
@@ -596,6 +604,22 @@ impl World {
                 for &c in cores.iter().rev() {
                     self.gravity_simulate(g, c, dt);
                 }
+            }
+            Controller::Spring { joint } => {
+                let es = crate::event_sim::EventSim {
+                    delta_time: dt,
+                    i_delta_time: Self::inv_dt(dt),
+                    sim_unit: su,
+                };
+                self.spring_simulate(joint, &es);
+            }
+            Controller::Constraint { joint } => {
+                let es = crate::event_sim::EventSim {
+                    delta_time: dt,
+                    i_delta_time: Self::inv_dt(dt),
+                    sim_unit: su,
+                };
+                self.constraint_simulate(joint, &es);
             }
             Controller::Friction { fs, kind } => {
                 let es = crate::event_sim::EventSim {
