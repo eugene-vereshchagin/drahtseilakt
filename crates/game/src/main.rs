@@ -35,6 +35,7 @@ usage: drahtseilakt [options]
   --screenshot FILE   no window: render the frame after the replay (or --ticks N) to a PNG
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
+  --from N            with --replay: play the replay up to tick N without a window, then hand over the keys
   --size WxH          window or screenshot size (default 1600x900)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
@@ -51,6 +52,7 @@ pub struct Options {
     pub screenshot: Option<PathBuf>,
     pub ticks: Option<u64>,
     pub trace: Option<u64>,
+    pub from: Option<u64>,
     pub size: (u32, u32),
     pub look: Option<[f32; 6]>,
 }
@@ -66,6 +68,7 @@ fn parse_args() -> Result<Options, String> {
         screenshot: None,
         ticks: None,
         trace: None,
+        from: None,
         size: (1600, 900),
         look: None,
     };
@@ -101,6 +104,13 @@ fn parse_args() -> Result<Options, String> {
                     value()?
                         .parse()
                         .map_err(|_| "--ticks needs a number".to_owned())?,
+                )
+            }
+            "--from" => {
+                o.from = Some(
+                    value()?
+                        .parse()
+                        .map_err(|_| "--from needs a tick number".to_owned())?,
                 )
             }
             "--trace" => {

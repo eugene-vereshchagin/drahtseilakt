@@ -18,6 +18,28 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Fullscreen, Window, WindowId};
 
+/// The frame timings of one measuring period (DRAHTSEILAKT_TIMING), printed every two seconds.
+#[derive(Debug)]
+struct Timing {
+    since: Instant,
+    frames: u64,
+    ticks: u64,
+    simulate: std::time::Duration,
+    frame: std::time::Duration,
+}
+
+impl Default for Timing {
+    fn default() -> Self {
+        Timing {
+            since: Instant::now(),
+            frames: 0,
+            ticks: 0,
+            simulate: std::time::Duration::ZERO,
+            frame: std::time::Duration::ZERO,
+        }
+    }
+}
+
 struct Game {
     level: LoadedLevel,
     start_ball: crate::sim::BallKind,
@@ -140,6 +162,16 @@ impl Game {
         if let Err(e) = std::fs::write(&snapshot, self.replay_out.to_text()) {
             eprintln!("could not save the replay of the {} to {}: {e}", f.kind.name(), snapshot.display());
         }
+    }
+
+    /// Plays the replay up to a tick without a window, then gives the keys to the player (`--from`). The replay's
+    /// inputs stay in the run's replay, so the attempt saved later still replays from the start.
+    fn fast_forward(&mut self, tick: u64) {
+        let end = self.replay_in.as_ref().map_or(0, |r| r.end).min(tick);
+        while self.sim.tick < end && !self.sim.finished && !self.sim.game_over {
+            self.tick(0);
+        }
+        self.replay_in = None;
     }
 
     /// Saves a run that did not finish (restarted or closed before the end), so that the falls and the lifts of
@@ -322,6 +354,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         );
         return Ok(());
     }
+    if let Some(tick) = o.from {
+        game.fast_forward(tick);
+    }
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Poll);
     let mut app = App {
@@ -333,6 +368,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         keys: 0,
         last: Instant::now(),
         acc: 0.0,
+        timing: std::env::var_os("DRAHTSEILAKT_TIMING").map(|_| Timing::default()),
         prev: None,
         error: None,
     };
@@ -530,6 +566,8 @@ struct App {
     last: Instant,
     acc: f32,
     prev: Option<Snapshot>,
+    /// Timings for DRAHTSEILAKT_TIMING: frames, and the time spent in the ticks and in the drawing of each.
+    timing: Option<Timing>,
     error: Option<String>,
 }
 
@@ -635,11 +673,15 @@ impl App {
         let now = Instant::now();
         self.acc = (self.acc + (now - self.last).as_secs_f32()).min(0.25);
         self.last = now;
+        let started = Instant::now();
+        let mut ticks = 0u32;
         while self.acc >= TICK {
             self.prev = Some(Snapshot::of(&self.game.sim));
             self.game.tick(self.keys);
             self.acc -= TICK;
+            ticks += 1;
         }
+        let simulated = started.elapsed();
         let cur = Snapshot::of(&self.game.sim);
         let snap = Snapshot::lerp(&self.prev.unwrap_or(cur), &cur, self.acc / TICK);
         let Some(gpu) = &mut self.gpu else { return };
@@ -678,6 +720,25 @@ impl App {
             ),
         );
         gpu.renderer.queue.present(frame);
+        if let Some(t) = &mut self.timing {
+            t.frames += 1;
+            t.ticks += u64::from(ticks);
+            t.simulate += simulated;
+            t.frame += started.elapsed();
+            if t.since.elapsed().as_secs() >= 2 {
+                let per_tick = t.simulate.as_secs_f64() * 1000.0 / t.ticks.max(1) as f64;
+                let per_frame = t.frame.as_secs_f64() * 1000.0 / t.frames.max(1) as f64;
+                eprintln!(
+                    "timing: {:.1} frames/s, {:.2} ticks per frame, tick {:.2} ms, frame {:.2} ms (of which the ticks {:.2} ms)",
+                    t.frames as f64 / t.since.elapsed().as_secs_f64(),
+                    t.ticks as f64 / t.frames.max(1) as f64,
+                    per_tick,
+                    per_frame,
+                    t.simulate.as_secs_f64() * 1000.0 / t.frames.max(1) as f64,
+                );
+                *t = Timing::default();
+            }
+        }
         if let Some(w) = &self.window {
             if self.game.sim.tick.is_multiple_of(15) {
                 w.set_title(&self.game.title());
