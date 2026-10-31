@@ -10,8 +10,11 @@ use glam::Vec3;
 const STUCK_SECONDS: f32 = 2.0;
 /// Below this speed, in units per second, the ball counts as still.
 const STILL_SPEED: f32 = 0.3;
-/// An upward speed, in units per second, with which the ball leaves the ground. Rolling over seams stays well below.
+/// An upward speed, in units per second, with which the ball leaves the ground. Rolling up a slope gives this too, so
+/// it is only the first condition.
 const LAUNCH_UP: f32 = 3.0;
+/// Ticks in the air before a take-off counts: one or two ticks are the contact flag flickering at a seam.
+const LAUNCH_AIR_TICKS: u32 = 6;
 /// A speed, in units per second, no rolling ball reaches in play; the report is an error in the physics.
 const FAST_SPEED: f32 = 40.0;
 
@@ -61,6 +64,9 @@ pub struct Watch {
     still_ticks: u32,
     stuck_reported: bool,
     prev_ground: bool,
+    /// The upward speed of the last take-off, and the ticks in the air since.
+    takeoff_up: Option<f32>,
+    air_ticks: u32,
     launch_reported: bool,
     fast_reported: bool,
 }
@@ -84,14 +90,22 @@ impl Watch {
             self.stuck_reported = false;
         }
 
-        // launch: the ball leaves the ground with an upward speed
-        if self.prev_ground && !on_ground && vel.y > LAUNCH_UP {
-            if !self.launch_reported {
-                self.launch_reported = true;
-                out.push(found(Kind::Launch));
-            }
-        } else if on_ground {
+        // launch: the ball leaves the ground with an upward speed and stays in the air
+        if on_ground {
+            self.takeoff_up = None;
+            self.air_ticks = 0;
             self.launch_reported = false;
+        } else {
+            if self.prev_ground && vel.y > LAUNCH_UP {
+                self.takeoff_up = Some(vel.y);
+            }
+            if self.takeoff_up.is_some() {
+                self.air_ticks += 1;
+                if self.air_ticks >= LAUNCH_AIR_TICKS && !self.launch_reported {
+                    self.launch_reported = true;
+                    out.push(found(Kind::Launch));
+                }
+            }
         }
         self.prev_ground = on_ground;
 
@@ -142,12 +156,24 @@ mod tests {
     }
 
     #[test]
-    fn leaving_the_ground_upward_is_a_launch_reported_once() {
+    fn a_flight_of_six_ticks_from_an_upward_takeoff_is_a_launch_reported_once() {
         let mut w = Watch::default();
         assert!(w.observe(1, Vec3::ZERO, Vec3::new(5.0, 0.0, 0.0), 0, true).is_empty());
-        let f = w.observe(2, Vec3::ZERO, Vec3::new(5.0, 6.0, 0.0), 0, false);
-        assert_eq!(f.iter().map(|f| f.kind).collect::<Vec<_>>(), vec![Kind::Launch]);
-        assert!(w.observe(3, Vec3::ZERO, Vec3::new(5.0, 6.5, 0.0), 0, false).is_empty(), "reported once");
+        let mut found = Vec::new();
+        for t in 2..=12 {
+            found.extend(w.observe(t, Vec3::ZERO, Vec3::new(5.0, 6.0 - t as f32, 0.0), 0, false));
+        }
+        assert_eq!(found.iter().map(|f| f.kind).collect::<Vec<_>>(), vec![Kind::Launch]);
+        assert_eq!(found[0].tick, 7, "the sixth tick in the air");
+    }
+
+    #[test]
+    fn a_one_tick_flicker_of_the_contact_is_not_a_launch() {
+        let mut w = Watch::default();
+        w.observe(1, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, true);
+        assert!(w.observe(2, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, false).is_empty());
+        assert!(w.observe(3, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, true).is_empty());
+        assert!(w.observe(4, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, false).is_empty());
     }
 
     #[test]
