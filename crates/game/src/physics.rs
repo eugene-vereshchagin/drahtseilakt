@@ -347,7 +347,8 @@ mod tests {
             );
             let ball = w.add_ball(2.0, m, Vec3::new(-6.0, 2.0, 0.0), Quat::IDENTITY);
             for _ in 0..180 {
-                w.step(Some((ball, Vec3::X * force * PSI_PER_SECOND / 60.0)));
+                w.set_push(ball, Vec3::X * force);
+                w.step(None);
             }
             w.state(bx).unwrap().pos.x - 6.0
         };
