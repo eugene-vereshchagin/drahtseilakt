@@ -187,10 +187,11 @@ pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u6
 
     // Points, lives and sector in the top left corner, always.
     let hud = format!(
-        "POINTS {}   LIVES {}   SECTOR {}",
+        "POINTS {}   LIVES {}   SECTOR {}   TICK {}",
         sim.points,
         sim.lives,
-        sim.sector + 1
+        sim.sector + 1,
+        sim.tick
     );
     out.push(Rect {
         x: 0.0,

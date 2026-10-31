@@ -384,11 +384,12 @@ impl Game {
             ""
         };
         format!(
-            "Drahtseilakt — {}   points {}   lives {}   sector {}   {}{state}",
+            "Drahtseilakt — {}   points {}   lives {}   sector {}   tick {}   {}{state}",
             self.level.name,
             s.points,
             s.lives,
             s.sector + 1,
+            s.tick,
             clock(s.tick)
         )
     }

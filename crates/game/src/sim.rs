@@ -483,7 +483,9 @@ impl Sim {
 
 fn camera_goal(cam: &Camera, ball: Vec3) -> Vec3 {
     let back = -cam.forward();
-    let (dist, height) = (22.0 - 12.0 * cam.lift, 12.0 + 38.0 * cam.lift);
+    // The original's in-game camera sits 22 back and 35 up from the ball, looking at its centre (C reference,
+    // InGameCam at level 1: offset (-22, +35, 0)); Space lifts it further.
+    let (dist, height) = (22.0 - 12.0 * cam.lift, 35.0 + 38.0 * cam.lift);
     ball + back * dist + Vec3::Y * height
 }
 
