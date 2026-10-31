@@ -1,11 +1,15 @@
 // The physics of the game: the player's ball, the level's loose boxes and balls, and the level's physical geometry.
-// Rigid-body dynamics come from rapier (Apache-2.0, a library we depend on, not code we copied). What is ours here:
-// the level as a static triangle mesh, the original game's material values (docs/physics.md, sections 3 and 4) with
-// pair friction and elasticity as products, and the one-step-per-tick contract that keeps replays reproducible.
+// The dynamics are IVP's (crates/ivp, a port of OpenBallance's physics, GPL-3.0): the level's floors as one fixed
+// compact surface, the boxes as convex surfaces, the balls as spheres, with the original game's material values
+// (docs/physics.md, sections 3 and 4). A tick is one step of 1/60 s, which the physics runs as its own time steps of
+// 1/66 s.
 
 use crate::collide::Triangle;
 use glam::{Quat, Vec3};
-use rapier3d::prelude::*;
+use ivp::body::{BodyDesc, BodyState, Shape};
+use ivp::core::World as IvpWorld;
+use ivp::ledge::{self, Surface};
+use ivp::math::Quat as IvpQuat;
 
 /// Steps per second of the original's own time (its "PSI"); its control forces are impulses per step.
 pub const PSI_PER_SECOND: f32 = 66.0;
@@ -14,9 +18,8 @@ pub const GRAVITY: f32 = 20.0;
 /// Elasticity and friction of the level's floors and rails and of PH modules (`Physicalize_Floors`).
 pub const SURFACE_ELASTICITY: f32 = 0.3;
 pub const SURFACE_FRICTION: f32 = 0.7;
-/// Solver iterations per step; one step is one tick (1/60 s).
-const SOLVER_ITERATIONS: usize = 8;
-const TICK: f32 = 1.0 / 60.0;
+/// One tick, in seconds.
+const TICK: f64 = 1.0 / 60.0;
 
 /// The material of a body, as the original's tables give it.
 #[derive(Clone, Copy, Debug)]
@@ -45,143 +48,153 @@ pub struct State {
 }
 
 pub struct World {
-    physics: PhysicsWorld,
-    handles: Vec<RigidBodyHandle>,
-    colliders: Vec<ColliderHandle>,
+    physics: IvpWorld,
+    /// The IVP body of each of the game's bodies, in creation order.
+    handles: Vec<usize>,
     /// Poses after the last step, for drawing.
     pub bodies: Vec<Body>,
     /// Whether body 0 (the ball) is touching something.
     pub grounded: bool,
 }
 
-fn vector(v: Vec3) -> Vector {
-    Vector::new(v.x, v.y, v.z)
+fn vec3_f64(v: Vec3) -> [f64; 3] {
+    [f64::from(v.x), f64::from(v.y), f64::from(v.z)]
 }
 
-fn vec3(v: Vector) -> Vec3 {
-    Vec3::new(v.x, v.y, v.z)
+fn vec3(v: [f64; 3]) -> Vec3 {
+    Vec3::new(v[0] as f32, v[1] as f32, v[2] as f32)
 }
 
-fn quat(r: Rotation) -> Quat {
-    Quat::from_xyzw(r.x, r.y, r.z, r.w)
+fn quat(q: IvpQuat) -> Quat {
+    Quat::from_xyzw(q.x as f32, q.y as f32, q.z as f32, q.w as f32)
 }
 
-fn rotation(q: Quat) -> Rotation {
-    Rotation::from_xyzw(q.x, q.y, q.z, q.w)
-}
-
-/// Pair coefficients are products of the two materials' values, as in the original.
-fn coefficients(c: ColliderBuilder, friction: f32, elasticity: f32) -> ColliderBuilder {
-    c.friction(friction)
-        .restitution(elasticity)
-        .friction_combine_rule(CoefficientCombineRule::Multiply)
-        .restitution_combine_rule(CoefficientCombineRule::Multiply)
+fn ivp_quat(q: Quat) -> IvpQuat {
+    IvpQuat {
+        x: f64::from(q.x),
+        y: f64::from(q.y),
+        z: f64::from(q.z),
+        w: f64::from(q.w),
+    }
 }
 
 impl World {
-    /// A world with the level's physical triangles as one fixed mesh.
+    /// A world with the level's physical triangles as one fixed surface (a convex piece per triangle, as IVP keeps
+    /// the level's floors).
     pub fn new(triangles: &[Triangle]) -> World {
-        let mut physics = PhysicsWorld::new();
-        physics.gravity = Vector::new(0.0, -GRAVITY, 0.0);
-        physics.integration_parameters.dt = TICK;
-        physics.integration_parameters.num_solver_iterations = SOLVER_ITERATIONS;
+        let mut physics = IvpWorld::new();
+        physics.time_start();
+        physics.set_gravity([0.0, -GRAVITY, 0.0]);
+        let ledges: Vec<ledge::Ledge> = triangles
+            .iter()
+            .filter_map(|t| ledge::triangle(vec3_f64(t.a), vec3_f64(t.b), vec3_f64(t.c)))
+            .collect();
         let mut world = World {
             physics,
             handles: Vec::new(),
-            colliders: Vec::new(),
             bodies: Vec::new(),
             grounded: false,
         };
-        let mut vertices = Vec::with_capacity(triangles.len() * 3);
-        let mut indices = Vec::with_capacity(triangles.len());
-        for t in triangles {
-            let k = vertices.len() as u32;
-            vertices.extend([vector(t.a), vector(t.b), vector(t.c)]);
-            indices.push([k, k + 1, k + 2]);
-        }
-        if let Ok(mesh) = ColliderBuilder::trimesh(vertices, indices) {
-            let collider = coefficients(mesh, SURFACE_FRICTION, SURFACE_ELASTICITY);
-            world.physics.colliders.insert(collider);
+        if let Some(floor) = Surface::compile(ledges) {
+            let desc = BodyDesc {
+                fixed: true,
+                friction: SURFACE_FRICTION,
+                elasticity: SURFACE_ELASTICITY,
+                ..BodyDesc::default()
+            };
+            world.physics.add_body(desc, Shape::Surface(floor), [0.0; 3], ivp_quat(Quat::IDENTITY));
         }
         world
     }
 
-    fn add(&mut self, shape: ColliderBuilder, m: Material, pos: Vec3, rot: Quat) -> usize {
-        let body = RigidBodyBuilder::dynamic()
-            .pose(Pose::from_parts(vector(pos), rotation(rot)))
-            .linear_damping(m.lin_damp)
-            .angular_damping(m.rot_damp);
-        let collider = coefficients(shape, m.friction, m.elasticity).mass(m.mass);
-        let (handle, col) = self.physics.insert(body, collider);
-        self.handles.push(handle);
-        self.colliders.push(col);
+    fn add(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Quat) -> usize {
+        let desc = BodyDesc {
+            mass: m.mass,
+            friction: m.friction,
+            elasticity: m.elasticity,
+            lin_damp: m.lin_damp,
+            rot_damp: m.rot_damp,
+            ..BodyDesc::default()
+        };
+        let id = self.physics.add_body(desc, shape, vec3_f64(pos), ivp_quat(rot));
+        self.handles.push(id);
         self.bodies.push(Body { pos, rot });
         self.handles.len() - 1
     }
 
-    /// The player's ball, radius 2 in every case. By convention the first body.
+    /// The player's ball, with its radius. By convention the first body.
     pub fn add_ball(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
-        self.add(ColliderBuilder::ball(radius), m, pos, rot)
+        self.add(Shape::Sphere(radius), m, pos, rot)
     }
 
-    /// A box with the given half sizes.
+    /// A box with the given half sizes: a convex surface of its eight corners. A box with positive half sizes always
+    /// has a hull and a surface, so the two lookups cannot fail for the game's boxes.
+    #[allow(clippy::expect_used)]
     pub fn add_box(&mut self, half: Vec3, m: Material, pos: Vec3, rot: Quat) -> usize {
-        self.add(ColliderBuilder::cuboid(half.x, half.y, half.z), m, pos, rot)
+        let mut corners = Vec::with_capacity(8);
+        for &x in &[-1.0f64, 1.0] {
+            for &y in &[-1.0f64, 1.0] {
+                for &z in &[-1.0f64, 1.0] {
+                    corners.push([x * f64::from(half.x), y * f64::from(half.y), z * f64::from(half.z)]);
+                }
+            }
+        }
+        let hull = ivp::convex::hull(&corners).expect("a box has a hull");
+        let surface = Surface::compile(vec![hull]).expect("a box surface");
+        self.add(Shape::Surface(surface), m, pos, rot)
     }
 
     /// A loose sphere.
     pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
-        self.add(ColliderBuilder::ball(radius), m, pos, rot)
+        self.add(Shape::Sphere(radius), m, pos, rot)
     }
 
     pub fn state(&self, i: usize) -> Option<State> {
-        let b = self.physics.bodies.get(*self.handles.get(i)?)?;
+        let id = *self.handles.get(i)?;
+        let s: BodyState = self.physics.body_state(id);
         Some(State {
-            pos: vec3(b.translation()),
-            vel: vec3(b.linvel()),
-            rot: quat(*b.rotation()),
-            spin: vec3(b.angvel()),
+            pos: vec3(s.pos),
+            vel: Vec3::new(s.vel[0], s.vel[1], s.vel[2]),
+            rot: quat(s.rot),
+            spin: Vec3::new(s.spin[0], s.spin[1], s.spin[2]),
         })
     }
 
     /// Puts a body where the simulation says it is. The ball's state is owned by the simulation, so a respawn or a
     /// change of ball takes effect here, before the step.
     pub fn set_state(&mut self, i: usize, s: State) {
-        let Some(&h) = self.handles.get(i) else {
+        let Some(&id) = self.handles.get(i) else {
             return;
         };
-        if let Some(b) = self.physics.bodies.get_mut(h) {
-            b.set_position(Pose::from_parts(vector(s.pos), rotation(s.rot)), true);
-            b.set_linvel(vector(s.vel), true);
-            b.set_angvel(vector(s.spin), true);
-        }
+        self.physics.set_body_state(
+            id,
+            BodyState {
+                pos: vec3_f64(s.pos),
+                rot: ivp_quat(s.rot),
+                vel: [s.vel.x, s.vel.y, s.vel.z],
+                spin: [s.spin.x, s.spin.y, s.spin.z],
+            },
+        );
     }
 
-    /// Advances the world by one tick. `push` is an impulse for one body (the player's push).
+    /// Advances the world by one tick. `push` is an impulse for one body (the player's push), at its centre.
     pub fn step(&mut self, push: Option<(usize, Vec3)>) {
         if let Some((i, impulse)) = push
-            && let Some(b) = self
-                .handles
-                .get(i)
-                .and_then(|&h| self.physics.bodies.get_mut(h))
+            && let Some(&id) = self.handles.get(i)
         {
-            b.apply_impulse(vector(impulse), true);
-        }
-        self.physics.step();
-        for (i, &h) in self.handles.iter().enumerate() {
-            if let Some(b) = self.physics.bodies.get(h) {
-                self.bodies[i] = Body {
-                    pos: vec3(b.translation()),
-                    rot: quat(*b.rotation()),
-                };
-            }
-        }
-        self.grounded = self.colliders.first().is_some_and(|&c| {
+            let centre = self.physics.body_state(id).pos;
             self.physics
-                .narrow_phase
-                .contact_pairs_with(c)
-                .any(|p| p.has_any_active_contact())
-        });
+                .body_impulse(id, centre, [impulse.x, impulse.y, impulse.z]);
+        }
+        self.physics.advance(TICK);
+        for (i, &id) in self.handles.iter().enumerate() {
+            let (pos, rot) = self.physics.body_pose(id);
+            self.bodies[i] = Body {
+                pos: vec3(pos),
+                rot: quat(rot),
+            };
+        }
+        self.grounded = self.handles.first().is_some_and(|&id| self.physics.body_touching(id));
     }
 }
 
@@ -266,9 +279,10 @@ mod tests {
         );
         steps(&mut w, 300, None);
         let s = w.state(b).unwrap();
-        // The lowest corner of the tilted box sits on the floor: the centre is above half the diagonal's reach.
+        // The lowest corner sits on the floor: the centre is 2.5 times the rotated box's vertical sum above it, which
+        // is about 3.99 for this tilt, plus the collision distance of 0.01 the contacts keep (IVP_COLL_DIST).
         assert!(s.pos.y > 1.0, "box sank to {}", s.pos.y);
-        assert!(s.pos.y < 4.0, "box floats at {}", s.pos.y);
+        assert!((s.pos.y - 4.0).abs() < 0.05, "box rests at {}", s.pos.y);
     }
 
     #[test]
@@ -332,8 +346,10 @@ mod tests {
             }
         }
         assert!(before > 0.0, "the ball never landed");
-        // Pair elasticity 0.2 × 0.3 = 0.06: a few percent of the impact, not the rubber bounce of before (0.6).
-        assert!(after < 0.2 * before, "rebound {after} from impact {before}");
+        // The impact restitutes at sqrt(e) (docs/ivp_contact.md 6): the pair's elasticity is 0.2 × 0.3 = 0.06, and
+        // sqrt(0.06) = 0.245 of the impact speed comes back.
+        let ratio = after / before;
+        assert!((ratio - 0.06f32.sqrt()).abs() < 0.02, "rebound {after} from impact {before}, ratio {ratio}");
     }
 
     #[test]
@@ -383,3 +399,5 @@ mod tests {
         );
     }
 }
+
+

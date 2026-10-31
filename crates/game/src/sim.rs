@@ -755,9 +755,10 @@ mod tests {
             }
         }
         assert!(was_falling, "the ball never landed");
-        // Pair elasticity 0.2 × 0.3 = 0.06: a rebound of a few percent, not the rubber bounce of before (0.6).
+        // The impact restitutes at sqrt(e) (docs/ivp_contact.md 6): the pair's elasticity is 0.2 × 0.3 = 0.06, and
+        // sqrt(0.06) = 0.245 of the impact speed comes back.
         assert!(
-            rebound < 0.2 * impact,
+            (rebound / impact - 0.06f32.sqrt()).abs() < 0.02,
             "rebound {rebound} from impact {impact}"
         );
     }
