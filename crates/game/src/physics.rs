@@ -12,7 +12,6 @@ use ivp::ledge::{self, Surface};
 use ivp::math::Quat as IvpQuat;
 
 /// Steps per second of the original's own time (its "PSI"); its control forces are impulses per step.
-pub const PSI_PER_SECOND: f32 = 66.0;
 /// Gravity of the game (docs/physics.md, section 1).
 pub const GRAVITY: f32 = 20.0;
 /// Elasticity and friction of the level's floors and rails and of PH modules (`Physicalize_Floors`).
@@ -55,6 +54,8 @@ pub struct World {
     pub bodies: Vec<Body>,
     /// Whether body 0 (the ball) is touching something.
     pub grounded: bool,
+    /// The push controller of each body that has been pushed (see `set_push`).
+    pushers: Vec<Option<usize>>,
 }
 
 fn vec3_f64(v: Vec3) -> [f64; 3] {
@@ -94,6 +95,7 @@ impl World {
             handles: Vec::new(),
             bodies: Vec::new(),
             grounded: false,
+            pushers: Vec::new(),
         };
         if let Some(floor) = Surface::compile(ledges) {
             let desc = BodyDesc {
@@ -122,6 +124,27 @@ impl World {
         self.handles.push(id);
         self.bodies.push(Body { pos, rot });
         self.handles.len() - 1
+    }
+
+    /// The player's push on a body, as the original steers its ball: a force that the physics applies at every PSI
+    /// at the body's centre while the body is awake. The controller is made the first time and only its force changes
+    /// after that.
+    pub fn set_push(&mut self, i: usize, force: Vec3) {
+        let Some(&id) = self.handles.get(i) else {
+            return;
+        };
+        if self.pushers.len() <= i {
+            self.pushers.resize(i + 1, None);
+        }
+        let f = [force.x, force.y, force.z];
+        match self.pushers[i] {
+            Some(ctrl) => self.physics.force_set(ctrl, f),
+            None => {
+                if f != [0.0; 3] {
+                    self.pushers[i] = Some(self.physics.force_create(id, f, [0.0; 3], true));
+                }
+            }
+        }
     }
 
     /// The player's ball, with its radius. By convention the first body.

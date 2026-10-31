@@ -6,7 +6,7 @@
 // and fits these numbers to reference trajectories.
 
 use crate::collide::Triangle;
-use crate::physics::{Material, PSI_PER_SECOND, State, World};
+use crate::physics::{Material, State, World};
 use glam::{Mat3, Quat, Vec3};
 use level::Level;
 
@@ -394,12 +394,12 @@ impl Sim {
         }
         let push = push.normalize_or_zero();
 
-        // The push is the original's control force: an impulse per step, 66 steps per second of its time, so per
-        // tick the impulse is the force times 66/60 (the mass cancels against the velocity change F/m per step).
+        // The push is the original's control force, a SetPhysicsForce: the physics applies an impulse of the force at
+        // every PSI (66 a second of its time), while the ball is awake. The ball's force is its material's.
         let p = self.ball.kind.params();
-        let impulse = (push != Vec3::ZERO).then(|| push * PSI_PER_SECOND * p.force / 60.0);
+        self.world.set_push(0, push * p.force);
         self.world.set_state(0, self.ball.state());
-        self.world.step(impulse.map(|i| (0, i)));
+        self.world.step(None);
         if let Some(s) = self.world.state(0) {
             self.ball.position = s.pos;
             self.ball.velocity = s.vel;

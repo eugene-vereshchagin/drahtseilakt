@@ -108,6 +108,14 @@ impl World {
         ctrl
     }
 
+    /// Changes the force of a SetPhysicsForce, from the next PSI on: the game steers its ball this way, one force per
+    /// PSI, without creating a controller every step.
+    pub fn force_set(&mut self, ctrl: usize, force_ws: P3) {
+        if let Some(Controller::Force(f)) = self.controllers.get_mut(ctrl) {
+            f.force_ws = force_ws;
+        }
+    }
+
     /// Destroys a SetPhysicsForce (`phys_force_destroy`): it leaves its body. A destroyed force, or one whose body is
     /// gone, does nothing.
     pub fn force_destroy(&mut self, ctrl: usize) {
