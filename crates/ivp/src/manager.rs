@@ -4,9 +4,8 @@
 // listeners while the gap is large). The per-PSI passes re-solve the EXACT ones and the critical ones take their events.
 //
 // The mindists live in an arena (`CollWorld::mds`), their lists are index links, and the synapses are referred to by
-// `syn_ref`. The object cache and the poses come from the core (`Core::object_pose_at`). Two hooks belong to the contact
-// system, which is not ported: the inter-penetration recovery after a recalc that failed, and the impact of a mindist
-// whose gap closed. They are empty here, so a contact is not resolved yet.
+// `syn_ref`. The object cache and the poses come from the core (`Core::object_pose_at`). The contact system hooks in
+// through `contact_inter_penetration` (a recalc that failed) and `contact_do_impact` (a mindist whose gap closed).
 
 use crate::collision::{CollKind, ObjKind};
 use crate::core::{Core, World};

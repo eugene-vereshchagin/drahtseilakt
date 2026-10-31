@@ -374,8 +374,9 @@ mod tests {
             Quat::IDENTITY,
         );
         let ball = w.add_ball(2.0, wood(), Vec3::new(-16.0, 2.0, 0.0), Quat::IDENTITY);
+        // the push of the wood ball in the game: its force 0.43 times 66 / 60 per tick (sim.rs)
         for _ in 0..480 {
-            w.step(Some((ball, Vec3::X * 1.0)));
+            w.step(Some((ball, Vec3::X * 0.473)));
         }
         let (sa, sb, sc) = (
             w.state(a).unwrap(),

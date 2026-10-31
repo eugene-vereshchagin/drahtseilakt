@@ -528,8 +528,8 @@ impl<'a, 'm> Ev<'a, 'm> {
         let qf = l.p(Ledge::next(e));
         let mut f1 = Functor::new(Kind::PointLine, self.worst_approach);
         f1.h = 0.5 * (r + cd);
-        f1.qf = qf;
-        f1.pf = pf;
+        // the upstream keeps the edge's start in qf (in polygon space) and leaves pf zero: pf is the ball's centre
+        f1.qf = pf;
         f1.a = fsub_d(qf, pf);
         normalize4(&mut f1.a);
         let sp = &self.sims[1].m0;

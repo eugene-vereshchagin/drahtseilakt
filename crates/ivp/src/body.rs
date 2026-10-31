@@ -253,9 +253,10 @@ impl World {
         self.async_push_core(c, to_p3(point_cs), to_p3(imp_cs), impulse);
     }
 
-    /// Sets the time factor the frame time is scaled by (`phys_set_time_factor`): 2 while playing, 0 paused.
+    /// Sets the time factor the frame time is scaled by (`phys_set_time_factor`): 2 while playing, 0 paused. The factor
+    /// is in thousandths of a second per millisecond, as the upstream keeps it.
     pub fn set_time_factor(&mut self, f: f32) {
-        self.env.time_factor = f;
+        self.env.time_factor = f * 0.001;
     }
 
     /// The frame's physics step (`phys_frame`): the frame time is smoothed over the last frames, scaled by the time
@@ -385,5 +386,29 @@ mod tests {
         }
         assert!(max_x > 10.5, "the ball left the block: x {max_x}");
         assert!(max_up < 0.5, "the ball launched upward after the edge: vy {max_up}");
+    }
+
+    /// A ball falling onto a tilted triangle, its lowest corner under the centre, with a sideways speed. The contact
+    /// with the edge at the foot of the slope must bring the ball to rest, not pump it: the port once pushed the ball
+    /// up to 136 u/s here, where the upstream gives about 16.
+    #[test]
+    fn a_ball_falling_onto_a_tilted_triangle_does_not_explode() {
+        let mut w = world();
+        w.set_gravity([0.0, -20.0, 0.0]);
+        let slope = Surface::compile(vec![
+            crate::ledge::triangle([0.0, -2.0, -1.4], [2.5, -2.7, 1.1], [0.0, -2.0, 1.1]).expect("a triangle"),
+        ])
+        .expect("a slope");
+        w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(slope), [0.0; 3], IDENTITY);
+        let desc = BodyDesc { mass: 1.9, friction: 0.8, elasticity: 0.2, lin_damp: 0.9, rot_damp: 0.1, ..BodyDesc::default() };
+        let ball = w.add_body(desc, Shape::Sphere(2.0), [0.0; 3], IDENTITY);
+        w.set_body_state(ball, BodyState { pos: [0.0; 3], rot: IDENTITY, vel: [-2.3, -2.7, 0.0], spin: [0.0; 3] });
+        let mut top = 0.0f32;
+        for _ in 0..120 {
+            w.advance(1.0 / 60.0);
+            let v = w.body_state(ball).vel;
+            top = top.max((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt());
+        }
+        assert!(top < 25.0, "the ball gained speed on the slope: {top}");
     }
 }

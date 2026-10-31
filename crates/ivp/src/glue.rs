@@ -441,8 +441,9 @@ mod tests {
         w.set_time_factor(0.5);
         let t0 = w.time();
         let reached = w.frame(16.0);
-        // the smoothed frame time of the first frame is a quarter of its own: 4 ms, scaled by the factor
-        assert!((reached - (t0 + f64::from(4.0_f32 * 0.5))).abs() < 1e-9, "reached {reached}");
+        // the smoothed frame time of the first frame is a quarter of its own: 4 ms, scaled by the factor 0.5 in
+        // thousandths of a second per millisecond
+        assert!((reached - (t0 + f64::from(4.0_f32 * 0.5 * 0.001))).abs() < 1e-9, "reached {reached}");
         assert!((w.time() - reached).abs() < 1e-9, "the simulation ends at the time reached");
     }
 
