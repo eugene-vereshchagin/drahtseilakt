@@ -799,37 +799,39 @@ impl<'a, 'm> Solver<'a, 'm> {
             other_info: Info<'b>,
             vec: V3,
         }
+        // the faces: the triangle of an edge of one side, owned by that side; the other edge and its start point
+        // are in the other side's frame (the upstream's KKFace initialisers, in its field order)
         let faces = [
             Face {
                 tri: a.l.opp(ka),
                 other: kb,
                 point: kb0_a,
-                owner: b,
-                other_info: a,
+                owner: a,
+                other_info: b,
                 vec: n_a,
             },
             Face {
                 tri: ka,
                 other: b.l.opp(kb),
                 point: kb1_a,
-                owner: b,
-                other_info: a,
+                owner: a,
+                other_info: b,
                 vec: n_a,
             },
             Face {
                 tri: b.l.opp(kb),
                 other: ka,
                 point: kk.k0,
-                owner: a,
-                other_info: b,
+                owner: b,
+                other_info: a,
                 vec: c,
             },
             Face {
                 tri: kb,
                 other: a.l.opp(ka),
                 point: kk.k1,
-                owner: a,
-                other_info: b,
+                owner: b,
+                other_info: a,
                 vec: c,
             },
         ];

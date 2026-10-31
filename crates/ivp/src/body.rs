@@ -290,3 +290,4 @@ mod tests {
         assert!(w.body_touching(ball), "the ball has a contact");
     }
 }
+

@@ -703,7 +703,7 @@ impl World {
 
     /// Rebases an object's hull to zero (`ivp_hull_reset`, 0x1001a820): the synapses' angular sums move with it
     /// (`ivp_mindist_hull_reset`, 0x10017d50).
-    fn hull_reset(&mut self, obj: usize) {
+    pub(crate) fn hull_reset(&mut self, obj: usize) {
         let h = &self.coll.hulls[obj];
         let dh = -h.hull_value;
         let dc = -h.center_hull_value;

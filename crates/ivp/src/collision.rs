@@ -103,8 +103,26 @@ impl World {
         self.fs_revive_core(c)
     }
 
-    /// A core froze: its collision objects leave the hull managers. 0x10017140.
-    pub(crate) fn core_frozen(&mut self, _c: usize) {}
+    /// A core froze: its pairs are rechecked as not moving, its hull is frozen at its value now, and its cache is dropped
+    /// (`phys_collision_object_frozen`, 0x1000ce20).
+    pub(crate) fn core_frozen(&mut self, c: usize) {
+        self.recheck_ov_element(c);
+        let now = self.env.current_time;
+        let h = &mut self.coll.hulls[c];
+        let dt = now - h.last_time;
+        h.hull_value = (f64::from(h.hull_value) + dt * f64::from(h.gradient)) as f32;
+        h.gradient = 0.0;
+        h.center_hull_value = (f64::from(h.center_hull_value) + dt * f64::from(h.center_gradient)) as f32;
+        h.center_gradient = 0.0;
+        self.hull_reset(c);
+        self.coll.objs[c].cache_valid = false;
+    }
+
+    /// A core was revived: its pairs are rechecked as moving, forced, so the new pairs stay off the hull
+    /// (`phys_collision_object_revived`, 0x1000cf20 -> 0x100099f0).
+    pub(crate) fn object_revived(&mut self, c: usize) {
+        self.recheck_ov_element_forced(c);
+    }
 
     /// A core integrated into the next PSI: the hull update of its object (0x1001e750, phys_contact.c 431).
     pub(crate) fn core_integrated(&mut self, c: usize, dt: f64) {

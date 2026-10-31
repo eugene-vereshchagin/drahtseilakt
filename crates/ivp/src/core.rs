@@ -679,6 +679,8 @@ impl World {
         self.cores[c].time_of_last_psi = t;
         let next = self.env.time_of_next_psi;
         self.init_core_for_simulation(c, Self::inv_dt(next - t));
+        // the broadphase of the revived core is rechecked as moving (0x1000cf20 -> 0x100099f0), then the contacts
+        self.object_revived(c);
         self.core_revived(c)
     }
 
