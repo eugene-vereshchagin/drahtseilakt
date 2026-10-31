@@ -83,7 +83,7 @@ fn lerp3(a: V3, b: V3, t: f64) -> V3 {
 
 /// The barycentric weights of X's projection in the triangle of `e` (`0x10020ad0`): the weights of the edges `e`,
 /// next(e), prev(e) in the order the caller reads them, and the determinant. Only the four outputs are f32.
-fn tri_qr_vals(l: &Ledge, e: Edge, x: V3) -> [f32; 4] {
+pub(crate) fn tri_qr_vals(l: &Ledge, e: Edge, x: V3) -> [f32; 4] {
     let t = &l.tris[e.tri];
     let (q0, q1, q2) = (l.points[t.start[0]], l.points[t.start[1]], l.points[t.start[2]]);
     let a = fsub_d(q0, q1);

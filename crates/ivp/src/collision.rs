@@ -48,6 +48,11 @@ pub struct ObjInfo {
     pub cache_time_code: u32,
     pub exact_syn: Option<usize>,
     pub invalid_syn: Option<usize>,
+    /// The contact points this object takes part in, as (point index, its synapse index), in creation order.
+    pub fric: Vec<(usize, usize)>,
+    /// The object's friction and elasticity (its material, set by the glue).
+    pub friction: f32,
+    pub elasticity: f32,
 }
 
 /// The collision state of one world: the OV tree, the per-object records and hull managers, the collision records and
@@ -61,6 +66,8 @@ pub struct CollWorld {
     pub collisions: Vec<Collision>,
     pub free_collisions: Vec<usize>,
     pub mds: Vec<Mindist>,
+    pub cps: Vec<crate::contact::ContactPoint>,
+    pub free_cps: Vec<usize>,
     pub watchers: Vec<crate::watcher::Watcher>,
     pub free_watchers: Vec<usize>,
     /// The hull managers (object indices) whose hull grew past a listener this PSI, checked after integration.
