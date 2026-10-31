@@ -124,7 +124,13 @@ impl World {
     }
 
     fn add(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Quat) -> usize {
+        self.add_shifted(shape, m, pos, rot, None)
+    }
+
+    /// A body whose mass centre is `shift` in its own frame (`None`: the shape's own centre, as "Auto Mass Center").
+    fn add_shifted(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Quat, shift: Option<[f32; 3]>) -> usize {
         let desc = BodyDesc {
+            shift,
             // the floor is entity 0; the game's bodies follow in creation order, so the ball is entity 1
             entity: self.handles.len() as u32 + 1,
             mass: m.mass,
@@ -206,26 +212,33 @@ impl World {
         }
     }
 
-    /// A box with the given half sizes: a convex surface of its eight corners. A box with positive half sizes always
-    /// has a hull and a surface, so the two lookups cannot fail for the game's boxes.
+    /// A box with the given half sizes: the hull of its eight corners (tests).
+    #[cfg(test)]
     #[allow(clippy::expect_used)]
     pub fn add_box(&mut self, half: Vec3, m: Material, pos: Vec3, rot: Quat) -> usize {
         let mut corners = Vec::with_capacity(8);
-        for &x in &[-1.0f64, 1.0] {
-            for &y in &[-1.0f64, 1.0] {
-                for &z in &[-1.0f64, 1.0] {
-                    corners.push([x * f64::from(half.x), y * f64::from(half.y), z * f64::from(half.z)]);
+        for x in [-half.x, half.x] {
+            for y in [-half.y, half.y] {
+                for z in [-half.z, half.z] {
+                    corners.push(Vec3::new(x, y, z));
                 }
             }
         }
-        let hull = ivp::convex::hull(&corners).expect("a box has a hull");
-        let surface = Surface::compile(vec![hull]).expect("a box surface");
-        self.add(Shape::Surface(surface), m, pos, rot)
+        self.add_convex(&corners, m, pos, rot).expect("a box has a hull")
     }
 
     /// A loose sphere.
     pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
         self.add(Shape::Sphere(radius), m, pos, rot)
+    }
+
+    /// A loose convex body: the hull of `points` in its own frame, its mass centre at its origin (the original's
+    /// sector objects are physicalized without "Auto Mass Center"). None when the points span no volume.
+    pub fn add_convex(&mut self, points: &[Vec3], m: Material, pos: Vec3, rot: Quat) -> Option<usize> {
+        let pts: Vec<[f64; 3]> = points.iter().map(|&p| vec3_f64(p)).collect();
+        let hull = ivp::convex::hull(&pts)?;
+        let surface = Surface::compile(vec![hull])?;
+        Some(self.add_shifted(Shape::Surface(surface), m, pos, rot, Some([0.0; 3])))
     }
 
     /// The triangles of the level's physical objects near a point, in world space, as the physics sees them.

@@ -296,17 +296,12 @@ impl Sim {
                 continue;
             };
             let name = o.name.to_ascii_lowercase();
-            let m = Mat3::from_cols(
-                Vec3::new(o.matrix[0][0], o.matrix[0][1], o.matrix[0][2]),
-                Vec3::new(o.matrix[1][0], o.matrix[1][1], o.matrix[1][2]),
-                Vec3::new(o.matrix[2][0], o.matrix[2][1], o.matrix[2][2]),
-            );
-            let (pos, rot) = (Vec3::from(o.position()), Quat::from_mat3(&m).normalize());
+            // As the original physicalizes them: the pose without the scale, the mesh's points scaled.
+            let Some((pos, rot, scale)) = pose_and_scale(&o.matrix) else {
+                continue;
+            };
+            let points: Vec<Vec3> = mesh.positions.iter().map(|p| Vec3::from(*p) * scale).collect();
             let body = if level.members("P_Box").any(|(k, _)| k == i) {
-                let half = mesh
-                    .positions
-                    .iter()
-                    .fold(Vec3::ZERO, |h, p| h.max(Vec3::from(*p).abs()));
                 let material = Material {
                     friction: 0.7,
                     elasticity: 0.3,
@@ -314,15 +309,11 @@ impl Sim {
                     lin_damp: 0.1,
                     rot_damp: 0.1,
                 };
-                world.add_box(half, material, pos, rot)
+                world.add_convex(&points, material, pos, rot)
             } else if let Some(kind) = name
                 .strip_prefix("p_ball_")
                 .and_then(|_| BallKind::from_name(&name))
             {
-                let radius = mesh
-                    .positions
-                    .iter()
-                    .fold(0.0f32, |r, p| r.max(Vec3::from(*p).length()));
                 let (mass, friction, elasticity, lin) = match kind {
                     BallKind::Wood => (2.0, 0.6, 0.2, 0.6),
                     BallKind::Stone => (10.0, 0.7, 0.1, 0.2),
@@ -335,8 +326,16 @@ impl Sim {
                     lin_damp: lin,
                     rot_damp: 0.1,
                 };
-                world.add_sphere(radius, material, pos, rot)
+                // The wooden and the stone ball are spheres of radius 2 (times the object's scale); the paper ball
+                // has no radius in the table and is the hull of its mesh.
+                match kind {
+                    BallKind::Paper => world.add_convex(&points, material, pos, rot),
+                    _ => Some(world.add_sphere(BALL_RADIUS * scale.x, material, pos, rot)),
+                }
             } else {
+                continue;
+            };
+            let Some(body) = body else {
                 continue;
             };
             loose.push((i, body));
@@ -622,6 +621,22 @@ fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
     v.into_iter().map(|x| x.1).collect()
 }
 
+/// An object's pose without its scale, and the scale (the lengths of its matrix's axes), as the original's physicalize
+/// splits them. None for a mirrored or degenerate matrix, which has no rotation.
+fn pose_and_scale(matrix: &[[f32; 4]; 4]) -> Option<(Vec3, Quat, Vec3)> {
+    let mat = glam::Mat4::from_cols_array_2d(matrix);
+    let axes = [mat.x_axis.truncate(), mat.y_axis.truncate(), mat.z_axis.truncate()];
+    let scale = Vec3::new(axes[0].length(), axes[1].length(), axes[2].length());
+    if scale.min_element() <= 1e-6 {
+        return None;
+    }
+    let unscaled = Mat3::from_cols(axes[0] / scale.x, axes[1] / scale.y, axes[2] / scale.z);
+    if unscaled.determinant() <= 0.0 {
+        return None;
+    }
+    Some((mat.w_axis.truncate(), Quat::from_mat3(&unscaled).normalize(), scale))
+}
+
 /// The physical objects of the level, one mesh each, as the original physicalizes them: the mesh's points scaled by
 /// the object's scale in its own frame, the pose without the scale (an object in two solid groups is made once).
 fn static_meshes(level: &Level) -> Vec<StaticMesh> {
@@ -651,25 +666,16 @@ fn static_meshes(level: &Level) -> Vec<StaticMesh> {
             let Some(mesh) = o.mesh.and_then(|i| level.meshes.get(i)) else {
                 continue;
             };
-            let mat = glam::Mat4::from_cols_array_2d(&o.matrix);
-            let axes = [mat.x_axis.truncate(), mat.y_axis.truncate(), mat.z_axis.truncate()];
-            let scale = Vec3::new(axes[0].length(), axes[1].length(), axes[2].length());
-            let unscaled = glam::Mat3::from_cols(axes[0] / scale.x, axes[1] / scale.y, axes[2] / scale.z);
             // A mirrored or degenerate matrix has no rotation; such an object keeps its world triangles at the origin.
-            let rotation = scale.min_element() > 1e-6 && unscaled.determinant() > 0.0;
-            let (pos, rot) = if rotation {
-                (mat.w_axis.truncate(), Quat::from_mat3(&unscaled).normalize())
-            } else {
-                (Vec3::ZERO, Quat::IDENTITY)
+            let mat = glam::Mat4::from_cols_array_2d(&o.matrix);
+            let (pos, rot, local): (Vec3, Quat, Vec<Vec3>) = match pose_and_scale(&o.matrix) {
+                Some((pos, rot, scale)) => (pos, rot, mesh.positions.iter().map(|p| Vec3::from(*p) * scale).collect()),
+                None => (
+                    Vec3::ZERO,
+                    Quat::IDENTITY,
+                    mesh.positions.iter().map(|p| mat.transform_point3(Vec3::from(*p))).collect(),
+                ),
             };
-            let local: Vec<Vec3> = mesh
-                .positions
-                .iter()
-                .map(|p| {
-                    let p = Vec3::from(*p);
-                    if rotation { p * scale } else { mat.transform_point3(p) }
-                })
-                .collect();
             let mut triangles = Vec::new();
             for part in &mesh.parts {
                 for t in part.indices.as_chunks::<3>().0 {
