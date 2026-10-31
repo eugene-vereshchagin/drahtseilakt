@@ -258,6 +258,7 @@ mod tests {
         Surface::compile(ledges).expect("a floor")
     }
 
+
     const IDENTITY: Quat = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
 
     fn world() -> World {
@@ -289,5 +290,62 @@ mod tests {
         assert!((y - f64::from(radius)).abs() < 0.2, "resting height {y}");
         assert!(w.body_touching(ball), "the ball has a contact");
     }
-}
 
+    /// A ball rolling off the edge of a plate must fall: after it leaves the plate its upward speed stays small.
+    #[test]
+    fn a_ball_rolling_off_an_edge_does_not_launch() {
+        let mut w = world();
+        // a 20 x 20 plate at y = 0, centred on the origin
+        let p = [[-10.0, 0.0, -10.0], [10.0, 0.0, -10.0], [10.0, 0.0, 10.0], [-10.0, 0.0, 10.0]];
+        let plate = Surface::compile(vec![
+            crate::ledge::triangle(p[0], p[2], p[1]).unwrap(),
+            crate::ledge::triangle(p[0], p[3], p[2]).unwrap(),
+        ])
+        .unwrap();
+        let _f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(plate), [0.0; 3], IDENTITY);
+        let ball = w.add_body(BodyDesc::default(), Shape::Sphere(1.0), [5.0, 1.0, 0.0], IDENTITY);
+        w.set_body_state(ball, BodyState { pos: [5.0, 1.0, 0.0], rot: IDENTITY, vel: [3.0, 0.0, 0.0], spin: [0.0; 3] });
+        let mut max_up = 0.0f32;
+        let mut max_x = 0.0f64;
+        for _ in 0..180 {
+            w.advance(1.0 / 60.0);
+            let s = w.body_state(ball);
+            max_x = max_x.max(s.pos[0]);
+            if s.pos[0] > 10.5 {
+                max_up = max_up.max(s.vel[1]);
+            }
+        }
+        assert!(max_x > 10.5, "the ball left the plate: x {max_x}");
+        assert!(max_up < 0.5, "the ball launched upward after the edge: vy {max_up}");
+    }
+
+    /// The same off a box's top edge: a convex block, not a plate.
+    #[test]
+    fn a_ball_rolling_off_a_block_edge_does_not_launch() {
+        let mut w = world();
+        let mut corners = Vec::new();
+        for &x in &[-10.0f64, 10.0] {
+            for &y in &[0.0f64, 2.0] {
+                for &z in &[-10.0f64, 10.0] {
+                    corners.push([x, y, z]);
+                }
+            }
+        }
+        let block = Surface::compile(vec![crate::convex::hull(&corners).unwrap()]).unwrap();
+        let _b = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(block), [0.0; 3], IDENTITY);
+        let ball = w.add_body(BodyDesc::default(), Shape::Sphere(1.0), [5.0, 3.0, 0.0], IDENTITY);
+        w.set_body_state(ball, BodyState { pos: [5.0, 3.0, 0.0], rot: IDENTITY, vel: [3.0, 0.0, 0.0], spin: [0.0; 3] });
+        let mut max_up = 0.0f32;
+        let mut max_x = 0.0f64;
+        for _ in 0..180 {
+            w.advance(1.0 / 60.0);
+            let s = w.body_state(ball);
+            max_x = max_x.max(s.pos[0]);
+            if s.pos[0] > 10.5 {
+                max_up = max_up.max(s.vel[1]);
+            }
+        }
+        assert!(max_x > 10.5, "the ball left the block: x {max_x}");
+        assert!(max_up < 0.5, "the ball launched upward after the edge: vy {max_up}");
+    }
+}
