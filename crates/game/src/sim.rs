@@ -6,7 +6,7 @@
 // and fits these numbers to reference trajectories.
 
 use crate::collide::Triangle;
-use crate::physics::{Material, State, World};
+use crate::physics::{Material, World};
 use glam::{Mat3, Quat, Vec3};
 use level::Level;
 
@@ -88,6 +88,12 @@ struct Params {
 /// The camera's heading at the start and after a respawn, in quarter turns (see `Sim::new`).
 const START_QUARTER: i32 = 1;
 
+/// Ticks the ball spends out of the physics in a transformer: the C game removes the old ball's body three frames
+/// after the transformer is under it and makes the new one 149 frames later.
+const TRAFO_TICKS: u64 = 149;
+/// Where a transformer holds the ball: its own (0, 3, 0), where the C game makes the new ball.
+const TRAFO_HOLD: Vec3 = Vec3::new(0.0, 3.0, 0.0);
+
 /// The rotational damping of the original's balls (docs/physics.md, section 3).
 const BALL_ROT_DAMP: f32 = 0.1;
 
@@ -115,14 +121,6 @@ impl Ball {
         }
     }
 
-    fn state(&self) -> State {
-        State {
-            pos: self.position,
-            vel: self.velocity,
-            rot: self.rotation,
-            spin: self.spin,
-        }
-    }
 }
 
 /// The game camera: behind the ball, turned in quarter turns, optionally lifted.
@@ -171,6 +169,13 @@ struct Rules {
     death_y: f32,
 }
 
+/// The ball inside a transformer: out of the physics until `release`, then a new ball of its new kind at `at`.
+#[derive(Clone, Copy, Debug)]
+struct TrafoHold {
+    release: u64,
+    at: Vec3,
+}
+
 pub struct Sim {
     rules: Rules,
     world: World,
@@ -188,6 +193,8 @@ pub struct Sim {
     pub taken: Vec<usize>,
     pub events: Vec<(u64, Event)>,
     prev_input: u8,
+    /// The ball inside a transformer, if it is in one.
+    hold: Option<TrafoHold>,
 }
 
 const PICK_RADIUS: f32 = 3.5;
@@ -330,7 +337,16 @@ impl Sim {
             taken: Vec::new(),
             events: Vec::new(),
             prev_input: 0,
+            hold: None,
         }
+    }
+
+    /// Puts the ball somewhere at rest, as a new ball (tests).
+    #[cfg(test)]
+    fn put_ball(&mut self, pos: Vec3) {
+        self.ball.position = pos;
+        self.ball.velocity = Vec3::ZERO;
+        self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), pos, self.ball.rotation);
     }
 
     /// The rigid bodies: index 0 is the ball, then the loose ones. Each is (level object index, body index).
@@ -384,17 +400,28 @@ impl Sim {
 
         // The push is the original's control force, a SetPhysicsForce: the physics applies an impulse of the force at
         // every PSI (66 a second of its time), while the ball is awake. The ball's force is its material's.
+        // The physics owns the ball's state; the game only reads it back. Only a new ball (a respawn, the end of a
+        // transformer) puts a new body in, as the original does.
         let p = self.ball.kind.params();
         self.world.set_push(0, push * p.force);
-        self.world.set_state(0, self.ball.state());
         self.world.step(None);
-        if let Some(s) = self.world.state(0) {
+        if let Some(h) = self.hold {
+            // Out of the physics, the ball is drawn moving to the transformer's hold point.
+            self.ball.position += (h.at - self.ball.position) * (1.0 - (-TICK * 6.0f32).exp());
+            if self.tick >= h.release {
+                self.hold = None;
+                self.ball.position = h.at;
+                self.ball.velocity = Vec3::ZERO;
+                self.ball.spin = Vec3::ZERO;
+                self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), h.at, self.ball.rotation);
+            }
+        } else if let Some(s) = self.world.state(0) {
             self.ball.position = s.pos;
             self.ball.velocity = s.vel;
             self.ball.rotation = s.rot;
             self.ball.spin = s.spin;
         }
-        self.ball.on_ground = self.world.grounded;
+        self.ball.on_ground = self.hold.is_none() && self.world.grounded;
 
         self.follow_camera();
         self.apply_rules();
@@ -430,8 +457,17 @@ impl Sim {
             }
         }
         for &(_, q, kind) in &self.rules.trafos {
-            if self.ball.kind != kind && near(q, PICK_RADIUS + 1.0) {
+            if self.hold.is_none() && self.ball.kind != kind && near(q, PICK_RADIUS + 1.0) {
+                // The original takes the ball out of the physics and, after a while, makes a ball of the new kind at
+                // rest above the transformer.
                 self.ball.kind = kind;
+                self.world.remove(0);
+                self.ball.velocity = Vec3::ZERO;
+                self.ball.spin = Vec3::ZERO;
+                self.hold = Some(TrafoHold {
+                    release: self.tick + TRAFO_TICKS,
+                    at: q + TRAFO_HOLD,
+                });
                 self.events.push((self.tick, Event::Transform(kind)));
             }
         }
@@ -472,6 +508,10 @@ impl Sim {
             .unwrap_or(self.rules.start + Vec3::Y * BALL_RADIUS);
         self.ball.position = spawn;
         self.ball.velocity = Vec3::ZERO;
+        self.ball.spin = Vec3::ZERO;
+        self.hold = None;
+        self.world
+            .replace_ball(0, BALL_RADIUS, self.ball.material(), spawn, self.ball.rotation);
         // The camera comes back as it was at the start: the start heading, not lifted, no turn in progress.
         self.camera.quarter = START_QUARTER;
         self.camera.yaw = START_QUARTER as f32 * std::f32::consts::FRAC_PI_2;
@@ -649,17 +689,25 @@ mod tests {
             sim.step(input::UP);
         }
         let forward = sim.camera.forward();
-        // Rolling without slipping, the top of the ball moves at twice the ball's speed in the direction of travel.
-        // Over ten ticks the top point's displacement must point the same way as the ball.
-        let before = sim.ball.rotation * Vec3::Y;
-        for _ in 0..10 {
-            sim.step(input::UP);
-        }
-        let after = sim.ball.rotation * Vec3::Y;
+        // Rolling without slipping on a floor, the spin is up × velocity / radius: about the axis to the right of the
+        // travel, at speed / radius.
+        let v = sim.ball.velocity;
+        let rolling = Vec3::Y.cross(v) / BALL_RADIUS;
+        assert!(v.dot(forward) > 5.0, "the ball does not roll forward: {v:?}");
         assert!(
-            (after - before).dot(forward) > 0.0,
-            "top point moves {:?}, the ball moves along {forward:?}",
-            after - before
+            (sim.ball.spin - rolling).length() < 0.1 * rolling.length(),
+            "spin {:?}, rolling without slipping {rolling:?}",
+            sim.ball.spin
+        );
+        // The pose turns about the spin: the rotation over one tick has the spin's axis.
+        let before = sim.ball.rotation;
+        sim.step(input::UP);
+        let (axis, angle) = (sim.ball.rotation * before.inverse()).to_axis_angle();
+        let axis = if angle > std::f32::consts::PI { -axis } else { axis };
+        assert!(
+            axis.dot(sim.ball.spin.normalize()) > 0.99,
+            "turned about {axis:?}, spin {:?}",
+            sim.ball.spin
         );
     }
 
@@ -687,7 +735,7 @@ mod tests {
             sim.step(input::LIFT);
         }
         assert_ne!((sim.camera.quarter, sim.camera.lift), (START_QUARTER, 0.0));
-        sim.ball.position = Vec3::new(500.0, 10.0, 0.0);
+        sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
         for _ in 0..600 {
             sim.step(0);
             if sim.lives < 3 {
@@ -697,6 +745,57 @@ mod tests {
         assert_eq!(sim.camera.quarter, START_QUARTER);
         assert!((sim.camera.yaw - START_QUARTER as f32 * std::f32::consts::FRAC_PI_2).abs() < 1e-6);
         assert_eq!(sim.camera.lift, 0.0);
+    }
+
+    #[test]
+    fn a_transformer_makes_a_new_heavier_ball_after_holding_it() {
+        // A stone transformer right under the start: the ball is taken out of the physics, held, and comes back as a
+        // stone ball at rest above the transformer, as the C game does (old body gone, new one TRAFO_TICKS later).
+        let mut level = flat_level();
+        let trafo = level.objects.len();
+        level.objects.push(Object {
+            name: "P_Trafo_Stone_01".into(),
+            matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            mesh: None,
+            visible: true,
+        });
+        level.groups.push(Group {
+            name: "P_Trafo_Stone".into(),
+            members: vec![trafo],
+        });
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        sim.step(0);
+        assert!(sim.events.contains(&(1, Event::Transform(BallKind::Stone))));
+        assert!(sim.world.state(0).is_none(), "the ball left the physics");
+        for _ in 1..TRAFO_TICKS {
+            sim.step(0);
+            assert!(sim.world.state(0).is_none());
+        }
+        sim.step(0);
+        let s = sim.world.state(0).expect("a new ball");
+        assert_eq!(sim.ball.kind, BallKind::Stone);
+        assert!((s.pos - TRAFO_HOLD).length() < 0.1, "made at {:?}", s.pos);
+
+        // The stone ball is heavier: the same push gives it less than half the wooden ball's speed (C game, level 1:
+        // 3.1 against 6.9 after 30 ticks).
+        for _ in 0..60 {
+            sim.step(0);
+        }
+        let mut wood = Sim::new(&flat_level(), BallKind::Wood);
+        for _ in 0..60 {
+            wood.step(0);
+        }
+        for _ in 0..30 {
+            sim.step(input::DOWN);
+            wood.step(input::DOWN);
+        }
+        let (vs, vw) = (sim.ball.velocity.length(), wood.ball.velocity.length());
+        assert!(vs > 1.0 && vs < 0.6 * vw, "stone {vs}, wood {vw}");
     }
 
     #[test]
@@ -727,7 +826,7 @@ mod tests {
     fn falling_off_costs_a_life_and_respawns() {
         let level = flat_level();
         let mut sim = Sim::new(&level, BallKind::Paper);
-        sim.ball.position = Vec3::new(500.0, 10.0, 0.0);
+        sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
         for _ in 0..600 {
             sim.step(0);
             if sim.lives < 3 {
@@ -744,7 +843,7 @@ mod tests {
         let level = flat_level();
         let mut sim = Sim::new(&level, BallKind::Wood);
         for lost in 1..=3 {
-            sim.ball.position = Vec3::new(500.0, 10.0, 0.0);
+            sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
             for _ in 0..600 {
                 sim.step(0);
                 if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost {
@@ -760,7 +859,7 @@ mod tests {
     fn a_wooden_ball_barely_bounces() {
         let level = flat_level();
         let mut sim = Sim::new(&level, BallKind::Wood);
-        sim.ball.position = Vec3::new(0.0, 20.0, 0.0);
+        sim.put_ball(Vec3::new(0.0, 20.0, 0.0));
         let mut impact = 0.0f32;
         let mut rebound = 0.0f32;
         let mut was_falling = false;

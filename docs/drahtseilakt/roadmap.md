@@ -3,14 +3,16 @@
 What this fork is going to do, in order, and how we know each step is done. The reasons behind the choices
 are in [decisions.md](decisions.md). Start here if you are picking the work up.
 
-State on 2026-10-31: phase 0 is closed (decisions.md, "Everything from scratch, in Rust"). A first night of the
+State on 2026-11-01: phase 0 is closed (decisions.md, "Everything from scratch, in Rust"). A first night of the
 new engine got level 1 playable, ahead of the phase order:
 
 - **Phase 1**: the reader reads every file of the game and all ~600 maps, every scene object decodes.
   Missing: fuzz targets, the inventory of Building Blocks, removing upstream's C code.
 - **Phase 2**: levels on screen with their sky, any size and aspect ratio, gamma-space lighting like the
   original. Missing: free camera, HUD and menu (points, lives and time are in the window title), 8K check.
-- **Phase 3**: own ball physics, tuned by hand and judged by nobody yet; no reference trajectories.
+- **Phase 3**: the ball physics is IVP's, ported from the upstream's C (crates/ivp) and checked against the C
+  game: a straight push of the wooden and of the stone ball and a 17-second route on level 1 agree to within 0.1
+  and 0.8 units. Missing: floor materials per object, the modules' physics.
 - **Phase 4**: rules from the level's groups (start, reset points, checkpoints, extra points and lives, ball
   transformers, falling, finish); replays recorded, the best per level kept. Missing: the modules' own
   behaviour (boxes, moving parts, whose placeholders are solid for now), sounds, music, level 13's add-on.

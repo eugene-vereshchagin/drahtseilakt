@@ -51,8 +51,9 @@ pub struct State {
 
 pub struct World {
     physics: IvpWorld,
-    /// The IVP body of each of the game's bodies, in creation order.
-    handles: Vec<usize>,
+    /// The IVP body of each of the game's bodies, in creation order; none while a body is taken out of the physics
+    /// (the ball inside a transformer).
+    handles: Vec<Option<usize>>,
     /// Poses after the last step, for drawing.
     pub bodies: Vec<Body>,
     /// Whether body 0 (the ball) is touching something.
@@ -124,16 +125,48 @@ impl World {
             ..BodyDesc::default()
         };
         let id = self.physics.add_body(desc, shape, vec3_f64(pos), ivp_quat(rot));
-        self.handles.push(id);
+        self.handles.push(Some(id));
         self.bodies.push(Body { pos, rot });
         self.handles.len() - 1
+    }
+
+    /// Takes a body out of the physics, as the original's "dephysicalize": its body, its push and its contacts go.
+    pub fn remove(&mut self, i: usize) {
+        if let Some(id) = self.handles.get_mut(i).and_then(Option::take) {
+            self.physics.body_destroy(id);
+        }
+        if let Some(p) = self.pushers.get_mut(i) {
+            *p = None;
+        }
+    }
+
+    /// Puts a new ball in place of body `i`, at rest, as the original physicalizes a new ball after a death or in a
+    /// transformer: the old body is destroyed and a new one made with the new material. The game index and the entity
+    /// number stay the same.
+    pub fn replace_ball(&mut self, i: usize, radius: f32, m: Material, pos: Vec3, rot: Quat) {
+        if i >= self.handles.len() {
+            return;
+        }
+        self.remove(i);
+        let desc = BodyDesc {
+            entity: i as u32 + 1,
+            mass: m.mass,
+            friction: m.friction,
+            elasticity: m.elasticity,
+            lin_damp: m.lin_damp,
+            rot_damp: m.rot_damp,
+            ..BodyDesc::default()
+        };
+        let id = self.physics.add_body(desc, Shape::Sphere(radius), vec3_f64(pos), ivp_quat(rot));
+        self.handles[i] = Some(id);
+        self.bodies[i] = Body { pos, rot };
     }
 
     /// The player's push on a body, as the original steers its ball: a force that the physics applies at every PSI
     /// at the body's centre while the body is awake. The controller is made the first time and only its force changes
     /// after that.
     pub fn set_push(&mut self, i: usize, force: Vec3) {
-        let Some(&id) = self.handles.get(i) else {
+        let Some(&Some(id)) = self.handles.get(i) else {
             return;
         };
         if self.pushers.len() <= i {
@@ -192,7 +225,7 @@ impl World {
     }
 
     pub fn state(&self, i: usize) -> Option<State> {
-        let id = *self.handles.get(i)?;
+        let id = (*self.handles.get(i)?)?;
         let s: BodyState = self.physics.body_state(id);
         Some(State {
             pos: vec3(s.pos),
@@ -202,41 +235,27 @@ impl World {
         })
     }
 
-    /// Puts a body where the simulation says it is. The ball's state is owned by the simulation, so a respawn or a
-    /// change of ball takes effect here, before the step.
-    pub fn set_state(&mut self, i: usize, s: State) {
-        let Some(&id) = self.handles.get(i) else {
-            return;
-        };
-        self.physics.set_body_state(
-            id,
-            BodyState {
-                pos: vec3_f64(s.pos),
-                rot: ivp_quat(s.rot),
-                vel: [s.vel.x, s.vel.y, s.vel.z],
-                spin: [s.spin.x, s.spin.y, s.spin.z],
-            },
-        );
-    }
-
     /// Advances the world by one tick. `push` is an impulse for one body (the player's push), at its centre.
     pub fn step(&mut self, push: Option<(usize, Vec3)>) {
         if let Some((i, impulse)) = push
-            && let Some(&id) = self.handles.get(i)
+            && let Some(&Some(id)) = self.handles.get(i)
         {
             let centre = self.physics.body_state(id).pos;
             self.physics
                 .body_impulse(id, centre, [impulse.x, impulse.y, impulse.z]);
         }
         self.physics.advance(TIME_FACTOR * TICK);
-        for (i, &id) in self.handles.iter().enumerate() {
+        for (i, id) in self.handles.iter().enumerate() {
+            let Some(id) = *id else {
+                continue;
+            };
             let (pos, rot) = self.physics.body_pose(id);
             self.bodies[i] = Body {
                 pos: vec3(pos),
                 rot: quat(rot),
             };
         }
-        self.grounded = self.handles.first().is_some_and(|&id| self.physics.body_touching(id));
+        self.grounded = self.handles.first().copied().flatten().is_some_and(|id| self.physics.body_touching(id));
     }
 }
 
