@@ -7,7 +7,7 @@ members = ["crates/nmo", "crates/level", "crates/game"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 license = "GPL-3.0-only"
 repository = "https://github.com/eugene-vereshchagin/drahtseilakt"
 

@@ -5,11 +5,10 @@
 // The physics is written from scratch and tuned by hand for now; phase 3 measures the original under Wine
 // and fits these numbers to reference trajectories.
 
-use crate::collide::{Collider, Triangle};
-use crate::physics::{Body, PSI_PER_SECOND, World};
+use crate::collide::Triangle;
+use crate::physics::{Material, PSI_PER_SECOND, State, World};
 use glam::{Mat3, Quat, Vec3};
 use level::Level;
-use std::sync::Arc;
 
 pub const TICK: f32 = 1.0 / 60.0;
 pub const BALL_RADIUS: f32 = 2.0;
@@ -101,22 +100,25 @@ pub struct Ball {
 }
 
 impl Ball {
-    /// The ball as a rigid body of the physics world.
-    fn body(&self) -> Body {
+    /// The ball's material: the original's table for its kind.
+    fn material(&self) -> Material {
         let p = self.kind.params();
-        let mut b = Body::sphere(
-            BALL_RADIUS,
-            p.mass,
-            p.friction,
-            p.elasticity,
-            p.lin_damp,
-            BALL_ROT_DAMP,
-        );
-        b.pos = self.position;
-        b.vel = self.velocity;
-        b.rot = self.rotation;
-        b.ang = self.spin;
-        b
+        Material {
+            friction: p.friction,
+            elasticity: p.elasticity,
+            mass: p.mass,
+            lin_damp: p.lin_damp,
+            rot_damp: BALL_ROT_DAMP,
+        }
+    }
+
+    fn state(&self) -> State {
+        State {
+            pos: self.position,
+            vel: self.velocity,
+            rot: self.rotation,
+            spin: self.spin,
+        }
     }
 }
 
@@ -166,9 +168,7 @@ struct Rules {
     death_y: f32,
 }
 
-#[derive(Clone)]
 pub struct Sim {
-    collider: Arc<Collider>,
     rules: Rules,
     world: World,
     /// The loose bodies (boxes and loose balls): (level object index, body index in the world).
@@ -192,7 +192,7 @@ const GATE_RADIUS: f32 = 7.0;
 
 impl Sim {
     pub fn new(level: &Level, start_ball: BallKind) -> Sim {
-        let collider = Arc::new(Collider::new(collision_triangles(level)));
+        let triangles = collision_triangles(level);
         let pos = |name: &str| -> Vec<(usize, Vec3)> {
             level
                 .members(name)
@@ -223,14 +223,17 @@ impl Sim {
             extra_points: pos("P_Extra_Point"),
             extra_lives: pos("P_Extra_Life"),
             trafos,
-            death_y: collider.min_y - 60.0,
+            death_y: triangles
+                .iter()
+                .flat_map(|t| [t.a.y, t.b.y, t.c.y])
+                .fold(f32::INFINITY, f32::min)
+                - 60.0,
         };
         // The camera starts looking the way out of the start: where the physical floor around the start leads
         // (the mean direction to floor vertices in a ring around it), in quarter turns as the original camera
         // turns. The start object's axes do not tell this reliably (they agree in 7 of 13 levels). Without a
         // clear way out: +X, the most common in the original levels.
-        let ring = collider
-            .triangles
+        let ring = triangles
             .iter()
             .flat_map(|t| [t.a, t.b, t.c])
             .fold(Vec3::ZERO, |acc, v| {
@@ -260,9 +263,10 @@ impl Sim {
             kind: start_ball,
             on_ground: false,
         };
-        let mut world = World::new(Arc::clone(&collider));
-        // Body 0 is the ball; it is rebuilt from `ball` before every step.
-        world.bodies.push(ball.body());
+        let mut world = World::new(&triangles);
+        // Body 0 is the ball.
+        let ball_body = world.add_ball(BALL_RADIUS, ball.material(), ball.position, ball.rotation);
+        debug_assert_eq!(ball_body, 0);
         // Loose objects that move: boxes and the loose balls (their material table in docs/physics.md, section 3).
         let mut loose = Vec::new();
         for (i, o) in level.objects.iter().enumerate() {
@@ -270,12 +274,25 @@ impl Sim {
                 continue;
             };
             let name = o.name.to_ascii_lowercase();
+            let m = Mat3::from_cols(
+                Vec3::new(o.matrix[0][0], o.matrix[0][1], o.matrix[0][2]),
+                Vec3::new(o.matrix[1][0], o.matrix[1][1], o.matrix[1][2]),
+                Vec3::new(o.matrix[2][0], o.matrix[2][1], o.matrix[2][2]),
+            );
+            let (pos, rot) = (Vec3::from(o.position()), Quat::from_mat3(&m).normalize());
             let body = if level.members("P_Box").any(|(k, _)| k == i) {
                 let half = mesh
                     .positions
                     .iter()
                     .fold(Vec3::ZERO, |h, p| h.max(Vec3::from(*p).abs()));
-                Body::cuboid(half, 1.0, 0.7, 0.3, 0.1, 0.1)
+                let material = Material {
+                    friction: 0.7,
+                    elasticity: 0.3,
+                    mass: 1.0,
+                    lin_damp: 0.1,
+                    rot_damp: 0.1,
+                };
+                world.add_box(half, material, pos, rot)
             } else if let Some(kind) = name
                 .strip_prefix("p_ball_")
                 .and_then(|_| BallKind::from_name(&name))
@@ -289,20 +306,18 @@ impl Sim {
                     BallKind::Stone => (10.0, 0.7, 0.1, 0.2),
                     BallKind::Paper => (0.2, 0.5, 0.4, 1.5),
                 };
-                Body::sphere(radius, mass, friction, elasticity, lin, 0.1)
+                let material = Material {
+                    friction,
+                    elasticity,
+                    mass,
+                    lin_damp: lin,
+                    rot_damp: 0.1,
+                };
+                world.add_sphere(radius, material, pos, rot)
             } else {
                 continue;
             };
-            let m = Mat3::from_cols(
-                Vec3::new(o.matrix[0][0], o.matrix[0][1], o.matrix[0][2]),
-                Vec3::new(o.matrix[1][0], o.matrix[1][1], o.matrix[1][2]),
-                Vec3::new(o.matrix[2][0], o.matrix[2][1], o.matrix[2][2]),
-            );
-            let mut body = body;
-            body.pos = Vec3::from(o.position());
-            body.rot = Quat::from_mat3(&m).normalize();
-            loose.push((i, world.bodies.len()));
-            world.bodies.push(body);
+            loose.push((i, body));
         }
         let mut camera = Camera {
             quarter,
@@ -313,7 +328,6 @@ impl Sim {
         };
         camera.position = camera_goal(&camera, ball.position);
         Sim {
-            collider,
             rules,
             world,
             loose,
@@ -338,20 +352,6 @@ impl Sim {
 
     pub fn loose(&self) -> &[(usize, usize)] {
         &self.loose
-    }
-
-    /// The physical geometry, for planning.
-    pub fn collider(&self) -> &Collider {
-        &self.collider
-    }
-
-    /// Where the ball should go next: the next checkpoint in order, then the end of the level.
-    pub fn next_target(&self) -> Option<Vec3> {
-        self.rules
-            .checkpoints
-            .get(self.sector)
-            .map(|c| c.1)
-            .or(self.rules.end)
     }
 
     pub fn step(&mut self, input: u8) {
@@ -394,16 +394,18 @@ impl Sim {
         }
         let push = push.normalize_or_zero();
 
-        // The push is the original's control force: an impulse per step, 66 steps per second of its time.
+        // The push is the original's control force: an impulse per step, 66 steps per second of its time, so per
+        // tick the impulse is the force times 66/60 (the mass cancels against the velocity change F/m per step).
         let p = self.ball.kind.params();
-        let drive = (push != Vec3::ZERO).then(|| (0, push * PSI_PER_SECOND * p.force / p.mass));
-        self.world.bodies[0] = self.ball.body();
-        self.world.step(TICK, drive);
-        let b = self.world.bodies[0];
-        self.ball.position = b.pos;
-        self.ball.velocity = b.vel;
-        self.ball.rotation = b.rot;
-        self.ball.spin = b.ang;
+        let impulse = (push != Vec3::ZERO).then(|| push * PSI_PER_SECOND * p.force / 60.0);
+        self.world.set_state(0, self.ball.state());
+        self.world.step(impulse.map(|i| (0, i)));
+        if let Some(s) = self.world.state(0) {
+            self.ball.position = s.pos;
+            self.ball.velocity = s.vel;
+            self.ball.rotation = s.rot;
+            self.ball.spin = s.spin;
+        }
         self.ball.on_ground = self.world.grounded;
 
         self.follow_camera();
@@ -543,12 +545,7 @@ fn collision_triangles(level: &Level) -> Vec<Triangle> {
                     if n.length_squared() < 1e-12 {
                         continue;
                     }
-                    out.push(Triangle {
-                        a,
-                        b,
-                        c,
-                        normal: n.normalize(),
-                    });
+                    out.push(Triangle { a, b, c });
                 }
             }
         }

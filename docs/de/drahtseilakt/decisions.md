@@ -179,6 +179,16 @@ Fehlerklasse, die die Sicherheitsregeln sonst von Hand bekämpfen, fällt weg. w
 ist dort heimisch, und cargo liefert festgelegte, vendorte Offline-Builds und Fuzzing auf allen drei
 Plattformen.
 
+## Starrkörperphysik kommt aus einer fertigen Bibliothek: rapier
+
+Ersetzt die Regel, nach der die Physik selbst geschrieben wird. Der eigene Löser für Kisten und Kugeln ließ Kisten
+einsinken, ineinander laufen und verlieren; eine fertige, geprüfte Starrkörper-Engine macht das richtig. Wir
+hängen von rapier3d 0.36 ab (Apache-2.0, mit GPL-3.0 verträglich, von dimforge gepflegt), wie von wgpu und winit:
+eine Bibliothek, kein Code aus einem anderen Spielprojekt. Unser Teil ist, was das Spiel ausmacht: das Level als eine
+statische Mesh, die Materialwerte des Originalspiels mit Paar-Reibung und -Elastizität als Produkten
+(docs/physics.md, Abschnitte 3 und 4), der Steuerimpuls des Spielers und ein Schritt pro Takt, damit ein Replay
+reproduzierbar ist.
+
 ## Andere Projekte sind Vorbilder und Prüfstände
 
 OpenBallance, Ballanced und das Originalspiel unter Wine dienen dazu, Verhalten zu studieren und damit zu

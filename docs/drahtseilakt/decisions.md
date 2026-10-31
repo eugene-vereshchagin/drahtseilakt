@@ -179,6 +179,15 @@ safe Rust cannot read out of bounds or corrupt memory — a whole class of bugs 
 fight by hand. wgpu (Vulkan, Metal, Direct3D 12) is native to it, and cargo gives pinned, vendored, offline
 builds and fuzzing on all three platforms.
 
+## Rigid-body physics comes from a library: rapier
+
+Replaces the rule that the physics is written by hand. The own solver for boxes and balls sank boxes, let them
+pass one another and lost them; a ready, tested rigid-body engine does this properly. We depend on rapier3d 0.36
+(Apache-2.0, compatible with GPL-3.0, maintained by dimforge), as we depend on wgpu and winit: a library, not
+code taken from another game project. Our part is what the game is: the level as one static mesh, the original
+game's material values with pair friction and elasticity as products (docs/physics.md, sections 3 and 4), the
+player's control impulse, and one step per tick so that a replay reproduces.
+
 ## Other projects are references and test benches
 
 OpenBallance, Ballanced and the original game under Wine are used to study behaviour and to compare against:

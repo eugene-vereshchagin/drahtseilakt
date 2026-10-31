@@ -7,7 +7,6 @@
 
 mod app;
 mod assets;
-mod autopilot;
 mod collide;
 mod hud;
 mod physics;
@@ -32,7 +31,6 @@ usage: drahtseilakt [options]
   --record FILE       write a replay of the run (also written automatically on finishing a level)
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
-  --autopilot         no window: the experimental test driver (does not finish level 1 yet; see autopilot.rs)
   --screenshot FILE   no window: render the frame after the replay (or --ticks N) to a PNG
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
@@ -49,7 +47,6 @@ pub struct Options {
     pub export: Option<PathBuf>,
     pub replay: Option<PathBuf>,
     pub headless: bool,
-    pub autopilot: bool,
     pub screenshot: Option<PathBuf>,
     pub ticks: Option<u64>,
     pub trace: Option<u64>,
@@ -65,7 +62,6 @@ fn parse_args() -> Result<Options, String> {
         export: None,
         replay: None,
         headless: false,
-        autopilot: false,
         screenshot: None,
         ticks: None,
         trace: None,
@@ -98,7 +94,6 @@ fn parse_args() -> Result<Options, String> {
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,
-            "--autopilot" => o.autopilot = true,
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--ticks" => {
                 o.ticks = Some(

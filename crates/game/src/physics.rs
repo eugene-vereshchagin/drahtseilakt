@@ -1,508 +1,197 @@
-// Rigid bodies: the player's ball and the level's boxes. They fall under gravity, push one another and the level's
-// physical geometry, and rub against it. The solver is sequential impulses: every contact gets a normal impulse
-// that stops its penetration and reflects the approach by the pair's elasticity, and a friction impulse limited by
-// the pair's friction times the normal impulse. Rolling without slipping is not written anywhere: a ball whose
-// contact point is at rest turns because friction says so. Material values are the original game's (docs/physics.md,
-// sections 3 and 4); the simulation steps are its 66 steps per second, split into substeps here.
+// The physics of the game: the player's ball, the level's loose boxes and balls, and the level's physical geometry.
+// Rigid-body dynamics come from rapier (Apache-2.0, a library we depend on, not code we copied). What is ours here:
+// the level as a static triangle mesh, the original game's material values (docs/physics.md, sections 3 and 4) with
+// pair friction and elasticity as products, and the one-step-per-tick contract that keeps replays reproducible.
 
-use crate::collide::Collider;
-use glam::{Mat3, Quat, Vec3};
-use std::sync::Arc;
+use crate::collide::Triangle;
+use glam::{Quat, Vec3};
+use rapier3d::prelude::*;
 
-/// Substeps per tick (1/60 s). Boxes stacked on each other need more than one.
-pub const SUBSTEPS: u32 = 6;
 /// Steps per second of the original's own time (its "PSI"); its control forces are impulses per step.
 pub const PSI_PER_SECOND: f32 = 66.0;
 /// Gravity of the game (docs/physics.md, section 1).
 pub const GRAVITY: f32 = 20.0;
-/// Elasticity and friction of the level's floors and rails and of PH modules; a pair multiplies the two.
+/// Elasticity and friction of the level's floors and rails and of PH modules (`Physicalize_Floors`).
 pub const SURFACE_ELASTICITY: f32 = 0.3;
 pub const SURFACE_FRICTION: f32 = 0.7;
+/// Solver iterations per step; one step is one tick (1/60 s).
+const SOLVER_ITERATIONS: usize = 8;
+const TICK: f32 = 1.0 / 60.0;
 
-const ITERATIONS: u32 = 10;
-/// Penetration left alone, and how fast a deeper one is pushed out of the way.
-const SLOP: f32 = 0.005;
-const PUSH_OUT: f32 = 0.2;
-const MAX_PUSH: f32 = 3.0;
-/// Approach speed below which a contact does not bounce.
-const REST_SPEED: f32 = 1.0;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Shape {
-    Sphere {
-        radius: f32,
-    },
-    /// Half the size along each local axis.
-    Box {
-        half: Vec3,
-    },
-}
-
+/// The material of a body, as the original's tables give it.
 #[derive(Clone, Copy, Debug)]
-pub struct Body {
-    pub shape: Shape,
-    pub pos: Vec3,
-    pub vel: Vec3,
-    pub rot: Quat,
-    /// World angular velocity.
-    pub ang: Vec3,
-    /// Zero for a body that does not move.
-    pub inv_mass: f32,
-    /// Inverse inertia along the body's own axes.
-    pub inv_inertia: Vec3,
+pub struct Material {
     pub friction: f32,
     pub elasticity: f32,
+    pub mass: f32,
     pub lin_damp: f32,
     pub rot_damp: f32,
 }
 
-impl Body {
-    /// A solid sphere: inertia 0.4 m r².
-    pub fn sphere(
-        radius: f32,
-        mass: f32,
-        friction: f32,
-        elasticity: f32,
-        lin_damp: f32,
-        rot_damp: f32,
-    ) -> Body {
-        let inertia = 0.4 * mass * radius * radius;
-        Body {
-            shape: Shape::Sphere { radius },
-            pos: Vec3::ZERO,
-            vel: Vec3::ZERO,
-            rot: Quat::IDENTITY,
-            ang: Vec3::ZERO,
-            inv_mass: 1.0 / mass,
-            inv_inertia: Vec3::splat(1.0 / inertia),
-            friction,
-            elasticity,
-            lin_damp,
-            rot_damp,
-        }
-    }
-
-    /// A solid box: inertia m/3 (b² + c²) along each axis for half sizes b, c.
-    pub fn cuboid(
-        half: Vec3,
-        mass: f32,
-        friction: f32,
-        elasticity: f32,
-        lin_damp: f32,
-        rot_damp: f32,
-    ) -> Body {
-        let (x, y, z) = (half.x * half.x, half.y * half.y, half.z * half.z);
-        let i = Vec3::new(y + z, x + z, x + y) * (mass / 3.0);
-        Body {
-            shape: Shape::Box { half },
-            pos: Vec3::ZERO,
-            vel: Vec3::ZERO,
-            rot: Quat::IDENTITY,
-            ang: Vec3::ZERO,
-            inv_mass: 1.0 / mass,
-            inv_inertia: Vec3::new(1.0 / i.x, 1.0 / i.y, 1.0 / i.z),
-            friction,
-            elasticity,
-            lin_damp,
-            rot_damp,
-        }
-    }
-
-    fn inv_inertia_world(&self) -> Mat3 {
-        let r = Mat3::from_quat(self.rot);
-        r * Mat3::from_diagonal(self.inv_inertia) * r.transpose()
-    }
-
-    /// Velocity of the material point at `offset` from the centre.
-    fn point_velocity(&self, offset: Vec3) -> Vec3 {
-        self.vel + self.ang.cross(offset)
-    }
-
-    /// The eight corners of a box in the world.
-    fn corners(&self, half: Vec3) -> [Vec3; 8] {
-        let mut out = [Vec3::ZERO; 8];
-        for (k, c) in out.iter_mut().enumerate() {
-            let s = Vec3::new(
-                if k & 1 == 0 { -1.0 } else { 1.0 },
-                if k & 2 == 0 { -1.0 } else { 1.0 },
-                if k & 4 == 0 { -1.0 } else { 1.0 },
-            );
-            *c = self.pos + self.rot * (s * half);
-        }
-        out
-    }
-}
-
-/// A contact: body `a` is pushed along `normal`, which points from `b` (or from the level, when `b` is None) to `a`.
+/// What the rest of the game needs of a body: where it is and how it is turned.
 #[derive(Clone, Copy, Debug)]
-struct Contact {
-    a: usize,
-    b: Option<usize>,
-    point: Vec3,
-    normal: Vec3,
-    depth: f32,
-    friction: f32,
-    elasticity: f32,
-    /// Approach speed before the step, for the bounce.
-    approach: f32,
-    normal_impulse: f32,
-    tangent_impulse: f32,
+pub struct Body {
+    pub pos: Vec3,
+    pub rot: Quat,
 }
 
-#[derive(Clone)]
+/// The full state of a body that the simulation reads and writes.
+#[derive(Clone, Copy, Debug)]
+pub struct State {
+    pub pos: Vec3,
+    pub vel: Vec3,
+    pub rot: Quat,
+    pub spin: Vec3,
+}
+
 pub struct World {
+    physics: PhysicsWorld,
+    handles: Vec<RigidBodyHandle>,
+    colliders: Vec<ColliderHandle>,
+    /// Poses after the last step, for drawing.
     pub bodies: Vec<Body>,
-    pub statics: Arc<Collider>,
-    /// Whether body 0 touched something it can stand on this step.
+    /// Whether body 0 (the ball) is touching something.
     pub grounded: bool,
 }
 
+fn vector(v: Vec3) -> Vector {
+    Vector::new(v.x, v.y, v.z)
+}
+
+fn vec3(v: Vector) -> Vec3 {
+    Vec3::new(v.x, v.y, v.z)
+}
+
+fn quat(r: Rotation) -> Quat {
+    Quat::from_xyzw(r.x, r.y, r.z, r.w)
+}
+
+fn rotation(q: Quat) -> Rotation {
+    Rotation::from_xyzw(q.x, q.y, q.z, q.w)
+}
+
+/// Pair coefficients are products of the two materials' values, as in the original.
+fn coefficients(c: ColliderBuilder, friction: f32, elasticity: f32) -> ColliderBuilder {
+    c.friction(friction)
+        .restitution(elasticity)
+        .friction_combine_rule(CoefficientCombineRule::Multiply)
+        .restitution_combine_rule(CoefficientCombineRule::Multiply)
+}
+
 impl World {
-    pub fn new(statics: Arc<Collider>) -> World {
-        World {
+    /// A world with the level's physical triangles as one fixed mesh.
+    pub fn new(triangles: &[Triangle]) -> World {
+        let mut physics = PhysicsWorld::new();
+        physics.gravity = Vector::new(0.0, -GRAVITY, 0.0);
+        physics.integration_parameters.dt = TICK;
+        physics.integration_parameters.num_solver_iterations = SOLVER_ITERATIONS;
+        let mut world = World {
+            physics,
+            handles: Vec::new(),
+            colliders: Vec::new(),
             bodies: Vec::new(),
-            statics,
             grounded: false,
+        };
+        let mut vertices = Vec::with_capacity(triangles.len() * 3);
+        let mut indices = Vec::with_capacity(triangles.len());
+        for t in triangles {
+            let k = vertices.len() as u32;
+            vertices.extend([vector(t.a), vector(t.b), vector(t.c)]);
+            indices.push([k, k + 1, k + 2]);
+        }
+        if let Ok(mesh) = ColliderBuilder::trimesh(vertices, indices) {
+            let collider = coefficients(mesh, SURFACE_FRICTION, SURFACE_ELASTICITY);
+            world.physics.colliders.insert(collider);
+        }
+        world
+    }
+
+    fn add(&mut self, shape: ColliderBuilder, m: Material, pos: Vec3, rot: Quat) -> usize {
+        let body = RigidBodyBuilder::dynamic()
+            .pose(Pose::from_parts(vector(pos), rotation(rot)))
+            .linear_damping(m.lin_damp)
+            .angular_damping(m.rot_damp);
+        let collider = coefficients(shape, m.friction, m.elasticity).mass(m.mass);
+        let (handle, col) = self.physics.insert(body, collider);
+        self.handles.push(handle);
+        self.colliders.push(col);
+        self.bodies.push(Body { pos, rot });
+        self.handles.len() - 1
+    }
+
+    /// The player's ball, radius 2 in every case. By convention the first body.
+    pub fn add_ball(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
+        self.add(ColliderBuilder::ball(radius), m, pos, rot)
+    }
+
+    /// A box with the given half sizes.
+    pub fn add_box(&mut self, half: Vec3, m: Material, pos: Vec3, rot: Quat) -> usize {
+        self.add(ColliderBuilder::cuboid(half.x, half.y, half.z), m, pos, rot)
+    }
+
+    /// A loose sphere.
+    pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
+        self.add(ColliderBuilder::ball(radius), m, pos, rot)
+    }
+
+    pub fn state(&self, i: usize) -> Option<State> {
+        let b = self.physics.bodies.get(*self.handles.get(i)?)?;
+        Some(State {
+            pos: vec3(b.translation()),
+            vel: vec3(b.linvel()),
+            rot: quat(*b.rotation()),
+            spin: vec3(b.angvel()),
+        })
+    }
+
+    /// Puts a body where the simulation says it is. The ball's state is owned by the simulation, so a respawn or a
+    /// change of ball takes effect here, before the step.
+    pub fn set_state(&mut self, i: usize, s: State) {
+        let Some(&h) = self.handles.get(i) else {
+            return;
+        };
+        if let Some(b) = self.physics.bodies.get_mut(h) {
+            b.set_position(Pose::from_parts(vector(s.pos), rotation(s.rot)), true);
+            b.set_linvel(vector(s.vel), true);
+            b.set_angvel(vector(s.spin), true);
         }
     }
 
-    /// Advances the world by one tick. `drive` is an acceleration added to body `index` during the tick (the
-    /// player's push); the original's control force is an impulse per step of its own, which comes to the same.
-    pub fn step(&mut self, dt: f32, drive: Option<(usize, Vec3)>) {
-        let h = dt / SUBSTEPS as f32;
-        self.grounded = false;
-        for _ in 0..SUBSTEPS {
-            self.substep(h, drive);
-        }
-    }
-
-    fn substep(&mut self, h: f32, drive: Option<(usize, Vec3)>) {
-        for (i, b) in self.bodies.iter_mut().enumerate() {
-            if b.inv_mass == 0.0 {
-                continue;
-            }
-            b.vel.y -= GRAVITY * h;
-            if let Some((j, acc)) = drive {
-                if i == j {
-                    b.vel += acc * h;
-                }
+    /// Advances the world by one tick. `push` is an impulse for one body (the player's push).
+    pub fn step(&mut self, push: Option<(usize, Vec3)>) {
+        if let Some((i, impulse)) = push {
+            if let Some(b) = self
+                .handles
+                .get(i)
+                .and_then(|&h| self.physics.bodies.get_mut(h))
+            {
+                b.apply_impulse(vector(impulse), true);
             }
         }
-        let mut contacts = self.contacts();
-        self.solve(&mut contacts, h);
-        for b in self.bodies.iter_mut() {
-            if b.inv_mass == 0.0 {
-                continue;
-            }
-            b.vel *= (-b.lin_damp * h).exp();
-            b.ang *= (-b.rot_damp * h).exp();
-            b.pos += b.vel * h;
-            b.rot = (Quat::from_scaled_axis(b.ang * h) * b.rot).normalize();
-        }
-    }
-
-    /// The contacts of this substep, at the current positions.
-    fn contacts(&mut self) -> Vec<Contact> {
-        let mut out = Vec::new();
-        let statics = Arc::clone(&self.statics);
-        for i in 0..self.bodies.len() {
-            let b = self.bodies[i];
-            if b.inv_mass == 0.0 {
-                continue;
-            }
-            let (fric_s, elas_s) = (SURFACE_FRICTION, SURFACE_ELASTICITY);
-            let mut push = |point: Vec3, normal: Vec3, depth: f32, other: Option<usize>| {
-                let (friction, elasticity) = match other {
-                    Some(j) => (
-                        b.friction * self.bodies[j].friction,
-                        b.elasticity * self.bodies[j].elasticity,
-                    ),
-                    None => (b.friction * fric_s, b.elasticity * elas_s),
+        self.physics.step();
+        for (i, &h) in self.handles.iter().enumerate() {
+            if let Some(b) = self.physics.bodies.get(h) {
+                self.bodies[i] = Body {
+                    pos: vec3(b.translation()),
+                    rot: quat(*b.rotation()),
                 };
-                out.push(Contact {
-                    a: i,
-                    b: other,
-                    point,
-                    normal,
-                    depth,
-                    friction,
-                    elasticity,
-                    approach: 0.0,
-                    normal_impulse: 0.0,
-                    tangent_impulse: 0.0,
-                });
-            };
-            match b.shape {
-                Shape::Sphere { radius } => {
-                    for c in statics.contacts(b.pos, radius).into_iter().take(4) {
-                        push(b.pos - c.normal * radius, c.normal, c.depth, None);
-                    }
-                }
-                Shape::Box { half } => {
-                    for corner in b.corners(half) {
-                        box_vs_level(&statics, b.pos, corner, &mut push);
-                    }
-                }
             }
         }
-        // Body against body: the ball and boxes, boxes and boxes.
-        for i in 0..self.bodies.len() {
-            for j in i + 1..self.bodies.len() {
-                let (a, b) = (self.bodies[i], self.bodies[j]);
-                if a.inv_mass == 0.0 && b.inv_mass == 0.0 {
-                    continue;
-                }
-                let friction = a.friction * b.friction;
-                let elasticity = a.elasticity * b.elasticity;
-                match (a.shape, b.shape) {
-                    (Shape::Sphere { radius }, Shape::Box { half }) => {
-                        if let Some((point, normal, depth)) = sphere_vs_box(a.pos, radius, &b, half)
-                        {
-                            out.push(pair(i, j, point, normal, depth, friction, elasticity));
-                        }
-                    }
-                    (Shape::Box { half }, Shape::Sphere { radius }) => {
-                        if let Some((point, normal, depth)) = sphere_vs_box(b.pos, radius, &a, half)
-                        {
-                            out.push(pair(j, i, point, normal, depth, friction, elasticity));
-                        }
-                    }
-                    (Shape::Box { half: ha }, Shape::Box { half: hb }) => {
-                        for c in a.corners(ha) {
-                            if let Some((normal, depth)) = corner_in_box(c, &b, hb) {
-                                out.push(pair(i, j, c, normal, depth, friction, elasticity));
-                            }
-                        }
-                        for c in b.corners(hb) {
-                            if let Some((normal, depth)) = corner_in_box(c, &a, ha) {
-                                out.push(pair(j, i, c, normal, depth, friction, elasticity));
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        for c in &out {
-            if c.a == 0 && c.normal.y > 0.3 {
-                self.grounded = true;
-            }
-        }
-        out
+        self.grounded = self.colliders.first().is_some_and(|&c| {
+            self.physics
+                .narrow_phase
+                .contact_pairs_with(c)
+                .any(|p| p.has_any_active_contact())
+        });
     }
-
-    /// Sequential impulses: normal impulses that push apart and bounce, then friction within the cone.
-    fn solve(&mut self, contacts: &mut [Contact], h: f32) {
-        for c in contacts.iter_mut() {
-            let (va, vb) = self.velocities(c);
-            c.approach = (va - vb).dot(c.normal);
-        }
-        for _ in 0..ITERATIONS {
-            for c in contacts.iter_mut() {
-                // Normal: reach the separating speed the bounce and the penetration ask for.
-                let rest = if c.approach < -REST_SPEED {
-                    -c.elasticity * c.approach
-                } else {
-                    0.0
-                };
-                let bias = ((c.depth - SLOP).max(0.0) * PUSH_OUT / h).min(MAX_PUSH);
-                let target = rest.max(bias);
-                let relative = self.relative_velocity(c);
-                let k = self.effective_mass(c, c.normal);
-                if k <= 0.0 {
-                    continue;
-                }
-                let delta = (target - relative.dot(c.normal)) / k;
-                let new = (c.normal_impulse + delta).max(0.0);
-                let applied = new - c.normal_impulse;
-                c.normal_impulse = new;
-                self.apply(c, c.normal * applied);
-
-                // Friction: stop the sliding, up to friction times the normal impulse.
-                let relative = self.relative_velocity(c);
-                let tangent_velocity = relative - c.normal * relative.dot(c.normal);
-                let speed = tangent_velocity.length();
-                if speed < 1e-6 {
-                    continue;
-                }
-                let t = tangent_velocity / speed;
-                let kt = self.effective_mass(c, t);
-                if kt <= 0.0 {
-                    continue;
-                }
-                let limit = c.friction * c.normal_impulse;
-                let new_t = (c.tangent_impulse - speed / kt).clamp(-limit, limit);
-                let applied_t = new_t - c.tangent_impulse;
-                c.tangent_impulse = new_t;
-                self.apply(c, t * applied_t);
-            }
-        }
-    }
-
-    fn velocities(&self, c: &Contact) -> (Vec3, Vec3) {
-        let a = &self.bodies[c.a];
-        let va = a.point_velocity(c.point - a.pos);
-        let vb = match c.b {
-            Some(j) => {
-                let b = &self.bodies[j];
-                b.point_velocity(c.point - b.pos)
-            }
-            None => Vec3::ZERO,
-        };
-        (va, vb)
-    }
-
-    fn relative_velocity(&self, c: &Contact) -> Vec3 {
-        let (va, vb) = self.velocities(c);
-        va - vb
-    }
-
-    /// Effective mass of the pair along a unit direction at the contact point.
-    fn effective_mass(&self, c: &Contact, d: Vec3) -> f32 {
-        let term = |body: &Body, point: Vec3| -> f32 {
-            if body.inv_mass == 0.0 {
-                return 0.0;
-            }
-            let r = point - body.pos;
-            let rn = r.cross(d);
-            body.inv_mass + d.dot(body.inv_inertia_world().mul_vec3(rn).cross(r))
-        };
-        let a = term(&self.bodies[c.a], c.point);
-        let b = c.b.map(|j| term(&self.bodies[j], c.point)).unwrap_or(0.0);
-        a + b
-    }
-
-    /// Applies an impulse at the contact point: to `a` along +impulse, to `b` against it.
-    fn apply(&mut self, c: &Contact, impulse: Vec3) {
-        apply_to(&mut self.bodies[c.a], c.point, impulse);
-        if let Some(j) = c.b {
-            apply_to(&mut self.bodies[j], c.point, -impulse);
-        }
-    }
-}
-
-fn apply_to(b: &mut Body, point: Vec3, impulse: Vec3) {
-    if b.inv_mass == 0.0 {
-        return;
-    }
-    b.vel += impulse * b.inv_mass;
-    let r = point - b.pos;
-    b.ang += b.inv_inertia_world().mul_vec3(r.cross(impulse));
-}
-
-fn pair(
-    a: usize,
-    b: usize,
-    point: Vec3,
-    normal: Vec3,
-    depth: f32,
-    friction: f32,
-    elasticity: f32,
-) -> Contact {
-    Contact {
-        a,
-        b: Some(b),
-        point,
-        normal,
-        depth,
-        friction,
-        elasticity,
-        approach: 0.0,
-        normal_impulse: 0.0,
-        tangent_impulse: 0.0,
-    }
-}
-
-/// A corner of a box against the level: the corner is below a triangle that it lies over, on the far side from
-/// the box's centre.
-fn box_vs_level(
-    statics: &Collider,
-    centre: Vec3,
-    corner: Vec3,
-    push: &mut impl FnMut(Vec3, Vec3, f32, Option<usize>),
-) {
-    for i in statics.nearby(corner, 2.0) {
-        let Some(t) = statics.triangles.get(i as usize) else {
-            continue;
-        };
-        let mut n = t.normal;
-        if (centre - t.a).dot(n) < 0.0 {
-            n = -n;
-        }
-        let s = (corner - t.a).dot(n);
-        if s >= 0.0 {
-            continue;
-        }
-        let projected = corner - n * s;
-        if point_in_triangle(projected, t.a, t.b, t.c) {
-            push(corner, n, -s, None);
-        }
-    }
-}
-
-/// Whether a point projected on a triangle's plane lies inside it.
-fn point_in_triangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
-    let n = (b - a).cross(c - a);
-    let side = |u: Vec3, v: Vec3| (v - u).cross(p - u).dot(n);
-    let (s1, s2, s3) = (side(a, b), side(b, c), side(c, a));
-    (s1 >= 0.0 && s2 >= 0.0 && s3 >= 0.0) || (s1 <= 0.0 && s2 <= 0.0 && s3 <= 0.0)
-}
-
-/// Sphere against a box: the contact normal from the box to the sphere, its point and the depth.
-fn sphere_vs_box(centre: Vec3, radius: f32, boxed: &Body, half: Vec3) -> Option<(Vec3, Vec3, f32)> {
-    let inv = boxed.rot.inverse();
-    let l = inv * (centre - boxed.pos);
-    let q = l.clamp(-half, half);
-    let d = l - q;
-    let dist = d.length();
-    if dist > 1e-6 {
-        if dist >= radius {
-            return None;
-        }
-        let normal = boxed.rot * (d / dist);
-        return Some((boxed.pos + boxed.rot * q, normal, radius - dist));
-    }
-    // The centre is inside the box: leave by the nearest face.
-    let slack = half - l.abs();
-    let axis = if slack.x <= slack.y && slack.x <= slack.z {
-        Vec3::X
-    } else if slack.y <= slack.z {
-        Vec3::Y
-    } else {
-        Vec3::Z
-    };
-    let sign = if l.dot(axis) < 0.0 { -1.0 } else { 1.0 };
-    let face = (half * axis).length();
-    let normal = boxed.rot * (axis * sign);
-    Some((centre, normal, radius + face - l.dot(axis).abs()))
-}
-
-/// A corner inside a box: the normal from the box outward through its nearest face, and the depth.
-fn corner_in_box(corner: Vec3, boxed: &Body, half: Vec3) -> Option<(Vec3, f32)> {
-    let l = boxed.rot.inverse() * (corner - boxed.pos);
-    if l.abs().cmpgt(half).any() {
-        return None;
-    }
-    let slack = half - l.abs();
-    let (axis, depth) = if slack.x <= slack.y && slack.x <= slack.z {
-        (Vec3::X, slack.x)
-    } else if slack.y <= slack.z {
-        (Vec3::Y, slack.y)
-    } else {
-        (Vec3::Z, slack.z)
-    };
-    let sign = if l.dot(axis) < 0.0 { -1.0 } else { 1.0 };
-    Some((boxed.rot * (axis * sign), depth))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::collide::{Collider, Triangle};
-    use crate::sim::TICK;
 
-    /// A flat floor at y = 0, 200 units square, as two triangles.
-    fn floor() -> Arc<Collider> {
+    /// A flat floor at y = 0, 200 units square.
+    fn floor() -> Vec<Triangle> {
         let s = 100.0;
         let p = [
             Vec3::new(-s, 0.0, -s),
@@ -510,81 +199,187 @@ mod tests {
             Vec3::new(s, 0.0, s),
             Vec3::new(-s, 0.0, s),
         ];
-        let tri = |a, b, c| Triangle {
-            a,
-            b,
-            c,
-            normal: Vec3::Y,
-        };
-        Arc::new(Collider::new(vec![
-            tri(p[0], p[2], p[1]),
-            tri(p[0], p[3], p[2]),
-        ]))
+        let tri = |a, b, c| Triangle { a, b, c };
+        vec![tri(p[0], p[2], p[1]), tri(p[0], p[3], p[2])]
     }
 
-    fn ball(world: &mut World, at: Vec3) -> usize {
-        let mut b = Body::sphere(2.0, 1.9, 0.8, 0.2, 0.9, 0.1);
-        b.pos = at;
-        world.bodies.push(b);
-        world.bodies.len() - 1
+    fn crate_material() -> Material {
+        Material {
+            friction: 0.7,
+            elasticity: 0.3,
+            mass: 1.0,
+            lin_damp: 0.1,
+            rot_damp: 0.1,
+        }
     }
 
-    fn boxed(world: &mut World, at: Vec3) -> usize {
-        let mut b = Body::cuboid(Vec3::splat(2.5), 1.0, 0.7, 0.3, 0.1, 0.1);
-        b.pos = at;
-        world.bodies.push(b);
-        world.bodies.len() - 1
+    fn wood() -> Material {
+        Material {
+            friction: 0.8,
+            elasticity: 0.2,
+            mass: 1.9,
+            lin_damp: 0.9,
+            rot_damp: 0.1,
+        }
+    }
+
+    fn paper() -> Material {
+        Material {
+            friction: 0.5,
+            elasticity: 0.4,
+            mass: 0.2,
+            lin_damp: 1.5,
+            rot_damp: 0.1,
+        }
+    }
+
+    fn steps(w: &mut World, n: usize, push: Option<(usize, Vec3)>) {
+        for _ in 0..n {
+            w.step(push);
+        }
     }
 
     #[test]
     fn a_box_rests_on_the_floor() {
-        let mut w = World::new(floor());
-        let i = boxed(&mut w, Vec3::new(0.0, 8.0, 0.0));
-        for _ in 0..240 {
-            w.step(TICK, None);
-        }
-        let b = w.bodies[i];
-        assert!((b.pos.y - 2.5).abs() < 0.05, "box rests at {}", b.pos.y);
-        assert!(b.vel.length() < 0.05, "box still moves at {:?}", b.vel);
+        let mut w = World::new(&floor());
+        let b = w.add_box(
+            Vec3::splat(2.5),
+            crate_material(),
+            Vec3::new(0.0, 8.0, 0.0),
+            Quat::IDENTITY,
+        );
+        steps(&mut w, 240, None);
+        let s = w.state(b).unwrap();
+        assert!((s.pos.y - 2.5).abs() < 0.05, "box rests at {}", s.pos.y);
+        assert!(s.vel.length() < 0.05, "box still moves at {:?}", s.vel);
     }
 
     #[test]
-    fn a_ball_pushes_a_box_and_the_box_stays_down() {
-        let mut w = World::new(floor());
-        let box_i = boxed(&mut w, Vec3::new(6.0, 2.5, 0.0));
-        let ball_i = ball(&mut w, Vec3::new(-6.0, 2.0, 0.0));
-        let drive = Some((ball_i, Vec3::X * 40.0));
+    fn a_box_does_not_sink_into_the_floor_when_it_lands_tilted() {
+        let mut w = World::new(&floor());
+        let tilt = Quat::from_rotation_z(0.6) * Quat::from_rotation_x(0.3);
+        let b = w.add_box(
+            Vec3::splat(2.5),
+            crate_material(),
+            Vec3::new(0.0, 12.0, 0.0),
+            tilt,
+        );
+        steps(&mut w, 300, None);
+        let s = w.state(b).unwrap();
+        // The lowest corner of the tilted box sits on the floor: the centre is above half the diagonal's reach.
+        assert!(s.pos.y > 1.0, "box sank to {}", s.pos.y);
+        assert!(s.pos.y < 4.0, "box floats at {}", s.pos.y);
+    }
+
+    #[test]
+    fn a_wooden_ball_pushes_a_box_and_the_box_stays_down() {
+        let mut w = World::new(&floor());
+        let bx = w.add_box(
+            Vec3::splat(2.5),
+            crate_material(),
+            Vec3::new(6.0, 2.5, 0.0),
+            Quat::IDENTITY,
+        );
+        let ball = w.add_ball(2.0, wood(), Vec3::new(-6.0, 2.0, 0.0), Quat::IDENTITY);
         for _ in 0..240 {
-            w.step(TICK, drive);
+            w.step(Some((ball, Vec3::X * 1.5)));
         }
-        let b = w.bodies[box_i];
+        let b = w.state(bx).unwrap();
         assert!(b.pos.x > 8.0, "the box was not pushed: {:?}", b.pos);
         assert!(b.pos.y < 3.0, "the box left the floor: {:?}", b.pos);
     }
 
     #[test]
-    fn a_light_paper_ball_does_not_move_a_box() {
-        let mut heavy = World::new(floor());
-        let box_h = boxed(&mut heavy, Vec3::new(6.0, 2.5, 0.0));
-        let wood = ball(&mut heavy, Vec3::new(-6.0, 2.0, 0.0));
-        let mut paper = World::new(floor());
-        let box_p = boxed(&mut paper, Vec3::new(6.0, 2.5, 0.0));
-        let light = {
-            let mut b = Body::sphere(2.0, 0.2, 0.5, 0.4, 1.5, 0.1);
-            b.pos = Vec3::new(-6.0, 2.0, 0.0);
-            paper.bodies.push(b);
-            paper.bodies.len() - 1
+    fn a_paper_ball_does_not_move_a_box_that_a_wooden_one_moves() {
+        // The push is the original's control force per step (its column "Force", docs/physics.md section 3), times
+        // 66 steps per second of its time, per tick: the impulse the sim gives, which does not depend on the mass.
+        let run = |m: Material, force: f32| {
+            let mut w = World::new(&floor());
+            let bx = w.add_box(
+                Vec3::splat(2.5),
+                crate_material(),
+                Vec3::new(6.0, 2.5, 0.0),
+                Quat::IDENTITY,
+            );
+            let ball = w.add_ball(2.0, m, Vec3::new(-6.0, 2.0, 0.0), Quat::IDENTITY);
+            for _ in 0..180 {
+                w.step(Some((ball, Vec3::X * force * PSI_PER_SECOND / 60.0)));
+            }
+            w.state(bx).unwrap().pos.x - 6.0
         };
-        // The same push (an acceleration), so the difference is the mass only.
-        for _ in 0..120 {
-            heavy.step(TICK, Some((wood, Vec3::X * 20.0)));
-            paper.step(TICK, Some((light, Vec3::X * 20.0)));
-        }
-        let moved_by_wood = heavy.bodies[box_h].pos.x - 6.0;
-        let moved_by_paper = paper.bodies[box_p].pos.x - 6.0;
+        let by_wood = run(wood(), 0.43);
+        let by_paper = run(paper(), 0.065);
         assert!(
-            moved_by_wood > moved_by_paper + 0.5,
-            "wood {moved_by_wood}, paper {moved_by_paper}"
+            by_wood > by_paper + 0.5,
+            "wood moved the box {by_wood}, paper {by_paper}"
+        );
+    }
+
+    #[test]
+    fn a_wooden_ball_barely_bounces() {
+        let mut w = World::new(&floor());
+        let ball = w.add_ball(2.0, wood(), Vec3::new(0.0, 20.0, 0.0), Quat::IDENTITY);
+        let mut before = 0.0f32;
+        let mut after = 0.0f32;
+        for _ in 0..240 {
+            let v = w.state(ball).unwrap().vel.y;
+            w.step(None);
+            let now = w.state(ball).unwrap().vel.y;
+            if v < -1.0 && now > 0.0 {
+                before = -v;
+                after = now;
+                break;
+            }
+        }
+        assert!(before > 0.0, "the ball never landed");
+        // Pair elasticity 0.2 × 0.3 = 0.06: a few percent of the impact, not the rubber bounce of before (0.6).
+        assert!(after < 0.2 * before, "rebound {after} from impact {before}");
+    }
+
+    #[test]
+    fn stacked_and_pushed_boxes_stay_on_the_floor_and_do_not_pass_through_each_other() {
+        let mut w = World::new(&floor());
+        let a = w.add_box(
+            Vec3::splat(2.5),
+            crate_material(),
+            Vec3::new(-4.0, 2.5, 0.0),
+            Quat::IDENTITY,
+        );
+        let b = w.add_box(
+            Vec3::splat(2.5),
+            crate_material(),
+            Vec3::new(4.0, 2.5, 0.0),
+            Quat::IDENTITY,
+        );
+        let c = w.add_box(
+            Vec3::splat(2.5),
+            crate_material(),
+            Vec3::new(4.0, 7.5, 0.0),
+            Quat::IDENTITY,
+        );
+        let ball = w.add_ball(2.0, wood(), Vec3::new(-16.0, 2.0, 0.0), Quat::IDENTITY);
+        for _ in 0..480 {
+            w.step(Some((ball, Vec3::X * 1.0)));
+        }
+        let (sa, sb, sc) = (
+            w.state(a).unwrap(),
+            w.state(b).unwrap(),
+            w.state(c).unwrap(),
+        );
+        for (name, s) in [("a", sa), ("b", sb), ("c", sc)] {
+            assert!(
+                s.pos.y > 1.5 && s.pos.y < 9.0,
+                "box {name} is at {:?}",
+                s.pos
+            );
+        }
+        // Boxes are 5 wide: two centres closer than 5 on the same level mean one of them went into the other.
+        let gap = |p: Vec3, q: Vec3| (p - q).abs().max_element();
+        assert!(
+            gap(sa.pos, sb.pos) >= 4.9 || (sa.pos.y - sb.pos.y).abs() >= 4.9,
+            "a and b overlap: {:?} {:?}",
+            sa.pos,
+            sb.pos
         );
     }
 }
