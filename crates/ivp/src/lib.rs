@@ -11,6 +11,7 @@ pub mod contact;
 pub mod convex;
 pub mod core;
 pub mod event;
+pub mod fsolver;
 pub mod hull;
 pub mod ledge;
 pub mod manager;
