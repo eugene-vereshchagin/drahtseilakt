@@ -109,6 +109,8 @@ impl World {
 
     fn add(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Quat) -> usize {
         let desc = BodyDesc {
+            // the floor is entity 0; the game's bodies follow in creation order, so the ball is entity 1
+            entity: self.handles.len() as u32 + 1,
             mass: m.mass,
             friction: m.friction,
             elasticity: m.elasticity,
@@ -147,6 +149,14 @@ impl World {
     /// A loose sphere.
     pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
         self.add(Shape::Sphere(radius), m, pos, rot)
+    }
+
+    /// The contact points the ball takes part in, for the watch log: those whose entities include the ball (entity 1).
+    pub fn ball_contacts(&self) -> Vec<ivp::glue::ContactReadout> {
+        (0..)
+            .map_while(|i| self.physics.debug_contact(i))
+            .filter(|c| c.entities.contains(&1))
+            .collect()
     }
 
     pub fn state(&self, i: usize) -> Option<State> {
@@ -399,7 +409,18 @@ mod tests {
             sb.pos
         );
     }
+
+    /// A ball resting on the floor touches it: its contacts name the ball's entity, 1, and the floor's, 0.
+    #[test]
+    fn a_resting_ball_reports_its_contacts_with_entity_ids() {
+        let mut w = World::new(&floor());
+        w.add_ball(2.0, wood(), Vec3::new(0.0, 2.0, 0.0), Quat::IDENTITY);
+        for _ in 0..120 {
+            w.step(None);
+        }
+        let contacts = w.ball_contacts();
+        assert!(!contacts.is_empty(), "the ball on the floor has contacts");
+        assert!(contacts.iter().all(|c| c.entities.contains(&1)));
+        assert!(contacts.iter().any(|c| c.entities.contains(&0)), "the floor is entity 0: {contacts:?}");
+    }
 }
-
-
-

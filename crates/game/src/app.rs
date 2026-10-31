@@ -101,7 +101,7 @@ impl Game {
 
     /// Reports a finding: a line on the console and in the level's watch log, and the replay up to that tick, so that
     /// the case replays with --headless. A replay played back is only reported, not logged again.
-    fn report(&self, f: &Finding) {
+    fn report(&self, f: &Finding, contacts: &[ivp::glue::ContactReadout]) {
         let line = format!(
             "{} {} tick {} at ({:.2} {:.2} {:.2}) speed {:.2} input {:#04x}{}",
             clock(f.tick),
@@ -114,7 +114,17 @@ impl Game {
             f.input,
             if f.on_ground { " ground" } else { " air" }
         );
-        println!("{line}");
+        // the ball's contact points at that tick: which surfaces it touches, and along which normal
+        let mut lines = vec![line];
+        for c in contacts {
+            lines.push(format!(
+                "  contact {:?} types {:?} gap {:.4} normal ({:.3} {:.3} {:.3}) point ({:.2} {:.2} {:.2})",
+                c.entities, c.types, c.gap, c.normal[0], c.normal[1], c.normal[2], c.point[0], c.point[1], c.point[2]
+            ));
+        }
+        for l in &lines {
+            println!("{l}");
+        }
         if self.replay_in.is_some() {
             return;
         }
@@ -122,7 +132,9 @@ impl Game {
         let _ = std::fs::create_dir_all(&dir);
         use std::io::Write as _;
         if let Ok(mut log) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("watch.log")) {
-            let _ = writeln!(log, "{line}");
+            for l in &lines {
+                let _ = writeln!(log, "{l}");
+            }
         }
         let snapshot = dir.join(format!("{}-{}.replay", f.kind.name(), f.tick));
         if let Err(e) = std::fs::write(&snapshot, self.replay_out.to_text()) {
@@ -167,8 +179,12 @@ impl Game {
         self.sim.step(input);
         self.replay_out.record(self.sim.tick, input);
         let ball = &self.sim.ball;
-        for f in self.watch.observe(self.sim.tick, ball.position, ball.velocity, input, ball.on_ground) {
-            self.report(&f);
+        let found = self.watch.observe(self.sim.tick, ball.position, ball.velocity, input, ball.on_ground);
+        if !found.is_empty() {
+            let contacts = self.sim.world().ball_contacts();
+            for f in &found {
+                self.report(f, &contacts);
+            }
         }
         for (t, e) in self.sim.events.iter().skip(events_before) {
             if *e == Event::Died {
