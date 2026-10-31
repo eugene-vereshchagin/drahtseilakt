@@ -38,6 +38,8 @@ FILE.png` renders a frame. `drahtseilakt --help` lists everything.
 
 ## Legal
 
+Files ported from OpenBallance (GPL-3.0, emdzej and contributors) say so in their headers; the `ivp` crate is the physics port.
+
 Drahtseilakt is licensed under the GPL-3.0, like OpenBallance it began from. It needs your own copy of the
 game and never ships Ballance's data. (While this repository is private, `levels/` keeps a backup of the
 original levels for development; the public repository will not contain it.) Ballance is © 2004 Cyparade /

@@ -1,0 +1,11 @@
+[package]
+name = "ivp"
+version = "0.1.0"
+description = "The physics of Ballance: a Rust port of OpenBallance's src/phys (GPL-3.0), itself written from the original physics_RT.dll"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
