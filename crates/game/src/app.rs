@@ -81,9 +81,35 @@ impl Game {
     }
 
     fn restart(&mut self) {
+        self.save_attempt();
         self.sim = Sim::new(&self.level.level, self.start_ball);
         self.ball_lost_at = None;
         self.replay_out = Replay::new(&self.level.name, self.level.hash);
+    }
+
+    /// Saves a run that did not finish (restarted or closed before the end), so that the falls and the lifts of
+    /// the level can be studied later. Named by the time it was saved; the folder is the level's.
+    fn save_attempt(&self) {
+        if self.sim.finished || self.sim.tick == 0 || self.replay_in.is_some() {
+            return;
+        }
+        let stem = self
+            .level
+            .name
+            .trim_end_matches(".NMO")
+            .trim_end_matches(".nmo")
+            .to_owned();
+        let dir = replay_dir().join(&stem);
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let path = dir.join(format!("attempt-{stamp}-{}.replay", self.sim.tick));
+        let _ = std::fs::create_dir_all(&dir);
+        match std::fs::write(&path, self.replay_out.to_text()) {
+            Ok(()) => println!("attempt saved to {}", path.display()),
+            Err(e) => eprintln!("could not save the attempt to {}: {e}", path.display()),
+        }
     }
 
     /// One tick: the replay's input if there is one, else the keyboard's.
@@ -283,6 +309,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         error: None,
     };
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
+    app.game.save_attempt();
     match app.error {
         Some(e) => Err(e),
         None => Ok(()),
