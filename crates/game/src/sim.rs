@@ -229,25 +229,10 @@ impl Sim {
                 .fold(f32::INFINITY, f32::min)
                 - 60.0,
         };
-        // The camera starts looking the way out of the start: where the physical floor around the start leads
-        // (the mean direction to floor vertices in a ring around it), in quarter turns as the original camera
-        // turns. The start object's axes do not tell this reliably (they agree in 7 of 13 levels). Without a
-        // clear way out: +X, the most common in the original levels.
-        let ring = triangles
-            .iter()
-            .flat_map(|t| [t.a, t.b, t.c])
-            .fold(Vec3::ZERO, |acc, v| {
-                let d = Vec3::new(v.x - start.x, 0.0, v.z - start.z);
-                let len = d.length();
-                if (14.0..45.0).contains(&len) && (v.y - start.y).abs() < 20.0 {
-                    acc + d / len
-                } else {
-                    acc
-                }
-            });
-        let start_axis = if ring.length() > 1.0 { ring } else { Vec3::X };
-        let quarter =
-            (start_axis.x.atan2(start_axis.z) / std::f32::consts::FRAC_PI_2).round() as i32;
+        // The camera starts looking along +X. The original sets it from the shared camera object (Camera.nmo,
+        // Cam_Orient): its axis points along +X at every start, which the C game shows at the level 1 start. The
+        // earlier guess from the floors turned it 180 degrees.
+        let quarter = 1;
         let yaw = quarter as f32 * std::f32::consts::FRAC_PI_2;
         // The ball appears at the first reset point (its centre), else just above the start.
         let spawn = rules
