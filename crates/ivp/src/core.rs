@@ -80,6 +80,29 @@ pub struct Core {
     pub body: usize,
     pub temporarily_unmovable: u8,
     pub impacts_psi: i16,
+    /// The object's origin in core coordinates (`shift_core_f_object`); zero for most bodies.
+    pub shift: [f32; 3],
+}
+
+impl Core {
+    /// The pose of the object at time `t` (`ivp_body_m_world_f_object_at`, phys_core.c 333): the core's rotation
+    /// slerped from the last PSI, its position, and the object's shift rotated into the world.
+    pub fn object_pose_at(&self, t: f64) -> Matrix {
+        let dt = t - self.time_of_last_psi;
+        let q = math::quat_slerp(&self.q_last, &self.q_next, dt * f64::from(self.i_delta_time));
+        let r = math::quat_to_matrix(&q);
+        let mut vv = [0.0; 3];
+        for k in 0..3 {
+            vv[k] = self.pos_last[k] + f64::from(self.delta_pos[k]) * dt;
+        }
+        if self.shift != [0.0; 3] {
+            let s = math::rmul(&r, &[f64::from(self.shift[0]), f64::from(self.shift[1]), f64::from(self.shift[2])]);
+            for k in 0..3 {
+                vv[k] += s[k];
+            }
+        }
+        Matrix { r, vv }
+    }
 }
 
 /// A simulation unit (1.4): a set of cores that are simulated together, with its controllers' entries.
@@ -340,6 +363,7 @@ impl World {
             body,
             temporarily_unmovable: 0,
             impacts_psi: 0,
+            shift: [0.0; 3],
         });
         let su = self.new_unit();
         self.unit_add_core(su, idx);

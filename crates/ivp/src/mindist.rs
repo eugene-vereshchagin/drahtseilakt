@@ -34,6 +34,16 @@ pub struct Synapse {
     pub obj: usize,
     pub feat: Option<Feat>,
     pub status: i16,
+    /// The synapse's links in its object's EXACT or INVALID list (synapse references, see `SynRef`).
+    pub next: Option<usize>,
+    pub prev: Option<usize>,
+    /// The synapse's listener slot in its object's hull manager, while it listens.
+    pub hull_slot: Option<u32>,
+}
+
+/// A synapse reference: the mindist's arena index times two, plus the synapse index (0 or 1).
+pub fn syn_ref(md: usize, k: usize) -> usize {
+    md * 2 + k
 }
 
 /// Mindist flags (4.2.3): the sort bit, the recalc failure bits, the status, and the collision-distance index.
@@ -57,6 +67,15 @@ pub const MD_HULL: u32 = 5;
 /// sorted synapse's object toward the first's.
 #[derive(Clone, Debug, Default)]
 pub struct Mindist {
+    /// Whether the arena slot holds a live mindist.
+    pub alive: bool,
+    /// The links in the manager's EXACT or INVALID list (mindist arena indices).
+    pub next: Option<usize>,
+    pub prev: Option<usize>,
+    /// The slot of the mindist's event in the time list, while it has one.
+    pub ev_slot: Option<u32>,
+    /// The collision record of the pair in the broadphase.
+    pub collision: Option<usize>,
     pub flags: u32,
     pub syn: [Synapse; 2],
     pub sum_extra_radius: f32,

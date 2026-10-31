@@ -1,12 +1,12 @@
-// The collision part of the world (docs/ivp_collision.md; the records of phys_coll.h). The broadphase and the hull
-// listeners are ported (`crate::ov`); the mindists, the watchers and their solvers are not yet, so the pairs of the
-// broadphase are not created, and the hooks the core calls into the collision code are still stubs.
-//
-// Until the collision port lands, a world with these hooks simulates free bodies only, and the game must not rely on
-// it for contacts. Each hook keeps the contract the core expects.
+// The collision part of the world (docs/ivp_collision.md; the records of phys_coll.h). The broadphase (`crate::ov`),
+// the hull listeners, the mindists and their manager (`crate::manager`) are ported. The OO watchers and the contact
+// system are not yet, so a pair whose object has more than one convex piece gets no collision, and the contact hooks
+// of the manager are empty. Until those land, the game must not rely on this world for contacts.
 
 use crate::core::World;
 use crate::hull::HullManager;
+use crate::ledge::Surface;
+use crate::mindist::{Mindist, ObjCache};
 use crate::ov::OvTree;
 
 /// What a collision record is (`IvpCollision`): a mindist of the root delegator, or an OO watcher's child (3.1.8).
@@ -16,26 +16,57 @@ pub enum CollKind {
     Watcher,
 }
 
-/// The header every collision record shares (`IvpCollision`, phys_coll.h): the two objects it joins and the slot of
-/// each object's element vector that holds it (`fvec`, -1 for none).
+/// The header every collision record shares (`IvpCollision`, phys_coll.h): the two objects it joins, the slot of
+/// each object's element vector that holds it (`fvec`, -1 for none), and the record it stands for.
 #[derive(Clone, Copy, Debug)]
 pub struct Collision {
     pub kind: CollKind,
     pub objs: [usize; 2],
     pub fvec: [i32; 2],
+    /// The mindist arena index for a mindist record.
+    pub index: usize,
     /// Whether the record is in use; freed records keep their slot for reuse.
     pub alive: bool,
 }
 
-/// The collision state of one world: the OV tree, one hull manager per object, the collision records and the
-/// collision filter's group names (the glue's group of each object, all zero for an unnamed one).
+/// The kind of an object's collision geometry: a ball, or a polygon with its compact surface.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ObjKind {
+    Polygon,
+    Ball,
+}
+
+/// What the collision code keeps per object beyond its core: its geometry, its extra radius, its cache, and the heads
+/// of its EXACT and INVALID synapse lists (`IvpCollObject`, 4.2.7).
+#[derive(Debug, Default)]
+pub struct ObjInfo {
+    pub kind: Option<ObjKind>,
+    pub surface: Option<Surface>,
+    pub extra_radius: f32,
+    pub cache: ObjCache,
+    pub cache_valid: bool,
+    pub cache_time_code: u32,
+    pub exact_syn: Option<usize>,
+    pub invalid_syn: Option<usize>,
+}
+
+/// The collision state of one world: the OV tree, the per-object records and hull managers, the collision records and
+/// the mindist arena with its lists.
 #[derive(Debug, Default)]
 pub struct CollWorld {
     pub ov: OvTree,
     pub hulls: Vec<HullManager>,
     pub groups: Vec<[u8; 8]>,
+    pub objs: Vec<ObjInfo>,
     pub collisions: Vec<Collision>,
     pub free_collisions: Vec<usize>,
+    pub mds: Vec<Mindist>,
+    pub free_mds: Vec<usize>,
+    /// The heads of the manager's EXACT and INVALID mindist lists.
+    pub exact: Option<usize>,
+    pub invalid: Option<usize>,
+    /// The upstream's global counter of the collision-distance index decay (0x10075edc).
+    pub coll_dist_counter: u32,
     /// Statistics of the upstream's counters (env +0x78 onward), kept for the tests and the debug overlay.
     pub ov_rechecks: u32,
 }
@@ -52,24 +83,20 @@ impl World {
     /// A core integrated into the next PSI: the hull update of its objects. 0x1001e750.
     pub(crate) fn core_integrated(&mut self, _c: usize, _dt: f64) {}
 
-    /// After the controllers of a unit ran: the per-object hook. 0x100099a0.
-    pub(crate) fn after_controllers(&mut self, _unit: usize) {}
+    /// After the controllers of a unit ran: the per-object hook of each of its cores (0x100099a0).
+    pub(crate) fn after_controllers(&mut self, unit: usize) {
+        let cores = match self.units.get(unit) {
+            Some(u) => u.cores.clone(),
+            None => return,
+        };
+        for c in cores {
+            self.object_after_controllers(c);
+        }
+    }
 
     /// Before the PSI: the begin hook and the mindist pre-PSI pass. 0x100124c0 preamble.
     pub(crate) fn psi_start(&mut self) {}
 
     /// After the PSI's integration: the end hook. 0x1001ea50 tail.
     pub(crate) fn psi_end(&mut self) {}
-
-    /// The mindist between two objects that the broadphase found touching (0x10016290). Not ported yet: no pair is
-    /// created, so the broadphase keeps its tree but no contact is computed.
-    pub(crate) fn mindist_create(&mut self, _a: usize, _b: usize) -> Option<usize> {
-        None
-    }
-}
-
-impl World {
-    /// A mindist event of the time list fired (`0x100181b0`). Not ported yet: mindist events are never scheduled
-    /// by this port, so this is unreachable until the collision port lands.
-    pub(crate) fn mindist_simulate_event(&mut self, _payload: u32) {}
 }

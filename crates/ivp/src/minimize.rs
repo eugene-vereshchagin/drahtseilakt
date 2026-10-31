@@ -391,6 +391,11 @@ impl<'a, 'm> Solver<'a, 'm> {
         self.pos
     }
 
+    /// The mindist the solver writes into, for the recalc loop's flag updates.
+    pub fn mindist(&mut self) -> &mut Mindist {
+        self.md
+    }
+
     /// The info of synapse `k`: its feature, ledge and cache. None when the synapse has no polygon behind it.
     fn info(&self, k: usize) -> Option<Info<'a>> {
         let feat = self.md.syn[k].feat?;
@@ -1271,6 +1276,7 @@ mod tests {
                 edge: Edge { tri: 0, slot: 0 },
             }),
             status: ST_POINT,
+            ..Synapse::default()
         };
         md.syn[1] = Synapse {
             obj: 1,
@@ -1279,6 +1285,7 @@ mod tests {
                 edge: Edge { tri: 0, slot: 0 },
             }),
             status: ST_POINT,
+            ..Synapse::default()
         };
         let sides = [
             Side {

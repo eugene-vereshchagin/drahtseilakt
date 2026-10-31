@@ -12,6 +12,7 @@ pub mod core;
 pub mod event;
 pub mod hull;
 pub mod ledge;
+pub mod manager;
 pub mod math;
 pub mod mindist;
 pub mod minimize;

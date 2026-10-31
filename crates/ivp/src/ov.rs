@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 
+use crate::collision::{CollKind, Collision};
 use crate::core::World;
 use crate::hull::{encode_listener, ListenerKind};
 
@@ -574,6 +575,7 @@ impl World {
         if self.coll.ov.element(obj).is_some() {
             self.disable_collision_detection(obj);
         }
+        self.ensure_object(obj);
         if self.coll.hulls.len() <= obj {
             self.coll.hulls.resize_with(obj + 1, Default::default);
         }
@@ -737,12 +739,44 @@ impl World {
         }
     }
 
-    /// Deletes a collision: it leaves the elements, then its arena slot is released (the mindist's own teardown
-    /// comes with the mindist port).
+    /// Deletes a collision: a mindist tears itself down (and releases its record), a watcher child is not ported yet
+    /// and only releases the record.
     pub(crate) fn collision_delete(&mut self, c: usize) {
+        match self.coll.collisions[c].kind {
+            CollKind::Mindist => {
+                let m = self.coll.collisions[c].index;
+                self.mindist_delete(m);
+            }
+            CollKind::Watcher => self.collision_release(c),
+        }
+    }
+
+    /// Takes a collision out of its elements and frees its record (the root delegator's delete hook, 0x1002f3f0).
+    pub(crate) fn collision_release(&mut self, c: usize) {
         self.collision_leave_elements(c);
         self.coll.collisions[c].alive = false;
         self.coll.free_collisions.push(c);
+    }
+
+    /// Creates a collision record for mindist `m` of objects `objs` and returns its index.
+    pub(crate) fn collision_new(&mut self, kind: CollKind, objs: [usize; 2], index: usize) -> usize {
+        let c = Collision {
+            kind,
+            objs,
+            fvec: [-1, -1],
+            index,
+            alive: true,
+        };
+        match self.coll.free_collisions.pop() {
+            Some(i) => {
+                self.coll.collisions[i] = c;
+                i
+            }
+            None => {
+                self.coll.collisions.push(c);
+                self.coll.collisions.len() - 1
+            }
+        }
     }
 }
 

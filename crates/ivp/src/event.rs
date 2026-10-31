@@ -958,11 +958,13 @@ mod tests {
             obj: 0,
             feat: Some(feat),
             status: ST_POINT,
+            ..Synapse::default()
         };
         md.syn[1] = Synapse {
             obj: 1,
             feat: Some(feat),
             status: ST_POINT,
+            ..Synapse::default()
         };
         let sides = [
             Side {
