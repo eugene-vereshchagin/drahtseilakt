@@ -203,6 +203,7 @@ impl World {
 
     /// Takes a mindist into the arena, from the free slots first.
     fn md_alloc(&mut self, md: Mindist) -> usize {
+        self.coll.md_created += 1;
         match self.coll.free_mds.pop() {
             Some(i) => {
                 self.coll.mds[i] = md;
@@ -426,6 +427,7 @@ impl World {
         }
         self.coll.mds[m] = Mindist::default();
         self.coll.free_mds.push(m);
+        self.coll.md_deleted += 1;
     }
 
     /// The recalc (4.5, 0x10019950 with 20 countdown steps and two tries; 0x100197f0 with one try and none): solves

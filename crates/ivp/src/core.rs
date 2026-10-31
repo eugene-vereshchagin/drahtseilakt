@@ -89,6 +89,10 @@ pub struct Core {
     pub impact_stamp: u32,
     /// The object's origin in core coordinates (`shift_core_f_object`); zero for most bodies.
     pub shift: [f32; 3],
+    /// The game's id of the body this core belongs to (`PhysBodyDesc`'s entity), for the readouts.
+    pub entity: u32,
+    /// A body destroyed by `World::body_destroy`: its index stays reserved and nothing refers to it any more.
+    pub removed: bool,
 }
 
 impl Core {
@@ -134,6 +138,8 @@ pub enum Controller {
     /// A spring (`crate::constraint`, priority 1500) and a constraint (priority 405) acting on a joint.
     Spring { joint: usize },
     Constraint { joint: usize },
+    /// SetPhysicsForce's controller (`crate::glue`, priority 1500): a force on one body every PSI.
+    Force(crate::glue::Force),
 }
 
 /// The controllers of a friction system: the normal force (0), the tangential spring (600), the contact update (2000).
@@ -151,6 +157,7 @@ impl Controller {
             Controller::Gravity { .. } => 1000,
             Controller::Spring { .. } => 1500,
             Controller::Constraint { .. } => 405,
+            Controller::Force(_) => 1500,
             Controller::Friction { kind, .. } => match kind {
                 FrictionKind::Normal => 0,
                 FrictionKind::Spring => 600,
@@ -162,7 +169,7 @@ impl Controller {
     /// Whether the controller keeps its cores in one unit (springs and constraints do; gravity does not).
     pub fn links_cores(&self) -> bool {
         match self {
-            Controller::Gravity { .. } => false,
+            Controller::Gravity { .. } | Controller::Force(_) => false,
             Controller::Friction { kind, .. } => *kind == FrictionKind::Spring,
             Controller::Spring { .. } | Controller::Constraint { .. } => true,
         }
@@ -221,6 +228,10 @@ pub struct World {
     pub time_code: u32,
     /// The joints (springs and constraints) of the world (`crate::constraint`).
     pub joints: Vec<crate::constraint::Joint>,
+    /// The game's listeners of impacts and contacts (`phys_set_listeners`).
+    pub listeners: crate::glue::Listeners,
+    /// The frame time smoothing of `phys_frame`, in milliseconds.
+    pub smoothed_ms: f32,
     /// The collision state: the broadphase, the hull managers and the collision records (`crate::collision`).
     pub coll: crate::collision::CollWorld,
 }
@@ -255,7 +266,7 @@ impl World {
         }
     }
 
-    fn unit_list_remove(&mut self, su: usize) {
+    pub(crate) fn unit_list_remove(&mut self, su: usize) {
         self.active.retain(|&u| u != su);
         self.frozen.retain(|&u| u != su);
     }
@@ -401,6 +412,8 @@ impl World {
             sync_q: q,
             impact_stamp: 0,
             shift: [0.0; 3],
+            entity: 0,
+            removed: false,
         });
         let su = self.new_unit();
         self.unit_add_core(su, idx);
@@ -620,6 +633,11 @@ impl World {
                     sim_unit: su,
                 };
                 self.constraint_simulate(joint, &es);
+            }
+            Controller::Force(f) => {
+                if let Some(c) = f.body {
+                    self.force_simulate(c, &f);
+                }
             }
             Controller::Friction { fs, kind } => {
                 let es = crate::event_sim::EventSim {

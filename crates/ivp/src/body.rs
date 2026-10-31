@@ -7,15 +7,20 @@
 
 use crate::collision::ObjKind;
 use crate::core::{Controller, World, MT_NOT_SIM, MT_STATIC};
+use crate::glue::to_p3;
 use crate::ledge::Surface;
 use crate::math::{self, Matrix, Quat};
 
 type V3 = [f64; 3];
 
-/// A body's description (`PhysBodyDesc`): fixedness, collision, the material, the mass, the dampings, and the mass
-/// centre override (`shift`, in object space; None takes the surface's own centre).
+/// A body's description (`PhysBodyDesc`): the game's entity id, fixedness, collision, the material, the mass, the
+/// dampings, the no-collision group, and the mass centre override (`shift`, in object space; None takes the surface's
+/// own centre).
 #[derive(Clone, Copy, Debug)]
 pub struct BodyDesc {
+    pub entity: u32,
+    /// The no-collision group: equal non-empty groups do not collide. All zero bytes is no group.
+    pub group: [u8; 8],
     pub fixed: bool,
     pub collide: bool,
     pub start_frozen: bool,
@@ -30,6 +35,8 @@ pub struct BodyDesc {
 impl Default for BodyDesc {
     fn default() -> Self {
         BodyDesc {
+            entity: 0,
+            group: [0; 8],
             fixed: false,
             collide: true,
             start_frozen: false,
@@ -108,6 +115,11 @@ impl World {
         self.ensure_object_pub(c);
         // the object origin is the core moved back by the rotated centre: the shift is the negated centre
         self.cores[c].shift = [-mc[0], -mc[1], -mc[2]];
+        self.cores[c].entity = desc.entity;
+        if self.coll.groups.len() <= c {
+            self.coll.groups.resize(c + 1, [0; 8]);
+        }
+        self.coll.groups[c] = desc.group;
 
         let (kind, extra, surface) = match &shape {
             Shape::Sphere(radius) => (ObjKind::Ball, *radius, None),
@@ -228,6 +240,32 @@ impl World {
     pub fn body_impulse(&mut self, c: usize, point_ws: V3, impulse: [f32; 3]) {
         self.wake_body(c);
         self.async_push_core_ws(c, point_ws, impulse);
+    }
+
+    /// A body-local impulse (`phys_impulse` with `local`): the point is in core space and the impulse is rotated by the
+    /// pose at the current time, applied at the next PSI. The body is woken here, where the upstream's glue woke it
+    /// before the call.
+    pub fn body_impulse_local(&mut self, c: usize, point_cs: V3, impulse: [f32; 3]) {
+        self.wake_body(c);
+        let m = self.core_m_world_f_core_at(c, self.env.current_time);
+        let imp_cs = math::rtmul(&m.r, &to_v3(impulse));
+        // the upstream passes the impulse as the world impulse too, as it does here
+        self.async_push_core(c, to_p3(point_cs), to_p3(imp_cs), impulse);
+    }
+
+    /// Sets the time factor the frame time is scaled by (`phys_set_time_factor`): 2 while playing, 0 paused.
+    pub fn set_time_factor(&mut self, f: f32) {
+        self.env.time_factor = f;
+    }
+
+    /// The frame's physics step (`phys_frame`): the frame time is smoothed over the last frames, scaled by the time
+    /// factor, and the simulation runs to that time. Returns the time reached. The write-back of the awake bodies'
+    /// poses is the caller's (`body_pose`).
+    pub fn frame(&mut self, delta_ms: f32) -> f64 {
+        self.smoothed_ms = (delta_ms + 3.0 * self.smoothed_ms) * 0.25;
+        let target = self.env.current_time + f64::from(self.smoothed_ms * self.env.time_factor);
+        self.time_simulate_until(target);
+        target
     }
 
     /// Whether a body has a contact point right now (the ball's grounded test: a point of its friction system).

@@ -35,6 +35,8 @@ const C_1E19: f64 = 1e-19;
 #[derive(Clone, Debug, Default)]
 pub struct ImpactEvent {
     pub obj: [usize; 2],
+    /// The objects in the mindist's order: the listeners of obj order[0] run first, then order[1]'s.
+    pub order: [usize; 2],
     pub rel: P3,
     pub normal: P3,
     pub pos: V3,
@@ -691,13 +693,18 @@ impl World {
         self.coll.cps[cp].info.rel = saved;
         let t = self.coll.cps[cp].info.clone();
         let dt_last = (self.env.current_time - t_prev) as f32;
-        self.coll.impact_events.push(ImpactEvent {
+        let mut ev = ImpactEvent {
             obj: [t.obj[0], t.obj[1]],
+            order: [o0, o1],
             rel: saved,
             normal: t.n,
             pos: t.cp_ws,
             dt_last,
-        });
+        };
+        self.notify_impact(&mut ev);
+        // a listener may have negated the normal in place: the contact keeps that
+        self.coll.cps[cp].info.n = ev.normal;
+        self.coll.impact_events.push(ev);
     }
 
     /// The mindist's do_impact (`phys_contact_do_impact`, 0x100240a0): the objects come to the current time and are

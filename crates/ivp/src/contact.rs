@@ -565,6 +565,7 @@ impl World {
     /// Removes a point from both objects' lists and frees it (`ivp_cp_destroy`, 0x1001c230).
     pub(crate) fn cp_destroy(&mut self, idx: usize) {
         let syn = self.coll.cps[idx].syn;
+        self.notify_contact(syn[0].obj, syn[1].obj, false);
         for s in syn {
             self.coll.objs[s.obj].fric.retain(|&(cp, _)| cp != idx);
         }

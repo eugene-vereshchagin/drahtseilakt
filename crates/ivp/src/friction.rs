@@ -433,6 +433,9 @@ impl World {
             self.cp_update(cp);
             self.cp_read_materials(cp);
         }
+        // "friction created": the listeners hear of the new contact before its system is made
+        let (a, b) = (self.coll.cps[cp].syn[0].obj, self.coll.cps[cp].syn[1].obj);
+        self.notify_contact(a, b, true);
         let fs;
         let fi_o;
         let fi_m_now;

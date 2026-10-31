@@ -95,6 +95,9 @@ pub struct CollWorld {
     /// Statistics of the upstream's counters (env +0x78 onward), kept for the tests and the debug overlay.
     pub ov_rechecks: u32,
     pub watcher_checks: u32,
+    /// Mindists ever created and deleted; the live count is their difference (`md_live`, `md_created`, `md_deleted`).
+    pub md_created: u32,
+    pub md_deleted: u32,
 }
 
 impl World {

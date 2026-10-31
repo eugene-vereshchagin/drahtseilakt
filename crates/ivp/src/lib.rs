@@ -16,6 +16,7 @@ pub mod event;
 pub mod event_sim;
 pub mod friction;
 pub mod fsolver;
+pub mod glue;
 pub mod hull;
 pub mod impact;
 pub mod ledge;
