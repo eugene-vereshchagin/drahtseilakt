@@ -6,6 +6,7 @@
 // from the level model, not from files, so the input-hardening lints of the workspace do not apply here.
 #![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 
+pub mod body;
 pub mod collision;
 pub mod constraint;
 pub mod contact;
