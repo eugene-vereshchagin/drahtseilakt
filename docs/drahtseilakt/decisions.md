@@ -179,6 +179,18 @@ safe Rust cannot read out of bounds or corrupt memory — a whole class of bugs 
 fight by hand. wgpu (Vulkan, Metal, Direct3D 12) is native to it, and cargo gives pinned, vendored, offline
 builds and fuzzing on all three platforms.
 
+## The physics is ported from OpenBallance (GPL-3.0)
+
+Replaces "Rigid-body physics comes from a library: rapier" for the ball and the level's bodies. OpenBallance's
+physics (`src/phys`, about 9,600 lines of C) is a port of the original game's `physics_RT.dll` written from our own
+decompilation (`docs/physics.md`), and the project is GPL-3.0 as we are. Porting it to Rust is a derivative work
+allowed by the GPL: we keep the copyright notice of the upstream author and the licence, mark each ported file with
+its origin, and credit OpenBallance in the README. It is the closest thing to the original's feel that exists in
+open code, and it spares us months of tuning by hand.
+
+This is not an exception for Ballanced. Its physics is the leaked Ipion source ("All rights reserved") and it is
+not used, in any language. rapier stays only as a comparison bench until the port matches the original.
+
 ## Rigid-body physics comes from a library: rapier
 
 Replaces the rule that the physics is written by hand. The own solver for boxes and balls sank boxes, let them

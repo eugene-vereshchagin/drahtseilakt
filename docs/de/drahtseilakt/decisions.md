@@ -179,6 +179,18 @@ Fehlerklasse, die die Sicherheitsregeln sonst von Hand bekämpfen, fällt weg. w
 ist dort heimisch, und cargo liefert festgelegte, vendorte Offline-Builds und Fuzzing auf allen drei
 Plattformen.
 
+## Die Physik wird aus OpenBallance (GPL-3.0) portiert
+
+Ersetzt „Starrkörperphysik kommt aus einer fertigen Bibliothek: rapier“ für Kugel und Körper des Levels. Die Physik
+von OpenBallance (`src/phys`, rund 9.600 Zeilen C) ist ein Port der `physics_RT.dll` des Originalspiels, geschrieben
+nach unserer eigenen Dekompilierung (`docs/physics.md`), und das Projekt steht wie unseres unter GPL-3.0. Die Portierung
+nach Rust ist ein abgeleitetes Werk, das die GPL erlaubt: Wir behalten den Urheberrechtsvermerk des Upstream-Autors
+und die Lizenz, kennzeichnen jede übernommene Datei mit ihrer Herkunft und nennen OpenBallance in der README. Es ist
+das Nächste an dem Gefühl des Originals, das es in offenem Code gibt, und es erspart Monate von Hand-Feinabstimmung.
+
+Das ist keine Ausnahme für Ballanced. Dessen Physik ist der geleakte Ipion-Quelltext („All rights reserved“) und wird
+in keiner Sprache verwendet. rapier bleibt nur als Vergleichsstand, bis der Port dem Original entspricht.
+
 ## Starrkörperphysik kommt aus einer fertigen Bibliothek: rapier
 
 Ersetzt die Regel, nach der die Physik selbst geschrieben wird. Der eigene Löser für Kisten und Kugeln ließ Kisten
