@@ -206,13 +206,14 @@ impl Sim {
         let mut trafos = Vec::new();
         for g in &level.groups {
             if let Some(rest) = g.name.strip_prefix("P_Trafo_")
-                && let Some(kind) = BallKind::from_name(rest) {
-                    for &m in &g.members {
-                        if let Some(o) = level.objects.get(m) {
-                            trafos.push((m, Vec3::from(o.position()), kind));
-                        }
+                && let Some(kind) = BallKind::from_name(rest)
+            {
+                for &m in &g.members {
+                    if let Some(o) = level.objects.get(m) {
+                        trafos.push((m, Vec3::from(o.position()), kind));
                     }
                 }
+            }
         }
         let rules = Rules {
             start,
@@ -448,16 +449,19 @@ impl Sim {
         }
         // Checkpoints in order: reaching the next one opens the next sector.
         if let Some(&(_, q)) = self.rules.checkpoints.get(self.sector)
-            && near(q, GATE_RADIUS) {
-                self.sector += 1;
-                self.events
-                    .push((self.tick, Event::Checkpoint(self.sector)));
-            }
+            && near(q, GATE_RADIUS)
+        {
+            self.sector += 1;
+            self.events
+                .push((self.tick, Event::Checkpoint(self.sector)));
+        }
         if let Some(end) = self.rules.end
-            && self.sector >= self.rules.checkpoints.len() && near(end, GATE_RADIUS) {
-                self.finished = true;
-                self.events.push((self.tick, Event::Finished));
-            }
+            && self.sector >= self.rules.checkpoints.len()
+            && near(end, GATE_RADIUS)
+        {
+            self.finished = true;
+            self.events.push((self.tick, Event::Finished));
+        }
         if p.y < self.rules.death_y {
             self.die();
         }

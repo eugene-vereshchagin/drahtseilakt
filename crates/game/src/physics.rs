@@ -164,9 +164,9 @@ impl World {
                 .handles
                 .get(i)
                 .and_then(|&h| self.physics.bodies.get_mut(h))
-            {
-                b.apply_impulse(vector(impulse), true);
-            }
+        {
+            b.apply_impulse(vector(impulse), true);
+        }
         self.physics.step();
         for (i, &h) in self.handles.iter().enumerate() {
             if let Some(b) = self.physics.bodies.get(h) {

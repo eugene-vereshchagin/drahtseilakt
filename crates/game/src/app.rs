@@ -499,7 +499,8 @@ impl App {
             format,
             width: size.width.max(1),
             height: size.height.max(1),
-            present_mode: wgpu::PresentMode::AutoVsync,
+            // Fifo: frames are shown only at the monitor's refresh, never half of one frame and half of the next.
+            present_mode: wgpu::PresentMode::Fifo,
             desired_maximum_frame_latency: 2,
             alpha_mode: caps
                 .alpha_modes
@@ -509,6 +510,15 @@ impl App {
             view_formats: vec![],
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
+        eprintln!(
+            "window: {:?} presentation {:?}, {}x{}, format {:?}, modes offered {:?}",
+            adapter.get_info().name,
+            config.present_mode,
+            config.width,
+            config.height,
+            config.format,
+            caps.present_modes
+        );
         surface.configure(&device, &config);
         let mut renderer = Renderer::new(device, queue, format);
         upload(&mut renderer, &self.game, &self.data);
@@ -618,10 +628,11 @@ impl App {
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none()
-            && let Err(e) = self.init(event_loop) {
-                self.error = Some(e);
-                event_loop.exit();
-            }
+            && let Err(e) = self.init(event_loop)
+        {
+            self.error = Some(e);
+            event_loop.exit();
+        }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
