@@ -168,13 +168,7 @@ impl World {
         {
             let core = &mut self.cores[c];
             core.rot_inertia = rot_inertia;
-            core.inv_rot_inertia = [
-                (1.0 / f64::from(rot_inertia[0])) as f32,
-                (1.0 / f64::from(rot_inertia[1])) as f32,
-                (1.0 / f64::from(rot_inertia[2])) as f32,
-            ];
             core.mass = mass as f32;
-            core.inv_mass = (1.0 / mass) as f32;
             core.speed_damp = desc.lin_damp;
             core.rot_speed_damp = [desc.rot_damp; 3];
             core.upper_limit_radius = extra + radius_surface;
@@ -184,6 +178,8 @@ impl World {
             core.rot_speed = [0.0; 3];
             core.movement_state = if desc.fixed { MT_STATIC } else { MT_NOT_SIM };
         }
+        // the inverses, the equal-inertia flag and the inverse diameter (`calc_calc`, as the upstream's init does)
+        self.calc_calc(c);
         self.set_object_geometry(c, kind, surface, extra);
         self.set_object_material(c, desc.friction, desc.elasticity);
         if desc.collide && (kind == ObjKind::Ball || self.coll.objs[c].surface.is_some()) {
@@ -339,6 +335,9 @@ mod tests {
         let f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
         let ball = w.add_body(BodyDesc { mass: 1.0, ..BodyDesc::default() }, Shape::Sphere(2.0), [0.0, 5.0, 0.0], IDENTITY);
         assert_eq!(w.cores[ball].max_surface_deviation, 0.0);
+        // a ball's inertias are equal, and its inverse diameter is that of its radius
+        assert!(w.cores[ball].rot_inertias_equal);
+        assert_eq!(w.cores[ball].inv_object_diameter, 0.25);
         let (_, dev) = floor().radius_dev(floor().mass_center);
         assert_eq!(w.cores[f].max_surface_deviation, dev);
         assert!(dev < 100.0);
