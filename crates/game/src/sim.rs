@@ -635,14 +635,17 @@ mod tests {
     fn a_rolling_ball_turns_the_way_it_rolls() {
         let level = flat_level();
         let mut sim = Sim::new(&level, BallKind::Wood);
-        for _ in 0..30 {
+        // the start settles and the push builds up its speed before the rolling is judged
+        for _ in 0..90 {
             sim.step(input::UP);
         }
         let forward = sim.camera.forward();
         // Rolling without slipping, the top of the ball moves at twice the ball's speed in the direction of travel.
-        // Over one tick the top point's displacement must point the same way as the ball.
+        // Over ten ticks the top point's displacement must point the same way as the ball.
         let before = sim.ball.rotation * Vec3::Y;
-        sim.step(input::UP);
+        for _ in 0..10 {
+            sim.step(input::UP);
+        }
         let after = sim.ball.rotation * Vec3::Y;
         assert!(
             (after - before).dot(forward) > 0.0,

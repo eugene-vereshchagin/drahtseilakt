@@ -19,6 +19,9 @@ pub const SURFACE_ELASTICITY: f32 = 0.3;
 pub const SURFACE_FRICTION: f32 = 0.7;
 /// One tick, in seconds.
 const TICK: f64 = 1.0 / 60.0;
+/// The physics runs this many times faster than the frames while playing: the original's "Set Physics Globals" sets
+/// the time factor to 2 (checked in the C game: its physics time advances 2 s for every second of frames).
+const TIME_FACTOR: f64 = 2.0;
 
 /// The material of a body, as the original's tables give it.
 #[derive(Clone, Copy, Debug)]
@@ -225,7 +228,7 @@ impl World {
             self.physics
                 .body_impulse(id, centre, [impulse.x, impulse.y, impulse.z]);
         }
-        self.physics.advance(TICK);
+        self.physics.advance(TIME_FACTOR * TICK);
         for (i, &id) in self.handles.iter().enumerate() {
             let (pos, rot) = self.physics.body_pose(id);
             self.bodies[i] = Body {
