@@ -33,7 +33,14 @@ impl Default for MinList {
 
 impl MinList {
     pub fn new() -> MinList {
-        MinList { elems: Vec::new(), free_head: NO_INDEX, first: NO_INDEX, last: NO_INDEX, n: 0, min_value: 1e10 }
+        MinList {
+            elems: Vec::new(),
+            free_head: NO_INDEX,
+            first: NO_INDEX,
+            last: NO_INDEX,
+            n: 0,
+            min_value: 1e10,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -54,7 +61,15 @@ impl MinList {
             // Grow to 2n + 1, threading the new slots on the free list (upstream order: highest first).
             let old = self.elems.len() as u32;
             let cap = old * 2 + 1;
-            self.elems.resize(cap as usize, Elem { value: 0.0, payload: 0, prev: NO_INDEX, next: NO_INDEX });
+            self.elems.resize(
+                cap as usize,
+                Elem {
+                    value: 0.0,
+                    payload: 0,
+                    prev: NO_INDEX,
+                    next: NO_INDEX,
+                },
+            );
             for i in (old..cap).rev() {
                 self.elems[i as usize].next = self.free_head;
                 self.free_head = i;
@@ -108,7 +123,11 @@ impl MinList {
             self.last = x.prev;
         }
         self.n -= 1;
-        self.min_value = if self.first != NO_INDEX { self.elems[self.first as usize].value } else { 1e10 };
+        self.min_value = if self.first != NO_INDEX {
+            self.elems[self.first as usize].value
+        } else {
+            1e10
+        };
         self.elems[i as usize].next = self.free_head;
         self.free_head = i;
     }

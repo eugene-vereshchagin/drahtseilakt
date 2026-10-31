@@ -33,9 +33,21 @@ impl Matrix {
 pub fn quat_to_matrix(q: &Quat) -> [[f64; 3]; 3] {
     let (x2, y2, z2) = (q.x + q.x, q.y + q.y, q.z + q.z);
     [
-        [1.0 - (z2 * q.z + y2 * q.y), y2 * q.x - z2 * q.w, y2 * q.w + z2 * q.x],
-        [z2 * q.w + y2 * q.x, 1.0 - (z2 * q.z + x2 * q.x), z2 * q.y - x2 * q.w],
-        [z2 * q.x - y2 * q.w, x2 * q.w + z2 * q.y, 1.0 - (y2 * q.y + x2 * q.x)],
+        [
+            1.0 - (z2 * q.z + y2 * q.y),
+            y2 * q.x - z2 * q.w,
+            y2 * q.w + z2 * q.x,
+        ],
+        [
+            z2 * q.w + y2 * q.x,
+            1.0 - (z2 * q.z + x2 * q.x),
+            z2 * q.y - x2 * q.w,
+        ],
+        [
+            z2 * q.x - y2 * q.w,
+            x2 * q.w + z2 * q.y,
+            1.0 - (y2 * q.y + x2 * q.x),
+        ],
     ]
 }
 
@@ -141,7 +153,12 @@ pub fn quat_slerp(a: &Quat, b: &Quat, t: f64) -> Quat {
         let mut s = 1.5 - n;
         s = (0.5 - s * s * n) + s;
         s = (0.5 - s * s * n) + s;
-        Quat { x: x * s, y: y * s, z: z * s, w: w * s }
+        Quat {
+            x: x * s,
+            y: y * s,
+            z: z * s,
+            w: w * s,
+        }
     }
 }
 
@@ -154,7 +171,12 @@ pub fn quat_from_rot_poly(w: &[f32; 3], dt: f64) -> Quat {
         s[i] = f64::from(w[i]) * h;
         s[i] -= s[i] * s[i] * s[i] * f64::from(1.0f32 / 6.0f32);
     }
-    Quat { x: s[0], y: s[1], z: s[2], w: (1.0 - (s[0] * s[0] + s[1] * s[1] + s[2] * s[2])).sqrt() }
+    Quat {
+        x: s[0],
+        y: s[1],
+        z: s[2],
+        w: (1.0 - (s[0] * s[0] + s[1] * s[1] + s[2] * s[2])).sqrt(),
+    }
 }
 
 /// Rotation increment with the exact sine, clamped to stay a rotation (`ivp_quat_from_rot_sin`, 0x10019010).
@@ -171,7 +193,12 @@ pub fn quat_from_rot_sin(w: &[f32; 3], dt: f64) -> Quat {
             *v *= k;
         }
     }
-    Quat { x: s[0], y: s[1], z: s[2], w: (1.0 - (s[0] * s[0] + s[1] * s[1] + s[2] * s[2])).sqrt() }
+    Quat {
+        x: s[0],
+        y: s[1],
+        z: s[2],
+        w: (1.0 - (s[0] * s[0] + s[1] * s[1] + s[2] * s[2])).sqrt(),
+    }
 }
 
 /// Reciprocal square root from the upstream's bit-level initial guess and five Newton steps (0x1000e120).
@@ -200,7 +227,9 @@ pub fn normalize_d(v: &mut [f64; 3]) -> bool {
 
 /// Normalises a float vector and returns the length it had (`ivp_normalize_f`, 0x1000df30); 0 when near zero.
 pub fn normalize_f(v: &mut [f32; 3]) -> f32 {
-    let n = f64::from(v[0]) * f64::from(v[0]) + f64::from(v[1]) * f64::from(v[1]) + f64::from(v[2]) * f64::from(v[2]);
+    let n = f64::from(v[0]) * f64::from(v[0])
+        + f64::from(v[1]) * f64::from(v[1])
+        + f64::from(v[2]) * f64::from(v[2]);
     if n < 1e-19 {
         return 0.0;
     }
@@ -317,7 +346,11 @@ pub fn basis(axis: &[f64; 3], k: usize) -> [[f64; 3]; 3] {
         normalize_d(&mut v);
     }
     // v × a
-    let u = [v[1] * a[2] - v[2] * a[1], v[2] * a[0] - v[0] * a[2], v[0] * a[1] - v[1] * a[0]];
+    let u = [
+        v[1] * a[2] - v[2] * a[1],
+        v[2] * a[0] - v[0] * a[2],
+        v[0] * a[1] - v[1] * a[0],
+    ];
     let (k1, k2) = ((k + 1) % 3, (k + 2) % 3);
     let mut r = [[0.0; 3]; 3];
     for i in 0..3 {
@@ -339,11 +372,20 @@ mod tests {
 
     #[test]
     fn quaternion_round_trip_through_a_rotation() {
-        let q = quat_normalize_then(Quat { x: 0.2, y: -0.4, z: 0.1, w: 0.9 });
+        let q = quat_normalize_then(Quat {
+            x: 0.2,
+            y: -0.4,
+            z: 0.1,
+            w: 0.9,
+        });
         let back = matrix_to_quat(&quat_to_matrix(&q));
         // q and -q are the same rotation.
-        let same = close(back.x, q.x) && close(back.y, q.y) && close(back.z, q.z) && close(back.w, q.w);
-        let flipped = close(back.x, -q.x) && close(back.y, -q.y) && close(back.z, -q.z) && close(back.w, -q.w);
+        let same =
+            close(back.x, q.x) && close(back.y, q.y) && close(back.z, q.z) && close(back.w, q.w);
+        let flipped = close(back.x, -q.x)
+            && close(back.y, -q.y)
+            && close(back.z, -q.z)
+            && close(back.w, -q.w);
         assert!(same || flipped, "{q:?} came back as {back:?}");
     }
 
@@ -354,8 +396,16 @@ mod tests {
 
     #[test]
     fn inverse_transform_undoes_the_transform() {
-        let r = quat_to_matrix(&quat_normalize_then(Quat { x: 0.1, y: 0.5, z: -0.3, w: 0.8 }));
-        let m = Matrix { r, vv: [3.0, -1.0, 2.0] };
+        let r = quat_to_matrix(&quat_normalize_then(Quat {
+            x: 0.1,
+            y: 0.5,
+            z: -0.3,
+            w: 0.8,
+        }));
+        let m = Matrix {
+            r,
+            vv: [3.0, -1.0, 2.0],
+        };
         let id = mat_mul(&m, &mat_inverse(&m));
         for i in 0..3 {
             for j in 0..3 {
@@ -368,7 +418,15 @@ mod tests {
 
     #[test]
     fn general_inverse_agrees_with_the_transpose_for_rotations() {
-        let m = Matrix { r: quat_to_matrix(&quat_normalize_then(Quat { x: 0.3, y: 0.0, z: 0.2, w: 0.9 })), vv: [1.0, 2.0, 3.0] };
+        let m = Matrix {
+            r: quat_to_matrix(&quat_normalize_then(Quat {
+                x: 0.3,
+                y: 0.0,
+                z: 0.2,
+                w: 0.9,
+            })),
+            vv: [1.0, 2.0, 3.0],
+        };
         let a = mat_inverse(&m);
         let b = mat_inverse_general(&m, 1e-12).expect("a rotation is invertible");
         for i in 0..3 {
@@ -383,7 +441,10 @@ mod tests {
     fn rsqrt_is_accurate() {
         for n in [1e-6, 0.5, 1.0, 2.0, 1234.5] {
             let y = rsqrt(n);
-            assert!((y - 1.0 / n.sqrt()).abs() / (1.0 / n.sqrt()) < 1e-9, "rsqrt({n}) = {y}");
+            assert!(
+                (y - 1.0 / n.sqrt()).abs() / (1.0 / n.sqrt()) < 1e-9,
+                "rsqrt({n}) = {y}"
+            );
         }
     }
 
@@ -400,7 +461,10 @@ mod tests {
             let p = mat_rrt(&r, &r);
             for i in 0..3 {
                 for j in 0..3 {
-                    assert!(close(p[i][j], if i == j { 1.0 } else { 0.0 }), "not orthonormal at {i}{j}");
+                    assert!(
+                        close(p[i][j], if i == j { 1.0 } else { 0.0 }),
+                        "not orthonormal at {i}{j}"
+                    );
                 }
             }
         }
@@ -408,11 +472,29 @@ mod tests {
 
     #[test]
     fn slerp_halfway_between_identity_and_a_quarter_turn() {
-        let id = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        let id = Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
         let s = std::f64::consts::FRAC_1_SQRT_2;
-        let quarter = Quat { x: 0.0, y: 0.0, z: s, w: s };
+        let quarter = Quat {
+            x: 0.0,
+            y: 0.0,
+            z: s,
+            w: s,
+        };
         let half = quat_slerp(&id, &quarter, 0.5);
-        let eighth = Quat { x: 0.0, y: 0.0, z: (std::f64::consts::FRAC_PI_8).sin(), w: (std::f64::consts::FRAC_PI_8).cos() };
-        assert!(close(half.z, eighth.z) && close(half.w, eighth.w), "{half:?}");
+        let eighth = Quat {
+            x: 0.0,
+            y: 0.0,
+            z: (std::f64::consts::FRAC_PI_8).sin(),
+            w: (std::f64::consts::FRAC_PI_8).cos(),
+        };
+        assert!(
+            close(half.z, eighth.z) && close(half.w, eighth.w),
+            "{half:?}"
+        );
     }
 }

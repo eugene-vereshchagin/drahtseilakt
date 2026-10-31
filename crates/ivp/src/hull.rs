@@ -76,10 +76,12 @@ impl HullManager {
         let d = now - self.last_time;
         self.last_time = now;
         self.hull_value = (f64::from(self.hull_value) + d * f64::from(self.gradient)) as f32;
-        self.center_hull_value = (f64::from(self.center_hull_value) + d * f64::from(self.center_gradient)) as f32;
+        self.center_hull_value =
+            (f64::from(self.center_hull_value) + d * f64::from(self.center_gradient)) as f32;
         self.center_gradient = center_speed;
         self.gradient = speed * 1.00001;
-        self.hull_value_next_psi = (f64::from(self.gradient) * f64::from(dt) + f64::from(self.hull_value)) as f32;
+        self.hull_value_next_psi =
+            (f64::from(self.gradient) * f64::from(dt) + f64::from(self.hull_value)) as f32;
     }
 
     /// The rebasing to zero every ten seconds (`0x1001a820`). Returns the listeners whose synapses need the same
