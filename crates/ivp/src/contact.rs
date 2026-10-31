@@ -46,6 +46,12 @@ pub struct ContactInfo {
     pub span: [P3; 2],
     pub cp_cs: [P3; 2],
     pub cross_cs: [P3; 2],
+    /// The point's index in the system's solve (`index`), set by the solve.
+    pub index: i32,
+    /// The gap the solve reads (`t->gap`).
+    pub gap: f32,
+    /// The friction infos of the two sides in the system being solved.
+    pub fi: [Option<usize>; 2],
 }
 
 /// A contact point (`IvpContactPoint`, 2.6): its two friction synapses, the spring state and the geometry.
@@ -63,14 +69,20 @@ pub struct ContactPoint {
     pub recheck: u8,
     pub keeper: u16,
     pub time: f64,
-    /// The friction system this point belongs to, once the friction port links it.
+    /// The friction system this point belongs to.
     pub fs: Option<usize>,
+    /// The warm-start key of the solver (`key`): positive after a push, negative after a pull.
+    pub key: i32,
+    /// The pressure (normal force times the step) and the energy bookkeeping of the friction.
+    pub pressure: f32,
+    pub old_energy: f32,
+    pub destroyed: f32,
 }
 
 /// Contact distances (ivp_const.h): the gap a new point starts with, and the keeper's gap (f32 widened as the upstream).
 pub const SET_FRICTION_DIST: f32 = f32::from_bits(0x3ca3_d70a);
 pub const SET_KEEPER_DIST: f32 = f32::from_bits(0x3cbc_6a7f);
-const C_1E19: f64 = 1e-19;
+pub(crate) const C_1E19: f64 = 1e-19;
 
 fn dotd(a: &P3, b: &P3) -> f64 {
     (f64::from(a[2]) * f64::from(b[2]) + f64::from(a[1]) * f64::from(b[1])) + f64::from(a[0]) * f64::from(b[0])
@@ -105,7 +117,7 @@ fn world_point(c: &ObjCache, l: &Ledge, e: Edge) -> V3 {
     [x[0] + c.vv[0], x[1] + c.vv[1], x[2] + c.vv[2]]
 }
 
-fn left_feature(t: &mut ContactInfo) {
+pub(crate) fn left_feature(t: &mut ContactInfo) {
     t.flags = (t.flags & !0x200) | 0x100;
 }
 

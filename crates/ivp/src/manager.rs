@@ -152,6 +152,13 @@ impl World {
         o.cache_valid = false;
     }
 
+    /// The object's material, set by the glue: its friction and elasticity (the triangles carry no index of their own).
+    pub fn set_object_material(&mut self, obj: usize, friction: f32, elasticity: f32) {
+        self.ensure_object(obj);
+        self.coll.objs[obj].friction = friction;
+        self.coll.objs[obj].elasticity = elasticity;
+    }
+
     /// Makes room for object `obj` in the collision tables.
     pub(crate) fn ensure_object(&mut self, obj: usize) {
         if self.coll.objs.len() <= obj {

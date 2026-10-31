@@ -122,12 +122,28 @@ pub struct SimUnit {
 pub enum Controller {
     /// The gravity controller (1.7, priority 1000): the game's gravity vector.
     Gravity { g: [f32; 3] },
+    /// One of a friction system's three controllers (`crate::friction`).
+    Friction { fs: usize, kind: FrictionKind },
+}
+
+/// The controllers of a friction system: the normal force (0), the tangential spring (600), the contact update (2000).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
+pub enum FrictionKind {
+    Normal,
+    Spring,
+    Update,
 }
 
 impl Controller {
     pub fn priority(&self) -> i32 {
         match self {
             Controller::Gravity { .. } => 1000,
+            Controller::Friction { kind, .. } => match kind {
+                FrictionKind::Normal => 0,
+                FrictionKind::Spring => 600,
+                FrictionKind::Update => 2000,
+            },
         }
     }
 
@@ -135,6 +151,7 @@ impl Controller {
     pub fn links_cores(&self) -> bool {
         match self {
             Controller::Gravity { .. } => false,
+            Controller::Friction { kind, .. } => *kind == FrictionKind::Spring,
         }
     }
 }
@@ -561,13 +578,36 @@ impl World {
     }
 
     /// Applies one controller to its cores of a unit (`simulate` of each vtable).
-    fn run_controller(&mut self, ctrl: usize, cores: &[usize], dt: f64) {
-        let g = match &self.controllers[ctrl] {
-            Controller::Gravity { g } => *g,
-        };
-        for &c in cores.iter().rev() {
-            self.gravity_simulate(g, c, dt);
+    fn run_controller(&mut self, ctrl: usize, su: usize, cores: &[usize], dt: f64) {
+        match self.controllers[ctrl].clone() {
+            Controller::Gravity { g } => {
+                for &c in cores.iter().rev() {
+                    self.gravity_simulate(g, c, dt);
+                }
+            }
+            Controller::Friction { fs, kind } => {
+                let es = crate::event_sim::EventSim {
+                    delta_time: dt,
+                    i_delta_time: Self::inv_dt(dt),
+                    sim_unit: su,
+                };
+                match kind {
+                    FrictionKind::Spring => self.fs_spring_simulate(fs, &es),
+                    FrictionKind::Normal => self.fs_normal_simulate(fs, &es),
+                    FrictionKind::Update => self.fs_update_simulate(fs, su),
+                }
+            }
         }
+    }
+
+    /// The world's gravity vector: the gravity controller's, zero without one.
+    pub(crate) fn gravity_vector(&self) -> [f32; 3] {
+        for c in &self.controllers {
+            if let Controller::Gravity { g } = c {
+                return *g;
+            }
+        }
+        [0.0; 3]
     }
 
     /// Ensures a core is in simulation, reviving its unit when it is frozen (`0x1000dab0`).
@@ -588,7 +628,7 @@ impl World {
     }
 
     /// Restarts the sleep timers of a core; the references are kept (`0x1000cec0`).
-    fn reset_freeze_check_values(&mut self, c: usize) {
+    pub(crate) fn reset_freeze_check_values(&mut self, c: usize) {
         let t = self.env.current_time;
         self.cores[c].time_calm_ref = [t, t];
     }
@@ -813,7 +853,7 @@ impl World {
         }
         let entries = self.units[su].entries.clone();
         for (ctrl, ecores) in entries.iter().rev() {
-            self.run_controller(*ctrl, ecores, self.env.delta_psi);
+            self.run_controller(*ctrl, su, ecores, self.env.delta_psi);
         }
         for &c in cores.iter().rev() {
             out.push(c);

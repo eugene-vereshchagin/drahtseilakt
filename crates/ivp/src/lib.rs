@@ -11,6 +11,8 @@ pub mod contact;
 pub mod convex;
 pub mod core;
 pub mod event;
+pub mod event_sim;
+pub mod friction;
 pub mod fsolver;
 pub mod hull;
 pub mod ledge;

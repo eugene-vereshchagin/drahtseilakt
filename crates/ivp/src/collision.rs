@@ -53,6 +53,11 @@ pub struct ObjInfo {
     /// The object's friction and elasticity (its material, set by the glue).
     pub friction: f32,
     pub elasticity: f32,
+    /// The movable core's friction info, and a fixed core's one per friction system.
+    pub fi: Option<usize>,
+    pub fixed_fis: Vec<usize>,
+    /// The union-find parent of the core in a friction system's split (`uf_parent`).
+    pub uf_parent: Option<usize>,
 }
 
 /// The collision state of one world: the OV tree, the per-object records and hull managers, the collision records and
@@ -68,6 +73,10 @@ pub struct CollWorld {
     pub mds: Vec<Mindist>,
     pub cps: Vec<crate::contact::ContactPoint>,
     pub free_cps: Vec<usize>,
+    pub fss: Vec<crate::friction::FrictionSystem>,
+    pub free_fss: Vec<usize>,
+    pub fis: Vec<crate::friction::FrictionInfo>,
+    pub free_fis: Vec<usize>,
     pub watchers: Vec<crate::watcher::Watcher>,
     pub free_watchers: Vec<usize>,
     /// The hull managers (object indices) whose hull grew past a listener this PSI, checked after integration.
@@ -85,8 +94,8 @@ pub struct CollWorld {
 
 impl World {
     /// Revival of a core: the contact code's answer (1 asks the unit to restart its loop). 0x1001d4d0.
-    pub(crate) fn core_revived(&mut self, _c: usize) -> i32 {
-        0
+    pub(crate) fn core_revived(&mut self, c: usize) -> i32 {
+        self.fs_revive_core(c)
     }
 
     /// A core froze: its collision objects leave the hull managers. 0x10017140.
