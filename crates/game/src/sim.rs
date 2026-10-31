@@ -2,11 +2,12 @@
 // nothing of windows or rendering, so a replay (the inputs of every tick) reproduces a run exactly, headless
 // or on screen.
 //
-// The physics is written from scratch and tuned by hand for now; phase 3 measures the original under Wine
-// and fits these numbers to reference trajectories.
+// The physics is IVP's (physics.rs); the rules around it (pushing, transformers, falling off, respawning) follow
+// what the C game does, measured in its C reference build.
 
 use crate::collide::Triangle;
 use crate::physics::{Material, World};
+use crate::volume::Obb;
 use glam::{Mat3, Quat, Vec3};
 use level::Level;
 
@@ -93,6 +94,10 @@ const START_QUARTER: i32 = 1;
 const TRAFO_TICKS: u64 = 149;
 /// Where a transformer holds the ball: its own (0, 3, 0), where the C game makes the new ball.
 const TRAFO_HOLD: Vec3 = Vec3::new(0.0, 3.0, 0.0);
+/// After the ball's box reaches a depth-test cube, the C game stops the push at once, takes the falling ball out of the
+/// physics 61 frames later and shows the new ball at the reset point 10 frames after that.
+const DEATH_REMOVE_TICKS: u64 = 61;
+const DEATH_RESPAWN_TICKS: u64 = 71;
 
 /// The rotational damping of the original's balls (docs/physics.md, section 3).
 const BALL_ROT_DAMP: f32 = 0.1;
@@ -166,6 +171,9 @@ struct Rules {
     extra_points: Vec<(usize, Vec3)>,
     extra_lives: Vec<(usize, Vec3)>,
     trafos: Vec<(usize, Vec3, BallKind)>,
+    /// The level's depth-test cubes: the ball has fallen off when its box reaches one.
+    depth_cubes: Vec<Obb>,
+    /// Without depth-test cubes (a map that has none), the ball has fallen off this far below the lowest floor.
     death_y: f32,
 }
 
@@ -195,6 +203,8 @@ pub struct Sim {
     prev_input: u8,
     /// The ball inside a transformer, if it is in one.
     hold: Option<TrafoHold>,
+    /// The tick the ball fell off the level, until the new ball is in.
+    dying: Option<u64>,
 }
 
 const PICK_RADIUS: f32 = 3.5;
@@ -233,6 +243,7 @@ impl Sim {
             extra_points: pos("P_Extra_Point"),
             extra_lives: pos("P_Extra_Life"),
             trafos,
+            depth_cubes: depth_cubes(level),
             death_y: triangles
                 .iter()
                 .flat_map(|t| [t.a.y, t.b.y, t.c.y])
@@ -338,6 +349,7 @@ impl Sim {
             events: Vec::new(),
             prev_input: 0,
             hold: None,
+            dying: None,
         }
     }
 
@@ -402,6 +414,8 @@ impl Sim {
         // every PSI (66 a second of its time), while the ball is awake. The ball's force is its material's.
         // The physics owns the ball's state; the game only reads it back. Only a new ball (a respawn, the end of a
         // transformer) puts a new body in, as the original does.
+        // A ball that has fallen off is no longer steered.
+        let push = if self.dying.is_some() { Vec3::ZERO } else { push };
         let p = self.ball.kind.params();
         self.world.set_push(0, push * p.force);
         self.world.step(None);
@@ -486,9 +500,27 @@ impl Sim {
             self.finished = true;
             self.events.push((self.tick, Event::Finished));
         }
-        if p.y < self.rules.death_y {
+        if let Some(d) = self.dying {
+            if self.tick == d + DEATH_REMOVE_TICKS {
+                self.world.remove(0);
+            }
+            if self.tick >= d + DEATH_RESPAWN_TICKS {
+                self.dying = None;
+                self.respawn();
+            }
+        } else if self.hold.is_none() && self.fell_off() {
             self.die();
         }
+    }
+
+    /// Whether the ball has left the level: its mesh box reaches a depth-test cube (the original's `BallManager`
+    /// test), or, on a level without them, it is far below the floors.
+    fn fell_off(&self) -> bool {
+        if self.rules.depth_cubes.is_empty() {
+            return self.ball.position.y < self.rules.death_y;
+        }
+        let ball = Obb::cube(self.ball.position, BALL_RADIUS, Mat3::from_quat(self.ball.rotation));
+        self.rules.depth_cubes.iter().any(|c| c.overlaps(&ball))
     }
 
     fn die(&mut self) {
@@ -500,6 +532,11 @@ impl Sim {
             self.events.push((self.tick, Event::GameOver));
             return;
         }
+        self.dying = Some(self.tick);
+    }
+
+    /// A new ball at the current reset point, at rest, and the camera in its start view.
+    fn respawn(&mut self) {
         let spawn = self
             .rules
             .resets
@@ -527,6 +564,23 @@ fn camera_goal(cam: &Camera, ball: Vec3) -> Vec3 {
     // InGameCam at level 1: offset (-22, +35, 0)); Space lifts it further.
     let (dist, height) = (22.0 - 12.0 * cam.lift, 35.0 + 38.0 * cam.lift);
     ball + back * dist + Vec3::Y * height
+}
+
+/// The boxes of the level's depth-test cubes (group `DepthTestCubes`): each member's mesh box under its matrix.
+fn depth_cubes(level: &Level) -> Vec<Obb> {
+    level
+        .members("DepthTestCubes")
+        .filter_map(|(_, o)| {
+            let mesh = o.mesh.and_then(|i| level.meshes.get(i))?;
+            let mut min = Vec3::splat(f32::INFINITY);
+            let mut max = Vec3::splat(f32::NEG_INFINITY);
+            for p in &mesh.positions {
+                min = min.min(Vec3::from(*p));
+                max = max.max(Vec3::from(*p));
+            }
+            (min.x <= max.x).then(|| Obb::from_box(min, max, &glam::Mat4::from_cols_array_2d(&o.matrix)))
+        })
+        .collect()
 }
 
 fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
@@ -742,6 +796,9 @@ mod tests {
                 break;
             }
         }
+        for _ in 0..DEATH_RESPAWN_TICKS {
+            sim.step(0);
+        }
         assert_eq!(sim.camera.quarter, START_QUARTER);
         assert!((sim.camera.yaw - START_QUARTER as f32 * std::f32::consts::FRAC_PI_2).abs() < 1e-6);
         assert_eq!(sim.camera.lift, 0.0);
@@ -799,6 +856,73 @@ mod tests {
     }
 
     #[test]
+    fn a_ball_that_reaches_a_depth_cube_falls_unsteered_then_comes_back() {
+        // A depth-test cube whose top is 10 below the floor, beside it: the ball runs off the floor's edge.
+        let mut level = flat_level();
+        let mesh = level.meshes.len();
+        let mut corners = Vec::new();
+        for x in [-1.0f32, 1.0] {
+            for y in [-1.0f32, 1.0] {
+                for z in [-1.0f32, 1.0] {
+                    corners.push([x, y, z]);
+                }
+            }
+        }
+        level.meshes.push(Mesh {
+            name: "cube".into(),
+            positions: corners,
+            normals: vec![[0.0, 1.0, 0.0]; 8],
+            uvs: vec![[0.0; 2]; 8],
+            parts: vec![],
+        });
+        let cube = level.objects.len();
+        level.objects.push(Object {
+            name: "Quader01".into(),
+            // 400 wide, 100 deep, top at y = -10
+            matrix: [
+                [200.0, 0.0, 0.0, 0.0],
+                [0.0, 50.0, 0.0, 0.0],
+                [0.0, 0.0, 200.0, 0.0],
+                [0.0, -60.0, 0.0, 1.0],
+            ],
+            mesh: Some(mesh),
+            visible: false,
+        });
+        level.groups.push(Group {
+            name: "DepthTestCubes".into(),
+            members: vec![cube],
+        });
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        sim.put_ball(Vec3::new(110.0, 5.0, 0.0));
+        let mut died = None;
+        for _ in 0..300 {
+            sim.step(input::UP);
+            if died.is_none() && sim.events.iter().any(|e| e.1 == Event::Died) {
+                died = Some((sim.tick, sim.ball.position, sim.ball.velocity));
+                break;
+            }
+        }
+        let (t, p, v) = died.expect("the ball fell into the cube");
+        // The ball's box (half size 2) reaches the cube's top at y = -10.
+        assert!(p.y <= -8.0 && p.y > -9.0, "died at {p:?}");
+        // Unsteered from there: with the push held, the speed along it only decays (it would grow by about 15 in
+        // 30 ticks if the push still worked).
+        for _ in 0..30 {
+            sim.step(input::UP);
+        }
+        assert!(sim.ball.velocity.x < v.x, "the falling ball was still pushed: {:?} from {v:?}", sim.ball.velocity);
+        while sim.tick < t + DEATH_REMOVE_TICKS {
+            sim.step(0);
+        }
+        assert!(sim.world.state(0).is_none(), "the ball left the physics");
+        while sim.tick < t + DEATH_RESPAWN_TICKS {
+            sim.step(0);
+        }
+        assert!(sim.world.state(0).is_some());
+        assert!(sim.ball.position.distance(Vec3::new(0.0, BALL_RADIUS, 0.0)) < 0.5);
+    }
+
+    #[test]
     fn same_input_same_run() {
         let level = flat_level();
         let run = || {
@@ -835,6 +959,9 @@ mod tests {
         }
         assert_eq!(sim.lives, 2);
         assert!(sim.events.iter().any(|e| e.1 == Event::Died));
+        for _ in 0..DEATH_RESPAWN_TICKS {
+            sim.step(0);
+        }
         assert!(sim.ball.position.distance(Vec3::new(0.0, BALL_RADIUS, 0.0)) < 1.0);
     }
 
@@ -846,7 +973,7 @@ mod tests {
             sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
             for _ in 0..600 {
                 sim.step(0);
-                if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost {
+                if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost && sim.dying.is_none() {
                     break;
                 }
             }
