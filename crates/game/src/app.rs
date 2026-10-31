@@ -7,7 +7,8 @@ use crate::assets::{Data, LoadedLevel};
 use crate::render::Renderer;
 use crate::replay::Replay;
 use crate::scene::{self, BallMeshes, Snapshot};
-use crate::sim::{Event, Sim, TICK, input};
+use crate::collide::closest_point;
+use crate::sim::{BALL_RADIUS, Event, Sim, TICK, input};
 use crate::watch::{Finding, Watch};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -313,7 +314,16 @@ impl Game {
         self.log_tick(input);
         self.dump_spin_loss();
         let ball = &self.sim.ball;
-        let found = self.watch.observe(self.sim.tick, ball.position, ball.velocity, input, ball.on_ground);
+        // How deep the ball is in the floor: its radius less its distance to the nearest floor triangle.
+        let sink = self
+            .sim
+            .world()
+            .floor_near(ball.position, BALL_RADIUS + 1.0)
+            .iter()
+            .map(|t| ball.position.distance(closest_point(t, ball.position)))
+            .fold(f32::INFINITY, f32::min);
+        let sink = if sink.is_finite() { BALL_RADIUS - sink } else { 0.0 };
+        let found = self.watch.observe(self.sim.tick, ball.position, ball.velocity, input, ball.on_ground, sink);
         if !found.is_empty() {
             let contacts = self.sim.world().ball_contacts();
             for f in &found {
