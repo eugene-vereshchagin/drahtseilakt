@@ -59,6 +59,18 @@ pub enum Shape {
     Surface(Surface),
 }
 
+/// The rotation turned by `w` (core axes, radians per second) for `dt` seconds, as a quaternion.
+fn spin_turn(w: &[f64; 3], dt: f64) -> math::Quat {
+    let (wx, wy, wz) = (w[0], w[1], w[2]);
+    let speed = (wx * wx + wy * wy + wz * wz).sqrt();
+    if speed < 1e-12 {
+        return math::Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+    }
+    let half = 0.5 * speed * dt;
+    let k = half.sin() / speed;
+    math::Quat { x: wx * k, y: wy * k, z: wz * k, w: half.cos() }
+}
+
 /// The state the game reads and writes: the object origin, the rotation, the speed of the mass centre and the spin in
 /// world axes.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -232,6 +244,10 @@ impl World {
             // the spin in world axes becomes the core's rotation speed
             let spin_cs = math::rtmul(&r, &to_v3(s.spin));
             core.rot_speed = [spin_cs[0] as f32, spin_cs[1] as f32, spin_cs[2] as f32];
+            // The next PSI's rotation follows from the spin, as the physics integrates it. An impact between PSIs
+            // recomputes the spin from the rotation between the last and the next PSI (`core_sync`); with both equal
+            // the spin would vanish, so the next rotation is the current one turned by the spin for one PSI.
+            core.q_next = math::quat_mul(&s.rot, &spin_turn(&spin_cs, self.env.delta_psi));
         }
         self.wake_body(c);
     }
@@ -410,5 +426,22 @@ mod tests {
             top = top.max((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt());
         }
         assert!(top < 25.0, "the ball gained speed on the slope: {top}");
+    }
+
+    /// The game sets the ball's state every tick. An impact between two PSIs synchronises the core from the rotation
+    /// between its last and next PSI (`core_sync`); the state set must keep that consistent with the spin, or the spin
+    /// vanishes at the impact (the game lost a rolling ball's spin at a landing this way).
+    #[test]
+    fn a_state_set_keeps_the_spin_that_an_impact_synchronises_from() {
+        let mut w = world();
+        let ball = w.add_body(BodyDesc::default(), Shape::Sphere(2.0), [0.0; 3], IDENTITY);
+        let spin = [0.0, 0.0, -6.0];
+        w.set_body_state(ball, BodyState { pos: [0.0; 3], rot: IDENTITY, vel: [12.0, 0.0, 0.0], spin });
+        w.advance(1.0 / 60.0);
+        let s = w.body_state(ball);
+        w.set_body_state(ball, s);
+        w.core_sync(ball);
+        let got = w.cores[ball].rot_speed;
+        assert!((got[2] + 6.0).abs() < 0.05, "the synchronised spin is {got:?}, expected the spin of -6 about z");
     }
 }

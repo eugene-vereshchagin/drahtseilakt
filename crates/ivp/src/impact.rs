@@ -104,7 +104,7 @@ impl World {
 
     /// Brings a core to the current time for the impact: its rotation and pose move to now, its rotation speed is
     /// recomputed from the PSI's rotation, and the old values are kept to restore (`synchronize_with_rot_z`, 0x1000cfa0).
-    fn core_sync(&mut self, c: usize) {
+    pub(crate) fn core_sync(&mut self, c: usize) {
         let now = self.env.current_time;
         let core = &mut self.cores[c];
         core.synced = true;
