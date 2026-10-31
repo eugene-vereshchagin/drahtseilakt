@@ -196,7 +196,7 @@ impl Default for Env {
             time_of_last_psi: 0.0,
             freeze_check_time: 0.0,
             max_velocity: MAX_VELOCITY_DEFAULT,
-            max_angular_velocity_per_psi: 0.0,
+            max_angular_velocity_per_psi: 1.570_796_37,
             sleep_countdown: 0,
             state: 0,
         }
