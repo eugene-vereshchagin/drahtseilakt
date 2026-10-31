@@ -617,12 +617,11 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_none() {
-            if let Err(e) = self.init(event_loop) {
+        if self.window.is_none()
+            && let Err(e) = self.init(event_loop) {
                 self.error = Some(e);
                 event_loop.exit();
             }
-        }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {

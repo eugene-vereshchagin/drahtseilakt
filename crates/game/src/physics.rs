@@ -159,15 +159,14 @@ impl World {
 
     /// Advances the world by one tick. `push` is an impulse for one body (the player's push).
     pub fn step(&mut self, push: Option<(usize, Vec3)>) {
-        if let Some((i, impulse)) = push {
-            if let Some(b) = self
+        if let Some((i, impulse)) = push
+            && let Some(b) = self
                 .handles
                 .get(i)
                 .and_then(|&h| self.physics.bodies.get_mut(h))
             {
                 b.apply_impulse(vector(impulse), true);
             }
-        }
         self.physics.step();
         for (i, &h) in self.handles.iter().enumerate() {
             if let Some(b) = self.physics.bodies.get(h) {
@@ -187,6 +186,7 @@ impl World {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

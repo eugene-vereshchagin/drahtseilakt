@@ -205,15 +205,14 @@ impl Sim {
             .unwrap_or(Vec3::ZERO);
         let mut trafos = Vec::new();
         for g in &level.groups {
-            if let Some(rest) = g.name.strip_prefix("P_Trafo_") {
-                if let Some(kind) = BallKind::from_name(rest) {
+            if let Some(rest) = g.name.strip_prefix("P_Trafo_")
+                && let Some(kind) = BallKind::from_name(rest) {
                     for &m in &g.members {
                         if let Some(o) = level.objects.get(m) {
                             trafos.push((m, Vec3::from(o.position()), kind));
                         }
                     }
                 }
-            }
         }
         let rules = Rules {
             start,
@@ -448,19 +447,17 @@ impl Sim {
             }
         }
         // Checkpoints in order: reaching the next one opens the next sector.
-        if let Some(&(_, q)) = self.rules.checkpoints.get(self.sector) {
-            if near(q, GATE_RADIUS) {
+        if let Some(&(_, q)) = self.rules.checkpoints.get(self.sector)
+            && near(q, GATE_RADIUS) {
                 self.sector += 1;
                 self.events
                     .push((self.tick, Event::Checkpoint(self.sector)));
             }
-        }
-        if let Some(end) = self.rules.end {
-            if self.sector >= self.rules.checkpoints.len() && near(end, GATE_RADIUS) {
+        if let Some(end) = self.rules.end
+            && self.sector >= self.rules.checkpoints.len() && near(end, GATE_RADIUS) {
                 self.finished = true;
                 self.events.push((self.tick, Event::Finished));
             }
-        }
         if p.y < self.rules.death_y {
             self.die();
         }
@@ -533,7 +530,7 @@ fn collision_triangles(level: &Level) -> Vec<Triangle> {
                 .map(|p| mat.transform_point3(Vec3::from(*p)))
                 .collect();
             for part in &mesh.parts {
-                for t in part.indices.chunks_exact(3) {
+                for t in part.indices.as_chunks::<3>().0 {
                     let v = |k: usize| {
                         t.get(k)
                             .and_then(|&i| world.get(i as usize))
