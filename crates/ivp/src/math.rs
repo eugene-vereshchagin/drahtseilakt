@@ -201,15 +201,21 @@ pub fn quat_from_rot_sin(w: &[f32; 3], dt: f64) -> Quat {
     }
 }
 
-/// Reciprocal square root from the upstream's bit-level initial guess and five Newton steps (0x1000e120).
-pub fn rsqrt(n: f64) -> f64 {
+/// Reciprocal square root from the upstream's bit-level initial guess and `steps` Newton steps (phys_mindist.c
+/// `rsqrt_steps`). The solvers use 4 or 5; `rsqrt` is the 5-step one.
+pub fn rsqrt_steps(n: f64, steps: u32) -> f64 {
     let hi = (n.to_bits() >> 32) as u32;
     let guess_hi = (0x7ff0_0000u32.wrapping_sub(hi)) / 2 + 0x1ff0_0000u32;
     let mut y = f64::from_bits(u64::from(guess_hi) << 32);
-    for _ in 0..5 {
+    for _ in 0..steps {
         y = (0.5 - 0.5 * n * y * y + 1.0) * y;
     }
     y
+}
+
+/// Reciprocal square root with five Newton steps (0x1000e120).
+pub fn rsqrt(n: f64) -> f64 {
+    rsqrt_steps(n, 5)
 }
 
 /// Normalises a double vector; false (unchanged) for a near-zero one (`ivp_normalize_d`, 0x1000e120).

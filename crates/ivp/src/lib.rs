@@ -12,6 +12,8 @@ pub mod core;
 pub mod hull;
 pub mod ledge;
 pub mod math;
+pub mod mindist;
+pub mod minimize;
 pub mod minlist;
 pub mod ov;
 pub mod time;
