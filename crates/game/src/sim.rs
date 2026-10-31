@@ -85,6 +85,9 @@ struct Params {
     lin_damp: f32,
 }
 
+/// The camera's heading at the start and after a respawn, in quarter turns (see `Sim::new`).
+const START_QUARTER: i32 = 1;
+
 /// The rotational damping of the original's balls (docs/physics.md, section 3).
 const BALL_ROT_DAMP: f32 = 0.1;
 
@@ -232,7 +235,7 @@ impl Sim {
         // The camera starts looking along +X. The original sets it from the shared camera object (Camera.nmo,
         // Cam_Orient): its axis points along +X at every start, which the C game shows at the level 1 start. The
         // earlier guess from the floors turned it 180 degrees.
-        let quarter = 1;
+        let quarter = START_QUARTER;
         let yaw = quarter as f32 * std::f32::consts::FRAC_PI_2;
         // The ball appears at the first reset point (its centre), else just above the start.
         let spawn = rules
@@ -469,6 +472,10 @@ impl Sim {
             .unwrap_or(self.rules.start + Vec3::Y * BALL_RADIUS);
         self.ball.position = spawn;
         self.ball.velocity = Vec3::ZERO;
+        // The camera comes back as it was at the start: the start heading, not lifted, no turn in progress.
+        self.camera.quarter = START_QUARTER;
+        self.camera.yaw = START_QUARTER as f32 * std::f32::consts::FRAC_PI_2;
+        self.camera.lift = 0.0;
         self.camera.position = camera_goal(&self.camera, self.ball.position);
         self.camera.target = self.ball.position;
     }
@@ -664,6 +671,30 @@ mod tests {
         assert!(BallKind::Paper.params().mass < BallKind::Wood.params().mass);
         assert!(BallKind::Wood.params().mass < BallKind::Stone.params().mass);
         assert!(p(BallKind::Paper) > p(BallKind::Stone));
+    }
+
+    #[test]
+    fn a_respawn_brings_the_camera_back_to_the_start_view() {
+        let level = flat_level();
+        // Turn the camera away and lift it, then fall off.
+        let mut sim = Sim::new(&level, BallKind::Paper);
+        for _ in 0..120 {
+            sim.step(input::SHIFT | input::RIGHT);
+        }
+        for _ in 0..120 {
+            sim.step(input::LIFT);
+        }
+        assert_ne!((sim.camera.quarter, sim.camera.lift), (START_QUARTER, 0.0));
+        sim.ball.position = Vec3::new(500.0, 10.0, 0.0);
+        for _ in 0..600 {
+            sim.step(0);
+            if sim.lives < 3 {
+                break;
+            }
+        }
+        assert_eq!(sim.camera.quarter, START_QUARTER);
+        assert!((sim.camera.yaw - START_QUARTER as f32 * std::f32::consts::FRAC_PI_2).abs() < 1e-6);
+        assert_eq!(sim.camera.lift, 0.0);
     }
 
     #[test]
