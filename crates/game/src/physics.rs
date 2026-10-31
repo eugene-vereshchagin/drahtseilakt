@@ -90,6 +90,43 @@ fn quat(q: IvpQuat) -> Quat {
     Quat::from_xyzw(q.x as f32, q.y as f32, q.z as f32, q.w as f32)
 }
 
+/// A body's rotation: a level object's matrix without its scale, which the physics turns into its quaternion as the
+/// original's glue does (`ivp_matrix_to_quat` in double precision), or a quaternion for a body the game makes itself.
+#[derive(Clone, Copy, Debug)]
+pub enum Rot {
+    Basis(glam::Mat3),
+    Quat(Quat),
+}
+
+impl From<Quat> for Rot {
+    fn from(q: Quat) -> Rot {
+        Rot::Quat(q)
+    }
+}
+
+impl Rot {
+    /// The rotation for drawing and for the game's own geometry.
+    pub fn quat(self) -> Quat {
+        match self {
+            Rot::Basis(m) => Quat::from_mat3(&m).normalize(),
+            Rot::Quat(q) => q,
+        }
+    }
+
+    fn ivp(self) -> IvpQuat {
+        match self {
+            Rot::Basis(m) => {
+                // the rows of the rotation are the matrix's axes' components (its columns are the axes)
+                let c = [m.x_axis, m.y_axis, m.z_axis];
+                let r: [[f64; 3]; 3] =
+                    std::array::from_fn(|row| std::array::from_fn(|col| f64::from(c[col][row])));
+                ivp::math::matrix_to_quat(&r)
+            }
+            Rot::Quat(q) => ivp_quat(q),
+        }
+    }
+}
+
 fn ivp_quat(q: Quat) -> IvpQuat {
     IvpQuat {
         x: f64::from(q.x),
@@ -132,13 +169,13 @@ impl World {
             };
             let id = world
                 .physics
-                .add_body(desc, Shape::Surface(surface), vec3_f64(mesh.pos), ivp_quat(mesh.rot));
+                .add_body(desc, Shape::Surface(surface), vec3_f64(mesh.pos), mesh.rot.ivp());
             world.statics.push((id, mesh.group != GROUP_BALL));
         }
         world
     }
 
-    fn add(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Quat) -> usize {
+    fn add(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Rot) -> usize {
         self.add_shifted(shape, m, pos, rot, None, "")
     }
 
@@ -149,7 +186,7 @@ impl World {
         shape: Shape,
         m: Material,
         pos: Vec3,
-        rot: Quat,
+        rot: Rot,
         shift: Option<[f32; 3]>,
         group_name: &str,
     ) -> usize {
@@ -165,9 +202,9 @@ impl World {
             rot_damp: m.rot_damp,
             ..BodyDesc::default()
         };
-        let id = self.physics.add_body(desc, shape, vec3_f64(pos), ivp_quat(rot));
+        let id = self.physics.add_body(desc, shape, vec3_f64(pos), rot.ivp());
         self.handles.push(Some(id));
-        self.bodies.push(Body { pos, rot });
+        self.bodies.push(Body { pos, rot: rot.quat() });
         self.handles.len() - 1
     }
 
@@ -227,7 +264,7 @@ impl World {
 
     /// The player's ball, with its radius, in group Ball. By convention the first body.
     pub fn add_ball(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
-        self.add_shifted(Shape::Sphere(radius), m, pos, rot, None, GROUP_BALL)
+        self.add_shifted(Shape::Sphere(radius), m, pos, rot.into(), None, GROUP_BALL)
     }
 
     /// The original's "Physics WakeUp": a sleeping body comes back into the simulation, an awake one restarts its
@@ -254,17 +291,17 @@ impl World {
     }
 
     /// A loose sphere.
-    pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
-        self.add(Shape::Sphere(radius), m, pos, rot)
+    pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: impl Into<Rot>) -> usize {
+        self.add(Shape::Sphere(radius), m, pos, rot.into())
     }
 
     /// A loose convex body: the hull of `points` in its own frame, its mass centre at its origin (the original's
     /// sector objects are physicalized without "Auto Mass Center"). None when the points span no volume.
-    pub fn add_convex(&mut self, points: &[Vec3], m: Material, pos: Vec3, rot: Quat) -> Option<usize> {
+    pub fn add_convex(&mut self, points: &[Vec3], m: Material, pos: Vec3, rot: impl Into<Rot>) -> Option<usize> {
         let pts: Vec<[f64; 3]> = points.iter().map(|&p| vec3_f64(p)).collect();
         let hull = ivp::convex::hull(&pts)?;
         let surface = Surface::compile(vec![hull])?;
-        Some(self.add_shifted(Shape::Surface(surface), m, pos, rot, Some([0.0; 3]), ""))
+        Some(self.add_shifted(Shape::Surface(surface), m, pos, rot.into(), Some([0.0; 3]), ""))
     }
 
     /// The triangles near a point of the level's physical objects that the player's ball collides with, in world
@@ -347,7 +384,7 @@ mod tests {
         vec![StaticMesh {
             triangles: vec![tri(p[0], p[2], p[1]), tri(p[0], p[3], p[2])],
             pos: Vec3::ZERO,
-            rot: Quat::IDENTITY,
+            rot: Quat::IDENTITY.into(),
             group: GROUP_FLOOR,
         }]
     }
@@ -394,7 +431,7 @@ mod tests {
         // rests one radius above y = 10.
         let mut f = floor();
         f[0].pos = Vec3::new(0.0, 10.0, 0.0);
-        f[0].rot = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        f[0].rot = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2).into();
         let mut w = World::new(&f);
         let ball = w.add_ball(2.0, wood(), Vec3::new(3.0, 15.0, 4.0), Quat::IDENTITY);
         steps(&mut w, 180, None);
@@ -415,7 +452,7 @@ mod tests {
                 Triangle { a: w(0.0, -50.0), b: w(0.0, 50.0), c: w(4.0, 50.0) },
             ],
             pos: Vec3::ZERO,
-            rot: Quat::IDENTITY,
+            rot: Quat::IDENTITY.into(),
             group: GROUP_BALL,
         });
         let mut world = World::new(&statics);
@@ -430,6 +467,17 @@ mod tests {
         assert!(b.x > 14.0, "the ball did not pass the stopper: {b:?}");
         assert!(x.x < 10.0, "the box went through the stopper: {x:?}");
         assert!(world.floor_near(Vec3::new(10.0, 2.0, 0.0), 60.0).iter().all(|t| t.iter().all(|v| v.y == 0.0)), "the stopper is not the ball's floor");
+    }
+
+    #[test]
+    fn a_level_matrix_becomes_the_same_rotation_as_its_quaternion() {
+        // A quarter turn about y given as an object's matrix: the physics' quaternion is that turn, from the matrix
+        // in double precision as the original's glue takes it.
+        let turn = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let q = Rot::Basis(glam::Mat3::from_quat(turn)).ivp();
+        let h = std::f64::consts::FRAC_1_SQRT_2;
+        assert!((q.x).abs() < 1e-6 && (q.y - h).abs() < 1e-6 && (q.z).abs() < 1e-6 && (q.w - h).abs() < 1e-6, "{q:?}");
+        assert!(Rot::Basis(glam::Mat3::from_quat(turn)).quat().angle_between(turn) < 1e-5);
     }
 
     #[test]

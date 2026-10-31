@@ -1,7 +1,8 @@
 // The level's physical geometry: what the level's physical groups (floors, rails, modules) are made of, one mesh per
 // object as the original physicalizes them. The watch measures the ball's distance to their triangles.
 
-use glam::{Quat, Vec3};
+use crate::physics::Rot;
+use glam::Vec3;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Triangle {
@@ -16,7 +17,7 @@ pub struct Triangle {
 pub struct StaticMesh {
     pub triangles: Vec<Triangle>,
     pub pos: Vec3,
-    pub rot: Quat,
+    pub rot: Rot,
     /// The collision group: objects of the same non-empty group do not collide (docs/physics.md 3.4).
     pub group: &'static str,
 }
@@ -24,10 +25,11 @@ pub struct StaticMesh {
 impl StaticMesh {
     /// The triangles in world space.
     pub fn world_triangles(&self) -> impl Iterator<Item = Triangle> + '_ {
-        self.triangles.iter().map(|t| Triangle {
-            a: self.pos + self.rot * t.a,
-            b: self.pos + self.rot * t.b,
-            c: self.pos + self.rot * t.c,
+        let rot = self.rot.quat();
+        self.triangles.iter().map(move |t| Triangle {
+            a: self.pos + rot * t.a,
+            b: self.pos + rot * t.b,
+            c: self.pos + rot * t.c,
         })
     }
 }

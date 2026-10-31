@@ -6,7 +6,7 @@
 // what the C game does, measured in its C reference build.
 
 use crate::collide::{StaticMesh, Triangle};
-use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, World};
+use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, Rot, World};
 use crate::volume::Obb;
 use glam::{Mat3, Quat, Vec3};
 use level::Level;
@@ -623,7 +623,7 @@ fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
 
 /// An object's pose without its scale, and the scale (the lengths of its matrix's axes), as the original's physicalize
 /// splits them. None for a mirrored or degenerate matrix, which has no rotation.
-fn pose_and_scale(matrix: &[[f32; 4]; 4]) -> Option<(Vec3, Quat, Vec3)> {
+fn pose_and_scale(matrix: &[[f32; 4]; 4]) -> Option<(Vec3, Rot, Vec3)> {
     let mat = glam::Mat4::from_cols_array_2d(matrix);
     let axes = [mat.x_axis.truncate(), mat.y_axis.truncate(), mat.z_axis.truncate()];
     let scale = Vec3::new(axes[0].length(), axes[1].length(), axes[2].length());
@@ -634,7 +634,7 @@ fn pose_and_scale(matrix: &[[f32; 4]; 4]) -> Option<(Vec3, Quat, Vec3)> {
     if unscaled.determinant() <= 0.0 {
         return None;
     }
-    Some((mat.w_axis.truncate(), Quat::from_mat3(&unscaled).normalize(), scale))
+    Some((mat.w_axis.truncate(), Rot::Basis(unscaled), scale))
 }
 
 /// The physical objects of the level, one mesh each, as the original physicalizes them: the mesh's points scaled by
@@ -665,11 +665,11 @@ fn static_meshes(level: &Level) -> Vec<StaticMesh> {
             };
             // A mirrored or degenerate matrix has no rotation; such an object keeps its world triangles at the origin.
             let mat = glam::Mat4::from_cols_array_2d(&o.matrix);
-            let (pos, rot, local): (Vec3, Quat, Vec<Vec3>) = match pose_and_scale(&o.matrix) {
+            let (pos, rot, local): (Vec3, Rot, Vec<Vec3>) = match pose_and_scale(&o.matrix) {
                 Some((pos, rot, scale)) => (pos, rot, mesh.positions.iter().map(|p| Vec3::from(*p) * scale).collect()),
                 None => (
                     Vec3::ZERO,
-                    Quat::IDENTITY,
+                    Rot::Quat(Quat::IDENTITY),
                     mesh.positions.iter().map(|p| mat.transform_point3(Vec3::from(*p))).collect(),
                 ),
             };
