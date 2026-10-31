@@ -16,6 +16,36 @@ pub enum ListenerKind {
     Watcher,
 }
 
+impl ListenerKind {
+    /// The code a listener kind takes in the low two bits of a hull payload.
+    fn code(self) -> u32 {
+        match self {
+            ListenerKind::Synapse => 0,
+            ListenerKind::Ov => 1,
+            ListenerKind::Watcher => 2,
+        }
+    }
+}
+
+/// Packs a listener into the payload the hull's list carries: its arena index in the upper bits, its kind in the
+/// lower two. The hull manager's list is shared by the kinds, so the payload says which vector the index is in.
+pub fn encode_listener(kind: ListenerKind, index: u32) -> u32 {
+    (index << 2) | kind.code()
+}
+
+/// The inverse of `encode_listener`.
+pub fn decode_listener(payload: u32) -> Listener {
+    let kind = match payload & 3 {
+        0 => ListenerKind::Synapse,
+        1 => ListenerKind::Ov,
+        _ => ListenerKind::Watcher,
+    };
+    Listener {
+        kind,
+        index: payload >> 2,
+    }
+}
+
 /// A hull manager (2.1.6): `hull_value(t) = hull_value + (t - last_time) * gradient`.
 #[derive(Clone, Debug)]
 pub struct HullManager {

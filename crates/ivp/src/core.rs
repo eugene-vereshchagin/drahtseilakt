@@ -166,6 +166,8 @@ pub struct World {
     pub time: crate::time::TimeManager,
     /// Bumped on every change of the current time (the upstream's time code).
     pub time_code: u32,
+    /// The collision state: the broadphase, the hull managers and the collision records (`crate::collision`).
+    pub coll: crate::collision::CollWorld,
 }
 
 fn v3(a: [f32; 3]) -> [f64; 3] {
