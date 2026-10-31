@@ -329,6 +329,7 @@ pub fn basis(axis: &[f64; 3], k: usize) -> [[f64; 3]; 3] {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
