@@ -26,6 +26,8 @@ struct Timing {
     ticks: u64,
     simulate: std::time::Duration,
     frame: std::time::Duration,
+    /// Where the drawing time goes: acquire, scene instances, draw, overlay, present.
+    stages: [std::time::Duration; 5],
 }
 
 impl Default for Timing {
@@ -36,6 +38,7 @@ impl Default for Timing {
             ticks: 0,
             simulate: std::time::Duration::ZERO,
             frame: std::time::Duration::ZERO,
+            stages: [std::time::Duration::ZERO; 5],
         }
     }
 }
@@ -55,6 +58,8 @@ struct Game {
     ball_lost_at: Option<u64>,
     /// Looks for stuck balls and launches; see `watch.rs`.
     watch: Watch,
+    /// The session log of a windowed run: the ball and its contacts at every tick (see `start_session`).
+    session: Option<std::io::BufWriter<std::fs::File>>,
 }
 
 impl Game {
@@ -101,6 +106,7 @@ impl Game {
             record: o.record.clone(),
             ball_lost_at: None,
             watch: Watch::default(),
+            session: None,
             replay_in,
             level,
             balls,
@@ -164,6 +170,60 @@ impl Game {
         }
     }
 
+    /// Opens the session log of a windowed run in the level's folder: one line for the ball at every tick, and one
+    /// for each of its contacts. A replay played back is logged too, so the same case can be compared with the run.
+    fn start_session(&mut self) {
+        let dir = self.run_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let path = dir.join(format!("session-{stamp}.log"));
+        match std::fs::File::create(&path) {
+            Ok(f) => {
+                let mut w = std::io::BufWriter::new(f);
+                use std::io::Write as _;
+                let _ = writeln!(w, "# {} from tick {} ({})", self.level.name, self.sim.tick, clock(self.sim.tick));
+                self.session = Some(w);
+                println!("session log: {}", path.display());
+            }
+            Err(e) => eprintln!("could not open the session log {}: {e}", path.display()),
+        }
+    }
+
+    /// One session line for the ball and one per contact, after the tick.
+    fn log_tick(&mut self, input: u8) {
+        let Some(w) = &mut self.session else { return };
+        use std::io::Write as _;
+        let b = &self.sim.ball;
+        let _ = writeln!(
+            w,
+            "{} {} ball {:.4} {:.4} {:.4} vel {:.3} {:.3} {:.3} spin {:.3} {:.3} {:.3} {} input {:#04x} {:?}",
+            self.sim.tick,
+            clock(self.sim.tick),
+            b.position.x,
+            b.position.y,
+            b.position.z,
+            b.velocity.x,
+            b.velocity.y,
+            b.velocity.z,
+            b.spin.x,
+            b.spin.y,
+            b.spin.z,
+            if b.on_ground { "ground" } else { "air" },
+            input,
+            b.kind,
+        );
+        for c in self.sim.world().ball_contacts() {
+            let _ = writeln!(
+                w,
+                "  contact {:?} types {:?} gap {:.4} normal {:.3} {:.3} {:.3} point {:.3} {:.3} {:.3}",
+                c.entities, c.types, c.gap, c.normal[0], c.normal[1], c.normal[2], c.point[0], c.point[1], c.point[2]
+            );
+        }
+        if self.sim.tick.is_multiple_of(60) {
+            let _ = w.flush();
+        }
+    }
+
     /// Plays the replay up to a tick without a window, then gives the keys to the player (`--from`). The replay's
     /// inputs stay in the run's replay, so the attempt saved later still replays from the start.
     fn fast_forward(&mut self, tick: u64) {
@@ -210,6 +270,7 @@ impl Game {
         let events_before = self.sim.events.len();
         self.sim.step(input);
         self.replay_out.record(self.sim.tick, input);
+        self.log_tick(input);
         let ball = &self.sim.ball;
         let found = self.watch.observe(self.sim.tick, ball.position, ball.velocity, input, ball.on_ground);
         if !found.is_empty() {
@@ -357,6 +418,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     if let Some(tick) = o.from {
         game.fast_forward(tick);
     }
+    game.start_session();
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Poll);
     let mut app = App {
@@ -377,6 +439,25 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     match app.error {
         Some(e) => Err(e),
         None => Ok(()),
+    }
+}
+
+/// The time of one frame at 60 frames a second.
+const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
+
+/// How frames are shown. `Immediate` by default: on the test machine the vertical-sync modes (`Fifo`,
+/// `FifoRelaxed`) blocked the presenting for about a second per frame, while `Immediate` presents at once and may
+/// tear. DRAHTSEILAKT_PRESENT=fifo gives the synchronised mode back, which never tears.
+fn present_mode(offered: &[wgpu::PresentMode]) -> wgpu::PresentMode {
+    let wanted = match std::env::var("DRAHTSEILAKT_PRESENT").as_deref() {
+        Ok("fifo") => wgpu::PresentMode::Fifo,
+        Ok("relaxed") => wgpu::PresentMode::FifoRelaxed,
+        _ => wgpu::PresentMode::Immediate,
+    };
+    if offered.contains(&wanted) {
+        wanted
+    } else {
+        wgpu::PresentMode::Fifo
     }
 }
 
@@ -599,8 +680,7 @@ impl App {
             format,
             width: size.width.max(1),
             height: size.height.max(1),
-            // Fifo: frames are shown only at the monitor's refresh, never half of one frame and half of the next.
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: present_mode(&caps.present_modes),
             desired_maximum_frame_latency: 2,
             alpha_mode: caps
                 .alpha_modes
@@ -670,6 +750,11 @@ impl App {
     }
 
     fn frame(&mut self) {
+        // Immediate presenting does not wait for the monitor, so the frames are capped here at about 60 a second.
+        let since = self.last.elapsed();
+        if since < FRAME {
+            std::thread::sleep(FRAME - since);
+        }
         let now = Instant::now();
         self.acc = (self.acc + (now - self.last).as_secs_f32()).min(0.25);
         self.last = now;
@@ -685,6 +770,7 @@ impl App {
         let cur = Snapshot::of(&self.game.sim);
         let snap = Snapshot::lerp(&self.prev.unwrap_or(cur), &cur, self.acc / TICK);
         let Some(gpu) = &mut self.gpu else { return };
+        let acquire_started = Instant::now();
         let frame = match gpu.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(f)
             | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
@@ -693,7 +779,9 @@ impl App {
                 return;
             }
         };
+        let acquired = acquire_started.elapsed();
         let view = frame.texture.create_view(&Default::default());
+        let build_started = Instant::now();
         let inst = scene::instances(
             &self.game.placements,
             &self.game.sim.taken,
@@ -701,6 +789,8 @@ impl App {
             &self.game.ball_meshes,
             &snap,
         );
+        let built = build_started.elapsed();
+        let draw_started = Instant::now();
         gpu.renderer.draw(
             &view,
             gpu.config.width,
@@ -708,6 +798,8 @@ impl App {
             &scene::view(&snap),
             &inst,
         );
+        let drawn = draw_started.elapsed();
+        let overlay_started = Instant::now();
         gpu.renderer.draw_overlay(
             &view,
             gpu.config.width,
@@ -719,8 +811,16 @@ impl App {
                 self.game.ball_lost_at,
             ),
         );
+        let overlaid = overlay_started.elapsed();
+        let present_started = Instant::now();
         gpu.renderer.queue.present(frame);
+        let presented = present_started.elapsed();
         if let Some(t) = &mut self.timing {
+            t.stages[0] += acquired;
+            t.stages[1] += built;
+            t.stages[2] += drawn;
+            t.stages[3] += overlaid;
+            t.stages[4] += presented;
             t.frames += 1;
             t.ticks += u64::from(ticks);
             t.simulate += simulated;
@@ -735,6 +835,15 @@ impl App {
                     per_tick,
                     per_frame,
                     t.simulate.as_secs_f64() * 1000.0 / t.frames.max(1) as f64,
+                );
+                let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0 / t.frames.max(1) as f64;
+                eprintln!(
+                    "timing stages per frame: acquire {:.2} ms, instances {:.2} ms, draw {:.2} ms, overlay {:.2} ms, present {:.2} ms",
+                    ms(t.stages[0]),
+                    ms(t.stages[1]),
+                    ms(t.stages[2]),
+                    ms(t.stages[3]),
+                    ms(t.stages[4]),
                 );
                 *t = Timing::default();
             }

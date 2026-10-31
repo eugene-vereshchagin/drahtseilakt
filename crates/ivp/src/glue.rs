@@ -256,6 +256,25 @@ impl World {
         })
     }
 
+    /// The contact points of one body, in one pass over the points (`debug_contact` for each would be quadratic).
+    pub fn contacts_of(&self, entity: u32) -> Vec<ContactReadout> {
+        self.coll
+            .cps
+            .iter()
+            .filter(|p| p.alive && p.fs.is_some())
+            .filter_map(|p| {
+                let entities = [self.cores[p.syn[0].obj].entity, self.cores[p.syn[1].obj].entity];
+                (entities[0] == entity || entities[1] == entity).then(|| ContactReadout {
+                    entities,
+                    types: [p.syn[0].typ, p.syn[1].typ],
+                    gap: p.gap,
+                    normal: p.info.n,
+                    point: p.info.cp_ws,
+                })
+            })
+            .collect()
+    }
+
     /// The collision counters (`phys_debug_collision`): live mindists, mindists created, OV rechecks, watcher checks,
     /// impacts, and the tree split guards of the compiled surfaces (the upstream counts them globally).
     pub fn debug_collision(&self) -> [u32; 6] {

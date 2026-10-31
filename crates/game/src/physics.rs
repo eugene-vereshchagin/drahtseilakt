@@ -153,10 +153,7 @@ impl World {
 
     /// The contact points the ball takes part in, for the watch log: those whose entities include the ball (entity 1).
     pub fn ball_contacts(&self) -> Vec<ivp::glue::ContactReadout> {
-        (0..)
-            .map_while(|i| self.physics.debug_contact(i))
-            .filter(|c| c.entities.contains(&1))
-            .collect()
+        self.physics.contacts_of(1)
     }
 
     pub fn state(&self, i: usize) -> Option<State> {
