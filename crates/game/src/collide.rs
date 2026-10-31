@@ -5,22 +5,12 @@
 use glam::Vec3;
 use std::collections::HashMap;
 
-/// What a surface is made of, from the level's physics groups; it decides friction and sounds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Surface {
-    Floor,
-    Rail,
-    Wood,
-    Stopper,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct Triangle {
     pub a: Vec3,
     pub b: Vec3,
     pub c: Vec3,
     pub normal: Vec3,
-    pub surface: Surface,
 }
 
 #[derive(Clone)]
@@ -36,7 +26,6 @@ pub struct Contact {
     /// From the surface towards the ball's centre, unit length.
     pub normal: Vec3,
     pub depth: f32,
-    pub surface: Surface,
 }
 
 impl Collider {
@@ -113,7 +102,6 @@ impl Collider {
                 out.push(Contact {
                     normal,
                     depth: radius - dist,
-                    surface: t.surface,
                 });
             }
         }

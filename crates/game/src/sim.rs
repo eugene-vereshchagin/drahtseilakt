@@ -5,7 +5,7 @@
 // The physics is written from scratch and tuned by hand for now; phase 3 measures the original under Wine
 // and fits these numbers to reference trajectories.
 
-use crate::collide::{Collider, Surface, Triangle};
+use crate::collide::{Collider, Triangle};
 use glam::{Quat, Vec3};
 use level::Level;
 
@@ -34,29 +34,27 @@ pub enum BallKind {
 }
 
 impl BallKind {
+    /// The original game's balls (its `Physicalize_GameBall` table, see docs/physics.md): the control force, mass,
+    /// linear damping per second and elasticity of the ball's own material.
     fn params(self) -> Params {
         match self {
-            // Heavier balls accelerate less but carry more momentum (mass × speed), which is what moves boxes.
             BallKind::Wood => Params {
-                force: 20.0,
-                mass: 1.0,
-                damping: 0.25,
-                bounce: 0.6,
-                roll: 0.8,
+                force: 0.43,
+                mass: 1.9,
+                lin_damp: 0.9,
+                elasticity: 0.2,
             },
             BallKind::Stone => Params {
-                force: 24.0,
-                mass: 2.0,
-                damping: 0.10,
-                bounce: 0.8,
-                roll: 0.5,
+                force: 0.92,
+                mass: 10.0,
+                lin_damp: 0.3,
+                elasticity: 0.1,
             },
             BallKind::Paper => Params {
-                force: 14.0,
-                mass: 0.5,
-                damping: 0.40,
-                bounce: 0.4,
-                roll: 1.2,
+                force: 0.065,
+                mass: 0.2,
+                lin_damp: 1.5,
+                elasticity: 0.4,
             },
         }
     }
@@ -75,17 +73,22 @@ impl BallKind {
     }
 }
 
-/// Per-kind tuning, in metres and seconds: push acceleration, linear damping per second, bounce restitution,
-/// rolling resistance per second against the surface.
+/// Per-kind tuning (see `BallKind::params`).
 #[derive(Clone, Copy)]
 struct Params {
-    /// Push force of the arrow keys; acceleration is force / mass.
     force: f32,
     mass: f32,
-    damping: f32,
-    bounce: f32,
-    roll: f32,
+    lin_damp: f32,
+    elasticity: f32,
 }
+
+/// The original simulation runs 66 steps per second of its own time (its "PSI"); control forces are impulses per
+/// step, so the push is a force times 66 (docs/physics.md, section 4).
+const PSI_PER_SECOND: f32 = 66.0;
+/// A solid sphere rolling without slipping has effective inertia 1.4 m (0.4 m r² rotation plus m).
+const ROLLING_MASS_FACTOR: f32 = 1.4;
+/// Elasticity of the level's floors and rails (`Physicalize_Floors`); a pair multiplies the two materials'.
+const FLOOR_ELASTICITY: f32 = 0.3;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Ball {
@@ -311,21 +314,15 @@ impl Sim {
         }
         let push = push.normalize_or_zero();
 
-        let Params {
-            force,
-            mass,
-            damping,
-            bounce,
-            roll,
-        } = self.ball.kind.params();
-        let accel = force / mass;
+        let p = self.ball.kind.params();
+        let accel = PSI_PER_SECOND * p.force / (ROLLING_MASS_FACTOR * p.mass);
         let dt = TICK / SUBSTEPS as f32;
         for _ in 0..SUBSTEPS {
             self.ball.velocity += push * accel * dt;
             self.ball.velocity.y -= GRAVITY * dt;
-            self.ball.velocity *= 1.0 - damping * dt;
+            self.ball.velocity *= (-p.lin_damp * dt).exp();
             self.ball.position += self.ball.velocity * dt;
-            self.resolve(bounce, roll, dt);
+            self.resolve(p.elasticity * FLOOR_ELASTICITY);
         }
         // Rolling look: spin about the axis perpendicular to motion and the ground.
         let horizontal = Vec3::new(self.ball.velocity.x, 0.0, self.ball.velocity.z);
@@ -344,7 +341,9 @@ impl Sim {
         }
     }
 
-    fn resolve(&mut self, bounce: f32, roll: f32, dt: f32) {
+    /// Pushes the ball out of the floor and reflects its normal velocity with the pair's elasticity. Rolling has no
+    /// resistance of its own: in the original it slows through damping and the contact's friction.
+    fn resolve(&mut self, elasticity: f32) {
         self.ball.on_ground = false;
         for _ in 0..4 {
             let contacts = self.collider.contacts(self.ball.position, BALL_RADIUS);
@@ -352,19 +351,11 @@ impl Sim {
             self.ball.position += c.normal * c.depth;
             let vn = self.ball.velocity.dot(c.normal);
             if vn < 0.0 {
-                let e = if -vn > 4.0 { bounce } else { 0.0 };
-                self.ball.velocity -= c.normal * vn * (1.0 + e);
+                self.ball.velocity -= c.normal * vn * (1.0 + elasticity);
             }
             if c.normal.y > 0.3 {
                 self.ball.on_ground = true;
             }
-            // Rolling resistance along the surface.
-            let tangential = self.ball.velocity - c.normal * self.ball.velocity.dot(c.normal);
-            let factor = match c.surface {
-                Surface::Rail => roll * 0.7,
-                _ => roll,
-            };
-            self.ball.velocity -= tangential * (factor * dt).min(1.0);
         }
     }
 
@@ -460,15 +451,18 @@ fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
 fn collision_triangles(level: &Level) -> Vec<Triangle> {
     let mut out = Vec::new();
     for g in &level.groups {
-        let surface = match g.name.to_ascii_lowercase().as_str() {
-            "phys_floors" => Surface::Floor,
-            "phys_floorrails" => Surface::Rail,
-            "phys_floorstopper" => Surface::Stopper,
-            n if n.starts_with("phys_") => Surface::Wood,
+        // The player ball (group Ball) does not collide with objects of its own group: floor stoppers are such
+        // objects, so they stop boxes and loose balls but not the ball (docs/physics.md, section 3.4).
+        let solid = match g.name.to_ascii_lowercase().as_str() {
+            "phys_floors" | "phys_floorrails" => true,
+            "phys_floorstopper" => false,
             // Modules and boxes are solid for now; their own behaviour comes with phase 4.
-            n if n.starts_with("p_modul") || n == "p_box" => Surface::Floor,
-            _ => continue,
+            n if n.starts_with("p_modul") || n == "p_box" => true,
+            _ => false,
         };
+        if !solid {
+            continue;
+        }
         for &m in &g.members {
             let Some(o) = level.objects.get(m) else {
                 continue;
@@ -500,7 +494,6 @@ fn collision_triangles(level: &Level) -> Vec<Triangle> {
                         b,
                         c,
                         normal: n.normalize(),
-                        surface,
                     });
                 }
             }
@@ -688,5 +681,32 @@ mod tests {
         }
         assert_eq!(sim.lives, 0);
         assert!(sim.game_over, "three balls lost, the run must be over");
+    }
+
+    #[test]
+    fn a_wooden_ball_barely_bounces() {
+        let level = flat_level();
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        sim.ball.position = Vec3::new(0.0, 20.0, 0.0);
+        let mut impact = 0.0f32;
+        let mut rebound = 0.0f32;
+        let mut was_falling = false;
+        for _ in 0..240 {
+            let before = sim.ball.velocity.y;
+            sim.step(0);
+            if before < -1.0 && sim.ball.velocity.y > 0.0 {
+                // The first contact: speed before and after reflection.
+                impact = impact.max(-before);
+                rebound = rebound.max(sim.ball.velocity.y);
+                was_falling = true;
+                break;
+            }
+        }
+        assert!(was_falling, "the ball never landed");
+        // Pair elasticity 0.2 × 0.3 = 0.06: a rebound of a few percent, not the rubber bounce of before (0.6).
+        assert!(
+            rebound < 0.2 * impact,
+            "rebound {rebound} from impact {impact}"
+        );
     }
 }
