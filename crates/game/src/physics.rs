@@ -234,6 +234,12 @@ impl World {
         out
     }
 
+    /// The movement state of a body's core (the upstream's 0 moving .. 8 not simulated), for the session log.
+    pub fn movement_state(&self, i: usize) -> Option<i32> {
+        let id = (*self.handles.get(i)?)?;
+        self.physics.cores.get(id).map(|c| i32::from(c.movement_state))
+    }
+
     /// The contact points the ball takes part in, for the watch log: those whose entities include the ball (entity 1).
     pub fn ball_contacts(&self) -> Vec<ivp::glue::ContactReadout> {
         self.physics.contacts_of(1)

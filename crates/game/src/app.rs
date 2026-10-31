@@ -200,7 +200,7 @@ impl Game {
         let b = &self.sim.ball;
         let _ = writeln!(
             w,
-            "{} {} ball {:.4} {:.4} {:.4} vel {:.3} {:.3} {:.3} spin {:.3} {:.3} {:.3} {} input {:#04x} {:?}",
+            "{} {} ball {:.4} {:.4} {:.4} vel {:.3} {:.3} {:.3} spin {:.3} {:.3} {:.3} {} input {:#04x} {:?} ms {}",
             self.sim.tick,
             clock(self.sim.tick),
             b.position.x,
@@ -215,6 +215,7 @@ impl Game {
             if b.on_ground { "ground" } else { "air" },
             input,
             b.kind,
+            self.sim.world().movement_state(0).map_or(-1, |m| m),
         );
         for c in self.sim.world().ball_contacts() {
             let _ = writeln!(
