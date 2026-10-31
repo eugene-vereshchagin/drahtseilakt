@@ -3,3 +3,4 @@
 // original game's physics runs in x87 extended precision, which this port reproduces as f64 where the upstream did.
 
 pub mod math;
+pub mod minlist;
