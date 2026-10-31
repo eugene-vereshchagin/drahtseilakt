@@ -160,12 +160,10 @@ impl World {
                 *v = floor;
             }
         }
-        let radius_surface = match &surface {
-            Some(s) => {
-                let (rad, _) = s.radius_dev(mc);
-                rad
-            }
-            None => 0.0,
+        // the radius about the mass centre and the surface's deviation from it; a ball has neither (0x10009f00)
+        let (radius_surface, radius_dev) = match &surface {
+            Some(s) => s.radius_dev(mc),
+            None => (0.0, 0.0),
         };
         {
             let core = &mut self.cores[c];
@@ -180,6 +178,8 @@ impl World {
             core.speed_damp = desc.lin_damp;
             core.rot_speed_damp = [desc.rot_damp; 3];
             core.upper_limit_radius = extra + radius_surface;
+            // The rotation's share of the hull growth is the spin times this deviation (`calc_rotation_info`).
+            core.max_surface_deviation = radius_dev;
             core.speed = [0.0; 3];
             core.rot_speed = [0.0; 3];
             core.movement_state = if desc.fixed { MT_STATIC } else { MT_NOT_SIM };
@@ -329,6 +329,19 @@ mod tests {
         let f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
         assert!(w.cores[f].unmovable);
         assert_eq!(w.body_pose(f).0, [0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn a_ball_has_no_surface_deviation_and_a_surface_has_its_own() {
+        // The rotation's share of the hull growth is spin times the surface deviation: none for a ball (the upstream
+        // leaves it 0), the surface's own for a polygon, never the core's initial 1000.
+        let mut w = world();
+        let f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
+        let ball = w.add_body(BodyDesc { mass: 1.0, ..BodyDesc::default() }, Shape::Sphere(2.0), [0.0, 5.0, 0.0], IDENTITY);
+        assert_eq!(w.cores[ball].max_surface_deviation, 0.0);
+        let (_, dev) = floor().radius_dev(floor().mass_center);
+        assert_eq!(w.cores[f].max_surface_deviation, dev);
+        assert!(dev < 100.0);
     }
 
     #[test]
