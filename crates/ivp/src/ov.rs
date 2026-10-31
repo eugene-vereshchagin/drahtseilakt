@@ -675,7 +675,7 @@ impl World {
 
     /// Creates the pairs of two objects that have no collision yet (0x1002f430): their mindist, when there is one.
     fn object_pairs_may_collide(&mut self, a: usize, b: usize) {
-        let Some(c) = self.mindist_create(a, b) else { return };
+        let Some(c) = self.mindist_create(a, b).or_else(|| self.watcher_pair(a, b)) else { return };
         self.ov_add_collision(a, c);
         self.ov_add_collision(b, c);
     }
@@ -747,7 +747,10 @@ impl World {
                 let m = self.coll.collisions[c].index;
                 self.mindist_delete(m);
             }
-            CollKind::Watcher => self.collision_release(c),
+            CollKind::Watcher => {
+                let w = self.coll.collisions[c].index;
+                self.watcher_delete(w);
+            }
         }
     }
 

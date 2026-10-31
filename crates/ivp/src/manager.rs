@@ -38,7 +38,7 @@ impl Motion for CorePoses<'_> {
 }
 
 /// The core position of an object at a time (`ivp_core_pos_at`, 0x10012470).
-fn core_pos_at(c: &Core, t: f64) -> [f64; 3] {
+pub(crate) fn core_pos_at(c: &Core, t: f64) -> [f64; 3] {
     let dt = t - c.time_of_last_psi;
     let mut out = [0.0; 3];
     for k in 0..3 {
@@ -341,13 +341,27 @@ impl World {
 
     /// Creates the mindist of two objects and its collision record (`ivp_mindist_create`, 0x10016290). Returns the
     /// collision index, or None when the pair has no mindist: an object without geometry, or a polygon with more than
-    /// one piece.
+    /// one piece (its pairs go to a watcher).
     pub(crate) fn mindist_create(&mut self, a: usize, b: usize) -> Option<usize> {
         let ka = self.coll.objs.get(a)?.kind?;
         let kb = self.coll.objs.get(b)?.kind?;
         let feat_a = if ka == ObjKind::Polygon { Some(self.single_feat(a)?) } else { None };
         let feat_b = if kb == ObjKind::Polygon { Some(self.single_feat(b)?) } else { None };
+        let m = self.mindist_create_with(None, a, b, feat_a, feat_b)?;
+        let c = self.collision_new(CollKind::Mindist, [a, b], m);
+        self.coll.mds[m].collision = Some(c);
+        Some(c)
+    }
+
+    /// Creates a mindist between two pieces, owned by a watcher (`owner`) or by the pair's collision record (None).
+    /// The features are the pieces' first edges, or None for a ball. Solves it and schedules it (the body of
+    /// `ivp_mindist_create`).
+    pub(crate) fn mindist_create_with(&mut self, owner: Option<usize>, a: usize, b: usize, feat_a: Option<Feat>, feat_b: Option<Feat>) -> Option<usize> {
+        let ka = self.coll.objs.get(a)?.kind?;
+        let kb = self.coll.objs.get(b)?.kind?;
         let mut md = Mindist {
+            owner,
+            child_index: -1,
             alive: true,
             flags: 0x0fc0_0000,
             // a new mindist has never been solved: no time code matches its stamp, so its first recalc runs
@@ -382,10 +396,8 @@ impl World {
             ..Synapse::default()
         };
         let m = self.md_alloc(md);
-        let c = self.collision_new(CollKind::Mindist, [a, b], m);
-        self.coll.mds[m].collision = Some(c);
         self.insert_and_recalc_exact(m);
-        Some(c)
+        Some(m)
     }
 
     /// Deletes a mindist: out of its state's lists, its event cancelled, and its collision released
@@ -400,7 +412,9 @@ impl World {
         if let Some(slot) = self.coll.mds[m].ev_slot.take() {
             self.time_remove(slot);
         }
-        if let Some(c) = self.coll.mds[m].collision.take() {
+        if let Some(w) = self.coll.mds[m].owner {
+            self.watcher_child_deleted(w, m);
+        } else if let Some(c) = self.coll.mds[m].collision.take() {
             self.collision_release(c);
         }
         self.coll.mds[m] = Mindist::default();
@@ -578,7 +592,6 @@ impl World {
     /// A synapse of a HULL mindist fired (`ivp_mindist_hull_exceeded`, 0x10017d70): the halfspace re-estimate re-arms
     /// the synapses while the gap still exceeds six PSIs of worst-case approach; otherwise the mindist goes back to
     /// EXACT.
-    #[allow(dead_code)] // called by the hull phase, which is ported next
     pub(crate) fn mindist_hull_exceeded(&mut self, m: usize, intrusion: f32) {
         let sorted = [self.coll.mds[m].sorted(0), self.coll.mds[m].sorted(1)];
         let oa = self.coll.mds[m].syn[sorted[0]].obj;
@@ -622,6 +635,80 @@ impl World {
         }
         self.remove_hull(m);
         self.insert_and_recalc_exact(m);
+    }
+
+    /// The core of an object integrated: its hull grows with the core's speeds, and the object is queued for the
+    /// hull phase when its first listener lies below the next PSI (`phys_collision_core_integrated`, 0x1001e750).
+    pub(crate) fn hull_update_core(&mut self, obj: usize, dt: f64) {
+        self.ensure_object(obj);
+        let c = &self.cores[obj];
+        let speed = c.max_surface_rot_speed + c.current_speed;
+        let center = c.current_speed;
+        let now = self.env.current_time;
+        let h = &mut self.coll.hulls[obj];
+        h.update(now, dt as f32, speed, center);
+        if h.list.min_value() - h.hull_value_next_psi < 0.0 {
+            self.coll.check.push(obj);
+        }
+    }
+
+    /// The hull phase (`ivp_hull_phase`, 0x1001eb10): the queued hulls, last queued first, fire their listeners whose
+    /// threshold the next PSI reaches (at most 101 per hull), and rebase their values every ten seconds.
+    pub(crate) fn hull_phase(&mut self) {
+        while let Some(obj) = self.coll.check.pop() {
+            let mut k = 100i32;
+            loop {
+                let h = &self.coll.hulls[obj];
+                let d = h.list.min_value() - h.hull_value_next_psi;
+                if !(d < 0.0) {
+                    break;
+                }
+                let Some((_, payload)) = h.list.first() else { break };
+                self.listener_exceeded(obj, payload, d);
+                let stop = k < 0;
+                k -= 1;
+                if stop {
+                    break;
+                }
+            }
+            let h = &self.coll.hulls[obj];
+            if h.reset_time < h.last_time {
+                self.hull_reset(obj);
+                let h = &mut self.coll.hulls[obj];
+                h.reset_time = (h.last_time + 10.0).trunc();
+            }
+        }
+    }
+
+    /// A listener's threshold was reached (`listener_exceeded`): a mindist's synapse, an OV element, or a watcher.
+    fn listener_exceeded(&mut self, obj: usize, payload: u32, intrusion: f32) {
+        let l = crate::hull::decode_listener(payload);
+        match l.kind {
+            ListenerKind::Synapse => {
+                let m = (l.index / 2) as usize;
+                let _ = obj;
+                self.mindist_hull_exceeded(m, intrusion);
+            }
+            ListenerKind::Ov => self.recheck_ov_element(l.index as usize),
+            ListenerKind::Watcher => self.watcher_check(l.index as usize),
+        }
+    }
+
+    /// Rebases an object's hull to zero (`ivp_hull_reset`, 0x1001a820): the synapses' angular sums move with it
+    /// (`ivp_mindist_hull_reset`, 0x10017d50).
+    fn hull_reset(&mut self, obj: usize) {
+        let h = &self.coll.hulls[obj];
+        let dh = -h.hull_value;
+        let dc = -h.center_hull_value;
+        let touched = self.coll.hulls[obj].reset();
+        for payload in touched {
+            let l = crate::hull::decode_listener(payload);
+            if l.kind == ListenerKind::Synapse {
+                let m = (l.index / 2) as usize;
+                let sum = self.coll.mds[m].sum_angular_hull_time as f32;
+                self.coll.mds[m].sum_angular_hull_time = f64::from((dh - dc) + sum);
+            }
+        }
     }
 
     /// Short pass (`0x10017850`): every EXACT mindist re-solves; the ones that fail go INVALID.

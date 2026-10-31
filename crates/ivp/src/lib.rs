@@ -19,3 +19,4 @@ pub mod minimize;
 pub mod minlist;
 pub mod ov;
 pub mod time;
+pub mod watcher;

@@ -61,6 +61,10 @@ pub struct CollWorld {
     pub collisions: Vec<Collision>,
     pub free_collisions: Vec<usize>,
     pub mds: Vec<Mindist>,
+    pub watchers: Vec<crate::watcher::Watcher>,
+    pub free_watchers: Vec<usize>,
+    /// The hull managers (object indices) whose hull grew past a listener this PSI, checked after integration.
+    pub check: Vec<usize>,
     pub free_mds: Vec<usize>,
     /// The heads of the manager's EXACT and INVALID mindist lists.
     pub exact: Option<usize>,
@@ -69,6 +73,7 @@ pub struct CollWorld {
     pub coll_dist_counter: u32,
     /// Statistics of the upstream's counters (env +0x78 onward), kept for the tests and the debug overlay.
     pub ov_rechecks: u32,
+    pub watcher_checks: u32,
 }
 
 impl World {
@@ -80,8 +85,10 @@ impl World {
     /// A core froze: its collision objects leave the hull managers. 0x10017140.
     pub(crate) fn core_frozen(&mut self, _c: usize) {}
 
-    /// A core integrated into the next PSI: the hull update of its objects. 0x1001e750.
-    pub(crate) fn core_integrated(&mut self, _c: usize, _dt: f64) {}
+    /// A core integrated into the next PSI: the hull update of its object (0x1001e750, phys_contact.c 431).
+    pub(crate) fn core_integrated(&mut self, c: usize, dt: f64) {
+        self.hull_update_core(c, dt);
+    }
 
     /// After the controllers of a unit ran: the per-object hook of each of its cores (0x100099a0).
     pub(crate) fn after_controllers(&mut self, unit: usize) {
@@ -97,6 +104,10 @@ impl World {
     /// Before the PSI: the begin hook and the mindist pre-PSI pass. 0x100124c0 preamble.
     pub(crate) fn psi_start(&mut self) {}
 
-    /// After the PSI's integration: the end hook. 0x1001ea50 tail.
-    pub(crate) fn psi_end(&mut self) {}
+    /// After the PSI's integration: the hull phase, then the short and critic passes (0x10013cb0).
+    pub(crate) fn psi_end(&mut self) {
+        self.hull_phase();
+        self.short_pass();
+        self.critic_pass();
+    }
 }

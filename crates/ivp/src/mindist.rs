@@ -76,6 +76,10 @@ pub struct Mindist {
     pub ev_slot: Option<u32>,
     /// The collision record of the pair in the broadphase.
     pub collision: Option<usize>,
+    /// The watcher that owns this mindist as its child (the pieces of a multi-piece pair), if any.
+    pub owner: Option<usize>,
+    /// The mindist's index in its owner's children (-1 for none).
+    pub child_index: i32,
     pub flags: u32,
     pub syn: [Synapse; 2],
     pub sum_extra_radius: f32,
