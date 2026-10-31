@@ -1,10 +1,10 @@
 // The physics of the game: the player's ball, the level's loose boxes and balls, and the level's physical geometry.
-// The dynamics are IVP's (crates/ivp, a port of OpenBallance's physics, GPL-3.0): the level's floors as one fixed
-// compact surface, the boxes as convex surfaces, the balls as spheres, with the original game's material values
+// The dynamics are IVP's (crates/ivp, a port of OpenBallance's physics, GPL-3.0): each of the level's physical
+// objects as a fixed body of its own, as the original physicalizes them, the boxes as convex surfaces, the balls as spheres, with the original game's material values
 // (docs/physics.md, sections 3 and 4). A tick is one step of 1/60 s, which the physics runs as its own time steps of
 // 1/66 s.
 
-use crate::collide::Triangle;
+use crate::collide::StaticMesh;
 use glam::{Quat, Vec3};
 use ivp::body::{BodyDesc, BodyState, Shape};
 use ivp::core::World as IvpWorld;
@@ -60,6 +60,8 @@ pub struct World {
     pub grounded: bool,
     /// The push controller of each body that has been pushed (see `set_push`).
     pushers: Vec<Option<usize>>,
+    /// The IVP bodies of the level's physical objects.
+    statics: Vec<usize>,
 }
 
 fn vec3_f64(v: Vec3) -> [f64; 3] {
@@ -84,31 +86,39 @@ fn ivp_quat(q: Quat) -> IvpQuat {
 }
 
 impl World {
-    /// A world with the level's physical triangles as one fixed surface (a convex piece per triangle, as IVP keeps
-    /// the level's floors).
-    pub fn new(triangles: &[Triangle]) -> World {
+    /// A world with each of the level's physical objects as a fixed body: a compact surface of a convex piece per
+    /// triangle in the object's frame, at the object's pose (the original's concave physicalize).
+    pub fn new(statics: &[StaticMesh]) -> World {
         let mut physics = IvpWorld::new();
         physics.time_start();
         physics.set_gravity([0.0, -GRAVITY, 0.0]);
-        let ledges: Vec<ledge::Ledge> = triangles
-            .iter()
-            .filter_map(|t| ledge::triangle(vec3_f64(t.a), vec3_f64(t.b), vec3_f64(t.c)))
-            .collect();
         let mut world = World {
             physics,
             handles: Vec::new(),
             bodies: Vec::new(),
             grounded: false,
             pushers: Vec::new(),
+            statics: Vec::new(),
         };
-        if let Some(floor) = Surface::compile(ledges) {
+        for mesh in statics {
+            let ledges: Vec<ledge::Ledge> = mesh
+                .triangles
+                .iter()
+                .filter_map(|t| ledge::triangle(vec3_f64(t.a), vec3_f64(t.b), vec3_f64(t.c)))
+                .collect();
+            let Some(surface) = Surface::compile(ledges) else {
+                continue;
+            };
             let desc = BodyDesc {
                 fixed: true,
                 friction: SURFACE_FRICTION,
                 elasticity: SURFACE_ELASTICITY,
                 ..BodyDesc::default()
             };
-            world.physics.add_body(desc, Shape::Surface(floor), [0.0; 3], ivp_quat(Quat::IDENTITY));
+            let id = world
+                .physics
+                .add_body(desc, Shape::Surface(surface), vec3_f64(mesh.pos), ivp_quat(mesh.rot));
+            world.statics.push(id);
         }
         world
     }
@@ -210,13 +220,18 @@ impl World {
         self.add(Shape::Sphere(radius), m, pos, rot)
     }
 
-    /// The triangles of the level's floor near a point, as the physics sees them (the floor is body 0).
+    /// The triangles of the level's physical objects near a point, in world space, as the physics sees them.
     pub fn floor_near(&self, p: Vec3, r: f32) -> Vec<[Vec3; 3]> {
-        self.physics
-            .surface_triangles_near(0, [f64::from(p.x), f64::from(p.y), f64::from(p.z)], f64::from(r))
-            .into_iter()
-            .map(|t| t.map(|v| Vec3::new(v[0] as f32, v[1] as f32, v[2] as f32)))
-            .collect()
+        let mut out = Vec::new();
+        for &id in &self.statics {
+            let (pos, rot) = self.physics.body_pose(id);
+            let (pos, rot) = (vec3(pos), quat(rot));
+            let local = rot.inverse() * (p - pos);
+            for t in self.physics.surface_triangles_near(id, vec3_f64(local), f64::from(r)) {
+                out.push(t.map(|v| pos + rot * vec3(v)));
+            }
+        }
+        out
     }
 
     /// The contact points the ball takes part in, for the watch log: those whose entities include the ball (entity 1).
@@ -263,9 +278,10 @@ impl World {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::collide::Triangle;
 
     /// A flat floor at y = 0, 200 units square.
-    fn floor() -> Vec<Triangle> {
+    fn floor() -> Vec<StaticMesh> {
         let s = 100.0;
         let p = [
             Vec3::new(-s, 0.0, -s),
@@ -274,7 +290,11 @@ mod tests {
             Vec3::new(-s, 0.0, s),
         ];
         let tri = |a, b, c| Triangle { a, b, c };
-        vec![tri(p[0], p[2], p[1]), tri(p[0], p[3], p[2])]
+        vec![StaticMesh {
+            triangles: vec![tri(p[0], p[2], p[1]), tri(p[0], p[3], p[2])],
+            pos: Vec3::ZERO,
+            rot: Quat::IDENTITY,
+        }]
     }
 
     fn crate_material() -> Material {
@@ -311,6 +331,22 @@ mod tests {
         for _ in 0..n {
             w.step(push);
         }
+    }
+
+    #[test]
+    fn a_floor_with_its_own_pose_holds_the_ball_where_it_is_in_the_world() {
+        // The floor's triangles in its own frame, the body moved up by 10 and turned a quarter about y: the ball
+        // rests one radius above y = 10.
+        let mut f = floor();
+        f[0].pos = Vec3::new(0.0, 10.0, 0.0);
+        f[0].rot = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let mut w = World::new(&f);
+        let ball = w.add_ball(2.0, wood(), Vec3::new(3.0, 15.0, 4.0), Quat::IDENTITY);
+        steps(&mut w, 180, None);
+        let s = w.state(ball).unwrap();
+        assert!((s.pos.y - 12.0).abs() < 0.05, "the ball is at {:?}", s.pos);
+        let near = w.floor_near(Vec3::new(0.0, 10.0, 0.0), 200.0);
+        assert!(near.iter().flatten().all(|v| (v.y - 10.0).abs() < 1e-4), "the triangles in the world: {near:?}");
     }
 
     #[test]

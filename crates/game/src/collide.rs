@@ -1,13 +1,33 @@
-// The level's physical triangles: what the level's physical groups (floors, rails, modules) are made of, in world
-// space. The physics world takes them as one static mesh; the watch measures the ball's distance to them.
+// The level's physical geometry: what the level's physical groups (floors, rails, modules) are made of, one mesh per
+// object as the original physicalizes them. The watch measures the ball's distance to their triangles.
 
-use glam::Vec3;
+use glam::{Quat, Vec3};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Triangle {
     pub a: Vec3,
     pub b: Vec3,
     pub c: Vec3,
+}
+
+/// One physical object of the level as the original physicalizes it: its mesh's triangles in the object's own
+/// frame, scaled by the object's scale, and the object's pose without the scale. The physics makes a fixed body of it.
+#[derive(Debug, Clone)]
+pub struct StaticMesh {
+    pub triangles: Vec<Triangle>,
+    pub pos: Vec3,
+    pub rot: Quat,
+}
+
+impl StaticMesh {
+    /// The triangles in world space.
+    pub fn world_triangles(&self) -> impl Iterator<Item = Triangle> + '_ {
+        self.triangles.iter().map(|t| Triangle {
+            a: self.pos + self.rot * t.a,
+            b: self.pos + self.rot * t.b,
+            c: self.pos + self.rot * t.c,
+        })
+    }
 }
 
 /// The point of triangle `t` closest to `p` (Ericson, Real-Time Collision Detection, 5.1.5).

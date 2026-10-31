@@ -5,7 +5,7 @@
 // The physics is IVP's (physics.rs); the rules around it (pushing, transformers, falling off, respawning) follow
 // what the C game does, measured in its C reference build.
 
-use crate::collide::Triangle;
+use crate::collide::{StaticMesh, Triangle};
 use crate::physics::{Material, World};
 use crate::volume::Obb;
 use glam::{Mat3, Quat, Vec3};
@@ -212,7 +212,7 @@ const GATE_RADIUS: f32 = 7.0;
 
 impl Sim {
     pub fn new(level: &Level, start_ball: BallKind) -> Sim {
-        let triangles = collision_triangles(level);
+        let statics = static_meshes(level);
         let pos = |name: &str| -> Vec<(usize, Vec3)> {
             level
                 .members(name)
@@ -244,8 +244,9 @@ impl Sim {
             extra_lives: pos("P_Extra_Life"),
             trafos,
             depth_cubes: depth_cubes(level),
-            death_y: triangles
+            death_y: statics
                 .iter()
+                .flat_map(StaticMesh::world_triangles)
                 .flat_map(|t| [t.a.y, t.b.y, t.c.y])
                 .fold(f32::INFINITY, f32::min)
                 - 60.0,
@@ -269,7 +270,7 @@ impl Sim {
             kind: start_ball,
             on_ground: false,
         };
-        let mut world = World::new(&triangles);
+        let mut world = World::new(&statics);
         // Body 0 is the ball.
         let ball_body = world.add_ball(BALL_RADIUS, ball.material(), ball.position, ball.rotation);
         debug_assert_eq!(ball_body, 0);
@@ -592,9 +593,11 @@ fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
     v.into_iter().map(|x| x.1).collect()
 }
 
-/// Triangles of the physical objects, in world space.
-fn collision_triangles(level: &Level) -> Vec<Triangle> {
+/// The physical objects of the level, one mesh each, as the original physicalizes them: the mesh's points scaled by
+/// the object's scale in its own frame, the pose without the scale (an object in two solid groups is made once).
+fn static_meshes(level: &Level) -> Vec<StaticMesh> {
     let mut out = Vec::new();
+    let mut seen = Vec::new();
     for g in &level.groups {
         // The player ball (group Ball) does not collide with objects of its own group: floor stoppers are such
         // objects, so they stop boxes and loose balls but not the ball (docs/physics.md, section 3.4).
@@ -609,6 +612,10 @@ fn collision_triangles(level: &Level) -> Vec<Triangle> {
             continue;
         }
         for &m in &g.members {
+            if seen.contains(&m) {
+                continue;
+            }
+            seen.push(m);
             let Some(o) = level.objects.get(m) else {
                 continue;
             };
@@ -616,26 +623,42 @@ fn collision_triangles(level: &Level) -> Vec<Triangle> {
                 continue;
             };
             let mat = glam::Mat4::from_cols_array_2d(&o.matrix);
-            let world: Vec<Vec3> = mesh
+            let axes = [mat.x_axis.truncate(), mat.y_axis.truncate(), mat.z_axis.truncate()];
+            let scale = Vec3::new(axes[0].length(), axes[1].length(), axes[2].length());
+            let unscaled = glam::Mat3::from_cols(axes[0] / scale.x, axes[1] / scale.y, axes[2] / scale.z);
+            // A mirrored or degenerate matrix has no rotation; such an object keeps its world triangles at the origin.
+            let rotation = scale.min_element() > 1e-6 && unscaled.determinant() > 0.0;
+            let (pos, rot) = if rotation {
+                (mat.w_axis.truncate(), Quat::from_mat3(&unscaled).normalize())
+            } else {
+                (Vec3::ZERO, Quat::IDENTITY)
+            };
+            let local: Vec<Vec3> = mesh
                 .positions
                 .iter()
-                .map(|p| mat.transform_point3(Vec3::from(*p)))
+                .map(|p| {
+                    let p = Vec3::from(*p);
+                    if rotation { p * scale } else { mat.transform_point3(p) }
+                })
                 .collect();
+            let mut triangles = Vec::new();
             for part in &mesh.parts {
                 for t in part.indices.as_chunks::<3>().0 {
                     let v = |k: usize| {
                         t.get(k)
-                            .and_then(|&i| world.get(i as usize))
+                            .and_then(|&i| local.get(i as usize))
                             .copied()
                             .unwrap_or_default()
                     };
                     let (a, b, c) = (v(0), v(1), v(2));
-                    let n = (b - a).cross(c - a);
-                    if n.length_squared() < 1e-12 {
+                    if (b - a).cross(c - a).length_squared() < 1e-12 {
                         continue;
                     }
-                    out.push(Triangle { a, b, c });
+                    triangles.push(Triangle { a, b, c });
                 }
+            }
+            if !triangles.is_empty() {
+                out.push(StaticMesh { triangles, pos, rot });
             }
         }
     }
