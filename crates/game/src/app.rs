@@ -8,6 +8,7 @@ use crate::render::Renderer;
 use crate::replay::Replay;
 use crate::scene::{self, BallMeshes, Snapshot};
 use crate::sim::{Event, Sim, TICK, input};
+use crate::watch::{Finding, Watch};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -30,6 +31,8 @@ struct Game {
     record: Option<PathBuf>,
     /// The tick the ball was last lost, for the "ball lost" message.
     ball_lost_at: Option<u64>,
+    /// Looks for stuck balls and launches; see `watch.rs`.
+    watch: Watch,
 }
 
 impl Game {
@@ -75,6 +78,7 @@ impl Game {
             replay_out: Replay::new(&level.name, level.hash),
             record: o.record.clone(),
             ball_lost_at: None,
+            watch: Watch::default(),
             replay_in,
             level,
             balls,
@@ -85,7 +89,45 @@ impl Game {
         self.save_attempt();
         self.sim = Sim::new(&self.level.level, self.start_ball);
         self.ball_lost_at = None;
+        self.watch = Watch::default();
         self.replay_out = Replay::new(&self.level.name, self.level.hash);
+    }
+
+    /// The folder of this level's runs, attempts, watch log and findings.
+    fn run_dir(&self) -> PathBuf {
+        let stem = self.level.name.trim_end_matches(".NMO").trim_end_matches(".nmo");
+        replay_dir().join(stem)
+    }
+
+    /// Reports a finding: a line on the console and in the level's watch log, and the replay up to that tick, so that
+    /// the case replays with --headless. A replay played back is only reported, not logged again.
+    fn report(&self, f: &Finding) {
+        let line = format!(
+            "{} {} tick {} at ({:.2} {:.2} {:.2}) speed {:.2} input {:#04x}{}",
+            clock(f.tick),
+            f.kind.name(),
+            f.tick,
+            f.pos.x,
+            f.pos.y,
+            f.pos.z,
+            f.vel.length(),
+            f.input,
+            if f.on_ground { " ground" } else { " air" }
+        );
+        println!("{line}");
+        if self.replay_in.is_some() {
+            return;
+        }
+        let dir = self.run_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        use std::io::Write as _;
+        if let Ok(mut log) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("watch.log")) {
+            let _ = writeln!(log, "{line}");
+        }
+        let snapshot = dir.join(format!("{}-{}.replay", f.kind.name(), f.tick));
+        if let Err(e) = std::fs::write(&snapshot, self.replay_out.to_text()) {
+            eprintln!("could not save the replay of the {} to {}: {e}", f.kind.name(), snapshot.display());
+        }
     }
 
     /// Saves a run that did not finish (restarted or closed before the end), so that the falls and the lifts of
@@ -124,6 +166,10 @@ impl Game {
         let events_before = self.sim.events.len();
         self.sim.step(input);
         self.replay_out.record(self.sim.tick, input);
+        let ball = &self.sim.ball;
+        for f in self.watch.observe(self.sim.tick, ball.position, ball.velocity, input, ball.on_ground) {
+            self.report(&f);
+        }
         for (t, e) in self.sim.events.iter().skip(events_before) {
             if *e == Event::Died {
                 self.ball_lost_at = Some(*t);

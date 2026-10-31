@@ -15,6 +15,7 @@ mod replay;
 mod scene;
 mod sim;
 mod sky;
+mod watch;
 
 use assets::{Data, Source};
 use std::path::PathBuf;
