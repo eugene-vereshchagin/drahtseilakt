@@ -6,7 +6,7 @@
 // what the C game does, measured in its C reference build.
 
 use crate::collide::{StaticMesh, Triangle};
-use crate::physics::{Material, World};
+use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, World};
 use crate::volume::Obb;
 use glam::{Mat3, Quat, Vec3};
 use level::Level;
@@ -643,18 +643,15 @@ fn static_meshes(level: &Level) -> Vec<StaticMesh> {
     let mut out = Vec::new();
     let mut seen = Vec::new();
     for g in &level.groups {
-        // The player ball (group Ball) does not collide with objects of its own group: floor stoppers are such
-        // objects, so they stop boxes and loose balls but not the ball (docs/physics.md, section 3.4).
-        let solid = match g.name.to_ascii_lowercase().as_str() {
-            "phys_floors" | "phys_floorrails" => true,
-            "phys_floorstopper" => false,
+        // Floors and rails are group Floor. Floor stoppers are group Ball, the player ball's: they stop boxes and
+        // loose balls but not the ball (docs/physics.md, section 3.4).
+        let group = match g.name.to_ascii_lowercase().as_str() {
+            "phys_floors" | "phys_floorrails" => GROUP_FLOOR,
+            "phys_floorstopper" => GROUP_BALL,
             // Modules are solid for now; their own behaviour comes with phase 4. Boxes are bodies (see `Sim::new`).
-            n if n.starts_with("p_modul") => true,
-            _ => false,
+            n if n.starts_with("p_modul") => "",
+            _ => continue,
         };
-        if !solid {
-            continue;
-        }
         for &m in &g.members {
             if seen.contains(&m) {
                 continue;
@@ -693,7 +690,12 @@ fn static_meshes(level: &Level) -> Vec<StaticMesh> {
                 }
             }
             if !triangles.is_empty() {
-                out.push(StaticMesh { triangles, pos, rot });
+                out.push(StaticMesh {
+                    triangles,
+                    pos,
+                    rot,
+                    group,
+                });
             }
         }
     }

@@ -17,6 +17,8 @@ pub struct StaticMesh {
     pub triangles: Vec<Triangle>,
     pub pos: Vec3,
     pub rot: Quat,
+    /// The collision group: objects of the same non-empty group do not collide (docs/physics.md 3.4).
+    pub group: &'static str,
 }
 
 impl StaticMesh {

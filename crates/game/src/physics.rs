@@ -23,6 +23,20 @@ const TICK: f64 = 1.0 / 60.0;
 /// the time factor to 2 (checked in the C game: its physics time advances 2 s for every second of frames).
 const TIME_FACTOR: f64 = 2.0;
 
+/// The collision group of the player's ball and of the floor stoppers (docs/physics.md 3.4).
+pub const GROUP_BALL: &str = "Ball";
+/// The collision group of the level's floors and rails.
+pub const GROUP_FLOOR: &str = "Floor";
+
+/// A group name as the physics keeps it: its first 8 bytes, NUL padded.
+fn group(name: &str) -> [u8; 8] {
+    let mut g = [0u8; 8];
+    for (d, s) in g.iter_mut().zip(name.bytes()) {
+        *d = s;
+    }
+    g
+}
+
 /// The material of a body, as the original's tables give it.
 #[derive(Clone, Copy, Debug)]
 pub struct Material {
@@ -60,8 +74,8 @@ pub struct World {
     pub grounded: bool,
     /// The push controller of each body that has been pushed (see `set_push`).
     pushers: Vec<Option<usize>>,
-    /// The IVP bodies of the level's physical objects.
-    statics: Vec<usize>,
+    /// The IVP bodies of the level's physical objects, with whether the player's ball collides with them.
+    statics: Vec<(usize, bool)>,
 }
 
 fn vec3_f64(v: Vec3) -> [f64; 3] {
@@ -113,24 +127,35 @@ impl World {
                 fixed: true,
                 friction: SURFACE_FRICTION,
                 elasticity: SURFACE_ELASTICITY,
+                group: group(mesh.group),
                 ..BodyDesc::default()
             };
             let id = world
                 .physics
                 .add_body(desc, Shape::Surface(surface), vec3_f64(mesh.pos), ivp_quat(mesh.rot));
-            world.statics.push(id);
+            world.statics.push((id, mesh.group != GROUP_BALL));
         }
         world
     }
 
     fn add(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Quat) -> usize {
-        self.add_shifted(shape, m, pos, rot, None)
+        self.add_shifted(shape, m, pos, rot, None, "")
     }
 
-    /// A body whose mass centre is `shift` in its own frame (`None`: the shape's own centre, as "Auto Mass Center").
-    fn add_shifted(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Quat, shift: Option<[f32; 3]>) -> usize {
+    /// A body whose mass centre is `shift` in its own frame (`None`: the shape's own centre, as "Auto Mass Center"),
+    /// in collision group `group_name` ("" collides with everything).
+    fn add_shifted(
+        &mut self,
+        shape: Shape,
+        m: Material,
+        pos: Vec3,
+        rot: Quat,
+        shift: Option<[f32; 3]>,
+        group_name: &str,
+    ) -> usize {
         let desc = BodyDesc {
             shift,
+            group: group(group_name),
             // the floor is entity 0; the game's bodies follow in creation order, so the ball is entity 1
             entity: self.handles.len() as u32 + 1,
             mass: m.mass,
@@ -166,6 +191,7 @@ impl World {
         self.remove(i);
         let desc = BodyDesc {
             entity: i as u32 + 1,
+            group: group(GROUP_BALL),
             mass: m.mass,
             friction: m.friction,
             elasticity: m.elasticity,
@@ -199,9 +225,9 @@ impl World {
         }
     }
 
-    /// The player's ball, with its radius. By convention the first body.
+    /// The player's ball, with its radius, in group Ball. By convention the first body.
     pub fn add_ball(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
-        self.add(Shape::Sphere(radius), m, pos, rot)
+        self.add_shifted(Shape::Sphere(radius), m, pos, rot, None, GROUP_BALL)
     }
 
     /// The original's "Physics WakeUp": a sleeping body comes back into the simulation, an awake one restarts its
@@ -238,13 +264,14 @@ impl World {
         let pts: Vec<[f64; 3]> = points.iter().map(|&p| vec3_f64(p)).collect();
         let hull = ivp::convex::hull(&pts)?;
         let surface = Surface::compile(vec![hull])?;
-        Some(self.add_shifted(Shape::Surface(surface), m, pos, rot, Some([0.0; 3])))
+        Some(self.add_shifted(Shape::Surface(surface), m, pos, rot, Some([0.0; 3]), ""))
     }
 
-    /// The triangles of the level's physical objects near a point, in world space, as the physics sees them.
+    /// The triangles near a point of the level's physical objects that the player's ball collides with, in world
+    /// space, as the physics sees them.
     pub fn floor_near(&self, p: Vec3, r: f32) -> Vec<[Vec3; 3]> {
         let mut out = Vec::new();
-        for &id in &self.statics {
+        for &(id, _) in self.statics.iter().filter(|s| s.1) {
             let (pos, rot) = self.physics.body_pose(id);
             let (pos, rot) = (vec3(pos), quat(rot));
             let local = rot.inverse() * (p - pos);
@@ -321,6 +348,7 @@ mod tests {
             triangles: vec![tri(p[0], p[2], p[1]), tri(p[0], p[3], p[2])],
             pos: Vec3::ZERO,
             rot: Quat::IDENTITY,
+            group: GROUP_FLOOR,
         }]
     }
 
@@ -374,6 +402,34 @@ mod tests {
         assert!((s.pos.y - 12.0).abs() < 0.05, "the ball is at {:?}", s.pos);
         let near = w.floor_near(Vec3::new(0.0, 10.0, 0.0), 200.0);
         assert!(near.iter().flatten().all(|v| (v.y - 10.0).abs() < 1e-4), "the triangles in the world: {near:?}");
+    }
+
+    #[test]
+    fn a_floor_stopper_stops_a_box_but_not_the_ball() {
+        // A wall 4 high across x = 10, in the ball's group: the box pushed into it stops, the ball rolls through.
+        let mut statics = floor();
+        let w = |y: f32, z: f32| Vec3::new(10.0, y, z);
+        statics.push(StaticMesh {
+            triangles: vec![
+                Triangle { a: w(0.0, -50.0), b: w(4.0, 50.0), c: w(4.0, -50.0) },
+                Triangle { a: w(0.0, -50.0), b: w(0.0, 50.0), c: w(4.0, 50.0) },
+            ],
+            pos: Vec3::ZERO,
+            rot: Quat::IDENTITY,
+            group: GROUP_BALL,
+        });
+        let mut world = World::new(&statics);
+        let ball = world.add_ball(2.0, wood(), Vec3::new(0.0, 2.0, 8.0), Quat::IDENTITY);
+        let bx = world.add_box(Vec3::splat(1.0), crate_material(), Vec3::new(0.0, 1.0, -8.0), Quat::IDENTITY);
+        for _ in 0..240 {
+            world.set_push(ball, Vec3::X * 0.43);
+            world.set_push(bx, Vec3::X * 0.3);
+            world.step(None);
+        }
+        let (b, x) = (world.state(ball).unwrap().pos, world.state(bx).unwrap().pos);
+        assert!(b.x > 14.0, "the ball did not pass the stopper: {b:?}");
+        assert!(x.x < 10.0, "the box went through the stopper: {x:?}");
+        assert!(world.floor_near(Vec3::new(10.0, 2.0, 0.0), 60.0).iter().all(|t| t.iter().all(|v| v.y == 0.0)), "the stopper is not the ball's floor");
     }
 
     #[test]
