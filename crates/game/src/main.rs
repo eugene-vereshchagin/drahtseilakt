@@ -12,6 +12,7 @@ mod hud;
 mod menu;
 mod modules;
 mod physics;
+mod proximity;
 mod render;
 mod replay;
 mod scene;

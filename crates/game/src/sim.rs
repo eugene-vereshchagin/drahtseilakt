@@ -6,6 +6,7 @@
 // what the C game does, measured in its C reference build.
 
 use crate::collide::{StaticMesh, Triangle};
+use crate::proximity::{Proximity, Range};
 use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, Rot, World};
 use crate::scene::{ModuleBody, Modules, module_of};
 use crate::volume::Obb;
@@ -212,7 +213,7 @@ struct ModuleInst {
     parts: Vec<usize>,
     joints: Vec<JointInst>,
     /// The part woken when the ball comes near: its body, the point measured from, and the distance.
-    wake: Option<(usize, Vec3, f32)>,
+    wake: Option<(usize, Vec3, Proximity)>,
     /// The forces made when it is woken.
     forces: Vec<ForceInst>,
     finish: Option<FinishInst>,
@@ -231,7 +232,7 @@ struct ForceInst {
 #[derive(Clone, Debug)]
 struct FinishInst {
     near: usize,
-    distance: f32,
+    prox: Proximity,
     force: ForceInst,
     breaks: Vec<usize>,
 }
@@ -241,29 +242,19 @@ struct FinishInst {
 #[derive(Clone, Debug)]
 struct FinishTrigger {
     near: usize,
-    distance: f32,
+    prox: Proximity,
     force: ForceInst,
     breaks: Vec<usize>,
     /// The physics' joints to break, made when the module came into the physics.
     joints: Vec<usize>,
-    armed: bool,
-    next: u64,
 }
 
 impl FinishTrigger {
-    /// Armed, with the physics' joints its module just made.
+    /// Switched on, with the physics' joints its module just made.
     fn arm(&mut self, made: &[Option<usize>]) {
         self.joints = self.breaks.iter().filter_map(|&k| made.get(k).copied().flatten()).collect();
-        self.armed = true;
-        self.next = 0;
+        self.prox.switch_on();
     }
-}
-
-/// Frames until the finish's next proximity check at distance `d` (its TT Scaleable Proximity: every frame within
-/// 5, every 10 frames beyond 10, in between in proportion).
-fn finish_delay(d: f32) -> u64 {
-    let k = ((d - 5.0) / 5.0).clamp(0.0, 1.0);
-    (1.0 + 9.0 * k).round() as u64
 }
 
 /// A module's wake-up on approach, armed while its module is in the physics (crate::modules::WakeSpec).
@@ -274,17 +265,7 @@ struct WakeTrigger {
     /// The forces made when it fires.
     forces: Vec<ForceInst>,
     near: Vec3,
-    distance: f32,
-    armed: bool,
-    /// The tick of the next check: the original's TT Scaleable Proximity looks again after 10 frames within 55 units
-    /// and after 60 beyond 100, in between in proportion.
-    next: u64,
-}
-
-/// Frames until the next proximity check at distance `d` (TT Scaleable Proximity's exactness, as module 34 sets it).
-fn proximity_delay(d: f32) -> u64 {
-    let k = ((d - 55.0) / 45.0).clamp(0.0, 1.0);
-    (10.0 + 50.0 * k).round() as u64
+    prox: Proximity,
 }
 
 /// A module's joint between two game bodies, its points and axes in the world.
@@ -397,7 +378,8 @@ fn module_parts(
     // a point given in a frame object (the frame's whole matrix, as Virtools' Transform), and a frame's Z axis
     let point = |frame: &str, p: [f32; 3]| at(frame).map(|m| m.transform_point3(Vec3::from(p)));
     if let Some(w) = spec.wake {
-        inst.wake = Some((body(w.part)?, at(w.near)?.w_axis.truncate(), w.distance));
+        let prox = Proximity::new(w.distance, w.exact.0, w.exact.1, w.frames);
+        inst.wake = Some((body(w.part)?, at(w.near)?.w_axis.truncate(), prox));
     }
     // A force's direction turned by its frame and normalised (a near-zero one is +x), times its value.
     let force = |f: &ForceSpec| -> Option<ForceInst> {
@@ -451,7 +433,9 @@ fn module_parts(
             .filter(|(_, j)| matches!(j, JointSpec::Hinge { frame, .. } if f.breaks.contains(frame)))
             .map(|(k, _)| k)
             .collect();
-        inst.finish = Some(FinishInst { near: body(f.near)?, distance: f.distance, force: force(&f.force)?, breaks });
+        // the finish's proximity: tested every frame within 5, every 10 frames beyond 10
+        let prox = Proximity::new(f.distance, 5.0, 10.0, (1, 10));
+        inst.finish = Some(FinishInst { near: body(f.near)?, prox, force: force(&f.force)?, breaks });
     }
     Some(inst)
 }
@@ -767,26 +751,19 @@ impl Sim {
         for (sector, inst) in unsectored_modules.iter().map(|m| (None, m)).chain(sectored) {
             let now = sector.is_none_or(|n| n == 0);
             let joints = if now { inst.enter(&mut world) } else { Vec::new() };
-            if let Some((body, near, distance)) = inst.wake {
-                wake_triggers.push(WakeTrigger {
-                    sector,
-                    body,
-                    forces: inst.forces.clone(),
-                    near,
-                    distance,
-                    armed: now,
-                    next: 0,
-                });
+            if let Some((body, near, mut prox)) = inst.wake {
+                if now {
+                    prox.switch_on();
+                }
+                wake_triggers.push(WakeTrigger { sector, body, forces: inst.forces.clone(), near, prox });
             }
             if let Some(f) = &inst.finish {
                 let mut t = FinishTrigger {
                     near: f.near,
-                    distance: f.distance,
+                    prox: f.prox,
                     force: f.force,
                     breaks: f.breaks.clone(),
                     joints: Vec::new(),
-                    armed: false,
-                    next: 0,
                 };
                 if now {
                     t.arm(&joints);
@@ -1144,17 +1121,14 @@ impl Sim {
 
     /// The modules' wake-ups on approach: a part is woken, once, when the ball comes within its distance.
     fn check_wake_triggers(&mut self) {
-        let (tick, ball) = (self.tick, self.ball.position);
-        for w in self.wake_triggers.iter_mut().filter(|w| w.armed && w.next <= tick) {
-            let d = ball.distance(w.near);
-            if d < w.distance {
-                w.armed = false;
+        let ball = self.ball.position;
+        for w in &mut self.wake_triggers {
+            if w.prox.frame(ball, w.near) == Some(Range::Enter) {
+                w.prox.switch_off();
                 self.world.wake(w.body);
                 for f in &w.forces {
                     self.world.add_force(f.body, f.force, f.point);
                 }
-            } else {
-                w.next = tick + proximity_delay(d);
             }
         }
     }
@@ -1162,17 +1136,15 @@ impl Sim {
     /// The finish's triggers: the ball within reach of the balloon's platform pushes its box away, breaks its bridge
     /// and finishes the level, as its script does. The ball is measured to the part where the physics has it.
     fn check_finishes(&mut self) {
-        let (tick, ball) = (self.tick, self.ball.position);
+        let ball = self.ball.position;
         let mut fired = None;
-        for t in self.finishes.iter_mut().filter(|t| t.armed && t.next <= tick) {
+        for t in &mut self.finishes {
             let Some(near) = self.world.bodies.get(t.near) else { continue };
-            let d = ball.distance(near.pos);
-            if d < t.distance {
-                t.armed = false;
+            if t.prox.frame(ball, near.pos) == Some(Range::Enter) {
+                t.prox.switch_off();
                 fired = Some((t.force, t.joints.clone()));
                 break;
             }
-            t.next = tick + finish_delay(d);
         }
         if let Some((force, joints)) = fired {
             self.world.add_force(force.body, force.force, force.point);
@@ -1206,13 +1178,16 @@ impl Sim {
                         if let Some(f) = &inst.finish
                             && let Some(t) = self.finishes.iter_mut().find(|t| t.near == f.near)
                         {
-                            t.armed = false;
+                            t.prox.switch_off();
                         }
                     }
                 }
                 for w in self.wake_triggers.iter_mut().filter(|w| w.sector == Some(c.sector)) {
-                    w.armed = c.enter;
-                    w.next = tick;
+                    if c.enter {
+                        w.prox.switch_on();
+                    } else {
+                        w.prox.switch_off();
+                    }
                 }
                 continue;
             }

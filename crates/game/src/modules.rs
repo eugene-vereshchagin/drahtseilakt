@@ -69,12 +69,15 @@ pub const FIXCUBE: &str = "FixCube";
 /// A module's wake-up on approach: its script starts a TT Scaleable Proximity between the ball's position and
 /// `near` (a part, or the module itself when it names the module's root `_MF` object) once its joints are made, and
 /// when the ball comes within `distance` runs Physics WakeUp on `part`, once. A part made asleep would otherwise stay
-/// asleep with nothing touching it (the stone of module 34 above its box).
+/// asleep with nothing touching it (the stone of module 34 above its box). `exact` and `frames` are the block's
+/// exactness: it tests every `frames.0` frames within `exact.0`, every `frames.1` beyond `exact.1`.
 #[derive(Debug, Clone, Copy)]
 pub struct WakeSpec {
     pub part: &'static str,
     pub near: &'static str,
     pub distance: f32,
+    pub exact: (f32, f32),
+    pub frames: (u32, u32),
 }
 
 /// A force a module's script puts on a part (SetPhysicsForce): `value` along `dir` turned by `dir_frame`'s axes and
@@ -162,7 +165,7 @@ const MODULES: &[ModuleSpec] = &[
         ],
         joints: &[
         ],
-        wake: Some(WakeSpec { part: "P_Modul_01_Pusher", near: "P_Modul_01_Pusher", distance: 50.0 }),
+        wake: Some(WakeSpec { part: "P_Modul_01_Pusher", near: "P_Modul_01_Pusher", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
     },
@@ -264,7 +267,7 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Slider { a: "P_Modul_03_Floor", b: "FixCube", from: "P_Modul_03_frame_low", to: "P_Modul_03_frame_high", limits: false, lo: -1.0, hi: 1.0 },
             JointSpec::Spring { a: "P_Modul_03_Floor", pos_a: [0.0, 0.0, 0.0], frame_a: "P_Modul_03_frame_low", b: "FixCube", pos_b: [0.0, 0.0, 0.0], frame_b: "P_Modul_03_frame_high", length: 0.0, constant: 15.0, lin_damp: 0.1, glob_damp: 1.0 },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_03_Floor", near: "P_Modul_03_MF", distance: 35.0 }),
+        wake: Some(WakeSpec { part: "P_Modul_03_Floor", near: "P_Modul_03_MF", distance: 35.0, exact: (35.0, 50.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
     },
@@ -328,7 +331,7 @@ const MODULES: &[ModuleSpec] = &[
         joints: &[
             JointSpec::Hinge { a: "P_Modul_19_Flaps", b: "FixCube", frame: "P_Modul_19_HingeFrame" },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_19_Flaps", near: "P_Modul_19_MF", distance: 50.0 }),
+        wake: Some(WakeSpec { part: "P_Modul_19_Flaps", near: "P_Modul_19_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
     },
@@ -349,7 +352,7 @@ const MODULES: &[ModuleSpec] = &[
         joints: &[
             JointSpec::Hinge { a: "P_Modul_25_Bridge", b: "FixCube", frame: "P_Modul_25_HingeFrame" },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_25_Bridge", near: "P_Modul_25_MF", distance: 50.0 }),
+        wake: Some(WakeSpec { part: "P_Modul_25_Bridge", near: "P_Modul_25_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
     },
@@ -491,7 +494,7 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Hinge { a: "P_Modul_29_Platte09", b: "FixCube", frame: "P_Modul_29_HingeFrame10" },
             JointSpec::Hinge { a: "P_Modul_29_Platte07", b: "P_Modul_29_Platte06", frame: "P_Modul_29_HingeFrame07" },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_29_Platte04", near: "P_Modul_29_MF", distance: 80.0 }),
+        wake: Some(WakeSpec { part: "P_Modul_29_Platte04", near: "P_Modul_29_MF", distance: 80.0, exact: (85.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
     },
@@ -512,7 +515,7 @@ const MODULES: &[ModuleSpec] = &[
         joints: &[
             JointSpec::Hinge { a: "P_Modul_30_Wippe", b: "FixCube", frame: "P_Modul_30_HingeFrame" },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_30_Wippe", near: "P_Modul_30_MF", distance: 50.0 }),
+        wake: Some(WakeSpec { part: "P_Modul_30_Wippe", near: "P_Modul_30_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
     },
@@ -543,7 +546,7 @@ const MODULES: &[ModuleSpec] = &[
         joints: &[
             JointSpec::Slider { a: "P_Modul_34_Schiebestein", b: "FixCube", from: "P_Modul_34_Slider_Frame01", to: "P_Modul_34_Slider_Frame02", limits: false, lo: -1.0, hi: 1.0 },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_34_Schiebestein", near: "P_Modul_34_Schiebestein", distance: 50.0 }),
+        wake: Some(WakeSpec { part: "P_Modul_34_Schiebestein", near: "P_Modul_34_Schiebestein", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
     },
@@ -564,7 +567,7 @@ const MODULES: &[ModuleSpec] = &[
         joints: &[
             JointSpec::Hinge { a: "P_Modul_37_Bridge", b: "FixCube", frame: "P_Modul_37_HingeFrame" },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_37_Bridge", near: "P_Modul_37_MF", distance: 50.0 }),
+        wake: Some(WakeSpec { part: "P_Modul_37_Bridge", near: "P_Modul_37_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
     },
@@ -824,7 +827,7 @@ const MODULES: &[ModuleSpec] = &[
         ],
         // The platform is woken when the ball comes within 70 (exactness 75 to 100, every 10 to 60 frames), and the
         // balloons' forces start then.
-        wake: Some(WakeSpec { part: "PE_Balloon_Platform", near: "PE_Balloon_Platform", distance: 70.0 }),
+        wake: Some(WakeSpec { part: "PE_Balloon_Platform", near: "PE_Balloon_Platform", distance: 70.0, exact: (75.0, 100.0), frames: (10, 60) }),
         forces: &[
             ForceSpec {
                 part: "PE_Balloon_Ballon01",

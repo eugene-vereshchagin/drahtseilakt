@@ -1501,3 +1501,20 @@ The old ball is pulled to the transformer's (0, 3, 0) (Set Physics Spring above)
 which a critically damped spring of 0.23 per frame matches. The new ball keeps the old one's orientation. The
 transformer's own `P_Trafo_*_MF` and `_Shadow`, hidden in their module file, are shown from the level start and
 stay shown throughout.
+
+## TT Scaleable Proximity (as the port runs it)
+
+`TT_Toolbox_RT`, GUID `2a2a63ca:00826175`; the C reference's `bb_tt_scaleable_proximity` (src/bb/bb_interface.c) is
+the description, `crates/game/src/proximity.rs` the port. The distance between ObjectA and ObjectB is compared
+squared with the Distance pin. The test runs every N frames, N going linearly in the **squared** distance from the
+minimum frame delay at the near exactness to the maximum at the far one (truncated, at least 1); the first test
+after On happens at once. A test gives Enter (within, and it was not or the block was just switched on), In, Exit
+or Out. The module scripts' values:
+
+| Script | Distance | Exactness | Frames |
+|---|---|---|---|
+| P_Modul_01, 19, 25, 30, 34, 37 wake-up | 50 | 55 / 100 | 10 / 60 |
+| P_Modul_03 wake-up | 35 | 35 / 50 | 10 / 60 |
+| P_Modul_29 wake-up; its stone-ball test | 80; 4 | 85 / 100; 8 / 20 | 10 / 60; 2 / 30 |
+| P_Modul_18 activation; its updraft test | 80; 7 | 85 / 100; 12 / 20 | 10 / 60; 1 / 10 |
+| PE_Balloon wake-up; finish | 70; 1 | 75 / 100; 5 / 10 | 10 / 60; 1 / 10 |
