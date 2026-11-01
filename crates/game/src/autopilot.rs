@@ -444,10 +444,10 @@ impl Pilot {
     /// the one ending furthest along the way without losing the ball, if it gets on from `here`.
     fn manoeuvre(&mut self, sim: &Sim, here: f32) -> Option<Vec<(u64, u8)>> {
         let mut best: Option<(f32, Vec<(u64, u8)>)> = None;
-        for _ in 0..40 {
+        for _ in 0..60 {
             let mut plan = Vec::new();
             let mut t = sim.tick;
-            for _ in 0..2 {
+            for _ in 0..3 {
                 let c = CHOICES[(self.rand() % 8 + 1) as usize];
                 t += 30 + u64::from(self.rand() % 90);
                 plan.push((t, c));
@@ -466,12 +466,39 @@ impl Pilot {
             if lost {
                 continue;
             }
-            let v = self.route.progress(s.ball.position, self.at);
-            if v > here + 0.5 && best.as_ref().is_none_or(|b| v > b.0) {
+            let v = self.route.progress(s.ball.position, self.at) - self.blocking(&s);
+            if v > here - self.blocking(sim) + 0.5 && best.as_ref().is_none_or(|b| v > b.0) {
                 best = Some((v, plan));
             }
         }
         best.map(|b| b.1)
+    }
+
+    /// How much the loose things (boxes, balls) stand in the way ahead: each one on the next stretch of the way
+    /// counts as five points of it, so pushing one off the way is worth a manoeuvre.
+    fn blocking(&self, sim: &Sim) -> f32 {
+        let ahead: Vec<Vec3> = self
+            .route
+            .points
+            .iter()
+            .skip(self.at)
+            .take(40)
+            .copied()
+            .collect();
+        let world = sim.world();
+        let mut n = 0.0;
+        for &(_, body) in sim.loose() {
+            let Some(st) = world.state(body) else {
+                continue;
+            };
+            let p = st.pos;
+            if ahead.iter().any(|q| {
+                Vec3::new(p.x - q.x, 0.0, p.z - q.z).length() < 2.5 && (p.y - q.y).abs() < 4.0
+            }) {
+                n += 5.0;
+            }
+        }
+        n
     }
 
     /// The input for the next tick of `sim`.
