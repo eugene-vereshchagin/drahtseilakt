@@ -29,8 +29,9 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   des Originals: Ereignisklänge, Stöße und Rollen der Kugel nach Bodenmaterial, die Musik des Levels. Ventilatoren brummen in ihrer Nähe, das Seil der
   Plattenbrücke reißt hörbar. Das Menü stellt die Lautstärke von Ton und Musik
   ein. Partikel, wie die Blöcke des Originals sie erzeugen: die Flammen am Start und an den Checkpoints, die
-  Funken und Spuren der Extrapunkte. der Wind der Ventilatoren, die Funken des Extralebens. Fehlt: der Rauch der Kugel,
-  die Erweiterung von Level 13.
+  Funken und Spuren der Extrapunkte. der Wind der Ventilatoren, die Funken des Extralebens. Level 13 (die SuDu-Erweiterung von 2004,
+  nach ihrem Readme in die Kopie des Spielers installiert) lädt und ist spielbar; das vollständige Grundspiel hat
+  dreizehn Level. Fehlt: der Rauch der Kugel.
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
 
 
@@ -169,7 +170,8 @@ sagt, dass sich die Kugel richtig anfühlt.
 - **Replays**: ein Eingabeprotokoll je Takt in einem dokumentierten, versionierten Textformat, das Level per
   Hash bezeichnet. Die Wiedergabe ohne Fenster prüft Checkpoints, Ziel und Punkte. Replays enthalten nur
   unsere Eingaben, liegen daher im Repository (`tests/replays/`) und laufen in der CI.
-- Level 13.
+- Level 13: die SuDu-Erweiterung von 2004, Teil des Grundspiels. Der Spieler installiert sie nach ihrem Readme
+  in seine Kopie (sie ersetzt Gameplay, Menu, MenuLevel, Levelinit, Sound und PE_Balloon und fügt Level_13 hinzu).
 
 Fertig, wenn: sich alle dreizehn Level beenden lassen und jedes ein bestehendes Replay hat.
 

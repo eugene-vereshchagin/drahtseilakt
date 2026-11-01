@@ -27,7 +27,9 @@ new engine got level 1 playable, ahead of the phase order:
   bridge. Sound as the original's Sound_Manager and Music_Manager make it: event sounds, the ball's hits and rolling
   by floor material, the level's music. The fans hum near them, the plate bridge's rope tears. The menu sets the sound and music volumes.
   Particles as the original's blocks make them: the flames at the start and the checkpoints, the extra points'
-  sparkles and trails, the fans' wind, the extra life's fizz. Missing: the ball's smoke, level 13's add-on.
+  sparkles and trails, the fans' wind, the extra life's fizz. Level 13 (the SuDu add-on of 2004, installed into
+  the player's copy as its readme says) loads and plays; the full base game is thirteen levels. Missing: the
+  ball's smoke.
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
 
 
@@ -158,7 +160,8 @@ ball feels right.
 - **Replays**: a per-tick input log in a documented, versioned text format, the level identified by its hash.
   Headless playback checks checkpoints, finish and score. Replays hold only our input, so they live in the
   repository (`tests/replays/`) and run in CI.
-- Level 13.
+- Level 13: the SuDu add-on of 2004, part of the base game. The player installs it into their copy as its
+  readme says (it replaces Gameplay, Menu, MenuLevel, Levelinit, Sound and PE_Balloon, adds Level_13).
 
 Done when: all thirteen levels can be finished, and each has a replay that passes.
 
