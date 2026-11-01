@@ -503,10 +503,16 @@ pub fn instances(
     out
 }
 
+/// The in-game camera's field of view: InGameCam's (Camera.nmo), 1.0123 radians across its 4:3 view, so
+/// vertically 2·atan(tan(1.0123 / 2) · 3/4) ≈ 45°; a wider window sees more at the sides.
+pub fn fov_y() -> f32 {
+    2.0 * ((1.012_291_f32 / 2.0).tan() * 0.75).atan()
+}
+
 pub fn view(s: &Snapshot) -> View {
     View {
         eye: s.eye,
         target: s.target,
-        fov_y: 58f32.to_radians(),
+        fov_y: fov_y(),
     }
 }
