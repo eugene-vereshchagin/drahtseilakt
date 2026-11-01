@@ -109,9 +109,14 @@ const DEATH_SECTOR_END_TICKS: u64 = 62;
 const DEATH_SECTOR_BEGIN_TICKS: u64 = 66;
 
 /// After the ball's box reaches a depth-test cube, the C game stops the push at once, takes the falling ball out of the
-/// physics 61 frames later and shows the new ball at the reset point 10 frames after that.
+/// physics 61 frames later (a life goes then), shows the new ball at the reset point 10 frames after that, and makes
+/// it a body that rolls and answers the keys 245 frames after the loss (C game, level 2: lost at 331, the new body
+/// falling from 577).
 const DEATH_REMOVE_TICKS: u64 = 61;
-const DEATH_RESPAWN_TICKS: u64 = 71;
+const DEATH_SHOW_TICKS: u64 = 71;
+const DEATH_RESPAWN_TICKS: u64 = 245;
+/// The points counter waits while a ball is lost, and goes on this many ticks after the new ball, where it was.
+const POINTS_RESUME_TICKS: u64 = 5;
 
 /// The rotational damping of the original's balls (docs/physics.md, section 3).
 const BALL_ROT_DAMP: f32 = 0.1;
@@ -672,6 +677,9 @@ pub struct Sim {
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
     ball_boxes: [(Vec3, Vec3); 3],
+    /// The points counter's ticks counted, and the tick it goes on from after a lost ball.
+    points_clock: u64,
+    points_resume: u64,
     /// The tick the depth-test cubes' Group Iterator started (with the new ball), and the ball's pose at the end of
     /// the last tick, which is what the original's test sees (its scripts run before its physics in a frame).
     depth_from: u64,
@@ -698,6 +706,12 @@ const LEVEL_INTRO_SECONDS: f64 = 594.0 / 60.0;
 const START_OBJECTS_SECONDS: f64 = 180.0 / 30.0;
 const START_OBJECTS_SECONDS_TUTORIAL: f64 = 4.0 / 60.0;
 const GATE_RADIUS: f32 = 7.0;
+/// The points a level starts with (the Energy array's StartPoints), and the counter that takes one every half
+/// second (its Timefactor, 500 ms): measured in the C game on level 2, the points go down at ticks 32, 62, 92...
+const START_POINTS: i64 = 1000;
+const POINTS_FROM: u64 = 32;
+const POINTS_EVERY: u64 = 30;
+
 /// Ticks from a new ball to the depth-test cubes' first test: fitted to the C game, where a ball leaving level 2 on
 /// the same route is lost at tick 331 (the iterator's round is 4 ticks there, so this is known modulo 4).
 const DEPTH_PHASE: u64 = 3;
@@ -994,7 +1008,8 @@ impl Sim {
             camera,
             tick: 0,
             lives: 3,
-            points: 1000,
+            // the points counter takes its first point as the level starts (C game, level 2: 999 when the ball comes)
+            points: START_POINTS - 1,
             sector: 0,
             finished: false,
             finished_at: 0,
@@ -1016,6 +1031,8 @@ impl Sim {
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
             depth_from: DEPTH_PHASE,
+            points_clock: 0,
+            points_resume: 0,
             prev_pose: (ball.position, ball.rotation),
             sector_changes: Vec::new(),
         }
@@ -1173,8 +1190,12 @@ impl Sim {
         if self.trafo_anim.is_some_and(|a| self.tick as f32 > (a.start + crate::trafo::BEGIN) as f32 + crate::trafo::END) {
             self.trafo_anim = None;
         }
-        if self.tick.is_multiple_of(30) && self.points > 0 {
-            self.points -= 1;
+        // The points counter, every 30 ticks from tick 32, waiting while a ball is lost.
+        if self.tick > POINTS_FROM - POINTS_EVERY && self.dying.is_none() && self.tick >= self.points_resume {
+            self.points_clock += 1;
+            if self.points_clock.is_multiple_of(POINTS_EVERY) && self.points > 0 {
+                self.points -= 1;
+            }
         }
     }
 
@@ -1254,11 +1275,22 @@ impl Sim {
         if let Some(d) = self.dying {
             if self.tick == d + DEATH_REMOVE_TICKS {
                 self.world.remove(0);
+                // Lives are balls: the last ball lost ends the run.
+                self.lives = self.lives.saturating_sub(1);
+                if self.lives == 0 {
+                    self.game_over = true;
+                    self.events.push((self.tick, Event::GameOver));
+                    return;
+                }
+            }
+            if self.tick == d + DEATH_SHOW_TICKS {
+                self.place_ball();
+                self.events.push((self.tick, Event::NewBall));
             }
             if self.tick >= d + DEATH_RESPAWN_TICKS {
                 self.dying = None;
-                self.respawn();
-                self.events.push((self.tick, Event::NewBall));
+                self.make_ball();
+                self.points_resume = self.tick + POINTS_RESUME_TICKS;
             }
         } else if self.hold.is_none() && self.fell_off() {
             self.die();
@@ -1283,13 +1315,6 @@ impl Sim {
 
     fn die(&mut self) {
         self.events.push((self.tick, Event::Died));
-        // Lives are balls: the last ball lost ends the run.
-        self.lives = self.lives.saturating_sub(1);
-        if self.lives == 0 {
-            self.game_over = true;
-            self.events.push((self.tick, Event::GameOver));
-            return;
-        }
         self.dying = Some(self.tick);
         // The current sector starts again: its objects leave the physics and are made again at their places.
         self.sector_change(DEATH_SECTOR_END_TICKS, self.sector, false);
@@ -1543,6 +1568,21 @@ impl Sim {
 
     /// A new ball at the current reset point, at rest, and the camera in its start view.
     fn respawn(&mut self) {
+        self.place_ball();
+        self.make_ball();
+    }
+
+    /// The new ball's body at the place it was put, at rest.
+    fn make_ball(&mut self) {
+        self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), self.ball.position, Rot::Quat(self.ball.rotation));
+        self.drop_ball_forces();
+        // the new ball starts the depth-test cubes' iterator again
+        self.depth_from = self.tick + DEPTH_PHASE;
+        self.prev_pose = (self.ball.position, self.ball.rotation);
+    }
+
+    /// The new ball put at the current reset point (shown, not yet a body), and the camera in its start view.
+    fn place_ball(&mut self) {
         let spawn = self
             .rules
             .resets
@@ -1556,11 +1596,6 @@ impl Sim {
         self.ball.spin = Vec3::ZERO;
         self.hold = None;
         self.trafo_anim = None;
-        self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), spawn, Rot::Basis(turn));
-        self.drop_ball_forces();
-        // the new ball starts the depth-test cubes' iterator again
-        self.depth_from = self.tick + DEPTH_PHASE;
-        self.prev_pose = (self.ball.position, self.ball.rotation);
         // The camera comes back as it was at the start: the start heading, not lifted, no turn in progress.
         self.camera.quarter = START_QUARTER;
         self.camera.yaw = START_QUARTER as f32 * std::f32::consts::FRAC_PI_2;
@@ -2280,7 +2315,9 @@ mod tests {
     }
 
     /// A short route off level 2 with the player's copy (skipped without OPENBALLANCE_DATA): the ball is lost at
-    /// tick 331, as in the C game on the same input, where the depth-test cubes are tested one a frame.
+    /// tick 331, as in the C game on the same input, where the depth-test cubes are tested one a frame; the new ball
+    /// is a body from tick 577 (C: y 10.33 there, 10.07 at 581), and at tick 600 the points are 988 with 2 lives,
+    /// the counter having waited while the ball was lost.
     #[test]
     fn a_ball_leaving_level_2_is_lost_on_the_c_game_s_tick() {
         let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
@@ -2297,6 +2334,15 @@ mod tests {
         }
         let died = sim.events.iter().find(|e| e.1 == Event::Died).map(|e| e.0);
         assert_eq!(died, Some(331));
+        let mut heights = Vec::new();
+        while sim.tick < 600 {
+            sim.step(input(sim.tick + 1));
+            if sim.tick == 577 || sim.tick == 581 {
+                heights.push(sim.ball.position.y);
+            }
+        }
+        assert!((heights[0] - 10.33).abs() < 0.02 && (heights[1] - 10.07).abs() < 0.03, "{heights:?}");
+        assert_eq!((sim.points, sim.lives), (988, 2));
     }
 
     /// Level 1's module 34 with the player's copy (skipped without OPENBALLANCE_DATA): a wooden ball pushed into
