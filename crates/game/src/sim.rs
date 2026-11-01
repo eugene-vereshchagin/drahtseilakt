@@ -188,6 +188,8 @@ pub enum Event {
     Finished,
     /// A new ball after a lost one.
     NewBall,
+    /// A hinge a heavy ball breaks (module 29's plate bridge): its script plays Misc_RopeTears.
+    RopeTears,
 }
 
 /// What the rules need from the level, resolved once.
@@ -1370,6 +1372,7 @@ impl Sim {
     fn check_breaks(&mut self) {
         let (ball, kind) = (self.ball.position, self.ball.kind);
         let alive = self.hold.is_none() && self.dying.is_none();
+        let tick = self.tick;
         for b in &mut self.breaks {
             let Some(near) = self.world.bodies.get(b.at.near).map(|x| x.pos) else { continue };
             if b.at.prox.frame(ball, near) == Some(Range::Enter) && alive && kind == b.at.kind {
@@ -1377,6 +1380,7 @@ impl Sim {
                 if let Some(j) = b.joint.take() {
                     self.world.remove_joint(j);
                 }
+                self.events.push((tick, Event::RopeTears));
             }
         }
     }

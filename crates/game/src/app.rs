@@ -1016,6 +1016,7 @@ impl App {
                 Event::Transform(_) => drop(audio.play(&self.data, "Misc_Trafo", 1.0, 0.0)),
                 Event::Died => drop(audio.play(&self.data, "Misc_Fall", 1.0, 0.0)),
                 Event::NewBall => drop(audio.play(&self.data, "Misc_Lightning", 1.0, 0.0)),
+                Event::RopeTears => drop(audio.play(&self.data, "Misc_RopeTears", 1.0, 0.0)),
                 Event::GameOver | Event::Finished => {}
             }
         }
