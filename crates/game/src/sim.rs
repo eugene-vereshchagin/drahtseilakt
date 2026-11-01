@@ -705,6 +705,8 @@ struct SectorChange {
 }
 
 const PICK_RADIUS: f32 = 3.5;
+/// How near a transformer takes the ball.
+pub const TRAFO_REACH: f32 = PICK_RADIUS + 1.0;
 /// Physics time from the level's load to its first sector's objects: 594 frames at time factor 1 (the C game,
 /// level 1).
 const LEVEL_INTRO_SECONDS: f64 = 594.0 / 60.0;
@@ -1274,7 +1276,7 @@ impl Sim {
             }
         }
         for &(_, q, kind, at) in &self.rules.trafos {
-            if self.hold.is_none() && self.ball.kind != kind && near(q, PICK_RADIUS + 1.0) {
+            if self.hold.is_none() && self.ball.kind != kind && near(q, TRAFO_REACH) {
                 // The original takes the ball out of the physics and, after a while, makes a ball of the new kind at
                 // rest above the transformer.
                 let old = self.ball.kind;
@@ -1391,6 +1393,11 @@ impl Sim {
     /// against the box of the ball's mesh, as the original does.
     pub fn set_ball_boxes(&mut self, boxes: [(Vec3, Vec3); 3]) {
         self.ball_boxes = boxes;
+    }
+
+    /// The transformers: where each takes a ball (one within `TRAFO_REACH` of it) and the kind it makes.
+    pub fn trafos(&self) -> impl Iterator<Item = (Vec3, BallKind)> + '_ {
+        self.rules.trafos.iter().map(|&(_, q, kind, _)| (q, kind))
     }
 
     /// The transformer animation playing: the transformer's matrix, the animation's age in ticks and the kind it

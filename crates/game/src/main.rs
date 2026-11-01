@@ -15,6 +15,7 @@ mod endscreen;
 mod extra;
 mod freecam;
 mod hud;
+mod locate;
 mod menu;
 mod menuscene;
 mod modules;
@@ -48,8 +49,10 @@ usage: drahtseilakt [options]
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
   --autopilot         no window: the test player plays the level (to --ticks); saved with --record
-  --follow FILE       the test player follows the ball's way in a replay of a player's run
+  --follow FILE       the test player follows the ball's way in a replay of a player's run, or a --locate track
   --plan FILE         the test player's way goes through the level objects named in FILE, in order
+  --locate DIR        find the ball's way in a video's frames (DIR/s0001.jpg, four a second); track to --record
+  --frames DIR        with --replay: draw four frames a second into DIR, with the ball's true places
   --screenshot FILE   no window: render the frame after the replay (or --ticks N) to a PNG
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
@@ -82,10 +85,17 @@ pub struct Options {
     pub headless: bool,
     /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
     pub autopilot: bool,
-    /// The test player follows the ball's way in this replay (a player's run) instead of finding one.
+    /// The test player follows the ball's way in this replay (a player's run) or `--locate` track instead of finding
+    /// one.
     pub follow: Option<PathBuf>,
     /// The test player's way goes through these level objects in order (a file of names).
     pub plan: Option<PathBuf>,
+    /// Find the ball's way in the frames (s0001.jpg, `locate::RATE` a second) of a video of the original; the track is
+    /// written to --record.
+    pub locate: Option<PathBuf>,
+    /// Draw frames of the replay (`locate::RATE` a second) into this folder, with the ball's true places (to check
+    /// --locate).
+    pub frames: Option<PathBuf>,
     pub screenshot: Option<PathBuf>,
     pub ticks: Option<u64>,
     pub trace: Option<u64>,
@@ -112,6 +122,8 @@ fn parse_args() -> Result<Options, String> {
         autopilot: false,
         follow: None,
         plan: None,
+        locate: None,
+        frames: None,
         screenshot: None,
         ticks: None,
         trace: None,
@@ -157,6 +169,8 @@ fn parse_args() -> Result<Options, String> {
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,
             "--autopilot" => o.autopilot = true,
+            "--locate" => o.locate = Some(value()?.into()),
+            "--frames" => o.frames = Some(value()?.into()),
             "--plan" => {
                 o.plan = Some(value()?.into());
                 o.autopilot = true;
@@ -189,7 +203,9 @@ fn parse_args() -> Result<Options, String> {
                 )
             }
             "--sector" => {
-                let n: usize = value()?.parse().map_err(|_| "--sector needs a number".to_owned())?;
+                let n: usize = value()?
+                    .parse()
+                    .map_err(|_| "--sector needs a number".to_owned())?;
                 if n == 0 {
                     return Err("--sector starts at 1".into());
                 }

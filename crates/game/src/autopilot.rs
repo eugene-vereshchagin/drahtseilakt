@@ -376,6 +376,11 @@ impl Route {
         }
     }
 
+    /// Every floor point of the level (as the way was found over them).
+    pub fn floor_points(&self) -> impl Iterator<Item = Vec3> + '_ {
+        self.floor.values().flatten().map(|f| f.0)
+    }
+
     /// The point of the way nearest the ball at `p`.
     pub fn nearest(&self, p: Vec3) -> Option<usize> {
         let f = p - Vec3::Y * crate::sim::BALL_RADIUS;
@@ -413,17 +418,19 @@ impl Route {
         best.map_or(0.0, |b| b.1)
     }
 
-    /// How far along the way `p` is, searching from point `from` on: on the segment it is nearest to (within reach),
-    /// its index plus the part of it passed, less the square of the distance off it (keep to the way, do not cut
-    /// corners along the edge).
-    fn progress(&self, p: Vec3, from: usize) -> f32 {
-        self.progress_on(p, from).0
+    /// How far along the way `p` is, searching from point `from` up to `until`: on the segment it is nearest to
+    /// (within reach), its index plus the part of it passed, less the square of the distance off it (keep to the way,
+    /// do not cut corners along the edge).
+    fn progress(&self, p: Vec3, from: usize, until: usize) -> f32 {
+        self.progress_on(p, from, until).0
     }
 
     /// `progress`, and whether `p` is on the way (within reach of it) rather than beside it.
-    fn progress_on(&self, p: Vec3, from: usize) -> (f32, bool) {
+    fn progress_on(&self, p: Vec3, from: usize, until: usize) -> (f32, bool) {
         let floor = p - Vec3::Y * crate::sim::BALL_RADIUS;
-        let end = (from + 120).min(self.points.len().saturating_sub(1));
+        let end = (from + 120)
+            .min(self.points.len().saturating_sub(1))
+            .min(until.max(from + 1));
         let mut best: Option<(f32, f32)> = None;
         for i in from..end {
             let (Some(&a), Some(&b)) = (self.points.get(i), self.points.get(i + 1)) else {
@@ -526,7 +533,7 @@ impl Pilot {
     /// How far along the way the ball at `p` is, held before the next transformer until the ball has been in it:
     /// near it, the nearer the better.
     fn progress(&self, p: Vec3) -> f32 {
-        let v = self.route.progress(p, self.at);
+        let v = self.route.progress(p, self.at, self.until());
         match self.gates.get(self.gate) {
             Some(&(i, g)) if v > i as f32 - 1.0 => {
                 (i as f32 - 1.0)
@@ -535,6 +542,12 @@ impl Pilot {
             }
             _ => v,
         }
+    }
+
+    /// The point the way is searched up to: the next transformer's (the way may pass by later on, after it, in
+    /// another kind of ball).
+    fn until(&self) -> usize {
+        self.gates.get(self.gate).map_or(usize::MAX, |g| g.0)
     }
 
     /// How far along the way the ball has come (route points).
@@ -713,7 +726,9 @@ impl Pilot {
         }
         let here = self.progress(sim.ball.position);
         // only on the way does the ball get on along it
-        let (on, on_way) = self.route.progress_on(sim.ball.position, self.at);
+        let (on, on_way) = self
+            .route
+            .progress_on(sim.ball.position, self.at, self.until());
         if on_way && on > self.at as f32 {
             self.at = on.floor().max(0.0) as usize;
         }
@@ -850,12 +865,12 @@ mod tests {
             floor: HashMap::new(),
         };
         let up = Vec3::Y * crate::sim::BALL_RADIUS;
-        let a = r.progress(Vec3::new(3.0, 0.0, 0.0) + up, 0);
-        let b = r.progress(Vec3::new(3.5, 0.0, 0.0) + up, 0);
-        let c = r.progress(Vec3::new(9.0, 0.0, 1.0) + up, 0);
+        let a = r.progress(Vec3::new(3.0, 0.0, 0.0) + up, 0, usize::MAX);
+        let b = r.progress(Vec3::new(3.5, 0.0, 0.0) + up, 0, usize::MAX);
+        let c = r.progress(Vec3::new(9.0, 0.0, 1.0) + up, 0, usize::MAX);
         assert!(a < b && b < c, "{a} {b} {c}");
         assert!((a - 1.5).abs() < 1e-4);
         // far off the way: no point within reach, so behind where the search began
-        assert!(r.progress(Vec3::new(9.0, 0.0, 20.0) + up, 2) < 2.0);
+        assert!(r.progress(Vec3::new(9.0, 0.0, 20.0) + up, 2, usize::MAX) < 2.0);
     }
 }

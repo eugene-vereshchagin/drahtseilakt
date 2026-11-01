@@ -49,7 +49,7 @@ beschleunigen ihn wieder (der Lauf selbst bleibt Takt für Takt derselbe), F5 sp
 dorthin zurück (die Aufzeichnung wird bis dorthin gekürzt, so lässt sich ein langes Level stückweise aufnehmen),
 und Sektor und Takt werden angezeigt. Ein so unterstützter Lauf wird behalten, ist aber nie der beste. Zum Testen lässt `--autopilot` einen Testspieler das Level ohne
 Fenster versuchen (mit `--record FILE` bleibt sein Lauf erhalten); `--follow FILE` lässt ihn dem Weg der Kugel im Replay eines
-Spielers folgen. `drahtseilakt --help` zeigt alles.
+Spielers folgen. `--locate DIR --record TRACK` findet den Weg der Kugel in den Bildern eines Videos des Originals (DIR/s0001.jpg usw., vier pro Sekunde, z. B. `ffmpeg -vf fps=4,scale=640:480`): Das Level wird von den möglichen Orten der Kugel aus gezeichnet und mit dem Bild verglichen; einer solchen Spur folgt der Testspieler mit `--follow TRACK`. `--frames DIR --replay FILE` zeichnet ein Replay als solche Bilder, mit den wahren Orten der Kugel, zum Prüfen. `drahtseilakt --help` zeigt alles.
 
 ## Rechtliches
 

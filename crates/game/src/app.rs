@@ -617,10 +617,17 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         let loaded = data.load(&o.source)?;
         return crate::assets::export(&data, &loaded, dir);
     }
+    if let Some(dir) = &o.locate {
+        let mut game = Game::new(&o, &data)?;
+        return locate_run(&mut game, &data, &o, dir);
+    }
     if let Some(follow) = &o.follow {
         return follow_run(&o, &data, follow);
     }
     let mut game = Game::new(&o, &data)?;
+    if let Some(dir) = &o.frames {
+        return frames_run(&mut game, &data, dir);
+    }
     if let Some(path) = &o.screenshot {
         return screenshot(&mut game, &data, &o, path);
     }
@@ -732,11 +739,164 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     }
 }
 
+/// Plays the replay and draws `locate::RATE` frames of it a second (640 × 480 with the in-game interface, as a
+/// video of the original would show it) into `dir` as s0001.jpg, ..., with `truth.txt`: each frame's number, the
+/// ball's place and the view's quarter. A video with a known answer, to check `--locate` with.
+fn frames_run(game: &mut Game, data: &Data, dir: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let end = game.replay_in.as_ref().map(|r| r.end).ok_or("--frames needs --replay")?;
+    let (_, device, queue) = pollster::block_on(device(None))?;
+    let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
+    upload(&mut r, game, data);
+    let off = crate::locate::Offscreen::sized(&r, 640, 480);
+    let mut truth = String::from("# frame x y z quarter\n");
+    let mut k = 0;
+    while game.sim.tick < end && !game.sim.game_over {
+        game.tick(0);
+        if !game.sim.tick.is_multiple_of(u64::from(60 / crate::locate::RATE)) {
+            continue;
+        }
+        k += 1;
+        let snap = Snapshot::of(&game.sim);
+        let mut inst = scene::instances(
+            &game.placements,
+            &game.sim.taken,
+            &game.sim.world().bodies,
+            &game.ball_meshes,
+            game.trafo.as_ref().map(|t| &t.1),
+            (&game.sim.extra_views(), game.extra_model.as_ref()),
+            &snap,
+        );
+        if snap.kind.is_some() {
+            scene::shadows(&game.shadow_receivers, snap.ball, &mut inst);
+        }
+        let screen = crate::ui::Screen { w: 640.0, h: 480.0 };
+        let quads = crate::hud::interface(&game.sim, game.font.as_ref(), screen);
+        let px = off.pixels(&mut r, &scene::view(&snap), &inst, &quads).ok_or("the frame could not be read back")?;
+        let img = image::RgbaImage::from_raw(640, 480, px).ok_or("frame size")?;
+        let rgb = image::DynamicImage::ImageRgba8(img).to_rgb8();
+        rgb.save(dir.join(format!("s{k:04}.jpg"))).map_err(|e| e.to_string())?;
+        let b = game.sim.ball.position;
+        truth.push_str(&format!("{k} {:.2} {:.2} {:.2} {}\n", b.x, b.y, b.z, game.sim.camera.quarter));
+    }
+    std::fs::write(dir.join("truth.txt"), truth).map_err(|e| e.to_string())?;
+    println!("{k} frames in {}", dir.display());
+    Ok(())
+}
+
+/// Finds the ball's way in a video's frames (`locate::RATE` a second) and writes it as a track: per frame its
+/// number, the ball's place, the view's quarter and how alike the best picture was.
+fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(), String> {
+    let mut names: Vec<PathBuf> = std::fs::read_dir(dir)
+        .map_err(|e| format!("{}: {e}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with('s') && n.ends_with(".jpg")))
+        .collect();
+    // in the frames' order (s0001.jpg, ..., s10000.jpg: by number, not by name)
+    let number = |p: &PathBuf| -> Option<u64> {
+        p.file_stem()?.to_str()?.strip_prefix('s')?.parse().ok()
+    };
+    names.retain(|p| number(p).is_some());
+    names.sort_by_key(|p| number(p));
+    if let Some(n) = o.ticks {
+        names.truncate(n as usize);
+    }
+    let frames: Vec<Vec<f32>> = names
+        .iter()
+        .map(|p| crate::locate::frame_edges(p).ok_or_else(|| format!("{}: not a picture", p.display())))
+        .collect::<Result<_, _>>()?;
+    println!("{} frames", frames.len());
+    let start = game.sim.ball.position;
+    let route = crate::autopilot::Route::find(&game.level.level, &game.modules, start, &[]);
+    let floor: Vec<glam::Vec3> = route.floor_points().collect();
+    let (_, device, queue) = pollster::block_on(device(None))?;
+    let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
+    upload(&mut r, game, data);
+    let off = crate::locate::Offscreen::new(&r);
+    let base = Snapshot::of(&game.sim);
+    let mut draw = |view: &crate::render::View, ball: glam::Vec3| {
+        let snap = Snapshot { ball, eye: view.eye, target: view.target, ..base };
+        let inst = scene::instances(
+            &game.placements,
+            &game.sim.taken,
+            &game.sim.world().bodies,
+            &game.ball_meshes,
+            None,
+            (&[], None),
+            &snap,
+        );
+        off.edges(&mut r, view, &inst)
+    };
+    let quarter = game.sim.camera.quarter;
+    let fixes = crate::locate::track(&frames, &floor, start, quarter, &mut draw)?;
+    let mut text = format!("{}\n", crate::locate::TRACK_HEAD);
+    for (k, f) in fixes.iter().enumerate() {
+        let (b, q, s) = (f.ball, f.quarter, f.score);
+        text.push_str(&format!("{} {:.2} {:.2} {:.2} {q} {s:.3}\n", k + 1, b.x, b.y, b.z));
+    }
+    match &o.record {
+        Some(p) => std::fs::write(p, &text).map_err(|e| format!("{}: {e}", p.display()))?,
+        None => print!("{text}"),
+    }
+    Ok(())
+}
+
+/// The test player follows a track `--locate` found in a video: the places it was sure of (a good likeness, not
+/// far from the frame before), in order, are its way, without the loops of it (the player went round, or waited by a
+/// tutorial's text). Where the way passes a transformer of another kind than the ball's, the ball is taken to have
+/// gone into it (a gate of the way, which no loop is cut across).
+fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
+    let mut own = o.clone();
+    own.follow = None;
+    let mut game = Game::new(&own, data)?;
+    let trafos: Vec<_> = game.sim.trafos().collect();
+    let mut kind = game.sim.ball.kind;
+    let mut path: Vec<glam::Vec3> = Vec::new();
+    let mut gates: Vec<(usize, glam::Vec3)> = Vec::new();
+    let mut last: Option<glam::Vec3> = None;
+    for line in text.lines().filter(|l| !l.starts_with('#')) {
+        let v: Option<Vec<f32>> = line.split_whitespace().map(|x| x.parse().ok()).collect();
+        let Some([_, x, y, z, _, likeness]) = v.as_deref().and_then(|v| <[f32; 6]>::try_from(v).ok()) else {
+            return Err(format!("not a track line: {line}"));
+        };
+        let ball = glam::Vec3::new(x, y, z);
+        let floor = ball - glam::Vec3::Y * crate::sim::BALL_RADIUS;
+        // (a likeness that is not a number is not sure either)
+        if likeness.is_nan() || likeness < crate::locate::SURE || !floor.is_finite() {
+            continue;
+        }
+        // a slip: far from the frame before (the next frames, if they go on from here, are taken again)
+        let slip = last.is_some_and(|l: glam::Vec3| l.distance(floor) > crate::locate::JUMP);
+        last = Some(floor);
+        if slip || path.last().is_some_and(|p| p.distance(floor) < 1.5) {
+            continue;
+        }
+        let kept = gates.last().map_or(0, |g| g.0);
+        if let Some(i) = path.iter().skip(kept).rposition(|p| p.distance(floor) < 2.5) {
+            // (the last gate's own point stays)
+            let keep = if gates.is_empty() { 0 } else { kept + 1 };
+            path.truncate((kept + i).max(keep));
+        }
+        path.push(floor);
+        let trafo = trafos.iter().find(|t| t.1 != kind && t.0.distance(ball) < crate::sim::TRAFO_REACH);
+        if let Some(&(q, k)) = trafo {
+            gates.push((path.len() - 1, q));
+            kind = k;
+        }
+    }
+    println!("track: {} points, transformers {:?}", path.len(), gates);
+    let route = crate::autopilot::Route::along(&game.level.level, &game.modules, path);
+    pilot_run(&mut game, &own, crate::autopilot::Pilot::new(route, gates))
+}
+
 /// The test player follows a player's run: the ball's way in that replay (where it rolled, in order, every 1.5;
 /// not while a ball is being lost) is its way, the transformers it went into its gates, and it begins where the run
 /// began.
 fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
     let text = std::fs::read_to_string(follow).map_err(|e| format!("{}: {e}", follow.display()))?;
+    if text.starts_with(crate::locate::TRACK_HEAD) {
+        return follow_track(o, data, &text);
+    }
     let run = Replay::parse(&text)?;
     let mut watch = o.clone();
     watch.replay = Some(follow.to_path_buf());
