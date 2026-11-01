@@ -82,18 +82,20 @@ pub struct Instance {
     pub diffuse: Option<[f32; 4]>,
     /// Drawn without lighting, in its material's diffuse colour (sprites, as the original draws them).
     pub unlit: bool,
+    /// The ball's shadow pass over this floor mesh: its centre (world x, z) and side.
+    pub shadow: Option<[f32; 3]>,
 }
 
 impl Instance {
     /// A mesh drawn with its own materials as they are.
     pub fn plain(model: usize, mesh: usize, matrix: Mat4) -> Instance {
-        Instance { model, mesh, matrix, marker: None, uv_offset: [0.0; 2], diffuse: None, unlit: false }
+        Instance { model, mesh, matrix, marker: None, uv_offset: [0.0; 2], diffuse: None, unlit: false, shadow: None }
     }
 }
 
 /// The per-instance uniform: the model matrix, then (u, v) added to the texture coordinates, then the diffuse
 /// colour to use instead of the material's (alpha below 0: the material's own).
-const INSTANCE_BYTES: usize = 96;
+const INSTANCE_BYTES: usize = 112;
 
 pub struct View {
     pub eye: Vec3,
@@ -163,6 +165,8 @@ pub struct Renderer {
     pub models: Vec<Model>,
     overlay_pipeline: wgpu::RenderPipeline,
     markers: HashMap<[u32; 4], GpuMaterial>,
+    /// The ball's shadow (TT Simple Shadow's material: the HardShadow texture as it is, multiplied into the frame).
+    shadow_material: Option<GpuMaterial>,
     /// Particles: their pipelines by blend and lines, their layout, and their textures by name.
     particle_shader: wgpu::ShaderModule,
     particle_layout: wgpu::PipelineLayout,
@@ -323,6 +327,7 @@ impl Renderer {
             models: Vec::new(),
             overlay_pipeline,
             markers: HashMap::new(),
+            shadow_material: None,
             particle_shader,
             particle_layout,
             particle_tex_layout,
@@ -496,6 +501,36 @@ impl Renderer {
     }
 
     /// A material of one colour: lit and opaque, or (for markers) unlit and blended.
+    /// Sets the ball shadow's texture (the game's HardShadow): its pass multiplies the floor by it (ZERO / SRCCOLOR),
+    /// unlit, without writing depth.
+    pub fn set_shadow_texture(&mut self, width: u32, height: u32, rgba: Vec<u8>) {
+        let view = upload_texture(&self.device, &self.queue, width, height, rgba);
+        let uniform = MaterialUniform {
+            diffuse: [1.0; 4],
+            emissive: [1.0, 1.0, 1.0, 1.0],
+            params: [-1.0, 1.0, 0.0, 0.0],
+            ambient: [0.0; 4],
+        };
+        let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("shadow material"),
+            contents: bytemuck::bytes_of(&uniform),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+        let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("shadow material"),
+            layout: &self.material_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: buf.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&view) },
+                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&self.clamp) },
+            ],
+        });
+        self.shadow_material = Some(GpuMaterial {
+            bind,
+            key: PipelineKey { blend: Some((Blend::Zero, Blend::SrcColor)), z_write: false },
+        });
+    }
+
     fn flat_material(&self, color: [f32; 4], marker: bool) -> GpuMaterial {
         let uniform = MaterialUniform {
             diffuse: color,
@@ -829,6 +864,9 @@ impl Renderer {
             data[16..18].copy_from_slice(&inst.uv_offset);
             data[18] = if inst.unlit { 1.0 } else { 0.0 };
             data[20..24].copy_from_slice(&inst.diffuse.unwrap_or([0.0, 0.0, 0.0, -1.0]));
+            if let Some([x, z, side]) = inst.shadow {
+                data[24..28].copy_from_slice(&[x, z, side, 1.0]);
+            }
             let at = i * UNIFORM_ALIGN as usize;
             if let Some(dst) = matrices.get_mut(at..at + INSTANCE_BYTES) {
                 dst.copy_from_slice(bytemuck::cast_slice(&data));
@@ -859,7 +897,9 @@ impl Renderer {
             };
             for (p, part) in mesh.parts.iter().enumerate() {
                 let key = match inst.marker {
-                    // a marker is one flat colour: no channels
+                    // a shadow pass covers the mesh's own faces once each, a marker is one flat colour: no channels
+                    _ if inst.shadow.is_some() && part.channel.is_some() => None,
+                    _ if inst.shadow.is_some() => self.shadow_material.as_ref().map(|m| m.key),
                     Some(_) if part.channel.is_some() => None,
                     Some(c) => self.markers.get(&c.map(f32::to_bits)).map(|m| m.key),
                     None if part.channel.is_some() => part.channel.as_ref().map(|c| c.1),
@@ -943,6 +983,7 @@ impl Renderer {
                     continue;
                 };
                 let mat = match inst.marker {
+                    _ if inst.shadow.is_some() => self.shadow_material.as_ref(),
                     Some(c) => self.markers.get(&c.map(f32::to_bits)),
                     None => model.materials.get(part.material),
                 };

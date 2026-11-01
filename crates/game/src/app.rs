@@ -78,6 +78,8 @@ struct Game {
     effects: crate::particles::Effects,
     /// The game's font (Font_1 with its glyph table), when the copy has it.
     font: Option<crate::ui::Font>,
+    /// The floors that take the ball's shadow.
+    shadow_receivers: Vec<scene::ShadowReceiver>,
     /// The level's music theme (the level table's Music), and whether it is the last original level.
     music_theme: Option<u32>,
     /// The level table's LevelBonus.
@@ -215,6 +217,7 @@ impl Game {
             extra_model,
             effects,
             font: crate::ui::Font::game(data),
+            shadow_receivers: scene::shadow_receivers(&level.level),
             music_theme: data.settings(&level.name).music,
             level_bonus,
             last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
@@ -939,6 +942,14 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     if let Some((file, _)) = &game.trafo {
         renderer.add_model(&file.level, &loader);
     }
+    let shadow = level::Texture {
+        name: "HardShadow".into(),
+        source: level::TextureSource::File("HardShadow.bmp".into()),
+        color_key: None,
+    };
+    if let Some((w, h, rgba)) = data.texture(&shadow) {
+        renderer.set_shadow_texture(w, h, rgba);
+    }
     for name in crate::particles::textures().into_iter().chain(["Font_1", "Button01_special", "Button01_select", "Button01_deselect"]) {
         let t = level::Texture {
             name: name.to_owned(),
@@ -1020,6 +1031,10 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         (&game.sim.extra_views(), game.extra_model.as_ref()),
         &snap,
     );
+    let mut inst = inst;
+    if snap.kind.is_some() {
+        scene::shadows(&game.shadow_receivers, snap.ball, &mut inst);
+    }
     let particles = game.effects.batches(snap.eye, snap.target);
     r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
     r.draw_overlay(
@@ -1547,7 +1562,7 @@ impl App {
             let particles = ms.effects.batches(eye, target);
             (inst, particles, crate::render::View { eye, target, fov_y: ms.fov_y })
         } else {
-            let inst = scene::instances(
+            let mut inst = scene::instances(
                 &self.game.placements,
                 &self.game.sim.taken,
                 &self.game.sim.world().bodies,
@@ -1556,6 +1571,9 @@ impl App {
                 (&self.game.sim.extra_views(), self.game.extra_model.as_ref()),
                 &snap,
             );
+            if snap.kind.is_some() {
+                scene::shadows(&self.game.shadow_receivers, snap.ball, &mut inst);
+            }
             let particles = self.game.effects.batches(snap.eye, snap.target);
             (inst, particles, scene::view(&snap))
         };

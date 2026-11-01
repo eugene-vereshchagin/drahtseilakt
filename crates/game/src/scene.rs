@@ -367,6 +367,44 @@ pub fn placements(
     out
 }
 
+/// A floor that takes the ball's shadow (the level's `Shadow` group): its mesh, placement and world box.
+pub struct ShadowReceiver {
+    pub mesh: usize,
+    pub matrix: Mat4,
+    pub min: Vec3,
+    pub max: Vec3,
+}
+
+/// The level's shadow receivers: the visible members of its `Shadow` group with a mesh.
+pub fn shadow_receivers(level: &Level) -> Vec<ShadowReceiver> {
+    let Some(g) = level.group("Shadow") else { return Vec::new() };
+    g.members
+        .iter()
+        .filter_map(|&i| {
+            let o = level.objects.get(i).filter(|o| o.visible)?;
+            let mesh = o.mesh?;
+            let m = Mat4::from_cols_array_2d(&o.matrix);
+            let pts = level.meshes.get(mesh)?.positions.iter().map(|&p| m.transform_point3(Vec3::from(p)));
+            let (min, max) = pts.fold((Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)), |(a, b), p| (a.min(p), b.max(p)));
+            (min.x <= max.x).then_some(ShadowReceiver { mesh, matrix: m, min, max })
+        })
+        .collect()
+}
+
+/// The ball's blob shadow (TT Simple Shadow, Ball_Shadow: HardShadow, size scale 1.3, maximum height 20): a pass
+/// over every receiver under the ball (its box meets the ball's in x and z, its top at most 20 below the ball's
+/// bottom), a square of the ball's width times 1.3 centred under it.
+pub fn shadows(receivers: &[ShadowReceiver], ball: Vec3, out: &mut Vec<Instance>) {
+    let r = crate::sim::BALL_RADIUS;
+    let side = 2.0 * r * 1.3;
+    for f in receivers {
+        let over = f.min.x <= ball.x + r && f.max.x >= ball.x - r && f.min.z <= ball.z + r && f.max.z >= ball.z - r;
+        if over && f.min.y <= ball.y + r && (ball.y - r) - f.max.y <= 20.0 {
+            out.push(Instance { shadow: Some([ball.x, ball.z, side]), ..Instance::plain(LEVEL_MODEL, f.mesh, f.matrix) });
+        }
+    }
+}
+
 pub fn instances(
     placements: &[Placement],
     taken: &[usize],
@@ -421,6 +459,7 @@ pub fn instances(
             marker: p.marker,
             uv_offset: [0.0; 2],
             unlit: p.sprite.is_some(),
+            shadow: None,
             // a transformer's shadow fades while its kind's animation plays (Set Diffuse on its material)
             diffuse: match (p.trafo_shadow, s.trafo) {
                 (Some(k), Some((_, age, kind))) if k == kind => crate::trafo::shadow_alpha(age).map(|a| [1.0, 1.0, 1.0, a]),
@@ -437,6 +476,7 @@ pub fn instances(
             uv_offset: [0.0; 2],
             diffuse: None,
             unlit: false,
+            shadow: None,
         });
     }
     if let (Some(model), Some((at, age, _))) = (trafo, s.trafo) {
@@ -457,6 +497,7 @@ pub fn instances(
             uv_offset: [0.0; 2],
             diffuse: None,
             unlit: false,
+            shadow: None,
         });
     }
     out

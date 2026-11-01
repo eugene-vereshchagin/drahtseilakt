@@ -30,6 +30,9 @@ struct Instance {
     uv: vec4<f32>,
     // The diffuse colour instead of the material's; a < 0: the material's.
     diffuse: vec4<f32>,
+    // The ball's blob shadow on this floor (TT Simple Shadow): xy its centre (world x, z), z the square's side;
+    // w 1 when this is the shadow's pass.
+    shadow: vec4<f32>,
 };
 
 @group(1) @binding(0) var<uniform> inst: Instance;
@@ -57,6 +60,12 @@ fn vs(@location(0) pos: vec3<f32>, @location(1) normal: vec3<f32>, @location(2) 
 
 @fragment
 fn fs(in: VsOut) -> @location(0) vec4<f32> {
+    // The ball's shadow: the texture over a square centred under the ball, projected straight down, held at its
+    // border outside (the texture's border is white), drawn as it is and multiplied into the frame by the blend.
+    if inst.shadow.w > 0.5 {
+        let st = clamp(vec2<f32>(0.5) + (inst.shadow.xy - in.world.xz) / inst.shadow.z, vec2<f32>(0.0), vec2<f32>(1.0));
+        return textureSampleLevel(tex, samp, st, 0.0);
+    }
     // The TexGen effect: Chrome maps the normal as the camera sees it, Reflect the view reflected about it (a
     // sphere map), as the fixed-function pipeline's camera-space normal and reflection coordinates do.
     var uv = in.uv;

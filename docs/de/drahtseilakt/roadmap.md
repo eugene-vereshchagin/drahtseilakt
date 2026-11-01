@@ -11,7 +11,7 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
 - **Phase 2**: Level auf dem Bildschirm mit ihrem Himmel, jede Größe und jedes Seitenverhältnis, Licht im
   Gamma-Raum wie im Original (seine Fixed-Function-Formel: Emissive + Ambient + Diffuse, mal Textur; bisher eine
   Lichtquelle), 3D-Sprites (die silbernen Kugeln der Extrapunkte), Texturen mit Farbschlüssel, Spiegelungen (TexGen) und
-  Materialkanäle (das Blau der Kuppeln). Ein Hauptmenü und ein Levelmenü
+  Materialkanäle (das Blau der Kuppeln), der Schattenfleck der Kugel auf den Böden darunter (TT Simple Shadow). Ein Hauptmenü und ein Levelmenü
   in der eigenen Schrift des Prototyps; eine freie Kamera im Debug-Modus. Die Anzeige im
   Spiel ist die des Originals: Punktekasten und Lebenskugeln, die Punkte in der Schrift des Spiels. Die Menüs sehen
   aus wie im Original (seine Knöpfe, das dunkle Band und die Schriften). Der Bildschirm am Levelende zählt
