@@ -508,6 +508,7 @@ const fn font_style(scale: [f32; 2], color: [f32; 4]) -> crate::ui::Style {
         margins: [2.0; 4],
         color,
         v2: true,
+            shadow: None,
     }
 }
 const FONT_01: crate::ui::Style = font_style([0.45, 0.55], WHITE);

@@ -14,8 +14,8 @@ new engine got level 1 playable, ahead of the phase order:
   (the domes' blue). A main menu and a level menu
   in the prototype's own font; a free camera in debug mode. The in-game
   interface is the original's: its points box and life balls, the points in the game's own font. The menus
-  look like the original's (its buttons, dark band and fonts). Missing: the menu's 3D scene behind them, the
-  level end screen, the level's own lights, 8K check.
+  look like the original's (its buttons, dark band and fonts). The level end screen counts the score as the original's
+  does. Missing: the menu's 3D scene behind them, the highscore table and its name entry, the level's own lights, 8K check.
 - **Phase 3**: the ball physics is IVP's, ported from the upstream's C (crates/ivp) and checked against the C
   game: a straight push of the wooden and of the stone ball and a 17-second route on level 1 agree to within 0.1
   and 0.8 units. Missing: floor materials per object.

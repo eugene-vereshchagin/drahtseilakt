@@ -853,7 +853,8 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         .or(game.replay_in.as_ref().map(|r| r.end))
         .unwrap_or(1);
     let mut prev = Snapshot::of(&game.sim);
-    while game.sim.tick < ticks && !game.sim.finished && !game.sim.game_over {
+    // after the finish the world goes on (the balloon, the end screen)
+    while game.sim.tick < ticks && !game.sim.game_over {
         prev = Snapshot::of(&game.sim);
         game.tick(0);
     }
@@ -897,10 +898,14 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         &view,
         w,
         h,
-        &crate::hud::overlay(&game.sim, w, h, game.ball_lost_at, true),
+        &crate::hud::overlay(&game.sim, w, h, game.ball_lost_at, true, game.font.is_some()),
     );
     let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
-    r.draw_ui(&view, w, h, &crate::hud::interface(&game.sim, game.font.as_ref(), screen));
+    let mut quads = crate::hud::interface(&game.sim, game.font.as_ref(), screen);
+    if let (Some(t), Some(f)) = (crate::endscreen::of(&game.sim), game.font.as_ref()) {
+        quads.extend(crate::endscreen::interface(&t, f, screen));
+    }
+    r.draw_ui(&view, w, h, &quads);
 
     let row = (4 * w).div_ceil(256) * 256;
     let buf = r.device.create_buffer(&wgpu::BufferDescriptor {
@@ -1429,6 +1434,7 @@ impl App {
                         gpu.config.height,
                         self.game.ball_lost_at,
                         self.debug,
+                        self.game.font.is_some(),
                     );
                     if let Some(c) = &self.fly {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
@@ -1444,7 +1450,13 @@ impl App {
         let quads = match (&self.menu, self.loading) {
             (_, Some((n, _))) if font.is_some() => Menu::new(&self.data, n, false).interface(font, screen, Some(n)),
             (Some(m), None) if font.is_some() => m.interface(font, screen, None),
-            (None, None) => crate::hud::interface(&self.game.sim, font, screen),
+            (None, None) => {
+                let mut q = crate::hud::interface(&self.game.sim, font, screen);
+                if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
+                    q.extend(crate::endscreen::interface(&t, f, screen));
+                }
+                q
+            }
             _ => Vec::new(),
         };
         gpu.renderer.draw_ui(&view, gpu.config.width, gpu.config.height, &quads);

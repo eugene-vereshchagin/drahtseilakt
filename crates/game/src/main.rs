@@ -11,6 +11,7 @@ mod audio;
 mod autopilot;
 mod ballsound;
 mod collide;
+mod endscreen;
 mod extra;
 mod freecam;
 mod hud;

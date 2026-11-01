@@ -189,7 +189,15 @@ const SHADE: [f32; 4] = [0.0, 0.0, 0.0, 0.55];
 const GOLD: [f32; 4] = [1.0, 0.85, 0.3, 1.0];
 
 /// What the player sees over the frame, for the current state of the run.
-pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u64>, debug: bool) -> Vec<Rect> {
+/// `end_screen`: the original's end screen is drawn (endscreen.rs), so no banner for a finished level.
+pub fn overlay(
+    sim: &Sim,
+    width_px: u32,
+    height_px: u32,
+    ball_lost_at: Option<u64>,
+    debug: bool,
+    end_screen: bool,
+) -> Vec<Rect> {
     let (w, h) = (width_px as f32, height_px as f32);
     let scale = (h / 240.0).round().max(2.0);
     let mut out = Vec::new();
@@ -215,7 +223,9 @@ pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u6
         text(out, s, (w - width(s, scale)) / 2.0, y, scale, color);
     };
     let mid = h / 2.0;
-    if sim.finished || sim.game_over {
+    if sim.finished && end_screen {
+        // drawn by endscreen.rs
+    } else if sim.finished || sim.game_over {
         // A banner with a title and one line under it, centred on the screen.
         let (title, color) = if sim.finished {
             ("LEVEL COMPLETE", GOLD)
@@ -289,13 +299,17 @@ pub fn interface(sim: &Sim, font: Option<&crate::ui::Font>, screen: crate::ui::S
         texture: SPECIAL,
     };
     let mut out = Vec::new();
-    let lives = sim.lives.min(40) as usize;
+    // on the end screen the counter's points and the lives move over to the tally
+    let tally = crate::endscreen::of(sim);
+    let lives = tally.map_or(sim.lives, |t| t.lives).min(40) as usize;
+    let points = tally.map_or(sim.points, |t| t.counter);
     let first = 0.910_90_f32;
     for k in 0..lives {
         let x = first - k as f32 * 0.0387;
         out.push(quad([x, 0.885_40, x + 0.043_75, 0.943_73], [0.0667, 0.5294, 0.1765, 0.6392], Anchor::Right));
     }
-    let end = first - lives.saturating_sub(1) as f32 * 0.0387 - 0.0208;
+    // with no ball left the end piece sits where a first ball would end (C game: 0.9288)
+    let end = first - (lives as f32 - 1.0) * 0.0387 - 0.0208;
     out.push(quad([end, 0.881_30, end + 0.023_44, 0.943_80], [0.0040, 0.5255, 0.0600, 0.6410], Anchor::Right));
     out.push(quad([0.890_63, 0.85, 0.981_25, 0.977_09], [0.1843, 0.4667, 0.4078, 0.7020], Anchor::Right));
     out.push(quad([0.015, 0.87, 0.235, 0.98], [0.3255, 0.7300, 1.0, 0.9804], Anchor::Left));
@@ -308,8 +322,9 @@ pub fn interface(sim: &Sim, font: Option<&crate::ui::Font>, screen: crate::ui::S
             margins: [2.0; 4],
             color: WHITE,
             v2: true,
+            shadow: None,
         };
-        let digits = f.layout(sim.points.max(0).to_string().as_bytes(), homogeneous([0.05, 0.884_17, 0.203_75, 0.934_17]), &style);
+        let digits = f.layout(points.max(0).to_string().as_bytes(), homogeneous([0.05, 0.884_17, 0.203_75, 0.934_17]), &style);
         out.extend(crate::ui::place(digits, screen, Anchor::Left));
     }
     out

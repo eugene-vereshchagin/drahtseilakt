@@ -14,8 +14,8 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   Materialkanäle (das Blau der Kuppeln). Ein Hauptmenü und ein Levelmenü
   in der eigenen Schrift des Prototyps; eine freie Kamera im Debug-Modus. Die Anzeige im
   Spiel ist die des Originals: Punktekasten und Lebenskugeln, die Punkte in der Schrift des Spiels. Die Menüs sehen
-  aus wie im Original (seine Knöpfe, das dunkle Band und die Schriften). Fehlt: die 3D-Szene des Menüs dahinter,
-  der Bildschirm am Levelende, die eigenen Lichter des Levels, 8K-Prüfung.
+  aus wie im Original (seine Knöpfe, das dunkle Band und die Schriften). Der Bildschirm am Levelende zählt
+  die Punkte wie im Original. Fehlt: die 3D-Szene des Menüs dahinter, die Bestenliste und ihre Namenseingabe, die eigenen Lichter des Levels, 8K-Prüfung.
 - **Phase 3**: Die Kugelphysik ist IVP, aus dem C-Code des Upstreams portiert (crates/ivp) und gegen das C-Spiel
   geprüft: ein gerader Stoß der Holz- und der Steinkugel und eine 17-Sekunden-Route in Level 1 stimmen auf 0,1
   bzw. 0,8 Einheiten überein. Fehlt: Bodenmaterialien je Objekt.

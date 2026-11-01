@@ -113,6 +113,8 @@ pub struct Style {
     /// The 2D Text block is version 2 or later: the letter spacing is a tenth of the space's advance times
     /// spacing.x, not pixels.
     pub v2: bool,
+    /// The font's shadow (Set Font Properties' Shadow): drawn first, this many pixels off, in this colour.
+    pub shadow: Option<([f32; 2], [f32; 4])>,
 }
 
 impl Font {
@@ -187,17 +189,11 @@ impl Font {
             } else {
                 (r[0] + r[2]) / 2.0 - width / 2.0
             };
-            self.line(
-                text.get(start..end).unwrap_or_default(),
-                x,
-                y,
-                sx,
-                gh,
-                adv,
-                ls,
-                st.color,
-                &mut out,
-            );
+            let line = text.get(start..end).unwrap_or_default();
+            if let Some((off, color)) = st.shadow {
+                self.line(line, x + off[0], y + off[1], sx, gh, adv, ls, color, &mut out);
+            }
+            self.line(line, x, y, sx, gh, adv, ls, st.color, &mut out);
             y += line_h;
         }
         out
@@ -344,6 +340,7 @@ mod tests {
             margins: [2.0; 4],
             color: [1.0; 4],
             v2: false,
+            shadow: None,
         };
         let q = f.layout(b"953", [32.0, 424.4, 130.4, 448.4], &st);
         assert_eq!(q.len(), 3);
@@ -370,6 +367,7 @@ mod tests {
             margins: [2.0; 4],
             color: [1.0; 4],
             v2: true,
+            shadow: None,
         };
         let q = f.layout(b"Level 2", homogeneous([0.4031, 0.15, 0.5969, 0.2]), &st);
         let first = q.first().expect("glyphs");
@@ -392,6 +390,7 @@ mod tests {
             margins: [2.0; 4],
             color: [1.0; 4],
             v2: true,
+            shadow: None,
         };
         let q = f.layout(
             b"953",
