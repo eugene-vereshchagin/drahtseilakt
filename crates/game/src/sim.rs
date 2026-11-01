@@ -666,6 +666,10 @@ pub struct Sim {
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
     ball_boxes: [(Vec3, Vec3); 3],
+    /// The tick the depth-test cubes' Group Iterator started (with the new ball), and the ball's pose at the end of
+    /// the last tick, which is what the original's test sees (its scripts run before its physics in a frame).
+    depth_from: u64,
+    prev_pose: (Vec3, Quat),
     /// Sector changes due: at a tick, a sector's objects or modules leave or enter the physics.
     sector_changes: Vec<SectorChange>,
 }
@@ -688,6 +692,9 @@ const LEVEL_INTRO_SECONDS: f64 = 594.0 / 60.0;
 const START_OBJECTS_SECONDS: f64 = 180.0 / 30.0;
 const START_OBJECTS_SECONDS_TUTORIAL: f64 = 4.0 / 60.0;
 const GATE_RADIUS: f32 = 7.0;
+/// Ticks from a new ball to the depth-test cubes' first test: fitted to the C game, where a ball leaving level 2 on
+/// the same route is lost at tick 331 (the iterator's round is 4 ticks there, so this is known modulo 4).
+const DEPTH_PHASE: u64 = 3;
 
 impl Sim {
     /// A run of a level without its modules' physics (their placeholders are solid).
@@ -996,6 +1003,8 @@ impl Sim {
             module_sectors,
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
+            depth_from: DEPTH_PHASE,
+            prev_pose: (ball.position, ball.rotation),
             sector_changes: Vec::new(),
         }
     }
@@ -1125,6 +1134,7 @@ impl Sim {
         self.push_keys = push_keys;
         let p = self.ball.kind.params();
         self.world.set_push(0, push * p.force);
+        self.prev_pose = (self.ball.position, self.ball.rotation);
         self.world.step(None);
         if let Some(h) = self.hold {
             // Out of the physics, the ball is drawn moving to the transformer's hold point.
@@ -1243,14 +1253,19 @@ impl Sim {
     }
 
     /// Whether the ball has left the level: its mesh box reaches a depth-test cube (the original's `BallManager`
-    /// test), or, on a level without them, it is far below the floors.
+    /// test), or, on a level without them, it is far below the floors. As the original's Group Iterator, one cube
+    /// is tested a tick, in the group's order, with a tick without a test after the last one (N + 1 ticks a round,
+    /// from the new ball on), against the ball where it was at the end of the last tick.
     fn fell_off(&self) -> bool {
-        if self.rules.depth_cubes.is_empty() {
+        let cubes = &self.rules.depth_cubes;
+        if cubes.is_empty() {
             return self.ball.position.y < self.rules.death_y;
         }
+        let Some(age) = self.tick.checked_sub(self.depth_from) else { return false };
+        let Some(cube) = cubes.get((age % (cubes.len() as u64 + 1)) as usize) else { return false };
         let (lo, hi) = self.ball_boxes[self.ball.kind as usize];
-        let ball = Obb::from_box(lo, hi, &glam::Mat4::from_rotation_translation(self.ball.rotation, self.ball.position));
-        self.rules.depth_cubes.iter().any(|c| c.overlaps(&ball))
+        let (pos, rot) = self.prev_pose;
+        cube.overlaps(&Obb::from_box(lo, hi, &glam::Mat4::from_rotation_translation(rot, pos)))
     }
 
     fn die(&mut self) {
@@ -1517,6 +1532,9 @@ impl Sim {
         self.trafo_anim = None;
         self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), spawn, Rot::Basis(turn));
         self.drop_ball_forces();
+        // the new ball starts the depth-test cubes' iterator again
+        self.depth_from = self.tick + DEPTH_PHASE;
+        self.prev_pose = (self.ball.position, self.ball.rotation);
         // The camera comes back as it was at the start: the start heading, not lifted, no turn in progress.
         self.camera.quarter = START_QUARTER;
         self.camera.yaw = START_QUARTER as f32 * std::f32::consts::FRAC_PI_2;
@@ -2220,6 +2238,26 @@ mod tests {
         // the wooden ball only bends the bridge
         let (wood, broken) = drop(BallKind::Wood);
         assert!(!broken && wood < 5.0, "under the wooden ball: broken {broken}, the plate fell {wood}");
+    }
+
+    /// A short route off level 2 with the player's copy (skipped without OPENBALLANCE_DATA): the ball is lost at
+    /// tick 331, as in the C game on the same input, where the depth-test cubes are tested one a frame.
+    #[test]
+    fn a_ball_leaving_level_2_is_lost_on_the_c_game_s_tick() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+        let route: [(u64, u8); 9] = [(1, 0), (40, 1), (140, 0), (170, 8), (230, 0), (260, 2), (330, 0), (360, 4), (400, 0)];
+        let input = |t: u64| route.iter().rev().find(|r| r.0 <= t).map_or(0, |r| r.1);
+        while sim.tick < 400 && !sim.events.iter().any(|e| e.1 == Event::Died) {
+            sim.step(input(sim.tick + 1));
+        }
+        let died = sim.events.iter().find(|e| e.1 == Event::Died).map(|e| e.0);
+        assert_eq!(died, Some(331));
     }
 
     #[test]

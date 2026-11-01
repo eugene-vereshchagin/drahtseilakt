@@ -1072,6 +1072,11 @@ Box sources (CK2_3D):
   - `Group Iterator.Loop Out -> In`; `True -> Deactivate Ball.In 0` (the ball has left the level volume);
     `False -> Group Iterator.Loop In` (delay 1).
   - This is the OBB of each depth-test cube against the OBB of the ball's mesh box.
+  - `New Ball.output0 -> Group Iterator.In`; `Group Iterator.Out -> In` (delay 1). So one cube is tested a frame,
+    in the group's order, and after the last one a frame passes without a test: a round is N + 1 frames, started
+    by each new ball. The test runs before the frame's physics, so it sees the ball where the last frame left it.
+    The port does the same (`Sim::fell_off`), its phase fitted to the C game on level 2 (a ball lost at the same
+    tick, 331, on the same input).
 - **`3D Entities/PH/P_Modul_18.nmo`** (id 6510, `Physics Force`):
   - `Entity 1` = `Get Cell.Cell Value` (the ball); `Entity 2` = `P_Modul_18_Kollisionsquader` (a 3D
     object); hierarchies FALSE.
