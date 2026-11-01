@@ -101,9 +101,9 @@ const MARKERS: [(&str, [f32; 4]); 3] = [
     ("P_Extra_Point", [0.9, 0.9, 1.0, 0.7]),
 ];
 
-/// Modules whose file hides all of their meshes but whose script shows them all when the level starts (seen in the C
-/// game: a transformer's ring and its shadow are visible from the start).
-const SHOWN_MODULES: [&str; 3] = ["P_Trafo_Wood", "P_Trafo_Stone", "P_Trafo_Paper"];
+/// Modules whose own systems draw what they show (the extra points' balls, the finish's balloon or UFO), so their
+/// `All_` group is not shown as a whole.
+const OWN_DRAWING: [&str; 2] = ["P_Extra_Point", "PE_Balloon"];
 
 /// One drawn thing of the level: a level mesh, a module mesh at a placeholder, or a marker.
 pub struct Placement {
@@ -182,16 +182,9 @@ impl ExtraModel {
     }
 }
 
-/// Objects of modules that the file hides and a script shows, and how the script turns them: module 18's rotor
-/// turns about its own y at -15 radians a second (its Particle Script: Rotate by Per Second(-15)).
-const SHOWN_OBJECTS: [(&str, Option<(Vec3, f32)>); 4] = [
-    ("P_Modul_18_Rotor", Some((Vec3::Y, -15.0))),
-    // the extra life's bubble, the silver pearl in it (a sprite) and its shadow: hidden in the file, shown by its
-    // script while the ball is within 60 (shown here until it is taken)
-    ("P_Extra_Life_Sphere", None),
-    ("P_Extra_Life_SilverBall", None),
-    ("P_Extra_Life_Shadow", None),
-];
+/// Module objects a script turns, and how: module 18's rotor turns about its own y at -15 radians a second (its
+/// Particle Script: Rotate by Per Second(-15)).
+const SPINNING: [(&str, Vec3, f32); 1] = [("P_Modul_18_Rotor", Vec3::Y, -15.0)];
 
 /// Module models (`3D Entities/PH/<name>.nmo`), uploaded after the fixed models, with their names.
 #[derive(Default)]
@@ -329,15 +322,20 @@ pub fn placements(
         let Some((index, module)) = module_of(level, i).and_then(|n| modules.get(n)) else {
             continue;
         };
-        // The module's textured meshes. Hidden ones are shown by the original's scripts, which we do not run; a box
-        // is a body that exists from the start, so its mesh is shown whatever the file says. A part the physics
-        // moves is drawn at its body, scaled by its own scale.
+        // The module's textured meshes. A module file hides everything; the original shows the module's `All_<name>`
+        // group when its sector comes in (CKGroup's Show shows each member), so its members are drawn, apart from
+        // modules whose own systems draw them. A box is a body that exists from the start, so its mesh is shown
+        // whatever the file says. A part the physics moves is drawn at its body, scaled by its own scale.
         let body = boxes.iter().find(|b| b.0 == i).map(|b| b.1);
-        let shown = SHOWN_MODULES.iter().any(|m| m.eq_ignore_ascii_case(&modules.names[index]));
-        for mo in &module.objects {
+        let name = &modules.names[index];
+        let all = (!OWN_DRAWING.iter().any(|m| m.eq_ignore_ascii_case(name)))
+            .then(|| module.group(&format!("All_{name}")))
+            .flatten();
+        for (k, mo) in module.objects.iter().enumerate() {
             let part = parts.iter().find(|p| p.placeholder == i && p.object == mo.name);
-            let scripted = SHOWN_OBJECTS.iter().find(|s| s.0.eq_ignore_ascii_case(&mo.name));
-            if !(mo.visible || shown || scripted.is_some() || body.is_some() || part.is_some()) {
+            let in_all = all.is_some_and(|g| g.members.contains(&k));
+            let spin = SPINNING.iter().find(|s| s.0.eq_ignore_ascii_case(&mo.name)).map(|s| (s.1, s.2));
+            if !(mo.visible || in_all || body.is_some() || part.is_some()) {
                 continue;
             }
             let Some(mm) = mo.mesh.filter(|&m| has_material(module, m)) else {
@@ -357,7 +355,7 @@ pub fn placements(
                 marker: None,
                 object: i,
                 body,
-                spin: scripted.and_then(|s| s.1),
+                spin,
                 trafo_shadow: modules.names[index]
                     .strip_prefix("P_Trafo_")
                     .filter(|_| mo.name.ends_with("_Shadow"))
