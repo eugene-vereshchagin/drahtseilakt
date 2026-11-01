@@ -717,7 +717,7 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
     // rather than around them.
     let start = game.sim.ball.position;
     let base = crate::autopilot::Route::find(level, &game.modules, start, &stages);
-    let mut waypoints: Vec<(usize, glam::Vec3)> = Vec::new();
+    let mut waypoints: Vec<(usize, glam::Vec3, bool)> = Vec::new();
     for t in game.sim.transformers() {
         let near = base
             .points
@@ -726,16 +726,16 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
             .map(|(i, p)| (i, glam::Vec3::new(p.x - t.x, 0.0, p.z - t.z).length() + (p.y - t.y).abs()))
             .min_by(|a, b| a.1.total_cmp(&b.1));
         if let Some((i, _)) = near.filter(|n| n.1 < 30.0) {
-            waypoints.push((i, t));
+            waypoints.push((i, t, true));
         }
     }
     for (k, &m) in base.marks.iter().enumerate() {
         if let Some(&s) = stages.get(k) {
-            waypoints.push((m, s));
+            waypoints.push((m, s, false));
         }
     }
     waypoints.sort_by_key(|w| w.0);
-    let stages: Vec<glam::Vec3> = waypoints.into_iter().map(|w| w.1).collect();
+    let stages: Vec<glam::Vec3> = waypoints.iter().map(|w| w.1).collect();
     let route = crate::autopilot::Route::find(level, &game.modules, start, &stages);
     println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
     if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
@@ -743,7 +743,11 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
             println!("route {i} {:.2} {:.2} {:.2}", p.x, p.y, p.z);
         }
     }
-    let mut pilot = crate::autopilot::Pilot::new(route);
+    // the transformers' places on the new way: their gates
+    let gates: Vec<(usize, glam::Vec3)> =
+        route.marks.iter().zip(&waypoints).filter(|(_, w)| w.2).map(|(&m, w)| (m, w.1)).collect();
+    println!("transformers on the way: {}", gates.len());
+    let mut pilot = crate::autopilot::Pilot::new(route, gates);
     let limit = o.ticks.unwrap_or(60 * 60 * 20);
     while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
         let i = pilot.next(&game.sim);

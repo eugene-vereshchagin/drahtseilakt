@@ -23,7 +23,12 @@ pub struct Route {
     pub points: Vec<Vec3>,
     /// Where each stage (checkpoint, end) is reached along the way.
     pub marks: Vec<usize>,
+    /// The floor points by cell (`CELL`), each with how far it is from an edge.
+    floor: HashMap<(i32, i32), Vec<(Vec3, f32)>>,
 }
+
+/// The cell of the floor lookup.
+const CELL: f32 = 2.0;
 
 /// The world triangles of the level's floors and rails and of the modules at their stand-ins.
 /// The world triangles of the floors, rails (flagged) and modules.
@@ -357,13 +362,47 @@ impl Route {
             marks.push(points.len().saturating_sub(1));
             from = goal_node;
         }
-        Route { points, marks }
+        let mut floor: HashMap<(i32, i32), Vec<(Vec3, f32)>> = HashMap::new();
+        for (p, c) in pts.iter().zip(&clear) {
+            floor
+                .entry(((p.x / CELL).floor() as i32, (p.z / CELL).floor() as i32))
+                .or_default()
+                .push((*p, *c));
+        }
+        Route {
+            points,
+            marks,
+            floor,
+        }
+    }
+
+    /// How far the ball at `p` is from an edge: the clearance of the floor point under it (0 with none under it).
+    pub fn clearance(&self, p: Vec3) -> f32 {
+        let f = p - Vec3::Y * crate::sim::BALL_RADIUS;
+        let (cx, cz) = ((f.x / CELL).floor() as i32, (f.z / CELL).floor() as i32);
+        let mut best: Option<(f32, f32)> = None;
+        for dx in -1..=1 {
+            for dz in -1..=1 {
+                for &(q, c) in self.floor.get(&(cx + dx, cz + dz)).into_iter().flatten() {
+                    let h = Vec3::new(q.x - f.x, 0.0, q.z - f.z).length();
+                    if h < 1.8 && (q.y - f.y).abs() < 1.5 && best.is_none_or(|b| h < b.0) {
+                        best = Some((h, c));
+                    }
+                }
+            }
+        }
+        best.map_or(0.0, |b| b.1)
     }
 
     /// How far along the way `p` is, searching from point `from` on: on the segment it is nearest to (within reach),
     /// its index plus the part of it passed, less the square of the distance off it (keep to the way, do not cut
     /// corners along the edge).
     fn progress(&self, p: Vec3, from: usize) -> f32 {
+        self.progress_on(p, from).0
+    }
+
+    /// `progress`, and whether `p` is on the way (within reach of it) rather than beside it.
+    fn progress_on(&self, p: Vec3, from: usize) -> (f32, bool) {
         let floor = p - Vec3::Y * crate::sim::BALL_RADIUS;
         let end = (from + 120).min(self.points.len().saturating_sub(1));
         let mut best: Option<(f32, f32)> = None;
@@ -383,9 +422,21 @@ impl Route {
                 best = Some((i as f32 + t - 0.4 * off * off, off));
             }
         }
+        // off the way (landed beside it after a drop): the point ahead that is best for its nearness
         best.map_or_else(
-            || from as f32 - floor.distance(self.points.get(from).copied().unwrap_or(floor)),
-            |b| b.0,
+            || {
+                // only a little way ahead: further on the way may pass close by on another track
+                let v = (from..(from + 15).min(end).max(from + 1))
+                    .filter_map(|i| {
+                        self.points
+                            .get(i)
+                            .map(|q| i as f32 - 0.5 * floor.distance(*q))
+                    })
+                    .fold(f32::NEG_INFINITY, f32::max)
+                    .max(from as f32 - 100.0);
+                (v, false)
+            },
+            |b| (b.0, true),
         )
     }
 }
@@ -409,6 +460,10 @@ const PERIOD: u64 = 6;
 /// A player rolls calmly: above this speed every unit costs `FAST` way points.
 const CALM: f32 = 7.0;
 const FAST: f32 = 1.5;
+/// Nearer an edge than `SAFE`, every unit nearer costs `EDGE` way points at each sample (every sixth tick) of a
+/// tried choice: a player keeps to the middle.
+const SAFE: f32 = 3.0;
+const EDGE: f32 = 0.6;
 const HOLD: u64 = 18;
 const COAST: u64 = 36;
 
@@ -420,21 +475,40 @@ pub struct Pilot {
     moved: u64,
     /// The furthest along the way it has been.
     best: f32,
+    /// The transformers to roll into, in order: their place on the way and where they are; and the next one.
+    gates: Vec<(usize, Vec3)>,
+    gate: usize,
     /// A manoeuvre found while stuck: choices held until their ticks.
     plan: Vec<(u64, u8)>,
     seed: u32,
 }
 
 impl Pilot {
-    pub fn new(route: Route) -> Pilot {
+    pub fn new(route: Route, gates: Vec<(usize, Vec3)>) -> Pilot {
         Pilot {
             route,
+            gates,
+            gate: 0,
             at: 0,
             choice: 0,
             moved: 0,
             best: f32::NEG_INFINITY,
             plan: Vec::new(),
             seed: 0x2545_F491,
+        }
+    }
+
+    /// How far along the way the ball at `p` is, held before the next transformer until the ball has been in it:
+    /// near it, the nearer the better.
+    fn progress(&self, p: Vec3) -> f32 {
+        let v = self.route.progress(p, self.at);
+        match self.gates.get(self.gate) {
+            Some(&(i, g)) if v > i as f32 - 1.0 => {
+                (i as f32 - 1.0)
+                    - 0.3 * Vec3::new(g.x - p.x, 0.0, g.z - p.z).length()
+                    - 0.3 * (g.y - p.y).abs()
+            }
+            _ => v,
         }
     }
 
@@ -509,7 +583,7 @@ impl Pilot {
             if lost {
                 continue;
             }
-            let v = self.route.progress(s.ball.position, self.at) - self.blocking(&s);
+            let v = self.progress(s.ball.position) - self.blocking(&s);
             if v > here - self.blocking(sim) + 0.5 && best.as_ref().is_none_or(|b| v > b.0) {
                 best = Some((v, plan));
             }
@@ -559,9 +633,18 @@ impl Pilot {
         if !sim.tick.is_multiple_of(PERIOD) {
             return self.choice;
         }
-        let here = self.route.progress(sim.ball.position, self.at);
-        if here > self.at as f32 {
-            self.at = here.floor().max(0.0) as usize;
+        // a transformer reached opens its gate
+        if let Some(&(_, g)) = self.gates.get(self.gate)
+            && Vec3::new(g.x - sim.ball.position.x, 0.0, g.z - sim.ball.position.z).length() < 2.5
+            && (g.y - sim.ball.position.y).abs() < 5.0
+        {
+            self.gate += 1;
+        }
+        let here = self.progress(sim.ball.position);
+        // only on the way does the ball get on along it
+        let (on, on_way) = self.route.progress_on(sim.ball.position, self.at);
+        if on_way && on > self.at as f32 {
+            self.at = on.floor().max(0.0) as usize;
         }
         // getting on: a quarter of a point further than ever
         if here > self.best + 0.25 {
@@ -598,8 +681,12 @@ impl Pilot {
             // stuck for two seconds: hold each choice for up to two seconds
             let stuck = sim.tick.saturating_sub(self.moved) / 120;
             let hold = HOLD * (1 + (stuck % 4) * 2);
+            let mut edge = 0.0;
             for t in 0..hold + COAST {
                 s.step(if t < hold { c } else { 0 });
+                if t % 6 == 5 && s.ball.on_ground {
+                    edge += (SAFE - self.route.clearance(s.ball.position)).max(0.0);
+                }
                 if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
                     lost = true;
                     break;
@@ -607,6 +694,23 @@ impl Pilot {
                 if s.finished {
                     break;
                 }
+            }
+            // still in the air (a drop off a rail, a jump): it is judged where it lands, up to two seconds on
+            let mut flight = 0;
+            while !lost && !s.finished && !s.ball.on_ground && flight < 120 {
+                s.step(0);
+                flight += 1;
+                if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
+                    lost = true;
+                }
+            }
+            // still falling after two seconds, or down on no floor of the level: lost
+            if !lost
+                && !s.finished
+                && (!s.ball.on_ground || self.route.clearance(s.ball.position) <= 0.0)
+                && flight > 0
+            {
+                lost = true;
             }
             // in the air and well below where it was: falling off, unless the way itself goes down there
             let way_down = self
@@ -625,9 +729,10 @@ impl Pilot {
             } else if s.finished {
                 f32::INFINITY
             } else {
-                self.route.progress(s.ball.position, self.at)
+                self.progress(s.ball.position)
                     - self.blocking(&s)
                     - FAST * (s.ball.velocity.length() - CALM).max(0.0)
+                    - EDGE * edge
                     + if c == self.choice { 0.05 } else { 0.0 }
             };
             if std::env::var_os("AUTOPILOT_SCORES").is_some() {
@@ -657,6 +762,7 @@ mod tests {
         let r = Route {
             points,
             marks: vec![9],
+            floor: HashMap::new(),
         };
         let up = Vec3::Y * crate::sim::BALL_RADIUS;
         let a = r.progress(Vec3::new(3.0, 0.0, 0.0) + up, 0);
