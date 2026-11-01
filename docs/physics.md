@@ -248,6 +248,18 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   stone balls are too heavy. Not checked against the C build (its level 1 has no fan). The rotor
   (`P_Modul_18_Rotor`) turns about its y at -15 rad/s.
 
+  The swing (`P_Modul_08_MF Script`, `Physicalize and Swing`) and the sack (`P_Modul_26_MF Script`, `Swing`) push
+  their part at its origin along ±z of `P_Modul_08_Fix` / `P_Modul_26_Halter` (1.1 / 0.25), switched by Delayers:
+  - The swing: one frame after its hinge, +z for 500 ms, nothing for 500 ms, -z for 500 ms, nothing for 500 ms, and
+    again; each +z push wakes it. A Delayer of 500 ms fires after 31 frames of 1/60 s summed in single precision, so
+    each phase lasts 30 frames.
+  - The sack: a Sequencer steps every 1500 ms (91 frames) plus a link delay of one frame, its Out 1 making +z (and
+    waking the sack), its Out 2 -z. The Sequencer keeps its place between physicalizations, and the C game
+    physicalizes every module once while loading the level, so the first push in play is -z.
+  Measured in the C build (level 8, the checkpoints moved under the ball to bring sectors 3 and 5 in): the sacks and
+  the swing swing up to about ±7.6 and ±4.8 in z; the port matches them to 0.05 for 1000 frames, except one sack
+  that drifts after about 540 frames (cause not found).
+
 - **FixCube** (Levelinit `init Placeholders`): fixed, Enable Collision 0, surface `FixCube_Mesh`. It is the
   static anchor for single-body joints.
 - **Ball pieces** (explosions in `Balls.nmo`): convex, group Ball, friction 2, elasticity 1, mass 0.2 (stone

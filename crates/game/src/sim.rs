@@ -218,6 +218,69 @@ struct ModuleInst {
     forces: Vec<ForceInst>,
     finish: Option<FinishInst>,
     updraft: Option<UpdraftInst>,
+    swing: Option<SwingInst>,
+}
+
+/// A swing placed (crate::modules::SwingSpec): the part, the world direction of its +push and the timing.
+#[derive(Clone, Copy, Debug)]
+struct SwingInst {
+    body: usize,
+    force: Vec3,
+    phase: u64,
+    pauses: bool,
+    start: u64,
+}
+
+/// A swing while its module is in the physics: the tick it came in and the push now on.
+#[derive(Clone, Debug)]
+struct SwingRun {
+    sector: Option<usize>,
+    at: SwingInst,
+    since: Option<u64>,
+    /// The Sequencer's steps taken (crate::modules::SwingSpec): the step at the last coming in.
+    steps: u64,
+    /// The push on now: its direction (+1 or -1) and the physics' force.
+    push: Option<(i8, usize)>,
+}
+
+impl SwingRun {
+    fn new(sector: Option<usize>, at: SwingInst, now: bool) -> SwingRun {
+        // the level's load took the Sequencer's first step
+        let mut w = SwingRun { sector, at, since: None, steps: 1, push: None };
+        if now {
+            w.enter(0);
+        }
+        w
+    }
+
+    fn enter(&mut self, tick: u64) {
+        self.since = Some(tick);
+        self.steps += 1;
+    }
+
+    /// The push its script wants `age` ticks after the module came in: +1, -1 or none.
+    fn wanted(&self, age: u64) -> i8 {
+        let Some(t) = age.checked_sub(self.at.start) else { return 0 };
+        let phase = t / self.at.phase.max(1);
+        if self.at.pauses {
+            [1, 0, -1, 0][(phase % 4) as usize]
+        } else if (self.steps + phase) % 2 == 1 {
+            1
+        } else {
+            -1
+        }
+    }
+
+    fn stop(&mut self, world: &mut World, tick: u64) {
+        if let Some(since) = self.since.take()
+            && !self.at.pauses
+        {
+            self.steps += tick.saturating_sub(since + self.at.start) / self.at.phase.max(1);
+        }
+        if let Some((_, f)) = self.push.take() {
+            world.remove_force(f);
+        }
+    }
 }
 
 /// An updraft placed (crate::modules::UpdraftSpec): the point the ball is measured to, the box it must reach, and
@@ -479,6 +542,17 @@ fn module_parts(
             value: u.value,
         });
     }
+    if let Some(w) = &spec.swing {
+        let dir = at(w.dir_frame)?.transform_vector3(Vec3::from(w.dir));
+        let dir = if dir.length_squared() <= 1e-4 { Vec3::X } else { dir.normalize() };
+        inst.swing = Some(SwingInst {
+            body: body(w.part)?,
+            force: dir * w.value,
+            phase: u64::from(w.phase),
+            pauses: w.pauses,
+            start: u64::from(w.start),
+        });
+    }
     if let Some(f) = &spec.finish {
         // The joints broken are the hinges at the named frames.
         let breaks = spec
@@ -551,6 +625,8 @@ pub struct Sim {
     finishes: Vec<FinishTrigger>,
     /// The fans' updrafts.
     updrafts: Vec<UpdraftTrigger>,
+    /// The swings' and sacks' pushes.
+    swings: Vec<SwingRun>,
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
@@ -805,10 +881,14 @@ impl Sim {
         let mut wake_triggers = Vec::new();
         let mut finishes = Vec::new();
         let mut updrafts = Vec::new();
+        let mut swings = Vec::new();
         let sectored = module_sectors.iter().enumerate().flat_map(|(n, v)| v.iter().map(move |m| (Some(n), m)));
         for (sector, inst) in unsectored_modules.iter().map(|m| (None, m)).chain(sectored) {
             let now = sector.is_none_or(|n| n == 0);
             let joints = if now { inst.enter(&mut world) } else { Vec::new() };
+            if let Some(at) = inst.swing {
+                swings.push(SwingRun::new(sector, at, now));
+            }
             if let Some(u) = inst.updraft {
                 let mut t = UpdraftTrigger::new(sector, u);
                 if now {
@@ -870,6 +950,7 @@ impl Sim {
             wake_triggers,
             finishes,
             updrafts,
+            swings,
             module_sectors,
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
@@ -1102,6 +1183,7 @@ impl Sim {
         }
         self.apply_sector_changes();
         self.check_wake_triggers();
+        self.run_swings();
         self.check_updrafts();
         self.check_finishes();
         if let Some(d) = self.dying {
@@ -1201,6 +1283,30 @@ impl Sim {
         }
     }
 
+    /// The swings' and sacks' pushes, switched by their scripts' delayers; a push along + wakes the part.
+    fn run_swings(&mut self) {
+        let tick = self.tick;
+        for w in &mut self.swings {
+            let Some(since) = w.since else { continue };
+            let want = w.wanted(tick - since);
+            if w.push.map(|p| p.0) == Some(want) || (want == 0 && w.push.is_none()) {
+                continue;
+            }
+            if let Some((_, f)) = w.push.take() {
+                self.world.remove_force(f);
+            }
+            if want != 0 {
+                let Some(origin) = self.world.bodies.get(w.at.body).map(|b| b.pos) else { continue };
+                if want > 0 {
+                    self.world.wake(w.at.body);
+                }
+                if let Some(f) = self.world.add_force(w.at.body, w.at.force * f32::from(want), origin) {
+                    w.push = Some((want, f));
+                }
+            }
+        }
+    }
+
     /// The fans' updrafts, as module 18's script runs them: the outer proximity switches the inner one on and off;
     /// at each inner test while within it, the ball's box against the fan's volume makes or removes the force.
     fn check_updrafts(&mut self) {
@@ -1288,6 +1394,13 @@ impl Sim {
                         w.prox.switch_on();
                     } else {
                         w.prox.switch_off();
+                    }
+                }
+                for w in self.swings.iter_mut().filter(|w| w.sector == Some(c.sector)) {
+                    if c.enter {
+                        w.enter(tick);
+                    } else {
+                        w.stop(&mut self.world, tick);
                     }
                 }
                 for u in self.updrafts.iter_mut().filter(|u| u.sector == Some(c.sector)) {
@@ -1962,6 +2075,44 @@ mod tests {
         assert!(lo > 63.5 && hi < 66.0, "paper ball between {lo} and {hi}");
         let (_, hi) = height(BallKind::Wood);
         assert!(hi < 49.0, "wooden ball up to {hi}");
+    }
+
+    /// Level 8's sack (sector 3) and swing (sector 5) with the player's copy (skipped without OPENBALLANCE_DATA):
+    /// their scripts' pushes swing them as in the C game, which moved them by these z offsets at these frames after
+    /// their sector came in (the C build with the checkpoints moved under the ball).
+    #[test]
+    fn level_8_s_sack_and_swing_swing_as_in_the_c_game() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(8)).expect("level 8").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let cases: [(usize, f32, &[(u64, f32)]); 2] = [
+            (2, 572.15, &[(135, 1.86), (255, -5.31), (510, 7.26), (600, -7.54)]),
+            (4, 865.12, &[(30, 2.53), (105, -5.13), (180, 6.33), (480, -4.57)]),
+        ];
+        for (sector, x, samples) in cases {
+            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+            sim.start_from(sector, None, None);
+            let body = sim
+                .swings
+                .iter()
+                .find(|w| w.since.is_some() && (sim.world.bodies[w.at.body].pos.x - x).abs() < 1.0)
+                .expect("the part")
+                .at
+                .body;
+            let z0 = sim.world.bodies[body].pos.z;
+            let mut t = 0;
+            for &(frame, dz) in samples {
+                while t < frame {
+                    sim.step(0);
+                    t += 1;
+                }
+                let got = sim.world.bodies[body].pos.z - z0;
+                assert!((got - dz).abs() < 0.15, "part at x {x}, frame {frame}: {got} against {dz}");
+            }
+        }
     }
 
     #[test]

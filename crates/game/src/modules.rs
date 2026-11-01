@@ -114,6 +114,26 @@ pub struct UpdraftSpec {
     pub value: f32,
 }
 
+/// A push a module's script switches on and off by its delayers, all the time while the module is in the physics
+/// (P_Modul_08's swing, P_Modul_26's sack): `value` along `dir` of `dir_frame` on `part` at its origin, then along
+/// -`dir`; each phase lasts `phase` frames, with a pause as long between the pushes when `pauses`; the first push
+/// starts `start` frames after the module comes in, and every push along +`dir` wakes the part. The phases are the
+/// script's Delayers (500 ms or 1500 ms, which the C game reaches after 31 or 91 frames of 1/60 s summed in single
+/// precision) and its links' delays. Without pauses the direction comes from a Sequencer that keeps its place: each
+/// phase, and each time the module comes in, is its next step, odd steps along +`dir`; the level's load already
+/// took one step (the C game physicalizes every module once while loading), so the first push in play is along
+/// -`dir`, as measured in the C game (level 8's sacks).
+#[derive(Debug, Clone, Copy)]
+pub struct SwingSpec {
+    pub part: &'static str,
+    pub dir_frame: &'static str,
+    pub dir: [f32; 3],
+    pub value: f32,
+    pub phase: u32,
+    pub pauses: bool,
+    pub start: u32,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ModuleSpec {
     pub name: &'static str,
@@ -124,6 +144,7 @@ pub struct ModuleSpec {
     pub forces: &'static [ForceSpec],
     pub finish: Option<FinishSpec>,
     pub updraft: Option<UpdraftSpec>,
+    pub swing: Option<SwingSpec>,
 }
 
 const fn material(friction: f32, elasticity: f32, mass: f32, lin_damp: f32, rot_damp: f32) -> Material {
@@ -180,6 +201,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_03",
@@ -283,6 +305,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_08",
@@ -305,6 +328,15 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: Some(SwingSpec {
+            part: "P_Modul_08_Schaukel",
+            dir_frame: "P_Modul_08_Fix",
+            dir: [0.0, 0.0, 1.0],
+            value: 1.1,
+            phase: 30,
+            pauses: true,
+            start: 1,
+        }),
     },
     ModuleSpec {
         name: "P_Modul_17",
@@ -328,6 +360,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     // The fan: no physical parts, only its script's updraft on the ball.
     ModuleSpec {
@@ -342,6 +375,7 @@ const MODULES: &[ModuleSpec] = &[
             volume: "P_Modul_18_Kollisionsquader",
             value: 0.1,
         }),
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_19",
@@ -364,6 +398,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_25",
@@ -386,6 +421,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_26",
@@ -419,6 +455,15 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: Some(SwingSpec {
+            part: "P_Modul_26_Sack",
+            dir_frame: "P_Modul_26_Halter",
+            dir: [0.0, 0.0, 1.0],
+            value: 0.25,
+            phase: 91,
+            pauses: false,
+            start: 0,
+        }),
     },
     ModuleSpec {
         name: "P_Modul_29",
@@ -530,6 +575,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_30",
@@ -552,6 +598,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_34",
@@ -584,6 +631,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_37",
@@ -606,6 +654,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "P_Modul_41",
@@ -628,6 +677,7 @@ const MODULES: &[ModuleSpec] = &[
         forces: &[],
         finish: None,
         updraft: None,
+        swing: None,
     },
     ModuleSpec {
         name: "PE_Balloon",
@@ -932,6 +982,7 @@ const MODULES: &[ModuleSpec] = &[
             },
         ],
         updraft: None,
+        swing: None,
         finish: Some(FinishSpec {
             near: "PE_Balloon_Platform",
             distance: 1.0,

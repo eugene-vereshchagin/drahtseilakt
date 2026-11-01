@@ -19,7 +19,8 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   Levelstart wie im C-Spiel, ebenso die Animation des Kugelwandlers (Ring, Stäbe, Wechsel der Kugel). Die Module der Level 1 bis 12
   bestehen aus ihren physikalischen Teilen und Gelenken wie im C-Spiel, und der Ballon des Ziels trägt die Kugel davon
   wie im C-Spiel. Der Aufwind der
-  Ventilatoren hebt die Papierkugel. Fehlt: die Skripte der übrigen Module (ihre Kräfte und Zeitgeber), das Rollen der Blitztextur und die Ringfarbe des Kugelwandlers, Klänge, Musik, die Erweiterung von Level 13.
+  Ventilatoren hebt die Papierkugel; Schaukeln und Säcke schwingen wie im C-Spiel. Fehlt: die Skripte der übrigen
+  Module, das Rollen der Blitztextur und die Ringfarbe des Kugelwandlers, Klänge, Musik, die Erweiterung von Level 13.
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
 
 
