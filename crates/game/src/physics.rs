@@ -76,6 +76,22 @@ pub struct World {
     pushers: Vec<Option<usize>>,
     /// The IVP bodies of the level's physical objects, with whether the player's ball collides with them.
     statics: Vec<(usize, bool)>,
+    /// How each game body is made, for the ones that come and go (a sector's objects); none for the ball.
+    spawns: Vec<Option<Spawn>>,
+}
+
+/// What the physics needs to make a game body again at its start: the original physicalizes a sector's objects when
+/// the sector begins and again after a lost ball, at their places in the level.
+#[derive(Clone, Debug)]
+struct Spawn {
+    shape: Shape,
+    m: Material,
+    pos: Vec3,
+    rot: Rot,
+    /// The mass centre in the body's frame (`None`: the shape's own, as "Auto Mass Center").
+    shift: Option<[f32; 3]>,
+    group: &'static str,
+    fixed: bool,
 }
 
 fn vec3_f64(v: Vec3) -> [f64; 3] {
@@ -150,6 +166,7 @@ impl World {
             grounded: false,
             pushers: Vec::new(),
             statics: Vec::new(),
+            spawns: Vec::new(),
         };
         for mesh in statics {
             let ledges: Vec<ledge::Ledge> = mesh
@@ -175,36 +192,75 @@ impl World {
         world
     }
 
-    fn add(&mut self, shape: Shape, m: Material, pos: Vec3, rot: Rot) -> usize {
-        self.add_shifted(shape, m, pos, rot, None, "")
+    /// A new game body from its spawn, made in the physics now when `active`, else only placed (a sector's object
+    /// before its sector).
+    fn add_spawn(&mut self, spawn: Spawn, active: bool) -> usize {
+        self.handles.push(None);
+        self.bodies.push(Body {
+            pos: spawn.pos,
+            rot: spawn.rot.quat(),
+        });
+        self.spawns.push(Some(spawn));
+        let i = self.handles.len() - 1;
+        if active {
+            self.activate(i);
+        }
+        i
     }
 
-    /// A body whose mass centre is `shift` in its own frame (`None`: the shape's own centre, as "Auto Mass Center"),
-    /// in collision group `group_name` ("" collides with everything).
-    fn add_shifted(
-        &mut self,
-        shape: Shape,
-        m: Material,
-        pos: Vec3,
-        rot: Rot,
-        shift: Option<[f32; 3]>,
-        group_name: &str,
-    ) -> usize {
+    /// Makes body `i` in the physics at its start, if it is not there (the original's "physicalize").
+    pub fn activate(&mut self, i: usize) {
+        if !matches!(self.handles.get(i), Some(None)) {
+            return;
+        }
+        let Some(Some(s)) = self.spawns.get(i).cloned() else {
+            return;
+        };
         let desc = BodyDesc {
-            shift,
-            group: group(group_name),
-            // the floor is entity 0; the game's bodies follow in creation order, so the ball is entity 1
-            entity: self.handles.len() as u32 + 1,
-            mass: m.mass,
-            friction: m.friction,
-            elasticity: m.elasticity,
-            lin_damp: m.lin_damp,
-            rot_damp: m.rot_damp,
+            fixed: s.fixed,
+            shift: s.shift,
+            group: group(s.group),
+            // the level's objects are entity 0; the game's bodies follow in creation order, so the ball is entity 1
+            entity: i as u32 + 1,
+            mass: s.m.mass,
+            friction: s.m.friction,
+            elasticity: s.m.elasticity,
+            lin_damp: s.m.lin_damp,
+            rot_damp: s.m.rot_damp,
             ..BodyDesc::default()
         };
-        let id = self.physics.add_body(desc, shape, vec3_f64(pos), rot.ivp());
-        self.handles.push(Some(id));
-        self.bodies.push(Body { pos, rot: rot.quat() });
+        let id = self.physics.add_body(desc, s.shape, vec3_f64(s.pos), s.rot.ivp());
+        self.handles[i] = Some(id);
+        self.bodies[i] = Body {
+            pos: s.pos,
+            rot: s.rot.quat(),
+        };
+    }
+
+    /// Takes body `i` out of the physics and puts it back at its start (a sector's object when the sector ends).
+    pub fn deactivate(&mut self, i: usize) {
+        self.remove(i);
+        if let Some(Some(s)) = self.spawns.get(i) {
+            self.bodies[i] = Body {
+                pos: s.pos,
+                rot: s.rot.quat(),
+            };
+        }
+    }
+
+    /// Runs the physics for `seconds` of its own time in frames of 1/60 s (the level start, at time factor 1).
+    pub fn run(&mut self, seconds: f64) {
+        let frames = (seconds * 60.0).round() as u32;
+        for _ in 0..frames {
+            self.physics.advance(1.0 / 60.0);
+        }
+    }
+
+    /// A slot for the player's ball before it is made (`replace_ball` makes it). By convention the first body.
+    pub fn reserve_ball(&mut self, pos: Vec3, rot: Quat) -> usize {
+        self.handles.push(None);
+        self.bodies.push(Body { pos, rot });
+        self.spawns.push(None);
         self.handles.len() - 1
     }
 
@@ -262,9 +318,12 @@ impl World {
         }
     }
 
-    /// The player's ball, with its radius, in group Ball. By convention the first body.
+    /// The player's ball, with its radius, in group Ball, made now. By convention the first body (tests).
+    #[cfg(test)]
     pub fn add_ball(&mut self, radius: f32, m: Material, pos: Vec3, rot: Quat) -> usize {
-        self.add_shifted(Shape::Sphere(radius), m, pos, rot.into(), None, GROUP_BALL)
+        let i = self.reserve_ball(pos, rot);
+        self.replace_ball(i, radius, m, pos, rot);
+        i
     }
 
     /// The original's "Physics WakeUp": a sleeping body comes back into the simulation, an awake one restarts its
@@ -287,21 +346,47 @@ impl World {
                 }
             }
         }
-        self.add_convex(&corners, m, pos, rot).expect("a box has a hull")
+        self.add_convex(&corners, m, pos, rot, false, true).expect("a box has a hull")
     }
 
-    /// A loose sphere.
-    pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: impl Into<Rot>) -> usize {
-        self.add(Shape::Sphere(radius), m, pos, rot.into())
+    /// A loose sphere, its mass centre its centre; made in the physics now when `active`.
+    pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: impl Into<Rot>, active: bool) -> usize {
+        let spawn = Spawn {
+            shape: Shape::Sphere(radius),
+            m,
+            pos,
+            rot: rot.into(),
+            shift: None,
+            group: "",
+            fixed: false,
+        };
+        self.add_spawn(spawn, active)
     }
 
     /// A loose convex body: the hull of `points` in its own frame, its mass centre at its origin (the original's
     /// sector objects are physicalized without "Auto Mass Center"). None when the points span no volume.
-    pub fn add_convex(&mut self, points: &[Vec3], m: Material, pos: Vec3, rot: impl Into<Rot>) -> Option<usize> {
+    pub fn add_convex(
+        &mut self,
+        points: &[Vec3],
+        m: Material,
+        pos: Vec3,
+        rot: impl Into<Rot>,
+        fixed: bool,
+        active: bool,
+    ) -> Option<usize> {
         let pts: Vec<[f64; 3]> = points.iter().map(|&p| vec3_f64(p)).collect();
         let hull = ivp::convex::hull(&pts)?;
         let surface = Surface::compile(vec![hull])?;
-        Some(self.add_shifted(Shape::Surface(surface), m, pos, rot.into(), Some([0.0; 3]), ""))
+        let spawn = Spawn {
+            shape: Shape::Surface(surface),
+            m,
+            pos,
+            rot: rot.into(),
+            shift: Some([0.0; 3]),
+            group: "",
+            fixed,
+        };
+        Some(self.add_spawn(spawn, active))
     }
 
     /// The triangles near a point of the level's physical objects that the player's ball collides with, in world

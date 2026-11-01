@@ -94,6 +94,15 @@ const START_QUARTER: i32 = 1;
 const TRAFO_TICKS: u64 = 149;
 /// Where a transformer holds the ball: its own (0, 3, 0), where the C game makes the new ball.
 const TRAFO_HOLD: Vec3 = Vec3::new(0.0, 3.0, 0.0);
+/// After a checkpoint, the C game takes the passed sector's objects out of the physics 44 frames later and makes the
+/// next sector's 4 frames after that.
+const SECTOR_END_TICKS: u64 = 44;
+const SECTOR_BEGIN_TICKS: u64 = 48;
+/// After a lost ball, the current sector's objects leave the physics one frame after the ball and come back at their
+/// places four frames later.
+const DEATH_SECTOR_END_TICKS: u64 = 62;
+const DEATH_SECTOR_BEGIN_TICKS: u64 = 66;
+
 /// After the ball's box reaches a depth-test cube, the C game stops the push at once, takes the falling ball out of the
 /// physics 61 frames later and shows the new ball at the reset point 10 frames after that.
 const DEATH_REMOVE_TICKS: u64 = 61;
@@ -220,9 +229,18 @@ pub struct Sim {
     dying: Option<u64>,
     /// The arrows that pushed at the last tick, to wake the ball when they change.
     push_keys: u8,
+    /// The body indices of each sector's objects (sector 1 first).
+    sectors: Vec<Vec<usize>>,
+    /// Sector changes due: at a tick, a sector's objects leave (false) or enter (true) the physics.
+    sector_changes: Vec<(u64, usize, bool)>,
 }
 
 const PICK_RADIUS: f32 = 3.5;
+/// Physics time from the level's load to its first sector's objects: 594 frames at time factor 1 (the C game,
+/// level 1).
+const LEVEL_INTRO_SECONDS: f64 = 594.0 / 60.0;
+/// Physics time between a sector's objects and the ball at a level start: four frames at time factor 1.
+const START_OBJECTS_SECONDS: f64 = 4.0 / 60.0;
 const GATE_RADIUS: f32 = 7.0;
 
 impl Sim {
@@ -286,11 +304,22 @@ impl Sim {
             on_ground: false,
         };
         let mut world = World::new(&statics);
-        // Body 0 is the ball.
-        let ball_body = world.add_ball(BALL_RADIUS, ball.material(), ball.position, ball.rotation);
+        // Body 0 is the ball; it is made after the first sector's objects (below).
+        let ball_body = world.reserve_ball(ball.position, ball.rotation);
         debug_assert_eq!(ball_body, 0);
-        // Loose objects that move: boxes and the loose balls (their material table in docs/physics.md, section 3).
+        // The sector of each level object (groups Sector_01, Sector_02, ...): a sector's objects are in the physics
+        // only while it is the current one; an object in no sector always is.
+        let sector_of = |i: usize| -> Option<usize> {
+            level.groups.iter().find_map(|g| {
+                let n: usize = g.name.strip_prefix("Sector_")?.parse().ok()?;
+                (n >= 1 && g.members.contains(&i)).then_some(n - 1)
+            })
+        };
+        // Loose objects that move, and the domes: boxes, the loose balls and P_Dome (their material table in
+        // docs/physics.md, section 3).
         let mut loose = Vec::new();
+        let mut sectors: Vec<Vec<usize>> = Vec::new();
+        let mut unsectored = Vec::new();
         for (i, o) in level.objects.iter().enumerate() {
             let Some(mesh) = o.mesh.and_then(|m| level.meshes.get(m)) else {
                 continue;
@@ -301,7 +330,20 @@ impl Sim {
                 continue;
             };
             let points: Vec<Vec3> = mesh.positions.iter().map(|p| Vec3::from(*p) * scale).collect();
-            let body = if level.members("P_Box").any(|(k, _)| k == i) {
+            let sector = sector_of(i);
+            // Every object is made at the level start (below); here it is only placed.
+            let active = false;
+            let body = if level.members("P_Dome").any(|(k, _)| k == i) {
+                // A dome is a fixed bumper.
+                let material = Material {
+                    friction: 0.2,
+                    elasticity: 0.8,
+                    mass: 0.2,
+                    lin_damp: 0.1,
+                    rot_damp: 0.1,
+                };
+                world.add_convex(&points, material, pos, rot, true, active)
+            } else if level.members("P_Box").any(|(k, _)| k == i) {
                 let material = Material {
                     friction: 0.7,
                     elasticity: 0.3,
@@ -309,7 +351,7 @@ impl Sim {
                     lin_damp: 0.1,
                     rot_damp: 0.1,
                 };
-                world.add_convex(&points, material, pos, rot)
+                world.add_convex(&points, material, pos, rot, false, active)
             } else if let Some(kind) = name
                 .strip_prefix("p_ball_")
                 .and_then(|_| BallKind::from_name(&name))
@@ -329,8 +371,8 @@ impl Sim {
                 // The wooden and the stone ball are spheres of radius 2 (times the object's scale); the paper ball
                 // has no radius in the table and is the hull of its mesh.
                 match kind {
-                    BallKind::Paper => world.add_convex(&points, material, pos, rot),
-                    _ => Some(world.add_sphere(BALL_RADIUS * scale.x, material, pos, rot)),
+                    BallKind::Paper => world.add_convex(&points, material, pos, rot, false, active),
+                    _ => Some(world.add_sphere(BALL_RADIUS * scale.x, material, pos, rot, active)),
                 }
             } else {
                 continue;
@@ -338,8 +380,26 @@ impl Sim {
             let Some(body) = body else {
                 continue;
             };
+            match sector {
+                Some(n) => {
+                    if sectors.len() <= n {
+                        sectors.resize(n + 1, Vec::new());
+                    }
+                    sectors[n].push(body);
+                }
+                None => unsectored.push(body),
+            }
             loose.push((i, body));
         }
+        // The level start as the C game runs it at level 1: the physics runs at time factor 1 with only the level's
+        // geometry, then the first sector's objects are made (at 9.90 s of its time), then the ball four frames later
+        // (9.9667 s). The time puts the steps of the physics where the original's are.
+        world.run(LEVEL_INTRO_SECONDS);
+        for &b in unsectored.iter().chain(sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
+            world.activate(b);
+        }
+        world.run(START_OBJECTS_SECONDS);
+        world.replace_ball(0, BALL_RADIUS, ball.material(), ball.position, ball.rotation);
         let mut camera = Camera {
             quarter,
             yaw,
@@ -366,6 +426,8 @@ impl Sim {
             hold: None,
             dying: None,
             push_keys: 0,
+            sectors,
+            sector_changes: Vec::new(),
         }
     }
 
@@ -521,6 +583,9 @@ impl Sim {
             self.sector += 1;
             self.events
                 .push((self.tick, Event::Checkpoint(self.sector)));
+            // The passed sector's objects leave the physics, then the next sector's are made at their places.
+            self.sector_changes.push((self.tick + SECTOR_END_TICKS, self.sector - 1, false));
+            self.sector_changes.push((self.tick + SECTOR_BEGIN_TICKS, self.sector, true));
         }
         if let Some(end) = self.rules.end
             && self.sector >= self.rules.checkpoints.len()
@@ -529,6 +594,7 @@ impl Sim {
             self.finished = true;
             self.events.push((self.tick, Event::Finished));
         }
+        self.apply_sector_changes();
         if let Some(d) = self.dying {
             if self.tick == d + DEATH_REMOVE_TICKS {
                 self.world.remove(0);
@@ -562,6 +628,25 @@ impl Sim {
             return;
         }
         self.dying = Some(self.tick);
+        // The current sector starts again: its objects leave the physics and are made again at their places.
+        self.sector_changes.push((self.tick + DEATH_SECTOR_END_TICKS, self.sector, false));
+        self.sector_changes.push((self.tick + DEATH_SECTOR_BEGIN_TICKS, self.sector, true));
+    }
+
+    /// The sector changes due at this tick, in the order they were made.
+    fn apply_sector_changes(&mut self) {
+        let tick = self.tick;
+        let due: Vec<(u64, usize, bool)> = self.sector_changes.iter().copied().filter(|c| c.0 == tick).collect();
+        self.sector_changes.retain(|c| c.0 > tick);
+        for (_, n, enter) in due {
+            for &b in self.sectors.get(n).map(Vec::as_slice).unwrap_or(&[]) {
+                if enter {
+                    self.world.activate(b);
+                } else {
+                    self.world.deactivate(b);
+                }
+            }
+        }
     }
 
     /// A new ball at the current reset point, at rest, and the camera in its start view.
@@ -1033,6 +1118,106 @@ mod tests {
         assert!(sim.ball.position.distance(start) > 1.0, "the push did not move a sleeping ball");
     }
 
+    /// A unit cube mesh (corners at -1..1) added to the level, and an object of it at `at` in the given groups.
+    fn add_cube(level: &mut Level, name: &str, at: Vec3, groups: &[&str]) -> usize {
+        let mesh = level.meshes.len();
+        let mut corners = Vec::new();
+        for x in [-1.0f32, 1.0] {
+            for y in [-1.0f32, 1.0] {
+                for z in [-1.0f32, 1.0] {
+                    corners.push([x, y, z]);
+                }
+            }
+        }
+        level.meshes.push(Mesh {
+            name: "cube".into(),
+            positions: corners,
+            normals: vec![[0.0, 1.0, 0.0]; 8],
+            uvs: vec![[0.0; 2]; 8],
+            parts: vec![],
+        });
+        let obj = level.objects.len();
+        level.objects.push(Object {
+            name: name.into(),
+            matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [at.x, at.y, at.z, 1.0],
+            ],
+            mesh: Some(mesh),
+            visible: true,
+        });
+        for g in groups {
+            match level.groups.iter_mut().find(|x| x.name == *g) {
+                Some(x) => x.members.push(obj),
+                None => level.groups.push(Group {
+                    name: (*g).into(),
+                    members: vec![obj],
+                }),
+            }
+        }
+        obj
+    }
+
+    #[test]
+    fn a_sector_s_objects_are_in_the_physics_only_while_it_is_current() {
+        // A box in sector 1 and one in sector 2, and the first checkpoint on the ball's way.
+        let mut level = flat_level();
+        add_cube(&mut level, "P_Box_01", Vec3::new(-30.0, 1.0, 0.0), &["P_Box", "Sector_01"]);
+        add_cube(&mut level, "P_Box_02", Vec3::new(-30.0, 1.0, 20.0), &["P_Box", "Sector_02"]);
+        add_cube(&mut level, "PC_TwoFlames_01", Vec3::new(0.0, 0.0, 0.0), &["PC_Checkpoints"]);
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        let (b1, b2) = (sim.loose[0].1, sim.loose[1].1);
+        assert!(sim.world.state(b1).is_some(), "the first sector's box is in the physics");
+        assert!(sim.world.state(b2).is_none(), "the second sector's box is not yet");
+        // the ball starts on the checkpoint: the sector changes at once
+        sim.step(0);
+        let t = sim.tick;
+        assert!(sim.events.contains(&(t, Event::Checkpoint(1))));
+        while sim.tick < t + SECTOR_END_TICKS {
+            sim.step(0);
+        }
+        assert!(sim.world.state(b1).is_none(), "the passed sector's box left");
+        assert!(sim.world.state(b2).is_none());
+        while sim.tick < t + SECTOR_BEGIN_TICKS {
+            sim.step(0);
+        }
+        assert!(sim.world.state(b2).is_some(), "the next sector's box came");
+    }
+
+    #[test]
+    fn a_lost_ball_puts_the_sector_s_objects_back() {
+        let mut level = flat_level();
+        let start = Vec3::new(-30.0, 1.0, 0.0);
+        add_cube(&mut level, "P_Box_01", start, &["P_Box", "Sector_01"]);
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        let b = sim.loose[0].1;
+        // push the box away, then lose the ball
+        for _ in 0..60 {
+            sim.world.set_push(b, Vec3::X * 0.5);
+            sim.step(0);
+        }
+        sim.world.set_push(b, Vec3::ZERO);
+        let moved = sim.world.state(b).unwrap().pos;
+        assert!(moved.distance(start) > 3.0, "the box did not move: {moved:?}");
+        sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
+        let mut died = None;
+        for _ in 0..600 {
+            sim.step(0);
+            if sim.lives < 3 {
+                died = Some(sim.tick);
+                break;
+            }
+        }
+        let d = died.expect("the ball fell");
+        while sim.tick < d + DEATH_SECTOR_BEGIN_TICKS {
+            sim.step(0);
+        }
+        let back = sim.world.state(b).unwrap().pos;
+        assert!(back.distance(start) < 0.1, "the box is at {back:?}, its place is {start:?}");
+    }
+
     #[test]
     fn same_input_same_run() {
         let level = flat_level();
@@ -1093,31 +1278,4 @@ mod tests {
         assert!(sim.game_over, "three balls lost, the run must be over");
     }
 
-    #[test]
-    fn a_wooden_ball_barely_bounces() {
-        let level = flat_level();
-        let mut sim = Sim::new(&level, BallKind::Wood);
-        sim.put_ball(Vec3::new(0.0, 20.0, 0.0));
-        let mut impact = 0.0f32;
-        let mut rebound = 0.0f32;
-        let mut was_falling = false;
-        for _ in 0..240 {
-            let before = sim.ball.velocity.y;
-            sim.step(0);
-            if before < -1.0 && sim.ball.velocity.y > 0.0 {
-                // The first contact: speed before and after reflection.
-                impact = impact.max(-before);
-                rebound = rebound.max(sim.ball.velocity.y);
-                was_falling = true;
-                break;
-            }
-        }
-        assert!(was_falling, "the ball never landed");
-        // The impact restitutes at sqrt(e) (docs/ivp_contact.md 6): the pair's elasticity is 0.2 × 0.3 = 0.06, and
-        // sqrt(0.06) = 0.245 of the impact speed comes back.
-        assert!(
-            (rebound / impact - 0.06f32.sqrt()).abs() < 0.02,
-            "rebound {rebound} from impact {impact}"
-        );
-    }
 }

@@ -218,6 +218,15 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   | P_Ball_Wood | | 0.6 / 0.2 | 2 | 0.6 / 0.1 | 2 |
   | P_Ball_Stone | | 0.7 / 0.1 | 10 | 0.2 / 0.1 | 2 |
 
+  A sector's objects (groups `Sector_01`, `Sector_02`, ...) are in the physics only while it is the current sector.
+  Measured in the C build at level 1 (frames of 1/60 s):
+  - Level start: the physics runs at time factor 1 with the level's geometry only; at 9.90 s of its time the first
+    sector's objects are physicalized, at 9.9667 s (four frames later) the player ball.
+  - Checkpoint: 44 frames after the ball reaches it, the passed sector's objects are unphysicalized; 4 frames later
+    the next sector's are physicalized at their places in the level.
+  - Lost ball: one frame after the ball is taken out of the physics (61 frames after its box reaches a depth-test
+    cube), the current sector's objects are unphysicalized, and 4 frames later physicalized again at their places.
+
 - **FixCube** (Levelinit `init Placeholders`): fixed, Enable Collision 0, surface `FixCube_Mesh`. It is the
   static anchor for single-body joints.
 - **Ball pieces** (explosions in `Balls.nmo`): convex, group Ball, friction 2, elasticity 1, mass 0.2 (stone
