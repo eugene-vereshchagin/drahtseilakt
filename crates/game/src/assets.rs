@@ -97,6 +97,8 @@ pub struct Settings {
     pub start_ball: Option<String>,
     /// The level's music theme (`Music_Theme_<n>_1..3`).
     pub music: Option<u32>,
+    /// The points a finished level adds to the score.
+    pub level_bonus: Option<i64>,
 }
 
 impl Data {
@@ -106,6 +108,7 @@ impl Data {
             sky: None,
             start_ball: None,
             music: None,
+            level_bonus: None,
         };
         let Some(path) = self.file("3D Entities/Levelinit.nmo") else {
             return none;
@@ -142,6 +145,10 @@ impl Data {
             start_ball: text(row, "StartBall"),
             music: match table.column("Music").and_then(|c| row.get(c)) {
                 Some(nmo::scene::Cell::Int(n)) => u32::try_from(*n).ok(),
+                _ => None,
+            },
+            level_bonus: match table.column("LevelBonus").and_then(|c| row.get(c)) {
+                Some(nmo::scene::Cell::Int(n)) => Some(i64::from(*n)),
                 _ => None,
             },
         }

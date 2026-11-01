@@ -648,6 +648,8 @@ pub struct Sim {
     pub finished: bool,
     /// The tick the level was finished at (the run's time; the world goes on after it).
     pub finished_at: u64,
+    /// The points finishing the level adds (the level table's LevelBonus).
+    pub level_bonus: i64,
     pub game_over: bool,
     /// Objects taken (extra points and lives) are hidden by the renderer.
     pub taken: Vec<usize>,
@@ -713,6 +715,8 @@ const GATE_RADIUS: f32 = 7.0;
 /// The points a level starts with (the Energy array's StartPoints), and the counter that takes one every half
 /// second (its Timefactor, 500 ms): measured in the C game on level 2, the points go down at ticks 32, 62, 92...
 const START_POINTS: i64 = 1000;
+/// The points each life left adds to a finished level's score (the Energy array's LifeBonus).
+const LIFE_BONUS: i64 = 200;
 const POINTS_FROM: u64 = 32;
 const POINTS_EVERY: u64 = 30;
 
@@ -1031,6 +1035,7 @@ impl Sim {
             sector: 0,
             finished: false,
             finished_at: 0,
+            level_bonus: 0,
             game_over: false,
             taken: Vec::new(),
             events: Vec::new(),
@@ -1411,6 +1416,12 @@ impl Sim {
     /// The fans in the physics now (their points), for their sound.
     pub fn fans(&self) -> Vec<Vec3> {
         self.updrafts.iter().filter(|u| u.outer.on || u.inner.on).map(|u| u.at.point).collect()
+    }
+
+    /// The score of a finished level, as the original's end screen counts it: the points left (time points), the
+    /// level bonus and 200 for each life (C game: 950 + 100 + 3 × 200 = 1650 on level 1).
+    pub fn score(&self) -> i64 {
+        self.points + self.level_bonus + LIFE_BONUS * i64::from(self.lives)
     }
 
     /// Whether the last checkpoint has been passed (the level's last stage), and where the level ends.

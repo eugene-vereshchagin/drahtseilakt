@@ -228,7 +228,10 @@ list Auto Mass Center, Linear Damp and Rot Damp.
     cube; a life goes then), the current sector's objects are unphysicalized, and 4 frames later physicalized again
     at their places. The new ball is shown at the reset point 71 frames after the loss and physicalized 245 frames
     after it (level 2: lost at 331, the new ball falling from 577). The points counter (Energy: 1000, one point every
-    500 ms, first at frame 32 of the ball) waits from the loss until 5 frames after the new ball, where it was.
+    500 ms, first at frame 32 of the ball) waits from the loss until 5 frames after the new ball, where it was; it
+    stops at the finish. The end screen's score is the points left ("Time Points"), the level table's LevelBonus
+    and 200 per life (Energy's LifeBonus): 950 + 100 + 3 × 200 = 1650 in the C build on level 1. An extra life gives
+    a life and no points.
 
   The finish (`PE_Balloon Script`, PH/PE_Balloon.nmo), with the last sector: the platform (mass 4, its mass centre
   at (0,2,0)), the eight bridge planks, the four ropes and balloons and `PE_Box_slide` are physicalized asleep; box

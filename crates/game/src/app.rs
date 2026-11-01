@@ -74,6 +74,8 @@ struct Game {
     session: Option<std::io::BufWriter<std::fs::File>>,
     /// The level's music theme (the level table's Music), and whether it is the last original level.
     music_theme: Option<u32>,
+    /// The level table's LevelBonus.
+    level_bonus: i64,
     last_level: bool,
     /// The ball's sounds, and what they ask of the sound output since the window last played them.
     ball_sound: BallSound,
@@ -156,6 +158,8 @@ impl Game {
         let ball_meshes = BallMeshes::find(&balls.level);
         let mut sim = Sim::with_modules(&level.level, start_ball, &modules, tutorial);
         sim.set_ball_boxes(ball_meshes.boxes);
+        let level_bonus = data.settings(&level.name).level_bonus.unwrap_or(0);
+        sim.level_bonus = level_bonus;
         let start = match &replay_in {
             Some(r) => r.start.clone(),
             None => start_of(o, &level.level)?,
@@ -188,6 +192,7 @@ impl Game {
             watch: Watch::default(),
             session: None,
             music_theme: data.settings(&level.name).music,
+            level_bonus,
             last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
             ball_sound: BallSound::default(),
             fan_sound: FanSound::default(),
@@ -208,6 +213,7 @@ impl Game {
             self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
         );
         self.sim.set_ball_boxes(self.ball_meshes.boxes);
+        self.sim.level_bonus = self.level_bonus;
         self.ball_sound.silence(&mut self.sound_out);
         self.fan_sound.silence(&mut self.sound_out);
         if let Some(st) = &self.start {
