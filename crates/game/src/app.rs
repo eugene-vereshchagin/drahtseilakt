@@ -98,12 +98,16 @@ impl Game {
             .and_then(crate::sim::BallKind::from_name)
             .unwrap_or(crate::sim::BallKind::Wood);
         let modules = scene::load_modules(&level.level, data);
-        let sim = Sim::with_modules(&level.level, start_ball, &modules);
+        // The original's level 1 begins with its tutorial, which stops the level before the ball comes.
+        let tutorial = level.name.eq_ignore_ascii_case("Level_01.NMO");
+        let ball_meshes = BallMeshes::find(&balls.level);
+        let mut sim = Sim::with_modules(&level.level, start_ball, &modules, tutorial);
+        sim.set_ball_boxes(ball_meshes.boxes);
         let placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
         Ok(Game {
             placements,
             modules,
-            ball_meshes: BallMeshes::find(&balls.level),
+            ball_meshes,
             sim,
             start_ball,
             replay_out: Replay::new(&level.name, level.hash),
@@ -120,7 +124,13 @@ impl Game {
 
     fn restart(&mut self) {
         self.save_attempt();
-        self.sim = Sim::with_modules(&self.level.level, self.start_ball, &self.modules);
+        self.sim = Sim::with_modules(
+            &self.level.level,
+            self.start_ball,
+            &self.modules,
+            self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
+        );
+        self.sim.set_ball_boxes(self.ball_meshes.boxes);
         self.ball_lost_at = None;
         self.watch = Watch::default();
         self.replay_out = Replay::new(&self.level.name, self.level.hash);

@@ -258,7 +258,7 @@ impl World {
         }
     }
 
-    /// Runs the physics for `seconds` of its own time in frames of 1/60 s (the level start, at time factor 1).
+    /// Runs the physics for `seconds` of its own time in steps of 1/60 s (a frame at time factor 1, half a frame at 2).
     pub fn run(&mut self, seconds: f64) {
         let frames = (seconds * 60.0).round() as u32;
         for _ in 0..frames {
@@ -287,10 +287,11 @@ impl World {
     /// Puts a new ball in place of body `i`, at rest, as the original physicalizes a new ball after a death or in a
     /// transformer: the old body is destroyed and a new one made with the new material. The game index and the entity
     /// number stay the same.
-    pub fn replace_ball(&mut self, i: usize, radius: f32, m: Material, pos: Vec3, rot: Quat) {
+    pub fn replace_ball(&mut self, i: usize, radius: f32, m: Material, pos: Vec3, rot: impl Into<Rot>) {
         if i >= self.handles.len() {
             return;
         }
+        let rot = rot.into();
         self.remove(i);
         let desc = BodyDesc {
             entity: i as u32 + 1,
@@ -302,9 +303,9 @@ impl World {
             rot_damp: m.rot_damp,
             ..BodyDesc::default()
         };
-        let id = self.physics.add_body(desc, Shape::Sphere(radius), vec3_f64(pos), ivp_quat(rot));
+        let id = self.physics.add_body(desc, Shape::Sphere(radius), vec3_f64(pos), rot.ivp());
         self.handles[i] = Some(id);
-        self.bodies[i] = Body { pos, rot };
+        self.bodies[i] = Body { pos, rot: rot.quat() };
     }
 
     /// The player's push on a body, as the original steers its ball: a force that the physics applies at every PSI

@@ -190,6 +190,8 @@ struct Rules {
     start: Vec3,
     checkpoints: Vec<(usize, Vec3)>,
     resets: Vec<Vec3>,
+    /// Each reset point's turn (its matrix without scale): a new ball takes its reset point's whole matrix.
+    reset_turns: Vec<Mat3>,
     end: Option<Vec3>,
     extra_points: Vec<(usize, Vec3)>,
     extra_lives: Vec<(usize, Vec3)>,
@@ -386,6 +388,8 @@ pub struct Sim {
     module_sectors: Vec<Vec<ModuleInst>>,
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
+    /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
+    ball_boxes: [(Vec3, Vec3); 3],
     /// Sector changes due: at a tick, a sector's objects or modules leave or enter the physics.
     sector_changes: Vec<SectorChange>,
 }
@@ -403,19 +407,22 @@ const PICK_RADIUS: f32 = 3.5;
 /// Physics time from the level's load to its first sector's objects: 594 frames at time factor 1 (the C game,
 /// level 1).
 const LEVEL_INTRO_SECONDS: f64 = 594.0 / 60.0;
-/// Physics time between a sector's objects and the ball at a level start: four frames at time factor 1.
-const START_OBJECTS_SECONDS: f64 = 4.0 / 60.0;
+/// Physics time between a sector's objects and the ball at a level start (the C game): 180 frames at time factor 2
+/// (levels 2 to 12), or four frames at time factor 1 when the tutorial stops the level first (level 1).
+const START_OBJECTS_SECONDS: f64 = 180.0 / 30.0;
+const START_OBJECTS_SECONDS_TUTORIAL: f64 = 4.0 / 60.0;
 const GATE_RADIUS: f32 = 7.0;
 
 impl Sim {
     /// A run of a level without its modules' physics (their placeholders are solid).
     #[cfg(test)]
     pub fn new(level: &Level, start_ball: BallKind) -> Sim {
-        Sim::with_modules(level, start_ball, &Modules::default())
+        Sim::with_modules(level, start_ball, &Modules::default(), false)
     }
 
     /// A run of a level, with the physics of the modules the port has (crate::modules) from their loaded files.
-    pub fn with_modules(level: &Level, start_ball: BallKind, modules: &Modules) -> Sim {
+    /// `tutorial`: the level starts with the original's tutorial (level 1), which stops the level before the ball.
+    pub fn with_modules(level: &Level, start_ball: BallKind, modules: &Modules, tutorial: bool) -> Sim {
         // A placeholder whose module is loaded is not solid itself: the module is made of its parts when the port
         // has its physics, and an original module without an entry has none. A placeholder whose module file is
         // missing (a map's own module) stays solid.
@@ -451,6 +458,7 @@ impl Sim {
             start,
             checkpoints: pos("PC_Checkpoints"),
             resets: sorted_by_name(level, "PR_Resetpoints"),
+            reset_turns: sorted_turns_by_name(level, "PR_Resetpoints"),
             end: pos("PE_Levelende").first().map(|p| p.1),
             extra_points: pos("P_Extra_Point"),
             extra_lives: pos("P_Extra_Life"),
@@ -474,10 +482,11 @@ impl Sim {
             .first()
             .copied()
             .unwrap_or(start + Vec3::Y * BALL_RADIUS);
+        let turn = rules.reset_turns.first().copied().unwrap_or(Mat3::IDENTITY);
         let ball = Ball {
             position: spawn,
             velocity: Vec3::ZERO,
-            rotation: Quat::IDENTITY,
+            rotation: Rot::Basis(turn).quat(),
             spin: Vec3::ZERO,
             kind: start_ball,
             on_ground: false,
@@ -619,13 +628,18 @@ impl Sim {
         for &b in unsectored.iter().chain(sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
             world.activate(b);
         }
-        // The modules come one frame after the sector's objects.
-        world.run(1.0 / 60.0);
+        // The modules come one frame after the sector's objects, then the ball.
+        let (frame, until_ball) = if tutorial {
+            (1.0 / 60.0, START_OBJECTS_SECONDS_TUTORIAL)
+        } else {
+            (1.0 / 30.0, START_OBJECTS_SECONDS)
+        };
+        world.run(frame);
         for inst in unsectored_modules.iter().chain(module_sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
             inst.enter(&mut world);
         }
-        world.run(START_OBJECTS_SECONDS - 1.0 / 60.0);
-        world.replace_ball(0, BALL_RADIUS, ball.material(), ball.position, ball.rotation);
+        world.run(until_ball - frame);
+        world.replace_ball(0, BALL_RADIUS, ball.material(), ball.position, Rot::Basis(turn));
         let mut camera = Camera {
             quarter,
             yaw,
@@ -655,6 +669,7 @@ impl Sim {
             sectors,
             module_sectors,
             module_bodies,
+            ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
             sector_changes: Vec::new(),
         }
     }
@@ -843,7 +858,8 @@ impl Sim {
         if self.rules.depth_cubes.is_empty() {
             return self.ball.position.y < self.rules.death_y;
         }
-        let ball = Obb::cube(self.ball.position, BALL_RADIUS, Mat3::from_quat(self.ball.rotation));
+        let (lo, hi) = self.ball_boxes[self.ball.kind as usize];
+        let ball = Obb::from_box(lo, hi, &glam::Mat4::from_rotation_translation(self.ball.rotation, self.ball.position));
         self.rules.depth_cubes.iter().any(|c| c.overlaps(&ball))
     }
 
@@ -878,6 +894,12 @@ impl Sim {
             enter,
             modules: true,
         });
+    }
+
+    /// The boxes of the ball meshes (wood, stone, paper) from the game's Balls.nmo; the depth-test cubes are tested
+    /// against the box of the ball's mesh, as the original does.
+    pub fn set_ball_boxes(&mut self, boxes: [(Vec3, Vec3); 3]) {
+        self.ball_boxes = boxes;
     }
 
     /// The modules' parts that the physics moves, for drawing.
@@ -920,12 +942,13 @@ impl Sim {
             .get(self.sector)
             .copied()
             .unwrap_or(self.rules.start + Vec3::Y * BALL_RADIUS);
+        let turn = self.rules.reset_turns.get(self.sector).copied().unwrap_or(Mat3::IDENTITY);
         self.ball.position = spawn;
+        self.ball.rotation = Rot::Basis(turn).quat();
         self.ball.velocity = Vec3::ZERO;
         self.ball.spin = Vec3::ZERO;
         self.hold = None;
-        self.world
-            .replace_ball(0, BALL_RADIUS, self.ball.material(), spawn, self.ball.rotation);
+        self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), spawn, Rot::Basis(turn));
         // The camera comes back as it was at the start: the start heading, not lifted, no turn in progress.
         self.camera.quarter = START_QUARTER;
         self.camera.yaw = START_QUARTER as f32 * std::f32::consts::FRAC_PI_2;
@@ -958,6 +981,22 @@ fn depth_cubes(level: &Level) -> Vec<Obb> {
             (min.x <= max.x).then(|| Obb::from_box(min, max, &glam::Mat4::from_cols_array_2d(&o.matrix)))
         })
         .collect()
+}
+
+/// The turns (matrices without scale) of a group's members, sorted by name as `sorted_by_name`.
+fn sorted_turns_by_name(level: &Level, group: &str) -> Vec<Mat3> {
+    let mut v: Vec<(String, Mat3)> = level
+        .members(group)
+        .map(|(_, o)| {
+            let turn = match pose_and_scale(&o.matrix) {
+                Some((_, Rot::Basis(m), _)) => m,
+                _ => Mat3::IDENTITY,
+            };
+            (o.name.clone(), turn)
+        })
+        .collect();
+    v.sort_by(|a, b| a.0.cmp(&b.0));
+    v.into_iter().map(|x| x.1).collect()
 }
 
 fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
@@ -1456,7 +1495,8 @@ mod tests {
         add_cube(&mut level, "P_Box_01", start, &["P_Box", "Sector_01"]);
         let mut sim = Sim::new(&level, BallKind::Wood);
         let b = sim.loose[0].1;
-        // push the box away, then lose the ball
+        // push the box away (it fell asleep before the ball came), then lose the ball
+        sim.world.wake(b);
         for _ in 0..60 {
             sim.world.set_push(b, Vec3::X * 0.5);
             sim.step(0);
@@ -1507,7 +1547,7 @@ mod tests {
         let mut modules = Modules::default();
         modules.models.push(file);
         modules.names.push("P_Modul_34".into());
-        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
         let parts = sim.module_bodies().to_vec();
         assert_eq!(parts.len(), 2);
         // the stand-in's matrix times the part's: (-7, 1, 0) turned a quarter about y is (0, 1, 7), moved to x = 20

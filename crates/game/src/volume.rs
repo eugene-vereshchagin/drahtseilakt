@@ -2,7 +2,9 @@
 // level when the box of its mesh overlaps one of the level's depth-test cubes (docs/gameplay_bbs.md, the box tests
 // and their use in BallManager).
 
-use glam::{Mat3, Mat4, Vec3};
+use glam::{Mat4, Vec3};
+#[cfg(test)]
+use glam::Mat3;
 
 /// An oriented box: centre, unit axes and half extents along them.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -27,7 +29,8 @@ impl Obb {
         }
     }
 
-    /// A cube of half size `half` centred at `center`, turned by `rot` (the ball's mesh box).
+    /// A cube of half size `half` centred at `center`, turned by `rot` (tests).
+    #[cfg(test)]
     pub fn cube(center: Vec3, half: f32, rot: Mat3) -> Obb {
         Obb {
             center,

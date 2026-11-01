@@ -46,6 +46,8 @@ pub struct BallMeshes {
     pub wood: Option<usize>,
     pub stone: Option<usize>,
     pub paper: Option<usize>,
+    /// The boxes of the three meshes (wood, stone, paper), a sphere's ±2 where a mesh is missing.
+    pub boxes: [(Vec3, Vec3); 3],
 }
 
 impl BallMeshes {
@@ -56,10 +58,25 @@ impl BallMeshes {
                 .iter()
                 .position(|m| m.name.eq_ignore_ascii_case(name))
         };
+        let (wood, stone, paper) = (
+            mesh("Ball_Wood_Mesh"),
+            mesh("Ball_Stone_HighRes_Mesh").or_else(|| mesh("Ball_Stone_Mesh")),
+            mesh("Ball_Paper_Mesh"),
+        );
+        let bounds = |m: Option<usize>| {
+            let sphere = (Vec3::splat(-2.0), Vec3::splat(2.0));
+            let Some(m) = m.and_then(|i| balls.meshes.get(i)).filter(|m| !m.positions.is_empty()) else {
+                return sphere;
+            };
+            m.positions.iter().fold((Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)), |(lo, hi), p| {
+                (lo.min(Vec3::from(*p)), hi.max(Vec3::from(*p)))
+            })
+        };
         BallMeshes {
-            wood: mesh("Ball_Wood_Mesh"),
-            stone: mesh("Ball_Stone_HighRes_Mesh").or_else(|| mesh("Ball_Stone_Mesh")),
-            paper: mesh("Ball_Paper_Mesh"),
+            wood,
+            stone,
+            paper,
+            boxes: [bounds(wood), bounds(stone), bounds(paper)],
         }
     }
 }
