@@ -19,7 +19,9 @@ new engine got level 1 playable, ahead of the phase order:
   them, its camera going round its curve. Missing: the stone ball's roll in it, the highscore table and its name entry, the level's own lights, 8K check.
 - **Phase 3**: the ball physics is IVP's, ported from the upstream's C (crates/ivp) and checked against the C
   game: a straight push of the wooden and of the stone ball and a 17-second route on level 1 agree to within 0.1
-  and 0.8 units. Missing: floor materials per object.
+  and 0.8 units. Every floor, rail and stopper has the one material the original gives them (friction 0.7,
+  elasticity 0.3; Levelinit's Physicalize_Floors, the same with level 13's add-on); they differ only in their
+  collision group.
 - **Phase 4**: rules from the level's groups (start, reset points, checkpoints, extra points and lives, ball
   transformers, falling, finish); replays recorded, the best per level kept. Sectors, domes and the level start
   follow the C game, and so does the transformer's animation (ring, bars, the ball's change). The modules of levels 1 to 12 are made of

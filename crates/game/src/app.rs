@@ -788,6 +788,11 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
         }
     }
     waypoints.sort_by_key(|w| w.0);
+    // A plan (--plan) names the objects to pass through, in order, as a player who knows the level does: it
+    // replaces the found order.
+    if let Some(plan) = &o.plan {
+        waypoints = read_plan(plan, level)?.into_iter().map(|(p, trafo)| (0, p, trafo)).collect();
+    }
     let stages: Vec<glam::Vec3> = waypoints.iter().map(|w| w.1).collect();
     let route = crate::autopilot::Route::find(level, &game.modules, start, &stages);
     println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
@@ -801,6 +806,27 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
         route.marks.iter().zip(&waypoints).filter(|(_, w)| w.2).map(|(&m, w)| (m, w.1)).collect();
     println!("transformers on the way: {:?}", gates);
     pilot_run(game, o, crate::autopilot::Pilot::new(route, gates))
+}
+
+/// A plan: one level object a line (`NAME  # note`), in the order the way goes through them; blank lines and
+/// `#` comments are skipped. Returns where each is and whether it is a transformer.
+fn read_plan(path: &Path, level: &level::Level) -> Result<Vec<(glam::Vec3, bool)>, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let name = line.split('#').next().unwrap_or_default().trim().trim_end_matches('?').trim();
+        if name.is_empty() {
+            continue;
+        }
+        let i = level
+            .objects
+            .iter()
+            .position(|ob| ob.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| format!("{}: no object {name}", path.display()))?;
+        let trafo = level.groups_of(i).any(|g| g.starts_with("P_Trafo"));
+        out.push((glam::Vec3::from(level.objects[i].position()), trafo));
+    }
+    Ok(out)
 }
 
 /// Runs the test player to --ticks (or the finish), prints how far it got and saves its run at --record.

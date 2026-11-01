@@ -19,7 +19,9 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   (MenuLevel), ihre Kamera fährt ihre Kurve ab. Fehlt: das Rollen der Steinkugel darin, die Bestenliste und ihre Namenseingabe, die eigenen Lichter des Levels, 8K-Prüfung.
 - **Phase 3**: Die Kugelphysik ist IVP, aus dem C-Code des Upstreams portiert (crates/ivp) und gegen das C-Spiel
   geprüft: ein gerader Stoß der Holz- und der Steinkugel und eine 17-Sekunden-Route in Level 1 stimmen auf 0,1
-  bzw. 0,8 Einheiten überein. Fehlt: Bodenmaterialien je Objekt.
+  bzw. 0,8 Einheiten überein. Alle Böden, Schienen und Stopper haben das eine Material, das das Original ihnen
+  gibt (Reibung 0,7, Elastizität 0,3; Physicalize_Floors aus Levelinit, gleich in der Erweiterung von Level 13);
+  sie unterscheiden sich nur in ihrer Kollisionsgruppe.
 - **Phase 4**: Regeln aus den Gruppen des Levels (Start, Rücksetzpunkte, Checkpoints, Bonuspunkte und -leben,
   Kugelwandler, Absturz, Ziel); Replays werden aufgezeichnet, das beste je Level behalten. Sektoren, Kuppeln und der
   Levelstart wie im C-Spiel, ebenso die Animation des Kugelwandlers (Ring, Stäbe, Wechsel der Kugel). Die Module der Level 1 bis 12

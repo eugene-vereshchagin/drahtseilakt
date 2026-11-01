@@ -49,6 +49,7 @@ usage: drahtseilakt [options]
   --headless          no window: run the replay to its end and print what happened
   --autopilot         no window: the test player plays the level (to --ticks); saved with --record
   --follow FILE       the test player follows the ball's way in a replay of a player's run
+  --plan FILE         the test player's way goes through the level objects named in FILE, in order
   --screenshot FILE   no window: render the frame after the replay (or --ticks N) to a PNG
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
@@ -83,6 +84,8 @@ pub struct Options {
     pub autopilot: bool,
     /// The test player follows the ball's way in this replay (a player's run) instead of finding one.
     pub follow: Option<PathBuf>,
+    /// The test player's way goes through these level objects in order (a file of names).
+    pub plan: Option<PathBuf>,
     pub screenshot: Option<PathBuf>,
     pub ticks: Option<u64>,
     pub trace: Option<u64>,
@@ -108,6 +111,7 @@ fn parse_args() -> Result<Options, String> {
         headless: false,
         autopilot: false,
         follow: None,
+        plan: None,
         screenshot: None,
         ticks: None,
         trace: None,
@@ -153,6 +157,10 @@ fn parse_args() -> Result<Options, String> {
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,
             "--autopilot" => o.autopilot = true,
+            "--plan" => {
+                o.plan = Some(value()?.into());
+                o.autopilot = true;
+            }
             "--follow" => {
                 o.follow = Some(value()?.into());
                 o.autopilot = true;
