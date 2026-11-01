@@ -16,6 +16,7 @@ mod replay;
 mod scene;
 mod sim;
 mod sky;
+mod trafo;
 mod volume;
 mod watch;
 

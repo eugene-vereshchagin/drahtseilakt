@@ -1482,3 +1482,22 @@ Otherwise call `CKBitmapData::SetCurrentSlot(slot)` on the texture's bitmap part
 selects which image slot is shown. Return 0.
 
 Game: `Gameplay.nmo` `Init` (id 12996). Slot 0, fired after a `Set Cell`.
+
+## The transformer animation (AnimTrafo.nmo), measured
+
+`AnimTrafo_MF Script` runs Ring_Open, Up'n Down (with FlashAnim) and Ring_Close; all its objects sit at the
+file's origin and are placed at the transformer's world matrix. Measured in the C game (60 frames a second),
+counting from the frame the animation's objects are placed (one frame after the ball is taken):
+
+| Frames | What |
+|---|---|
+| 0–9 | The four `AnimTrafo_Ringpart` move by (-0.5, 0, -0.5) in their `AnimTrafo_Frame0N`, speeding up (≈ t²). |
+| 22–142 | `AnimTrafo_Bars` rise to (0, 5.2, 0) by 69, stay to 93 and come back down; the ring parts and `AnimTrafo_Flashfield` move with them. The flash field is shown from 22, hidden at 142. |
+| 142–153 | The ring parts move back, speeding up (≈ t²). |
+| 147 | The old ball is hidden; the new one is shown at 148 (149 frames after the ball was taken). |
+| 153 | All of the animation's objects are hidden. |
+
+The old ball is pulled to the transformer's (0, 3, 0) (Set Physics Spring above): half way in 7 frames, 90% in 17,
+which a critically damped spring of 0.23 per frame matches. The new ball keeps the old one's orientation. The
+transformer's own `P_Trafo_*_MF` and `_Shadow`, hidden in their module file, are shown from the level start and
+stay shown throughout.

@@ -15,7 +15,10 @@ pub const SKY_MODEL: usize = 2;
 pub struct Snapshot {
     pub ball: Vec3,
     pub rotation: Quat,
-    pub kind: BallKind,
+    /// The ball to draw (none for a moment in a transformer).
+    pub kind: Option<BallKind>,
+    /// A transformer animation playing: the transformer's matrix and the animation's age in ticks.
+    pub trafo: Option<(Mat4, f32)>,
     pub eye: Vec3,
     pub target: Vec3,
 }
@@ -25,7 +28,8 @@ impl Snapshot {
         Snapshot {
             ball: sim.ball.position,
             rotation: sim.ball.rotation,
-            kind: sim.ball.kind,
+            kind: sim.drawn_ball(),
+            trafo: sim.trafo_anim(),
             eye: sim.camera.position,
             target: sim.camera.target,
         }
@@ -36,6 +40,10 @@ impl Snapshot {
             ball: a.ball.lerp(b.ball, t),
             rotation: a.rotation.slerp(b.rotation, t),
             kind: b.kind,
+            trafo: match (a.trafo, b.trafo) {
+                (Some((_, x)), Some((m, y))) => Some((m, x + (y - x) * t)),
+                (_, b) => b,
+            },
             eye: a.eye.lerp(b.eye, t),
             target: a.target.lerp(b.target, t),
         }
@@ -88,6 +96,10 @@ const MARKERS: [(&str, [f32; 4]); 3] = [
     ("PS_Levelstart", [1.0, 0.45, 0.85, 0.35]),
     ("P_Extra_Point", [0.9, 0.9, 1.0, 0.7]),
 ];
+
+/// Modules whose file hides all of their meshes but whose script shows them all when the level starts (seen in the C
+/// game: a transformer's ring and its shadow are visible from the start).
+const SHOWN_MODULES: [&str; 3] = ["P_Trafo_Wood", "P_Trafo_Stone", "P_Trafo_Paper"];
 
 /// One drawn thing of the level: a level mesh, a module mesh at a placeholder, or a marker.
 pub struct Placement {
@@ -227,9 +239,10 @@ pub fn placements(
         // is a body that exists from the start, so its mesh is shown whatever the file says. A part the physics
         // moves is drawn at its body, scaled by its own scale.
         let body = boxes.iter().find(|b| b.0 == i).map(|b| b.1);
+        let shown = SHOWN_MODULES.iter().any(|m| m.eq_ignore_ascii_case(&modules.names[index]));
         for mo in &module.objects {
             let part = parts.iter().find(|p| p.placeholder == i && p.object == mo.name);
-            if !(mo.visible || body.is_some() || part.is_some()) {
+            if !(mo.visible || shown || body.is_some() || part.is_some()) {
                 continue;
             }
             let Some(mm) = mo.mesh.filter(|&m| has_material(module, m)) else {
@@ -260,6 +273,7 @@ pub fn instances(
     taken: &[usize],
     bodies: &[crate::physics::Body],
     balls: &BallMeshes,
+    trafo: Option<&crate::trafo::TrafoModel>,
     s: &Snapshot,
 ) -> Vec<Instance> {
     let mut out: Vec<Instance> = placements
@@ -283,10 +297,14 @@ pub fn instances(
             marker: None,
         });
     }
+    if let (Some(model), Some((at, age))) = (trafo, s.trafo) {
+        model.instances(&at, age, &mut out);
+    }
     let mesh = match s.kind {
-        BallKind::Wood => balls.wood,
-        BallKind::Stone => balls.stone,
-        BallKind::Paper => balls.paper,
+        Some(BallKind::Wood) => balls.wood,
+        Some(BallKind::Stone) => balls.stone,
+        Some(BallKind::Paper) => balls.paper,
+        None => None,
     };
     if let Some(mesh) = mesh {
         out.push(Instance {

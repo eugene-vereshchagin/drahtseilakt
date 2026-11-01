@@ -51,6 +51,8 @@ struct Game {
     ball_meshes: BallMeshes,
     placements: Vec<scene::Placement>,
     modules: scene::Modules,
+    /// The transformer animation's file (`AnimTrafo.nmo`), drawn after the modules, if the copy has it.
+    trafo: Option<(LoadedLevel, crate::trafo::TrafoModel)>,
     sim: Sim,
     replay_in: Option<Replay>,
     replay_out: Replay,
@@ -104,7 +106,13 @@ impl Game {
         let mut sim = Sim::with_modules(&level.level, start_ball, &modules, tutorial);
         sim.set_ball_boxes(ball_meshes.boxes);
         let placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
+        let trafo_model = scene::FIRST_MODULE_MODEL + modules.models.len();
+        let trafo = data
+            .file("3D Entities/AnimTrafo.nmo")
+            .and_then(|p| crate::assets::load_nmo(&p).ok())
+            .and_then(|f| crate::trafo::TrafoModel::new(&f.level, trafo_model).map(|m| (f, m)));
         Ok(Game {
+            trafo,
             placements,
             modules,
             ball_meshes,
@@ -567,6 +575,9 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     for m in &game.modules.models {
         renderer.add_model(m, &loader);
     }
+    if let Some((file, _)) = &game.trafo {
+        renderer.add_model(&file.level, &loader);
+    }
     // The zenith colour: the top row of the front texture, averaged.
     if let Some((w, _, rgba)) = sky.textures.first().and_then(|t| data.texture(t)) {
         let row = rgba.get(..(w as usize * 4)).unwrap_or_default();
@@ -629,6 +640,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         &game.sim.taken,
         &game.sim.world().bodies,
         &game.ball_meshes,
+        game.trafo.as_ref().map(|t| &t.1),
         &snap,
     );
     r.draw(&view, w, h, &scene::view(&snap), &inst);
@@ -852,6 +864,7 @@ impl App {
             &self.game.sim.taken,
             &self.game.sim.world().bodies,
             &self.game.ball_meshes,
+            self.game.trafo.as_ref().map(|t| &t.1),
             &snap,
         );
         let built = build_started.elapsed();

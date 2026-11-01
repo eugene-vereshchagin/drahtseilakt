@@ -9,7 +9,7 @@ use crate::collide::{StaticMesh, Triangle};
 use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, Rot, World};
 use crate::scene::{ModuleBody, Modules, module_of};
 use crate::volume::Obb;
-use glam::{Mat3, Quat, Vec3};
+use glam::{Mat3, Mat4, Quat, Vec3};
 use level::Level;
 
 pub const TICK: f32 = 1.0 / 60.0;
@@ -95,6 +95,9 @@ const START_QUARTER: i32 = 1;
 const TRAFO_TICKS: u64 = 149;
 /// Where a transformer holds the ball: its own (0, 3, 0), where the C game makes the new ball.
 const TRAFO_HOLD: Vec3 = Vec3::new(0.0, 3.0, 0.0);
+/// How fast the held ball is pulled to the hold point: a critically damped spring of this rate (per tick), as the C
+/// game's ball moves (half way in 7 frames, 90% in 17).
+const TRAFO_PULL: f32 = 0.23;
 /// After a checkpoint, the C game takes the passed sector's objects out of the physics 44 frames later and makes the
 /// next sector's 4 frames after that.
 const SECTOR_END_TICKS: u64 = 44;
@@ -195,7 +198,8 @@ struct Rules {
     end: Option<Vec3>,
     extra_points: Vec<(usize, Vec3)>,
     extra_lives: Vec<(usize, Vec3)>,
-    trafos: Vec<(usize, Vec3, BallKind)>,
+    /// The transformers: object, position, the kind they make, world matrix (where their animation plays).
+    trafos: Vec<(usize, Vec3, BallKind, Mat4)>,
     /// The level's depth-test cubes: the ball has fallen off when its box reaches one.
     depth_cubes: Vec<Obb>,
     /// Without depth-test cubes (a map that has none), the ball has fallen off this far below the lowest floor.
@@ -379,8 +383,20 @@ fn module_parts(
 /// The ball inside a transformer: out of the physics until `release`, then a new ball of its new kind at `at`.
 #[derive(Clone, Copy, Debug)]
 struct TrafoHold {
+    start: u64,
     release: u64,
     at: Vec3,
+    /// Where the ball was taken.
+    from: Vec3,
+    /// The kind it was, drawn until the new ball comes.
+    old: BallKind,
+}
+
+/// A transformer's animation (see `trafo.rs`): the transformer's matrix and the tick it took the ball.
+#[derive(Clone, Copy, Debug)]
+pub struct TrafoAnim {
+    pub at: Mat4,
+    pub start: u64,
 }
 
 pub struct Sim {
@@ -402,6 +418,8 @@ pub struct Sim {
     prev_input: u8,
     /// The ball inside a transformer, if it is in one.
     hold: Option<TrafoHold>,
+    /// The transformer animation playing, if one is.
+    trafo_anim: Option<TrafoAnim>,
     /// The tick the ball fell off the level, until the new ball is in.
     dying: Option<u64>,
     /// The arrows that pushed at the last tick, to wake the ball when they change.
@@ -475,7 +493,7 @@ impl Sim {
             {
                 for &m in &g.members {
                     if let Some(o) = level.objects.get(m) {
-                        trafos.push((m, Vec3::from(o.position()), kind));
+                        trafos.push((m, Vec3::from(o.position()), kind, Mat4::from_cols_array_2d(&o.matrix)));
                     }
                 }
             }
@@ -705,6 +723,7 @@ impl Sim {
             events: Vec::new(),
             prev_input: 0,
             hold: None,
+            trafo_anim: None,
             dying: None,
             push_keys: 0,
             sectors,
@@ -797,7 +816,8 @@ impl Sim {
         self.world.step(None);
         if let Some(h) = self.hold {
             // Out of the physics, the ball is drawn moving to the transformer's hold point.
-            self.ball.position += (h.at - self.ball.position) * (1.0 - (-TICK * 6.0f32).exp());
+            let t = (self.tick - h.start) as f32 * TRAFO_PULL;
+            self.ball.position = h.at + (h.from - h.at) * (1.0 + t) * (-t).exp();
             if self.tick >= h.release {
                 self.hold = None;
                 self.ball.position = h.at;
@@ -815,6 +835,9 @@ impl Sim {
 
         self.follow_camera();
         self.apply_rules();
+        if self.trafo_anim.is_some_and(|a| self.tick as f32 > (a.start + crate::trafo::BEGIN) as f32 + crate::trafo::END) {
+            self.trafo_anim = None;
+        }
         if self.tick.is_multiple_of(30) && self.points > 0 {
             self.points -= 1;
         }
@@ -846,18 +869,23 @@ impl Sim {
                 self.events.push((self.tick, Event::ExtraLife));
             }
         }
-        for &(_, q, kind) in &self.rules.trafos {
+        for &(_, q, kind, at) in &self.rules.trafos {
             if self.hold.is_none() && self.ball.kind != kind && near(q, PICK_RADIUS + 1.0) {
                 // The original takes the ball out of the physics and, after a while, makes a ball of the new kind at
                 // rest above the transformer.
+                let old = self.ball.kind;
                 self.ball.kind = kind;
                 self.world.remove(0);
                 self.ball.velocity = Vec3::ZERO;
                 self.ball.spin = Vec3::ZERO;
                 self.hold = Some(TrafoHold {
+                    start: self.tick,
                     release: self.tick + TRAFO_TICKS,
                     at: q + TRAFO_HOLD,
+                    from: p,
+                    old,
                 });
+                self.trafo_anim = Some(TrafoAnim { at, start: self.tick });
                 self.events.push((self.tick, Event::Transform(kind)));
             }
         }
@@ -946,6 +974,21 @@ impl Sim {
     }
 
     /// The modules' parts that the physics moves, for drawing.
+    /// The transformer animation playing: the transformer's matrix and the animation's age in ticks.
+    pub fn trafo_anim(&self) -> Option<(Mat4, f32)> {
+        self.trafo_anim
+            .map(|a| (a.at, self.tick as f32 - (a.start + crate::trafo::BEGIN) as f32))
+    }
+
+    /// The ball to draw: in a transformer the old kind until the old ball is hidden, then none until the new one.
+    pub fn drawn_ball(&self) -> Option<BallKind> {
+        match self.hold {
+            Some(h) if self.tick >= h.start + crate::trafo::BEGIN + crate::trafo::OLD_BALL_HIDDEN as u64 => None,
+            Some(h) => Some(h.old),
+            None => Some(self.ball.kind),
+        }
+    }
+
     pub fn module_bodies(&self) -> &[ModuleBody] {
         &self.module_bodies
     }
@@ -1009,6 +1052,7 @@ impl Sim {
         self.ball.velocity = Vec3::ZERO;
         self.ball.spin = Vec3::ZERO;
         self.hold = None;
+        self.trafo_anim = None;
         self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), spawn, Rot::Basis(turn));
         // The camera comes back as it was at the start: the start heading, not lifted, no turn in progress.
         self.camera.quarter = START_QUARTER;
@@ -1337,14 +1381,23 @@ mod tests {
         sim.step(0);
         assert!(sim.events.contains(&(1, Event::Transform(BallKind::Stone))));
         assert!(sim.world.state(0).is_none(), "the ball left the physics");
+        // The old wooden ball is drawn until a tick before the new one, and the animation plays from the next tick.
+        assert_eq!(sim.drawn_ball(), Some(BallKind::Wood));
+        assert_eq!(sim.trafo_anim().map(|a| a.1), Some(-1.0));
         for _ in 1..TRAFO_TICKS {
             sim.step(0);
             assert!(sim.world.state(0).is_none());
         }
+        assert_eq!(sim.drawn_ball(), None, "the old ball is hidden");
         sim.step(0);
+        assert_eq!(sim.drawn_ball(), Some(BallKind::Stone));
         let s = sim.world.state(0).expect("a new ball");
         assert_eq!(sim.ball.kind, BallKind::Stone);
         assert!((s.pos - TRAFO_HOLD).length() < 0.1, "made at {:?}", s.pos);
+        for _ in 0..10 {
+            sim.step(0);
+        }
+        assert!(sim.trafo_anim().is_none(), "the animation is over");
 
         // The stone ball is heavier: the same push gives it less than half the wooden ball's speed (C game, level 1:
         // 3.1 against 6.9 after 30 ticks).

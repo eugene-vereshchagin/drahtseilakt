@@ -15,9 +15,9 @@ new engine got level 1 playable, ahead of the phase order:
   and 0.8 units. Missing: floor materials per object, the modules' physics.
 - **Phase 4**: rules from the level's groups (start, reset points, checkpoints, extra points and lives, ball
   transformers, falling, finish); replays recorded, the best per level kept. Sectors, domes and the level start
-  follow the C game. The modules of levels 1 to 12 are made of
+  follow the C game, and so does the transformer's animation (ring, bars, the ball's change). The modules of levels 1 to 12 are made of
   their physical parts and joints as in the C game. Missing: the modules' scripts (their forces and timers, the
-  finish's balloon), sounds, music, level 13's add-on.
+  finish's balloon), the transformer's flash texture scroll and ring colour, sounds, music, level 13's add-on.
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
 
 
