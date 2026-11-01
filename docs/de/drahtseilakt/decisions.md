@@ -208,3 +208,13 @@ vergleichen: ausführen, ihre Dokumentation lesen, messen. Code wird daraus nich
 Ipion-Quelltext wird gar nicht geöffnet: Die Physik entsteht aus dem gemessenen Verhalten des Originalspiels.
 Die Reverse-Engineering-Notizen in `docs/` (Dateiformate, Building Blocks, Verhalten des Spiels) bleiben als
 Nachschlagewerk.
+
+## Der Ton geht über cpal hinaus
+
+*2026-11-01.* Das Spiel spielt die WAV-Dateien des Spielers über cpal 0.18 (Apache-2.0, RustAudio): ALSA unter
+Linux (PipeWire und PulseAudio nehmen es über ihre ALSA-Schicht an; der Build braucht die ALSA-Header, unter
+Debian `libasound2-dev`), WASAPI unter Windows, CoreAudio unter macOS. Es öffnet nur einen Ausgabestrom; WAV
+lesen, mischen, Lautstärke und Tonhöhe sind unseres (crates/game/src/audio.rs), so bleiben wir nah an den
+Tonskripten des Originals. rodio und kira bringen Decoder und Mischer mit, die wir nicht brauchen; miniaudio,
+SDL3 und OpenAL sind C-Bibliotheken. Das Crate ist auf eine Version festgelegt und liegt im Cargo-Cache, der
+Build bleibt also offline.

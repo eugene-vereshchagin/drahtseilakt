@@ -7,11 +7,14 @@
 
 mod app;
 mod assets;
+mod audio;
+mod ballsound;
 mod collide;
 mod freecam;
 mod hud;
 mod menu;
 mod modules;
+mod music;
 mod physics;
 mod proximity;
 mod render;

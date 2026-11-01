@@ -21,6 +21,7 @@ bytemuck = { version = "1", features = ["derive"] }
 pollster = "0.4"
 image = { version = "=0.25.10", default-features = false, features = ["bmp", "tga", "png", "jpeg"] }
 ivp = { path = "../ivp" }
+cpal = "=0.18.2"
 
 [lints]
 workspace = true

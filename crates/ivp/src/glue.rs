@@ -267,6 +267,27 @@ impl World {
         })
     }
 
+    /// The post-collision events since the last call (`PhysImpactEvent`, what PhysicsCollDetection listens to): the
+    /// two objects and their relative velocity at the impact. Taking them empties the list.
+    pub fn take_impacts(&mut self) -> Vec<([usize; 2], P3)> {
+        self.coll.impact_events.drain(..).map(|e| (e.obj, e.rel)).collect()
+    }
+
+    /// The objects an object has friction contacts with now (one entry per contact point), as PhysicsContinuousContact
+    /// counts them.
+    pub fn friction_partners(&self, obj: usize) -> Vec<usize> {
+        self.coll
+            .cps
+            .iter()
+            .filter(|p| p.alive && p.fs.is_some())
+            .filter_map(|p| match (p.syn[0].obj, p.syn[1].obj) {
+                (a, b) if a == obj => Some(b),
+                (a, b) if b == obj => Some(a),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// The contact points of one body, in one pass over the points (`debug_contact` for each would be quadratic).
     pub fn contacts_of(&self, entity: u32) -> Vec<ContactReadout> {
         self.coll

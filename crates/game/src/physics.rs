@@ -63,8 +63,28 @@ pub struct State {
     pub spin: Vec3,
 }
 
+/// A body's sound material, as the original's attributes give it: the hit ("Coll Detection ID": 1 stone, 2 wood,
+/// 3 metal, 4 dome) and the roll ("Continuous Contact ID": 1 stone, 2 wood, 3 metal); 0 for none.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SoundIds {
+    pub hit: u8,
+    pub roll: u8,
+}
+
+/// What the ball met at the last step, for its sounds: the impacts (the other body's hit material and the
+/// relative speed) and the materials of the bodies it has friction contacts with, one per contact point.
+#[derive(Clone, Debug, Default)]
+pub struct BallSounds {
+    pub impacts: Vec<(u8, f32)>,
+    pub rolls: Vec<u8>,
+}
+
 pub struct World {
     physics: IvpWorld,
+    /// The sound material of each game body.
+    sounds: Vec<SoundIds>,
+    /// What the ball met at the last step.
+    pub ball_sounds: BallSounds,
     /// The IVP body of each of the game's bodies, in creation order; none while a body is taken out of the physics
     /// (the ball inside a transformer).
     handles: Vec<Option<usize>>,
@@ -75,7 +95,7 @@ pub struct World {
     /// The push controller of each body that has been pushed (see `set_push`).
     pushers: Vec<Option<usize>>,
     /// The IVP bodies of the level's physical objects, with whether the player's ball collides with them.
-    statics: Vec<(usize, bool)>,
+    statics: Vec<(usize, bool, SoundIds)>,
     /// How each game body is made, for the ones that come and go (a sector's objects); none for the ball.
     spawns: Vec<Option<Spawn>>,
 }
@@ -169,6 +189,8 @@ impl World {
         physics.set_gravity([0.0, -GRAVITY, 0.0]);
         let mut world = World {
             physics,
+            sounds: Vec::new(),
+            ball_sounds: BallSounds::default(),
             handles: Vec::new(),
             bodies: Vec::new(),
             grounded: false,
@@ -195,7 +217,7 @@ impl World {
             let id = world
                 .physics
                 .add_body(desc, Shape::Surface(surface), vec3_f64(mesh.pos), mesh.rot.ivp());
-            world.statics.push((id, mesh.group != GROUP_BALL));
+            world.statics.push((id, mesh.group != GROUP_BALL, mesh.sound));
         }
         world
     }
@@ -203,6 +225,7 @@ impl World {
     /// A new game body from its spawn, made in the physics now when `active`, else only placed (a sector's object
     /// before its sector).
     fn add_spawn(&mut self, spawn: Spawn, active: bool) -> usize {
+        self.sounds.push(SoundIds::default());
         self.handles.push(None);
         self.bodies.push(Body {
             pos: spawn.pos,
@@ -268,6 +291,7 @@ impl World {
 
     /// A slot for the player's ball before it is made (`replace_ball` makes it). By convention the first body.
     pub fn reserve_ball(&mut self, pos: Vec3, rot: Quat) -> usize {
+        self.sounds.push(SoundIds::default());
         self.handles.push(None);
         self.bodies.push(Body { pos, rot });
         self.spawns.push(None);
@@ -502,6 +526,48 @@ impl World {
         self.physics.force_destroy(ctrl);
     }
 
+    /// Gives game body `i` a sound material.
+    pub fn set_sound(&mut self, i: usize, ids: SoundIds) {
+        if let Some(s) = self.sounds.get_mut(i) {
+            *s = ids;
+        }
+    }
+
+    /// The sound material of an IVP body.
+    fn sound_of(&self, id: usize) -> SoundIds {
+        if let Some(s) = self.statics.iter().find(|s| s.0 == id) {
+            return s.2;
+        }
+        let i = self.handles.iter().position(|h| *h == Some(id));
+        i.and_then(|i| self.sounds.get(i)).copied().unwrap_or_default()
+    }
+
+    /// The ball's impacts and contacts of the step just taken (every impact is taken, so the list does not grow).
+    fn listen_ball(&mut self) {
+        let impacts = self.physics.take_impacts();
+        let Some(&Some(ball)) = self.handles.first() else {
+            self.ball_sounds = BallSounds::default();
+            return;
+        };
+        let mut s = BallSounds::default();
+        for (obj, rel) in impacts {
+            let other = match obj {
+                [a, b] if a == ball => b,
+                [a, b] if b == ball => a,
+                _ => continue,
+            };
+            let speed = (rel[0] * rel[0] + rel[1] * rel[1] + rel[2] * rel[2]).sqrt();
+            s.impacts.push((self.sound_of(other).hit, speed));
+        }
+        s.rolls = self.physics.friction_partners(ball).into_iter().map(|o| self.sound_of(o).roll).collect();
+        self.ball_sounds = s;
+    }
+
+    /// The physics' own time, in seconds.
+    pub fn time(&self) -> f64 {
+        self.physics.time()
+    }
+
     /// Removes a joint made by `add_slider`, `add_hinge` or `add_ball_joint` (a joint's Destroy input).
     pub fn remove_joint(&mut self, j: usize) {
         self.physics.joint_destroy(j);
@@ -511,7 +577,7 @@ impl World {
     /// space, as the physics sees them.
     pub fn floor_near(&self, p: Vec3, r: f32) -> Vec<[Vec3; 3]> {
         let mut out = Vec::new();
-        for &(id, _) in self.statics.iter().filter(|s| s.1) {
+        for &(id, _, _) in self.statics.iter().filter(|s| s.1) {
             let (pos, rot) = self.physics.body_pose(id);
             let (pos, rot) = (vec3(pos), quat(rot));
             let local = rot.inverse() * (p - pos);
@@ -554,6 +620,7 @@ impl World {
                 .body_impulse(id, centre, [impulse.x, impulse.y, impulse.z]);
         }
         self.physics.advance(TIME_FACTOR * TICK);
+        self.listen_ball();
         for (i, id) in self.handles.iter().enumerate() {
             let Some(id) = *id else {
                 continue;
@@ -589,6 +656,7 @@ mod tests {
             pos: Vec3::ZERO,
             rot: Quat::IDENTITY.into(),
             group: GROUP_FLOOR,
+            sound: SoundIds::default(),
         }]
     }
 
@@ -657,6 +725,7 @@ mod tests {
             pos: Vec3::ZERO,
             rot: Quat::IDENTITY.into(),
             group: GROUP_BALL,
+            sound: SoundIds::default(),
         });
         let mut world = World::new(&statics);
         let ball = world.add_ball(2.0, wood(), Vec3::new(0.0, 2.0, 8.0), Quat::IDENTITY);

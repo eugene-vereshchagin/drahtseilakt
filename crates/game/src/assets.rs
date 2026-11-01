@@ -95,6 +95,8 @@ pub struct Settings {
     /// Letter of the sky textures (`Sky_<letter>_Front.bmp`, ...).
     pub sky: Option<String>,
     pub start_ball: Option<String>,
+    /// The level's music theme (`Music_Theme_<n>_1..3`).
+    pub music: Option<u32>,
 }
 
 impl Data {
@@ -103,6 +105,7 @@ impl Data {
         let none = Settings {
             sky: None,
             start_ball: None,
+            music: None,
         };
         let Some(path) = self.file("3D Entities/Levelinit.nmo") else {
             return none;
@@ -137,6 +140,10 @@ impl Data {
         Settings {
             sky: text(row, "Sky").and_then(|s| s.strip_prefix("Sky_").map(str::to_owned)),
             start_ball: text(row, "StartBall"),
+            music: match table.column("Music").and_then(|c| row.get(c)) {
+                Some(nmo::scene::Cell::Int(n)) => u32::try_from(*n).ok(),
+                _ => None,
+            },
         }
     }
 }

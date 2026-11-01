@@ -20,7 +20,9 @@ new engine got level 1 playable, ahead of the phase order:
   follow the C game, and so does the transformer's animation (ring, bars, the ball's change). The modules of levels 1 to 12 are made of
   their physical parts and joints as in the C game, and the finish's balloon carries the ball away as in the C game.
   The fans' updrafts lift the paper ball; the swings and sacks swing as in the C game; a stone ball breaks the plate
-  bridge. Missing: the modules' sounds and particles, sounds, music, level 13's add-on.
+  bridge. Sound as the original's Sound_Manager and Music_Manager make it: event sounds, the ball's hits and rolling
+  by floor material, the level's music. Missing: the modules' sounds (fans, ropes) and particles, the sound
+  volume settings, level 13's add-on.
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
 
 

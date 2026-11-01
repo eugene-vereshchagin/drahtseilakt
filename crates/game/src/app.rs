@@ -6,7 +6,10 @@ use crate::Options;
 use crate::assets::{Data, LoadedLevel};
 use crate::render::Renderer;
 use crate::replay::Replay;
+use crate::audio::Audio;
+use crate::ballsound::{BallSound, SoundCmd};
 use crate::freecam::FreeCam;
+use crate::music::Music;
 use crate::menu::{Action, Menu};
 use crate::scene::{self, BallMeshes, Snapshot};
 use crate::collide::closest_point;
@@ -69,6 +72,12 @@ struct Game {
     prev_spin: f32,
     /// The session log of a windowed run: the ball and its contacts at every tick (see `start_session`).
     session: Option<std::io::BufWriter<std::fs::File>>,
+    /// The level's music theme (the level table's Music), and whether it is the last original level.
+    music_theme: Option<u32>,
+    last_level: bool,
+    /// The ball's sounds, and what they ask of the sound output since the window last played them.
+    ball_sound: BallSound,
+    pub sound_out: Vec<SoundCmd>,
 }
 
 /// The start the options ask for, if any: --at is a point or a level object (the ball 4 above it), the sector the
@@ -177,6 +186,10 @@ impl Game {
             ball_lost_at: None,
             watch: Watch::default(),
             session: None,
+            music_theme: data.settings(&level.name).music,
+            last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
+            ball_sound: BallSound::default(),
+            sound_out: Vec::new(),
             prev_spin: 0.0,
             replay_in,
             level,
@@ -193,6 +206,7 @@ impl Game {
             self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
         );
         self.sim.set_ball_boxes(self.ball_meshes.boxes);
+        self.ball_sound.silence(&mut self.sound_out);
         if let Some(st) = &self.start {
             begin_at(&mut self.sim, st);
         }
@@ -393,6 +407,17 @@ impl Game {
         }
         let events_before = self.sim.events.len();
         self.sim.step(input);
+        if self.sim.drawn_ball() == Some(self.sim.ball.kind) && !self.sim.game_over {
+            let world = self.sim.world();
+            let speed = self.sim.ball.velocity.length();
+            self.ball_sound.tick(&world.ball_sounds, self.sim.ball.kind, speed, world.time(), &mut self.sound_out);
+        } else {
+            self.ball_sound.silence(&mut self.sound_out);
+        }
+        if self.sound_out.len() > 4096 {
+            // nobody plays them (a run without a window)
+            self.sound_out.clear();
+        }
         self.replay_out.record(self.sim.tick, input);
         self.log_tick(input);
         self.dump_spin_loss();
@@ -572,6 +597,10 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         fly: None,
         fly_keys: 0,
         last_view: (glam::Vec3::ZERO, glam::Vec3::X),
+        audio: Audio::open(),
+        heard: 0,
+        rolling: [None; 3],
+        music: None,
         game,
         data,
         size: o.size,
@@ -808,6 +837,13 @@ struct App {
     fly_keys: u16,
     /// Where the camera looked at the last frame, for taking up the free camera there.
     last_view: (glam::Vec3, glam::Vec3),
+    /// The sound output, if there is a device; and how many of the run's events have sounded.
+    audio: Option<Audio>,
+    heard: usize,
+    /// The rolling loops playing (stone, wood, metal).
+    rolling: [Option<u64>; 3],
+    /// The level's music.
+    music: Option<Music>,
     data: Data,
     size: (u32, u32),
     window: Option<Arc<Window>>,
@@ -890,6 +926,12 @@ impl App {
         let mut game = Game::new(&o, &self.data)?;
         game.start_session();
         self.game = game;
+        if let Some(a) = &mut self.audio {
+            a.stop_all();
+        }
+        self.rolling = [None; 3];
+        self.heard = 0;
+        self.music = None;
         self.number = Some(n);
         self.prev = None;
         self.keys = 0;
@@ -903,14 +945,90 @@ impl App {
         Ok(())
     }
 
+    /// The sounds of what happened in the run since the last frame, as the original's Sound_Manager plays them on
+    /// the game's messages (Sound.nmo, Simple Sound Messages).
+    fn sound_events(&mut self) {
+        let Some(audio) = &mut self.audio else {
+            self.game.sound_out.clear();
+            return;
+        };
+        for cmd in self.game.sound_out.drain(..) {
+            match cmd {
+                SoundCmd::Play(name, volume) => drop(audio.play(&self.data, name, volume, 0.0)),
+                SoundCmd::Loop(slot, name) => {
+                    if let Some(id) = self.rolling.get_mut(slot).and_then(Option::take) {
+                        audio.stop(id);
+                    }
+                    if let Some(r) = self.rolling.get_mut(slot) {
+                        *r = audio.play_loop(&self.data, name, 0.0);
+                    }
+                }
+                SoundCmd::Stop(slot) => {
+                    if let Some(id) = self.rolling.get_mut(slot).and_then(Option::take) {
+                        audio.stop(id);
+                    }
+                }
+                SoundCmd::Roll(volume, pitch) => {
+                    for id in self.rolling.iter().flatten() {
+                        audio.set_volume(*id, volume);
+                        audio.set_pitch(*id, pitch);
+                    }
+                }
+            }
+        }
+        let sim = &self.game.sim;
+        if self.heard > sim.events.len() || (sim.tick <= 1 && self.heard > 0) {
+            // a new run
+            self.heard = 0;
+        }
+        if self.music.is_none() && sim.tick >= 1 {
+            let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64);
+            self.music = Some(Music::new(self.game.music_theme, self.game.last_level, seed, sim.tick));
+        }
+        if let Some(m) = &mut self.music {
+            m.frame(sim, audio, &self.data);
+        }
+        if sim.tick == 1 && self.heard == 0 {
+            audio.play(&self.data, "Misc_StartLevel", 1.0, 0.0);
+        }
+        for (_, e) in sim.events.iter().skip(self.heard) {
+            match e {
+                Event::Checkpoint(_) => drop(audio.play(&self.data, "Misc_Checkpoint", 1.0, 0.0)),
+                Event::ExtraLife => {
+                    // Life_Up: the blob, and the extra ball's sound 317 ms later
+                    audio.play(&self.data, "Extra_Life_Blob", 1.0, 0.0);
+                    audio.play(&self.data, "Misc_extraball", 1.0, 0.317);
+                }
+                Event::ExtraPoint => drop(audio.play(&self.data, "Extra_Hit", 1.0, 0.0)),
+                Event::Transform(_) => drop(audio.play(&self.data, "Misc_Trafo", 1.0, 0.0)),
+                Event::Died => drop(audio.play(&self.data, "Misc_Fall", 1.0, 0.0)),
+                Event::NewBall => drop(audio.play(&self.data, "Misc_Lightning", 1.0, 0.0)),
+                Event::GameOver | Event::Finished => {}
+            }
+        }
+        self.heard = sim.events.len();
+    }
+
+    /// The run starts again: its music too.
+    fn restart(&mut self) {
+        self.game.restart();
+        self.prev = None;
+        if let (Some(a), Some(m)) = (&mut self.audio, &mut self.music) {
+            m.stop(a);
+        }
+        self.music = None;
+    }
+
     /// Plays original level `n`: the current run starts again if it is that level, otherwise it is loaded.
     fn play(&mut self, n: u32) {
         self.menu = None;
         if self.number == Some(n) {
-            self.game.restart();
-            self.prev = None;
+            self.restart();
         } else {
             self.loading = Some((n, false));
+            if let Some(a) = &mut self.audio {
+                a.play(&self.data, "Menu_load", 1.0, 0.0);
+            }
         }
     }
 
@@ -923,6 +1041,12 @@ impl App {
     }
 
     fn menu_key(&mut self, code: KeyCode, event_loop: &ActiveEventLoop) {
+        // every key the menu takes clicks, as the original's menu sends Menu_Click
+        if matches!(code, KeyCode::ArrowUp | KeyCode::ArrowDown | KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape)
+            && let Some(a) = &mut self.audio
+        {
+            a.play(&self.data, "Menu_click", 1.0, 0.0);
+        }
         let Some(menu) = &mut self.menu else { return };
         let action = match code {
             KeyCode::ArrowUp => {
@@ -1016,8 +1140,7 @@ impl App {
                 return;
             }
             KeyCode::KeyR if down => {
-                self.game.restart();
-                self.prev = None;
+                self.restart();
                 0
             }
             KeyCode::F11 if down => {
@@ -1079,6 +1202,7 @@ impl App {
             ticks += 1;
         }
         let simulated = started.elapsed();
+        self.sound_events();
         let cur = Snapshot::of(&self.game.sim);
         let mut snap = Snapshot::lerp(&self.prev.unwrap_or(cur), &cur, self.acc / TICK);
         if let Some(c) = &self.fly {

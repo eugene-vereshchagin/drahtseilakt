@@ -186,6 +186,8 @@ pub enum Event {
     Died,
     GameOver,
     Finished,
+    /// A new ball after a lost one.
+    NewBall,
 }
 
 /// What the rules need from the level, resolved once.
@@ -853,6 +855,12 @@ impl Sim {
             let Some(body) = body else {
                 continue;
             };
+            // its sound material from its groups; a dome sounds as one (hit material 4)
+            let mut sound = sound_ids(level, i);
+            if level.members("P_Dome").any(|(k, _)| k == i) {
+                sound.hit = 4;
+            }
+            world.set_sound(body, sound);
             match sector {
                 Some(n) => {
                     if sectors.len() <= n {
@@ -1248,6 +1256,7 @@ impl Sim {
             if self.tick >= d + DEATH_RESPAWN_TICKS {
                 self.dying = None;
                 self.respawn();
+                self.events.push((self.tick, Event::NewBall));
             }
         } else if self.hold.is_none() && self.fell_off() {
             self.die();
@@ -1323,6 +1332,11 @@ impl Sim {
             Some(h) => Some(h.old),
             None => Some(self.ball.kind),
         }
+    }
+
+    /// Whether the last checkpoint has been passed (the level's last stage), and where the level ends.
+    pub fn last_stage(&self) -> (bool, Option<Vec3>) {
+        (self.sector >= self.rules.checkpoints.len(), self.rules.end)
     }
 
     /// The modules' parts that the physics moves, for drawing.
@@ -1635,6 +1649,18 @@ fn pose_and_scale(matrix: &[[f32; 4]; 4]) -> Option<(Vec3, Rot, Vec3)> {
 
 /// The physical objects of the level, one mesh each, as the original physicalizes them: the mesh's points scaled by
 /// the object's scale in its own frame, the pose without the scale (an object in two solid groups is made once).
+/// A level object's sound material from its groups (`Sound_HitID_0N`, `Sound_RollID_0N`), which the original's
+/// level init turns into the "Coll Detection ID" and "Continuous Contact ID" attributes.
+fn sound_ids(level: &Level, i: usize) -> crate::physics::SoundIds {
+    let id = |prefix: &str| {
+        level
+            .groups_of(i)
+            .find_map(|g| g.strip_prefix(prefix).and_then(|n| n.parse::<u8>().ok()))
+            .unwrap_or(0)
+    };
+    crate::physics::SoundIds { hit: id("Sound_HitID_"), roll: id("Sound_RollID_") }
+}
+
 fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
     let mut out = Vec::new();
     let mut seen = Vec::new();
@@ -1691,6 +1717,7 @@ fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
                     pos,
                     rot,
                     group,
+                    sound: sound_ids(level, m),
                 });
             }
         }
@@ -2288,6 +2315,28 @@ mod tests {
         assert!((x - 148.88).abs() < 0.2 && (y + 2.50).abs() < 0.05, "wooden ball: box at x {x}, stone at y {y}");
         let (x, y) = push(BallKind::Stone);
         assert!(x > 155.0 && y < -6.0, "stone ball: box at x {x}, stone at y {y}");
+    }
+
+    /// Level 1's start with the player's copy (skipped without OPENBALLANCE_DATA): the ball dropped onto the floor
+    /// hits it, and rolling on it touches a material the original's sound scripts know (its groups).
+    #[test]
+    fn the_ball_meets_sound_materials_on_level_1() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
+        sim.start_from(0, None, Some(sim.ball.position + Vec3::Y * 6.0));
+        let (mut hits, mut rolls) = (Vec::new(), Vec::new());
+        for t in 0..240 {
+            sim.step(if t > 60 { input::UP } else { 0 });
+            hits.extend(sim.world.ball_sounds.impacts.iter().map(|i| i.0).filter(|&m| m > 0));
+            rolls.extend(sim.world.ball_sounds.rolls.iter().copied().filter(|&m| m > 0));
+        }
+        assert!(!hits.is_empty(), "no hit on a known material");
+        assert!(!rolls.is_empty(), "no rolling on a known material");
     }
 
     #[test]

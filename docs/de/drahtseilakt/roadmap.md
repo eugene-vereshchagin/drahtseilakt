@@ -21,7 +21,9 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   bestehen aus ihren physikalischen Teilen und Gelenken wie im C-Spiel, und der Ballon des Ziels trägt die Kugel davon
   wie im C-Spiel. Der Aufwind der
   Ventilatoren hebt die Papierkugel; Schaukeln und Säcke schwingen wie im C-Spiel; eine Steinkugel bricht die
-  Plattenbrücke. Fehlt: Klänge und Partikel der Module, Klänge, Musik, die Erweiterung von Level 13.
+  Plattenbrücke. Ton wie bei Sound_Manager und Music_Manager
+  des Originals: Ereignisklänge, Stöße und Rollen der Kugel nach Bodenmaterial, die Musik des Levels. Fehlt:
+  Klänge der Module (Ventilatoren, Seile) und Partikel, die Lautstärke-Einstellungen, die Erweiterung von Level 13.
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
 
 

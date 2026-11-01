@@ -20,6 +20,8 @@ pub struct StaticMesh {
     pub rot: Rot,
     /// The collision group: objects of the same non-empty group do not collide (docs/physics.md 3.4).
     pub group: &'static str,
+    /// Its sound material (crate::physics::SoundIds).
+    pub sound: crate::physics::SoundIds,
 }
 
 impl StaticMesh {

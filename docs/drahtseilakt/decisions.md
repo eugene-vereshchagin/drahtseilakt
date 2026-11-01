@@ -206,3 +206,12 @@ OpenBallance, Ballanced and the original game under Wine are used to study behav
 running them, reading their documentation, measuring them. No code is copied from them. The leaked Ipion
 source is not opened at all: the physics is built from the original game's measured behaviour. The
 reverse-engineering notes in `docs/` (file formats, Building Blocks, how the game behaves) stay as reference.
+
+## Sound goes out through cpal
+
+*2026-11-01.* The game plays the player's WAV files through cpal 0.18 (Apache-2.0, RustAudio): ALSA on Linux
+(PipeWire and PulseAudio take it through their ALSA layer; the build needs the ALSA headers, `libasound2-dev` on
+Debian), WASAPI on Windows, CoreAudio on macOS. It only opens an output stream; reading WAV, mixing, volume and
+pitch are ours (crates/game/src/audio.rs), which keeps us close to what the original's sound scripts do. rodio
+and kira bring decoders and mixers we do not need; miniaudio, SDL3 and OpenAL are C libraries. The crate is
+pinned and its sources sit in the cargo cache, so the build stays offline.
