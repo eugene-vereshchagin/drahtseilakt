@@ -56,6 +56,8 @@ struct Game {
     sim: Sim,
     replay_in: Option<Replay>,
     replay_out: Replay,
+    /// Where the run begins when not at the level start (--sector, --at, --ball, or the replay's).
+    start: Option<crate::replay::Start>,
     record: Option<PathBuf>,
     /// The tick the ball was last lost, for the "ball lost" message.
     ball_lost_at: Option<u64>,
@@ -65,6 +67,43 @@ struct Game {
     prev_spin: f32,
     /// The session log of a windowed run: the ball and its contacts at every tick (see `start_session`).
     session: Option<std::io::BufWriter<std::fs::File>>,
+}
+
+/// The start the options ask for, if any: --at is a point or a level object (the ball 4 above it), the sector the
+/// one given or the nearest object's.
+fn start_of(o: &Options, level: &level::Level) -> Result<Option<crate::replay::Start>, String> {
+    if o.sector.is_none() && o.at.is_none() && o.ball.is_none() {
+        return Ok(None);
+    }
+    let at = match &o.at {
+        None => None,
+        Some(v) => Some(match crate::replay::parse_point(v) {
+            Some(p) => p,
+            None => {
+                let obj = level
+                    .objects
+                    .iter()
+                    .find(|ob| ob.name.eq_ignore_ascii_case(v))
+                    .ok_or_else(|| format!("--at: no point or object {v}"))?;
+                let [x, y, z] = obj.position();
+                [x, y + 4.0, z]
+            }
+        }),
+    };
+    let sector = o
+        .sector
+        .or_else(|| at.and_then(|p| crate::sim::sector_near(level, glam::Vec3::from(p))).map(|n| n + 1))
+        .unwrap_or(1);
+    Ok(Some(crate::replay::Start {
+        sector,
+        ball: o.ball.clone(),
+        at,
+    }))
+}
+
+fn begin_at(sim: &mut Sim, st: &crate::replay::Start) {
+    let kind = st.ball.as_deref().and_then(crate::sim::BallKind::from_name);
+    sim.start_from(st.sector - 1, kind, st.at.map(glam::Vec3::from));
 }
 
 impl Game {
@@ -105,6 +144,18 @@ impl Game {
         let ball_meshes = BallMeshes::find(&balls.level);
         let mut sim = Sim::with_modules(&level.level, start_ball, &modules, tutorial);
         sim.set_ball_boxes(ball_meshes.boxes);
+        let start = match &replay_in {
+            Some(r) => r.start.clone(),
+            None => start_of(o, &level.level)?,
+        };
+        if let Some(st) = &start {
+            if st.sector > sim.sector_count() {
+                return Err(format!("{} has {} sectors", level.name, sim.sector_count()));
+            }
+            begin_at(&mut sim, st);
+        }
+        let mut replay_out = Replay::new(&level.name, level.hash);
+        replay_out.start = start.clone();
         let placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
         let trafo_model = scene::FIRST_MODULE_MODEL + modules.models.len();
         let trafo = data
@@ -118,7 +169,8 @@ impl Game {
             ball_meshes,
             sim,
             start_ball,
-            replay_out: Replay::new(&level.name, level.hash),
+            replay_out,
+            start,
             record: o.record.clone(),
             ball_lost_at: None,
             watch: Watch::default(),
@@ -139,9 +191,13 @@ impl Game {
             self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
         );
         self.sim.set_ball_boxes(self.ball_meshes.boxes);
+        if let Some(st) = &self.start {
+            begin_at(&mut self.sim, st);
+        }
         self.ball_lost_at = None;
         self.watch = Watch::default();
         self.replay_out = Replay::new(&self.level.name, self.level.hash);
+        self.replay_out.start = self.start.clone();
     }
 
     /// The folder of this level's runs, attempts, watch log and findings.
@@ -385,7 +441,8 @@ impl Game {
             .ok()
             .and_then(|t| Replay::parse(&t).ok())
             .map(|r| r.end);
-        if best_ticks.is_none_or(|b| self.sim.tick < b) {
+        // A run begun elsewhere than the level start is a test, never the level's best.
+        if self.start.is_none() && best_ticks.is_none_or(|b| self.sim.tick < b) {
             targets.push(best.clone());
             println!(
                 "best run of {} so far: {}",

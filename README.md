@@ -34,7 +34,9 @@ turn the camera, Space lifts it, R restarts, F11 is full screen, Esc quits.
 
 Every finished run is saved as a replay (on Linux in `~/.local/share/drahtseilakt/replays/<level>/`, the
 fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it without a window, `--screenshot
-FILE.png` renders a frame. `drahtseilakt --help` lists everything.
+FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
+object's name) anywhere, with `--ball wood|stone|paper`; such a run keeps its start in its replay and is never a
+best run. `drahtseilakt --help` lists everything.
 
 ## Legal
 

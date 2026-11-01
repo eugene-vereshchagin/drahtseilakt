@@ -37,8 +37,10 @@ startet neu, F11 ist Vollbild, Esc beendet.
 
 Jeder beendete Lauf wird als Replay gespeichert (unter Linux in
 `~/.local/share/drahtseilakt/replays/<Level>/`, der schnellste als `best.replay`); `--replay FILE` spielt eines
-ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bild. `drahtseilakt --help` zeigt
-alles.
+ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bild. Um eine Stelle zu testen,
+beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
+Stelle, mit `--ball wood|stone|paper`; ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
+`drahtseilakt --help` zeigt alles.
 
 ## Rechtliches
 

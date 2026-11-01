@@ -735,6 +735,38 @@ impl Sim {
         }
     }
 
+    /// The number of sectors (at least 1).
+    pub fn sector_count(&self) -> usize {
+        self.rules.resets.len().max(self.sectors.len()).max(self.module_sectors.len()).max(1)
+    }
+
+    /// Begins the run elsewhere than the level start, for testing a place: `sector` (0 is the first) becomes the
+    /// current one, as if its checkpoint had just been passed, and a new ball of `kind` (the current one if `None`)
+    /// is made at rest at `at` (the sector's reset point if `None`), in the start view.
+    pub fn start_from(&mut self, sector: usize, kind: Option<BallKind>, at: Option<Vec3>) {
+        let sector = sector.min(self.sector_count() - 1);
+        if sector != self.sector {
+            let tick = self.tick;
+            for (sector, enter) in [(self.sector, false), (sector, true)] {
+                for modules in [false, true] {
+                    self.sector_changes.push(SectorChange { tick, sector, enter, modules });
+                }
+            }
+            self.apply_sector_changes();
+            self.sector = sector;
+        }
+        if let Some(k) = kind {
+            self.ball.kind = k;
+        }
+        self.respawn();
+        if let Some(p) = at {
+            self.ball.position = p;
+            self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), p, Rot::Quat(self.ball.rotation));
+            self.camera.position = camera_goal(&self.camera, p);
+            self.camera.target = p;
+        }
+    }
+
     /// Puts the ball somewhere at rest, as a new ball (tests).
     #[cfg(test)]
     fn put_ball(&mut self, pos: Vec3) {
@@ -973,7 +1005,6 @@ impl Sim {
         self.ball_boxes = boxes;
     }
 
-    /// The modules' parts that the physics moves, for drawing.
     /// The transformer animation playing: the transformer's matrix and the animation's age in ticks.
     pub fn trafo_anim(&self) -> Option<(Mat4, f32)> {
         self.trafo_anim
@@ -989,6 +1020,7 @@ impl Sim {
         }
     }
 
+    /// The modules' parts that the physics moves, for drawing.
     pub fn module_bodies(&self) -> &[ModuleBody] {
         &self.module_bodies
     }
@@ -1061,6 +1093,26 @@ impl Sim {
         self.camera.position = camera_goal(&self.camera, self.ball.position);
         self.camera.target = self.ball.position;
     }
+}
+
+/// The sector of the level object nearest to `p` among those in a sector (groups `Sector_NN`; 0 is the first), or
+/// `None` if no object is in one.
+pub fn sector_near(level: &Level, p: Vec3) -> Option<usize> {
+    level
+        .groups
+        .iter()
+        .filter_map(|g| {
+            let n: usize = g.name.strip_prefix("Sector_")?.parse().ok().filter(|&n| n >= 1)?;
+            let d = g
+                .members
+                .iter()
+                .filter_map(|&i| level.objects.get(i))
+                .map(|o| p.distance_squared(Vec3::from(o.position())))
+                .fold(f32::INFINITY, f32::min);
+            Some((d, n - 1))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, n)| n)
 }
 
 fn camera_goal(cam: &Camera, ball: Vec3) -> Vec3 {
@@ -1600,6 +1652,22 @@ mod tests {
             sim.step(0);
         }
         assert!(sim.world.state(b2).is_some(), "the next sector's box came");
+    }
+
+    #[test]
+    fn a_run_can_begin_at_a_later_sector_and_place() {
+        let mut level = flat_level();
+        add_cube(&mut level, "P_Box_01", Vec3::new(-30.0, 1.0, 0.0), &["P_Box", "Sector_01"]);
+        add_cube(&mut level, "P_Box_02", Vec3::new(-30.0, 1.0, 20.0), &["P_Box", "Sector_02"]);
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        let (b1, b2) = (sim.loose[0].1, sim.loose[1].1);
+        let at = Vec3::new(-20.0, 3.0, 20.0);
+        assert_eq!(sector_near(&level, at), Some(1));
+        sim.start_from(1, Some(BallKind::Stone), Some(at));
+        assert_eq!((sim.sector, sim.ball.kind), (1, BallKind::Stone));
+        assert!(sim.world.state(b1).is_none(), "the first sector's box left");
+        assert!(sim.world.state(b2).is_some(), "the chosen sector's box is in");
+        assert!((sim.world.state(0).expect("a ball").pos - at).length() < 1e-4);
     }
 
     #[test]

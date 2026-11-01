@@ -39,6 +39,11 @@ usage: drahtseilakt [options]
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
   --from N            with --replay: play the replay up to tick N without a window, then hand over the keys
+  --sector N          begin at sector N's reset point (testing a place; 1 is the level start)
+  --at X,Y,Z|OBJECT   begin with the ball at rest at a point, or 4 above a level object (e.g. P_Modul_34_01);
+                      the sector is the nearest object's unless --sector is given
+  --ball KIND         begin with a wood, stone or paper ball
+                      (a run begun elsewhere is recorded with its start and is never a level's best run)
   --size WxH          window or screenshot size (default 1600x900)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
@@ -57,6 +62,10 @@ pub struct Options {
     pub trace: Option<u64>,
     pub from: Option<u64>,
     pub size: (u32, u32),
+    /// --sector, --at, --ball: a run begun elsewhere than the level start.
+    pub sector: Option<usize>,
+    pub at: Option<String>,
+    pub ball: Option<String>,
     pub look: Option<[f32; 6]>,
 }
 
@@ -73,6 +82,9 @@ fn parse_args() -> Result<Options, String> {
         trace: None,
         from: None,
         size: (1600, 900),
+        sector: None,
+        at: None,
+        ball: None,
         look: None,
     };
     // `--name=value` is the same as `--name value` (handy for values that start with a minus).
@@ -122,6 +134,21 @@ fn parse_args() -> Result<Options, String> {
                         .parse()
                         .map_err(|_| "--trace needs a number".to_owned())?,
                 )
+            }
+            "--sector" => {
+                let n: usize = value()?.parse().map_err(|_| "--sector needs a number".to_owned())?;
+                if n == 0 {
+                    return Err("--sector starts at 1".into());
+                }
+                o.sector = Some(n);
+            }
+            "--at" => o.at = Some(value()?),
+            "--ball" => {
+                let v = value()?.to_ascii_lowercase();
+                if !["wood", "stone", "paper"].contains(&v.as_str()) {
+                    return Err("--ball is wood, stone or paper".into());
+                }
+                o.ball = Some(v);
             }
             "--look" => {
                 let v: Vec<f32> = value()?
