@@ -496,6 +496,8 @@ pub struct Pilot {
     best: f32,
     /// Where the ball was at the last decision.
     last: Option<Vec3>,
+    /// The tick of the last turn of the view.
+    turned: u64,
     /// The transformers to roll into, in order: their place on the way and where they are; and the next one.
     gates: Vec<(usize, Vec3)>,
     gate: usize,
@@ -515,6 +517,7 @@ impl Pilot {
             moved: 0,
             best: f32::NEG_INFINITY,
             last: None,
+            turned: 0,
             plan: Vec::new(),
             seed: 0x2545_F491,
         }
@@ -640,6 +643,34 @@ impl Pilot {
         n
     }
 
+    /// A quarter turn of the view towards the way ahead, if it is needed now.
+    fn turn(&mut self, sim: &Sim) -> Option<u8> {
+        // not more often than every second and a half: a player does not swing the view at every bend
+        if sim.tick < self.turned + 90 {
+            return None;
+        }
+        let (Some(&a), Some(&b)) = (
+            self.route.points.get(self.at),
+            self.route.points.get(self.at + 20),
+        ) else {
+            return None;
+        };
+        let d = Vec3::new(b.x - a.x, 0.0, b.z - a.z).normalize_or_zero();
+        if d == Vec3::ZERO || sim.camera.push_forward().dot(d) > 0.3 {
+            return None;
+        }
+        let right = sim.camera.push_right();
+        self.turned = sim.tick;
+        Some(
+            input::SHIFT
+                | if right.dot(d) > 0.0 {
+                    input::RIGHT
+                } else {
+                    input::LEFT
+                },
+        )
+    }
+
     /// The input for the next tick of `sim`.
     pub fn next(&mut self, sim: &Sim) -> u8 {
         if let Some(&(until, c)) = self.plan.first() {
@@ -654,6 +685,11 @@ impl Pilot {
         }
         if !sim.tick.is_multiple_of(PERIOD) {
             return self.choice;
+        }
+        // A player turns the view to face the way ahead (Shift with Left or Right, a quarter a press): when the way
+        // ahead points well away from where "up" pushes, one press this tick, released the next.
+        if let Some(turn) = self.turn(sim) {
+            return turn;
         }
         // a new ball (the old one lost) starts again at a reset point: find it on the way anew
         if self

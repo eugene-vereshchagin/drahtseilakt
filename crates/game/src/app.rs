@@ -586,9 +586,11 @@ fn load_volumes() -> [f32; 2] {
 }
 
 /// The profile saved in the settings: extended (our additions on) or classic (the original only).
+/// While the game is being developed the extended profile is the default: classic only when chosen.
+// TODO(release): make classic the default again.
 fn load_extended() -> bool {
     let text = std::fs::read_to_string(settings_path()).unwrap_or_default();
-    text.lines().any(|l| l.trim() == "profile extended")
+    !text.lines().any(|l| l.trim() == "profile classic")
 }
 
 fn save_settings(v: [f32; 2], extended: bool) {
