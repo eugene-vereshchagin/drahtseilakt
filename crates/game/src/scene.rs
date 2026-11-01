@@ -200,6 +200,14 @@ pub fn load_modules(level: &Level, data: &crate::assets::Data) -> Modules {
             modules.names.push(name.to_owned());
         }
     }
+    // the extra points' module, for where its small balls start (its stand-ins are drawn as markers)
+    if level.group("P_Extra_Point").is_some()
+        && let Some(path) = data.file("3D Entities/PH/P_Extra_Point.nmo")
+        && let Ok(m) = crate::assets::load_nmo(&path)
+    {
+        modules.models.push(m.level);
+        modules.names.push("P_Extra_Point".to_owned());
+    }
     modules
 }
 
@@ -296,9 +304,21 @@ pub fn instances(
     bodies: &[crate::physics::Body],
     balls: &BallMeshes,
     trafo: Option<&crate::trafo::TrafoModel>,
+    extra_balls: &[(usize, Vec3)],
     s: &Snapshot,
 ) -> Vec<Instance> {
-    let mut out: Vec<Instance> = placements
+    // The extra points' small balls, drawn for now as small copies of their pickup's marker (the original's are
+    // sprites, which the renderer does not draw yet).
+    let mut out: Vec<Instance> = extra_balls
+        .iter()
+        .filter_map(|&(object, pos)| {
+            let p = placements.iter().find(|p| p.object == object && p.marker.is_some())?;
+            let mut i = Instance::plain(p.model, p.mesh, Mat4::from_translation(pos) * Mat4::from_scale(Vec3::splat(0.25)));
+            i.marker = p.marker;
+            Some(i)
+        })
+        .collect();
+    out.extend(placements
         .iter()
         .filter(|p| !taken.contains(&p.object))
         .map(|p| Instance {
@@ -317,7 +337,7 @@ pub fn instances(
                 _ => None,
             },
         })
-        .collect();
+        );
     for mesh in 0..crate::sky::FACE_COUNT {
         out.push(Instance {
             model: SKY_MODEL,

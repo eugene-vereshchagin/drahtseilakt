@@ -191,6 +191,8 @@ pub enum Event {
     Died,
     GameOver,
     Finished,
+    /// Small balls of an extra point reaching the ball (each 20 points).
+    ExtraHits(u32),
     /// A new ball after a lost one.
     NewBall,
     /// A hinge a heavy ball breaks (module 29's plate bridge): its script plays Misc_RopeTears.
@@ -671,6 +673,8 @@ pub struct Sim {
     updrafts: Vec<UpdraftTrigger>,
     /// The swings' and sacks' pushes.
     swings: Vec<SwingRun>,
+    /// The extra points' pickups (TT Extra), when the module file gives their small balls.
+    extras: Vec<crate::extra::Extra>,
     /// The hinges heavy balls break.
     breaks: Vec<BreakTrigger>,
     /// The modules' parts that are bodies, for drawing.
@@ -990,6 +994,20 @@ impl Sim {
                 finishes.push(t);
             }
         }
+        // The extra points' small balls start at the module's frames 1..6, around each stand-in.
+        let mut extras = Vec::new();
+        if let Some((_, file)) = modules.get("P_Extra_Point") {
+            let local: Vec<Vec3> = (1..=6)
+                .filter_map(|k| file.objects.iter().find(|o| o.name == format!("P_Extra_Point_Frame{k}")))
+                .map(|o| Vec3::from(o.position()))
+                .collect();
+            if local.len() == 6 {
+                for &(i, q) in &rules.extra_points {
+                    let rot = level.objects.get(i).and_then(|o| pose_and_scale(&o.matrix)).map_or(Quat::IDENTITY, |p| p.1.quat());
+                    extras.push(crate::extra::Extra::new(i, q, rot, &local));
+                }
+            }
+        }
         world.run(until_ball - frame);
         world.replace_ball(0, BALL_RADIUS, ball.material(), ball.position, Rot::Basis(turn));
         let mut camera = Camera {
@@ -1026,6 +1044,7 @@ impl Sim {
             finishes,
             updrafts,
             swings,
+            extras,
             breaks,
             module_sectors,
             module_bodies,
@@ -1211,8 +1230,31 @@ impl Sim {
         let p = self.ball.position;
         let near = |q: Vec3, r: f32| p.distance_squared(q) < r * r;
 
+        // The extra points as TT Extra runs them: switched on within 80, 100 points when one fires, 20 a small ball.
+        let mut extra_events = Vec::new();
+        for e in &mut self.extras {
+            let on = e.fired() || near(e.center(), 80.0);
+            match e.tick(p, on) {
+                Some(crate::extra::ExtraEvent::Activated) => extra_events.push((e.object, None)),
+                Some(crate::extra::ExtraEvent::Hits(n)) => extra_events.push((e.object, Some(n))),
+                None => {}
+            }
+        }
+        for (i, hits) in extra_events {
+            match hits {
+                None => {
+                    self.taken.push(i);
+                    self.points += crate::extra::POINTS_ACTIVATED;
+                    self.events.push((self.tick, Event::ExtraPoint));
+                }
+                Some(n) => {
+                    self.points += crate::extra::POINTS_HIT * i64::from(n);
+                    self.events.push((self.tick, Event::ExtraHits(n)));
+                }
+            }
+        }
         for &(i, q) in &self.rules.extra_points {
-            if !self.taken.contains(&i) && near(q, PICK_RADIUS) {
+            if self.extras.is_empty() && !self.taken.contains(&i) && near(q, PICK_RADIUS) {
                 self.taken.push(i);
                 self.points += 100;
                 self.events.push((self.tick, Event::ExtraPoint));
@@ -1359,6 +1401,11 @@ impl Sim {
             Some(h) => Some(h.old),
             None => Some(self.ball.kind),
         }
+    }
+
+    /// The extra points' small balls in flight: their pickup's level object and where they are.
+    pub fn extra_balls(&self) -> Vec<(usize, Vec3)> {
+        self.extras.iter().filter(|e| e.fired() && !e.done()).flat_map(|e| e.small_balls().map(move |p| (e.object, p))).collect()
     }
 
     /// The fans in the physics now (their points), for their sound.
@@ -2392,6 +2439,41 @@ mod tests {
         }
         assert!(!hits.is_empty(), "no hit on a known material");
         assert!(!rolls.is_empty(), "no rolling on a known material");
+    }
+
+    /// Level 1's first extra point with the player's copy (skipped without OPENBALLANCE_DATA): the ball at its
+    /// centre fires it (100 points); its six small balls fly away for a second and then reach the ball, 20 points
+    /// each, as in the C game with an extra point moved onto the ball: no hit 60 frames after firing, five by 120,
+    /// all six by 200.
+    #[test]
+    fn an_extra_point_gives_its_points_as_in_the_c_game() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
+        assert!(!sim.extras.is_empty(), "the module's small balls");
+        let at = sim.extras[0].center();
+        sim.start_from(0, None, Some(at));
+        let mut fired = None;
+        let mut hits = Vec::new();
+        for _ in 0..300 {
+            sim.step(0);
+            for (t, e) in sim.events.iter() {
+                match e {
+                    Event::ExtraPoint if fired.is_none() => fired = Some(*t),
+                    Event::ExtraHits(n) if *t == sim.tick => hits.extend(std::iter::repeat_n(*t, *n as usize)),
+                    _ => {}
+                }
+            }
+        }
+        let f = fired.expect("fired");
+        let by = |d: u64| hits.iter().filter(|&&t| t <= f + d).count();
+        eprintln!("fired {f} hits {:?}", hits.iter().map(|t| t - f).collect::<Vec<_>>());
+        assert_eq!((by(60), by(200)), (0, 6));
+        assert!(by(120) >= 4, "{} by 120", by(120));
     }
 
     #[test]

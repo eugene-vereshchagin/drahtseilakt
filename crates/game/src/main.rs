@@ -10,6 +10,7 @@ mod assets;
 mod audio;
 mod ballsound;
 mod collide;
+mod extra;
 mod freecam;
 mod hud;
 mod menu;

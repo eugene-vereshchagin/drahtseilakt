@@ -307,6 +307,11 @@ A `Ray Intersection` from `(0,-2,0)` along `(0,-1,0)` in the MF frame, depth 1.5
 drive On/Off. `Hit` and `Activated` send messages (score), `Binary Switch.False` (extra already taken,
 from an array cell) drives Off.
 
+Points, measured in the C build with an extra point moved onto the ball on level 1: 100 when it fires and 20 for
+each small ball that reaches the ball (220 in all); no hit in the first 60 frames (the fly-away), five by 120, all
+six by 200. The port runs this block in `crates/game/src/extra.rs`, the small balls starting at the module's
+`P_Extra_Point_Frame1..6`, and gives the same.
+
 ### Engine calls
 
 | Class | Offset | Method |

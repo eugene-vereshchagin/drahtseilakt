@@ -789,6 +789,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         &game.sim.world().bodies,
         &game.ball_meshes,
         game.trafo.as_ref().map(|t| &t.1),
+        &game.sim.extra_balls(),
         &snap,
     );
     r.draw(&view, w, h, &scene::view(&snap), &inst);
@@ -1048,7 +1049,8 @@ impl App {
                     audio.play(&self.data, "Extra_Life_Blob", 1.0, 0.0);
                     audio.play(&self.data, "Misc_extraball", 1.0, 0.317);
                 }
-                Event::ExtraPoint => drop(audio.play(&self.data, "Extra_Hit", 1.0, 0.0)),
+                Event::ExtraPoint => drop(audio.play(&self.data, "Extra_Start", 1.0, 0.0)),
+                Event::ExtraHits(_) => drop(audio.play(&self.data, "Extra_Hit", 1.0, 0.0)),
                 Event::Transform(_) => drop(audio.play(&self.data, "Misc_Trafo", 1.0, 0.0)),
                 Event::Died => drop(audio.play(&self.data, "Misc_Fall", 1.0, 0.0)),
                 Event::NewBall => drop(audio.play(&self.data, "Misc_Lightning", 1.0, 0.0)),
@@ -1291,6 +1293,7 @@ impl App {
             &self.game.sim.world().bodies,
             &self.game.ball_meshes,
             self.game.trafo.as_ref().map(|t| &t.1),
+            &self.game.sim.extra_balls(),
             &snap,
         );
         let built = build_started.elapsed();
