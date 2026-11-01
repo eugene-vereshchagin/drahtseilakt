@@ -2260,6 +2260,33 @@ mod tests {
         assert_eq!(died, Some(331));
     }
 
+    /// Level 1's module 34 with the player's copy (skipped without OPENBALLANCE_DATA): a wooden ball pushed into
+    /// the box under the stone moves it to x 148.88 and stalls, the stone staying up, as in the C game (its ball
+    /// brought back next to the box by a moved reset point); a stone ball pushes the box out and the stone drops.
+    #[test]
+    fn module_34_s_box_gives_way_to_a_stone_ball_only() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let push = |kind| {
+            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
+            sim.start_from(1, Some(kind), Some(Vec3::new(132.0, -7.0, -563.03)));
+            let part = |n: &str| sim.module_bodies.iter().find(|b| b.object == n).map(|b| b.body).expect(n);
+            let (kiste, stein) = (part("P_Modul_34_Kiste"), part("P_Modul_34_Schiebestein"));
+            for t in 0..300 {
+                sim.step(if t < 120 { input::UP } else { 0 });
+            }
+            (sim.world.bodies[kiste].pos.x, sim.world.bodies[stein].pos.y)
+        };
+        let (x, y) = push(BallKind::Wood);
+        assert!((x - 148.88).abs() < 0.2 && (y + 2.50).abs() < 0.05, "wooden ball: box at x {x}, stone at y {y}");
+        let (x, y) = push(BallKind::Stone);
+        assert!(x > 155.0 && y < -6.0, "stone ball: box at x {x}, stone at y {y}");
+    }
+
     #[test]
     fn a_run_can_begin_at_a_later_sector_and_place() {
         let mut level = flat_level();
