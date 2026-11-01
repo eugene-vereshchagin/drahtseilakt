@@ -601,6 +601,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         let loaded = data.load(&o.source)?;
         return crate::assets::export(&data, &loaded, dir);
     }
+    if let Some(follow) = &o.follow {
+        return follow_run(&o, &data, follow);
+    }
     let mut game = Game::new(&o, &data)?;
     if let Some(path) = &o.screenshot {
         return screenshot(&mut game, &data, &o, path);
@@ -708,6 +711,53 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     }
 }
 
+/// The test player follows a player's run: the ball's way in that replay (where it rolled, in order, every 1.5;
+/// not while a ball is being lost) is its way, the transformers it went into its gates, and it begins where the run
+/// began.
+fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
+    let text = std::fs::read_to_string(follow).map_err(|e| format!("{}: {e}", follow.display()))?;
+    let run = Replay::parse(&text)?;
+    let mut watch = o.clone();
+    watch.replay = Some(follow.to_path_buf());
+    watch.follow = None;
+    let mut seen = Game::new(&watch, data)?;
+    let mut path: Vec<glam::Vec3> = Vec::new();
+    let mut gates: Vec<(usize, glam::Vec3)> = Vec::new();
+    let mut lost = false;
+    while seen.sim.tick < run.end && !seen.sim.finished && !seen.sim.game_over {
+        let before = seen.sim.events.len();
+        seen.tick(0);
+        for (_, e) in seen.sim.events.iter().skip(before) {
+            match e {
+                crate::sim::Event::Died => lost = true,
+                crate::sim::Event::NewBall => lost = false,
+                crate::sim::Event::Transform(_) => {
+                    gates.push((path.len(), seen.sim.ball.position - glam::Vec3::Y * crate::sim::BALL_RADIUS))
+                }
+                _ => {}
+            }
+        }
+        let b = &seen.sim.ball;
+        let floor = b.position - glam::Vec3::Y * crate::sim::BALL_RADIUS;
+        if !lost && b.on_ground && path.last().is_none_or(|p| p.distance(floor) >= 1.5) {
+            path.push(floor);
+        }
+    }
+    println!("followed: {} points, transformers {:?}", path.len(), gates);
+    // the test player's own run begins where the followed one began
+    let mut own = o.clone();
+    own.replay = None;
+    own.follow = None;
+    if let Some(st) = &run.start {
+        own.sector = Some(st.sector);
+        own.ball = st.ball.clone();
+        own.at = st.at.map(|[x, y, z]| format!("{x},{y},{z}"));
+    }
+    let mut game = Game::new(&own, data)?;
+    let route = crate::autopilot::Route::along(&game.level.level, &game.modules, path);
+    pilot_run(&mut game, &own, crate::autopilot::Pilot::new(route, gates))
+}
+
 /// The test player plays the level from where the run begins: it saves the run at --record (or as an attempt) and
 /// prints how far it got.
 fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
@@ -747,7 +797,11 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
     let gates: Vec<(usize, glam::Vec3)> =
         route.marks.iter().zip(&waypoints).filter(|(_, w)| w.2).map(|(&m, w)| (m, w.1)).collect();
     println!("transformers on the way: {:?}", gates);
-    let mut pilot = crate::autopilot::Pilot::new(route, gates);
+    pilot_run(game, o, crate::autopilot::Pilot::new(route, gates))
+}
+
+/// Runs the test player to --ticks (or the finish), prints how far it got and saves its run at --record.
+fn pilot_run(game: &mut Game, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<(), String> {
     let limit = o.ticks.unwrap_or(60 * 60 * 20);
     while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
         let i = pilot.next(&game.sim);

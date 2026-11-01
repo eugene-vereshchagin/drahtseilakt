@@ -47,6 +47,7 @@ usage: drahtseilakt [options]
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
   --autopilot         no window: the test player plays the level (to --ticks); saved with --record
+  --follow FILE       the test player follows the ball's way in a replay of a player's run
   --screenshot FILE   no window: render the frame after the replay (or --ticks N) to a PNG
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
@@ -79,6 +80,8 @@ pub struct Options {
     pub headless: bool,
     /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
     pub autopilot: bool,
+    /// The test player follows the ball's way in this replay (a player's run) instead of finding one.
+    pub follow: Option<PathBuf>,
     pub screenshot: Option<PathBuf>,
     pub ticks: Option<u64>,
     pub trace: Option<u64>,
@@ -103,6 +106,7 @@ fn parse_args() -> Result<Options, String> {
         replay: None,
         headless: false,
         autopilot: false,
+        follow: None,
         screenshot: None,
         ticks: None,
         trace: None,
@@ -148,6 +152,10 @@ fn parse_args() -> Result<Options, String> {
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,
             "--autopilot" => o.autopilot = true,
+            "--follow" => {
+                o.follow = Some(value()?.into());
+                o.autopilot = true;
+            }
             "--debug" => o.debug = true,
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--ticks" => {

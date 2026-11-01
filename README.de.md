@@ -44,7 +44,8 @@ beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines L
 Stelle, mit `--ball wood|stone|paper`; ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
 Die Lautstärke von Ton und Musik steht auf der Einstellungsseite des Menüs. Im Debug-Modus (`--debug` oder der Schalter auf der Debug-Seite des Menüs) nimmt F2 eine freie Kamera auf, um
 durch das Level zu fliegen, während der Lauf wartet. Zum Testen lässt `--autopilot` einen Testspieler das Level ohne
-Fenster versuchen (mit `--record FILE` bleibt sein Lauf erhalten). `drahtseilakt --help` zeigt alles.
+Fenster versuchen (mit `--record FILE` bleibt sein Lauf erhalten); `--follow FILE` lässt ihn dem Weg der Kugel im Replay eines
+Spielers folgen. `drahtseilakt --help` zeigt alles.
 
 ## Rechtliches
 

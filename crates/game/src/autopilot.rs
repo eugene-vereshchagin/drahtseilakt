@@ -386,6 +386,15 @@ impl Route {
             .map(|(i, _)| i)
     }
 
+    /// A way given as floor points in order (a player's run): the level's floors are read for the edges.
+    pub fn along(level: &Level, modules: &crate::scene::Modules, path: Vec<Vec3>) -> Route {
+        let start = path.first().copied().unwrap_or(Vec3::ZERO);
+        let mut r = Route::find(level, modules, start, &[]);
+        r.marks = vec![path.len().saturating_sub(1)];
+        r.points = path;
+        r
+    }
+
     /// How far the ball at `p` is from an edge: the clearance of the floor point under it (0 with none under it).
     pub fn clearance(&self, p: Vec3) -> f32 {
         let f = p - Vec3::Y * crate::sim::BALL_RADIUS;
