@@ -16,6 +16,7 @@ mod hud;
 mod menu;
 mod modules;
 mod music;
+mod particles;
 mod physics;
 mod proximity;
 mod render;

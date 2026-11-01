@@ -3,6 +3,7 @@
 // the projection always uses the real one.
 
 use glam::{Mat4, Vec3};
+use crate::particles::Blend as PBlend;
 use level::{Blend, Level};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
@@ -157,6 +158,13 @@ pub struct Renderer {
     pub models: Vec<Model>,
     overlay_pipeline: wgpu::RenderPipeline,
     markers: HashMap<[u32; 4], GpuMaterial>,
+    /// Particles: their pipelines by blend and lines, their layout, and their textures by name.
+    particle_shader: wgpu::ShaderModule,
+    particle_layout: wgpu::PipelineLayout,
+    particle_tex_layout: wgpu::BindGroupLayout,
+    particle_pipelines: HashMap<(PBlend, bool), wgpu::RenderPipeline>,
+    particle_textures: HashMap<&'static str, wgpu::BindGroup>,
+    particle_white: wgpu::BindGroup,
     /// The colour behind everything (the sky's zenith).
     pub clear: wgpu::Color,
     depth: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
@@ -249,6 +257,37 @@ impl Renderer {
         });
         let overlay_pipeline = overlay_pipeline(&device, format);
         let white = upload_texture(&device, &queue, 1, 1, vec![255; 4]);
+        let particle_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("particles"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("particles.wgsl").into()),
+        });
+        let particle_tex_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("particle texture"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+        let particle_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("particles"),
+            bind_group_layouts: &[Some(&globals_layout), Some(&particle_tex_layout)],
+            immediate_size: 0,
+        });
+        let particle_white = particle_bind(&device, &particle_tex_layout, &white, &sampler);
         Renderer {
             device,
             queue,
@@ -268,6 +307,12 @@ impl Renderer {
             models: Vec::new(),
             overlay_pipeline,
             markers: HashMap::new(),
+            particle_shader,
+            particle_layout,
+            particle_tex_layout,
+            particle_pipelines: HashMap::new(),
+            particle_textures: HashMap::new(),
+            particle_white,
             clear: wgpu::Color {
                 r: 0.4,
                 g: 0.45,
@@ -496,6 +541,63 @@ impl Renderer {
         })
     }
 
+    /// Uploads a particle texture under its name (particles.rs names them).
+    pub fn add_particle_texture(&mut self, name: &'static str, width: u32, height: u32, rgba: Vec<u8>) {
+        let view = upload_texture(&self.device, &self.queue, width, height, rgba);
+        let bind = particle_bind(&self.device, &self.particle_tex_layout, &view, &self.sampler);
+        self.particle_textures.insert(name, bind);
+    }
+
+    fn particle_pipeline(&mut self, key: (PBlend, bool)) {
+        let (device, shader, layout, format) = (&self.device, &self.particle_shader, &self.particle_layout, self.format);
+        self.particle_pipelines.entry(key).or_insert_with(|| {
+            let (src, dst) = match key.0 {
+                PBlend::AlphaAdd => (wgpu::BlendFactor::SrcAlpha, wgpu::BlendFactor::One),
+                PBlend::OneSrcColor => (wgpu::BlendFactor::One, wgpu::BlendFactor::Src),
+            };
+            let c = wgpu::BlendComponent { src_factor: src, dst_factor: dst, operation: wgpu::BlendOperation::Add };
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("particles"),
+                layout: Some(layout),
+                vertex: wgpu::VertexState {
+                    module: shader,
+                    entry_point: Some("vs"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<crate::particles::Vertex>() as u64,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Float32x4],
+                    })],
+                },
+                primitive: wgpu::PrimitiveState {
+                    topology: if key.1 { wgpu::PrimitiveTopology::LineList } else { wgpu::PrimitiveTopology::TriangleList },
+                    cull_mode: None,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: DEPTH_FORMAT,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: Default::default(),
+                fragment: Some(wgpu::FragmentState {
+                    module: shader,
+                    entry_point: Some("fs"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format,
+                        blend: Some(wgpu::BlendState { color: c, alpha: c }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                multiview_mask: None,
+                cache: None,
+            })
+        });
+    }
+
     fn depth_view(&mut self, width: u32, height: u32) -> Option<wgpu::TextureView> {
         let fresh = match &self.depth {
             Some((_, _, w, h)) => *w != width || *h != height,
@@ -590,6 +692,7 @@ impl Renderer {
         height: u32,
         view: &View,
         instances: &[Instance],
+        particles: &[crate::particles::Batch],
     ) {
         let aspect = width.max(1) as f32 / height.max(1) as f32;
         let proj = perspective_lh(view.fov_y, aspect, 0.5, 3000.0);
@@ -669,6 +772,20 @@ impl Renderer {
         for d in &draws {
             self.pipeline(d.3);
         }
+        let particle_draws: Vec<(wgpu::Buffer, u32, (PBlend, bool), Option<&'static str>)> = particles
+            .iter()
+            .filter(|b| !b.vertices.is_empty())
+            .map(|b| {
+                let key = (b.blend, b.lines);
+                self.particle_pipeline(key);
+                let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("particles"),
+                    contents: bytemuck::cast_slice(&b.vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+                (buf, b.vertices.len() as u32, key, b.texture)
+            })
+            .collect();
 
         let Some(depth) = self.depth_view(width, height) else {
             return;
@@ -729,6 +846,17 @@ impl Renderer {
                 pass.set_index_buffer(part.index.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..part.count, 0, 0..1);
             }
+            // Particles last, over everything, testing depth without writing it.
+            for (buf, count, key, texture) in &particle_draws {
+                let Some(pipeline) = self.particle_pipelines.get(key) else {
+                    continue;
+                };
+                let bind = texture.and_then(|t| self.particle_textures.get(t)).unwrap_or(&self.particle_white);
+                pass.set_pipeline(pipeline);
+                pass.set_bind_group(1, bind, &[]);
+                pass.set_vertex_buffer(0, buf.slice(..));
+                pass.draw(0..*count, 0..1);
+            }
         }
         self.queue.submit([enc.finish()]);
     }
@@ -758,6 +886,22 @@ fn look_at_lh(eye: Vec3, target: Vec3, up: Vec3) -> Mat4 {
         glam::Vec4::new(s.z, u.z, f.z, 0.0),
         glam::Vec4::new(-s.dot(eye), -u.dot(eye), -f.dot(eye), 1.0),
     )
+}
+
+fn particle_bind(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    view: &wgpu::TextureView,
+    sampler: &wgpu::Sampler,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("particle texture"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) },
+        ],
+    })
 }
 
 fn model_buffer(

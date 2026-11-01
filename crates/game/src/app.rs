@@ -74,6 +74,8 @@ struct Game {
     session: Option<std::io::BufWriter<std::fs::File>>,
     /// The extra points' module meshes, when the copy has the module.
     extra_model: Option<scene::ExtraModel>,
+    /// The particle systems (flames, the extra points' sparkles); only for the eye.
+    effects: crate::particles::Effects,
     /// The level's music theme (the level table's Music), and whether it is the last original level.
     music_theme: Option<u32>,
     /// The level table's LevelBonus.
@@ -175,7 +177,21 @@ impl Game {
         }
         let mut replay_out = Replay::new(&level.name, level.hash);
         replay_out.start = start.clone();
-        let placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
+        let module_file = |name: &str| {
+            let path = data.file(&format!("3D Entities/PH/{name}.nmo"))?;
+            crate::assets::load_nmo(&path).ok().map(|m| m.level)
+        };
+        let effects = crate::particles::Effects::new(&level.level, &module_file);
+        let mut placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
+        if effects.has_flames() {
+            // the flames are drawn, so their stand-ins need no markers
+            placements.retain(|p| {
+                p.marker.is_none()
+                    || !level.level.groups_of(p.object).any(|g| {
+                        g.eq_ignore_ascii_case("PC_Checkpoints") || g.eq_ignore_ascii_case("PS_Levelstart")
+                    })
+            });
+        }
         let trafo_model = scene::FIRST_MODULE_MODEL + modules.models.len();
         let trafo = data
             .file("3D Entities/AnimTrafo.nmo")
@@ -195,6 +211,7 @@ impl Game {
             watch: Watch::default(),
             session: None,
             extra_model,
+            effects,
             music_theme: data.settings(&level.name).music,
             level_bonus,
             last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
@@ -416,10 +433,12 @@ impl Game {
         if self.sim.finished {
             // After the finish the world goes on for the eye (the balloon leaves); the run is over and recorded.
             self.sim.step(0);
+            self.effects.tick(&self.sim);
             return;
         }
         let events_before = self.sim.events.len();
         self.sim.step(input);
+        self.effects.tick(&self.sim);
         if self.sim.drawn_ball() == Some(self.sim.ball.kind) && !self.sim.game_over {
             let world = self.sim.world();
             let speed = self.sim.ball.velocity.length();
@@ -736,6 +755,16 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     if let Some((file, _)) = &game.trafo {
         renderer.add_model(&file.level, &loader);
     }
+    for name in crate::particles::textures() {
+        let t = level::Texture {
+            name: name.to_owned(),
+            source: level::TextureSource::File(format!("{name}.bmp")),
+            color_key: None,
+        };
+        if let Some((w, h, rgba)) = data.texture(&t) {
+            renderer.add_particle_texture(name, w, h, rgba);
+        }
+    }
     // The zenith colour: the top row of the front texture, averaged.
     if let Some((w, _, rgba)) = sky.textures.first().and_then(|t| data.texture(t)) {
         let row = rgba.get(..(w as usize * 4)).unwrap_or_default();
@@ -802,7 +831,8 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         (&game.sim.extra_views(), game.extra_model.as_ref()),
         &snap,
     );
-    r.draw(&view, w, h, &scene::view(&snap), &inst);
+    let particles = game.effects.batches(snap.eye, snap.target);
+    r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
     r.draw_overlay(
         &view,
         w,
@@ -1308,12 +1338,14 @@ impl App {
         );
         let built = build_started.elapsed();
         let draw_started = Instant::now();
+        let particles = self.game.effects.batches(snap.eye, snap.target);
         gpu.renderer.draw(
             &view,
             gpu.config.width,
             gpu.config.height,
             &scene::view(&snap),
             &inst,
+            &particles,
         );
         let drawn = draw_started.elapsed();
         let overlay_started = Instant::now();

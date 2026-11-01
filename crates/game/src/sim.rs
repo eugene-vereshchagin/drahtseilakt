@@ -1424,6 +1424,11 @@ impl Sim {
         self.points + self.level_bonus + LIFE_BONUS * i64::from(self.lives)
     }
 
+    /// Whether the checkpoint at level object `object` has been passed.
+    pub fn checkpoint_passed(&self, object: usize) -> bool {
+        self.rules.checkpoints.iter().position(|c| c.0 == object).is_some_and(|k| k < self.sector)
+    }
+
     /// Whether the last checkpoint has been passed (the level's last stage), and where the level ends.
     pub fn last_stage(&self) -> (bool, Option<Vec3>) {
         (self.sector >= self.rules.checkpoints.len(), self.rules.end)

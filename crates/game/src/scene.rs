@@ -93,8 +93,8 @@ impl BallMeshes {
     }
 }
 
-/// Groups the original shows with particles (flames, sparkles), which this engine does not draw yet: their
-/// placeholders are shown as translucent markers so the player sees where they are. Temporary, until phase 4.
+/// Groups the original shows with particles (flames, sparkles): their placeholders are shown as translucent markers
+/// when the copy lacks the module that makes the particles (the app drops them when the flames are drawn).
 const MARKERS: [(&str, [f32; 4]); 3] = [
     ("PC_Checkpoints", [1.0, 0.45, 0.85, 0.45]),
     ("PS_Levelstart", [1.0, 0.45, 0.85, 0.35]),

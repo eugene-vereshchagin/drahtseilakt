@@ -25,7 +25,9 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   Plattenbrücke. Ton wie bei Sound_Manager und Music_Manager
   des Originals: Ereignisklänge, Stöße und Rollen der Kugel nach Bodenmaterial, die Musik des Levels. Ventilatoren brummen in ihrer Nähe, das Seil der
   Plattenbrücke reißt hörbar. Das Menü stellt die Lautstärke von Ton und Musik
-  ein. Fehlt: Partikel, die Erweiterung von Level 13.
+  ein. Partikel, wie die Blöcke des Originals sie erzeugen: die Flammen am Start und an den Checkpoints, die
+  Funken und Spuren der Extrapunkte. Fehlt: die übrigen Partikel (Ventilatoren, Extraleben, der Rauch der Kugel),
+  die Erweiterung von Level 13.
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
 
 
