@@ -15,6 +15,8 @@ const STEP: f32 = 1.2;
 /// A way down may drop this far (one way only), at this extra cost per unit.
 const DROP: f32 = 15.0;
 const DROP_COST: f32 = 4.0;
+/// Within this of an edge the way costs more, the nearer the more.
+const CLEAR: f32 = 6.0;
 
 /// The way through the level: floor points, in order.
 pub struct Route {
@@ -196,6 +198,38 @@ impl Route {
                 !sides.iter().all(|&x| x)
             })
             .collect();
+        // How far each point is from the nearest edge (up to `CLEAR`): the way keeps to the middle, as a player who
+        // fears the edge does. Rails are narrow by nature and count as clear.
+        let mut edges: HashMap<(i32, i32), Vec<Vec3>> = HashMap::new();
+        for (p, _) in found.iter().zip(&edge).filter(|(_, e)| **e) {
+            edges
+                .entry((
+                    (p.0.x / CLEAR).floor() as i32,
+                    (p.0.z / CLEAR).floor() as i32,
+                ))
+                .or_default()
+                .push(p.0);
+        }
+        let clear: Vec<f32> = found
+            .iter()
+            .map(|&(p, rail)| {
+                if rail {
+                    return CLEAR;
+                }
+                let (cx, cz) = ((p.x / CLEAR).floor() as i32, (p.z / CLEAR).floor() as i32);
+                let mut c = CLEAR;
+                for dx in -1..=1 {
+                    for dz in -1..=1 {
+                        for q in edges.get(&(cx + dx, cz + dz)).into_iter().flatten() {
+                            if (q.y - p.y).abs() < 1.5 {
+                                c = c.min(Vec3::new(q.x - p.x, 0.0, q.z - p.z).length());
+                            }
+                        }
+                    }
+                }
+                c
+            })
+            .collect();
         let closest = |p: Vec3| -> usize {
             pts.iter()
                 .enumerate()
@@ -234,7 +268,10 @@ impl Route {
                     } else {
                         0.0
                     };
-                    let cost = h.max(0.1) + edgy + if dy < -STEP { -dy * DROP_COST } else { 0.0 };
+                    let fear = (CLEAR - clear.get(v).copied().unwrap_or(0.0)) / CLEAR;
+                    let cost = h.max(0.1) * (1.0 + 6.0 * fear * fear)
+                        + edgy
+                        + if dy < -STEP { -dy * DROP_COST } else { 0.0 };
                     let nd = d + cost;
                     if dist.get(&v).is_none_or(|&x| nd < x) {
                         dist.insert(v, nd);
@@ -339,7 +376,7 @@ impl Route {
             let off = floor.distance(a + ab * t);
             // the nearest segment (the later one of equals) says where along the way it is
             if off < 3.5 && best.is_none_or(|b| off <= b.1 + 1e-4) {
-                best = Some((i as f32 + t - 0.1 * off, off));
+                best = Some((i as f32 + t - 0.5 * off, off));
             }
         }
         best.map_or_else(
