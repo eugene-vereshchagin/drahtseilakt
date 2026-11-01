@@ -358,7 +358,8 @@ impl Route {
     }
 
     /// How far along the way `p` is, searching from point `from` on: on the segment it is nearest to (within reach),
-    /// its index plus the part of it passed, less a little for the distance off it.
+    /// its index plus the part of it passed, less the square of the distance off it (keep to the way, do not cut
+    /// corners along the edge).
     fn progress(&self, p: Vec3, from: usize) -> f32 {
         let floor = p - Vec3::Y * crate::sim::BALL_RADIUS;
         let end = (from + 120).min(self.points.len().saturating_sub(1));
@@ -376,7 +377,7 @@ impl Route {
             let off = floor.distance(a + ab * t);
             // the nearest segment (the later one of equals) says where along the way it is
             if off < 3.5 && best.is_none_or(|b| off <= b.1 + 1e-4) {
-                best = Some((i as f32 + t - 0.5 * off, off));
+                best = Some((i as f32 + t - 0.4 * off * off, off));
             }
         }
         best.map_or_else(
@@ -411,6 +412,8 @@ pub struct Pilot {
     choice: u8,
     /// The tick the way last went on: when it stands still, the choices are held longer (to push a box away).
     moved: u64,
+    /// The furthest along the way it has been.
+    best: f32,
     /// A manoeuvre found while stuck: choices held until their ticks.
     plan: Vec<(u64, u8)>,
     seed: u32,
@@ -423,6 +426,7 @@ impl Pilot {
             at: 0,
             choice: 0,
             moved: 0,
+            best: f32::NEG_INFINITY,
             plan: Vec::new(),
             seed: 0x2545_F491,
         }
@@ -444,7 +448,36 @@ impl Pilot {
     /// the one ending furthest along the way without losing the ball, if it gets on from `here`.
     fn manoeuvre(&mut self, sim: &Sim, here: f32) -> Option<Vec<(u64, u8)>> {
         let mut best: Option<(f32, Vec<(u64, u8)>)> = None;
-        for _ in 0..60 {
+        // First the rams: roll back one way, then hard the other (a wooden ball moves a box only with a run-up) and
+        // brake, so as not to follow the box off the edge; then random manoeuvres of three held choices.
+        let opposite = |c: u8| {
+            let mut o = 0;
+            for (a, b) in [(input::UP, input::DOWN), (input::LEFT, input::RIGHT)] {
+                if c & a != 0 {
+                    o |= b;
+                }
+                if c & b != 0 {
+                    o |= a;
+                }
+            }
+            o
+        };
+        let mut plans: Vec<Vec<(u64, u8)>> = Vec::new();
+        for &c in CHOICES.iter().skip(1) {
+            for back in [30u64, 60, 100] {
+                for run in [30u64, 60, 120] {
+                    for brake in [0u64, 20, 40] {
+                        let t = sim.tick + back + run;
+                        plans.push(vec![
+                            (sim.tick + back, opposite(c)),
+                            (t, c),
+                            (t + brake, opposite(c)),
+                        ]);
+                    }
+                }
+            }
+        }
+        for _ in 0..40 {
             let mut plan = Vec::new();
             let mut t = sim.tick;
             for _ in 0..3 {
@@ -452,6 +485,10 @@ impl Pilot {
                 t += 30 + u64::from(self.rand() % 90);
                 plan.push((t, c));
             }
+            plans.push(plan);
+        }
+        for plan in plans {
+            let t = plan.last().map_or(sim.tick, |p| p.0);
             let mut s = sim.clone();
             let lives = s.lives;
             let mut lost = false;
@@ -475,7 +512,7 @@ impl Pilot {
     }
 
     /// How much the loose things (boxes, balls) stand in the way ahead: each one on the next stretch of the way
-    /// counts as five points of it, so pushing one off the way is worth a manoeuvre.
+    /// counts as ten points of it, so pushing one off the way is worth a manoeuvre.
     fn blocking(&self, sim: &Sim) -> f32 {
         let ahead: Vec<Vec3> = self
             .route
@@ -495,7 +532,7 @@ impl Pilot {
             if ahead.iter().any(|q| {
                 Vec3::new(p.x - q.x, 0.0, p.z - q.z).length() < 2.5 && (p.y - q.y).abs() < 4.0
             }) {
-                n += 5.0;
+                n += 10.0;
             }
         }
         n
@@ -519,17 +556,22 @@ impl Pilot {
         let here = self.route.progress(sim.ball.position, self.at);
         if here > self.at as f32 {
             self.at = here.floor().max(0.0) as usize;
+        }
+        // getting on: a quarter of a point further than ever
+        if here > self.best + 0.25 {
+            self.best = here;
             self.moved = sim.tick;
         }
-        // stuck for four seconds: try random two-part manoeuvres and keep the best that gets on
-        if sim.tick.saturating_sub(self.moved) > 240
-            && let Some(plan) = self.manoeuvre(sim, here)
-        {
-            self.plan = plan;
+        // stuck for four seconds: try rams and random manoeuvres and keep the best that gets on
+        if sim.tick.saturating_sub(self.moved) > 240 {
+            // found or not, the next try comes after four seconds more
             self.moved = sim.tick;
-            if let Some(&(_, c)) = self.plan.first() {
-                self.choice = c;
-                return c;
+            if let Some(plan) = self.manoeuvre(sim, here) {
+                self.plan = plan;
+                if let Some(&(_, c)) = self.plan.first() {
+                    self.choice = c;
+                    return c;
+                }
             }
         }
         // below every floor of the way ahead: falling
@@ -577,7 +619,7 @@ impl Pilot {
             } else if s.finished {
                 f32::INFINITY
             } else {
-                self.route.progress(s.ball.position, self.at)
+                self.route.progress(s.ball.position, self.at) - self.blocking(&s)
                     + if c == self.choice { 0.05 } else { 0.0 }
             };
             if std::env::var_os("AUTOPILOT_SCORES").is_some() {

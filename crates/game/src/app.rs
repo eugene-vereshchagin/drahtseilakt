@@ -629,6 +629,16 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
                     b.velocity.length(),
                     if b.on_ground { "ground" } else { "air" }
                 );
+                // the loose things near the ball (boxes, balls), with DRAHTSEILAKT_TRACE_LOOSE set
+                if std::env::var_os("DRAHTSEILAKT_TRACE_LOOSE").is_some() {
+                    for &(o, body) in game.sim.loose() {
+                        let Some(st) = game.sim.world().state(body) else { continue };
+                        if st.pos.distance(b.position) < 40.0 {
+                            let name = game.level.level.objects.get(o).map_or("?", |ob| ob.name.as_str());
+                            println!("    {name} ({:8.2} {:8.2} {:8.2})", st.pos.x, st.pos.y, st.pos.z);
+                        }
+                    }
+                }
             }
         }
         let s = &game.sim;
