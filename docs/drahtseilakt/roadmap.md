@@ -198,6 +198,18 @@ Done when: most maps play; the report lists the rest, each with its reason.
 - **Replays rendered to video**: offline, frame by frame, at any resolution up to 8K with sound. Nothing is
   uploaded without the owner's command.
 
+## What players added with mods
+
+A static survey of thirty BML/BML+ mods (strings and readmes only; mods are never run) shows what players
+missed. Into the base engine: practice tools (spawn and sector select, quick restart, a ghost of the best run
+per sector, split and real-time timers); deterministic input recording and playback with fast-forward (TAS);
+an info overlay (ball position, extra lives and points left in the sector); the free camera and a field-of-view
+setting; no fixed sector limit and event hooks for map scripts; gravity, time factor and game speed as
+settings for tests; screenshots. Later or optional: dynamic field of view, mouse camera rotation, two balls,
+new ball types and pieces, challenge modes (blackout, decoy balls). The original's limits the mods work
+around (frame rate cap, 4:3, low resolutions, eight sectors, a bitmap font, fragile ball-change timing) are
+not ours to copy; its hidden constants (gravity -20, physics time factor 2) are.
+
 ## Throughout
 
 - The security rules (`CLAUDE.md`): hostile input, pinned and vendored dependencies, CI actions pinned by

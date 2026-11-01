@@ -208,6 +208,20 @@ Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen 
 - **Replays als Video**: offline, Bild für Bild, in jeder Auflösung bis 8K, mit Ton. Hochgeladen wird nichts
   ohne Anweisung des Inhabers.
 
+## Was Spieler mit Mods ergänzt haben
+
+Eine statische Durchsicht von dreißig BML/BML+-Mods (nur Zeichenketten und Readmes; Mods werden nie
+ausgeführt) zeigt, was Spielern fehlte. Ins Grundspiel: Übungswerkzeuge (Start an Punkt und Sektor nach Wahl,
+schneller Neustart, ein Geist des besten Laufs je Sektor, Zwischenzeiten und Echtzeituhr); deterministische
+Aufnahme und Wiedergabe der Eingaben mit Vorspulen (TAS); eine Info-Einblendung (Position der Kugel, im Sektor
+verbleibende Extraleben und -punkte); die freie Kamera und eine Einstellung des Sichtfelds; keine feste Grenze
+der Sektoren und Ereignisse für Kartenskripte; Schwerkraft, Zeitfaktor und Spieltempo als Einstellungen für
+Tests; Bildschirmfotos. Später oder wahlweise: dynamisches Sichtfeld, Kameradrehung mit der Maus, zwei Kugeln,
+neue Kugeltypen und Bauteile, Herausforderungsmodi (Verdunkelung, Täuschkugeln). Die Grenzen des Originals,
+die die Mods umgehen (Bildratengrenze, 4:3, niedrige Auflösungen, acht Sektoren, eine Bitmap-Schrift,
+anfälliger Kugelwechsel), übernehmen wir nicht; seine verborgenen Konstanten (Schwerkraft -20, Zeitfaktor der
+Physik 2) schon.
+
 ## Durchgehend
 
 - Die Sicherheitsregeln (`CLAUDE.md`): feindliche Eingaben, festgelegte und vendorte Abhängigkeiten,
