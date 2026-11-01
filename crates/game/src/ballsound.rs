@@ -18,6 +18,76 @@ pub enum SoundCmd {
     Stop(usize),
     /// Volume and pitch of every rolling loop.
     Roll(f32, f32),
+    /// The volume of loop `slot`.
+    Volume(usize, f32),
+}
+
+/// The loop slots of the fans' sounds (after the three rolling ones): the original has four Misc_Ventilator sounds.
+pub const FAN_SLOTS: usize = 4;
+pub const FAN_SLOT0: usize = 3;
+/// A fan is heard within 25 of it, at full volume within 2 (P_Modul_18's PlaySound, TT ProximityVolumeControl).
+const FAN_FAR: f32 = 25.0;
+const FAN_NEAR: f32 = 2.0;
+
+/// The fan sound's volume at a distance: 1 within 2, else 0.02 × 50^g with g going from 1 at 2 to 0 at 25 in the
+/// squared distance (so it never quite falls silent before it stops).
+pub fn fan_volume(d: f32) -> f32 {
+    let (d2, near, far) = (d * d, FAN_NEAR * FAN_NEAR, FAN_FAR * FAN_FAR);
+    let g = if d2 >= far {
+        0.0
+    } else if d2 <= near {
+        1.0
+    } else {
+        1.0 - (d2 - near) / (far - near)
+    };
+    0.02 * 50f32.powf(g)
+}
+
+/// The fans' sounds: which fan each of the four loops plays for.
+#[derive(Default)]
+pub struct FanSound {
+    playing: [Option<usize>; FAN_SLOTS],
+}
+
+impl FanSound {
+    /// One tick: the fans in the physics (their points) and where the ball is.
+    pub fn tick(&mut self, fans: &[glam::Vec3], ball: glam::Vec3, out: &mut Vec<SoundCmd>) {
+        for (k, slot) in self.playing.iter_mut().enumerate() {
+            if let Some(f) = *slot
+                && fans.get(f).is_none_or(|p| p.distance(ball) >= FAN_FAR)
+            {
+                *slot = None;
+                out.push(SoundCmd::Stop(FAN_SLOT0 + k));
+            }
+        }
+        for (f, p) in fans.iter().enumerate() {
+            let d = p.distance(ball);
+            if d >= FAN_FAR {
+                continue;
+            }
+            let k = match self.playing.iter().position(|s| *s == Some(f)) {
+                Some(k) => k,
+                None => {
+                    // a free one of the four sounds; with none free the fan stays silent, as in the original
+                    let Some(k) = self.playing.iter().position(Option::is_none) else {
+                        continue;
+                    };
+                    self.playing[k] = Some(f);
+                    out.push(SoundCmd::Loop(FAN_SLOT0 + k, "Misc_Ventilator"));
+                    k
+                }
+            };
+            out.push(SoundCmd::Volume(FAN_SLOT0 + k, fan_volume(d)));
+        }
+    }
+
+    pub fn silence(&mut self, out: &mut Vec<SoundCmd>) {
+        for (k, slot) in self.playing.iter_mut().enumerate() {
+            if slot.take().is_some() {
+                out.push(SoundCmd::Stop(FAN_SLOT0 + k));
+            }
+        }
+    }
 }
 
 /// Materials, as the attributes number them: 1 stone, 2 wood, 3 metal, 4 dome (hits only).
@@ -126,10 +196,7 @@ impl BallSound {
             }
         }
         if self.touch.iter().any(|t| t.2) {
-            out.push(SoundCmd::Roll(
-                (speed * VOLUME_PER_SPEED).min(1.0),
-                0.5 + speed * 0.01,
-            ));
+            out.push(SoundCmd::Roll(speed * VOLUME_PER_SPEED, 0.5 + speed * 0.01));
         }
     }
 
@@ -172,6 +239,20 @@ mod tests {
             &mut out,
         );
         assert!(out.is_empty(), "too slow, or no material");
+    }
+
+    #[test]
+    fn a_fan_is_heard_near_it_and_stops_beyond_25() {
+        assert_eq!(fan_volume(1.0), 1.0);
+        assert!((fan_volume(24.99) - 0.02).abs() < 0.001);
+        let mut f = FanSound::default();
+        let mut out = Vec::new();
+        let fans = [glam::Vec3::ZERO];
+        f.tick(&fans, glam::Vec3::X * 10.0, &mut out);
+        assert_eq!(out[0], SoundCmd::Loop(FAN_SLOT0, "Misc_Ventilator"));
+        out.clear();
+        f.tick(&fans, glam::Vec3::X * 30.0, &mut out);
+        assert_eq!(out, vec![SoundCmd::Stop(FAN_SLOT0)]);
     }
 
     #[test]

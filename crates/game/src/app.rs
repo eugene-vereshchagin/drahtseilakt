@@ -7,7 +7,7 @@ use crate::assets::{Data, LoadedLevel};
 use crate::render::Renderer;
 use crate::replay::Replay;
 use crate::audio::Audio;
-use crate::ballsound::{BallSound, SoundCmd};
+use crate::ballsound::{BallSound, FanSound, SoundCmd};
 use crate::freecam::FreeCam;
 use crate::music::Music;
 use crate::menu::{Action, Menu};
@@ -77,6 +77,7 @@ struct Game {
     last_level: bool,
     /// The ball's sounds, and what they ask of the sound output since the window last played them.
     ball_sound: BallSound,
+    fan_sound: FanSound,
     pub sound_out: Vec<SoundCmd>,
 }
 
@@ -189,6 +190,7 @@ impl Game {
             music_theme: data.settings(&level.name).music,
             last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
             ball_sound: BallSound::default(),
+            fan_sound: FanSound::default(),
             sound_out: Vec::new(),
             prev_spin: 0.0,
             replay_in,
@@ -207,6 +209,7 @@ impl Game {
         );
         self.sim.set_ball_boxes(self.ball_meshes.boxes);
         self.ball_sound.silence(&mut self.sound_out);
+        self.fan_sound.silence(&mut self.sound_out);
         if let Some(st) = &self.start {
             begin_at(&mut self.sim, st);
         }
@@ -414,6 +417,11 @@ impl Game {
         } else {
             self.ball_sound.silence(&mut self.sound_out);
         }
+        if self.sim.finished || self.sim.game_over {
+            self.fan_sound.silence(&mut self.sound_out);
+        } else {
+            self.fan_sound.tick(&self.sim.fans(), self.sim.ball.position, &mut self.sound_out);
+        }
         if self.sound_out.len() > 4096 {
             // nobody plays them (a run without a window)
             self.sound_out.clear();
@@ -599,7 +607,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         last_view: (glam::Vec3::ZERO, glam::Vec3::X),
         audio: Audio::open(),
         heard: 0,
-        rolling: [None; 3],
+        rolling: [None; 3 + crate::ballsound::FAN_SLOTS],
         music: None,
         game,
         data,
@@ -840,8 +848,8 @@ struct App {
     /// The sound output, if there is a device; and how many of the run's events have sounded.
     audio: Option<Audio>,
     heard: usize,
-    /// The rolling loops playing (stone, wood, metal).
-    rolling: [Option<u64>; 3],
+    /// The loops playing, by slot: rolling (stone, wood, metal), then the fans'.
+    rolling: [Option<u64>; 3 + crate::ballsound::FAN_SLOTS],
     /// The level's music.
     music: Option<Music>,
     data: Data,
@@ -929,7 +937,7 @@ impl App {
         if let Some(a) = &mut self.audio {
             a.stop_all();
         }
-        self.rolling = [None; 3];
+        self.rolling = [None; 3 + crate::ballsound::FAN_SLOTS];
         self.heard = 0;
         self.music = None;
         self.number = Some(n);
@@ -969,9 +977,14 @@ impl App {
                     }
                 }
                 SoundCmd::Roll(volume, pitch) => {
-                    for id in self.rolling.iter().flatten() {
+                    for id in self.rolling.iter().take(3).flatten() {
                         audio.set_volume(*id, volume);
                         audio.set_pitch(*id, pitch);
+                    }
+                }
+                SoundCmd::Volume(slot, volume) => {
+                    if let Some(Some(id)) = self.rolling.get(slot) {
+                        audio.set_volume(*id, volume);
                     }
                 }
             }

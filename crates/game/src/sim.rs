@@ -1334,6 +1334,11 @@ impl Sim {
         }
     }
 
+    /// The fans in the physics now (their points), for their sound.
+    pub fn fans(&self) -> Vec<Vec3> {
+        self.updrafts.iter().filter(|u| u.outer.on || u.inner.on).map(|u| u.at.point).collect()
+    }
+
     /// Whether the last checkpoint has been passed (the level's last stage), and where the level ends.
     pub fn last_stage(&self) -> (bool, Option<Vec3>) {
         (self.sector >= self.rules.checkpoints.len(), self.rules.end)

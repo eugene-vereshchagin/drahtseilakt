@@ -20,7 +20,10 @@ impl Drop for Audio {
     /// A file output is written when the game ends.
     fn drop(&mut self) {
         if let Output::File { path, samples } = &self.output {
-            let data: Vec<u8> = samples.iter().flat_map(|s| ((s * 32767.0) as i16).to_le_bytes()).collect();
+            let data: Vec<u8> = samples
+                .iter()
+                .flat_map(|s| ((s * 32767.0) as i16).to_le_bytes())
+                .collect();
             let mut out = b"RIFF".to_vec();
             out.extend((36 + data.len() as u32).to_le_bytes());
             out.extend(b"WAVEfmt ");
@@ -194,8 +197,13 @@ impl Mixer {
 /// Where the mix goes: the system's output, or a WAV file (DRAHTSEILAKT_SOUND_FILE, for checking the sound
 /// without speakers), mixed as the game's frames pass.
 enum Output {
-    Device { _stream: cpal::Stream },
-    File { path: std::path::PathBuf, samples: Vec<f32> },
+    Device {
+        _stream: cpal::Stream,
+    },
+    File {
+        path: std::path::PathBuf,
+        samples: Vec<f32>,
+    },
 }
 
 pub struct Audio {
@@ -211,8 +219,14 @@ impl Audio {
     pub fn open() -> Option<Audio> {
         if let Some(path) = std::env::var_os("DRAHTSEILAKT_SOUND_FILE") {
             return Some(Audio {
-                output: Output::File { path: path.into(), samples: Vec::new() },
-                mixer: Arc::new(Mutex::new(Mixer { voices: Vec::new(), rate: FILE_RATE })),
+                output: Output::File {
+                    path: path.into(),
+                    samples: Vec::new(),
+                },
+                mixer: Arc::new(Mutex::new(Mixer {
+                    voices: Vec::new(),
+                    rate: FILE_RATE,
+                })),
                 sounds: HashMap::new(),
                 next: 1,
             });
@@ -335,7 +349,8 @@ impl Audio {
         if let Ok(mut m) = self.mixer.lock()
             && let Some(v) = m.voices.iter_mut().find(|v| v.id == id)
         {
-            v.volume = volume.clamp(0.0, 1.0);
+            // as the original's Volume Control, not limited to 1 (the rolling sound goes above it when fast)
+            v.volume = volume.clamp(0.0, 4.0);
         }
     }
 
