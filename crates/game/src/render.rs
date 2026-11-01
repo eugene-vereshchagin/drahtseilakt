@@ -25,6 +25,8 @@ struct Globals {
     view_proj: [[f32; 4]; 4],
     light_dir: [f32; 4],
     ambient: [f32; 4],
+    view: [[f32; 4]; 4],
+    eye: [f32; 4],
 }
 
 #[repr(C)]
@@ -40,6 +42,9 @@ struct GpuPart {
     index: wgpu::Buffer,
     count: u32,
     material: usize,
+    /// A material channel: its own vertices (the mesh's with the channel's coordinates) and blend, drawn over the
+    /// mesh without writing depth.
+    channel: Option<(wgpu::Buffer, PipelineKey)>,
 }
 
 struct GpuMesh {
@@ -368,7 +373,11 @@ impl Renderer {
                             None => m.alpha_cutoff.unwrap_or(-1.0),
                         },
                         if m.unlit { 1.0 } else { 0.0 },
-                        0.0,
+                        match m.texgen {
+                            Some(level::TexGen::Reflect) => 2.0,
+                            Some(level::TexGen::Chrome) => 3.0,
+                            None => 0.0,
+                        },
                         0.0,
                     ],
                     ambient: [m.ambient[0], m.ambient[1], m.ambient[2], 0.0],
@@ -435,7 +444,7 @@ impl Renderer {
                         contents: bytemuck::cast_slice(&vertices),
                         usage: wgpu::BufferUsages::VERTEX,
                     });
-                let parts = m
+                let mut parts: Vec<GpuPart> = m
                     .parts
                     .iter()
                     .filter(|p| !p.indices.is_empty())
@@ -449,8 +458,36 @@ impl Renderer {
                             }),
                         count: p.indices.len() as u32,
                         material: p.material.unwrap_or(default_material),
+                        channel: None,
                     })
                     .collect();
+                // the material channels: every face again, with the channel's material, coordinates and blend
+                let all: Vec<u32> = m.parts.iter().flat_map(|p| p.indices.iter().copied()).collect();
+                for c in &m.channels {
+                    if all.is_empty() || c.material >= default_material {
+                        continue;
+                    }
+                    let vertices: Vec<Vertex> = vertices
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| Vertex { uv: c.uvs.get(i).copied().unwrap_or_default(), ..*v })
+                        .collect();
+                    let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some(&m.name),
+                        contents: bytemuck::cast_slice(&vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+                    parts.push(GpuPart {
+                        index: self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some(&m.name),
+                            contents: bytemuck::cast_slice(&all),
+                            usage: wgpu::BufferUsages::INDEX,
+                        }),
+                        count: all.len() as u32,
+                        material: c.material,
+                        channel: Some((buf, PipelineKey { blend: Some(c.blend), z_write: false })),
+                    });
+                }
                 Some(GpuMesh { vertex, parts })
             })
             .collect();
@@ -772,6 +809,8 @@ impl Renderer {
             view_proj: (proj * look).to_cols_array_2d(),
             light_dir: [0.35, -0.85, 0.4, 0.0],
             ambient: [0.38, 0.38, 0.42, 1.0],
+            view: look.to_cols_array_2d(),
+            eye: [view.eye.x, view.eye.y, view.eye.z, 1.0],
         };
         self.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
@@ -820,7 +859,10 @@ impl Renderer {
             };
             for (p, part) in mesh.parts.iter().enumerate() {
                 let key = match inst.marker {
+                    // a marker is one flat colour: no channels
+                    Some(_) if part.channel.is_some() => None,
                     Some(c) => self.markers.get(&c.map(f32::to_bits)).map(|m| m.key),
+                    None if part.channel.is_some() => part.channel.as_ref().map(|c| c.1),
                     None => self
                         .models
                         .get(inst.model)
@@ -913,7 +955,7 @@ impl Renderer {
                 pass.set_pipeline(pipeline);
                 pass.set_bind_group(1, &self.models_bind, &[(i as u64 * UNIFORM_ALIGN) as u32]);
                 pass.set_bind_group(2, &mat.bind, &[]);
-                pass.set_vertex_buffer(0, mesh.vertex.slice(..));
+                pass.set_vertex_buffer(0, part.channel.as_ref().map_or(&mesh.vertex, |c| &c.0).slice(..));
                 pass.set_index_buffer(part.index.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..part.count, 0, 0..1);
             }

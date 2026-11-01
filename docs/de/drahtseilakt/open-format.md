@@ -19,13 +19,17 @@ Ein Ordner mit:
 - **Knoten**: einer je Objekt des Levels, der Reihe nach, mit Name, Weltmatrix `matrix` und, wenn es gezeichnet
   wird, `mesh`. `extras.drahtseilakt.visible` sagt, ob das Objekt angezeigt wird.
 - **Meshes**: eines je Mesh mit Geometrie; ein Primitiv je Material, alle Primitive eines Meshes teilen sich
-  dieselben Accessoren `POSITION`, `NORMAL` und `TEXCOORD_0` (Floats), `indices` als 32-Bit-Ganzzahlen.
+  dieselben Accessoren `POSITION`, `NORMAL` und `TEXCOORD_0` (Floats), `indices` als 32-Bit-Ganzzahlen. Die
+  Materialkanäle eines Meshes (Durchgänge über das ganze Mesh mit einem anderen Material) stehen in
+  `extras.drahtseilakt.channels`: je Kanal `material`, `blend` (Namen von Quell- und Zielfaktor, wie unten) und
+  `texcoord` k, der Satz `TEXCOORD_k` mit seinen Koordinaten; höchstens 16.
 - **Materialien**: `baseColorFactor` (Diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`;
   `alphaMode` `OPAQUE`, `MASK` (mit `alphaCutoff`) oder `BLEND`; unbeleuchtete Materialien über
   `KHR_materials_unlit`. In `extras.drahtseilakt` steht, wofür glTF kein Feld hat: `ambient`, `z_write`,
   `blend` (Namen von Quell- und Zielfaktor: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`,
-  `inv_src_alpha`, `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`) und `alpha_cutoff`, wenn
-  Blending und Alpha-Test zusammenkommen.
+  `inv_src_alpha`, `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`), `alpha_cutoff`, wenn
+  Blending und Alpha-Test zusammenkommen, und `texgen` (`reflect` oder `chrome`), wenn die
+  Texturkoordinaten vom Blick kommen.
 - **Szenen-Extras** `extras.drahtseilakt`: `format` (1), `groups` (Name und Indizes der Mitgliedsknoten — die
   Spielregeln lesen sie, siehe [nmo-format.md](nmo-format.md)), `sky` (Buchstabe des Himmels) und `start_ball`.
 

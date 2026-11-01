@@ -10,7 +10,8 @@ new engine got level 1 playable, ahead of the phase order:
   Missing: fuzz targets, the inventory of Building Blocks, removing upstream's C code.
 - **Phase 2**: levels on screen with their sky, any size and aspect ratio, gamma-space lighting like the
   original (its fixed-function formula: emissive + ambient + diffuse, times the texture; one light so far), 3D
-  sprites (the extra points' silver balls) and colour-keyed textures. A main menu and a level menu
+  sprites (the extra points' silver balls), colour-keyed textures, reflections (TexGen) and material channels
+  (the domes' blue). A main menu and a level menu
   in the prototype's own font; a free camera in debug mode. The in-game
   interface is the original's: its points box and life balls, the points in the game's own font. The menus
   look like the original's (its buttons, dark band and fonts). Missing: the menu's 3D scene behind them, the

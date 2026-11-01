@@ -60,12 +60,15 @@ auf ganze Wörter aufgefüllten Bytes; nach dem abschließenden NUL kann Datenm�
 | jedes Objekt | | `0x4` / `0x18` | vorhanden: verborgen / hierarchisch verborgen |
 | Gruppe | 23 | `0xFFFFF` | Anzahl, Verweise auf Mitglieder |
 | Material | 30 | `0x1000` | Diffuse, Ambient, Specular, Emissive (ARGB-Wörter), Glanzstärke (Float), Texturverweis, Randfarbe, Moduswort, Flagwort |
+| | | `0x10000` | Effekt: Parameterverweis, Effekt (1 TexGen, 2 TexGen mit Bezugssystem); der Wert des Parameters ist der TexGen-Typ (CK2_3D.dll: None 0, Transform 1, Reflect 2, Chrome 3, Planar 4, Cube-Maps 31..34) |
+| Parameter | 46 | `0x40` | Typ-GUID (2 Wörter), ein Wort, Größe in Bytes, der Wert |
 | Textur | 31 | `0x10000` | Anzahl der Slots, Dateiname je Slot |
 | | | `0x20000` | eingebettete Pixel: Anzahl der Slots, dann Bits pro Pixel, Breite, Höhe, Masken A R G B, ein Wort, Pixelanzahl, Pixel; `[1, 0]`, wenn die Pixel in einer Datei liegen |
 | | | `0x2FF000` | Ladeoptionen: ein Wort (`0x100` eine transparente Farbe, `0x200` ein Videoformat folgt), dann je nach Abschnittsgröße die transparente Farbe (0xRRGGBB), der aktuelle Slot, das Videoformat; Texel dieser Farbe verwirft ein Alphatest |
 | Mesh | 32 | `0x100000` | Materialslots: Anzahl, dann (Verweis, Wort) je Slot |
 | | | `0x20000` | Vertexanzahl, Speicherflags, Größe (Datenwörter + 1), dann Positionen, Farben, Speculars, Normalen, UVs je nach Flags |
 | | | `0x10000` | Flächenanzahl, dann zwei Wörter je Fläche: Indizes 0 und 1 (je 16 Bit), Index 2 und Materialslot |
+| | | `0x4000` | Materialkanäle (das Mesh noch einmal mit einem anderen Material über sich gezeichnet): Anzahl, dann je Kanal Materialverweis, Flags (`0x1` aktiv), Quell- und Zielmischung, UV-Anzahl (0 oder die Vertexanzahl) und die UV-Paare |
 | 3D-Entity / -Objekt, Kamera, Licht | 33, 41, 34, 35, 38, 39 | `0x100000` | ein Wort, Flags, 3×3-Achsen (zeilenweise), Position — die Weltmatrix |
 | 3D-Objekt | 41 | `0x4000` | Verweis auf das aktuelle Mesh, Anzahl, Mesh-Verweise |
 | 3D-Sprite | 37 | `0x400000` | Modus (0 zum Blick, 1 dreht um x, 2 um y, 3 wie platziert), halbe Breite, halbe Höhe, Versatz x und y (-1..1 der halben Größe), Texturrechteck u0 v0 u1 v1, Materialverweis; ungeleuchtet in der Diffusfarbe des Materials gezeichnet |

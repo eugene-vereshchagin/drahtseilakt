@@ -19,13 +19,16 @@
 - **Узлы**: по одному на объект уровня, по порядку, с именем, мировой матрицей `matrix` и, если объект
   рисуется, ссылкой `mesh`. `extras.drahtseilakt.visible` — показан ли объект.
 - **Меши**: по одному на меш с геометрией; по примитиву на материал, все примитивы меша делят одни
-  accessor'ы `POSITION`, `NORMAL` и `TEXCOORD_0` (float), `indices` — 32-битные целые.
+  accessor'ы `POSITION`, `NORMAL` и `TEXCOORD_0` (float), `indices` — 32-битные целые. Каналы материалов меша
+  (проходы по всему мешу другим материалом) — в `extras.drahtseilakt.channels`: у каждого `material`, `blend`
+  (имена коэффициентов источника и приёмника, как ниже) и `texcoord` k — набор `TEXCOORD_k` с его
+  координатами; не больше 16.
 - **Материалы**: `baseColorFactor` (diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (с `alphaCutoff`) или `BLEND`; материалы без освещения — через `KHR_materials_unlit`.
   В `extras.drahtseilakt` то, для чего в glTF нет поля: `ambient`, `z_write`, `blend` (имена коэффициентов
   источника и приёмника: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`, `inv_src_alpha`,
-  `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`) и `alpha_cutoff`, если смешивание и
-  альфа-тест вместе.
+  `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`), `alpha_cutoff`, если смешивание и
+  альфа-тест вместе, и `texgen` (`reflect` или `chrome`), если координаты текстуры берутся от взгляда.
 - **Extras сцены** `extras.drahtseilakt`: `format` (1), `groups` (имя и индексы узлов-членов — по ним работают
   правила игры, см. [nmo-format.md](nmo-format.md)), `sky` (буква неба) и `start_ball`.
 

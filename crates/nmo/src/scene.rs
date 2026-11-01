@@ -9,6 +9,8 @@ use crate::error::{Error, Part, Result};
 /// Caps against hostile counts; the largest original mesh has a few thousand vertices.
 const MAX_VERTICES: usize = 1 << 20;
 const MAX_FACES: usize = 1 << 21;
+/// Material channels a mesh may have.
+pub const MAX_CHANNELS: usize = 16;
 const MAX_TEXTURE_SIDE: u32 = 8_192;
 
 fn malformed(what: &'static str) -> Error {
@@ -36,6 +38,18 @@ pub struct Mesh {
     pub faces: Vec<([u16; 3], u16)>,
     /// Material object indices; `None` for an empty slot.
     pub materials: Vec<Option<usize>>,
+}
+
+/// A mesh's material channel: the mesh drawn again with another material, blended over itself.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Channel {
+    pub material: Option<usize>,
+    /// Bit 0x1: active.
+    pub flags: u32,
+    pub src_blend: Blend,
+    pub dest_blend: Blend,
+    /// One pair per vertex, or empty when the channel shares the mesh's.
+    pub uvs: Vec<[f32; 2]>,
 }
 
 mod vertex_flags {
@@ -118,6 +132,33 @@ pub fn mesh(chunk: &Chunk) -> Result<Mesh> {
         }
     }
     Ok(mesh)
+}
+
+/// A mesh's material channels (section 0x4000), apart from the mesh so that a bad one costs only the channels:
+/// count, then per channel its material, flags, source and destination blend, and its texture coordinates (a count,
+/// then that many pairs: none or one per vertex of the mesh's `vertices`).
+pub fn mesh_channels(chunk: &Chunk, vertices: usize) -> Result<Vec<Channel>> {
+    let mut out = Vec::new();
+    if let Some(mut w) = chunk.section(0x0000_4000) {
+        let n = w.u32()? as usize;
+        if n > MAX_CHANNELS {
+            return Err(malformed("channel count"));
+        }
+        for _ in 0..n {
+            let material = reference(chunk, w.u32()?);
+            let flags = w.u32()?;
+            let src_blend = Blend::from_nibble(w.u32()?);
+            let dest_blend = Blend::from_nibble(w.u32()?);
+            let count = w.u32()? as usize;
+            if count != 0 && count != vertices {
+                return Err(malformed("channel uv count"));
+            }
+            let words = w.take(count.checked_mul(2).ok_or(malformed("channel uv data"))?)?;
+            let uvs = words.as_chunks::<2>().0.iter().map(|c| uv2(c)).collect();
+            out.push(Channel { material, flags, src_blend, dest_blend, uvs });
+        }
+    }
+    Ok(out)
 }
 
 fn xyz(c: &[u32]) -> [f32; 3] {
@@ -346,6 +387,29 @@ pub fn sprite(chunk: &Chunk) -> Result<Sprite> {
     Ok(s)
 }
 
+/// A material's effect (section 0x10000), apart from the material so that a bad one costs only the effect: its
+/// kind (1 texture coordinate generation, 2 the same with a referential) and the parameter object holding its
+/// setting.
+pub fn material_effect(chunk: &Chunk) -> Result<Option<(u32, Option<usize>)>> {
+    let Some(mut e) = chunk.section(0x0001_0000) else {
+        return Ok(None);
+    };
+    let param = reference(chunk, e.u32()?);
+    Ok(Some((e.u32()?, param)))
+}
+
+/// A parameter object's value as one word (section 0x40: type GUID, a word, the size in bytes, the value), when it
+/// is four bytes.
+pub fn parameter_word(chunk: &Chunk) -> Result<Option<u32>> {
+    let Some(mut w) = chunk.section(0x40) else {
+        return Ok(None);
+    };
+    w.take(2)?;
+    w.u32()?;
+    let size = w.u32()?;
+    Ok(if size == 4 { Some(w.u32()?) } else { None })
+}
+
 pub fn group(chunk: &Chunk) -> Result<Vec<usize>> {
     let Some(mut w) = chunk.section(0x000F_FFFF) else {
         return Ok(vec![]);
@@ -450,6 +514,41 @@ mod tests {
         assert_eq!(s.material, Some(9));
         let d = sprite(&chunk(&[(0x4, vec![])])).expect("defaults");
         assert_eq!((d.size, d.uv), ([2.0; 2], [0.0, 0.0, 1.0, 1.0]));
+    }
+
+    /// Level 1's dome as saved: one channel with material 6, active, ZERO / SRCCOLOR, one UV pair per vertex.
+    #[test]
+    fn a_mesh_s_material_channels_are_read_and_bad_ones_refused() {
+        let f = f32::to_bits;
+        let verts = (0x0002_0000, vec![2, 0x10 | 0x4 | 0x1 | 0x2, 0, 0, 0, 0, 0, 0, 0]);
+        let ok = chunk(&[(0x0000_4000, vec![1, 6, 0x0200_0001, 1, 3, 2, f(0.5), f(0.25), f(0.75), f(1.0)]), verts.clone()]);
+        let m = mesh(&ok).expect("mesh");
+        assert_eq!(m.positions.len(), 2);
+        let chans = mesh_channels(&ok, 2).expect("channels");
+        let c = chans.first().expect("a channel");
+        assert_eq!((c.material, c.flags, c.src_blend, c.dest_blend), (Some(6), 0x0200_0001, Blend::Zero, Blend::SrcColor));
+        assert_eq!(c.uvs, [[0.5, 0.25], [0.75, 1.0]]);
+        // no coordinates of its own: allowed
+        assert!(mesh_channels(&chunk(&[(0x0000_4000, vec![1, 6, 1, 1, 3, 0])]), 2).is_ok());
+        // a count that is neither 0 nor the vertex count, data cut short, too many channels; the mesh stays
+        assert!(mesh_channels(&chunk(&[(0x0000_4000, vec![1, 6, 1, 1, 3, 1, f(0.5), f(0.5)])]), 2).is_err());
+        assert!(mesh_channels(&chunk(&[(0x0000_4000, vec![1, 6, 1, 1, 3, 2, f(0.5)])]), 2).is_err());
+        let many = chunk(&[(0x0000_4000, vec![u32::MAX]), verts]);
+        assert!(mesh_channels(&many, 2).is_err());
+        assert!(mesh(&many).is_ok());
+    }
+
+    /// The dome's material effect (TexGen, its parameter object 4) and that parameter's value (3, Chrome).
+    #[test]
+    fn a_material_effect_and_a_parameter_word_are_read() {
+        let mat = chunk(&[(0x1000, vec![0; 9]), (0x0001_0000, vec![4, 1])]);
+        assert_eq!(material_effect(&mat).expect("effect"), Some((1, Some(4))));
+        assert_eq!(material_effect(&chunk(&[(0x1000, vec![0; 9])])).expect("plain"), None);
+        assert!(material_effect(&chunk(&[(0x1000, vec![0; 9]), (0x0001_0000, vec![4])])).is_err());
+        let par = chunk(&[(0x40, vec![0x7dbc_28f5, 0x3f16_1e80, 1, 4, 3])]);
+        assert_eq!(parameter_word(&par).expect("parameter"), Some(3));
+        assert_eq!(parameter_word(&chunk(&[(0x40, vec![0, 0, 1, 8, 1, 2])])).expect("wide"), None);
+        assert!(parameter_word(&chunk(&[(0x40, vec![0, 0, 1, 4])])).is_err());
     }
 
     #[test]

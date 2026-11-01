@@ -10,7 +10,7 @@
 // just above; slices are only indexed through `chunks_exact`, whose chunks have the exact length.
 #![allow(clippy::indexing_slicing)]
 
-use crate::{Blend, Group, Level, Material, Mesh, Object, Part, Texture, TextureSource};
+use crate::{Blend, Channel, Group, Level, Material, Mesh, Object, Part, TexGen, Texture, TextureSource};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -146,6 +146,15 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
             34962,
             json!({"componentType": FLOAT, "count": n, "type": "VEC2"}),
         );
+        // each channel's coordinates as one more TEXCOORD set, named in the mesh's extras
+        let mut attributes = json!({"POSITION": p_acc, "NORMAL": n_acc, "TEXCOORD_0": t_acc});
+        let mut channels = Vec::new();
+        for (k, c) in (1usize..).zip(&m.channels) {
+            let uv: Vec<f32> = (0..n).flat_map(|i| c.uvs.get(i).copied().unwrap_or([0.0; 2])).collect();
+            let acc = push(&f32_bytes(&uv), 34962, json!({"componentType": FLOAT, "count": n, "type": "VEC2"}));
+            attributes[format!("TEXCOORD_{k}")] = json!(acc);
+            channels.push(json!({"material": c.material, "blend": [blend_name(c.blend.0), blend_name(c.blend.1)], "texcoord": k}));
+        }
         let mut prims = Vec::new();
         for p in parts {
             // Mirroring Z reverses the winding; swap two corners to keep faces facing the same way.
@@ -160,14 +169,18 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
                 34963,
                 json!({"componentType": UINT, "count": idx.len(), "type": "SCALAR"}),
             );
-            let mut prim = json!({"attributes": {"POSITION": p_acc, "NORMAL": n_acc, "TEXCOORD_0": t_acc}, "indices": i_acc});
+            let mut prim = json!({"attributes": attributes.clone(), "indices": i_acc});
             if let Some(mat) = p.material {
                 prim["material"] = json!(mat);
             }
             prims.push(prim);
         }
         mesh_index.push(Some(meshes.len()));
-        meshes.push(json!({"name": m.name, "primitives": prims}));
+        let mut mesh = json!({"name": m.name, "primitives": prims});
+        if !channels.is_empty() {
+            mesh["extras"] = json!({"drahtseilakt": {"channels": channels}});
+        }
+        meshes.push(mesh);
     }
 
     let materials: Vec<Value> = level
@@ -201,6 +214,12 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
             }
             if m.unlit {
                 v["extensions"] = json!({"KHR_materials_unlit": {}});
+            }
+            if let Some(g) = m.texgen {
+                v["extras"]["drahtseilakt"]["texgen"] = json!(match g {
+                    TexGen::Reflect => "reflect",
+                    TexGen::Chrome => "chrome",
+                });
             }
             v
         })
@@ -461,6 +480,11 @@ pub fn import(dir: &Path) -> Result<Level, String> {
             z_write: x["z_write"].as_bool().unwrap_or(blend.is_none()),
             two_sided: m["doubleSided"].as_bool().unwrap_or(false),
             unlit: m["extensions"].get("KHR_materials_unlit").is_some(),
+            texgen: match x["texgen"].as_str() {
+                Some("reflect") => Some(TexGen::Reflect),
+                Some("chrome") => Some(TexGen::Chrome),
+                _ => None,
+            },
         });
     }
 
@@ -514,12 +538,36 @@ pub fn import(dir: &Path) -> Result<Level, String> {
         if normals.len() != positions.len() || uvs.len() != positions.len() {
             return Err("vertex attributes of different lengths".into());
         }
+        let mut channels = Vec::new();
+        let listed = m["extras"]["drahtseilakt"]["channels"].as_array().cloned().unwrap_or_default();
+        if listed.len() > nmo::scene::MAX_CHANNELS {
+            return Err("too many channels on a mesh".into());
+        }
+        for c in &listed {
+            let material = c["material"]
+                .as_u64()
+                .map(|v| v as usize)
+                .filter(|&v| v < level.materials.len())
+                .ok_or("channel without a material")?;
+            let b = |k: usize| c["blend"].get(k).and_then(Value::as_str).and_then(blend_from);
+            let (Some(s), Some(d)) = (b(0), b(1)) else {
+                return Err("channel without its blend".into());
+            };
+            let k = c["texcoord"].as_u64().ok_or("channel without texture coordinates")?;
+            let acc = attr[format!("TEXCOORD_{k}")].as_u64().ok_or("channel coordinates missing")?;
+            let uvs = r.floats::<2>(acc, "VEC2")?;
+            if uvs.len() != positions.len() {
+                return Err("channel coordinates of another length".into());
+            }
+            channels.push(Channel { material, blend: (s, d), uvs });
+        }
         level.meshes.push(Mesh {
             name: m["name"].as_str().unwrap_or_default().to_owned(),
             positions,
             normals,
             uvs,
             parts,
+            channels,
         });
     }
 

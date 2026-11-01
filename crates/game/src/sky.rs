@@ -75,9 +75,11 @@ pub fn model(letter: &str) -> Level {
             z_write: false,
             two_sided: true,
             unlit: true,
+            texgen: None,
         });
         sky.meshes.push(Mesh {
             name: format!("Sky_{face}"),
+            channels: Vec::new(),
             positions: corners
                 .iter()
                 .map(|c| [c[0] * SIZE, c[1] * SIZE, c[2] * SIZE])

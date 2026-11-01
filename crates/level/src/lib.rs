@@ -28,6 +28,8 @@ pub struct Mesh {
     pub uvs: Vec<[f32; 2]>,
     /// Triangles grouped by material.
     pub parts: Vec<Part>,
+    /// Passes over the whole mesh with other materials, in order.
+    pub channels: Vec<Channel>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -66,6 +68,27 @@ pub struct Material {
     pub two_sided: bool,
     /// Drawn with its own colour only, without lighting (skies).
     pub unlit: bool,
+    /// Texture coordinates generated from the view instead of the mesh's (the material's TexGen effect).
+    pub texgen: Option<TexGen>,
+}
+
+/// How a material's texture coordinates are made from the view (Virtools' TexGen types).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TexGen {
+    /// From the reflection of the view about the normal (type 2).
+    Reflect,
+    /// From the normal as seen from the view (type 3).
+    Chrome,
+}
+
+/// A further pass of a mesh with another material, blended over it (a Virtools material channel).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Channel {
+    pub material: usize,
+    /// Source and destination blend.
+    pub blend: (Blend, Blend),
+    /// One pair per vertex.
+    pub uvs: Vec<[f32; 2]>,
 }
 
 #[derive(Debug, Clone)]

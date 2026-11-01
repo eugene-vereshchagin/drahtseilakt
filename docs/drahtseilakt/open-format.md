@@ -18,13 +18,16 @@ A folder holding:
 - **Nodes**: one per object of the level, in order, with its name, its world `matrix` and, if it is drawn,
   its `mesh`. `extras.drahtseilakt.visible` tells whether the object is shown.
 - **Meshes**: one per mesh with geometry; one primitive per material, all primitives of a mesh sharing the
-  same `POSITION`, `NORMAL` and `TEXCOORD_0` accessors (floats), `indices` as 32-bit integers.
+  same `POSITION`, `NORMAL` and `TEXCOORD_0` accessors (floats), `indices` as 32-bit integers. A mesh's
+  material channels (passes over the whole mesh with another material) are `extras.drahtseilakt.channels`:
+  each its `material`, `blend` (source and destination factor names, as below) and `texcoord` k, the
+  `TEXCOORD_k` set holding its coordinates; at most 16.
 - **Materials**: `baseColorFactor` (diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (with `alphaCutoff`) or `BLEND`; unlit materials use `KHR_materials_unlit`.
   `extras.drahtseilakt` holds what glTF has no field for: `ambient`, `z_write`, `blend` (source and
   destination factor names: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`, `inv_src_alpha`,
-  `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`) and `alpha_cutoff` when blending and alpha
-  test are combined.
+  `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`), `alpha_cutoff` when blending and alpha
+  test are combined, and `texgen` (`reflect` or `chrome`) when the texture coordinates come from the view.
 - **Scene extras** `extras.drahtseilakt`: `format` (1), `groups` (name and member node indices — the game
   rules read these, see [nmo-format.md](nmo-format.md)), `sky` (sky letter) and `start_ball`.
 

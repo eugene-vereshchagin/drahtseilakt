@@ -59,12 +59,15 @@ words; writers may leave garbage after the terminating NUL.
 | any object | | `0x4` / `0x18` | present: hidden / hierarchically hidden |
 | Group | 23 | `0xFFFFF` | count, member references |
 | Material | 30 | `0x1000` | diffuse, ambient, specular, emissive (ARGB words), specular power (float), texture reference, border colour, modes word, flags word |
+| | | `0x10000` | effect: parameter reference, effect (1 TexGen, 2 TexGen with a referential); the parameter's value is the TexGen type (CK2_3D.dll: None 0, Transform 1, Reflect 2, Chrome 3, Planar 4, cube maps 31..34) |
+| Parameter | 46 | `0x40` | type GUID (2 words), a word, size in bytes, the value |
 | Texture | 31 | `0x10000` | slot count, file name of each slot |
 | | | `0x20000` | embedded pixels: slot count, then bits per pixel, width, height, masks A R G B, a word, pixel count, pixels; `[1, 0]` when the pixels live in a file |
 | | | `0x2FF000` | load options: a word (`0x100` a transparent colour, `0x200` a video format follows), then by the section's size the transparent colour (0xRRGGBB), the current slot, the video format; texels of that colour are dropped by an alpha test |
 | Mesh | 32 | `0x100000` | material slots: count, then (reference, word) per slot |
 | | | `0x20000` | vertex count, save flags, size (data words + 1), then positions, colours, speculars, normals, UVs as the flags say |
 | | | `0x10000` | face count, then two words per face: indices 0 and 1 (16 bits each), index 2 and the material slot |
+| | | `0x4000` | material channels (the mesh drawn again with another material, blended over itself): count, then per channel material reference, flags (`0x1` active), source and destination blend, UV count (0 or the vertex count) and the UV pairs |
 | 3D entity / object, camera, light | 33, 41, 34, 35, 38, 39 | `0x100000` | a word, flags, 3×3 axes (rows), position — the world matrix |
 | 3D object | 41 | `0x4000` | current mesh reference, count, mesh references |
 | Sprite 3D | 37 | `0x400000` | mode (0 faces the view, 1 turns about x, 2 about y, 3 as placed), half width, half height, offset x and y (-1..1 of the half size), texture rectangle u0 v0 u1 v1, material reference; drawn unlit in the material's diffuse colour |

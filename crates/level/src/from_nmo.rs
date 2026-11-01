@@ -1,7 +1,7 @@
 // Loading a level from a Virtools file into the engine's model. Objects that fail to decode are skipped and
 // reported, so one broken object in a community map costs that object, not the level.
 
-use crate::{Blend, Group, Level, Material, Mesh, Object, Part, Sprite, Texture, TextureSource};
+use crate::{Blend, Channel, Group, Level, Material, Mesh, Object, Part, Sprite, TexGen, Texture, TextureSource};
 use nmo::{Document, class, scene};
 use std::collections::HashMap;
 
@@ -60,7 +60,25 @@ fn build(doc: &Document) -> Loaded {
         match scene::material(chunk) {
             Ok(m) => {
                 materials.insert(i, level.materials.len());
-                level.materials.push(material(name(o), &m, &textures));
+                let mut mat = material(name(o), &m, &textures);
+                // TexGen (effect 1, or 2 with a referential, used as the view): its type is the parameter's value
+                let effect = scene::material_effect(chunk).unwrap_or_else(|e| {
+                    warn(o, e);
+                    None
+                });
+                if let Some((1 | 2, Some(p))) = effect {
+                    let kind = doc
+                        .get(p)
+                        .filter(|po| PARAMETER_CLASSES.contains(&po.class_id))
+                        .and_then(|po| po.chunk.as_ref())
+                        .and_then(|c| scene::parameter_word(c).ok().flatten());
+                    mat.texgen = match kind {
+                        Some(2) => Some(TexGen::Reflect),
+                        Some(3) => Some(TexGen::Chrome),
+                        _ => None,
+                    };
+                }
+                level.materials.push(mat);
             }
             Err(e) => warn(o, e),
         }
@@ -72,7 +90,12 @@ fn build(doc: &Document) -> Loaded {
         match scene::mesh(chunk) {
             Ok(m) => {
                 meshes.insert(i, level.meshes.len());
-                level.meshes.push(mesh(name(o), m, &materials));
+                // a bad channel section costs only the channels
+                let channels = scene::mesh_channels(chunk, m.positions.len()).unwrap_or_else(|e| {
+                    warn(o, e);
+                    Vec::new()
+                });
+                level.meshes.push(mesh(name(o), m, &channels, &materials));
             }
             Err(e) => warn(o, e),
         }
@@ -106,6 +129,7 @@ fn build(doc: &Document) -> Loaded {
                             let [u0, v0, u1, v1] = s.uv;
                             mesh_index = Some(level.meshes.len());
                             level.meshes.push(Mesh {
+                                channels: Vec::new(),
                                 name: format!("{}_Sprite", name(o)),
                                 positions: vec![[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 0.0, 0.0]],
                                 normals: vec![[0.0, 0.0, -1.0]; 4],
@@ -194,10 +218,15 @@ fn material(name: String, m: &scene::Material, textures: &HashMap<usize, usize>)
         z_write: m.z_write,
         two_sided: m.two_sided,
         unlit: false,
+        texgen: None,
     }
 }
 
-fn mesh(name: String, m: scene::Mesh, materials: &HashMap<usize, usize>) -> Mesh {
+/// Parameter classes (parameter in 2, out 3, local 45, parameter 46, as the game's files have them): what a material
+/// effect's setting may be.
+const PARAMETER_CLASSES: [u32; 4] = [2, 3, 45, 46];
+
+fn mesh(name: String, m: scene::Mesh, channels: &[scene::Channel], materials: &HashMap<usize, usize>) -> Mesh {
     let mut parts: Vec<Part> = Vec::new();
     for (idx, slot) in &m.faces {
         let material = m
@@ -230,12 +259,23 @@ fn mesh(name: String, m: scene::Mesh, materials: &HashMap<usize, usize>) -> Mesh
     } else {
         vec![[0.0; 2]; m.positions.len()]
     };
+    // the active channels whose material is here; a channel without its own coordinates uses the mesh's
+    let channels = channels
+        .iter()
+        .filter(|c| c.flags & 1 != 0)
+        .filter_map(|c| {
+            let material = c.material.and_then(|i| materials.get(&i).copied())?;
+            let uvs = if c.uvs.len() == m.positions.len() { c.uvs.clone() } else { uvs.clone() };
+            Some(Channel { material, blend: (blend(c.src_blend), blend(c.dest_blend)), uvs })
+        })
+        .collect();
     Mesh {
         name,
         positions: m.positions,
         normals,
         uvs,
         parts,
+        channels,
     }
 }
 

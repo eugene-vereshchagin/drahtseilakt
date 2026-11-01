@@ -7,13 +7,17 @@ struct Globals {
     light_dir: vec4<f32>,
     // rgb: ambient light; a: unused.
     ambient: vec4<f32>,
+    // world to camera space, and where the eye is
+    view: mat4x4<f32>,
+    eye: vec4<f32>,
 };
 
 struct Material {
     diffuse: vec4<f32>,
     // rgb: emissive; a: 1 when a texture is bound.
     emissive: vec4<f32>,
-    // x: alpha cutoff (negative: no alpha test).
+    // x: alpha cutoff (negative: no alpha test); y: 1 unlit; z: texture coordinates from the view (2 Reflect,
+    // 3 Chrome; 0 the mesh's).
     params: vec4<f32>,
     // rgb: the material's ambient colour.
     ambient: vec4<f32>,
@@ -37,6 +41,7 @@ struct VsOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) normal: vec3<f32>,
     @location(1) uv: vec2<f32>,
+    @location(2) world: vec3<f32>,
 };
 
 @vertex
@@ -46,14 +51,29 @@ fn vs(@location(0) pos: vec3<f32>, @location(1) normal: vec3<f32>, @location(2) 
     out.clip = g.view_proj * world;
     out.normal = (inst.m * vec4<f32>(normal, 0.0)).xyz;
     out.uv = uv + inst.uv.xy;
+    out.world = world.xyz;
     return out;
 }
 
 @fragment
 fn fs(in: VsOut) -> @location(0) vec4<f32> {
+    // The TexGen effect: Chrome maps the normal as the camera sees it, Reflect the view reflected about it (a
+    // sphere map), as the fixed-function pipeline's camera-space normal and reflection coordinates do.
+    var uv = in.uv;
+    if mat.params.z > 0.5 {
+        let nv = normalize((g.view * vec4<f32>(normalize(in.normal), 0.0)).xyz);
+        if mat.params.z > 2.5 {
+            uv = vec2<f32>(0.5 + 0.5 * nv.x, 0.5 - 0.5 * nv.y);
+        } else {
+            let e = normalize((g.view * vec4<f32>(in.world - g.eye.xyz, 0.0)).xyz);
+            let r = reflect(e, nv);
+            let m = 2.0 * sqrt(r.x * r.x + r.y * r.y + (r.z - 1.0) * (r.z - 1.0));
+            uv = vec2<f32>(0.5 + r.x / max(m, 1e-4), 0.5 - r.y / max(m, 1e-4));
+        }
+    }
     var base = vec4<f32>(1.0);
     if mat.emissive.a > 0.5 {
-        base = textureSample(tex, samp, in.uv);
+        base = textureSample(tex, samp, uv);
     }
     var diffuse = mat.diffuse;
     if inst.diffuse.a >= 0.0 {

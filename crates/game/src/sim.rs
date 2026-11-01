@@ -1853,6 +1853,7 @@ mod tests {
         let s = 100.0;
         let floor = Mesh {
             name: "floor".into(),
+            channels: Vec::new(),
             positions: vec![[-s, 0.0, -s], [s, 0.0, -s], [s, 0.0, s], [-s, 0.0, s]],
             normals: vec![[0.0, 1.0, 0.0]; 4],
             uvs: vec![[0.0; 2]; 4],
@@ -1889,6 +1890,7 @@ mod tests {
                 z_write: true,
                 two_sided: false,
                 unlit: false,
+                texgen: None,
             }],
             textures: vec![],
             objects: vec![
@@ -2082,6 +2084,7 @@ mod tests {
         }
         level.meshes.push(Mesh {
             name: "cube".into(),
+            channels: Vec::new(),
             positions: corners,
             normals: vec![[0.0, 1.0, 0.0]; 8],
             uvs: vec![[0.0; 2]; 8],
@@ -2199,6 +2202,7 @@ mod tests {
         }
         level.meshes.push(Mesh {
             name: "cube".into(),
+            channels: Vec::new(),
             positions: corners,
             normals: vec![[0.0, 1.0, 0.0]; 8],
             uvs: vec![[0.0; 2]; 8],
