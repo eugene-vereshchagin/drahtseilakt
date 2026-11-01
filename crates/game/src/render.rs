@@ -69,7 +69,22 @@ pub struct Instance {
     pub matrix: Mat4,
     /// Draw the mesh as a translucent, unlit marker of this colour instead of its own materials.
     pub marker: Option<[f32; 4]>,
+    /// Added to the mesh's texture coordinates (a script's Texture Scroller).
+    pub uv_offset: [f32; 2],
+    /// In place of its materials' diffuse colour (a script's Set Diffuse).
+    pub diffuse: Option<[f32; 4]>,
 }
+
+impl Instance {
+    /// A mesh drawn with its own materials as they are.
+    pub fn plain(model: usize, mesh: usize, matrix: Mat4) -> Instance {
+        Instance { model, mesh, matrix, marker: None, uv_offset: [0.0; 2], diffuse: None }
+    }
+}
+
+/// The per-instance uniform: the model matrix, then (u, v) added to the texture coordinates, then the diffuse
+/// colour to use instead of the material's (alpha below 0: the material's own).
+const INSTANCE_BYTES: usize = 96;
 
 pub struct View {
     pub eye: Vec3,
@@ -170,7 +185,7 @@ impl Renderer {
         });
         let model_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("model"),
-            entries: &[uniform_entry(0, true, wgpu::ShaderStages::VERTEX)],
+            entries: &[uniform_entry(0, true, wgpu::ShaderStages::VERTEX_FRAGMENT)],
         });
         let material_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("material"),
@@ -587,10 +602,13 @@ impl Renderer {
         }
         let mut matrices = vec![0u8; instances.len() * UNIFORM_ALIGN as usize];
         for (i, inst) in instances.iter().enumerate() {
-            let m = inst.matrix.to_cols_array();
+            let mut data = [0f32; INSTANCE_BYTES / 4];
+            data[..16].copy_from_slice(&inst.matrix.to_cols_array());
+            data[16..18].copy_from_slice(&inst.uv_offset);
+            data[20..24].copy_from_slice(&inst.diffuse.unwrap_or([0.0, 0.0, 0.0, -1.0]));
             let at = i * UNIFORM_ALIGN as usize;
-            if let Some(dst) = matrices.get_mut(at..at + 64) {
-                dst.copy_from_slice(bytemuck::cast_slice(&m));
+            if let Some(dst) = matrices.get_mut(at..at + INSTANCE_BYTES) {
+                dst.copy_from_slice(bytemuck::cast_slice(&data));
             }
         }
         self.queue.write_buffer(&self.models_buf, 0, &matrices);
@@ -751,7 +769,7 @@ fn model_buffer(
             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                 buffer: &buf,
                 offset: 0,
-                size: wgpu::BufferSize::new(64),
+                size: wgpu::BufferSize::new(INSTANCE_BYTES as u64),
             }),
         }],
     });

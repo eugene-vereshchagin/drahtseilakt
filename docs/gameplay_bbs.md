@@ -1502,6 +1502,12 @@ counting from the frame the animation's objects are placed (one frame after the 
 | 147 | The old ball is hidden; the new one is shown at 148 (149 frames after the ball was taken). |
 | 153 | All of the animation's objects are hidden. |
 
+While the bars move, `Set Diffuse` sets the material of the new kind's transformer shadow
+(`P_Trafo_<kind>_Shadow`, shared by every transformer of that kind) to (1,1,1,1) → (1,1,1,0.196) by the same
+progression, so those shadows fade; and from the ring's opening on, `FlashAnim` scrolls the flash field's texture
+by (0.5, 0) and (-0.5, 0) in turn, a step every 5 frames (a Delayer of 50 ms, which takes 4 frames, and a link's
+delay). The flash field is a horizontal disc of radius 2.46 that rises with the bars.
+
 The old ball is pulled to the transformer's (0, 3, 0) (Set Physics Spring above): half way in 7 frames, 90% in 17,
 which a critically damped spring of 0.23 per frame matches. The new ball keeps the old one's orientation. The
 transformer's own `P_Trafo_*_MF` and `_Shadow`, hidden in their module file, are shown from the level start and

@@ -88,14 +88,30 @@ impl TrafoModel {
                 // The ring parts hang from the bars.
                 Role::Ring(dir) => lift + dir * 0.5 * ring_open(age),
             };
-            out.push(Instance {
-                model: self.model,
-                mesh,
-                matrix: *at * Mat4::from_translation(offset) * local,
-                marker: None,
-            });
+            let mut inst = Instance::plain(self.model, mesh, *at * Mat4::from_translation(offset) * local);
+            if matches!(role, Role::Flash) {
+                inst.uv_offset = [flash_scroll(age), 0.0];
+            }
+            out.push(inst);
         }
     }
+}
+
+/// The flash field's texture shift along u at an age: from the ring's opening on, the script's FlashAnim scrolls it
+/// by +0.5 and back by -0.5 in turn, a step every 5 ticks (a Delayer of 50 ms, 4 ticks, and a link's delay).
+fn flash_scroll(age: f32) -> f32 {
+    let steps = ((age - RING_OPEN).max(0.0) / 5.0) as u32;
+    if steps.is_multiple_of(2) { 0.5 } else { 0.0 }
+}
+
+/// The alpha of the shadows of the transformers making the new ball while the animation plays: Set Diffuse with
+/// (1,1,1,1) to (1,1,1,0.196) by the bars' progression; None outside the bars' rise and fall.
+pub fn shadow_alpha(age: f32) -> Option<f32> {
+    if !(BARS_FROM..FLASH_UNTIL).contains(&age) {
+        return None;
+    }
+    let v = bars_lift(age) / 5.2;
+    Some(1.0 + (0.196_078 - 1.0) * v)
 }
 
 /// How far the bars are up at an age.

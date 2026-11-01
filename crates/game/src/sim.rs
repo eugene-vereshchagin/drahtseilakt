@@ -619,6 +619,8 @@ struct TrafoHold {
 pub struct TrafoAnim {
     pub at: Mat4,
     pub start: u64,
+    /// The kind of ball it makes.
+    pub kind: BallKind,
 }
 
 pub struct Sim {
@@ -1208,7 +1210,7 @@ impl Sim {
                     from: p,
                     old,
                 });
-                self.trafo_anim = Some(TrafoAnim { at, start: self.tick });
+                self.trafo_anim = Some(TrafoAnim { at, start: self.tick, kind });
                 self.events.push((self.tick, Event::Transform(kind)));
             }
         }
@@ -1307,10 +1309,11 @@ impl Sim {
         self.ball_boxes = boxes;
     }
 
-    /// The transformer animation playing: the transformer's matrix and the animation's age in ticks.
-    pub fn trafo_anim(&self) -> Option<(Mat4, f32)> {
+    /// The transformer animation playing: the transformer's matrix, the animation's age in ticks and the kind it
+    /// makes.
+    pub fn trafo_anim(&self) -> Option<(Mat4, f32, BallKind)> {
         self.trafo_anim
-            .map(|a| (a.at, self.tick as f32 - (a.start + crate::trafo::BEGIN) as f32))
+            .map(|a| (a.at, self.tick as f32 - (a.start + crate::trafo::BEGIN) as f32, a.kind))
     }
 
     /// The ball to draw: in a transformer the old kind until the old ball is hidden, then none until the new one.

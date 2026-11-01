@@ -17,8 +17,8 @@ pub struct Snapshot {
     pub rotation: Quat,
     /// The ball to draw (none for a moment in a transformer).
     pub kind: Option<BallKind>,
-    /// A transformer animation playing: the transformer's matrix and the animation's age in ticks.
-    pub trafo: Option<(Mat4, f32)>,
+    /// A transformer animation playing: the transformer's matrix, the animation's age in ticks and the kind it makes.
+    pub trafo: Option<(Mat4, f32, BallKind)>,
     pub eye: Vec3,
     pub target: Vec3,
     /// The run's time in seconds, for the scripts' turning objects.
@@ -44,7 +44,7 @@ impl Snapshot {
             rotation: a.rotation.slerp(b.rotation, t),
             kind: b.kind,
             trafo: match (a.trafo, b.trafo) {
-                (Some((_, x)), Some((m, y))) => Some((m, x + (y - x) * t)),
+                (Some((_, x, _)), Some((m, y, k))) => Some((m, x + (y - x) * t, k)),
                 (_, b) => b,
             },
             eye: a.eye.lerp(b.eye, t),
@@ -117,6 +117,8 @@ pub struct Placement {
     pub body: Option<usize>,
     /// A turn its script gives it all the time: about this axis of its own frame, at this many radians a second.
     pub spin: Option<(Vec3, f32)>,
+    /// The shadow of a transformer making this kind of ball.
+    pub trafo_shadow: Option<BallKind>,
 }
 
 /// Objects of modules that the file hides and a script shows, and how the script turns them: module 18's rotor
@@ -223,6 +225,7 @@ pub fn placements(
                 object: i,
                 body: None,
                 spin: None,
+                trafo_shadow: None,
             });
             continue;
         }
@@ -241,6 +244,7 @@ pub fn placements(
                 object: i,
                 body: None,
                 spin: None,
+                trafo_shadow: None,
             });
             continue;
         }
@@ -276,6 +280,10 @@ pub fn placements(
                 object: i,
                 body,
                 spin: scripted.and_then(|s| s.1),
+                trafo_shadow: modules.names[index]
+                    .strip_prefix("P_Trafo_")
+                    .filter(|_| mo.name.ends_with("_Shadow"))
+                    .and_then(BallKind::from_name),
             });
         }
     }
@@ -302,6 +310,12 @@ pub fn instances(
                 (None, None) => p.matrix,
             },
             marker: p.marker,
+            uv_offset: [0.0; 2],
+            // a transformer's shadow fades while its kind's animation plays (Set Diffuse on its material)
+            diffuse: match (p.trafo_shadow, s.trafo) {
+                (Some(k), Some((_, age, kind))) if k == kind => crate::trafo::shadow_alpha(age).map(|a| [1.0, 1.0, 1.0, a]),
+                _ => None,
+            },
         })
         .collect();
     for mesh in 0..crate::sky::FACE_COUNT {
@@ -310,9 +324,11 @@ pub fn instances(
             mesh,
             matrix: Mat4::from_translation(s.eye),
             marker: None,
+            uv_offset: [0.0; 2],
+            diffuse: None,
         });
     }
-    if let (Some(model), Some((at, age))) = (trafo, s.trafo) {
+    if let (Some(model), Some((at, age, _))) = (trafo, s.trafo) {
         model.instances(&at, age, &mut out);
     }
     let mesh = match s.kind {
@@ -327,6 +343,8 @@ pub fn instances(
             mesh,
             matrix: Mat4::from_rotation_translation(s.rotation, s.ball),
             marker: None,
+            uv_offset: [0.0; 2],
+            diffuse: None,
         });
     }
     out

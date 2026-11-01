@@ -18,7 +18,15 @@ struct Material {
 };
 
 @group(0) @binding(0) var<uniform> g: Globals;
-@group(1) @binding(0) var<uniform> model: mat4x4<f32>;
+struct Instance {
+    m: mat4x4<f32>,
+    // xy: added to the texture coordinates (a script's Texture Scroller).
+    uv: vec4<f32>,
+    // The diffuse colour instead of the material's; a < 0: the material's.
+    diffuse: vec4<f32>,
+};
+
+@group(1) @binding(0) var<uniform> inst: Instance;
 @group(2) @binding(0) var<uniform> mat: Material;
 @group(2) @binding(1) var tex: texture_2d<f32>;
 @group(2) @binding(2) var samp: sampler;
@@ -32,10 +40,10 @@ struct VsOut {
 @vertex
 fn vs(@location(0) pos: vec3<f32>, @location(1) normal: vec3<f32>, @location(2) uv: vec2<f32>) -> VsOut {
     var out: VsOut;
-    let world = model * vec4<f32>(pos, 1.0);
+    let world = inst.m * vec4<f32>(pos, 1.0);
     out.clip = g.view_proj * world;
-    out.normal = (model * vec4<f32>(normal, 0.0)).xyz;
-    out.uv = uv;
+    out.normal = (inst.m * vec4<f32>(normal, 0.0)).xyz;
+    out.uv = uv + inst.uv.xy;
     return out;
 }
 
@@ -45,7 +53,11 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     if mat.emissive.a > 0.5 {
         base = textureSample(tex, samp, in.uv);
     }
-    let color = base * mat.diffuse;
+    var diffuse = mat.diffuse;
+    if inst.diffuse.a >= 0.0 {
+        diffuse = inst.diffuse;
+    }
+    let color = base * diffuse;
     if mat.params.x >= 0.0 && color.a <= mat.params.x {
         discard;
     }
