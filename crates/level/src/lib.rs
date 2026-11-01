@@ -86,6 +86,8 @@ pub enum TextureSource {
 pub struct Texture {
     pub name: String,
     pub source: TextureSource,
+    /// Texels of this colour (RGB) are transparent: the original drops them with an alpha test.
+    pub color_key: Option<[u8; 3]>,
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +97,18 @@ pub struct Object {
     pub matrix: [[f32; 4]; 4],
     pub mesh: Option<usize>,
     pub visible: bool,
+    /// A sprite (CKSprite3D): its mesh is a unit quad (0..1 in x and y) that is turned and sized each frame.
+    pub sprite: Option<Sprite>,
+}
+
+/// How a sprite is placed each frame (the original's CKSprite3D): `mode` 0 faces the view, 1 turns about the world x,
+/// 2 about the world y, 3 keeps its own axes; the quad is `size` wide and high, shifted by `offset` (-1..1 of half
+/// its size) in its plane.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sprite {
+    pub mode: u32,
+    pub size: [f32; 2],
+    pub offset: [f32; 2],
 }
 
 impl Object {

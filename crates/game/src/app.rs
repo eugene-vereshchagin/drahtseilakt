@@ -72,6 +72,8 @@ struct Game {
     prev_spin: f32,
     /// The session log of a windowed run: the ball and its contacts at every tick (see `start_session`).
     session: Option<std::io::BufWriter<std::fs::File>>,
+    /// The extra points' module meshes, when the copy has the module.
+    extra_model: Option<scene::ExtraModel>,
     /// The level's music theme (the level table's Music), and whether it is the last original level.
     music_theme: Option<u32>,
     /// The level table's LevelBonus.
@@ -153,6 +155,7 @@ impl Game {
             .and_then(crate::sim::BallKind::from_name)
             .unwrap_or(crate::sim::BallKind::Wood);
         let modules = scene::load_modules(&level.level, data);
+        let extra_model = scene::ExtraModel::new(&modules);
         // The original's level 1 begins with its tutorial, which stops the level before the ball comes.
         let tutorial = level.name.eq_ignore_ascii_case("Level_01.NMO");
         let ball_meshes = BallMeshes::find(&balls.level);
@@ -191,6 +194,7 @@ impl Game {
             ball_lost_at: None,
             watch: Watch::default(),
             session: None,
+            extra_model,
             music_theme: data.settings(&level.name).music,
             level_bonus,
             last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
@@ -795,7 +799,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         &game.sim.world().bodies,
         &game.ball_meshes,
         game.trafo.as_ref().map(|t| &t.1),
-        &game.sim.extra_balls(),
+        (&game.sim.extra_views(), game.extra_model.as_ref()),
         &snap,
     );
     r.draw(&view, w, h, &scene::view(&snap), &inst);
@@ -1299,7 +1303,7 @@ impl App {
             &self.game.sim.world().bodies,
             &self.game.ball_meshes,
             self.game.trafo.as_ref().map(|t| &t.1),
-            &self.game.sim.extra_balls(),
+            (&self.game.sim.extra_views(), self.game.extra_model.as_ref()),
             &snap,
         );
         let built = build_started.elapsed();

@@ -119,6 +119,67 @@ pub struct Placement {
     pub spin: Option<(Vec3, f32)>,
     /// The shadow of a transformer making this kind of ball.
     pub trafo_shadow: Option<BallKind>,
+    /// A sprite: `matrix` is then its place, and the quad is turned and sized each frame (`sprite_matrix`).
+    pub sprite: Option<level::Sprite>,
+}
+
+/// The matrix that draws a sprite's unit quad (0..1 in x and y) for a view from `eye` toward `target`, as the
+/// original's CKSprite3D places it (C reference ck_sprite3d_quad): its axes face the view (mode 0), turn about the
+/// world x (1) or y (2), or stay its own (3); the quad spans its size along them, from (offset - 1) / 2 of it.
+pub fn sprite_matrix(place: &Mat4, s: &level::Sprite, eye: Vec3, target: Vec3) -> Mat4 {
+    let dir = (target - eye).normalize_or(Vec3::Z);
+    let right = Vec3::Y.cross(dir).normalize_or(Vec3::X);
+    let up = dir.cross(right).normalize_or(Vec3::Y);
+    let (x, y, z) = match s.mode {
+        0 => (right, up, dir),
+        1 => {
+            let d = Vec3::new(0.0, -up.z, up.y).normalize_or(Vec3::Z);
+            (Vec3::X, Vec3::new(0.0, d.z, -d.y).normalize_or(Vec3::Y), d)
+        }
+        2 => {
+            let r = Vec3::new(dir.z, 0.0, -dir.x).normalize_or(Vec3::X);
+            (r, Vec3::Y, Vec3::new(-r.z, 0.0, r.x).normalize_or(Vec3::Z))
+        }
+        _ => (
+            place.x_axis.truncate().normalize_or(Vec3::X),
+            place.y_axis.truncate().normalize_or(Vec3::Y),
+            place.z_axis.truncate().normalize_or(Vec3::Z),
+        ),
+    };
+    let (rt, upv) = (x * s.size[0], y * s.size[1]);
+    let origin = place.w_axis.truncate() + rt * ((s.offset[0] - 1.0) * 0.5) + upv * ((s.offset[1] - 1.0) * 0.5);
+    Mat4::from_cols(rt.extend(0.0), upv.extend(0.0), z.extend(0.0), origin.extend(1.0))
+}
+
+/// The extra points' meshes (the P_Extra_Point module): the centre sprite, the six small balls' sprites and the floor
+/// glow, with the floor's matrix in the module.
+pub struct ExtraModel {
+    pub model: usize,
+    center: Option<(usize, level::Sprite)>,
+    balls: Vec<(usize, level::Sprite)>,
+    floor: Option<(usize, Mat4)>,
+}
+
+impl ExtraModel {
+    /// From the loaded modules, when they have the extra points' module.
+    pub fn new(modules: &Modules) -> Option<ExtraModel> {
+        let (index, file) = modules.get("P_Extra_Point")?;
+        let sprite = |name: &str| {
+            let o = file.objects.iter().find(|o| o.name == name)?;
+            Some((o.mesh?, o.sprite?))
+        };
+        let floor = file
+            .objects
+            .iter()
+            .find(|o| o.name == "P_Extra_Point_Floor")
+            .and_then(|o| Some((o.mesh?, Mat4::from_cols_array_2d(&o.matrix))));
+        Some(ExtraModel {
+            model: FIRST_MODULE_MODEL + index,
+            center: sprite("P_Extra_Point_Ball0"),
+            balls: (1..=6).filter_map(|k| sprite(&format!("P_Extra_Point_Ball{k}"))).collect(),
+            floor,
+        })
+    }
 }
 
 /// Objects of modules that the file hides and a script shows, and how the script turns them: module 18's rotor
@@ -234,6 +295,7 @@ pub fn placements(
                 body: None,
                 spin: None,
                 trafo_shadow: None,
+                sprite: None,
             });
             continue;
         }
@@ -253,6 +315,7 @@ pub fn placements(
                 body: None,
                 spin: None,
                 trafo_shadow: None,
+                sprite: None,
             });
             continue;
         }
@@ -292,6 +355,7 @@ pub fn placements(
                     .strip_prefix("P_Trafo_")
                     .filter(|_| mo.name.ends_with("_Shadow"))
                     .and_then(BallKind::from_name),
+                sprite: mo.sprite,
             });
         }
     }
@@ -304,33 +368,54 @@ pub fn instances(
     bodies: &[crate::physics::Body],
     balls: &BallMeshes,
     trafo: Option<&crate::trafo::TrafoModel>,
-    extra_balls: &[(usize, Vec3)],
+    extras: (&[crate::extra::ExtraView], Option<&ExtraModel>),
     s: &Snapshot,
 ) -> Vec<Instance> {
-    // The extra points' small balls, drawn for now as small copies of their pickup's marker (the original's are
-    // sprites, which the renderer does not draw yet).
-    let mut out: Vec<Instance> = extra_balls
-        .iter()
-        .filter_map(|&(object, pos)| {
-            let p = placements.iter().find(|p| p.object == object && p.marker.is_some())?;
-            let mut i = Instance::plain(p.model, p.mesh, Mat4::from_translation(pos) * Mat4::from_scale(Vec3::splat(0.25)));
-            i.marker = p.marker;
-            Some(i)
-        })
-        .collect();
+    let (views, extra_model) = extras;
+    let mut out: Vec<Instance> = Vec::new();
+    // The extra points with their module: the centre sprite and the floor glow until one fires, its small balls
+    // while they fly; their stand-ins' markers are then not drawn.
+    if let Some(m) = extra_model {
+        for v in views {
+            let place = Mat4::from_rotation_translation(v.rot, v.center);
+            if !v.fired {
+                if let Some((mesh, sp)) = &m.center {
+                    let mut i = Instance::plain(m.model, *mesh, sprite_matrix(&place, sp, s.eye, s.target));
+                    i.unlit = true;
+                    out.push(i);
+                }
+                if let Some((mesh, local)) = &m.floor
+                    && !v.flying
+                {
+                    out.push(Instance::plain(m.model, *mesh, place * *local));
+                }
+            }
+            for &(k, pos) in &v.balls {
+                if let Some((mesh, sp)) = m.balls.get(k) {
+                    let at = Mat4::from_translation(pos);
+                    let mut i = Instance::plain(m.model, *mesh, sprite_matrix(&at, sp, s.eye, s.target));
+                    i.unlit = true;
+                    out.push(i);
+                }
+            }
+        }
+    }
+    let hidden = |object: usize| extra_model.is_some() && views.iter().any(|v| v.object == object);
     out.extend(placements
         .iter()
-        .filter(|p| !taken.contains(&p.object))
+        .filter(|p| !taken.contains(&p.object) && !(p.marker.is_some() && hidden(p.object)))
         .map(|p| Instance {
             model: p.model,
             mesh: p.mesh,
-            matrix: match (p.body.and_then(|b| bodies.get(b)), p.spin) {
-                (Some(b), _) => Mat4::from_rotation_translation(b.rot, b.pos) * p.matrix,
-                (None, Some((axis, rate))) => p.matrix * Mat4::from_axis_angle(axis, rate * s.time),
-                (None, None) => p.matrix,
+            matrix: match (p.body.and_then(|b| bodies.get(b)), p.spin, &p.sprite) {
+                (Some(b), _, _) => Mat4::from_rotation_translation(b.rot, b.pos) * p.matrix,
+                (None, Some((axis, rate)), _) => p.matrix * Mat4::from_axis_angle(axis, rate * s.time),
+                (None, None, Some(sp)) => sprite_matrix(&p.matrix, sp, s.eye, s.target),
+                (None, None, None) => p.matrix,
             },
             marker: p.marker,
             uv_offset: [0.0; 2],
+            unlit: p.sprite.is_some(),
             // a transformer's shadow fades while its kind's animation plays (Set Diffuse on its material)
             diffuse: match (p.trafo_shadow, s.trafo) {
                 (Some(k), Some((_, age, kind))) if k == kind => crate::trafo::shadow_alpha(age).map(|a| [1.0, 1.0, 1.0, a]),
@@ -346,6 +431,7 @@ pub fn instances(
             marker: None,
             uv_offset: [0.0; 2],
             diffuse: None,
+            unlit: false,
         });
     }
     if let (Some(model), Some((at, age, _))) = (trafo, s.trafo) {
@@ -365,6 +451,7 @@ pub fn instances(
             marker: None,
             uv_offset: [0.0; 2],
             diffuse: None,
+            unlit: false,
         });
     }
     out

@@ -1408,9 +1408,9 @@ impl Sim {
         }
     }
 
-    /// The extra points' small balls in flight: their pickup's level object and where they are.
-    pub fn extra_balls(&self) -> Vec<(usize, Vec3)> {
-        self.extras.iter().filter(|e| e.fired() && !e.done()).flat_map(|e| e.small_balls().map(move |p| (e.object, p))).collect()
+    /// What to draw of the extra points.
+    pub fn extra_views(&self) -> Vec<crate::extra::ExtraView> {
+        self.extras.iter().map(crate::extra::Extra::view).collect()
     }
 
     /// The fans in the physics now (their points), for their sound.
@@ -1858,6 +1858,7 @@ mod tests {
             matrix: m,
             mesh,
             visible: true,
+            sprite: None,
         };
         Level {
             meshes: vec![floor],
@@ -2005,6 +2006,7 @@ mod tests {
             ],
             mesh: None,
             visible: true,
+            sprite: None,
         });
         level.groups.push(Group {
             name: "P_Trafo_Stone".into(),
@@ -2081,6 +2083,7 @@ mod tests {
             ],
             mesh: Some(mesh),
             visible: false,
+            sprite: None,
         });
         level.groups.push(Group {
             name: "DepthTestCubes".into(),
@@ -2196,6 +2199,7 @@ mod tests {
             ],
             mesh: Some(mesh),
             visible: true,
+            sprite: None,
         });
         for g in groups {
             match level.groups.iter_mut().find(|x| x.name == *g) {

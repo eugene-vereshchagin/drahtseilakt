@@ -19,6 +19,7 @@ fn decode(doc: &Document) -> Vec<String> {
             | class::TARGET_CAMERA
             | class::LIGHT
             | class::TARGET_LIGHT => scene::entity(chunk).map(|_| ()),
+            class::SPRITE_3D => scene::entity(chunk).and_then(|_| scene::sprite(chunk)).map(|_| ()),
             _ => Ok(()),
         };
         if let Err(e) = result {

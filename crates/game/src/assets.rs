@@ -66,6 +66,19 @@ impl Data {
 
     /// RGBA pixels of a texture: its own pixels, or its file from the game's texture folders.
     pub fn texture(&self, t: &level::Texture) -> Option<(u32, u32, Vec<u8>)> {
+        let (w, h, mut rgba) = self.texture_pixels(t)?;
+        // the texture's transparent colour: those texels get alpha 0 (SetAlphaForTransparentColor)
+        if let Some(key) = t.color_key {
+            for px in rgba.chunks_exact_mut(4) {
+                if px[..3] == key {
+                    px[3] = 0;
+                }
+            }
+        }
+        Some((w, h, rgba))
+    }
+
+    fn texture_pixels(&self, t: &level::Texture) -> Option<(u32, u32, Vec<u8>)> {
         match &t.source {
             level::TextureSource::Pixels {
                 width,

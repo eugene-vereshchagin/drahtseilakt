@@ -60,6 +60,18 @@ pub enum ExtraEvent {
     Hits(u32),
 }
 
+/// What to draw of a pickup: its stand-in, where and how it is turned, whether it has fired, whether it floats
+/// (no floor under it, so no floor glow), and its small balls still flying (their index and place).
+#[derive(Clone, Debug)]
+pub struct ExtraView {
+    pub object: usize,
+    pub center: Vec3,
+    pub rot: Quat,
+    pub fired: bool,
+    pub flying: bool,
+    pub balls: Vec<(usize, Vec3)>,
+}
+
 #[derive(Clone, Debug)]
 pub struct Extra {
     /// The pickup's level object, its place and turn.
@@ -70,6 +82,8 @@ pub struct Extra {
     state: State,
     timer: f32,
     away: Vec3,
+    /// No floor under it (the script's Ray Intersection down from it), so no floor glow.
+    pub flying: bool,
 }
 
 impl Extra {
@@ -97,6 +111,19 @@ impl Extra {
             state: State::Orbit,
             timer: FLY_AWAY_MS,
             away: Vec3::ZERO,
+            flying: false,
+        }
+    }
+
+    /// What to draw of it.
+    pub fn view(&self) -> ExtraView {
+        ExtraView {
+            object: self.object,
+            center: self.center,
+            rot: self.rot,
+            fired: self.fired(),
+            flying: self.flying,
+            balls: self.balls.iter().enumerate().filter(|(_, b)| b.alive && self.state != State::Done).map(|(k, b)| (k, b.pos)).collect(),
         }
     }
 
@@ -106,6 +133,7 @@ impl Extra {
     }
 
     /// Whether it has given all it gives.
+    #[cfg(test)]
     pub fn done(&self) -> bool {
         self.state == State::Done
     }
@@ -113,11 +141,6 @@ impl Extra {
     /// Whether it has fired (the pickup itself is gone).
     pub fn fired(&self) -> bool {
         self.state != State::Orbit
-    }
-
-    /// The small balls still flying, for drawing.
-    pub fn small_balls(&self) -> impl Iterator<Item = Vec3> + '_ {
-        self.balls.iter().filter(|b| b.alive).map(|b| b.pos)
     }
 
     /// One tick with the ball at `ball`; `near`: the ball is close enough for the pickup to be switched on.

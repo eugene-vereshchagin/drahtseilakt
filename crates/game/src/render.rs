@@ -32,6 +32,7 @@ struct MaterialUniform {
     diffuse: [f32; 4],
     emissive: [f32; 4],
     params: [f32; 4],
+    ambient: [f32; 4],
 }
 
 struct GpuPart {
@@ -73,12 +74,14 @@ pub struct Instance {
     pub uv_offset: [f32; 2],
     /// In place of its materials' diffuse colour (a script's Set Diffuse).
     pub diffuse: Option<[f32; 4]>,
+    /// Drawn without lighting, in its material's diffuse colour (sprites, as the original draws them).
+    pub unlit: bool,
 }
 
 impl Instance {
     /// A mesh drawn with its own materials as they are.
     pub fn plain(model: usize, mesh: usize, matrix: Mat4) -> Instance {
-        Instance { model, mesh, matrix, marker: None, uv_offset: [0.0; 2], diffuse: None }
+        Instance { model, mesh, matrix, marker: None, uv_offset: [0.0; 2], diffuse: None, unlit: false }
     }
 }
 
@@ -301,11 +304,16 @@ impl Renderer {
                         if view.is_some() { 1.0 } else { 0.0 },
                     ],
                     params: [
-                        m.alpha_cutoff.unwrap_or(-1.0),
+                        // a texture with a transparent colour turns the alpha test on, dropping alpha 0
+                        match m.texture.and_then(|t| level.textures.get(t)).and_then(|t| t.color_key) {
+                            Some(_) => 0.0,
+                            None => m.alpha_cutoff.unwrap_or(-1.0),
+                        },
                         if m.unlit { 1.0 } else { 0.0 },
                         0.0,
                         0.0,
                     ],
+                    ambient: [m.ambient[0], m.ambient[1], m.ambient[2], 0.0],
                 };
                 let buf = self
                     .device
@@ -398,6 +406,7 @@ impl Renderer {
             diffuse: color,
             emissive: [0.0; 4],
             params: [-1.0, if marker { 1.0 } else { 0.0 }, 0.0, 0.0],
+            ambient: [0.0; 4],
         };
         let buf = self
             .device
@@ -605,6 +614,7 @@ impl Renderer {
             let mut data = [0f32; INSTANCE_BYTES / 4];
             data[..16].copy_from_slice(&inst.matrix.to_cols_array());
             data[16..18].copy_from_slice(&inst.uv_offset);
+            data[18] = if inst.unlit { 1.0 } else { 0.0 };
             data[20..24].copy_from_slice(&inst.diffuse.unwrap_or([0.0, 0.0, 0.0, -1.0]));
             let at = i * UNIFORM_ALIGN as usize;
             if let Some(dst) = matrices.get_mut(at..at + INSTANCE_BYTES) {

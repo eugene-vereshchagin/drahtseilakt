@@ -15,12 +15,14 @@ struct Material {
     emissive: vec4<f32>,
     // x: alpha cutoff (negative: no alpha test).
     params: vec4<f32>,
+    // rgb: the material's ambient colour.
+    ambient: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> g: Globals;
 struct Instance {
     m: mat4x4<f32>,
-    // xy: added to the texture coordinates (a script's Texture Scroller).
+    // xy: added to the texture coordinates (a script's Texture Scroller); z: 1 to draw unlit (sprites).
     uv: vec4<f32>,
     // The diffuse colour instead of the material's; a < 0: the material's.
     diffuse: vec4<f32>,
@@ -61,12 +63,15 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     if mat.params.x >= 0.0 && color.a <= mat.params.x {
         discard;
     }
-    if mat.params.y > 0.5 {
+    if mat.params.y > 0.5 || inst.uv.z > 0.5 {
         return color;
     }
-    // Two-sided lighting: the original's meshes do not agree on which side faces out.
+    // The original's fixed-function lighting (D3D7, as the C reference draws it): the lit colour is the material's
+    // emissive, plus the scene's ambient times the material's ambient, plus the light times the material's diffuse
+    // and N.L, held to 0..1, and the texture is multiplied by it. Two-sided: the original's meshes do not agree on
+    // which side faces out.
     let n = normalize(in.normal);
     let lambert = abs(dot(n, -g.light_dir.xyz));
-    let light = g.ambient.rgb + (vec3<f32>(1.0) - g.ambient.rgb) * lambert;
-    return vec4<f32>(color.rgb * light + mat.emissive.rgb, color.a);
+    let lit = clamp(mat.emissive.rgb + g.ambient.rgb * mat.ambient.rgb + diffuse.rgb * lambert, vec3<f32>(0.0), vec3<f32>(1.0));
+    return vec4<f32>(base.rgb * lit, color.a);
 }

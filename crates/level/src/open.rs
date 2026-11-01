@@ -210,7 +210,13 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
         .textures
         .iter()
         .enumerate()
-        .map(|(i, t)| json!({"uri": texture_file(i, &t.name), "name": t.name}))
+        .map(|(i, t)| {
+            let mut v = json!({"uri": texture_file(i, &t.name), "name": t.name});
+            if let Some(k) = t.color_key {
+                v["extras"] = json!({"drahtseilakt": {"color_key": k}});
+            }
+            v
+        })
         .collect();
     let textures: Vec<Value> = (0..level.textures.len())
         .map(|i| json!({"source": i, "sampler": 0}))
@@ -223,6 +229,9 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
             let m = flip_matrix(&o.matrix);
             let flat: Vec<f32> = m.iter().flatten().copied().collect();
             let mut v = json!({"name": o.name, "matrix": flat, "extras": {"drahtseilakt": {"visible": o.visible}}});
+            if let Some(s) = o.sprite {
+                v["extras"]["drahtseilakt"]["sprite"] = json!({"mode": s.mode, "size": s.size, "offset": s.offset});
+            }
             if let Some(mesh) = o.mesh.and_then(|i| mesh_index.get(i).copied().flatten()) {
                 v["mesh"] = json!(mesh);
             }
@@ -336,6 +345,30 @@ impl Reader<'_> {
     }
 }
 
+/// A texture's colour key from the image's extras: three bytes, or none.
+fn color_key_of(v: &serde_json::Value) -> Option<[u8; 3]> {
+    let a = v.as_array()?;
+    if a.len() != 3 {
+        return None;
+    }
+    let mut k = [0u8; 3];
+    for (o, c) in k.iter_mut().zip(a) {
+        *o = u8::try_from(c.as_u64()?).ok()?;
+    }
+    Some(k)
+}
+
+/// A sprite's placement from the object's extras, if it is one and its numbers are sound.
+fn sprite_of(v: &serde_json::Value) -> Option<crate::Sprite> {
+    let pair = |k: &str| -> Option<[f32; 2]> {
+        let a = v[k].as_array()?;
+        let x = a.first()?.as_f64()? as f32;
+        let y = a.get(1)?.as_f64()? as f32;
+        (x.is_finite() && y.is_finite()).then_some([x, y])
+    };
+    Some(crate::Sprite { mode: u32::try_from(v["mode"].as_u64()?).ok()?, size: pair("size")?, offset: pair("offset")? })
+}
+
 /// Reads an open level from `dir`. Texture images become `TextureSource::File` with the full path.
 pub fn import(dir: &Path) -> Result<Level, String> {
     let text = read_capped(&dir.join("level.gltf"), MAX_JSON)?;
@@ -370,6 +403,7 @@ pub fn import(dir: &Path) -> Result<Level, String> {
         level.textures.push(Texture {
             name: img["name"].as_str().unwrap_or(uri).to_owned(),
             source: TextureSource::File(dir.join(uri).to_string_lossy().into_owned()),
+            color_key: color_key_of(&img["extras"]["drahtseilakt"]["color_key"]),
         });
     }
     let tex_image: Vec<Option<usize>> = arr("textures")
@@ -510,6 +544,7 @@ pub fn import(dir: &Path) -> Result<Level, String> {
             visible: n["extras"]["drahtseilakt"]["visible"]
                 .as_bool()
                 .unwrap_or(true),
+            sprite: sprite_of(&n["extras"]["drahtseilakt"]["sprite"]),
         });
     }
 

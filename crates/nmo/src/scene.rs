@@ -222,15 +222,20 @@ pub struct Texture {
     pub file_name: Option<Vec<u8>>,
     /// Pixels saved inside the file, if any: width, height and RGBA bytes.
     pub embedded: Option<(u32, u32, Vec<u8>)>,
+    /// The colour (0xRRGGBB) its texels are transparent in, when it has one (CKTexture's transparent colour).
+    pub transparent: Option<u32>,
 }
 
 pub fn texture(chunk: &Chunk) -> Result<Texture> {
     let mut tex = Texture {
         file_name: None,
         embedded: None,
+        transparent: None,
     };
+    let mut slot_count = 0u32;
     if let Some(mut w) = chunk.section(0x0001_0000) {
         let slots = w.u32()?;
+        slot_count = slots;
         if slots > 0 {
             let name = w.string()?;
             if !name.is_empty() {
@@ -253,6 +258,21 @@ pub fn texture(chunk: &Chunk) -> Result<Texture> {
                     tex.embedded = Some((width, height, unpack_pixels(data, masks)));
                 }
             }
+        }
+    }
+    // The load options (section 0x2ff000): a packed word (0x100 transparent, 0x200 a video format follows), then,
+    // by the section's size, the transparent colour, as CKTexture::Load reads it (C reference ck_3d.c).
+    if let Some(mut w) = chunk.section(0x002F_F000) {
+        let size = w.remaining().saturating_sub(1).saturating_mul(4);
+        let mix = w.u32()?;
+        let colour = match size {
+            12 => Some(w.u32()?),
+            8 if slot_count < 2 || mix & 0x200 == 0 => Some(w.u32()?),
+            4 if mix & 0x200 == 0 && slot_count < 2 => Some(w.u32()?),
+            _ => None,
+        };
+        if mix & 0x100 != 0 {
+            tex.transparent = Some(colour.unwrap_or(0) & 0x00FF_FFFF);
         }
     }
     Ok(tex)
@@ -295,6 +315,35 @@ pub fn entity(chunk: &Chunk) -> Result<Entity> {
         mesh,
         flags,
     })
+}
+
+/// A CKSprite3D's own part (section 0x400000): how it turns toward the view (0 facing it, 1 about its x, 2 about
+/// its y, 3 as placed), its size (stored as half), the quad's offset in its plane (-1..1 of the half size), the
+/// texture rectangle (u0, v0, u1, v1) and its material.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sprite {
+    pub mode: u32,
+    pub size: [f32; 2],
+    pub offset: [f32; 2],
+    pub uv: [f32; 4],
+    pub material: Option<usize>,
+}
+
+/// The sprite's part, or the constructor's values (2 × 2, no offset, the whole texture) when the file has none.
+pub fn sprite(chunk: &Chunk) -> Result<Sprite> {
+    let mut s = Sprite { mode: 0, size: [2.0; 2], offset: [0.0; 2], uv: [0.0, 0.0, 1.0, 1.0], material: None };
+    let Some(mut w) = chunk.section(0x0040_0000) else {
+        return Ok(s);
+    };
+    s.mode = w.u32()?;
+    let finite = |v: f32| if v.is_finite() { Ok(v) } else { Err(malformed("sprite value")) };
+    s.size = [finite(w.f32()? * 2.0)?, finite(w.f32()? * 2.0)?];
+    s.offset = [finite(w.f32()?)?, finite(w.f32()?)?];
+    for v in &mut s.uv {
+        *v = finite(w.f32()?)?;
+    }
+    s.material = reference(chunk, w.u32()?);
+    Ok(s)
 }
 
 pub fn group(chunk: &Chunk) -> Result<Vec<usize>> {
@@ -369,4 +418,56 @@ pub fn data_array(chunk: &Chunk) -> Result<DataArray> {
         }
     }
     Ok(DataArray { columns, rows })
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::arithmetic_side_effects, clippy::indexing_slicing, clippy::panic)]
+mod tests {
+    use super::*;
+    use crate::chunk::OPTION_FILE;
+
+    /// A chunk of one identifier's section holding `data`.
+    fn chunk(sections: &[(u32, Vec<u32>)]) -> Chunk {
+        let mut words = Vec::new();
+        for (k, (id, data)) in sections.iter().enumerate() {
+            let next = words.len() + 2 + data.len();
+            words.push(*id);
+            words.push(if k + 1 == sections.len() { 0 } else { next as u32 });
+            words.extend(data);
+        }
+        Chunk { data_version: 7, class_id: 0, chunk_version: 7, options: OPTION_FILE, words }
+    }
+
+    #[test]
+    fn a_sprite_is_read_and_one_without_its_part_takes_the_defaults() {
+        let f = f32::to_bits;
+        let c = chunk(&[(0x0040_0000, vec![2, f(0.25), f(0.5), f(0.1), f(-0.2), f(0.0), f(0.5), f(1.0), f(0.75), 9])]);
+        let s = sprite(&c).expect("sprite");
+        assert_eq!(s.mode, 2);
+        assert_eq!(s.size, [0.5, 1.0]);
+        assert_eq!(s.offset, [0.1, -0.2]);
+        assert_eq!(s.uv, [0.0, 0.5, 1.0, 0.75]);
+        assert_eq!(s.material, Some(9));
+        let d = sprite(&chunk(&[(0x4, vec![])])).expect("defaults");
+        assert_eq!((d.size, d.uv), ([2.0; 2], [0.0, 0.0, 1.0, 1.0]));
+    }
+
+    #[test]
+    fn a_broken_sprite_is_refused() {
+        let short = chunk(&[(0x0040_0000, vec![0, 0])]);
+        assert!(sprite(&short).is_err());
+        let nan = chunk(&[(0x0040_0000, vec![0, f32::NAN.to_bits(), 0, 0, 0, 0, 0, 0, 0, 0])]);
+        assert!(sprite(&nan).is_err());
+    }
+
+    #[test]
+    fn a_texture_s_transparent_colour_is_read_as_its_options_say() {
+        let with = chunk(&[(0x0001_0000, vec![1, 0]), (0x002F_F000, vec![0x101, 0xFF00_0000, 0, 0])]);
+        // no file name slot words here: the 0x10000 section above is only a slot count of 1 and an empty string
+        assert_eq!(texture(&with).expect("texture").transparent, Some(0));
+        let magenta = chunk(&[(0x002F_F000, vec![0x100, 0x00FF_00FF])]);
+        assert_eq!(texture(&magenta).expect("texture").transparent, Some(0x00FF_00FF));
+        let none = chunk(&[(0x002F_F000, vec![0x001, 0x00FF_00FF])]);
+        assert_eq!(texture(&none).expect("texture").transparent, None);
+    }
 }

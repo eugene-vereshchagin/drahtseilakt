@@ -1,7 +1,7 @@
 // Loading a level from a Virtools file into the engine's model. Objects that fail to decode are skipped and
 // reported, so one broken object in a community map costs that object, not the level.
 
-use crate::{Blend, Group, Level, Material, Mesh, Object, Part, Texture, TextureSource};
+use crate::{Blend, Group, Level, Material, Mesh, Object, Part, Sprite, Texture, TextureSource};
 use nmo::{Document, class, scene};
 use std::collections::HashMap;
 
@@ -47,6 +47,7 @@ fn build(doc: &Document) -> Loaded {
                 level.textures.push(Texture {
                     name: name(o),
                     source,
+                    color_key: t.transparent.map(|c| [(c >> 16) as u8, (c >> 8) as u8, c as u8]),
                 });
             }
             Err(e) => warn(o, e),
@@ -85,6 +86,7 @@ fn build(doc: &Document) -> Loaded {
         class::TARGET_CAMERA,
         class::LIGHT,
         class::TARGET_LIGHT,
+        class::SPRITE_3D,
     ];
     let mut objects = HashMap::new();
     for (i, o) in doc.objects.iter().enumerate() {
@@ -96,6 +98,28 @@ fn build(doc: &Document) -> Loaded {
             Ok(e) => {
                 let [x, y, z, p] = e.matrix;
                 let hidden = chunk.section(0x4).is_some() || chunk.section(0x18).is_some();
+                // A sprite is drawn as a quad of its own: a unit square with its texture rectangle and material.
+                let (mut mesh_index, mut sprite) = (e.mesh.and_then(|m| meshes.get(&m).copied()), None);
+                if o.class_id == class::SPRITE_3D {
+                    match scene::sprite(chunk) {
+                        Ok(s) => {
+                            let [u0, v0, u1, v1] = s.uv;
+                            mesh_index = Some(level.meshes.len());
+                            level.meshes.push(Mesh {
+                                name: format!("{}_Sprite", name(o)),
+                                positions: vec![[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 0.0, 0.0]],
+                                normals: vec![[0.0, 0.0, -1.0]; 4],
+                                uvs: vec![[u0, v1], [u0, v0], [u1, v0], [u1, v1]],
+                                parts: vec![Part {
+                                    material: s.material.and_then(|m| materials.get(&m).copied()),
+                                    indices: vec![0, 1, 2, 0, 2, 3],
+                                }],
+                            });
+                            sprite = Some(Sprite { mode: s.mode, size: s.size, offset: s.offset });
+                        }
+                        Err(err) => warn(o, err),
+                    }
+                }
                 objects.insert(i, level.objects.len());
                 level.objects.push(Object {
                     name: name(o),
@@ -105,8 +129,9 @@ fn build(doc: &Document) -> Loaded {
                         [z[0], z[1], z[2], 0.0],
                         [p[0], p[1], p[2], 1.0],
                     ],
-                    mesh: e.mesh.and_then(|m| meshes.get(&m).copied()),
+                    mesh: mesh_index,
                     visible: !hidden,
+                    sprite,
                 });
             }
             Err(e) => warn(o, e),

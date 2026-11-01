@@ -62,6 +62,7 @@ pub fn model(letter: &str) -> Level {
         sky.textures.push(Texture {
             name: format!("Sky_{letter}_{face}"),
             source: TextureSource::File(format!("Sky_{letter}_{face}.bmp")),
+            color_key: None,
         });
         sky.materials.push(Material {
             name: format!("Sky_{face}"),

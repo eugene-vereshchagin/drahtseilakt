@@ -9,9 +9,10 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
 - **Phase 1**: Der Leser liest jede Datei des Spiels und alle ~600 Karten, jedes Szenenobjekt wird dekodiert.
   Fehlt: Fuzz-Ziele, die Bestandsaufnahme der Building Blocks, das Entfernen des C-Codes des Upstreams.
 - **Phase 2**: Level auf dem Bildschirm mit ihrem Himmel, jede Größe und jedes Seitenverhältnis, Licht im
-  Gamma-Raum wie im Original. Ein Hauptmenü und ein Levelmenü
+  Gamma-Raum wie im Original (seine Fixed-Function-Formel: Emissive + Ambient + Diffuse, mal Textur; bisher eine
+  Lichtquelle), 3D-Sprites (die silbernen Kugeln der Extrapunkte) und Texturen mit Farbschlüssel. Ein Hauptmenü und ein Levelmenü
   in der eigenen Schrift des Prototyps; eine freie Kamera im Debug-Modus. Fehlt: HUD und Menübildschirme des
-  Originals, 8K-Prüfung.
+  Originals, die eigenen Lichter des Levels, 8K-Prüfung.
 - **Phase 3**: Die Kugelphysik ist IVP, aus dem C-Code des Upstreams portiert (crates/ivp) und gegen das C-Spiel
   geprüft: ein gerader Stoß der Holz- und der Steinkugel und eine 17-Sekunden-Route in Level 1 stimmen auf 0,1
   bzw. 0,8 Einheiten überein. Fehlt: Bodenmaterialien je Objekt.
