@@ -352,6 +352,57 @@ mod tests {
         assert!((q[2].rect[2] - 128.0).abs() <= 1.0, "{:?}", q[2].rect);
     }
 
+    /// The C game draws a level button's label ("Level 2", GameFont_03) and the points (Font_Punktezähler) with
+    /// these glyph quads (DUMPQUADS of the C build; x less its -0.25 pixel tweak).
+    #[test]
+    fn the_game_font_lays_out_as_in_the_c_game() {
+        let Some(data) =
+            std::env::var_os("OPENBALLANCE_DATA").and_then(|_| Data::locate(None).ok())
+        else {
+            return;
+        };
+        let f = Font::game(&data).expect("M_FontData_01");
+        let st = Style {
+            scale: [0.35, 0.4],
+            spacing: [0.0, 0.0],
+            align: 0,
+            flags: TEXT_SCREEN,
+            margins: [2.0; 4],
+            color: [1.0; 4],
+            v2: true,
+        };
+        let q = f.layout(b"Level 2", homogeneous([0.4031, 0.15, 0.5969, 0.2]), &st);
+        let first = q.first().expect("glyphs");
+        let last = q.last().expect("glyphs");
+        assert_eq!(
+            (first.rect[0], first.rect[1], first.rect[3]),
+            (297.0, 78.0, 90.0)
+        );
+        assert!(
+            (first.uv[0] - 0.75635).abs() < 1e-4 && (first.uv[1] - 0.25049).abs() < 1e-4,
+            "{:?}",
+            first.uv
+        );
+        assert_eq!((last.rect[0], last.rect[2]), (337.0, 343.0));
+        let points = Style {
+            scale: [0.8, 0.9],
+            spacing: [1.5, 1.0],
+            align: ALIGN_RIGHT,
+            flags: TEXT_SCREEN,
+            margins: [2.0; 4],
+            color: [1.0; 4],
+            v2: true,
+        };
+        let q = f.layout(
+            b"953",
+            homogeneous([0.05, 0.884_17, 0.203_75, 0.934_17]),
+            &points,
+        );
+        let x: Vec<[f32; 2]> = q.iter().map(|g| [g.rect[0], g.rect[2]]).collect();
+        assert_eq!(x, [[67.0, 82.0], [89.0, 104.0], [111.0, 125.0]]);
+        assert_eq!(q[0].rect[1], 422.0);
+    }
+
     #[test]
     fn the_context_keeps_its_edges_on_a_wide_window() {
         let s = Screen {

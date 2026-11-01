@@ -758,7 +758,7 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     if let Some((file, _)) = &game.trafo {
         renderer.add_model(&file.level, &loader);
     }
-    for name in crate::particles::textures().into_iter().chain(["Font_1", "Button01_special"]) {
+    for name in crate::particles::textures().into_iter().chain(["Font_1", "Button01_special", "Button01_select", "Button01_deselect"]) {
         let t = level::Texture {
             name: name.to_owned(),
             source: level::TextureSource::File(if name.starts_with("Font_") || name.starts_with("Button") {
@@ -1363,6 +1363,8 @@ impl App {
             gpu.config.width,
             gpu.config.height,
             &match (&self.menu, self.loading) {
+                // with the game's font the menus are the original's (drawn below), else the prototype's
+                (_, Some(_)) | (Some(_), None) if self.game.font.is_some() => Vec::new(),
                 (_, Some((n, _))) => {
                     Menu::new(&self.data, n, false).overlay(gpu.config.width, gpu.config.height, Some(n))
                 }
@@ -1384,11 +1386,15 @@ impl App {
                 }
             },
         );
-        if self.menu.is_none() && self.loading.is_none() {
-            let screen = crate::ui::Screen { w: gpu.config.width as f32, h: gpu.config.height as f32 };
-            let quads = crate::hud::interface(&self.game.sim, self.game.font.as_ref(), screen);
-            gpu.renderer.draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
-        }
+        let screen = crate::ui::Screen { w: gpu.config.width as f32, h: gpu.config.height as f32 };
+        let font = self.game.font.as_ref();
+        let quads = match (&self.menu, self.loading) {
+            (_, Some((n, _))) if font.is_some() => Menu::new(&self.data, n, false).interface(font, screen, Some(n)),
+            (Some(m), None) if font.is_some() => m.interface(font, screen, None),
+            (None, None) => crate::hud::interface(&self.game.sim, font, screen),
+            _ => Vec::new(),
+        };
+        gpu.renderer.draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();
         gpu.renderer.queue.present(frame);

@@ -1,8 +1,8 @@
 // The menus: the main menu (continue the run, the levels, custom levels, settings, credits, debug, quit), the level
 // menu (the original levels of the player's copy, each with its best time) and the pages behind the other lines,
-// chosen with the arrows and Enter. Custom levels, settings and debug are placeholders until they are built. The main menu is shown when the game
-// starts without a level named on the command line, and on Esc during a run. Drawn with the prototype's own font
-// (hud.rs) until the original's menu screens are ported.
+// chosen with the arrows and Enter. Custom levels and debug are placeholders until they are built. The main menu is
+// shown when the game starts without a level named on the command line, and on Esc during a run. Drawn as the
+// original's menu screens (`interface`), or with the prototype's own font (hud.rs) when the copy lacks the game font.
 
 use crate::assets::Data;
 use crate::hud::{Rect, text, width};
@@ -39,6 +39,19 @@ pub enum Item {
 }
 
 impl Item {
+    /// The button's label in the original's menu style.
+    fn title(self) -> &'static str {
+        match self {
+            Item::Continue => "Continue",
+            Item::Levels => "Start",
+            Item::Custom => "Custom levels",
+            Item::Settings => "Options",
+            Item::Credits => "Credits",
+            Item::Debug => "Debug",
+            Item::Quit => "Exit",
+        }
+    }
+
     fn label(self) -> &'static str {
         match self {
             Item::Continue => "CONTINUE",
@@ -55,27 +68,27 @@ impl Item {
     fn page(self) -> Vec<String> {
         let lines: &[&str] = match self {
             Item::Custom => &[
-                "COMMUNITY MAPS: NOT IN THE MENU YET",
+                "Community maps are not in the menu yet.",
                 "",
-                "PLAY ONE FROM THE COMMAND LINE:",
-                "DRAHTSEILAKT --MAP FILE.NMO",
+                "Play one from the command line:",
+                "drahtseilakt --map file.nmo",
             ],
-            Item::Settings => &["", "SCREEN AND KEYS COME HERE"],
+            Item::Settings => &["", "Screen and keys come here."],
             Item::Credits => &[
-                "DRAHTSEILAKT BY VERESK",
+                "Drahtseilakt by Veresk",
                 "",
-                "BALLANCE BY CYPARADE / ATARI 2004",
-                "STARTED AS A FORK OF OPENBALLANCE BY EMDZEJ",
-                "PHYSICS: IVP PORTED FROM OPENBALLANCE",
+                "Ballance by Cyparade / Atari 2004",
+                "Started as a fork of OpenBallance by emdzej",
+                "Physics: IVP, ported from OpenBallance",
                 "",
-                "PLAYS YOUR OWN COPY OF THE GAME",
+                "Plays your own copy of the game",
             ],
             Item::Debug => &[
                 "",
-                "BEGIN ANYWHERE FROM THE COMMAND LINE:",
-                "--SECTOR N   --AT X,Y,Z OR OBJECT   --BALL KIND",
+                "Begin anywhere from the command line:",
+                "--sector n  --at x,y,z or object  --ball kind",
                 "",
-                "REPLAYS AND SESSION LOGS:",
+                "Replays and session logs:",
             ],
             _ => &[],
         };
@@ -368,6 +381,138 @@ impl Menu {
         out
     }
 }
+
+/// The original's menu screens (Menu.nmo's 2D frames and texts as the C game shows them): a dark band down the
+/// middle, the buttons over Button01_select (chosen), Button01_deselect or Button01_special (not playable), their
+/// labels in the game's fonts (GameFont_01 for the main buttons, GameFont_03 and the grey GameFont_03a for the levels).
+impl Menu {
+    pub fn interface(&self, font: Option<&crate::ui::Font>, screen: crate::ui::Screen, loading: Option<u32>) -> Vec<crate::ui::Quad> {
+        use crate::ui::{Anchor, Quad, homogeneous};
+        let mut out = Vec::new();
+        let quad = |r: [f32; 4], uv: [f32; 4], color: [f32; 4], texture: &'static str| Quad {
+            rect: screen.rect(homogeneous(r), Anchor::Center),
+            uv,
+            top: color,
+            bottom: color,
+            texture,
+        };
+        // M_BlackScreen: a strip of Button01_special's black at 0.61
+        out.push(quad([0.3, 0.0, 0.7, 1.0], [0.0, 0.99, 1.0, 1.0], [1.0, 1.0, 1.0, 0.61], SPECIAL));
+        let label = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style| {
+            if let Some(f) = font {
+                out.extend(crate::ui::place(f.layout(t.as_bytes(), homogeneous(r), style), screen, Anchor::Center));
+            }
+        };
+        if let Some(n) = loading {
+            label(&mut out, &format!("Loading level {n}"), [0.3, 0.45, 0.7, 0.55], &FONT_01);
+            return out;
+        }
+        let button = |out: &mut Vec<Quad>, r: [f32; 4], uv: [f32; 4], state: Button| {
+            let tex = match state {
+                Button::Over => SELECT_TEX,
+                Button::Up => DESELECT_TEX,
+                Button::Inactive => SPECIAL,
+            };
+            out.push(quad(r, uv, WHITE, tex));
+        };
+        match self.screen {
+            Screen::Main => {
+                // five buttons 0.15 apart from 0.15 in the original; more lines close up
+                let n = self.items.len().max(1);
+                let step = if n <= 5 { 0.15 } else { 0.75 / n as f32 };
+                let top = if n <= 5 { 0.15 } else { 0.1 };
+                for (i, item) in self.items.iter().enumerate() {
+                    let y = top + i as f32 * step;
+                    let r = [0.35, y, 0.65, y + 0.0938];
+                    let state = if i == self.item { Button::Over } else { Button::Up };
+                    button(&mut out, r, MAIN_UV, state);
+                    label(&mut out, item.title(), r, &FONT_01);
+                }
+            }
+            Screen::Levels => {
+                // 0.06 apart from 0.09 (twelve levels); a thirteenth closes them up
+                let n = self.entries.len().max(1);
+                let step = if n <= 12 { 0.06 } else { 0.72 / n as f32 };
+                for (i, e) in self.entries.iter().enumerate() {
+                    let y = 0.09 + i as f32 * step;
+                    let r = [0.4031, y, 0.5969, y + step - 0.01];
+                    let state = match (e.available, i == self.selected) {
+                        (false, _) => Button::Inactive,
+                        (true, true) => Button::Over,
+                        (true, false) => Button::Up,
+                    };
+                    button(&mut out, r, LEVEL_UV, state);
+                    label(&mut out, &format!("Level {}", e.number), r, if e.available { &FONT_03 } else { &FONT_03A });
+                    if let Some(t) = e.best {
+                        let mut st = FONT_03A;
+                        st.align = crate::ui::ALIGN_LEFT;
+                        label(&mut out, &clock(t), [0.6, y, 0.7, y + step - 0.01], &st);
+                    }
+                }
+                let r = [0.4031, 0.85, 0.5906, 0.9438];
+                button(&mut out, r, BACK_UV, Button::Up);
+                label(&mut out, "Back", r, &FONT_01);
+            }
+            Screen::Page(item) => {
+                let r = [0.35, 0.05, 0.65, 0.1438];
+                button(&mut out, r, MAIN_UV, Button::Over);
+                label(&mut out, item.title(), r, &FONT_01);
+                let mut y = 0.2;
+                if item == Item::Settings {
+                    for (i, (name, v)) in [("Sound", self.volumes[0]), ("Music", self.volumes[1])].into_iter().enumerate() {
+                        let r = [0.35, y, 0.65, y + 0.0938];
+                        button(&mut out, r, MAIN_UV, if i == self.setting { Button::Over } else { Button::Up });
+                        label(&mut out, &format!("{name}  {}%", (v * 100.0).round() as u32), r, &FONT_01);
+                        y += 0.12;
+                    }
+                }
+                if item == Item::Debug {
+                    let on = if self.debug { "on" } else { "off" };
+                    label(&mut out, &format!("Debug mode {on}, free camera on F2"), [0.3, y, 0.7, y + 0.05], &FONT_03);
+                    y += 0.06;
+                }
+                for l in item.page() {
+                    label(&mut out, &l, [0.3, y, 0.7, y + 0.05], &FONT_03);
+                    y += 0.05;
+                }
+                let r = [0.4031, 0.85, 0.5906, 0.9438];
+                button(&mut out, r, BACK_UV, Button::Up);
+                label(&mut out, "Back", r, &FONT_01);
+            }
+        }
+        out
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Button {
+    Over,
+    Up,
+    Inactive,
+}
+
+const SPECIAL: &str = "Button01_special";
+const SELECT_TEX: &str = "Button01_select";
+const DESELECT_TEX: &str = "Button01_deselect";
+/// The texture parts of the main buttons, the level buttons and the Back button.
+const MAIN_UV: [f32; 4] = [0.0, 0.5137, 1.0, 0.7451];
+const LEVEL_UV: [f32; 4] = [0.0, 0.2470, 0.6470, 0.3686];
+const BACK_UV: [f32; 4] = [0.2392, 0.7529, 0.8666, 0.9843];
+
+const fn font_style(scale: [f32; 2], color: [f32; 4]) -> crate::ui::Style {
+    crate::ui::Style {
+        scale,
+        spacing: [0.0, 0.0],
+        align: 0,
+        flags: crate::ui::TEXT_SCREEN,
+        margins: [2.0; 4],
+        color,
+        v2: true,
+    }
+}
+const FONT_01: crate::ui::Style = font_style([0.45, 0.55], WHITE);
+const FONT_03: crate::ui::Style = font_style([0.35, 0.4], WHITE);
+const FONT_03A: crate::ui::Style = font_style([0.35, 0.4], [0.514, 0.514, 0.514, 1.0]);
 
 const WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
 const GREY: [f32; 4] = [0.6, 0.6, 0.6, 1.0];

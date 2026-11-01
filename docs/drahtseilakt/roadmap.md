@@ -12,8 +12,9 @@ new engine got level 1 playable, ahead of the phase order:
   original (its fixed-function formula: emissive + ambient + diffuse, times the texture; one light so far), 3D
   sprites (the extra points' silver balls) and colour-keyed textures. A main menu and a level menu
   in the prototype's own font; a free camera in debug mode. The in-game
-  interface is the original's: its points box and life balls, the points in the game's own font. Missing: the
-  original's menu screens, the level's own lights, 8K check.
+  interface is the original's: its points box and life balls, the points in the game's own font. The menus
+  look like the original's (its buttons, dark band and fonts). Missing: the menu's 3D scene behind them, the
+  level end screen, the level's own lights, 8K check.
 - **Phase 3**: the ball physics is IVP's, ported from the upstream's C (crates/ivp) and checked against the C
   game: a straight push of the wooden and of the stone ball and a 17-second route on level 1 agree to within 0.1
   and 0.8 units. Missing: floor materials per object.
