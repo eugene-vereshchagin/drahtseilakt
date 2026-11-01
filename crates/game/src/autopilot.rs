@@ -376,6 +376,16 @@ impl Route {
         }
     }
 
+    /// The point of the way nearest the ball at `p`.
+    pub fn nearest(&self, p: Vec3) -> Option<usize> {
+        let f = p - Vec3::Y * crate::sim::BALL_RADIUS;
+        self.points
+            .iter()
+            .enumerate()
+            .min_by(|a, b| a.1.distance_squared(f).total_cmp(&b.1.distance_squared(f)))
+            .map(|(i, _)| i)
+    }
+
     /// How far the ball at `p` is from an edge: the clearance of the floor point under it (0 with none under it).
     pub fn clearance(&self, p: Vec3) -> f32 {
         let f = p - Vec3::Y * crate::sim::BALL_RADIUS;
@@ -463,7 +473,7 @@ const FAST: f32 = 1.5;
 /// Nearer an edge than `SAFE`, every unit nearer costs `EDGE` way points at each sample (every sixth tick) of a
 /// tried choice: a player keeps to the middle.
 const SAFE: f32 = 3.0;
-const EDGE: f32 = 0.6;
+const EDGE: f32 = 0.3;
 const HOLD: u64 = 18;
 const COAST: u64 = 36;
 
@@ -475,6 +485,8 @@ pub struct Pilot {
     moved: u64,
     /// The furthest along the way it has been.
     best: f32,
+    /// Where the ball was at the last decision.
+    last: Option<Vec3>,
     /// The transformers to roll into, in order: their place on the way and where they are; and the next one.
     gates: Vec<(usize, Vec3)>,
     gate: usize,
@@ -493,6 +505,7 @@ impl Pilot {
             choice: 0,
             moved: 0,
             best: f32::NEG_INFINITY,
+            last: None,
             plan: Vec::new(),
             seed: 0x2545_F491,
         }
@@ -633,6 +646,19 @@ impl Pilot {
         if !sim.tick.is_multiple_of(PERIOD) {
             return self.choice;
         }
+        // a new ball (the old one lost) starts again at a reset point: find it on the way anew
+        if self
+            .last
+            .is_some_and(|l| l.distance(sim.ball.position) > 20.0)
+        {
+            if let Some(i) = self.route.nearest(sim.ball.position) {
+                self.at = i;
+                self.gate = self.gates.iter().take_while(|g| g.0 <= i).count();
+            }
+            self.best = f32::NEG_INFINITY;
+            self.plan.clear();
+        }
+        self.last = Some(sim.ball.position);
         // a transformer reached opens its gate
         if let Some(&(_, g)) = self.gates.get(self.gate)
             && Vec3::new(g.x - sim.ball.position.x, 0.0, g.z - sim.ball.position.z).length() < 2.5
@@ -673,6 +699,16 @@ impl Pilot {
             .map(|p| p.y)
             .fold(f32::INFINITY, f32::min)
             - 6.0;
+        // the way ahead climbs (a rail uphill): a run-up is needed, so speed is no fault there
+        let uphill = {
+            let here_y = self.route.points.get(self.at).map_or(0.0, |p| p.y);
+            self.route
+                .points
+                .iter()
+                .skip(self.at)
+                .take(25)
+                .any(|p| p.y > here_y + 2.0)
+        };
         let mut best = (f32::NEG_INFINITY, self.choice);
         for &c in &CHOICES {
             let mut s = sim.clone();
@@ -731,7 +767,11 @@ impl Pilot {
             } else {
                 self.progress(s.ball.position)
                     - self.blocking(&s)
-                    - FAST * (s.ball.velocity.length() - CALM).max(0.0)
+                    - if uphill {
+                        0.0
+                    } else {
+                        FAST * (s.ball.velocity.length() - CALM).max(0.0)
+                    }
                     - EDGE * edge
                     + if c == self.choice { 0.05 } else { 0.0 }
             };

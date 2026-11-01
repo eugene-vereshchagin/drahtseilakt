@@ -746,7 +746,7 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
     // the transformers' places on the new way: their gates
     let gates: Vec<(usize, glam::Vec3)> =
         route.marks.iter().zip(&waypoints).filter(|(_, w)| w.2).map(|(&m, w)| (m, w.1)).collect();
-    println!("transformers on the way: {}", gates.len());
+    println!("transformers on the way: {:?}", gates);
     let mut pilot = crate::autopilot::Pilot::new(route, gates);
     let limit = o.ticks.unwrap_or(60 * 60 * 20);
     while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
