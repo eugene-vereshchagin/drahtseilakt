@@ -79,6 +79,7 @@ pub struct BallSounds {
     pub rolls: Vec<u8>,
 }
 
+#[derive(Clone)]
 pub struct World {
     physics: IvpWorld,
     /// The sound material of each game body.

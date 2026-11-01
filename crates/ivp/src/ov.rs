@@ -58,7 +58,7 @@ pub struct Element {
 }
 
 /// The OV tree (2.6) and its elements, indexed by object.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OvTree {
     nodes: Vec<Node>,
     free_nodes: Vec<usize>,

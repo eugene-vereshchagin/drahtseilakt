@@ -43,7 +43,8 @@ ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bil
 beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
 Stelle, mit `--ball wood|stone|paper`; ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
 Die Lautstärke von Ton und Musik steht auf der Einstellungsseite des Menüs. Im Debug-Modus (`--debug` oder der Schalter auf der Debug-Seite des Menüs) nimmt F2 eine freie Kamera auf, um
-durch das Level zu fliegen, während der Lauf wartet. `drahtseilakt --help` zeigt alles.
+durch das Level zu fliegen, während der Lauf wartet. Zum Testen lässt `--autopilot` einen Testspieler das Level ohne
+Fenster versuchen (mit `--record FILE` bleibt sein Lauf erhalten). `drahtseilakt --help` zeigt alles.
 
 ## Rechtliches
 

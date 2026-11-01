@@ -38,7 +38,7 @@ pub enum ObjKind {
 
 /// What the collision code keeps per object beyond its core: its geometry, its extra radius, its cache, and the heads
 /// of its EXACT and INVALID synapse lists (`IvpCollObject`, 4.2.7).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ObjInfo {
     pub kind: Option<ObjKind>,
     pub surface: Option<Surface>,
@@ -62,7 +62,7 @@ pub struct ObjInfo {
 
 /// The collision state of one world: the OV tree, the per-object records and hull managers, the collision records and
 /// the mindist arena with its lists.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CollWorld {
     pub ov: OvTree,
     pub hulls: Vec<HullManager>,

@@ -19,7 +19,7 @@ pub const MT_STATIC: i8 = 0x10;
 pub const MAX_VELOCITY_DEFAULT: f32 = 2000.0;
 
 /// The DLL-global random generator of 0x1002fcd0: a multiplicative congruence shared by all worlds, never reseeded.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Rng {
     seed: u32,
 }
@@ -213,7 +213,7 @@ impl Default for Env {
 }
 
 /// The cores, units and controllers of one physics world.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct World {
     pub env: Env,
     pub cores: Vec<Core>,

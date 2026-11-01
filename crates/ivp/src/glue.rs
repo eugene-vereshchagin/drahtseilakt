@@ -32,6 +32,13 @@ pub trait Listener {
 #[derive(Default)]
 pub struct Listeners(pub Option<Box<dyn Listener>>);
 
+/// A copy of a world (a look ahead) has no listener: it hears nothing the original would.
+impl Clone for Listeners {
+    fn clone(&self) -> Self {
+        Listeners(None)
+    }
+}
+
 impl std::fmt::Debug for Listeners {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Listeners({})", if self.0.is_some() { "set" } else { "empty" })

@@ -634,6 +634,7 @@ pub struct TrafoAnim {
     pub kind: BallKind,
 }
 
+#[derive(Clone)]
 pub struct Sim {
     rules: Rules,
     world: World,
@@ -1422,6 +1423,16 @@ impl Sim {
     /// level bonus and 200 for each life (C game: 950 + 100 + 3 × 200 = 1650 on level 1).
     pub fn score(&self) -> i64 {
         self.points + self.level_bonus + LIFE_BONUS * i64::from(self.lives)
+    }
+
+    /// The checkpoints in the order the sectors pass them, then the level's end.
+    pub fn stages(&self) -> Vec<Vec3> {
+        self.rules.checkpoints.iter().map(|c| c.1).chain(self.rules.end).collect()
+    }
+
+    /// Whether the ball is falling to its loss (lost, not yet replaced).
+    pub fn is_dying(&self) -> bool {
+        self.dying.is_some()
     }
 
     /// Whether the checkpoint at level object `object` has been passed.

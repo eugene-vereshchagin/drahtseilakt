@@ -605,6 +605,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     if let Some(path) = &o.screenshot {
         return screenshot(&mut game, &data, &o, path);
     }
+    if o.autopilot {
+        return autopilot(&mut game, &o);
+    }
     if o.headless {
         game.start_session();
         let end = game
@@ -693,6 +696,56 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         Some(e) => Err(e),
         None => Ok(()),
     }
+}
+
+/// The test player plays the level from where the run begins: it saves the run at --record (or as an attempt) and
+/// prints how far it got.
+fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
+    let level = &game.level.level;
+    let stages: Vec<glam::Vec3> = game.sim.stages().into_iter().skip(game.sim.sector).collect();
+    let route = crate::autopilot::Route::find(level, &game.modules, game.sim.ball.position, &stages);
+    println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
+    if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
+        for (i, p) in route.points.iter().enumerate() {
+            println!("route {i} {:.2} {:.2} {:.2}", p.x, p.y, p.z);
+        }
+    }
+    let mut pilot = crate::autopilot::Pilot::new(route);
+    let limit = o.ticks.unwrap_or(60 * 60 * 20);
+    while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
+        let i = pilot.next(&game.sim);
+        game.tick(i);
+        if game.sim.tick.is_multiple_of(600) {
+            let b = game.sim.ball.position;
+            println!(
+                "{} sector {} lives {} route {} / {} ball ({:.1} {:.1} {:.1})",
+                clock(game.sim.tick),
+                game.sim.sector + 1,
+                game.sim.lives,
+                pilot.reached(),
+                pilot.route.points.len(),
+                b.x,
+                b.y,
+                b.z
+            );
+        }
+    }
+    let s = &game.sim;
+    println!(
+        "result: {} after {} ({}), sector {}, lives {}, route {} / {}",
+        if s.finished { "finished" } else if s.game_over { "game over" } else { "not finished" },
+        s.tick,
+        clock(s.tick),
+        s.sector + 1,
+        s.lives,
+        pilot.reached(),
+        pilot.route.points.len()
+    );
+    if let Some(path) = &o.record {
+        std::fs::write(path, game.replay_out.to_text()).map_err(|e| format!("{}: {e}", path.display()))?;
+        println!("saved {}", path.display());
+    }
+    Ok(())
 }
 
 /// The time of one frame at 60 frames a second.

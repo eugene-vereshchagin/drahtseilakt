@@ -39,7 +39,8 @@ fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it wit
 FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
 object's name) anywhere, with `--ball wood|stone|paper`; such a run keeps its start in its replay and is never a
 best run. Sound and music volumes are on the menu's Settings page. In debug mode (`--debug`, or the switch on the menu's Debug page) F2 takes up a free camera to fly
-through the level while the run waits. `drahtseilakt --help` lists everything.
+through the level while the run waits. For testing, `--autopilot` lets a test player try the level without a window
+(with `--record FILE` to keep its run). `drahtseilakt --help` lists everything.
 
 ## Legal
 

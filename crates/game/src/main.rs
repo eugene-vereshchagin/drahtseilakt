@@ -8,6 +8,7 @@
 mod app;
 mod assets;
 mod audio;
+mod autopilot;
 mod ballsound;
 mod collide;
 mod extra;
@@ -44,6 +45,7 @@ usage: drahtseilakt [options]
   --record FILE       write a replay of the run (also written automatically on finishing a level)
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
+  --autopilot         no window: the test player plays the level (to --ticks); saved with --record
   --screenshot FILE   no window: render the frame after the replay (or --ticks N) to a PNG
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
@@ -74,6 +76,8 @@ pub struct Options {
     pub export: Option<PathBuf>,
     pub replay: Option<PathBuf>,
     pub headless: bool,
+    /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
+    pub autopilot: bool,
     pub screenshot: Option<PathBuf>,
     pub ticks: Option<u64>,
     pub trace: Option<u64>,
@@ -97,6 +101,7 @@ fn parse_args() -> Result<Options, String> {
         export: None,
         replay: None,
         headless: false,
+        autopilot: false,
         screenshot: None,
         ticks: None,
         trace: None,
@@ -141,6 +146,7 @@ fn parse_args() -> Result<Options, String> {
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,
+            "--autopilot" => o.autopilot = true,
             "--debug" => o.debug = true,
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--ticks" => {
