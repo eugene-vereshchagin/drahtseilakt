@@ -264,7 +264,13 @@ list Auto Mass Center, Linear Damp and Rot Damp.
     physicalizes every module once while loading the level, so the first push in play is -z.
   Measured in the C build (level 8, the checkpoints moved under the ball to bring sectors 3 and 5 in): the sacks and
   the swing swing up to about ±7.6 and ±4.8 in z; the port matches them to 0.05 for 1000 frames, except one sack
-  that drifts after about 540 frames (cause not found).
+  that drifts after about 540 frames. That is not a port difference: at frame 519 the sack at x 592.99 is at the
+  top of its swing when a sleep test falls on it, so its bodies turn "slow" (0.1 more damping) and keep that until
+  the next test. The sleep test comes when one countdown shared by the whole physics world, reset from the shared
+  random generator, runs out on a unit, so when it comes depends on every active body and on how long the world
+  has run; the C run (checkpoints moved, the physics running about 44 s before the sector against our 16 s) has
+  its tests elsewhere. With that one test suppressed the port's sack follows the C trace to 0.02 up to frame 1050.
+  The slow drift of the idle ball at level 1's start is the same kind of difference.
 
   The plate bridge (`P_Modul_29_MF Script`): once its wake-up (80 across, to `P_Modul_29_MF`) has fired, a second
   proximity of 4 over all axes to `P_Modul_29_Platte06` (exactness 8 / 20, 2 / 30 frames); when the ball enters it,
