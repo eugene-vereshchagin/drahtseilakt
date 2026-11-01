@@ -240,6 +240,14 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   finish the platform carries the ball along +x of the world at 1.1 units per 20 frames, rising slowly, the ball
   0.72 behind the platform's origin. The port does the same (crates/game/src/modules.rs, `PE_Balloon`).
 
+  The fan (`P_Modul_18_MF Script`, PH/P_Modul_18.nmo) has no physical parts. While the ball is within 80 of
+  `P_Modul_18_Particle` across (x and z only), a second proximity of 7 across tests, at each of its In tests, the
+  ball's mesh box against the box of `P_Modul_18_Kollisionsquader` (2 × 16 × 2 above the fan, Box Box Intersection,
+  OBB against OBB); while they overlap the ball has SetPhysicsForce (0,1,0) world, 0.1, made once and destroyed once.
+  A paper ball rises at about 8.7 units a second and hovers with its box's top at the volume's top; the wooden and
+  stone balls are too heavy. Not checked against the C build (its level 1 has no fan). The rotor
+  (`P_Modul_18_Rotor`) turns about its y at -15 rad/s.
+
 - **FixCube** (Levelinit `init Placeholders`): fixed, Enable Collision 0, surface `FixCube_Mesh`. It is the
   static anchor for single-body joints.
 - **Ball pieces** (explosions in `Balls.nmo`): convex, group Ball, friction 2, elasticity 1, mass 0.2 (stone

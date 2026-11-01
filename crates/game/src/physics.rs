@@ -497,6 +497,11 @@ impl World {
         Some(self.physics.force_create(id, p3(force), vec3_f64(point), false))
     }
 
+    /// Removes a force made by `add_force` (SetPhysicsForce's Destroy).
+    pub fn remove_force(&mut self, ctrl: usize) {
+        self.physics.force_destroy(ctrl);
+    }
+
     /// Removes a joint made by `add_slider`, `add_hinge` or `add_ball_joint` (a joint's Destroy input).
     pub fn remove_joint(&mut self, j: usize) {
         self.physics.joint_destroy(j);

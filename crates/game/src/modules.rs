@@ -104,6 +104,16 @@ pub struct FinishSpec {
     pub breaks: &'static [&'static str],
 }
 
+/// An updraft (P_Modul_18): while the ball is within 80 of `near`, and then within 7, its box is tested against the
+/// box of `volume` at every test of the inner proximity; while they overlap the ball gets `value` straight up (world
+/// (0,1,0)) at every PSI, as the script's SetPhysicsForce on the ball does.
+#[derive(Debug, Clone, Copy)]
+pub struct UpdraftSpec {
+    pub near: &'static str,
+    pub volume: &'static str,
+    pub value: f32,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ModuleSpec {
     pub name: &'static str,
@@ -113,6 +123,7 @@ pub struct ModuleSpec {
     /// Forces made when the wake-up fires.
     pub forces: &'static [ForceSpec],
     pub finish: Option<FinishSpec>,
+    pub updraft: Option<UpdraftSpec>,
 }
 
 const fn material(friction: f32, elasticity: f32, mass: f32, lin_damp: f32, rot_damp: f32) -> Material {
@@ -168,6 +179,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: Some(WakeSpec { part: "P_Modul_01_Pusher", near: "P_Modul_01_Pusher", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_03",
@@ -270,6 +282,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: Some(WakeSpec { part: "P_Modul_03_Floor", near: "P_Modul_03_MF", distance: 35.0, exact: (35.0, 50.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_08",
@@ -291,6 +304,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: None,
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_17",
@@ -313,6 +327,21 @@ const MODULES: &[ModuleSpec] = &[
         wake: None,
         forces: &[],
         finish: None,
+        updraft: None,
+    },
+    // The fan: no physical parts, only its script's updraft on the ball.
+    ModuleSpec {
+        name: "P_Modul_18",
+        parts: &[],
+        joints: &[],
+        wake: None,
+        forces: &[],
+        finish: None,
+        updraft: Some(UpdraftSpec {
+            near: "P_Modul_18_Particle",
+            volume: "P_Modul_18_Kollisionsquader",
+            value: 0.1,
+        }),
     },
     ModuleSpec {
         name: "P_Modul_19",
@@ -334,6 +363,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: Some(WakeSpec { part: "P_Modul_19_Flaps", near: "P_Modul_19_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_25",
@@ -355,6 +385,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: Some(WakeSpec { part: "P_Modul_25_Bridge", near: "P_Modul_25_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_26",
@@ -387,6 +418,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: None,
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_29",
@@ -497,6 +529,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: Some(WakeSpec { part: "P_Modul_29_Platte04", near: "P_Modul_29_MF", distance: 80.0, exact: (85.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_30",
@@ -518,6 +551,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: Some(WakeSpec { part: "P_Modul_30_Wippe", near: "P_Modul_30_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_34",
@@ -549,6 +583,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: Some(WakeSpec { part: "P_Modul_34_Schiebestein", near: "P_Modul_34_Schiebestein", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_37",
@@ -570,6 +605,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: Some(WakeSpec { part: "P_Modul_37_Bridge", near: "P_Modul_37_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "P_Modul_41",
@@ -591,6 +627,7 @@ const MODULES: &[ModuleSpec] = &[
         wake: None,
         forces: &[],
         finish: None,
+        updraft: None,
     },
     ModuleSpec {
         name: "PE_Balloon",
@@ -894,6 +931,7 @@ const MODULES: &[ModuleSpec] = &[
                 value: 0.3,
             },
         ],
+        updraft: None,
         finish: Some(FinishSpec {
             near: "PE_Balloon_Platform",
             distance: 1.0,

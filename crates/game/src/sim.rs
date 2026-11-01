@@ -6,7 +6,7 @@
 // what the C game does, measured in its C reference build.
 
 use crate::collide::{StaticMesh, Triangle};
-use crate::proximity::{Proximity, Range};
+use crate::proximity::{ACROSS, ALL_AXES, Proximity, Range};
 use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, Rot, World};
 use crate::scene::{ModuleBody, Modules, module_of};
 use crate::volume::Obb;
@@ -217,6 +217,48 @@ struct ModuleInst {
     /// The forces made when it is woken.
     forces: Vec<ForceInst>,
     finish: Option<FinishInst>,
+    updraft: Option<UpdraftInst>,
+}
+
+/// An updraft placed (crate::modules::UpdraftSpec): the point the ball is measured to, the box it must reach, and
+/// the force.
+#[derive(Clone, Copy, Debug)]
+struct UpdraftInst {
+    point: Vec3,
+    volume: Obb,
+    value: f32,
+}
+
+/// An updraft while its module is in the physics: the script's two proximities (80 to switch it on, 7 to test the
+/// boxes) and the force on the ball while it is in the volume.
+#[derive(Clone, Debug)]
+struct UpdraftTrigger {
+    sector: Option<usize>,
+    at: UpdraftInst,
+    outer: Proximity,
+    inner: Proximity,
+    force: Option<usize>,
+}
+
+impl UpdraftTrigger {
+    fn new(sector: Option<usize>, at: UpdraftInst) -> UpdraftTrigger {
+        UpdraftTrigger {
+            sector,
+            at,
+            outer: Proximity::new(80.0, ACROSS, 85.0, 100.0, (10, 60)),
+            inner: Proximity::new(7.0, ACROSS, 12.0, 20.0, (1, 10)),
+            force: None,
+        }
+    }
+
+    /// Off: no tests and no force.
+    fn stop(&mut self, world: &mut World) {
+        self.outer.switch_off();
+        self.inner.switch_off();
+        if let Some(f) = self.force.take() {
+            world.remove_force(f);
+        }
+    }
 }
 
 /// A force on a body: a world vector at a world point (crate::modules::ForceSpec, placed).
@@ -378,7 +420,8 @@ fn module_parts(
     // a point given in a frame object (the frame's whole matrix, as Virtools' Transform), and a frame's Z axis
     let point = |frame: &str, p: [f32; 3]| at(frame).map(|m| m.transform_point3(Vec3::from(p)));
     if let Some(w) = spec.wake {
-        let prox = Proximity::new(w.distance, w.exact.0, w.exact.1, w.frames);
+        // every module's wake-up measures across (x and z), whatever the height
+        let prox = Proximity::new(w.distance, ACROSS, w.exact.0, w.exact.1, w.frames);
         inst.wake = Some((body(w.part)?, at(w.near)?.w_axis.truncate(), prox));
     }
     // A force's direction turned by its frame and normalised (a near-zero one is +x), times its value.
@@ -424,6 +467,18 @@ fn module_parts(
             }
         });
     }
+    if let Some(u) = &spec.updraft {
+        let o = file.objects.iter().find(|o| o.name == u.volume)?;
+        let mesh = file.meshes.get(o.mesh?)?;
+        let (lo, hi) = mesh.positions.iter().fold((Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)), |(lo, hi), p| {
+            (lo.min(Vec3::from(*p)), hi.max(Vec3::from(*p)))
+        });
+        inst.updraft = Some(UpdraftInst {
+            point: at(u.near)?.w_axis.truncate(),
+            volume: Obb::from_box(lo, hi, &at(u.volume)?),
+            value: u.value,
+        });
+    }
     if let Some(f) = &spec.finish {
         // The joints broken are the hinges at the named frames.
         let breaks = spec
@@ -434,7 +489,7 @@ fn module_parts(
             .map(|(k, _)| k)
             .collect();
         // the finish's proximity: tested every frame within 5, every 10 frames beyond 10
-        let prox = Proximity::new(f.distance, 5.0, 10.0, (1, 10));
+        let prox = Proximity::new(f.distance, ALL_AXES, 5.0, 10.0, (1, 10));
         inst.finish = Some(FinishInst { near: body(f.near)?, prox, force: force(&f.force)?, breaks });
     }
     Some(inst)
@@ -494,6 +549,8 @@ pub struct Sim {
     wake_triggers: Vec<WakeTrigger>,
     /// The finish's triggers (the balloon's); the level's end gate counts only when there is none.
     finishes: Vec<FinishTrigger>,
+    /// The fans' updrafts.
+    updrafts: Vec<UpdraftTrigger>,
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
@@ -747,10 +804,18 @@ impl Sim {
         // the start.
         let mut wake_triggers = Vec::new();
         let mut finishes = Vec::new();
+        let mut updrafts = Vec::new();
         let sectored = module_sectors.iter().enumerate().flat_map(|(n, v)| v.iter().map(move |m| (Some(n), m)));
         for (sector, inst) in unsectored_modules.iter().map(|m| (None, m)).chain(sectored) {
             let now = sector.is_none_or(|n| n == 0);
             let joints = if now { inst.enter(&mut world) } else { Vec::new() };
+            if let Some(u) = inst.updraft {
+                let mut t = UpdraftTrigger::new(sector, u);
+                if now {
+                    t.outer.switch_on();
+                }
+                updrafts.push(t);
+            }
             if let Some((body, near, mut prox)) = inst.wake {
                 if now {
                     prox.switch_on();
@@ -804,6 +869,7 @@ impl Sim {
             sectors,
             wake_triggers,
             finishes,
+            updrafts,
             module_sectors,
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
@@ -947,6 +1013,7 @@ impl Sim {
                 self.ball.velocity = Vec3::ZERO;
                 self.ball.spin = Vec3::ZERO;
                 self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), h.at, self.ball.rotation);
+                self.drop_ball_forces();
             }
         } else if let Some(s) = self.world.state(0) {
             self.ball.position = s.pos;
@@ -1035,6 +1102,7 @@ impl Sim {
         }
         self.apply_sector_changes();
         self.check_wake_triggers();
+        self.check_updrafts();
         self.check_finishes();
         if let Some(d) = self.dying {
             if self.tick == d + DEATH_REMOVE_TICKS {
@@ -1133,6 +1201,39 @@ impl Sim {
         }
     }
 
+    /// The fans' updrafts, as module 18's script runs them: the outer proximity switches the inner one on and off;
+    /// at each inner test while within it, the ball's box against the fan's volume makes or removes the force.
+    fn check_updrafts(&mut self) {
+        let ball = self.ball.position;
+        let (lo, hi) = self.ball_boxes[self.ball.kind as usize];
+        let ball_box = Obb::from_box(lo, hi, &Mat4::from_rotation_translation(self.ball.rotation, ball));
+        let alive = self.hold.is_none() && self.dying.is_none();
+        for u in &mut self.updrafts {
+            match u.outer.frame(ball, u.at.point) {
+                Some(Range::Enter) => u.inner.switch_on(),
+                Some(Range::Exit) => {
+                    u.inner.switch_off();
+                    if let Some(f) = u.force.take() {
+                        self.world.remove_force(f);
+                    }
+                }
+                _ => {}
+            }
+            if u.inner.frame(ball, u.at.point) != Some(Range::In) {
+                continue;
+            }
+            let inside = alive && u.at.volume.overlaps(&ball_box);
+            match (inside, u.force) {
+                (true, None) => u.force = self.world.add_force(0, Vec3::Y * u.at.value, ball),
+                (false, Some(f)) => {
+                    self.world.remove_force(f);
+                    u.force = None;
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// The finish's triggers: the ball within reach of the balloon's platform pushes its box away, breaks its bridge
     /// and finishes the level, as its script does. The ball is measured to the part where the physics has it.
     fn check_finishes(&mut self) {
@@ -1189,6 +1290,13 @@ impl Sim {
                         w.prox.switch_off();
                     }
                 }
+                for u in self.updrafts.iter_mut().filter(|u| u.sector == Some(c.sector)) {
+                    if c.enter {
+                        u.outer.switch_on();
+                    } else {
+                        u.stop(&mut self.world);
+                    }
+                }
                 continue;
             }
             for &b in self.sectors.get(c.sector).map(Vec::as_slice).unwrap_or(&[]) {
@@ -1198,6 +1306,13 @@ impl Sim {
                     self.world.deactivate(b);
                 }
             }
+        }
+    }
+
+    /// The scripts' forces on the ball went with its old body; a new ball starts without them.
+    fn drop_ball_forces(&mut self) {
+        for u in &mut self.updrafts {
+            u.force = None;
         }
     }
 
@@ -1217,6 +1332,7 @@ impl Sim {
         self.hold = None;
         self.trafo_anim = None;
         self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), spawn, Rot::Basis(turn));
+        self.drop_ball_forces();
         // The camera comes back as it was at the start: the start heading, not lifted, no turn in progress.
         self.camera.quarter = START_QUARTER;
         self.camera.yaw = START_QUARTER as f32 * std::f32::consts::FRAC_PI_2;
@@ -1815,6 +1931,37 @@ mod tests {
         assert!((speed - 1.1).abs() < 0.3, "the platform went {:?} -> {:?}", p0, p1);
         let behind = sim.ball.position - p1;
         assert!((behind.x + 0.72).abs() < 0.2 && behind.y.abs() < 0.5, "the ball at {behind:?} from the platform");
+    }
+
+    /// Level 2's first fan with the player's copy (skipped without OPENBALLANCE_DATA): its updraft lifts a paper
+    /// ball to the top of its volume (62.8) and holds it there, its box's top touching it; a wooden ball stays down.
+    #[test]
+    fn a_fan_holds_a_paper_ball_at_the_top_of_its_updraft() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let at = Vec3::new(1016.67, 49.0, -366.74);
+        let height = |kind| {
+            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+            sim.start_from(2, Some(kind), Some(at));
+            let mut ys = Vec::new();
+            for t in 0..600 {
+                sim.step(0);
+                if t >= 300 {
+                    ys.push(sim.ball.position.y);
+                }
+            }
+            let lo = ys.iter().copied().fold(f32::MAX, f32::min);
+            let hi = ys.iter().copied().fold(f32::MIN, f32::max);
+            (lo, hi)
+        };
+        let (lo, hi) = height(BallKind::Paper);
+        assert!(lo > 63.5 && hi < 66.0, "paper ball between {lo} and {hi}");
+        let (_, hi) = height(BallKind::Wood);
+        assert!(hi < 49.0, "wooden ball up to {hi}");
     }
 
     #[test]

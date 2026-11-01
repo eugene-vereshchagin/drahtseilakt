@@ -21,6 +21,8 @@ pub struct Snapshot {
     pub trafo: Option<(Mat4, f32)>,
     pub eye: Vec3,
     pub target: Vec3,
+    /// The run's time in seconds, for the scripts' turning objects.
+    pub time: f32,
 }
 
 impl Snapshot {
@@ -32,6 +34,7 @@ impl Snapshot {
             trafo: sim.trafo_anim(),
             eye: sim.camera.position,
             target: sim.camera.target,
+            time: sim.tick as f32 * crate::sim::TICK,
         }
     }
 
@@ -46,6 +49,7 @@ impl Snapshot {
             },
             eye: a.eye.lerp(b.eye, t),
             target: a.target.lerp(b.target, t),
+            time: a.time + (b.time - a.time) * t,
         }
     }
 }
@@ -111,7 +115,13 @@ pub struct Placement {
     pub object: usize,
     /// A rigid body of the physics world that moves this placement: `matrix` is then relative to the body.
     pub body: Option<usize>,
+    /// A turn its script gives it all the time: about this axis of its own frame, at this many radians a second.
+    pub spin: Option<(Vec3, f32)>,
 }
+
+/// Objects of modules that the file hides and a script shows, and how the script turns them: module 18's rotor
+/// turns about its own y at -15 radians a second (its Particle Script: Rotate by Per Second(-15)).
+const SHOWN_OBJECTS: [(&str, Option<(Vec3, f32)>); 1] = [("P_Modul_18_Rotor", Some((Vec3::Y, -15.0)))];
 
 /// Module models (`3D Entities/PH/<name>.nmo`), uploaded after the fixed models, with their names.
 #[derive(Default)]
@@ -212,6 +222,7 @@ pub fn placements(
                 marker: None,
                 object: i,
                 body: None,
+                spin: None,
             });
             continue;
         }
@@ -229,6 +240,7 @@ pub fn placements(
                 marker: Some(color),
                 object: i,
                 body: None,
+                spin: None,
             });
             continue;
         }
@@ -242,7 +254,8 @@ pub fn placements(
         let shown = SHOWN_MODULES.iter().any(|m| m.eq_ignore_ascii_case(&modules.names[index]));
         for mo in &module.objects {
             let part = parts.iter().find(|p| p.placeholder == i && p.object == mo.name);
-            if !(mo.visible || shown || body.is_some() || part.is_some()) {
+            let scripted = SHOWN_OBJECTS.iter().find(|s| s.0.eq_ignore_ascii_case(&mo.name));
+            if !(mo.visible || shown || scripted.is_some() || body.is_some() || part.is_some()) {
                 continue;
             }
             let Some(mm) = mo.mesh.filter(|&m| has_material(module, m)) else {
@@ -262,6 +275,7 @@ pub fn placements(
                 marker: None,
                 object: i,
                 body,
+                spin: scripted.and_then(|s| s.1),
             });
         }
     }
@@ -282,9 +296,10 @@ pub fn instances(
         .map(|p| Instance {
             model: p.model,
             mesh: p.mesh,
-            matrix: match p.body.and_then(|b| bodies.get(b)) {
-                Some(b) => Mat4::from_rotation_translation(b.rot, b.pos) * p.matrix,
-                None => p.matrix,
+            matrix: match (p.body.and_then(|b| bodies.get(b)), p.spin) {
+                (Some(b), _) => Mat4::from_rotation_translation(b.rot, b.pos) * p.matrix,
+                (None, Some((axis, rate))) => p.matrix * Mat4::from_axis_angle(axis, rate * s.time),
+                (None, None) => p.matrix,
             },
             marker: p.marker,
         })
