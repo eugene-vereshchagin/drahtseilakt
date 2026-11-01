@@ -76,6 +76,8 @@ struct Game {
     extra_model: Option<scene::ExtraModel>,
     /// The particle systems (flames, the extra points' sparkles); only for the eye.
     effects: crate::particles::Effects,
+    /// The game's font (Font_1 with its glyph table), when the copy has it.
+    font: Option<crate::ui::Font>,
     /// The level's music theme (the level table's Music), and whether it is the last original level.
     music_theme: Option<u32>,
     /// The level table's LevelBonus.
@@ -212,6 +214,7 @@ impl Game {
             session: None,
             extra_model,
             effects,
+            font: crate::ui::Font::game(data),
             music_theme: data.settings(&level.name).music,
             level_bonus,
             last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
@@ -755,14 +758,18 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     if let Some((file, _)) = &game.trafo {
         renderer.add_model(&file.level, &loader);
     }
-    for name in crate::particles::textures() {
+    for name in crate::particles::textures().into_iter().chain(["Font_1", "Button01_special"]) {
         let t = level::Texture {
             name: name.to_owned(),
-            source: level::TextureSource::File(format!("{name}.bmp")),
+            source: level::TextureSource::File(if name.starts_with("Font_") || name.starts_with("Button") {
+                format!("{name}.tga")
+            } else {
+                format!("{name}.bmp")
+            }),
             color_key: None,
         };
         if let Some((w, h, rgba)) = data.texture(&t) {
-            renderer.add_particle_texture(name, w, h, rgba);
+            renderer.add_named_texture(name, w, h, rgba);
         }
     }
     // The zenith colour: the top row of the front texture, averaged.
@@ -837,8 +844,10 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         &view,
         w,
         h,
-        &crate::hud::overlay(&game.sim, w, h, game.ball_lost_at),
+        &crate::hud::overlay(&game.sim, w, h, game.ball_lost_at, true),
     );
+    let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
+    r.draw_ui(&view, w, h, &crate::hud::interface(&game.sim, game.font.as_ref(), screen));
 
     let row = (4 * w).div_ceil(256) * 256;
     let buf = r.device.create_buffer(&wgpu::BufferDescriptor {
@@ -1364,6 +1373,7 @@ impl App {
                         gpu.config.width,
                         gpu.config.height,
                         self.game.ball_lost_at,
+                        self.debug,
                     );
                     if let Some(c) = &self.fly {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
@@ -1374,6 +1384,11 @@ impl App {
                 }
             },
         );
+        if self.menu.is_none() && self.loading.is_none() {
+            let screen = crate::ui::Screen { w: gpu.config.width as f32, h: gpu.config.height as f32 };
+            let quads = crate::hud::interface(&self.game.sim, self.game.font.as_ref(), screen);
+            gpu.renderer.draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
+        }
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();
         gpu.renderer.queue.present(frame);

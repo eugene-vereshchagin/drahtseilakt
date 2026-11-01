@@ -25,6 +25,7 @@ mod scene;
 mod sim;
 mod sky;
 mod trafo;
+mod ui;
 mod volume;
 mod watch;
 

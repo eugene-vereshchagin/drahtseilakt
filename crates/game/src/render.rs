@@ -163,8 +163,11 @@ pub struct Renderer {
     particle_layout: wgpu::PipelineLayout,
     particle_tex_layout: wgpu::BindGroupLayout,
     particle_pipelines: HashMap<(PBlend, bool), wgpu::RenderPipeline>,
-    particle_textures: HashMap<&'static str, wgpu::BindGroup>,
+    named_textures: HashMap<&'static str, wgpu::BindGroup>,
     particle_white: wgpu::BindGroup,
+    /// The original's 2D interface: its pipeline over the frame (named textures, alpha blended, no depth).
+    ui_pipeline: wgpu::RenderPipeline,
+    clamp: wgpu::Sampler,
     /// The colour behind everything (the sky's zenith).
     pub clear: wgpu::Color,
     depth: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
@@ -288,6 +291,14 @@ impl Renderer {
             immediate_size: 0,
         });
         let particle_white = particle_bind(&device, &particle_tex_layout, &white, &sampler);
+        let clamp = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("clamp"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            ..Default::default()
+        });
+        let ui_pipeline = ui_pipeline(&device, &particle_tex_layout, format);
         Renderer {
             device,
             queue,
@@ -311,8 +322,10 @@ impl Renderer {
             particle_layout,
             particle_tex_layout,
             particle_pipelines: HashMap::new(),
-            particle_textures: HashMap::new(),
+            named_textures: HashMap::new(),
             particle_white,
+            ui_pipeline,
+            clamp,
             clear: wgpu::Color {
                 r: 0.4,
                 g: 0.45,
@@ -542,10 +555,68 @@ impl Renderer {
     }
 
     /// Uploads a particle texture under its name (particles.rs names them).
-    pub fn add_particle_texture(&mut self, name: &'static str, width: u32, height: u32, rgba: Vec<u8>) {
+    pub fn add_named_texture(&mut self, name: &'static str, width: u32, height: u32, rgba: Vec<u8>) {
         let view = upload_texture(&self.device, &self.queue, width, height, rgba);
-        let bind = particle_bind(&self.device, &self.particle_tex_layout, &view, &self.sampler);
-        self.particle_textures.insert(name, bind);
+        let bind = particle_bind(&self.device, &self.particle_tex_layout, &view, &self.clamp);
+        self.named_textures.insert(name, bind);
+    }
+
+    /// Draws the original's 2D interface over `target`, which keeps its content: quads in window pixels, each
+    /// with a named texture (white when the copy lacks it).
+    pub fn draw_ui(&self, target: &wgpu::TextureView, width: u32, height: u32, quads: &[crate::ui::Quad]) {
+        if quads.is_empty() {
+            return;
+        }
+        let (w, h) = (width.max(1) as f32, height.max(1) as f32);
+        let mut verts: Vec<UiVertex> = Vec::with_capacity(quads.len() * 6);
+        let mut runs: Vec<(&'static str, u32, u32)> = Vec::new();
+        for q in quads {
+            let [x0, y0, x1, y1] = q.rect;
+            let (cx0, cy0, cx1, cy1) = (x0 / w * 2.0 - 1.0, 1.0 - y0 / h * 2.0, x1 / w * 2.0 - 1.0, 1.0 - y1 / h * 2.0);
+            let [u0, v0, u1, v1] = q.uv;
+            let v = |x: f32, y: f32, u: f32, t: f32, color: [f32; 4]| UiVertex { pos: [x, y], uv: [u, t], color };
+            let first = verts.len() as u32;
+            verts.extend([
+                v(cx0, cy0, u0, v0, q.top),
+                v(cx1, cy0, u1, v0, q.top),
+                v(cx1, cy1, u1, v1, q.bottom),
+                v(cx0, cy0, u0, v0, q.top),
+                v(cx1, cy1, u1, v1, q.bottom),
+                v(cx0, cy1, u0, v1, q.bottom),
+            ]);
+            match runs.last_mut() {
+                Some(r) if r.0 == q.texture => r.2 += 6,
+                _ => runs.push((q.texture, first, 6)),
+            }
+        }
+        let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("ui"),
+            contents: bytemuck::cast_slice(&verts),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let mut enc = self.device.create_command_encoder(&Default::default());
+        {
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("ui"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.ui_pipeline);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            for (texture, first, count) in runs {
+                pass.set_bind_group(0, self.named_textures.get(texture).unwrap_or(&self.particle_white), &[]);
+                pass.draw(first..first + count, 0..1);
+            }
+        }
+        self.queue.submit([enc.finish()]);
     }
 
     fn particle_pipeline(&mut self, key: (PBlend, bool)) {
@@ -851,7 +922,7 @@ impl Renderer {
                 let Some(pipeline) = self.particle_pipelines.get(key) else {
                     continue;
                 };
-                let bind = texture.and_then(|t| self.particle_textures.get(t)).unwrap_or(&self.particle_white);
+                let bind = texture.and_then(|t| self.named_textures.get(t)).unwrap_or(&self.particle_white);
                 pass.set_pipeline(pipeline);
                 pass.set_bind_group(1, bind, &[]);
                 pass.set_vertex_buffer(0, buf.slice(..));
@@ -886,6 +957,56 @@ fn look_at_lh(eye: Vec3, target: Vec3, up: Vec3) -> Mat4 {
         glam::Vec4::new(s.z, u.z, f.z, 0.0),
         glam::Vec4::new(-s.dot(eye), -u.dot(eye), -f.dot(eye), 1.0),
     )
+}
+
+/// A vertex of the 2D interface: clip-space position, texture coordinates, colour.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct UiVertex {
+    pos: [f32; 2],
+    uv: [f32; 2],
+    color: [f32; 4],
+}
+
+fn ui_pipeline(device: &wgpu::Device, textures: &wgpu::BindGroupLayout, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("ui"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("ui.wgsl").into()),
+    });
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("ui"),
+        bind_group_layouts: &[Some(textures)],
+        immediate_size: 0,
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("ui"),
+        layout: Some(&layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs"),
+            compilation_options: Default::default(),
+            buffers: &[Some(wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<UiVertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x4],
+            })],
+        },
+        primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
+        depth_stencil: None,
+        multisample: Default::default(),
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs"),
+            compilation_options: Default::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        multiview_mask: None,
+        cache: None,
+    })
 }
 
 fn particle_bind(

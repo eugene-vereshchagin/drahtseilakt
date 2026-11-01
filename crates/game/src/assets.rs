@@ -115,6 +115,17 @@ pub struct Settings {
 }
 
 impl Data {
+    /// The data array `name` of the game file `relative`.
+    pub fn data_array(&self, relative: &str, name: &str) -> Option<nmo::scene::DataArray> {
+        let bytes = std::fs::read(self.file(relative)?).ok()?;
+        let file = nmo::read(&bytes).ok()?;
+        let doc = nmo::Document::parse(&file).ok()?;
+        doc.of_class(nmo::class::DATA_ARRAY)
+            .find(|(_, o)| o.name.eq_ignore_ascii_case(name.as_bytes()))
+            .and_then(|(_, o)| o.chunk.as_ref())
+            .and_then(|c| nmo::scene::data_array(c).ok())
+    }
+
     /// The settings row whose level file matches `file_name`; a community map without one takes level 1's.
     pub fn settings(&self, file_name: &str) -> Settings {
         let none = Settings {
@@ -123,24 +134,9 @@ impl Data {
             music: None,
             level_bonus: None,
         };
-        let Some(path) = self.file("3D Entities/Levelinit.nmo") else {
+        let Some(table) = self.data_array("3D Entities/Levelinit.nmo", "AllLevel") else {
             return none;
         };
-        let Ok(bytes) = std::fs::read(path) else {
-            return none;
-        };
-        let Ok(file) = nmo::read(&bytes) else {
-            return none;
-        };
-        let Ok(doc) = nmo::Document::parse(&file) else {
-            return none;
-        };
-        let table = doc
-            .of_class(nmo::class::DATA_ARRAY)
-            .find(|(_, o)| o.name.eq_ignore_ascii_case(b"AllLevel"))
-            .and_then(|(_, o)| o.chunk.as_ref())
-            .and_then(|c| nmo::scene::data_array(c).ok());
-        let Some(table) = table else { return none };
         let text = |row: &Vec<nmo::scene::Cell>, col: &str| -> Option<String> {
             match table.column(col).and_then(|c| row.get(c)) {
                 Some(nmo::scene::Cell::String(s)) => Some(String::from_utf8_lossy(s).into_owned()),

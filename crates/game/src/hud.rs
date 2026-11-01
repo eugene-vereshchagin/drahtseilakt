@@ -1,6 +1,6 @@
-// On-screen text for the prototype: a 5×7 pixel font written for this project (no game assets), drawn as
-// solid quads over the frame, and the messages the game shows (points and lives, level complete, ball lost,
-// game over). Replaced by the real HUD in phase 4.
+// The in-game interface: the original's points counter and life balls (`interface`, laid out as the C game shows
+// them: the Gameplay scripts' 2D frames over Button01_special, the points in the game font), and the prototype's
+// messages in a 5×7 pixel font written for this project (level complete, ball lost, game over; the debug line).
 
 use crate::sim::Sim;
 
@@ -189,27 +189,27 @@ const SHADE: [f32; 4] = [0.0, 0.0, 0.0, 0.55];
 const GOLD: [f32; 4] = [1.0, 0.85, 0.3, 1.0];
 
 /// What the player sees over the frame, for the current state of the run.
-pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u64>) -> Vec<Rect> {
+pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u64>, debug: bool) -> Vec<Rect> {
     let (w, h) = (width_px as f32, height_px as f32);
     let scale = (h / 240.0).round().max(2.0);
     let mut out = Vec::new();
 
-    // Points, lives and sector in the top left corner, always.
+    // The sector and the tick in the top left corner, in debug mode.
     let hud = format!(
-        "POINTS {}   LIVES {}   SECTOR {}   TICK {}",
-        sim.points,
-        sim.lives,
+        "SECTOR {}   TICK {}",
         sim.sector + 1,
         sim.tick
     );
-    out.push(Rect {
-        x: 0.0,
-        y: 0.0,
-        w: width(&hud, scale) + 2.0 * scale,
-        h: 9.0 * scale,
-        color: SHADE,
-    });
-    text(&mut out, &hud, scale, scale * 1.5, scale, WHITE);
+    if debug {
+        out.push(Rect {
+            x: 0.0,
+            y: 0.0,
+            w: width(&hud, scale) + 2.0 * scale,
+            h: 9.0 * scale,
+            color: SHADE,
+        });
+        text(&mut out, &hud, scale, scale * 1.5, scale, WHITE);
+    }
 
     let centre = |out: &mut Vec<Rect>, s: &str, y: f32, scale: f32, color: [f32; 4]| {
         text(out, s, (w - width(s, scale)) / 2.0, y, scale, color);
@@ -271,6 +271,46 @@ pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u6
             scale * 2.0,
             [1.0, 0.45, 0.45, 1.0],
         );
+    }
+    out
+}
+
+/// The points box and the life balls as the original draws them (rectangles and texture parts of its 2D frames, as
+/// the C game places them; the points in Font_Punktezähler's style). One ball per life; each further one 0.0387 of
+/// the context to the left, the end piece after the last.
+pub fn interface(sim: &Sim, font: Option<&crate::ui::Font>, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
+    use crate::ui::{Anchor, Quad, homogeneous};
+    const SPECIAL: &str = "Button01_special";
+    let quad = |r: [f32; 4], uv: [f32; 4], anchor: Anchor| Quad {
+        rect: screen.rect(homogeneous(r), anchor),
+        uv,
+        top: WHITE,
+        bottom: WHITE,
+        texture: SPECIAL,
+    };
+    let mut out = Vec::new();
+    let lives = sim.lives.min(40) as usize;
+    let first = 0.910_90_f32;
+    for k in 0..lives {
+        let x = first - k as f32 * 0.0387;
+        out.push(quad([x, 0.885_40, x + 0.043_75, 0.943_73], [0.0667, 0.5294, 0.1765, 0.6392], Anchor::Right));
+    }
+    let end = first - lives.saturating_sub(1) as f32 * 0.0387 - 0.0208;
+    out.push(quad([end, 0.881_30, end + 0.023_44, 0.943_80], [0.0040, 0.5255, 0.0600, 0.6410], Anchor::Right));
+    out.push(quad([0.890_63, 0.85, 0.981_25, 0.977_09], [0.1843, 0.4667, 0.4078, 0.7020], Anchor::Right));
+    out.push(quad([0.015, 0.87, 0.235, 0.98], [0.3255, 0.7300, 1.0, 0.9804], Anchor::Left));
+    if let Some(f) = font {
+        let style = crate::ui::Style {
+            scale: [0.8, 0.9],
+            spacing: [1.5, 1.0],
+            align: crate::ui::ALIGN_RIGHT,
+            flags: crate::ui::TEXT_SCREEN,
+            margins: [2.0; 4],
+            color: WHITE,
+            v2: true,
+        };
+        let digits = f.layout(sim.points.max(0).to_string().as_bytes(), homogeneous([0.05, 0.884_17, 0.203_75, 0.934_17]), &style);
+        out.extend(crate::ui::place(digits, screen, Anchor::Left));
     }
     out
 }
