@@ -24,7 +24,7 @@ new engine got level 1 playable, ahead of the phase order:
   bridge. Sound as the original's Sound_Manager and Music_Manager make it: event sounds, the ball's hits and rolling
   by floor material, the level's music. The fans hum near them, the plate bridge's rope tears. The menu sets the sound and music volumes.
   Particles as the original's blocks make them: the flames at the start and the checkpoints, the extra points'
-  sparkles and trails. Missing: the other particles (fans, extra life, the ball's smoke), level 13's add-on.
+  sparkles and trails, the fans' wind, the extra life's fizz. Missing: the ball's smoke, level 13's add-on.
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
 
 

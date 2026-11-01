@@ -459,7 +459,8 @@ impl System {
         }
         self.emitting = on;
         self.particles.clear();
-        self.elapsed = 0.0;
+        // On starts the clock at the delay, so the first emission comes at once
+        self.elapsed = if on { self.spec.delay } else { 0.0 };
         self.trail = None;
     }
 
@@ -581,10 +582,19 @@ enum When {
     Before(usize, Vec3),
     /// The checkpoint's two small flames: near, once it is passed.
     After(usize, Vec3),
+    /// A fan's wind: while its updraft is switched on and the ball is within `FAN_NEAR`; the frame spins about the
+    /// rotor's axis (the script's Rotate, `FAN_SPIN` a second) from `base` by `angle`.
+    Fan { base: Mat4, axis: Vec3, angle: f32 },
+    /// An extra life's blob and fizz: one emission when the ball takes it (the level object; its script switches
+    /// them on and, five frames later, off again, within one emission delay).
+    Taken { object: usize, done: bool },
 }
 
 /// The modules' proximity (TT Scaleable Proximity, Distance 70).
 const NEAR: f32 = 70.0;
+/// Module 18's proximity (80) and its particle frame's spin (Per Second -15 into Rotate, radians).
+const FAN_NEAR: f32 = 80.0;
+const FAN_SPIN: f32 = -15.0;
 
 /// The particle systems of an extra point: its burst when it fires, the six small balls' trails, their hits.
 struct ExtraFx {
@@ -615,16 +625,18 @@ impl Effects {
         for (group, file) in [
             ("PS_Levelstart", "PS_FourFlames"),
             ("PC_Checkpoints", "PC_TwoFlames"),
+            ("P_Modul_18", "P_Modul_18"),
+            ("P_Extra_Life", "P_Extra_Life"),
         ] {
             if level.group(group).is_none() {
                 continue;
             }
             let Some(m) = module(file) else { continue };
-            let root = m
-                .objects
-                .iter()
-                .find(|o| o.name.eq_ignore_ascii_case(&format!("{file}_MF")))
+            let named = |n: &str| m.objects.iter().find(|o| o.name.eq_ignore_ascii_case(n));
+            let root = named(&format!("{file}_MF"))
                 .map_or(Mat4::IDENTITY, |o| Mat4::from_cols_array_2d(&o.matrix));
+            let rotor =
+                named(&format!("{file}_Rotor")).map(|o| Mat4::from_cols_array_2d(&o.matrix));
             for (i, o) in level.members(group) {
                 let place = Mat4::from_cols_array_2d(&o.matrix);
                 let at = place.w_axis.truncate();
@@ -638,6 +650,17 @@ impl Effects {
                     };
                     let frame = place * root.inverse() * Mat4::from_cols_array_2d(&f.matrix);
                     let when = match spec.frame {
+                        f if f.starts_with("P_Modul_18") => When::Fan {
+                            base: frame,
+                            axis: rotor.map_or(Vec3::Y, |r| {
+                                (place * root.inverse() * r).y_axis.truncate()
+                            }),
+                            angle: 0.0,
+                        },
+                        f if f.starts_with("P_Extra_Life") => When::Taken {
+                            object: i,
+                            done: false,
+                        },
                         f if f.ends_with("_Big") => When::Before(i, at),
                         f if f.starts_with("PC_") => When::After(i, at),
                         _ => When::Near(at),
@@ -652,7 +675,9 @@ impl Effects {
 
     /// Whether the level has any flames (their stand-ins need no markers then).
     pub fn has_flames(&self) -> bool {
-        !self.emitters.is_empty()
+        self.emitters
+            .iter()
+            .any(|e| matches!(e.1, When::Near(_) | When::Before(..) | When::After(..)))
     }
 
     fn next_seed(&mut self) -> u32 {
@@ -664,11 +689,27 @@ impl Effects {
     pub fn tick(&mut self, sim: &crate::sim::Sim) {
         let ball = sim.ball.position;
         let dt = crate::sim::TICK * 1000.0;
+        let fans = sim.fans();
         for (s, when) in &mut self.emitters {
-            let on = match *when {
+            let on = match when {
                 When::Near(at) => at.distance(ball) < NEAR,
-                When::Before(o, at) => !sim.checkpoint_passed(o) && at.distance(ball) < NEAR,
-                When::After(o, at) => sim.checkpoint_passed(o) && at.distance(ball) < NEAR,
+                When::Before(o, at) => !sim.checkpoint_passed(*o) && at.distance(ball) < NEAR,
+                When::After(o, at) => sim.checkpoint_passed(*o) && at.distance(ball) < NEAR,
+                When::Fan { base, axis, angle } => {
+                    let at = base.w_axis.truncate();
+                    *angle = (*angle + FAN_SPIN * crate::sim::TICK) % std::f32::consts::TAU;
+                    let turn = Mat4::from_axis_angle(axis.normalize_or(Vec3::Y), *angle);
+                    s.frame =
+                        Mat4::from_translation(at) * turn * Mat4::from_translation(-at) * *base;
+                    fans.iter().any(|p| p.distance(at) < 1.0) && at.distance(ball) < FAN_NEAR
+                }
+                When::Taken { object, done } => {
+                    if !*done && sim.taken.contains(object) {
+                        *done = true;
+                        s.pulses = 1;
+                    }
+                    false
+                }
             };
             s.set_active(on);
             s.tick(dt);
