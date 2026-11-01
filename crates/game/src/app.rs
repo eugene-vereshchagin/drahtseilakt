@@ -1202,6 +1202,9 @@ impl App {
             ticks += 1;
         }
         let simulated = started.elapsed();
+        if let Some(a) = &mut self.audio {
+            a.pass(f64::from(ticks) * f64::from(TICK));
+        }
         self.sound_events();
         let cur = Snapshot::of(&self.game.sim);
         let mut snap = Snapshot::lerp(&self.prev.unwrap_or(cur), &cur, self.acc / TICK);

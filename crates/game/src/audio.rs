@@ -13,6 +13,34 @@ pub struct Sound {
     rate: u32,
 }
 
+/// The rate of a file output.
+const FILE_RATE: u32 = 44100;
+
+impl Drop for Audio {
+    /// A file output is written when the game ends.
+    fn drop(&mut self) {
+        if let Output::File { path, samples } = &self.output {
+            let data: Vec<u8> = samples.iter().flat_map(|s| ((s * 32767.0) as i16).to_le_bytes()).collect();
+            let mut out = b"RIFF".to_vec();
+            out.extend((36 + data.len() as u32).to_le_bytes());
+            out.extend(b"WAVEfmt ");
+            out.extend(16u32.to_le_bytes());
+            out.extend(1u16.to_le_bytes());
+            out.extend(2u16.to_le_bytes());
+            out.extend(FILE_RATE.to_le_bytes());
+            out.extend((FILE_RATE * 4).to_le_bytes());
+            out.extend(4u16.to_le_bytes());
+            out.extend(16u16.to_le_bytes());
+            out.extend(b"data");
+            out.extend((data.len() as u32).to_le_bytes());
+            out.extend(data);
+            if let Err(e) = std::fs::write(path, out) {
+                eprintln!("sound file {}: {e}", path.display());
+            }
+        }
+    }
+}
+
 /// The largest WAV file read (the game's longest music part is about 4 MB).
 const MAX_WAV_BYTES: usize = 64 << 20;
 
@@ -163,16 +191,32 @@ impl Mixer {
 }
 
 /// The game's sound: the output stream, the mixer it plays, and the sounds loaded so far.
+/// Where the mix goes: the system's output, or a WAV file (DRAHTSEILAKT_SOUND_FILE, for checking the sound
+/// without speakers), mixed as the game's frames pass.
+enum Output {
+    Device { _stream: cpal::Stream },
+    File { path: std::path::PathBuf, samples: Vec<f32> },
+}
+
 pub struct Audio {
-    _stream: cpal::Stream,
+    output: Output,
     mixer: Arc<Mutex<Mixer>>,
     sounds: HashMap<String, Option<Arc<Sound>>>,
     next: u64,
 }
 
 impl Audio {
-    /// The default output device, or None (no device, or it refused a stream): the game is then silent.
+    /// The default output device, or None (no device, or it refused a stream): the game is then silent. With
+    /// DRAHTSEILAKT_SOUND_FILE set, the mix is written to that WAV file instead (44100 Hz stereo, 16 bit).
     pub fn open() -> Option<Audio> {
+        if let Some(path) = std::env::var_os("DRAHTSEILAKT_SOUND_FILE") {
+            return Some(Audio {
+                output: Output::File { path: path.into(), samples: Vec::new() },
+                mixer: Arc::new(Mutex::new(Mixer { voices: Vec::new(), rate: FILE_RATE })),
+                sounds: HashMap::new(),
+                next: 1,
+            });
+        }
         let device = cpal::default_host().default_output_device()?;
         let config = device.default_output_config().ok()?;
         let channels = usize::from(config.channels());
@@ -215,11 +259,23 @@ impl Audio {
         .ok()?;
         stream.play().ok()?;
         Some(Audio {
-            _stream: stream,
+            output: Output::Device { _stream: stream },
             mixer,
             sounds: HashMap::new(),
             next: 1,
         })
+    }
+
+    /// `seconds` of the game passed: with a file output, that much is mixed into it (a device mixes by itself).
+    pub fn pass(&mut self, seconds: f64) {
+        if let Output::File { samples, .. } = &mut self.output {
+            let frames = (seconds * f64::from(FILE_RATE)).round() as usize;
+            let mut buf = vec![0.0f32; frames * 2];
+            if let Ok(mut m) = self.mixer.lock() {
+                m.fill(&mut buf, 2);
+            }
+            samples.extend(buf);
+        }
     }
 
     /// A sound of the game by its file name without `.wav`, loaded once (None if the copy lacks it or it is broken).
