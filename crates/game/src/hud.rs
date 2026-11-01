@@ -237,8 +237,8 @@ pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u6
         if sim.finished {
             let time = format!(
                 "TIME {:02}:{:05.2}",
-                sim.tick / 3600,
-                (sim.tick % 3600) as f32 / 60.0
+                sim.finished_at / 3600,
+                (sim.finished_at % 3600) as f32 / 60.0
             );
             centre(&mut out, &time, line_top, small, WHITE);
             centre(&mut out, "ENTER NEXT LEVEL   ESC MENU", keys_top, scale, WHITE);

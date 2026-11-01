@@ -213,13 +213,66 @@ struct ModuleInst {
     joints: Vec<JointInst>,
     /// The part woken when the ball comes near: its body, the point measured from, and the distance.
     wake: Option<(usize, Vec3, f32)>,
+    /// The forces made when it is woken.
+    forces: Vec<ForceInst>,
+    finish: Option<FinishInst>,
+}
+
+/// A force on a body: a world vector at a world point (crate::modules::ForceSpec, placed).
+#[derive(Clone, Copy, Debug)]
+struct ForceInst {
+    body: usize,
+    force: Vec3,
+    point: Vec3,
+}
+
+/// The finish's trigger of a module (crate::modules::FinishSpec, placed): the part measured to, the distance, the
+/// push, and the joints it breaks (indices into the module's joints).
+#[derive(Clone, Debug)]
+struct FinishInst {
+    near: usize,
+    distance: f32,
+    force: ForceInst,
+    breaks: Vec<usize>,
+}
+
+/// A finish trigger armed while its module is in the physics: the joints it breaks are those made when the module
+/// came in.
+#[derive(Clone, Debug)]
+struct FinishTrigger {
+    near: usize,
+    distance: f32,
+    force: ForceInst,
+    breaks: Vec<usize>,
+    /// The physics' joints to break, made when the module came into the physics.
+    joints: Vec<usize>,
+    armed: bool,
+    next: u64,
+}
+
+impl FinishTrigger {
+    /// Armed, with the physics' joints its module just made.
+    fn arm(&mut self, made: &[Option<usize>]) {
+        self.joints = self.breaks.iter().filter_map(|&k| made.get(k).copied().flatten()).collect();
+        self.armed = true;
+        self.next = 0;
+    }
+}
+
+/// Frames until the finish's next proximity check at distance `d` (its TT Scaleable Proximity: every frame within
+/// 5, every 10 frames beyond 10, in between in proportion).
+fn finish_delay(d: f32) -> u64 {
+    let k = ((d - 5.0) / 5.0).clamp(0.0, 1.0);
+    (1.0 + 9.0 * k).round() as u64
 }
 
 /// A module's wake-up on approach, armed while its module is in the physics (crate::modules::WakeSpec).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct WakeTrigger {
     sector: Option<usize>,
     body: usize,
+    /// The forces made when it fires.
+    forces: Vec<ForceInst>,
     near: Vec3,
     distance: f32,
     armed: bool,
@@ -244,21 +297,24 @@ enum JointInst {
 }
 
 impl ModuleInst {
-    /// The parts are made at their places and their joints attached, as the module's scripts do.
-    fn enter(&self, world: &mut World) {
+    /// The parts are made at their places and their joints attached, as the module's scripts do. Returns the physics'
+    /// joint of each of the module's joints.
+    fn enter(&self, world: &mut World) -> Vec<Option<usize>> {
         for &b in &self.parts {
             world.activate(b);
         }
+        let mut made = Vec::new();
         for j in &self.joints {
-            match *j {
+            made.push(match *j {
                 JointInst::Slider { a, b, p0, p1, limits } => world.add_slider(a, b, p0, p1, limits),
                 JointInst::Hinge { a, b, anchor, axis } => world.add_hinge(a, b, anchor, axis),
                 JointInst::Ball { a, b, anchor } => world.add_ball_joint(a, b, anchor),
                 JointInst::Spring { a, pa, b, pb, length, constant, lin_damp, glob_damp } => {
                     world.add_spring(a, pa, b, pb, length, constant, lin_damp, glob_damp)
                 }
-            };
+            });
         }
+        made
     }
 
     /// The parts leave the physics, their joints with them.
@@ -293,7 +349,7 @@ fn module_parts(
     fixcube: Option<usize>,
     bodies: &mut Vec<ModuleBody>,
 ) -> Option<ModuleInst> {
-    use crate::modules::{FIXCUBE, JointSpec};
+    use crate::modules::{FIXCUBE, ForceSpec, JointSpec};
     let place = glam::Mat4::from_cols_array_2d(&level.objects.get(i)?.matrix);
     let at = |name: &str| -> Option<glam::Mat4> {
         let o = file.objects.iter().find(|o| o.name == name)?;
@@ -343,6 +399,15 @@ fn module_parts(
     if let Some(w) = spec.wake {
         inst.wake = Some((body(w.part)?, at(w.near)?.w_axis.truncate(), w.distance));
     }
+    // A force's direction turned by its frame and normalised (a near-zero one is +x), times its value.
+    let force = |f: &ForceSpec| -> Option<ForceInst> {
+        let dir = at(f.dir_frame)?.transform_vector3(Vec3::from(f.dir));
+        let dir = if dir.length_squared() <= 1e-4 { Vec3::X } else { dir.normalize() };
+        Some(ForceInst { body: body(f.part)?, force: dir * f.value, point: point(f.pos_frame, f.pos)? })
+    };
+    for f in spec.forces {
+        inst.forces.push(force(f)?);
+    }
     for j in spec.joints {
         inst.joints.push(match *j {
             JointSpec::Slider { a, b, from, to, limits, lo, hi } => JointInst::Slider {
@@ -376,6 +441,17 @@ fn module_parts(
                 }
             }
         });
+    }
+    if let Some(f) = &spec.finish {
+        // The joints broken are the hinges at the named frames.
+        let breaks = spec
+            .joints
+            .iter()
+            .enumerate()
+            .filter(|(_, j)| matches!(j, JointSpec::Hinge { frame, .. } if f.breaks.contains(frame)))
+            .map(|(k, _)| k)
+            .collect();
+        inst.finish = Some(FinishInst { near: body(f.near)?, distance: f.distance, force: force(&f.force)?, breaks });
     }
     Some(inst)
 }
@@ -411,6 +487,8 @@ pub struct Sim {
     pub points: i64,
     pub sector: usize,
     pub finished: bool,
+    /// The tick the level was finished at (the run's time; the world goes on after it).
+    pub finished_at: u64,
     pub game_over: bool,
     /// Objects taken (extra points and lives) are hidden by the renderer.
     pub taken: Vec<usize>,
@@ -430,6 +508,8 @@ pub struct Sim {
     module_sectors: Vec<Vec<ModuleInst>>,
     /// The modules' wake-ups on approach.
     wake_triggers: Vec<WakeTrigger>,
+    /// The finish's triggers (the balloon's); the level's end gate counts only when there is none.
+    finishes: Vec<FinishTrigger>,
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
@@ -679,22 +759,39 @@ impl Sim {
             (1.0 / 30.0, START_OBJECTS_SECONDS)
         };
         world.run(frame);
-        for inst in unsectored_modules.iter().chain(module_sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
-            inst.enter(&mut world);
-        }
-        // The wake-ups on approach, armed now for the modules that are in the physics from the start.
+        // The wake-ups on approach and the finish triggers, armed now for the modules that are in the physics from
+        // the start.
         let mut wake_triggers = Vec::new();
+        let mut finishes = Vec::new();
         let sectored = module_sectors.iter().enumerate().flat_map(|(n, v)| v.iter().map(move |m| (Some(n), m)));
         for (sector, inst) in unsectored_modules.iter().map(|m| (None, m)).chain(sectored) {
+            let now = sector.is_none_or(|n| n == 0);
+            let joints = if now { inst.enter(&mut world) } else { Vec::new() };
             if let Some((body, near, distance)) = inst.wake {
                 wake_triggers.push(WakeTrigger {
                     sector,
                     body,
+                    forces: inst.forces.clone(),
                     near,
                     distance,
-                    armed: sector.is_none_or(|n| n == 0),
+                    armed: now,
                     next: 0,
                 });
+            }
+            if let Some(f) = &inst.finish {
+                let mut t = FinishTrigger {
+                    near: f.near,
+                    distance: f.distance,
+                    force: f.force,
+                    breaks: f.breaks.clone(),
+                    joints: Vec::new(),
+                    armed: false,
+                    next: 0,
+                };
+                if now {
+                    t.arm(&joints);
+                }
+                finishes.push(t);
             }
         }
         world.run(until_ball - frame);
@@ -718,6 +815,7 @@ impl Sim {
             points: 1000,
             sector: 0,
             finished: false,
+            finished_at: 0,
             game_over: false,
             taken: Vec::new(),
             events: Vec::new(),
@@ -728,6 +826,7 @@ impl Sim {
             push_keys: 0,
             sectors,
             wake_triggers,
+            finishes,
             module_sectors,
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
@@ -785,7 +884,22 @@ impl Sim {
     }
 
     pub fn step(&mut self, input: u8) {
-        if self.finished || self.game_over {
+        if self.game_over {
+            return;
+        }
+        if self.finished {
+            // The level is over, the world goes on: the balloon carries the ball away, unsteered, the camera looking
+            // after it from where it stopped.
+            self.tick += 1;
+            self.world.set_push(0, Vec3::ZERO);
+            self.world.step(None);
+            if let Some(s) = self.world.state(0) {
+                self.ball.position = s.pos;
+                self.ball.velocity = s.vel;
+                self.ball.rotation = s.rot;
+                self.ball.spin = s.spin;
+            }
+            self.camera.target += (self.ball.position - self.camera.target) * (1.0 - (-TICK * 12.0f32).exp());
             return;
         }
         self.tick += 1;
@@ -934,14 +1048,17 @@ impl Sim {
             self.sector_change(SECTOR_BEGIN_TICKS, self.sector, true);
         }
         if let Some(end) = self.rules.end
+            && self.finishes.is_empty()
             && self.sector >= self.rules.checkpoints.len()
             && near(end, GATE_RADIUS)
         {
             self.finished = true;
+            self.finished_at = self.tick;
             self.events.push((self.tick, Event::Finished));
         }
         self.apply_sector_changes();
         self.check_wake_triggers();
+        self.check_finishes();
         if let Some(d) = self.dying {
             if self.tick == d + DEATH_REMOVE_TICKS {
                 self.world.remove(0);
@@ -1033,9 +1150,38 @@ impl Sim {
             if d < w.distance {
                 w.armed = false;
                 self.world.wake(w.body);
+                for f in &w.forces {
+                    self.world.add_force(f.body, f.force, f.point);
+                }
             } else {
                 w.next = tick + proximity_delay(d);
             }
+        }
+    }
+
+    /// The finish's triggers: the ball within reach of the balloon's platform pushes its box away, breaks its bridge
+    /// and finishes the level, as its script does. The ball is measured to the part where the physics has it.
+    fn check_finishes(&mut self) {
+        let (tick, ball) = (self.tick, self.ball.position);
+        let mut fired = None;
+        for t in self.finishes.iter_mut().filter(|t| t.armed && t.next <= tick) {
+            let Some(near) = self.world.bodies.get(t.near) else { continue };
+            let d = ball.distance(near.pos);
+            if d < t.distance {
+                t.armed = false;
+                fired = Some((t.force, t.joints.clone()));
+                break;
+            }
+            t.next = tick + finish_delay(d);
+        }
+        if let Some((force, joints)) = fired {
+            self.world.add_force(force.body, force.force, force.point);
+            for j in joints {
+                self.world.remove_joint(j);
+            }
+            self.finished = true;
+            self.finished_at = self.tick;
+            self.events.push((self.tick, Event::Finished));
         }
     }
 
@@ -1049,9 +1195,19 @@ impl Sim {
                 let insts = self.module_sectors.get(c.sector).cloned().unwrap_or_default();
                 for inst in &insts {
                     if c.enter {
-                        inst.enter(&mut self.world);
+                        let joints = inst.enter(&mut self.world);
+                        if let Some(f) = &inst.finish
+                            && let Some(t) = self.finishes.iter_mut().find(|t| t.near == f.near)
+                        {
+                            t.arm(&joints);
+                        }
                     } else {
                         inst.leave(&mut self.world);
+                        if let Some(f) = &inst.finish
+                            && let Some(t) = self.finishes.iter_mut().find(|t| t.near == f.near)
+                        {
+                            t.armed = false;
+                        }
                     }
                 }
                 for w in self.wake_triggers.iter_mut().filter(|w| w.sector == Some(c.sector)) {
@@ -1652,6 +1808,38 @@ mod tests {
             sim.step(0);
         }
         assert!(sim.world.state(b2).is_some(), "the next sector's box came");
+    }
+
+    /// Level 1's finish with the player's copy (skipped without OPENBALLANCE_DATA): rolled onto the balloon's
+    /// platform, the ball finishes the level and the balloon carries it away along +x at about 1.1 units per 20
+    /// ticks, the ball 0.72 behind the platform's centre, as in the C game (docs/physics.md, the balloon).
+    #[test]
+    fn the_balloon_finishes_level_1_and_carries_the_ball_away() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
+        sim.start_from(3, None, Some(Vec3::new(704.0, -9.0, -873.7)));
+        for t in 0..400 {
+            sim.step(if t < 120 { input::UP } else { 0 });
+            if sim.finished {
+                break;
+            }
+        }
+        assert!(sim.finished, "not finished, the ball at {:?}", sim.ball.position);
+        let platform = sim.finishes[0].near;
+        let p0 = sim.world.bodies[platform].pos;
+        for _ in 0..200 {
+            sim.step(0);
+        }
+        let p1 = sim.world.bodies[platform].pos;
+        let speed = (p1.x - p0.x) / 10.0;
+        assert!((speed - 1.1).abs() < 0.3, "the platform went {:?} -> {:?}", p0, p1);
+        let behind = sim.ball.position - p1;
+        assert!((behind.x + 0.72).abs() < 0.2 && behind.y.abs() < 0.5, "the ball at {behind:?} from the platform");
     }
 
     #[test]

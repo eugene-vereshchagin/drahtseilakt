@@ -227,6 +227,19 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   - Lost ball: one frame after the ball is taken out of the physics (61 frames after its box reaches a depth-test
     cube), the current sector's objects are unphysicalized, and 4 frames later physicalized again at their places.
 
+  The finish (`PE_Balloon Script`, PH/PE_Balloon.nmo), with the last sector: the platform (mass 4, its mass centre
+  at (0,2,0)), the eight bridge planks, the four ropes and balloons and `PE_Box_slide` are physicalized asleep; box
+  on FixCube by a slider (close → far, limits -30000..0), platform on the box by a slider (high → low, no limits) and
+  a spring (15 / 20 / 0.6 / 1); ropes hinged to the platform and to the balloons; the bridge a hinge chain from the
+  platform (Hinge01) to FixCube (Hinge09). When the ball comes within 70 of the platform it is woken and the balloon
+  forces start: 0.3 up (in `hinge_b`) on each balloon and 0.3 outwards on each rope. When the ball is within 1 of the
+  platform's origin, `PE_Box_slide` gets 0.2 along its (-1,0,1), the bridge hinges are destroyed and the level is
+  finished (a message to `All_Gameplay`). Measured in the C build with the balloon moved next to the start of level
+  1 and the sectors advanced by moving the checkpoints under the ball: woken, the platform settles about 1.74 down
+  and 0.74 along its x, swinging about 1 at first; a slow ball sticks in the sagging bridge and falls off; after the
+  finish the platform carries the ball along +x of the world at 1.1 units per 20 frames, rising slowly, the ball
+  0.72 behind the platform's origin. The port does the same (crates/game/src/modules.rs, `PE_Balloon`).
+
 - **FixCube** (Levelinit `init Placeholders`): fixed, Enable Collision 0, surface `FixCube_Mesh`. It is the
   static anchor for single-body joints.
 - **Ball pieces** (explosions in `Balls.nmo`): convex, group Ball, friction 2, elasticity 1, mass 0.2 (stone

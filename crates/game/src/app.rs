@@ -385,6 +385,11 @@ impl Game {
             Some(_) => 0,
             None => keys,
         };
+        if self.sim.finished {
+            // After the finish the world goes on for the eye (the balloon leaves); the run is over and recorded.
+            self.sim.step(0);
+            return;
+        }
         let events_before = self.sim.events.len();
         self.sim.step(input);
         self.replay_out.record(self.sim.tick, input);

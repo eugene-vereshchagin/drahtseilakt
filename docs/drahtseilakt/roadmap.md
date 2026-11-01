@@ -13,12 +13,12 @@ new engine got level 1 playable, ahead of the phase order:
   in the prototype's own font. Missing: free camera, the original's HUD and menu screens, 8K check.
 - **Phase 3**: the ball physics is IVP's, ported from the upstream's C (crates/ivp) and checked against the C
   game: a straight push of the wooden and of the stone ball and a 17-second route on level 1 agree to within 0.1
-  and 0.8 units. Missing: floor materials per object, the modules' physics.
+  and 0.8 units. Missing: floor materials per object.
 - **Phase 4**: rules from the level's groups (start, reset points, checkpoints, extra points and lives, ball
   transformers, falling, finish); replays recorded, the best per level kept. Sectors, domes and the level start
   follow the C game, and so does the transformer's animation (ring, bars, the ball's change). The modules of levels 1 to 12 are made of
-  their physical parts and joints as in the C game. Missing: the modules' scripts (their forces and timers, the
-  finish's balloon), the transformer's flash texture scroll and ring colour, sounds, music, level 13's add-on.
+  their physical parts and joints as in the C game, and the finish's balloon carries the ball away as in the C game.
+  Missing: the other modules' scripts (their forces and timers), the transformer's flash texture scroll and ring colour, sounds, music, level 13's add-on.
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
 
 

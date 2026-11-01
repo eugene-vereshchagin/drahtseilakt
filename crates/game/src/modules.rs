@@ -1,7 +1,8 @@
 // The physics of the original's modules (PH/P_Modul_NN.nmo, PH/PE_Balloon.nmo): which of a module's objects its
 // scripts physicalize, with which values and collision meshes, and the joints they make, as the C game makes them
-// (docs/physics.md, the PH module table). The modules' scripted behaviour (forces, timers) is not here; a module
-// without an entry has no physics at all in the original, so its placeholder is not solid either.
+// (docs/physics.md, the PH module table), and the parts of their scripts the port runs: forces that start when the ball
+// comes near, and the finish's balloon. Other scripted behaviour (timers, the other modules' forces) is not here yet;
+// a module without an entry has no physics at all in the original, so its placeholder is not solid either.
 
 use crate::physics::Material;
 
@@ -76,12 +77,39 @@ pub struct WakeSpec {
     pub distance: f32,
 }
 
+/// A force a module's script puts on a part (SetPhysicsForce): `value` along `dir` turned by `dir_frame`'s axes and
+/// normalised, at `pos` in `pos_frame`, both taken where the frames are when the force is made. The force keeps its
+/// world direction; it is an impulse at every PSI while the part is awake (docs/physics.md, 2.2).
+#[derive(Debug, Clone, Copy)]
+pub struct ForceSpec {
+    pub part: &'static str,
+    pub pos: [f32; 3],
+    pub pos_frame: &'static str,
+    pub dir: [f32; 3],
+    pub dir_frame: &'static str,
+    pub value: f32,
+}
+
+/// The finish's trigger (PE_Balloon): when the ball comes within `distance` of part `near` (TT Scaleable Proximity
+/// with exactness 5 to 10, every 1 to 10 frames), the script pushes with `force`, breaks the hinges at the frames
+/// `breaks` and tells the game the level is finished.
+#[derive(Debug, Clone, Copy)]
+pub struct FinishSpec {
+    pub near: &'static str,
+    pub distance: f32,
+    pub force: ForceSpec,
+    pub breaks: &'static [&'static str],
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ModuleSpec {
     pub name: &'static str,
     pub parts: &'static [PartSpec],
     pub joints: &'static [JointSpec],
     pub wake: Option<WakeSpec>,
+    /// Forces made when the wake-up fires.
+    pub forces: &'static [ForceSpec],
+    pub finish: Option<FinishSpec>,
 }
 
 const fn material(friction: f32, elasticity: f32, mass: f32, lin_damp: f32, rot_damp: f32) -> Material {
@@ -95,8 +123,8 @@ const fn material(friction: f32, elasticity: f32, mass: f32, lin_damp: f32, rot_
 }
 
 /// Every module with physics in levels 1 to 12, as the C game physicalizes them at a level's load (its PHYSICALIZE,
-/// SLIDER, HINGE, BALLJOINT and SPRING records, printed from its building blocks). The finish (PE_Balloon) is not
-/// here: its balloons are held up by its script, and without it they would pull its bridge down under the ball.
+/// SLIDER, HINGE, BALLJOINT and SPRING records, printed from its building blocks), and the finish (PE_Balloon) from its
+/// script's blocks: its balloons are held up by their forces, which start with its wake-up.
 const MODULES: &[ModuleSpec] = &[
     ModuleSpec {
         name: "P_Modul_01",
@@ -135,6 +163,8 @@ const MODULES: &[ModuleSpec] = &[
         joints: &[
         ],
         wake: Some(WakeSpec { part: "P_Modul_01_Pusher", near: "P_Modul_01_Pusher", distance: 50.0 }),
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_03",
@@ -235,6 +265,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Spring { a: "P_Modul_03_Floor", pos_a: [0.0, 0.0, 0.0], frame_a: "P_Modul_03_frame_low", b: "FixCube", pos_b: [0.0, 0.0, 0.0], frame_b: "P_Modul_03_frame_high", length: 0.0, constant: 15.0, lin_damp: 0.1, glob_damp: 1.0 },
         ],
         wake: Some(WakeSpec { part: "P_Modul_03_Floor", near: "P_Modul_03_MF", distance: 35.0 }),
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_08",
@@ -254,6 +286,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Hinge { a: "P_Modul_08_Schaukel", b: "FixCube", frame: "P_Modul_08_HingeFrame" },
         ],
         wake: None,
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_17",
@@ -274,6 +308,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Spring { a: "Modul17_Dreharme", pos_a: [0.0, 4.0, 0.0], frame_a: "P_Modul_17_HingeFrame", b: "FixCube", pos_b: [0.0, 0.0, -4.0], frame_b: "Modul17_Dreharme", length: 0.0, constant: 0.32, lin_damp: 0.1, glob_damp: 0.1 },
         ],
         wake: None,
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_19",
@@ -293,6 +329,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Hinge { a: "P_Modul_19_Flaps", b: "FixCube", frame: "P_Modul_19_HingeFrame" },
         ],
         wake: Some(WakeSpec { part: "P_Modul_19_Flaps", near: "P_Modul_19_MF", distance: 50.0 }),
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_25",
@@ -312,6 +350,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Hinge { a: "P_Modul_25_Bridge", b: "FixCube", frame: "P_Modul_25_HingeFrame" },
         ],
         wake: Some(WakeSpec { part: "P_Modul_25_Bridge", near: "P_Modul_25_MF", distance: 50.0 }),
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_26",
@@ -342,6 +382,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Ball { a: "P_Modul_26_Rope", b: "P_Modul_26_Sack", frame: "P_Modul_26_Balljoint_unten", pos: [0.0, 0.0, 0.0] },
         ],
         wake: None,
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_29",
@@ -450,6 +492,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Hinge { a: "P_Modul_29_Platte07", b: "P_Modul_29_Platte06", frame: "P_Modul_29_HingeFrame07" },
         ],
         wake: Some(WakeSpec { part: "P_Modul_29_Platte04", near: "P_Modul_29_MF", distance: 80.0 }),
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_30",
@@ -469,6 +513,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Hinge { a: "P_Modul_30_Wippe", b: "FixCube", frame: "P_Modul_30_HingeFrame" },
         ],
         wake: Some(WakeSpec { part: "P_Modul_30_Wippe", near: "P_Modul_30_MF", distance: 50.0 }),
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_34",
@@ -498,6 +544,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Slider { a: "P_Modul_34_Schiebestein", b: "FixCube", from: "P_Modul_34_Slider_Frame01", to: "P_Modul_34_Slider_Frame02", limits: false, lo: -1.0, hi: 1.0 },
         ],
         wake: Some(WakeSpec { part: "P_Modul_34_Schiebestein", near: "P_Modul_34_Schiebestein", distance: 50.0 }),
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_37",
@@ -517,6 +565,8 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Hinge { a: "P_Modul_37_Bridge", b: "FixCube", frame: "P_Modul_37_HingeFrame" },
         ],
         wake: Some(WakeSpec { part: "P_Modul_37_Bridge", near: "P_Modul_37_MF", distance: 50.0 }),
+        forces: &[],
+        finish: None,
     },
     ModuleSpec {
         name: "P_Modul_41",
@@ -536,6 +586,324 @@ const MODULES: &[ModuleSpec] = &[
             JointSpec::Hinge { a: "P_Modul_41", b: "FixCube", frame: "P_Modul_41_HingeFrame" },
         ],
         wake: None,
+        forces: &[],
+        finish: None,
+    },
+    ModuleSpec {
+        name: "PE_Balloon",
+        parts: &[
+            PartSpec {
+                object: "PE_Balloon_Platform",
+                fixed: false,
+                material: material(0.7, 0.4, 4.0, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 2.0, 0.0],
+                meshes: &["PE_Balloon_Col_01_Mesh", "PE_Balloon_Col_02_Mesh", "PE_Balloon_Col_03_Mesh", "PE_Balloon_Col_04_Mesh", "PE_Balloon_Col_05_Mesh", "PE_Balloon_Col_06_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Platte01",
+                fixed: false,
+                material: material(0.7, 0.4, 0.5, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Platte01_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Platte02",
+                fixed: false,
+                material: material(0.7, 0.4, 0.5, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Platte02_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Platte03",
+                fixed: false,
+                material: material(0.7, 0.4, 0.5, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Platte03_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Platte04",
+                fixed: false,
+                material: material(0.7, 0.4, 0.5, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Platte04_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Platte05",
+                fixed: false,
+                material: material(0.7, 0.4, 0.5, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Platte05_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Platte06",
+                fixed: false,
+                material: material(0.7, 0.4, 0.5, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Platte06_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Platte07",
+                fixed: false,
+                material: material(0.7, 0.4, 0.5, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Platte07_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Platte08",
+                fixed: false,
+                material: material(0.7, 0.4, 0.5, 0.1, 0.1),
+                group: "Floor",
+                start_frozen: true,
+                collide: true,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Platte08_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Ballon_Seil01",
+                fixed: false,
+                material: material(0.7, 0.4, 0.2, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Ballon_Seil01_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Ballon_Seil02",
+                fixed: false,
+                material: material(0.7, 0.4, 0.2, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Ballon_Seil02_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Ballon_Seil03",
+                fixed: false,
+                material: material(0.7, 0.4, 0.2, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Ballon_Seil03_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Ballon_Seil04",
+                fixed: false,
+                material: material(0.7, 0.4, 0.2, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Ballon_Seil04_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Ballon01",
+                fixed: false,
+                material: material(0.7, 0.4, 0.2, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Ballon01_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Ballon02",
+                fixed: false,
+                material: material(0.7, 0.4, 0.2, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Ballon02_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Ballon03",
+                fixed: false,
+                material: material(0.7, 0.4, 0.2, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Ballon03_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Balloon_Ballon04",
+                fixed: false,
+                material: material(0.7, 0.4, 0.2, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["PE_Balloon_Ballon04_Mesh"],
+            },
+            PartSpec {
+                object: "PE_Box_slide",
+                fixed: false,
+                material: material(0.7, 0.4, 4.0, 1.0, 1.0),
+                group: "",
+                start_frozen: true,
+                collide: false,
+                shift: [0.0, 0.0, 0.0],
+                meshes: &["Box_slide_Mesh"],
+            },
+        ],
+        joints: &[
+            JointSpec::Slider {
+                a: "PE_Box_slide",
+                b: "FixCube",
+                from: "PE_Balloon_Slideframe_close",
+                to: "PE_Balloon_Slideframe_far",
+                limits: true,
+                lo: -30000.0,
+                hi: 0.0,
+            },
+            JointSpec::Slider {
+                a: "PE_Balloon_Platform",
+                b: "PE_Box_slide",
+                from: "PE_Balloon_Slideframe_high",
+                to: "PE_Balloon_Slideframe_low",
+                limits: false,
+                lo: -2.0,
+                hi: 2.0,
+            },
+            JointSpec::Spring {
+                a: "PE_Balloon_Platform",
+                pos_a: [0.0, 0.0, 0.0],
+                frame_a: "PE_Balloon_Slideframe_high",
+                b: "PE_Box_slide",
+                pos_b: [0.0, 0.0, 0.0],
+                frame_b: "PE_Balloon_Slideframe_low",
+                length: 15.0,
+                constant: 20.0,
+                lin_damp: 0.6,
+                glob_damp: 1.0,
+            },
+            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Ballon_Seil01", frame: "PE_Balloon_Ballon01_hinge_a" },
+            JointSpec::Hinge { a: "PE_Balloon_Ballon_Seil01", b: "PE_Balloon_Ballon01", frame: "PE_Balloon_Ballon01_hinge_b" },
+            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Ballon_Seil02", frame: "PE_Balloon_Ballon02_hinge_a" },
+            JointSpec::Hinge { a: "PE_Balloon_Ballon_Seil02", b: "PE_Balloon_Ballon02", frame: "PE_Balloon_Ballon02_hinge_b" },
+            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Ballon_Seil03", frame: "PE_Balloon_Ballon03_hinge_a" },
+            JointSpec::Hinge { a: "PE_Balloon_Ballon_Seil03", b: "PE_Balloon_Ballon03", frame: "PE_Balloon_Ballon03_hinge_b" },
+            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Ballon_Seil04", frame: "PE_Balloon_Ballon04_hinge_a" },
+            JointSpec::Hinge { a: "PE_Balloon_Ballon_Seil04", b: "PE_Balloon_Ballon04", frame: "PE_Balloon_Ballon04_hinge_b" },
+            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Platte01", frame: "PE_Balloon_Hinge01" },
+            JointSpec::Hinge { a: "PE_Balloon_Platte01", b: "PE_Balloon_Platte02", frame: "PE_Balloon_Hinge02" },
+            JointSpec::Hinge { a: "PE_Balloon_Platte02", b: "PE_Balloon_Platte03", frame: "PE_Balloon_Hinge03" },
+            JointSpec::Hinge { a: "PE_Balloon_Platte03", b: "PE_Balloon_Platte04", frame: "PE_Balloon_Hinge04" },
+            JointSpec::Hinge { a: "PE_Balloon_Platte04", b: "PE_Balloon_Platte05", frame: "PE_Balloon_Hinge05" },
+            JointSpec::Hinge { a: "PE_Balloon_Platte05", b: "PE_Balloon_Platte06", frame: "PE_Balloon_Hinge06" },
+            JointSpec::Hinge { a: "PE_Balloon_Platte06", b: "PE_Balloon_Platte07", frame: "PE_Balloon_Hinge07" },
+            JointSpec::Hinge { a: "PE_Balloon_Platte07", b: "PE_Balloon_Platte08", frame: "PE_Balloon_Hinge08" },
+            JointSpec::Hinge { a: "PE_Balloon_Platte08", b: "FixCube", frame: "PE_Balloon_Hinge09" },
+        ],
+        // The platform is woken when the ball comes within 70 (exactness 75 to 100, every 10 to 60 frames), and the
+        // balloons' forces start then.
+        wake: Some(WakeSpec { part: "PE_Balloon_Platform", near: "PE_Balloon_Platform", distance: 70.0 }),
+        forces: &[
+            ForceSpec {
+                part: "PE_Balloon_Ballon01",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Balloon_Ballon01",
+                dir: [0.0, 1.0, 0.0],
+                dir_frame: "PE_Balloon_Ballon01_hinge_b",
+                value: 0.3,
+            },
+            ForceSpec {
+                part: "PE_Balloon_Ballon_Seil01",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Balloon_Ballon01_hinge_b",
+                dir: [-0.2, 0.0, 0.0],
+                dir_frame: "PE_Balloon_Ballon01_hinge_b",
+                value: 0.3,
+            },
+            ForceSpec {
+                part: "PE_Balloon_Ballon02",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Balloon_Ballon02",
+                dir: [0.0, 1.0, 0.0],
+                dir_frame: "PE_Balloon_Ballon02_hinge_b",
+                value: 0.3,
+            },
+            ForceSpec {
+                part: "PE_Balloon_Ballon_Seil02",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Balloon_Ballon02_hinge_b",
+                dir: [-0.2, 0.0, 0.0],
+                dir_frame: "PE_Balloon_Ballon02_hinge_b",
+                value: 0.3,
+            },
+            ForceSpec {
+                part: "PE_Balloon_Ballon03",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Balloon_Ballon03",
+                dir: [0.0, 1.0, 0.0],
+                dir_frame: "PE_Balloon_Ballon03_hinge_b",
+                value: 0.3,
+            },
+            ForceSpec {
+                part: "PE_Balloon_Ballon_Seil03",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Balloon_Ballon03_hinge_b",
+                dir: [-0.2, 0.0, 0.0],
+                dir_frame: "PE_Balloon_Ballon03_hinge_b",
+                value: 0.3,
+            },
+            ForceSpec {
+                part: "PE_Balloon_Ballon04",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Balloon_Ballon04",
+                dir: [0.0, 1.0, 0.0],
+                dir_frame: "PE_Balloon_Ballon04_hinge_b",
+                value: 0.3,
+            },
+            ForceSpec {
+                part: "PE_Balloon_Ballon_Seil04",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Balloon_Ballon04_hinge_b",
+                dir: [-0.2, 0.0, 0.0],
+                dir_frame: "PE_Balloon_Ballon04_hinge_b",
+                value: 0.3,
+            },
+        ],
+        finish: Some(FinishSpec {
+            near: "PE_Balloon_Platform",
+            distance: 1.0,
+            force: ForceSpec {
+                part: "PE_Box_slide",
+                pos: [0.0, 0.0, 0.0],
+                pos_frame: "PE_Box_slide",
+                dir: [-1.0, 0.0, 1.0],
+                dir_frame: "PE_Box_slide",
+                value: 0.2,
+            },
+            breaks: &["PE_Balloon_Hinge01", "PE_Balloon_Hinge02", "PE_Balloon_Hinge03", "PE_Balloon_Hinge04", "PE_Balloon_Hinge05", "PE_Balloon_Hinge06", "PE_Balloon_Hinge07", "PE_Balloon_Hinge08", "PE_Balloon_Hinge09"],
+        }),
     },
 ];
 
@@ -549,15 +917,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_module_is_found_by_name_and_its_slider_names_a_part() {
-        let m = spec("p_modul_34").expect("module 34");
-        let named = |n: &str| n == FIXCUBE || m.parts.iter().any(|p| p.object == n);
-        assert!(m.joints.iter().all(|j| match j {
-            JointSpec::Slider { a, b, .. } | JointSpec::Hinge { a, b, .. } | JointSpec::Ball { a, b, .. } => {
-                named(a) && named(b)
-            }
-            JointSpec::Spring { a, b, .. } => named(a) && named(b),
-        }));
+    fn a_module_is_found_by_name_and_its_joints_and_forces_name_its_parts() {
+        assert!(spec("p_modul_34").is_some());
         assert!(spec("P_Modul_99").is_none());
+        for m in MODULES {
+            let named = |n: &str| n == FIXCUBE || m.parts.iter().any(|p| p.object == n);
+            assert!(m.joints.iter().all(|j| match j {
+                JointSpec::Slider { a, b, .. } | JointSpec::Hinge { a, b, .. } | JointSpec::Ball { a, b, .. } => {
+                    named(a) && named(b)
+                }
+                JointSpec::Spring { a, b, .. } => named(a) && named(b),
+            }), "{}", m.name);
+            assert!(m.forces.iter().all(|f| named(f.part)), "{}", m.name);
+            if let Some(f) = &m.finish {
+                assert!(named(f.near) && named(f.force.part), "{}", m.name);
+                // every hinge it breaks is one of the module's
+                let hinge = |fr: &str| m.joints.iter().any(|j| matches!(j, JointSpec::Hinge { frame, .. } if *frame == fr));
+                assert!(f.breaks.iter().all(|b| hinge(b)), "{}", m.name);
+            }
+        }
     }
 }

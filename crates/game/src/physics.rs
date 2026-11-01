@@ -488,6 +488,20 @@ impl World {
         Some(self.physics.spring_create(Some(ia), p3(pa), Some(ib), p3(pb), length, constant, lin_damp, glob_damp))
     }
 
+    /// A constant force on body `i` at a world point (SetPhysicsForce): `force` is a world vector, given to the body
+    /// at every PSI while it is awake. None when the body is not in the physics. Returns the force's handle.
+    pub fn add_force(&mut self, i: usize, force: Vec3, point: Vec3) -> Option<usize> {
+        let Some(&Some(id)) = self.handles.get(i) else {
+            return None;
+        };
+        Some(self.physics.force_create(id, p3(force), vec3_f64(point), false))
+    }
+
+    /// Removes a joint made by `add_slider`, `add_hinge` or `add_ball_joint` (a joint's Destroy input).
+    pub fn remove_joint(&mut self, j: usize) {
+        self.physics.joint_destroy(j);
+    }
+
     /// The triangles near a point of the level's physical objects that the player's ball collides with, in world
     /// space, as the physics sees them.
     pub fn floor_near(&self, p: Vec3, r: f32) -> Vec<[Vec3; 3]> {
