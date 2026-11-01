@@ -8,6 +8,7 @@ pub struct Data {
 }
 
 /// Where a level comes from.
+#[derive(Clone)]
 pub enum Source {
     /// One of the original levels of the player's copy (1–13).
     Original(u32),

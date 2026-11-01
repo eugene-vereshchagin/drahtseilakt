@@ -133,6 +133,12 @@ fn glyph(c: char) -> [&'static str; GLYPH_H] {
         '/' => [
             "....#", "....#", "...#.", "..#..", ".#...", "#....", "#....",
         ],
+        ',' => [
+            ".....", ".....", ".....", ".....", "..#..", "..#..", ".#...",
+        ],
+        '_' => [
+            ".....", ".....", ".....", ".....", ".....", ".....", "#####",
+        ],
         _ => [
             ".....", ".....", ".....", ".....", ".....", ".....", ".....",
         ],
@@ -218,7 +224,8 @@ pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u6
         let title_top = mid - big * 3.5;
         let line_top = title_top + big * 7.0 + scale * 3.0;
         let band_top = title_top - scale * 4.0;
-        let band_bottom = line_top + small * 7.0 + scale * 4.0;
+        let keys_top = line_top + small * 7.0 + scale * 3.0;
+        let band_bottom = keys_top + scale * 7.0 + scale * 4.0;
         out.push(Rect {
             x: 0.0,
             y: band_top,
@@ -234,8 +241,10 @@ pub fn overlay(sim: &Sim, width_px: u32, height_px: u32, ball_lost_at: Option<u6
                 (sim.tick % 3600) as f32 / 60.0
             );
             centre(&mut out, &time, line_top, small, WHITE);
+            centre(&mut out, "ENTER NEXT LEVEL   ESC MENU", keys_top, scale, WHITE);
         } else {
             centre(&mut out, "PRESS R TO TRY AGAIN", line_top, small, WHITE);
+            centre(&mut out, "ESC MENU", keys_top, scale, WHITE);
         }
     } else if let Some(at) = ball_lost_at.filter(|&at| sim.tick.saturating_sub(at) < 120) {
         let _ = at;

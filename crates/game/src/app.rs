@@ -6,6 +6,7 @@ use crate::Options;
 use crate::assets::{Data, LoadedLevel};
 use crate::render::Renderer;
 use crate::replay::Replay;
+use crate::menu::{Action, Menu};
 use crate::scene::{self, BallMeshes, Snapshot};
 use crate::collide::closest_point;
 use crate::sim::{BALL_RADIUS, Event, Sim, TICK, input};
@@ -487,7 +488,7 @@ fn clock(tick: u64) -> String {
     format!("{:02}:{:05.2}", (secs / 60.0) as u64, secs % 60.0)
 }
 
-fn replay_dir() -> PathBuf {
+pub fn replay_dir() -> PathBuf {
     let base = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
@@ -551,7 +552,16 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     game.start_session();
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Poll);
+    // Without a level named, the window opens with the main menu over the first level.
+    let menu = (!o.chosen && o.replay.is_none()).then(|| Menu::new(&data, 1, false));
     let mut app = App {
+        number: match o.source {
+            crate::assets::Source::Original(n) => Some(n),
+            _ => None,
+        },
+        opts: o.clone(),
+        menu,
+        loading: None,
         game,
         data,
         size: o.size,
@@ -773,6 +783,14 @@ struct Gpu {
 
 struct App {
     game: Game,
+    /// The options the game was started with, for loading another level.
+    opts: Options,
+    /// The original level being played, if it is one.
+    number: Option<u32>,
+    /// The menu, while it is open; the run is paused under it.
+    menu: Option<Menu>,
+    /// A level to load: (its number, whether the loading screen has been drawn).
+    loading: Option<(u32, bool)>,
     data: Data,
     size: (u32, u32),
     window: Option<Arc<Window>>,
@@ -846,7 +864,78 @@ impl App {
         Ok(())
     }
 
+    /// Loads original level `n` in place of the current one: a new run, its models uploaded anew.
+    fn switch(&mut self, n: u32) -> Result<(), String> {
+        self.game.save_attempt();
+        let mut o = self.opts.clone();
+        o.source = crate::assets::Source::Original(n);
+        (o.replay, o.from, o.sector, o.at, o.ball) = (None, None, None, None, None);
+        let mut game = Game::new(&o, &self.data)?;
+        game.start_session();
+        self.game = game;
+        self.number = Some(n);
+        self.prev = None;
+        self.keys = 0;
+        if let Some(gpu) = &mut self.gpu {
+            gpu.renderer.models.clear();
+            upload(&mut gpu.renderer, &self.game, &self.data);
+        }
+        if let Some(w) = &self.window {
+            w.set_title(&self.game.title());
+        }
+        Ok(())
+    }
+
+    /// Plays original level `n`: the current run starts again if it is that level, otherwise it is loaded.
+    fn play(&mut self, n: u32) {
+        self.menu = None;
+        if self.number == Some(n) {
+            self.game.restart();
+            self.prev = None;
+        } else {
+            self.loading = Some((n, false));
+        }
+    }
+
+    fn open_menu(&mut self) {
+        let run = !(self.game.sim.finished || self.game.sim.game_over);
+        self.menu = Some(Menu::new(&self.data, self.number.unwrap_or(1), run));
+        self.keys = 0;
+    }
+
+    fn menu_key(&mut self, code: KeyCode, event_loop: &ActiveEventLoop) {
+        let Some(menu) = &mut self.menu else { return };
+        let action = match code {
+            KeyCode::ArrowUp => {
+                menu.step(-1);
+                Action::None
+            }
+            KeyCode::ArrowDown => {
+                menu.step(1);
+                Action::None
+            }
+            KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space => menu.enter(),
+            KeyCode::Escape => menu.back(),
+            _ => Action::None,
+        };
+        match action {
+            Action::None => {}
+            Action::Continue => self.menu = None,
+            Action::Play(n) => self.play(n),
+            Action::Quit => event_loop.exit(),
+        }
+    }
+
     fn key(&mut self, code: KeyCode, down: bool, event_loop: &ActiveEventLoop) {
+        if self.loading.is_some() {
+            return;
+        }
+        if self.menu.is_some() {
+            if down {
+                self.menu_key(code, event_loop);
+            }
+            return;
+        }
         let bit = match code {
             KeyCode::ArrowUp => input::UP,
             KeyCode::ArrowDown => input::DOWN,
@@ -855,8 +944,16 @@ impl App {
             KeyCode::ShiftLeft | KeyCode::ShiftRight => input::SHIFT,
             KeyCode::Space => input::LIFT,
             KeyCode::Escape if down => {
-                event_loop.exit();
-                0
+                self.open_menu();
+                return;
+            }
+            KeyCode::Enter | KeyCode::NumpadEnter if down && self.game.sim.finished => {
+                // The next level, or the menu after the last one.
+                match self.number.map(|n| n + 1).filter(|&n| n <= crate::menu::LEVELS) {
+                    Some(n) if self.data.file(&format!("3D Entities/Level/Level_{n:02}.NMO")).is_some() => self.play(n),
+                    _ => self.open_menu(),
+                }
+                return;
             }
             KeyCode::KeyR if down => {
                 self.game.restart();
@@ -892,6 +989,22 @@ impl App {
         let now = Instant::now();
         self.acc = (self.acc + (now - self.last).as_secs_f32()).min(0.25);
         self.last = now;
+        // A level to load is loaded after a frame that says so; the run waits while the menu is open.
+        if let Some((n, drawn)) = self.loading {
+            if drawn {
+                self.loading = None;
+                if let Err(e) = self.switch(n) {
+                    eprintln!("drahtseilakt: {e}");
+                    self.open_menu();
+                }
+                self.acc = 0.0;
+            } else {
+                self.loading = Some((n, true));
+            }
+        }
+        if self.menu.is_some() || self.loading.is_some() {
+            self.acc = 0.0;
+        }
         let started = Instant::now();
         let mut ticks = 0u32;
         while self.acc >= TICK {
@@ -939,12 +1052,18 @@ impl App {
             &view,
             gpu.config.width,
             gpu.config.height,
-            &crate::hud::overlay(
-                &self.game.sim,
-                gpu.config.width,
-                gpu.config.height,
-                self.game.ball_lost_at,
-            ),
+            &match (&self.menu, self.loading) {
+                (_, Some((n, _))) => {
+                    Menu::new(&self.data, n, false).overlay(gpu.config.width, gpu.config.height, Some(n))
+                }
+                (Some(m), None) => m.overlay(gpu.config.width, gpu.config.height, None),
+                (None, None) => crate::hud::overlay(
+                    &self.game.sim,
+                    gpu.config.width,
+                    gpu.config.height,
+                    self.game.ball_lost_at,
+                ),
+            },
         );
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();

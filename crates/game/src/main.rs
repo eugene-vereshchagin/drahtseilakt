@@ -9,6 +9,7 @@ mod app;
 mod assets;
 mod collide;
 mod hud;
+mod menu;
 mod modules;
 mod physics;
 mod render;
@@ -47,12 +48,18 @@ usage: drahtseilakt [options]
   --size WxH          window or screenshot size (default 1600x900)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
-keys: arrows roll the ball (relative to the camera), Shift+Left/Right turn the camera,
-      Space lifts the camera, R restarts, F11 full screen, Esc quits";
+Without --level, --map or --open the window opens with the level menu.
 
+keys: arrows roll the ball (relative to the camera), Shift+Left/Right turn the camera,
+      Space lifts the camera, R restarts, F11 full screen, Esc opens the level menu;
+      after a finished level Enter plays the next one";
+
+#[derive(Clone)]
 pub struct Options {
     pub data: Option<PathBuf>,
     pub source: Source,
+    /// A level was named (--level, --map, --open): no menu at the start.
+    pub chosen: bool,
     pub record: Option<PathBuf>,
     pub export: Option<PathBuf>,
     pub replay: Option<PathBuf>,
@@ -73,6 +80,7 @@ fn parse_args() -> Result<Options, String> {
     let mut o = Options {
         data: None,
         source: Source::Original(1),
+        chosen: false,
         record: None,
         export: None,
         replay: None,
@@ -106,9 +114,16 @@ fn parse_args() -> Result<Options, String> {
                     return Err("--level is 1 to 13".into());
                 }
                 o.source = Source::Original(n);
+                o.chosen = true;
             }
-            "--map" => o.source = Source::Nmo(value()?.into()),
-            "--open" => o.source = Source::Open(value()?.into()),
+            "--map" => {
+                o.source = Source::Nmo(value()?.into());
+                o.chosen = true;
+            }
+            "--open" => {
+                o.source = Source::Open(value()?.into());
+                o.chosen = true;
+            }
             "--export" => o.export = Some(value()?.into()),
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),

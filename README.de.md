@@ -33,7 +33,9 @@ target/release/drahtseilakt --data /pfad/zu/Ballance --level 1
 FILE.nmo` jede Leveldatei oder Community-Karte, `--open DIR` ein Level im
 [offenen Format](docs/de/drahtseilakt/open-format.md); `--export DIR` wandelt das gewählte Level darin um.
 Pfeiltasten rollen die Kugel relativ zur Kamera, Shift+Links/Rechts drehen die Kamera, Leertaste hebt sie, R
-startet neu, F11 ist Vollbild, Esc beendet.
+startet neu, F11 ist Vollbild, Esc öffnet das Menü. Ohne genanntes Level beginnt das Spiel mit dem Hauptmenü
+(Level mit ihren Bestzeiten; eigene Level, Einstellungen und Debug sind vorerst Platzhalter); nach einem
+geschafften Level spielt Enter das nächste.
 
 Jeder beendete Lauf wird als Replay gespeichert (unter Linux in
 `~/.local/share/drahtseilakt/replays/<Level>/`, der schnellste als `best.replay`); `--replay FILE` spielt eines
