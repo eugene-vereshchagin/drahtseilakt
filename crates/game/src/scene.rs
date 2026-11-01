@@ -184,7 +184,13 @@ impl ExtraModel {
 
 /// Objects of modules that the file hides and a script shows, and how the script turns them: module 18's rotor
 /// turns about its own y at -15 radians a second (its Particle Script: Rotate by Per Second(-15)).
-const SHOWN_OBJECTS: [(&str, Option<(Vec3, f32)>); 1] = [("P_Modul_18_Rotor", Some((Vec3::Y, -15.0)))];
+const SHOWN_OBJECTS: [(&str, Option<(Vec3, f32)>); 3] = [
+    ("P_Modul_18_Rotor", Some((Vec3::Y, -15.0))),
+    // the extra life's bubble and its shadow: hidden in the file, shown by its script while the ball is within 60
+    // (shown here until it is taken)
+    ("P_Extra_Life_Sphere", None),
+    ("P_Extra_Life_Shadow", None),
+];
 
 /// Module models (`3D Entities/PH/<name>.nmo`), uploaded after the fixed models, with their names.
 #[derive(Default)]
