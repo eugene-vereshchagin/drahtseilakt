@@ -38,8 +38,11 @@ Every finished run is saved as a replay (on Linux in `~/.local/share/drahtseilak
 fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it without a window, `--screenshot
 FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
 object's name) anywhere, with `--ball wood|stone|paper`; such a run keeps its start in its replay and is never a
-best run. Sound and music volumes are on the menu's Settings page. In debug mode (`--debug`, or the switch on the menu's Debug page) F2 takes up a free camera to fly
-through the level while the run waits. For testing, `--autopilot` lets a test player try the level without a window
+best run. Sound and music volumes are on the menu's Settings page. Two profiles, chosen on the menu's Profile page: *Classic* is the original game only, and only its runs can
+be a level's best; *Extended* (or `--debug`) adds our tools: F2 takes up a free camera to fly through the level
+while the run waits, `[` and `]` slow the run down and speed it up again (the run itself stays the same tick by
+tick), F5 saves the moment and F9 goes back to it (the run's record is cut back to it, so a long level can be
+recorded piece by piece), and the sector and tick are shown. A run helped this way is kept but never the best. For testing, `--autopilot` lets a test player try the level without a window
 (with `--record FILE` to keep its run); `--follow FILE` makes it follow the ball's way in a player's replay. `drahtseilakt --help` lists everything.
 
 ## Legal

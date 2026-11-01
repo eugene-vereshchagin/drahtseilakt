@@ -84,6 +84,8 @@ struct Game {
     music_theme: Option<u32>,
     /// The level table's LevelBonus.
     level_bonus: i64,
+    /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
+    assisted: bool,
     last_level: bool,
     /// The ball's sounds, and what they ask of the sound output since the window last played them.
     ball_sound: BallSound,
@@ -220,6 +222,7 @@ impl Game {
             shadow_receivers: scene::shadow_receivers(&level.level),
             music_theme: data.settings(&level.name).music,
             level_bonus,
+            assisted: false,
             last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
             ball_sound: BallSound::default(),
             fan_sound: FanSound::default(),
@@ -233,6 +236,7 @@ impl Game {
 
     fn restart(&mut self) {
         self.save_attempt();
+        self.assisted = false;
         self.sim = Sim::with_modules(
             &self.level.level,
             self.start_ball,
@@ -517,7 +521,7 @@ impl Game {
             .and_then(|t| Replay::parse(&t).ok())
             .map(|r| r.end);
         // A run begun elsewhere than the level start is a test, never the level's best.
-        if self.start.is_none() && best_ticks.is_none_or(|b| self.sim.tick < b) {
+        if self.start.is_none() && !self.assisted && best_ticks.is_none_or(|b| self.sim.tick < b) {
             targets.push(best.clone());
             println!(
                 "best run of {} so far: {}",
@@ -581,12 +585,19 @@ fn load_volumes() -> [f32; 2] {
     [get("sound"), get("music")]
 }
 
-fn save_volumes(v: [f32; 2]) {
+/// The profile saved in the settings: extended (our additions on) or classic (the original only).
+fn load_extended() -> bool {
+    let text = std::fs::read_to_string(settings_path()).unwrap_or_default();
+    text.lines().any(|l| l.trim() == "profile extended")
+}
+
+fn save_settings(v: [f32; 2], extended: bool) {
     let path = settings_path();
     if let Some(d) = path.parent() {
         let _ = std::fs::create_dir_all(d);
     }
-    if let Err(e) = std::fs::write(&path, format!("sound {}\nmusic {}\n", v[0], v[1])) {
+    let profile = if extended { "extended" } else { "classic" };
+    if let Err(e) = std::fs::write(&path, format!("sound {}\nmusic {}\nprofile {profile}\n", v[0], v[1])) {
         eprintln!("could not save the settings to {}: {e}", path.display());
     }
 }
@@ -681,7 +692,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         opts: o.clone(),
         menu,
         loading: None,
-        debug: o.debug,
+        debug: o.debug || load_extended(),
+        time_scale: 1.0,
+        saved: None,
         fly: None,
         fly_keys: 0,
         last_view: (glam::Vec3::ZERO, glam::Vec3::X),
@@ -1153,6 +1166,10 @@ struct App {
     /// The original's menu scene (MenuLevel.nmo), drawn behind the menus, and how long the menu has been up.
     menu_scene: Option<crate::menuscene::MenuScene>,
     menu_ms: f32,
+    /// Extended profile: how fast the run goes against real time (the run itself is the same tick by tick), and a
+    /// saved moment of the run (F5) to go back to (F9).
+    time_scale: f32,
+    saved: Option<(Sim, Replay)>,
     /// The keys down now.
     held: std::collections::HashSet<KeyCode>,
 }
@@ -1386,10 +1403,15 @@ impl App {
                 if let Some(a) = &mut self.audio {
                     a.set_volumes(v[0], v[1]);
                 }
-                save_volumes(v);
+                save_settings(v, self.debug);
             }
             Action::ToggleDebug => {
                 self.debug = !self.debug;
+                save_settings(self.volumes, self.debug);
+                if !self.debug {
+                    self.time_scale = 1.0;
+                    self.saved = None;
+                }
                 if !self.debug {
                     self.fly = None;
                 }
@@ -1463,6 +1485,32 @@ impl App {
             }
             KeyCode::KeyR if down => {
                 self.restart();
+                self.saved = None;
+                0
+            }
+            // the extended profile's practice keys: slower or faster, save the moment, back to it
+            KeyCode::BracketLeft | KeyCode::BracketRight if down && self.debug => {
+                let slower = code == KeyCode::BracketLeft;
+                self.time_scale = if slower { (self.time_scale / 2.0).max(0.125) } else { (self.time_scale * 2.0).min(1.0) };
+                if self.time_scale < 1.0 {
+                    self.game.assisted = true;
+                }
+                0
+            }
+            KeyCode::F5 if down && self.debug => {
+                self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone()));
+                0
+            }
+            KeyCode::F9 if down && self.debug => {
+                if let Some((sim, replay)) = &self.saved {
+                    // the run goes on from the saved moment: its record is cut back to it
+                    self.game.sim = sim.clone();
+                    self.game.replay_out = replay.clone();
+                    self.game.assisted = true;
+                    // what happened after the saved moment did not happen
+                    self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
+                    self.prev = None;
+                }
                 0
             }
             KeyCode::F11 if down => {
@@ -1494,7 +1542,7 @@ impl App {
         let now = Instant::now();
         // this frame's real step (after the cap's sleep), held to a quarter second after a stall
         let step = (now - self.last).as_secs_f32().min(0.25);
-        self.acc = (self.acc + (now - self.last).as_secs_f32()).min(0.25);
+        self.acc = (self.acc + (now - self.last).as_secs_f32() * self.time_scale).min(0.25);
         self.last = now;
         // A level to load is loaded after a frame that says so; the run waits while the menu is open.
         if let Some((n, drawn)) = self.loading {
@@ -1602,6 +1650,12 @@ impl App {
                         self.debug,
                         self.game.font.is_some(),
                     );
+                    if self.debug && (self.time_scale < 1.0 || self.saved.is_some()) {
+                        let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
+                        let slow = if self.time_scale < 1.0 { format!("SLOW 1/{}", (1.0 / self.time_scale).round()) } else { String::new() };
+                        let saved = if self.saved.is_some() { "   SAVED: F9 BACK" } else { "" };
+                        crate::hud::text(&mut o, &format!("{slow}{saved}"), scale, scale * 21.0, scale, [0.6, 0.9, 1.0, 1.0]);
+                    }
                     if let Some(c) = &self.fly {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
                         let line = format!("FREE CAMERA   {:.1} {:.1} {:.1}   F2 BACK", c.pos.x, c.pos.y, c.pos.z);

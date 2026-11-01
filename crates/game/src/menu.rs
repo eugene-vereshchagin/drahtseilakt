@@ -47,7 +47,7 @@ impl Item {
             Item::Custom => "Custom levels",
             Item::Settings => "Options",
             Item::Credits => "Credits",
-            Item::Debug => "Debug",
+            Item::Debug => "Profile",
             Item::Quit => "Exit",
         }
     }
@@ -84,6 +84,10 @@ impl Item {
                 "Plays your own copy of the game",
             ],
             Item::Debug => &[
+                "Classic: the original game only; best runs count.",
+                "Extended: free camera F2, slower [ and faster ],",
+                "save the moment F5 and go back to it F9,",
+                "the sector and tick shown. Helped runs never count.",
                 "",
                 "Begin anywhere from the command line:",
                 "--sector n  --at x,y,z or object  --ball kind",
@@ -293,7 +297,7 @@ impl Menu {
                 }
             }
             if item == Item::Debug {
-                let switch = format!("DEBUG MODE: {}   FREE CAMERA ON F2", if self.debug { "ON" } else { "OFF" });
+                let switch = format!("PROFILE: {}   ENTER SWITCHES", if self.debug { "EXTENDED" } else { "CLASSIC" });
                 centre(&mut out, &switch, y, s, if self.debug { GOLD } else { WHITE });
                 y += line;
             }
@@ -468,7 +472,8 @@ impl Menu {
                 }
                 if item == Item::Debug {
                     let on = if self.debug { "on" } else { "off" };
-                    label(&mut out, &format!("Debug mode {on}, free camera on F2"), [0.3, y, 0.7, y + 0.05], &FONT_03);
+                    let profile = if on == "on" { "Extended" } else { "Classic" };
+                    label(&mut out, &format!("Profile: {profile} (Enter switches)"), [0.3, y, 0.7, y + 0.05], &FONT_01);
                     y += 0.06;
                 }
                 for l in item.page() {

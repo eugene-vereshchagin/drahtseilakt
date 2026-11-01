@@ -42,8 +42,12 @@ Jeder beendete Lauf wird als Replay gespeichert (unter Linux in
 ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bild. Um eine Stelle zu testen,
 beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
 Stelle, mit `--ball wood|stone|paper`; ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
-Die Lautstärke von Ton und Musik steht auf der Einstellungsseite des Menüs. Im Debug-Modus (`--debug` oder der Schalter auf der Debug-Seite des Menüs) nimmt F2 eine freie Kamera auf, um
-durch das Level zu fliegen, während der Lauf wartet. Zum Testen lässt `--autopilot` einen Testspieler das Level ohne
+Die Lautstärke von Ton und Musik steht auf der Einstellungsseite des Menüs. Zwei Profile, gewählt auf der Profilseite des Menüs: *Klassisch* ist nur das Originalspiel, und nur seine Läufe
+können der beste eines Levels sein; *Erweitert* (oder `--debug`) fügt unsere Werkzeuge hinzu: F2 nimmt eine freie
+Kamera auf, um durch das Level zu fliegen, während der Lauf wartet, `[` und `]` verlangsamen den Lauf und
+beschleunigen ihn wieder (der Lauf selbst bleibt Takt für Takt derselbe), F5 speichert den Moment und F9 kehrt
+dorthin zurück (die Aufzeichnung wird bis dorthin gekürzt, so lässt sich ein langes Level stückweise aufnehmen),
+und Sektor und Takt werden angezeigt. Ein so unterstützter Lauf wird behalten, ist aber nie der beste. Zum Testen lässt `--autopilot` einen Testspieler das Level ohne
 Fenster versuchen (mit `--record FILE` bleibt sein Lauf erhalten); `--follow FILE` lässt ihn dem Weg der Kugel im Replay eines
 Spielers folgen. `drahtseilakt --help` zeigt alles.
 
