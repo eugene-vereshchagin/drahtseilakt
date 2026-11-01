@@ -358,6 +358,106 @@ pub fn entity(chunk: &Chunk) -> Result<Entity> {
     })
 }
 
+/// A 3D curve (CKCurve, class 43; section 0xffc00000 of data version 5 and later): its control points in order,
+/// the fitting coefficient, and whether it is open.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Curve {
+    pub points: Vec<usize>,
+    pub fitting: f32,
+    pub open: bool,
+}
+
+/// Control points a curve may have.
+const MAX_CURVE_POINTS: usize = 4096;
+
+pub fn curve(chunk: &Chunk) -> Result<Option<Curve>> {
+    if chunk.data_version < 5 {
+        return Ok(None);
+    }
+    let Some(mut w) = chunk.section(0xffc0_0000) else {
+        return Ok(None);
+    };
+    let n = w.u32()? as usize;
+    if n > MAX_CURVE_POINTS || n > w.remaining() {
+        return Err(malformed("curve point count"));
+    }
+    let mut points = Vec::with_capacity(n);
+    for _ in 0..n {
+        if let Some(r) = reference(chunk, w.u32()?) {
+            points.push(r);
+        }
+    }
+    let fitting = w.f32()?;
+    if !fitting.is_finite() {
+        return Err(malformed("curve fitting"));
+    }
+    w.u32()?; // the step count of its line mesh
+    let open = w.u32()? != 0;
+    Ok(Some(Curve { points, fitting, open }))
+}
+
+/// A curve's control point (CKCurvePoint, class 36; section 0x10000000 of data version 5 and later): TCB or
+/// its own tangents, whether the segment leaving it is straight, tension, continuity and bias, and its saved in
+/// and out tangents (curve-local).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CurvePoint {
+    pub tcb: bool,
+    pub linear: bool,
+    pub tcb_values: [f32; 3],
+    pub tangents: [[f32; 3]; 2],
+}
+
+pub fn curve_point(chunk: &Chunk) -> Result<Option<CurvePoint>> {
+    if chunk.data_version < 5 {
+        return Ok(None);
+    }
+    let Some(mut w) = chunk.section(0x1000_0000) else {
+        return Ok(None);
+    };
+    w.u32()?; // the curve
+    let tcb = w.u32()? == 0;
+    let linear = w.u32()? != 0;
+    let mut f = || -> Result<f32> {
+        let v = w.f32()?;
+        if v.is_finite() { Ok(v) } else { Err(malformed("curve point value")) }
+    };
+    let tcb_values = [f()?, f()?, f()?];
+    let tangents = [[f()?, f()?, f()?], [f()?, f()?, f()?]];
+    Ok(Some(CurvePoint { tcb, linear, tcb_values, tangents }))
+}
+
+/// A camera's lens (section 0xfc00000 of data version 5 and later: projection, field of view, orthographic zoom,
+/// aspect, near and far planes) and, for a target camera (class 35), its target (section 0x10000000).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Camera {
+    pub fov: f32,
+    pub near: f32,
+    pub far: f32,
+    pub target: Option<usize>,
+}
+
+pub fn camera(chunk: &Chunk) -> Result<Camera> {
+    let mut cam = Camera { fov: 0.5, near: 1.0, far: 4000.0, target: None };
+    if chunk.data_version >= 5
+        && let Some(mut w) = chunk.section(0x0fc0_0000)
+    {
+        w.u32()?;
+        let fov = w.f32()?;
+        w.u32()?;
+        w.u32()?;
+        let (near, far) = (w.f32()?, w.f32()?);
+        if [fov, near, far].iter().all(|v| v.is_finite()) {
+            (cam.fov, cam.near, cam.far) = (fov, near, far);
+        }
+    }
+    if u32::from(chunk.class_id) == crate::class::TARGET_CAMERA
+        && let Some(mut w) = chunk.section(0x1000_0000)
+    {
+        cam.target = reference(chunk, w.u32()?);
+    }
+    Ok(cam)
+}
+
 /// A CKSprite3D's own part (section 0x400000): how it turns toward the view (0 facing it, 1 about its x, 2 about
 /// its y, 3 as placed), its size (stored as half), the quad's offset in its plane (-1..1 of the half size), the
 /// texture rectangle (u0, v0, u1, v1) and its material.
@@ -536,6 +636,27 @@ mod tests {
         let many = chunk(&[(0x0000_4000, vec![u32::MAX]), verts]);
         assert!(mesh_channels(&many, 2).is_err());
         assert!(mesh(&many).is_ok());
+    }
+
+    /// A curve, its points and a target camera as MenuLevel.nmo saves them, and broken ones refused.
+    #[test]
+    fn curves_points_and_cameras_are_read_and_bad_ones_refused() {
+        let f = f32::to_bits;
+        let v10 = |sections: &[(u32, Vec<u32>)]| Chunk { data_version: 10, ..chunk(sections) };
+        let c = v10(&[(0xffc0_0000, vec![2, 7, 8, f(0.0), 100, 0])]);
+        assert_eq!(curve(&c).expect("curve"), Some(Curve { points: vec![7, 8], fitting: 0.0, open: false }));
+        assert!(curve(&v10(&[(0xffc0_0000, vec![5000])])).is_err(), "too many points");
+        assert!(curve(&v10(&[(0xffc0_0000, vec![2, 7, 8])])).is_err(), "cut short");
+        assert!(curve(&v10(&[(0xffc0_0000, vec![1, 7, f(f32::NAN), 100, 0])])).is_err(), "fitting not a number");
+        let old = Chunk { data_version: 4, ..chunk(&[(0xffc0_0000, vec![0, f(0.0), 1, 0])]) };
+        assert_eq!(curve(&old).expect("old"), None, "data version 4: another layout");
+        let p = v10(&[(0x1000_0000, vec![3, 0, 0, f(-0.6), f(0.0), f(0.0), 0, 0, 0, 0, 0, 0])]);
+        let cp = curve_point(&p).expect("point").expect("its part");
+        assert!(cp.tcb && !cp.linear && cp.tcb_values == [-0.6, 0.0, 0.0]);
+        assert!(curve_point(&v10(&[(0x1000_0000, vec![3, 0, 0, f(f32::INFINITY)])])).is_err());
+        let cam = Chunk { class_id: 35, ..v10(&[(0x0fc0_0000, vec![0, f(0.95), f(1.0), 0, f(20.0), f(550.0)]), (0x1000_0000, vec![4])]) };
+        assert_eq!(camera(&cam).expect("camera"), Camera { fov: 0.95, near: 20.0, far: 550.0, target: Some(4) });
+        assert!(camera(&Chunk { class_id: 35, ..v10(&[(0x0fc0_0000, vec![0, f(0.95)])]) }).is_err(), "cut short");
     }
 
     /// The dome's material effect (TexGen, its parameter object 4) and that parameter's value (3, Chrome).

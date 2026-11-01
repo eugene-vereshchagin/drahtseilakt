@@ -71,6 +71,10 @@ words; writers may leave garbage after the terminating NUL.
 | 3D entity / object, camera, light | 33, 41, 34, 35, 38, 39 | `0x100000` | a word, flags, 3×3 axes (rows), position — the world matrix |
 | 3D object | 41 | `0x4000` | current mesh reference, count, mesh references |
 | Sprite 3D | 37 | `0x400000` | mode (0 faces the view, 1 turns about x, 2 about y, 3 as placed), half width, half height, offset x and y (-1..1 of the half size), texture rectangle u0 v0 u1 v1, material reference; drawn unlit in the material's diffuse colour |
+| Camera, target camera | 34, 35 | `0xfc00000` | (data version 5 and later) projection, field of view (horizontal, radians), orthographic zoom, aspect (width, height as 16-bit halves), near and far planes |
+| Target camera | 35 | `0x10000000` | its target object |
+| Curve | 43 | `0xffc00000` | (data version 5 and later) control points: count and references in curve order, fitting coefficient, step count, open flag |
+| Curve point | 36 | `0x10000000` | (data version 5 and later) the curve, user tangents (instead of TCB), linear, tension, continuity, bias, in and out tangents (curve-local) |
 | Data array | 52 | `0x1000` | columns: count, then name (string) and type (1 int, 2 float, 3 string, 4 object, 5 parameter + type GUID) |
 | | | `0x2000` | rows: count, then one value per column |
 

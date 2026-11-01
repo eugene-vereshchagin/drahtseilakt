@@ -702,6 +702,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         timing: std::env::var_os("DRAHTSEILAKT_TIMING").map(|_| Timing::default()),
         prev: None,
         error: None,
+        menu_scene: None,
+        menu_ms: 0.0,
+        held: std::collections::HashSet::new(),
     };
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
     app.game.save_attempt();
@@ -887,6 +890,14 @@ async fn adapter_device(
         .await
         .map_err(|e| format!("no graphics device: {e}"))?;
     Ok((adapter, device, queue))
+}
+
+/// Uploads the menu scene's model (after the game's, whose model numbers it must not take).
+fn upload_menu_scene(renderer: &mut Renderer, scene: Option<&mut crate::menuscene::MenuScene>, data: &Data) {
+    if let Some(ms) = scene {
+        let loader = |t: &level::Texture| data.texture(t);
+        ms.model = Some(renderer.add_model(&ms.level, &loader));
+    }
 }
 
 fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
@@ -1098,6 +1109,11 @@ struct App {
     /// Timings for DRAHTSEILAKT_TIMING: frames, and the time spent in the ticks and in the drawing of each.
     timing: Option<Timing>,
     error: Option<String>,
+    /// The original's menu scene (MenuLevel.nmo), drawn behind the menus, and how long the menu has been up.
+    menu_scene: Option<crate::menuscene::MenuScene>,
+    menu_ms: f32,
+    /// The keys down now.
+    held: std::collections::HashSet<KeyCode>,
 }
 
 impl App {
@@ -1150,6 +1166,10 @@ impl App {
         surface.configure(&device, &config);
         let mut renderer = Renderer::new(device, queue, format);
         upload(&mut renderer, &self.game, &self.data);
+        if self.menu_scene.is_none() {
+            self.menu_scene = crate::menuscene::MenuScene::load(&self.data);
+        }
+        upload_menu_scene(&mut renderer, self.menu_scene.as_mut(), &self.data);
         self.gpu = Some(Gpu {
             surface,
             config,
@@ -1181,6 +1201,7 @@ impl App {
         if let Some(gpu) = &mut self.gpu {
             gpu.renderer.models.clear();
             upload(&mut gpu.renderer, &self.game, &self.data);
+            upload_menu_scene(&mut gpu.renderer, self.menu_scene.as_mut(), &self.data);
         }
         if let Some(w) = &self.window {
             w.set_title(&self.game.title());
@@ -1430,6 +1451,8 @@ impl App {
             std::thread::sleep(FRAME - since);
         }
         let now = Instant::now();
+        // this frame's real step (after the cap's sleep), held to a quarter second after a stall
+        let step = (now - self.last).as_secs_f32().min(0.25);
         self.acc = (self.acc + (now - self.last).as_secs_f32()).min(0.25);
         self.last = now;
         // A level to load is loaded after a frame that says so; the run waits while the menu is open.
@@ -1485,26 +1508,34 @@ impl App {
         let acquired = acquire_started.elapsed();
         let view = frame.texture.create_view(&Default::default());
         let build_started = Instant::now();
-        let inst = scene::instances(
-            &self.game.placements,
-            &self.game.sim.taken,
-            &self.game.sim.world().bodies,
-            &self.game.ball_meshes,
-            self.game.trafo.as_ref().map(|t| &t.1),
-            (&self.game.sim.extra_views(), self.game.extra_model.as_ref()),
-            &snap,
-        );
+        // With a menu up, the original's menu scene is behind it, its camera going round
+        let menu_scene = self.menu_scene.as_mut().filter(|m| m.model.is_some() && (self.menu.is_some() || self.loading.is_some()));
+        let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
+            self.menu_ms = (self.menu_ms + step * 1000.0) % crate::menuscene::ROUND_MS;
+            ms.effects.tick_menu(step * 1000.0);
+            let (eye, target) = ms.camera(self.menu_ms);
+            let mut inst = ms.instances();
+            for mesh in 0..crate::sky::FACE_COUNT {
+                inst.push(crate::render::Instance::plain(scene::SKY_MODEL, mesh, glam::Mat4::from_translation(eye)));
+            }
+            let particles = ms.effects.batches(eye, target);
+            (inst, particles, crate::render::View { eye, target, fov_y: ms.fov_y })
+        } else {
+            let inst = scene::instances(
+                &self.game.placements,
+                &self.game.sim.taken,
+                &self.game.sim.world().bodies,
+                &self.game.ball_meshes,
+                self.game.trafo.as_ref().map(|t| &t.1),
+                (&self.game.sim.extra_views(), self.game.extra_model.as_ref()),
+                &snap,
+            );
+            let particles = self.game.effects.batches(snap.eye, snap.target);
+            (inst, particles, scene::view(&snap))
+        };
         let built = build_started.elapsed();
         let draw_started = Instant::now();
-        let particles = self.game.effects.batches(snap.eye, snap.target);
-        gpu.renderer.draw(
-            &view,
-            gpu.config.width,
-            gpu.config.height,
-            &scene::view(&snap),
-            &inst,
-            &particles,
-        );
+        gpu.renderer.draw(&view, gpu.config.width, gpu.config.height, &frame_view, &inst, &particles);
         let drawn = draw_started.elapsed();
         let overlay_started = Instant::now();
         gpu.renderer.draw_overlay(
@@ -1626,8 +1657,20 @@ impl ApplicationHandler for App {
                         ..
                     },
                 ..
-            } => self.key(code, state == ElementState::Pressed, event_loop),
+            } => {
+                // A key already down pressed again is a repeat the platform did not mark (X11 under load): ignored.
+                let down = state == ElementState::Pressed;
+                if down && !self.held.insert(code) {
+                    return;
+                }
+                if !down {
+                    self.held.remove(&code);
+                }
+                self.key(code, down, event_loop)
+            }
             WindowEvent::RedrawRequested => self.frame(),
+            // a key let go while the window was not ours may never be reported released
+            WindowEvent::Focused(false) => self.held.clear(),
             _ => {}
         }
     }

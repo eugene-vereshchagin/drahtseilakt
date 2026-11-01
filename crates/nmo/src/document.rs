@@ -24,6 +24,7 @@ pub mod class {
     pub const TARGET_LIGHT: u32 = 39;
     pub const OBJECT_3D: u32 = 41;
     pub const SPRITE_3D: u32 = 37;
+    pub const CURVE: u32 = 43;
 }
 
 #[derive(Debug, Clone)]

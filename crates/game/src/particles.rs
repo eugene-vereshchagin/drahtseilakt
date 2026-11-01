@@ -578,6 +578,8 @@ pub struct Batch {
 enum When {
     /// The ball within `NEAR` of the module (the level start's four flames).
     Near(Vec3),
+    /// Always (the menu scene's flames).
+    Always,
     /// The checkpoint's big flame: near, until the checkpoint (the level object) is passed.
     Before(usize, Vec3),
     /// The checkpoint's two small flames: near, once it is passed.
@@ -673,6 +675,34 @@ impl Effects {
         fx
     }
 
+    /// The menu scene's flames: the start's four flames at its frames `FourFlames_Flame_A..D` (or with the `PS_`
+    /// prefix), burning all the time.
+    pub fn menu(level: &level::Level) -> Effects {
+        let mut fx = Effects { emitters: Vec::new(), extras: Vec::new(), seed: 7 };
+        for spec in SPECS.iter().filter(|s| s.frame.starts_with("PS_FourFlames_Flame_")) {
+            let short = spec.frame.trim_start_matches("PS_");
+            let Some(o) = level
+                .objects
+                .iter()
+                .find(|o| o.name.trim().eq_ignore_ascii_case(short) || o.name.trim().eq_ignore_ascii_case(spec.frame))
+            else {
+                continue;
+            };
+            let seed = fx.next_seed();
+            let mut s = System::new(*spec, Mat4::from_cols_array_2d(&o.matrix), seed);
+            s.set_active(true);
+            fx.emitters.push((s, When::Always));
+        }
+        fx
+    }
+
+    /// The menu's flames go on by `dt` milliseconds.
+    pub fn tick_menu(&mut self, dt: f32) {
+        for (s, _) in &mut self.emitters {
+            s.tick(dt);
+        }
+    }
+
     /// Whether the level has any flames (their stand-ins need no markers then).
     pub fn has_flames(&self) -> bool {
         self.emitters
@@ -693,6 +723,7 @@ impl Effects {
         for (s, when) in &mut self.emitters {
             let on = match when {
                 When::Near(at) => at.distance(ball) < NEAR,
+                When::Always => true,
                 When::Before(o, at) => !sim.checkpoint_passed(*o) && at.distance(ball) < NEAR,
                 When::After(o, at) => sim.checkpoint_passed(*o) && at.distance(ball) < NEAR,
                 When::Fan { base, axis, angle } => {

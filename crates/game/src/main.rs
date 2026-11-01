@@ -16,6 +16,7 @@ mod extra;
 mod freecam;
 mod hud;
 mod menu;
+mod menuscene;
 mod modules;
 mod music;
 mod particles;

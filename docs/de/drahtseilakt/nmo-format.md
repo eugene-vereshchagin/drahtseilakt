@@ -72,6 +72,10 @@ auf ganze Wörter aufgefüllten Bytes; nach dem abschließenden NUL kann Datenm�
 | 3D-Entity / -Objekt, Kamera, Licht | 33, 41, 34, 35, 38, 39 | `0x100000` | ein Wort, Flags, 3×3-Achsen (zeilenweise), Position — die Weltmatrix |
 | 3D-Objekt | 41 | `0x4000` | Verweis auf das aktuelle Mesh, Anzahl, Mesh-Verweise |
 | 3D-Sprite | 37 | `0x400000` | Modus (0 zum Blick, 1 dreht um x, 2 um y, 3 wie platziert), halbe Breite, halbe Höhe, Versatz x und y (-1..1 der halben Größe), Texturrechteck u0 v0 u1 v1, Materialverweis; ungeleuchtet in der Diffusfarbe des Materials gezeichnet |
+| Kamera, Zielkamera | 34, 35 | `0xfc00000` | (Datenversion 5 und neuer) Projektion, Sichtfeld (horizontal, Bogenmaß), orthografischer Zoom, Seitenverhältnis (Breite und Höhe als 16-Bit-Hälften), nahe und ferne Ebene |
+| Zielkamera | 35 | `0x10000000` | ihr Zielobjekt |
+| Kurve | 43 | `0xffc00000` | (Datenversion 5 und neuer) Stützpunkte: Anzahl und Verweise in Kurvenreihenfolge, Glättungskoeffizient, Schrittzahl, Offen-Flag |
+| Kurvenpunkt | 36 | `0x10000000` | (Datenversion 5 und neuer) die Kurve, eigene Tangenten (statt TCB), linear, Tension, Continuity, Bias, Ein- und Ausgangstangente (kurvenlokal) |
 | Datenarray | 52 | `0x1000` | Spalten: Anzahl, dann Name (String) und Typ (1 Int, 2 Float, 3 String, 4 Objekt, 5 Parameter + Typ-GUID) |
 | | | `0x2000` | Zeilen: Anzahl, dann ein Wert je Spalte |
 
