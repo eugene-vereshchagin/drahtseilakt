@@ -59,10 +59,13 @@ fn floor_triangles(level: &Level, modules: &crate::scene::Modules) -> Vec<([Vec3
         }
     }
     for i in 0..level.objects.len() {
-        // loose balls and boxes are things in the way, not floors
-        let Some(name) = crate::scene::module_of(level, i)
-            .filter(|n| !n.starts_with("P_Ball") && !n.starts_with("P_Box"))
-        else {
+        // loose balls and boxes are things in the way, a dome is a hump to go round, module 34 a box with a stone
+        // on it to push away: not floors
+        let Some(name) = crate::scene::module_of(level, i).filter(|n| {
+            !["P_Ball", "P_Box", "P_Dome", "P_Modul_34"]
+                .iter()
+                .any(|k| n.starts_with(k))
+        }) else {
             continue;
         };
         let Some((_, module)) = modules.get(name) else {
@@ -403,6 +406,9 @@ const CHOICES: [u8; 9] = [
 /// The steering: every `PERIOD` ticks each choice is tried for `HOLD` ticks and then `COAST` with no arrows on a copy of
 /// the run; the one that ends furthest along the way without losing the ball is held.
 const PERIOD: u64 = 6;
+/// A player rolls calmly: above this speed every unit costs `FAST` way points.
+const CALM: f32 = 7.0;
+const FAST: f32 = 1.5;
 const HOLD: u64 = 18;
 const COAST: u64 = 36;
 
@@ -619,7 +625,9 @@ impl Pilot {
             } else if s.finished {
                 f32::INFINITY
             } else {
-                self.route.progress(s.ball.position, self.at) - self.blocking(&s)
+                self.route.progress(s.ball.position, self.at)
+                    - self.blocking(&s)
+                    - FAST * (s.ball.velocity.length() - CALM).max(0.0)
                     + if c == self.choice { 0.05 } else { 0.0 }
             };
             if std::env::var_os("AUTOPILOT_SCORES").is_some() {

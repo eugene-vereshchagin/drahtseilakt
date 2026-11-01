@@ -1430,6 +1430,11 @@ impl Sim {
         self.rules.checkpoints.iter().map(|c| c.1).chain(self.rules.end).collect()
     }
 
+    /// Where the transformers are.
+    pub fn transformers(&self) -> Vec<Vec3> {
+        self.rules.trafos.iter().map(|t| t.1).collect()
+    }
+
     /// Whether the ball is falling to its loss (lost, not yet replaced).
     pub fn is_dying(&self) -> bool {
         self.dying.is_some()

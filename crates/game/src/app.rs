@@ -713,7 +713,30 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
 fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
     let level = &game.level.level;
     let stages: Vec<glam::Vec3> = game.sim.stages().into_iter().skip(game.sim.sector).collect();
-    let route = crate::autopilot::Route::find(level, &game.modules, game.sim.ball.position, &stages);
+    // The transformers the way passes (within 30) are part of the way, in its order: a player rolls into them
+    // rather than around them.
+    let start = game.sim.ball.position;
+    let base = crate::autopilot::Route::find(level, &game.modules, start, &stages);
+    let mut waypoints: Vec<(usize, glam::Vec3)> = Vec::new();
+    for t in game.sim.transformers() {
+        let near = base
+            .points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (i, glam::Vec3::new(p.x - t.x, 0.0, p.z - t.z).length() + (p.y - t.y).abs()))
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some((i, _)) = near.filter(|n| n.1 < 30.0) {
+            waypoints.push((i, t));
+        }
+    }
+    for (k, &m) in base.marks.iter().enumerate() {
+        if let Some(&s) = stages.get(k) {
+            waypoints.push((m, s));
+        }
+    }
+    waypoints.sort_by_key(|w| w.0);
+    let stages: Vec<glam::Vec3> = waypoints.into_iter().map(|w| w.1).collect();
+    let route = crate::autopilot::Route::find(level, &game.modules, start, &stages);
     println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
     if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
         for (i, p) in route.points.iter().enumerate() {
