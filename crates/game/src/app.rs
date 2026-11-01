@@ -6,6 +6,7 @@ use crate::Options;
 use crate::assets::{Data, LoadedLevel};
 use crate::render::Renderer;
 use crate::replay::Replay;
+use crate::freecam::FreeCam;
 use crate::menu::{Action, Menu};
 use crate::scene::{self, BallMeshes, Snapshot};
 use crate::collide::closest_point;
@@ -567,6 +568,10 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         opts: o.clone(),
         menu,
         loading: None,
+        debug: o.debug,
+        fly: None,
+        fly_keys: 0,
+        last_view: (glam::Vec3::ZERO, glam::Vec3::X),
         game,
         data,
         size: o.size,
@@ -796,6 +801,13 @@ struct App {
     menu: Option<Menu>,
     /// A level to load: (its number, whether the loading screen has been drawn).
     loading: Option<(u32, bool)>,
+    /// Debug mode: F2 takes up the free camera.
+    debug: bool,
+    /// The free camera while it is up (the run waits), and the keys flying it.
+    fly: Option<FreeCam>,
+    fly_keys: u16,
+    /// Where the camera looked at the last frame, for taking up the free camera there.
+    last_view: (glam::Vec3, glam::Vec3),
     data: Data,
     size: (u32, u32),
     window: Option<Arc<Window>>,
@@ -904,7 +916,9 @@ impl App {
 
     fn open_menu(&mut self) {
         let run = !(self.game.sim.finished || self.game.sim.game_over);
-        self.menu = Some(Menu::new(&self.data, self.number.unwrap_or(1), run));
+        let mut menu = Menu::new(&self.data, self.number.unwrap_or(1), run);
+        menu.debug = self.debug;
+        self.menu = Some(menu);
         self.keys = 0;
     }
 
@@ -928,6 +942,15 @@ impl App {
             Action::Continue => self.menu = None,
             Action::Play(n) => self.play(n),
             Action::Quit => event_loop.exit(),
+            Action::ToggleDebug => {
+                self.debug = !self.debug;
+                if !self.debug {
+                    self.fly = None;
+                }
+                if let Some(m) = &mut self.menu {
+                    m.debug = self.debug;
+                }
+            }
         }
     }
 
@@ -938,6 +961,38 @@ impl App {
         if self.menu.is_some() {
             if down {
                 self.menu_key(code, event_loop);
+            }
+            return;
+        }
+        if code == KeyCode::F2 && down && self.debug {
+            self.fly = match self.fly {
+                Some(_) => None,
+                None => Some(FreeCam::at(self.last_view.0, self.last_view.1)),
+            };
+            self.keys = 0;
+            self.fly_keys = 0;
+            return;
+        }
+        if self.fly.is_some() && code != KeyCode::Escape && code != KeyCode::F11 {
+            use crate::freecam::keys;
+            let bit = match code {
+                KeyCode::ArrowUp => keys::FORWARD,
+                KeyCode::ArrowDown => keys::BACK,
+                KeyCode::ArrowLeft => keys::TURN_LEFT,
+                KeyCode::ArrowRight => keys::TURN_RIGHT,
+                KeyCode::KeyA => keys::LEFT,
+                KeyCode::KeyD => keys::RIGHT,
+                KeyCode::PageUp => keys::UP,
+                KeyCode::PageDown => keys::DOWN,
+                KeyCode::Home => keys::LOOK_UP,
+                KeyCode::End => keys::LOOK_DOWN,
+                KeyCode::ShiftLeft | KeyCode::ShiftRight => keys::FAST,
+                _ => 0,
+            };
+            if down {
+                self.fly_keys |= bit;
+            } else {
+                self.fly_keys &= !bit;
             }
             return;
         }
@@ -1007,6 +1062,11 @@ impl App {
                 self.loading = Some((n, true));
             }
         }
+        if let Some(c) = &mut self.fly {
+            // the run waits while the free camera is up
+            c.fly(self.fly_keys, self.acc);
+            self.acc = 0.0;
+        }
         if self.menu.is_some() || self.loading.is_some() {
             self.acc = 0.0;
         }
@@ -1020,7 +1080,11 @@ impl App {
         }
         let simulated = started.elapsed();
         let cur = Snapshot::of(&self.game.sim);
-        let snap = Snapshot::lerp(&self.prev.unwrap_or(cur), &cur, self.acc / TICK);
+        let mut snap = Snapshot::lerp(&self.prev.unwrap_or(cur), &cur, self.acc / TICK);
+        if let Some(c) = &self.fly {
+            (snap.eye, snap.target) = c.view();
+        }
+        self.last_view = (snap.eye, snap.target);
         let Some(gpu) = &mut self.gpu else { return };
         let acquire_started = Instant::now();
         let frame = match gpu.surface.get_current_texture() {
@@ -1062,12 +1126,20 @@ impl App {
                     Menu::new(&self.data, n, false).overlay(gpu.config.width, gpu.config.height, Some(n))
                 }
                 (Some(m), None) => m.overlay(gpu.config.width, gpu.config.height, None),
-                (None, None) => crate::hud::overlay(
-                    &self.game.sim,
-                    gpu.config.width,
-                    gpu.config.height,
-                    self.game.ball_lost_at,
-                ),
+                (None, None) => {
+                    let mut o = crate::hud::overlay(
+                        &self.game.sim,
+                        gpu.config.width,
+                        gpu.config.height,
+                        self.game.ball_lost_at,
+                    );
+                    if let Some(c) = &self.fly {
+                        let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
+                        let line = format!("FREE CAMERA   {:.1} {:.1} {:.1}   F2 BACK", c.pos.x, c.pos.y, c.pos.z);
+                        crate::hud::text(&mut o, &line, scale, scale * 11.0, scale, [1.0, 0.85, 0.3, 1.0]);
+                    }
+                    o
+                }
             },
         );
         let overlaid = overlay_started.elapsed();

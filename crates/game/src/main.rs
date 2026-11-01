@@ -8,6 +8,7 @@
 mod app;
 mod assets;
 mod collide;
+mod freecam;
 mod hud;
 mod menu;
 mod modules;
@@ -46,6 +47,8 @@ usage: drahtseilakt [options]
                       the sector is the nearest object's unless --sector is given
   --ball KIND         begin with a wood, stone or paper ball
                       (a run begun elsewhere is recorded with its start and is never a level's best run)
+  --debug             debug mode: F2 takes up the free camera (the run waits; arrows fly and turn, A/D move
+                      sideways, PageUp/PageDown up and down, Home/End look up and down, Shift faster)
   --size WxH          window or screenshot size (default 1600x900)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
@@ -70,6 +73,8 @@ pub struct Options {
     pub trace: Option<u64>,
     pub from: Option<u64>,
     pub size: (u32, u32),
+    /// Debug mode from the start: the free camera on F2.
+    pub debug: bool,
     /// --sector, --at, --ball: a run begun elsewhere than the level start.
     pub sector: Option<usize>,
     pub at: Option<String>,
@@ -94,6 +99,7 @@ fn parse_args() -> Result<Options, String> {
         sector: None,
         at: None,
         ball: None,
+        debug: false,
         look: None,
     };
     // `--name=value` is the same as `--name value` (handy for values that start with a minus).
@@ -129,6 +135,7 @@ fn parse_args() -> Result<Options, String> {
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,
+            "--debug" => o.debug = true,
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--ticks" => {
                 o.ticks = Some(

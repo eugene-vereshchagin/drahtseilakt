@@ -71,7 +71,6 @@ impl Item {
                 "PLAYS YOUR OWN COPY OF THE GAME",
             ],
             Item::Debug => &[
-                "NOTHING TO SWITCH HERE YET",
                 "",
                 "BEGIN ANYWHERE FROM THE COMMAND LINE:",
                 "--SECTOR N   --AT X,Y,Z OR OBJECT   --BALL KIND",
@@ -95,6 +94,8 @@ pub enum Action {
     Continue,
     Play(u32),
     Quit,
+    /// The Debug page's switch: debug mode (the free camera on F2) on or off.
+    ToggleDebug,
 }
 
 pub struct Menu {
@@ -104,6 +105,8 @@ pub struct Menu {
     pub item: usize,
     pub entries: Vec<Entry>,
     pub selected: usize,
+    /// Debug mode, as the Debug page shows it.
+    pub debug: bool,
 }
 
 impl Menu {
@@ -139,6 +142,7 @@ impl Menu {
             item: 0,
             entries,
             selected,
+            debug: false,
         }
     }
 
@@ -171,6 +175,7 @@ impl Menu {
                 None => Action::None,
             },
             Screen::Levels => self.chosen().map_or(Action::None, Action::Play),
+            Screen::Page(Item::Debug) => Action::ToggleDebug,
             Screen::Page(_) => {
                 self.screen = Screen::Main;
                 Action::None
@@ -249,12 +254,18 @@ impl Menu {
         if let Screen::Page(item) = self.screen {
             centre(&mut out, item.label(), y, s * 1.5, WHITE);
             y += 2.5 * line;
+            if item == Item::Debug {
+                let switch = format!("DEBUG MODE: {}   FREE CAMERA ON F2", if self.debug { "ON" } else { "OFF" });
+                centre(&mut out, &switch, y, s, if self.debug { GOLD } else { WHITE });
+                y += line;
+            }
             for l in item.page() {
                 centre(&mut out, &l, y, s, WHITE);
                 y += line;
             }
             y += line;
-            centre(&mut out, "ENTER OR ESC BACK", y, s, GREY);
+            let keys = if item == Item::Debug { "ENTER SWITCHES   ESC BACK" } else { "ENTER OR ESC BACK" };
+            centre(&mut out, keys, y, s, GREY);
             return out;
         }
         if self.screen == Screen::Main {
@@ -367,6 +378,7 @@ mod tests {
             screen: Screen::Levels,
             items: vec![Item::Levels, Item::Credits, Item::Quit],
             item: 0,
+            debug: false,
         }
     }
 
