@@ -7,6 +7,7 @@
 
 use crate::collide::{StaticMesh, Triangle};
 use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, Rot, World};
+use crate::scene::{ModuleBody, Modules, module_of};
 use crate::volume::Obb;
 use glam::{Mat3, Quat, Vec3};
 use level::Level;
@@ -199,6 +200,99 @@ struct Rules {
     death_y: f32,
 }
 
+/// A placed module's physics: its parts' bodies and its sliders to FixCube (part body, axis points in the world).
+#[derive(Clone, Debug, Default)]
+struct ModuleInst {
+    parts: Vec<usize>,
+    sliders: Vec<(usize, Vec3, Vec3)>,
+}
+
+impl ModuleInst {
+    /// The parts are made at their places and their sliders attached, as the module's scripts do.
+    fn enter(&self, world: &mut World, fixcube: Option<usize>) {
+        for &b in &self.parts {
+            world.activate(b);
+        }
+        if let Some(f) = fixcube {
+            for &(b, p0, p1) in &self.sliders {
+                world.add_slider(b, f, p0, p1);
+            }
+        }
+    }
+
+    /// The parts leave the physics, their joints with them.
+    fn leave(&self, world: &mut World) {
+        for &b in &self.parts {
+            world.deactivate(b);
+        }
+    }
+}
+
+/// The corners of FixCube, a unit cube; it collides with nothing, so only its being a body counts.
+const FIXCUBE: [Vec3; 8] = [
+    Vec3::new(-1.0, -1.0, -1.0),
+    Vec3::new(1.0, -1.0, -1.0),
+    Vec3::new(-1.0, 1.0, -1.0),
+    Vec3::new(1.0, 1.0, -1.0),
+    Vec3::new(-1.0, -1.0, 1.0),
+    Vec3::new(1.0, -1.0, 1.0),
+    Vec3::new(-1.0, 1.0, 1.0),
+    Vec3::new(1.0, 1.0, 1.0),
+];
+
+/// The parts of the module placed by level object `i` (its stand-in), as bodies out of the physics until their sector,
+/// and the module's sliders. Each part is at the stand-in's matrix times its matrix in the module file, its collision
+/// meshes scaled by its scale. None when the module file lacks a part.
+fn module_parts(
+    world: &mut World,
+    level: &Level,
+    i: usize,
+    spec: &crate::modules::ModuleSpec,
+    file: &Level,
+    bodies: &mut Vec<ModuleBody>,
+) -> Option<ModuleInst> {
+    let place = glam::Mat4::from_cols_array_2d(&level.objects.get(i)?.matrix);
+    let at = |name: &str| -> Option<glam::Mat4> {
+        let o = file.objects.iter().find(|o| o.name == name)?;
+        Some(place * glam::Mat4::from_cols_array_2d(&o.matrix))
+    };
+    let mut inst = ModuleInst::default();
+    for part in spec.parts {
+        let world_m = at(part.object)?;
+        let (pos, rot, scale) = pose_and_scale(&world_m.to_cols_array_2d())?;
+        let pieces: Vec<Vec<Vec3>> = part
+            .meshes
+            .iter()
+            .filter_map(|m| file.meshes.iter().find(|x| x.name == *m))
+            .map(|m| m.positions.iter().map(|p| Vec3::from(*p) * scale).collect())
+            .collect();
+        let body = world.add_part(
+            &pieces,
+            part.material,
+            pos,
+            rot,
+            part.fixed,
+            part.group,
+            part.start_frozen,
+            true,
+            false,
+        )?;
+        inst.parts.push(body);
+        bodies.push(ModuleBody {
+            placeholder: i,
+            object: part.object.to_owned(),
+            body,
+            scale,
+        });
+    }
+    for s in spec.sliders {
+        let part = spec.parts.iter().position(|p| p.object == s.part)?;
+        let (p0, p1) = (at(s.from)?.w_axis.truncate(), at(s.to)?.w_axis.truncate());
+        inst.sliders.push((*inst.parts.get(part)?, p0, p1));
+    }
+    Some(inst)
+}
+
 /// The ball inside a transformer: out of the physics until `release`, then a new ball of its new kind at `at`.
 #[derive(Clone, Copy, Debug)]
 struct TrafoHold {
@@ -231,8 +325,23 @@ pub struct Sim {
     push_keys: u8,
     /// The body indices of each sector's objects (sector 1 first).
     sectors: Vec<Vec<usize>>,
-    /// Sector changes due: at a tick, a sector's objects leave (false) or enter (true) the physics.
-    sector_changes: Vec<(u64, usize, bool)>,
+    /// Each sector's modules.
+    module_sectors: Vec<Vec<ModuleInst>>,
+    /// The modules' parts that are bodies, for drawing.
+    module_bodies: Vec<ModuleBody>,
+    /// The fixed anchor of the modules' joints.
+    fixcube: Option<usize>,
+    /// Sector changes due: at a tick, a sector's objects or modules leave or enter the physics.
+    sector_changes: Vec<SectorChange>,
+}
+
+/// A change of a sector's bodies due at a tick: its objects or its modules, entering or leaving the physics.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SectorChange {
+    tick: u64,
+    sector: usize,
+    enter: bool,
+    modules: bool,
 }
 
 const PICK_RADIUS: f32 = 3.5;
@@ -244,8 +353,21 @@ const START_OBJECTS_SECONDS: f64 = 4.0 / 60.0;
 const GATE_RADIUS: f32 = 7.0;
 
 impl Sim {
+    /// A run of a level without its modules' physics (their placeholders are solid).
+    #[cfg(test)]
     pub fn new(level: &Level, start_ball: BallKind) -> Sim {
-        let statics = static_meshes(level);
+        Sim::with_modules(level, start_ball, &Modules::default())
+    }
+
+    /// A run of a level, with the physics of the modules the port has (crate::modules) from their loaded files.
+    pub fn with_modules(level: &Level, start_ball: BallKind, modules: &Modules) -> Sim {
+        // The placeholders whose modules are made from their parts are not solid themselves.
+        let made: Vec<usize> = (0..level.objects.len())
+            .filter(|&i| {
+                module_of(level, i).is_some_and(|n| crate::modules::spec(n).is_some() && modules.get(n).is_some())
+            })
+            .collect();
+        let statics = static_meshes(level, &made);
         let pos = |name: &str| -> Vec<(usize, Vec3)> {
             level
                 .members(name)
@@ -394,11 +516,57 @@ impl Sim {
         // The level start as the C game runs it at level 1: the physics runs at time factor 1 with only the level's
         // geometry, then the first sector's objects are made (at 9.90 s of its time), then the ball four frames later
         // (9.9667 s). The time puts the steps of the physics where the original's are.
+        // The modules' parts: each placeholder's module, made from the module file at the placeholder's place.
+        let mut module_sectors: Vec<Vec<ModuleInst>> = Vec::new();
+        let mut unsectored_modules = Vec::new();
+        let mut module_bodies = Vec::new();
+        for &i in &made {
+            let Some(name) = module_of(level, i) else { continue };
+            let (Some(spec), Some((_, file))) = (crate::modules::spec(name), modules.get(name)) else {
+                continue;
+            };
+            let Some(inst) = module_parts(&mut world, level, i, spec, file, &mut module_bodies) else {
+                continue;
+            };
+            match sector_of(i) {
+                Some(n) => {
+                    if module_sectors.len() <= n {
+                        module_sectors.resize_with(n + 1, Vec::new);
+                    }
+                    module_sectors[n].push(inst);
+                }
+                None => unsectored_modules.push(inst),
+            }
+        }
+        // The fixed anchor of the modules' joints (the original's FixCube: fixed, out of the collision system, at the
+        // origin).
+        let fixcube = world.add_part(
+            &[FIXCUBE.to_vec()],
+            Material {
+                friction: 0.7,
+                elasticity: 0.4,
+                mass: 1.0,
+                lin_damp: 0.1,
+                rot_damp: 0.1,
+            },
+            Vec3::ZERO,
+            Quat::IDENTITY,
+            true,
+            "",
+            false,
+            false,
+            true,
+        );
         world.run(LEVEL_INTRO_SECONDS);
         for &b in unsectored.iter().chain(sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
             world.activate(b);
         }
-        world.run(START_OBJECTS_SECONDS);
+        // The modules come one frame after the sector's objects.
+        world.run(1.0 / 60.0);
+        for inst in unsectored_modules.iter().chain(module_sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
+            inst.enter(&mut world, fixcube);
+        }
+        world.run(START_OBJECTS_SECONDS - 1.0 / 60.0);
         world.replace_ball(0, BALL_RADIUS, ball.material(), ball.position, ball.rotation);
         let mut camera = Camera {
             quarter,
@@ -427,6 +595,9 @@ impl Sim {
             dying: None,
             push_keys: 0,
             sectors,
+            module_sectors,
+            module_bodies,
+            fixcube,
             sector_changes: Vec::new(),
         }
     }
@@ -583,9 +754,10 @@ impl Sim {
             self.sector += 1;
             self.events
                 .push((self.tick, Event::Checkpoint(self.sector)));
-            // The passed sector's objects leave the physics, then the next sector's are made at their places.
-            self.sector_changes.push((self.tick + SECTOR_END_TICKS, self.sector - 1, false));
-            self.sector_changes.push((self.tick + SECTOR_BEGIN_TICKS, self.sector, true));
+            // The passed sector's objects leave the physics, then the next sector's are made at their places, its
+            // modules one frame later.
+            self.sector_change(SECTOR_END_TICKS, self.sector - 1, false);
+            self.sector_change(SECTOR_BEGIN_TICKS, self.sector, true);
         }
         if let Some(end) = self.rules.end
             && self.sector >= self.rules.checkpoints.len()
@@ -629,18 +801,52 @@ impl Sim {
         }
         self.dying = Some(self.tick);
         // The current sector starts again: its objects leave the physics and are made again at their places.
-        self.sector_changes.push((self.tick + DEATH_SECTOR_END_TICKS, self.sector, false));
-        self.sector_changes.push((self.tick + DEATH_SECTOR_BEGIN_TICKS, self.sector, true));
+        self.sector_change(DEATH_SECTOR_END_TICKS, self.sector, false);
+        self.sector_change(DEATH_SECTOR_BEGIN_TICKS, self.sector, true);
+    }
+
+    /// Schedules a sector's objects to enter or leave the physics `after` ticks from now, and its modules with them
+    /// (entering one tick later).
+    fn sector_change(&mut self, after: u64, sector: usize, enter: bool) {
+        let tick = self.tick + after;
+        self.sector_changes.push(SectorChange {
+            tick,
+            sector,
+            enter,
+            modules: false,
+        });
+        self.sector_changes.push(SectorChange {
+            tick: if enter { tick + 1 } else { tick },
+            sector,
+            enter,
+            modules: true,
+        });
+    }
+
+    /// The modules' parts that the physics moves, for drawing.
+    pub fn module_bodies(&self) -> &[ModuleBody] {
+        &self.module_bodies
     }
 
     /// The sector changes due at this tick, in the order they were made.
     fn apply_sector_changes(&mut self) {
         let tick = self.tick;
-        let due: Vec<(u64, usize, bool)> = self.sector_changes.iter().copied().filter(|c| c.0 == tick).collect();
-        self.sector_changes.retain(|c| c.0 > tick);
-        for (_, n, enter) in due {
-            for &b in self.sectors.get(n).map(Vec::as_slice).unwrap_or(&[]) {
-                if enter {
+        let due: Vec<SectorChange> = self.sector_changes.iter().copied().filter(|c| c.tick == tick).collect();
+        self.sector_changes.retain(|c| c.tick > tick);
+        for c in due {
+            if c.modules {
+                let insts = self.module_sectors.get(c.sector).cloned().unwrap_or_default();
+                for inst in &insts {
+                    if c.enter {
+                        inst.enter(&mut self.world, self.fixcube);
+                    } else {
+                        inst.leave(&mut self.world);
+                    }
+                }
+                continue;
+            }
+            for &b in self.sectors.get(c.sector).map(Vec::as_slice).unwrap_or(&[]) {
+                if c.enter {
                     self.world.activate(b);
                 } else {
                     self.world.deactivate(b);
@@ -724,7 +930,7 @@ fn pose_and_scale(matrix: &[[f32; 4]; 4]) -> Option<(Vec3, Rot, Vec3)> {
 
 /// The physical objects of the level, one mesh each, as the original physicalizes them: the mesh's points scaled by
 /// the object's scale in its own frame, the pose without the scale (an object in two solid groups is made once).
-fn static_meshes(level: &Level) -> Vec<StaticMesh> {
+fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
     let mut out = Vec::new();
     let mut seen = Vec::new();
     for g in &level.groups {
@@ -738,7 +944,7 @@ fn static_meshes(level: &Level) -> Vec<StaticMesh> {
             _ => continue,
         };
         for &m in &g.members {
-            if seen.contains(&m) {
+            if seen.contains(&m) || made.contains(&m) {
                 continue;
             }
             seen.push(m);
@@ -1216,6 +1422,48 @@ mod tests {
         }
         let back = sim.world.state(b).unwrap().pos;
         assert!(back.distance(start) < 0.1, "the box is at {back:?}, its place is {start:?}");
+    }
+
+    #[test]
+    fn a_module_is_made_of_its_parts_at_its_stand_in_and_its_stone_slides() {
+        // Module 34 as a file: a box and a stone (cubes of half size 1) one above the other, and the slider's frames
+        // on a vertical axis through the stone. Its stand-in in sector 1, turned a quarter about y, 20 along x.
+        let mut file = flat_level();
+        file.objects.clear();
+        file.groups.clear();
+        let kiste = add_cube(&mut file, "P_Modul_34_Kiste", Vec3::new(-7.0, 1.0, 0.0), &[]);
+        let stein = add_cube(&mut file, "P_Modul_34_Schiebestein", Vec3::new(-7.0, 3.0, 0.0), &[]);
+        file.meshes[file.objects[kiste].mesh.unwrap()].name = "P_Modul_34_Kiste_Mesh".into();
+        file.meshes[file.objects[stein].mesh.unwrap()].name = "P_Modul_34_Schiebestein_Mesh".into();
+        for (name, y) in [("P_Modul_34_Slider_Frame01", 6.0), ("P_Modul_34_Slider_Frame02", -6.0)] {
+            let o = add_cube(&mut file, name, Vec3::new(-7.0, y, 0.0), &[]);
+            file.objects[o].mesh = None;
+        }
+        let mut level = flat_level();
+        let stand_in = add_cube(&mut level, "P_Modul_34_01", Vec3::ZERO, &["P_Modul_34", "Sector_01"]);
+        level.objects[stand_in].matrix = [
+            [0.0, 0.0, -1.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0],
+            [20.0, 0.0, 0.0, 1.0],
+        ];
+        let mut modules = Modules::default();
+        modules.models.push(file);
+        modules.names.push("P_Modul_34".into());
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
+        let parts = sim.module_bodies().to_vec();
+        assert_eq!(parts.len(), 2);
+        // the stand-in's matrix times the part's: (-7, 1, 0) turned a quarter about y is (0, 1, 7), moved to x = 20
+        let k = sim.world.state(parts[0].body).expect("the box is made").pos;
+        assert!((k - Vec3::new(20.0, 1.0, 7.0)).length() < 1e-4, "box at {k:?}");
+        // take the box away: the stone drops along its slider onto the floor, straight down
+        sim.world.deactivate(parts[0].body);
+        sim.world.wake(parts[1].body);
+        for _ in 0..120 {
+            sim.step(0);
+        }
+        let st = sim.world.state(parts[1].body).unwrap().pos;
+        assert!((st - Vec3::new(20.0, 1.0, 7.0)).length() < 0.05, "stone at {st:?}");
     }
 
     #[test]

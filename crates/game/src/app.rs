@@ -97,8 +97,9 @@ impl Game {
             .as_deref()
             .and_then(crate::sim::BallKind::from_name)
             .unwrap_or(crate::sim::BallKind::Wood);
-        let sim = Sim::new(&level.level, start_ball);
-        let (placements, modules) = scene::placements(&level.level, data, sim.loose());
+        let modules = scene::load_modules(&level.level, data);
+        let sim = Sim::with_modules(&level.level, start_ball, &modules);
+        let placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
         Ok(Game {
             placements,
             modules,
@@ -119,7 +120,7 @@ impl Game {
 
     fn restart(&mut self) {
         self.save_attempt();
-        self.sim = Sim::new(&self.level.level, self.start_ball);
+        self.sim = Sim::with_modules(&self.level.level, self.start_ball, &self.modules);
         self.ball_lost_at = None;
         self.watch = Watch::default();
         self.replay_out = Replay::new(&self.level.name, self.level.hash);

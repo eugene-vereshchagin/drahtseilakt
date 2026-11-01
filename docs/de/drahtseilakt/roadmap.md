@@ -15,9 +15,9 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   geprüft: ein gerader Stoß der Holz- und der Steinkugel und eine 17-Sekunden-Route in Level 1 stimmen auf 0,1
   bzw. 0,8 Einheiten überein. Fehlt: Bodenmaterialien je Objekt, die Physik der Module.
 - **Phase 4**: Regeln aus den Gruppen des Levels (Start, Rücksetzpunkte, Checkpoints, Bonuspunkte und -leben,
-  Kugelwandler, Absturz, Ziel); Replays werden aufgezeichnet, das beste je Level behalten. Fehlt: das eigene
-  Verhalten der Module (Kisten, bewegte Teile, deren Platzhalter vorerst fest sind), Klänge, Musik, die
-  Erweiterung von Level 13.
+  Kugelwandler, Absturz, Ziel); Replays werden aufgezeichnet, das beste je Level behalten. Sektoren, Kuppeln und der
+  Levelstart wie im C-Spiel. Fehlt: die Skripte der Module (die Teile von P_Modul_01 und 34 sind physikalisch, die
+  Platzhalter der übrigen Module vorerst fest), Klänge, Musik, die Erweiterung von Level 13.
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
 
 

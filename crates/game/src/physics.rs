@@ -92,6 +92,10 @@ struct Spawn {
     shift: Option<[f32; 3]>,
     group: &'static str,
     fixed: bool,
+    /// Made asleep (a module's movable part waits to be touched).
+    frozen: bool,
+    /// In the collision system at all (FixCube is not).
+    collide: bool,
 }
 
 fn vec3_f64(v: Vec3) -> [f64; 3] {
@@ -218,6 +222,8 @@ impl World {
         };
         let desc = BodyDesc {
             fixed: s.fixed,
+            start_frozen: s.frozen,
+            collide: s.collide,
             shift: s.shift,
             group: group(s.group),
             // the level's objects are entity 0; the game's bodies follow in creation order, so the ball is entity 1
@@ -359,6 +365,8 @@ impl World {
             shift: None,
             group: "",
             fixed: false,
+            frozen: false,
+            collide: true,
         };
         self.add_spawn(spawn, active)
     }
@@ -385,8 +393,57 @@ impl World {
             shift: Some([0.0; 3]),
             group: "",
             fixed,
+            frozen: false,
+            collide: true,
         };
         Some(self.add_spawn(spawn, active))
+    }
+
+    /// A module's part (or FixCube): one convex piece per point set, in its own frame, its mass centre at its origin,
+    /// with the module's values. None when no piece spans a volume.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_part(
+        &mut self,
+        pieces: &[Vec<Vec3>],
+        m: Material,
+        pos: Vec3,
+        rot: impl Into<Rot>,
+        fixed: bool,
+        group: &'static str,
+        frozen: bool,
+        collide: bool,
+        active: bool,
+    ) -> Option<usize> {
+        let hulls: Vec<ledge::Ledge> = pieces
+            .iter()
+            .filter_map(|p| {
+                let pts: Vec<[f64; 3]> = p.iter().map(|&v| vec3_f64(v)).collect();
+                ivp::convex::hull(&pts)
+            })
+            .collect();
+        let surface = Surface::compile(hulls)?;
+        let spawn = Spawn {
+            shape: Shape::Surface(surface),
+            m,
+            pos,
+            rot: rot.into(),
+            shift: Some([0.0; 3]),
+            group,
+            fixed,
+            frozen,
+            collide,
+        };
+        Some(self.add_spawn(spawn, active))
+    }
+
+    /// A slider of body `a` to body `b` along the world axis from `p0` to `p1`, without limits (Set Physics Slider).
+    /// None when either body is not in the physics.
+    pub fn add_slider(&mut self, a: usize, b: usize, p0: Vec3, p1: Vec3) -> Option<usize> {
+        let (Some(&Some(ia)), Some(&Some(ib))) = (self.handles.get(a), self.handles.get(b)) else {
+            return None;
+        };
+        let p = |v: Vec3| [v.x, v.y, v.z];
+        self.physics.slider_create(Some(ia), Some(ib), p(p0), p(p1), false, -1.0, 1.0)
     }
 
     /// The triangles near a point of the level's physical objects that the player's ball collides with, in world

@@ -84,9 +84,30 @@ pub struct Placement {
     pub body: Option<usize>,
 }
 
-/// Module models (`3D Entities/PH/<name>.nmo`), uploaded after the fixed models.
+/// Module models (`3D Entities/PH/<name>.nmo`), uploaded after the fixed models, with their names.
+#[derive(Default)]
 pub struct Modules {
     pub models: Vec<Level>,
+    pub names: Vec<String>,
+}
+
+impl Modules {
+    /// The model of a module by its name (`P_Modul_34`).
+    pub fn get(&self, name: &str) -> Option<(usize, &Level)> {
+        let i = self.names.iter().position(|n| n.eq_ignore_ascii_case(name))?;
+        Some((i, self.models.get(i)?))
+    }
+}
+
+/// A module part that the physics moves: the placeholder's level object, the part's object in the module file, and
+/// its body.
+#[derive(Debug, Clone)]
+pub struct ModuleBody {
+    pub placeholder: usize,
+    pub object: String,
+    pub body: usize,
+    /// The part's scale, which the body's pose leaves out.
+    pub scale: Vec3,
 }
 
 pub const FIRST_MODULE_MODEL: usize = 3;
@@ -106,15 +127,48 @@ fn module_name(object: &str) -> &str {
     }
 }
 
+/// The module a level object stands in for: a visible mesh without any material and without a marker group is an
+/// editor stand-in, which the original replaces with its module (named by the object without its `_NN`).
+pub fn module_of(level: &Level, i: usize) -> Option<&str> {
+    let o = level.objects.get(i)?;
+    let mesh = o.mesh?;
+    if !o.visible || has_material(level, mesh) {
+        return None;
+    }
+    let marker = level
+        .groups_of(i)
+        .any(|g| MARKERS.iter().any(|m| m.0.eq_ignore_ascii_case(g)));
+    (!marker).then(|| module_name(&o.name))
+}
+
+/// Loads every module the level's stand-ins name, once each (a missing or unreadable file is left out).
+pub fn load_modules(level: &Level, data: &crate::assets::Data) -> Modules {
+    let mut modules = Modules::default();
+    let mut tried: Vec<String> = Vec::new();
+    for i in 0..level.objects.len() {
+        let Some(name) = module_of(level, i) else { continue };
+        if tried.iter().any(|t| t == name) {
+            continue;
+        }
+        tried.push(name.to_owned());
+        let Some(path) = data.file(&format!("3D Entities/PH/{name}.nmo")) else {
+            continue;
+        };
+        if let Ok(m) = crate::assets::load_nmo(&path) {
+            modules.models.push(m.level);
+            modules.names.push(name.to_owned());
+        }
+    }
+    modules
+}
+
 pub fn placements(
     level: &Level,
-    data: &crate::assets::Data,
+    modules: &Modules,
     boxes: &[(usize, usize)],
-) -> (Vec<Placement>, Modules) {
+    parts: &[ModuleBody],
+) -> Vec<Placement> {
     let mut out = Vec::new();
-    let mut modules = Modules { models: Vec::new() };
-    let mut loaded: std::collections::HashMap<String, Option<usize>> =
-        std::collections::HashMap::new();
     for (i, o) in level.objects.iter().enumerate() {
         let Some(mesh) = o.mesh else { continue };
         if !o.visible {
@@ -149,45 +203,39 @@ pub fn placements(
             });
             continue;
         }
-        let name = module_name(&o.name).to_owned();
-        let index = *loaded.entry(name.clone()).or_insert_with(|| {
-            let path = data.file(&format!("3D Entities/PH/{name}.nmo"))?;
-            let m = crate::assets::load_nmo(&path).ok()?;
-            modules.models.push(m.level);
-            Some(modules.models.len() - 1)
-        });
-        let Some(index) = index else { continue };
-        let Some(module) = modules.models.get(index) else {
+        let Some((index, module)) = module_of(level, i).and_then(|n| modules.get(n)) else {
             continue;
         };
         // The module's textured meshes. Hidden ones are shown by the original's scripts, which we do not run; a box
-        // is a body that exists from the start, so its mesh is shown whatever the file says.
+        // is a body that exists from the start, so its mesh is shown whatever the file says. A part the physics
+        // moves is drawn at its body, scaled by its own scale.
         let body = boxes.iter().find(|b| b.0 == i).map(|b| b.1);
-        for mo in module
-            .objects
-            .iter()
-            .filter(|mo| mo.visible || body.is_some())
-        {
+        for mo in &module.objects {
+            let part = parts.iter().find(|p| p.placeholder == i && p.object == mo.name);
+            if !(mo.visible || body.is_some() || part.is_some()) {
+                continue;
+            }
             let Some(mm) = mo.mesh.filter(|&m| has_material(module, m)) else {
                 continue;
             };
             // A body moves its module: the matrix is then relative to the body, which starts at the placeholder.
             let local = Mat4::from_cols_array_2d(&mo.matrix);
+            let (matrix, body) = match part {
+                Some(p) => (Mat4::from_scale(p.scale), Some(p.body)),
+                None if body.is_some() => (local, body),
+                None => (matrix * local, None),
+            };
             out.push(Placement {
                 model: FIRST_MODULE_MODEL + index,
                 mesh: mm,
-                matrix: if body.is_some() {
-                    local
-                } else {
-                    matrix * local
-                },
+                matrix,
                 marker: None,
                 object: i,
                 body,
             });
         }
     }
-    (out, modules)
+    out
 }
 
 pub fn instances(

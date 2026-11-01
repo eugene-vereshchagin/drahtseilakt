@@ -14,8 +14,9 @@ new engine got level 1 playable, ahead of the phase order:
   game: a straight push of the wooden and of the stone ball and a 17-second route on level 1 agree to within 0.1
   and 0.8 units. Missing: floor materials per object, the modules' physics.
 - **Phase 4**: rules from the level's groups (start, reset points, checkpoints, extra points and lives, ball
-  transformers, falling, finish); replays recorded, the best per level kept. Missing: the modules' own
-  behaviour (boxes, moving parts, whose placeholders are solid for now), sounds, music, level 13's add-on.
+  transformers, falling, finish); replays recorded, the best per level kept. Sectors, domes and the level start
+  follow the C game. Missing: the modules' scripts (the parts of P_Modul_01 and 34 are physical, the other modules'
+  placeholders are solid for now), sounds, music, level 13's add-on.
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
 
 
