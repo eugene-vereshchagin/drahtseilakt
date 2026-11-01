@@ -200,23 +200,37 @@ struct Rules {
     death_y: f32,
 }
 
-/// A placed module's physics: its parts' bodies and its sliders to FixCube (part body, axis points in the world).
+/// A placed module's physics: its parts' bodies and its joints, in world terms.
 #[derive(Clone, Debug, Default)]
 struct ModuleInst {
     parts: Vec<usize>,
-    sliders: Vec<(usize, Vec3, Vec3)>,
+    joints: Vec<JointInst>,
+}
+
+/// A module's joint between two game bodies, its points and axes in the world.
+#[derive(Clone, Copy, Debug)]
+enum JointInst {
+    Slider { a: usize, b: usize, p0: Vec3, p1: Vec3, limits: Option<(f32, f32)> },
+    Hinge { a: usize, b: usize, anchor: Vec3, axis: Vec3 },
+    Ball { a: usize, b: usize, anchor: Vec3 },
+    Spring { a: usize, pa: Vec3, b: usize, pb: Vec3, length: f32, constant: f32, lin_damp: f32, glob_damp: f32 },
 }
 
 impl ModuleInst {
-    /// The parts are made at their places and their sliders attached, as the module's scripts do.
-    fn enter(&self, world: &mut World, fixcube: Option<usize>) {
+    /// The parts are made at their places and their joints attached, as the module's scripts do.
+    fn enter(&self, world: &mut World) {
         for &b in &self.parts {
             world.activate(b);
         }
-        if let Some(f) = fixcube {
-            for &(b, p0, p1) in &self.sliders {
-                world.add_slider(b, f, p0, p1);
-            }
+        for j in &self.joints {
+            match *j {
+                JointInst::Slider { a, b, p0, p1, limits } => world.add_slider(a, b, p0, p1, limits),
+                JointInst::Hinge { a, b, anchor, axis } => world.add_hinge(a, b, anchor, axis),
+                JointInst::Ball { a, b, anchor } => world.add_ball_joint(a, b, anchor),
+                JointInst::Spring { a, pa, b, pb, length, constant, lin_damp, glob_damp } => {
+                    world.add_spring(a, pa, b, pb, length, constant, lin_damp, glob_damp)
+                }
+            };
         }
     }
 
@@ -241,22 +255,25 @@ const FIXCUBE: [Vec3; 8] = [
 ];
 
 /// The parts of the module placed by level object `i` (its stand-in), as bodies out of the physics until their sector,
-/// and the module's sliders. Each part is at the stand-in's matrix times its matrix in the module file, its collision
-/// meshes scaled by its scale. None when the module file lacks a part.
+/// and the module's joints. Each object of the module is at the stand-in's matrix times its matrix in the module file;
+/// a part's collision meshes are scaled by its scale. None when the module file lacks a part or a frame.
 fn module_parts(
     world: &mut World,
     level: &Level,
     i: usize,
     spec: &crate::modules::ModuleSpec,
     file: &Level,
+    fixcube: Option<usize>,
     bodies: &mut Vec<ModuleBody>,
 ) -> Option<ModuleInst> {
+    use crate::modules::{FIXCUBE, JointSpec};
     let place = glam::Mat4::from_cols_array_2d(&level.objects.get(i)?.matrix);
     let at = |name: &str| -> Option<glam::Mat4> {
         let o = file.objects.iter().find(|o| o.name == name)?;
         Some(place * glam::Mat4::from_cols_array_2d(&o.matrix))
     };
     let mut inst = ModuleInst::default();
+    let mut named: Vec<(&str, usize)> = Vec::new();
     for part in spec.parts {
         let world_m = at(part.object)?;
         let (pos, rot, scale) = pose_and_scale(&world_m.to_cols_array_2d())?;
@@ -274,10 +291,12 @@ fn module_parts(
             part.fixed,
             part.group,
             part.start_frozen,
-            true,
+            part.collide,
+            part.shift,
             false,
         )?;
         inst.parts.push(body);
+        named.push((part.object, body));
         bodies.push(ModuleBody {
             placeholder: i,
             object: part.object.to_owned(),
@@ -285,10 +304,48 @@ fn module_parts(
             scale,
         });
     }
-    for s in spec.sliders {
-        let part = spec.parts.iter().position(|p| p.object == s.part)?;
-        let (p0, p1) = (at(s.from)?.w_axis.truncate(), at(s.to)?.w_axis.truncate());
-        inst.sliders.push((*inst.parts.get(part)?, p0, p1));
+    let body = |n: &str| -> Option<usize> {
+        if n == FIXCUBE {
+            fixcube
+        } else {
+            named.iter().find(|p| p.0 == n).map(|p| p.1)
+        }
+    };
+    // a point given in a frame object (the frame's whole matrix, as Virtools' Transform), and a frame's Z axis
+    let point = |frame: &str, p: [f32; 3]| at(frame).map(|m| m.transform_point3(Vec3::from(p)));
+    for j in spec.joints {
+        inst.joints.push(match *j {
+            JointSpec::Slider { a, b, from, to, limits, lo, hi } => JointInst::Slider {
+                a: body(a)?,
+                b: body(b)?,
+                p0: point(from, [0.0; 3])?,
+                p1: point(to, [0.0; 3])?,
+                limits: limits.then_some((lo, hi)),
+            },
+            JointSpec::Hinge { a, b, frame } => JointInst::Hinge {
+                a: body(a)?,
+                b: body(b)?,
+                anchor: point(frame, [0.0; 3])?,
+                axis: at(frame)?.z_axis.truncate().normalize_or_zero(),
+            },
+            JointSpec::Ball { a, b, frame, pos } => JointInst::Ball {
+                a: body(a)?,
+                b: body(b)?,
+                anchor: point(frame, pos)?,
+            },
+            JointSpec::Spring { a, pos_a, frame_a, b, pos_b, frame_b, length, constant, lin_damp, glob_damp } => {
+                JointInst::Spring {
+                    a: body(a)?,
+                    pa: point(frame_a, pos_a)?,
+                    b: body(b)?,
+                    pb: point(frame_b, pos_b)?,
+                    length,
+                    constant,
+                    lin_damp,
+                    glob_damp,
+                }
+            }
+        });
     }
     Some(inst)
 }
@@ -329,8 +386,6 @@ pub struct Sim {
     module_sectors: Vec<Vec<ModuleInst>>,
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
-    /// The fixed anchor of the modules' joints.
-    fixcube: Option<usize>,
     /// Sector changes due: at a tick, a sector's objects or modules leave or enter the physics.
     sector_changes: Vec<SectorChange>,
 }
@@ -361,13 +416,15 @@ impl Sim {
 
     /// A run of a level, with the physics of the modules the port has (crate::modules) from their loaded files.
     pub fn with_modules(level: &Level, start_ball: BallKind, modules: &Modules) -> Sim {
-        // The placeholders whose modules are made from their parts are not solid themselves.
+        // A placeholder whose module is loaded is not solid itself: the module is made of its parts when the port
+        // has its physics, and an original module without an entry has none. A placeholder whose module file is
+        // missing (a map's own module) stays solid.
+        let loaded = |i: usize| module_of(level, i).filter(|n| modules.get(n).is_some());
         let made: Vec<usize> = (0..level.objects.len())
-            .filter(|&i| {
-                module_of(level, i).is_some_and(|n| crate::modules::spec(n).is_some() && modules.get(n).is_some())
-            })
+            .filter(|&i| loaded(i).is_some_and(|n| crate::modules::spec(n).is_some()))
             .collect();
-        let statics = static_meshes(level, &made);
+        let not_solid: Vec<usize> = (0..level.objects.len()).filter(|&i| loaded(i).is_some()).collect();
+        let statics = static_meshes(level, &not_solid);
         let pos = |name: &str| -> Vec<(usize, Vec3)> {
             level
                 .members(name)
@@ -516,28 +573,6 @@ impl Sim {
         // The level start as the C game runs it at level 1: the physics runs at time factor 1 with only the level's
         // geometry, then the first sector's objects are made (at 9.90 s of its time), then the ball four frames later
         // (9.9667 s). The time puts the steps of the physics where the original's are.
-        // The modules' parts: each placeholder's module, made from the module file at the placeholder's place.
-        let mut module_sectors: Vec<Vec<ModuleInst>> = Vec::new();
-        let mut unsectored_modules = Vec::new();
-        let mut module_bodies = Vec::new();
-        for &i in &made {
-            let Some(name) = module_of(level, i) else { continue };
-            let (Some(spec), Some((_, file))) = (crate::modules::spec(name), modules.get(name)) else {
-                continue;
-            };
-            let Some(inst) = module_parts(&mut world, level, i, spec, file, &mut module_bodies) else {
-                continue;
-            };
-            match sector_of(i) {
-                Some(n) => {
-                    if module_sectors.len() <= n {
-                        module_sectors.resize_with(n + 1, Vec::new);
-                    }
-                    module_sectors[n].push(inst);
-                }
-                None => unsectored_modules.push(inst),
-            }
-        }
         // The fixed anchor of the modules' joints (the original's FixCube: fixed, out of the collision system, at the
         // origin).
         let fixcube = world.add_part(
@@ -555,8 +590,31 @@ impl Sim {
             "",
             false,
             false,
+            [0.0; 3],
             true,
         );
+        // The modules' parts: each placeholder's module, made from the module file at the placeholder's place.
+        let mut module_sectors: Vec<Vec<ModuleInst>> = Vec::new();
+        let mut unsectored_modules = Vec::new();
+        let mut module_bodies = Vec::new();
+        for &i in &made {
+            let Some(name) = module_of(level, i) else { continue };
+            let (Some(spec), Some((_, file))) = (crate::modules::spec(name), modules.get(name)) else {
+                continue;
+            };
+            let Some(inst) = module_parts(&mut world, level, i, spec, file, fixcube, &mut module_bodies) else {
+                continue;
+            };
+            match sector_of(i) {
+                Some(n) => {
+                    if module_sectors.len() <= n {
+                        module_sectors.resize_with(n + 1, Vec::new);
+                    }
+                    module_sectors[n].push(inst);
+                }
+                None => unsectored_modules.push(inst),
+            }
+        }
         world.run(LEVEL_INTRO_SECONDS);
         for &b in unsectored.iter().chain(sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
             world.activate(b);
@@ -564,7 +622,7 @@ impl Sim {
         // The modules come one frame after the sector's objects.
         world.run(1.0 / 60.0);
         for inst in unsectored_modules.iter().chain(module_sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
-            inst.enter(&mut world, fixcube);
+            inst.enter(&mut world);
         }
         world.run(START_OBJECTS_SECONDS - 1.0 / 60.0);
         world.replace_ball(0, BALL_RADIUS, ball.material(), ball.position, ball.rotation);
@@ -597,7 +655,6 @@ impl Sim {
             sectors,
             module_sectors,
             module_bodies,
-            fixcube,
             sector_changes: Vec::new(),
         }
     }
@@ -838,7 +895,7 @@ impl Sim {
                 let insts = self.module_sectors.get(c.sector).cloned().unwrap_or_default();
                 for inst in &insts {
                     if c.enter {
-                        inst.enter(&mut self.world, self.fixcube);
+                        inst.enter(&mut self.world);
                     } else {
                         inst.leave(&mut self.world);
                     }

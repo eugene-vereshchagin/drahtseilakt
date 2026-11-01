@@ -98,6 +98,10 @@ struct Spawn {
     collide: bool,
 }
 
+fn p3(v: Vec3) -> [f32; 3] {
+    [v.x, v.y, v.z]
+}
+
 fn vec3_f64(v: Vec3) -> [f64; 3] {
     [f64::from(v.x), f64::from(v.y), f64::from(v.z)]
 }
@@ -412,6 +416,7 @@ impl World {
         group: &'static str,
         frozen: bool,
         collide: bool,
+        shift: [f32; 3],
         active: bool,
     ) -> Option<usize> {
         let hulls: Vec<ledge::Ledge> = pieces
@@ -427,7 +432,7 @@ impl World {
             m,
             pos,
             rot: rot.into(),
-            shift: Some([0.0; 3]),
+            shift: Some(shift),
             group,
             fixed,
             frozen,
@@ -436,14 +441,50 @@ impl World {
         Some(self.add_spawn(spawn, active))
     }
 
-    /// A slider of body `a` to body `b` along the world axis from `p0` to `p1`, without limits (Set Physics Slider).
-    /// None when either body is not in the physics.
-    pub fn add_slider(&mut self, a: usize, b: usize, p0: Vec3, p1: Vec3) -> Option<usize> {
-        let (Some(&Some(ia)), Some(&Some(ib))) = (self.handles.get(a), self.handles.get(b)) else {
-            return None;
-        };
-        let p = |v: Vec3| [v.x, v.y, v.z];
-        self.physics.slider_create(Some(ia), Some(ib), p(p0), p(p1), false, -1.0, 1.0)
+    /// The IVP bodies of two game bodies, both in the physics.
+    fn pair(&self, a: usize, b: usize) -> Option<(usize, usize)> {
+        match (self.handles.get(a), self.handles.get(b)) {
+            (Some(&Some(ia)), Some(&Some(ib))) => Some((ia, ib)),
+            _ => None,
+        }
+    }
+
+    /// A slider of body `a` to body `b` along the world axis from `p0` to `p1`, limited to lo..hi along it when
+    /// asked (Set Physics Slider). None when either body is not in the physics.
+    pub fn add_slider(&mut self, a: usize, b: usize, p0: Vec3, p1: Vec3, limits: Option<(f32, f32)>) -> Option<usize> {
+        let (ia, ib) = self.pair(a, b)?;
+        let (lim, lo, hi) = limits.map_or((false, -1.0, 1.0), |(lo, hi)| (true, lo, hi));
+        self.physics.slider_create(Some(ia), Some(ib), p3(p0), p3(p1), lim, lo, hi)
+    }
+
+    /// A hinge of body `a` to body `b` at a world anchor about a world axis (Set Physics Hinge).
+    pub fn add_hinge(&mut self, a: usize, b: usize, anchor: Vec3, axis: Vec3) -> Option<usize> {
+        let (ia, ib) = self.pair(a, b)?;
+        self.physics.hinge_create(Some(ia), Some(ib), p3(anchor), p3(axis))
+    }
+
+    /// A ball joint of body `a` to body `b` at a world anchor (Set Physics Ball Joint).
+    pub fn add_ball_joint(&mut self, a: usize, b: usize, anchor: Vec3) -> Option<usize> {
+        let (ia, ib) = self.pair(a, b)?;
+        self.physics.balljoint_create(Some(ia), Some(ib), p3(anchor))
+    }
+
+    /// A spring between world anchors on bodies `a` and `b` (Set Physics Spring): rest length, constant, and the
+    /// linear and global dampings.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_spring(
+        &mut self,
+        a: usize,
+        pa: Vec3,
+        b: usize,
+        pb: Vec3,
+        length: f32,
+        constant: f32,
+        lin_damp: f32,
+        glob_damp: f32,
+    ) -> Option<usize> {
+        let (ia, ib) = self.pair(a, b)?;
+        Some(self.physics.spring_create(Some(ia), p3(pa), Some(ib), p3(pb), length, constant, lin_damp, glob_damp))
     }
 
     /// The triangles near a point of the level's physical objects that the player's ball collides with, in world
