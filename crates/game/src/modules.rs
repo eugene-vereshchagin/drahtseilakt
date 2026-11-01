@@ -134,6 +134,19 @@ pub struct SwingSpec {
     pub start: u32,
 }
 
+/// A hinge a module's script breaks under a heavy ball (P_Modul_29's plate bridge): once its wake-up has fired, a
+/// proximity of `distance` over all axes (exactness `exact`, `frames`) to part `near`; when the ball enters it and
+/// is of kind `ball` (the script tests the ball's name against `Ball_Stone`), the hinge at `frame` is destroyed.
+#[derive(Debug, Clone, Copy)]
+pub struct BreakSpec {
+    pub near: &'static str,
+    pub distance: f32,
+    pub exact: (f32, f32),
+    pub frames: (u32, u32),
+    pub ball: &'static str,
+    pub frame: &'static str,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ModuleSpec {
     pub name: &'static str,
@@ -145,6 +158,7 @@ pub struct ModuleSpec {
     pub finish: Option<FinishSpec>,
     pub updraft: Option<UpdraftSpec>,
     pub swing: Option<SwingSpec>,
+    pub breaks: Option<BreakSpec>,
 }
 
 const fn material(friction: f32, elasticity: f32, mass: f32, lin_damp: f32, rot_damp: f32) -> Material {
@@ -202,6 +216,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_03",
@@ -306,6 +321,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_08",
@@ -337,6 +353,7 @@ const MODULES: &[ModuleSpec] = &[
             pauses: true,
             start: 1,
         }),
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_17",
@@ -361,6 +378,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     // The fan: no physical parts, only its script's updraft on the ball.
     ModuleSpec {
@@ -376,6 +394,7 @@ const MODULES: &[ModuleSpec] = &[
             value: 0.1,
         }),
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_19",
@@ -399,6 +418,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_25",
@@ -422,6 +442,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_26",
@@ -464,6 +485,7 @@ const MODULES: &[ModuleSpec] = &[
             pauses: false,
             start: 0,
         }),
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_29",
@@ -576,6 +598,14 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: Some(BreakSpec {
+            near: "P_Modul_29_Platte06",
+            distance: 4.0,
+            exact: (8.0, 20.0),
+            frames: (2, 30),
+            ball: "Stone",
+            frame: "P_Modul_29_HingeFrame07",
+        }),
     },
     ModuleSpec {
         name: "P_Modul_30",
@@ -599,6 +629,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_34",
@@ -632,6 +663,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_37",
@@ -655,6 +687,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "P_Modul_41",
@@ -678,6 +711,7 @@ const MODULES: &[ModuleSpec] = &[
         finish: None,
         updraft: None,
         swing: None,
+        breaks: None,
     },
     ModuleSpec {
         name: "PE_Balloon",
@@ -983,6 +1017,7 @@ const MODULES: &[ModuleSpec] = &[
         ],
         updraft: None,
         swing: None,
+        breaks: None,
         finish: Some(FinishSpec {
             near: "PE_Balloon_Platform",
             distance: 1.0,

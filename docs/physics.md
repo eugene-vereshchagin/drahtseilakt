@@ -260,6 +260,12 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   the swing swing up to about ±7.6 and ±4.8 in z; the port matches them to 0.05 for 1000 frames, except one sack
   that drifts after about 540 frames (cause not found).
 
+  The plate bridge (`P_Modul_29_MF Script`): once its wake-up (80 across, to `P_Modul_29_MF`) has fired, a second
+  proximity of 4 over all axes to `P_Modul_29_Platte06` (exactness 8 / 20, 2 / 30 frames); when the ball enters it,
+  `Test` compares the ball's name with `Ball_Stone`, and if equal a sound plays, the proximity stops and the hinge
+  between plates 07 and 06 (`HingeFrame07`, `10 Hinges` input 2) is destroyed: a stone ball breaks the bridge in
+  two and falls with it, a wooden or paper ball only bends it. Not checked against the C build.
+
 - **FixCube** (Levelinit `init Placeholders`): fixed, Enable Collision 0, surface `FixCube_Mesh`. It is the
   static anchor for single-body joints.
 - **Ball pieces** (explosions in `Balls.nmo`): convex, group Ball, friction 2, elasticity 1, mass 0.2 (stone

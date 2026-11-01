@@ -219,6 +219,25 @@ struct ModuleInst {
     finish: Option<FinishInst>,
     updraft: Option<UpdraftInst>,
     swing: Option<SwingInst>,
+    breaks: Option<BreakInst>,
+}
+
+/// A hinge a heavy ball breaks, placed (crate::modules::BreakSpec): the part measured to, the proximity, the kind
+/// of ball and the joint (an index into the module's joints).
+#[derive(Clone, Copy, Debug)]
+struct BreakInst {
+    near: usize,
+    prox: Proximity,
+    kind: BallKind,
+    joint: usize,
+}
+
+/// A break while its module is in the physics: switched on by the module's wake-up; the physics' joint it
+/// destroys, made when the module came in.
+#[derive(Clone, Debug)]
+struct BreakTrigger {
+    at: BreakInst,
+    joint: Option<usize>,
 }
 
 /// A swing placed (crate::modules::SwingSpec): the part, the world direction of its +push and the timing.
@@ -367,6 +386,8 @@ impl FinishTrigger {
 struct WakeTrigger {
     sector: Option<usize>,
     body: usize,
+    /// The break it switches on when it fires (an index into the breaks).
+    then: Option<usize>,
     /// The forces made when it fires.
     forces: Vec<ForceInst>,
     near: Vec3,
@@ -553,6 +574,18 @@ fn module_parts(
             start: u64::from(w.start),
         });
     }
+    if let Some(b) = &spec.breaks {
+        let joint = spec
+            .joints
+            .iter()
+            .position(|j| matches!(j, JointSpec::Hinge { frame, .. } if *frame == b.frame))?;
+        inst.breaks = Some(BreakInst {
+            near: body(b.near)?,
+            prox: Proximity::new(b.distance, ALL_AXES, b.exact.0, b.exact.1, b.frames),
+            kind: BallKind::from_name(b.ball)?,
+            joint,
+        });
+    }
     if let Some(f) = &spec.finish {
         // The joints broken are the hinges at the named frames.
         let breaks = spec
@@ -627,6 +660,8 @@ pub struct Sim {
     updrafts: Vec<UpdraftTrigger>,
     /// The swings' and sacks' pushes.
     swings: Vec<SwingRun>,
+    /// The hinges heavy balls break.
+    breaks: Vec<BreakTrigger>,
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
@@ -882,6 +917,7 @@ impl Sim {
         let mut finishes = Vec::new();
         let mut updrafts = Vec::new();
         let mut swings = Vec::new();
+        let mut breaks = Vec::new();
         let sectored = module_sectors.iter().enumerate().flat_map(|(n, v)| v.iter().map(move |m| (Some(n), m)));
         for (sector, inst) in unsectored_modules.iter().map(|m| (None, m)).chain(sectored) {
             let now = sector.is_none_or(|n| n == 0);
@@ -896,11 +932,16 @@ impl Sim {
                 }
                 updrafts.push(t);
             }
+            let then = inst.breaks.map(|at| {
+                let joint = joints.get(at.joint).copied().flatten();
+                breaks.push(BreakTrigger { at, joint });
+                breaks.len() - 1
+            });
             if let Some((body, near, mut prox)) = inst.wake {
                 if now {
                     prox.switch_on();
                 }
-                wake_triggers.push(WakeTrigger { sector, body, forces: inst.forces.clone(), near, prox });
+                wake_triggers.push(WakeTrigger { sector, body, then, forces: inst.forces.clone(), near, prox });
             }
             if let Some(f) = &inst.finish {
                 let mut t = FinishTrigger {
@@ -951,6 +992,7 @@ impl Sim {
             finishes,
             updrafts,
             swings,
+            breaks,
             module_sectors,
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
@@ -1183,6 +1225,7 @@ impl Sim {
         }
         self.apply_sector_changes();
         self.check_wake_triggers();
+        self.check_breaks();
         self.run_swings();
         self.check_updrafts();
         self.check_finishes();
@@ -1275,9 +1318,27 @@ impl Sim {
         for w in &mut self.wake_triggers {
             if w.prox.frame(ball, w.near) == Some(Range::Enter) {
                 w.prox.switch_off();
+                if let Some(b) = w.then.and_then(|i| self.breaks.get_mut(i)) {
+                    b.at.prox.switch_on();
+                }
                 self.world.wake(w.body);
                 for f in &w.forces {
                     self.world.add_force(f.body, f.force, f.point);
+                }
+            }
+        }
+    }
+
+    /// The hinges heavy balls break: the ball within reach of the part, and of the kind the script tests for.
+    fn check_breaks(&mut self) {
+        let (ball, kind) = (self.ball.position, self.ball.kind);
+        let alive = self.hold.is_none() && self.dying.is_none();
+        for b in &mut self.breaks {
+            let Some(near) = self.world.bodies.get(b.at.near).map(|x| x.pos) else { continue };
+            if b.at.prox.frame(ball, near) == Some(Range::Enter) && alive && kind == b.at.kind {
+                b.at.prox.switch_off();
+                if let Some(j) = b.joint.take() {
+                    self.world.remove_joint(j);
                 }
             }
         }
@@ -1380,8 +1441,18 @@ impl Sim {
                         {
                             t.arm(&joints);
                         }
+                        if let Some(b) = &inst.breaks
+                            && let Some(t) = self.breaks.iter_mut().find(|t| t.at.near == b.near)
+                        {
+                            t.joint = joints.get(b.joint).copied().flatten();
+                        }
                     } else {
                         inst.leave(&mut self.world);
+                        if let Some(b) = &inst.breaks
+                            && let Some(t) = self.breaks.iter_mut().find(|t| t.at.near == b.near)
+                        {
+                            t.at.prox.switch_off();
+                        }
                         if let Some(f) = &inst.finish
                             && let Some(t) = self.finishes.iter_mut().find(|t| t.near == f.near)
                         {
@@ -2113,6 +2184,42 @@ mod tests {
                 assert!((got - dz).abs() < 0.15, "part at x {x}, frame {frame}: {got} against {dz}");
             }
         }
+    }
+
+    /// Level 2's plate bridge (module 29) with the player's copy (skipped without OPENBALLANCE_DATA): a stone ball
+    /// on plate 06 breaks the hinge between plates 06 and 07 and falls with the plates; a wooden ball only bends
+    /// the bridge (about 3.7).
+    #[test]
+    fn a_stone_ball_breaks_the_plate_bridge_and_a_wooden_one_does_not() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let drop = |kind| {
+            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+            let plate = sim.breaks.first().expect("module 29").at.near;
+            let p = sim.world.bodies[plate].pos;
+            let sector = sector_near(&level, p).expect("its sector");
+            sim.start_from(sector, Some(kind), Some(p + Vec3::Y * 3.0));
+            // the deepest the plate went before the ball was lost (the sector's objects then come back)
+            let y0 = sim.world.bodies[plate].pos.y;
+            let mut deepest = 0.0f32;
+            for _ in 0..240 {
+                sim.step(0);
+                if sim.dying.is_some() {
+                    break;
+                }
+                deepest = deepest.max(y0 - sim.world.bodies[plate].pos.y);
+            }
+            (deepest, sim.breaks[0].joint.is_none())
+        };
+        let (stone, broken) = drop(BallKind::Stone);
+        assert!(broken && stone > 6.0, "under the stone ball: broken {broken}, the plate fell {stone}");
+        // the wooden ball only bends the bridge
+        let (wood, broken) = drop(BallKind::Wood);
+        assert!(!broken && wood < 5.0, "under the wooden ball: broken {broken}, the plate fell {wood}");
     }
 
     #[test]
