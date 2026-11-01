@@ -133,12 +133,16 @@ struct Voice {
     pitch: f32,
     looping: bool,
     wait: f64,
+    /// Music (its own volume setting) rather than a sound.
+    music: bool,
 }
 
 #[derive(Default)]
 struct Mixer {
     voices: Vec<Voice>,
     rate: u32,
+    /// The player's volumes for sounds and for music (the Settings page).
+    volumes: [f32; 2],
 }
 
 impl Mixer {
@@ -146,7 +150,9 @@ impl Mixer {
     fn fill(&mut self, out: &mut [f32], channels: usize) {
         out.fill(0.0);
         let dt = 1.0 / f64::from(self.rate.max(1));
+        let volumes = self.volumes;
         for v in &mut self.voices {
+            let gain = v.volume * volumes[usize::from(v.music)];
             let step = f64::from(v.sound.rate) * dt * f64::from(v.pitch.max(0.0));
             for frame in out.chunks_mut(channels.max(1)) {
                 if v.wait > 0.0 {
@@ -180,7 +186,7 @@ impl Mixer {
                     .unwrap_or(a);
                 let s = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
                 for (c, o) in frame.iter_mut().enumerate() {
-                    *o += s[c.min(1)] * v.volume;
+                    *o += s[c.min(1)] * gain;
                 }
                 v.pos += step;
             }
@@ -226,6 +232,7 @@ impl Audio {
                 mixer: Arc::new(Mutex::new(Mixer {
                     voices: Vec::new(),
                     rate: FILE_RATE,
+                    volumes: [1.0; 2],
                 })),
                 sounds: HashMap::new(),
                 next: 1,
@@ -237,6 +244,7 @@ impl Audio {
         let mixer = Arc::new(Mutex::new(Mixer {
             voices: Vec::new(),
             rate: config.sample_rate(),
+            volumes: [1.0; 2],
         }));
         let m = mixer.clone();
         let err = |e| eprintln!("sound: {e}");
@@ -312,12 +320,29 @@ impl Audio {
 
     /// Plays a sound once, after `wait` seconds, at a volume (0 to 1). Returns its handle.
     pub fn play(&mut self, data: &Data, name: &str, volume: f32, wait: f64) -> Option<u64> {
-        self.start(data, name, volume, wait, false)
+        self.start(data, name, volume, wait, false, false)
     }
 
     /// Plays a sound over and over until stopped.
     pub fn play_loop(&mut self, data: &Data, name: &str, volume: f32) -> Option<u64> {
-        self.start(data, name, volume, 0.0, true)
+        self.start(data, name, volume, 0.0, true, false)
+    }
+
+    /// Plays music once (at the music volume).
+    pub fn play_music(&mut self, data: &Data, name: &str) -> Option<u64> {
+        self.start(data, name, 1.0, 0.0, false, true)
+    }
+
+    /// Plays music over and over until stopped.
+    pub fn play_music_loop(&mut self, data: &Data, name: &str) -> Option<u64> {
+        self.start(data, name, 1.0, 0.0, true, true)
+    }
+
+    /// The player's volumes for sounds and for music (0 to 1).
+    pub fn set_volumes(&mut self, sound: f32, music: f32) {
+        if let Ok(mut m) = self.mixer.lock() {
+            m.volumes = [sound.clamp(0.0, 1.0), music.clamp(0.0, 1.0)];
+        }
     }
 
     fn start(
@@ -327,6 +352,7 @@ impl Audio {
         volume: f32,
         wait: f64,
         looping: bool,
+        music: bool,
     ) -> Option<u64> {
         let sound = self.sound(data, name)?;
         let id = self.next;
@@ -340,6 +366,7 @@ impl Audio {
             pitch: 1.0,
             looping,
             wait,
+            music,
         });
         Some(id)
     }
@@ -429,6 +456,7 @@ mod tests {
         let mut m = Mixer {
             voices: Vec::new(),
             rate: 2,
+            volumes: [1.0; 2],
         };
         m.voices.push(Voice {
             id: 1,
@@ -438,6 +466,7 @@ mod tests {
             pitch: 1.0,
             looping: false,
             wait: 0.0,
+            music: false,
         });
         let mut out = [0.0f32; 8];
         m.fill(&mut out, 2);
@@ -452,6 +481,7 @@ mod tests {
             pitch: 1.0,
             looping: true,
             wait: 0.0,
+            music: false,
         });
         m.fill(&mut out, 2);
         assert_eq!(m.voices.len(), 1, "a loop goes on");

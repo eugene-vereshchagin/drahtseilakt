@@ -527,6 +527,35 @@ fn clock(tick: u64) -> String {
     format!("{:02}:{:05.2}", (secs / 60.0) as u64, secs % 60.0)
 }
 
+/// The player's settings file: one `name value` a line (`sound 0.8`, `music 0.5`).
+fn settings_path() -> PathBuf {
+    replay_dir().parent().map(|d| d.join("settings.txt")).unwrap_or_else(|| PathBuf::from("settings.txt"))
+}
+
+/// The sound and music volumes from the settings file, full where it has none.
+fn load_volumes() -> [f32; 2] {
+    let text = std::fs::read_to_string(settings_path()).unwrap_or_default();
+    let get = |key: &str| {
+        text.lines()
+            .filter_map(|l| l.split_once(' '))
+            .find(|(k, _)| *k == key)
+            .and_then(|(_, v)| v.trim().parse::<f32>().ok())
+            .filter(|v| v.is_finite())
+            .map_or(1.0, |v| v.clamp(0.0, 1.0))
+    };
+    [get("sound"), get("music")]
+}
+
+fn save_volumes(v: [f32; 2]) {
+    let path = settings_path();
+    if let Some(d) = path.parent() {
+        let _ = std::fs::create_dir_all(d);
+    }
+    if let Err(e) = std::fs::write(&path, format!("sound {}\nmusic {}\n", v[0], v[1])) {
+        eprintln!("could not save the settings to {}: {e}", path.display());
+    }
+}
+
 pub fn replay_dir() -> PathBuf {
     let base = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
@@ -605,10 +634,15 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         fly: None,
         fly_keys: 0,
         last_view: (glam::Vec3::ZERO, glam::Vec3::X),
-        audio: Audio::open(),
+        audio: Audio::open().map(|mut a| {
+            let v = load_volumes();
+            a.set_volumes(v[0], v[1]);
+            a
+        }),
         heard: 0,
         rolling: [None; 3 + crate::ballsound::FAN_SLOTS],
         music: None,
+        volumes: load_volumes(),
         game,
         data,
         size: o.size,
@@ -852,6 +886,8 @@ struct App {
     rolling: [Option<u64>; 3 + crate::ballsound::FAN_SLOTS],
     /// The level's music.
     music: Option<Music>,
+    /// The player's sound and music volumes (the Settings page, kept in settings.txt).
+    volumes: [f32; 2],
     data: Data,
     size: (u32, u32),
     window: Option<Arc<Window>>,
@@ -1050,13 +1086,14 @@ impl App {
         let run = !(self.game.sim.finished || self.game.sim.game_over);
         let mut menu = Menu::new(&self.data, self.number.unwrap_or(1), run);
         menu.debug = self.debug;
+        menu.volumes = self.volumes;
         self.menu = Some(menu);
         self.keys = 0;
     }
 
     fn menu_key(&mut self, code: KeyCode, event_loop: &ActiveEventLoop) {
         // every key the menu takes clicks, as the original's menu sends Menu_Click
-        if matches!(code, KeyCode::ArrowUp | KeyCode::ArrowDown | KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape)
+        if matches!(code, KeyCode::ArrowUp | KeyCode::ArrowDown | KeyCode::ArrowLeft | KeyCode::ArrowRight | KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape)
             && let Some(a) = &mut self.audio
         {
             a.play(&self.data, "Menu_click", 1.0, 0.0);
@@ -1071,6 +1108,8 @@ impl App {
                 menu.step(1);
                 Action::None
             }
+            KeyCode::ArrowLeft => menu.adjust(-1),
+            KeyCode::ArrowRight => menu.adjust(1),
             KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space => menu.enter(),
             KeyCode::Escape => menu.back(),
             _ => Action::None,
@@ -1080,6 +1119,13 @@ impl App {
             Action::Continue => self.menu = None,
             Action::Play(n) => self.play(n),
             Action::Quit => event_loop.exit(),
+            Action::Volumes(v) => {
+                self.volumes = v;
+                if let Some(a) = &mut self.audio {
+                    a.set_volumes(v[0], v[1]);
+                }
+                save_volumes(v);
+            }
             Action::ToggleDebug => {
                 self.debug = !self.debug;
                 if !self.debug {

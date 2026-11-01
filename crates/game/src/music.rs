@@ -83,7 +83,7 @@ impl Music {
         }
         if p.playing.is_none() && p.wait_until.is_some_and(|t| now >= t) {
             let part = 1 + (r.1 * 3.0) as u32 % 3;
-            p.playing = audio.play(data, &format!("{name}_{part}"), 1.0, 0.0);
+            p.playing = audio.play_music(data, &format!("{name}_{part}"));
             p.wait_until = None;
         }
     }
@@ -100,7 +100,7 @@ impl Music {
             } else {
                 "Music_Final"
             };
-            audio.play(data, name, 1.0, 0.0);
+            audio.play_music(data, name);
             return;
         }
         let now = sim.tick.saturating_sub(self.began) as f64 * f64::from(TICK);
@@ -118,7 +118,7 @@ impl Music {
         }
         let near = last_stage && end.is_some_and(|e| e.distance(sim.ball.position) < END_DISTANCE);
         match (near, self.end_loop) {
-            (true, None) => self.end_loop = audio.play_loop(data, "Music_EndCheckpoint", 1.0),
+            (true, None) => self.end_loop = audio.play_music_loop(data, "Music_EndCheckpoint"),
             (false, Some(id)) => {
                 audio.stop(id);
                 self.end_loop = None;

@@ -21,8 +21,8 @@ new engine got level 1 playable, ahead of the phase order:
   their physical parts and joints as in the C game, and the finish's balloon carries the ball away as in the C game.
   The fans' updrafts lift the paper ball; the swings and sacks swing as in the C game; a stone ball breaks the plate
   bridge. Sound as the original's Sound_Manager and Music_Manager make it: event sounds, the ball's hits and rolling
-  by floor material, the level's music. The fans hum near them, the plate bridge's rope tears. Missing: particles, the sound
-  volume settings, level 13's add-on.
+  by floor material, the level's music. The fans hum near them, the plate bridge's rope tears. The menu sets the sound and music volumes. Missing:
+  particles, level 13's add-on.
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
 
 

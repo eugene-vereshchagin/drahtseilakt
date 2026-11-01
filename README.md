@@ -38,7 +38,7 @@ Every finished run is saved as a replay (on Linux in `~/.local/share/drahtseilak
 fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it without a window, `--screenshot
 FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
 object's name) anywhere, with `--ball wood|stone|paper`; such a run keeps its start in its replay and is never a
-best run. In debug mode (`--debug`, or the switch on the menu's Debug page) F2 takes up a free camera to fly
+best run. Sound and music volumes are on the menu's Settings page. In debug mode (`--debug`, or the switch on the menu's Debug page) F2 takes up a free camera to fly
 through the level while the run waits. `drahtseilakt --help` lists everything.
 
 ## Legal

@@ -60,7 +60,7 @@ impl Item {
                 "PLAY ONE FROM THE COMMAND LINE:",
                 "DRAHTSEILAKT --MAP FILE.NMO",
             ],
-            Item::Settings => &["NOTHING TO SET YET", "", "SCREEN, KEYS AND SOUND COME HERE"],
+            Item::Settings => &["", "SCREEN AND KEYS COME HERE"],
             Item::Credits => &[
                 "DRAHTSEILAKT BY VERESK",
                 "",
@@ -88,7 +88,7 @@ impl Item {
 }
 
 /// What a key in the menu asks of the game.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Action {
     None,
     Continue,
@@ -96,6 +96,8 @@ pub enum Action {
     Quit,
     /// The Debug page's switch: debug mode (the free camera on F2) on or off.
     ToggleDebug,
+    /// The Settings page's volumes changed: sound and music, 0 to 1.
+    Volumes([f32; 2]),
 }
 
 pub struct Menu {
@@ -107,6 +109,9 @@ pub struct Menu {
     pub selected: usize,
     /// Debug mode, as the Debug page shows it.
     pub debug: bool,
+    /// The volumes the Settings page sets (sound, music), and its line chosen.
+    pub volumes: [f32; 2],
+    pub setting: usize,
 }
 
 impl Menu {
@@ -143,7 +148,19 @@ impl Menu {
             entries,
             selected,
             debug: false,
+            volumes: [1.0; 2],
+            setting: 0,
         }
+    }
+
+    /// Left (-1) or right (+1): on the Settings page, the chosen volume down or up by a tenth.
+    pub fn adjust(&mut self, by: i32) -> Action {
+        if self.screen != Screen::Page(Item::Settings) {
+            return Action::None;
+        }
+        let Some(v) = self.volumes.get_mut(self.setting) else { return Action::None };
+        *v = ((*v * 10.0).round() + by as f32).clamp(0.0, 10.0) / 10.0;
+        Action::Volumes(self.volumes)
     }
 
     /// Up (-1) or down (+1) on the current screen.
@@ -154,6 +171,7 @@ impl Menu {
                 self.item = (self.item as isize + by).rem_euclid(n) as usize;
             }
             Screen::Levels => self.step_level(by),
+            Screen::Page(Item::Settings) => self.setting = (self.setting as isize + by).rem_euclid(2) as usize,
             Screen::Page(_) => {}
         }
     }
@@ -254,6 +272,13 @@ impl Menu {
         if let Screen::Page(item) = self.screen {
             centre(&mut out, item.label(), y, s * 1.5, WHITE);
             y += 2.5 * line;
+            if item == Item::Settings {
+                for (i, (name, v)) in [("SOUND", self.volumes[0]), ("MUSIC", self.volumes[1])].into_iter().enumerate() {
+                    let text = format!("{name}  {:>3}%", (v * 100.0).round() as u32);
+                    centre(&mut out, &text, y, s * 1.5, if i == self.setting { GOLD } else { WHITE });
+                    y += 1.6 * line;
+                }
+            }
             if item == Item::Debug {
                 let switch = format!("DEBUG MODE: {}   FREE CAMERA ON F2", if self.debug { "ON" } else { "OFF" });
                 centre(&mut out, &switch, y, s, if self.debug { GOLD } else { WHITE });
@@ -264,7 +289,11 @@ impl Menu {
                 y += line;
             }
             y += line;
-            let keys = if item == Item::Debug { "ENTER SWITCHES   ESC BACK" } else { "ENTER OR ESC BACK" };
+            let keys = match item {
+                Item::Debug => "ENTER SWITCHES   ESC BACK",
+                Item::Settings => "UP/DOWN CHOOSE   LEFT/RIGHT CHANGE   ESC BACK",
+                _ => "ENTER OR ESC BACK",
+            };
             centre(&mut out, keys, y, s, GREY);
             return out;
         }
@@ -379,6 +408,8 @@ mod tests {
             items: vec![Item::Levels, Item::Credits, Item::Quit],
             item: 0,
             debug: false,
+            volumes: [1.0; 2],
+            setting: 0,
         }
     }
 
