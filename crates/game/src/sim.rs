@@ -207,6 +207,27 @@ struct Rules {
 struct ModuleInst {
     parts: Vec<usize>,
     joints: Vec<JointInst>,
+    /// The part woken when the ball comes near: its body, the point measured from, and the distance.
+    wake: Option<(usize, Vec3, f32)>,
+}
+
+/// A module's wake-up on approach, armed while its module is in the physics (crate::modules::WakeSpec).
+#[derive(Clone, Copy, Debug)]
+struct WakeTrigger {
+    sector: Option<usize>,
+    body: usize,
+    near: Vec3,
+    distance: f32,
+    armed: bool,
+    /// The tick of the next check: the original's TT Scaleable Proximity looks again after 10 frames within 55 units
+    /// and after 60 beyond 100, in between in proportion.
+    next: u64,
+}
+
+/// Frames until the next proximity check at distance `d` (TT Scaleable Proximity's exactness, as module 34 sets it).
+fn proximity_delay(d: f32) -> u64 {
+    let k = ((d - 55.0) / 45.0).clamp(0.0, 1.0);
+    (10.0 + 50.0 * k).round() as u64
 }
 
 /// A module's joint between two game bodies, its points and axes in the world.
@@ -315,6 +336,9 @@ fn module_parts(
     };
     // a point given in a frame object (the frame's whole matrix, as Virtools' Transform), and a frame's Z axis
     let point = |frame: &str, p: [f32; 3]| at(frame).map(|m| m.transform_point3(Vec3::from(p)));
+    if let Some(w) = spec.wake {
+        inst.wake = Some((body(w.part)?, at(w.near)?.w_axis.truncate(), w.distance));
+    }
     for j in spec.joints {
         inst.joints.push(match *j {
             JointSpec::Slider { a, b, from, to, limits, lo, hi } => JointInst::Slider {
@@ -386,6 +410,8 @@ pub struct Sim {
     sectors: Vec<Vec<usize>>,
     /// Each sector's modules.
     module_sectors: Vec<Vec<ModuleInst>>,
+    /// The modules' wake-ups on approach.
+    wake_triggers: Vec<WakeTrigger>,
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
@@ -638,6 +664,21 @@ impl Sim {
         for inst in unsectored_modules.iter().chain(module_sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
             inst.enter(&mut world);
         }
+        // The wake-ups on approach, armed now for the modules that are in the physics from the start.
+        let mut wake_triggers = Vec::new();
+        let sectored = module_sectors.iter().enumerate().flat_map(|(n, v)| v.iter().map(move |m| (Some(n), m)));
+        for (sector, inst) in unsectored_modules.iter().map(|m| (None, m)).chain(sectored) {
+            if let Some((body, near, distance)) = inst.wake {
+                wake_triggers.push(WakeTrigger {
+                    sector,
+                    body,
+                    near,
+                    distance,
+                    armed: sector.is_none_or(|n| n == 0),
+                    next: 0,
+                });
+            }
+        }
         world.run(until_ball - frame);
         world.replace_ball(0, BALL_RADIUS, ball.material(), ball.position, Rot::Basis(turn));
         let mut camera = Camera {
@@ -667,6 +708,7 @@ impl Sim {
             dying: None,
             push_keys: 0,
             sectors,
+            wake_triggers,
             module_sectors,
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
@@ -839,6 +881,7 @@ impl Sim {
             self.events.push((self.tick, Event::Finished));
         }
         self.apply_sector_changes();
+        self.check_wake_triggers();
         if let Some(d) = self.dying {
             if self.tick == d + DEATH_REMOVE_TICKS {
                 self.world.remove(0);
@@ -907,6 +950,20 @@ impl Sim {
         &self.module_bodies
     }
 
+    /// The modules' wake-ups on approach: a part is woken, once, when the ball comes within its distance.
+    fn check_wake_triggers(&mut self) {
+        let (tick, ball) = (self.tick, self.ball.position);
+        for w in self.wake_triggers.iter_mut().filter(|w| w.armed && w.next <= tick) {
+            let d = ball.distance(w.near);
+            if d < w.distance {
+                w.armed = false;
+                self.world.wake(w.body);
+            } else {
+                w.next = tick + proximity_delay(d);
+            }
+        }
+    }
+
     /// The sector changes due at this tick, in the order they were made.
     fn apply_sector_changes(&mut self) {
         let tick = self.tick;
@@ -921,6 +978,10 @@ impl Sim {
                     } else {
                         inst.leave(&mut self.world);
                     }
+                }
+                for w in self.wake_triggers.iter_mut().filter(|w| w.sector == Some(c.sector)) {
+                    w.armed = c.enter;
+                    w.next = tick;
                 }
                 continue;
             }
@@ -1553,9 +1614,11 @@ mod tests {
         // the stand-in's matrix times the part's: (-7, 1, 0) turned a quarter about y is (0, 1, 7), moved to x = 20
         let k = sim.world.state(parts[0].body).expect("the box is made").pos;
         assert!((k - Vec3::new(20.0, 1.0, 7.0)).length() < 1e-4, "box at {k:?}");
+        // the ball is within 50 of the stone: the module's script wakes it, once
+        sim.step(0);
+        assert_ne!(sim.world.movement_state(parts[1].body), Some(8), "the stone was not woken");
         // take the box away: the stone drops along its slider onto the floor, straight down
         sim.world.deactivate(parts[0].body);
-        sim.world.wake(parts[1].body);
         for _ in 0..120 {
             sim.step(0);
         }
