@@ -215,3 +215,14 @@ Debian), WASAPI on Windows, CoreAudio on macOS. It only opens an output stream; 
 pitch are ours (crates/game/src/audio.rs), which keeps us close to what the original's sound scripts do. rodio
 and kira bring decoders and mixers we do not need; miniaudio, SDL3 and OpenAL are C libraries. The crate is
 pinned and its sources sit in the cargo cache, so the build stays offline.
+
+## Levels live in one folder, four kinds
+
+*2026-11-02.* All levels sit in `levels/` in the game's data folder, in four folders by origin and format:
+`original/` (the player's copy of the original game, copied there by default), `community/` (community `.nmo`
+maps), `remastered/` (the original levels converted to the open format with modern textures, made on the
+player's machine) and `open/` (levels in the open format, own or converted). Any of them can be moved in the
+settings; the default folder then keeps a README that says where they went. The classic mode sees only the
+original. Some open-format levels come with the game when their authors want it, with a free licence and none of
+the original's assets inside. The community is largest in China, so the docs are in Simplified Chinese too.
+Details: [levels.md](levels.md).

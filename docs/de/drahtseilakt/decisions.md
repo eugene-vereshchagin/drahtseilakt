@@ -218,3 +218,14 @@ lesen, mischen, Lautstärke und Tonhöhe sind unseres (crates/game/src/audio.rs)
 Tonskripten des Originals. rodio und kira bringen Decoder und Mischer mit, die wir nicht brauchen; miniaudio,
 SDL3 und OpenAL sind C-Bibliotheken. Das Crate ist auf eine Version festgelegt und liegt im Cargo-Cache, der
 Build bleibt also offline.
+
+## Level liegen in einem Ordner, vier Arten
+
+*2026-11-02.* Alle Level liegen in `levels/` im Datenordner des Spiels, in vier Ordnern nach Herkunft und Format:
+`original/` (die Kopie des Originalspiels des Spielers, standardmäßig dorthin kopiert), `community/`
+(Community-Karten als `.nmo`), `remastered/` (die Original-Level im offenen Format mit modernen Texturen, auf dem
+Rechner des Spielers erzeugt) und `open/` (Level im offenen Format, eigene oder umgewandelte). Jeder davon lässt
+sich in den Einstellungen verlegen; der Standardordner behält dann ein README, das sagt, wohin. Der klassische
+Modus sieht nur das Original. Einige Level im offenen Format kommen mit dem Spiel, wenn ihre Autoren das wollen,
+mit freier Lizenz und ohne Bestandteile des Originals. Die größte Community ist in China, daher gibt es die Doku
+auch in vereinfachtem Chinesisch. Einzelheiten: [levels.md](levels.md).
