@@ -213,7 +213,8 @@ Done when: most maps play; the report lists the rest, each with its reason.
   like an arc, so rails stay straight; and a remastered Level_NN plays with level NN's settings (light, music,
   the last level's lightning). Second step done: relief. The toolbox makes a normal map from each lit texture's own
   picture (its fine detail of brightness as height: rivets, plank gaps, ropes) and the renderer bends the lighting
-  by it; levels without one draw exactly as before.
+  by it; levels without one draw exactly as before. Off by default (`--relief S`): guessed from the picture, it
+  deepened every crack and gap (the owner: "etched by acid"); real relief needs height from more than the picture.
 - **Local texture enhancement**: scripts the player runs on their own copy to upscale textures (up to 8K);
   the repository holds the pipeline and its parameters, never the results.
 - **Replays rendered to video**: offline, frame by frame, at any resolution up to 8K with sound. Nothing is
