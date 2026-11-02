@@ -260,6 +260,14 @@ original's look, as levels that name the original's resources, which the toolbox
 copy. The toolbox makes every resource the game can use out of the player's original files. So nobody's property is
 shipped, and every player can put the original together on their own machine in a couple of clicks.
 
+## The generated sound theme is the default
+
+*2026-11-02.* The owner's decision: the generated sound theme (*neuro*: effects synthesized by code, tuned against
+measurements of the original's sounds, nothing of the original in them) ships as the game's default sound theme. It
+plays until the player chooses another theme on the extended page, and always in the classic mode. *system* stays
+the theme every theme falls back to and stays selectable, as do *original* and the player's own themes. A choice the
+player made is kept; the settings write `sound-theme` only once the player has chosen, so a player who never chose
+follows the default.
 
 ## A level is a folder
 

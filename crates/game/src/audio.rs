@@ -583,6 +583,57 @@ mod tests {
         assert!(n >= 20, "{n} files");
     }
 
+    /// Every sound and piece the game asks for by name: the events' (app.rs), the balls' (ballsound.rs), the fans',
+    /// the menu's, the thunder and all the music of every level theme (music.rs).
+    fn every_role() -> Vec<String> {
+        let mut v: Vec<String> = [
+            "Misc_StartLevel",
+            "Misc_Checkpoint",
+            "Extra_Life_Blob",
+            "Misc_extraball",
+            "Extra_Start",
+            "Extra_Hit",
+            "Misc_Trafo",
+            "Misc_Fall",
+            "Misc_Lightning",
+            "Misc_RopeTears",
+            "Misc_Ventilator",
+            "Menu_load",
+            "Menu_click",
+            "Music_thunder",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        for kind in [crate::sim::BallKind::Wood, crate::sim::BallKind::Stone, crate::sim::BallKind::Paper] {
+            let (rolls, hits) = crate::ballsound::table(kind);
+            v.extend(rolls.iter().chain(hits.iter()).map(|s| (*s).to_owned()));
+        }
+        for n in 1..=5 {
+            for last in [false, true] {
+                v.extend(crate::music::Music::wanted(Some(n), last));
+            }
+        }
+        v.sort();
+        v.dedup();
+        v
+    }
+
+    #[test]
+    fn the_generated_theme_holds_every_role_without_a_fallback() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/sounds/neuro");
+        let txt = std::fs::read_to_string(dir.join("theme.txt")).unwrap_or_default();
+        assert!(txt.lines().any(|l| l.trim() == "fallback none"), "the neuro theme takes nothing from another");
+        let roles = every_role();
+        assert!(roles.len() >= 50, "{} roles", roles.len());
+        for name in &roles {
+            let p = gamedata::sound_themes::in_theme(&dir, name);
+            assert!(p.is_some(), "neuro lacks {name}");
+            let bytes = p.and_then(|p| std::fs::read(p).ok()).unwrap_or_default();
+            let decoded = parse_ogg(&bytes);
+            assert!(decoded.as_ref().is_ok_and(|s| !s.frames.is_empty()), "{name}: {:?}", decoded.err());
+        }
+    }
+
     #[test]
     fn our_own_sounds_and_music_decode() {
         let mut n = 0;

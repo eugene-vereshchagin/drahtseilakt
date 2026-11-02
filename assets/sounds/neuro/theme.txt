@@ -1,10 +1,11 @@
 # The neuro sound theme: effects synthesized for Drahtseilakt by code (oscillators, noise, filters, modal synthesis),
-# tuned against measurements of the original's sounds; no sample of the original is in them. Music and the roles it
-# has no sound for come from the system theme.
+# tuned against measurements of the original's sounds; no sample of the original is in them. Its level music is
+# synthesized too: short guzheng-like plucked phrases, the atmospheres and the end music. It holds every role the
+# game asks for, so it takes nothing from another theme (`fallback none`).
 name.en Generated
 name.ru Нейрогенерация
 name.de Generiert
 name.zh 生成
-author Drahtseilakt
+author Claude (Anthropic), for Veresk
 licence GPL-3.0-only, as the game
-fallback system
+fallback none

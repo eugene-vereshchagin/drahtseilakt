@@ -188,6 +188,7 @@ impl Game {
         // a replay recorded before the bursts plays without them, as it was recorded
         sim.bursts = replay_in.as_ref().is_none_or(|r| r.version >= 2);
         sim.pieces_expire = replay_in.as_ref().is_none_or(|r| r.version >= 3);
+        sim.checkpoints_by_name = replay_in.as_ref().is_none_or(|r| r.version >= 4);
         let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
         let start = match &replay_in {
@@ -202,6 +203,10 @@ impl Game {
         }
         let mut replay_out = Replay::new(&level.name, level.hash);
         replay_out.start = start.clone();
+        // a run re-recorded from an old replay plays by its rules, so it keeps its format
+        if let Some(r) = &replay_in {
+            replay_out.version = r.version;
+        }
         let module_file = |name: &str| data.part(&format!("3D Entities/PH/{name}.nmo")).map(|m| m.level);
         let effects = crate::particles::Effects::new(&level.level, &module_file);
         let mut placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
@@ -268,6 +273,7 @@ impl Game {
         self.sim.set_pieces(self.pieces.clone());
         self.sim.bursts = self.replay_in.as_ref().is_none_or(|r| r.version >= 2);
         self.sim.pieces_expire = self.replay_in.as_ref().is_none_or(|r| r.version >= 3);
+        self.sim.checkpoints_by_name = self.replay_in.as_ref().is_none_or(|r| r.version >= 4);
         self.sim.level_bonus = self.level_bonus;
         self.ball_sound.silence(&mut self.sound_out);
         self.fan_sound.silence(&mut self.sound_out);
@@ -278,6 +284,9 @@ impl Game {
         self.watch = Watch::default();
         self.replay_out = Replay::new(&self.level.name, self.level.hash);
         self.replay_out.start = self.start.clone();
+        if let Some(r) = &self.replay_in {
+            self.replay_out.version = r.version;
+        }
     }
 
     /// The folder of this level's runs, attempts, watch log and findings.
@@ -671,8 +680,12 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
         v[0],
         v[1],
         gamedata::resources::chosen().key(),
-        // the sound theme is the extended mode's choice: the classic mode (the system theme) keeps it as it was
-        if features.mode { format!("sound-theme {}\n", gamedata::sound_themes::wanted()) } else { String::new() },
+        // the sound theme is the extended mode's choice, written only once the player made one (until then the
+        // default plays, whichever it is); the classic mode (the default theme) keeps the line as it was
+        match gamedata::sound_themes::wanted() {
+            Some(w) if features.mode => format!("sound-theme {w}\n"),
+            _ => String::new(),
+        },
         features.lines()
     );
     if !player.is_empty() {
@@ -804,14 +817,14 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Original });
-    // the sound theme: the extended mode's choice (`sound-theme`), the system theme in the classic mode
+    // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (a player who chose the original's interface before there were themes keeps hearing the original's sounds)
     let theme = if extended {
         setting("sound-theme").or_else(|| (chosen != gamedata::resources::Provider::Own).then(|| "original".to_owned()))
     } else {
         None
     };
-    gamedata::sound_themes::start(theme.as_deref().unwrap_or(gamedata::sound_themes::SYSTEM));
+    gamedata::sound_themes::start(theme.as_deref());
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_level(data.level_dir(&o.source).as_deref());
     if let Some(dir) = &o.export {
@@ -848,8 +861,13 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             .as_ref()
             .map(|r| r.end)
             .ok_or("--headless needs --replay")?;
+        // when the end music (Music_EndCheckpoint) would begin to loop, and the finish music after it
+        let mut end_music = None;
         while game.sim.tick < end && !game.sim.finished && !game.sim.game_over {
             game.tick(0);
+            if end_music.is_none() && crate::music::near_end(&game.sim) {
+                end_music = Some(game.sim.tick);
+            }
             if let Some(n) = o.trace.filter(|&n| n > 0 && game.sim.tick % n == 0) {
                 let b = &game.sim.ball;
                 let _ = n;
@@ -898,6 +916,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             s.lives,
             s.sector + 1
         );
+        match end_music {
+            Some(t) => println!("end music: Music_EndCheckpoint loops from {} ({} before the end)", clock(t),
+                clock(s.tick.saturating_sub(t))),
+            None => println!("end music: Music_EndCheckpoint never began"),
+        }
         return Ok(());
     }
     if let Some(tick) = o.from {
@@ -1869,10 +1892,13 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         &view,
         w,
         h,
-        &crate::hud::overlay(&game.sim, w, h, game.ball_lost_at, true, game.font.is_some()),
+        &crate::hud::overlay(&game.sim, w, h, true, game.font.is_some()),
     );
     let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
     let mut quads = crate::hud::interface(&game.sim, game.font.as_ref(), screen);
+    let strings = crate::lang::Strings::load(data, &crate::lang::chosen(setting("language").as_deref()));
+    let lost = strings.ours("ball lost");
+    quads.extend(crate::hud::ball_lost(&game.sim, game.ball_lost_at, &lost, game.font.as_ref(), screen));
     if let (Some(t), Some(f)) = (crate::endscreen::of(&game.sim), game.font.as_ref()) {
         quads.extend(crate::endscreen::interface(&t, f, screen));
     }
@@ -2409,10 +2435,10 @@ impl App {
                     Action::Switch(f) => self.features.toggle(f),
                     _ => self.features.mode = !self.features.mode,
                 }
-                // the sound theme follows the mode: the saved choice in the extended mode, the system theme else
+                // the sound theme follows the mode: the saved choice in the extended mode, the default theme else
                 // (taken before the settings are written, which keep the extended mode's choice)
                 let theme = if self.features.mode { setting("sound-theme") } else { None };
-                gamedata::sound_themes::choose(theme.as_deref().unwrap_or(gamedata::sound_themes::SYSTEM));
+                gamedata::sound_themes::restore(theme.as_deref());
                 if let Some(a) = &mut self.audio {
                     a.forget_sounds();
                 }
@@ -2691,7 +2717,6 @@ impl App {
                         &self.game.sim,
                         gpu.config.width,
                         gpu.config.height,
-                        self.game.ball_lost_at,
                         tools,
                         self.game.font.is_some(),
                     );
@@ -2725,6 +2750,8 @@ impl App {
             }
             (None, None, _) => {
                 let mut q = crate::hud::interface(&self.game.sim, font, screen);
+                let lost = self.strings.ours("ball lost");
+                q.extend(crate::hud::ball_lost(&self.game.sim, self.game.ball_lost_at, &lost, font, screen));
                 if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
                     q.extend(crate::endscreen::interface(&t, f, screen));
                 }

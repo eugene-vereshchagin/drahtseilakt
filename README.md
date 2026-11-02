@@ -60,6 +60,12 @@ tick), F5 saves the moment and F9 goes back to it (the run's record is cut back 
 recorded piece by piece), and the sector and tick are shown. A run helped this way is kept but never the best. For testing, `--autopilot` lets a test player try the level without a window
 (with `--record FILE` to keep its run); `--follow FILE` makes it follow the ball's way in a player's replay; where it is stuck it writes a report, and it follows hints ([the test player](docs/drahtseilakt/autopilot.md)). `--locate DIR --record TRACK` finds the ball's way in the frames of a video of the original (DIR/s0001.jpg on, four a second, e.g. `ffmpeg -vf fps=4,scale=640:480`) by drawing the level from the places it may be and comparing; the test player follows such a track with `--follow TRACK`. `--frames DIR --replay FILE` draws a replay as such frames, with the true places, to check it. `drahtseilakt --help` lists everything.
 
+## Who made it
+
+The code, the documentation and the generated sounds and music are written by **Claude** (Anthropic's AI model,
+working in Claude Code). **Veresk** owns the project: the idea, the decisions, the plan, the playing and the ear
+that says what is right. The commits carry both names.
+
 ## Legal
 
 Files ported from OpenBallance (GPL-3.0, emdzej and contributors) say so in their headers; the `ivp` crate is the physics port.

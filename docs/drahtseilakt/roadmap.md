@@ -42,7 +42,9 @@ new engine got level 1 playable, ahead of the phase order:
   into its pieces (Balls.nmo's explosion scripts: bodies in the ball's group, pushed up, lying about for 20 s
   (Gameplay.nmo's Fadeout Manager) or until the ball is lost, then faded out); replays recorded before the bursts
   (format 1) play without them, and those recorded before the 20 s (format 2) with the pieces lying until the ball
-  is lost. The ball's smoke puffs when it appears and when it
+  is lost. The checkpoints open the sectors in the order of their names (PC_TwoFlames_01, _02, ...), however the
+  level's group lists them (levels 11 and 12 list them out of order); replays recorded before (format 3) keep the
+  group's order. The ball's smoke puffs when it appears and when it
   bursts (BallParticle_Frame script).
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically. An exported level is whole:
   it carries its settings (music, light, bonus, tutorial, last level) and, in its `game/` folder, its modules, the
