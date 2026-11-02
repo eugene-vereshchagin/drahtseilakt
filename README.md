@@ -35,7 +35,7 @@ each folder with a README saying what belongs there ([where levels live](docs/dr
 `--data` (or `OPENBALLANCE_DATA`) plays from another Ballance folder instead. The separate
 `drahtseilakt-toolbox remaster --scale 8` converts the original levels into `levels/remastered/` (the open format)
 with rounder shapes and textures eight times larger: by Real-ESRGAN (it adds detail) when it is in `realesrgan/` beside
-the toolbox (its own repository, drahtseilakt-toolbox, pins it) or on the PATH, else by Lanczos; they play from Custom levels. The game itself needs neither. `--level N` plays original level N, `--map FILE.nmo`
+the toolbox (its own repository, drahtseilakt-toolbox, pins it) or on the PATH, else by Lanczos; they play from Start → Remastered. The game itself needs neither. `--level N` plays original level N, `--map FILE.nmo`
 any level file or community map, `--open DIR` a level in the [open format](docs/drahtseilakt/open-format.md);
 `--export DIR` converts the chosen level to it. Arrows roll the ball relative to the camera, Shift+Left/Right
 turn the camera, Space lifts it, F11 is full screen, Esc pauses. Without a level named the game opens with its
@@ -50,7 +50,7 @@ FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint 
 object's name) anywhere, with `--ball wood|stone|paper`; such a run keeps its start in its replay and is never a
 best run. Until the extended mode is turned on (Options, Extended, or `--debug` for one run) the game is the
 original as closely as it can be. The *extended mode* opens every level, shows best times, the sound volume
-beside the music's and a Custom levels list (the community maps, open-format and remastered levels in `levels/`), and
+beside the music's and levels by kind under Start (the original, remastered, community and open-format levels in `levels/`), and
 adds our tools: R restarts, F2 takes up a free camera to fly through the level
 while the run waits, `[` and `]` slow the run down and speed it up again (the run itself stays the same tick by
 tick), F5 saves the moment and F9 goes back to it (the run's record is cut back to it, so a long level can be

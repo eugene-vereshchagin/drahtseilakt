@@ -28,7 +28,7 @@ target/release/drahtseilakt --data /path/to/Ballance --level 1
 
 `drahtseilakt --import DIR` 会把 DIR 中你已安装的 Ballance 原版游戏（或你的游戏 CD 镜像：`--import Ballance.cue`、`.bin` 或 `.iso`；没有找到游戏时启动的窗口提供同样的功能：电脑上找到的内容、拖到窗口上的文件夹或镜像、输入的路径）复制到游戏的 `levels/original/`；所有关卡都放在
 游戏数据文件夹（Linux 上为 `~/.local/share/drahtseilakt/`）的 `levels/` 中，每个文件夹里都有说明应放什么的 README
-（[关卡存放位置](docs/zh/drahtseilakt/levels.md)）。`--data`（或 `OPENBALLANCE_DATA`）则改为从另一个 Ballance 文件夹游玩。独立程序 `drahtseilakt-toolbox remaster --scale 8` 会把原版关卡转换到 `levels/remastered/`（开放格式），形状更圆，纹理放大八倍：Real-ESRGAN 位于 toolbox 旁的 `realesrgan/`（版本固定在其仓库 drahtseilakt-toolbox 中）或在 PATH 中时使用它（会补出细节），否则使用 Lanczos；它们在 Custom levels 中游玩。游戏本身两者都不需要。`--level N` 游玩原版第 N 关，`--map FILE.nmo`
+（[关卡存放位置](docs/zh/drahtseilakt/levels.md)）。`--data`（或 `OPENBALLANCE_DATA`）则改为从另一个 Ballance 文件夹游玩。独立程序 `drahtseilakt-toolbox remaster --scale 8` 会把原版关卡转换到 `levels/remastered/`（开放格式），形状更圆，纹理放大八倍：Real-ESRGAN 位于 toolbox 旁的 `realesrgan/`（版本固定在其仓库 drahtseilakt-toolbox 中）或在 PATH 中时使用它（会补出细节），否则使用 Lanczos；它们在 Start → Remastered 中游玩。游戏本身两者都不需要。`--level N` 游玩原版第 N 关，`--map FILE.nmo`
 游玩任意关卡文件或自制地图，`--open DIR` 游玩[开放格式](docs/zh/drahtseilakt/open-format.md)的关卡；
 `--export DIR` 把所选关卡转换为该格式。方向键相对于相机滚动球，Shift+左/右
 转动相机，空格键抬高相机，F11 切换全屏，Esc 暂停。不指定关卡时，游戏以
@@ -42,8 +42,8 @@ Options、Credits、Exit；在关卡中按 Esc 打开暂停菜单，失败的一
 FILE.png` 渲染一帧。要测试某个位置，`--sector N` 从某个检查点开始，`--at X,Y,Z`（或关卡
 对象的名称）可从任意位置开始，配合 `--ball wood|stone|paper`；这样的一局会把起点保存在回放中，并且永远不会
 算作最佳成绩。在开启扩展模式之前（Options、Extended，或用 `--debug` 开启一次），游戏会尽可能
-贴近原版。*扩展模式*会解锁所有关卡，显示最佳时间，在音乐音量旁显示音效音量，并提供 Custom levels 列表
-（`levels/` 中的自制地图、开放格式关卡和重制关卡），还会
+贴近原版。*扩展模式*会解锁所有关卡，显示最佳时间，在音乐音量旁显示音效音量，并在 Start 下按类别列出关卡
+（`levels/` 中的原版、重制、自制地图和开放格式关卡），还会
 加入我们的工具：R 重新开始，F2 启用自由相机在关卡中飞行，
 同时这一局暂停等待，`[` 和 `]` 让游戏变慢和重新加快（这一局本身逐 tick
 保持不变），F5 保存当前时刻，F9 回到该时刻（这一局的记录会截断到那里，因此长关卡可以

@@ -47,19 +47,21 @@ per-player thing is the name in the highscore list.
 
 Turned on in Options, or for one run with `--debug`. The menus keep the original's look; what changes:
 
-- **Main menu**: Start, *Custom levels*, Highscore, Options, Credits, Exit.
+- **Main menu**: Start, Highscore, Options, Credits, Exit, as the original; *Start* first asks which levels.
 - **Options**: the *Extended* page has the mode's switch and, under it, one switch for each of its additions
   (all on with the mode; the settings keep those turned off as `extended.<key> off`):
   - all levels open, without unlocking;
   - best times beside the levels;
-  - the Custom levels line in the main menu;
+  - levels by kind under Start;
   - practice tools: free camera (F2), slower and faster (`[` `]`), save the moment and go back to it (F5 / F9),
     the sector and tick on screen; a run helped this way is kept but never a best run;
   - the sound volume beside the music volume.
   More switches come with the features in the roadmap (field of view, timers, the ghost of the best run).
-- **Custom levels**: every community map and open-format level in `levels/` ([levels.md](levels.md)) is a line, by its file name, played like an original level. A map that
-  cannot be loaded says why and is not started. Its runs and best times are kept apart from the original levels.
-  Later: title, author and difficulty from the community catalogue, subfolders as packs.
+- **Levels by kind**: Start offers *Original* (the classic list of levels), *Remastered*, *Community maps* and
+  *Open format*, the folders of `levels/` ([levels.md](levels.md)). In each, its levels by file name, then the folders
+  holding more (Enter opens one, Esc goes back up), played like an original level. A level that cannot be loaded says
+  why and is not started; its runs and best times are kept apart from the original levels. Later: title, author and
+  difficulty from the community catalogue.
 - Texture packs and our own mods come here too when they exist, each behind its own switch and a warning that
   third-party content is played at the player's own risk.
 

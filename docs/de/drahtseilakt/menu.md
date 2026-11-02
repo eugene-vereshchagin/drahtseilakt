@@ -49,21 +49,21 @@ Persönliche ist der Name in der Highscore-Liste.
 Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalten das Aussehen des Originals; es
 ändert sich:
 
-- **Hauptmenü**: Start, *Custom levels*, Highscore, Options, Credits, Exit.
+- **Hauptmenü**: Start, Highscore, Options, Credits, Exit wie im Original; *Start* fragt zuerst, welche Level.
 - **Options**: die Seite *Extended* hat den Schalter des Modus und darunter je einen Schalter für jede seiner
   Ergänzungen (mit dem Modus alle an; die Einstellungen halten die ausgeschalteten als `extended.<key> off`):
   - alle Level offen, ohne Freischalten;
   - Bestzeiten neben den Leveln;
-  - die Zeile Custom levels im Hauptmenü;
+  - Level nach Art unter Start;
   - Übungswerkzeuge: freie Kamera (F2), langsamer und schneller (`[` `]`), den Moment sichern und dorthin zurück
     (F5 / F9), Sektor und Tick auf dem Bildschirm; ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;
   - die Lautstärke der Geräusche neben der Musik.
   Weitere Schalter kommen mit den Funktionen des Fahrplans (Blickwinkel, Timer, Geist des besten Laufs).
-- **Custom levels**: jede Community-Karte und jedes Level im offenen Format in `levels/` ([levels.md](levels.md))
-  ist eine Zeile mit ihrem Dateinamen und spielt wie ein
-  Original-Level. Eine Karte, die nicht geladen werden kann, sagt warum und startet nicht. Ihre Läufe und
-  Bestzeiten bleiben getrennt von den Original-Leveln. Später: Titel, Autor und Schwierigkeit aus dem
-  Community-Katalog, Unterordner als Pakete.
+- **Level nach Art**: Start bietet *Original* (die klassische Levelliste), *Remastered*, *Community maps* und
+  *Open format*, die Ordner von `levels/` ([levels.md](levels.md)). In jedem seine Level nach Dateinamen, dann die
+  Ordner mit weiteren (Enter öffnet, Esc geht zurück nach oben), gespielt wie ein Original-Level. Ein Level, das nicht
+  geladen werden kann, sagt warum und startet nicht; seine Läufe und Bestzeiten bleiben getrennt von den
+  Original-Leveln. Später: Titel, Autor und Schwierigkeit aus dem Community-Katalog.
 - Texturpakete und unsere eigenen Mods kommen ebenfalls hierher, wenn es sie gibt, jeweils hinter einem eigenen
   Schalter und mit dem Hinweis, dass Inhalte Dritter auf eigenes Risiko gespielt werden.
 

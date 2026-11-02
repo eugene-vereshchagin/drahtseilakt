@@ -9,6 +9,7 @@ use crate::features::{FEATURES, Feature, Features};
 use crate::highscore::{NAME_MAX, Table};
 use crate::hud::{Rect, text, width};
 use crate::lang::{Strings, latin1};
+use crate::levels::Kind;
 use std::path::{Path, PathBuf};
 
 /// The original game's levels: 1 to 12, and 13 of the add-on when the copy has it.
@@ -29,6 +30,8 @@ pub struct Entry {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Screen {
     Main,
+    /// The extended mode's choice of levels: the original, remastered, community and open-format ones.
+    Kinds,
     Start,
     Custom,
     Highscore,
@@ -59,7 +62,6 @@ pub enum Ask {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Line {
     Start,
-    Custom,
     Highscore,
     Options,
     Credits,
@@ -74,6 +76,8 @@ enum Line {
     Sound,
     Extended,
     Level(usize),
+    /// A kind of levels, by its place in LEVEL_KINDS.
+    Kind(usize),
     Map(usize),
     Music,
     Effects,
@@ -160,11 +164,7 @@ impl Menu {
         let mut m = Menu {
             stack: Vec::new(),
             entries,
-            maps: if features.has(Feature::CustomLevels) {
-                maps()
-            } else {
-                Vec::new()
-            },
+            maps: Vec::new(),
             folder: Vec::new(),
             features,
             volumes: [1.0; 2],
@@ -242,16 +242,6 @@ impl Menu {
     /// The lines of `screen`, in the order the arrows go through them.
     fn lines(&self, screen: Screen) -> Vec<Line> {
         match screen {
-            Screen::Main if self.features.has(Feature::CustomLevels) => {
-                vec![
-                    Line::Start,
-                    Line::Custom,
-                    Line::Highscore,
-                    Line::Options,
-                    Line::Credits,
-                    Line::Exit,
-                ]
-            }
             Screen::Main => vec![
                 Line::Start,
                 Line::Highscore,
@@ -259,6 +249,7 @@ impl Menu {
                 Line::Credits,
                 Line::Exit,
             ],
+            Screen::Kinds => (0..LEVEL_KINDS.len()).map(Line::Kind).chain([Line::Back]).collect(),
             Screen::Start => (0..self.entries.len())
                 .map(Line::Level)
                 .chain([Line::Back])
@@ -396,8 +387,19 @@ impl Menu {
             Action::None
         };
         match line {
+            // in the extended mode the levels come by kind; the original ones are the classic list
+            Line::Start if self.features.has(Feature::CustomLevels) => open(self, Screen::Kinds),
             Line::Start => open(self, Screen::Start),
-            Line::Custom => open(self, Screen::Custom),
+            Line::Kind(k) => match LEVEL_KINDS.get(k) {
+                Some(Kind::Original) => open(self, Screen::Start),
+                Some(&kind) => {
+                    let root = crate::levels::dir(kind);
+                    self.maps = maps_in(&root);
+                    self.folder = vec![root];
+                    open(self, Screen::Custom)
+                }
+                None => Action::None,
+            },
             Line::Highscore => open(self, Screen::Highscore),
             Line::Options => open(self, Screen::Options),
             Line::Credits => open(self, Screen::Credits),
@@ -452,15 +454,18 @@ impl Menu {
             Screen::Pause => Action::Continue,
             Screen::Main | Screen::Dead | Screen::End | Screen::Entry => Action::None,
             Screen::Highscore if self.after_entry => self.enter(),
-            // out of a folder of custom levels, onto the folder left
-            Screen::Custom if !self.folder.is_empty() => {
+            // out of a folder of custom levels, onto the folder left (out of the kind's own folder: off the screen)
+            Screen::Custom if self.folder.len() > 1 => {
                 let left = self.folder.pop();
-                self.maps = self.folder.last().map_or_else(maps, |f| maps_in(f));
+                self.maps = self.folder.last().map(|f| maps_in(f)).unwrap_or_default();
                 let at = self.maps.iter().position(|p| Some(p) == left.as_ref()).unwrap_or(0);
                 self.set_chosen(at);
                 Action::None
             }
             _ => {
+                if self.screen() == Screen::Custom {
+                    self.folder.clear();
+                }
                 self.pop();
                 Action::None
             }
@@ -550,7 +555,13 @@ impl Menu {
         let s = &self.strings;
         match line {
             Line::Start => s.get("Menu_Main Button Start", "Start"),
-            Line::Custom => b"Custom levels".to_vec(),
+            Line::Kind(k) => match LEVEL_KINDS.get(k) {
+                Some(Kind::Original) => b"Original".to_vec(),
+                Some(Kind::Remastered) => b"Remastered".to_vec(),
+                Some(Kind::Community) => b"Community maps".to_vec(),
+                Some(Kind::Open) => b"Open format".to_vec(),
+                None => Vec::new(),
+            },
             Line::Highscore => s.get("Menu_Main Button Highscore", "Highscore"),
             Line::Options => s.get("Menu_Main Button Options", "Options"),
             Line::Credits => s.get("Menu_Main Button Credits", "Credits"),
@@ -584,15 +595,8 @@ impl Menu {
                         .file_stem()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_default();
-                    let folder = p
-                        .parent()
-                        .and_then(|d| d.file_name())
-                        .map(|d| d.to_string_lossy().into_owned());
-                    let name = match folder {
-                        _ if is_folder(p) => format!("{name}/"),
-                        Some(f) if p.is_dir() => format!("{name} ({f})"),
-                        _ => name,
-                    };
+                    // the screen's title says which kind of levels; a folder of more levels ends in "/"
+                    let name = if is_folder(p) { format!("{name}/") } else { name };
                     name.chars()
                         .map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?'))
                         .collect()
@@ -621,7 +625,13 @@ impl Menu {
             Screen::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Screen::Sound => s.get("Menu_Options Button Sound", "Sound"),
             Screen::Extended => b"Extended".to_vec(),
-            Screen::Custom => b"Custom levels".to_vec(),
+            Screen::Kinds => b"Levels".to_vec(),
+            Screen::Custom => match self.folder.first().and_then(|root| {
+                LEVEL_KINDS.iter().position(|&k| crate::levels::dir(k) == *root)
+            }) {
+                Some(k) => self.label(Line::Kind(k)),
+                None => b"Custom levels".to_vec(),
+            },
             Screen::Highscore => {
                 let mut t = s.get("Highscore Title (+ SPACE!)", "Highscore Level ");
                 t.extend_from_slice(self.shown.to_string().as_bytes());
@@ -741,8 +751,11 @@ impl Menu {
                 (self.name.clone(), Vec::new()),
             ],
             Screen::Custom if self.maps.is_empty() => vec![
-                (b"No levels yet. Put .nmo maps into".to_vec(), Vec::new()),
-                (short_path(&maps_dir()).into_bytes(), Vec::new()),
+                (b"No levels yet. Put them into".to_vec(), Vec::new()),
+                (
+                    self.folder.last().map(|f| short_path(f)).unwrap_or_default().into_bytes(),
+                    Vec::new(),
+                ),
             ],
             _ => Vec::new(),
         }
@@ -965,7 +978,7 @@ impl Menu {
         };
         match sc {
             Screen::Main | Screen::Pause | Screen::Dead | Screen::End => big(&mut out, 0.15),
-            Screen::Options => {
+            Screen::Options | Screen::Kinds => {
                 title(&mut out);
                 big(&mut out, 0.30);
             }
@@ -1286,20 +1299,8 @@ fn finished(number: u32) -> bool {
     })
 }
 
-/// The folder players put community maps into.
-pub fn maps_dir() -> PathBuf {
-    crate::levels::dir(crate::levels::Kind::Community)
-}
-
-/// The custom levels: the community maps, then the open-format and remastered levels (levels.md).
-fn maps() -> Vec<PathBuf> {
-    use crate::levels::{Kind, dir};
-    [Kind::Community, Kind::Open, Kind::Remastered]
-        .into_iter()
-        .flat_map(|k| maps_in(&dir(k)))
-        .take(4096)
-        .collect()
-}
+/// The kinds of levels the extended mode offers, in the menu's order (levels.md).
+const LEVEL_KINDS: [Kind; 4] = [Kind::Original, Kind::Remastered, Kind::Community, Kind::Open];
 
 /// How deep folders of custom levels may go (a map collection sorted by kind, season and map).
 const FOLDER_DEPTH: u32 = 4;
@@ -1425,11 +1426,13 @@ mod tests {
             labels,
             [&b"Start"[..], b"Highscore", b"Options", b"Credits", b"Exit"]
         );
-        let m = menu(&[true], true);
-        assert!(
-            m.lines(Screen::Main).contains(&Line::Custom),
-            "custom levels in the extended mode only"
-        );
+        let mut m = menu(&[true], true);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Kinds, "levels by kind in the extended mode only");
+        let kinds: Vec<Vec<u8>> = m.lines(Screen::Kinds).into_iter().map(|l| m.label(l)).collect();
+        assert_eq!(kinds[..4], [&b"Original"[..], b"Remastered", b"Community maps", b"Open format"]);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Start, "the original levels are the classic list");
     }
 
     #[test]
@@ -1521,7 +1524,7 @@ mod tests {
         m.step(1);
         assert_eq!(m.lines(Screen::Main)[m.chosen()], Line::Options);
         m.apply_mode(Features::new(true), Vec::new(), Vec::new());
-        assert_eq!(m.lines(Screen::Main).len(), 6);
+        assert_eq!(m.lines(Screen::Main).len(), 5);
         assert_eq!(m.lines(Screen::Main)[m.chosen()], Line::Options);
     }
 
