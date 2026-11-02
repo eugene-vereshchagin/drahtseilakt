@@ -647,17 +647,23 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
     }
     let profile = if features.mode { "extended" } else { "classic" };
     let mut text = format!(
-        "sound {}\nmusic {}\nprofile {profile}\ninterface {}\n{}",
+        "sound {}\nmusic {}\nprofile {profile}\ninterface {}\n{}{}",
         v[0],
         v[1],
         gamedata::resources::chosen().key(),
+        // the sound theme is the extended mode's choice: the classic mode (the system theme) keeps it as it was
+        if features.mode { format!("sound-theme {}\n", gamedata::sound_themes::wanted()) } else { String::new() },
         features.lines()
     );
     if !player.is_empty() {
         text.push_str(&format!("player {}\n", crate::lang::latin1(player)));
     }
     // the lines only the file sets (language, the level folders) are kept as they are
-    let ours = ["sound", "music", "profile", "player", "interface"];
+    let ours: &[&str] = if features.mode {
+        &["sound", "music", "profile", "player", "interface", "sound-theme"]
+    } else {
+        &["sound", "music", "profile", "player", "interface"]
+    };
     for line in settings_text().lines() {
         let key = line.split_once(' ').map_or(line, |(k, _)| k);
         if !ours.contains(&key) && !key.starts_with("extended.") && !line.trim().is_empty() {
@@ -733,8 +739,14 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Original });
-    // our own sounds and music unless the extended mode chose the original's (or its remaster)
-    gamedata::resources::set_own_audio(!extended || chosen == gamedata::resources::Provider::Own);
+    // the sound theme: the extended mode's choice (`sound-theme`), the system theme in the classic mode
+    // (a player who chose the original's interface before there were themes keeps hearing the original's sounds)
+    let theme = if extended {
+        setting("sound-theme").or_else(|| (chosen != gamedata::resources::Provider::Own).then(|| "original".to_owned()))
+    } else {
+        None
+    };
+    gamedata::sound_themes::start(theme.as_deref().unwrap_or(gamedata::sound_themes::SYSTEM));
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_level(data.level_dir(&o.source).as_deref());
     if let Some(dir) = &o.export {
@@ -2090,10 +2102,25 @@ impl App {
                 gamedata::resources::set_chosen(p);
                 save_settings(self.volumes, self.features, &self.player);
             }
+            Action::SoundTheme(key) => {
+                // the next sounds and pieces come from the new theme
+                gamedata::sound_themes::choose(&key);
+                if let Some(a) = &mut self.audio {
+                    a.forget_sounds();
+                }
+                save_settings(self.volumes, self.features, &self.player);
+            }
             Action::ToggleDebug | Action::Switch(_) => {
                 match action {
                     Action::Switch(f) => self.features.toggle(f),
                     _ => self.features.mode = !self.features.mode,
+                }
+                // the sound theme follows the mode: the saved choice in the extended mode, the system theme else
+                // (taken before the settings are written, which keep the extended mode's choice)
+                let theme = if self.features.mode { setting("sound-theme") } else { None };
+                gamedata::sound_themes::choose(theme.as_deref().unwrap_or(gamedata::sound_themes::SYSTEM));
+                if let Some(a) = &mut self.audio {
+                    a.forget_sounds();
                 }
                 save_settings(self.volumes, self.features, &self.player);
                 if !self.features.has(crate::features::Feature::Tools) {

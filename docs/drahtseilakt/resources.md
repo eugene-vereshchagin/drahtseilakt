@@ -31,9 +31,9 @@ Text the game's font cannot draw (its font has Latin-1 only) is drawn with the s
 | ball shadow | `Textures/HardShadow.bmp` | planned |
 | skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | planned |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | planned |
-| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | ours (assets/own, CREDITS.md) |
-| menu sounds | `Sounds/Menu_click, Menu_load` | ours (assets/own, CREDITS.md) |
-| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | ours (assets/own, CREDITS.md) |
+| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | sound themes (assets/sounds) |
+| menu sounds | `Sounds/Menu_click, Menu_load` | sound themes (assets/sounds) |
+| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | sound themes (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: nine pieces, Music/music.txt maps them onto the five themes; no atmosphere part |
 | original levels | `3D Entities/Level/Level_NN.NMO` | planned |
 
@@ -41,8 +41,14 @@ Own content comes in stages: interface (fonts, buttons, points box, life balls, 
 skies, particles and sounds (from open libraries), music in the spirit of a mahjong game with Chinese motifs,
 then modules and levels of our own.
 
-Sounds and music: the classic mode and the extended mode's *own* interface play ours (assets/own: Ogg Vorbis made by
-`assets/own/prepare.py` from openly licensed recordings, CC0 or CC-BY, authors and changes in
-`assets/own/CREDITS.md`, also named on the Credits screen); the *original* or *remaster* interface plays the copy's.
-Our music never falls back to the copy's; a sound we lack does. The level's music is decoded ahead on a thread of its
-own.
+Sounds and music come in **sound themes**, each a folder (`Sounds/` and `Music/` by the names the game asks for,
+Ogg Vorbis or WAV, a `music.txt` table for the level themes, a `theme.txt` with its name in four languages, author,
+licence and `fallback`). The game ships two in `assets/sounds/`: *system* (openly licensed recordings and the owner's
+music, made by `assets/sounds/system/prepare.py`, CC0 or CC-BY, authors and changes in its `CREDITS.md`, also on the
+Credits screen) and *neuro* (effects synthesized for the game, GPL-3.0-only; music and missing roles from *system*).
+Players add their own themes in the data folder's `sounds/<name>/`; *original* among them is made by the toolbox from
+the player's copy and never shipped (until it exists, choosing it plays the copy's sounds). The extended page's
+*Sounds* line chooses the theme (`sound-theme NAME`); the classic mode plays *system*. A sound the theme and its
+fallback lack comes from the copy (a level's own sounds); music never does. A player's theme folder is untrusted:
+plain names only, no links, a capped number of themes, sounds decoded through the audio caps. The level's music is
+decoded ahead on a thread of its own.

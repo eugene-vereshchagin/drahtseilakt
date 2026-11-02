@@ -1,0 +1,7 @@
+# The system sound theme: openly licensed recordings and music chosen by the owner (CREDITS.md).
+name.en System
+name.ru Системная
+name.de System
+name.zh 系统
+author Kenney, freesound and OpenGameArt authors, Kevin MacLeod and others (CREDITS.md)
+licence CC0 and CC-BY 3.0/4.0, per file in CREDITS.md

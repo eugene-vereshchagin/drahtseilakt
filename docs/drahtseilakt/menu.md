@@ -55,6 +55,8 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
   - best times beside the levels;
   - levels by kind under Start;
   - Interface: own / original / remaster, where the interface's files come from ([resources.md](resources.md));
+  - Sounds: the sound theme — system, generated, original (made by the toolbox) or a player's own
+    ([resources.md](resources.md)); the classic mode plays the system theme;
   - practice tools: free camera (F2), slower and faster (`[` `]`), save the moment and go back to it (F5 / F9),
     five seconds back (F3, again for further, up to half a minute), the sector and tick on screen; a run helped this
     way is kept but never a best run;

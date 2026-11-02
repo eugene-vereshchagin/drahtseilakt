@@ -25,12 +25,12 @@
 | ball shadow | `Textures/HardShadow.bmp` | 计划中 |
 | skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | 计划中 |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | 计划中 |
-| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | 自有（assets/own，CREDITS.md） |
-| menu sounds | `Sounds/Menu_click, Menu_load` | 自有（assets/own，CREDITS.md） |
-| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | 自有（assets/own，CREDITS.md） |
+| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | 音效主题（assets/sounds） |
+| menu sounds | `Sounds/Menu_click, Menu_load` | 音效主题（assets/sounds） |
+| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | 音效主题（assets/sounds） |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | 自有：九首乐曲，Music/music.txt 把它们分配到五个主题；没有氛围部分 |
 | original levels | `3D Entities/Level/Level_NN.NMO` | 计划中 |
 
 自有内容分阶段推出：界面（字体、按钮、分数框、生命球、文字、菜单场景），然后是球、天空、粒子和音效（来自开放素材库），带中国元素、类似麻将游戏风格的音乐，最后是自己的模块和关卡。
 
-音效和音乐：经典模式以及扩展模式中界面选 *own* 时播放我们自己的（assets/own：由 `assets/own/prepare.py` 从自由许可的录音（CC0 或 CC-BY）制作的 Ogg Vorbis；作者和改动见 `assets/own/CREDITS.md`，也显示在 Credits 画面上）；界面选 *original* 或 *remaster* 时播放拷贝中的。我们的音乐从不回退到拷贝中的音乐，缺少的音效会回退。关卡音乐会在单独的线程中预先解码。
+音效和音乐以**音效主题**提供，每个主题是一个文件夹（`Sounds/` 和 `Music/` 中按游戏请求的名称存放，Ogg Vorbis 或 WAV，关卡主题用的 `music.txt` 表，以及包含四种语言名称、作者、许可证和 `fallback` 的 `theme.txt`）。游戏在 `assets/sounds/` 中随附两个主题：*system*（自由许可的录音和项目所有者选择的音乐，由 `assets/sounds/system/prepare.py` 制作，CC0 或 CC-BY，作者和改动见其 `CREDITS.md`，也显示在 Credits 画面上）和 *neuro*（为游戏合成的音效，GPL-3.0-only；音乐和缺少的部分取自 *system*）。玩家可以在数据文件夹的 `sounds/<名称>/` 中添加自己的主题；其中 *original* 由 toolbox 从玩家的拷贝制作，从不随游戏分发（在它存在之前，选择它会播放拷贝中的音效）。Extended 页面上的 *Sounds* 一行用于选择主题（`sound-theme 名称`）；经典模式播放 *system*。主题及其后备主题都没有的音效取自拷贝（关卡自己的音效）；音乐从不如此。玩家的主题文件夹不受信任：只接受简单名称，不跟随链接，主题数量有上限，音效通过音频层的限制解码。关卡音乐会在单独的线程中预先解码。

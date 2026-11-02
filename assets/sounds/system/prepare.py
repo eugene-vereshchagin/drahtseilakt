@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Prepares the game's own sounds and music (assets/own/Sounds, assets/own/Music) from the openly licensed files the
+# Prepares the system sound theme (assets/sounds/system/Sounds and Music) from the openly licensed files the
 # owner chose (CREDITS.md lists each source, author and licence). It is run by hand, not by the build: the sources are
 # not in the repository. Each file is decoded with ffmpeg, cut, made mono or stereo, matched in loudness to the
 # original's sound of the same role (the player's copy, given as ORIGINAL), looped without a seam where the game loops
