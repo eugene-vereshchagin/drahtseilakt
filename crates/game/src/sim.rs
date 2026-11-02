@@ -665,6 +665,10 @@ pub struct Sim {
     pub camera: Camera,
     pub tick: u64,
     pub lives: u32,
+    /// Practice (extended mode): the last ball is not lost, and `lives_spared` says it happened (the run is then
+    /// helped). Off for every replay, so runs replay as recorded.
+    pub endless_lives: bool,
+    pub lives_spared: bool,
     pub points: i64,
     pub sector: usize,
     pub finished: bool,
@@ -1067,6 +1071,8 @@ impl Sim {
             camera,
             tick: 0,
             lives: 3,
+            endless_lives: false,
+            lives_spared: false,
             // the points counter takes its first point as the level starts (C game, level 2: 999 when the ball comes)
             points: START_POINTS - 1,
             sector: 0,
@@ -1396,8 +1402,12 @@ impl Sim {
         if let Some(d) = self.dying {
             if self.tick == d + DEATH_REMOVE_TICKS {
                 self.world.remove(0);
-                // Lives are balls: the last ball lost ends the run.
-                self.lives = self.lives.saturating_sub(1);
+                // Lives are balls: the last ball lost ends the run (in practice the last one is kept).
+                if self.endless_lives && self.lives <= 1 {
+                    self.lives_spared = true;
+                } else {
+                    self.lives = self.lives.saturating_sub(1);
+                }
                 if self.lives == 0 {
                     self.game_over = true;
                     self.events.push((self.tick, Event::GameOver));

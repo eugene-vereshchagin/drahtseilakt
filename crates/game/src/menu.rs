@@ -40,6 +40,8 @@ pub enum Screen {
     Controls,
     Sound,
     Extended,
+    /// The extended mode's debug additions (practice tools, endless lives).
+    Debug,
     Credits,
     /// Over a level: Esc in a run, no lives left, the level finished.
     Pause,
@@ -82,6 +84,8 @@ enum Line {
     Music,
     Effects,
     Mode,
+    /// The Debug mode screen.
+    DebugMenu,
     /// One of the extended mode's additions, by its place in FEATURES.
     Switch(usize),
     Yes,
@@ -271,9 +275,10 @@ impl Menu {
             Screen::Sound => vec![Line::Music, Line::Back],
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
-                .chain((0..FEATURES.len()).map(Line::Switch))
-                .chain([Line::Back])
+                .chain(switches(false))
+                .chain([Line::DebugMenu, Line::Back])
                 .collect(),
+            Screen::Debug => switches(true).chain([Line::Back]).collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
             Screen::Highscore if self.after_entry => vec![Line::Next],
             Screen::Highscore | Screen::Graphics | Screen::Controls | Screen::Credits => {
@@ -369,7 +374,7 @@ impl Menu {
                 Action::None
             }
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
-            (Screen::Extended, Some(Line::Switch(i))) => {
+            (Screen::Extended | Screen::Debug, Some(Line::Switch(i))) => {
                 FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
             }
             _ => Action::None,
@@ -407,6 +412,7 @@ impl Menu {
             Line::Controls => open(self, Screen::Controls),
             Line::Sound => open(self, Screen::Sound),
             Line::Extended => open(self, Screen::Extended),
+            Line::DebugMenu => open(self, Screen::Debug),
             Line::Exit => open(self, Screen::Ask(Ask::Quit)),
             Line::ExitLevel => open(self, Screen::Ask(Ask::Exit)),
             // the pause asks first; the dead and end menus restart at once
@@ -605,6 +611,7 @@ impl Menu {
             Line::Music => s.get("Menu_Opt_Sound Volume", "Music Volume"),
             Line::Effects => b"  Sound Volume".to_vec(),
             Line::Mode => b"  Extended mode?".to_vec(),
+            Line::DebugMenu => b"Debug mode".to_vec(),
             Line::Switch(i) => FEATURES
                 .get(i)
                 .map_or("", |f| f.label())
@@ -616,6 +623,21 @@ impl Menu {
         }
     }
 
+    /// A switch's row: its label and yes or no.
+    fn switch_field(&self, line: Line) -> (Vec<u8>, Vec<u8>) {
+        let on = match line {
+            Line::Switch(i) => FEATURES.get(i).is_some_and(|&f| self.features.switched_on(f)),
+            _ => false,
+        };
+        let s = &self.strings;
+        let yes = if on {
+            s.get("Menu_Opt_Graphics Synch Yes", "Yes")
+        } else {
+            s.get("Menu_Opt_Graphics Synch No", "No")
+        };
+        (self.label(line), yes)
+    }
+
     /// A screen's title, if it has one.
     fn title(&self, screen: Screen) -> Option<Vec<u8>> {
         let s = &self.strings;
@@ -625,6 +647,7 @@ impl Menu {
             Screen::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Screen::Sound => s.get("Menu_Options Button Sound", "Sound"),
             Screen::Extended => b"Extended".to_vec(),
+            Screen::Debug => b"Debug mode".to_vec(),
             Screen::Kinds => b"Levels".to_vec(),
             Screen::Custom => match self.folder.first().and_then(|root| {
                 LEVEL_KINDS.iter().position(|&k| crate::levels::dir(k) == *root)
@@ -709,19 +732,20 @@ impl Menu {
                 // the mode, then each addition's switch, then where things are
                 let mut f = vec![(self.label(Line::Mode), yes_no(self.features.mode))];
                 if self.features.mode {
-                    for (i, &x) in FEATURES.iter().enumerate() {
-                        f.push((
-                            self.label(Line::Switch(i)),
-                            yes_no(self.features.switched_on(x)),
-                        ));
-                    }
-                    for l in [
-                        "Tools: R restart, F2 free camera, [ ] speed,",
-                        "F5 / F9 save and back. Helped runs never count.",
-                        &short_path(&crate::levels::data_dir().join("levels")),
-                    ] {
-                        f.push((l.as_bytes().to_vec(), Vec::new()));
-                    }
+                    f.extend(switches(false).map(|l| self.switch_field(l)));
+                    f.push((self.label(Line::DebugMenu), b">".to_vec()));
+                    f.push((short_path(&crate::levels::data_dir().join("levels")).into_bytes(), Vec::new()));
+                }
+                f
+            }
+            Screen::Debug => {
+                let mut f: Vec<(Vec<u8>, Vec<u8>)> = switches(true).map(|l| self.switch_field(l)).collect();
+                for l in [
+                    "R restart, F2 free camera, [ ] speed,",
+                    "F3 five seconds back, F5 / F9 save and back.",
+                    "Helped runs are kept, never the best.",
+                ] {
+                    f.push((l.as_bytes().to_vec(), Vec::new()));
                 }
                 f
             }
@@ -1075,7 +1099,7 @@ impl Menu {
                 }
                 back_only(&mut out);
             }
-            Screen::Graphics | Screen::Controls | Screen::Sound | Screen::Extended => {
+            Screen::Graphics | Screen::Controls | Screen::Sound | Screen::Extended | Screen::Debug => {
                 title(&mut out);
                 let fields = self.fields(sc);
                 if sc == Screen::Controls {
@@ -1089,15 +1113,18 @@ impl Menu {
                         label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
                         label(&mut out, key, [0.505, y, 0.65, y + 0.0396], &FONT_03);
                     }
-                } else if sc == Screen::Extended && self.features.mode {
-                    if let Some((name, value)) = fields.first() {
+                } else if (sc == Screen::Extended && self.features.mode) || sc == Screen::Debug {
+                    // Extended: the mode's field first; then the switches (and the Debug mode line) as the Controls
+                    // page's rows, then lines of help or the folder
+                    let first = usize::from(sc == Screen::Extended);
+                    if let (1, Some((name, value))) = (first, fields.first()) {
                         field(&mut out, 0.27, name, value, self.chosen() == 0);
                     }
-                    // the additions' switches as the Controls page's rows, then two lines of help and the folder
-                    let n = FEATURES.len();
-                    for (k, (name, value)) in fields.iter().skip(1).take(n).enumerate() {
-                        let y = 0.40 + k as f32 * 0.05;
-                        let st = if self.chosen() == k + 1 {
+                    let n = lines.iter().filter(|l| matches!(l, Line::Switch(_) | Line::DebugMenu)).count();
+                    let top = if first == 1 { 0.40 } else { 0.30 };
+                    for (k, (name, value)) in fields.iter().skip(first).take(n).enumerate() {
+                        let y = top + k as f32 * 0.05;
+                        let st = if self.chosen() == k + first {
                             Button::Over
                         } else {
                             Button::Up
@@ -1106,8 +1133,8 @@ impl Menu {
                         label(&mut out, name, [0.375, y, 0.58, y + 0.0396], &FONT_03);
                         label(&mut out, value, [0.58, y, 0.65, y + 0.0396], &FONT_03);
                     }
-                    for (k, (l, _)) in fields.iter().skip(1 + n).enumerate() {
-                        let y = 0.66 + k as f32 * 0.045;
+                    for (k, (l, _)) in fields.iter().skip(first + n).enumerate() {
+                        let y = top + n as f32 * 0.05 + 0.03 + k as f32 * 0.045;
                         label(&mut out, l, [0.31, y, 0.69, y + 0.045], &FONT_03);
                     }
                 } else {
@@ -1297,6 +1324,11 @@ fn finished(number: u32) -> bool {
             n == "best.replay" || (n.starts_with(&prefix) && n.ends_with(".replay"))
         })
     })
+}
+
+/// The switch lines of the extended mode's additions: the debug ones, or the others.
+fn switches(debug: bool) -> impl Iterator<Item = Line> {
+    FEATURES.iter().enumerate().filter(move |(_, f)| f.debug() == debug).map(|(i, _)| Line::Switch(i))
 }
 
 /// The kinds of levels the extended mode offers, in the menu's order (levels.md).
