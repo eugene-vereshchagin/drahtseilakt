@@ -53,11 +53,23 @@ impl Data {
             .try_fold(self.root.clone(), |dir, part| find(&dir, part))
     }
 
+    /// Where original level `n` is: its file in the copy, or, for a level the copy lacks (a copy without level 13),
+    /// the player's own remastered export of it in levels/remastered/Level_NN.
+    pub fn original(&self, n: u32) -> Option<Source> {
+        if let Some(p) = self.file(&format!("3D Entities/Level/Level_{n:02}.NMO")) {
+            return Some(Source::Nmo(p));
+        }
+        let dir = crate::levels::dir(crate::levels::Kind::Remastered).join(format!("Level_{n:02}"));
+        dir.join("level.gltf").is_file().then_some(Source::Open(dir))
+    }
+
     pub fn load(&self, source: &Source) -> Result<LoadedLevel, String> {
         let path = match source {
-            Source::Original(n) => self
-                .file(&format!("3D Entities/Level/Level_{n:02}.NMO"))
-                .ok_or_else(|| format!("Level_{n:02}.NMO is not in {}", self.root.display()))?,
+            Source::Original(n) => match self.original(*n) {
+                Some(Source::Nmo(p)) => p,
+                Some(Source::Open(dir)) => return load_open(&dir),
+                _ => return Err(format!("Level_{n:02}.NMO is not in {}", self.root.display())),
+            },
             Source::Nmo(p) => p.clone(),
             Source::Open(dir) => return load_open(dir),
         };

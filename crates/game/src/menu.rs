@@ -146,9 +146,7 @@ impl Menu {
         let entries: Vec<Entry> = (1..=LEVELS)
             .map(|number| Entry {
                 number,
-                available: data
-                    .file(&format!("3D Entities/Level/Level_{number:02}.NMO"))
-                    .is_some(),
+                available: data.original(number).is_some(),
                 open: features.has(Feature::AllLevels) || number == 1 || finished(number - 1),
                 best: features
                     .has(Feature::BestTimes)

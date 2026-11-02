@@ -75,5 +75,6 @@ docs and the folders' READMEs are also in Simplified Chinese, next to English, R
 3. Done: `--import` from an installed game or from the CD image (the game also finds the imported copy
    without `--data`). The European CD's 318 game files come out identical to an installed copy.
 4. The custom levels menu reading `community/` and `open/`; `remastered/` is made by `--remaster N`: the converter
-   (phase 6) and the textures N times larger (Real-ESRGAN when installed, else Lanczos; phase 7).
+   (phase 6) and the textures N times larger (Real-ESRGAN when installed, else Lanczos; phase 7). An original level
+   the copy lacks (a copy without level 13) is played in the levels menu from its export in `remastered/`.
 5. Levels that come with the game, as authors offer them.

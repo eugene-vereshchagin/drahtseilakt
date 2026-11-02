@@ -23,7 +23,7 @@ new engine got level 1 playable, ahead of the phase order:
   default with an extended mode ([menu.md](menu.md)): pause, dead and end menus, highscores with the name entry,
   levels unlocking, custom levels from a maps folder. The stone ball rolls its recorded way in the menu scene. The in-game camera follows as the original's rig does (two springs, a
   view turn of 250 ms, the lift; measured against the C game). The passing lights are the scripts' own: the last
-  level's lightning flashes with its thunder, and the new ball's blue light. Missing: 8K check.
+  level's lightning flashes with its thunder, and the new ball's blue light. The 8K check waits until after the release.
 - **Phase 3**: the ball physics is IVP's, ported from the upstream's C (crates/ivp) and checked against the C
   game: a straight push of the wooden and of the stone ball and a 17-second route on level 1 agree to within 0.1
   and 0.8 units. Every floor, rail and stopper has the one material the original gives them (friction 0.7,
@@ -144,7 +144,7 @@ fuzzing has run for a meaningful time without findings; the inventory exists.
   an SDL3 binding or from pure-Rust crates (winit, gilrs, cpal) is decided at the start and recorded.
 - Level 1 drawn from its `.nmo` with the player's textures: meshes, materials, transparency, sky, lights.
 - Any resolution and aspect ratio from the first frame, no 4:3: the 3D view uses the real aspect ratio; the
-  2D layout keeps 640×480 at 4:3 in the middle and anchors edge elements to the edges; HiDPI; 8K checked.
+  2D layout keeps 640×480 at 4:3 in the middle and anchors edge elements to the edges; HiDPI; 8K is checked after the release (4K until then).
 - The fixed 60 Hz simulation tick with interpolated rendering from the start.
 - A free camera to fly through any level.
 
