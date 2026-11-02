@@ -14,6 +14,8 @@ Ein Ordner mit:
 - `level.bin` — sein Binärpuffer (der einzige, unter diesem Namen);
 - `textures/NNNN_name.png` — ein Bild je Textur; die `uri` eines Bildes muss eine einfache Datei direkt in `textures/`
   nennen (keine weiteren Ordner), sonst wird das Level abgelehnt;
+- `level.txt` (freiwillig) — Titel, Autor und Version als Zeilen `Schlüssel = Wert`; ein Level in `levels/` ist ein
+  Ordner mit einem Level, nach diesem Titel benannt ([levels.md](levels.md), „Ein Level ist ein Ordner“);
 - `game/` — die Dateien des Spiels, die das Level benutzt, nach ihren Pfaden in der Kopie des Spielers, damit es
   ohne die Leveldateien der Kopie spielt: seine Teile im selben offenen Format, jedes ein Ordner mit dem Dateinamen
   ohne `.nmo` (`game/3D Entities/Balls/`, `game/3D Entities/AnimTrafo/`, `game/3D Entities/PH/P_Box/`...: die

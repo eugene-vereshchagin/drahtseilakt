@@ -268,3 +268,16 @@ plays until the player chooses another theme on the extended page, and always in
 the theme every theme falls back to and stays selectable, as do *original* and the player's own themes. A choice the
 player made is kept; the settings write `sound-theme` only once the player has chosen, so a player who never chose
 follows the default.
+
+## A level is a folder
+
+*2026-11-03, the owner's decision.* The custom levels menu showed whatever lay in `levels/community/`: archive dumps
+with folders of folders, pictures, documents, packed archives. Now a level is a folder directly in the kind's folder
+holding exactly one level, a `.nmo` or a level in the open format (the clear format, easy to finish or fix up by
+hand), with an optional `level.txt` (title, author, version), README, preview picture and the resource folders it
+uses; anything else and any deeper nesting is ignored, and a folder with no level or several is not one. A single
+loose `.nmo` in the kind's folder is a level too, the simplest drop-in. Players may name a level in level.txt, but
+a title is cleaned and capped at 40 characters (cut at a word, "…"), in the menu and wherever the game shows the
+name, so a title can never break the interface. The menu is a flat list by title. Collections are not a concept: a
+series becomes one folder per level. `drahtseilakt-toolbox import-maps` sorts a download into this shape. Details:
+[levels.md](levels.md), "A level is a folder".

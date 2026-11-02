@@ -94,6 +94,8 @@ struct Game {
     /// Where the level's runs are kept: the original levels' in replays/, a custom level's under replays/maps/ in its
     /// folder's name (community, open, remastered), so no two kinds share runs.
     runs_root: PathBuf,
+    /// The level's name as shown (the window's title): a custom level's title, capped (package.rs), else its file's.
+    shown_name: String,
     /// The ball's sounds, and what they ask of the sound output since the window last played them.
     ball_sound: BallSound,
     fan_sound: FanSound,
@@ -243,12 +245,19 @@ impl Game {
             level_bonus,
             assisted: false,
             last_level: level.level.settings.last_level,
-            runs_root: match &o.source {
-                crate::assets::Source::Original(_) => replay_dir(),
-                crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
-                    let kind = p.parent().and_then(|d| d.file_name()).map_or_else(|| "other".into(), |n| n.to_owned());
-                    replay_dir().join("maps").join(kind)
+            runs_root: {
+                let (root, old) = runs_root(&o.source);
+                let stem = level.name.trim_end_matches(".NMO").trim_end_matches(".nmo");
+                match old.map(|old| move_runs(&old, &root, stem)) {
+                    Some(Ok(true)) => println!("runs of {} moved to {}", shown(stem), shown_path(&root)),
+                    Some(Err(e)) => eprintln!("could not move the runs of {}: {}", shown(stem), shown(&e)),
+                    _ => {}
                 }
+                root
+            },
+            shown_name: match &o.source {
+                crate::assets::Source::Original(_) => level.name.clone(),
+                crate::assets::Source::Nmo(_) | crate::assets::Source::Open(_) => loading_name(&o.source),
             },
             ball_sound: BallSound::default(),
             fan_sound: FanSound::default(),
@@ -469,8 +478,8 @@ impl Game {
         let path = dir.join(format!("attempt-{stamp}-{}.replay", self.sim.tick));
         let _ = std::fs::create_dir_all(&dir);
         match std::fs::write(&path, self.replay_out.to_text()) {
-            Ok(()) => println!("attempt saved to {}", path.display()),
-            Err(e) => eprintln!("could not save the attempt to {}: {e}", path.display()),
+            Ok(()) => println!("attempt saved to {}", shown_path(&path)),
+            Err(e) => eprintln!("could not save the attempt to {}: {e}", shown_path(&path)),
         }
     }
 
@@ -576,8 +585,8 @@ impl Game {
                 let _ = std::fs::create_dir_all(d);
             }
             match std::fs::write(&path, &text) {
-                Ok(()) => println!("run saved to {}", path.display()),
-                Err(e) => eprintln!("could not save the run to {}: {e}", path.display()),
+                Ok(()) => println!("run saved to {}", shown_path(&path)),
+                Err(e) => eprintln!("could not save the run to {}: {e}", shown_path(&path)),
             }
         }
     }
@@ -593,7 +602,7 @@ impl Game {
         };
         format!(
             "Drahtseilakt — {}   points {}   lives {}   sector {}   tick {}   {}{state}",
-            self.level.name,
+            self.shown_name,
             s.points,
             s.lives,
             s.sector + 1,
@@ -766,14 +775,86 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
     Some(m)
 }
 
-/// What the loading screen says is loading.
+/// What the loading screen says is loading: a custom level's title, capped like the menu's (package.rs).
 fn loading_name(source: &crate::assets::Source) -> String {
     match source {
         crate::assets::Source::Original(n) => format!("level {n}"),
         crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
-            p.file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned())
+            gamedata::package::title_of(p, &custom_roots()).replace('…', "...")
         }
     }
+}
+
+/// The custom levels' folders (all but the original's).
+fn custom_roots() -> Vec<PathBuf> {
+    crate::levels::KINDS
+        .into_iter()
+        .filter(|&k| k != crate::levels::Kind::Original)
+        .map(crate::levels::dir)
+        .collect()
+}
+
+/// Where a level's runs are kept: the original levels' in replays/, a loose custom level's (a `.nmo` straight in a
+/// kind's folder) and an open-format one's under replays/maps/<kind>/, a level folder's (levels.md, "A level is a
+/// folder") under replays/levels/<kind>/<folder>/, apart from the loose ones (a loose Foo.nmo and a folder Foo/ never
+/// share runs) and from each other (Level_07.NMO of two collections). With it, where a level folder's runs were kept
+/// before (replays/maps/<folder>/), to move them from.
+fn runs_root(source: &crate::assets::Source) -> (PathBuf, Option<PathBuf>) {
+    let maps = replay_dir().join("maps");
+    let name = |p: &Path| p.file_name().map(std::ffi::OsStr::to_owned);
+    match source {
+        crate::assets::Source::Original(_) => (replay_dir(), None),
+        crate::assets::Source::Nmo(p) => {
+            let folder = p.parent();
+            let kind = folder.and_then(Path::parent).filter(|k| custom_roots().iter().any(|r| r == k));
+            match (kind.and_then(name), folder.and_then(name)) {
+                (Some(kind), Some(folder)) => {
+                    // the old place was named by the folder alone, and a loose map's by its kind's folder's name (that
+                    // folder may be moved, ~/MyMaps): a level folder named like one of those shared it then
+                    let kinds = crate::levels::KINDS.into_iter().map(crate::levels::dir);
+                    let shared = folder == "other" || kinds.filter_map(|d| name(&d)).any(|k| k == folder);
+                    let old = (!shared).then(|| maps.join(&folder));
+                    (replay_dir().join("levels").join(kind).join(folder), old)
+                }
+                _ => (maps.join(folder.and_then(name).unwrap_or_else(|| "other".into())), None),
+            }
+        }
+        crate::assets::Source::Open(p) => {
+            (maps.join(p.parent().and_then(name).unwrap_or_else(|| "other".into())), None)
+        }
+    }
+}
+
+/// Text and paths from level names, printed with control and format characters escaped.
+fn shown(s: &str) -> String {
+    gamedata::package::printable(s)
+}
+
+fn shown_path(p: &Path) -> String {
+    gamedata::package::printable(&p.to_string_lossy())
+}
+
+/// Moves a level's runs from where an earlier version kept them (`old`/`stem`) to `new`/`stem`, once: only real
+/// folders (no link anywhere on the way is followed), never over runs already in the new place.
+fn move_runs(old: &Path, new: &Path, stem: &str) -> Result<bool, String> {
+    let real_dir = |p: &Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink());
+    let (from, to) = (old.join(stem), new.join(stem));
+    let maps = old.parent().map(Path::to_path_buf).unwrap_or_default();
+    if stem.is_empty() || !real_dir(&maps) || !real_dir(old) || !real_dir(&from) {
+        return Ok(false);
+    }
+    if std::fs::symlink_metadata(&to).is_ok() {
+        return Ok(false);
+    }
+    let fail = |p: &Path, e: std::io::Error| format!("{}: {e}", p.display());
+    std::fs::create_dir_all(new).map_err(|e| fail(new, e))?;
+    if !real_dir(new) {
+        return Err(format!("{}: not a folder of ours", new.display()));
+    }
+    std::fs::rename(&from, &to).map_err(|e| fail(&to, e))?;
+    // the old folder goes when it is left empty
+    let _ = std::fs::remove_dir(old);
+    Ok(true)
 }
 
 pub fn replay_dir() -> PathBuf {
@@ -2867,5 +2948,61 @@ impl ApplicationHandler for App {
         if let Some(w) = &self.window {
             w.request_redraw();
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod runs_tests {
+    use super::*;
+
+    #[test]
+    fn runs_move_once_from_the_old_place_and_never_over_new_ones() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-runs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (old, new) = (root.join("maps/Folder"), root.join("levels/community/Folder"));
+        std::fs::create_dir_all(old.join("Level_07")).unwrap();
+        std::fs::write(old.join("Level_07/run-1.replay"), "r").unwrap();
+        assert_eq!(move_runs(&old, &new, "Level_07"), Ok(true));
+        assert!(new.join("Level_07/run-1.replay").is_file());
+        assert!(!old.exists(), "the emptied old folder goes");
+        // nothing to move any more
+        assert_eq!(move_runs(&old, &new, "Level_07"), Ok(false));
+        // runs in both places: the new ones stay, the old ones are left where they are
+        std::fs::create_dir_all(old.join("Level_07")).unwrap();
+        std::fs::write(old.join("Level_07/run-2.replay"), "o").unwrap();
+        assert_eq!(move_runs(&old, &new, "Level_07"), Ok(false));
+        assert!(old.join("Level_07/run-2.replay").is_file() && !new.join("Level_07/run-2.replay").exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runs_behind_a_link_are_not_moved() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-runs-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("elsewhere/Level_07")).unwrap();
+        std::fs::create_dir_all(root.join("maps")).unwrap();
+        std::os::unix::fs::symlink(root.join("elsewhere"), root.join("maps/Folder")).unwrap();
+        assert_eq!(move_runs(&root.join("maps/Folder"), &root.join("levels/c/Folder"), "Level_07"), Ok(false));
+        assert!(root.join("elsewhere/Level_07").is_dir());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_loose_map_and_a_level_folder_of_one_name_keep_their_runs_apart() {
+        let community = crate::levels::dir(crate::levels::Kind::Community);
+        let (loose, _) = runs_root(&crate::assets::Source::Nmo(community.join("Foo.nmo")));
+        let (folder, old) = runs_root(&crate::assets::Source::Nmo(community.join("Foo").join("Foo.nmo")));
+        // the loose map's runs are in <loose>/Foo, the folder's in <folder>/Foo: neither inside the other
+        assert!(!folder.join("Foo").starts_with(loose.join("Foo")) && !loose.join("Foo").starts_with(&folder));
+        assert_eq!(old, Some(replay_dir().join("maps").join("Foo")));
+        // a level folder named exactly like a kind's folder (wherever it is moved) shared its old place: not moved
+        let kind_name = community.file_name().unwrap().to_owned();
+        let (_, none) = runs_root(&crate::assets::Source::Nmo(community.join(&kind_name).join("x.nmo")));
+        assert_eq!(none, None);
+        let (_, some) = runs_root(&crate::assets::Source::Nmo(community.join("Community-like").join("x.nmo")));
+        assert!(some.is_some());
+        assert_eq!(shown("a\u{1b}[2J"), "a\\u{1b}[2J");
     }
 }

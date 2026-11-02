@@ -95,8 +95,10 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
 - **Controls** fügt *Defaults* hinzu: zurück zu den Tasten des Originals (Pfeile, Shift, Leertaste), ohne gedrehte
   Kamera.
 - **Level nach Art**: Start bietet *Original* (die klassische Levelliste), *Remastered*, *Community maps* und
-  *Open format*, die Ordner von `levels/` ([levels.md](levels.md)). In jedem seine Level nach Dateinamen, dann die
-  Ordner mit weiteren (Enter öffnet, Esc geht zurück nach oben), gespielt wie ein Original-Level. Ein Level, das nicht
+  *Open format*, die Ordner von `levels/` ([levels.md](levels.md)). In jedem eine flache Liste seiner Level nach Titel (ein
+  Level ist ein Ordner mit einem Level oder eine einzelne `.nmo`: levels.md, „Ein Level ist ein Ordner“; keine Ordner
+  zum Öffnen, nichts anderes gezeigt), gespielt wie ein Original-Level. Ein Titel hat höchstens 40 Zeichen und wird
+  kleiner oder umbrochen, um auf seiner Schaltfläche zu bleiben. Ein Level, das nicht
   geladen werden kann, sagt warum und startet nicht; seine Läufe und Bestzeiten bleiben getrennt von den
   Original-Leveln. Später: Titel, Autor und Schwierigkeit aus dem Community-Katalog.
 - Texturpakete und unsere eigenen Mods kommen ebenfalls hierher, wenn es sie gibt, jeweils hinter einem eigenen

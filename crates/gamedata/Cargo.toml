@@ -12,5 +12,9 @@ level = { path = "../level" }
 nmo = { path = "../nmo" }
 image = { version = "=0.25.10", default-features = false, features = ["bmp", "tga", "png", "jpeg"] }
 
+[target.'cfg(unix)'.dependencies]
+# O_NOFOLLOW and O_NONBLOCK for opening untrusted files (package.rs); already in the lock through wgpu and cpal
+libc = "=0.2.189"
+
 [lints]
 workspace = true

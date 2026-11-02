@@ -87,8 +87,9 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
   original's is 58°, InGameCam's 1.0123 radians). The classic mode always draws the original's.
 - **Controls** adds *Defaults*, back to the original's keys (arrows, Shift, Space) and no inverted turn.
 - **Levels by kind**: Start offers *Original* (the classic list of levels), *Remastered*, *Community maps* and
-  *Open format*, the folders of `levels/` ([levels.md](levels.md)). In each, its levels by file name, then the folders
-  holding more (Enter opens one, Esc goes back up), played like an original level. A level that cannot be loaded says
+  *Open format*, the folders of `levels/` ([levels.md](levels.md)). In each, a flat list of its levels by title (a level is a
+  folder holding one level, or a loose `.nmo`: levels.md, "A level is a folder"; no folders to open, nothing else
+  shown), played like an original level. A title is at most 40 characters and shrinks or wraps to stay on its button. A level that cannot be loaded says
   why and is not started; its runs and best times are kept apart from the original levels. Later: title, author and
   difficulty from the community catalogue.
 - Texture packs and our own mods come here too when they exist, each behind its own switch and a warning that
