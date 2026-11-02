@@ -35,7 +35,12 @@ A folder holding:
   `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`), `alpha_cutoff` when blending and alpha
   test are combined, and `texgen` (`reflect` or `chrome`) when the texture coordinates come from the view.
 - **Scene extras** `extras.drahtseilakt`: `format` (1), `groups` (name and member node indices — the game
-  rules read these, see [nmo-format.md](nmo-format.md)), `sky` (sky letter) and `start_ball`.
+  rules read these, see [nmo-format.md](nmo-format.md)), `sky` (sky letter), `start_ball` and `settings`: what the
+  original takes from its level table and its rules by level number, so the level plays the same without the game's
+  files — `music` (theme 1 to 1000), `light` (three numbers 0..1), `level_bonus` (points), `tutorial` and
+  `last_level` (true or false: the original's first and last level), and `source_hash` (16 hex digits: the FNV-1a of
+  the `.nmo` it was converted from). A replay recorded on that file plays on the converted level (the same level, so
+  the same run); malformed settings refuse the level.
 
 ## Coordinates
 

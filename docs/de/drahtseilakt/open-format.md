@@ -37,7 +37,12 @@ Ein Ordner mit:
   Blending und Alpha-Test zusammenkommen, und `texgen` (`reflect` oder `chrome`), wenn die
   Texturkoordinaten vom Blick kommen.
 - **Szenen-Extras** `extras.drahtseilakt`: `format` (1), `groups` (Name und Indizes der Mitgliedsknoten — die
-  Spielregeln lesen sie, siehe [nmo-format.md](nmo-format.md)), `sky` (Buchstabe des Himmels) und `start_ball`.
+  Spielregeln lesen sie, siehe [nmo-format.md](nmo-format.md)), `sky` (Buchstabe des Himmels), `start_ball` und
+  `settings`: was das Original aus seiner Leveltabelle und seinen Regeln nach Levelnummer nimmt, damit das Level ohne
+  die Dateien des Spiels gleich spielt — `music` (Thema 1 bis 1000), `light` (drei Zahlen 0..1), `level_bonus`
+  (Punkte), `tutorial` und `last_level` (true oder false: erstes und letztes Level des Originals) und `source_hash`
+  (16 Hexziffern: FNV-1a der `.nmo`, aus der es umgewandelt wurde). Ein auf dieser Datei aufgenommenes Replay läuft auf
+  dem umgewandelten Level (dasselbe Level, also derselbe Lauf); fehlerhafte Einstellungen lehnen das Level ab.
 
 ## Koordinaten
 
