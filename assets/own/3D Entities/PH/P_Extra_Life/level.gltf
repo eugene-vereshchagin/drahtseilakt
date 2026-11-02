@@ -1,0 +1,612 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "drahtseilakt make_parts.py"
+ },
+ "extensionsUsed": [],
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "format": 1,
+     "groups": [
+      {
+       "name": "All_P_Extra_Life",
+       "members": [
+        5,
+        2,
+        0,
+        1,
+        3,
+        4
+       ]
+      }
+     ],
+     "sky": null,
+     "start_ball": null,
+     "settings": {
+      "tutorial": false,
+      "last_level": false
+     }
+    }
+   }
+  }
+ ],
+ "nodes": [
+  {
+   "name": "P_Extra_Life_Shadow",
+   "matrix": [
+    1.4,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.4,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.4,
+    0.0,
+    0.0,
+    -2.117,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 0
+  },
+  {
+   "name": "P_Extra_Life_SilverBall",
+   "matrix": [
+    -0.32304544492505166,
+    0.0,
+    0.9432129348737619,
+    0.0,
+    0.5239446356214861,
+    0.827826272691587,
+    0.17944826843695716,
+    0.0,
+    -0.7831659460692466,
+    0.5538227715086786,
+    -0.26823019717382235,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false,
+     "sprite": {
+      "mode": 0,
+      "size": [
+       1.0,
+       1.0
+      ],
+      "offset": [
+       0.0,
+       0.0
+      ]
+     }
+    }
+   },
+   "mesh": 1
+  },
+  {
+   "name": "P_Extra_Life_Sphere",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 2
+  },
+  {
+   "name": "P_Extra_Life_Particle_Blob",
+   "matrix": [
+    2.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Life_Particle_Fizz",
+   "matrix": [
+    2.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Life_MF",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "P_Extra_Life_Shadow_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Life_SilverBall_Sprite",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 4,
+      "NORMAL": 5,
+      "TEXCOORD_0": 6
+     },
+     "indices": 7,
+     "material": 1
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Life_Sphere_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 8,
+      "NORMAL": 9,
+      "TEXCOORD_0": 10
+     },
+     "indices": 11,
+     "material": 2
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "P_Extra_Life_Schatten",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.0,
+     0.0,
+     0.0,
+     0.17
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 0
+    }
+   },
+   "emissiveFactor": [
+    0.49,
+    0.3,
+    0.6
+   ],
+   "doubleSided": false,
+   "alphaMode": "BLEND",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": false,
+     "blend": [
+      "one",
+      "one"
+     ]
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Life_SilverBall",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 1
+    }
+   },
+   "emissiveFactor": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "doubleSided": false,
+   "alphaMode": "BLEND",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": false,
+     "blend": [
+      "src_alpha",
+      "inv_src_alpha"
+     ]
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Life_Sphere",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 2
+    }
+   },
+   "emissiveFactor": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "doubleSided": false,
+   "alphaMode": "BLEND",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": false,
+     "blend": [
+      "one",
+      "src_alpha"
+     ],
+     "texgen": "reflect"
+    }
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0,
+   "sampler": 0
+  },
+  {
+   "source": 1,
+   "sampler": 0
+  },
+  {
+   "source": 2,
+   "sampler": 0
+  }
+ ],
+ "images": [
+  {
+   "uri": "textures/glow.png",
+   "name": "glow"
+  },
+  {
+   "uri": "textures/silver.png",
+   "name": "silver"
+  },
+  {
+   "uri": "textures/oil.png",
+   "name": "oil"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987,
+   "wrapS": 10497,
+   "wrapT": 10497
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "level.bin",
+   "byteLength": 8272
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 48,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 96,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 128,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 152,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 200,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 248,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 280,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 304,
+   "byteLength": 1836,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 2140,
+   "byteLength": 1836,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 3976,
+   "byteLength": 1224,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 5200,
+   "byteLength": 3072,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    -1.17,
+    0.0,
+    -1.17
+   ],
+   "max": [
+    1.17,
+    0.0,
+    1.17
+   ],
+   "bufferView": 0
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 1
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 2
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 3
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    1.0,
+    1.0,
+    -0.0
+   ],
+   "bufferView": 4
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 5
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 6
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 7
+  },
+  {
+   "componentType": 5126,
+   "count": 153,
+   "type": "VEC3",
+   "min": [
+    -2.0,
+    -2.0,
+    -2.0
+   ],
+   "max": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bufferView": 8
+  },
+  {
+   "componentType": 5126,
+   "count": 153,
+   "type": "VEC3",
+   "bufferView": 9
+  },
+  {
+   "componentType": 5126,
+   "count": 153,
+   "type": "VEC2",
+   "bufferView": 10
+  },
+  {
+   "componentType": 5125,
+   "count": 768,
+   "type": "SCALAR",
+   "bufferView": 11
+  }
+ ]
+}
