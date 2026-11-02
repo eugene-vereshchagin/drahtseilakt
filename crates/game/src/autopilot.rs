@@ -367,7 +367,13 @@ impl Route {
             if let [x, y, z] = c[..] {
                 for (i, f) in found.iter().enumerate() {
                     if f.0.distance(Vec3::new(x, y, z)) < 4.0 {
-                        eprintln!("near {:?} rail {:?} axis {:?} edge {:?}", f.0, f.1, axis.get(i), edge.get(i));
+                        eprintln!(
+                            "near {:?} rail {:?} axis {:?} edge {:?}",
+                            f.0,
+                            f.1,
+                            axis.get(i),
+                            edge.get(i)
+                        );
                     }
                 }
             }
@@ -392,16 +398,28 @@ impl Route {
         // A ball on rails stays on them (they hold it from the sides): it goes on or off a rail only along it (not
         // across a crossing rail, not sideways off it), and drops off only where it ends.
         let rail_ok = |u: usize, v: usize, dy: f32| -> bool {
-            let (Some(&p), Some(&q)) = (pts.get(u), pts.get(v)) else { return false };
+            let (Some(&p), Some(&q)) = (pts.get(u), pts.get(v)) else {
+                return false;
+            };
             let dir = Vec3::new(q.x - p.x, 0.0, q.z - p.z).normalize_or_zero();
-            let across = |w: usize| axis.get(w).copied().flatten().is_some_and(|a| a.dot(dir).abs() < 0.7);
+            let across = |w: usize| {
+                axis.get(w)
+                    .copied()
+                    .flatten()
+                    .is_some_and(|a| a.dot(dir).abs() < 0.7)
+            };
             if across(u) || across(v) {
                 return false;
             }
-            let Some(r) = found.get(u).and_then(|f| f.1).filter(|_| dy < -STEP) else { return true };
+            let Some(r) = found.get(u).and_then(|f| f.1).filter(|_| dy < -STEP) else {
+                return true;
+            };
             !near(p).into_iter().filter_map(|w| found.get(w)).any(|f| {
                 let o = Vec3::new(f.0.x - p.x, 0.0, f.0.z - p.z);
-                f.1 == Some(r) && (f.0.y - p.y).abs() < 1.0 && o.length() < LINK && o.dot(dir) > 0.5 * o.length()
+                f.1 == Some(r)
+                    && (f.0.y - p.y).abs() < 1.0
+                    && o.length() < LINK
+                    && o.dot(dir) > 0.5 * o.length()
             })
         };
         let closest = |p: Vec3| -> usize {
@@ -455,75 +473,53 @@ impl Route {
             // Dijkstra; where the goal is not reached over the floors, again with leaps over gaps (a drawbridge to
             // knock over, a jump, a moving part to wait for) at a high price, so the way crosses the narrowest one
             for leap in [false, true] {
-            dist.clear();
-            prev.clear();
-            lifted.clear();
-            let mut heap = BinaryHeap::new();
-            dist.insert(from, 0.0);
-            heap.push(Item(0.0, from));
-            while let Some(Item(d, u)) = heap.pop() {
-                if at_goal(u) {
-                    to = u;
-                    break;
-                }
-                if dist.get(&u).is_some_and(|&x| d > x) {
-                    continue;
-                }
-                let Some(&p) = pts.get(u) else { continue };
-                for v in near(p) {
-                    let Some(&q) = pts.get(v) else { continue };
-                    let h = Vec3::new(q.x - p.x, 0.0, q.z - p.z).length();
-                    let dy = q.y - p.y;
-                    // (a narrow gap at one height is rolled over)
-                    // (not onto or off a rail: a rail is got onto only where it begins)
-                    let gap = h > LINK
-                        && h <= GAP
-                        && dy.abs() < 0.3
-                        && found.get(u).is_some_and(|f| f.1.is_none())
-                        && found.get(v).is_some_and(|f| f.1.is_none())
-                        && open_gap(
-                            p,
-                            q,
-                            near(p).into_iter().filter_map(|w| pts.get(w).copied()),
-                        );
-                    if v == u || (h > LINK && !gap) || dy > STEP || dy < -DROP {
+                dist.clear();
+                prev.clear();
+                lifted.clear();
+                let mut heap = BinaryHeap::new();
+                dist.insert(from, 0.0);
+                heap.push(Item(0.0, from));
+                while let Some(Item(d, u)) = heap.pop() {
+                    if at_goal(u) {
+                        to = u;
+                        break;
+                    }
+                    if dist.get(&u).is_some_and(|&x| d > x) {
                         continue;
                     }
-                    if !rail_ok(u, v, dy) {
-                        continue;
-                    }
-                    let edgy = if edge.get(v).copied().unwrap_or(true) {
-                        40.0
-                    } else {
-                        0.0
-                    };
-                    let fear = (CLEAR - clear.get(v).copied().unwrap_or(0.0)) / CLEAR;
-                    let cost = h.max(0.1) * (1.0 + 6.0 * fear * fear)
-                        + edgy
-                        + if dy < -STEP { -dy * DROP_COST } else { 0.0 };
-                    let nd = d + cost;
-                    if dist.get(&v).is_none_or(|&x| nd < x) {
-                        dist.insert(v, nd);
-                        prev.insert(v, u);
-                        lifted.remove(&v);
-                        heap.push(Item(nd, v));
-                    }
-                }
-                if leap {
-                    for v in near_wide(p) {
+                    let Some(&p) = pts.get(u) else { continue };
+                    for v in near(p) {
                         let Some(&q) = pts.get(v) else { continue };
                         let h = Vec3::new(q.x - p.x, 0.0, q.z - p.z).length();
                         let dy = q.y - p.y;
-                        if h <= GAP
-                            || h > LEAP
-                            || dy > STEP
-                            || dy < -DROP
-                            || edge.get(v).copied().unwrap_or(true)
-                            || !rail_ok(u, v, dy)
-                        {
+                        // (a narrow gap at one height is rolled over)
+                        // (not onto or off a rail: a rail is got onto only where it begins)
+                        let gap = h > LINK
+                            && h <= GAP
+                            && dy.abs() < 0.3
+                            && found.get(u).is_some_and(|f| f.1.is_none())
+                            && found.get(v).is_some_and(|f| f.1.is_none())
+                            && open_gap(
+                                p,
+                                q,
+                                near(p).into_iter().filter_map(|w| pts.get(w).copied()),
+                            );
+                        if v == u || (h > LINK && !gap) || dy > STEP || dy < -DROP {
                             continue;
                         }
-                        let nd = d + LEAP_COST + 4.0 * h + if dy < 0.0 { -dy * DROP_COST } else { 0.0 };
+                        if !rail_ok(u, v, dy) {
+                            continue;
+                        }
+                        let edgy = if edge.get(v).copied().unwrap_or(true) {
+                            40.0
+                        } else {
+                            0.0
+                        };
+                        let fear = (CLEAR - clear.get(v).copied().unwrap_or(0.0)) / CLEAR;
+                        let cost = h.max(0.1) * (1.0 + 6.0 * fear * fear)
+                            + edgy
+                            + if dy < -STEP { -dy * DROP_COST } else { 0.0 };
+                        let nd = d + cost;
                         if dist.get(&v).is_none_or(|&x| nd < x) {
                             dist.insert(v, nd);
                             prev.insert(v, u);
@@ -531,26 +527,53 @@ impl Route {
                             heap.push(Item(nd, v));
                         }
                     }
-                }
-                // over a fan: up its updraft and across onto a floor near its top
-                for &f in lifts.get(&u).into_iter().flatten() {
-                    let Some(&(at, top, _)) = fans.get(f) else { continue };
-                    for &v in lands.get(f).into_iter().flatten() {
-                        let Some(&q) = pts.get(v) else { continue };
-                        let across = Vec3::new(q.x - at.x, 0.0, q.z - at.z).length();
-                        let nd = d + (top - p.y).max(0.0) + across + FAN_COST;
-                        if dist.get(&v).is_none_or(|&x| nd < x) {
-                            dist.insert(v, nd);
-                            prev.insert(v, u);
-                            lifted.insert(v, f);
-                            heap.push(Item(nd, v));
+                    if leap {
+                        for v in near_wide(p) {
+                            let Some(&q) = pts.get(v) else { continue };
+                            let h = Vec3::new(q.x - p.x, 0.0, q.z - p.z).length();
+                            let dy = q.y - p.y;
+                            if h <= GAP
+                                || h > LEAP
+                                || dy > STEP
+                                || dy < -DROP
+                                || edge.get(v).copied().unwrap_or(true)
+                                || !rail_ok(u, v, dy)
+                            {
+                                continue;
+                            }
+                            let nd = d
+                                + LEAP_COST
+                                + 4.0 * h
+                                + if dy < 0.0 { -dy * DROP_COST } else { 0.0 };
+                            if dist.get(&v).is_none_or(|&x| nd < x) {
+                                dist.insert(v, nd);
+                                prev.insert(v, u);
+                                lifted.remove(&v);
+                                heap.push(Item(nd, v));
+                            }
+                        }
+                    }
+                    // over a fan: up its updraft and across onto a floor near its top
+                    for &f in lifts.get(&u).into_iter().flatten() {
+                        let Some(&(at, top, _)) = fans.get(f) else {
+                            continue;
+                        };
+                        for &v in lands.get(f).into_iter().flatten() {
+                            let Some(&q) = pts.get(v) else { continue };
+                            let across = Vec3::new(q.x - at.x, 0.0, q.z - at.z).length();
+                            let nd = d + (top - p.y).max(0.0) + across + FAN_COST;
+                            if dist.get(&v).is_none_or(|&x| nd < x) {
+                                dist.insert(v, nd);
+                                prev.insert(v, u);
+                                lifted.insert(v, f);
+                                heap.push(Item(nd, v));
+                            }
                         }
                     }
                 }
-            }
-            if dist.contains_key(&to) && at_goal(to) {
-                break;
-            }
+                if dist.contains_key(&to) && at_goal(to) {
+                    break;
+                }
             }
             if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
                 eprintln!(
@@ -624,7 +647,9 @@ impl Route {
             for (k, &i) in way.iter().enumerate() {
                 let Some(&q) = pts.get(i) else { continue };
                 // a fan's lift: straight up its column to the top, then across to where it lands
-                if let (Some(&f), Some(&p)) = (lifted.get(&i), k.checked_sub(1).and_then(|j| way.get(j))) {
+                if let (Some(&f), Some(&p)) =
+                    (lifted.get(&i), k.checked_sub(1).and_then(|j| way.get(j)))
+                {
                     rides.push((points.len().saturating_sub(1), f));
                     if let (Some(&(at, top, _)), Some(&a)) = (fans.get(f), pts.get(p)) {
                         let up = Vec3::new(at.x, top - 1.0, at.z);
@@ -741,7 +766,12 @@ impl Route {
     }
 
     /// A way given as floor points in order (a player's run): the level's floors are read for the edges.
-    pub fn along(level: &Level, modules: &crate::scene::Modules, fans: &[Fan], path: Vec<Vec3>) -> Route {
+    pub fn along(
+        level: &Level,
+        modules: &crate::scene::Modules,
+        fans: &[Fan],
+        path: Vec<Vec3>,
+    ) -> Route {
         let start = path.first().copied().unwrap_or(Vec3::ZERO);
         let mut r = Route::find(level, modules, fans, start, &[]);
         r.marks = vec![path.len().saturating_sub(1)];
@@ -912,6 +942,14 @@ const BRIDGE_CHARGES: usize = 3;
 /// Stuck this near the next transformer, the ball is taken into it.
 const GATE_STUCK: f32 = 10.0;
 
+/// Keeping to the player's line (`Pilot::track`): how far ahead the courses are compared, how far our ball may be
+/// from the player's before the line is lost, how far on it is looked for again, and what the player's own keys are
+/// worth (in summed units) over an arrow choice.
+const TRACK_AHEAD: u64 = 30;
+const TRACK_LOST: f32 = 4.0;
+const TRACK_RESYNC: usize = 3600;
+const TRACK_OWN: f32 = 0.5;
+
 /// A player's tick matches the ball within this distance and this difference of speed.
 const DEMO_NEAR: f32 = 2.0;
 const DEMO_SPEED: f32 = 4.0;
@@ -983,8 +1021,24 @@ impl Demo {
     }
 }
 
+/// A variation of the steering after a rewind (pilot_run goes back to a saved state when the ball is lost or the
+/// way stands still): for a while each choice's score gets a seeded random addition and, on some tries, the player's
+/// line is not taken, so the run from the saved state takes another course than the one that failed. The
+/// simulation is deterministic, so a try is reproducible from its seed.
+#[derive(Clone, Debug)]
+struct Noise {
+    /// The opening move: held until this tick, before anything else (a hint too: a hint's course is varied by the
+    /// moment and the place it goes on from).
+    opening: (u64, u8),
+    seed: u32,
+    until: u64,
+    amp: f32,
+    no_demo: bool,
+}
+
+#[derive(Clone)]
 pub struct Pilot {
-    pub route: Route,
+    pub route: std::sync::Arc<Route>,
     at: usize,
     choice: u8,
     /// The tick the way last went on: when it stands still, the choices are held longer (to push a box away).
@@ -1012,7 +1066,7 @@ pub struct Pilot {
     pub hints: crate::hints::Runner,
     /// The player's run it follows, if any; the player's tick it matched last; and, when the player's pushes were
     /// the choice, from which of the player's ticks and from which tick of ours.
-    pub demo: Option<Demo>,
+    pub demo: Option<std::sync::Arc<Demo>>,
     demo_at: Option<(usize, u64)>,
     demo_run: Option<(usize, u64)>,
     /// The player's still places already rolled back to.
@@ -1023,6 +1077,12 @@ pub struct Pilot {
     /// each has been charged.
     pub bridges: Vec<Vec3>,
     charged: Vec<usize>,
+    /// After a rewind: the variation of its choices (`perturb`).
+    noise: Option<Noise>,
+    /// Keeping to the followed player's ball tick by tick (`track`): the player's tick matched and our tick then, and
+    /// the inputs chosen for the ticks up to the next decision.
+    tracking: Option<(usize, u64)>,
+    track_keys: Vec<(u64, u8)>,
 }
 
 /// How near the ball a point of the way must be to take the way up there (a run begun at a sector).
@@ -1031,7 +1091,7 @@ const TAKE_UP_NEAR: f32 = 8.0;
 impl Pilot {
     pub fn new(route: Route, gates: Vec<Gate>) -> Pilot {
         Pilot {
-            route,
+            route: std::sync::Arc::new(route),
             gates,
             gate: 0,
             kind: None,
@@ -1052,7 +1112,165 @@ impl Pilot {
             demo_after: 0,
             bridges: Vec::new(),
             charged: Vec::new(),
+            noise: None,
+            tracking: None,
+            track_keys: Vec::new(),
         }
+    }
+
+    /// The ball is back at a saved state after a failure there (`attempt` from 1, the more the wider the variation):
+    /// a short opening move of its own (a wait or a push of random length: moving parts are then met at another
+    /// phase) and, for some seconds, random additions to its choices' scores; from the third try on every third
+    /// one leaves the player's line, which may be what failed.
+    pub fn perturb(&mut self, sim: &Sim, attempt: u32) {
+        let mut seed = 0x9E37_79B9u32.wrapping_mul(attempt.wrapping_add(1))
+            ^ (sim.tick as u32).wrapping_mul(0x85EB_CA6B);
+        let mut rand = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            seed
+        };
+        let a = attempt.min(12);
+        let opening = CHOICES[(rand() % 9) as usize];
+        let len = 6 + u64::from(rand() % (12 + 6 * a));
+        self.seed = rand() | 1;
+        self.noise = Some(Noise {
+            opening: (sim.tick + len, opening),
+            seed: rand() | 1,
+            until: sim.tick + 240 + 60 * u64::from(a),
+            amp: 0.4 * a as f32,
+            no_demo: attempt >= 3 && attempt.is_multiple_of(3),
+        });
+        self.hints.rearm();
+        self.tracking = None;
+        self.track_keys.clear();
+        self.choice = opening;
+        self.best = f32::NEG_INFINITY;
+        self.moved = sim.tick;
+        self.demo_run = None;
+    }
+
+    /// Keeping to the followed player's ball: once ours is where the player's was (as `Demo::find` matches), the
+    /// player's run is a line in time, and at each decision the inputs for the next `PERIOD` ticks are chosen so that
+    /// over the next `TRACK_AHEAD` ticks our ball stays nearest the player's (its place, and its speed a little): the
+    /// player's own keys, or each arrow choice for `PERIOD` ticks and the player's keys after, tried on copies of the
+    /// run. So a slip is corrected at once, and a puzzle's pushes (blocks, levers, a board) are made as the player
+    /// made them. Where our ball is more than `TRACK_LOST` from the player's, or the player's ball is being lost, the
+    /// line is taken up again further on where it passes near, or left to the way's search.
+    fn track(&mut self, sim: &Sim) -> Option<u8> {
+        let d = self
+            .demo
+            .clone()
+            .filter(|_| sim.tick >= self.demo_after && !self.demo_off(sim.tick))?;
+        let b = &sim.ball;
+        let fits = |t: &DemoTick, near: f32| {
+            t.alive
+                && t.kind == b.kind
+                && t.sector == sim.sector
+                && t.pos.distance(b.position) < near
+        };
+        let k = match self.tracking {
+            Some((k0, t0)) => {
+                let k = k0 + usize::try_from(sim.tick.saturating_sub(t0)).unwrap_or(usize::MAX);
+                if d.ticks.get(k).is_some_and(|t| fits(t, TRACK_LOST)) {
+                    Some(k)
+                } else {
+                    // lost the line: taken up again where it passes near (after a player's lost ball, the new
+                    // ball's way back past here), else left
+                    let again = (k..(k + TRACK_RESYNC).min(d.ticks.len()))
+                        .find(|&i| d.ticks.get(i).is_some_and(|t| fits(t, DEMO_NEAR)));
+                    if again.is_none() && std::env::var_os("AUTOPILOT_DEMO").is_some() {
+                        eprintln!("track lost at t{} (player's tick {k})", sim.tick);
+                    }
+                    again
+                }
+            }
+            None => d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)),
+        };
+        let Some(k) = k else {
+            self.tracking = None;
+            self.track_keys.clear();
+            return None;
+        };
+        if self.tracking.is_none() && std::env::var_os("AUTOPILOT_DEMO").is_some() {
+            eprintln!("track from t{} (player's tick {k})", sim.tick);
+        }
+        self.tracking = Some((k, sim.tick));
+        self.demo_at = Some((k, sim.tick));
+        let q = sim.camera.quarter;
+        let lives = sim.lives;
+        // the player's keys from tick `k + t`, in our view (as a copy's view turns with them, each tick's own)
+        let theirs = |s: &Sim, t: u64| d.input(k + t as usize, s.camera.quarter);
+        let cost_of = |first: Option<u8>| -> (f32, Vec<u8>) {
+            let mut s = sim.clone();
+            let mut keys = Vec::new();
+            let mut cost = 0.0;
+            for t in 0..TRACK_AHEAD {
+                let i = match first {
+                    Some(c) if t < PERIOD => c,
+                    _ => theirs(&s, t),
+                };
+                if t < PERIOD {
+                    keys.push(i);
+                }
+                s.step(i);
+                if s.lives < lives || s.is_dying() || s.game_over {
+                    return (f32::INFINITY, keys);
+                }
+                if s.finished {
+                    return (f32::NEG_INFINITY, keys);
+                }
+                if let Some(p) = d.ticks.get(k + t as usize + 1)
+                    && t % 3 == 2
+                {
+                    cost += s.ball.position.distance(p.pos) + 0.1 * s.ball.velocity.distance(p.vel);
+                }
+            }
+            (cost, keys)
+        };
+        let mut best = cost_of(None);
+        // the player's own keys are kept unless an arrow choice is clearly nearer
+        best.0 -= TRACK_OWN;
+        for &c in CHOICES.iter() {
+            let tried = cost_of(Some(c));
+            if tried.0 < best.0 {
+                best = tried;
+            }
+        }
+        if best.0 == f32::INFINITY {
+            // every course loses the ball here: left to the way's search
+            self.tracking = None;
+            self.track_keys.clear();
+            return None;
+        }
+        let _ = q;
+        self.track_keys = best
+            .1
+            .iter()
+            .enumerate()
+            .map(|(t, &i)| (sim.tick + 1 + t as u64, i))
+            .collect();
+        self.choice = 0;
+        self.track_keys.first().map(|x| x.1)
+    }
+
+    /// The random addition to a choice's score now (none when not varied).
+    fn jitter(&mut self, tick: u64) -> f32 {
+        let Some(n) = self.noise.as_mut().filter(|n| tick < n.until) else {
+            return 0.0;
+        };
+        n.seed ^= n.seed << 13;
+        n.seed ^= n.seed >> 17;
+        n.seed ^= n.seed << 5;
+        n.amp * (n.seed % 1000) as f32 / 1000.0
+    }
+
+    /// Whether the player's line is left this time (a varied try).
+    fn demo_off(&self, tick: u64) -> bool {
+        self.noise
+            .as_ref()
+            .is_some_and(|n| n.no_demo && tick < n.until)
     }
 
     /// How far along the way the ball at `p` is, held before the next transformer until the ball has been in it:
@@ -1088,12 +1306,20 @@ impl Pilot {
     /// past the transformers before it (the way may pass there again later, so the first point near enough wins).
     pub fn take_up(&mut self, sim: &Sim) {
         let f = sim.ball.position - Vec3::Y * crate::sim::BALL_RADIUS;
-        let near = self.route.points.iter().position(|p| p.distance(f) < TAKE_UP_NEAR);
+        let near = self
+            .route
+            .points
+            .iter()
+            .position(|p| p.distance(f) < TAKE_UP_NEAR);
         let Some(i) = near.or_else(|| self.route.nearest(sim.ball.position, usize::MAX)) else {
             return;
         };
         self.at = i;
-        self.gate = self.gates.iter().position(|g| g.0 > i).unwrap_or(self.gates.len());
+        self.gate = self
+            .gates
+            .iter()
+            .position(|g| g.0 > i)
+            .unwrap_or(self.gates.len());
     }
 
     /// A new ball after a lost one: the way is taken up again where it stands (the reset point is behind the place
@@ -1104,15 +1330,25 @@ impl Pilot {
         // here: then it first becomes that kind at the transformer nearest (the levels keep one by the reset points
         // for this); a transformer ahead that makes the kind it already is has nothing to do for it. Where the way's
         // next transformer is nearer than one of that kind, the ball is made over there anyway and goes on as it is.
-        let wanted = self.gates.iter().take_while(|g| g.0 <= self.at).last().map(|g| g.2);
+        let wanted = self
+            .gates
+            .iter()
+            .take_while(|g| g.0 <= self.at)
+            .last()
+            .map(|g| g.2);
         let pos = sim.ball.position;
-        let next = self.gates.get(self.gate).map_or(f32::INFINITY, |g| g.1.distance(pos));
+        let next = self
+            .gates
+            .get(self.gate)
+            .map_or(f32::INFINITY, |g| g.1.distance(pos));
         // there by a via (it backs off for a run-up where the ball cannot climb), then into it,
         let fetch = wanted.filter(|&k| k != sim.ball.kind).and_then(|k| {
-            let near = sim.trafos().filter(|(_, kind)| *kind == k).min_by(|a, b| {
-                a.0.distance(pos).total_cmp(&b.0.distance(pos))
-            });
-            near.filter(|(at, _)| at.distance(pos) <= next).map(|(at, _)| (at, k))
+            let near = sim
+                .trafos()
+                .filter(|(_, kind)| *kind == k)
+                .min_by(|a, b| a.0.distance(pos).total_cmp(&b.0.distance(pos)));
+            near.filter(|(at, _)| at.distance(pos) <= next)
+                .map(|(at, _)| (at, k))
         });
         if let Some((at, k)) = fetch {
             self.hints.add(crate::hints::Hint {
@@ -1129,7 +1365,11 @@ impl Pilot {
                 line: 0,
             });
         } else {
-            while self.gates.get(self.gate).is_some_and(|g| g.2 == sim.ball.kind) {
+            while self
+                .gates
+                .get(self.gate)
+                .is_some_and(|g| g.2 == sim.ball.kind)
+            {
                 self.gate += 1;
             }
         }
@@ -1203,23 +1443,33 @@ impl Pilot {
         let b = sim.ball.position;
         let flat = |p: Vec3, q: Vec3| Vec3::new(p.x - q.x, 0.0, p.z - q.z).length();
         let (k, &bridge) = self.bridges.iter().enumerate().find(|(k, g)| {
-            flat(**g, b) < BRIDGE_NEAR && self.charged.iter().filter(|&&c| c == *k).count() < BRIDGE_CHARGES
+            flat(**g, b) < BRIDGE_NEAR
+                && self.charged.iter().filter(|&&c| c == *k).count() < BRIDGE_CHARGES
         })?;
-        let ahead = self.route.points.get(self.at..(self.at + 80).min(self.route.points.len()))?;
+        let ahead = self
+            .route
+            .points
+            .get(self.at..(self.at + 80).min(self.route.points.len()))?;
         // the way passes over it: a stretch of it within reach of the bridge's foot
         let over = ahead.windows(2).position(|w| {
             let ab = w[1] - w[0];
             let t = ((bridge - w[0]).dot(ab) / ab.length_squared().max(1e-6)).clamp(0.0, 1.0);
             flat(w[0] + ab * t, bridge) < 5.0
         })?;
-        let past = ahead.iter().skip(over).find(|p| flat(**p, b) > flat(bridge, b) + 8.0)?;
+        let past = ahead
+            .iter()
+            .skip(over)
+            .find(|p| flat(**p, b) > flat(bridge, b) + 8.0)?;
         self.charged.push(k);
         let hint = crate::hints::Hint {
             at: b,
             radius: 6.0,
             sector: Some(sim.sector + 1),
             kind: Some(sim.ball.kind),
-            steps: vec![crate::hints::Step::Via(*past + Vec3::Y * crate::sim::BALL_RADIUS, 600)],
+            steps: vec![crate::hints::Step::Via(
+                *past + Vec3::Y * crate::sim::BALL_RADIUS,
+                600,
+            )],
             line: 0,
         };
         // tried on a copy first: some bridges are lowered by a lever, not knocked over, and a charge at them
@@ -1239,7 +1489,10 @@ impl Pilot {
         }
         let here = self.progress(sim.ball.position);
         let ok = s.finished || self.progress(s.ball.position) > here + 2.0;
-        eprintln!("charge the drawbridge at {bridge:?} through {past:?}: {}", if ok { "taken" } else { "no use" });
+        eprintln!(
+            "charge the drawbridge at {bridge:?} through {past:?}: {}",
+            if ok { "taken" } else { "no use" }
+        );
         ok.then_some(hint)
     }
 
@@ -1248,12 +1501,20 @@ impl Pilot {
     /// tried on a copy of the run, the shortest that keeps the ball and gets on is taken.
     fn leap(&mut self, sim: &Sim) -> Option<crate::hints::Hint> {
         // (not on a followed player's line: a gap in it is where the player flew, and the player's keys take it)
-        if self.demo.as_ref().is_some_and(|d| d.find(sim, RUN_UP_NEAR, None, self.demo_expected(sim)).is_some()) {
+        if self.demo.as_ref().is_some_and(|d| {
+            d.find(sim, RUN_UP_NEAR, None, self.demo_expected(sim))
+                .is_some()
+        }) {
             return None;
         }
         let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
-        let ahead = self.route.points.get(self.at..(self.at + LOOK).min(self.route.points.len()))?;
-        let k = ahead.windows(2).position(|w| flat(w[1] - w[0]).length() > GAP)?;
+        let ahead = self
+            .route
+            .points
+            .get(self.at..(self.at + LOOK).min(self.route.points.len()))?;
+        let k = ahead
+            .windows(2)
+            .position(|w| flat(w[1] - w[0]).length() > GAP)?;
         let (edge, over) = (*ahead.get(k)?, *ahead.get(k + 1)?);
         let dir = flat(over - edge).normalize_or_zero();
         let here = self.progress(sim.ball.position);
@@ -1268,7 +1529,10 @@ impl Pilot {
                 radius: 6.0,
                 sector: Some(sim.sector + 1),
                 kind: Some(sim.ball.kind),
-                steps: vec![crate::hints::Step::Goto(from + lift, 400), crate::hints::Step::Air(dir, 300)],
+                steps: vec![
+                    crate::hints::Step::Goto(from + lift, 400),
+                    crate::hints::Step::Air(dir, 300),
+                ],
                 line: 0,
             };
             let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
@@ -1400,6 +1664,113 @@ impl Pilot {
         best.map(|b| b.1)
     }
 
+    /// A beam search over sequences of held choices (`SEARCH_HOLDS` long, or a wait), `SEARCH_DEPTH` deep, keeping
+    /// the `SEARCH_BEAM` best states at each depth (one a place: the beam stays spread). A state is judged after a
+    /// coast with no arrows, by how far along the way it is and how little stands in the way; a lost ball ends a
+    /// sequence. The best sequence that gets on from `here` is the plan. Deterministic: the order of the tries is
+    /// fixed and ties keep the first.
+    fn search(&self, sim: &Sim, here: f32) -> Option<Vec<(u64, u8)>> {
+        let mut actions: Vec<(u8, u64)> = Vec::new();
+        for &c in CHOICES.iter().skip(1) {
+            for &d in &SEARCH_HOLDS {
+                actions.push((c, d));
+            }
+        }
+        actions.push((0, 30));
+        let base = here - self.blocking(sim) - self.parts_in_way(sim);
+        // (state, plan, score)
+        let mut beam: Vec<Node> = vec![(sim.clone(), Vec::new(), base)];
+        let mut best: Option<(f32, Vec<(u64, u8)>)> = None;
+        let lives = sim.lives;
+        for _ in 0..SEARCH_DEPTH {
+            let jobs: Vec<(usize, (u8, u64))> = (0..beam.len())
+                .flat_map(|i| actions.iter().map(move |&a| (i, a)))
+                .collect();
+            let run = |&(i, (c, d)): &(usize, (u8, u64))| -> Option<Node> {
+                let (from, plan, _) = beam.get(i)?;
+                let mut s = from.clone();
+                for _ in 0..d {
+                    s.step(c);
+                    if s.lives < lives || s.is_dying() || s.game_over {
+                        return None;
+                    }
+                }
+                let mut plan = plan.clone();
+                plan.push((s.tick, c));
+                if s.finished {
+                    return Some((s, plan, f32::INFINITY));
+                }
+                // judged where it comes to after a coast
+                let mut judge = s.clone();
+                for _ in 0..SEARCH_COAST {
+                    judge.step(0);
+                    if judge.lives < lives || judge.is_dying() || judge.game_over {
+                        return None;
+                    }
+                }
+                if !judge.ball.on_ground && !judge.in_updraft() {
+                    return None;
+                }
+                let v = self.progress(judge.ball.position)
+                    - self.blocking(&judge)
+                    - self.parts_in_way(&judge);
+                Some((s, plan, v))
+            };
+            let tried: Vec<Option<Node>> =
+                if std::env::var_os("AUTOPILOT_PARALLEL").is_some() {
+                    std::thread::scope(|scope| {
+                        let run = &run;
+                        let chunks: Vec<_> = jobs
+                            .chunks(jobs.len().div_ceil(SEARCH_THREADS).max(1))
+                            .map(|ch| scope.spawn(move || ch.iter().map(run).collect::<Vec<_>>()))
+                            .collect();
+                        chunks
+                            .into_iter()
+                            .flat_map(|h| h.join().unwrap_or_else(|e| std::panic::resume_unwind(e)))
+                            .collect()
+                    })
+                } else {
+                    jobs.iter().map(run).collect()
+                };
+            let mut next: Vec<Node> = tried.into_iter().flatten().collect();
+            next.sort_by(|a, b| b.2.total_cmp(&a.2));
+            for n in &next {
+                if n.2 > base + 0.5 && best.as_ref().is_none_or(|b| n.2 > b.0) {
+                    best = Some((n.2, n.1.clone()));
+                }
+            }
+            if best.as_ref().is_some_and(|b| b.0 == f32::INFINITY) {
+                break;
+            }
+            // one a place (2 units), the best first
+            let mut kept: Vec<Node> = Vec::new();
+            for n in next {
+                if kept.len() >= SEARCH_BEAM {
+                    break;
+                }
+                if kept
+                    .iter()
+                    .all(|k| k.0.ball.position.distance(n.0.ball.position) > 2.0)
+                {
+                    kept.push(n);
+                }
+            }
+            if kept.is_empty() {
+                break;
+            }
+            beam = kept;
+        }
+        if let Some((v, plan)) = &best {
+            eprintln!(
+                "search at tick {}: {} steps, {:.1} -> {v:.1}",
+                sim.tick,
+                plan.len(),
+                base
+            );
+        }
+        best.map(|b| b.1)
+    }
+
     /// How much the loose things (boxes, balls) stand in the way ahead: each one on the next stretch of the way
     /// counts as ten points of it, so pushing one off the way is worth a manoeuvre.
     fn blocking(&self, sim: &Sim) -> f32 {
@@ -1421,6 +1792,37 @@ impl Pilot {
             if ahead.iter().any(|q| {
                 Vec3::new(p.x - q.x, 0.0, p.z - q.z).length() < 2.5 && (p.y - q.y).abs() < 4.0
             }) {
+                n += 10.0;
+            }
+        }
+        n
+    }
+
+    /// How much the modules' moving parts stand on the way ahead (a pusher's block in the lane, a plank standing up):
+    /// each part whose middle is over the next stretch of the way, above its floor and not under the ball, counts as
+    /// ten points of it. Only the search when stuck weighs this: a part moved out of the lane is worth a sequence.
+    fn parts_in_way(&self, sim: &Sim) -> f32 {
+        let ahead = self
+            .route
+            .points
+            .get(self.at..(self.at + 40).min(self.route.points.len()))
+            .unwrap_or_default();
+        let world = sim.world();
+        let ball = sim.ball.position;
+        let mut n = 0.0;
+        for m in sim.module_bodies() {
+            let Some(st) = world.state(m.body) else {
+                continue;
+            };
+            let p = st.pos;
+            if p.distance(ball) < 4.0 {
+                continue;
+            }
+            let over = ahead.iter().any(|q| {
+                let up = p.y - q.y;
+                Vec3::new(p.x - q.x, 0.0, p.z - q.z).length() < 2.5 && up > 0.5 && up < 4.0
+            });
+            if over {
                 n += 10.0;
             }
         }
@@ -1457,6 +1859,11 @@ impl Pilot {
 
     /// The input for the next tick of `sim`.
     pub fn next(&mut self, sim: &Sim) -> u8 {
+        if let Some((until, c)) = self.noise.as_ref().map(|n| n.opening)
+            && sim.tick < until
+        {
+            return c;
+        }
         // a hint for this place drives while it runs; after it, the place on the way is found anew
         if let Some(i) = self.hints.input(sim) {
             return i;
@@ -1469,23 +1876,41 @@ impl Pilot {
             // at its first point on from here near the ball where the way's ball is of this kind
             let f = sim.ball.position - Vec3::Y * crate::sim::BALL_RADIUS;
             let near = self.route.nearest(sim.ball.position, self.until());
-            let off = near.and_then(|i| self.route.points.get(i)).is_none_or(|p| p.distance(f) >= TAKE_UP_NEAR);
+            let off = near
+                .and_then(|i| self.route.points.get(i))
+                .is_none_or(|p| p.distance(f) >= TAKE_UP_NEAR);
             let began = self.hints.began;
-            let made_over = sim.events.iter().rev().take_while(|(t, _)| *t >= began).any(|(_, e)| {
-                matches!(e, crate::sim::Event::Transform(_))
-            });
-            let kind = |i: usize| self.gates.iter().take_while(|g| g.0 <= i).last().map(|g| g.2);
+            let made_over = sim
+                .events
+                .iter()
+                .rev()
+                .take_while(|(t, _)| *t >= began)
+                .any(|(_, e)| matches!(e, crate::sim::Event::Transform(_)));
+            let kind = |i: usize| {
+                self.gates
+                    .iter()
+                    .take_while(|g| g.0 <= i)
+                    .last()
+                    .map(|g| g.2)
+            };
             let on = (off && made_over)
                 .then(|| {
                     (self.until()..self.route.points.len()).find(|&i| {
-                        self.route.points.get(i).is_some_and(|p| p.distance(f) < TAKE_UP_NEAR)
+                        self.route
+                            .points
+                            .get(i)
+                            .is_some_and(|p| p.distance(f) < TAKE_UP_NEAR)
                             && kind(i).is_none_or(|k| k == sim.ball.kind)
                     })
                 })
                 .flatten();
             if let Some(i) = on {
                 self.at = i;
-                self.gate = self.gates.iter().position(|g| g.0 > i).unwrap_or(self.gates.len());
+                self.gate = self
+                    .gates
+                    .iter()
+                    .position(|g| g.0 > i)
+                    .unwrap_or(self.gates.len());
             } else if let Some(i) = near {
                 self.at = self.at.max(i);
             }
@@ -1520,6 +1945,9 @@ impl Pilot {
                 return c;
             }
         }
+        if let Some(&(_, i)) = self.track_keys.iter().find(|k| k.0 == sim.tick + 1) {
+            return i;
+        }
         if !sim.tick.is_multiple_of(PERIOD) {
             if let (Some((k, from)), Some(d)) = (self.demo_run, &self.demo) {
                 let t = usize::try_from(sim.tick.saturating_sub(from)).unwrap_or(usize::MAX);
@@ -1536,7 +1964,8 @@ impl Pilot {
             .as_ref()
             .filter(|_| sim.tick >= self.demo_after)
             .and_then(|d| d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)))
-            .is_some();
+            .is_some()
+            || self.tracking.is_some();
         if !on_demo && let Some(turn) = self.turn(sim) {
             return turn;
         }
@@ -1544,7 +1973,11 @@ impl Pilot {
         // (or the way's ball was of its kind before it too: then it changes nothing, and its rim, which a ball of its
         // kind does not sink into, is no place to roll onto)
         let had = *self.kind.get_or_insert(sim.ball.kind);
-        let before = self.gate.checked_sub(1).and_then(|i| self.gates.get(i)).map(|g| g.2);
+        let before = self
+            .gate
+            .checked_sub(1)
+            .and_then(|i| self.gates.get(i))
+            .map(|g| g.2);
         if let Some(&(_, g, k)) = self.gates.get(self.gate) {
             let reached = g.distance(sim.ball.position) < crate::sim::TRAFO_REACH;
             let idle = before.map_or(had == k, |b| b == k);
@@ -1589,6 +2022,10 @@ impl Pilot {
             self.best = here;
             self.moved = sim.tick;
         }
+        // on the followed player's line: kept to it tick by tick
+        if let Some(i) = self.track(sim) {
+            return i;
+        }
         // stuck for four seconds: try rams and random manoeuvres and keep the best that gets on
         if sim.tick.saturating_sub(self.moved) > 240 {
             // found or not, the next try comes after four seconds more
@@ -1610,16 +2047,20 @@ impl Pilot {
             if let Some(&(_, g, k)) = self.gates.get(self.gate)
                 && sim.ball.kind != k
                 && g.distance(sim.ball.position) < GATE_STUCK
-                && let Some((t, _)) = sim.trafos().filter(|(_, kind)| *kind == k).min_by(|a, b| {
-                    a.0.distance(g).total_cmp(&b.0.distance(g))
-                })
+                && let Some((t, _)) = sim
+                    .trafos()
+                    .filter(|(_, kind)| *kind == k)
+                    .min_by(|a, b| a.0.distance(g).total_cmp(&b.0.distance(g)))
             {
                 self.hints.add(crate::hints::Hint {
                     at: sim.ball.position,
                     radius: 6.0,
                     sector: Some(sim.sector + 1),
                     kind: Some(sim.ball.kind),
-                    steps: vec![crate::hints::Step::Via(t, 900), crate::hints::Step::Become(k)],
+                    steps: vec![
+                        crate::hints::Step::Via(t, 900),
+                        crate::hints::Step::Become(k),
+                    ],
                     line: 0,
                 });
                 return 0;
@@ -1630,6 +2071,14 @@ impl Pilot {
             if let Some(hint) = self.run_up(sim, here) {
                 self.hints.add(hint);
                 return 0;
+            }
+            // nothing short gets on: a search over sequences of held choices (beam search on copies of the run)
+            if let Some(plan) = self.search(sim, here) {
+                self.plan = plan;
+                if let Some(&(_, c)) = self.plan.first() {
+                    self.choice = c;
+                    return c;
+                }
             }
         }
         // below every floor of the way ahead: falling
@@ -1657,58 +2106,26 @@ impl Pilot {
         let matched = self
             .demo
             .as_ref()
-            .filter(|_| sim.tick >= self.demo_after)
+            .filter(|_| sim.tick >= self.demo_after && !self.demo_off(sim.tick))
             .and_then(|d| d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)));
         if let Some(k) = matched {
             self.demo_at = Some((k, sim.tick));
         }
         let mut demo_won = false;
-        for &c in CHOICES.iter().chain(matched.map(|_| &DEMO_CHOICE)) {
+        // stuck for two seconds: hold each choice for up to two seconds
+        let stuck = sim.tick.saturating_sub(self.moved) / 120;
+        let hold = HOLD * (1 + (stuck % 4) * 2);
+        let choices: Vec<u8> = CHOICES
+            .iter()
+            .copied()
+            .chain(matched.map(|_| DEMO_CHOICE))
+            .collect();
+        let demo_k = matched.zip(self.demo.as_deref());
+        let tried = rollouts(sim, &self.route, demo_k, &choices, hold, low);
+        for (&c, (s, lost, edge)) in choices.iter().zip(tried) {
             let from_demo = c == DEMO_CHOICE;
-            let mut s = sim.clone();
-            let lives = s.lives;
-            let mut lost = false;
-            // stuck for two seconds: hold each choice for up to two seconds
-            let stuck = sim.tick.saturating_sub(self.moved) / 120;
-            let hold = HOLD * (1 + (stuck % 4) * 2);
-            let mut edge = 0.0;
-            for t in 0..hold + COAST {
-                let input = match (from_demo, matched, &self.demo) {
-                    (true, Some(k), Some(d)) => d.input(k + t as usize, s.camera.quarter),
-                    _ if t < hold => c,
-                    _ => 0,
-                };
-                s.step(input);
-                if t % 6 == 5 && s.ball.on_ground {
-                    edge += (SAFE - self.route.clearance(s.ball.position)).max(0.0);
-                }
-                if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
-                    lost = true;
-                    break;
-                }
-                if s.finished {
-                    break;
-                }
-            }
-            // still in the air (a drop off a rail, a jump): it is judged where it lands, up to two seconds on
-            let mut flight = 0;
-            // (a ball an updraft holds up is judged where it floats)
-            while !lost && !s.finished && !s.ball.on_ground && flight < 120 && !s.in_updraft() {
-                s.step(0);
-                flight += 1;
-                if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
-                    lost = true;
-                }
-            }
-            // still falling after two seconds, or down on no floor of the level: lost
-            if !lost
-                && !s.finished
-                && !s.in_updraft()
-                && (!s.ball.on_ground || self.route.clearance(s.ball.position) <= 0.0)
-                && flight > 0
-            {
-                lost = true;
-            }
+            let lives = sim.lives;
+            let mut lost = lost;
             // in the air and well below where it was: falling off, unless the way itself goes down there
             let way_down = self
                 .route
@@ -1744,6 +2161,7 @@ impl Pilot {
                     + if c == self.choice { 0.05 } else { 0.0 }
                     // the player's own line, when as good, is taken: it knows what the search does not
                     + if from_demo { DEMO_BONUS } else { 0.0 }
+                    + self.jitter(sim.tick)
             };
             if std::env::var_os("AUTOPILOT_SCORES").is_some() {
                 eprintln!(
@@ -1778,6 +2196,192 @@ impl Pilot {
     }
 }
 
+/// Each choice tried on a copy of the run: held for `hold` ticks (the player's keys from tick `k` of the followed run
+/// for `DEMO_CHOICE`), then `COAST` with no arrows, and on while in the air (up to two seconds): the copy, whether
+/// the ball was lost (fell below `low`, or came down on no floor), and how near edges it rolled. The copies are run in
+/// threads when AUTOPILOT_PARALLEL is set; the results are in the order of the choices, so the run is the same.
+fn rollouts(
+    sim: &Sim,
+    route: &Route,
+    demo: Option<(usize, &Demo)>,
+    choices: &[u8],
+    hold: u64,
+    low: f32,
+) -> Vec<(Sim, bool, f32)> {
+    let one = |c: u8| {
+        let mut s = sim.clone();
+        let lives = s.lives;
+        let mut lost = false;
+        let mut edge = 0.0;
+        for t in 0..hold + COAST {
+            let input = match demo {
+                Some((k, d)) if c == DEMO_CHOICE => d.input(k + t as usize, s.camera.quarter),
+                _ if t < hold => c,
+                _ => 0,
+            };
+            s.step(input);
+            if t % 6 == 5 && s.ball.on_ground {
+                edge += (SAFE - route.clearance(s.ball.position)).max(0.0);
+            }
+            if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
+                lost = true;
+                break;
+            }
+            if s.finished {
+                break;
+            }
+        }
+        // still in the air (a drop off a rail, a jump): it is judged where it lands, up to two seconds on
+        let mut flight = 0;
+        // (a ball an updraft holds up is judged where it floats)
+        while !lost && !s.finished && !s.ball.on_ground && flight < 120 && !s.in_updraft() {
+            s.step(0);
+            flight += 1;
+            if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
+                lost = true;
+            }
+        }
+        // still falling after two seconds, or down on no floor of the level: lost
+        if !lost
+            && !s.finished
+            && !s.in_updraft()
+            && (!s.ball.on_ground || route.clearance(s.ball.position) <= 0.0)
+            && flight > 0
+        {
+            lost = true;
+        }
+        (s, lost, edge)
+    };
+    if std::env::var_os("AUTOPILOT_PARALLEL").is_none() {
+        return choices.iter().map(|&c| one(c)).collect();
+    }
+    std::thread::scope(|scope| {
+        let one = &one;
+        let handles: Vec<_> = choices
+            .iter()
+            .map(|&c| scope.spawn(move || one(c)))
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap_or_else(|e| std::panic::resume_unwind(e)))
+            .collect()
+    })
+}
+
+/// A state of the search: the copy of the run, the held choices that led to it (until which tick each), its score.
+type Node = (Sim, Vec<(u64, u8)>, f32);
+
+/// The beam search when stuck: how long each choice is held, how many are chained, how many states are kept at each
+/// depth, the coast before a state is judged, and how many threads share the tries (with AUTOPILOT_PARALLEL).
+const SEARCH_HOLDS: [u64; 3] = [20, 45, 90];
+const SEARCH_DEPTH: usize = 4;
+const SEARCH_BEAM: usize = 6;
+const SEARCH_COAST: u64 = 40;
+const SEARCH_THREADS: usize = 10;
+
+/// How often a state is saved to go back to (two seconds), and how many are kept (thinned out as they age).
+const SAVE_EVERY: u64 = 120;
+const SAVES_KEPT: usize = 24;
+/// Standing still this long (20 s) is a failure to go back from, like a lost ball.
+pub const REWIND_STILL: u64 = 1200;
+/// A state saved less than this before a failure (a second) is not gone back to: the ball may be doomed there.
+const SAVE_MARGIN: u64 = 60;
+/// A failure is not gone back from further than this (a minute): a cause that early is a way to find anew, not a try.
+const BACK_MOST: u64 = 3600;
+/// No state is saved in the first seconds of a run (the ball is still being brought in).
+const SAVE_FROM: u64 = 300;
+/// Tries at one place before a failure there is taken as it comes (the ball lost, the run given up), and how much
+/// further along the way (points) a failure must come to count as a new place.
+const TRIES_AT_PLACE: u32 = 30;
+const NEW_PLACE: usize = 6;
+
+/// Going back in the run: the simulation is deterministic and can be copied, so instead of losing a ball, or standing
+/// still where its way does not get on, the test player goes back to a state saved a little before and tries again,
+/// varied (Pilot::perturb). Tries at one place go back further the more there have been: the cause may lie earlier
+/// (a run-up too slow, a bad line into a bend). The run kept is the one that got through; its replay plays as any.
+pub struct Rewinds<T> {
+    saves: Vec<(u64, T)>,
+    /// The furthest place (sector, way point) a failure came at, and how many tries failed there.
+    front: (usize, usize),
+    tries: u32,
+    total: u32,
+    max_total: u32,
+}
+
+impl<T: Clone> Rewinds<T> {
+    pub fn new(max_total: u32) -> Rewinds<T> {
+        Rewinds {
+            saves: Vec::new(),
+            front: (0, 0),
+            tries: 0,
+            total: 0,
+            max_total,
+        }
+    }
+
+    /// Whether a state is to be saved now: every `SAVE_EVERY` ticks, the ball on the ground and not being lost.
+    pub fn due(&self, sim: &Sim) -> bool {
+        self.max_total > 0
+            && sim.tick >= SAVE_FROM
+            && sim.ball.on_ground
+            && !sim.is_dying()
+            && !sim.finished
+            && self
+                .saves
+                .last()
+                .is_none_or(|s| sim.tick >= s.0 + SAVE_EVERY)
+    }
+
+    pub fn save(&mut self, tick: u64, state: T) {
+        // full: every second one of the older half goes, so the saves reach back further the older they are
+        if self.saves.len() >= SAVES_KEPT {
+            let half = self.saves.len() / 2;
+            let mut i = 0;
+            self.saves.retain(|_| {
+                i += 1;
+                i > half || i % 2 == 1
+            });
+        }
+        self.saves.push((tick, state));
+    }
+
+    pub fn total(&self) -> u32 {
+        self.total
+    }
+
+    /// A failure at tick `at` (the ball lost then, or the way standing still since then) at `place` (sector, way
+    /// point): the state to go back to and which try at this place it is, or None when the failure is to be taken.
+    /// The saves after the one gone back to are dropped (they were on the failed course).
+    pub fn back(&mut self, at: u64, place: (usize, usize)) -> Option<(T, u32)> {
+        if place.0 > self.front.0 || (place.0 == self.front.0 && place.1 > self.front.1 + NEW_PLACE)
+        {
+            self.front = place;
+            self.tries = 0;
+        }
+        self.tries += 1;
+        if self.tries > TRIES_AT_PLACE || self.total >= self.max_total {
+            return None;
+        }
+        let before = self.saves.iter().rposition(|s| s.0 + SAVE_MARGIN <= at)?;
+        // three tries from the last save before the failure, then three from each one going back twice as far
+        let back = match self.tries {
+            0..=3 => 0,
+            t => 1usize << ((t - 4) / 3).min(10),
+        };
+        // (not further back than `BACK_MOST` before the failure)
+        let oldest = self
+            .saves
+            .iter()
+            .position(|s| s.0 + BACK_MOST >= at)
+            .unwrap_or(before)
+            .min(before);
+        let k = before.saturating_sub(back).max(oldest);
+        self.saves.truncate(k + 1);
+        self.total += 1;
+        self.saves.last().map(|s| (s.1.clone(), self.tries))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1786,7 +2390,12 @@ mod tests {
     fn a_strip_of_rail_points_runs_along_its_length() {
         // a pair of rails along x, 1.5 apart
         let pts: Vec<Vec3> = (-4..=4)
-            .flat_map(|i| [Vec3::new(i as f32 * 1.5, 0.0, -0.75), Vec3::new(i as f32 * 1.5, 0.0, 0.75)])
+            .flat_map(|i| {
+                [
+                    Vec3::new(i as f32 * 1.5, 0.0, -0.75),
+                    Vec3::new(i as f32 * 1.5, 0.0, 0.75),
+                ]
+            })
             .collect();
         let a = rail_axis(&pts).expect("an axis");
         assert!(a.x.abs() > 0.99, "along x: {a:?}");

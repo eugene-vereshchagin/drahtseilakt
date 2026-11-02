@@ -424,6 +424,15 @@ impl Runner {
         }
     }
 
+    /// After the test player went back in its run (instead of losing a ball): the hints may fire again, as for a new
+    /// ball (the one running goes on).
+    pub fn rearm(&mut self) {
+        let running = self.running.as_ref().map(|r| r.hint);
+        for (i, f) in self.fired.iter_mut().enumerate() {
+            *f = Some(i) == running;
+        }
+    }
+
     /// One more hint, made while playing (the test player's own, from the run it follows).
     pub fn add(&mut self, hint: Hint) {
         if self.hints.len() < MAX_HINTS * 4 {

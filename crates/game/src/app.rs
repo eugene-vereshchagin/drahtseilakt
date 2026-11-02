@@ -1354,7 +1354,7 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
     }
     let route = crate::autopilot::Route::along(&game.level.level, &game.modules, &game.sim.updrafts(), w.path);
     let mut pilot = crate::autopilot::Pilot::new(route, w.gates);
-    pilot.demo = Some(w.demo);
+    pilot.demo = Some(std::sync::Arc::new(w.demo));
     pilot_run(&mut game, data, &own, pilot)
 }
 
@@ -1813,13 +1813,38 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
     let mut heard = game.sim.events.len();
     let mut hint_at = pilot.hints.at();
     let mut dead = false;
+    // the states it goes back to when the ball is lost or the way stands still (autopilot.rs, Rewinds)
+    let mut rewinds = crate::autopilot::Rewinds::new(o.rewinds);
     while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
+        let s = &game.sim;
+        if rewinds.due(s) {
+            let state = (s.clone(), game.replay_out.clone(), pilot.clone(), best, since, hint_at);
+            rewinds.save(s.tick, state);
+        }
         let i = pilot.next(&game.sim);
         game.tick(i);
         if pilot.reached() > best {
             (best, since) = (pilot.reached(), game.sim.tick);
         }
         let fell = game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::Died));
+        // lost, or standing still too long: back to a state saved before, varied (a try of its own, reproducible)
+        let still = game.sim.tick - since > give_up.min(crate::autopilot::REWIND_STILL);
+        let failed_at = if fell { Some(game.sim.tick) } else { still.then_some(since) };
+        if let Some(at) = failed_at
+            && let Some((state, attempt)) = rewinds.back(at, (game.sim.sector, pilot.reached()))
+        {
+            let (sim, replay, p, b, sn, h) = state;
+            println!("{} {} at ({:.1} {:.1} {:.1}): back to {} (try {attempt}, {} rewinds)", clock(game.sim.tick),
+                if fell { "lost" } else { "stuck" }, game.sim.ball.position.x, game.sim.ball.position.y,
+                game.sim.ball.position.z, clock(sim.tick), rewinds.total());
+            game.sim = sim;
+            game.replay_out = replay;
+            pilot = p;
+            pilot.perturb(&game.sim, attempt);
+            (best, since, hint_at) = (b, game.sim.tick.max(sn), h);
+            heard = game.sim.events.len();
+            continue;
+        }
         if game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::NewBall)) {
             pilot.new_ball(&game.sim);
             // back at the reset point: getting on is counted from there again

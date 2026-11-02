@@ -24,6 +24,16 @@ weiterkommt, innerhalb 30 Einheiten der Linie, rollt er zu einer früheren Stell
 und gibt von dort seine Tasten (ein Anlauf, eine Lücke mit Tempo), wenn das auf einer Kopie des Laufs die Kugel hält
 und weiterkommt. `AUTOPILOT_DEMO=1` gibt jeden Treffer aus.
 
+**An der Linie des Spielers bleiben.** Sobald seine Kugel dort ist, wo die des Spielers war, ist der Lauf des Spielers
+eine Linie in der Zeit: bei jeder Entscheidung (jede Zehntelsekunde) wird die Eingabe für das nächste Zehntel so
+gewählt, dass seine Kugel die nächste halbe Sekunde der des Spielers am nächsten bleibt (dem Ort, ein wenig auch dem
+Tempo): die Tasten des Spielers selbst oder jede Pfeilwahl für ein Zehntel und danach die Tasten des Spielers, alle
+auf Kopien des Laufs probiert. Ein Ausrutscher wird sofort korrigiert, und die Stöße eines Rätsels (Blöcke in einem
+Labyrinth aus Bahnen, ein Hebel, ein Brett) geschehen, wie der Spieler sie machte. Wo seine Kugel mehr als 4
+Einheiten von der des Spielers entfernt ist oder der Spieler dort seine Kugel verliert, wird die Linie weiter vorn
+wieder aufgenommen, wo die Kugel des Spielers nahe vorbeikommt (nach einer verlorenen Kugel: der Weg der neuen zurück
+an dieser Stelle vorbei), sonst steuert die Wegsuche.
+
 `--then REPLAY` (bis zu 8-mal) hängt einen Lauf an, der an einem Sektor beginnt (ein Replay, das mit `start N`
 anfängt): ab diesem Sektor sind der Weg, seine Transformatoren und die Takte des Spielers die dieses Laufs. So wird
 ein Level von seinem Anfang verfolgt, mit dem ganzen Lauf des Inhabers und einem späteren, der durch einen Sektor
@@ -59,6 +69,33 @@ Steckt er innerhalb 16 einer **Zugbrücke** (P_Modul_25, ein aufrecht stehendes 
 der Weg führt, versucht der Testspieler zuerst einen Anlauf entlang des Wegs (zurück für Schwung, solange sie steht),
 wenn der Anlauf auf einer Kopie des Laufs die Kugel behält und weiterkommt: manche Brücken fallen beim Stoß, andere
 nur durch einen Hebel.
+
+## Zurück und noch einmal
+
+Die Simulation ist deterministisch und lässt sich kopieren, also speichert der Testspieler seinen Lauf alle zwei
+Sekunden (die Kugel am Boden; die Stände werden mit dem Alter ausgedünnt und reichen einige Minuten zurück) und geht,
+wenn die Kugel verloren ist oder sein Weg 20 Sekunden nicht weiterkommt, zu einem Stand zurück und versucht es
+abgewandelt noch einmal: ein kurzer eigener erster Zug (ein Warten oder ein Stoß zufälliger Länge, vor allem anderen,
+auch einem laufenden Hinweis, sodass bewegte Teile in einer anderen Phase getroffen werden) und für einige Sekunden
+zufällige Zuschläge auf die Bewertungen seiner Wahlen; ab dem dritten Versuch verlässt jeder dritte die Linie des
+Spielers. Drei Versuche gehen vom letzten Stand vor dem Fehlschlag aus, dann je drei von einem doppelt so weit
+zurückliegenden (die Ursache kann früher liegen: ein zu langsamer Anlauf, eine schlechte Linie in eine Kurve). Nach 30
+Versuchen an einer Stelle (eine Stelle: 6 Wegpunkte weiter als die letzte) wird der Fehlschlag hingenommen: die Kugel
+geht verloren, oder der Lauf wird mit seinem Bericht aufgegeben. Die Hinweise können nach dem Zurückgehen wieder
+auslösen, wie für eine neue Kugel. `--rewinds N` begrenzt, wie oft er in einem Lauf zurückgeht (600; 0: nie). Die
+Abwandlung hat einen festen Startwert, ein Lauf ist also reproduzierbar; behalten wird der Lauf (und seine
+Aufzeichnung), der durchkam, ohne die fehlgeschlagenen Versuche.
+
+## Die Suche, wenn er feststeckt
+
+Festgefahren, wo weder Rammen noch Manöver, Brückensturm oder Sprung weiterkommen, sucht der Testspieler tiefer: eine
+Strahlsuche über Folgen gehaltener Pfeile (jeder eine Drittel-, Dreiviertel- oder anderthalb Sekunden lang, oder eine
+halbe Sekunde ohne Pfeile), vier tief, mit den sechs besten Zuständen je Tiefe, einer je Ort. Jeder wird nach
+zwei Dritteln einer Sekunde Ausrollen danach bewertet, wie weit die Kugel auf dem Weg ist, abzüglich dessen, was vorn
+im Weg steht: lose Kisten und Kugeln sowie bewegte Teile der Module über dem Weg (der Block eines Schiebers in der
+Bahn, ein aufgestelltes Brett). Eine verlorene Kugel beendet eine Folge. Die beste, die weiterkommt, wird gehalten.
+Mit `AUTOPILOT_PARALLEL=1` laufen die Kopien jeder Entscheidung und der Suche nebeneinander in Threads; die
+Reihenfolge der Ergebnisse ist fest, der Lauf also derselbe.
 
 ## Berichte, wo er steckt
 
@@ -114,20 +151,21 @@ anderes Programm).
 
 ## Stand
 
-Den Läufen des Inhabers folgend (`--autopilot --follow`), 2026-11-02:
+Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und Halten der Linie des Spielers,
+2026-11-03 (die geschafften Läufe liegen in `hints/runs/`, ihre Videos außerhalb des Repositorys, gemacht mit
+`scripts/video.sh`):
 
-- Level 1: vom Start an geschafft in 8:00.70 (Hinweise für die Rampe, die Kiste, die Schieber und die Schienen).
-- Level 2: vom Start an geschafft in 5:47.25 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers durch Sektor 5).
-- Level 3: vom Start an geschafft in 8:34.07.
-- Level 4: ab Sektor 2 beendet in 7:55.15 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3; ein Hinweis in den Papier-Transformator am Hang); vom Start bis Sektor 5 (Weg 2347 von 2953).
-- Level 5: vom Start an geschafft in 12:03.58 (Hinweise für beide Kisten und den Schieber).
-- Level 6: mit dem Lauf des Inhabers (er endet am gewölbten Stamm in Sektor 2) und dem Plan `hints/Level_06.plan`
-  geht der Testspieler allein weiter, stößt die Zugbrücke um und kam einmal bis Sektor 3; meist rollt er an der Stelle
-  vorbei, wo es vom Stamm hinabgeht (2026-11-03).
-- Level 7: bis Sektor 5 (Weg 2635 von 3261): das Brett, auf dem die Papierkugel landet, muss erst als Stein an seinen Platz geschoben werden.
-- Level 8–13 (2026-11-03): 8 allein mit dem Plan aus dem Video bis zum ersten Holz-Transformator (Weg 149 von 1118);
-  9 dem Lauf des Inhabers folgend bis Sektor 3; 10 dem beendeten Lauf des Inhabers mit `hints/Level_10.txt` folgend
-  bis Sektor 2; 11 in Sektor 1 (die Brücken und Schieber vor dem ersten Kontrollpunkt); 12 und 13 bis dorthin, wo die
-  Läufe des Inhabers enden (Sektor 1; Sektor 2, wo die Steinkugel an einem Ventilator steht, den sie als Papier
-  nehmen muss).
-- Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
+- Level 1: vom Start an geschafft in 6:28.87, ohne verlorene Kugel (Hinweise für Rampe, Kiste, Schieber und Schienen).
+- Level 2: vom Start an geschafft in 5:44.53 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers ab Sektor 5).
+- Level 3: vom Start an geschafft (der Hebel in Sektor 4 wird viermal getroffen).
+- Level 4: vom Start an geschafft in 9:16.25 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
+- Level 5: vom Start an geschafft (Hinweise für beide Kisten und den Schieber).
+- Level 6: mit dem Lauf des Inhabers (er endet am gewölbten Baumstamm in Sektor 2) und dem Plan
+  `hints/Level_06.plan` kommt der Testspieler allein bis zum gewölbten Stamm, wo er den Weg hinunter nicht findet.
+- Level 7: vom Start an geschafft in 11:28.38, dem geschafften Lauf des Inhabers folgend.
+- Level 8: allein mit dem Plan aus dem Video bis zum ersten Holz-Transformator (Weg 156 von 1072).
+- Level 9: vom Start an geschafft in 12:30.10, dem geschafften Lauf des Inhabers folgend (das Labyrinth der Schieber
+  in Sektor 3 wird gelöst, wie der Inhaber es löste).
+- Level 10: vom Start an geschafft in 14:55.75, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
+- Level 11–13: 11 in Sektor 1 (die Brücken und Schieber vor dem ersten Kontrollpunkt); 12 in Sektor 1 (der Abstieg
+  nach den Sandsäcken); 13 in Sektor 2, wo die Steinkugel an einem Ventilator steht, den sie als Papier reiten muss.

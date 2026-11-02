@@ -22,6 +22,15 @@ line, it rolls back to a place before where the player stood still and gives the
 run-up, a gap crossed at speed), when on a copy of the run that keeps the ball and gets on. `AUTOPILOT_DEMO=1`
 prints each match.
 
+**Keeping to the player's line.** Once its ball is where the player's was, the player's run is a line in time: at
+each decision (every tenth of a second) the inputs for the next tenth are chosen so that over the next half second
+its ball stays nearest the player's (the place, and a little the speed): the player's own keys, or each choice of
+arrows for a tenth and the player's keys after it, all tried on copies of the run. A slip is corrected at once, and
+a puzzle's pushes (blocks in a maze of lanes, a lever, a board) are made as the player made them. Where its ball is
+more than 4 units from the player's, or the player's ball is being lost there, the line is taken up again further on
+where the player's ball passes near (after a lost ball, the new one's way back past here), or left to the way's
+search.
+
 `--then REPLAY` (up to 8 times) joins a run begun at a sector (a replay that starts with `start N`): from that sector
 on, the way, its transformers and the player's ticks are that run's. So a level is followed from its start with the
 owner's whole run and a later one that got through a sector the whole run did not.
@@ -54,6 +63,30 @@ point, climbing a little and dropping down (30 units at most):
 Stuck within 16 of a **drawbridge** (P_Modul_25, a plank standing up on a hinge) that the way passes over, the
 test player first tries a charge at it along the way (backing off for a run-up while it stands), when on a copy of
 the run the charge keeps the ball and gets on: some bridges fall when hit, others only by a lever.
+
+## Going back and trying again
+
+The simulation is deterministic and can be copied, so the test player saves its run every two seconds (the ball on
+the ground; the saves thin out as they age, reaching back several minutes) and, when its ball is lost or its way
+has not got on for 20 seconds, goes back to a save and tries again, varied: a short opening move of its own (a wait
+or a push of random length, before anything else, a running hint too, so moving parts are met at another phase) and,
+for some seconds, random additions to its choices' scores; from the third try on every third one leaves the
+player's line. Three tries go from the last save before the failure, then three from each save twice as far back
+(the cause may lie earlier: a run-up too slow, a bad line into a bend). After 30 tries at one place (a place: 6 way
+points further than the last), the failure is taken as it comes: the ball is lost, or the run is given up with its
+report. The hints may fire again after going back, as for a new ball. `--rewinds N` caps how often it goes back in
+a run (600; 0: never). The variation is seeded, so a run is reproducible; the run kept, and its replay, is the one
+that got through, without the tries that failed.
+
+## The search when stuck
+
+Stuck where no ram, manoeuvre, charge or leap gets on, the test player searches deeper: a beam search over
+sequences of held arrows (each held a third, three quarters or a second and a half, or no arrows for half a second),
+four deep, keeping the six best states at each depth, one a place. Each is judged after a coast of two thirds of a
+second by how far along the way the ball is, less how much stands in the way ahead: loose boxes and balls, and the
+modules' moving parts over the way (a pusher's block in the lane, a plank standing up). A lost ball ends a sequence.
+The best that gets on is held. With `AUTOPILOT_PARALLEL=1` the copies of the run of each decision and of the search
+are run in threads, side by side; the order of the results is fixed, so the run is the same.
 
 ## Stuck reports
 
@@ -108,19 +141,20 @@ with ffmpeg (the frames go through a pipe, nothing large is kept; the game itsel
 
 ## Where it stands
 
-Following the owner's runs (`--autopilot --follow`), 2026-11-02 (the finished runs are kept in `hints/runs/`):
+Following the owner's runs (`--autopilot --follow`), with going back and keeping to the player's line, 2026-11-03
+(the finished runs are kept in `hints/runs/`, their videos outside the repository, made with `scripts/video.sh`):
 
-- Level 1: finished from the start in 8:00.70 (hints for the ramp, the crate, the pushers and the rails).
-- Level 2: finished from the start in 5:47.25 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
-- Level 3: finished from the start in 8:34.07.
-- Level 4: finished from sector 2 in 7:55.15 (`--follow` the owner's run, `--then` the one from sector 3; a hint into the paper transformer on the slope); from the start to sector 5 (route 2347 of 2953).
-- Level 5: finished from the start in 12:03.58 (hints for both crates and the pusher).
+- Level 1: finished from the start in 6:28.87, no ball lost (hints for the ramp, the crate, the pushers and the rails).
+- Level 2: finished from the start in 5:44.53 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
+- Level 3: finished from the start (the lever in sector 4 is hit four times).
+- Level 4: finished from the start in 9:16.25 (`--follow` the owner's run, `--then` the one from sector 3).
+- Level 5: finished from the start (hints for both crates and the pusher).
 - Level 6: with the owner's run (it ends at the convex log in sector 2) and the plan `hints/Level_06.plan`, the test
-  player goes on by itself, knocks the drawbridge over and has reached sector 3 once; usually it rolls past the way
-  down off the log (2026-11-03).
-- Level 7: to sector 5 (route 2635 of 3261): the plank the paper ball lands on must first be shoved into place as stone.
-- Levels 8–13 (2026-11-03): 8 by itself with the walkthrough's plan to the first wood transformer (route 149 of
-  1118); 9 following the owner's run to sector 3; 10 following the owner's finished run with `hints/Level_10.txt` to
-  sector 2; 11 in sector 1 (the bridges and pushers before the first checkpoint); 12 and 13 to where the owner's runs
-  end (sector 1; sector 2, where the stone ball stands at a fan it must ride as paper).
-- Videos of the finished runs: `scripts/video.sh`, kept outside the repository.
+  player goes on by itself to the convex log, where the way down off it is not found.
+- Level 7: finished from the start in 11:28.38, following the owner's finished run.
+- Level 8: by itself with the walkthrough's plan, to the first wood transformer (route 156 of 1072).
+- Level 9: finished from the start in 12:30.10, following the owner's finished run (the maze of pushers in sector 3
+  is solved as the owner solved it).
+- Level 10: finished from the start in 14:55.75, following the owner's finished run with `hints/Level_10.txt`.
+- Levels 11–13: 11 in sector 1 (the bridges and pushers before the first checkpoint); 12 in sector 1 (the drop
+  after the sandbags); 13 in sector 2, where the stone ball stands at a fan it must ride as paper.
