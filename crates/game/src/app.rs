@@ -1098,20 +1098,69 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
 /// The followed player's keys this long before a lost ball are not followed (four seconds).
 const DOOMED_TICKS: usize = 240;
 
+/// A watched player's run: the replay, the ball's way (and the sector of each of its points), the transformers it
+/// went into (gates) and the player's ticks.
+struct Watched {
+    run: Replay,
+    path: Vec<glam::Vec3>,
+    sectors: Vec<usize>,
+    gates: Vec<crate::autopilot::Gate>,
+    demo: crate::autopilot::Demo,
+}
+
 /// The test player follows a player's run: the ball's way in that replay (where it rolled, in order, every 1.5;
 /// not while a ball is being lost) is its way, the transformers it went into its gates, and it begins where the run
-/// began.
+/// began. Each --then run (one begun at a sector) is followed from its sector on instead.
 fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
     let text = std::fs::read_to_string(follow).map_err(|e| format!("{}: {e}", follow.display()))?;
     if text.starts_with(crate::locate::TRACK_HEAD) {
         return follow_track(o, data, &text);
     }
-    let run = Replay::parse(&text)?;
+    let mut w = watch_run(o, data, follow, &text)?;
+    for more in &o.then {
+        let text = std::fs::read_to_string(more).map_err(|e| format!("{}: {e}", more.display()))?;
+        let m = watch_run(o, data, more, &text)?;
+        let Some(from) = m.run.start.as_ref().map(|st| st.sector.saturating_sub(1)) else {
+            return Err(format!("{}: --then needs a run begun at a sector", more.display()));
+        };
+        // the followed way up to that sector, then the other run's
+        let cut = w.sectors.iter().position(|&s| s >= from).unwrap_or(w.path.len());
+        w.path.truncate(cut);
+        w.sectors.truncate(cut);
+        w.gates.retain(|g| g.0 < cut);
+        w.gates.extend(m.gates.iter().map(|g| (g.0 + cut, g.1, g.2)));
+        w.path.extend(m.path);
+        w.sectors.extend(m.sectors);
+        let ticks = w.demo.ticks.iter().position(|t| t.sector >= from).unwrap_or(w.demo.ticks.len());
+        w.demo.ticks.truncate(ticks);
+        w.demo.ticks.extend(m.demo.ticks);
+    }
+    println!("followed: {} points, transformers {:?}", w.path.len(), w.gates);
+    // the test player's own run begins where the followed one began
+    let mut own = o.clone();
+    own.replay = None;
+    own.follow = None;
+    if let Some(st) = &w.run.start {
+        own.sector = Some(st.sector);
+        own.ball = st.ball.clone();
+        own.at = st.at.map(|[x, y, z]| format!("{x},{y},{z}"));
+    }
+    let mut game = Game::new(&own, data)?;
+    let route = crate::autopilot::Route::along(&game.level.level, &game.modules, w.path);
+    let mut pilot = crate::autopilot::Pilot::new(route, w.gates);
+    pilot.demo = Some(w.demo);
+    pilot_run(&mut game, data, &own, pilot)
+}
+
+/// Watches a player's run (`text`, read from `file`) to its end.
+fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watched, String> {
+    let run = Replay::parse(text)?;
     let mut watch = o.clone();
-    watch.replay = Some(follow.to_path_buf());
+    watch.replay = Some(file.to_path_buf());
     watch.follow = None;
     let mut seen = Game::new(&watch, data)?;
     let mut path: Vec<glam::Vec3> = Vec::new();
+    let mut sectors: Vec<usize> = Vec::new();
     let mut gates: Vec<crate::autopilot::Gate> = Vec::new();
     let mut demo = crate::autopilot::Demo::default();
     let mut lost = false;
@@ -1158,23 +1207,16 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         let floor = b.position - glam::Vec3::Y * crate::sim::BALL_RADIUS;
         if !lost && b.on_ground && path.last().is_none_or(|p| p.distance(floor) >= 1.5) {
             path.push(floor);
+            sectors.push(seen.sim.sector);
         }
     }
-    println!("followed: {} points, transformers {:?}", path.len(), gates);
-    // the test player's own run begins where the followed one began
-    let mut own = o.clone();
-    own.replay = None;
-    own.follow = None;
-    if let Some(st) = &run.start {
-        own.sector = Some(st.sector);
-        own.ball = st.ball.clone();
-        own.at = st.at.map(|[x, y, z]| format!("{x},{y},{z}"));
-    }
-    let mut game = Game::new(&own, data)?;
-    let route = crate::autopilot::Route::along(&game.level.level, &game.modules, path);
-    let mut pilot = crate::autopilot::Pilot::new(route, gates);
-    pilot.demo = Some(demo);
-    pilot_run(&mut game, data, &own, pilot)
+    Ok(Watched {
+        run,
+        path,
+        sectors,
+        gates,
+        demo,
+    })
 }
 
 /// The test player plays the level from where the run begins: it saves the run at --record (or as an attempt) and
@@ -1433,9 +1475,10 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
             best = pilot.reached();
         }
         heard = game.sim.events.len();
-        // a hint going on to its next step gets on too (its steps lead off the way: round, back for a run-up)
+        // a hint going on to its next step gets on too (its steps lead off the way: round, back for a run-up), and so
+        // does one playing a recorded run
         let now_at = pilot.hints.at();
-        if fell || (now_at != hint_at && now_at.is_some()) {
+        if fell || (now_at != hint_at && now_at.is_some()) || pilot.hints.replaying() {
             since = game.sim.tick;
         }
         hint_at = now_at;

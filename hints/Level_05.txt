@@ -1,0 +1,17 @@
+# Level 5 — hints for the test player (docs/drahtseilakt/autopilot.md). Written from the owner's run.
+#
+# Sector 3, the crate P_Modul_34_04 (x 858.9, z -258.1): its crate (x 851.2) holds the sliding stone up out of the
+# upper lane along z -258. As stone, the owner comes north up the lower lane at x 851.2 and rams the crate north out
+# from under the stone in gentle rams from z -265, backing off each time (a hard ram jams the crate; the falling
+# stone pins a ball under it; once it is down, it stops further rams short).
+at 851.2 -71.6 -268 r 8 sector 3 kind stone : goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -266 ; push 0 1 60 ; push 0 -1 90 ; goto 851.2 -71.6 -270
+
+# Then, as wood, west along the upper lane over the fallen stone: slowly the ball stops on the stone's edge; the owner
+# comes up from the east (x 884.7) at speed.
+at 868 -68 -258.2 r 14 sector 3 kind wood : goto 884.7 -71.9 -258.2 ; push -1 0 150
+
+# Sector 4, the crate of P_Modul_34_01 (module at 853.9 -77.4 -62.8, the crate at x 846.2) and the pusher P_Modul_01_02
+# (873.5, -48.4): as stone, the owner rams the crate north from z -98 along x 846 until it gives, goes on north and
+# shoves the pusher east along z -48 from the lower floor, then comes round by z -33 and over it south. The owner's
+# own inputs for the rams, then the way round.
+at 846 -81 -98 r 5 sector 4 kind stone : goto 846 -81 -98.1 ; wait 30 ; replay Level_05-owner.replay 25080 25990 ; goto 848.1 -80.9 -57.6 ; goto 850.9 -80.9 -53.3 ; goto 851.1 -81 -48 ; via 871 -78.4 -48.2 ; goto 856.5 -80.5 -47.6 ; goto 851.1 -81 -46.9 ; goto 851.2 -80.9 -36.7

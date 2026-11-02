@@ -375,12 +375,22 @@ pub struct Runner {
     lives: Option<u32>,
     /// A hint has just ended: the pilot finds its place on the way anew.
     pub ended: bool,
+    /// The tick the last hint began.
+    pub began: u64,
 }
 
 impl Runner {
     /// Where a running hint is (its index and step), so that a hint going through its steps counts as getting on.
     pub fn at(&self) -> Option<(usize, usize)> {
         self.running.as_ref().map(|r| (r.hint, r.step))
+    }
+
+    /// Whether a running hint is playing a recorded run: a replay step gets on by itself however long it is.
+    pub fn replaying(&self) -> bool {
+        self.running.as_ref().is_some_and(|r| {
+            let step = self.hints.get(r.hint).and_then(|h| h.steps.get(r.step));
+            matches!(step, Some(Step::Replay(..) | Step::Inputs(..)))
+        })
     }
 }
 
@@ -432,6 +442,7 @@ impl Runner {
                 self.hints.get(i).map_or(0, |h| h.line),
                 sim.tick
             );
+            self.began = sim.tick;
             self.running = Some(Running {
                 hint: i,
                 step: 0,
@@ -568,6 +579,12 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
         }
         Step::Replay(..) => None,
         Step::Inputs(_, inputs) => {
+            // a transformer holding the ball as the step begins holds its recorded run too: it starts as the ball
+            // is let go, in step with the player's whatever way the ball came in (later holds are the player's own)
+            if t == 0 && sim.is_held() {
+                run.start = run.start.saturating_add(1);
+                return Some(0);
+            }
             let bits = *inputs.get(usize::try_from(t).ok()?)?;
             // the player's view turns are followed in the quarter kept, not made: the arrows are turned to ours
             let pressed = bits & !run.prev;

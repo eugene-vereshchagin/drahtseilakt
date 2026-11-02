@@ -60,6 +60,7 @@ usage: drahtseilakt [options]
   --headless          no window: run the replay to its end and print what happened
   --autopilot         no window: the test player plays the level (to --ticks); saved with --record
   --follow FILE       the test player follows the ball's way in a replay of a player's run, or a --locate track
+  --then FILE         with --follow: from the sector this replay begins at, its way instead (up to 8 times)
   --plan FILE         the test player's way goes through the level objects named in FILE, in order
   --hints FILE        the test player's hints (default: hints/<level>.txt in the data folder; autopilot.md)
   --report DIR        where the test player writes a report each time it is stuck (default: the temp folder)
@@ -105,6 +106,8 @@ pub struct Options {
     /// The test player follows the ball's way in this replay (a player's run) or `--locate` track instead of finding
     /// one.
     pub follow: Option<PathBuf>,
+    /// Runs begun at a sector: the followed way is theirs from that sector on (in order).
+    pub then: Vec<PathBuf>,
     /// The test player's way goes through these level objects in order (a file of names).
     pub plan: Option<PathBuf>,
     /// The test player's hint file, instead of the level's in the data folder.
@@ -146,6 +149,7 @@ fn parse_args() -> Result<Options, String> {
         headless: false,
         autopilot: false,
         follow: None,
+        then: Vec::new(),
         plan: None,
         hints: None,
         report: None,
@@ -209,6 +213,12 @@ fn parse_args() -> Result<Options, String> {
             "--give-up" => {
                 let s: u64 = value()?.parse().map_err(|_| "--give-up needs seconds".to_owned())?;
                 o.give_up = s.clamp(5, 3600);
+            }
+            "--then" => {
+                if o.then.len() >= MAX_THEN {
+                    return Err(format!("more than {MAX_THEN} --then runs"));
+                }
+                o.then.push(value()?.into());
             }
             "--follow" => {
                 o.follow = Some(value()?.into());
@@ -292,6 +302,9 @@ fn windowed(o: &Options) -> bool {
         && o.locate.is_none()
         && o.frames.is_none()
 }
+
+/// How many --then runs may follow on.
+const MAX_THEN: usize = 8;
 
 /// Set in the game started again after an import.
 const RESTARTED: &str = "DRAHTSEILAKT_RESTARTED";
