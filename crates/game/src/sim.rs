@@ -2091,6 +2091,7 @@ mod tests {
             ],
             sky: None,
             start_ball: None,
+            settings: level::Settings::default(),
         }
     }
 

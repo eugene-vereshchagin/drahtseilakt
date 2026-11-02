@@ -18,6 +18,27 @@ pub struct Level {
     pub sky: Option<String>,
     /// Name of the ball the level starts with (`Ball_Wood`, ...), when the level names one.
     pub start_ball: Option<String>,
+    /// What the original game gives a level from its level table and its rules by level number; an open-format
+    /// level carries it itself, so it plays the same without the game's files.
+    pub settings: Settings,
+}
+
+/// A level's settings beyond its scene (the original's `AllLevel` table in Levelinit.nmo, and its first and last
+/// levels' rules).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Settings {
+    /// The level's music theme (`Music_Theme_<n>_*`).
+    pub music: Option<u32>,
+    /// The colour of the level's light (0..1).
+    pub light: Option<[f32; 3]>,
+    /// The points the finish adds.
+    pub level_bonus: Option<i64>,
+    /// The level begins with the original's tutorial (level 1), which stops it before the ball comes.
+    pub tutorial: bool,
+    /// The game's last level: its finish plays the last music, and lightning flashes over it.
+    pub last_level: bool,
+    /// The hash of the file the level was converted from (replays recorded on that file play on this level).
+    pub source_hash: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default)]

@@ -156,7 +156,9 @@ impl Game {
                     String::from_utf8(crate::hints::read_plain(p, crate::hints::MAX_REPLAY_FILE)?)
                         .map_err(|_| format!("{}: not UTF-8", p.display()))?;
                 let r = Replay::parse(&text).map_err(|e| format!("{}: {e}", p.display()))?;
-                if r.level_hash != level.hash {
+                // a replay plays on its level file, or on a level converted from that file (an open-format export
+                // records its source's hash): the same level, so the same run
+                if r.level_hash != level.hash && Some(r.level_hash) != level.level.settings.source_hash {
                     return Err(format!(
                         "{}: recorded on another level file than {}",
                         p.display(),
@@ -175,8 +177,9 @@ impl Game {
             .unwrap_or(crate::sim::BallKind::Wood);
         let modules = scene::load_modules(&level.level, data, remastered);
         let extra_model = scene::ExtraModel::new(&modules);
-        // The original's level 1 begins with its tutorial, which stops the level before the ball comes.
-        let tutorial = level.name.eq_ignore_ascii_case("Level_01.NMO");
+        // The original's level 1 begins with its tutorial, which stops the level before the ball comes (the level's
+        // settings say so: an .nmo's from the game's table, an open-format level's its own).
+        let tutorial = level.level.settings.tutorial;
         let ball_meshes = BallMeshes::find(&balls.level);
         let mut sim = Sim::with_modules(&level.level, start_ball, &modules, tutorial);
         sim.set_ball_boxes(ball_meshes.boxes);
@@ -185,7 +188,7 @@ impl Game {
         // a replay recorded before the bursts plays without them, as it was recorded
         sim.bursts = replay_in.as_ref().is_none_or(|r| r.version >= 2);
         sim.pieces_expire = replay_in.as_ref().is_none_or(|r| r.version >= 3);
-        let level_bonus = data.settings(&level.name).level_bonus.unwrap_or(0);
+        let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
         let start = match &replay_in {
             Some(r) => r.start.clone(),
@@ -236,10 +239,10 @@ impl Game {
             effects,
             font: crate::ui::Font::game(data),
             shadow_receivers: scene::shadow_receivers(&level.level),
-            music_theme: data.settings(&level.name).music,
+            music_theme: level.level.settings.music,
             level_bonus,
             assisted: false,
-            last_level: o.source.original_number().is_some_and(|n| data.level_count() == Some(n)),
+            last_level: level.level.settings.last_level,
             runs_root: match &o.source {
                 crate::assets::Source::Original(_) => replay_dir(),
                 crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
@@ -1562,7 +1565,7 @@ fn upload_menu_scene(renderer: &mut Renderer, scene: Option<&mut crate::menuscen
 
 fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     // the level's light colour (the level table's Light; white for a level without a row)
-    renderer.light.color = data.settings(&game.level.name).light.unwrap_or([1.0; 3]);
+    renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
     let loader = |t: &level::Texture| data.texture(t);
     renderer.add_model(&game.level.level, &loader);
     renderer.add_model(&game.balls.level, &loader);

@@ -207,7 +207,7 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
         "asset": {"version": "2.0", "generator": "drahtseilakt"},
         "extensionsUsed": if level.materials.iter().any(|m| m.unlit) { json!(["KHR_materials_unlit"]) } else { json!([]) },
         "scene": 0,
-        "scenes": [{"nodes": (0..nodes.len()).collect::<Vec<_>>(), "extras": {"drahtseilakt": {"format": VERSION, "groups": groups, "sky": level.sky, "start_ball": level.start_ball}}}],
+        "scenes": [{"nodes": (0..nodes.len()).collect::<Vec<_>>(), "extras": {"drahtseilakt": {"format": VERSION, "groups": groups, "sky": level.sky, "start_ball": level.start_ball, "settings": settings_json(&level.settings)}}}],
         "nodes": nodes,
         "meshes": meshes,
         "materials": materials,
@@ -223,6 +223,89 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
     std::fs::write(dir.join("level.gltf"), text).map_err(|e| e.to_string())?;
     std::fs::write(dir.join("level.bin"), &bin).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// The level's settings as the scene's extras keep them (only what it has).
+fn settings_json(s: &crate::Settings) -> Value {
+    let mut v = json!({"tutorial": s.tutorial, "last_level": s.last_level});
+    if let Some(m) = s.music {
+        v["music"] = json!(m);
+    }
+    if let Some(l) = s.light {
+        v["light"] = json!(l);
+    }
+    if let Some(b) = s.level_bonus {
+        v["level_bonus"] = json!(b);
+    }
+    if let Some(h) = s.source_hash {
+        v["source_hash"] = json!(format!("{h:016x}"));
+    }
+    v
+}
+
+/// The most a level's music theme and bonus may be (the original's are 1 to 5 and up to 20000).
+const MAX_MUSIC: u64 = 1000;
+const MAX_BONUS: i64 = 1_000_000_000;
+
+/// The level's settings from the scene's extras: none there is the default; one there that is malformed refuses the
+/// level.
+fn settings_from(v: &Value) -> Result<crate::Settings, String> {
+    if v.is_null() {
+        return Ok(crate::Settings::default());
+    }
+    if !v.is_object() {
+        return Err("settings: not an object".into());
+    }
+    let flag = |k: &str| -> Result<bool, String> {
+        match &v[k] {
+            Value::Null => Ok(false),
+            Value::Bool(b) => Ok(*b),
+            _ => Err(format!("settings: {k} is not true or false")),
+        }
+    };
+    let music = match &v["music"] {
+        Value::Null => None,
+        m => Some(
+            m.as_u64()
+                .filter(|&m| m <= MAX_MUSIC)
+                .and_then(|m| u32::try_from(m).ok())
+                .ok_or("settings: music is not a theme number")?,
+        ),
+    };
+    let light = match &v["light"] {
+        Value::Null => None,
+        l => {
+            let a = l.as_array().filter(|a| a.len() == 3).ok_or("settings: light is not three numbers")?;
+            let c = |i: usize| -> Result<f32, String> {
+                let x = a.get(i).and_then(Value::as_f64).ok_or("settings: light is not three numbers")? as f32;
+                if x.is_finite() { Ok(x.clamp(0.0, 1.0)) } else { Err("settings: light is not finite".into()) }
+            };
+            Some([c(0)?, c(1)?, c(2)?])
+        }
+    };
+    let level_bonus = match &v["level_bonus"] {
+        Value::Null => None,
+        b => Some(
+            b.as_i64()
+                .filter(|b| b.abs() <= MAX_BONUS)
+                .ok_or("settings: level_bonus is not a number of points")?,
+        ),
+    };
+    let source_hash = match &v["source_hash"] {
+        Value::Null => None,
+        h => {
+            let s = h.as_str().filter(|s| s.len() == 16).ok_or("settings: source_hash is not 16 hex digits")?;
+            Some(u64::from_str_radix(s, 16).map_err(|_| "settings: source_hash is not 16 hex digits".to_owned())?)
+        }
+    };
+    Ok(crate::Settings {
+        music,
+        light,
+        level_bonus,
+        tutorial: flag("tutorial")?,
+        last_level: flag("last_level")?,
+        source_hash,
+    })
 }
 
 /// A mesh the open format writes: one with vertices and faces (an empty one is left out, so the meshes read back
@@ -721,6 +804,7 @@ pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
     let x = &doc["scenes"][0]["extras"]["drahtseilakt"];
     level.sky = x["sky"].as_str().map(str::to_owned);
     level.start_ball = x["start_ball"].as_str().map(str::to_owned);
+    level.settings = settings_from(&x["settings"])?;
     let mut bytes = text;
     bytes.extend_from_slice(&bin);
     Ok((level, bytes))

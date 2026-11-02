@@ -130,19 +130,6 @@ pub enum Source {
 }
 
 impl Source {
-    /// The original level this is: one of the copy's, or the player's remastered export of one
-    /// (levels/remastered/Level_NN), which plays with that level's settings.
-    pub fn original_number(&self) -> Option<u32> {
-        match self {
-            Source::Original(n) => Some(*n),
-            Source::Open(dir) => self.remastered().then(|| {
-                let name = dir.file_name()?.to_str()?;
-                name.get(..6)?.eq_ignore_ascii_case("Level_").then(|| name.get(6..)?.parse().ok())?
-            })?,
-            Source::Nmo(_) => None,
-        }
-    }
-
     /// The level is in the remastered folder (drawn with the remastered look).
     pub fn remastered(&self) -> bool {
         let root = crate::profile::dir(crate::profile::Kind::Remastered);
@@ -219,10 +206,20 @@ impl Data {
             Source::Open(dir) => return load_open(dir),
         };
         let mut loaded = load_nmo(&path)?;
-        // Levels of the game name their sky and ball in the game's own table, not in the level file.
+        // Levels of the game name their sky, ball, music, light and bonus in the game's own table, not in the level
+        // file; the level takes them, so an export carries them (the open format plays without the table).
         let s = self.settings(&loaded.name);
         loaded.level.sky = loaded.level.sky.take().or(s.sky);
         loaded.level.start_ball = loaded.level.start_ball.take().or(s.start_ball);
+        loaded.level.settings = level::Settings {
+            music: s.music,
+            light: s.light,
+            level_bonus: s.level_bonus,
+            // the original's first level begins with its tutorial; its last one has the lightning and last music
+            tutorial: loaded.name.eq_ignore_ascii_case("Level_01.NMO"),
+            last_level: s.last,
+            source_hash: Some(loaded.hash),
+        };
         Ok(loaded)
     }
 
@@ -289,6 +286,9 @@ pub struct Settings {
     pub level_bonus: Option<i64>,
     /// The colour of the level's light (Gameplay_Sky sets Light_Ingame to it).
     pub light: Option<[f32; 3]>,
+    /// The level is the table's last row (its own row, not the first one a map without a row takes): the game's
+    /// last level (Gameplay_Blitz and the last music test CurrentLevel against the rows).
+    pub last: bool,
 }
 
 impl Data {
@@ -356,6 +356,7 @@ impl Data {
             music: None,
             level_bonus: None,
             light: None,
+            last: false,
         };
         let Some(table) = self.data_array("3D Entities/Levelinit.nmo", "AllLevel") else {
             return none;
@@ -366,19 +367,20 @@ impl Data {
                 _ => None,
             }
         };
-        let row = table
+        let own = table
             .rows
             .iter()
-            .find(|r| {
+            .position(|r| {
                 // a level file's name, or an export's folder named after it (Level_13 for Level_13.NMO)
                 text(r, "Levelfile").is_some_and(|f| {
                     f.eq_ignore_ascii_case(file_name)
                         || Path::new(&f).file_stem().is_some_and(|s| s.eq_ignore_ascii_case(file_name))
                 })
-            })
-            .or_else(|| table.rows.first());
-        let Some(row) = row else { return none };
+            });
+        let last = own.is_some_and(|i| i.checked_add(1) == Some(table.rows.len()));
+        let Some(row) = own.and_then(|i| table.rows.get(i)).or_else(|| table.rows.first()) else { return none };
         Settings {
+            last,
             sky: text(row, "Sky").and_then(|s| s.strip_prefix("Sky_").map(str::to_owned)),
             start_ball: text(row, "StartBall"),
             music: match table.column("Music").and_then(|c| row.get(c)) {
