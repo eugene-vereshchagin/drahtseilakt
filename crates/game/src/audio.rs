@@ -150,6 +150,8 @@ pub fn parse_ogg(bytes: &[u8]) -> Result<Sound, String> {
             return Err("too long".into());
         }
     }
+    // grown by doubling: the room never used is given back (a piece of music would keep nearly twice its size)
+    frames.shrink_to_fit();
     Ok(Sound { frames, rate })
 }
 
@@ -441,6 +443,10 @@ impl Audio {
     /// Forgets the sounds loaded (a new level may bring its own).
     pub fn forget_sounds(&mut self) {
         self.sounds.clear();
+        // what is still being decoded was the old level's: its thread sends into a channel no longer listened to
+        // (and stops), and the new level decodes its own afresh
+        self.pending.clear();
+        self.decoded = std::sync::mpsc::channel();
     }
 
     /// A sound of the game by its name (the original's file name without `.wav`), loaded once: our own when our own
@@ -479,14 +485,22 @@ impl Audio {
             },
         );
         self.pending.extend(wanted.iter().cloned());
-        std::thread::spawn(move || {
+        let names = wanted.clone();
+        let started = std::thread::Builder::new().name("music decoding".into()).spawn(move || {
             for n in wanted {
-                let s = load(&data, &n);
+                // a decoder that fails hard leaves that piece silent, never the game stopped or the name pending
+                let s = std::panic::catch_unwind(|| load(&data, &n)).unwrap_or(None);
                 if send.send((n, s)).is_err() {
                     return;
                 }
             }
         });
+        if started.is_err() {
+            // no thread to be had: they are decoded when first played instead
+            for n in names {
+                self.pending.remove(&n);
+            }
+        }
     }
 
     /// Plays a sound once, after `wait` seconds, at a volume (0 to 1). Returns its handle.
@@ -618,10 +632,8 @@ mod tests {
         let good = std::fs::read(own().join("Sounds/Extra_Hit.ogg")).unwrap_or_default();
         assert!(parse_ogg(&good).is_ok());
         assert!(parse_ogg(b"OggS not really").is_err());
-        assert!(
-            parse_ogg(&good[..good.len() / 3]).is_ok()
-                || parse_ogg(&good[..good.len() / 3]).is_err()
-        );
+        // a file cut short is read as far as it goes or refused, and never panics
+        let _ = parse_ogg(&good[..good.len() / 3]);
         assert!(parse_ogg(&[]).is_err());
     }
 

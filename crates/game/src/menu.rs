@@ -772,7 +772,8 @@ impl Menu {
                 "Physics: IVP, ported from OpenBallance",
                 "",
                 "Music: Kevin MacLeod (incompetech.com, CC-BY 4.0),",
-                "elerya, Hitctrl, Spring Spring (CC-BY 3.0), neolein (CC0)",
+                "elerya, Hitctrl, Spring Spring, WakianTech (K-ManZ),",
+                "Tsorthan Grove (CC-BY), neolein (CC0)",
                 "Sounds: Kenney, freesound and OpenGameArt authors",
                 "(CC0, CC-BY): the full list in assets/own/CREDITS.md",
             ]
