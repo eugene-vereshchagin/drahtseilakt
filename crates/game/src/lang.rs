@@ -28,7 +28,7 @@ pub struct Strings {
 
 /// Our additions' strings the copy has none for, in LANGUAGES' order (German, English, Spanish, Italian, French),
 /// Latin-1 as the game's font draws them.
-const OURS: [(&str, [&str; 5]); 6] = [
+const OURS: [(&str, [&str; 5]); 7] = [
     (
         "sound volume",
         [
@@ -87,6 +87,16 @@ const OURS: [(&str, [&str; 5]); 6] = [
             "Exclusiva",
             "Esclusivo",
             "Exclusif",
+        ],
+    ),
+    (
+        "ball lost",
+        [
+            "Ball verloren",
+            "Ball lost",
+            "Bola perdida",
+            "Palla persa",
+            "Balle perdue",
         ],
     ),
 ];

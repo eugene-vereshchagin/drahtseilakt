@@ -1847,10 +1847,13 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         &view,
         w,
         h,
-        &crate::hud::overlay(&game.sim, w, h, game.ball_lost_at, true, game.font.is_some()),
+        &crate::hud::overlay(&game.sim, w, h, true, game.font.is_some()),
     );
     let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
     let mut quads = crate::hud::interface(&game.sim, game.font.as_ref(), screen);
+    let strings = crate::lang::Strings::load(data, &crate::lang::chosen(setting("language").as_deref()));
+    let lost = strings.ours("ball lost");
+    quads.extend(crate::hud::ball_lost(&game.sim, game.ball_lost_at, &lost, game.font.as_ref(), screen));
     if let (Some(t), Some(f)) = (crate::endscreen::of(&game.sim), game.font.as_ref()) {
         quads.extend(crate::endscreen::interface(&t, f, screen));
     }
@@ -2669,7 +2672,6 @@ impl App {
                         &self.game.sim,
                         gpu.config.width,
                         gpu.config.height,
-                        self.game.ball_lost_at,
                         tools,
                         self.game.font.is_some(),
                     );
@@ -2703,6 +2705,8 @@ impl App {
             }
             (None, None, _) => {
                 let mut q = crate::hud::interface(&self.game.sim, font, screen);
+                let lost = self.strings.ours("ball lost");
+                q.extend(crate::hud::ball_lost(&self.game.sim, self.game.ball_lost_at, &lost, font, screen));
                 if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
                     q.extend(crate::endscreen::interface(&t, f, screen));
                 }
