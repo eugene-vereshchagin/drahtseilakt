@@ -277,10 +277,8 @@ impl Menu {
                 Line::Extended,
                 Line::Back,
             ],
-            Screen::Sound if self.features.has(Feature::SoundVolume) => {
-                vec![Line::Music, Line::Effects, Line::Back]
-            }
-            Screen::Sound => vec![Line::Music, Line::Back],
+            // the original's two volumes: the music's and the effects'
+            Screen::Sound => vec![Line::Music, Line::Effects, Line::Back],
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(false))
@@ -743,11 +741,10 @@ impl Menu {
             }
             Screen::Sound => {
                 let pct = |v: f32| format!("{}", (v * 10.0).round() as u32).into_bytes();
-                let mut f = vec![(self.label(Line::Music), pct(self.volumes[1]))];
-                if self.features.has(Feature::SoundVolume) {
-                    f.push((self.label(Line::Effects), pct(self.volumes[0])));
-                }
-                f
+                vec![
+                    (self.label(Line::Music), pct(self.volumes[1])),
+                    (self.label(Line::Effects), pct(self.volumes[0])),
+                ]
             }
             Screen::Extended => {
                 // the mode, then each addition's switch, then where things are
@@ -757,7 +754,6 @@ impl Menu {
                     f.push((self.label(Line::Interface), interface_value()));
                     f.push((self.label(Line::SoundTheme), theme_value()));
                     f.push((self.label(Line::DebugMenu), b">".to_vec()));
-                    f.push((short_path(&crate::levels::data_dir().join("levels")).into_bytes(), Vec::new()));
                 }
                 f
             }
@@ -801,10 +797,16 @@ impl Menu {
                 ),
                 (self.name.clone(), Vec::new()),
             ],
+            // where to put them, as the folder inside the game's data folder (not a whole path)
             Screen::Custom if self.maps.is_empty() => vec![
-                (b"No levels yet. Put them into".to_vec(), Vec::new()),
+                (b"No levels here yet. Put them into".to_vec(), Vec::new()),
                 (
-                    self.folder.last().map(|f| short_path(f)).unwrap_or_default().into_bytes(),
+                    self.folder
+                        .first()
+                        .and_then(|f| f.file_name())
+                        .map(|n| format!("levels/{}/", n.to_string_lossy()))
+                        .unwrap_or_default()
+                        .into_bytes(),
                     Vec::new(),
                 ),
             ],
@@ -945,17 +947,39 @@ impl Menu {
                 q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max)
                     - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
             };
+            let tall = |q: &[Quad]| {
+                q.iter().map(|q| q.rect[3]).fold(f32::MIN, f32::max)
+                    - q.iter().map(|q| q.rect[1]).fold(f32::MAX, f32::min)
+            };
+            let scaled = |k: f32| {
+                let mut st = *style;
+                st.scale = [st.scale[0] * k, st.scale[1] * k];
+                st
+            };
             let mut quads = f.layout(t, frame, style);
             let w = wide(&quads);
             if style.flags & crate::ui::TEXT_WORDWRAP == 0 && w > avail && avail > 0.0 {
-                let k = (avail / w).max(SHRINK);
-                let mut st = *style;
-                st.scale = [st.scale[0] * k, st.scale[1] * k];
-                let mut text = t.to_vec();
-                quads = f.layout(&text, frame, &st);
-                while wide(&quads) > avail && text.len() > 4 {
-                    text = shorten(&text);
+                let k = avail / w;
+                if k >= FIT_SHRINK {
+                    // a little smaller is enough
+                    quads = f.layout(t, frame, &scaled(k));
+                } else if let Some((a, b)) = two_lines(t) {
+                    // two lines, each in its half of the frame, as large as both fit
+                    let (wa, wb) = (wide(&f.layout(&a, frame, style)), wide(&f.layout(&b, frame, style)));
+                    let half = (frame[3] - frame[1]) / 2.0;
+                    let k2 = (avail / wa.max(wb)).min(half / tall(&quads).max(1e-6)).min(1.0);
+                    let mid = (frame[1] + frame[3]) / 2.0;
+                    let st = scaled(k2.max(WRAP_SHRINK));
+                    quads = f.layout(&a, [frame[0], frame[1], frame[2], mid], &st);
+                    quads.extend(f.layout(&b, [frame[0], mid, frame[2], frame[3]], &st));
+                } else {
+                    let st = scaled(k.max(SHRINK));
+                    let mut text = t.to_vec();
                     quads = f.layout(&text, frame, &st);
+                    while wide(&quads) > avail && text.len() > 4 {
+                        text = shorten(&text);
+                        quads = f.layout(&text, frame, &st);
+                    }
                 }
             }
             out.extend(crate::ui::place(quads, screen, Anchor::Center));
@@ -1077,8 +1101,8 @@ impl Menu {
                         _ => None,
                     };
                     if let Some(t) = text {
-                        let t: String = if t.chars().count() > 24 {
-                            t.chars().take(22).chain("..".chars()).collect()
+                        let t: String = if t.chars().count() > 48 {
+                            t.chars().take(46).chain("..".chars()).collect()
                         } else {
                             t
                         };
@@ -1086,14 +1110,36 @@ impl Menu {
                         let height = font
                             .and_then(|f| f.layout(b"A", frame, &FONT_03).first().map(|q| q.rect[3] - q.rect[1]))
                             .unwrap_or((frame[3] - frame[1]) * 0.5);
-                        let quads = crate::fallback::layout(&t, frame, height, FONT_03.align, FONT_03.color);
+                        // as the game font's labels: a little smaller to fit, else two lines
+                        let (al, co) = (FONT_03.align, FONT_03.color);
+                        let span = |q: &[Quad]| {
+                            q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max)
+                                - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
+                        };
+                        let avail = frame[2] - frame[0];
+                        let mut quads = crate::fallback::layout(&t, frame, height, al, co);
+                        let w = span(&quads);
+                        if w > avail && avail > 0.0 {
+                            let k = avail / w;
+                            let words: Vec<&str> = t.split(' ').collect();
+                            if k >= FIT_SHRINK || words.len() < 2 {
+                                quads = crate::fallback::layout(&t, frame, height * k.max(SHRINK), al, co);
+                            } else {
+                                let half = words.len() / 2;
+                                let (a, b) = (words[..half].join(" "), words[half..].join(" "));
+                                let mid = (frame[1] + frame[3]) / 2.0;
+                                let h = height * WRAP_SHRINK.max(0.5);
+                                quads = crate::fallback::layout(&a, [frame[0], frame[1], frame[2], mid], h, al, co);
+                                quads.extend(crate::fallback::layout(&b, [frame[0], mid, frame[2], frame[3]], h, al, co));
+                            }
+                        }
                         out.extend(crate::ui::place(quads, screen, Anchor::Center));
                         continue;
                     }
-                    // a long name smaller, to stay on its button
+                    // a long name smaller or on two lines, to stay on its button (the label does it)
                     let mut name = self.label(lines[i]);
-                    if name.len() > 30 {
-                        name.truncate(28);
+                    if name.len() > 60 {
+                        name.truncate(58);
                         name.extend_from_slice(b"..");
                     }
                     label(&mut out, &name, [0.39, y, 0.635, y + 0.04], &FONT_03);
@@ -1273,6 +1319,23 @@ impl Menu {
 
 /// The smallest a label is drawn to fit, against its style's size.
 const SHRINK: f32 = 0.6;
+/// A label is drawn a little smaller to fit down to this; below it, it goes on two lines (down to WRAP_SHRINK).
+const FIT_SHRINK: f32 = 0.75;
+const WRAP_SHRINK: f32 = 0.45;
+
+/// A label in two lines, broken at the space nearest its middle; None for one word.
+fn two_lines(t: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
+    let mid = t.len() / 2;
+    let at = t
+        .iter()
+        .enumerate()
+        .filter(|&(_, &c)| c == b' ')
+        .map(|(i, _)| i)
+        .min_by_key(|&i| i.abs_diff(mid))?;
+    let a = t.get(..at)?.trim_ascii().to_vec();
+    let b = t.get(at + 1..)?.trim_ascii().to_vec();
+    (!a.is_empty() && !b.is_empty()).then_some((a, b))
+}
 
 /// `t` a letter shorter, its middle shown as "..".
 fn shorten(t: &[u8]) -> Vec<u8> {
@@ -1289,15 +1352,6 @@ fn shorten(t: &[u8]) -> Vec<u8> {
         [head.get(..head.len() - 1).unwrap_or_default(), b"..", tail].concat()
     } else {
         [head, b"..", tail.get(1..).unwrap_or_default()].concat()
-    }
-}
-
-/// A path as the menu shows it: the home folder as ~.
-fn short_path(p: &Path) -> String {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    match home.as_deref().and_then(|h| p.strip_prefix(h).ok()) {
-        Some(rest) => format!("~/{}", rest.display()),
-        None => p.display().to_string(),
     }
 }
 
@@ -1652,6 +1706,15 @@ mod tests {
         assert_eq!(m.enter(), Action::None);
         m.typed("a");
         assert_eq!(m.enter(), Action::Score(b"  a".to_vec()));
+    }
+
+    #[test]
+    fn a_long_label_breaks_at_the_space_nearest_its_middle() {
+        assert_eq!(two_lines(b"Levels by kind?"), Some((b"Levels".to_vec(), b"by kind?".to_vec())));
+        assert_eq!(two_lines(b"Interface: remaster"), Some((b"Interface:".to_vec(), b"remaster".to_vec())));
+        assert_eq!(two_lines(b"Word"), None);
+        assert_eq!(two_lines(b" Word "), None);
+        assert_eq!(two_lines(b""), None);
     }
 
     #[test]

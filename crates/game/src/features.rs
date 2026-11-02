@@ -12,18 +12,17 @@ pub enum Feature {
     CustomLevels,
     /// Practice tools: R, F2, [ ], F3 (five seconds back), F5 / F9, the sector and tick on screen.
     Tools,
-    /// The sound volume beside the music's.
-    SoundVolume,
     /// The last ball is never lost: the run goes on (a run so saved is never the best).
     EndlessLives,
 }
 
-pub const FEATURES: [Feature; 6] = [
+// (the sound volume beside the music's was one; it is the original's own setting and always there now: an old
+// `extended.sound-volume off` line is simply not read)
+pub const FEATURES: [Feature; 5] = [
     Feature::AllLevels,
     Feature::BestTimes,
     Feature::CustomLevels,
     Feature::Tools,
-    Feature::SoundVolume,
     Feature::EndlessLives,
 ];
 
@@ -34,7 +33,6 @@ impl Feature {
             Feature::BestTimes => "best-times",
             Feature::CustomLevels => "custom-levels",
             Feature::Tools => "tools",
-            Feature::SoundVolume => "sound-volume",
             Feature::EndlessLives => "endless-lives",
         }
     }
@@ -46,7 +44,6 @@ impl Feature {
             Feature::BestTimes => "Best times?",
             Feature::CustomLevels => "Levels by kind?",
             Feature::Tools => "Practice tools?",
-            Feature::SoundVolume => "Sound volume?",
             Feature::EndlessLives => "Endless lives?",
         }
     }

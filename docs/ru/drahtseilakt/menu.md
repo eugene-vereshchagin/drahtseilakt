@@ -17,7 +17,7 @@
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | |
 | Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | |
 | Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview — по клавише; Invert Rotation? (Yes/No); OK | по умолчанию стрелки, Shift, пробел |
-| Sound (`Menu_Opt_Sound`) | Music Volume, OK | одна громкость |
+| Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | громкость музыки и эффектов (у нас обе в любом режиме, как владелец помнит оригинал) |
 | Credits (`Menu_Credits`) | титры оригинала | |
 | Пауза, Esc на уровне (`Menu_Pause`) | Back, Restart Level, Highscore, Options, Exit Level | Restart и Exit сначала спрашивают Yes / No; очки остаются на экране |
 | Смерть, жизней нет (`Menu_Dead`) | Restart Level, Home | |
@@ -59,7 +59,6 @@
   - инструменты тренировки: свободная камера (F2), медленнее и быстрее (`[` `]`), сохранить момент и вернуться к
     нему (F5 / F9), на пять секунд назад (F3, ещё раз — дальше, до полуминуты), сектор и тик на экране; забег с такой
     помощью сохраняется, но лучшим не становится;
-  - громкость звуков рядом с громкостью музыки;
   - бесконечные жизни: последний шар не теряется (спасённый так забег лучшим не становится). Ограничения времени,
     которое нужно было бы снимать, нет: очки только убывают и останавливаются на нуле, как в оригинале.
   Новые переключатели появятся вместе с функциями из плана (угол обзора, таймеры, призрак лучшего забега).

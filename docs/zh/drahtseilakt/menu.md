@@ -16,7 +16,7 @@
 | Options（`Menu_Options`） | Graphics, Controls, Sound, Back | |
 | Graphics（`Menu_Opt_Graphics`） | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | |
 | Controls（`Menu_Opt_Keys`） | Forward, Backward, Left, Right, Rotation, Overview：各一个键；Invert Rotation? (Yes/No)；OK | 默认：方向键、Shift、Space |
-| Sound（`Menu_Opt_Sound`） | Music Volume, OK | 一个音量 |
+| Sound（`Menu_Opt_Sound`） | Music Volume, Sound Volume, OK | 音乐和音效两个音量（我们在所有模式下都显示两者，与项目所有者记得的原版一致） |
 | Credits（`Menu_Credits`） | 原版的制作人员名单 | |
 | 暂停，关卡中按 Esc（`Menu_Pause`） | Back, Restart Level, Highscore, Options, Exit Level | Restart 和 Exit 会先询问 Yes / No；分数保留在屏幕上 |
 | 死亡，没有剩余生命（`Menu_Dead`） | Restart Level, Home | |
@@ -47,7 +47,6 @@
   - Interface：own / original / remaster，界面文件的来源（[resources.md](resources.md)）；
   - Sounds：音效主题——系统、生成、原版（由 toolbox 制作）或玩家自己的主题（[resources.md](resources.md)）；经典模式播放系统主题；
   - 练习工具：自由视角（F2），减速和加速（`[` `]`），保存当前时刻并回到该时刻（F5 / F9），后退五秒（F3，再按一次继续后退，最多半分钟），屏幕上显示小节和 tick；借助这些工具完成的游玩会被保存，但永远不算最佳成绩；
-  - 音乐音量旁边增加音效音量；
   - 无限生命：最后一个球永远不会丢失（因此而保住的游玩永远不算最佳成绩）。没有需要取消的时间限制：分数只会递减并停在零，与原版相同。
   更多开关会随路线图中的功能一起到来（视野、计时器、最佳成绩的幽灵）。
 - **按类别的关卡**：Start 提供 *Original*（经典关卡列表）、*Remastered*、*Community maps* 和 *Open format*，即 `levels/`（[levels.md](levels.md)）中的各个文件夹。每一类中先按文件名列出其关卡，再列出包含更多关卡的文件夹（Enter 打开，Esc 返回上一级），像原版关卡一样游玩。无法加载的关卡会说明原因且不会启动；其游玩记录和最佳时间与原版关卡分开保存。以后：从社区目录获取标题、作者和难度。

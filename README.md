@@ -49,8 +49,8 @@ fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it wit
 FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
 object's name) anywhere, with `--ball wood|stone|paper`; such a run keeps its start in its replay and is never a
 best run. Until the extended mode is turned on (Options, Extended, or `--debug` for one run) the game is the
-original as closely as it can be. The *extended mode* opens every level, shows best times, the sound volume
-beside the music's and levels by kind under Start (the original, remastered, community and open-format levels in `levels/`), and
+original as closely as it can be. The *extended mode* opens every level, shows best times and levels
+by kind under Start (the original, remastered, community and open-format levels in `levels/`), and
 adds our tools: R restarts, F2 takes up a free camera to fly through the level
 while the run waits, `[` and `]` slow the run down and speed it up again (the run itself stays the same tick by
 tick), F5 saves the moment and F9 goes back to it (the run's record is cut back to it, so a long level can be

@@ -54,8 +54,8 @@ ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bil
 beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
 Stelle, mit `--ball wood|stone|paper`; ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
 Bis der erweiterte Modus eingeschaltet ist (Options, Extended, oder `--debug` für einen Start), ist das Spiel so
-genau wie möglich das Original. Der *erweiterte Modus* öffnet alle Level, zeigt Bestzeiten, die Lautstärke der
-Geräusche neben der Musik und Level nach Art unter Start (Original, Remaster, Community-Karten und Level im
+genau wie möglich das Original. Der *erweiterte Modus* öffnet alle Level, zeigt Bestzeiten und
+Level nach Art unter Start (Original, Remaster, Community-Karten und Level im
 offenen Format aus `levels/`) und fügt unsere Werkzeuge hinzu: R startet neu, F2 nimmt eine freie
 Kamera auf, um durch das Level zu fliegen, während der Lauf wartet, `[` und `]` verlangsamen den Lauf und
 beschleunigen ihn wieder (der Lauf selbst bleibt Takt für Takt derselbe), F5 speichert den Moment und F9 kehrt

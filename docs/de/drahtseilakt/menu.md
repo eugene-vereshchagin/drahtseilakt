@@ -18,7 +18,7 @@ Englisch, Spanisch, Italienisch und Französisch; `GameSettings.Language` wählt
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | |
 | Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | |
 | Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview: je eine Taste; Invert Rotation? (Yes/No); OK | Vorgaben: Pfeile, Shift, Leertaste |
-| Sound (`Menu_Opt_Sound`) | Music Volume, OK | eine Lautstärke |
+| Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | Lautstärke der Musik und der Effekte (bei uns beide in jedem Modus, wie der Inhaber das Original kennt) |
 | Credits (`Menu_Credits`) | der Abspann des Originals | |
 | Pause, Esc im Level (`Menu_Pause`) | Back, Restart Level, Highscore, Options, Exit Level | Restart und Exit fragen zuerst Yes / No; die Punkte bleiben sichtbar |
 | Tot, keine Leben mehr (`Menu_Dead`) | Restart Level, Home | |
@@ -62,7 +62,6 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   - Übungswerkzeuge: freie Kamera (F2), langsamer und schneller (`[` `]`), den Moment sichern und dorthin zurück
     (F5 / F9), fünf Sekunden zurück (F3, nochmals weiter, bis eine halbe Minute), Sektor und Tick auf dem Bildschirm;
     ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;
-  - die Lautstärke der Geräusche neben der Musik;
   - endlose Leben: die letzte Kugel geht nie verloren (ein so geretteter Lauf ist nie bester Lauf). Ein Zeitlimit zum
     Aufheben gibt es nicht: die Punkte zählen nur herunter und bleiben bei null stehen, wie im Original.
   Weitere Schalter kommen mit den Funktionen des Fahrplans (Blickwinkel, Timer, Geist des besten Laufs).

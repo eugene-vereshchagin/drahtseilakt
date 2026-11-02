@@ -18,7 +18,7 @@ English, Spanish, Italian and French; `GameSettings.Language` chooses the column
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | |
 | Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | |
 | Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview: one key each; Invert Rotation? (Yes/No); OK | defaults: arrows, Shift, Space |
-| Sound (`Menu_Opt_Sound`) | Music Volume, OK | one volume |
+| Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | the music's and the effects' volume (ours shows both in every mode, as the owner knows the original) |
 | Credits (`Menu_Credits`) | the original's credits | |
 | Pause, Esc in a level (`Menu_Pause`) | Back, Restart Level, Highscore, Options, Exit Level | Restart and Exit ask Yes / No first; the points stay on screen |
 | Dead, no lives left (`Menu_Dead`) | Restart Level, Home | |
@@ -60,7 +60,6 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
   - practice tools: free camera (F2), slower and faster (`[` `]`), save the moment and go back to it (F5 / F9),
     five seconds back (F3, again for further, up to half a minute), the sector and tick on screen; a run helped this
     way is kept but never a best run;
-  - the sound volume beside the music volume;
   - endless lives: the last ball is never lost (a run it saves is never a best run). There is no time limit to lift:
     the points only count down and stop at zero, as in the original.
   More switches come with the features in the roadmap (field of view, timers, the ghost of the best run).
