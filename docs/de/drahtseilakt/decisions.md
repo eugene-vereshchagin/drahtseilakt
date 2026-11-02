@@ -229,3 +229,11 @@ sich in den Einstellungen verlegen; der Standardordner behält dann ein README, 
 Modus sieht nur das Original. Einige Level im offenen Format kommen mit dem Spiel, wenn ihre Autoren das wollen,
 mit freier Lizenz und ohne Bestandteile des Originals. Die größte Community ist in China, daher gibt es die Doku
 auch in vereinfachtem Chinesisch. Einzelheiten: [levels.md](levels.md).
+
+
+## Mitgelieferte Level sind neue Inhalte
+
+*2026-11-02.* „Das Spiel spielt nur die eigenen Daten des Spielers“ verbietet Ersatz für die Dateien des
+Originals. Level, deren Autoren sie mit dem Spiel ausliefern lassen, unter freier Lizenz und ohne Bestandteile
+des Originals, sind neue Inhalte und dürfen mitkommen (levels.md). Was Spieler selbst in ihre Ordner kopieren,
+ist ihre Sache, nicht unsere.

@@ -226,3 +226,10 @@ settings; the default folder then keeps a README that says where they went. The 
 original. Some open-format levels come with the game when their authors want it, with a free licence and none of
 the original's assets inside. The community is largest in China, so the docs are in Simplified Chinese too.
 Details: [levels.md](levels.md).
+
+
+## Shipped levels are new content
+
+*2026-11-02.* "The game plays only the player's own data" forbids substitutes for the original's files. Levels
+whose authors let them come with the game, under a free licence and with none of the original's assets inside,
+are new content and may ship (levels.md). What players copy into their own folders is their business, not ours.

@@ -54,6 +54,8 @@ The active profile for this project:
   (decisions.md, "The private repository is a backup").
 - **The game plays only the player's own data.** No substitute content; enhancements (e.g. upscaled
   textures) are scripts the player runs on their own copy. Both our native format and original `.nmo` play.
+  New content is not a substitute: levels whose authors let them ship with the game (free licence, none of the
+  original's assets inside) may come with it (levels.md). What players copy into their folders is their business.
 - **Mods are never executed.** BML mods are Windows DLLs: a source of feature requirements, read only, never
   loaded, never run — not even under Wine.
 - **The game never goes online.** No network code in the game: fonts and every other resource ship with it or
