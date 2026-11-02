@@ -422,6 +422,16 @@ mod tests {
             assert!(in_theme(&system, name).is_some(), "system {name}");
         }
         assert!(in_theme(&assets.join("neuro"), "Misc_Fall").is_some());
+        // the generated theme has its own level music, every part of the five themes
+        for n in 1..=5 {
+            for part in 1..=3 {
+                let name = format!("Music_Theme_{n}_{part}");
+                assert!(
+                    in_theme(&assets.join("neuro"), &name).is_some(),
+                    "neuro {name}"
+                );
+            }
+        }
         assert!(t.iter().all(|t| !t.names.is_empty()));
         // the generated theme plays unless the player chose another; a choice not found falls back to it
         assert_eq!(playing(&t, None), DEFAULT);

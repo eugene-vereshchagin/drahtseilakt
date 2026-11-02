@@ -34,7 +34,7 @@ Text the game's font cannot draw (its font has Latin-1 only) is drawn with the s
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | sound themes (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | sound themes (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | sound themes (assets/sounds) |
-| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: nine pieces, Music/music.txt maps them onto the five themes; no atmosphere part |
+| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: *system* nine pieces, Music/music.txt maps them onto the five themes; *neuro* fifteen synthesized phrases, one per part; no atmosphere part |
 | original levels | `3D Entities/Level/Level_NN.NMO` | planned |
 
 Own content comes in stages: interface (fonts, buttons, points box, life balls, texts, menu scene), then balls,
@@ -45,7 +45,8 @@ Sounds and music come in **sound themes**, each a folder (`Sounds/` and `Music/`
 Ogg Vorbis or WAV, a `music.txt` table for the level themes, a `theme.txt` with its name in four languages, author,
 licence and `fallback`). The game ships two in `assets/sounds/`: *system* (openly licensed recordings and the owner's
 music, made by `assets/sounds/system/prepare.py`, CC0 or CC-BY, authors and changes in its `CREDITS.md`, also on the
-Credits screen) and *neuro* (effects synthesized for the game, GPL-3.0-only; music and missing roles from *system*).
+Credits screen) and *neuro* (effects and level music synthesized for the game, GPL-3.0-only; the level music is
+short guzheng-like plucked phrases, one for each of the five themes' three parts; missing roles from *system*).
 Players add their own themes in the data folder's `sounds/<name>/`; *original* among them is made by the toolbox from
 the player's copy and never shipped (until it exists, choosing it plays the copy's sounds). The extended page's
 *Sounds* line chooses the theme (`sound-theme NAME`); *neuro* plays until the player chooses another, and always in
