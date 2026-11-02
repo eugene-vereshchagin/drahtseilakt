@@ -861,18 +861,17 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     let trafos: Vec<_> = game.sim.trafos().collect();
     // where the loose objects (boxes, balls) and the modules' moving parts start, and how near the ball comes to
     // one to move it
-    const PUSH: f32 = 6.0;
+    const PUSH: f32 = 8.0;
     // (the level's objects where they start: the bodies of later sectors are not in the physics yet)
+    // (a module's part is placed by the module, not a level object: where its body is made, or else the module's)
     let objects = &game.level.level.objects;
-    let parts = game.sim.module_bodies().iter().filter_map(|m| objects.iter().position(|o| o.name == m.object));
-    let loose: Vec<glam::Vec3> = game
+    let at = |o: usize| objects.get(o).map(|o| glam::Vec4::from(o.matrix[3]).truncate());
+    let parts = game
         .sim
-        .loose()
+        .module_bodies()
         .iter()
-        .map(|l| l.0)
-        .chain(parts)
-        .filter_map(|o| objects.get(o).map(|o| glam::Vec4::from(o.matrix[3]).truncate()))
-        .collect();
+        .filter_map(|m| game.sim.world().state(m.body).map(|s| s.pos).or_else(|| at(m.placeholder)));
+    let loose: Vec<glam::Vec3> = game.sim.loose().iter().filter_map(|l| at(l.0)).chain(parts).collect();
     let mut kind = game.sim.ball.kind;
     let mut path: Vec<glam::Vec3> = Vec::new();
     let mut gates: Vec<(usize, glam::Vec3)> = Vec::new();
@@ -919,7 +918,10 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     let mut gate_stages: Vec<(usize, glam::Vec3)> = Vec::new();
     for (i, &p) in path.iter().enumerate() {
         let gate = gates.iter().find(|g| g.0 == i);
-        if gate.is_some() || i + 1 == path.len() || stages.last().is_none_or(|l| l.distance(p) >= STAGE) {
+        // (by a loose object every place is a stage: how far the player went to push it matters)
+        let near_loose = loose.iter().any(|o| o.distance(p) < PUSH);
+        let apart = stages.last().is_none_or(|l| l.distance(p) >= if near_loose { 1.5 } else { STAGE });
+        if gate.is_some() || i + 1 == path.len() || apart {
             stages.push(p);
         }
         if let Some(&(_, q)) = gate {
@@ -927,12 +929,13 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
         }
     }
     // a stage the next one comes back from (the track jittered along a straight, or the player overshot and came
-    // back) is no stage; a gate's is kept
+    // back) is no stage; a gate's is kept, and one by a loose object (the player went to push it)
     let mut k = 1;
     while k + 1 < stages.len() {
         let (a, b, c) = (stages[k - 1], stages[k], stages[k + 1]);
         let spike = a.distance(c) < 0.5 * a.distance(b).max(b.distance(c));
-        if spike && gate_stages.iter().all(|g| g.0 != k) {
+        let pushing = loose.iter().any(|o| o.distance(b) < PUSH);
+        if spike && !pushing && gate_stages.iter().all(|g| g.0 != k) {
             stages.remove(k);
             for g in gate_stages.iter_mut().filter(|g| g.0 > k) {
                 g.0 -= 1;
