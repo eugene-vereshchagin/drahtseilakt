@@ -70,6 +70,16 @@ Persönliche ist der Name in der Highscore-Liste.
   die Kamera (Rotation mit links oder rechts), die untere Aktionstaste (A / ✕) ist Overview, Start pausiert. In den
   Menüs bewegt das Steuerkreuz, die untere Taste ist Enter, die rechte (B / ○) Esc. Ihre Tasten lassen sich noch
   nicht umbelegen.
+- **Die Maus** bedient jedes Menü, wie im Original: die Schaltfläche unter dem Zeiger wird gewählt (nur wenn er sich
+  bewegt, so streitet ein ruhender Zeiger nie mit den Tasten), ein Linksklick drückt sie wie Enter, die rechte Taste
+  und die Zurück-Taste der Maus sind Esc. Eine Zeile mit einem Wert (Lautstärke, Auflösung, Sichtfeld, ein
+  Ja/Nein-Schalter) geht mit einem Klick auf ihre linke Hälfte herunter und auf ihre rechte hinauf, wie Links und
+  Rechts; die Pfeile der Bestenliste wechseln das Level. Das Mausrad scrollt die Liste der Community-Level (und wählt
+  die Zeile unter dem Zeiger), sonst geht es durch die Zeilen, in der Bestenliste durch die Level. Ein Klick auf die
+  Zeile einer Taste auf der Seite Controls wartet wie Enter auf eine Taste; Maustasten lassen sich nicht belegen. Der
+  Zeiger ist über den Menüs sichtbar und im Lauf verborgen, nie im Fenster gefangen; der Lauf nimmt nichts von der
+  Maus, so tut ein Klick, der ein Menü schließt, im Level nichts. Die Schaltflächen werden dort getroffen, wo sie
+  gezeichnet sind, in jedem Fenster und mit beiden Oberflächen.
 - Jeder beendete Lauf wird weiterhin als Replay behalten (auf dem Bildschirm ändert das nichts); der schnellste
   ist die Bestzeit, die der erweiterte Modus zeigt.
 

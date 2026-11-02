@@ -2,8 +2,9 @@
 // highscores, the options and their pages, the credits; over a level the pause, dead and end menus, the yes/no
 // questions and the new highscore's name entry. The words are the copy's (lang.rs), the layout the original's 2D
 // frames as the C game shows them. The extended mode adds the custom levels and a page of its own; Options adds the
-// Language page. Chosen with the arrows and Enter; drawn with the interface's textures (our own, or the copy's) and
-// its face (ui.rs), or with the prototype's font when there is neither.
+// Language page. Chosen with the arrows and Enter, or with the mouse (the cursor, a click, the wheel, on the very
+// rectangles drawn); drawn with the interface's textures (our own, or the copy's) and its face (ui.rs), or with the
+// prototype's font when there is neither.
 
 use crate::assets::Data;
 use crate::features::{FEATURES, Feature, Features};
@@ -172,6 +173,50 @@ pub enum Action {
     Bindings(Bindings),
 }
 
+/// What a button under the cursor is: a line of the screen (by its place in the screen's lines), or one of the
+/// highscores' arrows (left -1, right +1).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Target {
+    Line(usize),
+    Arrow(i32),
+}
+
+/// A button where it is drawn: its rectangle in window pixels (left, top, right, bottom).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Hit {
+    pub rect: [f32; 4],
+    pub target: Target,
+}
+
+/// The mouse's cursor over the menu: where it is in the window (pixels), the window's size, and whether the menu is
+/// drawn as the interface (a face to draw with) or as the prototype's lines.
+#[derive(Clone, Copy, Debug)]
+pub struct Pointer {
+    pub interface: bool,
+    pub screen: crate::ui::Screen,
+    pub x: f32,
+    pub y: f32,
+}
+
+/// A line whose value the arrows change (a volume, a size, a switch): a click changes it as they do.
+fn valued(line: Line) -> bool {
+    matches!(
+        line,
+        Line::Music
+            | Line::Effects
+            | Line::Resolution
+            | Line::Synch
+            | Line::Clouds
+            | Line::Fullscreen
+            | Line::Fov
+            | Line::Invert
+            | Line::Mode
+            | Line::Interface
+            | Line::SoundTheme
+            | Line::Switch(_)
+    )
+}
+
 pub struct Menu {
     /// The screens open, the first the menu's base, each with its chosen line.
     stack: Vec<(Screen, usize)>,
@@ -204,6 +249,9 @@ pub struct Menu {
     /// The Controls page's keys, and the action whose new key is awaited.
     pub bindings: Bindings,
     waiting: Option<usize>,
+    /// The first line a long list shows (the custom levels): it moves only as far as keeps the chosen line in view,
+    /// so the line under the cursor stays where it is.
+    top: usize,
 }
 
 impl Menu {
@@ -247,6 +295,7 @@ impl Menu {
             resolutions: Vec::new(),
             bindings: Bindings::load(|_| None, strings.controls, strings.invert),
             waiting: None,
+            top: 0,
         };
         m.push(base);
         m
@@ -272,6 +321,34 @@ impl Menu {
         if let Some(s) = self.stack.last_mut() {
             s.1 = i;
         }
+        self.top = self.shown(self.list_len(self.screen())).start;
+    }
+
+    /// How many lines of `screen` scroll as a list: the custom levels without their Back, else all of its lines.
+    fn list_len(&self, screen: Screen) -> usize {
+        let n = self.lines(screen).len();
+        if screen == Screen::Custom { n.saturating_sub(1) } else { n }
+    }
+
+    /// The lines of a list of `n` shown at once: all of a short one, else LIST_LINES from the list's top, moved as
+    /// little as keeps the chosen line in view.
+    fn shown(&self, n: usize) -> std::ops::Range<usize> {
+        if n <= LIST_LINES + 1 {
+            return 0..n;
+        }
+        let mut start = self.top.min(n - LIST_LINES);
+        let c = self.chosen();
+        if c < start {
+            start = c;
+        } else if c < n && c >= start + LIST_LINES {
+            start = c + 1 - LIST_LINES;
+        }
+        start..start + LIST_LINES
+    }
+
+    /// A newly shown screen's list starts with its chosen line in the middle.
+    fn centre_list(&mut self) {
+        self.top = self.chosen().saturating_sub(LIST_LINES / 2);
     }
 
     /// Opens `screen` over the current one, its line chosen as the original chooses it.
@@ -301,6 +378,7 @@ impl Menu {
             self.shown = self.level;
         }
         self.stack.push((screen, first.unwrap_or(0)));
+        self.centre_list();
         if !self.selectable(screen, self.chosen()) {
             self.step(1);
         }
@@ -309,6 +387,7 @@ impl Menu {
     fn pop(&mut self) {
         if self.stack.len() > 1 {
             self.stack.pop();
+            self.centre_list();
         }
     }
 
@@ -601,6 +680,98 @@ impl Menu {
     fn toggle_invert(&mut self) -> Action {
         self.bindings.invert = !self.bindings.invert;
         Action::Bindings(self.bindings)
+    }
+
+    /// The buttons of the screen shown and where they are drawn, in a window of `screen`'s size: the interface's
+    /// (the very rectangles it draws, any size and aspect) or the prototype's lines.
+    pub fn hits(&self, interface: bool, screen: crate::ui::Screen) -> Vec<Hit> {
+        if interface {
+            let hits = std::cell::RefCell::new(Vec::new());
+            self.draw(None, screen, &hits);
+            hits.into_inner()
+        } else {
+            let mut hits = Vec::new();
+            self.sketch(screen.w, screen.h, &mut hits);
+            hits
+        }
+    }
+
+    /// The button under the cursor.
+    fn hit(&self, p: Pointer) -> Option<Hit> {
+        let inside = |h: &Hit| p.x >= h.rect[0] && p.x < h.rect[2] && p.y >= h.rect[1] && p.y < h.rect[3];
+        self.hits(p.interface, p.screen).into_iter().find(inside)
+    }
+
+    /// The cursor moved: the line under it is chosen, as the arrows would choose it (a line that cannot be chosen,
+    /// or a key being awaited, leaves the choice alone). True when the chosen line changed.
+    pub fn hover(&mut self, p: Pointer) -> bool {
+        if self.waiting() {
+            return false;
+        }
+        let Some(Hit { target: Target::Line(i), .. }) = self.hit(p) else {
+            return false;
+        };
+        if i == self.chosen() || !self.selectable(self.screen(), i) {
+            return false;
+        }
+        self.set_chosen(i);
+        true
+    }
+
+    /// A left click: the button under the cursor chosen and pressed as Enter presses it; a line with a value goes
+    /// down on its left half and up on its right half, as Left and Right change it; the highscores' arrows change
+    /// the level. None when no button is there (or a key is awaited: a mouse button is not a key to bind).
+    pub fn click(&mut self, p: Pointer) -> Option<Action> {
+        if self.waiting() {
+            return None;
+        }
+        let hit = self.hit(p)?;
+        match hit.target {
+            Target::Arrow(by) => Some(self.adjust(by)),
+            Target::Line(i) => {
+                let sc = self.screen();
+                if !self.selectable(sc, i) {
+                    return None;
+                }
+                self.set_chosen(i);
+                let by = if p.x < (hit.rect[0] + hit.rect[2]) / 2.0 { -1 } else { 1 };
+                Some(match self.lines(sc).get(i) {
+                    Some(&l) if valued(l) => self.adjust(by),
+                    _ => self.enter(),
+                })
+            }
+        }
+    }
+
+    /// The wheel turned a notch, down (+1) or up (-1): a long list (the custom levels) scrolls, its line under the
+    /// cursor (`at`) chosen, else the chosen line kept in view; the highscores go through the levels; elsewhere the
+    /// lines are chosen as the arrows choose them.
+    pub fn wheel(&mut self, by: i32, at: Option<Pointer>) -> Action {
+        let by = by.signum();
+        if self.waiting() || by == 0 {
+            return Action::None;
+        }
+        let sc = self.screen();
+        let n = self.list_len(sc);
+        match sc {
+            Screen::Highscore => return self.adjust(by),
+            Screen::Entry => {}
+            Screen::Custom if n > LIST_LINES + 1 => {
+                let start = self.shown(n).start;
+                self.top = start.saturating_add_signed(by as isize).min(n - LIST_LINES);
+                let c = self.chosen();
+                if c < n
+                    && let Some(s) = self.stack.last_mut()
+                {
+                    s.1 = c.clamp(self.top, self.top + LIST_LINES - 1);
+                }
+                if let Some(p) = at {
+                    self.hover(p);
+                }
+            }
+            _ => self.step(by as isize),
+        }
+        Action::None
     }
 
     /// A new key is awaited (Enter on a Controls row).
@@ -948,7 +1119,11 @@ impl Menu {
     /// The prototype's menu over the frame (when the copy lacks the game's font): a shaded screen, the title, the
     /// lines and the page's fields.
     pub fn overlay(&self, width_px: u32, height_px: u32) -> Vec<Rect> {
-        let (w, h) = (width_px as f32, height_px as f32);
+        self.sketch(width_px as f32, height_px as f32, &mut Vec::new())
+    }
+
+    /// The prototype's menu, and in `hits` where its lines are (each line's band, as the chosen one is shaded).
+    fn sketch(&self, w: f32, h: f32, hits: &mut Vec<Hit>) -> Vec<Rect> {
         let mut out = vec![Rect {
             x: 0.0,
             y: 0.0,
@@ -964,7 +1139,11 @@ impl Menu {
         let screen = self.screen();
         let lines = self.lines(screen);
         let fields = self.fields(screen);
-        let shown = window(lines.len(), self.chosen());
+        // a long list shows the lines around the chosen one (the custom levels' Back as well, after them)
+        let mut shown: Vec<usize> = self.shown(self.list_len(screen)).collect();
+        if screen == Screen::Custom {
+            shown.push(lines.len().saturating_sub(1));
+        }
         let total = 6.0 + fields.len() as f32 + 1.2 * shown.len() as f32;
         let mut y = ((h - total * line) / 2.0).max(0.0);
         let title = self.title(screen).map_or_else(|| "DRAHTSEILAKT".to_owned(), |t| t.trim().to_uppercase());
@@ -991,16 +1170,18 @@ impl Menu {
                 (false, true) => WHITE,
                 (false, false) => GREY,
             };
+            let pad = s * 3.0;
+            let lw = width(&t, s);
+            let band = Rect {
+                x: (w - lw) / 2.0 - pad,
+                y: y - s * 1.5,
+                w: lw + 2.0 * pad,
+                h: line,
+                color: SELECT,
+            };
+            hits.push(Hit { rect: [band.x, band.y, band.x + band.w, band.y + band.h], target: Target::Line(i) });
             if i == self.chosen() {
-                let pad = s * 3.0;
-                let lw = width(&t, s);
-                out.push(Rect {
-                    x: (w - lw) / 2.0 - pad,
-                    y: y - s * 1.5,
-                    w: lw + 2.0 * pad,
-                    h: line,
-                    color: SELECT,
-                });
+                out.push(band);
             }
             centre(&mut out, &t, y, s, color);
             y += 1.2 * line;
@@ -1032,20 +1213,22 @@ impl Menu {
     }
 }
 
-/// The lines of a list shown at once: all of a short one, else a window around the chosen line.
-fn window(n: usize, chosen: usize) -> std::ops::Range<usize> {
-    if n <= LIST_LINES + 1 {
-        return 0..n;
-    }
-    let start = chosen.saturating_sub(LIST_LINES / 2).min(n - LIST_LINES);
-    start..start + LIST_LINES
-}
 
 /// The original's menu screens (Menu.nmo's 2D frames, measured in the C game): a dark band down the middle, the
 /// buttons over Button01_select (chosen), Button01_deselect or Button01_special (not playable), their labels in the
 /// game's fonts (GameFont_01 for the main buttons, GameFont_03 and the grey GameFont_03a for the small ones).
 impl Menu {
     pub fn interface(&self, font: Option<&crate::ui::Face>, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
+        self.draw(font, screen, &std::cell::RefCell::new(Vec::new()))
+    }
+
+    /// The interface's quads, and in `hits` the buttons a click or the cursor can choose, where they are drawn.
+    fn draw(
+        &self,
+        font: Option<&crate::ui::Face>,
+        screen: crate::ui::Screen,
+        hits: &std::cell::RefCell<Vec<Hit>>,
+    ) -> Vec<crate::ui::Quad> {
         use crate::ui::{Anchor, Quad, homogeneous};
         let mut out = Vec::new();
         // the own interface's picture behind the menus (the original's has its 3D scene, drawn by the game)
@@ -1121,7 +1304,10 @@ impl Menu {
             }
             out.extend(crate::ui::place(quads, screen, Anchor::Center));
         };
-        let button = |out: &mut Vec<Quad>, r: [f32; 4], uv: [f32; 4], state: Button| {
+        let button = |out: &mut Vec<Quad>, r: [f32; 4], uv: [f32; 4], state: Button, at: Option<Target>| {
+            if let Some(target) = at {
+                hits.borrow_mut().push(Hit { rect: screen.rect(homogeneous(r), Anchor::Center), target });
+            }
             let tex = match state {
                 Button::Over => SELECT_TEX,
                 Button::Up => DESELECT_TEX,
@@ -1151,13 +1337,13 @@ impl Menu {
             let mut k = 0;
             for (i, &l) in lines.iter().enumerate() {
                 if l == Line::Back {
-                    button(out, BACK_RECT, BACK_UV, state(i));
+                    button(out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
                     label(out, &self.label(l), BACK_RECT, &FONT_01);
                     continue;
                 }
                 let y = top + k as f32 * step;
                 let r = [0.35, y, 0.65, y + 0.0938];
-                button(out, r, MAIN_UV, state(i));
+                button(out, r, MAIN_UV, state(i), Some(Target::Line(i)));
                 label(out, &self.label(l), r, &FONT_01);
                 k += 1;
             }
@@ -1172,19 +1358,15 @@ impl Menu {
                 .iter()
                 .position(|&l| l == Line::Back || l == Line::Next)
             {
-                button(out, BACK_RECT, BACK_UV, state(i));
+                button(out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
                 label(out, &self.label(lines[i]), BACK_RECT, &FONT_01);
             }
         };
         // a field: its label at the top, its value under it (a yes/no pair, or text between arrows)
-        let field = |out: &mut Vec<Quad>, y: f32, name: &str, value: &str, chosen: bool| {
+        let field = |out: &mut Vec<Quad>, y: f32, name: &str, value: &str, i: usize| {
             let r = [0.35, y, 0.65, y + 0.1];
-            button(
-                out,
-                r,
-                FIELD_UV,
-                if chosen { Button::Over } else { Button::Up },
-            );
+            let st = if self.chosen() == i { Button::Over } else { Button::Up };
+            button(out, r, FIELD_UV, st, Some(Target::Line(i)));
             label(out, name, [0.35, y + 0.005, 0.65, y + 0.045], &FONT_03);
             label(out, value, [0.40, y + 0.045, 0.60, y + 0.085], &FONT_03);
         };
@@ -1199,13 +1381,13 @@ impl Menu {
                 // the languages in their own names, the one spoken in gold
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Lang(k) = l else {
-                        button(&mut out, BACK_RECT, BACK_UV, state(i));
+                        button(&mut out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
                         label(&mut out, &self.label(l), BACK_RECT, &FONT_01);
                         continue;
                     };
                     let y = 0.28 + k as f32 * 0.065;
                     let r = [0.4031, y, 0.5969, y + 0.052];
-                    button(&mut out, r, LEVEL_UV, state(i));
+                    button(&mut out, r, LEVEL_UV, state(i), Some(Target::Line(i)));
                     let spoken = LANGUAGES.get(k).is_some_and(|c| c.0 == self.strings.language());
                     let style = if spoken { FONT_03_GOLD } else { FONT_03 };
                     label(&mut out, &self.label(l), [0.42, y, 0.5969, y + 0.052], &style);
@@ -1217,13 +1399,13 @@ impl Menu {
                 let step = if n <= 12 { 0.06 } else { 0.72 / n as f32 };
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Level(k) = l else {
-                        button(&mut out, BACK_RECT, BACK_UV, state(i));
+                        button(&mut out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
                         label(&mut out, &self.label(l), BACK_RECT, &FONT_01);
                         continue;
                     };
                     let y = 0.09 + k as f32 * step;
                     let r = [0.4031, y, 0.5969, y + step - 0.01];
-                    button(&mut out, r, LEVEL_UV, state(i));
+                    button(&mut out, r, LEVEL_UV, state(i), Some(Target::Line(i)));
                     let style = if self.selectable(sc, i) {
                         &FONT_03
                     } else {
@@ -1244,11 +1426,11 @@ impl Menu {
             }
             Screen::Custom => {
                 title(&mut out);
-                let shown = window(lines.len().saturating_sub(1), self.chosen());
+                let shown = self.shown(self.list_len(sc));
                 for (row, i) in shown.enumerate() {
                     let y = 0.27 + row as f32 * 0.045;
                     let r = [0.36, y, 0.64, y + 0.04];
-                    button(&mut out, r, LEVEL_UV, state(i));
+                    button(&mut out, r, LEVEL_UV, state(i), Some(Target::Line(i)));
                     // a long name smaller or on two lines, to stay on its button (the label does it)
                     let mut name = self.label(lines[i]);
                     if name.chars().count() > 60 {
@@ -1271,12 +1453,14 @@ impl Menu {
                     [0.36, 0.174, 0.39625, 0.2257],
                     ARROW_LEFT_UV,
                     Button::Up,
+                    Some(Target::Arrow(-1)),
                 );
                 button(
                     &mut out,
                     [0.6038, 0.174, 0.64, 0.2257],
                     ARROW_RIGHT_UV,
                     Button::Up,
+                    Some(Target::Arrow(1)),
                 );
                 for (k, (name, points)) in self.fields(sc).iter().enumerate() {
                     let y = 0.30 + k as f32 * 0.05;
@@ -1285,6 +1469,7 @@ impl Menu {
                         [0.36, y, 0.64, y + 0.041],
                         PLACE_UV,
                         Button::Inactive,
+                        None,
                     );
                     let u = 0.0627 * k as f32;
                     let ny = y + 0.007;
@@ -1293,6 +1478,7 @@ impl Menu {
                         [0.364, ny, 0.384, ny + 0.0267],
                         [u, 0.0, u + 0.0588, 0.0588],
                         Button::Inactive,
+                        None,
                     );
                     let mut left = FONT_03;
                     left.align = crate::ui::ALIGN_LEFT;
@@ -1312,16 +1498,16 @@ impl Menu {
                         let chosen = self.chosen() == k;
                         let st = if chosen { Button::Over } else { Button::Up };
                         if *line == Line::Invert {
-                            field(&mut out, if self.features.mode { 0.715 } else { 0.70 }, name, key, chosen);
+                            field(&mut out, if self.features.mode { 0.715 } else { 0.70 }, name, key, k);
                             continue;
                         }
                         let y = 0.30 + k as f32 * 0.06;
                         if *line == Line::Defaults {
-                            button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st);
+                            button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st, Some(Target::Line(k)));
                             label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
                             continue;
                         }
-                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st);
+                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st, Some(Target::Line(k)));
                         label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
                         label(&mut out, key, [0.505, y, 0.65, y + 0.0396], &FONT_03);
                     }
@@ -1330,7 +1516,7 @@ impl Menu {
                     // page's rows, then lines of help or the folder
                     let first = usize::from(sc == Screen::Extended);
                     if let (1, Some((name, value))) = (first, fields.first()) {
-                        field(&mut out, 0.27, name, value, self.chosen() == 0);
+                        field(&mut out, 0.27, name, value, 0);
                     }
                     let rows = |l: &&Line| {
                         matches!(l, Line::Switch(_) | Line::Interface | Line::SoundTheme | Line::DebugMenu)
@@ -1344,7 +1530,8 @@ impl Menu {
                         } else {
                             Button::Up
                         };
-                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st);
+                        let at = Some(Target::Line(k + first));
+                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st, at);
                         label(&mut out, name, [0.375, y, 0.55, y + 0.0396], &FONT_03);
                         label(&mut out, value, [0.55, y, 0.65, y + 0.0396], &FONT_03);
                     }
@@ -1357,7 +1544,7 @@ impl Menu {
                     let (top, step) = if fields.len() > 4 { (0.25, 0.12) } else { (0.295, 0.15) };
                     for (k, (name, value)) in fields.iter().enumerate() {
                         let y = top + k as f32 * step;
-                        field(&mut out, y, name, value, self.chosen() == k);
+                        field(&mut out, y, name, value, k);
                     }
                 }
                 back_only(&mut out);
@@ -1376,7 +1563,7 @@ impl Menu {
                     label(&mut out, &t, [0.35, 0.30, 0.65, 0.50], &st);
                 }
                 for (i, r) in [YES_RECT, NO_RECT].into_iter().enumerate() {
-                    button(&mut out, r, YES_NO_UV, state(i));
+                    button(&mut out, r, YES_NO_UV, state(i), Some(Target::Line(i)));
                     label(&mut out, &self.label(lines[i]), r, &FONT_03);
                 }
             }
@@ -1404,6 +1591,7 @@ impl Menu {
                     [0.4031, 0.80, 0.5906, 0.8938],
                     BACK_UV,
                     Button::Over,
+                    Some(Target::Line(0)),
                 );
                 label(
                     &mut out,
@@ -1691,9 +1879,199 @@ mod tests {
             resolutions: vec![(800, 600), (1280, 720), (1920, 1080)],
             bindings: Bindings::default(),
             waiting: None,
+            top: 0,
         };
         m.push(Screen::Main);
         m
+    }
+
+    /// Window sizes of every shape: the original's, wide, ultra-wide, portrait, tiny.
+    const WINDOWS: [(f32, f32); 5] =
+        [(640.0, 480.0), (1920.0, 1080.0), (3440.0, 1080.0), (1080.0, 1920.0), (320.0, 200.0)];
+
+    fn at(m: &Menu, interface: bool, w: f32, h: f32, target: Target, fx: f32) -> Pointer {
+        let screen = crate::ui::Screen { w, h };
+        let hit = m.hits(interface, screen).into_iter().find(|h| h.target == target).unwrap();
+        let r = hit.rect;
+        Pointer { interface, screen, x: r[0] + (r[2] - r[0]) * fx, y: (r[1] + r[3]) / 2.0 }
+    }
+
+    fn line_of(m: &Menu, l: Line) -> Target {
+        Target::Line(m.lines(m.screen()).iter().position(|&x| x == l).unwrap())
+    }
+
+    #[test]
+    fn the_buttons_are_hit_where_they_are_drawn_in_any_window() {
+        let m = menu(&[true, true], true);
+        for (w, h) in WINDOWS {
+            let screen = crate::ui::Screen { w, h };
+            let hits = m.hits(true, screen);
+            // one per line, each exactly a button the interface draws
+            assert_eq!(hits.len(), m.lines(Screen::Main).len());
+            let quads = m.interface(None, screen);
+            for hit in &hits {
+                assert!(quads.iter().any(|q| q.rect == hit.rect), "{w}x{h}: {hit:?}");
+                assert!(hit.rect[0] >= 0.0 && hit.rect[2] <= w && hit.rect[1] >= 0.0 && hit.rect[3] <= h);
+            }
+            // a click on Options opens it, wherever the window puts it
+            let mut m = menu(&[true, true], true);
+            let p = at(&m, true, w, h, line_of(&m, Line::Options), 0.5);
+            assert_eq!(m.click(p), Some(Action::None));
+            assert_eq!(m.screen(), Screen::Options);
+            // the same with the prototype's lines
+            let mut m = menu(&[true, true], true);
+            let p = at(&m, false, w, h, line_of(&m, Line::Credits), 0.5);
+            assert_eq!(m.click(p), Some(Action::None));
+            assert_eq!(m.screen(), Screen::Credits);
+        }
+    }
+
+    #[test]
+    fn hovering_chooses_a_line_and_nothing_else() {
+        let mut m = menu(&[true, false, true], false);
+        m.push(Screen::Start);
+        let level2 = at(&m, true, 1920.0, 1080.0, Target::Line(1), 0.5);
+        let level3 = at(&m, true, 1920.0, 1080.0, Target::Line(2), 0.5);
+        // a locked level is not chosen, an open one is, and once chosen it says nothing changed
+        assert!(!m.hover(level2));
+        assert!(m.hover(level3));
+        assert_eq!(m.chosen(), 2);
+        assert!(!m.hover(level3));
+        assert_eq!(m.click(level2), None);
+        assert_eq!(m.click(level3), Some(Action::Play(3)));
+        // between the buttons nothing is hit
+        let gap = Pointer { x: 5.0, y: 5.0, ..level3 };
+        assert!(!m.hover(gap));
+        assert_eq!(m.click(gap), None);
+    }
+
+    #[test]
+    fn a_click_on_a_value_goes_down_on_its_left_half_and_up_on_its_right() {
+        let mut m = menu(&[true], true);
+        m.push(Screen::Options);
+        m.push(Screen::Sound);
+        m.volumes = [0.5, 0.5];
+        let music = line_of(&m, Line::Music);
+        assert_eq!(m.click(at(&m, true, 1600.0, 900.0, music, 0.2)), Some(Action::Volumes([0.5, 0.4])));
+        assert_eq!(m.click(at(&m, true, 1600.0, 900.0, music, 0.8)), Some(Action::Volumes([0.5, 0.5])));
+        m.back();
+        m.push(Screen::Graphics);
+        let fov = m.graphics.fov;
+        let p = at(&m, true, 1600.0, 900.0, line_of(&m, Line::Fov), 0.9);
+        assert!(graphics(m.click(p).unwrap()).unwrap().fov > fov);
+        let p = at(&m, true, 1600.0, 900.0, line_of(&m, Line::Fov), 0.1);
+        assert_eq!(graphics(m.click(p).unwrap()).unwrap().fov, fov);
+        // a switch flips on either half
+        let synch = m.graphics.vsync;
+        let p = at(&m, true, 1600.0, 900.0, line_of(&m, Line::Synch), 0.1);
+        assert_eq!(graphics(m.click(p).unwrap()).unwrap().vsync, !synch);
+        // the resolution goes through the sizes
+        let p = at(&m, true, 1600.0, 900.0, line_of(&m, Line::Resolution), 0.9);
+        assert_eq!(graphics(m.click(p).unwrap()).unwrap().resolution, Some((800, 600)));
+        // Back is a button like any other
+        let p = at(&m, true, 1600.0, 900.0, line_of(&m, Line::Back), 0.5);
+        m.click(p);
+        assert_eq!(m.screen(), Screen::Options);
+    }
+
+    #[test]
+    fn the_highscores_arrows_change_the_level() {
+        let mut m = menu(&[true, true, true], false);
+        m.push(Screen::Highscore);
+        let right = at(&m, true, 800.0, 600.0, Target::Arrow(1), 0.5);
+        m.click(right);
+        assert_eq!(m.shown, 2);
+        let left = at(&m, true, 800.0, 600.0, Target::Arrow(-1), 0.5);
+        m.click(left);
+        m.click(left);
+        assert_eq!(m.shown, 3);
+        // the wheel too
+        m.wheel(1, None);
+        assert_eq!(m.shown, 1);
+    }
+
+    #[test]
+    fn a_click_on_a_key_waits_for_a_key_and_no_mouse_button_is_bound() {
+        let mut m = menu(&[true], false);
+        m.push(Screen::Options);
+        m.push(Screen::Controls);
+        let forward = at(&m, true, 1280.0, 1024.0, Target::Line(0), 0.5);
+        let left = at(&m, true, 1280.0, 1024.0, Target::Line(2), 0.5);
+        assert_eq!(m.click(left), Some(Action::None));
+        assert!(m.waiting());
+        // the cursor and more clicks leave the wait alone; Esc (the right button) gives it up
+        assert!(!m.hover(forward));
+        assert_eq!(m.click(forward), None);
+        assert_eq!(m.chosen(), 2);
+        m.back();
+        assert!(!m.waiting());
+        assert_eq!(m.screen(), Screen::Controls);
+    }
+
+    #[test]
+    fn yes_and_no_are_clicked() {
+        let mut m = menu(&[true], false);
+        m.push(Screen::Ask(Ask::Quit));
+        let no = at(&m, true, 1366.0, 768.0, line_of(&m, Line::No), 0.5);
+        let yes = at(&m, true, 1366.0, 768.0, line_of(&m, Line::Yes), 0.5);
+        assert_eq!(m.click(yes), Some(Action::Quit));
+        m.click(no);
+        assert_eq!(m.screen(), Screen::Main);
+    }
+
+    #[test]
+    fn a_long_list_keeps_still_under_the_cursor_and_the_wheel_scrolls_it() {
+        let mut m = menu(&[true], true);
+        m.maps = (0..30)
+            .map(|i| Package {
+                level: PathBuf::from(format!("{i}.nmo")),
+                folder: PathBuf::from(format!("{i}.nmo")),
+                title: format!("Level number {i} with a rather long title"),
+                author: None,
+                version: None,
+            })
+            .collect();
+        m.push(Screen::Custom);
+        let (w, h) = (2560.0, 1440.0);
+        let rows = |m: &Menu| -> Vec<usize> {
+            let screen = crate::ui::Screen { w, h };
+            let line = |h: &Hit| if let Target::Line(i) = h.target { Some(i) } else { None };
+            m.hits(true, screen).iter().filter_map(line).collect()
+        };
+        // twelve maps and Back
+        assert_eq!(rows(&m), (0..12).chain([30]).collect::<Vec<_>>());
+        // the cursor down the rows: the list does not move under it
+        for i in [3, 11, 7] {
+            assert!(m.hover(at(&m, true, w, h, Target::Line(i), 0.5)));
+            assert_eq!(m.chosen(), i);
+            assert_eq!(rows(&m)[0], 0);
+        }
+        // the wheel scrolls; the row under the cursor (the eighth shown) is chosen
+        let p = at(&m, true, w, h, Target::Line(7), 0.5);
+        m.wheel(1, Some(p));
+        m.wheel(1, Some(p));
+        assert_eq!(rows(&m)[0], 2);
+        assert_eq!(m.chosen(), 9);
+        // without the cursor on it the chosen line stays in view
+        for _ in 0..40 {
+            m.wheel(1, None);
+        }
+        assert_eq!(rows(&m)[0], 18);
+        assert_eq!(m.chosen(), 18);
+        m.wheel(-1, None);
+        assert_eq!(rows(&m)[0], 17);
+        // the arrows still move the view only as far as the chosen line needs
+        m.step(1);
+        assert_eq!((m.chosen(), rows(&m)[0]), (19, 17));
+        assert_eq!(m.click(at(&m, true, w, h, Target::Line(20), 0.5)), Some(Action::Map(PathBuf::from("20.nmo"))));
+    }
+
+    #[test]
+    fn the_name_entry_ok_is_clicked() {
+        let mut m = menu(&[true], false);
+        m.ask_name(b"Veresk".to_vec(), 1234);
+        let ok = at(&m, true, 1024.0, 768.0, Target::Line(0), 0.5);
+        assert_eq!(m.click(ok), Some(Action::Score(b"Veresk".to_vec())));
     }
 
     #[test]

@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Fullscreen, Window, WindowId};
@@ -1018,6 +1018,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         pads: crate::options::Pads::open(),
         pad_keys: 0,
         pad_held: false,
+        cursor: None,
+        wheel: 0.0,
+        cursor_shown: None,
         resolutions: crate::options::WINDOWED.to_vec(),
         player: load_player(),
         time_scale: 1.0,
@@ -2114,6 +2117,12 @@ struct App {
     pad_keys: u8,
     /// A pad button that closed the menu is still held: the run takes none of the pad's keys until all are let go.
     pad_held: bool,
+    /// The mouse's cursor in the window (pixels), while it is over it.
+    cursor: Option<(f64, f64)>,
+    /// The wheel's turn not yet a whole notch (a touchpad's pixels come in small steps).
+    wheel: f64,
+    /// The cursor is shown (menus) or hidden (the run); None until first set.
+    cursor_shown: Option<bool>,
 }
 
 /// The sizes the Graphics page offers: the monitor's modes and the window sizes that fit on it, smallest first.
@@ -2929,6 +2938,88 @@ impl App {
     }
 }
 
+/// Pixels of a touchpad's scrolling that make one notch of the wheel.
+const WHEEL_PIXELS: f64 = 40.0;
+
+/// The mouse in the menus (menu.rs: hover, click, wheel). The run takes nothing from the mouse, so a click that
+/// closes a menu has nothing to leak into it.
+impl App {
+    /// Where the cursor is over the menu, as the menu lays its buttons out in this window.
+    fn pointer(&self) -> Option<crate::menu::Pointer> {
+        let (x, y) = self.cursor?;
+        let gpu = self.gpu.as_ref()?;
+        Some(crate::menu::Pointer {
+            interface: self.game.font.is_some(),
+            screen: crate::ui::Screen { w: gpu.config.width as f32, h: gpu.config.height as f32 },
+            x: x as f32,
+            y: y as f32,
+        })
+    }
+
+    /// The menu's click sound, as its keys make it.
+    fn menu_click(&mut self) {
+        if let Some(a) = &mut self.audio {
+            a.play(&self.data, "Menu_click", 1.0, 0.0);
+        }
+    }
+
+    fn mouse_moved(&mut self) {
+        let Some(p) = self.pointer() else { return };
+        if self.loading.is_none() && self.menu.as_mut().is_some_and(|m| m.hover(p)) {
+            self.menu_click();
+        }
+    }
+
+    /// Left presses the button under the cursor; right and the mouse's back button are Esc.
+    fn mouse_button(&mut self, button: MouseButton, event_loop: &ActiveEventLoop) {
+        if self.menu.is_none() || self.loading.is_some() {
+            return;
+        }
+        match button {
+            MouseButton::Left => {
+                let Some(p) = self.pointer() else { return };
+                if let Some(action) = self.menu.as_mut().and_then(|m| m.click(p)) {
+                    self.menu_click();
+                    self.menu_action(action, event_loop);
+                }
+            }
+            MouseButton::Right | MouseButton::Back => self.menu_key(KeyCode::Escape, None, event_loop),
+            _ => {}
+        }
+    }
+
+    /// Each whole notch of the wheel (up scrolls up) is one step of the menu's wheel.
+    fn mouse_wheel(&mut self, delta: MouseScrollDelta, event_loop: &ActiveEventLoop) {
+        if self.menu.is_none() || self.loading.is_some() {
+            self.wheel = 0.0;
+            return;
+        }
+        self.wheel += match delta {
+            MouseScrollDelta::LineDelta(_, y) => f64::from(y),
+            MouseScrollDelta::PixelDelta(p) => p.y / WHEEL_PIXELS,
+        };
+        while self.wheel.abs() >= 1.0 {
+            let by = if self.wheel > 0.0 { -1 } else { 1 };
+            self.wheel += f64::from(by);
+            let p = self.pointer();
+            if let Some(action) = self.menu.as_mut().map(|m| m.wheel(by, p)) {
+                self.menu_action(action, event_loop);
+            }
+        }
+    }
+
+    /// The cursor shown over the menus and hidden in the run (and while a level loads); never confined.
+    fn show_cursor(&mut self) {
+        let shown = self.menu.is_some() && self.loading.is_none();
+        if self.cursor_shown != Some(shown)
+            && let Some(w) = &self.window
+        {
+            w.set_cursor_visible(shown);
+            self.cursor_shown = Some(shown);
+        }
+    }
+}
+
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none()
@@ -2975,6 +3066,19 @@ impl ApplicationHandler for App {
                 self.key(code, down, text.as_deref(), event_loop)
             }
             WindowEvent::RedrawRequested => self.frame(),
+            // the mouse in the menus: the cursor chooses (only when it moves), a click presses, the wheel scrolls
+            WindowEvent::CursorMoved { position, .. } => {
+                let at = Some((position.x, position.y));
+                if at != self.cursor {
+                    self.cursor = at;
+                    self.mouse_moved();
+                }
+            }
+            WindowEvent::CursorLeft { .. } => self.cursor = None,
+            WindowEvent::MouseInput { state: ElementState::Pressed, button, .. } => {
+                self.mouse_button(button, event_loop)
+            }
+            WindowEvent::MouseWheel { delta, .. } => self.mouse_wheel(delta, event_loop),
             // a key let go while the window was not ours may never be reported released
             WindowEvent::Focused(false) => self.held.clear(),
             _ => {}
@@ -2983,6 +3087,7 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         self.gamepads(event_loop);
+        self.show_cursor();
         if let Some(w) = &self.window {
             w.request_redraw();
         }
