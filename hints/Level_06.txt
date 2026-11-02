@@ -1,0 +1,3 @@
+# Level 6 — hints for the test player (docs/drahtseilakt/autopilot.md). The owner's run (Level_06-owner.replay,
+# beside this file) ends at the convex log in sector 2; from there the test player finds the way itself, by the plan
+# Level_06.plan (the order of transformers and fans the walkthrough video takes).

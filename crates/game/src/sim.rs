@@ -1596,6 +1596,25 @@ impl Sim {
         self.extras.iter().map(crate::extra::Extra::view).collect()
     }
 
+    /// The fans' updrafts, for the test player: where each is measured to, the top of its volume and how far across
+    /// from its point it takes the ball (the inner proximity, within the volume).
+    pub fn updrafts(&self) -> Vec<(Vec3, f32, f32)> {
+        self.updrafts
+            .iter()
+            .map(|u| {
+                let v = &u.at.volume;
+                let reach = |f: fn(Vec3) -> f32| (0..3).map(|i| f(v.axes[i]).abs() * v.half[i]).sum::<f32>();
+                let across = reach(|a| a.x).min(reach(|a| a.z)).min(7.0);
+                (u.at.point, v.center.y + reach(|a| a.y), across)
+            })
+            .collect()
+    }
+
+    /// Whether an updraft lifts the ball now.
+    pub fn in_updraft(&self) -> bool {
+        self.updrafts.iter().any(|u| u.force.is_some())
+    }
+
     /// The fans in the physics now (their points), for their sound.
     pub fn fans(&self) -> Vec<Vec3> {
         self.updrafts.iter().filter(|u| u.outer.on || u.inner.on).map(|u| u.at.point).collect()
