@@ -465,6 +465,10 @@ fn read_capped(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
 struct Reader<'a> {
     doc: &'a Value,
     bin: &'a [u8],
+    /// Bytes still to be read through accessors. glTF lets accessors be shared, so a level.gltf naming one large
+    /// accessor from many meshes would copy the buffer again and again (gigabytes from a small file); what is read in
+    /// all stays within twice the buffer (what the exporter writes reads each byte once).
+    budget: std::cell::Cell<usize>,
 }
 
 impl Reader<'_> {
@@ -499,6 +503,8 @@ impl Reader<'_> {
         if needed > length {
             return Err(format!("accessor {index}: larger than its view"));
         }
+        let left = self.budget.get().checked_sub(needed).ok_or("accessors read more than twice the buffer")?;
+        self.budget.set(left);
         let end = offset.checked_add(needed).ok_or("view overflows")?;
         let bytes = self
             .bin
@@ -592,6 +598,7 @@ fn import_from(
     let r = Reader {
         doc: &doc,
         bin: &bin,
+        budget: std::cell::Cell::new(bin.len().saturating_mul(2)),
     };
     let arr = |key: &str| doc[key].as_array().cloned().unwrap_or_default();
     let mut level = Level::default();

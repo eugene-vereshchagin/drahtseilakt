@@ -89,6 +89,14 @@ fn fuzz_image() {
 // --- small text files ------------------------------------------------------------------------------------------
 
 pub fn run_level_txt(input: &[u8]) {
+    // the names shown for a level folder or file (its title, else its name) go through the same cleaning
+    let text = String::from_utf8_lossy(input);
+    for max in [1, 2, 7, gamedata::package::TITLE_MAX] {
+        let c = gamedata::package::clean(&text, max);
+        assert!(c.chars().count() <= max, "clean() over {max} characters");
+        assert!(!c.chars().any(char::is_control), "clean() kept a control character");
+    }
+    assert!(!gamedata::package::printable(&text).chars().any(char::is_control), "printable() kept a control character");
     let info = gamedata::package::parse_info(input);
     for (v, max) in [
         (&info.title, gamedata::package::TITLE_MAX),

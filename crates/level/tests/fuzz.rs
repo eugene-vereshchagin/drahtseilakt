@@ -67,6 +67,21 @@ pub fn run_nmo_file(bytes: &[u8]) {
         decode_all(&doc);
     }
     if let Ok(loaded) = level::from_nmo::load_file(&file) {
+        // the model is not much larger than the file it came from: no few words make megabytes
+        let floats: usize = loaded
+            .level
+            .meshes
+            .iter()
+            .map(|m| {
+                m.positions.len() * 3
+                    + m.normals.len() * 3
+                    + m.uvs.len() * 2
+                    + m.channels.iter().map(|c| c.uvs.len() * 2).sum::<usize>()
+                    + m.parts.iter().map(|p| p.indices.len()).sum::<usize>()
+            })
+            .sum();
+        let input = file.header1.len() + file.data.len();
+        assert!(floats * 4 <= 64 * input + (1 << 20), "a model of {floats} numbers from {input} bytes");
         for t in &loaded.level.textures {
             if let level::TextureSource::Pixels { width, height, rgba } = &t.source {
                 check_pixels(*width, *height, rgba);
@@ -275,6 +290,20 @@ fn fuzz_nmo_chunk() {
 pub fn run_open_level(input: &[u8]) {
     let parts = fuzzkit::split_parts(input, 2);
     if let Ok(l) = level::open::import_bytes(&fuzzkit::scratch(), parts[0], parts[1]) {
+        // no more vertex data than the buffer holds, twice over (accessors may be shared)
+        let numbers: usize = l
+            .meshes
+            .iter()
+            .flat_map(|m| std::iter::once(m).chain(m.look.as_deref()))
+            .map(|m| {
+                m.positions.len() * 3
+                    + m.normals.len() * 3
+                    + m.uvs.len() * 2
+                    + m.channels.iter().map(|c| c.uvs.len() * 2).sum::<usize>()
+                    + m.parts.iter().map(|p| p.indices.len()).sum::<usize>()
+            })
+            .sum();
+        assert!(numbers * 4 <= 2 * parts[1].len() + (1 << 16), "{numbers} numbers from a buffer of {}", parts[1].len());
         // what the game takes as it is: points it adds, a light colour, a theme number
         let s = &l.settings;
         assert!(s.level_bonus.is_none_or(|b| b.unsigned_abs() <= 1_000_000_000), "level bonus {:?}", s.level_bonus);

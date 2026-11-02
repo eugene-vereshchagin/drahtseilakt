@@ -37,7 +37,7 @@ use std::io::{BufRead, Write};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// How a target's inputs are mutated: as bytes, or also as text (lines, words and numbers).
@@ -91,22 +91,27 @@ fn artifacts(name: &str) -> PathBuf {
     root().join("artifacts").join(name)
 }
 
-static SCRATCH: OnceLock<PathBuf> = OnceLock::new();
+thread_local! {
+    static SCRATCH: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+}
 
-/// A folder of this process for targets that must read from files (disc images, level folders): under the target's
-/// artifacts (on disk, never /tmp), removed when the run ends.
+/// A folder of this process and thread for targets that must read from files (disc images, level folders): under
+/// fuzz/artifacts/work (on disk, never /tmp), removed when the run ends. One a thread: tests run side by side.
 pub fn scratch() -> PathBuf {
-    SCRATCH
-        .get_or_init(|| {
-            let d = artifacts("work").join(format!("p{}", std::process::id()));
-            let _ = std::fs::create_dir_all(&d);
-            d
-        })
-        .clone()
+    SCRATCH.with(|s| {
+        s.borrow_mut()
+            .get_or_insert_with(|| {
+                let id: String = format!("{:?}", std::thread::current().id()).chars().filter(char::is_ascii_digit).collect();
+                let d = artifacts("work").join(format!("p{}-t{id}", std::process::id()));
+                let _ = std::fs::create_dir_all(&d);
+                d
+            })
+            .clone()
+    })
 }
 
 fn drop_scratch() {
-    if let Some(d) = SCRATCH.get() {
+    if let Some(d) = SCRATCH.with(|s| s.borrow_mut().take()) {
         let _ = std::fs::remove_dir_all(d);
     }
 }
@@ -286,7 +291,22 @@ pub fn minimize(input: &[u8], mut still: impl FnMut(&[u8]) -> bool, budget: usiz
         }
         chunk = (chunk / 2).max(1);
     }
-    // then bytes made plainer ('0' for text-like bytes, 0 otherwise), which makes a repro easier to read
+    // then whole words zeroed (the binary formats are made of 32-bit words; deleting bytes breaks their counts), then
+    // bytes made plainer ('0' for text-like bytes, 0 otherwise): a repro easier to read
+    for i in (0..cur.len().saturating_sub(3)).step_by(4) {
+        if out_of_budget(tries) {
+            break;
+        }
+        if cur[i..i + 4] == [0; 4] {
+            continue;
+        }
+        let mut cand = cur.clone();
+        cand[i..i + 4].fill(0);
+        tries += 1;
+        if still(&cand) {
+            cur = cand;
+        }
+    }
     for i in 0..cur.len() {
         if out_of_budget(tries) {
             break;

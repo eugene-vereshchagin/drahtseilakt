@@ -88,6 +88,14 @@ pub fn mesh(chunk: &Chunk) -> Result<Mesh> {
         if count > 0 {
             let flags = w.u32()?;
             let _size = w.u32()?;
+            // Vertices that carry no data of their own (no positions, no normals, one colour, specular and uv for
+            // all) cost the file nothing: a few words would make a million of them, some 20 MB a mesh. Such vertices
+            // are no more than the words left; any other vertex carries at least one word per vertex.
+            use vertex_flags::*;
+            let bare = NO_POSITION | NO_NORMAL | SINGLE_UV | SINGLE_COLOR | SINGLE_SPECULAR;
+            if flags & bare == bare && count > w.remaining() {
+                return Err(malformed("vertex count"));
+            }
             let vec3s = |w: &mut crate::chunk::Words<'_>| -> Result<Vec<[f32; 3]>> {
                 let words = w.take(count.checked_mul(3).ok_or(malformed("vertex data"))?)?;
                 Ok(words.chunks_exact(3).map(xyz).collect())
@@ -834,4 +842,25 @@ mod tests {
         assert_eq!(pictured(0, 0), None);
         assert_eq!(pictured(1, 1), Some((1, 1, vec![0x40, 0x20, 0x10, 0x80])));
     }
+
+    /// Found by review while fuzzing: a mesh whose vertices carry no data of their own (no positions, no normals, one
+    /// colour, one specular colour and one uv for all) made up to a million vertices out of a handful of words, about
+    /// 20 MB each; a file of many such meshes asked for gigabytes. Such vertices are no more than the words left.
+    #[test]
+    fn vertices_without_data_of_their_own_are_bounded_by_the_words() {
+        use vertex_flags::*;
+        let all = NO_POSITION | NO_NORMAL | SINGLE_UV | SINGLE_COLOR | SINGLE_SPECULAR;
+        let made = |count: u32, flags: u32, extra: usize| {
+            let mut data = vec![count, flags, 0, 0, 0, 0, 0];
+            data.extend(std::iter::repeat_n(0, extra));
+            mesh(&chunk(&[(0x0002_0000, data)])).map(|m| m.positions.len())
+        };
+        assert!(made(MAX_VERTICES as u32, all, 0).is_err());
+        assert!(made(1000, all, 0).is_err());
+        assert_eq!(made(4, all, 0).ok(), Some(4));
+        // positions in the file: as many vertices as they hold
+        assert!(made(1000, all & !NO_POSITION, 3000).is_ok());
+        assert!(made(1000, all & !NO_POSITION, 2000).is_err());
+    }
 }
+
