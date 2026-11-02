@@ -222,6 +222,9 @@ pub enum Event {
 struct Rules {
     start: Vec3,
     checkpoints: Vec<(usize, Vec3)>,
+    /// The checkpoints in the order their group lists them, as replays of formats 1 to 3 were recorded (sim.rs
+    /// `checkpoints_by_name`).
+    checkpoints_listed: Vec<(usize, Vec3)>,
     resets: Vec<Vec3>,
     /// Each reset point's turn (its matrix without scale): a new ball takes its reset point's whole matrix.
     reset_turns: Vec<Mat3>,
@@ -721,6 +724,9 @@ pub struct Sim {
     /// The old ball bursts in a transformer: off only to play a replay recorded before the bursts (format 1), as
     /// their bodies, however far, change the physics' course.
     pub bursts: bool,
+    /// The checkpoints follow their names: off only to play a replay recorded before (formats 1 to 3), when they
+    /// followed their group's list, and a level that lists them out of order (11, 12) never opened some sectors.
+    pub checkpoints_by_name: bool,
     /// The points counter's ticks counted, and the tick it goes on from after a lost ball.
     points_clock: u64,
     points_resume: u64,
@@ -807,7 +813,17 @@ impl Sim {
         }
         let rules = Rules {
             start,
-            checkpoints: pos("PC_Checkpoints"),
+            // in the order of their names (PC_TwoFlames_01, _02, ...), as the original numbers its sectors: a level's
+            // group need not list them so (level 11 lists _01, _02, _04, _05, _03; level 12 _02 ... _06, _01, _07)
+            checkpoints_listed: pos("PC_Checkpoints"),
+            checkpoints: {
+                let mut c = pos("PC_Checkpoints");
+                c.sort_by(|a, b| {
+                    let name = |i: usize| level.objects.get(i).map_or("", |o| o.name.as_str());
+                    name_order(name(a.0), name(b.0))
+                });
+                c
+            },
             resets: sorted_by_name(level, "PR_Resetpoints"),
             reset_turns: sorted_turns_by_name(level, "PR_Resetpoints"),
             end: pos("PE_Levelende").first().map(|p| p.1),
@@ -1103,6 +1119,7 @@ impl Sim {
             pieces_fade: [None; 3],
             pieces_expire: true,
             bursts: true,
+            checkpoints_by_name: true,
             depth_from: DEPTH_PHASE,
             points_clock: 0,
             points_resume: 0,
@@ -1373,7 +1390,7 @@ impl Sim {
             }
         }
         // Checkpoints in order: reaching the next one opens the next sector.
-        if let Some(&(_, q)) = self.rules.checkpoints.get(self.sector)
+        if let Some(&(_, q)) = self.checkpoints().get(self.sector)
             && near(q, GATE_RADIUS)
         {
             self.sector += 1;
@@ -1386,7 +1403,7 @@ impl Sim {
         }
         if let Some(end) = self.rules.end
             && self.finishes.is_empty()
-            && self.sector >= self.rules.checkpoints.len()
+            && self.sector >= self.checkpoints().len()
             && near(end, GATE_RADIUS)
         {
             self.finished = true;
@@ -1584,9 +1601,14 @@ impl Sim {
         self.points + self.level_bonus + LIFE_BONUS * i64::from(self.lives)
     }
 
+    /// The checkpoints in the order the sectors pass them.
+    fn checkpoints(&self) -> &[(usize, Vec3)] {
+        if self.checkpoints_by_name { &self.rules.checkpoints } else { &self.rules.checkpoints_listed }
+    }
+
     /// The checkpoints in the order the sectors pass them, then the level's end.
     pub fn stages(&self) -> Vec<Vec3> {
-        self.rules.checkpoints.iter().map(|c| c.1).chain(self.rules.end).collect()
+        self.checkpoints().iter().map(|c| c.1).chain(self.rules.end).collect()
     }
 
     /// Where the transformers are.
@@ -1606,12 +1628,12 @@ impl Sim {
 
     /// Whether the checkpoint at level object `object` has been passed.
     pub fn checkpoint_passed(&self, object: usize) -> bool {
-        self.rules.checkpoints.iter().position(|c| c.0 == object).is_some_and(|k| k < self.sector)
+        self.checkpoints().iter().position(|c| c.0 == object).is_some_and(|k| k < self.sector)
     }
 
     /// Whether the last checkpoint has been passed (the level's last stage), and where the level ends.
     pub fn last_stage(&self) -> (bool, Option<Vec3>) {
-        (self.sector >= self.rules.checkpoints.len(), self.rules.end)
+        (self.sector >= self.checkpoints().len(), self.rules.end)
     }
 
     /// The modules' parts that the physics moves, for drawing.
@@ -1914,8 +1936,19 @@ fn sorted_turns_by_name(level: &Level, group: &str) -> Vec<Mat3> {
             (o.name.clone(), turn)
         })
         .collect();
-    v.sort_by(|a, b| a.0.cmp(&b.0));
+    v.sort_by(|a, b| name_order(&a.0, &b.0));
     v.into_iter().map(|x| x.1).collect()
+}
+
+/// Objects numbered by name (PR_Resetpoint_9, PR_Resetpoint_10): by the name before the number, then by the number
+/// as a number, then by the whole name.
+fn name_order(a: &str, b: &str) -> std::cmp::Ordering {
+    let split = |s: &str| {
+        let stem = s.trim_end_matches(|c: char| c.is_ascii_digit());
+        let n: u64 = s.get(stem.len()..).and_then(|d| d.parse().ok()).unwrap_or(0);
+        (stem.to_owned(), n)
+    };
+    split(a).cmp(&split(b)).then_with(|| a.cmp(b))
 }
 
 fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
@@ -1923,7 +1956,7 @@ fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
         .members(group)
         .map(|(_, o)| (o.name.clone(), Vec3::from(o.position())))
         .collect();
-    v.sort_by(|a, b| a.0.cmp(&b.0));
+    v.sort_by(|a, b| name_order(&a.0, &b.0));
     v.into_iter().map(|x| x.1).collect()
 }
 
@@ -2461,6 +2494,33 @@ mod tests {
             sim.step(0);
         }
         assert!(sim.world.state(b2).is_some(), "the next sector's box came");
+    }
+
+    #[test]
+    fn checkpoints_go_by_their_names_whatever_order_their_group_lists() {
+        // as level 11 lists them: the second first, the first (under the ball) after it
+        let mut level = flat_level();
+        let far = add_cube(&mut level, "PC_TwoFlames_02", Vec3::new(0.0, 0.0, 300.0), &["PC_Checkpoints"]);
+        let near = add_cube(&mut level, "PC_TwoFlames_01", Vec3::new(0.0, 0.0, 0.0), &["PC_Checkpoints"]);
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        sim.step(0);
+        assert!(sim.events.contains(&(sim.tick, Event::Checkpoint(1))), "the first by name is passed");
+        assert!(sim.checkpoint_passed(near) && !sim.checkpoint_passed(far));
+        // a replay of format 3 or older keeps the group's order: the far one is first, the ball not at it
+        let mut old = Sim::new(&level, BallKind::Wood);
+        old.checkpoints_by_name = false;
+        old.step(0);
+        assert!(!old.events.iter().any(|e| matches!(e.1, Event::Checkpoint(_))));
+    }
+
+    #[test]
+    fn numbered_names_go_by_their_numbers() {
+        use std::cmp::Ordering::Less;
+        assert_eq!(name_order("PR_Resetpoint_9", "PR_Resetpoint_10"), Less);
+        assert_eq!(name_order("PC_TwoFlames_03", "PC_TwoFlames_04"), Less);
+        assert_eq!(name_order("PC_TwoFlames_1", "PC_TwoFlames_01"), "PC_TwoFlames_1".cmp("PC_TwoFlames_01"));
+        assert_eq!(name_order("A_2", "B_1"), Less, "the stem first");
+        assert_eq!(name_order("PC_TwoFlames", "PC_TwoFlames_01"), Less);
     }
 
     /// Level 1's finish with the player's copy (skipped without OPENBALLANCE_DATA): rolled onto the balloon's

@@ -185,6 +185,7 @@ impl Game {
         // a replay recorded before the bursts plays without them, as it was recorded
         sim.bursts = replay_in.as_ref().is_none_or(|r| r.version >= 2);
         sim.pieces_expire = replay_in.as_ref().is_none_or(|r| r.version >= 3);
+        sim.checkpoints_by_name = replay_in.as_ref().is_none_or(|r| r.version >= 4);
         let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
         let start = match &replay_in {
@@ -267,6 +268,7 @@ impl Game {
         self.sim.set_pieces(self.pieces.clone());
         self.sim.bursts = self.replay_in.as_ref().is_none_or(|r| r.version >= 2);
         self.sim.pieces_expire = self.replay_in.as_ref().is_none_or(|r| r.version >= 3);
+        self.sim.checkpoints_by_name = self.replay_in.as_ref().is_none_or(|r| r.version >= 4);
         self.sim.level_bonus = self.level_bonus;
         self.ball_sound.silence(&mut self.sound_out);
         self.fan_sound.silence(&mut self.sound_out);
