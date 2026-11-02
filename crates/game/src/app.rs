@@ -1511,7 +1511,7 @@ struct App {
     error: Option<String>,
     /// The original's menu scene (MenuLevel.nmo), drawn behind the menus, and how long the menu has been up.
     menu_scene: Option<crate::menuscene::MenuScene>,
-    menu_ms: f32,
+    menu_ms: f64,
     /// Extended profile: how fast the run goes against real time (the run itself is the same tick by tick), and a
     /// saved moment of the run (F5) to go back to (F9).
     time_scale: f32,
@@ -1997,10 +1997,10 @@ impl App {
         let menu_up = self.menu.as_ref().is_some_and(|m| !m.over_level()) || self.loading.is_some();
         let menu_scene = self.menu_scene.as_mut().filter(|m| m.model.is_some() && menu_up);
         let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
-            self.menu_ms = (self.menu_ms + step * 1000.0) % crate::menuscene::ROUND_MS;
+            self.menu_ms += f64::from(step) * 1000.0;
             ms.effects.tick_menu(step * 1000.0);
-            let (eye, target) = ms.camera(self.menu_ms);
-            let mut inst = ms.instances();
+            let (eye, target) = ms.camera((self.menu_ms % f64::from(crate::menuscene::ROUND_MS)) as f32);
+            let mut inst = ms.instances(self.menu_ms);
             for mesh in 0..crate::sky::FACE_COUNT {
                 inst.push(crate::render::Instance::plain(scene::SKY_MODEL, mesh, glam::Mat4::from_translation(eye)));
             }

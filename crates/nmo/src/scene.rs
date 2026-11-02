@@ -426,6 +426,84 @@ pub fn curve_point(chunk: &Chunk) -> Result<Option<CurvePoint>> {
     Ok(Some(CurvePoint { tcb, linear, tcb_values, tangents }))
 }
 
+/// An object animation (CKObjectAnimation, class 15; section 0x4000000 of data version 1 and later,
+/// docs/animation.md 5.2): the entity it moves, its length in frames, and the keys of its linear position,
+/// rotation (quaternion x, y, z, w) and scale controllers. Other controllers (TCB, Bezier, scale axis, morph) are
+/// skipped by their size; merged animations are left out.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectAnimation {
+    pub entity: Option<usize>,
+    pub flags: u32,
+    pub length: f32,
+    pub position: Vec<(f32, [f32; 3])>,
+    pub rotation: Vec<(f32, [f32; 4])>,
+    pub scale: Vec<(f32, [f32; 3])>,
+}
+
+/// Keys one controller may have.
+const MAX_KEYS: usize = 1 << 20;
+/// Controllers one animation may list.
+const MAX_CONTROLLERS: usize = 64;
+
+pub fn object_animation(chunk: &Chunk) -> Result<Option<ObjectAnimation>> {
+    if chunk.data_version < 1 {
+        return Ok(None);
+    }
+    let Some(mut w) = chunk.section(0x0400_0000) else {
+        return Ok(None);
+    };
+    w.take(7)?; // a vector and four unused floats
+    let flags = w.u32()?;
+    let entity = reference(chunk, w.u32()?);
+    let length = w.f32()?;
+    if !length.is_finite() || length < 0.0 {
+        return Err(malformed("animation length"));
+    }
+    if flags & 0x80 != 0 {
+        w.take(3)?; // merge factor and the two merged animations
+    }
+    let mut anim =
+        ObjectAnimation { entity, flags, length, position: Vec::new(), rotation: Vec::new(), scale: Vec::new() };
+    for _ in 0..MAX_CONTROLLERS {
+        let kind = w.u32()?;
+        if kind == 0 {
+            return Ok(Some(anim));
+        }
+        let size = w.u32()? as usize;
+        let block = w.take(size)?;
+        // the key's words: time and three values (position, scale) or four (rotation)
+        let width = match kind {
+            0x637c_4301 | 1 | 0x654a_3a04 | 4 => 4,
+            0x49ed_4002 | 2 => 5,
+            _ => continue,
+        };
+        let (&count, keys) = block.split_first().ok_or(malformed("animation keys"))?;
+        let count = count as usize;
+        if count > MAX_KEYS || count.checked_mul(width) != Some(keys.len()) {
+            return Err(malformed("animation key count"));
+        }
+        let mut finite = true;
+        let mut read = |k: &[u32]| -> Vec<f32> {
+            let v: Vec<f32> = k.iter().map(|&x| f32::from_bits(x)).collect();
+            finite &= v.iter().all(|x| x.is_finite());
+            v
+        };
+        for k in keys.chunks_exact(width) {
+            let v = read(k);
+            match (kind, v.as_slice()) {
+                (0x637c_4301 | 1, &[t, x, y, z]) => anim.position.push((t, [x, y, z])),
+                (0x654a_3a04 | 4, &[t, x, y, z]) => anim.scale.push((t, [x, y, z])),
+                (_, &[t, x, y, z, q]) => anim.rotation.push((t, [x, y, z, q])),
+                _ => {}
+            }
+        }
+        if !finite {
+            return Err(malformed("animation key"));
+        }
+    }
+    Err(malformed("animation controller count"))
+}
+
 /// A camera's lens (section 0xfc00000 of data version 5 and later: projection, field of view, orthographic zoom,
 /// aspect, near and far planes) and, for a target camera (class 35), its target (section 0x10000000).
 #[derive(Debug, Clone, PartialEq)]
@@ -600,6 +678,36 @@ mod tests {
             words.extend(data);
         }
         Chunk { data_version: 7, class_id: 0, chunk_version: 7, options: OPTION_FILE, words }
+    }
+
+    /// Record Anim's layout (docs/animation.md 5.2): linear position, rotation and scale, then the end of the list;
+    /// a TCB controller between them is skipped by its size.
+    #[test]
+    fn an_object_animation_is_read_and_bad_ones_refused() {
+        let f = f32::to_bits;
+        let head = |rest: &[u32]| {
+            let mut v = vec![0, 0, 0, 0, 0, 0, 0, 0, 5, f(100.0)];
+            v.extend_from_slice(rest);
+            chunk(&[(0x0400_0000, v)])
+        };
+        let ok = head(&[
+            0x637c_4301, 9, 2, f(0.0), f(1.0), f(2.0), f(3.0), f(100.0), f(4.0), f(5.0), f(6.0),
+            0x347e_4a01, 3, 1, 0, 0,
+            0x49ed_4002, 6, 1, f(0.0), f(0.0), f(0.0), f(0.0), f(1.0),
+            0x654a_3a04, 5, 1, f(0.0), f(1.0), f(1.0), f(1.0),
+            0,
+        ]);
+        let a = object_animation(&ok).expect("animation").expect("its part");
+        assert_eq!((a.entity, a.length), (Some(5), 100.0));
+        assert_eq!(a.position, vec![(0.0, [1.0, 2.0, 3.0]), (100.0, [4.0, 5.0, 6.0])]);
+        assert_eq!(a.rotation, vec![(0.0, [0.0, 0.0, 0.0, 1.0])]);
+        assert_eq!(a.scale, vec![(0.0, [1.0; 3])]);
+        let disagree = head(&[0x637c_4301, 9, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert!(object_animation(&disagree).is_err(), "count and size disagree");
+        assert!(object_animation(&head(&[0x637c_4301, 5, 1, f(f32::NAN), 0, 0, 0, 0])).is_err(), "not a number");
+        assert!(object_animation(&head(&[0x637c_4301, 1000, 1])).is_err(), "cut short");
+        assert!(object_animation(&head(&[0x1234, 0])).is_err(), "no end to the list");
+        assert_eq!(object_animation(&chunk(&[(0x4, vec![])])).expect("none"), None);
     }
 
     #[test]

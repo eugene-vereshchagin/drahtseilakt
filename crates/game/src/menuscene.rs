@@ -1,13 +1,15 @@
 // The 3D scene behind the menus, as the original's MenuLevel.nmo makes it (docs/animation.md): its objects, its
 // camera (Cam_MenuLevel) carried round a closed TCB curve (I_MenuLevel_Curve) once every 44 seconds by Position On
-// Curve and looking at its target, and the four flames of its start. The stone ball's recorded roll is not played
-// yet.
+// Curve and looking at its target, the four flames of its start, and the stone ball rolling its recorded way (Record
+// Anim, played by Ball_Stone Script's Play Animation 3D Entity once every 59.246 seconds, looping).
 
 use crate::render::Instance;
 use glam::{Mat4, Vec3};
 
 /// One round of the curve (MenuLevel_Init's Bezier Progression).
 pub const ROUND_MS: f32 = 44_000.0;
+/// One round of the stone ball's recorded roll (Ball_Stone Script's Play Animation 3D Entity: Duration 59246 ms).
+pub const ROLL_MS: f64 = 59_246.0;
 /// Samples per segment when the curve measures its length.
 const SAMPLES: usize = 100;
 
@@ -151,6 +153,81 @@ pub struct MenuScene {
     /// The camera's vertical field of view (the file gives the horizontal one of its 4:3 view).
     pub fov_y: f32,
     pub effects: crate::particles::Effects,
+    /// The recorded animations and the scene objects they move.
+    anims: Vec<(usize, Anim)>,
+}
+
+/// An object animation's linear keys (docs/animation.md 5.3): position, rotation (x, y, z, w) and scale by frame.
+#[derive(Debug, Clone)]
+struct Anim {
+    length: f32,
+    position: Vec<(f32, Vec3)>,
+    rotation: Vec<(f32, glam::Vec4)>,
+    scale: Vec<(f32, Vec3)>,
+}
+
+/// The keys around `t`: the segment's two values and how far `t` is into it (the first or last key outside them).
+fn segment<T: Copy>(keys: &[(f32, T)], t: f32) -> Option<(T, T, f32)> {
+    let (first, last) = (keys.first()?, keys.last()?);
+    if t <= first.0 {
+        return Some((first.1, first.1, 0.0));
+    }
+    if t >= last.0 {
+        return Some((last.1, last.1, 0.0));
+    }
+    let hi = keys.partition_point(|k| k.0 < t).max(1);
+    let (a, b) = (keys.get(hi - 1)?, keys.get(hi)?);
+    let span = b.0 - a.0;
+    Some((a.1, b.1, if span > 0.0 { (t - a.0) / span } else { 0.0 }))
+}
+
+/// VxMath's Slerp: the shorter way, linear when the two are close; not normalized.
+fn slerp(q0: glam::Vec4, q1: glam::Vec4, f: f32) -> glam::Vec4 {
+    let d = q0.dot(q1);
+    let (d, sign) = if d < 0.0 { (-d, -1.0) } else { (d, 1.0) };
+    let (k0, k1) = if 1.0 - d > 0.01 {
+        let th = d.min(1.0).acos();
+        (((1.0 - f) * th).sin() / th.sin(), (f * th).sin() / th.sin())
+    } else {
+        (1.0 - f, f)
+    };
+    q0 * k0 + q1 * (k1 * sign)
+}
+
+impl Anim {
+    /// The object's world matrix at `step` (0 to 1) of the animation: the rotation's rows (VxQuaternion::ToMatrix)
+    /// are the object's axes, each scaled, the position its fourth column.
+    fn matrix(&self, step: f32) -> Option<Mat4> {
+        let t = step * self.length;
+        let lerp = |k: &[(f32, Vec3)]| segment(k, t).map(|(a, b, f)| a + (b - a) * f);
+        let pos = lerp(&self.position)?;
+        let scale = lerp(&self.scale).unwrap_or(Vec3::ONE);
+        let q = segment(&self.rotation, t).map_or(glam::Vec4::W, |(a, b, f)| slerp(a, b, f));
+        let n = q.length_squared();
+        let s = if n > 0.0 { 2.0 / n } else { 0.0 };
+        let (x, y, z, w) = (q.x, q.y, q.z, q.w);
+        let ax = Vec3::new(
+            1.0 - s * (y * y + z * z),
+            s * (x * y - w * z),
+            s * (x * z + w * y),
+        ) * scale.x;
+        let ay = Vec3::new(
+            s * (x * y + w * z),
+            1.0 - s * (x * x + z * z),
+            s * (y * z - w * x),
+        ) * scale.y;
+        let az = Vec3::new(
+            s * (x * z - w * y),
+            s * (y * z + w * x),
+            1.0 - s * (x * x + y * y),
+        ) * scale.z;
+        Some(Mat4::from_cols(
+            ax.extend(0.0),
+            ay.extend(0.0),
+            az.extend(0.0),
+            pos.extend(1.0),
+        ))
+    }
 }
 
 impl MenuScene {
@@ -179,6 +256,38 @@ impl MenuScene {
             tcb.push(cp.map_or([0.0; 3], |cp| cp.tcb_values.map(|v| v.clamp(-1.0, 1.0))));
         }
         let level = crate::assets::load_nmo(&path).ok()?.level;
+        // each animation with its object in the scene, found by name
+        let anims = doc
+            .of_class(nmo::class::OBJECT_ANIMATION)
+            .filter_map(|(_, o)| {
+                nmo::scene::object_animation(o.chunk.as_ref()?)
+                    .ok()
+                    .flatten()
+            })
+            .filter_map(|a| {
+                let name = doc.get(a.entity?)?.name_lossy();
+                let at = level.objects.iter().position(|o| o.name == name)?;
+                let anim = Anim {
+                    length: a.length,
+                    position: a
+                        .position
+                        .into_iter()
+                        .map(|(t, v)| (t, Vec3::from(v)))
+                        .collect(),
+                    rotation: a
+                        .rotation
+                        .into_iter()
+                        .map(|(t, q)| (t, glam::Vec4::from(q)))
+                        .collect(),
+                    scale: a
+                        .scale
+                        .into_iter()
+                        .map(|(t, v)| (t, Vec3::from(v)))
+                        .collect(),
+                };
+                Some((at, anim))
+            })
+            .collect();
         let effects = crate::particles::Effects::menu(&level);
         // a sane lens (between about 3 and 170 degrees), a curve of finite points and length
         let fov_y = 2.0 * ((cam.fov.clamp(0.05, 3.0) / 2.0).tan() * 0.75).atan();
@@ -192,6 +301,7 @@ impl MenuScene {
             level,
             model: None,
             effects,
+            anims,
         })
     }
 
@@ -200,25 +310,31 @@ impl MenuScene {
         (self.curve.pos(ms / ROUND_MS), self.target)
     }
 
-    /// The scene's objects to draw (visible, with a material).
-    pub fn instances(&self) -> Vec<Instance> {
+    /// The scene's objects to draw (visible, with a material) `ms` into the menu, the animated ones where their
+    /// animations have them then. Only Record Anim is played by the original (on the stone ball), so every
+    /// animation here takes its duration.
+    pub fn instances(&self, ms: f64) -> Vec<Instance> {
+        let step = ((ms % ROLL_MS) / ROLL_MS) as f32;
         let Some(model) = self.model else {
             return Vec::new();
         };
         let mut out = Vec::new();
-        for o in &self.level.objects {
+        for (i, o) in self.level.objects.iter().enumerate() {
             let Some(mesh) = o.mesh else { continue };
+            let moved = self
+                .anims
+                .iter()
+                .find(|(at, _)| *at == i)
+                .and_then(|(_, a)| a.matrix(step))
+                .filter(|m| m.is_finite());
             let lit = self
                 .level
                 .meshes
                 .get(mesh)
                 .is_some_and(|m| m.parts.iter().any(|p| p.material.is_some()));
             if o.visible && lit && o.sprite.is_none() {
-                out.push(Instance::plain(
-                    model,
-                    mesh,
-                    Mat4::from_cols_array_2d(&o.matrix),
-                ));
+                let m = moved.unwrap_or_else(|| Mat4::from_cols_array_2d(&o.matrix));
+                out.push(Instance::plain(model, mesh, m));
             }
         }
         out
@@ -228,6 +344,34 @@ impl MenuScene {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Record Anim's first key puts the stone ball where MenuLevel.nmo saved it (docs/animation.md 5.2), the
+    /// rotation's rows read as its axes; its later keys move it. Needs the player's copy (OPENBALLANCE_DATA).
+    #[test]
+    fn the_stone_ball_starts_where_it_was_saved() {
+        if std::env::var_os("OPENBALLANCE_DATA").is_none() {
+            return;
+        }
+        let Ok(data) = crate::assets::Data::locate(None) else {
+            return;
+        };
+        let Some(scene) = MenuScene::load(&data) else {
+            return;
+        };
+        let (at, anim) = scene
+            .anims
+            .iter()
+            .find(|(at, _)| scene.level.objects[*at].name == "I_Ball_Stone")
+            .expect("Record Anim");
+        let saved = Mat4::from_cols_array_2d(&scene.level.objects[*at].matrix);
+        let start = anim.matrix(0.0).expect("its keys");
+        assert!(start.abs_diff_eq(saved, 1e-3), "{start:?} vs {saved:?}");
+        let later = anim.matrix(0.5).expect("its keys");
+        assert!(
+            later.w_axis.truncate().distance(saved.w_axis.truncate()) > 1.0,
+            "it moves"
+        );
+    }
 
     /// The menu's curve (docs/animation.md, 3.3): four points round a circle of radius about 95, TCB tension -0.6;
     /// its length is 595.27, and it starts at the first point.
