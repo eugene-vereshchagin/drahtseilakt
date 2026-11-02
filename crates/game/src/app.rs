@@ -180,6 +180,7 @@ impl Game {
         sim.set_pieces(pieces.clone());
         // a replay recorded before the bursts plays without them, as it was recorded
         sim.bursts = replay_in.as_ref().is_none_or(|r| r.version >= 2);
+        sim.pieces_expire = replay_in.as_ref().is_none_or(|r| r.version >= 3);
         let level_bonus = data.settings(&level.name).level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
         let start = match &replay_in {
@@ -266,6 +267,7 @@ impl Game {
         self.sim.set_ball_boxes(self.ball_meshes.boxes);
         self.sim.set_pieces(self.pieces.clone());
         self.sim.bursts = self.replay_in.as_ref().is_none_or(|r| r.version >= 2);
+        self.sim.pieces_expire = self.replay_in.as_ref().is_none_or(|r| r.version >= 3);
         self.sim.level_bonus = self.level_bonus;
         self.ball_sound.silence(&mut self.sound_out);
         self.fan_sound.silence(&mut self.sound_out);
@@ -420,13 +422,16 @@ impl Game {
     }
 
     /// Plays the replay up to a tick without a window, then gives the keys to the player (`--from`). The replay's
-    /// inputs stay in the run's replay, so the attempt saved later still replays from the start.
+    /// inputs stay in the run's replay, so the attempt saved later still replays from the start; it keeps the
+    /// replay's format too, as the run goes on by that format's rules.
     fn fast_forward(&mut self, tick: u64) {
         let end = self.replay_in.as_ref().map_or(0, |r| r.end).min(tick);
         while self.sim.tick < end && !self.sim.finished && !self.sim.game_over {
             self.tick(0);
         }
-        self.replay_in = None;
+        if let Some(r) = self.replay_in.take() {
+            self.replay_out.version = r.version;
+        }
     }
 
     /// The folder of a level's runs: the original levels' by name, a custom map's under maps/, so that a map named

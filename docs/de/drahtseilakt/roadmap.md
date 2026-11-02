@@ -44,8 +44,9 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   Funken und Spuren der Extrapunkte. der Wind der Ventilatoren, die Funken des Extralebens. Level 13 (die SuDu-Erweiterung von 2004,
   nach ihrem Readme in die Kopie des Spielers installiert) lädt und ist spielbar; das vollständige Grundspiel hat
   dreizehn Level. Im Transformator zerspringt die alte Kugel in ihre Stücke (die
-  Explosionsskripte aus Balls.nmo: Körper in der Gruppe der Kugel, nach oben gestoßen, liegen bis zum Verlust der
-  Kugel, dann ausgeblendet); vorher aufgenommene Replays (Format 1) laufen ohne sie. Der Rauch der Kugel pufft, wenn sie erscheint und
+  Explosionsskripte aus Balls.nmo: Körper in der Gruppe der Kugel, nach oben gestoßen, liegen 20 s (Fadeout
+  Manager aus Gameplay.nmo) oder bis zum Verlust der Kugel, dann ausgeblendet); vor den Stücken aufgenommene Replays
+  (Format 1) laufen ohne sie, vor den 20 s aufgenommene (Format 2) mit Stücken, die bis zum Verlust der Kugel liegen. Der Rauch der Kugel pufft, wenn sie erscheint und
   wenn sie zerspringt (BallParticle_Frame script).
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
 

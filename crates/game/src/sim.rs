@@ -705,11 +705,15 @@ pub struct Sim {
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
     ball_boxes: [(Vec3, Vec3); 3],
-    /// The balls' pieces (pieces.rs), those lying about now (their kind, piece and body), and the tick their fade
-    /// began (the ball was lost).
+    /// The balls' pieces (pieces.rs), those lying about now (their kind, piece and body), and for each kind (wood,
+    /// stone, paper) the tick they burst and the tick their fade began (20 s on, or the ball was lost).
     pieces: crate::pieces::Pieces,
     flying: Vec<(BallKind, usize, usize)>,
-    pieces_fade: Option<u64>,
+    pieces_burst: [Option<u64>; 3],
+    pieces_fade: [Option<u64>; 3],
+    /// The pieces go 20 s after their burst (Fadeout Manager): off only to play a replay recorded before it (formats 1
+    /// and 2), where they lay until the ball was lost.
+    pub pieces_expire: bool,
     /// The old ball bursts in a transformer: off only to play a replay recorded before the bursts (format 1), as
     /// their bodies, however far, change the physics' course.
     pub bursts: bool,
@@ -1089,7 +1093,9 @@ impl Sim {
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
             pieces: crate::pieces::Pieces::default(),
             flying: Vec::new(),
-            pieces_fade: None,
+            pieces_burst: [None; 3],
+            pieces_fade: [None; 3],
+            pieces_expire: true,
             bursts: true,
             depth_from: DEPTH_PHASE,
             points_clock: 0,
@@ -1227,13 +1233,32 @@ impl Sim {
         self.world.set_push(0, push * p.force);
         self.prev_pose = (self.ball.position, self.ball.rotation);
         self.world.step(None);
-        if let Some(f) = self.pieces_fade
-            && self.tick >= f + crate::pieces::FADE_TICKS
-        {
-            for (_, _, body) in std::mem::take(&mut self.flying) {
-                self.world.remove(body);
+        // a kind's pieces start to fade 20 s after their burst, and go when their fade is over (in the order they were
+        // made, so kinds going on the same tick leave the physics as they always did)
+        let mut gone = [false; 3];
+        let (tick, expire) = (self.tick, self.pieces_expire);
+        for ((burst, fade), go) in self.pieces_burst.iter_mut().zip(&mut self.pieces_fade).zip(&mut gone) {
+            if let (Some(b), None) = (*burst, *fade)
+                && expire
+                && tick >= b + crate::pieces::LIE_TICKS
+            {
+                *fade = Some(tick);
             }
-            self.pieces_fade = None;
+            if fade.is_some_and(|f| tick >= f + crate::pieces::FADE_TICKS) {
+                *go = true;
+                *fade = None;
+                *burst = None;
+            }
+        }
+        if gone.contains(&true) {
+            let world = &mut self.world;
+            self.flying.retain(|&(kind, _, body)| {
+                let go = gone.get(crate::pieces::index(kind)).copied().unwrap_or(false);
+                if go {
+                    world.remove(body);
+                }
+                !go
+            });
         }
         if let Some(h) = self.hold {
             // the old ball bursts as it is hidden in the transformer
@@ -1412,8 +1437,11 @@ impl Sim {
     fn die(&mut self) {
         self.events.push((self.tick, Event::Died));
         // the pieces lying about fade out and go (Ball_ResetPieces_<kind>)
-        if !self.flying.is_empty() && self.pieces_fade.is_none() {
-            self.pieces_fade = Some(self.tick);
+        for (kind, _, _) in &self.flying {
+            let k = crate::pieces::index(*kind);
+            if let Some(f @ None) = self.pieces_fade.get_mut(k) {
+                *f = Some(self.tick);
+            }
         }
         self.dying = Some(self.tick);
         // The current sector starts again: its objects leave the physics and are made again at their places.
@@ -1465,10 +1493,13 @@ impl Sim {
 
     /// The pieces lying about: each one's mesh in the balls' model, its body and how opaque it is.
     pub fn pieces_view(&self) -> Vec<(usize, usize, f32)> {
-        let alpha = self.pieces_fade.map_or(1.0, |f| crate::pieces::fade(self.tick.saturating_sub(f)));
+        let alpha = |kind: BallKind| {
+            let fade = self.pieces_fade.get(crate::pieces::index(kind)).copied().flatten();
+            fade.map_or(1.0, |f| crate::pieces::fade(self.tick.saturating_sub(f)))
+        };
         self.flying
             .iter()
-            .filter_map(|&(kind, p, body)| self.pieces.of(kind).get(p).map(|piece| (piece.mesh, body, alpha)))
+            .filter_map(|&(kind, p, body)| self.pieces.of(kind).get(p).map(|piece| (piece.mesh, body, alpha(kind))))
             .collect()
     }
 
@@ -1480,6 +1511,11 @@ impl Sim {
             self.world.remove(body);
         }
         self.flying.retain(|f| f.0 != kind);
+        let k = crate::pieces::index(kind);
+        if let (Some(at), Some(fade)) = (self.pieces_burst.get_mut(k), self.pieces_fade.get_mut(k)) {
+            *at = Some(self.tick);
+            *fade = None;
+        }
         let b = crate::pieces::burst(kind);
         let mut rng = crate::pieces::Rng::new(self.tick);
         let pieces: Vec<crate::pieces::Piece> = self.pieces.of(kind).to_vec();

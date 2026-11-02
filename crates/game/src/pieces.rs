@@ -2,15 +2,17 @@
 // original's Ball_Explosion_<kind> scripts do. Each kind's pieces (the group Ball_<Kind>_Pieces, placed about the
 // frame Ball_<Kind>Pieces_Frame) are set where the ball was, made bodies of their own hulls in the ball's collision
 // group (they do not meet the ball) with the script's mass, friction, elasticity and dampings, and pushed along their
-// own up by a random impulse. They lie where they fall until the ball is lost; then Ball_ResetPieces_<kind> fades
-// them out over two seconds and takes them away.
+// own up by a random impulse. They lie where they fall for 20 seconds (Gameplay.nmo's Fadeout Manager), or until the
+// ball is lost; then Ball_ResetPieces_<kind> fades them out over two seconds and takes them away.
 
 use crate::sim::BallKind;
 use glam::{Mat4, Quat, Vec3};
 use level::Level;
 
-/// The fade after the ball is lost (Fade <Kind> Pieces: a Bezier progression of 2000 ms), in ticks.
+/// The fade (Fade <Kind> Pieces: a Bezier progression of 2000 ms), in ticks.
 pub const FADE_TICKS: u64 = 120;
+/// How long the pieces lie before they fade (Gameplay.nmo's Fadeout Manager: a timer of 20000 ms from the burst).
+pub const LIE_TICKS: u64 = 1200;
 
 /// One piece: its mesh in the balls' model, where it sits about its frame, and its hull in its own frame.
 #[derive(Clone, Debug)]
@@ -75,7 +77,7 @@ pub struct Pieces {
     turns: [Quat; 3],
 }
 
-fn index(kind: BallKind) -> usize {
+pub fn index(kind: BallKind) -> usize {
     match kind {
         BallKind::Wood => 0,
         BallKind::Stone => 1,
