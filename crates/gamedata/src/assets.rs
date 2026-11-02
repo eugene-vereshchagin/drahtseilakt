@@ -19,6 +19,8 @@ const NMO_MAX: u64 = 256 * 1024 * 1024;
 /// The most texture pixels a level's own game files may bring in all (1 GB of RGBA), counted from their headers.
 const OVERLAY_PIXELS_MAX: u64 = 256 * 1024 * 1024;
 static OVERLAY_PIXELS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// The level's textures already counted (a texture decoded again, as a sky face is, counts once).
+static OVERLAY_COUNTED: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
 
 /// The game files a level's own folder may stand in for: its parts (the modules, the balls, the transformer), its
 /// sky, particles and shadow, and a run's sounds. The interface's files (the menus, the font, the level table, the
@@ -36,6 +38,11 @@ fn overlay_serves(relative: &str) -> bool {
         || l.starts_with("textures/particles/")
         || l.strip_prefix("textures/").is_some_and(|n| n.starts_with("hardshadow."))
         || sound
+}
+
+/// A Virtools file of the copy read whole, through the cap every game file read has.
+pub fn read_game_file(path: &Path) -> Option<Vec<u8>> {
+    read_capped(path, NMO_MAX)
 }
 
 /// A file read whole, a plain one of at most `cap` bytes (what it says its length is does not count).
@@ -122,6 +129,9 @@ impl Data {
     pub fn for_level(&self, level_dir: Option<&Path>) -> Data {
         // each level brings its own textures, within the budget again
         OVERLAY_PIXELS.store(0, std::sync::atomic::Ordering::Relaxed);
+        if let Ok(mut counted) = OVERLAY_COUNTED.lock() {
+            counted.clear();
+        }
         Data {
             root: self.root.clone(),
             overlay: level_dir.map(|d| d.join(GAME_FILES)),
@@ -291,6 +301,9 @@ impl Data {
         if !self.overlay.as_deref().is_some_and(|o| path.starts_with(o)) {
             return true;
         }
+        if OVERLAY_COUNTED.lock().is_ok_and(|c| c.iter().any(|p| p == path)) {
+            return true;
+        }
         let Some((w, h)) = image::ImageReader::open(path)
             .ok()
             .and_then(|r| r.with_guessed_format().ok())
@@ -305,7 +318,12 @@ impl Data {
                 return false;
             };
             match OVERLAY_PIXELS.compare_exchange_weak(taken, next, Ordering::Relaxed, Ordering::Relaxed) {
-                Ok(_) => return true,
+                Ok(_) => {
+                    if let Ok(mut counted) = OVERLAY_COUNTED.lock() {
+                        counted.push(path.to_path_buf());
+                    }
+                    return true;
+                }
                 Err(now) => taken = now,
             }
         }
@@ -503,9 +521,11 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<usize, 
     let mut missing = 0usize;
     for (i, t) in level.textures.iter().enumerate() {
         let path = dir.join(level::open::texture_file(i, &t.name));
-        fresh(&path)?;
+        // read first: the texture may be this very file (a level exported into its own folder); a texture not found
+        // leaves what is there
         match data.texture(t) {
             Some((w, h, rgba)) => {
+                fresh(&path)?;
                 image::save_buffer(&path, &rgba, w, h, image::ExtendedColorType::Rgba8).map_err(|e| e.to_string())?
             }
             None => missing = missing.saturating_add(1),

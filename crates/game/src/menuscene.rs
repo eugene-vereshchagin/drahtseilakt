@@ -234,7 +234,7 @@ impl MenuScene {
     /// MenuLevel.nmo from the player's copy, if it is there and has its camera and curve.
     pub fn load(data: &crate::assets::Data) -> Option<MenuScene> {
         let path = data.file("3D Entities/MenuLevel.nmo")?;
-        let bytes = std::fs::read(&path).ok()?;
+        let bytes = gamedata::assets::read_game_file(&path)?;
         let file = nmo::read(&bytes).ok()?;
         let doc = nmo::Document::parse(&file).ok()?;
         let chunk = |i: usize| doc.get(i).and_then(|o| o.chunk.as_ref());
