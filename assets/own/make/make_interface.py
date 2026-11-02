@@ -171,8 +171,8 @@ def glass(c, d, look):
 def env(ry, rx):
     """The chrome's surroundings by the reflected ray (ry -1 up .. 1 down): a pale cloudy sky, a soft dark band at
     the horizon, a bright floor; a little cloud in the sky so the ball does not look painted."""
-    sky = 0.86 - 0.18 * np.clip(ry + 1, 0, 1) + 0.06 * np.sin(5.0 * rx + 2.0 * ry)
-    dark = 0.45
+    sky = 0.9 - 0.15 * np.clip(ry + 1, 0, 1) + 0.06 * np.sin(5.0 * rx + 2.0 * ry)
+    dark = 0.55
     floor = 0.98
     t = np.clip((ry + 0.15) / 0.3, 0, 1)
     u = np.clip((ry - 0.25) / 0.4, 0, 1)
@@ -195,7 +195,7 @@ def chrome(c, cx, cy, r, kind="steel", ring=False):
     tint = {"steel": np.array([0.93, 0.95, 1.0]), "gold": np.array([1.0, 0.78, 0.38]),
             "pearl": np.array([1.0, 0.97, 0.9])}[kind]
     col = v[..., None] * tint + spec[..., None] * 0.9
-    col = col * (0.62 + 0.38 * nz ** 0.3)[..., None]
+    col = col * (0.7 + 0.3 * nz ** 0.3)[..., None]
     c.over(np.clip(col, 0, 1), inside(circle(c, cx, cy, r)))
     if ring:
         tube(c, np.abs(circle(c, cx, cy, r + 1.4)), 2.2)
@@ -304,7 +304,7 @@ def small_row(c, x0, y0, x1, y1, look, ball, dot=True, rr=None):
 
 def arrow(c, x0, y0, x1, y1, pointing, look):
     """A rounded triangle outlined in steel, pointing left or right, a ball in it."""
-    m = 6.0
+    m = 4.8
     mid = (y0 + y1) / 2
     if pointing < 0:
         pts = [(x0 + m, mid), (x1 - m, y0 + m), (x1 - m, y1 - m)]
@@ -313,7 +313,7 @@ def arrow(c, x0, y0, x1, y1, pointing, look):
     d = triangle(c, pts) - 4.5
     outline(c, d)
     cx = sum(p[0] for p in pts) / 3
-    chrome(c, cx, mid, 7.5, look["ball"])
+    chrome(c, cx + 1.5 * pointing, mid, 8.5, look["ball"])
 
 
 def back_button(c, look):
