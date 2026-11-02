@@ -78,6 +78,8 @@ Deutsch.
 3. Erledigt: `--import` aus einem installierten Spiel oder vom CD-Abbild (das Spiel findet die importierte
    Kopie auch ohne `--data`). Die 318 Spieldateien der europäischen CD gleichen einer installierten Kopie aufs Byte.
 4. Das Menü der eigenen Level liest `community/` und `open/`; `remastered/` macht `drahtseilakt-toolbox remaster`:
-   der Umwandler (Phase 6), rundere Formen und N-mal größere Texturen (Real-ESRGAN, wenn installiert, sonst Lanczos; Phase 7). Ein Originallevel,
+   der Umwandler (Phase 6), rundere Formen und N-mal größere Texturen; die Teile, die alle Level teilen (Kugeln,
+   Module, Transformator), werden ebenso in den versteckten Ordner `remastered/.shared/` umgearbeitet, und ein
+   Remaster-Level zeichnet sie so (Real-ESRGAN, wenn installiert, sonst Lanczos; Phase 7). Ein Originallevel,
    das der Kopie fehlt (eine Kopie ohne Level 13), wird im Levelmenü aus seinem Export in `remastered/` gespielt.
 5. Level, die mit dem Spiel kommen, sobald Autoren sie anbieten.

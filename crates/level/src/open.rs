@@ -222,13 +222,19 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// A mesh the open format writes: one with vertices and faces (an empty one is left out, so the meshes read back
+/// are the written ones, in their order).
+pub fn written(m: &Mesh) -> bool {
+    !m.positions.is_empty() && m.parts.iter().any(|p| !p.indices.is_empty())
+}
+
 /// One mesh as glTF, its data pushed into the buffer; None for a mesh without faces.
 fn mesh_json(m: &Mesh, push: &mut impl FnMut(&[u8], u64, Value) -> usize) -> Option<Value> {
     let n = m.positions.len();
-    let parts: Vec<&Part> = m.parts.iter().filter(|p| !p.indices.is_empty()).collect();
-    if n == 0 || parts.is_empty() {
+    if !written(m) {
         return None;
     }
+    let parts: Vec<&Part> = m.parts.iter().filter(|p| !p.indices.is_empty()).collect();
     let pos: Vec<f32> = m
         .positions
         .iter()

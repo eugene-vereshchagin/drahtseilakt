@@ -1309,6 +1309,11 @@ fn is_folder(p: &Path) -> bool {
     p.is_dir() && !p.join("level.gltf").is_file()
 }
 
+/// A hidden file or folder (its name begins with a dot): never shown (the toolbox keeps its parts in one).
+fn hidden(p: &Path) -> bool {
+    p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with('.'))
+}
+
 fn is_level(p: &Path) -> bool {
     let nmo = p.is_file() && p.extension().is_some_and(|x| x.eq_ignore_ascii_case("nmo"));
     nmo || (p.is_dir() && p.join("level.gltf").is_file())
@@ -1330,7 +1335,7 @@ fn maps_in(dir: &Path) -> Vec<PathBuf> {
     let Ok(d) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
-    let all: Vec<PathBuf> = d.flatten().map(|e| e.path()).take(4096).collect();
+    let all: Vec<PathBuf> = d.flatten().map(|e| e.path()).filter(|p| !hidden(p)).take(4096).collect();
     let mut levels: Vec<PathBuf> = all.iter().filter(|p| is_level(p)).cloned().collect();
     let mut folders: Vec<PathBuf> = all
         .into_iter()

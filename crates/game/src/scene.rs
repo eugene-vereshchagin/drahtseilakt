@@ -248,7 +248,7 @@ pub fn module_of(level: &Level, i: usize) -> Option<&str> {
 }
 
 /// Loads every module the level's stand-ins name, once each (a missing or unreadable file is left out).
-pub fn load_modules(level: &Level, data: &crate::assets::Data) -> Modules {
+pub fn load_modules(level: &Level, data: &crate::assets::Data, remastered: bool) -> Modules {
     let mut modules = Modules::default();
     let mut tried: Vec<String> = Vec::new();
     for i in 0..level.objects.len() {
@@ -257,18 +257,14 @@ pub fn load_modules(level: &Level, data: &crate::assets::Data) -> Modules {
             continue;
         }
         tried.push(name.to_owned());
-        let Some(path) = data.file(&format!("3D Entities/PH/{name}.nmo")) else {
-            continue;
-        };
-        if let Ok(m) = crate::assets::load_nmo(&path) {
+        if let Some(m) = data.part(&format!("3D Entities/PH/{name}.nmo"), remastered) {
             modules.models.push(m.level);
             modules.names.push(name.to_owned());
         }
     }
     // the extra points' module, for where its small balls start (its stand-ins are drawn as markers)
     if level.group("P_Extra_Point").is_some()
-        && let Some(path) = data.file("3D Entities/PH/P_Extra_Point.nmo")
-        && let Ok(m) = crate::assets::load_nmo(&path)
+        && let Some(m) = data.part("3D Entities/PH/P_Extra_Point.nmo", remastered)
     {
         modules.models.push(m.level);
         modules.names.push("P_Extra_Point".to_owned());

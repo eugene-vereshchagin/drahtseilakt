@@ -143,10 +143,11 @@ impl Game {
         for w in &level.warnings {
             eprintln!("warning: {w}");
         }
-        let balls_path = data
-            .file("3D Entities/Balls.nmo")
-            .ok_or("Balls.nmo not found in the game data")?;
-        let balls = crate::assets::load_nmo(&balls_path)?;
+        // a remastered level's shared parts (balls, modules, transformer) are drawn as the toolbox remade them
+        let remastered = o.source.remastered();
+        let balls = data
+            .part("3D Entities/Balls.nmo", remastered)
+            .ok_or("Balls.nmo not found or unreadable in the game data")?;
         let replay_in = match &o.replay {
             Some(p) => {
                 let text =
@@ -169,7 +170,7 @@ impl Game {
             .as_deref()
             .and_then(crate::sim::BallKind::from_name)
             .unwrap_or(crate::sim::BallKind::Wood);
-        let modules = scene::load_modules(&level.level, data);
+        let modules = scene::load_modules(&level.level, data, remastered);
         let extra_model = scene::ExtraModel::new(&modules);
         // The original's level 1 begins with its tutorial, which stops the level before the ball comes.
         let tutorial = level.name.eq_ignore_ascii_case("Level_01.NMO");
@@ -212,8 +213,7 @@ impl Game {
         }
         let trafo_model = scene::FIRST_MODULE_MODEL + modules.models.len();
         let trafo = data
-            .file("3D Entities/AnimTrafo.nmo")
-            .and_then(|p| crate::assets::load_nmo(&p).ok())
+            .part("3D Entities/AnimTrafo.nmo", remastered)
             .and_then(|f| crate::trafo::TrafoModel::new(&f.level, trafo_model).map(|m| (f, m)));
         Ok(Game {
             trafo,

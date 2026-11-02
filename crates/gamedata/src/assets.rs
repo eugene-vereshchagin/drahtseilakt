@@ -3,6 +3,95 @@
 
 use std::path::{Path, PathBuf};
 
+/// The largest texture file of an open-format level read, and its largest side (the toolbox makes them up to 8K).
+const IMAGE_MAX: u64 = 64 * 1024 * 1024;
+const SIDE_MAX: u32 = 8192;
+
+/// Where the toolbox keeps its remade copy of a game file the levels share (the balls, the modules, the
+/// transformer; `relative` as "3D Entities/PH/P_Ball_Wood.nmo"): levels/remastered/.shared/ and the file's path
+/// without its extension, in lower case (the game's names do not agree on case), a folder in the open format.
+pub fn remade_dir(relative: &str) -> PathBuf {
+    let stem = Path::new(&relative.to_lowercase()).with_extension("");
+    crate::profile::dir(crate::profile::Kind::Remastered).join(".shared").join(stem)
+}
+
+/// Gives a game file's level what the toolbox remade of it, when there is a remade copy that matches it: each
+/// mesh's finer look, and each texture's larger file. The level's own meshes stay as they are, so the physics does
+/// not change. A remade copy that does not match (another copy of the game, an older toolbox) is left unused.
+pub fn graft(level: &mut level::Level, remade: &Path) {
+    graft_within(level, &crate::profile::dir(crate::profile::Kind::Remastered), remade);
+}
+
+/// [`graft`] with the remade copy inside `root`: real folders from `root` down, never through a link, and its parts
+/// small (a part's buffer and its textures' pixels are capped, the textures of all parts together too).
+pub fn graft_within(level: &mut level::Level, root: &Path, remade: &Path) {
+    if !real_folders(root, &remade.join("textures")) {
+        return;
+    }
+    let small = std::fs::symlink_metadata(remade.join("level.bin")).is_ok_and(|m| m.is_file() && m.len() <= PART_MAX);
+    if !small {
+        return;
+    }
+    let Ok(r) = level::open::import(remade) else { return };
+    let written: Vec<&mut level::Mesh> = level.meshes.iter_mut().filter(|m| level::open::written(m)).collect();
+    let same = written.len() == r.meshes.len() && written.iter().zip(&r.meshes).all(|(m, rm)| m.name == rm.name);
+    let textures = level.textures.len() == r.textures.len()
+        && level.textures.iter().zip(&r.textures).all(|(t, rt)| t.name == rt.name);
+    if !same || !textures {
+        return;
+    }
+    for (m, rm) in written.into_iter().zip(r.meshes) {
+        m.look = rm.look;
+    }
+    for (t, rt) in level.textures.iter_mut().zip(r.textures) {
+        if let level::TextureSource::File(p) = &rt.source
+            && take_pixels(p)
+        {
+            t.source = rt.source;
+        }
+    }
+}
+
+/// The largest buffer of a remade part, and the most texture pixels all remade parts may bring (1 GB of RGBA).
+const PART_MAX: u64 = 64 * 1024 * 1024;
+const PIXELS_MAX: u64 = 256 * 1024 * 1024;
+static PIXELS_TAKEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// A remade texture may be used: its file is a plain one and its pixels (read from its header) still fit in what the
+/// remade parts may bring together; they are counted as taken.
+fn take_pixels(path: &str) -> bool {
+    use std::sync::atomic::Ordering;
+    let plain = std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
+    let Some((w, h)) = plain
+        .then(|| image::ImageReader::open(path).ok()?.with_guessed_format().ok()?.into_dimensions().ok())
+        .flatten()
+    else {
+        return false;
+    };
+    let n = u64::from(w).saturating_mul(u64::from(h));
+    let mut taken = PIXELS_TAKEN.load(Ordering::Relaxed);
+    loop {
+        let Some(next) = taken.checked_add(n).filter(|&t| t <= PIXELS_MAX) else {
+            return false;
+        };
+        match PIXELS_TAKEN.compare_exchange_weak(taken, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => return true,
+            Err(now) => taken = now,
+        }
+    }
+}
+
+/// Every folder from `root` down to `dir` is a real folder (no link on the way), `dir` inside `root`.
+fn real_folders(root: &Path, dir: &Path) -> bool {
+    let Ok(rest) = dir.strip_prefix(root) else { return false };
+    let mut at = root.to_path_buf();
+    std::fs::symlink_metadata(&at).is_ok_and(|m| m.is_dir())
+        && rest.components().all(|c| {
+            at.push(c);
+            matches!(c, std::path::Component::Normal(_)) && std::fs::symlink_metadata(&at).is_ok_and(|m| m.is_dir())
+        })
+}
+
 pub struct Data {
     pub root: PathBuf,
 }
@@ -68,10 +157,13 @@ impl Data {
         )
     }
 
+    /// A file of the copy by its path inside it (`/` between parts, any case). Names come from levels, which may be
+    /// hostile: a part that is empty, `.` or `..`, or holds `\` or `:`, finds nothing (it could leave the copy).
     pub fn file(&self, relative: &str) -> Option<PathBuf> {
-        relative
-            .split('/')
-            .try_fold(self.root.clone(), |dir, part| find(&dir, part))
+        relative.split('/').try_fold(self.root.clone(), |dir, part| {
+            let plain = !matches!(part, "" | "." | "..") && !part.contains(['\\', ':']);
+            plain.then(|| find(&dir, part)).flatten()
+        })
     }
 
     /// Where original level `n` is: its file in the copy, or, for a level the copy lacks (a copy without level 13),
@@ -82,6 +174,16 @@ impl Data {
         }
         let dir = crate::profile::dir(crate::profile::Kind::Remastered).join(format!("Level_{n:02}"));
         dir.join("level.gltf").is_file().then_some(Source::Open(dir))
+    }
+
+    /// A game file the levels share (`relative` as "3D Entities/Balls.nmo"), with what the toolbox remade of it when
+    /// `remastered` (a remastered level is played).
+    pub fn part(&self, relative: &str, remastered: bool) -> Option<LoadedLevel> {
+        let mut loaded = load_nmo(&self.file(relative)?).ok()?;
+        if remastered {
+            graft(&mut loaded.level, &remade_dir(relative));
+        }
+        Some(loaded)
     }
 
     pub fn load(&self, source: &Source) -> Result<LoadedLevel, String> {
@@ -123,8 +225,19 @@ impl Data {
                 height,
                 rgba,
             } => Some((*width, *height, rgba.clone())),
+            // an open-format level's texture: a plain file of its folder, its size checked before it is decoded
             level::TextureSource::File(name) if Path::new(name).is_absolute() => {
-                let img = image::open(name).ok()?.to_rgba8();
+                let path = Path::new(name);
+                let plain = std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
+                if !plain {
+                    return None;
+                }
+                let mut reader = image::ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+                let mut limits = image::Limits::default();
+                limits.max_image_width = Some(SIDE_MAX);
+                limits.max_image_height = Some(SIDE_MAX);
+                reader.limits(limits);
+                let img = reader.decode().ok()?.to_rgba8();
                 Some((img.width(), img.height(), img.into_raw()))
             }
             level::TextureSource::File(name) => {
