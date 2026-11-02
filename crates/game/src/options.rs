@@ -17,9 +17,11 @@ pub const WINDOWED: [(u32, u32); 8] = [
     (2560, 1440),
 ];
 
-/// The sizes the settings take: from the original's smallest mode to well past 8K.
-const WIDTH: std::ops::RangeInclusive<u32> = 320..=16384;
-const HEIGHT: std::ops::RangeInclusive<u32> = 200..=16384;
+/// The sizes the settings take: from the original's smallest mode to 8K, the largest surface the renderer asks
+/// the graphics device for (its default limit, 8192 a side; a larger one would fail on every start).
+pub const SURFACE_MAX: u32 = 8192;
+const WIDTH: std::ops::RangeInclusive<u32> = 320..=SURFACE_MAX;
+const HEIGHT: std::ops::RangeInclusive<u32> = 200..=SURFACE_MAX;
 
 /// A size written `WxH` (or `W*H`, as the menu shows it), refused outside the sizes a window can have.
 pub fn parse_size(v: &str) -> Option<(u32, u32)> {

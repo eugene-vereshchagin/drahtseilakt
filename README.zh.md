@@ -19,7 +19,8 @@ Drahtseilakt 是 **Ballance**（Cyparade / Atari，2004）的一个新引擎，�
 
 ## 构建和游玩
 
-Rust（stable，1.87 或更新版本）和 cargo；在 Linux 上需要 Vulkan 驱动。你需要自己的 Ballance 拷贝。
+Rust（stable，1.87 或更新版本）和 cargo；在 Linux 上需要 Vulkan 驱动，以及手柄所需的 udev 头文件（Debian/Ubuntu 上为
+`libudev-dev`，Fedora 上为 `systemd-devel`）。你需要自己的 Ballance 拷贝。
 
 ```sh
 cargo build --release

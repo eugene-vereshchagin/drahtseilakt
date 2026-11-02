@@ -21,7 +21,8 @@ Warum das Spiel das überhaupt brauchte: [Geschichte](docs/de/drahtseilakt/histo
 
 ## Bauen und spielen
 
-Rust (stable, 1.87 oder neuer) und cargo; unter Linux ein Vulkan-Treiber. Du brauchst deine eigene Kopie von
+Rust (stable, 1.87 oder neuer) und cargo; unter Linux ein Vulkan-Treiber und die udev-Header für Gamepads
+(`libudev-dev` unter Debian/Ubuntu, `systemd-devel` unter Fedora). Du brauchst deine eigene Kopie von
 Ballance.
 
 ```sh

@@ -20,7 +20,8 @@ Windows и macOS, в любом разрешении и соотношении �
 
 ## Сборка и игра
 
-Rust (stable, 1.87 или новее) и cargo; на Linux — драйвер Vulkan. Нужна ваша собственная копия Ballance.
+Rust (stable, 1.87 или новее) и cargo; на Linux — драйвер Vulkan и заголовки udev для геймпадов (`libudev-dev` в
+Debian/Ubuntu, `systemd-devel` в Fedora). Нужна ваша собственная копия Ballance.
 
 ```sh
 cargo build --release

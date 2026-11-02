@@ -903,6 +903,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         bindings,
         pads: crate::options::Pads::open(),
         pad_keys: 0,
+        pad_held: false,
         resolutions: crate::options::WINDOWED.to_vec(),
         player: load_player(),
         time_scale: 1.0,
@@ -1652,8 +1653,8 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format,
-        width: size.width.max(1),
-        height: size.height.max(1),
+        width: size.width.clamp(1, crate::options::SURFACE_MAX),
+        height: size.height.clamp(1, crate::options::SURFACE_MAX),
         present_mode: present_mode(&caps.present_modes, load_graphics().vsync),
         desired_maximum_frame_latency: 2,
         alpha_mode: caps
@@ -1986,6 +1987,8 @@ struct App {
     bindings: crate::options::Bindings,
     pads: crate::options::Pads,
     pad_keys: u8,
+    /// A pad button that closed the menu is still held: the run takes none of the pad's keys until all are let go.
+    pad_held: bool,
 }
 
 /// The sizes the Graphics page offers: the monitor's modes and the window sizes that fit on it, smallest first.
@@ -2383,6 +2386,8 @@ impl App {
                     a.forget_sounds();
                 }
                 save_settings(self.volumes, self.features, &self.player);
+                // the field of view is the extended mode's: the classic one plays at the original's
+                show_graphics(&load_graphics(), self.features);
                 if !self.features.has(crate::features::Feature::Tools) {
                     self.time_scale = 1.0;
                     self.saved = None;
@@ -2752,7 +2757,11 @@ impl App {
         use crate::options::PadPress;
         let (keys, pressed) = self.pads.poll();
         // the run's keys only while it runs, as the keyboard's
-        self.pad_keys = if self.menu.is_none() && self.loading.is_none() && self.fly.is_none() { keys } else { 0 };
+        if keys == 0 {
+            self.pad_held = false;
+        }
+        let running = self.menu.is_none() && self.loading.is_none() && self.fly.is_none();
+        self.pad_keys = if running && !self.pad_held { keys } else { 0 };
         for p in pressed {
             let code = match p {
                 PadPress::Up => KeyCode::ArrowUp,
@@ -2767,6 +2776,8 @@ impl App {
             if menu || (self.menu.is_none() && p == PadPress::Start) {
                 self.key(code, true, None, event_loop);
                 self.key(code, false, None, event_loop);
+                // the button that chose may close the menu: what it holds is not the run's
+                self.pad_held = keys != 0;
             }
         }
     }
@@ -2787,8 +2798,9 @@ impl ApplicationHandler for App {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
                 if let Some(gpu) = &mut self.gpu {
-                    gpu.config.width = size.width.max(1);
-                    gpu.config.height = size.height.max(1);
+                    // a window larger than the surface the device allows (a 10K monitor) draws at the largest one
+                    gpu.config.width = size.width.clamp(1, crate::options::SURFACE_MAX);
+                    gpu.config.height = size.height.clamp(1, crate::options::SURFACE_MAX);
                     gpu.surface.configure(&gpu.renderer.device, &gpu.config);
                 }
                 if let Some(m) = &mut self.menu {

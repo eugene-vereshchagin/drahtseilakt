@@ -20,7 +20,8 @@ files. Why the game needed this at all: [history](docs/drahtseilakt/history.md).
 
 ## Building and playing
 
-Rust (stable, 1.87 or newer) and cargo; on Linux a Vulkan driver. You need your own copy of Ballance.
+Rust (stable, 1.87 or newer) and cargo; on Linux a Vulkan driver, and udev's headers for the gamepads (`libudev-dev`
+on Debian/Ubuntu, `systemd-devel` on Fedora). You need your own copy of Ballance.
 
 ```sh
 cargo build --release
