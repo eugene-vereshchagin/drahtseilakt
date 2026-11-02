@@ -585,3 +585,57 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
     with open(os.path.join(out_dir, "level.bin"), "wb") as f:
         f.write(bin_)
     return len(bin_)
+
+
+def convex_hull(points, eps=1e-9):
+    """The faces of the convex hull of a few points (an incremental hull: fine for the tens of points a collision
+    shape has), as lists of point indices wound outward."""
+    p = np.asarray(points, np.float64)
+    n = len(p)
+    # a first tetrahedron of four points not in one plane
+    i0 = 0
+    i1 = int(np.argmax(np.linalg.norm(p - p[i0], axis=1)))
+    d = np.cross(p - p[i0], p[i1] - p[i0])
+    i2 = int(np.argmax(np.linalg.norm(d, axis=1)))
+    nrm = np.cross(p[i1] - p[i0], p[i2] - p[i0])
+    i3 = int(np.argmax(np.abs((p - p[i0]) @ nrm)))
+    centre = p[[i0, i1, i2, i3]].mean(0)
+
+    def oriented(a, b, c):
+        nv = np.cross(p[b] - p[a], p[c] - p[a])
+        return (a, b, c) if np.dot(nv, p[a] - centre) > 0 else (a, c, b)
+
+    faces = [oriented(*f) for f in ((i0, i1, i2), (i0, i1, i3), (i0, i2, i3), (i1, i2, i3))]
+    for q in range(n):
+        if q in (i0, i1, i2, i3):
+            continue
+        seen = []
+        for f in faces:
+            a, b, c = f
+            nv = np.cross(p[b] - p[a], p[c] - p[a])
+            if np.dot(nv, p[q] - p[a]) > eps * max(1.0, np.linalg.norm(nv)):
+                seen.append(f)
+        if not seen:
+            continue
+        edges = {}
+        for a, b, c in seen:
+            for e in ((a, b), (b, c), (c, a)):
+                edges[e] = edges.get(e, 0) + 1
+        horizon = [e for e in edges if (e[1], e[0]) not in edges]
+        faces = [f for f in faces if f not in seen] + [(a, b, q) for a, b in horizon]
+    return faces
+
+
+def hull(m, mat, points, smooth=False):
+    """The convex hull of `points` as a solid: flat faces (or shaded round from the centre with `smooth`)."""
+    p = np.asarray(points, np.float64)
+    centre = p.mean(0)
+    for a, b, c in convex_hull(p):
+        if smooth:
+            ids = []
+            for i in (a, b, c):
+                nv = p[i] - centre
+                ids.append(m.vertex(p[i], nv / (np.linalg.norm(nv) + 1e-12), planar_uv([p[i]], nv)[0]))
+            m.tri(mat, *ids)
+        else:
+            m.face(mat, [p[a], p[b], p[c]])

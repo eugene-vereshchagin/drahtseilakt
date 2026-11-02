@@ -404,79 +404,79 @@
  "buffers": [
   {
    "uri": "level.bin",
-   "byteLength": 11424
+   "byteLength": 10392
   }
  ],
  "bufferViews": [
   {
    "buffer": 0,
    "byteOffset": 0,
-   "byteLength": 1872,
+   "byteLength": 2376,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 1872,
-   "byteLength": 1872,
+   "byteOffset": 2376,
+   "byteLength": 2376,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 3744,
-   "byteLength": 1248,
+   "byteOffset": 4752,
+   "byteLength": 1584,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 4992,
-   "byteLength": 3168,
+   "byteOffset": 6336,
+   "byteLength": 792,
    "target": 34963
   },
   {
    "buffer": 0,
-   "byteOffset": 8160,
+   "byteOffset": 7128,
    "byteLength": 288,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 8448,
+   "byteOffset": 7416,
    "byteLength": 288,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 8736,
+   "byteOffset": 7704,
    "byteLength": 192,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 8928,
+   "byteOffset": 7896,
    "byteLength": 144,
    "target": 34963
   },
   {
    "buffer": 0,
-   "byteOffset": 9072,
+   "byteOffset": 8040,
    "byteLength": 720,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 9792,
+   "byteOffset": 8760,
    "byteLength": 720,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 10512,
+   "byteOffset": 9480,
    "byteLength": 480,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 10992,
+   "byteOffset": 9960,
    "byteLength": 432,
    "target": 34963
   }
@@ -484,7 +484,7 @@
  "accessors": [
   {
    "componentType": 5126,
-   "count": 156,
+   "count": 198,
    "type": "VEC3",
    "min": [
     -1.394,
@@ -500,19 +500,19 @@
   },
   {
    "componentType": 5126,
-   "count": 156,
+   "count": 198,
    "type": "VEC3",
    "bufferView": 1
   },
   {
    "componentType": 5126,
-   "count": 156,
+   "count": 198,
    "type": "VEC2",
    "bufferView": 2
   },
   {
    "componentType": 5125,
-   "count": 792,
+   "count": 198,
    "type": "SCALAR",
    "bufferView": 3
   },

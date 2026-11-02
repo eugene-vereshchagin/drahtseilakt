@@ -33,9 +33,10 @@ Collision meshes (measured size → ours; the shape used):
                 Col4                      hub, regular hexagon radius 2.76, 0.57 thick
     P_Modul_25  Col01                     board, box 9.57 x 0.50 x 5.00
                 Col02                     stop, right triangle 0.82 x 0.62, 0.50 thick
-    P_Modul_26  Sack                      our sack (a lathe shape, oval section) in the measured box 2.79 x 6.07 x 3.89
+    P_Modul_26  Sack                      hull of our sack's points: octagonal body 2.79 x 3.64, seams to 3.89, neck,
+                                          the tie's ends leaning over (heights and reaches to 0.05)
                 Rope                      decagonal rod, 0.15 radius, 12.5 long
-    P_Modul_29  Platte01..09              planks, boxes of each plank's measured size (1.42..1.50 x 0.57..0.60 x 4.69..5.11)
+    P_Modul_29  Platte01..09              planks: each its measured box with its measured corner cuts (PLANKS)
     P_Modul_30  Col1                      board, box 14.80 x 0.50 x 5.00
                 Col2                      axle, square turned 45 degrees, 0.73 across, 9.71 long
     P_Modul_34  Kiste, Schiebestein       boxes 4.1 x 4.1 x 5 and 5 x 5 x 5
@@ -49,11 +50,13 @@ Collision meshes (measured size → ours; the shape used):
                 Col_05                    back rail, 2.2 x 7.35 (plan), 2.5 high
                 Col_06                    entry plate, box 2.35 x 0.50 x 4.17
                 Platte01..08              planks as in P_Modul_29
-                Ballon01..04, Seil01..04  balloons (12-sided lathe, 3.48 x 4.35) and their ropes (not colliding)
+                Ballon01..04              balloons (12-sided lathe, 3.48 x 4.35, not colliding)
+                Seil01..04                ropes (not colliding): a fan fitted to the hull's volume, centre, inertia
                 Box_slide                 unit box
 
-How close each is (hull volume and box against the original's) is checked by a script outside the repository;
-the numbers are in the commit that changed them.
+How close each is (hull volume, centre, inertia, box against the original's) is checked by a script outside the
+repository (it needs the player's copy); hull volumes are within 0.99..1.03 and inertias within 0.92..1.07 of the
+original's. How the parts behave is checked by crates/game/src/partcheck.rs (copy's part against ours).
 
 Run from anywhere: python3 -I assets/own/make/make_parts.py
 Needs Python 3 with numpy and Pillow. The output is deterministic (fixed seeds).
@@ -741,12 +744,12 @@ def make_modul_03():
         m, mt, [(-3.618, -2.72, -0.438), (3.618, -2.72, -0.438), (3.255, -2.72, 0.438), (-3.255, -2.72, 0.438),
                 (-3.618, 4.565, -0.438), (3.618, 4.565, -0.438), (3.255, 4.565, 0.438), (-3.255, 4.565, 0.438)])
 
-    def post(m, mt, x_out, x_in):
-        # 1.01 wide, 1.32 deep at its foot and 0.86 at its head, its inner back corner bevelled
+    def post(m, mt, x_out, x_in, head=-0.46):
+        # 1.01 wide, 1.32 deep at its foot and 0.86 (0.89 the right one) at its head, its outer back corner bevelled
         s = 1 if x_in > x_out else -1
         k.hexahedron(m, mt, [(x_out, -1.92, -0.92), (x_in, -1.92, -0.92), (x_in, -1.92, 0.395),
                              (x_out + s * 0.36, -1.92, 0.395),
-                             (x_out, 4.128, -0.46), (x_in, 4.128, -0.46), (x_in, 4.128, 0.395),
+                             (x_out, 4.128, head), (x_in, 4.128, head), (x_in, 4.128, 0.395),
                              (x_out + s * 0.36, 4.128, 0.395)])
 
     lintel = lambda m, mt: k.hexahedron(m, mt, [
@@ -759,7 +762,7 @@ def make_modul_03():
     k.box(mw, trim, (-3.5, 4.565, -0.35), (3.5, 4.75, 0.35))
     mg = k.Mesh("P_Modul_03_Gate_Mesh")
     post(mg, walls, -3.612, -2.6)
-    post(mg, walls, 3.601, 2.6)
+    post(mg, walls, 3.601, 2.6, -0.49)
     lintel(mg, walls)
     p.node("P_Modul_03_frame_high", pos=(0, 17.079, 0), x=(0, 0, 1), s=0.313)
     p.node("P_Modul_03_frame_low", pos=(0, -6.117, 0), x=(0, 0, 1), s=0.313)
@@ -774,7 +777,7 @@ def make_modul_03():
     p.node("P_Modul_03_Gate", p.mesh(mg), pos=(8.497, -6.59, 0), x=(0, 0, 1), s=(1, 0.999, 1))
     p.node("P_Modul_03_MF")
     p.mesh(col("P_Modul_03_Wall_Coll_Mesh", lambda m: wall(m, None)))
-    p.mesh(col("P_Modul_03_Gate_Coll03_Mesh", lambda m: post(m, None, 3.601, 2.6)))
+    p.mesh(col("P_Modul_03_Gate_Coll03_Mesh", lambda m: post(m, None, 3.601, 2.6, -0.49)))
     p.mesh(col("P_Modul_03_Gate_Coll02_Mesh", lambda m: lintel(m, None)))
     p.mesh(col("P_Modul_03_Gate_Coll01_Mesh", lambda m: post(m, None, -3.612, -2.6)))
     p.group("P_Modul_03_FallingParts", ["P_Modul_03_Gate"] + [f"P_Modul_03_Wall0{i}" for i in range(1, 8)])
@@ -800,8 +803,8 @@ def make_modul_08():
     def seat(m, mt, sgn):
         # half of the seat from the middle (z = ±0.025) out to the end (±3.35): its top rises from 0.34 to 0.88
         z_mid, z_end, z_lip = 0.025 * sgn, 3.35 * sgn, 3.0 * sgn
-        prism_yz(m, mt, [(0.336, z_mid), (0.88, z_lip), (0.88, z_end), (0.48, z_end)] if sgn > 0 else
-                 [(0.336, z_mid), (0.48, z_end), (0.88, z_end), (0.88, z_lip)], -1.783, 1.783)
+        prism_yz(m, mt, [(0.336, z_mid), (0.875, z_lip), (0.875, z_end), (0.48, z_end)] if sgn > 0 else
+                 [(0.336, z_mid), (0.48, z_end), (0.875, z_end), (0.875, z_lip)], -1.783, 1.783)
 
     ms = k.Mesh("P_Modul_08_Schaukel_Mesh")
     rod(ms, metal, -2.981, -2.527)
@@ -951,10 +954,24 @@ def make_modul_25():
     p.write()
 
 
-# The sack's outline (height, radius): a heavy belly low down, a tied neck, a frayed top; turned in twelve steps
-# its hull holds the same volume as the original's (the sack is a body of its own mesh, its inertia follows it).
-SACK = [(-2.975, 0.0), (-2.75, 0.9), (-2.2, 1.6), (-1.5, 1.947), (-0.5, 1.8), (0.5, 1.45), (1.2, 0.95), (1.65, 0.5),
-        (1.9, 0.36), (2.15, 0.36), (2.6, 0.7), (3.092, 0.8)]
+def sack_points():
+    """The sack as the original's is built (measured: its rings' heights and widths, its seams, its tie): an
+    octagonal body, oval across (1.39 wide in x, 1.82 in z), slung low; two seam corners below reaching 1.95; a
+    shoulder and a tied neck; and the tie's frayed end flapping over to one side (+z), 1.2 wide, from 2.16 up to 3.09.
+    The body (it is a body of its own hull) is the hull of these points."""
+    pts = [(0.0, -2.975, -0.09)]
+    rings = [(-2.03, 1.1, 1.6, 6), (-1.03, 1.394, 1.82, 8), (-0.03, 1.394, 1.82, 8), (0.97, 1.18, 1.59, 8),
+             (1.58, 0.75, 1.0, 8), (1.92, 0.42, 0.44, 8)]
+    for y, rx, rz, n in rings:
+        for i in range(n):
+            a = 2 * math.pi * i / n
+            pts.append((rx * math.cos(a), y, rz * math.sin(a) - (0.09 if abs(math.cos(a)) > 0.9 else 0.0)))
+    pts += [(0.0, -2.86, -1.947), (0.0, -2.86, 1.947)]
+    # the tie's frayed ends, each (height, reach towards +z, offset across), to 0.05
+    for y, z, x in ((2.15, 1.6, 0.1), (2.2, 1.5, -0.35), (2.5, 1.25, 0.5), (2.65, 1.0, -0.6), (3.0, 0.9, 0.1),
+                    (3.092, 0.8, -0.35)):
+        pts.append((x, y, z))
+    return pts
 
 
 def make_modul_26():
@@ -964,8 +981,7 @@ def make_modul_26():
     holder = p.mat("P_Modul_26_Halter", "iron.png", diffuse=0.62, emissive=0.4, specular=0.5, power=20)
     rope = p.mat("P_Modul_26_Seil", "rope.png", diffuse=0.73, emissive=0.41)
     ms = k.Mesh("P_Modul_26_Sack_Mesh")
-    # oval across: 2.79 wide in x, 3.89 in z
-    lathe(ms, sack, SACK, 12, sx=1.394 / 1.947, sz=1.0)
+    k.hull(ms, sack, sack_points())
     mh = k.Mesh("P_Modul_26_Halter_Mesh")
     k.box(mh, holder, (-0.733, 0.0, -1.427), (0.733, 0.255, 1.426))
     mr = k.Mesh("P_Modul_26_Rope_Mesh")
@@ -981,19 +997,30 @@ def make_modul_26():
     p.write()
 
 
-# The planks of the plate bridges (P_Modul_29 and the balloon's), each its measured box (lo, hi) in its own frame.
+# The planks of the plate bridges (P_Modul_29 and the balloon's), measured: each a worn board, its box (x0, x1,
+# y0, y1, z0, z1) and the corners where its end is cut back or skewed, as offsets of the box's corners (bottom
+# x0z0, x1z0, x1z1, x0z1 = 0..3, top the same = 4..7). The ball rolls over their gaps, so their ends matter.
 PLANKS = {
-    1: ((-0.75, 0.0, -2.5), (0.75, 0.6, 2.5)), 2: ((-0.75, 0.0, -2.581), (0.699, 0.6, 2.5)),
-    3: ((-0.75, 0.0, -2.386), (0.75, 0.6, 2.303)), 4: ((-0.75, 0.0, -2.5), (0.75, 0.6, 2.5)),
-    5: ((-0.75, 0.0, -2.388), (0.75, 0.6, 2.5)), 6: ((-0.75, 0.0, -2.577), (0.75, 0.6, 2.53)),
-    7: ((-0.666, 0.0, -2.5), (0.75, 0.6, 2.5)), 8: ((-0.708, 0.017, -2.411), (0.708, 0.583, 2.415)),
-    9: ((-0.75, 0.0, -2.5), (0.75, 0.6, 2.502)),
+    1: ((-0.75, 0.75, 0.0, 0.6, -2.5, 2.5), {}),
+    2: ((-0.75, 0.70, 0.0, 0.6, -2.41, 2.5), {1: (-0.01, 0.01, -0.17), 4: (0.01, -0.01, 0.16)}),
+    3: ((-0.75, 0.75, 0.0, 0.6, -2.386, 2.303), {}),
+    4: ((-0.75, 0.75, 0.0, 0.6, -2.5, 2.5), {6: (0, 0, -0.21), 7: (0, 0, -0.21)}),
+    5: ((-0.75, 0.75, 0.0, 0.6, -2.388, 2.5), {4: (0.21, 0, 0)}),
+    6: ((-0.75, 0.75, 0.0, 0.6, -2.577, 2.42), {3: (0, 0.01, -0.11), 6: (0, -0.01, 0.11)}),
+    7: ((-0.666, 0.75, 0.0, 0.6, -2.5, 2.5), {4: (0, 0, 0.22), 5: (0, 0, 0.22)}),
+    8: ((-0.708, 0.708, 0.017, 0.583, -2.411, 2.415), {}),
+    9: ((-0.75, 0.75, 0.0, 0.6, -2.5, 2.502), {7: (0.24, 0, 0)}),
 }
 
 
-def plank(m, mt, lo, hi):
-    """A plank: its box, its top edges a little rounded off in look only (the collision mesh is the box)."""
-    k.box(m, mt, lo, hi, scale=3.0)
+def plank(m, mt, i):
+    """Plank i of PLANKS."""
+    (x0, x1, y0, y1, z0, z1), cuts = PLANKS[i]
+    c = [np.array(q, np.float64) for q in ((x0, y0, z0), (x1, y0, z0), (x1, y0, z1), (x0, y0, z1),
+                                           (x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1))]
+    for j, off in cuts.items():
+        c[j] = c[j] + np.array(off)
+    k.hull(m, mt, c)
 
 
 def make_modul_29():
@@ -1002,13 +1029,13 @@ def make_modul_29():
     wood = p.mat("P_Modul_29", "wood_dark.png", emissive=0.25)
     for i in (7, 8, 9):
         m = k.Mesh(f"P_Modul_29_Platte0{i}_Mesh")
-        plank(m, wood, *PLANKS[i])
+        plank(m, wood, i)
         p.node(f"P_Modul_29_Platte0{i}", p.mesh(m), pos=(-5.736 + 1.639 * (i - 1), -0.6, 0.211))
     for i, x in enumerate((-6.584, -4.916, -3.291, -1.639, 0.033, 1.639, 3.327, 4.936, 6.592, 8.224), 1):
         p.node(f"P_Modul_29_HingeFrame{i:02d}", pos=(x, 0, 0))
     for i in range(1, 7):
         m = k.Mesh(f"P_Modul_29_Platte0{i}_Mesh")
-        plank(m, wood, *PLANKS[i])
+        plank(m, wood, i)
         p.node(f"P_Modul_29_Platte0{i}", p.mesh(m), pos=(-5.736 + 1.639 * (i - 1), -0.6, 0.211))
     p.node("P_Modul_29_MF")
     p.group("All_P_Modul_29", ["P_Modul_29_MF"] + [f"P_Modul_29_HingeFrame{i:02d}" for i in range(10, 0, -1)] +
@@ -1134,6 +1161,22 @@ def make_modul_41():
 BALLOON = [(-2.174, 0.0), (-2.174, 0.15), (-0.65, 1.51), (0.43, 1.74), (1.3, 1.51), (1.94, 0.87), (2.174, 0.0)]
 
 
+# A balloon's ropes, measured as a whole: from the knot under the balloon five ropes fan down in one upright plane
+# towards the platform's rim, ending at these fractions of the way (along, across the rim's way) and heights below
+# the rim's hinge; ROPE_SPREAD sideways and ROPE_R thick, so that the hull (the ropes are one body) has the
+# original's volume and inertia.
+ROPE_ENDS = [(0.73, -0.51), (1.0, -0.61), (0.39, -0.36), (0.32, 0.15), (0.17, -0.14)]
+ROPE_SPREAD, ROPE_R = 0.05, 0.155
+
+
+def balloon_ropes(m, mat, top, rim):
+    flat = np.array([rim[0] - top[0], 0.0, rim[2] - top[2]])
+    side = np.cross(np.array([0.0, 1.0, 0.0]), flat / np.linalg.norm(flat))
+    for j, (f, dy) in enumerate(ROPE_ENDS):
+        end = top + flat * f + np.array([0.0, rim[1] - top[1] + dy, 0.0]) + side * ROPE_SPREAD * (1 if j % 2 else -1)
+        k.tube(m, mat, [top, end], ROPE_R, seg=6)
+
+
 def make_balloon():
     """The finish: a platform hung under four balloons, reached by a plank bridge; when the ball is in, the
     bridge's hinges break and the balloons carry it off (the sim's PE_Balloon entry)."""
@@ -1193,18 +1236,12 @@ def make_balloon():
     seil = [(3.12, 1.856, -11.621), (-8.455, 1.856, -8.435), (-8.44, 1.856, 8.488), (3.119, 1.856, 11.577)]
     for i in range(4):
         ms = k.Mesh(f"PE_Balloon_Ballon_Seil0{i + 1}_Mesh")
-        top = np.array(hinge_b[i][0]) - np.array(seil[i])
-        bottom = np.array(hinge_a[i][0]) - np.array(seil[i])
-        along = np.array(hinge_a[i][1], np.float64)
-        across = np.cross(np.array([0.0, 1.0, 0.0]), along)
-        # tied down a little below the rim, to four rings round the hinge
-        for off in (along * 1.3, -along * 1.3, across * 1.0, -across * 1.0):
-            k.tube(ms, rope, [top, bottom + off - np.array([0, 1.05, 0])], 0.06, seg=5)
+        balloon_ropes(ms, rope, np.array(hinge_b[i][0]) - np.array(seil[i]), np.array(hinge_a[i][0]) - np.array(seil[i]))
         p.node(f"PE_Balloon_Ballon_Seil0{i + 1}", p.mesh(ms), pos=seil[i])
     for i in range(1, 9):
         m = k.Mesh(f"PE_Balloon_Platte0{i}_Mesh")
         # the bridge's planks have the plate bridge's measured sizes, in the balloon's order
-        plank(m, bridge, *PLANKS[[2, 3, 1, 5, 6, 7, 8, 9][i - 1]])
+        plank(m, bridge, i + 1)
         p.node(f"PE_Balloon_Platte0{i}", p.mesh(m), pos=(9.506 + 1.639 * (i - 1), -0.593, 0.167))
     p.node("PE_Balloon_MF")
     for i, f in ((1, rail1), (2, ramp), (3, rail3), (4, floor), (5, back), (6, entry)):
