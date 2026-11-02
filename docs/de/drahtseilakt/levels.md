@@ -57,8 +57,8 @@ jeder Sprache); die Links im README sind Text, das Spiel öffnet sie nie.
 ## Läufe und Highscores nach Art
 
 Replays, Bestzeiten und Highscores werden nach Art getrennt, damit eine Community-Karte mit dem Namen eines
-Original-Levels nie als dieses zählt: `replays/<Level>/` für die Original-Level, `replays/maps/<Karte>/` für die
-anderen.
+Original-Levels nie als dieses zählt: `replays/<Level>/` für die Original-Level, `replays/maps/<Ordner>/<Karte>/` für die
+anderen (`community`, `open`, `remastered`).
 
 ## Sprachen
 
@@ -68,9 +68,11 @@ Deutsch.
 
 ## Reihenfolge der Arbeit
 
-1. Diese Seite und die Entscheidung; die chinesische Doku.
-2. Die Ordner `levels/` mit ihren READMEs; die Einstellungen, die sie verlegen, mit dem zurückgelassenen README.
-3. `--import`: das Original aus einem installierten Spiel kopieren; dann von der CD.
+1. Erledigt (2026-11-02): diese Seite und die Entscheidung; die chinesische Doku.
+2. Erledigt: die Ordner `levels/` mit ihren READMEs; die Einstellungen, die sie verlegen, mit dem zurückgelassenen
+   README.
+3. `--import` aus einem installierten Spiel ist erledigt (das Spiel findet die importierte Kopie auch ohne
+   `--data`); als Nächstes von der CD.
 4. Das Menü der eigenen Level liest `community/` und `open/`; `remastered/` mit dem Umwandler (Phase 6 des
    Fahrplans) und den Texturskripten (Phase 7).
 5. Level, die mit dem Spiel kommen, sobald Autoren sie anbieten.

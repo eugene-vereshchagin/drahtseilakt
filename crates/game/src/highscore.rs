@@ -142,11 +142,7 @@ impl Table {
 }
 
 fn path() -> PathBuf {
-    let replays = crate::app::replay_dir();
-    replays.parent().map_or_else(
-        || PathBuf::from("highscores.txt"),
-        |d| d.join("highscores.txt"),
-    )
+    crate::levels::data_dir().join("highscores.txt")
 }
 
 #[cfg(test)]

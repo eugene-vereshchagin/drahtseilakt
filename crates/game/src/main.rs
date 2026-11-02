@@ -17,6 +17,7 @@ mod freecam;
 mod highscore;
 mod hud;
 mod lang;
+mod levels;
 mod locate;
 mod menu;
 mod menuscene;
@@ -42,7 +43,8 @@ use std::process::ExitCode;
 const USAGE: &str = "\
 usage: drahtseilakt [options]
 
-  --data DIR          the Ballance folder (default: $OPENBALLANCE_DATA, then ./data)
+  --data DIR          the Ballance folder (default: $OPENBALLANCE_DATA, then the imported copy, then ./data)
+  --import DIR        copy the original game from your installed Ballance in DIR into the levels folder
   --level N           play original level N (1-13; default 1)
   --map FILE.nmo      play a level file: a community map or any .nmo
   --open DIR          play a level in the open format (a folder with level.gltf)
@@ -78,6 +80,8 @@ keys: arrows roll the ball (relative to the camera), Shift+Left/Right turn the c
 #[derive(Clone)]
 pub struct Options {
     pub data: Option<PathBuf>,
+    /// Copy the original game from this installed copy into the levels folder, then stop.
+    pub import: Option<PathBuf>,
     pub source: Source,
     /// A level was named (--level, --map, --open): no menu at the start.
     pub chosen: bool,
@@ -115,6 +119,7 @@ pub struct Options {
 fn parse_args() -> Result<Options, String> {
     let mut o = Options {
         data: None,
+        import: None,
         source: Source::Original(1),
         chosen: false,
         record: None,
@@ -148,6 +153,7 @@ fn parse_args() -> Result<Options, String> {
         let mut value = || args.next().ok_or_else(|| format!("{a} needs a value"));
         match a.as_str() {
             "--data" => o.data = Some(value()?.into()),
+            "--import" => o.import = Some(value()?.into()),
             "--level" => {
                 let n: u32 = value()?
                     .parse()
@@ -251,6 +257,12 @@ fn parse_args() -> Result<Options, String> {
 
 fn main() -> ExitCode {
     let result = parse_args().and_then(|o| {
+        if let Some(from) = &o.import {
+            let copied = levels::import(from)?;
+            levels::prepare(&lang::docs_language(app::setting("language").as_deref()));
+            println!("{copied} files copied to {}", levels::dir(levels::Kind::Original).display());
+            return Ok(());
+        }
         let data = Data::locate(o.data.clone())?;
         app::run(o, data)
     });

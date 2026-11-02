@@ -348,6 +348,7 @@ mod tests {
     /// Record Anim's first key puts the stone ball where MenuLevel.nmo saved it (docs/animation.md 5.2), the
     /// rotation's rows read as its axes; its later keys move it. Needs the player's copy (OPENBALLANCE_DATA).
     #[test]
+    #[allow(clippy::expect_used)]
     fn the_stone_ball_starts_where_it_was_saved() {
         if std::env::var_os("OPENBALLANCE_DATA").is_none() {
             return;

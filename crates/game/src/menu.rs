@@ -635,8 +635,8 @@ impl Menu {
                 if self.debug {
                     for l in [
                         "All levels open, best times shown",
-                        "Custom levels from the maps folder:",
-                        &short_path(&maps_dir()),
+                        "Custom levels from:",
+                        &short_path(&crate::levels::data_dir().join("levels")),
                         "F2 free camera, [ ] slower and faster,",
                         "F5 save the moment, F9 back to it,",
                         "R restarts. Helped runs never count.",
@@ -674,7 +674,7 @@ impl Menu {
                 (self.name.clone(), Vec::new()),
             ],
             Screen::Custom if self.maps.is_empty() => vec![
-                (b"No maps yet. Put .nmo files into".to_vec(), Vec::new()),
+                (b"No levels yet. Put .nmo maps into".to_vec(), Vec::new()),
                 (short_path(&maps_dir()).into_bytes(), Vec::new()),
             ],
             _ => Vec::new(),
@@ -1206,21 +1206,22 @@ fn finished(number: u32) -> bool {
     })
 }
 
-/// The folder players put custom levels into.
+/// The folder players put community maps into.
 pub fn maps_dir() -> PathBuf {
-    let replays = crate::app::replay_dir();
-    replays
-        .parent()
-        .map_or_else(|| PathBuf::from("maps"), |d| d.join("maps"))
+    crate::levels::dir(crate::levels::Kind::Community)
 }
 
-/// The map files in the maps folder, by name; the folder is made if missing, for the player to find.
+/// The custom levels: the community maps, then the open-format and remastered levels (levels.md).
 fn maps() -> Vec<PathBuf> {
-    let dir = maps_dir();
-    let _ = std::fs::create_dir_all(&dir);
-    maps_in(&dir)
+    use crate::levels::{Kind, dir};
+    [Kind::Community, Kind::Open, Kind::Remastered]
+        .into_iter()
+        .flat_map(|k| maps_in(&dir(k)))
+        .take(4096)
+        .collect()
 }
 
+/// A folder's levels by name: `.nmo` files, and folders holding an open-format level (level.gltf).
 fn maps_in(dir: &Path) -> Vec<PathBuf> {
     let Ok(d) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -1228,7 +1229,10 @@ fn maps_in(dir: &Path) -> Vec<PathBuf> {
     let mut v: Vec<PathBuf> = d
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.is_file() && p.extension().is_some_and(|x| x.eq_ignore_ascii_case("nmo")))
+        .filter(|p| {
+            let nmo = p.is_file() && p.extension().is_some_and(|x| x.eq_ignore_ascii_case("nmo"));
+            nmo || (p.is_dir() && p.join("level.gltf").is_file())
+        })
         .take(4096)
         .collect();
     v.sort();
@@ -1409,11 +1413,14 @@ mod tests {
         for f in ["b.NMO", "a.nmo", "c.txt"] {
             std::fs::write(dir.join(f), b"").unwrap();
         }
+        std::fs::create_dir_all(dir.join("open level")).unwrap();
+        std::fs::write(dir.join("open level/level.gltf"), b"").unwrap();
+        std::fs::create_dir_all(dir.join("empty")).unwrap();
         let names: Vec<_> = maps_in(&dir)
             .iter()
             .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
         let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(names, ["a.nmo", "b.NMO"]);
+        assert_eq!(names, ["a.nmo", "b.NMO", "open level"]);
     }
 }

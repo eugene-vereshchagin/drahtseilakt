@@ -56,7 +56,7 @@ language); the README's links are text, and the game never opens them.
 ## Runs and highscores by kind
 
 Replays, best times and highscores are kept per kind, so a community map named like an original level never
-counts as one: `replays/<level>/` for the original levels, `replays/maps/<map>/` for the others.
+counts as one: `replays/<level>/` for the original levels, `replays/maps/<folder>/<map>/` for the others (`community`, `open`, `remastered`).
 
 ## Languages
 
@@ -65,9 +65,10 @@ docs and the folders' READMEs are also in Simplified Chinese, next to English, R
 
 ## Order of work
 
-1. This page and the decision; Chinese docs.
-2. The `levels/` folders with their READMEs; the settings that move them, with the README left behind.
-3. `--import`: copying the original from an installed game; then from the CD.
+1. Done (2026-11-02): this page and the decision; Chinese docs.
+2. Done: the `levels/` folders with their READMEs; the settings that move them, with the README left behind.
+3. `--import` from an installed game is done (the game also finds the imported copy without `--data`); from
+   the CD next.
 4. The custom levels menu reading `community/` and `open/`; `remastered/` with the converter (roadmap phase 6)
    and the texture scripts (phase 7).
 5. Levels that come with the game, as authors offer them.

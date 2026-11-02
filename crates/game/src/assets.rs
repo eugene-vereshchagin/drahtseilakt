@@ -30,14 +30,15 @@ impl Data {
         let candidates = explicit
             .into_iter()
             .chain(std::env::var_os("OPENBALLANCE_DATA").map(PathBuf::from))
-            .chain([PathBuf::from("data")]);
+            .chain([crate::levels::dir(crate::levels::Kind::Original), PathBuf::from("data")]);
         for root in candidates {
             if find(&root, "3D Entities").is_some() {
                 return Ok(Data { root });
             }
         }
         Err(
-            "game data not found: pass --data DIR or set OPENBALLANCE_DATA to your Ballance folder"
+            "game data not found: import your Ballance with --import DIR, pass --data DIR or set OPENBALLANCE_DATA \
+             to your Ballance folder"
                 .into(),
         )
     }
@@ -253,7 +254,7 @@ pub fn load_nmo(path: &Path) -> Result<LoadedLevel, String> {
 }
 
 /// A directory entry by name, ignoring case.
-fn find(dir: &Path, name: &str) -> Option<PathBuf> {
+pub fn find(dir: &Path, name: &str) -> Option<PathBuf> {
     let exact = dir.join(name);
     if exact.exists() {
         return Some(exact);

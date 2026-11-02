@@ -87,8 +87,9 @@ struct Game {
     /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
     assisted: bool,
     last_level: bool,
-    /// One of the original levels (not a custom map): its runs are kept apart from the custom maps'.
-    original: bool,
+    /// Where the level's runs are kept: the original levels' in replays/, a custom level's under replays/maps/ in its
+    /// folder's name (community, open, remastered), so no two kinds share runs.
+    runs_root: PathBuf,
     /// The ball's sounds, and what they ask of the sound output since the window last played them.
     ball_sound: BallSound,
     fan_sound: FanSound,
@@ -226,7 +227,13 @@ impl Game {
             level_bonus,
             assisted: false,
             last_level: matches!(o.source, crate::assets::Source::Original(12)),
-            original: matches!(o.source, crate::assets::Source::Original(_)),
+            runs_root: match &o.source {
+                crate::assets::Source::Original(_) => replay_dir(),
+                crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
+                    let kind = p.parent().and_then(|d| d.file_name()).map_or_else(|| "other".into(), |n| n.to_owned());
+                    replay_dir().join("maps").join(kind)
+                }
+            },
             ball_sound: BallSound::default(),
             fan_sound: FanSound::default(),
             sound_out: Vec::new(),
@@ -413,7 +420,7 @@ impl Game {
     /// The folder of a level's runs: the original levels' by name, a custom map's under maps/, so that a map named
     /// like an original level never counts as one.
     fn runs_dir(&self, stem: &str) -> PathBuf {
-        if self.original { replay_dir().join(stem) } else { replay_dir().join("maps").join(stem) }
+        self.runs_root.join(stem)
     }
 
     /// Saves a run that did not finish (restarted or closed before the end), so that the falls and the lifts of
@@ -577,7 +584,7 @@ fn clock(tick: u64) -> String {
 
 /// The player's settings file: one `name value` a line (`sound 0.8`, `music 0.5`).
 fn settings_path() -> PathBuf {
-    replay_dir().parent().map(|d| d.join("settings.txt")).unwrap_or_else(|| PathBuf::from("settings.txt"))
+    crate::levels::data_dir().join("settings.txt")
 }
 
 /// The settings file's text: a file larger than any we write is not ours and is ignored; bytes that are not UTF-8
@@ -586,7 +593,8 @@ fn settings_text() -> String {
     const MAX: u64 = 64 * 1024;
     let small = std::fs::metadata(settings_path()).is_ok_and(|m| m.len() <= MAX);
     let bytes = if small { std::fs::read(settings_path()).unwrap_or_default() } else { Vec::new() };
-    String::from_utf8_lossy(&bytes).into_owned()
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes);
+    String::from_utf8_lossy(bytes).into_owned()
 }
 
 /// The sound and music volumes from the settings file, full where it has none.
@@ -604,7 +612,7 @@ fn load_volumes() -> [f32; 2] {
 }
 
 /// A value of the settings file ("key value" lines).
-fn setting(key: &str) -> Option<String> {
+pub fn setting(key: &str) -> Option<String> {
     settings_text()
         .lines()
         .filter_map(|l| l.split_once(' '))
@@ -635,10 +643,25 @@ fn save_settings(v: [f32; 2], extended: bool, player: &[u8]) {
     if !player.is_empty() {
         text.push_str(&format!("player {}\n", crate::lang::latin1(player)));
     }
-    if let Some(l) = setting("language") {
-        text.push_str(&format!("language {l}\n"));
+    // the lines only the file sets (language, the level folders) are kept as they are
+    let ours = ["sound", "music", "profile", "player"];
+    for line in settings_text().lines() {
+        let key = line.split_once(' ').map_or(line, |(k, _)| k);
+        if !ours.contains(&key) && !line.trim().is_empty() {
+            text.push_str(line);
+            text.push('\n');
+        }
     }
-    if let Err(e) = std::fs::write(&path, text) {
+    // a file that is not ours to rewrite (too big, or not UTF-8) is left as it is
+    let foreign = std::fs::metadata(&path).is_ok_and(|m| m.len() > 64 * 1024)
+        || std::fs::read(&path).is_ok_and(|b| std::str::from_utf8(&b).is_err());
+    if foreign {
+        eprintln!("{}: not saved over (too big or not UTF-8)", path.display());
+        return;
+    }
+    // written beside it, then moved over it: a crash never leaves half a file
+    let temp = path.with_extension("txt.new");
+    if let Err(e) = std::fs::write(&temp, text).and_then(|()| std::fs::rename(&temp, &path)) {
         eprintln!("could not save the settings to {}: {e}", path.display());
     }
 }
@@ -688,11 +711,7 @@ fn loading_name(source: &crate::assets::Source) -> String {
 }
 
 pub fn replay_dir() -> PathBuf {
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
-        .unwrap_or_else(|| PathBuf::from("."));
-    base.join("drahtseilakt/replays")
+    crate::levels::data_dir().join("replays")
 }
 
 pub fn run(o: Options, data: Data) -> Result<(), String> {
@@ -783,6 +802,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Poll);
     // Without a level named, the window opens with the main menu over the first level.
+    crate::levels::prepare(&crate::lang::docs_language(setting("language").as_deref()));
     let strings = crate::lang::Strings::load(&data, &crate::lang::chosen(setting("language").as_deref()));
     let debug = o.debug || load_extended();
     let menu = (!o.chosen && o.replay.is_none()).then(|| {
@@ -1784,6 +1804,7 @@ impl App {
             Action::None => {}
             Action::Continue => self.menu = None,
             Action::Play(n) => self.play(n),
+            Action::Map(path) if path.is_dir() => self.load(crate::assets::Source::Open(path)),
             Action::Map(path) => self.load(crate::assets::Source::Nmo(path)),
             Action::Restart => {
                 self.menu = None;

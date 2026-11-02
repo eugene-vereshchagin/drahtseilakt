@@ -143,6 +143,21 @@ pub fn chosen(setting: Option<&str>) -> String {
         .unwrap_or_else(|| "en".to_owned())
 }
 
+/// The languages our own texts (docs, the level folders' READMEs) are written in.
+pub const DOCS_LANGUAGES: [&str; 4] = ["en", "ru", "de", "zh"];
+
+/// The language of our own texts: the settings' choice, else the system's (LANG), else English.
+pub fn docs_language(setting: Option<&str>) -> String {
+    let system = std::env::var("LANG")
+        .ok()
+        .and_then(|l| l.get(..2).map(str::to_ascii_lowercase));
+    [setting.map(str::to_owned), system]
+        .into_iter()
+        .flatten()
+        .find(|l| DOCS_LANGUAGES.contains(&l.as_str()))
+        .unwrap_or_else(|| "en".to_owned())
+}
+
 /// Latin-1 bytes as text for the prototype's font.
 pub fn latin1(b: &[u8]) -> String {
     b.iter().map(|&c| char::from(c)).collect()
