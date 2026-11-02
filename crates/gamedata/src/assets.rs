@@ -146,8 +146,22 @@ impl Data {
         self.copy_file(relative)
     }
 
-    /// A file of the copy itself (never the level's own).
+    /// A file of the game's layout from its providers (never the level's own): our own files, the player's copy and
+    /// the toolbox's remaster of it, in the order the interface setting gives (resources.rs).
     fn copy_file(&self, relative: &str) -> Option<PathBuf> {
+        let found = crate::resources::in_use().order().into_iter().find_map(|p| match p {
+            crate::resources::Provider::Original => self.copy_only(relative),
+            crate::resources::Provider::Own => crate::resources::own_root().and_then(|r| plain_path(&r, relative)),
+            crate::resources::Provider::Remastered => plain_path(&crate::resources::remastered_root(), relative),
+        });
+        if found.is_none() {
+            crate::resources::missing(relative);
+        }
+        found
+    }
+
+    /// A file of the player's copy itself.
+    fn copy_only(&self, relative: &str) -> Option<PathBuf> {
         relative.split('/').try_fold(self.root.clone(), |dir, part| {
             let plain = !matches!(part, "" | "." | "..") && !part.contains(['\\', ':']);
             plain.then(|| find(&dir, part)).flatten()

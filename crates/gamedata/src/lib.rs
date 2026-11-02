@@ -4,6 +4,7 @@
 
 pub mod assets;
 pub mod profile;
+pub mod resources;
 
 /// FNV-1a, 64 bits: the hash a level file is known by (replays name the level file they were recorded on).
 pub fn fnv1a(bytes: &[u8]) -> u64 {

@@ -56,6 +56,7 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   - alle Level offen, ohne Freischalten;
   - Bestzeiten neben den Leveln;
   - Level nach Art unter Start;
+  - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
   - Übungswerkzeuge: freie Kamera (F2), langsamer und schneller (`[` `]`), den Moment sichern und dorthin zurück
     (F5 / F9), fünf Sekunden zurück (F3, nochmals weiter, bis eine halbe Minute), Sektor und Tick auf dem Bildschirm;
     ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;

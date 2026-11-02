@@ -86,6 +86,8 @@ enum Line {
     Mode,
     /// The Debug mode screen.
     DebugMenu,
+    /// Where the interface's files come from: own, the original, its remaster (resources.rs).
+    Interface,
     /// One of the extended mode's additions, by its place in FEATURES.
     Switch(usize),
     Yes,
@@ -111,6 +113,8 @@ pub enum Action {
     Switch(Feature),
     /// The volumes changed: sound and music, 0 to 1.
     Volumes([f32; 2]),
+    /// The interface's provider chosen (it takes effect on the next start).
+    Interface(gamedata::resources::Provider),
     /// The new highscore's name was entered: the game saves it and shows the list.
     Score(Vec<u8>),
 }
@@ -276,7 +280,7 @@ impl Menu {
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(false))
-                .chain([Line::DebugMenu, Line::Back])
+                .chain([Line::Interface, Line::DebugMenu, Line::Back])
                 .collect(),
             Screen::Debug => switches(true).chain([Line::Back]).collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
@@ -374,6 +378,7 @@ impl Menu {
                 Action::None
             }
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
+            (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
             (Screen::Extended | Screen::Debug, Some(Line::Switch(i))) => {
                 FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
             }
@@ -439,6 +444,7 @@ impl Menu {
                 p => p.map_or(Action::None, Action::Map),
             },
             Line::Mode => Action::ToggleDebug,
+            Line::Interface => Action::Interface(next_provider(1)),
             Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
             Line::Music | Line::Effects => Action::None,
             Line::Yes => match screen {
@@ -612,6 +618,7 @@ impl Menu {
             Line::Effects => b"  Sound Volume".to_vec(),
             Line::Mode => b"  Extended mode?".to_vec(),
             Line::DebugMenu => b"Debug mode".to_vec(),
+            Line::Interface => b"Interface".to_vec(),
             Line::Switch(i) => FEATURES
                 .get(i)
                 .map_or("", |f| f.label())
@@ -621,6 +628,13 @@ impl Menu {
             Line::No => s.get("Menu_Opt_Graphics Synch No", "No"),
             Line::Ok => s.get("Menu_YesNo YES", "OK"),
         }
+    }
+
+    /// A custom level's name as it is (any script), a folder's ending in "/".
+    fn map_text(&self, i: usize) -> Option<String> {
+        let p = self.maps.get(i)?;
+        let name = p.file_stem()?.to_string_lossy().into_owned();
+        Some(if is_folder(p) { format!("{name}/") } else { name })
     }
 
     /// A switch's row: its label and yes or no.
@@ -733,6 +747,7 @@ impl Menu {
                 let mut f = vec![(self.label(Line::Mode), yes_no(self.features.mode))];
                 if self.features.mode {
                     f.extend(switches(false).map(|l| self.switch_field(l)));
+                    f.push((self.label(Line::Interface), interface_value()));
                     f.push((self.label(Line::DebugMenu), b">".to_vec()));
                     f.push((short_path(&crate::levels::data_dir().join("levels")).into_bytes(), Vec::new()));
                 }
@@ -1044,6 +1059,25 @@ impl Menu {
                     let y = 0.27 + row as f32 * 0.045;
                     let r = [0.36, y, 0.64, y + 0.04];
                     button(&mut out, r, LEVEL_UV, state(i));
+                    // a name the game's font cannot draw (Chinese, Cyrillic) in the shipped fonts, as high as its letters
+                    let text = match lines[i] {
+                        Line::Map(k) => self.map_text(k).filter(|t| crate::fallback::needed(t)),
+                        _ => None,
+                    };
+                    if let Some(t) = text {
+                        let t: String = if t.chars().count() > 24 {
+                            t.chars().take(22).chain("..".chars()).collect()
+                        } else {
+                            t
+                        };
+                        let frame = crate::ui::homogeneous([0.39, y, 0.635, y + 0.04]);
+                        let height = font
+                            .and_then(|f| f.layout(b"A", frame, &FONT_03).first().map(|q| q.rect[3] - q.rect[1]))
+                            .unwrap_or((frame[3] - frame[1]) * 0.5);
+                        let quads = crate::fallback::layout(&t, frame, height, FONT_03.align, FONT_03.color);
+                        out.extend(crate::ui::place(quads, screen, Anchor::Center));
+                        continue;
+                    }
                     // a long name smaller, to stay on its button
                     let mut name = self.label(lines[i]);
                     if name.len() > 30 {
@@ -1120,7 +1154,8 @@ impl Menu {
                     if let (1, Some((name, value))) = (first, fields.first()) {
                         field(&mut out, 0.27, name, value, self.chosen() == 0);
                     }
-                    let n = lines.iter().filter(|l| matches!(l, Line::Switch(_) | Line::DebugMenu)).count();
+                    let rows = |l: &&Line| matches!(l, Line::Switch(_) | Line::Interface | Line::DebugMenu);
+                    let n = lines.iter().filter(rows).count();
                     let top = if first == 1 { 0.40 } else { 0.30 };
                     for (k, (name, value)) in fields.iter().skip(first).take(n).enumerate() {
                         let y = top + k as f32 * 0.05;
@@ -1329,6 +1364,30 @@ fn finished(number: u32) -> bool {
 /// The switch lines of the extended mode's additions: the debug ones, or the others.
 fn switches(debug: bool) -> impl Iterator<Item = Line> {
     FEATURES.iter().enumerate().filter(move |(_, f)| f.debug() == debug).map(|(i, _)| Line::Switch(i))
+}
+
+/// The interface's provider after the chosen one, `by` steps on (the arrows go round the three).
+fn next_provider(by: i32) -> gamedata::resources::Provider {
+    use gamedata::resources::{Provider, chosen};
+    let all = Provider::ALL;
+    let at = all.iter().position(|&p| p == chosen()).unwrap_or(1) as i32;
+    let n = all.len() as i32;
+    all.get((at + by).rem_euclid(n) as usize).copied().unwrap_or(Provider::Original)
+}
+
+/// The Interface line's value: the provider chosen, marked when it waits for the next start.
+fn interface_value() -> Vec<u8> {
+    use gamedata::resources::{Provider, chosen, in_use};
+    let name: &[u8] = match chosen() {
+        Provider::Own => b"own",
+        Provider::Original => b"original",
+        Provider::Remastered => b"remaster",
+    };
+    let mut v = name.to_vec();
+    if chosen() != in_use() {
+        v.extend_from_slice(b" (restart)");
+    }
+    v
 }
 
 /// The kinds of levels the extended mode offers, in the menu's order (levels.md).

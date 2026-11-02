@@ -25,6 +25,7 @@ image = { version = "=0.25.10", default-features = false, features = ["bmp", "tg
 ivp = { path = "../ivp" }
 cpal = "=0.18.2"
 serde_json = "=1.0.154"
+ab_glyph = "=0.2.32"
 
 [lints]
 workspace = true

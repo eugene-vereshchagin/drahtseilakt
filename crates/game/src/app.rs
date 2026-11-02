@@ -646,12 +646,18 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
         let _ = std::fs::create_dir_all(d);
     }
     let profile = if features.mode { "extended" } else { "classic" };
-    let mut text = format!("sound {}\nmusic {}\nprofile {profile}\n{}", v[0], v[1], features.lines());
+    let mut text = format!(
+        "sound {}\nmusic {}\nprofile {profile}\ninterface {}\n{}",
+        v[0],
+        v[1],
+        gamedata::resources::chosen().key(),
+        features.lines()
+    );
     if !player.is_empty() {
         text.push_str(&format!("player {}\n", crate::lang::latin1(player)));
     }
     // the lines only the file sets (language, the level folders) are kept as they are
-    let ours = ["sound", "music", "profile", "player"];
+    let ours = ["sound", "music", "profile", "player", "interface"];
     for line in settings_text().lines() {
         let key = line.split_once(' ').map_or(line, |(k, _)| k);
         if !ours.contains(&key) && !key.starts_with("extended.") && !line.trim().is_empty() {
@@ -722,6 +728,11 @@ pub fn replay_dir() -> PathBuf {
 }
 
 pub fn run(o: Options, data: Data) -> Result<(), String> {
+    // where the interface's files come from: the extended mode's choice, the copy's in the classic mode
+    let chosen = gamedata::resources::from_settings();
+    gamedata::resources::set_chosen(chosen);
+    let extended = load_features(o.debug).mode;
+    gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Original });
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_level(data.level_dir(&o.source).as_deref());
     if let Some(dir) = &o.export {
@@ -1670,6 +1681,9 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         }
         quads.extend(m.interface(game.font.as_ref(), screen));
     }
+    if let Some((aw, ah, rgba)) = crate::fallback::take_changed() {
+        r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
+    }
     r.draw_ui(&view, w, h, &quads);
 
     let row = (4 * w).div_ceil(256) * 256;
@@ -2068,6 +2082,10 @@ impl App {
                 }
                 save_settings(v, self.features, &self.player);
             }
+            Action::Interface(p) => {
+                gamedata::resources::set_chosen(p);
+                save_settings(self.volumes, self.features, &self.player);
+            }
             Action::ToggleDebug | Action::Switch(_) => {
                 match action {
                     Action::Switch(f) => self.features.toggle(f),
@@ -2387,6 +2405,9 @@ impl App {
             }
             _ => Vec::new(),
         };
+        if let Some((w, h, rgba)) = crate::fallback::take_changed() {
+            gpu.renderer.add_named_texture(crate::fallback::TEXTURE, w, h, rgba);
+        }
         gpu.renderer.draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();
