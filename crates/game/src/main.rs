@@ -36,6 +36,7 @@ mod scene;
 mod setup;
 mod sim;
 mod sky;
+mod smooth;
 mod trafo;
 mod ui;
 mod volume;

@@ -18,6 +18,27 @@ pub enum Source {
     Open(PathBuf),
 }
 
+impl Source {
+    /// The original level this is: one of the copy's, or the player's remastered export of one
+    /// (levels/remastered/Level_NN), which plays with that level's settings.
+    pub fn original_number(&self) -> Option<u32> {
+        match self {
+            Source::Original(n) => Some(*n),
+            Source::Open(dir) => self.remastered().then(|| {
+                let name = dir.file_name()?.to_str()?;
+                name.get(..6)?.eq_ignore_ascii_case("Level_").then(|| name.get(6..)?.parse().ok())?
+            })?,
+            Source::Nmo(_) => None,
+        }
+    }
+
+    /// The level is in the remastered folder (drawn with the remastered look).
+    pub fn remastered(&self) -> bool {
+        let root = crate::levels::dir(crate::levels::Kind::Remastered);
+        matches!(self, Source::Open(dir) if dir.parent().is_some_and(|p| p == root))
+    }
+}
+
 pub struct LoadedLevel {
     pub level: level::Level,
     pub name: String,
@@ -211,7 +232,13 @@ impl Data {
         let row = table
             .rows
             .iter()
-            .find(|r| text(r, "Levelfile").is_some_and(|f| f.eq_ignore_ascii_case(file_name)))
+            .find(|r| {
+                // a level file's name, or an export's folder named after it (Level_13 for Level_13.NMO)
+                text(r, "Levelfile").is_some_and(|f| {
+                    f.eq_ignore_ascii_case(file_name)
+                        || Path::new(&f).file_stem().is_some_and(|s| s.eq_ignore_ascii_case(file_name))
+                })
+            })
             .or_else(|| table.rows.first());
         let Some(row) = row else { return none };
         Settings {

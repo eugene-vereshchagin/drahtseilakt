@@ -219,6 +219,9 @@ Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen 
 - **Rundes sieht rund aus**: die Kugel analytisch gezeichnet; Pro-Pixel-Licht mit glatten Normalen;
   normalengeführte Tessellierung für Schienen und Rohre. Nur optisch: Die Physik bleibt auf den
   Originalpolygonen. Welche Techniken und wie weit, wird mit dem Inhaber nach dem Ausprobieren entschieden.
+  Erster Schritt erledigt: Remaster-Level zeichnen gekrümmte Meshes als gekrümmte Punkt-Normalen-Dreiecke
+  (smooth.rs) und biegen nur Kanten, deren Normalen sie wie einen Bogen biegen, damit Schienen gerade bleiben;
+  ein Remaster Level_NN spielt mit den Einstellungen von Level NN (Licht, Musik, Blitze des letzten Levels).
 - **Lokale Texturverbesserung**: Skripte, die der Spieler auf seiner Kopie ausführt, um Texturen
   hochzuskalieren (bis 8K); das Repository enthält die Pipeline und ihre Parameter, nie die Ergebnisse.
 - **Replays als Video**: offline, Bild für Bild, in jeder Auflösung bis 8K, mit Ton. Hochgeladen wird nichts

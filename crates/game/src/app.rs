@@ -89,6 +89,8 @@ struct Game {
     /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
     assisted: bool,
     last_level: bool,
+    /// The level is a remastered export: drawn with its rounder shapes (smooth.rs).
+    remastered: bool,
     /// Where the level's runs are kept: the original levels' in replays/, a custom level's under replays/maps/ in its
     /// folder's name (community, open, remastered), so no two kinds share runs.
     runs_root: PathBuf,
@@ -233,10 +235,8 @@ impl Game {
             music_theme: data.settings(&level.name).music,
             level_bonus,
             assisted: false,
-            last_level: match o.source {
-                crate::assets::Source::Original(n) => data.level_count() == Some(n),
-                _ => false,
-            },
+            last_level: o.source.original_number().is_some_and(|n| data.level_count() == Some(n)),
+            remastered: o.source.remastered(),
             runs_root: match &o.source {
                 crate::assets::Source::Original(_) => replay_dir(),
                 crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
@@ -1379,16 +1379,20 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     // the level's light colour (the level table's Light; white for a level without a row)
     renderer.light.color = data.settings(&game.level.name).light.unwrap_or([1.0; 3]);
     let loader = |t: &level::Texture| data.texture(t);
-    renderer.add_model(&game.level.level, &loader);
+    // the remastered look rounds the level's and its moving parts' round shapes; the physics keeps the originals
+    fn look(l: &level::Level, round: bool) -> std::borrow::Cow<'_, level::Level> {
+        if round { std::borrow::Cow::Owned(crate::smooth::level(l)) } else { std::borrow::Cow::Borrowed(l) }
+    }
+    renderer.add_model(&look(&game.level.level, game.remastered), &loader);
     renderer.add_model(&game.balls.level, &loader);
     let letter = game.level.level.sky.clone().unwrap_or_else(|| "A".into());
     let sky = crate::sky::model(&letter);
     renderer.add_model(&sky, &loader);
     for m in &game.modules.models {
-        renderer.add_model(m, &loader);
+        renderer.add_model(&look(m, game.remastered), &loader);
     }
     if let Some((file, _)) = &game.trafo {
-        renderer.add_model(&file.level, &loader);
+        renderer.add_model(&look(&file.level, game.remastered), &loader);
     }
     let shadow = level::Texture {
         name: "HardShadow".into(),
