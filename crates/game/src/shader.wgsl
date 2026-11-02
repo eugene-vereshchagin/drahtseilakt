@@ -49,22 +49,28 @@ struct Instance {
 @group(2) @binding(0) var<uniform> mat: Material;
 @group(2) @binding(1) var tex: texture_2d<f32>;
 @group(2) @binding(2) var samp: sampler;
+// The material's normal map (params.w 1): the relief a remastered level's toolbox gives it.
+@group(2) @binding(3) var relief: texture_2d<f32>;
 
 struct VsOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) normal: vec3<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) world: vec3<f32>,
+    // the texture's u direction on the surface, and (w) which way its v goes
+    @location(3) tangent: vec4<f32>,
 };
 
 @vertex
-fn vs(@location(0) pos: vec3<f32>, @location(1) normal: vec3<f32>, @location(2) uv: vec2<f32>) -> VsOut {
+fn vs(@location(0) pos: vec3<f32>, @location(1) normal: vec3<f32>, @location(2) uv: vec2<f32>,
+    @location(3) tangent: vec4<f32>) -> VsOut {
     var out: VsOut;
     let world = inst.m * vec4<f32>(pos, 1.0);
     out.clip = g.view_proj * world;
     out.normal = (inst.m * vec4<f32>(normal, 0.0)).xyz;
     out.uv = uv + inst.uv.xy;
     out.world = world.xyz;
+    out.tangent = vec4<f32>((inst.m * vec4<f32>(tangent.xyz, 0.0)).xyz, tangent.w);
     return out;
 }
 
@@ -110,7 +116,16 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     // diffuse and N.L, held to 0..1, and the texture is multiplied by it; the highlight (the light's colour times the
     // material's specular and N.H to its power, a local viewer) is added after. Two-sided: the original's meshes do
     // not agree on which side faces out, so the side facing the light is lit.
-    var n = normalize(in.normal);
+    // The surface's normal: the interpolated one, bent by the material's normal map when it has one (tangent space,
+    // green towards -v as glTF has it). Without a map it is exactly the interpolated normal, as the original's.
+    var surface = normalize(in.normal);
+    if mat.params.w > 0.5 {
+        let m = textureSample(relief, samp, uv).xyz * 2.0 - vec3<f32>(1.0);
+        let t = normalize(in.tangent.xyz - surface * dot(surface, in.tangent.xyz));
+        let b = cross(surface, t) * in.tangent.w;
+        surface = normalize(t * m.x - b * m.y + surface * m.z);
+    }
+    var n = surface;
     let l = -normalize(g.light_dir.xyz);
     if dot(n, l) < 0.0 {
         n = -n;
@@ -118,7 +133,7 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     let lambert = max(dot(n, l), 0.0);
     // The passing lights add their own diffuse term (each lights the side facing it); the point light falls off as
     // 1/d and ends at its reach.
-    let raw = normalize(in.normal);
+    let raw = surface;
     var extra = g.flash_color.rgb * abs(dot(raw, -normalize(g.flash_dir.xyz)));
     let to_point = g.point_pos.xyz - in.world;
     let d = length(to_point);

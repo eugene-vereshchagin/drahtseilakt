@@ -140,3 +140,50 @@ fn a_path_from_a_level_never_leaves_the_copy() {
     }
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[test]
+fn a_remade_copy_gives_its_normal_maps() {
+    let d = dir("normals");
+    let material = level::Material {
+        name: "wood".into(),
+        diffuse: [1.0; 4],
+        ambient: [0.0; 3],
+        emissive: [0.0; 3],
+        specular: [0.0; 3],
+        power: 0.0,
+        texture: Some(0),
+        normal: None,
+        blend: None,
+        alpha_cutoff: None,
+        z_write: true,
+        two_sided: false,
+        unlit: false,
+        texgen: None,
+    };
+    let mut remade = part();
+    remade.materials.push(level::Material {
+        normal: Some(1),
+        ..material.clone()
+    });
+    remade.textures.push(Texture {
+        name: "Ball_Wood_normal".into(),
+        source: TextureSource::File("Ball_Wood_normal".into()),
+        color_key: None,
+    });
+    let png = d.join(level::open::texture_file(1, "Ball_Wood_normal"));
+    image::save_buffer(&png, &[128u8; 64], 4, 4, image::ExtendedColorType::Rgba8).unwrap();
+    level::open::export(&remade, &d).unwrap();
+    let mut l = part();
+    l.materials.push(material);
+    gamedata::assets::graft_within(&mut l, &root(), &d);
+    assert_eq!(
+        l.textures.len(),
+        2,
+        "the normal map is added after the part's own texture"
+    );
+    assert_eq!(l.materials[0].normal, Some(1));
+    assert!(
+        matches!(&l.textures[1].source, TextureSource::File(p) if p.ends_with("Ball_Wood_normal.png"))
+    );
+    let _ = std::fs::remove_dir_all(&d);
+}

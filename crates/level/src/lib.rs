@@ -66,6 +66,9 @@ pub struct Material {
     pub specular: [f32; 3],
     pub power: f32,
     pub texture: Option<usize>,
+    /// A normal map over the base texture (tangent space, green up as glTF has it): the relief the toolbox gives a
+    /// remastered level. Only drawn; none in the original's levels.
+    pub normal: Option<usize>,
     /// Blending against the frame, used when `blend` is set.
     pub blend: Option<(Blend, Blend)>,
     /// Pixels with alpha at or below this are discarded (alpha test), when set.

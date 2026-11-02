@@ -78,6 +78,7 @@ pub fn model(letter: &str) -> Level {
             two_sided: true,
             unlit: true,
             texgen: None,
+            normal: None,
         });
         sky.meshes.push(Mesh {
             name: format!("Sky_{face}"),

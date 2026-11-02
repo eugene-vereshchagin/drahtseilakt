@@ -211,7 +211,9 @@ Done when: most maps play; the report lists the rest, each with its reason.
   levels' curved meshes a look of curved point-normal triangles, written into the level (toolbox smooth.rs; the levels are shaded flat, so faces meeting
   at under 40 degrees are taken as one smooth surface first), bending only edges whose normals bend them
   like an arc, so rails stay straight; and a remastered Level_NN plays with level NN's settings (light, music,
-  the last level's lightning).
+  the last level's lightning). Second step done: relief. The toolbox makes a normal map from each lit texture's own
+  picture (its fine detail of brightness as height: rivets, plank gaps, ropes) and the renderer bends the lighting
+  by it; levels without one draw exactly as before.
 - **Local texture enhancement**: scripts the player runs on their own copy to upscale textures (up to 8K);
   the repository holds the pipeline and its parameters, never the results.
 - **Replays rendered to video**: offline, frame by frame, at any resolution up to 8K with sound. Nothing is

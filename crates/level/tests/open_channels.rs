@@ -21,6 +21,7 @@ fn material(name: &str, texgen: Option<TexGen>) -> Material {
         two_sided: false,
         unlit: false,
         texgen,
+        normal: None,
     }
 }
 

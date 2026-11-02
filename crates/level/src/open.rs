@@ -152,6 +152,9 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
             if m.unlit {
                 v["extensions"] = json!({"KHR_materials_unlit": {}});
             }
+            if let Some(t) = m.normal {
+                v["normalTexture"] = json!({"index": t});
+            }
             if let Some(g) = m.texgen {
                 v["extras"]["drahtseilakt"]["texgen"] = json!(match g {
                     TexGen::Reflect => "reflect",
@@ -541,8 +544,22 @@ pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
             Some("MASK") => Some(m["alphaCutoff"].as_f64().unwrap_or(0.5) as f32),
             _ => x["alpha_cutoff"].as_f64().map(|v| v as f32),
         };
+        // a normal map named must be one of the level's textures: one that is not is refused, not dropped
+        let normal = match &m["normalTexture"] {
+            Value::Null => None,
+            n => {
+                let image = n["index"]
+                    .as_u64()
+                    .and_then(|t| tex_image.get(usize::try_from(t).ok()?).copied().flatten());
+                match image.filter(|&i| i < level.textures.len()) {
+                    Some(i) => Some(i),
+                    None => return Err("a material's normal map is not one of the level's textures".into()),
+                }
+            }
+        };
         level.materials.push(Material {
             name: m["name"].as_str().unwrap_or_default().to_owned(),
+            normal,
             diffuse: f4(&pbr["baseColorFactor"], [1.0; 4]),
             ambient: rgb(&x["ambient"]),
             emissive: rgb(&m["emissiveFactor"]),

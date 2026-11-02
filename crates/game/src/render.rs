@@ -17,6 +17,9 @@ struct Vertex {
     pos: [f32; 3],
     normal: [f32; 3],
     uv: [f32; 2],
+    /// The direction the texture's u grows along the surface, and (w) which way its v goes against it: the frame a
+    /// normal map's relief is read in.
+    tangent: [f32; 4],
 }
 
 #[repr(C)]
@@ -195,6 +198,8 @@ pub struct Renderer {
     model_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     white: wgpu::TextureView,
+    /// The normal map of a material without one: the surface's own normal.
+    flat_normal: wgpu::TextureView,
     pub models: Vec<Model>,
     overlay_pipeline: wgpu::RenderPipeline,
     markers: HashMap<[u32; 4], GpuMaterial>,
@@ -263,6 +268,17 @@ impl Renderer {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                // the material's normal map (a flat one when it has none)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
             ],
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -302,6 +318,7 @@ impl Renderer {
         });
         let overlay_pipeline = overlay_pipeline(&device, format);
         let white = upload_texture(&device, &queue, 1, 1, vec![255; 4]);
+        let flat_normal = upload_texture(&device, &queue, 1, 1, vec![128, 128, 255, 255]);
         let particle_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("particles"),
             source: wgpu::ShaderSource::Wgsl(include_str!("particles.wgsl").into()),
@@ -360,6 +377,7 @@ impl Renderer {
             model_layout,
             sampler,
             white,
+            flat_normal,
             models: Vec::new(),
             overlay_pipeline,
             markers: HashMap::new(),
@@ -399,6 +417,7 @@ impl Renderer {
                     .texture
                     .and_then(|t| textures.get(t))
                     .and_then(Option::as_ref);
+                let relief = m.normal.and_then(|t| textures.get(t)).and_then(Option::as_ref);
                 let uniform = MaterialUniform {
                     diffuse: m.diffuse,
                     emissive: [
@@ -419,7 +438,7 @@ impl Renderer {
                             Some(level::TexGen::Chrome) => 3.0,
                             None => 0.0,
                         },
-                        0.0,
+                        if relief.is_some() { 1.0 } else { 0.0 },
                     ],
                     ambient: [m.ambient[0], m.ambient[1], m.ambient[2], 0.0],
                     specular: [m.specular[0], m.specular[1], m.specular[2], m.power],
@@ -449,6 +468,10 @@ impl Renderer {
                             binding: 2,
                             resource: wgpu::BindingResource::Sampler(&self.sampler),
                         },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: wgpu::BindingResource::TextureView(relief.unwrap_or(&self.flat_normal)),
+                        },
                     ],
                 });
                 GpuMaterial {
@@ -474,11 +497,13 @@ impl Renderer {
                 if m.positions.is_empty() {
                     return None;
                 }
+                let tangents = tangents(m);
                 let vertices: Vec<Vertex> = (0..m.positions.len())
                     .map(|i| Vertex {
                         pos: m.positions.get(i).copied().unwrap_or_default(),
                         normal: m.normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]),
                         uv: m.uvs.get(i).copied().unwrap_or_default(),
+                        tangent: tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]),
                     })
                     .collect();
                 let vertex = self
@@ -563,6 +588,7 @@ impl Renderer {
                 wgpu::BindGroupEntry { binding: 0, resource: buf.as_entire_binding() },
                 wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&view) },
                 wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&self.clamp) },
+                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&self.flat_normal) },
             ],
         });
         self.shadow_material = Some(GpuMaterial {
@@ -601,6 +627,10 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&self.flat_normal),
                 },
             ],
         });
@@ -643,7 +673,9 @@ impl Renderer {
                     buffers: &[Some(wgpu::VertexBufferLayout {
                         array_stride: std::mem::size_of::<Vertex>() as u64,
                         step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2],
+                        attributes: &wgpu::vertex_attr_array![
+                            0 => Float32x3, 1 => Float32x3, 2 => Float32x2, 3 => Float32x4
+                        ],
                     })],
                 },
                 primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
@@ -1181,6 +1213,43 @@ fn model_buffer(
 }
 
 /// Uploads RGBA pixels with a full mip chain (box-filtered on the CPU).
+/// Each vertex's tangent frame for normal maps: the direction its texture's u grows along the surface, made square to
+/// the vertex's normal, and in w which way v goes (+1 or -1, mirrored coordinates flip it). Faces whose coordinates
+/// are degenerate add nothing; a vertex no face gives a frame gets one square to its normal.
+fn tangents(m: &level::Mesh) -> Vec<[f32; 4]> {
+    let n = m.positions.len();
+    let (mut tan, mut bit) = (vec![Vec3::ZERO; n], vec![Vec3::ZERO; n]);
+    let at = |i: u32| -> Option<(Vec3, glam::Vec2)> {
+        Some((Vec3::from(*m.positions.get(i as usize)?), glam::Vec2::from(*m.uvs.get(i as usize)?)))
+    };
+    for t in m.parts.iter().flat_map(|p| p.indices.as_chunks::<3>().0) {
+        let (Some((p0, w0)), Some((p1, w1)), Some((p2, w2))) = (at(t[0]), at(t[1]), at(t[2])) else { continue };
+        let (e1, e2, d1, d2) = (p1 - p0, p2 - p0, w1 - w0, w2 - w0);
+        let det = d1.x * d2.y - d2.x * d1.y;
+        if det.abs() < 1e-12 || !det.is_finite() {
+            continue;
+        }
+        let (u, v) = ((e1 * d2.y - e2 * d1.y) / det, (e2 * d1.x - e1 * d2.x) / det);
+        for &i in t {
+            if let (Some(a), Some(b)) = (tan.get_mut(i as usize), bit.get_mut(i as usize)) {
+                *a += u;
+                *b += v;
+            }
+        }
+    }
+    (0..n)
+        .map(|i| {
+            let nrm = m.normals.get(i).map(|&v| Vec3::from(v).normalize_or(Vec3::Y)).unwrap_or(Vec3::Y);
+            let u = tan.get(i).copied().unwrap_or_default();
+            let t = (u - nrm * nrm.dot(u)).normalize_or_zero();
+            let t = if t == Vec3::ZERO { nrm.any_orthonormal_vector() } else { t };
+            let b = bit.get(i).copied().unwrap_or_default();
+            let w = if nrm.cross(t).dot(b) < 0.0 { -1.0 } else { 1.0 };
+            [t.x, t.y, t.z, w]
+        })
+        .collect()
+}
+
 fn upload_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,

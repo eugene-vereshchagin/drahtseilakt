@@ -25,7 +25,9 @@ A folder holding:
   (`extras.drahtseilakt.look`: the index of another mesh; the toolbox's rounder shapes): the looks come after all
   the level's own meshes, each the look of one mesh, and nodes never place them; the physics and the rules use the
   mesh itself.
-- **Materials**: `baseColorFactor` (diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`; `alphaMode`
+- **Materials**: `baseColorFactor` (diffuse), `baseColorTexture`, `normalTexture` (a normal map, tangent space with
+  green up as glTF has it: the relief the toolbox gives remastered levels; it must name one of the level's textures),
+  `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (with `alphaCutoff`) or `BLEND`; unlit materials use `KHR_materials_unlit`.
   `extras.drahtseilakt` holds what glTF has no field for: `ambient`, `specular` and `power` (the highlight), `z_write`, `blend` (source and
   destination factor names: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`, `inv_src_alpha`,

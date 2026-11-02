@@ -224,6 +224,9 @@ Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen 
   gekrümmten Punkt-Normalen-Dreiecken und schreibt sie ins Level (smooth.rs der Toolbox; die Level sind flach schattiert, daher gelten Flächen unter 40 Grad zueinander zuerst als eine
   glatte Fläche) und biegen nur Kanten, deren Normalen sie wie einen Bogen biegen, damit Schienen gerade bleiben;
   ein Remaster Level_NN spielt mit den Einstellungen von Level NN (Licht, Musik, Blitze des letzten Levels).
+  Zweiter Schritt erledigt: Relief. Die Toolbox macht aus dem Bild jeder beleuchteten Textur eine Normal Map (feine
+  Helligkeitsunterschiede als Höhe: Nieten, Fugen zwischen Brettern, Seile), und der Renderer beugt das Licht damit;
+  Level ohne sie werden genau wie vorher gezeichnet.
 - **Lokale Texturverbesserung**: Skripte, die der Spieler auf seiner Kopie ausführt, um Texturen
   hochzuskalieren (bis 8K); das Repository enthält die Pipeline und ihre Parameter, nie die Ergebnisse.
 - **Replays als Video**: offline, Bild für Bild, in jeder Auflösung bis 8K, mit Ton. Hochgeladen wird nichts

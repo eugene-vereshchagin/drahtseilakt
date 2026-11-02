@@ -26,7 +26,9 @@ Ein Ordner mit:
   tragen, die an seiner Stelle gezeichnet wird (`extras.drahtseilakt.look`: der Index eines anderen Meshs; so hält
   die Toolbox rundere Formen): solche Meshes stehen nach allen eigenen Meshes des Levels, jedes die Gestalt genau
   eines Meshs, und kein Knoten setzt sie; Physik und Regeln benutzen das Mesh selbst.
-- **Materialien**: `baseColorFactor` (Diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`;
+- **Materialien**: `baseColorFactor` (Diffuse), `baseColorTexture`, `normalTexture` (eine Normal Map im
+  Tangentenraum, Grün nach oben wie in glTF: das Relief, das die Toolbox Remaster-Leveln gibt; sie muss eine der
+  Texturen des Levels nennen), `emissiveFactor`, `doubleSided`;
   `alphaMode` `OPAQUE`, `MASK` (mit `alphaCutoff`) oder `BLEND`; unbeleuchtete Materialien über
   `KHR_materials_unlit`. In `extras.drahtseilakt` steht, wofür glTF kein Feld hat: `ambient`, `specular` und `power` (das Glanzlicht), `z_write`,
   `blend` (Namen von Quell- und Zielfaktor: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`,

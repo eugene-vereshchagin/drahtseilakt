@@ -14,7 +14,7 @@
 
 - **节点（Nodes）**：关卡中每个对象一个，按顺序排列，带有名称、世界 `matrix`，若需绘制还带有 `mesh`。`extras.drahtseilakt.visible` 表示该对象是否显示。
 - **网格（Meshes）**：每个有几何体的网格一个；每种材质一个图元，同一网格的所有图元共用相同的 `POSITION`、`NORMAL` 和 `TEXCOORD_0` 访问器（浮点），`indices` 为 32 位整数。网格的材质通道（用另一材质对整个网格再绘制一遍）位于 `extras.drahtseilakt.channels`：每个通道包含其 `material`、`blend`（源与目标因子名，见下文）和 `texcoord` k，即存放其坐标的 `TEXCOORD_k` 集；最多 16 个。网格可以带一个更精细的外观，绘制时代替它（`extras.drahtseilakt.look`：另一个网格的索引；toolbox 用它保存更圆的形状）：这些网格排在关卡自身所有网格之后，每个只作为一个网格的外观，节点从不放置它们；物理和规则使用网格本身。
-- **材质（Materials）**：`baseColorFactor`（漫反射）、`baseColorTexture`、`emissiveFactor`、`doubleSided`；`alphaMode` 为 `OPAQUE`、`MASK`（带 `alphaCutoff`）或 `BLEND`；无光照材质使用 `KHR_materials_unlit`。
+- **材质（Materials）**：`baseColorFactor`（漫反射）、`baseColorTexture`、`normalTexture`（切线空间的法线贴图，与 glTF 一样绿色朝上：toolbox 为重制关卡生成的凹凸细节；必须指向关卡的某个纹理）、`emissiveFactor`、`doubleSided`；`alphaMode` 为 `OPAQUE`、`MASK`（带 `alphaCutoff`）或 `BLEND`；无光照材质使用 `KHR_materials_unlit`。
   `extras.drahtseilakt` 存放 glTF 没有对应字段的内容：`ambient`、`specular` 与 `power`（高光）、`z_write`、`blend`（源与目标因子名：`zero`、`one`、`src_color`、`inv_src_color`、`src_alpha`、`inv_src_alpha`、`dest_alpha`、`inv_dest_alpha`、`dest_color`、`inv_dest_color`）、混合与 alpha 测试同时使用时的 `alpha_cutoff`，以及纹理坐标由视角生成时的 `texgen`（`reflect` 或 `chrome`）。
 - **场景附加数据** `extras.drahtseilakt`：`format`（1）、`groups`（名称和成员节点索引——游戏规则读取这些，见 [nmo-format.md](nmo-format.md)）、`sky`（天空字母）和 `start_ball`。
 
