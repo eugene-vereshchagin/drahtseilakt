@@ -28,6 +28,11 @@ cargo build --release
 target/release/drahtseilakt --data /path/to/Ballance --level 1
 ```
 
+On Windows the release build opens no console window: started from Explorer, the game writes its messages to
+`drahtseilakt.log` in its data folder (`%APPDATA%\drahtseilakt\`); with its output redirected (`2> log.txt`) it
+writes there. The Actions workflow *Drahtseilakt* (run on demand) builds and tests it on Windows, Linux and macOS and
+uploads each laid out as installed: the program beside `assets/`.
+
 `drahtseilakt --import DIR` copies the original game from your installed Ballance in DIR (or from your game CD's
 image: `--import Ballance.cue`, `.bin` or `.iso`; started without the game, the window offers the same: what it
 finds on the computer, a folder or image dropped on it, or a path typed) into the game's

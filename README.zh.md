@@ -27,6 +27,10 @@ cargo build --release
 target/release/drahtseilakt --data /path/to/Ballance --level 1
 ```
 
+在 Windows 上，发布版构建不会打开控制台窗口：从资源管理器启动时，游戏把信息写入其数据文件夹（`%APPDATA%\drahtseilakt\`）中的
+`drahtseilakt.log`；输出被重定向时（`2> log.txt`）则写到那里。Actions 工作流 *Drahtseilakt*（按需运行）在 Windows、Linux 和
+macOS 上构建并测试游戏，并按安装后的布局上传每个构建：程序旁边是 `assets/`。
+
 `drahtseilakt --import DIR` 会把 DIR 中你已安装的 Ballance 原版游戏（或你的游戏 CD 镜像：`--import Ballance.cue`、`.bin` 或 `.iso`；没有找到游戏时启动的窗口提供同样的功能：电脑上找到的内容、拖到窗口上的文件夹或镜像、输入的路径）复制到游戏的 `levels/original/`；所有关卡都放在
 游戏数据文件夹（Linux 上为 `~/.local/share/drahtseilakt/`）的 `levels/` 中，每个文件夹里都有说明应放什么的 README
 （[关卡存放位置](docs/zh/drahtseilakt/levels.md)）。`--data`（或 `OPENBALLANCE_DATA`）则改为从另一个 Ballance 文件夹游玩。独立程序 `drahtseilakt-toolbox remaster --scale 8` 会把原版关卡转换到 `levels/remastered/`（开放格式），形状更圆，纹理放大八倍：Real-ESRGAN 位于 toolbox 旁的 `realesrgan/`（版本固定在其仓库 drahtseilakt-toolbox 中）或在 PATH 中时使用它（会补出细节），否则使用 Lanczos；它们在 Start → Remastered 中游玩。游戏本身两者都不需要。`--level N` 游玩原版第 N 关，`--map FILE.nmo`
