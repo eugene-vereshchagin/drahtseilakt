@@ -4,6 +4,8 @@
 
 use crate::Options;
 use crate::assets::{Data, LoadedLevel};
+pub use gamedata::profile::setting;
+use gamedata::profile::{settings_path, settings_text};
 use crate::render::Renderer;
 use crate::replay::Replay;
 use crate::audio::Audio;
@@ -89,8 +91,6 @@ struct Game {
     /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
     assisted: bool,
     last_level: bool,
-    /// The level is a remastered export: drawn with its rounder shapes (smooth.rs).
-    remastered: bool,
     /// Where the level's runs are kept: the original levels' in replays/, a custom level's under replays/maps/ in its
     /// folder's name (community, open, remastered), so no two kinds share runs.
     runs_root: PathBuf,
@@ -237,7 +237,6 @@ impl Game {
             level_bonus,
             assisted: false,
             last_level: o.source.original_number().is_some_and(|n| data.level_count() == Some(n)),
-            remastered: o.source.remastered(),
             runs_root: match &o.source {
                 crate::assets::Source::Original(_) => replay_dir(),
                 crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
@@ -599,20 +598,6 @@ fn clock(tick: u64) -> String {
     format!("{:02}:{:05.2}", (secs / 60.0) as u64, secs % 60.0)
 }
 
-/// The player's settings file: one `name value` a line (`sound 0.8`, `music 0.5`).
-fn settings_path() -> PathBuf {
-    crate::levels::data_dir().join("settings.txt")
-}
-
-/// The settings file's text: a file larger than any we write is not ours and is ignored; bytes that are not UTF-8
-/// are read as replacement characters, so the other lines still count.
-fn settings_text() -> String {
-    const MAX: u64 = 64 * 1024;
-    let small = std::fs::metadata(settings_path()).is_ok_and(|m| m.len() <= MAX);
-    let bytes = if small { std::fs::read(settings_path()).unwrap_or_default() } else { Vec::new() };
-    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes);
-    String::from_utf8_lossy(bytes).into_owned()
-}
 
 /// The sound and music volumes from the settings file, full where it has none.
 fn load_volumes() -> [f32; 2] {
@@ -628,14 +613,6 @@ fn load_volumes() -> [f32; 2] {
     [get("sound"), get("music")]
 }
 
-/// A value of the settings file ("key value" lines).
-pub fn setting(key: &str) -> Option<String> {
-    settings_text()
-        .lines()
-        .filter_map(|l| l.split_once(' '))
-        .find(|(k, _)| *k == key)
-        .map(|(_, v)| v.trim().to_owned())
-}
 
 /// The mode saved in the settings: extended (our additions on) only when chosen, else classic (the original).
 fn load_extended() -> bool {
@@ -1384,20 +1361,16 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     // the level's light colour (the level table's Light; white for a level without a row)
     renderer.light.color = data.settings(&game.level.name).light.unwrap_or([1.0; 3]);
     let loader = |t: &level::Texture| data.texture(t);
-    // the remastered look rounds the level's and its moving parts' round shapes; the physics keeps the originals
-    fn look(l: &level::Level, round: bool) -> std::borrow::Cow<'_, level::Level> {
-        if round { std::borrow::Cow::Owned(crate::smooth::level(l)) } else { std::borrow::Cow::Borrowed(l) }
-    }
-    renderer.add_model(&look(&game.level.level, game.remastered), &loader);
+    renderer.add_model(&game.level.level, &loader);
     renderer.add_model(&game.balls.level, &loader);
     let letter = game.level.level.sky.clone().unwrap_or_else(|| "A".into());
     let sky = crate::sky::model(&letter);
     renderer.add_model(&sky, &loader);
     for m in &game.modules.models {
-        renderer.add_model(&look(m, game.remastered), &loader);
+        renderer.add_model(m, &loader);
     }
     if let Some((file, _)) = &game.trafo {
-        renderer.add_model(&look(&file.level, game.remastered), &loader);
+        renderer.add_model(&file.level, &loader);
     }
     let shadow = level::Texture {
         name: "HardShadow".into(),

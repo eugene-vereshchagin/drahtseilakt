@@ -34,10 +34,11 @@ Spiel-CD: `--import Ballance.cue`, `.bin` oder `.iso`; ohne das Spiel gestartet 
 was es auf dem Rechner findet, einen daraufgezogenen Ordner oder ein Abbild, einen eingetippten Pfad) nach `levels/original/`
 des Spiels; alle Level liegen in `levels/` in seinem Datenordner (`~/.local/share/drahtseilakt/` unter Linux),
 jeder Ordner mit einem README, was hineingehört ([wo die Level liegen](docs/de/drahtseilakt/levels.md)).
-`--data` (oder `OPENBALLANCE_DATA`) spielt stattdessen aus einem anderen Ballance-Ordner. `drahtseilakt --remaster 8`
-wandelt die Original-Level nach `levels/remastered/` (offenes Format) mit achtmal größeren Texturen um: mit
-Real-ESRGAN, wenn `realesrgan-ncnn-vulkan` installiert ist (es ergänzt Details), sonst mit Lanczos; sie laufen unter
-Custom levels. `--level N` spielt Originallevel N, `--map
+`--data` (oder `OPENBALLANCE_DATA`) spielt stattdessen aus einem anderen Ballance-Ordner. Das eigene
+Programm `drahtseilakt-toolbox remaster --scale 8` wandelt die Original-Level nach `levels/remastered/` (offenes
+Format) mit runderen Formen und achtmal größeren Texturen um: mit Real-ESRGAN, wenn `realesrgan-ncnn-vulkan`
+installiert ist (es ergänzt Details), sonst mit Lanczos; sie laufen unter Custom levels. Das Spiel selbst braucht
+beides nicht. `--level N` spielt Originallevel N, `--map
 FILE.nmo` jede Leveldatei oder Community-Karte, `--open DIR` ein Level im
 [offenen Format](docs/de/drahtseilakt/open-format.md); `--export DIR` wandelt das gewählte Level darin um.
 Pfeiltasten rollen die Kugel relativ zur Kamera, Shift+Links/Rechts drehen die Kamera, Leertaste hebt sie, F11

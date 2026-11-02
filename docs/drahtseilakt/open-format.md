@@ -21,7 +21,10 @@ A folder holding:
   same `POSITION`, `NORMAL` and `TEXCOORD_0` accessors (floats), `indices` as 32-bit integers. A mesh's
   material channels (passes over the whole mesh with another material) are `extras.drahtseilakt.channels`:
   each its `material`, `blend` (source and destination factor names, as below) and `texcoord` k, the
-  `TEXCOORD_k` set holding its coordinates; at most 16.
+  `TEXCOORD_k` set holding its coordinates; at most 16. A mesh may carry a finer look drawn in its place
+  (`extras.drahtseilakt.look`: the index of another mesh; the toolbox's rounder shapes): the looks come after all
+  the level's own meshes, each the look of one mesh, and nodes never place them; the physics and the rules use the
+  mesh itself.
 - **Materials**: `baseColorFactor` (diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (with `alphaCutoff`) or `BLEND`; unlit materials use `KHR_materials_unlit`.
   `extras.drahtseilakt` holds what glTF has no field for: `ambient`, `specular` and `power` (the highlight), `z_write`, `blend` (source and

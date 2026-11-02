@@ -6,82 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
-    Original,
-    Community,
-    Remastered,
-    Open,
-}
-
-pub const KINDS: [Kind; 4] = [
-    Kind::Original,
-    Kind::Community,
-    Kind::Remastered,
-    Kind::Open,
-];
-
-impl Kind {
-    pub fn folder(self) -> &'static str {
-        match self {
-            Kind::Original => "original",
-            Kind::Community => "community",
-            Kind::Remastered => "remastered",
-            Kind::Open => "open",
-        }
-    }
-}
-
-/// The game's data folder: XDG_DATA_HOME or ~/.local/share on Linux, %APPDATA% on Windows,
-/// ~/Library/Application Support on macOS; the current folder when none is known.
-pub fn data_dir() -> PathBuf {
-    let var = |k: &str| {
-        std::env::var_os(k)
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-    };
-    let base = if cfg!(windows) {
-        var("APPDATA")
-    } else if cfg!(target_os = "macos") {
-        var("HOME").map(|h| h.join("Library/Application Support"))
-    } else {
-        // a relative XDG_DATA_HOME is ignored, as the XDG spec says
-        var("XDG_DATA_HOME")
-            .filter(|p| p.is_absolute())
-            .or_else(|| var("HOME").map(|h| h.join(".local/share")))
-    };
-    base.unwrap_or_else(|| PathBuf::from("."))
-        .join("drahtseilakt")
-}
-
-/// Where a kind's folder is by default.
-pub fn default_dir(kind: Kind) -> PathBuf {
-    data_dir().join("levels").join(kind.folder())
-}
-
-/// Where a kind's levels are: the folder the settings name (`levels.<kind>`), else the default.
-pub fn dir(kind: Kind) -> PathBuf {
-    crate::app::setting(&format!("levels.{}", kind.folder()))
-        .filter(|p| !p.is_empty())
-        .map_or_else(|| default_dir(kind), |p| resolve(&p))
-}
-
-/// A folder named in the settings: `~/` is the home folder, and a relative path is taken from the data folder (never
-/// from wherever the game was started).
-fn resolve(p: &str) -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from);
-    let path = match (p.strip_prefix("~/").or_else(|| p.strip_prefix("~\\")), home) {
-        (Some(rest), Some(h)) => h.join(rest),
-        _ => PathBuf::from(p),
-    };
-    if path.is_absolute() {
-        path
-    } else {
-        data_dir().join(path)
-    }
-}
+pub use gamedata::profile::{KINDS, Kind, data_dir, default_dir, dir};
 
 const README: &str = "README.txt";
 /// The last line of a README that points to a moved folder, so that it alone is ever replaced.
@@ -591,6 +516,7 @@ fn copy(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use gamedata::profile::resolve;
     use super::*;
 
     #[test]

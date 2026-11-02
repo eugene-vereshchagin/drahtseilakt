@@ -35,6 +35,7 @@ fn level() -> Level {
         normals: vec![[0.0, 0.0, 1.0]; 3],
         uvs: vec![[0.0; 2]; 3],
         parts: vec![Part { material: Some(0), indices: vec![0, 1, 2] }],
+        look: None,
         channels: vec![Channel {
             material: 1,
             blend: (Blend::Zero, Blend::SrcColor),

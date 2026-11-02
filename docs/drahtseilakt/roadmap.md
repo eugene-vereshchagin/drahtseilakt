@@ -207,8 +207,8 @@ Done when: most maps play; the report lists the rest, each with its reason.
 
 - **Round things look round**: the ball drawn analytically; per-pixel lighting with smooth normals;
   normal-guided tessellation for rails and pipes. Visual only: physics stays on the original polygons. Which
-  techniques, and how far, is decided with the owner after trying them. First step done: remastered levels draw
-  their curved meshes as curved point-normal triangles (smooth.rs; the levels are shaded flat, so faces meeting
+  techniques, and how far, is decided with the owner after trying them. First step done: the toolbox gives remastered
+  levels' curved meshes a look of curved point-normal triangles, written into the level (toolbox smooth.rs; the levels are shaded flat, so faces meeting
   at under 40 degrees are taken as one smooth surface first), bending only edges whose normals bend them
   like an arc, so rails stay straight; and a remastered Level_NN plays with level NN's settings (light, music,
   the last level's lightning).

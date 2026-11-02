@@ -22,7 +22,10 @@ Ein Ordner mit:
   dieselben Accessoren `POSITION`, `NORMAL` und `TEXCOORD_0` (Floats), `indices` als 32-Bit-Ganzzahlen. Die
   Materialkanäle eines Meshes (Durchgänge über das ganze Mesh mit einem anderen Material) stehen in
   `extras.drahtseilakt.channels`: je Kanal `material`, `blend` (Namen von Quell- und Zielfaktor, wie unten) und
-  `texcoord` k, der Satz `TEXCOORD_k` mit seinen Koordinaten; höchstens 16.
+  `texcoord` k, der Satz `TEXCOORD_k` mit seinen Koordinaten; höchstens 16. Ein Mesh kann eine feinere Gestalt
+  tragen, die an seiner Stelle gezeichnet wird (`extras.drahtseilakt.look`: der Index eines anderen Meshs; so hält
+  die Toolbox rundere Formen): solche Meshes stehen nach allen eigenen Meshes des Levels, jedes die Gestalt genau
+  eines Meshs, und kein Knoten setzt sie; Physik und Regeln benutzen das Mesh selbst.
 - **Materialien**: `baseColorFactor` (Diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`;
   `alphaMode` `OPAQUE`, `MASK` (mit `alphaCutoff`) oder `BLEND`; unbeleuchtete Materialien über
   `KHR_materials_unlit`. In `extras.drahtseilakt` steht, wofür glTF kein Feld hat: `ambient`, `specular` und `power` (das Glanzlicht), `z_write`,

@@ -6,7 +6,7 @@
 #![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 mod app;
-mod assets;
+use gamedata::assets;
 mod audio;
 mod autopilot;
 mod ballsound;
@@ -30,13 +30,11 @@ mod physics;
 mod pieces;
 mod proximity;
 mod render;
-mod remaster;
 mod replay;
 mod scene;
 mod setup;
 mod sim;
 mod sky;
-mod smooth;
 mod trafo;
 mod ui;
 mod volume;
@@ -50,8 +48,6 @@ const USAGE: &str = "\
 usage: drahtseilakt [options]
 
   --data DIR          the Ballance folder (default: $OPENBALLANCE_DATA, then the imported copy, then ./data)
-  --remaster N        convert the original levels into levels/remastered (open format) and make their textures
-                      N times larger (Real-ESRGAN when installed, else Lanczos); they are in Custom levels
   --import DIR        copy the original game into the levels folder from your installed Ballance in DIR, or
                       from your game CD's image (a .cue, .bin or .iso)
   --level N           play original level N (1-13; default 1)
@@ -94,8 +90,6 @@ pub struct Options {
     pub data: Option<PathBuf>,
     /// Copy the original game from this installed copy into the levels folder, then stop.
     pub import: Option<PathBuf>,
-    /// Convert the original levels into levels/remastered and upscale their textures by this factor, then stop.
-    pub remaster: Option<u32>,
     pub source: Source,
     /// A level was named (--level, --map, --open): no menu at the start.
     pub chosen: bool,
@@ -134,7 +128,6 @@ fn parse_args() -> Result<Options, String> {
     let mut o = Options {
         data: None,
         import: None,
-        remaster: None,
         source: Source::Original(1),
         chosen: false,
         record: None,
@@ -169,10 +162,6 @@ fn parse_args() -> Result<Options, String> {
         match a.as_str() {
             "--data" => o.data = Some(value()?.into()),
             "--import" => o.import = Some(value()?.into()),
-            "--remaster" => {
-                let f: u32 = value()?.parse().map_err(|_| "--remaster needs a factor (2 to 32)".to_owned())?;
-                o.remaster = Some(f.clamp(2, 32));
-            }
             "--level" => {
                 let n: u32 = value()?
                     .parse()
@@ -323,12 +312,6 @@ fn main() -> ExitCode {
             }
             Err(e) => return Err(e),
         };
-        if let Some(factor) = o.remaster {
-            for line in remaster::run(&data, factor)? {
-                println!("{line}");
-            }
-            return Ok(());
-        }
         app::run(o, data)
     });
     match result {

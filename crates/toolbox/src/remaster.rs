@@ -1,5 +1,6 @@
 // Remastered levels (docs/drahtseilakt/levels.md, roadmap phase 7): the original levels converted to the open format
-// in levels/remastered, with their textures made larger on the player's machine. A texture is upscaled by Real-ESRGAN
+// in levels/remastered, with rounder shapes (smooth.rs, written into the level as each mesh's look) and their textures
+// made larger on the player's machine. A texture is upscaled by Real-ESRGAN
 // when the player has installed it (`realesrgan-ncnn-vulkan` on the PATH: it adds detail), else by Lanczos with a
 // light sharpening (larger and sharper, no new detail). The originals are kept beside (textures.original/), so a
 // second run starts from them again. A colour-keyed texture gets its key as alpha first (its edges are blended when
@@ -8,7 +9,7 @@
 // are never followed or written through, every file is written beside and moved into place, and a texture that
 // cannot be read is left as it is and reported.
 
-use crate::assets::{Data, Source};
+use gamedata::assets::{Data, Source};
 use image::{RgbaImage, imageops};
 use std::path::{Path, PathBuf};
 
@@ -18,12 +19,13 @@ const SIDE_MAX: u32 = 8192;
 const GLTF_MAX: u64 = 64 * 1024 * 1024;
 const IMAGE_MAX: u64 = 64 * 1024 * 1024;
 
-/// Converts every original level the copy has that is not in levels/remastered yet, then upscales the textures of
-/// every level there by `factor`. Returns a line a level, and one for each texture left as it was.
+/// Converts every original level the copy has that is not in levels/remastered yet, gives every level there its
+/// rounder shapes, and upscales its textures by `factor` (1: left as they are). Returns a line a level, and one for each
+/// texture left as it was.
 pub fn run(data: &Data, factor: u32) -> Result<Vec<String>, String> {
-    let root = crate::levels::dir(crate::levels::Kind::Remastered);
+    let root = gamedata::profile::dir(gamedata::profile::Kind::Remastered);
     let mut out = Vec::new();
-    for n in 1..=crate::menu::LEVELS {
+    for n in 1..=data.level_count().unwrap_or(13) {
         let dir = root.join(format!("Level_{n:02}"));
         if std::fs::symlink_metadata(dir.join("level.gltf")).is_ok() {
             continue;
@@ -31,7 +33,7 @@ pub fn run(data: &Data, factor: u32) -> Result<Vec<String>, String> {
         let Ok(loaded) = data.load(&Source::Original(n)) else {
             continue;
         };
-        crate::assets::export(data, &loaded, &dir)?;
+        gamedata::assets::export(data, &loaded, &dir)?;
     }
     let mut levels: Vec<PathBuf> = std::fs::read_dir(&root)
         .map_err(|e| format!("{}: {e}", root.display()))?
@@ -42,12 +44,71 @@ pub fn run(data: &Data, factor: u32) -> Result<Vec<String>, String> {
     levels.sort();
     let esrgan = esrgan();
     for dir in levels {
+        match shapes(&dir) {
+            Ok(n) => out.push(format!("{}: {n} meshes rounder", dir.display())),
+            Err(e) => out.push(format!("{}: shapes left as they were: {e}", dir.display())),
+        }
+        if factor < 2 {
+            continue;
+        }
         match level(&dir, factor, esrgan.as_deref(), &mut out) {
-            Ok(n) => out.push(format!("{}: {n} textures x{factor}", dir.display())),
+            Ok(n) => out.push(format!(
+                "{}: {n} textures x{factor} ({})",
+                dir.display(),
+                if esrgan.is_some() {
+                    "Real-ESRGAN"
+                } else {
+                    "Lanczos"
+                }
+            )),
             Err(e) => out.push(format!("{}: not remastered: {e}", dir.display())),
         }
     }
     Ok(out)
+}
+
+/// Gives a level's meshes their rounder looks, made again from the meshes themselves (so a better toolbox replaces
+/// what an older one made), and writes the level file beside and moves it into place. Returns how many meshes got one.
+fn shapes(dir: &Path) -> Result<usize, String> {
+    let mut level = level::open::import(dir)?;
+    // writing the level again names its textures as an export does: a level made otherwise is left alone
+    for (i, t) in level.textures.iter().enumerate() {
+        let ours = dir
+            .join(level::open::texture_file(i, &t.name))
+            .to_string_lossy()
+            .into_owned();
+        if !matches!(&t.source, level::TextureSource::File(p) if *p == ours) {
+            return Err("its textures are not named as the game exports them".into());
+        }
+    }
+    let n = crate::smooth::looks(&mut level);
+    // a fresh folder of our own to write into (one left from before is removed, links in it never followed)
+    let tmp = dir.join(".remaster-level");
+    match std::fs::symlink_metadata(&tmp) {
+        Ok(m) if m.is_dir() => {
+            std::fs::remove_dir_all(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?
+        }
+        Ok(_) => return Err(".remaster-level is not a folder".into()),
+        Err(_) => {}
+    }
+    std::fs::create_dir(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    level::open::export(&level, &tmp)?;
+    let names = ["level.bin", "level.gltf"];
+    for name in names {
+        let (from, to) = (tmp.join(name), dir.join(name));
+        if !real_file(&from) || !writable(&to) {
+            return Err(format!("{}: not a plain file", to.display()));
+        }
+    }
+    // both places were checked just above; the buffer moves first and the level file last. Should the system fail
+    // between the two, the level no longer loads (its accessors do not fit the new buffer, or it is refused); its
+    // folder is then removed and the toolbox run again, which exports it anew from the player's copy.
+    for name in names {
+        std::fs::rename(tmp.join(name), dir.join(name))
+            .map_err(|e| format!("{}: {e}", dir.join(name).display()))?;
+    }
+    let _ = std::fs::remove_dir(&tmp);
+    Ok(n)
 }
 
 /// A directory itself, not a link to one.
@@ -341,6 +402,7 @@ fn esrgan_upscale(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -374,6 +436,44 @@ mod tests {
         ] {
             assert_eq!(texture_name(bad), None, "{bad}");
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_left_over_folder_with_links_is_never_written_through() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-shapes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let dir = root.join("Level_01");
+        let mut l = level::Level::default();
+        l.meshes.push(level::Mesh {
+            name: "t".into(),
+            positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            uvs: vec![[0.0; 2]; 3],
+            parts: vec![level::Part {
+                material: None,
+                indices: vec![0, 1, 2],
+            }],
+            channels: Vec::new(),
+            look: None,
+        });
+        level::open::export(&l, &dir).unwrap();
+        // someone's file outside, and links to it where the toolbox writes
+        let outside = root.join("outside.txt");
+        std::fs::write(&outside, b"keep").unwrap();
+        let tmp = dir.join(".remaster-level");
+        std::fs::create_dir(&tmp).unwrap();
+        std::os::unix::fs::symlink(&outside, tmp.join("level.gltf")).unwrap();
+        std::os::unix::fs::symlink(&outside, tmp.join("level.bin")).unwrap();
+        assert_eq!(shapes(&dir).unwrap(), 0);
+        assert_eq!(std::fs::read(&outside).unwrap(), b"keep");
+        assert!(
+            std::fs::symlink_metadata(dir.join("level.gltf"))
+                .unwrap()
+                .is_file()
+        );
+        assert!(level::open::import(&dir).is_ok());
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

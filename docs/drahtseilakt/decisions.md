@@ -233,3 +233,16 @@ Details: [levels.md](levels.md).
 *2026-11-02.* "The game plays only the player's own data" forbids substitutes for the original's files. Levels
 whose authors let them come with the game, under a free licence and with none of the original's assets inside,
 are new content and may ship (levels.md). What players copy into their own folders is their business, not ours.
+
+
+## The toolbox prepares levels; the game only plays
+
+*2026-11-02.* Making remastered levels is a separate program, `drahtseilakt-toolbox`, in the same repository and
+workspace (it shares the level reading with the game through `crates/gamedata`) and shipped as its own download.
+The game plays the original `.nmo` files and whatever open-format levels are in its folders and knows nothing of
+how they were made; it never runs another program. The toolbox converts the originals into `levels/remastered/`,
+writes each curved mesh's rounder look into the level (the open format keeps it beside the mesh, which the physics
+keeps using, so runs are the same) and makes the textures larger. Real-ESRGAN, which adds detail, is used when the
+player has installed it; it is never downloaded and never a dependency of the game, so a plain player needs
+nothing more than the game. Whether the toolbox's archive later carries Real-ESRGAN (its licence allows it,
+pinned and checksummed) is decided at the release.

@@ -22,7 +22,9 @@
   accessor'ы `POSITION`, `NORMAL` и `TEXCOORD_0` (float), `indices` — 32-битные целые. Каналы материалов меша
   (проходы по всему мешу другим материалом) — в `extras.drahtseilakt.channels`: у каждого `material`, `blend`
   (имена коэффициентов источника и приёмника, как ниже) и `texcoord` k — набор `TEXCOORD_k` с его
-  координатами; не больше 16.
+  координатами; не больше 16. У меша может быть более детальный вид, который рисуется вместо него
+  (`extras.drahtseilakt.look` — индекс другого меша; так toolbox хранит более круглые формы): такие меши идут после
+  всех собственных мешей уровня, каждый — вид ровно одного меша, узлы их не ставят; физика и правила берут сам меш.
 - **Материалы**: `baseColorFactor` (diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (с `alphaCutoff`) или `BLEND`; материалы без освещения — через `KHR_materials_unlit`.
   В `extras.drahtseilakt` то, для чего в glTF нет поля: `ambient`, `specular` и `power` (блик), `z_write`, `blend` (имена коэффициентов

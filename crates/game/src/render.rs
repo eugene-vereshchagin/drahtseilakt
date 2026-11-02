@@ -468,6 +468,8 @@ impl Renderer {
         let meshes = level
             .meshes
             .iter()
+            // a mesh with a finer look (a remastered level's) is drawn as that look
+            .map(|m| m.look.as_deref().unwrap_or(m))
             .map(|m| {
                 if m.positions.is_empty() {
                     return None;

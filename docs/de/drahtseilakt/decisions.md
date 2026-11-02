@@ -237,3 +237,17 @@ auch in vereinfachtem Chinesisch. Einzelheiten: [levels.md](levels.md).
 Originals. Level, deren Autoren sie mit dem Spiel ausliefern lassen, unter freier Lizenz und ohne Bestandteile
 des Originals, sind neue Inhalte und dürfen mitkommen (levels.md). Was Spieler selbst in ihre Ordner kopieren,
 ist ihre Sache, nicht unsere.
+
+
+## Die Toolbox bereitet Level vor; das Spiel spielt nur
+
+*2026-11-02.* Remaster-Level macht ein eigenes Programm, `drahtseilakt-toolbox`, im selben Repository und
+Workspace (das Lesen der Level teilt es über `crates/gamedata` mit dem Spiel), ausgeliefert als eigener Download.
+Das Spiel spielt die Original-`.nmo`-Dateien und die Level im offenen Format aus seinen Ordnern und weiß nicht,
+wie sie entstanden sind; es startet nie ein anderes Programm. Die Toolbox wandelt die Originale nach
+`levels/remastered/`, schreibt für jedes gekrümmte Mesh seine rundere Gestalt in das Level (das offene Format hält
+sie neben dem Mesh, das die Physik weiter benutzt, sodass Läufe gleich bleiben) und vergrößert die Texturen.
+Real-ESRGAN, das Details ergänzt, wird benutzt, wenn der Spieler es selbst installiert hat; es wird nie
+heruntergeladen und ist nie eine Abhängigkeit des Spiels, ein Spieler braucht also nichts außer dem Spiel. Ob das
+Archiv der Toolbox später Real-ESRGAN mitbringt (die Lizenz erlaubt es, fest und mit Prüfsumme), wird zur
+Veröffentlichung entschieden.

@@ -134,6 +134,7 @@ fn build(doc: &Document) -> Loaded {
                             mesh_index = Some(level.meshes.len());
                             level.meshes.push(Mesh {
                                 channels: Vec::new(),
+                                look: None,
                                 name: format!("{}_Sprite", name(o)),
                                 positions: vec![[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 0.0, 0.0]],
                                 normals: vec![[0.0, 0.0, -1.0]; 4],
@@ -282,6 +283,7 @@ fn mesh(name: String, m: scene::Mesh, channels: &[scene::Channel], materials: &H
         uvs,
         parts,
         channels,
+        look: None,
     }
 }
 

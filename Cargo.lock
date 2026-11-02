@@ -478,6 +478,7 @@ dependencies = [
  "bytemuck",
  "cdimage",
  "cpal",
+ "gamedata",
  "glam",
  "image",
  "ivp",
@@ -487,6 +488,17 @@ dependencies = [
  "serde_json",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "drahtseilakt-toolbox"
+version = "0.1.0"
+dependencies = [
+ "gamedata",
+ "glam",
+ "image",
+ "level",
+ "serde_json",
 ]
 
 [[package]]
@@ -586,6 +598,15 @@ dependencies = [
  "futures-task",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "gamedata"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "level",
+ "nmo",
 ]
 
 [[package]]

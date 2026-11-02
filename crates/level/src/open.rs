@@ -101,86 +101,21 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
     let mut meshes = Vec::new();
     let mut mesh_index = Vec::new();
     for m in &level.meshes {
-        let n = m.positions.len();
-        let parts: Vec<&Part> = m.parts.iter().filter(|p| !p.indices.is_empty()).collect();
-        if n == 0 || parts.is_empty() {
-            mesh_index.push(None);
-            continue;
+        let at = mesh_json(m, &mut push).map(|v| {
+            meshes.push(v);
+            meshes.len().saturating_sub(1)
+        });
+        mesh_index.push(at);
+    }
+    // a mesh's finer look is one more mesh after all the level's own, named in the mesh's extras
+    for (m, at) in level.meshes.iter().zip(&mesh_index) {
+        let (Some(look), Some(at)) = (&m.look, *at) else { continue };
+        let Some(v) = mesh_json(look, &mut push) else { continue };
+        meshes.push(v);
+        let k = meshes.len().saturating_sub(1);
+        if let Some(mesh) = meshes.get_mut(at) {
+            mesh["extras"]["drahtseilakt"]["look"] = json!(k);
         }
-        let pos: Vec<f32> = m
-            .positions
-            .iter()
-            .flat_map(|p| [p[0], p[1], -p[2]])
-            .collect();
-        let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
-        for p in pos.chunks_exact(3) {
-            for k in 0..3 {
-                let v = p.get(k).copied().unwrap_or(0.0);
-                if let (Some(l), Some(h)) = (lo.get_mut(k), hi.get_mut(k)) {
-                    *l = l.min(v);
-                    *h = h.max(v);
-                }
-            }
-        }
-        let p_acc = push(
-            &f32_bytes(&pos),
-            34962,
-            json!({"componentType": FLOAT, "count": n, "type": "VEC3", "min": lo, "max": hi}),
-        );
-        let nor: Vec<f32> = (0..n)
-            .flat_map(|i| {
-                let v = m.normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]);
-                [v[0], v[1], -v[2]]
-            })
-            .collect();
-        let n_acc = push(
-            &f32_bytes(&nor),
-            34962,
-            json!({"componentType": FLOAT, "count": n, "type": "VEC3"}),
-        );
-        let uv: Vec<f32> = (0..n)
-            .flat_map(|i| m.uvs.get(i).copied().unwrap_or([0.0; 2]))
-            .collect();
-        let t_acc = push(
-            &f32_bytes(&uv),
-            34962,
-            json!({"componentType": FLOAT, "count": n, "type": "VEC2"}),
-        );
-        // each channel's coordinates as one more TEXCOORD set, named in the mesh's extras
-        let mut attributes = json!({"POSITION": p_acc, "NORMAL": n_acc, "TEXCOORD_0": t_acc});
-        let mut channels = Vec::new();
-        for (k, c) in (1usize..).zip(&m.channels) {
-            let uv: Vec<f32> = (0..n).flat_map(|i| c.uvs.get(i).copied().unwrap_or([0.0; 2])).collect();
-            let acc = push(&f32_bytes(&uv), 34962, json!({"componentType": FLOAT, "count": n, "type": "VEC2"}));
-            attributes[format!("TEXCOORD_{k}")] = json!(acc);
-            channels.push(json!({"material": c.material, "blend": [blend_name(c.blend.0), blend_name(c.blend.1)], "texcoord": k}));
-        }
-        let mut prims = Vec::new();
-        for p in parts {
-            // Mirroring Z reverses the winding; swap two corners to keep faces facing the same way.
-            let idx: Vec<u32> = p
-                .indices
-                .chunks_exact(3)
-                .flat_map(|t| [t[0], t[2], t[1]])
-                .collect();
-            let bytes: Vec<u8> = idx.iter().flat_map(|i| i.to_le_bytes()).collect();
-            let i_acc = push(
-                &bytes,
-                34963,
-                json!({"componentType": UINT, "count": idx.len(), "type": "SCALAR"}),
-            );
-            let mut prim = json!({"attributes": attributes.clone(), "indices": i_acc});
-            if let Some(mat) = p.material {
-                prim["material"] = json!(mat);
-            }
-            prims.push(prim);
-        }
-        mesh_index.push(Some(meshes.len()));
-        let mut mesh = json!({"name": m.name, "primitives": prims});
-        if !channels.is_empty() {
-            mesh["extras"] = json!({"drahtseilakt": {"channels": channels}});
-        }
-        meshes.push(mesh);
     }
 
     let materials: Vec<Value> = level
@@ -287,21 +222,146 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// One mesh as glTF, its data pushed into the buffer; None for a mesh without faces.
+fn mesh_json(m: &Mesh, push: &mut impl FnMut(&[u8], u64, Value) -> usize) -> Option<Value> {
+    let n = m.positions.len();
+    let parts: Vec<&Part> = m.parts.iter().filter(|p| !p.indices.is_empty()).collect();
+    if n == 0 || parts.is_empty() {
+        return None;
+    }
+    let pos: Vec<f32> = m
+        .positions
+        .iter()
+        .flat_map(|p| [p[0], p[1], -p[2]])
+        .collect();
+    let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
+    for p in pos.chunks_exact(3) {
+        for k in 0..3 {
+            let v = p.get(k).copied().unwrap_or(0.0);
+            if let (Some(l), Some(h)) = (lo.get_mut(k), hi.get_mut(k)) {
+                *l = l.min(v);
+                *h = h.max(v);
+            }
+        }
+    }
+    let p_acc = push(
+        &f32_bytes(&pos),
+        34962,
+        json!({"componentType": FLOAT, "count": n, "type": "VEC3", "min": lo, "max": hi}),
+    );
+    let nor: Vec<f32> = (0..n)
+        .flat_map(|i| {
+            let v = m.normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]);
+            [v[0], v[1], -v[2]]
+        })
+        .collect();
+    let n_acc = push(
+        &f32_bytes(&nor),
+        34962,
+        json!({"componentType": FLOAT, "count": n, "type": "VEC3"}),
+    );
+    let uv: Vec<f32> = (0..n)
+        .flat_map(|i| m.uvs.get(i).copied().unwrap_or([0.0; 2]))
+        .collect();
+    let t_acc = push(
+        &f32_bytes(&uv),
+        34962,
+        json!({"componentType": FLOAT, "count": n, "type": "VEC2"}),
+    );
+    // each channel's coordinates as one more TEXCOORD set, named in the mesh's extras
+    let mut attributes = json!({"POSITION": p_acc, "NORMAL": n_acc, "TEXCOORD_0": t_acc});
+    let mut channels = Vec::new();
+    for (k, c) in (1usize..).zip(&m.channels) {
+        let uv: Vec<f32> = (0..n).flat_map(|i| c.uvs.get(i).copied().unwrap_or([0.0; 2])).collect();
+        let acc = push(&f32_bytes(&uv), 34962, json!({"componentType": FLOAT, "count": n, "type": "VEC2"}));
+        attributes[format!("TEXCOORD_{k}")] = json!(acc);
+        channels.push(json!({"material": c.material, "blend": [blend_name(c.blend.0), blend_name(c.blend.1)], "texcoord": k}));
+    }
+    let mut prims = Vec::new();
+    for p in parts {
+        // Mirroring Z reverses the winding; swap two corners to keep faces facing the same way.
+        let idx: Vec<u32> = p
+            .indices
+            .chunks_exact(3)
+            .flat_map(|t| [t[0], t[2], t[1]])
+            .collect();
+        let bytes: Vec<u8> = idx.iter().flat_map(|i| i.to_le_bytes()).collect();
+        let i_acc = push(
+            &bytes,
+            34963,
+            json!({"componentType": UINT, "count": idx.len(), "type": "SCALAR"}),
+        );
+        let mut prim = json!({"attributes": attributes.clone(), "indices": i_acc});
+        if let Some(mat) = p.material {
+            prim["material"] = json!(mat);
+        }
+        prims.push(prim);
+    }
+    let mut mesh = json!({"name": m.name, "primitives": prims});
+    if !channels.is_empty() {
+        mesh["extras"] = json!({"drahtseilakt": {"channels": channels}});
+    }
+    Some(mesh)
+}
+
+/// Gives each mesh the finer look its extras name and takes the looks out of the level's meshes. The looks must all
+/// come after the level's own meshes, each the look of one mesh only, and have no look of their own; anything else is
+/// refused.
+fn attach_looks(meshes: &mut Vec<Mesh>, looks: &[Option<u64>]) -> Result<(), String> {
+    let wanted: Vec<(usize, usize)> = looks
+        .iter()
+        .enumerate()
+        .filter_map(|(i, k)| k.map(|k| usize::try_from(k).map(|k| (i, k))))
+        .collect::<Result<_, _>>()
+        .map_err(|_| "a look's index is out of range".to_owned())?;
+    let Some(first) = wanted.iter().map(|&(_, k)| k).min() else {
+        return Ok(());
+    };
+    let mut seen = vec![false; meshes.len()];
+    for &(i, k) in &wanted {
+        if k >= meshes.len() || i >= first || k < first {
+            return Err("a mesh's look must be one of the meshes after the level's own".into());
+        }
+        match seen.get_mut(k) {
+            Some(s) if !*s => *s = true,
+            _ => return Err("a look is the look of two meshes".into()),
+        }
+    }
+    let extra: Vec<Mesh> = meshes.split_off(first);
+    if seen.iter().skip(first).any(|s| !s) {
+        return Err("a mesh after the level's own is no mesh's look".into());
+    }
+    let mut extra: Vec<Option<Mesh>> = extra.into_iter().map(Some).collect();
+    for (i, k) in wanted {
+        let look = k.checked_sub(first).and_then(|j| extra.get_mut(j)).and_then(Option::take);
+        if let (Some(m), Some(look)) = (meshes.get_mut(i), look) {
+            m.look = Some(Box::new(look));
+        }
+    }
+    Ok(())
+}
+
 fn f32_bytes(v: &[f32]) -> Vec<u8> {
     v.iter().flat_map(|f| f.to_le_bytes()).collect()
 }
 
+/// A level file: a regular file itself (never a link, a device or a pipe), read up to `cap` bytes (what it says its
+/// length is does not count; a file that grows while read is refused).
 fn read_capped(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
-    let len = std::fs::metadata(path)
-        .map_err(|e| format!("{}: {e}", path.display()))?
-        .len();
-    if len > cap {
-        return Err(format!(
-            "{}: {len} bytes, above the limit of {cap}",
-            path.display()
-        ));
+    use std::io::Read;
+    let plain = std::fs::symlink_metadata(path).map_err(|e| format!("{}: {e}", path.display()))?.is_file();
+    if !plain {
+        return Err(format!("{}: not a plain file", path.display()));
     }
-    std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))
+    let file = std::fs::File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut bytes = Vec::new();
+    file.take(cap.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    if u64::try_from(bytes.len()).map_or(true, |n| n > cap) {
+        return Err(format!("{}: above the limit of {cap} bytes", path.display()));
+    }
+    Ok(bytes)
 }
 
 struct Reader<'a> {
@@ -392,6 +452,12 @@ fn sprite_of(v: &serde_json::Value) -> Option<crate::Sprite> {
 
 /// Reads an open level from `dir`. Texture images become `TextureSource::File` with the full path.
 pub fn import(dir: &Path) -> Result<Level, String> {
+    import_read(dir).map(|(level, _)| level)
+}
+
+/// Reads an open level from `dir`, and gives the bytes it was read from (level.gltf, then level.bin), so that what
+/// a level is known by is what was played.
+pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
     let text = read_capped(&dir.join("level.gltf"), MAX_JSON)?;
     let doc: Value = serde_json::from_slice(&text).map_err(|e| format!("level.gltf: {e}"))?;
     if doc["asset"]["version"].as_str() != Some("2.0") {
@@ -492,6 +558,8 @@ pub fn import(dir: &Path) -> Result<Level, String> {
         });
     }
 
+    // each mesh's finer look, by its index among the meshes (they come after all the level's own)
+    let mut looks: Vec<Option<u64>> = Vec::new();
     for m in arr("meshes") {
         let prims = m["primitives"].as_array().cloned().unwrap_or_default();
         let first = prims.first().ok_or("mesh without primitives")?;
@@ -565,6 +633,7 @@ pub fn import(dir: &Path) -> Result<Level, String> {
             }
             channels.push(Channel { material, blend: (s, d), uvs });
         }
+        looks.push(m["extras"]["drahtseilakt"]["look"].as_u64());
         level.meshes.push(Mesh {
             name: m["name"].as_str().unwrap_or_default().to_owned(),
             positions,
@@ -572,8 +641,10 @@ pub fn import(dir: &Path) -> Result<Level, String> {
             uvs,
             parts,
             channels,
+            look: None,
         });
     }
+    attach_looks(&mut level.meshes, &looks)?;
 
     for n in arr("nodes") {
         let mut m = [[0.0f32; 4]; 4];
@@ -623,5 +694,7 @@ pub fn import(dir: &Path) -> Result<Level, String> {
     let x = &doc["scenes"][0]["extras"]["drahtseilakt"];
     level.sky = x["sky"].as_str().map(str::to_owned);
     level.start_ball = x["start_ball"].as_str().map(str::to_owned);
-    Ok(level)
+    let mut bytes = text;
+    bytes.extend_from_slice(&bin);
+    Ok((level, bytes))
 }

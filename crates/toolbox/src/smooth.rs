@@ -3,11 +3,12 @@
 // or rounder shape) are taken as one smooth surface and their corners get the surface's normal; each curved mesh is
 // then refined as curved point-normal triangles: every triangle becomes a cubic patch through its corners, its edges
 // bent to meet the corners' normals, cut into smaller triangles. Flat faces stay flat and sharp edges (a box's) stay
-// straight; only the drawn meshes change — the physics keeps the original geometry, so runs and replays are the same.
+// straight. The refined mesh is written into the level as the mesh's look, which the game draws; its physics keeps the
+// mesh itself, so runs and replays are the same.
 //
 // An edge is bent the same way for every triangle on it, so the refined mesh has no cracks: where two faces meet at
 // a crease (the same corners, different normals, such as a disc's top and its rim), the edge takes the normals that
-// bend it most, so a flat top follows its round side. Only edges bent like an arc bend at all.
+// bend it most, so a flat top follows its round side. Edges bent at one end only bend just a little (see `bend`).
 
 use glam::Vec3;
 use level::{Level, Mesh, Part};
@@ -25,15 +26,16 @@ const SMOOTH_COS: f32 = 0.766;
 /// most, while a long ramp between two kinks would rise off the floor the ball rolls on.
 const MAX_BOW: f32 = 0.35;
 
-/// The level with its curved meshes refined.
-pub fn level(level: &Level) -> Level {
-    let mut out = level.clone();
-    for m in &mut out.meshes {
-        if let Some(r) = mesh(m) {
-            *m = r;
-        }
+/// Gives each curved mesh of the level its refined look (made from the mesh itself; an older look is replaced or
+/// dropped). Returns how many meshes have one.
+pub fn looks(level: &mut Level) -> usize {
+    let mut n = 0;
+    for m in &mut level.meshes {
+        m.look = None;
+        m.look = mesh(m).map(Box::new);
+        n += usize::from(m.look.is_some());
     }
-    out
+    n
 }
 
 /// A position's key, to find the corners triangles share (their vertices may be split by normals or coordinates).
@@ -200,6 +202,7 @@ pub fn mesh(m: &Mesh) -> Option<Mesh> {
         normals: Vec::new(),
         uvs: Vec::new(),
         parts: Vec::new(),
+        look: None,
         channels: m
             .channels
             .iter()

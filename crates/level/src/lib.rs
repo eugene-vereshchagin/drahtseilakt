@@ -30,6 +30,9 @@ pub struct Mesh {
     pub parts: Vec<Part>,
     /// Passes over the whole mesh with other materials, in order.
     pub channels: Vec<Channel>,
+    /// What is drawn instead of this mesh, when a level carries a finer look (the toolbox's rounder shapes); the
+    /// physics and the rules always use the mesh itself.
+    pub look: Option<Box<Mesh>>,
 }
 
 #[derive(Debug, Clone, Default)]

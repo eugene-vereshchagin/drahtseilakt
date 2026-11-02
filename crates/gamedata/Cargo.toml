@@ -1,0 +1,16 @@
+[package]
+name = "gamedata"
+version = "0.1.0"
+description = "The player's copy of the game and the level folders: finding files and textures, the level table, loading and exporting levels; shared by the game and the toolbox"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+level = { path = "../level" }
+nmo = { path = "../nmo" }
+image = { version = "=0.25.10", default-features = false, features = ["bmp", "tga", "png", "jpeg"] }
+
+[lints]
+workspace = true

@@ -34,7 +34,7 @@ impl Source {
 
     /// The level is in the remastered folder (drawn with the remastered look).
     pub fn remastered(&self) -> bool {
-        let root = crate::levels::dir(crate::levels::Kind::Remastered);
+        let root = crate::profile::dir(crate::profile::Kind::Remastered);
         matches!(self, Source::Open(dir) if dir.parent().is_some_and(|p| p == root))
     }
 }
@@ -51,7 +51,7 @@ impl Data {
         let candidates = explicit
             .into_iter()
             .chain(std::env::var_os("OPENBALLANCE_DATA").map(PathBuf::from))
-            .chain([crate::levels::dir(crate::levels::Kind::Original), PathBuf::from("data")]);
+            .chain([crate::profile::dir(crate::profile::Kind::Original), PathBuf::from("data")]);
         // a copy counts when it has the first level, not only the folder: a half-made import is not a game
         let playable = |root: &Path| {
             ["3D Entities", "Level", "Level_01.NMO"].iter().try_fold(root.to_path_buf(), |d, p| find(&d, p)).is_some()
@@ -80,7 +80,7 @@ impl Data {
         if let Some(p) = self.file(&format!("3D Entities/Level/Level_{n:02}.NMO")) {
             return Some(Source::Nmo(p));
         }
-        let dir = crate::levels::dir(crate::levels::Kind::Remastered).join(format!("Level_{n:02}"));
+        let dir = crate::profile::dir(crate::profile::Kind::Remastered).join(format!("Level_{n:02}"));
         dir.join("level.gltf").is_file().then_some(Source::Open(dir))
     }
 
@@ -107,9 +107,9 @@ impl Data {
         let (w, h, mut rgba) = self.texture_pixels(t)?;
         // the texture's transparent colour: those texels get alpha 0 (SetAlphaForTransparentColor)
         if let Some(key) = t.color_key {
-            for px in rgba.chunks_exact_mut(4) {
-                if px[..3] == key {
-                    px[3] = 0;
+            for [r, g, b, a] in rgba.as_chunks_mut::<4>().0 {
+                if [*r, *g, *b] == key {
+                    *a = 0;
                 }
             }
         }
@@ -264,16 +264,14 @@ impl Data {
 }
 
 pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {
-    let level = level::open::import(dir)?;
-    let mut bytes = std::fs::read(dir.join("level.gltf")).map_err(|e| e.to_string())?;
-    bytes.extend(std::fs::read(dir.join("level.bin")).map_err(|e| e.to_string())?);
+    let (level, bytes) = level::open::import_read(dir)?;
     Ok(LoadedLevel {
         level,
         name: dir
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default(),
-        hash: crate::replay::fnv1a(&bytes),
+        hash: crate::fnv1a(&bytes),
         warnings: Vec::new(),
     })
 }
@@ -281,7 +279,7 @@ pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {
 /// Writes a level in the open format into `dir`, with its textures as PNG files (from the player's copy).
 pub fn export(data: &Data, loaded: &LoadedLevel, dir: &Path) -> Result<(), String> {
     level::open::export(&loaded.level, dir)?;
-    let mut missing = 0;
+    let mut missing = 0usize;
     for (i, t) in loaded.level.textures.iter().enumerate() {
         let path = dir.join(level::open::texture_file(i, &t.name));
         if let Some(parent) = path.parent() {
@@ -292,7 +290,7 @@ pub fn export(data: &Data, loaded: &LoadedLevel, dir: &Path) -> Result<(), Strin
                 image::save_buffer(&path, &rgba, w, h, image::ExtendedColorType::Rgba8)
                     .map_err(|e| e.to_string())?
             }
-            None => missing += 1,
+            None => missing = missing.saturating_add(1),
         }
     }
     println!(
@@ -316,7 +314,7 @@ pub fn load_nmo(path: &Path) -> Result<LoadedLevel, String> {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default(),
-        hash: crate::replay::fnv1a(&bytes),
+        hash: crate::fnv1a(&bytes),
         warnings: loaded.warnings,
     })
 }
