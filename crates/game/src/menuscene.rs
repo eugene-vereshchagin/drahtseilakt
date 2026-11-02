@@ -305,6 +305,37 @@ impl MenuScene {
         })
     }
 
+    /// What the frame draws `ms` into the menu: the scene's objects and the sky about the camera, the flames, and
+    /// the view (the window and the screenshots draw the menu the same way).
+    pub fn frame(
+        &self,
+        ms: f64,
+    ) -> (
+        Vec<Instance>,
+        Vec<crate::particles::Batch>,
+        crate::render::View,
+    ) {
+        let (eye, target) = self.camera((ms % f64::from(ROUND_MS)) as f32);
+        let mut inst = self.instances(ms);
+        for mesh in 0..crate::sky::FACE_COUNT {
+            inst.push(Instance::plain(
+                crate::scene::SKY_MODEL,
+                mesh,
+                Mat4::from_translation(eye),
+            ));
+        }
+        let particles = self.effects.batches(eye, target);
+        (
+            inst,
+            particles,
+            crate::render::View {
+                eye,
+                target,
+                fov_y: self.fov_y,
+            },
+        )
+    }
+
     /// The camera at `ms` into the menu: where it is and what it looks at.
     pub fn camera(&self, ms: f32) -> (Vec3, Vec3) {
         (self.curve.pos(ms / ROUND_MS), self.target)
