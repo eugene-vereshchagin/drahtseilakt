@@ -127,4 +127,5 @@ later as an extended-mode feature.
 
 `DRAHTSEILAKT_SHOT_MENU=base:keys` with `--screenshot` draws a menu over the frame without a window (base `main`,
 `pause`, `dead` or `end`; keys `u d l r` for the arrows, `e` Enter, `b` Esc, `n` the name entry, `w` the key W
-pressed while one is awaited), to look at every screen.
+pressed while one is awaited), to look at every screen. A menu not over a level stands over the interface's menu
+scene, `DRAHTSEILAKT_SHOT_MENU_MS` milliseconds (default 0) into its camera's round.

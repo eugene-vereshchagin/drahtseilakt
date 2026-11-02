@@ -138,4 +138,5 @@ Profile später als Funktion des erweiterten Modus kommen.
 `DRAHTSEILAKT_SHOT_MENU=base:keys` mit `--screenshot` zeichnet ein Menü über das Bild ohne Fenster (base `main`,
 `pause`, `dead` oder `end`; Tasten `u d l r` für die Pfeile, `e` Enter, `b` Esc, `n` die Namenseingabe, `w` die
 Taste W, während eine erwartet wird), um jeden
-Bildschirm anzusehen.
+Bildschirm anzusehen. Ein Menü, das nicht über einem Level liegt, steht über der 3D-Menüszene der Oberfläche,
+`DRAHTSEILAKT_SHOT_MENU_MS` Millisekunden (Vorgabe 0) in die Runde ihrer Kamera.

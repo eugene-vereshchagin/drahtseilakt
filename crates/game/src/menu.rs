@@ -1230,11 +1230,8 @@ impl Menu {
         hits: &std::cell::RefCell<Vec<Hit>>,
     ) -> Vec<crate::ui::Quad> {
         use crate::ui::{Anchor, Quad, homogeneous};
+        // behind the menus the game draws the interface's 3D scene (the original's or our own, menuscene.rs)
         let mut out = Vec::new();
-        // the own interface's picture behind the menus (the original's has its 3D scene, drawn by the game)
-        if font.is_some_and(crate::ui::Face::own) && !self.over_level() {
-            out.push(crate::ui::backdrop(screen));
-        }
         let quad = |r: [f32; 4], uv: [f32; 4], texture: &'static str| Quad {
             rect: screen.rect(homogeneous(r), Anchor::Center),
             uv,
@@ -1604,7 +1601,8 @@ impl Menu {
         out
     }
 
-    /// The loading screen in the interface's face: the own interface's picture and band behind it.
+    /// The loading screen in the interface's face: with the own interface a band behind it (the menu scene is
+    /// drawn under it).
     pub fn loading_interface(
         face: &crate::ui::Face,
         screen: crate::ui::Screen,
@@ -1614,7 +1612,6 @@ impl Menu {
         use crate::ui::{Anchor, Quad, homogeneous};
         let mut out = Vec::new();
         if face.own() {
-            out.push(crate::ui::backdrop(screen));
             out.push(Quad {
                 rect: screen.rect(homogeneous([0.0, 0.43, 1.0, 0.57]), Anchor::Center),
                 uv: [0.0, 0.99, 1.0, 1.0],

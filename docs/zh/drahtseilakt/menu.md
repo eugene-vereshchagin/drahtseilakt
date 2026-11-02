@@ -88,4 +88,4 @@
 5. 已完成：Graphics 和 Controls；手柄。
 
 `DRAHTSEILAKT_SHOT_MENU=base:keys` 配合 `--screenshot` 可以在没有窗口的情况下把菜单画在画面上（base 为 `main`、`pause`、`dead` 或 `end`；
-keys 中 `u d l r` 表示方向键，`e` 表示 Enter，`b` 表示 Esc，`n` 表示名字输入，`w` 表示在等待按键时按下 W 键），用来查看每一个界面。
+keys 中 `u d l r` 表示方向键，`e` 表示 Enter，`b` 表示 Esc，`n` 表示名字输入，`w` 表示在等待按键时按下 W 键），用来查看每一个界面。不在关卡之上的菜单画在界面的菜单 3D 场景前，场景取其镜头环绕一周中的第 `DRAHTSEILAKT_SHOT_MENU_MS` 毫秒（默认 0）。

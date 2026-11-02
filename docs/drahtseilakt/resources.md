@@ -22,7 +22,7 @@ Chinese and Cyrillic names of community maps.
 | Role | The original's file | Own |
 |---|---|---|
 | menu font and glyph table, buttons | `3D Entities/Menu.nmo (Font_1, M_FontData_01)` | Tektur (`assets/fonts`), drawn by the game |
-| menu 3D scene | `3D Entities/MenuLevel.nmo` | a picture: `Textures/Menu_Background.png` |
+| menu 3D scene | `3D Entities/MenuLevel.nmo` | ours in the open format: `3D Entities/MenuLevel/` |
 | texts in the copy's languages | `3D Entities/Language.nmo` | `Texts/menu.txt`, seven languages |
 | menu texts, level table defaults | `base.cmo` | planned |
 | level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | planned |
@@ -47,18 +47,28 @@ loading screen are our own, so a player with no copy of the original's interface
 interface files are not even read while the own interface is in use.
 
 - **Textures** (`assets/own/Textures/`): `Button01_select.tga`, `Button01_deselect.tga` and `Button01_special.tga`, each
-  part where the game's code takes it from (the UV rectangles in `menu.rs`, `hud.rs`, `endscreen.rs`): violet glass
-  panels in a steel tube with a polished ball, rose with a gold ball when chosen, grey when not open yet; the
-  highscore places' numbers, the life ball and its bracket, the points box, the end screen's bar, the dark band. And
-  `Menu_Background.png`, the picture behind the menus and the loading screen (dusk over a sea of clouds, a wooden
-  track with a ball on the left, a pillar with a ball on the right; the middle is under the menus' band). It stands
-  for the original's 3D menu scene, which is drawn only with the original's interface.
-- **How they are made**: by `assets/own/make/make_interface.py` (Python with numpy and Pillow), from nothing but the
-  script and the shipped Tektur font; the outputs are committed, so the build needs no Python. The look follows the
-  original's style from its colours and proportions only: nothing of the original is copied, traced or resampled.
+  part where the game's code takes it from (the UV rectangles in `menu.rs`, `hud.rs`, `endscreen.rs`), in the
+  original's kind of look made our own way (version 2, 2026-11-03): see-through glass, neutral grey or (chosen) dark
+  red; steel tubes shaded as lit cylinders with a brushed grain; channels of tubes with a tinted fill (lilac grey,
+  gold when chosen) curling round a chrome ball that reflects a sky; the highscore places with a pearl, the life ball
+  and its frame, the points box with its rail, the end screen's glowing bar, the dark band.
+- **The menu scene** (`assets/own/3D Entities/MenuLevel/`, the open level format): what the menus and the loading
+  screen stand over, drawn by the game as it draws the original's MenuLevel.nmo, its camera going round the same
+  circle with the same lens. An island of track pieces hanging in a dusk sky: a central block with a dark bowl,
+  arms of track with raised borders, the start with four cups and a stone ball, three transformer boxes, two lantern
+  towers on tall poles, steel rails and a spiral, a wooden ramp, columns reaching down into the clouds, and far
+  floors. Its camera's curve and target are the nodes `I_MenuLevel_Curve_0..3` and `Cam_MenuLevel_Target`, the
+  flames burn at `FourFlames_Flame_A..D`, and its own sky is the `Sky_*` objects, drawn round the camera.
+- **How they are made**: by `assets/own/make/make_interface.py` (the textures) and `make_menu_scene.py` (the scene,
+  its textures and sky), Python with numpy and Pillow, from nothing but the scripts and the shipped Tektur font; the
+  outputs are committed, so the build needs no Python. As the generated sounds were: the original is measured (its
+  palette, line widths, proportions and layout; its scene's floor heights, extents and sky colours by elevation),
+  ours is drawn to those numbers, and `metric.py` scores how close each element and each screen comes (Lab colour
+  histogram overlap, SSIM of the blurred lightness and of the edge maps); `scores.md` keeps the scores. Nothing of
+  the original is copied, traced or resampled, and its pictures never enter the repository.
 - **Font**: Tektur (SIL OFL, `assets/fonts/Tektur-Variable.ttf`, pinned and checksummed in `assets/fonts/README.md`),
   a squared technical face close in feel to the original's wide menu font, drawn with small capitals for the lower
-  case, a little wide and spaced, as the original's. What it lacks comes from Noto Sans, Chinese from Noto Sans SC.
+  case, widened and spaced to the original's measured proportions (its labels' widths within 2 %). What it lacks comes from Noto Sans, Chinese from Noto Sans SC.
   The glyphs are rasterised at run time into an atlas and laid out with the same rectangles, alignment, word wrap and
   shadow as the game's font, so the screens keep the original's layout (`crates/game/src/fallback.rs`).
 - **Texts** (`assets/own/Texts/menu.txt`, built into the game): every menu, in-game and end screen text in English,

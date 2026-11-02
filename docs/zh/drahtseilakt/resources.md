@@ -13,7 +13,7 @@
 | 角色 | 原版文件 | 自有 |
 |---|---|---|
 | menu font and glyph table, buttons | `3D Entities/Menu.nmo (Font_1, M_FontData_01)` | Tektur（`assets/fonts`），由游戏绘制 |
-| menu 3D scene | `3D Entities/MenuLevel.nmo` | 一张图片：`Textures/Menu_Background.png` |
+| menu 3D scene | `3D Entities/MenuLevel.nmo` | 我们自己的，开放格式：`3D Entities/MenuLevel/` |
 | texts in the copy's languages | `3D Entities/Language.nmo` | `Texts/menu.txt`，七种语言 |
 | menu texts, level table defaults | `base.cmo` | 计划中 |
 | level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | 计划中 |
@@ -35,9 +35,10 @@
 
 第 2 阶段（2026-11-03）：菜单、关卡内界面（分数框、生命球、“球掉落了”）、关卡结束画面和加载画面都是我们自己的。没有原版界面文件的玩家也能看到全部界面；使用自有界面时，拷贝的界面文件根本不会被读取。
 
-- **纹理**（`assets/own/Textures/`）：`Button01_select.tga`、`Button01_deselect.tga` 和 `Button01_special.tga`，每个部件都放在游戏代码取用它的位置（`menu.rs`、`hud.rs`、`endscreen.rs` 中的 UV 矩形）：钢管包边、带抛光圆球的紫色玻璃面板，选中时为玫瑰色配金色圆球，未解锁的关卡为灰色；高分榜的名次数字、生命球及其支架、分数框、结束画面的高亮条、深色条带。另有 `Menu_Background.png`，即菜单和加载画面背后的图片（云海上的黄昏，左边是放着球的木制轨道，右边是顶着球的石柱；中间被菜单的条带遮住）。它代替原版的 3D 菜单场景，后者只在使用原版界面时绘制。
-- **制作方式**：由 `assets/own/make/make_interface.py`（Python，需要 numpy 和 Pillow）仅凭脚本本身和随附的 Tektur 字体生成；生成结果已提交到仓库，构建不需要 Python。外观只在颜色和比例上参考原版风格：没有复制、描摹或重新采样原版的任何内容。
-- **字体**：Tektur（SIL OFL，`assets/fonts/Tektur-Variable.ttf`，版本和校验和见 `assets/fonts/README.md`），一种方正的科技感字体，气质接近原版宽体菜单字体；小写字母以小型大写字母绘制，略宽、字距略大，与原版一致。它缺少的字符取自 Noto Sans，中文取自 Noto Sans SC。字形在运行时光栅化到图集中，并按与游戏字体相同的矩形、对齐、换行和阴影排版，因此各画面保持原版的布局（`crates/game/src/fallback.rs`）。
+- **纹理**（`assets/own/Textures/`）：`Button01_select.tga`、`Button01_deselect.tga` 和 `Button01_special.tga`，每个部件都放在游戏代码取用它的位置（`menu.rs`、`hud.rs`、`endscreen.rs` 中的 UV 矩形），与原版同一类外观，但用我们自己的方式绘制（第 2 版，2026-11-03）：半透明玻璃，未选中为中性灰、选中为暗红；钢管按受光圆柱体着色并带拉丝纹理；由钢管组成、填充着色（未选中为淡紫灰，选中为金色）的凹槽环绕着一颗映出天空的镀铬圆球；高分榜名次带一颗珍珠，生命球及其框架，带导轨的分数框，结束画面发光的高亮条，深色条带。
+- **菜单场景**（`assets/own/3D Entities/MenuLevel/`，开放关卡格式）：菜单和加载画面背后的场景；游戏像绘制原版 MenuLevel.nmo 一样绘制它，镜头以相同的镜头参数沿同一圆周环绕。它是一座悬在黄昏天空中的轨道部件之岛：带深色圆碗的中央方块、带凸起边沿的轨道分支、有四个杯座和一颗石球的起点、三个变形器、高杆上的两座灯塔、钢轨和螺旋、木制坡道、向下伸入云层的立柱以及远处的平台。镜头的曲线和目标是节点 `I_MenuLevel_Curve_0..3` 和 `Cam_MenuLevel_Target`，火焰在 `FourFlames_Flame_A..D` 处燃烧，它自己的天空是围绕镜头绘制的 `Sky_*` 对象。
+- **制作方式**：由 `assets/own/make/make_interface.py`（纹理）和 `make_menu_scene.py`（场景及其纹理和天空）生成，Python，需要 numpy 和 Pillow，仅凭脚本本身和随附的 Tektur 字体；生成结果已提交到仓库，构建不需要 Python。与生成音效的做法相同：测量原版（调色板、线宽、比例和布局；场景中平台的高度和范围、按仰角的天空颜色），按这些数字绘制我们的版本，再由 `metric.py` 评估每个元素和每个画面的接近程度（Lab 颜色直方图重叠度、模糊亮度和边缘图的 SSIM）；分数记录在 `scores.md` 中。没有复制、描摹或重新采样原版的任何内容，原版的图片从不进入仓库。
+- **字体**：Tektur（SIL OFL，`assets/fonts/Tektur-Variable.ttf`，版本和校验和见 `assets/fonts/README.md`），一种方正的科技感字体，气质接近原版宽体菜单字体；小写字母以小型大写字母绘制，按测得的原版比例加宽并加大字距（标签宽度误差在 2% 以内）。它缺少的字符取自 Noto Sans，中文取自 Noto Sans SC。字形在运行时光栅化到图集中，并按与游戏字体相同的矩形、对齐、换行和阴影排版，因此各画面保持原版的布局（`crates/game/src/fallback.rs`）。
 - **文字**（`assets/own/Texts/menu.txt`，内置于游戏）：菜单、关卡内和结束画面的全部文字，有英语、俄语、德语、简体中文、法语、西班牙语和意大利语，原版 `Language.nmo` 有对应键时沿用其键名。使用原版界面时，优先采用拷贝在其五种语言中的文字；俄语和中文（拷贝没有）使用我们的文字，以随附字体绘制。
 
 自有界面的默认高分榜也是我们自己的（十个名字，3000 到 750 分）。无论使用哪种界面，仍来自拷贝的有：默认按键（base.cmo 的 DB_Options；没有时为方向键、Shift 和空格），以及关卡的部件（球、粒子、球的阴影、天空、机关），之后的阶段会替换它们。
