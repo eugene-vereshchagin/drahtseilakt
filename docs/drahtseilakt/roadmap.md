@@ -38,7 +38,8 @@ new engine got level 1 playable, ahead of the phase order:
   sparkles and trails, the fans' wind, the extra life's fizz. Level 13 (the SuDu add-on of 2004, installed into
   the player's copy as its readme says) loads and plays; the full base game is thirteen levels. In a transformer the old ball bursts
   into its pieces (Balls.nmo's explosion scripts: bodies in the ball's group, pushed up, lying about until the ball
-  is lost, then faded out); replays recorded before that (format 1) play without it. Missing: the ball's smoke.
+  is lost, then faded out); replays recorded before that (format 1) play without it. The ball's smoke puffs when it appears and when it
+  bursts (BallParticle_Frame script).
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
 
 

@@ -634,6 +634,9 @@ pub struct TrafoAnim {
     pub kind: BallKind,
 }
 
+/// The ball's smoke after its lightning (Ball_LightningSphere's Delayer: 2500 ms).
+const SMOKE_AFTER_NEW_BALL: u64 = 150;
+
 #[derive(Clone)]
 pub struct Sim {
     rules: Rules,
@@ -1426,6 +1429,19 @@ impl Sim {
     /// The balls' pieces, for the bursts in the transformers.
     pub fn set_pieces(&mut self, pieces: crate::pieces::Pieces) {
         self.pieces = pieces;
+    }
+
+    /// Where the ball's smoke puffs this tick, if it does: at the ball when a transformer bursts the old one, and at
+    /// the new ball 2.5 s after its lightning (Ball_LightningSphere starts BallParticle_Frame script then), as at the
+    /// level start.
+    pub fn smoke(&self) -> Option<Vec3> {
+        let hidden = crate::trafo::BEGIN + crate::trafo::OLD_BALL_HIDDEN as u64;
+        let burst = self.hold.is_some_and(|h| self.tick == h.start + hidden);
+        let new_ball = self.tick == 1
+            || self.tick.checked_sub(SMOKE_AFTER_NEW_BALL).is_some_and(|t| {
+                self.events.iter().rev().take(64).any(|&(at, e)| at == t && e == Event::NewBall)
+            });
+        (burst || new_ball).then_some(self.ball.position)
     }
 
     /// The pieces lying about: each one's mesh in the balls' model, its body and how opaque it is.

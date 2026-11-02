@@ -208,6 +208,35 @@ pub const SPECS: &[Spec] = &[
 
 /// The extra points' particles: the burst at the centre when one fires, the trails of the small balls, the bursts
 /// where they hit.
+/// The ball's smoke (Balls.nmo's BallParticle_Frame script): one puff around the ball when it appears and when a
+/// transformer bursts the old one; its frame is the ball's, scaled 1.5. On for six frames, the pool of 60 is full
+/// after three.
+pub const BALL_SMOKE: Spec = Spec {
+    kind: Kind::Spherical,
+    render: Render::Sprite,
+    blend: Blend::AlphaAdd,
+    evolutions: 3,
+    variances: 5,
+    delay: 0.0,
+    emission: 20,
+    emission_var: 0,
+    max: 60,
+    speed: 0.001,
+    speed_var: 0.0005,
+    yaw_var: 0.349,
+    pitch_var: 0.349,
+    life: 1600.0,
+    life_var: 1000.0,
+    size0: 2.0,
+    size0_var: 0.0,
+    size1: 3.0,
+    size1_var: 0.0,
+    color0: [0.784; 4],
+    color1: [0.0; 4],
+    texture: Some("Particle_Smoke"),
+    ..spec("Ball_Particle_Frame")
+};
+
 pub const EXTRA_BURST: Spec = Spec {
     blend: Blend::OneSrcColor,
     variances: 4,
@@ -555,7 +584,7 @@ pub fn textures() -> Vec<&'static str> {
     let mut out: Vec<&'static str> = Vec::new();
     for t in SPECS
         .iter()
-        .chain([&EXTRA_BURST, &EXTRA_HIT, &EXTRA_TRAIL])
+        .chain([&EXTRA_BURST, &EXTRA_HIT, &EXTRA_TRAIL, &BALL_SMOKE])
         .filter_map(|s| s.texture)
     {
         if !out.contains(&t) {
@@ -590,6 +619,8 @@ enum When {
     /// An extra life's blob and fizz: one emission when the ball takes it (the level object; its script switches
     /// them on and, five frames later, off again, within one emission delay).
     Taken { object: usize, done: bool },
+    /// The ball's smoke: a puff where the game says (`Sim::smoke`).
+    Smoke,
 }
 
 /// The modules' proximity (TT Scaleable Proximity, Distance 70).
@@ -624,6 +655,8 @@ impl Effects {
             extras: Vec::new(),
             seed: 1,
         };
+        let seed = fx.next_seed();
+        fx.emitters.push((System::new(BALL_SMOKE, Mat4::IDENTITY, seed), When::Smoke));
         for (group, file) in [
             ("PS_Levelstart", "PS_FourFlames"),
             ("PC_Checkpoints", "PC_TwoFlames"),
@@ -733,6 +766,14 @@ impl Effects {
                     s.frame =
                         Mat4::from_translation(at) * turn * Mat4::from_translation(-at) * *base;
                     fans.iter().any(|p| p.distance(at) < 1.0) && at.distance(ball) < FAN_NEAR
+                }
+                When::Smoke => {
+                    if let Some(p) = sim.smoke() {
+                        s.frame = Mat4::from_scale_rotation_translation(Vec3::splat(1.5), glam::Quat::IDENTITY, p);
+                        // on for six frames: three emissions fill the pool of sixty
+                        s.pulses = 3;
+                    }
+                    false
                 }
                 When::Taken { object, done } => {
                     if !*done && sim.taken.contains(object) {

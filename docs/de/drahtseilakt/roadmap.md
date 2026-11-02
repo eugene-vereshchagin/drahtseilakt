@@ -43,7 +43,8 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   nach ihrem Readme in die Kopie des Spielers installiert) lädt und ist spielbar; das vollständige Grundspiel hat
   dreizehn Level. Im Transformator zerspringt die alte Kugel in ihre Stücke (die
   Explosionsskripte aus Balls.nmo: Körper in der Gruppe der Kugel, nach oben gestoßen, liegen bis zum Verlust der
-  Kugel, dann ausgeblendet); vorher aufgenommene Replays (Format 1) laufen ohne sie. Fehlt: der Rauch der Kugel.
+  Kugel, dann ausgeblendet); vorher aufgenommene Replays (Format 1) laufen ohne sie. Der Rauch der Kugel pufft, wenn sie erscheint und
+  wenn sie zerspringt (BallParticle_Frame script).
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
 
 
