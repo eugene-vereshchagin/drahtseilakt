@@ -26,6 +26,7 @@ mod modules;
 mod music;
 mod particles;
 mod physics;
+mod pieces;
 mod proximity;
 mod render;
 mod replay;

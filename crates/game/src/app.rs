@@ -54,6 +54,8 @@ struct Game {
     start_ball: crate::sim::BallKind,
     balls: LoadedLevel,
     ball_meshes: BallMeshes,
+    /// The balls' pieces, for each new run's bursts.
+    pieces: crate::pieces::Pieces,
     placements: Vec<scene::Placement>,
     modules: scene::Modules,
     /// The transformer animation's file (`AnimTrafo.nmo`), drawn after the modules, if the copy has it.
@@ -172,6 +174,10 @@ impl Game {
         let ball_meshes = BallMeshes::find(&balls.level);
         let mut sim = Sim::with_modules(&level.level, start_ball, &modules, tutorial);
         sim.set_ball_boxes(ball_meshes.boxes);
+        let pieces = crate::pieces::Pieces::find(&balls.level);
+        sim.set_pieces(pieces.clone());
+        // a replay recorded before the bursts plays without them, as it was recorded
+        sim.bursts = replay_in.as_ref().is_none_or(|r| r.version >= 2);
         let level_bonus = data.settings(&level.name).level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
         let start = match &replay_in {
@@ -211,6 +217,7 @@ impl Game {
             placements,
             modules,
             ball_meshes,
+            pieces,
             sim,
             start_ball,
             replay_out,
@@ -254,6 +261,8 @@ impl Game {
             self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
         );
         self.sim.set_ball_boxes(self.ball_meshes.boxes);
+        self.sim.set_pieces(self.pieces.clone());
+        self.sim.bursts = self.replay_in.as_ref().is_none_or(|r| r.version >= 2);
         self.sim.level_bonus = self.level_bonus;
         self.ball_sound.silence(&mut self.sound_out);
         self.fan_sound.silence(&mut self.sound_out);
@@ -890,6 +899,7 @@ fn frames_run(game: &mut Game, data: &Data, dir: &Path) -> Result<(), String> {
             game.trafo.as_ref().map(|t| &t.1),
             (&game.sim.extra_views(), game.extra_model.as_ref()),
             &snap,
+            &game.sim.pieces_view(),
         );
         if snap.kind.is_some() {
             scene::shadows(&game.shadow_receivers, snap.ball, &mut inst);
@@ -948,6 +958,7 @@ fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(
             None,
             (&[], None),
             &snap,
+            &game.sim.pieces_view(),
         );
         off.edges(&mut r, view, &inst)
     };
@@ -1459,6 +1470,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         game.trafo.as_ref().map(|t| &t.1),
         (&game.sim.extra_views(), game.extra_model.as_ref()),
         &snap,
+        &game.sim.pieces_view(),
     );
     let mut inst = inst;
     if snap.kind.is_some() {
@@ -2066,6 +2078,7 @@ impl App {
                 self.game.trafo.as_ref().map(|t| &t.1),
                 (&self.game.sim.extra_views(), self.game.extra_model.as_ref()),
                 &snap,
+                &self.game.sim.pieces_view(),
             );
             if snap.kind.is_some() {
                 scene::shadows(&self.game.shadow_receivers, snap.ball, &mut inst);

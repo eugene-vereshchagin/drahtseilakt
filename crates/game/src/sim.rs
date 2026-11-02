@@ -684,6 +684,14 @@ pub struct Sim {
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
     ball_boxes: [(Vec3, Vec3); 3],
+    /// The balls' pieces (pieces.rs), those lying about now (their kind, piece and body), and the tick their fade
+    /// began (the ball was lost).
+    pieces: crate::pieces::Pieces,
+    flying: Vec<(BallKind, usize, usize)>,
+    pieces_fade: Option<u64>,
+    /// The old ball bursts in a transformer: off only to play a replay recorded before the bursts (format 1), as
+    /// their bodies, however far, change the physics' course.
+    pub bursts: bool,
     /// The points counter's ticks counted, and the tick it goes on from after a lost ball.
     points_clock: u64,
     points_resume: u64,
@@ -1057,6 +1065,10 @@ impl Sim {
             module_sectors,
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
+            pieces: crate::pieces::Pieces::default(),
+            flying: Vec::new(),
+            pieces_fade: None,
+            bursts: true,
             depth_from: DEPTH_PHASE,
             points_clock: 0,
             points_resume: 0,
@@ -1192,7 +1204,19 @@ impl Sim {
         self.world.set_push(0, push * p.force);
         self.prev_pose = (self.ball.position, self.ball.rotation);
         self.world.step(None);
+        if let Some(f) = self.pieces_fade
+            && self.tick >= f + crate::pieces::FADE_TICKS
+        {
+            for (_, _, body) in std::mem::take(&mut self.flying) {
+                self.world.remove(body);
+            }
+            self.pieces_fade = None;
+        }
         if let Some(h) = self.hold {
+            // the old ball bursts as it is hidden in the transformer
+            if self.tick == h.start + crate::trafo::BEGIN + crate::trafo::OLD_BALL_HIDDEN as u64 && self.bursts {
+                self.burst(h.old, self.ball.position);
+            }
             // Out of the physics, the ball is drawn moving to the transformer's hold point.
             let t = (self.tick - h.start) as f32 * TRAFO_PULL;
             self.ball.position = h.at + (h.from - h.at) * (1.0 + t) * (-t).exp();
@@ -1365,6 +1389,10 @@ impl Sim {
 
     fn die(&mut self) {
         self.events.push((self.tick, Event::Died));
+        // the pieces lying about fade out and go (Ball_ResetPieces_<kind>)
+        if !self.flying.is_empty() && self.pieces_fade.is_none() {
+            self.pieces_fade = Some(self.tick);
+        }
         self.dying = Some(self.tick);
         // The current sector starts again: its objects leave the physics and are made again at their places.
         self.sector_change(DEATH_SECTOR_END_TICKS, self.sector, false);
@@ -1393,6 +1421,49 @@ impl Sim {
     /// against the box of the ball's mesh, as the original does.
     pub fn set_ball_boxes(&mut self, boxes: [(Vec3, Vec3); 3]) {
         self.ball_boxes = boxes;
+    }
+
+    /// The balls' pieces, for the bursts in the transformers.
+    pub fn set_pieces(&mut self, pieces: crate::pieces::Pieces) {
+        self.pieces = pieces;
+    }
+
+    /// The pieces lying about: each one's mesh in the balls' model, its body and how opaque it is.
+    pub fn pieces_view(&self) -> Vec<(usize, usize, f32)> {
+        let alpha = self.pieces_fade.map_or(1.0, |f| crate::pieces::fade(self.tick.saturating_sub(f)));
+        self.flying
+            .iter()
+            .filter_map(|&(kind, p, body)| self.pieces.of(kind).get(p).map(|piece| (piece.mesh, body, alpha)))
+            .collect()
+    }
+
+    /// The old ball bursts at `at` into its pieces (Ball_Explosion_<kind>): the pieces of that kind lying about are
+    /// taken up again, set about the ball, made bodies and pushed along their own up.
+    fn burst(&mut self, kind: BallKind, at: Vec3) {
+        let again: Vec<usize> = self.flying.iter().filter(|f| f.0 == kind).map(|f| f.2).collect();
+        for body in again {
+            self.world.remove(body);
+        }
+        self.flying.retain(|f| f.0 != kind);
+        let b = crate::pieces::burst(kind);
+        let mut rng = crate::pieces::Rng::new(self.tick);
+        let pieces: Vec<crate::pieces::Piece> = self.pieces.of(kind).to_vec();
+        for (k, piece) in pieces.iter().enumerate() {
+            let (pos, rot) = self.pieces.pose(kind, piece, at);
+            let m = Material {
+                friction: rng.range(b.friction),
+                elasticity: b.elasticity,
+                mass: rng.range(b.mass),
+                lin_damp: b.lin_damp,
+                rot_damp: b.rot_damp,
+            };
+            let pieces = [piece.hull.clone()];
+            let made = self.world.add_part(&pieces, m, pos, rot, false, GROUP_BALL, false, true, [0.0; 3], true);
+            let Some(body) = made else { continue };
+            let up = rot * Vec3::Y;
+            self.world.impulse_at(body, pos + rot * b.point, up * rng.range(b.impulse));
+            self.flying.push((kind, k, body));
+        }
     }
 
     /// The transformers: where each takes a ball (one within `TRAFO_REACH` of it) and the kind it makes.

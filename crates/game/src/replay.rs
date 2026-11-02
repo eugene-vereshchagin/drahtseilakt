@@ -2,7 +2,7 @@
 // is identified by a hash of its file, so a replay never runs against the wrong data. A replay holds only our
 // input, never game data, so it can live in the repository.
 //
-//   drahtseilakt-replay 1
+//   drahtseilakt-replay 2        (1: recorded before the ball burst into pieces in transformers; played so)
 //   level <file name> <fnv-1a 64 of the file, hex>
 //   start <sector> <ball kind or -> <x,y,z or ->   (optional: a run begun elsewhere than the level start)
 //   <tick> <input bits, hex>      (from this tick on; tick 1 is the first)
@@ -10,7 +10,9 @@
 
 use std::fmt::Write as _;
 
-pub const FORMAT: &str = "drahtseilakt-replay 1";
+pub const FORMAT: &str = "drahtseilakt-replay 2";
+/// The formats read: 1 (no bursts) and 2.
+const FORMATS: [&str; 2] = ["drahtseilakt-replay 1", FORMAT];
 
 /// Where a run begins when it is not the level start (for testing a place): the sector (1 is the first), the ball
 /// kind (the sector's usual one if `None`) and the place (the sector's reset point if `None`).
@@ -23,6 +25,8 @@ pub struct Start {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Replay {
+    /// The format it was recorded in (1 or 2).
+    pub version: u32,
     pub level_name: String,
     pub level_hash: u64,
     pub start: Option<Start>,
@@ -40,6 +44,7 @@ pub fn fnv1a(bytes: &[u8]) -> u64 {
 impl Replay {
     pub fn new(level_name: &str, level_hash: u64) -> Replay {
         Replay {
+            version: 2,
             level_name: level_name.to_owned(),
             level_hash,
             start: None,
@@ -90,9 +95,11 @@ impl Replay {
             .lines()
             .map(str::trim)
             .filter(|l| !l.is_empty() && !l.starts_with('#'));
-        if lines.next() != Some(FORMAT) {
+        let head = lines.next().unwrap_or_default();
+        let Some(version) = FORMATS.iter().position(|f| *f == head) else {
             return Err(format!("not a replay (expected \"{FORMAT}\")"));
-        }
+        };
+        let version = version as u32 + 1;
         let level = lines.next().ok_or("missing level line")?;
         let mut f = level.split_whitespace();
         if f.next() != Some("level") {
@@ -102,6 +109,7 @@ impl Replay {
         let level_hash = u64::from_str_radix(f.next().ok_or("missing level hash")?, 16)
             .map_err(|e| e.to_string())?;
         let mut r = Replay {
+            version,
             level_name,
             level_hash,
             start: None,
@@ -179,6 +187,11 @@ mod tests {
         r.start = Some(Start { sector: 2, ball: None, at: None });
         assert_eq!(Replay::parse(&r.to_text())?, r);
         assert!(Replay::parse("drahtseilakt-replay 1\nlevel a 1\nstart 0 - -\nend 1").is_err());
+        let old = Replay::parse("drahtseilakt-replay 1\nlevel a 1\n1 01\nend 5").expect("format 1 still reads");
+        assert_eq!(old.version, 1);
+        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 2");
+        assert_eq!(new.version, 2);
+        assert!(Replay::parse("drahtseilakt-replay 3\nlevel a 1\nend 1").is_err(), "a later format is refused");
         assert!(Replay::parse("drahtseilakt-replay 1\nlevel a 1\nstart 1 - 1,2\nend 1").is_err());
         Ok(())
     }

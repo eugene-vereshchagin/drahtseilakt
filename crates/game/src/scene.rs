@@ -409,6 +409,7 @@ pub fn shadows(receivers: &[ShadowReceiver], ball: Vec3, out: &mut Vec<Instance>
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn instances(
     placements: &[Placement],
     taken: &[usize],
@@ -417,6 +418,7 @@ pub fn instances(
     trafo: Option<&crate::trafo::TrafoModel>,
     extras: (&[crate::extra::ExtraView], Option<&ExtraModel>),
     s: &Snapshot,
+    pieces: &[(usize, usize, f32)],
 ) -> Vec<Instance> {
     let (views, extra_model) = extras;
     let mut out: Vec<Instance> = Vec::new();
@@ -485,6 +487,20 @@ pub fn instances(
     }
     if let (Some(model), Some((at, age, _))) = (trafo, s.trafo) {
         model.instances(&at, age, &mut out);
+    }
+    // the burst balls' pieces at their bodies, fading after the ball is lost
+    for &(mesh, body, alpha) in pieces {
+        let Some(b) = bodies.get(body) else { continue };
+        out.push(Instance {
+            model: BALLS_MODEL,
+            mesh,
+            matrix: Mat4::from_rotation_translation(b.rot, b.pos),
+            marker: None,
+            uv_offset: [0.0; 2],
+            diffuse: (alpha < 1.0).then_some([1.0, 1.0, 1.0, alpha]),
+            unlit: false,
+            shadow: None,
+        });
     }
     let mesh = match s.kind {
         Some(BallKind::Wood) => balls.wood,

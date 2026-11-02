@@ -611,6 +611,13 @@ impl World {
         })
     }
 
+    /// An impulse on body `i` at a world point (Physics Impulse), applied at the next PSI; the body is woken.
+    pub fn impulse_at(&mut self, i: usize, point: Vec3, impulse: Vec3) {
+        if let Some(&Some(id)) = self.handles.get(i) {
+            self.physics.body_impulse(id, vec3_f64(point), [impulse.x, impulse.y, impulse.z]);
+        }
+    }
+
     /// Advances the world by one tick. `push` is an impulse for one body (the player's push), at its centre.
     pub fn step(&mut self, push: Option<(usize, Vec3)>) {
         if let Some((i, impulse)) = push
