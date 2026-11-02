@@ -127,20 +127,29 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
             uv = vec2<f32>(0.5 + r.x / max(m, 1e-4), 0.5 - r.y / max(m, 1e-4));
         }
     }
+    // the coordinates' change across the pixel before the parallax moves them: sampling with these keeps the mip
+    // level the surface's own (the moved coordinates jump at a brick's edge, and would pick the smallest mip there)
+    let tex_dx = dpdx(uv);
+    let tex_dy = dpdy(uv);
+    // whether the parallax moved them (where it did not, the texture is sampled as it always was)
+    var moved = false;
     // masonry and the like: the relief's height moves what is seen (the mesh's own coordinates only)
     if mat.ambient.a > 0.0 && mat.params.w > 0.5 && mat.params.z < 0.5 {
-        let n = normalize(in.normal);
-        let along = in.tangent.xyz - n * dot(n, in.tangent.xyz);
+        // the side seen: a two-sided mesh seen from its back shows its relief as well
         let v = normalize(g.eye.xyz - in.world);
+        let n0 = normalize(in.normal);
+        let n = select(n0, -n0, dot(n0, v) < 0.0);
+        let along = in.tangent.xyz - n * dot(n, in.tangent.xyz);
         if dot(along, along) > 1e-8 && dot(n, v) > 0.0 {
             let t = normalize(along);
             let b = cross(n, t) * in.tangent.w;
             uv = parallax(uv, vec3<f32>(dot(v, t), dot(v, b), dot(v, n)), mat.ambient.a, uv_dx, uv_dy);
+            moved = true;
         }
     }
     var base = vec4<f32>(1.0);
     if mat.emissive.a > 0.5 {
-        base = textureSample(tex, samp, uv);
+        base = select(textureSample(tex, samp, uv), textureSampleGrad(tex, samp, uv, tex_dx, tex_dy), moved);
     }
     var diffuse = mat.diffuse;
     if inst.diffuse.a >= 0.0 {
@@ -162,7 +171,8 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     // green towards -v as glTF has it). Without a map it is exactly the interpolated normal, as the original's.
     var surface = normalize(in.normal);
     if mat.params.w > 0.5 {
-        let m = textureSample(relief, samp, uv).xyz * 2.0 - vec3<f32>(1.0);
+        let sampled = select(textureSample(relief, samp, uv), textureSampleGrad(relief, samp, uv, tex_dx, tex_dy), moved);
+        let m = sampled.xyz * 2.0 - vec3<f32>(1.0);
         // the tangent, square to the normal; interpolated across a face it can vanish or lie along the normal (mirrored
         // coordinates), and then the surface stays as it is rather than turn into NaN
         let along = in.tangent.xyz - surface * dot(surface, in.tangent.xyz);
