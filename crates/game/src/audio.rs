@@ -49,20 +49,26 @@ impl Drop for Audio {
 /// A sound by its name: from the chosen sound theme (sound_themes.rs: the system or generated theme shipped with the
 /// game, or a player's own, "original" among them), else its fallback theme; a sound no theme has comes from the
 /// copy's WAV (a level's own sounds), never music: until the original's theme is chosen only our own music plays.
+/// `name` may be a role's other file, `<role>#<k>` (music.rs `key`): the `k`-th of the role's pool, then the role's first.
 fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
+    let (name, k) = match name.split_once('#') {
+        Some((role, k)) => (role, k.parse::<usize>().unwrap_or(0)),
+        None => (name, 0),
+    };
     let copy = gamedata::sound_themes::plays_copy();
     // a level's own sound (a community level brings its own) comes before any theme's
     let own = data.level_own(&format!("Sounds/{name}.wav")).into_iter();
+    // another file of a pool is that file or nothing: falling back to the role's first could play a track twice in a
+    // row (music.rs drops a track that does not decode; a sound plays its first file instead)
+    if k > 0 {
+        let variant = if copy { None } else { gamedata::sound_themes::pool(name).into_iter().nth(k) };
+        return variant.and_then(|path| decode_file(&path));
+    }
     let themed = if copy { Vec::new() } else { gamedata::sound_themes::files(name) };
     for path in own.chain(themed) {
-        let ogg = path.extension().is_some_and(|x| x.eq_ignore_ascii_case("ogg"));
-        let decoded = read_capped(&path)
-            .ok_or_else(|| "unreadable".to_owned())
-            .and_then(|b| if ogg { parse_ogg(&b) } else { parse_wav(&b) });
-        match decoded {
-            Ok(s) => return Some(Arc::new(s)),
-            // a broken file is passed over for the next theme's
-            Err(e) => eprintln!("sound {}: {e}", path.display()),
+        // a broken file is passed over for the next theme's
+        if let Some(s) = decode_file(&path) {
+            return Some(s);
         }
     }
     if !copy && name.starts_with("Music_") && !name.eq_ignore_ascii_case("Music_thunder") {
@@ -79,6 +85,32 @@ fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
         }
     }
 }
+
+/// A theme's sound file decoded (Ogg Vorbis or WAV, by its extension); none, with a note, when it is broken.
+fn decode_file(path: &std::path::Path) -> Option<Arc<Sound>> {
+    let ogg = path.extension().is_some_and(|x| x.eq_ignore_ascii_case("ogg"));
+    let decoded = read_capped(path)
+        .ok_or_else(|| "unreadable".to_owned())
+        .and_then(|b| if ogg { parse_ogg(&b) } else { parse_wav(&b) });
+    match decoded {
+        Ok(s) => Some(Arc::new(s)),
+        Err(e) => {
+            eprintln!("sound {}: {e}", path.display());
+            None
+        }
+    }
+}
+
+/// Music as the audio layer names it: a role beginning with Music_ (a pool's other file too), not the thunder (an
+/// effect despite its name).
+fn is_music(name: &str) -> bool {
+    let role = name.split('#').next().unwrap_or(name);
+    role.starts_with("Music_") && !role.eq_ignore_ascii_case("Music_thunder")
+}
+
+/// The most decoded music held at once, in frames (stereo, 8 bytes each: 384 MB); a piece that would go over it is
+/// not played, so that a theme of very long pieces cannot take the machine's memory.
+const MUSIC_BUDGET: usize = 48 << 20;
 
 /// The most frames an Ogg Vorbis sound may decode to (ten minutes at 48 kHz).
 const MAX_OGG_FRAMES: usize = 48_000 * 600;
@@ -318,6 +350,45 @@ pub struct Audio {
         std::sync::mpsc::Sender<Decoded>,
         std::sync::mpsc::Receiver<Decoded>,
     ),
+    variants: Variants,
+}
+
+/// The sounds' pools (a theme may give a sound several files): how many each has and which played last, and the
+/// generator that picks among them (a sound's pick never touches the game).
+#[derive(Default)]
+struct Variants {
+    rng: Option<crate::music::Rng>,
+    pools: HashMap<String, (usize, Option<usize>)>,
+}
+
+impl Variants {
+    /// The key to play the sound `name` by: one of its pool's files at random, never the same twice in a row; the
+    /// sound itself when a level brings its own, the copy's sounds play or the pool has one file.
+    fn size(&mut self, data: &Data, name: &str) -> usize {
+        self.entry(data, name).0
+    }
+
+    fn entry(&mut self, data: &Data, name: &str) -> &mut (usize, Option<usize>) {
+        self.pools.entry(name.to_owned()).or_insert_with(|| {
+            let own = data.level_own(&format!("Sounds/{name}.wav")).is_some();
+            let copy = gamedata::sound_themes::plays_copy();
+            (if own || copy { 1 } else { gamedata::sound_themes::pool(name).len() }, None)
+        })
+    }
+
+    fn pick(&mut self, data: &Data, name: &str) -> String {
+        if self.entry(data, name).0 <= 1 {
+            return name.to_owned();
+        }
+        let rng = self.rng.get_or_insert_with(|| {
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+            crate::music::Rng::new(now.map_or(1, |d| d.as_nanos() as u64))
+        });
+        let (n, last) = self.pools.entry(name.to_owned()).or_insert((1, None));
+        let k = crate::music::pick(rng, *n, *last);
+        *last = Some(k);
+        crate::music::key(name, k)
+    }
 }
 
 impl Audio {
@@ -339,6 +410,7 @@ impl Audio {
                 next: 1,
                 pending: std::collections::HashSet::new(),
                 decoded: std::sync::mpsc::channel(),
+                variants: Variants::default(),
             });
         }
         let device = cpal::default_host().default_output_device()?;
@@ -390,6 +462,7 @@ impl Audio {
             next: 1,
             pending: std::collections::HashSet::new(),
             decoded: std::sync::mpsc::channel(),
+            variants: Variants::default(),
         })
     }
 
@@ -412,23 +485,88 @@ impl Audio {
         // (and stops), and the new level decodes its own afresh
         self.pending.clear();
         self.decoded = std::sync::mpsc::channel();
+        // a new level or theme may have other pools
+        self.variants.pools.clear();
     }
 
     /// A sound of the game by its name (the original's file name without `.wav`), loaded once: our own when our own
     /// sounds play and we have it, else the copy's (our own music never falls back to the copy's). None if there is
     /// none, it is broken, or it is still being decoded ahead.
     fn sound(&mut self, data: &Data, name: &str) -> Option<Arc<Sound>> {
-        while let Ok((n, s)) = self.decoded.1.try_recv() {
-            self.pending.remove(&n);
-            self.sounds.insert(n, s);
-        }
+        self.receive();
         if self.pending.contains(name) {
             return None;
         }
+        if let Some(s) = self.sounds.get(name) {
+            return s.clone();
+        }
+        let s = self.admit(name, load(data, name));
+        self.sounds.insert(name.to_owned(), s.clone());
+        s
+    }
+
+    /// Takes in what the decoding thread has finished.
+    fn receive(&mut self) {
+        while let Ok((n, s)) = self.decoded.1.try_recv() {
+            self.pending.remove(&n);
+            let s = self.admit(&n, s);
+            self.sounds.insert(n, s);
+        }
+    }
+
+    /// A decoded sound as it is kept: music only within MUSIC_BUDGET together with the music held already.
+    fn admit(&self, name: &str, s: Option<Arc<Sound>>) -> Option<Arc<Sound>> {
+        let s = s?;
+        if !is_music(name) {
+            return Some(s);
+        }
+        let held: usize = self
+            .sounds
+            .iter()
+            .filter(|(k, _)| is_music(k))
+            .filter_map(|(_, v)| v.as_ref().map(|v| v.frames.len()))
+            .fold(0, usize::saturating_add);
+        if held.saturating_add(s.frames.len()) > MUSIC_BUDGET {
+            eprintln!("music {name}: over the budget of decoded music, not played");
+            return None;
+        }
+        Some(s)
+    }
+
+    /// The sound `name` was tried and cannot be played (broken, missing, over the music budget).
+    pub fn failed(&mut self, name: &str) -> bool {
+        self.receive();
+        !self.pending.contains(name) && matches!(self.sounds.get(name), Some(None))
+    }
+
+    /// The sound `name` is being decoded ahead.
+    pub fn pending(&mut self, name: &str) -> bool {
+        self.receive();
+        self.pending.contains(name)
+    }
+
+    /// Lets go of the decoded music not in `keep` (what plays now and may play next; a piece still playing is held
+    /// by the mixer until it ends). What could not be decoded is remembered, so as not to be tried again.
+    pub fn keep_music(&mut self, keep: &[String]) {
+        self.receive();
         self.sounds
-            .entry(name.to_owned())
-            .or_insert_with(|| load(data, name))
-            .clone()
+            .retain(|k, v| !is_music(k) || v.is_none() || keep.contains(k));
+    }
+
+    /// The sounds' picks come from this seed from now on (a replay's: the same each time it plays).
+    pub fn seed_sounds(&mut self, seed: u64) {
+        self.variants.rng = Some(crate::music::Rng::new(seed));
+    }
+
+    /// Decodes ahead the other files of the sounds' pools (the first files are decoded when first played, as
+    /// always), so that a pick is not decoded while the game runs.
+    pub fn preload_sound_pools(&mut self, data: &Data) {
+        let mut keys = Vec::new();
+        for name in gamedata::sound_themes::KNOWN_SOUNDS.iter().filter(|n| !is_music(n)) {
+            let n = self.variants.size(data, name);
+            keys.extend((1..n).map(|k| crate::music::key(name, k)));
+        }
+        self.preload(data, &keys);
     }
 
     /// Decodes these sounds on a thread of their own (the level's music: long pieces), so that none is decoded while
@@ -504,7 +642,13 @@ impl Audio {
         looping: bool,
         music: bool,
     ) -> Option<u64> {
-        let sound = self.sound(data, name)?;
+        // a sound plays one of its pool's files (the music picks its own: music.rs)
+        let picked = (!music).then(|| self.variants.pick(data, name));
+        // a pick still being decoded, or broken, plays the sound's first file instead
+        let sound = match picked.as_deref().map(|p| self.sound(data, p)) {
+            Some(Some(s)) => s,
+            _ => self.sound(data, name)?,
+        };
         let id = self.next;
         self.next += 1;
         let mut m = self.mixer.lock().ok()?;
@@ -610,7 +754,7 @@ mod tests {
         }
         for n in 1..=5 {
             for last in [false, true] {
-                v.extend(crate::music::Music::wanted(Some(n), last));
+                v.extend(crate::music::Music::roles(Some(n), last));
             }
         }
         v.sort();
@@ -667,13 +811,49 @@ mod tests {
 
     #[test]
     fn the_music_table_names_our_tracks() {
-        // the table's tracks are all there, and a level's music is found through it
-        let text = std::fs::read_to_string(own().join("Music/music.txt")).unwrap_or_default();
-        for line in text.lines().filter(|l| !l.starts_with('#')) {
-            let (_, file) = line.split_once(' ').unwrap_or_default();
+        // the table is read without a note, its tracks are all there, and every track in Music/ is played somewhere
+        let bytes = std::fs::read(own().join("Music/music.txt")).unwrap_or_default();
+        let table = gamedata::sound_themes::parse_table(&bytes);
+        assert!(table.notes.is_empty(), "{:?}", table.notes);
+        let named: Vec<&String> = table.roles.iter().flat_map(|(_, files)| files).collect();
+        for file in &named {
             assert!(own().join("Music").join(file).is_file(), "{file}");
         }
-        assert!(text.contains("Music_Theme_1_1 "));
+        for e in std::fs::read_dir(own().join("Music")).into_iter().flatten().flatten() {
+            let f = e.file_name().to_string_lossy().into_owned();
+            let role = f.trim_end_matches(".ogg");
+            if f.ends_with(".ogg") && !gamedata::sound_themes::known_role(role) {
+                assert!(named.contains(&&f), "{f} plays in no role");
+            }
+        }
+        assert!(table.roles.iter().any(|(r, _)| r == "Music_Theme_1_1"));
+    }
+
+    #[test]
+    fn the_system_theme_holds_every_role_the_game_plays() {
+        // every role in the shipped system theme (the theme every theme falls back to), each file of each pool
+        // decoding, the level music's pools apart from one another, and themes 4 and 5 with tracks of their own
+        let roles = every_role();
+        for name in &roles {
+            assert!(gamedata::sound_themes::known_role(name), "{name} is a role the tables accept");
+            let pool = gamedata::sound_themes::pool_in_theme(&own(), name);
+            assert!(!pool.is_empty(), "system lacks {name}");
+            for p in &pool {
+                let bytes = std::fs::read(p).unwrap_or_default();
+                let decoded = parse_ogg(&bytes);
+                assert!(decoded.as_ref().is_ok_and(|s| !s.frames.is_empty()), "{}: {:?}", p.display(), decoded.err());
+            }
+        }
+        let pool = |name: &str| gamedata::sound_themes::pool_in_theme(&own(), name);
+        let atmos: Vec<_> = (1..=3).flat_map(|k| pool(&format!("Music_Atmo_{k}"))).collect();
+        assert_eq!(atmos.len(), 8, "the eight atmospheres");
+        let theme = |n: u32| -> Vec<_> { (1..=3).flat_map(|k| pool(&format!("Music_Theme_{n}_{k}"))).collect() };
+        for n in 1..=5 {
+            for m in 1..n {
+                assert!(theme(n).iter().all(|t| !theme(m).contains(t)), "themes {m} and {n} share a track");
+            }
+        }
+        assert_eq!(theme(4).len() + theme(5).len(), 9, "the third round's nine tracks");
     }
 
     fn wav(channels: u16, bits: u16, rate: u32, samples: &[u8]) -> Vec<u8> {

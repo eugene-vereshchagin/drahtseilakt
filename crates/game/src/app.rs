@@ -2330,13 +2330,20 @@ impl App {
             self.started = sim.tick > START_SOUND_WITHIN;
         }
         if self.music.is_none() && sim.tick >= 1 {
-            let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64);
-            // the level's music decoded ahead (our pieces are long), then its manager
-            audio.preload(&self.data, &Music::wanted(self.game.music_theme, self.game.last_level));
+            // a replay plays its music in the same order each time; a run of the player's, in a new one
+            let now = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos());
+            let replay = self.game.replay_in.as_ref();
+            let seed = replay.map_or_else(|| now() as u64, |r| r.level_hash ^ r.end.rotate_left(32));
             self.music = Some(Music::new(self.game.music_theme, self.game.last_level, seed, sim.tick));
+            // the sounds' picks from the same seed, their pools' other files decoded ahead
+            audio.seed_sounds(seed.rotate_left(29) ^ 0x5851_f42d_4c95_7f2d);
+            audio.preload_sound_pools(&self.data);
         }
         if let Some(m) = &mut self.music {
+            // what may play next decoded ahead (our pieces are long), then the music's frame; the rest let go
+            audio.preload(&self.data, &m.upcoming());
             m.frame(sim, audio, &self.data);
+            audio.keep_music(&m.keep());
         }
         // the start sound once a run: a frame may take more than one tick (the first after a level loaded does), so
         // it is not looked for on tick 1 alone
