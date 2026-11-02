@@ -48,7 +48,8 @@ music, made by `assets/sounds/system/prepare.py`, CC0 or CC-BY, authors and chan
 Credits screen) and *neuro* (effects synthesized for the game, GPL-3.0-only; music and missing roles from *system*).
 Players add their own themes in the data folder's `sounds/<name>/`; *original* among them is made by the toolbox from
 the player's copy and never shipped (until it exists, choosing it plays the copy's sounds). The extended page's
-*Sounds* line chooses the theme (`sound-theme NAME`); the classic mode plays *system*. A sound the theme and its
+*Sounds* line chooses the theme (`sound-theme NAME`); *neuro* plays until the player chooses another, and always in
+the classic mode (decisions.md, "The generated sound theme is the default"); a choice once made is kept. A sound the theme and its
 fallback lack comes from the copy (a level's own sounds); music never does. A player's theme folder is untrusted:
 plain names only, no links, a capped number of themes, sounds decoded through the audio caps. The level's music is
 decoded ahead on a thread of its own.

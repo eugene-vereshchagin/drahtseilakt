@@ -49,7 +49,8 @@ Aufnahmen und die Musik des Inhabers, gemacht von `assets/sounds/system/prepare.
 GPL-3.0-only; Musik und fehlende Rollen aus *system*). Eigene Themen legt der Spieler in `sounds/<Name>/` des
 Datenordners; darunter macht die Toolbox *original* aus der Kopie des Spielers, das nie ausgeliefert wird (solange es
 fehlt, spielt seine Wahl die Klänge der Kopie). Die Zeile *Sounds* der Seite Extended wählt das Thema
-(`sound-theme NAME`); der klassische Modus spielt *system*. Ein Klang, der dem Thema und seinem Ersatz fehlt, kommt aus
+(`sound-theme NAME`); bis der Spieler ein anderes wählt, und im klassischen Modus immer, spielt *neuro*
+(decisions.md, „Das generierte Klangthema ist der Standard“); eine getroffene Wahl bleibt. Ein Klang, der dem Thema und seinem Ersatz fehlt, kommt aus
 der Kopie (die eigenen Klänge eines Levels); Musik nie. Der Themenordner eines Spielers ist nicht vertrauenswürdig:
 nur einfache Namen, keine Links, begrenzte Zahl von Themen, Klänge durch die Grenzen der Klangschicht dekodiert. Die
 Musik des Levels wird vorab in einem eigenen Thread dekodiert.

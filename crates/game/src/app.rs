@@ -651,8 +651,12 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
         v[0],
         v[1],
         gamedata::resources::chosen().key(),
-        // the sound theme is the extended mode's choice: the classic mode (the system theme) keeps it as it was
-        if features.mode { format!("sound-theme {}\n", gamedata::sound_themes::wanted()) } else { String::new() },
+        // the sound theme is the extended mode's choice, written only once the player made one (until then the
+        // default plays, whichever it is); the classic mode (the default theme) keeps the line as it was
+        match gamedata::sound_themes::wanted() {
+            Some(w) if features.mode => format!("sound-theme {w}\n"),
+            _ => String::new(),
+        },
         features.lines()
     );
     if !player.is_empty() {
@@ -739,14 +743,14 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Original });
-    // the sound theme: the extended mode's choice (`sound-theme`), the system theme in the classic mode
+    // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (a player who chose the original's interface before there were themes keeps hearing the original's sounds)
     let theme = if extended {
         setting("sound-theme").or_else(|| (chosen != gamedata::resources::Provider::Own).then(|| "original".to_owned()))
     } else {
         None
     };
-    gamedata::sound_themes::start(theme.as_deref().unwrap_or(gamedata::sound_themes::SYSTEM));
+    gamedata::sound_themes::start(theme.as_deref());
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_level(data.level_dir(&o.source).as_deref());
     if let Some(dir) = &o.export {
@@ -2216,10 +2220,10 @@ impl App {
                     Action::Switch(f) => self.features.toggle(f),
                     _ => self.features.mode = !self.features.mode,
                 }
-                // the sound theme follows the mode: the saved choice in the extended mode, the system theme else
+                // the sound theme follows the mode: the saved choice in the extended mode, the default theme else
                 // (taken before the settings are written, which keep the extended mode's choice)
                 let theme = if self.features.mode { setting("sound-theme") } else { None };
-                gamedata::sound_themes::choose(theme.as_deref().unwrap_or(gamedata::sound_themes::SYSTEM));
+                gamedata::sound_themes::restore(theme.as_deref());
                 if let Some(a) = &mut self.audio {
                     a.forget_sounds();
                 }
