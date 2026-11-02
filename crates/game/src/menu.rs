@@ -771,7 +771,10 @@ impl Menu {
                 "Started as a fork of OpenBallance by emdzej",
                 "Physics: IVP, ported from OpenBallance",
                 "",
-                "Plays your own copy of the game",
+                "Music: Kevin MacLeod (incompetech.com, CC-BY 4.0),",
+                "elerya, Hitctrl, Spring Spring (CC-BY 3.0), neolein (CC0)",
+                "Sounds: Kenney, freesound and OpenGameArt authors",
+                "(CC0, CC-BY): the full list in assets/own/CREDITS.md",
             ]
             .iter()
             .map(|l| (l.as_bytes().to_vec(), Vec::new()))

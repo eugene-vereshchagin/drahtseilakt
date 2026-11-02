@@ -1,6 +1,8 @@
-// Sound: the game's WAV files from the player's copy (Sounds/), mixed in software and played through the system's
-// output (cpal: ALSA on Linux, WASAPI on Windows, CoreAudio on macOS). The game asks for sounds by name, as the
-// original's Wave Player and Play Sound Instance blocks do; without an output device it runs silent.
+// Sound: the game's own sounds and music (assets/own: Ogg Vorbis, CREDITS.md) or the WAV files of the player's copy
+// (Sounds/), mixed in software and played through the system's output (cpal: ALSA on Linux, WASAPI on Windows,
+// CoreAudio on macOS). The game asks for sounds by name, as the original's Wave Player and Play Sound Instance blocks
+// do; our own file of that name plays when our own sounds are chosen (resources.rs). The level's music is decoded
+// ahead on a thread of its own, as our pieces are long. Without an output device the game runs silent.
 
 use crate::assets::Data;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -44,6 +46,113 @@ impl Drop for Audio {
     }
 }
 
+/// A sound by its name: our own (Ogg Vorbis) when our own sounds play and we have it, else the copy's WAV. Our own
+/// music never falls back to the copy's: until the extended mode chooses the original's, only ours plays.
+fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
+    let own = gamedata::resources::own_audio();
+    if own && let Some(path) = own_file(name) {
+        let decoded = read_capped(&path)
+            .ok_or_else(|| "unreadable".to_owned())
+            .and_then(|b| parse_ogg(&b));
+        return match decoded {
+            Ok(s) => Some(Arc::new(s)),
+            Err(e) => {
+                eprintln!("sound {}: {e}", path.display());
+                None
+            }
+        };
+    }
+    if own && name.starts_with("Music_") && !name.eq_ignore_ascii_case("Music_thunder") {
+        return None;
+    }
+    let path = data.file(&format!("Sounds/{name}.wav"))?;
+    // it may come from a level's game folder (a stranger's): read through the cap, never past it
+    let bytes = read_capped(&path)?;
+    match parse_wav(&bytes) {
+        Ok(s) => Some(Arc::new(s)),
+        Err(e) => {
+            eprintln!("sound {}: {e}", path.display());
+            None
+        }
+    }
+}
+
+/// Our own file for a sound's name: Sounds/<name>.ogg or Music/<name>.ogg in assets/own, or the track Music/music.txt
+/// names for it (a line `<name> <file>.ogg`).
+fn own_file(name: &str) -> Option<std::path::PathBuf> {
+    let root = gamedata::resources::own_root()?;
+    let plain = |n: &str| {
+        !n.is_empty()
+            && n.len() <= 96
+            && n.chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+            && !n.starts_with('.')
+    };
+    if !plain(name) {
+        return None;
+    }
+    let is_file = |p: &std::path::Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.is_file());
+    for folder in ["Sounds", "Music"] {
+        let p = root.join(folder).join(format!("{name}.ogg"));
+        if is_file(&p) {
+            return Some(p);
+        }
+    }
+    static TABLE: std::sync::OnceLock<Vec<(String, String)>> = std::sync::OnceLock::new();
+    let table = TABLE.get_or_init(|| {
+        let text = read_capped(&root.join("Music").join("music.txt")).unwrap_or_default();
+        String::from_utf8_lossy(&text)
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+            .filter_map(|l| l.split_once(' '))
+            .map(|(a, b)| (a.trim().to_owned(), b.trim().to_owned()))
+            .filter(|(a, b)| plain(a) && plain(b) && b.ends_with(".ogg"))
+            .take(256)
+            .collect()
+    });
+    let file = &table.iter().find(|(n, _)| n.eq_ignore_ascii_case(name))?.1;
+    let p = root.join("Music").join(file);
+    is_file(&p).then_some(p)
+}
+
+/// The most frames an Ogg Vorbis sound may decode to (ten minutes at 48 kHz).
+const MAX_OGG_FRAMES: usize = 48_000 * 600;
+
+/// Decodes an Ogg Vorbis file (mono or stereo). Our own files are read through the same cap and checks as the
+/// copy's: a malformed or too long file is refused.
+pub fn parse_ogg(bytes: &[u8]) -> Result<Sound, String> {
+    if bytes.len() > MAX_WAV_BYTES {
+        return Err("too large".into());
+    }
+    let mut r = lewton::inside_ogg::OggStreamReader::new(std::io::Cursor::new(bytes))
+        .map_err(|e| e.to_string())?;
+    let (channels, rate) = (r.ident_hdr.audio_channels, r.ident_hdr.audio_sample_rate);
+    if !(1..=2).contains(&channels) || !(1000..=192_000).contains(&rate) {
+        return Err(format!("unsupported: {channels} channels, {rate} Hz"));
+    }
+    let mut frames: Vec<[f32; 2]> = Vec::new();
+    while let Some(packet) = r.read_dec_packet_itl().map_err(|e| e.to_string())? {
+        if channels == 1 {
+            frames.extend(packet.iter().map(|&v| {
+                let x = f32::from(v) / 32768.0;
+                [x, x]
+            }));
+        } else {
+            frames.extend(
+                packet
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|[l, r]| [f32::from(*l) / 32768.0, f32::from(*r) / 32768.0]),
+            );
+        }
+        if frames.len() > MAX_OGG_FRAMES {
+            return Err("too long".into());
+        }
+    }
+    Ok(Sound { frames, rate })
+}
+
 /// The largest WAV file read (the game's longest music part is about 4 MB).
 const MAX_WAV_BYTES: usize = 64 << 20;
 
@@ -57,7 +166,11 @@ fn read_capped(path: &std::path::Path) -> Option<Vec<u8>> {
     }
     let cap = u64::try_from(MAX_WAV_BYTES).ok()?;
     let mut bytes = Vec::new();
-    std::fs::File::open(path).ok()?.take(cap.saturating_add(1)).read_to_end(&mut bytes).ok()?;
+    std::fs::File::open(path)
+        .ok()?
+        .take(cap.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .ok()?;
     (bytes.len() <= MAX_WAV_BYTES).then_some(bytes)
 }
 
@@ -224,11 +337,20 @@ enum Output {
     },
 }
 
+/// A sound decoded ahead: its name and the sound (None if it could not be read).
+type Decoded = (String, Option<Arc<Sound>>);
+
 pub struct Audio {
     output: Output,
     mixer: Arc<Mutex<Mixer>>,
     sounds: HashMap<String, Option<Arc<Sound>>>,
     next: u64,
+    /// Sounds being decoded ahead (by name), and where their decoding thread sends them.
+    pending: std::collections::HashSet<String>,
+    decoded: (
+        std::sync::mpsc::Sender<Decoded>,
+        std::sync::mpsc::Receiver<Decoded>,
+    ),
 }
 
 impl Audio {
@@ -248,6 +370,8 @@ impl Audio {
                 })),
                 sounds: HashMap::new(),
                 next: 1,
+                pending: std::collections::HashSet::new(),
+                decoded: std::sync::mpsc::channel(),
             });
         }
         let device = cpal::default_host().default_output_device()?;
@@ -297,6 +421,8 @@ impl Audio {
             mixer,
             sounds: HashMap::new(),
             next: 1,
+            pending: std::collections::HashSet::new(),
+            decoded: std::sync::mpsc::channel(),
         })
     }
 
@@ -317,23 +443,50 @@ impl Audio {
         self.sounds.clear();
     }
 
-    /// A sound of the game by its file name without `.wav`, loaded once (None if the copy lacks it or it is broken).
+    /// A sound of the game by its name (the original's file name without `.wav`), loaded once: our own when our own
+    /// sounds play and we have it, else the copy's (our own music never falls back to the copy's). None if there is
+    /// none, it is broken, or it is still being decoded ahead.
     fn sound(&mut self, data: &Data, name: &str) -> Option<Arc<Sound>> {
+        while let Ok((n, s)) = self.decoded.1.try_recv() {
+            self.pending.remove(&n);
+            self.sounds.insert(n, s);
+        }
+        if self.pending.contains(name) {
+            return None;
+        }
         self.sounds
             .entry(name.to_owned())
-            .or_insert_with(|| {
-                let path = data.file(&format!("Sounds/{name}.wav"))?;
-                // it may come from a level's game folder (a stranger's): read through the cap, never past it
-                let bytes = read_capped(&path)?;
-                match parse_wav(&bytes) {
-                    Ok(s) => Some(Arc::new(s)),
-                    Err(e) => {
-                        eprintln!("sound {}: {e}", path.display());
-                        None
-                    }
-                }
-            })
+            .or_insert_with(|| load(data, name))
             .clone()
+    }
+
+    /// Decodes these sounds on a thread of their own (the level's music: long pieces), so that none is decoded while
+    /// the game runs; until one is ready it is not played.
+    pub fn preload(&mut self, data: &Data, names: &[String]) {
+        let wanted: Vec<String> = names
+            .iter()
+            .filter(|n| !self.sounds.contains_key(*n) && !self.pending.contains(*n))
+            .cloned()
+            .collect();
+        if wanted.is_empty() {
+            return;
+        }
+        let (send, data) = (
+            self.decoded.0.clone(),
+            Data {
+                root: data.root.clone(),
+                overlay: data.overlay.clone(),
+            },
+        );
+        self.pending.extend(wanted.iter().cloned());
+        std::thread::spawn(move || {
+            for n in wanted {
+                let s = load(&data, &n);
+                if send.send((n, s)).is_err() {
+                    return;
+                }
+            }
+        });
     }
 
     /// Plays a sound once, after `wait` seconds, at a volume (0 to 1). Returns its handle.
@@ -433,6 +586,55 @@ impl Audio {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Our own sounds and music, as shipped in assets/own.
+    fn own() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/own")
+    }
+
+    #[test]
+    fn our_own_sounds_and_music_decode() {
+        let mut n = 0;
+        for folder in ["Sounds", "Music"] {
+            for e in std::fs::read_dir(own().join(folder))
+                .into_iter()
+                .flatten()
+                .flatten()
+            {
+                let p = e.path();
+                if p.extension().is_some_and(|x| x == "ogg") {
+                    let bytes = std::fs::read(&p).unwrap_or_default();
+                    let s = parse_ogg(&bytes).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+                    assert!(!s.frames.is_empty() && s.rate == 44100, "{}", p.display());
+                    n += 1;
+                }
+            }
+        }
+        assert!(n >= 30, "{n} files");
+    }
+
+    #[test]
+    fn a_broken_ogg_is_refused() {
+        let good = std::fs::read(own().join("Sounds/Extra_Hit.ogg")).unwrap_or_default();
+        assert!(parse_ogg(&good).is_ok());
+        assert!(parse_ogg(b"OggS not really").is_err());
+        assert!(
+            parse_ogg(&good[..good.len() / 3]).is_ok()
+                || parse_ogg(&good[..good.len() / 3]).is_err()
+        );
+        assert!(parse_ogg(&[]).is_err());
+    }
+
+    #[test]
+    fn the_music_table_names_our_tracks() {
+        // the table's tracks are all there, and a level's music is found through it
+        let text = std::fs::read_to_string(own().join("Music/music.txt")).unwrap_or_default();
+        for line in text.lines().filter(|l| !l.starts_with('#')) {
+            let (_, file) = line.split_once(' ').unwrap_or_default();
+            assert!(own().join("Music").join(file).is_file(), "{file}");
+        }
+        assert!(text.contains("Music_Theme_1_1 "));
+    }
 
     fn wav(channels: u16, bits: u16, rate: u32, samples: &[u8]) -> Vec<u8> {
         let mut v = b"RIFF\0\0\0\0WAVEfmt ".to_vec();

@@ -25,10 +25,12 @@
 | ball shadow | `Textures/HardShadow.bmp` | 计划中 |
 | skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | 计划中 |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | 计划中 |
-| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | 计划中 |
-| menu sounds | `Sounds/Menu_click, Menu_load` | 计划中 |
-| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | 计划中 |
-| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | 计划中 |
+| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | 自有（assets/own，CREDITS.md） |
+| menu sounds | `Sounds/Menu_click, Menu_load` | 自有（assets/own，CREDITS.md） |
+| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | 自有（assets/own，CREDITS.md） |
+| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | 自有：九首乐曲，Music/music.txt 把它们分配到五个主题；没有氛围部分 |
 | original levels | `3D Entities/Level/Level_NN.NMO` | 计划中 |
 
 自有内容分阶段推出：界面（字体、按钮、分数框、生命球、文字、菜单场景），然后是球、天空、粒子和音效（来自开放素材库），带中国元素、类似麻将游戏风格的音乐，最后是自己的模块和关卡。
+
+音效和音乐：经典模式以及扩展模式中界面选 *own* 时播放我们自己的（assets/own：由 `assets/own/prepare.py` 从自由许可的录音（CC0 或 CC-BY）制作的 Ogg Vorbis；作者和改动见 `assets/own/CREDITS.md`，也显示在 Credits 画面上）；界面选 *original* 或 *remaster* 时播放拷贝中的。我们的音乐从不回退到拷贝中的音乐，缺少的音效会回退。关卡音乐会在单独的线程中预先解码。

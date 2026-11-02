@@ -733,6 +733,8 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Original });
+    // our own sounds and music unless the extended mode chose the original's (or its remaster)
+    gamedata::resources::set_own_audio(!extended || chosen == gamedata::resources::Provider::Own);
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_level(data.level_dir(&o.source).as_deref());
     if let Some(dir) = &o.export {
@@ -1909,6 +1911,8 @@ impl App {
         }
         if self.music.is_none() && sim.tick >= 1 {
             let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64);
+            // the level's music decoded ahead (our pieces are long), then its manager
+            audio.preload(&self.data, &Music::wanted(self.game.music_theme, self.game.last_level));
             self.music = Some(Music::new(self.game.music_theme, self.game.last_level, seed, sim.tick));
         }
         if let Some(m) = &mut self.music {

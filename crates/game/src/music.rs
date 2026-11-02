@@ -4,6 +4,9 @@
 // theme stops, and within 200 of the level's end Music_EndCheckpoint loops; the finish plays Music_Final
 // (Music_LastFinal after the last level). It runs on the game's time, so it waits with the run.
 
+/// A part not there yet (being decoded ahead) is tried again after this many seconds.
+const RETRY: f64 = 1.0;
+
 use crate::assets::Data;
 use crate::audio::Audio;
 use crate::sim::{Sim, TICK};
@@ -37,6 +40,24 @@ const THEME_PAUSE: f64 = 50.0;
 const END_DISTANCE: f32 = 200.0;
 
 impl Music {
+    /// The music a level with theme `theme` may play, to be decoded ahead.
+    pub fn wanted(theme: Option<u32>, last_level: bool) -> Vec<String> {
+        let mut v: Vec<String> = (1..=3).map(|k| format!("Music_Atmo_{k}")).collect();
+        if let Some(n) = theme {
+            v.extend((1..=3).map(|k| format!("Music_Theme_{n}_{k}")));
+        }
+        v.push("Music_EndCheckpoint".to_owned());
+        v.push(
+            if last_level {
+                "Music_LastFinal"
+            } else {
+                "Music_Final"
+            }
+            .to_owned(),
+        );
+        v
+    }
+
     /// The music of a level with theme `theme`; `last_level`: the finish plays the last level's music.
     pub fn new(theme: Option<u32>, last_level: bool, seed: u64, tick: u64) -> Music {
         let mut m = Music {
@@ -84,7 +105,12 @@ impl Music {
         if p.playing.is_none() && p.wait_until.is_some_and(|t| now >= t) {
             let part = 1 + (r.1 * 3.0) as u32 % 3;
             p.playing = audio.play_music(data, &format!("{name}_{part}"));
-            p.wait_until = None;
+            // a part not there (or still being decoded) is tried again a little later
+            p.wait_until = if p.playing.is_some() {
+                None
+            } else {
+                Some(now + RETRY)
+            };
         }
     }
 
