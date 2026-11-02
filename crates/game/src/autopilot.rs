@@ -665,6 +665,9 @@ const EDGE: f32 = 0.3;
 const HOLD: u64 = 18;
 const COAST: u64 = 36;
 
+/// A transformer on the way: its place on the way, where it is, and the ball it makes.
+pub type Gate = (usize, Vec3, crate::sim::BallKind);
+
 pub struct Pilot {
     pub route: Route,
     at: usize,
@@ -677,13 +680,13 @@ pub struct Pilot {
     last: Option<Vec3>,
     /// The tick of the last turn of the view.
     turned: u64,
-    /// The transformers to roll into, in order: their place on the way and where they are; and the next one.
-    gates: Vec<(usize, Vec3)>,
+    /// The transformers to roll into, in order: their place on the way, where they are and the ball they make; and
+    /// the next one.
+    gates: Vec<Gate>,
     gate: usize,
-    /// The ball's kind at the last decision (a change is a transformer gone through), and the tick the last gate
-    /// opened.
+    /// The ball's kind when the last gate opened: a gate opens when the ball has become its kind since (it went
+    /// through), or, already of its kind then, when the ball reaches it (rolling through without a stop).
     kind: Option<crate::sim::BallKind>,
-    opened: u64,
     /// A manoeuvre found while stuck: choices held until their ticks.
     plan: Vec<(u64, u8)>,
     seed: u32,
@@ -693,13 +696,12 @@ pub struct Pilot {
 }
 
 impl Pilot {
-    pub fn new(route: Route, gates: Vec<(usize, Vec3)>) -> Pilot {
+    pub fn new(route: Route, gates: Vec<Gate>) -> Pilot {
         Pilot {
             route,
             gates,
             gate: 0,
             kind: None,
-            opened: 0,
             at: 0,
             choice: 0,
             moved: 0,
@@ -726,7 +728,7 @@ impl Pilot {
                 - (field.get(&node).copied().unwrap_or(FIELD) + across) / SPACING;
         }
         match self.gates.get(self.gate) {
-            Some(&(i, g)) if v > i as f32 - 1.0 => {
+            Some(&(i, g, _)) if v > i as f32 - 1.0 => {
                 (i as f32 - 1.0)
                     - 0.3 * Vec3::new(g.x - p.x, 0.0, g.z - p.z).length()
                     - 0.3 * (g.y - p.y).abs()
@@ -903,20 +905,20 @@ impl Pilot {
             if let Some(i) = self.route.nearest(sim.ball.position, self.until()) {
                 self.at = i;
                 self.gate = self.gates.iter().take_while(|g| g.0 <= i).count();
+                self.kind = Some(sim.ball.kind);
             }
             self.best = f32::NEG_INFINITY;
             self.plan.clear();
         }
         self.last = Some(sim.ball.position);
-        // a transformer gone through (the ball changed) or reached opens its gate
-        // (a change just after the ball reached the gate is that gate's)
-        let changed = self.kind.is_some_and(|k| k != sim.ball.kind) && sim.tick > self.opened + 120;
-        self.kind = Some(sim.ball.kind);
-        if let Some(&(_, g)) = self.gates.get(self.gate)
-            && (changed || g.distance(sim.ball.position) < crate::sim::TRAFO_REACH)
-        {
-            self.gate += 1;
-            self.opened = sim.tick;
+        // the next transformer is gone through: the ball has become its kind, or was its kind already and reached it
+        let had = *self.kind.get_or_insert(sim.ball.kind);
+        if let Some(&(_, g, k)) = self.gates.get(self.gate) {
+            let reached = g.distance(sim.ball.position) < crate::sim::TRAFO_REACH;
+            if sim.ball.kind == k && (had != k || reached) {
+                self.gate += 1;
+                self.kind = Some(sim.ball.kind);
+            }
         }
         // only on the way does the ball get on along it
         let (on, on_way) = self
@@ -938,9 +940,11 @@ impl Pilot {
         if std::env::var_os("AUTOPILOT_TRACE").is_some() {
             let node = self.route.node(sim.ball.position);
             eprintln!(
-                "t {} at {} target {} {:?} here {here:.2} node {:?} field {}",
+                "t {} at {} gate {} kind {:?} target {} {:?} here {here:.2} node {:?} field {}",
                 sim.tick,
                 self.at,
+                self.gate,
+                sim.ball.kind,
                 target,
                 self.route.points.get(target),
                 node.map(|n| (self.route.pts.get(n.0), n.1)),

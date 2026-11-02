@@ -990,7 +990,7 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     let loose: Vec<glam::Vec3> = game.sim.loose().iter().filter_map(|l| at(l.0)).chain(parts).collect();
     let mut kind = game.sim.ball.kind;
     let mut path: Vec<glam::Vec3> = Vec::new();
-    let mut gates: Vec<(usize, glam::Vec3)> = Vec::new();
+    let mut gates: Vec<crate::autopilot::Gate> = Vec::new();
     let mut last: Option<glam::Vec3> = None;
     for line in text.lines().filter(|l| !l.starts_with('#')) {
         let v: Option<Vec<f32>> = line.split_whitespace().map(|x| x.parse().ok()).collect();
@@ -1022,7 +1022,7 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
         path.push(floor);
         let trafo = trafos.iter().find(|t| t.1 != kind && t.0.distance(ball) < crate::sim::TRAFO_REACH);
         if let Some(&(q, k)) = trafo {
-            gates.push((path.len() - 1, q));
+            gates.push((path.len() - 1, q, k));
             kind = k;
         }
     }
@@ -1031,7 +1031,7 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     // `STAGE`, and the gates' are its stages
     const STAGE: f32 = 6.0;
     let mut stages: Vec<glam::Vec3> = Vec::new();
-    let mut gate_stages: Vec<(usize, glam::Vec3)> = Vec::new();
+    let mut gate_stages: Vec<(usize, glam::Vec3, crate::sim::BallKind)> = Vec::new();
     for (i, &p) in path.iter().enumerate() {
         let gate = gates.iter().find(|g| g.0 == i);
         // (by a loose object every place is a stage: how far the player went to push it matters)
@@ -1040,8 +1040,8 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
         if gate.is_some() || i + 1 == path.len() || apart {
             stages.push(p);
         }
-        if let Some(&(_, q)) = gate {
-            gate_stages.push((stages.len() - 1, q));
+        if let Some(&(_, q, kind)) = gate {
+            gate_stages.push((stages.len() - 1, q, kind));
         }
     }
     // a stage the next one comes back from (the track jittered along a straight, or the player overshot and came
@@ -1063,8 +1063,8 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     }
     let start = game.sim.ball.position;
     let route = crate::autopilot::Route::through(&game.level.level, &game.modules, start, &stages);
-    let gates: Vec<(usize, glam::Vec3)> =
-        gate_stages.iter().filter_map(|&(k, q)| route.marks.get(k).map(|&m| (m, q))).collect();
+    let gates: Vec<crate::autopilot::Gate> =
+        gate_stages.iter().filter_map(|&(k, q, kind)| route.marks.get(k).map(|&m| (m, q, kind))).collect();
     let (places, ways) = (path.len(), route.points.len());
     println!("track: {places} places, {} stages, way {ways} points, transformers {gates:?}", stages.len());
     if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
@@ -1094,7 +1094,7 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
     watch.follow = None;
     let mut seen = Game::new(&watch, data)?;
     let mut path: Vec<glam::Vec3> = Vec::new();
-    let mut gates: Vec<(usize, glam::Vec3)> = Vec::new();
+    let mut gates: Vec<crate::autopilot::Gate> = Vec::new();
     let mut lost = false;
     while seen.sim.tick < run.end && !seen.sim.finished && !seen.sim.game_over {
         let before = seen.sim.events.len();
@@ -1103,8 +1103,9 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
             match e {
                 crate::sim::Event::Died => lost = true,
                 crate::sim::Event::NewBall => lost = false,
-                crate::sim::Event::Transform(_) => {
-                    gates.push((path.len(), seen.sim.ball.position - glam::Vec3::Y * crate::sim::BALL_RADIUS))
+                crate::sim::Event::Transform(k) => {
+                    let at = seen.sim.ball.position - glam::Vec3::Y * crate::sim::BALL_RADIUS;
+                    gates.push((path.len(), at, *k))
                 }
                 _ => {}
             }
@@ -1176,8 +1177,17 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
         }
     }
     // the transformers' places on the new way: their gates
-    let gates: Vec<(usize, glam::Vec3)> =
-        route.marks.iter().zip(&waypoints).filter(|(_, w)| w.2).map(|(&m, w)| (m, w.1)).collect();
+    // (each with the ball its transformer makes: the level's transformer at that place)
+    let kind_at = |p: glam::Vec3| {
+        game.sim.trafos().min_by(|a, b| a.0.distance(p).total_cmp(&b.0.distance(p))).map(|t| t.1)
+    };
+    let gates: Vec<crate::autopilot::Gate> = route
+        .marks
+        .iter()
+        .zip(&waypoints)
+        .filter(|(_, w)| w.2)
+        .filter_map(|(&m, w)| Some((m, w.1, kind_at(w.1)?)))
+        .collect();
     println!("transformers on the way: {:?}", gates);
     pilot_run(game, o, crate::autopilot::Pilot::new(route, gates))
 }
