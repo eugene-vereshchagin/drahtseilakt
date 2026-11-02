@@ -32,18 +32,22 @@ target/release/drahtseilakt --data /pfad/zu/Ballance --level 1
 `--data` (oder `OPENBALLANCE_DATA`) ist der Ballance-Ordner. `--level N` spielt Originallevel N, `--map
 FILE.nmo` jede Leveldatei oder Community-Karte, `--open DIR` ein Level im
 [offenen Format](docs/de/drahtseilakt/open-format.md); `--export DIR` wandelt das gewählte Level darin um.
-Pfeiltasten rollen die Kugel relativ zur Kamera, Shift+Links/Rechts drehen die Kamera, Leertaste hebt sie, R
-startet neu, F11 ist Vollbild, Esc öffnet das Menü. Ohne genanntes Level beginnt das Spiel mit dem Hauptmenü
-(Level mit ihren Bestzeiten; eigene Level, Einstellungen und Debug sind vorerst Platzhalter); nach einem
-geschafften Level spielt Enter das nächste.
+Pfeiltasten rollen die Kugel relativ zur Kamera, Shift+Links/Rechts drehen die Kamera, Leertaste hebt sie, F11
+ist Vollbild, Esc pausiert. Ohne genanntes Level beginnt das Spiel mit dem Hauptmenü. Die Menüs sind die des
+Originals ([Menüs](docs/de/drahtseilakt/menu.md)), in den Worten der Kopie: Start (ein Level öffnet sich, sobald
+das vorige geschafft ist), Highscore (zehn Plätze pro Level, in unserem Datenordner), Options, Credits, Exit; Esc
+im Level öffnet das Pausenmenü, ein verlorener Lauf das Tot-Menü, ein geschaffter die Punkte, die Namenseingabe
+für einen neuen Highscore und das Levelende-Menü.
 
 Jeder beendete Lauf wird als Replay gespeichert (unter Linux in
 `~/.local/share/drahtseilakt/replays/<Level>/`, der schnellste als `best.replay`); `--replay FILE` spielt eines
 ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bild. Um eine Stelle zu testen,
 beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
 Stelle, mit `--ball wood|stone|paper`; ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
-Die Lautstärke von Ton und Musik steht auf der Einstellungsseite des Menüs. Zwei Profile, gewählt auf der Profilseite des Menüs: *Klassisch* ist nur das Originalspiel, und nur seine Läufe
-können der beste eines Levels sein; *Erweitert* (oder `--debug`) fügt unsere Werkzeuge hinzu: F2 nimmt eine freie
+Bis der erweiterte Modus eingeschaltet ist (Options, Extended, oder `--debug` für einen Start), ist das Spiel so
+genau wie möglich das Original. Der *erweiterte Modus* öffnet alle Level, zeigt Bestzeiten, die Lautstärke der
+Geräusche neben der Musik und eine Liste Custom levels (jede `.nmo` in `~/.local/share/drahtseilakt/maps/` unter
+Linux) und fügt unsere Werkzeuge hinzu: R startet neu, F2 nimmt eine freie
 Kamera auf, um durch das Level zu fliegen, während der Lauf wartet, `[` und `]` verlangsamen den Lauf und
 beschleunigen ihn wieder (der Lauf selbst bleibt Takt für Takt derselbe), F5 speichert den Moment und F9 kehrt
 dorthin zurück (die Aufzeichnung wird bis dorthin gekürzt, so lässt sich ein langes Level stückweise aufnehmen),

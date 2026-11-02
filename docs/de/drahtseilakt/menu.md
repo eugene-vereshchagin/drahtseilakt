@@ -33,8 +33,8 @@ Persönliche ist der Name in der Highscore-Liste.
 
 - Dieselben Bildschirme, Zeilen, Reihenfolge und Texte wie in der Tabelle, gezeichnet mit den Texturen und
   Schriften der Kopie. Die Texte kommen aus `Language.nmo` der Kopie, die Menüs sprechen also ihre Sprache.
-- **Eine Ergänzung**: Options hat eine fünfte Zeile, *Extended mode* (Yes / No). Das ist der einzige Unterschied,
-  den ein Spieler der Original-Level sieht.
+- **Eine Ergänzung**: Options hat eine vierte Schaltfläche, *Extended*; ihre Seite hat den Schalter *Extended
+  mode?* (Yes / No). Das ist der einzige Unterschied, den ein Spieler der Original-Level sieht.
 - Level werden wie im Original freigeschaltet. Highscores wie im Original: zehn pro Level, Punkte, ein Name. Sie
   beginnen mit den Vorgaben der Kopie und werden in unserem eigenen Datenordner gespeichert, nie in den Dateien
   des Spiels. Die `Database.tdb` des Spielers zu lesen, um alte Punkte zu übernehmen, ist eine spätere Option
@@ -50,7 +50,8 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
 ändert sich:
 
 - **Hauptmenü**: Start, *Custom levels*, Highscore, Options, Credits, Exit.
-- **Options** bekommt eine Seite *Extended* mit Schaltern:
+- **Options**: die Seite *Extended* nennt, was der Modus hinzufügt. Vorerst schaltet der Modus alles zusammen
+  ein; einzelne Schalter kommen als Nächstes:
   - alle Level offen, ohne Freischalten;
   - Bestzeiten neben den Leveln;
   - Übungswerkzeuge: freie Kamera (F2), langsamer und schneller (`[` `]`), den Moment sichern und dorthin zurück
@@ -74,8 +75,12 @@ Profile später als Funktion des erweiterten Modus kommen.
 
 ## Reihenfolge der Arbeit
 
-1. Klassisch als Vorgabe; Hauptmenü und Options wie in der Tabelle; die Zeile *Extended mode*.
-2. Der Pausenbildschirm mit seinen Yes-/No-Fragen; der Tot-Bildschirm; der Levelende-Bildschirm.
-3. Highscores mit Namenseingabe; Freischalten der Level.
-4. Die Schalter der Seite Extended; die Liste Custom levels aus dem Kartenordner.
-5. Einstellungen Graphics und Controls, sobald ihr Verhalten gebaut ist.
+1. Erledigt (2026-11-02): klassisch als Vorgabe; Hauptmenü und Options wie in der Tabelle; die Seite *Extended*.
+2. Erledigt: das Pausenmenü mit seinen Yes-/No-Fragen; das Tot-Menü; das Levelende-Menü.
+3. Erledigt: Highscores mit Namenseingabe; Freischalten der Level.
+4. Die Liste Custom levels aus dem Kartenordner ist erledigt; die einzelnen Schalter der Seite Extended folgen.
+5. Einstellungen Graphics und Controls, sobald ihr Verhalten gebaut ist (jetzt angezeigt, nicht änderbar).
+
+`DRAHTSEILAKT_SHOT_MENU=base:keys` mit `--screenshot` zeichnet ein Menü über das Bild ohne Fenster (base `main`,
+`pause`, `dead` oder `end`; Tasten `u d l r` für die Pfeile, `e` Enter, `b` Esc, `n` die Namenseingabe), um jeden
+Bildschirm anzusehen.

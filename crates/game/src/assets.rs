@@ -126,6 +126,36 @@ impl Data {
             .and_then(|c| nmo::scene::data_array(c).ok())
     }
 
+    /// Every data array of the game file `relative` that `wanted` accepts by name, the file read once.
+    pub fn data_arrays(
+        &self,
+        relative: &str,
+        wanted: impl Fn(&str) -> bool,
+    ) -> Vec<(String, nmo::scene::DataArray)> {
+        let Some(bytes) = self.file(relative).and_then(|p| std::fs::read(p).ok()) else {
+            return Vec::new();
+        };
+        let Ok(file) = nmo::read(&bytes) else {
+            return Vec::new();
+        };
+        let Ok(doc) = nmo::Document::parse(&file) else {
+            return Vec::new();
+        };
+        doc.of_class(nmo::class::DATA_ARRAY)
+            .filter_map(|(_, o)| {
+                let name = String::from_utf8_lossy(&o.name).into_owned();
+                if !wanted(&name) {
+                    return None;
+                }
+                let array = o
+                    .chunk
+                    .as_ref()
+                    .and_then(|c| nmo::scene::data_array(c).ok())?;
+                Some((name, array))
+            })
+            .collect()
+    }
+
     /// The settings row whose level file matches `file_name`; a community map without one takes level 1's.
     pub fn settings(&self, file_name: &str) -> Settings {
         let none = Settings {

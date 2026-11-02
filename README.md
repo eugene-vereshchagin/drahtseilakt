@@ -30,16 +30,20 @@ target/release/drahtseilakt --data /path/to/Ballance --level 1
 `--data` (or `OPENBALLANCE_DATA`) is the Ballance folder. `--level N` plays original level N, `--map FILE.nmo`
 any level file or community map, `--open DIR` a level in the [open format](docs/drahtseilakt/open-format.md);
 `--export DIR` converts the chosen level to it. Arrows roll the ball relative to the camera, Shift+Left/Right
-turn the camera, Space lifts it, R restarts, F11 is full screen, Esc opens the menu. Without a level named the
-game opens with its main menu (levels with their best times; custom levels, settings and debug are placeholders
-for now); after a finished level Enter plays the next.
+turn the camera, Space lifts it, F11 is full screen, Esc pauses. Without a level named the game opens with its
+main menu. The menus are the original's ([menus](docs/drahtseilakt/menu.md)), in the copy's own words: Start
+(a level opens when the one before it is finished), Highscore (ten places a level, kept in our data folder),
+Options, Credits, Exit; Esc in a level opens the pause menu, a lost run the dead menu, a finished one the points,
+the name entry for a new highscore and the end menu.
 
 Every finished run is saved as a replay (on Linux in `~/.local/share/drahtseilakt/replays/<level>/`, the
 fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it without a window, `--screenshot
 FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
 object's name) anywhere, with `--ball wood|stone|paper`; such a run keeps its start in its replay and is never a
-best run. Sound and music volumes are on the menu's Settings page. Two profiles, chosen on the menu's Profile page: *Classic* is the original game only, and only its runs can
-be a level's best; *Extended* (or `--debug`) adds our tools: F2 takes up a free camera to fly through the level
+best run. Until the extended mode is turned on (Options, Extended, or `--debug` for one run) the game is the
+original as closely as it can be. The *extended mode* opens every level, shows best times, the sound volume
+beside the music's and a Custom levels list (every `.nmo` in `~/.local/share/drahtseilakt/maps/` on Linux), and
+adds our tools: R restarts, F2 takes up a free camera to fly through the level
 while the run waits, `[` and `]` slow the run down and speed it up again (the run itself stays the same tick by
 tick), F5 saves the moment and F9 goes back to it (the run's record is cut back to it, so a long level can be
 recorded piece by piece), and the sector and tick are shown. A run helped this way is kept but never the best. For testing, `--autopilot` lets a test player try the level without a window

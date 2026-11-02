@@ -33,8 +33,8 @@ per-player thing is the name in the highscore list.
 
 - The same screens, lines, order and strings as the table above, drawn with the copy's own textures and fonts.
   The strings come from the copy's `Language.nmo`, so the menus speak the copy's language.
-- **One addition**: Options has a fifth line, *Extended mode* (Yes / No). That is the only difference a player of
-  the original levels sees.
+- **One addition**: Options has a fourth button, *Extended*; its page has the switch *Extended mode?* (Yes / No).
+  That is the only difference a player of the original levels sees.
 - Levels unlock as in the original. Highscores are the original's: ten per level, points, a name. They start
   from the copy's defaults and are saved in our own data folder, never in the game's files. Reading the player's
   `Database.tdb` to take over their old scores is a later option (a parser: reviewed like every file reader).
@@ -48,7 +48,8 @@ per-player thing is the name in the highscore list.
 Turned on in Options, or for one run with `--debug`. The menus keep the original's look; what changes:
 
 - **Main menu**: Start, *Custom levels*, Highscore, Options, Credits, Exit.
-- **Options** gets an *Extended* page with switches, each on or off:
+- **Options**: the *Extended* page lists what the mode adds. For now the mode turns all of it on together; a
+  switch for each comes next:
   - all levels open, without unlocking;
   - best times beside the levels;
   - practice tools: free camera (F2), slower and faster (`[` `]`), save the moment and go back to it (F5 / F9),
@@ -71,8 +72,12 @@ later as an extended-mode feature.
 
 ## Order of work
 
-1. Classic by default; the main menu and Options as in the table; the *Extended mode* line.
-2. The pause screen with its Yes / No questions; the dead screen; the end-of-level screen.
-3. Highscores with the name entry; levels unlocking.
-4. The extended page's switches; the custom levels list from the maps folder.
-5. Graphics and Controls settings as their behaviour is built.
+1. Done (2026-11-02): classic by default; the main menu and Options as in the table; the *Extended* page.
+2. Done: the pause menu with its Yes / No questions; the dead menu; the end menu.
+3. Done: highscores with the name entry; levels unlocking.
+4. The custom levels list from the maps folder is done; the extended page's separate switches are next.
+5. Graphics and Controls settings as their behaviour is built (now shown, not changeable).
+
+`DRAHTSEILAKT_SHOT_MENU=base:keys` with `--screenshot` draws a menu over the frame without a window (base `main`,
+`pause`, `dead` or `end`; keys `u d l r` for the arrows, `e` Enter, `b` Esc, `n` the name entry), to look at
+every screen.

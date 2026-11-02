@@ -112,6 +112,28 @@ pub fn of(sim: &Sim) -> Option<Tally> {
     tally(t, sim.points, sim.level_bonus, sim.lives)
 }
 
+/// Ticks the counted points stay on screen before the end menu.
+const LINGER: u64 = 60;
+
+/// The points are counted and have been on screen a moment: the end menu comes.
+pub fn over(sim: &Sim) -> bool {
+    sim.finished
+        && sim
+            .tick
+            .checked_sub(sim.finished_at + END_DELAY + LINGER)
+            .and_then(|t| tally(t, sim.points, sim.level_bonus, sim.lives))
+            .is_some_and(|t| t.done)
+}
+
+/// The run's score as the end screen counts it: the level bonus, the points left and 200 for each life.
+pub fn score(sim: &Sim) -> i64 {
+    total(sim.points, sim.level_bonus, sim.lives)
+}
+
+fn total(points: i64, bonus: i64, lives: u32) -> i64 {
+    bonus + points.max(0) + LIFE * i64::from(lives)
+}
+
 /// The end screen's quads.
 pub fn interface(t: &Tally, font: &Font, screen: Screen) -> Vec<Quad> {
     let quad = |r: [f32; 4], uv: [f32; 4], color: [f32; 4], texture: &'static str| Quad {
@@ -181,6 +203,15 @@ mod tests {
 
     /// The C game's level 1 run sent "End Level" with 969 points, a bonus of 100 and three lives: the numbers it showed
     /// (DUMPTEXT every 10 frames from the message).
+    #[test]
+    fn the_score_is_what_the_tally_ends_on() {
+        let end = (0..2000)
+            .filter_map(|t| tally(t, 969, 100, 3))
+            .find(|t| t.done)
+            .map(|t| t.numbers[3]);
+        assert_eq!(end, Some(total(969, 100, 3)));
+    }
+
     #[test]
     fn the_tally_counts_as_the_c_game_did() {
         let at = |t| tally(t, 969, 100, 3).expect("shown");

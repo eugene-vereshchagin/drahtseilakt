@@ -87,6 +87,8 @@ struct Game {
     /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
     assisted: bool,
     last_level: bool,
+    /// One of the original levels (not a custom map): its runs are kept apart from the custom maps'.
+    original: bool,
     /// The ball's sounds, and what they ask of the sound output since the window last played them.
     ball_sound: BallSound,
     fan_sound: FanSound,
@@ -223,7 +225,8 @@ impl Game {
             music_theme: data.settings(&level.name).music,
             level_bonus,
             assisted: false,
-            last_level: level.name.eq_ignore_ascii_case("Level_12.NMO"),
+            last_level: matches!(o.source, crate::assets::Source::Original(12)),
+            original: matches!(o.source, crate::assets::Source::Original(_)),
             ball_sound: BallSound::default(),
             fan_sound: FanSound::default(),
             sound_out: Vec::new(),
@@ -407,6 +410,12 @@ impl Game {
         self.replay_in = None;
     }
 
+    /// The folder of a level's runs: the original levels' by name, a custom map's under maps/, so that a map named
+    /// like an original level never counts as one.
+    fn runs_dir(&self, stem: &str) -> PathBuf {
+        if self.original { replay_dir().join(stem) } else { replay_dir().join("maps").join(stem) }
+    }
+
     /// Saves a run that did not finish (restarted or closed before the end), so that the falls and the lifts of
     /// the level can be studied later. Named by the time it was saved; the folder is the level's.
     fn save_attempt(&self) {
@@ -419,7 +428,7 @@ impl Game {
             .trim_end_matches(".NMO")
             .trim_end_matches(".nmo")
             .to_owned();
-        let dir = replay_dir().join(&stem);
+        let dir = self.runs_dir(&stem);
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -510,7 +519,7 @@ impl Game {
             .trim_end_matches(".NMO")
             .trim_end_matches(".nmo")
             .to_owned();
-        let dir = replay_dir().join(&stem);
+        let dir = self.runs_dir(&stem);
         let mut targets = vec![dir.join(format!("{}-{}.replay", stem, self.sim.tick))];
         if let Some(r) = &self.record {
             targets.push(r.clone());
@@ -571,9 +580,18 @@ fn settings_path() -> PathBuf {
     replay_dir().parent().map(|d| d.join("settings.txt")).unwrap_or_else(|| PathBuf::from("settings.txt"))
 }
 
+/// The settings file's text: a file larger than any we write is not ours and is ignored; bytes that are not UTF-8
+/// are read as replacement characters, so the other lines still count.
+fn settings_text() -> String {
+    const MAX: u64 = 64 * 1024;
+    let small = std::fs::metadata(settings_path()).is_ok_and(|m| m.len() <= MAX);
+    let bytes = if small { std::fs::read(settings_path()).unwrap_or_default() } else { Vec::new() };
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
 /// The sound and music volumes from the settings file, full where it has none.
 fn load_volumes() -> [f32; 2] {
-    let text = std::fs::read_to_string(settings_path()).unwrap_or_default();
+    let text = settings_text();
     let get = |key: &str| {
         text.lines()
             .filter_map(|l| l.split_once(' '))
@@ -585,22 +603,87 @@ fn load_volumes() -> [f32; 2] {
     [get("sound"), get("music")]
 }
 
-/// The profile saved in the settings: extended (our additions on) or classic (the original only).
-/// While the game is being developed the extended profile is the default: classic only when chosen.
-// TODO(release): make classic the default again.
-fn load_extended() -> bool {
-    let text = std::fs::read_to_string(settings_path()).unwrap_or_default();
-    !text.lines().any(|l| l.trim() == "profile classic")
+/// A value of the settings file ("key value" lines).
+fn setting(key: &str) -> Option<String> {
+    settings_text()
+        .lines()
+        .filter_map(|l| l.split_once(' '))
+        .find(|(k, _)| *k == key)
+        .map(|(_, v)| v.trim().to_owned())
 }
 
-fn save_settings(v: [f32; 2], extended: bool) {
+/// The mode saved in the settings: extended (our additions on) only when chosen, else classic (the original).
+fn load_extended() -> bool {
+    setting("profile").as_deref() == Some("extended")
+}
+
+/// The name last entered for a highscore, in the game's Latin-1.
+fn load_player() -> Vec<u8> {
+    setting("player")
+        .map(|n| n.chars().filter_map(|c| u8::try_from(u32::from(c)).ok()).take(crate::highscore::NAME_MAX).collect())
+        .unwrap_or_default()
+}
+
+/// Saves the settings; the language, which only the file sets, is kept.
+fn save_settings(v: [f32; 2], extended: bool, player: &[u8]) {
     let path = settings_path();
     if let Some(d) = path.parent() {
         let _ = std::fs::create_dir_all(d);
     }
     let profile = if extended { "extended" } else { "classic" };
-    if let Err(e) = std::fs::write(&path, format!("sound {}\nmusic {}\nprofile {profile}\n", v[0], v[1])) {
+    let mut text = format!("sound {}\nmusic {}\nprofile {profile}\n", v[0], v[1]);
+    if !player.is_empty() {
+        text.push_str(&format!("player {}\n", crate::lang::latin1(player)));
+    }
+    if let Some(l) = setting("language") {
+        text.push_str(&format!("language {l}\n"));
+    }
+    if let Err(e) = std::fs::write(&path, text) {
         eprintln!("could not save the settings to {}: {e}", path.display());
+    }
+}
+
+/// The menu `spec` asks for ("base:keys", see `screenshot`).
+fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)) -> Option<Menu> {
+    use crate::menu::Screen;
+    let (base, keys) = spec.split_once(':').unwrap_or((spec, ""));
+    let base = match base {
+        "main" => Screen::Main,
+        "pause" => Screen::Pause,
+        "dead" => Screen::Dead,
+        "end" => Screen::End,
+        _ => return None,
+    };
+    let strings = crate::lang::Strings::load(data, &crate::lang::chosen(setting("language").as_deref()));
+    let number = match o.source {
+        crate::assets::Source::Original(n) => Some(n),
+        _ => None,
+    };
+    let mut m = Menu::new(data, &strings, base, number, o.debug || load_extended());
+    m.resolution = size;
+    m.volumes = load_volumes();
+    for k in keys.chars() {
+        match k {
+            'u' => m.step(-1),
+            'd' => m.step(1),
+            'l' => drop(m.adjust(-1)),
+            'r' => drop(m.adjust(1)),
+            'e' => drop(m.enter()),
+            'b' => drop(m.back()),
+            'n' => m.ask_name(load_player(), crate::endscreen::score(&game.sim)),
+            _ => {}
+        }
+    }
+    Some(m)
+}
+
+/// What the loading screen says is loading.
+fn loading_name(source: &crate::assets::Source) -> String {
+    match source {
+        crate::assets::Source::Original(n) => format!("level {n}"),
+        crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
+            p.file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned())
+        }
     }
 }
 
@@ -700,7 +783,13 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Poll);
     // Without a level named, the window opens with the main menu over the first level.
-    let menu = (!o.chosen && o.replay.is_none()).then(|| Menu::new(&data, 1, false));
+    let strings = crate::lang::Strings::load(&data, &crate::lang::chosen(setting("language").as_deref()));
+    let debug = o.debug || load_extended();
+    let menu = (!o.chosen && o.replay.is_none()).then(|| {
+        let mut m = Menu::new(&data, &strings, crate::menu::Screen::Main, Some(1), debug);
+        m.volumes = load_volumes();
+        m
+    });
     let mut app = App {
         number: match o.source {
             crate::assets::Source::Original(n) => Some(n),
@@ -709,7 +798,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         opts: o.clone(),
         menu,
         loading: None,
-        debug: o.debug || load_extended(),
+        debug,
+        strings,
+        player: load_player(),
         time_scale: 1.0,
         saved: None,
         fly: None,
@@ -1303,6 +1394,15 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     if let (Some(t), Some(f)) = (crate::endscreen::of(&game.sim), game.font.as_ref()) {
         quads.extend(crate::endscreen::interface(&t, f, screen));
     }
+    // DRAHTSEILAKT_SHOT_MENU=base:keys draws a menu over the frame, to look at the menus without a window: base is
+    // main, pause, dead or end, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options.
+    let shot = std::env::var("DRAHTSEILAKT_SHOT_MENU").ok();
+    if let Some(m) = shot.and_then(|spec| shot_menu(&spec, data, game, o, (w, h))) {
+        if !m.over_level() {
+            quads.clear();
+        }
+        quads.extend(m.interface(game.font.as_ref(), screen));
+    }
     r.draw_ui(&view, w, h, &quads);
 
     let row = (4 * w).div_ceil(256) * 256;
@@ -1376,10 +1476,14 @@ struct App {
     number: Option<u32>,
     /// The menu, while it is open; the run is paused under it.
     menu: Option<Menu>,
-    /// A level to load: (its number, whether the loading screen has been drawn).
-    loading: Option<(u32, bool)>,
-    /// Debug mode: F2 takes up the free camera.
+    /// A level to load: (the level, whether the loading screen has been drawn).
+    loading: Option<(crate::assets::Source, bool)>,
+    /// The extended mode: our additions (F2 takes up the free camera, ...).
     debug: bool,
+    /// The copy's words for the menus.
+    strings: crate::lang::Strings,
+    /// The name last entered for a highscore.
+    player: Vec<u8>,
     /// The free camera while it is up (the run waits), and the keys flying it.
     fly: Option<FreeCam>,
     fly_keys: u16,
@@ -1480,11 +1584,15 @@ impl App {
         Ok(())
     }
 
-    /// Loads original level `n` in place of the current one: a new run, its models uploaded anew.
-    fn switch(&mut self, n: u32) -> Result<(), String> {
+    /// Loads a level in place of the current one: a new run, its models uploaded anew.
+    fn switch(&mut self, source: crate::assets::Source) -> Result<(), String> {
         self.game.save_attempt();
         let mut o = self.opts.clone();
-        o.source = crate::assets::Source::Original(n);
+        let number = match source {
+            crate::assets::Source::Original(n) => Some(n),
+            _ => None,
+        };
+        o.source = source;
         (o.replay, o.from, o.sector, o.at, o.ball) = (None, None, None, None, None);
         let mut game = Game::new(&o, &self.data)?;
         game.start_session();
@@ -1495,7 +1603,7 @@ impl App {
         self.rolling = [None; 3 + crate::ballsound::FAN_SLOTS];
         self.heard = 0;
         self.music = None;
-        self.number = Some(n);
+        self.number = number;
         self.prev = None;
         self.keys = 0;
         if let Some(gpu) = &mut self.gpu {
@@ -1596,23 +1704,52 @@ impl App {
         if self.number == Some(n) {
             self.restart();
         } else {
-            self.loading = Some((n, false));
-            if let Some(a) = &mut self.audio {
-                a.play(&self.data, "Menu_load", 1.0, 0.0);
-            }
+            self.load(crate::assets::Source::Original(n));
         }
     }
 
-    fn open_menu(&mut self) {
-        let run = !(self.game.sim.finished || self.game.sim.game_over);
-        let mut menu = Menu::new(&self.data, self.number.unwrap_or(1), run);
-        menu.debug = self.debug;
+    /// Loads a level after the loading screen has been drawn.
+    fn load(&mut self, source: crate::assets::Source) {
+        self.menu = None;
+        self.loading = Some((source, false));
+        if let Some(a) = &mut self.audio {
+            a.play(&self.data, "Menu_load", 1.0, 0.0);
+        }
+    }
+
+    /// Opens the menu with `base` as its first screen: the main menu, or the pause, dead or end menu over the level.
+    fn open_menu(&mut self, base: crate::menu::Screen) {
+        let mut menu = Menu::new(&self.data, &self.strings, base, self.number, self.debug);
         menu.volumes = self.volumes;
+        if let Some(gpu) = &self.gpu {
+            menu.resolution = (gpu.config.width, gpu.config.height);
+        }
         self.menu = Some(menu);
         self.keys = 0;
     }
 
-    fn menu_key(&mut self, code: KeyCode, event_loop: &ActiveEventLoop) {
+    /// A lost run opens the dead menu; a finished one, once its points are counted, the new highscore's name entry
+    /// (an original level, begun at its start and not helped) or the end menu.
+    fn run_over(&mut self) {
+        if self.menu.is_some() || self.loading.is_some() || self.fly.is_some() {
+            return;
+        }
+        // with a saved moment (extended mode) a lost run waits for F9 or R; Esc opens the dead menu
+        if self.game.sim.game_over && !(self.debug && self.saved.is_some()) {
+            self.open_menu(crate::menu::Screen::Dead);
+        } else if crate::endscreen::over(&self.game.sim) {
+            self.open_menu(crate::menu::Screen::End);
+            let counts = self.game.start.is_none() && !self.game.assisted && self.game.replay_in.is_none();
+            let points = crate::endscreen::score(&self.game.sim);
+            if let (Some(m), Some(n), true) = (&mut self.menu, self.number, counts)
+                && m.scores.place(n, points).is_some()
+            {
+                m.ask_name(self.player.clone(), points);
+            }
+        }
+    }
+
+    fn menu_key(&mut self, code: KeyCode, typed: Option<&str>, event_loop: &ActiveEventLoop) {
         // every key the menu takes clicks, as the original's menu sends Menu_Click
         if matches!(code, KeyCode::ArrowUp | KeyCode::ArrowDown | KeyCode::ArrowLeft | KeyCode::ArrowRight | KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape)
             && let Some(a) = &mut self.audio
@@ -1620,6 +1757,14 @@ impl App {
             a.play(&self.data, "Menu_click", 1.0, 0.0);
         }
         let Some(menu) = &mut self.menu else { return };
+        // the name entry takes what is typed
+        if menu.screen() == crate::menu::Screen::Entry && !matches!(code, KeyCode::Enter | KeyCode::NumpadEnter) {
+            match code {
+                KeyCode::Backspace => menu.erase(),
+                _ => menu.typed(typed.unwrap_or_default()),
+            }
+            return;
+        }
         let action = match code {
             KeyCode::ArrowUp => {
                 menu.step(-1);
@@ -1639,38 +1784,53 @@ impl App {
             Action::None => {}
             Action::Continue => self.menu = None,
             Action::Play(n) => self.play(n),
+            Action::Map(path) => self.load(crate::assets::Source::Nmo(path)),
+            Action::Restart => {
+                self.menu = None;
+                self.restart();
+                self.saved = None;
+            }
+            Action::Home => self.open_menu(crate::menu::Screen::Main),
             Action::Quit => event_loop.exit(),
             Action::Volumes(v) => {
                 self.volumes = v;
                 if let Some(a) = &mut self.audio {
                     a.set_volumes(v[0], v[1]);
                 }
-                save_settings(v, self.debug);
+                save_settings(v, self.debug, &self.player);
             }
             Action::ToggleDebug => {
                 self.debug = !self.debug;
-                save_settings(self.volumes, self.debug);
+                save_settings(self.volumes, self.debug, &self.player);
                 if !self.debug {
                     self.time_scale = 1.0;
                     self.saved = None;
-                }
-                if !self.debug {
                     self.fly = None;
                 }
                 if let Some(m) = &mut self.menu {
-                    m.debug = self.debug;
+                    m.set_debug(self.debug, &self.data);
+                }
+            }
+            Action::Score(name) => {
+                self.player = name.clone();
+                save_settings(self.volumes, self.debug, &self.player);
+                if let Some(m) = &mut self.menu {
+                    let mut scores = m.scores.clone();
+                    scores.insert(m.level, &name, m.points);
+                    scores.save();
+                    m.show_scores(scores);
                 }
             }
         }
     }
 
-    fn key(&mut self, code: KeyCode, down: bool, event_loop: &ActiveEventLoop) {
+    fn key(&mut self, code: KeyCode, down: bool, typed: Option<&str>, event_loop: &ActiveEventLoop) {
         if self.loading.is_some() {
             return;
         }
         if self.menu.is_some() {
             if down {
-                self.menu_key(code, event_loop);
+                self.menu_key(code, typed, event_loop);
             }
             return;
         }
@@ -1713,19 +1873,13 @@ impl App {
             KeyCode::ArrowRight => input::RIGHT,
             KeyCode::ShiftLeft | KeyCode::ShiftRight => input::SHIFT,
             KeyCode::Space => input::LIFT,
-            KeyCode::Escape if down => {
-                self.open_menu();
+            // the run waits under the pause menu; a finished or lost run has its own menu
+            KeyCode::Escape if down && !self.game.sim.finished => {
+                let lost = self.game.sim.game_over;
+                self.open_menu(if lost { crate::menu::Screen::Dead } else { crate::menu::Screen::Pause });
                 return;
             }
-            KeyCode::Enter | KeyCode::NumpadEnter if down && self.game.sim.finished => {
-                // The next level, or the menu after the last one.
-                match self.number.map(|n| n + 1).filter(|&n| n <= crate::menu::LEVELS) {
-                    Some(n) if self.data.file(&format!("3D Entities/Level/Level_{n:02}.NMO")).is_some() => self.play(n),
-                    _ => self.open_menu(),
-                }
-                return;
-            }
-            KeyCode::KeyR if down => {
+            KeyCode::KeyR if down && self.debug => {
                 self.restart();
                 self.saved = None;
                 0
@@ -1787,17 +1941,16 @@ impl App {
         self.acc = (self.acc + (now - self.last).as_secs_f32() * self.time_scale).min(0.25);
         self.last = now;
         // A level to load is loaded after a frame that says so; the run waits while the menu is open.
-        if let Some((n, drawn)) = self.loading {
-            if drawn {
-                self.loading = None;
-                if let Err(e) = self.switch(n) {
+        match self.loading.take() {
+            Some((source, true)) => {
+                if let Err(e) = self.switch(source) {
                     eprintln!("drahtseilakt: {e}");
-                    self.open_menu();
+                    self.open_menu(crate::menu::Screen::Main);
                 }
                 self.acc = 0.0;
-            } else {
-                self.loading = Some((n, true));
             }
+            Some((source, false)) => self.loading = Some((source, true)),
+            None => {}
         }
         if let Some(c) = &mut self.fly {
             // the run waits while the free camera is up
@@ -1816,6 +1969,7 @@ impl App {
             ticks += 1;
         }
         let simulated = started.elapsed();
+        self.run_over();
         if let Some(a) = &mut self.audio {
             a.pass(f64::from(ticks) * f64::from(TICK));
         }
@@ -1840,7 +1994,8 @@ impl App {
         let view = frame.texture.create_view(&Default::default());
         let build_started = Instant::now();
         // With a menu up, the original's menu scene is behind it, its camera going round
-        let menu_scene = self.menu_scene.as_mut().filter(|m| m.model.is_some() && (self.menu.is_some() || self.loading.is_some()));
+        let menu_up = self.menu.as_ref().is_some_and(|m| !m.over_level()) || self.loading.is_some();
+        let menu_scene = self.menu_scene.as_mut().filter(|m| m.model.is_some() && menu_up);
         let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
             self.menu_ms = (self.menu_ms + step * 1000.0) % crate::menuscene::ROUND_MS;
             ms.effects.tick_menu(step * 1000.0);
@@ -1876,13 +2031,13 @@ impl App {
             &view,
             gpu.config.width,
             gpu.config.height,
-            &match (&self.menu, self.loading) {
+            &match (&self.menu, &self.loading) {
                 // with the game's font the menus are the original's (drawn below), else the prototype's
                 (_, Some(_)) | (Some(_), None) if self.game.font.is_some() => Vec::new(),
-                (_, Some((n, _))) => {
-                    Menu::new(&self.data, n, false).overlay(gpu.config.width, gpu.config.height, Some(n))
+                (_, Some((source, _))) => {
+                    Menu::loading_overlay(gpu.config.width, gpu.config.height, &loading_name(source))
                 }
-                (Some(m), None) => m.overlay(gpu.config.width, gpu.config.height, None),
+                (Some(m), None) => m.overlay(gpu.config.width, gpu.config.height),
                 (None, None) => {
                     let mut o = crate::hud::overlay(
                         &self.game.sim,
@@ -1909,10 +2064,18 @@ impl App {
         );
         let screen = crate::ui::Screen { w: gpu.config.width as f32, h: gpu.config.height as f32 };
         let font = self.game.font.as_ref();
-        let quads = match (&self.menu, self.loading) {
-            (_, Some((n, _))) if font.is_some() => Menu::new(&self.data, n, false).interface(font, screen, Some(n)),
-            (Some(m), None) if font.is_some() => m.interface(font, screen, None),
-            (None, None) => {
+        let quads = match (&self.menu, &self.loading, font) {
+            (_, Some((source, _)), Some(f)) => Menu::loading_interface(f, screen, &loading_name(source)),
+            (Some(m), None, Some(_)) => {
+                // over a level its points and lives stay in view, as the original's pause shows them
+                let mut q = Vec::new();
+                if m.over_level() {
+                    q = crate::hud::interface(&self.game.sim, font, screen);
+                }
+                q.extend(m.interface(font, screen));
+                q
+            }
+            (None, None, _) => {
                 let mut q = crate::hud::interface(&self.game.sim, font, screen);
                 if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
                     q.extend(crate::endscreen::interface(&t, f, screen));
@@ -1994,6 +2157,7 @@ impl ApplicationHandler for App {
                         physical_key: PhysicalKey::Code(code),
                         state,
                         repeat: false,
+                        text,
                         ..
                     },
                 ..
@@ -2006,7 +2170,7 @@ impl ApplicationHandler for App {
                 if !down {
                     self.held.remove(&code);
                 }
-                self.key(code, down, event_loop)
+                self.key(code, down, text.as_deref(), event_loop)
             }
             WindowEvent::RedrawRequested => self.frame(),
             // a key let go while the window was not ours may never be reported released
