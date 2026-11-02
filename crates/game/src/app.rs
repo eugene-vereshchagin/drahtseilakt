@@ -94,6 +94,8 @@ struct Game {
     /// Where the level's runs are kept: the original levels' in replays/, a custom level's under replays/maps/ in its
     /// folder's name (community, open, remastered), so no two kinds share runs.
     runs_root: PathBuf,
+    /// The level's name as shown (the window's title): a custom level's title, capped (package.rs), else its file's.
+    shown_name: String,
     /// The ball's sounds, and what they ask of the sound output since the window last played them.
     ball_sound: BallSound,
     fan_sound: FanSound,
@@ -238,12 +240,10 @@ impl Game {
             level_bonus,
             assisted: false,
             last_level: level.level.settings.last_level,
-            runs_root: match &o.source {
-                crate::assets::Source::Original(_) => replay_dir(),
-                crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
-                    let kind = p.parent().and_then(|d| d.file_name()).map_or_else(|| "other".into(), |n| n.to_owned());
-                    replay_dir().join("maps").join(kind)
-                }
+            runs_root: runs_root(&o.source),
+            shown_name: match &o.source {
+                crate::assets::Source::Original(_) => level.name.clone(),
+                crate::assets::Source::Nmo(_) | crate::assets::Source::Open(_) => loading_name(&o.source),
             },
             ball_sound: BallSound::default(),
             fan_sound: FanSound::default(),
@@ -584,7 +584,7 @@ impl Game {
         };
         format!(
             "Drahtseilakt — {}   points {}   lives {}   sector {}   tick {}   {}{state}",
-            self.level.name,
+            self.shown_name,
             s.points,
             s.lives,
             s.sector + 1,
@@ -753,12 +753,43 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
     Some(m)
 }
 
-/// What the loading screen says is loading.
+/// What the loading screen says is loading: a custom level's title, capped like the menu's (package.rs).
 fn loading_name(source: &crate::assets::Source) -> String {
     match source {
         crate::assets::Source::Original(n) => format!("level {n}"),
         crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
-            p.file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned())
+            gamedata::package::title_of(p, &custom_roots()).replace('…', "...")
+        }
+    }
+}
+
+/// The custom levels' folders (all but the original's).
+fn custom_roots() -> Vec<PathBuf> {
+    crate::levels::KINDS
+        .into_iter()
+        .filter(|&k| k != crate::levels::Kind::Original)
+        .map(crate::levels::dir)
+        .collect()
+}
+
+/// Where a level's runs are kept: the original levels' in replays/, a custom level's under replays/maps/<kind>/, a
+/// level folder's (levels.md, "A level is a folder") in a folder of its own there, so that two folders' levels of
+/// one file name (Level_07.NMO of two collections) keep their runs apart.
+fn runs_root(source: &crate::assets::Source) -> PathBuf {
+    let maps = replay_dir().join("maps");
+    let name = |p: &Path| p.file_name().map(std::ffi::OsStr::to_owned);
+    match source {
+        crate::assets::Source::Original(_) => replay_dir(),
+        crate::assets::Source::Nmo(p) => {
+            let folder = p.parent();
+            let kind = folder.and_then(Path::parent).filter(|k| custom_roots().iter().any(|r| r == k));
+            match (kind.and_then(name), folder.and_then(name)) {
+                (Some(kind), Some(folder)) => maps.join(kind).join(folder),
+                _ => maps.join(folder.and_then(name).unwrap_or_else(|| "other".into())),
+            }
+        }
+        crate::assets::Source::Open(p) => {
+            maps.join(p.parent().and_then(name).unwrap_or_else(|| "other".into()))
         }
     }
 }

@@ -11,6 +11,7 @@ use crate::hud::{Rect, text, width};
 use crate::lang::{Strings, latin1};
 use crate::levels::Kind;
 use crate::options::{Bindings, Fullscreen, Graphics};
+use gamedata::package::Package;
 use std::path::{Path, PathBuf};
 
 /// The original game's levels: 1 to 12, and 13 of the add-on when the copy has it.
@@ -167,11 +168,10 @@ pub struct Menu {
     /// The screens open, the first the menu's base, each with its chosen line.
     stack: Vec<(Screen, usize)>,
     pub entries: Vec<Entry>,
-    /// The custom levels shown: the levels and the folders holding more of them, in the folder open (the levels
-    /// folders' tops when none is).
-    pub maps: Vec<PathBuf>,
-    /// The folders opened in the custom levels, innermost last.
-    folder: Vec<PathBuf>,
+    /// The custom levels shown: the levels of the kind's folder, by title (levels.md, "A level is a folder").
+    pub maps: Vec<Package>,
+    /// The kind's folder the custom levels come from.
+    folder: Option<PathBuf>,
     /// The extended mode and its additions.
     pub features: Features,
     pub volumes: [f32; 2],
@@ -223,7 +223,7 @@ impl Menu {
             stack: Vec::new(),
             entries,
             maps: Vec::new(),
-            folder: Vec::new(),
+            folder: None,
             features,
             volumes: [1.0; 2],
             strings: strings.clone(),
@@ -477,7 +477,7 @@ impl Menu {
                 Some(&kind) => {
                     let root = crate::levels::dir(kind);
                     self.maps = maps_in(&root);
-                    self.folder = vec![root];
+                    self.folder = Some(root);
                     open(self, Screen::Custom)
                 }
                 None => Action::None,
@@ -506,15 +506,7 @@ impl Menu {
                 Some(e) if e.available && e.open => Action::Play(e.number),
                 _ => Action::None,
             },
-            Line::Map(i) => match self.maps.get(i).cloned() {
-                Some(p) if is_folder(&p) => {
-                    self.maps = maps_in(&p);
-                    self.folder.push(p);
-                    self.set_chosen(0);
-                    Action::None
-                }
-                p => p.map_or(Action::None, Action::Map),
-            },
+            Line::Map(i) => self.maps.get(i).map_or(Action::None, |p| Action::Map(p.level.clone())),
             Line::Mode => Action::ToggleDebug,
             Line::Interface => Action::Interface(next_provider(1)),
             Line::SoundTheme => Action::SoundTheme(next_theme(1)),
@@ -554,17 +546,9 @@ impl Menu {
             Screen::Pause => Action::Continue,
             Screen::Main | Screen::Dead | Screen::End | Screen::Entry => Action::None,
             Screen::Highscore if self.after_entry => self.enter(),
-            // out of a folder of custom levels, onto the folder left (out of the kind's own folder: off the screen)
-            Screen::Custom if self.folder.len() > 1 => {
-                let left = self.folder.pop();
-                self.maps = self.folder.last().map(|f| maps_in(f)).unwrap_or_default();
-                let at = self.maps.iter().position(|p| Some(p) == left.as_ref()).unwrap_or(0);
-                self.set_chosen(at);
-                Action::None
-            }
             _ => {
                 if self.screen() == Screen::Custom {
-                    self.folder.clear();
+                    self.folder = None;
                 }
                 self.pop();
                 Action::None
@@ -674,7 +658,7 @@ impl Menu {
     }
 
     /// The mode and what depends on it set; each open screen keeps its chosen line, wherever the lines move to.
-    fn apply_mode(&mut self, features: Features, entries: Vec<Entry>, maps: Vec<PathBuf>) {
+    fn apply_mode(&mut self, features: Features, entries: Vec<Entry>, maps: Vec<Package>) {
         let chosen: Vec<Option<Line>> = self
             .stack
             .iter()
@@ -682,7 +666,7 @@ impl Menu {
             .collect();
         self.entries = entries;
         self.maps = maps;
-        self.folder.clear();
+        self.folder = None;
         self.features = features;
         for k in 0..self.stack.len() {
             let Some(&(sc, i)) = self.stack.get(k) else {
@@ -735,22 +719,10 @@ impl Menu {
                     &format!("Level {n}"),
                 )
             }
-            // the file name in the font's Latin-1, what it lacks as '?'; an open-format level (a folder) says which
-            // folder it is in, as an original level converted there is named like the original
+            // the level's title (cleaned and capped, package.rs) in the font's Latin-1, what it lacks as '?'
             Line::Map(i) => self
-                .maps
-                .get(i)
-                .map(|p| {
-                    let name = p
-                        .file_stem()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_default();
-                    // the screen's title says which kind of levels; a folder of more levels ends in "/"
-                    let name = if is_folder(p) { format!("{name}/") } else { name };
-                    name.chars()
-                        .map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?'))
-                        .collect()
-                })
+                .map_text(i)
+                .map(|t| t.chars().map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?')).collect())
                 .unwrap_or_default(),
             Line::Music => s.get("Menu_Opt_Sound Volume", "Music Volume"),
             Line::Effects => s.ours("sound volume"),
@@ -780,11 +752,9 @@ impl Menu {
         }
     }
 
-    /// A custom level's name as it is (any script), a folder's ending in "/".
+    /// A custom level's title as it is (any script), a cut one's "…" as "..." (the game's font has no "…").
     fn map_text(&self, i: usize) -> Option<String> {
-        let p = self.maps.get(i)?;
-        let name = p.file_stem()?.to_string_lossy().into_owned();
-        Some(if is_folder(p) { format!("{name}/") } else { name })
+        self.maps.get(i).map(|p| p.title.replace('…', "..."))
     }
 
     /// A switch's row: its label and yes or no.
@@ -813,7 +783,7 @@ impl Menu {
             Screen::Extended => b"Extended".to_vec(),
             Screen::Debug => b"Debug mode".to_vec(),
             Screen::Kinds => b"Levels".to_vec(),
-            Screen::Custom => match self.folder.first().and_then(|root| {
+            Screen::Custom => match self.folder.as_ref().and_then(|root| {
                 LEVEL_KINDS.iter().position(|&k| crate::levels::dir(k) == *root)
             }) {
                 Some(k) => self.label(Line::Kind(k)),
@@ -958,7 +928,7 @@ impl Menu {
                 (b"No levels here yet. Put them into".to_vec(), Vec::new()),
                 (
                     self.folder
-                        .first()
+                        .as_ref()
                         .and_then(|f| f.file_name())
                         .map(|n| format!("levels/{}/", n.to_string_lossy()))
                         .unwrap_or_default()
@@ -1126,8 +1096,17 @@ impl Menu {
                     let k2 = (avail / wa.max(wb)).min(half / tall(&quads).max(1e-6)).min(1.0);
                     let mid = (frame[1] + frame[3]) / 2.0;
                     let st = scaled(k2.max(WRAP_SHRINK));
-                    quads = f.layout(&a, [frame[0], frame[1], frame[2], mid], &st);
-                    quads.extend(f.layout(&b, [frame[0], mid, frame[2], frame[3]], &st));
+                    // each line still too wide at the smallest size loses its middle to ".."
+                    let fit = |mut text: Vec<u8>, r: [f32; 4]| {
+                        let mut q = f.layout(&text, r, &st);
+                        while wide(&q) > avail && text.len() > 4 {
+                            text = shorten(&text);
+                            q = f.layout(&text, r, &st);
+                        }
+                        q
+                    };
+                    quads = fit(a, [frame[0], frame[1], frame[2], mid]);
+                    quads.extend(fit(b, [frame[0], mid, frame[2], frame[3]]));
                 } else {
                     let st = scaled(k.max(SHRINK));
                     let mut text = t.to_vec();
@@ -1258,38 +1237,49 @@ impl Menu {
                         _ => None,
                     };
                     if let Some(t) = text {
-                        let t: String = if t.chars().count() > 48 {
-                            t.chars().take(46).chain("..".chars()).collect()
-                        } else {
-                            t
-                        };
                         // clear of the button's ball at its left
                         let frame = crate::ui::homogeneous([0.42, y, 0.615, y + 0.04]);
                         let height = font
                             .and_then(|f| f.layout(b"A", frame, &FONT_03).first().map(|q| q.rect[3] - q.rect[1]))
                             .unwrap_or((frame[3] - frame[1]) * 0.5);
-                        // as the game font's labels: a little smaller to fit, else two lines
+                        // as the game font's labels: a little smaller to fit, else two lines (at the space nearest
+                        // the middle, or the middle letter for a script without spaces), and what still does not
+                        // fit loses letters to ".."
                         let (al, co) = (FONT_03.align, FONT_03.color);
                         let span = |q: &[Quad]| {
                             q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max)
                                 - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
                         };
                         let avail = frame[2] - frame[0];
+                        let fit = |t: &str, r: [f32; 4], h: f32| {
+                            let mut chars: Vec<char> = t.chars().collect();
+                            let mut q = crate::fallback::layout(t, r, h, al, co);
+                            while span(&q) > avail && chars.len() > 3 {
+                                chars.truncate(chars.len() - 1);
+                                let cut: String = chars.iter().collect::<String>().trim_end().to_owned() + "..";
+                                q = crate::fallback::layout(&cut, r, h, al, co);
+                            }
+                            q
+                        };
                         let mut quads = crate::fallback::layout(&t, frame, height, al, co);
                         let w = span(&quads);
                         if w > avail && avail > 0.0 {
                             let k = avail / w;
-                            let words: Vec<&str> = t.split(' ').collect();
-                            if k >= FIT_SHRINK || words.len() < 2 {
-                                quads = crate::fallback::layout(&t, frame, height * k.max(SHRINK), al, co);
+                            let chars: Vec<char> = t.chars().collect();
+                            if k >= FIT_SHRINK || chars.len() < 4 {
+                                quads = fit(&t, frame, height * k.max(SHRINK));
                             } else {
-                                let half = words.len() / 2;
-                                let (a, b) = (words[..half].join(" "), words[half..].join(" "));
-                                let mid = (frame[1] + frame[3]) / 2.0;
+                                let mid = chars.len() / 2;
+                                let at = (1..chars.len())
+                                    .filter(|&i| chars.get(i) == Some(&' '))
+                                    .min_by_key(|&i| i.abs_diff(mid))
+                                    .unwrap_or(mid);
+                                let a: String = chars.iter().take(at).collect();
+                                let b: String = chars.iter().skip(at).collect();
+                                let ymid = (frame[1] + frame[3]) / 2.0;
                                 let h = height * WRAP_SHRINK.max(0.5);
-                                quads = crate::fallback::layout(&a, [frame[0], frame[1], frame[2], mid], h, al, co);
-                                let at = [frame[0], mid, frame[2], frame[3]];
-                                quads.extend(crate::fallback::layout(&b, at, h, al, co));
+                                quads = fit(a.trim(), [frame[0], frame[1], frame[2], ymid], h);
+                                quads.extend(fit(b.trim(), [frame[0], ymid, frame[2], frame[3]], h));
                             }
                         }
                         out.extend(crate::ui::place(quads, screen, Anchor::Center));
@@ -1643,49 +1633,16 @@ fn interface_value() -> Vec<u8> {
 /// The kinds of levels the extended mode offers, in the menu's order (levels.md).
 const LEVEL_KINDS: [Kind; 4] = [Kind::Original, Kind::Remastered, Kind::Community, Kind::Open];
 
-/// How deep folders of custom levels may go (a map collection sorted by kind, season and map).
-const FOLDER_DEPTH: u32 = 4;
-
-/// A folder of levels to open, not a level: a folder that is not an open-format level.
-fn is_folder(p: &Path) -> bool {
-    p.is_dir() && !p.join("level.gltf").is_file()
-}
-
-/// A hidden file or folder (its name begins with a dot): never shown (the toolbox keeps its parts in one).
-fn hidden(p: &Path) -> bool {
-    p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with('.'))
-}
-
-fn is_level(p: &Path) -> bool {
-    let nmo = p.is_file() && p.extension().is_some_and(|x| x.eq_ignore_ascii_case("nmo"));
-    nmo || (p.is_dir() && p.join("level.gltf").is_file())
-}
-
-/// The folder holds a level, itself or in its folders (`depth` deep at most).
-fn holds_levels(dir: &Path, depth: u32) -> bool {
-    let Ok(d) = std::fs::read_dir(dir) else {
-        return false;
-    };
-    d.flatten().take(4096).map(|e| e.path()).any(|p| {
-        is_level(&p) || (depth > 0 && p.is_dir() && !p.is_symlink() && holds_levels(&p, depth - 1))
-    })
-}
-
-/// A folder's levels by name: `.nmo` files and folders holding an open-format level (level.gltf), then by name the
-/// folders holding more levels.
-fn maps_in(dir: &Path) -> Vec<PathBuf> {
-    let Ok(d) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-    let all: Vec<PathBuf> = d.flatten().map(|e| e.path()).filter(|p| !hidden(p)).take(4096).collect();
-    let mut levels: Vec<PathBuf> = all.iter().filter(|p| is_level(p)).cloned().collect();
-    let mut folders: Vec<PathBuf> = all
-        .into_iter()
-        .filter(|p| is_folder(p) && !p.is_symlink() && holds_levels(p, FOLDER_DEPTH))
-        .collect();
-    levels.sort();
-    folders.sort();
-    levels.extend(folders);
+/// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
+/// it; folders that hold no level or several are not shown, and said so on the console.
+fn maps_in(dir: &Path) -> Vec<Package> {
+    let (levels, skipped) = gamedata::package::scan(dir);
+    if !skipped.is_empty() {
+        eprintln!("{}: {} folders are not levels (a level folder holds one level):", dir.display(), skipped.len());
+        for s in skipped.iter().take(10) {
+            eprintln!("  {s}");
+        }
+    }
     levels
 }
 
@@ -1695,32 +1652,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn custom_levels_open_and_leave_their_folders() {
+    fn custom_levels_are_a_flat_list_of_level_folders() {
         let root = std::env::temp_dir().join(format!("drahtseilakt-menu-{}", std::process::id()));
         let season = root.join("Pro Racing").join("Season 1");
         std::fs::create_dir_all(&season).unwrap();
         std::fs::create_dir_all(root.join("Empty")).unwrap();
+        std::fs::create_dir_all(root.join("Zeta")).unwrap();
         std::fs::write(season.join("Track.nmo"), b"").unwrap();
+        std::fs::write(root.join("Zeta/Level_07.NMO"), b"").unwrap();
+        std::fs::write(root.join("Zeta/level.txt"), b"title = Alpha Road\n").unwrap();
         std::fs::write(root.join("Alone.NMO"), b"").unwrap();
+        std::fs::write(root.join("pack.tar.gz"), b"").unwrap();
         let mut m = menu(&[true], true);
-        // inside a folder already, as the tops are the player's own level folders
-        m.folder.push(root.clone());
+        m.folder = Some(root.clone());
         m.maps = maps_in(&root);
         m.stack.push((Screen::Custom, 0));
-        // the levels first, then the folders holding levels; an empty folder is not shown
-        assert_eq!(m.maps, vec![root.join("Alone.NMO"), root.join("Pro Racing")]);
-        assert_eq!(m.label(Line::Map(1)), b"Pro Racing/".to_vec());
+        // by title; no folders to open, nested levels and junk not shown
+        let titles: Vec<Vec<u8>> = (0..m.maps.len()).map(|i| m.label(Line::Map(i))).collect();
+        assert_eq!(titles, [b"Alone".to_vec(), b"Alpha Road".to_vec()]);
+        assert_eq!(m.enter(), Action::Map(root.join("Alone.NMO")));
         m.set_chosen(1);
-        assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.maps, vec![root.join("Pro Racing").join("Season 1")]);
-        m.enter();
-        assert_eq!(m.maps, vec![season.join("Track.nmo")]);
-        assert_eq!(m.enter(), Action::Map(season.join("Track.nmo")));
-        // Esc goes back up a folder at a time, onto the folder left, and then leaves the screen
+        assert_eq!(m.enter(), Action::Map(root.join("Zeta/Level_07.NMO")));
+        // Esc leaves the screen at once
         m.back();
-        m.back();
-        assert_eq!((m.chosen(), m.folder.len()), (1, 1));
-        assert_eq!(m.maps[1], root.join("Pro Racing"));
+        assert_ne!(m.screen(), Screen::Custom);
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -1738,7 +1693,7 @@ mod tests {
                 })
                 .collect(),
             maps: Vec::new(),
-            folder: Vec::new(),
+            folder: None,
             features: Features::new(extended),
             volumes: [1.0; 2],
             strings: Strings::default(),
@@ -1999,7 +1954,7 @@ mod tests {
     }
 
     #[test]
-    fn maps_are_the_nmo_files_of_the_folder() {
+    fn maps_are_the_level_files_and_folders_of_the_folder() {
         let dir = std::env::temp_dir().join(format!("drahtseilakt-maps-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         for f in ["b.NMO", "a.nmo", "c.txt"] {
@@ -2010,7 +1965,7 @@ mod tests {
         std::fs::create_dir_all(dir.join("empty")).unwrap();
         let names: Vec<_> = maps_in(&dir)
             .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .map(|p| p.level.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(names, ["a.nmo", "b.NMO", "open level"]);

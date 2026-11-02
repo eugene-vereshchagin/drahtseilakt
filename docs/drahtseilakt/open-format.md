@@ -13,6 +13,8 @@ A folder holding:
 - `level.bin` — its binary buffer (the only buffer, referenced by that name);
 - `textures/NNNN_name.png` — one image per texture; an image's `uri` must name a plain file directly in `textures/`
   (no further folders), else the level is refused;
+- `level.txt` (optional) — its title, author and version as `key = value` lines; a level in `levels/` is a folder
+  holding one level, named by this title ([levels.md](levels.md), "A level is a folder");
 - `game/` — the game's files the level uses, by their paths in the player's copy, so that it plays without the
   copy's level files: its parts in this same open format, each a folder named by its file without `.nmo`
   (`game/3D Entities/Balls/`, `game/3D Entities/AnimTrafo/`, `game/3D Entities/PH/P_Box/`...: the balls, the

@@ -20,13 +20,18 @@ pub fn prepare(language: &str) {
         if here != default {
             write(&default, &moved(language, &here), true);
         }
-        // a folder moved back replaces the README that pointed away (ours, with its marker), never anyone else's
+        // a folder moved back replaces the README that pointed away (ours, with its marker), and an earlier version
+        // of ours is brought up to date; never anyone else's
         let readme = here.join(README);
         let small = std::fs::metadata(&readme).is_ok_and(|m| m.len() < 4096);
-        let pointed =
-            small && std::fs::read_to_string(&readme).is_ok_and(|t| t.ends_with(MOVED_MARK));
-        write(&here, &about(language, kind), pointed);
+        let replace = small && std::fs::read_to_string(&readme).is_ok_and(|t| outdated(&t));
+        write(&here, &about(language, kind), replace);
     }
+}
+
+/// A README of ours that a newer text replaces: one that pointed to a moved folder, or an earlier version's, untouched.
+fn outdated(text: &str) -> bool {
+    text.ends_with(MOVED_MARK) || SUPERSEDED.contains(&text)
 }
 
 /// Writes `text` as the folder's README, making the folder; an existing README is replaced only when `replace`.
@@ -65,14 +70,19 @@ fn about(language: &str, kind: Kind) -> String {
              сначала установите дополнение SuDu в свою игру, как сказано в его readme.\n"
         }
         ("ru", Kind::Community) => {
-            "Любительские карты (.nmo), играются в расширенном режиме (Options, Extended).\n\nГде брать: каталог \
-             github.com/pseudoacetyl/BallanceCustomMaps (список карт и ссылки на файлы), Ballance International \
-             Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nКарты запускаются как данные; моды и DLL игра никогда \
-             не выполняет.\n"
+            "Любительские карты, играются в расширенном режиме (Options, Extended).\n\nКаждый уровень — папка здесь \
+             с одним уровнем: один файл .nmo или уровень в открытом формате (level.gltf, level.bin, textures/ — его \
+             легко поправить). Рядом по желанию: level.txt со строками title = ..., author = ..., version = ... \
+             (в меню показывается title, до 40 знаков; без него — имя папки), README и картинка preview.png или preview.jpg. \
+             Одиночный .nmo прямо в этой папке — тоже уровень. Вложенные папки, прочие файлы и папки без уровня или с \
+             несколькими меню не показывает. Скачанную коллекцию раскладывает так: drahtseilakt-toolbox import-maps \
+             <папка>.\n\nГде брать: каталог github.com/pseudoacetyl/BallanceCustomMaps (список карт и ссылки на \
+             файлы), Ballance International Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nКарты запускаются как \
+             данные; моды и DLL игра никогда не выполняет.\n"
         }
         ("ru", Kind::Remastered) => {
-            "Оригинальные уровни в открытом формате, с современными текстурами (4K–8K).\n\nДелаются на вашей машине \
-             из папки original скриптами игры (план работ, фазы 6 и 7) и никуда не распространяются.\n"
+            "Оригинальные уровни в открытом формате, с современными текстурами (4K–8K).\n\nДелает их на вашей \
+             машине из папки original программа drahtseilakt-toolbox (remaster); никуда не распространяются.\n"
         }
         ("ru", Kind::Open) => {
             "Уровни в открытом формате: созданные в нём или сконвертированные любительские карты; каждый уровень — \
@@ -86,14 +96,20 @@ fn about(language: &str, kind: Kind) -> String {
              sagt.\n"
         }
         ("de", Kind::Community) => {
-            "Community-Karten (.nmo), gespielt im erweiterten Modus (Options, Extended).\n\nWo es sie gibt: der \
-             Katalog github.com/pseudoacetyl/BallanceCustomMaps (Kartenliste und Links zu den Dateien), der Ballance \
+            "Community-Karten, gespielt im erweiterten Modus (Options, Extended).\n\nJedes Level ist hier ein Ordner \
+             mit genau einem Level: einer .nmo-Datei oder einem Level im offenen Format (level.gltf, level.bin, \
+             textures/ - leicht nachzubessern). Daneben nach Wunsch: level.txt mit Zeilen title = ..., author = ..., \
+             version = ... (das Menü zeigt title, bis 40 Zeichen; ohne ihn den Ordnernamen), ein README und ein Bild \
+             preview.png oder preview.jpg. Eine einzelne .nmo direkt in diesem Ordner ist auch ein Level. Unterordner, \
+             andere Dateien und Ordner ohne oder mit mehreren Levels zeigt das Menü nicht. Eine geladene Sammlung \
+             sortiert drahtseilakt-toolbox import-maps <Ordner> so ein.\n\nWo es sie gibt: der Katalog \
+             github.com/pseudoacetyl/BallanceCustomMaps (Kartenliste und Links zu den Dateien), der Ballance \
              International Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nKarten laufen als Daten; Mods und DLLs \
              führt das Spiel nie aus.\n"
         }
         ("de", Kind::Remastered) => {
             "Die Original-Level im offenen Format, mit modernen Texturen (4K–8K).\n\nAuf Ihrem Rechner aus dem Ordner \
-             original von den Skripten des Spiels erzeugt (Fahrplan, Phasen 6 und 7) und nie weitergegeben.\n"
+             original vom Programm drahtseilakt-toolbox (remaster) erzeugt und nie weitergegeben.\n"
         }
         ("de", Kind::Open) => {
             "Level im offenen Format: darin gebaut oder umgewandelte Community-Karten; jedes Level ist ein Ordner mit \
@@ -106,13 +122,18 @@ fn about(language: &str, kind: Kind) -> String {
              扩展包的 readme 把它安装到你的游戏中。\n"
         }
         ("zh", Kind::Community) => {
-            "自制地图（.nmo），在扩展模式下游玩（Options，Extended）。\n\n获取途径：目录 \
-             github.com/pseudoacetyl/BallanceCustomMaps（地图列表和文件链接）、Ballance International Discord \
-             （#new）、百度贴吧 平衡球吧、哔哩哔哩。\n地图只作为数据运行；游戏从不执行模组或 DLL。\n"
+            "自制地图，在扩展模式下游玩（Options，Extended）。\n\n每个关卡是这里的一个文件夹，只含一个关卡：一个 \
+             .nmo 文件，或一个开放格式的关卡（level.gltf、level.bin、textures/，便于修改）。可选：level.txt，每行 \
+             title = ...、author = ...、version = ...（菜单显示 title，最多 40 个字符；没有时显示文件夹名），README，\
+             以及预览图 preview.png 或 preview.jpg。直接放在本文件夹里的单个 .nmo 也算一个关卡。子文件夹、其他文件、\
+             没有关卡或有多个关卡的文件夹不会显示。下载的合集可以用 drahtseilakt-toolbox import-maps <文件夹> \
+             整理成这样。\n\n获取途径：目录 github.com/pseudoacetyl/BallanceCustomMaps（地图列表和文件链接）、\
+             Ballance International Discord（#new）、百度贴吧 平衡球吧、哔哩哔哩。\n地图只作为数据运行；游戏从不执行\
+             模组或 DLL。\n"
         }
         ("zh", Kind::Remastered) => {
-            "开放格式的原版关卡，配有现代纹理（4K–8K）。\n\n由游戏的脚本在你的电脑上从 original 文件夹生成（路线图第 6、7 \
-             阶段），不会对外分发。\n"
+            "开放格式的原版关卡，配有现代纹理（4K–8K）。\n\n由 drahtseilakt-toolbox（remaster）在你的电脑上从 original \
+             文件夹生成，不会对外分发。\n"
         }
         ("zh", Kind::Open) => {
             "开放格式的关卡：直接以该格式制作的关卡或转换后的自制地图；每个关卡是一个含有 level.gltf 的文件夹。\n\n\
@@ -124,14 +145,20 @@ fn about(language: &str, kind: Kind) -> String {
              the SuDu add-on into your game as its readme says.\n"
         }
         (_, Kind::Community) => {
-            "Community maps (.nmo), played in the extended mode (Options, Extended).\n\nWhere to get them: the \
-             catalogue github.com/pseudoacetyl/BallanceCustomMaps (the list of maps and links to their files), the \
-             Ballance International Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nMaps run as data; the game \
-             never runs mods or DLLs.\n"
+            "Community maps, played in the extended mode (Options, Extended).\n\nEach level is a folder here holding \
+             one level: one .nmo file, or a level in the open format (level.gltf, level.bin, textures/ - easy to fix \
+             up). Beside it, if you like: level.txt with lines title = ..., author = ..., version = ... (the menu \
+             shows the title, up to 40 characters; without one, the folder's name), a README and a picture preview.png or \
+             preview.jpg. A single .nmo put straight into this folder is a level too. Folders inside a level's folder, \
+             other files, and folders with no level or several are not shown. drahtseilakt-toolbox import-maps \
+             <folder> sorts a downloaded collection into this shape.\n\nWhere to get them: the catalogue \
+             github.com/pseudoacetyl/BallanceCustomMaps (the list of maps and links to their files), the Ballance \
+             International Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nMaps run as data; the game never runs \
+             mods or DLLs.\n"
         }
         (_, Kind::Remastered) => {
             "The original levels in the open format, with modern textures (4K-8K).\n\nMade on your machine from the \
-             original folder by the game's scripts (roadmap, phases 6 and 7) and never distributed.\n"
+             original folder by the program drahtseilakt-toolbox (remaster) and never distributed.\n"
         }
         (_, Kind::Open) => {
             "Levels in the open format: made in it, or converted community maps; each level is a folder with \
@@ -141,6 +168,34 @@ fn about(language: &str, kind: Kind) -> String {
     };
     text.to_owned()
 }
+
+/// The READMEs earlier versions of the game wrote (community and remastered, every language): one of these, untouched,
+/// is replaced by the current text; any other README is the player's and stays.
+const SUPERSEDED: [&str; 8] = [
+    "Любительские карты (.nmo), играются в расширенном режиме (Options, Extended).\n\nГде брать: каталог \
+             github.com/pseudoacetyl/BallanceCustomMaps (список карт и ссылки на файлы), Ballance International \
+             Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nКарты запускаются как данные; моды и DLL игра никогда \
+             не выполняет.\n",
+    "Оригинальные уровни в открытом формате, с современными текстурами (4K–8K).\n\nДелаются на вашей машине \
+             из папки original скриптами игры (план работ, фазы 6 и 7) и никуда не распространяются.\n",
+    "Community-Karten (.nmo), gespielt im erweiterten Modus (Options, Extended).\n\nWo es sie gibt: der \
+             Katalog github.com/pseudoacetyl/BallanceCustomMaps (Kartenliste und Links zu den Dateien), der Ballance \
+             International Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nKarten laufen als Daten; Mods und DLLs \
+             führt das Spiel nie aus.\n",
+    "Die Original-Level im offenen Format, mit modernen Texturen (4K–8K).\n\nAuf Ihrem Rechner aus dem Ordner \
+             original von den Skripten des Spiels erzeugt (Fahrplan, Phasen 6 und 7) und nie weitergegeben.\n",
+    "自制地图（.nmo），在扩展模式下游玩（Options，Extended）。\n\n获取途径：目录 \
+             github.com/pseudoacetyl/BallanceCustomMaps（地图列表和文件链接）、Ballance International Discord \
+             （#new）、百度贴吧 平衡球吧、哔哩哔哩。\n地图只作为数据运行；游戏从不执行模组或 DLL。\n",
+    "开放格式的原版关卡，配有现代纹理（4K–8K）。\n\n由游戏的脚本在你的电脑上从 original 文件夹生成（路线图第 6、7 \
+             阶段），不会对外分发。\n",
+    "Community maps (.nmo), played in the extended mode (Options, Extended).\n\nWhere to get them: the \
+             catalogue github.com/pseudoacetyl/BallanceCustomMaps (the list of maps and links to their files), the \
+             Ballance International Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nMaps run as data; the game \
+             never runs mods or DLLs.\n",
+    "The original levels in the open format, with modern textures (4K-8K).\n\nMade on your machine from the \
+             original folder by the game's scripts (roadmap, phases 6 and 7) and never distributed.\n",
+];
 
 /// What a folder or file found on the machine is, if it is a Ballance to import.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -554,6 +609,21 @@ mod tests {
         if let Some(h) = std::env::var_os("HOME") {
             assert_eq!(resolve("~/maps"), PathBuf::from(h).join("maps"));
         }
+    }
+
+    #[test]
+    fn earlier_readmes_are_brought_up_to_date_and_players_ones_kept() {
+        for l in ["en", "ru", "de", "zh"] {
+            for k in KINDS {
+                assert!(!outdated(&about(l, k)), "{l} {k:?}: the current text is not replaced again");
+            }
+        }
+        assert!(SUPERSEDED.iter().all(|t| outdated(t) && t.len() < 4096));
+        assert!(SUPERSEDED.iter().any(|t| t.contains("game's scripts")));
+        assert!(!outdated("my own notes\n"));
+        assert!(!outdated(&format!("{}extra\n", SUPERSEDED[0])));
+        assert!(about("en", Kind::Community).contains("level.txt"));
+        assert!(about("en", Kind::Remastered).contains("drahtseilakt-toolbox"));
     }
 
     #[test]

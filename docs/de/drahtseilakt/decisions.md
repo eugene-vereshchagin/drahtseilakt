@@ -265,3 +265,18 @@ freier Lizenz oder, für wer das Aussehen des Originals will, als Level, die die
 welche die Toolbox aus der eigenen Kopie jedes Spielers beilegt. Die Toolbox macht aus den Originaldateien des
 Spielers alles, was das Spiel benutzen kann. So wird niemandes Eigentum ausgeliefert, und jeder stellt sich das
 Original mit ein paar Klicks selbst zusammen.
+
+
+## Ein Level ist ein Ordner
+
+*2026-11-03, Entscheidung des Eigentümers.* Das Menü der eigenen Level zeigte alles, was in `levels/community/` lag:
+entpackte Archive mit Ordnern in Ordnern, Bildern, Dokumenten, gepackten Archiven. Jetzt ist ein Level ein Ordner
+direkt im Ordner seiner Art mit genau einem Level, einer `.nmo` oder einem Level im offenen Format (dem klaren, leicht
+von Hand fertigzustellen oder nachzubessern), dazu freiwillig `level.txt` (Titel, Autor, Version), README, Vorschaubild
+und die Ressourcenordner, die es nutzt; alles andere und jede tiefere Verschachtelung wird übergangen, und ein Ordner
+ohne oder mit mehreren Leveln ist keines. Eine einzelne `.nmo` im Ordner der Art ist auch ein Level, der einfachste
+Weg. Spieler dürfen ein Level in level.txt benennen, aber ein Titel wird bereinigt und auf 40 Zeichen gekürzt (an einer
+Wortgrenze, „…“), im Menü und überall, wo das Spiel den Namen zeigt, damit ein Titel die Oberfläche nie sprengt. Das
+Menü ist eine flache Liste nach Titel. Sammlungen sind kein Begriff: eine Reihe wird ein Ordner je Level.
+`drahtseilakt-toolbox import-maps` sortiert einen Download so ein. Einzelheiten: [levels.md](levels.md), „Ein Level ist
+ein Ordner“.
