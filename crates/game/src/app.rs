@@ -781,8 +781,13 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             .as_ref()
             .map(|r| r.end)
             .ok_or("--headless needs --replay")?;
+        // when the end music (Music_EndCheckpoint) would begin to loop, and the finish music after it
+        let mut end_music = None;
         while game.sim.tick < end && !game.sim.finished && !game.sim.game_over {
             game.tick(0);
+            if end_music.is_none() && crate::music::near_end(&game.sim) {
+                end_music = Some(game.sim.tick);
+            }
             if let Some(n) = o.trace.filter(|&n| n > 0 && game.sim.tick % n == 0) {
                 let b = &game.sim.ball;
                 let _ = n;
@@ -831,6 +836,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             s.lives,
             s.sector + 1
         );
+        match end_music {
+            Some(t) => println!("end music: Music_EndCheckpoint loops from {} ({} before the end)", clock(t),
+                clock(s.tick.saturating_sub(t))),
+            None => println!("end music: Music_EndCheckpoint never began"),
+        }
         return Ok(());
     }
     if let Some(tick) = o.from {

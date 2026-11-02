@@ -33,7 +33,7 @@ SIL OFL): китайские и кириллические названия ка
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | звуковые темы (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | звуковые темы (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | звуковые темы (assets/sounds) |
-| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | свои: в *system* девять пьес, Music/music.txt раскладывает их по пяти темам; в *neuro* пятнадцать синтезированных фраз, по одной на часть; атмосферной части нет |
+| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | свои: в *system* девять пьес, Music/music.txt раскладывает их по пяти темам; в *neuro* пятнадцать синтезированных фраз, по одной на часть, и своя музыка финиша; атмосферной части нет |
 | original levels | `3D Entities/Level/Level_NN.NMO` | в планах |
 
 Своё появляется по этапам: интерфейс (шрифты, кнопки, окно очков, шарики жизней, тексты, сцена меню), затем шары,

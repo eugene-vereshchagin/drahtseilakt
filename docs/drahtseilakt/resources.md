@@ -34,7 +34,7 @@ Text the game's font cannot draw (its font has Latin-1 only) is drawn with the s
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | sound themes (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | sound themes (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | sound themes (assets/sounds) |
-| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: *system* nine pieces, Music/music.txt maps them onto the five themes; *neuro* fifteen synthesized phrases, one per part; no atmosphere part |
+| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: *system* nine pieces, Music/music.txt maps them onto the five themes; *neuro* fifteen synthesized phrases, one per part, and its own end music; no atmosphere part |
 | original levels | `3D Entities/Level/Level_NN.NMO` | planned |
 
 Own content comes in stages: interface (fonts, buttons, points box, life balls, texts, menu scene), then balls,

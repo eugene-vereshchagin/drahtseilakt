@@ -422,7 +422,13 @@ mod tests {
             assert!(in_theme(&system, name).is_some(), "system {name}");
         }
         assert!(in_theme(&assets.join("neuro"), "Misc_Fall").is_some());
-        // the generated theme has its own level music, every part of the five themes
+        // the generated theme has its own level music, every part of the five themes, and its own end music
+        for name in ["Music_EndCheckpoint", "Music_Final", "Music_LastFinal"] {
+            assert!(
+                in_theme(&assets.join("neuro"), name).is_some(),
+                "neuro {name}"
+            );
+        }
         for n in 1..=5 {
             for part in 1..=3 {
                 let name = format!("Music_Theme_{n}_{part}");

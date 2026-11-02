@@ -34,7 +34,7 @@ Text, den die Schrift des Spiels nicht kann (sie hat nur Latin-1), wird mit den 
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | Klangthemen (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | Klangthemen (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | Klangthemen (assets/sounds) |
-| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | eigene: in *system* neun Stücke, Music/music.txt verteilt sie auf die fünf Themen; in *neuro* fünfzehn synthetisierte Phrasen, eine je Teil; kein Atmosphäre-Teil |
+| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | eigene: in *system* neun Stücke, Music/music.txt verteilt sie auf die fünf Themen; in *neuro* fünfzehn synthetisierte Phrasen, eine je Teil, und eigene Zielmusik; kein Atmosphäre-Teil |
 | original levels | `3D Entities/Level/Level_NN.NMO` | geplant |
 
 Eigenes kommt in Stufen: Oberfläche (Schriften, Knöpfe, Punktekasten, Lebenskugeln, Texte, Menüszene), dann Kugeln,

@@ -28,7 +28,7 @@
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | 音效主题（assets/sounds） |
 | menu sounds | `Sounds/Menu_click, Menu_load` | 音效主题（assets/sounds） |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | 音效主题（assets/sounds） |
-| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | 自有：*system* 有九首乐曲，Music/music.txt 把它们分配到五个主题；*neuro* 有十五段合成乐句，每个部分一段；没有氛围部分 |
+| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | 自有：*system* 有九首乐曲，Music/music.txt 把它们分配到五个主题；*neuro* 有十五段合成乐句，每个部分一段，以及自己的终点音乐；没有氛围部分 |
 | original levels | `3D Entities/Level/Level_NN.NMO` | 计划中 |
 
 自有内容分阶段推出：界面（字体、按钮、分数框、生命球、文字、菜单场景），然后是球、天空、粒子和音效（来自开放素材库），带中国元素、类似麻将游戏风格的音乐，最后是自己的模块和关卡。

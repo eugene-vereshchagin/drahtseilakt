@@ -27,3 +27,10 @@ coming home to the mode's root, slides into notes, press-bends and the slow vibr
 long notes, sweeps up the strings, a low drum in the fifth theme), played on an additive guzheng-like string in a soft
 synthesized room. Of the original's parts only numbers were measured: length, loudness, the pitch classes that sound
 most, the onset grid and density, and how long a phrase plays before its tail.
+
+The end music is made the same way. `Music_EndCheckpoint`, which loops after the last checkpoint near the finish,
+keeps the original's length and grid (64 eighth notes at 136 a minute, 14.11 s): a muted, driving pentatonic
+ostinato in D over a low drone that builds bar by bar (more notes, a drum on the beats, a higher answering line, a
+run back into the start), rendered so its tails and room wrap round and it loops without a seam. `Music_Final` is a
+struck opening, a sweep up the strings and slow ringing notes in A; `Music_LastFinal` is a bright high chime over a
+soft low rumble.

@@ -39,6 +39,12 @@ const THEME_PAUSE: f64 = 50.0;
 /// Within this of the level's end, after the last checkpoint, the end music loops.
 const END_DISTANCE: f32 = 200.0;
 
+/// Whether the end music loops now: after the last checkpoint, within END_DISTANCE of the level's end.
+pub fn near_end(sim: &Sim) -> bool {
+    let (last_stage, end) = sim.last_stage();
+    last_stage && end.is_some_and(|e| e.distance(sim.ball.position) < END_DISTANCE)
+}
+
 impl Music {
     /// The music a level with theme `theme` may play, to be decoded ahead.
     pub fn wanted(theme: Option<u32>, last_level: bool) -> Vec<String> {
@@ -130,7 +136,7 @@ impl Music {
             return;
         }
         let now = sim.tick.saturating_sub(self.began) as f64 * f64::from(TICK);
-        let (last_stage, end) = sim.last_stage();
+        let (last_stage, _) = sim.last_stage();
         self.run(false, "Music_Atmo", now, audio, data);
         match self.theme {
             _ if last_stage => {
@@ -142,8 +148,7 @@ impl Music {
             Some(n) => self.run(true, &format!("Music_Theme_{n}"), now, audio, data),
             None => {}
         }
-        let near = last_stage && end.is_some_and(|e| e.distance(sim.ball.position) < END_DISTANCE);
-        match (near, self.end_loop) {
+        match (near_end(sim), self.end_loop) {
             (true, None) => self.end_loop = audio.play_music_loop(data, "Music_EndCheckpoint"),
             (false, Some(id)) => {
                 audio.stop(id);
