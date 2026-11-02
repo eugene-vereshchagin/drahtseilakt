@@ -65,6 +65,15 @@ per-player thing is the name in the highscore list.
   it: the left stick or the cross rolls the ball, the left and right shoulder buttons turn the camera (Rotation
   with left or right), the lower face button (A / ✕) is Overview, Start pauses. In the menus the cross moves, the
   lower face button is Enter, the right one (B / ○) Esc. Their buttons cannot be rebound yet.
+- **The mouse** works every menu, as in the original: the button under the cursor is chosen (only when the cursor
+  moves, so a resting cursor never fights the keys), a left click presses it as Enter does, the right button and the
+  mouse's back button are Esc. A line with a value (a volume, the resolution, the field of view, a Yes/No switch)
+  goes down on a click on its left half and up on its right half, as Left and Right change it; the highscores'
+  arrows change the level. The wheel scrolls the community levels' list (choosing the line under the cursor) and
+  goes through the lines elsewhere, through the levels on the highscores. A click on a key's line on the Controls
+  page waits for a key as Enter does; mouse buttons cannot be bound. The cursor is shown over the menus and hidden
+  in a run, never held in the window; the run takes nothing from the mouse, so a click that closes a menu does
+  nothing in the level. The buttons are hit where they are drawn, in any window and either interface.
 - Every finished run is still kept as a replay (it costs nothing on screen); the fastest counts as the best time
   shown in the extended mode.
 
