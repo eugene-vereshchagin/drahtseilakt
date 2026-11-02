@@ -555,14 +555,25 @@ impl Menu {
                     &format!("Level {n}"),
                 )
             }
-            // the file name in the font's Latin-1, what it lacks as '?'
+            // the file name in the font's Latin-1, what it lacks as '?'; an open-format level (a folder) says which
+            // folder it is in, as an original level converted there is named like the original
             Line::Map(i) => self
                 .maps
                 .get(i)
-                .and_then(|p| p.file_stem())
-                .map(|n| {
-                    n.to_string_lossy()
-                        .chars()
+                .map(|p| {
+                    let name = p
+                        .file_stem()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    let folder = p
+                        .parent()
+                        .and_then(|d| d.file_name())
+                        .map(|d| d.to_string_lossy().into_owned());
+                    let name = match folder {
+                        Some(f) if p.is_dir() => format!("{name} ({f})"),
+                        _ => name,
+                    };
+                    name.chars()
                         .map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?'))
                         .collect()
                 })
