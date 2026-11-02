@@ -15,8 +15,11 @@ const STEP: f32 = 1.2;
 /// A gap in a floor narrower than this (between points at one height) is no gap to the ball, which rolls over it.
 const GAP: f32 = 5.5;
 /// A way down may drop this far (one way only), at this extra cost per unit.
-const DROP: f32 = 15.0;
+const DROP: f32 = 30.0;
 const DROP_COST: f32 = 4.0;
+/// Where no way over the floors reaches a goal, a leap over a gap this long at most, at this price.
+const LEAP: f32 = 20.0;
+const LEAP_COST: f32 = 200.0;
 /// Within this of an edge the way costs more, the nearer the more.
 const CLEAR: f32 = 6.0;
 
@@ -35,6 +38,29 @@ fn open_gap(p: Vec3, q: Vec3, mut between: impl Iterator<Item = Vec3>) -> bool {
     })
 }
 
+/// The direction a strip of rail points runs (offsets across the ground from one of them): the main axis of their
+/// spread, if they spread at all.
+fn rail_axis(offsets: &[Vec3]) -> Option<Vec3> {
+    let n = offsets.len() as f32;
+    if offsets.len() < 2 {
+        return None;
+    }
+    let m = offsets.iter().fold(Vec3::ZERO, |a, r| a + *r) / n;
+    let (mut xx, mut xz, mut zz) = (0.0, 0.0, 0.0);
+    for r in offsets {
+        let c = *r - m;
+        xx += c.x * c.x;
+        xz += c.x * c.z;
+        zz += c.z * c.z;
+    }
+    if xx + zz < 1e-3 {
+        return None;
+    }
+    // the angle of the covariance's main axis
+    let a = 0.5 * (2.0 * xz).atan2(xx - zz);
+    Some(Vec3::new(a.cos(), 0.0, a.sin()))
+}
+
 /// The way through the level: floor points, in order.
 /// Way points between two passes of one place for the later pass to be another visit (a loop), not the same pass.
 const LOOP_GAP: f32 = 6.0;
@@ -43,6 +69,8 @@ pub struct Route {
     pub points: Vec<Vec3>,
     /// Where each stage (checkpoint, end) is reached along the way.
     pub marks: Vec<usize>,
+    /// Where the way rides a fan's updraft (the point it is lifted from), and which fan.
+    pub lifts: Vec<(usize, usize)>,
     /// The floor points by cell (`CELL`), each with how far it is from an edge.
     floor: HashMap<(i32, i32), Vec<(Vec3, f32)>>,
     /// The floor points the way was found over, and their indices by cell (`GAP`), to find ways over them anew.
@@ -63,11 +91,10 @@ const GOAL: f32 = 3.5;
 /// The cell of the floor lookup.
 const CELL: f32 = 2.0;
 
-/// The world triangles of the level's floors and rails and of the modules at their stand-ins.
-/// The world triangles of the floors, rails (flagged) and modules.
-fn floor_triangles(level: &Level, modules: &crate::scene::Modules) -> Vec<([Vec3; 3], bool)> {
+/// The world triangles of the floors, rails (with the rail's object) and modules.
+fn floor_triangles(level: &Level, modules: &crate::scene::Modules) -> Vec<([Vec3; 3], Rail)> {
     let mut out = Vec::new();
-    let mut add = |mesh: &level::Mesh, m: Mat4, rail: bool| {
+    let mut add = |mesh: &level::Mesh, m: Mat4, rail: Rail| {
         for part in &mesh.parts {
             for t in part.indices.as_chunks::<3>().0 {
                 let p = |i: u32| {
@@ -86,8 +113,9 @@ fn floor_triangles(level: &Level, modules: &crate::scene::Modules) -> Vec<([Vec3
         if n != "phys_floors" && n != "phys_floorrails" {
             continue;
         }
-        let rail = n == "phys_floorrails";
+        let rails = n == "phys_floorrails";
         for &i in &g.members {
+            let rail = rails.then_some(i);
             let Some(o) = level.objects.get(i) else {
                 continue;
             };
@@ -115,21 +143,31 @@ fn floor_triangles(level: &Level, modules: &crate::scene::Modules) -> Vec<([Vec3
         let place = Mat4::from_cols_array_2d(&o.matrix);
         for mo in &module.objects {
             if let Some(mesh) = mo.mesh.and_then(|k| module.meshes.get(k)) {
-                add(mesh, place * Mat4::from_cols_array_2d(&mo.matrix), false);
+                add(mesh, place * Mat4::from_cols_array_2d(&mo.matrix), None);
             }
         }
     }
     out
 }
 
+/// A fan's updraft (Sim::updrafts): where it is measured to, the top of its volume, how far across it takes the ball.
+pub type Fan = (Vec3, f32, f32);
+/// A paper ball lifted by a fan is pushed off the top of its updraft onto a floor this far across from its column at
+/// most, and the lift costs this much more than its length (a player rides one only where it leads somewhere).
+const FAN_LAND: f32 = 14.0;
+const FAN_COST: f32 = 20.0;
+
+/// The rail object a floor point is on, if it is on a rail.
+type Rail = Option<usize>;
+
 /// Points over the up-facing triangles, `SPACING` apart, at most one per cell and height band: the lowest, so a
 /// floor wins over the kerb along its edge.
-fn floor_points(tris: &[([Vec3; 3], bool)]) -> Vec<(Vec3, bool)> {
-    let mut cells: HashMap<(i32, i32, i32), (Vec3, bool)> = HashMap::new();
+fn floor_points(tris: &[([Vec3; 3], Rail)]) -> Vec<(Vec3, Rail)> {
+    let mut cells: HashMap<(i32, i32, i32), (Vec3, Rail)> = HashMap::new();
     for &([a, b, c], rail) in tris {
         let n = (b - a).cross(c - a);
         let len = n.length();
-        if len < 1e-6 || (n.y / len).abs() < if rail { 0.25 } else { 0.75 } {
+        if len < 1e-6 || (n.y / len).abs() < if rail.is_some() { 0.25 } else { 0.75 } {
             continue;
         }
         let edge = (b - a).length().max((c - a).length()).max((c - b).length());
@@ -150,7 +188,7 @@ fn floor_points(tris: &[([Vec3; 3], bool)]) -> Vec<(Vec3, bool)> {
             }
         }
     }
-    let mut v: Vec<(Vec3, bool)> = cells.into_values().collect();
+    let mut v: Vec<(Vec3, Rail)> = cells.into_values().collect();
     v.sort_by(|(a, _), (b, _)| {
         a.x.total_cmp(&b.x)
             .then(a.z.total_cmp(&b.z))
@@ -178,10 +216,11 @@ impl Route {
     pub fn find(
         level: &Level,
         modules: &crate::scene::Modules,
+        fans: &[Fan],
         start: Vec3,
         stages: &[Vec3],
     ) -> Route {
-        Route::search(level, modules, start, stages, false)
+        Route::search(level, modules, fans, start, stages, false)
     }
 
     /// The way through `places` close together (where a player's ball went): straight from one to the next where
@@ -189,15 +228,17 @@ impl Route {
     pub fn through(
         level: &Level,
         modules: &crate::scene::Modules,
+        fans: &[Fan],
         start: Vec3,
         places: &[Vec3],
     ) -> Route {
-        Route::search(level, modules, start, places, true)
+        Route::search(level, modules, fans, start, places, true)
     }
 
     fn search(
         level: &Level,
         modules: &crate::scene::Modules,
+        fans: &[Fan],
         start: Vec3,
         stages: &[Vec3],
         straight_on: bool,
@@ -230,11 +271,25 @@ impl Route {
             }
             v
         };
+        // the floor points within reach of a leap
+        let near_wide = |p: Vec3| -> Vec<usize> {
+            let (cx, cz) = ((p.x / GAP).floor() as i32, (p.z / GAP).floor() as i32);
+            let r = (LEAP / GAP).ceil() as i32;
+            let mut v = Vec::new();
+            for dx in -r..=r {
+                for dz in -r..=r {
+                    if let Some(c) = grid.get(&(cx + dx, cz + dz)) {
+                        v.extend(c);
+                    }
+                }
+            }
+            v
+        };
         // A floor point without floor on every side (a kerb's top, the edge) is no way to go, unless on a rail.
         let edge: Vec<bool> = found
             .iter()
             .map(|&(p, rail)| {
-                if rail {
+                if rail.is_some() {
                     return false;
                 }
                 let mut sides = [false; 4];
@@ -275,7 +330,7 @@ impl Route {
         let clear: Vec<f32> = found
             .iter()
             .map(|&(p, rail)| {
-                if rail {
+                if rail.is_some() {
                     return CLEAR;
                 }
                 let (cx, cz) = ((p.x / CLEAR).floor() as i32, (p.z / CLEAR).floor() as i32);
@@ -292,6 +347,63 @@ impl Route {
                 c
             })
             .collect();
+        // Along which way each rail point's rail runs: the main axis of its own rail's points near.
+        let axis: Vec<Option<Vec3>> = found
+            .iter()
+            .map(|&(p, rail)| {
+                let r = rail?;
+                let offsets: Vec<Vec3> = near(p)
+                    .into_iter()
+                    .filter_map(|w| found.get(w))
+                    .filter(|f| f.1 == Some(r) && (f.0.y - p.y).abs() < 3.0)
+                    .map(|f| Vec3::new(f.0.x - p.x, 0.0, f.0.z - p.z))
+                    .filter(|o| o.length() < 2.0 * LINK)
+                    .collect();
+                rail_axis(&offsets)
+            })
+            .collect();
+        if let Ok(v) = std::env::var("AUTOPILOT_NEAR") {
+            let c: Vec<f32> = v.split(',').filter_map(|x| x.parse().ok()).collect();
+            if let [x, y, z] = c[..] {
+                for (i, f) in found.iter().enumerate() {
+                    if f.0.distance(Vec3::new(x, y, z)) < 4.0 {
+                        eprintln!("near {:?} rail {:?} axis {:?} edge {:?}", f.0, f.1, axis.get(i), edge.get(i));
+                    }
+                }
+            }
+        }
+        // The fans: the floor points under each one's updraft (where a ball is lifted from) and those near its top
+        // (where it can be pushed off onto).
+        let mut lifts: HashMap<usize, Vec<usize>> = HashMap::new();
+        let mut lands: Vec<Vec<usize>> = Vec::new();
+        for (f, &(at, top, across)) in fans.iter().enumerate() {
+            let flat = |q: Vec3| Vec3::new(q.x - at.x, 0.0, q.z - at.z).length();
+            let mut onto = Vec::new();
+            for (i, &q) in pts.iter().enumerate() {
+                let h = flat(q);
+                if h < across && q.y > at.y - 4.0 && q.y < top - 4.0 {
+                    lifts.entry(i).or_default().push(f);
+                } else if h < across + FAN_LAND && q.y < top - 0.5 && q.y > at.y - 4.0 {
+                    onto.push(i);
+                }
+            }
+            lands.push(onto);
+        }
+        // A ball on rails stays on them (they hold it from the sides): it goes on or off a rail only along it (not
+        // across a crossing rail, not sideways off it), and drops off only where it ends.
+        let rail_ok = |u: usize, v: usize, dy: f32| -> bool {
+            let (Some(&p), Some(&q)) = (pts.get(u), pts.get(v)) else { return false };
+            let dir = Vec3::new(q.x - p.x, 0.0, q.z - p.z).normalize_or_zero();
+            let across = |w: usize| axis.get(w).copied().flatten().is_some_and(|a| a.dot(dir).abs() < 0.7);
+            if across(u) || across(v) {
+                return false;
+            }
+            let Some(r) = found.get(u).and_then(|f| f.1).filter(|_| dy < -STEP) else { return true };
+            !near(p).into_iter().filter_map(|w| found.get(w)).any(|f| {
+                let o = Vec3::new(f.0.x - p.x, 0.0, f.0.z - p.z);
+                f.1 == Some(r) && (f.0.y - p.y).abs() < 1.0 && o.length() < LINK && o.dot(dir) > 0.5 * o.length()
+            })
+        };
         let closest = |p: Vec3| -> usize {
             pts.iter()
                 .enumerate()
@@ -300,6 +412,7 @@ impl Route {
         };
         let mut points = Vec::new();
         let mut marks = Vec::new();
+        let mut rides = Vec::new();
         let mut from = closest(start - Vec3::Y * crate::sim::BALL_RADIUS);
         // the line from `a` to `b`, if every step of it is just over a floor point
         let on_floor = |a: Vec3, b: Vec3| -> Option<Vec<Vec3>> {
@@ -335,9 +448,16 @@ impl Route {
             let at_goal =
                 |i: usize| i == goal_node || pts.get(i).is_some_and(|p| p.distance(goal) < GOAL);
             let mut to = goal_node;
-            // Dijkstra
             let mut dist: HashMap<usize, f32> = HashMap::new();
             let mut prev: HashMap<usize, usize> = HashMap::new();
+            // the points reached by a fan's lift, and which fan
+            let mut lifted: HashMap<usize, usize> = HashMap::new();
+            // Dijkstra; where the goal is not reached over the floors, again with leaps over gaps (a drawbridge to
+            // knock over, a jump, a moving part to wait for) at a high price, so the way crosses the narrowest one
+            for leap in [false, true] {
+            dist.clear();
+            prev.clear();
+            lifted.clear();
             let mut heap = BinaryHeap::new();
             dist.insert(from, 0.0);
             heap.push(Item(0.0, from));
@@ -355,15 +475,21 @@ impl Route {
                     let h = Vec3::new(q.x - p.x, 0.0, q.z - p.z).length();
                     let dy = q.y - p.y;
                     // (a narrow gap at one height is rolled over)
+                    // (not onto or off a rail: a rail is got onto only where it begins)
                     let gap = h > LINK
                         && h <= GAP
                         && dy.abs() < 0.3
+                        && found.get(u).is_some_and(|f| f.1.is_none())
+                        && found.get(v).is_some_and(|f| f.1.is_none())
                         && open_gap(
                             p,
                             q,
                             near(p).into_iter().filter_map(|w| pts.get(w).copied()),
                         );
                     if v == u || (h > LINK && !gap) || dy > STEP || dy < -DROP {
+                        continue;
+                    }
+                    if !rail_ok(u, v, dy) {
                         continue;
                     }
                     let edgy = if edge.get(v).copied().unwrap_or(true) {
@@ -379,9 +505,52 @@ impl Route {
                     if dist.get(&v).is_none_or(|&x| nd < x) {
                         dist.insert(v, nd);
                         prev.insert(v, u);
+                        lifted.remove(&v);
                         heap.push(Item(nd, v));
                     }
                 }
+                if leap {
+                    for v in near_wide(p) {
+                        let Some(&q) = pts.get(v) else { continue };
+                        let h = Vec3::new(q.x - p.x, 0.0, q.z - p.z).length();
+                        let dy = q.y - p.y;
+                        if h <= GAP
+                            || h > LEAP
+                            || dy > STEP
+                            || dy < -DROP
+                            || edge.get(v).copied().unwrap_or(true)
+                            || !rail_ok(u, v, dy)
+                        {
+                            continue;
+                        }
+                        let nd = d + LEAP_COST + 4.0 * h + if dy < 0.0 { -dy * DROP_COST } else { 0.0 };
+                        if dist.get(&v).is_none_or(|&x| nd < x) {
+                            dist.insert(v, nd);
+                            prev.insert(v, u);
+                            lifted.remove(&v);
+                            heap.push(Item(nd, v));
+                        }
+                    }
+                }
+                // over a fan: up its updraft and across onto a floor near its top
+                for &f in lifts.get(&u).into_iter().flatten() {
+                    let Some(&(at, top, _)) = fans.get(f) else { continue };
+                    for &v in lands.get(f).into_iter().flatten() {
+                        let Some(&q) = pts.get(v) else { continue };
+                        let across = Vec3::new(q.x - at.x, 0.0, q.z - at.z).length();
+                        let nd = d + (top - p.y).max(0.0) + across + FAN_COST;
+                        if dist.get(&v).is_none_or(|&x| nd < x) {
+                            dist.insert(v, nd);
+                            prev.insert(v, u);
+                            lifted.insert(v, f);
+                            heap.push(Item(nd, v));
+                        }
+                    }
+                }
+            }
+            if dist.contains_key(&to) && at_goal(to) {
+                break;
+            }
             }
             if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
                 eprintln!(
@@ -452,7 +621,21 @@ impl Route {
                 }
             }
             way.reverse();
-            points.extend(way.iter().filter_map(|&i| pts.get(i).copied()));
+            for (k, &i) in way.iter().enumerate() {
+                let Some(&q) = pts.get(i) else { continue };
+                // a fan's lift: straight up its column to the top, then across to where it lands
+                if let (Some(&f), Some(&p)) = (lifted.get(&i), k.checked_sub(1).and_then(|j| way.get(j))) {
+                    rides.push((points.len().saturating_sub(1), f));
+                    if let (Some(&(at, top, _)), Some(&a)) = (fans.get(f), pts.get(p)) {
+                        let up = Vec3::new(at.x, top - 1.0, at.z);
+                        for (s, e) in [(a, up), (up, q)] {
+                            let n = ((s.distance(e) / SPACING).ceil() as usize).clamp(1, 200);
+                            points.extend((1..n).map(|j| s + (e - s) * (j as f32 / n as f32)));
+                        }
+                    }
+                }
+                points.push(q);
+            }
             // after a jump straight to the goal, on from the goal
             let jumped = !straight.is_empty();
             points.extend(straight);
@@ -469,6 +652,7 @@ impl Route {
         Route {
             points,
             marks,
+            lifts: rides,
             floor,
             pts,
             grid,
@@ -557,9 +741,9 @@ impl Route {
     }
 
     /// A way given as floor points in order (a player's run): the level's floors are read for the edges.
-    pub fn along(level: &Level, modules: &crate::scene::Modules, path: Vec<Vec3>) -> Route {
+    pub fn along(level: &Level, modules: &crate::scene::Modules, fans: &[Fan], path: Vec<Vec3>) -> Route {
         let start = path.first().copied().unwrap_or(Vec3::ZERO);
-        let mut r = Route::find(level, modules, start, &[]);
+        let mut r = Route::find(level, modules, fans, start, &[]);
         r.marks = vec![path.len().saturating_sub(1)];
         r.points = path;
         r
@@ -718,6 +902,13 @@ pub struct Demo {
     pub ticks: Vec<DemoTick>,
 }
 
+/// A leap is tried with these run-ups (units back from the edge).
+const LEAP_RUN_UPS: [f32; 4] = [6.0, 10.0, 15.0, 20.0];
+
+/// Stuck this near a drawbridge the way goes over, the ball charges it, at most this often a bridge.
+const BRIDGE_NEAR: f32 = 16.0;
+const BRIDGE_CHARGES: usize = 3;
+
 /// Stuck this near the next transformer, the ball is taken into it.
 const GATE_STUCK: f32 = 10.0;
 
@@ -828,6 +1019,10 @@ pub struct Pilot {
     run_ups: Vec<usize>,
     /// The tick the player's line is followed again from, after a hint.
     demo_after: u64,
+    /// The drawbridges (P_Modul_25: a plank standing up on a hinge, knocked over to lie across a gap), and how often
+    /// each has been charged.
+    pub bridges: Vec<Vec3>,
+    charged: Vec<usize>,
 }
 
 /// How near the ball a point of the way must be to take the way up there (a run begun at a sector).
@@ -855,6 +1050,8 @@ impl Pilot {
             demo_run: None,
             run_ups: Vec::new(),
             demo_after: 0,
+            bridges: Vec::new(),
+            charged: Vec::new(),
         }
     }
 
@@ -998,6 +1195,103 @@ impl Pilot {
             }
         }
         (s.finished || self.progress(s.ball.position) > here + 2.0).then_some(hint)
+    }
+
+    /// A charge at a drawbridge near (within `BRIDGE_NEAR`) that the way ahead passes over: through it to the first
+    /// point of the way well past it. Each bridge is charged `BRIDGE_CHARGES` times at most.
+    fn charge(&mut self, sim: &Sim) -> Option<crate::hints::Hint> {
+        let b = sim.ball.position;
+        let flat = |p: Vec3, q: Vec3| Vec3::new(p.x - q.x, 0.0, p.z - q.z).length();
+        let (k, &bridge) = self.bridges.iter().enumerate().find(|(k, g)| {
+            flat(**g, b) < BRIDGE_NEAR && self.charged.iter().filter(|&&c| c == *k).count() < BRIDGE_CHARGES
+        })?;
+        let ahead = self.route.points.get(self.at..(self.at + 80).min(self.route.points.len()))?;
+        // the way passes over it: a stretch of it within reach of the bridge's foot
+        let over = ahead.windows(2).position(|w| {
+            let ab = w[1] - w[0];
+            let t = ((bridge - w[0]).dot(ab) / ab.length_squared().max(1e-6)).clamp(0.0, 1.0);
+            flat(w[0] + ab * t, bridge) < 5.0
+        })?;
+        let past = ahead.iter().skip(over).find(|p| flat(**p, b) > flat(bridge, b) + 8.0)?;
+        self.charged.push(k);
+        let hint = crate::hints::Hint {
+            at: b,
+            radius: 6.0,
+            sector: Some(sim.sector + 1),
+            kind: Some(sim.ball.kind),
+            steps: vec![crate::hints::Step::Via(*past + Vec3::Y * crate::sim::BALL_RADIUS, 600)],
+            line: 0,
+        };
+        // tried on a copy first: some bridges are lowered by a lever, not knocked over, and a charge at them
+        // throws the ball off; it must keep the ball and get on
+        let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
+        let mut s = sim.clone();
+        let lives = s.lives;
+        for t in 0..720 {
+            let i = trial.input(&s).unwrap_or(0);
+            s.step(i);
+            if s.lives < lives || s.is_dying() || s.game_over {
+                return None;
+            }
+            if s.finished || (t > 60 && trial.at().is_none()) {
+                break;
+            }
+        }
+        let here = self.progress(sim.ball.position);
+        let ok = s.finished || self.progress(s.ball.position) > here + 2.0;
+        eprintln!("charge the drawbridge at {bridge:?} through {past:?}: {}", if ok { "taken" } else { "no use" });
+        ok.then_some(hint)
+    }
+
+    /// A leap over a gap the way crosses just ahead (two of its points further apart than a gap the ball rolls over):
+    /// back from its edge for a run-up, then pushing across until the ball has flown and landed. The run-ups are
+    /// tried on a copy of the run, the shortest that keeps the ball and gets on is taken.
+    fn leap(&mut self, sim: &Sim) -> Option<crate::hints::Hint> {
+        // (not on a followed player's line: a gap in it is where the player flew, and the player's keys take it)
+        if self.demo.as_ref().is_some_and(|d| d.find(sim, RUN_UP_NEAR, None, self.demo_expected(sim)).is_some()) {
+            return None;
+        }
+        let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+        let ahead = self.route.points.get(self.at..(self.at + LOOK).min(self.route.points.len()))?;
+        let k = ahead.windows(2).position(|w| flat(w[1] - w[0]).length() > GAP)?;
+        let (edge, over) = (*ahead.get(k)?, *ahead.get(k + 1)?);
+        let dir = flat(over - edge).normalize_or_zero();
+        let here = self.progress(sim.ball.position);
+        let lift = Vec3::Y * crate::sim::BALL_RADIUS;
+        for back in LEAP_RUN_UPS {
+            let from = edge - dir * back;
+            if self.route.clearance(from + lift) <= 0.0 {
+                continue;
+            }
+            let hint = crate::hints::Hint {
+                at: sim.ball.position,
+                radius: 6.0,
+                sector: Some(sim.sector + 1),
+                kind: Some(sim.ball.kind),
+                steps: vec![crate::hints::Step::Goto(from + lift, 400), crate::hints::Step::Air(dir, 300)],
+                line: 0,
+            };
+            let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
+            let mut s = sim.clone();
+            let lives = s.lives;
+            let mut lost = false;
+            for t in 0..900 {
+                let i = trial.input(&s).unwrap_or(0);
+                s.step(i);
+                if s.lives < lives || s.is_dying() || s.game_over {
+                    lost = true;
+                    break;
+                }
+                if s.finished || (t > 30 && trial.at().is_none() && s.ball.on_ground) {
+                    break;
+                }
+            }
+            if !lost && (s.finished || self.progress(s.ball.position) > here + 2.0) {
+                eprintln!("leap from {edge:?} to {over:?} with a run-up of {back}");
+                return Some(hint);
+            }
+        }
+        None
     }
 
     /// Where the followed player's run is now: the tick last matched, gone on by the ticks since.
@@ -1247,10 +1541,14 @@ impl Pilot {
             return turn;
         }
         // the next transformer is gone through: the ball has become its kind, or was its kind already and reached it
+        // (or the way's ball was of its kind before it too: then it changes nothing, and its rim, which a ball of its
+        // kind does not sink into, is no place to roll onto)
         let had = *self.kind.get_or_insert(sim.ball.kind);
+        let before = self.gate.checked_sub(1).and_then(|i| self.gates.get(i)).map(|g| g.2);
         if let Some(&(_, g, k)) = self.gates.get(self.gate) {
             let reached = g.distance(sim.ball.position) < crate::sim::TRAFO_REACH;
-            if sim.ball.kind == k && (had != k || reached) {
+            let idle = before.map_or(had == k, |b| b == k);
+            if sim.ball.kind == k && (had != k || reached || idle) {
                 self.gate += 1;
                 self.kind = Some(sim.ball.kind);
             }
@@ -1295,6 +1593,12 @@ impl Pilot {
         if sim.tick.saturating_sub(self.moved) > 240 {
             // found or not, the next try comes after four seconds more
             self.moved = sim.tick;
+            // stuck at a drawbridge the way goes over: charge it along the way (backing off for a run-up while it
+            // stands), to knock it over and roll across (first: no manoeuvre knows to)
+            if let Some(hint) = self.charge(sim).or_else(|| self.leap(sim)) {
+                self.hints.add(hint);
+                return 0;
+            }
             if let Some(plan) = self.manoeuvre(sim, here) {
                 self.plan = plan;
                 if let Some(&(_, c)) = self.plan.first() {
@@ -1388,7 +1692,8 @@ impl Pilot {
             }
             // still in the air (a drop off a rail, a jump): it is judged where it lands, up to two seconds on
             let mut flight = 0;
-            while !lost && !s.finished && !s.ball.on_ground && flight < 120 {
+            // (a ball an updraft holds up is judged where it floats)
+            while !lost && !s.finished && !s.ball.on_ground && flight < 120 && !s.in_updraft() {
                 s.step(0);
                 flight += 1;
                 if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
@@ -1398,6 +1703,7 @@ impl Pilot {
             // still falling after two seconds, or down on no floor of the level: lost
             if !lost
                 && !s.finished
+                && !s.in_updraft()
                 && (!s.ball.on_ground || self.route.clearance(s.ball.position) <= 0.0)
                 && flight > 0
             {
@@ -1477,6 +1783,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_strip_of_rail_points_runs_along_its_length() {
+        // a pair of rails along x, 1.5 apart
+        let pts: Vec<Vec3> = (-4..=4)
+            .flat_map(|i| [Vec3::new(i as f32 * 1.5, 0.0, -0.75), Vec3::new(i as f32 * 1.5, 0.0, 0.75)])
+            .collect();
+        let a = rail_axis(&pts).expect("an axis");
+        assert!(a.x.abs() > 0.99, "along x: {a:?}");
+        assert!(rail_axis(&[Vec3::ZERO]).is_none(), "one point runs nowhere");
+    }
+
+    #[test]
     fn progress_grows_along_the_way_and_ignores_what_is_off_it() {
         let points: Vec<Vec3> = (0..10)
             .map(|i| Vec3::new(i as f32 * 2.0, 0.0, 0.0))
@@ -1484,6 +1801,7 @@ mod tests {
         let r = Route {
             points,
             marks: vec![9],
+            lifts: Vec::new(),
             floor: HashMap::new(),
             pts: Vec::new(),
             grid: HashMap::new(),

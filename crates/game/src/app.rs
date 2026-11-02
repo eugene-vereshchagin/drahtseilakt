@@ -987,8 +987,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         game.fast_forward(tick);
     }
     game.start_session();
-    let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
-    event_loop.set_control_flow(ControlFlow::Poll);
+    let video = o.video.clone();
     // Without a level named, the window opens with the main menu over the first level.
     crate::levels::prepare(&crate::lang::docs_language(setting("language").as_deref()));
     let strings = load_strings(&data);
@@ -1061,6 +1060,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         menu_ms: 0.0,
         held: std::collections::HashSet::new(),
     };
+    if let Some(path) = video {
+        return app.video(&path);
+    }
+    let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
+    event_loop.set_control_flow(ControlFlow::Poll);
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
     app.game.save_attempt();
     match app.error {
@@ -1138,7 +1142,7 @@ fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(
         .collect::<Result<_, _>>()?;
     println!("{} frames", frames.len());
     let start = game.sim.ball.position;
-    let route = crate::autopilot::Route::find(&game.level.level, &game.modules, start, &[]);
+    let route = crate::autopilot::Route::find(&game.level.level, &game.modules, &game.sim.updrafts(), start, &[]);
     let floor: Vec<glam::Vec3> = route.floor_points().collect();
     let (_, device, queue) = pollster::block_on(device(None))?;
     let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
@@ -1270,7 +1274,8 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
         }
     }
     let start = game.sim.ball.position;
-    let route = crate::autopilot::Route::through(&game.level.level, &game.modules, start, &stages);
+    let fans = game.sim.updrafts();
+    let route = crate::autopilot::Route::through(&game.level.level, &game.modules, &fans, start, &stages);
     let gates: Vec<crate::autopilot::Gate> =
         gate_stages.iter().filter_map(|&(k, q, kind)| route.marks.get(k).map(|&m| (m, q, kind))).collect();
     let (places, ways) = (path.len(), route.points.len());
@@ -1299,6 +1304,9 @@ struct Watched {
     sectors: Vec<usize>,
     gates: Vec<crate::autopilot::Gate>,
     demo: crate::autopilot::Demo,
+    /// Whether the run finished the level, and where on its way it lost each ball.
+    finished: bool,
+    deaths: Vec<usize>,
 }
 
 /// The test player follows a player's run: the ball's way in that replay (where it rolled, in order, every 1.5;
@@ -1327,6 +1335,8 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         let ticks = w.demo.ticks.iter().position(|t| t.sector >= from).unwrap_or(w.demo.ticks.len());
         w.demo.ticks.truncate(ticks);
         w.demo.ticks.extend(m.demo.ticks);
+        w.deaths = m.deaths.iter().map(|d| d + cut).collect();
+        w.finished = m.finished;
     }
     println!("followed: {} points, transformers {:?}", w.path.len(), w.gates);
     // the test player's own run begins where the followed one began
@@ -1339,10 +1349,50 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         own.at = st.at.map(|[x, y, z]| format!("{x},{y},{z}"));
     }
     let mut game = Game::new(&own, data)?;
-    let route = crate::autopilot::Route::along(&game.level.level, &game.modules, w.path);
+    if !w.finished {
+        way_on(&game, &own, &mut w)?;
+    }
+    let route = crate::autopilot::Route::along(&game.level.level, &game.modules, &game.sim.updrafts(), w.path);
     let mut pilot = crate::autopilot::Pilot::new(route, w.gates);
     pilot.demo = Some(w.demo);
     pilot_run(&mut game, data, &own, pilot)
+}
+
+/// A followed run that did not finish: its way up to its last sector and its try there that got furthest (lost its
+/// ball furthest from where it came into that sector), then the way the test player finds by itself from there to
+/// the end.
+fn way_on(game: &Game, o: &Options, w: &mut Watched) -> Result<(), String> {
+    let Some(&last) = w.sectors.last() else { return Ok(()) };
+    let first = w.sectors.iter().position(|&s| s == last).unwrap_or(0);
+    let entry = w.path.get(first).copied().unwrap_or_default();
+    // its tries in that sector, each from where it came in (or a new ball) to where it lost the ball
+    let mut ends: Vec<usize> = w.deaths.iter().copied().filter(|&d| d > first && d <= w.path.len()).collect();
+    ends.push(w.path.len());
+    let tries: Vec<(usize, usize)> = std::iter::once(first).chain(ends.iter().copied()).zip(ends.iter().copied())
+        .filter(|(a, b)| b > a)
+        .collect();
+    let far = |t: &(usize, usize)| w.path.get(t.1 - 1).map_or(0.0, |p| p.distance(entry));
+    if let Some(&(a, b)) = tries.iter().max_by(|x, y| far(x).total_cmp(&far(y))) {
+        let mut path: Vec<glam::Vec3> = w.path.get(..first).unwrap_or_default().to_vec();
+        path.extend(w.path.get(a..b).unwrap_or_default());
+        let mut gates: Vec<crate::autopilot::Gate> = w.gates.iter().copied().filter(|g| g.0 < first).collect();
+        gates.extend(w.gates.iter().filter(|g| g.0 >= a && g.0 < b).map(|g| (g.0 - a + first, g.1, g.2)));
+        w.sectors.truncate(first);
+        w.sectors.extend(std::iter::repeat_n(last, b - a));
+        w.path = path;
+        w.gates = gates;
+    }
+    let Some(&from) = w.path.last() else { return Ok(()) };
+    let kind = w.gates.last().map_or(game.sim.ball.kind, |g| g.2);
+    let up = from + glam::Vec3::Y * crate::sim::BALL_RADIUS;
+    let (route, gates) = found_way(game, o, up, last, &w.path, kind)?;
+    let n = w.path.len();
+    println!("the followed run ends unfinished at {from:?} (sector {}): the way on is found, {} points", last + 1,
+        route.points.len());
+    w.gates.extend(gates.iter().map(|g| (g.0 + n, g.1, g.2)));
+    w.sectors.extend(std::iter::repeat_n(last, route.points.len()));
+    w.path.extend(route.points);
+    Ok(())
 }
 
 /// Watches a player's run (`text`, read from `file`) to its end.
@@ -1357,6 +1407,7 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
     let mut gates: Vec<crate::autopilot::Gate> = Vec::new();
     let mut demo = crate::autopilot::Demo::default();
     let mut lost = false;
+    let mut deaths = Vec::new();
     while seen.sim.tick < run.end && !seen.sim.finished && !seen.sim.game_over {
         // the player's tick: the ball as it is, and the push the player gives now, in the world
         let s = &seen.sim;
@@ -1376,6 +1427,7 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
             match e {
                 crate::sim::Event::Died => {
                     lost = true;
+                    deaths.push(path.len());
                     // the player's last seconds before losing a ball are no line to follow
                     let n = demo.ticks.len();
                     for t in demo.ticks.iter_mut().skip(n.saturating_sub(DOOMED_TICKS)) {
@@ -1403,24 +1455,95 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
             sectors.push(seen.sim.sector);
         }
     }
+    let finished = seen.sim.finished;
+    let (path, sectors, gates, deaths) = failed_tries_out(path, sectors, gates, deaths, finished);
     Ok(Watched {
         run,
         path,
         sectors,
         gates,
         demo,
+        finished,
+        deaths,
     })
+}
+
+/// A player's way without the tries that lost the ball: each one's stretch from where it came into the sector it was
+/// lost in (the ball starts that sector again at its reset point) to where it was lost. The tries in the last sector
+/// of a run that did not finish are kept: which got furthest is chosen later (way_on).
+fn failed_tries_out(
+    path: Vec<glam::Vec3>,
+    sectors: Vec<usize>,
+    gates: Vec<crate::autopilot::Gate>,
+    deaths: Vec<usize>,
+    finished: bool,
+) -> (Vec<glam::Vec3>, Vec<usize>, Vec<crate::autopilot::Gate>, Vec<usize>) {
+    let last = sectors.last().copied().unwrap_or(0);
+    let mut keep = vec![true; path.len()];
+    let mut try_start = 0;
+    for &d in &deaths {
+        let d = d.min(path.len());
+        let s = d.checked_sub(1).and_then(|i| sectors.get(i)).copied().unwrap_or(0);
+        if finished || s != last {
+            let from = (try_start..d).find(|&i| sectors.get(i) == Some(&s)).unwrap_or(d);
+            keep.iter_mut().take(d).skip(from).for_each(|k| *k = false);
+        }
+        try_start = d;
+    }
+    // the new places of the points kept
+    let mut at = Vec::with_capacity(path.len() + 1);
+    let mut n = 0;
+    for &k in &keep {
+        at.push(n);
+        n += usize::from(k);
+    }
+    at.push(n);
+    let new = |i: usize| at.get(i).copied().unwrap_or(n);
+    let gates = gates.into_iter().filter(|g| keep.get(g.0).copied().unwrap_or(true)).map(|g| (new(g.0), g.1, g.2));
+    let in_last = |d: usize| sectors.get(d.saturating_sub(1)) == Some(&last);
+    let deaths = deaths.iter().filter(|&&d| d >= keep.len() || !finished && in_last(d));
+    let deaths: Vec<usize> = deaths.map(|&d| new(d)).collect();
+    let path = path.into_iter().zip(&keep).filter(|p| *p.1).map(|p| p.0).collect();
+    let sectors = sectors.into_iter().zip(&keep).filter(|p| *p.1).map(|p| p.0).collect();
+    (path, sectors, gates.collect(), deaths)
 }
 
 /// The test player plays the level from where the run begins: it saves the run at --record (or as an attempt) and
 /// prints how far it got.
 fn autopilot(game: &mut Game, data: &Data, o: &Options) -> Result<(), String> {
+    let start = game.sim.ball.position;
+    let (route, gates) = found_way(game, o, start, game.sim.sector, &[], game.sim.ball.kind)?;
+    println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
+    if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
+        for p in route.floor_points() {
+            eprintln!("floor {:.1} {:.1} {:.1}", p.x, p.y, p.z);
+        }
+    }
+    if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
+        for (i, p) in route.points.iter().enumerate() {
+            println!("route {i} {:.2} {:.2} {:.2}", p.x, p.y, p.z);
+        }
+    }
+    println!("transformers on the way: {:?}", gates);
+    pilot_run(game, data, o, crate::autopilot::Pilot::new(route, gates))
+}
+
+/// The way the test player finds by itself from `start` in `sector` (from 0) through the rest of the level's
+/// checkpoints to its end, and the transformers on it (its gates). A plan is followed from the start of the sector,
+/// but for the objects of it a player's way `passed` already came by (within 20: those and all before them).
+fn found_way(
+    game: &Game,
+    o: &Options,
+    start: glam::Vec3,
+    sector: usize,
+    passed: &[glam::Vec3],
+    kind: crate::sim::BallKind,
+) -> Result<(crate::autopilot::Route, Vec<crate::autopilot::Gate>), String> {
     let level = &game.level.level;
-    let stages: Vec<glam::Vec3> = game.sim.stages().into_iter().skip(game.sim.sector).collect();
+    let stages: Vec<glam::Vec3> = game.sim.stages().into_iter().skip(sector).collect();
     // The transformers the way passes (within 30) are part of the way, in its order: a player rolls into them
     // rather than around them.
-    let start = game.sim.ball.position;
-    let base = crate::autopilot::Route::find(level, &game.modules, start, &stages);
+    let base = crate::autopilot::Route::find(level, &game.modules, &game.sim.updrafts(), start, &stages);
     let mut waypoints: Vec<(usize, glam::Vec3, bool)> = Vec::new();
     for t in game.sim.transformers() {
         let near = base
@@ -1440,44 +1563,70 @@ fn autopilot(game: &mut Game, data: &Data, o: &Options) -> Result<(), String> {
     }
     waypoints.sort_by_key(|w| w.0);
     // A plan (--plan) names the objects to pass through, in order, as a player who knows the level does: it
-    // replaces the found order.
+    // replaces the found order (from the checkpoint the sector begins at on).
     if let Some(plan) = &o.plan {
-        waypoints = read_plan(plan, level)?.into_iter().map(|(p, trafo)| (0, p, trafo)).collect();
-    }
-    let stages: Vec<glam::Vec3> = waypoints.iter().map(|w| w.1).collect();
-    let route = crate::autopilot::Route::find(level, &game.modules, start, &stages);
-    println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
-    if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
-        for p in route.floor_points() {
-            eprintln!("floor {:.1} {:.1} {:.1}", p.x, p.y, p.z);
+        let mut planned = read_plan(plan, level, sector)?;
+        // (up to the sector's checkpoint: what comes after it is not passed yet)
+        let end = stages.first().and_then(|c| planned.iter().position(|p| p.0.distance(*c) < 1.0));
+        let came = planned
+            .iter()
+            .take(end.unwrap_or(planned.len()))
+            .rposition(|p| passed.iter().any(|q| q.distance(p.0) < 20.0));
+        if let Some(k) = came {
+            planned.drain(..=k);
         }
+        waypoints = planned.into_iter().map(|(p, trafo)| (0, p, trafo)).collect();
     }
-    if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
-        for (i, p) in route.points.iter().enumerate() {
-            println!("route {i} {:.2} {:.2} {:.2}", p.x, p.y, p.z);
-        }
-    }
-    // the transformers' places on the new way: their gates
+    let fans = game.sim.updrafts();
+    // the transformers' places on the way: their gates
     // (each with the ball its transformer makes: the level's transformer at that place)
     let kind_at = |p: glam::Vec3| {
         game.sim.trafos().min_by(|a, b| a.0.distance(p).total_cmp(&b.0.distance(p))).map(|t| t.1)
     };
-    let gates: Vec<crate::autopilot::Gate> = route
-        .marks
-        .iter()
-        .zip(&waypoints)
-        .filter(|(_, w)| w.2)
-        .filter_map(|(&m, w)| Some((m, w.1, kind_at(w.1)?)))
-        .collect();
-    println!("transformers on the way: {:?}", gates);
-    pilot_run(game, data, o, crate::autopilot::Pilot::new(route, gates))
+    let mut tries = 0;
+    loop {
+        let stages: Vec<glam::Vec3> = waypoints.iter().map(|w| w.1).collect();
+        let route = crate::autopilot::Route::find(level, &game.modules, &fans, start, &stages);
+        let gates: Vec<crate::autopilot::Gate> = route
+            .marks
+            .iter()
+            .zip(&waypoints)
+            .filter(|(_, w)| w.2)
+            .filter_map(|(&m, w)| Some((m, w.1, kind_at(w.1)?)))
+            .collect();
+        // Only a paper ball rides an updraft: a lift on the way taken as another ball is preceded by the paper
+        // transformer nearest the fan, and the way is found again (a few times at most).
+        let ball_at = |i: usize| gates.iter().take_while(|g| g.0 <= i).last().map_or(kind, |g| g.2);
+        let wrong = route.lifts.iter().find(|&&(i, _)| ball_at(i) != crate::sim::BallKind::Paper);
+        let paper = wrong.and_then(|&(i, f)| {
+            let base = fans.get(f)?.0;
+            let t = game.sim.trafos().filter(|t| t.1 == crate::sim::BallKind::Paper).min_by(|a, b| {
+                a.0.distance(base).total_cmp(&b.0.distance(base))
+            })?;
+            (t.0.distance(base) < FAN_PAPER_NEAR).then_some((i, t.0))
+        });
+        tries += 1;
+        let Some((i, at)) = paper.filter(|_| tries <= FAN_PAPER_TRIES) else { return Ok((route, gates)) };
+        let before = route.marks.iter().position(|&m| m >= i).unwrap_or(waypoints.len());
+        if waypoints.iter().any(|w| w.1.distance(at) < 1.0) {
+            return Ok((route, gates));
+        }
+        println!("the way rides a fan at {i} not as paper: into the paper transformer at {at:?} first");
+        waypoints.insert(before, (0, at, true));
+    }
 }
 
+/// How often the way is found again to take a paper transformer before a fan, and how far from the fan one may be.
+const FAN_PAPER_TRIES: usize = 4;
+const FAN_PAPER_NEAR: f32 = 150.0;
+
 /// A plan: one level object a line (`NAME  # note`), in the order the way goes through them; blank lines and
-/// `#` comments are skipped. Returns where each is and whether it is a transformer.
-fn read_plan(path: &Path, level: &level::Level) -> Result<Vec<(glam::Vec3, bool)>, String> {
+/// `#` comments are skipped. Returns where each is and whether it is a transformer, from the checkpoint sector
+/// `sector` (from 0) begins at on (PC_TwoFlames_0N; all of it for the first).
+fn read_plan(path: &Path, level: &level::Level, sector: usize) -> Result<Vec<(glam::Vec3, bool)>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut out = Vec::new();
+    let begins = format!("PC_TwoFlames_{sector:02}");
     for line in text.lines() {
         let name = line.split('#').next().unwrap_or_default().trim().trim_end_matches('?').trim();
         if name.is_empty() {
@@ -1488,6 +1637,10 @@ fn read_plan(path: &Path, level: &level::Level) -> Result<Vec<(glam::Vec3, bool)
             .iter()
             .position(|ob| ob.name.eq_ignore_ascii_case(name))
             .ok_or_else(|| format!("{}: no object {name}", path.display()))?;
+        if sector > 0 && name.eq_ignore_ascii_case(&begins) {
+            out.clear();
+            continue;
+        }
         let trafo = level.groups_of(i).any(|g| g.starts_with("P_Trafo"));
         out.push((glam::Vec3::from(level.objects[i].position()), trafo));
     }
@@ -1641,6 +1794,11 @@ fn stuck_report(
 /// is stuck it writes a report (--report), and it follows the level's hints.
 fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<(), String> {
     pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
+    let level = &game.level.level;
+    pilot.bridges = (0..level.objects.len())
+        .filter(|&i| crate::scene::module_of(level, i) == Some("P_Modul_25"))
+        .filter_map(|i| level.objects.get(i).map(|ob| glam::Vec3::from(ob.position())))
+        .collect();
     if game.start.is_some() {
         pilot.take_up(&game.sim);
     }
@@ -1725,6 +1883,9 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
     }
     Ok(())
 }
+
+/// A video goes on this long past the finish (six seconds), for the end screen.
+const VIDEO_AFTER: u64 = 360;
 
 /// The time of one frame at 60 frames a second.
 const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
@@ -1902,6 +2063,56 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     }
 }
 
+/// The pixels of an offscreen frame (RGBA, rows top down).
+fn read_back(r: &Renderer, target: &wgpu::Texture, w: u32, h: u32) -> Result<Vec<u8>, String> {
+    let row = (4 * w).div_ceil(256) * 256;
+    let buf = r.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("readback"),
+        size: u64::from(row) * u64::from(h),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    let mut enc = r.device.create_command_encoder(&Default::default());
+    enc.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture: target,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buf,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(row),
+                rows_per_image: Some(h),
+            },
+        },
+        wgpu::Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: 1,
+        },
+    );
+    r.queue.submit([enc.finish()]);
+    let slice = buf.slice(..);
+    slice.map_async(wgpu::MapMode::Read, |_| {});
+    r.device
+        .poll(wgpu::PollType::wait_indefinitely())
+        .map_err(|e| e.to_string())?;
+    let mapped = slice.get_mapped_range().map_err(|e| format!("{e:?}"))?;
+    let mut pixels = Vec::with_capacity((4 * w * h) as usize);
+    for y in 0..h {
+        let start = (y * row) as usize;
+        pixels.extend_from_slice(
+            mapped
+                .get(start..start + (4 * w) as usize)
+                .unwrap_or_default(),
+        );
+    }
+    Ok(pixels)
+}
+
 fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<(), String> {
     let ticks = o
         .ticks
@@ -1987,51 +2198,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     }
     r.draw_ui(&view, w, h, &quads);
 
-    let row = (4 * w).div_ceil(256) * 256;
-    let buf = r.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("readback"),
-        size: u64::from(row) * u64::from(h),
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-    let mut enc = r.device.create_command_encoder(&Default::default());
-    enc.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo {
-            texture: &target,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        wgpu::TexelCopyBufferInfo {
-            buffer: &buf,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(row),
-                rows_per_image: Some(h),
-            },
-        },
-        wgpu::Extent3d {
-            width: w,
-            height: h,
-            depth_or_array_layers: 1,
-        },
-    );
-    r.queue.submit([enc.finish()]);
-    let slice = buf.slice(..);
-    slice.map_async(wgpu::MapMode::Read, |_| {});
-    r.device
-        .poll(wgpu::PollType::wait_indefinitely())
-        .map_err(|e| e.to_string())?;
-    let mapped = slice.get_mapped_range().map_err(|e| format!("{e:?}"))?;
-    let mut pixels = Vec::with_capacity((4 * w * h) as usize);
-    for y in 0..h {
-        let start = (y * row) as usize;
-        pixels.extend_from_slice(
-            mapped
-                .get(start..start + (4 * w) as usize)
-                .unwrap_or_default(),
-        );
-    }
+    let pixels = read_back(&r, &target, w, h)?;
     image::save_buffer(path, &pixels, w, h, image::ExtendedColorType::Rgba8)
         .map_err(|e| e.to_string())?;
     println!(
@@ -2420,6 +2587,94 @@ impl App {
     /// A lost run opens the dead menu; a finished one, once its points are counted, the new highscore's name entry
     /// (an original level, begun at its start and not helped) or the end menu.
     /// The practice tools are on: the extended mode with its tools switched on.
+    /// Records the replay as a video, without a window: one frame a tick (60 a second) at the window's size, as raw
+    /// RGB into `out` (a file, or a pipe a video encoder reads), the sound mixed as in the window (into
+    /// DRAHTSEILAKT_SOUND_FILE when set). It goes on six seconds past the finish, for the end screen.
+    fn video(&mut self, out: &Path) -> Result<(), String> {
+        use std::io::Write as _;
+        let (w, h) = self.size;
+        let (_, device, queue) = pollster::block_on(device(None))?;
+        let format = wgpu::TextureFormat::Rgba8Unorm;
+        let mut r = Renderer::new(device, queue, format);
+        upload(&mut r, &self.game, &self.data);
+        let target = r.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("video"),
+            size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let view = target.create_view(&Default::default());
+        let file = std::fs::File::create(out).map_err(|e| format!("{}: {e}", out.display()))?;
+        let mut sink = std::io::BufWriter::with_capacity(1 << 22, file);
+        let end = self.game.replay_in.as_ref().map(|r| r.end).ok_or("--video needs --replay")?;
+        let lost = self.strings.ours("ball lost");
+        let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
+        let mut frames = 0u64;
+        loop {
+            let sim = &self.game.sim;
+            let past = sim.finished && sim.tick >= sim.finished_at + VIDEO_AFTER;
+            if sim.game_over || past || (!sim.finished && sim.tick >= end) {
+                break;
+            }
+            self.game.tick(0);
+            if let Some(a) = &mut self.audio {
+                a.pass(f64::from(TICK));
+            }
+            self.sound_events();
+            let sim = &self.game.sim;
+            let snap = Snapshot::of(sim);
+            if self.game.last_level {
+                let (flash, began) = self.blitz.step(sim.tick);
+                r.flash = flash;
+                if let (true, Some(a)) = (began, &mut self.audio) {
+                    a.play(&self.data, "Music_thunder", 1.0, crate::lights::THUNDER_DELAY);
+                }
+            }
+            let sim = &self.game.sim;
+            r.point = crate::lights::point(&sim.events, sim.tick, snap.ball);
+            let g = &self.game;
+            let mut inst = scene::instances(
+                &g.placements,
+                &sim.taken,
+                &sim.world().bodies,
+                &g.ball_meshes,
+                g.trafo.as_ref().map(|t| &t.1),
+                (&sim.extra_views(), g.extra_model.as_ref()),
+                &snap,
+                &sim.pieces_view(),
+            );
+            if snap.kind.is_some() {
+                scene::shadows(&g.shadow_receivers, snap.ball, &mut inst);
+            }
+            let particles = g.effects.batches(snap.eye, snap.target);
+            r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
+            r.draw_overlay(&view, w, h, &crate::hud::overlay(sim, w, h, false, g.font.is_some()));
+            let font = g.font.as_ref();
+            let mut quads = crate::hud::interface(sim, font, screen);
+            quads.extend(crate::hud::ball_lost(sim, g.ball_lost_at, &lost, font, screen));
+            if let (Some(t), Some(f)) = (crate::endscreen::of(sim), font) {
+                quads.extend(crate::endscreen::interface(&t, f, &self.strings, screen));
+            }
+            if let Some((aw, ah, rgba)) = crate::fallback::take_changed() {
+                r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
+            }
+            r.draw_ui(&view, w, h, &quads);
+            let px = read_back(&r, &target, w, h)?;
+            let rgb: Vec<u8> = px.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
+            sink.write_all(&rgb).map_err(|e| format!("{}: {e}", out.display()))?;
+            frames += 1;
+        }
+        sink.flush().map_err(|e| format!("{}: {e}", out.display()))?;
+        // the sound file is written as the mix is let go
+        self.audio = None;
+        println!("video: {frames} frames of {w}x{h} at 60 a second into {}", out.display());
+        Ok(())
+    }
+
     fn tools(&self) -> bool {
         self.features.has(crate::features::Feature::Tools)
     }
@@ -3147,5 +3402,32 @@ mod runs_tests {
         let (_, some) = runs_root(&crate::assets::Source::Nmo(community.join("Community-like").join("x.nmo")));
         assert!(some.is_some());
         assert_eq!(shown("a\u{1b}[2J"), "a\\u{1b}[2J");
+    }
+}
+
+#[cfg(test)]
+mod follow_tests {
+    use super::failed_tries_out;
+    use glam::Vec3;
+
+    /// A run that lost its ball in sector 2 and then got through it: the lost try's stretch in sector 2 goes, the
+    /// way through sector 1 and the try that got through stay, and the transformers move with their points.
+    #[test]
+    fn a_lost_try_is_left_out_of_the_way_followed() {
+        let path: Vec<Vec3> = (0..10).map(|i| Vec3::new(i as f32, 0.0, 0.0)).collect();
+        // sector 1 (0..3), the try lost in sector 2 (3..6), the new ball's try through sector 2 (6..10)
+        let sectors = vec![0, 0, 0, 1, 1, 1, 1, 1, 1, 1];
+        let gates = vec![(4, Vec3::ZERO, crate::sim::BallKind::Paper), (7, Vec3::X, crate::sim::BallKind::Stone)];
+        let (p, s, g, d) = failed_tries_out(path, sectors, gates, vec![6], true);
+        assert_eq!(p.iter().map(|v| v.x as i32).collect::<Vec<_>>(), vec![0, 1, 2, 6, 7, 8, 9]);
+        assert_eq!(s.len(), 7);
+        assert_eq!(g.len(), 1);
+        assert_eq!(g[0].0, 4, "the transformer at old 7 is now at 4");
+        assert!(d.is_empty());
+        // unfinished, the tries in its last sector are kept for way_on to choose from
+        let path: Vec<Vec3> = (0..6).map(|i| Vec3::new(i as f32, 0.0, 0.0)).collect();
+        let (p, _, _, d) = failed_tries_out(path, vec![0, 0, 1, 1, 1, 1], Vec::new(), vec![4], false);
+        assert_eq!(p.len(), 6);
+        assert_eq!(d, vec![4]);
     }
 }

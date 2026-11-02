@@ -29,6 +29,37 @@ anfängt): ab diesem Sektor sind der Weg, seine Transformatoren und die Takte de
 ein Level von seinem Anfang verfolgt, mit dem ganzen Lauf des Inhabers und einem späteren, der durch einen Sektor
 kam, durch den der ganze Lauf nicht kam.
 
+Versuche eines Spielers, in denen die Kugel verloren ging, fallen aus dem verfolgten Weg heraus: von jedem das Stück
+vom Eintritt in den Sektor, in dem sie verloren ging, bis dorthin (die neue Kugel beginnt den Sektor neu). Ein Lauf,
+der nicht ins Ziel kam, wird bis zum Ende seines Versuchs im letzten Sektor verfolgt, der am weitesten kam, und von
+dort findet der Testspieler den Weg selbst (mit `--plan` durch die Objekte des Plans, an denen der Spieler noch nicht
+vorbeikam).
+
+## Die Wegsuche
+
+`--plan FILE` nennt die Objekte des Levels, durch die es geht, der Reihe nach, eines je Zeile (Transformatoren,
+Ventilatoren, Kontrollpunkte, `#`-Kommentare), wie ein Spieler, der das Level kennt; ohne Plan werden die
+Transformatoren innerhalb 30 vom gefundenen Weg in seiner Reihenfolge genommen. Die nach einem Video geschriebenen
+Pläne liegen als `hints/Level_NN.plan` bereit.
+
+Der Weg wird über die Bodenpunkte der Böden, Schienen und Module des Levels gesucht. Außer von Punkt zu Punkt zu
+rollen, ein wenig zu steigen und hinabzufallen (höchstens 30 Einheiten):
+
+- **Schienen** halten die Kugel seitlich: auf eine Schiene und von ihr geht ein Weg nur entlang (nicht quer über eine
+  kreuzende Schiene, nicht seitlich hinab), fällt nur dort von ihr, wo sie endet, und springt über keine Lücke auf eine.
+- **Aufwinde** (P_Modul_18): vom Boden unter einem Ventilator die Säule hinauf bis zur Oberkante seines Volumens und
+  hinüber auf einen Boden nahe dieser Höhe (höchstens 14 Einheiten um sie). Nur eine Papierkugel steigt; dafür sorgen
+  die Transformatoren auf dem Weg. Eine Kugel, die ein Aufwind hält, wird bewertet, wo sie schwebt, nicht als fallend.
+- **Sprünge**: wo kein Weg über die Böden das nächste Ziel erreicht, wird mit Lücken bis 20 Einheiten zu hohem Preis
+  erneut gesucht, sodass der Weg die schmalste überquert (eine Zugbrücke zum Umstoßen, ein Teil, auf das man wartet)
+  statt durch die Luft zu führen.
+- Ein Transformator der Art, die die Kugel schon ist (mit der der Weg ankam), ändert nichts und gilt sofort als passiert.
+
+Steckt er innerhalb 16 einer **Zugbrücke** (P_Modul_25, ein aufrecht stehendes Brett an einem Scharnier), über die
+der Weg führt, versucht der Testspieler zuerst einen Anlauf entlang des Wegs (zurück für Schwung, solange sie steht),
+wenn der Anlauf auf einer Kopie des Laufs die Kugel behält und weiterkommt: manche Brücken fallen beim Stoß, andere
+nur durch einen Hebel.
+
 ## Berichte, wo er steckt
 
 Kommt der Testspieler 20 Sekunden auf seinem Weg nicht weiter, schreibt er einen Bericht nach `--report DIR`
@@ -63,6 +94,8 @@ einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinte
 | `wait T` | T Takte ohne Pfeile |
 | `turn N` | die Ansicht um N Viertel drehen (negativ: links) |
 | `become KIND` | in den nächsten Transformator dieser Art rollen (höchstens 1200 Takte) |
+| `lead X Y Z D T` | D Einheiten vor dem losen Körper nächst dem Punkt bleiben, während er rollt (hinter ihm bei negativem D), T Takte lang: eine Steinkugel schiebt die Papierkugel durch Ventilatoren, eine Kugel, auf die man wartet |
+| `shove X Y Z TX TY TZ T` | den losen Körper (oder das bewegliche Teil eines Moduls) nächst X Y Z nach TX TY TZ schieben: um ihn herum hinter ihn, dann langsam hinein (höchstens T Takte) — ein Brett an seinen Platz geschoben, eine Kugel dorthin gerollt, wo man sie braucht |
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
 
 Richtungen sind Weltrichtungen (X nach Osten, Z nach Norden, wie das Level gebaut ist), ein Hinweis hängt also nicht
@@ -70,6 +103,14 @@ von der Drehung der Ansicht ab; die Pfeile werden in jedem Takt zur Ansicht gew�
 vertrauenswürdig: ihre Größe (64 KiB), die Zahl der Hinweise (256) und Schritte (64 je Hinweis) und jede Zahl sind
 begrenzt, ein Replay ist ein einfacher Dateiname daneben, und eine fehlerhafte Zeile weist die ganze Datei mit ihrer
 Zeilennummer ab. `HINTS_TRACE=1` gibt die Kugel alle zehn Takte aus, solange ein Hinweis lenkt.
+
+## Videos seiner Läufe
+
+`--video FILE` mit `--replay` zeichnet den Lauf ohne Fenster, ein Bild je Takt (60 pro Sekunde) in `--size`, als
+rohes RGB nach FILE, und mischt seinen Ton wie im Fenster (nach `DRAHTSEILAKT_SOUND_FILE`); nach dem Ziel geht es sechs
+Sekunden weiter für den Endbildschirm. `scripts/video.sh LEVEL REPLAY OUT.mp4 [WxH]` fügt beides mit ffmpeg zu einem
+H.264-Video zusammen (die Bilder gehen durch eine Pipe, nichts Großes bleibt liegen; das Spiel selbst startet nie ein
+anderes Programm).
 
 ## Stand
 
@@ -80,5 +121,13 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), 2026-11-02:
 - Level 3: vom Start an geschafft in 8:34.07.
 - Level 4: ab Sektor 2 beendet in 7:55.15 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3; ein Hinweis in den Papier-Transformator am Hang); vom Start bis Sektor 5 (Weg 2347 von 2953).
 - Level 5: vom Start an geschafft in 12:03.58 (Hinweise für beide Kisten und den Schieber).
-- Level 6: der Lauf des Inhabers endet in Sektor 2 am gewölbten Stamm, der des Testspielers auch.
+- Level 6: mit dem Lauf des Inhabers (er endet am gewölbten Stamm in Sektor 2) und dem Plan `hints/Level_06.plan`
+  geht der Testspieler allein weiter, stößt die Zugbrücke um und kam einmal bis Sektor 3; meist rollt er an der Stelle
+  vorbei, wo es vom Stamm hinabgeht (2026-11-03).
 - Level 7: bis Sektor 5 (Weg 2635 von 3261): das Brett, auf dem die Papierkugel landet, muss erst als Stein an seinen Platz geschoben werden.
+- Level 8–13 (2026-11-03): 8 allein mit dem Plan aus dem Video bis zum ersten Holz-Transformator (Weg 149 von 1118);
+  9 dem Lauf des Inhabers folgend bis Sektor 3; 10 dem beendeten Lauf des Inhabers mit `hints/Level_10.txt` folgend
+  bis Sektor 2; 11 in Sektor 1 (die Brücken und Schieber vor dem ersten Kontrollpunkt); 12 und 13 bis dorthin, wo die
+  Läufe des Inhabers enden (Sektor 1; Sektor 2, wo die Steinkugel an einem Ventilator steht, den sie als Papier
+  nehmen muss).
+- Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
