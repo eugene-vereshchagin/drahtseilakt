@@ -571,6 +571,9 @@ fn own_file(relative: &str) -> Option<PathBuf> {
 }
 
 pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {
+    // its textures are named by their whole paths: a folder given relative to where the game was started would make
+    // them relative ones, which are taken for the game's own texture names
+    let dir = &std::path::absolute(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let (level, bytes) = level::open::import_read(dir)?;
     Ok(LoadedLevel {
         level,
