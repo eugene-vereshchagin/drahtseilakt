@@ -110,7 +110,7 @@ const ROLL_DELAY: f64 = 0.3;
 const VOLUME_PER_SPEED: f32 = 0.05;
 
 /// The BallSound table: (roll on stone, wood, metal), (hit on stone, wood, metal, dome).
-fn table(kind: BallKind) -> ([&'static str; 3], [&'static str; MATERIALS]) {
+pub(crate) fn table(kind: BallKind) -> ([&'static str; 3], [&'static str; MATERIALS]) {
     match kind {
         BallKind::Paper => (["Roll_Paper"; 3], ["Hit_Paper"; MATERIALS]),
         BallKind::Wood => (

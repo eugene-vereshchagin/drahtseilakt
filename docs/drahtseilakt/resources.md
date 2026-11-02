@@ -43,10 +43,11 @@ then modules and levels of our own.
 
 Sounds and music come in **sound themes**, each a folder (`Sounds/` and `Music/` by the names the game asks for,
 Ogg Vorbis or WAV, a `music.txt` table for the level themes, a `theme.txt` with its name in four languages, author,
-licence and `fallback`). The game ships two in `assets/sounds/`: *system* (openly licensed recordings and the owner's
+licence and `fallback`, `none` for no other theme). The game ships two in `assets/sounds/`: *system* (openly licensed recordings and the owner's
 music, made by `assets/sounds/system/prepare.py`, CC0 or CC-BY, authors and changes in its `CREDITS.md`, also on the
 Credits screen) and *neuro* (effects and level music synthesized for the game, GPL-3.0-only; the level music is
-short guzheng-like plucked phrases, one for each of the five themes' three parts; missing roles from *system*).
+short guzheng-like plucked phrases, one for each of the five themes' three parts; it holds every role the game asks for and takes nothing from another
+theme, `fallback none`).
 Players add their own themes in the data folder's `sounds/<name>/`; *original* among them is made by the toolbox from
 the player's copy and never shipped (until it exists, choosing it plays the copy's sounds). The extended page's
 *Sounds* line chooses the theme (`sound-theme NAME`); *neuro* plays until the player chooses another, and always in

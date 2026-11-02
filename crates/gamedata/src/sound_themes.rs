@@ -4,8 +4,8 @@
 // the data folder's sounds/ — among them "original", which the toolbox makes from the player's copy and which is
 // never shipped. The generated theme (neuro) plays unless the player chose another (owner's decision 2026-11-02);
 // the extended mode chooses (`sound-theme NAME`), the classic mode plays the default. A sound the chosen theme
-// lacks comes from its fallback theme (theme.txt `fallback NAME`, the system theme when none), then — for a level's
-// own sounds, never for music — from the copy.
+// lacks comes from its fallback theme (theme.txt `fallback NAME`, the system theme when none; `fallback none`: no
+// other theme, as the complete generated theme has), then — for a level's own sounds, never for music — from the copy.
 //
 // The player's theme folders are untrusted (they are shared): only plain folder and file names, real folders and
 // files (no links), a capped number of themes and a capped theme.txt; the sounds themselves are decoded through the
@@ -254,8 +254,11 @@ pub fn choices() -> Vec<String> {
     keys
 }
 
+/// The `fallback` of a theme complete on its own: no other theme's sounds are taken.
+pub const NO_FALLBACK: &str = "none";
+
 /// The files of the sound `name`, in the order they are tried: the chosen theme's, its fallback's, the system
-/// theme's (a broken one is passed over for the next).
+/// theme's (a broken one is passed over for the next); only the chosen theme's when its fallback is "none".
 pub fn files(name: &str) -> Vec<PathBuf> {
     if !plain(name) {
         return Vec::new();
@@ -263,14 +266,18 @@ pub fn files(name: &str) -> Vec<PathBuf> {
     let themes = themes();
     let first = chosen();
     let mut keys = vec![first.clone()];
-    if let Some(f) = themes
+    let fallback = themes
         .iter()
         .find(|t| t.key == first)
-        .and_then(|t| t.fallback.clone())
-    {
-        keys.push(f);
+        .and_then(|t| t.fallback.clone());
+    match fallback.as_deref() {
+        Some(NO_FALLBACK) => {}
+        Some(f) => {
+            keys.push(f.to_owned());
+            keys.push(SYSTEM.to_owned());
+        }
+        None => keys.push(SYSTEM.to_owned()),
     }
-    keys.push(SYSTEM.to_owned());
     keys.dedup();
     keys.iter()
         .filter_map(|k| themes.iter().find(|t| &t.key == k))

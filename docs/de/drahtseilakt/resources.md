@@ -43,11 +43,12 @@ Motiven, dann eigene Module und Level.
 
 Klänge und Musik kommen als **Klangthemen**, jedes ein Ordner (`Sounds/` und `Music/` nach den Namen, nach denen
 das Spiel fragt, Ogg Vorbis oder WAV, eine Tabelle `music.txt` für die Levelthemen, eine `theme.txt` mit dem Namen in
-vier Sprachen, Autor, Lizenz und `fallback`). Das Spiel liefert zwei in `assets/sounds/`: *system* (frei lizenzierte
+vier Sprachen, Autor, Lizenz und `fallback`, `none` für kein anderes Thema). Das Spiel liefert zwei in `assets/sounds/`: *system* (frei lizenzierte
 Aufnahmen und die Musik des Inhabers, gemacht von `assets/sounds/system/prepare.py`, CC0 oder CC-BY, Autoren und
 Änderungen in ihrer `CREDITS.md` und auf dem Credits-Bildschirm) und *neuro* (für das Spiel synthetisierte Effekte
 und Levelmusik, GPL-3.0-only; die Levelmusik sind kurze gezupfte Phrasen im Stil der Guzheng, eine für jeden der drei
-Teile der fünf Themen; fehlende Rollen aus *system*). Eigene Themen legt der Spieler in `sounds/<Name>/` des
+Teile der fünf Themen; es enthält jede Rolle, nach der das Spiel fragt, und nimmt nichts aus einem anderen Thema,
+`fallback none`). Eigene Themen legt der Spieler in `sounds/<Name>/` des
 Datenordners; darunter macht die Toolbox *original* aus der Kopie des Spielers, das nie ausgeliefert wird (solange es
 fehlt, spielt seine Wahl die Klänge der Kopie). Die Zeile *Sounds* der Seite Extended wählt das Thema
 (`sound-theme NAME`); bis der Spieler ein anderes wählt, und im klassischen Modus immer, spielt *neuro*
