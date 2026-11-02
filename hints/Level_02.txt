@@ -7,7 +7,7 @@
 # first shoves the pusher P_Modul_01_03 (x 933.8, z -366) west out of the lane from the east lane (z -366.7),
 # becomes paper again at the transformer west of the junction (916, -347) and crosses the bridge.
 at 930.5 48 -338 r 6 sector 3 kind paper : goto 960 48 -346.7 ; goto 992 48 -347 ; goto 992 48 -368 ; goto 1016.7 48 -366.7 ; wait 40 ; push -1 0 20 ; wait 80 ; become stone
-at 1024 68 -367 r 6 sector 3 kind stone : push -1 0 60 ; wait 60 ; goto 1003 48 -369 ; goto 992 48 -366.7 ; goto 950 46 -366.7 ; push -1 0 90 ; goto 975 48 -366.7 ; goto 991 48 -368 ; goto 991 48 -386.6 ; goto 931 48 -386.7 ; goto 931.3 48 -368 ; push 0 1 160 ; wait 60 ; goto 931 48 -350 ; become paper ; goto 930.3 48 -347 ; wait 20 ; push 0 1 150
+at 1024 68 -367 r 6 sector 3 kind stone : push -1 0 60 ; wait 60 ; goto 1003 48 -369 ; goto 992 48 -366.7 ; goto 992 48 -366.7 ; push -1 0 150 ; goto 992 48 -366.7 ; push -1 0 150 ; goto 975 48 -366.7 ; goto 991 48 -368 ; goto 991 48 -386.6 ; goto 931 48 -386.7 ; goto 931.3 48 -368 ; push 0 1 160 ; wait 60 ; goto 931 48 -350 ; become paper ; goto 930.3 48 -347 ; wait 20 ; push 0 1 150
 
 # Sector 3, the rail down north from the square frame (x 927, from y 48 to 3): the test player will not roll off the
 # edge onto it. The owner's inputs from the edge, where they stood almost still, down the rail.

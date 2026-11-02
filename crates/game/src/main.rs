@@ -111,6 +111,9 @@ pub struct Options {
     pub hints: Option<PathBuf>,
     /// Where the test player's stuck reports go.
     pub report: Option<PathBuf>,
+    /// The test player gives up when its ball has not moved for this many seconds (or its way has not got on for
+    /// four times as long): the run is dead, its report is written and it stops.
+    pub give_up: u64,
     /// Find the ball's way in the frames (s0001.jpg, `locate::RATE` a second) of a video of the original; the track is
     /// written to --record.
     pub locate: Option<PathBuf>,
@@ -146,6 +149,7 @@ fn parse_args() -> Result<Options, String> {
         plan: None,
         hints: None,
         report: None,
+        give_up: 30,
         locate: None,
         frames: None,
         screenshot: None,
@@ -202,6 +206,10 @@ fn parse_args() -> Result<Options, String> {
             }
             "--hints" => o.hints = Some(value()?.into()),
             "--report" => o.report = Some(value()?.into()),
+            "--give-up" => {
+                let s: u64 = value()?.parse().map_err(|_| "--give-up needs seconds".to_owned())?;
+                o.give_up = s.clamp(5, 3600);
+            }
             "--follow" => {
                 o.follow = Some(value()?.into());
                 o.autopilot = true;

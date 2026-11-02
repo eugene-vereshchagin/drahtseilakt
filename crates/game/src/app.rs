@@ -1314,8 +1314,6 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
     Ok(hints)
 }
 
-/// After this many ticks without getting on along the way the test player is stuck: a report is written.
-const STUCK_TICKS: u64 = 60 * 20;
 
 /// A report of where the test player is stuck, for whoever writes its hints: what it knows of the place, and two
 /// pictures, its own view and the place from above.
@@ -1411,18 +1409,37 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
     // the player's own data folder, not a shared temporary one
     let report = o.report.clone().unwrap_or_else(|| crate::levels::data_dir().join("stuck"));
     let limit = o.ticks.unwrap_or(60 * 60 * 20);
-    let (mut best, mut since, mut reported) = (0usize, game.sim.tick, None::<usize>);
+    let (mut best, mut since) = (0usize, game.sim.tick);
+    // a dead run: the ball neither falls nor gets on along the way for --give-up seconds (it stands or goes to and
+    // fro, not knowing where to go); its report is written and the run stops, for whoever writes the hints. A ball
+    // that falls is an ordinary mistake: each fall starts the wait again, and the pilot goes on by itself.
+    let give_up = o.give_up.saturating_mul(60);
+    let mut heard = game.sim.events.len();
+    let mut hint_at = pilot.hints.at();
+    let mut dead = false;
     while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
         let i = pilot.next(&game.sim);
         game.tick(i);
         if pilot.reached() > best {
             (best, since) = (pilot.reached(), game.sim.tick);
         }
-        if game.sim.tick - since > STUCK_TICKS && reported != Some(best) && pilot.hints.running().is_none() {
-            reported = Some(best);
+        let fell = game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::Died));
+        heard = game.sim.events.len();
+        // a hint going on to its next step gets on too (its steps lead off the way: round, back for a run-up)
+        let now_at = pilot.hints.at();
+        if fell || (now_at != hint_at && now_at.is_some()) {
+            since = game.sim.tick;
+        }
+        hint_at = now_at;
+        if game.sim.tick - since > give_up {
+            let b = game.sim.ball.position;
+            println!("dead run: ball at ({:.1} {:.1} {:.1}), not falling and the way not on for {} s", b.x, b.y, b.z,
+                (game.sim.tick - since) / 60);
             if let Err(e) = stuck_report(game, data, o, &pilot, &report) {
                 eprintln!("stuck report: {e}");
             }
+            dead = true;
+            break;
         }
         if game.sim.tick.is_multiple_of(600) {
             let b = game.sim.ball.position;
@@ -1442,7 +1459,15 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
     let s = &game.sim;
     println!(
         "result: {} after {} ({}), sector {}, lives {}, route {} / {}",
-        if s.finished { "finished" } else if s.game_over { "game over" } else { "not finished" },
+        if s.finished {
+            "finished"
+        } else if s.game_over {
+            "game over"
+        } else if dead {
+            "dead run"
+        } else {
+            "not finished"
+        },
         s.tick,
         clock(s.tick),
         s.sector + 1,

@@ -378,6 +378,13 @@ pub struct Runner {
 }
 
 impl Runner {
+    /// Where a running hint is (its index and step), so that a hint going through its steps counts as getting on.
+    pub fn at(&self) -> Option<(usize, usize)> {
+        self.running.as_ref().map(|r| (r.hint, r.step))
+    }
+}
+
+impl Runner {
     pub fn new(hints: Vec<Hint>) -> Runner {
         let fired = vec![false; hints.len()];
         Runner {
@@ -395,13 +402,6 @@ impl Runner {
         }
     }
 
-    /// The hint running, if one is (its line in the file).
-    pub fn running(&self) -> Option<usize> {
-        self.running
-            .as_ref()
-            .and_then(|r| self.hints.get(r.hint))
-            .map(|h| h.line)
-    }
 
     /// The input of a hint for this tick, or None when no hint drives.
     pub fn input(&mut self, sim: &Sim) -> Option<u8> {
