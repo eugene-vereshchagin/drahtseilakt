@@ -49,7 +49,8 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
 
 - **Main menu**: Start, Highscore, Options, Credits, Exit, as the original; *Start* first asks which levels.
 - **Options**: the *Extended* page has the mode's switch and, under it, one switch for each of its additions
-  (all on with the mode; the settings keep those turned off as `extended.<key> off`):
+  (all on with the mode; the settings keep those turned off as `extended.<key> off`); the debug ones (practice tools,
+  endless lives) are on its *Debug mode* screen, the others on the page itself:
   - all levels open, without unlocking;
   - best times beside the levels;
   - levels by kind under Start;

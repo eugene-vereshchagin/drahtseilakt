@@ -50,7 +50,8 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
 ändert sich:
 
 - **Hauptmenü**: Start, Highscore, Options, Credits, Exit wie im Original; *Start* fragt zuerst, welche Level.
-- **Options**: die Seite *Extended* hat den Schalter des Modus und darunter je einen Schalter für jede seiner
+- **Options** (die Debug-Schalter, Übungswerkzeuge und endlose Leben, liegen auf ihrem Unterbildschirm *Debug mode*):
+  die Seite *Extended* hat den Schalter des Modus und darunter je einen Schalter für jede seiner
   Ergänzungen (mit dem Modus alle an; die Einstellungen halten die ausgeschalteten als `extended.<key> off`):
   - alle Level offen, ohne Freischalten;
   - Bestzeiten neben den Leveln;

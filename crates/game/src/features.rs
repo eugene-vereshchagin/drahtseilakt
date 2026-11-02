@@ -44,11 +44,16 @@ impl Feature {
         match self {
             Feature::AllLevels => "All levels open?",
             Feature::BestTimes => "Best times?",
-            Feature::CustomLevels => "Custom levels?",
+            Feature::CustomLevels => "Levels by kind?",
             Feature::Tools => "Practice tools?",
             Feature::SoundVolume => "Sound volume?",
             Feature::EndlessLives => "Endless lives?",
         }
+    }
+
+    /// A debug addition: on the Extended page's Debug mode screen, not among the others.
+    pub fn debug(self) -> bool {
+        matches!(self, Feature::Tools | Feature::EndlessLives)
     }
 
     fn bit(self) -> u8 {

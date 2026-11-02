@@ -40,7 +40,7 @@
 在 Options 中打开，或用 `--debug` 只对一次游玩打开。菜单保持原版的外观；变化的是：
 
 - **主菜单**：Start、Highscore、Options、Credits、Exit，与原版相同；*Start* 会先询问要玩哪类关卡。
-- **Options**：*Extended* 页面上有该模式的开关，其下每项新增内容各有一个开关（随模式全部打开；设置中以 `extended.<key> off` 记录被关闭的项）：
+- **Options**：调试类开关（练习工具、无限生命）位于其子页面 *Debug mode* 中；*Extended* 页面上有该模式的开关，其下每项新增内容各有一个开关（随模式全部打开；设置中以 `extended.<key> off` 记录被关闭的项）：
   - 所有关卡开放，无需解锁；
   - 关卡旁显示最佳时间；
   - Start 下按类别列出关卡；
