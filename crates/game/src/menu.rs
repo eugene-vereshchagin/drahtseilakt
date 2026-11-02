@@ -1638,7 +1638,8 @@ const LEVEL_KINDS: [Kind; 4] = [Kind::Original, Kind::Remastered, Kind::Communit
 fn maps_in(dir: &Path) -> Vec<Package> {
     let (levels, skipped) = gamedata::package::scan(dir);
     if !skipped.is_empty() {
-        eprintln!("{}: {} folders are not levels (a level folder holds one level):", dir.display(), skipped.len());
+        let shown = gamedata::package::printable(&dir.to_string_lossy());
+        eprintln!("{shown}: {} folders are not levels (a level folder holds one level):", skipped.len());
         for s in skipped.iter().take(10) {
             eprintln!("  {s}");
         }

@@ -45,8 +45,10 @@ pub enum Skipped {
 impl std::fmt::Display for Skipped {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Skipped::Empty(p) => write!(f, "{}: no level in it", p.display()),
-            Skipped::Several(p, n) => write!(f, "{}: {n} level files, a level folder holds one", p.display()),
+            Skipped::Empty(p) => write!(f, "{}: no level in it", printable(&p.to_string_lossy())),
+            Skipped::Several(p, n) => {
+                write!(f, "{}: {n} level files, a level folder holds one", printable(&p.to_string_lossy()))
+            }
         }
     }
 }
@@ -75,7 +77,8 @@ pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
 /// The level a folder holds: exactly one `.nmo` directly in it, or it is an open-format level (level.gltf).
 pub fn examine(folder: &Path) -> Result<Package, Skipped> {
     let list = entries(folder, FOLDER_ENTRIES_MAX);
-    let open = list.iter().any(|(p, k)| k.is_file() && name_is(p, "level.gltf"));
+    // exactly "level.gltf", the name the loader opens (a "LEVEL.GLTF" would not load on a case-sensitive system)
+    let open = list.iter().any(|(p, k)| k.is_file() && p.file_name().is_some_and(|n| n == "level.gltf"));
     let nmos: Vec<&PathBuf> = list
         .iter()
         .filter(|(p, k)| k.is_file() && is_nmo(p))
@@ -175,20 +178,57 @@ fn read_info(path: &Path) -> Info {
     info
 }
 
-/// A plain file's bytes, at most `cap` of them: a link, a folder or a larger file gives nothing.
-fn read_small(path: &Path, cap: u64) -> Option<Vec<u8>> {
+/// A plain file's bytes, at most `cap` of them: a link, a folder, a FIFO or a larger file gives nothing.
+pub fn read_small(path: &Path, cap: u64) -> Option<Vec<u8>> {
     let meta = std::fs::symlink_metadata(path).ok()?;
     if !meta.is_file() || meta.len() > cap {
         return None;
     }
-    let file = std::fs::File::open(path).ok()?;
-    // what was opened is checked again (it may have been swapped since), and never more than the cap is read
-    if !file.metadata().ok()?.is_file() {
-        return None;
-    }
+    let file = open_plain(path, &meta).ok()?;
     let mut bytes = Vec::new();
     file.take(cap.saturating_add(1)).read_to_end(&mut bytes).ok()?;
     (u64::try_from(bytes.len()).ok()? <= cap).then_some(bytes)
+}
+
+/// Opens `path` for reading only if it is still the plain file `seen` (its symlink_metadata): never through a link
+/// (O_NOFOLLOW, or the reparse point itself on Windows), never blocking on a FIFO swapped in (O_NONBLOCK), and the
+/// file opened checked to be the same one (device and inode on Unix) and a regular file.
+pub fn open_plain(path: &Path, seen: &std::fs::Metadata) -> std::io::Result<std::fs::File> {
+    let refused = || std::io::Error::new(std::io::ErrorKind::InvalidData, "not the plain file looked at");
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        // FILE_FLAG_OPEN_REPARSE_POINT: a link is opened as itself, and refused below
+        options.custom_flags(0x0020_0000);
+    }
+    let file = options.open(path)?;
+    let now = file.metadata()?;
+    if !now.is_file() || !seen.is_file() {
+        return Err(refused());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if (now.dev(), now.ino()) != (seen.dev(), seen.ino()) {
+            return Err(refused());
+        }
+    }
+    Ok(file)
+}
+
+/// `s` safe to print on a terminal: control and invisible format characters (escape sequences, direction
+/// overrides) shown as `\u{..}` escapes.
+pub fn printable(s: &str) -> String {
+    s.chars()
+        .map(|c| if c.is_control() || is_format(c) { c.escape_unicode().to_string() } else { c.to_string() })
+        .collect()
 }
 
 /// Text fit to show: control, format and direction characters removed (no right-to-left overrides, no zero-width
@@ -257,11 +297,6 @@ fn entries(dir: &Path, max: usize) -> Vec<(PathBuf, std::fs::FileType)> {
 
 fn is_nmo(p: &Path) -> bool {
     p.extension().is_some_and(|x| x.eq_ignore_ascii_case("nmo"))
-}
-
-fn name_is(p: &Path, name: &str) -> bool {
-    p.file_name()
-        .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(name))
 }
 
 #[cfg(test)]
@@ -391,6 +426,42 @@ mod tests {
         assert!(skipped.is_empty());
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn printed_names_cannot_drive_the_terminal() {
+        assert_eq!(printable("a\u{1b}]0;x\u{7}b\u{202e}c"), "a\\u{1b}]0;x\\u{7}b\\u{202e}c");
+        let s = Skipped::Empty(PathBuf::from("lv/\u{1b}[2J"));
+        assert!(!s.to_string().contains('\u{1b}'));
+    }
+
+    #[test]
+    fn only_level_gltf_by_its_exact_name_is_an_open_level() {
+        let root = temp("gltf-case");
+        std::fs::create_dir_all(root.join("Upper")).unwrap();
+        std::fs::write(root.join("Upper/LEVEL.GLTF"), b"").unwrap();
+        assert_eq!(examine(&root.join("Upper")), Err(Skipped::Empty(root.join("Upper"))));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_fifo_or_a_swapped_file_is_not_read() {
+        let root = temp("fifo");
+        let fifo = root.join("level.txt");
+        let made = std::process::Command::new("mkfifo").arg(&fifo).status();
+        if made.is_ok_and(|s| s.success()) {
+            // returns at once (not blocking on the FIFO) with nothing
+            assert_eq!(read_small(&fifo, INFO_MAX), None);
+        }
+        let a = root.join("a.txt");
+        let b = root.join("b.txt");
+        std::fs::write(&a, b"a").unwrap();
+        std::fs::write(&b, b"b").unwrap();
+        let seen = std::fs::symlink_metadata(&a).unwrap();
+        assert!(open_plain(&b, &seen).is_err(), "another file than the one looked at");
+        assert!(open_plain(&a, &seen).is_ok());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

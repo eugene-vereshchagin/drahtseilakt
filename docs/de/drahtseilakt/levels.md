@@ -94,8 +94,10 @@ jeder Sprache); die Links im README sind Text, das Spiel öffnet sie nie.
 
 Replays, Bestzeiten und Highscores werden nach Art getrennt, damit eine Community-Karte mit dem Namen eines
 Original-Levels nie als dieses zählt: `replays/<Level>/` für die Original-Level, `replays/maps/<Art>/<Karte>/` für die
-anderen (`community`, `open`, `remastered`), die eines Level-Ordners unter `replays/maps/<Art>/<Level-Ordner>/<Karte>/`,
-damit `Level_07.NMO` aus zwei Ordnern ihre Läufe getrennt halten.
+anderen (`community`, `open`, `remastered`), die eines Level-Ordners unter `replays/levels/<Art>/<Level-Ordner>/<Karte>/`,
+damit `Level_07.NMO` aus zwei Ordnern ihre Läufe getrennt halten. Auch eine einzelne `Foo.nmo` und ein Ordner `Foo/`
+teilen keine Läufe. Läufe, die eine frühere Version in `replays/maps/<Level-Ordner>/` hielt, werden beim ersten Spielen
+des Levels dorthin verschoben (nur durch echte Ordner, nie über schon vorhandene).
 
 ## Sprachen
 

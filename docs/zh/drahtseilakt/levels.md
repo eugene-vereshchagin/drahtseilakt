@@ -53,7 +53,7 @@
 
 ## 按类别记录成绩和高分榜
 
-回放、最佳时间和高分榜按类别分别保存，因此与原版关卡同名的自制地图绝不会被算作原版关卡：原版关卡为 `replays/<level>/`，其他为 `replays/maps/<kind>/<map>/`（`community`、`open`、`remastered`），关卡文件夹的为 `replays/maps/<kind>/<关卡文件夹>/<map>/`，这样两个文件夹中的 `Level_07.NMO` 不会共用成绩。
+回放、最佳时间和高分榜按类别分别保存，因此与原版关卡同名的自制地图绝不会被算作原版关卡：原版关卡为 `replays/<level>/`，其他为 `replays/maps/<kind>/<map>/`（`community`、`open`、`remastered`），关卡文件夹的为 `replays/levels/<kind>/<关卡文件夹>/<map>/`，这样两个文件夹中的 `Level_07.NMO` 不会共用成绩，单独的 `Foo.nmo` 和文件夹 `Foo/` 也不会。旧版本保存在 `replays/maps/<关卡文件夹>/` 中的成绩会在首次游玩该关卡时移到那里（只经过真实文件夹，绝不覆盖已有的成绩）。
 
 ## 语言
 

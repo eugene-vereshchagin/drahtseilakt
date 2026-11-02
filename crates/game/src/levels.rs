@@ -22,10 +22,11 @@ pub fn prepare(language: &str) {
         }
         // a folder moved back replaces the README that pointed away (ours, with its marker), and an earlier version
         // of ours is brought up to date; never anyone else's
-        let readme = here.join(README);
-        let small = std::fs::metadata(&readme).is_ok_and(|m| m.len() < 4096);
-        let replace = small && std::fs::read_to_string(&readme).is_ok_and(|t| outdated(&t));
-        write(&here, &about(language, kind), replace);
+        // read as a plain file of at most 4 KiB, never through a link
+        let ours = gamedata::package::read_small(&here.join(README), 4096)
+            .and_then(|b| String::from_utf8(b).ok())
+            .is_some_and(|t| outdated(&t));
+        write(&here, &about(language, kind), ours);
     }
 }
 
@@ -34,13 +35,33 @@ fn outdated(text: &str) -> bool {
     text.ends_with(MOVED_MARK) || SUPERSEDED.contains(&text)
 }
 
-/// Writes `text` as the folder's README, making the folder; an existing README is replaced only when `replace`.
+/// Writes `text` as the folder's README, making the folder; an existing README is replaced only when `replace` and it
+/// is a plain file. A README that is a link (even a dangling one) is never written through or replaced. The text is
+/// written beside and renamed into place, so a README is never half written.
 fn write(folder: &Path, text: &str, replace: bool) {
     let path = folder.join(README);
-    if path.exists() && !replace {
-        return;
+    match std::fs::symlink_metadata(&path) {
+        Ok(m) if m.file_type().is_symlink() => {
+            eprintln!("{}: a link, not written", path.display());
+            return;
+        }
+        Ok(m) if !replace || !m.is_file() => return,
+        _ => {}
     }
-    if let Err(e) = std::fs::create_dir_all(folder).and_then(|()| std::fs::write(&path, text)) {
+    let tmp = folder.join(format!(".{README}.{}.tmp", std::process::id()));
+    let result = std::fs::create_dir_all(folder).and_then(|()| {
+        // a leftover of an earlier run (a file or a link) is removed itself, never followed
+        if std::fs::symlink_metadata(&tmp).is_ok() {
+            std::fs::remove_file(&tmp)?;
+        }
+        let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
+        std::io::Write::write_all(&mut f, text.as_bytes())?;
+        f.sync_all()?;
+        drop(f);
+        std::fs::rename(&tmp, &path)
+    });
+    if let Err(e) = result {
+        let _ = std::fs::remove_file(&tmp);
         eprintln!("could not write {}: {e}", path.display());
     }
 }
@@ -624,6 +645,36 @@ mod tests {
         assert!(!outdated(&format!("{}extra\n", SUPERSEDED[0])));
         assert!(about("en", Kind::Community).contains("level.txt"));
         assert!(about("en", Kind::Remastered).contains("drahtseilakt-toolbox"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_readme_that_is_a_link_is_never_written_through() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-readme-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (folder, outside) = (root.join("levels"), root.join("outside"));
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        // a dangling link: writing through it would make a file outside
+        std::os::unix::fs::symlink(outside.join("made.txt"), folder.join(README)).unwrap();
+        write(&folder, "text", true);
+        assert!(!outside.join("made.txt").exists());
+        assert!(std::fs::symlink_metadata(folder.join(README)).unwrap().file_type().is_symlink());
+        // a link to an existing file: neither it nor its target is changed
+        std::fs::write(outside.join("target.txt"), "theirs").unwrap();
+        std::fs::remove_file(folder.join(README)).unwrap();
+        std::os::unix::fs::symlink(outside.join("target.txt"), folder.join(README)).unwrap();
+        write(&folder, "text", true);
+        assert_eq!(std::fs::read_to_string(outside.join("target.txt")).unwrap(), "theirs");
+        // a plain README: written atomically, replaced only when asked, no temporary file left
+        let plain = root.join("plain");
+        write(&plain, "one", false);
+        write(&plain, "two", false);
+        assert_eq!(std::fs::read_to_string(plain.join(README)).unwrap(), "one");
+        write(&plain, "three", true);
+        assert_eq!(std::fs::read_to_string(plain.join(README)).unwrap(), "three");
+        assert_eq!(std::fs::read_dir(&plain).unwrap().count(), 1);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

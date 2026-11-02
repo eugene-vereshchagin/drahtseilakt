@@ -93,7 +93,9 @@ language); the README's links are text, and the game never opens them.
 
 Replays, best times and highscores are kept per kind, so a community map named like an original level never
 counts as one: `replays/<level>/` for the original levels, `replays/maps/<kind>/<map>/` for the others (`community`, `open`, `remastered`), a level folder's
-under `replays/maps/<kind>/<level folder>/<map>/`, so two folders' `Level_07.NMO` keep their runs apart.
+under `replays/levels/<kind>/<level folder>/<map>/`, so two folders' `Level_07.NMO` keep their runs apart and a
+loose `Foo.nmo` and a folder `Foo/` never share. Runs an earlier version kept in `replays/maps/<level folder>/` are
+moved there the first time the level is played (only through real folders, never over runs already there).
 
 ## Languages
 
