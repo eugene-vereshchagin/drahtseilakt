@@ -1,12 +1,15 @@
 # The neuro sound theme
 
-Every file in `Sounds/` was synthesized for Drahtseilakt by code: oscillators, noise, filters and modal synthesis
+Author: Claude (Anthropic), for Veresk — every sound and piece here was designed and synthesized by Claude, an AI
+model by Anthropic, working for the project's owner.
+
+Every file in `Sounds/` and `Music/` was synthesized for Drahtseilakt by code: oscillators, noise, filters and modal synthesis
 (banks of decaying resonators). The original's sounds were only measured (duration, loudness envelope, spectral
 centroid, peak frequencies and decay) to set the synthesis parameters; no sample of the original was resampled,
 cut, filtered or otherwise copied into them. They are part of the game and under its licence (GPL-3.0-only).
 
-Roles without a sound here (Hit_Stone_Kuppel, Hit_Wood_Dome, Menu_load, Music_thunder, the atmosphere parts and the
-music the game has no part for here) come from the system theme (`fallback system` in theme.txt).
+The theme holds every role the game asks for, so it takes nothing from another theme (`fallback none` in
+theme.txt); a test checks this.
 
 How the paper ball and the iron posts are made (redone after listening in game): the paper ball is a granular
 crackle — thousands of millisecond noise bursts, each band-passed at its own frequency, over a soft rustle with slow
@@ -34,3 +37,9 @@ ostinato in D over a low drone that builds bar by bar (more notes, a drum on the
 run back into the start), rendered so its tails and room wrap round and it loops without a seam. `Music_Final` is a
 struck opening, a sweep up the strings and slow ringing notes in A; `Music_LastFinal` is a bright high chime over a
 soft low rumble.
+
+The roles the system theme used to fill (made 2026-11-03, for a theme complete on its own): the ball on the big dome
+rings the shell's low modes (stone: a 390/440 Hz pair over a 98 Hz body; wood: a deep 43 Hz boom with a 255 Hz ring)
+after a short knock; the level loading is a struck high bell (2.67 kHz with a slow beat) under thin tones sweeping
+upward; the thunder is a dry crack and a long rumble of overlapping low rolls; the three atmospheres are a quiet
+swell and fade of glassy sustained tones, of a breathing band of wind, and of a breathy pad with faint tones in it.
