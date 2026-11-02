@@ -3,7 +3,8 @@
 // "Textures/Font_1.tga"); each such file plays a role (the menu's font, the fall's sound...). Three providers can
 // fill a role: our own files shipped with the game (assets/own/, laid out as the original), the player's copy, and
 // the toolbox's remaster of the copy (levels/remastered/.interface/). The player chooses which comes first with
-// `interface own|original|remastered` (the extended mode's Interface switch); the classic mode plays the copy's.
+// `interface own|original|remastered` (the extended mode's Interface switch); our own is the default, and the
+// classic mode always plays it.
 // A role no provider fills is missing: logged once, never a crash.
 
 use std::path::{Path, PathBuf};
@@ -49,8 +50,8 @@ impl Provider {
 
 /// What the game plays with now, and what the player chose (it takes effect on the next start: the interface's
 /// files are loaded once).
-static IN_USE: AtomicU8 = AtomicU8::new(1);
-static CHOSEN: AtomicU8 = AtomicU8::new(1);
+static IN_USE: AtomicU8 = AtomicU8::new(0);
+static CHOSEN: AtomicU8 = AtomicU8::new(0);
 
 fn index(p: Provider) -> u8 {
     match p {
@@ -85,11 +86,11 @@ pub fn chosen() -> Provider {
     of(CHOSEN.load(Ordering::Relaxed))
 }
 
-/// The settings' choice (`interface ...`), the copy's when none.
+/// The settings' choice (`interface ...`), our own when none.
 pub fn from_settings() -> Provider {
     crate::profile::setting("interface")
         .and_then(|s| Provider::parse(&s))
-        .unwrap_or(Provider::Original)
+        .unwrap_or(Provider::Own)
 }
 
 /// The game's own assets folder (fonts, own files): `DRAHTSEILAKT_ASSETS`, else `assets/` beside the program or
@@ -140,6 +141,11 @@ pub const ROLES: &[(&str, &str)] = &[
         "3D Entities/Menu.nmo",
     ),
     ("menu: the 3D scene behind it", "3D Entities/MenuLevel.nmo"),
+    // ours only: the own interface's picture behind its menus (it stands for the original's 3D scene)
+    (
+        "menu: the own interface's picture behind it",
+        "Textures/Menu_Background.png",
+    ),
     ("texts in the copy's languages", "3D Entities/Language.nmo"),
     ("menu texts and the level table's defaults", "base.cmo"),
     (

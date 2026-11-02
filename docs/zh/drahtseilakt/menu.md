@@ -13,7 +13,7 @@
 | 主菜单（`Menu_Main`） | Start, Highscore, Options, Credits, Exit | Exit 会询问 "Do you want to quit the game?"（Yes / No） |
 | Start（`Menu_Start`） | Level 1 … Level 12, Back | 前一关完成后，这一关才能玩（`DB_Levelfreischaltung`）；其余的显示为灰色。第 13 关附加包会替换 Menu.nmo 并加上它的那一行 |
 | Highscore（`Menu_Highscore`） | "Highscore Level N"、十个名字及分数、Back；左右键切换关卡 | 副本的默认值是 base.cmo 中的数组 `DB_Highscore_LvNN`（"Mr. Default"） |
-| Options（`Menu_Options`） | Graphics, Controls, Sound, Back | |
+| Options（`Menu_Options`） | Graphics, Controls, Sound, Back | 我们在 Back 前另有 Language 和 Extended |
 | Graphics（`Menu_Opt_Graphics`） | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | 副本的默认值（`DB_Options`）：不同步，有云 |
 | Controls（`Menu_Opt_Keys`） | Forward, Backward, Left, Right, Rotation, Overview：各一个键；Invert Rotation? (Yes/No)；OK | 默认：方向键、Shift、Space；`DB_Options` 以按键在 `Language.nmo` 的 `all_keys` 中的行号保存它（按顺序的 DirectInput 扫描码） |
 | Sound（`Menu_Opt_Sound`） | Music Volume, Sound Volume, OK | 音乐和音效两个音量（我们在所有模式下都显示两者，与项目所有者记得的原版一致） |
@@ -28,9 +28,9 @@
 
 ## 我们的：经典模式（默认）
 
-- 与上表相同的界面、行、顺序和字符串，用副本自己的纹理和字体绘制。字符串来自副本的 `Language.nmo`，所以菜单使用副本的语言。
-- **一处新增**：Options 有第四个按钮 *Extended*；它的页面上有开关 *Extended mode?*（Yes / No）。这是玩原版关卡的玩家能看到的唯一区别。
-- 关卡解锁方式与原版相同。高分榜也是原版的：每关十条，分数、名字。它们从副本的默认值开始，保存在我们自己的数据文件夹中，绝不写入游戏的文件。
+- 与上表相同的界面、行、顺序和字符串，用我们自己的界面绘制（decisions.md，“自有界面为默认”；[resources.md](resources.md)，“自有界面”）：我们的纹理、字体和文字。扩展模式的 Interface 开关可以选择原版界面，即用副本的纹理和字体、并使用其 `Language.nmo` 的语言。
+- Options 中有**两处新增**：*Language* 和 *Extended*。*Language* 打开语言页面，每种语言以其自身名称显示（English、Русский、Deutsch、简体中文、Français、Español、Italiano），当前语言显示为金色；按 Enter 立即切换到所选语言并保存（`language zh`）。在玩家选择之前，如果系统语言（区域设置变量 `LC_ALL`、`LC_MESSAGES`、`LANG`；从桌面启动的程序在 Windows 和 macOS 上没有这些变量）在列表中，菜单就使用系统语言，否则使用英语。*Extended* 页面上有开关 *Extended mode?*（Yes / No）。这就是玩原版关卡的玩家能看到的全部变化。
+- 关卡解锁方式与原版相同。高分榜也是原版的：每关十条，分数、名字。它们从我们自己的默认榜单开始（使用原版界面时从副本的默认值开始），保存在我们自己的数据文件夹中，绝不写入游戏的文件。
   读取玩家的 `Database.tdb` 以接管其旧分数是以后的选项（一个解析器：和每个文件读取器一样要经过审查）。
 - **Graphics**：原版的三行，再加一行 *Fullscreen?*（No / Yes / Exclusive），因为窗口也可以占满屏幕。左右键（或 Enter）修改一行；
   修改立即生效并保存在 `settings.txt` 中：

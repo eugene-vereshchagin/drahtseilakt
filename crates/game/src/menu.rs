@@ -1,14 +1,15 @@
 // The menus as the original's Menu.nmo has them (docs/drahtseilakt/menu.md): the main menu, the level list, the
 // highscores, the options and their pages, the credits; over a level the pause, dead and end menus, the yes/no
 // questions and the new highscore's name entry. The words are the copy's (lang.rs), the layout the original's 2D
-// frames as the C game shows them. The extended mode adds the custom levels and a page of its own. Chosen with the
-// arrows and Enter; drawn with the copy's textures and font, or with the prototype's font when the copy lacks it.
+// frames as the C game shows them. The extended mode adds the custom levels and a page of its own; Options adds the
+// Language page. Chosen with the arrows and Enter; drawn with the interface's textures (our own, or the copy's) and
+// its face (ui.rs), or with the prototype's font when there is neither.
 
 use crate::assets::Data;
 use crate::features::{FEATURES, Feature, Features};
 use crate::highscore::{NAME_MAX, Table};
 use crate::hud::{Rect, text, width};
-use crate::lang::{Strings, latin1};
+use crate::lang::{LANGUAGES, Strings, latin1};
 use crate::levels::Kind;
 use crate::options::{Bindings, Fullscreen, Graphics};
 use gamedata::package::Package;
@@ -69,6 +70,8 @@ pub enum Screen {
     Extended,
     /// The extended mode's debug additions (practice tools, endless lives).
     Debug,
+    /// The menus' language.
+    Language,
     Credits,
     /// Over a level: Esc in a run, no lives left, the level finished.
     Pause,
@@ -117,6 +120,9 @@ enum Line {
     Interface,
     /// The sound theme (sound_themes.rs): the arrows go round the themes found.
     SoundTheme,
+    /// The Language page, and a language on it (by its place in lang::LANGUAGES).
+    Language,
+    Lang(usize),
     /// One of the extended mode's additions, by its place in FEATURES.
     Switch(usize),
     Yes,
@@ -156,6 +162,8 @@ pub enum Action {
     Interface(gamedata::resources::Provider),
     /// The sound theme chosen (its key).
     SoundTheme(String),
+    /// The menus' language chosen (its code): the game saves it and speaks it at once.
+    Language(String),
     /// The new highscore's name was entered: the game saves it and shows the list.
     Score(Vec<u8>),
     /// The Graphics page changed: the game applies and saves it.
@@ -284,6 +292,9 @@ impl Menu {
                 .iter()
                 .position(|e| e.number == self.level && e.available && e.open)
                 .and_then(|i| at(Line::Level(i))),
+            Screen::Language => {
+                LANGUAGES.iter().position(|l| l.0 == self.strings.language()).and_then(|i| at(Line::Lang(i)))
+            }
             _ => None,
         };
         if screen == Screen::Highscore {
@@ -324,9 +335,11 @@ impl Menu {
                 Line::Graphics,
                 Line::Controls,
                 Line::Sound,
+                Line::Language,
                 Line::Extended,
                 Line::Back,
             ],
+            Screen::Language => (0..LANGUAGES.len()).map(Line::Lang).chain([Line::Back]).collect(),
             // the original's two volumes: the music's and the effects'
             Screen::Sound => vec![Line::Music, Line::Effects, Line::Back],
             Screen::Extended if self.features.mode => [Line::Mode]
@@ -490,6 +503,14 @@ impl Menu {
             Line::Sound => open(self, Screen::Sound),
             Line::Extended => open(self, Screen::Extended),
             Line::DebugMenu => open(self, Screen::Debug),
+            Line::Language => open(self, Screen::Language),
+            Line::Lang(i) => match LANGUAGES.get(i) {
+                Some(&(code, _)) => {
+                    self.pop();
+                    Action::Language(code.to_owned())
+                }
+                None => Action::None,
+            },
             Line::Exit => open(self, Screen::Ask(Ask::Quit)),
             Line::ExitLevel => open(self, Screen::Ask(Ask::Exit)),
             // the pause asks first; the dead and end menus restart at once
@@ -684,17 +705,17 @@ impl Menu {
         }
     }
 
-    /// The label of a line in the copy's words.
-    fn label(&self, line: Line) -> Vec<u8> {
+    /// The label of a line in the menus' words.
+    fn label(&self, line: Line) -> String {
         let s = &self.strings;
         match line {
             Line::Start => s.get("Menu_Main Button Start", "Start"),
             Line::Kind(k) => match LEVEL_KINDS.get(k) {
-                Some(Kind::Original) => b"Original".to_vec(),
-                Some(Kind::Remastered) => b"Remastered".to_vec(),
-                Some(Kind::Community) => b"Community maps".to_vec(),
-                Some(Kind::Open) => b"Open format".to_vec(),
-                None => Vec::new(),
+                Some(Kind::Original) => s.ours("kind original"),
+                Some(Kind::Remastered) => s.ours("kind remastered"),
+                Some(Kind::Community) => s.ours("kind community"),
+                Some(Kind::Open) => s.ours("kind open"),
+                None => String::new(),
             },
             Line::Highscore => s.get("Menu_Main Button Highscore", "Highscore"),
             Line::Options => s.get("Menu_Main Button Options", "Options"),
@@ -703,38 +724,30 @@ impl Menu {
             Line::Back => s.get("Menu_Start Button Back", "Back"),
             Line::Restart => s.get("Menu_Pause Button Restart", "Restart Level"),
             Line::ExitLevel => s.get("Menu_Pause Button Exit", "Exit Level"),
-            Line::Next if self.screen() == Screen::Highscore => {
-                s.get("Menu_Highscore \"Next\"", "Next")
-            }
+            Line::Next if self.screen() == Screen::Highscore => s.get("Menu_Highscore \"Next\"", "Next"),
             Line::Next => s.get("Menu_End Next Level", "Next level"),
             Line::Home => s.get("Menu_Dead Home", "Home"),
             Line::Graphics => s.get("Menu_Options Button Graphics", "Graphics"),
             Line::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Line::Sound => s.get("Menu_Options Button Sound", "Sound"),
-            Line::Extended => b"Extended".to_vec(),
+            Line::Language => s.ours("language"),
+            Line::Lang(i) => LANGUAGES.get(i).map_or("", |l| l.1).to_owned(),
+            Line::Extended => s.ours("extended"),
             Line::Level(i) => {
                 let n = self.entries.get(i).map_or(0, |e| e.number);
-                s.get(
-                    &format!("Menu_Start Button Level{n}"),
-                    &format!("Level {n}"),
-                )
+                // the copy's own label for the level, else ours
+                let copy = s.get(&format!("Menu_Start Button Level{n}"), "");
+                if copy.is_empty() { s.numbered("level", n) } else { copy }
             }
-            // the level's title (cleaned and capped, package.rs) in the font's Latin-1, what it lacks as '?'
-            Line::Map(i) => self
-                .map_text(i)
-                .map(|t| t.chars().map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?')).collect())
-                .unwrap_or_default(),
+            // the level's title (cleaned and capped, package.rs), any script
+            Line::Map(i) => self.map_text(i).unwrap_or_default(),
             Line::Music => s.get("Menu_Opt_Sound Volume", "Music Volume"),
             Line::Effects => s.ours("sound volume"),
-            Line::Mode => b"  Extended mode?".to_vec(),
-            Line::DebugMenu => b"Debug mode".to_vec(),
-            Line::Interface => b"Interface".to_vec(),
-            Line::SoundTheme => b"Sounds".to_vec(),
-            Line::Switch(i) => FEATURES
-                .get(i)
-                .map_or("", |f| f.label())
-                .as_bytes()
-                .to_vec(),
+            Line::Mode => s.ours("extended mode"),
+            Line::DebugMenu => s.ours("debug mode"),
+            Line::Interface => s.ours("interface"),
+            Line::SoundTheme => s.ours("sounds"),
+            Line::Switch(i) => FEATURES.get(i).map_or_else(String::new, |f| s.ours(&format!("feature {}", f.key()))),
             Line::Yes => s.get("Menu_Opt_Graphics Synch Yes", "Yes"),
             Line::No => s.get("Menu_Opt_Graphics Synch No", "No"),
             Line::Ok => s.get("Menu_YesNo YES", "OK"),
@@ -758,7 +771,7 @@ impl Menu {
     }
 
     /// A switch's row: its label and yes or no.
-    fn switch_field(&self, line: Line) -> (Vec<u8>, Vec<u8>) {
+    fn switch_field(&self, line: Line) -> (String, String) {
         let on = match line {
             Line::Switch(i) => FEATURES.get(i).is_some_and(|&f| self.features.switched_on(f)),
             _ => false,
@@ -773,27 +786,24 @@ impl Menu {
     }
 
     /// A screen's title, if it has one.
-    fn title(&self, screen: Screen) -> Option<Vec<u8>> {
+    fn title(&self, screen: Screen) -> Option<String> {
         let s = &self.strings;
         Some(match screen {
             Screen::Options => s.get("Menu_Options Title", "Options"),
             Screen::Graphics => s.get("Menu_Options Button Graphics", "Graphics"),
             Screen::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Screen::Sound => s.get("Menu_Options Button Sound", "Sound"),
-            Screen::Extended => b"Extended".to_vec(),
-            Screen::Debug => b"Debug mode".to_vec(),
-            Screen::Kinds => b"Levels".to_vec(),
+            Screen::Extended => s.ours("extended"),
+            Screen::Debug => s.ours("debug mode"),
+            Screen::Language => s.ours("language"),
+            Screen::Kinds => s.ours("levels"),
             Screen::Custom => match self.folder.as_ref().and_then(|root| {
                 LEVEL_KINDS.iter().position(|&k| crate::levels::dir(k) == *root)
             }) {
                 Some(k) => self.label(Line::Kind(k)),
-                None => b"Custom levels".to_vec(),
+                None => s.ours("custom levels"),
             },
-            Screen::Highscore => {
-                let mut t = s.get("Highscore Title (+ SPACE!)", "Highscore Level ");
-                t.extend_from_slice(self.shown.to_string().as_bytes());
-                t
-            }
+            Screen::Highscore => s.numbered("Highscore Title (+ SPACE!)", self.shown),
             Screen::Ask(Ask::Quit) => {
                 s.get("Menu_YesNo Exit Game?", "Do you want to quit the game?")
             }
@@ -813,7 +823,7 @@ impl Menu {
     }
 
     /// Lines of text a page shows besides its buttons: (label, value).
-    fn fields(&self, screen: Screen) -> Vec<(Vec<u8>, Vec<u8>)> {
+    fn fields(&self, screen: Screen) -> Vec<(String, String)> {
         let s = &self.strings;
         let yes_no = |b: bool| {
             if b {
@@ -833,14 +843,14 @@ impl Menu {
                 let mut f = vec![
                     (
                         self.label(Line::Resolution),
-                        format!("{} * {}", self.resolution.0, self.resolution.1).into_bytes(),
+                        format!("{} * {}", self.resolution.0, self.resolution.1),
                     ),
                     (self.label(Line::Synch), yes_no(g.vsync)),
                     (self.label(Line::Clouds), yes_no(g.clouds)),
                     (self.label(Line::Fullscreen), full),
                 ];
                 if self.features.mode {
-                    f.push((self.label(Line::Fov), format!("{}", g.fov).into_bytes()));
+                    f.push((self.label(Line::Fov), format!("{}", g.fov)));
                 }
                 f
             }
@@ -854,19 +864,19 @@ impl Menu {
                         let key = if self.waiting == Some(i) {
                             s.ours("press a key")
                         } else {
-                            crate::options::key_label(k, |row| s.key(row))
+                            crate::options::key_label(k, |row, name| s.key(row, name))
                         };
                         (self.label(Line::Key(i)), key)
                     })
                     .collect();
                 if self.features.mode {
-                    f.push((self.label(Line::Defaults), Vec::new()));
+                    f.push((self.label(Line::Defaults), String::new()));
                 }
                 f.push((self.label(Line::Invert), yes_no(self.bindings.invert)));
                 f
             }
             Screen::Sound => {
-                let pct = |v: f32| format!("{}", (v * 10.0).round() as u32).into_bytes();
+                let pct = |v: f32| format!("{}", (v * 10.0).round() as u32);
                 vec![
                     (self.label(Line::Music), pct(self.volumes[1])),
                     (self.label(Line::Effects), pct(self.volumes[0])),
@@ -877,20 +887,16 @@ impl Menu {
                 let mut f = vec![(self.label(Line::Mode), yes_no(self.features.mode))];
                 if self.features.mode {
                     f.extend(switches(false).map(|l| self.switch_field(l)));
-                    f.push((self.label(Line::Interface), interface_value()));
+                    f.push((self.label(Line::Interface), self.interface_value()));
                     f.push((self.label(Line::SoundTheme), theme_value()));
-                    f.push((self.label(Line::DebugMenu), b">".to_vec()));
+                    f.push((self.label(Line::DebugMenu), ">".to_owned()));
                 }
                 f
             }
             Screen::Debug => {
-                let mut f: Vec<(Vec<u8>, Vec<u8>)> = switches(true).map(|l| self.switch_field(l)).collect();
-                for l in [
-                    "R restart, F2 free camera, [ ] speed,",
-                    "F3 five seconds back, F5 / F9 save and back.",
-                    "Helped runs are kept, never the best.",
-                ] {
-                    f.push((l.as_bytes().to_vec(), Vec::new()));
+                let mut f: Vec<(String, String)> = switches(true).map(|l| self.switch_field(l)).collect();
+                for l in ["help 1", "help 2", "help 3"] {
+                    f.push((s.ours(l), String::new()));
                 }
                 f
             }
@@ -908,32 +914,31 @@ impl Menu {
                 "(CC0, CC-BY): assets/sounds/system/CREDITS.md",
             ]
             .iter()
-            .map(|l| (l.as_bytes().to_vec(), Vec::new()))
+            .map(|l| ((*l).to_owned(), String::new()))
             .collect(),
             Screen::Highscore => self
                 .scores
                 .list(self.shown)
                 .iter()
-                .map(|(n, p)| (n.clone(), p.to_string().into_bytes()))
+                .map(|(n, p)| (latin1(n), p.to_string()))
                 .collect(),
             Screen::Entry => vec![
                 (
                     s.get("Menu_HighscoreEntry \"Points\"", "Points"),
-                    self.points.to_string().into_bytes(),
+                    self.points.to_string(),
                 ),
-                (self.name.clone(), Vec::new()),
+                (latin1(&self.name), String::new()),
             ],
             // where to put them, as the folder inside the game's data folder (not a whole path)
             Screen::Custom if self.maps.is_empty() => vec![
-                (b"No levels here yet. Put them into".to_vec(), Vec::new()),
+                (s.ours("no levels"), String::new()),
                 (
                     self.folder
                         .as_ref()
                         .and_then(|f| f.file_name())
                         .map(|n| format!("levels/{}/", n.to_string_lossy()))
-                        .unwrap_or_default()
-                        .into_bytes(),
-                    Vec::new(),
+                        .unwrap_or_default(),
+                    String::new(),
                 ),
             ],
             _ => Vec::new(),
@@ -962,14 +967,11 @@ impl Menu {
         let shown = window(lines.len(), self.chosen());
         let total = 6.0 + fields.len() as f32 + 1.2 * shown.len() as f32;
         let mut y = ((h - total * line) / 2.0).max(0.0);
-        let title = self.title(screen).map_or_else(
-            || "DRAHTSEILAKT".to_owned(),
-            |t| latin1(&t).trim().to_uppercase(),
-        );
+        let title = self.title(screen).map_or_else(|| "DRAHTSEILAKT".to_owned(), |t| t.trim().to_uppercase());
         centre(&mut out, &title, y, s * 1.5, GOLD);
         y += 2.5 * line;
         for (l, v) in &fields {
-            let t = format!("{}  {}", latin1(l).trim(), latin1(v))
+            let t = format!("{}  {}", l.trim(), v)
                 .trim()
                 .to_uppercase();
             centre(&mut out, &t, y, s, WHITE);
@@ -978,7 +980,7 @@ impl Menu {
         y += line;
         for i in shown {
             let Some(&l) = lines.get(i) else { continue };
-            let mut t = latin1(&self.label(l)).trim().to_uppercase();
+            let mut t = self.label(l).trim().to_uppercase();
             if let (Line::Level(k), true) = (l, self.features.has(Feature::BestTimes))
                 && let Some(b) = self.entries.get(k).and_then(|e| e.best)
             {
@@ -1043,13 +1045,13 @@ fn window(n: usize, chosen: usize) -> std::ops::Range<usize> {
 /// buttons over Button01_select (chosen), Button01_deselect or Button01_special (not playable), their labels in the
 /// game's fonts (GameFont_01 for the main buttons, GameFont_03 and the grey GameFont_03a for the small ones).
 impl Menu {
-    pub fn interface(
-        &self,
-        font: Option<&crate::ui::Font>,
-        screen: crate::ui::Screen,
-    ) -> Vec<crate::ui::Quad> {
+    pub fn interface(&self, font: Option<&crate::ui::Face>, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
         use crate::ui::{Anchor, Quad, homogeneous};
         let mut out = Vec::new();
+        // the own interface's picture behind the menus (the original's has its 3D scene, drawn by the game)
+        if font.is_some_and(crate::ui::Face::own) && !self.over_level() {
+            out.push(crate::ui::backdrop(screen));
+        }
         let quad = |r: [f32; 4], uv: [f32; 4], texture: &'static str| Quad {
             rect: screen.rect(homogeneous(r), Anchor::Center),
             uv,
@@ -1065,7 +1067,7 @@ impl Menu {
         });
         // a label wider than its frame is drawn smaller, down to SHRINK of its size, and what still does not fit
         // loses its middle to ".."
-        let label = |out: &mut Vec<Quad>, t: &[u8], r: [f32; 4], style: &crate::ui::Style| {
+        let label = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style| {
             let Some(f) = font else { return };
             let frame = homogeneous(r);
             let avail = frame[2] - frame[0] - style.margins[0] - style.margins[2];
@@ -1097,9 +1099,9 @@ impl Menu {
                     let mid = (frame[1] + frame[3]) / 2.0;
                     let st = scaled(k2.max(WRAP_SHRINK));
                     // each line still too wide at the smallest size loses its middle to ".."
-                    let fit = |mut text: Vec<u8>, r: [f32; 4]| {
+                    let fit = |mut text: String, r: [f32; 4]| {
                         let mut q = f.layout(&text, r, &st);
-                        while wide(&q) > avail && text.len() > 4 {
+                        while wide(&q) > avail && text.chars().count() > 4 {
                             text = shorten(&text);
                             q = f.layout(&text, r, &st);
                         }
@@ -1109,9 +1111,9 @@ impl Menu {
                     quads.extend(fit(b, [frame[0], mid, frame[2], frame[3]]));
                 } else {
                     let st = scaled(k.max(SHRINK));
-                    let mut text = t.to_vec();
+                    let mut text = t.to_owned();
                     quads = f.layout(&text, frame, &st);
-                    while wide(&quads) > avail && text.len() > 4 {
+                    while wide(&quads) > avail && text.chars().count() > 4 {
                         text = shorten(&text);
                         quads = f.layout(&text, frame, &st);
                     }
@@ -1144,7 +1146,7 @@ impl Menu {
             let step = if top + 0.15 * (n as f32 - 1.0) <= 0.76 {
                 0.15
             } else {
-                (0.78 - top) / (n as f32 - 1.0).max(1.0)
+                (0.74 - top) / (n as f32 - 1.0).max(1.0)
             };
             let mut k = 0;
             for (i, &l) in lines.iter().enumerate() {
@@ -1175,7 +1177,7 @@ impl Menu {
             }
         };
         // a field: its label at the top, its value under it (a yes/no pair, or text between arrows)
-        let field = |out: &mut Vec<Quad>, y: f32, name: &[u8], value: &[u8], chosen: bool| {
+        let field = |out: &mut Vec<Quad>, y: f32, name: &str, value: &str, chosen: bool| {
             let r = [0.35, y, 0.65, y + 0.1];
             button(
                 out,
@@ -1191,6 +1193,23 @@ impl Menu {
             Screen::Options | Screen::Kinds => {
                 title(&mut out);
                 big(&mut out, 0.30);
+            }
+            Screen::Language => {
+                title(&mut out);
+                // the languages in their own names, the one spoken in gold
+                for (i, &l) in lines.iter().enumerate() {
+                    let Line::Lang(k) = l else {
+                        button(&mut out, BACK_RECT, BACK_UV, state(i));
+                        label(&mut out, &self.label(l), BACK_RECT, &FONT_01);
+                        continue;
+                    };
+                    let y = 0.28 + k as f32 * 0.065;
+                    let r = [0.4031, y, 0.5969, y + 0.052];
+                    button(&mut out, r, LEVEL_UV, state(i));
+                    let spoken = LANGUAGES.get(k).is_some_and(|c| c.0 == self.strings.language());
+                    let style = if spoken { FONT_03_GOLD } else { FONT_03 };
+                    label(&mut out, &self.label(l), [0.42, y, 0.5969, y + 0.052], &style);
+                }
             }
             Screen::Start => {
                 // 0.06 apart from 0.09 (twelve levels); a thirteenth closes them up
@@ -1216,7 +1235,7 @@ impl Menu {
                         st.align = crate::ui::ALIGN_LEFT;
                         label(
                             &mut out,
-                            clock(t).as_bytes(),
+                            &clock(t),
                             [0.6, y, 0.7, y + step - 0.01],
                             &st,
                         );
@@ -1230,66 +1249,10 @@ impl Menu {
                     let y = 0.27 + row as f32 * 0.045;
                     let r = [0.36, y, 0.64, y + 0.04];
                     button(&mut out, r, LEVEL_UV, state(i));
-                    // a name the game's font cannot draw (Chinese, Cyrillic) in the shipped fonts, as high as its
-                    // letters
-                    let text = match lines[i] {
-                        Line::Map(k) => self.map_text(k).filter(|t| crate::fallback::needed(t)),
-                        _ => None,
-                    };
-                    if let Some(t) = text {
-                        // clear of the button's ball at its left
-                        let frame = crate::ui::homogeneous([0.42, y, 0.615, y + 0.04]);
-                        let height = font
-                            .and_then(|f| f.layout(b"A", frame, &FONT_03).first().map(|q| q.rect[3] - q.rect[1]))
-                            .unwrap_or((frame[3] - frame[1]) * 0.5);
-                        // as the game font's labels: a little smaller to fit, else two lines (at the space nearest
-                        // the middle, or the middle letter for a script without spaces), and what still does not
-                        // fit loses letters to ".."
-                        let (al, co) = (FONT_03.align, FONT_03.color);
-                        let span = |q: &[Quad]| {
-                            q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max)
-                                - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
-                        };
-                        let avail = frame[2] - frame[0];
-                        let fit = |t: &str, r: [f32; 4], h: f32| {
-                            let mut chars: Vec<char> = t.chars().collect();
-                            let mut q = crate::fallback::layout(t, r, h, al, co);
-                            while span(&q) > avail && chars.len() > 3 {
-                                chars.truncate(chars.len() - 1);
-                                let cut: String = chars.iter().collect::<String>().trim_end().to_owned() + "..";
-                                q = crate::fallback::layout(&cut, r, h, al, co);
-                            }
-                            q
-                        };
-                        let mut quads = crate::fallback::layout(&t, frame, height, al, co);
-                        let w = span(&quads);
-                        if w > avail && avail > 0.0 {
-                            let k = avail / w;
-                            let chars: Vec<char> = t.chars().collect();
-                            if k >= FIT_SHRINK || chars.len() < 4 {
-                                quads = fit(&t, frame, height * k.max(SHRINK));
-                            } else {
-                                let mid = chars.len() / 2;
-                                let at = (1..chars.len())
-                                    .filter(|&i| chars.get(i) == Some(&' '))
-                                    .min_by_key(|&i| i.abs_diff(mid))
-                                    .unwrap_or(mid);
-                                let a: String = chars.iter().take(at).collect();
-                                let b: String = chars.iter().skip(at).collect();
-                                let ymid = (frame[1] + frame[3]) / 2.0;
-                                let h = height * WRAP_SHRINK.max(0.5);
-                                quads = fit(a.trim(), [frame[0], frame[1], frame[2], ymid], h);
-                                quads.extend(fit(b.trim(), [frame[0], ymid, frame[2], frame[3]], h));
-                            }
-                        }
-                        out.extend(crate::ui::place(quads, screen, Anchor::Center));
-                        continue;
-                    }
                     // a long name smaller or on two lines, to stay on its button (the label does it)
                     let mut name = self.label(lines[i]);
-                    if name.len() > 60 {
-                        name.truncate(58);
-                        name.extend_from_slice(b"..");
+                    if name.chars().count() > 60 {
+                        name = name.chars().take(58).collect::<String>() + "..";
                     }
                     label(&mut out, &name, [0.42, y, 0.615, y + 0.04], &FONT_03);
                 }
@@ -1423,10 +1386,7 @@ impl Menu {
                 }
                 let fields = self.fields(sc);
                 if let Some((l, p)) = fields.first() {
-                    let mut t = l.clone();
-                    t.extend_from_slice(b": ");
-                    t.extend_from_slice(p);
-                    label(&mut out, &t, [0.38, 0.43133, 0.62, 0.50133], &FONT_01);
+                    label(&mut out, &format!("{l}: {p}"), [0.38, 0.43133, 0.62, 0.50133], &FONT_01);
                 }
                 out.push(Quad {
                     top: [0.0, 0.0, 0.0, 0.43],
@@ -1437,8 +1397,7 @@ impl Menu {
                         SPECIAL,
                     )
                 });
-                let mut name = self.name.clone();
-                name.push(b'_');
+                let name = latin1(&self.name) + "_";
                 label(&mut out, &name, [0.38, 0.52733, 0.62, 0.59733], &FONT_01);
                 button(
                     &mut out,
@@ -1457,23 +1416,32 @@ impl Menu {
         out
     }
 
-    /// The loading screen in the game's font.
+    /// The loading screen in the interface's face: the own interface's picture and band behind it.
     pub fn loading_interface(
-        font: &crate::ui::Font,
+        face: &crate::ui::Face,
         screen: crate::ui::Screen,
+        strings: &Strings,
         what: &str,
     ) -> Vec<crate::ui::Quad> {
-        use crate::ui::{Anchor, homogeneous};
-        let r = [0.3, 0.45, 0.7, 0.55];
-        crate::ui::place(
-            font.layout(
-                format!("Loading {what}").as_bytes(),
-                homogeneous(r),
-                &FONT_01,
-            ),
+        use crate::ui::{Anchor, Quad, homogeneous};
+        let mut out = Vec::new();
+        if face.own() {
+            out.push(crate::ui::backdrop(screen));
+            out.push(Quad {
+                rect: screen.rect(homogeneous([0.0, 0.43, 1.0, 0.57]), Anchor::Center),
+                uv: [0.0, 0.99, 1.0, 1.0],
+                top: [1.0, 1.0, 1.0, 0.61],
+                bottom: [1.0, 1.0, 1.0, 0.61],
+                texture: SPECIAL,
+            });
+        }
+        let text = strings.ours("loading").replace("{name}", what);
+        out.extend(crate::ui::place(
+            face.layout(&text, homogeneous([0.2, 0.45, 0.8, 0.55]), &FONT_01),
             screen,
             Anchor::Center,
-        )
+        ));
+        out
     }
 }
 
@@ -1483,35 +1451,45 @@ const SHRINK: f32 = 0.6;
 const FIT_SHRINK: f32 = 0.75;
 const WRAP_SHRINK: f32 = 0.45;
 
-/// A label in two lines, broken at the space nearest its middle; None for one word.
-fn two_lines(t: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
-    let mid = t.len() / 2;
-    let at = t
+/// A label in two lines, broken at the space nearest its middle, or for a text without spaces in a script that
+/// needs none (Chinese) at its middle character; None for one word.
+fn two_lines(t: &str) -> Option<(String, String)> {
+    let chars: Vec<char> = t.chars().collect();
+    let mid = chars.len() / 2;
+    let at = chars
         .iter()
         .enumerate()
-        .filter(|&(_, &c)| c == b' ')
+        .filter(|&(_, &c)| c == ' ')
         .map(|(i, _)| i)
-        .min_by_key(|&i| i.abs_diff(mid))?;
-    let a = t.get(..at)?.trim_ascii().to_vec();
-    let b = t.get(at + 1..)?.trim_ascii().to_vec();
+        .min_by_key(|&i| i.abs_diff(mid));
+    let (a, b): (String, String) = match at {
+        Some(at) => (chars.iter().take(at).collect(), chars.iter().skip(at + 1).collect()),
+        None if chars.iter().any(|&c| u32::from(c) >= 0x2E80) && chars.len() > 1 => {
+            (chars.iter().take(mid).collect(), chars.iter().skip(mid).collect())
+        }
+        None => return None,
+    };
+    let (a, b) = (a.trim().to_owned(), b.trim().to_owned());
     (!a.is_empty() && !b.is_empty()).then_some((a, b))
 }
 
 /// `t` a letter shorter, its middle shown as "..".
-fn shorten(t: &[u8]) -> Vec<u8> {
-    let Some(at) = t.windows(2).position(|w| w == b"..") else {
+fn shorten(t: &str) -> String {
+    let c: Vec<char> = t.chars().collect();
+    let s = |r: &[char]| r.iter().collect::<String>();
+    let Some(at) = c.windows(2).position(|w| w == ['.', '.']) else {
         // the first time three letters of the middle make room for ".."
-        let mid = t.len() / 2;
-        let head = t.get(..mid.saturating_sub(1)).unwrap_or_default();
-        let tail = t.get(mid + 2..).unwrap_or_default();
-        return [head, b"..", tail].concat();
+        let mid = c.len() / 2;
+        let head = c.get(..mid.saturating_sub(1)).unwrap_or_default();
+        let tail = c.get(mid + 2..).unwrap_or_default();
+        return s(head) + ".." + &s(tail);
     };
-    let head = t.get(..at).unwrap_or_default();
-    let tail = t.get(at + 2..).unwrap_or_default();
+    let head = c.get(..at).unwrap_or_default();
+    let tail = c.get(at + 2..).unwrap_or_default();
     if head.len() > tail.len() {
-        [head.get(..head.len() - 1).unwrap_or_default(), b"..", tail].concat()
+        s(head.get(..head.len() - 1).unwrap_or_default()) + ".." + &s(tail)
     } else {
-        [head, b"..", tail.get(1..).unwrap_or_default()].concat()
+        s(head) + ".." + &s(tail.get(1..).unwrap_or_default())
     }
 }
 
@@ -1554,6 +1532,7 @@ const fn font_style(scale: [f32; 2], color: [f32; 4]) -> crate::ui::Style {
 const FONT_01: crate::ui::Style = font_style([0.45, 0.55], WHITE);
 const FONT_03: crate::ui::Style = font_style([0.35, 0.4], WHITE);
 const FONT_03A: crate::ui::Style = font_style([0.35, 0.4], [0.514, 0.514, 0.514, 1.0]);
+const FONT_03_GOLD: crate::ui::Style = font_style([0.35, 0.4], GOLD);
 
 const WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
 const GREY: [f32; 4] = [0.6, 0.6, 0.6, 1.0];
@@ -1610,24 +1589,26 @@ fn next_theme(by: i32) -> String {
     all.get((at + by).rem_euclid(n) as usize).cloned().unwrap_or_else(|| SYSTEM.to_owned())
 }
 
-/// The Sounds line's value: the chosen theme's key (its folder's name, as the Interface line shows its own).
-fn theme_value() -> Vec<u8> {
-    gamedata::sound_themes::chosen().into_bytes()
+/// The Sounds line's value: the chosen theme's key (its folder's name).
+fn theme_value() -> String {
+    gamedata::sound_themes::chosen()
 }
 
-/// The Interface line's value: the provider chosen, marked when it waits for the next start.
-fn interface_value() -> Vec<u8> {
-    use gamedata::resources::{Provider, chosen, in_use};
-    let name: &[u8] = match chosen() {
-        Provider::Own => b"own",
-        Provider::Original => b"original",
-        Provider::Remastered => b"remaster",
-    };
-    let mut v = name.to_vec();
-    if chosen() != in_use() {
-        v.extend_from_slice(b" (restart)");
+impl Menu {
+    /// The Interface line's value: the provider chosen, marked when it waits for the next start.
+    fn interface_value(&self) -> String {
+        use gamedata::resources::{Provider, chosen, in_use};
+        let s = &self.strings;
+        let mut v = match chosen() {
+            Provider::Own => s.ours("interface own"),
+            Provider::Original => s.ours("interface original"),
+            Provider::Remastered => s.ours("interface remaster"),
+        };
+        if chosen() != in_use() {
+            v = format!("{v} {}", s.ours("restart needed"));
+        }
+        v
     }
-    v
 }
 
 /// The kinds of levels the extended mode offers, in the menu's order (levels.md).
@@ -1669,8 +1650,8 @@ mod tests {
         m.maps = maps_in(&root);
         m.stack.push((Screen::Custom, 0));
         // by title; no folders to open, nested levels and junk not shown
-        let titles: Vec<Vec<u8>> = (0..m.maps.len()).map(|i| m.label(Line::Map(i))).collect();
-        assert_eq!(titles, [b"Alone".to_vec(), b"Alpha Road".to_vec()]);
+        let titles: Vec<String> = (0..m.maps.len()).map(|i| m.label(Line::Map(i))).collect();
+        assert_eq!(titles, ["Alone", "Alpha Road"]);
         assert_eq!(m.enter(), Action::Map(root.join("Alone.NMO")));
         m.set_chosen(1);
         assert_eq!(m.enter(), Action::Map(root.join("Zeta/Level_07.NMO")));
@@ -1821,15 +1802,31 @@ mod tests {
             .collect();
         assert_eq!(
             labels,
-            [&b"Start"[..], b"Highscore", b"Options", b"Credits", b"Exit"]
+            ["Start", "Highscore", "Options", "Credits", "Exit"]
         );
         let mut m = menu(&[true], true);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Kinds, "levels by kind in the extended mode only");
-        let kinds: Vec<Vec<u8>> = m.lines(Screen::Kinds).into_iter().map(|l| m.label(l)).collect();
-        assert_eq!(kinds[..4], [&b"Original"[..], b"Remastered", b"Community maps", b"Open format"]);
+        let kinds: Vec<String> = m.lines(Screen::Kinds).into_iter().map(|l| m.label(l)).collect();
+        assert_eq!(kinds[..4], ["Original", "Remastered", "Community maps", "Open format"]);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Start, "the original levels are the classic list");
+    }
+
+    #[test]
+    fn options_open_the_language_page_and_a_language_is_chosen() {
+        let mut m = menu(&[true], false);
+        m.push(Screen::Options);
+        assert!(m.lines(Screen::Options).contains(&Line::Language));
+        m.set_chosen(3);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Language);
+        // the language spoken is chosen first (English), its name in its own words
+        assert_eq!(m.lines(Screen::Language)[m.chosen()], Line::Lang(0));
+        assert_eq!(m.label(Line::Lang(1)), "Русский");
+        m.step(1);
+        assert_eq!(m.enter(), Action::Language("ru".to_owned()));
+        assert_eq!(m.screen(), Screen::Options, "back on Options");
     }
 
     #[test]
@@ -1890,7 +1887,7 @@ mod tests {
         t.insert(1, b"veresk", 3000);
         m.show_scores(t);
         assert_eq!(m.screen(), Screen::Highscore);
-        assert_eq!(m.label(m.lines(Screen::Highscore)[0]), b"Next");
+        assert_eq!(m.label(m.lines(Screen::Highscore)[0]), "Next");
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::End);
         assert_eq!(m.enter(), Action::Play(2), "Next level is chosen");
@@ -1907,7 +1904,7 @@ mod tests {
         assert_eq!(m.screen(), Screen::Highscore);
         m.adjust(1);
         m.adjust(1);
-        assert_eq!(m.title(Screen::Highscore).unwrap(), b"Highscore Level 3");
+        assert_eq!(m.title(Screen::Highscore).unwrap(), "Highscore Level 3");
         m.back();
         m.step(-1);
         m.step(-1);
@@ -1936,22 +1933,25 @@ mod tests {
 
     #[test]
     fn a_long_label_breaks_at_the_space_nearest_its_middle() {
-        assert_eq!(two_lines(b"Levels by kind?"), Some((b"Levels".to_vec(), b"by kind?".to_vec())));
-        assert_eq!(two_lines(b"Interface: remaster"), Some((b"Interface:".to_vec(), b"remaster".to_vec())));
-        assert_eq!(two_lines(b"Word"), None);
-        assert_eq!(two_lines(b" Word "), None);
-        assert_eq!(two_lines(b""), None);
+        let pair = |a: &str, b: &str| Some((a.to_owned(), b.to_owned()));
+        assert_eq!(two_lines("Levels by kind?"), pair("Levels", "by kind?"));
+        assert_eq!(two_lines("Interface: remaster"), pair("Interface:", "remaster"));
+        assert_eq!(two_lines("Word"), None);
+        assert_eq!(two_lines(" Word "), None);
+        assert_eq!(two_lines(""), None);
+        assert_eq!(two_lines("确定退出游戏"), pair("确定退", "出游戏"), "Chinese at its middle character");
     }
 
     #[test]
     fn shortening_keeps_both_ends() {
-        let mut t = b"abcdefgh".to_vec();
+        let mut t = "abcdefgh".to_owned();
         t = shorten(&t);
-        assert_eq!(t, b"abc..gh");
+        assert_eq!(t, "abc..gh");
         t = shorten(&t);
-        assert_eq!(t, b"ab..gh");
+        assert_eq!(t, "ab..gh");
         t = shorten(&t);
-        assert_eq!(t, b"ab..h");
+        assert_eq!(t, "ab..h");
+        assert_eq!(shorten("уровень"), "ур..нь", "letters, not bytes");
     }
 
     #[test]

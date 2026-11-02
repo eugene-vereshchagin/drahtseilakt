@@ -15,7 +15,7 @@ Englisch, Spanisch, Italienisch und Französisch; `GameSettings.Language` wählt
 | Hauptmenü (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit fragt „Do you want to quit the game?“ (Yes / No) |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | ein Level ist spielbar, sobald das vorige geschafft ist (`DB_Levelfreischaltung`); die anderen sind grau. Das Add-on mit Level 13 ersetzt Menu.nmo und fügt seine Zeile hinzu |
 | Highscore (`Menu_Highscore`) | „Highscore Level N“, zehn Namen mit Punkten, Back; links und rechts wechseln das Level | die Vorgaben der Kopie sind die Arrays `DB_Highscore_LvNN` in base.cmo („Mr. Default“) |
-| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | |
+| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | bei uns vor Back noch Language und Extended |
 | Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | Vorgaben der Kopie (`DB_Options`): keine Synchronisation, Wolken |
 | Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview: je eine Taste; Invert Rotation? (Yes/No); OK | Vorgaben: Pfeile, Shift, Leertaste; `DB_Options` speichert eine Taste als ihre Zeile in `all_keys` aus `Language.nmo` (die Scancodes von DirectInput der Reihe nach) |
 | Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | Lautstärke der Musik und der Effekte (bei uns beide in jedem Modus, wie der Inhaber das Original kennt) |
@@ -31,12 +31,18 @@ Persönliche ist der Name in der Highscore-Liste.
 
 ## Unser klassischer Modus (Vorgabe)
 
-- Dieselben Bildschirme, Zeilen, Reihenfolge und Texte wie in der Tabelle, gezeichnet mit den Texturen und
-  Schriften der Kopie. Die Texte kommen aus `Language.nmo` der Kopie, die Menüs sprechen also ihre Sprache.
-- **Eine Ergänzung**: Options hat eine vierte Schaltfläche, *Extended*; ihre Seite hat den Schalter *Extended
-  mode?* (Yes / No). Das ist der einzige Unterschied, den ein Spieler der Original-Level sieht.
+- Dieselben Bildschirme, Zeilen, Reihenfolge und Texte wie in der Tabelle, gezeichnet mit unserer eigenen Oberfläche
+  (decisions.md, „Die eigene Oberfläche ist die Vorgabe“; [resources.md](resources.md), „Die eigene Oberfläche“):
+  unsere Texturen, unsere Schrift, unsere Texte. Der Schalter Interface des erweiterten Modus kann die des Originals
+  wählen, mit den Texturen und der Schrift der Kopie und in der Sprache ihrer `Language.nmo`.
+- **Zwei Ergänzungen** in Options: *Language* und *Extended*. *Language* öffnet eine Seite mit den Sprachen, jede in
+  ihrem eigenen Namen (English, Русский, Deutsch, 简体中文, Français, Español, Italiano), die gesprochene in Gold; Enter
+  spricht die gewählte sofort und speichert sie (`language de`). Bis der Spieler wählt, sprechen die Menüs die Sprache
+  des Systems (die Locale-Variablen `LC_ALL`, `LC_MESSAGES`, `LANG`; Windows und macOS setzen sie für ein vom Desktop
+  gestartetes Programm nicht), wenn sie eine davon ist, sonst Englisch. *Extended* hat den Schalter *Extended mode?*
+  (Yes / No). Das ist alles, was ein Spieler der Original-Level verändert sieht.
 - Level werden wie im Original freigeschaltet. Highscores wie im Original: zehn pro Level, Punkte, ein Name. Sie
-  beginnen mit den Vorgaben der Kopie und werden in unserem eigenen Datenordner gespeichert, nie in den Dateien
+  beginnen mit unseren eigenen Vorgabelisten (mit der Oberfläche des Originals mit denen der Kopie) und werden in unserem eigenen Datenordner gespeichert, nie in den Dateien
   des Spiels. Die `Database.tdb` des Spielers zu lesen, um alte Punkte zu übernehmen, ist eine spätere Option
   (ein Parser: geprüft wie jeder Dateileser).
 - **Graphics**: die drei Zeilen des Originals und eine weitere, *Fullscreen?* (No / Yes / Exclusive), da ein Fenster

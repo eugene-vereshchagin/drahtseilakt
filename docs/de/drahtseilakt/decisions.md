@@ -266,6 +266,19 @@ welche die Toolbox aus der eigenen Kopie jedes Spielers beilegt. Die Toolbox mac
 Spielers alles, was das Spiel benutzen kann. So wird niemandes Eigentum ausgeliefert, und jeder stellt sich das
 Original mit ein paar Klicks selbst zusammen.
 
+## Die eigene Oberfläche ist die Vorgabe
+
+*2026-11-03.* Nach „Eigene Inhalte als Vorgabe“ liefert das Spiel seine eigene Oberfläche (Menüs, Oberfläche im Level,
+End- und Ladebildschirm: unsere Texturen, von einem Skript im Repository gezeichnet, die freie Schrift Tektur, unsere
+Texte), und sie sieht jeder Spieler als Vorgabe, im klassischen Modus immer. Der Schalter Interface des erweiterten
+Modus wählt die des Originals aus der Kopie des Spielers oder ihr Remaster. Die eigenen Menüs sprechen sieben Sprachen
+(Englisch, Russisch, Deutsch, vereinfachtes Chinesisch, Französisch, Spanisch, Italienisch): eine Seite Language in
+Options, auch im klassischen Modus, denn wer die Menüs nicht lesen kann, kann nicht spielen; Vorgabe ist die Sprache
+des Systems, sonst Englisch. Mit der Oberfläche des Originals und einer Sprache, die seine Kopie nicht hat (Russisch,
+Chinesisch), werden unsere Texte in den mitgelieferten Schriften gezeichnet, da seine Schrift nur Latin-1 kennt.
+Tektur wurde statt Michroma gewählt (näher an den breiten Buchstaben des Originals, aber nur Latein), damit jeder
+lateinische und kyrillische Text eine Gestalt hat.
+
 ## Das generierte Klangthema ist der Standard
 
 *2026-11-02.* Entscheidung des Inhabers: das generierte Klangthema (*neuro*: per Code synthetisierte Effekte, nach

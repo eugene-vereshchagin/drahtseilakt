@@ -37,17 +37,6 @@ impl Feature {
         }
     }
 
-    /// The switch's label on the Extended page.
-    pub fn label(self) -> &'static str {
-        match self {
-            Feature::AllLevels => "All levels open?",
-            Feature::BestTimes => "Best times?",
-            Feature::CustomLevels => "Levels by kind?",
-            Feature::Tools => "Practice tools?",
-            Feature::EndlessLives => "Endless lives?",
-        }
-    }
-
     /// A debug addition: on the Extended page's Debug mode screen, not among the others.
     pub fn debug(self) -> bool {
         matches!(self, Feature::Tools | Feature::EndlessLives)

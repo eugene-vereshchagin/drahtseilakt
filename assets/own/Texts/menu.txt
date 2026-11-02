@@ -1,0 +1,92 @@
+# The own interface's words, one text a line: its key, then English, Russian, German, Simplified Chinese, French,
+# Spanish and Italian, between " | ". Keys of the original's Language.nmo keep its names (its copy's words come first
+# with the original interface, in the copy's five languages); the others are ours. {n} is a number, {name} a level's
+# name. A missing translation (an empty column) is English. Built into the game (lang.rs); written for Drahtseilakt.
+#
+# key | en | ru | de | zh | fr | es | it
+Menu_Main Button Start | Start | Старт | Start | 开始 | Jouer | Jugar | Gioca
+Menu_Main Button Highscore | Highscore | Рекорды | Highscore | 最高分 | Records | Récords | Record
+Menu_Main Button Options | Options | Настройки | Optionen | 设置 | Options | Opciones | Opzioni
+Menu_Main Button Credits | Credits | Авторы | Credits | 制作人员 | Crédits | Créditos | Riconoscimenti
+Menu_Main Button ExitApplication | Exit | Выход | Beenden | 退出 | Quitter | Salir | Esci
+Menu_Start Button Back | Back | Назад | Zurück | 返回 | Retour | Volver | Indietro
+Menu_Pause Button Restart | Restart Level | Заново | Neu starten | 重新开始 | Recommencer | Reiniciar nivel | Ricomincia
+Menu_Pause Button Exit | Exit Level | Выйти из уровня | Level verlassen | 退出关卡 | Quitter le niveau | Salir del nivel | Esci dal livello
+Menu_Highscore "Next" | Next | Далее | Weiter | 继续 | Suivant | Siguiente | Avanti
+Menu_End Next Level | Next Level | Следующий уровень | Nächstes Level | 下一关 | Niveau suivant | Siguiente nivel | Livello successivo
+Menu_Dead Home | Home | В меню | Hauptmenü | 主菜单 | Menu | Menú | Menu
+Menu_Options Title | Options | Настройки | Optionen | 设置 | Options | Opciones | Opzioni
+Menu_Options Button Graphics | Graphics | Графика | Grafik | 图形 | Graphismes | Gráficos | Grafica
+Menu_Options Button Controls | Controls | Управление | Steuerung | 操作 | Commandes | Controles | Comandi
+Menu_Options Button Sound | Sound | Звук | Sound | 声音 | Son | Sonido | Audio
+Menu_Opt_Sound Volume | Music Volume | Громкость музыки | Musiklautstärke | 音乐音量 | Volume musique | Volumen de música | Volume musica
+Menu_Opt_Graphics Synch Yes | Yes | Да | Ja | 是 | Oui | Sí | Sì
+Menu_Opt_Graphics Synch No | No | Нет | Nein | 否 | Non | No | No
+Menu_YesNo YES | OK | ОК | OK | 确定 | OK | Aceptar | OK
+Menu_Opt_Graphics Resolution | Screen Resolution | Разрешение экрана | Auflösung | 屏幕分辨率 | Résolution | Resolución | Risoluzione
+Menu_Opt_Graphics Synch | Sync to Screen? | Вертикальная синхронизация? | Bildsynchronisation? | 垂直同步? | Synchro verticale ? | ¿Sincronización vertical? | Sincronia verticale?
+Menu_Opt_Graphics Clouds | Clouds? | Облака? | Wolken? | 云层? | Nuages ? | ¿Nubes? | Nuvole?
+Menu_Opt_Keys Forward | Forward | Вперёд | Vorwärts | 前进 | Avancer | Adelante | Avanti
+Menu_Opt_Keys Backward | Backward | Назад | Rückwärts | 后退 | Reculer | Atrás | Indietro
+Menu_Opt_Keys Left | Left | Влево | Links | 向左 | Gauche | Izquierda | Sinistra
+Menu_Opt_Keys Right | Right | Вправо | Rechts | 向右 | Droite | Derecha | Destra
+Menu_Opt_Keys Rotation | Rotation | Поворот камеры | Kamera drehen | 旋转视角 | Rotation | Rotación | Rotazione
+Menu_Opt_Keys Overview | Overview | Обзор | Übersicht | 俯瞰 | Vue d'ensemble | Vista general | Panoramica
+Menu_Opt_Keys Invert Cam Rot? | Invert Rotation? | Обратный поворот? | Drehung umkehren? | 反转旋转? | Inverser la rotation ? | ¿Invertir rotación? | Inverti rotazione?
+Highscore Title (+ SPACE!) | Highscore Level {n} | Рекорды: уровень {n} | Highscore Level {n} | 第 {n} 关最高分 | Records niveau {n} | Récords nivel {n} | Record livello {n}
+Menu_YesNo Exit Game? | Do you want to quit the game? | Выйти из игры? | Möchtest du das Spiel beenden? | 确定要退出游戏吗？ | Voulez-vous quitter le jeu ? | ¿Quieres salir del juego? | Vuoi uscire dal gioco?
+Menu_YesNo Restart Level? | Do you want to restart the level? | Начать уровень заново? | Möchtest du das Level neu starten? | 确定要重新开始本关吗？ | Voulez-vous recommencer le niveau ? | ¿Quieres reiniciar el nivel? | Vuoi ricominciare il livello?
+Menu_YesNo Exit Level? | Do you want to exit the level? | Выйти из уровня? | Möchtest du das Level verlassen? | 确定要退出本关吗？ | Voulez-vous quitter le niveau ? | ¿Quieres salir del nivel? | Vuoi uscire dal livello?
+Menu_HighscoreEntry "Enter Highscore" | New highscore entry! | Новый рекорд! | Neuer Highscore! | 新纪录！ | Nouveau record ! | ¡Nuevo récord! | Nuovo record!
+Menu_HighscoreEntry "Points" | Points | Очки | Punkte | 得分 | Points | Puntos | Punti
+level | Level {n} | Уровень {n} | Level {n} | 第 {n} 关 | Niveau {n} | Nivel {n} | Livello {n}
+sound volume | Sound Volume | Громкость звуков | Effektlautstärke | 音效音量 | Volume effets | Volumen de efectos | Volume effetti
+fullscreen | Fullscreen? | Полный экран? | Vollbild? | 全屏? | Plein écran ? | ¿Pantalla completa? | Schermo intero?
+field of view | Field of View | Угол обзора | Blickwinkel | 视野 | Champ de vision | Campo de visión | Campo visivo
+press a key | Press a key | Нажмите клавишу | Taste drücken | 请按键 | Appuyez sur une touche | Pulse una tecla | Premi un tasto
+defaults | Defaults | По умолчанию | Standard | 默认 | Par défaut | Predeterminado | Predefiniti
+exclusive | Exclusive | Эксклюзивный | Exklusiv | 独占 | Exclusif | Exclusiva | Esclusivo
+ball lost | Ball lost | Шар потерян | Ball verloren | 球掉落了 | Balle perdue | Bola perdida | Palla persa
+language | Language | Язык | Sprache | 语言 | Langue | Idioma | Lingua
+extended | Extended | Расширенный | Erweitert | 扩展 | Étendu | Extendido | Esteso
+extended mode | Extended mode? | Расширенный режим? | Erweiterter Modus? | 扩展模式? | Mode étendu ? | ¿Modo extendido? | Modalità estesa?
+debug mode | Debug mode | Режим отладки | Debug-Modus | 调试模式 | Mode débogage | Modo depuración | Modalità debug
+interface | Interface | Интерфейс | Oberfläche | 界面 | Interface | Interfaz | Interfaccia
+interface own | own | свой | eigene | 自带 | propre | propia | propria
+interface original | original | оригинал | Original | 原版 | original | original | originale
+interface remaster | remaster | ремастер | Remaster | 重制 | remaster | remaster | remaster
+restart needed | (restart) | (перезапуск) | (Neustart) | （需重启） | (redémarrer) | (reiniciar) | (riavvia)
+sounds | Sounds | Звуки | Klänge | 音效 | Sons | Sonidos | Suoni
+levels | Levels | Уровни | Level | 关卡 | Niveaux | Niveles | Livelli
+kind original | Original | Оригинальные | Original | 原版 | Originaux | Originales | Originali
+kind remastered | Remastered | Ремастер | Remastered | 重制版 | Remasterisés | Remasterizados | Rimasterizzati
+kind community | Community maps | Карты сообщества | Community-Karten | 社区地图 | Cartes de la communauté | Mapas de la comunidad | Mappe della comunità
+kind open | Open format | Открытый формат | Offenes Format | 开放格式 | Format ouvert | Formato abierto | Formato aperto
+custom levels | Custom levels | Свои уровни | Eigene Level | 自定义关卡 | Niveaux perso | Niveles propios | Livelli personali
+no levels | No levels here yet. Put them into | Здесь пока нет уровней. Положите их в | Noch keine Level hier. Lege sie in | 这里还没有关卡。请放入 | Aucun niveau ici. Placez-les dans | Aún no hay niveles. Ponlos en | Ancora nessun livello. Mettili in
+feature all-levels | All levels open? | Все уровни открыты? | Alle Level offen? | 开放全部关卡? | Tous les niveaux ouverts ? | ¿Todos los niveles abiertos? | Tutti i livelli aperti?
+feature best-times | Best times? | Лучшее время? | Bestzeiten? | 最佳时间? | Meilleurs temps ? | ¿Mejores tiempos? | Tempi migliori?
+feature custom-levels | Levels by kind? | Уровни по видам? | Level nach Art? | 按类别选关? | Niveaux par type ? | ¿Niveles por tipo? | Livelli per tipo?
+feature tools | Practice tools? | Тренировка? | Trainingswerkzeuge? | 练习工具? | Outils d'entraînement ? | ¿Herramientas de práctica? | Strumenti di allenamento?
+feature endless-lives | Endless lives? | Бесконечные жизни? | Unendliche Leben? | 无限生命? | Vies infinies ? | ¿Vidas infinitas? | Vite infinite?
+help 1 | R restart, F2 free camera, [ ] speed, | R заново, F2 свободная камера, [ ] скорость, | R neu, F2 freie Kamera, [ ] Tempo, | R 重来，F2 自由视角，[ ] 速度， | R recommencer, F2 caméra libre, [ ] vitesse, | R reiniciar, F2 cámara libre, [ ] velocidad, | R ricomincia, F2 camera libera, [ ] velocità,
+help 2 | F3 five seconds back, F5 / F9 save and back. | F3 на 5 секунд назад, F5 / F9 сохранить и вернуться. | F3 fünf Sekunden zurück, F5 / F9 sichern und zurück. | F3 后退五秒，F5 / F9 保存与返回。 | F3 cinq secondes en arrière, F5 / F9 sauver et revenir. | F3 cinco segundos atrás, F5 / F9 guardar y volver. | F3 cinque secondi indietro, F5 / F9 salva e torna.
+help 3 | Helped runs are kept, never the best. | Такие забеги хранятся, но не лучшие. | Solche Läufe zählen nie als beste. | 辅助过的成绩会保存，但不算最佳。 | Ces parties ne comptent jamais comme meilleures. | Estas partidas nunca cuentan como mejores. | Queste partite non contano mai come migliori.
+loading | Loading {name} | Загрузка: {name} | Lade {name} | 正在加载 {name} | Chargement : {name} | Cargando {name} | Caricamento: {name}
+level bonus | Level Bonus: | Бонус уровня: | Levelbonus: | 关卡奖励： | Bonus du niveau : | Bonus de nivel: | Bonus livello:
+time points | Time Points: | Очки за время: | Zeitpunkte: | 时间得分： | Points de temps : | Puntos de tiempo: | Punti tempo:
+extra lives | Extra Lives: | Доп. жизни: | Extraleben: | 额外生命： | Vies en plus : | Vidas extra: | Vite extra:
+score | Score: | Итого: | Gesamt: | 总分： | Score : | Puntuación: | Punteggio:
+end keys | Enter: next level    Esc: menu | Enter: следующий уровень    Esc: меню | Enter: nächstes Level    Esc: Menü | Enter：下一关    Esc：菜单 | Entrée : niveau suivant    Échap : menu | Intro: siguiente nivel    Esc: menú | Invio: livello successivo    Esc: menu
+key ArrowUp | Up | Вверх | Hoch | 上 | Haut | Arriba | Su
+key ArrowDown | Down | Вниз | Runter | 下 | Bas | Abajo | Giù
+key ArrowLeft | Left | Влево | Links | 左 | Gauche | Izquierda | Sinistra
+key ArrowRight | Right | Вправо | Rechts | 右 | Droite | Derecha | Destra
+key ShiftLeft | Left Shift | Левый Shift | Umschalt links | 左 Shift | Maj gauche | Mayús izq. | Maiusc sinistro
+key ShiftRight | Right Shift | Правый Shift | Umschalt rechts | 右 Shift | Maj droite | Mayús der. | Maiusc destro
+key ControlLeft | Left Ctrl | Левый Ctrl | Strg links | 左 Ctrl | Ctrl gauche | Ctrl izq. | Ctrl sinistro
+key ControlRight | Right Ctrl | Правый Ctrl | Strg rechts | 右 Ctrl | Ctrl droite | Ctrl der. | Ctrl destro
+key Space | Space | Пробел | Leertaste | 空格 | Espace | Espacio | Spazio
+key Enter | Enter | Enter | Eingabe | 回车 | Entrée | Intro | Invio
+key Tab | Tab | Tab | Tab | Tab | Tab | Tab | Tab
+key Backspace | Backspace | Backspace | Rücktaste | 退格 | Retour arrière | Retroceso | Backspace

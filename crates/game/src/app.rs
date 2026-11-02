@@ -80,8 +80,9 @@ struct Game {
     extra_model: Option<scene::ExtraModel>,
     /// The particle systems (flames, the extra points' sparkles); only for the eye.
     effects: crate::particles::Effects,
-    /// The game's font (Font_1 with its glyph table), when the copy has it.
-    font: Option<crate::ui::Font>,
+    /// The interface's face: the own one in the shipped fonts, or the copy's font (Font_1 with its glyph table) for
+    /// the original's interface.
+    font: Option<crate::ui::Face>,
     /// The floors that take the ball's shadow.
     shadow_receivers: Vec<scene::ShadowReceiver>,
     /// The level's music theme (the level table's Music), and whether it is the last original level.
@@ -239,7 +240,7 @@ impl Game {
             session: None,
             extra_model,
             effects,
-            font: crate::ui::Font::game(data),
+            font: crate::ui::Face::new(data, gamedata::resources::in_use()),
             shadow_receivers: scene::shadow_receivers(&level.level),
             music_theme: level.level.settings.music,
             level_bonus,
@@ -663,6 +664,12 @@ fn load_graphics() -> crate::options::Graphics {
     crate::options::Graphics::load(setting)
 }
 
+/// The menus' words in the chosen language (lang.rs): the copy's for the original's interface, else ours.
+fn load_strings(data: &Data) -> crate::lang::Strings {
+    let copy = gamedata::resources::in_use() != gamedata::resources::Provider::Own;
+    crate::lang::Strings::load(data, &crate::lang::chosen(setting("language").as_deref()), copy)
+}
+
 /// The keys kept in the settings, else the copy's (its DB_Options), else the original's.
 fn load_bindings(strings: &crate::lang::Strings) -> crate::options::Bindings {
     crate::options::Bindings::load(setting, strings.controls, strings.invert)
@@ -747,7 +754,7 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
         "end" => Screen::End,
         _ => return None,
     };
-    let strings = crate::lang::Strings::load(data, &crate::lang::chosen(setting("language").as_deref()));
+    let strings = load_strings(data);
     let number = match o.source {
         crate::assets::Source::Original(n) => Some(n),
         _ => None,
@@ -862,11 +869,12 @@ pub fn replay_dir() -> PathBuf {
 }
 
 pub fn run(o: Options, data: Data) -> Result<(), String> {
-    // where the interface's files come from: the extended mode's choice, the copy's in the classic mode
+    // where the interface's files come from: the extended mode's choice, our own in the classic mode
     let chosen = gamedata::resources::from_settings();
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
-    gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Original });
+    // the own interface by default and always in the classic mode; the extended mode may choose the original's
+    gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Own });
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (a player who chose the original's interface before there were themes keeps hearing the original's sounds)
     let theme = if extended {
@@ -981,7 +989,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     event_loop.set_control_flow(ControlFlow::Poll);
     // Without a level named, the window opens with the main menu over the first level.
     crate::levels::prepare(&crate::lang::docs_language(setting("language").as_deref()));
-    let strings = crate::lang::Strings::load(&data, &crate::lang::chosen(setting("language").as_deref()));
+    let strings = load_strings(&data);
     let features = load_features(o.debug);
     let graphics = load_graphics();
     let bindings = load_bindings(&strings);
@@ -1845,11 +1853,19 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     if let Some((w, h, rgba)) = data.texture(&shadow) {
         renderer.set_shadow_texture(w, h, rgba);
     }
-    for name in crate::particles::textures().into_iter().chain(["Font_1", "Button01_special", "Button01_select", "Button01_deselect"]) {
+    // the interface's textures; the own interface's picture behind its menus only with it (the copy has none)
+    let own = gamedata::resources::in_use() == gamedata::resources::Provider::Own;
+    let interface = ["Font_1", "Button01_special", "Button01_select", "Button01_deselect"];
+    let backdrop = own.then_some(crate::ui::BACKDROP);
+    // the own interface draws its texts in the shipped fonts: the copy's font is not read
+    let fonts = interface.into_iter().filter(|n| !(own && *n == "Font_1"));
+    for name in crate::particles::textures().into_iter().chain(fonts).chain(backdrop) {
         let t = level::Texture {
             name: name.to_owned(),
             source: level::TextureSource::File(if name.starts_with("Font_") || name.starts_with("Button") {
                 format!("{name}.tga")
+            } else if name == crate::ui::BACKDROP {
+                format!("{name}.png")
             } else {
                 format!("{name}.bmp")
             }),
@@ -1946,11 +1962,11 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     );
     let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
     let mut quads = crate::hud::interface(&game.sim, game.font.as_ref(), screen);
-    let strings = crate::lang::Strings::load(data, &crate::lang::chosen(setting("language").as_deref()));
+    let strings = load_strings(data);
     let lost = strings.ours("ball lost");
     quads.extend(crate::hud::ball_lost(&game.sim, game.ball_lost_at, &lost, game.font.as_ref(), screen));
     if let (Some(t), Some(f)) = (crate::endscreen::of(&game.sim), game.font.as_ref()) {
-        quads.extend(crate::endscreen::interface(&t, f, screen));
+        quads.extend(crate::endscreen::interface(&t, f, &strings, screen));
     }
     // DRAHTSEILAKT_SHOT_MENU=base:keys draws a menu over the frame, to look at the menus without a window: base is
     // main, pause, dead or end, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options.
@@ -2161,7 +2177,10 @@ impl App {
         let Gpu { surface, config, mut renderer, modes } = window_gpu(&window)?;
         upload(&mut renderer, &self.game, &self.data);
         if self.menu_scene.is_none() {
-            self.menu_scene = crate::menuscene::MenuScene::load(&self.data);
+            // the original's 3D scene behind its menus; the own interface has its picture (menu.rs)
+            if gamedata::resources::in_use() != gamedata::resources::Provider::Own {
+                self.menu_scene = crate::menuscene::MenuScene::load(&self.data);
+            }
         }
         upload_menu_scene(&mut renderer, self.menu_scene.as_mut(), &self.data);
         self.gpu = Some(Gpu {
@@ -2479,6 +2498,14 @@ impl App {
                 gamedata::resources::set_chosen(p);
                 save_settings(self.volumes, self.features, &self.player);
             }
+            Action::Language(code) => {
+                // spoken at once: the menus' words again, in the new language
+                put_settings(&[("language".to_owned(), code)]);
+                self.strings = load_strings(&self.data);
+                if let Some(m) = &mut self.menu {
+                    m.strings = self.strings.clone();
+                }
+            }
             Action::SoundTheme(key) => {
                 // the next sounds and pieces come from the new theme
                 gamedata::sound_themes::choose(&key);
@@ -2795,7 +2822,9 @@ impl App {
         let screen = crate::ui::Screen { w: gpu.config.width as f32, h: gpu.config.height as f32 };
         let font = self.game.font.as_ref();
         let quads = match (&self.menu, &self.loading, font) {
-            (_, Some((source, _)), Some(f)) => Menu::loading_interface(f, screen, &loading_name(source)),
+            (_, Some((source, _)), Some(f)) => {
+                Menu::loading_interface(f, screen, &self.strings, &loading_name(source))
+            }
             (Some(m), None, Some(_)) => {
                 // over a level its points and lives stay in view, as the original's pause shows them
                 let mut q = Vec::new();
@@ -2810,7 +2839,7 @@ impl App {
                 let lost = self.strings.ours("ball lost");
                 q.extend(crate::hud::ball_lost(&self.game.sim, self.game.ball_lost_at, &lost, font, screen));
                 if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
-                    q.extend(crate::endscreen::interface(&t, f, screen));
+                    q.extend(crate::endscreen::interface(&t, f, &self.strings, screen));
                 }
                 q
             }
