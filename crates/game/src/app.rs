@@ -249,8 +249,8 @@ impl Game {
                 let (root, old) = runs_root(&o.source);
                 let stem = level.name.trim_end_matches(".NMO").trim_end_matches(".nmo");
                 match old.map(|old| move_runs(&old, &root, stem)) {
-                    Some(Ok(true)) => println!("runs of {stem} moved to {}", root.display()),
-                    Some(Err(e)) => eprintln!("could not move the runs of {stem}: {e}"),
+                    Some(Ok(true)) => println!("runs of {} moved to {}", shown(stem), shown_path(&root)),
+                    Some(Err(e)) => eprintln!("could not move the runs of {}: {}", shown(stem), shown(&e)),
                     _ => {}
                 }
                 root
@@ -478,8 +478,8 @@ impl Game {
         let path = dir.join(format!("attempt-{stamp}-{}.replay", self.sim.tick));
         let _ = std::fs::create_dir_all(&dir);
         match std::fs::write(&path, self.replay_out.to_text()) {
-            Ok(()) => println!("attempt saved to {}", path.display()),
-            Err(e) => eprintln!("could not save the attempt to {}: {e}", path.display()),
+            Ok(()) => println!("attempt saved to {}", shown_path(&path)),
+            Err(e) => eprintln!("could not save the attempt to {}: {e}", shown_path(&path)),
         }
     }
 
@@ -585,8 +585,8 @@ impl Game {
                 let _ = std::fs::create_dir_all(d);
             }
             match std::fs::write(&path, &text) {
-                Ok(()) => println!("run saved to {}", path.display()),
-                Err(e) => eprintln!("could not save the run to {}: {e}", path.display()),
+                Ok(()) => println!("run saved to {}", shown_path(&path)),
+                Err(e) => eprintln!("could not save the run to {}: {e}", shown_path(&path)),
             }
         }
     }
@@ -809,9 +809,10 @@ fn runs_root(source: &crate::assets::Source) -> (PathBuf, Option<PathBuf>) {
             let kind = folder.and_then(Path::parent).filter(|k| custom_roots().iter().any(|r| r == k));
             match (kind.and_then(name), folder.and_then(name)) {
                 (Some(kind), Some(folder)) => {
-                    // the old place was named by the folder alone: one named like a kind's folder was shared then
-                    let reserved = ["original", "community", "remastered", "open", "other"];
-                    let shared = reserved.iter().any(|r| folder.to_string_lossy().eq_ignore_ascii_case(r));
+                    // the old place was named by the folder alone, and a loose map's by its kind's folder's name (that
+                    // folder may be moved, ~/MyMaps): a level folder named like one of those shared it then
+                    let kinds = crate::levels::KINDS.into_iter().map(crate::levels::dir);
+                    let shared = folder == "other" || kinds.filter_map(|d| name(&d)).any(|k| k == folder);
                     let old = (!shared).then(|| maps.join(&folder));
                     (replay_dir().join("levels").join(kind).join(folder), old)
                 }
@@ -822,6 +823,15 @@ fn runs_root(source: &crate::assets::Source) -> (PathBuf, Option<PathBuf>) {
             (maps.join(p.parent().and_then(name).unwrap_or_else(|| "other".into())), None)
         }
     }
+}
+
+/// Text and paths from level names, printed with control and format characters escaped.
+fn shown(s: &str) -> String {
+    gamedata::package::printable(s)
+}
+
+fn shown_path(p: &Path) -> String {
+    gamedata::package::printable(&p.to_string_lossy())
 }
 
 /// Moves a level's runs from where an earlier version kept them (`old`/`stem`) to `new`/`stem`, once: only real
@@ -2987,7 +2997,12 @@ mod runs_tests {
         // the loose map's runs are in <loose>/Foo, the folder's in <folder>/Foo: neither inside the other
         assert!(!folder.join("Foo").starts_with(loose.join("Foo")) && !loose.join("Foo").starts_with(&folder));
         assert_eq!(old, Some(replay_dir().join("maps").join("Foo")));
-        let (_, none) = runs_root(&crate::assets::Source::Nmo(community.join("community").join("x.nmo")));
-        assert_eq!(none, None, "a folder named like a kind shared its old place: not moved");
+        // a level folder named exactly like a kind's folder (wherever it is moved) shared its old place: not moved
+        let kind_name = community.file_name().unwrap().to_owned();
+        let (_, none) = runs_root(&crate::assets::Source::Nmo(community.join(&kind_name).join("x.nmo")));
+        assert_eq!(none, None);
+        let (_, some) = runs_root(&crate::assets::Source::Nmo(community.join("Community-like").join("x.nmo")));
+        assert!(some.is_some());
+        assert_eq!(shown("a\u{1b}[2J"), "a\\u{1b}[2J");
     }
 }
