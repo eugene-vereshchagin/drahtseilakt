@@ -567,11 +567,24 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
     while Instant::now() < deadline {
         let ms = deadline.saturating_duration_since(Instant::now()).as_millis().to_string();
         let o = spawn(target, &[("FUZZ_FROM", iter.to_string()), ("FUZZ_MS", ms)], rss_cap);
+        let status = o.status.map(describe).unwrap_or_else(|| "not started".into());
         for f in &o.findings {
+            // a hang or an oom must come again in a fresh process: a machine busy elsewhere (swapping) stalls any
+            // input, and memory a long run kept is not the input's
+            let mut w = f.split_whitespace();
+            if let (Some("hang" | "oom"), Some(path)) = (w.next(), w.nth(1)) {
+                let path = PathBuf::from(path);
+                let input = std::fs::read(&path).unwrap_or_default();
+                if !reproduces(target, &input, &status, rss_cap) {
+                    eprintln!("{}: {f}: not again in a fresh process; dropped", target.name);
+                    let _ = std::fs::remove_file(&path);
+                    let _ = std::fs::remove_file(path.with_extension("txt"));
+                    continue;
+                }
+            }
             eprintln!("{}: FOUND {f}", target.name);
             findings.push(f.clone());
         }
-        let status = o.status.map(describe).unwrap_or_else(|| "not started".into());
         if let Some((next, n)) = o.done {
             execs += n;
             iter = next;
@@ -589,8 +602,8 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
                     let mut w = f.split_whitespace();
                     let _kind = w.next();
                     let at: Option<u64> = w.next().and_then(|v| v.parse().ok());
-                    if let Some(p) = w.next() {
-                        to_minimize.push((PathBuf::from(p), status.clone()));
+                    if let Some(p) = w.next().map(PathBuf::from).filter(|p| p.exists()) {
+                        to_minimize.push((p, status.clone()));
                     }
                     iter = at.map_or(reached + 1, |a| a + 1);
                 } else {

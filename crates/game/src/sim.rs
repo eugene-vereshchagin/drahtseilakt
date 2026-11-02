@@ -2095,12 +2095,12 @@ fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use level::{Group, Level, Material, Mesh, Object, Part};
 
     /// A flat 200×200 floor at y = 0 in Phys_Floors, a start at the origin, a reset point a ball's radius up.
-    fn flat_level() -> Level {
+    pub(crate) fn flat_level() -> Level {
         let s = 100.0;
         let floor = Mesh {
             name: "floor".into(),

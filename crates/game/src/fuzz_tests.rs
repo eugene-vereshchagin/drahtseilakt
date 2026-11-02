@@ -5,7 +5,9 @@
 //   wav, ogg   a sound or music file as audio.rs decodes it;
 //   highscore  the saved highscore table;
 //   settings   the settings file as every reader of it takes its values (graphics, keys, extended mode's additions,
-//              language, interface, volumes).
+//              language, interface, volumes);
+//   level_sim  a level (an .nmo, or the open format) loaded and played for a second: what a stranger's map does to
+//              the game past its reader (the physics over its shapes, the rules over its objects).
 // #[ignore]: `FUZZ_SECS=600 cargo test --release --offline -p drahtseilakt fuzz_tests -- --ignored`. Seeds: synthetic
 // inputs, the repository's own hints and replays and shipped sounds, and the player's files when present.
 
@@ -228,6 +230,66 @@ fn fuzz_settings() {
     fuzzkit::fuzz(t, settings_seeds, run_settings);
 }
 
+// --- a level played ----------------------------------------------------------------------------------------------
+
+/// The first bytes say the form: "Nemo" an .nmo file, anything else the open format (level.gltf, then level.bin).
+fn run_level_sim(input: &[u8]) {
+    let level = if input.starts_with(b"Nemo") {
+        match level::from_nmo::load(input) {
+            Ok(l) => l.level,
+            Err(_) => return,
+        }
+    } else {
+        let parts = fuzzkit::split_parts(input, 2);
+        match level::open::import_bytes(&fuzzkit::scratch(), parts[0], parts[1]) {
+            Ok(l) => l,
+            Err(_) => return,
+        }
+    };
+    let mut sim = crate::sim::Sim::new(&level, crate::sim::BallKind::Wood);
+    // a second of play, the arrows and the camera keys taken from the input's last bytes
+    for k in 0..60usize {
+        let bits = input.get(input.len().saturating_sub(1 + k % 16)).copied().unwrap_or(0);
+        sim.step(bits);
+    }
+}
+
+fn level_sim_seeds() -> Vec<Vec<u8>> {
+    let mut out = Vec::new();
+    let d = fuzzkit::scratch().join("seed");
+    let _ = std::fs::create_dir_all(&d);
+    if level::open::export(&crate::sim::tests::flat_level(), &d).is_ok()
+        && let (Ok(g), Ok(b)) = (std::fs::read(d.join("level.gltf")), std::fs::read(d.join("level.bin")))
+    {
+        out.push(fuzzkit::join_parts(&[&g, &b]));
+    }
+    // the player's converted levels and maps, small ones
+    let mut roots = profile("levels/open");
+    roots.extend(fuzzkit::real_roots());
+    for p in fuzzkit::files_under(&roots, &["gltf", "nmo"], 16, 2 << 20) {
+        if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("nmo")) {
+            if let Ok(b) = std::fs::read(&p) {
+                out.push(b);
+            }
+        } else if let Some(dir) = p.parent()
+            && std::fs::metadata(dir.join("level.bin")).is_ok_and(|m| m.len() <= 4 << 20)
+            && let (Ok(g), Ok(b)) = (std::fs::read(&p), std::fs::read(dir.join("level.bin")))
+        {
+            out.push(fuzzkit::join_parts(&[&g, &b]));
+        }
+    }
+    out
+}
+
+#[test]
+#[ignore]
+fn fuzz_level_sim() {
+    let mut t = Target::new("level_sim", test_name!("fuzz_level_sim"), Kind::Binary);
+    t.max_len = 16 << 20;
+    t.rss_mb = 1024;
+    fuzzkit::fuzz(t, level_sim_seeds, run_level_sim);
+}
+
 // --- committed repros --------------------------------------------------------------------------------------------
 
 #[test]
@@ -238,4 +300,5 @@ fn fuzz_regressions() {
     fuzzkit::regressions("ogg", run_ogg);
     fuzzkit::regressions("highscore", run_highscore);
     fuzzkit::regressions("settings", run_settings);
+    fuzzkit::regressions("level_sim", run_level_sim);
 }

@@ -21,7 +21,8 @@ FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -
 
 Targets: `nmo_file`, `nmo_chunk`, `open_level` (crate `level`); `image`, `level_txt`, `theme_txt`, `sound_table`
 (`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `wav`, `ogg`, `highscore`,
-`settings` (the game, `crates/game/src/fuzz_tests.rs`).
+`settings` and `level_sim` — a level loaded and played for a second, which takes a stranger's map past its reader
+into the physics and the rules (the game, `crates/game/src/fuzz_tests.rs`).
 
 Seeds are small synthetic files the tests make, the game's own shipped files, and — when present — the player's
 files (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, the profile's original and community levels), read at run time and
@@ -46,4 +47,4 @@ cd fuzz && cargo +nightly fuzz run nmo_file corpus/nmo_file
 ```
 
 The game is a binary crate, so of its own parsers only `replay` (which stands alone) has a cargo-fuzz target; the
-others (`hints`, `wav`, `ogg`, `highscore`, `settings`) run on the stable fuzzer.
+others (`hints`, `wav`, `ogg`, `highscore`, `settings`, `level_sim`) run on the stable fuzzer.

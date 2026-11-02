@@ -36,8 +36,9 @@ declare -A where=(
   [ogg]="game/drahtseilakt fuzz_tests::fuzz_ogg"
   [highscore]="game/drahtseilakt fuzz_tests::fuzz_highscore"
   [settings]="game/drahtseilakt fuzz_tests::fuzz_settings"
+  [level_sim]="game/drahtseilakt fuzz_tests::fuzz_level_sim"
 )
-order=(nmo_file nmo_chunk open_level image ogg disc_image cue_sheet iscab wav replay hints settings highscore
+order=(nmo_file nmo_chunk open_level level_sim image ogg disc_image cue_sheet iscab wav replay hints settings highscore
   level_txt theme_txt sound_table)
 targets=("$@")
 [ ${#targets[@]} -eq 0 ] && targets=("${order[@]}")
