@@ -54,8 +54,11 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
   - best times beside the levels;
   - levels by kind under Start;
   - practice tools: free camera (F2), slower and faster (`[` `]`), save the moment and go back to it (F5 / F9),
-    the sector and tick on screen; a run helped this way is kept but never a best run;
-  - the sound volume beside the music volume.
+    five seconds back (F3, again for further, up to half a minute), the sector and tick on screen; a run helped this
+    way is kept but never a best run;
+  - the sound volume beside the music volume;
+  - endless lives: the last ball is never lost (a run it saves is never a best run). There is no time limit to lift:
+    the points only count down and stop at zero, as in the original.
   More switches come with the features in the roadmap (field of view, timers, the ghost of the best run).
 - **Levels by kind**: Start offers *Original* (the classic list of levels), *Remastered*, *Community maps* and
   *Open format*, the folders of `levels/` ([levels.md](levels.md)). In each, its levels by file name, then the folders

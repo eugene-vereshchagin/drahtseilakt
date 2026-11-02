@@ -56,8 +56,11 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   - Bestzeiten neben den Leveln;
   - Level nach Art unter Start;
   - Übungswerkzeuge: freie Kamera (F2), langsamer und schneller (`[` `]`), den Moment sichern und dorthin zurück
-    (F5 / F9), Sektor und Tick auf dem Bildschirm; ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;
-  - die Lautstärke der Geräusche neben der Musik.
+    (F5 / F9), fünf Sekunden zurück (F3, nochmals weiter, bis eine halbe Minute), Sektor und Tick auf dem Bildschirm;
+    ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;
+  - die Lautstärke der Geräusche neben der Musik;
+  - endlose Leben: die letzte Kugel geht nie verloren (ein so geretteter Lauf ist nie bester Lauf). Ein Zeitlimit zum
+    Aufheben gibt es nicht: die Punkte zählen nur herunter und bleiben bei null stehen, wie im Original.
   Weitere Schalter kommen mit den Funktionen des Fahrplans (Blickwinkel, Timer, Geist des besten Laufs).
 - **Level nach Art**: Start bietet *Original* (die klassische Levelliste), *Remastered*, *Community maps* und
   *Open format*, die Ordner von `levels/` ([levels.md](levels.md)). In jedem seine Level nach Dateinamen, dann die

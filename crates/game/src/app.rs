@@ -614,6 +614,11 @@ fn load_volumes() -> [f32; 2] {
 }
 
 
+/// F3 goes this far back (five seconds); the run is kept once a second for the last half minute.
+const REWIND_TICKS: u64 = 300;
+const HISTORY_EVERY: u64 = 60;
+const HISTORY_KEPT: usize = 31;
+
 /// The mode saved in the settings: extended (our additions on) only when chosen, else classic (the original).
 fn load_extended() -> bool {
     setting("profile").as_deref() == Some("extended")
@@ -822,6 +827,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         player: load_player(),
         time_scale: 1.0,
         saved: None,
+        history: std::collections::VecDeque::new(),
         fly: None,
         fly_keys: 0,
         last_view: (glam::Vec3::ZERO, glam::Vec3::X),
@@ -1608,6 +1614,8 @@ struct App {
     /// saved moment of the run (F5) to go back to (F9).
     time_scale: f32,
     saved: Option<(Sim, Replay)>,
+    /// Extended profile: the run as it was each second of the last half minute, to go five seconds back (F3).
+    history: std::collections::VecDeque<(Sim, Replay)>,
     /// The keys down now.
     held: std::collections::HashSet<KeyCode>,
 }
@@ -1736,6 +1744,30 @@ impl App {
             }
         }
         self.heard = sim.events.len();
+    }
+
+    /// Practice: keeps the run as it is once a second (the last half minute) for F3, and the last ball when endless
+    /// lives are on. A run that went back (its tick behind the moments kept) starts the history again.
+    fn keep_history(&mut self) {
+        let tools = self.tools() && self.game.replay_in.is_none();
+        self.game.sim.endless_lives = tools && self.features.has(crate::features::Feature::EndlessLives);
+        if self.game.sim.lives_spared {
+            self.game.assisted = true;
+        }
+        if !tools {
+            self.history.clear();
+            return;
+        }
+        let tick = self.game.sim.tick;
+        if self.history.back().is_some_and(|(s, _)| s.tick > tick) {
+            self.history.clear();
+        }
+        if self.history.back().is_none_or(|(s, _)| tick >= s.tick + HISTORY_EVERY) {
+            self.history.push_back((self.game.sim.clone(), self.game.replay_out.clone()));
+            if self.history.len() > HISTORY_KEPT {
+                self.history.pop_front();
+            }
+        }
     }
 
     /// The run starts again: its music too.
@@ -1952,6 +1984,22 @@ impl App {
                 }
                 0
             }
+            KeyCode::F3 if down && self.tools() => {
+                // five seconds back, from the moments kept each second; pressed again it goes on further back
+                let to = self.game.sim.tick.saturating_sub(REWIND_TICKS);
+                while self.history.len() > 1 && self.history.back().is_some_and(|(s, _)| s.tick > to) {
+                    self.history.pop_back();
+                }
+                if let Some((sim, replay)) = self.history.back() {
+                    self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
+                    self.game.sim = sim.clone();
+                    self.game.replay_out = replay.clone();
+                    self.game.assisted = true;
+                    self.prev = None;
+                    self.menu = None;
+                }
+                0
+            }
             KeyCode::F5 if down && self.tools() => {
                 self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone()));
                 0
@@ -2024,6 +2072,7 @@ impl App {
         while self.acc >= TICK {
             self.prev = Some(Snapshot::of(&self.game.sim));
             self.game.tick(self.keys);
+            self.keep_history();
             self.acc -= TICK;
             ticks += 1;
         }
