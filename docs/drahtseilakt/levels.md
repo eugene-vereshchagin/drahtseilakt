@@ -12,7 +12,7 @@ they come from and what format they are in:
 | Folder | What | Where it comes from | Mode |
 |---|---|---|---|
 | `levels/original/` | the original game: `base.cmo`, `3D Entities/`, `Textures/`, `Sounds/` and the rest, level 13's add-on installed into it | copied by the game from the player's installed game or CD | classic and extended |
-| `levels/community/` | community maps, `.nmo` | the player downloads them; the folder's README says where | extended |
+| `levels/community/` | community maps, `.nmo`, in folders as the player likes (the menu opens them, four deep) | the player downloads them; the folder's README says where | extended |
 | `levels/remastered/` | the original levels converted to the open format, with textures upscaled to 4K–8K and what else a modern look needs | made on the player's machine by our scripts from `original/`; never distributed | extended |
 | `levels/open/` | levels in the open format: made in it, or converted community maps | made by players; some come with the game | extended |
 

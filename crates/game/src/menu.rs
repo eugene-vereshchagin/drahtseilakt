@@ -111,8 +111,11 @@ pub struct Menu {
     /// The screens open, the first the menu's base, each with its chosen line.
     stack: Vec<(Screen, usize)>,
     pub entries: Vec<Entry>,
-    /// The custom levels: the map files in the maps folder.
+    /// The custom levels shown: the levels and the folders holding more of them, in the folder open (the levels
+    /// folders' tops when none is).
     pub maps: Vec<PathBuf>,
+    /// The folders opened in the custom levels, innermost last.
+    folder: Vec<PathBuf>,
     /// The extended mode and its additions.
     pub features: Features,
     pub volumes: [f32; 2],
@@ -162,6 +165,7 @@ impl Menu {
             } else {
                 Vec::new()
             },
+            folder: Vec::new(),
             features,
             volumes: [1.0; 2],
             strings: strings.clone(),
@@ -417,7 +421,15 @@ impl Menu {
                 Some(e) if e.available && e.open => Action::Play(e.number),
                 _ => Action::None,
             },
-            Line::Map(i) => self.maps.get(i).cloned().map_or(Action::None, Action::Map),
+            Line::Map(i) => match self.maps.get(i).cloned() {
+                Some(p) if is_folder(&p) => {
+                    self.maps = maps_in(&p);
+                    self.folder.push(p);
+                    self.set_chosen(0);
+                    Action::None
+                }
+                p => p.map_or(Action::None, Action::Map),
+            },
             Line::Mode => Action::ToggleDebug,
             Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
             Line::Music | Line::Effects => Action::None,
@@ -440,6 +452,14 @@ impl Menu {
             Screen::Pause => Action::Continue,
             Screen::Main | Screen::Dead | Screen::End | Screen::Entry => Action::None,
             Screen::Highscore if self.after_entry => self.enter(),
+            // out of a folder of custom levels, onto the folder left
+            Screen::Custom if !self.folder.is_empty() => {
+                let left = self.folder.pop();
+                self.maps = self.folder.last().map_or_else(maps, |f| maps_in(f));
+                let at = self.maps.iter().position(|p| Some(p) == left.as_ref()).unwrap_or(0);
+                self.set_chosen(at);
+                Action::None
+            }
             _ => {
                 self.pop();
                 Action::None
@@ -507,6 +527,7 @@ impl Menu {
             .collect();
         self.entries = entries;
         self.maps = maps;
+        self.folder.clear();
         self.features = features;
         for k in 0..self.stack.len() {
             let Some(&(sc, i)) = self.stack.get(k) else {
@@ -568,6 +589,7 @@ impl Menu {
                         .and_then(|d| d.file_name())
                         .map(|d| d.to_string_lossy().into_owned());
                     let name = match folder {
+                        _ if is_folder(p) => format!("{name}/"),
                         Some(f) if p.is_dir() => format!("{name} ({f})"),
                         _ => name,
                     };
@@ -1279,28 +1301,81 @@ fn maps() -> Vec<PathBuf> {
         .collect()
 }
 
-/// A folder's levels by name: `.nmo` files, and folders holding an open-format level (level.gltf).
+/// How deep folders of custom levels may go (a map collection sorted by kind, season and map).
+const FOLDER_DEPTH: u32 = 4;
+
+/// A folder of levels to open, not a level: a folder that is not an open-format level.
+fn is_folder(p: &Path) -> bool {
+    p.is_dir() && !p.join("level.gltf").is_file()
+}
+
+fn is_level(p: &Path) -> bool {
+    let nmo = p.is_file() && p.extension().is_some_and(|x| x.eq_ignore_ascii_case("nmo"));
+    nmo || (p.is_dir() && p.join("level.gltf").is_file())
+}
+
+/// The folder holds a level, itself or in its folders (`depth` deep at most).
+fn holds_levels(dir: &Path, depth: u32) -> bool {
+    let Ok(d) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    d.flatten().take(4096).map(|e| e.path()).any(|p| {
+        is_level(&p) || (depth > 0 && p.is_dir() && !p.is_symlink() && holds_levels(&p, depth - 1))
+    })
+}
+
+/// A folder's levels by name: `.nmo` files and folders holding an open-format level (level.gltf), then by name the
+/// folders holding more levels.
 fn maps_in(dir: &Path) -> Vec<PathBuf> {
     let Ok(d) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
-    let mut v: Vec<PathBuf> = d
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| {
-            let nmo = p.is_file() && p.extension().is_some_and(|x| x.eq_ignore_ascii_case("nmo"));
-            nmo || (p.is_dir() && p.join("level.gltf").is_file())
-        })
-        .take(4096)
+    let all: Vec<PathBuf> = d.flatten().map(|e| e.path()).take(4096).collect();
+    let mut levels: Vec<PathBuf> = all.iter().filter(|p| is_level(p)).cloned().collect();
+    let mut folders: Vec<PathBuf> = all
+        .into_iter()
+        .filter(|p| is_folder(p) && !p.is_symlink() && holds_levels(p, FOLDER_DEPTH))
         .collect();
-    v.sort();
-    v
+    levels.sort();
+    folders.sort();
+    levels.extend(folders);
+    levels
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn custom_levels_open_and_leave_their_folders() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-menu-{}", std::process::id()));
+        let season = root.join("Pro Racing").join("Season 1");
+        std::fs::create_dir_all(&season).unwrap();
+        std::fs::create_dir_all(root.join("Empty")).unwrap();
+        std::fs::write(season.join("Track.nmo"), b"").unwrap();
+        std::fs::write(root.join("Alone.NMO"), b"").unwrap();
+        let mut m = menu(&[true], true);
+        // inside a folder already, as the tops are the player's own level folders
+        m.folder.push(root.clone());
+        m.maps = maps_in(&root);
+        m.stack.push((Screen::Custom, 0));
+        // the levels first, then the folders holding levels; an empty folder is not shown
+        assert_eq!(m.maps, vec![root.join("Alone.NMO"), root.join("Pro Racing")]);
+        assert_eq!(m.label(Line::Map(1)), b"Pro Racing/".to_vec());
+        m.set_chosen(1);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.maps, vec![root.join("Pro Racing").join("Season 1")]);
+        m.enter();
+        assert_eq!(m.maps, vec![season.join("Track.nmo")]);
+        assert_eq!(m.enter(), Action::Map(season.join("Track.nmo")));
+        // Esc goes back up a folder at a time, onto the folder left, and then leaves the screen
+        m.back();
+        m.back();
+        assert_eq!((m.chosen(), m.folder.len()), (1, 1));
+        assert_eq!(m.maps[1], root.join("Pro Racing"));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 
     fn menu(open: &[bool], extended: bool) -> Menu {
         let mut m = Menu {
@@ -1316,6 +1391,7 @@ mod tests {
                 })
                 .collect(),
             maps: Vec::new(),
+            folder: Vec::new(),
             features: Features::new(extended),
             volumes: [1.0; 2],
             strings: Strings::default(),

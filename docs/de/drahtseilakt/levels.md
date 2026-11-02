@@ -12,7 +12,7 @@ geteilt nach Herkunft und Format:
 | Ordner | Was | Woher | Modus |
 |---|---|---|---|
 | `levels/original/` | das Originalspiel: `base.cmo`, `3D Entities/`, `Textures/`, `Sounds/` und der Rest, mit dem darin installierten Add-on für Level 13 | vom Spiel aus dem installierten Spiel des Spielers oder von der CD kopiert | klassisch und erweitert |
-| `levels/community/` | Community-Karten, `.nmo` | der Spieler lädt sie selbst; das README des Ordners sagt, wo | erweitert |
+| `levels/community/` | Community-Karten, `.nmo`, in Ordnern nach Belieben des Spielers (das Menü öffnet sie, bis vier tief) | der Spieler lädt sie selbst; das README des Ordners sagt, wo | erweitert |
 | `levels/remastered/` | die Original-Level im offenen Format, mit auf 4K–8K vergrößerten Texturen und was ein modernes Aussehen sonst braucht | auf dem Rechner des Spielers von unseren Skripten aus `original/` erzeugt; nie weitergegeben | erweitert |
 | `levels/open/` | Level im offenen Format: darin gebaut oder umgewandelte Community-Karten | von Spielern gemacht; einige kommen mit dem Spiel | erweitert |
 
