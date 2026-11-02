@@ -89,7 +89,7 @@ Verbeugung vor Cyparade, dem deutschen Studio, das Ballance gemacht hat.
 
 ## Dokumentation in mehreren Sprachen
 
-Die Dokumentation wird auf Englisch, Russisch und Deutsch geschrieben. Englisch ist die Hauptversion (die
+Die Dokumentation wird auf Englisch, Russisch, Deutsch und vereinfachtem Chinesisch geschrieben (am 2026-11-02 für die große chinesische Community hinzugekommen). Englisch ist die Hauptversion (die
 Sprache von Code, Kommentaren und Commits); die anderen spiegeln deren Struktur unter `docs/<sprache>/` und in
 `README.<sprache>.md`. Alle Versionen ändern sich in derselben Änderung. Die Website wird aus `docs/` mit einer
 Locale pro Sprache gebaut. (Ersetzt den früheren Eintrag zu zwei Sprachen.)

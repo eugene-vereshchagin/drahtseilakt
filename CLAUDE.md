@@ -59,9 +59,10 @@ The active profile for this project:
 - **The game never goes online.** No network code in the game: fonts and every other resource ship with it or
   come from the player's copy. Only the build may download, pinned and checksummed, and it must also build offline.
 - Docs are updated in the same change as the behaviour they describe.
-- **Docs exist in English, Russian and German.** English is primary; every other language mirrors the same
-  path under `docs/<lang>/` (e.g. `docs/drahtseilakt/roadmap.md` ↔ `docs/ru/drahtseilakt/roadmap.md` ↔
-  `docs/de/drahtseilakt/roadmap.md`) and has `README.<lang>.md`. A change to one updates all of them in the
+- **Docs exist in English, Russian, German and Simplified Chinese** (`zh`, for the large Chinese community).
+  English is primary; every other language mirrors the same path under `docs/<lang>/` (e.g.
+  `docs/drahtseilakt/roadmap.md` ↔ `docs/ru/drahtseilakt/roadmap.md` ↔ `docs/de/drahtseilakt/roadmap.md` ↔
+  `docs/zh/drahtseilakt/roadmap.md`) and has `README.<lang>.md`. A change to one updates all of them in the
   same commit. The site (VitePress, `docs/.vitepress/config.ts`) has an English root locale and one locale
   per other language; a new page gets its sidebar entry in every locale. Adding a language means: a
   `docs/<lang>/` mirror, a `README.<lang>.md`, a locale in the config, the switcher line in every README.

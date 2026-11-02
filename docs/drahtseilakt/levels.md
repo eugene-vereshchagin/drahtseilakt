@@ -25,8 +25,8 @@ The game copies what it needs from the player's own copy into `levels/original/`
 copy is the player's own data on the player's machine; nothing is downloaded and nothing goes into the
 repository. `--data DIR` still plays from any folder without copying.
 
-The folder's README lists what to copy by hand: `base.cmo`, the folders `3D Entities`, `Textures`, `Sounds` and
-`Bin` of an installed Ballance, and, for level 13, the SuDu add-on installed into that copy as its readme says.
+The folder's README lists what to copy by hand: `base.cmo` and the folders `3D Entities`, `Textures` and `Sounds` of
+an installed Ballance (the game reads nothing else), and, for level 13, the SuDu add-on installed into that copy as its readme says.
 
 ## Any folder can be moved
 

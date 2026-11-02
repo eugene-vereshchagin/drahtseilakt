@@ -1,6 +1,6 @@
 # Drahtseilakt
 
-[English](README.md) · [Русский](README.ru.md) · **Deutsch**
+[English](README.md) · [Русский](README.ru.md) · **Deutsch** · [简体中文](README.zh.md)
 
 *Drahtseilakt* — die Nummer des Seiltänzers und jeder Balanceakt, bei dem ein Schritt zur Seite den Absturz
 bedeutet. Ballance, 2004 vom kleinen deutschen Studio Cyparade gemacht, ist genau das: eine Kugel auf einer

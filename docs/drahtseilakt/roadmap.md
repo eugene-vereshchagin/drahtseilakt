@@ -224,5 +224,5 @@ not ours to copy; its hidden constants (gravity -20, physics time factor 2) are.
 - The security rules (`CLAUDE.md`): hostile input, pinned and vendored dependencies, CI actions pinned by
   commit SHA with minimal `permissions:` (upstream's workflows pin by tag and must be fixed or replaced).
 - Data-free tests run everywhere (unit, synthetic files, fuzzing); game-data tests run locally.
-- Documentation in three languages. Upstream's English-only documentation is reference material and is not
+- Documentation in four languages. Upstream's English-only documentation is reference material and is not
   translated unless it becomes ours.

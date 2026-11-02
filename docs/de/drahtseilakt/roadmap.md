@@ -239,5 +239,5 @@ Physik 2) schon.
   CI-Actions per Commit-SHA festgelegt mit minimalen `permissions:` (die Workflows des Upstreams legen per Tag
   fest und müssen korrigiert oder ersetzt werden).
 - Datenfreie Tests laufen überall (Unit, synthetische Dateien, Fuzzing); Tests mit Spieldaten lokal.
-- Dokumentation in drei Sprachen. Die nur englische Dokumentation des Upstreams ist Nachschlagematerial und
+- Dokumentation in vier Sprachen. Die nur englische Dokumentation des Upstreams ist Nachschlagematerial und
   wird nicht übersetzt, solange sie nicht unsere wird.

@@ -85,6 +85,42 @@ export default defineConfig({
         langMenuLabel: "Sprache",
       },
     },
+    zh: {
+      label: "简体中文",
+      lang: "zh-CN",
+      link: "/zh/",
+      themeConfig: {
+        nav: [
+          { text: "路线图", link: "/zh/drahtseilakt/roadmap" },
+          { text: "决定", link: "/zh/drahtseilakt/decisions" },
+          { text: "文档（英文）", link: "/guide/" },
+        ],
+        sidebar: {
+          "/zh/": [
+            {
+              text: "Drahtseilakt",
+              items: [
+                { text: "历史", link: "/zh/drahtseilakt/history" },
+                { text: "路线图", link: "/zh/drahtseilakt/roadmap" },
+                { text: "决定", link: "/zh/drahtseilakt/decisions" },
+                { text: "菜单", link: "/zh/drahtseilakt/menu" },
+                { text: "关卡存放位置", link: "/zh/drahtseilakt/levels" },
+                { text: "自制地图", link: "/zh/drahtseilakt/community-maps" },
+                { text: "Virtools 文件格式", link: "/zh/drahtseilakt/nmo-format" },
+                { text: "开放关卡格式", link: "/zh/drahtseilakt/open-format" },
+              ],
+            },
+          ],
+        },
+        outline: { level: [2, 3], label: "本页内容" },
+        docFooter: { prev: "上一页", next: "下一页" },
+        lastUpdated: { text: "更新于" },
+        darkModeSwitchLabel: "主题",
+        sidebarMenuLabel: "菜单",
+        returnToTopLabel: "回到顶部",
+        langMenuLabel: "语言",
+      },
+    },
   },
 
   head: [

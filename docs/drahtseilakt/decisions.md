@@ -93,7 +93,7 @@ Both change in the same change. The site is built from `docs/` with two locales.
 
 ## Documentation in several languages
 
-Documentation is written in English, Russian and German. English is the primary version (the language of the
+Documentation is written in English, Russian, German and Simplified Chinese (added on 2026-11-02 for the large Chinese community). English is the primary version (the language of the
 code, comments and commits); the others mirror its structure under `docs/<lang>/` and in `README.<lang>.md`.
 All versions change in the same change. The site is built from `docs/` with one locale per language. German
 because the game and the name are German. (Replaces the entry on two languages.)

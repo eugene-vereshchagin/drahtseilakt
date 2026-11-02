@@ -1,6 +1,6 @@
 # Drahtseilakt
 
-**English** · [Русский](README.ru.md) · [Deutsch](README.de.md)
+**English** · [Русский](README.ru.md) · [Deutsch](README.de.md) · [简体中文](README.zh.md)
 
 *Drahtseilakt* (German, "tightrope act") is what the Germans call any balancing act where one step aside
 means a fall. Ballance — made in 2004 by Cyparade, a small German studio — is exactly that: a ball on a rail

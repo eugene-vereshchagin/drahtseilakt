@@ -1,6 +1,6 @@
 # Drahtseilakt
 
-[English](README.md) · **Русский** · [Deutsch](README.de.md)
+[English](README.md) · **Русский** · [Deutsch](README.de.md) · [简体中文](README.zh.md)
 
 *Drahtseilakt* (нем. «номер канатоходца») — так немцы называют любое балансирование, где шаг в сторону
 означает падение. Ballance, сделанный в 2004 году небольшой немецкой студией Cyparade, ровно об этом: шар

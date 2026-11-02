@@ -25,8 +25,8 @@ installierten Spiel (`drahtseilakt --import <Ballance-Ordner>`) und später dire
 InstallShield-Archiven). Die Kopie sind die eigenen Daten des Spielers auf seinem Rechner; nichts wird
 heruntergeladen, nichts kommt ins Repository. `--data DIR` spielt weiterhin aus jedem Ordner ohne Kopie.
 
-Das README des Ordners nennt, was von Hand zu kopieren ist: `base.cmo`, die Ordner `3D Entities`, `Textures`,
-`Sounds` und `Bin` eines installierten Ballance und für Level 13 das SuDu-Add-on, in diese Kopie installiert, wie
+Das README des Ordners nennt, was von Hand zu kopieren ist: `base.cmo` und die Ordner `3D Entities`, `Textures`
+und `Sounds` eines installierten Ballance (mehr liest das Spiel nicht) und für Level 13 das SuDu-Add-on, in diese Kopie installiert, wie
 sein Readme es sagt.
 
 ## Jeder Ordner lässt sich verlegen
