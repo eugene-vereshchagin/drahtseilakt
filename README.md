@@ -32,7 +32,9 @@ image: `--import Ballance.cue`, `.bin` or `.iso`; started without the game, the 
 finds on the computer, a folder or image dropped on it, or a path typed) into the game's
 `levels/original/`; all levels live in `levels/` in its data folder (`~/.local/share/drahtseilakt/` on Linux),
 each folder with a README saying what belongs there ([where levels live](docs/drahtseilakt/levels.md)).
-`--data` (or `OPENBALLANCE_DATA`) plays from another Ballance folder instead. `--level N` plays original level N, `--map FILE.nmo`
+`--data` (or `OPENBALLANCE_DATA`) plays from another Ballance folder instead. `drahtseilakt --remaster 8` converts
+the original levels into `levels/remastered/` (the open format) with textures eight times larger: by Real-ESRGAN when
+`realesrgan-ncnn-vulkan` is installed (it adds detail), else by Lanczos; they play from Custom levels. `--level N` plays original level N, `--map FILE.nmo`
 any level file or community map, `--open DIR` a level in the [open format](docs/drahtseilakt/open-format.md);
 `--export DIR` converts the chosen level to it. Arrows roll the ball relative to the camera, Shift+Left/Right
 turn the camera, Space lifts it, F11 is full screen, Esc pauses. Without a level named the game opens with its

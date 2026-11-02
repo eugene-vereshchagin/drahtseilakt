@@ -23,6 +23,7 @@ pollster = "0.4"
 image = { version = "=0.25.10", default-features = false, features = ["bmp", "tga", "png", "jpeg"] }
 ivp = { path = "../ivp" }
 cpal = "=0.18.2"
+serde_json = "=1.0.154"
 
 [lints]
 workspace = true

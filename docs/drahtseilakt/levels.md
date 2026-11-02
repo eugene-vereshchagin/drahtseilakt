@@ -74,6 +74,6 @@ docs and the folders' READMEs are also in Simplified Chinese, next to English, R
 2. Done: the `levels/` folders with their READMEs; the settings that move them, with the README left behind.
 3. Done: `--import` from an installed game or from the CD image (the game also finds the imported copy
    without `--data`). The European CD's 318 game files come out identical to an installed copy.
-4. The custom levels menu reading `community/` and `open/`; `remastered/` with the converter (roadmap phase 6)
-   and the texture scripts (phase 7).
+4. The custom levels menu reading `community/` and `open/`; `remastered/` is made by `--remaster N`: the converter
+   (phase 6) and the textures N times larger (Real-ESRGAN when installed, else Lanczos; phase 7).
 5. Levels that come with the game, as authors offer them.

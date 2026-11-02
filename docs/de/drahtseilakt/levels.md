@@ -77,6 +77,6 @@ Deutsch.
    README.
 3. Erledigt: `--import` aus einem installierten Spiel oder vom CD-Abbild (das Spiel findet die importierte
    Kopie auch ohne `--data`). Die 318 Spieldateien der europäischen CD gleichen einer installierten Kopie aufs Byte.
-4. Das Menü der eigenen Level liest `community/` und `open/`; `remastered/` mit dem Umwandler (Phase 6 des
-   Fahrplans) und den Texturskripten (Phase 7).
+4. Das Menü der eigenen Level liest `community/` und `open/`; `remastered/` macht `--remaster N`: der Umwandler
+   (Phase 6) und N-mal größere Texturen (Real-ESRGAN, wenn installiert, sonst Lanczos; Phase 7).
 5. Level, die mit dem Spiel kommen, sobald Autoren sie anbieten.

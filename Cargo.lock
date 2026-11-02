@@ -484,6 +484,7 @@ dependencies = [
  "level",
  "nmo",
  "pollster",
+ "serde_json",
  "wgpu",
  "winit",
 ]
