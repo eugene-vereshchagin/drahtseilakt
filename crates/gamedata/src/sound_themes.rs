@@ -1,14 +1,17 @@
-// Sound themes (docs/drahtseilakt/resources.md): a theme is a folder of sounds and music by the names the game asks
-// for (Sounds/<name>.ogg|.wav, Music/<name>.ogg|.wav, or a track Music/music.txt names). The game ships two in its
-// assets (sounds/system: openly licensed recordings; sounds/neuro: our synthesized ones); the player may add more in
-// the data folder's sounds/ — among them "original", which the toolbox makes from the player's copy and which is
-// never shipped. The generated theme (neuro) plays unless the player chose another (owner's decision 2026-11-02);
-// the extended mode chooses (`sound-theme NAME`), the classic mode plays the default. A sound the chosen theme
-// lacks comes from its fallback theme (theme.txt `fallback NAME`, the system theme when none; `fallback none`: no
+// Sound themes (docs/drahtseilakt/sound-themes.md): a theme is a folder of sounds and music by the names the game asks
+// for (Sounds/<name>.ogg|.wav, Music/<name>.ogg|.wav), and tables naming more files per name (Music/music.txt,
+// Sounds/sounds.txt): every name, a *role*, has a pool of files the game picks one from each time it plays it. The game
+// ships two in its assets (sounds/system: openly licensed recordings; sounds/neuro: our synthesized ones); the player
+// may add more in the data folder's sounds/ — among them "original", which the toolbox makes from the player's copy
+// and which is never shipped. The generated theme (neuro) plays unless the player chose another (owner's decision
+// 2026-11-02); the extended mode chooses (`sound-theme NAME`), the classic mode plays the default. A sound the chosen
+// theme lacks comes from its fallback theme (theme.txt `fallback NAME`, the system theme when none; `fallback none`: no
 // other theme, as the complete generated theme has), then — for a level's own sounds, never for music — from the copy.
 //
 // The player's theme folders are untrusted (they are shared): only plain folder and file names, real folders and
-// files (no links), a capped number of themes and a capped theme.txt; the sounds themselves are decoded through the
+// files (no links), a capped number of themes, a capped theme.txt and capped tables (size, lines, files per role; a
+// table over a cap or not UTF-8 is refused whole, a line naming anything but plain .ogg/.wav files of its own folder is
+// passed over, a role the game does not know is ignored with a note); the sounds themselves are decoded through the
 // audio layer's caps.
 
 use std::path::{Path, PathBuf};
@@ -257,12 +260,9 @@ pub fn choices() -> Vec<String> {
 /// The `fallback` of a theme complete on its own: no other theme's sounds are taken.
 pub const NO_FALLBACK: &str = "none";
 
-/// The files of the sound `name`, in the order they are tried: the chosen theme's, its fallback's, the system
-/// theme's (a broken one is passed over for the next); only the chosen theme's when its fallback is "none".
-pub fn files(name: &str) -> Vec<PathBuf> {
-    if !plain(name) {
-        return Vec::new();
-    }
+/// The folders of the themes a sound is looked for in, in order: the chosen theme's, its fallback's, the system
+/// theme's; only the chosen theme's when its fallback is "none".
+fn chain() -> Vec<PathBuf> {
     let themes = themes();
     let first = chosen();
     let mut keys = vec![first.clone()];
@@ -281,64 +281,267 @@ pub fn files(name: &str) -> Vec<PathBuf> {
     keys.dedup();
     keys.iter()
         .filter_map(|k| themes.iter().find(|t| &t.key == k))
-        .filter_map(|t| in_theme(&t.dir, name))
+        .map(|t| t.dir.clone())
         .collect()
 }
 
-/// A sound's file in one theme folder: Sounds/ or Music/, Ogg first, then WAV, then the track music.txt names.
-pub fn in_theme(dir: &Path, name: &str) -> Option<PathBuf> {
-    if !plain(name) || !real_dir(dir) {
-        return None;
+/// The files of the sound `name`, in the order they are tried: the first of its pool in each theme of `chain` (a broken
+/// one is passed over for the next).
+pub fn files(name: &str) -> Vec<PathBuf> {
+    if !plain(name) {
+        return Vec::new();
     }
-    for folder in ["Sounds", "Music"] {
-        if !real_dir(&dir.join(folder)) {
-            continue;
+    chain().iter().filter_map(|d| in_theme(d, name)).collect()
+}
+
+/// A sound's first file in one theme folder: the file named like it (Sounds/ or Music/, Ogg first, then WAV), else the
+/// first its tables name.
+pub fn in_theme(dir: &Path, name: &str) -> Option<PathBuf> {
+    pool_in_theme(dir, name).into_iter().next()
+}
+
+/// The most files a role's pool holds (more are ignored).
+pub const MAX_POOL: usize = 16;
+
+/// Every file one theme folder has for the role `name`, in order: the file named like it (Sounds/ or Music/, Ogg first,
+/// then WAV), then those Sounds/sounds.txt and Music/music.txt name for it, each once, at most MAX_POOL.
+pub fn pool_in_theme(dir: &Path, name: &str) -> Vec<PathBuf> {
+    let mut pool: Vec<PathBuf> = Vec::new();
+    if !plain(name) || !real_dir(dir) {
+        return pool;
+    }
+    let named = ["Sounds", "Music"].into_iter().find_map(|folder| {
+        let d = dir.join(folder);
+        if !real_dir(&d) {
+            return None;
         }
-        for ext in ["ogg", "wav"] {
-            let p = dir.join(folder).join(format!("{name}.{ext}"));
-            if real_file(&p) {
-                return Some(p);
+        ["ogg", "wav"]
+            .into_iter()
+            .map(|ext| d.join(format!("{name}.{ext}")))
+            .find(|p| real_file(p))
+    });
+    pool.extend(named);
+    for (folder, table) in [("Sounds", "sounds.txt"), ("Music", "music.txt")] {
+        let d = dir.join(folder);
+        for (role, files) in cached_table(&d, table) {
+            if !role.eq_ignore_ascii_case(name) {
+                continue;
+            }
+            for f in files {
+                let p = d.join(f);
+                if pool.len() < MAX_POOL && !pool.contains(&p) && real_file(&p) {
+                    pool.push(p);
+                }
             }
         }
     }
-    let music = dir.join("Music");
-    let table = music_table(&music);
-    let file = &table.iter().find(|(n, _)| n.eq_ignore_ascii_case(name))?.1;
-    let p = music.join(file);
-    real_file(&p).then_some(p)
+    pool
 }
 
-/// A theme's music.txt (`<name> <file>` lines), read once per folder.
-fn music_table(music: &Path) -> Vec<(String, String)> {
+/// The pool of the role `name` the game picks from: the first theme's in the order `files` tries them that has the role
+/// at all (a theme's pool is never mixed with its fallback's).
+pub fn pool(name: &str) -> Vec<PathBuf> {
+    chain()
+        .iter()
+        .map(|dir| pool_in_theme(dir, name))
+        .find(|p| !p.is_empty())
+        .unwrap_or_default()
+}
+
+/// The largest table read, and the most lines and roles in one.
+const MAX_TABLE: usize = 16 * 1024;
+const MAX_TABLE_LINES: usize = 512;
+const MAX_ROLES: usize = 256;
+
+/// The music roles beyond the parts a level plays, and the sounds the game plays or the original has (a table may
+/// name them; any other name is ignored with a note).
+const KNOWN_SOUNDS: &[&str] = &[
+    "Misc_StartLevel",
+    "Misc_Checkpoint",
+    "Misc_Fall",
+    "Misc_Lightning",
+    "Misc_Trafo",
+    "Misc_extraball",
+    "Misc_RopeTears",
+    "Misc_Ventilator",
+    "Misc_UFO",
+    "Misc_UFO_anim",
+    "Extra_Life_Blob",
+    "Extra_Start",
+    "Extra_Hit",
+    "Menu_click",
+    "Menu_load",
+    "Menu_atmo",
+    "Menu_dong",
+    "Menu_counter",
+    "Music_thunder",
+    "Music_EndCheckpoint",
+    "Music_Final",
+    "Music_LastFinal",
+    "Music_Highscore",
+    "Music_Atmo",
+    "Roll_Paper",
+    "Roll_Wood_Wood",
+    "Roll_Wood_Stone",
+    "Roll_Wood_Metal",
+    "Roll_Stone_Wood",
+    "Roll_Stone_Stone",
+    "Roll_Stone_Metal",
+    "Hit_Paper",
+    "Hit_Wood_Wood",
+    "Hit_Wood_Stone",
+    "Hit_Wood_Metal",
+    "Hit_Wood_Dome",
+    "Hit_WoodenFlap",
+    "Hit_Stone_Wood",
+    "Hit_Stone_Stone",
+    "Hit_Stone_Metal",
+    "Hit_Stone_Kuppel",
+    "Pieces_Paper",
+    "Pieces_Wood",
+    "Pieces_Stone",
+];
+
+/// A role the game knows: a sound of KNOWN_SOUNDS, an atmosphere part (Music_Atmo_1..3), a level theme
+/// (Music_Theme_<n>, any of its parts) or one of its parts (Music_Theme_<n>_<1..3>), n from 1 to 99.
+pub fn known_role(name: &str) -> bool {
+    if KNOWN_SOUNDS.iter().any(|k| k.eq_ignore_ascii_case(name)) {
+        return true;
+    }
+    // a number from 1 to `max`, without leading zeros
+    let number = |s: &str, max: u32| {
+        s.len() <= 2
+            && !s.starts_with('0')
+            && s.parse::<u32>().is_ok_and(|n| (1..=max).contains(&n))
+    };
+    let lower = name.to_ascii_lowercase();
+    if let Some(part) = lower.strip_prefix("music_atmo_") {
+        return number(part, 3);
+    }
+    let Some(rest) = lower.strip_prefix("music_theme_") else {
+        return false;
+    };
+    match rest.split_once('_') {
+        Some((n, part)) => number(n, 99) && number(part, 3),
+        None => number(rest, 99),
+    }
+}
+
+/// A parsed table: each role with its files, in the order given (a role on several lines gathers them), and notes on
+/// what was passed over.
+#[derive(Debug, Default, PartialEq)]
+pub struct Table {
+    pub roles: Vec<(String, Vec<String>)>,
+    pub notes: Vec<String>,
+}
+
+/// Parses a table (`<role> <file> [<file> ...]` lines, `#` comments; the old one-file lines are the same format).
+/// Fails closed: a table too large, with too many lines or not UTF-8 gives no roles at all; a line with a name that is
+/// not plain, or a file that is not a plain .ogg/.wav name, is passed over whole; an unknown role is ignored.
+pub fn parse_table(bytes: &[u8]) -> Table {
+    let mut t = Table::default();
+    if bytes.len() > MAX_TABLE {
+        t.notes
+            .push(format!("larger than {MAX_TABLE} bytes: not read"));
+        return t;
+    }
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        t.notes.push("not UTF-8: not read".to_owned());
+        return t;
+    };
+    if text.lines().count() > MAX_TABLE_LINES {
+        t.notes
+            .push(format!("more than {MAX_TABLE_LINES} lines: not read"));
+        return t;
+    }
+    let sound_file = |f: &str| {
+        let lower = f.to_ascii_lowercase();
+        plain(f) && (lower.ends_with(".ogg") || lower.ends_with(".wav")) && f.len() > 4
+    };
+    for (i, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut words = line.split_whitespace();
+        let Some(role) = words.next() else { continue };
+        let files: Vec<&str> = words.collect();
+        let n = i.saturating_add(1);
+        if !plain(role) || role.len() > MAX_NAME {
+            t.notes.push(format!("line {n}: not a plain role name"));
+        } else if files.is_empty() {
+            t.notes.push(format!("line {n}: {role} names no file"));
+        } else if let Some(bad) = files.iter().find(|f| !sound_file(f)) {
+            let bad: String = bad
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(MAX_NAME)
+                .collect();
+            t.notes.push(format!(
+                "line {n}: {bad:?} is not a plain .ogg or .wav file name"
+            ));
+        } else if !known_role(role) {
+            t.notes.push(format!(
+                "line {n}: {role} is not a role the game plays: ignored"
+            ));
+        } else if let Some((_, pool)) = t
+            .roles
+            .iter_mut()
+            .find(|(r, _)| r.eq_ignore_ascii_case(role))
+        {
+            for f in files {
+                if pool.len() < MAX_POOL && !pool.iter().any(|p| p == f) {
+                    pool.push(f.to_owned());
+                }
+            }
+        } else if t.roles.len() < MAX_ROLES {
+            let mut pool: Vec<String> = Vec::new();
+            for f in files {
+                if pool.len() < MAX_POOL && !pool.iter().any(|p| p == f) {
+                    pool.push(f.to_owned());
+                }
+            }
+            t.roles.push((role.to_owned(), pool));
+        }
+    }
+    t
+}
+
+/// A folder's table (`file` in it), read once per folder; its notes are printed when it is first read.
+fn cached_table(folder: &Path, file: &str) -> Vec<(String, Vec<String>)> {
     use std::io::Read;
-    static TABLES: Mutex<Vec<(PathBuf, Vec<(String, String)>)>> = Mutex::new(Vec::new());
+    type Cache = Vec<(PathBuf, Vec<(String, Vec<String>)>)>;
+    static TABLES: Mutex<Cache> = Mutex::new(Vec::new());
+    let path = folder.join(file);
     if let Ok(t) = TABLES.lock()
-        && let Some((_, table)) = t.iter().find(|(p, _)| p == music)
+        && let Some((_, table)) = t.iter().find(|(p, _)| *p == path)
     {
         return table.clone();
     }
-    let path = music.join("music.txt");
-    let mut text = String::new();
-    if real_dir(music)
+    let mut bytes = Vec::new();
+    if real_dir(folder)
         && real_file(&path)
         && let Ok(f) = std::fs::File::open(&path)
     {
-        let _ = f.take(64 * 1024).read_to_string(&mut text);
+        // one byte more than the cap: a larger table is seen as such and refused
+        let _ = f
+            .take((MAX_TABLE as u64).saturating_add(1))
+            .read_to_end(&mut bytes);
     }
-    let table: Vec<(String, String)> = text
-        .lines()
-        .filter(|l| !l.starts_with('#'))
-        .filter_map(|l| l.split_once(' '))
-        .map(|(a, b)| (a.trim().to_owned(), b.trim().to_owned()))
-        .filter(|(a, b)| plain(a) && plain(b) && (b.ends_with(".ogg") || b.ends_with(".wav")))
-        .take(256)
-        .collect();
+    let table = if bytes.is_empty() {
+        Table::default()
+    } else {
+        parse_table(&bytes)
+    };
+    for note in &table.notes {
+        eprintln!("sound theme table {}: {note}", path.display());
+    }
     if let Ok(mut t) = TABLES.lock()
-        && t.len() < MAX_THEMES
+        && t.len() < 2 * MAX_THEMES
     {
-        t.push((music.to_path_buf(), table.clone()));
+        t.push((path, table.roles.clone()));
     }
-    table
+    table.roles
 }
 
 #[cfg(test)]
@@ -453,5 +656,106 @@ mod tests {
         assert_eq!(playing(&t, Some(ORIGINAL)), ORIGINAL);
         let only_system: Vec<Theme> = t.iter().filter(|t| t.key == SYSTEM).cloned().collect();
         assert_eq!(playing(&only_system, None), SYSTEM);
+    }
+
+    #[test]
+    fn a_table_gives_each_role_a_pool_and_keeps_the_old_format() {
+        let t = parse_table(
+            b"# a comment\nMusic_Theme_1_1 a.ogg\r\nMusic_Atmo_1\ta.ogg  b.WAV a.ogg\n\nmusic_atmo_1 c.ogg\n\
+              Music_Atmo d.ogg\nMusic_Theme_4 e.ogg\nHit_Wood_Wood h1.ogg h2.ogg\n",
+        );
+        assert!(t.notes.is_empty(), "{:?}", t.notes);
+        let pool = |r: &str| {
+            t.roles
+                .iter()
+                .find(|(k, _)| k == r)
+                .map(|(_, v)| v.clone())
+                .unwrap_or_default()
+        };
+        // the old one-file line, a pool on one line and on several (a role's case does not matter), the groups
+        assert_eq!(pool("Music_Theme_1_1"), ["a.ogg"]);
+        assert_eq!(pool("Music_Atmo_1"), ["a.ogg", "b.WAV", "c.ogg"]);
+        assert_eq!(pool("Music_Atmo"), ["d.ogg"]);
+        assert_eq!(pool("Music_Theme_4"), ["e.ogg"]);
+        assert_eq!(pool("Hit_Wood_Wood"), ["h1.ogg", "h2.ogg"]);
+        assert_eq!(t.roles.len(), 5);
+    }
+
+    #[test]
+    fn a_hostile_table_is_refused_or_passed_over() {
+        // lines naming anything but plain .ogg/.wav files of the folder are passed over whole, unknown roles ignored
+        let t = parse_table(
+            b"Music_Final ../x.ogg\nMusic_Final /etc/passwd.ogg\nMusic_Final a\\b.ogg\nMusic_Final .hidden.ogg\n\
+              Music_Final ok.ogg evil.exe\nMusic_Final C:x.ogg\nMusic_Final .ogg\nMusic_Final\n../role ok.ogg\n\
+              Music_Theme_1_4 ok.ogg\nMusic_Theme_0 ok.ogg\nMusic_Atmo_01 ok.ogg\nMy_Sound ok.ogg\n\
+              Music_Final \x1b[31m.ogg\nMusic_LastFinal fine.ogg\n",
+        );
+        assert_eq!(
+            t.roles,
+            [("Music_LastFinal".to_owned(), vec!["fine.ogg".to_owned()])]
+        );
+        assert_eq!(t.notes.len(), 14, "{:#?}", t.notes);
+        assert!(
+            t.notes.iter().all(|n| !n.contains('\x1b')),
+            "no control characters echoed"
+        );
+        // a pool is capped
+        let many: String = (0..40).map(|i| format!("Hit_Paper p{i}.ogg\n")).collect();
+        assert_eq!(parse_table(many.as_bytes()).roles[0].1.len(), MAX_POOL);
+        // too large, too many lines, not UTF-8: nothing at all
+        let large = format!("Music_Final a.ogg\n{}", "#".repeat(MAX_TABLE));
+        assert!(parse_table(large.as_bytes()).roles.is_empty());
+        let long = "Music_Final a.ogg\n".to_owned() + &"\n".repeat(MAX_TABLE_LINES);
+        assert!(parse_table(long.as_bytes()).roles.is_empty());
+        assert!(parse_table(b"Music_Final a.ogg\n\xff\xfe").roles.is_empty());
+        assert_eq!(parse_table(b""), Table::default());
+    }
+
+    #[test]
+    fn a_theme_folder_gives_a_pool_of_real_files() {
+        let r = root("pool");
+        let t = r.join("t");
+        std::fs::create_dir_all(t.join("Sounds")).unwrap();
+        std::fs::create_dir_all(t.join("Music")).unwrap();
+        for f in [
+            "Sounds/Hit_Paper.wav",
+            "Sounds/paper2.ogg",
+            "Music/a1.ogg",
+            "Music/a2.ogg",
+        ] {
+            std::fs::write(t.join(f), b"x").unwrap();
+        }
+        std::fs::write(
+            t.join("Sounds/sounds.txt"),
+            "Hit_Paper paper2.ogg missing.ogg Hit_Paper.wav\n",
+        )
+        .unwrap();
+        std::fs::write(
+            t.join("Music/music.txt"),
+            "Music_Atmo_1 a1.ogg\nMusic_Atmo_1 a2.ogg linked.ogg\nMusic_Final paper2.ogg\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(t.join("Music/a1.ogg"), t.join("Music/linked.ogg")).unwrap();
+        // the file named like the role first, then the tables' (each once, only real files of the table's folder)
+        assert_eq!(
+            pool_in_theme(&t, "Hit_Paper"),
+            [t.join("Sounds/Hit_Paper.wav"), t.join("Sounds/paper2.ogg")]
+        );
+        assert_eq!(
+            pool_in_theme(&t, "Music_Atmo_1"),
+            [t.join("Music/a1.ogg"), t.join("Music/a2.ogg")]
+        );
+        assert!(
+            pool_in_theme(&t, "Music_Final").is_empty(),
+            "a table names its own folder's files"
+        );
+        assert_eq!(in_theme(&t, "Music_Atmo_1"), Some(t.join("Music/a1.ogg")));
+        assert!(
+            known_role("Music_Theme_12_3")
+                && known_role("music_atmo_2")
+                && !known_role("Music_Atmo_4")
+        );
+        std::fs::remove_dir_all(&r).unwrap();
     }
 }
