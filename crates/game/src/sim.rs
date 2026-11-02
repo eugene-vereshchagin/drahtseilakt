@@ -228,6 +228,10 @@ struct Rules {
     resets: Vec<Vec3>,
     /// Each reset point's turn (its matrix without scale): a new ball takes its reset point's whole matrix.
     reset_turns: Vec<Mat3>,
+    /// The reset points and their turns in plain byte order of their names, as replays of formats 1 to 3 were
+    /// recorded (`checkpoints_by_name`; the same order as `resets` for every original level).
+    resets_listed: Vec<Vec3>,
+    reset_turns_listed: Vec<Mat3>,
     end: Option<Vec3>,
     extra_points: Vec<(usize, Vec3)>,
     extra_lives: Vec<(usize, Vec3)>,
@@ -826,6 +830,8 @@ impl Sim {
             },
             resets: sorted_by_name(level, "PR_Resetpoints"),
             reset_turns: sorted_turns_by_name(level, "PR_Resetpoints"),
+            resets_listed: by_bytes(level, "PR_Resetpoints").into_iter().map(|o| Vec3::from(o.position())).collect(),
+            reset_turns_listed: by_bytes(level, "PR_Resetpoints").into_iter().map(turn_of).collect(),
             end: pos("PE_Levelende").first().map(|p| p.1),
             extra_points: pos("P_Extra_Point"),
             extra_lives: pos("P_Extra_Life"),
@@ -1848,13 +1854,13 @@ impl Sim {
 
     /// The new ball put at the current reset point (shown, not yet a body), and the camera in its start view.
     fn place_ball(&mut self) {
-        let spawn = self
-            .rules
-            .resets
-            .get(self.sector)
-            .copied()
-            .unwrap_or(self.rules.start + Vec3::Y * BALL_RADIUS);
-        let turn = self.rules.reset_turns.get(self.sector).copied().unwrap_or(Mat3::IDENTITY);
+        let (resets, turns) = if self.checkpoints_by_name {
+            (&self.rules.resets, &self.rules.reset_turns)
+        } else {
+            (&self.rules.resets_listed, &self.rules.reset_turns_listed)
+        };
+        let spawn = resets.get(self.sector).copied().unwrap_or(self.rules.start + Vec3::Y * BALL_RADIUS);
+        let turn = turns.get(self.sector).copied().unwrap_or(Mat3::IDENTITY);
         self.ball.position = spawn;
         self.ball.rotation = Rot::Basis(turn).quat();
         self.ball.velocity = Vec3::ZERO;
@@ -1928,27 +1934,42 @@ fn depth_cubes(level: &Level) -> Vec<Obb> {
 fn sorted_turns_by_name(level: &Level, group: &str) -> Vec<Mat3> {
     let mut v: Vec<(String, Mat3)> = level
         .members(group)
-        .map(|(_, o)| {
-            let turn = match pose_and_scale(&o.matrix) {
-                Some((_, Rot::Basis(m), _)) => m,
-                _ => Mat3::IDENTITY,
-            };
-            (o.name.clone(), turn)
-        })
+        .map(|(_, o)| (o.name.clone(), turn_of(o)))
         .collect();
     v.sort_by(|a, b| name_order(&a.0, &b.0));
     v.into_iter().map(|x| x.1).collect()
 }
 
+/// An object's turn: its matrix without scale.
+fn turn_of(o: &level::Object) -> Mat3 {
+    match pose_and_scale(&o.matrix) {
+        Some((_, Rot::Basis(m), _)) => m,
+        _ => Mat3::IDENTITY,
+    }
+}
+
+/// A group's members in plain byte order of their names, as reset points were taken before replay format 4.
+fn by_bytes<'a>(level: &'a Level, group: &str) -> Vec<&'a level::Object> {
+    let mut v: Vec<&level::Object> = level.members(group).map(|(_, o)| o).collect();
+    v.sort_by(|a, b| a.name.cmp(&b.name));
+    v
+}
+
 /// Objects numbered by name (PR_Resetpoint_9, PR_Resetpoint_10): by the name before the number, then by the number
-/// as a number, then by the whole name.
+/// as a number (compared digit by digit, so any length of number orders right), then by the whole name.
 fn name_order(a: &str, b: &str) -> std::cmp::Ordering {
-    let split = |s: &str| {
+    fn split(s: &str) -> (usize, &str) {
         let stem = s.trim_end_matches(|c: char| c.is_ascii_digit());
-        let n: u64 = s.get(stem.len()..).and_then(|d| d.parse().ok()).unwrap_or(0);
-        (stem.to_owned(), n)
-    };
-    split(a).cmp(&split(b)).then_with(|| a.cmp(b))
+        let digits = s.get(stem.len()..).unwrap_or("").trim_start_matches('0');
+        (stem.len(), digits)
+    }
+    let ((sa, da), (sb, db)) = (split(a), split(b));
+    let stem = |s: &str, n: usize| s.get(..n).unwrap_or("").to_owned();
+    stem(a, sa)
+        .cmp(&stem(b, sb))
+        .then_with(|| da.len().cmp(&db.len()))
+        .then_with(|| da.cmp(db))
+        .then_with(|| a.cmp(b))
 }
 
 fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
@@ -2518,7 +2539,10 @@ mod tests {
         use std::cmp::Ordering::Less;
         assert_eq!(name_order("PR_Resetpoint_9", "PR_Resetpoint_10"), Less);
         assert_eq!(name_order("PC_TwoFlames_03", "PC_TwoFlames_04"), Less);
-        assert_eq!(name_order("PC_TwoFlames_1", "PC_TwoFlames_01"), "PC_TwoFlames_1".cmp("PC_TwoFlames_01"));
+        assert_eq!(name_order("PC_TwoFlames_01", "PC_TwoFlames_1"), Less, "equal numbers: by the whole name");
+        assert_eq!(name_order("PC_TwoFlames_02", "PC_TwoFlames_1"), std::cmp::Ordering::Greater);
+        assert_eq!(name_order("X_1", "X_99999999999999999999999"), Less, "numbers longer than any integer");
+        assert_eq!(name_order("X_00000000000000000000000009", "X_10"), Less);
         assert_eq!(name_order("A_2", "B_1"), Less, "the stem first");
         assert_eq!(name_order("PC_TwoFlames", "PC_TwoFlames_01"), Less);
     }

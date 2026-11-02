@@ -200,6 +200,10 @@ impl Game {
         }
         let mut replay_out = Replay::new(&level.name, level.hash);
         replay_out.start = start.clone();
+        // a run re-recorded from an old replay plays by its rules, so it keeps its format
+        if let Some(r) = &replay_in {
+            replay_out.version = r.version;
+        }
         let module_file = |name: &str| data.part(&format!("3D Entities/PH/{name}.nmo")).map(|m| m.level);
         let effects = crate::particles::Effects::new(&level.level, &module_file);
         let mut placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
@@ -279,6 +283,9 @@ impl Game {
         self.watch = Watch::default();
         self.replay_out = Replay::new(&self.level.name, self.level.hash);
         self.replay_out.start = self.start.clone();
+        if let Some(r) = &self.replay_in {
+            self.replay_out.version = r.version;
+        }
     }
 
     /// The folder of this level's runs, attempts, watch log and findings.
