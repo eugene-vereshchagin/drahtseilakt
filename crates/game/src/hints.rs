@@ -27,6 +27,10 @@ use std::path::{Path, PathBuf};
 const MAX_FILE: u64 = 64 * 1024;
 const MAX_HINTS: usize = 256;
 const MAX_STEPS: usize = 64;
+/// The most replay steps a hint file may have (each plays its replay from the start to find the stretch).
+const MAX_REPLAY_STEPS: usize = 16;
+/// The largest replay a hint may name.
+pub const MAX_REPLAY_FILE: u64 = 4 * 1024 * 1024;
 const MAX_COORD: f32 = 100_000.0;
 const MAX_TICKS: u64 = 60 * 60 * 10;
 const MAX_RADIUS: f32 = 200.0;
@@ -104,12 +108,18 @@ fn direction(x: Option<&str>, z: Option<&str>) -> Result<Vec3, String> {
 }
 
 /// A replay's file name: a plain name, beside the hint file (no folders, no way out of it).
+/// A replay's file name beside the hint file: letters, digits, `_`, `-` and `.` only, ending in `.replay`, not
+/// beginning with a dot, and no Windows device name (CON, NUL, COM1...).
 fn plain_name(s: &str) -> Result<&str, String> {
-    let plain = !s.is_empty()
+    let stem = s.strip_suffix(".replay").unwrap_or_default().to_ascii_uppercase();
+    let base = stem.split('.').next().unwrap_or_default();
+    let device = matches!(base, "CON" | "PRN" | "AUX" | "NUL")
+        || ((base.starts_with("COM") || base.starts_with("LPT")) && base.len() == 4);
+    let plain = !stem.is_empty()
         && !s.starts_with('.')
-        && !s
-            .chars()
-            .any(|c| matches!(c, '/' | '\\' | ':') || c.is_control());
+        && s.len() <= 128
+        && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+        && !device;
     if plain {
         Ok(s)
     } else {
@@ -240,6 +250,14 @@ pub fn parse(text: &str) -> Result<Vec<Hint>, String> {
             return Err(format!("more than {MAX_HINTS} hints"));
         }
     }
+    let replays = out
+        .iter()
+        .flat_map(|h| &h.steps)
+        .filter(|s| matches!(s, Step::Replay(..)))
+        .count();
+    if replays > MAX_REPLAY_STEPS {
+        return Err(format!("more than {MAX_REPLAY_STEPS} replay steps"));
+    }
     Ok(out)
 }
 
@@ -250,15 +268,31 @@ pub fn load(path: &Path) -> Result<Vec<Hint>, String> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(e) => return Err(format!("{}: {e}", path.display())),
     };
-    if !meta.is_file() || meta.len() > MAX_FILE {
-        return Err(format!(
-            "{}: not a plain file of at most {MAX_FILE} bytes",
-            path.display()
-        ));
+    if !meta.is_file() {
+        return Err(format!("{}: not a plain file", path.display()));
     }
-    let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let bytes = read_plain(path, MAX_FILE)?;
     let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))?;
     parse(&text).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// A file shared with the hints: a plain file itself (never a link, a device or a pipe), read up to `cap` bytes
+/// whatever it says its length is.
+pub fn read_plain(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let plain = std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file());
+    if !plain {
+        return Err(format!("{}: not a plain file", path.display()));
+    }
+    let file = std::fs::File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut bytes = Vec::new();
+    file.take(cap.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    if u64::try_from(bytes.len()).map_or(true, |n| n > cap) {
+        return Err(format!("{}: more than {cap} bytes", path.display()));
+    }
+    Ok(bytes)
 }
 
 /// A view at `quarter`, for the axes its arrows push along.
@@ -546,6 +580,21 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn replay_names_are_plain_and_their_steps_few() {
+        for good in ["run.replay", "Level_02-owner.replay", "a.b.replay"] {
+            assert!(plain_name(good).is_ok(), "{good}");
+        }
+        for bad in ["../x.replay", "a/b.replay", "x.txt", ".replay", ".hidden.replay", "CON.replay", "nul.replay",
+            "COM1.replay", "aux.x.replay", "a b.replay", "a:b.replay", "a\\b.replay"]
+        {
+            assert!(plain_name(bad).is_err(), "{bad}");
+        }
+        let line = "at 0 0 0 r 5 : replay run.replay 1 2";
+        assert!(parse(&vec![line; 16].join("\n")).is_ok());
+        assert!(parse(&vec![line; 17].join("\n")).is_err(), "too many replay steps");
+    }
+
     use super::*;
 
     #[test]

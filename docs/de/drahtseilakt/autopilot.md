@@ -9,7 +9,7 @@ mit Tempo. Dafür liest er **Hinweise**.
 ## Berichte, wo er steckt
 
 Kommt der Testspieler 20 Sekunden auf seinem Weg nicht weiter, schreibt er einen Bericht nach `--report DIR`
-(Standard: `drahtseilakt-stuck` im temporären Ordner des Systems), einen Ordner je Stelle:
+(Standard: `stuck/` im Datenordner des Spiels), ein neuer Ordner je Stelle:
 
 - `report.txt`: Level, Takt, Sektor, Leben, Art, Ort und Tempo der Kugel und das Viertel der Ansicht, der Weg
   voraus, die Transformatoren, losen Körper und Levelobjekte in der Nähe (mit ihren Gruppen);

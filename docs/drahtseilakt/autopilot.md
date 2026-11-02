@@ -8,7 +8,7 @@ and pushers to hit first, updrafts to ride, rails to take at speed. For those it
 ## Stuck reports
 
 When the test player gets no further along its way for 20 seconds, it writes a report into `--report DIR`
-(default: `drahtseilakt-stuck` in the system's temporary folder), one folder per place:
+(default: `stuck/` in the game's data folder), a new folder per place:
 
 - `report.txt`: the level, tick, sector, lives, the ball's kind, place, speed and the view's quarter, the way
   ahead, the transformers, loose bodies and level objects near (with their groups);

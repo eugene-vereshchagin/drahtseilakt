@@ -150,7 +150,8 @@ impl Game {
         let replay_in = match &o.replay {
             Some(p) => {
                 let text =
-                    std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+                    String::from_utf8(crate::hints::read_plain(p, crate::hints::MAX_REPLAY_FILE)?)
+                        .map_err(|_| format!("{}: not UTF-8", p.display()))?;
                 let r = Replay::parse(&text).map_err(|e| format!("{}: {e}", p.display()))?;
                 if r.level_hash != level.hash {
                     return Err(format!(
@@ -1240,7 +1241,8 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
         for step in &mut h.steps {
             let crate::hints::Step::Replay(file, from, to) = step else { continue };
             let file = dir.join(&*file);
-            let text = std::fs::read_to_string(&file).map_err(|e| format!("{}: {e}", file.display()))?;
+            let bytes = crate::hints::read_plain(&file, crate::hints::MAX_REPLAY_FILE)?;
+            let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
             let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
             let mut watch = o.clone();
             watch.replay = Some(file.clone());
@@ -1250,8 +1252,19 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
             while seen.sim.tick < *from && !seen.sim.game_over {
                 seen.tick(0);
             }
-            let at = |t: u64| run.changes.iter().take_while(|c| c.0 <= t).last().map_or(0, |c| c.1);
-            let inputs: Vec<u8> = (from.saturating_add(1)..=*to).map(at).collect();
+            // the input of each tick of the stretch, in one pass over the replay's changes
+            let mut inputs = Vec::new();
+            let mut changes = run.changes.iter().peekable();
+            let mut input = 0u8;
+            for t in 0..=*to {
+                while let Some(&&(_, i)) = changes.peek().filter(|c| c.0 <= t) {
+                    input = i;
+                    changes.next();
+                }
+                if t > *from {
+                    inputs.push(input);
+                }
+            }
             *step = crate::hints::Step::Inputs(seen.sim.camera.quarter, inputs);
         }
     }
@@ -1276,8 +1289,22 @@ fn stuck_report(
     use std::fmt::Write as _;
     let s = &game.sim;
     let b = s.ball.position;
-    let folder = dir.join(format!("{}-t{}", level_stem(game), s.tick));
-    std::fs::create_dir_all(&folder).map_err(|e| format!("{}: {e}", folder.display()))?;
+    // a new folder of its own for each report (never one already there, so nothing in it is written through)
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let stem = format!("{}-t{}", level_stem(game), s.tick);
+    let mut folder = None;
+    for k in 0..100u32 {
+        let f = dir.join(if k == 0 { stem.clone() } else { format!("{stem}-{k}") });
+        match std::fs::create_dir(&f) {
+            Ok(()) => {
+                folder = Some(f);
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(format!("{}: {e}", f.display())),
+        }
+    }
+    let folder = folder.ok_or_else(|| format!("{}: no new folder for the report", dir.display()))?;
     let mut t = String::new();
     let _ = writeln!(t, "level {}  tick {} ({})  sector {}  lives {}", game.level.name, s.tick, clock(s.tick),
         s.sector + 1, s.lives);
@@ -1341,7 +1368,8 @@ fn stuck_report(
 /// is stuck it writes a report (--report), and it follows the level's hints.
 fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<(), String> {
     pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
-    let report = o.report.clone().unwrap_or_else(|| std::env::temp_dir().join("drahtseilakt-stuck"));
+    // the player's own data folder, not a shared temporary one
+    let report = o.report.clone().unwrap_or_else(|| crate::levels::data_dir().join("stuck"));
     let limit = o.ticks.unwrap_or(60 * 60 * 20);
     let (mut best, mut since, mut reported) = (0usize, game.sim.tick, None::<usize>);
     while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
