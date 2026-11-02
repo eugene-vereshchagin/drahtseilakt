@@ -16,8 +16,8 @@ Englisch, Spanisch, Italienisch und Französisch; `GameSettings.Language` wählt
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | ein Level ist spielbar, sobald das vorige geschafft ist (`DB_Levelfreischaltung`); die anderen sind grau. Das Add-on mit Level 13 ersetzt Menu.nmo und fügt seine Zeile hinzu |
 | Highscore (`Menu_Highscore`) | „Highscore Level N“, zehn Namen mit Punkten, Back; links und rechts wechseln das Level | die Vorgaben der Kopie sind die Arrays `DB_Highscore_LvNN` in base.cmo („Mr. Default“) |
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | |
-| Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | |
-| Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview: je eine Taste; Invert Rotation? (Yes/No); OK | Vorgaben: Pfeile, Shift, Leertaste |
+| Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | Vorgaben der Kopie (`DB_Options`): keine Synchronisation, Wolken |
+| Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview: je eine Taste; Invert Rotation? (Yes/No); OK | Vorgaben: Pfeile, Shift, Leertaste; `DB_Options` speichert eine Taste als ihre Zeile in `all_keys` aus `Language.nmo` (die Scancodes von DirectInput der Reihe nach) |
 | Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | Lautstärke der Musik und der Effekte (bei uns beide in jedem Modus, wie der Inhaber das Original kennt) |
 | Credits (`Menu_Credits`) | der Abspann des Originals | |
 | Pause, Esc im Level (`Menu_Pause`) | Back, Restart Level, Highscore, Options, Exit Level | Restart und Exit fragen zuerst Yes / No; die Punkte bleiben sichtbar |
@@ -39,8 +39,31 @@ Persönliche ist der Name in der Highscore-Liste.
   beginnen mit den Vorgaben der Kopie und werden in unserem eigenen Datenordner gespeichert, nie in den Dateien
   des Spiels. Die `Database.tdb` des Spielers zu lesen, um alte Punkte zu übernehmen, ist eine spätere Option
   (ein Parser: geprüft wie jeder Dateileser).
-- Einstellungen des Originals, die uns noch fehlen (Auflösung, Synchronisation, Wolken, Tasten), kommen, sobald
-  ihr Verhalten gebaut ist; bis dahin zeigen ihre Zeilen den aktuellen Wert und lassen sich nicht ändern.
+- **Graphics**: die drei Zeilen des Originals und eine weitere, *Fullscreen?* (No / Yes / Exclusive), da ein Fenster
+  den ganzen Bildschirm füllen kann. Links und rechts (oder Enter) ändern eine Zeile; die Änderung wirkt sofort und
+  wird in `settings.txt` gespeichert:
+  - *Screen Resolution* geht durch die Modi des Monitors und die üblichen Fenstergrößen (`resolution 1600x900`); das
+    Fenster nimmt diese Größe an, ein exklusiver Vollbildmodus diesen Modus;
+  - *Synch to Screen?* lässt die Bilder auf den Monitor warten (`vsync on`; aus als Vorgabe, wie in der Kopie, und weil
+    das Warten auf dem Testrechner hängen blieb; `DRAHTSEILAKT_PRESENT` geht weiter vor);
+  - *Clouds?* zeigt die Wolkenschicht der Level (`clouds on|off`), ihr Objekt `SkyLayer`, das `Gameplay.nmo` zeigt,
+    wenn die Option an ist. Ihre Textur sind graue Wolken auf Schwarz und ihr Material mischt nicht, also zeichnen wir
+    sie zum Himmel dahinter addiert (unsere Lesart; das Material der Kopie sagt es nicht). Die Videoverfolgung zeichnet
+    ohne sie;
+  - *Fullscreen?* (`fullscreen off|borderless|exclusive`): randlos nimmt den Modus des Desktops, exklusiv ändert ihn,
+    wo die Plattform es kann (Wayland nicht: randlos). F11 wechselt zwischen Fenster und randlos.
+- **Controls**: Enter auf der Zeile einer Taste wartet auf eine Taste („Press a key"); die gedrückte wird belegt, Esc
+  bricht ab. Eine Taste, die eine andere Aktion hat, wird getauscht, so tut keine Taste zwei Dinge. Esc und F11
+  gehören dem Spiel und lassen sich nicht belegen; eine belegte Taste geht den Übungstasten des erweiterten Modus vor.
+  Invert Rotation? dreht die Kamera andersherum. Die Tasten werden als `key.forward ArrowUp` … `key.overview Space`
+  und `invert-rotation on|off` gespeichert (die Tastennamen von winit); ohne sie gelten die Tasten aus `DB_Options`
+  der Kopie. Jede Shift-Taste tut, was die belegte tut, solange die andere nicht selbst belegt ist. Die Seite zeigt
+  eine Taste unter dem Namen der Kopie, sonst unter unserem.
+- **Gamepads** (gilrs) drücken dieselben Tasten wie die Tastatur, so ist ein Lauf und sein Replay gleich, womit auch
+  immer gespielt wurde: der linke Stick oder das Steuerkreuz rollt die Kugel, die linke und rechte Schultertaste drehen
+  die Kamera (Rotation mit links oder rechts), die untere Aktionstaste (A / ✕) ist Overview, Start pausiert. In den
+  Menüs bewegt das Steuerkreuz, die untere Taste ist Enter, die rechte (B / ○) Esc. Ihre Tasten lassen sich noch
+  nicht umbelegen.
 - Jeder beendete Lauf wird weiterhin als Replay behalten (auf dem Bildschirm ändert das nichts); der schnellste
   ist die Bestzeit, die der erweiterte Modus zeigt.
 
@@ -64,7 +87,12 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
     ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;
   - endlose Leben: die letzte Kugel geht nie verloren (ein so geretteter Lauf ist nie bester Lauf). Ein Zeitlimit zum
     Aufheben gibt es nicht: die Punkte zählen nur herunter und bleiben bei null stehen, wie im Original.
-  Weitere Schalter kommen mit den Funktionen des Fahrplans (Blickwinkel, Timer, Geist des besten Laufs).
+  Weitere Schalter kommen mit den Funktionen des Fahrplans (Timer, Geist des besten Laufs).
+- **Graphics** fügt *Field of View* hinzu: die Breite der Spielkamera über 4:3, 40° bis 100° in Schritten von 2
+  (`fov 58`; das Original hat 58°, die 1,0123 Radiant von InGameCam). Der klassische Modus zeichnet immer den des
+  Originals.
+- **Controls** fügt *Defaults* hinzu: zurück zu den Tasten des Originals (Pfeile, Shift, Leertaste), ohne gedrehte
+  Kamera.
 - **Level nach Art**: Start bietet *Original* (die klassische Levelliste), *Remastered*, *Community maps* und
   *Open format*, die Ordner von `levels/` ([levels.md](levels.md)). In jedem seine Level nach Dateinamen, dann die
   Ordner mit weiteren (Enter öffnet, Esc geht zurück nach oben), gespielt wie ein Original-Level. Ein Level, das nicht
@@ -86,8 +114,9 @@ Profile später als Funktion des erweiterten Modus kommen.
 2. Erledigt: das Pausenmenü mit seinen Yes-/No-Fragen; das Tot-Menü; das Levelende-Menü.
 3. Erledigt: Highscores mit Namenseingabe; Freischalten der Level.
 4. Erledigt: die Liste Custom levels (levels.md) und die Schalter der Seite Extended.
-5. Einstellungen Graphics und Controls, sobald ihr Verhalten gebaut ist (jetzt angezeigt, nicht änderbar).
+5. Erledigt: Graphics und Controls; Gamepads.
 
 `DRAHTSEILAKT_SHOT_MENU=base:keys` mit `--screenshot` zeichnet ein Menü über das Bild ohne Fenster (base `main`,
-`pause`, `dead` oder `end`; Tasten `u d l r` für die Pfeile, `e` Enter, `b` Esc, `n` die Namenseingabe), um jeden
+`pause`, `dead` oder `end`; Tasten `u d l r` für die Pfeile, `e` Enter, `b` Esc, `n` die Namenseingabe, `w` die
+Taste W, während eine erwartet wird), um jeden
 Bildschirm anzusehen.

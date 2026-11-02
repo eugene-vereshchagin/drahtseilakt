@@ -14,8 +14,8 @@
 | Start（`Menu_Start`） | Level 1 … Level 12, Back | 前一关完成后，这一关才能玩（`DB_Levelfreischaltung`）；其余的显示为灰色。第 13 关附加包会替换 Menu.nmo 并加上它的那一行 |
 | Highscore（`Menu_Highscore`） | "Highscore Level N"、十个名字及分数、Back；左右键切换关卡 | 副本的默认值是 base.cmo 中的数组 `DB_Highscore_LvNN`（"Mr. Default"） |
 | Options（`Menu_Options`） | Graphics, Controls, Sound, Back | |
-| Graphics（`Menu_Opt_Graphics`） | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | |
-| Controls（`Menu_Opt_Keys`） | Forward, Backward, Left, Right, Rotation, Overview：各一个键；Invert Rotation? (Yes/No)；OK | 默认：方向键、Shift、Space |
+| Graphics（`Menu_Opt_Graphics`） | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | 副本的默认值（`DB_Options`）：不同步，有云 |
+| Controls（`Menu_Opt_Keys`） | Forward, Backward, Left, Right, Rotation, Overview：各一个键；Invert Rotation? (Yes/No)；OK | 默认：方向键、Shift、Space；`DB_Options` 以按键在 `Language.nmo` 的 `all_keys` 中的行号保存它（按顺序的 DirectInput 扫描码） |
 | Sound（`Menu_Opt_Sound`） | Music Volume, Sound Volume, OK | 音乐和音效两个音量（我们在所有模式下都显示两者，与项目所有者记得的原版一致） |
 | Credits（`Menu_Credits`） | 原版的制作人员名单 | |
 | 暂停，关卡中按 Esc（`Menu_Pause`） | Back, Restart Level, Highscore, Options, Exit Level | Restart 和 Exit 会先询问 Yes / No；分数保留在屏幕上 |
@@ -32,7 +32,21 @@
 - **一处新增**：Options 有第四个按钮 *Extended*；它的页面上有开关 *Extended mode?*（Yes / No）。这是玩原版关卡的玩家能看到的唯一区别。
 - 关卡解锁方式与原版相同。高分榜也是原版的：每关十条，分数、名字。它们从副本的默认值开始，保存在我们自己的数据文件夹中，绝不写入游戏的文件。
   读取玩家的 `Database.tdb` 以接管其旧分数是以后的选项（一个解析器：和每个文件读取器一样要经过审查）。
-- 原版有而我们暂时还没有的设置（屏幕分辨率、同步、云、按键）会随着各自行为的实现而加入；在此之前，这些行显示当前值，不能修改。
+- **Graphics**：原版的三行，再加一行 *Fullscreen?*（No / Yes / Exclusive），因为窗口也可以占满屏幕。左右键（或 Enter）修改一行；
+  修改立即生效并保存在 `settings.txt` 中：
+  - *Screen Resolution* 依次切换显示器的模式和常见的窗口尺寸（`resolution 1600x900`）；窗口采用该尺寸，独占全屏采用该显示模式；
+  - *Synch to Screen?* 让画面等待显示器（`vsync on`；默认关闭，与副本相同，也因为在测试机器上等待会卡住；`DRAHTSEILAKT_PRESENT`
+    仍然优先）；
+  - *Clouds?* 显示关卡的云层（`clouds on|off`），即其 `SkyLayer` 对象，选项打开时 `Gameplay.nmo` 会显示它。它的纹理是黑底上的灰色云，
+    材质不做混合，所以我们把它叠加到后面的天空上绘制（这是我们的理解；副本的材质没有说明）。视频追踪绘制时不带云层；
+  - *Fullscreen?*（`fullscreen off|borderless|exclusive`）：无边框使用桌面的显示模式，独占在平台允许时更改它（Wayland 不允许：改为无边框）。
+    F11 在窗口和无边框之间切换。
+- **Controls**：在某个按键的行上按 Enter 会等待按键（“Press a key”）；按下的键被绑定，Esc 取消。已被其他动作占用的键会互换，所以没有一个键
+  同时做两件事。Esc 和 F11 属于游戏本身，不能绑定；绑定的键优先于扩展模式的练习键。Invert Rotation? 让相机反向转动。按键保存为
+  `key.forward ArrowUp` … `key.overview Space` 和 `invert-rotation on|off`（winit 的按键名）；没有这些行时使用副本 `DB_Options`
+  中的按键。只要另一个 Shift 本身没有被绑定，任意一个 Shift 都起到已绑定的那个的作用。页面用副本中的名字显示按键，没有时用我们自己的。
+- **手柄**（gilrs）按下与键盘相同的键，所以无论用什么玩，一次游玩和它的回放都相同：左摇杆或十字键滚动球，左右肩键转动相机（Rotation 加左或右），
+  下方的面键（A / ✕）是 Overview，Start 暂停。在菜单中十字键移动，下方的键是 Enter，右边的键（B / ○）是 Esc。手柄按键暂时不能重新绑定。
 - 每一次完成的游玩仍然会保存为回放（在屏幕上没有任何代价）；最快的一次算作扩展模式中显示的最佳时间。
 
 ## 我们的：扩展模式
@@ -48,7 +62,10 @@
   - Sounds：音效主题——系统、生成、原版（由 toolbox 制作）或玩家自己的主题（[resources.md](resources.md)）；经典模式播放系统主题；
   - 练习工具：自由视角（F2），减速和加速（`[` `]`），保存当前时刻并回到该时刻（F5 / F9），后退五秒（F3，再按一次继续后退，最多半分钟），屏幕上显示小节和 tick；借助这些工具完成的游玩会被保存，但永远不算最佳成绩；
   - 无限生命：最后一个球永远不会丢失（因此而保住的游玩永远不算最佳成绩）。没有需要取消的时间限制：分数只会递减并停在零，与原版相同。
-  更多开关会随路线图中的功能一起到来（视野、计时器、最佳成绩的幽灵）。
+  更多开关会随路线图中的功能一起到来（计时器、最佳成绩的幽灵）。
+- **Graphics** 增加 *Field of View*：游戏相机在 4:3 上的视野宽度，40° 到 100°，步长 2（`fov 58`；原版为 58°，即 InGameCam 的
+  1.0123 弧度）。经典模式始终使用原版的视野。
+- **Controls** 增加 *Defaults*：恢复原版的按键（方向键、Shift、Space），并取消相机反转。
 - **按类别的关卡**：Start 提供 *Original*（经典关卡列表）、*Remastered*、*Community maps* 和 *Open format*，即 `levels/`（[levels.md](levels.md)）中的各个文件夹。每一类中先按文件名列出其关卡，再列出包含更多关卡的文件夹（Enter 打开，Esc 返回上一级），像原版关卡一样游玩。无法加载的关卡会说明原因且不会启动；其游玩记录和最佳时间与原版关卡分开保存。以后：从社区目录获取标题、作者和难度。
 - 材质包和我们自己的模组出现后也会放在这里，每个都有自己的开关，并提示第三方内容的游玩风险由玩家自行承担。
 
@@ -63,7 +80,7 @@
 2. 已完成：带 Yes / No 询问的暂停菜单；死亡菜单；关卡结束菜单。
 3. 已完成：带名字输入的高分榜；关卡解锁。
 4. 已完成：自定义关卡列表（levels.md）和扩展页面上的开关。
-5. Graphics 和 Controls 设置随各自行为的实现而加入（目前只显示，不能修改）。
+5. 已完成：Graphics 和 Controls；手柄。
 
 `DRAHTSEILAKT_SHOT_MENU=base:keys` 配合 `--screenshot` 可以在没有窗口的情况下把菜单画在画面上（base 为 `main`、`pause`、`dead` 或 `end`；
-keys 中 `u d l r` 表示方向键，`e` 表示 Enter，`b` 表示 Esc，`n` 表示名字输入），用来查看每一个界面。
+keys 中 `u d l r` 表示方向键，`e` 表示 Enter，`b` 表示 Esc，`n` 表示名字输入，`w` 表示在等待按键时按下 W 键），用来查看每一个界面。

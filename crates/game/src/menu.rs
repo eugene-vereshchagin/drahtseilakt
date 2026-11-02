@@ -10,12 +10,38 @@ use crate::highscore::{NAME_MAX, Table};
 use crate::hud::{Rect, text, width};
 use crate::lang::{Strings, latin1};
 use crate::levels::Kind;
+use crate::options::{Bindings, Fullscreen, Graphics};
 use std::path::{Path, PathBuf};
 
 /// The original game's levels: 1 to 12, and 13 of the add-on when the copy has it.
 pub const LEVELS: u32 = 13;
 /// Lines of a long list (custom levels) shown at once.
 const LIST_LINES: usize = 12;
+
+/// The Controls page's rows: the copy's names for them (Language.nmo), in options::ACTIONS' order.
+const KEY_NAMES: [(&str, &str); 6] = [
+    ("Menu_Opt_Keys Forward", "Forward"),
+    ("Menu_Opt_Keys Backward", "Backward"),
+    ("Menu_Opt_Keys Left", "Left"),
+    ("Menu_Opt_Keys Right", "Right"),
+    ("Menu_Opt_Keys Rotation", "Rotation"),
+    ("Menu_Opt_Keys Overview", "Overview"),
+];
+
+/// The size `by` places from `now` among `sizes` (sorted), round; from where `now` would be when it is not one.
+fn step_size(sizes: &[(u32, u32)], now: (u32, u32), by: i32) -> Option<(u32, u32)> {
+    let n = i64::try_from(sizes.len()).ok().filter(|&n| n > 0)?;
+    let area = |s: &(u32, u32)| (u64::from(s.0) * u64::from(s.1), s.0);
+    let at = match sizes.iter().position(|&s| s == now) {
+        Some(i) => i64::try_from(i).ok()?,
+        // between two sizes: one step lands on the size next to it in that direction
+        None => {
+            let after = i64::try_from(sizes.iter().filter(|s| area(s) < area(&now)).count()).ok()?;
+            if by > 0 { after - 1 } else { after }
+        }
+    };
+    sizes.get(usize::try_from((at + i64::from(by)).rem_euclid(n)).ok()?).copied()
+}
 
 pub struct Entry {
     pub number: u32,
@@ -95,6 +121,16 @@ enum Line {
     Yes,
     No,
     Ok,
+    /// The Graphics page: the window's size, synch to screen, the clouds, the full screen, the field of view.
+    Resolution,
+    Synch,
+    Clouds,
+    Fullscreen,
+    Fov,
+    /// The Controls page: an action's key (by its place in options::ACTIONS), the turn inverted, the original's keys.
+    Key(usize),
+    Invert,
+    Defaults,
 }
 
 /// What a key in the menu asks of the game.
@@ -121,6 +157,10 @@ pub enum Action {
     SoundTheme(String),
     /// The new highscore's name was entered: the game saves it and shows the list.
     Score(Vec<u8>),
+    /// The Graphics page changed: the game applies and saves it.
+    Graphics(Graphics),
+    /// The keys changed: the game takes and saves them.
+    Bindings(Bindings),
 }
 
 pub struct Menu {
@@ -150,6 +190,12 @@ pub struct Menu {
     after_entry: bool,
     /// The level played is a custom level: no highscores and no next level.
     pub custom: bool,
+    /// The Graphics page's choices, and the sizes its resolution goes through (the monitor's and window sizes).
+    pub graphics: Graphics,
+    pub resolutions: Vec<(u32, u32)>,
+    /// The Controls page's keys, and the action whose new key is awaited.
+    pub bindings: Bindings,
+    waiting: Option<usize>,
 }
 
 impl Menu {
@@ -189,6 +235,10 @@ impl Menu {
             points: 0,
             after_entry: false,
             custom: current.is_none(),
+            graphics: Graphics::default(),
+            resolutions: Vec::new(),
+            bindings: Bindings::load(|_| None, strings.controls, strings.invert),
+            waiting: None,
         };
         m.push(base);
         m
@@ -287,9 +337,26 @@ impl Menu {
             Screen::Debug => switches(true).chain([Line::Back]).collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
             Screen::Highscore if self.after_entry => vec![Line::Next],
-            Screen::Highscore | Screen::Graphics | Screen::Controls | Screen::Credits => {
-                vec![Line::Back]
+            // the original's lines, the full screen (a window can be one), and the extended mode's field of view
+            Screen::Graphics => {
+                let mut l = vec![Line::Resolution, Line::Synch, Line::Clouds, Line::Fullscreen];
+                if self.features.mode {
+                    l.push(Line::Fov);
+                }
+                l.push(Line::Back);
+                l
             }
+            // the original's lines, and the extended mode's way back to the original's keys
+            Screen::Controls => {
+                let mut l: Vec<Line> = (0..crate::options::ACTIONS.len()).map(Line::Key).collect();
+                if self.features.mode {
+                    l.push(Line::Defaults);
+                }
+                l.push(Line::Invert);
+                l.push(Line::Back);
+                l
+            }
+            Screen::Highscore | Screen::Credits => vec![Line::Back],
             Screen::Pause if self.custom => {
                 vec![Line::Restart, Line::Options, Line::ExitLevel, Line::Back]
             }
@@ -379,6 +446,8 @@ impl Menu {
                 self.step(by as isize);
                 Action::None
             }
+            (Screen::Graphics, Some(l)) => self.change_graphics(l, by),
+            (Screen::Controls, Some(Line::Invert)) => self.toggle_invert(),
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
             (Screen::Extended, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
@@ -451,6 +520,18 @@ impl Menu {
             Line::SoundTheme => Action::SoundTheme(next_theme(1)),
             Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
             Line::Music | Line::Effects => Action::None,
+            Line::Resolution | Line::Synch | Line::Clouds | Line::Fullscreen | Line::Fov => {
+                self.change_graphics(line, 1)
+            }
+            Line::Key(i) => {
+                self.waiting = Some(i);
+                Action::None
+            }
+            Line::Invert => self.toggle_invert(),
+            Line::Defaults => {
+                self.bindings = Bindings::default();
+                Action::Bindings(self.bindings)
+            }
             Line::Yes => match screen {
                 Screen::Ask(Ask::Quit) => Action::Quit,
                 Screen::Ask(Ask::Restart) => Action::Restart,
@@ -464,8 +545,11 @@ impl Menu {
         }
     }
 
-    /// Esc: back a screen; the pause menu back to the run.
+    /// Esc: back a screen; the pause menu back to the run. A key being awaited is left as it was.
     pub fn back(&mut self) -> Action {
+        if self.waiting.take().is_some() {
+            return Action::None;
+        }
         match self.screen() {
             Screen::Pause => Action::Continue,
             Screen::Main | Screen::Dead | Screen::End | Screen::Entry => Action::None,
@@ -485,6 +569,56 @@ impl Menu {
                 self.pop();
                 Action::None
             }
+        }
+    }
+
+    /// A Graphics line changed by Enter or an arrow: the next size, a switch flipped, the next full screen, the
+    /// field of view a step wider or narrower.
+    fn change_graphics(&mut self, line: Line, by: i32) -> Action {
+        let g = &mut self.graphics;
+        match line {
+            Line::Resolution => {
+                let Some(next) = step_size(&self.resolutions, self.resolution, by) else {
+                    return Action::None;
+                };
+                g.resolution = Some(next);
+                self.resolution = next;
+            }
+            Line::Synch => g.vsync = !g.vsync,
+            Line::Clouds => g.clouds = !g.clouds,
+            Line::Fullscreen => g.fullscreen = g.fullscreen.next(by),
+            Line::Fov => g.fov = g.fov_by(by),
+            _ => return Action::None,
+        }
+        Action::Graphics(*g)
+    }
+
+    fn toggle_invert(&mut self) -> Action {
+        self.bindings.invert = !self.bindings.invert;
+        Action::Bindings(self.bindings)
+    }
+
+    /// A new key is awaited (Enter on a Controls row).
+    pub fn waiting(&self) -> bool {
+        self.waiting.is_some()
+    }
+
+    /// The key pressed while one is awaited: bound to the action (a key another action has is swapped). Esc gives
+    /// the wait up; a key that cannot be bound leaves it on.
+    pub fn capture(&mut self, code: winit::keyboard::KeyCode) -> Action {
+        let Some(action) = self.waiting else {
+            return Action::None;
+        };
+        if code == winit::keyboard::KeyCode::Escape {
+            self.waiting = None;
+            return Action::None;
+        }
+        match self.bindings.bind(action, code) {
+            Ok(_) => {
+                self.waiting = None;
+                Action::Bindings(self.bindings)
+            }
+            Err(_) => Action::None,
         }
     }
 
@@ -619,7 +753,7 @@ impl Menu {
                 })
                 .unwrap_or_default(),
             Line::Music => s.get("Menu_Opt_Sound Volume", "Music Volume"),
-            Line::Effects => b"  Sound Volume".to_vec(),
+            Line::Effects => s.ours("sound volume"),
             Line::Mode => b"  Extended mode?".to_vec(),
             Line::DebugMenu => b"Debug mode".to_vec(),
             Line::Interface => b"Interface".to_vec(),
@@ -632,6 +766,17 @@ impl Menu {
             Line::Yes => s.get("Menu_Opt_Graphics Synch Yes", "Yes"),
             Line::No => s.get("Menu_Opt_Graphics Synch No", "No"),
             Line::Ok => s.get("Menu_YesNo YES", "OK"),
+            Line::Resolution => s.get("Menu_Opt_Graphics Resolution", "Screen Resolution"),
+            Line::Synch => s.get("Menu_Opt_Graphics Synch", "Synch to Screen?"),
+            Line::Clouds => s.get("Menu_Opt_Graphics Clouds", "Clouds?"),
+            Line::Fullscreen => s.ours("fullscreen"),
+            Line::Fov => s.ours("field of view"),
+            Line::Key(i) => {
+                let (key, name) = KEY_NAMES.get(i).copied().unwrap_or(("", ""));
+                s.get(key, name)
+            }
+            Line::Invert => s.get("Menu_Opt_Keys Invert Cam Rot?", "Invert Rotation?"),
+            Line::Defaults => s.ours("defaults"),
         }
     }
 
@@ -708,35 +853,46 @@ impl Menu {
             }
         };
         match screen {
-            Screen::Graphics => vec![
-                (
-                    s.get("Menu_Opt_Graphics Resolution", "Screen Resolution"),
-                    format!("{} * {}", self.resolution.0, self.resolution.1).into_bytes(),
-                ),
-                (
-                    s.get("Menu_Opt_Graphics Synch", "Synch to Screen?"),
-                    yes_no(true),
-                ),
-                (s.get("Menu_Opt_Graphics Clouds", "Clouds?"), yes_no(true)),
-            ],
-            Screen::Controls => {
-                let names = [
-                    ("Menu_Opt_Keys Forward", "Forward"),
-                    ("Menu_Opt_Keys Backward", "Backward"),
-                    ("Menu_Opt_Keys Left", "Left"),
-                    ("Menu_Opt_Keys Right", "Right"),
-                    ("Menu_Opt_Keys Rotation", "Rotation"),
-                    ("Menu_Opt_Keys Overview", "Overview"),
+            Screen::Graphics => {
+                let g = &self.graphics;
+                let full = match g.fullscreen {
+                    Fullscreen::Off => yes_no(false),
+                    Fullscreen::Borderless => yes_no(true),
+                    Fullscreen::Exclusive => s.ours("exclusive"),
+                };
+                let mut f = vec![
+                    (
+                        self.label(Line::Resolution),
+                        format!("{} * {}", self.resolution.0, self.resolution.1).into_bytes(),
+                    ),
+                    (self.label(Line::Synch), yes_no(g.vsync)),
+                    (self.label(Line::Clouds), yes_no(g.clouds)),
+                    (self.label(Line::Fullscreen), full),
                 ];
-                let mut f: Vec<_> = names
+                if self.features.mode {
+                    f.push((self.label(Line::Fov), format!("{}", g.fov).into_bytes()));
+                }
+                f
+            }
+            Screen::Controls => {
+                let mut f: Vec<_> = self
+                    .bindings
+                    .keys
                     .iter()
-                    .zip(s.controls)
-                    .map(|(&(k, d), row)| (s.get(k, d), s.key(row)))
+                    .enumerate()
+                    .map(|(i, &k)| {
+                        let key = if self.waiting == Some(i) {
+                            s.ours("press a key")
+                        } else {
+                            crate::options::key_label(k, |row| s.key(row))
+                        };
+                        (self.label(Line::Key(i)), key)
+                    })
                     .collect();
-                f.push((
-                    s.get("Menu_Opt_Keys Invert Cam Rot?", "Invert Rotation?"),
-                    yes_no(s.invert),
-                ));
+                if self.features.mode {
+                    f.push((self.label(Line::Defaults), Vec::new()));
+                }
+                f.push((self.label(Line::Invert), yes_no(self.bindings.invert)));
                 f
             }
             Screen::Sound => {
@@ -1095,7 +1251,8 @@ impl Menu {
                     let y = 0.27 + row as f32 * 0.045;
                     let r = [0.36, y, 0.64, y + 0.04];
                     button(&mut out, r, LEVEL_UV, state(i));
-                    // a name the game's font cannot draw (Chinese, Cyrillic) in the shipped fonts, as high as its letters
+                    // a name the game's font cannot draw (Chinese, Cyrillic) in the shipped fonts, as high as its
+                    // letters
                     let text = match lines[i] {
                         Line::Map(k) => self.map_text(k).filter(|t| crate::fallback::needed(t)),
                         _ => None,
@@ -1106,7 +1263,8 @@ impl Menu {
                         } else {
                             t
                         };
-                        let frame = crate::ui::homogeneous([0.39, y, 0.635, y + 0.04]);
+                        // clear of the button's ball at its left
+                        let frame = crate::ui::homogeneous([0.42, y, 0.615, y + 0.04]);
                         let height = font
                             .and_then(|f| f.layout(b"A", frame, &FONT_03).first().map(|q| q.rect[3] - q.rect[1]))
                             .unwrap_or((frame[3] - frame[1]) * 0.5);
@@ -1130,7 +1288,8 @@ impl Menu {
                                 let mid = (frame[1] + frame[3]) / 2.0;
                                 let h = height * WRAP_SHRINK.max(0.5);
                                 quads = crate::fallback::layout(&a, [frame[0], frame[1], frame[2], mid], h, al, co);
-                                quads.extend(crate::fallback::layout(&b, [frame[0], mid, frame[2], frame[3]], h, al, co));
+                                let at = [frame[0], mid, frame[2], frame[3]];
+                                quads.extend(crate::fallback::layout(&b, at, h, al, co));
                             }
                         }
                         out.extend(crate::ui::place(quads, screen, Anchor::Center));
@@ -1142,7 +1301,7 @@ impl Menu {
                         name.truncate(58);
                         name.extend_from_slice(b"..");
                     }
-                    label(&mut out, &name, [0.39, y, 0.635, y + 0.04], &FONT_03);
+                    label(&mut out, &name, [0.42, y, 0.615, y + 0.04], &FONT_03);
                 }
                 for (row, (l, _)) in self.fields(sc).iter().enumerate() {
                     let y = 0.30 + row as f32 * 0.05;
@@ -1195,13 +1354,21 @@ impl Menu {
                 title(&mut out);
                 let fields = self.fields(sc);
                 if sc == Screen::Controls {
-                    for (k, (name, key)) in fields.iter().enumerate() {
-                        if k == 6 {
-                            field(&mut out, 0.70, name, key, false);
+                    // the six keys' rows, the extended mode's defaults row under them, the invert field
+                    for (k, ((name, key), line)) in fields.iter().zip(&lines).enumerate() {
+                        let chosen = self.chosen() == k;
+                        let st = if chosen { Button::Over } else { Button::Up };
+                        if *line == Line::Invert {
+                            field(&mut out, if self.features.mode { 0.715 } else { 0.70 }, name, key, chosen);
                             continue;
                         }
                         let y = 0.30 + k as f32 * 0.06;
-                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, Button::Up);
+                        if *line == Line::Defaults {
+                            button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st);
+                            label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
+                            continue;
+                        }
+                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st);
                         label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
                         label(&mut out, key, [0.505, y, 0.65, y + 0.0396], &FONT_03);
                     }
@@ -1212,7 +1379,9 @@ impl Menu {
                     if let (1, Some((name, value))) = (first, fields.first()) {
                         field(&mut out, 0.27, name, value, self.chosen() == 0);
                     }
-                    let rows = |l: &&Line| matches!(l, Line::Switch(_) | Line::Interface | Line::SoundTheme | Line::DebugMenu);
+                    let rows = |l: &&Line| {
+                        matches!(l, Line::Switch(_) | Line::Interface | Line::SoundTheme | Line::DebugMenu)
+                    };
                     let n = lines.iter().filter(rows).count();
                     let top = if first == 1 { 0.40 } else { 0.30 };
                     for (k, (name, value)) in fields.iter().skip(first).take(n).enumerate() {
@@ -1231,10 +1400,11 @@ impl Menu {
                         label(&mut out, l, [0.31, y, 0.69, y + 0.045], &FONT_03);
                     }
                 } else {
+                    // the original's fields 0.15 apart; the extended mode's fifth closes them up
+                    let (top, step) = if fields.len() > 4 { (0.25, 0.12) } else { (0.295, 0.15) };
                     for (k, (name, value)) in fields.iter().enumerate() {
-                        let y = 0.295 + k as f32 * 0.15;
-                        let chosen = sc != Screen::Graphics && self.chosen() == k;
-                        field(&mut out, y, name, value, chosen);
+                        let y = top + k as f32 * step;
+                        field(&mut out, y, name, value, self.chosen() == k);
                     }
                 }
                 back_only(&mut out);
@@ -1580,9 +1750,109 @@ mod tests {
             points: 0,
             after_entry: false,
             custom: false,
+            graphics: Graphics::default(),
+            resolutions: vec![(800, 600), (1280, 720), (1920, 1080)],
+            bindings: Bindings::default(),
+            waiting: None,
         };
         m.push(Screen::Main);
         m
+    }
+
+    #[test]
+    fn the_classic_graphics_page_has_the_originals_lines_and_the_full_screen() {
+        let m = menu(&[true], false);
+        assert_eq!(
+            m.lines(Screen::Graphics),
+            [Line::Resolution, Line::Synch, Line::Clouds, Line::Fullscreen, Line::Back]
+        );
+        let e = menu(&[true], true);
+        assert!(e.lines(Screen::Graphics).contains(&Line::Fov));
+        assert!(!m.lines(Screen::Controls).contains(&Line::Defaults));
+        assert!(e.lines(Screen::Controls).contains(&Line::Defaults));
+    }
+
+    fn graphics(a: Action) -> Option<Graphics> {
+        if let Action::Graphics(g) = a { Some(g) } else { None }
+    }
+
+    fn bindings(a: Action) -> Option<Bindings> {
+        if let Action::Bindings(b) = a { Some(b) } else { None }
+    }
+
+    #[test]
+    fn graphics_lines_change_and_say_so() {
+        let mut m = menu(&[true], true);
+        m.push(Screen::Graphics);
+        // Back is chosen first, as the original's; up to Fov, then the others
+        m.step(-1);
+        assert_eq!(m.adjust(1), Action::Graphics(Graphics { fov: 60, ..Graphics::default() }));
+        m.step(-1);
+        let g = graphics(m.adjust(1)).unwrap();
+        assert_eq!(g.fullscreen, Fullscreen::Borderless);
+        m.step(-1);
+        let g = graphics(m.enter()).unwrap();
+        assert!(!g.clouds);
+        m.step(-1);
+        let g = graphics(m.enter()).unwrap();
+        assert!(g.vsync);
+        m.step(-1);
+        // 640 x 480 is not offered: right goes to the next size up, left to the one below it
+        let g = graphics(m.adjust(1)).unwrap();
+        assert_eq!(g.resolution, Some((800, 600)));
+        assert_eq!(m.resolution, (800, 600));
+        m.adjust(-1);
+        assert_eq!(m.resolution, (1920, 1080), "round from the smallest");
+    }
+
+    #[test]
+    fn sizes_step_round_and_from_between() {
+        let s = [(800, 600), (1280, 720), (1920, 1080)];
+        assert_eq!(step_size(&s, (1280, 720), 1), Some((1920, 1080)));
+        assert_eq!(step_size(&s, (1920, 1080), 1), Some((800, 600)));
+        assert_eq!(step_size(&s, (1600, 900), -1), Some((1280, 720)));
+        assert_eq!(step_size(&s, (1600, 900), 1), Some((1920, 1080)));
+        assert_eq!(step_size(&s, (4000, 3000), 1), Some((800, 600)));
+        assert_eq!(step_size(&[], (800, 600), 1), None);
+    }
+
+    #[test]
+    fn a_key_is_rebound_by_pressing_it_and_esc_gives_up() {
+        use winit::keyboard::KeyCode;
+        let mut m = menu(&[true], false);
+        m.push(Screen::Controls);
+        m.set_chosen(0);
+        assert_eq!(m.enter(), Action::None);
+        assert!(m.waiting());
+        assert_eq!(m.fields(Screen::Controls)[0].1, m.strings.ours("press a key"));
+        // Esc: nothing changes, the page stays
+        assert_eq!(m.capture(KeyCode::Escape), Action::None);
+        assert!(!m.waiting());
+        assert_eq!(m.screen(), Screen::Controls);
+        // F11 is the game's: the wait goes on; W is taken
+        m.enter();
+        assert_eq!(m.capture(KeyCode::F11), Action::None);
+        assert!(m.waiting());
+        let b = bindings(m.capture(KeyCode::KeyW)).unwrap();
+        assert_eq!(b.keys[0], KeyCode::KeyW);
+        // backward onto W: forward gets backward's old key
+        m.set_chosen(1);
+        m.enter();
+        let b = bindings(m.capture(KeyCode::KeyW)).unwrap();
+        assert_eq!((b.keys[0], b.keys[1]), (KeyCode::ArrowDown, KeyCode::KeyW));
+        // Esc while waiting through back() too
+        m.enter();
+        assert_eq!(m.back(), Action::None);
+        assert_eq!(m.screen(), Screen::Controls);
+        // the invert line, and the extended mode's defaults
+        m.set_chosen(6);
+        let b = bindings(m.adjust(1)).unwrap();
+        assert!(b.invert);
+        let mut e = menu(&[true], true);
+        e.bindings = b;
+        e.push(Screen::Controls);
+        e.set_chosen(6);
+        assert_eq!(e.enter(), Action::Bindings(Bindings::default()));
     }
 
     #[test]

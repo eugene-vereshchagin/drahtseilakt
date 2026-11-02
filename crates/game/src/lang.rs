@@ -22,7 +22,74 @@ pub struct Strings {
     pub invert: bool,
     /// Each level's default highscore list (index 0 is level 1), best first.
     pub highscores: Vec<crate::highscore::List>,
+    /// The language's place in LANGUAGES (for our own additions' strings); English when none.
+    lang: Option<usize>,
 }
+
+/// Our additions' strings the copy has none for, in LANGUAGES' order (German, English, Spanish, Italian, French),
+/// Latin-1 as the game's font draws them.
+const OURS: [(&str, [&str; 5]); 6] = [
+    (
+        "sound volume",
+        [
+            "  Effektlautst\u{e4}rke",
+            "  Sound Volume",
+            "  Volumen de efectos",
+            "  Volume effetti",
+            "  Volume effets",
+        ],
+    ),
+    (
+        "fullscreen",
+        [
+            "  Vollbild?",
+            "  Fullscreen?",
+            "  \u{bf}Pantalla completa?",
+            "  Schermo intero?",
+            "  Plein \u{e9}cran?",
+        ],
+    ),
+    (
+        "field of view",
+        [
+            "  Blickwinkel",
+            "  Field of View",
+            "  Campo de visi\u{f3}n",
+            "  Campo visivo",
+            "  Champ de vision",
+        ],
+    ),
+    (
+        "press a key",
+        [
+            "Taste dr\u{fc}cken",
+            "Press a key",
+            "Pulse una tecla",
+            "Premi un tasto",
+            "Appuyez sur une touche",
+        ],
+    ),
+    (
+        "defaults",
+        [
+            "Standard",
+            "Defaults",
+            "Predeterminado",
+            "Predefiniti",
+            "Par d\u{e9}faut",
+        ],
+    ),
+    (
+        "exclusive",
+        [
+            "Exklusiv",
+            "Exclusive",
+            "Exclusiva",
+            "Esclusivo",
+            "Exclusif",
+        ],
+    ),
+];
 
 impl Strings {
     /// The copy's strings in `language` (one of LANGUAGES; English when the copy lacks it).
@@ -30,6 +97,7 @@ impl Strings {
         let column = LANGUAGES.iter().position(|&l| l == language).unwrap_or(1) + 1;
         let mut s = Strings {
             controls: [68, 69, 70, 71, 39, 53],
+            lang: Some(column - 1),
             ..Strings::default()
         };
         let cell = |row: &[nmo::scene::Cell], c: usize| match row.get(c) {
@@ -125,9 +193,23 @@ impl Strings {
             .unwrap_or_else(|| fallback.as_bytes().to_vec())
     }
 
-    /// The name of the key DB_Options keeps as `row`.
-    pub fn key(&self, row: usize) -> Vec<u8> {
-        self.keys.get(row).cloned().unwrap_or_else(|| b"?".to_vec())
+    /// One of our additions' strings (OURS) in the menus' language, Latin-1.
+    pub fn ours(&self, key: &str) -> Vec<u8> {
+        let i = self.lang.unwrap_or(1);
+        OURS.iter()
+            .find(|(k, _)| *k == key)
+            .and_then(|(_, t)| t.get(i).or(t.get(1)))
+            .map(|t| {
+                t.chars()
+                    .map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?'))
+                    .collect()
+            })
+            .unwrap_or_else(|| key.as_bytes().to_vec())
+    }
+
+    /// The copy's name of the key in `row` of its key list (the rows DB_Options counts in), if it has one.
+    pub fn key(&self, row: usize) -> Option<Vec<u8>> {
+        self.keys.get(row).filter(|k| !k.is_empty()).cloned()
     }
 }
 
@@ -171,7 +253,7 @@ mod tests {
     fn a_missing_key_falls_back() {
         let s = Strings::default();
         assert_eq!(s.get("Menu_Main Button Start", "Start"), b"Start");
-        assert_eq!(s.key(3), b"?");
+        assert_eq!(s.key(3), None);
     }
 
     #[test]

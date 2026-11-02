@@ -42,7 +42,9 @@ beides nicht. `--level N` spielt Originallevel N, `--map
 FILE.nmo` jede Leveldatei oder Community-Karte, `--open DIR` ein Level im
 [offenen Format](docs/de/drahtseilakt/open-format.md); `--export DIR` wandelt das gewählte Level darin um.
 Pfeiltasten rollen die Kugel relativ zur Kamera, Shift+Links/Rechts drehen die Kamera, Leertaste hebt sie, F11
-ist Vollbild, Esc pausiert. Ohne genanntes Level beginnt das Spiel mit dem Hauptmenü. Die Menüs sind die des
+ist Vollbild, Esc pausiert; andere Tasten belegt Options → Controls. Ein Gamepad spielt auch: der linke Stick
+oder das Steuerkreuz rollt, die Schultertasten drehen die Kamera, die untere Aktionstaste hebt sie, Start
+pausiert. Ohne genanntes Level beginnt das Spiel mit dem Hauptmenü. Die Menüs sind die des
 Originals ([Menüs](docs/de/drahtseilakt/menu.md)), in den Worten der Kopie: Start (ein Level öffnet sich, sobald
 das vorige geschafft ist), Highscore (zehn Plätze pro Level, in unserem Datenordner), Options, Credits, Exit; Esc
 im Level öffnet das Pausenmenü, ein verlorener Lauf das Tot-Menü, ein geschaffter die Punkte, die Namenseingabe

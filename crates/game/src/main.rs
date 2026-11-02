@@ -27,6 +27,7 @@ mod menu;
 mod menuscene;
 mod modules;
 mod music;
+mod options;
 mod particles;
 mod physics;
 mod pieces;
@@ -87,8 +88,9 @@ Without the game found, the window offers to bring in your Ballance: from an ins
 its drive or an image of it (found on this computer, dropped on the window or typed).
 
 keys: arrows roll the ball (relative to the camera), Shift+Left/Right turn the camera,
-      Space lifts the camera, F11 full screen, Esc pauses; in the extended mode R restarts,
-      F2 free camera, [ ] slower and faster, F5 / F9 save the moment and back to it";
+      Space lifts the camera, F11 full screen, Esc pauses; Options > Controls binds other keys; a gamepad's
+      left stick rolls, its shoulder buttons turn the camera, A lifts it, Start pauses; in the extended mode
+      R restarts, F2 free camera, [ ] slower and faster, F5 / F9 save the moment and back to it";
 
 #[derive(Clone)]
 pub struct Options {
@@ -129,6 +131,8 @@ pub struct Options {
     pub trace: Option<u64>,
     pub from: Option<u64>,
     pub size: (u32, u32),
+    /// The size was given (--size): the settings' resolution does not replace it.
+    pub size_given: bool,
     /// Debug mode from the start: the free camera on F2.
     pub debug: bool,
     /// --sector, --at, --ball: a run begun elsewhere than the level start.
@@ -162,6 +166,7 @@ fn parse_args() -> Result<Options, String> {
         trace: None,
         from: None,
         size: (1600, 900),
+        size_given: false,
         sector: None,
         at: None,
         ball: None,
@@ -276,6 +281,7 @@ fn parse_args() -> Result<Options, String> {
                 o.look = Some(a);
             }
             "--size" => {
+                o.size_given = true;
                 let v = value()?;
                 let (w, h) = v.split_once('x').ok_or("--size is WxH")?;
                 o.size = (

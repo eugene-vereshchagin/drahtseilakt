@@ -3,6 +3,7 @@
 
 use crate::render::{Instance, View};
 use crate::sim::{BallKind, Sim};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use glam::{Mat4, Quat, Vec3};
 use level::Level;
 
@@ -121,6 +122,43 @@ pub struct Placement {
     pub trafo_shadow: Option<BallKind>,
     /// A sprite: `matrix` is then its place, and the quad is turned and sized each frame (`sprite_matrix`).
     pub sprite: Option<level::Sprite>,
+    /// The level's cloud layer (its `SkyLayer`), which the Graphics page's Clouds switch hides.
+    pub cloud: bool,
+}
+
+/// The Clouds switch (the Graphics page): the original's `Skylayer ein?`.
+static CLOUDS: AtomicBool = AtomicBool::new(true);
+
+pub fn set_clouds(on: bool) {
+    CLOUDS.store(on, Ordering::Relaxed);
+}
+
+/// The cloud layer's look. Its texture is grey clouds on black and its material has no blending, yet the original
+/// shows clouds over the sky, not a black floor: it is drawn added to what is behind it (black adds nothing), unlit
+/// and without hiding what comes after it.
+pub fn cloud_material(level: &mut Level) {
+    let clouds: Vec<usize> = level
+        .objects
+        .iter()
+        .filter(|o| o.name == "SkyLayer")
+        .filter_map(|o| o.mesh)
+        .filter_map(|m| level.meshes.get(m))
+        .flat_map(|m| m.parts.iter().filter_map(|p| p.material))
+        .collect();
+    for i in clouds {
+        if let Some(m) = level.materials.get_mut(i) {
+            m.blend = Some((level::Blend::One, level::Blend::One));
+            m.z_write = false;
+            m.unlit = true;
+        }
+    }
+}
+
+/// The field of view the player chose, degrees across 4:3 (the extended mode's); 0 for the original's.
+static FOV: AtomicU32 = AtomicU32::new(0);
+
+pub fn set_fov(degrees: Option<u32>) {
+    FOV.store(degrees.unwrap_or(0), Ordering::Relaxed);
 }
 
 /// The matrix that draws a sprite's unit quad (0..1 in x and y) for a view from `eye` toward `target`, as the
@@ -269,7 +307,9 @@ pub fn placements(
     let mut out = Vec::new();
     for (i, o) in level.objects.iter().enumerate() {
         let Some(mesh) = o.mesh else { continue };
-        if !o.visible {
+        // the cloud layer is hidden in the file: Gameplay.nmo shows it when the options have clouds (instances())
+        let cloud = o.name == "SkyLayer";
+        if !o.visible && !cloud {
             continue;
         }
         let matrix = Mat4::from_cols_array_2d(&o.matrix);
@@ -284,6 +324,7 @@ pub fn placements(
                 spin: None,
                 trafo_shadow: None,
                 sprite: None,
+                cloud,
             });
             continue;
         }
@@ -304,6 +345,7 @@ pub fn placements(
                 spin: None,
                 trafo_shadow: None,
                 sprite: None,
+                cloud: false,
             });
             continue;
         }
@@ -349,6 +391,7 @@ pub fn placements(
                     .filter(|_| mo.name.ends_with("_Shadow"))
                     .and_then(BallKind::from_name),
                 sprite: mo.sprite,
+                cloud: false,
             });
         }
     }
@@ -434,9 +477,11 @@ pub fn instances(
         }
     }
     let hidden = |object: usize| extra_model.is_some() && views.iter().any(|v| v.object == object);
+    let clouds = CLOUDS.load(Ordering::Relaxed);
     out.extend(placements
         .iter()
         .filter(|p| !taken.contains(&p.object) && !(p.marker.is_some() && hidden(p.object)))
+        .filter(|p| clouds || !p.cloud)
         .map(|p| Instance {
             model: p.model,
             mesh: p.mesh,
@@ -509,8 +554,16 @@ pub fn instances(
 
 /// The in-game camera's field of view: InGameCam's (Camera.nmo), 1.0123 radians across its 4:3 view, so
 /// vertically 2·atan(tan(1.0123 / 2) · 3/4) ≈ 45°; a wider window sees more at the sides.
-pub fn fov_y() -> f32 {
+pub fn original_fov_y() -> f32 {
     2.0 * ((1.012_291_f32 / 2.0).tan() * 0.75).atan()
+}
+
+/// The field of view drawn: the player's choice in the extended mode, else the original's.
+pub fn fov_y() -> f32 {
+    match FOV.load(Ordering::Relaxed) {
+        0 => original_fov_y(),
+        d => 2.0 * (((d as f32).to_radians() / 2.0).tan() * 0.75).atan(),
+    }
 }
 
 pub fn view(s: &Snapshot) -> View {

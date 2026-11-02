@@ -15,7 +15,7 @@ use crate::music::Music;
 use crate::menu::{Action, Menu};
 use crate::scene::{self, BallMeshes, Snapshot};
 use crate::collide::closest_point;
-use crate::sim::{BALL_RADIUS, Event, Sim, TICK, input};
+use crate::sim::{BALL_RADIUS, Event, Sim, TICK};
 use crate::watch::{Finding, Watch};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -139,7 +139,8 @@ fn begin_at(sim: &mut Sim, st: &crate::replay::Start) {
 
 impl Game {
     fn new(o: &Options, data: &Data) -> Result<Game, String> {
-        let level = data.load(&o.source)?;
+        let mut level = data.load(&o.source)?;
+        scene::cloud_material(&mut level.level);
         for w in &level.warnings {
             eprintln!("warning: {w}");
         }
@@ -634,17 +635,36 @@ fn load_player() -> Vec<u8> {
         .unwrap_or_default()
 }
 
-/// Saves the settings; the language, which only the file sets, is kept.
 /// The extended mode (from the settings, or `--debug` for one run) and the additions the settings turn off.
 fn load_features(debug: bool) -> crate::features::Features {
     crate::features::Features::load(debug || load_extended(), setting)
 }
 
-fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]) {
-    let path = settings_path();
-    if let Some(d) = path.parent() {
-        let _ = std::fs::create_dir_all(d);
+/// The Graphics page's choices kept in the settings.
+fn load_graphics() -> crate::options::Graphics {
+    crate::options::Graphics::load(setting)
+}
+
+/// The keys kept in the settings, else the copy's (its DB_Options), else the original's.
+fn load_bindings(strings: &crate::lang::Strings) -> crate::options::Bindings {
+    crate::options::Bindings::load(setting, strings.controls, strings.invert)
+}
+
+/// Sets `lines` (key and value) in the settings; every other line is kept as it is.
+fn put_settings(lines: &[(String, String)]) {
+    let mut text: String = lines.iter().map(|(k, v)| format!("{k} {v}\n")).collect();
+    for line in settings_text().lines() {
+        let key = line.split_once(' ').map_or(line, |(k, _)| k);
+        if !lines.iter().any(|(k, _)| k == key) && !line.trim().is_empty() {
+            text.push_str(line);
+            text.push('\n');
+        }
     }
+    write_settings(&text);
+}
+
+/// Saves the settings; the language, which only the file sets, is kept.
+fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]) {
     let profile = if features.mode { "extended" } else { "classic" };
     let mut text = format!(
         "sound {}\nmusic {}\nprofile {profile}\ninterface {}\n{}{}",
@@ -670,6 +690,15 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
             text.push_str(line);
             text.push('\n');
         }
+    }
+    write_settings(&text);
+}
+
+/// Writes the settings file, unless it is not ours to rewrite.
+fn write_settings(text: &str) {
+    let path = settings_path();
+    if let Some(d) = path.parent() {
+        let _ = std::fs::create_dir_all(d);
     }
     // a file that is not ours to rewrite (too big, or not UTF-8) is left as it is
     let foreign = std::fs::metadata(&path).is_ok_and(|m| m.len() > 64 * 1024)
@@ -704,6 +733,9 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
     let mut m = Menu::new(data, &strings, base, number, load_features(o.debug));
     m.resolution = size;
     m.volumes = load_volumes();
+    m.graphics = load_graphics();
+    m.bindings = load_bindings(&strings);
+    m.resolutions = crate::options::WINDOWED.to_vec();
     for k in keys.chars() {
         match k {
             'u' => m.step(-1),
@@ -712,6 +744,8 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
             'r' => drop(m.adjust(1)),
             'e' => drop(m.enter()),
             'b' => drop(m.back()),
+            // a key pressed while one is awaited on the Controls page (W)
+            'w' => drop(m.capture(KeyCode::KeyW)),
             'n' => m.ask_name(load_player(), crate::endscreen::score(&game.sim)),
             _ => {}
         }
@@ -753,6 +787,10 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         let loaded = data.load(&o.source)?;
         return crate::assets::export(&data, &loaded, dir);
     }
+    // the video tracking draws the levels as it was tuned on: without the cloud layer
+    if o.locate.is_some() || o.follow.is_some() || o.frames.is_some() {
+        scene::set_clouds(false);
+    }
     if let Some(dir) = &o.locate {
         let mut game = Game::new(&o, &data)?;
         return locate_run(&mut game, &data, &o, dir);
@@ -765,6 +803,8 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         return frames_run(&mut game, &data, dir);
     }
     if let Some(path) = &o.screenshot {
+        // the player's clouds and field of view, as the window would show them
+        show_graphics(&load_graphics(), load_features(o.debug));
         return screenshot(&mut game, &data, &o, path);
     }
     if o.autopilot {
@@ -839,9 +879,14 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     crate::levels::prepare(&crate::lang::docs_language(setting("language").as_deref()));
     let strings = crate::lang::Strings::load(&data, &crate::lang::chosen(setting("language").as_deref()));
     let features = load_features(o.debug);
+    let graphics = load_graphics();
+    let bindings = load_bindings(&strings);
+    show_graphics(&graphics, features);
     let menu = (!o.chosen && o.replay.is_none()).then(|| {
         let mut m = Menu::new(&data, &strings, crate::menu::Screen::Main, Some(1), features);
         m.volumes = load_volumes();
+        m.graphics = graphics;
+        m.bindings = bindings;
         m
     });
     let mut app = App {
@@ -854,6 +899,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         loading: None,
         features,
         strings,
+        graphics,
+        bindings,
+        pads: crate::options::Pads::open(),
+        pad_keys: 0,
+        resolutions: crate::options::WINDOWED.to_vec(),
         player: load_player(),
         time_scale: 1.0,
         saved: None,
@@ -876,7 +926,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         volumes: load_volumes(),
         game,
         data,
-        size: o.size,
+        // the settings' size, unless --size asks for one
+        size: match graphics.resolution {
+            Some(r) if !o.size_given => r,
+            _ => o.size,
+        },
         window: None,
         gpu: None,
         keys: 0,
@@ -1559,11 +1613,14 @@ const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
 
 /// How frames are shown. `Immediate` by default: on the test machine the vertical-sync modes (`Fifo`,
 /// `FifoRelaxed`) blocked the presenting for about a second per frame, while `Immediate` presents at once and may
-/// tear. DRAHTSEILAKT_PRESENT=fifo gives the synchronised mode back, which never tears.
-fn present_mode(offered: &[wgpu::PresentMode]) -> wgpu::PresentMode {
+/// tear. Synch to Screen (`vsync`, the Graphics page) or DRAHTSEILAKT_PRESENT=fifo gives the synchronised mode,
+/// which never tears; the variable comes first.
+pub(crate) fn present_mode(offered: &[wgpu::PresentMode], vsync: bool) -> wgpu::PresentMode {
     let wanted = match std::env::var("DRAHTSEILAKT_PRESENT").as_deref() {
         Ok("fifo") => wgpu::PresentMode::Fifo,
         Ok("relaxed") => wgpu::PresentMode::FifoRelaxed,
+        Ok("immediate") => wgpu::PresentMode::Immediate,
+        _ if vsync => wgpu::PresentMode::Fifo,
         _ => wgpu::PresentMode::Immediate,
     };
     if offered.contains(&wanted) {
@@ -1597,7 +1654,7 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
         format,
         width: size.width.max(1),
         height: size.height.max(1),
-        present_mode: present_mode(&caps.present_modes),
+        present_mode: present_mode(&caps.present_modes, load_graphics().vsync),
         desired_maximum_frame_latency: 2,
         alpha_mode: caps
         .alpha_modes
@@ -1618,7 +1675,7 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
     );
     surface.configure(&device, &config);
     let renderer = Renderer::new(device, queue, format);
-    Ok(Gpu { surface, config, renderer })
+    Ok(Gpu { surface, config, renderer, modes: caps.present_modes })
 }
 
 async fn device(
@@ -1862,6 +1919,8 @@ pub(crate) struct Gpu {
     pub surface: wgpu::Surface<'static>,
     pub config: wgpu::SurfaceConfiguration,
     pub renderer: Renderer,
+    /// The presenting modes the surface offers.
+    pub modes: Vec<wgpu::PresentMode>,
 }
 
 struct App {
@@ -1920,6 +1979,67 @@ struct App {
     history: std::collections::VecDeque<(Sim, Replay)>,
     /// The keys down now.
     held: std::collections::HashSet<KeyCode>,
+    /// The Graphics page's choices, and the sizes its resolution offers.
+    graphics: crate::options::Graphics,
+    resolutions: Vec<(u32, u32)>,
+    /// The keys of the game's actions, and the gamepads with the keys they hold.
+    bindings: crate::options::Bindings,
+    pads: crate::options::Pads,
+    pad_keys: u8,
+}
+
+/// The sizes the Graphics page offers: the monitor's modes and the window sizes that fit on it, smallest first.
+fn sizes(window: &Window) -> Vec<(u32, u32)> {
+    let monitor = window.current_monitor();
+    let fits = monitor.as_ref().map(|m| m.size()).map_or((u32::MAX, u32::MAX), |s| (s.width, s.height));
+    let mut v: Vec<(u32, u32)> = monitor
+        .iter()
+        .flat_map(|m| m.video_modes())
+        .map(|m| (m.size().width, m.size().height))
+        .chain(crate::options::WINDOWED.into_iter().filter(|s| s.0 <= fits.0 && s.1 <= fits.1))
+        .filter(|&(w, h)| crate::options::parse_size(&format!("{w}x{h}")).is_some())
+        .collect();
+    v.sort_by_key(|&(w, h)| (u64::from(w) * u64::from(h), w));
+    v.dedup();
+    v
+}
+
+/// The window over the whole screen or not. Exclusive takes the monitor's mode of `size` (its fastest), else its
+/// largest; a platform that cannot (Wayland) gets borderless.
+fn set_fullscreen(window: &Window, how: crate::options::Fullscreen, size: Option<(u32, u32)>) {
+    use crate::options::Fullscreen as Full;
+    let exclusive = || {
+        let modes: Vec<_> = window.current_monitor()?.video_modes().collect();
+        let area = |m: &winit::monitor::VideoModeHandle| u64::from(m.size().width) * u64::from(m.size().height);
+        let wanted = |m: &&winit::monitor::VideoModeHandle| Some((m.size().width, m.size().height)) == size;
+        let best = modes
+            .iter()
+            .filter(wanted)
+            .max_by_key(|m| m.refresh_rate_millihertz())
+            .or_else(|| modes.iter().max_by_key(|m| (area(m), m.refresh_rate_millihertz())))?;
+        Some(Fullscreen::Exclusive(best.clone()))
+    };
+    match how {
+        Full::Off => {
+            window.set_fullscreen(None);
+            if let Some((w, h)) = size {
+                let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(w, h));
+            }
+        }
+        Full::Borderless => window.set_fullscreen(Some(Fullscreen::Borderless(None))),
+        Full::Exclusive => {
+            window.set_fullscreen(exclusive().or(Some(Fullscreen::Borderless(None))));
+            if window.fullscreen().is_none() {
+                window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+            }
+        }
+    }
+}
+
+/// The Graphics page's switches that the drawing reads: the clouds, and the field of view (the extended mode's).
+fn show_graphics(g: &crate::options::Graphics, features: crate::features::Features) {
+    scene::set_clouds(g.clouds);
+    scene::set_fov((features.mode && g.fov != crate::options::FOV_ORIGINAL).then_some(g.fov));
 }
 
 impl App {
@@ -1928,7 +2048,7 @@ impl App {
             .with_title(self.game.title())
             .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
-        let Gpu { surface, config, mut renderer } = window_gpu(&window)?;
+        let Gpu { surface, config, mut renderer, modes } = window_gpu(&window)?;
         upload(&mut renderer, &self.game, &self.data);
         if self.menu_scene.is_none() {
             self.menu_scene = crate::menuscene::MenuScene::load(&self.data);
@@ -1938,7 +2058,10 @@ impl App {
             surface,
             config,
             renderer,
+            modes,
         });
+        self.resolutions = sizes(&window);
+        set_fullscreen(&window, self.graphics.fullscreen, self.graphics.resolution);
         self.window = Some(window);
         self.last = Instant::now();
         Ok(())
@@ -2115,11 +2238,36 @@ impl App {
     fn open_menu(&mut self, base: crate::menu::Screen) {
         let mut menu = Menu::new(&self.data, &self.strings, base, self.number, self.features);
         menu.volumes = self.volumes;
+        menu.graphics = self.graphics;
+        menu.bindings = self.bindings;
+        menu.resolutions = self.resolutions.clone();
         if let Some(gpu) = &self.gpu {
             menu.resolution = (gpu.config.width, gpu.config.height);
         }
         self.menu = Some(menu);
         self.keys = 0;
+    }
+
+    /// The Graphics page's choices applied (live where the platform lets them be) and saved.
+    fn set_graphics(&mut self, g: crate::options::Graphics) {
+        let old = std::mem::replace(&mut self.graphics, g);
+        show_graphics(&g, self.features);
+        if let Some(gpu) = &mut self.gpu
+            && g.vsync != old.vsync
+        {
+            gpu.config.present_mode = present_mode(&gpu.modes, g.vsync);
+            gpu.surface.configure(&gpu.renderer.device, &gpu.config);
+        }
+        if let Some(w) = &self.window
+            && (g.fullscreen != old.fullscreen || g.resolution != old.resolution)
+        {
+            set_fullscreen(w, g.fullscreen, g.resolution);
+        }
+        if let Some(m) = &mut self.menu {
+            m.graphics = g;
+        }
+        let lines: Vec<(String, String)> = g.lines().into_iter().map(|(k, v)| (k.to_owned(), v)).collect();
+        put_settings(&lines);
     }
 
     /// A lost run opens the dead menu; a finished one, once its points are counted, the new highscore's name entry
@@ -2156,6 +2304,12 @@ impl App {
             a.play(&self.data, "Menu_click", 1.0, 0.0);
         }
         let Some(menu) = &mut self.menu else { return };
+        // a key awaited on the Controls page takes the key pressed
+        if menu.waiting() {
+            let action = menu.capture(code);
+            self.menu_action(action, event_loop);
+            return;
+        }
         // the name entry takes what is typed
         if menu.screen() == crate::menu::Screen::Entry && !matches!(code, KeyCode::Enter | KeyCode::NumpadEnter) {
             match code {
@@ -2179,6 +2333,11 @@ impl App {
             KeyCode::Escape => menu.back(),
             _ => Action::None,
         };
+        self.menu_action(action, event_loop);
+    }
+
+    /// Does what a menu's key asked.
+    fn menu_action(&mut self, action: Action, event_loop: &ActiveEventLoop) {
         match action {
             Action::None => {}
             Action::Continue => self.menu = None,
@@ -2232,6 +2391,11 @@ impl App {
                 if let Some(m) = &mut self.menu {
                     m.set_features(self.features, &self.data);
                 }
+            }
+            Action::Graphics(g) => self.set_graphics(g),
+            Action::Bindings(b) => {
+                self.bindings = b;
+                put_settings(&b.lines());
             }
             Action::Score(name) => {
                 self.player = name.clone();
@@ -2288,13 +2452,10 @@ impl App {
             }
             return;
         }
+        // the keys bound to the game's actions (the Controls page) come before the practice keys
+        let bound = self.bindings.bits(code);
         let bit = match code {
-            KeyCode::ArrowUp => input::UP,
-            KeyCode::ArrowDown => input::DOWN,
-            KeyCode::ArrowLeft => input::LEFT,
-            KeyCode::ArrowRight => input::RIGHT,
-            KeyCode::ShiftLeft | KeyCode::ShiftRight => input::SHIFT,
-            KeyCode::Space => input::LIFT,
+            _ if bound != 0 => bound,
             // the run waits under the pause menu; a finished or lost run has its own menu
             KeyCode::Escape if down && !self.game.sim.finished => {
                 let lost = self.game.sim.game_over;
@@ -2347,15 +2508,12 @@ impl App {
                 }
                 0
             }
+            // the full screen on or off, as the Graphics page sets it
             KeyCode::F11 if down => {
-                if let Some(w) = &self.window {
-                    let full = w.fullscreen().is_some();
-                    w.set_fullscreen(if full {
-                        None
-                    } else {
-                        Some(Fullscreen::Borderless(None))
-                    });
-                }
+                use crate::options::Fullscreen as Full;
+                let on = self.window.as_ref().is_some_and(|w| w.fullscreen().is_some());
+                let how = if on { Full::Off } else { Full::Borderless };
+                self.set_graphics(crate::options::Graphics { fullscreen: how, ..self.graphics });
                 0
             }
             _ => 0,
@@ -2402,7 +2560,8 @@ impl App {
         let mut ticks = 0u32;
         while self.acc >= TICK {
             self.prev = Some(Snapshot::of(&self.game.sim));
-            self.game.tick(self.keys);
+            // the gamepads press the same keys; the camera's turn inverted as chosen
+            self.game.tick(self.bindings.turn(self.keys | self.pad_keys));
             self.keep_history();
             self.acc -= TICK;
             ticks += 1;
@@ -2587,6 +2746,32 @@ impl App {
     }
 }
 
+impl App {
+    /// The gamepads: the keys they hold, for the run; their buttons, as the menus' keys (and Start as Esc).
+    fn gamepads(&mut self, event_loop: &ActiveEventLoop) {
+        use crate::options::PadPress;
+        let (keys, pressed) = self.pads.poll();
+        // the run's keys only while it runs, as the keyboard's
+        self.pad_keys = if self.menu.is_none() && self.loading.is_none() && self.fly.is_none() { keys } else { 0 };
+        for p in pressed {
+            let code = match p {
+                PadPress::Up => KeyCode::ArrowUp,
+                PadPress::Down => KeyCode::ArrowDown,
+                PadPress::Left => KeyCode::ArrowLeft,
+                PadPress::Right => KeyCode::ArrowRight,
+                PadPress::Enter => KeyCode::Enter,
+                PadPress::Back | PadPress::Start => KeyCode::Escape,
+            };
+            // in a run only Start (the pause) counts: the other buttons are its keys
+            let menu = self.menu.as_ref().is_some_and(|m| !m.waiting());
+            if menu || (self.menu.is_none() && p == PadPress::Start) {
+                self.key(code, true, None, event_loop);
+                self.key(code, false, None, event_loop);
+            }
+        }
+    }
+}
+
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none()
@@ -2605,6 +2790,9 @@ impl ApplicationHandler for App {
                     gpu.config.width = size.width.max(1);
                     gpu.config.height = size.height.max(1);
                     gpu.surface.configure(&gpu.renderer.device, &gpu.config);
+                }
+                if let Some(m) = &mut self.menu {
+                    m.resolution = (size.width, size.height);
                 }
             }
             WindowEvent::KeyboardInput {
@@ -2635,7 +2823,8 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn about_to_wait(&mut self, _: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        self.gamepads(event_loop);
         if let Some(w) = &self.window {
             w.request_redraw();
         }

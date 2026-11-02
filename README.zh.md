@@ -31,7 +31,8 @@ target/release/drahtseilakt --data /path/to/Ballance --level 1
 （[关卡存放位置](docs/zh/drahtseilakt/levels.md)）。`--data`（或 `OPENBALLANCE_DATA`）则改为从另一个 Ballance 文件夹游玩。独立程序 `drahtseilakt-toolbox remaster --scale 8` 会把原版关卡转换到 `levels/remastered/`（开放格式），形状更圆，纹理放大八倍：Real-ESRGAN 位于 toolbox 旁的 `realesrgan/`（版本固定在其仓库 drahtseilakt-toolbox 中）或在 PATH 中时使用它（会补出细节），否则使用 Lanczos；它们在 Start → Remastered 中游玩。游戏本身两者都不需要。`--level N` 游玩原版第 N 关，`--map FILE.nmo`
 游玩任意关卡文件或自制地图，`--open DIR` 游玩[开放格式](docs/zh/drahtseilakt/open-format.md)的关卡；
 `--export DIR` 把所选关卡转换为该格式。方向键相对于相机滚动球，Shift+左/右
-转动相机，空格键抬高相机，F11 切换全屏，Esc 暂停。不指定关卡时，游戏以
+转动相机，空格键抬高相机，F11 切换全屏，Esc 暂停；其他按键可在 Options → Controls 中绑定。也可以用手柄：左摇杆或十字键滚动球，
+肩键转动相机，下方的面键抬高相机，Start 暂停。不指定关卡时，游戏以
 主菜单启动。菜单就是原版的菜单（[菜单](docs/zh/drahtseilakt/menu.md)），使用这份拷贝自己的文字：Start
 （完成前一关后下一关才会解锁）、Highscore（每关十个名次，保存在我们的数据文件夹中）、
 Options、Credits、Exit；在关卡中按 Esc 打开暂停菜单，失败的一局打开死亡菜单，完成的一局显示分数、

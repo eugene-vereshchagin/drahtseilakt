@@ -38,7 +38,9 @@ with rounder shapes and textures eight times larger: by Real-ESRGAN (it adds det
 the toolbox (its own repository, drahtseilakt-toolbox, pins it) or on the PATH, else by Lanczos; they play from Start → Remastered. The game itself needs neither. `--level N` plays original level N, `--map FILE.nmo`
 any level file or community map, `--open DIR` a level in the [open format](docs/drahtseilakt/open-format.md);
 `--export DIR` converts the chosen level to it. Arrows roll the ball relative to the camera, Shift+Left/Right
-turn the camera, Space lifts it, F11 is full screen, Esc pauses. Without a level named the game opens with its
+turn the camera, Space lifts it, F11 is full screen, Esc pauses; Options → Controls binds other keys. A gamepad
+plays too: the left stick or the pad's cross rolls, the shoulder buttons turn the camera, the lower face button
+lifts it, Start pauses. Without a level named the game opens with its
 main menu. The menus are the original's ([menus](docs/drahtseilakt/menu.md)), in the copy's own words: Start
 (a level opens when the one before it is finished), Highscore (ten places a level, kept in our data folder),
 Options, Credits, Exit; Esc in a level opens the pause menu, a lost run the dead menu, a finished one the points,
