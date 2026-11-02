@@ -4,30 +4,33 @@ The game asks for its files by the original's layout; each file plays a **role**
 the wooden ball...). Following the decision "Own content by default" ([decisions.md](decisions.md)), three
 providers can fill a role:
 
-- **own**: our files shipped with the game in `assets/own/`, laid out as the original (none yet: stage 2 makes them);
+- **own**: our files shipped with the game in `assets/own/`, laid out as the original (the interface since stage 2:
+  see "The own interface" below);
 - **original**: the player's copy;
 - **remaster**: the toolbox's remaster of the copy, in `levels/remastered/.interface/`.
 
 The extended mode's **Interface** switch (own / original / remaster, setting `interface`) chooses which comes first;
-it takes effect on the next start. The classic mode always plays the copy's. A role that no provider fills is
+it takes effect on the next start. **Own** is the default, and the classic mode always plays it (decisions.md, "The
+own interface is the default"). A role that no provider fills is
 missing: the game says so once and goes on without it. A level's own folder (`<level>/game/`, see
 [open-format.md](open-format.md)) still comes first for its parts.
 
-Text the game's font cannot draw (its font has Latin-1 only) is drawn with the shipped Noto fonts
-(`assets/fonts`, SIL OFL): the Chinese and Cyrillic names of community maps.
+Text the copy's font cannot draw (its font has Latin-1 only) is drawn with the shipped fonts (`assets/fonts`, SIL
+OFL), as the own interface draws all its text: Russian and Chinese menus with the original's interface chosen, and the
+Chinese and Cyrillic names of community maps.
 
 | Role | The original's file | Own |
 |---|---|---|
-| menu font and glyph table, buttons | `3D Entities/Menu.nmo (Font_1, M_FontData_01)` | planned |
-| menu 3D scene | `3D Entities/MenuLevel.nmo` | planned |
-| texts in the copy's languages | `3D Entities/Language.nmo` | planned |
+| menu font and glyph table, buttons | `3D Entities/Menu.nmo (Font_1, M_FontData_01)` | Tektur (`assets/fonts`), drawn by the game |
+| menu 3D scene | `3D Entities/MenuLevel.nmo` | a picture: `Textures/Menu_Background.png` |
+| texts in the copy's languages | `3D Entities/Language.nmo` | `Texts/menu.txt`, seven languages |
 | menu texts, level table defaults | `base.cmo` | planned |
 | level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | planned |
 | balls, pieces, shadows | `3D Entities/Balls.nmo` | planned |
 | transformer animation | `3D Entities/AnimTrafo.nmo` | planned |
 | modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | planned |
-| game font texture | `Textures/Font_1.tga` | planned |
-| buttons and the points box | `Textures/Button01_special/select/deselect.tga` | planned |
+| game font texture | `Textures/Font_1.tga` | Tektur, rasterised by the game |
+| buttons and the points box | `Textures/Button01_special/select/deselect.tga` | ours, same names |
 | ball shadow | `Textures/HardShadow.bmp` | planned |
 | skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | planned |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | planned |
@@ -36,6 +39,35 @@ Text the game's font cannot draw (its font has Latin-1 only) is drawn with the s
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | sound themes (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: *system* nine pieces, Music/music.txt maps them onto the five themes; *neuro* fifteen synthesized phrases, one per part, and its own end music; no atmosphere part |
 | original levels | `3D Entities/Level/Level_NN.NMO` | planned |
+
+## The own interface
+
+Stage 2 (2026-11-03): the menus, the in-game interface (points box, life balls, "ball lost"), the end screen and the
+loading screen are our own, so a player with no copy of the original's interface files sees all of them, and a copy's
+interface files are not even read while the own interface is in use.
+
+- **Textures** (`assets/own/Textures/`): `Button01_select.tga`, `Button01_deselect.tga` and `Button01_special.tga`, each
+  part where the game's code takes it from (the UV rectangles in `menu.rs`, `hud.rs`, `endscreen.rs`): violet glass
+  panels in a steel tube with a polished ball, rose with a gold ball when chosen, grey when not open yet; the
+  highscore places' numbers, the life ball and its bracket, the points box, the end screen's bar, the dark band. And
+  `Menu_Background.png`, the picture behind the menus and the loading screen (dusk over a sea of clouds, a wooden
+  track with a ball on the left, a pillar with a ball on the right; the middle is under the menus' band). It stands
+  for the original's 3D menu scene, which is drawn only with the original's interface.
+- **How they are made**: by `assets/own/make/make_interface.py` (Python with numpy and Pillow), from nothing but the
+  script and the shipped Tektur font; the outputs are committed, so the build needs no Python. The look follows the
+  original's style from its colours and proportions only: nothing of the original is copied, traced or resampled.
+- **Font**: Tektur (SIL OFL, `assets/fonts/Tektur-Variable.ttf`, pinned and checksummed in `assets/fonts/README.md`),
+  a squared technical face close in feel to the original's wide menu font, drawn with small capitals for the lower
+  case, a little wide and spaced, as the original's. What it lacks comes from Noto Sans, Chinese from Noto Sans SC.
+  The glyphs are rasterised at run time into an atlas and laid out with the same rectangles, alignment, word wrap and
+  shadow as the game's font, so the screens keep the original's layout (`crates/game/src/fallback.rs`).
+- **Texts** (`assets/own/Texts/menu.txt`, built into the game): every menu, in-game and end screen text in English,
+  Russian, German, Simplified Chinese, French, Spanish and Italian, under the original's `Language.nmo` keys where it
+  has one. With the original's interface its copy's texts come first in the copy's five languages; for Russian and
+  Chinese (which the copy lacks) ours, drawn in the shipped fonts.
+
+Still from the copy, whatever the interface: the default keys and the default highscore lists (base.cmo), and the
+parts of a level (balls, particles, the ball's shadow, skies, modules), which later stages replace.
 
 Own content comes in stages: interface (fonts, buttons, points box, life balls, texts, menu scene), then balls,
 skies, particles and sounds (from open libraries), music in the spirit of a mahjong game with Chinese motifs,

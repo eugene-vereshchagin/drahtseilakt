@@ -15,7 +15,7 @@ English, Spanish, Italian and French; `GameSettings.Language` chooses the column
 | Main (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit asks "Do you want to quit the game?" (Yes / No) |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | a level is playable once the one before it is finished (`DB_Levelfreischaltung`); the others are grey. The level 13 add-on replaces Menu.nmo and adds its line |
 | Highscore (`Menu_Highscore`) | "Highscore Level N", ten names with points, Back; left and right change the level | the copy's defaults are the arrays `DB_Highscore_LvNN` in base.cmo ("Mr. Default") |
-| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | |
+| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | ours adds Language and Extended before Back |
 | Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | the copy's defaults (`DB_Options`): no synch, clouds |
 | Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview: one key each; Invert Rotation? (Yes/No); OK | defaults: arrows, Shift, Space; `DB_Options` keeps a key as its row in `Language.nmo`'s `all_keys` (DirectInput's scan codes in order) |
 | Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | the music's and the effects' volume (ours shows both in every mode, as the owner knows the original) |
@@ -31,10 +31,16 @@ per-player thing is the name in the highscore list.
 
 ## Ours: the classic mode (the default)
 
-- The same screens, lines, order and strings as the table above, drawn with the copy's own textures and fonts.
-  The strings come from the copy's `Language.nmo`, so the menus speak the copy's language.
-- **One addition**: Options has a fourth button, *Extended*; its page has the switch *Extended mode?* (Yes / No).
-  That is the only difference a player of the original levels sees.
+- The same screens, lines, order and strings as the table above, drawn with our own interface (decisions.md, "The
+  own interface is the default"; [resources.md](resources.md), "The own interface"): our textures, our font, our
+  texts. The extended mode's Interface switch can choose the original's, drawn with the copy's textures and font and
+  speaking its `Language.nmo`.
+- **Two additions** in Options: *Language* and *Extended*. *Language* opens a page with the languages, each in its own
+  name (English, Русский, Deutsch, 简体中文, Français, Español, Italiano), the one spoken in gold; Enter speaks the
+  chosen one at once and saves it (`language ru`). Until the player chooses, the menus speak the system's language
+  (the locale variables `LC_ALL`, `LC_MESSAGES`, `LANG`; Windows and macOS set none for a program started from the
+  desktop) if it is one of these, else English. *Extended* has the switch *Extended mode?* (Yes / No).
+  That is all a player of the original levels sees changed.
 - Levels unlock as in the original. Highscores are the original's: ten per level, points, a name. They start
   from the copy's defaults and are saved in our own data folder, never in the game's files. Reading the player's
   `Database.tdb` to take over their old scores is a later option (a parser: reviewed like every file reader).

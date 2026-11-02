@@ -14,7 +14,7 @@
 | Главное (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit спрашивает «Do you want to quit the game?» (Yes / No) |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | уровень открывается, когда пройден предыдущий (`DB_Levelfreischaltung`); остальные серые. Дополнение с 13-м уровнем заменяет Menu.nmo и добавляет свою строку |
 | Highscore (`Menu_Highscore`) | «Highscore Level N», десять имён с очками, Back; влево и вправо меняют уровень | начальные таблицы копии — массивы `DB_Highscore_LvNN` в base.cmo («Mr. Default») |
-| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | |
+| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | у нас перед Back ещё Language и Extended |
 | Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | по умолчанию в копии (`DB_Options`): без синхронизации, с облаками |
 | Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview — по клавише; Invert Rotation? (Yes/No); OK | по умолчанию стрелки, Shift, пробел; `DB_Options` хранит клавишу как номер строки в `all_keys` из `Language.nmo` (скан-коды DirectInput по порядку) |
 | Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | громкость музыки и эффектов (у нас обе в любом режиме, как владелец помнит оригинал) |
@@ -30,10 +30,16 @@
 
 ## Наш классический режим (по умолчанию)
 
-- Те же экраны, строки, порядок и тексты, что в таблице, нарисованные текстурами и шрифтами копии. Строки берутся
-  из `Language.nmo` копии, так что меню говорит на языке копии.
-- **Одно дополнение**: в Options четвёртая кнопка — *Extended*; на её странице переключатель *Extended mode?*
-  (Yes / No). Это единственное отличие, которое видит игрок оригинальных уровней.
+- Те же экраны, строки, порядок и тексты, что в таблице, нарисованные нашим собственным интерфейсом (decisions.md,
+  «Свой интерфейс — по умолчанию»; [resources.md](resources.md), «Свой интерфейс»): наши текстуры, наш шрифт, наши
+  тексты. Переключатель Interface расширенного режима может выбрать интерфейс оригинала — текстурами и шрифтом
+  копии и на языке её `Language.nmo`.
+- **Два дополнения** в Options: *Language* и *Extended*. *Language* открывает страницу с языками, каждый на своём
+  языке (English, Русский, Deutsch, 简体中文, Français, Español, Italiano), текущий — золотым; Enter сразу включает
+  выбранный и сохраняет его (`language ru`). Пока игрок не выбрал, меню говорит на языке системы (переменные локали
+  `LC_ALL`, `LC_MESSAGES`, `LANG`; Windows и macOS не задают их программе, запущенной с рабочего стола), если он из
+  этого списка, иначе по-английски. *Extended* — переключатель *Extended mode?* (Yes / No). Это всё, что игрок
+  оригинальных уровней видит изменённым.
 - Уровни открываются как в оригинале. Рекорды — как в оригинале: десять на уровень, очки, имя. Начинаются с
   таблиц копии и сохраняются в нашей папке данных, никогда не в файлах игры. Прочитать `Database.tdb` игрока, чтобы
   перенести его старые рекорды, — возможность на потом (это разборщик файла, ревью как у любого).

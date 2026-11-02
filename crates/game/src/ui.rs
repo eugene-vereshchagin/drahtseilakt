@@ -191,7 +191,17 @@ impl Font {
             };
             let line = text.get(start..end).unwrap_or_default();
             if let Some((off, color)) = st.shadow {
-                self.line(line, x + off[0], y + off[1], sx, gh, adv, ls, color, &mut out);
+                self.line(
+                    line,
+                    x + off[0],
+                    y + off[1],
+                    sx,
+                    gh,
+                    adv,
+                    ls,
+                    color,
+                    &mut out,
+                );
             }
             self.line(line, x, y, sx, gh, adv, ls, st.color, &mut out);
             y += line_h;
@@ -302,6 +312,75 @@ impl Font {
             });
             x = x1 + sx * g[4] + ls;
         }
+    }
+}
+
+/// The font the interface's texts are drawn in: the copy's game font (the original's interface), or the own one in
+/// the shipped fonts (fallback.rs). Either draws a text as 2D Text with a style would; the game font hands what it
+/// cannot draw (beyond Latin-1: Russian, Chinese) to the shipped fonts.
+pub enum Face {
+    Game(Font),
+    Own,
+}
+
+impl Face {
+    /// The interface's face: the own one, or for the original's (or its remaster) the copy's font when it has one.
+    /// None when neither can draw (no copy font and no shipped fonts).
+    pub fn new(data: &Data, provider: gamedata::resources::Provider) -> Option<Face> {
+        let game = (provider != gamedata::resources::Provider::Own)
+            .then(|| Font::game(data))
+            .flatten();
+        match game {
+            Some(f) => Some(Face::Game(f)),
+            None => crate::fallback::available().then_some(Face::Own),
+        }
+    }
+
+    /// `text` laid out in the context rectangle `rect` as 2D Text with `st` draws it: glyph quads in context pixels.
+    pub fn layout(&self, text: &str, rect: [f32; 4], st: &Style) -> Vec<Quad> {
+        match self {
+            Face::Game(f) if !crate::fallback::needed(text) => {
+                let bytes: Vec<u8> = text
+                    .chars()
+                    .map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?'))
+                    .collect();
+                f.layout(&bytes, rect, st)
+            }
+            _ => crate::fallback::styled(text, rect, st),
+        }
+    }
+
+    /// The own interface's face.
+    pub fn own(&self) -> bool {
+        matches!(self, Face::Own)
+    }
+}
+
+/// The own interface's picture behind its menus and loading screen (assets/own/Textures/Menu_Background.png).
+pub const BACKDROP: &str = "Menu_Background";
+/// Its aspect ratio, as drawn by assets/own/make.
+const BACKDROP_ASPECT: f32 = 16.0 / 9.0;
+
+/// The own interface's picture over the whole window, cut to its shape (never stretched).
+pub fn backdrop(screen: Screen) -> Quad {
+    let aspect = if screen.h > 0.0 {
+        screen.w / screen.h
+    } else {
+        BACKDROP_ASPECT
+    };
+    let uv = if aspect >= BACKDROP_ASPECT {
+        let v = (1.0 - BACKDROP_ASPECT / aspect) / 2.0;
+        [0.0, v, 1.0, 1.0 - v]
+    } else {
+        let u = (1.0 - aspect / BACKDROP_ASPECT) / 2.0;
+        [u, 0.0, 1.0 - u, 1.0]
+    };
+    Quad {
+        rect: [0.0, 0.0, screen.w, screen.h],
+        uv,
+        top: [1.0; 4],
+        bottom: [1.0; 4],
+        texture: BACKDROP,
     }
 }
 

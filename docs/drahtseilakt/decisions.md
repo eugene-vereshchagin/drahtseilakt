@@ -260,6 +260,18 @@ original's look, as levels that name the original's resources, which the toolbox
 copy. The toolbox makes every resource the game can use out of the player's original files. So nobody's property is
 shipped, and every player can put the original together on their own machine in a couple of clicks.
 
+## The own interface is the default
+
+*2026-11-03.* Following "Own content by default": the game ships its own interface (menus, in-game interface, end and
+loading screens: our textures drawn by a script in the repository, the freely licensed Tektur font, our texts), and it
+is what every player sees by default, in the classic mode always. The extended mode's Interface switch chooses the
+original's from the player's copy, or its remaster. The own menus speak seven languages (English, Russian, German,
+Simplified Chinese, French, Spanish, Italian): a Language page in Options, in the classic mode too, since a player who
+cannot read the menus cannot play; the default is the system's language, else English. With the original's interface
+and a language its copy lacks (Russian, Chinese), our texts are drawn in the shipped fonts, as its Latin-1 font cannot.
+Tektur was chosen over Michroma (closer to the original's wide letters, but Latin only) so that every Latin and
+Cyrillic text has one design.
+
 ## The generated sound theme is the default
 
 *2026-11-02.* The owner's decision: the generated sound theme (*neuro*: effects synthesized by code, tuned against

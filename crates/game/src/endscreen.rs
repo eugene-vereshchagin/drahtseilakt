@@ -4,7 +4,7 @@
 // move over to Time Points (one a frame, then five, then faster), then 200 for each life, one life at a time.
 
 use crate::sim::Sim;
-use crate::ui::{ALIGN_RIGHT, Anchor, Font, Quad, Screen, Style, TEXT_SCREEN, homogeneous, place};
+use crate::ui::{ALIGN_RIGHT, Anchor, Face, Quad, Screen, Style, TEXT_SCREEN, homogeneous, place};
 
 /// Ticks from the finish to the original's "End Level" (the balloon carries the ball off meanwhile).
 const END_DELAY: u64 = 180;
@@ -21,7 +21,8 @@ const LIFE: i64 = 200;
 const WHITE: [f32; 4] = [1.0; 4];
 /// The lines' tops (fractions of the screen), and the label and number columns.
 const ROWS: [f32; 4] = [0.30, 0.36, 0.42, 0.50];
-const LABELS: [&str; 4] = ["Level Bonus:", "Time Points:", "Extra Lives:", "Score:"];
+/// The lines' texts (lang.rs).
+const LABELS: [&str; 4] = ["level bonus", "time points", "extra lives", "score"];
 
 /// GameFont_04: scale 0.6, right aligned, a shadow 2 off at 120 degrees in black at one half.
 const FONT_04: Style = Style {
@@ -135,7 +136,12 @@ fn total(points: i64, bonus: i64, lives: u32) -> i64 {
 }
 
 /// The end screen's quads.
-pub fn interface(t: &Tally, font: &Font, screen: Screen) -> Vec<Quad> {
+pub fn interface(
+    t: &Tally,
+    font: &Face,
+    strings: &crate::lang::Strings,
+    screen: Screen,
+) -> Vec<Quad> {
     let quad = |r: [f32; 4], uv: [f32; 4], color: [f32; 4], texture: &'static str| Quad {
         rect: screen.rect(homogeneous(r), Anchor::Center),
         uv,
@@ -168,12 +174,12 @@ pub fn interface(t: &Tally, font: &Font, screen: Screen) -> Vec<Quad> {
     for (k, (&y, label)) in ROWS.iter().zip(LABELS).enumerate() {
         let text = |out: &mut Vec<Quad>, s: &str, x0: f32, x1: f32| {
             out.extend(place(
-                font.layout(s.as_bytes(), homogeneous([x0, y, x1, y + 0.05]), &FONT_04),
+                font.layout(s, homogeneous([x0, y, x1, y + 0.05]), &FONT_04),
                 screen,
                 Anchor::Center,
             ));
         };
-        text(&mut out, label, 0.32, 0.57);
+        text(&mut out, &strings.ours(label), 0.32, 0.57);
         text(
             &mut out,
             &t.numbers.get(k).copied().unwrap_or(0).to_string(),
@@ -189,7 +195,7 @@ pub fn interface(t: &Tally, font: &Font, screen: Screen) -> Vec<Quad> {
         };
         let r = homogeneous([0.25, 0.60, 0.75, 0.65]);
         out.extend(place(
-            font.layout(b"Enter: next level    Esc: menu", r, &keys),
+            font.layout(&strings.ours("end keys"), r, &keys),
             screen,
             Anchor::Center,
         ));

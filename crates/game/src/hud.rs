@@ -331,14 +331,14 @@ fn lost_alpha(age: u64) -> f32 {
     }
 }
 
-/// The "ball lost" message (`text`, Latin-1) as the game's texts are drawn: the interface's font in white with the
-/// shadow its fonts have (2 off at 120 degrees, black at one half), the size of the points counter's digits, in the
-/// 4:3 context so any window shows it alike. Without the game's font, in the shipped Noto (fallback.rs), same size.
+/// The "ball lost" message as the game's texts are drawn: the interface's face in white with the shadow its fonts
+/// have (2 off at 120 degrees, black at one half), the size of the points counter's digits, in the 4:3 context so
+/// any window shows it alike.
 pub fn ball_lost(
     sim: &Sim,
     lost_at: Option<u64>,
-    text: &[u8],
-    font: Option<&crate::ui::Font>,
+    text: &str,
+    font: Option<&crate::ui::Face>,
     screen: crate::ui::Screen,
 ) -> Vec<crate::ui::Quad> {
     use crate::ui::{Anchor, Style, TEXT_SCREEN, homogeneous, place};
@@ -346,44 +346,24 @@ pub fn ball_lost(
         return Vec::new();
     };
     let a = lost_alpha(sim.tick.saturating_sub(at));
-    if a <= 0.0 || sim.tick < at {
+    let Some(f) = font.filter(|_| a > 0.0 && sim.tick >= at) else {
         return Vec::new();
-    }
-    let color = [1.0, 1.0, 1.0, a];
-    let shadow = ([1.0, 1.732_05], [0.0, 0.0, 0.0, 0.502 * a]);
-    let rect = homogeneous(LOST_RECT);
-    let quads = match font {
-        Some(f) => {
-            let style = Style {
-                scale: [0.8, 0.9],
-                spacing: [1.5, 1.0],
-                align: 0,
-                flags: TEXT_SCREEN,
-                margins: [0.0; 4],
-                color,
-                v2: true,
-                shadow: Some(shadow),
-            };
-            f.layout(text, rect, &style)
-        }
-        None => {
-            // the game font's line height at that scale: a 16th of its texture, 0.9 of the context
-            let height = 0.9 * crate::ui::CONTEXT_H / 16.0;
-            let s = crate::lang::latin1(text);
-            let off = |r: [f32; 4]| {
-                [
-                    r[0] + shadow.0[0],
-                    r[1] + shadow.0[1],
-                    r[2] + shadow.0[0],
-                    r[3] + shadow.0[1],
-                ]
-            };
-            let mut q = crate::fallback::layout(&s, off(rect), height, 0, shadow.1);
-            q.extend(crate::fallback::layout(&s, rect, height, 0, color));
-            q
-        }
     };
-    place(quads, screen, Anchor::Center)
+    let style = Style {
+        scale: [0.8, 0.9],
+        spacing: [1.5, 1.0],
+        align: 0,
+        flags: TEXT_SCREEN,
+        margins: [0.0; 4],
+        color: [1.0, 1.0, 1.0, a],
+        v2: true,
+        shadow: Some(([1.0, 1.732_05], [0.0, 0.0, 0.0, 0.502 * a])),
+    };
+    place(
+        f.layout(text, homogeneous(LOST_RECT), &style),
+        screen,
+        Anchor::Center,
+    )
 }
 
 /// The points box and the life balls as the original draws them (rectangles and texture parts of its 2D frames, as
@@ -391,7 +371,7 @@ pub fn ball_lost(
 /// the context to the left, the end piece after the last.
 pub fn interface(
     sim: &Sim,
-    font: Option<&crate::ui::Font>,
+    font: Option<&crate::ui::Face>,
     screen: crate::ui::Screen,
 ) -> Vec<crate::ui::Quad> {
     use crate::ui::{Anchor, Quad, homogeneous};
@@ -446,7 +426,7 @@ pub fn interface(
             shadow: None,
         };
         let digits = f.layout(
-            points.max(0).to_string().as_bytes(),
+            &points.max(0).to_string(),
             homogeneous([0.05, 0.884_17, 0.203_75, 0.934_17]),
             &style,
         );

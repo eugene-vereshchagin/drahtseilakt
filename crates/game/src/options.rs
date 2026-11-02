@@ -282,18 +282,18 @@ pub fn key_name(code: KeyCode) -> Option<&'static str> {
 }
 
 /// A key as the Controls page shows it: the copy's name where it has one (as the original shows it), else ours.
-pub fn key_label(code: KeyCode, copy: impl Fn(usize) -> Option<Vec<u8>>) -> Vec<u8> {
+pub fn key_label(code: KeyCode, named: impl Fn(Option<usize>, &str) -> Option<String>) -> String {
     let Some(&(_, name, row)) = KEYS.iter().find(|k| k.0 == code) else {
-        return b"?".to_vec();
+        return "?".to_owned();
     };
-    if let Some(t) = row.and_then(copy) {
+    if let Some(t) = named(row, name) {
         return t;
     }
     let short = ["Key", "Digit"]
         .iter()
         .find_map(|p| name.strip_prefix(p))
         .unwrap_or(name);
-    short.as_bytes().to_vec()
+    short.to_owned()
 }
 
 /// The other one of a pair of keys (the shifts, controls, alts): it does what its twin does when it is bound to
@@ -699,10 +699,10 @@ mod tests {
 
     #[test]
     fn labels_use_the_copy_names_else_ours() {
-        let copy = |row: usize| (row == 53).then(|| b"space".to_vec());
-        assert_eq!(key_label(KeyCode::Space, copy), b"space");
-        assert_eq!(key_label(KeyCode::KeyQ, copy), b"Q");
-        assert_eq!(key_label(KeyCode::Enter, copy), b"Enter");
-        assert_eq!(key_label(KeyCode::F7, copy), b"?");
+        let copy = |row: Option<usize>, _: &str| (row == Some(53)).then(|| "space".to_owned());
+        assert_eq!(key_label(KeyCode::Space, copy), "space");
+        assert_eq!(key_label(KeyCode::KeyQ, copy), "Q");
+        assert_eq!(key_label(KeyCode::Enter, copy), "Enter");
+        assert_eq!(key_label(KeyCode::F7, copy), "?");
     }
 }
