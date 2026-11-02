@@ -229,6 +229,21 @@ Done when: most maps play; the report lists the rest, each with its reason.
 - **Replays rendered to video**: offline, frame by frame, at any resolution up to 8K with sound. Nothing is
   uploaded without the owner's command.
 
+## Release criteria
+
+*2026-11-03, the owner's condition (decisions.md, "The game plays out of the box").* The game is released when:
+
+- **Own parts**: every part a level can use (the three balls and their pieces, transformers, fans, pushers,
+  drawbridges, the box, the stone-ball puzzle, swings and rope bridges, the start and the finish, checkpoints, extra
+  life and points, domes) has our own model, made by a script in `assets/own/make` to the original's measured sizes
+  and physics.
+- **At least ten own levels** of graded difficulty, shipped with the game in the open format.
+- **The test player** finishes each of them in several styles (careful, fast, ...), with videos of the runs.
+- **No copy needed**: the game starts and plays with no copy of the original at all; the import stays on offer.
+
+State: the game starts with no copy and plays our own test level `assets/levels/Parts_Test` with our own parts;
+the levels come next.
+
 ## What players added with mods
 
 A static survey of thirty BML/BML+ mods (strings and readmes only; mods are never run) shows what players

@@ -300,3 +300,15 @@ series becomes one folder per level. `drahtseilakt-toolbox import-maps` sorts a 
 original. Until the redone one convinces, the default — and the classic mode — plays the copy's own interface when
 the player's copy has its menu, else ours. Nothing of the original is shipped by this: it comes from the player's own
 copy, as the levels do. The interface no longer decides the sound theme.
+
+## The game plays out of the box
+
+*2026-11-03, the owner's release condition.* An original level's layout and its parts' models (`3D Entities/PH/*.nmo`,
+`Balls.nmo` and the rest) are Cyparade's and Atari's work; its mechanics are free. So before the release the game
+needs its own parts and its own levels, and it must ship in working order *before* anyone imports anything: it
+starts and plays with no copy of the original at all. Without a copy the menu offers our own levels (those shipped
+with the game and those in `levels/open/`) and the import of a copy; everything a run needs (interface, sounds,
+fonts, menu scene, the balls and their pieces, the modules, skies, particles, the ball's shadow, default keys, a
+level's settings) comes from what the game ships. Our parts are made by scripts in `assets/own/make` to the
+original's measured sizes, with its physics values unchanged, so they behave as the original's do; nothing of its
+geometry is copied. Release criteria: [roadmap.md](roadmap.md), "Release criteria".
