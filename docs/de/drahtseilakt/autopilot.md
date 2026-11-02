@@ -18,7 +18,11 @@ weiß (erst einen Hebel treffen, zu einem Transformator zurück, auf einem Aufzu
 führt für immer von seiner Linie weg. Wo die Linie des Spielers nicht nah ist (er fiel dort, oder die Kugel ist
 abgekommen), lenkt die Wegsuche, und festgefahren probiert sie auch längere Stücke seiner Tasten von nahen Stellen.
 Zuerst wird der Tick gesucht, bis zu dem der Lauf seit dem letzten Treffer gekommen ist, damit eine Stelle, an der
-der Spieler stand, nicht immer wieder gespielt wird. `AUTOPILOT_DEMO=1` gibt jeden Treffer aus.
+der Spieler stand, nicht immer wieder gespielt wird. Die letzten vier Sekunden des Spielers vor einer verlorenen Kugel werden nicht verfolgt, und nach einem Hinweis wartet
+die Linie des Spielers zehn Sekunden (der Hinweis kennt die Stelle besser). Festgefahren, wo kein Manöver
+weiterkommt, innerhalb 30 Einheiten der Linie, rollt er zu einer früheren Stelle zurück, an der der Spieler stand,
+und gibt von dort seine Tasten (ein Anlauf, eine Lücke mit Tempo), wenn das auf einer Kopie des Laufs die Kugel hält
+und weiterkommt. `AUTOPILOT_DEMO=1` gibt jeden Treffer aus.
 
 ## Berichte, wo er steckt
 

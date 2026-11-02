@@ -16,7 +16,11 @@ search does not (a lever to hit first, a transformer to go back to, a place to w
 own would lead off the player's line for good. Where the player's line is not at hand (the player fell there, or the
 ball has strayed) the way's search steers, and stuck it also tries longer stretches of the player's keys from the
 places near. The player's tick looked for first is the one the run has come to since the last match, so a place
-where the player stood still is not played again and again. `AUTOPILOT_DEMO=1` prints each match.
+where the player stood still is not played again and again. The player's last four seconds before losing a ball are no line to follow, and after a hint the player's line waits
+ten seconds (the hint knows the place better). Stuck where no manoeuvre gets on, within 30 units of the player's
+line, it rolls back to a place before where the player stood still and gives the player's keys from there (a
+run-up, a gap crossed at speed), when on a copy of the run that keeps the ball and gets on. `AUTOPILOT_DEMO=1`
+prints each match.
 
 ## Stuck reports
 

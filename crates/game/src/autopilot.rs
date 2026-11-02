@@ -724,6 +724,14 @@ const DEMO_SPEED: f32 = 4.0;
 /// Stuck, the player's pushes are tried for these stretches from the places within `DEMO_STUCK_NEAR`.
 const DEMO_STRETCHES: [u64; 3] = [240, 480, 900];
 const DEMO_STUCK_NEAR: f32 = 4.0;
+/// After a hint the player's line waits this long (ten seconds).
+const DEMO_AFTER_HINT: u64 = 600;
+/// Stuck within `RUN_UP_NEAR` of the player's line, it looks back up to `RUN_UP_BACK` of the player's ticks for a
+/// place the player stood still within `RUN_UP_REACH`, and gives the player's keys from there for `RUN_UP_KEYS`.
+const RUN_UP_NEAR: f32 = 30.0;
+const RUN_UP_BACK: usize = 1200;
+const RUN_UP_REACH: f32 = 30.0;
+const RUN_UP_KEYS: usize = 1500;
 
 impl Demo {
     /// The player's tick nearest the ball (same ball, same sector, not being lost), within `near` and, when `speed` is
@@ -813,6 +821,10 @@ pub struct Pilot {
     pub demo: Option<Demo>,
     demo_at: Option<(usize, u64)>,
     demo_run: Option<(usize, u64)>,
+    /// The player's still places already rolled back to.
+    run_ups: Vec<usize>,
+    /// The tick the player's line is followed again from, after a hint.
+    demo_after: u64,
 }
 
 impl Pilot {
@@ -835,6 +847,8 @@ impl Pilot {
             demo: None,
             demo_at: None,
             demo_run: None,
+            run_ups: Vec::new(),
+            demo_after: 0,
         }
     }
 
@@ -870,6 +884,57 @@ impl Pilot {
     /// How far along the way the ball has come (route points).
     pub fn reached(&self) -> usize {
         self.at
+    }
+
+    /// A hint of its own from the followed run, when stuck near the player's line: roll to a place before this one
+    /// where the player stood still (in this sector, as this ball, within reach), then give the player's keys from
+    /// there on, past this place. Each place the player stood is tried twice at most.
+    fn run_up(&mut self, sim: &Sim, here: f32) -> Option<crate::hints::Hint> {
+        let d = self.demo.as_ref()?;
+        let near = d.find(sim, RUN_UP_NEAR, None, self.demo_expected(sim))?;
+        let b = &sim.ball;
+        let rest = (near.saturating_sub(RUN_UP_BACK)..near).rev().find(|&k| {
+            d.ticks.get(k).is_some_and(|t| {
+                t.alive
+                    && t.kind == b.kind
+                    && t.sector == sim.sector
+                    && t.vel.length() < 1.0
+                    && t.pos.distance(b.position) < RUN_UP_REACH
+                    && (t.pos.y - b.position.y).abs() < 2.0
+                    && self.run_ups.iter().filter(|&&r| r == k).count() < 2
+            })
+        })?;
+        self.run_ups.push(rest);
+        let t = d.ticks.get(rest)?;
+        let keys: Vec<u8> = (rest..rest + RUN_UP_KEYS)
+            .map_while(|k| d.ticks.get(k).filter(|t| t.alive).map(|t| t.bits))
+            .collect();
+        let hint = crate::hints::Hint {
+            at: b.position,
+            radius: 3.0,
+            sector: Some(sim.sector + 1),
+            kind: Some(b.kind),
+            steps: vec![
+                crate::hints::Step::Goto(t.pos, 600),
+                crate::hints::Step::Inputs(t.quarter, keys),
+            ],
+            line: 0,
+        };
+        // tried on a copy: it must keep the ball and end further along the way
+        let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
+        let mut s = sim.clone();
+        let lives = s.lives;
+        for _ in 0..(600 + RUN_UP_KEYS) {
+            let Some(i) = trial.input(&s) else { break };
+            s.step(i);
+            if s.lives < lives || s.is_dying() || s.game_over {
+                return None;
+            }
+            if s.finished {
+                break;
+            }
+        }
+        (s.finished || self.progress(s.ball.position) > here + 2.0).then_some(hint)
     }
 
     /// Where the followed player's run is now: the tick last matched, gone on by the ticks since.
@@ -1040,6 +1105,8 @@ impl Pilot {
             return i;
         }
         if std::mem::take(&mut self.hints.ended) {
+            // a hint knows the place better than the followed run: the player's line waits a while after one
+            self.demo_after = sim.tick + DEMO_AFTER_HINT;
             if let Some(i) = self.route.nearest(sim.ball.position, self.until()) {
                 self.at = self.at.max(i);
             }
@@ -1073,6 +1140,7 @@ impl Pilot {
         let on_demo = self
             .demo
             .as_ref()
+            .filter(|_| sim.tick >= self.demo_after)
             .and_then(|d| d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)))
             .is_some();
         if !on_demo && let Some(turn) = self.turn(sim) {
@@ -1148,6 +1216,13 @@ impl Pilot {
                     return c;
                 }
             }
+            // no manoeuvre gets on, near the followed player's line: back to where the player stood before this
+            // place, and from there the player's keys (a run-up the player took, a gap crossed at speed), when on a
+            // copy of the run that keeps the ball and gets on
+            if let Some(hint) = self.run_up(sim, here) {
+                self.hints.add(hint);
+                return 0;
+            }
         }
         // below every floor of the way ahead: falling
         let low = self
@@ -1174,6 +1249,7 @@ impl Pilot {
         let matched = self
             .demo
             .as_ref()
+            .filter(|_| sim.tick >= self.demo_after)
             .and_then(|d| d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)));
         if let Some(k) = matched {
             self.demo_at = Some((k, sim.tick));

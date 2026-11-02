@@ -1092,6 +1092,9 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     pilot_run(&mut game, data, &own, crate::autopilot::Pilot::new(route, gates))
 }
 
+/// The followed player's keys this long before a lost ball are not followed (four seconds).
+const DOOMED_TICKS: usize = 240;
+
 /// The test player follows a player's run: the ball's way in that replay (where it rolled, in order, every 1.5;
 /// not while a ball is being lost) is its way, the transformers it went into its gates, and it begins where the run
 /// began.
@@ -1126,7 +1129,14 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         seen.tick(0);
         for (_, e) in seen.sim.events.iter().skip(before) {
             match e {
-                crate::sim::Event::Died => lost = true,
+                crate::sim::Event::Died => {
+                    lost = true;
+                    // the player's last seconds before losing a ball are no line to follow
+                    let n = demo.ticks.len();
+                    for t in demo.ticks.iter_mut().skip(n.saturating_sub(DOOMED_TICKS)) {
+                        t.alive = false;
+                    }
+                }
                 crate::sim::Event::NewBall => lost = false,
                 crate::sim::Event::Transform(k) => {
                     let at = seen.sim.ball.position - glam::Vec3::Y * crate::sim::BALL_RADIUS;

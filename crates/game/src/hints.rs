@@ -387,6 +387,14 @@ impl Runner {
         }
     }
 
+    /// One more hint, made while playing (the test player's own, from the run it follows).
+    pub fn add(&mut self, hint: Hint) {
+        if self.hints.len() < MAX_HINTS * 4 {
+            self.hints.push(hint);
+            self.fired.push(false);
+        }
+    }
+
     /// The hint running, if one is (its line in the file).
     pub fn running(&self) -> Option<usize> {
         self.running
