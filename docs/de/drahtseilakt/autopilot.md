@@ -6,6 +6,29 @@ Laufs ausprobiert. `--follow FILE` lässt ihn stattdessen dem Weg der Kugel im R
 Stellen schafft er allein nicht: Rätsel, Hebel und Schieber, die zuerst getroffen werden müssen, Aufwinde, Schienen
 mit Tempo. Dafür liest er **Hinweise**.
 
+## Dem Lauf eines Spielers folgen
+
+Mit `--follow REPLAY` kennt der Testspieler den Lauf des Spielers Tick für Tick: wo die Kugel war, wie schnell,
+welche Kugel, in welchem Sektor und welche Tasten gedrückt waren. Wo seine Kugel ist, wo die des Spielers war
+(innerhalb 2 Einheiten, die Geschwindigkeit innerhalb 4, dieselbe Kugel, derselbe Sektor, nicht verloren), sind die
+Tasten des Spielers bei jeder Entscheidung eine weitere Wahl (in der Ansicht des Spielers genau seine Tasten, auch
+Drehungen der Ansicht; in einer anderen dieselben Stöße als ihre Pfeile). Sie wird auf einer Kopie des Laufs bewertet
+wie jede andere und immer genommen, wenn sie die Kugel nicht verliert: Der Spieler wusste, was die Wegsuche nicht
+weiß (erst einen Hebel treffen, zu einem Transformator zurück, auf einem Aufzug warten), und eine eigene Abkürzung
+führt für immer von seiner Linie weg. Wo die Linie des Spielers nicht nah ist (er fiel dort, oder die Kugel ist
+abgekommen), lenkt die Wegsuche, und festgefahren probiert sie auch längere Stücke seiner Tasten von nahen Stellen.
+Zuerst wird der Tick gesucht, bis zu dem der Lauf seit dem letzten Treffer gekommen ist, damit eine Stelle, an der
+der Spieler stand, nicht immer wieder gespielt wird. Die letzten vier Sekunden des Spielers vor einer verlorenen Kugel werden nicht verfolgt, und nach einem Hinweis wartet
+die Linie des Spielers zehn Sekunden (der Hinweis kennt die Stelle besser). Festgefahren, wo kein Manöver
+weiterkommt, innerhalb 30 Einheiten der Linie, rollt er zu einer früheren Stelle zurück, an der der Spieler stand,
+und gibt von dort seine Tasten (ein Anlauf, eine Lücke mit Tempo), wenn das auf einer Kopie des Laufs die Kugel hält
+und weiterkommt. `AUTOPILOT_DEMO=1` gibt jeden Treffer aus.
+
+`--then REPLAY` (bis zu 8-mal) hängt einen Lauf an, der an einem Sektor beginnt (ein Replay, das mit `start N`
+anfängt): ab diesem Sektor sind der Weg, seine Transformatoren und die Takte des Spielers die dieses Laufs. So wird
+ein Level von seinem Anfang verfolgt, mit dem ganzen Lauf des Inhabers und einem späteren, der durch einen Sektor
+kam, durch den der ganze Lauf nicht kam.
+
 ## Berichte, wo er steckt
 
 Kommt der Testspieler 20 Sekunden auf seinem Weg nicht weiter, schreibt er einen Bericht nach `--report DIR`
@@ -29,7 +52,7 @@ at X Y Z r R [sector N] [kind wood|stone|paper] : SCHRITT ; SCHRITT ; ...
 ```
 
 Kommt die Kugel dem Punkt näher als R (in diesem Sektor, als diese Kugel), laufen die Schritte der Reihe nach,
-einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu. Schritte:
+einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinter den Transformatoren, wenn der Hinweis die Kugel verwandelt hat). Schritte:
 
 | Schritt | Was er tut |
 |---|---|
@@ -40,7 +63,7 @@ einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu. Schri
 | `wait T` | T Takte ohne Pfeile |
 | `turn N` | die Ansicht um N Viertel drehen (negativ: links) |
 | `become KIND` | in den nächsten Transformator dieser Art rollen (höchstens 1200 Takte) |
-| `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht |
+| `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
 
 Richtungen sind Weltrichtungen (X nach Osten, Z nach Norden, wie das Level gebaut ist), ein Hinweis hängt also nicht
 von der Drehung der Ansicht ab; die Pfeile werden in jedem Takt zur Ansicht gewählt. Eine Hinweisdatei ist nicht
@@ -50,11 +73,12 @@ Zeilennummer ab. `HINTS_TRACE=1` gibt die Kugel alle zehn Takte aus, solange ein
 
 ## Stand
 
-- Level 1: die zwei Schieber in Sektor 3 (Hinweis: über die untere Bahn herum, sie nach Norden schieben); das
-  Level wird geschafft.
-- Level 2, Sektor 3: die Zugbrücke, die Aufwinde zum Stein-Transformator, der Schieber, die Schiene hinab;
-  Sektor 4: die Schiene und die Spiralrampe. Die wellige Halfpipe danach noch nicht: Der Inhaber schwingt quer
-  darüber, um das Tempo zu halten, was Wegpunkte nicht tun.
-- Level 5, Sektor 1: Zum Hebel P_Modul_37 führt ein schmales Schienenpaar, das mit Tempo genommen werden muss; mit
-  acht Pfeilrichtungen rollt die Kugel davon ab. Noch nicht geschafft.
-- Level 3 (drehende Arme) und 4 (das Steinkugel-Rätsel): noch keine Hinweise.
+Den Läufen des Inhabers folgend (`--autopilot --follow`), 2026-11-02:
+
+- Level 1: vom Start an geschafft in 8:00.70 (Hinweise für die Rampe, die Kiste, die Schieber und die Schienen).
+- Level 2: vom Start an geschafft in 5:47.25 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers durch Sektor 5).
+- Level 3: vom Start an geschafft in 8:34.07.
+- Level 4: ab Sektor 2 beendet in 7:55.15 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3; ein Hinweis in den Papier-Transformator am Hang); vom Start bis Sektor 5 (Weg 2347 von 2953).
+- Level 5: vom Start an geschafft in 12:03.58 (Hinweise für beide Kisten und den Schieber).
+- Level 6: der Lauf des Inhabers endet in Sektor 2 am gewölbten Stamm, der des Testspielers auch.
+- Level 7: bis Sektor 5 (Weg 2635 von 3261): das Brett, auf dem die Papierkugel landet, muss erst als Stein an seinen Platz geschoben werden.

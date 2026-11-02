@@ -1599,6 +1599,11 @@ impl Sim {
         self.dying.is_some()
     }
 
+    /// Whether a transformer holds the ball (out of the physics, made over into another kind).
+    pub fn is_held(&self) -> bool {
+        self.hold.is_some()
+    }
+
     /// Whether the checkpoint at level object `object` has been passed.
     pub fn checkpoint_passed(&self, object: usize) -> bool {
         self.rules.checkpoints.iter().position(|c| c.0 == object).is_some_and(|k| k < self.sector)

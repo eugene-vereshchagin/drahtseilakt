@@ -669,6 +669,13 @@ const CHOICES: [u8; 9] = [
     input::DOWN | input::RIGHT,
 ];
 
+/// Not an arrow combination: the choice of the player's own pushes (Demo).
+const DEMO_CHOICE: u8 = 0xff;
+/// What the player's line is worth over a choice of ours, in way points: so much that it is always taken unless it
+/// loses the ball. The player knew what the way's search does not (a lever to hit first, a transformer to go back
+/// to, a place to wait); a short cut of ours that looks further leads off the player's line for good.
+const DEMO_BONUS: f32 = 1000.0;
+
 /// The steering: every `PERIOD` ticks each choice is tried for `HOLD` ticks and then `COAST` with no arrows on a copy of
 /// the run; the one that ends furthest along the way without losing the ball is held.
 const PERIOD: u64 = 6;
@@ -684,6 +691,106 @@ const COAST: u64 = 36;
 
 /// A transformer on the way: its place on the way, where it is, and the ball it makes.
 pub type Gate = (usize, Vec3, crate::sim::BallKind);
+
+/// One tick of a player's run the test player follows: the ball (where, how fast, which, in which sector, not being
+/// lost) and what the player pushed then, in the world (so it reads the same in any view).
+#[derive(Clone, Copy, Debug)]
+pub struct DemoTick {
+    pub pos: Vec3,
+    pub vel: Vec3,
+    pub kind: crate::sim::BallKind,
+    pub sector: usize,
+    pub alive: bool,
+    pub push: Vec3,
+    /// The keys as the player pressed them, and the view's quarter then: in the same view they are given as they
+    /// were (turns of the view too, and pushes while the view turns, which no world direction gives exactly).
+    pub bits: u8,
+    pub quarter: i32,
+}
+
+/// A player's run, tick by tick. Where the test player's ball is where the player's was, as fast and the same
+/// ball, it may do what the player did there: each decision tries the player's pushes as one more choice (and,
+/// stuck, longer stretches of them), judged on a copy of the run like every other choice. One mechanism for every
+/// place a person passed that the way's search does not: a narrow rail taken at speed, a swing across a trough, a
+/// puzzle's pushes.
+#[derive(Clone, Debug, Default)]
+pub struct Demo {
+    pub ticks: Vec<DemoTick>,
+}
+
+/// Stuck this near the next transformer, the ball is taken into it.
+const GATE_STUCK: f32 = 10.0;
+
+/// A player's tick matches the ball within this distance and this difference of speed.
+const DEMO_NEAR: f32 = 2.0;
+const DEMO_SPEED: f32 = 4.0;
+/// Stuck, the player's pushes are tried for these stretches from the places within `DEMO_STUCK_NEAR`.
+const DEMO_STRETCHES: [u64; 3] = [240, 480, 900];
+const DEMO_STUCK_NEAR: f32 = 4.0;
+/// After a hint the player's line waits this long (ten seconds).
+const DEMO_AFTER_HINT: u64 = 600;
+/// Stuck within `RUN_UP_NEAR` of the player's line, it looks back up to `RUN_UP_BACK` of the player's ticks for a
+/// place the player stood still within `RUN_UP_REACH`, and gives the player's keys from there for `RUN_UP_KEYS`.
+const RUN_UP_NEAR: f32 = 30.0;
+const RUN_UP_BACK: usize = 1200;
+const RUN_UP_REACH: f32 = 30.0;
+const RUN_UP_KEYS: usize = 1500;
+
+impl Demo {
+    /// The player's tick nearest the ball (same ball, same sector, not being lost), within `near` and, when `speed` is
+    /// some, as fast within it; searched near `hint` first (the player's run goes on as ours does).
+    fn find(&self, sim: &Sim, near: f32, speed: Option<f32>, hint: Option<usize>) -> Option<usize> {
+        let b = &sim.ball;
+        let fits = |t: &DemoTick| {
+            t.alive
+                && t.kind == b.kind
+                && t.sector == sim.sector
+                && t.pos.distance(b.position) < near
+                && speed.is_none_or(|s| t.vel.distance(b.velocity) < s)
+        };
+        let best_in = |from: usize, to: usize| {
+            self.ticks
+                .get(from..to.min(self.ticks.len()))?
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| fits(t))
+                .min_by(|x, y| {
+                    x.1.pos
+                        .distance(b.position)
+                        .total_cmp(&y.1.pos.distance(b.position))
+                })
+                .map(|(i, _)| from + i)
+        };
+        // the player's run going on from where it was followed comes first (where the player stood still, every tick
+        // of it is as near), then the nearest around it, then anywhere
+        let near = hint
+            .and_then(|h| best_in(h.saturating_sub(120), h + 600))
+            .or_else(|| best_in(0, self.ticks.len()))?;
+        let dist = |k: usize| {
+            self.ticks
+                .get(k)
+                .map_or(f32::INFINITY, |t| t.pos.distance(b.position))
+        };
+        Some(
+            match hint.filter(|&h| self.ticks.get(h).is_some_and(fits)) {
+                Some(h) if dist(h) <= dist(near) + 0.5 => h,
+                _ => near,
+            },
+        )
+    }
+
+    /// The player's input of tick `k` for a view at `quarter`: the very keys when the view is the player's, else the
+    /// push as arrows of this view.
+    fn input(&self, k: usize, quarter: i32) -> u8 {
+        self.ticks.get(k).map_or(0, |t| {
+            if t.quarter == quarter {
+                t.bits
+            } else {
+                crate::hints::arrows(t.push, quarter)
+            }
+        })
+    }
+}
 
 pub struct Pilot {
     pub route: Route,
@@ -712,7 +819,19 @@ pub struct Pilot {
     field: Option<(usize, HashMap<usize, f32>)>,
     /// The hints for places it cannot pass alone (hints.rs): while one runs, it drives.
     pub hints: crate::hints::Runner,
+    /// The player's run it follows, if any; the player's tick it matched last; and, when the player's pushes were
+    /// the choice, from which of the player's ticks and from which tick of ours.
+    pub demo: Option<Demo>,
+    demo_at: Option<(usize, u64)>,
+    demo_run: Option<(usize, u64)>,
+    /// The player's still places already rolled back to.
+    run_ups: Vec<usize>,
+    /// The tick the player's line is followed again from, after a hint.
+    demo_after: u64,
 }
+
+/// How near the ball a point of the way must be to take the way up there (a run begun at a sector).
+const TAKE_UP_NEAR: f32 = 8.0;
 
 impl Pilot {
     pub fn new(route: Route, gates: Vec<Gate>) -> Pilot {
@@ -731,6 +850,11 @@ impl Pilot {
             seed: 0x2545_F491,
             field: None,
             hints: crate::hints::Runner::default(),
+            demo: None,
+            demo_at: None,
+            demo_run: None,
+            run_ups: Vec::new(),
+            demo_after: 0,
         }
     }
 
@@ -763,9 +887,123 @@ impl Pilot {
         self.gates.get(self.gate).map_or(usize::MAX, |g| g.0)
     }
 
+    /// A run begun elsewhere than the level's start (a sector): the way is taken up at its point nearest the ball,
+    /// past the transformers before it (the way may pass there again later, so the first point near enough wins).
+    pub fn take_up(&mut self, sim: &Sim) {
+        let f = sim.ball.position - Vec3::Y * crate::sim::BALL_RADIUS;
+        let near = self.route.points.iter().position(|p| p.distance(f) < TAKE_UP_NEAR);
+        let Some(i) = near.or_else(|| self.route.nearest(sim.ball.position, usize::MAX)) else {
+            return;
+        };
+        self.at = i;
+        self.gate = self.gates.iter().position(|g| g.0 > i).unwrap_or(self.gates.len());
+    }
+
+    /// A new ball after a lost one: the way is taken up again where it stands (the reset point is behind the place
+    /// the ball was lost), and whatever was planned there is dropped.
+    pub fn new_ball(&mut self, sim: &Sim) {
+        self.take_up(sim);
+        // The new ball is the one lost (the original's New Ball script), not always the kind the way was taken in
+        // here: then it first becomes that kind at the transformer nearest (the levels keep one by the reset points
+        // for this); a transformer ahead that makes the kind it already is has nothing to do for it. Where the way's
+        // next transformer is nearer than one of that kind, the ball is made over there anyway and goes on as it is.
+        let wanted = self.gates.iter().take_while(|g| g.0 <= self.at).last().map(|g| g.2);
+        let pos = sim.ball.position;
+        let next = self.gates.get(self.gate).map_or(f32::INFINITY, |g| g.1.distance(pos));
+        // there by a via (it backs off for a run-up where the ball cannot climb), then into it,
+        let fetch = wanted.filter(|&k| k != sim.ball.kind).and_then(|k| {
+            let near = sim.trafos().filter(|(_, kind)| *kind == k).min_by(|a, b| {
+                a.0.distance(pos).total_cmp(&b.0.distance(pos))
+            });
+            near.filter(|(at, _)| at.distance(pos) <= next).map(|(at, _)| (at, k))
+        });
+        if let Some((at, k)) = fetch {
+            self.hints.add(crate::hints::Hint {
+                at: sim.ball.position,
+                radius: 6.0,
+                sector: Some(sim.sector + 1),
+                kind: Some(sim.ball.kind),
+                // and back to the reset point, where the way (and a followed run) goes on from
+                steps: vec![
+                    crate::hints::Step::Via(at, 900),
+                    crate::hints::Step::Become(k),
+                    crate::hints::Step::Goto(sim.ball.position, 900),
+                ],
+                line: 0,
+            });
+        } else {
+            while self.gates.get(self.gate).is_some_and(|g| g.2 == sim.ball.kind) {
+                self.gate += 1;
+            }
+        }
+        self.kind = Some(sim.ball.kind);
+        self.best = f32::NEG_INFINITY;
+        self.moved = sim.tick;
+        self.plan.clear();
+        self.last = Some(sim.ball.position);
+        self.choice = 0;
+    }
+
     /// How far along the way the ball has come (route points).
     pub fn reached(&self) -> usize {
         self.at
+    }
+
+    /// A hint of its own from the followed run, when stuck near the player's line: roll to a place before this one
+    /// where the player stood still (in this sector, as this ball, within reach), then give the player's keys from
+    /// there on, past this place. Each place the player stood is tried twice at most.
+    fn run_up(&mut self, sim: &Sim, here: f32) -> Option<crate::hints::Hint> {
+        let d = self.demo.as_ref()?;
+        let near = d.find(sim, RUN_UP_NEAR, None, self.demo_expected(sim))?;
+        let b = &sim.ball;
+        let rest = (near.saturating_sub(RUN_UP_BACK)..near).rev().find(|&k| {
+            d.ticks.get(k).is_some_and(|t| {
+                t.alive
+                    && t.kind == b.kind
+                    && t.sector == sim.sector
+                    && t.vel.length() < 1.0
+                    && t.pos.distance(b.position) < RUN_UP_REACH
+                    && (t.pos.y - b.position.y).abs() < 2.0
+                    && self.run_ups.iter().filter(|&&r| r == k).count() < 2
+            })
+        })?;
+        self.run_ups.push(rest);
+        let t = d.ticks.get(rest)?;
+        let keys: Vec<u8> = (rest..rest + RUN_UP_KEYS)
+            .map_while(|k| d.ticks.get(k).filter(|t| t.alive).map(|t| t.bits))
+            .collect();
+        let hint = crate::hints::Hint {
+            at: b.position,
+            radius: 3.0,
+            sector: Some(sim.sector + 1),
+            kind: Some(b.kind),
+            steps: vec![
+                crate::hints::Step::Goto(t.pos, 600),
+                crate::hints::Step::Inputs(t.quarter, keys),
+            ],
+            line: 0,
+        };
+        // tried on a copy: it must keep the ball and end further along the way
+        let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
+        let mut s = sim.clone();
+        let lives = s.lives;
+        for _ in 0..(600 + RUN_UP_KEYS) {
+            let Some(i) = trial.input(&s) else { break };
+            s.step(i);
+            if s.lives < lives || s.is_dying() || s.game_over {
+                return None;
+            }
+            if s.finished {
+                break;
+            }
+        }
+        (s.finished || self.progress(s.ball.position) > here + 2.0).then_some(hint)
+    }
+
+    /// Where the followed player's run is now: the tick last matched, gone on by the ticks since.
+    fn demo_expected(&self, sim: &Sim) -> Option<usize> {
+        self.demo_at
+            .map(|(k, at)| k + usize::try_from(sim.tick.saturating_sub(at)).unwrap_or(0))
     }
 
     fn rand(&mut self) -> u32 {
@@ -817,6 +1055,32 @@ impl Pilot {
                 plan.push((t, c));
             }
             plans.push(plan);
+        }
+        // the player's pushes from the places near where the player's ball was, for longer stretches
+        if let Some(d) = &self.demo {
+            let mut starts: Vec<usize> = Vec::new();
+            for speed in [Some(DEMO_SPEED), None] {
+                if let Some(k) = d.find(sim, DEMO_STUCK_NEAR, speed, self.demo_expected(sim))
+                    && !starts.contains(&k)
+                {
+                    starts.push(k);
+                }
+            }
+            for k in starts {
+                for len in DEMO_STRETCHES {
+                    // as held choices, a tick each (the copy's view does not turn: the arrows are for this one)
+                    let q = sim.camera.quarter;
+                    let mut plan: Vec<(u64, u8)> = Vec::new();
+                    for i in 0..len {
+                        let c = d.input(k + i as usize, q);
+                        match plan.last_mut() {
+                            Some(last) if last.1 == c => last.0 = sim.tick + i + 1,
+                            _ => plan.push((sim.tick + i + 1, c)),
+                        }
+                    }
+                    plans.push(plan);
+                }
+            }
         }
         for plan in plans {
             let t = plan.last().map_or(sim.tick, |p| p.0);
@@ -904,7 +1168,31 @@ impl Pilot {
             return i;
         }
         if std::mem::take(&mut self.hints.ended) {
-            if let Some(i) = self.route.nearest(sim.ball.position, self.until()) {
+            // a hint knows the place better than the followed run: the player's line waits a while after one
+            self.demo_after = sim.tick + DEMO_AFTER_HINT;
+            // the way's point nearest the ball before the next transformer; but a hint may have gone past
+            // transformers, making the ball over itself: where that point is far from the ball, the way is taken up
+            // at its first point on from here near the ball where the way's ball is of this kind
+            let f = sim.ball.position - Vec3::Y * crate::sim::BALL_RADIUS;
+            let near = self.route.nearest(sim.ball.position, self.until());
+            let off = near.and_then(|i| self.route.points.get(i)).is_none_or(|p| p.distance(f) >= TAKE_UP_NEAR);
+            let began = self.hints.began;
+            let made_over = sim.events.iter().rev().take_while(|(t, _)| *t >= began).any(|(_, e)| {
+                matches!(e, crate::sim::Event::Transform(_))
+            });
+            let kind = |i: usize| self.gates.iter().take_while(|g| g.0 <= i).last().map(|g| g.2);
+            let on = (off && made_over)
+                .then(|| {
+                    (self.until()..self.route.points.len()).find(|&i| {
+                        self.route.points.get(i).is_some_and(|p| p.distance(f) < TAKE_UP_NEAR)
+                            && kind(i).is_none_or(|k| k == sim.ball.kind)
+                    })
+                })
+                .flatten();
+            if let Some(i) = on {
+                self.at = i;
+                self.gate = self.gates.iter().position(|g| g.0 > i).unwrap_or(self.gates.len());
+            } else if let Some(i) = near {
                 self.at = self.at.max(i);
             }
             self.best = f32::NEG_INFINITY;
@@ -913,25 +1201,8 @@ impl Pilot {
             self.last = Some(sim.ball.position);
             self.choice = 0;
         }
-        if let Some(&(until, c)) = self.plan.first() {
-            if sim.tick < until {
-                return c;
-            }
-            self.plan.remove(0);
-            if let Some(&(_, c)) = self.plan.first() {
-                self.choice = c;
-                return c;
-            }
-        }
-        if !sim.tick.is_multiple_of(PERIOD) {
-            return self.choice;
-        }
-        // A player turns the view to face the way ahead (Shift with Left or Right, a quarter a press): when the way
-        // ahead points well away from where "up" pushes, one press this tick, released the next.
-        if let Some(turn) = self.turn(sim) {
-            return turn;
-        }
-        // a new ball (the old one lost) starts again at a reset point: find it on the way anew
+        // a new ball (the old one lost) starts again at a reset point: find it on the way anew (seen every tick, so
+        // that a plan or the player's keys carrying the ball far is no new ball)
         if self
             .last
             .is_some_and(|l| l.distance(sim.ball.position) > 20.0)
@@ -945,6 +1216,36 @@ impl Pilot {
             self.plan.clear();
         }
         self.last = Some(sim.ball.position);
+        if let Some(&(until, c)) = self.plan.first() {
+            if sim.tick < until {
+                return c;
+            }
+            self.plan.remove(0);
+            if let Some(&(_, c)) = self.plan.first() {
+                self.choice = c;
+                return c;
+            }
+        }
+        if !sim.tick.is_multiple_of(PERIOD) {
+            if let (Some((k, from)), Some(d)) = (self.demo_run, &self.demo) {
+                let t = usize::try_from(sim.tick.saturating_sub(from)).unwrap_or(usize::MAX);
+                return d.input(k.saturating_add(t), sim.camera.quarter);
+            }
+            return self.choice;
+        }
+        self.demo_run = None;
+        // A player turns the view to face the way ahead (Shift with Left or Right, a quarter a press): when the way
+        // ahead points well away from where "up" pushes, one press this tick, released the next. Not where the
+        // followed player's line is at hand: it turns the view as the player did.
+        let on_demo = self
+            .demo
+            .as_ref()
+            .filter(|_| sim.tick >= self.demo_after)
+            .and_then(|d| d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)))
+            .is_some();
+        if !on_demo && let Some(turn) = self.turn(sim) {
+            return turn;
+        }
         // the next transformer is gone through: the ball has become its kind, or was its kind already and reached it
         let had = *self.kind.get_or_insert(sim.ball.kind);
         if let Some(&(_, g, k)) = self.gates.get(self.gate) {
@@ -1001,6 +1302,31 @@ impl Pilot {
                     return c;
                 }
             }
+            // stuck by the next transformer (its rim holds the ball off): into it, backing off for a run-up
+            if let Some(&(_, g, k)) = self.gates.get(self.gate)
+                && sim.ball.kind != k
+                && g.distance(sim.ball.position) < GATE_STUCK
+                && let Some((t, _)) = sim.trafos().filter(|(_, kind)| *kind == k).min_by(|a, b| {
+                    a.0.distance(g).total_cmp(&b.0.distance(g))
+                })
+            {
+                self.hints.add(crate::hints::Hint {
+                    at: sim.ball.position,
+                    radius: 6.0,
+                    sector: Some(sim.sector + 1),
+                    kind: Some(sim.ball.kind),
+                    steps: vec![crate::hints::Step::Via(t, 900), crate::hints::Step::Become(k)],
+                    line: 0,
+                });
+                return 0;
+            }
+            // no manoeuvre gets on, near the followed player's line: back to where the player stood before this
+            // place, and from there the player's keys (a run-up the player took, a gap crossed at speed), when on a
+            // copy of the run that keeps the ball and gets on
+            if let Some(hint) = self.run_up(sim, here) {
+                self.hints.add(hint);
+                return 0;
+            }
         }
         // below every floor of the way ahead: falling
         let low = self
@@ -1023,7 +1349,18 @@ impl Pilot {
                 .any(|p| p.y > here_y + 2.0)
         };
         let mut best = (f32::NEG_INFINITY, self.choice);
-        for &c in &CHOICES {
+        // the player's pushes from where the player's ball was where ours is, as fast: one more choice
+        let matched = self
+            .demo
+            .as_ref()
+            .filter(|_| sim.tick >= self.demo_after)
+            .and_then(|d| d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)));
+        if let Some(k) = matched {
+            self.demo_at = Some((k, sim.tick));
+        }
+        let mut demo_won = false;
+        for &c in CHOICES.iter().chain(matched.map(|_| &DEMO_CHOICE)) {
+            let from_demo = c == DEMO_CHOICE;
             let mut s = sim.clone();
             let lives = s.lives;
             let mut lost = false;
@@ -1032,7 +1369,12 @@ impl Pilot {
             let hold = HOLD * (1 + (stuck % 4) * 2);
             let mut edge = 0.0;
             for t in 0..hold + COAST {
-                s.step(if t < hold { c } else { 0 });
+                let input = match (from_demo, matched, &self.demo) {
+                    (true, Some(k), Some(d)) => d.input(k + t as usize, s.camera.quarter),
+                    _ if t < hold => c,
+                    _ => 0,
+                };
+                s.step(input);
                 if t % 6 == 5 && s.ball.on_ground {
                     edge += (SAFE - self.route.clearance(s.ball.position)).max(0.0);
                 }
@@ -1073,6 +1415,13 @@ impl Pilot {
             if !s.ball.on_ground && s.ball.position.y < sim.ball.position.y - 6.0 && !way_down {
                 lost = true;
             }
+            // the player's line is judged by what happens, not by the way's floors: a ball waiting on a lift or riding
+            // a module stands on no floor of the way, and that is no loss; only a lost ball, or one falling fast, is
+            if from_demo {
+                let gone = s.lives < lives || s.is_dying() || s.game_over;
+                let falling = !s.ball.on_ground && s.ball.velocity.y < -12.0 && !way_down;
+                lost = gone || falling;
+            }
             let score = if lost {
                 f32::NEG_INFINITY
             } else if s.finished {
@@ -1087,6 +1436,8 @@ impl Pilot {
                     }
                     - EDGE * edge
                     + if c == self.choice { 0.05 } else { 0.0 }
+                    // the player's own line, when as good, is taken: it knows what the search does not
+                    + if from_demo { DEMO_BONUS } else { 0.0 }
             };
             if std::env::var_os("AUTOPILOT_SCORES").is_some() {
                 eprintln!(
@@ -1096,7 +1447,25 @@ impl Pilot {
             }
             if score > best.0 {
                 best = (score, c);
+                demo_won = from_demo;
             }
+        }
+        // AUTOPILOT_DEMO: at each decision, which of the followed player's ticks matched and whether it was taken
+        if std::env::var_os("AUTOPILOT_DEMO").is_some() {
+            eprintln!(
+                "demo t{} ball {:?} v {:.1} matched {matched:?} won {demo_won}",
+                sim.tick,
+                sim.ball.position,
+                sim.ball.velocity.length()
+            );
+        }
+        if demo_won && let Some(k) = matched {
+            self.demo_run = Some((k, sim.tick));
+            self.choice = 0;
+            return self
+                .demo
+                .as_ref()
+                .map_or(0, |d| d.input(k, sim.camera.quarter));
         }
         self.choice = best.1;
         self.choice

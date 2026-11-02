@@ -6,8 +6,8 @@
 # the updraft P_Modul_18_01 (x 1016.7) up as paper, drifts west onto the higher one (_12, x 1006.7) and then east, becomes stone, comes down, goes round by the south lane, knocks the bridge over,
 # first shoves the pusher P_Modul_01_03 (x 933.8, z -366) west out of the lane from the east lane (z -366.7),
 # becomes paper again at the transformer west of the junction (916, -347) and crosses the bridge.
-at 930.5 48 -338 r 6 sector 3 kind paper : goto 960 48 -346.7 ; goto 992 48 -347 ; goto 992 48 -368 ; goto 1016.7 48 -366.7 ; wait 40 ; push -1 0 20 ; wait 80 ; become stone
-at 1024 68 -367 r 6 sector 3 kind stone : push -1 0 60 ; wait 60 ; goto 1003 48 -369 ; goto 992 48 -366.7 ; goto 950 46 -366.7 ; push -1 0 90 ; goto 975 48 -366.7 ; goto 991 48 -368 ; goto 991 48 -386.6 ; goto 931 48 -386.7 ; goto 931.3 48 -368 ; push 0 1 160 ; wait 60 ; goto 931 48 -350 ; become paper ; goto 930.3 48 -347 ; wait 20 ; push 0 1 150
+at 930.5 48 -346.7 r 6 sector 3 kind paper : goto 960 48 -346.7 ; goto 992 48 -347 ; goto 992 48 -368 ; goto 1000 48 -373 ; goto 1014 48 -373 ; goto 1016.7 48 -366.7 ; wait 40 ; push -1 0 20 ; wait 80 ; become stone
+at 1024 68 -367 r 6 sector 3 kind stone : push -1 0 60 ; wait 60 ; goto 1003 48 -369 ; goto 992 48 -366.7 ; goto 992 48 -366.7 ; push -1 0 150 ; push -1 0 150 ; goto 946 47 -366.7 ; goto 975 48 -366.7 ; goto 991 48 -368 ; goto 991 48 -386.6 ; goto 931 48 -386.7 ; goto 931.3 48 -368 ; push 0 1 160 ; goto 931.3 48.7 -331 ; goto 931.3 48.7 -327 ; goto 931.3 48.5 -350 ; become paper ; goto 930.3 48 -347 ; wait 20 ; push 0 1 150
 
 # Sector 3, the rail down north from the square frame (x 927, from y 48 to 3): the test player will not roll off the
 # edge onto it. The owner's inputs from the edge, where they stood almost still, down the rail.
@@ -15,5 +15,7 @@ at 934 48.7 -206.5 r 5 sector 3 kind paper : goto 927.5 48.7 -206.5 ; wait 30 ; 
 
 # Sector 4, the double rail at x 1055.4: the way to the paper transformer (1040.6, 4.8, 12.3) is not across to the
 # wavy wooden track beside it but south along the rail to z -213, up the ramp there and north along the whole
-# wavy track (the owner's path, a point every second) into the transformer.
-at 1055.4 6.1 -30 r 8 sector 4 kind stone : goto 1055.4 6.1 -213.5 ; via 1047.8 7.2 -225.6 ; via 1035.0 7.7 -225.6 ; via 1019.1 8.1 -225.6 ; via 1010.2 9.3 -218.7 ; via 1016.6 10.3 -209.6 ; via 1025.3 11.6 -213.6 ; via 1023.5 12.2 -223.7 ; via 1015.7 13.4 -225.2 ; via 1010.1 14.3 -218.2 ; via 1017.4 15.3 -209.5 ; via 1029.3 15.3 -209.4 ; goto 1042 14.4 -209.3 ; via 1043.1 13.4 -198.3 ; via 1041.7 12.9 -178.8 ; via 1044.3 15.1 -171.9 ; via 1047.7 7.3 -154.3 ; via 1041.3 14.5 -142.5 ; via 1037.0 14.3 -134.1 ; via 1033.6 12.1 -113.8 ; via 1036.7 15.0 -106.6 ; via 1044.0 7.2 -90.0 ; via 1041.5 14.5 -76.7 ; via 1040.7 13.6 -67.1 ; via 1042.7 12.8 -47.3 ; via 1041.1 15.1 -39.8 ; via 1040.6 7.0 -21.6 ; via 1040.6 7.0 -5.5 ; become paper
+# wavy track into the transformer: the waves are crossed with the owner's own inputs (they swing across each
+# trough to keep the stone ball's speed, which waypoints cannot).
+at 1055.4 6.1 -30 r 8 sector 4 kind stone : goto 1055.4 6.1 -213.5 ; via 1047.8 7.2 -225.6 ; via 1035.0 7.7 -225.6 ; via 1019.1 8.1 -225.6 ; via 1010.2 9.3 -218.7 ; via 1016.6 10.3 -209.6 ; via 1025.3 11.6 -213.6 ; via 1023.5 12.2 -223.7 ; via 1015.7 13.4 -225.2 ; via 1010.1 14.3 -218.2 ; via 1017.4 15.3 -209.5 ; via 1029.3 15.3 -209.4 ; goto 1043 14.4 -209.3 ; wait 20 ; replay Level_02-owner.replay 20130 21180 ; become paper
+at 1093.59 5.82 62.42 r 1 sector 5 kind paper : replay Level_02-s5.replay 685 3286

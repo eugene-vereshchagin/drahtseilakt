@@ -3,4 +3,27 @@
 # Sector 3, the two pushers (P_Modul_01_01 at x 262.8, _02 at x 272.8) stand in the lane along z -793. A player
 # goes round by the lower lane (z -817), pushes each one north (+z) out of the lane, comes back west and up the
 # side lane (x 237), and rolls east along z -793.
-at 245 -3 -793 r 10 sector 3 : goto 237 -3.3 -803 ; goto 237 -4.9 -816 ; goto 263 -5 -817 ; push 0 1 180 ; goto 263 -5 -812 ; goto 272.5 -5 -812 ; push 0 1 180 ; goto 272 -5 -815 ; goto 240 -5 -817 ; goto 237 -3.3 -803 ; goto 237 -3.3 -793
+at 245 -3 -793 r 10 sector 3 : goto 237 -3.3 -803 ; goto 237 -4.9 -816 ; goto 263 -5 -817 ; via 263 -5.6 -797.5 ; goto 263 -5 -812 ; goto 272.5 -5 -812 ; via 272.3 -5.6 -797.8 ; goto 272 -5 -815 ; goto 240 -5 -817 ; goto 237 -3.3 -803 ; goto 237 -3.3 -793
+
+# Sector 3, the rails south from (299.6, -797) into the box of the wood transformer: rolled slowly the stone ball
+# stops at the box's rim; the owner rolls them at speed.
+at 299.6 -3.6 -800 r 4 sector 3 kind stone : goto 299.6 -3.6 -799 ; push 0 -1 150
+
+# Sector 1, the ramp up north at (-155, -300) after the wood transformer: the wood ball cannot climb it from the
+# corridor slowly; the owner comes east along z -286 from x -188 at speed and turns up it.
+at -160 22.3 -291 r 9 sector 1 kind wood : goto -190 21.8 -286 ; push 1 0 95 ; push 0.3 -1 120
+
+# Then from the ramp's top round east to the lane along z -363.8: the owner's line (the basin south of it, at y 18,
+# has no way up).
+at -165.7 21.6 -348.8 r 5 sector 1 kind wood : via -157 21.7 -349.3 ; via -138.9 22 -357.6 ; goto -134 21.3 -363.5 ; push 1 0 60
+
+
+# Sector 2, the crate of P_Modul_34_01 (module at 147.2 -4.1 -555.3; its x is the world's z): the crate stands on the
+# lower floor at (147.2, -6.6, -563) under the sliding stone, which stands up out of the lane above and blocks it. A
+# ball on the lower floor pushes the crate east (+x) out from under the stone, and the stone slides down level with
+# the lane (the owner: from the west along z -562.5; the walkthrough video, level 1). The ball backs off at once: the
+# stone falling on it would pin it under.
+at 147.2 -1 -533.2 r 5 sector 2 kind stone : goto 127 -2.6 -557 ; goto 133 -7.1 -563 ; push 1 0 100 ; push -1 0 100
+# Then up out of the lower floor: the wedge ramp at x 157 rises north to the upper floor; the owner runs at it from
+# the south end (z -575).
+at 152 -7.1 -554 r 5 sector 2 kind stone : goto 152 -7.1 -574 ; goto 154.6 -7.1 -573.6 ; via 155.1 -7.1 -566 ; via 156.8 -4.8 -548.3 ; via 157.8 -4.1 -543 ; goto 148.8 -2.3 -548.2
