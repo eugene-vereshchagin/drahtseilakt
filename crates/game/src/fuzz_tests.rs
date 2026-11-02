@@ -326,7 +326,14 @@ fn plain_nmo(f: &nmo::File) -> Vec<u8> {
 #[test]
 #[ignore]
 fn fuzz_level_sim() {
-    let mut t = Target::new("level_sim", test_name!("fuzz_level_sim"), Kind::Binary);
+    // text mutations too: the open format's names and numbers (a group "Sector_1000000000", a far position)
+    let mut t = Target::new("level_sim", test_name!("fuzz_level_sim"), Kind::Text);
+    t.dict = &[
+        "Sector_", "Sector_01", "PC_Checkpoints", "PC_TwoFlames_01", "PS_Levelstart", "PS_FourFlames_01",
+        "PR_Resetpoints", "PR_Resetpoint_01", "PE_Levelende", "P_Box", "P_Box_01", "P_Dome", "P_Extra_Point",
+        "P_Trafo_Stone", "P_Ball_Paper", "Phys_Floors", "Phys_FloorRails", "Phys_FloorStopper", "P_Modul_01",
+        "\"members\"", "\"matrix\"", "\"groups\"", "\"name\"", "1e30", "-1e30", "3.4e38",
+    ];
     t.max_len = 16 << 20;
     t.rss_mb = 1024;
     fuzzkit::fuzz(t, level_sim_seeds, run_level_sim);
