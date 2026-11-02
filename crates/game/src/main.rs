@@ -16,6 +16,7 @@ mod extra;
 mod features;
 mod freecam;
 mod highscore;
+mod hints;
 mod hud;
 mod lang;
 mod levels;
@@ -60,6 +61,8 @@ usage: drahtseilakt [options]
   --autopilot         no window: the test player plays the level (to --ticks); saved with --record
   --follow FILE       the test player follows the ball's way in a replay of a player's run, or a --locate track
   --plan FILE         the test player's way goes through the level objects named in FILE, in order
+  --hints FILE        the test player's hints (default: hints/<level>.txt in the data folder; autopilot.md)
+  --report DIR        where the test player writes a report each time it is stuck (default: the temp folder)
   --locate DIR        find the ball's way in a video's frames (DIR/s0001.jpg, four a second); track to --record
   --frames DIR        with --replay: draw four frames a second into DIR, with the ball's true places
   --screenshot FILE   no window: render the frame after the replay (or --ticks N) to a PNG
@@ -104,6 +107,10 @@ pub struct Options {
     pub follow: Option<PathBuf>,
     /// The test player's way goes through these level objects in order (a file of names).
     pub plan: Option<PathBuf>,
+    /// The test player's hint file, instead of the level's in the data folder.
+    pub hints: Option<PathBuf>,
+    /// Where the test player's stuck reports go.
+    pub report: Option<PathBuf>,
     /// Find the ball's way in the frames (s0001.jpg, `locate::RATE` a second) of a video of the original; the track is
     /// written to --record.
     pub locate: Option<PathBuf>,
@@ -137,6 +144,8 @@ fn parse_args() -> Result<Options, String> {
         autopilot: false,
         follow: None,
         plan: None,
+        hints: None,
+        report: None,
         locate: None,
         frames: None,
         screenshot: None,
@@ -191,6 +200,8 @@ fn parse_args() -> Result<Options, String> {
                 o.plan = Some(value()?.into());
                 o.autopilot = true;
             }
+            "--hints" => o.hints = Some(value()?.into()),
+            "--report" => o.report = Some(value()?.into()),
             "--follow" => {
                 o.follow = Some(value()?.into());
                 o.autopilot = true;

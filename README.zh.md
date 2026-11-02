@@ -48,7 +48,7 @@ FILE.png` 渲染一帧。要测试某个位置，`--sector N` 从某个检查点
 同时这一局暂停等待，`[` 和 `]` 让游戏变慢和重新加快（这一局本身逐 tick
 保持不变），F5 保存当前时刻，F9 回到该时刻（这一局的记录会截断到那里，因此长关卡可以
 分段录制），并显示小节和 tick。以这种方式辅助的一局会被保存，但永远不算最佳成绩。用于测试时，`--autopilot` 让测试玩家在无窗口的情况下尝试通关
-（配合 `--record FILE` 保存其过程）；`--follow FILE` 让它沿着玩家回放中球的路线前进。`--locate DIR --record TRACK` 在原版视频的帧中找出球的路线（DIR/s0001.jpg 起，每秒四帧，例如 `ffmpeg -vf fps=4,scale=640:480`），方法是从球可能所在的位置绘制关卡并进行比较；测试玩家用 `--follow TRACK` 沿着这样的轨迹前进。`--frames DIR --replay FILE` 把回放绘制成这样的帧，带有真实位置，用于检验。`drahtseilakt --help` 列出全部选项。
+（配合 `--record FILE` 保存其过程）；`--follow FILE` 让它沿着玩家回放中球的路线前进；卡住时它会写报告，并遵循提示（[测试玩家](docs/zh/drahtseilakt/autopilot.md)）。`--locate DIR --record TRACK` 在原版视频的帧中找出球的路线（DIR/s0001.jpg 起，每秒四帧，例如 `ffmpeg -vf fps=4,scale=640:480`），方法是从球可能所在的位置绘制关卡并进行比较；测试玩家用 `--follow TRACK` 沿着这样的轨迹前进。`--frames DIR --replay FILE` 把回放绘制成这样的帧，带有真实位置，用于检验。`drahtseilakt --help` 列出全部选项。
 
 ## 法律信息
 

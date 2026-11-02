@@ -1,0 +1,6 @@
+# Level 1 — hints for the test player (docs/drahtseilakt/autopilot.md). Written from the owner's run.
+#
+# Sector 3, the two pushers (P_Modul_01_01 at x 262.8, _02 at x 272.8) stand in the lane along z -793. A player
+# goes round by the lower lane (z -817), pushes each one north (+z) out of the lane, comes back west and up the
+# side lane (x 237), and rolls east along z -793.
+at 245 -3 -793 r 10 sector 3 : goto 237 -3.3 -803 ; goto 237 -4.9 -816 ; goto 263 -5 -817 ; push 0 1 180 ; goto 263 -5 -812 ; goto 272.5 -5 -812 ; push 0 1 180 ; goto 272 -5 -815 ; goto 240 -5 -817 ; goto 237 -3.3 -803 ; goto 237 -3.3 -793
