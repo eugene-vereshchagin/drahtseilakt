@@ -617,6 +617,9 @@ fn load_volumes() -> [f32; 2] {
 }
 
 
+/// The level's start sound is played when the run is seen within its first second.
+const START_SOUND_WITHIN: u64 = 60;
+
 /// F3 goes this far back (five seconds); the run is kept once a second for the last half minute.
 const REWIND_TICKS: u64 = 300;
 const HISTORY_EVERY: u64 = 60;
@@ -840,6 +843,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             a
         }),
         heard: 0,
+        started: false,
         rolling: [None; 3 + crate::ballsound::FAN_SLOTS],
         music: None,
         blitz: crate::lights::Blitz::new(
@@ -1756,6 +1760,8 @@ struct App {
     /// The sound output, if there is a device; and how many of the run's events have sounded.
     audio: Option<Audio>,
     heard: usize,
+    /// The level's start sound has sounded for this run.
+    started: bool,
     /// The loops playing, by slot: rolling (stone, wood, metal), then the fans'.
     rolling: [Option<u64>; 3 + crate::ballsound::FAN_SLOTS],
     /// The level's music.
@@ -1828,6 +1834,7 @@ impl App {
         }
         self.rolling = [None; 3 + crate::ballsound::FAN_SLOTS];
         self.heard = 0;
+        self.started = false;
         self.music = None;
         self.number = number;
         self.prev = None;
@@ -1881,8 +1888,9 @@ impl App {
         }
         let sim = &self.game.sim;
         if self.heard > sim.events.len() || (sim.tick <= 1 && self.heard > 0) {
-            // a new run
+            // a new run (or one taken back)
             self.heard = 0;
+            self.started = sim.tick > START_SOUND_WITHIN;
         }
         if self.music.is_none() && sim.tick >= 1 {
             let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64);
@@ -1891,7 +1899,10 @@ impl App {
         if let Some(m) = &mut self.music {
             m.frame(sim, audio, &self.data);
         }
-        if sim.tick == 1 && self.heard == 0 {
+        // the start sound once a run: a frame may take more than one tick (the first after a level loaded does), so
+        // it is not looked for on tick 1 alone
+        if !self.started && (1..=START_SOUND_WITHIN).contains(&sim.tick) {
+            self.started = true;
             audio.play(&self.data, "Misc_StartLevel", 1.0, 0.0);
         }
         for (_, e) in sim.events.iter().skip(self.heard) {
@@ -1938,9 +1949,10 @@ impl App {
         }
     }
 
-    /// The run starts again: its music too.
+    /// The run starts again: its music and its start sound too.
     fn restart(&mut self) {
         self.game.restart();
+        self.started = false;
         self.prev = None;
         if let (Some(a), Some(m)) = (&mut self.audio, &mut self.music) {
             m.stop(a);
