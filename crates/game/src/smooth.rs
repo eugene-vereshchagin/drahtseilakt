@@ -53,16 +53,22 @@ struct Bend {
     angle: f32,
 }
 
-/// The least share of one corner's offset in the other's for an edge to bend: an arc bends both ends alike, while an
-/// edge whose normals tilt at one end only (where a straight rail meets its curve) would bend into a wave.
+/// The least share of one corner's offset in the other's for an edge to bend like an arc. An edge whose normals tilt
+/// at one end only (a corner between two straight runs, or where a straight rail meets its curve) bends lopsided: it
+/// may, but only a little ([`MAX_LOPSIDED_BOW`]), so a corner is rounded while a long rail does not bend into a wave.
 const ARC_LIKE: f32 = 0.2;
+/// The most a lopsided edge may bow, in level units.
+const MAX_LOPSIDED_BOW: f32 = 0.1;
 
 fn bend(lo: Vec3, hi: Vec3, n_lo: Vec3, n_hi: Vec3) -> Bend {
     let w_lo = (hi - lo).dot(n_lo);
     let w_hi = (lo - hi).dot(n_hi);
-    let arc =
-        w_lo * w_hi > 0.0 && w_lo.abs().min(w_hi.abs()) >= ARC_LIKE * w_lo.abs().max(w_hi.abs());
-    if !arc {
+    let (least, most) = (w_lo.abs().min(w_hi.abs()), w_lo.abs().max(w_hi.abs()));
+    // the ends bend the edge the same way (an end that hardly tilts counts as not bending it); an S is never bent
+    let one_way = w_lo * w_hi > 0.0 || least <= 0.2 * most;
+    let lopsided = least < ARC_LIKE * most;
+    let bow = (w_lo.abs() + w_hi.abs()) / 8.0;
+    if !one_way || most == 0.0 || (lopsided && bow > MAX_LOPSIDED_BOW) {
         return Bend {
             near_lo: lo.lerp(hi, 1.0 / 3.0),
             near_hi: hi.lerp(lo, 1.0 / 3.0),
