@@ -49,13 +49,24 @@ flache Liste der Level, nach Titel sortiert, ohne Ordner zum Öffnen.
   taugen für Linux, Windows und macOS (keine reservierten Namen, keine Punkte oder Leerzeichen am Ende, höchstens 40
   Zeichen, ein zweites „Hello Mars“ mit „(2)“); die Quelle wird nur gelesen. Ein zweiter Lauf fügt nur Neues hinzu.
 
+## Level, die mit dem Spiel kommen
+
+Unsere eigenen Level kommen mit dem Spiel in seinem `assets/levels/`, ein Ordner je Level im offenen Format, nur aus
+unseren eigenen Teilen gemacht (assets/own, [resources.md](resources.md)), sie spielen also ganz ohne Kopie des
+Originals. Das Menü zeigt sie mit den Leveln im offenen Format aus `levels/open/`: unter Start, wenn es keine Kopie
+gibt (die Liste „Our levels“), unter „Open format“ des erweiterten Modus immer. Sie entstehen durch Skripte in
+`assets/own/make/` (`levelkit.py` baut ein Level aus Bahnstücken und den Platzhaltern der Teile; `make_test_level.py`
+das erste, `Parts_Test`, einige hundert Einheiten Bahn mit jedem Teil darauf oder daneben), deren Ergebnisse im
+Repository liegen. Ihre Lizenz ist die des Spiels (GPL-3.0-only).
+
 ## Das Originalspiel: standardmäßig kopiert
 
 Das Spiel kopiert einmal, was es braucht, aus der eigenen Kopie des Spielers nach `levels/original/`: aus einem
 installierten Spiel (`drahtseilakt --import <Ballance-Ordner>`) oder direkt von der CD des Spiels oder ihrem
 Abbild (`drahtseilakt --import Ballance.cue`, auch `.bin`, `.iso`: das InstallShield-6-Archiv in `SETUP/`, gelesen
-von `crates/cdimage`). Ein Start ohne das Spiel öffnet ein Fenster, das dasselbe tut: es zeigt, was es auf dem
-Rechner findet (installierte Spiele in den üblichen Ordnern von Windows, Wine, GOG, Heroic und Lutris; Discs in
+von `crates/cdimage`). Die Kopie ist freiwillig (decisions.md, „Das Spiel läuft ohne
+Weiteres“): ohne sie startet das Spiel mit seinen eigenen Leveln, und **Import** im Hauptmenü öffnet ein Fenster, das
+dasselbe tut: es zeigt, was es auf dem Rechner findet (installierte Spiele in den üblichen Ordnern von Windows, Wine, GOG, Heroic und Lutris; Discs in
 ihren Laufwerken; CD-Abbilder im Home-, Desktop- und Download-Ordner), nimmt einen daraufgezogenen Ordner, ein
 Abbild oder einen eingetippten Pfad und startet das Spiel mit der Kopie. Die Kopie sind die eigenen Daten des Spielers auf seinem Rechner; nichts wird
 heruntergeladen, nichts kommt ins Repository. `--data DIR` spielt weiterhin aus jedem Ordner ohne Kopie.

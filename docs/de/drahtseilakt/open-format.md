@@ -22,8 +22,11 @@ Ein Ordner mit:
   Kugeln, der Transformator und das Modul jedes danach benannten Objekts), und unverändert die Seiten seines Himmels
   (`game/Textures/Sky/`), die Texturen der Partikel (`game/Textures/Particles/`), der Schatten der Kugel und die
   Geräusche eines Laufs (`game/Sounds/`, nicht die des Menüs noch die Musik anderer Level). Das Spiel sucht zuerst
-  dort, dann in der Kopie; ein Pfad in `game/`, auf dem etwas ein Link ist, findet nichts. Nur die Oberfläche (Menüs,
-  Schrift, Knöpfe, Klänge und Szene des Menüs) kommt noch aus der Kopie. `--export` und die Toolbox schreiben ihn.
+  dort, dann, für ein aus einer `.nmo` umgewandeltes Level (seine Einstellungen nennen einen `source_hash`) oder ein
+  Remaster, in der Kopie und danach in unseren eigenen Teilen; für ein neues Level (kein `source_hash`) in unseren
+  eigenen Teilen (`assets/own/`, [resources.md](resources.md)) und danach in der Kopie, ein eigenes Level spielt also
+  mit und ohne Kopie gleich. Ein Pfad in `game/`, auf dem etwas ein Link ist, findet nichts. `--export` und die
+  Toolbox schreiben ihn.
 
 ## Inhalt
 
@@ -58,8 +61,8 @@ Ein Ordner mit:
   Level kann jeden Hash nennen, ein darauf laufendes Replay beweist also keinen Lauf auf dem Original. Ein Level ohne
   Einstellungen (vor ihnen gemacht) läuft mit den Vorgaben und sagt es; ein Remaster `Level_NN` nimmt sie aus der
   Tabelle der Kopie. Die Dateien in `game/` ersetzen nur die eigenen Teile des Levels, Himmel, Partikel, Schatten und
-  die Geräusche eines Laufs: die Dateien der Oberfläche (Menüs, Schrift, Leveltabelle, Menügeräusche) sind immer die
-  der Kopie, und jede Datei wird mit einer Größengrenze gelesen.
+  die Geräusche eines Laufs: die Dateien der Oberfläche (Menüs, Schrift, Leveltabelle, Menügeräusche) kommen nie aus
+  einem Level: sie sind die der Oberfläche (unsere oder die der Kopie), und jede Datei wird mit einer Größengrenze gelesen.
 
 ## Koordinaten
 

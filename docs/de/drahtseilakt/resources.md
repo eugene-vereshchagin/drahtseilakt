@@ -24,20 +24,20 @@ Menüs bei gewählter Oberfläche des Originals, die chinesischen und kyrillisch
 | menu 3D scene | `3D Entities/MenuLevel.nmo` | unsere im offenen Format: `3D Entities/MenuLevel/` |
 | texts in the copy's languages | `3D Entities/Language.nmo` | `Texts/menu.txt`, sieben Sprachen |
 | menu texts, level table defaults | `base.cmo` | geplant |
-| level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | geplant |
-| balls, pieces, shadows | `3D Entities/Balls.nmo` | geplant |
-| transformer animation | `3D Entities/AnimTrafo.nmo` | geplant |
-| modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | geplant |
+| level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | ein Level von uns bringt seine eigenen Einstellungen mit (open-format.md) |
+| balls, pieces, shadows | `3D Entities/Balls.nmo` | unsere im offenen Format: `3D Entities/Balls/` |
+| transformer animation | `3D Entities/AnimTrafo.nmo` | unsere: `3D Entities/AnimTrafo/` |
+| modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | unsere: `3D Entities/PH/<module>/`, jedes Modul des Originals |
 | game font texture | `Textures/Font_1.tga` | Tektur, vom Spiel gerastert |
 | buttons and the points box | `Textures/Button01_special/select/deselect.tga` | unsere, gleiche Namen |
-| ball shadow | `Textures/HardShadow.bmp` | geplant |
-| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | geplant |
-| particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | geplant |
+| ball shadow | `Textures/HardShadow.bmp` | unserer: `Textures/HardShadow.png` |
+| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | unsere für die Buchstaben A, B, C: `Textures/Sky/Sky_<letter>_<face>.png` |
+| particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | unsere, dieselben Namen als `.png` |
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | Klangthemen (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | Klangthemen (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | Klangthemen (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | eigene: in *system* achtzehn Stücke und acht Atmosphären, Music/music.txt gibt jedem Teil einen Pool (Themen 1–3 die ersten neun Stücke, Themen 4 und 5 neun weitere); in *neuro* fünfzehn synthetisierte Phrasen, eine je Teil, eigene Atmosphären und Zielmusik |
-| original levels | `3D Entities/Level/Level_NN.NMO` | geplant |
+| original levels | `3D Entities/Level/Level_NN.NMO` | unsere eigenen Level, `assets/levels/` (levels.md) |
 
 ## Die eigene Oberfläche
 
@@ -81,9 +81,27 @@ sie alle, und solange die eigene Oberfläche gewählt ist, werden die Oberfläch
   den mitgelieferten Schriften gezeichnet.
 
 Die Standard-Highscore-Listen der eigenen Oberfläche sind ebenfalls unsere (zehn Namen, 3000 bis 750 Punkte).
-Weiterhin aus der Kopie, bei jeder Oberfläche: die Standardtasten (DB_Options aus base.cmo; ohne sie Pfeile, Shift und
-Leertaste) und die Teile eines Levels (Kugeln, Partikel, der Schatten der Kugel, Himmel, Module), die spätere Stufen
-ersetzen.
+Weiterhin aus der Kopie, wenn es eine gibt: die Standardtasten (DB_Options aus base.cmo; ohne sie Pfeile, Shift und
+Leertaste).
+
+## Unsere eigenen Teile
+
+Stufe 3 (2026-11-03, decisions.md „Das Spiel läuft ohne Weiteres“): jedes Teil, das ein Level nennen kann, hat ein
+eigenes von uns, im offenen Format unter `assets/own/3D Entities/` (die Module von `PH/`, `Balls/`, `AnimTrafo/`) und
+`assets/own/Textures/` (Himmel, Partikel, der Schatten der Kugel; ein als `.bmp` oder `.tga` verlangtes Bild kann
+unseres als `.png` sein), gemacht von `assets/own/make/make_parts.py` aus nichts als dem Skript. Sie sind nach den
+gemessenen Größen des Originals gemacht: jedes Objekt, das der Code des Spiels nennt (Teile, Gelenkrahmen,
+Flammenframes, die Meshes der Kugeln, deren Boxen die Physik benutzt), hat die gemessene Lage, jedes Kollisionsmesh
+die gemessenen Maße als eigene Form (ein Quader, ein Pyramidenstumpf, ein Prisma, ein Ellipsoid), und die physikalischen
+Werte (Massen, Reibungen, Gelenke, Kräfte) sind die des Spiels, unverändert (crates/game/src/modules.rs); nur das
+Aussehen ist neu. `crates/game/src/partcheck.rs` fährt jedes Modul der Level 1 bis 12 mit dem Teil der Kopie und mit
+unserem vom selben Start mit derselben Eingabe und vergleicht die Wege.
+
+Ein Level nimmt zuerst unsere Teile, wenn es neuer Inhalt ist (ein Level im offenen Format, nicht aus einer `.nmo`
+umgewandelt: kein `source_hash` in seinen Einstellungen), es spielt also mit und ohne Kopie gleich; ein Level der
+Kopie, eine Community-Karte oder ein umgewandeltes Level oder Remaster nimmt zuerst die der Kopie, wie es gemacht
+wurde, und unsere für das, was der Kopie fehlt (ohne Kopie unsere). Der eigene `game/`-Ordner eines Levels kommt vor
+beiden.
 
 Eigenes kommt in Stufen: Oberfläche (Schriften, Knöpfe, Punktekasten, Lebenskugeln, Texte, Menüszene), dann Kugeln,
 Himmel, Partikel und Klänge (aus offenen Bibliotheken), Musik im Stil eines Mahjong-Spiels mit chinesischen

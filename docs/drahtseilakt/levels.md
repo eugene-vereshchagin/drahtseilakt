@@ -48,12 +48,23 @@ folders to open.
   and macOS (no reserved names, no trailing dots or spaces, at most 40 characters, a second "Hello Mars" numbered
   "(2)"); the source is only read. A second run adds only what is new.
 
+## Levels shipped with the game
+
+Our own levels come with the game in its `assets/levels/`, a folder per level in the open format, made of our own
+parts only (assets/own, [resources.md](resources.md)), so they play with no copy of the original at all. The menu
+shows them with the open-format levels of `levels/open/`: under Start when there is no copy (the list "Our levels"),
+under the extended mode's "Open format" always. They are made by scripts in `assets/own/make/` (`levelkit.py` builds
+a level from track pieces and the stand-ins of the parts; `make_test_level.py` the first one, `Parts_Test`, a few
+hundred units of track with every part on it or beside it), whose outputs are committed. Their licence is the
+game's (GPL-3.0-only).
+
 ## The original game: copied by default
 
 The game copies what it needs from the player's own copy into `levels/original/` once: from an installed game
 (`drahtseilakt --import <Ballance folder>`) or straight from the game's CD or its image
 (`drahtseilakt --import Ballance.cue`, or `.bin`, `.iso`: the InstallShield 6 archive in `SETUP/`, read by
-`crates/cdimage`). A start without the game opens a window that does the same: it lists what it finds on the
+`crates/cdimage`). The copy is optional (decisions.md, "The game plays out of the box"): without one the game starts
+with its own levels, and the main menu's **Import** opens a window that does the same: it lists what it finds on the
 computer (installed games in the usual folders of Windows, Wine, GOG, Heroic and Lutris; discs in their drives; CD
 images in the home, Desktop and Downloads folders), takes a folder or image dropped on it or a path typed, and starts
 the game with the copy. The

@@ -28,16 +28,19 @@ mod tests {
         at: Vec3,
         ticks: u64,
         input: &dyn Fn(u64) -> u8,
-    ) -> (Vec<Vec3>, Vec<Vec<Vec3>>) {
+    ) -> (Vec<Vec3>, Vec<Vec<Vec3>>, Option<u64>) {
         let modules = crate::scene::load_modules(level, data);
         let mut sim = Sim::with_modules(level, ball, &modules, false);
         if let Some(balls) = data.part("3D Entities/Balls.nmo") {
             sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);
         }
         sim.start_from(sector, Some(ball), Some(at));
-        let (mut way, mut parts) = (Vec::new(), Vec::new());
+        let (mut way, mut parts, mut finished) = (Vec::new(), Vec::new(), None);
         for t in 0..ticks {
             sim.step(input(t));
+            if sim.finished && finished.is_none() {
+                finished = Some(t);
+            }
             way.push(sim.ball.position);
             parts.push(
                 sim.module_bodies()
@@ -46,7 +49,7 @@ mod tests {
                     .collect(),
             );
         }
-        (way, parts)
+        (way, parts, finished)
     }
 
     /// The shipped test level, with no copy and nothing in the player's folders: it loads, every part it names is
@@ -62,6 +65,8 @@ mod tests {
         let modules = crate::scene::load_modules(&level, &data);
         let named: std::collections::BTreeSet<String> = (0..level.objects.len())
             .filter_map(|i| crate::scene::module_of(&level, i).map(str::to_owned))
+            // a reset point's stand-in names no part (the original has none either)
+            .filter(|n| !n.starts_with("PR_"))
             .collect();
         let missing: Vec<&String> = named.iter().filter(|n| modules.get(n).is_none()).collect();
         assert!(
@@ -92,7 +97,15 @@ mod tests {
             sim.ball.position,
             sim.sector + 1
         );
-        assert_eq!(sim.lives, 3, "no ball lost on the way");
+        println!(
+            "finished at tick {} ({:.1} s), the balls {kinds:?}",
+            sim.tick,
+            sim.tick as f32 / 60.0
+        );
+        assert_eq!(
+            sim.lives, 4,
+            "the extra life on the way taken, no ball lost"
+        );
         assert_eq!(
             kinds,
             [
@@ -153,8 +166,8 @@ mod tests {
                 let at = Vec3::from(level.objects[i].position()) + Vec3::Y * 6.0;
                 for ball in [BallKind::Wood, BallKind::Stone] {
                     let push = |t: u64| if t < 60 { input::UP } else { 0 };
-                    let (wa, pa) = run(&level, &copy, sector, ball, at, 300, &push);
-                    let (wb, pb) = run(&level, &ours, sector, ball, at, 300, &push);
+                    let (wa, pa, fa) = run(&level, &copy, sector, ball, at, 300, &push);
+                    let (wb, pb, fb) = run(&level, &ours, sector, ball, at, 300, &push);
                     let ball_2s = apart(&wa, &wb, 120);
                     let ball_5s = apart(&wa, &wb, 300);
                     let parts_2s = pa
@@ -168,6 +181,9 @@ mod tests {
                         "level {n:2} {name:12} {ball:?}: ball {ball_2s:.3} (2 s) {ball_5s:.3} (5 s), parts {parts_2s:.3} \
                          (2 s){}",
                         if same_count { "" } else { ", NOT the same parts" }
+                    ) + &format!(
+                        ", apart from tick {:?}, finished {fa:?} / {fb:?}",
+                        wa.iter().zip(&wb).position(|(p, q)| p.distance(*q) > 0.1)
                     ));
                     let score = if same_count {
                         ball_2s.max(parts_2s)

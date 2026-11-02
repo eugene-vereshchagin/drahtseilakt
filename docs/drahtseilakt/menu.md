@@ -13,6 +13,7 @@ English, Spanish, Italian and French; `GameSettings.Language` chooses the column
 | Screen | Lines, top to bottom | Notes |
 |---|---|---|
 | Main (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit asks "Do you want to quit the game?" (Yes / No) |
+| Main without a copy (ours) | Start, Import, Highscore, Options, Credits, Exit | Start lists "Our levels" (the shipped ones and `levels/open/`); Import opens the window that brings in the player's copy, then the game starts again with it (decisions.md, "The game plays out of the box") |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | a level is playable once the one before it is finished (`DB_Levelfreischaltung`); the others are grey. The level 13 add-on replaces Menu.nmo and adds its line |
 | Highscore (`Menu_Highscore`) | "Highscore Level N", ten names with points, Back; left and right change the level | the copy's defaults are the arrays `DB_Highscore_LvNN` in base.cmo ("Mr. Default") |
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | ours adds Language and Extended before Back |
