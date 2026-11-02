@@ -422,7 +422,19 @@ impl Audio {
             volumes: [1.0; 2],
         }));
         let m = mixer.clone();
-        let err = |e| eprintln!("sound: {e}");
+        // The stream reports its errors from the audio thread; some backends repeat one many times a second (ALSA over
+        // PipeWire at start), so only the 1st, 10th, 100th ... of them are printed.
+        let errors = std::sync::atomic::AtomicU64::new(0);
+        let err = move |e| {
+            let n = errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed).saturating_add(1);
+            let mut k = n;
+            while k >= 10 && k % 10 == 0 {
+                k /= 10;
+            }
+            if k == 1 {
+                eprintln!("sound: {e} (error {n} of the output stream)");
+            }
+        };
         let stream = match config.sample_format() {
             cpal::SampleFormat::F32 => device.build_output_stream(
                 config.config(),
