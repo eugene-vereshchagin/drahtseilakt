@@ -2261,11 +2261,15 @@ impl App {
             let replay = self.game.replay_in.as_ref();
             let seed = replay.map_or_else(|| now() as u64, |r| r.level_hash ^ r.end.rotate_left(32));
             self.music = Some(Music::new(self.game.music_theme, self.game.last_level, seed, sim.tick));
+            // the sounds' picks from the same seed, their pools' other files decoded ahead
+            audio.seed_sounds(seed.rotate_left(29) ^ 0x5851_f42d_4c95_7f2d);
+            audio.preload_sound_pools(&self.data);
         }
         if let Some(m) = &mut self.music {
-            // what may play next decoded ahead (our pieces are long), then the music's frame
+            // what may play next decoded ahead (our pieces are long), then the music's frame; the rest let go
             audio.preload(&self.data, &m.upcoming());
             m.frame(sim, audio, &self.data);
+            audio.keep_music(&m.keep());
         }
         // the start sound once a run: a frame may take more than one tick (the first after a level loaded does), so
         // it is not looked for on tick 1 alone

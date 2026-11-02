@@ -119,7 +119,8 @@ The music has its own volume setting. How a level plays it (as the original's mu
 The atmosphere and the theme play at the same time, each with its own pauses, so the atmosphere should be very quiet
 and calm. The original's theme parts are short phrases; longer pieces work too (*system*'s are whole tracks of up to
 100 s at about −17 LUFS), but each piece is held decoded in memory while a level plays (about 35 MB for 100 s of
-stereo), so keep them under two minutes or so. `Music_Highscore` (the original's 2 s jingle) is accepted but not
+stereo), so keep them under two minutes or so. At most 384 MB of decoded music is held at once; a piece
+that would go over it, or that cannot be decoded, is left out of its pool for the run and another one plays. `Music_Highscore` (the original's 2 s jingle) is accepted but not
 played yet.
 
 ## Pools: several files for one role
@@ -152,7 +153,7 @@ Music_Final fanfare_a.ogg fanfare_b.ogg
 
 The tables are read as untrusted files (themes are shared by strangers) and checked strictly:
 
-- at most 16 KiB and 512 lines, in UTF-8; a table over these or not UTF-8 is ignored whole;
+- at most 16 KiB and 512 lines, in UTF-8 (a byte order mark at the start is allowed); a table over these or not UTF-8 is ignored whole;
 - file names are plain names ending in `.ogg` or `.wav` (letters, digits, `_`, `-`, `.`, not beginning with a dot): no
   folders, paths or drive letters. A line naming anything else is passed over whole;
 - a role the game does not know is ignored; at most 16 files per role and 256 roles;

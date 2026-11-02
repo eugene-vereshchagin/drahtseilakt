@@ -124,6 +124,7 @@ fn read_theme_txt(path: &Path) -> (Vec<(String, String)>, Option<String>) {
     }
     let mut names = Vec::new();
     let mut fallback = None;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
     for line in text.lines().filter(|l| !l.starts_with('#')).take(64) {
         let Some((k, v)) = line.split_once(' ') else {
             continue;
@@ -355,7 +356,7 @@ const MAX_ROLES: usize = 256;
 
 /// The music roles beyond the parts a level plays, and the sounds the game plays or the original has (a table may
 /// name them; any other name is ignored with a note).
-const KNOWN_SOUNDS: &[&str] = &[
+pub const KNOWN_SOUNDS: &[&str] = &[
     "Misc_StartLevel",
     "Misc_Checkpoint",
     "Misc_Fall",
@@ -449,6 +450,8 @@ pub fn parse_table(bytes: &[u8]) -> Table {
         t.notes.push("not UTF-8: not read".to_owned());
         return t;
     };
+    // a byte order mark, as some editors write at the start, is not part of the first role's name
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     if text.lines().count() > MAX_TABLE_LINES {
         t.notes
             .push(format!("more than {MAX_TABLE_LINES} lines: not read"));
@@ -502,6 +505,10 @@ pub fn parse_table(bytes: &[u8]) -> Table {
                 }
             }
             t.roles.push((role.to_owned(), pool));
+        } else {
+            t.notes.push(format!(
+                "line {n}: more than {MAX_ROLES} roles: {role} ignored"
+            ));
         }
     }
     t
@@ -678,6 +685,13 @@ mod tests {
         assert_eq!(pool("Music_Atmo"), ["d.ogg"]);
         assert_eq!(pool("Music_Theme_4"), ["e.ogg"]);
         assert_eq!(pool("Hit_Wood_Wood"), ["h1.ogg", "h2.ogg"]);
+        // a byte order mark at the start is no part of the first role
+        let bom = parse_table("\u{feff}Music_Final f.ogg\n".as_bytes());
+        assert!(bom.notes.is_empty(), "{:?}", bom.notes);
+        assert_eq!(
+            bom.roles,
+            [("Music_Final".to_owned(), vec!["f.ogg".to_owned()])]
+        );
         assert_eq!(t.roles.len(), 5);
     }
 
@@ -709,6 +723,14 @@ mod tests {
         assert!(parse_table(long.as_bytes()).roles.is_empty());
         assert!(parse_table(b"Music_Final a.ogg\n\xff\xfe").roles.is_empty());
         assert_eq!(parse_table(b""), Table::default());
+        // roles past the cap are ignored with a note: the theme's known roles are fewer, so they repeat in case
+        let roles: String = (1..=99)
+            .flat_map(|n| (1..=3).map(move |k| format!("Music_Theme_{n}_{k} a.ogg\n")))
+            .collect();
+        let t = parse_table(roles.as_bytes());
+        assert_eq!(t.roles.len(), MAX_ROLES);
+        assert_eq!(t.notes.len(), 297 - 256, "{:?}", t.notes.first());
+        assert!(t.notes.iter().all(|n| n.contains("more than 256 roles")));
     }
 
     #[test]

@@ -88,27 +88,20 @@ fn theme_pool(role: &str) -> Vec<PathBuf> {
     gamedata::sound_themes::pool(role)
 }
 
-/// One of the music's random players (Music_Atmo, Music_Theme): it waits a random pause of up to `pause` seconds,
-/// plays one of its tracks, and waits again when the track has ended.
-struct Player {
-    pause: f64,
-    wait_until: Option<f64>,
-    playing: Option<u64>,
+/// A pool of tracks to play one after another at random: the next one is chosen ahead (so that it can be decoded
+/// ahead), never the one played last when there is another; a track that cannot be decoded is dropped from it.
+struct Pool {
     tracks: Vec<String>,
-    /// The track it plays next (chosen ahead, so that it can be decoded ahead), and the one it played last.
     next: Option<usize>,
     last: Option<usize>,
     rng: Rng,
 }
 
-impl Player {
-    fn new(pause: f64, tracks: Vec<String>, seed: u64) -> Player {
+impl Pool {
+    fn new(tracks: Vec<String>, seed: u64) -> Pool {
         let mut rng = Rng::new(seed);
         let next = (!tracks.is_empty()).then(|| pick(&mut rng, tracks.len(), None));
-        Player {
-            pause,
-            wait_until: None,
-            playing: None,
+        Pool {
             tracks,
             next,
             last: None,
@@ -119,6 +112,61 @@ impl Player {
     fn upcoming(&self) -> Option<&String> {
         self.tracks.get(self.next?)
     }
+
+    /// The next track has begun: the one after it is chosen.
+    fn played(&mut self) {
+        self.last = self.next;
+        self.next =
+            (!self.tracks.is_empty()).then(|| pick(&mut self.rng, self.tracks.len(), self.last));
+    }
+
+    /// Drops the next track while it could not be decoded (broken, missing, over the music budget) and chooses
+    /// another, so that one bad file never silences the pool.
+    fn drop_failed(&mut self, failed: &mut dyn FnMut(&str) -> bool) {
+        while let Some(k) = self.next {
+            match self.tracks.get(k) {
+                Some(t) if failed(t) => {}
+                Some(_) => return,
+                None => {
+                    self.next = None;
+                    return;
+                }
+            }
+            self.tracks.remove(k);
+            self.last = match self.last {
+                Some(l) if l == k => None,
+                Some(l) if l > k => Some(l.saturating_sub(1)),
+                l => l,
+            };
+            self.next = (!self.tracks.is_empty())
+                .then(|| pick(&mut self.rng, self.tracks.len(), self.last));
+        }
+    }
+
+    /// The track playing (the one last begun).
+    fn current(&self) -> Option<&String> {
+        self.tracks.get(self.last?)
+    }
+}
+
+/// One of the music's random players (Music_Atmo, Music_Theme): it waits a random pause of up to `pause` seconds,
+/// plays one of its tracks, and waits again when the track has ended.
+struct Player {
+    pause: f64,
+    wait_until: Option<f64>,
+    playing: Option<u64>,
+    pool: Pool,
+}
+
+impl Player {
+    fn new(pause: f64, tracks: Vec<String>, seed: u64) -> Player {
+        Player {
+            pause,
+            wait_until: None,
+            playing: None,
+            pool: Pool::new(tracks, seed),
+        }
+    }
 }
 
 pub struct Music {
@@ -128,10 +176,12 @@ pub struct Music {
     atmo: Player,
     themes: Player,
     end_loop: Option<u64>,
+    /// The end loop's pool and the finish music's (one of each plays).
+    end: Pool,
+    fin: Pool,
+    /// The run is finished: the other music has stopped, the finish music is waited for (while it is decoded).
+    finishing: bool,
     finished: bool,
-    /// The end loop's track and the finish music's, picked from their pools.
-    end_track: Option<String>,
-    final_track: Option<String>,
 }
 
 /// Seconds before the theme's first pause begins, and the longest random pauses.
@@ -194,46 +244,56 @@ impl Music {
                 pool,
             )
         });
-        // each player its own generator: the order each plays in follows from the seed alone
-        let mut rng = Rng::new(seed);
-        let mut one = |role: &str| {
-            let tracks = candidates(&[role.to_owned()], pool);
-            let k = pick(&mut rng, tracks.len(), None);
-            tracks.into_iter().nth(k)
-        };
-        let end_track = one("Music_EndCheckpoint");
-        let final_track = one(if last_level {
-            "Music_LastFinal"
-        } else {
-            "Music_Final"
-        });
+        // each pool its own generator: the order each plays in follows from the seed alone
+        let fin = candidates(
+            &[if last_level {
+                "Music_LastFinal"
+            } else {
+                "Music_Final"
+            }
+            .to_owned()],
+            pool,
+        );
         let mut m = Music {
             began: tick,
             theme,
             atmo: Player::new(ATMO_PAUSE, atmo, seed ^ 0x9e37_79b9_7f4a_7c15),
             themes: Player::new(THEME_PAUSE, themes, seed ^ 0xc2b2_ae3d_27d4_eb4f),
             end_loop: None,
+            end: Pool::new(candidates(&["Music_EndCheckpoint".to_owned()], pool), seed),
+            fin: Pool::new(fin, seed.rotate_left(17)),
+            finishing: false,
             finished: false,
-            end_track,
-            final_track,
         };
-        m.atmo.wait_until = Some(m.atmo.rng.next() * ATMO_PAUSE);
-        m.themes.wait_until = Some(THEME_FROM + m.themes.rng.next() * THEME_PAUSE);
+        m.atmo.wait_until = Some(m.atmo.pool.rng.next() * ATMO_PAUSE);
+        m.themes.wait_until = Some(THEME_FROM + m.themes.pool.rng.next() * THEME_PAUSE);
         m
     }
 
     /// What may play next, to be decoded ahead: each player's next track, the end loop and the finish music.
     pub fn upcoming(&self) -> Vec<String> {
         [
-            self.atmo.upcoming(),
-            self.themes.upcoming(),
-            self.end_track.as_ref(),
-            self.final_track.as_ref(),
+            self.atmo.pool.upcoming(),
+            self.themes.pool.upcoming(),
+            self.end.upcoming(),
+            self.fin.upcoming(),
         ]
         .into_iter()
         .flatten()
         .cloned()
         .collect()
+    }
+
+    /// The music to keep decoded: what may play next and what plays now (the rest may be let go).
+    pub fn keep(&self) -> Vec<String> {
+        let mut v = self.upcoming();
+        let playing = [
+            self.atmo.playing.and(self.atmo.pool.current()),
+            self.themes.playing.and(self.themes.pool.current()),
+            self.end_loop.and(self.end.upcoming()),
+        ];
+        v.extend(playing.into_iter().flatten().cloned());
+        v
     }
 
     /// Starts a player's next track when its pause is over, and begins its next pause when its track has ended.
@@ -245,16 +305,17 @@ impl Music {
         };
         if p.playing.is_some_and(|id| !audio.is_playing(id)) {
             p.playing = None;
-            p.wait_until = Some(now + p.rng.next() * p.pause);
+            p.wait_until = Some(now + p.pool.rng.next() * p.pause);
         }
         if p.playing.is_none() && p.wait_until.is_some_and(|t| now >= t) {
-            let Some(k) = p.next else { return };
-            let Some(track) = p.tracks.get(k) else { return };
+            p.pool.drop_failed(&mut |t| audio.failed(t));
+            let Some(track) = p.pool.upcoming() else {
+                return;
+            };
             p.playing = audio.play_music(data, track);
-            // a track not there (or still being decoded) is tried again a little later
+            // a track still being decoded is tried again a little later
             p.wait_until = if p.playing.is_some() {
-                p.last = Some(k);
-                p.next = Some(pick(&mut p.rng, p.tracks.len(), p.last));
+                p.pool.played();
                 None
             } else {
                 Some(now + RETRY)
@@ -267,10 +328,21 @@ impl Music {
         if self.finished {
             return;
         }
-        if sim.finished {
-            self.stop(audio);
-            if let Some(track) = &self.final_track {
-                audio.play_music(data, track);
+        if sim.finished || self.finishing {
+            if !self.finishing {
+                self.stop(audio);
+                self.finished = false;
+                self.finishing = true;
+            }
+            // the finish music once, as soon as it is decoded (another of its pool if it cannot be)
+            self.fin.drop_failed(&mut |t| audio.failed(t));
+            match self.fin.upcoming() {
+                Some(t) if audio.pending(t) => {}
+                Some(t) => {
+                    audio.play_music(data, t);
+                    self.finished = true;
+                }
+                None => self.finished = true,
             }
             return;
         }
@@ -289,7 +361,8 @@ impl Music {
         }
         match (near_end(sim), self.end_loop) {
             (true, None) => {
-                if let Some(track) = &self.end_track {
+                self.end.drop_failed(&mut |t| audio.failed(t));
+                if let Some(track) = self.end.upcoming() {
                     self.end_loop = audio.play_music_loop(data, track);
                 }
             }
@@ -342,7 +415,7 @@ mod tests {
     fn a_player_chooses_among_every_track_of_its_parts_and_group() {
         let m = Music::with_pools(Some(4), false, 7, 0, &pools);
         assert_eq!(
-            m.atmo.tracks,
+            m.atmo.pool.tracks,
             [
                 "Music_Atmo",
                 "Music_Atmo#1",
@@ -351,27 +424,23 @@ mod tests {
             ]
         );
         assert_eq!(
-            m.themes.tracks,
+            m.themes.pool.tracks,
             ["Music_Theme_4_1", "Music_Theme_4_1#1", "Music_Theme_4_3"]
         );
-        assert_eq!(m.end_track.as_deref(), Some("Music_EndCheckpoint"));
-        assert!(matches!(
-            m.final_track.as_deref(),
-            Some("Music_Final" | "Music_Final#1")
-        ));
+        assert_eq!(m.end.tracks, ["Music_EndCheckpoint"]);
+        assert_eq!(m.fin.tracks, ["Music_Final", "Music_Final#1"]);
         let none = Music::with_pools(None, true, 7, 0, &pools);
-        assert!(none.themes.tracks.is_empty() && none.final_track.is_none());
+        assert!(none.themes.pool.tracks.is_empty() && none.fin.upcoming().is_none());
         assert_eq!(none.upcoming().len(), 2, "an atmosphere and the end loop");
     }
 
-    /// The order a player plays its tracks in, as `run` advances it.
+    /// The order a pool plays its tracks in.
     fn order(seed: u64, n: usize) -> Vec<usize> {
-        let mut p = Player::new(1.0, (0..4).map(|k| key("Music_Atmo", k)).collect(), seed);
+        let mut p = Pool::new((0..4).map(|k| key("Music_Atmo", k)).collect(), seed);
         (0..n)
             .map(|_| {
                 let k = p.next.unwrap();
-                p.last = Some(k);
-                p.next = Some(pick(&mut p.rng, p.tracks.len(), p.last));
+                p.played();
                 k
             })
             .collect()
@@ -395,6 +464,33 @@ mod tests {
         assert_eq!(pick(&mut rng, 0, None), 0);
         for _ in 0..1000 {
             assert!(pick(&mut rng, 3, Some(9)) < 3);
+        }
+    }
+
+    #[test]
+    fn a_track_that_cannot_be_decoded_is_dropped_and_another_plays() {
+        let tracks = || (0..3).map(|k| key("Music_Atmo", k)).collect::<Vec<_>>();
+        for seed in 1..50 {
+            let mut p = Pool::new(tracks(), seed);
+            p.played();
+            let playing = p.current().cloned().unwrap();
+            let bad = p.upcoming().cloned().unwrap();
+            p.drop_failed(&mut |t| t == bad);
+            // the broken one is gone, and the next is neither it nor the one just played
+            assert_eq!(p.tracks.len(), 2);
+            let next = p.upcoming().cloned().unwrap();
+            assert!(next != bad && next != playing, "seed {seed}: {next}");
+            assert_eq!(p.current(), Some(&playing));
+            // every track broken: the pool is silent, never stuck or out of range
+            p.drop_failed(&mut |_| true);
+            assert!(p.tracks.is_empty() && p.upcoming().is_none() && p.next.is_none());
+        }
+        // the next pick never repeats the track just begun
+        let mut p = Pool::new(tracks(), 3);
+        for _ in 0..20 {
+            let before = p.upcoming().cloned();
+            p.played();
+            assert_ne!(p.upcoming().cloned(), before);
         }
     }
 }

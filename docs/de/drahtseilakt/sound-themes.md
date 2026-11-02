@@ -122,7 +122,9 @@ Die Musik hat eine eigene Lautstärkeeinstellung. Wie ein Level sie spielt (wie 
 Atmosphäre und Thema spielen gleichzeitig, jedes mit eigenen Pausen, daher sollte die Atmosphäre sehr leise und ruhig
 sein. Die Thementeile des Originals sind kurze Phrasen; längere Stücke gehen auch (die von *system* sind ganze Stücke bis
 100 s bei etwa −17 LUFS), aber jedes Stück liegt während eines Levels dekodiert im Speicher (etwa 35 MB für 100 s
-Stereo), also besser unter etwa zwei Minuten. `Music_Highscore` (der 2-s-Jingle des Originals) wird angenommen, aber
+Stereo), also besser unter etwa zwei Minuten. Höchstens 384 MB dekodierte
+Musik werden zugleich gehalten; ein Stück darüber oder eines, das sich nicht dekodieren lässt, fällt für den Lauf aus
+seinem Pool, und ein anderes spielt. `Music_Highscore` (der 2-s-Jingle des Originals) wird angenommen, aber
 noch nicht gespielt.
 
 ## Pools: mehrere Dateien für eine Rolle
@@ -158,7 +160,7 @@ Music_Final fanfare_a.ogg fanfare_b.ogg
 
 Die Tabellen werden als nicht vertrauenswürdige Dateien gelesen (Themen werden von Fremden geteilt) und streng geprüft:
 
-- höchstens 16 KiB und 512 Zeilen, in UTF-8; eine größere oder nicht-UTF-8-Tabelle wird ganz übergangen;
+- höchstens 16 KiB und 512 Zeilen, in UTF-8 (eine Byte-Order-Mark am Anfang ist erlaubt); eine größere oder nicht-UTF-8-Tabelle wird ganz übergangen;
 - Dateinamen sind einfache Namen mit `.ogg` oder `.wav` am Ende (Buchstaben, Ziffern, `_`, `-`, `.`, nicht mit einem
   Punkt am Anfang): keine Ordner, Pfade oder Laufwerksbuchstaben. Eine Zeile, die etwas anderes nennt, wird ganz
   übergangen;
