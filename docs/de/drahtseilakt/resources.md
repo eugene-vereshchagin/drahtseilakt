@@ -67,6 +67,13 @@ sie alle, und solange die eigene Oberfläche gewählt ist, werden die Oberfläch
   jedes Element und jeder Bildschirm kommt (Überlappung der Lab-Farbhistogramme, SSIM der unscharfen Helligkeit und der
   Kantenbilder); `scores.md` hält die Werte fest. Nichts vom Original ist kopiert, nachgezeichnet oder neu abgetastet,
   seine Bilder kommen nie ins Repository.
+- **Fototexturen** (Version 3 der Menüszene, 2026-11-03): ihr Beton (Böden, Block, Säulen), die Ziegelränder, die
+  hölzerne Rampe und Kiste und das Eisen (Manschetten, Sockel, Laternenstützen) entstehen aus frei lizenzierten
+  Fototexturen (CC0, ambientCG), von `make_menu_scene.py` auf die gemessene Palette und Körnung der Originaltexturen in
+  denselben Rollen abgestimmt, mit ihren Normal Maps. `assets/own/make/free_textures.py` legt jedes Quellarchiv mit
+  seinem SHA-256 fest (`fetch` lädt fehlende herunter, nichts wird entpackt oder ausgeführt); die Quellen werden nicht
+  mitgeliefert, die daraus gemachten Texturen schon. Quellen, Autoren und Lizenzen: `assets/own/CREDITS.md`;
+  Prüfsummen der mitgelieferten Dateien: `assets/own/SHA256SUMS`.
 - **Schrift**: Tektur (SIL OFL, `assets/fonts/Tektur-Variable.ttf`, Version und Prüfsumme in `assets/fonts/README.md`),
   eine eckige technische Schrift, im Charakter nahe an der breiten Menüschrift des Originals; Kleinbuchstaben als
   Kapitälchen, verbreitert und gesperrt nach den gemessenen Proportionen des Originals (Breite der Beschriftungen

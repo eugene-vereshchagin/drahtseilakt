@@ -14,7 +14,8 @@ those first and these for what they lack. Sounds and music are not here: they ar
   Italian (built into the game).
 - `make/make_interface.py`: draws the textures (`python3 -I assets/own/make/make_interface.py`, needs numpy and
   Pillow); `make/make_menu_scene.py` builds the menu scene the same way. Their outputs are committed so the build
-  needs no Python. Change a script, run it, commit both.
+  needs no Python. Change a script, run it, commit both. The menu scene's concrete, brick, wood and iron come from
+  CC0 photo textures (`make/free_textures.py`: pinned, checksummed; `CREDITS.md`; `SHA256SUMS` for the shipped files).
 - `make/metric.py`: scores how close each element and screen comes to the original's (measured from the player's
   copy, never stored); `make/scores.md` is its latest report (how to make the comparison screenshots: its docstring
   and docs/drahtseilakt/menu.md, `DRAHTSEILAKT_SHOT_MENU`).

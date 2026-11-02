@@ -1073,7 +1073,6 @@ impl Menu {
             }
             Screen::Credits => [
                 "Drahtseilakt by Veresk",
-                "",
                 "Ballance by Cyparade / Atari 2004",
                 "Started as a fork of OpenBallance by emdzej",
                 "Physics: IVP, ported from OpenBallance",
@@ -1083,6 +1082,7 @@ impl Menu {
                 "juskiddink, botpl (CC-BY), neolein, Tozan (CC0)",
                 "Sounds: Kenney, freesound and OpenGameArt authors",
                 "(CC0, CC-BY): assets/sounds/system/CREDITS.md",
+                "Textures: ambientCG.com (CC0), thank you",
             ]
             .iter()
             .map(|l| ((*l).to_owned(), String::new()))

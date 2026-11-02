@@ -66,6 +66,12 @@ interface files are not even read while the own interface is in use.
   ours is drawn to those numbers, and `metric.py` scores how close each element and each screen comes (Lab colour
   histogram overlap, SSIM of the blurred lightness and of the edge maps); `scores.md` keeps the scores. Nothing of
   the original is copied, traced or resampled, and its pictures never enter the repository.
+- **Photo textures** (version 3 of the menu scene, 2026-11-03): its concrete (floors, block, columns), brick borders,
+  wooden ramp and crate and iron (collars, plinths, lantern posts) are made from freely licensed photo textures (CC0,
+  ambientCG), graded by `make_menu_scene.py` to the measured palette and grain of the original's textures in those
+  roles, with their normal maps. `assets/own/make/free_textures.py` pins each source archive by its SHA-256 (`fetch`
+  downloads the missing ones, nothing is extracted or run); the sources are not shipped, the textures made from them
+  are. Sources, authors and licences: `assets/own/CREDITS.md`; checksums of the shipped files: `assets/own/SHA256SUMS`.
 - **Font**: Tektur (SIL OFL, `assets/fonts/Tektur-Variable.ttf`, pinned and checksummed in `assets/fonts/README.md`),
   a squared technical face close in feel to the original's wide menu font, drawn with small capitals for the lower
   case, widened and spaced to the original's measured proportions (its labels' widths within 2 %). What it lacks comes from Noto Sans, Chinese from Noto Sans SC.
