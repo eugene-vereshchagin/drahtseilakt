@@ -29,6 +29,7 @@ export default defineConfig({
               text: "Drahtseilakt",
               items: [
                 { text: "История", link: "/ru/drahtseilakt/history" },
+                { text: "В цифрах", link: "/ru/drahtseilakt/stats" },
                 { text: "План работ", link: "/ru/drahtseilakt/roadmap" },
                 { text: "Решения", link: "/ru/drahtseilakt/decisions" },
                 { text: "Меню", link: "/ru/drahtseilakt/menu" },
@@ -68,6 +69,7 @@ export default defineConfig({
               text: "Drahtseilakt",
               items: [
                 { text: "Geschichte", link: "/de/drahtseilakt/history" },
+                { text: "In Zahlen", link: "/de/drahtseilakt/stats" },
                 { text: "Fahrplan", link: "/de/drahtseilakt/roadmap" },
                 { text: "Entscheidungen", link: "/de/drahtseilakt/decisions" },
                 { text: "Menüs", link: "/de/drahtseilakt/menu" },
@@ -107,6 +109,7 @@ export default defineConfig({
               text: "Drahtseilakt",
               items: [
                 { text: "历史", link: "/zh/drahtseilakt/history" },
+                { text: "数字", link: "/zh/drahtseilakt/stats" },
                 { text: "路线图", link: "/zh/drahtseilakt/roadmap" },
                 { text: "决定", link: "/zh/drahtseilakt/decisions" },
                 { text: "菜单", link: "/zh/drahtseilakt/menu" },
@@ -192,6 +195,7 @@ export default defineConfig({
           text: "Drahtseilakt",
           items: [
             { text: "History", link: "/drahtseilakt/history" },
+            { text: "By the numbers", link: "/drahtseilakt/stats" },
             { text: "Roadmap", link: "/drahtseilakt/roadmap" },
             { text: "Decisions", link: "/drahtseilakt/decisions" },
             { text: "Menus", link: "/drahtseilakt/menu" },
