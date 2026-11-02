@@ -48,7 +48,11 @@ A folder holding:
   files — `music` (theme 1 to 1000), `light` (three numbers 0..1), `level_bonus` (points), `tutorial` and
   `last_level` (true or false: the original's first and last level), and `source_hash` (16 hex digits: the FNV-1a of
   the `.nmo` it was converted from). A replay recorded on that file plays on the converted level (the same level, so
-  the same run); malformed settings refuse the level.
+  the same run); malformed settings refuse the level. Any level can name any hash, so a replay that plays on it is
+  no proof of a run on the original. A level without settings (made before they were kept) plays with the defaults
+  and says so; a remastered `Level_NN` takes them from the copy's table instead. The game files of `game/` stand in
+  only for the level's own parts, sky, particles, shadow and a run's sounds: the interface's files (menus, font, the
+  level table, menu sounds) are always the copy's, and every file read is capped.
 
 ## Coordinates
 

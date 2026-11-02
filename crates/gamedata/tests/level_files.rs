@@ -172,3 +172,86 @@ fn a_game_file_is_copied_in_never_through_a_link() {
     );
     let _ = std::fs::remove_dir_all(&r);
 }
+
+#[test]
+fn a_level_folder_never_stands_in_for_the_interface() {
+    let r = root("interface");
+    let (copy, level) = (r.join("copy"), r.join("level"));
+    for rel in [
+        "3D Entities/Menu.nmo",
+        "3D Entities/Levelinit.nmo",
+        "3D Entities/Language.nmo",
+        "Sounds/Menu_click.wav",
+        "Sounds/Hit.wav",
+        "3D Entities/PH/P_Box.nmo",
+        "Textures/Sky/Sky_A_Front.bmp",
+    ] {
+        for (base, what) in [(&copy, "copy"), (&level.join("game"), "level")] {
+            let p = base.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(&p, what).unwrap();
+        }
+    }
+    let data = Data {
+        root: copy,
+        overlay: None,
+    }
+    .for_level(Some(&level));
+    let from = |rel: &str| std::fs::read(data.file(rel).unwrap()).unwrap();
+    // the interface's files are the copy's, whatever a level folder holds
+    for rel in [
+        "3D Entities/Menu.nmo",
+        "3D Entities/Levelinit.nmo",
+        "3D Entities/Language.nmo",
+        "Sounds/Menu_click.wav",
+    ] {
+        assert_eq!(from(rel), b"copy", "{rel}");
+    }
+    // the level's own parts, sky and sounds are its own
+    for rel in [
+        "Sounds/Hit.wav",
+        "3D Entities/PH/P_Box.nmo",
+        "Textures/Sky/Sky_A_Front.bmp",
+    ] {
+        assert_eq!(from(rel), b"level", "{rel}");
+    }
+    let _ = std::fs::remove_dir_all(&r);
+}
+
+#[test]
+fn an_open_level_without_settings_says_so() {
+    let r = root("settings");
+    let (copy, level) = (r.join("copy"), r.join("Somewhere"));
+    std::fs::create_dir_all(&copy).unwrap();
+    level::open::export(&level::Level::default(), &level).unwrap();
+    let data = Data {
+        root: copy,
+        overlay: None,
+    };
+    let loaded = data
+        .load(&gamedata::assets::Source::Open(level.clone()))
+        .unwrap();
+    assert!(
+        loaded.warnings.iter().any(|w| w.contains("no settings")),
+        "{:?}",
+        loaded.warnings
+    );
+    let _ = std::fs::remove_dir_all(&r);
+}
+
+#[cfg(unix)]
+#[test]
+fn copying_a_game_file_never_writes_through_a_hard_link() {
+    let r = root("hardlink");
+    let (src, game, victim) = (r.join("Hit.wav"), r.join("game"), r.join("victim.txt"));
+    std::fs::write(&src, b"sound").unwrap();
+    std::fs::write(&victim, b"keep").unwrap();
+    std::fs::create_dir_all(game.join("Sounds")).unwrap();
+    // a stranger's folder with the copy's neighbour already there, hard-linked to someone's file
+    std::fs::hard_link(&victim, game.join("Sounds/Hit.wav.new")).unwrap();
+    std::fs::hard_link(&victim, game.join("Sounds/Hit.wav")).unwrap();
+    gamedata::assets::copy_into(&src, &game, "Sounds/Hit.wav").unwrap();
+    assert_eq!(std::fs::read(&victim).unwrap(), b"keep");
+    assert_eq!(std::fs::read(game.join("Sounds/Hit.wav")).unwrap(), b"sound");
+    let _ = std::fs::remove_dir_all(&r);
+}

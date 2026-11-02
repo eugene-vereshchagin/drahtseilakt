@@ -50,7 +50,12 @@ Ein Ordner mit:
   die Dateien des Spiels gleich spielt — `music` (Thema 1 bis 1000), `light` (drei Zahlen 0..1), `level_bonus`
   (Punkte), `tutorial` und `last_level` (true oder false: erstes und letztes Level des Originals) und `source_hash`
   (16 Hexziffern: FNV-1a der `.nmo`, aus der es umgewandelt wurde). Ein auf dieser Datei aufgenommenes Replay läuft auf
-  dem umgewandelten Level (dasselbe Level, also derselbe Lauf); fehlerhafte Einstellungen lehnen das Level ab.
+  dem umgewandelten Level (dasselbe Level, also derselbe Lauf); fehlerhafte Einstellungen lehnen das Level ab. Jedes
+  Level kann jeden Hash nennen, ein darauf laufendes Replay beweist also keinen Lauf auf dem Original. Ein Level ohne
+  Einstellungen (vor ihnen gemacht) läuft mit den Vorgaben und sagt es; ein Remaster `Level_NN` nimmt sie aus der
+  Tabelle der Kopie. Die Dateien in `game/` ersetzen nur die eigenen Teile des Levels, Himmel, Partikel, Schatten und
+  die Geräusche eines Laufs: die Dateien der Oberfläche (Menüs, Schrift, Leveltabelle, Menügeräusche) sind immer die
+  der Kopie, und jede Datei wird mit einer Größengrenze gelesen.
 
 ## Koordinaten
 
