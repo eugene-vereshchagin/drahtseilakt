@@ -6,6 +6,20 @@ Laufs ausprobiert. `--follow FILE` lässt ihn stattdessen dem Weg der Kugel im R
 Stellen schafft er allein nicht: Rätsel, Hebel und Schieber, die zuerst getroffen werden müssen, Aufwinde, Schienen
 mit Tempo. Dafür liest er **Hinweise**.
 
+## Dem Lauf eines Spielers folgen
+
+Mit `--follow REPLAY` kennt der Testspieler den Lauf des Spielers Tick für Tick: wo die Kugel war, wie schnell,
+welche Kugel, in welchem Sektor und welche Tasten gedrückt waren. Wo seine Kugel ist, wo die des Spielers war
+(innerhalb 2 Einheiten, die Geschwindigkeit innerhalb 4, dieselbe Kugel, derselbe Sektor, nicht verloren), sind die
+Tasten des Spielers bei jeder Entscheidung eine weitere Wahl (in der Ansicht des Spielers genau seine Tasten, auch
+Drehungen der Ansicht; in einer anderen dieselben Stöße als ihre Pfeile). Sie wird auf einer Kopie des Laufs bewertet
+wie jede andere und immer genommen, wenn sie die Kugel nicht verliert: Der Spieler wusste, was die Wegsuche nicht
+weiß (erst einen Hebel treffen, zu einem Transformator zurück, auf einem Aufzug warten), und eine eigene Abkürzung
+führt für immer von seiner Linie weg. Wo die Linie des Spielers nicht nah ist (er fiel dort, oder die Kugel ist
+abgekommen), lenkt die Wegsuche, und festgefahren probiert sie auch längere Stücke seiner Tasten von nahen Stellen.
+Zuerst wird der Tick gesucht, bis zu dem der Lauf seit dem letzten Treffer gekommen ist, damit eine Stelle, an der
+der Spieler stand, nicht immer wieder gespielt wird. `AUTOPILOT_DEMO=1` gibt jeden Treffer aus.
+
 ## Berichte, wo er steckt
 
 Kommt der Testspieler 20 Sekunden auf seinem Weg nicht weiter, schreibt er einen Bericht nach `--report DIR`
@@ -50,11 +64,12 @@ Zeilennummer ab. `HINTS_TRACE=1` gibt die Kugel alle zehn Takte aus, solange ein
 
 ## Stand
 
-- Level 1: die zwei Schieber in Sektor 3 (Hinweis: über die untere Bahn herum, sie nach Norden schieben); das
-  Level wird geschafft.
-- Level 2, Sektor 3: die Zugbrücke, die Aufwinde zum Stein-Transformator, der Schieber, die Schiene hinab;
-  Sektor 4: die Schiene und die Spiralrampe. Die wellige Halfpipe danach noch nicht: Der Inhaber schwingt quer
-  darüber, um das Tempo zu halten, was Wegpunkte nicht tun.
-- Level 5, Sektor 1: Zum Hebel P_Modul_37 führt ein schmales Schienenpaar, das mit Tempo genommen werden muss; mit
-  acht Pfeilrichtungen rollt die Kugel davon ab. Noch nicht geschafft.
-- Level 3 (drehende Arme) und 4 (das Steinkugel-Rätsel): noch keine Hinweise.
+Den Läufen des Inhabers folgend (`--autopilot --follow`), 2026-11-02:
+
+- Level 1: beendet (mit dem Hinweis für die Schieber).
+- Level 2: bis Sektor 4 (Hinweise für Sektor 3; die wellige Halfpipe noch nicht).
+- Level 3: bis Sektor 4 (Weg 1773 von 2065).
+- Level 4: ab Sektor 3 beendet in 5:26.00 mit 4 Leben (dort begann der Lauf des Inhabers).
+- Level 5: bis Sektor 3 (Weg 2224 von 3514).
+- Level 6: der Lauf des Inhabers endet in Sektor 2 am gewölbten Stamm, der des Testspielers auch.
+- Level 7: bis Sektor 3 (Weg 1002 von 3261).

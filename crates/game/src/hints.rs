@@ -308,7 +308,7 @@ fn view(quarter: i32) -> crate::sim::Camera {
 }
 
 /// The world push of arrows `bits` with the view at `quarter` (the sim's own rule: Left / Right only without Shift).
-fn world_push(bits: u8, quarter: i32) -> Vec3 {
+pub fn world_push(bits: u8, quarter: i32) -> Vec3 {
     let cam = view(quarter);
     let (f, r) = (cam.push_forward(), cam.push_right());
     let mut v = Vec3::ZERO;

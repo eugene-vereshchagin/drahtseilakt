@@ -5,6 +5,19 @@ transformers and steers the ball along it, trying each choice of arrows on a cop
 makes it follow the ball's way in a player's replay instead. Some places it cannot pass alone: puzzles, levers
 and pushers to hit first, updrafts to ride, rails to take at speed. For those it reads **hints**.
 
+## Following a player's run
+
+With `--follow REPLAY` the test player has the player's run tick by tick: where the ball was, how fast, which ball,
+in which sector, and the keys pressed. Where its ball is where the player's was (within 2 units, as fast within 4,
+the same ball, the same sector, not being lost), the player's own keys are one more choice at each decision (in the
+player's view, the very keys, turns of the view too; in another view, the same pushes as its arrows), judged on a
+copy of the run like every other choice and taken whenever they do not lose the ball: the player knew what the way's
+search does not (a lever to hit first, a transformer to go back to, a place to wait on a lift). A short cut of its
+own would lead off the player's line for good. Where the player's line is not at hand (the player fell there, or the
+ball has strayed) the way's search steers, and stuck it also tries longer stretches of the player's keys from the
+places near. The player's tick looked for first is the one the run has come to since the last match, so a place
+where the player stood still is not played again and again. `AUTOPILOT_DEMO=1` prints each match.
+
 ## Stuck reports
 
 When the test player gets no further along its way for 20 seconds, it writes a report into `--report DIR`
@@ -49,10 +62,12 @@ ticks while a hint drives.
 
 ## Where it stands
 
-- Level 1: the two pushers in sector 3 (hint: round by the lower lane, push them north); the level is finished.
-- Level 2, sector 3: the drawbridge, the updrafts up to the stone transformer, the pusher, the rail down; sector
-  4: the rail and the spiral ramp. The wavy half-pipe after it is not passed yet: the owner swings across it to
-  keep the speed, which waypoints do not do.
-- Level 5, sector 1: the lever P_Modul_37 is reached only over a narrow pair of rails taken at speed; with eight
-  arrow directions the ball drifts off it. Not passed yet.
-- Levels 3 (turning arms) and 4 (the stone-ball puzzle): no hints yet.
+Following the owner's runs (`--autopilot --follow`), 2026-11-02:
+
+- Level 1: finished (with the hint for the pushers).
+- Level 2: to sector 4 (hints for sector 3; the wavy half-pipe is not passed yet).
+- Level 3: to sector 4 (route 1773 of 2065).
+- Level 4: finished from sector 3 in 5:26.00 with 4 lives (the owner's run began there).
+- Level 5: to sector 3 (route 2224 of 3514).
+- Level 6: the owner's run ends in sector 2 at the convex log, and so does the test player's.
+- Level 7: to sector 3 (route 1002 of 3261).

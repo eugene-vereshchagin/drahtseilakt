@@ -1107,8 +1107,21 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
     let mut seen = Game::new(&watch, data)?;
     let mut path: Vec<glam::Vec3> = Vec::new();
     let mut gates: Vec<crate::autopilot::Gate> = Vec::new();
+    let mut demo = crate::autopilot::Demo::default();
     let mut lost = false;
     while seen.sim.tick < run.end && !seen.sim.finished && !seen.sim.game_over {
+        // the player's tick: the ball as it is, and the push the player gives now, in the world
+        let s = &seen.sim;
+        demo.ticks.push(crate::autopilot::DemoTick {
+            pos: s.ball.position,
+            vel: s.ball.velocity,
+            kind: s.ball.kind,
+            sector: s.sector,
+            alive: !s.is_dying() && !lost,
+            push: crate::hints::world_push(run.input_at(s.tick + 1), s.camera.quarter),
+            bits: run.input_at(s.tick + 1),
+            quarter: s.camera.quarter,
+        });
         let before = seen.sim.events.len();
         seen.tick(0);
         for (_, e) in seen.sim.events.iter().skip(before) {
@@ -1146,7 +1159,9 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
     }
     let mut game = Game::new(&own, data)?;
     let route = crate::autopilot::Route::along(&game.level.level, &game.modules, path);
-    pilot_run(&mut game, data, &own, crate::autopilot::Pilot::new(route, gates))
+    let mut pilot = crate::autopilot::Pilot::new(route, gates);
+    pilot.demo = Some(demo);
+    pilot_run(&mut game, data, &own, pilot)
 }
 
 /// The test player plays the level from where the run begins: it saves the run at --record (or as an attempt) and

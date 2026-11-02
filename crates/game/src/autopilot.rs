@@ -669,6 +669,13 @@ const CHOICES: [u8; 9] = [
     input::DOWN | input::RIGHT,
 ];
 
+/// Not an arrow combination: the choice of the player's own pushes (Demo).
+const DEMO_CHOICE: u8 = 0xff;
+/// What the player's line is worth over a choice of ours, in way points: so much that it is always taken unless it
+/// loses the ball. The player knew what the way's search does not (a lever to hit first, a transformer to go back
+/// to, a place to wait); a short cut of ours that looks further leads off the player's line for good.
+const DEMO_BONUS: f32 = 1000.0;
+
 /// The steering: every `PERIOD` ticks each choice is tried for `HOLD` ticks and then `COAST` with no arrows on a copy of
 /// the run; the one that ends furthest along the way without losing the ball is held.
 const PERIOD: u64 = 6;
@@ -684,6 +691,95 @@ const COAST: u64 = 36;
 
 /// A transformer on the way: its place on the way, where it is, and the ball it makes.
 pub type Gate = (usize, Vec3, crate::sim::BallKind);
+
+/// One tick of a player's run the test player follows: the ball (where, how fast, which, in which sector, not being
+/// lost) and what the player pushed then, in the world (so it reads the same in any view).
+#[derive(Clone, Copy, Debug)]
+pub struct DemoTick {
+    pub pos: Vec3,
+    pub vel: Vec3,
+    pub kind: crate::sim::BallKind,
+    pub sector: usize,
+    pub alive: bool,
+    pub push: Vec3,
+    /// The keys as the player pressed them, and the view's quarter then: in the same view they are given as they
+    /// were (turns of the view too, and pushes while the view turns, which no world direction gives exactly).
+    pub bits: u8,
+    pub quarter: i32,
+}
+
+/// A player's run, tick by tick. Where the test player's ball is where the player's was, as fast and the same
+/// ball, it may do what the player did there: each decision tries the player's pushes as one more choice (and,
+/// stuck, longer stretches of them), judged on a copy of the run like every other choice. One mechanism for every
+/// place a person passed that the way's search does not: a narrow rail taken at speed, a swing across a trough, a
+/// puzzle's pushes.
+#[derive(Clone, Debug, Default)]
+pub struct Demo {
+    pub ticks: Vec<DemoTick>,
+}
+
+/// A player's tick matches the ball within this distance and this difference of speed.
+const DEMO_NEAR: f32 = 2.0;
+const DEMO_SPEED: f32 = 4.0;
+/// Stuck, the player's pushes are tried for these stretches from the places within `DEMO_STUCK_NEAR`.
+const DEMO_STRETCHES: [u64; 3] = [240, 480, 900];
+const DEMO_STUCK_NEAR: f32 = 4.0;
+
+impl Demo {
+    /// The player's tick nearest the ball (same ball, same sector, not being lost), within `near` and, when `speed` is
+    /// some, as fast within it; searched near `hint` first (the player's run goes on as ours does).
+    fn find(&self, sim: &Sim, near: f32, speed: Option<f32>, hint: Option<usize>) -> Option<usize> {
+        let b = &sim.ball;
+        let fits = |t: &DemoTick| {
+            t.alive
+                && t.kind == b.kind
+                && t.sector == sim.sector
+                && t.pos.distance(b.position) < near
+                && speed.is_none_or(|s| t.vel.distance(b.velocity) < s)
+        };
+        let best_in = |from: usize, to: usize| {
+            self.ticks
+                .get(from..to.min(self.ticks.len()))?
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| fits(t))
+                .min_by(|x, y| {
+                    x.1.pos
+                        .distance(b.position)
+                        .total_cmp(&y.1.pos.distance(b.position))
+                })
+                .map(|(i, _)| from + i)
+        };
+        // the player's run going on from where it was followed comes first (where the player stood still, every tick
+        // of it is as near), then the nearest around it, then anywhere
+        let near = hint
+            .and_then(|h| best_in(h.saturating_sub(120), h + 600))
+            .or_else(|| best_in(0, self.ticks.len()))?;
+        let dist = |k: usize| {
+            self.ticks
+                .get(k)
+                .map_or(f32::INFINITY, |t| t.pos.distance(b.position))
+        };
+        Some(
+            match hint.filter(|&h| self.ticks.get(h).is_some_and(fits)) {
+                Some(h) if dist(h) <= dist(near) + 0.5 => h,
+                _ => near,
+            },
+        )
+    }
+
+    /// The player's input of tick `k` for a view at `quarter`: the very keys when the view is the player's, else the
+    /// push as arrows of this view.
+    fn input(&self, k: usize, quarter: i32) -> u8 {
+        self.ticks.get(k).map_or(0, |t| {
+            if t.quarter == quarter {
+                t.bits
+            } else {
+                crate::hints::arrows(t.push, quarter)
+            }
+        })
+    }
+}
 
 pub struct Pilot {
     pub route: Route,
@@ -712,6 +808,11 @@ pub struct Pilot {
     field: Option<(usize, HashMap<usize, f32>)>,
     /// The hints for places it cannot pass alone (hints.rs): while one runs, it drives.
     pub hints: crate::hints::Runner,
+    /// The player's run it follows, if any; the player's tick it matched last; and, when the player's pushes were
+    /// the choice, from which of the player's ticks and from which tick of ours.
+    pub demo: Option<Demo>,
+    demo_at: Option<(usize, u64)>,
+    demo_run: Option<(usize, u64)>,
 }
 
 impl Pilot {
@@ -731,6 +832,9 @@ impl Pilot {
             seed: 0x2545_F491,
             field: None,
             hints: crate::hints::Runner::default(),
+            demo: None,
+            demo_at: None,
+            demo_run: None,
         }
     }
 
@@ -766,6 +870,12 @@ impl Pilot {
     /// How far along the way the ball has come (route points).
     pub fn reached(&self) -> usize {
         self.at
+    }
+
+    /// Where the followed player's run is now: the tick last matched, gone on by the ticks since.
+    fn demo_expected(&self, sim: &Sim) -> Option<usize> {
+        self.demo_at
+            .map(|(k, at)| k + usize::try_from(sim.tick.saturating_sub(at)).unwrap_or(0))
     }
 
     fn rand(&mut self) -> u32 {
@@ -817,6 +927,32 @@ impl Pilot {
                 plan.push((t, c));
             }
             plans.push(plan);
+        }
+        // the player's pushes from the places near where the player's ball was, for longer stretches
+        if let Some(d) = &self.demo {
+            let mut starts: Vec<usize> = Vec::new();
+            for speed in [Some(DEMO_SPEED), None] {
+                if let Some(k) = d.find(sim, DEMO_STUCK_NEAR, speed, self.demo_expected(sim))
+                    && !starts.contains(&k)
+                {
+                    starts.push(k);
+                }
+            }
+            for k in starts {
+                for len in DEMO_STRETCHES {
+                    // as held choices, a tick each (the copy's view does not turn: the arrows are for this one)
+                    let q = sim.camera.quarter;
+                    let mut plan: Vec<(u64, u8)> = Vec::new();
+                    for i in 0..len {
+                        let c = d.input(k + i as usize, q);
+                        match plan.last_mut() {
+                            Some(last) if last.1 == c => last.0 = sim.tick + i + 1,
+                            _ => plan.push((sim.tick + i + 1, c)),
+                        }
+                    }
+                    plans.push(plan);
+                }
+            }
         }
         for plan in plans {
             let t = plan.last().map_or(sim.tick, |p| p.0);
@@ -924,11 +1060,22 @@ impl Pilot {
             }
         }
         if !sim.tick.is_multiple_of(PERIOD) {
+            if let (Some((k, from)), Some(d)) = (self.demo_run, &self.demo) {
+                let t = usize::try_from(sim.tick.saturating_sub(from)).unwrap_or(usize::MAX);
+                return d.input(k.saturating_add(t), sim.camera.quarter);
+            }
             return self.choice;
         }
+        self.demo_run = None;
         // A player turns the view to face the way ahead (Shift with Left or Right, a quarter a press): when the way
-        // ahead points well away from where "up" pushes, one press this tick, released the next.
-        if let Some(turn) = self.turn(sim) {
+        // ahead points well away from where "up" pushes, one press this tick, released the next. Not where the
+        // followed player's line is at hand: it turns the view as the player did.
+        let on_demo = self
+            .demo
+            .as_ref()
+            .and_then(|d| d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)))
+            .is_some();
+        if !on_demo && let Some(turn) = self.turn(sim) {
             return turn;
         }
         // a new ball (the old one lost) starts again at a reset point: find it on the way anew
@@ -1023,7 +1170,17 @@ impl Pilot {
                 .any(|p| p.y > here_y + 2.0)
         };
         let mut best = (f32::NEG_INFINITY, self.choice);
-        for &c in &CHOICES {
+        // the player's pushes from where the player's ball was where ours is, as fast: one more choice
+        let matched = self
+            .demo
+            .as_ref()
+            .and_then(|d| d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)));
+        if let Some(k) = matched {
+            self.demo_at = Some((k, sim.tick));
+        }
+        let mut demo_won = false;
+        for &c in CHOICES.iter().chain(matched.map(|_| &DEMO_CHOICE)) {
+            let from_demo = c == DEMO_CHOICE;
             let mut s = sim.clone();
             let lives = s.lives;
             let mut lost = false;
@@ -1032,7 +1189,12 @@ impl Pilot {
             let hold = HOLD * (1 + (stuck % 4) * 2);
             let mut edge = 0.0;
             for t in 0..hold + COAST {
-                s.step(if t < hold { c } else { 0 });
+                let input = match (from_demo, matched, &self.demo) {
+                    (true, Some(k), Some(d)) => d.input(k + t as usize, s.camera.quarter),
+                    _ if t < hold => c,
+                    _ => 0,
+                };
+                s.step(input);
                 if t % 6 == 5 && s.ball.on_ground {
                     edge += (SAFE - self.route.clearance(s.ball.position)).max(0.0);
                 }
@@ -1073,6 +1235,13 @@ impl Pilot {
             if !s.ball.on_ground && s.ball.position.y < sim.ball.position.y - 6.0 && !way_down {
                 lost = true;
             }
+            // the player's line is judged by what happens, not by the way's floors: a ball waiting on a lift or riding
+            // a module stands on no floor of the way, and that is no loss; only a lost ball, or one falling fast, is
+            if from_demo {
+                let gone = s.lives < lives || s.is_dying() || s.game_over;
+                let falling = !s.ball.on_ground && s.ball.velocity.y < -12.0 && !way_down;
+                lost = gone || falling;
+            }
             let score = if lost {
                 f32::NEG_INFINITY
             } else if s.finished {
@@ -1087,6 +1256,8 @@ impl Pilot {
                     }
                     - EDGE * edge
                     + if c == self.choice { 0.05 } else { 0.0 }
+                    // the player's own line, when as good, is taken: it knows what the search does not
+                    + if from_demo { DEMO_BONUS } else { 0.0 }
             };
             if std::env::var_os("AUTOPILOT_SCORES").is_some() {
                 eprintln!(
@@ -1096,7 +1267,25 @@ impl Pilot {
             }
             if score > best.0 {
                 best = (score, c);
+                demo_won = from_demo;
             }
+        }
+        // AUTOPILOT_DEMO: at each decision, which of the followed player's ticks matched and whether it was taken
+        if std::env::var_os("AUTOPILOT_DEMO").is_some() {
+            eprintln!(
+                "demo t{} ball {:?} v {:.1} matched {matched:?} won {demo_won}",
+                sim.tick,
+                sim.ball.position,
+                sim.ball.velocity.length()
+            );
+        }
+        if demo_won && let Some(k) = matched {
+            self.demo_run = Some((k, sim.tick));
+            self.choice = 0;
+            return self
+                .demo
+                .as_ref()
+                .map_or(0, |d| d.input(k, sim.camera.quarter));
         }
         self.choice = best.1;
         self.choice
