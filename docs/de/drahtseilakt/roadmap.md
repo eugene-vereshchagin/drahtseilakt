@@ -7,7 +7,10 @@ Stand 01.11.2026: Phase 0 ist abgeschlossen (decisions.md, „Alles von Grund au
 der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
 
 - **Phase 1**: Der Leser liest jede Datei des Spiels und alle ~600 Karten, jedes Szenenobjekt wird dekodiert.
-  Fehlt: Fuzz-Ziele, die Bestandsaufnahme der Building Blocks, das Entfernen des C-Codes des Upstreams.
+  Ein Mutationstest beschädigt die entpackten Teile der Dateien des Spielers und lässt jeden Decoder darauf laufen
+  (crates/level/tests/mutations.rs, mit `cargo test`). Fehlt: cargo-fuzz-Ziele (brauchen eine Nightly-Toolchain und
+  libfuzzer, noch nicht installiert), die Bestandsaufnahme der Building Blocks, das Entfernen des C-Codes des
+  Upstreams.
 - **Phase 2**: Level auf dem Bildschirm mit ihrem Himmel, jede Größe und jedes Seitenverhältnis, Licht im
   Gamma-Raum wie im Original (seine Fixed-Function-Formel: Emissive + Ambient + Diffuse, mal Textur; bisher eine
   Lichtquelle), 3D-Sprites (die silbernen Kugeln der Extrapunkte), Texturen mit Farbschlüssel, Spiegelungen (TexGen) und

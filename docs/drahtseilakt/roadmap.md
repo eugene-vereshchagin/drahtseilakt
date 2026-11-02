@@ -7,7 +7,9 @@ State on 2026-11-01: phase 0 is closed (decisions.md, "Everything from scratch, 
 new engine got level 1 playable, ahead of the phase order:
 
 - **Phase 1**: the reader reads every file of the game and all ~600 maps, every scene object decodes.
-  Missing: fuzz targets, the inventory of Building Blocks, removing upstream's C code.
+  A mutation test damages the decompressed parts of the player's files and runs every decoder on them
+  (crates/level/tests/mutations.rs, with `cargo test`). Missing: cargo-fuzz targets (need a nightly toolchain and
+  libfuzzer, not installed yet), the inventory of Building Blocks, removing upstream's C code.
 - **Phase 2**: levels on screen with their sky, any size and aspect ratio, gamma-space lighting like the
   original (its fixed-function formula: emissive + ambient + diffuse, times the texture; one light so far), 3D
   sprites (the extra points' silver balls), colour-keyed textures, reflections (TexGen) and material channels

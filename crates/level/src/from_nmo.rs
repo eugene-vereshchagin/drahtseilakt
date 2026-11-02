@@ -12,8 +12,12 @@ pub struct Loaded {
 }
 
 pub fn load(bytes: &[u8]) -> Result<Loaded, nmo::Error> {
-    let file = nmo::read(bytes)?;
-    let doc = Document::parse(&file)?;
+    load_file(&nmo::read(bytes)?)
+}
+
+/// A level from a file whose container is already read.
+pub fn load_file(file: &nmo::File) -> Result<Loaded, nmo::Error> {
+    let doc = Document::parse(file)?;
     Ok(build(&doc))
 }
 
