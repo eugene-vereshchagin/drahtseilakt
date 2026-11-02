@@ -46,7 +46,9 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   dreizehn Level. Im Transformator zerspringt die alte Kugel in ihre Stücke (die
   Explosionsskripte aus Balls.nmo: Körper in der Gruppe der Kugel, nach oben gestoßen, liegen 20 s (Fadeout
   Manager aus Gameplay.nmo) oder bis zum Verlust der Kugel, dann ausgeblendet); vor den Stücken aufgenommene Replays
-  (Format 1) laufen ohne sie, vor den 20 s aufgenommene (Format 2) mit Stücken, die bis zum Verlust der Kugel liegen. Der Rauch der Kugel pufft, wenn sie erscheint und
+  (Format 1) laufen ohne sie, vor den 20 s aufgenommene (Format 2) mit Stücken, die bis zum Verlust der Kugel liegen. Die Checkpoints öffnen die Sektoren in der Reihenfolge ihrer Namen
+  (PC_TwoFlames_01, _02, ...), wie auch immer die Gruppe des Levels sie aufzählt (Level 11 und 12 zählen sie
+  durcheinander auf); früher aufgenommene Replays (Format 3) behalten die Reihenfolge der Gruppe. Der Rauch der Kugel pufft, wenn sie erscheint und
   wenn sie zerspringt (BallParticle_Frame script).
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert. Ein
   exportiertes Level ist vollständig: es trägt seine Einstellungen (Musik, Licht, Bonus, Tutorial, letztes Level) und
