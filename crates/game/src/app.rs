@@ -1406,6 +1406,9 @@ fn stuck_report(
 /// is stuck it writes a report (--report), and it follows the level's hints.
 fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<(), String> {
     pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
+    if game.start.is_some() {
+        pilot.take_up(&game.sim);
+    }
     // the player's own data folder, not a shared temporary one
     let report = o.report.clone().unwrap_or_else(|| crate::levels::data_dir().join("stuck"));
     let limit = o.ticks.unwrap_or(60 * 60 * 20);
@@ -1424,6 +1427,11 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
             (best, since) = (pilot.reached(), game.sim.tick);
         }
         let fell = game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::Died));
+        if game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::NewBall)) {
+            pilot.new_ball(&game.sim);
+            // back at the reset point: getting on is counted from there again
+            best = pilot.reached();
+        }
         heard = game.sim.events.len();
         // a hint going on to its next step gets on too (its steps lead off the way: round, back for a run-up)
         let now_at = pilot.hints.at();
