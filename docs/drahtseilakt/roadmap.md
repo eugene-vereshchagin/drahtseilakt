@@ -180,6 +180,7 @@ Done when: all thirteen levels can be finished, and each has a replay that passe
   and records count only here); *Extended* — third-party content at the player's own risk, with a clear
   warning: community maps, texture packs, later mods. Mods means our own system — data and scripts in a
   sandbox without file or network access; BML mods are Windows DLLs and are never loaded.
+  The menus of both modes: [menu.md](menu.md).
 
 Done when: most maps play; the report lists the rest, each with its reason.
 

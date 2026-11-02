@@ -190,6 +190,7 @@ Fertig, wenn: sich alle dreizehn Level beenden lassen und jedes ein bestehendes 
   Rekorde zählen nur hier); *Erweitert* — Inhalte Dritter auf eigenes Risiko mit deutlicher Warnung:
   Community-Karten, Texturpakete, später Mods. Mods heißt unser eigenes System — Daten und Skripte in einer
   Sandbox ohne Datei- oder Netzzugriff; BML-Mods sind Windows-DLLs und werden nie geladen.
+  Die Menüs beider Modi: [menu.md](menu.md).
 
 Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen auf, jede mit Grund.
 
