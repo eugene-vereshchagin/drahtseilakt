@@ -265,3 +265,12 @@ freier Lizenz oder, für wer das Aussehen des Originals will, als Level, die die
 welche die Toolbox aus der eigenen Kopie jedes Spielers beilegt. Die Toolbox macht aus den Originaldateien des
 Spielers alles, was das Spiel benutzen kann. So wird niemandes Eigentum ausgeliefert, und jeder stellt sich das
 Original mit ein paar Klicks selbst zusammen.
+
+## Das generierte Klangthema ist der Standard
+
+*2026-11-02.* Entscheidung des Inhabers: das generierte Klangthema (*neuro*: per Code synthetisierte Effekte, nach
+Messungen der Klänge des Originals abgestimmt, nichts vom Original darin) wird als Standard-Klangthema des Spiels
+ausgeliefert. Es spielt, bis der Spieler auf der Seite Extended ein anderes Thema wählt, und im klassischen Modus
+immer. *system* bleibt das Thema, auf das jedes Thema zurückgreift, und bleibt wählbar, ebenso *original* und die
+eigenen Themen des Spielers. Eine Wahl des Spielers bleibt erhalten; die Einstellungen schreiben `sound-theme` erst,
+wenn der Spieler gewählt hat, so folgt ein Spieler, der nie gewählt hat, dem Standard.

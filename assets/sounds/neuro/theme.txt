@@ -1,6 +1,6 @@
 # The neuro sound theme: effects synthesized for Drahtseilakt by code (oscillators, noise, filters, modal synthesis),
-# tuned against measurements of the original's sounds; no sample of the original is in them. Music and the roles it
-# has no sound for come from the system theme.
+# tuned against measurements of the original's sounds; no sample of the original is in them. Its level music is
+# synthesized too: short guzheng-like plucked phrases. The roles it has no sound for come from the system theme.
 name.en Generated
 name.ru Нейрогенерация
 name.de Generiert

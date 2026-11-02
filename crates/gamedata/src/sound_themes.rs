@@ -2,9 +2,10 @@
 // for (Sounds/<name>.ogg|.wav, Music/<name>.ogg|.wav, or a track Music/music.txt names). The game ships two in its
 // assets (sounds/system: openly licensed recordings; sounds/neuro: our synthesized ones); the player may add more in
 // the data folder's sounds/ — among them "original", which the toolbox makes from the player's copy and which is
-// never shipped. The extended mode chooses one (`sound-theme NAME`); the classic mode plays the system theme. A
-// sound the chosen theme lacks comes from its fallback theme (theme.txt `fallback NAME`, the system theme when
-// none), then — for a level's own sounds, never for music — from the copy.
+// never shipped. The generated theme (neuro) plays unless the player chose another (owner's decision 2026-11-02);
+// the extended mode chooses (`sound-theme NAME`), the classic mode plays the default. A sound the chosen theme
+// lacks comes from its fallback theme (theme.txt `fallback NAME`, the system theme when none), then — for a level's
+// own sounds, never for music — from the copy.
 //
 // The player's theme folders are untrusted (they are shared): only plain folder and file names, real folders and
 // files (no links), a capped number of themes and a capped theme.txt; the sounds themselves are decoded through the
@@ -17,8 +18,10 @@ use std::sync::Mutex;
 const MAX_THEMES: usize = 32;
 const MAX_THEME_TXT: u64 = 4096;
 const MAX_NAME: usize = 64;
-/// The theme played when none is chosen, and the one every theme falls back to.
+/// The theme every theme falls back to (and the one played when the default theme is not there).
 pub const SYSTEM: &str = "system";
+/// The theme played when the player has not chosen one: the generated theme (decisions.md, 2026-11-02).
+pub const DEFAULT: &str = "neuro";
 /// The theme the toolbox makes from the player's copy; while there is no such folder, choosing it plays the copy's
 /// sounds directly.
 pub const ORIGINAL: &str = "original";
@@ -156,24 +159,45 @@ pub fn scan() -> Vec<Theme> {
 struct State {
     themes: Vec<Theme>,
     chosen: String,
-    /// What the player chose, kept as it is for the settings even when that theme is not there this time.
-    wanted: String,
+    /// What the player chose, kept as it is for the settings even when that theme is not there this time; none when
+    /// they never chose (then the default plays, and a later default is followed).
+    wanted: Option<String>,
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
 
-/// Finds the themes and takes `chosen` (the setting's; the system theme when it is not there, except "original",
-/// which plays the copy's sounds until the toolbox has made its folder).
-pub fn start(chosen: &str) {
+/// The theme that plays for the player's choice `wanted` among `themes`: the chosen one when it is there ("original"
+/// always: it plays the copy's sounds until the toolbox has made its folder), else the default, else the system theme.
+fn playing(themes: &[Theme], wanted: Option<&str>) -> String {
+    let found = |k: &str| themes.iter().any(|t| t.key == k);
+    match wanted {
+        Some(w) if found(w) || w == ORIGINAL => w.to_owned(),
+        _ if found(DEFAULT) => DEFAULT.to_owned(),
+        _ => SYSTEM.to_owned(),
+    }
+}
+
+/// Finds the themes and takes the player's choice (the setting's; none when they never chose one).
+pub fn start(wanted: Option<&str>) {
     let themes = scan();
-    let wanted = chosen.to_owned();
-    let chosen = if themes.iter().any(|t| t.key == chosen) || chosen == ORIGINAL {
-        chosen.to_owned()
-    } else {
-        SYSTEM.to_owned()
-    };
+    let chosen = playing(&themes, wanted);
     if let Ok(mut s) = STATE.lock() {
-        *s = Some(State { themes, chosen, wanted });
+        *s = Some(State {
+            themes,
+            chosen,
+            wanted: wanted.map(str::to_owned),
+        });
+    }
+}
+
+/// Plays the player's choice again (none: the default) without choosing anything — the mode switch: the classic
+/// mode plays the default, the extended mode the saved choice.
+pub fn restore(wanted: Option<&str>) {
+    if let Ok(mut s) = STATE.lock()
+        && let Some(s) = s.as_mut()
+    {
+        s.chosen = playing(&s.themes, wanted);
+        s.wanted = wanted.map(str::to_owned);
     }
 }
 
@@ -192,7 +216,7 @@ pub fn chosen() -> String {
         .lock()
         .ok()
         .and_then(|s| s.as_ref().map(|s| s.chosen.clone()))
-        .unwrap_or_else(|| SYSTEM.to_owned())
+        .unwrap_or_else(|| DEFAULT.to_owned())
 }
 
 /// Chooses another theme (it plays from the next sound loaded; the game forgets the ones loaded).
@@ -202,18 +226,17 @@ pub fn choose(key: &str) {
         && (s.themes.iter().any(|t| t.key == key) || key == ORIGINAL)
     {
         s.chosen = key.to_owned();
-        s.wanted = key.to_owned();
+        s.wanted = Some(key.to_owned());
     }
 }
 
 /// The theme the player chose, for the settings: kept even when it was not found this time (a player's theme folder
-/// moved away for a while is not forgotten).
-pub fn wanted() -> String {
+/// moved away for a while is not forgotten); none when they never chose one.
+pub fn wanted() -> Option<String> {
     STATE
         .lock()
         .ok()
-        .and_then(|s| s.as_ref().map(|s| s.wanted.clone()))
-        .unwrap_or_else(|| SYSTEM.to_owned())
+        .and_then(|s| s.as_ref().and_then(|s| s.wanted.clone()))
 }
 
 /// The copy's own sounds play: "original" chosen while the toolbox has not made its folder.
@@ -238,10 +261,11 @@ pub fn files(name: &str) -> Vec<PathBuf> {
         return Vec::new();
     }
     let themes = themes();
-    let mut keys = vec![chosen()];
+    let first = chosen();
+    let mut keys = vec![first.clone()];
     if let Some(f) = themes
         .iter()
-        .find(|t| t.key == keys[0])
+        .find(|t| t.key == first)
         .and_then(|t| t.fallback.clone())
     {
         keys.push(f);
@@ -398,6 +422,29 @@ mod tests {
             assert!(in_theme(&system, name).is_some(), "system {name}");
         }
         assert!(in_theme(&assets.join("neuro"), "Misc_Fall").is_some());
+        // the generated theme has its own level music, every part of the five themes, and its own end music
+        for name in ["Music_EndCheckpoint", "Music_Final", "Music_LastFinal"] {
+            assert!(
+                in_theme(&assets.join("neuro"), name).is_some(),
+                "neuro {name}"
+            );
+        }
+        for n in 1..=5 {
+            for part in 1..=3 {
+                let name = format!("Music_Theme_{n}_{part}");
+                assert!(
+                    in_theme(&assets.join("neuro"), &name).is_some(),
+                    "neuro {name}"
+                );
+            }
+        }
         assert!(t.iter().all(|t| !t.names.is_empty()));
+        // the generated theme plays unless the player chose another; a choice not found falls back to it
+        assert_eq!(playing(&t, None), DEFAULT);
+        assert_eq!(playing(&t, Some("system")), "system");
+        assert_eq!(playing(&t, Some("gone")), DEFAULT);
+        assert_eq!(playing(&t, Some(ORIGINAL)), ORIGINAL);
+        let only_system: Vec<Theme> = t.iter().filter(|t| t.key == SYSTEM).cloned().collect();
+        assert_eq!(playing(&only_system, None), SYSTEM);
     }
 }
