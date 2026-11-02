@@ -28,6 +28,10 @@ struct Globals {
     view: [[f32; 4]; 4],
     eye: [f32; 4],
     light_color: [f32; 4],
+    flash_dir: [f32; 4],
+    flash_color: [f32; 4],
+    point_pos: [f32; 4],
+    point_color: [f32; 4],
 }
 
 #[repr(C)]
@@ -179,6 +183,10 @@ pub struct Renderer {
     material_layout: wgpu::BindGroupLayout,
     /// The scene's light (the level's colour once a level is loaded).
     pub light: Light,
+    /// The last level's lightning (lights.rs): its brightness, 0 when it is hidden.
+    pub flash: f32,
+    /// The new ball's light (lights.rs): where it is and its colour, while it shows.
+    pub point: Option<(Vec3, [f32; 3])>,
     globals: wgpu::Buffer,
     globals_bind: wgpu::BindGroup,
     models_buf: wgpu::Buffer,
@@ -342,6 +350,8 @@ impl Renderer {
             pipelines: HashMap::new(),
             material_layout,
             light: Light::default(),
+            flash: 0.0,
+            point: None,
             globals,
             globals_bind,
             models_buf,
@@ -876,6 +886,10 @@ impl Renderer {
             view: look.to_cols_array_2d(),
             eye: [view.eye.x, view.eye.y, view.eye.z, 1.0],
             light_color: [self.light.color[0], self.light.color[1], self.light.color[2], 1.0],
+            flash_dir: crate::lights::FLASH_DIR.normalize().extend(0.0).to_array(),
+            flash_color: [self.flash, self.flash, self.flash, 0.0],
+            point_pos: self.point.map_or([0.0; 4], |(p, _)| p.extend(crate::lights::POINT_RANGE).to_array()),
+            point_color: self.point.map_or([0.0; 4], |(_, c)| [c[0], c[1], c[2], 0.0]),
         };
         self.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));

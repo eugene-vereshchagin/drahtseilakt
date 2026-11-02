@@ -24,8 +24,8 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   Tot- und Levelende-Menü, Highscores mit Namenseingabe, Freischalten der Level, eigene Level aus einem
   Kartenordner. Die Steinkugel rollt in der Menüszene ihren
   aufgezeichneten Weg. Die Spielkamera folgt wie im Original (zwei Federn, eine Drehung in
-  250 ms, das Anheben; am C-Spiel gemessen). Fehlt: die Blitze des letzten Levels, das blaue Licht der neuen
-  Kugel, 8K-Prüfung.
+  250 ms, das Anheben; am C-Spiel gemessen). Die kurzen Lichter sind die der Skripte: die Blitze des letzten
+  Levels mit ihrem Donner und das blaue Licht der neuen Kugel. Fehlt: 8K-Prüfung.
 - **Phase 3**: Die Kugelphysik ist IVP, aus dem C-Code des Upstreams portiert (crates/ivp) und gegen das C-Spiel
   geprüft: ein gerader Stoß der Holz- und der Steinkugel und eine 17-Sekunden-Route in Level 1 stimmen auf 0,1
   bzw. 0,8 Einheiten überein. Alle Böden, Schienen und Stopper haben das eine Material, das das Original ihnen

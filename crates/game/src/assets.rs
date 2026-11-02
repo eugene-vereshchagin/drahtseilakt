@@ -171,6 +171,13 @@ impl Data {
             .collect()
     }
 
+    /// How many levels the game's table has (the rows of `AllLevel` in Levelinit.nmo): the last of them is the one
+    /// the scripts treat as the last level (its finish music, its lightning).
+    pub fn level_count(&self) -> Option<u32> {
+        let table = self.data_array("3D Entities/Levelinit.nmo", "AllLevel")?;
+        u32::try_from(table.rows.len()).ok()
+    }
+
     /// The settings row whose level file matches `file_name`; a community map without one takes level 1's.
     pub fn settings(&self, file_name: &str) -> Settings {
         let none = Settings {

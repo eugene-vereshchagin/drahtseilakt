@@ -19,6 +19,7 @@ mod highscore;
 mod hud;
 mod lang;
 mod levels;
+mod lights;
 mod locate;
 mod menu;
 mod menuscene;

@@ -12,6 +12,12 @@ struct Globals {
     eye: vec4<f32>,
     // rgb: the light's colour (the level's Light).
     light_color: vec4<f32>,
+    // The passing lights (lights.rs): the last level's lightning (a second directional light) and the new ball's
+    // point light (xyz where, w its reach); black when they are hidden.
+    flash_dir: vec4<f32>,
+    flash_color: vec4<f32>,
+    point_pos: vec4<f32>,
+    point_color: vec4<f32>,
 };
 
 struct Material {
@@ -110,8 +116,17 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         n = -n;
     }
     let lambert = max(dot(n, l), 0.0);
-    let lit = clamp(mat.emissive.rgb + g.ambient.rgb * mat.ambient.rgb + g.light_color.rgb * diffuse.rgb * lambert,
-        vec3<f32>(0.0), vec3<f32>(1.0));
+    // The passing lights add their own diffuse term (each lights the side facing it); the point light falls off as
+    // 1/d and ends at its reach.
+    let raw = normalize(in.normal);
+    var extra = g.flash_color.rgb * abs(dot(raw, -normalize(g.flash_dir.xyz)));
+    let to_point = g.point_pos.xyz - in.world;
+    let d = length(to_point);
+    if d < g.point_pos.w && d > 1e-3 {
+        extra += g.point_color.rgb * abs(dot(raw, to_point / d)) / d;
+    }
+    let lit = clamp(mat.emissive.rgb + g.ambient.rgb * mat.ambient.rgb
+        + (g.light_color.rgb * lambert + extra) * diffuse.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
     var spec = vec3<f32>(0.0);
     if mat.specular.a > 0.0 && lambert > 0.0 {
         let v = normalize(g.eye.xyz - in.world);

@@ -233,7 +233,10 @@ impl Game {
             music_theme: data.settings(&level.name).music,
             level_bonus,
             assisted: false,
-            last_level: matches!(o.source, crate::assets::Source::Original(12)),
+            last_level: match o.source {
+                crate::assets::Source::Original(n) => data.level_count() == Some(n),
+                _ => false,
+            },
             runs_root: match &o.source {
                 crate::assets::Source::Original(_) => replay_dir(),
                 crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
@@ -848,6 +851,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         heard: 0,
         rolling: [None; 3 + crate::ballsound::FAN_SLOTS],
         music: None,
+        blitz: crate::lights::Blitz::new(
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64),
+        ),
         volumes: load_volumes(),
         game,
         data,
@@ -1448,6 +1454,11 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = Renderer::new(device, queue, format);
     upload(&mut r, game, data);
+    // the passing lights as the window would show them (the lightning on a fixed schedule)
+    if game.last_level {
+        r.flash = crate::lights::Blitz::new(1).step(game.sim.tick).0;
+    }
+    r.point = crate::lights::point(&game.sim.events, game.sim.tick, snap.ball);
     let (w, h) = o.size;
     let target = r.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("screenshot"),
@@ -1593,6 +1604,8 @@ struct App {
     rolling: [Option<u64>; 3 + crate::ballsound::FAN_SLOTS],
     /// The level's music.
     music: Option<Music>,
+    /// The last level's lightning (lights.rs).
+    blitz: crate::lights::Blitz,
     /// The player's sound and music volumes (the Settings page, kept in settings.txt).
     volumes: [f32; 2],
     data: Data,
@@ -2040,6 +2053,17 @@ impl App {
         self.sound_events();
         let cur = Snapshot::of(&self.game.sim);
         let mut snap = Snapshot::lerp(&self.prev.unwrap_or(cur), &cur, self.acc / TICK);
+        // the passing lights: the last level's lightning and its thunder, and the new ball's light
+        let sim = &self.game.sim;
+        let mut flash = 0.0;
+        if self.game.last_level {
+            let began;
+            (flash, began) = self.blitz.step(sim.tick);
+            if let (true, Some(a)) = (began, &mut self.audio) {
+                a.play(&self.data, "Music_thunder", 1.0, crate::lights::THUNDER_DELAY);
+            }
+        }
+        let point = crate::lights::point(&sim.events, sim.tick, snap.ball);
         if let Some(c) = &self.fly {
             (snap.eye, snap.target) = c.view();
         }
@@ -2090,6 +2114,7 @@ impl App {
         };
         let built = build_started.elapsed();
         let draw_started = Instant::now();
+        (gpu.renderer.flash, gpu.renderer.point) = if menu_up { (0.0, None) } else { (flash, point) };
         gpu.renderer.draw(&view, gpu.config.width, gpu.config.height, &frame_view, &inst, &particles);
         let drawn = draw_started.elapsed();
         let overlay_started = Instant::now();
