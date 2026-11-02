@@ -1280,9 +1280,13 @@ def sky_colour(d, mood):
     band = np.exp(-(((e - 2) / 12) ** 2))
     s = np.clip((streaks[sy, sx] - 0.5) * 2.5, 0, 1) * band
     c = c + (np.array(mood["cloud"]) - c) * (0.5 * s)[..., None]
-    sea = k.value_noise(256, w, (6, 5), mood["seed"] + 1, octaves=6)
-    py = np.clip((-e - 8) / 82 * 255, 0, 255).astype(int)
-    puff = np.clip((sea[py, sx] - 0.45) * 2.2, -1, 1)
+    # the sea of cloud below is a layer seen in perspective: its noise is laid on a plane under the camera (by
+    # azimuth and elevation it would swirl into the point straight down)
+    sea = k.value_noise(512, 512, (8, 8), mood["seed"] + 1, octaves=6)
+    depth = np.maximum(-d[..., 1], 0.12)
+    px = ((d[..., 0] / depth * 0.18 + 0.5) % 1.0 * 511).astype(int)
+    pz = ((d[..., 2] / depth * 0.18 + 0.5) % 1.0 * 511).astype(int)
+    puff = np.clip((sea[pz, px] - 0.45) * 2.2, -1, 1)
     deep = np.clip((-e - 10) / 16, 0, 1)
     lit, sh = np.array(mood["cloud"]), np.array(mood["shade"])
     c = c + np.where((puff > 0)[..., None], (lit - c) * (0.6 * puff)[..., None], (sh - c) * (-0.4 * puff)[..., None]) \
