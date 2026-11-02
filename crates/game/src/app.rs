@@ -1855,19 +1855,16 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     if let Some((w, h, rgba)) = data.texture(&shadow) {
         renderer.set_shadow_texture(w, h, rgba);
     }
-    // the interface's textures; the own interface's picture behind its menus only with it (the copy has none)
+    // the interface's textures
     let own = gamedata::resources::in_use() == gamedata::resources::Provider::Own;
     let interface = ["Font_1", "Button01_special", "Button01_select", "Button01_deselect"];
-    let backdrop = own.then_some(crate::ui::BACKDROP);
     // the own interface draws its texts in the shipped fonts: the copy's font is not read
     let fonts = interface.into_iter().filter(|n| !(own && *n == "Font_1"));
-    for name in crate::particles::textures().into_iter().chain(fonts).chain(backdrop) {
+    for name in crate::particles::textures().into_iter().chain(fonts) {
         let t = level::Texture {
             name: name.to_owned(),
             source: level::TextureSource::File(if name.starts_with("Font_") || name.starts_with("Button") {
                 format!("{name}.tga")
-            } else if name == crate::ui::BACKDROP {
-                format!("{name}.png")
             } else {
                 format!("{name}.bmp")
             }),
@@ -1953,6 +1950,9 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         r.draw(&view, w, h, &frame_view, &inst, &particles);
         let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
         let quads = menu.map(|m| m.interface(game.font.as_ref(), screen)).unwrap_or_default();
+        if let Some((aw, ah, rgba)) = crate::fallback::take_changed() {
+            r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
+        }
         r.draw_ui(&view, w, h, &quads);
         return save_target(&r, &target, (w, h), path, game.sim.tick);
     }
@@ -2061,7 +2061,8 @@ fn save_target(r: &Renderer, target: &wgpu::Texture, (w, h): (u32, u32), path: &
 /// The scene behind the menus: the original's (MenuLevel.nmo) with the copy's interface, else ours.
 fn load_menu_scene(data: &Data) -> Option<crate::menuscene::MenuScene> {
     if gamedata::resources::in_use() == gamedata::resources::Provider::Own {
-        return None;
+        let dir = gamedata::resources::own_root()?.join("3D Entities").join("MenuLevel");
+        return crate::menuscene::MenuScene::load_open(&dir);
     }
     crate::menuscene::MenuScene::load(data)
 }

@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Draws the own interface's textures (docs/drahtseilakt/resources.md, "own"), from nothing but this script and the
-shipped Tektur font: the buttons (Button01_select / Button01_deselect), the special parts (Button01_special: the
-highscore places, the disabled level button, the life ball, the points box, the end screen's bar, the black band)
-and the picture behind the menus (Menu_Background). Each part sits where the game's code takes it from the texture
-(the UV rectangles in crates/game/src/menu.rs, hud.rs and endscreen.rs), so the own files stand in for the copy's
-by name. The look follows the original's style (violet glass panels in a steel tube with a polished ball, warm when
-chosen) from its colours and proportions only; nothing of the original is copied, traced or resampled.
+shipped Tektur font: the buttons (Button01_select / Button01_deselect) and the special parts (Button01_special: the
+highscore places, the disabled level button, the life ball and its frame, the points box, the end screen's bar, the
+black band). Each part sits where the game's code takes it from the texture (the UV rectangles in
+crates/game/src/menu.rs, hud.rs and endscreen.rs), so the own files stand in for the copy's by name.
+
+The look is the original's kind, made our own way from its measured numbers (metric.py scores how close each part
+comes): see-through glass, neutral grey or (chosen) dark red; steel tubes 2.6 texels wide, shaded as lit cylinders
+with a brushed grain; channels of three tubes with a tinted fill (lilac grey, gold when chosen) curling round a
+chrome ball that reflects a sky. Nothing of the original is copied, traced or resampled: every shape is drawn here
+from a few measured positions, widths and colours.
 
 Run from anywhere: python3 -I assets/own/make/make_interface.py
 Needs Python 3 with numpy and Pillow. The output is deterministic (fixed noise seeds).
@@ -430,150 +434,11 @@ def draw_numbers(img):
     img.alpha_composite(small, (0, 0))
 
 
-# --- the picture behind the menus --------------------------------------------------------------------------------
-
-
-def noise(shape, scale, seed, octaves=5):
-    """Fractal value noise in 0..1, tiling-free, deterministic."""
-    rng = np.random.default_rng(seed)
-    h, w = shape
-    out = np.zeros(shape, np.float32)
-    amp, total = 1.0, 0.0
-    for o in range(octaves):
-        cells = (max(2, int(h / scale * 2**o)) + 2, max(2, int(w / scale * 2**o)) + 2)
-        grid = rng.random(cells).astype(np.float32)
-        img = Image.fromarray(grid).resize((w, h), Image.BICUBIC)
-        out += np.asarray(img) * amp
-        total += amp
-        amp *= 0.5
-    return np.clip(out / total, 0, 1)
-
-
-def background(w=1600, h=900):
-    """Dusk over a sea of clouds: a violet sky warming to the horizon, the low sun's glow, drifting cloud banks, and
-    floating rails with a ball on the left and a pillar with a ball on the right (the middle is under the menus)."""
-    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
-    v = ys / h
-    horizon = 0.56
-    sky = mix(rgb(16, 22, 58), rgb(92, 64, 140), np.clip(v / horizon, 0, 1) ** 1.3)
-    sky = mix(sky, rgb(246, 168, 112), np.clip((v - horizon * 0.62) / (horizon * 0.38), 0, 1) ** 2.2)
-    # the sun's glow, low and a little right of the middle
-    sx, sy = w * 0.56, h * horizon
-    dist = np.hypot((xs - sx) / w, (ys - sy) / h * 1.6)
-    sky = sky + (np.exp(-dist * 7.0) * 0.55)[..., None] * np.array(rgb(255, 214, 160))
-    sky = sky + (np.exp(-dist * 30.0) * 0.5)[..., None] * np.array(rgb(255, 245, 220))
-    # high thin clouds
-    wisp = noise((h, w), 260, 7)
-    wisp = np.clip((wisp - 0.52) * 3.0, 0, 1) * np.clip(1 - v / horizon, 0, 1) * 0.35
-    sky = mix(sky, rgb(214, 170, 210), wisp)
-    # the cloud sea below the horizon: banks lit warm from the sun, darker towards the viewer
-    sea = noise((h, w), 140, 11, octaves=6)
-    below = np.clip((v - horizon) / (1 - horizon), 0, 1)
-    tops = np.clip((sea - 0.42 + (1 - below) * 0.25) * 2.4, 0, 1) * (v > horizon - 0.02)
-    lit = mix(rgb(250, 196, 160), rgb(120, 92, 150), below ** 0.8)
-    lit = lit + (np.exp(-dist * 4.0) * 0.25)[..., None]
-    sky = mix(sky, lit, tops * np.clip((v - horizon + 0.02) * 30, 0, 1))
-    shade = noise((h, w), 60, 13, octaves=4)
-    sky = sky * (0.92 + 0.16 * shade[..., None])
-    img = Image.fromarray(np.clip(sky * 255, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
-    scenery(img)
-    return img.convert("RGB")
-
-
-def scenery(img):
-    """The floating parts, drawn at four times the size and scaled down (smooth edges)."""
-    w, h = img.size
-    k = 2
-    layer = Image.new("RGBA", (w * k, h * k), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    # the track on the left: a wooden deck running into the distance between two steel rails, a ball on it
-    near_y, far_y = 0.97, 0.60
-    def at(t, side):
-        """A point of the deck's edge (side -1 left, 1 right, 0 the middle) at depth t (0 near, 1 far)."""
-        p = t ** 0.55
-        y = near_y + (far_y - near_y) * p
-        half = 0.15 * (1 - p) + 0.010 * p
-        x = 0.16 + 0.06 * p
-        return ((x + side * half) * w * k, y * h * k)
-    steps = 60
-    for i in range(steps):
-        t0, t1 = i / steps, (i + 1) / steps
-        lum = 1.0 - 0.45 * t0
-        # the deck's side, under its right edge (lit less), then its top
-        thick = (1 - t0 ** 0.55) * 0.022 * h * k + 1
-        a, b = at(t0, 1), at(t1, 1)
-        d.polygon([a, b, (b[0], b[1] + thick * 0.95), (a[0], a[1] + thick)], fill=(int(70 * lum), int(44 * lum),
-                  int(28 * lum), 255))
-        a, b = at(t0, -1), at(t1, -1)
-        d.polygon([a, b, (b[0], b[1] + thick * 0.95), (a[0], a[1] + thick)], fill=(int(96 * lum), int(60 * lum),
-                  int(36 * lum), 255))
-        top = [at(t0, -1), at(t0, 1), at(t1, 1), at(t1, -1)]
-        seam = i % 6 == 5
-        f = 0.82 if seam else 1.0
-        d.polygon(top, fill=(int(178 * lum * f), int(122 * lum * f), int(72 * lum * f), 255))
-    # the planks' long seams
-    for side in (-0.6, -0.2, 0.2, 0.6):
-        pts = [at(j / 40, side) for j in range(41)]
-        for j in range(40):
-            d.line([pts[j], pts[j + 1]], fill=(110, 70, 40, 255), width=max(1, int(3 * (1 - j / 40))))
-    # the rails, a little above the deck's edges
-    for side in (-0.97, 0.97):
-        pts = [at(j / 60, side) for j in range(61)]
-        for j in range(60):
-            wd = max(2, int(14 * (1 - (j / 60) ** 0.55)))
-            lift = wd * 0.9
-            p0, p1 = (pts[j][0], pts[j][1] - lift), (pts[j + 1][0], pts[j + 1][1] - lift)
-            d.line([p0, p1], fill=(212, 216, 230, 255), width=wd)
-            d.line([(p0[0], p0[1] + wd * 0.35), (p1[0], p1[1] + wd * 0.35)], fill=(96, 98, 118, 255),
-                   width=max(1, wd // 3))
-    # a wooden ball on the deck, its shadow under it
-    t = 0.18
-    cx, cy = at(t, 0.1)
-    p = t ** 0.55
-    r = (0.15 * (1 - p) + 0.010 * p) * w * k * 0.42
-    d.ellipse([cx - r * 0.9, cy - r * 0.18, cx + r * 0.9, cy + r * 0.18], fill=(60, 36, 20, 140))
-    ball_on(layer, (cx, cy - r * 0.96), r, (172, 108, 56))
-    # the pillar on the right with a stone ball on it
-    px, top, bottom, pw = 0.84 * w * k, 0.50 * h * k, 1.02 * h * k, 0.055 * w * k
-    for i in range(int(pw)):
-        t = i / pw
-        lum = 0.35 + 0.65 * np.clip(np.cos((t - 0.35) * np.pi), 0, 1)
-        col = tuple(int(c * lum) for c in (186, 170, 150))
-        d.line([(px - pw / 2 + i, top), (px - pw / 2 + i, bottom)], fill=col + (255,))
-    cap = 0.022 * h * k
-    d.rounded_rectangle([px - pw * 0.68, top - cap, px + pw * 0.68, top + cap * 0.4], radius=cap * 0.4,
-                        fill=(150, 138, 124, 255))
-    ball_on(layer, (px, top - cap - 40 * k), 40 * k, (150, 152, 160))
-    small = layer.resize((w, h), Image.LANCZOS)
-    img.alpha_composite(small)
-
-
-def ball_on(layer, centre, r, color):
-    """A shaded ball pasted into `layer`."""
-    size = int(2 * r) + 4
-    ys, xs = np.mgrid[0:size, 0:size].astype(np.float32)
-    nx, ny = (xs - size / 2) / r, (ys - size / 2) / r
-    rr = nx * nx + ny * ny
-    nz = np.sqrt(np.clip(1 - rr, 0, 1))
-    light = np.array([0.35, -0.55, 0.76])
-    light /= np.linalg.norm(light)
-    lam = np.clip(nx * light[0] + ny * light[1] + nz * light[2], 0, 1)
-    base = np.array(color, np.float32) / 255
-    col = base * (0.22 + 0.9 * lam[..., None]) + (lam ** 30)[..., None] * 0.7
-    col += (np.clip(ny, 0, 1) * 0.25)[..., None] * np.array([1.0, 0.75, 0.6])
-    edge = np.clip((1 - np.sqrt(rr)) * r, 0, 1)
-    rgba = np.concatenate([np.clip(col, 0, 1), edge[..., None]], axis=-1)
-    tile = Image.fromarray((rgba * 255).astype(np.uint8), "RGBA")
-    layer.alpha_composite(tile, (int(centre[0] - size / 2), int(centre[1] - size / 2)))
-
-
 def main():
     os.makedirs(TEXTURES, exist_ok=True)
     for name in ("select", "deselect"):
         buttons(name).save(os.path.join(TEXTURES, f"Button01_{name}.tga"), rle=False)
     special().save(os.path.join(TEXTURES, "Button01_special.tga"), rle=False)
-    if "--textures" not in sys.argv:
-        background().save(os.path.join(TEXTURES, "Menu_Background.png"), optimize=True)
     print("written to", TEXTURES)
 
 

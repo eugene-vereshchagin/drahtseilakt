@@ -150,11 +150,6 @@ pub const ROLES: &[(&str, &str)] = &[
         "3D Entities/Menu.nmo",
     ),
     ("menu: the 3D scene behind it", "3D Entities/MenuLevel.nmo"),
-    // ours only: the own interface's picture behind its menus (it stands for the original's 3D scene)
-    (
-        "menu: the own interface's picture behind it",
-        "Textures/Menu_Background.png",
-    ),
     ("texts in the copy's languages", "3D Entities/Language.nmo"),
     ("menu texts and the level table's defaults", "base.cmo"),
     (
