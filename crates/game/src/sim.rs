@@ -2952,4 +2952,39 @@ mod tests {
         assert!(sim.game_over, "three balls lost, the run must be over");
     }
 
+    /// Level 10's first sector with the player's copy (skipped without OPENBALLANCE_DATA): the way on from the spur
+    /// at the hinged bridge (P_Modul_37_01), where a wooden ball is too light to tip it. Rammed by the wooden ball, the
+    /// pusher (P_Modul_01_01) clears its pegs from the loop's west side enough to pass; the rails behind lead to the
+    /// stone transformer P_Trafo_Stone_01; back round the loop the stone ball tips the bridge, and over it the ball
+    /// rolls on south (hints/Level_10.txt; the inputs of hints/Level_10-s1-bridge.replay, from the spur as wood).
+    #[test]
+    fn level_10_s_bridge_is_crossed_after_the_stone_transformer_behind_the_pusher() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(10)).expect("level 10").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let run = crate::replay::Replay::parse(include_str!("../../../hints/Level_10-s1-bridge.replay")).expect("replay");
+        let start = run.start.clone().expect("a run from the spur");
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+        sim.start_from(start.sector - 1, start.ball.as_deref().and_then(BallKind::from_name), start.at.map(Vec3::from));
+        let mut stone_at = None;
+        for t in 1..=run.end {
+            sim.step(run.input_at(t));
+            if stone_at.is_none() && sim.ball.kind == BallKind::Stone {
+                stone_at = Some(sim.ball.position);
+            }
+        }
+        let trafo = Vec3::new(331.7, -9.6, -89.6);
+        assert!(
+            stone_at.is_some_and(|p| (p - trafo).length() < TRAFO_REACH + 1.0),
+            "made stone at {stone_at:?}, not at P_Trafo_Stone_01"
+        );
+        let p = sim.ball.position;
+        assert_eq!(sim.lives, 3, "a ball was lost");
+        // south of the gap the bridge spans (z -78 to -65 at x 291.5), on the floor
+        assert!(p.z > -60.0 && (p.x - 291.5).abs() < 2.0 && p.y > -9.0, "the ball at {p:?}");
+    }
+
 }
