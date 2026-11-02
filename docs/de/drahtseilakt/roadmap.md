@@ -48,7 +48,12 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   Manager aus Gameplay.nmo) oder bis zum Verlust der Kugel, dann ausgeblendet); vor den Stücken aufgenommene Replays
   (Format 1) laufen ohne sie, vor den 20 s aufgenommene (Format 2) mit Stücken, die bis zum Verlust der Kugel liegen. Der Rauch der Kugel pufft, wenn sie erscheint und
   wenn sie zerspringt (BallParticle_Frame script).
-- **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert.
+- **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert. Ein
+  exportiertes Level ist vollständig: es trägt seine Einstellungen (Musik, Licht, Bonus, Tutorial, letztes Level) und
+  in seinem Ordner `game/` seine Module, die Kugeln, den Transformator, Himmel, Partikel, Schatten und Klänge, sodass
+  es mit nichts aus der Kopie außer der Oberfläche spielt. Die beendeten Läufe des Inhabers in Level 1, 3, 5, 7 und 9
+  (tests/replays/) ergeben auf der `.nmo` und auf ihrem Export dieselben Ereignisse (crates/game/tests/open_format.rs),
+  auch mit einer Kopie, die nur die Dateien der Oberfläche hat.
 
 
 ## Phase 0 — Ballanced prüfen, bevor ein Backend geschrieben wird

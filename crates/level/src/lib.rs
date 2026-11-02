@@ -7,6 +7,18 @@
 pub mod from_nmo;
 pub mod open;
 
+/// The module a level object is named after: its name without the trailing `_NN` (digits, then any letters:
+/// `P_Box_03` is `P_Box`, `P_Trafo_Stone_03a` is `P_Trafo_Stone`); a name without one is its own.
+pub fn module_name(object: &str) -> &str {
+    match object.rsplit_once('_') {
+        Some((head, tail)) => {
+            let digits = tail.trim_end_matches(|c: char| c.is_ascii_alphabetic());
+            if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) { head } else { object }
+        }
+        None => object,
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Level {
     pub meshes: Vec<Mesh>,
@@ -208,5 +220,17 @@ impl Level {
             .iter()
             .filter(move |g| g.members.contains(&object))
             .map(|g| g.name.as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_placeholder_names_its_module_with_or_without_a_letter() {
+        assert_eq!(super::module_name("P_Box_03"), "P_Box");
+        assert_eq!(super::module_name("P_Trafo_Stone_03a"), "P_Trafo_Stone");
+        assert_eq!(super::module_name("P_Modul_18_10a"), "P_Modul_18");
+        assert_eq!(super::module_name("P_Trafo_Stone_ab"), "P_Trafo_Stone_ab", "letters alone are no number");
+        assert_eq!(super::module_name("Floor"), "Floor");
     }
 }

@@ -44,7 +44,11 @@ new engine got level 1 playable, ahead of the phase order:
   (format 1) play without them, and those recorded before the 20 s (format 2) with the pieces lying until the ball
   is lost. The ball's smoke puffs when it appears and when it
   bursts (BallParticle_Frame script).
-- **Phase 6**: open format v1 with export and import; level 1 round-trips identically.
+- **Phase 6**: open format v1 with export and import; level 1 round-trips identically. An exported level is whole:
+  it carries its settings (music, light, bonus, tutorial, last level) and, in its `game/` folder, its modules, the
+  balls, the transformer, its sky, particles, shadow and sounds, so it plays with nothing of the copy but the
+  interface. The owner's finished runs of levels 1, 3, 5, 7 and 9 (tests/replays/) give the same events on the `.nmo`
+  and on its export (crates/game/tests/open_format.rs), also with a copy holding only the interface's files.
 
 
 ## Phase 0 — evaluate Ballanced before writing a backend

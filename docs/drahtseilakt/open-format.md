@@ -12,7 +12,15 @@ A folder holding:
 - `level.gltf` — [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) (JSON);
 - `level.bin` — its binary buffer (the only buffer, referenced by that name);
 - `textures/NNNN_name.png` — one image per texture; an image's `uri` must name a plain file directly in `textures/`
-  (no further folders), else the level is refused.
+  (no further folders), else the level is refused;
+- `game/` — the game's files the level uses, by their paths in the player's copy, so that it plays without the
+  copy's level files: its parts in this same open format, each a folder named by its file without `.nmo`
+  (`game/3D Entities/Balls/`, `game/3D Entities/AnimTrafo/`, `game/3D Entities/PH/P_Box/`...: the balls, the
+  transformer and the module of every object named after one), and as they are its sky's faces
+  (`game/Textures/Sky/`), the particles' textures (`game/Textures/Particles/`), the ball's shadow and the sounds a run
+  plays (`game/Sounds/`, not the menu's nor other levels' music). The game looks there first, then in the copy;
+  any part of a path in `game/` that is a link finds nothing. Only the interface (menus, font, buttons, the menu's
+  sounds and scene) still comes from the copy. `--export` and the toolbox write it.
 
 ## Contents
 

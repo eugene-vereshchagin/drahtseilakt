@@ -2467,7 +2467,7 @@ mod tests {
             return;
         };
         let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
-        let modules = crate::scene::load_modules(&level, &data, false);
+        let modules = crate::scene::load_modules(&level, &data);
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
         sim.start_from(3, None, Some(Vec3::new(704.0, -9.0, -873.7)));
         for t in 0..400 {
@@ -2498,7 +2498,7 @@ mod tests {
             return;
         };
         let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
-        let modules = crate::scene::load_modules(&level, &data, false);
+        let modules = crate::scene::load_modules(&level, &data);
         let at = Vec3::new(1016.67, 49.0, -366.74);
         let height = |kind| {
             let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
@@ -2530,7 +2530,7 @@ mod tests {
             return;
         };
         let level = data.load(&crate::assets::Source::Original(8)).expect("level 8").level;
-        let modules = crate::scene::load_modules(&level, &data, false);
+        let modules = crate::scene::load_modules(&level, &data);
         let cases: [(usize, f32, &[(u64, f32)]); 2] = [
             (2, 572.15, &[(135, 1.86), (255, -5.31), (510, 7.26), (600, -7.54)]),
             (4, 865.12, &[(30, 2.53), (105, -5.13), (180, 6.33), (480, -4.57)]),
@@ -2568,7 +2568,7 @@ mod tests {
             return;
         };
         let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
-        let modules = crate::scene::load_modules(&level, &data, false);
+        let modules = crate::scene::load_modules(&level, &data);
         let drop = |kind| {
             let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
             let plate = sim.breaks.first().expect("module 29").at.near;
@@ -2605,7 +2605,7 @@ mod tests {
             return;
         };
         let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
-        let modules = crate::scene::load_modules(&level, &data, false);
+        let modules = crate::scene::load_modules(&level, &data);
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
         let route: [(u64, u8); 9] = [(1, 0), (40, 1), (140, 0), (170, 8), (230, 0), (260, 2), (330, 0), (360, 4), (400, 0)];
         let input = |t: u64| route.iter().rev().find(|r| r.0 <= t).map_or(0, |r| r.1);
@@ -2635,7 +2635,7 @@ mod tests {
             return;
         };
         let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
-        let modules = crate::scene::load_modules(&level, &data, false);
+        let modules = crate::scene::load_modules(&level, &data);
         let push = |kind| {
             let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
             sim.start_from(1, Some(kind), Some(Vec3::new(132.0, -7.0, -563.03)));
@@ -2661,7 +2661,7 @@ mod tests {
             return;
         };
         let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
-        let modules = crate::scene::load_modules(&level, &data, false);
+        let modules = crate::scene::load_modules(&level, &data);
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
         sim.start_from(0, None, Some(sim.ball.position + Vec3::Y * 6.0));
         let (mut hits, mut rolls) = (Vec::new(), Vec::new());
@@ -2685,7 +2685,7 @@ mod tests {
             return;
         };
         let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
-        let modules = crate::scene::load_modules(&level, &data, false);
+        let modules = crate::scene::load_modules(&level, &data);
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
         assert!(!sim.extras.is_empty(), "the module's small balls");
         let at = sim.extras[0].center();

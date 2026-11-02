@@ -75,8 +75,8 @@ docs and the folders' READMEs are also in Simplified Chinese, next to English, R
 3. Done: `--import` from an installed game or from the CD image (the game also finds the imported copy
    without `--data`). The European CD's 318 game files come out identical to an installed copy.
 4. The custom levels menu reading `community/` and `open/`; `remastered/` is made by `drahtseilakt-toolbox remaster`:
-   the converter (phase 6), rounder shapes and the textures N times larger; the parts all levels share (the balls,
-   the modules, the transformer) are remade the same way into the hidden `remastered/.shared/`, and a remastered
-   level draws them so (Real-ESRGAN when installed, else Lanczos; phase 7). An original level
+   the converter (phase 6), rounder shapes and the textures N times larger; each level's parts (the balls,
+   the modules, the transformer) are remade the same way into its own `game/` folder with its sky and sounds, so it
+   plays without the copy's level files (open-format.md) (Real-ESRGAN when installed, else Lanczos; phase 7). An original level
    the copy lacks (a copy without level 13) is played in the levels menu from its export in `remastered/`.
 5. Levels that come with the game, as authors offer them.

@@ -221,18 +221,6 @@ fn has_material(level: &Level, mesh: usize) -> bool {
         .is_some_and(|m| m.parts.iter().any(|p| p.material.is_some()))
 }
 
-/// A placeholder's module: its object name without the trailing `_NN`, which may end in letters (`P_Box_03` →
-/// `P_Box`; level 4 has `P_Trafo_Stone_03a`, `P_Modul_18_10a`: a second placeholder by an earlier one).
-fn module_name(object: &str) -> &str {
-    match object.rsplit_once('_') {
-        Some((head, tail)) => {
-            let digits = tail.trim_end_matches(|c: char| c.is_ascii_alphabetic());
-            if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) { head } else { object }
-        }
-        None => object,
-    }
-}
-
 /// The module a level object stands in for: a visible mesh without any material and without a marker group is an
 /// editor stand-in, which the original replaces with its module (named by the object without its `_NN`).
 pub fn module_of(level: &Level, i: usize) -> Option<&str> {
@@ -244,11 +232,11 @@ pub fn module_of(level: &Level, i: usize) -> Option<&str> {
     let marker = level
         .groups_of(i)
         .any(|g| MARKERS.iter().any(|m| m.0.eq_ignore_ascii_case(g)));
-    (!marker).then(|| module_name(&o.name))
+    (!marker).then(|| level::module_name(&o.name))
 }
 
 /// Loads every module the level's stand-ins name, once each (a missing or unreadable file is left out).
-pub fn load_modules(level: &Level, data: &crate::assets::Data, remastered: bool) -> Modules {
+pub fn load_modules(level: &Level, data: &crate::assets::Data) -> Modules {
     let mut modules = Modules::default();
     let mut tried: Vec<String> = Vec::new();
     for i in 0..level.objects.len() {
@@ -257,14 +245,14 @@ pub fn load_modules(level: &Level, data: &crate::assets::Data, remastered: bool)
             continue;
         }
         tried.push(name.to_owned());
-        if let Some(m) = data.part(&format!("3D Entities/PH/{name}.nmo"), remastered) {
+        if let Some(m) = data.part(&format!("3D Entities/PH/{name}.nmo")) {
             modules.models.push(m.level);
             modules.names.push(name.to_owned());
         }
     }
     // the extra points' module, for where its small balls start (its stand-ins are drawn as markers)
     if level.group("P_Extra_Point").is_some()
-        && let Some(m) = data.part("3D Entities/PH/P_Extra_Point.nmo", remastered)
+        && let Some(m) = data.part("3D Entities/PH/P_Extra_Point.nmo")
     {
         modules.models.push(m.level);
         modules.names.push("P_Extra_Point".to_owned());
@@ -530,19 +518,5 @@ pub fn view(s: &Snapshot) -> View {
         eye: s.eye,
         target: s.target,
         fov_y: fov_y(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_placeholder_names_its_module_with_or_without_a_letter() {
-        assert_eq!(module_name("P_Box_03"), "P_Box");
-        assert_eq!(module_name("P_Trafo_Stone_03a"), "P_Trafo_Stone");
-        assert_eq!(module_name("P_Modul_18_10a"), "P_Modul_18");
-        assert_eq!(module_name("P_Trafo_Stone_ab"), "P_Trafo_Stone_ab", "letters alone are no number");
-        assert_eq!(module_name("Floor"), "Floor");
     }
 }

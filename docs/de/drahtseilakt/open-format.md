@@ -13,7 +13,15 @@ Ein Ordner mit:
 - `level.gltf` — [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) (JSON);
 - `level.bin` — sein Binärpuffer (der einzige, unter diesem Namen);
 - `textures/NNNN_name.png` — ein Bild je Textur; die `uri` eines Bildes muss eine einfache Datei direkt in `textures/`
-  nennen (keine weiteren Ordner), sonst wird das Level abgelehnt.
+  nennen (keine weiteren Ordner), sonst wird das Level abgelehnt;
+- `game/` — die Dateien des Spiels, die das Level benutzt, nach ihren Pfaden in der Kopie des Spielers, damit es
+  ohne die Leveldateien der Kopie spielt: seine Teile im selben offenen Format, jedes ein Ordner mit dem Dateinamen
+  ohne `.nmo` (`game/3D Entities/Balls/`, `game/3D Entities/AnimTrafo/`, `game/3D Entities/PH/P_Box/`...: die
+  Kugeln, der Transformator und das Modul jedes danach benannten Objekts), und unverändert die Seiten seines Himmels
+  (`game/Textures/Sky/`), die Texturen der Partikel (`game/Textures/Particles/`), der Schatten der Kugel und die
+  Geräusche eines Laufs (`game/Sounds/`, nicht die des Menüs noch die Musik anderer Level). Das Spiel sucht zuerst
+  dort, dann in der Kopie; ein Pfad in `game/`, auf dem etwas ein Link ist, findet nichts. Nur die Oberfläche (Menüs,
+  Schrift, Knöpfe, Klänge und Szene des Menüs) kommt noch aus der Kopie. `--export` und die Toolbox schreiben ihn.
 
 ## Inhalt
 

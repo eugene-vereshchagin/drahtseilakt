@@ -143,12 +143,9 @@ impl Game {
         for w in &level.warnings {
             eprintln!("warning: {w}");
         }
-        // a remastered level's shared parts (balls, modules, transformer) are drawn as the toolbox remade them, each
-        // level with the whole budget of their pixels
-        let remastered = o.source.remastered();
-        gamedata::assets::reset_pixel_budget();
+        // the shared parts (balls, modules, transformer): the level folder's own when it has them, else the copy's
         let balls = data
-            .part("3D Entities/Balls.nmo", remastered)
+            .part("3D Entities/Balls.nmo")
             .ok_or("Balls.nmo not found or unreadable in the game data")?;
         let replay_in = match &o.replay {
             Some(p) => {
@@ -175,7 +172,7 @@ impl Game {
             .as_deref()
             .and_then(crate::sim::BallKind::from_name)
             .unwrap_or(crate::sim::BallKind::Wood);
-        let modules = scene::load_modules(&level.level, data, remastered);
+        let modules = scene::load_modules(&level.level, data);
         let extra_model = scene::ExtraModel::new(&modules);
         // The original's level 1 begins with its tutorial, which stops the level before the ball comes (the level's
         // settings say so: an .nmo's from the game's table, an open-format level's its own).
@@ -202,10 +199,7 @@ impl Game {
         }
         let mut replay_out = Replay::new(&level.name, level.hash);
         replay_out.start = start.clone();
-        let module_file = |name: &str| {
-            let path = data.file(&format!("3D Entities/PH/{name}.nmo"))?;
-            crate::assets::load_nmo(&path).ok().map(|m| m.level)
-        };
+        let module_file = |name: &str| data.part(&format!("3D Entities/PH/{name}.nmo")).map(|m| m.level);
         let effects = crate::particles::Effects::new(&level.level, &module_file);
         let mut placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
         if effects.has_flames() {
@@ -219,7 +213,7 @@ impl Game {
         }
         let trafo_model = scene::FIRST_MODULE_MODEL + modules.models.len();
         let trafo = data
-            .part("3D Entities/AnimTrafo.nmo", remastered)
+            .part("3D Entities/AnimTrafo.nmo")
             .and_then(|f| crate::trafo::TrafoModel::new(&f.level, trafo_model).map(|m| (f, m)));
         Ok(Game {
             trafo,
@@ -728,6 +722,8 @@ pub fn replay_dir() -> PathBuf {
 }
 
 pub fn run(o: Options, data: Data) -> Result<(), String> {
+    // a level folder's own game files (modules, sky, sounds) come before the copy's
+    let data = data.for_level(data.level_dir(&o.source).as_deref());
     if let Some(dir) = &o.export {
         let loaded = data.load(&o.source)?;
         return crate::assets::export(&data, &loaded, dir);
@@ -1829,6 +1825,7 @@ impl App {
         };
         o.source = source;
         (o.replay, o.from, o.sector, o.at, o.ball) = (None, None, None, None, None);
+        self.data = self.data.for_level(self.data.level_dir(&o.source).as_deref());
         let mut game = Game::new(&o, &self.data)?;
         game.start_session();
         self.game = game;

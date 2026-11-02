@@ -19,14 +19,16 @@ fn dir(name: &str) -> PathBuf {
 #[test]
 fn settings_survive_the_round_trip() {
     let d = dir("trip");
-    let mut l = Level::default();
-    l.settings = Settings {
-        music: Some(3),
-        light: Some([1.0, 0.5, 0.25]),
-        level_bonus: Some(2000),
-        tutorial: true,
-        last_level: true,
-        source_hash: Some(0x0123_4567_89ab_cdef),
+    let l = Level {
+        settings: Settings {
+            music: Some(3),
+            light: Some([1.0, 0.5, 0.25]),
+            level_bonus: Some(2000),
+            tutorial: true,
+            last_level: true,
+            source_hash: Some(0x0123_4567_89ab_cdef),
+        },
+        ..Level::default()
     };
     level::open::export(&l, &d).unwrap();
     assert_eq!(level::open::import(&d).unwrap().settings, l.settings);

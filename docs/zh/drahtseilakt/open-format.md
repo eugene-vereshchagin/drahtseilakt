@@ -8,7 +8,8 @@
 
 - `level.gltf` —— [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html)（JSON）；
 - `level.bin` —— 其二进制缓冲区（唯一的缓冲区，按此名称引用）；
-- `textures/NNNN_name.png` —— 每个纹理一张图片；图片的 `uri` 必须直接指向 `textures/` 中的普通文件（不能有更深的文件夹），否则关卡会被拒绝。
+- `textures/NNNN_name.png` —— 每个纹理一张图片；图片的 `uri` 必须直接指向 `textures/` 中的普通文件（不能有更深的文件夹），否则关卡会被拒绝；
+- `game/` —— 关卡使用的游戏文件，按其在玩家拷贝中的路径存放，使关卡无需拷贝中的关卡文件也能游玩：它的部件采用同样的开放格式，每个部件是一个以文件名（去掉 `.nmo`）命名的文件夹（`game/3D Entities/Balls/`、`game/3D Entities/AnimTrafo/`、`game/3D Entities/PH/P_Box/`……：球、变球器以及每个以其命名的对象所对应的模块），另外原样存放其天空的各面（`game/Textures/Sky/`）、粒子纹理（`game/Textures/Particles/`）、球的阴影以及一次游玩会播放的声音（`game/Sounds/`，不含菜单声音和其他关卡的音乐）。游戏先在那里查找，再到拷贝中查找；`game/` 中路径上任何一环是链接时都找不到文件。只有界面（菜单、字体、按钮、菜单的声音和场景）仍来自拷贝。`--export` 和 toolbox 会写入它。
 
 ## 内容
 

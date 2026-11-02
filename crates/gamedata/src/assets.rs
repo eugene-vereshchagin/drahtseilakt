@@ -7,115 +7,18 @@ use std::path::{Path, PathBuf};
 const IMAGE_MAX: u64 = 64 * 1024 * 1024;
 const SIDE_MAX: u32 = 8192;
 
-/// Where the toolbox keeps its remade copy of a game file the levels share (the balls, the modules, the
-/// transformer; `relative` as "3D Entities/PH/P_Ball_Wood.nmo"): levels/remastered/.shared/ and the file's path
-/// without its extension, in lower case (the game's names do not agree on case), a folder in the open format.
-pub fn remade_dir(relative: &str) -> PathBuf {
-    let stem = Path::new(&relative.to_lowercase()).with_extension("");
-    crate::profile::dir(crate::profile::Kind::Remastered).join(".shared").join(stem)
-}
+/// The folder of a level that keeps the game's files it uses (its modules, the balls, the transformer, its sky,
+/// particles, shadow and sounds), by their paths in the player's copy; a level that has it plays without the copy's
+/// level files (docs/drahtseilakt/open-format.md).
+pub const GAME_FILES: &str = "game";
 
-/// Gives a game file's level what the toolbox remade of it, when there is a remade copy that matches it: each
-/// mesh's finer look, and each texture's larger file. The level's own meshes stay as they are, so the physics does
-/// not change. A remade copy that does not match (another copy of the game, an older toolbox) is left unused.
-pub fn graft(level: &mut level::Level, remade: &Path) {
-    graft_within(level, &crate::profile::dir(crate::profile::Kind::Remastered), remade);
-}
-
-/// [`graft`] with the remade copy inside `root`: real folders from `root` down, never through a link, and its parts
-/// small (a part's buffer and its textures' pixels are capped, the textures of all parts together too).
-pub fn graft_within(level: &mut level::Level, root: &Path, remade: &Path) {
-    if !real_folders(root, &remade.join("textures")) {
-        return;
-    }
-    let small = std::fs::symlink_metadata(remade.join("level.bin")).is_ok_and(|m| m.is_file() && m.len() <= PART_MAX);
-    if !small {
-        return;
-    }
-    let Ok(r) = level::open::import(remade) else { return };
-    let written: Vec<&mut level::Mesh> = level.meshes.iter_mut().filter(|m| level::open::written(m)).collect();
-    let same = written.len() == r.meshes.len() && written.iter().zip(&r.meshes).all(|(m, rm)| m.name == rm.name);
-    // the part's own textures first, in its order; the remade copy may add its normal maps after them
-    let own = level.textures.len();
-    let textures = r.textures.len() >= own
-        && r.textures.len() <= own.saturating_add(own).saturating_add(16)
-        && level.textures.iter().zip(&r.textures).all(|(t, rt)| t.name == rt.name);
-    let materials = level.materials.len() == r.materials.len()
-        && level.materials.iter().zip(&r.materials).all(|(m, rm)| m.name == rm.name);
-    if !same || !textures || !materials {
-        return;
-    }
-    for (m, rm) in written.into_iter().zip(r.meshes) {
-        m.look = rm.look;
-    }
-    let mut remade = r.textures.into_iter();
-    for (t, rt) in level.textures.iter_mut().zip(remade.by_ref()) {
-        if let level::TextureSource::File(p) = &rt.source
-            && take_pixels(p)
-        {
-            t.source = rt.source;
-        }
-    }
-    // the added ones (a normal map past the pixels allowed is left without its file, and draws flat)
-    for mut rt in remade {
-        let usable = matches!(&rt.source, level::TextureSource::File(p) if take_pixels(p));
-        if !usable {
-            rt.source = level::TextureSource::None;
-        }
-        level.textures.push(rt);
-    }
-    for (m, rm) in level.materials.iter_mut().zip(&r.materials) {
-        m.normal = rm.normal.filter(|&t| t < level.textures.len());
-    }
-}
-
-/// The largest buffer of a remade part, and the most texture pixels all remade parts may bring (1 GB of RGBA).
-const PART_MAX: u64 = 64 * 1024 * 1024;
-const PIXELS_MAX: u64 = 256 * 1024 * 1024;
-static PIXELS_TAKEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
-/// A remade texture may be used: its file is a plain one and its pixels (read from its header) still fit in what the
-/// remade parts may bring together; they are counted as taken.
-/// A new level starts with the whole budget of remade texture pixels again (what an earlier one took is let go).
-pub fn reset_pixel_budget() {
-    PIXELS_TAKEN.store(0, std::sync::atomic::Ordering::Relaxed);
-}
-
-fn take_pixels(path: &str) -> bool {
-    use std::sync::atomic::Ordering;
-    let plain = std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
-    let Some((w, h)) = plain
-        .then(|| image::ImageReader::open(path).ok()?.with_guessed_format().ok()?.into_dimensions().ok())
-        .flatten()
-    else {
-        return false;
-    };
-    let n = u64::from(w).saturating_mul(u64::from(h));
-    let mut taken = PIXELS_TAKEN.load(Ordering::Relaxed);
-    loop {
-        let Some(next) = taken.checked_add(n).filter(|&t| t <= PIXELS_MAX) else {
-            return false;
-        };
-        match PIXELS_TAKEN.compare_exchange_weak(taken, next, Ordering::Relaxed, Ordering::Relaxed) {
-            Ok(_) => return true,
-            Err(now) => taken = now,
-        }
-    }
-}
-
-/// Every folder from `root` down to `dir` is a real folder (no link on the way), `dir` inside `root`.
-fn real_folders(root: &Path, dir: &Path) -> bool {
-    let Ok(rest) = dir.strip_prefix(root) else { return false };
-    let mut at = root.to_path_buf();
-    std::fs::symlink_metadata(&at).is_ok_and(|m| m.is_dir())
-        && rest.components().all(|c| {
-            at.push(c);
-            matches!(c, std::path::Component::Normal(_)) && std::fs::symlink_metadata(&at).is_ok_and(|m| m.is_dir())
-        })
-}
+/// The largest game file a level folder may hold (a sound, a picture).
+const GAME_FILE_MAX: u64 = 64 * 1024 * 1024;
 
 pub struct Data {
     pub root: PathBuf,
+    /// The game files of the level being played (`<level>/game`), looked in before the copy.
+    pub overlay: Option<PathBuf>,
 }
 
 /// Where a level comes from.
@@ -156,7 +59,7 @@ impl Data {
         };
         for root in candidates {
             if playable(&root) {
-                return Ok(Data { root });
+                return Ok(Data { root, overlay: None });
             }
         }
         Err(
@@ -168,7 +71,36 @@ impl Data {
 
     /// A file of the copy by its path inside it (`/` between parts, any case). Names come from levels, which may be
     /// hostile: a part that is empty, `.` or `..`, or holds `\` or `:`, finds nothing (it could leave the copy).
+    /// The folder of the level `source` names, when it is one (an open-format level, or an original the copy lacks
+    /// played from its remastered export).
+    pub fn level_dir(&self, source: &Source) -> Option<PathBuf> {
+        match source {
+            Source::Open(dir) => Some(dir.clone()),
+            Source::Original(n) => match self.original(*n) {
+                Some(Source::Open(dir)) => Some(dir),
+                _ => None,
+            },
+            Source::Nmo(_) => None,
+        }
+    }
+
+    /// The same copy for playing the level in `level_dir`: its own game files (if it has them) first.
+    pub fn for_level(&self, level_dir: Option<&Path>) -> Data {
+        Data {
+            root: self.root.clone(),
+            overlay: level_dir.map(|d| d.join(GAME_FILES)),
+        }
+    }
+
     pub fn file(&self, relative: &str) -> Option<PathBuf> {
+        if let Some(found) = self.overlay.as_deref().and_then(|o| plain_path(o, relative)) {
+            return Some(found);
+        }
+        self.copy_file(relative)
+    }
+
+    /// A file of the copy itself (never the level's own).
+    fn copy_file(&self, relative: &str) -> Option<PathBuf> {
         relative.split('/').try_fold(self.root.clone(), |dir, part| {
             let plain = !matches!(part, "" | "." | "..") && !part.contains(['\\', ':']);
             plain.then(|| find(&dir, part)).flatten()
@@ -185,14 +117,14 @@ impl Data {
         dir.join("level.gltf").is_file().then_some(Source::Open(dir))
     }
 
-    /// A game file the levels share (`relative` as "3D Entities/Balls.nmo"), with what the toolbox remade of it when
-    /// `remastered` (a remastered level is played).
-    pub fn part(&self, relative: &str, remastered: bool) -> Option<LoadedLevel> {
-        let mut loaded = load_nmo(&self.file(relative)?).ok()?;
-        if remastered {
-            graft(&mut loaded.level, &remade_dir(relative));
+    /// A game file the levels share (`relative` as "3D Entities/Balls.nmo"): the level's own copy of it in the open
+    /// format when it has one (`<level>/game/3D Entities/Balls/`), else the copy's file.
+    pub fn part(&self, relative: &str) -> Option<LoadedLevel> {
+        let stem = relative.strip_suffix(".nmo").or_else(|| relative.strip_suffix(".NMO")).unwrap_or(relative);
+        if let Some(dir) = self.overlay.as_deref().and_then(|o| plain_path(o, stem)) {
+            return load_open(&dir).ok();
         }
-        Some(loaded)
+        load_nmo(&self.copy_file(relative)?).ok()
     }
 
     pub fn load(&self, source: &Source) -> Result<LoadedLevel, String> {
@@ -416,22 +348,30 @@ pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {
 }
 
 /// Writes a level in the open format into `dir`, with its textures as PNG files (from the player's copy).
+/// Exports a level into `dir` in the open format with its textures, and with the game files it uses (its modules,
+/// the balls, the transformer, its sky, particles, shadow and sounds) in `dir/game`, so that it plays without the
+/// copy's level files.
 pub fn export(data: &Data, loaded: &LoadedLevel, dir: &Path) -> Result<(), String> {
-    level::open::export(&loaded.level, dir)?;
-    let mut missing = 0usize;
-    for (i, t) in loaded.level.textures.iter().enumerate() {
-        let path = dir.join(level::open::texture_file(i, &t.name));
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        match data.texture(t) {
-            Some((w, h, rgba)) => {
-                image::save_buffer(&path, &rgba, w, h, image::ExtendedColorType::Rgba8)
-                    .map_err(|e| e.to_string())?
-            }
-            None => missing = missing.saturating_add(1),
-        }
+    let missing = export_level(data, &loaded.level, dir)?;
+    let game = dir.join(GAME_FILES);
+    let mut parts = 0usize;
+    for rel in parts_used(data, &loaded.level) {
+        let Some(part) = data.part(&rel) else { continue };
+        let stem = rel.strip_suffix(".nmo").or_else(|| rel.strip_suffix(".NMO")).unwrap_or(&rel);
+        export_level(data, &part.level, &game.join(stem))?;
+        parts = parts.saturating_add(1);
     }
+    let mut files = 0usize;
+    std::fs::create_dir_all(&game).map_err(|e| format!("{}: {e}", game.display()))?;
+    for rel in files_used(data, &loaded.level) {
+        let Some(src) = data.file(&rel) else { continue };
+        copy_into(&src, &game, &rel)?;
+        files = files.saturating_add(1);
+    }
+    println!(
+        "{}: {parts} modules and parts, {files} game files (sky, particles, shadow, sounds)",
+        game.display()
+    );
     println!(
         "{} written: {} objects, {} meshes, {} materials, {} textures ({missing} not found), {} groups",
         dir.display(),
@@ -442,6 +382,159 @@ pub fn export(data: &Data, loaded: &LoadedLevel, dir: &Path) -> Result<(), Strin
         loaded.level.groups.len()
     );
     Ok(())
+}
+
+/// Writes one level (or part) in the open format with its textures; returns how many textures were not found.
+fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<usize, String> {
+    level::open::export(level, dir)?;
+    let mut missing = 0usize;
+    for (i, t) in level.textures.iter().enumerate() {
+        let path = dir.join(level::open::texture_file(i, &t.name));
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        match data.texture(t) {
+            Some((w, h, rgba)) => {
+                image::save_buffer(&path, &rgba, w, h, image::ExtendedColorType::Rgba8).map_err(|e| e.to_string())?
+            }
+            None => missing = missing.saturating_add(1),
+        }
+    }
+    Ok(missing)
+}
+
+/// The shared parts a level uses, by their paths in the copy: the balls, the transformer, and the module of every
+/// object named after one (`P_Box_03` is P_Box, `PC_TwoFlames_01` the flames), as the copy names their files.
+pub fn parts_used(data: &Data, level: &level::Level) -> Vec<String> {
+    let mut out = vec!["3D Entities/Balls.nmo".to_owned(), "3D Entities/AnimTrafo.nmo".to_owned()];
+    let Some(ph) = data.file("3D Entities/PH") else { return out };
+    let Ok(listed) = std::fs::read_dir(&ph) else { return out };
+    let mut names: Vec<String> = listed
+        .flatten()
+        .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+        .filter(|n| n.to_ascii_lowercase().ends_with(".nmo"))
+        .filter(|n| {
+            let stem = n.get(..n.len().saturating_sub(4)).unwrap_or_default();
+            level.objects.iter().any(|o| level::module_name(&o.name).eq_ignore_ascii_case(stem))
+        })
+        .take(1024)
+        .collect();
+    names.sort();
+    out.extend(names.into_iter().map(|n| format!("3D Entities/PH/{n}")));
+    out
+}
+
+/// The game files a level uses besides its parts, by their paths in the copy: its sky's six faces, the particles'
+/// textures, the ball's shadow, and the sounds a run plays (not the menu's, nor other levels' music themes).
+pub fn files_used(data: &Data, level: &level::Level) -> Vec<String> {
+    let listed = |rel: &str| -> Vec<String> {
+        let Some(dir) = data.file(rel) else { return Vec::new() };
+        let mut v: Vec<String> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+            .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+            .take(4096)
+            .collect();
+        v.sort();
+        v
+    };
+    let mut out = Vec::new();
+    if let Some(letter) = &level.sky {
+        let prefix = format!("sky_{}_", letter.to_ascii_lowercase());
+        out.extend(
+            listed("Textures/Sky")
+                .into_iter()
+                .filter(|n| n.to_ascii_lowercase().starts_with(&prefix))
+                .map(|n| format!("Textures/Sky/{n}")),
+        );
+    }
+    out.extend(listed("Textures/Particles").into_iter().map(|n| format!("Textures/Particles/{n}")));
+    out.extend(
+        listed("Textures")
+            .into_iter()
+            .filter(|n| n.to_ascii_lowercase().starts_with("hardshadow."))
+            .map(|n| format!("Textures/{n}")),
+    );
+    let theme = level.settings.music.map(|m| format!("music_theme_{m}_"));
+    out.extend(
+        listed("Sounds")
+            .into_iter()
+            .filter(|n| {
+                let l = n.to_ascii_lowercase();
+                let interface = l.starts_with("menu_") || l.starts_with("atari") || l.starts_with("music_highscore");
+                let other_theme = l.starts_with("music_theme_") && theme.as_ref().is_none_or(|t| !l.starts_with(t));
+                l.ends_with(".wav") && !interface && !other_theme
+            })
+            .map(|n| format!("Sounds/{n}")),
+    );
+    out
+}
+
+/// A path inside `root` by its parts (`/` between them, any case), every step a real folder or file of `root`'s
+/// own: a part that is empty, `.` or `..`, holds `\\` or `:`, or is a link finds nothing (a level folder is the
+/// player's or a stranger's, and must not lead out of itself).
+fn plain_path(root: &Path, relative: &str) -> Option<PathBuf> {
+    if !std::fs::symlink_metadata(root).is_ok_and(|m| m.is_dir()) {
+        return None;
+    }
+    relative.split('/').try_fold(root.to_path_buf(), |dir, part| {
+        if matches!(part, "" | "." | "..") || part.contains(['\\', ':']) {
+            return None;
+        }
+        let entry = std::fs::read_dir(&dir)
+            .ok()?
+            .flatten()
+            .take(4096)
+            .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(part))?;
+        let kind = entry.file_type().ok()?;
+        (!kind.is_symlink()).then(|| entry.path())
+    })
+}
+
+/// Copies a game file into a level's game folder `root` at `relative` (its path in the copy): the source a plain file
+/// of at most GAME_FILE_MAX, `root` a real folder, the folders under it made one by one and never links, the file
+/// written beside and moved into place.
+pub fn copy_into(src: &Path, root: &Path, relative: &str) -> Result<(), String> {
+    use std::io::Read;
+    if !std::fs::metadata(src).is_ok_and(|m| m.is_file()) {
+        return Err(format!("{}: not a plain file", src.display()));
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(src)
+        .and_then(|f| f.take(GAME_FILE_MAX.saturating_add(1)).read_to_end(&mut bytes))
+        .map_err(|e| format!("{}: {e}", src.display()))?;
+    if u64::try_from(bytes.len()).map_or(true, |n| n > GAME_FILE_MAX) {
+        return Err(format!("{}: too big", src.display()));
+    }
+    if !std::fs::symlink_metadata(root).is_ok_and(|m| m.is_dir()) {
+        return Err(format!("{}: not a folder", root.display()));
+    }
+    let parts: Vec<&str> = relative.split('/').collect();
+    let Some((name, folders)) = parts.split_last() else { return Err("no file name".into()) };
+    let plain = |p: &str| !matches!(p, "" | "." | "..") && !p.contains(['\\', ':']);
+    if !parts.iter().all(|p| plain(p)) {
+        return Err(format!("{relative}: not a plain path"));
+    }
+    let mut at = root.to_path_buf();
+    for f in folders {
+        at.push(f);
+        match std::fs::symlink_metadata(&at) {
+            Ok(m) if m.is_dir() => {}
+            Ok(_) => return Err(format!("{}: not a folder", at.display())),
+            Err(_) => std::fs::create_dir(&at).map_err(|e| format!("{}: {e}", at.display()))?,
+        }
+    }
+    let dst = at.join(name);
+    let tmp = at.join(format!("{name}.new"));
+    for p in [&dst, &tmp] {
+        if std::fs::symlink_metadata(p).is_ok_and(|m| !m.is_file()) {
+            return Err(format!("{}: not a plain file", p.display()));
+        }
+    }
+    std::fs::write(&tmp, &bytes).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, &dst).map_err(|e| format!("{}: {e}", dst.display()))
 }
 
 pub fn load_nmo(path: &Path) -> Result<LoadedLevel, String> {
