@@ -56,10 +56,17 @@ fn read_capped(path: &Path, cap: u64) -> Option<Vec<u8>> {
     (u64::try_from(bytes.len()).ok()? <= cap).then_some(bytes)
 }
 
+#[derive(Clone, Debug)]
 pub struct Data {
-    pub root: PathBuf,
+    /// The player's copy of the original, if there is one: the game starts and plays without it (decisions.md, "The
+    /// game plays out of the box").
+    pub root: Option<PathBuf>,
     /// The game files of the level being played (`<level>/game`), looked in before the copy.
     pub overlay: Option<PathBuf>,
+    /// The level's parts (modules, balls, transformer, sky, particles, shadow) are ours before the copy's: the level
+    /// is new content, made for our parts, so it plays the same with or without a copy. A level of the copy (or
+    /// converted from one) plays with the copy's parts, as it was made.
+    pub own_parts: bool,
 }
 
 /// Where a level comes from.
@@ -89,6 +96,22 @@ pub struct LoadedLevel {
 }
 
 impl Data {
+    /// The game's files with the player's copy at `root`, or with none.
+    pub fn new(root: Option<PathBuf>) -> Data {
+        Data { root, overlay: None, own_parts: false }
+    }
+
+    /// Whether the player's copy is there at all.
+    pub fn has_copy(&self) -> bool {
+        self.root.is_some()
+    }
+
+    /// The game's files: the player's copy where one is found (`explicit`, `OPENBALLANCE_DATA`, the profile's
+    /// `levels/original`, `./data`), else none; the game plays its own levels without it.
+    pub fn find(explicit: Option<PathBuf>) -> Data {
+        Data::locate(explicit).unwrap_or_else(|_| Data::new(None))
+    }
+
     pub fn locate(explicit: Option<PathBuf>) -> Result<Data, String> {
         let candidates = explicit
             .into_iter()
@@ -100,7 +123,7 @@ impl Data {
         };
         for root in candidates {
             if playable(&root) {
-                return Ok(Data { root, overlay: None });
+                return Ok(Data::new(Some(root)));
             }
         }
         Err(
@@ -141,7 +164,19 @@ impl Data {
         Data {
             root: self.root.clone(),
             overlay: level_dir.map(|d| d.join(GAME_FILES)),
+            own_parts: self.own_parts,
         }
+    }
+
+    /// The same files for playing `source`: its own folder's game files first, then for a new level (an open-format
+    /// level that was not converted from a `.nmo`, nor a remastered original) our own parts before the copy's.
+    pub fn for_source(&self, source: &Source) -> Data {
+        let mut d = self.for_level(self.level_dir(source).as_deref());
+        d.own_parts = match source {
+            Source::Open(dir) => !source.remastered() && !converted(dir),
+            Source::Original(_) | Source::Nmo(_) => false,
+        };
+        d
     }
 
     pub fn file(&self, relative: &str) -> Option<PathBuf> {
@@ -153,19 +188,25 @@ impl Data {
     }
 
     /// A file of the game's layout from its providers (never the level's own): our own files, the player's copy and
-    /// the toolbox's remaster of it, in the order the interface setting gives (resources.rs).
+    /// the toolbox's remaster of it, in the order the interface setting gives (resources.rs). A level's parts (its
+    /// modules, the balls, sky, particles, shadow) come from ours first for a new level, else from the copy first.
     fn copy_file(&self, relative: &str) -> Option<PathBuf> {
-        // our own files and the toolbox's remaster stand in for the interface's roles only: a level, a module, a
-        // level's texture or sound always comes from the copy
+        use crate::resources::Provider;
+        // our own files and the toolbox's remaster stand in for the interface's roles; ours also for a level's parts
+        // (a level itself, a level's own texture or sound always comes from the copy)
         let role = crate::resources::role_of(relative).is_some();
-        let found = crate::resources::in_use().order().into_iter().find_map(|p| match p {
-            crate::resources::Provider::Original => self.copy_only(relative),
-            crate::resources::Provider::Own if role => {
-                crate::resources::own_root().and_then(|r| plain_path(&r, relative))
-            }
-            crate::resources::Provider::Remastered if role => {
-                plain_path(&crate::resources::remastered_root(), relative)
-            }
+        let part = crate::resources::is_part(relative);
+        let order = if part && self.own_parts {
+            [Provider::Own, Provider::Original, Provider::Own]
+        } else if part && !role {
+            Provider::Original.order()
+        } else {
+            crate::resources::in_use().order()
+        };
+        let found = order.into_iter().find_map(|p| match p {
+            Provider::Original => self.copy_only(relative),
+            Provider::Own if role || part => own_file(relative),
+            Provider::Remastered if role => plain_path(&crate::resources::remastered_root(), relative),
             _ => None,
         });
         if found.is_none() {
@@ -181,7 +222,7 @@ impl Data {
 
     /// A file of the player's copy itself.
     fn copy_only(&self, relative: &str) -> Option<PathBuf> {
-        relative.split('/').try_fold(self.root.clone(), |dir, part| {
+        relative.split('/').try_fold(self.root.clone()?, |dir, part| {
             let plain = !matches!(part, "" | "." | "..") && !part.contains(['\\', ':']);
             plain.then(|| find(&dir, part)).flatten()
         })
@@ -205,7 +246,17 @@ impl Data {
         if let Some(dir) = overlay.and_then(|o| plain_path(o, stem)) {
             return load_open(&dir).ok();
         }
-        load_nmo(&self.copy_file(relative)?).ok()
+        // ours, in the open format (`assets/own/3D Entities/PH/P_Box/`), before or after the copy's file
+        let own = || {
+            let root = crate::resources::own_root()?;
+            load_open(&plain_path(&root, stem)?).ok()
+        };
+        let copy = || load_nmo(&self.copy_only(relative)?).ok();
+        let found = if self.own_parts { own().or_else(copy) } else { copy().or_else(own) };
+        if found.is_none() {
+            crate::resources::missing(relative);
+        }
+        found
     }
 
     pub fn load(&self, source: &Source) -> Result<LoadedLevel, String> {
@@ -213,7 +264,12 @@ impl Data {
             Source::Original(n) => match self.original(*n) {
                 Some(Source::Nmo(p)) => p,
                 Some(Source::Open(dir)) => return self.load_open_level(&dir),
-                _ => return Err(format!("Level_{n:02}.NMO is not in {}", self.root.display())),
+                _ => {
+                    return Err(match &self.root {
+                        Some(root) => format!("Level_{n:02}.NMO is not in {}", root.display()),
+                        None => format!("Level_{n:02}.NMO: no copy of the original (import it from the menu)"),
+                    });
+                }
             },
             Source::Nmo(p) => p.clone(),
             Source::Open(dir) => return self.load_open_level(dir),
@@ -492,6 +548,26 @@ impl Data {
             },
         }
     }
+}
+
+/// Whether the open-format level in `dir` was converted from a `.nmo` (its settings name the source's hash): read
+/// from its level.gltf's head only, as the level is loaded properly later.
+fn converted(dir: &Path) -> bool {
+    let Some(bytes) = read_capped(&dir.join("level.gltf"), 64 * 1024 * 1024) else { return false };
+    let text = String::from_utf8_lossy(&bytes);
+    // the settings' key is written only when there is a hash (open.rs)
+    text.contains("\"source_hash\"")
+}
+
+/// One of our own files by its path in the original's layout; a picture the original has as `.bmp` or `.tga` may be
+/// ours as `.png` (our textures are made as PNG).
+fn own_file(relative: &str) -> Option<PathBuf> {
+    let root = crate::resources::own_root()?;
+    plain_path(&root, relative).or_else(|| {
+        let l = relative.to_ascii_lowercase();
+        let stem = relative.get(..relative.len().checked_sub(4)?)?;
+        (l.ends_with(".bmp") || l.ends_with(".tga")).then(|| plain_path(&root, &format!("{stem}.png"))).flatten()
+    })
 }
 
 pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {

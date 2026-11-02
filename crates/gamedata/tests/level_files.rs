@@ -22,11 +22,7 @@ fn a_level_folders_own_files_come_first() {
     std::fs::write(copy.join("Sounds/Hit.wav"), b"copy").unwrap();
     std::fs::write(copy.join("Sounds/Only.wav"), b"copy").unwrap();
     std::fs::write(level.join("game/Sounds/Hit.wav"), b"level").unwrap();
-    let data = Data {
-        root: copy.clone(),
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy.clone())).for_level(Some(&level));
     assert_eq!(
         std::fs::read(data.file("Sounds/hit.WAV").unwrap()).unwrap(),
         b"level",
@@ -37,10 +33,7 @@ fn a_level_folders_own_files_come_first() {
         b"copy",
         "else the copy's"
     );
-    let plain = Data {
-        root: copy,
-        overlay: None,
-    };
+    let plain = Data::new(Some(copy));
     assert_eq!(
         std::fs::read(plain.file("Sounds/Hit.wav").unwrap()).unwrap(),
         b"copy"
@@ -59,11 +52,7 @@ fn a_link_in_a_level_folder_leads_nowhere() {
     std::fs::write(outside.join("Hit.wav"), b"outside").unwrap();
     std::os::unix::fs::symlink(&outside, level.join("game/Sounds")).unwrap();
     std::os::unix::fs::symlink(outside.join("Hit.wav"), level.join("game/Textures/A.bmp")).unwrap();
-    let data = Data {
-        root: copy,
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy)).for_level(Some(&level));
     assert!(data.file("Sounds/Hit.wav").is_none(), "a linked folder");
     assert!(data.file("Textures/A.bmp").is_none(), "a linked file");
     let _ = std::fs::remove_dir_all(&r);
@@ -78,11 +67,7 @@ fn a_path_from_a_level_never_leaves_the_copy() {
     std::fs::write(r.join("outside.nmo"), b"").unwrap();
     let level = r.join("level");
     std::fs::create_dir_all(level.join("game")).unwrap();
-    let data = Data {
-        root: copy.join("3D Entities"),
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy.join("3D Entities"))).for_level(Some(&level));
     assert!(data.file("PH/P_Box.nmo").is_some());
     assert!(data.file("ph/p_box.NMO").is_some(), "any case");
     for bad in [
@@ -117,22 +102,14 @@ fn a_part_comes_from_the_level_folder_in_the_open_format() {
         sprite: None,
     });
     level::open::export(&part, &level.join("game/3D Entities/Balls")).unwrap();
-    let data = Data {
-        root: copy.clone(),
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy.clone())).for_level(Some(&level));
     let got = data
         .part("3D Entities/Balls.nmo")
         .expect("the level's own balls");
     assert_eq!(got.level.objects[0].name, "Ball_Wood");
+    // the copy has none (our own balls may stand in for them, as for any part)
     assert!(
-        Data {
-            root: copy,
-            overlay: None
-        }
-        .part("3D Entities/Balls.nmo")
-        .is_none(),
+        !Data::new(Some(copy)).copy_has("3D Entities/Balls.nmo"),
         "none in the copy"
     );
     let _ = std::fs::remove_dir_all(&r);
@@ -192,11 +169,7 @@ fn a_level_folder_never_stands_in_for_the_interface() {
             std::fs::write(&p, what).unwrap();
         }
     }
-    let data = Data {
-        root: copy,
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy)).for_level(Some(&level));
     let from = |rel: &str| std::fs::read(data.file(rel).unwrap()).unwrap();
     // the interface's files are the copy's, whatever a level folder holds
     for rel in [
@@ -224,10 +197,7 @@ fn an_open_level_without_settings_says_so() {
     let (copy, level) = (r.join("copy"), r.join("Somewhere"));
     std::fs::create_dir_all(&copy).unwrap();
     level::open::export(&level::Level::default(), &level).unwrap();
-    let data = Data {
-        root: copy,
-        overlay: None,
-    };
+    let data = Data::new(Some(copy));
     let loaded = data
         .load(&gamedata::assets::Source::Open(level.clone()))
         .unwrap();
@@ -252,6 +222,9 @@ fn copying_a_game_file_never_writes_through_a_hard_link() {
     std::fs::hard_link(&victim, game.join("Sounds/Hit.wav")).unwrap();
     gamedata::assets::copy_into(&src, &game, "Sounds/Hit.wav").unwrap();
     assert_eq!(std::fs::read(&victim).unwrap(), b"keep");
-    assert_eq!(std::fs::read(game.join("Sounds/Hit.wav")).unwrap(), b"sound");
+    assert_eq!(
+        std::fs::read(game.join("Sounds/Hit.wav")).unwrap(),
+        b"sound"
+    );
     let _ = std::fs::remove_dir_all(&r);
 }

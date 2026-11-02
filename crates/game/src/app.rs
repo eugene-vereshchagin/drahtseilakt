@@ -147,10 +147,14 @@ impl Game {
         for w in &level.warnings {
             eprintln!("warning: {w}");
         }
-        // the shared parts (balls, modules, transformer): the level folder's own when it has them, else the copy's
-        let balls = data
-            .part("3D Entities/Balls.nmo")
-            .ok_or("Balls.nmo not found or unreadable in the game data")?;
+        // the shared parts (balls, modules, transformer): the level folder's own when it has them, else ours or the
+        // copy's (assets.rs); without any the ball is drawn plain and bursts into nothing (said once, never fatal)
+        let balls = data.part("3D Entities/Balls.nmo").unwrap_or_else(|| crate::assets::LoadedLevel {
+            level: level::Level::default(),
+            name: "Balls".into(),
+            hash: 0,
+            warnings: Vec::new(),
+        });
         let replay_in = match &o.replay {
             Some(p) => {
                 let text =
@@ -886,7 +890,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     };
     gamedata::sound_themes::start(theme.as_deref());
     // a level folder's own game files (modules, sky, sounds) come before the copy's
-    let data = data.for_level(data.level_dir(&o.source).as_deref());
+    let data = data.for_source(&o.source);
     if let Some(dir) = &o.export {
         let loaded = data.load(&o.source)?;
         return crate::assets::export(&data, &loaded, dir);
@@ -2407,7 +2411,7 @@ impl App {
         };
         o.source = source;
         (o.replay, o.from, o.sector, o.at, o.ball) = (None, None, None, None, None);
-        self.data = self.data.for_level(self.data.level_dir(&o.source).as_deref());
+        self.data = self.data.for_source(&o.source);
         let mut game = Game::new(&o, &self.data)?;
         game.start_session();
         self.game = game;
@@ -2776,6 +2780,19 @@ impl App {
             }
             Action::Home => self.open_menu(crate::menu::Screen::Main),
             Action::Quit => event_loop.exit(),
+            Action::Import => {
+                // the import window runs in a process of its own and starts the game again when it is done
+                let started = std::env::current_exe().and_then(|exe| {
+                    std::process::Command::new(exe)
+                        .args(std::env::args_os().skip(1))
+                        .env(crate::IMPORT, "1")
+                        .spawn()
+                });
+                match started {
+                    Ok(_) => event_loop.exit(),
+                    Err(e) => eprintln!("could not open the import window: {e}"),
+                }
+            }
             Action::Volumes(v) => {
                 self.volumes = v;
                 if let Some(a) = &mut self.audio {
