@@ -75,7 +75,7 @@ Zeilennummer ab. `HINTS_TRACE=1` gibt die Kugel alle zehn Takte aus, solange ein
 
 Den Läufen des Inhabers folgend (`--autopilot --follow`), 2026-11-02:
 
-- Level 1: beendet (mit dem Hinweis für die Schieber).
+- Level 1: vom Start an geschafft in 8:00.70 (Hinweise für die Rampe, die Kiste, die Schieber und die Schienen).
 - Level 2: vom Start an geschafft in 5:47.25 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers durch Sektor 5).
 - Level 3: vom Start an geschafft in 8:34.07.
 - Level 4: ab Sektor 3 beendet in 5:26.00 mit 4 Leben (dort begann der Lauf des Inhabers).

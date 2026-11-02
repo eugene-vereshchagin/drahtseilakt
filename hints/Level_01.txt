@@ -13,6 +13,10 @@ at 299.6 -3.6 -800 r 4 sector 3 kind stone : goto 299.6 -3.6 -799 ; push 0 -1 15
 # corridor slowly; the owner comes east along z -286 from x -188 at speed and turns up it.
 at -160 22.3 -291 r 9 sector 1 kind wood : goto -190 21.8 -286 ; push 1 0 95 ; push 0.3 -1 120
 
+# Then from the ramp's top round east to the lane along z -363.8: the owner's line (the basin south of it, at y 18,
+# has no way up).
+at -165.7 21.6 -348.8 r 5 sector 1 kind wood : via -157 21.7 -349.3 ; via -138.9 22 -357.6 ; goto -134 21.3 -363.5 ; push 1 0 60
+
 
 # Sector 2, the crate of P_Modul_34_01 (module at 147.2 -4.1 -555.3; its x is the world's z): the crate stands on the
 # lower floor at (147.2, -6.6, -563) under the sliding stone, which stands up out of the lane above and blocks it. A

@@ -72,7 +72,7 @@ ticks while a hint drives.
 
 Following the owner's runs (`--autopilot --follow`), 2026-11-02 (the finished runs are kept in `hints/runs/`):
 
-- Level 1: finished (with the hint for the pushers).
+- Level 1: finished from the start in 8:00.70 (hints for the ramp, the crate, the pushers and the rails).
 - Level 2: finished from the start in 5:47.25 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
 - Level 3: finished from the start in 8:34.07.
 - Level 4: finished from sector 3 in 5:26.00 with 4 lives (the owner's run began there).
