@@ -156,6 +156,8 @@ pub fn scan() -> Vec<Theme> {
 struct State {
     themes: Vec<Theme>,
     chosen: String,
+    /// What the player chose, kept as it is for the settings even when that theme is not there this time.
+    wanted: String,
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
@@ -164,13 +166,14 @@ static STATE: Mutex<Option<State>> = Mutex::new(None);
 /// which plays the copy's sounds until the toolbox has made its folder).
 pub fn start(chosen: &str) {
     let themes = scan();
+    let wanted = chosen.to_owned();
     let chosen = if themes.iter().any(|t| t.key == chosen) || chosen == ORIGINAL {
         chosen.to_owned()
     } else {
         SYSTEM.to_owned()
     };
     if let Ok(mut s) = STATE.lock() {
-        *s = Some(State { themes, chosen });
+        *s = Some(State { themes, chosen, wanted });
     }
 }
 
@@ -199,7 +202,18 @@ pub fn choose(key: &str) {
         && (s.themes.iter().any(|t| t.key == key) || key == ORIGINAL)
     {
         s.chosen = key.to_owned();
+        s.wanted = key.to_owned();
     }
+}
+
+/// The theme the player chose, for the settings: kept even when it was not found this time (a player's theme folder
+/// moved away for a while is not forgotten).
+pub fn wanted() -> String {
+    STATE
+        .lock()
+        .ok()
+        .and_then(|s| s.as_ref().map(|s| s.wanted.clone()))
+        .unwrap_or_else(|| SYSTEM.to_owned())
 }
 
 /// The copy's own sounds play: "original" chosen while the toolbox has not made its folder.
@@ -217,10 +231,11 @@ pub fn choices() -> Vec<String> {
     keys
 }
 
-/// The file of the sound `name` in the chosen theme, else in its fallback, else in the system theme.
-pub fn file(name: &str) -> Option<PathBuf> {
+/// The files of the sound `name`, in the order they are tried: the chosen theme's, its fallback's, the system
+/// theme's (a broken one is passed over for the next).
+pub fn files(name: &str) -> Vec<PathBuf> {
     if !plain(name) {
-        return None;
+        return Vec::new();
     }
     let themes = themes();
     let mut keys = vec![chosen()];
@@ -235,7 +250,8 @@ pub fn file(name: &str) -> Option<PathBuf> {
     keys.dedup();
     keys.iter()
         .filter_map(|k| themes.iter().find(|t| &t.key == k))
-        .find_map(|t| in_theme(&t.dir, name))
+        .filter_map(|t| in_theme(&t.dir, name))
+        .collect()
 }
 
 /// A sound's file in one theme folder: Sounds/ or Music/, Ogg first, then WAV, then the track music.txt names.

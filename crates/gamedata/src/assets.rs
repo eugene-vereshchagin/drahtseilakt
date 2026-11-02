@@ -126,6 +126,12 @@ impl Data {
     }
 
     /// The same copy for playing the level in `level_dir`: its own game files (if it has them) first.
+    /// A file the level's own folder has of the files it may stand in for (its own sounds, say), never the copy's.
+    pub fn level_own(&self, relative: &str) -> Option<PathBuf> {
+        let o = self.overlay.as_deref()?;
+        overlay_serves(relative).then(|| plain_path(o, relative)).flatten()
+    }
+
     pub fn for_level(&self, level_dir: Option<&Path>) -> Data {
         // each level brings its own textures, within the budget again
         OVERLAY_PIXELS.store(0, std::sync::atomic::Ordering::Relaxed);

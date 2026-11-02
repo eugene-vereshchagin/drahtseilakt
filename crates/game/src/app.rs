@@ -652,7 +652,7 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
         v[1],
         gamedata::resources::chosen().key(),
         // the sound theme is the extended mode's choice: the classic mode (the system theme) keeps it as it was
-        if features.mode { format!("sound-theme {}\n", gamedata::sound_themes::chosen()) } else { String::new() },
+        if features.mode { format!("sound-theme {}\n", gamedata::sound_themes::wanted()) } else { String::new() },
         features.lines()
     );
     if !player.is_empty() {
@@ -740,7 +740,12 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Original });
     // the sound theme: the extended mode's choice (`sound-theme`), the system theme in the classic mode
-    let theme = if extended { setting("sound-theme") } else { None };
+    // (a player who chose the original's interface before there were themes keeps hearing the original's sounds)
+    let theme = if extended {
+        setting("sound-theme").or_else(|| (chosen != gamedata::resources::Provider::Own).then(|| "original".to_owned()))
+    } else {
+        None
+    };
     gamedata::sound_themes::start(theme.as_deref().unwrap_or(gamedata::sound_themes::SYSTEM));
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_level(data.level_dir(&o.source).as_deref());

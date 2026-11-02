@@ -51,18 +51,19 @@ impl Drop for Audio {
 /// copy's WAV (a level's own sounds), never music: until the original's theme is chosen only our own music plays.
 fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
     let copy = gamedata::sound_themes::plays_copy();
-    if !copy && let Some(path) = gamedata::sound_themes::file(name) {
+    // a level's own sound (a community level brings its own) comes before any theme's
+    let own = data.level_own(&format!("Sounds/{name}.wav")).into_iter();
+    let themed = if copy { Vec::new() } else { gamedata::sound_themes::files(name) };
+    for path in own.chain(themed) {
         let ogg = path.extension().is_some_and(|x| x.eq_ignore_ascii_case("ogg"));
         let decoded = read_capped(&path)
             .ok_or_else(|| "unreadable".to_owned())
             .and_then(|b| if ogg { parse_ogg(&b) } else { parse_wav(&b) });
-        return match decoded {
-            Ok(s) => Some(Arc::new(s)),
-            Err(e) => {
-                eprintln!("sound {}: {e}", path.display());
-                None
-            }
-        };
+        match decoded {
+            Ok(s) => return Some(Arc::new(s)),
+            // a broken file is passed over for the next theme's
+            Err(e) => eprintln!("sound {}: {e}", path.display()),
+        }
     }
     if !copy && name.starts_with("Music_") && !name.eq_ignore_ascii_case("Music_thunder") {
         return None;
