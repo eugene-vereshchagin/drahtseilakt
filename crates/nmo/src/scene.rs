@@ -292,7 +292,9 @@ pub fn texture(chunk: &Chunk) -> Result<Texture> {
             let masks = [w.u32()?, w.u32()?, w.u32()?, w.u32()?];
             let _ = w.u32()?;
             let count = w.u32()? as usize;
-            if bpp == 32 && width <= MAX_TEXTURE_SIDE && height <= MAX_TEXTURE_SIDE {
+            // at least one pixel a side: a zero-sized picture is no picture (the renderer could not make a texture of it)
+            let side = 1..=MAX_TEXTURE_SIDE;
+            if bpp == 32 && side.contains(&width) && side.contains(&height) {
                 let pixels = (width as usize).saturating_mul(height as usize);
                 if count == pixels {
                     let data = w.take(count)?;
@@ -813,5 +815,23 @@ mod tests {
         assert_eq!(texture(&magenta).expect("texture").transparent, Some(0x00FF_00FF));
         let none = chunk(&[(0x002F_F000, vec![0x001, 0x00FF_00FF])]);
         assert_eq!(texture(&none).expect("texture").transparent, None);
+    }
+
+    /// Fuzzing found it (nmo_chunk): an embedded picture 8192 wide and 0 high (no pixels, so the count matched) was
+    /// kept, and the renderer cannot make a texture of no size. A side of 0 is no embedded picture.
+    #[test]
+    fn an_embedded_picture_without_pixels_is_none() {
+        let masks = [0xFF00_0000, 0x00FF_0000, 0x0000_FF00, 0x0000_00FF];
+        let pictured = |w: u32, h: u32| {
+            let mut data = vec![1, 32, w, h];
+            data.extend(masks);
+            data.extend([0, w * h]);
+            data.extend(std::iter::repeat_n(0x8040_2010u32, (w * h) as usize));
+            texture(&chunk(&[(0x0002_0000, data)])).expect("texture").embedded
+        };
+        assert_eq!(pictured(8192, 0), None);
+        assert_eq!(pictured(0, 5), None);
+        assert_eq!(pictured(0, 0), None);
+        assert_eq!(pictured(1, 1), Some((1, 1, vec![0x40, 0x20, 0x10, 0x80])));
     }
 }

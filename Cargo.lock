@@ -269,6 +269,7 @@ dependencies = [
 name = "cdimage"
 version = "0.1.0"
 dependencies = [
+ "fuzzkit",
  "miniz_oxide 0.9.1",
 ]
 
@@ -485,6 +486,7 @@ dependencies = [
  "bytemuck",
  "cdimage",
  "cpal",
+ "fuzzkit",
  "gamedata",
  "gilrs",
  "glam",
@@ -605,9 +607,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuzzkit"
+version = "0.1.0"
+
+[[package]]
 name = "gamedata"
 version = "0.1.0"
 dependencies = [
+ "fuzzkit",
  "image",
  "level",
  "libc",
@@ -929,6 +936,7 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 name = "level"
 version = "0.1.0"
 dependencies = [
+ "fuzzkit",
  "nmo",
  "serde_json",
 ]
@@ -1156,6 +1164,7 @@ dependencies = [
 name = "nmo"
 version = "0.1.0"
 dependencies = [
+ "fuzzkit",
  "miniz_oxide 0.9.1",
 ]
 

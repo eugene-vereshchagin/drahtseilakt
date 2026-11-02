@@ -1,0 +1,110 @@
+# cargo-fuzz targets (libFuzzer, nightly): `cargo +nightly fuzz run <target>` from the repository root's fuzz/ folder.
+# Not a member of the workspace (the root Cargo.toml excludes it) and not built by default: the game's build and tests
+# never need libfuzzer-sys. It gets its own Cargo.lock the first time it is built with the network (pin it then and
+# commit it). Each target runs the same function as the stable fuzzer's test of that name (crates/fuzzkit,
+# docs/drahtseilakt/fuzzing.md): the test files are included as modules, so there is one entry point per parser.
+
+[package]
+name = "drahtseilakt-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "GPL-3.0-only"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+# rust-fuzz/libfuzzer: the libFuzzer bindings cargo-fuzz uses; exact version, checked when the lock is first made
+libfuzzer-sys = "=0.4.10"
+nmo = { path = "../crates/nmo" }
+level = { path = "../crates/level" }
+gamedata = { path = "../crates/gamedata" }
+cdimage = { path = "../crates/cdimage" }
+fuzzkit = { path = "../crates/fuzzkit" }
+miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
+image = { version = "=0.25.10", default-features = false, features = ["bmp", "tga", "png", "jpeg"] }
+
+# its own workspace: never part of the game's
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "nmo_file"
+path = "fuzz_targets/nmo_file.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nmo_chunk"
+path = "fuzz_targets/nmo_chunk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "open_level"
+path = "fuzz_targets/open_level.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "image"
+path = "fuzz_targets/image.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "level_txt"
+path = "fuzz_targets/level_txt.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "theme_txt"
+path = "fuzz_targets/theme_txt.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sound_table"
+path = "fuzz_targets/sound_table.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "disc_image"
+path = "fuzz_targets/disc_image.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cue_sheet"
+path = "fuzz_targets/cue_sheet.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "iscab"
+path = "fuzz_targets/iscab.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "replay"
+path = "fuzz_targets/replay.rs"
+test = false
+doc = false
+bench = false
