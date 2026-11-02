@@ -356,34 +356,6 @@ impl Face {
     }
 }
 
-/// The own interface's picture behind its menus and loading screen (assets/own/Textures/Menu_Background.png).
-pub const BACKDROP: &str = "Menu_Background";
-/// Its aspect ratio, as drawn by assets/own/make.
-const BACKDROP_ASPECT: f32 = 16.0 / 9.0;
-
-/// The own interface's picture over the whole window, cut to its shape (never stretched).
-pub fn backdrop(screen: Screen) -> Quad {
-    let aspect = if screen.h > 0.0 {
-        screen.w / screen.h
-    } else {
-        BACKDROP_ASPECT
-    };
-    let uv = if aspect >= BACKDROP_ASPECT {
-        let v = (1.0 - BACKDROP_ASPECT / aspect) / 2.0;
-        [0.0, v, 1.0, 1.0 - v]
-    } else {
-        let u = (1.0 - aspect / BACKDROP_ASPECT) / 2.0;
-        [u, 0.0, 1.0 - u, 1.0]
-    };
-    Quad {
-        rect: [0.0, 0.0, screen.w, screen.h],
-        uv,
-        top: [1.0; 4],
-        bottom: [1.0; 4],
-        texture: BACKDROP,
-    }
-}
-
 /// Quads in context pixels placed in the window with `anchor`.
 pub fn place(quads: Vec<Quad>, screen: Screen, anchor: Anchor) -> Vec<Quad> {
     quads

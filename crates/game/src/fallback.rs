@@ -26,15 +26,16 @@ const FONTS: [&str; 3] = [
     "NotoSans-Regular.ttf",
     "NotoSansSC-Regular.otf",
 ];
-/// Tektur's weight and width (its variation axes): a medium weight reads well over a busy picture.
-const WEIGHT: f32 = 620.0;
+/// Tektur's weight and width (its variation axes): bold enough to carry as much ink as the original's labels.
+const WEIGHT: f32 = 700.0;
 const WIDTH: f32 = 100.0;
-/// The capitals' height against the line (a little more than the original's, whose letters are wider), the
-/// small capitals' size against the capitals, the glyphs widened and spaced (fractions of an em), as its font is.
-const CAPS: f32 = 0.54;
+/// The capitals' height against the line, the small capitals' size against the capitals, the glyphs widened and
+/// spaced (fractions of an em): measured on the original's main menu at 1280x720 (capitals 10 pixels high, its five
+/// labels 45 to 124 pixels wide), Tektur so set draws them within 2 % of those widths.
+const CAPS: f32 = 0.45;
 const SMALL_CAPS: f32 = 0.8;
-const WIDE: f32 = 1.12;
-const TRACKING: f32 = 0.06;
+const WIDE: f32 = 1.7;
+const TRACKING: f32 = 0.18;
 /// The longest text laid out (characters): a label is short; more is cut.
 const TEXT_MAX: usize = 512;
 
@@ -347,8 +348,9 @@ fn draw(text: &str, r: [f32; 4], height: f32, widen: f32, st: &Style) -> Vec<Qua
         } else {
             (r[0] + r[2]) / 2.0 - width / 2.0
         };
-        // the capitals in the middle of the line, as the game font's sit in their cells
-        let baseline = top + height / 2.0 + atlas.cap * k / 2.0;
+        // the capitals a little above the middle of the line, where the game font's sit in their cells (measured
+        // on the original's menu: a fifth of a capital higher)
+        let baseline = top + height / 2.0 + atlas.cap * k * 0.3;
         let line = chars.get(start..end).unwrap_or_default();
         let mut passes = Vec::new();
         if let Some((off, color)) = st.shadow {

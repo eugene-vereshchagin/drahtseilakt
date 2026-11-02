@@ -2019,19 +2019,16 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     if let Some((w, h, rgba)) = data.texture(&shadow) {
         renderer.set_shadow_texture(w, h, rgba);
     }
-    // the interface's textures; the own interface's picture behind its menus only with it (the copy has none)
+    // the interface's textures
     let own = gamedata::resources::in_use() == gamedata::resources::Provider::Own;
     let interface = ["Font_1", "Button01_special", "Button01_select", "Button01_deselect"];
-    let backdrop = own.then_some(crate::ui::BACKDROP);
     // the own interface draws its texts in the shipped fonts: the copy's font is not read
     let fonts = interface.into_iter().filter(|n| !(own && *n == "Font_1"));
-    for name in crate::particles::textures().into_iter().chain(fonts).chain(backdrop) {
+    for name in crate::particles::textures().into_iter().chain(fonts) {
         let t = level::Texture {
             name: name.to_owned(),
             source: level::TextureSource::File(if name.starts_with("Font_") || name.starts_with("Button") {
                 format!("{name}.tga")
-            } else if name == crate::ui::BACKDROP {
-                format!("{name}.png")
             } else {
                 format!("{name}.bmp")
             }),
@@ -2154,6 +2151,25 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         view_formats: &[],
     });
     let view = target.create_view(&Default::default());
+    // DRAHTSEILAKT_SHOT_MENU=base:keys draws a menu over the frame, to look at the menus without a window: base is
+    // main, pause, dead or end, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options. A
+    // menu not over the level has the menu scene behind it, DRAHTSEILAKT_SHOT_MENU_MS (default 0) into the menu.
+    let shot = std::env::var("DRAHTSEILAKT_SHOT_MENU").ok();
+    let menu = shot.and_then(|spec| shot_menu(&spec, data, game, o, (w, h)));
+    let mut menu_scene = menu.as_ref().filter(|m| !m.over_level()).and_then(|_| load_menu_scene(data));
+    upload_menu_scene(&mut r, menu_scene.as_mut(), data);
+    if let Some(ms) = menu_scene.filter(|m| m.model.is_some()) {
+        let at = std::env::var("DRAHTSEILAKT_SHOT_MENU_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+        let (inst, particles, frame_view) = ms.frame(at);
+        r.draw(&view, w, h, &frame_view, &inst, &particles);
+        let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
+        let quads = menu.map(|m| m.interface(game.font.as_ref(), screen)).unwrap_or_default();
+        if let Some((aw, ah, rgba)) = crate::fallback::take_changed() {
+            r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
+        }
+        r.draw_ui(&view, w, h, &quads);
+        return save_target(&r, &target, (w, h), path, game.sim.tick);
+    }
     let inst = scene::instances(
         &game.placements,
         &game.sim.taken,
@@ -2184,10 +2200,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     if let (Some(t), Some(f)) = (crate::endscreen::of(&game.sim), game.font.as_ref()) {
         quads.extend(crate::endscreen::interface(&t, f, &strings, screen));
     }
-    // DRAHTSEILAKT_SHOT_MENU=base:keys draws a menu over the frame, to look at the menus without a window: base is
-    // main, pause, dead or end, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options.
-    let shot = std::env::var("DRAHTSEILAKT_SHOT_MENU").ok();
-    if let Some(m) = shot.and_then(|spec| shot_menu(&spec, data, game, o, (w, h))) {
+    if let Some(m) = menu {
         if !m.over_level() {
             quads.clear();
         }
@@ -2197,8 +2210,12 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
     }
     r.draw_ui(&view, w, h, &quads);
+    save_target(&r, &target, (w, h), path, game.sim.tick)
+}
 
-    let pixels = read_back(&r, &target, w, h)?;
+/// Reads the rendered frame back and writes it to a PNG.
+fn save_target(r: &Renderer, target: &wgpu::Texture, (w, h): (u32, u32), path: &Path, tick: u64) -> Result<(), String> {
+    let pixels = read_back(r, target, w, h)?;
     image::save_buffer(path, &pixels, w, h, image::ExtendedColorType::Rgba8)
         .map_err(|e| e.to_string())?;
     println!(
@@ -2206,9 +2223,18 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         path.display(),
         w,
         h,
-        game.sim.tick
+        tick
     );
     Ok(())
+}
+
+/// The scene behind the menus: the original's (MenuLevel.nmo) with the copy's interface, else ours.
+fn load_menu_scene(data: &Data) -> Option<crate::menuscene::MenuScene> {
+    if gamedata::resources::in_use() == gamedata::resources::Provider::Own {
+        let dir = gamedata::resources::own_root()?.join("3D Entities").join("MenuLevel");
+        return crate::menuscene::MenuScene::load_open(&dir);
+    }
+    crate::menuscene::MenuScene::load(data)
 }
 
 pub(crate) struct Gpu {
@@ -2355,10 +2381,7 @@ impl App {
         let Gpu { surface, config, mut renderer, modes } = window_gpu(&window)?;
         upload(&mut renderer, &self.game, &self.data);
         if self.menu_scene.is_none() {
-            // the original's 3D scene behind its menus; the own interface has its picture (menu.rs)
-            if gamedata::resources::in_use() != gamedata::resources::Provider::Own {
-                self.menu_scene = crate::menuscene::MenuScene::load(&self.data);
-            }
+            self.menu_scene = load_menu_scene(&self.data);
         }
         upload_menu_scene(&mut renderer, self.menu_scene.as_mut(), &self.data);
         self.gpu = Some(Gpu {
@@ -3021,13 +3044,7 @@ impl App {
         let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
             self.menu_ms += f64::from(step) * 1000.0;
             ms.effects.tick_menu(step * 1000.0);
-            let (eye, target) = ms.camera((self.menu_ms % f64::from(crate::menuscene::ROUND_MS)) as f32);
-            let mut inst = ms.instances(self.menu_ms);
-            for mesh in 0..crate::sky::FACE_COUNT {
-                inst.push(crate::render::Instance::plain(scene::SKY_MODEL, mesh, glam::Mat4::from_translation(eye)));
-            }
-            let particles = ms.effects.batches(eye, target);
-            (inst, particles, crate::render::View { eye, target, fov_y: ms.fov_y })
+            ms.frame(self.menu_ms)
         } else {
             let mut inst = scene::instances(
                 &self.game.placements,
