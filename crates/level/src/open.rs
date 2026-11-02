@@ -492,9 +492,13 @@ pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
 
     for (i, img) in arr("images").iter().enumerate() {
         let uri = img["uri"].as_str().ok_or("image without uri")?;
-        // Only plain relative paths inside the folder.
-        if uri.contains("..") || uri.starts_with('/') || uri.contains(':') || uri.contains('\\') {
-            return Err(format!("image {i}: path outside the level folder"));
+        // A texture is a file of the level's textures/ folder, by a plain name (no further folders: a link among them
+        // could lead out of the level's folder).
+        let plain = uri.strip_prefix("textures/").is_some_and(|n| {
+            !n.is_empty() && !n.starts_with('.') && !n.chars().any(|c| matches!(c, '/' | '\\' | ':') || c.is_control())
+        });
+        if !plain {
+            return Err(format!("image {i}: not a plain file of the level's textures/ folder"));
         }
         level.textures.push(Texture {
             name: img["name"].as_str().unwrap_or(uri).to_owned(),

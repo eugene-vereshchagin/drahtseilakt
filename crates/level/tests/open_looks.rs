@@ -143,3 +143,24 @@ fn level_files_that_are_links_are_refused() {
     );
     let _ = std::fs::remove_dir_all(&d);
 }
+
+#[test]
+fn an_image_outside_the_textures_folder_is_refused() {
+    let d = dir("uri");
+    let mut l = level();
+    l.textures.push(level::Texture {
+        name: "T".into(),
+        source: level::TextureSource::File("T.png".into()),
+        color_key: None,
+    });
+    level::open::export(&l, &d).unwrap();
+    let path = d.join("level.gltf");
+    let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    for bad in ["textures/x/evil.png", "other/a.png", "textures/", "textures/.hidden", "a.png"] {
+        let mut doc = doc.clone();
+        doc["images"][0]["uri"] = serde_json::json!(bad);
+        std::fs::write(&path, serde_json::to_string(&doc).unwrap()).unwrap();
+        assert!(level::open::import(&d).is_err(), "{bad}");
+    }
+    let _ = std::fs::remove_dir_all(&d);
+}

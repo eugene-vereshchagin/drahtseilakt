@@ -12,7 +12,8 @@
 
 - `level.gltf` — [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) (JSON);
 - `level.bin` — его двоичный буфер (единственный, по этому имени);
-- `textures/NNNN_name.png` — по картинке на текстуру.
+- `textures/NNNN_name.png` — по картинке на текстуру; `uri` картинки должен называть обычный файл прямо в `textures/`
+  (без вложенных папок), иначе уровень отвергается.
 
 ## Содержимое
 

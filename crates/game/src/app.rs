@@ -143,8 +143,10 @@ impl Game {
         for w in &level.warnings {
             eprintln!("warning: {w}");
         }
-        // a remastered level's shared parts (balls, modules, transformer) are drawn as the toolbox remade them
+        // a remastered level's shared parts (balls, modules, transformer) are drawn as the toolbox remade them, each
+        // level with the whole budget of their pixels
         let remastered = o.source.remastered();
+        gamedata::assets::reset_pixel_budget();
         let balls = data
             .part("3D Entities/Balls.nmo", remastered)
             .ok_or("Balls.nmo not found or unreadable in the game data")?;

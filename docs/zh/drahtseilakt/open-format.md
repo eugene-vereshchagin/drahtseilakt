@@ -8,7 +8,7 @@
 
 - `level.gltf` —— [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html)（JSON）；
 - `level.bin` —— 其二进制缓冲区（唯一的缓冲区，按此名称引用）；
-- `textures/NNNN_name.png` —— 每个纹理一张图片。
+- `textures/NNNN_name.png` —— 每个纹理一张图片；图片的 `uri` 必须直接指向 `textures/` 中的普通文件（不能有更深的文件夹），否则关卡会被拒绝。
 
 ## 内容
 

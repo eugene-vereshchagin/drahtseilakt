@@ -121,9 +121,17 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     var surface = normalize(in.normal);
     if mat.params.w > 0.5 {
         let m = textureSample(relief, samp, uv).xyz * 2.0 - vec3<f32>(1.0);
-        let t = normalize(in.tangent.xyz - surface * dot(surface, in.tangent.xyz));
-        let b = cross(surface, t) * in.tangent.w;
-        surface = normalize(t * m.x - b * m.y + surface * m.z);
+        // the tangent, square to the normal; interpolated across a face it can vanish or lie along the normal (mirrored
+        // coordinates), and then the surface stays as it is rather than turn into NaN
+        let along = in.tangent.xyz - surface * dot(surface, in.tangent.xyz);
+        if dot(along, along) > 1e-8 {
+            let t = normalize(along);
+            let b = cross(surface, t) * in.tangent.w;
+            let bent = t * m.x - b * m.y + surface * m.z;
+            if dot(bent, bent) > 1e-8 {
+                surface = normalize(bent);
+            }
+        }
     }
     var n = surface;
     let l = -normalize(g.light_dir.xyz);

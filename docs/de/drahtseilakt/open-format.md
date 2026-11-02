@@ -12,7 +12,8 @@ Ein Ordner mit:
 
 - `level.gltf` — [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) (JSON);
 - `level.bin` — sein Binärpuffer (der einzige, unter diesem Namen);
-- `textures/NNNN_name.png` — ein Bild je Textur.
+- `textures/NNNN_name.png` — ein Bild je Textur; die `uri` eines Bildes muss eine einfache Datei direkt in `textures/`
+  nennen (keine weiteren Ordner), sonst wird das Level abgelehnt.
 
 ## Inhalt
 

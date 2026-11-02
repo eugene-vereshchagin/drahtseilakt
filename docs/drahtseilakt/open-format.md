@@ -11,7 +11,8 @@ A folder holding:
 
 - `level.gltf` — [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) (JSON);
 - `level.bin` — its binary buffer (the only buffer, referenced by that name);
-- `textures/NNNN_name.png` — one image per texture.
+- `textures/NNNN_name.png` — one image per texture; an image's `uri` must name a plain file directly in `textures/`
+  (no further folders), else the level is refused.
 
 ## Contents
 

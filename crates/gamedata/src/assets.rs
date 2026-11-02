@@ -76,6 +76,11 @@ static PIXELS_TAKEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64
 
 /// A remade texture may be used: its file is a plain one and its pixels (read from its header) still fit in what the
 /// remade parts may bring together; they are counted as taken.
+/// A new level starts with the whole budget of remade texture pixels again (what an earlier one took is let go).
+pub fn reset_pixel_budget() {
+    PIXELS_TAKEN.store(0, std::sync::atomic::Ordering::Relaxed);
+}
+
 fn take_pixels(path: &str) -> bool {
     use std::sync::atomic::Ordering;
     let plain = std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
@@ -245,7 +250,9 @@ impl Data {
             // an open-format level's texture: a plain file of its folder, its size checked before it is decoded
             level::TextureSource::File(name) if Path::new(name).is_absolute() => {
                 let path = Path::new(name);
-                let plain = std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
+                // its folder a real one too (a link there would lead out of the level's folder)
+                let folder = path.parent().is_some_and(|d| std::fs::symlink_metadata(d).is_ok_and(|m| m.is_dir()));
+                let plain = folder && std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
                 if !plain {
                     return None;
                 }
