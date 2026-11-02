@@ -66,7 +66,8 @@ interface files are not even read while the own interface is in use.
   has one. With the original's interface its copy's texts come first in the copy's five languages; for Russian and
   Chinese (which the copy lacks) ours, drawn in the shipped fonts.
 
-Still from the copy, whatever the interface: the default keys and the default highscore lists (base.cmo), and the
+The own interface's default highscore lists are ours too (ten names, 3000 points down to 750). Still from the copy,
+whatever the interface: the default keys (base.cmo's DB_Options, the arrows, Shift and Space when it has none) and the
 parts of a level (balls, particles, the ball's shadow, skies, modules), which later stages replace.
 
 Own content comes in stages: interface (fonts, buttons, points box, life balls, texts, menu scene), then balls,

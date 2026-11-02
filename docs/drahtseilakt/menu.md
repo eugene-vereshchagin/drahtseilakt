@@ -42,7 +42,7 @@ per-player thing is the name in the highscore list.
   desktop) if it is one of these, else English. *Extended* has the switch *Extended mode?* (Yes / No).
   That is all a player of the original levels sees changed.
 - Levels unlock as in the original. Highscores are the original's: ten per level, points, a name. They start
-  from the copy's defaults and are saved in our own data folder, never in the game's files. Reading the player's
+  from our own default lists (the copy's with the original's interface) and are saved in our own data folder, never in the game's files. Reading the player's
   `Database.tdb` to take over their old scores is a later option (a parser: reviewed like every file reader).
 - **Graphics**: the original's three lines and one more, *Fullscreen?* (No / Yes / Exclusive), as a window can
   be one. Left and right (or Enter) change a line; it takes effect at once and is saved in `settings.txt`:

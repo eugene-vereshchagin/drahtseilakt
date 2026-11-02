@@ -68,8 +68,10 @@ sie alle, und solange die eigene Oberfläche gewählt ist, werden die Oberfläch
   zuerst die Texte der Kopie in ihren fünf Sprachen; für Russisch und Chinesisch (die die Kopie nicht hat) unsere, in
   den mitgelieferten Schriften gezeichnet.
 
-Weiterhin aus der Kopie, bei jeder Oberfläche: die Standardtasten und die Standard-Highscore-Listen (base.cmo) und die
-Teile eines Levels (Kugeln, Partikel, der Schatten der Kugel, Himmel, Module), die spätere Stufen ersetzen.
+Die Standard-Highscore-Listen der eigenen Oberfläche sind ebenfalls unsere (zehn Namen, 3000 bis 750 Punkte).
+Weiterhin aus der Kopie, bei jeder Oberfläche: die Standardtasten (DB_Options aus base.cmo; ohne sie Pfeile, Shift und
+Leertaste) und die Teile eines Levels (Kugeln, Partikel, der Schatten der Kugel, Himmel, Module), die spätere Stufen
+ersetzen.
 
 Eigenes kommt in Stufen: Oberfläche (Schriften, Knöpfe, Punktekasten, Lebenskugeln, Texte, Menüszene), dann Kugeln,
 Himmel, Partikel und Klänge (aus offenen Bibliotheken), Musik im Stil eines Mahjong-Spiels mit chinesischen

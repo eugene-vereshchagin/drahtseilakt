@@ -42,7 +42,7 @@ Persönliche ist der Name in der Highscore-Liste.
   gestartetes Programm nicht), wenn sie eine davon ist, sonst Englisch. *Extended* hat den Schalter *Extended mode?*
   (Yes / No). Das ist alles, was ein Spieler der Original-Level verändert sieht.
 - Level werden wie im Original freigeschaltet. Highscores wie im Original: zehn pro Level, Punkte, ein Name. Sie
-  beginnen mit den Vorgaben der Kopie und werden in unserem eigenen Datenordner gespeichert, nie in den Dateien
+  beginnen mit unseren eigenen Vorgabelisten (mit der Oberfläche des Originals mit denen der Kopie) und werden in unserem eigenen Datenordner gespeichert, nie in den Dateien
   des Spiels. Die `Database.tdb` des Spielers zu lesen, um alte Punkte zu übernehmen, ist eine spätere Option
   (ein Parser: geprüft wie jeder Dateileser).
 - **Graphics**: die drei Zeilen des Originals und eine weitere, *Fullscreen?* (No / Yes / Exclusive), da ein Fenster

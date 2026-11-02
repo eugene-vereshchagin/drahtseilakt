@@ -103,7 +103,8 @@ impl Strings {
                 }
             }
         }
-        let wanted = |n: &str| n == "DB_Options" || n.starts_with("DB_Highscore_Lv");
+        // the own interface's highscore lists are ours; the copy's default keys count either way
+        let wanted = |n: &str| n == "DB_Options" || (copy && n.starts_with("DB_Highscore_Lv"));
         let mut lists: Vec<(u32, crate::highscore::List)> = Vec::new();
         for (name, a) in data.data_arrays("base.cmo", wanted) {
             if name == "DB_Options" {
@@ -166,7 +167,23 @@ impl Strings {
                 }
             }
         }
+        if !copy {
+            s.own_highscores();
+        }
         s
+    }
+
+    /// The own interface's default highscore list of every original level: ten names, 3000 points down to 750.
+    fn own_highscores(&mut self) {
+        const NAMES: [&str; PLACES] = [
+            "Ada", "Boris", "Clara", "Dmitri", "Emil", "Fang", "Greta", "Hugo", "Iris", "Jun",
+        ];
+        let list: crate::highscore::List = NAMES
+            .iter()
+            .zip((0..).map(|k| 3000 - 250 * k))
+            .map(|(n, p)| (n.as_bytes().to_vec(), p))
+            .collect();
+        self.highscores = vec![list; crate::menu::LEVELS as usize];
     }
 
     /// The text of `key`: the copy's (Language.nmo's first column), else ours, else `fallback`.
@@ -300,6 +317,16 @@ mod tests {
             s.numbered("Highscore Title (+ SPACE!)", 4),
             "Highscore Level 4"
         );
+    }
+
+    #[test]
+    fn the_own_highscores_are_ten_a_level_best_first() {
+        let mut s = Strings::default();
+        s.own_highscores();
+        assert_eq!(s.highscores.len(), crate::menu::LEVELS as usize);
+        let first = &s.highscores[0];
+        assert_eq!(first.len(), PLACES);
+        assert!(first.windows(2).all(|w| w[0].1 > w[1].1));
     }
 
     #[test]
