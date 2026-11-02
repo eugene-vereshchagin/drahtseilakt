@@ -25,7 +25,9 @@
   координатами; не больше 16. У меша может быть более детальный вид, который рисуется вместо него
   (`extras.drahtseilakt.look` — индекс другого меша; так toolbox хранит более круглые формы): такие меши идут после
   всех собственных мешей уровня, каждый — вид ровно одного меша, узлы их не ставят; физика и правила берут сам меш.
-- **Материалы**: `baseColorFactor` (diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`; `alphaMode`
+- **Материалы**: `baseColorFactor` (diffuse), `baseColorTexture`, `normalTexture` (карта нормалей в касательном пространстве,
+  зелёный вверх, как в glTF: рельеф, который toolbox даёт ремастер-уровням; должна указывать на одну из текстур
+  уровня), `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (с `alphaCutoff`) или `BLEND`; материалы без освещения — через `KHR_materials_unlit`.
   В `extras.drahtseilakt` то, для чего в glTF нет поля: `ambient`, `specular` и `power` (блик), `z_write`, `blend` (имена коэффициентов
   источника и приёмника: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`, `inv_src_alpha`,

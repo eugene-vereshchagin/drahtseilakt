@@ -226,6 +226,7 @@ fn material(name: String, m: &scene::Material, textures: &HashMap<usize, usize>)
         two_sided: m.two_sided,
         unlit: false,
         texgen: None,
+        normal: None,
     }
 }
 

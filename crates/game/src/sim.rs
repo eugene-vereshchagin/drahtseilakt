@@ -2057,6 +2057,7 @@ mod tests {
                 two_sided: false,
                 unlit: false,
                 texgen: None,
+                normal: None,
             }],
             textures: vec![],
             objects: vec![

@@ -35,20 +35,37 @@ pub fn graft_within(level: &mut level::Level, root: &Path, remade: &Path) {
     let Ok(r) = level::open::import(remade) else { return };
     let written: Vec<&mut level::Mesh> = level.meshes.iter_mut().filter(|m| level::open::written(m)).collect();
     let same = written.len() == r.meshes.len() && written.iter().zip(&r.meshes).all(|(m, rm)| m.name == rm.name);
-    let textures = level.textures.len() == r.textures.len()
+    // the part's own textures first, in its order; the remade copy may add its normal maps after them
+    let own = level.textures.len();
+    let textures = r.textures.len() >= own
+        && r.textures.len() <= own.saturating_add(own).saturating_add(16)
         && level.textures.iter().zip(&r.textures).all(|(t, rt)| t.name == rt.name);
-    if !same || !textures {
+    let materials = level.materials.len() == r.materials.len()
+        && level.materials.iter().zip(&r.materials).all(|(m, rm)| m.name == rm.name);
+    if !same || !textures || !materials {
         return;
     }
     for (m, rm) in written.into_iter().zip(r.meshes) {
         m.look = rm.look;
     }
-    for (t, rt) in level.textures.iter_mut().zip(r.textures) {
+    let mut remade = r.textures.into_iter();
+    for (t, rt) in level.textures.iter_mut().zip(remade.by_ref()) {
         if let level::TextureSource::File(p) = &rt.source
             && take_pixels(p)
         {
             t.source = rt.source;
         }
+    }
+    // the added ones (a normal map past the pixels allowed is left without its file, and draws flat)
+    for mut rt in remade {
+        let usable = matches!(&rt.source, level::TextureSource::File(p) if take_pixels(p));
+        if !usable {
+            rt.source = level::TextureSource::None;
+        }
+        level.textures.push(rt);
+    }
+    for (m, rm) in level.materials.iter_mut().zip(&r.materials) {
+        m.normal = rm.normal.filter(|&t| t < level.textures.len());
     }
 }
 
