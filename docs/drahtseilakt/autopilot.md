@@ -26,6 +26,35 @@ prints each match.
 on, the way, its transformers and the player's ticks are that run's. So a level is followed from its start with the
 owner's whole run and a later one that got through a sector the whole run did not.
 
+A player's tries that lost the ball are left out of the way followed: each one's stretch from where it came into the
+sector it was lost in (the new ball starts that sector again). A run that did not finish is followed to the end of
+its try in its last sector that got furthest, and from there on the test player finds the way by itself (with
+`--plan`, through the plan's objects from the next checkpoint on).
+
+## The way's search
+
+`--plan FILE` names the level's objects to pass through, in order, one a line (transformers, fans, checkpoints,
+`#` comments), as a player who knows the level does; without one the transformers within 30 of the way found are
+taken in its order. The plans written from a walkthrough video are kept as `hints/Level_NN.plan`.
+
+The way is searched over the floor points of the level's floors, rails and modules. Besides rolling from point to
+point, climbing a little and dropping down (30 units at most):
+
+- **Rails** hold the ball from the sides: a way goes onto or off a rail only along it (not across a rail crossing
+  under or over, not sideways off it), drops off one only where it ends, and no gap is crossed onto a rail.
+- **Updrafts** (P_Modul_18): from the floor under a fan, up its column to the top of its volume and across onto a
+  floor near its top (14 units round it at most). Only a paper ball rises; the transformers on the way see to that.
+  A ball an updraft holds up is judged where it floats, not as falling.
+- **Leaps**: where no way over the floors reaches the next goal, the search is made again allowing gaps of up to 20
+  units at a high price, so the way crosses the narrowest one (a drawbridge to knock over, a part to wait for)
+  instead of heading through the air.
+- A transformer of the kind the ball already is (that the way came in with) changes nothing and is gone through
+  at once.
+
+Stuck within 16 of a **drawbridge** (P_Modul_25, a plank standing up on a hinge) that the way passes over, the
+test player first tries a charge at it along the way (backing off for a run-up while it stands), when on a copy of
+the run the charge keeps the ball and gets on: some bridges fall when hit, others only by a lever.
+
 ## Stuck reports
 
 When the test player gets no further along its way for 20 seconds, it writes a report into `--report DIR`
@@ -60,6 +89,8 @@ then the test player finds its place on the way again (past the transformers, wh
 | `wait T` | no arrows for T ticks |
 | `turn N` | turn the view N quarters (negative: left) |
 | `become KIND` | roll into the nearest transformer of that kind (1200 ticks at most) |
+| `lead X Y Z D T` | keep D units ahead of the loose body nearest the point as it rolls (behind it, when D is negative), for T ticks: a stone ball pushing the paper one through fans, a ball to wait for |
+| `shove X Y Z TX TY TZ T` | push the loose body (or a module's moving part) nearest X Y Z to TX TY TZ: round it to behind it, then on into it slowly (T ticks at most) — a board shoved into place, a ball rolled where it is wanted |
 | `replay FILE FROM TO` | a player's inputs of ticks FROM..TO of the replay FILE (beside the hint file), turned to the test player's view; begun with the ball held in a transformer, it starts as the ball is let go (FROM: the player's transform tick + 149), in step with the player |
 
 Directions are world directions (X east, Z north as the level is built), so a hint does not depend on where the
@@ -67,6 +98,13 @@ view is turned; the arrows are chosen for the view at each tick. A hint file is 
 the number of hints (256) and steps (64 a hint) and every number are capped, a replay is a plain file name beside
 it, and a malformed line refuses the whole file with its line number. `HINTS_TRACE=1` prints the ball every ten
 ticks while a hint drives.
+
+## Videos of its runs
+
+`--video FILE` with `--replay` draws the run without a window, one frame a tick (60 a second) at `--size`, as raw
+RGB into FILE, and mixes its sound as the window plays it (into `DRAHTSEILAKT_SOUND_FILE`); it goes on six seconds
+past the finish for the end screen. `scripts/video.sh LEVEL REPLAY OUT.mp4 [WxH]` joins the two into an H.264 video
+with ffmpeg (the frames go through a pipe, nothing large is kept; the game itself never runs another program).
 
 ## Where it stands
 
@@ -77,5 +115,12 @@ Following the owner's runs (`--autopilot --follow`), 2026-11-02 (the finished ru
 - Level 3: finished from the start in 8:34.07.
 - Level 4: finished from sector 2 in 7:55.15 (`--follow` the owner's run, `--then` the one from sector 3; a hint into the paper transformer on the slope); from the start to sector 5 (route 2347 of 2953).
 - Level 5: finished from the start in 12:03.58 (hints for both crates and the pusher).
-- Level 6: the owner's run ends in sector 2 at the convex log, and so does the test player's.
+- Level 6: with the owner's run (it ends at the convex log in sector 2) and the plan `hints/Level_06.plan`, the test
+  player goes on by itself, knocks the drawbridge over and has reached sector 3 once; usually it rolls past the way
+  down off the log (2026-11-03).
 - Level 7: to sector 5 (route 2635 of 3261): the plank the paper ball lands on must first be shoved into place as stone.
+- Levels 8–13 (2026-11-03): 8 by itself with the walkthrough's plan to the first wood transformer (route 149 of
+  1118); 9 following the owner's run to sector 3; 10 following the owner's finished run with `hints/Level_10.txt` to
+  sector 2; 11 in sector 1 (the bridges and pushers before the first checkpoint); 12 and 13 to where the owner's runs
+  end (sector 1; sector 2, where the stone ball stands at a fan it must ride as paper).
+- Videos of the finished runs: `scripts/video.sh`, kept outside the repository.

@@ -68,6 +68,7 @@ usage: drahtseilakt [options]
   --report DIR        where the test player writes a report each time it is stuck (default: the temp folder)
   --locate DIR        find the ball's way in a video's frames (DIR/s0001.jpg, four a second); track to --record
   --frames DIR        with --replay: draw four frames a second into DIR, with the ball's true places
+  --video FILE        with --replay: raw RGB frames, 60 a second at --size, into FILE (scripts/video.sh)
   --screenshot FILE   no window: render the frame after the replay (or --ticks N) to a PNG
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
@@ -126,6 +127,8 @@ pub struct Options {
     /// Draw frames of the replay (`locate::RATE` a second) into this folder, with the ball's true places (to check
     /// --locate).
     pub frames: Option<PathBuf>,
+    /// Record the replay as a video: raw RGB frames, one a tick at --size, into this file (or pipe).
+    pub video: Option<PathBuf>,
     pub screenshot: Option<PathBuf>,
     pub ticks: Option<u64>,
     pub trace: Option<u64>,
@@ -161,6 +164,7 @@ fn parse_args() -> Result<Options, String> {
         give_up: 30,
         locate: None,
         frames: None,
+        video: None,
         screenshot: None,
         ticks: None,
         trace: None,
@@ -210,6 +214,7 @@ fn parse_args() -> Result<Options, String> {
             "--autopilot" => o.autopilot = true,
             "--locate" => o.locate = Some(value()?.into()),
             "--frames" => o.frames = Some(value()?.into()),
+            "--video" => o.video = Some(value()?.into()),
             "--plan" => {
                 o.plan = Some(value()?.into());
                 o.autopilot = true;
@@ -308,6 +313,7 @@ fn windowed(o: &Options) -> bool {
         && o.export.is_none()
         && o.locate.is_none()
         && o.frames.is_none()
+        && o.video.is_none()
 }
 
 /// How many --then runs may follow on.

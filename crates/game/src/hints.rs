@@ -54,6 +54,8 @@ pub enum Step {
     Inputs(i32, Vec<u8>),
     /// Keep this far ahead of (behind, when negative) the loose body nearest the point as it rolls, for so many ticks.
     Lead(Vec3, f32, u64),
+    /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most.
+    Shove(Vec3, Vec3, u64),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -171,6 +173,11 @@ fn step(words: &[&str]) -> Result<Step, String> {
                 return Err(format!("lead is {MAX_LEAD} units at most"));
             }
             Step::Lead(p, d, ticks(w.next())?)
+        }
+        "shove" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let to = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            Step::Shove(p, to, ticks(w.next())?)
         }
         "become" => {
             Step::Become(kind_of(w.next().ok_or("become needs a kind")?).ok_or("not a ball kind")?)
@@ -525,6 +532,23 @@ impl Runner {
     }
 }
 
+/// The loose body (and, with `parts`, the module part) nearest `at`; usize::MAX for none.
+fn nearest_body(sim: &Sim, at: Vec3, parts: bool) -> usize {
+    let world = sim.world();
+    let parts = sim.module_bodies().iter().filter(|_| parts).map(|m| m.body);
+    sim.loose()
+        .iter()
+        .map(|&(_, b)| b)
+        .chain(parts)
+        .filter_map(|b| world.state(b).map(|st| (b, st.pos.distance(at))))
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map_or(usize::MAX, |n| n.0)
+}
+
+/// A shove is done with the body this near its place; the ball pushes it from this far behind its middle.
+const SHOVE_NEAR: f32 = 1.0;
+const SHOVE_BEHIND: f32 = 3.5;
+
 /// The input of `step` for this tick, or None when it is done.
 fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     let t = sim.tick.saturating_sub(run.start);
@@ -592,18 +616,42 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             })?;
             Some(towards(near.0))
         }
+        Step::Shove(at, to, n) => {
+            if t >= *n {
+                return None;
+            }
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
+            let st = sim.world().state(body)?;
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let left = flat(*to - st.pos);
+            if left.length() < SHOVE_NEAR {
+                return None;
+            }
+            let dir = left.normalize();
+            // behind the body as seen from where it must go, then on into it
+            let rel = flat(ball.position - st.pos);
+            let behind = st.pos - dir * SHOVE_BEHIND;
+            let off = flat(behind - ball.position);
+            let v = flat(ball.velocity);
+            let ahead = rel.dot(dir) > -0.5 * SHOVE_BEHIND;
+            if ahead || (off.length() > 2.0 && rel.normalize_or_zero().dot(-dir) < 0.9) {
+                // round it on the side the ball is: to beside it, then behind
+                let perp = Vec3::new(-dir.z, 0.0, dir.x);
+                let side = perp * rel.dot(perp).signum();
+                let round = if ahead { st.pos + side * SHOVE_BEHIND } else { behind };
+                let d = flat(round - ball.position);
+                return Some(arrows(d.clamp_length_max(6.0) - 0.8 * v, quarter));
+            }
+            // pushing: slowly, so the body is not knocked past the place or off the floor
+            let along = dir * 3.0 + (off - dir * off.dot(dir));
+            Some(arrows(along - 0.8 * (v - flat(st.vel)), quarter))
+        }
         Step::Lead(at, d, n) => {
             if t >= *n {
                 return None;
             }
             let world = sim.world();
-            let body = *run.body.get_or_insert_with(|| {
-                sim.loose()
-                    .iter()
-                    .filter_map(|&(_, b)| world.state(b).map(|st| (b, st.pos.distance(*at))))
-                    .min_by(|a, b| a.1.total_cmp(&b.1))
-                    .map_or(usize::MAX, |n| n.0)
-            });
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, false));
             let st = world.state(body)?;
             let v = Vec3::new(st.vel.x, 0.0, st.vel.z);
             // ahead along where it rolls (or, still, on the side the ball is), a little ahead of where it will be
@@ -688,6 +736,10 @@ mod tests {
         );
         assert_eq!(h[1].steps[2], Step::Become(BallKind::Paper));
         assert_eq!(h[1].line, 3);
+        let moving = parse("at 0 0 0 r 1 : lead 1 2 3 -4 300 ; shove 1 2 3 7 8 9 500").unwrap();
+        assert_eq!(moving[0].steps[0], Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300));
+        assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500));
+        assert!(parse("at 0 0 0 r 1 : lead 1 2 3 99 300").is_err(), "a lead is 50 units at most");
     }
 
     #[test]
