@@ -52,10 +52,14 @@ The active profile for this project:
   mods from `OPENBALLANCE_MODS` (see `docs/drahtseilakt/community-maps.md`). While the repository is private it
   may hold game data as a backup, only where the owner says; the public release is a new, clean repository
   (decisions.md, "The private repository is a backup").
-- **The game plays only the player's own data.** No substitute content; enhancements (e.g. upscaled
-  textures) are scripts the player runs on their own copy. Both our native format and original `.nmo` play.
-  New content is not a substitute: levels whose authors let them ship with the game (free licence, none of the
-  original's assets inside) may come with it (levels.md). What players copy into their folders is their business.
+- **Own content by default, the original's on the player's request** (owner's decision 2026-11-02, decisions.md
+  "Own content by default"). Nothing of the original is ever shipped. The game comes with its own interface and
+  parts, made as close to the original as we can ourselves (own drawings, sounds, freely licensed fonts); in the
+  extended mode a switch loads the original's from the player's copy, or its remaster made by the toolbox. Levels
+  are shared either with their own assets (free licence) or, for players who want it, so that the original's
+  resources are attached from each player's own copy by the toolbox. The toolbox makes every resource the game can
+  use out of the player's original files, in a couple of clicks. Both our native format and original `.nmo` play.
+  What players copy into their folders is their business.
 - **Mods are never executed.** BML mods are Windows DLLs: a source of feature requirements, read only, never
   loaded, never run — not even under Wine.
 - **The game never goes online.** No network code in the game: fonts and every other resource ship with it or

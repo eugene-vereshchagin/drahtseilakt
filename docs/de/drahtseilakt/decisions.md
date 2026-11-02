@@ -252,3 +252,16 @@ Real-ESRGAN, das Details ergänzt, wird benutzt, wenn der Spieler es selbst inst
 heruntergeladen und ist nie eine Abhängigkeit des Spiels, ein Spieler braucht also nichts außer dem Spiel. Ob das
 Archiv der Toolbox später Real-ESRGAN mitbringt (die Lizenz erlaubt es, fest und mit Prüfsumme), wird zur
 Veröffentlichung entschieden.
+
+
+## Eigenes als Standard, das Original auf Wunsch des Spielers
+
+*2026-11-02.* Ersetzt „das Spiel spielt nur die Daten des Spielers, kein Ersatzinhalt“. Das Spiel kommt mit eigener
+Oberfläche und eigenen Teilen (Menüs, Schrift, Oberflächenklänge, Kugeln, Module, wo ein Level sie braucht), von uns
+so nah am Original gemacht, wie wir es uns leisten können: eigene Zeichnungen und Klänge, frei lizenzierte Schriften,
+nichts vom Original. Im erweiterten Modus nimmt ein Schalter stattdessen die des Originals aus der Kopie des Spielers
+oder deren Remaster aus der Toolbox. Level lassen sich auf zwei Arten weitergeben: mit eigenen Ressourcen unter
+freier Lizenz oder, für wer das Aussehen des Originals will, als Level, die die Ressourcen des Originals benennen,
+welche die Toolbox aus der eigenen Kopie jedes Spielers beilegt. Die Toolbox macht aus den Originaldateien des
+Spielers alles, was das Spiel benutzen kann. So wird niemandes Eigentum ausgeliefert, und jeder stellt sich das
+Original mit ein paar Klicks selbst zusammen.

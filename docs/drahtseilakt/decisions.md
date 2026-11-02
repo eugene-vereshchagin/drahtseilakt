@@ -247,3 +247,15 @@ keeps using, so runs are the same) and makes the textures larger. Real-ESRGAN, w
 player has installed it; it is never downloaded and never a dependency of the game, so a plain player needs
 nothing more than the game. Whether the toolbox's archive later carries Real-ESRGAN (its licence allows it,
 pinned and checksummed) is decided at the release.
+
+
+## Own content by default, the original's on the player's request
+
+*2026-11-02.* This replaces "the game plays only the player's own data, no substitute content". The game ships with
+its own interface and parts (menus, font, interface sounds, balls, modules where a level needs them), made by us as
+close to the original as we can afford: own drawings and sounds, freely licensed fonts, nothing of the original. In
+the extended mode a switch takes the original's instead, from the player's copy, or its remaster made by the
+toolbox. Levels can be shared in two ways: with their own assets under a free licence, or, for players who want the
+original's look, as levels that name the original's resources, which the toolbox attaches from each player's own
+copy. The toolbox makes every resource the game can use out of the player's original files. So nobody's property is
+shipped, and every player can put the original together on their own machine in a couple of clicks.
