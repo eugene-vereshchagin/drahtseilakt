@@ -219,6 +219,9 @@ Done when: most maps play; the report lists the rest, each with its reason.
   picture (its fine detail of brightness as height: rivets, plank gaps, ropes) and the renderer bends the lighting
   by it; levels without one draw exactly as before. Off by default (`--relief S`): guessed from the picture, it
   deepened every crack and gap (the owner: "etched by acid"); real relief needs height from more than the picture.
+  Masonry done: where a texture shows brickwork in concrete (the brick bands of the floors), the toolbox tells the
+  bricks by their colour, not their brightness, raises them and sinks the mortar, and the renderer draws that height
+  with parallax occlusion; always on, wood, stone and metal are left alone.
 - **Local texture enhancement**: scripts the player runs on their own copy to upscale textures (up to 8K);
   the repository holds the pipeline and its parameters, never the results.
 - **Replays rendered to video**: offline, frame by frame, at any resolution up to 8K with sound. Nothing is

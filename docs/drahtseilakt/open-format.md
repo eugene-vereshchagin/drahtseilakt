@@ -35,7 +35,9 @@ A folder holding:
   the level's own meshes, each the look of one mesh, and nodes never place them; the physics and the rules use the
   mesh itself.
 - **Materials**: `baseColorFactor` (diffuse), `baseColorTexture`, `normalTexture` (a normal map, tangent space with
-  green up as glTF has it: the relief the toolbox gives remastered levels; it must name one of the level's textures),
+  green up as glTF has it: the relief the toolbox gives remastered levels; it must name one of the level's textures; with
+  `extras.drahtseilakt.parallax`, a depth in texture coordinates over 0 and at most 0.25, its alpha is a height,
+  1 the top, and the renderer draws it with parallax so the relief keeps its depth at a glancing view),
   `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (with `alphaCutoff`) or `BLEND`; unlit materials use `KHR_materials_unlit`.
   `extras.drahtseilakt` holds what glTF has no field for: `ambient`, `specular` and `power` (the highlight), `z_write`, `blend` (source and

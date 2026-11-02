@@ -227,6 +227,7 @@ fn material(name: String, m: &scene::Material, textures: &HashMap<usize, usize>)
         unlit: false,
         texgen: None,
         normal: None,
+        parallax: 0.0,
     }
 }
 

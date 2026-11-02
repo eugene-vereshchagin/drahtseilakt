@@ -22,6 +22,7 @@ fn material(name: &str, texgen: Option<TexGen>) -> Material {
         unlit: false,
         texgen,
         normal: None,
+        parallax: 0.0,
     }
 }
 

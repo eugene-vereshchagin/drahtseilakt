@@ -233,6 +233,9 @@ Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen 
   Helligkeitsunterschiede als Höhe: Nieten, Fugen zwischen Brettern, Seile), und der Renderer beugt das Licht damit;
   Level ohne sie werden genau wie vorher gezeichnet. Standardmäßig aus (`--relief S`): aus dem Bild geraten, vertiefte
   es jeden Riss und jede Fuge (der Inhaber: „von Säure zerfressen“); echtes Relief braucht Höhe aus mehr als dem Bild.
+  Mauerwerk erledigt: wo eine Textur Ziegel in Beton zeigt (die Ziegelbänder der Böden), erkennt die Toolbox die
+  Ziegel an der Farbe, nicht an der Helligkeit, hebt sie an und senkt die Fugen, und der Renderer zeichnet diese Höhe
+  mit Parallax Occlusion; immer an, Holz, Stein und Metall bleiben unberührt.
 - **Lokale Texturverbesserung**: Skripte, die der Spieler auf seiner Kopie ausführt, um Texturen
   hochzuskalieren (bis 8K); das Repository enthält die Pipeline und ihre Parameter, nie die Ergebnisse.
 - **Replays als Video**: offline, Bild für Bild, in jeder Auflösung bis 8K, mit Ton. Hochgeladen wird nichts

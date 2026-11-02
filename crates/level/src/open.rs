@@ -15,6 +15,8 @@ use serde_json::{Value, json};
 use std::path::Path;
 
 pub const VERSION: u64 = 1;
+/// The deepest parallax relief a material may ask for, in texture coordinates.
+pub const MAX_PARALLAX: f64 = 0.25;
 const MAX_JSON: u64 = 64 * 1024 * 1024;
 const MAX_BIN: u64 = 1024 * 1024 * 1024;
 const FLOAT: u64 = 5126;
@@ -154,6 +156,9 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
             }
             if let Some(t) = m.normal {
                 v["normalTexture"] = json!({"index": t});
+                if m.parallax > 0.0 {
+                    v["extras"]["drahtseilakt"]["parallax"] = json!(m.parallax);
+                }
             }
             if let Some(g) = m.texgen {
                 v["extras"]["drahtseilakt"]["texgen"] = json!(match g {
@@ -644,9 +649,18 @@ pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
                 }
             }
         };
+        // a parallax depth needs a normal map (its alpha is the height) and a sane depth; anything else is refused
+        let parallax = match &x["parallax"] {
+            Value::Null => 0.0,
+            p => match p.as_f64().filter(|p| p.is_finite() && *p > 0.0 && *p <= MAX_PARALLAX) {
+                Some(p) if normal.is_some() => p as f32,
+                _ => return Err("a material's parallax depth is not a depth over its normal map".into()),
+            },
+        };
         level.materials.push(Material {
             name: m["name"].as_str().unwrap_or_default().to_owned(),
             normal,
+            parallax,
             diffuse: f4(&pbr["baseColorFactor"], [1.0; 4]),
             ambient: rgb(&x["ambient"]),
             emissive: rgb(&m["emissiveFactor"]),

@@ -440,7 +440,13 @@ impl Renderer {
                         },
                         if relief.is_some() { 1.0 } else { 0.0 },
                     ],
-                    ambient: [m.ambient[0], m.ambient[1], m.ambient[2], 0.0],
+                    // w: the parallax depth (the normal map's alpha is then a height), only with a normal map
+                    ambient: [
+                        m.ambient[0],
+                        m.ambient[1],
+                        m.ambient[2],
+                        if relief.is_some() && m.parallax.is_finite() { m.parallax.clamp(0.0, 0.25) } else { 0.0 },
+                    ],
                     specular: [m.specular[0], m.specular[1], m.specular[2], m.power],
                 };
                 let buf = self

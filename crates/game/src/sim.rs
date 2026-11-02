@@ -2068,6 +2068,7 @@ mod tests {
                 unlit: false,
                 texgen: None,
                 normal: None,
+                parallax: 0.0,
             }],
             textures: vec![],
             objects: vec![

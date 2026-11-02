@@ -36,7 +36,8 @@
   всех собственных мешей уровня, каждый — вид ровно одного меша, узлы их не ставят; физика и правила берут сам меш.
 - **Материалы**: `baseColorFactor` (diffuse), `baseColorTexture`, `normalTexture` (карта нормалей в касательном пространстве,
   зелёный вверх, как в glTF: рельеф, который toolbox даёт ремастер-уровням; должна указывать на одну из текстур
-  уровня), `emissiveFactor`, `doubleSided`; `alphaMode`
+  уровня; с `extras.drahtseilakt.parallax`, глубиной в координатах текстуры больше 0 и не больше 0,25, её альфа —
+  высота, 1 — верх, и рендер рисует её с параллаксом, так что рельеф сохраняет глубину и при взгляде вскользь), `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (с `alphaCutoff`) или `BLEND`; материалы без освещения — через `KHR_materials_unlit`.
   В `extras.drahtseilakt` то, для чего в glTF нет поля: `ambient`, `specular` и `power` (блик), `z_write`, `blend` (имена коэффициентов
   источника и приёмника: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`, `inv_src_alpha`,

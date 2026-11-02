@@ -29,6 +29,7 @@ fn level() -> Level {
         power: 0.0,
         texture: Some(0),
         normal: Some(1),
+        parallax: 0.0,
         blend: None,
         alpha_cutoff: None,
         z_write: true,
@@ -107,4 +108,31 @@ fn a_normal_map_that_is_no_texture_is_refused() {
         assert!(level::open::import(&d).is_err(), "{name}");
         let _ = std::fs::remove_dir_all(&d);
     }
+}
+
+#[test]
+fn a_parallax_depth_survives_and_bad_ones_are_refused() {
+    let d = dir("parallax");
+    let mut l = level();
+    l.materials[0].parallax = 0.04;
+    level::open::export(&l, &d).unwrap();
+    let back = level::open::import(&d).unwrap();
+    assert!((back.materials[0].parallax - 0.04).abs() < 1e-6);
+    let path = d.join("level.gltf");
+    let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    for (name, depth, keep_normal) in [
+        ("negative", serde_json::json!(-0.1), true),
+        ("deep", serde_json::json!(5.0), true),
+        ("text", serde_json::json!("0.04"), true),
+        ("no map", serde_json::json!(0.04), false),
+    ] {
+        let mut doc = doc.clone();
+        doc["materials"][0]["extras"]["drahtseilakt"]["parallax"] = depth;
+        if !keep_normal {
+            doc["materials"][0].as_object_mut().unwrap().remove("normalTexture");
+        }
+        std::fs::write(&path, serde_json::to_string(&doc).unwrap()).unwrap();
+        assert!(level::open::import(&d).is_err(), "{name}");
+    }
+    let _ = std::fs::remove_dir_all(&d);
 }

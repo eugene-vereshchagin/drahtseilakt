@@ -37,7 +37,9 @@ Ein Ordner mit:
   eines Meshs, und kein Knoten setzt sie; Physik und Regeln benutzen das Mesh selbst.
 - **Materialien**: `baseColorFactor` (Diffuse), `baseColorTexture`, `normalTexture` (eine Normal Map im
   Tangentenraum, Grün nach oben wie in glTF: das Relief, das die Toolbox Remaster-Leveln gibt; sie muss eine der
-  Texturen des Levels nennen), `emissiveFactor`, `doubleSided`;
+  Texturen des Levels nennen; mit `extras.drahtseilakt.parallax`, einer Tiefe in Texturkoordinaten über 0 und
+  höchstens 0,25, ist ihr Alpha eine Höhe, 1 oben, und der Renderer zeichnet sie mit Parallax, sodass das Relief
+  auch bei flachem Blick seine Tiefe behält), `emissiveFactor`, `doubleSided`;
   `alphaMode` `OPAQUE`, `MASK` (mit `alphaCutoff`) oder `BLEND`; unbeleuchtete Materialien über
   `KHR_materials_unlit`. In `extras.drahtseilakt` steht, wofür glTF kein Feld hat: `ambient`, `specular` und `power` (das Glanzlicht), `z_write`,
   `blend` (Namen von Quell- und Zielfaktor: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`,
