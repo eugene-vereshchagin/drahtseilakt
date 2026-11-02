@@ -3,8 +3,9 @@
 // "Textures/Font_1.tga"); each such file plays a role (the menu's font, the fall's sound...). Three providers can
 // fill a role: our own files shipped with the game (assets/own/, laid out as the original), the player's copy, and
 // the toolbox's remaster of the copy (levels/remastered/.interface/). The player chooses which comes first with
-// `interface own|original|remastered` (the extended mode's Interface switch); our own is the default, and the
-// classic mode always plays it.
+// `interface own|original|remastered` (the extended mode's Interface switch). The default, and what the classic
+// mode plays, is the copy's own interface when the copy has it, else ours (owner's decision 2026-11-03, while our
+// own interface is redone).
 // A role no provider fills is missing: logged once, never a crash.
 
 use std::path::{Path, PathBuf};
@@ -86,11 +87,19 @@ pub fn chosen() -> Provider {
     of(CHOSEN.load(Ordering::Relaxed))
 }
 
-/// The settings' choice (`interface ...`), our own when none.
-pub fn from_settings() -> Provider {
-    crate::profile::setting("interface")
-        .and_then(|s| Provider::parse(&s))
-        .unwrap_or(Provider::Own)
+/// The settings' choice (`interface ...`), if the player made one.
+pub fn from_settings() -> Option<Provider> {
+    crate::profile::setting("interface").and_then(|s| Provider::parse(&s))
+}
+
+/// The interface played when the player chose none, and always in the classic mode: the copy's own when it has its
+/// menu, else ours.
+pub fn default_for(copy_has_menu: bool) -> Provider {
+    if copy_has_menu {
+        Provider::Original
+    } else {
+        Provider::Own
+    }
 }
 
 /// The game's own assets folder (fonts, own files): `DRAHTSEILAKT_ASSETS`, else `assets/` beside the program or

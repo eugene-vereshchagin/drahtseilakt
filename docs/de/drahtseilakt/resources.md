@@ -9,8 +9,8 @@ des Menüs, der Klang des Falls, die Holzkugel...). Nach der Entscheidung „Eig
 - **Remaster**: das Remaster der Kopie aus der Toolbox, in `levels/remastered/.interface/`.
 
 Der Schalter **Interface** des erweiterten Modus (own / original / remaster, Einstellung `interface`) wählt, wer
-zuerst kommt; er wirkt ab dem nächsten Start. **Eigen** ist die Vorgabe, und der klassische Modus spielt immer sie (decisions.md,
-„Die eigene Oberfläche ist die Vorgabe“). Eine Rolle, die keine
+zuerst kommt; er wirkt ab dem nächsten Start. Vorgabe, und was der klassische Modus spielt, ist die Oberfläche der Kopie, wenn sie ihr Menü hat, sonst **Eigen**
+(decisions.md, „Die Oberfläche der Kopie als Vorgabe, solange unsere neu entsteht“). Eine Rolle, die keine
 Quelle füllt, fehlt: das Spiel sagt es einmal und läuft ohne sie weiter. Der eigene Ordner eines Levels
 (`<Level>/game/`, siehe [open-format.md](open-format.md)) kommt für seine Teile weiterhin zuerst.
 

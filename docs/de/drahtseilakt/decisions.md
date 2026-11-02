@@ -301,3 +301,11 @@ Wortgrenze, „…“), im Menü und überall, wo das Spiel den Namen zeigt, dam
 Menü ist eine flache Liste nach Titel. Sammlungen sind kein Begriff: eine Reihe wird ein Ordner je Level.
 `drahtseilakt-toolbox import-maps` sortiert einen Download so ein. Einzelheiten: [levels.md](levels.md), „Ein Level ist
 ein Ordner“.
+
+## Die Oberfläche der Kopie als Vorgabe, solange unsere neu entsteht
+
+2026-11-03, Eigentümer: Die erste eigene Oberfläche (violette Pillen-Knöpfe, ein gemalter Hintergrund) hatte keine
+Ähnlichkeit mit dem Original. Bis die neu gemachte überzeugt, spielt die Vorgabe — und der klassische Modus — die
+Oberfläche der Kopie, wenn die Kopie des Spielers ihr Menü hat, sonst unsere. Vom Original wird dadurch nichts
+ausgeliefert: Sie kommt aus der eigenen Kopie des Spielers, wie die Level. Die Oberfläche bestimmt das Klangthema
+nicht mehr.

@@ -10,8 +10,8 @@ providers can fill a role:
 - **remaster**: the toolbox's remaster of the copy, in `levels/remastered/.interface/`.
 
 The extended mode's **Interface** switch (own / original / remaster, setting `interface`) chooses which comes first;
-it takes effect on the next start. **Own** is the default, and the classic mode always plays it (decisions.md, "The
-own interface is the default"). A role that no provider fills is
+it takes effect on the next start. The default, and what the classic mode plays, is the copy's own interface when the copy has its menu, else
+**own** (decisions.md, "The copy's interface by default while ours is redone"). A role that no provider fills is
 missing: the game says so once and goes on without it. A level's own folder (`<level>/game/`, see
 [open-format.md](open-format.md)) still comes first for its parts.
 

@@ -869,16 +869,18 @@ pub fn replay_dir() -> PathBuf {
 }
 
 pub fn run(o: Options, data: Data) -> Result<(), String> {
-    // where the interface's files come from: the extended mode's choice, our own in the classic mode
-    let chosen = gamedata::resources::from_settings();
+    // where the interface's files come from: the copy's own when it has its menu, else ours (resources.rs); the
+    // extended mode may choose another
+    let explicit = gamedata::resources::from_settings();
+    let default = gamedata::resources::default_for(data.copy_has("3D Entities/Menu.nmo"));
+    let chosen = explicit.unwrap_or(default);
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
-    // the own interface by default and always in the classic mode; the extended mode may choose the original's
-    gamedata::resources::set_in_use(if extended { chosen } else { gamedata::resources::Provider::Own });
+    gamedata::resources::set_in_use(if extended { chosen } else { default });
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
-    // (a player who chose the original's interface before there were themes keeps hearing the original's sounds)
+    // (the interface no longer implies the original's sounds: the copy's interface is now the default)
     let theme = if extended {
-        setting("sound-theme").or_else(|| (chosen != gamedata::resources::Provider::Own).then(|| "original".to_owned()))
+        setting("sound-theme")
     } else {
         None
     };

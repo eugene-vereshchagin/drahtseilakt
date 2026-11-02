@@ -293,3 +293,10 @@ a title is cleaned and capped at 40 characters (cut at a word, "…"), in the me
 name, so a title can never break the interface. The menu is a flat list by title. Collections are not a concept: a
 series becomes one folder per level. `drahtseilakt-toolbox import-maps` sorts a download into this shape. Details:
 [levels.md](levels.md), "A level is a folder".
+
+## The copy's interface by default while ours is redone
+
+2026-11-03, owner: the first own interface (purple pill buttons, a painted background) had no likeness to the
+original. Until the redone one convinces, the default — and the classic mode — plays the copy's own interface when
+the player's copy has its menu, else ours. Nothing of the original is shipped by this: it comes from the player's own
+copy, as the levels do. The interface no longer decides the sound theme.

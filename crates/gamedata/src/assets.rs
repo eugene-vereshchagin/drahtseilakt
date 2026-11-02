@@ -174,6 +174,11 @@ impl Data {
         found
     }
 
+    /// Whether the player's copy itself has a file (no other provider asked).
+    pub fn copy_has(&self, relative: &str) -> bool {
+        self.copy_only(relative).is_some()
+    }
+
     /// A file of the player's copy itself.
     fn copy_only(&self, relative: &str) -> Option<PathBuf> {
         relative.split('/').try_fold(self.root.clone(), |dir, part| {

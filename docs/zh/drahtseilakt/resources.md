@@ -6,7 +6,7 @@
 - **原版**：玩家的拷贝；
 - **重制**：toolbox 对拷贝的重制，位于 `levels/remastered/.interface/`。
 
-扩展模式的 **Interface** 开关（own / original / remaster，设置项 `interface`）决定谁优先；从下次启动起生效。**自有**为默认，经典模式始终使用它（decisions.md，“自有界面为默认”）。没有任何来源提供的角色即为缺失：游戏会提示一次，然后在没有它的情况下继续运行。关卡自己的文件夹（`<关卡>/game/`，见 [open-format.md](open-format.md)）对其部件依然最优先。
+扩展模式的 **Interface** 开关（own / original / remaster，设置项 `interface`）决定谁优先；从下次启动起生效。默认以及经典模式使用的是拷贝自带的界面（若拷贝有其菜单），否则为**自有**（decisions.md，“在自有界面重做期间默认使用拷贝的界面”）。没有任何来源提供的角色即为缺失：游戏会提示一次，然后在没有它的情况下继续运行。关卡自己的文件夹（`<关卡>/game/`，见 [open-format.md](open-format.md)）对其部件依然最优先。
 
 拷贝的字体无法绘制的文字（它只有 Latin-1）使用随附的字体（`assets/fonts`，SIL OFL）绘制，正如自有界面绘制它的所有文字：选择原版界面时的俄文和中文菜单，以及自制地图的中文和西里尔字母名称。
 
