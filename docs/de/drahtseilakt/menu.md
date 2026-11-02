@@ -96,6 +96,9 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   - Bestzeiten neben den Leveln;
   - Level nach Art unter Start;
   - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
+  - Textures: own / original, womit die Level, ihre Teile und die Kugeln gezeichnet werden: mit unseren Texturen
+    (Vorgabe, im klassischen Modus immer) oder denen der Kopie; das nächste Level lädt mit der Wahl
+    ([resources.md](resources.md));
   - Sounds: das Klangthema — System, generiert, original (von der Toolbox gemacht) oder ein eigenes des Spielers
     ([resources.md](resources.md)); das generierte, bis der Spieler ein anderes wählt, und im klassischen Modus
     immer;

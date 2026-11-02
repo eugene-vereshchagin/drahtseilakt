@@ -290,6 +290,9 @@ impl Data {
     }
 
     fn texture_pixels(&self, t: &level::Texture) -> Option<(u32, u32, Vec<u8>)> {
+        if let Some(own) = own_stand_in(t) {
+            return Some(own);
+        }
         match &t.source {
             level::TextureSource::Pixels {
                 width,
@@ -324,6 +327,27 @@ impl Data {
             level::TextureSource::None => None,
         }
     }
+}
+
+/// Our own texture in place of a texture of the original's (resources.rs, `textures own`): one a `.nmo` names, by its
+/// file's name or, for pixels it carries, by the texture's name. An open-format level's own files (a path in its
+/// folder) are its maker's and stay as they are. Our files ship with the game; still decoded with the size caps.
+fn own_stand_in(t: &level::Texture) -> Option<(u32, u32, Vec<u8>)> {
+    if crate::resources::textures() != crate::resources::TextureSet::Own {
+        return None;
+    }
+    let path = match &t.source {
+        level::TextureSource::File(name) if Path::new(name).is_absolute() => return None,
+        level::TextureSource::File(name) => {
+            crate::resources::own_texture(name).or_else(|| crate::resources::own_texture(&t.name))
+        }
+        level::TextureSource::Pixels { .. } => crate::resources::own_texture(&t.name),
+        level::TextureSource::None => return None,
+    }?;
+    if !std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX) {
+        return None;
+    }
+    decode_capped(&path)
 }
 
 impl Data {
