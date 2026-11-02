@@ -633,13 +633,18 @@ fn load_player() -> Vec<u8> {
 }
 
 /// Saves the settings; the language, which only the file sets, is kept.
-fn save_settings(v: [f32; 2], extended: bool, player: &[u8]) {
+/// The extended mode (from the settings, or `--debug` for one run) and the additions the settings turn off.
+fn load_features(debug: bool) -> crate::features::Features {
+    crate::features::Features::load(debug || load_extended(), setting)
+}
+
+fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]) {
     let path = settings_path();
     if let Some(d) = path.parent() {
         let _ = std::fs::create_dir_all(d);
     }
-    let profile = if extended { "extended" } else { "classic" };
-    let mut text = format!("sound {}\nmusic {}\nprofile {profile}\n", v[0], v[1]);
+    let profile = if features.mode { "extended" } else { "classic" };
+    let mut text = format!("sound {}\nmusic {}\nprofile {profile}\n{}", v[0], v[1], features.lines());
     if !player.is_empty() {
         text.push_str(&format!("player {}\n", crate::lang::latin1(player)));
     }
@@ -647,7 +652,7 @@ fn save_settings(v: [f32; 2], extended: bool, player: &[u8]) {
     let ours = ["sound", "music", "profile", "player"];
     for line in settings_text().lines() {
         let key = line.split_once(' ').map_or(line, |(k, _)| k);
-        if !ours.contains(&key) && !line.trim().is_empty() {
+        if !ours.contains(&key) && !key.starts_with("extended.") && !line.trim().is_empty() {
             text.push_str(line);
             text.push('\n');
         }
@@ -682,7 +687,7 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
         crate::assets::Source::Original(n) => Some(n),
         _ => None,
     };
-    let mut m = Menu::new(data, &strings, base, number, o.debug || load_extended());
+    let mut m = Menu::new(data, &strings, base, number, load_features(o.debug));
     m.resolution = size;
     m.volumes = load_volumes();
     for k in keys.chars() {
@@ -804,9 +809,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     // Without a level named, the window opens with the main menu over the first level.
     crate::levels::prepare(&crate::lang::docs_language(setting("language").as_deref()));
     let strings = crate::lang::Strings::load(&data, &crate::lang::chosen(setting("language").as_deref()));
-    let debug = o.debug || load_extended();
+    let features = load_features(o.debug);
     let menu = (!o.chosen && o.replay.is_none()).then(|| {
-        let mut m = Menu::new(&data, &strings, crate::menu::Screen::Main, Some(1), debug);
+        let mut m = Menu::new(&data, &strings, crate::menu::Screen::Main, Some(1), features);
         m.volumes = load_volumes();
         m
     });
@@ -818,7 +823,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         opts: o.clone(),
         menu,
         loading: None,
-        debug,
+        features,
         strings,
         player: load_player(),
         time_scale: 1.0,
@@ -1498,8 +1503,8 @@ struct App {
     menu: Option<Menu>,
     /// A level to load: (the level, whether the loading screen has been drawn).
     loading: Option<(crate::assets::Source, bool)>,
-    /// The extended mode: our additions (F2 takes up the free camera, ...).
-    debug: bool,
+    /// The extended mode and which of its additions are on (features.rs).
+    features: crate::features::Features,
     /// The copy's words for the menus.
     strings: crate::lang::Strings,
     /// The name last entered for a highscore.
@@ -1739,7 +1744,7 @@ impl App {
 
     /// Opens the menu with `base` as its first screen: the main menu, or the pause, dead or end menu over the level.
     fn open_menu(&mut self, base: crate::menu::Screen) {
-        let mut menu = Menu::new(&self.data, &self.strings, base, self.number, self.debug);
+        let mut menu = Menu::new(&self.data, &self.strings, base, self.number, self.features);
         menu.volumes = self.volumes;
         if let Some(gpu) = &self.gpu {
             menu.resolution = (gpu.config.width, gpu.config.height);
@@ -1750,12 +1755,17 @@ impl App {
 
     /// A lost run opens the dead menu; a finished one, once its points are counted, the new highscore's name entry
     /// (an original level, begun at its start and not helped) or the end menu.
+    /// The practice tools are on: the extended mode with its tools switched on.
+    fn tools(&self) -> bool {
+        self.features.has(crate::features::Feature::Tools)
+    }
+
     fn run_over(&mut self) {
         if self.menu.is_some() || self.loading.is_some() || self.fly.is_some() {
             return;
         }
         // with a saved moment (extended mode) a lost run waits for F9 or R; Esc opens the dead menu
-        if self.game.sim.game_over && !(self.debug && self.saved.is_some()) {
+        if self.game.sim.game_over && !(self.tools() && self.saved.is_some()) {
             self.open_menu(crate::menu::Screen::Dead);
         } else if crate::endscreen::over(&self.game.sim) {
             self.open_menu(crate::menu::Screen::End);
@@ -1818,23 +1828,26 @@ impl App {
                 if let Some(a) = &mut self.audio {
                     a.set_volumes(v[0], v[1]);
                 }
-                save_settings(v, self.debug, &self.player);
+                save_settings(v, self.features, &self.player);
             }
-            Action::ToggleDebug => {
-                self.debug = !self.debug;
-                save_settings(self.volumes, self.debug, &self.player);
-                if !self.debug {
+            Action::ToggleDebug | Action::Switch(_) => {
+                match action {
+                    Action::Switch(f) => self.features.toggle(f),
+                    _ => self.features.mode = !self.features.mode,
+                }
+                save_settings(self.volumes, self.features, &self.player);
+                if !self.features.has(crate::features::Feature::Tools) {
                     self.time_scale = 1.0;
                     self.saved = None;
                     self.fly = None;
                 }
                 if let Some(m) = &mut self.menu {
-                    m.set_debug(self.debug, &self.data);
+                    m.set_features(self.features, &self.data);
                 }
             }
             Action::Score(name) => {
                 self.player = name.clone();
-                save_settings(self.volumes, self.debug, &self.player);
+                save_settings(self.volumes, self.features, &self.player);
                 if let Some(m) = &mut self.menu {
                     let mut scores = m.scores.clone();
                     scores.insert(m.level, &name, m.points);
@@ -1855,7 +1868,7 @@ impl App {
             }
             return;
         }
-        if code == KeyCode::F2 && down && self.debug {
+        if code == KeyCode::F2 && down && self.tools() {
             self.fly = match self.fly {
                 Some(_) => None,
                 None => Some(FreeCam::at(self.last_view.0, self.last_view.1)),
@@ -1900,13 +1913,13 @@ impl App {
                 self.open_menu(if lost { crate::menu::Screen::Dead } else { crate::menu::Screen::Pause });
                 return;
             }
-            KeyCode::KeyR if down && self.debug => {
+            KeyCode::KeyR if down && self.tools() => {
                 self.restart();
                 self.saved = None;
                 0
             }
             // the extended profile's practice keys: slower or faster, save the moment, back to it
-            KeyCode::BracketLeft | KeyCode::BracketRight if down && self.debug => {
+            KeyCode::BracketLeft | KeyCode::BracketRight if down && self.tools() => {
                 let slower = code == KeyCode::BracketLeft;
                 self.time_scale = if slower { (self.time_scale / 2.0).max(0.125) } else { (self.time_scale * 2.0).min(1.0) };
                 if self.time_scale < 1.0 {
@@ -1914,11 +1927,11 @@ impl App {
                 }
                 0
             }
-            KeyCode::F5 if down && self.debug => {
+            KeyCode::F5 if down && self.tools() => {
                 self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone()));
                 0
             }
-            KeyCode::F9 if down && self.debug => {
+            KeyCode::F9 if down && self.tools() => {
                 if let Some((sim, replay)) = &self.saved {
                     // the run goes on from the saved moment: its record is cut back to it
                     self.game.sim = sim.clone();
@@ -2001,6 +2014,7 @@ impl App {
             (snap.eye, snap.target) = c.view();
         }
         self.last_view = (snap.eye, snap.target);
+        let tools = self.tools();
         let Some(gpu) = &mut self.gpu else { return };
         let acquire_started = Instant::now();
         let frame = match gpu.surface.get_current_texture() {
@@ -2065,10 +2079,10 @@ impl App {
                         gpu.config.width,
                         gpu.config.height,
                         self.game.ball_lost_at,
-                        self.debug,
+                        tools,
                         self.game.font.is_some(),
                     );
-                    if self.debug && (self.time_scale < 1.0 || self.saved.is_some()) {
+                    if tools && (self.time_scale < 1.0 || self.saved.is_some()) {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
                         let slow = if self.time_scale < 1.0 { format!("SLOW 1/{}", (1.0 / self.time_scale).round()) } else { String::new() };
                         let saved = if self.saved.is_some() { "   SAVED: F9 BACK" } else { "" };

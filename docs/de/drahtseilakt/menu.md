@@ -50,16 +50,17 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
 ändert sich:
 
 - **Hauptmenü**: Start, *Custom levels*, Highscore, Options, Credits, Exit.
-- **Options**: die Seite *Extended* nennt, was der Modus hinzufügt. Vorerst schaltet der Modus alles zusammen
-  ein; einzelne Schalter kommen als Nächstes:
+- **Options**: die Seite *Extended* hat den Schalter des Modus und darunter je einen Schalter für jede seiner
+  Ergänzungen (mit dem Modus alle an; die Einstellungen halten die ausgeschalteten als `extended.<key> off`):
   - alle Level offen, ohne Freischalten;
   - Bestzeiten neben den Leveln;
+  - die Zeile Custom levels im Hauptmenü;
   - Übungswerkzeuge: freie Kamera (F2), langsamer und schneller (`[` `]`), den Moment sichern und dorthin zurück
     (F5 / F9), Sektor und Tick auf dem Bildschirm; ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;
   - die Lautstärke der Geräusche neben der Musik.
   Weitere Schalter kommen mit den Funktionen des Fahrplans (Blickwinkel, Timer, Geist des besten Laufs).
-- **Custom levels**: jede Kartendatei im Kartenordner (unter Linux `~/.local/share/drahtseilakt/maps/`, unter
-  Windows und macOS der entsprechende Ordner) ist eine Zeile mit ihrem Dateinamen und spielt wie ein
+- **Custom levels**: jede Community-Karte und jedes Level im offenen Format in `levels/` ([levels.md](levels.md))
+  ist eine Zeile mit ihrem Dateinamen und spielt wie ein
   Original-Level. Eine Karte, die nicht geladen werden kann, sagt warum und startet nicht. Ihre Läufe und
   Bestzeiten bleiben getrennt von den Original-Leveln. Später: Titel, Autor und Schwierigkeit aus dem
   Community-Katalog, Unterordner als Pakete.
@@ -78,7 +79,7 @@ Profile später als Funktion des erweiterten Modus kommen.
 1. Erledigt (2026-11-02): klassisch als Vorgabe; Hauptmenü und Options wie in der Tabelle; die Seite *Extended*.
 2. Erledigt: das Pausenmenü mit seinen Yes-/No-Fragen; das Tot-Menü; das Levelende-Menü.
 3. Erledigt: Highscores mit Namenseingabe; Freischalten der Level.
-4. Die Liste Custom levels aus dem Kartenordner ist erledigt; die einzelnen Schalter der Seite Extended folgen.
+4. Erledigt: die Liste Custom levels (levels.md) und die Schalter der Seite Extended.
 5. Einstellungen Graphics und Controls, sobald ihr Verhalten gebaut ist (jetzt angezeigt, nicht änderbar).
 
 `DRAHTSEILAKT_SHOT_MENU=base:keys` mit `--screenshot` zeichnet ein Menü über das Bild ohne Fenster (base `main`,

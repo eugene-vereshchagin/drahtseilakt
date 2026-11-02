@@ -13,6 +13,7 @@ mod ballsound;
 mod collide;
 mod endscreen;
 mod extra;
+mod features;
 mod freecam;
 mod highscore;
 mod hud;

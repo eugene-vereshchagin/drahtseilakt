@@ -48,16 +48,16 @@ per-player thing is the name in the highscore list.
 Turned on in Options, or for one run with `--debug`. The menus keep the original's look; what changes:
 
 - **Main menu**: Start, *Custom levels*, Highscore, Options, Credits, Exit.
-- **Options**: the *Extended* page lists what the mode adds. For now the mode turns all of it on together; a
-  switch for each comes next:
+- **Options**: the *Extended* page has the mode's switch and, under it, one switch for each of its additions
+  (all on with the mode; the settings keep those turned off as `extended.<key> off`):
   - all levels open, without unlocking;
   - best times beside the levels;
+  - the Custom levels line in the main menu;
   - practice tools: free camera (F2), slower and faster (`[` `]`), save the moment and go back to it (F5 / F9),
     the sector and tick on screen; a run helped this way is kept but never a best run;
   - the sound volume beside the music volume.
   More switches come with the features in the roadmap (field of view, timers, the ghost of the best run).
-- **Custom levels**: every map file in the maps folder (on Linux `~/.local/share/drahtseilakt/maps/`, the
-  matching folder on Windows and macOS) is a line, by its file name, played like an original level. A map that
+- **Custom levels**: every community map and open-format level in `levels/` ([levels.md](levels.md)) is a line, by its file name, played like an original level. A map that
   cannot be loaded says why and is not started. Its runs and best times are kept apart from the original levels.
   Later: title, author and difficulty from the community catalogue, subfolders as packs.
 - Texture packs and our own mods come here too when they exist, each behind its own switch and a warning that
@@ -75,7 +75,7 @@ later as an extended-mode feature.
 1. Done (2026-11-02): classic by default; the main menu and Options as in the table; the *Extended* page.
 2. Done: the pause menu with its Yes / No questions; the dead menu; the end menu.
 3. Done: highscores with the name entry; levels unlocking.
-4. The custom levels list from the maps folder is done; the extended page's separate switches are next.
+4. Done: the custom levels list (levels.md) and the extended page's switches.
 5. Graphics and Controls settings as their behaviour is built (now shown, not changeable).
 
 `DRAHTSEILAKT_SHOT_MENU=base:keys` with `--screenshot` draws a menu over the frame without a window (base `main`,

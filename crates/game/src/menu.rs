@@ -5,6 +5,7 @@
 // arrows and Enter; drawn with the copy's textures and font, or with the prototype's font when the copy lacks it.
 
 use crate::assets::Data;
+use crate::features::{FEATURES, Feature, Features};
 use crate::highscore::{NAME_MAX, Table};
 use crate::hud::{Rect, text, width};
 use crate::lang::{Strings, latin1};
@@ -77,6 +78,8 @@ enum Line {
     Music,
     Effects,
     Mode,
+    /// One of the extended mode's additions, by its place in FEATURES.
+    Switch(usize),
     Yes,
     No,
     Ok,
@@ -96,6 +99,8 @@ pub enum Action {
     Quit,
     /// The extended mode on or off.
     ToggleDebug,
+    /// One of the extended mode's additions on or off.
+    Switch(Feature),
     /// The volumes changed: sound and music, 0 to 1.
     Volumes([f32; 2]),
     /// The new highscore's name was entered: the game saves it and shows the list.
@@ -108,8 +113,8 @@ pub struct Menu {
     pub entries: Vec<Entry>,
     /// The custom levels: the map files in the maps folder.
     pub maps: Vec<PathBuf>,
-    /// The extended mode.
-    pub debug: bool,
+    /// The extended mode and its additions.
+    pub features: Features,
     pub volumes: [f32; 2],
     pub strings: Strings,
     pub scores: Table,
@@ -136,7 +141,7 @@ impl Menu {
         strings: &Strings,
         base: Screen,
         current: Option<u32>,
-        debug: bool,
+        features: Features,
     ) -> Menu {
         let entries: Vec<Entry> = (1..=LEVELS)
             .map(|number| Entry {
@@ -144,15 +149,22 @@ impl Menu {
                 available: data
                     .file(&format!("3D Entities/Level/Level_{number:02}.NMO"))
                     .is_some(),
-                open: debug || number == 1 || finished(number - 1),
-                best: debug.then(|| best_ticks(number)).flatten(),
+                open: features.has(Feature::AllLevels) || number == 1 || finished(number - 1),
+                best: features
+                    .has(Feature::BestTimes)
+                    .then(|| best_ticks(number))
+                    .flatten(),
             })
             .collect();
         let mut m = Menu {
             stack: Vec::new(),
             entries,
-            maps: if debug { maps() } else { Vec::new() },
-            debug,
+            maps: if features.has(Feature::CustomLevels) {
+                maps()
+            } else {
+                Vec::new()
+            },
+            features,
             volumes: [1.0; 2],
             strings: strings.clone(),
             scores: Table::load(&strings.highscores),
@@ -228,7 +240,7 @@ impl Menu {
     /// The lines of `screen`, in the order the arrows go through them.
     fn lines(&self, screen: Screen) -> Vec<Line> {
         match screen {
-            Screen::Main if self.debug => {
+            Screen::Main if self.features.has(Feature::CustomLevels) => {
                 vec![
                     Line::Start,
                     Line::Custom,
@@ -260,8 +272,15 @@ impl Menu {
                 Line::Extended,
                 Line::Back,
             ],
-            Screen::Sound if self.debug => vec![Line::Music, Line::Effects, Line::Back],
+            Screen::Sound if self.features.has(Feature::SoundVolume) => {
+                vec![Line::Music, Line::Effects, Line::Back]
+            }
             Screen::Sound => vec![Line::Music, Line::Back],
+            Screen::Extended if self.features.mode => [Line::Mode]
+                .into_iter()
+                .chain((0..FEATURES.len()).map(Line::Switch))
+                .chain([Line::Back])
+                .collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
             Screen::Highscore if self.after_entry => vec![Line::Next],
             Screen::Highscore | Screen::Graphics | Screen::Controls | Screen::Credits => {
@@ -357,6 +376,9 @@ impl Menu {
                 Action::None
             }
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
+            (Screen::Extended, Some(Line::Switch(i))) => {
+                FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
+            }
             _ => Action::None,
         }
     }
@@ -399,6 +421,7 @@ impl Menu {
             },
             Line::Map(i) => self.maps.get(i).cloned().map_or(Action::None, Action::Map),
             Line::Mode => Action::ToggleDebug,
+            Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
             Line::Music | Line::Effects => Action::None,
             Line::Yes => match screen {
                 Screen::Ask(Ask::Quit) => Action::Quit,
@@ -465,14 +488,20 @@ impl Menu {
         self.push(Screen::Entry);
     }
 
-    /// The extended mode switched: the lines that depend on it follow.
-    pub fn set_debug(&mut self, debug: bool, data: &Data) {
-        let fresh = Menu::new(data, &self.strings, Screen::Main, Some(self.level), debug);
-        self.apply_mode(debug, fresh.entries, fresh.maps);
+    /// The extended mode or one of its additions switched: the lines that depend on them follow.
+    pub fn set_features(&mut self, features: Features, data: &Data) {
+        let fresh = Menu::new(
+            data,
+            &self.strings,
+            Screen::Main,
+            Some(self.level),
+            features,
+        );
+        self.apply_mode(features, fresh.entries, fresh.maps);
     }
 
     /// The mode and what depends on it set; each open screen keeps its chosen line, wherever the lines move to.
-    fn apply_mode(&mut self, debug: bool, entries: Vec<Entry>, maps: Vec<PathBuf>) {
+    fn apply_mode(&mut self, features: Features, entries: Vec<Entry>, maps: Vec<PathBuf>) {
         let chosen: Vec<Option<Line>> = self
             .stack
             .iter()
@@ -480,7 +509,7 @@ impl Menu {
             .collect();
         self.entries = entries;
         self.maps = maps;
-        self.debug = debug;
+        self.features = features;
         for k in 0..self.stack.len() {
             let Some(&(sc, i)) = self.stack.get(k) else {
                 continue;
@@ -541,6 +570,11 @@ impl Menu {
             Line::Music => s.get("Menu_Opt_Sound Volume", "Music Volume"),
             Line::Effects => b"  Sound Volume".to_vec(),
             Line::Mode => b"  Extended mode?".to_vec(),
+            Line::Switch(i) => FEATURES
+                .get(i)
+                .map_or("", |f| f.label())
+                .as_bytes()
+                .to_vec(),
             Line::Yes => s.get("Menu_Opt_Graphics Synch Yes", "Yes"),
             Line::No => s.get("Menu_Opt_Graphics Synch No", "No"),
             Line::Ok => s.get("Menu_YesNo YES", "OK"),
@@ -625,23 +659,25 @@ impl Menu {
             Screen::Sound => {
                 let pct = |v: f32| format!("{}", (v * 10.0).round() as u32).into_bytes();
                 let mut f = vec![(self.label(Line::Music), pct(self.volumes[1]))];
-                if self.debug {
+                if self.features.has(Feature::SoundVolume) {
                     f.push((self.label(Line::Effects), pct(self.volumes[0])));
                 }
                 f
             }
             Screen::Extended => {
-                let mut f = vec![(self.label(Line::Mode), yes_no(self.debug))];
-                if self.debug {
+                // the mode, then each addition's switch, then where things are
+                let mut f = vec![(self.label(Line::Mode), yes_no(self.features.mode))];
+                if self.features.mode {
+                    for (i, &x) in FEATURES.iter().enumerate() {
+                        f.push((
+                            self.label(Line::Switch(i)),
+                            yes_no(self.features.switched_on(x)),
+                        ));
+                    }
                     for l in [
-                        "All levels open, best times shown",
-                        "Custom levels from:",
+                        "Tools: R restart, F2 free camera, [ ] speed,",
+                        "F5 / F9 save and back. Helped runs never count.",
                         &short_path(&crate::levels::data_dir().join("levels")),
-                        "F2 free camera, [ ] slower and faster,",
-                        "F5 save the moment, F9 back to it,",
-                        "R restarts. Helped runs never count.",
-                        "Replays:",
-                        &short_path(&crate::app::replay_dir()),
                     ] {
                         f.push((l.as_bytes().to_vec(), Vec::new()));
                     }
@@ -720,7 +756,7 @@ impl Menu {
         for i in shown {
             let Some(&l) = lines.get(i) else { continue };
             let mut t = latin1(&self.label(l)).trim().to_uppercase();
-            if let (Line::Level(k), true) = (l, self.debug)
+            if let (Line::Level(k), true) = (l, self.features.has(Feature::BestTimes))
                 && let Some(b) = self.entries.get(k).and_then(|e| e.best)
             {
                 t = format!("{t}   {}", clock(b));
@@ -1009,13 +1045,26 @@ impl Menu {
                         label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
                         label(&mut out, key, [0.505, y, 0.65, y + 0.0396], &FONT_03);
                     }
-                } else if sc == Screen::Extended && self.debug {
+                } else if sc == Screen::Extended && self.features.mode {
                     if let Some((name, value)) = fields.first() {
-                        field(&mut out, 0.295, name, value, self.chosen() == 0);
+                        field(&mut out, 0.27, name, value, self.chosen() == 0);
                     }
-                    for (k, (l, _)) in fields.iter().skip(1).enumerate() {
-                        let y = 0.42 + k as f32 * 0.05;
-                        label(&mut out, l, [0.31, y, 0.69, y + 0.05], &FONT_03);
+                    // the additions' switches as the Controls page's rows, then two lines of help and the folder
+                    let n = FEATURES.len();
+                    for (k, (name, value)) in fields.iter().skip(1).take(n).enumerate() {
+                        let y = 0.40 + k as f32 * 0.05;
+                        let st = if self.chosen() == k + 1 {
+                            Button::Over
+                        } else {
+                            Button::Up
+                        };
+                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st);
+                        label(&mut out, name, [0.375, y, 0.58, y + 0.0396], &FONT_03);
+                        label(&mut out, value, [0.58, y, 0.65, y + 0.0396], &FONT_03);
+                    }
+                    for (k, (l, _)) in fields.iter().skip(1 + n).enumerate() {
+                        let y = 0.66 + k as f32 * 0.045;
+                        label(&mut out, l, [0.31, y, 0.69, y + 0.045], &FONT_03);
                     }
                 } else {
                     for (k, (name, value)) in fields.iter().enumerate() {
@@ -1244,7 +1293,7 @@ fn maps_in(dir: &Path) -> Vec<PathBuf> {
 mod tests {
     use super::*;
 
-    fn menu(open: &[bool], debug: bool) -> Menu {
+    fn menu(open: &[bool], extended: bool) -> Menu {
         let mut m = Menu {
             stack: Vec::new(),
             entries: open
@@ -1258,7 +1307,7 @@ mod tests {
                 })
                 .collect(),
             maps: Vec::new(),
-            debug,
+            features: Features::new(extended),
             volumes: [1.0; 2],
             strings: Strings::default(),
             scores: Table::default(),
@@ -1381,7 +1430,7 @@ mod tests {
         m.step(1);
         m.step(1);
         assert_eq!(m.lines(Screen::Main)[m.chosen()], Line::Options);
-        m.apply_mode(true, Vec::new(), Vec::new());
+        m.apply_mode(Features::new(true), Vec::new(), Vec::new());
         assert_eq!(m.lines(Screen::Main).len(), 6);
         assert_eq!(m.lines(Screen::Main)[m.chosen()], Line::Options);
     }
