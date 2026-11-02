@@ -246,7 +246,19 @@ fn run_level_sim(input: &[u8]) {
             Err(_) => return,
         }
     };
-    let mut sim = crate::sim::Sim::new(&level, crate::sim::BallKind::Wood);
+    // half the inputs with the modules of the player's copy, when there is one (its moving parts placed by the
+    // fuzzed level's objects), half with none
+    static DATA: std::sync::OnceLock<Option<crate::assets::Data>> = std::sync::OnceLock::new();
+    let data = DATA.get_or_init(|| {
+        (std::env::var_os("FUZZ_NO_REAL").is_none()).then(|| crate::assets::Data::locate(None).ok()).flatten()
+    });
+    let mut sim = match data {
+        Some(d) if fuzzkit::fnv(input) & 1 == 0 => {
+            let modules = crate::scene::load_modules(&level, d);
+            crate::sim::Sim::with_modules(&level, crate::sim::BallKind::Wood, &modules, false)
+        }
+        _ => crate::sim::Sim::new(&level, crate::sim::BallKind::Wood),
+    };
     // a second of play, the arrows and the camera keys taken from the input's last bytes
     for k in 0..60usize {
         let bits = input.get(input.len().saturating_sub(1 + k % 16)).copied().unwrap_or(0);
@@ -268,8 +280,11 @@ fn level_sim_seeds() -> Vec<Vec<u8>> {
     roots.extend(fuzzkit::real_roots());
     for p in fuzzkit::files_under(&roots, &["gltf", "nmo"], 16, 2 << 20) {
         if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("nmo")) {
-            if let Ok(b) = std::fs::read(&p) {
-                out.push(b);
+            // written plain: the mutations then reach the objects instead of the compressed stream
+            if let Ok(b) = std::fs::read(&p)
+                && let Ok(f) = nmo::read(&b)
+            {
+                out.push(plain_nmo(&f));
             }
         } else if let Some(dir) = p.parent()
             && std::fs::metadata(dir.join("level.bin")).is_ok_and(|m| m.len() <= 4 << 20)
@@ -278,6 +293,33 @@ fn level_sim_seeds() -> Vec<Vec<u8>> {
             out.push(fuzzkit::join_parts(&[&g, &b]));
         }
     }
+    out
+}
+
+/// A file's parts as a plain (uncompressed) file.
+fn plain_nmo(f: &nmo::File) -> Vec<u8> {
+    let h = &f.header;
+    let (h1, data) = (&f.header1, &f.data);
+    let fields = [
+        0,
+        h.ck_version,
+        h.file_version,
+        0,
+        0,
+        h1.len() as u32,
+        data.len() as u32,
+        data.len() as u32,
+        h.manager_count,
+        h.object_count,
+        h.max_id_saved,
+        h.product_version,
+        h.product_build,
+        h1.len() as u32,
+    ];
+    let mut out = b"Nemo Fi\0".to_vec();
+    fields.iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes()));
+    out.extend_from_slice(h1);
+    out.extend_from_slice(data);
     out
 }
 
