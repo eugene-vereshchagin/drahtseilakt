@@ -655,13 +655,21 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
                     b.velocity.length(),
                     if b.on_ground { "ground" } else { "air" }
                 );
-                // the loose things near the ball (boxes, balls), with DRAHTSEILAKT_TRACE_LOOSE set
+                // the loose things near the ball (boxes, balls, modules' parts), with DRAHTSEILAKT_TRACE_LOOSE set
                 if std::env::var_os("DRAHTSEILAKT_TRACE_LOOSE").is_some() {
                     for &(o, body) in game.sim.loose() {
                         let Some(st) = game.sim.world().state(body) else { continue };
                         if st.pos.distance(b.position) < 40.0 {
                             let name = game.level.level.objects.get(o).map_or("?", |ob| ob.name.as_str());
                             println!("    {name} ({:8.2} {:8.2} {:8.2})", st.pos.x, st.pos.y, st.pos.z);
+                        }
+                    }
+                    // and the modules' moving parts
+                    for m in game.sim.module_bodies() {
+                        let Some(st) = game.sim.world().state(m.body) else { continue };
+                        if st.pos.distance(b.position) < 40.0 {
+                            let (o, p) = (&m.object, st.pos);
+                            println!("    {o} #{} ({:8.2} {:8.2} {:8.2})", m.body, p.x, p.y, p.z);
                         }
                     }
                 }
@@ -843,13 +851,28 @@ fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(
 
 /// The test player follows a track `--locate` found in a video: the places it was sure of (a good likeness, not
 /// far from the frame before), in order, are its way, without the loops of it (the player went round, or waited by a
-/// tutorial's text). Where the way passes a transformer of another kind than the ball's, the ball is taken to have
+/// tutorial's text) unless a loop went to a loose object or a module's moving part (to push a box: the box moved is
+/// part of the way). Where the way passes a transformer of another kind than the ball's, the ball is taken to have
 /// gone into it (a gate of the way, which no loop is cut across).
 fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     let mut own = o.clone();
     own.follow = None;
     let mut game = Game::new(&own, data)?;
     let trafos: Vec<_> = game.sim.trafos().collect();
+    // where the loose objects (boxes, balls) and the modules' moving parts start, and how near the ball comes to
+    // one to move it
+    const PUSH: f32 = 6.0;
+    // (the level's objects where they start: the bodies of later sectors are not in the physics yet)
+    let objects = &game.level.level.objects;
+    let parts = game.sim.module_bodies().iter().filter_map(|m| objects.iter().position(|o| o.name == m.object));
+    let loose: Vec<glam::Vec3> = game
+        .sim
+        .loose()
+        .iter()
+        .map(|l| l.0)
+        .chain(parts)
+        .filter_map(|o| objects.get(o).map(|o| glam::Vec4::from(o.matrix[3]).truncate()))
+        .collect();
     let mut kind = game.sim.ball.kind;
     let mut path: Vec<glam::Vec3> = Vec::new();
     let mut gates: Vec<(usize, glam::Vec3)> = Vec::new();
@@ -873,9 +896,13 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
         }
         let kept = gates.last().map_or(0, |g| g.0);
         if let Some(i) = path.iter().skip(kept).rposition(|p| p.distance(floor) < 2.5) {
-            // (the last gate's own point stays)
-            let keep = if gates.is_empty() { 0 } else { kept + 1 };
-            path.truncate((kept + i).max(keep));
+            // a loop to a loose object (a box to push, say) did something there: it stays
+            let pushed = |p: &glam::Vec3| loose.iter().any(|o| o.distance(*p) < PUSH);
+            if !path.get(kept + i..).unwrap_or_default().iter().any(pushed) {
+                // (the last gate's own point stays)
+                let keep = if gates.is_empty() { 0 } else { kept + 1 };
+                path.truncate((kept + i).max(keep));
+            }
         }
         path.push(floor);
         let trafo = trafos.iter().find(|t| t.1 != kind && t.0.distance(ball) < crate::sim::TRAFO_REACH);
@@ -884,8 +911,53 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
             kind = k;
         }
     }
-    println!("track: {} points, transformers {:?}", path.len(), gates);
-    let route = crate::autopilot::Route::along(&game.level.level, &game.modules, path);
+    // the way between the track's places is found over the floors (a frame or a lost stretch may skip a corner,
+    // and a straight line from one place to the next would go through the wall there): the places, one every
+    // `STAGE`, and the gates' are its stages
+    const STAGE: f32 = 6.0;
+    let mut stages: Vec<glam::Vec3> = Vec::new();
+    let mut gate_stages: Vec<(usize, glam::Vec3)> = Vec::new();
+    for (i, &p) in path.iter().enumerate() {
+        let gate = gates.iter().find(|g| g.0 == i);
+        if gate.is_some() || i + 1 == path.len() || stages.last().is_none_or(|l| l.distance(p) >= STAGE) {
+            stages.push(p);
+        }
+        if let Some(&(_, q)) = gate {
+            gate_stages.push((stages.len() - 1, q));
+        }
+    }
+    // a stage the next one comes back from (the track jittered along a straight, or the player overshot and came
+    // back) is no stage; a gate's is kept
+    let mut k = 1;
+    while k + 1 < stages.len() {
+        let (a, b, c) = (stages[k - 1], stages[k], stages[k + 1]);
+        let spike = a.distance(c) < 0.5 * a.distance(b).max(b.distance(c));
+        if spike && gate_stages.iter().all(|g| g.0 != k) {
+            stages.remove(k);
+            for g in gate_stages.iter_mut().filter(|g| g.0 > k) {
+                g.0 -= 1;
+            }
+            k = k.saturating_sub(1).max(1);
+        } else {
+            k += 1;
+        }
+    }
+    let start = game.sim.ball.position;
+    let route = crate::autopilot::Route::through(&game.level.level, &game.modules, start, &stages);
+    let gates: Vec<(usize, glam::Vec3)> =
+        gate_stages.iter().filter_map(|&(k, q)| route.marks.get(k).map(|&m| (m, q))).collect();
+    let (places, ways) = (path.len(), route.points.len());
+    println!("track: {places} places, {} stages, way {ways} points, transformers {gates:?}", stages.len());
+    if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
+        for p in route.floor_points() {
+            eprintln!("floor {:.1} {:.1} {:.1}", p.x, p.y, p.z);
+        }
+    }
+    if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
+        for (i, p) in route.points.iter().enumerate() {
+            eprintln!("way {i} {:.1} {:.1} {:.1}", p.x, p.y, p.z);
+        }
+    }
     pilot_run(&mut game, &own, crate::autopilot::Pilot::new(route, gates))
 }
 
@@ -974,6 +1046,11 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
     let stages: Vec<glam::Vec3> = waypoints.iter().map(|w| w.1).collect();
     let route = crate::autopilot::Route::find(level, &game.modules, start, &stages);
     println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
+    if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
+        for p in route.floor_points() {
+            eprintln!("floor {:.1} {:.1} {:.1}", p.x, p.y, p.z);
+        }
+    }
     if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
         for (i, p) in route.points.iter().enumerate() {
             println!("route {i} {:.2} {:.2} {:.2}", p.x, p.y, p.z);

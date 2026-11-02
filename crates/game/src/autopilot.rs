@@ -12,11 +12,28 @@ use std::collections::{BinaryHeap, HashMap};
 const SPACING: f32 = 1.5;
 const LINK: f32 = 3.2;
 const STEP: f32 = 1.2;
+/// A gap in a floor narrower than this (between points at one height) is no gap to the ball, which rolls over it.
+const GAP: f32 = 5.5;
 /// A way down may drop this far (one way only), at this extra cost per unit.
 const DROP: f32 = 15.0;
 const DROP_COST: f32 = 4.0;
 /// Within this of an edge the way costs more, the nearer the more.
 const CLEAR: f32 = 6.0;
+
+/// Whether a gap from `p` to `q` (floor points at one height, farther apart than `LINK`) is open: no floor between
+/// them stands higher (a thin wall's top), going by the floor points `between` near them.
+fn open_gap(p: Vec3, q: Vec3, mut between: impl Iterator<Item = Vec3>) -> bool {
+    let d = q - p;
+    let len2 = d.x * d.x + d.z * d.z;
+    !between.any(|w| {
+        let t = (((w.x - p.x) * d.x + (w.z - p.z) * d.z) / len2.max(1e-6)).clamp(0.0, 1.0);
+        let c = p + d * t;
+        t > 0.0
+            && t < 1.0
+            && Vec3::new(w.x - c.x, 0.0, w.z - c.z).length() < 1.0
+            && w.y > p.y.max(q.y) + STEP
+    })
+}
 
 /// The way through the level: floor points, in order.
 pub struct Route {
@@ -25,7 +42,20 @@ pub struct Route {
     pub marks: Vec<usize>,
     /// The floor points by cell (`CELL`), each with how far it is from an edge.
     floor: HashMap<(i32, i32), Vec<(Vec3, f32)>>,
+    /// The floor points the way was found over, and their indices by cell (`GAP`), to find ways over them anew.
+    pts: Vec<Vec3>,
+    grid: HashMap<(i32, i32), Vec<usize>>,
 }
+
+/// How far ahead along the way the point is that the ball heads for (points), and how far round over the floors a
+/// way to it is looked for.
+const LOOK: usize = 20;
+const FIELD: f32 = 150.0;
+/// How many points ahead the ball is looked for along the way (more would find it on a later pass by the same
+/// place, past a loop it should go round).
+const AHEAD: usize = 40;
+/// How near a goal of the way a floor point reaches it.
+const GOAL: f32 = 3.5;
 
 /// The cell of the floor lookup.
 const CELL: f32 = 2.0;
@@ -148,6 +178,27 @@ impl Route {
         start: Vec3,
         stages: &[Vec3],
     ) -> Route {
+        Route::search(level, modules, start, stages, false)
+    }
+
+    /// The way through `places` close together (where a player's ball went): straight from one to the next where
+    /// that line keeps to a floor, found over the floors where it does not (a wall, a step between them).
+    pub fn through(
+        level: &Level,
+        modules: &crate::scene::Modules,
+        start: Vec3,
+        places: &[Vec3],
+    ) -> Route {
+        Route::search(level, modules, start, places, true)
+    }
+
+    fn search(
+        level: &Level,
+        modules: &crate::scene::Modules,
+        start: Vec3,
+        stages: &[Vec3],
+        straight_on: bool,
+    ) -> Route {
         let tris = floor_triangles(level, modules);
         let found = floor_points(&tris);
         let pts: Vec<Vec3> = found.iter().map(|f| f.0).collect();
@@ -160,12 +211,12 @@ impl Route {
         }
         let mut grid: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
         for (i, p) in pts.iter().enumerate() {
-            grid.entry(((p.x / LINK).floor() as i32, (p.z / LINK).floor() as i32))
+            grid.entry(((p.x / GAP).floor() as i32, (p.z / GAP).floor() as i32))
                 .or_default()
                 .push(i);
         }
         let near = |p: Vec3| -> Vec<usize> {
-            let (cx, cz) = ((p.x / LINK).floor() as i32, (p.z / LINK).floor() as i32);
+            let (cx, cz) = ((p.x / GAP).floor() as i32, (p.z / GAP).floor() as i32);
             let mut v = Vec::new();
             for dx in -1..=1 {
                 for dz in -1..=1 {
@@ -247,9 +298,40 @@ impl Route {
         let mut points = Vec::new();
         let mut marks = Vec::new();
         let mut from = closest(start - Vec3::Y * crate::sim::BALL_RADIUS);
+        // the line from `a` to `b`, if every step of it is just over a floor point
+        let on_floor = |a: Vec3, b: Vec3| -> Option<Vec<Vec3>> {
+            let n = (a.distance(b) / SPACING).ceil() as usize;
+            (1..=n.max(1))
+                .map(|k| a + (b - a) * (k as f32 / n.max(1) as f32))
+                .map(|p| {
+                    near(p)
+                        .into_iter()
+                        .filter_map(|v| pts.get(v))
+                        .any(|q| {
+                            Vec3::new(q.x - p.x, 0.0, q.z - p.z).length() < 1.6
+                                && (q.y - p.y).abs() < 1.0
+                        })
+                        .then_some(p)
+                })
+                .collect()
+        };
         for &goal in stages {
             let goal_node = closest(goal);
-            let to = goal_node;
+            if straight_on
+                && let Some(a) = pts.get(from).copied()
+                && a.distance(goal) < 12.0
+                && let Some(line) = on_floor(a, goal)
+            {
+                points.extend(line);
+                marks.push(points.len().saturating_sub(1));
+                from = goal_node;
+                continue;
+            }
+            // any floor point near the goal will do (the first reached): of two rails side by side, the one the way
+            // is on
+            let at_goal =
+                |i: usize| i == goal_node || pts.get(i).is_some_and(|p| p.distance(goal) < GOAL);
+            let mut to = goal_node;
             // Dijkstra
             let mut dist: HashMap<usize, f32> = HashMap::new();
             let mut prev: HashMap<usize, usize> = HashMap::new();
@@ -257,7 +339,8 @@ impl Route {
             dist.insert(from, 0.0);
             heap.push(Item(0.0, from));
             while let Some(Item(d, u)) = heap.pop() {
-                if u == to {
+                if at_goal(u) {
+                    to = u;
                     break;
                 }
                 if dist.get(&u).is_some_and(|&x| d > x) {
@@ -268,7 +351,16 @@ impl Route {
                     let Some(&q) = pts.get(v) else { continue };
                     let h = Vec3::new(q.x - p.x, 0.0, q.z - p.z).length();
                     let dy = q.y - p.y;
-                    if v == u || h > LINK || dy > STEP || dy < -DROP {
+                    // (a narrow gap at one height is rolled over)
+                    let gap = h > LINK
+                        && h <= GAP
+                        && dy.abs() < 0.3
+                        && open_gap(
+                            p,
+                            q,
+                            near(p).into_iter().filter_map(|w| pts.get(w).copied()),
+                        );
+                    if v == u || (h > LINK && !gap) || dy > STEP || dy < -DROP {
                         continue;
                     }
                     let edgy = if edge.get(v).copied().unwrap_or(true) {
@@ -358,9 +450,11 @@ impl Route {
             }
             way.reverse();
             points.extend(way.iter().filter_map(|&i| pts.get(i).copied()));
+            // after a jump straight to the goal, on from the goal
+            let jumped = !straight.is_empty();
             points.extend(straight);
             marks.push(points.len().saturating_sub(1));
-            from = goal_node;
+            from = if jumped { goal_node } else { to };
         }
         let mut floor: HashMap<(i32, i32), Vec<(Vec3, f32)>> = HashMap::new();
         for (p, c) in pts.iter().zip(&clear) {
@@ -373,7 +467,74 @@ impl Route {
             points,
             marks,
             floor,
+            pts,
+            grid,
         }
+    }
+
+    /// The floor points within `GAP` across of `p` (a floor point or a ball's floor).
+    fn around(&self, p: Vec3) -> impl Iterator<Item = usize> + '_ {
+        let (cx, cz) = ((p.x / GAP).floor() as i32, (p.z / GAP).floor() as i32);
+        (-1..=1)
+            .flat_map(move |dx| (-1..=1).map(move |dz| (cx + dx, cz + dz)))
+            .flat_map(|c| self.grid.get(&c).into_iter().flatten().copied())
+    }
+
+    /// The floor point the ball at `p` is on (its nearest at its height, within `GAP` across: the floor points have
+    /// holes, under a box's first place, say), if any, and how far across it is.
+    fn node(&self, p: Vec3) -> Option<(usize, f32)> {
+        let f = p - Vec3::Y * crate::sim::BALL_RADIUS;
+        self.around(f)
+            .filter_map(|i| self.pts.get(i).map(|q| (i, *q)))
+            .filter(|(_, q)| (q.y - f.y).abs() < 1.5)
+            .map(|(i, q)| (i, Vec3::new(q.x - f.x, 0.0, q.z - f.z).length()))
+            .filter(|&(_, h)| h < GAP)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+    }
+
+    /// How far a ball has to roll over the floors from each floor point to way point `target` (as far as `limit`):
+    /// up a step no higher than `STEP`, down any drop up to `DROP`, over gaps narrower than `GAP`.
+    fn cost_to(&self, target: usize, limit: f32) -> HashMap<usize, f32> {
+        let mut dist: HashMap<usize, f32> = HashMap::new();
+        let Some((goal, _)) = self
+            .points
+            .get(target)
+            .and_then(|&t| self.node(t + Vec3::Y * crate::sim::BALL_RADIUS))
+        else {
+            return dist;
+        };
+        let mut heap = BinaryHeap::new();
+        dist.insert(goal, 0.0);
+        heap.push(Item(0.0, goal));
+        while let Some(Item(d, v)) = heap.pop() {
+            if dist.get(&v).is_some_and(|&x| d > x) || d > limit {
+                continue;
+            }
+            let Some(&q) = self.pts.get(v) else { continue };
+            // the ways into v: from a point u whose way to v the ball can roll
+            for u in self.around(q) {
+                let Some(&p) = self.pts.get(u) else { continue };
+                let h = Vec3::new(q.x - p.x, 0.0, q.z - p.z).length();
+                let dy = q.y - p.y;
+                let gap = h > LINK
+                    && h <= GAP
+                    && dy.abs() < 0.3
+                    && open_gap(
+                        p,
+                        q,
+                        self.around(q).filter_map(|w| self.pts.get(w).copied()),
+                    );
+                if u == v || (h > LINK && !gap) || dy > STEP || dy < -DROP {
+                    continue;
+                }
+                let nd = d + h.max(0.1) + if dy < -STEP { -dy } else { 0.0 };
+                if dist.get(&u).is_none_or(|&x| nd < x) {
+                    dist.insert(u, nd);
+                    heap.push(Item(nd, u));
+                }
+            }
+        }
+        dist
     }
 
     /// Every floor point of the level (as the way was found over them).
@@ -381,11 +542,12 @@ impl Route {
         self.floor.values().flatten().map(|f| f.0)
     }
 
-    /// The point of the way nearest the ball at `p`.
-    pub fn nearest(&self, p: Vec3) -> Option<usize> {
+    /// The point of the way nearest the ball at `p`, before point `until` (the way may pass there again later).
+    pub fn nearest(&self, p: Vec3, until: usize) -> Option<usize> {
         let f = p - Vec3::Y * crate::sim::BALL_RADIUS;
         self.points
             .iter()
+            .take(until)
             .enumerate()
             .min_by(|a, b| a.1.distance_squared(f).total_cmp(&b.1.distance_squared(f)))
             .map(|(i, _)| i)
@@ -421,6 +583,7 @@ impl Route {
     /// How far along the way `p` is, searching from point `from` up to `until`: on the segment it is nearest to
     /// (within reach), its index plus the part of it passed, less the square of the distance off it (keep to the way,
     /// do not cut corners along the edge).
+    #[cfg(test)]
     fn progress(&self, p: Vec3, from: usize, until: usize) -> f32 {
         self.progress_on(p, from, until).0
     }
@@ -428,7 +591,7 @@ impl Route {
     /// `progress`, and whether `p` is on the way (within reach of it) rather than beside it.
     fn progress_on(&self, p: Vec3, from: usize, until: usize) -> (f32, bool) {
         let floor = p - Vec3::Y * crate::sim::BALL_RADIUS;
-        let end = (from + 120)
+        let end = (from + AHEAD)
             .min(self.points.len().saturating_sub(1))
             .min(until.max(from + 1));
         let mut best: Option<(f32, f32)> = None;
@@ -456,7 +619,7 @@ impl Route {
                     .filter_map(|i| {
                         self.points
                             .get(i)
-                            .map(|q| i as f32 - 0.5 * floor.distance(*q))
+                            .map(|q| i as f32 - 0.5 * reach(floor, *q))
                     })
                     .fold(f32::NEG_INFINITY, f32::max)
                     .max(from as f32 - 100.0);
@@ -465,6 +628,15 @@ impl Route {
             |b| (b.0, true),
         )
     }
+}
+
+/// How far a floor point `q` is from `floor` for the ball there: a point above it (a ledge, a ramp's top) is
+/// further than it looks, as the ball must go round to climb to it.
+fn reach(floor: Vec3, q: Vec3) -> f32 {
+    let h = Vec3::new(q.x - floor.x, 0.0, q.z - floor.z).length();
+    let dy = q.y - floor.y;
+    let up = if dy > STEP { 4.0 * dy } else { dy };
+    h.hypot(up)
 }
 
 /// The arrow combinations the player may hold (the camera is not turned, so the pushes stay on the world axes).
@@ -508,9 +680,16 @@ pub struct Pilot {
     /// The transformers to roll into, in order: their place on the way and where they are; and the next one.
     gates: Vec<(usize, Vec3)>,
     gate: usize,
+    /// The ball's kind at the last decision (a change is a transformer gone through), and the tick the last gate
+    /// opened.
+    kind: Option<crate::sim::BallKind>,
+    opened: u64,
     /// A manoeuvre found while stuck: choices held until their ticks.
     plan: Vec<(u64, u8)>,
     seed: u32,
+    /// The way point a little ahead that the ball heads for, and how far each floor point near is from it over the
+    /// floors.
+    field: Option<(usize, HashMap<usize, f32>)>,
 }
 
 impl Pilot {
@@ -519,6 +698,8 @@ impl Pilot {
             route,
             gates,
             gate: 0,
+            kind: None,
+            opened: 0,
             at: 0,
             choice: 0,
             moved: 0,
@@ -527,13 +708,23 @@ impl Pilot {
             turned: 0,
             plan: Vec::new(),
             seed: 0x2545_F491,
+            field: None,
         }
     }
 
     /// How far along the way the ball at `p` is, held before the next transformer until the ball has been in it:
     /// near it, the nearer the better.
     fn progress(&self, p: Vec3) -> f32 {
-        let v = self.route.progress(p, self.at, self.until());
+        // off the way, on a floor near the point it heads for: how far it is from that point over the floors (a
+        // ledge above the ball is not near, the way round to the ramp up to it is the way)
+        let (v, on_way) = self.route.progress_on(p, self.at, self.until());
+        if !on_way
+            && let Some((target, field)) = &self.field
+            && let Some((node, across)) = self.route.node(p)
+        {
+            return *target as f32
+                - (field.get(&node).copied().unwrap_or(FIELD) + across) / SPACING;
+        }
         match self.gates.get(self.gate) {
             Some(&(i, g)) if v > i as f32 - 1.0 => {
                 (i as f32 - 1.0)
@@ -709,7 +900,7 @@ impl Pilot {
             .last
             .is_some_and(|l| l.distance(sim.ball.position) > 20.0)
         {
-            if let Some(i) = self.route.nearest(sim.ball.position) {
+            if let Some(i) = self.route.nearest(sim.ball.position, self.until()) {
                 self.at = i;
                 self.gate = self.gates.iter().take_while(|g| g.0 <= i).count();
             }
@@ -717,20 +908,44 @@ impl Pilot {
             self.plan.clear();
         }
         self.last = Some(sim.ball.position);
-        // a transformer reached opens its gate
+        // a transformer gone through (the ball changed) or reached opens its gate
+        // (a change just after the ball reached the gate is that gate's)
+        let changed = self.kind.is_some_and(|k| k != sim.ball.kind) && sim.tick > self.opened + 120;
+        self.kind = Some(sim.ball.kind);
         if let Some(&(_, g)) = self.gates.get(self.gate)
-            && Vec3::new(g.x - sim.ball.position.x, 0.0, g.z - sim.ball.position.z).length() < 2.5
-            && (g.y - sim.ball.position.y).abs() < 5.0
+            && (changed || g.distance(sim.ball.position) < crate::sim::TRAFO_REACH)
         {
             self.gate += 1;
+            self.opened = sim.tick;
         }
-        let here = self.progress(sim.ball.position);
         // only on the way does the ball get on along it
         let (on, on_way) = self
             .route
             .progress_on(sim.ball.position, self.at, self.until());
+        // (not past a transformer not yet gone through)
+        let on = on.min(self.until().saturating_sub(1) as f32);
         if on_way && on > self.at as f32 {
             self.at = on.floor().max(0.0) as usize;
+        }
+        // the point to head for, a little ahead (not past the next transformer)
+        let target = (self.at + LOOK)
+            .min(self.until())
+            .min(self.route.points.len().saturating_sub(1));
+        if self.field.as_ref().is_none_or(|f| f.0 != target) {
+            self.field = Some((target, self.route.cost_to(target, FIELD)));
+        }
+        let here = self.progress(sim.ball.position);
+        if std::env::var_os("AUTOPILOT_TRACE").is_some() {
+            let node = self.route.node(sim.ball.position);
+            eprintln!(
+                "t {} at {} target {} {:?} here {here:.2} node {:?} field {}",
+                sim.tick,
+                self.at,
+                target,
+                self.route.points.get(target),
+                node.map(|n| (self.route.pts.get(n.0), n.1)),
+                self.field.as_ref().map_or(0, |f| f.1.len())
+            );
         }
         // getting on: a quarter of a point further than ever
         if here > self.best + 0.25 {
@@ -863,6 +1078,8 @@ mod tests {
             points,
             marks: vec![9],
             floor: HashMap::new(),
+            pts: Vec::new(),
+            grid: HashMap::new(),
         };
         let up = Vec3::Y * crate::sim::BALL_RADIUS;
         let a = r.progress(Vec3::new(3.0, 0.0, 0.0) + up, 0, usize::MAX);
