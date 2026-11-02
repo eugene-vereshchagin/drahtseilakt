@@ -28,7 +28,7 @@ target/release/drahtseilakt --data /path/to/Ballance --level 1
 ```
 
 在 Windows 上，发布版构建不会打开控制台窗口：从资源管理器启动时，游戏把信息写入其数据文件夹（`%APPDATA%\drahtseilakt\`）中的
-`drahtseilakt.log`；输出被重定向时（`2> log.txt`）则写到那里。Actions 工作流 *Drahtseilakt*（按需运行）在 Windows、Linux 和
+`drahtseilakt.log`（上一次启动的日志为 `drahtseilakt.old.log`；在控制台中未重定向时也是如此）；输出被重定向时（`2> log.txt`）则写到那里。Actions 工作流 *Drahtseilakt*（按需运行）在 Windows、Linux 和
 macOS 上构建并测试游戏，并按安装后的布局上传每个构建：程序旁边是 `assets/`。
 
 `drahtseilakt --import DIR` 会把 DIR 中你已安装的 Ballance 原版游戏（或你的游戏 CD 镜像：`--import Ballance.cue`、`.bin` 或 `.iso`；没有找到游戏时启动的窗口提供同样的功能：电脑上找到的内容、拖到窗口上的文件夹或镜像、输入的路径）复制到游戏的 `levels/original/`；所有关卡都放在

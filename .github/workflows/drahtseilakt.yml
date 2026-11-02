@@ -76,6 +76,7 @@ jobs:
           cp "target/release/${{ matrix.exe }}" "$d/"
           cp -r assets "$d/"
           rm -f "$d/assets/sounds/system/prepare.py"
+          rm -rf "$d/assets/own/make"
           cp LICENSE README*.md "$d/"
           if [ "$RUNNER_OS" != Windows ]; then
             # a tarball keeps the program executable (an artifact's zip does not)

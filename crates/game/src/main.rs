@@ -355,8 +355,10 @@ fn log_without_console() {
         return;
     }
     let dir = levels::data_dir();
-    let Ok(out) = std::fs::create_dir_all(&dir)
-        .and_then(|()| std::fs::File::create(dir.join("drahtseilakt.log")))
+    // the last start's log is kept beside (a crash's log survives the next start)
+    let log = dir.join("drahtseilakt.log");
+    let _ = std::fs::rename(&log, dir.join("drahtseilakt.old.log"));
+    let Ok(out) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::File::create(&log))
     else {
         return;
     };
