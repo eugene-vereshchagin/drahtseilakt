@@ -28,7 +28,8 @@ target/release/drahtseilakt --data /путь/к/Ballance --level 1
 ```
 
 `drahtseilakt --import DIR` копирует оригинальную игру из установленной Ballance в DIR (или с образа вашего CD:
-`--import Ballance.cue`, `.bin` или `.iso`) в `levels/original/`
+`--import Ballance.cue`, `.bin` или `.iso`; запущенная без игры, она предлагает то же в окне: найденное на
+компьютере, перетащенную папку или образ, вписанный путь) в `levels/original/`
 игры; все уровни лежат в `levels/` в её папке данных (`~/.local/share/drahtseilakt/` на Linux), в каждой папке
 README о том, что там должно лежать ([где лежат уровни](docs/ru/drahtseilakt/levels.md)).
 `--data` (или `OPENBALLANCE_DATA`) вместо этого играет из другой папки Ballance. `--level N` играет оригинальный уровень N, `--map

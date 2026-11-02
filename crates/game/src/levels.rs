@@ -217,6 +217,128 @@ fn about(language: &str, kind: Kind) -> String {
     text.to_owned()
 }
 
+/// What a folder or file found on the machine is, if it is a Ballance to import.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Found {
+    /// An installed game (a `3D Entities` folder).
+    Installed,
+    /// The game's CD, in its drive or copied off it (`SETUP/DATA1.HDR`).
+    Disc,
+    /// An image of the CD (`.cue` or `.iso`).
+    Image,
+}
+
+pub fn what(p: &Path) -> Option<Found> {
+    let ext = |e: &str| p.extension().is_some_and(|x| x.eq_ignore_ascii_case(e));
+    if p.is_file() {
+        return (ext("cue") || ext("iso") || ext("bin")).then_some(Found::Image);
+    }
+    if crate::assets::find(p, "3D Entities").is_some() {
+        return Some(Found::Installed);
+    }
+    let setup = crate::assets::find(p, "SETUP").and_then(|d| crate::assets::find(&d, "DATA1.HDR"));
+    setup.map(|_| Found::Disc)
+}
+
+/// Where a Ballance may be on this machine: installed games (in the usual folders of Windows, of Wine prefixes and of
+/// the GOG, Heroic and Lutris launchers), discs in their drives, and CD images in the home and download folders.
+pub fn candidates() -> Vec<(PathBuf, Found)> {
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from);
+    let mut parents: Vec<PathBuf> = Vec::new();
+    let mut discs: Vec<PathBuf> = Vec::new();
+    let subdirs = |d: &Path| -> Vec<PathBuf> {
+        std::fs::read_dir(d)
+            .map(|r| {
+                r.flatten()
+                    .map(|e| e.path())
+                    .filter(|p| p.is_dir())
+                    .take(64)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    if cfg!(windows) {
+        for drive in 'C'..='Z' {
+            let root = PathBuf::from(format!("{drive}:\\"));
+            if !root.exists() {
+                continue;
+            }
+            discs.push(root.clone());
+            for p in ["Program Files", "Program Files (x86)", "GOG Games", "Games"] {
+                parents.push(root.join(p));
+            }
+        }
+    } else {
+        if let Some(h) = &home {
+            for prefix in [".wine/drive_c", "Games/Heroic/Prefixes/default/drive_c"] {
+                for p in ["Program Files", "Program Files (x86)", "GOG Games"] {
+                    parents.push(h.join(prefix).join(p));
+                }
+            }
+            parents.push(h.join("Games"));
+            parents.push(h.join("Games/Heroic"));
+            parents.push(h.join("GOG Games"));
+        }
+        let user = std::env::var("USER").unwrap_or_default();
+        for mounts in ["/media", "/mnt", "/Volumes"]
+            .map(PathBuf::from)
+            .into_iter()
+            .chain([
+                PathBuf::from("/media").join(&user),
+                PathBuf::from("/run/media").join(&user),
+            ])
+        {
+            discs.extend(subdirs(&mounts));
+        }
+    }
+    let mut out: Vec<(PathBuf, Found)> = Vec::new();
+    let mut add = |p: PathBuf| {
+        if let Some(f) = what(&p)
+            && !out.iter().any(|(q, _)| *q == p)
+            && out.len() < 64
+        {
+            out.push((p, f));
+        }
+    };
+    for parent in parents {
+        for name in [
+            "Ballance",
+            "Atari/Ballance",
+            "GOG Galaxy/Games/Ballance",
+            "ballance",
+        ] {
+            add(parent.join(name));
+        }
+    }
+    for d in discs {
+        add(d);
+    }
+    if let Some(h) = &home {
+        for d in [h.clone(), h.join("Downloads"), h.join("Desktop")] {
+            let files = std::fs::read_dir(&d)
+                .map(|r| r.flatten().map(|e| e.path()).take(4096).collect::<Vec<_>>());
+            for f in files.unwrap_or_default() {
+                let name = f
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
+                // a .bin is listed only without a cue sheet next to it (the sheet names it)
+                let bin = f.extension().is_some_and(|e| e.eq_ignore_ascii_case("bin"));
+                let sheet = |p: &Path| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("cue"));
+                let has_cue = bin
+                    && std::fs::read_dir(&d)
+                        .is_ok_and(|r| r.flatten().take(4096).any(|e| sheet(&e.path())));
+                if name.contains("ballance") && !has_cue {
+                    add(f);
+                }
+            }
+        }
+    }
+    out
+}
+
 /// What `--import` copies from an installed game: the files and folders the game reads.
 const IMPORTED: [&str; 4] = ["base.cmo", "3D Entities", "Textures", "Sounds"];
 /// Files one import copies at most, and folder depth it follows.
@@ -226,8 +348,29 @@ const MAX_DEPTH: usize = 16;
 /// Copies the original game into the original levels' folder, from the installed copy at `from` or, when `from` is a
 /// file, from the game's CD image (a .cue, .bin or .iso): what the game reads. Returns how many files were written.
 pub fn import(from: &Path) -> Result<usize, String> {
+    let n = import_from(from)?;
+    // what was copied must play: a folder with an empty 3D Entities, or an archive cut short, is not the game
+    let level = ["3D Entities", "Level", "Level_01.NMO"]
+        .iter()
+        .try_fold(dir(Kind::Original), |d, p| crate::assets::find(&d, p));
+    if level.is_none() {
+        return Err(format!(
+            "{}: no level 1 came out of it; not the game",
+            from.display()
+        ));
+    }
+    Ok(n)
+}
+
+fn import_from(from: &Path) -> Result<usize, String> {
     if from.is_file() {
         return import_cd(from);
+    }
+    // a CD in its drive, or a copy of its files: the archive in SETUP/, not an installed game
+    let setup =
+        crate::assets::find(from, "SETUP").and_then(|d| crate::assets::find(&d, "DATA1.HDR"));
+    if crate::assets::find(from, "3D Entities").is_none() && setup.is_some() {
+        return import_disc_folder(from);
     }
     let to = dir(Kind::Original);
     // neither inside the other, checked before anything is made: a copy into the game it copies from would nest
@@ -284,17 +427,60 @@ fn canonical_to_be(p: &Path) -> PathBuf {
 /// The game's files from its CD: the InstallShield archive in SETUP (DATA1.HDR and its volumes DATA<n>.CAB), the
 /// files under the folders the game reads and base.cmo, each written to its place under the original levels' folder.
 fn import_cd(image: &Path) -> Result<usize, String> {
-    use cdimage::{iscab, iso};
-    let to = dir(Kind::Original);
+    use cdimage::iso;
     let fail = |e: cdimage::Error| format!("{}: {e}", image.display());
     let mut img = cdimage::Image::open(image).map_err(fail)?;
-    let hdr = iso::find(&mut img, "SETUP/DATA1.HDR")
-        .map_err(fail)?
-        .ok_or(format!(
-            "{}: no SETUP/DATA1.HDR (not the Ballance CD?)",
-            image.display()
-        ))?;
-    let cab = iscab::parse(&iso::read(&mut img, &hdr).map_err(fail)?).map_err(fail)?;
+    let mut read = |name: &str| -> Result<Option<Vec<u8>>, String> {
+        match iso::find(&mut img, name).map_err(fail)? {
+            Some(e) => iso::read(&mut img, &e).map(Some).map_err(fail),
+            None => Ok(None),
+        }
+    };
+    import_archive(&mut read, image)
+}
+
+/// The game's files from a CD's own folders (a disc in its drive, or its files copied off it).
+fn import_disc_folder(disc: &Path) -> Result<usize, String> {
+    let mut read = |name: &str| -> Result<Option<Vec<u8>>, String> {
+        let Some(path) = name
+            .split('/')
+            .try_fold(disc.to_path_buf(), |d, part| crate::assets::find(&d, part))
+        else {
+            return Ok(None);
+        };
+        // read at most one byte past the cap: a file larger than a CD's is refused, however it grows meanwhile
+        let cap = cdimage::image::READ_MAX as u64;
+        let mut bytes = Vec::new();
+        let file = std::fs::File::open(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        std::io::Read::read_to_end(&mut std::io::Read::take(file, cap + 1), &mut bytes)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        if bytes.len() as u64 > cap {
+            return Err(format!(
+                "{}: too big for a file of the game's CD",
+                path.display()
+            ));
+        }
+        Ok(Some(bytes))
+    };
+    import_archive(&mut read, disc)
+}
+
+/// Gives a file of the disc by its path, `None` when the disc has none.
+type DiscReader<'a> = dyn FnMut(&str) -> Result<Option<Vec<u8>>, String> + 'a;
+
+/// The game's files from the InstallShield archive of its CD, `read` giving a file of the disc by its path
+/// ("SETUP/DATA1.HDR"): those under the folders the game reads and base.cmo, each written to its place under the
+/// original levels' folder.
+fn import_archive(read: &mut DiscReader<'_>, disc: &Path) -> Result<usize, String> {
+    use cdimage::iscab;
+    let to = dir(Kind::Original);
+    let image = disc;
+    let fail = |e: cdimage::Error| format!("{}: {e}", image.display());
+    let hdr = read("SETUP/DATA1.HDR")?.ok_or(format!(
+        "{}: no SETUP/DATA1.HDR (not the Ballance CD?)",
+        image.display()
+    ))?;
+    let cab = iscab::parse(&hdr).map_err(fail)?;
     let wanted = |parts: &[String]| match parts {
         [name] => name.eq_ignore_ascii_case("base.cmo"),
         [first, ..] => IMPORTED.iter().any(|w| w.eq_ignore_ascii_case(first)),
@@ -312,10 +498,8 @@ fn import_cd(image: &Path) -> Result<usize, String> {
         };
         if volume.as_ref().is_none_or(|(n, _)| *n != f.volume) {
             let name = format!("SETUP/DATA{}.CAB", f.volume);
-            let e = iso::find(&mut img, &name)
-                .map_err(fail)?
-                .ok_or(format!("{}: no {name}", image.display()))?;
-            volume = Some((f.volume, iso::read(&mut img, &e).map_err(fail)?));
+            let data = read(&name)?.ok_or(format!("{}: no {name}", image.display()))?;
+            volume = Some((f.volume, data));
         }
         let Some((_, data)) = &volume else { continue };
         total = total.saturating_add(f.expanded);
@@ -408,6 +592,23 @@ fn copy(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn what_is_found_is_told_by_its_contents() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-what-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("game/3D Entities")).unwrap();
+        std::fs::create_dir_all(root.join("disc/Setup")).unwrap();
+        std::fs::write(root.join("disc/Setup/data1.hdr"), b"").unwrap();
+        std::fs::create_dir_all(root.join("other")).unwrap();
+        std::fs::write(root.join("b.CUE"), b"").unwrap();
+        std::fs::write(root.join("b.txt"), b"").unwrap();
+        assert_eq!(what(&root.join("game")), Some(Found::Installed));
+        assert_eq!(what(&root.join("disc")), Some(Found::Disc));
+        assert_eq!(what(&root.join("b.CUE")), Some(Found::Image));
+        assert_eq!(what(&root.join("other")), None);
+        assert_eq!(what(&root.join("b.txt")), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn every_folder_has_a_readme_in_every_language() {

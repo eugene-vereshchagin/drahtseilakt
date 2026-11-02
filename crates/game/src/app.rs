@@ -1261,6 +1261,54 @@ fn present_mode(offered: &[wgpu::PresentMode]) -> wgpu::PresentMode {
     }
 }
 
+/// The window's surface, its configuration and a renderer on it: gamma-space output, as the original (render.rs).
+pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
+    let instance =
+        wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+    let surface = instance
+        .create_surface(window.clone())
+        .map_err(|e| e.to_string())?;
+    let (adapter, device, queue) =
+        pollster::block_on(adapter_device(&instance, Some(&surface)))?;
+    let caps = surface.get_capabilities(&adapter);
+    // Gamma-space output, as the original (see render.rs).
+    let format = caps
+        .formats
+        .iter()
+        .copied()
+        .find(|f| !f.is_srgb())
+        .or(caps.formats.first().copied())
+        .ok_or("no surface format")?;
+    let size = window.inner_size();
+    let config = wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format,
+        width: size.width.max(1),
+        height: size.height.max(1),
+        present_mode: present_mode(&caps.present_modes),
+        desired_maximum_frame_latency: 2,
+        alpha_mode: caps
+        .alpha_modes
+        .first()
+        .copied()
+        .unwrap_or(wgpu::CompositeAlphaMode::Auto),
+        view_formats: vec![],
+        color_space: wgpu::SurfaceColorSpace::Auto,
+    };
+    eprintln!(
+        "window: {:?} presentation {:?}, {}x{}, format {:?}, modes offered {:?}",
+        adapter.get_info().name,
+        config.present_mode,
+        config.width,
+        config.height,
+        config.format,
+        caps.present_modes
+    );
+    surface.configure(&device, &config);
+    let renderer = Renderer::new(device, queue, format);
+    Ok(Gpu { surface, config, renderer })
+}
+
 async fn device(
     surface: Option<&wgpu::Surface<'_>>,
 ) -> Result<(wgpu::Adapter, wgpu::Device, wgpu::Queue), String> {
@@ -1487,10 +1535,10 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     Ok(())
 }
 
-struct Gpu {
-    surface: wgpu::Surface<'static>,
-    config: wgpu::SurfaceConfiguration,
-    renderer: Renderer,
+pub(crate) struct Gpu {
+    pub surface: wgpu::Surface<'static>,
+    pub config: wgpu::SurfaceConfiguration,
+    pub renderer: Renderer,
 }
 
 struct App {
@@ -1551,49 +1599,7 @@ impl App {
             .with_title(self.game.title())
             .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
-        let instance =
-            wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
-        let surface = instance
-            .create_surface(window.clone())
-            .map_err(|e| e.to_string())?;
-        let (adapter, device, queue) =
-            pollster::block_on(adapter_device(&instance, Some(&surface)))?;
-        let caps = surface.get_capabilities(&adapter);
-        // Gamma-space output, as the original (see render.rs).
-        let format = caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| !f.is_srgb())
-            .or(caps.formats.first().copied())
-            .ok_or("no surface format")?;
-        let size = window.inner_size();
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format,
-            width: size.width.max(1),
-            height: size.height.max(1),
-            present_mode: present_mode(&caps.present_modes),
-            desired_maximum_frame_latency: 2,
-            alpha_mode: caps
-                .alpha_modes
-                .first()
-                .copied()
-                .unwrap_or(wgpu::CompositeAlphaMode::Auto),
-            view_formats: vec![],
-            color_space: wgpu::SurfaceColorSpace::Auto,
-        };
-        eprintln!(
-            "window: {:?} presentation {:?}, {}x{}, format {:?}, modes offered {:?}",
-            adapter.get_info().name,
-            config.present_mode,
-            config.width,
-            config.height,
-            config.format,
-            caps.present_modes
-        );
-        surface.configure(&device, &config);
-        let mut renderer = Renderer::new(device, queue, format);
+        let Gpu { surface, config, mut renderer } = window_gpu(&window)?;
         upload(&mut renderer, &self.game, &self.data);
         if self.menu_scene.is_none() {
             self.menu_scene = crate::menuscene::MenuScene::load(&self.data);

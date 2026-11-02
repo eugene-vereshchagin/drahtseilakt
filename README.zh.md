@@ -26,7 +26,7 @@ cargo build --release
 target/release/drahtseilakt --data /path/to/Ballance --level 1
 ```
 
-`drahtseilakt --import DIR` 会把 DIR 中你已安装的 Ballance 原版游戏（或你的游戏 CD 镜像：`--import Ballance.cue`、`.bin` 或 `.iso`）复制到游戏的 `levels/original/`；所有关卡都放在
+`drahtseilakt --import DIR` 会把 DIR 中你已安装的 Ballance 原版游戏（或你的游戏 CD 镜像：`--import Ballance.cue`、`.bin` 或 `.iso`；没有找到游戏时启动的窗口提供同样的功能：电脑上找到的内容、拖到窗口上的文件夹或镜像、输入的路径）复制到游戏的 `levels/original/`；所有关卡都放在
 游戏数据文件夹（Linux 上为 `~/.local/share/drahtseilakt/`）的 `levels/` 中，每个文件夹里都有说明应放什么的 README
 （[关卡存放位置](docs/zh/drahtseilakt/levels.md)）。`--data`（或 `OPENBALLANCE_DATA`）则改为从另一个 Ballance 文件夹游玩。`--level N` 游玩原版第 N 关，`--map FILE.nmo`
 游玩任意关卡文件或自制地图，`--open DIR` 游玩[开放格式](docs/zh/drahtseilakt/open-format.md)的关卡；

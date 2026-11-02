@@ -31,8 +31,12 @@ impl Data {
             .into_iter()
             .chain(std::env::var_os("OPENBALLANCE_DATA").map(PathBuf::from))
             .chain([crate::levels::dir(crate::levels::Kind::Original), PathBuf::from("data")]);
+        // a copy counts when it has the first level, not only the folder: a half-made import is not a game
+        let playable = |root: &Path| {
+            ["3D Entities", "Level", "Level_01.NMO"].iter().try_fold(root.to_path_buf(), |d, p| find(&d, p)).is_some()
+        };
         for root in candidates {
-            if find(&root, "3D Entities").is_some() {
+            if playable(&root) {
                 return Ok(Data { root });
             }
         }

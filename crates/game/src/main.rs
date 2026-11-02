@@ -30,6 +30,7 @@ mod proximity;
 mod render;
 mod replay;
 mod scene;
+mod setup;
 mod sim;
 mod sky;
 mod trafo;
@@ -75,9 +76,12 @@ usage: drahtseilakt [options]
 
 Without --level, --map or --open the window opens with the level menu.
 
+Without the game found, the window offers to bring in your Ballance: from an installed game, the CD in
+its drive or an image of it (found on this computer, dropped on the window or typed).
+
 keys: arrows roll the ball (relative to the camera), Shift+Left/Right turn the camera,
-      Space lifts the camera, R restarts, F11 full screen, Esc opens the level menu;
-      after a finished level Enter plays the next one";
+      Space lifts the camera, F11 full screen, Esc pauses; in the extended mode R restarts,
+      F2 free camera, [ ] slower and faster, F5 / F9 save the moment and back to it";
 
 #[derive(Clone)]
 pub struct Options {
@@ -257,6 +261,34 @@ fn parse_args() -> Result<Options, String> {
     Ok(o)
 }
 
+/// A start that opens the game's window (not a run without one, not a tool, not an explicit folder).
+fn windowed(o: &Options) -> bool {
+    o.data.is_none()
+        && !o.headless
+        && !o.autopilot
+        && o.screenshot.is_none()
+        && o.export.is_none()
+        && o.locate.is_none()
+        && o.frames.is_none()
+}
+
+/// Set in the game started again after an import.
+const RESTARTED: &str = "DRAHTSEILAKT_RESTARTED";
+
+/// Starts this program again with the same arguments, waits for it and ends with its exit code.
+fn restart() -> ! {
+    let status = std::env::current_exe().and_then(|exe| {
+        std::process::Command::new(exe).args(std::env::args_os().skip(1)).env(RESTARTED, "1").status()
+    });
+    match status {
+        Ok(s) => std::process::exit(s.code().unwrap_or(1)),
+        Err(e) => {
+            eprintln!("drahtseilakt: could not start the game again: {e}");
+            std::process::exit(1)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let result = parse_args().and_then(|o| {
         if let Some(from) = &o.import {
@@ -265,7 +297,19 @@ fn main() -> ExitCode {
             println!("{copied} files copied to {}", levels::dir(levels::Kind::Original).display());
             return Ok(());
         }
-        let data = Data::locate(o.data.clone())?;
+        let data = match Data::locate(o.data.clone()) {
+            Ok(d) => d,
+            // a plain start without the game: the window that brings it in, then the game again with it
+            // (not again in the game started after an import: that one would only open the window anew)
+            Err(e) if windowed(&o) && std::env::var_os(RESTARTED).is_none() => {
+                match setup::run(o.size) {
+                    Ok(false) => return Ok(()),
+                    Ok(true) => restart(),
+                    Err(w) => return Err(format!("{e}\n(the window to bring it in did not open: {w})")),
+                }
+            }
+            Err(e) => return Err(e),
+        };
         app::run(o, data)
     });
     match result {

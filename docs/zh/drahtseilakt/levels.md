@@ -17,7 +17,7 @@
 
 ## 原版游戏：默认复制
 
-游戏从玩家自己的副本中把所需内容一次性复制到 `levels/original/`：从已安装的游戏复制（`drahtseilakt --import <Ballance folder>`），或直接从游戏 CD 或其镜像复制（`drahtseilakt --import Ballance.cue`，也可以是 `.bin`、`.iso`：读取 `SETUP/` 中的 InstallShield 6 压缩包，由 `crates/cdimage` 实现）。副本是玩家自己机器上的玩家自己的数据；不下载任何东西，也不往仓库里放任何东西。`--data DIR` 仍可不经复制直接从任意文件夹游玩。
+游戏从玩家自己的副本中把所需内容一次性复制到 `levels/original/`：从已安装的游戏复制（`drahtseilakt --import <Ballance folder>`），或直接从游戏 CD 或其镜像复制（`drahtseilakt --import Ballance.cue`，也可以是 `.bin`、`.iso`：读取 `SETUP/` 中的 InstallShield 6 压缩包，由 `crates/cdimage` 实现）。没有找到游戏时启动会打开一个窗口完成同样的事：它列出在电脑上找到的内容（Windows、Wine、GOG、Heroic 和 Lutris 常用文件夹中已安装的游戏；光驱中的光盘；主文件夹、桌面和“下载”文件夹中的 CD 镜像），接受拖到窗口上的文件夹或镜像或输入的路径，然后用这份副本启动游戏。副本是玩家自己机器上的玩家自己的数据；不下载任何东西，也不往仓库里放任何东西。`--data DIR` 仍可不经复制直接从任意文件夹游玩。
 
 该文件夹的 README 列出了需要手动复制的内容：已安装的 Ballance 中的 `base.cmo` 以及 `3D Entities`、`Textures` 和 `Sounds` 文件夹（游戏不读取其他内容）；对于第 13 关，还需按其说明文件将 SuDu 扩展包安装到该副本中。
 
