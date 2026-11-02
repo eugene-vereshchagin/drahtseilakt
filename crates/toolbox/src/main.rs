@@ -1,7 +1,8 @@
 // drahtseilakt-toolbox: prepares levels for the game on the player's own machine, from their own copy. The game only
 // plays what is in the level folders; making remastered levels (rounder shapes, larger textures) and whatever heavy
 // work later comes with it lives here, so the game needs none of it (docs/drahtseilakt/decisions.md, "The toolbox").
-// It never goes online either; Real-ESRGAN is used when the player has installed it.
+// It never goes online either; Real-ESRGAN, which its download carries (third-party.txt), or the player's own, is
+// used when it is there.
 
 // Hostile input is parsed only by the `nmo` and `level` crates; this crate works on validated models, and geometry
 // and image code reads better with plain arithmetic and indexing of fixed-size arrays.
@@ -23,8 +24,9 @@ commands:
 
 options:
   --scale N           make the textures N times larger (2 to 32, default 4; 1 leaves them as they are). With
-                      Real-ESRGAN (realesrgan-ncnn-vulkan on the PATH) they gain detail, else they are resampled
-                      with Lanczos and sharpened a little. The originals are kept in textures.original/.
+                      Real-ESRGAN (in realesrgan/ beside the toolbox, as its download carries it, or
+                      realesrgan-ncnn-vulkan on the PATH) they gain detail, else they are resampled with Lanczos
+                      and sharpened a little. The originals are kept in textures.original/.
   --data DIR          the Ballance folder (default: $OPENBALLANCE_DATA, then the copy the game imported)
   -h, --help          this text
 ";

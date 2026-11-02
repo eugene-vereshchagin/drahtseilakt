@@ -36,8 +36,8 @@ des Spiels; alle Level liegen in `levels/` in seinem Datenordner (`~/.local/shar
 jeder Ordner mit einem README, was hineingehört ([wo die Level liegen](docs/de/drahtseilakt/levels.md)).
 `--data` (oder `OPENBALLANCE_DATA`) spielt stattdessen aus einem anderen Ballance-Ordner. Das eigene
 Programm `drahtseilakt-toolbox remaster --scale 8` wandelt die Original-Level nach `levels/remastered/` (offenes
-Format) mit runderen Formen und achtmal größeren Texturen um: mit Real-ESRGAN, wenn `realesrgan-ncnn-vulkan`
-installiert ist (es ergänzt Details), sonst mit Lanczos; sie laufen unter Custom levels. Das Spiel selbst braucht
+Format) mit runderen Formen und achtmal größeren Texturen um: mit Real-ESRGAN (es ergänzt Details), wenn es in
+`realesrgan/` neben der Toolbox liegt (festgelegt in `crates/toolbox/third-party.txt`) oder im PATH ist, sonst mit Lanczos; sie laufen unter Custom levels. Das Spiel selbst braucht
 beides nicht. `--level N` spielt Originallevel N, `--map
 FILE.nmo` jede Leveldatei oder Community-Karte, `--open DIR` ein Level im
 [offenen Format](docs/de/drahtseilakt/open-format.md); `--export DIR` wandelt das gewählte Level darin um.

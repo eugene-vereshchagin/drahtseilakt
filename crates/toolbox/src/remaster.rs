@@ -160,18 +160,22 @@ fn texture_name(uri: &str) -> Option<&str> {
     (plain && !device).then_some(n)
 }
 
-/// Real-ESRGAN's program, if the player has it on the PATH.
+/// Real-ESRGAN's program: the one that comes with the toolbox (`realesrgan/` beside its own program, as its download
+/// carries it), else one the player has on the PATH.
 fn esrgan() -> Option<PathBuf> {
     let name = if cfg!(windows) {
         "realesrgan-ncnn-vulkan.exe"
     } else {
         "realesrgan-ncnn-vulkan"
     };
-    std::env::var_os("PATH").and_then(|p| {
-        std::env::split_paths(&p)
-            .map(|d| d.join(name))
-            .find(|f| f.is_file())
-    })
+    let beside = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|d| d.join("realesrgan").join(name)));
+    let on_path = std::env::var_os("PATH")
+        .into_iter()
+        .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .map(|d| d.join(name));
+    beside.into_iter().chain(on_path).find(|f| f.is_file())
 }
 
 /// Upscales one level's textures; returns how many. A texture that cannot be read or written is reported in `notes`

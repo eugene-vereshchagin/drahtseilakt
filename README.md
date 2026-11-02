@@ -34,8 +34,8 @@ finds on the computer, a folder or image dropped on it, or a path typed) into th
 each folder with a README saying what belongs there ([where levels live](docs/drahtseilakt/levels.md)).
 `--data` (or `OPENBALLANCE_DATA`) plays from another Ballance folder instead. The separate
 `drahtseilakt-toolbox remaster --scale 8` converts the original levels into `levels/remastered/` (the open format)
-with rounder shapes and textures eight times larger: by Real-ESRGAN when `realesrgan-ncnn-vulkan` is installed (it
-adds detail), else by Lanczos; they play from Custom levels. The game itself needs neither. `--level N` plays original level N, `--map FILE.nmo`
+with rounder shapes and textures eight times larger: by Real-ESRGAN (it adds detail) when it is in `realesrgan/` beside
+the toolbox (pinned in `crates/toolbox/third-party.txt`) or on the PATH, else by Lanczos; they play from Custom levels. The game itself needs neither. `--level N` plays original level N, `--map FILE.nmo`
 any level file or community map, `--open DIR` a level in the [open format](docs/drahtseilakt/open-format.md);
 `--export DIR` converts the chosen level to it. Arrows roll the ball relative to the camera, Shift+Left/Right
 turn the camera, Space lifts it, F11 is full screen, Esc pauses. Without a level named the game opens with its
