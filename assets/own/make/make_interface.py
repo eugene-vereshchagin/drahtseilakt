@@ -168,11 +168,10 @@ def glass(c, d, look):
     c.over(col, inside(d) * a)
 
 
-def env(ry, rx):
+def env(ry, rx, dark=0.55):
     """The chrome's surroundings by the reflected ray (ry -1 up .. 1 down): a pale cloudy sky, a soft dark band at
     the horizon, a bright floor; a little cloud in the sky so the ball does not look painted."""
     sky = 0.9 - 0.15 * np.clip(ry + 1, 0, 1) + 0.06 * np.sin(5.0 * rx + 2.0 * ry)
-    dark = 0.55
     floor = 0.98
     t = np.clip((ry + 0.15) / 0.3, 0, 1)
     u = np.clip((ry - 0.25) / 0.4, 0, 1)
@@ -188,12 +187,13 @@ def chrome(c, cx, cy, r, kind="steel", ring=False):
     ry = 2 * nz * ny
     rx = 2 * nz * nx
     ry = 0.75 * ry + 0.3 * rx  # the floor's light comes from the lower right
-    v = env(ry, rx)
+    # the life ball (the HUD's, seen small) has a deeper horizon in it, as the measured one does
+    v = env(ry, rx, 0.3 if kind == "silver" else 0.55)
     if kind == "pearl":
         v = 0.78 + 0.22 * nz
     spec = np.clip(nx * HALF[0] + ny * HALF[1] + nz * HALF[2], 0, 1) ** 60
     tint = {"steel": np.array([0.93, 0.95, 1.0]), "gold": np.array([1.0, 0.78, 0.38]),
-            "pearl": np.array([1.0, 0.97, 0.9])}[kind]
+            "pearl": np.array([1.0, 0.97, 0.9]), "silver": np.array([0.96, 0.96, 0.97])}[kind]
     col = v[..., None] * tint + spec[..., None] * 0.9
     col = col * (0.7 + 0.3 * nz ** 0.3)[..., None]
     c.over(np.clip(col, 0, 1), inside(circle(c, cx, cy, r)))
@@ -375,24 +375,22 @@ def special():
     # LEVEL_UV: a level not open yet, an empty socket and a red light
     small_row(c, 5.5, 66.5, 159.5, 90.5, look, "socket", rr=11)
     # the life ball (17, 135)-(45, 164), measured (19, 137)-(45, 163)
-    chrome(c, 31.5, 150, 12.6, "steel")
+    chrome(c, 31.5, 150, 12.6, "silver")
     # the end piece (1, 134)-(15, 164): a short bent tube, a channel's end
     channel(c, arc(c, 25, 150, 18, 145, 215), 4.2, (rgb(0, 0, 0), 0.0), lines=2)
     # the frame round the first life (47, 119)-(104, 180), measured (49, 121)-(104, 179): a channel open to the left,
     # its top ending in a curl, its bottom running out left
-    half = 4.2
-    path = np.minimum(arc(c, 74, 150, 21, -90, 90), seg(c, 53, 171, 74, 171))
-    path = np.minimum(path, seg(c, 61, 129, 74, 129))
+    half = 6.0
+    path = np.minimum(arc(c, 75, 149.5, 21.5, -90, 90), seg(c, 56, 171, 75, 171))
+    path = np.minimum(path, seg(c, 70, 128, 75, 128))
     channel(c, path, half, (rgb(0, 0, 0), 0.0), lines=2)
     # the points box (83, 187)-(256, 251), measured (84, 188)-(255, 250): a dark display, a channel curling under it
     d = rounded_box(c, 109, 189.5, 238, 225.5, 7)
     c.over((0.0, 0.0, 0.0), inside(d) * 0.4)
     outline(c, d, 2.8, color=np.array(rgb(170, 172, 182)))
-    rail = np.minimum(seg(c, 86, 192.5, 91, 192.5), arc(c, 91, 202, 9.5, 270, 360))
-    rail = np.minimum(rail, seg(c, 100.5, 202, 100.5, 229))
-    rail = np.minimum(rail, arc(c, 114, 229, 13.5, 90, 180))
-    rail = np.minimum(rail, seg(c, 114, 242.5, 250, 242.5))
-    channel(c, rail, 4.6, (rgb(0, 0, 0), 0.0), lines=2)
+    rail = np.minimum(seg(c, 92, 198, 92, 222), arc(c, 110, 222, 18, 90, 180))
+    rail = np.minimum(rail, seg(c, 110, 240, 247, 240))
+    channel(c, rail, 7.0, (rgb(0, 0, 0), 0.0), lines=2)
     # the end screen's bar (154, 133)-(230, 164), measured (154, 133)-(230, 160): a warm glowing plate, tinted yellow
     # by the game
     bar = rounded_box(c, 155, 133.5, 229.5, 159.5, 2)

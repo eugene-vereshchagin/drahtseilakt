@@ -532,10 +532,12 @@ def build():
         box(towers, MAT["border"], (x - 2.2, 13.6, z - 2.2), (x + 2.2, 14.1, z + 2.2))
         for dx in (-1.5, 1.5):
             for dz in (-1.5, 1.5):
-                tube(towers, MAT["steel"], [(x + dx, 14.1, z + dz), (x + dx, 19.6, z + dz)], 0.16, seg=6)
-        box(towers, MAT["lantern"], (x - 0.8, 15.0, z - 0.8), (x + 0.8, 18.2, z + 0.8), scale=1.6)
-        cylinder(towers, MAT["slate"], (x, 19.6, z), 4.0, 3.2, seg=4, r_top=0.0, vscale=3.2)
-        tube(towers, MAT["steel"], [(x, 23.6, z), (x, 26.4, z)], 0.12, seg=6)
+                tube(towers, MAT["steel"], [(x + dx, 14.1, z + dz), (x + dx, 19.4, z + dz)], 0.26, seg=6)
+        box(towers, MAT["lantern"], (x - 0.45, 15.6, z - 0.45), (x + 0.45, 17.6, z + 0.45), scale=1.0)
+        box(towers, MAT["steel"], (x - 0.5, 17.6, z - 0.5), (x + 0.5, 18.0, z + 0.5))
+        box(towers, MAT["plaster"], (x - 2.9, 19.4, z - 2.9), (x + 2.9, 19.8, z + 2.9), scale=5.8)
+        cylinder(towers, MAT["slate"], (x, 19.8, z), 4.0, 3.2, seg=4, r_top=0.0, vscale=3.2)
+        tube(towers, MAT["steel"], [(x, 22.6, z), (x, 26.4, z)], 0.14, seg=6)
         sphere(towers, MAT["steel"], (x, 26.6, z), 0.3, seg=8)
     add("Menu_Towers", towers)
 

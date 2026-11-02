@@ -21,7 +21,7 @@ Menüs bei gewählter Oberfläche des Originals, die chinesischen und kyrillisch
 | Rolle | Datei des Originals | Eigen |
 |---|---|---|
 | menu font and glyph table, buttons | `3D Entities/Menu.nmo (Font_1, M_FontData_01)` | Tektur (`assets/fonts`), vom Spiel gezeichnet |
-| menu 3D scene | `3D Entities/MenuLevel.nmo` | ein Bild: `Textures/Menu_Background.png` |
+| menu 3D scene | `3D Entities/MenuLevel.nmo` | unsere im offenen Format: `3D Entities/MenuLevel/` |
 | texts in the copy's languages | `3D Entities/Language.nmo` | `Texts/menu.txt`, sieben Sprachen |
 | menu texts, level table defaults | `base.cmo` | geplant |
 | level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | geplant |
@@ -46,19 +46,31 @@ Endbildschirm und der Ladebildschirm sind unsere eigenen. Ein Spieler ohne die O
 sie alle, und solange die eigene Oberfläche gewählt ist, werden die Oberflächendateien der Kopie gar nicht gelesen.
 
 - **Texturen** (`assets/own/Textures/`): `Button01_select.tga`, `Button01_deselect.tga` und `Button01_special.tga`, jedes
-  Teil dort, wo der Code des Spiels es entnimmt (die UV-Rechtecke in `menu.rs`, `hud.rs`, `endscreen.rs`): violette
-  Glasflächen in einem Stahlrohr mit polierter Kugel, rosa mit goldener Kugel beim gewählten Knopf, grau bei einem
-  noch nicht offenen Level; die Platznummern der Highscores, die Lebenskugel und ihre Klammer, der Punktekasten, der
-  Balken des Endbildschirms, das dunkle Band. Dazu `Menu_Background.png`, das Bild hinter den Menüs und dem
-  Ladebildschirm (Dämmerung über einem Wolkenmeer, links eine Holzbahn mit Kugel, rechts eine Säule mit Kugel; die
-  Mitte liegt unter dem Band der Menüs). Es steht für die 3D-Menüszene des Originals, die nur mit dessen Oberfläche
-  gezeichnet wird.
-- **Wie sie entstehen**: durch `assets/own/make/make_interface.py` (Python mit numpy und Pillow), nur aus dem Skript
-  und der mitgelieferten Schrift Tektur; die Ergebnisse liegen im Repository, der Build braucht kein Python. Der Stil
-  folgt dem Original nur in Farben und Proportionen: nichts vom Original ist kopiert, nachgezeichnet oder neu abgetastet.
+  Teil dort, wo der Code des Spiels es entnimmt (die UV-Rechtecke in `menu.rs`, `hud.rs`, `endscreen.rs`), in der Art
+  des Originals, auf eigene Weise gemacht (Version 2, 2026-11-03): durchsichtiges Glas, neutral grau oder (gewählt)
+  dunkelrot; Stahlrohre, als beleuchtete Zylinder schattiert, mit gebürsteter Maserung; Rinnen aus Rohren mit getönter
+  Füllung (fliedergrau, golden beim gewählten Knopf) um eine Chromkugel, in der sich ein Himmel spiegelt; die Plätze
+  der Highscores mit einer Perle, die Lebenskugel und ihr Rahmen, der Punktekasten mit seiner Schiene, der leuchtende
+  Balken des Endbildschirms, das dunkle Band.
+- **Die Menüszene** (`assets/own/3D Entities/MenuLevel/`, das offene Levelformat): worüber die Menüs und der
+  Ladebildschirm stehen; das Spiel zeichnet sie wie MenuLevel.nmo des Originals, ihre Kamera zieht denselben Kreis mit
+  demselben Objektiv. Eine Insel aus Bahnteilen in einem Dämmerungshimmel: ein Mittelblock mit dunkler Schale, Bahnarme
+  mit erhöhten Rändern, der Start mit vier Schalen und einer Steinkugel, drei Transformatoren, zwei Laternentürme auf
+  hohen Masten, Stahlschienen und eine Spirale, eine Holzrampe, Säulen hinab in die Wolken und ferne Böden. Kurve und
+  Ziel der Kamera sind die Knoten `I_MenuLevel_Curve_0..3` und `Cam_MenuLevel_Target`, die Flammen brennen an
+  `FourFlames_Flame_A..D`, ihr eigener Himmel sind die `Sky_*`-Objekte, um die Kamera gezeichnet.
+- **Wie sie entstehen**: durch `assets/own/make/make_interface.py` (die Texturen) und `make_menu_scene.py` (die Szene,
+  ihre Texturen und ihr Himmel), Python mit numpy und Pillow, nur aus den Skripten und der mitgelieferten Schrift
+  Tektur; die Ergebnisse liegen im Repository, der Build braucht kein Python. Wie bei den erzeugten Klängen: das
+  Original wird vermessen (Palette, Linienstärken, Proportionen und Anordnung; bei der Szene Höhen und Ausdehnung der
+  Böden, Himmelsfarben nach Höhenwinkel), unseres wird nach diesen Zahlen gezeichnet, und `metric.py` bewertet, wie nah
+  jedes Element und jeder Bildschirm kommt (Überlappung der Lab-Farbhistogramme, SSIM der unscharfen Helligkeit und der
+  Kantenbilder); `scores.md` hält die Werte fest. Nichts vom Original ist kopiert, nachgezeichnet oder neu abgetastet,
+  seine Bilder kommen nie ins Repository.
 - **Schrift**: Tektur (SIL OFL, `assets/fonts/Tektur-Variable.ttf`, Version und Prüfsumme in `assets/fonts/README.md`),
   eine eckige technische Schrift, im Charakter nahe an der breiten Menüschrift des Originals; Kleinbuchstaben als
-  Kapitälchen, etwas breiter und gesperrt, wie beim Original. Was ihr fehlt, kommt aus Noto Sans, Chinesisch aus Noto
+  Kapitälchen, verbreitert und gesperrt nach den gemessenen Proportionen des Originals (Breite der Beschriftungen
+  innerhalb von 2 %). Was ihr fehlt, kommt aus Noto Sans, Chinesisch aus Noto
   Sans SC. Die Glyphen werden zur Laufzeit in einen Atlas gerastert und mit denselben Rechtecken, Ausrichtungen,
   Umbrüchen und Schatten gesetzt wie die Schrift des Spiels, die Bildschirme behalten also das Layout des Originals
   (`crates/game/src/fallback.rs`).

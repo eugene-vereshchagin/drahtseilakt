@@ -12,6 +12,8 @@ Textures are laid over two backdrops (dark and warm) first, so their transparenc
 
   python3 -I metric.py textures COPY OUT     # every interface element of Button01_* (the copy's Textures folder)
   python3 -I metric.py screens ORIG OWN OUT  # screenshot pairs NAME.png in ORIG and OWN, whole and by region
+  python3 -I metric.py report BEFORE AFTER [ORIG]  # scores.md here from two runs' OUT folders (textures/ and
+                                                  # screens/); with ORIG, the original against itself as a yardstick
 
 Each writes OUT/scores.json and side-by-side sheets (original | ours) as OUT/<name>.png. Needs numpy, scipy, Pillow.
 """
@@ -210,11 +212,63 @@ def screens(orig, own, out):
     return scores
 
 
+def report(before, after, orig=None):
+    """scores.md: each element's and each screen's score now against before (v1, the first own interface)."""
+    def read(d, kind):
+        try:
+            with open(os.path.join(d, kind, "scores.json")) as f:
+                return json.load(f)
+        except OSError:
+            return {}
+    lines = ["# How close the own interface comes to the original", "",
+             "Made by `metric.py` (its docstring says how a score is made: 40 % Lab colour histogram overlap, 30 %",
+             "SSIM of the heavily blurred lightness, 30 % SSIM of the edge maps; 0 to 100). *Before* is the first own",
+             "interface (purple pill buttons, a flat picture behind the menus), *now* this one. Screens are 1280x720",
+             "renders of the same moment (`DRAHTSEILAKT_SHOT_MENU`, the menu scene `DRAHTSEILAKT_SHOT_MENU_MS` into",
+             "its round), English, the original's from the player's copy. The original's pictures never enter the",
+             "repository; only these numbers do.", "", "## Elements of the interface textures", "",
+             "| element | before | now | colour | shape | edges |", "|---|---:|---:|---:|---:|---:|"]
+    tb, ta = read(before, "textures"), read(after, "textures")
+    for name, s in ta.items():
+        b = tb.get(name, {}).get("total", "")
+        lines.append(f"| {name} | {b} | **{s['total']}** | {s['colour']} | {s['shape']} | {s['edges']} |")
+    mb = np.mean([v["total"] for v in tb.values()]) if tb else float("nan")
+    lines.append(f"| *mean* | {mb:.1f} | **{np.mean([v['total'] for v in ta.values()]):.1f}** | | | |")
+    lines += ["", "## Screens", "", "| screen | region | before | now |", "|---|---|---:|---:|"]
+    sb, sa = read(before, "screens"), read(after, "screens")
+    for key, regions in sa.items():
+        for r, v in regions.items():
+            b = sb.get(key, {}).get(r, {}).get("total", "")
+            lines.append(f"| {key} | {r} | {b} | **{v['total']}** |")
+    if orig:
+        lines += ["", "## Yardstick: the original against itself", "",
+                  "The original's main menu at one moment of its camera's round against another moment (the same scene",
+                  "and buttons, seen from elsewhere): what a score means for a scene that is the same kind of place.",
+                  "", "| screens | whole | menu column | scene left | scene right |", "|---|---:|---:|---:|---:|"]
+        shots = sorted(n for n in os.listdir(orig) if n.startswith("main_") and n.endswith(".png"))
+        for i, a_name in enumerate(shots):
+            for b_name in shots[i + 1 :]:
+                a = load(os.path.join(orig, a_name))[..., :3]
+                b = load(os.path.join(orig, b_name))[..., :3]
+                h, w = a.shape[:2]
+                row = []
+                for r in ("whole", "menu column", "scene left", "scene right"):
+                    x0, y0, x1, y1 = REGIONS[r]
+                    box = (slice(int(y0 * h), int(y1 * h)), slice(int(x0 * w), int(x1 * w)))
+                    row.append(score(a[box], b[box])["total"])
+                lines.append(f"| {a_name[:-4]} / {b_name[:-4]} | " + " | ".join(str(v) for v in row) + " |")
+    with open(os.path.join(HERE, "scores.md"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+    print("written", os.path.join(HERE, "scores.md"))
+
+
 def main(argv):
     if len(argv) == 4 and argv[1] == "textures":
         textures(argv[2], argv[3])
     elif len(argv) == 5 and argv[1] == "screens":
         screens(argv[2], argv[3], argv[4])
+    elif len(argv) in (4, 5) and argv[1] == "report":
+        report(*argv[2:])
     else:
         print(__doc__)
         return 2
