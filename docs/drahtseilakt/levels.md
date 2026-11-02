@@ -21,7 +21,9 @@ The classic mode sees only `original/`; the extended mode sees all four (menu.md
 ## The original game: copied by default
 
 The game copies what it needs from the player's own copy into `levels/original/` once: from an installed game
-(`drahtseilakt --import <Ballance folder>`) and later straight from the CD (its InstallShield archives). The
+(`drahtseilakt --import <Ballance folder>`) or straight from the game's CD or its image
+(`drahtseilakt --import Ballance.cue`, or `.bin`, `.iso`: the InstallShield 6 archive in `SETUP/`, read by
+`crates/cdimage`). The
 copy is the player's own data on the player's machine; nothing is downloaded and nothing goes into the
 repository. `--data DIR` still plays from any folder without copying.
 
@@ -67,8 +69,8 @@ docs and the folders' READMEs are also in Simplified Chinese, next to English, R
 
 1. Done (2026-11-02): this page and the decision; Chinese docs.
 2. Done: the `levels/` folders with their READMEs; the settings that move them, with the README left behind.
-3. `--import` from an installed game is done (the game also finds the imported copy without `--data`); from
-   the CD next.
+3. Done: `--import` from an installed game or from the CD image (the game also finds the imported copy
+   without `--data`). The European CD's 318 game files come out identical to an installed copy.
 4. The custom levels menu reading `community/` and `open/`; `remastered/` with the converter (roadmap phase 6)
    and the texture scripts (phase 7).
 5. Levels that come with the game, as authors offer them.

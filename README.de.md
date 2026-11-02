@@ -29,7 +29,8 @@ cargo build --release
 target/release/drahtseilakt --data /pfad/zu/Ballance --level 1
 ```
 
-`drahtseilakt --import DIR` kopiert das Originalspiel aus Ihrem installierten Ballance in DIR nach `levels/original/`
+`drahtseilakt --import DIR` kopiert das Originalspiel aus Ihrem installierten Ballance in DIR (oder vom Abbild Ihrer
+Spiel-CD: `--import Ballance.cue`, `.bin` oder `.iso`) nach `levels/original/`
 des Spiels; alle Level liegen in `levels/` in seinem Datenordner (`~/.local/share/drahtseilakt/` unter Linux),
 jeder Ordner mit einem README, was hineingehört ([wo die Level liegen](docs/de/drahtseilakt/levels.md)).
 `--data` (oder `OPENBALLANCE_DATA`) spielt stattdessen aus einem anderen Ballance-Ordner. `--level N` spielt Originallevel N, `--map

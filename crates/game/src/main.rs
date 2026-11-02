@@ -45,7 +45,8 @@ const USAGE: &str = "\
 usage: drahtseilakt [options]
 
   --data DIR          the Ballance folder (default: $OPENBALLANCE_DATA, then the imported copy, then ./data)
-  --import DIR        copy the original game from your installed Ballance in DIR into the levels folder
+  --import DIR        copy the original game into the levels folder from your installed Ballance in DIR, or
+                      from your game CD's image (a .cue, .bin or .iso)
   --level N           play original level N (1-13; default 1)
   --map FILE.nmo      play a level file: a community map or any .nmo
   --open DIR          play a level in the open format (a folder with level.gltf)

@@ -14,6 +14,7 @@ path = "src/main.rs"
 [dependencies]
 level = { path = "../level" }
 nmo = { path = "../nmo" }
+cdimage = { path = "../cdimage" }
 wgpu = "=30.0.1"
 winit = "=0.30.13"
 glam = { version = "=0.34.1", features = ["bytemuck"] }

@@ -21,8 +21,9 @@ Der klassische Modus sieht nur `original/`, der erweiterte alle vier (menu.md).
 ## Das Originalspiel: standardmäßig kopiert
 
 Das Spiel kopiert einmal, was es braucht, aus der eigenen Kopie des Spielers nach `levels/original/`: aus einem
-installierten Spiel (`drahtseilakt --import <Ballance-Ordner>`) und später direkt von der CD (aus ihren
-InstallShield-Archiven). Die Kopie sind die eigenen Daten des Spielers auf seinem Rechner; nichts wird
+installierten Spiel (`drahtseilakt --import <Ballance-Ordner>`) oder direkt von der CD des Spiels oder ihrem
+Abbild (`drahtseilakt --import Ballance.cue`, auch `.bin`, `.iso`: das InstallShield-6-Archiv in `SETUP/`, gelesen
+von `crates/cdimage`). Die Kopie sind die eigenen Daten des Spielers auf seinem Rechner; nichts wird
 heruntergeladen, nichts kommt ins Repository. `--data DIR` spielt weiterhin aus jedem Ordner ohne Kopie.
 
 Das README des Ordners nennt, was von Hand zu kopieren ist: `base.cmo` und die Ordner `3D Entities`, `Textures`
@@ -71,8 +72,8 @@ Deutsch.
 1. Erledigt (2026-11-02): diese Seite und die Entscheidung; die chinesische Doku.
 2. Erledigt: die Ordner `levels/` mit ihren READMEs; die Einstellungen, die sie verlegen, mit dem zurückgelassenen
    README.
-3. `--import` aus einem installierten Spiel ist erledigt (das Spiel findet die importierte Kopie auch ohne
-   `--data`); als Nächstes von der CD.
+3. Erledigt: `--import` aus einem installierten Spiel oder vom CD-Abbild (das Spiel findet die importierte
+   Kopie auch ohne `--data`). Die 318 Spieldateien der europäischen CD gleichen einer installierten Kopie aufs Byte.
 4. Das Menü der eigenen Level liest `community/` und `open/`; `remastered/` mit dem Umwandler (Phase 6 des
    Fahrplans) und den Texturskripten (Phase 7).
 5. Level, die mit dem Spiel kommen, sobald Autoren sie anbieten.

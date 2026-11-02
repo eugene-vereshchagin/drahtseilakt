@@ -223,9 +223,12 @@ const IMPORTED: [&str; 4] = ["base.cmo", "3D Entities", "Textures", "Sounds"];
 const MAX_FILES: usize = 100_000;
 const MAX_DEPTH: usize = 16;
 
-/// Copies the original game from the installed copy at `from` into the original levels' folder: what the game reads,
-/// files already there with the same size left alone. Returns how many files were copied.
+/// Copies the original game into the original levels' folder, from the installed copy at `from` or, when `from` is a
+/// file, from the game's CD image (a .cue, .bin or .iso): what the game reads. Returns how many files were written.
 pub fn import(from: &Path) -> Result<usize, String> {
+    if from.is_file() {
+        return import_cd(from);
+    }
     let to = dir(Kind::Original);
     // neither inside the other, checked before anything is made: a copy into the game it copies from would nest
     let (a, b) = (canonical(from)?, canonical_to_be(&to));
@@ -276,6 +279,68 @@ fn canonical_to_be(p: &Path) -> PathBuf {
             _ => return p.to_path_buf(),
         }
     }
+}
+
+/// The game's files from its CD: the InstallShield archive in SETUP (DATA1.HDR and its volumes DATA<n>.CAB), the
+/// files under the folders the game reads and base.cmo, each written to its place under the original levels' folder.
+fn import_cd(image: &Path) -> Result<usize, String> {
+    use cdimage::{iscab, iso};
+    let to = dir(Kind::Original);
+    let fail = |e: cdimage::Error| format!("{}: {e}", image.display());
+    let mut img = cdimage::Image::open(image).map_err(fail)?;
+    let hdr = iso::find(&mut img, "SETUP/DATA1.HDR")
+        .map_err(fail)?
+        .ok_or(format!(
+            "{}: no SETUP/DATA1.HDR (not the Ballance CD?)",
+            image.display()
+        ))?;
+    let cab = iscab::parse(&iso::read(&mut img, &hdr).map_err(fail)?).map_err(fail)?;
+    let wanted = |parts: &[String]| match parts {
+        [name] => name.eq_ignore_ascii_case("base.cmo"),
+        [first, ..] => IMPORTED.iter().any(|w| w.eq_ignore_ascii_case(first)),
+        [] => false,
+    };
+    let mut volume: Option<(u16, Vec<u8>)> = None;
+    let mut written = 0usize;
+    let mut total = 0u64;
+    let mut files: Vec<&iscab::File> = cab.files.iter().filter(|f| f.stored()).collect();
+    // by volume, so each volume is read once
+    files.sort_by_key(|f| (f.volume, f.offset));
+    for f in files {
+        let Some(parts) = f.parts().filter(|p| wanted(p)) else {
+            continue;
+        };
+        if volume.as_ref().is_none_or(|(n, _)| *n != f.volume) {
+            let name = format!("SETUP/DATA{}.CAB", f.volume);
+            let e = iso::find(&mut img, &name)
+                .map_err(fail)?
+                .ok_or(format!("{}: no {name}", image.display()))?;
+            volume = Some((f.volume, iso::read(&mut img, &e).map_err(fail)?));
+        }
+        let Some((_, data)) = &volume else { continue };
+        total = total.saturating_add(f.expanded);
+        if total > iscab::TOTAL_MAX {
+            return Err(format!(
+                "{}: more data than the game has; not imported further",
+                image.display()
+            ));
+        }
+        let bytes = iscab::extract(f, data).map_err(fail)?;
+        let dst = parts.iter().fold(to.clone(), |p, part| p.join(part));
+        if let Some(parent) = dst.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        // a link where the file goes is removed, never written through
+        if std::fs::symlink_metadata(&dst).is_ok_and(|m| m.file_type().is_symlink()) {
+            std::fs::remove_file(&dst).map_err(|e| format!("{}: {e}", dst.display()))?;
+        }
+        std::fs::write(&dst, bytes).map_err(|e| format!("{}: {e}", dst.display()))?;
+        written += 1;
+    }
+    if written == 0 {
+        return Err(format!("{}: no game files in its archive", image.display()));
+    }
+    Ok(written)
 }
 
 fn canonical(p: &Path) -> Result<PathBuf, String> {

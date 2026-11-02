@@ -17,7 +17,7 @@
 
 ## 原版游戏：默认复制
 
-游戏从玩家自己的副本中把所需内容一次性复制到 `levels/original/`：从已安装的游戏复制（`drahtseilakt --import <Ballance folder>`），以后也可直接从 CD 复制（从其 InstallShield 压缩包中）。副本是玩家自己机器上的玩家自己的数据；不下载任何东西，也不往仓库里放任何东西。`--data DIR` 仍可不经复制直接从任意文件夹游玩。
+游戏从玩家自己的副本中把所需内容一次性复制到 `levels/original/`：从已安装的游戏复制（`drahtseilakt --import <Ballance folder>`），或直接从游戏 CD 或其镜像复制（`drahtseilakt --import Ballance.cue`，也可以是 `.bin`、`.iso`：读取 `SETUP/` 中的 InstallShield 6 压缩包，由 `crates/cdimage` 实现）。副本是玩家自己机器上的玩家自己的数据；不下载任何东西，也不往仓库里放任何东西。`--data DIR` 仍可不经复制直接从任意文件夹游玩。
 
 该文件夹的 README 列出了需要手动复制的内容：已安装的 Ballance 中的 `base.cmo` 以及 `3D Entities`、`Textures` 和 `Sounds` 文件夹（游戏不读取其他内容）；对于第 13 关，还需按其说明文件将 SuDu 扩展包安装到该副本中。
 
@@ -51,6 +51,6 @@
 
 1. 已完成（2026-11-02）：本页和该决定；中文文档。
 2. 已完成：`levels/` 各文件夹及其 README；用于移动它们的设置，以及留在原处的 README。
-3. 从已安装游戏 `--import` 已完成（不加 `--data` 游戏也能找到导入的副本）；下一步是从 CD 复制。
+3. 已完成：从已安装的游戏或 CD 镜像 `--import`（不加 `--data` 游戏也能找到导入的副本）。欧洲版 CD 上的 318 个游戏文件与已安装的副本逐字节一致。
 4. 读取 `community/` 和 `open/` 的自定义关卡菜单；`remastered/` 及其转换器（路线图第 6 阶段）和纹理脚本（第 7 阶段）。
 5. 随游戏附带的关卡，视作者提供情况而定。
