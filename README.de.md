@@ -67,6 +67,12 @@ und Sektor und Takt werden angezeigt. Ein so unterstützter Lauf wird behalten, 
 Fenster versuchen (mit `--record FILE` bleibt sein Lauf erhalten); `--follow FILE` lässt ihn dem Weg der Kugel im Replay eines
 Spielers folgen; wo er steckt, schreibt er einen Bericht, und er folgt Hinweisen ([der Testspieler](docs/de/drahtseilakt/autopilot.md)). `--locate DIR --record TRACK` findet den Weg der Kugel in den Bildern eines Videos des Originals (DIR/s0001.jpg usw., vier pro Sekunde, z. B. `ffmpeg -vf fps=4,scale=640:480`): Das Level wird von den möglichen Orten der Kugel aus gezeichnet und mit dem Bild verglichen; einer solchen Spur folgt der Testspieler mit `--follow TRACK`. `--frames DIR --replay FILE` zeichnet ein Replay als solche Bilder, mit den wahren Orten der Kugel, zum Prüfen. `drahtseilakt --help` zeigt alles.
 
+## Wer es gemacht hat
+
+Code, Dokumentation und die erzeugten Klänge und Musik schreibt **Claude** (das KI-Modell von Anthropic, in Claude
+Code). **Veresk** führt das Projekt: die Idee, die Entscheidungen, der Plan, das Spielen und das Ohr, das sagt, was
+stimmt. Die Commits tragen beide Namen.
+
 ## Rechtliches
 
 Dateien, die aus OpenBallance übernommen wurden (GPL-3.0, emdzej und Mitwirkende), sind in ihren Kopfzeilen gekennzeichnet; das Crate `ivp` ist der Physik-Port.
