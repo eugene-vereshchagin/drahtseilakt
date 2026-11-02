@@ -31,9 +31,9 @@ Text, den die Schrift des Spiels nicht kann (sie hat nur Latin-1), wird mit den 
 | ball shadow | `Textures/HardShadow.bmp` | geplant |
 | skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | geplant |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | geplant |
-| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | eigene (assets/own, CREDITS.md) |
-| menu sounds | `Sounds/Menu_click, Menu_load` | eigene (assets/own, CREDITS.md) |
-| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | eigene (assets/own, CREDITS.md) |
+| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | Klangthemen (assets/sounds) |
+| menu sounds | `Sounds/Menu_click, Menu_load` | Klangthemen (assets/sounds) |
+| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | Klangthemen (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | eigene: neun Stücke, Music/music.txt verteilt sie auf die fünf Themen; kein Atmosphäre-Teil |
 | original levels | `3D Entities/Level/Level_NN.NMO` | geplant |
 
@@ -41,8 +41,15 @@ Eigenes kommt in Stufen: Oberfläche (Schriften, Knöpfe, Punktekasten, Lebensku
 Himmel, Partikel und Klänge (aus offenen Bibliotheken), Musik im Stil eines Mahjong-Spiels mit chinesischen
 Motiven, dann eigene Module und Level.
 
-Klänge und Musik: der klassische Modus und die Oberfläche *own* des erweiterten Modus spielen unsere (assets/own: Ogg
-Vorbis, von `assets/own/prepare.py` aus frei lizenzierten Aufnahmen gemacht, CC0 oder CC-BY; Autoren und Änderungen
-in `assets/own/CREDITS.md`, auch auf dem Credits-Bildschirm); die Oberfläche *original* oder *remaster* spielt die der
-Kopie. Unsere Musik wird nie durch die der Kopie ersetzt, ein fehlender Klang schon. Die Musik des Levels wird vorab
-in einem eigenen Thread dekodiert.
+Klänge und Musik kommen als **Klangthemen**, jedes ein Ordner (`Sounds/` und `Music/` nach den Namen, nach denen
+das Spiel fragt, Ogg Vorbis oder WAV, eine Tabelle `music.txt` für die Levelthemen, eine `theme.txt` mit dem Namen in
+vier Sprachen, Autor, Lizenz und `fallback`). Das Spiel liefert zwei in `assets/sounds/`: *system* (frei lizenzierte
+Aufnahmen und die Musik des Inhabers, gemacht von `assets/sounds/system/prepare.py`, CC0 oder CC-BY, Autoren und
+Änderungen in ihrer `CREDITS.md` und auf dem Credits-Bildschirm) und *neuro* (für das Spiel synthetisierte Effekte,
+GPL-3.0-only; Musik und fehlende Rollen aus *system*). Eigene Themen legt der Spieler in `sounds/<Name>/` des
+Datenordners; darunter macht die Toolbox *original* aus der Kopie des Spielers, das nie ausgeliefert wird (solange es
+fehlt, spielt seine Wahl die Klänge der Kopie). Die Zeile *Sounds* der Seite Extended wählt das Thema
+(`sound-theme NAME`); der klassische Modus spielt *system*. Ein Klang, der dem Thema und seinem Ersatz fehlt, kommt aus
+der Kopie (die eigenen Klänge eines Levels); Musik nie. Der Themenordner eines Spielers ist nicht vertrauenswürdig:
+nur einfache Namen, keine Links, begrenzte Zahl von Themen, Klänge durch die Grenzen der Klangschicht dekodiert. Die
+Musik des Levels wird vorab in einem eigenen Thread dekodiert.

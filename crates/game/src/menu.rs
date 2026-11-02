@@ -88,6 +88,8 @@ enum Line {
     DebugMenu,
     /// Where the interface's files come from: own, the original, its remaster (resources.rs).
     Interface,
+    /// The sound theme (sound_themes.rs): the arrows go round the themes found.
+    SoundTheme,
     /// One of the extended mode's additions, by its place in FEATURES.
     Switch(usize),
     Yes,
@@ -115,6 +117,8 @@ pub enum Action {
     Volumes([f32; 2]),
     /// The interface's provider chosen (it takes effect on the next start).
     Interface(gamedata::resources::Provider),
+    /// The sound theme chosen (its key).
+    SoundTheme(String),
     /// The new highscore's name was entered: the game saves it and shows the list.
     Score(Vec<u8>),
 }
@@ -280,7 +284,7 @@ impl Menu {
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(false))
-                .chain([Line::Interface, Line::DebugMenu, Line::Back])
+                .chain([Line::Interface, Line::SoundTheme, Line::DebugMenu, Line::Back])
                 .collect(),
             Screen::Debug => switches(true).chain([Line::Back]).collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
@@ -379,6 +383,7 @@ impl Menu {
             }
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
+            (Screen::Extended, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (Screen::Extended | Screen::Debug, Some(Line::Switch(i))) => {
                 FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
             }
@@ -445,6 +450,7 @@ impl Menu {
             },
             Line::Mode => Action::ToggleDebug,
             Line::Interface => Action::Interface(next_provider(1)),
+            Line::SoundTheme => Action::SoundTheme(next_theme(1)),
             Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
             Line::Music | Line::Effects => Action::None,
             Line::Yes => match screen {
@@ -619,6 +625,7 @@ impl Menu {
             Line::Mode => b"  Extended mode?".to_vec(),
             Line::DebugMenu => b"Debug mode".to_vec(),
             Line::Interface => b"Interface".to_vec(),
+            Line::SoundTheme => b"Sounds".to_vec(),
             Line::Switch(i) => FEATURES
                 .get(i)
                 .map_or("", |f| f.label())
@@ -748,6 +755,7 @@ impl Menu {
                 if self.features.mode {
                     f.extend(switches(false).map(|l| self.switch_field(l)));
                     f.push((self.label(Line::Interface), interface_value()));
+                    f.push((self.label(Line::SoundTheme), theme_value()));
                     f.push((self.label(Line::DebugMenu), b">".to_vec()));
                     f.push((short_path(&crate::levels::data_dir().join("levels")).into_bytes(), Vec::new()));
                 }
@@ -775,7 +783,7 @@ impl Menu {
                 "elerya, Hitctrl, Spring Spring, WakianTech (K-ManZ),",
                 "Tsorthan Grove (CC-BY), neolein (CC0)",
                 "Sounds: Kenney, freesound and OpenGameArt authors",
-                "(CC0, CC-BY): the full list in assets/own/CREDITS.md",
+                "(CC0, CC-BY): assets/sounds/system/CREDITS.md",
             ]
             .iter()
             .map(|l| (l.as_bytes().to_vec(), Vec::new()))
@@ -1158,7 +1166,7 @@ impl Menu {
                     if let (1, Some((name, value))) = (first, fields.first()) {
                         field(&mut out, 0.27, name, value, self.chosen() == 0);
                     }
-                    let rows = |l: &&Line| matches!(l, Line::Switch(_) | Line::Interface | Line::DebugMenu);
+                    let rows = |l: &&Line| matches!(l, Line::Switch(_) | Line::Interface | Line::SoundTheme | Line::DebugMenu);
                     let n = lines.iter().filter(rows).count();
                     let top = if first == 1 { 0.40 } else { 0.30 };
                     for (k, (name, value)) in fields.iter().skip(first).take(n).enumerate() {
@@ -1169,8 +1177,8 @@ impl Menu {
                             Button::Up
                         };
                         button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st);
-                        label(&mut out, name, [0.375, y, 0.58, y + 0.0396], &FONT_03);
-                        label(&mut out, value, [0.58, y, 0.65, y + 0.0396], &FONT_03);
+                        label(&mut out, name, [0.375, y, 0.55, y + 0.0396], &FONT_03);
+                        label(&mut out, value, [0.55, y, 0.65, y + 0.0396], &FONT_03);
                     }
                     for (k, (l, _)) in fields.iter().skip(first + n).enumerate() {
                         let y = top + n as f32 * 0.05 + 0.03 + k as f32 * 0.045;
@@ -1377,6 +1385,20 @@ fn next_provider(by: i32) -> gamedata::resources::Provider {
     let at = all.iter().position(|&p| p == chosen()).unwrap_or(1) as i32;
     let n = all.len() as i32;
     all.get((at + by).rem_euclid(n) as usize).copied().unwrap_or(Provider::Original)
+}
+
+/// The sound theme after the chosen one, `by` steps on (the arrows go round the themes found and "original").
+fn next_theme(by: i32) -> String {
+    use gamedata::sound_themes::{SYSTEM, choices, chosen};
+    let all = choices();
+    let at = all.iter().position(|k| *k == chosen()).unwrap_or(0) as i32;
+    let n = all.len().max(1) as i32;
+    all.get((at + by).rem_euclid(n) as usize).cloned().unwrap_or_else(|| SYSTEM.to_owned())
+}
+
+/// The Sounds line's value: the chosen theme's key (its folder's name, as the Interface line shows its own).
+fn theme_value() -> Vec<u8> {
+    gamedata::sound_themes::chosen().into_bytes()
 }
 
 /// The Interface line's value: the provider chosen, marked when it waits for the next start.

@@ -68,18 +68,6 @@ fn of(i: u8) -> Provider {
     }
 }
 
-/// The game's own sounds and music play (the classic mode and the extended mode's "own" interface; the owner's
-/// ruling: until the extended mode is turned on, only our own music plays). Otherwise the copy's.
-static OWN_AUDIO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
-
-pub fn set_own_audio(own: bool) {
-    OWN_AUDIO.store(own, Ordering::Relaxed);
-}
-
-pub fn own_audio() -> bool {
-    OWN_AUDIO.load(Ordering::Relaxed)
-}
-
 /// Sets what the game plays with (at its start) and what is shown as chosen.
 pub fn set_in_use(p: Provider) {
     IN_USE.store(index(p), Ordering::Relaxed);

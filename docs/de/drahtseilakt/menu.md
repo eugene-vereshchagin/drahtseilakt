@@ -57,6 +57,8 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   - Bestzeiten neben den Leveln;
   - Level nach Art unter Start;
   - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
+  - Sounds: das Klangthema — System, generiert, original (von der Toolbox gemacht) oder ein eigenes des Spielers
+    ([resources.md](resources.md)); der klassische Modus spielt das Systemthema;
   - Übungswerkzeuge: freie Kamera (F2), langsamer und schneller (`[` `]`), den Moment sichern und dorthin zurück
     (F5 / F9), fünf Sekunden zurück (F3, nochmals weiter, bis eine halbe Minute), Sektor und Tick auf dem Bildschirm;
     ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;

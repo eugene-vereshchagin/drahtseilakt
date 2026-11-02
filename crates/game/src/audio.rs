@@ -1,8 +1,8 @@
-// Sound: the game's own sounds and music (assets/own: Ogg Vorbis, CREDITS.md) or the WAV files of the player's copy
-// (Sounds/), mixed in software and played through the system's output (cpal: ALSA on Linux, WASAPI on Windows,
-// CoreAudio on macOS). The game asks for sounds by name, as the original's Wave Player and Play Sound Instance blocks
-// do; our own file of that name plays when our own sounds are chosen (resources.rs). The level's music is decoded
-// ahead on a thread of its own, as our pieces are long. Without an output device the game runs silent.
+// Sound: the chosen sound theme's sounds and music (assets/sounds/<theme> and the player's own themes; Ogg Vorbis
+// or WAV, sound_themes.rs) or the WAV files of the player's copy (Sounds/), mixed in software and played through the
+// system's output (cpal: ALSA on Linux, WASAPI on Windows, CoreAudio on macOS). The game asks for sounds by name, as
+// the original's Wave Player and Play Sound Instance blocks do. The level's music is decoded ahead on a thread of its
+// own, as our pieces are long. Without an output device the game runs silent.
 
 use crate::assets::Data;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -46,14 +46,16 @@ impl Drop for Audio {
     }
 }
 
-/// A sound by its name: our own (Ogg Vorbis) when our own sounds play and we have it, else the copy's WAV. Our own
-/// music never falls back to the copy's: until the extended mode chooses the original's, only ours plays.
+/// A sound by its name: from the chosen sound theme (sound_themes.rs: the system or generated theme shipped with the
+/// game, or a player's own, "original" among them), else its fallback theme; a sound no theme has comes from the
+/// copy's WAV (a level's own sounds), never music: until the original's theme is chosen only our own music plays.
 fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
-    let own = gamedata::resources::own_audio();
-    if own && let Some(path) = own_file(name) {
+    let copy = gamedata::sound_themes::plays_copy();
+    if !copy && let Some(path) = gamedata::sound_themes::file(name) {
+        let ogg = path.extension().is_some_and(|x| x.eq_ignore_ascii_case("ogg"));
         let decoded = read_capped(&path)
             .ok_or_else(|| "unreadable".to_owned())
-            .and_then(|b| parse_ogg(&b));
+            .and_then(|b| if ogg { parse_ogg(&b) } else { parse_wav(&b) });
         return match decoded {
             Ok(s) => Some(Arc::new(s)),
             Err(e) => {
@@ -62,7 +64,7 @@ fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
             }
         };
     }
-    if own && name.starts_with("Music_") && !name.eq_ignore_ascii_case("Music_thunder") {
+    if !copy && name.starts_with("Music_") && !name.eq_ignore_ascii_case("Music_thunder") {
         return None;
     }
     let path = data.file(&format!("Sounds/{name}.wav"))?;
@@ -75,44 +77,6 @@ fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
             None
         }
     }
-}
-
-/// Our own file for a sound's name: Sounds/<name>.ogg or Music/<name>.ogg in assets/own, or the track Music/music.txt
-/// names for it (a line `<name> <file>.ogg`).
-fn own_file(name: &str) -> Option<std::path::PathBuf> {
-    let root = gamedata::resources::own_root()?;
-    let plain = |n: &str| {
-        !n.is_empty()
-            && n.len() <= 96
-            && n.chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
-            && !n.starts_with('.')
-    };
-    if !plain(name) {
-        return None;
-    }
-    let is_file = |p: &std::path::Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.is_file());
-    for folder in ["Sounds", "Music"] {
-        let p = root.join(folder).join(format!("{name}.ogg"));
-        if is_file(&p) {
-            return Some(p);
-        }
-    }
-    static TABLE: std::sync::OnceLock<Vec<(String, String)>> = std::sync::OnceLock::new();
-    let table = TABLE.get_or_init(|| {
-        let text = read_capped(&root.join("Music").join("music.txt")).unwrap_or_default();
-        String::from_utf8_lossy(&text)
-            .lines()
-            .filter(|l| !l.starts_with('#'))
-            .filter_map(|l| l.split_once(' '))
-            .map(|(a, b)| (a.trim().to_owned(), b.trim().to_owned()))
-            .filter(|(a, b)| plain(a) && plain(b) && b.ends_with(".ogg"))
-            .take(256)
-            .collect()
-    });
-    let file = &table.iter().find(|(n, _)| n.eq_ignore_ascii_case(name))?.1;
-    let p = root.join("Music").join(file);
-    is_file(&p).then_some(p)
 }
 
 /// The most frames an Ogg Vorbis sound may decode to (ten minutes at 48 kHz).
@@ -601,9 +565,21 @@ impl Audio {
 mod tests {
     use super::*;
 
-    /// Our own sounds and music, as shipped in assets/own.
+    /// The system sound theme, as shipped in assets/sounds.
     fn own() -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/own")
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/sounds/system")
+    }
+
+    #[test]
+    fn the_generated_themes_sounds_decode() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/sounds/neuro/Sounds");
+        let mut n = 0;
+        for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let bytes = std::fs::read(e.path()).unwrap_or_default();
+            assert!(parse_ogg(&bytes).is_ok(), "{}", e.path().display());
+            n += 1;
+        }
+        assert!(n >= 20, "{n} files");
     }
 
     #[test]

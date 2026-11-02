@@ -30,9 +30,9 @@ SIL OFL): китайские и кириллические названия ка
 | ball shadow | `Textures/HardShadow.bmp` | в планах |
 | skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | в планах |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | в планах |
-| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | свои (assets/own, CREDITS.md) |
-| menu sounds | `Sounds/Menu_click, Menu_load` | свои (assets/own, CREDITS.md) |
-| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | свои (assets/own, CREDITS.md) |
+| event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | звуковые темы (assets/sounds) |
+| menu sounds | `Sounds/Menu_click, Menu_load` | звуковые темы (assets/sounds) |
+| ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | звуковые темы (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | свои: девять пьес, Music/music.txt раскладывает их по пяти темам; атмосферной части нет |
 | original levels | `3D Entities/Level/Level_NN.NMO` | в планах |
 
@@ -40,8 +40,14 @@ SIL OFL): китайские и кириллические названия ка
 небо, частицы и звуки (из открытых библиотек), музыка в духе маджонга с китайскими мотивами, затем свои модули и
 уровни.
 
-Звуки и музыка: классический режим и интерфейс *own* расширенного режима играют наши (assets/own: Ogg Vorbis, их делает
-`assets/own/prepare.py` из записей со свободной лицензией, CC0 или CC-BY; авторы и изменения — в
-`assets/own/CREDITS.md`, они же на экране Credits); интерфейс *original* или *remaster* играет копию. Наша музыка
-никогда не подменяется музыкой копии, недостающий звук — подменяется. Музыка уровня декодируется заранее в отдельном
-потоке.
+Звуки и музыка приходят **звуковыми темами**, каждая — папка (`Sounds/` и `Music/` по именам, которые просит игра,
+Ogg Vorbis или WAV, таблица `music.txt` для тем уровней, `theme.txt` с названием на четырёх языках, автором,
+лицензией и `fallback`). С игрой поставляются две, в `assets/sounds/`: *system* (записи под свободными лицензиями и
+музыка, выбранная владельцем, их делает `assets/sounds/system/prepare.py`, CC0 или CC-BY, авторы и изменения в её
+`CREDITS.md` и на экране Credits) и *neuro* (эффекты, синтезированные для игры, GPL-3.0-only; музыка и недостающие
+роли — из *system*). Свои темы игрок кладёт в `sounds/<имя>/` папки данных; среди них *original* делает toolbox из
+копии игрока, она никогда не поставляется (пока её нет, выбор её играет звуки копии). Строка *Sounds* на странице
+Extended выбирает тему (`sound-theme ИМЯ`); классический режим играет *system*. Звук, которого нет ни в теме, ни в
+её запасной, берётся из копии (собственные звуки уровня); музыка — никогда. Папка темы игрока недоверенная: только
+простые имена, никаких ссылок, ограниченное число тем, звуки декодируются через ограничения звукового слоя. Музыка
+уровня декодируется заранее в отдельном потоке.
