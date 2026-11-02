@@ -151,7 +151,8 @@ impl Game {
         let replay_in = match &o.replay {
             Some(p) => {
                 let text =
-                    std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+                    String::from_utf8(crate::hints::read_plain(p, crate::hints::MAX_REPLAY_FILE)?)
+                        .map_err(|_| format!("{}: not UTF-8", p.display()))?;
                 let r = Replay::parse(&text).map_err(|e| format!("{}: {e}", p.display()))?;
                 if r.level_hash != level.hash {
                     return Err(format!(
@@ -733,7 +734,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         return screenshot(&mut game, &data, &o, path);
     }
     if o.autopilot {
-        return autopilot(&mut game, &o);
+        return autopilot(&mut game, &data, &o);
     }
     if o.headless {
         game.start_session();
@@ -1076,7 +1077,7 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
             eprintln!("way {i} {:.1} {:.1} {:.1}", p.x, p.y, p.z);
         }
     }
-    pilot_run(&mut game, &own, crate::autopilot::Pilot::new(route, gates))
+    pilot_run(&mut game, data, &own, crate::autopilot::Pilot::new(route, gates))
 }
 
 /// The test player follows a player's run: the ball's way in that replay (where it rolled, in order, every 1.5;
@@ -1110,6 +1111,12 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
             }
         }
         let b = &seen.sim.ball;
+        // AUTOPILOT_TRACE_FOLLOW: the followed ball's place every half second, to find a stretch for a hint
+        if std::env::var_os("AUTOPILOT_TRACE_FOLLOW").is_some() && seen.sim.tick.is_multiple_of(30) {
+            let p = b.position;
+            eprintln!("follow t {} s {} ({:.1} {:.1} {:.1}) q {}", seen.sim.tick, seen.sim.sector + 1, p.x, p.y, p.z,
+                seen.sim.camera.quarter);
+        }
         let floor = b.position - glam::Vec3::Y * crate::sim::BALL_RADIUS;
         if !lost && b.on_ground && path.last().is_none_or(|p| p.distance(floor) >= 1.5) {
             path.push(floor);
@@ -1127,12 +1134,12 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
     }
     let mut game = Game::new(&own, data)?;
     let route = crate::autopilot::Route::along(&game.level.level, &game.modules, path);
-    pilot_run(&mut game, &own, crate::autopilot::Pilot::new(route, gates))
+    pilot_run(&mut game, data, &own, crate::autopilot::Pilot::new(route, gates))
 }
 
 /// The test player plays the level from where the run begins: it saves the run at --record (or as an attempt) and
 /// prints how far it got.
-fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
+fn autopilot(game: &mut Game, data: &Data, o: &Options) -> Result<(), String> {
     let level = &game.level.level;
     let stages: Vec<glam::Vec3> = game.sim.stages().into_iter().skip(game.sim.sector).collect();
     // The transformers the way passes (within 30) are part of the way, in its order: a player rolls into them
@@ -1188,7 +1195,7 @@ fn autopilot(game: &mut Game, o: &Options) -> Result<(), String> {
         .filter_map(|(&m, w)| Some((m, w.1, kind_at(w.1)?)))
         .collect();
     println!("transformers on the way: {:?}", gates);
-    pilot_run(game, o, crate::autopilot::Pilot::new(route, gates))
+    pilot_run(game, data, o, crate::autopilot::Pilot::new(route, gates))
 }
 
 /// A plan: one level object a line (`NAME  # note`), in the order the way goes through them; blank lines and
@@ -1212,12 +1219,171 @@ fn read_plan(path: &Path, level: &level::Level) -> Result<Vec<(glam::Vec3, bool)
     Ok(out)
 }
 
-/// Runs the test player to --ticks (or the finish), prints how far it got and saves its run at --record.
-fn pilot_run(game: &mut Game, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<(), String> {
+/// The level file's name without its extension (Level_01 for Level_01.NMO).
+fn level_stem(game: &Game) -> String {
+    Path::new(&game.level.name).file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned())
+}
+
+/// The level's hint file: --hints, else hints/<level>.txt in the data folder.
+fn hints_path(game: &Game, o: &Options) -> PathBuf {
+    o.hints.clone().unwrap_or_else(|| {
+        crate::levels::data_dir().join("hints").join(format!("{}.txt", level_stem(game)))
+    })
+}
+
+/// The hints of the level, a replay stretch read into the view's quarter at its start and its inputs (the replay is
+/// played to its first tick to know the quarter).
+fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints::Hint>, String> {
+    let path = hints_path(game, o);
+    let mut hints = crate::hints::load(&path)?;
+    let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+    for h in &mut hints {
+        for step in &mut h.steps {
+            let crate::hints::Step::Replay(file, from, to) = step else { continue };
+            let file = dir.join(&*file);
+            let bytes = crate::hints::read_plain(&file, crate::hints::MAX_REPLAY_FILE)?;
+            let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
+            let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
+            let mut watch = o.clone();
+            watch.replay = Some(file.clone());
+            watch.follow = None;
+            watch.autopilot = false;
+            let mut seen = Game::new(&watch, data)?;
+            while seen.sim.tick < *from && !seen.sim.game_over {
+                seen.tick(0);
+            }
+            // the input of each tick of the stretch, in one pass over the replay's changes
+            let mut inputs = Vec::new();
+            let mut changes = run.changes.iter().peekable();
+            let mut input = 0u8;
+            for t in 0..=*to {
+                while let Some(&&(_, i)) = changes.peek().filter(|c| c.0 <= t) {
+                    input = i;
+                    changes.next();
+                }
+                if t > *from {
+                    inputs.push(input);
+                }
+            }
+            *step = crate::hints::Step::Inputs(seen.sim.camera.quarter, inputs);
+        }
+    }
+    if !hints.is_empty() {
+        println!("{} hints from {}", hints.len(), path.display());
+    }
+    Ok(hints)
+}
+
+/// After this many ticks without getting on along the way the test player is stuck: a report is written.
+const STUCK_TICKS: u64 = 60 * 20;
+
+/// A report of where the test player is stuck, for whoever writes its hints: what it knows of the place, and two
+/// pictures, its own view and the place from above.
+fn stuck_report(
+    game: &mut Game,
+    data: &Data,
+    o: &Options,
+    pilot: &crate::autopilot::Pilot,
+    dir: &Path,
+) -> Result<(), String> {
+    use std::fmt::Write as _;
+    let s = &game.sim;
+    let b = s.ball.position;
+    // a new folder of its own for each report (never one already there, so nothing in it is written through)
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let stem = format!("{}-t{}", level_stem(game), s.tick);
+    let mut folder = None;
+    for k in 0..100u32 {
+        let f = dir.join(if k == 0 { stem.clone() } else { format!("{stem}-{k}") });
+        match std::fs::create_dir(&f) {
+            Ok(()) => {
+                folder = Some(f);
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(format!("{}: {e}", f.display())),
+        }
+    }
+    let folder = folder.ok_or_else(|| format!("{}: no new folder for the report", dir.display()))?;
+    let mut t = String::new();
+    let _ = writeln!(t, "level {}  tick {} ({})  sector {}  lives {}", game.level.name, s.tick, clock(s.tick),
+        s.sector + 1, s.lives);
+    let v = s.ball.velocity;
+    let _ = writeln!(t, "ball {:?} at ({:.2} {:.2} {:.2}) velocity ({:.2} {:.2} {:.2}) on ground {}", s.ball.kind,
+        b.x, b.y, b.z, v.x, v.y, v.z, s.ball.on_ground);
+    let _ = writeln!(t, "view quarter {} (up pushes along {:?})", s.camera.quarter, s.camera.push_forward());
+    let _ = writeln!(t, "route {} / {}; ahead:", pilot.reached(), pilot.route.points.len());
+    for p in pilot.route.points.iter().skip(pilot.reached()).step_by(5).take(12) {
+        let _ = writeln!(t, "  ({:.1} {:.1} {:.1})", p.x, p.y, p.z);
+    }
+    let _ = writeln!(t, "transformers:");
+    for (p, k) in s.trafos() {
+        if p.distance(b) < 80.0 {
+            let _ = writeln!(t, "  {k:?} at ({:.1} {:.1} {:.1}) {:.1} away", p.x, p.y, p.z, p.distance(b));
+        }
+    }
+    let level = &game.level.level;
+    let _ = writeln!(t, "loose bodies:");
+    for &(obj, body) in s.loose() {
+        let (Some(o), Some(st)) = (level.objects.get(obj), s.world().state(body)) else { continue };
+        if st.pos.distance(b) < 60.0 {
+            let p = st.pos;
+            let _ = writeln!(t, "  {} at ({:.1} {:.1} {:.1}) {:.1} away", o.name, p.x, p.y, p.z, p.distance(b));
+        }
+    }
+    let _ = writeln!(t, "objects within 40:");
+    let mut near: Vec<(f32, String)> = level
+        .objects
+        .iter()
+        .enumerate()
+        .filter(|(_, ob)| ob.mesh.is_some())
+        .filter_map(|(i, ob)| {
+            let p = glam::Vec3::from(ob.position());
+            let d = p.distance(b);
+            (d < 40.0).then(|| {
+                let groups: Vec<&str> = level.groups_of(i).filter(|g| !g.starts_with("Sector")).take(4).collect();
+                (d, format!("  {} at ({:.1} {:.1} {:.1}) {:.1} away {:?}", ob.name, p.x, p.y, p.z, d, groups))
+            })
+        })
+        .collect();
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for (_, l) in near.iter().take(60) {
+        let _ = writeln!(t, "{l}");
+    }
+    std::fs::write(folder.join("report.txt"), &t).map_err(|e| e.to_string())?;
+    let mut shot = o.clone();
+    shot.ticks = Some(game.sim.tick);
+    shot.size = (960, 720);
+    shot.look = None;
+    screenshot(game, data, &shot, &folder.join("view.png"))?;
+    for (name, h) in [("top.png", 45.0f32), ("wide.png", 120.0)] {
+        shot.look = Some([b.x, b.y + h, b.z + 0.01, b.x, b.y, b.z]);
+        screenshot(game, data, &shot, &folder.join(name))?;
+    }
+    println!("stuck: report in {}", folder.display());
+    Ok(())
+}
+
+/// Runs the test player to --ticks (or the finish), prints how far it got and saves its run at --record. Where it
+/// is stuck it writes a report (--report), and it follows the level's hints.
+fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<(), String> {
+    pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
+    // the player's own data folder, not a shared temporary one
+    let report = o.report.clone().unwrap_or_else(|| crate::levels::data_dir().join("stuck"));
     let limit = o.ticks.unwrap_or(60 * 60 * 20);
+    let (mut best, mut since, mut reported) = (0usize, game.sim.tick, None::<usize>);
     while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
         let i = pilot.next(&game.sim);
         game.tick(i);
+        if pilot.reached() > best {
+            (best, since) = (pilot.reached(), game.sim.tick);
+        }
+        if game.sim.tick - since > STUCK_TICKS && reported != Some(best) && pilot.hints.running().is_none() {
+            reported = Some(best);
+            if let Err(e) = stuck_report(game, data, o, &pilot, &report) {
+                eprintln!("stuck report: {e}");
+            }
+        }
         if game.sim.tick.is_multiple_of(600) {
             let b = game.sim.ball.position;
             println!(

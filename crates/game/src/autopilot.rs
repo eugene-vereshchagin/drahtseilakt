@@ -710,6 +710,8 @@ pub struct Pilot {
     /// The way point a little ahead that the ball heads for, and how far each floor point near is from it over the
     /// floors.
     field: Option<(usize, HashMap<usize, f32>)>,
+    /// The hints for places it cannot pass alone (hints.rs): while one runs, it drives.
+    pub hints: crate::hints::Runner,
 }
 
 impl Pilot {
@@ -728,6 +730,7 @@ impl Pilot {
             plan: Vec::new(),
             seed: 0x2545_F491,
             field: None,
+            hints: crate::hints::Runner::default(),
         }
     }
 
@@ -896,6 +899,20 @@ impl Pilot {
 
     /// The input for the next tick of `sim`.
     pub fn next(&mut self, sim: &Sim) -> u8 {
+        // a hint for this place drives while it runs; after it, the place on the way is found anew
+        if let Some(i) = self.hints.input(sim) {
+            return i;
+        }
+        if std::mem::take(&mut self.hints.ended) {
+            if let Some(i) = self.route.nearest(sim.ball.position, self.until()) {
+                self.at = self.at.max(i);
+            }
+            self.best = f32::NEG_INFINITY;
+            self.moved = sim.tick;
+            self.plan.clear();
+            self.last = Some(sim.ball.position);
+            self.choice = 0;
+        }
         if let Some(&(until, c)) = self.plan.first() {
             if sim.tick < until {
                 return c;
