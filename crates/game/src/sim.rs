@@ -147,16 +147,34 @@ impl Ball {
 
 }
 
-/// The game camera: behind the ball, turned in quarter turns, optionally lifted.
+/// The game camera, as the original's rig moves it (Camera.nmo's frames, Gameplay.nmo's two TT Set Dynamic Position
+/// blocks, measured against the C game to 0.0015): the look-at point (Cam_Target) springs to the ball, 10 a second;
+/// InGameCam springs to Cam_Pos, 22 behind the look-at point and 35 above it, with a force of 5 across and 0.8 up
+/// (2 while Space lifts its goal 50 higher) and a damping of 0.5 across and 0.3 up. A view turn swings Cam_Pos round
+/// a quarter in 250 ms, at an even rate.
 #[derive(Debug, Clone, Copy)]
 pub struct Camera {
-    /// Target heading in quarter turns, and the smoothed heading in radians.
+    /// Target heading in quarter turns, and the heading the view has turned to (radians).
     pub quarter: i32,
     pub yaw: f32,
+    /// Space held: 1, else 0.
     pub lift: f32,
     pub position: Vec3,
+    /// InGameCam's move in the last tick (the spring's memory of its speed).
+    pub step: Vec3,
     pub target: Vec3,
 }
+
+/// The rig's values: Cam_Pos about Cam_Target, Cam_Target's force, InGameCam's forces and dampings (x, y, z), the
+/// lift's goal and force up, and the view turn's time.
+const CAM_BACK: f32 = 22.0;
+const CAM_UP: f32 = 35.0;
+const CAM_TARGET_FORCE: f32 = 10.0;
+const CAM_FORCE: Vec3 = Vec3::new(5.0, 0.8, 5.0);
+const CAM_DAMP: Vec3 = Vec3::new(0.5, 0.3, 0.5);
+const CAM_LIFT: f32 = 50.0;
+const CAM_LIFT_FORCE: f32 = 2.0;
+const CAM_TURN_TICKS: f32 = 15.0;
 
 impl Camera {
     /// Forward on the ground plane: where "up" pushes the ball.
@@ -1033,6 +1051,7 @@ impl Sim {
             yaw,
             lift: 0.0,
             position: Vec3::ZERO,
+            step: Vec3::ZERO,
             target: ball.position,
         };
         camera.position = camera_goal(&camera, ball.position);
@@ -1145,7 +1164,7 @@ impl Sim {
                 self.ball.rotation = s.rot;
                 self.ball.spin = s.spin;
             }
-            self.camera.target += (self.ball.position - self.camera.target) * (1.0 - (-TICK * 12.0f32).exp());
+            self.camera.target += (self.ball.position - self.camera.target) * CAM_TARGET_FORCE * TICK;
             return;
         }
         self.tick += 1;
@@ -1161,10 +1180,11 @@ impl Sim {
                 self.camera.quarter += 1;
             }
         }
+        // a quarter in 250 ms at an even rate (the turn's Bezier progression is linear)
         let goal_yaw = self.camera.quarter as f32 * std::f32::consts::FRAC_PI_2;
-        self.camera.yaw += (goal_yaw - self.camera.yaw) * (1.0 - (-TICK * 8.0f32).exp());
-        let lift_goal = if input & input::LIFT != 0 { 1.0 } else { 0.0 };
-        self.camera.lift += (lift_goal - self.camera.lift) * (1.0 - (-TICK * 6.0f32).exp());
+        let rate = std::f32::consts::FRAC_PI_2 / CAM_TURN_TICKS;
+        self.camera.yaw += (goal_yaw - self.camera.yaw).clamp(-rate, rate);
+        self.camera.lift = if input & input::LIFT != 0 { 1.0 } else { 0.0 };
 
         // The push: the original's "Ball Navigation" has one force per arrow, each along a world axis chosen by the
         // camera's heading (Left / Right only when Shift is not held). Arrows held together add their forces, so a
@@ -1253,12 +1273,11 @@ impl Sim {
         }
     }
 
+    /// The rig's tick, in the original's order: InGameCam springs to Cam_Pos about the look-at point as it was, then
+    /// the look-at point springs to the ball (TT Set Dynamic Position: next = now + last move × damping + (goal −
+    /// now) × force × dt).
     fn follow_camera(&mut self) {
-        let goal = camera_goal(&self.camera, self.ball.position);
-        let k = 1.0 - (-TICK * 5.0f32).exp();
-        self.camera.position += (goal - self.camera.position) * k;
-        self.camera.target +=
-            (self.ball.position - self.camera.target) * (1.0 - (-TICK * 12.0f32).exp());
+        rig_step(&mut self.camera, self.ball.position);
     }
 
     fn apply_rules(&mut self) {
@@ -1769,11 +1788,13 @@ impl Sim {
         self.ball.spin = Vec3::ZERO;
         self.hold = None;
         self.trafo_anim = None;
-        // The camera comes back as it was at the start: the start heading, not lifted, no turn in progress.
+        // The rig comes back as it was at the start (TT Restore IC on Cam_MF, put at the reset point): the start
+        // heading, not lifted, the look-at point at the ball; InGameCam springs there from where it was, its speed
+        // forgotten.
         self.camera.quarter = START_QUARTER;
         self.camera.yaw = START_QUARTER as f32 * std::f32::consts::FRAC_PI_2;
         self.camera.lift = 0.0;
-        self.camera.position = camera_goal(&self.camera, self.ball.position);
+        self.camera.step = Vec3::ZERO;
         self.camera.target = self.ball.position;
     }
 }
@@ -1798,12 +1819,19 @@ pub fn sector_near(level: &Level, p: Vec3) -> Option<usize> {
         .map(|(_, n)| n)
 }
 
-fn camera_goal(cam: &Camera, ball: Vec3) -> Vec3 {
-    let back = -cam.forward();
-    // The original's in-game camera sits 22 back and 35 up from the ball, looking at its centre (C reference,
-    // InGameCam at level 1: offset (-22, +35, 0)); Space lifts it further.
-    let (dist, height) = (22.0 - 12.0 * cam.lift, 35.0 + 38.0 * cam.lift);
-    ball + back * dist + Vec3::Y * height
+/// One tick of the camera rig toward the ball at `ball` (see `Camera`).
+fn rig_step(c: &mut Camera, ball: Vec3) {
+    let goal = camera_goal(c, c.target);
+    let force = Vec3::new(CAM_FORCE.x, if c.lift > 0.5 { CAM_LIFT_FORCE } else { CAM_FORCE.y }, CAM_FORCE.z);
+    let next = c.position + c.step * CAM_DAMP + (goal - c.position) * force * TICK;
+    c.step = next - c.position;
+    c.position = next;
+    c.target += (ball - c.target) * CAM_TARGET_FORCE * TICK;
+}
+
+/// Cam_Pos about a look-at point: 22 behind it along the view's heading and 35 above, 50 more while Space is held.
+fn camera_goal(cam: &Camera, at: Vec3) -> Vec3 {
+    at - cam.forward() * CAM_BACK + Vec3::Y * (CAM_UP + CAM_LIFT * cam.lift)
 }
 
 /// The boxes of the level's depth-test cubes (group `DepthTestCubes`): each member's mesh box under its matrix.
@@ -2080,6 +2108,24 @@ mod tests {
         assert!(BallKind::Paper.params().mass < BallKind::Wood.params().mass);
         assert!(BallKind::Wood.params().mass < BallKind::Stone.params().mass);
         assert!(p(BallKind::Paper) > p(BallKind::Stone));
+    }
+
+    /// The rig's steady lag behind a ball rolling at a constant speed v along the view: the look-at point v·(1/10 −
+    /// dt), InGameCam v·(1 − 0.5)/5 more: about 0.183·v in all at 60 Hz (the C game's rig, measured).
+    #[test]
+    fn the_camera_lags_behind_a_rolling_ball_as_the_original() {
+        let mut c =
+            Camera { quarter: 0, yaw: 0.0, lift: 0.0, position: Vec3::ZERO, step: Vec3::ZERO, target: Vec3::ZERO };
+        c.position = camera_goal(&c, Vec3::ZERO);
+        let v = 10.0;
+        let mut ball = Vec3::ZERO;
+        for _ in 0..1200 {
+            ball += c.forward() * v * TICK;
+            rig_step(&mut c, ball);
+        }
+        let lag = (camera_goal(&c, ball) - c.position).dot(c.forward());
+        assert!((lag - 0.183 * v).abs() < 0.01, "lag {lag}");
+        assert!((c.position.y - (ball.y + CAM_UP)).abs() < 1e-3);
     }
 
     #[test]

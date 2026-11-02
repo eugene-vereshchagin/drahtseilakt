@@ -21,7 +21,8 @@ new engine got level 1 playable, ahead of the phase order:
   does. The menu's 3D scene (MenuLevel) turns behind
   them, its camera going round its curve. The menus are the original's screens in the copy's words, classic by
   default with an extended mode ([menu.md](menu.md)): pause, dead and end menus, highscores with the name entry,
-  levels unlocking, custom levels from a maps folder. The stone ball rolls its recorded way in the menu scene. Missing:
+  levels unlocking, custom levels from a maps folder. The stone ball rolls its recorded way in the menu scene. The in-game camera follows as the original's rig does (two springs, a
+  view turn of 250 ms, the lift; measured against the C game). Missing:
   the last level's lightning flashes, the new ball's blue light, 8K check.
 - **Phase 3**: the ball physics is IVP's, ported from the upstream's C (crates/ivp) and checked against the C
   game: a straight push of the wooden and of the stone ball and a 17-second route on level 1 agree to within 0.1
