@@ -36,6 +36,9 @@ fn open_gap(p: Vec3, q: Vec3, mut between: impl Iterator<Item = Vec3>) -> bool {
 }
 
 /// The way through the level: floor points, in order.
+/// Way points between two passes of one place for the later pass to be another visit (a loop), not the same pass.
+const LOOP_GAP: f32 = 6.0;
+
 pub struct Route {
     pub points: Vec<Vec3>,
     /// Where each stage (checkpoint, end) is reached along the way.
@@ -594,7 +597,10 @@ impl Route {
         let end = (from + AHEAD)
             .min(self.points.len().saturating_sub(1))
             .min(until.max(from + 1));
+        // the way may pass one place twice, out and back (the player went to push something there): the first
+        // pass near the ball is where it is, so a loop is driven in its order, not cut short
         let mut best: Option<(f32, f32)> = None;
+        let mut first: Option<(f32, f32)> = None;
         for i in from..end {
             let (Some(&a), Some(&b)) = (self.points.get(i), self.points.get(i + 1)) else {
                 break;
@@ -609,6 +615,17 @@ impl Route {
             // the nearest segment (the later one of equals) says where along the way it is
             if off < 3.5 && best.is_none_or(|b| off <= b.1 + 1e-4) {
                 best = Some((i as f32 + t - 0.4 * off * off, off));
+            }
+            // a pass the ball is on, before the way leaves this place and comes back
+            if first.is_none() && off < 1.5 {
+                first = Some((i as f32 + t - 0.4 * off * off, off));
+            }
+            // (the nearest pass is kept while the segments go on from it; a later one only after the way left)
+            if let (Some(f), Some(b)) = (first, best)
+                && b.0 > f.0 + LOOP_GAP
+            {
+                best = Some(f);
+                break;
             }
         }
         // off the way (landed beside it after a drop): the point ahead that is best for its nearness
