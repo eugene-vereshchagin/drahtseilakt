@@ -78,7 +78,7 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), 2026-11-02:
 - Level 1: vom Start an geschafft in 8:00.70 (Hinweise für die Rampe, die Kiste, die Schieber und die Schienen).
 - Level 2: vom Start an geschafft in 5:47.25 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers durch Sektor 5).
 - Level 3: vom Start an geschafft in 8:34.07.
-- Level 4: ab Sektor 3 beendet in 5:26.00 mit 4 Leben (dort begann der Lauf des Inhabers).
+- Level 4: ab Sektor 2 beendet in 7:55.15 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3; ein Hinweis in den Papier-Transformator am Hang); vom Start bis Sektor 5 (Weg 2347 von 2953).
 - Level 5: vom Start an geschafft in 12:03.58 (Hinweise für beide Kisten und den Schieber).
 - Level 6: der Lauf des Inhabers endet in Sektor 2 am gewölbten Stamm, der des Testspielers auch.
-- Level 7: bis Sektor 3 (Weg 1002 von 3261).
+- Level 7: bis Sektor 5 (Weg 2635 von 3261): das Brett, auf dem die Papierkugel landet, muss erst als Stein an seinen Platz geschoben werden.

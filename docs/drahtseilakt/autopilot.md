@@ -75,7 +75,7 @@ Following the owner's runs (`--autopilot --follow`), 2026-11-02 (the finished ru
 - Level 1: finished from the start in 8:00.70 (hints for the ramp, the crate, the pushers and the rails).
 - Level 2: finished from the start in 5:47.25 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
 - Level 3: finished from the start in 8:34.07.
-- Level 4: finished from sector 3 in 5:26.00 with 4 lives (the owner's run began there).
+- Level 4: finished from sector 2 in 7:55.15 (`--follow` the owner's run, `--then` the one from sector 3; a hint into the paper transformer on the slope); from the start to sector 5 (route 2347 of 2953).
 - Level 5: finished from the start in 12:03.58 (hints for both crates and the pusher).
 - Level 6: the owner's run ends in sector 2 at the convex log, and so does the test player's.
-- Level 7: to sector 3 (route 1002 of 3261).
+- Level 7: to sector 5 (route 2635 of 3261): the plank the paper ball lands on must first be shoved into place as stone.

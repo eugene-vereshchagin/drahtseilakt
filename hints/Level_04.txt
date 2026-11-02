@@ -1,0 +1,5 @@
+# Level 4 — hints for the test player (docs/drahtseilakt/autopilot.md). Written from the owner's runs.
+#
+# Sector 2, the long slope down south along x 1066.5: the paper transformer (1066.6, -126.8, -409.4) stands on it;
+# rolled down as it comes, the stone ball goes past it at speed. Into it.
+at 1066.5 -102 -375.4 r 10 sector 2 kind stone : become paper
