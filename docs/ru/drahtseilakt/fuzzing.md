@@ -21,8 +21,9 @@ FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -
 
 Цели: `nmo_file`, `nmo_chunk`, `open_level` (крейт `level`); `image`, `level_txt`, `theme_txt`, `sound_table`
 (`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `wav`, `ogg`, `highscore`,
-`settings` и `level_sim` — уровень, загруженный и сыгранный секунду: так чужая карта проходит дальше читателя, в
-физику и правила (игра, `crates/game/src/fuzz_tests.rs`).
+`settings`, `level_sim` — уровень, загруженный и сыгранный секунду: так чужая карта проходит дальше читателя, в
+физику и правила — и `module_sim` — файл модуля вместо того, что использует оригинальный уровень (папка уровня может
+принести свой), при наличии копии игрока (игра, `crates/game/src/fuzz_tests.rs`).
 
 Затравки — маленькие синтетические файлы, которые делают сами тесты, собственные файлы игры и, если они есть, файлы
 игрока (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, оригинальные и любительские уровни профиля): они читаются во время
@@ -48,4 +49,4 @@ cd fuzz && cargo +nightly fuzz run nmo_file corpus/nmo_file
 ```
 
 Игра — бинарный крейт, поэтому из её собственных парсеров цель cargo-fuzz есть только у `replay` (он самостоятелен);
-остальные (`hints`, `wav`, `ogg`, `highscore`, `settings`, `level_sim`) идут на стабильном фаззере.
+остальные (`hints`, `wav`, `ogg`, `highscore`, `settings`, `level_sim`, `module_sim`) идут на стабильном фаззере.

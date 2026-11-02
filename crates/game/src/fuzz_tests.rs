@@ -7,7 +7,9 @@
 //   settings   the settings file as every reader of it takes its values (graphics, keys, extended mode's additions,
 //              language, interface, volumes);
 //   level_sim  a level (an .nmo, or the open format) loaded and played for a second: what a stranger's map does to
-//              the game past its reader (the physics over its shapes, the rules over its objects).
+//              the game past its reader (the physics over its shapes, the rules over its objects);
+//   module_sim a module file (a level folder may bring its own) in place of one an original level of the player's
+//              copy uses, and that level played for a second (needs the copy).
 // #[ignore]: `FUZZ_SECS=600 cargo test --release --offline -p drahtseilakt fuzz_tests -- --ignored`. Seeds: synthetic
 // inputs, the repository's own hints and replays and shipped sounds, and the player's files when present.
 
@@ -232,20 +234,18 @@ fn fuzz_settings() {
 
 // --- a level played ----------------------------------------------------------------------------------------------
 
-/// The first bytes say the form: "Nemo" an .nmo file, anything else the open format (level.gltf, then level.bin).
-fn run_level_sim(input: &[u8]) {
-    let level = if input.starts_with(b"Nemo") {
-        match level::from_nmo::load(input) {
-            Ok(l) => l.level,
-            Err(_) => return,
-        }
+/// A level from an input: "Nemo" first an .nmo file, anything else the open format (level.gltf, then level.bin).
+fn level_of(input: &[u8]) -> Option<level::Level> {
+    if input.starts_with(b"Nemo") {
+        level::from_nmo::load(input).ok().map(|l| l.level)
     } else {
         let parts = fuzzkit::split_parts(input, 2);
-        match level::open::import_bytes(&fuzzkit::scratch(), parts[0], parts[1]) {
-            Ok(l) => l,
-            Err(_) => return,
-        }
-    };
+        level::open::import_bytes(&fuzzkit::scratch(), parts[0], parts[1]).ok()
+    }
+}
+
+fn run_level_sim(input: &[u8]) {
+    let Some(level) = level_of(input) else { return };
     // half the inputs with the modules of the player's copy, when there is one (its moving parts placed by the
     // fuzzed level's objects), half with none
     static DATA: std::sync::OnceLock<Option<crate::assets::Data>> = std::sync::OnceLock::new();
@@ -339,6 +339,75 @@ fn fuzz_level_sim() {
     fuzzkit::fuzz(t, level_sim_seeds, run_level_sim);
 }
 
+/// The player's copy, and some of its levels with the modules they use (none without a copy).
+#[allow(clippy::type_complexity)]
+fn copy_levels() -> &'static Option<(crate::assets::Data, Vec<(level::Level, crate::scene::Modules)>)> {
+    static COPY: std::sync::OnceLock<Option<(crate::assets::Data, Vec<(level::Level, crate::scene::Modules)>)>> =
+        std::sync::OnceLock::new();
+    COPY.get_or_init(|| {
+        if std::env::var_os("FUZZ_NO_REAL").is_some() {
+            return None;
+        }
+        let data = crate::assets::Data::locate(None).ok()?;
+        let levels: Vec<_> = [1, 4, 8, 12]
+            .iter()
+            .filter_map(|&n| data.load(&data.original(n)?).ok())
+            .map(|l| {
+                let modules = crate::scene::load_modules(&l.level, &data);
+                (l.level, modules)
+            })
+            .collect();
+        Some((data, levels))
+    })
+}
+
+/// A module file (a stranger's level folder may bring its own, game/3D Entities/PH/<name>.nmo, or one in the open
+/// format) in place of one an original level uses, and the level played for a second: the first byte picks the
+/// level, the second the module, the rest is the module's file.
+fn run_module_sim(input: &[u8]) {
+    let Some((_, levels)) = copy_levels() else { return };
+    let (Some(&a), Some(&b)) = (input.first(), input.get(1)) else { return };
+    let Some((level, modules)) = levels.get(usize::from(a) % levels.len().max(1)) else { return };
+    let Some(model) = input.get(2..).and_then(level_of) else { return };
+    let mut modules = modules.clone();
+    if modules.models.is_empty() {
+        return;
+    }
+    let k = usize::from(b) % modules.models.len();
+    modules.models[k] = model;
+    let mut sim = crate::sim::Sim::with_modules(level, crate::sim::BallKind::Wood, &modules, false);
+    for k in 0..60usize {
+        sim.step(input.get(input.len().saturating_sub(1 + k % 16)).copied().unwrap_or(0));
+    }
+}
+
+fn module_sim_seeds() -> Vec<Vec<u8>> {
+    let Some((data, levels)) = copy_levels() else { return Vec::new() };
+    let mut out = Vec::new();
+    for (a, (_, modules)) in levels.iter().enumerate() {
+        for (b, name) in modules.names.iter().enumerate().take(12) {
+            let Some(path) = data.file(&format!("3D Entities/PH/{name}.nmo")) else { continue };
+            if let Ok(bytes) = std::fs::read(&path)
+                && let Ok(f) = nmo::read(&bytes)
+            {
+                let mut s = vec![a as u8, b as u8];
+                s.extend(plain_nmo(&f));
+                out.push(s);
+            }
+        }
+    }
+    out
+}
+
+#[test]
+#[ignore]
+fn fuzz_module_sim() {
+    let mut t = Target::new("module_sim", test_name!("fuzz_module_sim"), Kind::Binary);
+    t.max_len = 8 << 20;
+    t.rss_mb = 1024;
+    fuzzkit::fuzz(t, module_sim_seeds, run_module_sim);
+}
+
 // --- committed repros --------------------------------------------------------------------------------------------
 
 #[test]
@@ -350,4 +419,5 @@ fn fuzz_regressions() {
     fuzzkit::regressions("highscore", run_highscore);
     fuzzkit::regressions("settings", run_settings);
     fuzzkit::regressions("level_sim", run_level_sim);
+    fuzzkit::regressions("module_sim", run_module_sim);
 }

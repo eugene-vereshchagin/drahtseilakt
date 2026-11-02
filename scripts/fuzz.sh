@@ -37,8 +37,9 @@ declare -A where=(
   [highscore]="game/drahtseilakt fuzz_tests::fuzz_highscore"
   [settings]="game/drahtseilakt fuzz_tests::fuzz_settings"
   [level_sim]="game/drahtseilakt fuzz_tests::fuzz_level_sim"
+  [module_sim]="game/drahtseilakt fuzz_tests::fuzz_module_sim"
 )
-order=(nmo_file nmo_chunk open_level level_sim image ogg disc_image cue_sheet iscab wav replay hints settings highscore
+order=(nmo_file nmo_chunk open_level level_sim module_sim image ogg disc_image cue_sheet iscab wav replay hints settings highscore
   level_txt theme_txt sound_table)
 targets=("$@")
 [ ${#targets[@]} -eq 0 ] && targets=("${order[@]}")
