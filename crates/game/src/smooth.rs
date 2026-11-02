@@ -1,8 +1,9 @@
-// Rounder shapes for the remastered look (roadmap phase 7): the original's round things are low-poly, smooth only in
-// their shading. Each mesh whose normals say it is curved is refined as curved point-normal triangles: every triangle
-// becomes a cubic patch through its corners, its edges bent to meet the corners' normals, and is cut into smaller
-// triangles. Flat faces stay flat and sharp edges stay straight (a face's own normal is square to its edges); only the
-// drawn meshes change — the physics keeps the original geometry, so runs and replays are the same.
+// Rounder shapes for the remastered look (roadmap phase 7): the original's round things are low-poly, and most of the
+// levels' geometry is shaded flat, one normal per face. Faces that meet at a shallow angle (under 40 degrees: a 9-sided
+// or rounder shape) are taken as one smooth surface and their corners get the surface's normal; each curved mesh is
+// then refined as curved point-normal triangles: every triangle becomes a cubic patch through its corners, its edges
+// bent to meet the corners' normals, cut into smaller triangles. Flat faces stay flat and sharp edges (a box's) stay
+// straight; only the drawn meshes change — the physics keeps the original geometry, so runs and replays are the same.
 //
 // An edge is bent the same way for every triangle on it, so the refined mesh has no cracks: where two faces meet at
 // a crease (the same corners, different normals, such as a disc's top and its rim), the edge takes the normals that
@@ -18,6 +19,11 @@ const MAX_CUTS: u32 = 6;
 const CUT_ANGLE: f32 = 0.21;
 /// The most vertices a refined mesh may have (a mesh past it is drawn as it is).
 const MAX_VERTICES: usize = 1 << 22;
+/// Faces meeting at less than this angle are one smooth surface (cos 40 degrees).
+const SMOOTH_COS: f32 = 0.766;
+/// The most an edge may bow out of its straight line, in level units: round things of the original bow a few tenths at
+/// most, while a long ramp between two kinks would rise off the floor the ball rolls on.
+const MAX_BOW: f32 = 0.35;
 
 /// The level with its curved meshes refined.
 pub fn level(level: &Level) -> Level {
@@ -49,7 +55,7 @@ struct Bend {
 
 /// The least share of one corner's offset in the other's for an edge to bend: an arc bends both ends alike, while an
 /// edge whose normals tilt at one end only (where a straight rail meets its curve) would bend into a wave.
-const ARC_LIKE: f32 = 0.5;
+const ARC_LIKE: f32 = 0.2;
 
 fn bend(lo: Vec3, hi: Vec3, n_lo: Vec3, n_hi: Vec3) -> Bend {
     let w_lo = (hi - lo).dot(n_lo);
@@ -72,6 +78,56 @@ fn bend(lo: Vec3, hi: Vec3, n_lo: Vec3, n_hi: Vec3) -> Bend {
     }
 }
 
+/// Each triangle's corner normals: the mesh's own where it is shaded smooth, else the normal of the smooth surface the
+/// face belongs to (the faces around the corner that meet it at a shallow angle, weighted by their area).
+fn corner_normals(m: &Mesh, tris: &[[u32; 3]]) -> Option<Vec<[Vec3; 3]>> {
+    let pos = |i: u32| m.positions.get(i as usize).map(|&p| Vec3::from(p));
+    // each face's normal, and around each corner the faces there with their angle at it (weighting by the angle keeps
+    // the normal the same however a quad was split into triangles)
+    let mut faces = Vec::with_capacity(tris.len());
+    let mut around: HashMap<[i64; 3], Vec<(usize, f32)>> = HashMap::new();
+    for (f, t) in tris.iter().enumerate() {
+        let p = [pos(t[0])?, pos(t[1])?, pos(t[2])?];
+        faces.push((p[1] - p[0]).cross(p[2] - p[0]).normalize_or_zero());
+        for c in 0..3 {
+            let (a, b, o) = (p[c], p[(c + 1) % 3], p[(c + 2) % 3]);
+            let angle = (b - a).angle_between(o - a);
+            around
+                .entry(key(a))
+                .or_default()
+                .push((f, if angle.is_finite() { angle } else { 0.0 }));
+        }
+    }
+    let mut out = Vec::with_capacity(tris.len());
+    for (f, t) in tris.iter().enumerate() {
+        let own = *faces.get(f)?;
+        let mut corners = [own; 3];
+        for (c, &i) in corners.iter_mut().zip(t) {
+            let given = m
+                .normals
+                .get(i as usize)
+                .map(|&n| Vec3::from(n).normalize_or_zero())
+                .unwrap_or(own);
+            if given != Vec3::ZERO && given.dot(own) < 0.999 {
+                // shaded smooth by its maker
+                *c = given;
+                continue;
+            }
+            let sum: Vec3 = around
+                .get(&key(pos(i)?))
+                .into_iter()
+                .flatten()
+                .filter_map(|&(g, angle)| faces.get(g).map(|n| (*n, angle)))
+                .filter(|(n, _)| n.dot(own) >= SMOOTH_COS)
+                .map(|(n, angle)| n * angle)
+                .sum();
+            *c = sum.normalize_or(own);
+        }
+        out.push(corners);
+    }
+    Some(out)
+}
+
 fn cubic(a: Vec3, b: Vec3, c: Vec3, d: Vec3, t: f32) -> Vec3 {
     let s = 1.0 - t;
     a * (s * s * s) + b * (3.0 * s * s * t) + c * (3.0 * s * t * t) + d * (t * t * t)
@@ -80,23 +136,22 @@ fn cubic(a: Vec3, b: Vec3, c: Vec3, d: Vec3, t: f32) -> Vec3 {
 /// The mesh refined, or None when it has no curved edge (or would grow too large).
 pub fn mesh(m: &Mesh) -> Option<Mesh> {
     let pos = |i: u32| m.positions.get(i as usize).map(|&p| Vec3::from(p));
-    let nor = |i: u32| {
-        m.normals
-            .get(i as usize)
-            .map(|&n| Vec3::from(n).normalize_or_zero())
-            .filter(|n| *n != Vec3::ZERO)
-    };
     let tris: Vec<[u32; 3]> = m
         .parts
         .iter()
         .flat_map(|p| p.indices.as_chunks::<3>().0.iter().copied())
         .collect();
+    let corners = corner_normals(m, &tris)?;
     // every edge's most bending normals
     let mut bends: HashMap<([i64; 3], [i64; 3]), Bend> = HashMap::new();
     let mut size = 0.0f32;
-    for t in &tris {
-        for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
-            let (Some(pa), Some(pb), Some(na), Some(nb)) = (pos(a), pos(b), nor(a), nor(b)) else {
+    for (t, n) in tris.iter().zip(&corners) {
+        for (a, b, na, nb) in [
+            (t[0], t[1], n[0], n[1]),
+            (t[1], t[2], n[1], n[2]),
+            (t[2], t[0], n[2], n[0]),
+        ] {
+            let (Some(pa), Some(pb)) = (pos(a), pos(b)) else {
                 return None;
             };
             let (ka, kb) = (key(pa), key(pb));
@@ -109,7 +164,10 @@ pub fn mesh(m: &Mesh) -> Option<Mesh> {
             } else {
                 (pb, pa, nb, na, (kb, ka))
             };
-            let e = bend(lo, hi, n_lo, n_hi);
+            let mut e = bend(lo, hi, n_lo, n_hi);
+            if e.amount / 8.0 > MAX_BOW {
+                e = bend(lo, hi, Vec3::ZERO, Vec3::ZERO);
+            }
             let keep = bends.get(&k).is_some_and(|old| old.amount >= e.amount);
             if !keep {
                 bends.insert(k, e);
@@ -167,6 +225,7 @@ pub fn mesh(m: &Mesh) -> Option<Mesh> {
             _ => pa.lerp(pb, 1.0 / 3.0),
         }
     };
+    let mut corner = corners.iter();
     for part in &m.parts {
         let mut indices = Vec::new();
         for t in part.indices.as_chunks::<3>().0 {
@@ -174,7 +233,8 @@ pub fn mesh(m: &Mesh) -> Option<Mesh> {
             let (Some(p0), Some(p1), Some(p2)) = (pos(i0), pos(i1), pos(i2)) else {
                 return None;
             };
-            let (n0, n1, n2) = (nor(i0)?, nor(i1)?, nor(i2)?);
+            // the shading follows the smooth surface the face is on (a face on none keeps its own normal)
+            let [n0, n1, n2] = *corner.next()?;
             let (b210, b120, b021, b012, b102, b201) = (
                 near(p0, p1),
                 near(p1, p0),
@@ -349,6 +409,49 @@ mod tests {
         };
         let side_rim = rim(&r.parts[0]);
         assert!(rim(&r.parts[1]).iter().all(|k| side_rim.contains(k)));
+    }
+
+    #[test]
+    fn a_flat_shaded_round_side_is_found_and_rounded() {
+        let mut c = cylinder(16);
+        // shaded flat, as the levels are: every face its own normal, so no vertex is shared
+        let mut flat = Mesh {
+            name: "f".into(),
+            ..Mesh::default()
+        };
+        for part in &c.parts {
+            let mut indices = Vec::new();
+            for t in part.indices.chunks_exact(3) {
+                let p: Vec<Vec3> = t
+                    .iter()
+                    .map(|&i| Vec3::from(c.positions[i as usize]))
+                    .collect();
+                let n = (p[1] - p[0]).cross(p[2] - p[0]).normalize();
+                for q in p {
+                    indices.push(flat.positions.len() as u32);
+                    flat.positions.push(q.to_array());
+                    flat.normals.push(n.to_array());
+                    flat.uvs.push([0.0; 2]);
+                }
+            }
+            flat.parts.push(Part {
+                material: None,
+                indices,
+            });
+        }
+        c = flat;
+        let r = mesh(&c).expect("the side is found curved");
+        let mut nearest = 1.0f32;
+        for &i in &r.parts[0].indices {
+            let p = Vec3::from(r.positions[i as usize]);
+            nearest = nearest.min(Vec3::new(p.x, 0.0, p.z).length());
+        }
+        // a 16-gon's chords come to 0.981 of the radius
+        assert!(nearest > 0.99, "{nearest}");
+        for &i in &r.parts[1].indices {
+            let p = Vec3::from(r.positions[i as usize]);
+            assert!((p.y - 1.0).abs() < 1e-4 && Vec3::new(p.x, 0.0, p.z).length() < 1.01);
+        }
     }
 
     #[test]
