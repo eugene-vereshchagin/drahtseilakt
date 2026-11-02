@@ -49,6 +49,18 @@ const MAX_WAV_BYTES: usize = 64 << 20;
 
 /// Reads an uncompressed PCM WAV file (8 or 16 bit, mono or stereo). The file is the player's, so every read is
 /// checked and a malformed file is refused.
+/// A sound file's bytes, at most MAX_WAV_BYTES of a plain file (more is refused, never read).
+fn read_capped(path: &std::path::Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+    if !std::fs::metadata(path).is_ok_and(|m| m.is_file()) {
+        return None;
+    }
+    let cap = u64::try_from(MAX_WAV_BYTES).ok()?;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path).ok()?.take(cap.saturating_add(1)).read_to_end(&mut bytes).ok()?;
+    (bytes.len() <= MAX_WAV_BYTES).then_some(bytes)
+}
+
 pub fn parse_wav(bytes: &[u8]) -> Result<Sound, String> {
     if bytes.len() > MAX_WAV_BYTES {
         return Err("too large".into());
@@ -300,13 +312,19 @@ impl Audio {
         }
     }
 
+    /// Forgets the sounds loaded (a new level may bring its own).
+    pub fn forget_sounds(&mut self) {
+        self.sounds.clear();
+    }
+
     /// A sound of the game by its file name without `.wav`, loaded once (None if the copy lacks it or it is broken).
     fn sound(&mut self, data: &Data, name: &str) -> Option<Arc<Sound>> {
         self.sounds
             .entry(name.to_owned())
             .or_insert_with(|| {
                 let path = data.file(&format!("Sounds/{name}.wav"))?;
-                let bytes = std::fs::read(&path).ok()?;
+                // it may come from a level's game folder (a stranger's): read through the cap, never past it
+                let bytes = read_capped(&path)?;
                 match parse_wav(&bytes) {
                     Ok(s) => Some(Arc::new(s)),
                     Err(e) => {

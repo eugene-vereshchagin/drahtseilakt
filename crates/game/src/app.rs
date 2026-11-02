@@ -1831,6 +1831,7 @@ impl App {
         self.game = game;
         if let Some(a) = &mut self.audio {
             a.stop_all();
+            a.forget_sounds();
         }
         self.rolling = [None; 3 + crate::ballsound::FAN_SLOTS];
         self.heard = 0;

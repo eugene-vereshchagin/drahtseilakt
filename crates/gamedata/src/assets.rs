@@ -185,21 +185,18 @@ impl Data {
                 if !plain {
                     return None;
                 }
-                let mut reader = image::ImageReader::open(path).ok()?.with_guessed_format().ok()?;
-                let mut limits = image::Limits::default();
-                limits.max_image_width = Some(SIDE_MAX);
-                limits.max_image_height = Some(SIDE_MAX);
-                reader.limits(limits);
-                let img = reader.decode().ok()?.to_rgba8();
-                Some((img.width(), img.height(), img.into_raw()))
+                decode_capped(path)
             }
             level::TextureSource::File(name) => {
                 let file = Path::new(name).file_name()?.to_str()?.to_owned();
                 let path = ["Textures", "Textures/Sky", "Textures/Particles"]
                     .iter()
                     .find_map(|dir| self.file(&format!("{dir}/{file}")))?;
-                let img = image::open(path).ok()?.to_rgba8();
-                Some((img.width(), img.height(), img.into_raw()))
+                // it may come from a level's game folder (a stranger's): its size checked before it is decoded
+                if !std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX) {
+                    return None;
+                }
+                decode_capped(&path)
             }
             level::TextureSource::None => None,
         }
@@ -401,6 +398,17 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<usize, 
         }
     }
     Ok(missing)
+}
+
+/// A picture decoded with its sides capped at SIDE_MAX, as RGBA.
+fn decode_capped(path: &Path) -> Option<(u32, u32, Vec<u8>)> {
+    let mut reader = image::ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(SIDE_MAX);
+    limits.max_image_height = Some(SIDE_MAX);
+    reader.limits(limits);
+    let img = reader.decode().ok()?.to_rgba8();
+    Some((img.width(), img.height(), img.into_raw()))
 }
 
 /// The shared parts a level uses, by their paths in the copy: the balls, the transformer, and the module of every
