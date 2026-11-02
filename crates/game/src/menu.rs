@@ -900,10 +900,10 @@ impl Menu {
                 "Ballance by Cyparade / Atari 2004",
                 "Started as a fork of OpenBallance by emdzej",
                 "Physics: IVP, ported from OpenBallance",
-                "",
                 "Music: Kevin MacLeod (incompetech.com, CC-BY 4.0),",
                 "elerya, Hitctrl, Spring Spring, WakianTech (K-ManZ),",
-                "Tsorthan Grove (CC-BY), neolein (CC0)",
+                "Tsorthan Grove, robcro6010, CarlosCarty, Amingliang,",
+                "juskiddink, botpl (CC-BY), neolein, Tozan (CC0)",
                 "Sounds: Kenney, freesound and OpenGameArt authors",
                 "(CC0, CC-BY): assets/sounds/system/CREDITS.md",
             ]

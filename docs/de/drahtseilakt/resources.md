@@ -34,7 +34,7 @@ Text, den die Schrift des Spiels nicht kann (sie hat nur Latin-1), wird mit den 
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | Klangthemen (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | Klangthemen (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | Klangthemen (assets/sounds) |
-| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | eigene: in *system* neun Stücke, Music/music.txt verteilt sie auf die fünf Themen; in *neuro* fünfzehn synthetisierte Phrasen, eine je Teil, und eigene Zielmusik; kein Atmosphäre-Teil |
+| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | eigene: in *system* achtzehn Stücke und acht Atmosphären, Music/music.txt gibt jedem Teil einen Pool (Themen 1–3 die ersten neun Stücke, Themen 4 und 5 neun weitere); in *neuro* fünfzehn synthetisierte Phrasen, eine je Teil, eigene Atmosphären und Zielmusik |
 | original levels | `3D Entities/Level/Level_NN.NMO` | geplant |
 
 Eigenes kommt in Stufen: Oberfläche (Schriften, Knöpfe, Punktekasten, Lebenskugeln, Texte, Menüszene), dann Kugeln,
@@ -42,7 +42,7 @@ Himmel, Partikel und Klänge (aus offenen Bibliotheken), Musik im Stil eines Mah
 Motiven, dann eigene Module und Level.
 
 Klänge und Musik kommen als **Klangthemen**, jedes ein Ordner (`Sounds/` und `Music/` nach den Namen, nach denen
-das Spiel fragt, Ogg Vorbis oder WAV, eine Tabelle `music.txt` für die Levelthemen, eine `theme.txt` mit dem Namen in
+das Spiel fragt, Ogg Vorbis oder WAV, Tabellen `Music/music.txt` und `Sounds/sounds.txt`, die einer Rolle mehrere Dateien geben, einen Pool, aus dem das Spiel zufällig wählt, eine `theme.txt` mit dem Namen in
 vier Sprachen, Autor, Lizenz und `fallback`, `none` für kein anderes Thema). Das Spiel liefert zwei in `assets/sounds/`: *system* (frei lizenzierte
 Aufnahmen und die Musik des Inhabers, gemacht von `assets/sounds/system/prepare.py`, CC0 oder CC-BY, Autoren und
 Änderungen in ihrer `CREDITS.md` und auf dem Credits-Bildschirm) und *neuro* (für das Spiel synthetisierte Effekte
@@ -55,4 +55,5 @@ fehlt, spielt seine Wahl die Klänge der Kopie). Die Zeile *Sounds* der Seite Ex
 (decisions.md, „Das generierte Klangthema ist der Standard“); eine getroffene Wahl bleibt. Ein Klang, der dem Thema und seinem Ersatz fehlt, kommt aus
 der Kopie (die eigenen Klänge eines Levels); Musik nie. Der Themenordner eines Spielers ist nicht vertrauenswürdig:
 nur einfache Namen, keine Links, begrenzte Zahl von Themen, Klänge durch die Grenzen der Klangschicht dekodiert. Die
-Musik des Levels wird vorab in einem eigenen Thread dekodiert.
+Musik, die als Nächste spielen kann, wird vorab in einem eigenen Thread dekodiert. Wie man ein Thema macht, alle
+Rollen und das Format der Tabellen: [Klangthemen](sound-themes.md).

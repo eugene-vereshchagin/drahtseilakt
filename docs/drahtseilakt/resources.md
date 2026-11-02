@@ -34,7 +34,7 @@ Text the game's font cannot draw (its font has Latin-1 only) is drawn with the s
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | sound themes (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | sound themes (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | sound themes (assets/sounds) |
-| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: *system* nine pieces, Music/music.txt maps them onto the five themes; *neuro* fifteen synthesized phrases, one per part, and its own end music; no atmosphere part |
+| music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: *system* eighteen tracks and eight atmospheres, Music/music.txt gives each part a pool (themes 1–3 the first nine tracks, themes 4 and 5 nine more); *neuro* fifteen synthesized phrases, one per part, its own atmospheres and end music |
 | original levels | `3D Entities/Level/Level_NN.NMO` | planned |
 
 Own content comes in stages: interface (fonts, buttons, points box, life balls, texts, menu scene), then balls,
@@ -42,7 +42,7 @@ skies, particles and sounds (from open libraries), music in the spirit of a mahj
 then modules and levels of our own.
 
 Sounds and music come in **sound themes**, each a folder (`Sounds/` and `Music/` by the names the game asks for,
-Ogg Vorbis or WAV, a `music.txt` table for the level themes, a `theme.txt` with its name in four languages, author,
+Ogg Vorbis or WAV, `Music/music.txt` and `Sounds/sounds.txt` tables giving a role several files, a pool the game picks from at random, a `theme.txt` with its name in four languages, author,
 licence and `fallback`, `none` for no other theme). The game ships two in `assets/sounds/`: *system* (openly licensed recordings and the owner's
 music, made by `assets/sounds/system/prepare.py`, CC0 or CC-BY, authors and changes in its `CREDITS.md`, also on the
 Credits screen) and *neuro* (effects and level music synthesized for the game, GPL-3.0-only; the level music is
@@ -53,5 +53,6 @@ the player's copy and never shipped (until it exists, choosing it plays the copy
 *Sounds* line chooses the theme (`sound-theme NAME`); *neuro* plays until the player chooses another, and always in
 the classic mode (decisions.md, "The generated sound theme is the default"); a choice once made is kept. A sound the theme and its
 fallback lack comes from the copy (a level's own sounds); music never does. A player's theme folder is untrusted:
-plain names only, no links, a capped number of themes, sounds decoded through the audio caps. The level's music is
-decoded ahead on a thread of its own.
+plain names only, no links, a capped number of themes, sounds decoded through the audio caps. The music that may play
+next is decoded ahead on a thread of its own. How to make a theme, every role and the tables' format:
+[Sound themes](sound-themes.md).

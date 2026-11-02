@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 # Prepares the system sound theme (assets/sounds/system/Sounds and Music) from the openly licensed files the
-# owner chose (CREDITS.md lists each source, author and licence). It is run by hand, not by the build: the sources are
-# not in the repository. Each file is decoded with ffmpeg, cut, made mono or stereo, matched in loudness to the
-# original's sound of the same role (the player's copy, given as ORIGINAL), looped without a seam where the game loops
-# it, and encoded as Ogg Vorbis.
+# owner chose (CREDITS.md lists each source, author, licence and the changes made). It is run by hand, not by the
+# build: the sources are not in the repository. Each file is decoded with ffmpeg, cut, made mono or stereo, matched in
+# loudness to the original's sound of the same role (the player's copy, given as ORIGINAL) or to our other tracks,
+# looped without a seam where the game loops it, and encoded as Ogg Vorbis. Music/music.txt, the table of which track
+# plays in which role (several per role: a pool the game picks from), is written from POOLS below.
 #
-#   python3 -I prepare.py CANDIDATES ORIGINAL_SOUNDS_DIR
+#   python3 -I prepare.py ORIGINAL_SOUNDS_DIR [--earlier CANDIDATES] [--round3 CANDIDATES_3]
 #
-# Needs ffmpeg and numpy. Writes into the folders beside this file.
+# --earlier: the first rounds' candidates (effects, the finish music and the first nine level tracks);
+# --round3: the third round's (2026-11-03: its music/ and music_atmo/ folders, the atmospheres and nine more tracks).
+# A round not given is left as it is. Needs ffmpeg and numpy. Writes into the folders beside this file.
 
+import argparse
 import json
 import subprocess
 import sys
@@ -76,13 +80,63 @@ TRACKS = [
 # The longest part of a track kept (the original's parts are 15 to 30 s; ours are whole pieces, cut and faded).
 TRACK_SECONDS = 100.0
 
-# Where each track plays: the original's five themes, three parts each (a part is played after a random pause).
-THEMES = {
-    1: ["ripples", "guzheng_city", "shenyang"],
-    2: ["liyan", "neolein_472707", "neolein_573972"],
-    3: ["cold_to_lukewarm", "misty_mountains", "ishikari_lore"],
-    4: ["shenyang", "ripples", "liyan"],
-    5: ["guzheng_city", "misty_mountains", "cold_to_lukewarm"],
+# The third round (2026-11-03): nine more tracks, matched in loudness to the nine above (their mean), cut and faded
+# like them; name, source (relative to CANDIDATES_3).
+TRACKS_3 = [
+    ("gentle_guzheng", "music/512943_6125364-hq.mp3"),
+    ("guzheng_loop", "music/520729_197130-hq.mp3"),
+    ("blossom_valley", "music/521367_4596312-hq.mp3"),
+    ("guzheng_fantasie", "music/541306_4596312-hq.mp3"),
+    ("crane_dance", "music/582209_5462375-hq.mp3"),
+    ("asian_duet", "music/asian_duet.mp3"),
+    ("finding_movement", "music/Finding Movement.mp3"),
+    ("orient_peace_valley", "music/orien1_0.ogg"),
+    ("senbazuru", "music/Senbazuru.mp3"),
+]
+
+# The atmospheres (Music_Atmo): beds made like the original's (26 to 28 s, one slow swell and fade, very quiet).
+# name, source (relative to CANDIDATES_3), start s, length s (None: to the end), where the swell peaks (0..1 of the
+# length), ffmpeg filter (None: none).
+ATMOS = [
+    ("atmo_quartz_bowl", "music_atmo/129219_649468-hq.mp3", 60.0, 27.0, 0.45, None),
+    ("atmo_tibetan_bowl", "music_atmo/196365_1847371-hq.mp3", 4.0, 27.0, 0.5, None),
+    ("atmo_mystic_forest", "music_atmo/559389_2282212-hq.mp3", 42.0, 27.0, 0.4, None),
+    ("atmo_reverb_flute", "music_atmo/815787_2520418-hq.mp3", 0.0, None, 0.35, None),
+    # the shakuhachi's cicadas are above 3 kHz: cut away
+    ("atmo_shakuhachi", "music_atmo/361508_313780-hq.mp3", 1.0, 27.0, 0.4,
+     "lowpass=f=2600,lowpass=f=2600,lowpass=f=2600,lowpass=f=2600"),
+    # the tonal wind's infrasonic rumble: cut away
+    ("atmo_tonal_wind", "music_atmo/397092_3287894-hq.mp3", 26.0, 27.0, 0.4,
+     "highpass=f=90,highpass=f=90,highpass=f=90"),
+    ("atmo_winter_temple", "music_atmo/612645_2282212-hq.mp3", 20.0, 27.0, 0.4, None),
+    ("atmo_wind_synth", "music_atmo/151783_1457270-hq.mp3", 0.0, None, 0.45, None),
+]
+
+# The atmospheres' loudness when the original's cannot be measured (its three measure -33, -34 and -30 LUFS).
+ATMO_LUFS = -32.5
+
+# Which tracks play in which role: a pool each, the game picks one at random each time (never the same twice in a
+# row). The atmospheres: tonal pads (1), airy flutes and wind (2), darker drones (3), like the original's three.
+# Themes 1 to 3 keep the first nine tracks; themes 4 and 5 have the third round's.
+POOLS = {
+    "Music_Atmo_1": ["atmo_quartz_bowl", "atmo_tibetan_bowl", "atmo_mystic_forest"],
+    "Music_Atmo_2": ["atmo_reverb_flute", "atmo_shakuhachi", "atmo_tonal_wind"],
+    "Music_Atmo_3": ["atmo_winter_temple", "atmo_wind_synth"],
+    "Music_Theme_1_1": ["ripples"],
+    "Music_Theme_1_2": ["guzheng_city"],
+    "Music_Theme_1_3": ["shenyang"],
+    "Music_Theme_2_1": ["liyan"],
+    "Music_Theme_2_2": ["neolein_472707"],
+    "Music_Theme_2_3": ["neolein_573972"],
+    "Music_Theme_3_1": ["cold_to_lukewarm"],
+    "Music_Theme_3_2": ["misty_mountains"],
+    "Music_Theme_3_3": ["ishikari_lore"],
+    "Music_Theme_4_1": ["gentle_guzheng", "guzheng_loop"],
+    "Music_Theme_4_2": ["senbazuru"],
+    "Music_Theme_4_3": ["finding_movement", "orient_peace_valley"],
+    "Music_Theme_5_1": ["blossom_valley"],
+    "Music_Theme_5_2": ["guzheng_fantasie", "asian_duet"],
+    "Music_Theme_5_3": ["crane_dance"],
 }
 
 
@@ -151,9 +205,54 @@ def level_to(x, target_db, peak_db=-1.0):
     return y * (limit / peak) if peak > limit else y
 
 
-def main():
-    candidates, original = Path(sys.argv[1]), Path(sys.argv[2])
-    made = {}
+def lufs(x):
+    """The integrated loudness (EBU R 128) of a signal, by ffmpeg's meter."""
+    out = subprocess.run(
+        ["ffmpeg", "-nostats", "-f", "f32le", "-ar", str(RATE), "-ac", str(x.shape[1]), "-i", "-",
+         "-af", "ebur128", "-f", "null", "-"],
+        input=np.ascontiguousarray(x, dtype="<f4").tobytes(), capture_output=True, check=True).stderr.decode()
+    values = [line.split()[1] for line in out.splitlines() if line.strip().startswith("I:")]
+    return float(values[-1]) if values else -70.0
+
+
+def lufs_of_file(path, channels=2):
+    return lufs(decode(path, 0.0, None, channels, 0))
+
+
+def to_lufs(x, target, peak_db=-1.0):
+    y = x * 10 ** ((target - lufs(x)) / 20)
+    peak = float(np.max(np.abs(y))) if y.size else 0.0
+    limit = 10 ** (peak_db / 20)
+    return y * (limit / peak) if peak > limit else y
+
+
+def track(x):
+    """A part of the level's music: at most TRACK_SECONDS, faded in over 1 s and out over 5 s."""
+    x = x[: int(TRACK_SECONDS * RATE)]
+    t = np.arange(len(x)) / RATE
+    return x * np.minimum(1.0, np.minimum(t / 1.0, (len(x) / RATE - t) / 5.0))[:, None]
+
+
+def swell(x, peak):
+    """One slow swell and fade over the whole bed, as the original's atmospheres: up to `peak` (0..1), then down."""
+    t = np.linspace(0.0, 1.0, len(x))
+    up = np.sin(np.pi / 2 * np.clip(t / peak, 0.0, 1.0)) ** 2
+    down = np.cos(np.pi / 2 * np.clip((t - peak) / (1.0 - peak), 0.0, 1.0)) ** 2
+    return x * np.where(t < peak, up, down)[:, None]
+
+
+def decode_filtered(path, start, length, flt):
+    args = ["ffmpeg", "-v", "error", "-ss", str(start), "-i", str(path)]
+    if length is not None:
+        args += ["-t", str(length)]
+    if flt:
+        args += ["-af", flt]
+    args += ["-ac", "2", "-ar", str(RATE), "-f", "f32le", "-"]
+    raw = subprocess.run(args, check=True, capture_output=True).stdout
+    return np.frombuffer(raw, dtype="<f4").reshape(-1, 2).copy()
+
+
+def earlier(candidates, original, made):
     for role, src, kind, start, length, semi, ch in SOUNDS:
         x = decode(candidates / src, start, length, ch, semi)
         if kind == "loop":
@@ -162,7 +261,6 @@ def main():
             x = seamless(x, length, 2.0)
         elif kind == "thunder":
             # the strike: from just before the loudest moment, `length` seconds, faded out
-            peak = int(np.argmax(np.max(np.abs(x), axis=1)))
             whole = decode(candidates / src, 0.0, None, ch, semi)
             peak = int(np.argmax(np.max(np.abs(whole), axis=1)))
             a = max(peak - int(0.4 * RATE), 0)
@@ -183,16 +281,53 @@ def main():
     target = sum(themes) / len(themes) if themes else -20.0
     for name, src in TRACKS:
         # a part of the level's music: at most TRACK_SECONDS, faded in and out (the game holds a part decoded whole)
-        x = decode(candidates / src, 0.0, TRACK_SECONDS, 2, 0)[: int(TRACK_SECONDS * RATE)]
-        x = x * np.minimum(1.0, np.minimum(np.arange(len(x)) / RATE / 1.0, (len(x) - np.arange(len(x))) / RATE / 5.0))[:, None]
+        x = track(decode(candidates / src, 0.0, TRACK_SECONDS, 2, 0))
         x = level_to(x, target)
         encode(x, HERE / "Music" / f"{name}.ogg", 4)
         made[name] = {"source": src, "seconds": round(len(x) / RATE, 2), "level_db": round(target, 1)}
+
+
+def round3(candidates, original, made):
+    # the tracks: as loud as the first nine are on average (measured in LUFS, their files as made)
+    first = [lufs_of_file(HERE / "Music" / f"{name}.ogg") for name, _ in TRACKS]
+    target = sum(first) / len(first)
+    for name, src in TRACKS_3:
+        x = track(decode(candidates / src, 0.0, TRACK_SECONDS, 2, 0))
+        x = to_lufs(x, target)
+        encode(x, HERE / "Music" / f"{name}.ogg", 4)
+        made[name] = {"source": src, "seconds": round(len(x) / RATE, 2), "lufs": round(lufs(x), 1)}
+    # the atmospheres: as loud as the original's on average
+    measured = [lufs_of_file(Path(original) / f"Music_Atmo_{k}.wav") for k in range(1, 4)
+                if (Path(original) / f"Music_Atmo_{k}.wav").is_file()]
+    target = sum(measured) / len(measured) if measured else ATMO_LUFS
+    for name, src, start, length, peak, flt in ATMOS:
+        x = decode_filtered(candidates / src, start, length, flt)
+        x = swell(x, peak)
+        x = to_lufs(x, target)
+        encode(x, HERE / "Music" / f"{name}.ogg", 3)
+        made[name] = {"source": src, "seconds": round(len(x) / RATE, 2), "lufs": round(lufs(x), 1)}
+
+
+def write_table():
     with open(HERE / "Music" / "music.txt", "w", encoding="utf-8") as f:
-        f.write("# Which of our tracks plays as which part of the original's music (Music_Theme_<n>_<part>).\n")
-        for n, parts in THEMES.items():
-            for k, track in enumerate(parts, 1):
-                f.write(f"Music_Theme_{n}_{k} {track}.ogg\n")
+        f.write("# Which of our tracks plays in which role of the original's music: a pool per role, the game picks one\n")
+        f.write("# at random each time it plays the role (docs/drahtseilakt/sound-themes.md). Written by prepare.py.\n")
+        for role, names in POOLS.items():
+            f.write(f"{role} {' '.join(n + '.ogg' for n in names)}\n")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("original")
+    ap.add_argument("--earlier", type=Path)
+    ap.add_argument("--round3", type=Path)
+    args = ap.parse_args()
+    made = {}
+    if args.earlier:
+        earlier(args.earlier, args.original, made)
+    if args.round3:
+        round3(args.round3, args.original, made)
+    write_table()
     print(json.dumps(made, indent=1, ensure_ascii=False))
 
 
