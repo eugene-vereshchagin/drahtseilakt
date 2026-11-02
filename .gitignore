@@ -50,6 +50,3 @@ __pycache__/
 
 # Cargo build output
 /target/
-
-# Third-party programs downloaded for the toolbox (pinned in crates/toolbox/third-party.txt), never committed
-/third_party/

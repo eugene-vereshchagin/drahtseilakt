@@ -195,8 +195,8 @@ ALSA 层接管；构建需要 ALSA 头文件，Debian 上是 `libasound2-dev`）
 
 ## 关卡由 toolbox 准备，游戏只负责游玩
 
-*2026-11-02.* 重制关卡由一个独立程序 `drahtseilakt-toolbox` 生成，它与游戏在同一仓库和 workspace 中（通过
-`crates/gamedata` 与游戏共用关卡读取代码），作为单独的下载包发布。游戏游玩原版 `.nmo` 文件和其文件夹中的开放格式关卡，
+*2026-11-02.* 重制关卡由一个独立程序 `drahtseilakt-toolbox` 生成，它有自己的仓库
+（eugene-vereshchagin/drahtseilakt-toolbox，与本仓库并列），作为独立程序展示和发布；它通过以路径引用的本仓库 `crates/gamedata` 和 `crates/level` 与游戏共用关卡读取代码。游戏游玩原版 `.nmo` 文件和其文件夹中的开放格式关卡，
 不关心它们是如何制作的；游戏从不运行其他程序。toolbox 把原版关卡转换到 `levels/remastered/`，把每个弯曲网格更圆的外观写入关卡
 （开放格式把它保存在网格旁边，物理仍使用网格本身，因此通关过程不变），并放大纹理。能补出细节的 Real-ESRGAN 只有在玩家自行安装后才会使用；
 它从不被下载，也从不是游戏的依赖，因此普通玩家除了游戏之外什么都不需要。toolbox 的压缩包以后是否附带 Real-ESRGAN

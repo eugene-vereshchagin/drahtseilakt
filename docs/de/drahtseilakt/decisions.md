@@ -241,8 +241,9 @@ ist ihre Sache, nicht unsere.
 
 ## Die Toolbox bereitet Level vor; das Spiel spielt nur
 
-*2026-11-02.* Remaster-Level macht ein eigenes Programm, `drahtseilakt-toolbox`, im selben Repository und
-Workspace (das Lesen der Level teilt es über `crates/gamedata` mit dem Spiel), ausgeliefert als eigener Download.
+*2026-11-02.* Remaster-Level macht ein eigenes Programm, `drahtseilakt-toolbox`, in einem eigenen Repository
+(eugene-vereshchagin/drahtseilakt-toolbox, neben diesem), gezeigt und ausgeliefert als eigenes Programm; das Lesen
+der Level teilt es mit dem Spiel über `crates/gamedata` und `crates/level` dieses Repositorys, per Pfad eingebunden.
 Das Spiel spielt die Original-`.nmo`-Dateien und die Level im offenen Format aus seinen Ordnern und weiß nicht,
 wie sie entstanden sind; es startet nie ein anderes Programm. Die Toolbox wandelt die Originale nach
 `levels/remastered/`, schreibt für jedes gekrümmte Mesh seine rundere Gestalt in das Level (das offene Format hält

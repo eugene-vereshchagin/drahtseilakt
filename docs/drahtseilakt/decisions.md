@@ -237,8 +237,9 @@ are new content and may ship (levels.md). What players copy into their own folde
 
 ## The toolbox prepares levels; the game only plays
 
-*2026-11-02.* Making remastered levels is a separate program, `drahtseilakt-toolbox`, in the same repository and
-workspace (it shares the level reading with the game through `crates/gamedata`) and shipped as its own download.
+*2026-11-02.* Making remastered levels is a separate program, `drahtseilakt-toolbox`, in a repository of its own
+(eugene-vereshchagin/drahtseilakt-toolbox, beside this one), shown and shipped as its own program; it shares the
+level reading with the game through this repository's `crates/gamedata` and `crates/level`, taken by path.
 The game plays the original `.nmo` files and whatever open-format levels are in its folders and knows nothing of
 how they were made; it never runs another program. The toolbox converts the originals into `levels/remastered/`,
 writes each curved mesh's rounder look into the level (the open format keeps it beside the mesh, which the physics

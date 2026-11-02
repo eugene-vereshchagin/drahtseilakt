@@ -35,7 +35,7 @@ README о том, что там должно лежать ([где лежат у
 `--data` (или `OPENBALLANCE_DATA`) вместо этого играет из другой папки Ballance. Отдельная
 программа `drahtseilakt-toolbox remaster --scale 8` конвертирует оригинальные уровни в `levels/remastered/`
 (открытый формат) с более круглыми формами и текстурами в восемь раз крупнее: через Real-ESRGAN (он дорисовывает детали), если он лежит
-в `realesrgan/` рядом с toolbox (закреплён в `crates/toolbox/third-party.txt`) или есть в PATH, иначе Lanczos; играются из Custom levels. Самой игре не нужно
+в `realesrgan/` рядом с toolbox (закреплён в его репозитории drahtseilakt-toolbox) или есть в PATH, иначе Lanczos; играются из Custom levels. Самой игре не нужно
 ни то, ни другое. `--level N` играет оригинальный уровень N, `--map
 FILE.nmo` — любой файл уровня или любительскую карту, `--open DIR` — уровень в
 [открытом формате](docs/ru/drahtseilakt/open-format.md); `--export DIR` конвертирует выбранный уровень в него.

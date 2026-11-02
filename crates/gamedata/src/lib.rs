@@ -1,5 +1,5 @@
-// The player's copy of the game and the level folders, shared by the game (crates/game) and the toolbox
-// (crates/toolbox): where the copy and the levels are, finding files and textures in the copy, the level table, and
+// The player's copy of the game and the level folders, shared by the game (crates/game) and drahtseilakt-toolbox
+// (its own repository, which takes this crate by path): where the copy and the levels are, finding files and textures in the copy, the level table, and
 // loading and exporting levels.
 
 pub mod assets;
