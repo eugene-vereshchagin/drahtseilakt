@@ -40,7 +40,8 @@ impl Provider {
     pub fn order(self) -> [Provider; 3] {
         match self {
             Provider::Own => [Provider::Own, Provider::Original, Provider::Remastered],
-            Provider::Original => [Provider::Original, Provider::Own, Provider::Remastered],
+            // the copy, and for a role it lacks our own; never the toolbox's remaster (classic plays the original)
+            Provider::Original => [Provider::Original, Provider::Own, Provider::Original],
             Provider::Remastered => [Provider::Remastered, Provider::Original, Provider::Own],
         }
     }

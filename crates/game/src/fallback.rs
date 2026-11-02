@@ -31,6 +31,8 @@ struct Atlas {
     /// The next free place: x, y of the shelf, the shelf's height.
     at: (u32, u32, u32),
     changed: bool,
+    /// The last glyph found no room: the atlas starts again empty (the glyphs on screen are made again next frame).
+    full: bool,
 }
 
 static ATLAS: Mutex<Option<Atlas>> = Mutex::new(None);
@@ -63,6 +65,7 @@ impl Atlas {
             glyphs: HashMap::new(),
             at: (1, 1, 0),
             changed: false,
+            full: false,
         }
     }
 
@@ -71,8 +74,19 @@ impl Atlas {
         if let Some(g) = self.glyphs.get(&c) {
             return *g;
         }
-        let made = self.make(c);
-        self.glyphs.insert(c, made);
+        let mut made = self.make(c);
+        if made.is_none() && self.full {
+            // no room left: the atlas starts again, and the glyph gets the first place in it
+            self.rgba.fill(0);
+            self.glyphs.clear();
+            self.at = (1, 1, 0);
+            self.full = false;
+            self.changed = true;
+            made = self.make(c);
+        }
+        if !self.full {
+            self.glyphs.insert(c, made);
+        }
         made
     }
 
@@ -91,12 +105,17 @@ impl Atlas {
             });
         };
         let b = outline.px_bounds();
-        let (w, h) = (b.width().ceil() as u32 + 1, b.height().ceil() as u32 + 1);
+        let (w, h) = ((b.width().ceil() as u32).saturating_add(1), (b.height().ceil() as u32).saturating_add(1));
+        if w.saturating_add(2) > SIDE || h.saturating_add(2) > SIDE {
+            // a glyph larger than the whole atlas never fits: no use starting it again for it
+            return None;
+        }
         let (mut x, mut y, mut row) = self.at;
         if x + w + 1 > SIDE {
             (x, y, row) = (1, y + row + 1, 0);
         }
-        if y + h + 1 > SIDE || w + 2 > SIDE {
+        if y + h + 1 > SIDE {
+            self.full = true;
             return None;
         }
         let rgba = &mut self.rgba;

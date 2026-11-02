@@ -149,10 +149,18 @@ impl Data {
     /// A file of the game's layout from its providers (never the level's own): our own files, the player's copy and
     /// the toolbox's remaster of it, in the order the interface setting gives (resources.rs).
     fn copy_file(&self, relative: &str) -> Option<PathBuf> {
+        // our own files and the toolbox's remaster stand in for the interface's roles only: a level, a module, a
+        // level's texture or sound always comes from the copy
+        let role = crate::resources::role_of(relative).is_some();
         let found = crate::resources::in_use().order().into_iter().find_map(|p| match p {
             crate::resources::Provider::Original => self.copy_only(relative),
-            crate::resources::Provider::Own => crate::resources::own_root().and_then(|r| plain_path(&r, relative)),
-            crate::resources::Provider::Remastered => plain_path(&crate::resources::remastered_root(), relative),
+            crate::resources::Provider::Own if role => {
+                crate::resources::own_root().and_then(|r| plain_path(&r, relative))
+            }
+            crate::resources::Provider::Remastered if role => {
+                plain_path(&crate::resources::remastered_root(), relative)
+            }
+            _ => None,
         });
         if found.is_none() {
             crate::resources::missing(relative);
@@ -312,7 +320,10 @@ impl Data {
     /// counted as taken); any other texture always does.
     fn overlay_pixels(&self, path: &Path) -> bool {
         use std::sync::atomic::Ordering;
-        if !self.overlay.as_deref().is_some_and(|o| path.starts_with(o)) {
+        // the files of a level's own folder and of the toolbox's interface share the budget; the copy's do not
+        let budgeted = self.overlay.as_deref().is_some_and(|o| path.starts_with(o))
+            || path.starts_with(crate::resources::remastered_root());
+        if !budgeted {
             return true;
         }
         if OVERLAY_COUNTED.lock().is_ok_and(|c| c.iter().any(|p| p == path)) {
