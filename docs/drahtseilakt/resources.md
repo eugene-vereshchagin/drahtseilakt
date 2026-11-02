@@ -86,6 +86,24 @@ The own interface's default highscore lists are ours too (ten names, 3000 points
 whatever the interface: the default keys (base.cmo's DB_Options, the arrows, Shift and Space when it has none) and the
 parts of a level (balls, particles, the ball's shadow, skies, modules), which later stages replace.
 
+## Own textures
+
+Stage 3 (2026-11-03): the levels, their parts and the balls are drawn with our own textures by default (decisions.md,
+"Own textures by default"): `assets/own/Textures/<name>.png` stands in for the original's texture of that name,
+whichever level asks for it — an original level, a community map, a module, the balls — compared by name without case,
+`_`, `-` or spaces (`BallWood.bmp` is `Ball_Wood`). 45 of the 63 textures the thirteen levels draw with are ours (the
+floors and their brick strips, the checkpoint, the columns, bricks, every wood, the metal, the roofs, the markings, the
+reflections, the three balls); the skies, particles, glows, shadows and a few pictures still come from the copy.
+`assets/own/TEXTURES.md` lists every texture with what it is, its size, how often it is used and whether ours stands in.
+They are made by `assets/own/make/make_textures.py` from CC0 photo textures (`free_textures.py`, pinned and
+checksummed; `assets/own/CREDITS.md`) and shapes drawn by the script, to the palette, grain and layout measured on the
+original's texture of the same name (its brick strips, bands, rings and shading as fractions of its side), at twice its
+resolution, tiling where it tiles and wrapping the balls as it does. The extended page's *Textures* switch
+(`textures own|original`) draws the copy's instead; the classic mode always draws ours. An open-format level's own
+textures (files in its folder) stay its maker's. `--textures original|own` chooses for one run; `--export` keeps the
+copy's unless given `--textures own`, which writes ours into the exported level. Our files ship with the game and are
+read through the same size caps as any texture; a level's name only picks among them, never makes a path.
+
 Own content comes in stages: interface (fonts, buttons, points box, life balls, texts, menu scene), then balls,
 skies, particles and sounds (from open libraries), music in the spirit of a mahjong game with Chinese motifs,
 then modules and levels of our own.

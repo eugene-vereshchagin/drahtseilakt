@@ -92,6 +92,26 @@ Weiterhin aus der Kopie, bei jeder Oberfläche: die Standardtasten (DB_Options a
 Leertaste) und die Teile eines Levels (Kugeln, Partikel, der Schatten der Kugel, Himmel, Module), die spätere Stufen
 ersetzen.
 
+## Eigene Texturen
+
+Stufe 3 (2026-11-03): die Level, ihre Teile und die Kugeln werden standardmäßig mit unseren eigenen Texturen
+gezeichnet (decisions.md, „Eigene Texturen als Vorgabe“): `assets/own/Textures/<Name>.png` tritt an die Stelle der
+Originaltextur dieses Namens, welches Level sie auch anfordert — ein Originallevel, eine Community-Karte, ein Modul,
+die Kugeln —, verglichen ohne Groß- und Kleinschreibung, `_`, `-` und Leerzeichen (`BallWood.bmp` ist `Ball_Wood`).
+45 der 63 Texturen, mit denen die dreizehn Level zeichnen, sind unsere (die Böden und ihre Ziegelstreifen, der
+Checkpoint, die Säulen, Ziegel, alles Holz, das Metall, die Dächer, die Markierungen, die Spiegelungen, die drei
+Kugeln); Himmel, Partikel, Leuchten, Schatten und einige Bilder kommen weiter aus der Kopie. `assets/own/TEXTURES.md`
+listet jede Textur mit dem, was sie ist, ihrer Größe, wie oft sie benutzt wird und ob unsere eintritt. Sie entstehen
+durch `assets/own/make/make_textures.py` aus CC0-Fototexturen (`free_textures.py`, festgelegt und mit Prüfsummen;
+`assets/own/CREDITS.md`) und vom Skript gezeichneten Formen, nach Palette, Körnung und Anordnung, gemessen an der
+Originaltextur gleichen Namens (ihre Ziegelstreifen, Bänder, Ringe und Schattierungen als Anteile ihrer Seite), in
+doppelter Auflösung, kachelnd, wo sie kachelt, und die Kugeln so umhüllend wie sie. Der Schalter *Textures* der
+erweiterten Seite (`textures own|original`) zeichnet die der Kopie; der klassische Modus zeichnet immer unsere. Die
+eigenen Texturen eines Levels im offenen Format (Dateien in seinem Ordner) bleiben die seines Autors.
+`--textures original|own` wählt für einen Lauf; `--export` behält die der Kopie, außer mit `--textures own`, das
+unsere in das exportierte Level schreibt. Unsere Dateien werden mit dem Spiel geliefert und mit denselben
+Größengrenzen gelesen wie jede Textur; ein Name aus einem Level wählt nur unter ihnen, er wird nie zu einem Pfad.
+
 Eigenes kommt in Stufen: Oberfläche (Schriften, Knöpfe, Punktekasten, Lebenskugeln, Texte, Menüszene), dann Kugeln,
 Himmel, Partikel und Klänge (aus offenen Bibliotheken), Musik im Stil eines Mahjong-Spiels mit chinesischen
 Motiven, dann eigene Module und Level.
