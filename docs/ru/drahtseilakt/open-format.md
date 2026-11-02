@@ -25,7 +25,7 @@
   координатами; не больше 16.
 - **Материалы**: `baseColorFactor` (diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (с `alphaCutoff`) или `BLEND`; материалы без освещения — через `KHR_materials_unlit`.
-  В `extras.drahtseilakt` то, для чего в glTF нет поля: `ambient`, `z_write`, `blend` (имена коэффициентов
+  В `extras.drahtseilakt` то, для чего в glTF нет поля: `ambient`, `specular` и `power` (блик), `z_write`, `blend` (имена коэффициентов
   источника и приёмника: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`, `inv_src_alpha`,
   `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`), `alpha_cutoff`, если смешивание и
   альфа-тест вместе, и `texgen` (`reflect` или `chrome`), если координаты текстуры берутся от взгляда.

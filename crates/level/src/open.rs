@@ -196,7 +196,9 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
                 "pbrMetallicRoughness": pbr,
                 "emissiveFactor": m.emissive,
                 "doubleSided": m.two_sided,
-                "extras": {"drahtseilakt": {"ambient": m.ambient, "z_write": m.z_write}},
+                "extras": {"drahtseilakt": {
+                    "ambient": m.ambient, "z_write": m.z_write, "specular": m.specular, "power": m.power,
+                }},
             });
             match (m.blend, m.alpha_cutoff) {
                 (Some((s, d)), _) => {
@@ -472,6 +474,8 @@ pub fn import(dir: &Path) -> Result<Level, String> {
             diffuse: f4(&pbr["baseColorFactor"], [1.0; 4]),
             ambient: rgb(&x["ambient"]),
             emissive: rgb(&m["emissiveFactor"]),
+            specular: rgb(&x["specular"]),
+            power: x["power"].as_f64().filter(|p| p.is_finite()).map_or(0.0, |p| p.clamp(0.0, 1000.0) as f32),
             texture: pbr["baseColorTexture"]["index"]
                 .as_u64()
                 .and_then(|t| tex_image.get(t as usize).copied().flatten()),

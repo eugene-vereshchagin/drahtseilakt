@@ -59,6 +59,9 @@ pub struct Material {
     pub diffuse: [f32; 4],
     pub ambient: [f32; 3],
     pub emissive: [f32; 3],
+    /// The highlight's colour and sharpness (the fixed-function specular term; none with a black colour or power 0).
+    pub specular: [f32; 3],
+    pub power: f32,
     pub texture: Option<usize>,
     /// Blending against the frame, used when `blend` is set.
     pub blend: Option<(Blend, Blend)>,

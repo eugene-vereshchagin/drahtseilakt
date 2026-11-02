@@ -69,6 +69,8 @@ pub fn model(letter: &str) -> Level {
             diffuse: [1.0; 4],
             ambient: [0.0; 3],
             emissive: [0.0; 3],
+            specular: [0.0; 3],
+            power: 0.0,
             texture: Some(i),
             blend: None,
             alpha_cutoff: None,

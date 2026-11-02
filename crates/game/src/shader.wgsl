@@ -10,6 +10,8 @@ struct Globals {
     // world to camera space, and where the eye is
     view: mat4x4<f32>,
     eye: vec4<f32>,
+    // rgb: the light's colour (the level's Light).
+    light_color: vec4<f32>,
 };
 
 struct Material {
@@ -21,6 +23,8 @@ struct Material {
     params: vec4<f32>,
     // rgb: the material's ambient colour.
     ambient: vec4<f32>,
+    // rgb: the highlight's colour; a: its power (0: none).
+    specular: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> g: Globals;
@@ -96,11 +100,23 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         return color;
     }
     // The original's fixed-function lighting (D3D7, as the C reference draws it): the lit colour is the material's
-    // emissive, plus the scene's ambient times the material's ambient, plus the light times the material's diffuse
-    // and N.L, held to 0..1, and the texture is multiplied by it. Two-sided: the original's meshes do not agree on
-    // which side faces out.
-    let n = normalize(in.normal);
-    let lambert = abs(dot(n, -g.light_dir.xyz));
-    let lit = clamp(mat.emissive.rgb + g.ambient.rgb * mat.ambient.rgb + diffuse.rgb * lambert, vec3<f32>(0.0), vec3<f32>(1.0));
-    return vec4<f32>(base.rgb * lit, color.a);
+    // emissive, plus the scene's ambient times the material's ambient, plus the light's colour times the material's
+    // diffuse and N.L, held to 0..1, and the texture is multiplied by it; the highlight (the light's colour times the
+    // material's specular and N.H to its power, a local viewer) is added after. Two-sided: the original's meshes do
+    // not agree on which side faces out, so the side facing the light is lit.
+    var n = normalize(in.normal);
+    let l = -normalize(g.light_dir.xyz);
+    if dot(n, l) < 0.0 {
+        n = -n;
+    }
+    let lambert = max(dot(n, l), 0.0);
+    let lit = clamp(mat.emissive.rgb + g.ambient.rgb * mat.ambient.rgb + g.light_color.rgb * diffuse.rgb * lambert,
+        vec3<f32>(0.0), vec3<f32>(1.0));
+    var spec = vec3<f32>(0.0);
+    if mat.specular.a > 0.0 && lambert > 0.0 {
+        let v = normalize(g.eye.xyz - in.world);
+        let h = normalize(l + v);
+        spec = g.light_color.rgb * mat.specular.rgb * pow(max(dot(n, h), 0.0), mat.specular.a);
+    }
+    return vec4<f32>(min(base.rgb * lit + spec, vec3<f32>(1.0)), color.a);
 }

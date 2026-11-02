@@ -24,7 +24,7 @@ A folder holding:
   `TEXCOORD_k` set holding its coordinates; at most 16.
 - **Materials**: `baseColorFactor` (diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`; `alphaMode`
   `OPAQUE`, `MASK` (with `alphaCutoff`) or `BLEND`; unlit materials use `KHR_materials_unlit`.
-  `extras.drahtseilakt` holds what glTF has no field for: `ambient`, `z_write`, `blend` (source and
+  `extras.drahtseilakt` holds what glTF has no field for: `ambient`, `specular` and `power` (the highlight), `z_write`, `blend` (source and
   destination factor names: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`, `inv_src_alpha`,
   `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`), `alpha_cutoff` when blending and alpha
   test are combined, and `texgen` (`reflect` or `chrome`) when the texture coordinates come from the view.

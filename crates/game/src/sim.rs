@@ -1983,6 +1983,8 @@ mod tests {
                 diffuse: [1.0; 4],
                 ambient: [0.0; 3],
                 emissive: [0.0; 3],
+                specular: [0.0; 3],
+                power: 0.0,
                 texture: None,
                 blend: None,
                 alpha_cutoff: None,

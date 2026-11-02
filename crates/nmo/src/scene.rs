@@ -588,6 +588,22 @@ pub fn parameter_word(chunk: &Chunk) -> Result<Option<u32>> {
     Ok(if size == 4 { Some(w.u32()?) } else { None })
 }
 
+/// A parameter object's value as floats (a colour, a vector), when it is 1 to 16 whole words and every one a finite
+/// number.
+pub fn parameter_floats(chunk: &Chunk) -> Result<Option<Vec<f32>>> {
+    let Some(mut w) = chunk.section(0x40) else {
+        return Ok(None);
+    };
+    w.take(2)?;
+    w.u32()?;
+    let size = w.u32()? as usize;
+    if size == 0 || !size.is_multiple_of(4) || size > 64 {
+        return Ok(None);
+    }
+    let v: Vec<f32> = w.take(size / 4)?.iter().map(|&x| f32::from_bits(x)).collect();
+    Ok(v.iter().all(|x| x.is_finite()).then_some(v))
+}
+
 pub fn group(chunk: &Chunk) -> Result<Vec<usize>> {
     let Some(mut w) = chunk.section(0x000F_FFFF) else {
         return Ok(vec![]);

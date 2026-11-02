@@ -117,6 +117,8 @@ pub struct Settings {
     pub music: Option<u32>,
     /// The points a finished level adds to the score.
     pub level_bonus: Option<i64>,
+    /// The colour of the level's light (Gameplay_Sky sets Light_Ingame to it).
+    pub light: Option<[f32; 3]>,
 }
 
 impl Data {
@@ -129,6 +131,14 @@ impl Data {
             .find(|(_, o)| o.name.eq_ignore_ascii_case(name.as_bytes()))
             .and_then(|(_, o)| o.chunk.as_ref())
             .and_then(|c| nmo::scene::data_array(c).ok())
+    }
+
+    /// The value of the parameter object at `index` of the game file `relative`, as floats.
+    pub fn parameter_floats(&self, relative: &str, index: usize) -> Option<Vec<f32>> {
+        let bytes = std::fs::read(self.file(relative)?).ok()?;
+        let file = nmo::read(&bytes).ok()?;
+        let doc = nmo::Document::parse(&file).ok()?;
+        nmo::scene::parameter_floats(doc.get(index)?.chunk.as_ref()?).ok().flatten()
     }
 
     /// Every data array of the game file `relative` that `wanted` accepts by name, the file read once.
@@ -168,6 +178,7 @@ impl Data {
             start_ball: None,
             music: None,
             level_bonus: None,
+            light: None,
         };
         let Some(table) = self.data_array("3D Entities/Levelinit.nmo", "AllLevel") else {
             return none;
@@ -193,6 +204,13 @@ impl Data {
             },
             level_bonus: match table.column("LevelBonus").and_then(|c| row.get(c)) {
                 Some(nmo::scene::Cell::Int(n)) => Some(i64::from(*n)),
+                _ => None,
+            },
+            light: match table.column("Light").and_then(|c| row.get(c)) {
+                Some(nmo::scene::Cell::Object(Some(p))) => self.parameter_floats("3D Entities/Levelinit.nmo", *p).and_then(|v| {
+                    let c = |i: usize| v.get(i).copied().map(|x| x.clamp(0.0, 1.0));
+                    Some([c(0)?, c(1)?, c(2)?])
+                }),
                 _ => None,
             },
         }

@@ -1370,6 +1370,8 @@ fn upload_menu_scene(renderer: &mut Renderer, scene: Option<&mut crate::menuscen
 }
 
 fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
+    // the level's light colour (the level table's Light; white for a level without a row)
+    renderer.light.color = data.settings(&game.level.name).light.unwrap_or([1.0; 3]);
     let loader = |t: &level::Texture| data.texture(t);
     renderer.add_model(&game.level.level, &loader);
     renderer.add_model(&game.balls.level, &loader);

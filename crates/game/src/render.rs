@@ -27,6 +27,7 @@ struct Globals {
     ambient: [f32; 4],
     view: [[f32; 4]; 4],
     eye: [f32; 4],
+    light_color: [f32; 4],
 }
 
 #[repr(C)]
@@ -36,6 +37,28 @@ struct MaterialUniform {
     emissive: [f32; 4],
     params: [f32; 4],
     ambient: [f32; 4],
+    /// rgb: the highlight's colour; a: its power (0: none).
+    specular: [f32; 4],
+}
+
+/// The scene's light as the original sets it (Gameplay.nmo's Light_Ingame, a directional light, and the scene
+/// ambient of base.cmo): where it travels, its colour (the level table's Light) and the ambient.
+#[derive(Clone, Copy, Debug)]
+pub struct Light {
+    pub dir: Vec3,
+    pub color: [f32; 3],
+    pub ambient: [f32; 3],
+}
+
+impl Default for Light {
+    fn default() -> Light {
+        Light {
+            dir: Vec3::new(0.3022, -0.7331, 0.6092),
+            color: [1.0; 3],
+            // 0x0F of 0xFF
+            ambient: [15.0 / 255.0; 3],
+        }
+    }
 }
 
 struct GpuPart {
@@ -154,6 +177,8 @@ pub struct Renderer {
     layout: wgpu::PipelineLayout,
     pipelines: HashMap<PipelineKey, wgpu::RenderPipeline>,
     material_layout: wgpu::BindGroupLayout,
+    /// The scene's light (the level's colour once a level is loaded).
+    pub light: Light,
     globals: wgpu::Buffer,
     globals_bind: wgpu::BindGroup,
     models_buf: wgpu::Buffer,
@@ -316,6 +341,7 @@ impl Renderer {
             layout,
             pipelines: HashMap::new(),
             material_layout,
+            light: Light::default(),
             globals,
             globals_bind,
             models_buf,
@@ -386,6 +412,7 @@ impl Renderer {
                         0.0,
                     ],
                     ambient: [m.ambient[0], m.ambient[1], m.ambient[2], 0.0],
+                    specular: [m.specular[0], m.specular[1], m.specular[2], m.power],
                 };
                 let buf = self
                     .device
@@ -510,6 +537,7 @@ impl Renderer {
             emissive: [1.0, 1.0, 1.0, 1.0],
             params: [-1.0, 1.0, 0.0, 0.0],
             ambient: [0.0; 4],
+            specular: [0.0; 4],
         };
         let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("shadow material"),
@@ -537,6 +565,7 @@ impl Renderer {
             emissive: [0.0; 4],
             params: [-1.0, if marker { 1.0 } else { 0.0 }, 0.0, 0.0],
             ambient: [0.0; 4],
+            specular: [0.0; 4],
         };
         let buf = self
             .device
@@ -842,10 +871,11 @@ impl Renderer {
         let look = look_at_lh(view.eye, view.target, Vec3::Y);
         let globals = Globals {
             view_proj: (proj * look).to_cols_array_2d(),
-            light_dir: [0.35, -0.85, 0.4, 0.0],
-            ambient: [0.38, 0.38, 0.42, 1.0],
+            light_dir: self.light.dir.normalize_or(Vec3::NEG_Y).extend(0.0).to_array(),
+            ambient: [self.light.ambient[0], self.light.ambient[1], self.light.ambient[2], 1.0],
             view: look.to_cols_array_2d(),
             eye: [view.eye.x, view.eye.y, view.eye.z, 1.0],
+            light_color: [self.light.color[0], self.light.color[1], self.light.color[2], 1.0],
         };
         self.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));

@@ -25,7 +25,7 @@ Ein Ordner mit:
   `texcoord` k, der Satz `TEXCOORD_k` mit seinen Koordinaten; höchstens 16.
 - **Materialien**: `baseColorFactor` (Diffuse), `baseColorTexture`, `emissiveFactor`, `doubleSided`;
   `alphaMode` `OPAQUE`, `MASK` (mit `alphaCutoff`) oder `BLEND`; unbeleuchtete Materialien über
-  `KHR_materials_unlit`. In `extras.drahtseilakt` steht, wofür glTF kein Feld hat: `ambient`, `z_write`,
+  `KHR_materials_unlit`. In `extras.drahtseilakt` steht, wofür glTF kein Feld hat: `ambient`, `specular` und `power` (das Glanzlicht), `z_write`,
   `blend` (Namen von Quell- und Zielfaktor: `zero`, `one`, `src_color`, `inv_src_color`, `src_alpha`,
   `inv_src_alpha`, `dest_alpha`, `inv_dest_alpha`, `dest_color`, `inv_dest_color`), `alpha_cutoff`, wenn
   Blending und Alpha-Test zusammenkommen, und `texgen` (`reflect` oder `chrome`), wenn die

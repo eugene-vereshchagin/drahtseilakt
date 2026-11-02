@@ -214,6 +214,8 @@ fn material(name: String, m: &scene::Material, textures: &HashMap<usize, usize>)
         diffuse: argb(m.diffuse),
         ambient: rgb(m.ambient),
         emissive: rgb(m.emissive),
+        specular: rgb(m.specular),
+        power: if m.specular_power.is_finite() { m.specular_power.clamp(0.0, 1000.0) } else { 0.0 },
         texture: m.texture.and_then(|t| textures.get(&t).copied()),
         blend: m
             .alpha_blend
