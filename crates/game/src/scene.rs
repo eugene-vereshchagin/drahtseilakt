@@ -221,11 +221,15 @@ fn has_material(level: &Level, mesh: usize) -> bool {
         .is_some_and(|m| m.parts.iter().any(|p| p.material.is_some()))
 }
 
-/// A placeholder's module: its object name without the trailing `_NN` (`P_Box_03` → `P_Box`).
+/// A placeholder's module: its object name without the trailing `_NN`, which may end in letters (`P_Box_03` →
+/// `P_Box`; level 4 has `P_Trafo_Stone_03a`, `P_Modul_18_10a`: a second placeholder by an earlier one).
 fn module_name(object: &str) -> &str {
     match object.rsplit_once('_') {
-        Some((head, tail)) if !tail.is_empty() && tail.bytes().all(|b| b.is_ascii_digit()) => head,
-        _ => object,
+        Some((head, tail)) => {
+            let digits = tail.trim_end_matches(|c: char| c.is_ascii_alphabetic());
+            if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) { head } else { object }
+        }
+        None => object,
     }
 }
 
@@ -514,5 +518,19 @@ pub fn view(s: &Snapshot) -> View {
         eye: s.eye,
         target: s.target,
         fov_y: fov_y(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_placeholder_names_its_module_with_or_without_a_letter() {
+        assert_eq!(module_name("P_Box_03"), "P_Box");
+        assert_eq!(module_name("P_Trafo_Stone_03a"), "P_Trafo_Stone");
+        assert_eq!(module_name("P_Modul_18_10a"), "P_Modul_18");
+        assert_eq!(module_name("P_Trafo_Stone_ab"), "P_Trafo_Stone_ab", "letters alone are no number");
+        assert_eq!(module_name("Floor"), "Floor");
     }
 }
