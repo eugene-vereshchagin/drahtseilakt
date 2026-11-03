@@ -66,6 +66,61 @@ they rest on are in [autopilot.md](autopilot.md).
 - **Stone** to ram boxes and push balls; it breaks hanging plates (P_Modul_29): it does not cross them, unless the
   level means it to drop through them with the plates (level 6's towers).
 
+## Zones the watcher marks
+
+Where the owner sees the test player drive wrong, he marks the stretch while watching (`--watch`, F8 and F4;
+[autopilot.md](autopilot.md), "Zones"), and the mark is a rule for that stretch from then on, in `<level>.zones`
+beside the hints:
+
+- **flow** ("don't dawdle here"): no stop, wait or slowing down there that the ball does not need. A hint's `goto`
+  is rolled through, its `wait` and `hold` left out, a slow `pass` or `press` taken at 5, each only when a copy of
+  the run shows the ball is kept so; the steering keeps at least 0.8 of the floor's pace.
+- **careful** ("keep the speed limit here and don't cut corners"): not faster than the zone's speed (4.5 by
+  default), on the way's middle line, no racing line; whatever drives is held under the limit.
+
+A zone of the watcher's comes before the pace rules above: it is what the owner saw.
+
+## The learned table: `hints/learned.txt`
+
+A zone also teaches the test player what kind of place it was, for every level, those not yet passed too (12, 13,
+our own). At each mark it reads the place along the marked stretch, every tenth of a second, by eight features:
+
+| Feature | Values |
+|---|---|
+| surface | `floor`, `rail`, `off` (on no floor of the way: a module's part, in the air) |
+| width | the floor's: `narrow` (under 4), `medium` (under 10), `wide` |
+| border | the floor's nearest edge within 8: `walls` (a wall stands there), `open` (it drops away), `far` |
+| curve | the way's turn over the next 8 points: `straight` (under 20°), `bend` (under 60°), `sharp` |
+| slope | the way's rise over them: `flat`, `up`, `down` (more than 0.15) |
+| ahead | the first within them: `gap`, `drop`, `rail-end`, `rail-start`, `sill`, `transformer`, or `none` |
+| module | the nearest module within 8 (`P_Modul_25`, `P_Box`, ...), or `none` |
+| kind | `wood`, `stone`, `paper` |
+
+What was the same over most (60%) of the stretch becomes a rule: the surface, the ball, and the values special to
+the place (not a plain medium or wide floor, straight, flat, nothing ahead, no module); the plain ones are left out,
+they would only make the rule hold in fewer places. A stretch with nothing special teaches nothing (its zone stays
+the level's own). The rule is added to `learned.txt` beside the hints, one file for all levels, with where it was
+learned and what the test player did there:
+
+```
+flow when surface=rail ahead=rail-end kind=wood   # Level_01 sector 2 (147.2 -2.1 -552.0) 2026-11-03: 3.0 s, stopping 40%, mostly hint, off the middle 0.0
+careful speed 4.5 when surface=floor width=narrow curve=sharp kind=stone
+```
+
+A rule holds where every feature it names has that value; it asks what a zone of its kind asks (flow, careful). Every
+run reads the table and looks at the place each tick: where the ball is in none of the level's own zones (they come
+first) and rules hold, flow if any of them is flow, the lowest limit of the careful ones; the status line names the
+most particular rule holding (`learned: rail, rail-end ahead, wood → don't dawdle`), and with F12 also the place as
+the rules see it (`here: surface=rail ...`). A rule names at least two features, one of them special to the place,
+so that none holds almost everywhere. Undoing a mark (Backspace) also takes out the rule it taught (by the mark's id in its evidence). A rule the table
+has already is not added again; a table full (512 rules) takes no more, and the screen says so. The table is
+plain text: a rule that turns out too wide is narrowed by adding a feature, or deleted. Read like a hint file, it is
+untrusted: size (64 KiB), rules (512) and numbers capped, values from the lists above, a malformed line left out with
+a note. `AUTOPILOT_SITUATION=1` prints the place as the rules see it every second of a run.
+
+The features tell 2079 kinds of place apart without the module (1701 on floors, 189 on rails, 189 off them), each of
+them again with each module near.
+
 ## A level's route: `hints/Level_NN.route`
 
 One file a level, read by people and agents (the test player reads the plan and the hints made from it): for each
