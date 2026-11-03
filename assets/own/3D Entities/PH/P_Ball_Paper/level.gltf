@@ -125,8 +125,8 @@
  ],
  "images": [
   {
-   "uri": "textures/ball_paper.png",
-   "name": "ball_paper"
+   "uri": "textures/Ball_Paper.png",
+   "name": "Ball_Paper"
   }
  ],
  "samplers": [

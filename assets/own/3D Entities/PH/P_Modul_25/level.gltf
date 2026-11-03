@@ -354,16 +354,16 @@
  ],
  "images": [
   {
-   "uri": "textures/wood.png",
-   "name": "wood"
+   "uri": "textures/Wood_Raft.png",
+   "name": "Wood_Raft"
   },
   {
-   "uri": "textures/iron.png",
-   "name": "iron"
+   "uri": "textures/Wood_Metal.png",
+   "name": "Wood_Metal"
   },
   {
-   "uri": "textures/stone.png",
-   "name": "stone"
+   "uri": "textures/Wood_Misc.png",
+   "name": "Wood_Misc"
   }
  ],
  "samplers": [

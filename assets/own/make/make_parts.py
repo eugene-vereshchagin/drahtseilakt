@@ -223,12 +223,45 @@ ALPHA_MAKERS = {"silver.png": _silver, "shadow.png": _shadow_soft}
 _cache = {}
 
 
-def texture(folder, name):
-    """Saves texture `name` into the part's textures/ (made once, kept in memory)."""
+def texture(folder, name, as_name=None):
+    """Saves texture `name` into the part's textures/ (made once, kept in memory), as `as_name` when given."""
     if name not in _cache:
         _cache[name] = ALPHA_MAKERS[name]() if name in ALPHA_MAKERS else (TEXTURE_MAKERS[name](), None)
     img, alpha = _cache[name]
-    k.save_png(os.path.join(folder, "textures"), name, img, alpha)
+    k.save_png(os.path.join(folder, "textures"), as_name or name, img, alpha)
+
+
+# The texture each material's role has in the original (its texture's name there), where the game's own texture pack
+# (assets/own/Textures, TEXTURES.md) has a picture of that name: the game draws our parts with the pack's picture by
+# that name (the default, `textures own`), and with our placeholder kept in the part's folder otherwise. Materials
+# not listed keep their placeholder's name (the pack has nothing for their role).
+PACK_NAMES = {
+    "AnimTrafo_Bars": "Trafo_Anim_Environment", "AnimTrafo_RingParts": "Trafo_Anim_Environment",
+    "AnimTrafo_RingParts_Color": "Trafo_Anim_Environment",
+    "Ball_Wood": "Ball_Wood", "Ball_Wood_Pieces": "Ball_Wood", "Ball_Stone": "Ball_Stone",
+    "Ball_Stone_Pieces": "Ball_Stone", "Ball_Paper": "Ball_Paper", "Ball_Paper_Pieces": "Ball_Paper",
+    "P_Ball_Wood": "P_Ball_Wood", "P_Ball_Stone": "Ball_Stone", "P_Ball_Paper": "Ball_Paper",
+    "P_Box": "E_Holzbeschlag", "P_Dome": "Dome",
+    "PE_Balloonl_Halter": "Wood_Metal", "PE_Balloon_SuspBridge": "Wood_Old",
+    "P_Modul_01_Stone": "Column_beige", "P_Modul_01_Target": "Target", "P_Modul_01_Wood": "Wood_Metal",
+    "P_Modul_08_Stone": "Ball_Stone", "P_Modul_08_Schelle": "Metal_stained", "P_Modul_08_Wood": "Wood_Nailed",
+    "P_Modul_17_Target": "Target", "P_Modul_17_Cube": "E_Holzbeschlag",
+    "P_Modul_18_Rotor": "Rail_Environment",
+    "P_Modul_19_Axis": "Rail_Environment", "P_Modul_19_Flaps": "Wood_MetalStripes",
+    "P_Modul_19_FlapsBackboards": "Wood_Nailed",
+    "P_Modul_25_Wood": "Wood_Raft", "P_Modul_25_HingeSide": "Wood_Misc", "P_Modul_25_Hinge": "Wood_Metal",
+    "P_Modul_26_Sandsack": "sandsack", "P_Modul_26_Halter": "E_Holzbeschlag", "P_Modul_26_Seil": "sandsack",
+    "P_Modul_29": "Wood_Old", "P_Modul_30_Board": "Modul30_d_Seiten",
+    "P_Modul_34_Floor_Side": "Floor_Side", "P_Modul34_Floor_Top_Flat": "Floor_Top_Flat",
+    "P_Modul_34_Box": "E_Holzbeschlag",
+    "P_Modul_37_WoodMisc": "Wood_Misc", "P_Modul_37_WoodAxis": "Wood_Metal", "P_Modul_37_Wood01": "Ball_Wood",
+    "P_Modul_37_Target": "Target", "P_Modul_37_Metall_1": "Metal_stained",
+    "P_Modul37_Misc_MetalButtons": "Metal_stained",
+    "P_Modul_41_BoxMetal": "E_Holzbeschlag", "P_Modul_41_BoxWood": "E_Holzbeschlag",
+    "P_Trafo_Wood": "Trafo_Environment", "P_Trafo_Wood_Color": "Trafo_Environment",
+    "P_Trafo_Stone": "Trafo_Environment", "P_Trafo_Stone_Color": "Trafo_Environment",
+    "P_Trafo_Paper": "Trafo_Environment", "P_Trafo_Paper_Color": "Trafo_Environment",
+}
 
 
 # --- a part being built ------------------------------------------------------------------------------------------
@@ -241,6 +274,7 @@ class Part:
         self.folder = os.path.join(ENT, folder)
         self.meshes, self.nodes, self.mats = [], [], []
         self.mat_ids, self.groups = {}, []
+        self.files = []
         if os.path.isdir(self.folder):
             shutil.rmtree(self.folder)
 
@@ -248,7 +282,12 @@ class Part:
         """A material by name, made once; its texture is written into the part's folder."""
         if name not in self.mat_ids:
             if tex:
-                texture(self.folder, tex)
+                # named after the role's texture in the pack; two roles of one name in a part share the first's file
+                file = PACK_NAMES[name] + ".png" if name in PACK_NAMES else tex
+                if file not in self.files:
+                    texture(self.folder, tex, file)
+                    self.files.append(file)
+                tex = file
             self.mats.append(k.material(name, tex, **kw))
             self.mat_ids[name] = len(self.mats) - 1
         return self.mat_ids[name]

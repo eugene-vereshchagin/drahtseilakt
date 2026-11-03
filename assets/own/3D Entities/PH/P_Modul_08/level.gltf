@@ -449,16 +449,16 @@
  ],
  "images": [
   {
-   "uri": "textures/stone.png",
-   "name": "stone"
+   "uri": "textures/Ball_Stone.png",
+   "name": "Ball_Stone"
   },
   {
-   "uri": "textures/iron.png",
-   "name": "iron"
+   "uri": "textures/Metal_stained.png",
+   "name": "Metal_stained"
   },
   {
-   "uri": "textures/wood.png",
-   "name": "wood"
+   "uri": "textures/Wood_Nailed.png",
+   "name": "Wood_Nailed"
   },
   {
    "uri": "textures/steel.png",

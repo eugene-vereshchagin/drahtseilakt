@@ -2971,16 +2971,16 @@
  ],
  "images": [
   {
-   "uri": "textures/ball_wood.png",
-   "name": "ball_wood"
+   "uri": "textures/Ball_Wood.png",
+   "name": "Ball_Wood"
   },
   {
-   "uri": "textures/ball_stone.png",
-   "name": "ball_stone"
+   "uri": "textures/Ball_Stone.png",
+   "name": "Ball_Stone"
   },
   {
-   "uri": "textures/ball_paper.png",
-   "name": "ball_paper"
+   "uri": "textures/Ball_Paper.png",
+   "name": "Ball_Paper"
   },
   {
    "uri": "textures/glow.png",

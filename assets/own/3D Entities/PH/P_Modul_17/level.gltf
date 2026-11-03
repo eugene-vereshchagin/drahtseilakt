@@ -323,16 +323,16 @@
  ],
  "images": [
   {
-   "uri": "textures/target.png",
-   "name": "target"
+   "uri": "textures/Target.png",
+   "name": "Target"
   },
   {
    "uri": "textures/steel.png",
    "name": "steel"
   },
   {
-   "uri": "textures/iron.png",
-   "name": "iron"
+   "uri": "textures/E_Holzbeschlag.png",
+   "name": "E_Holzbeschlag"
   }
  ],
  "samplers": [

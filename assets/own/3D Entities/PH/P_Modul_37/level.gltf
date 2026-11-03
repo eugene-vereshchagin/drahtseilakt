@@ -359,7 +359,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 1
+     "index": 2
     }
    },
    "emissiveFactor": [
@@ -398,7 +398,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 2
+     "index": 3
     }
    },
    "emissiveFactor": [
@@ -437,7 +437,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 3
+     "index": 4
     }
    },
    "emissiveFactor": [
@@ -528,24 +528,24 @@
  ],
  "images": [
   {
-   "uri": "textures/wood_dark.png",
-   "name": "wood_dark"
+   "uri": "textures/Wood_Misc.png",
+   "name": "Wood_Misc"
   },
   {
-   "uri": "textures/wood.png",
-   "name": "wood"
+   "uri": "textures/Wood_Metal.png",
+   "name": "Wood_Metal"
   },
   {
-   "uri": "textures/target.png",
-   "name": "target"
+   "uri": "textures/Ball_Wood.png",
+   "name": "Ball_Wood"
   },
   {
-   "uri": "textures/steel.png",
-   "name": "steel"
+   "uri": "textures/Target.png",
+   "name": "Target"
   },
   {
-   "uri": "textures/brass.png",
-   "name": "brass"
+   "uri": "textures/Metal_stained.png",
+   "name": "Metal_stained"
   }
  ],
  "samplers": [

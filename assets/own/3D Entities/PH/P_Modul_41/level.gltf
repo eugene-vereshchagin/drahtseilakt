@@ -228,7 +228,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 1
+     "index": 0
     }
    },
    "emissiveFactor": [
@@ -267,7 +267,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 2
+     "index": 1
     }
    },
    "emissiveFactor": [
@@ -303,20 +303,12 @@
   {
    "source": 1,
    "sampler": 0
-  },
-  {
-   "source": 2,
-   "sampler": 0
   }
  ],
  "images": [
   {
-   "uri": "textures/iron.png",
-   "name": "iron"
-  },
-  {
-   "uri": "textures/wood.png",
-   "name": "wood"
+   "uri": "textures/E_Holzbeschlag.png",
+   "name": "E_Holzbeschlag"
   },
   {
    "uri": "textures/steel.png",

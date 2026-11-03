@@ -337,7 +337,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 2
+     "index": 0
     }
    },
    "emissiveFactor": [
@@ -373,24 +373,16 @@
   {
    "source": 1,
    "sampler": 0
-  },
-  {
-   "source": 2,
-   "sampler": 0
   }
  ],
  "images": [
   {
-   "uri": "textures/burlap.png",
-   "name": "burlap"
+   "uri": "textures/sandsack.png",
+   "name": "sandsack"
   },
   {
-   "uri": "textures/iron.png",
-   "name": "iron"
-  },
-  {
-   "uri": "textures/rope.png",
-   "name": "rope"
+   "uri": "textures/E_Holzbeschlag.png",
+   "name": "E_Holzbeschlag"
   }
  ],
  "samplers": [

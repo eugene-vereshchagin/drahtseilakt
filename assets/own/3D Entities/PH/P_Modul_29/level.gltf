@@ -777,8 +777,8 @@
  ],
  "images": [
   {
-   "uri": "textures/wood_dark.png",
-   "name": "wood_dark"
+   "uri": "textures/Wood_Old.png",
+   "name": "Wood_Old"
   }
  ],
  "samplers": [

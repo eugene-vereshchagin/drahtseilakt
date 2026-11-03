@@ -345,16 +345,16 @@
  ],
  "images": [
   {
-   "uri": "textures/stone_side.png",
-   "name": "stone_side"
+   "uri": "textures/Floor_Side.png",
+   "name": "Floor_Side"
   },
   {
-   "uri": "textures/stone_light.png",
-   "name": "stone_light"
+   "uri": "textures/Floor_Top_Flat.png",
+   "name": "Floor_Top_Flat"
   },
   {
-   "uri": "textures/crate.png",
-   "name": "crate"
+   "uri": "textures/E_Holzbeschlag.png",
+   "name": "E_Holzbeschlag"
   }
  ],
  "samplers": [

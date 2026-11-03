@@ -223,8 +223,8 @@
  ],
  "images": [
   {
-   "uri": "textures/steel.png",
-   "name": "steel"
+   "uri": "textures/Rail_Environment.png",
+   "name": "Rail_Environment"
   }
  ],
  "samplers": [

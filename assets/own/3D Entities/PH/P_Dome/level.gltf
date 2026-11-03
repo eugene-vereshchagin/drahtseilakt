@@ -219,8 +219,8 @@
    "name": "shadow"
   },
   {
-   "uri": "textures/dome.png",
-   "name": "dome"
+   "uri": "textures/Dome.png",
+   "name": "Dome"
   }
  ],
  "samplers": [

@@ -519,7 +519,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 1
+     "index": 0
     }
    },
    "emissiveFactor": [
@@ -559,7 +559,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 1
+     "index": 0
     }
    },
    "emissiveFactor": [
@@ -599,7 +599,7 @@
     "metallicFactor": 0.0,
     "roughnessFactor": 1.0,
     "baseColorTexture": {
-     "index": 2
+     "index": 1
     }
    },
    "emissiveFactor": [
@@ -639,20 +639,12 @@
   {
    "source": 1,
    "sampler": 0
-  },
-  {
-   "source": 2,
-   "sampler": 0
   }
  ],
  "images": [
   {
-   "uri": "textures/steel.png",
-   "name": "steel"
-  },
-  {
-   "uri": "textures/chrome_env.png",
-   "name": "chrome_env"
+   "uri": "textures/Trafo_Anim_Environment.png",
+   "name": "Trafo_Anim_Environment"
   },
   {
    "uri": "textures/flash.png",

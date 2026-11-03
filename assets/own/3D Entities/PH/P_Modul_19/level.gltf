@@ -371,16 +371,16 @@
  ],
  "images": [
   {
-   "uri": "textures/steel.png",
-   "name": "steel"
+   "uri": "textures/Rail_Environment.png",
+   "name": "Rail_Environment"
   },
   {
-   "uri": "textures/wood.png",
-   "name": "wood"
+   "uri": "textures/Wood_MetalStripes.png",
+   "name": "Wood_MetalStripes"
   },
   {
-   "uri": "textures/wood_dark.png",
-   "name": "wood_dark"
+   "uri": "textures/Wood_Nailed.png",
+   "name": "Wood_Nailed"
   }
  ],
  "samplers": [

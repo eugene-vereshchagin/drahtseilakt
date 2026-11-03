@@ -125,8 +125,8 @@
  ],
  "images": [
   {
-   "uri": "textures/ball_wood.png",
-   "name": "ball_wood"
+   "uri": "textures/P_Ball_Wood.png",
+   "name": "P_Ball_Wood"
   }
  ],
  "samplers": [

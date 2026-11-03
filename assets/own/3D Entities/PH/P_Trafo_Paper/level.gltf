@@ -269,8 +269,8 @@
    "name": "shadow"
   },
   {
-   "uri": "textures/chrome_env.png",
-   "name": "chrome_env"
+   "uri": "textures/Trafo_Environment.png",
+   "name": "Trafo_Environment"
   }
  ],
  "samplers": [
