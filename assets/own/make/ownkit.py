@@ -451,13 +451,15 @@ S = np.diag([1.0, 1.0, -1.0, 1.0])
 
 
 def material(name, texture=None, diffuse=1.0, emissive=0.3, ambient=0.1, specular=0.0, power=0.0,
-             double_sided=False, alpha="OPAQUE", cutoff=0.5, blend=None, texgen=None, unlit=False, z_write=None):
-    """A material's description for write_open: `texture` a file in the folder's textures/ (made with save_png), the
+             double_sided=False, alpha="OPAQUE", cutoff=0.5, blend=None, texgen=None, unlit=False, z_write=None,
+             normal=None):
+    """A material's description for write_open: `texture` a file in the folder's textures/ (made with save_png),
+    `normal` its relief (a normal map there, glTF's normalTexture, on the same texture coordinates), the
     colours scalars (grey) or rgb(a) lists, `alpha` OPAQUE, MASK (with `cutoff`) or BLEND (with `blend`, a pair of
     the format's factor names), `texgen` reflect or chrome."""
     return dict(name=name, texture=texture, diffuse=diffuse, emissive=emissive, ambient=ambient, specular=specular,
                 power=power, double_sided=double_sided, alpha=alpha, cutoff=cutoff, blend=blend, texgen=texgen,
-                unlit=unlit, z_write=z_write)
+                unlit=unlit, z_write=z_write, normal=normal)
 
 
 def node(name, mesh=None, matrix=None, visible=False, sprite=None):
@@ -521,7 +523,8 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
             prims.append(prim)
         gl_meshes.append({"name": m.name, "primitives": prims})
 
-    images = list(dict.fromkeys(mt["texture"] for mt in materials if mt["texture"]))
+    images = list(dict.fromkeys([mt["texture"] for mt in materials if mt["texture"]]
+                                + [mt["normal"] for mt in materials if mt.get("normal")]))
     image_ids = {n: i for i, n in enumerate(images)}
     gl_mats = []
     unlit_used = False
@@ -533,6 +536,8 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
              "z_write": mt["z_write"] if mt["z_write"] is not None else mt["alpha"] != "BLEND"}
         v = {"name": mt["name"], "pbrMetallicRoughness": pbr, "emissiveFactor": _colour(mt["emissive"], 3),
              "doubleSided": mt["double_sided"], "alphaMode": mt["alpha"]}
+        if mt.get("normal"):
+            v["normalTexture"] = {"index": image_ids[mt["normal"]]}
         if mt["alpha"] == "BLEND":
             x["blend"] = list(mt["blend"] or ("src_alpha", "inv_src_alpha"))
         if mt["alpha"] == "MASK":

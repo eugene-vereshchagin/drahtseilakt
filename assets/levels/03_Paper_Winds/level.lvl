@@ -11,6 +11,7 @@ bonus 300
 ball wood
 columns 45
 
+safety border
 start
 width 12
 floor 30
@@ -42,6 +43,7 @@ fan ahead -5
 gap 4 up 12 nopilot
 floor 20
 checkpoint
+safety railings
 
 # sector 3: paper, gently down, a fan to a floor off to the side
 floor 15
@@ -59,6 +61,7 @@ floor 15
 trafo wood
 floor 15
 checkpoint
+safety border
 
 # sector 4: wood again, a plate bridge holds it too, down to the finish
 floor 15

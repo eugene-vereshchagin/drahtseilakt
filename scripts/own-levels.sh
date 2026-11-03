@@ -12,7 +12,8 @@
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 game=${DRAHTSEILAKT_BIN:-$here/target/release/drahtseilakt}
-export XDG_DATA_HOME="$here/target/own-levels-data"
+# (OWN_LEVELS_DATA: another folder, for runs of several levels side by side)
+export XDG_DATA_HOME="${OWN_LEVELS_DATA:-$here/target/own-levels-data}"
 mkdir -p "$XDG_DATA_HOME"
 if [ $# -eq 0 ]; then
     set -- $(ls -d "$here"/assets/levels/*/ | while read -r d; do [ -f "$d/level.lvl" ] && echo "${d%/}"; done)

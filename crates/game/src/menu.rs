@@ -2092,6 +2092,7 @@ mod tests {
                 version: None,
                 titles: Vec::new(),
                 order: None,
+                hidden: false,
             })
             .collect();
         m.push(Screen::Custom);
