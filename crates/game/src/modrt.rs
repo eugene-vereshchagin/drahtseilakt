@@ -20,16 +20,20 @@ pub struct ModRun {
     pub txt: Arc<ModTxt>,
     pub opts: Vec<f32>,
     pub vars: Vec<f32>,
+    /// Which variables are the run side's (a view rule reads those from the run side), worked out once.
+    sim_var: Arc<[bool]>,
 }
 
 impl ModRun {
     pub fn new(key: &str, txt: Arc<ModTxt>, opts: Vec<f32>) -> ModRun {
         let vars = txt.vars.iter().map(|v| v.1).collect();
+        let sim_var = txt.vars.iter().map(|v| v.2).collect();
         ModRun {
             key: key.to_owned(),
             txt,
             opts,
             vars,
+            sim_var,
         }
     }
 
@@ -87,7 +91,7 @@ fn fire(
     act: &mut dyn FnMut(&Action, &[f32]),
 ) {
     let txt = Arc::clone(&run.txt);
-    let sim_var: Vec<bool> = txt.vars.iter().map(|v| v.2).collect();
+    let sim_var = Arc::clone(&run.sim_var);
     for rule in txt.rules.iter().filter(|r| r.event == event) {
         let holds = {
             let look = Look {
@@ -299,9 +303,9 @@ impl ViewMods {
     pub fn fire(&mut self, event: Event, values: &dyn Fn(Value) -> f32, sim: &SimMods, lang: &str) {
         let mut out = std::mem::take(&mut self.out);
         for run in &mut self.runs {
-            let run_vars = sim.vars_of(&run.key).to_vec();
+            let run_vars = sim.vars_of(&run.key);
             let txt = Arc::clone(&run.txt);
-            fire(run, event, values, &run_vars, &mut |a, v| {
+            fire(run, event, values, run_vars, &mut |a, v| {
                 let x = v.first().copied().unwrap_or(0.0);
                 match a {
                     Action::CameraFov(_) => out.fov = x.clamp(-30.0, 60.0),
@@ -394,15 +398,30 @@ pub struct Mods {
     pub found: Vec<Mod>,
     pub on: Vec<bool>,
     pub opts: Vec<Vec<f32>>,
+    /// Why a mod was not switched on (by its place): the enabled mods' work would pass the budget.
+    pub note: Option<(usize, String)>,
 }
 
 impl Mods {
     /// The mods found, set as the settings say (`setting` reads a key).
     pub fn load(found: Vec<Mod>, setting: impl Fn(&str) -> Option<String>) -> Mods {
+        // switched on in order while the enabled mods' work stays within the budget (MAX_TOTAL_COST)
+        let mut spent = 0usize;
         let on = found
             .iter()
             .map(|m| {
-                m.parsed.is_ok() && setting(&format!("mod.{}", m.key)).as_deref() == Some("on")
+                let want = setting(&format!("mod.{}", m.key)).as_deref() == Some("on");
+                match (&m.parsed, want) {
+                    (Ok(t), true) if spent.saturating_add(t.cost) <= gamedata::mods::MAX_TOTAL_COST => {
+                        spent = spent.saturating_add(t.cost);
+                        true
+                    }
+                    (Ok(_), true) => {
+                        eprintln!("mod {}: not switched on: the mods on would do too much work a tick", m.key);
+                        false
+                    }
+                    _ => false,
+                }
             })
             .collect();
         let opts = found
@@ -420,7 +439,7 @@ impl Mods {
                 Err(_) => Vec::new(),
             })
             .collect();
-        Mods { found, on, opts }
+        Mods { found, on, opts, note: None }
     }
 
     /// The settings lines of every mod (on or off, and the options set otherwise than their defaults).
@@ -441,10 +460,33 @@ impl Mods {
         v
     }
 
+    /// The work the mods switched on can do a tick (their expression nodes in all).
+    pub fn cost(&self) -> usize {
+        self.found
+            .iter()
+            .zip(&self.on)
+            .filter(|(_, on)| **on)
+            .filter_map(|(m, _)| m.parsed.as_ref().ok().map(|t| t.cost))
+            .fold(0usize, usize::saturating_add)
+    }
+
+    /// Mod `i` switched: off at once; on only when it can be read and the mods on stay within the budget (else
+    /// `note` says why).
     pub fn toggle(&mut self, i: usize) {
-        let ok = self.found.get(i).is_some_and(|m| m.parsed.is_ok());
+        self.note = None;
+        let cost = match self.found.get(i).map(|m| &m.parsed) {
+            Some(Ok(t)) => t.cost,
+            _ => return,
+        };
+        let spent = self.cost();
         if let Some(on) = self.on.get_mut(i) {
-            *on = ok && !*on;
+            if *on {
+                *on = false;
+            } else if spent.saturating_add(cost) <= gamedata::mods::MAX_TOTAL_COST {
+                *on = true;
+            } else {
+                self.note = Some((i, format!("{spent} + {cost} > {}", gamedata::mods::MAX_TOTAL_COST)));
+            }
         }
     }
 
@@ -692,6 +734,32 @@ mod tests {
         view.out.lines.clear();
         view.fire(Event::Frame, &|_| 0.0, &sim, "en");
         assert_eq!(view.out.yaw, 0.0, "free view turned back");
+    }
+
+    #[test]
+    fn mods_past_the_work_budget_are_not_switched_on() {
+        // a mod of about 12k nodes: one fits, two would pass the budget
+        let sum = vec!["1"; 14].join("+");
+        let mut text = "name.en Big\n".to_owned();
+        for _ in 0..50 {
+            text.push_str("on frame\n");
+            for _ in 0..8 {
+                text.push_str(&format!("if {sum} > 0\n"));
+            }
+        }
+        let big = gamedata::mods::parse_mod_txt(&text).unwrap();
+        assert!(big.cost > gamedata::mods::MAX_TOTAL_COST / 2 && big.cost <= gamedata::mods::MAX_TOTAL_COST, "{}", big.cost);
+        let found = || vec![found("a", &text), found("b", &text)];
+        let mut m = Mods::load(found(), |_| None);
+        m.toggle(0);
+        m.toggle(1);
+        assert_eq!(m.on, vec![true, false]);
+        assert!(m.note.as_ref().is_some_and(|n| n.0 == 1), "the Mods screen says why");
+        m.toggle(0);
+        m.toggle(1);
+        assert_eq!(m.on, vec![false, true]);
+        let back = Mods::load(found(), |_| Some("on".into()));
+        assert_eq!(back.on, vec![true, false], "the settings cannot pass the budget either");
     }
 
     #[test]

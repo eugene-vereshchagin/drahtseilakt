@@ -178,6 +178,8 @@ A mod comes from a stranger, so the game reads it as hostile and fails closed:
   control characters or bidirectional overrides;
 - at most 16 options, 32 variables, 128 labels, 64 rules, 8 conditions and 16 actions a rule, 256 actions; an
   expression at most 64 parts and 16 deep; a key option at most 8 keys; at most 32 mods a folder;
+- a work budget: the expression nodes of all the mods switched on together at most 20,000 (each mod's are counted
+  when it is read); a mod that would pass it is not switched on, and the Mods screen says why;
 - no paths, no links, no file names, no network: a mod can only name the building blocks above.
 
 ## Not yet (queued)

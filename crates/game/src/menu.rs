@@ -967,6 +967,9 @@ impl Menu {
             Some(Line::Mod(i)) if self.screen() == Screen::Mods => match self.mods.found.get(*i).map(|m| &m.parsed) {
                 Some(Ok(t)) => {
                     let mut v = vec![t.description(s.language())];
+                    if let Some((_, why)) = self.mods.note.as_ref().filter(|n| n.0 == *i) {
+                        v.push(format!("{}: {why}", s.ours("mod budget")));
+                    }
                     if t.modded() {
                         v.push(s.ours("mod modded"));
                     }

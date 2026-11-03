@@ -600,7 +600,6 @@ impl World {
         self.physics.cores.get(id).map(|c| i32::from(c.movement_state))
     }
 
-    /// The contact points the ball takes part in, for the watch log: those whose entities include the ball (entity 1).
     /// A mod's gravity and time factor (modrt.rs SimOut): set only when they change.
     pub fn set_rules(&mut self, gravity: f32, time_factor: f32) {
         if gravity != self.gravity {
@@ -613,6 +612,7 @@ impl World {
         }
     }
 
+    /// The contact points the ball takes part in, for the watch log: those whose entities include the ball (entity 1).
     pub fn ball_contacts(&self) -> Vec<ivp::glue::ContactReadout> {
         self.physics.contacts_of(1)
     }

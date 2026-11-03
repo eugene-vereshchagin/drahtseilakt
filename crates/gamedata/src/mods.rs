@@ -46,7 +46,10 @@ pub const MAX_NODES: usize = 64;
 pub const MAX_KEYS: usize = 8;
 /// The largest readme or licence beside mod.txt (never read by the game, only allowed to be there).
 pub const MAX_SIDE_FILE: u64 = 64 * 1024;
-const MAX_ENTRIES: usize = 1024;
+/// The most entries of a mods folder looked at (a guard against a folder of millions; real ones hold a few).
+const MAX_ENTRIES: usize = 65_536;
+/// The most expression nodes the enabled mods may evaluate in all (each mod's `cost`): a static budget per tick.
+pub const MAX_TOTAL_COST: usize = 20_000;
 
 /// The languages a mod's texts may be in: the menus' (lang.rs LANGUAGES).
 pub const LANGUAGES: [&str; 7] = ["en", "ru", "de", "zh", "fr", "es", "it"];
@@ -337,6 +340,16 @@ impl Expr {
         finite(x)
     }
 
+    /// Its nodes (each value, number, operation and call).
+    pub fn size(&self) -> usize {
+        1usize.saturating_add(match self {
+            Expr::Neg(e) | Expr::Not(e) => e.size(),
+            Expr::Bin(_, a, b) => a.size().saturating_add(b.size()),
+            Expr::Call(_, args) => args.iter().map(Expr::size).fold(0usize, usize::saturating_add),
+            _ => 0,
+        })
+    }
+
     /// Visits every leaf: what the expression reads.
     fn leaves(&self, f: &mut dyn FnMut(&Expr)) {
         match self {
@@ -554,6 +567,9 @@ pub struct ModTxt {
     pub rules: Vec<Rule>,
     /// The hash of the text (fnv-1a 64), which a replay names.
     pub hash: u64,
+    /// The expression nodes its rules can evaluate in all (conditions and actions, one more an action): the most work
+    /// one round of its events can do, held against MAX_TOTAL_COST when it is switched on.
+    pub cost: usize,
 }
 
 impl ModTxt {
@@ -1373,6 +1389,19 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
         }
     }
     check_vars(&mut m)?;
+    m.cost = m
+        .rules
+        .iter()
+        .map(|r| {
+            let conds = r.conditions.iter().map(Expr::size).fold(0usize, usize::saturating_add);
+            let acts = r
+                .actions
+                .iter()
+                .map(|a| a.exprs().iter().map(|e| e.size()).fold(1usize, usize::saturating_add))
+                .fold(0usize, usize::saturating_add);
+            conds.saturating_add(acts)
+        })
+        .fold(0usize, usize::saturating_add);
     if m.names.is_empty() {
         return Err("mod.txt names the mod in no language (name.en ...)".into());
     }
@@ -1499,6 +1528,7 @@ pub fn mods_in(root: &Path, factory: bool) -> Vec<Mod> {
     let Ok(d) = std::fs::read_dir(root) else {
         return Vec::new();
     };
+    // the plain names first, then sorted, then capped: which mods are taken never depends on the folder's order
     let mut keys: Vec<String> = d
         .flatten()
         .take(MAX_ENTRIES)
@@ -1506,6 +1536,7 @@ pub fn mods_in(root: &Path, factory: bool) -> Vec<Mod> {
         .filter(|k| crate::sound_themes::plain(k) && k.len() <= MAX_KEY && !k.contains('.'))
         .collect();
     keys.sort();
+    keys.dedup();
     keys.into_iter()
         .take(MAX_MODS)
         .map(|key| {

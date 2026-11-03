@@ -2720,6 +2720,12 @@ fn save_target(r: &Renderer, target: &wgpu::Texture, (w, h): (u32, u32), path: &
     Ok(())
 }
 
+/// O_NOFOLLOW: the screenshot is never written through a link.
+#[cfg(unix)]
+fn libc_nofollow() -> i32 {
+    libc::O_NOFOLLOW
+}
+
 /// The scene behind the menus: the original's (MenuLevel.nmo) with the copy's interface, else ours.
 fn load_menu_scene(data: &Data) -> Option<crate::menuscene::MenuScene> {
     if gamedata::resources::in_use() == gamedata::resources::Provider::Own {
@@ -3467,16 +3473,18 @@ impl App {
 
     /// Saves the frame just drawn as a PNG in the data folder's screenshots/ (a mod's `screenshot`).
     fn save_screenshot(texture: &wgpu::Texture, gpu: &Gpu) {
+        use wgpu::TextureFormat as F;
+        // only the 8-bit formats are read back as they are (any other would need converting: said, not guessed)
+        let bgra = match gpu.config.format {
+            F::Bgra8Unorm | F::Bgra8UnormSrgb => true,
+            F::Rgba8Unorm | F::Rgba8UnormSrgb => false,
+            other => return eprintln!("screenshot: this display's format ({other:?}) cannot be saved yet"),
+        };
         let (w, h) = (gpu.config.width, gpu.config.height);
-        let pixels = match read_back(&gpu.renderer, texture, w, h) {
+        let mut pixels = match read_back(&gpu.renderer, texture, w, h) {
             Ok(p) => p,
             Err(e) => return eprintln!("screenshot: {e}"),
         };
-        let mut pixels = pixels;
-        let bgra = matches!(
-            gpu.config.format,
-            wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb
-        );
         for px in pixels.as_chunks_mut::<4>().0 {
             if bgra {
                 px.swap(0, 2);
@@ -3485,17 +3493,30 @@ impl App {
             px[3] = 255;
         }
         let dir = gamedata::profile::data_dir().join("screenshots");
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |d| d.as_millis());
-        let path = dir.join(format!("drahtseilakt-{stamp}.png"));
         let _ = std::fs::create_dir_all(&dir);
-        match image::save_buffer(&path, &pixels, w, h, image::ExtendedColorType::Rgba8) {
+        // a real folder, not a link to elsewhere
+        if !std::fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir()) {
+            return eprintln!("screenshot: {} is not a folder", shown_path(&dir));
+        }
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
+        let path = dir.join(format!("drahtseilakt-{stamp}.png"));
+        let mut open = std::fs::OpenOptions::new();
+        // a new file only, never through a link
+        open.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            open.custom_flags(libc_nofollow());
+        }
+        let written = open.open(&path).map_err(|e| e.to_string()).and_then(|f| {
+            use image::ImageEncoder;
+            image::codecs::png::PngEncoder::new(std::io::BufWriter::new(f))
+                .write_image(&pixels, w, h, image::ExtendedColorType::Rgba8)
+                .map_err(|e| e.to_string())
+        });
+        match written {
             Ok(()) => println!("screenshot saved to {}", shown_path(&path)),
-            Err(e) => eprintln!(
-                "could not save the screenshot to {}: {e}",
-                shown_path(&path)
-            ),
+            Err(e) => eprintln!("could not save the screenshot to {}: {e}", shown_path(&path)),
         }
     }
 

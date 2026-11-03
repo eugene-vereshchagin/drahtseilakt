@@ -252,3 +252,4 @@ Bitmap-Schrift, anfälliges Timing des Kugelwechsels), übernehmen wir nicht.
   bleibt beim Spiel.
 - `do screenshot` und `do restart` nur in `on key`-Regeln (nie in jedem Bild); höchstens ein Screenshot pro Sekunde.
 - Ein Replay, dessen Mod-Optionen fehlen, unbekannt oder außerhalb des Bereichs sind, wird mit Begründung abgelehnt.
+- Arbeitsbudget: die Ausdrucksknoten aller eingeschalteten Mods zusammen höchstens 20 000 (beim Lesen gezählt); ein Mod, der es überschreiten würde, wird nicht eingeschaltet, und der Bildschirm Mods sagt warum.
