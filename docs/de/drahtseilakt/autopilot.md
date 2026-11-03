@@ -265,6 +265,9 @@ diesem Weg in diesem Sektor.
   kostet 2, neben der Mitte des Bodens dreimal so viel wie sonst. Wo das Level Tempo braucht (ein Anstieg, eine
   Lücke), bremst eine careful-Zone die Kugel auch: dort gehört keine hin.
 
+Jede Markierung lehrt den Testspieler auch, was für eine Stelle es war, für jedes Level: eine Regel der gelernten
+Tabelle (`learned.txt` neben den Hinweisen; [autopilot-rules.md](autopilot-rules.md), „Die gelernte Tabelle“).
+
 Eine Zonendatei ist nicht vertrauenswürdig wie eine Hinweisdatei: ihre Größe (64 KiB), die Zonen (256) und Punkte
 (256 je Zone) und jede Zahl sind begrenzt; eine fehlerhafte Zeile wird mit einem Vermerk ausgelassen, die anderen
 Zonen gelten.

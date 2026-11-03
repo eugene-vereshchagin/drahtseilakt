@@ -1322,7 +1322,25 @@ pub struct Pilot {
     pub zones: std::sync::Arc<crate::zones::Zones>,
     /// What they ask where the ball is now.
     zone: crate::zones::Effect,
+    /// What it learned from the watcher's marks on every level (learned.rs), and the rule holding now.
+    pub learned: std::sync::Arc<crate::learned::Learned>,
+    learned_now: Option<String>,
+    /// The level's modules (their stand-ins' places and module names), for the situation of a place.
+    pub modules: std::sync::Arc<Vec<(Vec3, String)>>,
 }
+
+/// The situation of a place (learned.rs): the way ahead read this far (points) for its bend, its slope and what
+/// comes, a module this near counts, and the thresholds of the values.
+const SITUATION_AHEAD: usize = 8;
+const SITUATION_MODULE: f32 = 8.0;
+const NARROW: f32 = 4.0;
+const MEDIUM: f32 = 10.0;
+const BEND: f32 = 20.0;
+const SHARP: f32 = 60.0;
+const SLOPE: f32 = 0.15;
+const DROP_STEP: f32 = 2.0;
+/// A sill rises this steeply at least (a ramp's start does not), a drop falls more than it goes across.
+const SILL_STEEP: f32 = 0.6;
 
 /// How near the ball a point of the way must be to take the way up there (a run begun at a sector).
 const TAKE_UP_NEAR: f32 = 8.0;
@@ -1358,6 +1376,9 @@ impl Pilot {
             mode: "way search",
             zones: std::sync::Arc::default(),
             zone: crate::zones::Effect::default(),
+            learned: std::sync::Arc::default(),
+            learned_now: None,
+            modules: std::sync::Arc::default(),
         }
     }
 
@@ -2360,6 +2381,105 @@ impl Pilot {
         self.demo_after = 0;
     }
 
+    /// What steers now, in a word (for the evidence of a learned rule).
+    pub fn mode(&self) -> &'static str {
+        if self.tracking.is_some() { "keeping to the player's line" } else { self.mode }
+    }
+
+    /// The situation of the ball at `p` (as `kind`), the way read from its point `at` (learned.rs): what it is on,
+    /// the floor's width, what borders it, the way's bend and slope ahead, what comes just ahead, the module near.
+    pub fn situation(&self, p: Vec3, at: usize, kind: crate::sim::BallKind) -> crate::learned::Situation {
+        let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+        let foot = p - Vec3::Y * crate::sim::BALL_RADIUS;
+        let mut v: [Option<String>; 8] = Default::default();
+        let set = |v: &mut [Option<String>; 8], f: &str, val: &str| {
+            if let Some(k) = crate::learned::FEATURES.iter().position(|x| *x == f)
+                && let Some(slot) = v.get_mut(k)
+            {
+                *slot = Some(val.to_owned());
+            }
+        };
+        let under = self.route.floor_point(p);
+        set(&mut v, "surface", match under {
+            Some(q) if q.rail => "rail",
+            Some(_) => "floor",
+            None => "off",
+        });
+        if let Some(q) = under.filter(|q| !q.rail) {
+            let w = 2.0 * q.half;
+            set(&mut v, "width", if w < NARROW { "narrow" } else if w < MEDIUM { "medium" } else { "wide" });
+            set(&mut v, "border", match self.route.edges.border(foot) {
+                Some(true) => "walls",
+                Some(false) => "open",
+                None => "far",
+            });
+        }
+        let pts = &self.route.points;
+        // (the way read from its point nearest the ball a little on from `at`: the place on the way lags a hint)
+        let at = (at..(at + LOOK).min(pts.len()))
+            .min_by(|&a, &b| pts[a].distance_squared(foot).total_cmp(&pts[b].distance_squared(foot)))
+            .unwrap_or(at);
+        let pt = |k: usize| pts.get(k.min(pts.len().saturating_sub(1))).copied();
+        if let (Some(a), Some(b), Some(c)) = (pt(at), pt(at + SITUATION_AHEAD / 2), pt(at + SITUATION_AHEAD)) {
+            let (d1, d2) = (flat(b - a).normalize_or_zero(), flat(c - b).normalize_or_zero());
+            if d1 != Vec3::ZERO && d2 != Vec3::ZERO {
+                let angle = d1.dot(d2).clamp(-1.0, 1.0).acos().to_degrees();
+                set(&mut v, "curve", if angle < BEND { "straight" } else if angle < SHARP { "bend" } else { "sharp" });
+            }
+            let run = flat(c - a).length();
+            if run > 1.0 {
+                let s = (c.y - a.y) / run;
+                set(&mut v, "slope", if s > SLOPE { "up" } else if s < -SLOPE { "down" } else { "flat" });
+            }
+        }
+        // what comes just ahead along the way, the first of: a gap, a drop, a rail's end or start, a sill, a
+        // transformer
+        let rail = |q: Vec3| self.route.floor_point(q + Vec3::Y * crate::sim::BALL_RADIUS).is_some_and(|f| f.rail);
+        let end = (at + SITUATION_AHEAD).min(pts.len().saturating_sub(1));
+        let mut ahead = "none";
+        for k in at..end {
+            let (Some(&a), Some(&b)) = (pts.get(k), pts.get(k + 1)) else { break };
+            let h = flat(b - a).length();
+            // (a step up out of the slope the way had before it, not a ramp's rise)
+            let before = k.checked_sub(1).and_then(|j| pts.get(j)).map_or(0.0, |&z| a.y - z.y);
+            let rise = b.y - a.y;
+            ahead = if h > GAP {
+                "gap"
+            } else if a.y - b.y > DROP_STEP && a.y - b.y > h {
+                "drop"
+            } else if rail(a) && !rail(b) {
+                "rail-end"
+            } else if !rail(a) && rail(b) {
+                "rail-start"
+            } else if rise > SILL_STEP && rise < crate::sim::BALL_RADIUS && rise > SILL_STEEP * h && before < rise / 3.0 {
+                "sill"
+            } else {
+                continue;
+            };
+            break;
+        }
+        if ahead == "none"
+            && self.gates.iter().any(|g| g.0 >= at && g.0 <= end + SITUATION_AHEAD && g.1.distance(p) < 12.0)
+        {
+            ahead = "transformer";
+        }
+        set(&mut v, "ahead", ahead);
+        let module = self
+            .modules
+            .iter()
+            .filter(|m| m.0.distance(p) < SITUATION_MODULE)
+            .min_by(|a, b| a.0.distance(p).total_cmp(&b.0.distance(p)))
+            .map_or("none", |m| m.1.as_str());
+        set(&mut v, "module", module);
+        set(&mut v, "kind", &format!("{kind:?}").to_ascii_lowercase());
+        crate::learned::Situation { values: v }
+    }
+
+    /// The way's point nearest the ball at `p` (for the situation of a place it passed).
+    pub fn nearest_point(&self, p: Vec3) -> usize {
+        self.route.nearest(p, usize::MAX).unwrap_or(self.at)
+    }
+
     /// What steers now and where to, for whoever watches: the mode, the way's point reached of all, the next
     /// transformer, the hint running.
     pub fn status(&self) -> String {
@@ -2372,7 +2492,9 @@ impl Pilot {
         if self.zone.flow {
             zone += "   [flow zone]";
         }
-        if let Some(c) = self.zone.cap {
+        if let Some(l) = &self.learned_now {
+            zone = format!("   [learned: {l}]");
+        } else if let Some(c) = self.zone.cap {
             zone += &format!("   [careful zone, at most {c}]");
         }
         format!("{mode}{zone}   way {} / {}{gate}{hint}", self.at, self.route.points.len())
@@ -2382,7 +2504,22 @@ impl Pilot {
     /// careful zone's speed limit.
     pub fn next(&mut self, sim: &Sim) -> u8 {
         self.zone = self.zones.at(sim.ball.position, sim.sector);
+        // the level's own zones first; elsewhere what was learned on any level, where the place is of its kind
+        self.learned_now = None;
+        if self.zone == crate::zones::Effect::default() && !self.learned.is_empty() {
+            let here = self.situation(sim.ball.position, self.at, sim.ball.kind);
+            if let Some((e, label)) = self.learned.at(&here) {
+                self.zone = e;
+                self.learned_now = Some(label);
+            }
+        }
         self.hints.zone = self.zone;
+        // AUTOPILOT_SITUATION: the place as the learned rules see it, every second
+        if sim.tick.is_multiple_of(60) && std::env::var_os("AUTOPILOT_SITUATION").is_some() {
+            let p = sim.ball.position;
+            eprintln!("situation t{} ({:.1} {:.1} {:.1}) {}", sim.tick, p.x, p.y, p.z,
+                self.situation(p, self.at, sim.ball.kind).describe());
+        }
         let i = self.decide(sim);
         match self.zone.cap {
             Some(cap) => under_cap(i, sim, cap),
@@ -3088,5 +3225,72 @@ mod tests {
         let (mut p, mut sim) = flat_pilot("", "careful sector 1 r 20 speed 3 : -50 2 0 ; 150 2 0");
         let (_, own) = drive(&mut p, &mut sim, 400, 0);
         assert!(own < 3.0 * 1.3, "its own steering under the limit: {own}");
+    }
+
+    /// A way through `points` whose floor points are rails where `rail` says (else a floor 10 wide).
+    fn railed_route(points: Vec<Vec3>, rail: impl Fn(usize) -> bool) -> Route {
+        let mut floor: HashMap<(i32, i32), Vec<FloorPoint>> = HashMap::new();
+        for (k, &at) in points.iter().enumerate() {
+            let cell = ((at.x / CELL).floor() as i32, (at.z / CELL).floor() as i32);
+            let rail = rail(k);
+            floor.entry(cell).or_default().push(FloorPoint { at, coarse: 3.0, rail, half: if rail { 0.5 } else { 5.0 } });
+        }
+        let marks = vec![points.len() - 1];
+        Route {
+            points,
+            marks,
+            lifts: Vec::new(),
+            floor,
+            pts: Vec::new(),
+            grid: HashMap::new(),
+            edges: crate::edges::Edges::of(&[], 0),
+        }
+    }
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn a_mark_on_one_level_teaches_the_same_kind_of_place_on_another() {
+        use crate::sim::BallKind;
+        // level A: rails east from x 50, ending at their tenth point; the watcher marked the stretch before the end
+        let a = railed_route((0..30).map(|i| Vec3::new(50.0 + 1.5 * i as f32, 0.0, 40.0)).collect(), |k| k < 10);
+        let pa = Pilot::new(a, Vec::new());
+        let samples: Vec<_> = (3..9)
+            .map(|k| {
+                let p = pa.route.points[k] + Vec3::Y * crate::sim::BALL_RADIUS;
+                pa.situation(p, pa.nearest_point(p), BallKind::Wood)
+            })
+            .collect();
+        let rule = crate::learned::learn(&samples, crate::zones::Kind::Flow, None, "level A".into())
+            .expect("a rule from the rail's end");
+        assert_eq!(rule.line(), "flow when surface=rail ahead=rail-end kind=wood   # level A");
+        let table = std::sync::Arc::new(crate::learned::Learned { rules: vec![rule] });
+        // level B: other rails, north through the start, ending a few points on; a hint waits there
+        let b = || railed_route((0..30).map(|i| Vec3::new(0.0, 0.0, -9.0 + 1.5 * i as f32)).collect(), |k| k < 10);
+        let hint = crate::hints::parse("at 0 2 0 r 10 : wait 120 ; push 0 1 60").expect("hint");
+        let run = |learned: Option<std::sync::Arc<crate::learned::Learned>>| {
+            let mut sim = Sim::new(&crate::sim::tests::flat_level(), BallKind::Wood);
+            let mut p = Pilot::new(b(), Vec::new());
+            p.hints = crate::hints::Runner::new(hint.clone());
+            p.take_up(&sim);
+            if let Some(l) = learned {
+                p.learned = l;
+            }
+            let (i, _) = drive(&mut p, &mut sim, 30, 0);
+            (i, p.status())
+        };
+        let (plain, _) = run(None);
+        assert!(plain.iter().all(|&i| i == 0), "not taught: the wait is kept");
+        let (taught, status) = run(Some(table.clone()));
+        assert!(taught.iter().take(3).any(|&i| i != 0), "taught on level A: no dawdling on level B: {taught:?}");
+        assert!(status.contains("learned: rail, rail-end ahead, wood → don't dawdle"), "{status}");
+        // a level's own zone comes first: a careful zone there and no flow from the table
+        let mut sim = Sim::new(&crate::sim::tests::flat_level(), BallKind::Wood);
+        let mut p = Pilot::new(b(), Vec::new());
+        p.hints = crate::hints::Runner::new(hint.clone());
+        p.take_up(&sim);
+        p.learned = table;
+        p.zones = std::sync::Arc::new(crate::zones::parse("careful sector 1 r 10 : 0 2 0").0);
+        let (own, _) = drive(&mut p, &mut sim, 30, 0);
+        assert!(own.iter().all(|&i| i == 0), "the level's zone first: {own:?}");
     }
 }

@@ -247,6 +247,9 @@ path in that sector.
   floor three times as much as elsewhere. Where the level needs speed (a climb, a gap), a careful zone holds the
   ball back too: such a place is no place for one.
 
+Each mark also teaches the test player the kind of place it was, for every level: a rule of the learned table
+(`learned.txt` beside the hints; [autopilot-rules.md](autopilot-rules.md), "The learned table").
+
 A zones file is untrusted like a hint file: its size (64 KiB), the zones (256) and points (256 a zone) and every
 number are capped; a malformed line is left out with a note naming it, the other zones still count.
 

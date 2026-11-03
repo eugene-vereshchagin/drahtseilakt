@@ -24,6 +24,7 @@ mod highscore;
 mod hints;
 mod hud;
 mod lang;
+mod learned;
 mod levels;
 mod lights;
 mod locate;

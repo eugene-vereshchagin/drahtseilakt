@@ -1105,6 +1105,7 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
             look_back: LOOK_BACK,
             zones_shown: false,
             flash: None,
+            marked: Vec::new(),
         }),
     };
     if let Some(path) = video {
@@ -1801,6 +1802,21 @@ fn zones_path(game: &Game, o: &Options) -> PathBuf {
     dir.join(format!("{}.zones", level_stem(game)))
 }
 
+/// The learned table's file name, beside the hints: one for every level.
+const LEARNED: &str = "learned.txt";
+
+/// The learned table, the lines left out said.
+fn load_learned(path: &Path) -> crate::learned::Learned {
+    let (l, notes) = crate::learned::load(path);
+    for n in notes {
+        eprintln!("learned: {n}");
+    }
+    if !l.is_empty() {
+        println!("{} learned rules from {}", l.rules.len(), path.display());
+    }
+    l
+}
+
 /// The zones of the level, the lines left out said.
 fn load_zones(path: &Path) -> crate::zones::Zones {
     let (zones, notes) = crate::zones::load(path);
@@ -1965,8 +1981,9 @@ struct PilotRun {
     near_edges: crate::edges::EdgeStats,
     /// The last time it went back, for whoever watches: what failed, where, and back to when.
     went_back: Option<String>,
-    /// The watcher's zones file beside the hints (zones.rs).
+    /// The watcher's zones file beside the hints (zones.rs), and the learned table shared by the levels (learned.rs).
     zones_path: PathBuf,
+    learned_path: PathBuf,
 }
 
 impl PilotRun {
@@ -1974,6 +1991,18 @@ impl PilotRun {
         pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
         let zones_path = zones_path(game, o);
         pilot.zones = Arc::new(load_zones(&zones_path));
+        let learned_path = zones_path.with_file_name(LEARNED);
+        pilot.learned = Arc::new(load_learned(&learned_path));
+        let level = &game.level.level;
+        pilot.modules = Arc::new(
+            (0..level.objects.len())
+                .filter_map(|i| {
+                    let name = crate::scene::module_of(level, i)?;
+                    let ob = level.objects.get(i)?;
+                    Some((glam::Vec3::from(ob.position()), name.to_owned()))
+                })
+                .collect(),
+        );
         let level = &game.level.level;
         pilot.bridges = (0..level.objects.len())
             .filter(|&i| crate::scene::module_of(level, i) == Some("P_Modul_25"))
@@ -2005,6 +2034,7 @@ impl PilotRun {
             near_edges: crate::edges::EdgeStats::default(),
             went_back: None,
             zones_path,
+            learned_path,
         })
     }
 
@@ -2063,9 +2093,10 @@ impl PilotRun {
             game.sim = sim;
             game.replay_out = replay;
             // (the zones as they are now: the watcher may have marked one since that state was saved)
-            let zones = self.pilot.zones.clone();
+            let (zones, learned) = (self.pilot.zones.clone(), self.pilot.learned.clone());
             self.pilot = p;
             self.pilot.zones = zones;
+            self.pilot.learned = learned;
             self.pilot.perturb(&game.sim, attempt);
             (self.best, self.since, self.hint_at, self.near_edges) = (b, game.sim.tick.max(sn), h, ne);
             self.heard = game.sim.events.len();
@@ -2645,7 +2676,8 @@ struct PilotWatch {
     /// The box of the watcher's keys is shown (F1).
     keys_shown: bool,
     /// The ball's path of the last seconds (tick, place, sector), for the zones marked (F8, F4).
-    trail: std::collections::VecDeque<(u64, glam::Vec3, usize)>,
+    /// (And the ball's kind, its speed and what steered then, for what a marked stretch was like: learned.rs.)
+    trail: std::collections::VecDeque<Trail>,
     /// A zone being marked: its kind, the key held, from which tick of the trail, in which sector, since when.
     marking: Option<(crate::zones::Kind, KeyCode, u64, usize, Instant)>,
     /// How far back a mark reaches before its key went down, in seconds ([ and ]).
@@ -2654,7 +2686,12 @@ struct PilotWatch {
     zones_shown: bool,
     /// The zone marked last, shown a moment so the watcher sees what got marked.
     flash: Option<(crate::zones::Zone, Instant)>,
+    /// The zones marked in this window, last last: whether each also taught a rule (undone with it).
+    marked: Vec<bool>,
 }
+
+/// A tick of the watched ball's trail: the tick, its place, sector, kind, speed and what steered.
+type Trail = (u64, glam::Vec3, usize, crate::sim::BallKind, f32, &'static str);
 
 /// A mark reaches this far back before its key went down by default, and at most (seconds); the trail is kept a
 /// little longer; a key held longer than `MARK_HELD_MAX` ends its zone (a release the window never heard).
@@ -2819,6 +2856,11 @@ impl PilotWatch {
             self.run.rewinds.total(),
             self.run.pilot.status()
         );
+        // (with the zones shown, the place as the learned rules see it)
+        if self.zones_shown {
+            let p = &self.run.pilot;
+            t += &format!("\nhere: {}", p.situation(s.ball.position, p.reached(), s.ball.kind).describe());
+        }
         if let Some((n, at)) = &self.notice
             && at.elapsed() < NOTICE
         {
@@ -3346,7 +3388,17 @@ impl App {
                             w.run.pilot.zones = Arc::new(load_zones(&path));
                             w.pending = None;
                             let kind = line.split_whitespace().next().unwrap_or_default().to_owned();
-                            format!("undone: the last {kind} zone in {}", shown_path(&path))
+                            let mut t = format!("undone: the last {kind} zone in {}", shown_path(&path));
+                            // and the rule it taught
+                            if w.marked.pop() == Some(true) {
+                                let lp = w.run.learned_path.clone();
+                                match crate::zones::undo_last(&lp) {
+                                    Ok(_) => t += " and the rule it taught",
+                                    Err(e) => t += &format!(" (its rule not undone: {e})"),
+                                }
+                                w.run.pilot.learned = Arc::new(load_learned(&lp));
+                            }
+                            t
                         }
                         Ok(None) => "no zone to undo".to_owned(),
                         Err(e) => format!("not undone: {e}"),
@@ -3404,7 +3456,7 @@ impl App {
         };
         let file = w.run.zones_path.clone();
         let secs = s.tick.saturating_sub(from) as f32 / 60.0;
-        let text = match crate::zones::append(&file, &zone) {
+        let mut text = match crate::zones::append(&file, &zone) {
             Ok(()) => {
                 w.run.pilot.zones = Arc::new(load_zones(&file));
                 // (a decision on its way is made again, with the zone)
@@ -3412,8 +3464,57 @@ impl App {
                 format!("marked a {} zone: {secs:.1} s, {} points, in {}", kind.word(), zone.points.len(),
                     shown_path(&file))
             }
-            Err(e) => format!("zone not saved: {e}"),
+            Err(e) => {
+                let t = format!("zone not saved: {e}");
+                println!("{t}");
+                w.notice = Some((t, Instant::now()));
+                return;
+            }
         };
+        // what kind of place it was, for every level: a rule of the learned table (learned.rs)
+        let stretch: Vec<&Trail> = w.trail.iter().filter(|t| t.0 >= from && t.2 == sector).collect();
+        let pilot = &w.run.pilot;
+        let samples: Vec<crate::learned::Situation> = stretch
+            .iter()
+            .step_by(6)
+            .map(|t| pilot.situation(t.1, pilot.nearest_point(t.1), t.3))
+            .collect();
+        let n = stretch.len().max(1) as f32;
+        let stopping = stretch.iter().filter(|t| t.4 < 1.0).count() as f32 / n;
+        let off: Vec<f32> = stretch.iter().filter_map(|t| pilot.route.off_middle(t.1).map(|o| o.0)).collect();
+        let off = off.iter().sum::<f32>() / off.len().max(1) as f32;
+        let mut modes: Vec<(&str, usize)> = Vec::new();
+        for t in &stretch {
+            match modes.iter_mut().find(|m| m.0 == t.5) {
+                Some(m) => m.1 += 1,
+                None => modes.push((t.5, 1)),
+            }
+        }
+        let mode = modes.iter().max_by_key(|m| m.1).map_or("-", |m| m.0);
+        let at = zone.points.last().copied().unwrap_or_default();
+        let evidence = format!(
+            "{} sector {} ({:.1} {:.1} {:.1}) {}: {secs:.1} s, stopping {:.0}%, mostly {mode}, off the middle {off:.1}",
+            level_stem(&self.game), sector + 1, at.x, at.y, at.z, crate::learned::today(), 100.0 * stopping);
+        let rule = crate::learned::learn(&samples, kind, None, evidence);
+        let lp = w.run.learned_path.clone();
+        let taught = match rule {
+            Some(r) => match crate::learned::append(&lp, &r) {
+                Ok(()) => {
+                    w.run.pilot.learned = Arc::new(load_learned(&lp));
+                    text += &format!("; learned: {}", r.label());
+                    true
+                }
+                Err(e) => {
+                    text += &format!("; rule not saved: {e}");
+                    false
+                }
+            },
+            None => {
+                text += "; nothing special to learn there (the zone stays this level's)";
+                false
+            }
+        };
+        w.marked.push(taught);
         println!("{text}");
         w.notice = Some((text, Instant::now()));
         w.flash = Some((zone, Instant::now()));
@@ -3427,7 +3528,7 @@ impl App {
         while w.trail.back().is_some_and(|t| t.0 >= s.tick) {
             w.trail.pop_back();
         }
-        w.trail.push_back((s.tick, s.ball.position, s.sector));
+        w.trail.push_back((s.tick, s.ball.position, s.sector, s.ball.kind, s.ball.velocity.length(), w.run.pilot.mode()));
         while w.trail.front().is_some_and(|t| t.0 + TRAIL_TICKS < s.tick) {
             w.trail.pop_front();
         }

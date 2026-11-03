@@ -3,6 +3,7 @@
 //   replay     a replay file (replay.rs), read and written back;
 //   hints      a hint file of the test player (hints.rs);
 //   zones      a zones file of the test player (zones.rs);
+//   learned    the test player's learned table (learned.rs);
 //   wav, ogg   a sound or music file as audio.rs decodes it;
 //   highscore  the saved highscore table;
 //   settings   the settings file as every reader of it takes its values (graphics, keys, extended mode's additions,
@@ -108,6 +109,47 @@ fn zone_seeds() -> Vec<Vec<u8>> {
     roots.extend(profile("hints"));
     out.extend(fuzzkit::read_all(&fuzzkit::files_under(&roots, &["zones"], 40, 64 * 1024)));
     out
+}
+
+fn run_learned(input: &[u8]) {
+    let Ok(text) = std::str::from_utf8(input) else { return };
+    let (learned, _) = crate::learned::parse(text);
+    // every rule written back reads the same, and holds where its features are
+    for r in &learned.rules {
+        let (again, notes) = crate::learned::parse(&r.line());
+        assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(again.rules.first(), Some(r));
+        let mut s = crate::learned::Situation::default();
+        for (f, v) in &r.when {
+            s.values[*f] = Some(v.clone());
+        }
+        assert!(learned.at(&s).is_some());
+    }
+}
+
+fn learned_seeds() -> Vec<Vec<u8>> {
+    let mut out = vec![
+        b"flow when surface=rail ahead=rail-end kind=wood   # Level_01\ncareful speed 3 when surface=floor width=narrow curve=sharp module=P_Modul_25\n".to_vec(),
+    ];
+    let mut roots = vec![repo().join("hints")];
+    roots.extend(profile("hints"));
+    out.extend(
+        fuzzkit::read_all(&fuzzkit::files_under(&roots, &["txt"], 40, 64 * 1024))
+            .into_iter()
+            .filter(|b| b.starts_with(b"# What the test player learned")),
+    );
+    out
+}
+
+#[test]
+#[ignore]
+fn fuzz_learned() {
+    let mut t = Target::new("learned", test_name!("fuzz_learned"), Kind::Text);
+    t.dict = &[
+        "flow", "careful", "speed", "when", "surface=", "width=", "border=", "curve=", "slope=", "ahead=", "module=",
+        "kind=", "rail", "floor", "rail-end", "narrow", "#",
+    ];
+    fuzzkit::fuzz(t, learned_seeds, run_learned);
 }
 
 #[test]
@@ -446,6 +488,7 @@ fn fuzz_regressions() {
     fuzzkit::regressions("replay", run_replay);
     fuzzkit::regressions("hints", run_hints);
     fuzzkit::regressions("zones", run_zones);
+    fuzzkit::regressions("learned", run_learned);
     fuzzkit::regressions("wav", run_wav);
     fuzzkit::regressions("ogg", run_ogg);
     fuzzkit::regressions("highscore", run_highscore);

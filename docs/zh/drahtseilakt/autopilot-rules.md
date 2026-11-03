@@ -54,6 +54,40 @@
 
 观看者的区域优先于上面的节奏规则:那是所有者亲眼所见。
 
+## 学习表:`hints/learned.txt`
+
+区域还会告诉测试玩家那是什么样的地方,适用于所有关卡,包括尚未通过的(12、13、我们自己的关卡)。每次标记时,它沿标记段
+每十分之一秒按八个特征读取地点:
+
+| 特征 | 取值 |
+|---|---|
+| surface | `floor`、`rail`、`off`(不在路线的地面上:模块部件、空中) |
+| width | 地面宽度:`narrow`(小于 4)、`medium`(小于 10)、`wide` |
+| border | 8 以内最近的地面边缘:`walls`(有墙)、`open`(下面是落差)、`far` |
+| curve | 路线在接下来 8 个点上的转角:`straight`(小于 20°)、`bend`(小于 60°)、`sharp` |
+| slope | 其上的坡度:`flat`、`up`、`down`(超过 0.15) |
+| ahead | 其中遇到的第一个:`gap`、`drop`、`rail-end`、`rail-start`、`sill`、`transformer` 或 `none` |
+| module | 8 以内最近的模块(`P_Modul_25`、`P_Box` 等)或 `none` |
+| kind | `wood`、`stone`、`paper` |
+
+在该段大部分(60%)相同的东西成为一条规则:表面、球,以及该地点特有的值(不是普通的中等或宽地面、直、平、前方无物、无模块);
+普通的值被省略,它们只会让规则适用的地方更少。没有特别之处的段落不会学到任何东西(其区域仍只属于本关)。规则追加到提示旁的
+`learned.txt`(所有关卡共用一个文件),并记录在哪里学到的以及测试玩家当时在做什么:
+
+```
+flow when surface=rail ahead=rail-end kind=wood   # Level_01 sector 2 (147.2 -2.1 -552.0) 2026-11-03: 3.0 s, stopping 40%, mostly hint, off the middle 0.0
+careful speed 4.5 when surface=floor width=narrow curve=sharp kind=stone
+```
+
+规则在其列出的每个特征都取该值的地方生效;它的要求与同类区域相同(flow、careful)。每次运行都会读取此表并每个 tick 检查地点:
+在球不处于本关自己的区域(优先)且有规则生效时,只要其中有 flow 即为 flow,careful 取最低限速;状态行显示生效的最具体规则
+(`learned: rail, rail-end ahead, wood → don't dawdle`),按 F12 时还显示规则眼中的地点(`here: surface=rail ...`)。
+一条规则至少列出两个特征,其中一个是该地点特有的,这样就不会有规则几乎处处生效。撤销标记(Backspace)也会删除它学到的规则。
+此表是纯文本:过宽的规则可通过增加特征来收窄,或直接删除。它与提示文件一样按不受信任的输入读取:大小(64 KiB)、规则数(512)
+和数字都有上限,取值只能来自上面的列表,格式错误的行会被省略并注明。`AUTOPILOT_SITUATION=1` 在运行中每秒打印规则眼中的地点。
+
+这些特征在不计模块时区分 2079 种地点(地面 1701、轨道 189、其他 189),每种还可与附近的每个模块组合。
+
 ## 关卡的路线：`hints/Level_NN.route`
 
 每个关卡一个文件，供人和代理阅读（测试玩家读取由它做成的计划和提示）：每个小节按顺序列出各段，每段写明用哪种球、按顺序经过的对象、在每个对象处做什么以及节奏。
