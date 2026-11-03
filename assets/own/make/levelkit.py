@@ -1056,7 +1056,8 @@ class LevelBuilder:
                     if np.linalg.norm(nrm) < 1e-9 or N[list(t)][:, 1].mean() < 0.3:
                         continue
                     tris.append(q)
-                    lo, hi = np.floor(q[:, [0, 2]].min(0) / 4).astype(int), np.floor(q[:, [0, 2]].max(0) / 4).astype(int)
+                    lo = np.floor(q[:, [0, 2]].min(0) / 4).astype(int)
+                    hi = np.floor(q[:, [0, 2]].max(0) / 4).astype(int)
                     for a in range(lo[0], hi[0] + 1):
                         for b in range(lo[1], hi[1] + 1):
                             cells.setdefault((a, b), []).append(len(tris) - 1)
@@ -1116,7 +1117,8 @@ class LevelBuilder:
             near = geo[(np.abs(geo[:, 0] - x) < reach) & (np.abs(geo[:, 2] - z) < reach)
                        & (geo[:, 1] > y + 0.6) & (geo[:, 1] < y + HEADROOM)]
             if len(near):
-                bad.append(f"{what} at ({x:.1f}, {y:.1f}, {z:.1f}): a floor or rails {float(near[:, 1].min() - y):.1f} over "
+                over = float(near[:, 1].min() - y)
+                bad.append(f"{what} at ({x:.1f}, {y:.1f}, {z:.1f}): a floor or rails {over:.1f} over "
                            f"it (at least {HEADROOM} clear over it)")
         if bad:
             raise ValueError(f"{len(bad)} parts do not stand on a flat patch of floor with room over it:\n  "
