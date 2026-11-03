@@ -48,6 +48,7 @@ mod trafo;
 mod ui;
 mod volume;
 mod watch;
+mod zones;
 
 use assets::{Data, Source};
 use std::path::PathBuf;

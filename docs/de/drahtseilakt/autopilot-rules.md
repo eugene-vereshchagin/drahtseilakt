@@ -72,6 +72,21 @@ Die Mechanik, auf der sie beruhen, steht in [autopilot.md](autopilot.md).
 - **Stein** zum Rammen von Kisten und Schieben von Kugeln; er zerbricht hängende Platten (P_Modul_29): er fährt nicht
   darüber, außer das Level will, dass er mit den Platten hindurchfällt (die Türme von Level 6).
 
+## Zonen, die der Zuschauer markiert
+
+Wo der Besitzer sieht, dass der Testspieler falsch fährt, markiert er die Strecke beim Zusehen (`--watch`, F8 und
+F4; [autopilot.md](autopilot.md), „Zonen“), und die Markierung ist von da an eine Regel für diese Strecke, in
+`<level>.zones` neben den Hinweisen:
+
+- **flow** („hier nicht trödeln“): kein Halt, kein Warten, kein Langsamwerden, das die Kugel nicht braucht. Das
+  `goto` eines Hinweises wird durchrollt, `wait` und `hold` ausgelassen, ein langsames `pass` oder `press` mit 5
+  gefahren, jeweils nur, wenn eine Kopie des Laufs zeigt, dass die Kugel so bleibt; die Steuerung hält mindestens
+  0,8 des Tempos des Bodens.
+- **careful** („Tempolimit halten und keine Kurven schneiden“): nicht schneller als das Tempo der Zone (4,5 ohne
+  Angabe), auf der Mittellinie des Weges, keine Ideallinie; was auch steuert, bleibt unter dem Limit.
+
+Eine Zone des Zuschauers geht den Tempo-Regeln oben vor: sie ist, was der Besitzer gesehen hat.
+
 ## Die Route eines Levels: `hints/Level_NN.route`
 
 Eine Datei je Level, für Menschen und Agenten (der Testspieler liest den Plan und die daraus gemachten Hinweise): für

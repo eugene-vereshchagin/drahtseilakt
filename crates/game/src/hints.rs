@@ -499,7 +499,16 @@ struct Running {
     pushes: Vec<Vec3>,
     /// The point the last pass step went through (kept from step to step: the next pass keeps to the line from it).
     passed: Option<Vec3>,
+    /// In a flow zone (zones.rs) the step is run without its stop: a goto rolled through, a wait or hold left out,
+    /// a slow pass or press taken at `FLOW_SPEED`, when a copy of the run shows the ball is kept so.
+    flowed: bool,
 }
+
+/// In a flow zone a pass or press slower than this is taken at it.
+pub const FLOW_SPEED: f32 = 5.0;
+/// A flowed step is tried on a copy of the run this long (the rest of the hint) and a second after.
+const FLOW_CHECK: u64 = 600;
+const FLOW_COAST: u64 = 60;
 
 /// Runs the hints for the test player.
 #[derive(Debug, Clone, Default)]
@@ -512,6 +521,10 @@ pub struct Runner {
     pub ended: bool,
     /// The tick the last hint began.
     pub began: u64,
+    /// What the watcher's zones ask where the ball is now (set by the test player each tick).
+    pub zone: crate::zones::Effect,
+    /// A copy of the runner trying a step on a copy of the run: says nothing.
+    quiet: bool,
 }
 
 impl Runner {
@@ -600,11 +613,13 @@ impl Runner {
             if let Some(f) = self.fired.get_mut(i) {
                 *f = true;
             }
-            eprintln!(
+            if !self.quiet {
+                eprintln!(
                 "hint (line {}) at tick {}",
                 self.hints.get(i).map_or(0, |h| h.line),
                 sim.tick
             );
+            }
             self.began = sim.tick;
             self.running = Some(Running {
                 hint: i,
@@ -620,6 +635,7 @@ impl Runner {
                 from: Vec3::ZERO,
                 pushes: Vec::new(),
                 passed: None,
+                flowed: false,
             });
             self.begin(sim);
         }
@@ -630,7 +646,8 @@ impl Runner {
                 self.ended = true;
                 return None;
             };
-            if let Some(i) = drive(step, run, sim) {
+            let step = adjust(step, run.flowed, self.zone.cap);
+            if let Some(i) = drive(&step, run, sim) {
                 // HINTS_TRACE: the ball every ten ticks while a hint drives, to write hints by
                 if std::env::var_os("HINTS_TRACE").is_some() && sim.tick.is_multiple_of(10) {
                     let (p, v) = (sim.ball.position, sim.ball.velocity);
@@ -650,10 +667,12 @@ impl Runner {
             }
             run.step += 1;
             let p = sim.ball.position;
-            eprintln!(
-                "  step {} done at tick {} ball ({:.1} {:.1} {:.1})",
-                run.step, sim.tick, p.x, p.y, p.z
-            );
+            if !self.quiet {
+                eprintln!(
+                    "  step {} done at tick {} ball ({:.1} {:.1} {:.1})",
+                    run.step, sim.tick, p.x, p.y, p.z
+                );
+            }
             self.begin(sim);
         }
     }
@@ -672,12 +691,93 @@ impl Runner {
         run.body = None;
         run.from = Vec3::ZERO;
         run.pushes.clear();
-        if let Some(Step::Inputs(q, _)) =
-            self.hints.get(run.hint).and_then(|h| h.steps.get(run.step))
-        {
+        run.flowed = false;
+        let step = self.hints.get(run.hint).and_then(|h| h.steps.get(run.step));
+        if let Some(Step::Inputs(q, _)) = step {
             run.quarter = *q;
         }
+        // in a flow zone a step that stops the ball goes without its stop, when a copy of the run keeps the ball so
+        if self.zone.flow && step.is_some_and(|s| flowing(s).is_some()) && self.flow_keeps_ball(sim) {
+            if let Some(run) = self.running.as_mut() {
+                run.flowed = true;
+            }
+            if !self.quiet {
+                eprintln!("  step {} without its stop (a flow zone)", run_step(self));
+            }
+        }
     }
+
+    /// Whether the running step, flowed (`adjust`), keeps the ball: the rest of the hint and a second after, on a
+    /// copy of the run (as written from there on: one step at a time is flowed).
+    fn flow_keeps_ball(&self, sim: &Sim) -> bool {
+        let mut r = self.clone();
+        r.zone = crate::zones::Effect::default();
+        r.quiet = true;
+        let Some(run) = r.running.as_mut() else { return false };
+        run.flowed = true;
+        let mut s = sim.clone();
+        let lives = s.lives;
+        let gone = |s: &Sim| s.lives < lives || s.is_dying() || s.game_over;
+        let mut coast = 0;
+        for _ in 0..FLOW_CHECK + FLOW_COAST {
+            let i = if r.running.is_some() { r.input(&s).unwrap_or(0) } else { 0 };
+            if r.running.is_none() {
+                coast += 1;
+                if coast > FLOW_COAST {
+                    break;
+                }
+            }
+            s.step(i);
+            if gone(&s) {
+                return false;
+            }
+            if s.finished {
+                break;
+            }
+        }
+        true
+    }
+}
+
+/// The running step's number (from 1), for the log.
+fn run_step(r: &Runner) -> usize {
+    r.running.as_ref().map_or(0, |run| run.step + 1)
+}
+
+/// What a step does without its stop in a flow zone: a goto rolled through, a wait or hold left out, a slow pass or
+/// press at `FLOW_SPEED`; None for a step that has no stop to leave out.
+fn flowing(step: &Step) -> Option<Step> {
+    match *step {
+        Step::Goto(p, n) => Some(Step::Via(p, n)),
+        Step::Wait(_) => Some(Step::Wait(0)),
+        Step::Hold(p, _) => Some(Step::Hold(p, 0)),
+        Step::Pass(p, v, n) if v < FLOW_SPEED => Some(Step::Pass(p, FLOW_SPEED, n)),
+        Step::Press(p, side, v, n) if v < FLOW_SPEED => Some(Step::Press(p, side, FLOW_SPEED, n)),
+        _ => None,
+    }
+}
+
+/// The step as the zones have it run: without its stop (`flowed`), and with its speed not above a careful zone's
+/// limit (`cap`).
+fn adjust(step: &Step, flowed: bool, cap: Option<f32>) -> std::borrow::Cow<'_, Step> {
+    use std::borrow::Cow;
+    let mut out = Cow::Borrowed(step);
+    if flowed && let Some(f) = flowing(step) {
+        out = Cow::Owned(f);
+    }
+    if let Some(c) = cap {
+        let capped = match *out {
+            Step::Pass(p, v, n) if v > c => Some(Step::Pass(p, c, n)),
+            Step::Press(p, side, v, n) if v > c => Some(Step::Press(p, side, c, n)),
+            Step::Along(v, n) if v > c => Some(Step::Along(c, n)),
+            Step::Round(p, r, v, n) if v.abs() > c => Some(Step::Round(p, r, c * v.signum(), n)),
+            _ => None,
+        };
+        if let Some(s) = capped {
+            out = Cow::Owned(s);
+        }
+    }
+    out
 }
 
 /// The loose body (and, with `parts`, the module part) nearest `at`; usize::MAX for none.

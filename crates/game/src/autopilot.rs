@@ -1087,6 +1087,17 @@ const SLOW: f32 = 0.4;
 const SAFE: f32 = 3.0;
 const EDGE: f32 = 2.7;
 const MIDDLE: f32 = 0.6;
+/// The watcher's zones (zones.rs). A flow zone: below `FLOW_PACE` of the floor's pace each unit costs `FLOW_SLOW`
+/// way points (more than standing for a decision is worth, less than keeping the ball). A careful zone: above its
+/// limit each unit costs `CAREFUL_FAST` more, off the way's line ahead (the middle the way's search found) each
+/// unit `CAREFUL_LINE` on average, off the middle of the floor `CAREFUL_MIDDLE` times as much; the input is kept
+/// under the limit (`under_cap`), braking above `CAREFUL_BRAKE` times it.
+const FLOW_PACE: f32 = 0.8;
+const FLOW_SLOW: f32 = 1.5;
+const CAREFUL_FAST: f32 = 4.0;
+const CAREFUL_LINE: f32 = 2.0;
+const CAREFUL_MIDDLE: f32 = 3.0;
+const CAREFUL_BRAKE: f32 = 1.25;
 /// And a player holds a line: each arrow pressed or let go since the last decision costs this (no zig-zag).
 const SWITCH: f32 = 0.15;
 const ARROWS: u8 = input::UP | input::DOWN | input::LEFT | input::RIGHT;
@@ -1307,6 +1318,10 @@ pub struct Pilot {
     doomed_at: Option<u64>,
     /// What steers now, for whoever watches (`status`).
     mode: &'static str,
+    /// The watcher's zones (zones.rs): where not to dawdle, where to keep slow and on the middle.
+    pub zones: std::sync::Arc<crate::zones::Zones>,
+    /// What they ask where the ball is now.
+    zone: crate::zones::Effect,
 }
 
 /// How near the ball a point of the way must be to take the way up there (a run begun at a sector).
@@ -1341,6 +1356,8 @@ impl Pilot {
             track_keys: Vec::new(),
             doomed_at: None,
             mode: "way search",
+            zones: std::sync::Arc::default(),
+            zone: crate::zones::Effect::default(),
         }
     }
 
@@ -2351,11 +2368,30 @@ impl Pilot {
         });
         let mode = if self.tracking.is_some() { "keeping to the player's line" } else { self.mode };
         let hint = self.hints.describe().map_or_else(String::new, |h| format!("\n{h}"));
-        format!("{mode}   way {} / {}{gate}{hint}", self.at, self.route.points.len())
+        let mut zone = String::new();
+        if self.zone.flow {
+            zone += "   [flow zone]";
+        }
+        if let Some(c) = self.zone.cap {
+            zone += &format!("   [careful zone, at most {c}]");
+        }
+        format!("{mode}{zone}   way {} / {}{gate}{hint}", self.at, self.route.points.len())
     }
 
-    /// The input for the next tick of `sim`.
+    /// The input for the next tick of `sim`: as the steering, a hint or the player's line has it, kept under a
+    /// careful zone's speed limit.
     pub fn next(&mut self, sim: &Sim) -> u8 {
+        self.zone = self.zones.at(sim.ball.position, sim.sector);
+        self.hints.zone = self.zone;
+        let i = self.decide(sim);
+        match self.zone.cap {
+            Some(cap) => under_cap(i, sim, cap),
+            None => i,
+        }
+    }
+
+    /// The input for the next tick of `sim`, before a careful zone's limit.
+    fn decide(&mut self, sim: &Sim) -> u8 {
         if let Some((until, c)) = self.noise.as_ref().map(|n| n.opening)
             && sim.tick < until
         {
@@ -2576,7 +2612,14 @@ impl Pilot {
             .chain(matched.map(|_| DEMO_CHOICE))
             .collect();
         let demo_k = matched.zip(self.demo.as_deref());
-        let tried = rollouts(sim, &self.route, demo_k, &choices, hold, low);
+        // in a careful zone the way's line ahead is the line kept to (no corner cut)
+        let zone = self.zone;
+        let line_end = (self.at + LOOK).min(self.route.points.len());
+        let line = zone
+            .cap
+            .and_then(|_| self.route.points.get(self.at.saturating_sub(2)..line_end))
+            .filter(|l| l.len() >= 2);
+        let tried = rollouts(sim, &self.route, demo_k, &choices, hold, low, line);
         for (&c, (s, lost, edge)) in choices.iter().zip(tried) {
             let from_demo = c == DEMO_CHOICE;
             let lives = sim.lives;
@@ -2615,16 +2658,30 @@ impl Pilot {
             } else if s.finished {
                 f32::INFINITY
             } else {
+                let v = s.ball.velocity.length();
+                // (the pace for the floor, not above a careful zone's limit)
+                let cruise = |p: Vec3| {
+                    let c = self.route.cruise(p);
+                    zone.cap.map_or(c, |cap| c.min(cap))
+                };
                 self.progress(s.ball.position)
                     - self.blocking(&s)
-                    - if uphill {
+                    - if uphill && zone.cap.is_none() {
                         0.0
                     } else {
-                        FAST * (s.ball.velocity.length() - if steady { self.route.cruise(s.ball.position) } else { CALM })
-                            .max(0.0)
+                        FAST * (v - if steady || zone.cap.is_some() { cruise(s.ball.position) } else { CALM }).max(0.0)
                     }
+                    // a careful zone: over its limit costs a lot more
+                    - zone.cap.map_or(0.0, |cap| CAREFUL_FAST * (v - cap).max(0.0))
                     - if steady {
-                        SLOW * (0.5 * self.route.cruise(s.ball.position) - s.ball.velocity.length()).max(0.0)
+                        SLOW * (0.5 * cruise(s.ball.position) - v).max(0.0)
+                    } else {
+                        0.0
+                    }
+                    // a flow zone: slower than most of the pace costs more than a wait is worth (a choice that loses
+                    // the ball is still never taken)
+                    - if zone.flow {
+                        FLOW_SLOW * (FLOW_PACE * cruise(s.ball.position) - v).max(0.0)
                     } else {
                         0.0
                     }
@@ -2680,13 +2737,16 @@ fn rollouts(
     choices: &[u8],
     hold: u64,
     low: f32,
+    line: Option<&[Vec3]>,
 ) -> Vec<(Sim, bool, f32)> {
     let one = |c: u8| {
         let mut s = sim.clone();
         let lives = s.lives;
         let mut lost = false;
-        // (off the middle, nearer an edge than `SAFE`: summed over the samples on a floor)
+        // (off the middle, nearer an edge than `SAFE`: summed over the samples on a floor; off the way's line in a
+        // careful zone, over all samples)
         let (mut off, mut near, mut samples) = (0.0, 0.0, 0u32);
+        let (mut astray, mut line_samples) = (0.0, 0u32);
         for t in 0..hold + COAST {
             let input = match demo {
                 Some((k, d)) if c == DEMO_CHOICE => d.input(k + t as usize, s.camera.quarter),
@@ -2694,6 +2754,12 @@ fn rollouts(
                 _ => 0,
             };
             s.step(input);
+            if t % 6 == 5
+                && let Some(l) = line
+            {
+                astray += off_line(s.ball.position - Vec3::Y * crate::sim::BALL_RADIUS, l);
+                line_samples += 1;
+            }
             if t % 6 == 5
                 && s.ball.on_ground
                 && let Some((o, n)) = route.off_middle(s.ball.position)
@@ -2729,7 +2795,9 @@ fn rollouts(
         {
             lost = true;
         }
-        let edge = (MIDDLE * off + EDGE * near) / samples.max(1) as f32;
+        let middle = if line.is_some() { MIDDLE * CAREFUL_MIDDLE } else { MIDDLE };
+        let edge = (middle * off + EDGE * near) / samples.max(1) as f32
+            + CAREFUL_LINE * astray / line_samples.max(1) as f32;
         (s, lost, edge)
     };
     if std::env::var_os("AUTOPILOT_PARALLEL").is_none() {
@@ -2746,6 +2814,43 @@ fn rollouts(
             .map(|h| h.join().unwrap_or_else(|e| std::panic::resume_unwind(e)))
             .collect()
     })
+}
+
+/// How far the floor point `f` is from the way's line `l` (its segments).
+fn off_line(f: Vec3, l: &[Vec3]) -> f32 {
+    l.windows(2)
+        .map(|w| {
+            let (a, b) = (w[0], w[1]);
+            let ab = b - a;
+            let len2 = ab.length_squared();
+            let t = if len2 > 1e-9 { ((f - a).dot(ab) / len2).clamp(0.0, 1.0) } else { 0.0 };
+            f.distance(a + ab * t)
+        })
+        .fold(f32::INFINITY, f32::min)
+        .min(10.0)
+}
+
+/// Input `i` kept under the speed limit `cap` (a careful zone): over it, the arrows that push along the way the ball
+/// rolls are let go (those across it stay, to keep the line); well over it, the ball is braked. A turn of the view is
+/// left as it is.
+fn under_cap(i: u8, sim: &Sim, cap: f32) -> u8 {
+    let v = Vec3::new(sim.ball.velocity.x, 0.0, sim.ball.velocity.z);
+    let speed = v.length();
+    if i & input::SHIFT != 0 || speed <= cap {
+        return i;
+    }
+    let q = sim.camera.quarter;
+    if speed > cap * CAREFUL_BRAKE {
+        return (i & !ARROWS) | crate::hints::arrows(-v, q);
+    }
+    let dir = v / speed;
+    let mut out = i & !ARROWS;
+    for bit in [input::UP, input::DOWN, input::LEFT, input::RIGHT] {
+        if i & bit != 0 && crate::hints::world_push(bit, q).dot(dir) <= 0.2 {
+            out |= bit;
+        }
+    }
+    out
 }
 
 /// A state of the search: the copy of the run, the held choices that led to it (until which tick each), its score.
@@ -2912,5 +3017,76 @@ mod tests {
         assert!((a - 1.5).abs() < 1e-4);
         // far off the way: no point within reach, so behind where the search began
         assert!(r.progress(Vec3::new(9.0, 0.0, 20.0) + up, 2, usize::MAX) < 2.0);
+    }
+
+    /// A pilot on the flat test floor with a straight way east and these hints and zones.
+    #[allow(clippy::expect_used)]
+    fn flat_pilot(hints: &str, zones: &str) -> (Pilot, Sim) {
+        let sim = Sim::new(&crate::sim::tests::flat_level(), crate::sim::BallKind::Wood);
+        let points: Vec<Vec3> = (0..40).map(|i| Vec3::new(i as f32 * 1.5, 0.0, 0.0)).collect();
+        let r = Route {
+            points,
+            marks: vec![39],
+            lifts: Vec::new(),
+            floor: HashMap::new(),
+            pts: Vec::new(),
+            grid: HashMap::new(),
+            edges: crate::edges::Edges::of(&[], 0),
+        };
+        let mut p = Pilot::new(r, Vec::new());
+        p.hints = crate::hints::Runner::new(crate::hints::parse(hints).expect("hints"));
+        let (z, notes) = crate::zones::parse(zones);
+        assert!(notes.is_empty(), "{notes:?}");
+        p.zones = std::sync::Arc::new(z);
+        (p, sim)
+    }
+
+    /// The inputs of the first `n` ticks the pilot gives, and the fastest the ball rolled over the floor after `from`.
+    fn drive(p: &mut Pilot, sim: &mut Sim, n: u64, from: u64) -> (Vec<u8>, f32) {
+        let mut inputs = Vec::new();
+        let mut fastest = 0.0f32;
+        for t in 0..n {
+            let i = p.next(sim);
+            inputs.push(i);
+            sim.step(i);
+            if t >= from {
+                let v = sim.ball.velocity;
+                fastest = fastest.max(Vec3::new(v.x, 0.0, v.z).length());
+            }
+        }
+        (inputs, fastest)
+    }
+
+    #[test]
+    fn a_flow_zone_leaves_out_a_hints_stop_that_is_not_needed() {
+        let hint = "at 0 2 0 r 10 : wait 120 ; push 1 0 60";
+        // as written: two seconds standing first
+        let (mut p, mut sim) = flat_pilot(hint, "");
+        let (i, _) = drive(&mut p, &mut sim, 60, 0);
+        assert!(i.iter().all(|&i| i == 0), "the wait is kept outside a zone");
+        // in a flow zone the wait goes: pushing at once
+        let (mut p, mut sim) = flat_pilot(hint, "flow sector 1 r 10 : 0 2 0");
+        let (i, _) = drive(&mut p, &mut sim, 10, 0);
+        assert!(i.iter().take(3).any(|&i| i != 0), "the wait is left out in a flow zone: {i:?}");
+        // but not where leaving it out would lose the ball: a push that runs off the floor's edge
+        let off = "at 0 2 0 r 10 : wait 120 ; push 1 0 3000";
+        let (mut p, mut sim) = flat_pilot(off, "flow sector 1 r 10 : 0 2 0");
+        let (i, _) = drive(&mut p, &mut sim, 60, 0);
+        assert!(i.iter().all(|&i| i == 0), "a wait the ball needs is kept");
+    }
+
+    #[test]
+    fn a_careful_zone_keeps_the_ball_under_its_speed() {
+        let hint = "at 0 2 0 r 10 : push 1 0 400";
+        let (mut p, mut sim) = flat_pilot(hint, "");
+        let (_, free) = drive(&mut p, &mut sim, 400, 0);
+        assert!(free > 8.0, "pushed freely it runs fast: {free}");
+        let (mut p, mut sim) = flat_pilot(hint, "careful sector 1 r 20 speed 3 : -50 2 0 ; 150 2 0");
+        let (_, kept) = drive(&mut p, &mut sim, 400, 0);
+        assert!(kept < 3.0 * 1.3, "kept under the limit: {kept}");
+        // and the pilot's own steering too, with no hint
+        let (mut p, mut sim) = flat_pilot("", "careful sector 1 r 20 speed 3 : -50 2 0 ; 150 2 0");
+        let (_, own) = drive(&mut p, &mut sim, 400, 0);
+        assert!(own < 3.0 * 1.3, "its own steering under the limit: {own}");
     }
 }

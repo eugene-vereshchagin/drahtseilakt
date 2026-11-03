@@ -1100,6 +1100,11 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
             notice: None,
             done: false,
             keys_shown: true,
+            trail: std::collections::VecDeque::new(),
+            marking: None,
+            look_back: LOOK_BACK,
+            zones_shown: false,
+            flash: None,
         }),
     };
     if let Some(path) = video {
@@ -1789,6 +1794,25 @@ fn hints_path(game: &Game, o: &Options) -> PathBuf {
     })
 }
 
+/// The level's zones file (zones.rs): `<level>.zones` beside its hint file.
+fn zones_path(game: &Game, o: &Options) -> PathBuf {
+    let hints = hints_path(game, o);
+    let dir = hints.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+    dir.join(format!("{}.zones", level_stem(game)))
+}
+
+/// The zones of the level, the lines left out said.
+fn load_zones(path: &Path) -> crate::zones::Zones {
+    let (zones, notes) = crate::zones::load(path);
+    for n in notes {
+        eprintln!("zones: {n}");
+    }
+    if !zones.is_empty() {
+        println!("{} zones from {}", zones.zones.len(), path.display());
+    }
+    zones
+}
+
 /// The hints of the level, a replay stretch read into the view's quarter at its start and its inputs (the replay is
 /// played to its first tick to know the quarter).
 fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints::Hint>, String> {
@@ -1941,11 +1965,15 @@ struct PilotRun {
     near_edges: crate::edges::EdgeStats,
     /// The last time it went back, for whoever watches: what failed, where, and back to when.
     went_back: Option<String>,
+    /// The watcher's zones file beside the hints (zones.rs).
+    zones_path: PathBuf,
 }
 
 impl PilotRun {
     fn new(game: &Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<PilotRun, String> {
         pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
+        let zones_path = zones_path(game, o);
+        pilot.zones = Arc::new(load_zones(&zones_path));
         let level = &game.level.level;
         pilot.bridges = (0..level.objects.len())
             .filter(|&i| crate::scene::module_of(level, i) == Some("P_Modul_25"))
@@ -1976,6 +2004,7 @@ impl PilotRun {
             edges,
             near_edges: crate::edges::EdgeStats::default(),
             went_back: None,
+            zones_path,
         })
     }
 
@@ -2033,7 +2062,10 @@ impl PilotRun {
             self.went_back = Some(line);
             game.sim = sim;
             game.replay_out = replay;
+            // (the zones as they are now: the watcher may have marked one since that state was saved)
+            let zones = self.pilot.zones.clone();
             self.pilot = p;
+            self.pilot.zones = zones;
             self.pilot.perturb(&game.sim, attempt);
             (self.best, self.since, self.hint_at, self.near_edges) = (b, game.sim.tick.max(sn), h, ne);
             self.heard = game.sim.events.len();
@@ -2612,7 +2644,27 @@ struct PilotWatch {
     done: bool,
     /// The box of the watcher's keys is shown (F1).
     keys_shown: bool,
+    /// The ball's path of the last seconds (tick, place, sector), for the zones marked (F8, F4).
+    trail: std::collections::VecDeque<(u64, glam::Vec3, usize)>,
+    /// A zone being marked: its kind, the key held, from which tick of the trail, in which sector, since when.
+    marking: Option<(crate::zones::Kind, KeyCode, u64, usize, Instant)>,
+    /// How far back a mark reaches before its key went down, in seconds ([ and ]).
+    look_back: u32,
+    /// The zones are shown in the world (F12).
+    zones_shown: bool,
+    /// The zone marked last, shown a moment so the watcher sees what got marked.
+    flash: Option<(crate::zones::Zone, Instant)>,
 }
+
+/// A mark reaches this far back before its key went down by default, and at most (seconds); the trail is kept a
+/// little longer; a key held longer than `MARK_HELD_MAX` ends its zone (a release the window never heard).
+const LOOK_BACK: u32 = 3;
+const LOOK_BACK_MAX: u32 = 10;
+const TRAIL_TICKS: u64 = 60 * 12;
+const MARK_HELD_MAX: std::time::Duration = std::time::Duration::from_secs(120);
+/// A zone just marked is shown this long; the trail is thinned to a point every so many units.
+const FLASH: std::time::Duration = std::time::Duration::from_secs(4);
+const MARK_STEP: f32 = 1.5;
 
 /// The lines of the watched test player's status in the top left corner, in the interface's font.
 fn watch_overlay(text: &str, f: &crate::ui::Face, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
@@ -2638,6 +2690,7 @@ fn watch_overlay(text: &str, f: &crate::ui::Face, screen: crate::ui::Screen) -> 
 /// The watcher's keys' box: a line a key, from this high in the window down to just over the lives.
 const KEYS_LINE: f32 = 0.03;
 const KEYS_BOTTOM: f32 = 0.85;
+const KEYS_RIGHT: f32 = 0.62;
 
 impl PilotWatch {
     /// The box of the watcher's keys, bottom left, in the menus' language: the state that is on (paused, driven by
@@ -2655,13 +2708,19 @@ impl PilotWatch {
             (strings.ours(if self.hand.is_some() { "watch driving" } else { "watch hands" }), self.hand.is_some()),
             (strings.ours("watch skip"), false),
             (strings.ours("watch stuck"), false),
+            (strings.ours("watch flow"), self.marking.is_some_and(|m| m.0 == crate::zones::Kind::Flow)),
+            (strings.ours("watch careful"), self.marking.is_some_and(|m| m.0 == crate::zones::Kind::Careful)),
+            (strings.ours("watch mark how").replace("{n}", &self.look_back.to_string()), false),
+            (strings.ours("watch look back").replace("{n}", &self.look_back.to_string()), self.look_back != LOOK_BACK),
+            (strings.ours("watch undo"), false),
+            (strings.ours(if self.zones_shown { "watch zones shown" } else { "watch zones" }), self.zones_shown),
             (strings.ours("watch quit"), false),
             (strings.ours("watch box"), false),
         ];
         let top = KEYS_BOTTOM - KEYS_LINE * lines.len() as f32 - 0.01;
         let shade = [0.0, 0.0, 0.0, 0.55];
         let mut q = vec![crate::ui::Quad {
-            rect: crate::ui::homogeneous([0.01, top, 0.42, KEYS_BOTTOM]),
+            rect: crate::ui::homogeneous([0.01, top, KEYS_RIGHT, KEYS_BOTTOM]),
             uv: [0.0, 0.0, 1.0, 1.0],
             top: shade,
             bottom: shade,
@@ -2681,9 +2740,57 @@ impl PilotWatch {
         for (k, (line, on)) in lines.iter().enumerate() {
             let y = top + 0.005 + KEYS_LINE * k as f32;
             style.color = if *on { [1.0, 0.85, 0.3, 1.0] } else { [0.85, 0.85, 0.85, 1.0] };
-            q.extend(f.layout(line, crate::ui::homogeneous([0.02, y, 0.42, y + KEYS_LINE]), &style));
+            q.extend(f.layout(line, crate::ui::homogeneous([0.02, y, KEYS_RIGHT, y + KEYS_LINE]), &style));
         }
         crate::ui::place(q, screen, crate::ui::Anchor::Left)
+    }
+
+    /// The zones drawn in the world as translucent beads along their paths: all of this sector's with F12 (flow
+    /// green, careful orange), the one being marked and the one just marked brighter and larger.
+    fn zone_instances(&self, game: &Game, out: &mut Vec<crate::render::Instance>) {
+        use crate::zones::Kind;
+        let Some(mesh) = game.ball_meshes.wood.or(game.ball_meshes.stone).or(game.ball_meshes.paper) else { return };
+        let color = |k: Kind, a: f32| match k {
+            Kind::Flow => [0.2, 0.95, 0.45, a],
+            Kind::Careful => [1.0, 0.55, 0.1, a],
+        };
+        let mut bead = |p: glam::Vec3, r: f32, c: [f32; 4]| {
+            let m = glam::Mat4::from_scale_rotation_translation(
+                glam::Vec3::splat(r / crate::sim::BALL_RADIUS),
+                glam::Quat::IDENTITY,
+                p,
+            );
+            out.push(crate::render::Instance {
+                marker: Some(c),
+                ..crate::render::Instance::plain(scene::BALLS_MODEL, mesh, m)
+            });
+        };
+        let sector = game.sim.sector + 1;
+        if self.zones_shown {
+            for z in self.run.pilot.zones.zones.iter().filter(|z| z.sector == sector) {
+                if let [p] = z.points.as_slice() {
+                    bead(*p, z.radius, color(z.kind, 0.15));
+                }
+                for &p in &z.points {
+                    bead(p, 0.5, color(z.kind, 0.4));
+                }
+            }
+        }
+        if let Some((z, at)) = self.flash.as_ref().filter(|f| f.1.elapsed() < FLASH && f.0.sector == sector) {
+            // fading out
+            // (in steps of a twentieth: each colour is a material of its own)
+            let a = 0.7 * (1.0 - at.elapsed().as_secs_f32() / FLASH.as_secs_f32());
+            let a = (a * 20.0).round() / 20.0;
+            for &p in &z.points {
+                bead(p, 0.9, color(z.kind, a.max(0.1)));
+            }
+        }
+        if let Some((kind, _, from, sec, _)) = self.marking {
+            let path: Vec<glam::Vec3> = self.trail.iter().filter(|t| t.0 >= from && t.2 == sec).map(|t| t.1).collect();
+            for p in crate::zones::thin(&path, MARK_STEP) {
+                bead(p, 0.9, color(kind, 0.6));
+            }
+        }
     }
 
     /// What the watcher reads: the speed and state, the sector, lives and the edge, what the test player does and
@@ -2699,6 +2806,9 @@ impl PilotWatch {
         }
         if self.pending.as_ref().is_some_and(|p| p.1.elapsed() > THINKING) {
             state += "  thinking...";
+        }
+        if let Some((kind, ..)) = self.marking {
+            state += &format!("  MARKING {} ZONE (release the key to end)", kind.word().to_uppercase());
         }
         let edge = self.run.edges.ball_clearance(s.ball.position).map_or("-".into(), |d| format!("{d:.1}"));
         let mut t = format!(
@@ -3212,6 +3322,39 @@ impl App {
                 w.run.pilot.hints.skip_step(&self.game.sim);
                 w.notice = Some(("hint step skipped".into(), now));
             }
+            // a zone: from the look-back before the key went down to where the ball is when it is let go (a tap: the
+            // last seconds; held: on while held)
+            KeyCode::F8 | KeyCode::F4 => {
+                if w.marking.is_none() {
+                    let kind = if code == KeyCode::F8 { crate::zones::Kind::Flow } else { crate::zones::Kind::Careful };
+                    let s = &self.game.sim;
+                    let from = s.tick.saturating_sub(u64::from(w.look_back) * 60);
+                    w.marking = Some((kind, code, from, s.sector, now));
+                }
+            }
+            KeyCode::BracketLeft => w.look_back = w.look_back.saturating_sub(1).max(1),
+            KeyCode::BracketRight => w.look_back = (w.look_back + 1).min(LOOK_BACK_MAX),
+            KeyCode::F12 => w.zones_shown = !w.zones_shown,
+            KeyCode::Backspace => {
+                let text = if w.marking.take().is_some() {
+                    "mark cancelled".to_owned()
+                } else {
+                    w.flash = None;
+                    let path = w.run.zones_path.clone();
+                    match crate::zones::undo_last(&path) {
+                        Ok(Some(line)) => {
+                            w.run.pilot.zones = Arc::new(load_zones(&path));
+                            w.pending = None;
+                            let kind = line.split_whitespace().next().unwrap_or_default().to_owned();
+                            format!("undone: the last {kind} zone in {}", shown_path(&path))
+                        }
+                        Ok(None) => "no zone to undo".to_owned(),
+                        Err(e) => format!("not undone: {e}"),
+                    }
+                };
+                println!("{text}");
+                w.notice = Some((text, now));
+            }
             KeyCode::F7 => {
                 let (pilot, dir) = (w.run.pilot.clone(), w.run.report.clone());
                 let text = match stuck_report(&mut self.game, &self.data, &self.opts, &pilot, &dir) {
@@ -3225,6 +3368,72 @@ impl App {
             _ => return false,
         }
         true
+    }
+
+    /// A watcher's key let go: the end of the zone being marked with it. True when it was that key.
+    fn watch_key_up(&mut self, code: KeyCode) -> bool {
+        if self.pilot.as_ref().and_then(|w| w.marking).is_some_and(|m| m.1 == code) {
+            self.end_mark();
+            return true;
+        }
+        false
+    }
+
+    /// The zone being marked is done: the ball's path from its look-back to now (in the sector it was marked in),
+    /// written to the zones file at once, obeyed from now on, and shown a moment.
+    fn end_mark(&mut self) {
+        let Some(w) = self.pilot.as_mut() else { return };
+        let Some((kind, _, from, sector, _)) = w.marking.take() else { return };
+        let s = &self.game.sim;
+        let mut path: Vec<glam::Vec3> =
+            w.trail.iter().filter(|t| t.0 >= from && t.2 == sector).map(|t| t.1).collect();
+        if s.sector == sector {
+            path.push(s.ball.position);
+        }
+        let points = crate::zones::thin(&path, MARK_STEP);
+        if points.is_empty() {
+            w.notice = Some(("no path to mark (another sector)".into(), Instant::now()));
+            return;
+        }
+        let zone = crate::zones::Zone {
+            kind,
+            sector: sector + 1,
+            radius: crate::zones::MARK_RADIUS,
+            speed: None,
+            points,
+        };
+        let file = w.run.zones_path.clone();
+        let secs = s.tick.saturating_sub(from) as f32 / 60.0;
+        let text = match crate::zones::append(&file, &zone) {
+            Ok(()) => {
+                w.run.pilot.zones = Arc::new(load_zones(&file));
+                // (a decision on its way is made again, with the zone)
+                w.pending = None;
+                format!("marked a {} zone: {secs:.1} s, {} points, in {}", kind.word(), zone.points.len(),
+                    shown_path(&file))
+            }
+            Err(e) => format!("zone not saved: {e}"),
+        };
+        println!("{text}");
+        w.notice = Some((text, Instant::now()));
+        w.flash = Some((zone, Instant::now()));
+    }
+
+    /// After a tick of the watched run: the ball's place kept in the trail (cut back when the run went back), and a
+    /// zone whose key has been held too long ended.
+    fn watch_trail(&mut self) {
+        let Some(w) = self.pilot.as_mut() else { return };
+        let s = &self.game.sim;
+        while w.trail.back().is_some_and(|t| t.0 >= s.tick) {
+            w.trail.pop_back();
+        }
+        w.trail.push_back((s.tick, s.ball.position, s.sector));
+        while w.trail.front().is_some_and(|t| t.0 + TRAIL_TICKS < s.tick) {
+            w.trail.pop_front();
+        }
+        if w.marking.is_some_and(|m| m.4.elapsed() > MARK_HELD_MAX) {
+            self.end_mark();
+        }
     }
 
     fn tools(&self) -> bool {
@@ -3437,6 +3646,9 @@ impl App {
         if self.pilot.as_ref().is_some_and(|w| !w.done) && down && self.watch_key(code) {
             return;
         }
+        if !down && self.watch_key_up(code) {
+            return;
+        }
         // the keys bound to the game's actions (the Controls page) come before the practice keys
         let bound = self.bindings.bits(code);
         let bit = match code {
@@ -3555,6 +3767,7 @@ impl App {
                     self.acc = self.acc.min(TICK);
                     break;
                 }
+                self.watch_trail();
                 self.acc -= TICK;
                 ticks += 1;
                 continue;
@@ -3564,6 +3777,7 @@ impl App {
             self.game.tick(self.bindings.turn(self.keys | self.pad_keys));
             if let Some(w) = self.pilot.as_mut().filter(|w| !w.done) {
                 w.run.near_edges.tick(&w.run.edges, &self.game.sim.ball);
+                self.watch_trail();
             }
             self.keep_history();
             self.acc -= TICK;
@@ -3628,6 +3842,9 @@ impl App {
             );
             if snap.kind.is_some() {
                 scene::shadows(&self.game.shadow_receivers, snap.ball, &mut inst);
+            }
+            if let Some(w) = self.pilot.as_ref().filter(|w| !w.done) {
+                w.zone_instances(&self.game, &mut inst);
             }
             let particles = self.game.effects.batches(snap.eye, snap.target);
             (inst, particles, scene::view(&snap))

@@ -66,6 +66,20 @@ they rest on are in [autopilot.md](autopilot.md).
 - **Stone** to ram boxes and push balls; it breaks hanging plates (P_Modul_29): it does not cross them, unless the
   level means it to drop through them with the plates (level 6's towers).
 
+## Zones the watcher marks
+
+Where the owner sees the test player drive wrong, he marks the stretch while watching (`--watch`, F8 and F4;
+[autopilot.md](autopilot.md), "Zones"), and the mark is a rule for that stretch from then on, in `<level>.zones`
+beside the hints:
+
+- **flow** ("don't dawdle here"): no stop, wait or slowing down there that the ball does not need. A hint's `goto`
+  is rolled through, its `wait` and `hold` left out, a slow `pass` or `press` taken at 5, each only when a copy of
+  the run shows the ball is kept so; the steering keeps at least 0.8 of the floor's pace.
+- **careful** ("keep the speed limit here and don't cut corners"): not faster than the zone's speed (4.5 by
+  default), on the way's middle line, no racing line; whatever drives is held under the limit.
+
+A zone of the watcher's comes before the pace rules above: it is what the owner saw.
+
 ## A level's route: `hints/Level_NN.route`
 
 One file a level, read by people and agents (the test player reads the plan and the hints made from it): for each

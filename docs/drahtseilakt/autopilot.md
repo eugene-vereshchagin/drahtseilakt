@@ -203,11 +203,52 @@ transformer. The watcher's keys, in a box bottom left in the menus' language (th
 | F5 | take over: the arrows drive, the test player watches; F5 again hands the ball back from where it is now. The stretch is saved beside the hints as `<level>-hand-<tick>.replay` (the run up to then, so it replays exactly) and a hint line playing it (`at … : replay <file> FROM TO`) is added to `<level>-hand.txt`, both named on the screen; copied into the level's hint file, the test player plays it there next time. The saved states before it are not gone back to |
 | F6 | skip the running hint's step |
 | F7 | a stuck report of this place (as for a dead run, into `--report`) |
+| F8 | mark a zone "don't dawdle here" (flow; Zones below): a tap marks the ball's path over the last 3 seconds up to the tap; held, the zone goes on while the key is down (from 3 seconds before it went down) and ends when it is let go |
+| F4 | mark a zone "keep the speed limit here and don't cut corners" (careful), the same way |
+| [ / ] | how far back a mark reaches: 1 to 10 seconds (3) |
+| Backspace | undo the last zone marked (while a key is held: that mark is cancelled) |
+| F12 | show or hide the marked zones in the world, as translucent beads along their paths (flow green, careful orange) |
 | F1 | hide or show the box of keys |
 | Esc | the pause menu (leave the level, quit) |
 
 At the end, or when the window is closed, the run's summary is printed and the whole run, the hand-driven stretches
 too, is saved at `--record`.
+
+## Zones
+
+The watcher teaches the test player while watching (`--watch`): a key marks the stretch the ball just went as a
+zone, and the test player obeys it from then on, in this run and every later one, headless too. A mark reaches back
+(3 seconds by default, `[` and `]` change it) because one first has to notice that the ball rolls wrong: a tap of
+F8 or F4 marks the ball's path over the last seconds up to the tap; held, the zone goes on while the key is down and
+ends when it is let go, so no zone is ever left open. Paused (Space), a tap marks the last seconds before the pause.
+The stretch just marked lights up for a few seconds, a zone being marked shows as it grows, and the status line
+names the zone the ball is in.
+
+The zones are written at once, a line each, to `<level>.zones` beside the level's hint file (with `--hints
+hints/Level_01.txt`: `hints/Level_01.zones`), which every run of the level reads:
+
+```
+flow sector 1 r 4 : X Y Z ; X Y Z ; ...
+careful sector 2 r 4 [speed V] : X Y Z ; ...
+```
+
+The points are the ball's path through the stretch (one point: a place); the zone is everything within `r` of that
+path in that sector.
+
+- **flow** — don't dawdle here. A hint's step that stops the ball goes without its stop: a `goto` is rolled through,
+  a `wait` or `hold` left out, a `pass` or `press` slower than 5 taken at 5; but only when, on a copy of the run, the
+  rest of the hint and a second after keep the ball (a stop the ball needs stays). The steering pays for rolling
+  slower than 0.8 of the floor's pace more than a wait is worth (a choice that loses the ball is still never taken).
+- **careful** — keep the speed limit here and don't cut corners. Not faster than `speed` (4.5 when not given; edit
+  the line to change it): the steering pays four times as much for every unit over it, a hint's `pass`, `press`,
+  `along` and `round` are capped to it, and whatever drives (the steering, a hint, the player's line), the arrows
+  pushing along the ball's run are let go above the limit and the ball is braked above 1.25 times it. The way's
+  line ahead (the middle the way's search found) is kept to: each unit off it costs 2, and off the middle of the
+  floor three times as much as elsewhere. Where the level needs speed (a climb, a gap), a careful zone holds the
+  ball back too: such a place is no place for one.
+
+A zones file is untrusted like a hint file: its size (64 KiB), the zones (256) and points (256 a zone) and every
+number are capped; a malformed line is left out with a note naming it, the other zones still count.
 
 ## Videos of its runs
 

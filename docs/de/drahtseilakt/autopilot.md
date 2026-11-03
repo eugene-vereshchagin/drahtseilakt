@@ -219,11 +219,55 @@ der Sprache der Menüs (der eingeschaltete Zustand ist hervorgehoben):
 | F5 | selbst steuern: die Pfeile steuern, der Testspieler schaut zu; wieder F5 gibt ihm die Kugel zurück, wo sie gerade ist. Die Strecke wird neben den Hinweisen als `<level>-hand-<tick>.replay` gespeichert (der Lauf bis dahin, so spielt er genau nach), und eine Hinweiszeile, die sie abspielt (`at … : replay <Datei> FROM TO`), kommt in `<level>-hand.txt`; beide werden am Bildschirm genannt. In die Hinweisdatei des Levels kopiert, spielt der Testspieler sie dort beim nächsten Mal. Zu den Ständen davor geht er nicht mehr zurück |
 | F6 | den Schritt des laufenden Hinweises überspringen |
 | F7 | ein Bericht über diese Stelle (wie bei einem toten Lauf, nach `--report`) |
+| F8 | eine Zone „hier nicht trödeln“ markieren (flow; siehe „Zonen“ unten): kurz getippt markiert die Taste den Weg der Kugel über die letzten 3 Sekunden bis zum Tippen; gehalten läuft die Zone weiter, solange die Taste unten ist (ab 3 Sekunden, bevor sie gedrückt wurde), und endet beim Loslassen |
+| F4 | ebenso eine Zone „hier das Tempolimit halten und keine Kurven schneiden“ (careful) markieren |
+| [ / ] | wie weit eine Markierung zurückreicht: 1 bis 10 Sekunden (3) |
+| Rücktaste | die zuletzt markierte Zone zurücknehmen (während eine Taste gehalten wird: diese Markierung verwerfen) |
+| F12 | die markierten Zonen in der Welt zeigen oder ausblenden, als durchscheinende Perlen entlang ihres Weges (flow grün, careful orange) |
 | F1 | den Tastenkasten aus- oder einblenden |
 | Esc | das Pausenmenü (Level verlassen, beenden) |
 
 Am Ende, oder wenn das Fenster geschlossen wird, wird die Zusammenfassung des Laufs ausgegeben und der ganze Lauf,
 auch die von Hand gesteuerten Strecken, unter `--record` gespeichert.
+
+## Zonen
+
+Der Zuschauer bringt dem Testspieler beim Zusehen (`--watch`) etwas bei: eine Taste markiert die Strecke, die die
+Kugel gerade gerollt ist, als Zone, und der Testspieler hält sich von da an daran, in diesem Lauf und jedem späteren,
+auch ohne Fenster. Eine Markierung reicht zurück (3 Sekunden, `[` und `]` ändern das), denn erst muss man bemerken,
+dass die Kugel falsch rollt: F8 oder F4 kurz getippt markiert den Weg der Kugel über die letzten Sekunden bis zum
+Tippen; gehalten läuft die Zone weiter, solange die Taste unten ist, und endet beim Loslassen, so bleibt nie eine
+Zone offen. Angehalten (Leertaste) markiert ein Tippen die letzten Sekunden vor der Pause. Die gerade markierte
+Strecke leuchtet ein paar Sekunden auf, eine Zone im Markieren ist zu sehen, während sie wächst, und die Statuszeile
+nennt die Zone, in der die Kugel ist.
+
+Die Zonen werden sofort geschrieben, eine Zeile je Zone, nach `<level>.zones` neben der Hinweisdatei des Levels (mit
+`--hints hints/Level_01.txt`: `hints/Level_01.zones`), die jeder Lauf des Levels liest:
+
+```
+flow sector 1 r 4 : X Y Z ; X Y Z ; ...
+careful sector 2 r 4 [speed V] : X Y Z ; ...
+```
+
+Die Punkte sind der Weg der Kugel durch die Strecke (ein Punkt: eine Stelle); die Zone ist alles innerhalb `r` von
+diesem Weg in diesem Sektor.
+
+- **flow** — hier nicht trödeln. Ein Hinweisschritt, der die Kugel anhält, läuft ohne Halt: ein `goto` wird
+  durchrollt, ein `wait` oder `hold` ausgelassen, ein `pass` oder `press` langsamer als 5 mit 5 gefahren; aber nur,
+  wenn auf einer Kopie des Laufs der Rest des Hinweises und eine Sekunde danach die Kugel behalten (ein Halt, den die
+  Kugel braucht, bleibt). Die Steuerung zahlt für Rollen langsamer als 0,8 des Tempos des Bodens mehr, als ein
+  Warten wert ist (eine Wahl, die die Kugel verliert, wird nie genommen).
+- **careful** — hier das Tempolimit halten und keine Kurven schneiden. Nicht schneller als `speed` (4,5 ohne Angabe;
+  zum Ändern die Zeile bearbeiten): die Steuerung zahlt für jede Einheit darüber viermal so viel, `pass`, `press`,
+  `along` und `round` eines Hinweises werden darauf begrenzt, und was auch steuert (die Steuerung, ein Hinweis, die
+  Linie des Spielers), die Pfeile in Laufrichtung der Kugel werden über dem Limit losgelassen und über dem 1,25-Fachen
+  wird gebremst. Die Linie des Weges voraus (die Mitte, die die Wegsuche fand) wird gehalten: jede Einheit daneben
+  kostet 2, neben der Mitte des Bodens dreimal so viel wie sonst. Wo das Level Tempo braucht (ein Anstieg, eine
+  Lücke), bremst eine careful-Zone die Kugel auch: dort gehört keine hin.
+
+Eine Zonendatei ist nicht vertrauenswürdig wie eine Hinweisdatei: ihre Größe (64 KiB), die Zonen (256) und Punkte
+(256 je Zone) und jede Zahl sind begrenzt; eine fehlerhafte Zeile wird mit einem Vermerk ausgelassen, die anderen
+Zonen gelten.
 
 ## Videos seiner Läufe
 
