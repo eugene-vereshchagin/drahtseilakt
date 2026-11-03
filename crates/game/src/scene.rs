@@ -133,6 +133,13 @@ pub fn set_clouds(on: bool) {
     CLOUDS.store(on, Ordering::Relaxed);
 }
 
+/// The level has a sea of cloud drawn as a volume (clouds.rs), which takes the place of its flat cloud layer.
+static VOLUME_CLOUDS: AtomicBool = AtomicBool::new(false);
+
+pub fn set_volume_clouds(on: bool) {
+    VOLUME_CLOUDS.store(on, Ordering::Relaxed);
+}
+
 /// The cloud layer's look. Its texture is grey clouds on black and its material has no blending, yet the original
 /// shows clouds over the sky, not a black floor: it is drawn added to what is behind it (black adds nothing), unlit
 /// and without hiding what comes after it.
@@ -477,7 +484,7 @@ pub fn instances(
         }
     }
     let hidden = |object: usize| extra_model.is_some() && views.iter().any(|v| v.object == object);
-    let clouds = CLOUDS.load(Ordering::Relaxed);
+    let clouds = CLOUDS.load(Ordering::Relaxed) && !VOLUME_CLOUDS.load(Ordering::Relaxed);
     out.extend(placements
         .iter()
         .filter(|p| !taken.contains(&p.object) && !(p.marker.is_some() && hidden(p.object)))

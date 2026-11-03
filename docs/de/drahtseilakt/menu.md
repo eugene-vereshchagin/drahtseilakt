@@ -57,6 +57,9 @@ Persönliche ist der Name in der Highscore-Liste.
     wenn die Option an ist. Ihre Textur sind graue Wolken auf Schwarz und ihr Material mischt nicht, also zeichnen wir
     sie zum Himmel dahinter addiert (unsere Lesart; das Material der Kopie sagt es nicht). Die Videoverfolgung zeichnet
     ohne sie;
+  - `cloud-quality low|medium|high|off` (die Einstellungsdatei; sonst `medium`): wie fein das Wolkenmeer unserer Level
+    gezeichnet wird (levels.md, „Das Wolkenmeer"): Schritte hindurch, Schritte zur Sonne, kleine Ballen an den Rändern;
+    `off` zeichnet keins, und *Clouds?* aus blendet es ebenfalls aus;
   - *Fullscreen?* (`fullscreen off|borderless|exclusive`): randlos nimmt den Modus des Desktops, exklusiv ändert ihn,
     wo die Plattform es kann (Wayland nicht: randlos). F11 wechselt zwischen Fenster und randlos.
 - **Controls**: Enter auf der Zeile einer Taste wartet auf eine Taste („Press a key"); die gedrückte wird belegt, Esc

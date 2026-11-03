@@ -195,8 +195,7 @@
     184,
     185,
     186,
-    187,
-    188
+    187
    ],
    "extras": {
     "drahtseilakt": {
@@ -815,7 +814,7 @@
        ]
       }
      ],
-     "sky": "Mountains",
+     "sky": "Sunset",
      "start_ball": "Ball_Wood",
      "settings": {
       "tutorial": false,
@@ -830,18 +829,46 @@
       "parts": "own",
       "fog": {
        "color": [
-        0.6264,
-        0.6725,
-        0.6725
+        0.7239,
+        0.7105,
+        0.7367
        ],
        "color_down": [
-        0.401,
-        0.4215,
-        0.3486
+        0.736,
+        0.7174,
+        0.7396
        ],
        "density": 0.0011,
        "below": -44.5,
        "depth": 150.0
+      },
+      "clouds": {
+       "top": -67.5,
+       "thickness": 110.0,
+       "cover": 0.75,
+       "scale": 85.0,
+       "sun": [
+        0.7633,
+        0.101,
+        0.6381
+       ],
+       "sun_color": [
+        2.6,
+        1.7582,
+        1.0134
+       ],
+       "sky": [
+        0.2209,
+        0.2622,
+        0.4097
+       ],
+       "shadow": [
+        0.2017,
+        0.1639,
+        0.3035
+       ],
+       "haze": 0.0005,
+       "under": 1.0
       }
      }
     }
@@ -5924,33 +5951,6 @@
     }
    },
    "mesh": 187
-  },
-  {
-   "name": "SkyLayer",
-   "matrix": [
-    1.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    1.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    1.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    1.0
-   ],
-   "extras": {
-    "drahtseilakt": {
-     "visible": false
-    }
-   },
-   "mesh": 188
   }
  ],
  "meshes": [
@@ -9845,20 +9845,6 @@
      "material": 8
     }
    ]
-  },
-  {
-   "name": "SkyLayer_Mesh",
-   "primitives": [
-    {
-     "attributes": {
-      "POSITION": 898,
-      "NORMAL": 899,
-      "TEXCOORD_0": 900
-     },
-     "indices": 901,
-     "material": 11
-    }
-   ]
   }
  ],
  "materials": [
@@ -10080,7 +10066,7 @@
    "doubleSided": false,
    "alphaMode": "OPAQUE",
    "normalTexture": {
-    "index": 12
+    "index": 11
    },
    "extras": {
     "drahtseilakt": {
@@ -10161,7 +10147,7 @@
    "doubleSided": false,
    "alphaMode": "OPAQUE",
    "normalTexture": {
-    "index": 13
+    "index": 12
    },
    "extras": {
     "drahtseilakt": {
@@ -10296,45 +10282,6 @@
      "z_write": true
     }
    }
-  },
-  {
-   "name": "SkyLayer",
-   "pbrMetallicRoughness": {
-    "baseColorFactor": [
-     1.0,
-     1.0,
-     1.0,
-     1.0
-    ],
-    "metallicFactor": 0.0,
-    "roughnessFactor": 1.0,
-    "baseColorTexture": {
-     "index": 11
-    }
-   },
-   "emissiveFactor": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "doubleSided": false,
-   "alphaMode": "OPAQUE",
-   "extras": {
-    "drahtseilakt": {
-     "ambient": [
-      0.1,
-      0.1,
-      0.1
-     ],
-     "specular": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "power": 0.0,
-     "z_write": true
-    }
-   }
   }
  ],
  "textures": [
@@ -10389,10 +10336,6 @@
   {
    "source": 12,
    "sampler": 0
-  },
-  {
-   "source": 13,
-   "sampler": 0
   }
  ],
  "images": [
@@ -10441,10 +10384,6 @@
    "name": "Floor_Top_Checkpoint"
   },
   {
-   "uri": "textures/SkyLayer.png",
-   "name": "SkyLayer"
-  },
-  {
    "uri": "textures/Track_floor_border_n.png",
    "name": "Track_floor_border_n"
   },
@@ -10464,7 +10403,7 @@
  "buffers": [
   {
    "uri": "level.bin",
-   "byteLength": 3130792
+   "byteLength": 3130488
   }
  ],
  "bufferViews": [
@@ -15854,30 +15793,6 @@
    "buffer": 0,
    "byteOffset": 3129960,
    "byteLength": 528,
-   "target": 34963
-  },
-  {
-   "buffer": 0,
-   "byteOffset": 3130488,
-   "byteLength": 96,
-   "target": 34962
-  },
-  {
-   "buffer": 0,
-   "byteOffset": 3130584,
-   "byteLength": 96,
-   "target": 34962
-  },
-  {
-   "buffer": 0,
-   "byteOffset": 3130680,
-   "byteLength": 64,
-   "target": 34962
-  },
-  {
-   "buffer": 0,
-   "byteOffset": 3130744,
-   "byteLength": 48,
    "target": 34963
   }
  ],
@@ -23149,40 +23064,6 @@
    "count": 132,
    "type": "SCALAR",
    "bufferView": 897
-  },
-  {
-   "componentType": 5126,
-   "count": 8,
-   "type": "VEC3",
-   "min": [
-    -510.0,
-    -263.5,
-    -509.9997777489651
-   ],
-   "max": [
-    1715.717967697245,
-    -148.0,
-    1413.814337969447
-   ],
-   "bufferView": 898
-  },
-  {
-   "componentType": 5126,
-   "count": 8,
-   "type": "VEC3",
-   "bufferView": 899
-  },
-  {
-   "componentType": 5126,
-   "count": 8,
-   "type": "VEC2",
-   "bufferView": 900
-  },
-  {
-   "componentType": 5125,
-   "count": 12,
-   "type": "SCALAR",
-   "bufferView": 901
   }
  ]
 }

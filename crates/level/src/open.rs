@@ -252,7 +252,74 @@ fn settings_json(s: &crate::Settings) -> Value {
         v["fog"] = json!({"color": f.color, "color_down": f.color_down, "density": f.density, "below": f.below,
             "depth": f.depth});
     }
+    if let Some(c) = s.clouds {
+        v["clouds"] = json!({"top": c.top, "thickness": c.thickness, "cover": c.cover, "scale": c.scale, "sun": c.sun,
+            "sun_color": c.sun_color, "sky": c.sky, "shadow": c.shadow, "haze": c.haze, "under": c.under, "wind": c.wind});
+    }
     v
+}
+
+/// A number of a settings object: finite, held to lo..hi; `None` when it is missing (null).
+fn number(o: &Value, what: &str, k: &str, lo: f32, hi: f32) -> Result<Option<f32>, String> {
+    match &o[k] {
+        Value::Null => Ok(None),
+        x => {
+            let x = x.as_f64().ok_or_else(|| format!("settings: {what}'s {k} is not a number"))? as f32;
+            if x.is_finite() {
+                Ok(Some(x.clamp(lo, hi)))
+            } else {
+                Err(format!("settings: {what}'s {k} is not finite"))
+            }
+        }
+    }
+}
+
+/// N numbers of a settings object, each finite and held to lo..hi; `None` when they are missing (null).
+fn numbers<const N: usize>(o: &Value, what: &str, k: &str, lo: f32, hi: f32) -> Result<Option<[f32; N]>, String> {
+    if o[k].is_null() {
+        return Ok(None);
+    }
+    let bad = || format!("settings: {what}'s {k} is not {N} numbers");
+    let a = o[k].as_array().filter(|a| a.len() == N).ok_or_else(bad)?;
+    let mut out = [0.0f32; N];
+    for (slot, x) in out.iter_mut().zip(a) {
+        let x = x.as_f64().ok_or_else(bad)? as f32;
+        if !x.is_finite() {
+            return Err(format!("settings: {what}'s {k} is not finite"));
+        }
+        *slot = x.clamp(lo, hi);
+    }
+    Ok(Some(out))
+}
+
+/// The cloud layer's settings: its tops' height is needed, the rest has defaults ([`crate::Clouds::DEFAULT`]).
+fn clouds_from(c: &Value) -> Result<crate::Clouds, String> {
+    if !c.is_object() {
+        return Err("settings: clouds is not an object".into());
+    }
+    let d = crate::Clouds::DEFAULT;
+    let what = "clouds";
+    let top = number(c, what, "top", -1.0e6, 1.0e6)?.ok_or("settings: clouds has no top")?;
+    // the direction to the sun: a zero vector (nowhere) keeps the default
+    let sun = numbers::<3>(c, what, "sun", -1.0, 1.0)?
+        .map(|s| {
+            let l = (s[0] * s[0] + s[1] * s[1] + s[2] * s[2]).sqrt();
+            if l > 1e-3 { [s[0] / l, s[1] / l, s[2] / l] } else { d.sun }
+        })
+        .unwrap_or(d.sun);
+    Ok(crate::Clouds {
+        top,
+        thickness: number(c, what, "thickness", 1.0, 1.0e4)?.unwrap_or(d.thickness),
+        cover: number(c, what, "cover", 0.0, 1.0)?.unwrap_or(d.cover),
+        scale: number(c, what, "scale", 1.0, 1.0e4)?.unwrap_or(d.scale),
+        sun,
+        sun_color: numbers(c, what, "sun_color", 0.0, 64.0)?.unwrap_or(d.sun_color),
+        sky: numbers(c, what, "sky", 0.0, 16.0)?.unwrap_or(d.sky),
+        shadow: numbers(c, what, "shadow", 0.0, 16.0)?.unwrap_or(d.shadow),
+        haze: number(c, what, "haze", 0.0, 1.0)?.unwrap_or(d.haze),
+        under: number(c, what, "under", 0.0, 1.0)?.unwrap_or(d.under),
+        wind: numbers(c, what, "wind", -1.0e3, 1.0e3)?.unwrap_or(d.wind),
+    })
 }
 
 /// The most a level's music theme and bonus may be (the original's are 1 to 5 and up to 20000).
@@ -354,7 +421,12 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
             })
         }
     };
+    let clouds = match &v["clouds"] {
+        Value::Null => None,
+        c => Some(clouds_from(c)?),
+    };
     Ok(crate::Settings {
+        clouds,
         fog,
         own_parts,
         music,

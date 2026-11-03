@@ -129,13 +129,26 @@ floor 2.5 lower, from where a ball pushes the block out of the way). The floors 
 **Skies.** `sky` names the sky box round the level: `A`, `B`, `C` (ours, drawn above a sea of cloud, as the
 original's letters) or one of the photographic skies by name: `Mountains` (a sunset sky over hazy mountains with
 snow on the peaks), `Forest` (summer clouds over a forest canopy with glades and lakes), `Sea` (a calm sea at
-sunset, mirroring the clouds), `Storm` (a heavy overcast over a dark sea with whitecaps), `Sunset` (a pink sunset over
-a sea of cloud), `Night` (the Milky Way over a dark lake ringed by hills), `Desert` (a late afternoon over red
+sunset, mirroring the clouds), `Storm` (a heavy overcast over a dark sea with whitecaps), `Sunset` (a golden sunset over
+a sea of cloud), `Clouds` (a summer day over a sea of cloud), `Night` (the Milky Way over a dark lake ringed by hills), `Desert` (a late afternoon over red
 canyons), `Mist` (an evening glow over hills with mist in the valleys). Their skies are CC0 photographs from Poly
 Haven; what lies below the horizon is drawn by `assets/own/make/make_skies.py`, seen as from high above, so the
 track hangs far over it (`assets/own/CREDITS.md`). Any other name is a set of files `Textures/Sky/Sky_<name>_<face>`
 (Front, Right, Back, Left, Down, and Top if it has one) a level folder or the textures bring; a name is letters,
 digits, `_` and `-`. `--sky NAME` on the command line plays any level under another sky.
+
+**The sea of cloud.** Under `Sunset` and `Clouds` our levels hang over a sea of cumulus that the game draws as a
+volume (`crates/game/src/clouds.wgsl`): billows of tiling noise, lit by the sky's sun (bright where it meets them,
+blue-violet in their shade) and by the sky above, fading far off into the sky's own haze at the horizon; the columns
+and supports sink into it. Under `Mountains`, `Forest`, `Mist` and `Desert` it is broken banks with gaps through
+which the land shows far below. The level kit writes it into the level's settings (`clouds`,
+[open-format.md](open-format.md)) from the sky's light (`assets/own/make/sky_light.json`, written by
+`make_skies.py`) and its table (`levelkit.py`, `CLOUD_SEA`); a level changes it with
+`clouds cover C below B thickness T size S` (any of them: how much of it is cloud, 0..1; its tops B under the lowest
+floor, 35 if not given; T deep, 110; a cloud S across, 85) or has none with `clouds off`. The original's levels have
+none. The settings file's `cloud-quality` (`low`, `medium` (the default), `high`; `off` draws none) sets how finely
+it is drawn, and *Clouds?* off hides it as well ([menu.md](menu.md)). On an RTX 3060 at 2560×1440 it costs about
+3.5, 4.5 and 6 ms a frame (low, medium, high).
 
 **How the track keeps the ball on** (`safety`): the original's help shrinks from level to level, and ours follows
 it. Measured on the original's thirteen levels (its floors' edges, numbers only): in levels 1, 3 and 5 about two
