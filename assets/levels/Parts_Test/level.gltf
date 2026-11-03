@@ -2461,32 +2461,32 @@
  ],
  "images": [
   {
-   "uri": "textures/floor_top.png",
-   "name": "floor_top"
+   "uri": "textures/Floor_Top_Borderless.png",
+   "name": "Floor_Top_Borderless"
   },
   {
-   "uri": "textures/floor_border.png",
-   "name": "floor_border"
+   "uri": "textures/Floor_Top_Flat.png",
+   "name": "Floor_Top_Flat"
   },
   {
-   "uri": "textures/floor_side.png",
-   "name": "floor_side"
+   "uri": "textures/Floor_Side.png",
+   "name": "Floor_Side"
   },
   {
-   "uri": "textures/wood.png",
-   "name": "wood"
+   "uri": "textures/Wood_Plain.png",
+   "name": "Wood_Plain"
   },
   {
-   "uri": "textures/rail.png",
-   "name": "rail"
+   "uri": "textures/Rail_Environment.png",
+   "name": "Rail_Environment"
   },
   {
-   "uri": "textures/post.png",
-   "name": "post"
+   "uri": "textures/Column_beige.png",
+   "name": "Column_beige"
   },
   {
-   "uri": "textures/plate.png",
-   "name": "plate"
+   "uri": "textures/Floor_Top_Checkpoint.png",
+   "name": "Floor_Top_Checkpoint"
   }
  ],
  "samplers": [

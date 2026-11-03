@@ -26,6 +26,8 @@ import numpy as np
 import ownkit as K
 
 TEX = 256
+# The game's own texture set (CC0), by the original's texture names.
+TEXTURE_SET = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Textures")
 # The track's cross-section (across, up): its top at 0, borders 0.8 high and 1 wide, 2.5 deep.
 BORDER_H, BORDER_W, DEPTH = 0.8, 1.0, 2.5
 # Where the ball comes back after a fall: this far above the start's or a checkpoint's floor.
@@ -60,26 +62,34 @@ class LevelBuilder:
     # --- materials ---------------------------------------------------------------------------------------------
 
     def _standard_materials(self):
+        """The track's materials: the game's own texture set (assets/own/Textures, CC0, made by make_textures.py) by
+        the original's texture names, copied into the level so it carries its own free textures; a procedural
+        stand-in where the set lacks one."""
         s = self.seed
         textures = {
-            "floor_top.png": K.stone(TEX, K.rgb(158, 142, 116), s + 1, slabs=2, seams=0.25),
-            "floor_border.png": K.stone(TEX, K.rgb(128, 84, 62), s + 2, slabs=0, mottle=0.2),
-            "floor_side.png": K.stone(TEX, K.rgb(150, 128, 104), s + 3, slabs=4, seams=0.15),
-            "wood.png": K.planks(TEX, K.rgb(150, 104, 62), s + 4),
-            "rail.png": K.metal(TEX, K.rgb(196, 200, 210), s + 5),
-            "post.png": K.stone(TEX, K.rgb(120, 112, 104), s + 6, slabs=0),
-            "plate.png": K.stone(TEX, K.rgb(176, 150, 96), s + 7, slabs=1, seams=0.5),
+            "Floor_Top_Flat.png": lambda: K.stone(TEX, K.rgb(158, 142, 116), s + 1, slabs=2, seams=0.25),
+            "Floor_Top_Borderless.png": lambda: K.stone(TEX, K.rgb(128, 84, 62), s + 2, slabs=0, mottle=0.2),
+            "Floor_Side.png": lambda: K.stone(TEX, K.rgb(150, 128, 104), s + 3, slabs=4, seams=0.15),
+            "Wood_Plain.png": lambda: K.planks(TEX, K.rgb(150, 104, 62), s + 4),
+            "Rail_Environment.png": lambda: K.metal(TEX, K.rgb(196, 200, 210), s + 5),
+            "Column_beige.png": lambda: K.stone(TEX, K.rgb(120, 112, 104), s + 6, slabs=0),
+            "Floor_Top_Checkpoint.png": lambda: K.stone(TEX, K.rgb(176, 150, 96), s + 7, slabs=1, seams=0.5),
         }
-        for name, img in textures.items():
-            K.save_png(self.tex, name, img)
-        self.mat("top", "floor_top.png", diffuse=1.0, emissive=0.12, specular=0.3, power=100)
-        self.mat("border", "floor_border.png", diffuse=1.0, emissive=0.24)
-        self.mat("border_top", "floor_border.png", diffuse=1.0, emissive=0.28)
-        self.mat("side", "floor_side.png", diffuse=0.6, emissive=0.42)
-        self.mat("wood", "wood.png", diffuse=1.0, emissive=0.25, specular=0.39, power=50)
-        self.mat("rail", "rail.png", diffuse=0.5, emissive=0.35, specular=0.8, power=10, texgen="chrome")
-        self.mat("post", "post.png", diffuse=0.8, emissive=0.3)
-        self.mat("plate", "plate.png", diffuse=1.0, emissive=0.2, specular=0.3, power=60)
+        for name, make in textures.items():
+            src = os.path.join(TEXTURE_SET, name)
+            if os.path.isfile(src):
+                os.makedirs(self.tex, exist_ok=True)
+                shutil.copyfile(src, os.path.join(self.tex, name))
+            else:
+                K.save_png(self.tex, name, make())
+        self.mat("top", "Floor_Top_Borderless.png", diffuse=1.0, emissive=0.12, specular=0.3, power=100)
+        self.mat("border", "Floor_Top_Flat.png", diffuse=1.0, emissive=0.24)
+        self.mat("border_top", "Floor_Top_Flat.png", diffuse=1.0, emissive=0.28)
+        self.mat("side", "Floor_Side.png", diffuse=0.6, emissive=0.42)
+        self.mat("wood", "Wood_Plain.png", diffuse=1.0, emissive=0.25, specular=0.39, power=50)
+        self.mat("rail", "Rail_Environment.png", diffuse=0.5, emissive=0.35, specular=0.8, power=10, texgen="chrome")
+        self.mat("post", "Column_beige.png", diffuse=0.8, emissive=0.3)
+        self.mat("plate", "Floor_Top_Checkpoint.png", diffuse=1.0, emissive=0.2, specular=0.3, power=60)
 
     def mat(self, name, texture=None, **kw):
         if name not in self.mat_ids:
