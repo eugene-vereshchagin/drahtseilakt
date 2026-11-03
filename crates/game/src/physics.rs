@@ -794,6 +794,35 @@ mod tests {
     }
 
     #[test]
+    fn crates_made_overlapping_side_by_side_do_not_stop_the_world() {
+        // Two crates (cubes of 5) made 4 apart along x, so each one's corners lie exactly on the other's edges along
+        // x, as a level's crates set too close make them; they land on the floor. The contact of a corner on an edge
+        // at no distance once had no normal: the impact gave the crates NaN speeds, their NaN event times stopped the
+        // physics clock, and every body went on in a straight line from its last step, unsteered — a ball in the air
+        // floated at a constant speed. The ball, falling far away, must keep falling as gravity says.
+        let mut w = World::new(&floor());
+        for x in [0.0, 4.0] {
+            w.add_box(Vec3::splat(2.5), crate_material(), Vec3::new(x, 2.7, 0.0), Quat::IDENTITY);
+        }
+        let ball = w.add_ball(2.0, wood(), Vec3::new(60.0, 150.0, 0.0), Quat::IDENTITY);
+        let mut ys = Vec::new();
+        for _ in 0..120 {
+            w.step(None);
+            let s = w.state(ball).unwrap();
+            assert!(s.pos.is_finite() && s.vel.is_finite(), "the ball is at {:?}, speed {:?}", s.pos, s.vel);
+            ys.push(s.pos.y);
+        }
+        // the fall speeds up every tick (the drag of a wooden ball is far from cancelling gravity at these speeds)
+        for k in 2..ys.len() {
+            let (d0, d1) = (ys[k - 1] - ys[k - 2], ys[k] - ys[k - 1]);
+            assert!(d1 < d0 - 1e-4, "tick {k}: the ball moves {d0} then {d1}: it floats at a constant speed");
+        }
+        for (i, b) in w.bodies.iter().enumerate() {
+            assert!(b.pos.is_finite(), "body {i} is at {:?}", b.pos);
+        }
+    }
+
+    #[test]
     fn a_wooden_ball_pushes_a_box_and_the_box_stays_down() {
         let mut w = World::new(&floor());
         let bx = w.add_box(
