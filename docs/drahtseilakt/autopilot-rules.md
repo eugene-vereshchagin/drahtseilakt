@@ -45,6 +45,20 @@ they rest on are in [autopilot.md](autopilot.md).
   the box over the edge.
 - **Fans**: a paper ball waits over the grate only until it is lifted.
 
+## Mechanisms
+
+- **Planks standing on a hinge** (drawbridges, P_Modul_25): rammed down from a short run-up, braking at once after
+  the hit so as not to follow the plank into the gap.
+- **Pushers** (P_Modul_01): moved by hitting their disc, not by leaning on it; a few rams where one is not enough.
+- **A loose ball as a key**: where a loose ball has to roll somewhere to trip a mechanism (a pusher's disc, a
+  trapdoor), it is knocked there with a glancing hit along its row, the ball braking at once (level 11: two stone
+  balls knocked off the grid onto the rails under it).
+- **Seesaws** (P_Modul_30) are crossed from their low end with a run-up: from a standstill a stone ball does not get
+  over the pivot.
+- **A hint begins after a transformer has let the ball go**, not while it holds it: the way's place is found again
+  after the hint, and a transformer passed under a hint is not known as passed.
+- **A passed sector is gone**: its objects leave the physics and the picture, so the way never leads back into it.
+
 ## Balls
 
 - **Paper** over fans and along walls of air; light: it needs a run-up for slopes and sagging plates.
