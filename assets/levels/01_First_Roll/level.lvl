@@ -1,7 +1,7 @@
 # First Roll: the first of our levels, made in the spirit of the original's first one (its order of lessons, its kinds
 # of parts, its widths and its help; measured, not traced: the layout, turns, heights and lengths are ours). Four
-# sectors: a wooden bridge, the first rails and a loop of rails, boxes on a walled square, the stone transformer and
-# back to wood, loose paper balls; a long bridge, a dome, the stone on the crate (pushed out from under it from the
+# sectors: a wooden bridge, the first rails, boxes on a walled square, the stone transformer and
+# back to wood, loose paper balls; a loop of rails, a long bridge, a dome, the stone on the crate (pushed out from under it from the
 # floor below); a square of loose balls and two pushers (pushed out of their lane from the floor beside it), rails to
 # the wood transformer; wooden ramps zigzagging up between railed landings and the long way down to the finish.
 # Gutters along every floor; railings at the start, round the outer side of the turns, on the landings and where a
@@ -17,7 +17,7 @@ bonus 100
 ball wood
 columns 45
 
-# ---- sector 1: off the tower, a wooden bridge, the first rails and their loop, boxes on a walled square, a narrow
+# ---- sector 1: off the tower, a wooden bridge, the first rails (straight), boxes on a walled square, a narrow
 # way down to the stone transformer and back to wood, the square of paper balls, rails with points to the checkpoint
 safety gutter
 start
@@ -33,9 +33,12 @@ floor 8
 surface wood
 floor 84
 surface stone
-floor 8
-rails 20
-rails-left 360 13 down 8
+# the first rails: the way narrows between railings to their mouth, then straight and gently down
+railing both
+width 7
+floor 10
+railing off
+rails 30 down 7
 rails 14 down 2
 safety border
 width 26
@@ -45,9 +48,10 @@ box side -5 ahead 12
 floor 36
 life side 9 ahead -4
 box side -8 ahead -12
-width 6
+width 8
 floor 6
 safety gutter
+width 7
 railing right
 left 90 16 down 2
 railing off
@@ -96,11 +100,14 @@ width 10
 floor 12
 checkpoint
 
-# ---- sector 2: rails down, a long wooden bridge, two small squares (a point, a dome), rails round to the stone
+# ---- sector 2: rails down and a loop of rails, a long wooden bridge, two small squares (a point, a dome), rails round to the stone
 # transformer, the stone on the crate (push the crate out from under it from the floor below), boxes, a long way to
 # the checkpoint
 floor 7
-rails 22 down 6
+# the loop of rails, now the ball knows rails
+rails 14 down 2
+rails-left 360 14 down 7
+rails 12 down 2
 safety gutter
 width 9
 floor 6
@@ -112,7 +119,7 @@ safety border
 width 18
 floor 20
 point
-width 6
+width 8
 floor 12
 width 22
 floor 40
@@ -146,7 +153,7 @@ autopilot all
 right 90 8
 floor 10 up 2
 right 90 8 up 1.5
-width 5
+width 6
 floor 14 up 1.5
 right 90 8
 floor 15
@@ -191,7 +198,7 @@ floor 8
 pilot all : goto 6 -4 0 ; goto 12 -4 0 ; push 0 1 80 ; goto 12 -4 0 ; goto 28 -4 0 ; push 0 1 80 ; goto 28 -4 0
 nopilot all
 floor 40
-width 6
+width 7
 floor 8
 autopilot all
 safety gutter

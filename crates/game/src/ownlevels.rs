@@ -163,7 +163,7 @@ mod tests {
     /// height (a crack, a wedge of nothing between two pieces, a piece's edge running into the middle of another's
     /// face). The tops are the floors' faces turned up (Phys_Floors), their vertices joined where they are within a
     /// thousandth; an edge of the tops that only one face has is the tops' boundary, and there the floor must end:
-    /// a little way out from it (0.05 and 0.3, level) there is no other top within 0.1 of its height. A step (a
+    /// a little way out from it (0.05 and 0.3, level) there is no other top within 0.02 of its height. A step (a
     /// gutter's rim beside a flat piece, a ramp's foot) is not a seam; a gap the ball jumps is wider than 0.3.
     /// Returns the middles of the edges found.
     fn seams(level: &level::Level) -> Vec<[f32; 3]> {
@@ -257,7 +257,7 @@ mod tests {
                     ts.iter().any(|&j| {
                         j != k
                             && height_at(&tops[j], p.x, p.z)
-                                .is_some_and(|h| (h - mid.y).abs() < 0.1)
+                                .is_some_and(|h| (h - mid.y).abs() < 0.02)
                     })
                 })
             });

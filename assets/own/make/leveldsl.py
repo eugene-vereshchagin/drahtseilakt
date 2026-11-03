@@ -13,6 +13,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     start [X Y Z]            the start's platform, a bowl the ball sits in (its neck as wide as the first floor); the
                              cursor at its front edge (10 ahead of its middle)
     width W                  the floor's width from here on (with its borders); a change tapers over the next floor
+                             that runs on from the last (one after rails, a gap or a move begins at W); a way must
+                             leave the ball 5.5 across at its middle's height (levelkit.MIN_FREE), or nothing is made
     columns D                columns under the floors every D units of way (0: none), for the look
     safety railings|gutter|border|none   how the floors keep the ball on from here on (levelkit.py, SAFETY); the
                              first in a file is the level's
@@ -173,6 +175,8 @@ class Track:
         self.along = 0.0
         self.skip = 0.0
         self.laid_width = None
+        # where the last floor built ends (a floor beginning there runs on from its width)
+        self.floor_end = None
         # railings along the floors' left and right edges from here on (safety railings: both)
         self.rail_sides = (False, False)
         # rails being laid piece after piece (one object), and a checkpoint waiting for the floor after it
@@ -279,6 +283,10 @@ class Track:
         if not runs_on:
             self.end_stretch()
             from_start = self.build_start(pts[0])
+            # a floor running on from a checkpoint begins as wide as its piece; any other new stretch (after rails,
+            # a gap, a move) at the width set now
+            if self.pending is None and (self.floor_end is None or np.linalg.norm(self.floor_end - pts[0]) > 1e-6):
+                self.laid_width = self.width
             st = self.stretch = {"path": [pts[0]], "widths": [self.laid_width or self.width], "along": [self.along],
                                  "heads": [heads[0]], "rails": [self.rail_sides], "safety": self.safety,
                                  "surface": self.surface, "from_start": from_start}
@@ -348,10 +356,14 @@ class Track:
     def build_stretch(self, st):
         if st is None or len(st["path"]) < 2:
             return None
+        self.floor_end = np.asarray(st["path"][-1], np.float64)
         begins_joined = st.get("joined") == "start" or st.get("from_start", False)
-        self.b.track(f"Floor_{self.n('Floor'):03d}", [tuple(p) for p in st["path"]], st["widths"], st["along"],
-                     st["safety"], st["surface"], caps=(not begins_joined, not st.get("ends_joined", False)),
-                     headings=st["heads"], railings=st["rails"])
+        try:
+            self.b.track(f"Floor_{self.n('Floor'):03d}", [tuple(p) for p in st["path"]], st["widths"], st["along"],
+                         st["safety"], st["surface"], caps=(not begins_joined, not st.get("ends_joined", False)),
+                         headings=st["heads"], railings=st["rails"])
+        except ValueError as e:
+            raise LevelError(str(e)) from None
         return st
 
     def move_along(self, pts, head_turn=0.0):
@@ -783,10 +795,13 @@ def compile_level(path):
     titles = info["titles"]
     if "en" not in titles:
         raise LevelError(f"{path}: no title")
-    t.b.write(titles["en"], info["author"], sky=info["sky"], start_ball=f"Ball_{BALLS[info['ball']]}",
-              music=info["music"], light=info["light"], bonus=info["bonus"], licence="GPL-3.0-only",
-              extra={**{f"title.{k}": v for k, v in titles.items() if k != "en"},
-                     **({"order": info["order"]} if "order" in info else {})})
+    try:
+        t.b.write(titles["en"], info["author"], sky=info["sky"], start_ball=f"Ball_{BALLS[info['ball']]}",
+                  music=info["music"], light=info["light"], bonus=info["bonus"], licence="GPL-3.0-only",
+                  extra={**{f"title.{k}": v for k, v in titles.items() if k != "en"},
+                         **({"order": info["order"]} if "order" in info else {})})
+    except ValueError as e:
+        raise LevelError(f"{path}: {e}") from None
     write_pilot(folder, t)
     lengths = [b - a for a, b in zip([0.0] + t.sector_ends, t.sector_ends)]
     print(f"{folder}: {len(t.b.nodes)} objects, {t.sector} sectors, the way {t.sector_ends[-1]:.0f} long "

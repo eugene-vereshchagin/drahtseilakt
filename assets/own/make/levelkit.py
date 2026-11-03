@@ -54,6 +54,12 @@ KERB = 1.25  # the edge band: the brick strip, a groove and the shade, as one ke
 GUTTER = ((0.0, 0.7), (0.84, 0.46), (2.5, 0.0))  # (in from the edge, up) of a gutter's slope
 BORDER_W, BORDER_H = 1.0, 2.2
 RAIL_IN, RAIL_HEIGHTS, RAIL_R, POST_EVERY = 0.35, (1.3, 2.6), 0.17, 6.0
+# Where every profile's flat top is cut (section), in from each edge: the kerb's inner edge and the gutter's foot (and
+# the border's shade's); the foot's cut follows a narrow gutter's foot (at least GUTTER_FLAT out from the middle).
+FLAT_CUTS = (1.0, 1.25, 2.5)
+GUTTER_FLAT = 1.5
+# The shade beside a border, as wide as a gutter's slope, so the flat between them is the same.
+BORDER_SHADE = 1.5
 # The textures' scale: a slab of 5 units, four slabs along a texture; the border's bricks 10 units a repeat (as the
 # menu scene has them).
 SLAB, REPEAT, BRICK = 5.0, 20.0, 10.0
@@ -69,11 +75,77 @@ START_RADIUS, START_DEEP, START_RESET = 10.0, 5.0, 3.65
 CHECK_BOWL = [(0.0, 0.0), (2.03, 0.22), (3.24, 0.51), (4.23, 0.86), (5.0, 1.02)]
 CHECK_LEN, CHECK_RESET, CHECK_FLAMES = 10.0, 3.33, 7.0
 CUP_R, CUP_UP = 2.0, 0.3
+# Rails, measured on the original's: two tubes 0.6 thick, their middles 3.9 apart (the ball, 4 across, sits deep
+# between them, its middle 1.22 over theirs), their tops level with the floor they leave; each end of a tube bends out
+# and up (RAIL_FLARE: along, out, up), a mouth that leads a ball coming off the middle onto them.
+RAIL_GAUGE, RAIL_TUBE = 3.9, 0.3
+RAIL_DROP = RAIL_TUBE
+RAIL_FLARE = (3.0, 1.4, 1.6)
+# The ball's radius (every kind's) and the least room a way leaves it at the height of its middle, between borders or
+# railings: a way narrower than this wedges the ball (the kit refuses to build it).
+BALL_R = 2.0
+MIN_FREE = 5.5
+# The cloud layer under a level (the original's SkyLayer, which the game draws added over the sky): a plane CLOUD_BELOW
+# under the lowest floor, reaching CLOUD_MARGIN past the level on every side, its texture repeating every CLOUD_TILE
+# (the original's: 160 or so below, 400 to 600 past, 675 a repeat; numbers only).
+CLOUD_BELOW, CLOUD_MARGIN, CLOUD_TILE = 165.0, 500.0, 675.0
 # Where the ball comes back after a fall, above the floor round the start or a checkpoint.
 RESET_UP = START_RESET - START_BOWL[-1][1]
 
 
 def section(width, safety, surface="stone"):
+    """A track's cross-section (_profile), its flat top cut at the same places across for every profile (FLAT_CUTS in
+    from each edge), so two stretches of another profile meeting end to end share the vertices of the flat they have
+    in common. Which edges are cut, and how often, is decided at a wide way, so every width of a profile has the same
+    points (a stretch narrowing keeps them; on a narrow way a cut runs into its edge's end)."""
+    ref = max(width, 12.0)
+    pts_r, _ = _profile(ref, safety, surface)
+    pts, edges = _profile(width, safety, surface)
+    w, wr = width / 2, ref / 2
+    n = len(pts)
+    out_p, out_e = [pts[0]], []
+    for k in range(n):
+        a, b = pts[k], pts[(k + 1) % n]
+        ar, br = pts_r[k], pts_r[(k + 1) % n]
+        mat, kind = edges[k]
+        inner = []
+        if abs(ar[1]) < 1e-9 and abs(br[1]) < 1e-9 and abs(br[0] - ar[0]) > 1e-9:
+            lo_r, hi_r = min(ar[0], br[0]), max(ar[0], br[0])
+            lo, hi = min(a[0], b[0]), max(a[0], b[0])
+            for c in FLAT_CUTS:
+                for side in (-1, 1):
+                    xr = side * (wr - c)
+                    x = side * (max(w - c, GUTTER_FLAT) if c == GUTTER[-1][0] else w - c)
+                    if lo_r + 1e-6 < xr < hi_r - 1e-6:
+                        x = min(max(x, lo), hi)
+                        x = min(x, 0.0) if side < 0 else max(x, 0.0)
+                        inner.append((xr, min(max(x, lo), hi)))
+            inner.sort(reverse=br[0] < ar[0])
+            # in the order the edge runs, never back (on a narrow way two cuts may meet; they must not cross)
+            up = b[0] >= a[0]
+            prev, kept = a[0], []
+            for xr, x in inner:
+                x = max(x, prev) if up else min(x, prev)
+                kept.append((xr, x))
+                prev = x
+            inner = kept
+        seq = [a] + [(x, 0.0) for _, x in inner] + [b]
+        for q0, q1 in zip(seq, seq[1:]):
+            if kind[0] == "band" and abs(b[0] - a[0]) > 1e-12:
+                t0 = (q0[0] - a[0]) / (b[0] - a[0])
+                t1 = (q1[0] - a[0]) / (b[0] - a[0])
+                d0, d1 = kind[1], kind[2]
+                sub = ("band", d0 + (d1 - d0) * t0, d0 + (d1 - d0) * t1, kind[3])
+            else:
+                sub = kind
+            out_e.append((mat, sub))
+        out_p += [(x, 0.0) for _, x in inner]
+        if k < n - 1:
+            out_p.append(b)
+    return out_p, out_e
+
+
+def _profile(width, safety, surface="stone"):
     """A track's cross-section for its width and safety: its outline (across, up), from the bottom of its left side up,
     over the top and down the right side (the bottom closes it), and for each edge its material and how its texture
     runs across it: ("down", top) the side's, by the depth under `top`; ("band", d0, d1, w) a band's, by the distance
@@ -82,7 +154,7 @@ def section(width, safety, surface="stone"):
     w = width / 2
     top = "wood" if surface == "wood" else "top"
     if safety == "gutter":
-        g = min(1.0, (w - 1.5) / GUTTER[-1][0]) if w - 1.5 < GUTTER[-1][0] else 1.0
+        g = min(1.0, (w - GUTTER_FLAT) / GUTTER[-1][0]) if w - GUTTER_FLAT < GUTTER[-1][0] else 1.0
         slope = [(d * g, h) for d, h in GUTTER]
         h0 = slope[0][1]
         left = [(-w + d, h) for d, h in slope]
@@ -96,10 +168,11 @@ def section(width, safety, surface="stone"):
         return pts, edges
     if safety == "border":
         b, h = BORDER_W, BORDER_H
-        pts = [(-w, -DEPTH), (-w, 0.0), (-w, h), (-w + b, h), (-w + b, 0.0), (-w + b + KERB, 0.0),
-               (w - b - KERB, 0.0), (w - b, 0.0), (w - b, h), (w, h), (w, 0.0), (w, -DEPTH)]
+        pts = [(-w, -DEPTH), (-w, 0.0), (-w, h), (-w + b, h), (-w + b, 0.0), (-w + b + BORDER_SHADE, 0.0),
+               (w - b - BORDER_SHADE, 0.0), (w - b, 0.0), (w - b, h), (w, h), (w, 0.0), (w, -DEPTH)]
         edges = [("side", ("down", h)), ("side", ("down", h)), ("border", ("brick",)), ("border", ("brick",)),
-                 ("shade", ("band", 0.0, KERB, KERB)), (top, ("slab",)), ("shade", ("band", KERB, 0.0, KERB)),
+                 ("shade", ("band", 0.0, BORDER_SHADE, BORDER_SHADE)), (top, ("slab",)),
+                 ("shade", ("band", BORDER_SHADE, 0.0, BORDER_SHADE)),
                  ("border", ("brick",)), ("border", ("brick",)), ("side", ("down", h)), ("side", ("down", h)),
                  ("side", ("slab",))]
         return pts, edges
@@ -160,6 +233,20 @@ def join_points(width, safety, surface="stone"):
     return sorted({round(x, 9) for x, y in pts if abs(y) < 1e-9})
 
 
+def orient(m):
+    """Turns every triangle of a mesh to face the way its vertices' normals say (its points counter-clockwise seen
+    from that side), as the original's are: a face built in the other order would show its back to a tool that culls
+    or reads the winding."""
+    P = np.asarray(m.p, np.float64)
+    N = np.asarray(m.n, np.float64)
+    for mat, idx in m.parts.items():
+        for t in range(0, len(idx) - 2, 3):
+            a, b, c = idx[t], idx[t + 1], idx[t + 2]
+            g = np.cross(P[b] - P[a], P[c] - P[a])
+            if np.dot(g, N[a] + N[b] + N[c]) < 0:
+                idx[t + 1], idx[t + 2] = c, b
+
+
 def check_bowl(width):
     """A checkpoint's bowl on a way `width` wide: the measured one, smaller on a narrow way (its rim half a unit in
     from the edges) and its depth with it, so its slopes stay the measured ones (a stone ball resting in a steeper
@@ -218,7 +305,8 @@ def track_sweep(m, mats, path, widths, along, safety, surface, caps=(True, True)
         for i, (p, f, s_, u_, t) in enumerate(fr):
             a2, b2 = np.array(secs[i][0][e]), np.array(secs[i][0][(e + 1) % n])
             d2 = b2 - a2
-            out = s_ * d2[1] - u_ * d2[0]
+            # the outline runs clockwise in (across, up): its outward side is to the left of each edge
+            out = -s_ * d2[1] + u_ * d2[0]
             d = rings[i][(e + 1) % n] - rings[i][e]
             nm = np.cross(t, d)
             if np.linalg.norm(nm) < 1e-12:
@@ -249,6 +337,22 @@ def track_sweep(m, mats, path, widths, along, safety, surface, caps=(True, True)
                 m.tri(mats["side"], ids[t3[0]], ids[t3[1]], ids[t3[2]])
             else:
                 m.tri(mats["side"], ids[t3[0]], ids[t3[2]], ids[t3[1]])
+
+
+def free_width(width, safety, railings=(False, False), surface="stone"):
+    """The room a way leaves the ball across at the height of its middle (BALL_R over the floor): between its
+    borders, between its railings' rails, or its whole width."""
+    pts, _ = section(width, safety, surface)
+    xs = [x for x, y in pts if y > -1e-9]
+    lo, hi = min(xs), max(xs)
+    if safety == "border":
+        lo, hi = lo + BORDER_W, hi - BORDER_W
+    inset = RAIL_IN + RAIL_R
+    if railings[0]:
+        lo = max(lo, -width / 2 + inset)
+    if railings[1]:
+        hi = min(hi, width / 2 - inset)
+    return hi - lo
 
 
 def top_height(width, safety, x, surface="stone"):
@@ -308,6 +412,8 @@ class LevelBuilder:
         self.meshes, self.nodes, self.materials = [], [], []
         self.groups = {}
         self.mat_ids = {}
+        # the places where a way leaves the ball too little room (track): write() refuses the level while any are
+        self.narrow = []
         self.seed = seed
         self._standard_materials()
 
@@ -394,11 +500,15 @@ class LevelBuilder:
         safety is railings."""
         if safety not in SAFETY:
             raise ValueError(f"safety is one of {', '.join(SAFETY)}")
+        if railings is None:
+            railings = [(safety == "railings",) * 2] * len(path)
+        narrow = [(p, w, free_width(w, safety, r, surface)) for p, w, r in zip(path, widths, railings)
+                  if free_width(w, safety, r, surface) < MIN_FREE - 1e-6]
+        for p, w, f in narrow:
+            self.narrow.append(f"{name} at ({p[0]:.1f}, {p[1]:.1f}, {p[2]:.1f}): {w:.1f} wide, {f:.2f} free ({safety})")
         m = K.Mesh(name)
         track_sweep(m, self.mat_ids, path, widths, along, safety, surface, caps, headings)
         i = self.add(name, m, groups=self._floor_groups("wood" if surface == "wood" else "stone"))
-        if railings is None:
-            railings = [(safety == "railings",) * 2] * len(path)
         for k, side in ((0, "Left"), (1, "Right")):
             runs, cur = [], None
             for j in range(1, len(path)):
@@ -425,7 +535,8 @@ class LevelBuilder:
         for k in sides:
             sgn = -1.0 if k == 0 else 1.0
             off = [sgn * (w / 2 - RAIL_IN) for w in widths]
-            base = [p + s_ * o + u * top_height(w, safety, o, surface) for (p, f, s_, u, t), o, w in zip(fr, off, widths)]
+            base = [p + s_ * o + u * top_height(w, safety, o, surface)
+                    for (p, f, s_, u, t), o, w in zip(fr, off, widths)]
             for h in RAIL_HEIGHTS:
                 K.tube(m, rail, [b + fr[0][3] * h for b in base], RAIL_R, caps=True)
             # posts at the ends and about every POST_EVERY between
@@ -470,20 +581,32 @@ class LevelBuilder:
         phys = "Phys_FloorRails" if sound == "metal" else "Phys_Floors"
         return [phys, f"Sound_HitID_{sid}", f"Sound_RollID_{sid}", "Shadow"]
 
-    def rails(self, name, path, gauge=2.4, r=0.3, posts=6.0, sector=0, headings=None):
+    def rails(self, name, path, gauge=RAIL_GAUGE, r=RAIL_TUBE, posts=6.0, sector=0, headings=None, flare=True):
         """Two steel tubes the ball rolls on, `gauge` apart (across the cursor's heading at each point, so rails laid
-        piece after piece run on without a kink), with short posts under them."""
+        piece after piece run on without a kink), their tops at the path's height (the floor's top where they begin
+        and end), with short posts under them; with `flare`, each tube's ends bend out and up (RAIL_FLARE)."""
         m = K.Mesh(name)
         fr = ring_frames(path, headings)
-        for side in (-gauge / 2, gauge / 2):
-            K.tube(m, self.mat_ids["rail"], [p + s * side for p, f, s, u, t in fr], r, caps=True)
+        down = np.array([0.0, -RAIL_DROP, 0.0])
+        for sgn in (-1.0, 1.0):
+            line = [p + s * (sgn * gauge / 2) + down for p, f, s, u, t in fr]
+            if flare:
+                ahead, out, rise = RAIL_FLARE
+                for end, k in ((0, -1.0), (-1, 1.0)):
+                    p, f, s, u, t = fr[end]
+                    t3 = t * k
+                    bend = [line[end] + t3 * (ahead * c) + s * (sgn * out * c * c) + u * (rise * c * c)
+                            for c in np.linspace(0.25, 1.0, 4)]
+                    line = (bend[::-1] + line) if end == 0 else (line + bend)
+            K.tube(m, self.mat_ids["rail"], line, r, caps=True)
         run = 0.0
         for i in range(1, len(fr)):
             run += float(np.linalg.norm(fr[i][0] - fr[i - 1][0]))
             if run >= posts:
                 run = 0.0
                 p, f, s, u, t = fr[i]
-                K.tube(m, self.mat_ids["rail"], [p - s * gauge / 2 - u * r, p + s * gauge / 2 - u * r], r * 0.7)
+                K.tube(m, self.mat_ids["rail"], [p - s * gauge / 2 - u * r + down, p + s * gauge / 2 - u * r + down],
+                       r * 0.7)
         return self.add(name, m, groups=self._floor_groups("metal") + self.sector(sector))
 
     def bowl_piece(self, name, centre, fwd, bowl, outer, joins, cups, along=0.0):
@@ -710,13 +833,43 @@ class LevelBuilder:
 
     # --- writing -----------------------------------------------------------------------------------------------
 
+    def cloud_layer(self):
+        """The level's cloud layer (SkyLayer, hidden in the file as the original's: the game shows it when the
+        options have clouds, drawn added over the sky): a plane under the lowest floor, past the level on every side,
+        with our own clouds, grey wisps on black."""
+        floors = set(self.groups.get("Phys_Floors", []))
+        pts = np.array([q for i in floors for q in self.meshes[self.nodes[i]["mesh"]].p]) if floors else None
+        if pts is None or not len(pts):
+            return
+        lo, hi = pts.min(0), pts.max(0)
+        y = lo[1] - CLOUD_BELOW
+        x0, z0, x1, z1 = lo[0] - CLOUD_MARGIN, lo[2] - CLOUD_MARGIN, hi[0] + CLOUD_MARGIN, hi[2] + CLOUD_MARGIN
+        size = 256
+        wisps = K.value_noise(size, size, (4, 4), self.seed + 9, octaves=6)
+        streak = K.value_noise(size, size, (2, 8), self.seed + 10, octaves=4)
+        v = np.clip((wisps * 0.7 + streak * 0.3 - 0.47) * 3.2, 0, 1) ** 1.6 * 0.68
+        K.save_png(self.tex, "SkyLayer.png", np.repeat(v[..., None], 3, axis=2))
+        mat = self.mat("SkyLayer", "SkyLayer.png", diffuse=1.0, emissive=1.0)
+        m = K.Mesh("SkyLayer")
+        q = [(x0, y, z0), (x0, y, z1), (x1, y, z1), (x1, y, z0)]
+        uv = [((x - x0) / CLOUD_TILE, (z - z0) / CLOUD_TILE) for x, _, z in q]
+        m.face(mat, q, uv, normal=(0, 1, 0))
+        self.add("SkyLayer", m, visible=False)
+
     def write(self, title, author, sky, start_ball, music, light=(1.0, 1.0, 1.0), bonus=100, licence=None,
               extra=None):
         """Writes the level and its level.txt (with `extra` keys besides title, author, version, licence)."""
+        if self.narrow:
+            raise ValueError(f"{len(self.narrow)} places leave the ball less than {MIN_FREE} across at the height of "
+                             "its middle:\n  " + "\n  ".join(self.narrow))
+        self.cloud_layer()
+        for m in self.meshes:
+            orient(m)
         groups = sorted(self.groups.items())
         K.write_open(self.out, self.meshes, self.nodes, self.materials, groups, sky=sky, start_ball=start_ball,
                      settings={"music": music, "light": list(light), "level_bonus": bonus, "tutorial": False,
-                               "last_level": False, "parts": "own"}, generator=f"drahtseilakt levelkit.py {KIT_VERSION}")
+                               "last_level": False, "parts": "own"},
+                     generator=f"drahtseilakt levelkit.py {KIT_VERSION}")
         with open(os.path.join(self.out, "level.txt"), "w") as f:
             f.write(f"title = {title}\nauthor = {author}\nversion = 1\n")
             if licence:

@@ -173,6 +173,18 @@ runs on have their corners at the floor's own cross-section points, and their to
 (`the_seam_finder_sees_a_crack` checks the finder itself). A checkpoint on a narrow way has a smaller bowl, and its
 depth with it, so its slopes stay the measured ones (a stone ball resting in a steeper bowl did not roll out of it).
 
+**Room, rails and clouds** (2026-11-03, after the owner played level 1): a way must leave the ball (radius 2) at least
+5.5 across at the height of its middle, between its borders or its railings' rails (levelkit.MIN_FREE); the kit
+refuses to write a level that has a narrower place and lists every one (a way 6 wide with brick borders left 4, and
+the ball wedged). Rails are the original's, measured: tubes 0.6 thick, their middles 3.9 apart, so the ball sits deep
+between them, their tops level with the floor they leave, each tube's ends bent out and up into a mouth. Every
+profile's flat top is cut at the same places across (1, 1.25 and 2.5 in from the edges, the last at least 1.5 out from
+the middle, where a narrow gutter's foot is), so stretches of another profile meeting end to end share their vertices;
+every face turns the way its normal says (the tracks' faces were wound and their normals turned inwards before). Under
+every level lies a cloud layer as the original's (`SkyLayer`, hidden in the file, shown by the game when the options
+have clouds, drawn added over the sky): a plane 165 under the lowest floor, 500 past the level on every side, our own
+grey clouds on black repeating every 675.
+
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
 its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26 into it (to a lip) and two flame
