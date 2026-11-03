@@ -76,6 +76,26 @@ the run the charge keeps the ball and gets on: some bridges fall when hit, other
 first; then rams from a run-up of 8 or 14 along the way, braking at once after the hit (so as not to follow a plank
 that falls into the gap), a wait while it settles, and across.
 
+## Keeping to the middle
+
+A player keeps to the middle of a track, not along its edge; so does the test player. The level's floors are read
+once a level for their **edges**: where a floor's border has no floor going on just beyond it (a drop), or a wall
+stands on it (its foot); a seam between two floors' meshes is no edge. Each floor point knows how far it is from
+the nearest edge as high, and how far the middle of its floor is (the clearest point near: half the floor's width).
+
+- **The way's search** pays more for a point the nearer it is to an edge, so the way follows the middle of a track;
+  on a narrow floor its middle is the only way. A rail is no floor with edges: its line is the way.
+- **The steering** judges each choice tried on a copy of the run also by how far off the middle of its floor the
+  ball rolls (and more where it comes nearer than 3 to an edge): less than a choice that keeps the ball or gets on
+  is worth, more than a little progress. Each arrow pressed or let go since the last decision costs a little too, so
+  the line is smooth, not a zig-zag.
+- **Keeping to a player's line**, where the player's ball came nearer than 3 to an edge, its ball may keep up to 1.5
+  off that line toward the middle, when as fast; elsewhere the line is the player's.
+
+Each run's summary ends with how near the edges its ball rolled, over its ticks on a floor (not on rails): `edges:
+mean M, min N, within 1 for P% of T ticks on floors`. The same line ends `--replay FILE --headless`, so any run,
+a player's too, can be compared.
+
 ## Going back and trying again
 
 The simulation is deterministic and can be copied, so the test player saves its run every two seconds (the saves
@@ -150,6 +170,30 @@ the number of hints (256) and steps (64 a hint) and every number are capped, a r
 it, and a malformed line refuses the whole file with its line number. `HINTS_TRACE=1` prints the ball every ten
 ticks while a hint drives.
 
+## Watching it play
+
+`--watch` (with `--level N`, `--open DIR` or `--sector N`, and `--follow`, `--then`, `--plan`, `--hints` as for
+`--autopilot`) runs the test player in the game's window: its inputs drive the game each tick instead of the
+keyboard. Its decisions (tries on copies of the run, searches) are made on a thread of their own between frames; a
+decision that takes longer holds the view and shows "thinking". Going back to a saved state jumps there visibly, and
+the line says what failed and back to when. The status in the top left corner: the speed, the time, sector, lives,
+how far the ball is from the edge of its floor, how often it went back, what steers (the player's line, the way's
+search, a hint and its step, a manoeuvre or the beam search when stuck), the way's point reached and the next
+transformer. The watcher's keys, in a box bottom left in the menus' language (the state that is on stands out):
+
+| Key | What it does |
+|---|---|
+| Space | pause, go on |
+| + / − | faster, slower (¼× to 8×; only how many ticks a frame: the run stays the same) |
+| F5 | take over: the arrows drive, the test player watches; F5 again hands the ball back from where it is now. The stretch is saved beside the hints as `<level>-hand-<tick>.replay` (the run up to then, so it replays exactly) and a hint line playing it (`at … : replay <file> FROM TO`) is added to `<level>-hand.txt`, both named on the screen; copied into the level's hint file, the test player plays it there next time. The saved states before it are not gone back to |
+| F6 | skip the running hint's step |
+| F7 | a stuck report of this place (as for a dead run, into `--report`) |
+| F1 | hide or show the box of keys |
+| Esc | the pause menu (leave the level, quit) |
+
+At the end, or when the window is closed, the run's summary is printed and the whole run, the hand-driven stretches
+too, is saved at `--record`.
+
 ## Videos of its runs
 
 `--video FILE` with `--replay` draws the run without a window, one frame a tick (60 a second) at `--size`, as raw
@@ -162,19 +206,19 @@ with ffmpeg (the frames go through a pipe, nothing large is kept; the game itsel
 Following the owner's runs (`--autopilot --follow`), with going back and keeping to the player's line, 2026-11-03
 (the finished runs are kept in `hints/runs/`, their videos outside the repository, made with `scripts/video.sh`):
 
-- Level 1: finished from the start in 6:19.50 (hints for the ramp, the crate, the pushers and the rails).
-- Level 2: finished from the start in 5:44.53 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
-- Level 3: finished from the start in 7:32.08 (the lever and the bridge in sector 4 as the owner did them).
-- Level 4: finished from the start in 9:16.25 (`--follow` the owner's run, `--then` the one from sector 3).
-- Level 5: finished from the start in 13:06.93 (hints for both crates and the pusher).
+- Level 1: finished from the start in 6:12.27 (hints for the ramp, the crate, the pushers and the rails).
+- Level 2: finished from the start in 6:13.27 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
+- Level 3: finished from the start in 7:45.48 (the lever and the bridge in sector 4 as the owner did them).
+- Level 4: finished from the start in 9:19.47 (`--follow` the owner's run, `--then` the one from sector 3).
+- Level 5: finished from the start in 12:39.77 (hints for both crates and the pusher).
 - Level 6: with the owner's run (it ends at the convex log in sector 2) and the plan `hints/Level_06.plan`, the test
   player goes on by itself through sectors 2 and 3 and over the wavy log of sector 4 to its stone transformer; the
   boxes to push off the ledge as stone are next.
-- Level 7: finished from the start in 11:47.53, following the owner's finished run.
+- Level 7: finished from the start in 12:04.28, following the owner's finished run.
 - Level 8: by itself with the walkthrough's plan, to the first wood transformer (route 156 of 1072).
-- Level 9: finished from the start in 12:30.10, following the owner's finished run (the maze of pushers in sector 3
+- Level 9: finished from the start in 12:35.27, following the owner's finished run (the maze of pushers in sector 3
   is solved as the owner solved it).
-- Level 10: finished from the start in 14:42.52, following the owner's finished run with `hints/Level_10.txt`.
+- Level 10: finished from the start in 15:31.00, following the owner's finished run with `hints/Level_10.txt`.
 - Levels 11–13: 11 follows the owner's run through sectors 1–3 (losing a ball at the drawbridge as the owner did,
   which knocks it down) and goes on by itself in sector 4; 12 in sector 2 (its
   thin rails); 13 in sector 2, past the paper transformer and up the fan, at the beam the

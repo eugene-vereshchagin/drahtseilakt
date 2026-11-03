@@ -11,6 +11,7 @@ mod audio;
 mod autopilot;
 mod ballsound;
 mod collide;
+mod edges;
 mod endscreen;
 mod extra;
 mod fallback;
@@ -67,6 +68,8 @@ usage: drahtseilakt [options]
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
   --autopilot         no window: the test player plays the level (to --ticks); saved with --record
+  --watch             with --autopilot: the test player plays in the window (Space pause, +/- speed, F5 take
+                      over by hand and give back, F6 skip a hint's step, F7 a stuck report)
   --follow FILE       the test player follows the ball's way in a replay of a player's run, or a --locate track
   --then FILE         with --follow: from the sector this replay begins at, its way instead (up to 8 times)
   --plan FILE         the test player's way goes through the level objects named in FILE, in order
@@ -116,6 +119,8 @@ pub struct Options {
     pub headless: bool,
     /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
     pub autopilot: bool,
+    /// The test player plays in the window, for watching it and taking over by hand.
+    pub watch: bool,
     /// The test player follows the ball's way in this replay (a player's run) or `--locate` track instead of finding
     /// one.
     pub follow: Option<PathBuf>,
@@ -168,6 +173,7 @@ fn parse_args() -> Result<Options, String> {
         replay: None,
         headless: false,
         autopilot: false,
+        watch: false,
         follow: None,
         then: Vec::new(),
         plan: None,
@@ -233,6 +239,10 @@ fn parse_args() -> Result<Options, String> {
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,
             "--autopilot" => o.autopilot = true,
+            "--watch" => {
+                o.autopilot = true;
+                o.watch = true;
+            }
             "--locate" => o.locate = Some(value()?.into()),
             "--frames" => o.frames = Some(value()?.into()),
             "--video" => o.video = Some(value()?.into()),

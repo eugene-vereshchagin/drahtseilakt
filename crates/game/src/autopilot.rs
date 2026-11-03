@@ -84,11 +84,25 @@ pub struct Route {
     /// Where the way rides a fan's updraft (the point it is lifted from), and which fan.
     pub lifts: Vec<(usize, usize)>,
     /// The floor points by cell (`CELL`), each with how far it is from an edge.
-    floor: HashMap<(i32, i32), Vec<(Vec3, f32)>>,
+    floor: HashMap<(i32, i32), Vec<FloorPoint>>,
     /// The floor points the way was found over, and their indices by cell (`GAP`), to find ways over them anew.
     pts: Vec<Vec3>,
     grid: HashMap<(i32, i32), Vec<usize>>,
+    /// The edges of the level's floors.
+    pub edges: std::sync::Arc<crate::edges::Edges>,
 }
+
+/// A floor point as the steering reads it: how far it is from the nearest floor point without floor on every side
+/// (0 for those: no footing), whether it is on a rail, and half its floor's width (`half` in `Route::search`).
+struct FloorPoint {
+    at: Vec3,
+    coarse: f32,
+    rail: bool,
+    half: f32,
+}
+
+/// The middle of a floor is looked for this far round a point of it.
+const MIDDLE_NEAR: f32 = 6.0;
 
 /// How far ahead along the way the point is that the ball heads for (points), and how far round over the floors a
 /// way to it is looked for.
@@ -106,10 +120,23 @@ const SHUN_COST: f32 = 60.0;
 /// The cell of the floor lookup.
 const CELL: f32 = 2.0;
 
-/// The world triangles of the floors, rails (with the rail's object) and modules.
-fn floor_triangles(level: &Level, modules: &crate::scene::Modules) -> Vec<([Vec3; 3], Rail)> {
+/// The edges of the level's floors (edges.rs), built once a level.
+pub fn level_edges(
+    level: &Level,
+    modules: &crate::scene::Modules,
+) -> std::sync::Arc<crate::edges::Edges> {
+    let (tris, own) = floor_triangles(level, modules);
+    crate::edges::Edges::of(&tris, own)
+}
+
+/// The world triangles of the floors, rails (with the rail's object) and modules; and how many are the level's own
+/// (they come first, the modules' after).
+fn floor_triangles(
+    level: &Level,
+    modules: &crate::scene::Modules,
+) -> (Vec<([Vec3; 3], Rail)>, usize) {
     let mut out = Vec::new();
-    let mut add = |mesh: &level::Mesh, m: Mat4, rail: Rail| {
+    let add = |out: &mut Vec<([Vec3; 3], Rail)>, mesh: &level::Mesh, m: Mat4, rail: Rail| {
         for part in &mesh.parts {
             for t in part.indices.as_chunks::<3>().0 {
                 let p = |i: u32| {
@@ -135,10 +162,11 @@ fn floor_triangles(level: &Level, modules: &crate::scene::Modules) -> Vec<([Vec3
                 continue;
             };
             if let Some(mesh) = o.mesh.and_then(|k| level.meshes.get(k)) {
-                add(mesh, Mat4::from_cols_array_2d(&o.matrix), rail);
+                add(&mut out, mesh, Mat4::from_cols_array_2d(&o.matrix), rail);
             }
         }
     }
+    let own = out.len();
     for i in 0..level.objects.len() {
         // loose balls and boxes are things in the way, a dome is a hump to go round, module 34 a box with a stone
         // on it to push away: not floors
@@ -158,11 +186,16 @@ fn floor_triangles(level: &Level, modules: &crate::scene::Modules) -> Vec<([Vec3
         let place = Mat4::from_cols_array_2d(&o.matrix);
         for mo in &module.objects {
             if let Some(mesh) = mo.mesh.and_then(|k| module.meshes.get(k)) {
-                add(mesh, place * Mat4::from_cols_array_2d(&mo.matrix), None);
+                add(
+                    &mut out,
+                    mesh,
+                    place * Mat4::from_cols_array_2d(&mo.matrix),
+                    None,
+                );
             }
         }
     }
-    out
+    (out, own)
 }
 
 /// A fan's updraft (Sim::updrafts): where it is measured to, the top of its volume, how far across it takes the ball.
@@ -280,7 +313,8 @@ impl Route {
         grounded: &[usize],
         steep: bool,
     ) -> Route {
-        let tris = floor_triangles(level, modules);
+        let (tris, own) = floor_triangles(level, modules);
+        let floor_edges = crate::edges::Edges::of(&tris, own);
         // (a way found for the test player alone, not along a player's, takes steeper floors: the waves of a wavy log)
         let found = floor_points(
             &tris,
@@ -370,8 +404,8 @@ impl Route {
                 !sides.iter().all(|&x| x)
             })
             .collect();
-        // How far each point is from the nearest edge (up to `CLEAR`): the way keeps to the middle, as a player who
-        // fears the edge does. Rails are narrow by nature and count as clear.
+        // How far each point is from the nearest of the floor points without floor on every side (up to `CLEAR`):
+        // 0 for those, so a ball coming down there is taken as coming down on no floor. Rails count as clear.
         let mut edges: HashMap<(i32, i32), Vec<Vec3>> = HashMap::new();
         for (p, _) in found.iter().zip(&edge).filter(|(_, e)| **e) {
             edges
@@ -382,7 +416,7 @@ impl Route {
                 .or_default()
                 .push(p.0);
         }
-        let clear: Vec<f32> = found
+        let coarse: Vec<f32> = found
             .iter()
             .map(|&(p, rail)| {
                 if rail.is_some() {
@@ -400,6 +434,37 @@ impl Route {
                     }
                 }
                 c
+            })
+            .collect();
+        // How far each point is from the edge of its floor, a drop or a wall's foot (edges.rs, up to `CLEAR`): the
+        // way keeps to the middle, as a player who fears the edge does; on a narrow floor its middle is the way. A
+        // rail is narrow by nature and holds the ball: its line is the way, counted as clear.
+        let clear: Vec<f32> = found
+            .iter()
+            .map(|&(p, rail)| {
+                if rail.is_some() {
+                    CLEAR
+                } else {
+                    floor_edges.distance(p).min(CLEAR)
+                }
+            })
+            .collect();
+        // How far from its edges the middle of each point's floor is (the clearest point near, as high): half the
+        // floor's width, up to `CLEAR`. The steering keeps the ball near it.
+        let half: Vec<f32> = pts
+            .iter()
+            .enumerate()
+            .map(|(i, &p)| {
+                near(p)
+                    .into_iter()
+                    .filter(|&w| {
+                        pts.get(w).is_some_and(|q| {
+                            (q.y - p.y).abs() < 1.0
+                                && Vec3::new(q.x - p.x, 0.0, q.z - p.z).length() < MIDDLE_NEAR
+                        })
+                    })
+                    .filter_map(|w| clear.get(w).copied())
+                    .fold(clear.get(i).copied().unwrap_or(0.0), f32::max)
             })
             .collect();
         // Along which way each rail point's rail runs: the main axis of its own rail's points near.
@@ -749,12 +814,17 @@ impl Route {
             marks.push(points.len().saturating_sub(1));
             from = if jumped { goal_node } else { to };
         }
-        let mut floor: HashMap<(i32, i32), Vec<(Vec3, f32)>> = HashMap::new();
-        for (p, c) in pts.iter().zip(&clear) {
+        let mut floor: HashMap<(i32, i32), Vec<FloorPoint>> = HashMap::new();
+        for (i, p) in pts.iter().enumerate() {
             floor
                 .entry(((p.x / CELL).floor() as i32, (p.z / CELL).floor() as i32))
                 .or_default()
-                .push((*p, *c));
+                .push(FloorPoint {
+                    at: *p,
+                    coarse: coarse.get(i).copied().unwrap_or(0.0),
+                    rail: found.get(i).is_some_and(|f| f.1.is_some()),
+                    half: half.get(i).copied().unwrap_or(0.0),
+                });
         }
         Route {
             points,
@@ -763,6 +833,7 @@ impl Route {
             floor,
             pts,
             grid,
+            edges: floor_edges,
         }
     }
 
@@ -833,7 +904,7 @@ impl Route {
 
     /// Every floor point of the level (as the way was found over them).
     pub fn floor_points(&self) -> impl Iterator<Item = Vec3> + '_ {
-        self.floor.values().flatten().map(|f| f.0)
+        self.floor.values().flatten().map(|f| f.at)
     }
 
     /// The point of the way nearest the ball at `p`, before point `until` (the way may pass there again later).
@@ -862,22 +933,36 @@ impl Route {
         r
     }
 
-    /// How far the ball at `p` is from an edge: the clearance of the floor point under it (0 with none under it).
-    pub fn clearance(&self, p: Vec3) -> f32 {
+    /// The floor point under the ball at `p` (its nearest within 1.8 across, as high within 1.5), if any.
+    fn floor_point(&self, p: Vec3) -> Option<&FloorPoint> {
         let f = p - Vec3::Y * crate::sim::BALL_RADIUS;
         let (cx, cz) = ((f.x / CELL).floor() as i32, (f.z / CELL).floor() as i32);
-        let mut best: Option<(f32, f32)> = None;
+        let mut best: Option<(f32, &FloorPoint)> = None;
         for dx in -1..=1 {
             for dz in -1..=1 {
-                for &(q, c) in self.floor.get(&(cx + dx, cz + dz)).into_iter().flatten() {
-                    let h = Vec3::new(q.x - f.x, 0.0, q.z - f.z).length();
-                    if h < 1.8 && (q.y - f.y).abs() < 1.5 && best.is_none_or(|b| h < b.0) {
-                        best = Some((h, c));
+                for q in self.floor.get(&(cx + dx, cz + dz)).into_iter().flatten() {
+                    let h = Vec3::new(q.at.x - f.x, 0.0, q.at.z - f.z).length();
+                    if h < 1.8 && (q.at.y - f.y).abs() < 1.5 && best.is_none_or(|b| h < b.0) {
+                        best = Some((h, q));
                     }
                 }
             }
         }
-        best.map_or(0.0, |b| b.1)
+        best.map(|b| b.1)
+    }
+
+    /// How far the ball at `p` is from an edge, the coarse way: the clearance of the floor point under it to the
+    /// floor points without floor on every side (0 with none under it, or on one of those: no footing).
+    pub fn clearance(&self, p: Vec3) -> f32 {
+        self.floor_point(p).map_or(0.0, |q| q.coarse)
+    }
+
+    /// How far the ball at `p` is off the middle of its floor, and how much nearer than `SAFE` to its edge (edges.rs):
+    /// none on a rail (its line is the way) or on no floor.
+    pub fn off_middle(&self, p: Vec3) -> Option<(f32, f32)> {
+        let q = self.floor_point(p).filter(|q| !q.rail)?;
+        let d = self.edges.distance(p - Vec3::Y * crate::sim::BALL_RADIUS);
+        Some(((q.half - d).max(0.0), (SAFE - d).max(0.0)))
     }
 
     /// How far along the way `p` is, searching from point `from` up to `until`: on the segment it is nearest to
@@ -979,10 +1064,15 @@ const PERIOD: u64 = 6;
 /// A player rolls calmly: above this speed every unit costs `FAST` way points.
 const CALM: f32 = 7.0;
 const FAST: f32 = 1.5;
-/// Nearer an edge than `SAFE`, every unit nearer costs `EDGE` way points at each sample (every sixth tick) of a
-/// tried choice: a player keeps to the middle.
+/// A player keeps to the middle of a track: over the samples (every sixth tick) of a tried choice on a floor, each
+/// unit the ball is off the middle of its floor costs `MIDDLE` way points on average, and each unit nearer an edge
+/// than `SAFE` `EDGE` more. Less than a choice that keeps the ball or gets on is worth, more than a little progress.
 const SAFE: f32 = 3.0;
-const EDGE: f32 = 0.3;
+const EDGE: f32 = 2.7;
+const MIDDLE: f32 = 0.6;
+/// And a player holds a line: each arrow pressed or let go since the last decision costs this (no zig-zag).
+const SWITCH: f32 = 0.15;
+const ARROWS: u8 = input::UP | input::DOWN | input::LEFT | input::RIGHT;
 const HOLD: u64 = 18;
 const COAST: u64 = 36;
 
@@ -1036,6 +1126,12 @@ const TRACK_AHEAD: u64 = 30;
 const TRACK_LOST: f32 = 4.0;
 const TRACK_RESYNC: usize = 3600;
 const TRACK_OWN: f32 = 0.5;
+/// Where the player's ball hugged an edge (nearer than `SAFE`), ours may keep up to `TRACK_SLACK` off the player's
+/// line, each unit of it costing `TRACK_SLACK_COST` instead of a whole one, and each unit off the middle of the floor
+/// `TRACK_MIDDLE`: so it keeps nearer the middle where that line is as fast, the player's line elsewhere.
+const TRACK_SLACK: f32 = 1.5;
+const TRACK_SLACK_COST: f32 = 0.25;
+const TRACK_MIDDLE: f32 = 0.5;
 /// The player's line is kept to until this long (a second) before a lost ball.
 const TRACK_DOOMED: u32 = 60;
 /// A ball lost this long (four seconds) after keeping to the player's last seconds before a loss was lost as the
@@ -1177,6 +1273,8 @@ pub struct Pilot {
     track_keys: Vec<(u64, u8)>,
     /// The last tick the player's line was kept to in the player's last seconds before a lost ball.
     doomed_at: Option<u64>,
+    /// What steers now, for whoever watches (`status`).
+    mode: &'static str,
 }
 
 /// How near the ball a point of the way must be to take the way up there (a run begun at a sector).
@@ -1210,6 +1308,7 @@ impl Pilot {
             tracking: None,
             track_keys: Vec::new(),
             doomed_at: None,
+            mode: "way search",
         }
     }
 
@@ -1300,6 +1399,7 @@ impl Pilot {
         let lives = sim.lives;
         // the player's keys from tick `k + t`, in our view (as a copy's view turns with them, each tick's own)
         let theirs = |s: &Sim, t: u64| d.input(k + t as usize, s.camera.quarter);
+        let route = self.route.clone();
         let cost_of = |first: Option<u8>| -> (f32, Vec<u8>) {
             let mut s = sim.clone();
             let mut keys = Vec::new();
@@ -1322,7 +1422,20 @@ impl Pilot {
                 if let Some(p) = d.ticks.get(k + t as usize + 1)
                     && t % 3 == 2
                 {
-                    cost += s.ball.position.distance(p.pos) + 0.1 * s.ball.velocity.distance(p.vel);
+                    let off = s.ball.position.distance(p.pos);
+                    // where the player's ball hugged an edge, ours may keep up to `TRACK_SLACK` nearer the middle
+                    // (as fast, the speed still counts): each unit off the player's line within it costs less than
+                    // a unit off the middle
+                    let hugged = route.off_middle(p.pos).is_some_and(|m| m.1 > 0.0);
+                    let middle = route.off_middle(s.ball.position).map(|m| m.0);
+                    cost += match middle.filter(|_| hugged) {
+                        Some(m) => {
+                            (off - TRACK_SLACK).max(0.0)
+                                + TRACK_SLACK_COST * off.min(TRACK_SLACK)
+                                + TRACK_MIDDLE * m
+                        }
+                        None => off,
+                    } + 0.1 * s.ball.velocity.distance(p.vel);
                 }
             }
             (cost, keys)
@@ -2038,68 +2151,106 @@ impl Pilot {
         )
     }
 
+    /// The place on the way found anew after something else drove since tick `began` (a hint, the watcher's hands):
+    /// the way's point nearest the ball before the next transformer; but what drove may have gone past
+    /// transformers, making the ball over: where that point is far from the ball, the way is taken up at its first
+    /// point on from here near the ball where the way's ball is of this kind.
+    fn find_place(&mut self, sim: &Sim, began: u64) {
+        // a hint knows the place better than the followed run: the player's line waits a while after one
+        self.demo_after = sim.tick + DEMO_AFTER_HINT;
+        // the way's point nearest the ball before the next transformer; but a hint may have gone past
+        // transformers, making the ball over itself: where that point is far from the ball, the way is taken up
+        // at its first point on from here near the ball where the way's ball is of this kind
+        let f = sim.ball.position - Vec3::Y * crate::sim::BALL_RADIUS;
+        let near = self.route.nearest(sim.ball.position, self.until());
+        let off = near
+            .and_then(|i| self.route.points.get(i))
+            .is_none_or(|p| p.distance(f) >= TAKE_UP_NEAR);
+        let made_over = sim
+            .events
+            .iter()
+            .rev()
+            .take_while(|(t, _)| *t >= began)
+            .any(|(_, e)| matches!(e, crate::sim::Event::Transform(_)));
+        let kind = |i: usize| {
+            self.gates
+                .iter()
+                .take_while(|g| g.0 <= i)
+                .last()
+                .map(|g| g.2)
+        };
+        let on = (off && made_over)
+            .then(|| {
+                (self.until()..self.route.points.len()).find(|&i| {
+                    self.route
+                        .points
+                        .get(i)
+                        .is_some_and(|p| p.distance(f) < TAKE_UP_NEAR)
+                        && kind(i).is_none_or(|k| k == sim.ball.kind)
+                })
+            })
+            .flatten();
+        if let Some(i) = on {
+            self.at = i;
+            self.gate = self
+                .gates
+                .iter()
+                .position(|g| g.0 > i)
+                .unwrap_or(self.gates.len());
+        } else if let Some(i) = near {
+            self.at = self.at.max(i);
+        }
+        self.best = f32::NEG_INFINITY;
+        self.moved = sim.tick;
+        self.plan.clear();
+        self.last = Some(sim.ball.position);
+        self.choice = 0;
+    }
+
+    /// The watcher hands the ball back after driving it since tick `began`: the place on the way is found anew,
+    /// and getting on is counted from here.
+    pub fn resume(&mut self, sim: &Sim, began: u64) {
+        self.find_place(sim, began);
+        self.kind = Some(sim.ball.kind);
+        self.gate = self.gate.max(
+            self.gates
+                .iter()
+                .take_while(|g| g.0 <= self.at)
+                .count(),
+        );
+        self.tracking = None;
+        self.track_keys.clear();
+        self.demo_run = None;
+        self.demo_after = 0;
+    }
+
+    /// What steers now and where to, for whoever watches: the mode, the way's point reached of all, the next
+    /// transformer, the hint running.
+    pub fn status(&self) -> String {
+        let gate = self.gates.get(self.gate).map_or_else(String::new, |g| {
+            format!("   next: {:?} transformer at ({:.0} {:.0} {:.0})", g.2, g.1.x, g.1.y, g.1.z)
+        });
+        let mode = if self.tracking.is_some() { "keeping to the player's line" } else { self.mode };
+        let hint = self.hints.describe().map_or_else(String::new, |h| format!("\n{h}"));
+        format!("{mode}   way {} / {}{gate}{hint}", self.at, self.route.points.len())
+    }
+
     /// The input for the next tick of `sim`.
     pub fn next(&mut self, sim: &Sim) -> u8 {
         if let Some((until, c)) = self.noise.as_ref().map(|n| n.opening)
             && sim.tick < until
         {
+            self.mode = "a varied opening";
             return c;
         }
         // a hint for this place drives while it runs; after it, the place on the way is found anew
         if let Some(i) = self.hints.input(sim) {
+            self.mode = "hint";
             return i;
         }
         if std::mem::take(&mut self.hints.ended) {
-            // a hint knows the place better than the followed run: the player's line waits a while after one
-            self.demo_after = sim.tick + DEMO_AFTER_HINT;
-            // the way's point nearest the ball before the next transformer; but a hint may have gone past
-            // transformers, making the ball over itself: where that point is far from the ball, the way is taken up
-            // at its first point on from here near the ball where the way's ball is of this kind
-            let f = sim.ball.position - Vec3::Y * crate::sim::BALL_RADIUS;
-            let near = self.route.nearest(sim.ball.position, self.until());
-            let off = near
-                .and_then(|i| self.route.points.get(i))
-                .is_none_or(|p| p.distance(f) >= TAKE_UP_NEAR);
             let began = self.hints.began;
-            let made_over = sim
-                .events
-                .iter()
-                .rev()
-                .take_while(|(t, _)| *t >= began)
-                .any(|(_, e)| matches!(e, crate::sim::Event::Transform(_)));
-            let kind = |i: usize| {
-                self.gates
-                    .iter()
-                    .take_while(|g| g.0 <= i)
-                    .last()
-                    .map(|g| g.2)
-            };
-            let on = (off && made_over)
-                .then(|| {
-                    (self.until()..self.route.points.len()).find(|&i| {
-                        self.route
-                            .points
-                            .get(i)
-                            .is_some_and(|p| p.distance(f) < TAKE_UP_NEAR)
-                            && kind(i).is_none_or(|k| k == sim.ball.kind)
-                    })
-                })
-                .flatten();
-            if let Some(i) = on {
-                self.at = i;
-                self.gate = self
-                    .gates
-                    .iter()
-                    .position(|g| g.0 > i)
-                    .unwrap_or(self.gates.len());
-            } else if let Some(i) = near {
-                self.at = self.at.max(i);
-            }
-            self.best = f32::NEG_INFINITY;
-            self.moved = sim.tick;
-            self.plan.clear();
-            self.last = Some(sim.ball.position);
-            self.choice = 0;
+            self.find_place(sim, began);
         }
         // a new ball (the old one lost) starts again at a reset point: find it on the way anew (seen every tick, so
         // that a plan or the player's keys carrying the ball far is no new ball)
@@ -2219,6 +2370,7 @@ impl Pilot {
             }
             if let Some(plan) = self.manoeuvre(sim, here) {
                 self.plan = plan;
+                self.mode = "a manoeuvre (stuck)";
                 if let Some(&(_, c)) = self.plan.first() {
                     self.choice = c;
                     return c;
@@ -2256,6 +2408,7 @@ impl Pilot {
             // nothing short gets on: a search over sequences of held choices (beam search on copies of the run)
             if let Some(plan) = self.search(sim, here) {
                 self.plan = plan;
+                self.mode = "beam search (stuck)";
                 if let Some(&(_, c)) = self.plan.first() {
                     self.choice = c;
                     return c;
@@ -2348,8 +2501,8 @@ impl Pilot {
                     } else {
                         FAST * (s.ball.velocity.length() - CALM).max(0.0)
                     }
-                    - EDGE * edge
-                    + if c == self.choice { 0.05 } else { 0.0 }
+                    - edge
+                    - if from_demo { 0.0 } else { SWITCH * ((c ^ self.choice) & ARROWS).count_ones() as f32 }
                     // the player's own line, when as good, is taken: it knows what the search does not
                     + if from_demo { DEMO_BONUS } else { 0.0 }
                     + self.jitter(sim.tick)
@@ -2374,6 +2527,7 @@ impl Pilot {
                 sim.ball.velocity.length()
             );
         }
+        self.mode = if demo_won { "the player's keys" } else { "way search" };
         if demo_won && let Some(k) = matched {
             self.demo_run = Some((k, sim.tick));
             self.choice = 0;
@@ -2389,8 +2543,9 @@ impl Pilot {
 
 /// Each choice tried on a copy of the run: held for `hold` ticks (the player's keys from tick `k` of the followed run
 /// for `DEMO_CHOICE`), then `COAST` with no arrows, and on while in the air (up to two seconds): the copy, whether
-/// the ball was lost (fell below `low`, or came down on no floor), and how near edges it rolled. The copies are run in
-/// threads when AUTOPILOT_PARALLEL is set; the results are in the order of the choices, so the run is the same.
+/// the ball was lost (fell below `low`, or came down on no floor), and what its line off the middle costs. The
+/// copies are run in threads when AUTOPILOT_PARALLEL is set; the results are in the order of the choices, so the run
+/// is the same.
 fn rollouts(
     sim: &Sim,
     route: &Route,
@@ -2403,7 +2558,8 @@ fn rollouts(
         let mut s = sim.clone();
         let lives = s.lives;
         let mut lost = false;
-        let mut edge = 0.0;
+        // (off the middle, nearer an edge than `SAFE`: summed over the samples on a floor)
+        let (mut off, mut near, mut samples) = (0.0, 0.0, 0u32);
         for t in 0..hold + COAST {
             let input = match demo {
                 Some((k, d)) if c == DEMO_CHOICE => d.input(k + t as usize, s.camera.quarter),
@@ -2411,8 +2567,13 @@ fn rollouts(
                 _ => 0,
             };
             s.step(input);
-            if t % 6 == 5 && s.ball.on_ground {
-                edge += (SAFE - route.clearance(s.ball.position)).max(0.0);
+            if t % 6 == 5
+                && s.ball.on_ground
+                && let Some((o, n)) = route.off_middle(s.ball.position)
+            {
+                off += o;
+                near += n;
+                samples += 1;
             }
             if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
                 lost = true;
@@ -2441,6 +2602,7 @@ fn rollouts(
         {
             lost = true;
         }
+        let edge = (MIDDLE * off + EDGE * near) / samples.max(1) as f32;
         (s, lost, edge)
     };
     if std::env::var_os("AUTOPILOT_PARALLEL").is_none() {
@@ -2540,6 +2702,11 @@ impl<T: Clone> Rewinds<T> {
         self.total
     }
 
+    /// The states saved so far are not gone back to (a stretch driven by hand since: it is kept).
+    pub fn forget(&mut self) {
+        self.saves.clear();
+    }
+
     /// A failure at tick `at` (the ball lost then, or the way standing still since then) at `place` (sector, way
     /// point): the state to go back to and which try at this place it is, or None when the failure is to be taken.
     /// The saves after the one gone back to are dropped (they were on the failed course).
@@ -2608,6 +2775,7 @@ mod tests {
             floor: HashMap::new(),
             pts: Vec::new(),
             grid: HashMap::new(),
+            edges: crate::edges::Edges::of(&[], 0),
         };
         let up = Vec3::Y * crate::sim::BALL_RADIUS;
         let a = r.progress(Vec3::new(3.0, 0.0, 0.0) + up, 0, usize::MAX);
