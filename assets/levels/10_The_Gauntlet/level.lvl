@@ -11,6 +11,7 @@ bonus 1000
 ball wood
 columns 45
 
+safety none
 start
 width 10
 floor 15
@@ -64,9 +65,12 @@ nopilot safe,collector
 floor 30 down 7
 gap 6 down 3
 autopilot safe,collector
+# the landing and the turn after it keep the fast stone ball on
+safety border
 floor 15
 point
 left 90 22
+safety none
 floor 10
 trafo wood
 floor 15

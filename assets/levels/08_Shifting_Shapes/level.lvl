@@ -11,6 +11,7 @@ bonus 800
 ball wood
 columns 45
 
+safety gutter
 start
 width 11
 floor 20
@@ -76,6 +77,7 @@ fan ahead -5
 gap 4 up 12 nopilot
 floor 15
 checkpoint
+safety none
 
 # sector 5: paper: a plate bridge, a sack, wood to the finish
 floor 10

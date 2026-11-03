@@ -10,10 +10,13 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     title NAME...            the level's name (also title.ru, title.de, title.zh: its name in another language)
     order N                  its place in the list of our levels
     author NAME... / sky A|B|C / music 1..5 / bonus N / ball wood|stone|paper / light R G B
-    start [X Y Z]            the start's platform; the cursor at its front edge (10 ahead of its middle)
-    width W                  the floor's width from here on (with its borders, 1 a side)
+    start [X Y Z]            the start's platform, a bowl the ball sits in (its neck as wide as the first floor); the
+                             cursor at its front edge (10 ahead of its middle)
+    width W                  the floor's width from here on (with its borders); a change tapers over the next floor
     columns D                columns under the floors every D units of way (0: none), for the look
-    borders on|off           floors with borders or without
+    safety railings|gutter|border|none   how the floors keep the ball on from here on (levelkit.py, SAFETY); the
+                             first in a file is the level's
+    borders off|on           bare floors from here on / back to the level's safety
     surface stone|wood       the floor's top and its sound
     floor L [up H|down H]    a straight floor L long, rising or falling H over it
     left A R [up H|down H]   a floor turning A degrees to the left on a radius R (right A R: to the right)
@@ -23,7 +26,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     move F S U               the cursor moves F ahead, S to the left, U up (nothing built)
     turn A                   the heading turns A degrees to the left (negative: right), the cursor stays
     mark NAME / back NAME    remember the cursor / go back to it
-    checkpoint               a checkpoint at the cursor: the next sector begins
+    checkpoint               a checkpoint at the cursor (a piece 10 long with its bowl, taking 5 of the floors before
+                             and after it): the next sector begins
     finish                   the balloon, 22 ahead of the cursor (the floor must end at the cursor)
     point, life, box, dome, trafo KIND, loose KIND   a part at the cursor;  options: side S (to the left), ahead A
     column [side S] [ahead A] [depth D]   a stone column under the floor, for the look
@@ -108,17 +112,54 @@ def fmt(p):
     return " ".join(f"{c:.2f}" for c in p)
 
 
+def trim_start(pts, cut):
+    """The polyline `pts` with its first `cut` units left off."""
+    out = list(pts)
+    while len(out) >= 2:
+        seg = float(np.linalg.norm(out[1] - out[0]))
+        if seg > cut:
+            out[0] = out[0] + (out[1] - out[0]) * (cut / seg)
+            return out
+        cut -= seg
+        out.pop(0)
+    return out
+
+
+def trim_end(path, widths, along, cut):
+    """A stretch's points, widths and distances with its last `cut` units left off."""
+    path, widths, along = list(path), list(widths), list(along)
+    while len(path) >= 2:
+        seg = along[-1] - along[-2]
+        if seg > cut:
+            t = 1 - cut / seg
+            path[-1] = path[-2] + (path[-1] - path[-2]) * t
+            widths[-1] = widths[-2] + (widths[-1] - widths[-2]) * t
+            along[-1] = along[-2] + seg * t
+            return path, widths, along
+        cut -= seg
+        path.pop()
+        widths.pop()
+        along.pop()
+    return path, widths, along
+
+
 class Track:
     """The cursor and what the description has built so far."""
 
     def __init__(self, out_dir):
         self.b = L.LevelBuilder(out_dir, seed=sum(map(ord, os.path.basename(out_dir))))
-        # a wooden floor's top: the planks of the standard set
-        self.b.mat("wood_top", "Wood_Plain.png", diffuse=1.0, emissive=0.22, specular=0.3, power=50)
         self.pos = np.zeros(3)
         self.head = 0.0
         self.width = 10.0
-        self.borders = True
+        # the level's safety (its first `safety`), and the current stretch's
+        self.level_safety = None
+        self.safety = "border"
+        # the stretch of track being laid: its points, widths and distances along the track; the distance laid so far
+        # (gaps and all, so every texture runs on); how much of the next floor a checkpoint's piece takes
+        self.stretch = None
+        self.along = 0.0
+        self.skip = 0.0
+        self.laid_width = None
         self.surface = "stone"
         self.sector = 1
         self.marks = {}
@@ -127,6 +168,7 @@ class Track:
         self.info = {"author": "Drahtseilakt", "sky": "A", "music": 1, "bonus": 100, "ball": "wood",
                      "light": (1.0, 1.0, 1.0), "titles": {}}
         self.started = self.finished = False
+        self.start_at = None
         self.checkpoints = 0
         self.columns = 0.0
         self.column_run = 0.0
@@ -172,14 +214,11 @@ class Track:
         return pts
 
     def lay(self, pts, kind, straight=False):
-        name = f"{kind}_{self.n(kind):03d}"
-        # a straight floor needs only its ends (the rails keep their points: their posts stand along them)
-        path = [tuple(p) for p in ((pts[0], pts[-1]) if straight and kind == "Floor" else pts)]
         if kind == "Rails":
-            self.b.rails(name, path)
+            self.end_stretch()
+            self.b.rails(f"Rails_{self.n('Rails'):03d}", [tuple(p) for p in pts])
         else:
-            self.b.floor(name, path, self.width, self.borders, sound=self.surface,
-                         top="wood_top" if self.surface == "wood" else "top")
+            self.extend_stretch(pts if not straight else [pts[0], pts[-1]])
         for p in pts[1:]:
             self.pilot.way(p)
         self.floor_points.extend(pts)
@@ -191,8 +230,69 @@ class Track:
                     self.column_run = 0.0
                     self.column_spots.append(c)
 
+    # --- stretches of floor: the pieces laid one after another as one mesh ----------------------------------------
+
+    def extend_stretch(self, pts):
+        """Adds a floor's points to the stretch being laid when it runs on from its end (same place, heading, safety
+        and surface), else begins a new one. A width changed since the last floor tapers over this one."""
+        pts = [np.asarray(p, np.float64) for p in pts]
+        self.build_start()
+        if self.skip > 0:
+            self.end_stretch()
+            whole = sum(float(np.linalg.norm(b - a)) for a, b in zip(pts, pts[1:]))
+            pts = trim_start(pts, self.skip)
+            self.along += min(self.skip, whole)
+            self.skip = 0.0
+            if len(pts) < 2:
+                return
+        st = self.stretch
+        runs_on = (st is not None and st["safety"] == self.safety and st["surface"] == self.surface
+                   and np.linalg.norm(st["path"][-1] - pts[0]) < 1e-6)
+        if runs_on and len(st["path"]) >= 2:
+            d0 = st["path"][-1] - st["path"][-2]
+            d1 = pts[1] - pts[0]
+            runs_on = np.dot(d0, d1) / (np.linalg.norm(d0) * np.linalg.norm(d1) + 1e-12) > math.cos(math.radians(1))
+        if not runs_on:
+            self.end_stretch()
+            st = self.stretch = {"path": [pts[0]], "widths": [self.width], "along": [self.along],
+                                 "safety": self.safety, "surface": self.surface}
+            self.laid_width = self.width
+        w0 = self.laid_width if self.laid_width is not None else self.width
+        length = sum(float(np.linalg.norm(b - a)) for a, b in zip(pts, pts[1:]))
+        run = 0.0
+        for a, b in zip(pts, pts[1:]):
+            run += float(np.linalg.norm(b - a))
+            st["path"].append(b)
+            st["widths"].append(w0 + (self.width - w0) * (run / length if length > 0 else 1.0))
+            st["along"].append(st["along"][-1] + float(np.linalg.norm(b - a)))
+        self.along = st["along"][-1]
+        self.laid_width = self.width
+
+    def build_start(self):
+        if self.start_at is not None:
+            self.b.start(tuple(self.start_at), width=self.width)
+            self.start_at = None
+
+    def end_stretch(self, trim=0.0):
+        """Builds the stretch being laid (its last `trim` units left off, where a checkpoint's piece is)."""
+        st, self.stretch = self.stretch, None
+        if st is None:
+            return
+        path, widths, along = st["path"], st["widths"], st["along"]
+        if trim > 0:
+            path, widths, along = trim_end(path, widths, along, trim)
+        if len(path) < 2:
+            return
+        self.b.track(f"Floor_{self.n('Floor'):03d}", [tuple(p) for p in path], widths, along, st["safety"],
+                     st["surface"])
+
     def move_along(self, pts, head_turn=0.0):
-        self.pos = np.array(pts[-1], np.float64)
+        end = np.array(pts[-1], np.float64)
+        st = self.stretch
+        if st is None or np.linalg.norm(st["path"][-1] - end) > 1e-6:
+            # nothing laid to here (a gap, rails, a module): the distance along still runs on
+            self.along += sum(float(np.linalg.norm(np.subtract(b, a))) for a, b in zip(pts, pts[1:]))
+        self.pos = end
         self.head += head_turn
 
     # --- the description's commands ----------------------------------------------------------------------------
@@ -214,15 +314,25 @@ class Track:
             self.lay(pts, "Rails" if cmd.startswith("rails") else "Floor")
             self.move_along(pts, angle)
         elif cmd == "move":
-            self.pos = self.at(num(args, 0, line), num(args, 1, line), num(args, 2, line))
+            to = self.at(num(args, 0, line), num(args, 1, line), num(args, 2, line))
+            self.along += float(np.linalg.norm(to - self.pos))
+            self.pos = to
         elif cmd == "turn":
             self.head += num(args, 0, line)
         elif cmd == "columns":
             self.columns = num(args, 0, line)
         elif cmd == "width":
             self.width = num(args, 0, line)
+        elif cmd == "safety":
+            kind = word(args, 0, line)
+            if kind not in L.SAFETY:
+                raise LevelError(f"line {line}: safety is {', '.join(L.SAFETY)}")
+            if self.level_safety is None:
+                self.level_safety = kind
+            self.safety = kind
         elif cmd == "borders":
-            self.borders = word(args, 0, line) == "on"
+            # off: the bare floor; on: back to the level's safety
+            self.safety = (self.level_safety or "border") if word(args, 0, line) == "on" else "none"
         elif cmd == "surface":
             self.surface = word(args, 0, line)
             if self.surface not in ("stone", "wood"):
@@ -237,7 +347,8 @@ class Track:
         elif cmd == "start":
             if args:
                 self.pos = np.array([num(args, i, line) for i in range(3)])
-            self.b.start(tuple(self.pos))
+            # built with the first floor, as wide as it
+            self.start_at = self.pos.copy()
             self.pilot.begin(self.pos + np.array([0, L.RESET_UP, 0]), 1)
             self.pos = self.at(10.0)
             self.started = True
@@ -246,9 +357,12 @@ class Track:
                 raise LevelError(f"line {line}: a checkpoint's heading must be a multiple of 90 (the camera's)")
             self.checkpoints += 1
             self.pilot.way(self.pos, force=True)
-            self.b.checkpoint(self.checkpoints, tuple(self.pos), xaxis=tuple(self.left()))
+            # the piece takes the last half of its length of the floor before it and the first of the floor after
+            self.end_stretch(trim=L.CHECK_LEN / 2)
+            self.skip = L.CHECK_LEN / 2
+            reset = self.b.checkpoint(self.checkpoints, tuple(self.pos), width=self.width, fwd=tuple(self.fwd()))
             self.sector += 1
-            self.pilot.begin(self.pos + np.array([0, L.RESET_UP, 0]), self.sector)
+            self.pilot.begin(np.asarray(reset, np.float64), self.sector)
         elif cmd == "finish":
             at = self.at(22.0)
             self.b.finish(tuple(at), self.sector, xaxis=tuple(-self.fwd()))
@@ -513,6 +627,8 @@ def compile_level(path):
             t.run(*parsed, line=i)
     if not t.started or not t.finished:
         raise LevelError(f"{path}: a level needs a start and a finish")
+    t.build_start()
+    t.end_stretch()
     t.place_columns()
     info = t.info
     titles = info["titles"]

@@ -1,4 +1,4 @@
-# First Roll: the first of our levels. Wide floors with borders, gentle turns and slopes, a first short stretch of
+# First Roll: the first of our levels. Wide floors with railings, gentle turns and slopes, a first short stretch of
 # rails and one small jump. Edit this file and run `python3 -I assets/own/make/leveldsl.py <this file>`.
 title First Roll
 title.ru Первый разбег
@@ -11,6 +11,7 @@ bonus 100
 ball wood
 columns 45
 
+safety railings
 start
 width 14
 floor 30

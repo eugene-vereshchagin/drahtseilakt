@@ -11,6 +11,7 @@ bonus 500
 ball wood
 columns 45
 
+safety gutter
 start
 width 12
 floor 30
@@ -22,6 +23,7 @@ floor 20
 seesaw
 floor 20
 checkpoint
+safety border
 
 # sector 2: stone over a seesaw, wood again before the plate bridge
 floor 15
@@ -37,6 +39,7 @@ floor 15
 platebridge
 floor 20
 checkpoint
+safety gutter
 
 # sector 3: narrower, two plate bridges and a seesaw
 floor 15

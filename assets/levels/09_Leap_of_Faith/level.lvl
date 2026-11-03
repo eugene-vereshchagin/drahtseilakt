@@ -11,6 +11,8 @@ bonus 900
 ball wood
 columns 45
 
+safety none
+safety gutter
 start
 width 12
 floor 15
@@ -22,6 +24,7 @@ floor 10 down 2
 gap 8 down 3
 floor 20
 checkpoint
+safety none
 
 # sector 2: a ramp throws the ball over a gap, rails taken fast
 floor 15
@@ -44,9 +47,12 @@ nopilot safe,collector
 floor 35 down 8
 gap 6 down 3
 autopilot safe,collector
+# the landing and the turn after it keep the fast stone ball on
+safety border
 floor 15
 point
 right 90 24
+safety none
 floor 10
 trafo wood
 floor 15

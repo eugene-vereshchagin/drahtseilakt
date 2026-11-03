@@ -96,6 +96,54 @@ mod tests {
         }
     }
 
+    /// How a ball thrown sideways at the edge of a stretch of track of each safety fares (Parts_Test's stretches
+    /// beside the way, made by make_test_level.py: along +X from 20 to 100, 12 wide, at z 80, 120, 160, 200 for
+    /// railings, gutter, border, none): where it is after four seconds of being thrown at `speed` towards +Z (and
+    /// pushed on that way when `push`), and whether it was lost.
+    fn thrown(kind: BallKind, stretch: usize, speed: f32, push: bool) -> (glam::Vec3, bool) {
+        let dir = shipped().join("Parts_Test");
+        let source = Source::Open(dir.clone());
+        let data = Data::new(None).for_source(&source);
+        let loaded = data.load(&source).expect("the test level loads");
+        let data = data.with_parts(&loaded.level);
+        let modules = crate::scene::load_modules(&loaded.level, &data);
+        let mut sim = Sim::with_modules(&loaded.level, kind, &modules, false);
+        let z = 80.0 + 40.0 * stretch as f32;
+        sim.start_from(0, Some(kind), Some(glam::Vec3::new(60.0, 2.05, z)));
+        for _ in 0..30 {
+            sim.step(0);
+        }
+        sim.throw_ball(glam::Vec3::new(0.0, 0.0, speed));
+        let mut lost = false;
+        for _ in 0..240 {
+            sim.step(if push { crate::sim::input::LEFT } else { 0 });
+            lost |= sim.is_dying() || sim.ball.position.y < -3.0;
+        }
+        (sim.ball.position - glam::Vec3::new(0.0, 0.0, z), lost)
+    }
+
+    /// The railings and the borders of our tracks are solid: a ball of each kind thrown at them sideways, faster
+    /// than it rolls, and pushed on into them stays on the track; the gutter turns back a ball drifting into its
+    /// edge; the bare floor keeps nothing (so the throw would have taken the ball off).
+    #[test]
+    fn borders_and_railings_keep_the_ball_on_the_track() {
+        for kind in [BallKind::Wood, BallKind::Stone, BallKind::Paper] {
+            for (stretch, name) in [(0, "railings"), (2, "border")] {
+                for speed in [12.0, 25.0, 40.0] {
+                    let (at, lost) = thrown(kind, stretch, speed, true);
+                    assert!(
+                        !lost && at.y > 1.0 && at.z.abs() < 6.0,
+                        "{kind:?} thrown at {speed} into the {name}: {at:?}, lost {lost}"
+                    );
+                }
+            }
+            let (at, lost) = thrown(kind, 1, 6.0, false);
+            assert!(!lost && at.z.abs() < 3.5, "{kind:?} drifting into the gutter: {at:?}");
+            let (_, lost) = thrown(kind, 3, 25.0, true);
+            assert!(lost, "{kind:?} thrown off the bare floor");
+        }
+    }
+
     /// Every one of our levels has its runs, in the three styles, and each finishes the level.
     #[test]
     fn each_of_our_levels_is_finished_by_its_runs() {

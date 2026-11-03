@@ -1163,6 +1163,13 @@ impl Sim {
         }
     }
 
+    /// Throws the ball: `dv` added to its velocity at the next step (tests).
+    #[cfg(test)]
+    pub(crate) fn throw_ball(&mut self, dv: Vec3) {
+        let mass = self.ball.kind.params().mass;
+        self.world.impulse_at(0, self.ball.position, dv * mass);
+    }
+
     /// Puts the ball somewhere at rest, as a new ball (tests).
     #[cfg(test)]
     fn put_ball(&mut self, pos: Vec3) {

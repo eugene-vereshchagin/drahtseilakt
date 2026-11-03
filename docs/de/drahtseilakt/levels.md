@@ -29,7 +29,8 @@ flache Liste der Level, nach Titel sortiert, ohne Ordner zum Öffnen.
   Hand fertigzustellen oder nachzubessern: gewöhnliche glTF- und PNG-Dateien.
 - Daneben, alles freiwillig: `level.txt`, einfache Zeilen `Schlüssel = Wert` (`title`, `author`, `version`;
   `title.<Code>`, sein Titel in einer anderen Sprache, z. B. `title.ru`, gezeigt, wenn die Menüs sie sprechen; `order`,
-  eine Zahl, die es vor die Level ohne eine stellt, in ihrer Reihenfolge; `#` beginnt einen Kommentar, andere
+  eine Zahl, die es vor die Level ohne eine stellt, in ihrer Reihenfolge; `hidden = yes`, nicht in der Liste der mit
+  dem Spiel gelieferten Level, wie das Testlevel; `#` beginnt einen Kommentar, andere
   Schlüssel werden übergangen), ein README (`README.txt` oder `README.md`), ein Vorschaubild (`preview.png` oder
   `preview.jpg`) und die Ordner der Ressourcen, die das Level nutzt (`textures/`, `game/`).
 - **Der Titel** ist `title` aus level.txt, sonst der Ordnername. Er wird bereinigt (Steuerzeichen,
@@ -58,8 +59,9 @@ unseren eigenen Teilen gemacht (assets/own, [resources.md](resources.md)), sie s
 Originals. Das Menü zeigt sie mit den Leveln im offenen Format aus `levels/open/`: unter Start, wenn es keine Kopie
 gibt (die Liste „Our levels“), unter „Open format“ des erweiterten Modus immer. Sie entstehen durch Skripte in
 `assets/own/make/` (`levelkit.py` baut ein Level aus Bahnstücken und den Platzhaltern der Teile; `make_test_level.py`
-das erste, `Parts_Test`, einige hundert Einheiten Bahn mit jedem Teil darauf oder daneben), deren Ergebnisse im
-Repository liegen. Ihre Lizenz ist die des Spiels (GPL-3.0-only).
+das erste, `Parts_Test`, einige hundert Einheiten Bahn mit jedem Teil darauf oder daneben und einem Stück Bahn jeder
+Sicherungsart, für die Tests; es ist durch `hidden = yes` in seiner level.txt aus der Liste der Spieler genommen und
+öffnet weiter mit `--open`), deren Ergebnisse im Repository liegen. Ihre Lizenz ist die des Spiels (GPL-3.0-only).
 
 ## Unsere Level und wie man sie bearbeitet
 
@@ -69,7 +71,7 @@ Das Menü listet sie in dieser Reihenfolge (`order` in level.txt), unter ihren N
 
 | # | Level | Sektoren | Idee | Himmel, Musik, Bonus |
 |---|---|---|---|---|
-| 1 | First Roll (Erster Lauf) | 3 | breite Böden mit Rändern, sanfte Kurven und Hänge, ein erstes Stück Schienen, ein kleiner Sprung | A, 1, 100 |
+| 1 | First Roll (Erster Lauf) | 3 | breite Böden mit Geländern, sanfte Kurven und Hänge, ein erstes Stück Schienen, ein kleiner Sprung | A, 1, 100 |
 | 2 | Wood and Stone (Holz und Stein) | 4 | die Holzkugel erklimmt die Rampen, die die Steinkugel nicht schafft; die Steinkugel schiebt Kisten und lose Kugeln über Kanten ohne Rand | B, 2, 200 |
 | 3 | Paper Winds (Papierwinde) | 4 | die Papierkugel fährt auf Ventilatoren zu den Böden darüber; Plattenbrücken tragen sie | C, 3, 300 |
 | 4 | Swing Time (Schaukelzeit) | 4 | was sich bewegt: schwingende Säcke, drehende Arme, ein Klappenrad, Schaukeln, die eine Lücke überbrücken, während sie vorbeischwingen | A, 4, 400 |
@@ -98,7 +100,8 @@ ball wood                    # die Startkugel
 columns 45                   # Säulen unter den Böden alle 45 Einheiten Weg, für das Aussehen
 
 start                        # die Plattform des Starts; der Weg geht von ihrer Vorderkante weiter
-width 12                     # die Breite des Bodens (borders on|off, surface stone|wood)
+safety railings              # wie die Bahn den Ball hält: railings, gutter, border oder none (unten)
+width 12                     # die Breite des Bodens (borders off|on, surface stone|wood)
 floor 30                     # ein gerader Boden, 30 lang (floor 30 up 4, floor 30 down 6: eine Rampe)
 right 90 26                  # ein Boden, der sich um 90 Grad nach rechts dreht, Radius 26 (left A R)
 point                        # ein Extrapunkt hier (life: ein Extraleben; side S, ahead A: daneben, weiter vorn)
@@ -114,6 +117,49 @@ Außerdem: `rails L`, `rails-left A R`, `rails-right A R` (Schienen, auch hinauf
 `swingbridge` (eine Schaukel in einer Lücke von 5), `sack`, `arms`, `flaps`; `module P_Modul_NN` mit `ahead`, `side`,
 `up`, `turn`, `tilt` für jedes andere Teil; `move`, `turn`, `mark NAME` und `back NAME`, um den Cursor zu bewegen,
 ohne zu bauen. Die ganze Liste steht oben in leveldsl.py.
+
+**Wie die Bahn den Ball hält** (`safety`): Im Original nimmt die Hilfe von Level zu Level ab, und unsere Level folgen
+dem. Gemessen an den dreizehn Leveln des Originals (die Kanten seiner Böden, nur Zahlen): in den Leveln 1, 3 und 5
+sind etwa zwei Drittel der Bodenkanten profiliert (der Boden steigt zur Kante um 0,7 auf 2,5 Breite an: eine Rinne,
+die einen abdriftenden Ball zur Mitte zurückrollt; ein Drittel ist blank), ab Level 6 nur ein Viertel bis ein Drittel
+(der Rest blank); erhöhte Wände sind selten (nur die hölzernen Halfpipes von Level 4 und einige Stücke in 12 und 13);
+Stahlgeländer (ein Rohr etwa 2,6 über dem Boden, auf Pfosten) laufen an etwa 490 und 420 Einheiten der Bodenkanten in
+den Leveln 1 und 2, 130 bis 540 in 3 bis 8, unter 90 in 9 bis 11 und keine in 12. Unsere Level
+gehen denselben Weg, eine Stufe deutlicher: Level 1 und 2 haben Geländer, 3 und 4 Ziegelränder (3 einen Sektor mit
+Geländer), 5 bis 8 Rinnen (5 einen Sektor mit Rändern, 8 den letzten blank), 9 und 10 blanke Böden (9 den ersten
+Sektor als Rinne). `safety ART` setzt sie von dort an (die erste in einer Datei ist die des Levels); `borders off`
+macht die Böden von dort an blank, `borders on` gibt ihnen die Art des Levels zurück. Was jede ist:
+
+- `railings`: Stahlgeländer an beiden Kanten, Holme 1,3 und 2,6 über dem Boden auf Pfosten alle 6 Einheiten, in der
+  Physikgruppe der Schienen wie die des Originals;
+- `gutter`: der profilierte Boden des Originals, die Kanten 0,7 über einer flachen Mitte, ansteigend auf 2,5 in zwei
+  Flächen;
+- `border`: Ziegelränder 1 breit und 2,2 hoch an beiden Kanten, die Ziegel der Menüszene. Höher als die Mitte des
+  Balls (sein Radius ist 2), so trifft ein Ball die Fläche gerade und prallt zurück: über einen niedrigeren Rand (1,4)
+  rollte ein mit 25 Einheiten in der Sekunde dagegen geworfener Ball hinweg;
+- `none`: der blanke Boden, seine Kanten nur durch den Ziegelstreifen markiert.
+
+Jeder Rand und jedes Geländer gehört zur Physik der Böden: der Test `borders_and_railings_keep_the_ball_on_the_track`
+(ownlevels.rs) wirft jeden Ball mit 12, 25 und 40 Einheiten in der Sekunde seitlich gegen die Geländer und Ränder von
+Parts_Test und schiebt ihn weiter dagegen, und er bleibt auf der Bahn; ein in die Rinne treibender Ball rollt zurück;
+vom blanken Boden geworfen fällt er.
+
+**Das Aussehen der Bahn** folgt, wie die Teile, dem, was die Böden des Originals lesbar macht (gemessen an seinen
+Böden und Texturen, nur Zahlen): eine Textur deckt 5 Einheiten Boden; Platten von 5 mal 5 mit Fugen dazwischen, jede
+mit eigenem Ton, Schmutz und Abrieb, vier entlang einer Textur (Wiederholung nach 20 Einheiten), einer von drei
+Plattensätzen je Level; an jeder Kante ein Bordstein mit dem Streifen kleiner Ziegel des Originals, seiner Rille und
+seinem Schatten; die Hänge der Rinne zu ihrem Grund hin dunkler; der Schatten, den ein Rand neben sich wirft; die
+Seiten dunklerer Beton mit eigenem Ziegelstreifen. Die Texturen liegen in `assets/own/Track/` (make_textures.py,
+Schritt `track`); die Ränder nehmen die Ziegel der Menüszene. Sie werden nach der Strecke entlang der ganzen Bahn
+aufgetragen, und nacheinander gelegte Stücke (gerade, gebogen, ein Stück mit wechselnder Breite) sind ein Netz, so
+laufen die Texturen ohne Naht von Stück zu Stück.
+
+**Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
+Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
+Flammenschalen an ihrem Rand; ein Checkpoint ein Bodenstück von 10 Länge mit einer 1,26 tief eingelassenen Schale von
+Radius 5 (bis zu einer Lippe) und zwei Flammenschalen quer zum Weg, ±7 zur Seite, wo die Flammen des Teils brennen.
+Die Böden vor und nach einem Checkpoint enden an seinem Stück. Ihre Rahmen und Rücksetzpunkte stehen in den Schalen
+(die Rücksetzpunkte 3,65 und 3,33 über dem Grund, wie beim Original).
 
 **Was der Testspieler über ein Level weiß**, steht in derselben Datei. Aus dem gelegten Weg schreibt leveldsl.py die
 Hinweisdateien des Testspielers für drei Stile in den Ordner `pilot/` des Levels (autopilot.md, „Hinweisdateien“):
@@ -135,8 +181,7 @@ baut es und lässt den Testspieler es in jedem Stil spielen; jeder Lauf, der ins
 `crates/game/src/ownlevels.rs` spielt die drei Läufe jedes Levels ohne Kopie des Originals und schlägt fehl, wenn einer
 nicht ins Ziel kommt; so wird ein Level nie ohne einen Lauf ausgeliefert, der beweist, dass es zu schaffen ist.
 `scripts/video.sh assets/levels/03_Paper_Winds assets/levels/03_Paper_Winds/pilot/speed.replay out.mp4` macht aus
-einem Lauf ein Video. Ein Level wiegt 1,1 bis 1,5 MB, 0,6 MB davon die sieben Texturen unseres Satzes, die es
-mitbringt (das Format hält die Texturen eines Levels in seinem eigenen Ordner).
+einem Lauf ein Video. Ein Level wiegt 3,3 bis 3,8 MB, 2,6 MB davon die Texturen, die es mitbringt (das Format hält die Texturen eines Levels in seinem eigenen Ordner).
 
 ## Das Originalspiel: standardmäßig kopiert
 

@@ -642,7 +642,127 @@ def collage(n):
     return np.clip(out, 0, 1)
 
 
-STEPS = {"floors": make_floors, "stone": make_stone, "wood": make_wood, "marks": make_marks, "env": make_env,
+# --- our levels' track ----------------------------------------------------------------------------------------------
+# The track pieces of our own levels (levelkit.py) have textures of their own, in assets/own/Track/ (not stand-ins for
+# an original's texture, so not in Textures/). They follow what makes the original's floors read, measured on its
+# floor textures and levels (numbers only): a texture spans about 5 units of floor (Floor_Top_Borderless 4.96 units a
+# repeat, Floor_Top_Profil 5.1, Floor_Side 5.0); the floor's edge is a strip of small bricks a twelfth of that wide
+# (10 texels of 128: 0.4 units), a dark groove after it (2 texels), a shadow fading into the concrete (4 texels); the
+# concrete is nearly plain (lightness std 0.03 of its mean, mean colour (195, 176, 146)); a profiled (hollow) floor's
+# slope darkens towards its crease (0.28 at the deepest); the side is darker concrete (141, 121, 95), lighter
+# downwards, its own brick strip along the top. On top of those, so that a long track does not read as one flat
+# texture: slabs of 5 by 5 units with joints between them, each slab its own tone, dirt and wear (four slabs along a
+# texture, 20 units before it repeats), three sets of slabs (a level takes one by its seed), darker grooves where the
+# kerb meets the slabs, and the ambient shading a raised border casts on the floor beside it. Every joint falls on a
+# texture's edge, so the textures tile without a seam, and levelkit.py maps them by the distance along the track, so
+# one piece runs on into the next.
+
+TRACK_OUT = os.path.join(os.path.dirname(HERE), "Track")
+PX = 256 / 5.0  # texels a unit (a slab of 5 units is 256 texels)
+SLABS = 4  # slabs along a texture: 20 units a repeat
+TRACK_FLOOR = (195, 176, 146)
+
+
+def save_track(img, name):
+    a = np.clip(img * 255 + 0.5, 0, 255).astype(np.uint8)
+    os.makedirs(TRACK_OUT, exist_ok=True)
+    Image.fromarray(a, "RGB").save(os.path.join(TRACK_OUT, name + ".png"), optimize=True)
+
+
+def joint(img, axis, at_start=True, at_end=True, width=2, depth=0.5):
+    """Darkens the texture's edges across `axis` (0: rows, the slabs' ends; 1: columns, their sides) into a joint
+    half of it at each edge, so two slabs side by side show one groove `width` texels wide."""
+    n = img.shape[axis]
+    k = np.arange(n, dtype=np.float64)
+    d = np.minimum(k + 0.5 if at_start else np.inf, n - k - 0.5 if at_end else np.inf)
+    f = 1 - depth * np.exp(-((d / (width * 0.5)) ** 2)) - 0.12 * np.exp(-d / (width * 2.5))
+    shape = [1, 1, 1]
+    shape[axis] = n
+    return img * f.reshape(shape)
+
+
+def slab_variety(h, w, seed, tone=0.05, dirt=0.10, wear=0.06):
+    """A slab's own look as a factor: its tone, blotches of dirt and lighter worn patches (tiling noise)."""
+    rng = np.random.default_rng(seed)
+    t = 1 + rng.uniform(-tone, tone)
+    warm = np.array([1.0, rng.uniform(0.985, 1.01), rng.uniform(0.96, 1.01)])
+    d = noise(max(h, w), 3, seed + 1, 5)[:h, :w]
+    e = noise(max(h, w), 6, seed + 2, 3)[:h, :w]
+    f = t * (1 - dirt * np.clip((d - 0.45) * 2.2, 0, 1)) * (1 + wear * np.clip((e - 0.55) * 3, 0, 1))
+    return f[..., None] * warm
+
+
+def track_concrete(seed, h, w, mean=TRACK_FLOOR, rel=0.045):
+    """A column of SLABS slabs of concrete (h texels long, w across), each cut from another part of the photo, its own
+    tone, dirt and wear, with joints between them and at its sides."""
+    src = photo("Concrete047A", 1024, mean, rel, 0.25, 0.7, fix=False)
+    rng = np.random.default_rng(seed)
+    n = h // SLABS
+    out = np.zeros((h, w, 3))
+    for k in range(SLABS):
+        y0, x0 = rng.integers(0, 1024 - n), rng.integers(0, 1024 - w)
+        sl = src[y0:y0 + n, x0:x0 + w].copy()
+        sl = sl * slab_variety(n, w, seed * 31 + k)
+        out[k * n:(k + 1) * n] = joint(sl, 0)
+    return out
+
+
+def kerb(seed, w, bricks=True, shade=0.30):
+    """The edge band (w texels across, u = 0 at the floor's edge): a strip of bricks, a groove, then concrete shaded
+    towards the edge (what a border or the brick strip casts), its slabs' joints where the top's are, a groove at its
+    inner side where it meets the slabs."""
+    h = int(PX * 5) * SLABS
+    img = track_concrete(seed, h, w)
+    x = np.arange(w) / PX
+    strip, groove = (0.4, 0.08) if bricks else (0.0, 0.0)
+    img *= (1 - shade * np.exp(-np.maximum(x - strip - groove, 0) / 0.35))[None, :, None]
+    if bricks:
+        s, g = int(round(strip * PX)), max(2, int(round(groove * PX)))
+        img[:, :s] = brick_strip(h, s, seed + 7)
+        img[:, s:s + g] = rgb(96, 90, 84) * (0.9 + 0.2 * noise(h, 8, seed + 5)[:, :g, None])
+    return joint(img, 1, at_start=False, width=2, depth=0.35)
+
+
+def track_slope(seed, w):
+    """A profiled floor's slope (u = 0 at its high outer edge, 1 at its crease): the brick strip and groove at the edge,
+    the concrete darkening down towards the crease (the original's profiled top: 0.28 at the deepest)."""
+    img = kerb(seed, w, bricks=True, shade=0.18)
+    x = np.arange(w) / w
+    img *= (1 - 0.26 * x ** 1.6)[None, :, None]
+    return joint(img, 1, at_start=False, width=3, depth=0.45)
+
+
+def track_side(seed):
+    """The floor's sides (u = 0 at the top edge, 5 units down to 1): a brick strip along the top, a groove, darker
+    concrete lighter downwards."""
+    h = int(PX * 5) * SLABS
+    w = int(PX * 5)
+    src = photo("Concrete012", 1024, (141, 121, 95), 0.10, 0.3, 0.4, fix=False)
+    rng = np.random.default_rng(seed)
+    n = h // SLABS
+    img = np.zeros((h, w, 3))
+    for k in range(SLABS):
+        y0, x0 = rng.integers(0, 1024 - n), rng.integers(0, 1024 - w)
+        img[k * n:(k + 1) * n] = joint(src[y0:y0 + n, x0:x0 + w] * slab_variety(n, w, seed * 17 + k, dirt=0.15), 0,
+                                       width=2, depth=0.3)
+    img *= np.linspace(0.84, 1.12, w)[None, :, None]
+    s, g = int(round(0.4 * PX)), 3
+    img[:, :s] = brick_strip(h, s, seed + 9)
+    img[:, s:s + g] = rgb(90, 84, 78)
+    return img
+
+
+def make_track():
+    h = int(PX * 5) * SLABS
+    for k, name in enumerate("ABC"):
+        save_track(joint(track_concrete(200 + 10 * k, h, int(PX * 5)), 1, width=2, depth=0.4), f"Track_Top_{name}")
+        save_track(kerb(300 + 10 * k, int(PX * 1.25)), f"Track_Kerb_{name}")
+        save_track(kerb(400 + 10 * k, int(PX * 1.25), bricks=False, shade=0.38), f"Track_Shade_{name}")
+        save_track(track_slope(500 + 10 * k, int(PX * 2.5)), f"Track_Slope_{name}")
+    save_track(track_side(600), "Track_Side")
+
+
+STEPS = {"floors": make_floors, "track": make_track, "stone": make_stone, "wood": make_wood, "marks": make_marks, "env": make_env,
          "balls": make_balls}
 
 

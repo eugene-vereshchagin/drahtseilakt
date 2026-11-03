@@ -16,7 +16,9 @@ those first and these for what they lack. Sounds and music are not here: they ar
   unchanged (docs/drahtseilakt/resources.md, "Our own parts"); `Textures/HardShadow.png`, `Textures/Particles/`,
   `Textures/Sky/` (skies A, B, C) beside them. Made by `make/make_parts.py` (on `make/ownkit.py`).
 - `make/levelkit.py` builds levels of our own from track pieces and the parts' stand-ins; `make/make_test_level.py`
-  the shipped test level `assets/levels/Parts_Test/`.
+  the shipped test level `assets/levels/Parts_Test/`. `Track/` holds the track's own textures (slabs, kerbs, shade,
+  gutter slopes, sides; made by `make/make_textures.py track`), which levelkit.py copies into each level with the
+  menu scene's bricks for the borders.
 - `Textures/<name>.png` (all but the three buttons): our own textures for the levels, their parts and the balls, each
   standing in for the original's texture of that name (`textures own`, the default); `TEXTURES.md` lists every texture
   the levels use and which are ours, `CREDITS.md` the CC0 photo textures they are made from.

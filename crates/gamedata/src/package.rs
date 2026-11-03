@@ -40,6 +40,8 @@ pub struct Package {
     pub titles: Vec<(String, String)>,
     /// Its place in its folder's list (level.txt's `order`): levels with one come first, by it; then by title.
     pub order: Option<u32>,
+    /// Kept out of the players' lists (level.txt's `hidden = yes`): a level for tests, still loadable by its path.
+    pub hidden: bool,
 }
 
 impl Package {
@@ -119,6 +121,7 @@ pub fn examine(folder: &Path) -> Result<Package, Skipped> {
         version: info.version,
         titles: info.titles,
         order: info.order,
+        hidden: info.hidden,
     })
 }
 
@@ -136,6 +139,7 @@ fn loose(file: &Path) -> Package {
         version: None,
         titles: Vec::new(),
         order: None,
+        hidden: false,
     }
 }
 
@@ -169,6 +173,7 @@ pub struct Info {
     pub version: Option<String>,
     pub titles: Vec<(String, String)>,
     pub order: Option<u32>,
+    pub hidden: bool,
 }
 
 fn read_info(path: &Path) -> Info {
@@ -194,6 +199,10 @@ pub fn parse_info(bytes: &[u8]) -> Info {
         let key = key.trim().to_ascii_lowercase();
         if key == "order" {
             info.order = info.order.or_else(|| value.trim().parse().ok());
+            continue;
+        }
+        if key == "hidden" {
+            info.hidden = matches!(value.trim().to_ascii_lowercase().as_str(), "yes" | "true" | "1");
             continue;
         }
         if let Some(code) = key.strip_prefix("title.") {
@@ -455,8 +464,10 @@ mod tests {
         level("z", "title = Zeta\norder = 2\ntitle.ru = Зета \u{202e}\ntitle.RU = no\ntitle.de=\n");
         level("y", "title = Alpha\n");
         level("x", "title = Omega\norder = 1\ntitle.../x = no\ntitle.toolongcode = no\n");
-        level("w", "title = Beta\norder = nonsense\n");
+        level("w", "title = Beta\norder = nonsense\nhidden = maybe\n");
         let (found, _) = scan(&root);
+        assert!(found.iter().all(|p| !p.hidden), "hidden only when it says yes");
+        assert!(parse_info(b"hidden = Yes\n").hidden && parse_info(b"hidden=1").hidden);
         let titles: Vec<&str> = found.iter().map(|p| p.title.as_str()).collect();
         assert_eq!(titles, ["Omega", "Zeta", "Alpha", "Beta"], "ordered ones first, by order; then by title");
         let zeta = found.get(1).unwrap();
