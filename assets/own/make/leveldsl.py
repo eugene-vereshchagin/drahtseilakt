@@ -312,8 +312,8 @@ class Track:
         lo, hi = np.minimum(*corners), np.maximum(*corners)
         self.b.stopper(f"Stopper_{self.n('stopper'):03d}", tuple(lo), tuple(hi))
         pts = self.straight(board, 0.0)
-        for p in pts[1:]:
-            self.pilot.way(p)
+        # onto the board's raised end at some speed (a heavy ball from rest does not get up it)
+        self.jump(pts[-1], {})
         self.move_along(pts)
 
     def place_columns(self, depth=60.0):
