@@ -555,8 +555,9 @@ impl World {
                 self.core_sync(c);
             }
         }
-        // 16 bits as the upstream's, which wrap (a counter, not a size)
-        self.coll.cps[cp].info.pushes = self.coll.cps[cp].info.pushes.wrapping_add(1);
+        // 16 bits as the upstream's; past 32767 it stops there (the upstream's wrapped negative, and the push's
+        // sqrt(pushes) became NaN)
+        self.coll.cps[cp].info.pushes = self.coll.cps[cp].info.pushes.saturating_add(1);
         let rescue = self.coll.cps[cp].info.rescue;
         let mut pc: [Option<usize>; 2] = [None, None];
         self.impact_long_term(cp, &mut pc, rescue);
