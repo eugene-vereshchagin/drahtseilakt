@@ -20,7 +20,7 @@
 *所有者 2026-11-03 的决定*（decisions.md，“一个关卡就是一个文件夹”）。`community/` 和 `open/`（以及 `remastered/`）里放的是关卡，而不是压缩包解压出来的任何东西：自定义关卡菜单显示一个按标题排序的扁平关卡列表，没有需要打开的文件夹。
 
 - **一个关卡是类别文件夹中直接的一个文件夹**，其中恰好有一个关卡：一个 `.nmo` 文件，或一个开放格式的关卡（`level.gltf`、`level.bin`、`textures/`；open-format.md）。开放格式清晰明了，便于手工完成或修改：普通的 glTF 和 PNG 文件。
-- 旁边都是可选的：`level.txt`，简单的 `键 = 值` 行（`title`、`author`、`version`；`#` 开头为注释，其他键被忽略），README（`README.txt` 或 `README.md`），预览图（`preview.png` 或 `preview.jpg`），以及关卡使用的资源文件夹（`textures/`、`game/`）。
+- 旁边都是可选的：`level.txt`，简单的 `键 = 值` 行（`title`、`author`、`version`；`title.<代码>`，关卡在另一种语言中的标题，例如 `title.ru`，菜单使用该语言时显示；`order`，一个数字，使关卡按此顺序排在没有该键的关卡之前；`#` 开头为注释，其他键被忽略），README（`README.txt` 或 `README.md`），预览图（`preview.png` 或 `preview.jpg`），以及关卡使用的资源文件夹（`textures/`、`game/`）。
 - **标题**取 level.txt 的 `title`，否则取文件夹名。标题会被清理（去掉控制字符、文字方向覆盖符和其他不可见格式字符，连续空格合为一个），并按单词截断到 **40 个字符**（按字符而非字节计），末尾加“…”，游戏字体把它画成 "..."。游戏显示关卡名的所有地方（菜单、加载画面、窗口标题）都显示这个标题。只有当 level.txt 是不超过 4 KiB 的普通文件时才会读取；更大的文件或链接被忽略。
 - **直接放在类别文件夹中的单个 `.nmo` 也是一个关卡**，以文件名命名：试玩地图的最简单方式。
 - 菜单忽略：关卡文件夹中的其他文件、其中的所有文件夹（不嵌套）、隐藏名称（以点开头）、链接（从不跟随），以及没有关卡或有多个关卡的文件夹（多个 `.nmo`，或 `.nmo` 与 `level.gltf` 并存）：它们不是关卡，会在控制台中列出。
@@ -30,6 +30,60 @@
 ## 随游戏附带的关卡
 
 我们自己的关卡随游戏放在其 `assets/levels/` 中，每个关卡一个开放格式的文件夹，只用我们自己的部件制作（assets/own，[resources.md](resources.md)），因此完全不需要原版的副本也能游玩。菜单把它们与 `levels/open/` 中的开放格式关卡一起显示：没有副本时在 Start 下（列表“Our levels”），在扩展模式的“Open format”下则始终显示。它们由 `assets/own/make/` 中的脚本生成（`levelkit.py` 用轨道块和部件的替身搭建关卡；`make_test_level.py` 生成第一个关卡 `Parts_Test`：几百个单位长的轨道，每个部件都在轨道上或旁边），生成结果已提交到仓库。它们的许可证与游戏相同（GPL-3.0-only）。
+
+## 我们的关卡及其编辑方法
+
+*2026-11-03。* 十个我们自己的关卡随游戏附带，从初次滚动到终极考验（roadmap.md 的发布标准）。每个都是新的：布局是我们的，只有机制来自原版。菜单按此顺序（level.txt 中的 `order`）列出它们，使用菜单语言中的名称：
+
+| # | 关卡 | 小节 | 构思 | 天空、音乐、奖励 |
+|---|---|---|---|---|
+| 1 | First Roll（初次滚动） | 3 | 带护栏的宽地面，平缓的转弯和斜坡，第一段轨道，一个小跳跃 | A, 1, 100 |
+| 2 | Wood and Stone（木与石） | 4 | 木球爬上石球上不去的坡道；石球把箱子和松散的球从没有护栏的边缘推下去 | B, 2, 200 |
+| 3 | Paper Winds（纸之风） | 4 | 纸球乘风扇升到上方的地面；板桥承得住它 | C, 3, 300 |
+| 4 | Swing Time（摇摆时刻） | 4 | 会动的东西：摆动的沙袋、旋转的臂、翻板轮、摆过时架起缺口的秋千 | A, 4, 400 |
+| 5 | Bridges and Boards（桥与板） | 5 | 每种球下都有跷跷板；石球压上就会断的板桥 | B, 5, 500 |
+| 6 | Stone Work（石之工） | 5 | 挡路的箱子、松散的球和圆顶：石球把它们推下去，木球绕过去 | C, 1, 600 |
+| 7 | Rail Runner（轨道奔跑） | 5 | 穿过弯道、上上下下的长轨道；没有护栏的窄地面 | A, 2, 700 |
+| 8 | Shifting Shapes（形态变换） | 5 | 每个小节需要另一种球：纸球过风扇和板桥，石球推箱子，木球上坡道和跷跷板 | B, 3, 800 |
+| 9 | Leap of Faith（信仰之跃） | 5 | 速度与跳跃：长下坡，把球抛过缺口的坡道，高速通过的轨道 | C, 4, 900 |
+| 10 | The Gauntlet（终极考验） | 6 | 窄路，每种球和每个部件接连出现 | A, 5, 1000 |
+
+每个关卡都以木球开始，并有带火焰的检查点、额外分数和一条额外生命。
+
+**关卡以文本编写。** 每个文件夹中有它的描述 `level.lvl`，用一种小语言写成，由 `assets/own/make/leveldsl.py` 读取；它借助 `levelkit.py` 在旁边写出关卡（`level.gltf`、`level.bin`、`textures/`、`level.txt`）。描述像海龟绘图一样铺设轨道：一个光标（地面顶面上的一个点和一个朝向，开始时沿 +X，左边是 +Z）随每一段前移，部件放在光标所在之处。一行是一条命令；`#` 开始注释：
+
+```
+title Paper Winds            # 关卡名称；title.ru、title.de、title.zh：其他语言中的名称
+order 3                      # 它在列表中的位置
+sky C                        # A、B 或 C
+music 3                      # 主题，1 到 5
+bonus 300                    # 关卡奖励
+ball wood                    # 起始球
+columns 45                   # 每隔 45 单位路程在地面下放柱子，仅为外观
+
+start                        # 起点平台；路从它的前缘继续
+width 12                     # 地面宽度（borders on|off，surface stone|wood）
+floor 30                     # 一段长 30 的直地面（floor 30 up 4、floor 30 down 6：坡道）
+right 90 26                  # 以半径 26 向右转 90 度的地面（left A R）
+point                        # 此处一个额外分数（life：额外生命；side S、ahead A：在旁边、更前方）
+trafo paper                  # 一个变球器
+fan ahead -5                 # 此处后方 5 的风扇：纸球在上面升到其地面上方约 17
+gap 4 up 12                  # 前方 4、上方 12：不建任何东西（一次跳跃，或风扇把球送到的地面）
+checkpoint                   # 检查点（朝向为 90 的倍数）：下一小节开始
+finish                       # 气球，在前方 22 处
+```
+
+此外：`rails L`、`rails-left A R`、`rails-right A R`（轨道，也可向上或向下）；`box`、`dome`、`loose wood|stone|paper`；`seesaw`（架在与其板长相同的缺口上）、`platebridge`（14.8 的缺口）、`swingbridge`（5 的缺口中的秋千）、`sack`、`arms`、`flaps`；`module P_Modul_NN` 配合 `ahead`、`side`、`up`、`turn`、`tilt` 放置其他任何部件；`move`、`turn`、`mark NAME` 和 `back NAME` 只移动光标而不建造。完整列表在 leveldsl.py 的开头。
+
+**测试玩家对关卡的了解**也在同一个文件中。leveldsl.py 根据铺设的路线，把测试玩家三种风格的提示文件写入关卡的 `pilot/` 文件夹（autopilot.md，“提示文件”）：`safe`（从一点滚到另一点并停下，经过每个检查点，不冒险）、`speed`（不停顿地滚过各点）和 `collector`（同 safe，并去取路线外的每个额外分数和额外生命）。缺口、跷跷板和旋转臂在每种风格中都高速通过（谨慎的风格先助跑）；需要更多处理的地方用 `pilot STYLES : STEPS` 说明（提示的步骤，其点以相对光标的 `ahead side up` 表示；例如配合秋千时机的等待），并用 `nopilot STYLES` / `autopilot STYLES` 包住各风格能自行通过的路段。
+
+**修改关卡**：编辑其 `level.lvl`，然后
+
+```
+scripts/own-levels.sh assets/levels/03_Paper_Winds
+```
+
+会构建关卡，并让测试玩家以每种风格游玩；每次到达终点的运行都保存为 `pilot/<style>.replay`（这些运行在 `target/` 下单独的数据文件夹中进行）。测试 `crates/game/src/ownlevels.rs` 在没有原版副本的情况下播放每个关卡的三次运行，任何一次未到达终点即失败，因此发布的关卡一定附有证明它能通关的运行。`scripts/video.sh assets/levels/03_Paper_Winds assets/levels/03_Paper_Winds/pilot/speed.replay out.mp4` 把一次运行渲染成视频。一个关卡大小为 1.1 到 1.5 MB，其中 0.6 MB 是它携带的我们素材集中的七张纹理（该格式把关卡的纹理放在它自己的文件夹中）。
 
 ## 原版游戏：默认复制
 
