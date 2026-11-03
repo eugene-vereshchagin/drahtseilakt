@@ -968,9 +968,10 @@ impl Menu {
         }
     }
 
-    /// A custom level's title as it is (any script), a cut one's "…" as "..." (the game's font has no "…").
+    /// A custom level's title as it is (any script), in the menus' language when it has one in it, a cut one's "…"
+    /// as "..." (the game's font has no "…").
     fn map_text(&self, i: usize) -> Option<String> {
-        self.maps.get(i).map(|p| p.title.replace('…', "..."))
+        self.maps.get(i).map(|p| p.title_in(self.strings.language()).replace('…', "..."))
     }
 
     /// A switch's row: its label and yes or no.
@@ -2089,6 +2090,8 @@ mod tests {
                 title: format!("Level number {i} with a rather long title"),
                 author: None,
                 version: None,
+                titles: Vec::new(),
+                order: None,
             })
             .collect();
         m.push(Screen::Custom);

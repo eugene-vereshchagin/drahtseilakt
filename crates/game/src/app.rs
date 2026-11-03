@@ -795,17 +795,19 @@ fn loading_name(source: &crate::assets::Source) -> String {
     match source {
         crate::assets::Source::Original(n) => format!("level {n}"),
         crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
-            gamedata::package::title_of(p, &custom_roots()).replace('…', "...")
+            let lang = crate::lang::chosen(setting("language").as_deref());
+            gamedata::package::title_of(p, &custom_roots(), &lang).replace('…', "...")
         }
     }
 }
 
-/// The custom levels' folders (all but the original's).
+/// The custom levels' folders (all but the original's), and the levels shipped with the game.
 fn custom_roots() -> Vec<PathBuf> {
     crate::levels::KINDS
         .into_iter()
         .filter(|&k| k != crate::levels::Kind::Original)
         .map(crate::levels::dir)
+        .chain(gamedata::resources::shipped_levels_root())
         .collect()
 }
 
