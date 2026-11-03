@@ -20,7 +20,18 @@ PC_TwoFlames_03
 P_Trafo_Paper_05         # s165
 887 47.2 -326             # the helix's top (hint), then over the fan 18_05 between the blocks
 890 47.2 -350
+810 20.9 -403             # down the slope west along z -403 to the maze's west side
+770 9.1 -420             # south down its long west corridor
+770.5 9.1 -455.3
+788 9.1 -453              # east along z -453 to the seesaw P_Modul_30_02 below the wood transformer
+790 10.5 -459
 P_Trafo_Wood_05          # s211
+803 11.1 -424             # (hint) as wood south down the dead end x 803 into the target of P_Modul_37_02
+823 9.1 -492              # (hint) north up the dead end x 823 into the target of P_Modul_37_01
+788 9.1 -453              # the row along z -455 from its west end, over both bridges, the boxes rammed off
+830 9.1 -455
+850 9.1 -456
+865 9.1 -465
 PC_TwoFlames_04          
 865 -0.9 -560             # as wood over the swing north (hint)
 865 -2.9 -590

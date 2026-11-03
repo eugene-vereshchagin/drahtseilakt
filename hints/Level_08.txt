@@ -13,16 +13,26 @@ at 578 12 -237.5 r 4 sector 3 kind wood : goto 572 12 -237.5 ; goto 569.5 11.6 -
 # a slow ball sinks into) to the helix, round it up (centre 873 -321.3, radius 5.2) and off its top east.
 at 765 2.2 -335 r 5 sector 4 kind paper : goto 770.5 0.2 -338 ; press 770.5 4 -362 0 0 9 400 ; goto 770 4.8 -367.5 ; press 755 5 -367.5 0 0 8 300 ; goto 754 5 -364 ; press 754 7.2 -328 0 0 8 300 ; goto 758 7.2 -326
 at 758 7.2 -326 r 4 sector 4 kind paper : press 805 25.2 -325.3 0 0 30 400 ; press 864 25.2 -325.3 0 0 14 400 ; along 9 40 ; round 873 -321.3 5.2 8 600 46 ; press 887 47.2 -326 0 0 6 200
+# The maze: the paper ball comes down the maze's long west corridor, east along z -453 and up the seesaw
+# P_Modul_30_02 into the wood transformer. As wood it rolls fast into the targets at the ends of two dead ends
+# (south down x 802.3 into P_Modul_37_02's, north up x 823 into P_Modul_37_01's; a slow ball or one in the
+# corridor's middle misses the disc), so that both bridges fall into the gaps of the row along z -455, and rolls
+# along that row from its west end east over both, ramming the boxes off, to the last checkpoint.
+at 788 9.1 -455 r 3 sector 4 kind paper : goto 790.5 10.5 -458 ; press 790.5 9.2 -480 0 0 6 400 ; wait 30
+at 842.5 0.4 -431 r 4 sector 4 kind wood : goto 842.5 0.4 -431 ; goto 842.5 4 -420.5 ; goto 820 9.1 -420.3 ; goto 806 9.1 -420 ; goto 802.3 11.1 -424 ; press 802.3 11.1 -445 0 0 12 150 ; wait 30 ; goto 803 11.1 -428 ; goto 806 9.1 -420 ; goto 830 6.5 -420.3 ; goto 842.5 4 -420.5 ; goto 842.5 0.4 -431
+at 771.5 9.1 -482 r 3 sector 4 kind wood : goto 771 9.1 -489 ; goto 771.5 9.1 -495.5 ; goto 781 9.1 -495.5 ; goto 819 9.1 -495.5 ; goto 823.6 9.1 -494 ; press 823.6 9.1 -465 0 0 12 150 ; wait 30 ; goto 823 9.1 -490 ; goto 819 9.1 -495.5 ; goto 781 9.1 -495.5 ; goto 771.5 9.1 -495.5 ; goto 771 9.1 -489 ; goto 771 9.1 -470
+# The boxes P_Box_04/05 stacked on that row: rammed east from a run-up, again and again, to the corner where the
+# row turns south, and off its far side (rams a little north of the middle, braking after each).
+at 830 9.1 -455 r 4 sector 4 kind wood : goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 20 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 20 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 20 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 20 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 20 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 20 ; goto 845 9.1 -454 ; press 862 9.1 -454 0 0 10 80 ; push -1 0 15 ; wait 30 ; goto 845 9.1 -454 ; press 862 9.1 -454 0 0 10 80 ; push -1 0 15 ; wait 30 ; goto 845 9.1 -454 ; press 862 9.1 -454 0 0 10 80 ; push -1 0 15 ; wait 30 ; goto 845 9.1 -454 ; press 862 9.1 -454 0 0 10 80 ; push -1 0 15 ; wait 30 ; goto 850 9.1 -455.5
 #
 # Sector 5: the swing P_Modul_08_01 hangs in the gap between the square with the transformers and the square north
-# of it; its seat, a trough, swings along z between -565.6 and -577.4 every two seconds. The ball waits settled on
+# of it; its seat, a trough, swings along z between -566.74 and -576.76 every two seconds (once settled). The ball waits settled on
 # the near edge until the seat is at its far end, then rolls on as it comes back and rides it over (each ball its
-# own timing, found by trying). First as wood: north, east over the plank, down the hanging plates (a stone ball
+# own timing, found by trying; the stone ball, slower, starts from the seat's near end). First as wood: north, east over the plank, down the hanging plates (a stone ball
 # would break them) to the T, west into the target of P_Modul_37_03 (its bridge falls across the gap south of the
 # north square), back and over the swing south. Then as stone north, over the bridge, ramming the boxes off the
 # zigzag and off the fan at its end, back and south. Then as paper north to the fan.
-at 865 -0.9 -562 r 4 sector 5 kind wood : goto 865 -0.9 -560 ; wait 30 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 400 ; wait 30 ; push 0 -1 60 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 300 ; push 0 -1 50
-at 888 -2.2 -609.5 r 4 sector 5 kind wood : goto 892.3 -2.2 -608.5 ; goto 900 -2.2 -609.5 ; push -1 0 120 ; wait 60 ; goto 892.3 -2.2 -608.5 ; goto 892.5 -3 -598 ; goto 890 -2.2 -587 ; goto 874.6 -2.3 -587 ; goto 865 -2.9 -588 ; goto 865 -0.5 -583 ; wait 30 ; await 865.1 -4 -571 865.1 -2.8 -565.6 0.7 400 ; wait 16 ; push 0 1 30 ; await 865.1 -4 -571 865.1 -2.8 -565.6 0.7 300 ; push 0 1 50
-at 865 -0.9 -562 r 4 sector 5 kind stone : goto 865 -0.9 -560 ; wait 30 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 400 ; push 0 -1 95 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 300 ; push 0 -1 50
-at 822 -1.4 -636.5 r 4 sector 5 kind stone : via 826 -2.2 -631.7 ; via 855 -2.2 -631.7 ; via 855 -2.2 -618 ; via 865 -1 -617 ; via 865 -0.5 -598 ; goto 865 -0.5 -583 ; wait 30 ; await 865.1 -4 -571 865.1 -2.8 -565.6 0.7 400 ; push 0 1 115 ; await 865.1 -4 -571 865.1 -2.8 -565.6 0.7 300 ; push 0 1 50
-at 865 -0.9 -562 r 4 sector 5 kind paper : goto 865 -0.9 -560 ; wait 30 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 400 ; wait 40 ; push 0 -1 70 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 300 ; push 0 -1 50
+at 865 -0.9 -562 r 4 sector 5 kind wood : goto 865 -0.9 -560 ; wait 30 ; goto 865 -0.9 -560 ; wait 40 ; await 865.1 -4 -571 865.1 -3.1 -576.76 0.5 400 ; wait 30 ; push 0 -1 70 ; await 865.1 -4 -571 865.1 -3.1 -576.76 0.5 300 ; push 0 -1 50 ; goto 868 -2.9 -587 ; push 1 0 100 ; goto 890 -2.2 -587 ; goto 892.5 -3 -598 ; goto 892.3 -2.2 -608.5 ; goto 900 -2.2 -609.5 ; push -1 0 120 ; wait 60 ; goto 892.3 -2.2 -608.5 ; goto 892.5 -3 -598 ; goto 890 -2.2 -587 ; goto 874.6 -2.3 -587 ; goto 865 -2.9 -588 ; goto 865 -0.5 -583 ; wait 30 ; goto 865 -0.5 -583 ; wait 40 ; await 865.1 -4 -571 865.1 -3.0 -566.74 0.5 400 ; wait 30 ; push 0 1 90 ; await 865.1 -4 -571 865.1 -3.0 -566.74 0.5 300 ; push 0 1 50
+at 865 -0.9 -562 r 4 sector 5 kind stone : goto 865 -0.9 -560 ; wait 30 ; goto 865 -0.9 -560 ; wait 40 ; await 865.1 -4 -571 865.1 -3.0 -566.74 0.5 400 ; wait 40 ; push 0 -1 100 ; await 865.1 -4 -571 865.1 -3.1 -576.76 0.5 300 ; push 0 -1 50
+at 822 -1.4 -636.5 r 4 sector 5 kind stone : via 826 -2.2 -631.7 ; via 855 -2.2 -631.7 ; via 855 -2.2 -618 ; via 865 -1 -617 ; via 865 -0.5 -598 ; goto 865 -0.5 -583 ; wait 30 ; goto 865 -0.5 -583 ; wait 40 ; await 865.1 -4 -571 865.1 -3.1 -576.76 0.5 400 ; wait 30 ; push 0 1 135 ; await 865.1 -4 -571 865.1 -3.0 -566.74 0.5 300 ; push 0 1 50
+at 865 -0.9 -562 r 4 sector 5 kind paper : goto 865 -0.9 -560 ; wait 30 ; goto 865 -0.9 -560 ; wait 40 ; await 865.1 -4 -571 865.1 -3.1 -576.76 0.5 400 ; wait 40 ; push 0 -1 70 ; await 865.1 -4 -571 865.1 -3.1 -576.76 0.5 300 ; push 0 -1 50
