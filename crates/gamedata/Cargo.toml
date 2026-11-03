@@ -10,6 +10,8 @@ repository.workspace = true
 [dependencies]
 level = { path = "../level" }
 nmo = { path = "../nmo" }
+# matrices for a model pack's looks (assets.rs, attach_looks); already pinned in the lock through the game
+glam = "=0.34.1"
 image = { version = "=0.25.10", default-features = false, features = ["bmp", "tga", "png", "jpeg"] }
 
 [target.'cfg(unix)'.dependencies]

@@ -124,10 +124,14 @@ listet jede Textur mit dem, was sie ist, ihrer Größe, wie oft sie benutzt wird
 durch `assets/own/make/make_textures.py` aus CC0-Fototexturen (`free_textures.py`, festgelegt und mit Prüfsummen;
 `assets/own/CREDITS.md`) und vom Skript gezeichneten Formen, nach Palette, Körnung und Anordnung, gemessen an der
 Originaltextur gleichen Namens (ihre Ziegelstreifen, Bänder, Ringe und Schattierungen als Anteile ihrer Seite), in
-doppelter Auflösung, kachelnd, wo sie kachelt, und die Kugeln so umhüllend wie sie. Der Schalter *Textures* der
-erweiterten Seite (`textures own|original`) zeichnet die der Kopie; der klassische Modus zeichnet immer unsere. Die
-eigenen Texturen eines Levels im offenen Format (Dateien in seinem Ordner) bleiben die seines Autors.
-`--textures original|own` wählt für einen Lauf; `--export` behält die der Kopie, außer mit `--textures own`, das
+doppelter Auflösung, kachelnd, wo sie kachelt, und die Kugeln so umhüllend wie sie. Unsere Texturen sind das eingebaute
+Texturpaket `own`: die Zeile *Textures* der erweiterten Seite wählt unter den Texturpaketen ([packs.md](packs.md):
+`own`, `original` die der Kopie, `remastered` die eigenen hochskalierten Bilder eines remasterten Levels, und die Pakete
+des Spielers im Ordner `textures/` des Datenordners), die Zeile *Models* unter den Modellpaketen (nur das Aussehen der
+Teile und Kugeln, nie ihre Physik); der klassische Modus zeichnet immer unsere Texturen und die Teile, die jedes Level
+nimmt. Die eigenen Texturen eines Levels im offenen Format (Dateien in seinem Ordner) bleiben die seines Autors; die
+Texturen, die es als die des Spiels nennt (`game:`-Bilder, open-format.md), folgen dem Paket.
+`--textures PAKET` wählt für einen Lauf; `--export` behält die der Kopie, außer mit `--textures own`, das
 unsere in das exportierte Level schreibt. Unsere Dateien werden mit dem Spiel geliefert und mit denselben
 Größengrenzen gelesen wie jede Textur; ein Name aus einem Level wählt nur unter ihnen, er wird nie zu einem Pfad.
 

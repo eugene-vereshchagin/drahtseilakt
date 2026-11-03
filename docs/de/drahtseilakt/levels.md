@@ -86,7 +86,10 @@ Jedes Level beginnt mit der Holzkugel und hat Kontrollpunkte mit ihren Flammen, 
 
 **Ein Level wird als Text geschrieben.** Jeder Ordner enthält seine Beschreibung, `level.lvl`, in einer kleinen
 Sprache, die `assets/own/make/leveldsl.py` liest; es schreibt das Level daneben (`level.gltf`, `level.bin`,
-`textures/`, `level.txt`) mit `levelkit.py`. Die Beschreibung legt die Bahn wie eine Schildkröte: ein Cursor (ein Punkt
+`textures/`, `level.txt`) mit `levelkit.py`. Nur die eigenen Texturen des Levels (sein Satz Platten, Randsteine,
+Schatten und Hänge) liegen als Dateien in seinem `textures/`; die Texturen, die alle Level teilen, sind als die des
+Spiels genannt (`game:`-Bilder, open-format.md) und werden mit dem gewählten Texturpaket gezeichnet
+([packs.md](packs.md)). Die Beschreibung legt die Bahn wie eine Schildkröte: ein Cursor (ein Punkt
 auf der Oberseite des Bodens und eine Richtung, am Start entlang +X, links ist +Z) rückt mit jedem Stück weiter, und
 Teile werden dorthin gesetzt, wo er ist. Eine Zeile ist ein Befehl; `#` beginnt einen Kommentar:
 

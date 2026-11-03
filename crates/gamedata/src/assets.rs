@@ -259,7 +259,11 @@ impl Data {
             } else {
                 Maker::Stranger
             };
-            self.put_own_textures(&mut part.level, maker);
+            self.put_pack_textures(&mut part.level, maker);
+            // a stranger's own parts keep their look; a remaster's are the copy's, remade, and take the model pack's
+            if maker == Maker::Copy {
+                self.put_pack_looks(relative, &mut part.level, PartFrom::Remaster);
+            }
             return Some(part);
         }
         // ours, in the open format (`assets/own/3D Entities/PH/P_Box/`), before or after the copy's file; either way
@@ -269,7 +273,9 @@ impl Data {
             load_open(&plain_path(&root, stem)?).ok()
         };
         let copy = || load_nmo(&self.copy_only(relative)?).ok();
-        let mut part = if self.own_parts {
+        let own = || own().map(|p| (p, PartFrom::Own));
+        let copy = || copy().map(|p| (p, PartFrom::Copy));
+        let found = if self.own_parts {
             own().or_else(copy)
         } else {
             copy().or_else(|| {
@@ -282,11 +288,56 @@ impl Data {
                 ours
             })
         };
-        match &mut part {
-            Some(p) => self.put_own_textures(&mut p.level, Maker::Copy),
-            None => crate::resources::missing(relative),
+        let Some((mut part, from)) = found else {
+            crate::resources::missing(relative);
+            return None;
+        };
+        self.put_pack_textures(&mut part.level, Maker::Copy);
+        self.put_pack_looks(relative, &mut part.level, from);
+        Some(part)
+    }
+
+    /// Puts the chosen model pack's look on a part (`Kind::Models`, packs.rs): each of its meshes drawn as the pack's
+    /// mesh of the same object (else of the same name), the physics and the rules still using the part's own meshes.
+    /// The packs are asked in their chain's order; the first that has the part at all gives its look. `level` (the
+    /// default), or a built-in pack that is where the part already came from, leaves the part as it is.
+    fn put_pack_looks(&self, relative: &str, part: &mut level::Level, from: PartFrom) {
+        self.put_looks_of(relative, part, from, &crate::packs::chain(crate::packs::Kind::Models));
+    }
+
+    /// `put_pack_looks` with the chain of model packs given.
+    fn put_looks_of(&self, relative: &str, part: &mut level::Level, from: PartFrom, chain: &[crate::packs::Pack]) {
+        use crate::packs::{LEVEL, ORIGINAL, OWN};
+        let stem = relative.strip_suffix(".nmo").or_else(|| relative.strip_suffix(".NMO")).unwrap_or(relative);
+        for pack in chain {
+            let look = match (pack.key.as_str(), &pack.dir) {
+                (LEVEL, _) => return,
+                (OWN, _) if from == PartFrom::Own => return,
+                (ORIGINAL, _) if from == PartFrom::Copy => return,
+                (OWN, _) => crate::resources::own_root()
+                    .and_then(|r| plain_path(&r, stem))
+                    .and_then(|d| load_open(&d).ok())
+                    .map(|mut p| {
+                        self.put_pack_textures(&mut p.level, Maker::Copy);
+                        p.level
+                    }),
+                (ORIGINAL, _) => self.copy_only(relative).and_then(|p| load_nmo(&p).ok()).map(|mut p| {
+                    self.put_pack_textures(&mut p.level, Maker::Copy);
+                    p.level
+                }),
+                (_, Some(dir)) => load_pack_part(dir, stem).map(|mut l| {
+                    // the pack's own pictures are its maker's: never replaced
+                    self.put_pack_textures(&mut l, Maker::Stranger);
+                    l
+                }),
+                (_, None) => None,
+            };
+            if let Some(look) = look
+                && attach_looks(part, look) > 0
+            {
+                return;
+            }
         }
-        part
     }
 
     pub fn load(&self, source: &Source) -> Result<LoadedLevel, String> {
@@ -298,7 +349,7 @@ impl Data {
             Source::Open(_) if source.remastered() => Maker::Copy,
             Source::Nmo(_) | Source::Open(_) => Maker::Stranger,
         };
-        self.put_own_textures(&mut loaded.level, maker);
+        self.put_pack_textures(&mut loaded.level, maker);
         Ok(loaded)
     }
 
@@ -414,7 +465,17 @@ impl Data {
             // a texture a .nmo names: only the last part of its name, looked for in the game's texture folders (a
             // stranger's map may name any path there; it never reads one)
             level::TextureSource::File(name) => {
-                let path = self.texture_file(&bare_name(name)?)?;
+                let file = bare_name(name)?;
+                let (rel, path) = self.texture_file_at(&file)?;
+                // the level's sky, particles and shadow (the game's parts, not a level's or the interface's
+                // textures): a player's texture pack has its own of them first
+                let own = self.overlay.as_deref().is_some_and(|o| path.starts_with(o));
+                if !own
+                    && crate::resources::is_part(&rel)
+                    && let Some(found) = self.player_pack_picture(&file)
+                {
+                    return Some(found);
+                }
                 // it may come from a level's game folder (a stranger's): its size checked before it is decoded
                 if !std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX) {
                     return None;
@@ -424,7 +485,270 @@ impl Data {
                 }
                 decode_capped(&path)
             }
+            level::TextureSource::Game(name) => self.game_texture(name),
             level::TextureSource::None => None,
+        }
+    }
+
+    /// The game's texture `name` (an open-format level's `game:` image): the level's own `game/Textures/` first (a
+    /// level folder's picture of that name wins), then the texture packs' chain, then ours, then the copy's. The name
+    /// is only compared with the files' names (resources::texture_key), never made a path.
+    fn game_texture(&self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
+        use crate::packs::{Kind, ORIGINAL, OWN};
+        let level_own = self.overlay.as_deref().and_then(|o| plain_path(o, "Textures"));
+        let mut tried: Vec<PathBuf> = Vec::new();
+        let candidates = level_own
+            .and_then(|d| crate::packs::picture(&d, name))
+            .into_iter()
+            .chain(crate::packs::chain(Kind::Textures).into_iter().filter_map(|p| match (p.key.as_str(), &p.dir) {
+                (_, Some(dir)) => crate::packs::picture(dir, name),
+                (OWN, None) => crate::resources::own_texture(name),
+                (ORIGINAL, None) => self.copy_picture(name),
+                _ => None,
+            }))
+            .chain(crate::resources::own_texture(name))
+            .chain(self.copy_picture(name));
+        for path in candidates {
+            if tried.contains(&path) {
+                continue;
+            }
+            tried.push(path.clone());
+            if let Some(px) = self.decode_budgeted(&path) {
+                return Some(px);
+            }
+        }
+        None
+    }
+
+    /// The first picture of `name` among the player's texture packs that come before any built-in pack in the
+    /// chain, decoded (a broken one is passed over for the next).
+    fn player_pack_picture(&self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
+        crate::packs::chain(crate::packs::Kind::Textures)
+            .into_iter()
+            .map_while(|p| p.dir)
+            .filter_map(|dir| crate::packs::picture(&dir, name))
+            .find_map(|path| self.decode_budgeted(&path))
+    }
+
+    /// The copy's own picture of the texture `name`, found by its name as texture_key compares names (in its
+    /// Textures/ folder, Sky/ and Particles/).
+    fn copy_picture(&self, name: &str) -> Option<PathBuf> {
+        let dir = self.copy_only("Textures")?;
+        crate::packs::picture(&dir, name)
+    }
+
+    /// A picture decoded through the caps: a plain file of at most IMAGE_MAX, within the pixel budget when it is a
+    /// level's, the toolbox's or a player's pack's.
+    fn decode_budgeted(&self, path: &Path) -> Option<(u32, u32, Vec<u8>)> {
+        let plain = std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
+        if !plain || !self.overlay_pixels(path) {
+            return None;
+        }
+        decode_capped(path)
+    }
+}
+
+/// Where a part's physics (its own meshes) came from, for the model packs: a built-in pack that is the same source
+/// adds no look.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum PartFrom {
+    /// Ours (assets/own).
+    Own,
+    /// The player's copy.
+    Copy,
+    /// A remastered level's own folder (the copy's part, remade by the toolbox).
+    Remaster,
+}
+
+/// The largest level.gltf and level.bin of a part in a player's model pack, and the most vertices and triangles its
+/// meshes (with their looks) may have in all.
+const PACK_JSON_MAX: u64 = 8 * 1024 * 1024;
+const PACK_BIN_MAX: u64 = 64 * 1024 * 1024;
+pub const PACK_VERTICES_MAX: usize = 1 << 20;
+pub const PACK_TRIANGLES_MAX: usize = 1 << 21;
+
+/// A part of a player's model pack (`stem` as "3D Entities/PH/P_Box", found in the pack folder as "PH/P_Box"): its
+/// folder a plain path of real folders, its files capped, read as any open-format level is, then checked (counts of
+/// vertices and triangles, every number finite). Anything wrong leaves the part out (said once): the next pack in the
+/// chain gives it.
+fn load_pack_part(dir: &Path, stem: &str) -> Option<level::Level> {
+    let sub = stem.strip_prefix("3D Entities/").unwrap_or(stem);
+    let folder = plain_path(dir, sub)?;
+    let folder = std::path::absolute(&folder).ok()?;
+    let file = |name: &str, cap: u64| plain_path(&folder, name).and_then(|p| read_capped(&p, cap));
+    let checked = file("level.gltf", PACK_JSON_MAX)
+        .ok_or_else(|| format!("no level.gltf of at most {PACK_JSON_MAX} bytes"))
+        .and_then(|gltf| {
+            let bin = file("level.bin", PACK_BIN_MAX).ok_or_else(|| format!("no level.bin of at most {PACK_BIN_MAX} bytes"))?;
+            level::open::import_bytes(&folder, &gltf, &bin)
+        })
+        .and_then(|l| check_pack_part(&l).map(|()| l));
+    match checked {
+        Ok(l) => Some(l),
+        Err(e) => {
+            pack_warning(&folder, &e);
+            None
+        }
+    }
+}
+
+/// A model pack's part is within the caps: at most PACK_VERTICES_MAX vertices and PACK_TRIANGLES_MAX triangles in all
+/// (its meshes and their looks), every position, normal and texture coordinate finite.
+pub fn check_pack_part(l: &level::Level) -> Result<(), String> {
+    let (mut vertices, mut triangles) = (0usize, 0usize);
+    let looks = l.meshes.iter().flat_map(|m| std::iter::once(m).chain(m.look.as_deref()));
+    for m in looks {
+        vertices = vertices.saturating_add(m.positions.len());
+        triangles = m.parts.iter().fold(triangles, |t, p| t.saturating_add(p.indices.len() / 3));
+        let finite = m.positions.iter().chain(&m.normals).all(|v| v.iter().all(|x| x.is_finite()))
+            && m.uvs.iter().all(|v| v.iter().all(|x| x.is_finite()));
+        if !finite {
+            return Err(format!("mesh {}: a number that is not finite", m.name));
+        }
+    }
+    if vertices > PACK_VERTICES_MAX || triangles > PACK_TRIANGLES_MAX {
+        return Err(format!(
+            "{vertices} vertices and {triangles} triangles, over the caps ({PACK_VERTICES_MAX}, {PACK_TRIANGLES_MAX})"
+        ));
+    }
+    Ok(())
+}
+
+/// Says once that a model pack's part was left out.
+fn pack_warning(folder: &Path, why: &str) {
+    static SAID: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+    if let Ok(mut said) = SAID.lock()
+        && !said.iter().any(|s| s == folder)
+    {
+        said.push(folder.to_path_buf());
+        eprintln!("warning: model pack {}: {why}; left out", folder.display());
+    }
+}
+
+/// Puts the meshes of `look` (a part of a model pack) on the meshes of `base` (the part the game plays with) as their
+/// looks: a base mesh takes the look of the pack's object of the same name as the first object placing it (moved into
+/// that object's frame), else of the pack's mesh of the same name. The look's materials and textures are added to the
+/// base's. Returns how many meshes took a look; with none, `base` is left as it was.
+pub fn attach_looks(base: &mut level::Level, look: level::Level) -> usize {
+    type Pair = (usize, usize, Option<[[f32; 4]; 4]>);
+    let mut pairs: Vec<Pair> = Vec::new();
+    for (bm, _) in base.meshes.iter().enumerate() {
+        // every object placing the mesh must find the same look in the same place (a mesh shared by several objects
+        // has one look); objects that disagree leave the mesh its own look
+        let mut placed = base.objects.iter().filter(|o| o.mesh == Some(bm)).peekable();
+        let by_object = placed.peek().is_some().then(|| {
+            let mut agreed: Option<(usize, [[f32; 4]; 4])> = None;
+            for b in placed {
+                let l = look.objects.iter().find(|o| o.mesh.is_some() && o.name.eq_ignore_ascii_case(&b.name))?;
+                let this = (l.mesh?, relative_matrix(&b.matrix, &l.matrix)?);
+                match agreed {
+                    None => agreed = Some(this),
+                    Some((m, r)) if m == this.0 && near(&r, &this.1) => {}
+                    Some(_) => return None,
+                }
+            }
+            agreed
+        });
+        let shared = base.objects.iter().filter(|o| o.mesh == Some(bm)).count() > 1;
+        let by_object = by_object.flatten();
+        // a shared mesh is never matched by its name alone (its objects found no common look)
+        let shared_disagree = shared && by_object.is_none();
+        let name = base.meshes.get(bm).map(|m| m.name.as_str()).unwrap_or_default();
+        let found = by_object.map(|(lm, m)| (lm, Some(m))).or_else(|| {
+            if shared_disagree {
+                return None;
+            }
+            look.meshes.iter().position(|m| !name.is_empty() && m.name.eq_ignore_ascii_case(name)).map(|lm| (lm, None))
+        });
+        if let Some((lm, m)) = found {
+            pairs.push((bm, lm, m));
+        }
+    }
+    if pairs.is_empty() {
+        return 0;
+    }
+    let (t0, m0) = (base.textures.len(), base.materials.len());
+    base.textures.extend(look.textures.iter().cloned());
+    base.materials.extend(look.materials.iter().cloned().map(|mut m| {
+        m.texture = m.texture.and_then(|t| t.checked_add(t0));
+        m.normal = m.normal.and_then(|t| t.checked_add(t0));
+        m
+    }));
+    let mut n = 0usize;
+    for (bm, lm, matrix) in pairs {
+        let Some(src) = look.meshes.get(lm) else { continue };
+        let mut mesh = src.look.as_deref().unwrap_or(src).clone();
+        mesh.look = None;
+        for p in &mut mesh.parts {
+            p.material = p.material.and_then(|i| i.checked_add(m0));
+        }
+        for c in &mut mesh.channels {
+            c.material = c.material.saturating_add(m0);
+        }
+        if let Some(m) = matrix {
+            transform_mesh(&mut mesh, &m);
+        }
+        if let Some(b) = base.meshes.get_mut(bm) {
+            b.look = Some(Box::new(mesh));
+            n = n.saturating_add(1);
+        }
+    }
+    n
+}
+
+/// A matrix of the level model (column-major) as glam's.
+fn mat(m: &[[f32; 4]; 4]) -> glam::Mat4 {
+    glam::Mat4::from_cols_array_2d(m)
+}
+
+/// The matrix taking the look's object frame `look` into the base object's frame `base` (base⁻¹ · look; both affine),
+/// none when the base's cannot be inverted or the result is not finite; the identity exactly when it is one within
+/// float noise (no move needed).
+fn relative_matrix(base: &[[f32; 4]; 4], look: &[[f32; 4]; 4]) -> Option<[[f32; 4]; 4]> {
+    let inv = affine_inverse(base)?;
+    let out = mat(&inv).mul_mat4(&mat(look));
+    if !out.is_finite() {
+        return None;
+    }
+    Some(if out.abs_diff_eq(glam::Mat4::IDENTITY, 1e-6) { IDENTITY } else { out.to_cols_array_2d() })
+}
+
+/// Two matrices the same within float noise.
+fn near(a: &[[f32; 4]; 4], b: &[[f32; 4]; 4]) -> bool {
+    let (a, b) = (mat(a), mat(b));
+    let scale = a.to_cols_array().iter().chain(&b.to_cols_array()).fold(1.0f32, |m, x| m.max(x.abs()));
+    a.abs_diff_eq(b, 1e-4 * scale)
+}
+
+const IDENTITY: [[f32; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+
+/// The inverse of an affine matrix, none when it is not affine, cannot be inverted (a flattened frame) or is not finite.
+fn affine_inverse(m: &[[f32; 4]; 4]) -> Option<[[f32; 4]; 4]> {
+    let m = glam::DMat4::from_cols_array_2d(&m.map(|c| c.map(f64::from)));
+    let affine = m.row(3).abs_diff_eq(glam::DVec4::W, 1e-9);
+    let det = m.determinant();
+    if !affine || !det.is_finite() || det.abs() < 1e-12 {
+        return None;
+    }
+    let inv = m.inverse().as_mat4();
+    inv.is_finite().then(|| inv.to_cols_array_2d())
+}
+
+/// Moves a mesh by an affine matrix: its positions, and its normals by the inverse transpose (normalised again).
+fn transform_mesh(mesh: &mut level::Mesh, m: &[[f32; 4]; 4]) {
+    if *m == IDENTITY {
+        return;
+    }
+    let mm = mat(m);
+    for p in &mut mesh.positions {
+        *p = mm.transform_point3(glam::Vec3::from(*p)).to_array();
+    }
+    let Some(inv) = affine_inverse(m) else { return };
+    let normal = glam::Mat3::from_mat4(mat(&inv)).transpose();
+    for n in &mut mesh.normals {
+        let t = normal.mul_vec3(glam::Vec3::from(*n));
+        if let Some(t) = t.try_normalize() {
+            *n = t.to_array();
         }
     }
 }
@@ -453,47 +777,89 @@ impl Data {
     /// The file of a texture by its bare file name in the game's texture folders: the level's own first, then the
     /// copy's.
     fn texture_file(&self, file: &str) -> Option<PathBuf> {
-        ["Textures", "Textures/Sky", "Textures/Particles"].iter().find_map(|dir| self.file(&format!("{dir}/{file}")))
+        self.texture_file_at(file).map(|(_, p)| p)
     }
 
-    /// Puts our own textures in place of the original's (resources.rs, `textures own`), as pixels, when the level is
-    /// loaded (so the choice holds for everything drawn or exported from it):
-    /// - a texture a `.nmo` names by file: ours of that file's name, unless the level's own folder brings the file;
-    ///   by the texture's name only when no such file is found at all;
-    /// - pixels a `.nmo` carries: of the copy's levels and parts, ours of the texture's name; of a stranger's map only
-    ///   when they are the copy's own texture of that name, pixel for pixel (a map's own pictures stay its own);
-    /// - an open-format level's files: replaced only in a remaster of the copy's level, by name.
+    /// The same, with the path in the game's layout it was found at (`Textures/Sky/Sky_A_Front.bmp`).
+    fn texture_file_at(&self, file: &str) -> Option<(String, PathBuf)> {
+        ["Textures", "Textures/Sky", "Textures/Particles"].iter().find_map(|dir| {
+            let rel = format!("{dir}/{file}");
+            self.file(&rel).map(|p| (rel, p))
+        })
+    }
+
+    /// Puts the chosen texture pack's pictures in place of the level's textures (packs.rs, `Kind::Textures`), as
+    /// pixels, when the level is loaded (so the choice holds for everything drawn or exported from it). Which of a
+    /// level's textures a pack may replace (by name):
+    /// - a texture a `.nmo` names by file: unless the level's own folder brings the file (by the file's name, or the
+    ///   texture's name when no such file is found at all);
+    /// - pixels a `.nmo` carries: of the copy's levels and parts always; of a stranger's map only when they are the
+    ///   copy's own texture of that name, pixel for pixel (a map's own pictures stay its own);
+    /// - an open-format level's files: only in a remaster of the copy's level.
     ///
-    /// Ours have real alpha: the original's transparent colour is not applied to them.
-    fn put_own_textures(&self, level: &mut level::Level, maker: Maker) {
-        if crate::resources::textures() != crate::resources::TextureSet::Own {
+    /// The packs are asked in their chain's order: a player's pack and `own` give their picture of the name; `original`
+    /// keeps a texture that is the copy's as it is (a remaster's file takes the copy's picture of its name); `remastered`
+    /// keeps a remaster's own file. A pack without the name, or whose picture does not decode, passes to the next; the
+    /// end of the chain keeps the level's own. A pack's picture has real alpha: the transparent colour is dropped.
+    /// The game's textures by name (`game:` images) are resolved when drawn (`game_texture`).
+    fn put_pack_textures(&self, level: &mut level::Level, maker: Maker) {
+        self.put_textures_of(level, maker, &crate::packs::chain(crate::packs::Kind::Textures));
+    }
+
+    /// `put_pack_textures` with the chain of texture packs given.
+    fn put_textures_of(&self, level: &mut level::Level, maker: Maker, chain: &[crate::packs::Pack]) {
+        use crate::packs::{ORIGINAL, OWN, REMASTERED};
+        // the copy's textures as they are: nothing to do (the classic look of the copy, and the toolbox's default)
+        if chain.first().is_none_or(|p| p.key == ORIGINAL) && !matches!(maker, Maker::Copy) {
             return;
         }
         for t in &mut level.textures {
-            let own = match &t.source {
+            // the names a pack's picture is looked for under, or none when the texture is not one a pack replaces
+            let names: Vec<String> = match &t.source {
                 level::TextureSource::File(name) => match bare_name(name) {
                     Some(file) => match self.texture_file(&file) {
-                        Some(found) if self.overlay.as_deref().is_some_and(|o| found.starts_with(o)) => None,
-                        Some(_) => crate::resources::own_texture(&file),
-                        None => crate::resources::own_texture(&file).or_else(|| crate::resources::own_texture(&t.name)),
+                        Some(found) if self.overlay.as_deref().is_some_and(|o| found.starts_with(o)) => Vec::new(),
+                        Some(_) => vec![file],
+                        None => vec![file, t.name.clone()],
                     },
-                    None => None,
+                    None => Vec::new(),
                 },
-                level::TextureSource::Pixels { width, height, rgba } => {
-                    let ours = crate::resources::own_texture(&t.name);
-                    match maker {
-                        Maker::Copy => ours,
-                        Maker::Stranger => ours.filter(|_| self.is_copys_texture(&t.name, *width, *height, rgba)),
-                    }
+                level::TextureSource::Pixels { .. } => vec![t.name.clone()],
+                level::TextureSource::LevelFile(_) if maker == Maker::Copy => vec![t.name.clone()],
+                level::TextureSource::LevelFile(_) | level::TextureSource::Game(_) | level::TextureSource::None => {
+                    Vec::new()
                 }
-                level::TextureSource::LevelFile(_) if maker == Maker::Copy => crate::resources::own_texture(&t.name),
-                level::TextureSource::LevelFile(_) | level::TextureSource::None => None,
             };
-            let Some(path) = own else { continue };
-            if !std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX) {
+            if names.is_empty() {
                 continue;
             }
-            if let Some((width, height, rgba)) = decode_capped(&path) {
+            let remaster_file = matches!(t.source, level::TextureSource::LevelFile(_));
+            // a stranger's pixels are replaced only when they are the copy's: asked once, only when a pack has a picture
+            let mut copys: Option<bool> = None;
+            let mut replaced = None;
+            for pack in chain {
+                let path = match (pack.key.as_str(), &pack.dir) {
+                    (_, Some(dir)) => names.iter().find_map(|n| crate::packs::picture(dir, n)),
+                    (OWN, None) => names.iter().find_map(|n| crate::resources::own_texture(n)),
+                    (ORIGINAL, None) if remaster_file => self.copy_picture(&t.name),
+                    // the copy's texture: kept as it is
+                    (ORIGINAL, None) => break,
+                    (REMASTERED, None) if remaster_file => break,
+                    _ => None,
+                };
+                let Some(path) = path else { continue };
+                if let level::TextureSource::Pixels { width, height, rgba } = &t.source
+                    && maker == Maker::Stranger
+                    && !*copys.get_or_insert_with(|| self.is_copys_texture(&t.name, *width, *height, rgba))
+                {
+                    break;
+                }
+                if let Some(px) = self.decode_budgeted(&path) {
+                    replaced = Some(px);
+                    break;
+                }
+            }
+            if let Some((width, height, rgba)) = replaced {
                 t.source = level::TextureSource::Pixels { width, height, rgba };
                 t.color_key = None;
             }
@@ -530,9 +896,11 @@ impl Data {
     /// counted as taken); any other texture always does.
     fn overlay_pixels(&self, path: &Path) -> bool {
         use std::sync::atomic::Ordering;
-        // the files of a level's own folder and of the toolbox's interface share the budget; the copy's do not
+        // the files of a level's own folder, of the toolbox's interface and of the player's packs share the budget; the
+        // copy's do not
         let budgeted = self.overlay.as_deref().is_some_and(|o| path.starts_with(o))
-            || path.starts_with(crate::resources::remastered_root());
+            || path.starts_with(crate::resources::remastered_root())
+            || crate::packs::in_player_packs(path);
         if !budgeted {
             return true;
         }
@@ -776,6 +1144,10 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<usize, 
     real_folders(dir, &dir.join("textures"))?;
     let mut missing = 0usize;
     for (i, t) in level.textures.iter().enumerate() {
+        // the game's texture by name stays a name (level.gltf says `game:<name>`): no file of the level's
+        if matches!(t.source, level::TextureSource::Game(_)) {
+            continue;
+        }
         let path = dir.join(level::open::texture_file(i, &t.name));
         // read first: the texture may be this very file (a level exported into its own folder); a texture not found
         // leaves what is there
@@ -1056,6 +1428,240 @@ mod tests {
         assert_eq!(bare_name("/a/b/../x.png").as_deref(), Some("x.png"));
         assert_eq!(bare_name("a/.."), None);
         assert_eq!(bare_name("x:y.bmp"), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn player_pack(key: &str, dir: &Path, fallback: Option<&str>) -> crate::packs::Pack {
+        crate::packs::Pack {
+            key: key.into(),
+            dir: Some(dir.to_path_buf()),
+            names: Vec::new(),
+            fallback: fallback.map(str::to_owned),
+        }
+    }
+
+    fn builtin(key: &str) -> crate::packs::Pack {
+        crate::packs::Pack { key: key.into(), dir: None, names: Vec::new(), fallback: None }
+    }
+
+    fn pixels(name: &str, rgba: [u8; 4]) -> level::Texture {
+        level::Texture {
+            name: name.into(),
+            source: level::TextureSource::Pixels { width: 1, height: 1, rgba: rgba.to_vec() },
+            color_key: Some([0, 0, 0]),
+        }
+    }
+
+    fn first_pixel(t: &level::Texture) -> Option<[u8; 4]> {
+        match &t.source {
+            level::TextureSource::Pixels { rgba, .. } => rgba.get(..4).and_then(|p| p.try_into().ok()),
+            _ => None,
+        }
+    }
+
+    /// A player's texture pack replaces the copy's textures it has by name (any spelling), passes a broken or
+    /// oversized picture over for the next pack, never touches a stranger's own pixels, and stops at `original`.
+    #[test]
+    fn a_texture_pack_replaces_by_name_and_fails_closed() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-texpack-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (a, b) = (root.join("a"), root.join("b"));
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::create_dir_all(&b).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([10, 20, 30, 255])).save(a.join("wood_old.png")).unwrap();
+        // a picture that does not decode, and one too large to be read: both passed over for pack b's
+        std::fs::write(a.join("Brick.png"), b"not a png").unwrap();
+        image::RgbaImage::from_pixel(1, 1, image::Rgba([1, 1, 1, 255])).save(b.join("Brick.png")).unwrap();
+        image::RgbaImage::from_pixel(1, 1, image::Rgba([2, 2, 2, 255])).save(b.join("Metal.png")).unwrap();
+        let data = Data::new(None);
+        let chain = [player_pack("a", &a, Some("b")), player_pack("b", &b, Some("none"))];
+        let mut level = level::Level {
+            textures: vec![pixels("Wood_Old", [9, 9, 9, 255]), pixels("Brick", [9, 9, 9, 255]), pixels("Floor", [9, 9, 9, 255])],
+            ..Default::default()
+        };
+        data.put_textures_of(&mut level, Maker::Copy, &chain);
+        assert_eq!(first_pixel(&level.textures[0]), Some([10, 20, 30, 255]));
+        assert!(level.textures[0].color_key.is_none(), "a pack's picture has real alpha");
+        assert_eq!(first_pixel(&level.textures[1]), Some([1, 1, 1, 255]), "the broken picture falls to the fallback");
+        assert_eq!(first_pixel(&level.textures[2]), Some([9, 9, 9, 255]), "a name no pack has is kept");
+        // a stranger's own pixels (there is no copy to compare with): never replaced
+        let mut map = level::Level { textures: vec![pixels("Metal", [5, 5, 5, 255])], ..Default::default() };
+        data.put_textures_of(&mut map, Maker::Stranger, &chain);
+        assert_eq!(first_pixel(&map.textures[0]), Some([5, 5, 5, 255]));
+        // `original` first keeps the copy's texture as it is, whatever comes after
+        let mut copy = level::Level { textures: vec![pixels("Metal", [5, 5, 5, 255])], ..Default::default() };
+        data.put_textures_of(&mut copy, Maker::Copy, &[builtin("original"), player_pack("b", &b, None)]);
+        assert_eq!(first_pixel(&copy.textures[0]), Some([5, 5, 5, 255]));
+        // a picture over the size cap is not read
+        let big = root.join("big");
+        std::fs::create_dir_all(&big).unwrap();
+        std::fs::File::create(big.join("Metal.png")).unwrap().set_len(IMAGE_MAX + 1).unwrap();
+        let mut copy = level::Level { textures: vec![pixels("Metal", [5, 5, 5, 255])], ..Default::default() };
+        data.put_textures_of(&mut copy, Maker::Copy, &[player_pack("big", &big, Some("none"))]);
+        assert_eq!(first_pixel(&copy.textures[0]), Some([5, 5, 5, 255]));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn quad(name: &str, scale: f32) -> level::Mesh {
+        level::Mesh {
+            name: name.into(),
+            positions: vec![[0.0, 0.0, 0.0], [scale, 0.0, 0.0], [0.0, scale, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            uvs: vec![[0.0, 0.0]; 3],
+            parts: vec![level::Part { material: Some(0), indices: vec![0, 1, 2] }],
+            ..Default::default()
+        }
+    }
+
+    fn object(name: &str, mesh: usize, at: [f32; 3]) -> level::Object {
+        let mut matrix = IDENTITY;
+        matrix[3] = [at[0], at[1], at[2], 1.0];
+        level::Object { name: name.into(), matrix, mesh: Some(mesh), visible: true, sprite: None }
+    }
+
+    fn material(texture: Option<usize>) -> level::Material {
+        level::Material {
+            name: "m".into(),
+            diffuse: [1.0; 4],
+            ambient: [0.0; 3],
+            emissive: [0.0; 3],
+            specular: [0.0; 3],
+            power: 0.0,
+            texture,
+            normal: None,
+            parallax: 0.0,
+            blend: None,
+            alpha_cutoff: None,
+            z_write: true,
+            two_sided: false,
+            unlit: false,
+            texgen: None,
+        }
+    }
+
+    /// A look goes on the mesh of the object of the same name, moved into that object's frame, with its own materials
+    /// and textures added; the part's own meshes (the physics') are untouched.
+    #[test]
+    fn looks_go_on_by_object_and_leave_the_physics() {
+        let mut base = level::Level {
+            meshes: vec![quad("Box", 1.0), quad("Hidden", 1.0)],
+            materials: vec![material(None)],
+            objects: vec![object("P_Box_MF", 0, [5.0, 0.0, 0.0]), object("Collision", 1, [0.0, 0.0, 0.0])],
+            ..Default::default()
+        };
+        let before: Vec<Vec<[f32; 3]>> = base.meshes.iter().map(|m| m.positions.clone()).collect();
+        let look = level::Level {
+            meshes: vec![quad("Other", 2.0), quad("Hidden", 3.0)],
+            materials: vec![material(Some(0))],
+            textures: vec![pixels("T", [1, 2, 3, 255])],
+            // the pack's object one unit further along x: its look is moved by that in the base's frame
+            objects: vec![object("p_box_mf", 0, [6.0, 0.0, 0.0])],
+            ..Default::default()
+        };
+        assert_eq!(attach_looks(&mut base, look), 2);
+        let after: Vec<Vec<[f32; 3]>> = base.meshes.iter().map(|m| m.positions.clone()).collect();
+        assert_eq!(before, after, "the physics' meshes stay as they were");
+        let l0 = base.meshes[0].look.as_deref().unwrap();
+        assert_eq!(l0.positions, vec![[1.0, 0.0, 0.0], [3.0, 0.0, 0.0], [1.0, 2.0, 0.0]]);
+        assert_eq!(l0.parts[0].material, Some(1));
+        assert_eq!(base.materials[1].texture, Some(0));
+        assert_eq!(base.textures.len(), 1);
+        // matched by the mesh's name where no object matches, unmoved
+        assert_eq!(base.meshes[1].look.as_deref().unwrap().positions[1], [3.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn a_shared_mesh_takes_a_look_only_when_its_objects_agree() {
+        let make = || level::Level {
+            meshes: vec![quad("Wall", 1.0)],
+            materials: vec![material(None)],
+            objects: vec![object("Wall01", 0, [0.0, 0.0, 0.0]), object("Wall02", 0, [4.0, 0.0, 0.0])],
+            ..Default::default()
+        };
+        let look = |second: [f32; 3]| level::Level {
+            meshes: vec![quad("Wall", 2.0)],
+            materials: vec![material(None)],
+            objects: vec![object("Wall01", 0, [0.0, 0.0, 0.0]), object("Wall02", 0, second)],
+            ..Default::default()
+        };
+        let mut agree = make();
+        assert_eq!(attach_looks(&mut agree, look([4.0, 0.0, 0.0])), 1);
+        let mut disagree = make();
+        assert_eq!(attach_looks(&mut disagree, look([9.0, 0.0, 0.0])), 0);
+        assert!(disagree.meshes[0].look.is_none() && disagree.materials.len() == 1, "left as it was");
+    }
+
+    #[test]
+    fn the_relative_matrix_inverts_rotations_and_scales() {
+        // base: turned 90 degrees about y and scaled by 2, at (1, 2, 3)
+        let base = [[0.0, 0.0, -2.0, 0.0], [0.0, 2.0, 0.0, 0.0], [2.0, 0.0, 0.0, 0.0], [1.0, 2.0, 3.0, 1.0]];
+        assert_eq!(relative_matrix(&base, &base), Some(IDENTITY));
+        let inv = affine_inverse(&base).unwrap();
+        let mut mesh = quad("q", 1.0);
+        transform_mesh(&mut mesh, &base);
+        transform_mesh(&mut mesh, &inv);
+        for (p, q) in mesh.positions.iter().zip(quad("q", 1.0).positions) {
+            assert!(p.iter().zip(q).all(|(a, b)| (a - b).abs() < 1e-5), "{p:?} {q:?}");
+        }
+        assert!(mesh.normals.iter().all(|n| (n[2] - 1.0).abs() < 1e-5));
+        let flat = [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+        assert_eq!(affine_inverse(&flat), None, "a flattened frame cannot be inverted");
+    }
+
+    /// A player's model pack part: read only through plain folders and capped files, checked; anything wrong is left
+    /// out (the next pack gives the part).
+    #[test]
+    fn hostile_model_pack_parts_are_left_out() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-modelpack-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let good = level::Level {
+            meshes: vec![quad("Box", 1.0)],
+            materials: vec![material(None)],
+            objects: vec![object("P_Box_MF", 0, [0.0; 3])],
+            ..Default::default()
+        };
+        let part = root.join("pack/PH/P_Box");
+        std::fs::create_dir_all(&part).unwrap();
+        level::open::export(&good, &part).unwrap();
+        let pack = root.join("pack");
+        assert!(load_pack_part(&pack, "3D Entities/PH/P_Box").is_some());
+        assert!(load_pack_part(&pack, "3D Entities/PH/../PH/P_Box").is_none(), "no `..`");
+        assert!(load_pack_part(&pack, "3D Entities/PH/P_Ball").is_none(), "a part the pack lacks");
+        // a number that is not finite, and too many vertices
+        let mut nan = good.clone();
+        nan.meshes[0].positions[1][0] = f32::NAN;
+        assert!(check_pack_part(&nan).is_err());
+        let mut huge = good.clone();
+        huge.meshes[0].positions = vec![[0.0; 3]; PACK_VERTICES_MAX + 1];
+        assert!(check_pack_part(&huge).is_err());
+        assert!(check_pack_part(&good).is_ok());
+        // a level.bin over the cap is not read
+        let big = root.join("big/PH/P_Box");
+        std::fs::create_dir_all(&big).unwrap();
+        level::open::export(&good, &big).unwrap();
+        std::fs::OpenOptions::new().write(true).open(big.join("level.bin")).unwrap().set_len(PACK_BIN_MAX + 1).unwrap();
+        assert!(load_pack_part(&root.join("big"), "3D Entities/PH/P_Box").is_none());
+        #[cfg(unix)]
+        {
+            // a linked part folder, or a linked level.gltf, finds nothing
+            std::fs::create_dir_all(root.join("linked/PH")).unwrap();
+            std::os::unix::fs::symlink(&part, root.join("linked/PH/P_Box")).unwrap();
+            assert!(load_pack_part(&root.join("linked"), "3D Entities/PH/P_Box").is_none());
+            let file_link = root.join("filelink/PH/P_Box");
+            std::fs::create_dir_all(&file_link).unwrap();
+            std::os::unix::fs::symlink(part.join("level.gltf"), file_link.join("level.gltf")).unwrap();
+            std::fs::copy(part.join("level.bin"), file_link.join("level.bin")).unwrap();
+            assert!(load_pack_part(&root.join("filelink"), "3D Entities/PH/P_Box").is_none());
+        }
+        // through the chain: a broken pack passes to the next, `level` ends it with no look
+        let data = Data::new(None);
+        let mut base = good.clone();
+        let chain = [player_pack("big", &root.join("big"), None), player_pack("pack", &pack, None)];
+        data.put_looks_of("3D Entities/PH/P_Box.nmo", &mut base, PartFrom::Copy, &chain);
+        assert!(base.meshes[0].look.is_some());
+        let mut base = good.clone();
+        data.put_looks_of("3D Entities/PH/P_Box.nmo", &mut base, PartFrom::Copy, &[builtin("level"), player_pack("pack", &pack, None)]);
+        assert!(base.meshes[0].look.is_none());
         let _ = std::fs::remove_dir_all(&root);
     }
 

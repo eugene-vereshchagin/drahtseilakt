@@ -114,13 +114,17 @@ reflections, the three balls); the skies, particles, glows, shadows and a few pi
 They are made by `assets/own/make/make_textures.py` from CC0 photo textures (`free_textures.py`, pinned and
 checksummed; `assets/own/CREDITS.md`) and shapes drawn by the script, to the palette, grain and layout measured on the
 original's texture of the same name (its brick strips, bands, rings and shading as fractions of its side), at twice its
-resolution, tiling where it tiles and wrapping the balls as it does. The extended page's *Textures* switch
-(`textures own|original`) draws the copy's instead; the classic mode always draws ours. An open-format level's own
-textures (files in its folder) stay its maker's. `--textures original|own` chooses for one run; `--export` keeps the
-copy's unless given `--textures own`, which writes ours into the exported level. Our files ship with the game and are
+resolution, tiling where it tiles and wrapping the balls as it does. Our textures are the built-in texture pack `own`:
+the extended page's *Textures* line chooses among the texture packs ([packs.md](packs.md): `own`, `original` the
+copy's, `remastered` a remastered level's own upscaled pictures, and the player's packs in the data folder's
+`textures/`), its *Models* line among the model packs (the parts' and balls' looks only, never their physics); the
+classic mode always draws ours and the parts each level takes. An open-format level's own textures (files in its folder)
+stay its maker's; the textures it names as the game's (`game:` images, open-format.md) follow the pack. `--textures
+PACK` chooses for one run; `--export` keeps the copy's unless given `--textures own`, which writes ours into the
+exported level. Our files ship with the game and are
 read through the same size caps as any texture; a level's name only picks among them, never makes a path.
 
-Which textures ours replace, when a level is loaded (so drawing and export agree): in the copy's levels and parts, and
+Which textures ours (or any texture pack's) replace, when a level is loaded (so drawing and export agree): in the copy's levels and parts, and
 in their remasters (`levels/remastered/`), every texture we have one of, by name; in a stranger's map (a community
 `.nmo`) a texture it names by file when that file is the copy's (a file its own folder brings stays its own), and
 pixels it carries only when they are the copy's texture of that name, pixel for pixel, so a map's own pictures are

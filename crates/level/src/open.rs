@@ -67,6 +67,18 @@ fn blend_from(s: &str) -> Option<Blend> {
 }
 
 /// A file name for a texture that is safe on every platform.
+/// The prefix of an image `uri` naming the game's texture by name (`game:Track_Side`) instead of a file.
+pub const GAME_URI: &str = "game:";
+
+/// Whether `name` may be a `game:` texture's name: 1 to 128 characters, none a path separator, `:` or a control
+/// character, not beginning with a dot (it is only ever compared with the game's texture names, never made a path).
+pub fn game_texture_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.chars().count() <= 128
+        && !name.starts_with('.')
+        && !name.chars().any(|c| matches!(c, '/' | '\\' | ':') || c.is_control())
+}
+
 pub fn texture_file(index: usize, name: &str) -> String {
     let clean: String = name
         .chars()
@@ -175,7 +187,12 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
         .iter()
         .enumerate()
         .map(|(i, t)| {
-            let mut v = json!({"uri": texture_file(i, &t.name), "name": t.name});
+            // the game's texture by name stays a name (it is the packs', not the level's)
+            let uri = match &t.source {
+                TextureSource::Game(n) => format!("{GAME_URI}{n}"),
+                _ => texture_file(i, &t.name),
+            };
+            let mut v = json!({"uri": uri, "name": t.name});
             if let Some(k) = t.color_key {
                 v["extras"] = json!({"drahtseilakt": {"color_key": k}});
             }
@@ -746,6 +763,18 @@ fn import_from(
 
     for (i, img) in arr("images").iter().enumerate() {
         let uri = img["uri"].as_str().ok_or("image without uri")?;
+        // the game's texture by name: no file of the level's
+        if let Some(name) = uri.strip_prefix(GAME_URI) {
+            if !game_texture_name(name) {
+                return Err(format!("image {i}: not a plain name of the game's textures"));
+            }
+            level.textures.push(Texture {
+                name: img["name"].as_str().unwrap_or(name).to_owned(),
+                source: TextureSource::Game(name.to_owned()),
+                color_key: color_key_of(&img["extras"]["drahtseilakt"]["color_key"]),
+            });
+            continue;
+        }
         // A texture is a file of the level's textures/ folder, by a plain name (no further folders: a link among them
         // could lead out of the level's folder).
         let plain = uri.strip_prefix("textures/").is_some_and(|n| {

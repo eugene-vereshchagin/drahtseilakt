@@ -324,3 +324,15 @@ original level, a community map, a part); what we have no texture for (skies, pa
 pictures) still comes from the copy. An open-format level's own textures stay its maker's. Exporting a level with
 `--textures own` writes ours into it, so it can be shared with free assets only. (Refined after review: in a stranger's map only the copy's own textures are replaced, never its own pictures; the
 remasters of the copy's levels are replaced like the copy's; the menu scene follows the interface.)
+
+## Texture and model packs
+
+2026-11-03, the owner's request: what the levels look like comes in packs the player chooses, as the sounds come in
+themes ([packs.md](packs.md)): texture packs (built in: `own`, `original`, `remastered`) and model packs (built in:
+`level`, `own`, `original`), each its own line on the extended page, and any folder a player drops into the data
+folder's `textures/` or `models/` is a new pack. A pack only replaces what it has; what it lacks comes from its fallback,
+then the default. A model pack changes only the meshes drawn: the physics keeps the measured shapes (the original's for
+the copy's levels, ours for our levels), so play and replays never change. Our own levels name the textures they share
+as the game's (`game:` images, open-format.md) instead of carrying copies, so packs change them too and each level is
+about half the size. The classic mode stays as it was: our textures, the parts each level takes. `original` now means
+the copy's pictures in a remastered level too; the remaster's own upscaled pictures are `remastered`.

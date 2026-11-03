@@ -63,8 +63,11 @@ usage: drahtseilakt [options]
   --map FILE.nmo      play a level file: a community map or any .nmo
   --open DIR          play a level in the open format (a folder with level.gltf)
   --export DIR        convert the chosen level to the open format in DIR (textures as PNG) and exit
-  --textures SET      own (our free textures; the default for playing) or original (the copy's; the default for
-                      --export): the textures the levels are drawn, or exported, with
+  --textures PACK     the texture pack the levels are drawn, or exported, with: own (our free textures; the default
+                      for playing), original (the copy's; the default for --export), remastered, or a pack of the
+                      data folder's textures/ (docs/drahtseilakt/packs.md)
+  --models PACK       the model pack the parts and balls are drawn with: level (as the level takes them; the
+                      default), own, original, or a pack of the data folder's models/ (the physics never changes)
   --record FILE       write a replay of the run (also written automatically on finishing a level)
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
@@ -116,8 +119,10 @@ pub struct Options {
     pub chosen: bool,
     pub record: Option<PathBuf>,
     pub export: Option<PathBuf>,
-    /// The textures the levels are drawn (and exported) with, instead of the settings' (resources.rs).
-    pub textures: Option<gamedata::resources::TextureSet>,
+    /// The texture pack the levels are drawn (and exported) with, instead of the settings' (packs.rs).
+    pub textures: Option<String>,
+    /// The model pack the parts are drawn with, instead of the settings'.
+    pub models: Option<String>,
     pub replay: Option<PathBuf>,
     pub headless: bool,
     /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
@@ -173,6 +178,7 @@ fn parse_args() -> Result<Options, String> {
         record: None,
         export: None,
         textures: None,
+        models: None,
         replay: None,
         headless: false,
         autopilot: false,
@@ -232,11 +238,17 @@ fn parse_args() -> Result<Options, String> {
                 o.chosen = true;
             }
             "--export" => o.export = Some(value()?.into()),
-            "--textures" => {
+            // a pack's key: checked against the packs found when the game starts (an unknown one is refused there)
+            "--textures" | "--models" => {
                 let v = value()?;
-                o.textures = Some(
-                    gamedata::resources::TextureSet::parse(&v).ok_or("--textures is own or original".to_owned())?,
-                );
+                if !gamedata::packs::plain(&v) {
+                    return Err(format!("{a}: not a pack's name: {v}"));
+                }
+                if a == "--textures" {
+                    o.textures = Some(v);
+                } else {
+                    o.models = Some(v);
+                }
             }
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),

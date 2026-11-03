@@ -335,3 +335,16 @@ Community-Karte, ein Teil); wofür wir keine Textur haben (Himmel, Partikel, Leu
 weiter aus der Kopie. Die eigenen Texturen eines Levels im offenen Format bleiben die seines Autors. Ein Export mit
 `--textures own` schreibt unsere hinein, sodass es nur mit freien Ressourcen geteilt werden kann. (Nach der Prüfung präzisiert: in einer fremden Karte werden nur die Texturen der Kopie ersetzt, nie ihre eigenen
 Bilder; die Remaster der Level der Kopie werden wie die der Kopie ersetzt; die Menüszene folgt der Oberfläche.)
+
+## Textur- und Modellpakete
+
+2026-11-03, Wunsch des Eigentümers: wie die Level aussehen, kommt in Paketen, die der Spieler wählt, wie die Klänge in
+Themen kommen ([packs.md](packs.md)): Texturpakete (eingebaut: `own`, `original`, `remastered`) und Modellpakete
+(eingebaut: `level`, `own`, `original`), jedes mit einer eigenen Zeile auf der erweiterten Seite, und jeder Ordner, den
+ein Spieler in `textures/` oder `models/` des Datenordners legt, ist ein neues Paket. Ein Paket ersetzt nur, was es hat;
+was ihm fehlt, kommt aus seinem Rückfall, dann aus der Vorgabe. Ein Modellpaket ändert nur die gezeichneten Netze: die
+Physik behält die gemessenen Formen (die des Originals für die Level der Kopie, unsere für unsere Level), sodass Spiel
+und Wiederholungen sich nie ändern. Unsere Level nennen die Texturen, die sie teilen, als die des Spiels (`game:`-Bilder,
+open-format.md), statt Kopien mitzuführen, sodass Pakete auch sie ändern und jedes Level etwa halb so groß ist. Der
+klassische Modus bleibt, wie er war: unsere Texturen, die Teile, die jedes Level nimmt. `original` bedeutet nun auch in
+einem remasterten Level die Bilder der Kopie; die eigenen hochskalierten Bilder des Remasters sind `remastered`.

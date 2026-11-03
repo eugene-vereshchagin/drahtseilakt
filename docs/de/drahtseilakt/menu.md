@@ -100,9 +100,12 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   - Bestzeiten neben den Leveln;
   - Level nach Art unter Start;
   - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
-  - Textures: own / original, womit die Level, ihre Teile und die Kugeln gezeichnet werden: mit unseren Texturen
-    (Vorgabe, im klassischen Modus immer) oder denen der Kopie; das nächste Level lädt mit der Wahl
-    ([resources.md](resources.md));
+  - Textures: das Texturpaket, womit die Level, ihre Teile und die Kugeln gezeichnet werden — own (Vorgabe, im
+    klassischen Modus immer), original, remaster oder ein Paket des Spielers, mit seinem Namen; das nächste Level lädt
+    mit der Wahl ([packs.md](packs.md));
+  - Models: das Modellpaket, womit die Teile und Kugeln gezeichnet werden (nur ihr Aussehen, nie ihre Physik) — wie im
+    Level (jedes Level mit den Teilen, die es nimmt: Vorgabe, im klassischen Modus immer), own, original oder ein Paket
+    des Spielers ([packs.md](packs.md));
   - Sounds: das Klangthema — System, generiert, original (von der Toolbox gemacht) oder ein eigenes des Spielers
     ([resources.md](resources.md)); das generierte, bis der Spieler ein anderes wählt, und im klassischen Modus
     immer;
