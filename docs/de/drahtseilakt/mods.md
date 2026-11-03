@@ -41,7 +41,8 @@ Mods wirkt sofort; einer, der den Lauf ändert, ab dem nächsten Start des Level
 ## Gemoddete Läufe und Replays
 
 Ein Mod, der den Lauf ändert (jede *Laufaktion*, unten), macht den Lauf **gemoddet**: Er wird behalten, ist aber nie
-der beste Lauf des Levels, nie ein Highscore, wird nie vom Geist oder von den Zwischenzeiten verglichen. Sein Replay
+der beste Lauf des Levels, nie ein Highscore, wird nie vom Geist oder von den Zwischenzeiten verglichen und öffnet
+nicht das nächste Level (`Level_NN-<ticks>-modded.replay`; „All levels“ im Debug-Modus öffnet alle). Sein Replay
 nennt jeden solchen Mod in seinem Kopf —
 
     mod sticky-ball 9c41f0a2be1377d0 strength=60 wood_only=off

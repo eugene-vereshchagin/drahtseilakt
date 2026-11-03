@@ -40,7 +40,8 @@ the level.
 ## Modded runs and replays
 
 A mod that changes the run (any *run action*, below) makes the run **modded**: it is kept, but never the level's best
-run, never a highscore, never compared by the ghost or the splits. Its replay names each such mod in its header —
+run, never a highscore, never compared by the ghost or the splits, and it does not open the next level
+(`Level_NN-<ticks>-modded.replay`; the debug mode's "All levels" opens them all). Its replay names each such mod in its header —
 
     mod sticky-ball 9c41f0a2be1377d0 strength=60 wood_only=off
 

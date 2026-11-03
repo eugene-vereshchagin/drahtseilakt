@@ -1939,13 +1939,15 @@ fn best_ticks(number: u32) -> Option<u64> {
     crate::replay::Replay::parse(&text).ok().map(|r| r.end)
 }
 
-/// Level `number` was finished once: a finished run of it is kept (`Level_NN-<ticks>.replay`, or the best).
+/// Level `number` was finished once: a finished run of it is kept (`Level_NN-<ticks>.replay`, or the best). A run
+/// played with mods that change the game (`...-modded.replay`) opens no level; the debug mode's "All levels" does.
 fn finished(number: u32) -> bool {
     let prefix = format!("Level_{number:02}-");
     std::fs::read_dir(runs_dir(number)).is_ok_and(|d| {
         d.flatten().any(|e| {
             let n = e.file_name().to_string_lossy().into_owned();
-            n == "best.replay" || (n.starts_with(&prefix) && n.ends_with(".replay"))
+            n == "best.replay"
+                || (n.starts_with(&prefix) && n.ends_with(".replay") && !n.ends_with("-modded.replay"))
         })
     })
 }

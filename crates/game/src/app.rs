@@ -585,7 +585,9 @@ impl Game {
             .trim_end_matches(".nmo")
             .to_owned();
         let dir = self.runs_dir(&stem);
-        let mut targets = vec![dir.join(format!("{}-{}.replay", stem, self.sim.tick))];
+        // a modded run is kept as such and opens no level (menu.rs `finished`)
+        let tag = if self.sim.mods.modded() { "-modded" } else { "" };
+        let mut targets = vec![dir.join(format!("{}-{}{tag}.replay", stem, self.sim.tick))];
         if let Some(r) = &self.record {
             targets.push(r.clone());
         }
