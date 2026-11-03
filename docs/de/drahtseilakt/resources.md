@@ -104,10 +104,11 @@ Werte (Massen, Reibungen, Gelenke, Kräfte) sind die des Spiels, unverändert (c
 Aussehen ist neu. `crates/game/src/partcheck.rs` fährt jedes Modul der Level 1 bis 12 mit dem Teil der Kopie und mit
 unserem vom selben Start mit derselben Eingabe und vergleicht die Wege.
 
-Ein Level nimmt zuerst unsere Teile, wenn es neuer Inhalt ist (ein Level im offenen Format, nicht aus einer `.nmo`
-umgewandelt: kein `source_hash` in seinen Einstellungen), es spielt also mit und ohne Kopie gleich; ein Level der
-Kopie, eine Community-Karte oder ein umgewandeltes Level oder Remaster nimmt zuerst die der Kopie, wie es gemacht
-wurde, und unsere für das, was der Kopie fehlt (ohne Kopie unsere). Der eigene `game/`-Ordner eines Levels kommt vor
+Ein Level nimmt zuerst unsere Teile, wenn es selbst sagt, dass es für sie gemacht ist (`"parts": "own"` in seinen
+Einstellungen; das schreibt unser Levelbaukasten `assets/own/make/levelkit.py`), es spielt also mit und ohne Kopie
+gleich; jedes andere Level (eines der Kopie, eine Community-Karte, ein umgewandeltes, ein Remaster oder ein älteres
+Level im offenen Format) nimmt zuerst die der Kopie, wie es gemacht wurde, und unsere für das, was der Kopie fehlt
+(ohne Kopie unsere; mit Kopie wird ein eingesprungenes Teil von uns einmal gemeldet). Der eigene `game/`-Ordner eines Levels kommt vor
 beiden.
 
 ## Eigene Texturen

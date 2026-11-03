@@ -18,8 +18,49 @@ mod tests {
             .join(name)
     }
 
-    /// A run of `ticks` from sector `sector` with `ball` at `at`, the input given by the tick; the ball's places and
-    /// those of the parts the physics moves.
+    /// A run's record: the ball's places and those of the parts the physics moves, tick by tick, the tick the level
+    /// was finished, whether a ball was lost, and which parts moved more than a unit from where they started.
+    struct Run {
+        way: Vec<Vec3>,
+        parts: Vec<Vec<Vec3>>,
+        finished: Option<u64>,
+        lost: bool,
+        moved: Vec<bool>,
+        names: Vec<String>,
+    }
+
+    impl Run {
+        /// What came of the run at its end: finished, a ball lost, the parts that moved. A finished level's run is
+        /// over at its finish: what the balloon does with the ball after it is not its outcome.
+        fn outcome(&self) -> (bool, bool, &[bool]) {
+            match self.finished {
+                Some(_) => (true, false, &[]),
+                None => (false, self.lost, &self.moved),
+            }
+        }
+
+        /// The part furthest from where another run's is, over the first `n` ticks: its name, the distance, and the
+        /// first tick it was more than 0.1 away.
+        fn furthest(&self, other: &Run, n: usize) -> (String, f32, Option<usize>) {
+            let mut best = (String::new(), 0.0f32, None);
+            for (k, name) in self.names.iter().enumerate() {
+                let d: Vec<f32> = self
+                    .parts
+                    .iter()
+                    .zip(&other.parts)
+                    .take(n)
+                    .map(|(x, y)| x.get(k).zip(y.get(k)).map_or(0.0, |(p, q)| p.distance(*q)))
+                    .collect();
+                let m = d.iter().copied().fold(0.0, f32::max);
+                if m > best.1 {
+                    best = (name.clone(), m, d.iter().position(|&x| x > 0.1));
+                }
+            }
+            best
+        }
+    }
+
+    /// A run of `ticks` from sector `sector` with `ball` at `at`, the input given by the tick.
     fn run(
         level: &level::Level,
         data: &Data,
@@ -28,28 +69,50 @@ mod tests {
         at: Vec3,
         ticks: u64,
         input: &dyn Fn(u64) -> u8,
-    ) -> (Vec<Vec3>, Vec<Vec<Vec3>>, Option<u64>) {
+    ) -> Run {
         let modules = crate::scene::load_modules(level, data);
         let mut sim = Sim::with_modules(level, ball, &modules, false);
         if let Some(balls) = data.part("3D Entities/Balls.nmo") {
             sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);
         }
         sim.start_from(sector, Some(ball), Some(at));
-        let (mut way, mut parts, mut finished) = (Vec::new(), Vec::new(), None);
+        let lives = sim.lives;
+        let names = sim
+            .module_bodies()
+            .iter()
+            .map(|m| m.object.clone())
+            .collect();
+        let mut r = Run {
+            way: Vec::new(),
+            parts: Vec::new(),
+            finished: None,
+            lost: false,
+            moved: Vec::new(),
+            names,
+        };
         for t in 0..ticks {
             sim.step(input(t));
-            if sim.finished && finished.is_none() {
-                finished = Some(t);
+            if sim.finished && r.finished.is_none() {
+                r.finished = Some(t);
             }
-            way.push(sim.ball.position);
-            parts.push(
+            // a ball fallen far below where it was dropped is lost, whether or not the game has taken it yet
+            r.lost |= sim.lives < lives || sim.ball.position.y < at.y - 40.0;
+            r.way.push(sim.ball.position);
+            r.parts.push(
                 sim.module_bodies()
                     .iter()
                     .filter_map(|m| sim.world().state(m.body).map(|s| s.pos))
                     .collect(),
             );
         }
-        (way, parts, finished)
+        if let (Some(first), Some(last)) = (r.parts.first(), r.parts.last()) {
+            r.moved = first
+                .iter()
+                .zip(last)
+                .map(|(a, b)| a.distance(*b) > 1.0)
+                .collect();
+        }
+        r
     }
 
     /// The shipped test level, with no copy and nothing in the player's folders: it loads, every part it names is
@@ -60,8 +123,9 @@ mod tests {
         let dir = shipped("Parts_Test");
         let source = Source::Open(dir.clone());
         let data = Data::new(None).for_source(&source);
-        assert!(data.own_parts, "a new level takes our parts");
         let level = data.load(&source).expect("the test level loads").level;
+        let data = data.with_parts(&level);
+        assert!(data.own_parts, "our level says it is made for our parts");
         let modules = crate::scene::load_modules(&level, &data);
         let named: std::collections::BTreeSet<String> = (0..level.objects.len())
             .filter_map(|i| crate::scene::module_of(&level, i).map(str::to_owned))
@@ -127,12 +191,23 @@ mod tests {
             .fold(0.0, f32::max)
     }
 
+    /// The largest distance between the parts of two runs over their first `n` ticks.
+    fn parts_apart(a: &Run, b: &Run, n: usize) -> f32 {
+        a.parts
+            .iter()
+            .zip(&b.parts)
+            .take(n)
+            .flat_map(|(x, y)| x.iter().zip(y).map(|(p, q)| p.distance(*q)))
+            .fold(0.0, f32::max)
+    }
+
     /// Every module of levels 1 to 12 with the copy's part and with ours: the ball dropped onto the first stand-in of
     /// each from 6 above (a wooden one, and a stone one, which works the bridges and pushers), held forward for a
-    /// second, then left alone; the ball's way and the parts' ways compared over 5 seconds. A part of ours made to
-    /// the measured sizes gives the same way within a fraction of the ball's radius while the ball is on it; after
-    /// that a chaotic run (a ball falling off an edge or bouncing between parts) may part ways, so only the first
-    /// two seconds are held to the tolerance and the rest is reported.
+    /// second, then left alone for four more. How far apart two runs may come is measured on the copy itself: the
+    /// same run started 0.01 to 0.05 aside (NUDGES; a baseline of how chaotic the case is). Wherever the copy's outcome
+    /// after five seconds (finished, a ball lost, which parts moved) does not change for any nudge, ours must come to
+    /// the same outcome and stay within twice the baseline, or within TOLERANCE where the case is calm, over the first
+    /// two seconds (a finished run up to its finish). A case whose outcome a nudge already changes is reported only.
     #[test]
     fn our_modules_behave_as_the_copys() {
         let Some(copy) =
@@ -142,8 +217,7 @@ mod tests {
         };
         let mut ours = copy.clone();
         ours.own_parts = true;
-        let mut report = Vec::new();
-        let mut worst: Vec<(String, f32)> = Vec::new();
+        let (mut report, mut off) = (Vec::new(), Vec::new());
         let mut done: Vec<String> = Vec::new();
         for n in 1..=12 {
             let Ok(loaded) = copy.load(&Source::Original(n)) else {
@@ -166,83 +240,96 @@ mod tests {
                 let at = Vec3::from(level.objects[i].position()) + Vec3::Y * 6.0;
                 for ball in [BallKind::Wood, BallKind::Stone] {
                     let push = |t: u64| if t < 60 { input::UP } else { 0 };
-                    let (wa, pa, fa) = run(&level, &copy, sector, ball, at, 300, &push);
-                    let (wb, pb, fb) = run(&level, &ours, sector, ball, at, 300, &push);
-                    // a finished level's run is over: the balloon's flight after it is not compared, but both
-                    // must finish within a couple of ticks of each other
-                    let finish_gap = match (fa, fb) {
-                        (Some(a), Some(b)) => a.abs_diff(b),
-                        (None, None) => 0,
-                        _ => u64::MAX,
-                    };
-                    let upto = fa.zip(fb).map_or(120, |(a, b)| {
-                        usize::try_from(a.min(b)).unwrap_or(120).min(120)
-                    });
-                    let ball_2s = apart(&wa, &wb, upto);
-                    let ball_5s = apart(&wa, &wb, 300);
-                    let parts_2s = pa
+                    let a = run(&level, &copy, sector, ball, at, 300, &push);
+                    let nudged: Vec<Run> = NUDGES
                         .iter()
-                        .zip(&pb)
-                        .take(upto)
-                        .flat_map(|(x, y)| x.iter().zip(y).map(|(p, q)| p.distance(*q)))
+                        .map(|&d| run(&level, &copy, sector, ball, at + Vec3::from(d), 300, &push))
+                        .collect();
+                    let b = run(&level, &ours, sector, ball, at, 300, &push);
+                    // a finished level's run is over: what follows (the balloon's flight) is not compared
+                    let upto = nudged
+                        .iter()
+                        .map(|r| r.finished)
+                        .chain([a.finished, b.finished])
+                        .flatten()
+                        .min()
+                        .map_or(120, |f| usize::try_from(f).unwrap_or(120).min(120));
+                    let base = nudged
+                        .iter()
+                        .map(|r| apart(&a.way, &r.way, upto).max(parts_apart(&a, r, upto)))
                         .fold(0.0, f32::max);
-                    let same_count = pa.last().map(Vec::len) == pb.last().map(Vec::len);
+                    let ours_apart = apart(&a.way, &b.way, upto).max(parts_apart(&a, &b, upto));
+                    let allowed = TOLERANCE.max(2.0 * base);
+                    let robust = nudged.iter().all(|r| r.outcome() == a.outcome());
+                    let same = a.outcome() == b.outcome();
+                    let case = format!("level {n:2} {name:12} {ball:?}");
                     report.push(format!(
-                        "level {n:2} {name:12} {ball:?}: ball {ball_2s:.3} (2 s) {ball_5s:.3} (5 s), parts {parts_2s:.3} \
-                         (2 s){}",
-                        if same_count { "" } else { ", NOT the same parts" }
-                    ) + &format!(
-                        ", apart from tick {:?}, finished {fa:?} / {fb:?}",
-                        wa.iter().zip(&wb).position(|(p, q)| p.distance(*q) > 0.1)
+                        "{case}: ours {ours_apart:.3}, nudged copy {base:.3} (2 s); outcome {} ({}), finished \
+                         {:?} / {:?}, lost {} / {}",
+                        if same { "same" } else { "DIFFERENT" },
+                        if robust { "robust" } else { "chaotic: the nudge changes it too" },
+                        a.finished,
+                        b.finished,
+                        a.lost,
+                        b.lost
                     ));
-                    let score = if same_count && finish_gap <= 2 {
-                        ball_2s.max(parts_2s)
-                    } else {
-                        f32::MAX
-                    };
-                    worst.push((format!("{name} {ball:?}"), score));
+                    let (part, far, from) = a.furthest(&b, upto);
+                    report.push(format!(
+                        "    furthest part {part} {far:.3} from tick {from:?}"
+                    ));
+                    // where a nudge of the copy's own run already changes the outcome the case is chaotic: it is
+                    // reported, not held to a bound
+                    if robust && (ours_apart > allowed || !same) {
+                        off.push(format!(
+                            "{case}: {ours_apart:.3} allowed {allowed:.3}, outcome same {same}"
+                        ));
+                    }
                 }
             }
         }
         println!("{}", report.join("\n"));
-        let off: Vec<_> = worst
-            .iter()
-            .filter(|w| {
-                w.1 > if CHAOTIC.contains(&w.0.as_str()) {
-                    CHAOTIC_TOLERANCE
-                } else {
-                    TOLERANCE
-                }
-            })
-            .collect();
         assert!(
             off.is_empty(),
-            "beyond {TOLERANCE} in the first two seconds: {off:?}\n{}",
+            "our parts differ: {off:?}\n{}",
             report.join("\n")
         );
     }
 
-    /// Half the ball's radius: how far our part may take the ball (or itself) from where the copy's would in the first
-    /// two seconds.
-    const TOLERANCE: f32 = 1.0;
-    /// Runs where the heavy ball meets an irregular surface and the ways part chaotically within a tick or two of
-    /// the first contact (the stone ball on the sack's frayed top, against the falling room's walls): our shapes have
-    /// the measured volume, centre and inertia within a few per cent, so these are held to the ball's radius.
-    const CHAOTIC: [&str; 2] = ["P_Modul_26 Stone", "P_Modul_03 Stone"];
-    const CHAOTIC_TOLERANCE: f32 = 2.5;
+    /// The copy's run started this far aside, for how far apart two runs of the same part come: the largest of these
+    /// is the case's baseline.
+    const NUDGES: [[f32; 3]; 6] = [
+        [0.01, 0.0, 0.0],
+        [-0.02, 0.0, 0.0],
+        [0.0, 0.0, 0.02],
+        [0.0, 0.0, -0.05],
+        [0.05, 0.0, 0.05],
+        [0.0, 0.03, 0.0],
+    ];
 
+    /// How far our part may take the ball (or itself) from where the copy's would in the first two seconds of a calm
+    /// case: half the ball's radius (2).
+    const TOLERANCE: f32 = 1.0;
+
+    /// Only a level's own marker (`"parts": "own"`, written by our level kit) takes our parts first: an original
+    /// level, a map, and an open-format level without the marker (made or exported before) keep the copy's.
     #[test]
-    fn an_original_level_keeps_the_copys_parts() {
+    fn only_a_level_made_for_our_parts_takes_them_first() {
         let data = Data::new(Some(PathBuf::from("/nonexistent")));
-        assert!(!data.for_source(&Source::Original(1)).own_parts);
+        let mut level = level::Level::default();
         assert!(
-            !data
-                .for_source(&Source::Nmo(PathBuf::from("x.nmo")))
-                .own_parts
+            !data.with_parts(&level).own_parts,
+            "no marker: the copy's parts first"
         );
+        level.settings.source_hash = None;
+        level.settings.own_parts = true;
+        assert!(data.with_parts(&level).own_parts);
+        let shipped = data
+            .load(&Source::Open(shipped("Parts_Test")))
+            .expect("the test level loads")
+            .level;
         assert!(
-            data.for_source(&Source::Open(shipped("Parts_Test")))
-                .own_parts
+            shipped.settings.own_parts,
+            "our level kit writes the marker"
         );
     }
 }

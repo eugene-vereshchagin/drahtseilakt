@@ -97,10 +97,10 @@ an ellipsoid), and the physics values (masses, frictions, joints, forces) are th
 (crates/game/src/modules.rs); only the looks are new. `crates/game/src/partcheck.rs` runs every module of levels 1
 to 12 with the copy's part and with ours from the same start and input and compares the ways.
 
-A level takes our parts first when it is new content (an open-format level not converted from a `.nmo`: no
-`source_hash` in its settings), so it plays the same with or without a copy; a level of the copy, a community map
-or a converted or remastered level takes the copy's first, as it was made, and ours for what the copy lacks (with no
-copy, ours). A level's own `game/` folder comes before both.
+A level takes our parts first when it says it is made for them (its settings' `"parts": "own"`, which our level kit
+`assets/own/make/levelkit.py` writes), so it plays the same with or without a copy; any other level (the copy's, a
+community map, a converted, remastered or older open-format level) takes the copy's first, as it was made, and ours
+for what the copy lacks (with no copy, ours; with a copy, our part standing in is said once). A level's own `game/` folder comes before both.
 
 ## Own textures
 

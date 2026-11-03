@@ -121,9 +121,12 @@ pub fn assets_root() -> Option<PathBuf> {
             .and_then(Path::parent)
             .and_then(Path::parent)
             .map(|d| d.join("assets"));
-        // a test's program sits one folder deeper, in target/<profile>/deps
+        // a test's program sits one folder deeper, in target/<profile>/deps: only there, never for an installed
+        // program (whose folder four up could be anyone's)
+        let named = |p: Option<&Path>, n: &str| p.and_then(Path::file_name).is_some_and(|f| f == n);
         let deps = exe
             .as_deref()
+            .filter(|e| named(e.parent(), "deps") && named(e.ancestors().nth(3), "target"))
             .and_then(|e| e.ancestors().nth(4))
             .map(|d| d.join("assets"));
         from_env
@@ -317,6 +320,17 @@ pub fn role_of(relative: &str) -> Option<&'static str> {
         .iter()
         .find(|(_, path)| path.eq_ignore_ascii_case(relative))
         .map(|(role, _)| *role)
+}
+
+/// Says once that our part stands in for one the copy lacks or cannot read, in a level made for the copy's parts.
+pub fn stand_in(relative: &str) {
+    static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    if let Ok(mut said) = SAID.lock()
+        && !said.iter().any(|s| s == relative)
+    {
+        said.push(relative.to_owned());
+        eprintln!("warning: {relative}: the copy lacks it or it does not read; our own part stands in");
+    }
 }
 
 /// Says once that a role has no provider (the game goes on without it).

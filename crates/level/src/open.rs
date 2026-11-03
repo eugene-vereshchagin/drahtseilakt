@@ -245,6 +245,9 @@ fn settings_json(s: &crate::Settings) -> Value {
     if let Some(h) = s.source_hash {
         v["source_hash"] = json!(format!("{h:016x}"));
     }
+    if s.own_parts {
+        v["parts"] = json!("own");
+    }
     v
 }
 
@@ -303,7 +306,14 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
             Some(u64::from_str_radix(s, 16).map_err(|_| "settings: source_hash is not 16 hex digits".to_owned())?)
         }
     };
+    let own_parts = match &v["parts"] {
+        Value::Null => false,
+        Value::String(p) if p == "own" => true,
+        Value::String(p) if p == "copy" => false,
+        _ => return Err("settings: parts is not \"own\" or \"copy\"".into()),
+    };
     Ok(crate::Settings {
+        own_parts,
         music,
         light,
         level_bonus,

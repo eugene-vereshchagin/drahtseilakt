@@ -27,6 +27,7 @@ fn settings_survive_the_round_trip() {
             tutorial: true,
             last_level: true,
             source_hash: Some(0x0123_4567_89ab_cdef),
+            own_parts: true,
         },
         ..Level::default()
     };

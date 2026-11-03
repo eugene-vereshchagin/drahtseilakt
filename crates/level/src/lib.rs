@@ -51,6 +51,9 @@ pub struct Settings {
     pub last_level: bool,
     /// The hash of the file the level was converted from (replays recorded on that file play on this level).
     pub source_hash: Option<u64>,
+    /// The level is made for the game's own parts (`"parts": "own"`): it takes ours before the copy's, so it plays the
+    /// same with a copy or without one. Any other level takes the copy's parts first, as it was made.
+    pub own_parts: bool,
 }
 
 #[derive(Debug, Clone, Default)]

@@ -36,7 +36,7 @@ Collision meshes (measured size → ours; the shape used):
     P_Modul_26  Sack                      hull of our sack's points: octagonal body 2.79 x 3.64, seams to 3.89, neck,
                                           the tie's ends leaning over (heights and reaches to 0.05)
                 Rope                      decagonal rod, 0.15 radius, 12.5 long
-    P_Modul_29  Platte01..09              planks: each its measured box with its measured corner cuts (PLANKS)
+    P_Modul_29  Platte01..09              planks: each a board of its measured size with its ends' wear as a few kinds of cut (PLANKS)
     P_Modul_30  Col1                      board, box 14.80 x 0.50 x 5.00
                 Col2                      axle, square turned 45 degrees, 0.73 across, 9.71 long
     P_Modul_34  Kiste, Schiebestein       boxes 4.1 x 4.1 x 5 and 5 x 5 x 5
@@ -1036,29 +1036,50 @@ def make_modul_26():
     p.write()
 
 
-# The planks of the plate bridges (P_Modul_29 and the balloon's), measured: each a worn board, its box (x0, x1,
-# y0, y1, z0, z1) and the corners where its end is cut back or skewed, as offsets of the box's corners (bottom
-# x0z0, x1z0, x1z1, x0z1 = 0..3, top the same = 4..7). The ball rolls over their gaps, so their ends matter.
+# The planks of the plate bridges (P_Modul_29 and the balloon's), by measured dimensions, rounded to 0.05: each a
+# board of a width (x), thickness (y, from its bottom at 0) and length (z, from z0 to z1), with the wear of its ends
+# as our own few kinds of cut, each given by one length:
+#   ("lean", end, d)    the end's top edge stands d further out (+) or back (-) than its bottom edge;
+#   ("skew", end, d)    the end is cut on the slant across the board: its x1 corner d further out than its x0 one;
+#   ("corner", end, side, d)  the top corner of that end and side is cut back by d across the board.
+# `end` is 0 (the z0 end) or 1 (the z1 end), `side` 0 (x0) or 1 (x1). The ball rolls over their gaps, so the ends
+# matter to the physics; the boards' bodies are the hulls of these.
 PLANKS = {
-    1: ((-0.75, 0.75, 0.0, 0.6, -2.5, 2.5), {}),
-    2: ((-0.75, 0.70, 0.0, 0.6, -2.41, 2.5), {1: (-0.01, 0.01, -0.17), 4: (0.01, -0.01, 0.16)}),
-    3: ((-0.75, 0.75, 0.0, 0.6, -2.386, 2.303), {}),
-    4: ((-0.75, 0.75, 0.0, 0.6, -2.5, 2.5), {6: (0, 0, -0.21), 7: (0, 0, -0.21)}),
-    5: ((-0.75, 0.75, 0.0, 0.6, -2.388, 2.5), {4: (0.21, 0, 0)}),
-    6: ((-0.75, 0.75, 0.0, 0.6, -2.577, 2.42), {3: (0, 0.01, -0.11), 6: (0, -0.01, 0.11)}),
-    7: ((-0.666, 0.75, 0.0, 0.6, -2.5, 2.5), {4: (0, 0, 0.22), 5: (0, 0, 0.22)}),
-    8: ((-0.708, 0.708, 0.017, 0.583, -2.411, 2.415), {}),
-    9: ((-0.75, 0.75, 0.0, 0.6, -2.5, 2.502), {7: (0.24, 0, 0)}),
+    1: ((1.5, 0.6, -2.5, 2.5), ()),
+    2: ((1.45, 0.6, -2.4, 2.5), (("skew", 0, 0.15),)),
+    3: ((1.5, 0.6, -2.4, 2.3), ()),
+    4: ((1.5, 0.6, -2.5, 2.5), (("lean", 1, -0.2),)),
+    5: ((1.5, 0.6, -2.4, 2.5), (("corner", 0, 0, 0.2),)),
+    6: ((1.5, 0.6, -2.6, 2.4), (("skew", 1, 0.1),)),
+    7: ((1.4, 0.6, -2.5, 2.5), (("lean", 0, -0.2),)),
+    8: ((1.4, 0.55, -2.4, 2.4), ()),
+    9: ((1.5, 0.6, -2.5, 2.5), (("corner", 1, 0, 0.25),)),
 }
 
 
 def plank(m, mt, i):
-    """Plank i of PLANKS."""
-    (x0, x1, y0, y1, z0, z1), cuts = PLANKS[i]
-    c = [np.array(q, np.float64) for q in ((x0, y0, z0), (x1, y0, z0), (x1, y0, z1), (x0, y0, z1),
-                                           (x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1))]
-    for j, off in cuts.items():
-        c[j] = c[j] + np.array(off)
+    """Plank i of PLANKS: its board, its ends cut as listed."""
+    (w, t, z0, z1), cuts = PLANKS[i]
+    x0, x1 = -0.75, -0.75 + w
+    # corners: bottom x0z0, x1z0, x1z1, x0z1, then the top the same
+    c = [np.array(q, np.float64) for q in ((x0, 0, z0), (x1, 0, z0), (x1, 0, z1), (x0, 0, z1),
+                                           (x0, t, z0), (x1, t, z0), (x1, t, z1), (x0, t, z1))]
+    out = {0: -1.0, 1: 1.0}
+    ends = {0: (0, 1, 4, 5), 1: (3, 2, 7, 6)}  # (x0 bottom, x1 bottom, x0 top, x1 top) of each end
+    for cut in cuts:
+        kind, end = cut[0], cut[1]
+        b0, b1, t0, t1 = ends[end]
+        if kind == "lean":
+            for j in (t0, t1):
+                c[j][2] += out[end] * cut[2]
+        elif kind == "skew":
+            for j in (b1, t1):
+                c[j][2] += out[end] * cut[2] / 2
+            for j in (b0, t0):
+                c[j][2] -= out[end] * cut[2] / 2
+        elif kind == "corner":
+            j = t0 if cut[2] == 0 else t1
+            c[j][0] += cut[3] if cut[2] == 0 else -cut[3]
     k.hull(m, mt, c)
 
 

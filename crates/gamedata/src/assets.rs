@@ -112,15 +112,21 @@ impl Data {
         Data::locate(explicit).unwrap_or_else(|_| Data::new(None))
     }
 
+    /// The player's copy in exactly the folder `root` (`--data DIR`): no other place is tried, a folder that is not a
+    /// playable copy is refused.
+    pub fn at(root: PathBuf) -> Result<Data, String> {
+        if playable(&root) {
+            Ok(Data::new(Some(root)))
+        } else {
+            Err(format!("{}: not a copy of Ballance (no 3D Entities/Level/Level_01.NMO in it)", root.display()))
+        }
+    }
+
     pub fn locate(explicit: Option<PathBuf>) -> Result<Data, String> {
         let candidates = explicit
             .into_iter()
             .chain(std::env::var_os("OPENBALLANCE_DATA").map(PathBuf::from))
             .chain([crate::profile::dir(crate::profile::Kind::Original), PathBuf::from("data")]);
-        // a copy counts when it has the first level, not only the folder: a half-made import is not a game
-        let playable = |root: &Path| {
-            ["3D Entities", "Level", "Level_01.NMO"].iter().try_fold(root.to_path_buf(), |d, p| find(&d, p)).is_some()
-        };
         for root in candidates {
             if playable(&root) {
                 return Ok(Data::new(Some(root)));
@@ -168,15 +174,17 @@ impl Data {
         }
     }
 
-    /// The same files for playing `source`: its own folder's game files first, then for a new level (an open-format
-    /// level that was not converted from a `.nmo`, nor a remastered original) our own parts before the copy's.
+    /// The same files for playing `source`: its own folder's game files first (which parts come next is the loaded
+    /// level's to say: `with_parts`).
     pub fn for_source(&self, source: &Source) -> Data {
-        let mut d = self.for_level(self.level_dir(source).as_deref());
-        d.own_parts = match source {
-            Source::Open(dir) => !source.remastered() && !converted(dir),
-            Source::Original(_) | Source::Nmo(_) => false,
-        };
-        d
+        self.for_level(self.level_dir(source).as_deref())
+    }
+
+    /// The same files for the loaded `level`'s parts: ours before the copy's when the level says it is made for them
+    /// (its settings' `"parts": "own"`, which our level kit writes), else the copy's first. Only the level's own
+    /// marker decides, so a level made or exported before keeps the parts (and replays) it had.
+    pub fn with_parts(&self, level: &level::Level) -> Data {
+        Data { own_parts: level.settings.own_parts, ..self.clone() }
     }
 
     pub fn file(&self, relative: &str) -> Option<PathBuf> {
@@ -261,7 +269,19 @@ impl Data {
             load_open(&plain_path(&root, stem)?).ok()
         };
         let copy = || load_nmo(&self.copy_only(relative)?).ok();
-        let mut part = if self.own_parts { own().or_else(copy) } else { copy().or_else(own) };
+        let mut part = if self.own_parts {
+            own().or_else(copy)
+        } else {
+            copy().or_else(|| {
+                let ours = own();
+                // a level of the copy plays with the copy's parts: ours standing in for one the copy lacks or cannot
+                // read is said once
+                if ours.is_some() && self.has_copy() {
+                    crate::resources::stand_in(relative);
+                }
+                ours
+            })
+        };
         match &mut part {
             Some(p) => self.put_own_textures(&mut p.level, Maker::Copy),
             None => crate::resources::missing(relative),
@@ -311,6 +331,7 @@ impl Data {
             tutorial: loaded.name.eq_ignore_ascii_case("Level_01.NMO"),
             last_level: s.last,
             source_hash: Some(loaded.hash),
+            own_parts: false,
         };
         Ok(loaded)
     }
@@ -340,6 +361,7 @@ impl Data {
                     tutorial: k == 1,
                     last_level: s.last,
                     source_hash: None,
+                    own_parts: false,
                 };
                 loaded.warnings.push(format!(
                     "{}: made before levels kept their settings; they come from the game's table (remaster it again)",
@@ -667,13 +689,9 @@ impl Data {
     }
 }
 
-/// Whether the open-format level in `dir` was converted from a `.nmo` (its settings name the source's hash): read
-/// from its level.gltf's head only, as the level is loaded properly later.
-fn converted(dir: &Path) -> bool {
-    let Some(bytes) = read_capped(&dir.join("level.gltf"), 64 * 1024 * 1024) else { return false };
-    let text = String::from_utf8_lossy(&bytes);
-    // the settings' key is written only when there is a hash (open.rs)
-    text.contains("\"source_hash\"")
+/// A copy counts when it has the first level, not only the folder: a half-made import is not a game.
+fn playable(root: &Path) -> bool {
+    ["3D Entities", "Level", "Level_01.NMO"].iter().try_fold(root.to_path_buf(), |d, p| find(&d, p)).is_some()
 }
 
 /// One of our own files by its path in the original's layout; a picture the original has as `.bmp` or `.tga` may be

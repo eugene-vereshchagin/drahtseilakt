@@ -52,6 +52,8 @@ impl Default for Timing {
 }
 
 struct Game {
+    /// The game's files for this level: its parts ours or the copy's first, as the level says (Data::with_parts).
+    data: Data,
     level: LoadedLevel,
     start_ball: crate::sim::BallKind,
     balls: LoadedLevel,
@@ -143,6 +145,7 @@ fn begin_at(sim: &mut Sim, st: &crate::replay::Start) {
 impl Game {
     fn new(o: &Options, data: &Data) -> Result<Game, String> {
         let mut level = data.load(&o.source)?;
+        let data = &data.with_parts(&level.level);
         scene::cloud_material(&mut level.level);
         for w in &level.warnings {
             eprintln!("warning: {w}");
@@ -229,6 +232,7 @@ impl Game {
             .part("3D Entities/AnimTrafo.nmo")
             .and_then(|f| crate::trafo::TrafoModel::new(&f.level, trafo_model).map(|m| (f, m)));
         Ok(Game {
+            data: data.clone(),
             trafo,
             placements,
             modules,
@@ -911,14 +915,14 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     }
     if let Some(dir) = &o.locate {
         let mut game = Game::new(&o, &data)?;
-        return locate_run(&mut game, &data, &o, dir);
+        return locate_run(&mut game, &o, dir);
     }
     if let Some(follow) = &o.follow {
         return follow_run(&o, &data, follow);
     }
     let mut game = Game::new(&o, &data)?;
     if let Some(dir) = &o.frames {
-        return frames_run(&mut game, &data, dir);
+        return frames_run(&mut game, dir);
     }
     if let Some(path) = &o.screenshot {
         // the player's clouds and field of view, as the window would show them
@@ -1090,12 +1094,12 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
 /// Plays the replay and draws `locate::RATE` frames of it a second (640 × 480 with the in-game interface, as a
 /// video of the original would show it) into `dir` as s0001.jpg, ..., with `truth.txt`: each frame's number, the
 /// ball's place and the view's quarter. A video with a known answer, to check `--locate` with.
-fn frames_run(game: &mut Game, data: &Data, dir: &Path) -> Result<(), String> {
+fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let end = game.replay_in.as_ref().map(|r| r.end).ok_or("--frames needs --replay")?;
     let (_, device, queue) = pollster::block_on(device(None))?;
     let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
-    upload(&mut r, game, data);
+    upload(&mut r, game);
     let off = crate::locate::Offscreen::sized(&r, 640, 480);
     let mut truth = String::from("# frame x y z quarter\n");
     let mut k = 0;
@@ -1135,7 +1139,7 @@ fn frames_run(game: &mut Game, data: &Data, dir: &Path) -> Result<(), String> {
 
 /// Finds the ball's way in a video's frames (`locate::RATE` a second) and writes it as a track: per frame its
 /// number, the ball's place, the view's quarter and how alike the best picture was.
-fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(), String> {
+fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
     let mut names: Vec<PathBuf> = std::fs::read_dir(dir)
         .map_err(|e| format!("{}: {e}", dir.display()))?
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -1160,7 +1164,7 @@ fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(
     let floor: Vec<glam::Vec3> = route.floor_points().collect();
     let (_, device, queue) = pollster::block_on(device(None))?;
     let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
-    upload(&mut r, game, data);
+    upload(&mut r, game);
     let off = crate::locate::Offscreen::new(&r);
     let base = Snapshot::of(&game.sim);
     let mut draw = |view: &crate::render::View, ball: glam::Vec3| {
@@ -2010,7 +2014,9 @@ fn upload_menu_scene(renderer: &mut Renderer, scene: Option<&mut crate::menuscen
     }
 }
 
-fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
+fn upload(renderer: &mut Renderer, game: &Game) {
+    // the level's own parts' files (its sky, particles, shadow) as the level chose them
+    let data = &game.data;
     // the level's light colour (the level table's Light; white for a level without a row)
     renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
     let loader = |t: &level::Texture| data.texture(t);
@@ -2143,7 +2149,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     let (_, device, queue) = pollster::block_on(device(None))?;
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = Renderer::new(device, queue, format);
-    upload(&mut r, game, data);
+    upload(&mut r, game);
     // the passing lights as the window would show them (the lightning on a fixed schedule)
     if game.last_level {
         r.flash = crate::lights::Blitz::new(1).step(game.sim.tick).0;
@@ -2393,7 +2399,7 @@ impl App {
             .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
         let Gpu { surface, config, mut renderer, modes } = window_gpu(&window)?;
-        upload(&mut renderer, &self.game, &self.data);
+        upload(&mut renderer, &self.game);
         if self.menu_scene.is_none() {
             self.menu_scene = load_menu_scene(&self.data);
         }
@@ -2438,7 +2444,7 @@ impl App {
         self.keys = 0;
         if let Some(gpu) = &mut self.gpu {
             gpu.renderer.models.clear();
-            upload(&mut gpu.renderer, &self.game, &self.data);
+            upload(&mut gpu.renderer, &self.game);
             upload_menu_scene(&mut gpu.renderer, self.menu_scene.as_mut(), &self.data);
         }
         if let Some(w) = &self.window {
@@ -2633,7 +2639,7 @@ impl App {
         let (_, device, queue) = pollster::block_on(device(None))?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut r = Renderer::new(device, queue, format);
-        upload(&mut r, &self.game, &self.data);
+        upload(&mut r, &self.game);
         let target = r.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("video"),
             size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },

@@ -275,7 +275,7 @@ class LevelBuilder:
         groups = sorted(self.groups.items())
         K.write_open(self.out, self.meshes, self.nodes, self.materials, groups, sky=sky, start_ball=start_ball,
                      settings={"music": music, "light": list(light), "level_bonus": bonus, "tutorial": False,
-                               "last_level": False}, generator="drahtseilakt levelkit.py")
+                               "last_level": False, "parts": "own"}, generator="drahtseilakt levelkit.py")
         with open(os.path.join(self.out, "level.txt"), "w") as f:
             f.write(f"title = {title}\nauthor = {author}\nversion = 1\n")
             if licence:

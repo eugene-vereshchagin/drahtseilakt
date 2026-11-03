@@ -23,10 +23,9 @@ Ein Ordner mit:
   Kugeln, der Transformator und das Modul jedes danach benannten Objekts), und unverändert die Seiten seines Himmels
   (`game/Textures/Sky/`), die Texturen der Partikel (`game/Textures/Particles/`), der Schatten der Kugel und die
   Geräusche eines Laufs (`game/Sounds/`, nicht die des Menüs noch die Musik anderer Level). Das Spiel sucht zuerst
-  dort, dann, für ein aus einer `.nmo` umgewandeltes Level (seine Einstellungen nennen einen `source_hash`) oder ein
-  Remaster, in der Kopie und danach in unseren eigenen Teilen; für ein neues Level (kein `source_hash`) in unseren
-  eigenen Teilen (`assets/own/`, [resources.md](resources.md)) und danach in der Kopie, ein eigenes Level spielt also
-  mit und ohne Kopie gleich. Ein Pfad in `game/`, auf dem etwas ein Link ist, findet nichts. `--export` und die
+  dort, dann, für ein Level, das für unsere eigenen Teile gemacht ist (seine Einstellungen sagen `"parts": "own"`), in unseren
+  Teilen (`assets/own/`, [resources.md](resources.md)) und danach in der Kopie, es spielt also mit und ohne Kopie
+  gleich; für jedes andere Level in der Kopie und danach in unseren. Ein Pfad in `game/`, auf dem etwas ein Link ist, findet nichts. `--export` und die
   Toolbox schreiben ihn.
 
 ## Inhalt
@@ -57,7 +56,9 @@ Ein Ordner mit:
   `settings`: was das Original aus seiner Leveltabelle und seinen Regeln nach Levelnummer nimmt, damit das Level ohne
   die Dateien des Spiels gleich spielt — `music` (Thema 1 bis 1000), `light` (drei Zahlen 0..1), `level_bonus`
   (Punkte), `tutorial` und `last_level` (true oder false: erstes und letztes Level des Originals) und `source_hash`
-  (16 Hexziffern: FNV-1a der `.nmo`, aus der es umgewandelt wurde). Ein auf dieser Datei aufgenommenes Replay läuft auf
+  (16 Hexziffern: FNV-1a der `.nmo`, aus der es umgewandelt wurde) sowie `parts` (`"own"`: das Level ist für die
+  eigenen Teile des Spiels gemacht und nimmt sie vor denen der Kopie; `"copy"` oder nichts: zuerst die der Kopie; unser
+  Levelbaukasten schreibt `"own"`). Ein auf dieser Datei aufgenommenes Replay läuft auf
   dem umgewandelten Level (dasselbe Level, also derselbe Lauf); fehlerhafte Einstellungen lehnen das Level ab. Jedes
   Level kann jeden Hash nennen, ein darauf laufendes Replay beweist also keinen Lauf auf dem Original. Ein Level ohne
   Einstellungen (vor ihnen gemacht) läuft mit den Vorgaben und sagt es; ein Remaster `Level_NN` nimmt sie aus der

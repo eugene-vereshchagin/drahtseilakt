@@ -321,8 +321,6 @@ fn parse_args() -> Result<Options, String> {
 /// How many --then runs may follow on.
 const MAX_THEN: usize = 8;
 
-/// Set in the game started again after an import.
-const RESTARTED: &str = "DRAHTSEILAKT_RESTARTED";
 /// Set in the process that opens the import window for the menu's Import.
 pub const IMPORT: &str = "DRAHTSEILAKT_IMPORT";
 
@@ -331,7 +329,6 @@ fn restart() -> ! {
     let status = std::env::current_exe().and_then(|exe| {
         std::process::Command::new(exe)
             .args(std::env::args_os().skip(1))
-            .env(RESTARTED, "1")
             .env_remove(IMPORT)
             .status()
     });
@@ -361,9 +358,9 @@ fn main() -> ExitCode {
             restart();
         }
         // the copy of the original is optional: without it the game plays its own levels (decisions.md, "The game
-        // plays out of the box"); a folder named with --data must be a copy
+        // plays out of the box"); a folder named with --data must itself be a copy (no other place is tried)
         let data = match o.data.clone() {
-            Some(d) => Data::locate(Some(d))?,
+            Some(d) => Data::at(d)?,
             None => Data::find(None),
         };
         let mut o = o;

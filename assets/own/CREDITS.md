@@ -5,7 +5,9 @@ the original's texture in the same role, tiled, resized, with their normal maps,
 (`free_textures.py` pins each source by its SHA-256 and reads it; `make_menu_scene.py` makes the menu scene's
 textures from them, `make_textures.py` the levels', their parts' and the balls' in `Textures/`, listed in
 `TEXTURES.md`). The sources themselves are not shipped. CC0 asks for no credit; we thank the authors all the
-same. Everything else in `assets/own/` is drawn by our scripts from nothing.
+same. Everything else in `assets/own/` is drawn by our scripts from nothing. The levels shipped with the game (`assets/levels/`, made by `make/levelkit.py`) carry copies of
+some of these textures (`Textures/Floor_*`, `Wood_Plain`, `Column_beige`, `Rail_Environment`) in their `textures/`
+folders: the same CC0 pictures, credited here.
 
 Licence: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/ (ambientCG's licence page:
 https://docs.ambientcg.com/license/).
