@@ -1933,7 +1933,8 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
             heard = game.sim.events.len();
             continue;
         }
-        if game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::NewBall)) {
+        // (a stray transformer taken as it came: back into one making the way's kind, as for a new ball)
+        if stray || game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::NewBall)) {
             pilot.new_ball(&game.sim);
             // back at the reset point: getting on is counted from there again
             best = pilot.reached();

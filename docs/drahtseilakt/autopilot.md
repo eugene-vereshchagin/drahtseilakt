@@ -88,7 +88,7 @@ for some seconds, random additions to its choices' scores; from the third try on
 player's line. Three tries go from the last save before the failure, then three from each save twice as far back
 (the cause may lie earlier: a run-up too slow, a bad line into a bend). After 30 tries at one place (a place: 6 way
 points further than the last), the failure is taken as it comes: the ball is lost, or the run is given up with its
-report. The hints may fire again after going back, as for a new ball. A ball lost as the player lost one there (within
+report (a stray transformer taken so: the ball goes into one making the way's kind, as a new ball does). The hints may fire again after going back, as for a new ball. A ball lost as the player lost one there (within
 four seconds of keeping to the player's last seconds before a loss) is not gone back from, where the player's run got past that sector afterwards: what the
 player's ball did as it went may be what the level needs (a drawbridge knocked down as the ball fell with it). `--rewinds N` caps how often it goes back in
 a run (600; 0: never). The variation is seeded, so a run is reproducible; the run kept, and its replay, is the one
@@ -177,4 +177,5 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 - Level 10: finished from the start in 14:42.52, following the owner's finished run with `hints/Level_10.txt`.
 - Levels 11–13: 11 follows the owner's run through sectors 1–3 (losing a ball at the drawbridge as the owner did,
   which knocks it down) and goes on by itself in sector 4; 12 in sector 2 (its
-  thin rails); 13 in sector 2, at the paper transformer above the fan it must ride.
+  thin rails); 13 in sector 2, past the paper transformer and up the fan, at the beam the
+  fans 18_10–12 blow along.

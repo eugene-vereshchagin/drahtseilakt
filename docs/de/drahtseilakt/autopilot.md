@@ -97,7 +97,8 @@ zufällige Zuschläge auf die Bewertungen seiner Wahlen; ab dem dritten Versuch 
 Spielers. Drei Versuche gehen vom letzten Stand vor dem Fehlschlag aus, dann je drei von einem doppelt so weit
 zurückliegenden (die Ursache kann früher liegen: ein zu langsamer Anlauf, eine schlechte Linie in eine Kurve). Nach 30
 Versuchen an einer Stelle (eine Stelle: 6 Wegpunkte weiter als die letzte) wird der Fehlschlag hingenommen: die Kugel
-geht verloren, oder der Lauf wird mit seinem Bericht aufgegeben. Die Hinweise können nach dem Zurückgehen wieder
+geht verloren, oder der Lauf wird mit seinem Bericht aufgegeben (ein so hingenommener fremder Transformator: die Kugel
+fährt in einen, der die Art des Wegs macht, wie eine neue Kugel). Die Hinweise können nach dem Zurückgehen wieder
 auslösen, wie für eine neue Kugel. Eine Kugel, die verloren geht, wie der Spieler dort seine verlor (innerhalb vier
 Sekunden, nachdem er sich an die letzten Sekunden des Spielers vor einem Verlust hielt), führt nicht zurück, wo der Lauf des Spielers danach über diesen Sektor
 hinauskam: was die
@@ -191,4 +192,5 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 - Level 10: vom Start an geschafft in 14:42.52, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
 - Level 11–13: 11 folgt dem Lauf des Inhabers durch Sektor 1–3 (verliert an der Zugbrücke eine Kugel wie der
   Inhaber, was sie umstößt) und fährt in Sektor 4 allein weiter; 12 in Sektor 2
-  (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator über dem Ventilator, den sie reiten muss.
+  (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator vorbei und den Ventilator hinauf, am
+  Balken, an dem die Ventilatoren 18_10–12 entlangblasen.
