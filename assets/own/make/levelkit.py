@@ -808,9 +808,43 @@ class LevelBuilder:
         joins = set(range(len(front) - 1)) if join else set()
         bottom = self.bowl_piece("Start_Platform", at, (1, 0, 0), START_BOWL, outer, joins,
                                  [(sa * 6.1, sl * 7.3) for sa in (-1, 1) for sl in (-1, 1)], along)
+        # railings round the start's edge but where the way leaves it, as the original's start has (a beginner
+        # rolling off the bowl any way but forward must not fall)
+        cx, cy, cz = at
+        edge = [(R, hw), (neck, hw)]
+        for k in range(1, steps):
+            a = meet + (2 * math.pi - 2 * meet) * k / steps
+            edge.append((R * math.cos(a), R * math.sin(a)))
+        edge += [(neck, -hw), (R, -hw)]
+        pts = []
+        for i, (ex, ez) in enumerate(edge):
+            # pulled in by RAIL_IN towards the middle (along the neck's sides: straight in across)
+            if i in (0, 1, len(edge) - 2, len(edge) - 1):
+                q = (ex, ez - math.copysign(RAIL_IN, ez))
+            else:
+                f = (R - RAIL_IN) / R
+                q = (ex * f, ez * f)
+            pts.append(np.array([cx + q[0], cy, cz + q[1]]))
+        m = K.Mesh("Start_Railing")
+        rail = self.mat_ids["rail"]
+        for h in RAIL_HEIGHTS:
+            K.tube(m, rail, [q + np.array([0.0, h, 0.0]) for q in pts], RAIL_R, caps=True)
+        seg = [float(np.linalg.norm(pts[j + 1] - pts[j])) for j in range(len(pts) - 1)]
+        total = sum(seg)
+        count = max(1, int(round(total / POST_EVERY)))
+        for j in range(count + 1):
+            t = total * j / count
+            q = 0
+            while q < len(seg) - 1 and t > seg[q]:
+                t -= seg[q]
+                q += 1
+            c = t / seg[q] if seg[q] > 0 else 0.0
+            b = pts[q] * (1 - c) + pts[q + 1] * c
+            K.tube(m, rail, [b, b + np.array([0.0, RAIL_HEIGHTS[-1] + RAIL_R, 0.0])], RAIL_R * 0.8, caps=True)
+        self.add("Start_Railing", m, groups=self._floor_groups("metal"))
         # the start stands on a stone tower going down into the haze (only drawn), a cornice of brick under its edge
         tower = K.Mesh("Start_Tower")
-        x, y, z = at
+        x, y, z = cx, cy, cz
         K.cylinder(tower, self.mat_ids["post"], (x, y - START_DEEP - COLUMN_DEPTH, z), (0, 1, 0), START_RADIUS - 0.8,
                    COLUMN_DEPTH, seg=32, vscale=SLAB)
         K.cylinder(tower, self.mat_ids["border"], (x, y - START_DEEP - 1.4, z), (0, 1, 0), START_RADIUS + 0.3, 1.4,

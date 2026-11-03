@@ -256,6 +256,10 @@ Grundfläche wird abgetastet: jede Bodenoberseite darunter innerhalb von 0,05 ih
 jede; wo eine steht, wird die Rinne verbreitert oder das Teil versetzt. Eine Kugel, die wechselt, wirft ihre Haut ab:
 ihre Stücke sind gebogene Bruchstücke ihrer eigenen Schale, außen ihre Textur, innen eine dünne Seite.
 
+Der Start hat Geländer rings um seinen Rand außer dort, wo der Weg ihn verlässt (wie der des Originals), so bleibt
+eine Kugel, die aus der Schale in eine andere Richtung rollt, darauf; die Kamera schaut am Anfang den Weg hinaus
+entlang.
+
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
 Flammenschalen an ihrem Rand; ein Checkpoint ein Bodenstück von 10 Länge mit einer 1,26 tief eingelassenen Schale von
