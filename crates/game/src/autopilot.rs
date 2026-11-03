@@ -2326,6 +2326,16 @@ impl Pilot {
                 let falling = !s.ball.on_ground && s.ball.velocity.y < -12.0 && !way_down;
                 lost = gone || falling;
             }
+            // made over into a kind neither the way's next transformer nor the last one makes (a flat transformer
+            // rolled over on the way): as bad as a loss
+            let kinds = |i: usize| self.gates.get(i).map(|g| g.2);
+            if s.ball.kind != sim.ball.kind
+                && self.gate > 0
+                && kinds(self.gate) != Some(s.ball.kind)
+                && kinds(self.gate - 1) != Some(s.ball.kind)
+            {
+                lost = true;
+            }
             let score = if lost {
                 f32::NEG_INFINITY
             } else if s.finished {

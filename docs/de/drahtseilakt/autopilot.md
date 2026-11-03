@@ -89,7 +89,8 @@ und hinüber.
 Die Simulation ist deterministisch und lässt sich kopieren, also speichert der Testspieler seinen Lauf alle zwei
 Sekunden (die Stände werden mit dem Alter ausgedünnt und reichen einige Minuten zurück) und geht,
 wenn die Kugel verloren ist, ein anderer Transformator als der nächste des Wegs sie verwandelt hat,
-versehentlich überrollt (abseits der Linie des Spielers), oder sein Weg 20 Sekunden nicht weiterkommt, zu einem Stand zurück und versucht es
+versehentlich überrollt (abseits der Linie des Spielers; eine Wahl, die auf einer Kopie die Kugel so verwandelt,
+gilt als Verlust der Kugel), oder sein Weg 20 Sekunden nicht weiterkommt, zu einem Stand zurück und versucht es
 abgewandelt noch einmal: ein kurzer eigener erster Zug (ein Warten oder ein Stoß zufälliger Länge, vor allem anderen,
 auch einem laufenden Hinweis, sodass bewegte Teile in einer anderen Phase getroffen werden) und für einige Sekunden
 zufällige Zuschläge auf die Bewertungen seiner Wahlen; ab dem dritten Versuch verlässt jeder dritte die Linie des

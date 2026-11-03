@@ -80,7 +80,8 @@ that falls into the gap), a wait while it settles, and across.
 
 The simulation is deterministic and can be copied, so the test player saves its run every two seconds (the saves
 thin out as they age, reaching back several minutes) and, when its ball is lost, a transformer other than the way's next one, rolled over by a slip, makes
-it over (off the player's line), or its way
+it over (off the player's line; a choice tried on a copy that makes the ball over so counts as losing
+it), or its way
 has not got on for 20 seconds, goes back to a save and tries again, varied: a short opening move of its own (a wait
 or a push of random length, before anything else, a running hint too, so moving parts are met at another phase) and,
 for some seconds, random additions to its choices' scores; from the third try on every third one leaves the
