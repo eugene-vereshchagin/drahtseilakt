@@ -260,6 +260,11 @@ not stand on a flat, level patch at its own foot (its footprint sampled: every f
 foot, none missing) and names each; a gutter is widened, or the part moved, where one stands. A ball that changes
 sheds its skin: its pieces are curved fragments of its own shell, its texture outside, a thin inside.
 
+**Room over the ball** (2026-11-03): over a transformer (its cage lifts and holds the ball), a fan and the balloon
+nothing of the floors or rails may hang within 12; and a way may run under another floor or rails only with its
+underside at most 3.6 over it (a wall the ball meets) or 6 and more (room to pass), never between, where a ball
+wedges. The kit refuses a level that breaks either and names the places. A box may stand on another (`box ... up 5`).
+
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
 its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26 into it (to a lip) and two flame

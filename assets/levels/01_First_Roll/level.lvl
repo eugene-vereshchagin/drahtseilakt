@@ -46,7 +46,6 @@ box side 6 ahead 4
 box side -5 ahead 12
 floor 36
 loose wood side -8 ahead -10
-loose wood side 7 ahead -16
 life side 9 ahead -4
 box side -8 ahead -12
 width 8
@@ -96,7 +95,6 @@ loose paper side -4 ahead 10 shove
 loose paper side 2 ahead 15 shove
 loose paper side -6 ahead 19 shove
 floor 30
-point side -7 ahead -6
 width 8
 floor 6
 rails 16
@@ -127,6 +125,7 @@ width 9
 floor 6
 surface wood
 floor 24
+point ahead -12
 left 30 40
 right 30 40
 floor 10
@@ -143,6 +142,8 @@ floor 10
 floor 34
 # the dome sits on the line to the rails' mouth: go round it and line up again
 dome ahead -14
+point side 11 ahead -14
+loose wood side -11 ahead -26
 width 10
 floor 10
 rails-left 90 16
@@ -162,8 +163,8 @@ railing both
 width 16
 floor 19.5
 # the second gate to find out: the wooden ball cannot shift the crate; the stone transformer stands on this floor's
-# side, in sight of it, off the line the ball runs to the crate
-trafo stone side 5 ahead -6 nopilot
+# side where the ball lands, in sight of it, off the line the ball runs to the crate and out from under the lane
+trafo stone side 5 ahead -16 nopilot
 floor 9.5
 width 10
 safety gutter
@@ -182,7 +183,9 @@ floor 10
 width 15
 floor 6
 floor 24
+# two boxes stacked, as the original stacks them: the top one falls when the bottom one is shoved
 box side 2.2 ahead -10
+box side 2.2 ahead -10 up 5
 box side -2.2 ahead -20
 life side 0 ahead -16
 width 9
@@ -212,10 +215,11 @@ right 45 30
 right 90 16
 width 22
 floor 10
-loose stone side 7 ahead 4 shove
-loose stone side 2.5 ahead 4 shove
-loose stone side -2.5 ahead 4 shove
-loose stone side -7 ahead 4 shove
+loose stone side 8.5 ahead 4 shove
+loose stone side 4.25 ahead 4 shove
+loose stone ahead 4 shove
+loose stone side -4.25 ahead 4 shove
+loose stone side -8.5 ahead 4 shove
 loose paper side 0 ahead 10 shove
 floor 34
 point side 8 ahead -4
@@ -248,6 +252,7 @@ floor 10
 right 90 10
 width 11
 floor 16
+point ahead -10
 life
 floor 10
 # back to wood for the climb to the rails, which the stone ball cannot make
@@ -285,7 +290,6 @@ railing off
 floor 28 up 13
 surface stone
 railing both
-point
 right 90 7
 surface wood
 railing off
@@ -298,7 +302,6 @@ railing off
 floor 28 up 13
 surface stone
 railing both
-point
 right 90 7
 surface wood
 railing off
@@ -313,15 +316,19 @@ life
 loose stone side 4 ahead -10
 width 10
 floor 44 down 7
+loose stone side -3 ahead -26
 loose paper side -3 ahead -14
 right 90 20 down 3
 floor 30 down 6
+loose paper side 3 ahead -14
+loose wood side -3 ahead -24
 left 45 30 down 2
 right 45 30 down 2
 loose wood side 3 ahead -30
 left 90 20 down 3
 rails 30 down 8
 floor 30 down 4
+loose paper side -3 ahead -10
 point
 floor 30
 finish

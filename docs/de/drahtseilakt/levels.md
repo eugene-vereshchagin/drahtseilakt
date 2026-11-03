@@ -273,6 +273,12 @@ Grundfläche wird abgetastet: jede Bodenoberseite darunter innerhalb von 0,05 ih
 jede; wo eine steht, wird die Rinne verbreitert oder das Teil versetzt. Eine Kugel, die wechselt, wirft ihre Haut ab:
 ihre Stücke sind gebogene Bruchstücke ihrer eigenen Schale, außen ihre Textur, innen eine dünne Seite.
 
+**Raum über der Kugel** (2026-11-03): über einem Transformator (sein Käfig hebt und hält die Kugel), einem Ventilator
+und dem Ballon darf nichts von Böden oder Schienen innerhalb von 12 hängen; und ein Weg darf unter einem anderen Boden
+oder Schienen nur verlaufen, wenn deren Unterseite höchstens 3,6 über ihm liegt (eine Wand, auf die die Kugel trifft)
+oder 6 und mehr (Platz zum Durchrollen), nie dazwischen, wo eine Kugel klemmt. Der Baukasten lehnt ein Level ab, das
+eines davon verletzt, und nennt die Stellen. Eine Kiste kann auf einer anderen stehen (`box ... up 5`).
+
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
 Flammenschalen an ihrem Rand; ein Checkpoint ein Bodenstück von 10 Länge mit einer 1,26 tief eingelassenen Schale von

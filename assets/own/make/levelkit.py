@@ -109,6 +109,11 @@ SKY_DIR = os.path.join(OWN, "Textures", "Sky")
 RAIL_SADDLE, RAIL_SUPPORT, RAIL_COLUMN = 1.3, 40.0, 240.0
 # a clamp round each tube every this far along the rails (the concept's: about two and a half balls apart)
 RAIL_CLAMP = 9.0
+# The room a transformer (its cage rises 5.5 round the ball, held and lifted in it), a fan or the balloon needs over it.
+HEADROOM = 12.0
+# A way under another floor or rails leaves the ball either no way in (the floor above at most OVERPASS_WALL over it:
+# it meets the side as a wall) or room to pass (OVERPASS_CLEAR or more); between, it wedges.
+OVERPASS_WALL, OVERPASS_CLEAR = 3.6, 6.0
 # Where the ball comes back after a fall, above the floor round the start or a checkpoint.
 RESET_UP = START_RESET - START_BOWL[-1][1]
 
@@ -482,6 +487,8 @@ class LevelBuilder:
         # the parts standing on the floors (node, half the side of their footprint, what): write() checks that the
         # floor under each is flat, none of it through the part
         self.standing = []
+        # parts that lift or hold the ball, not standing on a floor's top (a fan, the balloon): checked for headroom
+        self.lifting = []
         self.seed = seed
         self._standard_materials()
 
@@ -943,18 +950,20 @@ class LevelBuilder:
     def finish(self, at, sector, xaxis=(-1, 0, 0)):
         """The finish: the balloon's stand-in (PE_Balloon, group PE_Levelende) with its platform at `at`; its bridge
         of plates reaches back along -X from 9.5 to 21 (the part's measured plates), so the track ends 22 before."""
-        self.placeholder("PE_Balloon_01", ["PE_Levelende"] + self.sector(sector), K.pose(at, xaxis), (-4, -1, -4),
-                         (4, 1, 4))
+        i = self.placeholder("PE_Balloon_01", ["PE_Levelende"] + self.sector(sector), K.pose(at, xaxis), (-4, -1, -4),
+                             (4, 1, 4))
+        self.lifting.append((i, 9.0, 0.0, "PE_Balloon_01"))
 
     # --- parts -------------------------------------------------------------------------------------------------
 
-    def box(self, n, at, sector):
+    def box(self, n, at, sector, on_floor=True):
         """A wooden box (P_Box): its body is its stand-in's mesh, a cube of 5 standing on `at`."""
         x, y, z = at
         m = K.Mesh("box")
         K.box(m, None, (-2.5, -2.5, -2.5), (2.5, 2.5, 2.5))
         i = self.placeholder(f"P_Box_{n:02d}", ["P_Box"] + self.sector(sector), K.pose((x, y + 2.5, z)), mesh=m)
-        self.standing.append((i, 2.5, 2.5, f"P_Box_{n:02d}"))
+        if on_floor:
+            self.standing.append((i, 2.5, 2.5, f"P_Box_{n:02d}"))
         return i
 
     def dome(self, n, at, sector):
@@ -1014,7 +1023,10 @@ class LevelBuilder:
 
     def module(self, name, n, matrix, sector, lo=(-2, -2, -2), hi=(2, 2, 2)):
         """A module (P_Modul_NN) at `matrix`, the frame its part is made in."""
-        return self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), matrix, lo, hi)
+        i = self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), matrix, lo, hi)
+        if name == "P_Modul_18":
+            self.lifting.append((i, 1.0, 0.6, f"{name}_{n:02d}"))
+        return i
 
     # --- writing -----------------------------------------------------------------------------------------------
 
@@ -1083,8 +1095,32 @@ class LevelBuilder:
             if worst > 0.05:
                 bad.append(f"{what} at ({x:.1f}, {y:.1f}, {z:.1f}): the floor under it is {worst:.2f} off its foot"
                            + (" (or missing)" if worst >= 9.0 else ""))
+        # headroom: over a transformer the ball is held and lifted (its cage rises 5.5) and over a fan it rises: nothing
+        # of the floors or rails may hang in the column over it, HEADROOM high and the pad's width and the ball's wide
+        geo = []
+        for g in ("Phys_Floors", "Phys_FloorRails"):
+            for i in self.groups.get(g, []):
+                # (a floor's own railings stand beside the way, not over it)
+                if "_Railing" in self.nodes[i]["name"]:
+                    continue
+                m = self.meshes[self.nodes[i]["mesh"]]
+                if m.p:
+                    geo.append(np.asarray(m.p))
+        geo = np.vstack(geo) if geo else np.zeros((0, 3))
+        for i, half, lift, what in self.standing + self.lifting:
+            if not (what.startswith("P_Trafo") or what.startswith("P_Modul_18") or what.startswith("PE_")):
+                continue
+            M = self.nodes[i]["matrix"]
+            x, y, z = M[0, 3], M[1, 3] - lift, M[2, 3]
+            reach = half + BALL_R + 0.5
+            near = geo[(np.abs(geo[:, 0] - x) < reach) & (np.abs(geo[:, 2] - z) < reach)
+                       & (geo[:, 1] > y + 0.6) & (geo[:, 1] < y + HEADROOM)]
+            if len(near):
+                bad.append(f"{what} at ({x:.1f}, {y:.1f}, {z:.1f}): a floor or rails {float(near[:, 1].min() - y):.1f} over "
+                           f"it (at least {HEADROOM} clear over it)")
         if bad:
-            raise ValueError(f"{len(bad)} parts do not stand on a flat patch of floor:\n  " + "\n  ".join(bad))
+            raise ValueError(f"{len(bad)} parts do not stand on a flat patch of floor with room over it:\n  "
+                             + "\n  ".join(bad))
 
     def floor_bounds(self):
         floors = set(self.groups.get("Phys_Floors", []))

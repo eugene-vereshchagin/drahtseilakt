@@ -37,7 +37,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     checkpoint               a checkpoint at the cursor (a piece 10 long with its bowl, taking 5 of the floors before
                              and after it): the next sector begins
     finish                   the balloon, 22 ahead of the cursor (the floor must end at the cursor)
-    point, life, box, dome, trafo KIND, loose KIND   a part at the cursor;  options: side S (to the left), ahead A;
+    point, life, box, dome, trafo KIND, loose KIND   a part at the cursor;  options: side S (to the left), ahead A
+                             (a box also up U: on another box, `up 5`);
                              a box or a loose ball must leave room for the ball beside it, or be marked `shove`
                              (the ball the way has there, no lighter than it, pushes it away)
     column [side S] [ahead A] [depth D]   a stone column under the floor, for the look
@@ -229,6 +230,8 @@ class Track:
         self.floor_points = []
         # each point's reach across (half the floor's width, or the rails'), for keeping columns clear of it
         self.floor_reach = []
+        self.floor_along = []
+        self.floor_rails = []
 
     # --- the cursor ---------------------------------------------------------------------------------------------
 
@@ -285,6 +288,9 @@ class Track:
         # every few units of it, for keeping columns clear of it
         self.floor_points.extend(dense)
         self.floor_reach.extend([L.RAIL_GAUGE / 2 + 1.0 if kind == "Rails" else self.width / 2] * len(dense))
+        # where along the way each lies (an overpass is a floor far on along the way, not the one before or after)
+        self.floor_along.extend([self.along] * len(dense))
+        self.floor_rails.extend([kind == "Rails"] * len(dense))
         self.since_gap += sum(float(np.linalg.norm(b - a)) for a, b in zip(pts, pts[1:]))
         if self.columns and kind == "Floor":
             for a, c in zip(pts, pts[1:]):
@@ -739,6 +745,31 @@ class Track:
                             "free": L.free_width(self.width_at(ahead), self.safety, self.rail_sides, self.surface),
                             "shove": "shove" in opts, "rolls": cmd == "loose", "line": line, "what": kind or cmd})
 
+    def check_overpasses(self):
+        """No way runs under another floor or rails with the room between them where a ball wedges: the underside over
+        a way's top is either at most OVERPASS_WALL over it (the ball meets its side as a wall) or OVERPASS_CLEAR or
+        more (the ball passes)."""
+        P = np.array(self.floor_points)
+        if not len(P):
+            return
+        R, A, RL = np.array(self.floor_reach), np.array(self.floor_along), np.array(self.floor_rails)
+        bad = []
+        for i in range(len(P)):
+            if RL[i]:
+                continue
+            flat = np.hypot(P[:, 0] - P[i, 0], P[:, 2] - P[i, 2])
+            # the underside of what passes over: a floor's DEPTH under its top, rails' tubes under theirs
+            under = P[:, 1] - np.where(RL, 0.6, L.DEPTH)
+            gap = under - P[i, 1]
+            hit = (flat < np.minimum(R, 3.0) + 1.0) & (np.abs(A - A[i]) > 30.0) & (gap > L.OVERPASS_WALL) \
+                & (gap < L.OVERPASS_CLEAR)
+            if np.any(hit):
+                j = int(np.argmax(hit))
+                bad.append(f"({P[i, 0]:.1f}, {P[i, 1]:.1f}, {P[i, 2]:.1f}): {gap[j]:.1f} under the way over it")
+        if bad:
+            raise LevelError(f"{len(bad)} places under an overpass where the ball wedges (under {L.OVERPASS_WALL} or "
+                             f"{L.OVERPASS_CLEAR} and more over a way), e.g. " + "; ".join(bad[:3]))
+
     def check_bodies(self):
         """The way must stay open past the boxes and loose balls on it: across the way where each lies, with the
         others near it, a gap of the room of a way (levelkit.MIN_FREE), unless they are all there to be shoved; and
@@ -781,7 +812,9 @@ class Track:
             self.b.extra_life(self.n("life"), tuple(p), s)
             self.pilot.step(["collector"], f"goto {fmt(p)}", p)
         elif cmd == "box":
-            self.b.box(self.n("box"), tuple(p), s)
+            # a box on a box (`up 5`): it stands on the one under it, not on the floor
+            up = float(opts.get("up", 0))
+            self.b.box(self.n("box"), tuple(p + np.array([0.0, up, 0.0])), s, on_floor=up == 0)
         elif cmd == "dome":
             self.b.dome(self.n("dome"), tuple(p), s)
             # a dome is gone round, never over: it must leave the room of a way on both sides
@@ -982,6 +1015,7 @@ def compile_level(path):
     t.end_rails()
     t.resolve_pending()
     t.check_bodies()
+    t.check_overpasses()
     t.place_columns()
     info = t.info
     titles = info["titles"]
