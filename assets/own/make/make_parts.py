@@ -439,6 +439,15 @@ def fit_box(m, box):
     m.transformed(mat)
 
 
+def round_look(name, mat, kind):
+    """The wooden or stone ball as drawn: its sphere with many more faces and smooth normals (the mesh above, as
+    coarse as the original's, stays the physics')."""
+    m = k.Mesh(name)
+    k.sphere(m, mat, (0, 0, 0), 2.0, seg=48)
+    fit_box(m, STONE_BOX if kind == "stone" else WOOD_BOX)
+    return m
+
+
 def paper_look(name, mat):
     """The paper ball as drawn: a sheet crumpled into a ball, round as a whole, its folds soft creases (many faces,
     smooth normals), the newspaper print over it."""
@@ -554,8 +563,7 @@ def make_balls():
     for name, mat, kind in (("Ball_Wood", wood, "wood"), ("Ball_Stone", stone, "stone"), ("Ball_Paper", paper, "paper")):
         mesh_name = "Ball_Stone_HighRes_Mesh" if kind == "stone" else f"{name}_Mesh"
         bm = ball_mesh(mesh_name, mat, kind)
-        if kind == "paper":
-            bm.look = paper_look(f"{name}_Look", mat)
+        bm.look = paper_look(f"{name}_Look", mat) if kind == "paper" else round_look(f"{name}_Look", mat, kind)
         p.node(name, p.mesh(bm))
         balls.append(name)
     # the new ball's flash: a glowing sphere, cut flat a little below the ball's middle where it meets the floor
@@ -586,8 +594,8 @@ def make_loose_balls():
         p = Part(f"PH/P_Ball_{kind}")
         mat = p.mat(f"P_Ball_{kind}", tex, emissive=em, specular=0.2, power=15)
         bm = ball_mesh(f"P_Ball_{kind}_Mesh", mat, kind.lower())
-        if kind == "Paper":
-            bm.look = paper_look(f"P_Ball_{kind}_Look", mat)
+        bm.look = (paper_look(f"P_Ball_{kind}_Look", mat) if kind == "Paper"
+                   else round_look(f"P_Ball_{kind}_Look", mat, kind.lower()))
         p.node(f"P_Ball_{kind}_MF", p.mesh(bm))
         p.group(f"All_P_Ball_{kind}", [f"P_Ball_{kind}_MF"])
         p.write()

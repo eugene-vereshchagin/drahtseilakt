@@ -106,7 +106,9 @@ SKY_DIR = os.path.join(OWN, "Textures", "Sky")
 # Rails' supports: a saddle under both tubes (its bar RAIL_SADDLE under their middles, below the ball riding between
 # them) on a column down into the haze, about every RAIL_SUPPORT of rails (the DSL picks where: not near their ends,
 # where the floors hold them, and not over another floor or rails).
-RAIL_SADDLE, RAIL_SUPPORT, RAIL_COLUMN = 1.4, 40.0, 240.0
+RAIL_SADDLE, RAIL_SUPPORT, RAIL_COLUMN = 1.3, 40.0, 240.0
+# a clamp round each tube every this far along the rails (the concept's: about two and a half balls apart)
+RAIL_CLAMP = 9.0
 # Where the ball comes back after a fall, above the floor round the start or a checkpoint.
 RESET_UP = START_RESET - START_BOWL[-1][1]
 
@@ -447,11 +449,12 @@ class LevelBuilder:
         variant = "ABC"[s % 3]
         os.makedirs(self.tex, exist_ok=True)
         for name in (f"Track_Top_{variant}", f"Track_Kerb_{variant}", f"Track_Shade_{variant}",
-                     f"Track_Slope_{variant}", "Track_Side", "Track_Column"):
+                     f"Track_Slope_{variant}", "Track_Side", "Track_Column", "Track_Rail", "Track_Rail_n"):
             shutil.copyfile(os.path.join(TRACK_SET, name + ".png"), os.path.join(self.tex, name + ".png"))
         for name in ("floor_border.png", "floor_border_n.png"):
             shutil.copyfile(os.path.join(MENU_SET, name), os.path.join(self.tex, "Track_" + name))
         textures = {
+            "Laterne_Glas.png": lambda: K.stone(TEX, K.rgb(250, 200, 120), s + 8, slabs=0),
             "Wood_Plain.png": lambda: K.planks(TEX, K.rgb(150, 104, 62), s + 4),
             "Rail_Environment.png": lambda: K.metal(TEX, K.rgb(196, 200, 210), s + 5),
             "Column_beige.png": lambda: K.stone(TEX, K.rgb(120, 112, 104), s + 6, slabs=0),
@@ -471,8 +474,10 @@ class LevelBuilder:
         # the borders: the menu scene's brick, with its relief
         self.mat("border", "Track_floor_border.png", diffuse=1.0, emissive=0.24, normal="Track_floor_border_n.png")
         self.mat("wood", "Wood_Plain.png", diffuse=1.0, emissive=0.25, specular=0.39, power=50)
-        self.mat("rail", "Rail_Environment.png", diffuse=0.5, emissive=0.35, specular=0.8, power=10, texgen="chrome")
+        self.mat("rail", "Track_Rail.png", diffuse=1.0, emissive=0.22, specular=0.85, power=40,
+                 normal="Track_Rail_n.png")
         self.mat("post", "Track_Column.png", diffuse=0.8, emissive=0.3)
+        self.mat("lamp", "Laterne_Glas.png", diffuse=1.0, emissive=1.0)
         self.mat("plate", "Floor_Top_Checkpoint.png", diffuse=1.0, emissive=0.2, specular=0.3, power=60)
 
     def mat(self, name, texture=None, **kw):
@@ -643,18 +648,49 @@ class LevelBuilder:
                     run = 0.0
                     p, f, s, u, t = fr[i]
                     K.tube(m, self.mat_ids["rail"], [p - s * gauge / 2 + lift, p + s * gauge / 2 + lift], r * 0.7)
-        for i in supports:
-            p, f, s, u, t = fr[i]
+        rail_id = self.add(name, m, groups=self._floor_groups("metal") + self.sector(sector))
+        # the fittings, only drawn (never in the ball's way): a clamp round each tube every RAIL_CLAMP, its strap
+        # bent down under the ball's path to the other tube's clamp; at the supports a thin rod from the strap down
+        # into the haze (after the owner's concept of the rails)
+        fit = K.Mesh(f"{name}_Fittings")
+        steel = self.mat_ids["rail"]
+        run = [0.0]
+        for i in range(1, len(fr)):
+            run.append(run[-1] + float(np.linalg.norm(fr[i][0] - fr[i - 1][0])))
+        total = run[-1]
+        count = int(total // RAIL_CLAMP)
+        spots = [RAIL_CLAMP * (k + 0.5) + (total - RAIL_CLAMP * count) / 2 for k in range(count)]
+        spots = [d for d in spots if RAIL_CLAMP / 2 <= d <= total - RAIL_CLAMP / 2]
+        held = {min(range(len(run)), key=lambda j: abs(run[j] - run[i])) for i in supports}
+        for d in spots:
+            j = int(np.searchsorted(run, d))
+            j = min(max(j, 1), len(fr) - 1)
+            c0 = (d - run[j - 1]) / max(run[j] - run[j - 1], 1e-9)
+            p = fr[j - 1][0] * (1 - c0) + fr[j][0] * c0
+            f, s_, u = fr[j][1], fr[j][2], fr[j][3]
             c = p + lift
-            bar = c - u * RAIL_SADDLE
             for sgn in (-1.0, 1.0):
-                K.tube(m, self.mat_ids["rail"], [c + s * (sgn * gauge / 2), bar + s * (sgn * gauge / 2)], r * 0.6,
-                       caps=True)
-            K.tube(m, self.mat_ids["rail"], [bar - s * (gauge / 2 + 0.2), bar + s * (gauge / 2 + 0.2)], r * 0.7,
-                   caps=True)
-            K.cylinder(m, self.mat_ids["post"], bar - u * RAIL_COLUMN, u, 0.45, RAIL_COLUMN - 0.2, seg=10,
-                       vscale=SLAB)
-        return self.add(name, m, groups=self._floor_groups("metal") + self.sector(sector))
+                tube_c = c + s_ * (sgn * gauge / 2)
+                inward = -s_ * sgn
+                # round the tube's outer side and underneath, clear of where the ball rests on it (above, inward)
+                for off in (-0.12, 0.12):
+                    arc = [tube_c + f * off + (inward * math.cos(a) + u * math.sin(a)) * (r + 0.06)
+                           for a in np.radians(np.linspace(110, 330, 9))]
+                    K.tube(fit, steel, arc, 0.05, seg=6)
+                K.sphere(fit, steel, tuple(tube_c + (inward * math.cos(math.radians(110)) + u * 0.94) * (r + 0.1)),
+                         0.07, seg=6)
+            strap = [c + s_ * (-gauge / 2) - u * (r + 0.06), c + s_ * (-0.8) - u * RAIL_SADDLE,
+                     c + s_ * 0.8 - u * RAIL_SADDLE, c + s_ * (gauge / 2) - u * (r + 0.06)]
+            K.tube(fit, steel, strap, 0.08, seg=6, caps=True)
+        for i in supports:
+            p, f, s_, u, t = fr[i]
+            bar = p + lift - u * RAIL_SADDLE
+            K.tube(fit, steel, [bar - f * 0.12, bar + f * 0.12], 0.09, seg=6, caps=True)
+            K.cylinder(fit, steel, bar - u * RAIL_COLUMN, u, 0.13, RAIL_COLUMN, seg=8)
+        if fit.p:
+            self.add(f"{name}_Fittings", fit)
+        return rail_id
+
 
     def bowl_piece(self, name, centre, fwd, bowl, outer, joins, cups, along=0.0):
         """A platform with a bowl in its middle (the start, a checkpoint): its top at `centre` (the floor's height round
@@ -755,12 +791,42 @@ class LevelBuilder:
         joins = set(range(len(front) - 1)) if join else set()
         bottom = self.bowl_piece("Start_Platform", at, (1, 0, 0), START_BOWL, outer, joins,
                                  [(sa * 6.1, sl * 7.3) for sa in (-1, 1) for sl in (-1, 1)], along)
+        # the start stands on a stone tower going down into the haze (only drawn), a cornice of brick under its edge
+        tower = K.Mesh("Start_Tower")
+        x, y, z = at
+        K.cylinder(tower, self.mat_ids["post"], (x, y - START_DEEP - COLUMN_DEPTH, z), (0, 1, 0), START_RADIUS - 0.8,
+                   COLUMN_DEPTH, seg=32, vscale=SLAB)
+        K.cylinder(tower, self.mat_ids["border"], (x, y - START_DEEP - 1.4, z), (0, 1, 0), START_RADIUS + 0.3, 1.4,
+                   seg=32, vscale=BRICK)
+        self.add("Start_Tower", tower)
+        for sa in (-1, 1):
+            for sl in (-1, 1):
+                self.lantern((x + sa * 9.0, y, z + sl * 9.0), (sa * 0.7071, 0.0, sl * 0.7071))
         # its z axis points back at the camera (-X): x axis (0, 0, 1)
         self.placeholder("PS_FourFlames_01", ["PS_Levelstart"], K.pose(tuple(bottom), (0, 0, 1)), (-8, 0, -7),
                          (8, 6, 7))
         reset = tuple(bottom + np.array([0.0, START_RESET, 0.0]))
         self.reset(1, reset)
         return reset
+
+    def lantern(self, at, out):
+        """A lantern on a wooden post standing at `at` (on the floor's level, just outside its edge, on a stone corbel
+        set into the floor's side), its arm reaching over `out`'s way, its glass glowing: only drawn."""
+        m = K.Mesh("lantern")
+        p = np.asarray(at, np.float64)
+        o = np.asarray(out, np.float64)
+        o = o / (np.linalg.norm(o) + 1e-9)
+        up = np.array([0.0, 1.0, 0.0])
+        K.obox(m, self.mat_ids["side"], tuple(p - up * 0.9), (tuple(o), tuple(up), tuple(np.cross(o, up))),
+               (0.55, 0.9, 0.55), scale=SLAB)
+        K.cylinder(m, self.mat_ids["wood"], p, up, 0.22, 6.2, seg=8)
+        arm = p + up * 5.9
+        K.cylinder(m, self.mat_ids["wood"], arm, -o, 0.12, 1.2, seg=6)
+        lamp = arm - o * 1.2 - up * 0.75
+        K.cylinder(m, self.mat_ids["rail"], lamp + up * 0.62, up, 0.05, 0.18, seg=6)
+        K.cylinder(m, self.mat_ids["lamp"], lamp - up * 0.3, up, 0.28, 0.6, seg=8, cap_mat=self.mat_ids["rail"])
+        K.cylinder(m, self.mat_ids["rail"], lamp + up * 0.3, up, 0.36, 0.08, seg=8, r_top=0.12)
+        self.add(f"Lantern_{len(self.nodes):03d}", m)
 
     def reset(self, n, point, xaxis=(0, 0, 1)):
         """Reset point n at `point` (where the ball comes back)."""
@@ -803,6 +869,9 @@ class LevelBuilder:
             joins |= set(range(b0, b0 + len(bk_l) - 1))
         bottom = self.bowl_piece(f"Checkpoint_{n:02d}", at, f, bowl, outer, joins,
                                  [(0.0, -CHECK_FLAMES), (0.0, CHECK_FLAMES)], along)
+        c = np.asarray(at, np.float64)
+        for sl in (-1.0, 1.0):
+            self.lantern(tuple(c + f * (hl - 1.0) + left * sl * (hw + 0.6)), tuple(left * sl))
         self.placeholder(f"PC_TwoFlames_{n:02d}", ["PC_Checkpoints"], K.pose(tuple(bottom), tuple(f)), (-4, 0, -8),
                          (4, 6, 8))
         reset = tuple(bottom + np.array([0.0, CHECK_RESET, 0.0]))

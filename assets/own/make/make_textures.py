@@ -542,10 +542,44 @@ def make_env():
 def make_balls():
     n = 128 * SCALE
     save(pits(stone_ball(n, 61), 61, count=150, sizes=(0.6, 1.6), depth=0.16), "Ball_Stone")
-    woodball = wood(n, (159, 126, 80), 0.34, 9, seed=18)
+    woodball = wood_ball(2 * n, 18)
     save(woodball, "Ball_Wood")
     save(woodball, "P_Ball_Wood")
     save(collage(n), "Ball_Paper")
+
+
+def wood_ball(n, seed):
+    """The wooden ball's skin, after the owner's concept (a reference, not copied): turned from one log, so the year
+    rings stand round each pole (on the sphere's mapping, rows of the same latitude), light wood with darker late
+    wood, fine radial cracks running out from the poles, a fine grain. Its mean the original's (159, 126, 80)."""
+    rng = np.random.default_rng(seed)
+    v = (np.arange(n) + 0.5) / n
+    d = np.minimum(v, 1 - v)[:, None]  # 0 at a pole, 0.5 at the equator (by row)
+    jitter = noise(n, 6, seed, 4)
+    # rings: denser outwards, each a little uneven round its circle
+    phase = (d * 2.0) ** 0.8 * 26.0 + 1.2 * (jitter - 0.5)
+    ring = 0.5 + 0.5 * np.cos(phase * 2 * np.pi)
+    late = np.clip(ring - 0.55, 0, 1) / 0.45
+    early, dark = np.array([214, 172, 118]) / 255.0, np.array([150, 104, 58]) / 255.0
+    img = early[None, None] + (dark - early)[None, None] * (0.95 * late ** 1.2)[..., None]
+    grain = noise(n, n // 6, seed + 1, 2) - 0.5
+    img = img * (1 + 0.10 * grain)[..., None] * (1 + 0.08 * (noise(n, 4, seed + 2, 4) - 0.5))[..., None]
+    # cracks: thin dark lines along a meridian from a pole out to some latitude, wandering a little
+    yy = np.arange(n)
+    for _ in range(26):
+        u0 = rng.uniform(0, n)
+        top = rng.random() < 0.5
+        length = rng.uniform(0.12, 0.38) * n
+        wobble = rng.uniform(1.5, 4.0)
+        for y in range(int(length)):
+            row = y if top else n - 1 - y
+            x = int(u0 + wobble * math.sin(y / (n * 0.04))) % n
+            fade = 1 - y / length
+            width = 1 + int(2 * fade)
+            for dx in range(-width, width + 1):
+                img[row, (x + dx) % n] *= 1 - 0.45 * fade * (1 - abs(dx) / (width + 1))
+    mean = img.reshape(-1, 3).mean(0)
+    return np.clip(img * (np.array([159, 126, 80]) / 255.0 / mean)[None, None], 0, 1)
 
 
 def stone_ball(n, seed):
@@ -794,6 +828,28 @@ def weather(img, seed, along_rows):
     return img * (1 - dark - grime + 0.04)[..., None]
 
 
+def track_rail(seed):
+    """The rails' steel (u round a tube, v along it, 4 units a repeat): worn galvanised steel, brushed along the tube,
+    a light rust tint in patches and along streaks, and its relief (a normal map: the brushing) for the highlight to
+    run along; after the owner's concept of the rails (a reference)."""
+    h, w = 512, 128
+    brush = np.repeat(noise(w, 96, seed, 2)[:1], h, 0)  # lines along v
+    brush = brush + 0.5 * np.repeat(noise(w, 32, seed + 1, 3)[:1], h, 0)
+    along = noise(h, 6, seed + 2, 4)[:, :1]
+    base = np.array([0.60, 0.62, 0.64])
+    img = base[None, None] * (0.82 + 0.25 * (brush - 0.6) + 0.10 * (along - 0.5))[..., None]
+    rust = np.clip((noise(h, 5, seed + 3, 5)[:, :w] - 0.58) * 3.0, 0, 1)
+    rust = np.maximum(rust, 0.6 * np.clip((noise(h, 40, seed + 4, 3)[:, :w] - 0.7) * 4.0, 0, 1))
+    tint = np.array([0.55, 0.36, 0.22])
+    img = img * (1 - 0.45 * rust[..., None]) + tint[None, None] * (0.45 * rust[..., None])
+    height = brush * 0.6 + rust * 0.4
+    gx = np.roll(height, -1, 1) - np.roll(height, 1, 1)
+    gy = np.roll(height, -1, 0) - np.roll(height, 1, 0)
+    nrm = np.stack([-gx * 2.0, -gy * 2.0, np.ones_like(gx)], -1)
+    nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
+    return np.clip(img, 0, 1), nrm * 0.5 + 0.5
+
+
 def track_column(seed):
     """The columns under the floors (u round, v down from the top, 5 units a repeat): the side's concrete, streaked
     from the top, a joint where one cast ring meets the next."""
@@ -816,6 +872,9 @@ def make_track():
         save_track(track_slope(500 + 10 * k, int(PX * 2.5)), f"Track_Slope_{name}")
     save_track(track_side(600), "Track_Side")
     save_track(track_column(700), "Track_Column")
+    rail, rail_n = track_rail(800)
+    save_track(rail, "Track_Rail")
+    save_track(rail_n, "Track_Rail_n")
 
 
 STEPS = {"floors": make_floors, "track": make_track, "stone": make_stone, "wood": make_wood, "marks": make_marks, "env": make_env,
