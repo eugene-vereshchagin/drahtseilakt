@@ -10,6 +10,7 @@ use gamedata::assets;
 mod audio;
 mod autopilot;
 mod ballsound;
+mod clouds;
 mod collide;
 mod edges;
 mod endscreen;
@@ -91,7 +92,7 @@ usage: drahtseilakt [options]
   --debug             debug mode: F2 takes up the free camera (the run waits; arrows fly and turn, A/D move
                       sideways, PageUp/PageDown up and down, Home/End look up and down, Shift faster)
   --sky NAME          play under another sky (A, B, C, Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
-                      Mist, or any Sky_<NAME>_* the textures have) instead of the level's own
+                      Mist, Clouds, or any Sky_<NAME>_* the textures have) instead of the level's own
   --size WxH          window or screenshot size (default 1600x900)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 

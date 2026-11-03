@@ -40,6 +40,7 @@
     仍然优先）；
   - *Clouds?* 显示关卡的云层（`clouds on|off`），即其 `SkyLayer` 对象，选项打开时 `Gameplay.nmo` 会显示它。它的纹理是黑底上的灰色云，
     材质不做混合，所以我们把它叠加到后面的天空上绘制（这是我们的理解；副本的材质没有说明）。视频追踪绘制时不带云层；
+  - `cloud-quality low|medium|high|off`（设置文件；默认 `medium`）：我们关卡的云海绘制得多精细（见 levels.md“云海”）：穿过它的步数、朝向太阳的步数、边缘的小云团；`off` 不绘制，关闭 *Clouds?* 也会隐藏它；
   - *Fullscreen?*（`fullscreen off|borderless|exclusive`）：无边框使用桌面的显示模式，独占在平台允许时更改它（Wayland 不允许：改为无边框）。
     F11 在窗口和无边框之间切换。
 - **Controls**：在某个按键的行上按 Enter 会等待按键（“Press a key”）；按下的键被绑定，Esc 取消。已被其他动作占用的键会互换，所以没有一个键

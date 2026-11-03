@@ -65,6 +65,12 @@ Ein Ordner mit:
   Tabelle der Kopie. Die Dateien in `game/` ersetzen nur die eigenen Teile des Levels, Himmel, Partikel, Schatten und
   die Geräusche eines Laufs: die Dateien der Oberfläche (Menüs, Schrift, Leveltabelle, Menügeräusche) kommen nie aus
   einem Level: sie sind die der Oberfläche (unsere oder die der Kopie), und jede Datei wird mit einer Größengrenze gelesen.
+- **Das Wolkenmeer** `settings.clouds` (unsere Level; levels.md, „Das Wolkenmeer"), nur gezeichnet: `top` (die Höhe
+  seiner Kuppen; nötig), `thickness`, `cover` (0..1), `scale` (die Größe einer Wolke), `sun` (die Richtung zur Sonne),
+  `sun_color`, `sky` (das Licht von oben), `shadow` (im Schatten; Farben in linearem Licht, 1 weiß), `haze` (Dunst des
+  Horizonts je Entfernungseinheit), `under` (0..1: wie viel der Welt darunter der Dunst dort verbirgt) und `wind`
+  (x, z je Sekunde). Nur `top` ist nötig; Werte außerhalb des Bereichs werden darauf begrenzt, ein fehlerhafter Wert
+  weist das Level ab.
 
 ## Koordinaten
 

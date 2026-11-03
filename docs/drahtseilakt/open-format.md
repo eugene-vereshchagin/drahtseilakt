@@ -61,6 +61,11 @@ A folder holding:
   and says so; a remastered `Level_NN` takes them from the copy's table instead. The game files of `game/` stand in
   only for the level's own parts, sky, particles, shadow and a run's sounds: the interface's files (menus, font, the
   level table, menu sounds) never come from a level: they are the interface's (ours, or the copy's), and every file read is capped.
+- **The sea of cloud** `settings.clouds` (our levels; levels.md, "The sea of cloud"), only drawn: `top` (the height
+  of its tops; needed), `thickness`, `cover` (0..1), `scale` (a cloud's size), `sun` (the direction towards the sun),
+  `sun_color`, `sky` (the light from above), `shadow` (in the shade; colours in linear light, 1 white), `haze` (of the
+  horizon's haze a unit of distance), `under` (0..1: how much of the world under it the haze there hides) and `wind`
+  (x, z a second). Only `top` is needed; values out of range are held to it, a malformed one refuses the level.
 
 ## Coordinates
 

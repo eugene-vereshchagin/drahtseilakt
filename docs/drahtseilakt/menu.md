@@ -54,6 +54,9 @@ per-player thing is the name in the highscore list.
   - *Clouds?* shows the levels' cloud layer (`clouds on|off`), their `SkyLayer` object, which `Gameplay.nmo` shows
     when the option is on. Its texture is grey clouds on black and its material does not blend, so we draw it added
     to the sky behind it (our reading; the copy's material does not say). The video tracking draws without it;
+  - `cloud-quality low|medium|high|off` (the settings file; `medium` if not given): how finely our levels' sea of
+    cloud is drawn (levels.md, "The sea of cloud"): steps through it, steps towards the sun, small billows on its
+    edges; `off` draws none, and *Clouds?* off hides it too;
   - *Fullscreen?* (`fullscreen off|borderless|exclusive`): borderless takes the desktop's mode, exclusive changes
     it where the platform can (Wayland cannot: borderless). F11 switches between a window and borderless.
 - **Controls**: Enter on a key's line waits for a key ("Press a key"); the key pressed is bound, Esc gives up.

@@ -57,6 +57,47 @@ pub struct Settings {
     /// The air between the camera and what it sees: none in the original's levels (their look has none); our own
     /// levels set it so their columns and the world far below fade into the sky's haze. Only drawn.
     pub fog: Option<Fog>,
+    /// A sea of cloud under the track, drawn as a volume (only drawn): none in the original's levels.
+    pub clouds: Option<Clouds>,
+}
+
+/// A level's cloud layer (only drawn, never the physics'): a slab of cumulus whose tops are at `top` and whose
+/// bottom `thickness` under it, `cover` of it cloud (1 a closed sea, less broken banks with gaps), each cloud about
+/// `scale` across, lit by a sun in the direction `sun` (towards it) of `sun_color`, the sky's light from above `sky`,
+/// and in shadow `shadow` (the light bounced from below); far off they fade into the sky's haze, `haze` of it a unit of
+/// distance (1 - e^(-haze * distance)). `under` is how much of the world under the layer the haze
+/// there hides (1 none of it shows through a gap, 0 all of it), `wind` the drift (x, z, units a second). The colours
+/// are linear light, 1 the brightness of white; the sun's may be brighter.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Clouds {
+    pub top: f32,
+    pub thickness: f32,
+    pub cover: f32,
+    pub scale: f32,
+    pub sun: [f32; 3],
+    pub sun_color: [f32; 3],
+    pub sky: [f32; 3],
+    pub shadow: [f32; 3],
+    pub haze: f32,
+    pub under: f32,
+    pub wind: [f32; 2],
+}
+
+impl Clouds {
+    /// The defaults of the settings a level may leave out (a white noon over a closed sea).
+    pub const DEFAULT: Clouds = Clouds {
+        top: 0.0,
+        thickness: 60.0,
+        cover: 0.85,
+        scale: 60.0,
+        sun: [0.3, 0.6, 0.74],
+        sun_color: [3.0, 2.9, 2.7],
+        sky: [0.55, 0.65, 0.85],
+        shadow: [0.35, 0.38, 0.48],
+        haze: 0.0005,
+        under: 1.0,
+        wind: [1.5, 0.6],
+    };
 }
 
 /// A level's fog (only drawn, never the physics'): what is far from the camera fades into the air's colour, `color`

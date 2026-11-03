@@ -377,6 +377,7 @@ fn synthetic_level() -> Level {
         source_hash: Some(0x1234),
         own_parts: true,
         fog: None,
+        clouds: None,
     };
     l
 }

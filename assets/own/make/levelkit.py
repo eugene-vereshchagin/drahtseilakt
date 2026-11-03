@@ -68,6 +68,51 @@ CUP_R, CUP_UP = 2.0, 0.3
 # Where the ball comes back after a fall, above the floor round the start or a checkpoint.
 RESET_UP = START_RESET - START_BOWL[-1][1]
 
+# The sea of cloud under a level (settings `clouds`, drawn by the game: crates/game/src/clouds.wgsl). By sky: how much
+# of it is cloud (1 a closed sea; under the skies with a land below, banks with gaps the land shows through, `under`
+# 0), how much of the world below the haze under it hides and (`sun`) how much of CLOUD_SUN its sun gives (a high
+# sun lights the whole sea). The skies' light (make_skies.py writes sky_light.json)
+# lights it: the sun's direction and colour (half way to white: a photograph's low sun is redder than the light on
+# the clouds it shines on) and the sky's, the shade bluer than the sky. A sky without its light there has no sea.
+CLOUD_SEA = {"Sunset": dict(cover=0.75, under=1.0, warm=0.7), "Clouds": dict(cover=0.8, under=1.0, sun=0.65),
+             "Mountains": dict(cover=0.42, under=0.0), "Forest": dict(cover=0.38, under=0.0),
+             "Mist": dict(cover=0.5, under=0.4), "Desert": dict(cover=0.3, under=0.0)}
+# its tops CLOUD_TOP under the lowest floor, CLOUD_THICK deep, a cloud about CLOUD_SIZE across, CLOUD_HAZE of the
+# horizon's haze a unit of distance
+CLOUD_TOP, CLOUD_THICK, CLOUD_SIZE, CLOUD_HAZE = 35.0, 110.0, 85.0, 0.0005
+# the light's strength on the clouds: the sun's, the sky's from above, the shade's
+CLOUD_SUN, CLOUD_SKY, CLOUD_SHADE = 2.6, (1.15, 1.2, 1.35), (1.05, 0.75, 1.0)
+SKY_LIGHT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sky_light.json")
+
+
+def cloud_sea(sky, lowest, cover=None, below=None, thickness=None, scale=None):
+    """The level's `clouds` settings under `sky` with its lowest floor's top at `lowest` (None: the sky has none); the
+    level's own cover, depth under the lowest floor, thickness and size of a cloud override the sky's."""
+    import json
+    if cover is not None and cover <= 0:
+        return None
+    if not os.path.exists(SKY_LIGHT):
+        return None
+    with open(SKY_LIGHT) as f:
+        light = json.load(f).get(sky)
+    sea = CLOUD_SEA.get(sky)
+    if light is None or (sea is None and cover is None):
+        return None
+    sea = sea or dict(cover=cover, under=1.0)
+    sun = np.asarray(light["sun_color"], np.float64)
+    chroma = sun / max(float(sun.max()), 1e-9)
+    warm = sea.get("warm", 0.5)
+    sun_col = (1 - warm + warm * chroma) * CLOUD_SUN * sea.get("sun", 1.0)
+    sky_col = np.asarray(light["sky"], np.float64)
+    r = lambda v: [round(float(x), 4) for x in v]  # noqa: E731
+    return {"top": round(float(lowest) - (CLOUD_TOP if below is None else below), 2),
+            "thickness": CLOUD_THICK if thickness is None else thickness,
+            "cover": sea["cover"] if cover is None else cover,
+            "scale": CLOUD_SIZE if scale is None else scale,
+            "sun": r(light["sun"]), "sun_color": r(sun_col),
+            "sky": r(sky_col * np.array(CLOUD_SKY)), "shadow": r(sky_col * np.array(CLOUD_SHADE)),
+            "haze": CLOUD_HAZE, "under": sea["under"]}
+
 
 def section(width, safety, surface="stone"):
     """A track's cross-section for its width and safety: its outline (across, up), from the bottom of its left side up,
@@ -584,13 +629,27 @@ class LevelBuilder:
 
     # --- writing -----------------------------------------------------------------------------------------------
 
+    def lowest_floor(self):
+        """The lowest point of the floors' meshes (Phys_Floors), or None without floors."""
+        ys = []
+        for i in self.groups.get("Phys_Floors", []):
+            node = self.nodes[i]
+            if node.get("mesh") is not None and self.meshes[node["mesh"]].p:
+                pts = np.asarray(self.meshes[node["mesh"]].p, np.float64)
+                ys.append(float((pts @ node["matrix"][:3, :3].T + node["matrix"][:3, 3])[:, 1].min()))
+        return min(ys) if ys else None
+
     def write(self, title, author, sky, start_ball, music, light=(1.0, 1.0, 1.0), bonus=100, licence=None,
-              extra=None):
-        """Writes the level and its level.txt (with `extra` keys besides title, author, version, licence)."""
+              extra=None, clouds=None):
+        """Writes the level and its level.txt (with `extra` keys besides title, author, version, licence). `clouds`:
+        the level's own choices for its sea of cloud (cloud_sea's cover, below, thickness, scale; cover 0 none)."""
         groups = sorted(self.groups.items())
+        lowest = self.lowest_floor()
+        sea = cloud_sea(sky, lowest, **(clouds or {})) if lowest is not None else None
         K.write_open(self.out, self.meshes, self.nodes, self.materials, groups, sky=sky, start_ball=start_ball,
                      settings={"music": music, "light": list(light), "level_bonus": bonus, "tutorial": False,
-                               "last_level": False, "parts": "own"}, generator="drahtseilakt levelkit.py")
+                               "last_level": False, "parts": "own", **({"clouds": sea} if sea else {})},
+                     generator="drahtseilakt levelkit.py")
         with open(os.path.join(self.out, "level.txt"), "w") as f:
             f.write(f"title = {title}\nauthor = {author}\nversion = 1\n")
             if licence:
