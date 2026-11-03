@@ -594,10 +594,7 @@ impl Audio {
         }
         let (send, data) = (
             self.decoded.0.clone(),
-            Data {
-                root: data.root.clone(),
-                overlay: data.overlay.clone(),
-            },
+            data.clone(),
         );
         self.pending.extend(wanted.iter().cloned());
         let names = wanted.clone();

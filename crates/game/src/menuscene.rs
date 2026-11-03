@@ -155,7 +155,17 @@ pub struct MenuScene {
     pub effects: crate::particles::Effects,
     /// The recorded animations and the scene objects they move.
     anims: Vec<(usize, Anim)>,
+    /// The scene's own sky (the own scene's `Sky_*` objects, drawn round the camera); none: the level's sky.
+    sky: Vec<usize>,
 }
+
+/// The original's lens: 0.95 across its 4:3 view (MenuLevel.nmo's Cam_MenuLevel), as the vertical field of view.
+fn lens(fov: f32) -> f32 {
+    2.0 * ((fov.clamp(0.05, 3.0) / 2.0).tan() * 0.75).atan()
+}
+const ORIGINAL_FOV: f32 = 0.95;
+/// The tension of the original's camera curve at each of its points (docs/animation.md, 3.3).
+const CURVE_TENSION: f32 = -0.6;
 
 /// An object animation's linear keys (docs/animation.md 5.3): position, rotation (x, y, z, w) and scale by frame.
 #[derive(Debug, Clone)]
@@ -290,7 +300,7 @@ impl MenuScene {
             .collect();
         let effects = crate::particles::Effects::menu(&level);
         // a sane lens (between about 3 and 170 degrees), a curve of finite points and length
-        let fov_y = 2.0 * ((cam.fov.clamp(0.05, 3.0) / 2.0).tan() * 0.75).atan();
+        let fov_y = lens(cam.fov);
         if !points.iter().all(|p| p.is_finite()) || !target.is_finite() {
             return None;
         }
@@ -302,7 +312,87 @@ impl MenuScene {
             model: None,
             effects,
             anims,
+            sky: Vec::new(),
         })
+    }
+
+    /// The own interface's scene in the open format (assets/own/3D Entities/MenuLevel, made by
+    /// make_menu_scene.py): the camera's closed curve through `I_MenuLevel_Curve_0..`, looking at
+    /// `Cam_MenuLevel_Target`, with the original's lens and tension; its own sky in the `Sky_*` objects.
+    pub fn load_open(dir: &std::path::Path) -> Option<MenuScene> {
+        let level = gamedata::assets::load_open(dir).ok()?.level;
+        let at = |name: &str| level.object(name).map(|(_, o)| Vec3::from(o.position()));
+        let target = at("Cam_MenuLevel_Target")?;
+        let points: Vec<Vec3> = (0..)
+            .map_while(|k| at(&format!("I_MenuLevel_Curve_{k}")))
+            .take(64)
+            .collect();
+        if points.len() < 2 || !points.iter().all(|p| p.is_finite()) || !target.is_finite() {
+            return None;
+        }
+        let tcb = vec![[CURVE_TENSION, 0.0, 0.0]; points.len()];
+        let sky = level
+            .objects
+            .iter()
+            .filter(|o| o.name.starts_with("Sky_"))
+            .filter_map(|o| o.mesh)
+            .collect();
+        Some(MenuScene {
+            curve: Curve::new(points, &tcb, false),
+            target,
+            fov_y: lens(ORIGINAL_FOV),
+            effects: crate::particles::Effects::menu(&level),
+            level,
+            model: None,
+            anims: Vec::new(),
+            sky,
+        })
+    }
+
+    /// What the frame draws `ms` into the menu: the scene's objects and the sky about the camera, the flames, and
+    /// the view (the window and the screenshots draw the menu the same way).
+    pub fn frame(
+        &self,
+        ms: f64,
+    ) -> (
+        Vec<Instance>,
+        Vec<crate::particles::Batch>,
+        crate::render::View,
+    ) {
+        let (eye, target) = self.camera((ms % f64::from(ROUND_MS)) as f32);
+        let mut inst = self.instances(ms);
+        let at_eye = Mat4::from_translation(eye);
+        if let Some(model) = self.model.filter(|_| !self.sky.is_empty()) {
+            inst.extend(
+                self.sky
+                    .iter()
+                    .map(|&mesh| Instance::plain(model, mesh, at_eye)),
+            );
+            let particles = self.effects.batches(eye, target);
+            let view = crate::render::View {
+                eye,
+                target,
+                fov_y: self.fov_y,
+            };
+            return (inst, particles, view);
+        }
+        for mesh in 0..crate::sky::FACE_COUNT {
+            inst.push(Instance::plain(
+                crate::scene::SKY_MODEL,
+                mesh,
+                Mat4::from_translation(eye),
+            ));
+        }
+        let particles = self.effects.batches(eye, target);
+        (
+            inst,
+            particles,
+            crate::render::View {
+                eye,
+                target,
+                fov_y: self.fov_y,
+            },
+        )
     }
 
     /// The camera at `ms` into the menu: where it is and what it looks at.
@@ -332,7 +422,8 @@ impl MenuScene {
                 .meshes
                 .get(mesh)
                 .is_some_and(|m| m.parts.iter().any(|p| p.material.is_some()));
-            if o.visible && lit && o.sprite.is_none() {
+            let sky = self.sky.contains(&mesh) && o.name.starts_with("Sky_");
+            if o.visible && lit && o.sprite.is_none() && !sky {
                 let m = moved.unwrap_or_else(|| Mat4::from_cols_array_2d(&o.matrix));
                 out.push(Instance::plain(model, mesh, m));
             }
@@ -372,6 +463,38 @@ mod tests {
             later.w_axis.truncate().distance(saved.w_axis.truncate()) > 1.0,
             "it moves"
         );
+    }
+
+    /// The own interface's scene (assets/own/3D Entities/MenuLevel, made by make_menu_scene.py) loads as the game
+    /// reads it: its camera's closed curve round the target at the original's radius and height, its own sky's
+    /// five faces drawn round the camera and not with the scene, the four flames of its start.
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn the_own_menu_scene_loads_with_its_camera_sky_and_flames() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../assets/own/3D Entities/MenuLevel");
+        let scene = MenuScene::load_open(&dir).expect("the own menu scene");
+        assert_eq!(scene.sky.len(), crate::sky::FACE_COUNT);
+        assert!("ABCD".chars().all(|c| {
+            scene
+                .level
+                .object(&format!("FourFlames_Flame_{c}"))
+                .is_some()
+        }));
+        let (eye, target) = scene.camera(0.0);
+        assert!(target.length() < 1e-3, "{target}");
+        assert!(
+            (Vec3::new(eye.x, 0.0, eye.z).length() - 95.0).abs() < 1.0
+                && (eye.y - 40.0).abs() < 1e-3,
+            "{eye}"
+        );
+        let mut scene = scene;
+        scene.model = Some(9);
+        let inst = scene.instances(0.0);
+        assert!(inst.len() > 5 && inst.iter().all(|i| !scene.sky.contains(&i.mesh)));
+        let (all, _, view) = scene.frame(0.0);
+        assert_eq!(all.len(), inst.len() + crate::sky::FACE_COUNT);
+        assert!((view.fov_y - lens(ORIGINAL_FOV)).abs() < 1e-6);
     }
 
     /// The menu's curve (docs/animation.md, 3.3): four points round a circle of radius about 95, TCB tension -0.6;

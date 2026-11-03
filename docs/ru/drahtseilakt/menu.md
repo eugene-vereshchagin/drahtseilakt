@@ -12,6 +12,7 @@
 | Экран | Строки сверху вниз | Примечания |
 |---|---|---|
 | Главное (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit спрашивает «Do you want to quit the game?» (Yes / No) |
+| Главное без копии (наше) | Start, Import, Highscore, Options, Credits, Exit | Start показывает «Our levels» (поставляемые и `levels/open/`); Import открывает окно, которое приносит копию игрока, после чего игра запускается заново уже с ней (decisions.md, «Игра играет из коробки») |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | уровень открывается, когда пройден предыдущий (`DB_Levelfreischaltung`); остальные серые. Дополнение с 13-м уровнем заменяет Menu.nmo и добавляет свою строку |
 | Highscore (`Menu_Highscore`) | «Highscore Level N», десять имён с очками, Back; влево и вправо меняют уровень | начальные таблицы копии — массивы `DB_Highscore_LvNN` в base.cmo («Mr. Default») |
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | у нас перед Back ещё Language и Extended |
@@ -89,6 +90,8 @@
   - лучшие времена рядом с уровнями;
   - уровни по видам под Start;
   - Interface: own / original / remaster — откуда берутся файлы интерфейса ([resources.md](resources.md));
+  - Textures: own / original — чем рисуются уровни, их детали и шары: нашими текстурами (по умолчанию и всегда в
+    классическом режиме) или текстурами копии; следующий уровень загружается с выбранными ([resources.md](resources.md));
   - Sounds: звуковая тема — системная, нейрогенерация, оригинальная (делает toolbox) или своя тема игрока
     ([resources.md](resources.md)); пока игрок не выбрал другую, и всегда в классическом режиме, играет
     нейрогенерация;
@@ -129,4 +132,5 @@
 `DRAHTSEILAKT_SHOT_MENU=base:keys` вместе с `--screenshot` рисует меню поверх кадра без окна (base — `main`,
 `pause`, `dead` или `end`; клавиши `u d l r` — стрелки, `e` — Enter, `b` — Esc, `n` — ввод имени, `w` — клавиша W
 в ожидании клавиши), чтобы
-посмотреть каждый экран.
+посмотреть каждый экран. Меню не поверх уровня стоит над 3D-сценой меню интерфейса, через
+`DRAHTSEILAKT_SHOT_MENU_MS` миллисекунд (по умолчанию 0) от начала круга её камеры.

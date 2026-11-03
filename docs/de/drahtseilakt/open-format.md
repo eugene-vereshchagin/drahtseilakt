@@ -4,7 +4,8 @@ Das eigene Levelformat der Engine: offen, dokumentiert, mit gewöhnlichen Werkze
 das das Spiel laden kann — die Originallevel aus der Kopie des Spielers, Community-Karten —, wird auf dem
 Rechner des Spielers darin umgewandelt (`drahtseilakt --level N --export DIR`, `--map FILE --export DIR`), und
 das Spiel spielt es (`drahtseilakt --open DIR`). Umgewandelte Level entstehen aus den eigenen Daten des
-Spielers und werden nicht verbreitet.
+Spielers und werden nicht verbreitet. Mit `--textures own` trägt ein Export unsere freien Texturen (resources.md, „Eigene Texturen“) statt
+deren der Kopie, wo wir eine haben: so lässt sich das Aussehen eines Levels nur mit freien Ressourcen teilen.
 
 ## Dateien
 
@@ -22,8 +23,10 @@ Ein Ordner mit:
   Kugeln, der Transformator und das Modul jedes danach benannten Objekts), und unverändert die Seiten seines Himmels
   (`game/Textures/Sky/`), die Texturen der Partikel (`game/Textures/Particles/`), der Schatten der Kugel und die
   Geräusche eines Laufs (`game/Sounds/`, nicht die des Menüs noch die Musik anderer Level). Das Spiel sucht zuerst
-  dort, dann in der Kopie; ein Pfad in `game/`, auf dem etwas ein Link ist, findet nichts. Nur die Oberfläche (Menüs,
-  Schrift, Knöpfe, Klänge und Szene des Menüs) kommt noch aus der Kopie. `--export` und die Toolbox schreiben ihn.
+  dort, dann, für ein Level, das für unsere eigenen Teile gemacht ist (seine Einstellungen sagen `"parts": "own"`), in unseren
+  Teilen (`assets/own/`, [resources.md](resources.md)) und danach in der Kopie, es spielt also mit und ohne Kopie
+  gleich; für jedes andere Level in der Kopie und danach in unseren. Ein Pfad in `game/`, auf dem etwas ein Link ist, findet nichts. `--export` und die
+  Toolbox schreiben ihn.
 
 ## Inhalt
 
@@ -53,13 +56,15 @@ Ein Ordner mit:
   `settings`: was das Original aus seiner Leveltabelle und seinen Regeln nach Levelnummer nimmt, damit das Level ohne
   die Dateien des Spiels gleich spielt — `music` (Thema 1 bis 1000), `light` (drei Zahlen 0..1), `level_bonus`
   (Punkte), `tutorial` und `last_level` (true oder false: erstes und letztes Level des Originals) und `source_hash`
-  (16 Hexziffern: FNV-1a der `.nmo`, aus der es umgewandelt wurde). Ein auf dieser Datei aufgenommenes Replay läuft auf
+  (16 Hexziffern: FNV-1a der `.nmo`, aus der es umgewandelt wurde) sowie `parts` (`"own"`: das Level ist für die
+  eigenen Teile des Spiels gemacht und nimmt sie vor denen der Kopie; `"copy"` oder nichts: zuerst die der Kopie; unser
+  Levelbaukasten schreibt `"own"`). Ein auf dieser Datei aufgenommenes Replay läuft auf
   dem umgewandelten Level (dasselbe Level, also derselbe Lauf); fehlerhafte Einstellungen lehnen das Level ab. Jedes
   Level kann jeden Hash nennen, ein darauf laufendes Replay beweist also keinen Lauf auf dem Original. Ein Level ohne
   Einstellungen (vor ihnen gemacht) läuft mit den Vorgaben und sagt es; ein Remaster `Level_NN` nimmt sie aus der
   Tabelle der Kopie. Die Dateien in `game/` ersetzen nur die eigenen Teile des Levels, Himmel, Partikel, Schatten und
-  die Geräusche eines Laufs: die Dateien der Oberfläche (Menüs, Schrift, Leveltabelle, Menügeräusche) sind immer die
-  der Kopie, und jede Datei wird mit einer Größengrenze gelesen.
+  die Geräusche eines Laufs: die Dateien der Oberfläche (Menüs, Schrift, Leveltabelle, Menügeräusche) kommen nie aus
+  einem Level: sie sind die der Oberfläche (unsere oder die der Kopie), und jede Datei wird mit einer Größengrenze gelesen.
 
 ## Koordinaten
 

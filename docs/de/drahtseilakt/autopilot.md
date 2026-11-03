@@ -84,6 +84,29 @@ nur durch einen Hebel. Zuerst geradewegs hindurch; dann Rammstöße aus einem An
 gleich nach dem Stoß gebremst (um einem Brett, das in die Lücke fällt, nicht zu folgen), ein Warten, bis es liegt,
 und hinüber.
 
+## In der Mitte bleiben
+
+Ein Spieler hält sich in der Mitte einer Bahn, nicht an ihrem Rand; der Testspieler auch. Die Böden des Levels
+werden einmal je Level auf ihre **Ränder** gelesen: wo es hinter dem Rand eines Bodens nicht gleich weitergeht (ein
+Absturz) oder eine Wand auf ihm steht (ihr Fuß); eine Naht zwischen den Meshes zweier Böden ist kein Rand. Jeder
+Bodenpunkt weiß, wie weit er vom nächsten Rand auf gleicher Höhe ist und wo die Mitte seines Bodens liegt (der
+freieste Punkt in der Nähe: die halbe Breite des Bodens).
+
+- **Die Wegsuche** zahlt für einen Punkt umso mehr, je näher er einem Rand ist, so folgt der Weg der Mitte einer
+  Bahn; auf einem schmalen Boden ist seine Mitte der einzige Weg. Eine Schiene ist kein Boden mit Rändern: ihre
+  Linie ist der Weg.
+- **Das Steuern** bewertet jede auf einer Kopie des Laufs probierte Wahl auch danach, wie weit die Kugel von der
+  Mitte ihres Bodens abkommt (und stärker, wo sie einem Rand näher als 3 kommt): weniger, als das Halten der Kugel
+  oder Vorankommen wert ist, mehr als ein kleiner Fortschritt. Jeder seit der letzten Entscheidung gedrückte oder
+  losgelassene Pfeil kostet auch etwas, so wird die Linie glatt, kein Zickzack.
+- **Beim Halten der Linie eines Spielers** darf seine Kugel dort, wo die Kugel des Spielers einem Rand näher als 3
+  kam, bis zu 1,5 von dieser Linie zur Mitte hin bleiben, wenn es ebenso schnell ist; sonst ist die Linie die des
+  Spielers.
+
+Die Zusammenfassung jedes Laufs endet damit, wie nah den Rändern seine Kugel rollte, über seine Ticks auf einem
+Boden (nicht auf Schienen): `edges: mean M, min N, within 1 for P% of T ticks on floors`. Dieselbe Zeile beendet
+`--replay FILE --headless`, so lässt sich jeder Lauf, auch der eines Spielers, vergleichen.
+
 ## Zurück und noch einmal
 
 Die Simulation ist deterministisch und lässt sich kopieren, also speichert der Testspieler seinen Lauf alle zwei
@@ -163,6 +186,31 @@ vertrauenswürdig: ihre Größe (64 KiB), die Zahl der Hinweise (256) und Schrit
 begrenzt, ein Replay ist ein einfacher Dateiname daneben, und eine fehlerhafte Zeile weist die ganze Datei mit ihrer
 Zeilennummer ab. `HINTS_TRACE=1` gibt die Kugel alle zehn Takte aus, solange ein Hinweis lenkt.
 
+## Ihm beim Spielen zusehen
+
+`--watch` (mit `--level N`, `--open DIR` oder `--sector N` und mit `--follow`, `--then`, `--plan`, `--hints` wie
+bei `--autopilot`) lässt den Testspieler im Fenster des Spiels spielen: seine Eingaben steuern das Spiel in jedem
+Tick statt der Tastatur. Seine Entscheidungen (Versuche auf Kopien des Laufs, Suchen) fallen zwischen den Bildern
+auf einem eigenen Thread; dauert eine länger, steht das Bild und zeigt „thinking“. Ein Zurückgehen zu einem
+gespeicherten Stand springt sichtbar dorthin, und die Zeile sagt, was misslang und wohin zurück. Der Stand oben
+links: Tempo, Zeit, Sektor, Leben, wie weit die Kugel vom Rand ihres Bodens ist, wie oft er zurückging, was steuert
+(die Linie des Spielers, die Wegsuche, ein Hinweis und sein Schritt, ein Manöver oder die Strahlsuche, wenn er
+feststeckt), der erreichte Wegpunkt und der nächste Transformator. Die Tasten stehen in einem Kasten unten links in
+der Sprache der Menüs (der eingeschaltete Zustand ist hervorgehoben):
+
+| Taste | Was sie tut |
+|---|---|
+| Leertaste | anhalten, weiter |
+| + / − | schneller, langsamer (¼× bis 8×; nur wie viele Ticks ein Bild: der Lauf bleibt derselbe) |
+| F5 | selbst steuern: die Pfeile steuern, der Testspieler schaut zu; wieder F5 gibt ihm die Kugel zurück, wo sie gerade ist. Die Strecke wird neben den Hinweisen als `<level>-hand-<tick>.replay` gespeichert (der Lauf bis dahin, so spielt er genau nach), und eine Hinweiszeile, die sie abspielt (`at … : replay <Datei> FROM TO`), kommt in `<level>-hand.txt`; beide werden am Bildschirm genannt. In die Hinweisdatei des Levels kopiert, spielt der Testspieler sie dort beim nächsten Mal. Zu den Ständen davor geht er nicht mehr zurück |
+| F6 | den Schritt des laufenden Hinweises überspringen |
+| F7 | ein Bericht über diese Stelle (wie bei einem toten Lauf, nach `--report`) |
+| F1 | den Tastenkasten aus- oder einblenden |
+| Esc | das Pausenmenü (Level verlassen, beenden) |
+
+Am Ende, oder wenn das Fenster geschlossen wird, wird die Zusammenfassung des Laufs ausgegeben und der ganze Lauf,
+auch die von Hand gesteuerten Strecken, unter `--record` gespeichert.
+
 ## Videos seiner Läufe
 
 `--video FILE` mit `--replay` zeichnet den Lauf ohne Fenster, ein Bild je Takt (60 pro Sekunde) in `--size`, als
@@ -177,20 +225,23 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 2026-11-03 (die geschafften Läufe liegen in `hints/runs/`, ihre Videos außerhalb des Repositorys, gemacht mit
 `scripts/video.sh`):
 
-- Level 1: vom Start an geschafft in 6:19.50 (Hinweise für Rampe, Kiste, Schieber und Schienen).
-- Level 2: vom Start an geschafft in 5:44.53 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers ab Sektor 5).
-- Level 3: vom Start an geschafft in 7:32.08 (Hebel und Brücke in Sektor 4 wie beim Inhaber).
-- Level 4: vom Start an geschafft in 9:16.25 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
-- Level 5: vom Start an geschafft in 13:06.93 (Hinweise für beide Kisten und den Schieber).
+- Level 1: vom Start an geschafft in 6:12.27 (Hinweise für Rampe, Kiste, Schieber und Schienen).
+- Level 2: vom Start an geschafft in 6:13.27 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers ab Sektor 5).
+- Level 3: vom Start an geschafft in 7:45.48 (Hebel und Brücke in Sektor 4 wie beim Inhaber).
+- Level 4: vom Start an geschafft in 9:19.47 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
+- Level 5: vom Start an geschafft in 12:39.77 (Hinweise für beide Kisten und den Schieber).
 - Level 6: mit dem Lauf des Inhabers (er endet am gewölbten Baumstamm in Sektor 2) und dem Plan
   `hints/Level_06.plan` kommt der Testspieler allein durch Sektor 2 und 3 und über den welligen Stamm von Sektor 4
   bis zu seinem Stein-Transformator; als Nächstes sind die Kisten als Stein vom Absatz zu stoßen.
-- Level 7: vom Start an geschafft in 11:47.53, dem geschafften Lauf des Inhabers folgend.
+- Level 7: vom Start an geschafft in 12:04.28, dem geschafften Lauf des Inhabers folgend.
 - Level 8: allein mit dem Plan aus dem Video bis zum ersten Holz-Transformator (Weg 156 von 1072).
-- Level 9: vom Start an geschafft in 12:30.10, dem geschafften Lauf des Inhabers folgend (das Labyrinth der Schieber
+- Level 9: vom Start an geschafft in 12:35.27, dem geschafften Lauf des Inhabers folgend (das Labyrinth der Schieber
   in Sektor 3 wird gelöst, wie der Inhaber es löste).
-- Level 10: vom Start an geschafft in 14:42.52, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
+- Level 10: vom Start an geschafft in 15:31.00, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
 - Level 11–13: 11 folgt dem Lauf des Inhabers durch Sektor 1–3 (verliert an der Zugbrücke eine Kugel wie der
   Inhaber, was sie umstößt) und fährt in Sektor 4 allein weiter; 12 in Sektor 2
   (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator vorbei und den Ventilator hinauf, am
   Balken, an dem die Ventilatoren 18_10–12 entlangblasen.
+- Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
+- Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
+  Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).

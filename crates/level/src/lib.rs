@@ -51,6 +51,9 @@ pub struct Settings {
     pub last_level: bool,
     /// The hash of the file the level was converted from (replays recorded on that file play on this level).
     pub source_hash: Option<u64>,
+    /// The level is made for the game's own parts (`"parts": "own"`): it takes ours before the copy's, so it plays the
+    /// same with a copy or without one. Any other level takes the copy's parts first, as it was made.
+    pub own_parts: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -138,8 +141,12 @@ pub struct Channel {
 
 #[derive(Debug, Clone)]
 pub enum TextureSource {
-    /// A file name, looked up in the game's texture folders.
+    /// A file name, looked up in the game's texture folders. From a `.nmo` it is the file's raw name (a stranger's
+    /// map may name anything there): only its last part is ever used.
     File(String),
+    /// A file of an open-format level's own `textures/` folder: its full path, made by the reader from the level's
+    /// folder (made absolute) and a plain name it checked. Only this source names a path to read.
+    LevelFile(std::path::PathBuf),
     /// Pixels stored with the level: width, height, RGBA.
     Pixels {
         width: u32,

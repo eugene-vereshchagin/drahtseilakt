@@ -52,6 +52,8 @@ impl Default for Timing {
 }
 
 struct Game {
+    /// The game's files for this level: its parts ours or the copy's first, as the level says (Data::with_parts).
+    data: Data,
     level: LoadedLevel,
     start_ball: crate::sim::BallKind,
     balls: LoadedLevel,
@@ -143,14 +145,19 @@ fn begin_at(sim: &mut Sim, st: &crate::replay::Start) {
 impl Game {
     fn new(o: &Options, data: &Data) -> Result<Game, String> {
         let mut level = data.load(&o.source)?;
+        let data = &data.with_parts(&level.level);
         scene::cloud_material(&mut level.level);
         for w in &level.warnings {
             eprintln!("warning: {w}");
         }
-        // the shared parts (balls, modules, transformer): the level folder's own when it has them, else the copy's
-        let balls = data
-            .part("3D Entities/Balls.nmo")
-            .ok_or("Balls.nmo not found or unreadable in the game data")?;
+        // the shared parts (balls, modules, transformer): the level folder's own when it has them, else ours or the
+        // copy's (assets.rs); without any the ball is drawn plain and bursts into nothing (said once, never fatal)
+        let balls = data.part("3D Entities/Balls.nmo").unwrap_or_else(|| crate::assets::LoadedLevel {
+            level: level::Level::default(),
+            name: "Balls".into(),
+            hash: 0,
+            warnings: Vec::new(),
+        });
         let replay_in = match &o.replay {
             Some(p) => {
                 let text =
@@ -225,6 +232,7 @@ impl Game {
             .part("3D Entities/AnimTrafo.nmo")
             .and_then(|f| crate::trafo::TrafoModel::new(&f.level, trafo_model).map(|m| (f, m)));
         Ok(Game {
+            data: data.clone(),
             trafo,
             placements,
             modules,
@@ -787,17 +795,19 @@ fn loading_name(source: &crate::assets::Source) -> String {
     match source {
         crate::assets::Source::Original(n) => format!("level {n}"),
         crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
-            gamedata::package::title_of(p, &custom_roots()).replace('…', "...")
+            let lang = crate::lang::chosen(setting("language").as_deref());
+            gamedata::package::title_of(p, &custom_roots(), &lang).replace('…', "...")
         }
     }
 }
 
-/// The custom levels' folders (all but the original's).
+/// The custom levels' folders (all but the original's), and the levels shipped with the game.
 fn custom_roots() -> Vec<PathBuf> {
     crate::levels::KINDS
         .into_iter()
         .filter(|&k| k != crate::levels::Kind::Original)
         .map(crate::levels::dir)
+        .chain(gamedata::resources::shipped_levels_root())
         .collect()
 }
 
@@ -877,6 +887,16 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { default });
+    // the levels' textures: ours unless the extended mode chose the copy's, or the command line says; an export keeps
+    // the level's own (the copy's) unless `--textures own` asks for ours in it
+    let textures = if o.export.is_some() {
+        Some(gamedata::resources::TextureSet::Original)
+    } else if extended {
+        gamedata::resources::textures_from_settings()
+    } else {
+        None
+    };
+    gamedata::resources::set_textures(o.textures.or(textures).unwrap_or(gamedata::resources::TextureSet::Own));
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (the interface no longer implies the original's sounds: the copy's interface is now the default)
     let theme = if extended {
@@ -886,7 +906,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     };
     gamedata::sound_themes::start(theme.as_deref());
     // a level folder's own game files (modules, sky, sounds) come before the copy's
-    let data = data.for_level(data.level_dir(&o.source).as_deref());
+    let data = data.for_source(&o.source);
     if let Some(dir) = &o.export {
         let loaded = data.load(&o.source)?;
         return crate::assets::export(&data, &loaded, dir);
@@ -897,14 +917,14 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     }
     if let Some(dir) = &o.locate {
         let mut game = Game::new(&o, &data)?;
-        return locate_run(&mut game, &data, &o, dir);
+        return locate_run(&mut game, &o, dir);
     }
     if let Some(follow) = &o.follow {
         return follow_run(&o, &data, follow);
     }
     let mut game = Game::new(&o, &data)?;
     if let Some(dir) = &o.frames {
-        return frames_run(&mut game, &data, dir);
+        return frames_run(&mut game, dir);
     }
     if let Some(path) = &o.screenshot {
         // the player's clouds and field of view, as the window would show them
@@ -912,7 +932,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         return screenshot(&mut game, &data, &o, path);
     }
     if o.autopilot {
-        return autopilot(&mut game, &data, &o);
+        return autopilot(game, &data, &o);
     }
     if o.headless {
         game.start_session();
@@ -923,8 +943,12 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             .ok_or("--headless needs --replay")?;
         // when the end music (Music_EndCheckpoint) would begin to loop, and the finish music after it
         let mut end_music = None;
+        // how near the floors' edges the ball rolls (edges.rs), for comparing runs
+        let edges = crate::autopilot::level_edges(&game.level.level, &game.modules);
+        let mut near_edges = crate::edges::EdgeStats::default();
         while game.sim.tick < end && !game.sim.finished && !game.sim.game_over {
             game.tick(0);
+            near_edges.tick(&edges, &game.sim.ball);
             if end_music.is_none() && crate::music::near_end(&game.sim) {
                 end_music = Some(game.sim.tick);
             }
@@ -976,6 +1000,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             s.lives,
             s.sector + 1
         );
+        println!("{}", near_edges.line());
         match end_music {
             Some(t) => println!("end music: Music_EndCheckpoint loops from {} ({} before the end)", clock(t),
                 clock(s.tick.saturating_sub(t))),
@@ -986,6 +1011,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     if let Some(tick) = o.from {
         game.fast_forward(tick);
     }
+    window(game, data, &o, None)
+}
+
+/// The game in its window (`pilot`: the test player plays it, with --watch).
+fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>) -> Result<(), String> {
     game.start_session();
     let video = o.video.clone();
     // Without a level named, the window opens with the main menu over the first level.
@@ -1059,6 +1089,16 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         menu_scene: None,
         menu_ms: 0.0,
         held: std::collections::HashSet::new(),
+        pilot: pilot.map(|run| PilotWatch {
+            run,
+            paused: false,
+            speed: 1.0,
+            hand: None,
+            pending: None,
+            notice: None,
+            done: false,
+            keys_shown: true,
+        }),
     };
     if let Some(path) = video {
         return app.video(&path);
@@ -1066,6 +1106,10 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Poll);
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
+    // a watched run closed before its end: summed up and saved as it stands
+    if let Some(w) = app.pilot.take().filter(|w| !w.done) {
+        w.run.summary(&app.game, o)?;
+    }
     app.game.save_attempt();
     match app.error {
         Some(e) => Err(e),
@@ -1076,12 +1120,12 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
 /// Plays the replay and draws `locate::RATE` frames of it a second (640 × 480 with the in-game interface, as a
 /// video of the original would show it) into `dir` as s0001.jpg, ..., with `truth.txt`: each frame's number, the
 /// ball's place and the view's quarter. A video with a known answer, to check `--locate` with.
-fn frames_run(game: &mut Game, data: &Data, dir: &Path) -> Result<(), String> {
+fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let end = game.replay_in.as_ref().map(|r| r.end).ok_or("--frames needs --replay")?;
     let (_, device, queue) = pollster::block_on(device(None))?;
     let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
-    upload(&mut r, game, data);
+    upload(&mut r, game);
     let off = crate::locate::Offscreen::sized(&r, 640, 480);
     let mut truth = String::from("# frame x y z quarter\n");
     let mut k = 0;
@@ -1121,7 +1165,7 @@ fn frames_run(game: &mut Game, data: &Data, dir: &Path) -> Result<(), String> {
 
 /// Finds the ball's way in a video's frames (`locate::RATE` a second) and writes it as a track: per frame its
 /// number, the ball's place, the view's quarter and how alike the best picture was.
-fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(), String> {
+fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
     let mut names: Vec<PathBuf> = std::fs::read_dir(dir)
         .map_err(|e| format!("{}: {e}", dir.display()))?
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -1146,7 +1190,7 @@ fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(
     let floor: Vec<glam::Vec3> = route.floor_points().collect();
     let (_, device, queue) = pollster::block_on(device(None))?;
     let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
-    upload(&mut r, game, data);
+    upload(&mut r, game);
     let off = crate::locate::Offscreen::new(&r);
     let base = Snapshot::of(&game.sim);
     let mut draw = |view: &crate::render::View, ball: glam::Vec3| {
@@ -1185,7 +1229,7 @@ fn locate_run(game: &mut Game, data: &Data, o: &Options, dir: &Path) -> Result<(
 fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     let mut own = o.clone();
     own.follow = None;
-    let mut game = Game::new(&own, data)?;
+    let game = Game::new(&own, data)?;
     let trafos: Vec<_> = game.sim.trafos().collect();
     // where the loose objects (boxes, balls) and the modules' moving parts start, and how near the ball comes to
     // one to move it
@@ -1290,7 +1334,7 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
             eprintln!("way {i} {:.1} {:.1} {:.1}", p.x, p.y, p.z);
         }
     }
-    pilot_run(&mut game, data, &own, crate::autopilot::Pilot::new(route, gates))
+    pilot_run(game, data, &own, crate::autopilot::Pilot::new(route, gates))
 }
 
 /// A run that did not finish is followed this many way points (and ticks of the player's) past the player's last
@@ -1353,7 +1397,7 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         own.ball = st.ball.clone();
         own.at = st.at.map(|[x, y, z]| format!("{x},{y},{z}"));
     }
-    let mut game = Game::new(&own, data)?;
+    let game = Game::new(&own, data)?;
     if !w.finished {
         way_on(&game, &own, &mut w)?;
     }
@@ -1362,7 +1406,7 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         crate::autopilot::Route::along(&game.level.level, &game.modules, &game.sim.updrafts(), w.path, !w.finished);
     let mut pilot = crate::autopilot::Pilot::new(route, w.gates);
     pilot.demo = Some(std::sync::Arc::new(w.demo));
-    pilot_run(&mut game, data, &own, pilot)
+    pilot_run(game, data, &own, pilot)
 }
 
 /// A followed run that did not finish: its way up to its last sector and its try there that got furthest (lost its
@@ -1561,9 +1605,9 @@ fn failed_tries_out(
 
 /// The test player plays the level from where the run begins: it saves the run at --record (or as an attempt) and
 /// prints how far it got.
-fn autopilot(game: &mut Game, data: &Data, o: &Options) -> Result<(), String> {
+fn autopilot(game: Game, data: &Data, o: &Options) -> Result<(), String> {
     let start = game.sim.ball.position;
-    let (route, gates) = found_way(game, o, start, game.sim.sector, &[], &[], game.sim.ball.kind)?;
+    let (route, gates) = found_way(&game, o, start, game.sim.sector, &[], &[], game.sim.ball.kind)?;
     println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
     if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
         for p in route.floor_points() {
@@ -1872,42 +1916,91 @@ fn stuck_report(
     Ok(())
 }
 
-/// Runs the test player to --ticks (or the finish), prints how far it got and saves its run at --record. Where it
-/// is stuck it writes a report (--report), and it follows the level's hints.
-fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<(), String> {
-    pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
-    let level = &game.level.level;
-    pilot.bridges = (0..level.objects.len())
-        .filter(|&i| crate::scene::module_of(level, i) == Some("P_Modul_25"))
-        .filter_map(|i| level.objects.get(i).map(|ob| glam::Vec3::from(ob.position())))
-        .collect();
-    if game.start.is_some() {
-        pilot.take_up(&game.sim);
+/// A state the test player goes back to: the run, its record, the player, how far it got and since when, the hint
+/// at, how near the edges it rolled.
+type Saved = (Sim, Replay, crate::autopilot::Pilot, usize, u64, Option<(usize, usize)>, crate::edges::EdgeStats);
+
+/// The test player's run, tick by tick (headless in `pilot_run`, or in the window with --watch): its hints and
+/// reports, going back when the ball is lost, giving up when the way stands still.
+struct PilotRun {
+    pilot: crate::autopilot::Pilot,
+    report: PathBuf,
+    limit: u64,
+    give_up: u64,
+    best: usize,
+    since: u64,
+    heard: usize,
+    hint_at: Option<(usize, usize)>,
+    dead: bool,
+    rewinds: crate::autopilot::Rewinds<Saved>,
+    edges: Arc<crate::edges::Edges>,
+    near_edges: crate::edges::EdgeStats,
+    /// The last time it went back, for whoever watches: what failed, where, and back to when.
+    went_back: Option<String>,
+}
+
+impl PilotRun {
+    fn new(game: &Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<PilotRun, String> {
+        pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
+        let level = &game.level.level;
+        pilot.bridges = (0..level.objects.len())
+            .filter(|&i| crate::scene::module_of(level, i) == Some("P_Modul_25"))
+            .filter_map(|i| level.objects.get(i).map(|ob| glam::Vec3::from(ob.position())))
+            .collect();
+        if game.start.is_some() {
+            pilot.take_up(&game.sim);
+        }
+        let hint_at = pilot.hints.at();
+        // how near the floors' edges the ball rolls, in the run kept (edges.rs): the summary's last line
+        let edges = pilot.route.edges.clone();
+        Ok(PilotRun {
+            pilot,
+            // the player's own data folder, not a shared temporary one
+            report: o.report.clone().unwrap_or_else(|| crate::levels::data_dir().join("stuck")),
+            limit: o.ticks.unwrap_or(60 * 60 * 20),
+            // a dead run: the ball neither falls nor gets on along the way for --give-up seconds (it stands or goes
+            // to and fro, not knowing where to go); its report is written and the run stops, for whoever writes the
+            // hints. A ball that falls is an ordinary mistake: each fall starts the wait again.
+            give_up: o.give_up.saturating_mul(60),
+            best: 0,
+            since: game.sim.tick,
+            heard: game.sim.events.len(),
+            hint_at,
+            dead: false,
+            // the states it goes back to when the ball is lost or the way stands still (autopilot.rs, Rewinds)
+            rewinds: crate::autopilot::Rewinds::new(o.rewinds),
+            edges,
+            near_edges: crate::edges::EdgeStats::default(),
+            went_back: None,
+        })
     }
-    // the player's own data folder, not a shared temporary one
-    let report = o.report.clone().unwrap_or_else(|| crate::levels::data_dir().join("stuck"));
-    let limit = o.ticks.unwrap_or(60 * 60 * 20);
-    let (mut best, mut since) = (0usize, game.sim.tick);
-    // a dead run: the ball neither falls nor gets on along the way for --give-up seconds (it stands or goes to and
-    // fro, not knowing where to go); its report is written and the run stops, for whoever writes the hints. A ball
-    // that falls is an ordinary mistake: each fall starts the wait again, and the pilot goes on by itself.
-    let give_up = o.give_up.saturating_mul(60);
-    let mut heard = game.sim.events.len();
-    let mut hint_at = pilot.hints.at();
-    let mut dead = false;
-    // the states it goes back to when the ball is lost or the way stands still (autopilot.rs, Rewinds)
-    let mut rewinds = crate::autopilot::Rewinds::new(o.rewinds);
-    while game.sim.tick < limit && !game.sim.finished && !game.sim.game_over {
+
+    /// Whether the run goes on.
+    fn going(&self, game: &Game) -> bool {
+        !self.dead && game.sim.tick < self.limit && !game.sim.finished && !game.sim.game_over
+    }
+
+    /// Before the player decides: a state saved to go back to, when one is due.
+    fn before(&mut self, game: &Game) {
         let s = &game.sim;
-        if rewinds.due(s) {
-            let state = (s.clone(), game.replay_out.clone(), pilot.clone(), best, since, hint_at);
-            rewinds.save(s.tick, state);
+        if self.rewinds.due(s) {
+            let state =
+                (s.clone(), game.replay_out.clone(), self.pilot.clone(), self.best, self.since, self.hint_at,
+                    self.near_edges);
+            self.rewinds.save(s.tick, state);
         }
-        let i = pilot.next(&game.sim);
+    }
+
+    /// One tick with input `i` (the player's), and what follows from it: back to a saved state when the ball was
+    /// lost or the way stood still, a new ball's place on the way, a report when the run is dead.
+    fn after(&mut self, game: &mut Game, data: &Data, o: &Options, i: u8) {
         game.tick(i);
-        if pilot.reached() > best {
-            (best, since) = (pilot.reached(), game.sim.tick);
+        self.near_edges.tick(&self.edges, &game.sim.ball);
+        let pilot = &mut self.pilot;
+        if pilot.reached() > self.best {
+            (self.best, self.since) = (pilot.reached(), game.sim.tick);
         }
+        let heard = self.heard;
         // (a transformer rolled over by a slip, making the ball another kind than the way's, counts as a fall)
         let stray = game.sim.events.iter().skip(heard).any(|(_, e)| {
             matches!(e, crate::sim::Event::Transform(k) if pilot.stray_transform(*k, game.sim.ball.position))
@@ -1916,93 +2009,109 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
         // (a ball lost as the player lost one there is not gone back from: it may be what the level needs)
         let as_the_player = fell && !stray && pilot.lost_as_the_player(&game.sim);
         // lost, or standing still too long: back to a state saved before, varied (a try of its own, reproducible)
-        let still = game.sim.tick - since > give_up.min(crate::autopilot::REWIND_STILL);
+        let still = game.sim.tick - self.since > self.give_up.min(crate::autopilot::REWIND_STILL);
         // (standing still: from where it last got on, a state saved there too)
         let failed_at = if as_the_player {
             None
         } else if fell {
             Some(game.sim.tick)
         } else {
-            still.then_some(since + 60)
+            still.then_some(self.since + 60)
         };
         if let Some(at) = failed_at
-            && let Some((state, attempt)) = rewinds.back(at, (game.sim.sector, pilot.reached()))
+            && let Some((state, attempt)) = self.rewinds.back(at, (game.sim.sector, pilot.reached()))
         {
-            let (sim, replay, p, b, sn, h) = state;
-            println!("{} {} at ({:.1} {:.1} {:.1}): back to {} (try {attempt}, {} rewinds)", clock(game.sim.tick),
-                if fell { "lost" } else { "stuck" }, game.sim.ball.position.x, game.sim.ball.position.y,
-                game.sim.ball.position.z, clock(sim.tick), rewinds.total());
+            let (sim, replay, p, b, sn, h, ne) = state;
+            let line = format!("{} {} at ({:.1} {:.1} {:.1}): back to {} (try {attempt}, {} rewinds)",
+                clock(game.sim.tick), if fell { "lost" } else { "stuck" }, game.sim.ball.position.x,
+                game.sim.ball.position.y, game.sim.ball.position.z, clock(sim.tick), self.rewinds.total());
+            println!("{line}");
+            self.went_back = Some(line);
             game.sim = sim;
             game.replay_out = replay;
-            pilot = p;
-            pilot.perturb(&game.sim, attempt);
-            (best, since, hint_at) = (b, game.sim.tick.max(sn), h);
-            heard = game.sim.events.len();
-            continue;
+            self.pilot = p;
+            self.pilot.perturb(&game.sim, attempt);
+            (self.best, self.since, self.hint_at, self.near_edges) = (b, game.sim.tick.max(sn), h, ne);
+            self.heard = game.sim.events.len();
+            return;
         }
         // (a stray transformer taken as it came: back into one making the way's kind, as for a new ball)
         if stray || game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::NewBall)) {
             pilot.new_ball(&game.sim);
             // back at the reset point: getting on is counted from there again
-            best = pilot.reached();
+            self.best = pilot.reached();
         }
-        heard = game.sim.events.len();
+        self.heard = game.sim.events.len();
         // a hint going on to its next step gets on too (its steps lead off the way: round, back for a run-up), and so
         // does one playing a recorded run
         let now_at = pilot.hints.at();
-        if fell || (now_at != hint_at && now_at.is_some()) || pilot.hints.replaying() {
-            since = game.sim.tick;
+        if fell || (now_at != self.hint_at && now_at.is_some()) || pilot.hints.replaying() {
+            self.since = game.sim.tick;
         }
-        hint_at = now_at;
-        if game.sim.tick - since > give_up {
+        self.hint_at = now_at;
+        if game.sim.tick - self.since > self.give_up {
             let b = game.sim.ball.position;
             println!("dead run: ball at ({:.1} {:.1} {:.1}), not falling and the way not on for {} s", b.x, b.y, b.z,
-                (game.sim.tick - since) / 60);
-            if let Err(e) = stuck_report(game, data, o, &pilot, &report) {
+                (game.sim.tick - self.since) / 60);
+            if let Err(e) = stuck_report(game, data, o, &self.pilot, &self.report) {
                 eprintln!("stuck report: {e}");
             }
-            dead = true;
-            break;
+            self.dead = true;
+            return;
         }
         if game.sim.tick.is_multiple_of(600) {
             let b = game.sim.ball.position;
-            println!(
-                "{} sector {} lives {} route {} / {} ball ({:.1} {:.1} {:.1})",
-                clock(game.sim.tick),
-                game.sim.sector + 1,
-                game.sim.lives,
-                pilot.reached(),
-                pilot.route.points.len(),
-                b.x,
-                b.y,
-                b.z
-            );
+            println!("{} sector {} lives {} route {} / {} ball ({:.1} {:.1} {:.1})", clock(game.sim.tick),
+                game.sim.sector + 1, game.sim.lives, pilot.reached(), pilot.route.points.len(), b.x, b.y, b.z);
         }
     }
-    let s = &game.sim;
-    println!(
-        "result: {} after {} ({}), sector {}, lives {}, route {} / {}",
-        if s.finished {
+
+    /// The watcher drove since tick `began` and hands the ball back: the way is taken up from here, getting on is
+    /// counted from here, and the states before are not gone back to (what the hands did is kept).
+    fn resume(&mut self, game: &Game, began: u64) {
+        self.pilot.resume(&game.sim, began);
+        self.rewinds.forget();
+        (self.best, self.since) = (self.pilot.reached(), game.sim.tick);
+        self.heard = game.sim.events.len();
+        self.hint_at = self.pilot.hints.at();
+    }
+
+    /// The summary of the run, and its record saved at --record.
+    fn summary(&self, game: &Game, o: &Options) -> Result<(), String> {
+        let s = &game.sim;
+        let what = if s.finished {
             "finished"
         } else if s.game_over {
             "game over"
-        } else if dead {
+        } else if self.dead {
             "dead run"
         } else {
             "not finished"
-        },
-        s.tick,
-        clock(s.tick),
-        s.sector + 1,
-        s.lives,
-        pilot.reached(),
-        pilot.route.points.len()
-    );
-    if let Some(path) = &o.record {
-        std::fs::write(path, game.replay_out.to_text()).map_err(|e| format!("{}: {e}", path.display()))?;
-        println!("saved {}", path.display());
+        };
+        println!("result: {what} after {} ({}), sector {}, lives {}, route {} / {}", s.tick, clock(s.tick),
+            s.sector + 1, s.lives, self.pilot.reached(), self.pilot.route.points.len());
+        println!("{}", self.near_edges.line());
+        if let Some(path) = &o.record {
+            std::fs::write(path, game.replay_out.to_text()).map_err(|e| format!("{}: {e}", path.display()))?;
+            println!("saved {}", path.display());
+        }
+        Ok(())
     }
-    Ok(())
+}
+
+/// Runs the test player to --ticks (or the finish), prints how far it got and saves its run at --record. Where it
+/// is stuck it writes a report (--report), and it follows the level's hints. With --watch it plays in the window.
+fn pilot_run(mut game: Game, data: &Data, o: &Options, pilot: crate::autopilot::Pilot) -> Result<(), String> {
+    let mut run = PilotRun::new(&game, data, o, pilot)?;
+    if o.watch {
+        return window(game, data.clone(), o, Some(Box::new(run)));
+    }
+    while run.going(&game) {
+        run.before(&game);
+        let i = run.pilot.next(&game.sim);
+        run.after(&mut game, data, o, i);
+    }
+    run.summary(&game, o)
 }
 
 /// A video goes on this long past the finish (six seconds), for the end screen.
@@ -2117,7 +2226,9 @@ fn upload_menu_scene(renderer: &mut Renderer, scene: Option<&mut crate::menuscen
     }
 }
 
-fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
+fn upload(renderer: &mut Renderer, game: &Game) {
+    // the level's own parts' files (its sky, particles, shadow) as the level chose them
+    let data = &game.data;
     // the level's light colour (the level table's Light; white for a level without a row)
     renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
     let loader = |t: &level::Texture| data.texture(t);
@@ -2140,19 +2251,16 @@ fn upload(renderer: &mut Renderer, game: &Game, data: &Data) {
     if let Some((w, h, rgba)) = data.texture(&shadow) {
         renderer.set_shadow_texture(w, h, rgba);
     }
-    // the interface's textures; the own interface's picture behind its menus only with it (the copy has none)
+    // the interface's textures
     let own = gamedata::resources::in_use() == gamedata::resources::Provider::Own;
     let interface = ["Font_1", "Button01_special", "Button01_select", "Button01_deselect"];
-    let backdrop = own.then_some(crate::ui::BACKDROP);
     // the own interface draws its texts in the shipped fonts: the copy's font is not read
     let fonts = interface.into_iter().filter(|n| !(own && *n == "Font_1"));
-    for name in crate::particles::textures().into_iter().chain(fonts).chain(backdrop) {
+    for name in crate::particles::textures().into_iter().chain(fonts) {
         let t = level::Texture {
             name: name.to_owned(),
             source: level::TextureSource::File(if name.starts_with("Font_") || name.starts_with("Button") {
                 format!("{name}.tga")
-            } else if name == crate::ui::BACKDROP {
-                format!("{name}.png")
             } else {
                 format!("{name}.bmp")
             }),
@@ -2253,7 +2361,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     let (_, device, queue) = pollster::block_on(device(None))?;
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = Renderer::new(device, queue, format);
-    upload(&mut r, game, data);
+    upload(&mut r, game);
     // the passing lights as the window would show them (the lightning on a fixed schedule)
     if game.last_level {
         r.flash = crate::lights::Blitz::new(1).step(game.sim.tick).0;
@@ -2275,6 +2383,25 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         view_formats: &[],
     });
     let view = target.create_view(&Default::default());
+    // DRAHTSEILAKT_SHOT_MENU=base:keys draws a menu over the frame, to look at the menus without a window: base is
+    // main, pause, dead or end, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options. A
+    // menu not over the level has the menu scene behind it, DRAHTSEILAKT_SHOT_MENU_MS (default 0) into the menu.
+    let shot = std::env::var("DRAHTSEILAKT_SHOT_MENU").ok();
+    let menu = shot.and_then(|spec| shot_menu(&spec, data, game, o, (w, h)));
+    let mut menu_scene = menu.as_ref().filter(|m| !m.over_level()).and_then(|_| load_menu_scene(data));
+    upload_menu_scene(&mut r, menu_scene.as_mut(), data);
+    if let Some(ms) = menu_scene.filter(|m| m.model.is_some()) {
+        let at = std::env::var("DRAHTSEILAKT_SHOT_MENU_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+        let (inst, particles, frame_view) = ms.frame(at);
+        r.draw(&view, w, h, &frame_view, &inst, &particles);
+        let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
+        let quads = menu.map(|m| m.interface(game.font.as_ref(), screen)).unwrap_or_default();
+        if let Some((aw, ah, rgba)) = crate::fallback::take_changed() {
+            r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
+        }
+        r.draw_ui(&view, w, h, &quads);
+        return save_target(&r, &target, (w, h), path, game.sim.tick);
+    }
     let inst = scene::instances(
         &game.placements,
         &game.sim.taken,
@@ -2305,10 +2432,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     if let (Some(t), Some(f)) = (crate::endscreen::of(&game.sim), game.font.as_ref()) {
         quads.extend(crate::endscreen::interface(&t, f, &strings, screen));
     }
-    // DRAHTSEILAKT_SHOT_MENU=base:keys draws a menu over the frame, to look at the menus without a window: base is
-    // main, pause, dead or end, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options.
-    let shot = std::env::var("DRAHTSEILAKT_SHOT_MENU").ok();
-    if let Some(m) = shot.and_then(|spec| shot_menu(&spec, data, game, o, (w, h))) {
+    if let Some(m) = menu {
         if !m.over_level() {
             quads.clear();
         }
@@ -2318,8 +2442,12 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
     }
     r.draw_ui(&view, w, h, &quads);
+    save_target(&r, &target, (w, h), path, game.sim.tick)
+}
 
-    let pixels = read_back(&r, &target, w, h)?;
+/// Reads the rendered frame back and writes it to a PNG.
+fn save_target(r: &Renderer, target: &wgpu::Texture, (w, h): (u32, u32), path: &Path, tick: u64) -> Result<(), String> {
+    let pixels = read_back(r, target, w, h)?;
     image::save_buffer(path, &pixels, w, h, image::ExtendedColorType::Rgba8)
         .map_err(|e| e.to_string())?;
     println!(
@@ -2327,9 +2455,18 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         path.display(),
         w,
         h,
-        game.sim.tick
+        tick
     );
     Ok(())
+}
+
+/// The scene behind the menus: the original's (MenuLevel.nmo) with the copy's interface, else ours.
+fn load_menu_scene(data: &Data) -> Option<crate::menuscene::MenuScene> {
+    if gamedata::resources::in_use() == gamedata::resources::Provider::Own {
+        let dir = gamedata::resources::own_root()?.join("3D Entities").join("MenuLevel");
+        return crate::menuscene::MenuScene::load_open(&dir);
+    }
+    crate::menuscene::MenuScene::load(data)
 }
 
 pub(crate) struct Gpu {
@@ -2411,7 +2548,159 @@ struct App {
     wheel: f64,
     /// The cursor is shown (menus) or hidden (the run); None until first set.
     cursor_shown: Option<bool>,
+    /// The test player playing in the window (--watch), while it plays.
+    pilot: Option<PilotWatch>,
 }
+
+/// The test player in the window (--watch): its run, and what the watcher does with it.
+struct PilotWatch {
+    run: Box<PilotRun>,
+    paused: bool,
+    /// How fast the run goes against real time (the run is the same tick by tick).
+    speed: f32,
+    /// Driven by hand (F5) since this tick, from this place, in this sector, as this ball.
+    hand: Option<(u64, glam::Vec3, usize, crate::sim::BallKind)>,
+    /// The test player deciding the next tick's input on its own thread (its searches take a while), since when.
+    pending: Option<(std::sync::mpsc::Receiver<(crate::autopilot::Pilot, u8)>, Instant)>,
+    /// A message for the watcher, and since when it shows.
+    notice: Option<(String, Instant)>,
+    /// The run is over and summed up: the window plays on as the game.
+    done: bool,
+    /// The box of the watcher's keys is shown (F1).
+    keys_shown: bool,
+}
+
+/// The lines of the watched test player's status in the top left corner, in the interface's font.
+fn watch_overlay(text: &str, f: &crate::ui::Face, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
+    let style = crate::ui::Style {
+        scale: [0.45, 0.5],
+        spacing: [1.0, 1.0],
+        align: crate::ui::ALIGN_LEFT | crate::ui::ALIGN_TOP,
+        flags: crate::ui::TEXT_SCREEN,
+        margins: [0.0; 4],
+        color: [0.75, 1.0, 0.75, 1.0],
+        v2: true,
+        shadow: Some(([1.0, 1.0], [0.0, 0.0, 0.0, 0.8])),
+    };
+    let mut q = Vec::new();
+    for (k, line) in text.lines().enumerate() {
+        let y = 0.01 + 0.032 * k as f32;
+        let quads = f.layout(line, crate::ui::homogeneous([0.01, y, 0.99, y + 0.032]), &style);
+        q.extend(crate::ui::place(quads, screen, crate::ui::Anchor::Left));
+    }
+    q
+}
+
+/// The watcher's keys' box: a line a key, from this high in the window down to just over the lives.
+const KEYS_LINE: f32 = 0.03;
+const KEYS_BOTTOM: f32 = 0.85;
+
+impl PilotWatch {
+    /// The box of the watcher's keys, bottom left, in the menus' language: the state that is on (paused, driven by
+    /// hand, another speed) stands out.
+    fn keys_box(
+        &self,
+        strings: &crate::lang::Strings,
+        f: &crate::ui::Face,
+        screen: crate::ui::Screen,
+    ) -> Vec<crate::ui::Quad> {
+        let speed = format!("{}", self.speed);
+        let lines = [
+            (strings.ours(if self.paused { "watch paused" } else { "watch pause" }), self.paused),
+            (strings.ours("watch speed").replace("{n}", &speed), self.speed != 1.0),
+            (strings.ours(if self.hand.is_some() { "watch driving" } else { "watch hands" }), self.hand.is_some()),
+            (strings.ours("watch skip"), false),
+            (strings.ours("watch stuck"), false),
+            (strings.ours("watch quit"), false),
+            (strings.ours("watch box"), false),
+        ];
+        let top = KEYS_BOTTOM - KEYS_LINE * lines.len() as f32 - 0.01;
+        let shade = [0.0, 0.0, 0.0, 0.55];
+        let mut q = vec![crate::ui::Quad {
+            rect: crate::ui::homogeneous([0.01, top, 0.42, KEYS_BOTTOM]),
+            uv: [0.0, 0.0, 1.0, 1.0],
+            top: shade,
+            bottom: shade,
+            // (no such texture: drawn plain)
+            texture: "",
+        }];
+        let mut style = crate::ui::Style {
+            scale: [0.42, 0.46],
+            spacing: [1.0, 1.0],
+            align: crate::ui::ALIGN_LEFT | crate::ui::ALIGN_TOP,
+            flags: crate::ui::TEXT_SCREEN,
+            margins: [0.0; 4],
+            color: [0.85, 0.85, 0.85, 1.0],
+            v2: true,
+            shadow: None,
+        };
+        for (k, (line, on)) in lines.iter().enumerate() {
+            let y = top + 0.005 + KEYS_LINE * k as f32;
+            style.color = if *on { [1.0, 0.85, 0.3, 1.0] } else { [0.85, 0.85, 0.85, 1.0] };
+            q.extend(f.layout(line, crate::ui::homogeneous([0.02, y, 0.42, y + KEYS_LINE]), &style));
+        }
+        crate::ui::place(q, screen, crate::ui::Anchor::Left)
+    }
+
+    /// What the watcher reads: the speed and state, the sector, lives and the edge, what the test player does and
+    /// where to, the last notice.
+    fn status(&self, game: &Game) -> String {
+        let s = &game.sim;
+        let mut state = format!("TEST PLAYER  x{}", self.speed);
+        if self.paused {
+            state += "  PAUSED (Space)";
+        }
+        if let Some((t, ..)) = self.hand {
+            state += &format!("  YOUR HANDS since {} (F5 hands back)", clock(t));
+        }
+        if self.pending.as_ref().is_some_and(|p| p.1.elapsed() > THINKING) {
+            state += "  thinking...";
+        }
+        let edge = self.run.edges.ball_clearance(s.ball.position).map_or("-".into(), |d| format!("{d:.1}"));
+        let mut t = format!(
+            "{state}\n{}  sector {}  lives {}  edge {edge}  rewinds {}\n{}",
+            clock(s.tick),
+            s.sector + 1,
+            s.lives,
+            self.run.rewinds.total(),
+            self.run.pilot.status()
+        );
+        if let Some((n, at)) = &self.notice
+            && at.elapsed() < NOTICE
+        {
+            t += &format!("\n{n}");
+        }
+        t
+    }
+}
+
+/// The stretch the watcher drove by hand (`hand`: since which tick, from where, in which sector, as which ball),
+/// saved beside the level's hints as `<level>-hand-<tick>.replay` (the run up to now, so it replays exactly), with
+/// a hint line playing it from that place appended to `<level>-hand.txt`: what is said on the screen.
+fn save_hand(game: &Game, o: &Options, hand: (u64, glam::Vec3, usize, crate::sim::BallKind)) -> Result<String, String> {
+    let (from, at, sector, kind) = hand;
+    let path = hints_path(game, o);
+    let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+    let stem = level_stem(game);
+    let name = format!("{stem}-hand-{from}.replay");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let file = dir.join(&name);
+    std::fs::write(&file, game.replay_out.to_text()).map_err(|e| format!("{}: {e}", file.display()))?;
+    let kind = format!("{kind:?}").to_ascii_lowercase();
+    let line = format!("at {:.2} {:.2} {:.2} r 4 sector {} kind {kind} : replay {name} {from} {}\n", at.x, at.y,
+        at.z, sector + 1, game.sim.tick);
+    let hints = dir.join(format!("{stem}-hand.txt"));
+    let mut old = std::fs::read_to_string(&hints).unwrap_or_default();
+    old += &line;
+    std::fs::write(&hints, old).map_err(|e| format!("{}: {e}", hints.display()))?;
+    Ok(format!("saved {} (hint in {})", shown_path(&file), shown_path(&hints)))
+}
+
+/// A decision taking longer than this shows "thinking"; a notice shows this long.
+const THINKING: std::time::Duration = std::time::Duration::from_millis(300);
+const NOTICE: std::time::Duration = std::time::Duration::from_secs(8);
+/// The ticks of a frame of the watched run are simulated for at most this long, so the window keeps answering.
+const WATCH_BUDGET: std::time::Duration = std::time::Duration::from_millis(12);
 
 /// The sizes the Graphics page offers: the monitor's modes and the window sizes that fit on it, smallest first.
 fn sizes(window: &Window) -> Vec<(u32, u32)> {
@@ -2474,12 +2763,9 @@ impl App {
             .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
         let Gpu { surface, config, mut renderer, modes } = window_gpu(&window)?;
-        upload(&mut renderer, &self.game, &self.data);
+        upload(&mut renderer, &self.game);
         if self.menu_scene.is_none() {
-            // the original's 3D scene behind its menus; the own interface has its picture (menu.rs)
-            if gamedata::resources::in_use() != gamedata::resources::Provider::Own {
-                self.menu_scene = crate::menuscene::MenuScene::load(&self.data);
-            }
+            self.menu_scene = load_menu_scene(&self.data);
         }
         upload_menu_scene(&mut renderer, self.menu_scene.as_mut(), &self.data);
         self.gpu = Some(Gpu {
@@ -2505,7 +2791,7 @@ impl App {
         };
         o.source = source;
         (o.replay, o.from, o.sector, o.at, o.ball) = (None, None, None, None, None);
-        self.data = self.data.for_level(self.data.level_dir(&o.source).as_deref());
+        self.data = self.data.for_source(&o.source);
         let mut game = Game::new(&o, &self.data)?;
         game.start_session();
         self.game = game;
@@ -2522,7 +2808,7 @@ impl App {
         self.keys = 0;
         if let Some(gpu) = &mut self.gpu {
             gpu.renderer.models.clear();
-            upload(&mut gpu.renderer, &self.game, &self.data);
+            upload(&mut gpu.renderer, &self.game);
             upload_menu_scene(&mut gpu.renderer, self.menu_scene.as_mut(), &self.data);
         }
         if let Some(w) = &self.window {
@@ -2717,7 +3003,7 @@ impl App {
         let (_, device, queue) = pollster::block_on(device(None))?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut r = Renderer::new(device, queue, format);
-        upload(&mut r, &self.game, &self.data);
+        upload(&mut r, &self.game);
         let target = r.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("video"),
             size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -2794,6 +3080,105 @@ impl App {
         self.audio = None;
         println!("video: {frames} frames of {w}x{h} at 60 a second into {}", out.display());
         Ok(())
+    }
+
+    /// One tick of the watched test player: its decision (on its own thread, waited for within this frame's
+    /// budget), then the tick. False when the decision is not ready yet (the view holds) or the run is over.
+    fn watch_tick(&mut self, started: Instant) -> bool {
+        let Some(w) = self.pilot.as_mut() else { return false };
+        if !w.run.going(&self.game) {
+            w.done = true;
+            w.pending = None;
+            if let Err(e) = w.run.summary(&self.game, &self.opts) {
+                eprintln!("drahtseilakt: {e}");
+            }
+            return false;
+        }
+        if w.pending.is_none() {
+            w.run.before(&self.game);
+            let (tx, rx) = std::sync::mpsc::channel();
+            let (mut p, sim) = (w.run.pilot.clone(), self.game.sim.clone());
+            std::thread::spawn(move || {
+                let i = p.next(&sim);
+                let _ = tx.send((p, i));
+            });
+            w.pending = Some((rx, Instant::now()));
+        }
+        let Some((rx, _)) = &w.pending else { return false };
+        let (p, i) = match rx.recv_timeout(WATCH_BUDGET.saturating_sub(started.elapsed())) {
+            Ok(r) => r,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => return false,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                w.done = true;
+                w.pending = None;
+                eprintln!("drahtseilakt: the test player stopped");
+                return false;
+            }
+        };
+        w.pending = None;
+        w.run.pilot = p;
+        self.prev = Some(Snapshot::of(&self.game.sim));
+        let tick = self.game.sim.tick;
+        w.run.after(&mut self.game, &self.data, &self.opts, i);
+        // gone back: the view jumps there, and says so
+        if self.game.sim.tick <= tick {
+            self.prev = None;
+            if let Some(line) = &w.run.went_back {
+                w.notice = Some((format!("BACK: {line}"), Instant::now()));
+            }
+        }
+        true
+    }
+
+    /// The watcher's keys (--watch): Space pause, + and - faster and slower, F5 the hands take over and give back,
+    /// F6 the hint's step skipped, F7 a stuck report. True when the key was one of them.
+    fn watch_key(&mut self, code: KeyCode) -> bool {
+        let Some(w) = self.pilot.as_mut() else { return false };
+        let now = Instant::now();
+        match code {
+            KeyCode::Space if w.hand.is_none() => w.paused = !w.paused,
+            KeyCode::F1 => w.keys_shown = !w.keys_shown,
+            KeyCode::Equal | KeyCode::NumpadAdd => w.speed = (w.speed * 2.0).min(8.0),
+            KeyCode::Minus | KeyCode::NumpadSubtract => w.speed = (w.speed / 2.0).max(0.25),
+            KeyCode::F5 => match w.hand.take() {
+                None => {
+                    // (a decision on its way is dropped: the player decides again when it has the ball back)
+                    w.pending = None;
+                    let s = &self.game.sim;
+                    w.hand = Some((s.tick, s.ball.position, s.sector, s.ball.kind));
+                    w.paused = false;
+                    self.keys = 0;
+                    w.notice = Some(("YOUR HANDS: the arrows drive, F5 hands back".into(), now));
+                }
+                Some(hand) => {
+                    let text = match save_hand(&self.game, &self.opts, hand) {
+                        Ok(t) => t,
+                        Err(e) => format!("not saved: {e}"),
+                    };
+                    println!("{text}");
+                    w.run.resume(&self.game, hand.0);
+                    self.keys = 0;
+                    w.notice = Some((text, now));
+                }
+            },
+            KeyCode::F6 => {
+                w.pending = None;
+                w.run.pilot.hints.skip_step(&self.game.sim);
+                w.notice = Some(("hint step skipped".into(), now));
+            }
+            KeyCode::F7 => {
+                let (pilot, dir) = (w.run.pilot.clone(), w.run.report.clone());
+                let text = match stuck_report(&mut self.game, &self.data, &self.opts, &pilot, &dir) {
+                    Ok(()) => format!("stuck report written in {}", shown_path(&dir)),
+                    Err(e) => format!("stuck report: {e}"),
+                };
+                if let Some(w) = self.pilot.as_mut() {
+                    w.notice = Some((text, now));
+                }
+            }
+            _ => return false,
+        }
+        true
     }
 
     fn tools(&self) -> bool {
@@ -2874,6 +3259,19 @@ impl App {
             }
             Action::Home => self.open_menu(crate::menu::Screen::Main),
             Action::Quit => event_loop.exit(),
+            Action::Import => {
+                // the import window runs in a process of its own and starts the game again when it is done
+                let started = std::env::current_exe().and_then(|exe| {
+                    std::process::Command::new(exe)
+                        .args(std::env::args_os().skip(1))
+                        .env(crate::IMPORT, "1")
+                        .spawn()
+                });
+                match started {
+                    Ok(_) => event_loop.exit(),
+                    Err(e) => eprintln!("could not open the import window: {e}"),
+                }
+            }
             Action::Volumes(v) => {
                 self.volumes = v;
                 if let Some(a) = &mut self.audio {
@@ -2884,6 +3282,11 @@ impl App {
             Action::Interface(p) => {
                 gamedata::resources::set_chosen(p);
                 save_settings(self.volumes, self.features, &self.player);
+            }
+            Action::Textures(t) => {
+                // the next level loads with them
+                gamedata::resources::set_textures(t);
+                put_settings(&[("textures".to_owned(), t.key().to_owned())]);
             }
             Action::Language(code) => {
                 // spoken at once: the menus' words again, in the new language
@@ -2985,6 +3388,9 @@ impl App {
             }
             return;
         }
+        if self.pilot.as_ref().is_some_and(|w| !w.done) && down && self.watch_key(code) {
+            return;
+        }
         // the keys bound to the game's actions (the Controls page) come before the practice keys
         let bound = self.bindings.bits(code);
         let bit = match code {
@@ -3067,7 +3473,12 @@ impl App {
         let now = Instant::now();
         // this frame's real step (after the cap's sleep), held to a quarter second after a stall
         let step = (now - self.last).as_secs_f32().min(0.25);
-        self.acc = (self.acc + (now - self.last).as_secs_f32() * self.time_scale).min(0.25);
+        let scale = match &self.pilot {
+            Some(w) if w.paused => 0.0,
+            Some(w) => w.speed,
+            None => self.time_scale,
+        };
+        self.acc = (self.acc + (now - self.last).as_secs_f32() * scale).min(0.25);
         self.last = now;
         // A level to load is loaded after a frame that says so; the run waits while the menu is open.
         match self.loading.take() {
@@ -3092,9 +3503,22 @@ impl App {
         let started = Instant::now();
         let mut ticks = 0u32;
         while self.acc >= TICK {
+            // the test player plays (--watch), unless the watcher drives by hand
+            if self.pilot.as_ref().is_some_and(|w| !w.done && w.hand.is_none()) {
+                if !self.watch_tick(started) {
+                    self.acc = self.acc.min(TICK);
+                    break;
+                }
+                self.acc -= TICK;
+                ticks += 1;
+                continue;
+            }
             self.prev = Some(Snapshot::of(&self.game.sim));
             // the gamepads press the same keys; the camera's turn inverted as chosen
             self.game.tick(self.bindings.turn(self.keys | self.pad_keys));
+            if let Some(w) = self.pilot.as_mut().filter(|w| !w.done) {
+                w.run.near_edges.tick(&w.run.edges, &self.game.sim.ball);
+            }
             self.keep_history();
             self.acc -= TICK;
             ticks += 1;
@@ -3142,13 +3566,7 @@ impl App {
         let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
             self.menu_ms += f64::from(step) * 1000.0;
             ms.effects.tick_menu(step * 1000.0);
-            let (eye, target) = ms.camera((self.menu_ms % f64::from(crate::menuscene::ROUND_MS)) as f32);
-            let mut inst = ms.instances(self.menu_ms);
-            for mesh in 0..crate::sky::FACE_COUNT {
-                inst.push(crate::render::Instance::plain(scene::SKY_MODEL, mesh, glam::Mat4::from_translation(eye)));
-            }
-            let particles = ms.effects.batches(eye, target);
-            (inst, particles, crate::render::View { eye, target, fov_y: ms.fov_y })
+            ms.frame(self.menu_ms)
         } else {
             let mut inst = scene::instances(
                 &self.game.placements,
@@ -3197,6 +3615,13 @@ impl App {
                         let saved = if self.saved.is_some() { "   SAVED: F9 BACK" } else { "" };
                         crate::hud::text(&mut o, &format!("{slow}{saved}"), scale, scale * 21.0, scale, [0.6, 0.9, 1.0, 1.0]);
                     }
+                    if let Some(w) = self.pilot.as_ref().filter(|w| !w.done && self.game.font.is_none()) {
+                        let scale = (gpu.config.height as f32 / 360.0).round().max(1.0);
+                        for (k, line) in w.status(&self.game).lines().enumerate() {
+                            let y = scale * (21.0 + 9.0 * k as f32);
+                            crate::hud::text(&mut o, line, scale, y, scale, [0.7, 1.0, 0.7, 1.0]);
+                        }
+                    }
                     if let Some(c) = &self.fly {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
                         let line = format!("FREE CAMERA   {:.1} {:.1} {:.1}   F2 BACK", c.pos.x, c.pos.y, c.pos.z);
@@ -3227,6 +3652,13 @@ impl App {
                 q.extend(crate::hud::ball_lost(&self.game.sim, self.game.ball_lost_at, &lost, font, screen));
                 if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
                     q.extend(crate::endscreen::interface(&t, f, &self.strings, screen));
+                }
+                // the watched test player's status, small in the top left corner (--watch)
+                if let (Some(w), Some(f)) = (self.pilot.as_ref().filter(|w| !w.done), font) {
+                    q.extend(watch_overlay(&w.status(&self.game), f, screen));
+                    if w.keys_shown {
+                        q.extend(w.keys_box(&self.strings, f, screen));
+                    }
                 }
                 q
             }

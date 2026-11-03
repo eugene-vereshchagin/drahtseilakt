@@ -243,6 +243,23 @@ Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen 
 - **Replays als Video**: offline, Bild für Bild, in jeder Auflösung bis 8K, mit Ton. Hochgeladen wird nichts
   ohne Anweisung des Inhabers.
 
+## Kriterien für die Veröffentlichung
+
+*2026-11-03, Bedingung des Eigentümers (decisions.md, „Das Spiel läuft ohne Weiteres“).* Das Spiel erscheint, wenn:
+
+- **Eigene Teile**: Jedes Teil, das ein Level verwenden kann (die drei Kugeln und ihre Bruchstücke, Transformatoren,
+  Ventilatoren, Schieber, Zugbrücken, die Kiste, das Steinkugel-Rätsel, Schaukeln und Seilbrücken, Start und Ziel,
+  Kontrollpunkte, Extraleben und Extrapunkte, Kuppeln), hat ein eigenes Modell, von einem Skript in
+  `assets/own/make` nach den gemessenen Maßen und der Physik des Originals gemacht.
+- **Mindestens zehn eigene Level** abgestufter Schwierigkeit, mit dem Spiel im offenen Format ausgeliefert.
+- **Der Testspieler** schafft jedes davon in mehreren Stilen (vorsichtig, schnell, ...), mit Videos der Läufe.
+- **Keine Kopie nötig**: Das Spiel startet und spielt ganz ohne Kopie des Originals; der Import bleibt angeboten.
+
+Stand: Das Spiel startet ohne Kopie und spielt unsere eigenen Level mit unseren Teilen: zehn Level abgestufter
+Schwierigkeit (levels.md, „Unsere Level und wie man sie bearbeitet“), jedes vom Testspieler in drei Stilen geschafft
+(safe, speed, collector), seine Läufe daneben aufbewahrt und von einem Test geprüft, und das Testlevel
+`assets/levels/Parts_Test`.
+
 ## Was Spieler mit Mods ergänzt haben
 
 Eine statische Durchsicht von dreißig BML/BML+-Mods (nur Zeichenketten und Readmes; Mods werden nie

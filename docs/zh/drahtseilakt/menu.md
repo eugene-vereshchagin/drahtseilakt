@@ -11,6 +11,7 @@
 | 界面 | 各行，从上到下 | 说明 |
 |---|---|---|
 | 主菜单（`Menu_Main`） | Start, Highscore, Options, Credits, Exit | Exit 会询问 "Do you want to quit the game?"（Yes / No） |
+| 没有副本时的主菜单（我们的） | Start, Import, Highscore, Options, Credits, Exit | Start 列出 "Our levels"（随附的关卡和 `levels/open/`）；Import 打开引入玩家副本的窗口，然后游戏用该副本重新启动（decisions.md，“游戏开箱即玩”） |
 | Start（`Menu_Start`） | Level 1 … Level 12, Back | 前一关完成后，这一关才能玩（`DB_Levelfreischaltung`）；其余的显示为灰色。第 13 关附加包会替换 Menu.nmo 并加上它的那一行 |
 | Highscore（`Menu_Highscore`） | "Highscore Level N"、十个名字及分数、Back；左右键切换关卡 | 副本的默认值是 base.cmo 中的数组 `DB_Highscore_LvNN`（"Mr. Default"） |
 | Options（`Menu_Options`） | Graphics, Controls, Sound, Back | 我们在 Back 前另有 Language 和 Extended |
@@ -64,6 +65,7 @@
   - 关卡旁显示最佳时间；
   - Start 下按类别列出关卡；
   - Interface：own / original / remaster，界面文件的来源（[resources.md](resources.md)）；
+  - Textures：own / original，关卡、关卡部件和球使用的纹理：我们的纹理（默认，经典模式下始终如此）或拷贝的纹理；下一个关卡按所选纹理加载（[resources.md](resources.md)）；
   - Sounds：音效主题——系统、生成、原版（由 toolbox 制作）或玩家自己的主题（[resources.md](resources.md)）；在玩家选择其他主题之前（经典模式下始终）播放生成主题；
   - 练习工具：自由视角（F2），减速和加速（`[` `]`），保存当前时刻并回到该时刻（F5 / F9），后退五秒（F3，再按一次继续后退，最多半分钟），屏幕上显示小节和 tick；借助这些工具完成的游玩会被保存，但永远不算最佳成绩；
   - 无限生命：最后一个球永远不会丢失（因此而保住的游玩永远不算最佳成绩）。没有需要取消的时间限制：分数只会递减并停在零，与原版相同。
@@ -88,4 +90,4 @@
 5. 已完成：Graphics 和 Controls；手柄。
 
 `DRAHTSEILAKT_SHOT_MENU=base:keys` 配合 `--screenshot` 可以在没有窗口的情况下把菜单画在画面上（base 为 `main`、`pause`、`dead` 或 `end`；
-keys 中 `u d l r` 表示方向键，`e` 表示 Enter，`b` 表示 Esc，`n` 表示名字输入，`w` 表示在等待按键时按下 W 键），用来查看每一个界面。
+keys 中 `u d l r` 表示方向键，`e` 表示 Enter，`b` 表示 Esc，`n` 表示名字输入，`w` 表示在等待按键时按下 W 键），用来查看每一个界面。不在关卡之上的菜单画在界面的菜单 3D 场景前，场景取其镜头环绕一周中的第 `DRAHTSEILAKT_SHOT_MENU_MS` 毫秒（默认 0）。

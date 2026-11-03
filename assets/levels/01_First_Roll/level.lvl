@@ -1,0 +1,56 @@
+# First Roll: the first of our levels. Wide floors with railings, gentle turns and slopes, a first short stretch of
+# rails and one small jump. Edit this file and run `python3 -I assets/own/make/leveldsl.py <this file>`.
+title First Roll
+title.ru Первый разбег
+title.de Erster Lauf
+title.zh 初次滚动
+order 1
+sky A
+music 1
+bonus 100
+ball wood
+columns 45
+
+safety railings
+start
+width 14
+floor 30
+point
+floor 20
+left 90 30
+floor 20 down 3
+right 90 30
+floor 20
+point
+floor 20
+checkpoint
+
+# sector 2: narrower, a slope down, a stretch of rails
+floor 20
+width 11
+floor 25 down 5
+right 90 24
+floor 15
+point side 2.5
+floor 15
+rails 24
+floor 20
+life
+floor 10
+left 90 24
+floor 20
+checkpoint
+
+# sector 3: down a long ramp, one small jump, the finish
+floor 20
+width 10
+floor 30 down 6
+point
+floor 10
+gap 4 down 1
+floor 25
+left 90 30
+floor 15 up 2
+right 90 30
+floor 30
+finish

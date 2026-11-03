@@ -20,6 +20,10 @@ pub const INFO_MAX: u64 = 4096;
 const ENTRIES_MAX: usize = 10_000;
 const FOLDER_ENTRIES_MAX: usize = 4096;
 
+/// The most titles in other languages a level.txt gives (`title.ru = ...`), and the longest language code.
+const TITLES_MAX: usize = 16;
+const LANG_CODE_MAX: usize = 8;
+
 /// One level of a custom levels folder.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Package {
@@ -31,6 +35,20 @@ pub struct Package {
     pub title: String,
     pub author: Option<String>,
     pub version: Option<String>,
+    /// Its title in other languages (level.txt's `title.<code>`, e.g. `title.ru`), each cleaned and capped as the
+    /// title is: (language code, title).
+    pub titles: Vec<(String, String)>,
+    /// Its place in its folder's list (level.txt's `order`): levels with one come first, by it; then by title.
+    pub order: Option<u32>,
+    /// Kept out of the players' lists (level.txt's `hidden = yes`): a level for tests, still loadable by its path.
+    pub hidden: bool,
+}
+
+impl Package {
+    /// The title in the language `lang` (a code such as "ru") when level.txt gives one, else the title.
+    pub fn title_in(&self, lang: &str) -> &str {
+        self.titles.iter().find(|(l, _)| l == lang).map_or(&self.title, |(_, t)| t)
+    }
 }
 
 /// Why a folder in a levels folder is not a level.
@@ -53,8 +71,8 @@ impl std::fmt::Display for Skipped {
     }
 }
 
-/// The levels of a custom levels folder, by title (then by path), and the folders that are not levels. Hidden entries
-/// (a name beginning with a dot), links and other files are passed over silently.
+/// The levels of a custom levels folder, by their order and title (then by path), and the folders that are not
+/// levels. Hidden entries (a name beginning with a dot), links and other files are passed over silently.
 pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
     let (mut found, mut skipped) = (Vec::new(), Vec::new());
     for (path, kind) in entries(root, ENTRIES_MAX) {
@@ -68,7 +86,7 @@ pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
         }
     }
     found.sort_by(|a, b| {
-        let key = |p: &Package| p.title.to_lowercase();
+        let key = |p: &Package| (p.order.is_none(), p.order, p.title.to_lowercase());
         key(a).cmp(&key(b)).then_with(|| a.level.cmp(&b.level))
     });
     (found, skipped)
@@ -101,6 +119,9 @@ pub fn examine(folder: &Path) -> Result<Package, Skipped> {
         title: info.title.unwrap_or_else(|| clean(&fallback, TITLE_MAX)),
         author: info.author,
         version: info.version,
+        titles: info.titles,
+        order: info.order,
+        hidden: info.hidden,
     })
 }
 
@@ -116,13 +137,16 @@ fn loose(file: &Path) -> Package {
         title: clean(&stem, TITLE_MAX),
         author: None,
         version: None,
+        titles: Vec::new(),
+        order: None,
+        hidden: false,
     }
 }
 
-/// The title to show for a level the game plays (`level` an `.nmo` or an open-format folder): its folder's when the
-/// level is in a level folder of `roots` (the custom levels folders) or is itself one, else its file's name; cleaned
-/// and capped either way.
-pub fn title_of(level: &Path, roots: &[PathBuf]) -> String {
+/// The title to show for a level the game plays (`level` an `.nmo` or an open-format folder): its folder's (in the
+/// language `lang` when it has one in it) when the level is in a level folder of `roots` (the custom levels folders)
+/// or is itself one, else its file's name; cleaned and capped either way.
+pub fn title_of(level: &Path, roots: &[PathBuf], lang: &str) -> String {
     let same = |a: &Path, b: &Path| {
         a == b || matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y)
     };
@@ -132,7 +156,7 @@ pub fn title_of(level: &Path, roots: &[PathBuf]) -> String {
         && let Ok(p) = examine(folder)
         && same(&p.level, level)
     {
-        return p.title;
+        return p.title_in(lang).to_owned();
     }
     let stem = level
         .file_stem()
@@ -142,18 +166,26 @@ pub fn title_of(level: &Path, roots: &[PathBuf]) -> String {
 }
 
 /// What level.txt says, each value cleaned; nothing when it is missing, a link, larger than INFO_MAX or unreadable.
-#[derive(Default)]
-struct Info {
-    title: Option<String>,
-    author: Option<String>,
-    version: Option<String>,
+#[derive(Default, Debug)]
+pub struct Info {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub version: Option<String>,
+    pub titles: Vec<(String, String)>,
+    pub order: Option<u32>,
+    pub hidden: bool,
 }
 
 fn read_info(path: &Path) -> Info {
-    let Some(bytes) = read_small(path, INFO_MAX) else {
-        return Info::default();
-    };
-    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes);
+    match read_small(path, INFO_MAX) {
+        Some(bytes) => parse_info(&bytes),
+        None => Info::default(),
+    }
+}
+
+/// What a level.txt's bytes say (the fuzz targets' entry; `read_info` reads the file).
+pub fn parse_info(bytes: &[u8]) -> Info {
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
     let text = String::from_utf8_lossy(bytes);
     let mut info = Info::default();
     for line in text.lines().take(64) {
@@ -164,7 +196,24 @@ fn read_info(path: &Path) -> Info {
         let Some((key, value)) = line.split_once('=') else {
             continue;
         };
-        let slot = match key.trim().to_ascii_lowercase().as_str() {
+        let key = key.trim().to_ascii_lowercase();
+        if key == "order" {
+            info.order = info.order.or_else(|| value.trim().parse().ok());
+            continue;
+        }
+        if key == "hidden" {
+            info.hidden = matches!(value.trim().to_ascii_lowercase().as_str(), "yes" | "true" | "1");
+            continue;
+        }
+        if let Some(code) = key.strip_prefix("title.") {
+            let v = clean(value, TITLE_MAX);
+            let fits = !code.is_empty() && code.len() <= LANG_CODE_MAX && code.bytes().all(|b| b.is_ascii_lowercase());
+            if fits && !v.is_empty() && info.titles.len() < TITLES_MAX && !info.titles.iter().any(|(c, _)| c == code) {
+                info.titles.push((code.to_owned(), v));
+            }
+            continue;
+        }
+        let slot = match key.as_str() {
             "title" => (&mut info.title, TITLE_MAX),
             "author" => (&mut info.author, FIELD_MAX),
             "version" => (&mut info.version, FIELD_MAX),
@@ -403,6 +452,31 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn titles_in_other_languages_and_the_order() {
+        let root = temp("order");
+        let level = |name: &str, info: &str| {
+            let d = root.join(name);
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join("x.nmo"), b"").unwrap();
+            std::fs::write(d.join(INFO_FILE), info).unwrap();
+        };
+        level("z", "title = Zeta\norder = 2\ntitle.ru = Зета \u{202e}\ntitle.RU = no\ntitle.de=\n");
+        level("y", "title = Alpha\n");
+        level("x", "title = Omega\norder = 1\ntitle.../x = no\ntitle.toolongcode = no\n");
+        level("w", "title = Beta\norder = nonsense\nhidden = maybe\n");
+        let (found, _) = scan(&root);
+        assert!(found.iter().all(|p| !p.hidden), "hidden only when it says yes");
+        assert!(parse_info(b"hidden = Yes\n").hidden && parse_info(b"hidden=1").hidden);
+        let titles: Vec<&str> = found.iter().map(|p| p.title.as_str()).collect();
+        assert_eq!(titles, ["Omega", "Zeta", "Alpha", "Beta"], "ordered ones first, by order; then by title");
+        let zeta = found.get(1).unwrap();
+        assert_eq!(zeta.title_in("ru"), "Зета", "cleaned; the first of a language kept");
+        assert_eq!((zeta.title_in("de"), zeta.title_in("zh")), ("Zeta", "Zeta"), "an empty or missing one: the title");
+        assert!(found.first().unwrap().titles.is_empty(), "codes are lowercase letters, at most 8");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[cfg(unix)]
     #[test]
     fn links_are_never_followed() {
@@ -472,10 +546,10 @@ mod tests {
         std::fs::write(d.join("Level_07.NMO"), b"").unwrap();
         std::fs::write(root.join("Loose One.nmo"), b"").unwrap();
         let roots = [root.clone()];
-        assert_eq!(title_of(&d.join("Level_07.NMO"), &roots), "Folder Name");
-        assert_eq!(title_of(&root.join("Loose One.nmo"), &roots), "Loose One");
+        assert_eq!(title_of(&d.join("Level_07.NMO"), &roots, "en"), "Folder Name");
+        assert_eq!(title_of(&root.join("Loose One.nmo"), &roots, "en"), "Loose One");
         // outside the levels folders a level is named by its file
-        assert_eq!(title_of(&d.join("Level_07.NMO"), &[]), "Level_07");
+        assert_eq!(title_of(&d.join("Level_07.NMO"), &[], "en"), "Level_07");
         let _ = std::fs::remove_dir_all(&root);
     }
 }

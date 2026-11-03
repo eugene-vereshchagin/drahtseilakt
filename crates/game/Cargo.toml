@@ -32,3 +32,6 @@ gilrs = "=0.11.2"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+fuzzkit = { path = "../fuzzkit" }

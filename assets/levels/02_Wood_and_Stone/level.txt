@@ -1,0 +1,8 @@
+title = Wood and Stone
+author = Drahtseilakt
+version = 1
+licence = GPL-3.0-only
+title.ru = Дерево и камень
+title.de = Holz und Stein
+title.zh = 木与石
+order = 2

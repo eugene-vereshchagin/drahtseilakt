@@ -27,8 +27,10 @@ folders to open.
 - **A level is a folder directly in the kind's folder** holding exactly one level: one `.nmo` file, or a level in the
   open format (`level.gltf`, `level.bin`, `textures/`; open-format.md). The open format is the clear one, easy to
   finish or fix up by hand: plain glTF and PNG files.
-- Beside it, all optional: `level.txt`, simple `key = value` lines (`title`, `author`, `version`; `#` starts a comment,
-  other keys are ignored), a README (`README.txt` or `README.md`), a preview picture (`preview.png` or
+- Beside it, all optional: `level.txt`, simple `key = value` lines (`title`, `author`, `version`; `title.<code>`, its
+  title in another language, e.g. `title.ru`, shown when the menus speak it; `order`, a number placing it before the
+  levels without one, in its order; `hidden = yes`, kept out of the list of the levels shipped with the game, as the
+  test level is; `#` starts a comment, other keys are ignored), a README (`README.txt` or `README.md`), a preview picture (`preview.png` or
   `preview.jpg`), and the folders of resources the level uses (`textures/`, `game/`).
 - **The title** is level.txt's `title`, else the folder's name. Either is cleaned (control characters, direction
   overrides and other invisible format characters removed, spaces made one) and cut to **40 characters** (characters,
@@ -48,12 +50,143 @@ folders to open.
   and macOS (no reserved names, no trailing dots or spaces, at most 40 characters, a second "Hello Mars" numbered
   "(2)"); the source is only read. A second run adds only what is new.
 
+## Levels shipped with the game
+
+Our own levels come with the game in its `assets/levels/`, a folder per level in the open format, made of our own
+parts only (assets/own, [resources.md](resources.md)), so they play with no copy of the original at all. The menu
+shows them with the open-format levels of `levels/open/`: under Start when there is no copy (the list "Our levels"),
+under the extended mode's "Open format" always. They are made by scripts in `assets/own/make/` (`levelkit.py` builds
+a level from track pieces and the stand-ins of the parts; `make_test_level.py` the first one, `Parts_Test`, a few
+hundred units of track with every part on it or beside it and a stretch of track of each safety, for the tests; it is
+hidden from the players' list by `hidden = yes` in its level.txt and still opens with `--open`), whose outputs are
+committed. Their licence is the
+game's (GPL-3.0-only).
+
+## Our levels and how to edit them
+
+*2026-11-03.* Ten levels of our own, from a first roll to the gauntlet, ship with the game (the release criterion of
+roadmap.md). Each is new: its layout is ours, only the mechanics are the original's. The menu lists them in this
+order (`order` in level.txt), by their names in the menus' language:
+
+| # | Level | Sectors | Idea | Sky, music, bonus |
+|---|---|---|---|---|
+| 1 | First Roll | 3 | wide floors with railings, gentle turns and slopes, a first stretch of rails, one small hop | A, 1, 100 |
+| 2 | Wood and Stone | 4 | the wooden ball climbs the ramps the stone one cannot; the stone ball shoves crates and loose balls off ledges without borders | B, 2, 200 |
+| 3 | Paper Winds | 4 | the paper ball rides fans up to the floors above; plate bridges hold it | C, 3, 300 |
+| 4 | Swing Time | 4 | things that move: swinging sacks, turning arms, a flap wheel, swings that bridge a gap while they swing by | A, 4, 400 |
+| 5 | Bridges and Boards | 5 | seesaws under every ball; plate bridges that break under the stone one | B, 5, 500 |
+| 6 | Stone Work | 5 | crates, loose balls and domes in the way: shoved off by the stone ball, gone round by the wooden one | C, 1, 600 |
+| 7 | Rail Runner | 5 | long rails through curves, up and down; narrow floors without borders | A, 2, 700 |
+| 8 | Shifting Shapes | 5 | every sector wants another ball: paper for fans and plate bridges, stone for crates, wood for ramps and seesaws | B, 3, 800 |
+| 9 | Leap of Faith | 5 | speed and jumps: long runs down, ramps that throw the ball over gaps, rails taken fast | C, 4, 900 |
+| 10 | The Gauntlet | 6 | narrow ways, every ball and every part one after another | A, 5, 1000 |
+
+Every level starts with the wooden ball and has checkpoints with their flames, extra points and an extra life.
+
+**A level is written as text.** Each folder holds its description, `level.lvl`, a small language read by
+`assets/own/make/leveldsl.py`, which writes the level beside it (`level.gltf`, `level.bin`, `textures/`, `level.txt`)
+with `levelkit.py`. The description lays the track like a turtle: a cursor (a point on the floor's top and a heading,
+along +X at the start, left is +Z) moves on with each piece, and parts are put where it is. A line is a command; `#`
+begins a comment:
+
+```
+title Paper Winds            # the level's name; title.ru, title.de, title.zh: in other languages
+order 3                      # its place in the list
+sky C                        # A, B or C
+music 3                      # the theme, 1 to 5
+bonus 300                    # the level bonus
+ball wood                    # the start ball
+columns 45                   # columns under the floors every 45 units of way, for the look
+
+start                        # the start's platform; the way goes on from its front edge
+safety railings              # how the track keeps the ball on: railings, gutter, border or none (below)
+width 12                     # the floor's width (borders off|on, surface stone|wood)
+floor 30                     # a straight floor 30 long (floor 30 up 4, floor 30 down 6: a ramp)
+right 90 26                  # a floor turning 90 degrees to the right on a radius of 26 (left A R)
+point                        # an extra point here (life: an extra life; side S, ahead A: beside, further on)
+trafo paper                  # a transformer
+fan ahead -5                 # a fan 5 back from here: a paper ball rises on it to about 17 over its floor
+gap 4 up 12                  # 4 ahead and 12 up: nothing built (a jump, or the floor a fan carries the ball to)
+checkpoint                   # a checkpoint (the heading a multiple of 90): the next sector begins
+finish                       # the balloon, 22 ahead
+```
+
+Besides: `rails L`, `rails-left A R`, `rails-right A R` (rails, also up or down); `box`, `dome`, `loose wood|stone|paper`;
+`seesaw` (over a gap of its board's length), `platebridge` (a gap of 14.8), `swingbridge` (a swing in a gap of 5),
+`sack`, `arms`, `flaps`; `module P_Modul_NN` with `ahead`, `side`, `up`, `turn`, `tilt` for any other part; `move`,
+`turn`, `mark NAME` and `back NAME` to move the cursor without building. The whole list is at the top of
+leveldsl.py.
+
+**How the track keeps the ball on** (`safety`): the original's help shrinks from level to level, and ours follows
+it. Measured on the original's thirteen levels (its floors' edges, numbers only): in levels 1, 3 and 5 about two
+thirds of the floors' edges are profiled (the floor rising 0.7 over 2.5 to its edge, a gutter that rolls a drifting
+ball back to the middle; a third bare), from level 6 on only a quarter to a third (the rest bare); raised walls
+are rare (only the wooden half pipes of level 4 and a few pieces of 12 and 13); steel railings (a pipe about 2.6 over
+the floor, on posts) run along about 490 and 420 units of the floors' edges in levels 1 and 2, 130 to 540 in levels 3
+to 8, under 90 in 9 to 11 and none in 12. Our levels go the same way, a step clearer:
+level 1 and 2 have railings, 3 and 4 brick borders (3 a sector of railings), 5 to 8 gutters (5 a sector of
+borders, 8 its last bare), 9 and 10 bare floors (9 its first sector a gutter). `safety KIND` sets it from there on
+(the first one in a file is the level's); `borders off` makes the floors bare from there on, `borders on` gives them
+back the level's safety. What each is:
+
+- `railings`: steel railings along both edges, rails at 1.3 and 2.6 over the floor on posts every 6 units, in the
+  rails' physics group as the original's;
+- `gutter`: the original's profiled floor, its edges 0.7 over a flat middle, rising over 2.5 in two facets;
+- `border`: brick borders 1 wide and 2.2 high along both edges, the menu scene's bricks. Higher than the ball's
+  middle (its radius is 2), so a ball meets the face square and turns back: a lower border (1.4) was ridden over by
+  a ball thrown at it at 25 units a second;
+- `none`: the bare floor, its edges marked by the brick strip.
+
+Every border and railing is part of the floors' physics: the test `borders_and_railings_keep_the_ball_on_the_track`
+(ownlevels.rs) throws each ball sideways at 12, 25 and 40 units a second into the railings and the borders of
+Parts_Test and pushes it on into them, and it stays on; a ball drifting into a gutter rolls back; thrown off the bare
+floor it falls.
+
+**The track's look** is made, like the parts, to what makes the original's floors read (measured on its floors and
+textures, numbers only): a texture spans 5 units of floor; slabs of 5 by 5 with joints between them, each slab its
+own tone, dirt and wear, four along a texture (20 units before it repeats), one of three sets of slabs by the level;
+a kerb along each edge with the original's strip of small bricks, its groove and its shade; the gutter's slopes darker
+towards their crease; the shade a border casts beside it; the sides darker concrete with their own brick strip. The
+textures are `assets/own/Track/` (make_textures.py, step `track`); the borders take the menu scene's brick. They are
+mapped by the distance along the whole track, and pieces laid one after another (straight, curved, a width changing
+over a piece) are one mesh, so the textures run on from piece to piece without a seam.
+
+**The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
+of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
+its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26 into it (to a lip) and two flame
+cups across the way, at ±7 to the sides, where the part's flames burn. The floors before and after a checkpoint end at
+its piece. Their frames and reset points stand in the bowls (the reset points 3.65 and 3.33 over the bottom, as the
+original's).
+
+**The test player's knowledge of a level** is in the same file. From the way laid, leveldsl.py writes the test
+player's hint files for three styles into the level's `pilot/` folder (autopilot.md, "Hint files"): `safe` (rolls
+from point to point and stops, takes every checkpoint, no risks), `speed` (rolls through the points without stopping)
+and `collector` (as safe, and fetches every extra point and life off the way). Gaps, seesaws and turning arms are
+taken at speed in every style (the careful ones with a run-up); a place that needs more says so with `pilot STYLES :
+STEPS` (the hint steps, their points as `ahead side up` about the cursor; e.g. a wait timed for a swing) and `nopilot
+STYLES` / `autopilot STYLES` around a stretch the styles take on their own.
+
+**To change a level**: edit its `level.lvl`, then
+
+```
+scripts/own-levels.sh assets/levels/03_Paper_Winds
+```
+
+builds it and lets the test player play it in each style; each run that finishes is kept as
+`pilot/<style>.replay` (the runs are played in a data folder of their own under `target/`). The test
+`crates/game/src/ownlevels.rs` plays every level's three runs with no copy of the original and fails when one does
+not finish, so a level is never shipped without a run that proves it can be finished. `scripts/video.sh
+assets/levels/03_Paper_Winds assets/levels/03_Paper_Winds/pilot/speed.replay out.mp4` renders a run as a video.
+A level weighs 3.3 to 3.8 MB, 2.6 MB of it the textures it carries (the format keeps a level's
+textures in its own folder).
+
 ## The original game: copied by default
 
 The game copies what it needs from the player's own copy into `levels/original/` once: from an installed game
 (`drahtseilakt --import <Ballance folder>`) or straight from the game's CD or its image
 (`drahtseilakt --import Ballance.cue`, or `.bin`, `.iso`: the InstallShield 6 archive in `SETUP/`, read by
-`crates/cdimage`). A start without the game opens a window that does the same: it lists what it finds on the
+`crates/cdimage`). The copy is optional (decisions.md, "The game plays out of the box"): without one the game starts
+with its own levels, and the main menu's **Import** opens a window that does the same: it lists what it finds on the
 computer (installed games in the usual folders of Windows, Wine, GOG, Heroic and Lutris; discs in their drives; CD
 images in the home, Desktop and Downloads folders), takes a folder or image dropped on it or a path typed, and starts
 the game with the copy. The

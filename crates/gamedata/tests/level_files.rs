@@ -22,11 +22,7 @@ fn a_level_folders_own_files_come_first() {
     std::fs::write(copy.join("Sounds/Hit.wav"), b"copy").unwrap();
     std::fs::write(copy.join("Sounds/Only.wav"), b"copy").unwrap();
     std::fs::write(level.join("game/Sounds/Hit.wav"), b"level").unwrap();
-    let data = Data {
-        root: copy.clone(),
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy.clone())).for_level(Some(&level));
     assert_eq!(
         std::fs::read(data.file("Sounds/hit.WAV").unwrap()).unwrap(),
         b"level",
@@ -37,10 +33,7 @@ fn a_level_folders_own_files_come_first() {
         b"copy",
         "else the copy's"
     );
-    let plain = Data {
-        root: copy,
-        overlay: None,
-    };
+    let plain = Data::new(Some(copy));
     assert_eq!(
         std::fs::read(plain.file("Sounds/Hit.wav").unwrap()).unwrap(),
         b"copy"
@@ -59,11 +52,7 @@ fn a_link_in_a_level_folder_leads_nowhere() {
     std::fs::write(outside.join("Hit.wav"), b"outside").unwrap();
     std::os::unix::fs::symlink(&outside, level.join("game/Sounds")).unwrap();
     std::os::unix::fs::symlink(outside.join("Hit.wav"), level.join("game/Textures/A.bmp")).unwrap();
-    let data = Data {
-        root: copy,
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy)).for_level(Some(&level));
     assert!(data.file("Sounds/Hit.wav").is_none(), "a linked folder");
     assert!(data.file("Textures/A.bmp").is_none(), "a linked file");
     let _ = std::fs::remove_dir_all(&r);
@@ -78,11 +67,7 @@ fn a_path_from_a_level_never_leaves_the_copy() {
     std::fs::write(r.join("outside.nmo"), b"").unwrap();
     let level = r.join("level");
     std::fs::create_dir_all(level.join("game")).unwrap();
-    let data = Data {
-        root: copy.join("3D Entities"),
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy.join("3D Entities"))).for_level(Some(&level));
     assert!(data.file("PH/P_Box.nmo").is_some());
     assert!(data.file("ph/p_box.NMO").is_some(), "any case");
     for bad in [
@@ -117,22 +102,14 @@ fn a_part_comes_from_the_level_folder_in_the_open_format() {
         sprite: None,
     });
     level::open::export(&part, &level.join("game/3D Entities/Balls")).unwrap();
-    let data = Data {
-        root: copy.clone(),
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy.clone())).for_level(Some(&level));
     let got = data
         .part("3D Entities/Balls.nmo")
         .expect("the level's own balls");
     assert_eq!(got.level.objects[0].name, "Ball_Wood");
+    // the copy has none (our own balls may stand in for them, as for any part)
     assert!(
-        Data {
-            root: copy,
-            overlay: None
-        }
-        .part("3D Entities/Balls.nmo")
-        .is_none(),
+        !Data::new(Some(copy)).copy_has("3D Entities/Balls.nmo"),
         "none in the copy"
     );
     let _ = std::fs::remove_dir_all(&r);
@@ -192,11 +169,7 @@ fn a_level_folder_never_stands_in_for_the_interface() {
             std::fs::write(&p, what).unwrap();
         }
     }
-    let data = Data {
-        root: copy,
-        overlay: None,
-    }
-    .for_level(Some(&level));
+    let data = Data::new(Some(copy)).for_level(Some(&level));
     let from = |rel: &str| std::fs::read(data.file(rel).unwrap()).unwrap();
     // the interface's files are the copy's, whatever a level folder holds
     for rel in [
@@ -224,10 +197,7 @@ fn an_open_level_without_settings_says_so() {
     let (copy, level) = (r.join("copy"), r.join("Somewhere"));
     std::fs::create_dir_all(&copy).unwrap();
     level::open::export(&level::Level::default(), &level).unwrap();
-    let data = Data {
-        root: copy,
-        overlay: None,
-    };
+    let data = Data::new(Some(copy));
     let loaded = data
         .load(&gamedata::assets::Source::Open(level.clone()))
         .unwrap();
@@ -252,6 +222,96 @@ fn copying_a_game_file_never_writes_through_a_hard_link() {
     std::fs::hard_link(&victim, game.join("Sounds/Hit.wav")).unwrap();
     gamedata::assets::copy_into(&src, &game, "Sounds/Hit.wav").unwrap();
     assert_eq!(std::fs::read(&victim).unwrap(), b"keep");
-    assert_eq!(std::fs::read(game.join("Sounds/Hit.wav")).unwrap(), b"sound");
+    assert_eq!(
+        std::fs::read(game.join("Sounds/Hit.wav")).unwrap(),
+        b"sound"
+    );
+    let _ = std::fs::remove_dir_all(&r);
+}
+
+/// A map's texture names as a `.nmo` gives them (raw strings, any path a stranger wrote): only their last part is
+/// ever looked for, in the game's texture folders; an absolute or `..` path never reads a file elsewhere, neither to
+/// draw nor to export.
+#[test]
+fn a_maps_texture_name_never_reads_a_path() {
+    let r = root("texnames");
+    let (copy, outside) = (r.join("copy"), r.join("outside"));
+    std::fs::create_dir_all(copy.join("Textures")).unwrap();
+    std::fs::create_dir_all(&outside).unwrap();
+    let px = |c: [u8; 4]| image::RgbaImage::from_pixel(2, 2, image::Rgba(c));
+    px([200, 0, 0, 255]).save(copy.join("Textures/Inside.png")).unwrap();
+    px([0, 200, 0, 255]).save(outside.join("Secret.png")).unwrap();
+    let data = Data::new(Some(copy.clone()));
+    let named = |name: String| level::Texture {
+        name: "T".into(),
+        source: level::TextureSource::File(name),
+        color_key: None,
+    };
+    let secret = outside.join("Secret.png");
+    let names = [
+        secret.to_string_lossy().into_owned(),
+        "../outside/Secret.png".to_owned(),
+        "Textures/../../outside/Secret.png".to_owned(),
+        "C:\\Pictures\\..\\Secret.png".to_owned(),
+        "..".to_owned(),
+        String::new(),
+    ];
+    for n in &names {
+        assert!(data.texture(&named(n.clone())).is_none(), "{n} read a file");
+    }
+    // a path's last part is a texture of the game's folders
+    let (_, _, rgba) = data.texture(&named(format!("{}/Inside.png", outside.display()))).unwrap();
+    assert_eq!(&rgba[..4], &[200, 0, 0, 255]);
+    let (_, _, rgba) = data.texture(&named("D:\\Maps\\Inside.png".into())).unwrap();
+    assert_eq!(&rgba[..4], &[200, 0, 0, 255]);
+
+    // the same names in a level exported to the open format: only the copy's texture is written
+    let mut lvl = level::Level::default();
+    lvl.textures = names.iter().cloned().map(named).collect();
+    lvl.textures.push(named("/x/Inside.png".into()));
+    let loaded = gamedata::assets::LoadedLevel {
+        level: lvl,
+        name: "Map.nmo".into(),
+        hash: 0,
+        warnings: Vec::new(),
+    };
+    let out = r.join("export");
+    gamedata::assets::export(&data, &loaded, &out).unwrap();
+    let written: Vec<_> = std::fs::read_dir(out.join("textures")).unwrap().flatten().collect();
+    assert_eq!(written.len(), 1, "only the copy's texture");
+    let img = image::open(written[0].path()).unwrap().to_rgba8();
+    assert_eq!(img.get_pixel(0, 0).0, [200, 0, 0, 255]);
+    let _ = std::fs::remove_dir_all(&r);
+}
+
+/// An open-format level read from a relative folder still knows its textures as its own files (by full path).
+#[cfg(unix)]
+#[test]
+fn an_open_levels_textures_are_its_own_files() {
+    let r = root("openown");
+    let out = r.join("lvl");
+    let mut lvl = level::Level::default();
+    lvl.textures.push(level::Texture {
+        name: "A".into(),
+        source: level::TextureSource::Pixels { width: 1, height: 1, rgba: vec![1, 2, 3, 255] },
+        color_key: None,
+    });
+    level::open::export(&lvl, &out).unwrap();
+    std::fs::create_dir_all(out.join("textures")).unwrap();
+    image::RgbaImage::from_pixel(1, 1, image::Rgba([1, 2, 3, 255]))
+        .save(out.join(level::open::texture_file(0, "A")))
+        .unwrap();
+    // the folder named relatively to where the program runs
+    let cwd = std::env::current_dir().unwrap();
+    let mut rel = PathBuf::new();
+    for _ in cwd.components().skip(1) {
+        rel.push("..");
+    }
+    let rel = rel.join(out.strip_prefix("/").unwrap_or(&out));
+    let back = level::open::import(&rel).unwrap();
+    match &back.textures[0].source {
+        level::TextureSource::LevelFile(p) => assert!(p.is_absolute() && p.starts_with(&out)),
+        other => panic!("{other:?}"),
+    }
     let _ = std::fs::remove_dir_all(&r);
 }

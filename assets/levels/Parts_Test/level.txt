@@ -1,0 +1,5 @@
+title = Parts test
+author = Drahtseilakt
+version = 1
+licence = GPL-3.0-only
+hidden = yes

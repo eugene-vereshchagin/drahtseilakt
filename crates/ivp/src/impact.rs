@@ -314,7 +314,9 @@ impl World {
     fn apply_result(&mut self, s: &Solver, pushed: &mut [Option<usize>; 2]) {
         for i in 0..2 {
             if self.movable(s.core[i]) {
-                self.cores[s.core[i]].impacts_psi += 1;
+                // a count the upstream keeps in 16 bits and lets wrap; a map's pile of bodies can pass 32767 impacts
+                // in one PSI (found by fuzzing a level played), which overflowed here
+                self.cores[s.core[i]].impacts_psi = self.cores[s.core[i]].impacts_psi.wrapping_add(1);
             }
         }
         if s.allow_delaying {
@@ -341,7 +343,7 @@ impl World {
                         let ch_rot = self.cores[ch].rot_speed;
                         self.cores[ch].speed_change = v3sub(s.speed[h], ch_speed);
                         self.cores[ch].rot_speed_change = v3sub(s.rot[h], ch_rot);
-                        self.cores[ch].impacts_psi -= 1;
+                        self.cores[ch].impacts_psi = self.cores[ch].impacts_psi.wrapping_sub(1);
                         return;
                     }
                 }
@@ -553,7 +555,9 @@ impl World {
                 self.core_sync(c);
             }
         }
-        self.coll.cps[cp].info.pushes += 1;
+        // 16 bits as the upstream's; past 32767 it stops there (the upstream's wrapped negative, and the push's
+        // sqrt(pushes) became NaN)
+        self.coll.cps[cp].info.pushes = self.coll.cps[cp].info.pushes.saturating_add(1);
         let rescue = self.coll.cps[cp].info.rescue;
         let mut pc: [Option<usize>; 2] = [None, None];
         self.impact_long_term(cp, &mut pc, rescue);
@@ -878,6 +882,20 @@ mod tests {
         }
         w.cores[1].speed = [0.0, 0.0, -2.0];
         w
+    }
+
+    /// Found by fuzzing a level played: the per-PSI impact count (16 bits, as the upstream's) overflowed when a
+    /// map's bodies made more than 32767 impacts in one PSI; it wraps, as the upstream's does.
+    #[test]
+    fn the_impact_count_wraps() {
+        let mut w = falling_pair();
+        w.enable_collision_detection(0);
+        w.enable_collision_detection(1);
+        let m = (0..w.coll.mds.len()).find(|&m| w.coll.mds[m].alive).expect("a mindist");
+        w.cores[0].impacts_psi = i16::MAX;
+        w.cores[1].impacts_psi = i16::MAX;
+        w.do_impact_mindist(m);
+        assert!(w.cores.iter().take(2).any(|c| c.impacts_psi < 0));
     }
 
     #[test]

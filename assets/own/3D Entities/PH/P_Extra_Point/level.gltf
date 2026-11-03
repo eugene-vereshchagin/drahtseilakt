@@ -1,0 +1,1447 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "drahtseilakt make_parts.py"
+ },
+ "extensionsUsed": [],
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "format": 1,
+     "groups": [
+      {
+       "name": "P_Extra_Point_Hitframes",
+       "members": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+       ]
+      },
+      {
+       "name": "All_P_Extra_Point",
+       "members": [
+        15,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        0,
+        1,
+        2,
+        3,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        4
+       ]
+      }
+     ],
+     "sky": null,
+     "start_ball": null,
+     "settings": {
+      "tutorial": false,
+      "last_level": false
+     }
+    }
+   }
+  }
+ ],
+ "nodes": [
+  {
+   "name": "P_Extra_Point_Frame4",
+   "matrix": [
+    0.9926575921858586,
+    0.0,
+    0.12095827659062325,
+    0.0,
+    0.0815703675127591,
+    0.7383956007624716,
+    -0.6694163218195849,
+    0.0,
+    -0.08931505931032646,
+    0.6743678052625501,
+    0.7329739991335056,
+    0.0,
+    -1.005,
+    -0.967,
+    -1.48,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball4",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9806191034530959,
+    -0.1959238983453688,
+    0.0,
+    0.0,
+    0.1959238983453688,
+    0.9806191034530959,
+    0.0,
+    -1.005,
+    -0.967,
+    -1.433,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false,
+     "sprite": {
+      "mode": 0,
+      "size": [
+       0.5,
+       0.5
+      ],
+      "offset": [
+       0.0,
+       0.0
+      ]
+     }
+    }
+   },
+   "mesh": 0
+  },
+  {
+   "name": "P_Extra_Point_Frame6",
+   "matrix": [
+    0.9832886375789119,
+    0.0,
+    -0.18205344052834382,
+    0.0,
+    -0.11400062508401795,
+    0.7796679331506075,
+    -0.6157286508658771,
+    0.0,
+    0.14194122969969086,
+    0.6261931922471372,
+    0.766638619751627,
+    0.0,
+    -1.345,
+    1.366,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball6",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9806191034530959,
+    -0.1959238983453688,
+    0.0,
+    0.0,
+    0.1959238983453688,
+    0.9806191034530959,
+    0.0,
+    -1.345,
+    1.366,
+    0.049,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false,
+     "sprite": {
+      "mode": 0,
+      "size": [
+       0.5,
+       0.5
+      ],
+      "offset": [
+       0.0,
+       0.0
+      ]
+     }
+    }
+   },
+   "mesh": 1
+  },
+  {
+   "name": "P_Extra_Point_Floor",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    -2.1,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 2
+  },
+  {
+   "name": "P_Extra_Point_Frame3",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.95,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball3",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9806191034530959,
+    -0.1959238983453688,
+    0.0,
+    0.0,
+    0.1959238983453688,
+    0.9806191034530959,
+    0.0,
+    0.0,
+    0.0,
+    2.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false,
+     "sprite": {
+      "mode": 0,
+      "size": [
+       0.5,
+       0.5
+      ],
+      "offset": [
+       0.0,
+       0.0
+      ]
+     }
+    }
+   },
+   "mesh": 3
+  },
+  {
+   "name": "P_Extra_Point_Frame0",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball0",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9806191034530959,
+    -0.1959238983453688,
+    0.0,
+    0.0,
+    0.1959238983453688,
+    0.9806191034530959,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false,
+     "sprite": {
+      "mode": 0,
+      "size": [
+       1.0,
+       1.0
+      ],
+      "offset": [
+       0.0,
+       0.0
+      ]
+     }
+    }
+   },
+   "mesh": 4
+  },
+  {
+   "name": "P_Extra_Point_Frame1",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    -2.05,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball1",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9806191034530959,
+    -0.1959238983453688,
+    0.0,
+    0.0,
+    0.1959238983453688,
+    0.9806191034530959,
+    0.0,
+    0.0,
+    0.0,
+    -2.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false,
+     "sprite": {
+      "mode": 0,
+      "size": [
+       0.5,
+       0.5
+      ],
+      "offset": [
+       0.0,
+       0.0
+      ]
+     }
+    }
+   },
+   "mesh": 5
+  },
+  {
+   "name": "P_Extra_Point_Frame5",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9806191034530959,
+    -0.1959238983453688,
+    0.0,
+    0.0,
+    0.1959238983453688,
+    0.9806191034530959,
+    0.0,
+    1.003,
+    0.998,
+    1.36,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball5",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9806191034530959,
+    -0.1959238983453688,
+    0.0,
+    0.0,
+    0.1959238983453688,
+    0.9806191034530959,
+    0.0,
+    1.003,
+    0.998,
+    1.414,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false,
+     "sprite": {
+      "mode": 0,
+      "size": [
+       0.5,
+       0.5
+      ],
+      "offset": [
+       0.0,
+       0.0
+      ]
+     }
+    }
+   },
+   "mesh": 6
+  },
+  {
+   "name": "P_Extra_Point_Frame2",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    2.0,
+    -0.05,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball2",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9806191034530959,
+    -0.1959238983453688,
+    0.0,
+    0.0,
+    0.1959238983453688,
+    0.9806191034530959,
+    0.0,
+    0.0,
+    2.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false,
+     "sprite": {
+      "mode": 0,
+      "size": [
+       0.5,
+       0.5
+      ],
+      "offset": [
+       0.0,
+       0.0
+      ]
+     }
+    }
+   },
+   "mesh": 7
+  },
+  {
+   "name": "P_Extra_Point_MF",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball_HitFrame01",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball_HitFrame02",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball_HitFrame04",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball_HitFrame03",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball_HitFrame05",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_Ball_HitFrame06",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "P_Extra_Point_Ball4_Sprite",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 1
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Point_Ball6_Sprite",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 4,
+      "NORMAL": 5,
+      "TEXCOORD_0": 6
+     },
+     "indices": 7,
+     "material": 1
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Point_Floor_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 8,
+      "NORMAL": 9,
+      "TEXCOORD_0": 10
+     },
+     "indices": 11,
+     "material": 0
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Point_Ball3_Sprite",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 12,
+      "NORMAL": 13,
+      "TEXCOORD_0": 14
+     },
+     "indices": 15,
+     "material": 1
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Point_Ball0_Sprite",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 16,
+      "NORMAL": 17,
+      "TEXCOORD_0": 18
+     },
+     "indices": 19,
+     "material": 1
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Point_Ball1_Sprite",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 20,
+      "NORMAL": 21,
+      "TEXCOORD_0": 22
+     },
+     "indices": 23,
+     "material": 1
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Point_Ball5_Sprite",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 24,
+      "NORMAL": 25,
+      "TEXCOORD_0": 26
+     },
+     "indices": 27,
+     "material": 1
+    }
+   ]
+  },
+  {
+   "name": "P_Extra_Point_Ball2_Sprite",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 28,
+      "NORMAL": 29,
+      "TEXCOORD_0": 30
+     },
+     "indices": 31,
+     "material": 1
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "ShadowPolyBig",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 0
+    }
+   },
+   "emissiveFactor": [
+    0.45,
+    0.5,
+    0.6
+   ],
+   "doubleSided": false,
+   "alphaMode": "BLEND",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": false,
+     "blend": [
+      "one",
+      "one"
+     ]
+    }
+   }
+  },
+  {
+   "name": "P_Extra_Point_SilverBall",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 1
+    }
+   },
+   "emissiveFactor": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "doubleSided": false,
+   "alphaMode": "MASK",
+   "alphaCutoff": 0.5,
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": true
+    }
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0,
+   "sampler": 0
+  },
+  {
+   "source": 1,
+   "sampler": 0
+  }
+ ],
+ "images": [
+  {
+   "uri": "textures/glow.png",
+   "name": "glow"
+  },
+  {
+   "uri": "textures/silver.png",
+   "name": "silver"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987,
+   "wrapS": 10497,
+   "wrapT": 10497
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "level.bin",
+   "byteLength": 1216
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 48,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 96,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 128,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 152,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 200,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 248,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 280,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 304,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 352,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 400,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 432,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 456,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 504,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 552,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 584,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 608,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 656,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 704,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 736,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 760,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 808,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 856,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 888,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 912,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 960,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 1008,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 1040,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 1064,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 1112,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 1160,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 1192,
+   "byteLength": 24,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    1.0,
+    1.0,
+    -0.0
+   ],
+   "bufferView": 0
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 1
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 2
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 3
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    1.0,
+    1.0,
+    -0.0
+   ],
+   "bufferView": 4
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 5
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 6
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 7
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    -2.288,
+    0.0,
+    -2.288
+   ],
+   "max": [
+    2.288,
+    0.0,
+    2.288
+   ],
+   "bufferView": 8
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 9
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 10
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 11
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    1.0,
+    1.0,
+    -0.0
+   ],
+   "bufferView": 12
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 13
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 14
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 15
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    1.0,
+    1.0,
+    -0.0
+   ],
+   "bufferView": 16
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 17
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 18
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 19
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    1.0,
+    1.0,
+    -0.0
+   ],
+   "bufferView": 20
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 21
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 22
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 23
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    1.0,
+    1.0,
+    -0.0
+   ],
+   "bufferView": 24
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 25
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 26
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 27
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    1.0,
+    1.0,
+    -0.0
+   ],
+   "bufferView": 28
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 29
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 30
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 31
+  }
+ ]
+}

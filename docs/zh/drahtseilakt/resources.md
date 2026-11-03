@@ -13,34 +13,48 @@
 | 角色 | 原版文件 | 自有 |
 |---|---|---|
 | menu font and glyph table, buttons | `3D Entities/Menu.nmo (Font_1, M_FontData_01)` | Tektur（`assets/fonts`），由游戏绘制 |
-| menu 3D scene | `3D Entities/MenuLevel.nmo` | 一张图片：`Textures/Menu_Background.png` |
+| menu 3D scene | `3D Entities/MenuLevel.nmo` | 我们自己的，开放格式：`3D Entities/MenuLevel/` |
 | texts in the copy's languages | `3D Entities/Language.nmo` | `Texts/menu.txt`，七种语言 |
 | menu texts, level table defaults | `base.cmo` | 计划中 |
-| level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | 计划中 |
-| balls, pieces, shadows | `3D Entities/Balls.nmo` | 计划中 |
-| transformer animation | `3D Entities/AnimTrafo.nmo` | 计划中 |
-| modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | 计划中 |
+| level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | 我们的关卡自带设置（open-format.md） |
+| balls, pieces, shadows | `3D Entities/Balls.nmo` | 我们自己的，开放格式：`3D Entities/Balls/` |
+| transformer animation | `3D Entities/AnimTrafo.nmo` | 我们自己的：`3D Entities/AnimTrafo/` |
+| modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | 我们自己的：`3D Entities/PH/<module>/`，原版的每个模块 |
 | game font texture | `Textures/Font_1.tga` | Tektur，由游戏光栅化 |
 | buttons and the points box | `Textures/Button01_special/select/deselect.tga` | 我们自己的，同名 |
-| ball shadow | `Textures/HardShadow.bmp` | 计划中 |
-| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | 计划中 |
-| particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | 计划中 |
+| ball shadow | `Textures/HardShadow.bmp` | 我们自己的：`Textures/HardShadow.png` |
+| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | 我们自己的，字母 A、B、C：`Textures/Sky/Sky_<letter>_<face>.png` |
+| particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | 我们自己的，同名的 `.png` |
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | 音效主题（assets/sounds） |
 | menu sounds | `Sounds/Menu_click, Menu_load` | 音效主题（assets/sounds） |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | 音效主题（assets/sounds） |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | 自有：*system* 有十八首乐曲和八段氛围，Music/music.txt 为每个部分给出一个池（主题 1–3 用前九首，主题 4 和 5 用另外九首）；*neuro* 有十五段合成乐句，每个部分一段，以及自己的氛围和终点音乐 |
-| original levels | `3D Entities/Level/Level_NN.NMO` | 计划中 |
+| original levels | `3D Entities/Level/Level_NN.NMO` | 我们自己的关卡，`assets/levels/`（levels.md） |
 
 ## 自有界面
 
 第 2 阶段（2026-11-03）：菜单、关卡内界面（分数框、生命球、“球掉落了”）、关卡结束画面和加载画面都是我们自己的。没有原版界面文件的玩家也能看到全部界面；使用自有界面时，拷贝的界面文件根本不会被读取。
 
-- **纹理**（`assets/own/Textures/`）：`Button01_select.tga`、`Button01_deselect.tga` 和 `Button01_special.tga`，每个部件都放在游戏代码取用它的位置（`menu.rs`、`hud.rs`、`endscreen.rs` 中的 UV 矩形）：钢管包边、带抛光圆球的紫色玻璃面板，选中时为玫瑰色配金色圆球，未解锁的关卡为灰色；高分榜的名次数字、生命球及其支架、分数框、结束画面的高亮条、深色条带。另有 `Menu_Background.png`，即菜单和加载画面背后的图片（云海上的黄昏，左边是放着球的木制轨道，右边是顶着球的石柱；中间被菜单的条带遮住）。它代替原版的 3D 菜单场景，后者只在使用原版界面时绘制。
-- **制作方式**：由 `assets/own/make/make_interface.py`（Python，需要 numpy 和 Pillow）仅凭脚本本身和随附的 Tektur 字体生成；生成结果已提交到仓库，构建不需要 Python。外观只在颜色和比例上参考原版风格：没有复制、描摹或重新采样原版的任何内容。
-- **字体**：Tektur（SIL OFL，`assets/fonts/Tektur-Variable.ttf`，版本和校验和见 `assets/fonts/README.md`），一种方正的科技感字体，气质接近原版宽体菜单字体；小写字母以小型大写字母绘制，略宽、字距略大，与原版一致。它缺少的字符取自 Noto Sans，中文取自 Noto Sans SC。字形在运行时光栅化到图集中，并按与游戏字体相同的矩形、对齐、换行和阴影排版，因此各画面保持原版的布局（`crates/game/src/fallback.rs`）。
+- **纹理**（`assets/own/Textures/`）：`Button01_select.tga`、`Button01_deselect.tga` 和 `Button01_special.tga`，每个部件都放在游戏代码取用它的位置（`menu.rs`、`hud.rs`、`endscreen.rs` 中的 UV 矩形），与原版同一类外观，但用我们自己的方式绘制（第 2 版，2026-11-03）：半透明玻璃，未选中为中性灰、选中为暗红；钢管按受光圆柱体着色并带拉丝纹理；由钢管组成、填充着色（未选中为淡紫灰，选中为金色）的凹槽环绕着一颗映出天空的镀铬圆球；高分榜名次带一颗珍珠，生命球及其框架，带导轨的分数框，结束画面发光的高亮条，深色条带。
+- **菜单场景**（`assets/own/3D Entities/MenuLevel/`，开放关卡格式）：菜单和加载画面背后的场景；游戏像绘制原版 MenuLevel.nmo 一样绘制它，镜头以相同的镜头参数沿同一圆周环绕。它是一座悬在黄昏天空中的轨道部件之岛：带深色圆碗的中央方块、带凸起边沿的轨道分支、有四个杯座和一颗石球的起点、三个变形器、高杆上的两座灯塔、钢轨和螺旋、木制坡道、向下伸入云层的立柱以及远处的平台。镜头的曲线和目标是节点 `I_MenuLevel_Curve_0..3` 和 `Cam_MenuLevel_Target`，火焰在 `FourFlames_Flame_A..D` 处燃烧，它自己的天空是围绕镜头绘制的 `Sky_*` 对象。
+- **制作方式**：由 `assets/own/make/make_interface.py`（纹理）和 `make_menu_scene.py`（场景及其纹理和天空）生成，Python，需要 numpy 和 Pillow，仅凭脚本本身和随附的 Tektur 字体；生成结果已提交到仓库，构建不需要 Python。与生成音效的做法相同：测量原版（调色板、线宽、比例和布局；场景中平台的高度和范围、按仰角的天空颜色），按这些数字绘制我们的版本，再由 `metric.py` 评估每个元素和每个画面的接近程度（Lab 颜色直方图重叠度、模糊亮度和边缘图的 SSIM）；分数记录在 `scores.md` 中。没有复制、描摹或重新采样原版的任何内容，原版的图片从不进入仓库。
+- **照片纹理**（菜单场景第 3 版，2026-11-03）：其中的混凝土（平台、方块、立柱）、砖砌边沿、木制坡道和木箱以及铁件（箍环、底座、灯柱）由自由许可的照片纹理（CC0，ambientCG）制成，由 `make_menu_scene.py` 按原版同一用途纹理的实测调色板和纹理颗粒调整，并带有法线贴图。`assets/own/make/free_textures.py` 以 SHA-256 固定每个源压缩包（`fetch` 下载缺少的压缩包，不解压也不运行其中任何内容）；源文件不随游戏提供，由它们制成的纹理随游戏提供。来源、作者和许可：`assets/own/CREDITS.md`；随附文件的校验和：`assets/own/SHA256SUMS`。
+- **字体**：Tektur（SIL OFL，`assets/fonts/Tektur-Variable.ttf`，版本和校验和见 `assets/fonts/README.md`），一种方正的科技感字体，气质接近原版宽体菜单字体；小写字母以小型大写字母绘制，按测得的原版比例加宽并加大字距（标签宽度误差在 2% 以内）。它缺少的字符取自 Noto Sans，中文取自 Noto Sans SC。字形在运行时光栅化到图集中，并按与游戏字体相同的矩形、对齐、换行和阴影排版，因此各画面保持原版的布局（`crates/game/src/fallback.rs`）。
 - **文字**（`assets/own/Texts/menu.txt`，内置于游戏）：菜单、关卡内和结束画面的全部文字，有英语、俄语、德语、简体中文、法语、西班牙语和意大利语，原版 `Language.nmo` 有对应键时沿用其键名。使用原版界面时，优先采用拷贝在其五种语言中的文字；俄语和中文（拷贝没有）使用我们的文字，以随附字体绘制。
 
-自有界面的默认高分榜也是我们自己的（十个名字，3000 到 750 分）。无论使用哪种界面，仍来自拷贝的有：默认按键（base.cmo 的 DB_Options；没有时为方向键、Shift 和空格），以及关卡的部件（球、粒子、球的阴影、天空、机关），之后的阶段会替换它们。
+自有界面的默认高分榜也是我们自己的（十个名字，3000 到 750 分）。有拷贝时仍来自拷贝的有：默认按键（base.cmo 的 DB_Options；没有时为方向键、Shift 和空格）。
+
+## 我们自己的部件
+
+第 3 阶段（2026-11-03，decisions.md，“游戏开箱即玩”）：关卡可以引用的每个部件都有我们自己的版本，以开放格式放在 `assets/own/3D Entities/`（`PH/` 中的模块、`Balls/`、`AnimTrafo/`）和 `assets/own/Textures/`（天空、粒子、球的阴影；以 `.bmp` 或 `.tga` 请求的图片，我们的版本可以是 `.png`）中，由 `assets/own/make/make_parts.py` 仅凭脚本本身生成。它们按原版测得的尺寸制作：游戏代码引用的每个对象（部件、关节框架、火焰帧、球的网格——物理使用其包围盒）都有测得的位姿，每个碰撞网格都以我们自己的形状（长方体、棱台、棱柱、椭球体）具有测得的尺寸，物理数值（质量、摩擦、关节、力）沿用游戏自己的，不作改动（crates/game/src/modules.rs）；只有外观是新的。`crates/game/src/partcheck.rs` 对第 1 到 12 关的每个模块，分别用拷贝的部件和我们的部件，从相同的起点、以相同的输入运行，并比较两者的轨迹。
+
+当关卡自己声明是为我们的部件而做时（其设置中的 `"parts": "own"`，由我们的关卡工具 `assets/own/make/levelkit.py` 写入），它优先使用我们的部件，因此有没有拷贝都玩起来一样；其他任何关卡（拷贝中的关卡、自制地图、转换或重制的关卡，或较早的开放格式关卡）则优先使用拷贝的部件，与其制作时一致，拷贝缺少的部分才用我们的（没有拷贝时全用我们的；有拷贝时，用我们的部件替代会提示一次）。关卡自己的 `game/` 文件夹优先于两者。
+
+## 自有纹理
+
+第 3 阶段（2026-11-03）：关卡、关卡部件和球默认使用我们自己的纹理绘制（decisions.md，“默认使用自有纹理”）：无论哪个关卡请求——原版关卡、社区地图、模块、球——`assets/own/Textures/<名称>.png` 都会替换同名的原版纹理；名称比较时忽略大小写、`_`、`-` 和空格（`BallWood.bmp` 即 `Ball_Wood`）。十三个关卡使用的 63 个纹理中有 45 个是我们的（平台及其砖条、检查点、立柱、砖墙、所有木材、金属、屋顶、标记、反射贴图、三种球）；天空、粒子、光晕、阴影和少数图片仍取自拷贝。`assets/own/TEXTURES.md` 列出每个纹理的用途、尺寸、使用频率以及是否已有我们的替代。它们由 `assets/own/make/make_textures.py` 用 CC0 照片纹理（`free_textures.py`，固定版本并校验；`assets/own/CREDITS.md`）和脚本绘制的图形制作，按同名原版纹理实测的调色板、颗粒和布局（砖条、箍带、圆环和明暗所占边长的比例）调整，分辨率加倍，原版平铺处无缝平铺，球的包裹方式与原版相同。扩展页面的 *Textures* 开关（`textures own|original`）改用拷贝的纹理；经典模式始终使用我们的纹理。开放格式关卡自带的纹理（其文件夹中的文件）仍归其作者。`--textures original|own` 为单次运行选择；`--export` 默认保留拷贝的纹理，加上 `--textures own` 则把我们的纹理写入导出的关卡。我们的文件随游戏提供，读取时与任何纹理一样受尺寸上限约束；关卡中的名称只在其中挑选，绝不会构成路径。
+
+哪些纹理会被我们的替换——在关卡加载时决定（因此绘制和导出一致）：拷贝的关卡和部件及其重制版（`levels/remastered/`）中，凡是我们有的纹理都按名称替换；他人的地图（社区 `.nmo`）中，按文件命名的纹理只在该文件来自拷贝时替换（地图自己文件夹带来的文件仍归地图），地图内嵌的像素只在与拷贝中同名纹理逐像素相同时替换，因此地图自己的图片绝不会被覆盖；开放格式关卡自带的文件从不替换。`.nmo` 中纹理的文件名只取最后一部分，在游戏的纹理文件夹中查找；只有开放格式关卡自己的文件夹按路径读取。菜单场景跟随界面：自有界面用我们的场景，原版界面用拷贝的 MenuLevel 及其自己的纹理。
 
 自有内容分阶段推出：界面（字体、按钮、分数框、生命球、文字、菜单场景），然后是球、天空、粒子和音效（来自开放素材库），带中国元素、类似麻将游戏风格的音乐，最后是自己的模块和关卡。
 

@@ -50,3 +50,9 @@ __pycache__/
 
 # Cargo build output
 /target/
+
+# Fuzzing: findings, logs and scratch files of the stable fuzzer (crates/fuzzkit), cargo-fuzz's corpus and build
+/fuzz/artifacts/
+/fuzz/corpus/
+/fuzz/target/
+/fuzz/coverage/

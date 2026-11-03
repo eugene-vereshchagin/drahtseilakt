@@ -95,6 +95,8 @@ pub enum Ask {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Line {
     Start,
+    /// Bring in the player's copy of the original (shown while there is none).
+    Import,
     Highscore,
     Options,
     Credits,
@@ -119,6 +121,8 @@ enum Line {
     DebugMenu,
     /// Where the interface's files come from: own, the original, its remaster (resources.rs).
     Interface,
+    /// Which textures the levels are drawn with: ours or the copy's (resources.rs).
+    Textures,
     /// The sound theme (sound_themes.rs): the arrows go round the themes found.
     SoundTheme,
     /// The Language page, and a language on it (by its place in lang::LANGUAGES).
@@ -149,6 +153,8 @@ pub enum Action {
     Continue,
     Play(u32),
     Map(PathBuf),
+    /// Open the window that brings in the player's copy of the original.
+    Import,
     Restart,
     /// Leave the level for the main menu.
     Home,
@@ -161,6 +167,8 @@ pub enum Action {
     Volumes([f32; 2]),
     /// The interface's provider chosen (it takes effect on the next start).
     Interface(gamedata::resources::Provider),
+    /// The levels' textures chosen (the next level loads with them).
+    Textures(gamedata::resources::TextureSet),
     /// The sound theme chosen (its key).
     SoundTheme(String),
     /// The menus' language chosen (its code): the game saves it and speaks it at once.
@@ -212,6 +220,7 @@ fn valued(line: Line) -> bool {
             | Line::Invert
             | Line::Mode
             | Line::Interface
+            | Line::Textures
             | Line::SoundTheme
             | Line::Switch(_)
     )
@@ -225,6 +234,10 @@ pub struct Menu {
     pub maps: Vec<Package>,
     /// The kind's folder the custom levels come from.
     folder: Option<PathBuf>,
+    /// The custom levels shown are our own (the shipped ones and the open-format folder's).
+    own_list: bool,
+    /// The player's copy of the original is there: without it the levels are our own and the menu offers the import.
+    copy: bool,
     /// The extended mode and its additions.
     pub features: Features,
     pub volumes: [f32; 2],
@@ -280,6 +293,8 @@ impl Menu {
             entries,
             maps: Vec::new(),
             folder: None,
+            own_list: false,
+            copy: data.has_copy(),
             features,
             volumes: [1.0; 2],
             strings: strings.clone(),
@@ -394,6 +409,9 @@ impl Menu {
     /// The lines of `screen`, in the order the arrows go through them.
     fn lines(&self, screen: Screen) -> Vec<Line> {
         match screen {
+            Screen::Main if !self.copy => {
+                vec![Line::Start, Line::Import, Line::Highscore, Line::Options, Line::Credits, Line::Exit]
+            }
             Screen::Main => vec![
                 Line::Start,
                 Line::Highscore,
@@ -424,7 +442,7 @@ impl Menu {
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(false))
-                .chain([Line::Interface, Line::SoundTheme, Line::DebugMenu, Line::Back])
+                .chain([Line::Interface, Line::Textures, Line::SoundTheme, Line::DebugMenu, Line::Back])
                 .collect(),
             Screen::Debug => switches(true).chain([Line::Back]).collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
@@ -542,6 +560,7 @@ impl Menu {
             (Screen::Controls, Some(Line::Invert)) => self.toggle_invert(),
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
+            (Screen::Extended, Some(Line::Textures)) => Action::Textures(next_textures()),
             (Screen::Extended, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (Screen::Extended | Screen::Debug, Some(Line::Switch(i))) => {
                 FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
@@ -563,13 +582,23 @@ impl Menu {
         match line {
             // in the extended mode the levels come by kind; the original ones are the classic list
             Line::Start if self.features.has(Feature::CustomLevels) => open(self, Screen::Kinds),
+            // without a copy the levels are our own (decisions.md, "The game plays out of the box")
+            Line::Start if !self.copy => {
+                self.maps = own_levels();
+                self.folder = Some(crate::levels::dir(Kind::Open));
+                self.own_list = true;
+                open(self, Screen::Custom)
+            }
             Line::Start => open(self, Screen::Start),
+            Line::Import => Action::Import,
             Line::Kind(k) => match LEVEL_KINDS.get(k) {
                 Some(Kind::Original) => open(self, Screen::Start),
                 Some(&kind) => {
                     let root = crate::levels::dir(kind);
-                    self.maps = maps_in(&root);
+                    // the open-format levels include those shipped with the game
+                    self.maps = if kind == Kind::Open { own_levels() } else { maps_in(&root) };
                     self.folder = Some(root);
+                    self.own_list = false;
                     open(self, Screen::Custom)
                 }
                 None => Action::None,
@@ -609,6 +638,7 @@ impl Menu {
             Line::Map(i) => self.maps.get(i).map_or(Action::None, |p| Action::Map(p.level.clone())),
             Line::Mode => Action::ToggleDebug,
             Line::Interface => Action::Interface(next_provider(1)),
+            Line::Textures => Action::Textures(next_textures()),
             Line::SoundTheme => Action::SoundTheme(next_theme(1)),
             Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
             Line::Music | Line::Effects => Action::None,
@@ -881,6 +911,7 @@ impl Menu {
         let s = &self.strings;
         match line {
             Line::Start => s.get("Menu_Main Button Start", "Start"),
+            Line::Import => s.ours("import"),
             Line::Kind(k) => match LEVEL_KINDS.get(k) {
                 Some(Kind::Original) => s.ours("kind original"),
                 Some(Kind::Remastered) => s.ours("kind remastered"),
@@ -917,6 +948,7 @@ impl Menu {
             Line::Mode => s.ours("extended mode"),
             Line::DebugMenu => s.ours("debug mode"),
             Line::Interface => s.ours("interface"),
+            Line::Textures => s.ours("textures"),
             Line::SoundTheme => s.ours("sounds"),
             Line::Switch(i) => FEATURES.get(i).map_or_else(String::new, |f| s.ours(&format!("feature {}", f.key()))),
             Line::Yes => s.get("Menu_Opt_Graphics Synch Yes", "Yes"),
@@ -936,9 +968,10 @@ impl Menu {
         }
     }
 
-    /// A custom level's title as it is (any script), a cut one's "…" as "..." (the game's font has no "…").
+    /// A custom level's title as it is (any script), in the menus' language when it has one in it, a cut one's "…"
+    /// as "..." (the game's font has no "…").
     fn map_text(&self, i: usize) -> Option<String> {
-        self.maps.get(i).map(|p| p.title.replace('…', "..."))
+        self.maps.get(i).map(|p| p.title_in(self.strings.language()).replace('…', "..."))
     }
 
     /// A switch's row: its label and yes or no.
@@ -968,6 +1001,7 @@ impl Menu {
             Screen::Debug => s.ours("debug mode"),
             Screen::Language => s.ours("language"),
             Screen::Kinds => s.ours("levels"),
+            Screen::Custom if self.own_list => s.ours("own levels"),
             Screen::Custom => match self.folder.as_ref().and_then(|root| {
                 LEVEL_KINDS.iter().position(|&k| crate::levels::dir(k) == *root)
             }) {
@@ -1059,6 +1093,7 @@ impl Menu {
                 if self.features.mode {
                     f.extend(switches(false).map(|l| self.switch_field(l)));
                     f.push((self.label(Line::Interface), self.interface_value()));
+                    f.push((self.label(Line::Textures), self.textures_value()));
                     f.push((self.label(Line::SoundTheme), theme_value()));
                     f.push((self.label(Line::DebugMenu), ">".to_owned()));
                 }
@@ -1073,7 +1108,6 @@ impl Menu {
             }
             Screen::Credits => [
                 "Drahtseilakt by Veresk",
-                "",
                 "Ballance by Cyparade / Atari 2004",
                 "Started as a fork of OpenBallance by emdzej",
                 "Physics: IVP, ported from OpenBallance",
@@ -1083,6 +1117,7 @@ impl Menu {
                 "juskiddink, botpl (CC-BY), neolein, Tozan (CC0)",
                 "Sounds: Kenney, freesound and OpenGameArt authors",
                 "(CC0, CC-BY): assets/sounds/system/CREDITS.md",
+                "Textures: ambientCG.com (CC0), thank you",
             ]
             .iter()
             .map(|l| ((*l).to_owned(), String::new()))
@@ -1230,11 +1265,8 @@ impl Menu {
         hits: &std::cell::RefCell<Vec<Hit>>,
     ) -> Vec<crate::ui::Quad> {
         use crate::ui::{Anchor, Quad, homogeneous};
+        // behind the menus the game draws the interface's 3D scene (the original's or our own, menuscene.rs)
         let mut out = Vec::new();
-        // the own interface's picture behind the menus (the original's has its 3D scene, drawn by the game)
-        if font.is_some_and(crate::ui::Face::own) && !self.over_level() {
-            out.push(crate::ui::backdrop(screen));
-        }
         let quad = |r: [f32; 4], uv: [f32; 4], texture: &'static str| Quad {
             rect: screen.rect(homogeneous(r), Anchor::Center),
             uv,
@@ -1519,7 +1551,10 @@ impl Menu {
                         field(&mut out, 0.27, name, value, 0);
                     }
                     let rows = |l: &&Line| {
-                        matches!(l, Line::Switch(_) | Line::Interface | Line::SoundTheme | Line::DebugMenu)
+                        matches!(
+                            l,
+                            Line::Switch(_) | Line::Interface | Line::Textures | Line::SoundTheme | Line::DebugMenu
+                        )
                     };
                     let n = lines.iter().filter(rows).count();
                     let top = if first == 1 { 0.40 } else { 0.30 };
@@ -1604,7 +1639,8 @@ impl Menu {
         out
     }
 
-    /// The loading screen in the interface's face: the own interface's picture and band behind it.
+    /// The loading screen in the interface's face: with the own interface a band behind it (the menu scene is
+    /// drawn under it).
     pub fn loading_interface(
         face: &crate::ui::Face,
         screen: crate::ui::Screen,
@@ -1614,7 +1650,6 @@ impl Menu {
         use crate::ui::{Anchor, Quad, homogeneous};
         let mut out = Vec::new();
         if face.own() {
-            out.push(crate::ui::backdrop(screen));
             out.push(Quad {
                 rect: screen.rect(homogeneous([0.0, 0.43, 1.0, 0.57]), Anchor::Center),
                 uv: [0.0, 0.99, 1.0, 1.0],
@@ -1768,6 +1803,15 @@ fn next_provider(by: i32) -> gamedata::resources::Provider {
     all.get((at + by).rem_euclid(n) as usize).copied().unwrap_or(Provider::Original)
 }
 
+/// The other choice of textures (there are two).
+fn next_textures() -> gamedata::resources::TextureSet {
+    use gamedata::resources::{TextureSet, textures};
+    match textures() {
+        TextureSet::Own => TextureSet::Original,
+        TextureSet::Original => TextureSet::Own,
+    }
+}
+
 /// The sound theme after the chosen one, `by` steps on (the arrows go round the themes found and "original").
 fn next_theme(by: i32) -> String {
     use gamedata::sound_themes::{SYSTEM, choices, chosen};
@@ -1783,6 +1827,14 @@ fn theme_value() -> String {
 }
 
 impl Menu {
+    /// The Textures line's value: ours or the copy's.
+    fn textures_value(&self) -> String {
+        match gamedata::resources::textures() {
+            gamedata::resources::TextureSet::Own => self.strings.ours("interface own"),
+            gamedata::resources::TextureSet::Original => self.strings.ours("interface original"),
+        }
+    }
+
     /// The Interface line's value: the provider chosen, marked when it waits for the next start.
     fn interface_value(&self) -> String {
         use gamedata::resources::{Provider, chosen, in_use};
@@ -1804,6 +1856,13 @@ const LEVEL_KINDS: [Kind; 4] = [Kind::Original, Kind::Remastered, Kind::Communit
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
 /// it; folders that hold no level or several are not shown, and said so on the console.
+/// Our own levels: those shipped with the game, then the player's open-format levels.
+fn own_levels() -> Vec<Package> {
+    let mut v = crate::levels::shipped();
+    v.extend(maps_in(&crate::levels::dir(Kind::Open)));
+    v
+}
+
 fn maps_in(dir: &Path) -> Vec<Package> {
     let (levels, skipped) = gamedata::package::scan(dir);
     if !skipped.is_empty() {
@@ -1864,6 +1923,8 @@ mod tests {
                 .collect(),
             maps: Vec::new(),
             folder: None,
+            own_list: false,
+            copy: true,
             features: Features::new(extended),
             volumes: [1.0; 2],
             strings: Strings::default(),
@@ -2029,6 +2090,9 @@ mod tests {
                 title: format!("Level number {i} with a rather long title"),
                 author: None,
                 version: None,
+                titles: Vec::new(),
+                order: None,
+                hidden: false,
             })
             .collect();
         m.push(Screen::Custom);
@@ -2287,6 +2351,19 @@ mod tests {
         m.step(-1);
         m.step(-1);
         assert_eq!(m.enter(), Action::Play(2));
+    }
+
+    #[test]
+    fn without_a_copy_the_menu_offers_our_levels_and_the_import() {
+        let mut m = menu(&[false; 13], false);
+        m.copy = false;
+        assert_eq!(m.lines(Screen::Main), [Line::Start, Line::Import, Line::Highscore, Line::Options, Line::Credits,
+            Line::Exit]);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Custom, "Start shows our own levels");
+        m.back();
+        m.step(1);
+        assert_eq!(m.enter(), Action::Import);
     }
 
     #[test]

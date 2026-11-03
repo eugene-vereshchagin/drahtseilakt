@@ -245,6 +245,9 @@ fn settings_json(s: &crate::Settings) -> Value {
     if let Some(h) = s.source_hash {
         v["source_hash"] = json!(format!("{h:016x}"));
     }
+    if s.own_parts {
+        v["parts"] = json!("own");
+    }
     v
 }
 
@@ -292,7 +295,8 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
         Value::Null => None,
         b => Some(
             b.as_i64()
-                .filter(|b| b.abs() <= MAX_BONUS)
+                // unsigned_abs: i64::MIN has no abs(), which wrapped to itself and passed the check
+                .filter(|b| b.unsigned_abs() <= MAX_BONUS.unsigned_abs())
                 .ok_or("settings: level_bonus is not a number of points")?,
         ),
     };
@@ -303,7 +307,14 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
             Some(u64::from_str_radix(s, 16).map_err(|_| "settings: source_hash is not 16 hex digits".to_owned())?)
         }
     };
+    let own_parts = match &v["parts"] {
+        Value::Null => false,
+        Value::String(p) if p == "own" => true,
+        Value::String(p) if p == "copy" => false,
+        _ => return Err("settings: parts is not \"own\" or \"copy\"".into()),
+    };
     Ok(crate::Settings {
+        own_parts,
         music,
         light,
         level_bonus,
@@ -464,6 +475,10 @@ fn read_capped(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
 struct Reader<'a> {
     doc: &'a Value,
     bin: &'a [u8],
+    /// Bytes still to be read through accessors. glTF lets accessors be shared, so a level.gltf naming one large
+    /// accessor from many meshes would copy the buffer again and again (gigabytes from a small file); what is read in
+    /// all stays within twice the buffer (what the exporter writes reads each byte once).
+    budget: std::cell::Cell<usize>,
 }
 
 impl Reader<'_> {
@@ -498,6 +513,8 @@ impl Reader<'_> {
         if needed > length {
             return Err(format!("accessor {index}: larger than its view"));
         }
+        let left = self.budget.get().checked_sub(needed).ok_or("accessors read more than twice the buffer")?;
+        self.budget.set(left);
         let end = offset.checked_add(needed).ok_or("view overflows")?;
         let bytes = self
             .bin
@@ -547,7 +564,22 @@ fn sprite_of(v: &serde_json::Value) -> Option<crate::Sprite> {
     Some(crate::Sprite { mode: u32::try_from(v["mode"].as_u64()?).ok()?, size: pair("size")?, offset: pair("offset")? })
 }
 
-/// Reads an open level from `dir`. Texture images become `TextureSource::File` with the full path.
+/// `dir` as a full path with `.` and `..` worked out by name (no link followed): what the level's own files are known by.
+pub fn full_path(dir: &Path) -> std::io::Result<std::path::PathBuf> {
+    let mut out = std::path::PathBuf::new();
+    for c in std::path::absolute(dir)?.components() {
+        match c {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other),
+        }
+    }
+    Ok(out)
+}
+
+/// Reads an open level from `dir`. Texture images become `TextureSource::LevelFile` with the full path.
 pub fn import(dir: &Path) -> Result<Level, String> {
     import_read(dir).map(|(level, _)| level)
 }
@@ -555,7 +587,26 @@ pub fn import(dir: &Path) -> Result<Level, String> {
 /// Reads an open level from `dir`, and gives the bytes it was read from (level.gltf, then level.bin), so that what
 /// a level is known by is what was played.
 pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
+    // the level's own files are known by their full path (a relative one would read like a texture's bare name)
+    let dir = &full_path(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let text = read_capped(&dir.join("level.gltf"), MAX_JSON)?;
+    import_from(dir, text, || read_capped(&dir.join("level.bin"), MAX_BIN))
+}
+
+/// Reads an open level from the bytes of its level.gltf and level.bin (the fuzz targets' entry: no files), its
+/// textures named as files of `dir`.
+pub fn import_bytes(dir: &Path, gltf: &[u8], bin: &[u8]) -> Result<Level, String> {
+    if u64::try_from(gltf.len()).map_or(true, |n| n > MAX_JSON) || u64::try_from(bin.len()).map_or(true, |n| n > MAX_BIN) {
+        return Err("above the size limits".into());
+    }
+    import_from(dir, gltf.to_vec(), || Ok(bin.to_vec())).map(|(level, _)| level)
+}
+
+fn import_from(
+    dir: &Path,
+    text: Vec<u8>,
+    read_bin: impl FnOnce() -> Result<Vec<u8>, String>,
+) -> Result<(Level, Vec<u8>), String> {
     let doc: Value = serde_json::from_slice(&text).map_err(|e| format!("level.gltf: {e}"))?;
     if doc["asset"]["version"].as_str() != Some("2.0") {
         return Err("level.gltf: not glTF 2.0".into());
@@ -570,10 +621,11 @@ pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
     if uri != "level.bin" {
         return Err("the buffer must be level.bin next to level.gltf".into());
     }
-    let bin = read_capped(&dir.join("level.bin"), MAX_BIN)?;
+    let bin = read_bin()?;
     let r = Reader {
         doc: &doc,
         bin: &bin,
+        budget: std::cell::Cell::new(bin.len().saturating_mul(2)),
     };
     let arr = |key: &str| doc[key].as_array().cloned().unwrap_or_default();
     let mut level = Level::default();
@@ -590,7 +642,7 @@ pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
         }
         level.textures.push(Texture {
             name: img["name"].as_str().unwrap_or(uri).to_owned(),
-            source: TextureSource::File(dir.join(uri).to_string_lossy().into_owned()),
+            source: TextureSource::LevelFile(dir.join(uri)),
             color_key: color_key_of(&img["extras"]["drahtseilakt"]["color_key"]),
         });
     }

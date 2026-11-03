@@ -1,0 +1,89 @@
+# Bridges and Boards: seesaws tip under any ball; plate bridges hold the wooden and paper balls but break under the
+# stone one. Edit this file and run `python3 -I assets/own/make/leveldsl.py <this file>`.
+title Bridges and Boards
+title.ru Мосты и доски
+title.de Brücken und Bretter
+title.zh 桥与板
+order 5
+sky B
+music 5
+bonus 500
+ball wood
+columns 45
+
+safety gutter
+start
+width 12
+floor 30
+seesaw
+floor 20
+point
+left 90 24
+floor 20
+seesaw
+floor 20
+checkpoint
+safety border
+
+# sector 2: stone over a seesaw, wood again before the plate bridge
+floor 15
+trafo stone
+floor 20
+seesaw
+floor 15
+right 90 24
+floor 25 down 4
+floor 10
+trafo wood
+floor 15
+platebridge
+floor 20
+checkpoint
+safety gutter
+
+# sector 3: narrower, two plate bridges and a seesaw
+floor 15
+width 10
+floor 15
+platebridge
+floor 10
+left 90 20
+floor 10
+point
+floor 10
+platebridge
+floor 15
+life
+floor 10
+seesaw
+floor 20
+checkpoint
+
+# sector 4: paper: a plate bridge, a fan up, a seesaw
+floor 15
+trafo paper
+floor 20
+platebridge
+floor 15
+right 90 22
+floor 20
+fan ahead -5
+gap 4 up 12 nopilot
+floor 20
+seesaw
+floor 15
+trafo wood
+floor 15
+checkpoint
+
+# sector 5: wood: a last seesaw, rails, the finish
+floor 15
+seesaw
+floor 15
+left 90 24
+floor 10
+rails 30
+floor 15
+point
+floor 30
+finish

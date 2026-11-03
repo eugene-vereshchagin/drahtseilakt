@@ -1,0 +1,106 @@
+# Stone Work: crates, loose balls and domes in the way. The stone ball shoves them off ledges without borders; the
+# wooden ball goes round them. Edit this file and run `python3 -I assets/own/make/leveldsl.py <this file>`.
+title Stone Work
+title.ru Каменная работа
+title.de Steinarbeit
+title.zh 石之工
+order 6
+sky C
+music 1
+bonus 600
+ball wood
+columns 45
+
+safety gutter
+start
+width 12
+floor 20
+width 26
+floor 10
+dome side 6 ahead 8
+dome side -7 ahead 22
+point side 6 ahead 22
+floor 32
+width 12
+floor 10
+right 90 24
+floor 15
+trafo stone
+floor 15
+checkpoint
+
+# sector 2: stone: rows of crates on a ledge without borders
+floor 15
+borders off
+width 13
+floor 10
+box side 3 ahead 8
+box side -3 ahead 8
+floor 20
+box side 3 ahead 10
+box side -3 ahead 10
+box ahead 16
+floor 25
+point
+floor 10
+borders on
+width 11
+floor 25 down 5
+left 90 22
+floor 20
+checkpoint
+
+# sector 3: stone: loose balls on a narrow way, a seesaw
+floor 15
+borders off
+width 11
+floor 10
+loose stone ahead 8 side 2
+loose wood ahead 16 side -2
+floor 25
+loose stone ahead 8
+floor 15
+borders on
+floor 10
+seesaw
+floor 15
+trafo wood
+floor 15
+checkpoint
+
+# sector 4: wood: domes on a narrow way, rails
+floor 15
+width 20
+borders off
+floor 10
+dome side 4 ahead 8
+life side -6 ahead 8
+dome side -4 ahead 26
+floor 34
+borders on
+width 11
+right 90 22
+floor 10
+rails 35
+floor 15
+trafo stone
+floor 15
+checkpoint
+
+# sector 5: stone: a wall of crates, down to the finish
+floor 15
+borders off
+width 14
+floor 10
+box side 3 ahead 8
+box side -3 ahead 8
+box ahead 15
+floor 20
+point
+floor 10
+borders on
+width 11
+left 90 24
+floor 25 down 4
+floor 30
+finish

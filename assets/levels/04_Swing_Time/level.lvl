@@ -1,0 +1,78 @@
+# Swing Time: things that move: swinging sacks across the way, turning arms to push through, a flap wheel, swings
+# that bridge a gap only while they swing by. Edit this file and run
+# `python3 -I assets/own/make/leveldsl.py <this file>`.
+title Swing Time
+title.ru Время качелей
+title.de Schaukelzeit
+title.zh 摇摆时刻
+order 4
+sky A
+music 4
+bonus 400
+ball wood
+columns 45
+
+safety border
+start
+width 12
+floor 25
+point
+floor 15
+sack ahead 15
+floor 30
+left 90 24
+floor 15
+sack ahead 10
+floor 20
+checkpoint
+
+# sector 2: turning arms and a flap wheel
+floor 15
+width 14
+floor 10
+arms ahead 10 side 2
+floor 20
+right 90 24
+floor 10
+flaps ahead 10
+floor 20
+point
+floor 15
+arms ahead 10 side 2
+floor 20
+checkpoint
+
+# sector 3: a swing over a gap
+floor 15
+width 10
+floor 20
+pilot safe,collector : goto -8 0 0 ; wait 50 ; via 0 0 0 ; via 9 0 0
+pilot speed : via 0 0 0 ; via 9 0 0
+swingbridge nopilot
+floor 20
+life
+left 90 22
+floor 15
+sack ahead 8
+floor 15
+trafo stone
+floor 15
+checkpoint
+
+# sector 4: stone: heavy enough not to be knocked off; a last swing and the finish
+floor 15
+sack ahead 8
+floor 15
+sack ahead 8
+floor 15
+right 90 24
+floor 15
+trafo wood
+floor 20
+pilot safe,collector : goto -8 0 0 ; wait 30 ; via 0 0 0 ; via 9 0 0
+pilot speed : via 0 0 0 ; via 9 0 0
+swingbridge nopilot
+floor 15
+point
+floor 30
+finish

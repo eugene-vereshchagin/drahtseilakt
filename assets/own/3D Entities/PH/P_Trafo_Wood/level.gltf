@@ -1,0 +1,422 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "drahtseilakt make_parts.py"
+ },
+ "extensionsUsed": [],
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "format": 1,
+     "groups": [
+      {
+       "name": "All_P_Trafo_Wood",
+       "members": [
+        0,
+        1
+       ]
+      }
+     ],
+     "sky": null,
+     "start_ball": null,
+     "settings": {
+      "tutorial": false,
+      "last_level": false
+     }
+    }
+   }
+  }
+ ],
+ "nodes": [
+  {
+   "name": "P_Trafo_Wood_Shadow",
+   "matrix": [
+    0.453,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.453,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.453,
+    0.0,
+    0.08,
+    -0.029,
+    -0.219,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 0
+  },
+  {
+   "name": "P_Trafo_Wood_MF",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 1
+  }
+ ],
+ "meshes": [
+  {
+   "name": "P_Trafo_Wood_Shadow_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  },
+  {
+   "name": "P_Trafo_Wood_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 4,
+      "NORMAL": 5,
+      "TEXCOORD_0": 6
+     },
+     "indices": 7,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 4,
+      "NORMAL": 5,
+      "TEXCOORD_0": 6
+     },
+     "indices": 8,
+     "material": 2
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "P_Trafo_Wood_Shadow",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 0
+    }
+   },
+   "emissiveFactor": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "doubleSided": false,
+   "alphaMode": "BLEND",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": false,
+     "blend": [
+      "src_alpha",
+      "inv_src_alpha"
+     ]
+    }
+   }
+  },
+  {
+   "name": "P_Trafo_Wood",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.6,
+     0.65,
+     0.74,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 1
+    }
+   },
+   "emissiveFactor": [
+    0.29,
+    0.29,
+    0.29
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": true,
+     "texgen": "reflect"
+    }
+   }
+  },
+  {
+   "name": "P_Trafo_Wood_Color",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.92,
+     0.58,
+     0.09,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 1
+    }
+   },
+   "emissiveFactor": [
+    0.2,
+    0.2,
+    0.2
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": true,
+     "texgen": "reflect"
+    }
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0,
+   "sampler": 0
+  },
+  {
+   "source": 1,
+   "sampler": 0
+  }
+ ],
+ "images": [
+  {
+   "uri": "textures/shadow.png",
+   "name": "shadow"
+  },
+  {
+   "uri": "textures/Trafo_Environment.png",
+   "name": "Trafo_Environment"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987,
+   "wrapS": 10497,
+   "wrapT": 10497
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "level.bin",
+   "byteLength": 29336
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 48,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 96,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 128,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 152,
+   "byteLength": 9216,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 9368,
+   "byteLength": 9216,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 18584,
+   "byteLength": 6144,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 24728,
+   "byteLength": 3072,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 27800,
+   "byteLength": 1536,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    -6.05,
+    0.0,
+    -6.05
+   ],
+   "max": [
+    6.05,
+    0.0,
+    6.05
+   ],
+   "bufferView": 0
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 1
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 2
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 3
+  },
+  {
+   "componentType": 5126,
+   "count": 768,
+   "type": "VEC3",
+   "min": [
+    -2.466,
+    -0.008,
+    -2.466
+   ],
+   "max": [
+    2.466,
+    0.475,
+    2.466
+   ],
+   "bufferView": 4
+  },
+  {
+   "componentType": 5126,
+   "count": 768,
+   "type": "VEC3",
+   "bufferView": 5
+  },
+  {
+   "componentType": 5126,
+   "count": 768,
+   "type": "VEC2",
+   "bufferView": 6
+  },
+  {
+   "componentType": 5125,
+   "count": 768,
+   "type": "SCALAR",
+   "bufferView": 7
+  },
+  {
+   "componentType": 5125,
+   "count": 384,
+   "type": "SCALAR",
+   "bufferView": 8
+  }
+ ]
+}

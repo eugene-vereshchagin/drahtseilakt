@@ -92,14 +92,23 @@ pub fn settings_text() -> String {
     const MAX: u64 = 64 * 1024;
     let small = std::fs::metadata(settings_path()).is_ok_and(|m| m.len() <= MAX);
     let bytes = if small { std::fs::read(settings_path()).unwrap_or_default() } else { Vec::new() };
-    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes);
+    settings_from_bytes(&bytes)
+}
+
+/// The settings file's bytes as text (the fuzz targets' entry; `settings_text` reads the file).
+pub fn settings_from_bytes(bytes: &[u8]) -> String {
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
     String::from_utf8_lossy(bytes).into_owned()
 }
 
 /// A value of the settings file ("key value" lines).
 pub fn setting(key: &str) -> Option<String> {
-    settings_text()
-        .lines()
+    setting_in(&settings_text(), key)
+}
+
+/// A value of the settings' text.
+pub fn setting_in(text: &str, key: &str) -> Option<String> {
+    text.lines()
         .filter_map(|l| l.split_once(' '))
         .find(|(k, _)| *k == key)
         .map(|(_, v)| v.trim().to_owned())

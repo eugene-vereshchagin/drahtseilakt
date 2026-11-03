@@ -666,6 +666,10 @@ t.cp_ws = p0
 The normal points from p0 (obj0) to p1 (obj1). A ball–ball pair gives a normal along the centre line, and the tail
 puts the contact point on ball 0's surface. The function has no validity test.
 
+Drahtseilakt's port departs here in one degenerate case: when the points coincide (`len` is 0, `n` would stay the
+near-zero `d`), the normal becomes (1, 0, 0), as the edge-edge case takes for parallel edges (§CP4.5). A zero normal
+makes the impact's virtual masses infinite and the bodies' speeds NaN (see §CP4.3).
+
 #### CP4.3 `0x1001f160` point_edge(cp, p0, g1, ctx1, t): POINT/BALL against EDGE
 
 ```
@@ -686,6 +690,18 @@ if cp.flags60.lowbyte == 1:
    u = ((e.z*r.z + r.y*e.y) + r.x*e.x) * inv_len*inv_len   // projection parameter along the edge
    if u < 0.0 || !(u <= 1.0): t.flags = (t.flags & ~0x200) | 0x100      // left the edge
 ```
+
+**The degenerate case.** A point exactly on an edge (`dist` 0) takes the stand-in `c = (1,0,0)`; when the edge runs
+along x, `n = e × c` is zero and `normalize_f` leaves it so. Two axis-aligned boxes of one size made overlapping side
+by side along x (a level's crates set too close) put each corner exactly on the other's edge, and that is this case.
+An impact along the zero normal (`impact_two_objects`, through the impact system of a box landing on the floor) has
+infinite virtual masses (`1/|u|` with `u = 0`) and gives both boxes NaN speeds; their mindists then insert NaN event
+times into the time manager's min list, a NaN reaches the list's head, `target - base > NaN` is false, and no PSI
+runs again: every body goes on in a straight line from its last PSI (the pose is extrapolated from `delta_pos`), the
+ball floats at a constant speed in the air and no force or wake-up reaches it. The arithmetic above is the original's
+(the C reference, ported exactly, does the same); whether the original binary hangs the same way was not checked.
+Drahtseilakt's port takes `c = (0,1,0)` when the normal comes out zero, so it is across the edge (an edge along x is
+never parallel to y); every other case is the original's arithmetic unchanged, and no recorded run changes.
 
 #### CP4.4 `0x1001ee70` point_triangle(cp, p0, g1, ctx1, t): POINT/BALL against TRIANGLE
 

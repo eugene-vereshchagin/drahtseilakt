@@ -1,4 +1,4 @@
-// Drahtseilakt: the game. Loads a level from the player's own copy (an original level or any .nmo map), plays
+// Drahtseilakt: the game. Loads a level (its own, from the player's copy of the original, or any .nmo map), plays
 // it in a window, records and replays runs, and can run without a window (replay checks, screenshots).
 
 // Hostile input is parsed only by the `nmo` crate; this crate works on validated models, and geometry code
@@ -11,11 +11,14 @@ mod audio;
 mod autopilot;
 mod ballsound;
 mod collide;
+mod edges;
 mod endscreen;
 mod extra;
 mod fallback;
 mod features;
 mod freecam;
+#[cfg(test)]
+mod fuzz_tests;
 mod highscore;
 mod hints;
 mod hud;
@@ -28,7 +31,9 @@ mod menuscene;
 mod modules;
 mod music;
 mod options;
+mod ownlevels;
 mod particles;
+mod partcheck;
 mod physics;
 mod pieces;
 mod proximity;
@@ -57,10 +62,14 @@ usage: drahtseilakt [options]
   --map FILE.nmo      play a level file: a community map or any .nmo
   --open DIR          play a level in the open format (a folder with level.gltf)
   --export DIR        convert the chosen level to the open format in DIR (textures as PNG) and exit
+  --textures SET      own (our free textures; the default for playing) or original (the copy's; the default for
+                      --export): the textures the levels are drawn, or exported, with
   --record FILE       write a replay of the run (also written automatically on finishing a level)
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
   --autopilot         no window: the test player plays the level (to --ticks); saved with --record
+  --watch             with --autopilot: the test player plays in the window (Space pause, +/- speed, F5 take
+                      over by hand and give back, F6 skip a hint's step, F7 a stuck report)
   --follow FILE       the test player follows the ball's way in a replay of a player's run, or a --locate track
   --then FILE         with --follow: from the sector this replay begins at, its way instead (up to 8 times)
   --plan FILE         the test player's way goes through the level objects named in FILE, in order
@@ -104,10 +113,14 @@ pub struct Options {
     pub chosen: bool,
     pub record: Option<PathBuf>,
     pub export: Option<PathBuf>,
+    /// The textures the levels are drawn (and exported) with, instead of the settings' (resources.rs).
+    pub textures: Option<gamedata::resources::TextureSet>,
     pub replay: Option<PathBuf>,
     pub headless: bool,
     /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
     pub autopilot: bool,
+    /// The test player plays in the window, for watching it and taking over by hand.
+    pub watch: bool,
     /// The test player follows the ball's way in this replay (a player's run) or `--locate` track instead of finding
     /// one.
     pub follow: Option<PathBuf>,
@@ -156,9 +169,11 @@ fn parse_args() -> Result<Options, String> {
         chosen: false,
         record: None,
         export: None,
+        textures: None,
         replay: None,
         headless: false,
         autopilot: false,
+        watch: false,
         follow: None,
         then: Vec::new(),
         plan: None,
@@ -208,14 +223,26 @@ fn parse_args() -> Result<Options, String> {
                 o.chosen = true;
             }
             "--open" => {
-                o.source = Source::Open(value()?.into());
+                // known by its full path (its own files are, and a remaster by where it lies)
+                let dir = PathBuf::from(value()?);
+                o.source = Source::Open(level::open::full_path(&dir).map_err(|e| format!("{}: {e}", dir.display()))?);
                 o.chosen = true;
             }
             "--export" => o.export = Some(value()?.into()),
+            "--textures" => {
+                let v = value()?;
+                o.textures = Some(
+                    gamedata::resources::TextureSet::parse(&v).ok_or("--textures is own or original".to_owned())?,
+                );
+            }
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),
             "--headless" => o.headless = true,
             "--autopilot" => o.autopilot = true,
+            "--watch" => {
+                o.autopilot = true;
+                o.watch = true;
+            }
             "--locate" => o.locate = Some(value()?.into()),
             "--frames" => o.frames = Some(value()?.into()),
             "--video" => o.video = Some(value()?.into()),
@@ -312,28 +339,19 @@ fn parse_args() -> Result<Options, String> {
     Ok(o)
 }
 
-/// A start that opens the game's window (not a run without one, not a tool, not an explicit folder).
-fn windowed(o: &Options) -> bool {
-    o.data.is_none()
-        && !o.headless
-        && !o.autopilot
-        && o.screenshot.is_none()
-        && o.export.is_none()
-        && o.locate.is_none()
-        && o.frames.is_none()
-        && o.video.is_none()
-}
-
 /// How many --then runs may follow on.
 const MAX_THEN: usize = 8;
 
-/// Set in the game started again after an import.
-const RESTARTED: &str = "DRAHTSEILAKT_RESTARTED";
+/// Set in the process that opens the import window for the menu's Import.
+pub const IMPORT: &str = "DRAHTSEILAKT_IMPORT";
 
 /// Starts this program again with the same arguments, waits for it and ends with its exit code.
 fn restart() -> ! {
     let status = std::env::current_exe().and_then(|exe| {
-        std::process::Command::new(exe).args(std::env::args_os().skip(1)).env(RESTARTED, "1").status()
+        std::process::Command::new(exe)
+            .args(std::env::args_os().skip(1))
+            .env_remove(IMPORT)
+            .status()
     });
     match status {
         Ok(s) => std::process::exit(s.code().unwrap_or(1)),
@@ -352,19 +370,29 @@ fn main() -> ExitCode {
             println!("{copied} files copied to {}", levels::dir(levels::Kind::Original).display());
             return Ok(());
         }
-        let data = match Data::locate(o.data.clone()) {
-            Ok(d) => d,
-            // a plain start without the game: the window that brings it in, then the game again with it
-            // (not again in the game started after an import: that one would only open the window anew)
-            Err(e) if windowed(&o) && std::env::var_os(RESTARTED).is_none() => {
-                match setup::run(o.size) {
-                    Ok(false) => return Ok(()),
-                    Ok(true) => restart(),
-                    Err(w) => return Err(format!("{e}\n(the window to bring it in did not open: {w})")),
-                }
+        // the menu's Import: the window that brings in the player's copy, in a process of its own (winit runs one
+        // event loop a process), then the game again, with the copy or without it
+        if std::env::var_os(IMPORT).is_some() {
+            if let Err(w) = setup::run(o.size) {
+                eprintln!("drahtseilakt: the window to bring in the game did not open: {w}");
             }
-            Err(e) => return Err(e),
+            restart();
+        }
+        // the copy of the original is optional: without it the game plays its own levels (decisions.md, "The game
+        // plays out of the box"); a folder named with --data must itself be a copy (no other place is tried)
+        let data = match o.data.clone() {
+            Some(d) => Data::at(d)?,
+            None => Data::find(None),
         };
+        let mut o = o;
+        if !data.has_copy() && !o.chosen {
+            // the level behind the menu at the start: our first own level
+            let first = levels::shipped().into_iter().next().ok_or(
+                "no copy of Ballance and no levels of the game's own (assets/levels): import your Ballance with \
+                 --import DIR, or pass --data DIR",
+            )?;
+            o.source = Source::Open(first.level);
+        }
         app::run(o, data)
     });
     match result {

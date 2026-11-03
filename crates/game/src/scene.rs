@@ -225,7 +225,7 @@ impl ExtraModel {
 const SPINNING: [(&str, Vec3, f32); 1] = [("P_Modul_18_Rotor", Vec3::Y, -15.0)];
 
 /// Module models (`3D Entities/PH/<name>.nmo`), uploaded after the fixed models, with their names.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Modules {
     pub models: Vec<Level>,
     pub names: Vec<String>,

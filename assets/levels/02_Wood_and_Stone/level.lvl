@@ -1,0 +1,80 @@
+# Wood and Stone: the wooden ball climbs ramps the stone one cannot; the stone ball shoves crates and loose balls
+# out of its way. Edit this file and run `python3 -I assets/own/make/leveldsl.py <this file>`.
+title Wood and Stone
+title.ru Дерево и камень
+title.de Holz und Stein
+title.zh 木与石
+order 2
+sky B
+music 2
+bonus 200
+ball wood
+columns 40
+
+safety railings
+start
+width 12
+floor 25
+floor 30 up 6
+point
+floor 15
+left 90 26
+floor 20
+trafo stone
+floor 15
+checkpoint
+
+# sector 2: stone, crates on a ledge without borders: shove them over the edge
+floor 15
+width 12
+borders off
+floor 15
+box
+floor 20
+right 90 22
+floor 10
+box side 2
+floor 15
+box side -2
+floor 20
+borders on
+floor 25 down 4
+point
+floor 10
+trafo wood
+floor 15
+checkpoint
+
+# sector 3: wood again, up the ramps, a first stretch of rails
+floor 15
+floor 30 up 7
+floor 12
+left 90 22
+floor 25 up 6
+floor 10
+life
+rails 30
+floor 15
+trafo stone
+floor 15
+checkpoint
+
+# sector 4: stone, loose balls in the way, down to the finish
+borders off
+width 13
+floor 15
+loose stone ahead 10
+floor 25
+right 90 24
+floor 15
+loose wood ahead 8 side 2
+floor 20
+borders on
+width 11
+floor 20 down 3
+point
+floor 25 down 3
+floor 20
+left 90 24
+floor 30
+finish

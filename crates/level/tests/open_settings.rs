@@ -27,6 +27,7 @@ fn settings_survive_the_round_trip() {
             tutorial: true,
             last_level: true,
             source_hash: Some(0x0123_4567_89ab_cdef),
+            own_parts: true,
         },
         ..Level::default()
     };
@@ -55,6 +56,9 @@ fn malformed_settings_are_refused() {
         serde_json::json!({"light": [1, 2]}),
         serde_json::json!({"light": ["a", 0, 0]}),
         serde_json::json!({"level_bonus": 1e30}),
+        // found by review while fuzzing: i64::MIN's abs() wrapped to itself in a release build and passed the cap
+        serde_json::json!({"level_bonus": i64::MIN}),
+        serde_json::json!({"level_bonus": -1_000_000_001i64}),
         serde_json::json!({"tutorial": "yes"}),
         serde_json::json!({"source_hash": "xyz"}),
         serde_json::json!({"source_hash": "0123456789abcdef0"}),

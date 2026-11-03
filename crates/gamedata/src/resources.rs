@@ -6,7 +6,8 @@
 // `interface own|original|remastered` (the extended mode's Interface switch). The default, and what the classic
 // mode plays, is the copy's own interface when the copy has it, else ours (owner's decision 2026-11-03, while our
 // own interface is redone).
-// A role no provider fills is missing: logged once, never a crash.
+// A level's parts (modules, balls, sky, particles, shadow) are ours too: a new level takes ours first, a level of the
+// copy the copy's first (assets.rs, Data::own_parts). A role no provider fills is missing: logged once, never a crash.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -103,7 +104,7 @@ pub fn default_for(copy_has_menu: bool) -> Provider {
 }
 
 /// The game's own assets folder (fonts, own files): `DRAHTSEILAKT_ASSETS`, else `assets/` beside the program or
-/// three folders up (a build's target/release in the source tree).
+/// three folders up (a build's target/release in the source tree), or four (a test's target/release/deps).
 pub fn assets_root() -> Option<PathBuf> {
     static ROOT: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     ROOT.get_or_init(|| {
@@ -120,10 +121,19 @@ pub fn assets_root() -> Option<PathBuf> {
             .and_then(Path::parent)
             .and_then(Path::parent)
             .map(|d| d.join("assets"));
+        // a test's program sits one folder deeper, in target/<profile>/deps: only there, never for an installed
+        // program (whose folder four up could be anyone's)
+        let named = |p: Option<&Path>, n: &str| p.and_then(Path::file_name).is_some_and(|f| f == n);
+        let deps = exe
+            .as_deref()
+            .filter(|e| named(e.parent(), "deps") && named(e.ancestors().nth(3), "target"))
+            .and_then(|e| e.ancestors().nth(4))
+            .map(|d| d.join("assets"));
         from_env
             .into_iter()
             .chain(beside)
             .chain(tree)
+            .chain(deps)
             .find(|p| real(p))
     })
     .clone()
@@ -134,12 +144,120 @@ pub fn own_root() -> Option<PathBuf> {
     assets_root().map(|a| a.join("own"))
 }
 
+/// The levels shipped with the game, in the open format: `levels/` in the assets folder.
+pub fn shipped_levels_root() -> Option<PathBuf> {
+    assets_root().map(|a| a.join("levels"))
+}
+
+/// Whether a file of the original's layout is one of a level's parts, which our own files fill too (the modules, the
+/// balls, the transformer, the skies, the particles and the ball's shadow): asked from ours first for a new level, from
+/// the copy first for the copy's (assets.rs).
+pub fn is_part(relative: &str) -> bool {
+    let l = relative.to_ascii_lowercase();
+    l.starts_with("3d entities/ph/")
+        || l.starts_with("3d entities/balls.")
+        || l.starts_with("3d entities/animtrafo.")
+        || l.starts_with("textures/sky/")
+        || l.starts_with("textures/particles/")
+        || l.starts_with("textures/hardshadow.")
+}
+
 /// The toolbox's remaster of the copy's interface.
 pub fn remastered_root() -> PathBuf {
     // found once: it is looked in on every file the copy lacks (the settings file need not be read each time)
     static ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     ROOT.get_or_init(|| crate::profile::dir(crate::profile::Kind::Remastered).join(".interface"))
         .clone()
+}
+
+/// Which textures the levels, their parts and the balls are drawn with (`textures own|original`, the extended mode's
+/// Textures switch). Our own stand in for the original's texture of the same name, whichever level asks for it (an
+/// original level, a community map, a part); a texture we have none for comes from the copy as before. The default,
+/// and what the classic mode plays, is ours (owner's decision 2026-11-03, decisions.md "Own textures by default").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextureSet {
+    Own,
+    Original,
+}
+
+impl TextureSet {
+    pub const ALL: [TextureSet; 2] = [TextureSet::Own, TextureSet::Original];
+
+    /// Its name in the settings file and on the command line.
+    pub fn key(self) -> &'static str {
+        match self {
+            TextureSet::Own => "own",
+            TextureSet::Original => "original",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<TextureSet> {
+        TextureSet::ALL.into_iter().find(|t| t.key() == s.trim())
+    }
+}
+
+/// The textures drawn now (they are read as each level loads, so a change applies to the next level). The game sets
+/// them at its start (ours by default); a program that only uses this library, such as the toolbox remastering the
+/// copy, reads the copy's unless it sets them.
+static TEXTURES: AtomicU8 = AtomicU8::new(0);
+
+pub fn set_textures(t: TextureSet) {
+    TEXTURES.store(u8::from(t == TextureSet::Own), Ordering::Relaxed);
+}
+
+pub fn textures() -> TextureSet {
+    if TEXTURES.load(Ordering::Relaxed) == 0 {
+        TextureSet::Original
+    } else {
+        TextureSet::Own
+    }
+}
+
+/// The settings' choice (`textures ...`), if the player made one.
+pub fn textures_from_settings() -> Option<TextureSet> {
+    crate::profile::setting("textures").and_then(|s| TextureSet::parse(&s))
+}
+
+/// How a texture's name is compared: its file name without the folder and the extension, in lower case, without
+/// `_`, `-` and spaces (the balls' module names its textures "BallWood.bmp", the copy's file is "Ball_Wood.bmp").
+pub fn texture_key(name: &str) -> String {
+    let file = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    let stem = match file.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() && ext.len() <= 4 => stem,
+        _ => file,
+    };
+    stem.chars()
+        .filter(|c| !matches!(c, '_' | '-' | ' '))
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// The most own textures looked at (the folder ships about sixty).
+const OWN_TEXTURES_MAX: usize = 4096;
+
+/// Our own textures by their key: the PNG files of `dir` (plain files only; a link or a folder is passed over).
+pub fn texture_index(dir: &Path) -> std::collections::HashMap<String, PathBuf> {
+    let mut index = std::collections::HashMap::new();
+    let Ok(listed) = std::fs::read_dir(dir) else { return index };
+    for entry in listed.flatten().take(OWN_TEXTURES_MAX) {
+        let path = entry.path();
+        let plain = std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_file());
+        let png = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("png"));
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        let key = texture_key(name);
+        if plain && png && !key.is_empty() {
+            index.entry(key).or_insert(path);
+        }
+    }
+    index
+}
+
+/// Our own texture standing in for the original's texture `name` (a texture's name or its file's), if we have one:
+/// `own/Textures/<name>.png` among the game's assets. The name only picks among our files; it never makes a path.
+pub fn own_texture(name: &str) -> Option<PathBuf> {
+    static INDEX: std::sync::OnceLock<std::collections::HashMap<String, PathBuf>> = std::sync::OnceLock::new();
+    let index = INDEX.get_or_init(|| own_root().map(|r| texture_index(&r.join("Textures"))).unwrap_or_default());
+    index.get(&texture_key(name)).cloned()
 }
 
 /// The roles the interface's files play, by the original's path (a texture by its file name in Textures/, a sound
@@ -150,11 +268,6 @@ pub const ROLES: &[(&str, &str)] = &[
         "3D Entities/Menu.nmo",
     ),
     ("menu: the 3D scene behind it", "3D Entities/MenuLevel.nmo"),
-    // ours only: the own interface's picture behind its menus (it stands for the original's 3D scene)
-    (
-        "menu: the own interface's picture behind it",
-        "Textures/Menu_Background.png",
-    ),
     ("texts in the copy's languages", "3D Entities/Language.nmo"),
     ("menu texts and the level table's defaults", "base.cmo"),
     (
@@ -209,6 +322,17 @@ pub fn role_of(relative: &str) -> Option<&'static str> {
         .map(|(role, _)| *role)
 }
 
+/// Says once that our part stands in for one the copy lacks or cannot read, in a level made for the copy's parts.
+pub fn stand_in(relative: &str) {
+    static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    if let Ok(mut said) = SAID.lock()
+        && !said.iter().any(|s| s == relative)
+    {
+        said.push(relative.to_owned());
+        eprintln!("warning: {relative}: the copy lacks it or it does not read; our own part stands in");
+    }
+}
+
 /// Says once that a role has no provider (the game goes on without it).
 pub fn missing(relative: &str) {
     static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
@@ -239,5 +363,41 @@ mod tests {
         );
         assert_eq!(role_of("sounds/misc_fall.WAV"), Some("sound: ball lost"));
         assert_eq!(role_of("3D Entities/Level/Level_01.NMO"), None);
+        assert!(is_part("3D Entities/PH/P_Box.nmo") && is_part("Textures/Sky/Sky_A_Front.bmp"));
+        assert!(is_part("Textures/HardShadow.bmp") && is_part("3D Entities/Balls.nmo"));
+        assert!(
+            !is_part("3D Entities/Level/Level_01.NMO") && !is_part("Textures/Button01_select.tga")
+        );
+    }
+
+    #[test]
+    fn a_texture_is_known_by_its_name_whatever_its_spelling() {
+        assert_eq!(texture_key("BallWood.bmp"), texture_key("Ball_Wood.BMP"));
+        assert_eq!(texture_key("Textures/Floor_Side.bmp"), "floorside");
+        assert_eq!(texture_key("C:\\Ballance\\Textures\\Floor_Side"), "floorside");
+        assert_eq!(texture_key("floor_top_Checkpoint"), "floortopcheckpoint");
+        assert_eq!(texture_key("Floor.Top.Strange"), "floor.top.strange");
+        assert_eq!(TextureSet::parse(" original "), Some(TextureSet::Original));
+        assert_eq!(TextureSet::parse("remastered"), None);
+    }
+
+    #[test]
+    fn own_textures_are_plain_png_files_of_the_folder() {
+        let dir = std::env::temp_dir().join(format!("drahtseilakt-own-tex-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("Wood_Old.png")).ok();
+        std::fs::write(dir.join("Floor_Side.png"), b"x").ok();
+        std::fs::write(dir.join("Button01_select.tga"), b"x").ok();
+        let index = texture_index(&dir);
+        assert!(index.contains_key("floorside"));
+        // a folder named like a texture, and a file that is not a PNG, are not ours
+        assert!(!index.contains_key("woodold"));
+        assert!(!index.contains_key("button01select"));
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(dir.join("Floor_Side.png"), dir.join("Brick.png")).ok();
+            assert!(!texture_index(&dir).contains_key("brick"));
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

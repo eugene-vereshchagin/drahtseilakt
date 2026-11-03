@@ -13,6 +13,7 @@ Englisch, Spanisch, Italienisch und Französisch; `GameSettings.Language` wählt
 | Bildschirm | Zeilen von oben nach unten | Hinweise |
 |---|---|---|
 | Hauptmenü (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit fragt „Do you want to quit the game?“ (Yes / No) |
+| Hauptmenü ohne Kopie (unseres) | Start, Import, Highscore, Options, Credits, Exit | Start listet „Our levels“ (die mitgelieferten und `levels/open/`); Import öffnet das Fenster, das die Kopie des Spielers holt, danach startet das Spiel mit ihr neu (decisions.md, „Das Spiel läuft ohne Weiteres“) |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | ein Level ist spielbar, sobald das vorige geschafft ist (`DB_Levelfreischaltung`); die anderen sind grau. Das Add-on mit Level 13 ersetzt Menu.nmo und fügt seine Zeile hinzu |
 | Highscore (`Menu_Highscore`) | „Highscore Level N“, zehn Namen mit Punkten, Back; links und rechts wechseln das Level | die Vorgaben der Kopie sind die Arrays `DB_Highscore_LvNN` in base.cmo („Mr. Default“) |
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | bei uns vor Back noch Language und Extended |
@@ -96,6 +97,9 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   - Bestzeiten neben den Leveln;
   - Level nach Art unter Start;
   - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
+  - Textures: own / original, womit die Level, ihre Teile und die Kugeln gezeichnet werden: mit unseren Texturen
+    (Vorgabe, im klassischen Modus immer) oder denen der Kopie; das nächste Level lädt mit der Wahl
+    ([resources.md](resources.md));
   - Sounds: das Klangthema — System, generiert, original (von der Toolbox gemacht) oder ein eigenes des Spielers
     ([resources.md](resources.md)); das generierte, bis der Spieler ein anderes wählt, und im klassischen Modus
     immer;
@@ -138,4 +142,5 @@ Profile später als Funktion des erweiterten Modus kommen.
 `DRAHTSEILAKT_SHOT_MENU=base:keys` mit `--screenshot` zeichnet ein Menü über das Bild ohne Fenster (base `main`,
 `pause`, `dead` oder `end`; Tasten `u d l r` für die Pfeile, `e` Enter, `b` Esc, `n` die Namenseingabe, `w` die
 Taste W, während eine erwartet wird), um jeden
-Bildschirm anzusehen.
+Bildschirm anzusehen. Ein Menü, das nicht über einem Level liegt, steht über der 3D-Menüszene der Oberfläche,
+`DRAHTSEILAKT_SHOT_MENU_MS` Millisekunden (Vorgabe 0) in die Runde ihrer Kamera.
