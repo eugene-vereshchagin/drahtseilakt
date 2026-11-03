@@ -48,7 +48,7 @@ fn image_seeds() -> Vec<Vec<u8>> {
     let formats = [image::ImageFormat::Bmp, image::ImageFormat::Tga, image::ImageFormat::Png, image::ImageFormat::Jpeg];
     for (k, format) in formats.iter().enumerate() {
         for (w, h) in [(1u32, 1u32), (3, 2), (8, 8)] {
-            let img = image::RgbaImage::from_fn(w, h, |x, y| image::Rgba([x as u8 * 40, y as u8 * 60, 7, 200]));
+            let img = image::RgbaImage::from_fn(w, h, |x, y| image::Rgba([(x * 40) as u8, (y * 60) as u8, 7, 200]));
             let img = if *format == image::ImageFormat::Jpeg {
                 image::DynamicImage::ImageRgb8(image::DynamicImage::ImageRgba8(img).to_rgb8())
             } else {

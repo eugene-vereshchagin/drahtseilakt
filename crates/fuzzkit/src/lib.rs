@@ -488,6 +488,8 @@ struct Outcome {
     last: Option<u64>,
     findings: Vec<String>,
     done: Option<(u64, u64)>,
+    /// It made its corpus (what fails before is the target's setup, not an input).
+    started: bool,
 }
 
 fn spawn(target: &Target, env: &[(&str, String)], rss_cap: u64) -> Outcome {
@@ -511,7 +513,7 @@ fn spawn(target: &Target, env: &[(&str, String)], rss_cap: u64) -> Outcome {
     for (k, v) in env {
         cmd.env(k, v);
     }
-    let mut out = Outcome { status: None, last: None, findings: Vec::new(), done: None };
+    let mut out = Outcome { status: None, last: None, findings: Vec::new(), done: None, started: false };
     let Ok(mut child) = cmd.spawn() else { return out };
     if let Some(stdout) = child.stdout.take() {
         for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -525,6 +527,7 @@ fn spawn(target: &Target, env: &[(&str, String)], rss_cap: u64) -> Outcome {
                     out.done = Some((next, execs));
                 }
             } else if line.starts_with("FUZZ#") {
+                out.started = true;
                 eprintln!("{}: {}", target.name, line.trim_start_matches("FUZZ# "));
             }
         }
@@ -591,6 +594,13 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
             if status == "exit 0" {
                 continue;
             }
+        }
+        if !o.started && status != "exit 0" {
+            // the seeds or the target's setup failed: every child would, so the run ends here
+            let f = format!("setup {status}: the target failed before its first input (run the test with FUZZ_CHILD=1)");
+            eprintln!("{}: FOUND {f}", target.name);
+            findings.push(f);
+            break;
         }
         let reached = o.last.unwrap_or(iter);
         execs += reached.saturating_sub(iter);
