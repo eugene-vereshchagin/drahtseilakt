@@ -105,7 +105,7 @@ impl Table {
     }
 
     /// A saved file; lines that do not read as "level points name" are skipped.
-    fn parse(bytes: &[u8]) -> Table {
+    pub(crate) fn parse(bytes: &[u8]) -> Table {
         let mut t = Table::default();
         for line in bytes.split(|&c| c == b'\n').take(LINES_MAX) {
             let mut parts = line.splitn(3, |&c| c == b' ');

@@ -162,20 +162,25 @@ pub fn title_of(level: &Path, roots: &[PathBuf], lang: &str) -> String {
 }
 
 /// What level.txt says, each value cleaned; nothing when it is missing, a link, larger than INFO_MAX or unreadable.
-#[derive(Default)]
-struct Info {
-    title: Option<String>,
-    author: Option<String>,
-    version: Option<String>,
-    titles: Vec<(String, String)>,
-    order: Option<u32>,
+#[derive(Default, Debug)]
+pub struct Info {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub version: Option<String>,
+    pub titles: Vec<(String, String)>,
+    pub order: Option<u32>,
 }
 
 fn read_info(path: &Path) -> Info {
-    let Some(bytes) = read_small(path, INFO_MAX) else {
-        return Info::default();
-    };
-    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes);
+    match read_small(path, INFO_MAX) {
+        Some(bytes) => parse_info(&bytes),
+        None => Info::default(),
+    }
+}
+
+/// What a level.txt's bytes say (the fuzz targets' entry; `read_info` reads the file).
+pub fn parse_info(bytes: &[u8]) -> Info {
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
     let text = String::from_utf8_lossy(bytes);
     let mut info = Info::default();
     for line in text.lines().take(64) {

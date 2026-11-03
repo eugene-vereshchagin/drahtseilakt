@@ -88,6 +88,14 @@ pub fn mesh(chunk: &Chunk) -> Result<Mesh> {
         if count > 0 {
             let flags = w.u32()?;
             let _size = w.u32()?;
+            // Vertices that carry no data of their own (no positions, no normals, one colour, specular and uv for
+            // all) cost the file nothing: a few words would make a million of them, some 20 MB a mesh. Such vertices
+            // are no more than the words left; any other vertex carries at least one word per vertex.
+            use vertex_flags::*;
+            let bare = NO_POSITION | NO_NORMAL | SINGLE_UV | SINGLE_COLOR | SINGLE_SPECULAR;
+            if flags & bare == bare && count > w.remaining() {
+                return Err(malformed("vertex count"));
+            }
             let vec3s = |w: &mut crate::chunk::Words<'_>| -> Result<Vec<[f32; 3]>> {
                 let words = w.take(count.checked_mul(3).ok_or(malformed("vertex data"))?)?;
                 Ok(words.chunks_exact(3).map(xyz).collect())
@@ -292,7 +300,9 @@ pub fn texture(chunk: &Chunk) -> Result<Texture> {
             let masks = [w.u32()?, w.u32()?, w.u32()?, w.u32()?];
             let _ = w.u32()?;
             let count = w.u32()? as usize;
-            if bpp == 32 && width <= MAX_TEXTURE_SIDE && height <= MAX_TEXTURE_SIDE {
+            // at least one pixel a side: a zero-sized picture is no picture (the renderer could not make a texture of it)
+            let side = 1..=MAX_TEXTURE_SIDE;
+            if bpp == 32 && side.contains(&width) && side.contains(&height) {
                 let pixels = (width as usize).saturating_mul(height as usize);
                 if count == pixels {
                     let data = w.take(count)?;
@@ -814,4 +824,43 @@ mod tests {
         let none = chunk(&[(0x002F_F000, vec![0x001, 0x00FF_00FF])]);
         assert_eq!(texture(&none).expect("texture").transparent, None);
     }
+
+    /// Fuzzing found it (nmo_chunk): an embedded picture 8192 wide and 0 high (no pixels, so the count matched) was
+    /// kept, and the renderer cannot make a texture of no size. A side of 0 is no embedded picture.
+    #[test]
+    fn an_embedded_picture_without_pixels_is_none() {
+        let masks = [0xFF00_0000, 0x00FF_0000, 0x0000_FF00, 0x0000_00FF];
+        let pictured = |w: u32, h: u32| {
+            let mut data = vec![1, 32, w, h];
+            data.extend(masks);
+            data.extend([0, w * h]);
+            data.extend(std::iter::repeat_n(0x8040_2010u32, (w * h) as usize));
+            texture(&chunk(&[(0x0002_0000, data)])).expect("texture").embedded
+        };
+        assert_eq!(pictured(8192, 0), None);
+        assert_eq!(pictured(0, 5), None);
+        assert_eq!(pictured(0, 0), None);
+        assert_eq!(pictured(1, 1), Some((1, 1, vec![0x40, 0x20, 0x10, 0x80])));
+    }
+
+    /// Found by review while fuzzing: a mesh whose vertices carry no data of their own (no positions, no normals, one
+    /// colour, one specular colour and one uv for all) made up to a million vertices out of a handful of words, about
+    /// 20 MB each; a file of many such meshes asked for gigabytes. Such vertices are no more than the words left.
+    #[test]
+    fn vertices_without_data_of_their_own_are_bounded_by_the_words() {
+        use vertex_flags::*;
+        let all = NO_POSITION | NO_NORMAL | SINGLE_UV | SINGLE_COLOR | SINGLE_SPECULAR;
+        let made = |count: u32, flags: u32, extra: usize| {
+            let mut data = vec![count, flags, 0, 0, 0, 0, 0];
+            data.extend(std::iter::repeat_n(0, extra));
+            mesh(&chunk(&[(0x0002_0000, data)])).map(|m| m.positions.len())
+        };
+        assert!(made(MAX_VERTICES as u32, all, 0).is_err());
+        assert!(made(1000, all, 0).is_err());
+        assert_eq!(made(4, all, 0).ok(), Some(4));
+        // positions in the file: as many vertices as they hold
+        assert!(made(1000, all & !NO_POSITION, 3000).is_ok());
+        assert!(made(1000, all & !NO_POSITION, 2000).is_err());
+    }
 }
+

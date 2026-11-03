@@ -16,6 +16,8 @@ mod extra;
 mod fallback;
 mod features;
 mod freecam;
+#[cfg(test)]
+mod fuzz_tests;
 mod highscore;
 mod hints;
 mod hud;

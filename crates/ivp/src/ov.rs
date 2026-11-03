@@ -18,6 +18,34 @@ fn pow2(e: i32) -> f64 {
     2f64.powi(e)
 }
 
+/// How far from the origin the tree reaches (Ballance's levels span a few thousand units). A centre beyond it (a
+/// stranger's map with absurd coordinates, a body flung away) is kept at its edge and a radius beyond it is cut to
+/// it, so the boxes' integer coordinates and levels stay in the range the upstream's arithmetic assumes: past it the
+/// coordinates overflowed, and growing the root to hold such a box never ended and took all memory (found by
+/// fuzzing a level played, crates/game/src/fuzz_tests.rs).
+const REACH: f64 = (1u64 << 20) as f64;
+
+/// The largest box coordinate made: well inside i32, so the walks' products stay inside i64.
+const COORD_MAX: f64 = (1u64 << 30) as f64;
+
+/// A centre's coordinate as the tree takes it: within REACH, NaN as 0 (as the cast took it).
+fn bounded(c: f32) -> f64 {
+    let c = f64::from(c);
+    if c.is_nan() { 0.0 } else { c.clamp(-REACH, REACH) }
+}
+
+/// A radius as the tree takes it: at most REACH (NaN as REACH).
+fn bounded_radius(r: f64) -> f64 {
+    if r.is_nan() { REACH } else { r.min(REACH) }
+}
+
+/// The box coordinates of `c - r` and `c + r` at scale `s`, when they fit in two units of the raster and in range.
+fn box_span(c: f64, r: f64, s: f64) -> Option<i32> {
+    let lo = ((c - r) * s).floor();
+    let hi = ((c + r) * s).ceil();
+    (lo >= -COORD_MAX && hi <= COORD_MAX && hi <= lo + 2.0).then_some(lo as i32)
+}
+
 /// The binary exponent of a positive double (0x1002e150).
 fn exponent(x: f64) -> i32 {
     ((x.to_bits() >> 52) & 0x7ff) as i32 - 0x3ff
@@ -172,6 +200,7 @@ impl OvTree {
     /// Chooses the box for an element of radius `r` (or `big_r` when that fits as well) and leaves it in `search`
     /// (0x1002e210). Returns the radius the box was chosen for.
     fn calc_optimal_box(&mut self, center: [f32; 3], r: f64, big_r: f64) -> f64 {
+        let (r, big_r) = (bounded_radius(r), bounded_radius(big_r));
         let mut lvl = exponent(2.0 * r) + 1;
         if lvl < -39 {
             lvl = -39;
@@ -185,10 +214,10 @@ impl OvTree {
                 if !fit {
                     break;
                 }
-                let c = f64::from(center[a]);
-                lo[a] = ((c - r) * s).floor() as i32;
-                let hi = ((c + r) * s).ceil() as i32;
-                fit = hi <= lo[a] + 2;
+                match box_span(bounded(center[a]), r, s) {
+                    Some(l) => lo[a] = l,
+                    None => fit = false,
+                }
             }
             if !fit {
                 lvl += 1;
@@ -211,9 +240,10 @@ impl OvTree {
                 if !fit2 {
                     break;
                 }
-                let c = f64::from(center[a]);
-                lo2[a] = ((c - big_r) * s2).floor() as i32;
-                fit2 = ((c + big_r) * s2).ceil() as i32 <= lo2[a] + 2;
+                match box_span(bounded(center[a]), big_r, s2) {
+                    Some(l) => lo2[a] = l,
+                    None => fit2 = false,
+                }
             }
             if fit2 {
                 self.search = BoxKey {
@@ -826,6 +856,21 @@ mod tests {
         for obj in 0..3 {
             assert!(box_contains_sphere(&w, obj), "object {obj}");
         }
+    }
+
+    /// Found by fuzzing a level played: an object at an absurd place (1e30, from a stranger's map) overflowed the box
+    /// coordinates and growing the root never ended, taking all memory. The tree reaches REACH; beyond it an object
+    /// is kept at its edge, and every object near the origin keeps its exact box.
+    #[test]
+    fn objects_at_absurd_places_are_kept_at_the_edge() {
+        let w = world_with(&[[0.0, 0.0, 0.0], [1e30, -1e30, 3.0], [f64::from(f32::MAX), 0.0, 0.0], [7.3, -2.9, 4.1]]);
+        assert!(box_contains_sphere(&w, 0));
+        assert!(box_contains_sphere(&w, 3));
+        assert!(w.coll.ov.nodes.iter().filter(|n| n.alive).count() < 200);
+        let mut w = world_with(&[[0.0, 0.0, 0.0]]);
+        w.cores[0].m_world_f_core.vv = [f64::NAN, 1e300, -1e300];
+        w.recheck_ov_element(0);
+        assert!(w.coll.ov.root.is_some());
     }
 
     #[test]

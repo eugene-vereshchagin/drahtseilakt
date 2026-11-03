@@ -122,9 +122,14 @@ fn read_theme_txt(path: &Path) -> (Vec<(String, String)>, Option<String>) {
     {
         let _ = f.take(MAX_THEME_TXT).read_to_string(&mut text);
     }
+    parse_theme_txt(&text)
+}
+
+/// A theme.txt's names and fallback from its text (the fuzz targets' entry; `read_theme_txt` reads the file).
+pub fn parse_theme_txt(text: &str) -> (Vec<(String, String)>, Option<String>) {
     let mut names = Vec::new();
     let mut fallback = None;
-    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     for line in text.lines().filter(|l| !l.starts_with('#')).take(64) {
         let Some((k, v)) = line.split_once(' ') else {
             continue;

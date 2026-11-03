@@ -871,10 +871,7 @@ impl Sim {
         // The sector of each level object (groups Sector_01, Sector_02, ...): a sector's objects are in the physics
         // only while it is the current one; an object in no sector always is.
         let sector_of = |i: usize| -> Option<usize> {
-            level.groups.iter().find_map(|g| {
-                let n: usize = g.name.strip_prefix("Sector_")?.parse().ok()?;
-                (n >= 1 && g.members.contains(&i)).then_some(n - 1)
-            })
+            level.groups.iter().find_map(|g| sector_number(&g.name).filter(|_| g.members.contains(&i)))
         };
         // Loose objects that move, and the domes: boxes, the loose balls and P_Dome (their material table in
         // docs/physics.md, section 3).
@@ -1897,6 +1894,16 @@ impl Sim {
     }
 }
 
+/// The most sectors a level has (the original's have up to 8; hints take sectors 1 to 64 as well).
+pub const MAX_SECTORS: usize = 64;
+
+/// The sector a group `Sector_NN` names (0 is the first), when NN is 1 to MAX_SECTORS: a map's absurd number (a
+/// billion) would make the sectors' lists that long.
+fn sector_number(group: &str) -> Option<usize> {
+    let n: usize = group.strip_prefix("Sector_")?.parse().ok()?;
+    (1..=MAX_SECTORS).contains(&n).then(|| n - 1)
+}
+
 /// The sector of the level object nearest to `p` among those in a sector (groups `Sector_NN`; 0 is the first), or
 /// `None` if no object is in one.
 pub fn sector_near(level: &Level, p: Vec3) -> Option<usize> {
@@ -1904,14 +1911,14 @@ pub fn sector_near(level: &Level, p: Vec3) -> Option<usize> {
         .groups
         .iter()
         .filter_map(|g| {
-            let n: usize = g.name.strip_prefix("Sector_")?.parse().ok().filter(|&n| n >= 1)?;
+            let n = sector_number(&g.name)?;
             let d = g
                 .members
                 .iter()
                 .filter_map(|&i| level.objects.get(i))
                 .map(|o| p.distance_squared(Vec3::from(o.position())))
                 .fold(f32::INFINITY, f32::min);
-            Some((d, n - 1))
+            Some((d, n))
         })
         .min_by(|a, b| a.0.total_cmp(&b.0))
         .map(|(_, n)| n)
@@ -2095,12 +2102,12 @@ fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use level::{Group, Level, Material, Mesh, Object, Part};
 
     /// A flat 200×200 floor at y = 0 in Phys_Floors, a start at the origin, a reset point a ball's radius up.
-    fn flat_level() -> Level {
+    pub(crate) fn flat_level() -> Level {
         let s = 100.0;
         let floor = Mesh {
             name: "floor".into(),
@@ -2816,6 +2823,20 @@ mod tests {
         eprintln!("fired {f} hits {:?}", hits.iter().map(|t| t - f).collect::<Vec<_>>());
         assert_eq!((by(60), by(200)), (0, 6));
         assert!(by(120) >= 4, "{} by 120", by(120));
+    }
+
+    /// Found by review while fuzzing a level played: a map's group "Sector_1000000000" made the list of sectors a
+    /// billion long (gigabytes, or a capacity overflow for larger numbers). A sector number beyond MAX_SECTORS puts
+    /// its objects in no sector.
+    #[test]
+    fn an_absurd_sector_number_is_no_sector() {
+        let mut level = flat_level();
+        add_cube(&mut level, "P_Box_01", Vec3::new(-30.0, 1.0, 0.0), &["P_Box", "Sector_1000000000"]);
+        add_cube(&mut level, "P_Box_02", Vec3::new(-30.0, 1.0, 20.0), &["P_Box", "Sector_18446744073709551615"]);
+        add_cube(&mut level, "P_Box_03", Vec3::new(-30.0, 1.0, 40.0), &["P_Box", "Sector_02"]);
+        let sim = Sim::new(&level, BallKind::Wood);
+        assert_eq!(sim.sector_count(), 2);
+        assert_eq!(sector_near(&level, Vec3::new(-30.0, 1.0, 0.0)), Some(1));
     }
 
     #[test]

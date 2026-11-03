@@ -3,7 +3,9 @@
 
 [workspace]
 resolver = "3"
-members = ["crates/nmo", "crates/level", "crates/ivp", "crates/gamedata", "crates/game", "crates/cdimage"]
+members = ["crates/nmo", "crates/level", "crates/ivp", "crates/gamedata", "crates/game", "crates/cdimage", "crates/fuzzkit"]
+# fuzz/ holds the cargo-fuzz targets (nightly, libfuzzer-sys): its own crate with its own lock, never built by default
+exclude = ["fuzz"]
 
 [workspace.package]
 edition = "2024"

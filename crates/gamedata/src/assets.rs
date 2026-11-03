@@ -679,10 +679,9 @@ impl Data {
                 _ => None,
             },
             light: match table.column("Light").and_then(|c| row.get(c)) {
-                Some(nmo::scene::Cell::Object(Some(p))) => self.parameter_floats("3D Entities/Levelinit.nmo", *p).and_then(|v| {
-                    let c = |i: usize| v.get(i).copied().map(|x| x.clamp(0.0, 1.0));
-                    Some([c(0)?, c(1)?, c(2)?])
-                }),
+                Some(nmo::scene::Cell::Object(Some(p))) => {
+                    self.parameter_floats("3D Entities/Levelinit.nmo", *p).and_then(|v| light_of(&v))
+                }
                 _ => None,
             },
         }
@@ -818,9 +817,28 @@ fn fresh(path: &Path) -> Result<(), String> {
     }
 }
 
+/// A light colour from a parameter's floats: the first three, each finite and clamped to 0..1 (a NaN would pass a clamp
+/// as it is, and the copy's Levelinit.nmo may be a level folder's own).
+fn light_of(v: &[f32]) -> Option<[f32; 3]> {
+    let c = |i: usize| v.get(i).copied().filter(|x| x.is_finite()).map(|x| x.clamp(0.0, 1.0));
+    Some([c(0)?, c(1)?, c(2)?])
+}
+
 /// A picture decoded with its sides capped at SIDE_MAX, as RGBA.
 fn decode_capped(path: &Path) -> Option<(u32, u32, Vec<u8>)> {
-    let mut reader = image::ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+    let bytes = read_capped(path, IMAGE_MAX)?;
+    let ext = path.extension().and_then(|e| e.to_str());
+    decode_image(&bytes, ext)
+}
+
+/// A picture's bytes decoded as `decode_capped` does (the format by the file's extension, else by its contents), its
+/// sides capped at SIDE_MAX, as RGBA: the fuzz targets' entry.
+pub fn decode_image(bytes: &[u8], ext: Option<&str>) -> Option<(u32, u32, Vec<u8>)> {
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes));
+    if let Some(format) = ext.and_then(image::ImageFormat::from_extension) {
+        reader.set_format(format);
+    }
+    let mut reader = reader.with_guessed_format().ok()?;
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(SIDE_MAX);
     limits.max_image_height = Some(SIDE_MAX);
@@ -1008,7 +1026,7 @@ pub fn find(dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -1032,5 +1050,14 @@ mod tests {
         assert_eq!(bare_name("a/.."), None);
         assert_eq!(bare_name("x:y.bmp"), None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Found by review while fuzzing: a NaN in the level table's light passed the clamp and lit the level with it.
+    #[test]
+    fn a_light_colour_is_three_finite_numbers() {
+        assert_eq!(light_of(&[0.5, 2.0, -1.0, 9.0]), Some([0.5, 1.0, 0.0]));
+        assert_eq!(light_of(&[0.5, f32::NAN, 0.0]), None);
+        assert_eq!(light_of(&[f32::INFINITY, 0.0, 0.0]), None);
+        assert_eq!(light_of(&[0.5, 0.5]), None);
     }
 }

@@ -14,4 +14,5 @@ miniz_oxide.workspace = true
 workspace = true
 
 [dev-dependencies]
+fuzzkit = { path = "../fuzzkit" }
 miniz_oxide.workspace = true
