@@ -1141,6 +1141,7 @@ fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
         let mut inst = scene::instances(
             &game.placements,
             &game.sim.taken,
+            &game.sim.unseen,
             &game.sim.world().bodies,
             &game.ball_meshes,
             game.trafo.as_ref().map(|t| &t.1),
@@ -1200,6 +1201,7 @@ fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
         let inst = scene::instances(
             &game.placements,
             &game.sim.taken,
+            &game.sim.unseen,
             &game.sim.world().bodies,
             &game.ball_meshes,
             None,
@@ -2413,6 +2415,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     let inst = scene::instances(
         &game.placements,
         &game.sim.taken,
+        &game.sim.unseen,
         &game.sim.world().bodies,
         &game.ball_meshes,
         game.trafo.as_ref().map(|t| &t.1),
@@ -3055,6 +3058,7 @@ impl App {
             let mut inst = scene::instances(
                 &g.placements,
                 &sim.taken,
+                &sim.unseen,
                 &sim.world().bodies,
                 &g.ball_meshes,
                 g.trafo.as_ref().map(|t| &t.1),
@@ -3579,6 +3583,7 @@ impl App {
             let mut inst = scene::instances(
                 &self.game.placements,
                 &self.game.sim.taken,
+                &self.game.sim.unseen,
                 &self.game.sim.world().bodies,
                 &self.game.ball_meshes,
                 self.game.trafo.as_ref().map(|t| &t.1),

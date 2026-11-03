@@ -230,6 +230,10 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   foot. Replays of format 4 and before keep the stand-ins.
 
   A sector's objects (groups `Sector_01`, `Sector_02`, ...) are in the physics only while it is the current sector.
+  They are seen only then too: Gameplay_SectorManager's Activate Sector shows each member (Show, after Set World Matrix)
+  and Deactivate Sector hides it (Hide, after Unphysicalize for the convex objects; a module's script takes its
+  instance down), so a passed sector's swings and boxes are gone, not hanging where a ball would fall through them
+  (level 11 under Wine: the swinging crates P_Modul_08_01/02 of sector 5 are not there once sector 6 is in play).
   Measured in the C build at level 1 (frames of 1/60 s):
   - Level start: the physics runs at time factor 1 with the level's geometry only; at 9.90 s of its time the first
     sector's objects are physicalized, at 9.9667 s (four frames later) the player ball.
