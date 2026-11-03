@@ -376,7 +376,7 @@ impl MenuScene {
             };
             return (inst, particles, view);
         }
-        for mesh in 0..crate::sky::FACE_COUNT {
+        for mesh in 0..crate::sky::faces() {
             inst.push(Instance::plain(
                 crate::scene::SKY_MODEL,
                 mesh,

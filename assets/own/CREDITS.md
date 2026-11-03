@@ -30,3 +30,26 @@ https://docs.ambientcg.com/license/).
 
 Each archive is `https://ambientcg.com/get?file=<archive>`; `python3 -I make/free_textures.py fetch` downloads the
 missing ones and refuses any whose checksum differs. `SHA256SUMS` lists the files made from them, as committed.
+
+## The photographic skies
+
+The skies a level names `Mountains`, `Forest`, `Sea`, `Storm`, `Sunset`, `Night`, `Desert` and `Mist`
+(`Textures/Sky/Sky_<name>_<face>.jpg`) are made by `make/make_skies.py` from HDR panoramas of
+[Poly Haven](https://polyhaven.com/) (licence: CC0 1.0 Universal, https://polyhaven.com/license; checked on each
+asset's page 2026-11-03): each panorama's sky, tone-mapped with a fixed exposure, over a world below the horizon that
+the script draws itself (sea, forest, mountains, canyons, a sea of cloud, a misty valley), lit by the same panorama.
+The panoramas are not shipped; `python3 -I make/make_skies.py fetch` downloads them once into
+`texture-sources/skies/` and refuses any whose checksum differs.
+
+| Sky | Source | Authors | Licence | Published | File (taken 2026-11-03) | SHA-256 of the file |
+|---|---|---|---|---|---|---|
+| `Sky_Mountains` | [table_mountain_1_puresky](https://polyhaven.com/a/table_mountain_1_puresky) | Greg Zaal, Jarod Guest, Poly Haven | CC0 1.0 | 2022-12-03 | `table_mountain_1_puresky_4k.hdr` | `1b1c70d89fdd257b242c6790d1a3e92bcaa4e72ea5f6644641df29e9efbb8617` |
+| `Sky_Forest` | [kloofendal_48d_partly_cloudy_puresky](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | Greg Zaal, Jarod Guest, Poly Haven | CC0 1.0 | 2022-11-19 | `kloofendal_48d_partly_cloudy_puresky_4k.hdr` | `3061c00a16ecae748e84fd6c44c04804f539c118bb66325db858bad87b11bf88` |
+| `Sky_Sea` | [kloppenheim_06_puresky](https://polyhaven.com/a/kloppenheim_06_puresky) | Greg Zaal, Jarod Guest, Poly Haven | CC0 1.0 | 2022-11-26 | `kloppenheim_06_puresky_4k.hdr` | `1bebd7cbbfb5c48a642f03d93bffbabb2c42d0b109061f37a72259d1cbdb3053` |
+| `Sky_Storm` | [kloppenheim_07_puresky](https://polyhaven.com/a/kloppenheim_07_puresky) | Greg Zaal, Jarod Guest, Poly Haven | CC0 1.0 | 2022-12-18 | `kloppenheim_07_puresky_4k.hdr` | `98a94dc8c290a89de0147642750beb9dae4c791ee33c1689bebbf58126e97f22` |
+| `Sky_Sunset` | [belfast_sunset_puresky](https://polyhaven.com/a/belfast_sunset_puresky) | Greg Zaal, Dimitrios Savva, Jarod Guest, Poly Haven | CC0 1.0 | 2022-10-19 | `belfast_sunset_puresky_4k.hdr` | `cafc52b99ce15d84bd039826a0333f5ab0259d8c1f4feb2f7faf5fafa039108a` |
+| `Sky_Night` | [rogland_clear_night](https://polyhaven.com/a/rogland_clear_night) | Greg Zaal, Poly Haven | CC0 1.0 | 2024-10-08 | `rogland_clear_night_4k.hdr` | `133d77ddf6a69926a138574169e5cdf4c04b785e8d22545274aa285f1ec3d879` |
+| `Sky_Desert` | [qwantani_late_afternoon_puresky](https://polyhaven.com/a/qwantani_late_afternoon_puresky) | Greg Zaal, Jarod Guest, Poly Haven | CC0 1.0 | 2025-07-18 | `qwantani_late_afternoon_puresky_4k.hdr` | `d820fa7a84732f69641655dcbea33b01ff78e6a4833ee3ca6f3bc938a0c09bb7` |
+| `Sky_Mist` | [kloppenheim_01_puresky](https://polyhaven.com/a/kloppenheim_01_puresky) | Greg Zaal, Jarod Guest, Poly Haven | CC0 1.0 | 2022-11-20 | `kloppenheim_01_puresky_4k.hdr` | `e667700214b1141dd0890c6e45decf9c84964b3c6596b717a48c56e3d893bde3` |
+
+Each file is `https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/<file>`. `SHA256SUMS` lists the faces made from them.

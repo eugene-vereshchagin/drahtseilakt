@@ -2227,9 +2227,15 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     let loader = |t: &level::Texture| data.texture(t);
     renderer.add_model(&game.level.level, &loader);
     renderer.add_model(&game.balls.level, &loader);
-    let letter = game.level.level.sky.clone().unwrap_or_else(|| "A".into());
-    let sky = crate::sky::model(&letter);
+    // the level's sky by its name (a name that could not name a file is taken as none); closed when it has a top
+    let letter = crate::sky::override_name()
+        .or_else(|| game.level.level.sky.clone())
+        .filter(|n| crate::sky::valid_name(n))
+        .unwrap_or_else(|| "A".into());
+    let top = data.file(&format!("Textures/Sky/{}", crate::sky::face_file(&letter, "Top"))).is_some();
+    let sky = crate::sky::model(&letter, top);
     renderer.add_model(&sky, &loader);
+    crate::sky::set_faces(sky.meshes.len());
     for m in &game.modules.models {
         renderer.add_model(m, &loader);
     }

@@ -92,7 +92,7 @@ begins a comment:
 ```
 title Paper Winds            # the level's name; title.ru, title.de, title.zh: in other languages
 order 3                      # its place in the list
-sky C                        # A, B or C
+sky C                        # A, B, C or a sky by name: Mountains, Sea, ... (below)
 music 3                      # the theme, 1 to 5
 bonus 300                    # the level bonus
 ball wood                    # the start ball
@@ -116,6 +116,17 @@ Besides: `rails L`, `rails-left A R`, `rails-right A R` (rails, also up or down)
 `sack`, `arms`, `flaps`; `module P_Modul_NN` with `ahead`, `side`, `up`, `turn`, `tilt` for any other part; `move`,
 `turn`, `mark NAME` and `back NAME` to move the cursor without building. The whole list is at the top of
 leveldsl.py.
+
+**Skies.** `sky` names the sky box round the level: `A`, `B`, `C` (ours, drawn above a sea of cloud, as the
+original's letters) or one of the photographic skies by name: `Mountains` (a sunset sky over hazy mountains with
+snow on the peaks), `Forest` (summer clouds over a forest canopy with glades and lakes), `Sea` (a calm sea at
+sunset, mirroring the clouds), `Storm` (a heavy overcast over a dark sea with whitecaps), `Sunset` (a pink sunset over
+a sea of cloud), `Night` (the Milky Way over a dark lake ringed by hills), `Desert` (a late afternoon over red
+canyons), `Mist` (an evening glow over hills with mist in the valleys). Their skies are CC0 photographs from Poly
+Haven; what lies below the horizon is drawn by `assets/own/make/make_skies.py`, seen as from high above, so the
+track hangs far over it (`assets/own/CREDITS.md`). Any other name is a set of files `Textures/Sky/Sky_<name>_<face>`
+(Front, Right, Back, Left, Down, and Top if it has one) a level folder or the textures bring; a name is letters,
+digits, `_` and `-`. `--sky NAME` on the command line plays any level under another sky.
 
 **How the track keeps the ball on** (`safety`): the original's help shrinks from level to level, and ours follows
 it. Measured on the original's thirteen levels (its floors' edges, numbers only): in levels 1, 3 and 5 about two
