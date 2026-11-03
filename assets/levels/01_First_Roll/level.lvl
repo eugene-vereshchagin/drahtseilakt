@@ -1,5 +1,11 @@
-# First Roll: the first of our levels. Wide floors with railings, gentle turns and slopes, a first short stretch of
-# rails and one small jump. Edit this file and run `python3 -I assets/own/make/leveldsl.py <this file>`.
+# First Roll: the first of our levels, made in the spirit of the original's first one (its order of lessons, its kinds
+# of parts, its widths and its help; measured, not traced: the layout, turns, heights and lengths are ours). Four
+# sectors: a wooden bridge, the first rails and a loop of rails, boxes on a walled square, the stone transformer and
+# back to wood, loose paper balls; a long bridge, a dome, the stone on the crate (pushed out from under it from the
+# floor below); a square of loose balls and two pushers (pushed out of their lane from the floor beside it), rails to
+# the wood transformer; wooden ramps zigzagging up between railed landings and the long way down to the finish.
+# Gutters along every floor; railings at the start, round the outer side of the turns, on the landings and where a
+# floor below the way has a drop. Edit this file and run `scripts/own-levels.sh assets/levels/01_First_Roll`.
 title First Roll
 title.ru Первый разбег
 title.de Erster Lauf
@@ -11,46 +17,256 @@ bonus 100
 ball wood
 columns 45
 
-safety railings
+# ---- sector 1: off the tower, a wooden bridge, the first rails and their loop, boxes on a walled square, a narrow
+# way down to the stone transformer and back to wood, the square of paper balls, rails with points to the checkpoint
+safety gutter
 start
 width 14
-floor 30
-point
-floor 20
-left 90 30
-floor 20 down 3
-right 90 30
-floor 20
-point
-floor 20
-checkpoint
-
-# sector 2: narrower, a slope down, a stretch of rails
-floor 20
-width 11
-floor 25 down 5
-right 90 24
-floor 15
-point side 2.5
-floor 15
-rails 24
-floor 20
-life
-floor 10
-left 90 24
-floor 20
-checkpoint
-
-# sector 3: down a long ramp, one small jump, the finish
-floor 20
+railing both
+floor 12
 width 10
-floor 30 down 6
+floor 40 down 5
+railing left
+right 90 18
+railing off
+floor 8
+surface wood
+floor 84
+surface stone
+floor 8
+rails 20
+rails-left 360 13 down 8
+rails 14 down 2
+safety border
+width 26
+floor 6
+box side 6 ahead 4
+box side -5 ahead 12
+floor 36
+life side 9 ahead -4
+box side -8 ahead -12
+width 6
+floor 6
+safety gutter
+railing right
+left 90 16 down 2
+railing off
+floor 44 down 3
 point
+floor 20
+railing left
+right 90 12
+railing off
 floor 10
-gap 4 down 1
-floor 25
-left 90 30
-floor 15 up 2
-right 90 30
+trafo stone
+floor 48 down 2
+railing right
+left 90 14
+railing off
+floor 14
+trafo wood
+floor 12
+width 8
+floor 34 up 5
+safety border
+width 24
+floor 6
+loose paper side 5 ahead 6
+loose paper side -4 ahead 10
+loose paper side 2 ahead 15
+loose paper side -6 ahead 19
 floor 30
+point side -7 ahead -6
+width 8
+floor 6
+rails 16
+point
+rails 16
+point
+rails-right 90 16
+point
+rails 16
+safety gutter
+width 12
+floor 12
+loose wood side 4 ahead -6
+loose wood side -4 ahead -6
+rails 28 down 3
+width 10
+floor 12
+checkpoint
+
+# ---- sector 2: rails down, a long wooden bridge, two small squares (a point, a dome), rails round to the stone
+# transformer, the stone on the crate (push the crate out from under it from the floor below), boxes, a long way to
+# the checkpoint
+floor 7
+rails 22 down 6
+safety gutter
+width 9
+floor 6
+surface wood
+floor 84
+surface stone
+floor 6
+safety border
+width 18
+floor 20
+point
+width 6
+floor 12
+width 22
+floor 40
+dome ahead -20
+width 10
+floor 6
+rails-left 90 16
+rails 16
+safety gutter
+width 8
+floor 10
+trafo stone
+floor 24
+mark drop
+# the stone on the crate: the way drops off its end onto a wide floor 5 lower, which runs under the lane the stone
+# blocks; the ball pushes the crate out from under the stone (and backs off), goes round and up to the lane
+pilot all : goto -3 0 0 ; push 1 0 40 ; goto 13 0 -5 ; goto 11 0 -5 ; push 1 0 110 ; push -1 0 100 ; goto 11 0 -5
+nopilot all
+move 42 0 -5
+turn 180
+safety none
+railing both
+width 16
+floor 19.5
+width 10
+floor 9.5
+safety gutter
+railing off
+floor 5
+autopilot all
+right 90 8
+floor 10 up 2
+right 90 8 up 1.5
+width 5
+floor 14 up 1.5
+right 90 8
+floor 15
+crateblock
+floor 10
+width 14
+floor 24
+box side 4 ahead -10
+box side -4 ahead -10
+life side 0 ahead -16
+width 9
+railing left
+left 90 18
+railing off
+floor 120
+checkpoint
+
+# ---- sector 3 (stone ball): a square of loose balls, the pushers (pushed from the lower floor beside their lane),
+# rails to the wood transformer
+floor 7
+floor 60
+railing left
+right 90 16
+railing off
+width 22
+floor 10
+loose stone side 7 ahead 4
+loose stone side 2.5 ahead 4
+loose stone side -2.5 ahead 4
+loose stone side -7 ahead 4
+loose paper side 0 ahead 10
+floor 34
+point side 8 ahead -4
+width 10
+floor 24
+floor 15 down 2.5
+# the lower floor beside the pushers' lane: the plates stand over it on the left, 28 and 12 on from here
+safety none
+railing right
+width 14
+floor 8
+pilot all : goto 6 -4 0 ; goto 12 -4 0 ; push 0 1 80 ; goto 12 -4 0 ; goto 28 -4 0 ; push 0 1 80 ; goto 28 -4 0
+nopilot all
+floor 40
+width 6
+floor 8
+autopilot all
+safety gutter
+railing off
+left 180 5 up 2.5
+floor 8
+floor 11.2
+pusher left
+floor 14.4
+pusher left
+floor 11.2
+floor 10
+right 90 10
+width 9
+floor 40
+life
+floor 16
+rails 24 down 2
+rails-left 90 18
+rails-right 90 18
+rails 16
+safety gutter
+width 10
+floor 10
+trafo wood
+floor 14
+checkpoint
+
+# ---- sector 4 (wood ball): a long straight, wooden ramps zigzagging up with railed landings, balls on the way
+# down, the finish
+floor 7
+floor 110
+railing left
+right 90 16
+railing off
+floor 16
+surface wood
+floor 34 up 9
+surface stone
+railing both
+point
+left 90 7
+surface wood
+railing off
+floor 34 up 9
+surface stone
+railing both
+point
+right 90 7
+surface wood
+railing off
+floor 34 up 9
+surface stone
+railing both
+left 90 7
+surface wood
+railing off
+floor 34 up 9
+surface stone
+railing both
+point
+right 90 7
+railing off
+width 14
+floor 36
+life
+loose stone side 4 ahead -10
+width 10
+floor 44 down 7
+loose paper side -3 ahead -14
+right 90 20 down 3
+floor 70 down 10
+loose wood side 3 ahead -30
+left 90 20 down 3
+floor 100 down 12
+point
+floor 60
 finish

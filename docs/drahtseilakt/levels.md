@@ -70,7 +70,7 @@ order (`order` in level.txt), by their names in the menus' language:
 
 | # | Level | Sectors | Idea | Sky, music, bonus |
 |---|---|---|---|---|
-| 1 | First Roll | 3 | wide floors with railings, gentle turns and slopes, a first stretch of rails, one small hop | A, 1, 100 |
+| 1 | First Roll | 4 | the original's first level in spirit: a wooden bridge, the first rails and a loop of them, boxes, the stone transformer and back, loose balls, a dome, the stone on the crate, two pushers, wooden ramps up between railed landings; gutters everywhere, railings where a fall is possible | A, 1, 100 |
 | 2 | Wood and Stone | 4 | the wooden ball climbs the ramps the stone one cannot; the stone ball shoves crates and loose balls off ledges without borders | B, 2, 200 |
 | 3 | Paper Winds | 4 | the paper ball rides fans up to the floors above; plate bridges hold it | C, 3, 300 |
 | 4 | Swing Time | 4 | things that move: swinging sacks, turning arms, a flap wheel, swings that bridge a gap while they swing by | A, 4, 400 |
@@ -117,6 +117,15 @@ Besides: `rails L`, `rails-left A R`, `rails-right A R` (rails, also up or down)
 `turn`, `mark NAME` and `back NAME` to move the cursor without building. The whole list is at the top of
 leveldsl.py.
 
+`railing left|right|both|off` puts steel railings along the floors' edges from there on, on any profile (level 1:
+gutters, and railings where a fall is possible). Two of the original's puzzles are commands of their own: `crateblock`
+(the stone on the crate, P_Modul_34: a slot of 6 across the way, the stone standing in it on its crate, which stands
+on a floor 5 lower that the description lays under the slot; a ball on that floor pushes the crate out from under the
+stone, and the stone slides down level with the way) and `pusher left|right` (P_Modul_01: a slot of 1.6 across a way
+at most 6 wide, the pusher's block filling the way, its target plate standing 5 out past the edge on that side over a
+floor 2.5 lower, from where a ball pushes the block out of the way). The floors under them are laid with `mark`,
+`move`, `turn` and `back`.
+
 **How the track keeps the ball on** (`safety`): the original's help shrinks from level to level, and ours follows
 it. Measured on the original's thirteen levels (its floors' edges, numbers only): in levels 1, 3 and 5 about two
 thirds of the floors' edges are profiled (the floor rising 0.7 over 2.5 to its edge, a gutter that rolls a drifting
@@ -124,7 +133,9 @@ ball back to the middle; a third bare), from level 6 on only a quarter to a thir
 are rare (only the wooden half pipes of level 4 and a few pieces of 12 and 13); steel railings (a pipe about 2.6 over
 the floor, on posts) run along about 490 and 420 units of the floors' edges in levels 1 and 2, 130 to 540 in levels 3
 to 8, under 90 in 9 to 11 and none in 12. Our levels go the same way, a step clearer:
-level 1 and 2 have railings, 3 and 4 brick borders (3 a sector of railings), 5 to 8 gutters (5 a sector of
+level 1 has gutters with railings where a fall is possible (round the start, along the outer side of turns, on the
+landings, beside floors with a drop), as the original's first level, level 2 railings, 3 and 4 brick borders (3 a
+sector of railings), 5 to 8 gutters (5 a sector of
 borders, 8 its last bare), 9 and 10 bare floors (9 its first sector a gutter). `safety KIND` sets it from there on
 (the first one in a file is the level's); `borders off` makes the floors bare from there on, `borders on` gives them
 back the level's safety. What each is:
@@ -150,6 +161,17 @@ towards their crease; the shade a border casts beside it; the sides darker concr
 textures are `assets/own/Track/` (make_textures.py, step `track`); the borders take the menu scene's brick. They are
 mapped by the distance along the whole track, and pieces laid one after another (straight, curved, a width changing
 over a piece) are one mesh, so the textures run on from piece to piece without a seam.
+
+**No seams** (2026-11-03): a stretch of floor is one mesh from the start or a checkpoint to the next, its
+cross-section carried upright across the cursor's own heading (exact on a turn), so a straight running into a turn or
+a ramp into a flat has the very same cross-section where they meet: no wedge of nothing between them; each ring of
+points is shared by the quads before and after it (no crack, no T-junction), and the textures are mapped by the
+distance along the way. The start's and the checkpoints' pieces are joined the same way: their edges where a floor
+runs on have their corners at the floor's own cross-section points, and their tops are mapped as the track's. The test
+`our_floors_have_no_seams` (ownlevels.rs) checks the floors of every level the kit made (version 2 on, in level.gltf's
+`asset.generator`): wherever a floor's top ends, there is no other top beside it at its height
+(`the_seam_finder_sees_a_crack` checks the finder itself). A checkpoint on a narrow way has a smaller bowl, and its
+depth with it, so its slopes stay the measured ones (a stone ball resting in a steeper bowl did not roll out of it).
 
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on

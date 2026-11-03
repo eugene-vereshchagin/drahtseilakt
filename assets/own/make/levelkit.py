@@ -27,6 +27,10 @@ import numpy as np
 import ownkit as K
 
 TEX = 256
+# The kit's version, written into each level it makes (asset.generator): 2 since the floors are seamless (one mesh
+# along the way, the cross-sections upright across the cursor's heading, the start's and checkpoints' pieces sharing
+# the floors' vertices). crates/game/src/ownlevels.rs checks the floors of the levels made by version 2 on for seams.
+KIT_VERSION = 2
 OWN = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The game's own texture set (CC0), by the original's texture names.
 TEXTURE_SET = os.path.join(OWN, "Textures")
@@ -82,21 +86,22 @@ def section(width, safety, surface="stone"):
         slope = [(d * g, h) for d, h in GUTTER]
         h0 = slope[0][1]
         left = [(-w + d, h) for d, h in slope]
-        pts = [(-w, -DEPTH)] + left + [(w - d, h) for d, h in reversed(slope)] + [(w, -DEPTH)]
+        pts = [(-w, -DEPTH), (-w, 0.0)] + left + [(w - d, h) for d, h in reversed(slope)] + [(w, 0.0), (w, -DEPTH)]
         sw = slope[-1][0]
-        edges = [("side", ("down", h0))]
+        edges = [("side", ("down", h0)), ("side", ("down", h0))]
         edges += [("slope", ("band", slope[k][0], slope[k + 1][0], sw)) for k in range(len(slope) - 1)]
         edges += [(top, ("slab",))]
         edges += [("slope", ("band", slope[k + 1][0], slope[k][0], sw)) for k in reversed(range(len(slope) - 1))]
-        edges += [("side", ("down", h0)), ("side", ("slab",))]
+        edges += [("side", ("down", h0)), ("side", ("down", h0)), ("side", ("slab",))]
         return pts, edges
     if safety == "border":
         b, h = BORDER_W, BORDER_H
-        pts = [(-w, -DEPTH), (-w, h), (-w + b, h), (-w + b, 0.0), (-w + b + KERB, 0.0), (w - b - KERB, 0.0),
-               (w - b, 0.0), (w - b, h), (w, h), (w, -DEPTH)]
-        edges = [("side", ("down", h)), ("border", ("brick",)), ("border", ("brick",)),
+        pts = [(-w, -DEPTH), (-w, 0.0), (-w, h), (-w + b, h), (-w + b, 0.0), (-w + b + KERB, 0.0),
+               (w - b - KERB, 0.0), (w - b, 0.0), (w - b, h), (w, h), (w, 0.0), (w, -DEPTH)]
+        edges = [("side", ("down", h)), ("side", ("down", h)), ("border", ("brick",)), ("border", ("brick",)),
                  ("shade", ("band", 0.0, KERB, KERB)), (top, ("slab",)), ("shade", ("band", KERB, 0.0, KERB)),
-                 ("border", ("brick",)), ("border", ("brick",)), ("side", ("down", h)), ("side", ("slab",))]
+                 ("border", ("brick",)), ("border", ("brick",)), ("side", ("down", h)), ("side", ("down", h)),
+                 ("side", ("slab",))]
         return pts, edges
     # railings and none: the bare floor with its kerbs (the railings stand on it, an object of their own)
     k = min(KERB, w / 3)
@@ -147,75 +152,149 @@ def ear_clip(poly):
     return out
 
 
-def track_sweep(m, mats, path, widths, along, safety, surface, caps=(True, True)):
+def join_points(width, safety, surface="stone"):
+    """Where a stretch's end meets a flat piece (the start's or a checkpoint's): the points of its cross-section at the
+    floor's top level (0), by their distance across (to the right); the piece's edge has its corners there, so the
+    two share every vertex along the join."""
+    pts, _ = section(width, safety, surface)
+    return sorted({round(x, 9) for x, y in pts if abs(y) < 1e-9})
+
+
+def check_bowl(width):
+    """A checkpoint's bowl on a way `width` wide: the measured one, smaller on a narrow way (its rim half a unit in
+    from the edges) and its depth with it, so its slopes stay the measured ones (a stone ball resting in a steeper
+    bowl does not roll out of it)."""
+    k = min(CHECK_BOWL[-1][0], width / 2 - 0.5) / CHECK_BOWL[-1][0]
+    return [(r * k, h * k) for r, h in CHECK_BOWL]
+
+
+def ring_frames(path, headings=None):
+    """Each point of a track's path with its heading (horizontal, along the way), the direction to its right and up
+    (the world's), and its direction along the path (with the slope). A cross-section stands upright across the
+    heading, so two pieces meeting at a point with the same heading (a straight into a turn, a ramp into a flat) have
+    the very same cross-section there: no wedge between them. The headings are the cursor's (exact on a turn);
+    without them they are taken from the path."""
+    pts = [np.asarray(p, np.float64) for p in path]
+    up = np.array([0.0, 1.0, 0.0])
+    out = []
+    for i, p in enumerate(pts):
+        t = pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]
+        if headings is not None:
+            f = np.asarray(headings[i], np.float64).copy()
+        else:
+            f = t.copy()
+        f[1] = 0.0
+        f /= np.linalg.norm(f) + 1e-12
+        if np.linalg.norm(t) < 1e-12:
+            t = f
+        t = t / np.linalg.norm(t)
+        side = np.array([f[2], 0.0, -f[0]])
+        out.append((p, f, side, up, t))
+    return out
+
+
+def track_sweep(m, mats, path, widths, along, safety, surface, caps=(True, True), headings=None):
     """A stretch of track: its cross-section (section) carried along `path`, each point with its width (a width
-    changing between two points tapers) and its distance along the whole track (`along`), by which every texture runs
-    on from one piece into the next with no seam. Ends closed where `caps` says (a stretch meeting another is not)."""
-    fr = K.frames(path)
+    changing between two points tapers), its heading and its distance along the whole track (`along`), by which every
+    texture runs on from one piece into the next with no seam. One strip of quads for each edge of the cross-section,
+    the points of each ring shared by the quads before and after it (no cracks, no T-junctions along the way). Ends
+    closed where `caps` says (a stretch running on into another piece is not)."""
+    fr = ring_frames(path, headings)
     secs = [section(w, safety, surface) for w in widths]
     edges = secs[0][1]
     n = len(secs[0][0])
+    # the rings' points, computed once, so neighbouring strips share them exactly
+    rings = [[p + s_ * q[0] + u_ * q[1] for q in sec[0]] for (p, f, s_, u_, t), sec in zip(fr, secs)]
+    runs = []
+    for sec in secs:
+        run = [0.0]
+        for k in range(n):
+            run.append(run[-1] + float(np.linalg.norm(np.subtract(sec[0][(k + 1) % n], sec[0][k]))))
+        runs.append(run)
     for e in range(n):
         mat, kind = edges[e]
         vscale = BRICK if kind[0] == "brick" else (SLAB if mat == "wood" else REPEAT)
+        ids = []
+        for i, (p, f, s_, u_, t) in enumerate(fr):
+            a2, b2 = np.array(secs[i][0][e]), np.array(secs[i][0][(e + 1) % n])
+            d2 = b2 - a2
+            out = s_ * d2[1] - u_ * d2[0]
+            d = rings[i][(e + 1) % n] - rings[i][e]
+            nm = np.cross(t, d)
+            if np.linalg.norm(nm) < 1e-12:
+                nm = out
+            if np.dot(nm, out) < 0:
+                nm = -nm
+            nm = nm / (np.linalg.norm(nm) + 1e-12)
+            ua, ub = _edge_uv(kind, a2, b2, runs[i][e], runs[i][e + 1])
+            v = along[i] / vscale
+            ids.append((m.vertex(rings[i][e], nm, (ua, v)), m.vertex(rings[i][(e + 1) % n], nm, (ub, v))))
         for i in range(len(fr) - 1):
-            p0, _, s0, u0 = fr[i]
-            p1, _, s1, u1 = fr[i + 1]
-            quad, uvs = [], []
-            for (p, s_, u_, sec, v) in ((p0, s0, u0, secs[i][0], along[i]), (p1, s1, u1, secs[i + 1][0], along[i + 1])):
-                a, b = np.array(sec[e]), np.array(sec[(e + 1) % n])
-                run = [0.0]
-                for k in range(n):
-                    run.append(run[-1] + float(np.linalg.norm(np.subtract(sec[(k + 1) % n], sec[k]))))
-                ua, ub = _edge_uv(kind, a, b, run[e], run[e + 1])
-                quad.append((p + s_ * a[0] + u_ * a[1], p + s_ * b[0] + u_ * b[1]))
-                uvs.append(((ua, v / vscale), (ub, v / vscale)))
-            q = [quad[0][0], quad[0][1], quad[1][1], quad[1][0]]
-            uv = [uvs[0][0], uvs[0][1], uvs[1][1], uvs[1][0]]
-            a, b = np.array(secs[i][0][e]), np.array(secs[i][0][(e + 1) % n])
-            d = b - a
-            out2 = np.array([d[1], -d[0]]) / (np.linalg.norm(d) + 1e-12)
-            nm = (s0 + s1) / 2 * out2[0] + (u0 + u1) / 2 * out2[1]
-            m.face(mats[mat], q, uv, normal=nm)
+            (a0, b0), (a1, b1) = ids[i], ids[i + 1]
+            for tri in ((a0, b0, b1), (a0, b1, a1)):
+                q = [np.asarray(m.p[k]) for k in tri]
+                if np.linalg.norm(np.cross(q[1] - q[0], q[2] - q[0])) > 1e-10:
+                    m.tri(mats[mat], *tri)
     for i, sgn, cap in ((0, -1, caps[0]), (len(fr) - 1, 1, caps[1])):
         if not cap:
             continue
-        p, f, s_, u_ = fr[i]
+        p, f, s_, u_, t = fr[i]
         sec = secs[i][0]
         # the outline runs clockwise seen from ahead (+f): reversed it is counter-clockwise in (across, up)
         poly = sec[::-1]
         tris = ear_clip(poly)
         ids = [m.vertex(p + s_ * q[0] + u_ * q[1], f * sgn, (q[0] / SLAB, -q[1] / SLAB)) for q in poly]
-        for t in tris:
+        for t3 in tris:
             if sgn > 0:
-                m.tri(mats["side"], ids[t[0]], ids[t[1]], ids[t[2]])
+                m.tri(mats["side"], ids[t3[0]], ids[t3[1]], ids[t3[2]])
             else:
-                m.tri(mats["side"], ids[t[0]], ids[t[2]], ids[t[1]])
+                m.tri(mats["side"], ids[t3[0]], ids[t3[2]], ids[t3[1]])
 
 
-def outline_mesh(m, mats, centre, outline, top_y, bottom_y, inner=None):
-    """A platform's sides and bottom: vertical faces round `outline` (points (x, z) counter-clockwise from above, about
-    `centre`) from `top_y` down to `bottom_y`, the bottom closing it."""
-    cx, cz = centre[0], centre[2]
-    run = 0.0
-    n = len(outline)
-    for k in range(n):
-        (x0, z0), (x1, z1) = outline[k], outline[(k + 1) % n]
-        L = math.hypot(x1 - x0, z1 - z0)
-        if L < 1e-9:
+def top_height(width, safety, x, surface="stone"):
+    """The height of a cross-section's top at `x` across (the highest of its edges over it): where a railing stands."""
+    pts, _ = section(width, safety, surface)
+    best = None
+    for k in range(1, len(pts) - 2):
+        (x0, y0), (x1, y1) = pts[k], pts[k + 1]
+        if abs(x1 - x0) < 1e-9:
             continue
-        q = [(cx + x0, top_y, cz + z0), (cx + x1, top_y, cz + z1), (cx + x1, bottom_y, cz + z1),
-             (cx + x0, bottom_y, cz + z0)]
-        h = (top_y - bottom_y) / SLAB
-        uv = [(0, run / REPEAT), (0, (run + L) / REPEAT), (h, (run + L) / REPEAT), (h, run / REPEAT)]
-        nm = np.array([z1 - z0, 0.0, -(x1 - x0)]) / L
-        m.face(mats["side"], q, uv, normal=nm)
-        run += L
-    pts = [(cx + x, bottom_y, cz + z) for x, z in outline]
-    tris = ear_clip([(x, z) for x, z in outline])
-    ids = [m.vertex(q, (0, -1, 0), (q[0] / SLAB, q[2] / SLAB)) for q in pts]
-    for t in tris:
-        m.tri(mats["side"], ids[t[0]], ids[t[2]], ids[t[1]])
+        c = (x - x0) / (x1 - x0)
+        if -1e-9 <= c <= 1 + 1e-9:
+            y = y0 + (y1 - y0) * c
+            best = y if best is None else max(best, y)
+    return best if best is not None else 0.0
+
+
+def zipper(inner, outer):
+    """Triangles between two closed loops round one middle, each given as (angle, vertex) sorted by angle from 0 on
+    (the inner one starting at angle 0): every point of both is used, so an edge of the outer loop is never split by
+    a vertex the other side does not have."""
+    two = 2 * math.pi
+    j0 = min(range(len(outer)), key=lambda j: min(outer[j][0] % two, two - outer[j][0] % two))
+    o = outer[j0:] + outer[:j0]
+    base = o[0][0] % two
+    if base > math.pi:
+        base -= two
+    oa = []
+    for k, (a, v) in enumerate(o):
+        a = (a - o[0][0]) % two + base
+        if k and a <= oa[-1][0]:
+            a += two
+        oa.append((a, v))
+    oa.append((oa[0][0] + two, oa[0][1]))
+    ia = inner + [(inner[0][0] + two, inner[0][1])]
+    i = j = 0
+    tris = []
+    while i < len(inner) or j < len(o):
+        adv_inner = j >= len(o) or (i < len(inner) and ia[i + 1][0] <= oa[j + 1][0])
+        if adv_inner:
+            tris.append((ia[i][1], oa[j][1], ia[i + 1][1]))
+            i += 1
+        else:
+            tris.append((ia[i][1], oa[j][1], oa[j + 1][1]))
+            j += 1
+    return tris
 
 
 class LevelBuilder:
@@ -307,45 +386,62 @@ class LevelBuilder:
 
     # --- track -------------------------------------------------------------------------------------------------
 
-    def track(self, name, path, widths, along, safety="border", surface="stone", caps=(True, True)):
-        """A stretch of track along a path of points (its top's centre line), each with its width and its distance
-        along the whole track (track_sweep), with the railings when its safety is railings."""
+    def track(self, name, path, widths, along, safety="border", surface="stone", caps=(True, True), headings=None,
+              railings=None):
+        """A stretch of track along a path of points (its top's centre line), each with its width, its heading and its
+        distance along the whole track (track_sweep). `railings`: for each point, whether a railing runs on its left
+        and on its right from the point before to it ((left, right) pairs); none given, both sides have them when the
+        safety is railings."""
         if safety not in SAFETY:
             raise ValueError(f"safety is one of {', '.join(SAFETY)}")
         m = K.Mesh(name)
-        track_sweep(m, self.mat_ids, path, widths, along, safety, surface, caps)
+        track_sweep(m, self.mat_ids, path, widths, along, safety, surface, caps, headings)
         i = self.add(name, m, groups=self._floor_groups("wood" if surface == "wood" else "stone"))
-        if safety == "railings":
-            self.railings(f"{name}_Railing", path, widths)
+        if railings is None:
+            railings = [(safety == "railings",) * 2] * len(path)
+        for k, side in ((0, "Left"), (1, "Right")):
+            runs, cur = [], None
+            for j in range(1, len(path)):
+                if railings[j][k]:
+                    cur = cur if cur is not None else j - 1
+                elif cur is not None:
+                    runs.append((cur, j - 1))
+                    cur = None
+            if cur is not None:
+                runs.append((cur, len(path) - 1))
+            for r, (j0, j1) in enumerate(runs):
+                sl = slice(j0, j1 + 1)
+                self.railings(f"{name}_Railing_{side}{r + 1}", path[sl], widths[sl],
+                              None if headings is None else headings[sl], safety, surface, sides=(k,))
         return i
 
-    def railings(self, name, path, widths):
-        """Steel railings along both edges of a stretch: two rails on posts (RAIL_HEIGHTS over the floor), solid to
-        the ball (the original's railings are in the rails' physics group too)."""
+    def railings(self, name, path, widths, headings=None, safety="railings", surface="stone", sides=(0, 1)):
+        """Steel railings along the edges of a stretch (`sides`: 0 its left, 1 its right): two rails on posts
+        (RAIL_HEIGHTS over the floor's top where they stand), solid to the ball (the original's railings are in the
+        rails' physics group too)."""
         m = K.Mesh(name)
-        fr = K.frames(path)
+        fr = ring_frames(path, headings)
         rail = self.mat_ids["rail"]
-        for sgn in (-1.0, 1.0):
+        for k in sides:
+            sgn = -1.0 if k == 0 else 1.0
             off = [sgn * (w / 2 - RAIL_IN) for w in widths]
+            base = [p + s_ * o + u * top_height(w, safety, o, surface) for (p, f, s_, u, t), o, w in zip(fr, off, widths)]
             for h in RAIL_HEIGHTS:
-                K.tube(m, rail, [p + s_ * o + u * h for (p, f, s_, u), o in zip(fr, off)], RAIL_R, caps=True)
+                K.tube(m, rail, [b + fr[0][3] * h for b in base], RAIL_R, caps=True)
             # posts at the ends and about every POST_EVERY between
-            seg = [float(np.linalg.norm(fr[k + 1][0] - fr[k][0])) for k in range(len(fr) - 1)]
+            seg = [float(np.linalg.norm(base[j + 1] - base[j])) for j in range(len(base) - 1)]
             total = sum(seg)
             count = max(1, int(round(total / POST_EVERY)))
             for j in range(count + 1):
                 t = total * j / count
-                k = 0
-                while k < len(seg) - 1 and t > seg[k]:
-                    t -= seg[k]
-                    k += 1
-                c = t / seg[k] if seg[k] > 0 else 0.0
-                p = fr[k][0] * (1 - c) + fr[k + 1][0] * c
-                s_ = fr[k][2] * (1 - c) + fr[k + 1][2] * c
-                u = fr[k][3] * (1 - c) + fr[k + 1][3] * c
-                o = off[k] * (1 - c) + off[k + 1] * c
-                base = p + s_ * o
-                K.tube(m, rail, [base, base + u * (RAIL_HEIGHTS[-1] + RAIL_R)], RAIL_R * 0.8, caps=True)
+                q = 0
+                while q < len(seg) - 1 and t > seg[q]:
+                    t -= seg[q]
+                    q += 1
+                c = t / seg[q] if seg[q] > 0 else 0.0
+                p = base[q] * (1 - c) + base[q + 1] * c
+                up = fr[0][3]
+                K.tube(m, rail, [p, p + up * (RAIL_HEIGHTS[-1] + RAIL_R)], RAIL_R * 0.8, caps=True)
         return self.add(name, m, groups=self._floor_groups("metal"))
 
     def slab(self, name, lo, hi, mat="top", sound="stone", sector=0):
@@ -374,28 +470,32 @@ class LevelBuilder:
         phys = "Phys_FloorRails" if sound == "metal" else "Phys_Floors"
         return [phys, f"Sound_HitID_{sid}", f"Sound_RollID_{sid}", "Shadow"]
 
-    def rails(self, name, path, gauge=2.4, r=0.3, posts=6.0, sector=0):
-        """Two steel tubes the ball rolls on, `gauge` apart, with short posts under them."""
+    def rails(self, name, path, gauge=2.4, r=0.3, posts=6.0, sector=0, headings=None):
+        """Two steel tubes the ball rolls on, `gauge` apart (across the cursor's heading at each point, so rails laid
+        piece after piece run on without a kink), with short posts under them."""
         m = K.Mesh(name)
-        fr = K.frames(path)
+        fr = ring_frames(path, headings)
         for side in (-gauge / 2, gauge / 2):
-            K.tube(m, self.mat_ids["rail"], [p + s * side for p, f, s, u in fr], r, caps=True)
+            K.tube(m, self.mat_ids["rail"], [p + s * side for p, f, s, u, t in fr], r, caps=True)
         run = 0.0
         for i in range(1, len(fr)):
             run += float(np.linalg.norm(fr[i][0] - fr[i - 1][0]))
             if run >= posts:
                 run = 0.0
-                p, f, s, u = fr[i]
+                p, f, s, u, t = fr[i]
                 K.tube(m, self.mat_ids["rail"], [p - s * gauge / 2 - u * r, p + s * gauge / 2 - u * r], r * 0.7)
         return self.add(name, m, groups=self._floor_groups("metal") + self.sector(sector))
 
-    def bowl_piece(self, name, centre, fwd, bowl, outline, cups):
+    def bowl_piece(self, name, centre, fwd, bowl, outer, joins, cups, along=0.0):
         """A platform with a bowl in its middle (the start, a checkpoint): its top at `centre` (the floor's height round
         the bowl), the bowl's profile `bowl` ((radius, height over its bottom) from its middle out), the platform's
-        outline `outline(angle)` (its distance from the middle, the angle from `fwd` towards the left) with the
-        angles its corners lie at (`outline.corners`), flame cups at `cups` ((ahead, left) about the middle). The
-        bowl is drawn with the checkpoint's floor (its rings round a grate at its middle, the outer ring at its rim),
-        the platform round it with the track's slabs."""
+        outline `outer` ((ahead, left) about the middle, counter-clockwise from ahead towards the left, seen round
+        the middle), flame cups at `cups` ((ahead, left)). The edges in `joins` (by index: outer[k] to outer[k+1])
+        are where a stretch of track runs on from the platform: there the platform has no side down to the track's
+        depth (the track's own sides go on from its sides), and its corners are the track's (join_points), so the
+        two share every vertex. The bowl is drawn with the checkpoint's floor (its rings round a grate at its middle,
+        the outer ring at its rim), the platform round it with the track's slabs, mapped as the track's (across, and
+        along by `along`, the distance along the track at the middle)."""
         c = np.asarray(centre, np.float64)
         f = np.asarray(fwd, np.float64)
         f = f / np.linalg.norm(f)
@@ -405,8 +505,8 @@ class LevelBuilder:
         bottom = c - up * deep
         tex = rb * 64 / 62  # the texture's half side, its outer ring's edge (62 of 64) at the rim
         m = K.Mesh(name)
-        plate, top = self.mat_ids["plate"], self.mat_ids["top"]
-        angles = sorted(set([2 * math.pi * k / 64 for k in range(64)] + [a % (2 * math.pi) for a in outline.corners]))
+        plate, top, side = self.mat_ids["plate"], self.mat_ids["top"], self.mat_ids["side"]
+        angles = [2 * math.pi * k / 64 for k in range(64)]
 
         def at(r, a, h):
             return bottom + f * (r * math.cos(a)) + left * (r * math.sin(a)) + up * h
@@ -414,8 +514,8 @@ class LevelBuilder:
         def uv_bowl(r, a):
             return (0.5 + r * math.cos(a) / (2 * tex), 0.5 + r * math.sin(a) / (2 * tex))
 
-        def uv_top(r, a):
-            return (r * math.sin(a) / SLAB + 0.5, r * math.cos(a) / REPEAT)
+        def uv_top(ahead, lft):
+            return (-lft / SLAB + 0.5, (along + ahead) / REPEAT)
 
         for k in range(len(angles)):
             a0, a1 = angles[k], angles[(k + 1) % len(angles)]
@@ -429,42 +529,62 @@ class LevelBuilder:
                 if np.linalg.norm(nrm) < 1e-12:
                     continue
                 m.face(plate, q, uv, normal=nrm if nrm[1] >= 0 else -nrm)
-            ra0, ra1 = outline(a0), outline(a1)
-            if ra0 > rb + 1e-6 or ra1 > rb + 1e-6:
-                q = [at(rb, a0, deep), at(ra0, a0, deep), at(ra1, a1, deep), at(rb, a1, deep)]
-                uv = [uv_top(rb, a0), uv_top(ra0, a0), uv_top(ra1, a1), uv_top(rb, a1)]
-                m.face(top, q, uv, normal=up)
-        # the sides and the bottom round the outline, in (ahead, left) about the middle, turned into the world's
-        pts = [(outline(a) * math.cos(a), outline(a) * math.sin(a)) for a in angles]
-        world = [(f * x + left * z) for x, z in pts]
-        outline_mesh(m, self.mat_ids, (c[0], 0.0, c[2]), [(w[0], w[2]) for w in world], c[1], c[1] - START_DEEP)
+        # the top round the bowl: from the rim out to the outline, one triangle fan zipped between the two loops
+        inner = [(a, m.vertex(at(rb, a, deep), up, uv_top(rb * math.cos(a), rb * math.sin(a)))) for a in angles]
+        world = [c + f * x + left * z for x, z in outer]
+        outer_v = [(math.atan2(z, x) % (2 * math.pi), m.vertex(w, up, uv_top(x, z))) for (x, z), w in zip(outer, world)]
+        for t in zipper(inner, outer_v):
+            m.tri(top, *t)
+        # the sides round the outline: down to the track's depth (none where a track runs on), then to the platform's
+        run = 0.0
+        n = len(outer)
+        for k in range(n):
+            p0, p1 = world[k], world[(k + 1) % n]
+            L = float(np.linalg.norm(p1 - p0))
+            if L < 1e-9:
+                continue
+            d = (p1 - p0) / L
+            nm = np.array([d[2], 0.0, -d[0]])
+            for y0, y1 in ((0.0, DEPTH), (DEPTH, START_DEEP)):
+                if y0 == 0.0 and k in joins:
+                    continue
+                q = [p0 - up * y0, p1 - up * y0, p1 - up * y1, p0 - up * y1]
+                uv = [(y0 / SLAB, run / REPEAT), (y0 / SLAB, (run + L) / REPEAT), (y1 / SLAB, (run + L) / REPEAT),
+                      (y1 / SLAB, run / REPEAT)]
+                m.face(side, q, uv, normal=nm)
+            run += L
+        pts = [w - up * START_DEEP for w in world]
+        ids = [m.vertex(q, -up, (q[0] / SLAB, q[2] / SLAB)) for q in pts]
+        for t in ear_clip([(x, z) for x, z in outer]):
+            m.tri(side, ids[t[0]], ids[t[2]], ids[t[1]])
         # the flame cups: a column each, its top a little over the floor with the checkpoint's rings on it
-        for ahead, side in cups:
-            p = c + f * ahead + left * side
-            K.cylinder(m, self.mat_ids["side"], p - up * (START_DEEP - 1.0), up, CUP_R, START_DEEP - 1.0 + CUP_UP,
+        for ahead, lft in cups:
+            p = c + f * ahead + left * lft
+            K.cylinder(m, side, p - up * (START_DEEP - 1.0), up, CUP_R, START_DEEP - 1.0 + CUP_UP,
                        seg=24, cap_mat=plate, vscale=SLAB)
         self.add(name, m, groups=self._floor_groups("stone"))
         return bottom
 
-    def start(self, at, width=14.0):
+    def start(self, at, width=14.0, join=None, along=-START_RADIUS):
         """The start: a round platform with a bowl in its middle the ball sits in, four flame cups round it and a neck
         as wide as the track leaving along +X (to 10 ahead), the stand-in of PS_FourFlames in the bowl's bottom and
-        the first reset point over it. `at` is the platform's top centre (the floor's height round the bowl).
-        Returns the reset point."""
-        hw = min(width, 2 * START_RADIUS) / 2
-
-        def outline(a):
-            ca, sa = math.cos(a), abs(math.sin(a))
-            if ca <= 1e-9:
-                return START_RADIUS
-            neck = min(START_RADIUS / ca, hw / sa if sa > 1e-9 else 1e9)
-            return max(START_RADIUS, neck)
-
-        corner = math.atan2(hw, START_RADIUS)
-        meet = math.asin(min(1.0, hw / START_RADIUS))
-        outline.corners = [corner, -corner, meet, -meet]
-        bottom = self.bowl_piece("Start_Platform", at, (1, 0, 0), START_BOWL, outline,
-                                 [(sa * 6.1, sl * 7.3) for sa in (-1, 1) for sl in (-1, 1)])
+        the first reset point over it. `at` is the platform's top centre (the floor's height round the bowl); `join`
+        the first stretch's join_points when it runs on from the neck's front edge. Returns the reset point."""
+        R = START_RADIUS
+        hw = min(width, 2 * R) / 2
+        neck = math.sqrt(max(R * R - hw * hw, 0.0))
+        front = [-x for x in (join or [-hw, hw])]
+        outer = [(R, lft) for lft in sorted(front)]
+        outer.append((neck, hw))
+        meet = math.atan2(hw, neck)
+        steps = 48
+        for k in range(1, steps):
+            a = meet + (2 * math.pi - 2 * meet) * k / steps
+            outer.append((R * math.cos(a), R * math.sin(a)))
+        outer.append((neck, -hw))
+        joins = set(range(len(front) - 1)) if join else set()
+        bottom = self.bowl_piece("Start_Platform", at, (1, 0, 0), START_BOWL, outer, joins,
+                                 [(sa * 6.1, sl * 7.3) for sa in (-1, 1) for sl in (-1, 1)], along)
         # its z axis points back at the camera (-X): x axis (0, 0, 1)
         self.placeholder("PS_FourFlames_01", ["PS_Levelstart"], K.pose(tuple(bottom), (0, 0, 1)), (-8, 0, -7),
                          (8, 6, 7))
@@ -484,27 +604,35 @@ class LevelBuilder:
         K.cylinder(m, self.mat_ids["border"], (x, y - DEPTH - 1.2, z), (0, 1, 0), r * 1.35, 1.2, seg=12)
         return self.add(name, m)
 
-    def checkpoint(self, n, at, width=14.0, fwd=(1, 0, 0)):
+    def checkpoint(self, n, at, width=14.0, fwd=(1, 0, 0), back=None, front=None, along=0.0):
         """Checkpoint n (1, 2...) at `at` (the floor's top, the track along `fwd`, a multiple of 90 degrees): a piece
         of floor CHECK_LEN long and as wide as the track with the checkpoint's bowl in its middle, two flame cups
         across the way (at ±7 to the sides, as the original's flames), the stand-in of PC_TwoFlames in the bowl's
         bottom (its z axis across the way, where its flames stand) and the next sector's reset point over it. The
-        floors before and after end at the piece. Returns the reset point."""
+        floors before and after end at the piece; `back` and `front` are their join_points where they run on from
+        it. Returns the reset point."""
         f = np.asarray(fwd, np.float64)
         f /= np.linalg.norm(f)
         left = np.array([-f[2], 0.0, f[0]])
         hw, hl = width / 2, CHECK_LEN / 2
-        rb = min(CHECK_BOWL[-1][0], hw - 0.5)
-        bowl = [(r * rb / CHECK_BOWL[-1][0], h) for r, h in CHECK_BOWL]
-
-        def outline(a):
-            ca, sa = abs(math.cos(a)), abs(math.sin(a))
-            return min(hl / ca if ca > 1e-9 else 1e9, hw / sa if sa > 1e-9 else 1e9)
-
-        corner = math.atan2(hw, hl)
-        outline.corners = [corner, math.pi - corner, math.pi + corner, -corner]
-        bottom = self.bowl_piece(f"Checkpoint_{n:02d}", at, f, bowl, outline,
-                                 [(0.0, -CHECK_FLAMES), (0.0, CHECK_FLAMES)])
+        bowl = check_bowl(width)
+        # counter-clockwise from the front edge's right corner: the front edge, the left side, the back edge, the
+        # right side (the sides cut every 2.5 for the triangles' shape)
+        fr_l = sorted(-x for x in (front or [-hw, hw]))
+        bk_l = sorted((-x for x in (back or [-hw, hw])), reverse=True)
+        cuts = max(1, int(round(CHECK_LEN / 2.5)))
+        outer = [(hl, lft) for lft in fr_l]
+        outer += [(hl - CHECK_LEN * k / cuts, hw) for k in range(1, cuts)]
+        outer += [(-hl, lft) for lft in bk_l]
+        outer += [(-hl + CHECK_LEN * k / cuts, -hw) for k in range(1, cuts)]
+        joins = set()
+        if front:
+            joins |= set(range(len(fr_l) - 1))
+        if back:
+            b0 = len(fr_l) + cuts - 1
+            joins |= set(range(b0, b0 + len(bk_l) - 1))
+        bottom = self.bowl_piece(f"Checkpoint_{n:02d}", at, f, bowl, outer, joins,
+                                 [(0.0, -CHECK_FLAMES), (0.0, CHECK_FLAMES)], along)
         self.placeholder(f"PC_TwoFlames_{n:02d}", ["PC_Checkpoints"], K.pose(tuple(bottom), tuple(f)), (-4, 0, -8),
                          (4, 6, 8))
         reset = tuple(bottom + np.array([0.0, CHECK_RESET, 0.0]))
@@ -588,7 +716,7 @@ class LevelBuilder:
         groups = sorted(self.groups.items())
         K.write_open(self.out, self.meshes, self.nodes, self.materials, groups, sky=sky, start_ball=start_ball,
                      settings={"music": music, "light": list(light), "level_bonus": bonus, "tutorial": False,
-                               "last_level": False, "parts": "own"}, generator="drahtseilakt levelkit.py")
+                               "last_level": False, "parts": "own"}, generator=f"drahtseilakt levelkit.py {KIT_VERSION}")
         with open(os.path.join(self.out, "level.txt"), "w") as f:
             f.write(f"title = {title}\nauthor = {author}\nversion = 1\n")
             if licence:

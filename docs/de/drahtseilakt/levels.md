@@ -71,7 +71,7 @@ Das Menü listet sie in dieser Reihenfolge (`order` in level.txt), unter ihren N
 
 | # | Level | Sektoren | Idee | Himmel, Musik, Bonus |
 |---|---|---|---|---|
-| 1 | First Roll (Erster Lauf) | 3 | breite Böden mit Geländern, sanfte Kurven und Hänge, ein erstes Stück Schienen, ein kleiner Sprung | A, 1, 100 |
+| 1 | First Roll (Erster Lauf) | 4 | das erste Level des Originals im Geist: eine Holzbrücke, die ersten Schienen und eine Schleife davon, Kisten, der Stein-Transformator und zurück, lose Kugeln, eine Kuppel, der Stein auf der Kiste, zwei Schieber, Holzrampen hinauf zwischen Absätzen mit Geländer; überall Rinnen, Geländer, wo man fallen kann | A, 1, 100 |
 | 2 | Wood and Stone (Holz und Stein) | 4 | die Holzkugel erklimmt die Rampen, die die Steinkugel nicht schafft; die Steinkugel schiebt Kisten und lose Kugeln über Kanten ohne Rand | B, 2, 200 |
 | 3 | Paper Winds (Papierwinde) | 4 | die Papierkugel fährt auf Ventilatoren zu den Böden darüber; Plattenbrücken tragen sie | C, 3, 300 |
 | 4 | Swing Time (Schaukelzeit) | 4 | was sich bewegt: schwingende Säcke, drehende Arme, ein Klappenrad, Schaukeln, die eine Lücke überbrücken, während sie vorbeischwingen | A, 4, 400 |
@@ -118,6 +118,15 @@ Außerdem: `rails L`, `rails-left A R`, `rails-right A R` (Schienen, auch hinauf
 `up`, `turn`, `tilt` für jedes andere Teil; `move`, `turn`, `mark NAME` und `back NAME`, um den Cursor zu bewegen,
 ohne zu bauen. Die ganze Liste steht oben in leveldsl.py.
 
+`railing left|right|both|off` setzt Stahlgeländer an die Ränder der Böden von dort an, auf jedem Profil (Level 1:
+Rinnen, und Geländer, wo man fallen kann). Zwei Rätsel des Originals sind eigene Befehle: `crateblock` (der Stein auf
+der Kiste, P_Modul_34: ein Schlitz von 6 quer über den Weg, darin der Stein auf seiner Kiste, die auf einem 5 tieferen
+Boden steht, den die Beschreibung unter den Schlitz legt; eine Kugel auf diesem Boden schiebt die Kiste unter dem
+Stein hervor, und der Stein rutscht bündig mit dem Weg herab) und `pusher left|right` (P_Modul_01: ein Schlitz von 1,6
+quer über einen höchstens 6 breiten Weg, der Block des Schiebers füllt den Weg, seine Zielscheibe steht auf dieser
+Seite 5 über den Rand hinaus über einem 2,5 tieferen Boden, von dem aus eine Kugel den Block aus dem Weg schiebt). Die
+Böden darunter werden mit `mark`, `move`, `turn` und `back` gelegt.
+
 **Wie die Bahn den Ball hält** (`safety`): Im Original nimmt die Hilfe von Level zu Level ab, und unsere Level folgen
 dem. Gemessen an den dreizehn Leveln des Originals (die Kanten seiner Böden, nur Zahlen): in den Leveln 1, 3 und 5
 sind etwa zwei Drittel der Bodenkanten profiliert (der Boden steigt zur Kante um 0,7 auf 2,5 Breite an: eine Rinne,
@@ -125,7 +134,9 @@ die einen abdriftenden Ball zur Mitte zurückrollt; ein Drittel ist blank), ab L
 (der Rest blank); erhöhte Wände sind selten (nur die hölzernen Halfpipes von Level 4 und einige Stücke in 12 und 13);
 Stahlgeländer (ein Rohr etwa 2,6 über dem Boden, auf Pfosten) laufen an etwa 490 und 420 Einheiten der Bodenkanten in
 den Leveln 1 und 2, 130 bis 540 in 3 bis 8, unter 90 in 9 bis 11 und keine in 12. Unsere Level
-gehen denselben Weg, eine Stufe deutlicher: Level 1 und 2 haben Geländer, 3 und 4 Ziegelränder (3 einen Sektor mit
+gehen denselben Weg, eine Stufe deutlicher: Level 1 hat Rinnen und Geländer, wo man fallen kann (um den Start, an der
+Außenseite der Kurven, auf den Absätzen, neben Böden mit einem Abgrund), wie das erste Level des Originals, Level 2
+Geländer, 3 und 4 Ziegelränder (3 einen Sektor mit
 Geländer), 5 bis 8 Rinnen (5 einen Sektor mit Rändern, 8 den letzten blank), 9 und 10 blanke Böden (9 den ersten
 Sektor als Rinne). `safety ART` setzt sie von dort an (die erste in einer Datei ist die des Levels); `borders off`
 macht die Böden von dort an blank, `borders on` gibt ihnen die Art des Levels zurück. Was jede ist:
@@ -153,6 +164,18 @@ Seiten dunklerer Beton mit eigenem Ziegelstreifen. Die Texturen liegen in `asset
 Schritt `track`); die Ränder nehmen die Ziegel der Menüszene. Sie werden nach der Strecke entlang der ganzen Bahn
 aufgetragen, und nacheinander gelegte Stücke (gerade, gebogen, ein Stück mit wechselnder Breite) sind ein Netz, so
 laufen die Texturen ohne Naht von Stück zu Stück.
+
+**Keine Nähte** (2026-11-03): ein Stück Boden ist ein Netz vom Start oder einem Checkpoint bis zum nächsten, sein
+Querschnitt wird aufrecht quer zur eigenen Richtung des Cursors (in einer Kurve genau) mitgeführt, so haben eine
+Gerade, die in eine Kurve übergeht, oder eine Rampe, die in eine Ebene übergeht, dort, wo sie sich treffen, denselben
+Querschnitt: kein Keil aus Nichts dazwischen; jeder Ring von Punkten gehört den Vierecken davor und danach (kein Riss,
+kein T-Stoß), und die Texturen liegen nach der Strecke entlang des Wegs. Die Stücke des Starts und der Checkpoints
+sind ebenso angeschlossen: an ihren Kanten, wo ein Boden weiterläuft, liegen ihre Ecken auf den Querschnittspunkten
+des Bodens selbst, und ihre Oberseite ist wie die Bahn texturiert. Der Test `our_floors_have_no_seams` (ownlevels.rs)
+prüft die Böden jedes Levels, das der Baukasten gemacht hat (ab Version 2, in `asset.generator` von level.gltf): wo
+die Oberseite eines Bodens endet, liegt daneben in ihrer Höhe keine andere (`the_seam_finder_sees_a_crack` prüft die
+Suche selbst). Ein Checkpoint auf einem schmalen Weg bekommt eine kleinere Schale und mit ihr weniger Tiefe, so
+bleiben ihre Hänge die gemessenen (eine Steinkugel, die in einer steileren Schale lag, rollte nicht heraus).
 
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
