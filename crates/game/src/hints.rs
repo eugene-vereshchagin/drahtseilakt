@@ -405,6 +405,25 @@ impl Runner {
         self.running.as_ref().map(|r| (r.hint, r.step))
     }
 
+    /// What runs now, for whoever watches: the hint's line, its step and the step, if a hint runs.
+    pub fn describe(&self) -> Option<String> {
+        let r = self.running.as_ref()?;
+        let h = self.hints.get(r.hint)?;
+        let step = h.steps.get(r.step).map_or_else(String::new, |s| {
+            let t = format!("{s:?}");
+            t.chars().take(48).collect()
+        });
+        Some(format!("hint line {} step {}/{}: {step}", h.line, r.step + 1, h.steps.len()))
+    }
+
+    /// The running hint's step is skipped (the watcher sees it will not do): on with the next one.
+    pub fn skip_step(&mut self, sim: &Sim) {
+        if let Some(r) = self.running.as_mut() {
+            r.step += 1;
+            self.begin(sim);
+        }
+    }
+
     /// Whether a running hint is playing a recorded run: a replay step gets on by itself however long it is.
     pub fn replaying(&self) -> bool {
         self.running.as_ref().is_some_and(|r| {
