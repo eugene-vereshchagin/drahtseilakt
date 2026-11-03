@@ -104,6 +104,14 @@ textures (files in its folder) stay its maker's. `--textures original|own` choos
 copy's unless given `--textures own`, which writes ours into the exported level. Our files ship with the game and are
 read through the same size caps as any texture; a level's name only picks among them, never makes a path.
 
+Which textures ours replace, when a level is loaded (so drawing and export agree): in the copy's levels and parts, and
+in their remasters (`levels/remastered/`), every texture we have one of, by name; in a stranger's map (a community
+`.nmo`) a texture it names by file when that file is the copy's (a file its own folder brings stays its own), and
+pixels it carries only when they are the copy's texture of that name, pixel for pixel, so a map's own pictures are
+never covered; an open-format level's own files never. A texture's file name from a `.nmo` is only ever its last part,
+looked for in the game's texture folders; only an open-format level's own folder is read by path. The menu scene
+follows the interface: ours with the own interface, the copy's MenuLevel with its own textures with the original's.
+
 Own content comes in stages: interface (fonts, buttons, points box, life balls, texts, menu scene), then balls,
 skies, particles and sounds (from open libraries), music in the spirit of a mahjong game with Chinese motifs,
 then modules and levels of our own.

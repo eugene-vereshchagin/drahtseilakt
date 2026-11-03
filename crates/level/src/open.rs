@@ -547,7 +547,22 @@ fn sprite_of(v: &serde_json::Value) -> Option<crate::Sprite> {
     Some(crate::Sprite { mode: u32::try_from(v["mode"].as_u64()?).ok()?, size: pair("size")?, offset: pair("offset")? })
 }
 
-/// Reads an open level from `dir`. Texture images become `TextureSource::File` with the full path.
+/// `dir` as a full path with `.` and `..` worked out by name (no link followed): what the level's own files are known by.
+pub fn full_path(dir: &Path) -> std::io::Result<std::path::PathBuf> {
+    let mut out = std::path::PathBuf::new();
+    for c in std::path::absolute(dir)?.components() {
+        match c {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other),
+        }
+    }
+    Ok(out)
+}
+
+/// Reads an open level from `dir`. Texture images become `TextureSource::LevelFile` with the full path.
 pub fn import(dir: &Path) -> Result<Level, String> {
     import_read(dir).map(|(level, _)| level)
 }
@@ -555,6 +570,8 @@ pub fn import(dir: &Path) -> Result<Level, String> {
 /// Reads an open level from `dir`, and gives the bytes it was read from (level.gltf, then level.bin), so that what
 /// a level is known by is what was played.
 pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
+    // the level's own files are known by their full path (a relative one would read like a texture's bare name)
+    let dir = &full_path(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let text = read_capped(&dir.join("level.gltf"), MAX_JSON)?;
     let doc: Value = serde_json::from_slice(&text).map_err(|e| format!("level.gltf: {e}"))?;
     if doc["asset"]["version"].as_str() != Some("2.0") {
@@ -590,7 +607,7 @@ pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
         }
         level.textures.push(Texture {
             name: img["name"].as_str().unwrap_or(uri).to_owned(),
-            source: TextureSource::File(dir.join(uri).to_string_lossy().into_owned()),
+            source: TextureSource::LevelFile(dir.join(uri)),
             color_key: color_key_of(&img["extras"]["drahtseilakt"]["color_key"]),
         });
     }

@@ -310,4 +310,5 @@ switch (`textures original`) draws the copy's. The owner chose to have them appl
 one that does not please is replaced later. Ours stand in by the original's texture name, whichever level asks (an
 original level, a community map, a part); what we have no texture for (skies, particles, glows, shadows, a few
 pictures) still comes from the copy. An open-format level's own textures stay its maker's. Exporting a level with
-`--textures own` writes ours into it, so it can be shared with free assets only.
+`--textures own` writes ours into it, so it can be shared with free assets only. (Refined after review: in a stranger's map only the copy's own textures are replaced, never its own pictures; the
+remasters of the copy's levels are replaced like the copy's; the menu scene follows the interface.)

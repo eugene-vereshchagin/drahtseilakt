@@ -112,6 +112,16 @@ eigenen Texturen eines Levels im offenen Format (Dateien in seinem Ordner) bleib
 unsere in das exportierte Level schreibt. Unsere Dateien werden mit dem Spiel geliefert und mit denselben
 Größengrenzen gelesen wie jede Textur; ein Name aus einem Level wählt nur unter ihnen, er wird nie zu einem Pfad.
 
+Welche Texturen unsere ersetzen, beim Laden eines Levels (so stimmen Zeichnen und Export überein): in den Leveln und
+Teilen der Kopie und in ihren Remastern (`levels/remastered/`) jede, für die wir eine haben, nach Namen; in einer
+fremden Karte (einer Community-`.nmo`) eine Textur, die sie per Datei nennt, wenn die Datei die der Kopie ist (eine
+Datei aus dem eigenen Ordner der Karte bleibt ihre), und mitgebrachte Pixel nur, wenn sie Pixel für Pixel die Textur
+der Kopie dieses Namens sind, sodass die eigenen Bilder einer Karte nie überdeckt werden; die eigenen Dateien eines
+Levels im offenen Format nie. Der Dateiname einer Textur aus einer `.nmo` ist immer nur sein letzter Teil, gesucht in
+den Texturordnern des Spiels; nur der eigene Ordner eines Levels im offenen Format wird per Pfad gelesen. Die
+Menüszene folgt der Oberfläche: unsere mit der eigenen Oberfläche, das MenuLevel der Kopie mit seinen eigenen
+Texturen mit der originalen.
+
 Eigenes kommt in Stufen: Oberfläche (Schriften, Knöpfe, Punktekasten, Lebenskugeln, Texte, Menüszene), dann Kugeln,
 Himmel, Partikel und Klänge (aus offenen Bibliotheken), Musik im Stil eines Mahjong-Spiels mit chinesischen
 Motiven, dann eigene Module und Level.

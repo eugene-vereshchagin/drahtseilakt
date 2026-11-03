@@ -209,7 +209,9 @@ fn parse_args() -> Result<Options, String> {
                 o.chosen = true;
             }
             "--open" => {
-                o.source = Source::Open(value()?.into());
+                // known by its full path (its own files are, and a remaster by where it lies)
+                let dir = PathBuf::from(value()?);
+                o.source = Source::Open(level::open::full_path(&dir).map_err(|e| format!("{}: {e}", dir.display()))?);
                 o.chosen = true;
             }
             "--export" => o.export = Some(value()?.into()),

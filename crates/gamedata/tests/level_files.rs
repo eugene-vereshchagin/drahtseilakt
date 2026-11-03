@@ -255,3 +255,93 @@ fn copying_a_game_file_never_writes_through_a_hard_link() {
     assert_eq!(std::fs::read(game.join("Sounds/Hit.wav")).unwrap(), b"sound");
     let _ = std::fs::remove_dir_all(&r);
 }
+
+/// A map's texture names as a `.nmo` gives them (raw strings, any path a stranger wrote): only their last part is
+/// ever looked for, in the game's texture folders; an absolute or `..` path never reads a file elsewhere, neither to
+/// draw nor to export.
+#[test]
+fn a_maps_texture_name_never_reads_a_path() {
+    let r = root("texnames");
+    let (copy, outside) = (r.join("copy"), r.join("outside"));
+    std::fs::create_dir_all(copy.join("Textures")).unwrap();
+    std::fs::create_dir_all(&outside).unwrap();
+    let px = |c: [u8; 4]| image::RgbaImage::from_pixel(2, 2, image::Rgba(c));
+    px([200, 0, 0, 255]).save(copy.join("Textures/Inside.png")).unwrap();
+    px([0, 200, 0, 255]).save(outside.join("Secret.png")).unwrap();
+    let data = Data {
+        root: copy.clone(),
+        overlay: None,
+    };
+    let named = |name: String| level::Texture {
+        name: "T".into(),
+        source: level::TextureSource::File(name),
+        color_key: None,
+    };
+    let secret = outside.join("Secret.png");
+    let names = [
+        secret.to_string_lossy().into_owned(),
+        "../outside/Secret.png".to_owned(),
+        "Textures/../../outside/Secret.png".to_owned(),
+        "C:\\Pictures\\..\\Secret.png".to_owned(),
+        "..".to_owned(),
+        String::new(),
+    ];
+    for n in &names {
+        assert!(data.texture(&named(n.clone())).is_none(), "{n} read a file");
+    }
+    // a path's last part is a texture of the game's folders
+    let (_, _, rgba) = data.texture(&named(format!("{}/Inside.png", outside.display()))).unwrap();
+    assert_eq!(&rgba[..4], &[200, 0, 0, 255]);
+    let (_, _, rgba) = data.texture(&named("D:\\Maps\\Inside.png".into())).unwrap();
+    assert_eq!(&rgba[..4], &[200, 0, 0, 255]);
+
+    // the same names in a level exported to the open format: only the copy's texture is written
+    let mut lvl = level::Level::default();
+    lvl.textures = names.iter().cloned().map(named).collect();
+    lvl.textures.push(named("/x/Inside.png".into()));
+    let loaded = gamedata::assets::LoadedLevel {
+        level: lvl,
+        name: "Map.nmo".into(),
+        hash: 0,
+        warnings: Vec::new(),
+    };
+    let out = r.join("export");
+    gamedata::assets::export(&data, &loaded, &out).unwrap();
+    let written: Vec<_> = std::fs::read_dir(out.join("textures")).unwrap().flatten().collect();
+    assert_eq!(written.len(), 1, "only the copy's texture");
+    let img = image::open(written[0].path()).unwrap().to_rgba8();
+    assert_eq!(img.get_pixel(0, 0).0, [200, 0, 0, 255]);
+    let _ = std::fs::remove_dir_all(&r);
+}
+
+/// An open-format level read from a relative folder still knows its textures as its own files (by full path).
+#[cfg(unix)]
+#[test]
+fn an_open_levels_textures_are_its_own_files() {
+    let r = root("openown");
+    let out = r.join("lvl");
+    let mut lvl = level::Level::default();
+    lvl.textures.push(level::Texture {
+        name: "A".into(),
+        source: level::TextureSource::Pixels { width: 1, height: 1, rgba: vec![1, 2, 3, 255] },
+        color_key: None,
+    });
+    level::open::export(&lvl, &out).unwrap();
+    std::fs::create_dir_all(out.join("textures")).unwrap();
+    image::RgbaImage::from_pixel(1, 1, image::Rgba([1, 2, 3, 255]))
+        .save(out.join(level::open::texture_file(0, "A")))
+        .unwrap();
+    // the folder named relatively to where the program runs
+    let cwd = std::env::current_dir().unwrap();
+    let mut rel = PathBuf::new();
+    for _ in cwd.components().skip(1) {
+        rel.push("..");
+    }
+    let rel = rel.join(out.strip_prefix("/").unwrap_or(&out));
+    let back = level::open::import(&rel).unwrap();
+    match &back.textures[0].source {
+        level::TextureSource::LevelFile(p) => assert!(p.is_absolute() && p.starts_with(&out)),
+        other => panic!("{other:?}"),
+    }
+    let _ = std::fs::remove_dir_all(&r);
+}

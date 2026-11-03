@@ -320,4 +320,5 @@ entschieden, sie ohne vorherige Durchsicht jeder einzelnen anzuwenden: eine, die
 Unsere treten über den Namen der Originaltextur ein, welches Level auch immer sie anfordert (ein Originallevel, eine
 Community-Karte, ein Teil); wofür wir keine Textur haben (Himmel, Partikel, Leuchten, Schatten, einige Bilder), kommt
 weiter aus der Kopie. Die eigenen Texturen eines Levels im offenen Format bleiben die seines Autors. Ein Export mit
-`--textures own` schreibt unsere hinein, sodass es nur mit freien Ressourcen geteilt werden kann.
+`--textures own` schreibt unsere hinein, sodass es nur mit freien Ressourcen geteilt werden kann. (Nach der Prüfung präzisiert: in einer fremden Karte werden nur die Texturen der Kopie ersetzt, nie ihre eigenen
+Bilder; die Remaster der Level der Kopie werden wie die der Kopie ersetzt; die Menüszene folgt der Oberfläche.)
