@@ -9,7 +9,7 @@
 #
 # Nothing large is kept: the pipe and the WAV live in a temporary folder beside OUT and are removed.
 #
-# Beside the video goes OUT's name with .README.md: the level, the engine, the textures, the sounds and the
+# Beside the video goes OUT's name with .README.txt: the level, the engine, the textures, the sounds and the
 # interface it was made with (read from the settings file the game used), and the run's mode (VIDEO_MODE: test,
 # calm, speedrun or collector; test by default), as every published video carries.
 set -eu

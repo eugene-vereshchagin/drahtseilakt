@@ -1,5 +1,6 @@
 #!/bin/sh
-# Writes the README that goes beside a published video (OUT's name with .README.md): the level, the engine, the
+# Writes the README that goes beside a published video (OUT's name with .README.txt, plain text to paste into a
+# video description): the level, the engine, the
 # textures, the sounds and the interface it was made with, read from the settings file the game used
 # (XDG_DATA_HOME, as for the run). scripts/video.sh calls it; run it alone for a video made before.
 #
@@ -45,17 +46,15 @@ case $ui in
     *) interface="Ballance's original, from the player's own copy (Drahtseilakt's own where the copy has none)" ;;
 esac
 engine="Drahtseilakt $(git -C "$here/.." describe --always --dirty 2>/dev/null || echo unknown), a new engine for Ballance written in Rust"
-cat > "${out%.*}.README.md" <<EOF2
-# $(basename "$out")
-
-- **Level:** $level_line
-- **Engine:** $engine
-- **Textures:** $textures
-- **Sounds:** $sounds
-- **Interface:** $interface
-- **Mode:** $mode_line
-- **Played by:** the Drahtseilakt test player (autopilot), replay \`$(basename "$replay")\`
-- **Video:** $size, 60 fps, H.264 with AAC sound, made $(date -u +%Y-%m-%d)
+cat > "${out%.*}.README.txt" <<EOF2
+Level: $level_line
+Engine: $engine
+Textures: $textures
+Sounds: $sounds
+Interface: $interface
+Mode: $mode_line
+Played by: the Drahtseilakt test player (autopilot), replay $(basename "$replay")
+Video: $size, 60 fps, H.264 with AAC sound, made $(date -u +%Y-%m-%d)
 
 Drahtseilakt needs the player's own copy of Ballance for the original levels and never ships Ballance's data.
 Ballance is (c) 2004 Cyparade / Atari; this project is not affiliated with them.
