@@ -234,6 +234,21 @@ fn rss_mb() -> u64 {
         .map_or(0, |pages| pages * 4096 / (1024 * 1024))
 }
 
+/// The processor time this process has taken, in ticks of 10 ms (Linux's /proc; 0 elsewhere, which leaves the
+/// six-deadline rule).
+fn cpu_ticks() -> u64 {
+    std::fs::read_to_string("/proc/self/stat")
+        .ok()
+        .and_then(|s| {
+            // after the command name's closing parenthesis: state is field 3, utime and stime fields 14 and 15
+            let rest = s.rsplit_once(')')?.1.split_whitespace().collect::<Vec<_>>();
+            let u: u64 = rest.get(11)?.parse().ok()?;
+            let k: u64 = rest.get(12)?.parse().ok()?;
+            Some(u + k)
+        })
+        .unwrap_or(0)
+}
+
 fn write_finding(name: &str, prefix: &str, input: &[u8], note: &str) -> PathBuf {
     let dir = artifacts(name);
     let _ = std::fs::create_dir_all(&dir);
@@ -246,10 +261,29 @@ fn write_finding(name: &str, prefix: &str, input: &[u8], note: &str) -> PathBuf 
 
 fn watchdog(name: Option<&'static str>, current: Arc<Mutex<Current>>, timeout: Duration, rss_cap: u64) {
     std::thread::spawn(move || {
+        // an input past its deadline is a hang when the process kept the processor busy since (a parser's hang is a
+        // loop), or when it is six deadlines late whatever it did: a machine swapping for other jobs stalls any
+        // input, and that is not the input's doing
+        let mut suspect: Option<(u64, u64, Instant)> = None;
         loop {
             std::thread::sleep(Duration::from_millis(20));
             let Ok(c) = current.lock() else { continue };
-            let over_time = c.since.is_some_and(|s| s.elapsed() > timeout);
+            let late = c.since.filter(|s| s.elapsed() > timeout);
+            let over_time = match (late, suspect) {
+                (None, _) => {
+                    suspect = None;
+                    false
+                }
+                (Some(_), Some((iter, cpu, at))) if iter == c.iter => {
+                    let waited = at.elapsed();
+                    let busy = Duration::from_millis(cpu_ticks().saturating_sub(cpu) * 10);
+                    (waited > timeout / 2 && busy * 2 > waited) || c.since.is_some_and(|s| s.elapsed() > timeout * 6)
+                }
+                (Some(_), _) => {
+                    suspect = Some((c.iter, cpu_ticks(), Instant::now()));
+                    false
+                }
+            };
             let rss = rss_mb();
             if !over_time && rss <= rss_cap {
                 continue;
@@ -517,6 +551,8 @@ fn spawn(target: &Target, env: &[(&str, String)], rss_cap: u64) -> Outcome {
     let Ok(mut child) = cmd.spawn() else { return out };
     if let Some(stdout) = child.stdout.take() {
         for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+            // libtest's "test name ... " may lead the first line
+            let Some(line) = line.find("FUZZ").and_then(|i| line.get(i..)) else { continue };
             if let Some(n) = line.strip_prefix("FUZZ@ ") {
                 out.last = n.trim().parse().ok();
             } else if let Some(f) = line.strip_prefix("FUZZ!") {
