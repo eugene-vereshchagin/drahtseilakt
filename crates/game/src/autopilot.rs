@@ -12,9 +12,13 @@ use std::collections::{BinaryHeap, HashMap};
 const SPACING: f32 = 1.5;
 const LINK: f32 = 3.2;
 const STEP: f32 = 1.2;
-/// Up a smooth slope (a wavy log, a ramp) a link may climb this much of its length: a ball with way on rolls up it,
+/// Up a smooth slope (a wavy log's wave, a ramp) a link may climb this much of its length: a ball with way on rolls up it,
 /// where a kerb as high, close by, stops it.
-const SLOPE_CLIMB: f32 = 0.85;
+const SLOPE_CLIMB: f32 = 1.1;
+/// A floor's triangle rises at most this steeply (the up part of its normal): a wave of a wavy log is rolled over.
+const FLOOR_NORMAL: f32 = 0.68;
+/// The same for the floors along a player's way (and the clearance and the field the steering reads there).
+const FLOOR_NORMAL_FOLLOWED: f32 = 0.75;
 
 /// How much a link `h` long may climb: a step, or a slope.
 fn climb(h: f32) -> f32 {
@@ -173,12 +177,12 @@ type Rail = Option<usize>;
 
 /// Points over the up-facing triangles, `SPACING` apart, at most one per cell and height band: the lowest, so a
 /// floor wins over the kerb along its edge.
-fn floor_points(tris: &[([Vec3; 3], Rail)]) -> Vec<(Vec3, Rail)> {
+fn floor_points(tris: &[([Vec3; 3], Rail)], normal_min: f32) -> Vec<(Vec3, Rail)> {
     let mut cells: HashMap<(i32, i32, i32), (Vec3, Rail)> = HashMap::new();
     for &([a, b, c], rail) in tris {
         let n = (b - a).cross(c - a);
         let len = n.length();
-        if len < 1e-6 || (n.y / len).abs() < if rail.is_some() { 0.25 } else { 0.75 } {
+        if len < 1e-6 || (n.y / len).abs() < if rail.is_some() { 0.25 } else { normal_min } {
             continue;
         }
         let edge = (b - a).length().max((c - a).length()).max((c - b).length());
@@ -231,11 +235,13 @@ impl Route {
         start: Vec3,
         stages: &[Vec3],
     ) -> Route {
-        Route::search(level, modules, fans, start, stages, false, &[])
+        Route::search(level, modules, fans, start, stages, false, &[], &[], false)
     }
 
     /// The way as `find`, kept off the transformers at `shun` (those a player does not mean to take: rolling over
-    /// one makes the ball over), where a way round them is not much longer.
+    /// one makes the ball over), where a way round them is not much longer; the stretches to the goals at `grounded`
+    /// (their indices in `stages`) without riding a fan.
+    #[allow(clippy::too_many_arguments)]
     pub fn find_shunning(
         level: &Level,
         modules: &crate::scene::Modules,
@@ -243,8 +249,11 @@ impl Route {
         start: Vec3,
         stages: &[Vec3],
         shun: &[Vec3],
+        grounded: &[usize],
     ) -> Route {
-        Route::search(level, modules, fans, start, stages, false, shun)
+        Route::search(
+            level, modules, fans, start, stages, false, shun, grounded, true,
+        )
     }
 
     /// The way through `places` close together (where a player's ball went): straight from one to the next where
@@ -256,9 +265,10 @@ impl Route {
         start: Vec3,
         places: &[Vec3],
     ) -> Route {
-        Route::search(level, modules, fans, start, places, true, &[])
+        Route::search(level, modules, fans, start, places, true, &[], &[], false)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn search(
         level: &Level,
         modules: &crate::scene::Modules,
@@ -267,9 +277,19 @@ impl Route {
         stages: &[Vec3],
         straight_on: bool,
         shun: &[Vec3],
+        grounded: &[usize],
+        steep: bool,
     ) -> Route {
         let tris = floor_triangles(level, modules);
-        let found = floor_points(&tris);
+        // (a way found for the test player alone, not along a player's, takes steeper floors: the waves of a wavy log)
+        let found = floor_points(
+            &tris,
+            if steep {
+                FLOOR_NORMAL
+            } else {
+                FLOOR_NORMAL_FOLLOWED
+            },
+        );
         let pts: Vec<Vec3> = found.iter().map(|f| f.0).collect();
         // the floor points on a transformer to keep off, each costing `SHUN_COST` more
         let shunned: Vec<bool> = pts
@@ -484,7 +504,7 @@ impl Route {
                 })
                 .collect()
         };
-        for &goal in stages {
+        for (stage, &goal) in stages.iter().enumerate() {
             let goal_node = closest(goal);
             if straight_on
                 && let Some(a) = pts.get(from).copied()
@@ -539,7 +559,11 @@ impl Route {
                                 q,
                                 near(p).into_iter().filter_map(|w| pts.get(w).copied()),
                             );
-                        if v == u || (h > LINK && !gap) || dy > climb(h) || dy < -DROP {
+                        if v == u
+                            || (h > LINK && !gap)
+                            || dy > if steep { climb(h) } else { STEP }
+                            || dy < -DROP
+                        {
                             continue;
                         }
                         if !rail_ok(u, v, dy) {
@@ -594,7 +618,13 @@ impl Route {
                         }
                     }
                     // over a fan: up its updraft and across onto a floor near its top
-                    for &f in lifts.get(&u).into_iter().flatten() {
+                    // (not on a stretch found over the floors only)
+                    let lifts_here = if grounded.contains(&stage) {
+                        None
+                    } else {
+                        lifts.get(&u)
+                    };
+                    for &f in lifts_here.into_iter().flatten() {
                         let Some(&(at, top, _)) = fans.get(f) else {
                             continue;
                         };
@@ -776,7 +806,7 @@ impl Route {
                         q,
                         self.around(q).filter_map(|w| self.pts.get(w).copied()),
                     );
-                if u == v || (h > LINK && !gap) || dy > climb(h) || dy < -DROP {
+                if u == v || (h > LINK && !gap) || dy > STEP || dy < -DROP {
                     continue;
                 }
                 let nd = d + h.max(0.1) + if dy < -STEP { -dy } else { 0.0 };
@@ -811,9 +841,10 @@ impl Route {
         modules: &crate::scene::Modules,
         fans: &[Fan],
         path: Vec<Vec3>,
+        steep: bool,
     ) -> Route {
         let start = path.first().copied().unwrap_or(Vec3::ZERO);
-        let mut r = Route::find(level, modules, fans, start, &[]);
+        let mut r = Route::search(level, modules, fans, start, &[], false, &[], &[], steep);
         r.marks = vec![path.len().saturating_sub(1)];
         r.points = path;
         r
@@ -995,6 +1026,9 @@ const TRACK_RESYNC: usize = 3600;
 const TRACK_OWN: f32 = 0.5;
 /// The player's line is kept to until this long (a second) before a lost ball.
 const TRACK_DOOMED: u32 = 60;
+/// A ball lost this long (four seconds) after keeping to the player's last seconds before a loss was lost as the
+/// player's was.
+const AS_THE_PLAYER: u64 = 240;
 
 /// A player's tick matches the ball within this distance and this difference of speed.
 const DEMO_NEAR: f32 = 2.0;
@@ -1129,6 +1163,8 @@ pub struct Pilot {
     /// the inputs chosen for the ticks up to the next decision.
     tracking: Option<(usize, u64)>,
     track_keys: Vec<(u64, u8)>,
+    /// The last tick the player's line was kept to in the player's last seconds before a lost ball.
+    doomed_at: Option<u64>,
 }
 
 /// How near the ball a point of the way must be to take the way up there (a run begun at a sector).
@@ -1161,6 +1197,7 @@ impl Pilot {
             noise: None,
             tracking: None,
             track_keys: Vec::new(),
+            doomed_at: None,
         }
     }
 
@@ -1244,6 +1281,9 @@ impl Pilot {
         }
         self.tracking = Some((k, sim.tick));
         self.demo_at = Some((k, sim.tick));
+        if d.ticks.get(k).is_some_and(|t| t.doomed_in.is_some()) {
+            self.doomed_at = Some(sim.tick);
+        }
         let q = sim.camera.quarter;
         let lives = sim.lives;
         // the player's keys from tick `k + t`, in our view (as a copy's view turns with them, each tick's own)
@@ -1440,6 +1480,14 @@ impl Pilot {
             && self.gate.checked_sub(1).and_then(wanted) != Some(kind)
     }
 
+    /// Whether a ball lost now was lost as the player lost one here: the player's line was kept to into the
+    /// player's last seconds before a lost ball (within `AS_THE_PLAYER` ticks). Such a loss is not gone back from:
+    /// what the player's ball did as it went may be what the level needs (a drawbridge knocked down with it).
+    pub fn lost_as_the_player(&self, sim: &Sim) -> bool {
+        self.doomed_at
+            .is_some_and(|t| sim.tick <= t + AS_THE_PLAYER)
+    }
+
     /// How far along the way the ball has come (route points).
     pub fn reached(&self) -> usize {
         self.at
@@ -1536,9 +1584,12 @@ impl Pilot {
             dir.normalize_or_zero()
         };
         let mut charges = vec![vec![via.clone()]];
-        for back in [8.0f32, 14.0] {
+        // (along the way first, then from each side: a plank standing across the way falls when hit from where it
+        // faces)
+        let sides = [dir, Vec3::X, -Vec3::X, Vec3::Z, -Vec3::Z];
+        for (dir, back) in sides.iter().flat_map(|&d| [8.0f32, 14.0].map(|b| (d, b))) {
             let from = bridge - dir * back;
-            if self.route.clearance(from + lift) <= 0.0 {
+            if dir == Vec3::ZERO || self.route.clearance(from + lift) <= 0.0 {
                 continue;
             }
             for run in [30u64, 50, 80] {

@@ -41,7 +41,9 @@ owner's whole run and a later one that got through a sector the whole run did no
 
 A player's tries that lost the ball are left out of the way followed: each one's stretch from where it came into the
 sector it was lost in (the new ball starts that sector again). A run that did not finish is followed to the end of
-its try in its last sector that got furthest, and from there on the test player finds the way by itself (with
+its try in its last sector that got furthest, but no further than just past its last transformer there (after it
+the player was looking for the way, and may have rolled where a ball is stuck: a stone ball into a fan's pit; the
+player's line ends there too), and from there on the test player finds the way by itself (with
 `--plan`, through the plan's objects from the next checkpoint on).
 
 ## The way's search
@@ -51,7 +53,8 @@ its try in its last sector that got furthest, and from there on the test player 
 taken in its order. The plans written from a walkthrough video are kept as `hints/Level_NN.plan`.
 
 The way is searched over the floor points of the level's floors, rails and modules. Besides rolling from point to
-point, climbing a little (a step of 1.2, or a smooth slope up to 40 degrees: a wavy log) and dropping down (30
+point, climbing a little (a step of 1.2; where the test player finds the way by itself, also a smooth slope up to 47
+degrees: a wavy log) and dropping down (30
 units at most):
 
 - **Rails** hold the ball from the sides: a way goes onto or off a rail only along it (not across a rail crossing
@@ -84,7 +87,9 @@ for some seconds, random additions to its choices' scores; from the third try on
 player's line. Three tries go from the last save before the failure, then three from each save twice as far back
 (the cause may lie earlier: a run-up too slow, a bad line into a bend). After 30 tries at one place (a place: 6 way
 points further than the last), the failure is taken as it comes: the ball is lost, or the run is given up with its
-report. The hints may fire again after going back, as for a new ball. `--rewinds N` caps how often it goes back in
+report. The hints may fire again after going back, as for a new ball. A ball lost as the player lost one there (within
+four seconds of keeping to the player's last seconds before a loss) is not gone back from, where the player's run got past that sector afterwards: what the
+player's ball did as it went may be what the level needs (a drawbridge knocked down as the ball fell with it). `--rewinds N` caps how often it goes back in
 a run (600; 0: never). The variation is seeded, so a run is reproducible; the run kept, and its replay, is the one
 that got through, without the tries that failed.
 

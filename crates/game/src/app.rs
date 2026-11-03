@@ -1293,6 +1293,11 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     pilot_run(&mut game, data, &own, crate::autopilot::Pilot::new(route, gates))
 }
 
+/// A run that did not finish is followed this many way points (and ticks of the player's) past the player's last
+/// transformer in its last sector.
+const LAST_GATE_ON: usize = 3;
+const LAST_GATE_TICKS: usize = 60;
+
 /// The followed player's keys this long before a lost ball are not followed (four seconds).
 const DOOMED_TICKS: usize = 240;
 
@@ -1352,7 +1357,9 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
     if !w.finished {
         way_on(&game, &own, &mut w)?;
     }
-    let route = crate::autopilot::Route::along(&game.level.level, &game.modules, &game.sim.updrafts(), w.path);
+    // (a way partly found by the test player takes the steeper floors that way was found over)
+    let route =
+        crate::autopilot::Route::along(&game.level.level, &game.modules, &game.sim.updrafts(), w.path, !w.finished);
     let mut pilot = crate::autopilot::Pilot::new(route, w.gates);
     pilot.demo = Some(std::sync::Arc::new(w.demo));
     pilot_run(&mut game, data, &own, pilot)
@@ -1382,12 +1389,32 @@ fn way_on(game: &Game, o: &Options, w: &mut Watched) -> Result<(), String> {
         w.path = path;
         w.gates = gates;
     }
+    // After the player's last transformer in that sector the player was looking for the way (and may have rolled
+    // where the ball is stuck: a stone ball into a fan's pit): the way on is found from just past it, and the
+    // player's line ends there.
+    if let Some(&(g, at, kind)) = w.gates.iter().rev().find(|g| g.0 >= first) {
+        let cut = (g + LAST_GATE_ON).min(w.path.len());
+        w.path.truncate(cut);
+        w.sectors.truncate(cut);
+        let made = w.demo.ticks.iter().rposition(|t| t.sector == last && t.kind == kind && t.pos.distance(at) < 6.0);
+        if let Some(k) = made {
+            for t in w.demo.ticks.iter_mut().skip(k + LAST_GATE_TICKS) {
+                t.alive = false;
+                t.doomed_in = None;
+            }
+        }
+    }
     let Some(&from) = w.path.last() else { return Ok(()) };
     let kind = w.gates.last().map_or(game.sim.ball.kind, |g| g.2);
     let up = from + glam::Vec3::Y * crate::sim::BALL_RADIUS;
     let took: Vec<glam::Vec3> = w.gates.iter().map(|g| g.1).collect();
     let (route, gates) = found_way(game, o, up, last, &w.path, &took, kind)?;
     let n = w.path.len();
+    if std::env::var_os("AUTOPILOT_DEBUG").is_some() {
+        for (i, p) in route.points.iter().enumerate() {
+            eprintln!("way on {} {:.1} {:.1} {:.1}", i + n, p.x, p.y, p.z);
+        }
+    }
     println!("the followed run ends unfinished at {from:?} (sector {}): the way on is found, {} points, transformers \
         {gates:?}", last + 1, route.points.len());
     w.gates.extend(gates.iter().map(|g| (g.0 + n, g.1, g.2)));
@@ -1474,6 +1501,12 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
         }
     }
     let finished = seen.sim.finished;
+    // the player's last seconds before a loss are kept to only where the run got on past that sector afterwards (a
+    // loss that served the level), not in the sector a run that did not finish ended in
+    let last = seen.sim.sector;
+    for t in demo.ticks.iter_mut().filter(|t| !finished && t.sector >= last) {
+        t.doomed_in = None;
+    }
     let (path, sectors, gates, deaths) = failed_tries_out(path, sectors, gates, deaths, finished);
     Ok(Watched {
         run,
@@ -1613,12 +1646,15 @@ fn found_way(
         game.sim.trafos().min_by(|a, b| a.0.distance(p).total_cmp(&b.0.distance(p))).map(|t| t.1)
     };
     let mut tries = 0;
+    // the stretches of the way (by goal) found without riding a fan
+    let mut grounded: Vec<usize> = Vec::new();
     loop {
         let stages: Vec<glam::Vec3> = waypoints.iter().map(|w| w.1).collect();
         // the transformers not on the way are kept off (rolling over one makes the ball over)
         let shun: Vec<glam::Vec3> =
             game.sim.transformers().into_iter().filter(|t| stages.iter().all(|s| s.distance(*t) > 1.0)).collect();
-        let route = crate::autopilot::Route::find_shunning(level, &game.modules, &fans, start, &stages, &shun);
+        let route =
+            crate::autopilot::Route::find_shunning(level, &game.modules, &fans, start, &stages, &shun, &grounded);
         let gates: Vec<crate::autopilot::Gate> = route
             .marks
             .iter()
@@ -1641,7 +1677,14 @@ fn found_way(
         let Some((i, at)) = paper.filter(|_| tries <= FAN_PAPER_TRIES) else { return Ok((route, gates)) };
         let before = route.marks.iter().position(|&m| m >= i).unwrap_or(waypoints.len());
         if waypoints.iter().any(|w| w.1.distance(at) < 1.0) {
-            return Ok((route, gates));
+            // the paper transformer is on the way already, after this lift: the stretch the lift is on is found
+            // again over the floors only (its goal may be that very transformer, up where the lift would lead)
+            if grounded.contains(&before) {
+                return Ok((route, gates));
+            }
+            println!("the way rides a fan at {i} not as paper: that stretch is found again without lifts");
+            grounded.push(before);
+            continue;
         }
         println!("the way rides a fan at {i} not as paper: into the paper transformer at {at:?} first");
         waypoints.insert(before, (0, at, true));
@@ -1863,10 +1906,18 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
             matches!(e, crate::sim::Event::Transform(k) if pilot.stray_transform(*k))
         });
         let fell = stray || game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::Died));
+        // (a ball lost as the player lost one there is not gone back from: it may be what the level needs)
+        let as_the_player = fell && !stray && pilot.lost_as_the_player(&game.sim);
         // lost, or standing still too long: back to a state saved before, varied (a try of its own, reproducible)
         let still = game.sim.tick - since > give_up.min(crate::autopilot::REWIND_STILL);
         // (standing still: from where it last got on, a state saved there too)
-        let failed_at = if fell { Some(game.sim.tick) } else { still.then_some(since + 60) };
+        let failed_at = if as_the_player {
+            None
+        } else if fell {
+            Some(game.sim.tick)
+        } else {
+            still.then_some(since + 60)
+        };
         if let Some(at) = failed_at
             && let Some((state, attempt)) = rewinds.back(at, (game.sim.sector, pilot.reached()))
         {

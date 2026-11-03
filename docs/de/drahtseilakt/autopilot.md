@@ -46,8 +46,10 @@ kam, durch den der ganze Lauf nicht kam.
 
 Versuche eines Spielers, in denen die Kugel verloren ging, fallen aus dem verfolgten Weg heraus: von jedem das Stück
 vom Eintritt in den Sektor, in dem sie verloren ging, bis dorthin (die neue Kugel beginnt den Sektor neu). Ein Lauf,
-der nicht ins Ziel kam, wird bis zum Ende seines Versuchs im letzten Sektor verfolgt, der am weitesten kam, und von
-dort findet der Testspieler den Weg selbst (mit `--plan` durch die Objekte des Plans, an denen der Spieler noch nicht
+der nicht ins Ziel kam, wird bis zum Ende seines Versuchs im letzten Sektor verfolgt, der am weitesten kam, aber nicht
+weiter als kurz hinter seinen letzten Transformator dort (danach suchte der Spieler den Weg und kann dorthin gerollt
+sein, wo eine Kugel festsitzt: eine Steinkugel in die Grube eines Ventilators; dort endet auch die Linie des
+Spielers), und von dort findet der Testspieler den Weg selbst (mit `--plan` durch die Objekte des Plans, an denen der Spieler noch nicht
 vorbeikam).
 
 ## Die Wegsuche
@@ -58,7 +60,8 @@ Transformatoren innerhalb 30 vom gefundenen Weg in seiner Reihenfolge genommen. 
 Pläne liegen als `hints/Level_NN.plan` bereit.
 
 Der Weg wird über die Bodenpunkte der Böden, Schienen und Module des Levels gesucht. Außer von Punkt zu Punkt zu
-rollen, ein wenig zu steigen (eine Stufe von 1,2 oder ein glatter Hang bis 40 Grad: ein welliger Stamm) und
+rollen, ein wenig zu steigen (eine Stufe von 1,2; wo der Testspieler den Weg selbst findet, auch ein glatter Hang bis 47
+Grad: ein welliger Stamm) und
 hinabzufallen (höchstens 30 Einheiten):
 
 - **Schienen** halten die Kugel seitlich: auf eine Schiene und von ihr geht ein Weg nur entlang (nicht quer über eine
@@ -93,7 +96,10 @@ Spielers. Drei Versuche gehen vom letzten Stand vor dem Fehlschlag aus, dann je 
 zurückliegenden (die Ursache kann früher liegen: ein zu langsamer Anlauf, eine schlechte Linie in eine Kurve). Nach 30
 Versuchen an einer Stelle (eine Stelle: 6 Wegpunkte weiter als die letzte) wird der Fehlschlag hingenommen: die Kugel
 geht verloren, oder der Lauf wird mit seinem Bericht aufgegeben. Die Hinweise können nach dem Zurückgehen wieder
-auslösen, wie für eine neue Kugel. `--rewinds N` begrenzt, wie oft er in einem Lauf zurückgeht (600; 0: nie). Die
+auslösen, wie für eine neue Kugel. Eine Kugel, die verloren geht, wie der Spieler dort seine verlor (innerhalb vier
+Sekunden, nachdem er sich an die letzten Sekunden des Spielers vor einem Verlust hielt), führt nicht zurück, wo der Lauf des Spielers danach über diesen Sektor
+hinauskam: was die
+Kugel des Spielers im Gehen tat, kann das sein, was das Level braucht (eine Zugbrücke, mit der Kugel umgestoßen). `--rewinds N` begrenzt, wie oft er in einem Lauf zurückgeht (600; 0: nie). Die
 Abwandlung hat einen festen Startwert, ein Lauf ist also reproduzierbar; behalten wird der Lauf (und seine
 Aufzeichnung), der durchkam, ohne die fehlgeschlagenen Versuche.
 
