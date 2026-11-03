@@ -1,7 +1,16 @@
-# Level 6 — hints for the test player (docs/drahtseilakt/autopilot.md), from the walkthrough video.
+# Level 6 — hints for the test player (docs/drahtseilakt/autopilot.md, the rules in autopilot-rules.md), from the
+# walkthrough video's storyboard (ref/video/frames/fast/level06).
 #
-# Sector 4: at the corner of the plank along z -714.5 where the way turns south to the fourth checkpoint (x 409), the
-# boxes P_Box_04-07 (stacked two by two at x 403 and 409) and the loose stone ball P_Ball_Stone_01 (x 397.6) stand
-# in the way. As stone, the walkthrough rams them east off the end of the plank. Rams from a run-up at x 380, braking
-# after each, three times.
-at 392 8.3 -714.5 r 9 sector 4 kind stone : goto 380 8.3 -714.5 ; push 1 0 150 ; push -1 0 50 ; wait 30 ; goto 380 8.3 -714.5 ; push 1 0 150 ; push -1 0 50 ; wait 30 ; goto 380 8.3 -714.5 ; push 1 0 150 ; push -1 0 60 ; goto 400 8.3 -714.5
+# Sector 4: the wavy log in three stretches (x 373..394 from z -730 to -795, x 393..414 from -788 to -865, x 373..394
+# from -845 to -935), joined by strips across it at z -789 and -852, flat transformers lying on it: wood at
+# (389.7 -730.2), (390.4 -779.1), (390 -877.6), paper at (377.9 -730.2), (396.5 -795.9). As wood from P_Trafo_Wood_02
+# south along it (between the transformers: x 384, 404, 383) to the stone transformer at its end, at a push that
+# carries over the waves; as stone back the same way (a stone ball stuck in a trough cannot climb out: it keeps its
+# speed), onto the plank along z -714.5, and the stone ball and the boxes P_Box_04..07 stacked at its corner rammed
+# east off it (from a run-up at x 380 each time, braking after each), then north to the fourth checkpoint.
+at 366 8.3 -714.3 r 4 sector 4 kind wood : pass 380 8.3 -714.5 6 ; pass 384 8.3 -721 6 ; press 384 3 -786 0 0 14 900 ; pass 386 3 -789 6 ; pass 400 3 -789 6 ; pass 404 3 -793 5 ; press 404 3 -846 0 0 14 900 ; pass 396 3 -852 6 ; pass 384 3 -853 6 ; pass 383.5 3 -858 5 ; press 383.7 3 -924 0 0 14 900 ; become stone
+at 383.5 3 -924 r 8 sector 4 kind stone : press 383 3 -853 0 0 30 900 ; pass 398 3 -852 7 ; pass 403.5 3 -851.5 4 ; press 404 3 -792 0 0 30 900 ; pass 400 3 -789 10 ; pass 386 3 -789 10 ; press 384 3 -720 0 0 30 900  ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; pass 409 8.3 -714.5 4 ; pass 411.3 8.3 -700 5
+#
+# Sector 5: after the stone ball drops with the broken plates onto the wavy log below, it keeps its speed along the
+# log's middle (a stone ball stuck in a trough cannot climb out) to the wood transformer at its end.
+at 515.2 -32 -577 r 6 sector 5 kind stone : press 514.5 -38 -540 0 0 30 600 ; press 516.5 -38 -510 0 0 30 600 ; press 513.5 -38 -480 0 0 30 600 ; press 512 -38 -460 0 0 30 600 ; press 517.5 -38 -430 0 0 30 600 ; press 514 -38 -400 0 0 30 600 ; press 514 -38 -370 0 0 30 600 ; pass 515.2 -35 -346.8 8

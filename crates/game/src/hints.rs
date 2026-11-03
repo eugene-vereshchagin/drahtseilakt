@@ -35,6 +35,13 @@ const MAX_COORD: f32 = 100_000.0;
 const MAX_TICKS: u64 = 60 * 60 * 10;
 const MAX_RADIUS: f32 = 200.0;
 const MAX_LEAD: f32 = 50.0;
+/// The fastest a press step rolls, and how far off its line it keeps at most.
+const MAX_PRESS_SPEED: f32 = 40.0;
+const MAX_PRESS_OFFSET: f32 = 3.0;
+/// A press is done once the ball, having rolled, has not moved faster than this for so many ticks (stopped at a
+/// rail's end).
+const PRESS_MOVING: f32 = 0.8;
+const PRESS_SETTLE: u64 = 20;
 /// The ticks a goto or become takes at most when the hint does not say.
 const GOTO_TICKS: u64 = 600;
 const BECOME_TICKS: u64 = 1200;
@@ -56,6 +63,31 @@ pub enum Step {
     Lead(Vec3, f32, u64),
     /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most.
     Shove(Vec3, Vec3, u64),
+    /// Hold the ball where it is until the loose body (or module part) nearest the first point is within the
+    /// distance of the second, for so many ticks at most: a swing or a lift to get on or off at the right moment.
+    Await(Vec3, Vec3, f32, u64),
+    /// Keep the ball over the loose body (or module part) nearest the first point until it is within the distance
+    /// of the second, for so many ticks at most: riding a swing across.
+    Ride(Vec3, Vec3, f32, u64),
+    /// Roll along the straight line from where the step begins to the point, kept to it sideways (with the offset
+    /// from it, a vector across: rails ridden leaning on their upper rail), not faster than the speed, for so many
+    /// ticks at most.
+    Press(Vec3, Vec3, f32, u64),
+    /// Push along the way the ball is rolling, not faster than the speed, for so many ticks: rails that lead it
+    /// (a helix) taken at speed.
+    Along(f32, u64),
+    /// Keep the ball on the point for so many ticks: still where it must wait (a slope would roll it away).
+    Hold(Vec3, u64),
+    /// Roll through the point without stopping, no faster than the speed (a corner, a rail's end, a transformer
+    /// rolled into on the way), for so many ticks at most.
+    Pass(Vec3, f32, u64),
+    /// Cross a moving part (a swing) toward the point: the moment and the length of the push along the direction
+    /// are found on copies of the run from here (wait, push, let it carry, push off), the first that ends within the
+    /// distance of the point, on a floor, the ball kept; then played. Closed on what the part is doing now.
+    Cross(Vec3, Vec3, f32),
+    /// Go round the upright axis through the point (x, z) at the radius, at the speed (one way round or, negative,
+    /// the other), for so many ticks or until the ball is above the point's height: up a helix of rails.
+    Round(Vec3, f32, f32, u64),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -178,6 +210,83 @@ fn step(words: &[&str]) -> Result<Step, String> {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let to = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             Step::Shove(p, to, ticks(w.next())?)
+        }
+        "await" | "ride" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let q = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let d = num(w.next())?;
+            if !(0.0..=MAX_LEAD).contains(&d) {
+                return Err(format!("{name} is within {MAX_LEAD} units at most"));
+            }
+            let t = ticks(w.next())?;
+            if name == "await" {
+                Step::Await(p, q, d, t)
+            } else {
+                Step::Ride(p, q, d, t)
+            }
+        }
+        "round" => {
+            let c = Vec3::new(num(w.next())?, 0.0, num(w.next())?);
+            let r = num(w.next())?;
+            if !(0.5..=MAX_LEAD).contains(&r) {
+                return Err(format!("round is 0.5 to {MAX_LEAD} units across"));
+            }
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed.abs()) {
+                return Err(format!("round is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            let t = ticks(w.next())?;
+            // (done above this height, when given)
+            let top = match w.next() {
+                Some(y) => num(Some(y))?,
+                None => f32::INFINITY,
+            };
+            Step::Round(Vec3::new(c.x, top, c.z), r, speed, t)
+        }
+        "cross" => {
+            let d = direction(w.next(), w.next())?;
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let r = num(w.next())?;
+            if !(0.5..=MAX_LEAD).contains(&r) {
+                return Err(format!("cross is within 0.5 to {MAX_LEAD} units"));
+            }
+            Step::Cross(d, p, r)
+        }
+        "pass" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
+                return Err(format!("pass is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            let t = match w.next() {
+                Some(t) => ticks(Some(t))?,
+                None => GOTO_TICKS,
+            };
+            Step::Pass(p, speed, t)
+        }
+        "hold" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            Step::Hold(p, ticks(w.next())?)
+        }
+        "along" => {
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
+                return Err(format!("along is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            Step::Along(speed, ticks(w.next())?)
+        }
+        "press" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            // (the offset from the straight line, in units: which side of the rails' middle the ball keeps to)
+            let side = Vec3::new(num(w.next())?, 0.0, num(w.next())?);
+            if side.length() > MAX_PRESS_OFFSET {
+                return Err(format!("press keeps {MAX_PRESS_OFFSET} units off the line at most"));
+            }
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
+                return Err(format!("press is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            Step::Press(p, side, speed, ticks(w.next())?)
         }
         "become" => {
             Step::Become(kind_of(w.next().ok_or("become needs a kind")?).ok_or("not a ball kind")?)
@@ -384,6 +493,12 @@ struct Running {
     back_until: u64,
     /// The loose body a lead keeps to.
     body: Option<usize>,
+    /// Where a press step began.
+    from: Vec3,
+    /// A cross step's pushes found, one a tick (world directions; empty: none found).
+    pushes: Vec<Vec3>,
+    /// The point the last pass step went through (kept from step to step: the next pass keeps to the line from it).
+    passed: Option<Vec3>,
 }
 
 /// Runs the hints for the test player.
@@ -502,6 +617,9 @@ impl Runner {
                 nearest_at: sim.tick,
                 back_until: 0,
                 body: None,
+                from: Vec3::ZERO,
+                pushes: Vec::new(),
+                passed: None,
             });
             self.begin(sim);
         }
@@ -552,6 +670,8 @@ impl Runner {
         run.nearest_at = sim.tick;
         run.back_until = 0;
         run.body = None;
+        run.from = Vec3::ZERO;
+        run.pushes.clear();
         if let Some(Step::Inputs(q, _)) =
             self.hints.get(run.hint).and_then(|h| h.steps.get(run.step))
         {
@@ -573,6 +693,52 @@ fn nearest_body(sim: &Sim, at: Vec3, parts: bool) -> usize {
         .map_or(usize::MAX, |n| n.0)
 }
 
+/// The waits before a cross step's push, its lengths and the coasts after it that are tried (ticks), how long the
+/// push off goes on, and how long the ball is let settle before it is judged.
+const CROSS_WAITS: std::ops::RangeInclusive<u64> = 0..=150;
+const CROSS_WAIT_STEP: usize = 5;
+const CROSS_PUSHES: [u64; 9] = [40, 55, 70, 85, 100, 115, 130, 145, 160];
+const CROSS_COASTS: [u64; 4] = [0, 20, 40, 60];
+const CROSS_OFF: u64 = 60;
+const CROSS_SETTLE: u64 = 60;
+
+/// A cross step's pushes, one a tick: the first wait, push, coast found on copies of the run that brings the ball
+/// within `r` of `to`, on a floor and not lost; none found, none.
+fn cross_plan(sim: &Sim, dir: Vec3, to: Vec3, r: f32) -> Vec<Vec3> {
+    let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+    let quarter = sim.camera.quarter;
+    for wait in CROSS_WAITS.step_by(CROSS_WAIT_STEP) {
+        // (the wait played once, shared by every push after it)
+        let mut waited = sim.clone();
+        for _ in 0..wait {
+            waited.step(0);
+        }
+        for push in CROSS_PUSHES {
+            for coast in CROSS_COASTS {
+                let mut s = waited.clone();
+                let lives = s.lives;
+                let mut plan: Vec<Vec3> = vec![Vec3::ZERO; usize::try_from(wait).unwrap_or(0)];
+                let mut lost = false;
+                for k in 0..push + coast + CROSS_OFF + CROSS_SETTLE {
+                    let p = if k < push || (k >= push + coast && k < push + coast + CROSS_OFF) { dir } else { Vec3::ZERO };
+                    if k < push + coast + CROSS_OFF {
+                        plan.push(p);
+                    }
+                    s.step(arrows(p, quarter));
+                    if s.lives < lives || s.is_dying() || s.game_over {
+                        lost = true;
+                        break;
+                    }
+                }
+                if !lost && s.ball.on_ground && flat(s.ball.position - to).length() < r && s.ball.position.y > to.y - 2.0 {
+                    return plan;
+                }
+            }
+        }
+    }
+    Vec::new()
+}
+
 /// A shove is done with the body this near its place; the ball pushes it from this far behind its middle.
 const SHOVE_NEAR: f32 = 1.0;
 const SHOVE_BEHIND: f32 = 3.5;
@@ -581,6 +747,10 @@ const SHOVE_BEHIND: f32 = 3.5;
 fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     let t = sim.tick.saturating_sub(run.start);
     let quarter = sim.camera.quarter;
+    // (a chain of pass steps is a line; any other step between them breaks it)
+    if !matches!(step, Step::Pass(..)) {
+        run.passed = None;
+    }
     let ball = &sim.ball;
     // rolling to a point: push towards it, less the speed already going there, so the ball stops on it
     let towards = |p: Vec3| {
@@ -694,6 +864,109 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let rel = Vec3::new(ball.velocity.x, 0.0, ball.velocity.z) - v;
             Some(arrows(off.clamp_length_max(6.0) - 0.8 * rel, quarter))
         }
+        Step::Await(at, q, d, n) => {
+            if t >= *n {
+                return None;
+            }
+            if t == 0 {
+                run.from = ball.position;
+            }
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
+            let st = sim.world().state(body)?;
+            // the ball held where it was as the step began (an edge may slope)
+            (st.pos.distance(*q) > *d).then(|| towards(run.from))
+        }
+        Step::Ride(at, q, d, n) => {
+            if t >= *n {
+                return None;
+            }
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
+            let st = sim.world().state(body)?;
+            if st.pos.distance(*q) <= *d {
+                return None;
+            }
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let off = flat(st.pos - ball.position);
+            let rel = flat(ball.velocity - st.vel);
+            Some(arrows(off.clamp_length_max(6.0) - 0.8 * rel, quarter))
+        }
+        Step::Press(p, side, speed, n) => {
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            if t == 0 {
+                run.from = ball.position;
+            }
+            let line = flat(*p - run.from);
+            let along = line.normalize_or_zero();
+            let across = Vec3::new(-along.z, 0.0, along.x);
+            let rel = flat(ball.position - run.from);
+            let v = flat(ball.velocity);
+            // (still moving: the end of a pair of rails stops the ball short of the point, and then it is done)
+            if v.length() > PRESS_MOVING {
+                run.nearest_at = sim.tick;
+                run.flown = true;
+            }
+            // done there, or past it (the point is a rail's end: what comes after is another step's), or stopped
+            if t >= *n
+                || flat(*p - ball.position).length() < 1.0
+                || rel.dot(along) >= line.length()
+                || (run.flown && sim.tick > run.nearest_at + PRESS_SETTLE)
+            {
+                return None;
+            }
+            // across: to the line (and its offset), damped; along: on while slower than the speed
+            let off = rel.dot(across) - side.dot(across);
+            let a = -(1.5 * off + 0.8 * v.dot(across));
+            let f = if v.dot(along) < *speed { 1.0 } else { -0.3 };
+            Some(arrows(along * f + across * a.clamp(-1.0, 1.0), quarter))
+        }
+        Step::Round(c, r, speed, n) => {
+            if t >= *n || ball.position.y > c.y {
+                return None;
+            }
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let out = flat(ball.position - *c);
+            let u = out.normalize_or_zero();
+            let around = Vec3::new(-u.z, 0.0, u.x) * speed.signum();
+            let v = flat(ball.velocity);
+            // across: to the radius, damped; around: on while slower than the speed
+            let a = -(1.5 * (out.length() - *r) + 0.8 * v.dot(u));
+            let f = if v.dot(around) < speed.abs() { 1.0 } else { -0.3 };
+            Some(arrows(around * f + u * a.clamp(-1.0, 1.0), quarter))
+        }
+        Step::Hold(p, n) => (t < *n).then(|| towards(*p)),
+        Step::Cross(d, p, r) => {
+            if t == 0 {
+                run.pushes = cross_plan(sim, *d, *p, *r);
+            }
+            let push = *run.pushes.get(usize::try_from(t).ok()?)?;
+            Some(arrows(push, quarter))
+        }
+        Step::Pass(p, speed, n) => {
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let d = flat(*p - ball.position);
+            if t >= *n || d.length() < 1.5 {
+                run.passed = Some(*p);
+                return None;
+            }
+            // kept to the line from the point passed before (a chain of points is a way along rails and tracks:
+            // the ball on it, not cutting across), or straight to the point for the first
+            let from = run.passed.filter(|f| flat(*p - *f).length() > 1.0).unwrap_or(ball.position);
+            let line = flat(*p - from);
+            let along = line.normalize_or_zero();
+            let across = Vec3::new(-along.z, 0.0, along.x);
+            let v = flat(ball.velocity);
+            let off = flat(ball.position - from).dot(across);
+            let a = -(1.5 * off + 0.8 * v.dot(across));
+            let f = if v.dot(along) < *speed { 1.0 } else { -0.5 };
+            Some(arrows(along * f + across * a.clamp(-1.0, 1.0), quarter))
+        }
+        Step::Along(speed, n) => {
+            if t >= *n {
+                return None;
+            }
+            let v = Vec3::new(ball.velocity.x, 0.0, ball.velocity.z);
+            Some(if v.length() < *speed { arrows(v, quarter) } else { 0 })
+        }
         Step::Replay(..) => None,
         Step::Inputs(_, inputs) => {
             // a transformer holding the ball as the step begins holds its recorded run too: it starts as the ball
@@ -767,6 +1040,27 @@ mod tests {
         let moving = parse("at 0 0 0 r 1 : lead 1 2 3 -4 300 ; shove 1 2 3 7 8 9 500").unwrap();
         assert_eq!(moving[0].steps[0], Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300));
         assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500));
+        let swing =
+            parse("at 0 0 0 r 1 : await 1 2 3 4 5 6 0.5 200 ; ride 1 2 3 4 5 6 0.5 90 ; press 1 2 3 0 1 6 200").unwrap();
+        assert_eq!(swing[0].steps[0], Step::Await(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 200));
+        assert_eq!(swing[0].steps[1], Step::Ride(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 90));
+        assert_eq!(swing[0].steps[2], Step::Press(Vec3::new(1.0, 2.0, 3.0), Vec3::Z, 6.0, 200));
+        assert!(parse("at 0 0 0 r 1 : press 1 2 3 0 4 6 200").is_err(), "too far off the line");
+        assert_eq!(parse("at 0 0 0 r 1 : along 12 240").unwrap()[0].steps[0], Step::Along(12.0, 240));
+        assert_eq!(parse("at 0 0 0 r 1 : hold 1 2 3 60").unwrap()[0].steps[0], Step::Hold(Vec3::new(1.0, 2.0, 3.0), 60));
+        assert_eq!(parse("at 0 0 0 r 1 : pass 1 2 3 5").unwrap()[0].steps[0], Step::Pass(Vec3::new(1.0, 2.0, 3.0), 5.0, GOTO_TICKS));
+        assert_eq!(
+            parse("at 0 0 0 r 1 : cross 0 -1 1 2 3 4").unwrap()[0].steps[0],
+            Step::Cross(-Vec3::Z, Vec3::new(1.0, 2.0, 3.0), 4.0)
+        );
+        assert_eq!(
+            parse("at 0 0 0 r 1 : round 1 2 6 -9 300").unwrap()[0].steps[0],
+            Step::Round(Vec3::new(1.0, f32::INFINITY, 2.0), 6.0, -9.0, 300)
+        );
+        assert_eq!(
+            parse("at 0 0 0 r 1 : round 1 2 6 9 300 45").unwrap()[0].steps[0],
+            Step::Round(Vec3::new(1.0, 45.0, 2.0), 6.0, 9.0, 300)
+        );
         assert!(parse("at 0 0 0 r 1 : lead 1 2 3 99 300").is_err(), "a lead is 50 units at most");
     }
 

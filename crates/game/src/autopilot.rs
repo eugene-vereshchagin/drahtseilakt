@@ -957,6 +957,15 @@ impl Route {
         self.floor_point(p).map_or(0.0, |q| q.coarse)
     }
 
+    /// The speed a steady player keeps at `p`: moderate on a rail or a narrow track, more on a wide floor.
+    pub fn cruise(&self, p: Vec3) -> f32 {
+        match self.floor_point(p) {
+            Some(q) if q.rail => CRUISE_RAIL,
+            Some(q) => (CRUISE_BASE + CRUISE_PER_HALF * q.half).clamp(CRUISE_RAIL, CRUISE_WIDE),
+            None => CALM,
+        }
+    }
+
     /// How far the ball at `p` is off the middle of its floor, and how much nearer than `SAFE` to its edge (edges.rs):
     /// none on a rail (its line is the way) or on no floor.
     pub fn off_middle(&self, p: Vec3) -> Option<(f32, f32)> {
@@ -1061,9 +1070,17 @@ const DEMO_BONUS: f32 = 1000.0;
 /// The steering: every `PERIOD` ticks each choice is tried for `HOLD` ticks and then `COAST` with no arrows on a copy of
 /// the run; the one that ends furthest along the way without losing the ball is held.
 const PERIOD: u64 = 6;
-/// A player rolls calmly: above this speed every unit costs `FAST` way points.
+/// A player rolls calmly: above this speed every unit costs `FAST` way points (off the floors; on them the floor's
+/// cruising speed, `Route::cruise`: moderate on a rail or a narrow track, more on a wide one).
 const CALM: f32 = 7.0;
 const FAST: f32 = 1.5;
+const CRUISE_RAIL: f32 = 6.0;
+const CRUISE_WIDE: f32 = 10.0;
+const CRUISE_BASE: f32 = 4.5;
+const CRUISE_PER_HALF: f32 = 1.2;
+/// And a steady player does not stop where nothing calls for it: below half the cruising speed each unit costs
+/// `SLOW` way points (less than a choice that keeps the ball is worth: a wait the level needs is still taken).
+const SLOW: f32 = 0.4;
 /// A player keeps to the middle of a track: over the samples (every sixth tick) of a tried choice on a floor, each
 /// unit the ball is off the middle of its floor costs `MIDDLE` way points on average, and each unit nearer an edge
 /// than `SAFE` `EDGE` more. Less than a choice that keeps the ball or gets on is worth, more than a little progress.
@@ -1118,6 +1135,21 @@ const BRIDGE_CHARGES: usize = 3;
 
 /// Stuck this near the next transformer, the ball is taken into it.
 const GATE_STUCK: f32 = 10.0;
+/// Held up this long (ticks) right by a gap the way crosses or the next transformer, the test player takes it at
+/// once rather than after the two seconds it waits elsewhere, and this near the gap's edge counts as by it.
+const HELD_UP: u64 = 45;
+/// Stuck this long (ticks), rams, manoeuvres and the deeper search are tried, and again after as long (following a
+/// player's run, longer: the player's line may wait there).
+const STUCK_TRY: u64 = 120;
+const STUCK_TRY_FOLLOWING: u64 = 240;
+const GAP_CLOSE: f32 = 10.0;
+/// A sill: the way off a rail onto a floor, or up a step of more than `SILL_STEP` (less than the ball's radius),
+/// within `SILL_AHEAD` points; taken from a run-up of `SILL_BACK` ticks back, on to `SILL_PAST` points past it.
+const SILL_STEP: f32 = 0.3;
+const SILL_AHEAD: usize = 8;
+const SILL_BACK: u64 = 25;
+const SILL_PAST: usize = 4;
+const SILL_NEAR: f32 = 3.0;
 
 /// Keeping to the player's line (`Pilot::track`): how far ahead the courses are compared, how far our ball may be
 /// from the player's before the line is lost, how far on it is looked for again, and what the player's own keys are
@@ -1835,6 +1867,70 @@ impl Pilot {
         None
     }
 
+    /// Into the next transformer, near it (its rim holds the ball off): through it, backing off for a run-up.
+    fn into_gate(&self, sim: &Sim) -> Option<crate::hints::Hint> {
+        let &(_, g, k) = self.gates.get(self.gate)?;
+        if sim.ball.kind == k || g.distance(sim.ball.position) >= GATE_STUCK {
+            return None;
+        }
+        let (t, _) = sim
+            .trafos()
+            .filter(|(_, kind)| *kind == k)
+            .min_by(|a, b| a.0.distance(g).total_cmp(&b.0.distance(g)))?;
+        Some(crate::hints::Hint {
+            at: sim.ball.position,
+            radius: 6.0,
+            sector: Some(sim.sector + 1),
+            kind: Some(sim.ball.kind),
+            steps: vec![crate::hints::Step::Via(t, 900), crate::hints::Step::Become(k)],
+            line: 0,
+        })
+    }
+
+    /// Held up where the way goes off a rail onto a floor, or up a little step (a sill): a short run-up back along the
+    /// way and on over it at speed, as a player keeps the momentum there.
+    fn over_sill(&self, sim: &Sim) -> Option<crate::hints::Hint> {
+        let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+        let pts = &self.route.points;
+        let end = (self.at + SILL_AHEAD).min(pts.len().saturating_sub(1));
+        let rail = |p: Vec3| self.route.floor_point(p).is_some_and(|q| q.rail);
+        let k = (self.at..end).find(|&k| {
+            let (a, b) = (pts[k], pts[k + 1]);
+            (rail(a) && !rail(b)) || (b.y > a.y + SILL_STEP && b.y < a.y + crate::sim::BALL_RADIUS)
+        })?;
+        // (right at it, and with floor behind for the run-up)
+        if flat(pts[k + 1] - sim.ball.position).length() > SILL_NEAR {
+            return None;
+        }
+        let past = *pts.get((k + SILL_PAST).min(pts.len() - 1))?;
+        let dir = flat(past - sim.ball.position).normalize_or_zero();
+        if dir == Vec3::ZERO || self.route.clearance(sim.ball.position - dir * SILL_NEAR) <= 0.0 {
+            return None;
+        }
+        Some(crate::hints::Hint {
+            at: sim.ball.position,
+            radius: 6.0,
+            sector: Some(sim.sector + 1),
+            kind: Some(sim.ball.kind),
+            steps: vec![
+                crate::hints::Step::Push(-dir, SILL_BACK),
+                crate::hints::Step::Via(past + Vec3::Y * crate::sim::BALL_RADIUS, 240),
+            ],
+            line: 0,
+        })
+    }
+
+    /// The ball is by a gap the way crosses just ahead (within `GAP_CLOSE` of its near edge).
+    fn gap_close(&self, sim: &Sim) -> bool {
+        let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+        let end = (self.at + LOOK).min(self.route.points.len());
+        self.route.points.get(self.at..end).is_some_and(|ahead| {
+            ahead.windows(2).any(|w| {
+                flat(w[1] - w[0]).length() > GAP && flat(w[0] - sim.ball.position).length() < GAP_CLOSE
+            })
+        })
+    }
+
     /// Where the followed player's run is now: the tick last matched, gone on by the ticks since.
     fn demo_expected(&self, sim: &Sim) -> Option<usize> {
         self.demo_at
@@ -2358,8 +2454,27 @@ impl Pilot {
         if let Some(i) = self.track(sim) {
             return i;
         }
-        // stuck for four seconds: try rams and random manoeuvres and keep the best that gets on
-        if sim.tick.saturating_sub(self.moved) > 240 {
+        // held up a moment right at a gap the way crosses, or at the next transformer's rim: no need to stand there
+        // for the full four seconds (a steady player goes on at once): the leap, or into the transformer, now
+        let held = sim.tick.saturating_sub(self.moved);
+        // (following a player's run, the player's pace is the measure: the steady style is for a way of its own)
+        let steady = self.demo.is_none();
+        let stuck_try = if steady { STUCK_TRY } else { STUCK_TRY_FOLLOWING };
+        if steady && held > HELD_UP && held <= stuck_try {
+            if self.gap_close(sim) && let Some(hint) = self.leap(sim) {
+                self.moved = sim.tick;
+                self.hints.add(hint);
+                return 0;
+            }
+            if let Some(hint) = self.into_gate(sim).or_else(|| self.over_sill(sim)) {
+                self.moved = sim.tick;
+                self.hints.add(hint);
+                return 0;
+            }
+        }
+        // stuck for two seconds: try rams and random manoeuvres and keep the best that gets on (a steady player does
+        // not stand about long)
+        if sim.tick.saturating_sub(self.moved) > stuck_try {
             // found or not, the next try comes after four seconds more
             self.moved = sim.tick;
             // stuck at a drawbridge the way goes over: charge it along the way (backing off for a run-up while it
@@ -2377,25 +2492,8 @@ impl Pilot {
                 }
             }
             // stuck by the next transformer (its rim holds the ball off): into it, backing off for a run-up
-            if let Some(&(_, g, k)) = self.gates.get(self.gate)
-                && sim.ball.kind != k
-                && g.distance(sim.ball.position) < GATE_STUCK
-                && let Some((t, _)) = sim
-                    .trafos()
-                    .filter(|(_, kind)| *kind == k)
-                    .min_by(|a, b| a.0.distance(g).total_cmp(&b.0.distance(g)))
-            {
-                self.hints.add(crate::hints::Hint {
-                    at: sim.ball.position,
-                    radius: 6.0,
-                    sector: Some(sim.sector + 1),
-                    kind: Some(sim.ball.kind),
-                    steps: vec![
-                        crate::hints::Step::Via(t, 900),
-                        crate::hints::Step::Become(k),
-                    ],
-                    line: 0,
-                });
+            if let Some(hint) = self.into_gate(sim) {
+                self.hints.add(hint);
                 return 0;
             }
             // no manoeuvre gets on, near the followed player's line: back to where the player stood before this
@@ -2499,7 +2597,13 @@ impl Pilot {
                     - if uphill {
                         0.0
                     } else {
-                        FAST * (s.ball.velocity.length() - CALM).max(0.0)
+                        FAST * (s.ball.velocity.length() - if steady { self.route.cruise(s.ball.position) } else { CALM })
+                            .max(0.0)
+                    }
+                    - if steady {
+                        SLOW * (0.5 * self.route.cruise(s.ball.position) - s.ball.velocity.length()).max(0.0)
+                    } else {
+                        0.0
                     }
                     - edge
                     - if from_demo { 0.0 } else { SWITCH * ((c ^ self.choice) & ARROWS).count_ones() as f32 }

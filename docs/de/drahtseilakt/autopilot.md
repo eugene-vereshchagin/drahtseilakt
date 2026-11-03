@@ -55,7 +55,7 @@ vorbeikam).
 ## Die Wegsuche
 
 `--plan FILE` nennt die Objekte des Levels, durch die es geht, der Reihe nach, eines je Zeile (Transformatoren,
-Ventilatoren, Kontrollpunkte, `#`-Kommentare), wie ein Spieler, der das Level kennt; ohne Plan werden die
+Ventilatoren, Kontrollpunkte, `#`-Kommentare) oder Orte auf dem Weg als `X Y Z` (welche Schiene zu nehmen ist, ein Punkt, an dem der Weg vorbeimuss), wie ein Spieler, der das Level kennt; ohne Plan werden die
 Transformatoren innerhalb 30 vom gefundenen Weg in seiner Reihenfolge genommen. Die nach einem Video geschriebenen
 Pläne liegen als `hints/Level_NN.plan` bereit.
 
@@ -98,7 +98,12 @@ freieste Punkt in der Nähe: die halbe Breite des Bodens).
 - **Das Steuern** bewertet jede auf einer Kopie des Laufs probierte Wahl auch danach, wie weit die Kugel von der
   Mitte ihres Bodens abkommt (und stärker, wo sie einem Rand näher als 3 kommt): weniger, als das Halten der Kugel
   oder Vorankommen wert ist, mehr als ein kleiner Fortschritt. Jeder seit der letzten Entscheidung gedrückte oder
-  losgelassene Pfeil kostet auch etwas, so wird die Linie glatt, kein Zickzack.
+  losgelassene Pfeil kostet auch etwas, so wird die Linie glatt, kein Zickzack. Und sie rollt mit der Geschwindigkeit
+  eines sicheren Spielers für ihren Boden: auf einer Schiene oder schmalen Bahn mäßig (6), auf breitem Boden schneller
+  (bis 10, mit der Breite des Bodens); schneller kostet, und langsamer als die Hälfte davon auch, wo nichts ein Warten
+  verlangt (ein Warten, das das Level verlangt, wird trotzdem genommen: eine Wahl, die die Kugel verliert, ist nie etwas wert). Kurz aufgehalten, wo der Weg von einer Schiene auf einen
+  Boden geht oder eine kleine Stufe hinauf (eine Schwelle), setzt sie etwas zurück und nimmt sie mit Anlauf. Dieser
+  ruhige Stil gilt für einen eigenen Weg; folgt sie dem Lauf eines Spielers, ist dessen Tempo das Maß.
 - **Beim Halten der Linie eines Spielers** darf seine Kugel dort, wo die Kugel des Spielers einem Rand näher als 3
   kam, bis zu 1,5 von dieser Linie zur Mitte hin bleiben, wenn es ebenso schnell ist; sonst ist die Linie die des
   Spielers.
@@ -131,7 +136,7 @@ Aufzeichnung), der durchkam, ohne die fehlgeschlagenen Versuche.
 
 ## Die Suche, wenn er feststeckt
 
-Vier Sekunden festgefahren, probiert der Testspieler auf Kopien des Laufs Rammstöße, Schaukeln (hin und her entlang
+Zwei Sekunden festgefahren (an einer Lücke, über die der Weg geht, oder am Rand des nächsten Transformators: eine Dreiviertelsekunde, und dann springt er sofort oder rollt hinein), probiert der Testspieler auf Kopien des Laufs Rammstöße, Schaukeln (hin und her entlang
 einer Wahl, zwei- oder viermal: aus einer Mulde zwischen Wellen, zu steil, um aus dem Stand hinaufzukommen) und
 zufällige Manöver. Festgefahren, wo weder Rammen noch Manöver, Brückensturm oder Sprung weiterkommen, sucht der Testspieler tiefer: eine
 Strahlsuche über Folgen gehaltener Pfeile (jeder eine Drittel-, Dreiviertel- oder anderthalb Sekunden lang, oder eine
@@ -178,6 +183,14 @@ einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinte
 | `become KIND` | in den nächsten Transformator dieser Art rollen (höchstens 1200 Takte) |
 | `lead X Y Z D T` | D Einheiten vor dem losen Körper nächst dem Punkt bleiben, während er rollt (hinter ihm bei negativem D), T Takte lang: eine Steinkugel schiebt die Papierkugel durch Ventilatoren, eine Kugel, auf die man wartet |
 | `shove X Y Z TX TY TZ T` | den losen Körper (oder das bewegliche Teil eines Moduls) nächst X Y Z nach TX TY TZ schieben: um ihn herum hinter ihn, dann langsam hinein (höchstens T Takte) — ein Brett an seinen Platz geschoben, eine Kugel dorthin gerollt, wo man sie braucht |
+| `press X Y Z SX SZ V T` | entlang der Geraden vom Ort, an dem der Schritt beginnt, zum Punkt rollen, seitlich an ihr gehalten (SX SZ: ein Versatz quer dazu, höchstens 3: auf welcher Seite eines Schienenpaars), solange langsamer als V; fertig am Punkt, dahinter oder nach T Takten — Schienen, auf der oberen lehnend gefahren, ein gleichmäßiger Anstieg |
+| `round X Z R V T [Y]` | um die senkrechte Achse durch (X, Z) im Radius R mit der Geschwindigkeit V rollen (in eine Richtung, bei negativem V in die andere), T Takte lang oder bis die Kugel über Y ist — eine Schienenspirale hinauf |
+| `along V T` | in die Richtung schieben, in die die Kugel rollt, nicht schneller als V, T Takte lang — Schienen, die sie führen |
+| `pass X Y Z V [T]` | durch den Punkt rollen, ohne anzuhalten, nicht schneller als V (eine Kurve, ein Schienenende, ein Transformator unterwegs); an der Linie vom Punkt gehalten, durch den das letzte `pass` des Hinweises ging (eine Kette davon folgt Schienen und Bahnen) |
+| `cross DX DZ X Y Z R` | über ein bewegliches Teil (eine Schaukel) zum Punkt: der Moment und die Länge des Stoßes entlang DX DZ werden auf Kopien des Laufs von hier gefunden (warten, stoßen, tragen lassen, abstoßen), der erste, nach dem die Kugel innerhalb R vom Punkt auf einem Boden ist, und dann gespielt |
+| `hold X Y Z T` | die Kugel T Takte auf dem Punkt halten — still, wo gewartet werden muss (auf einem Hang, oder nach schneller Ankunft) |
+| `await X Y Z QX QY QZ D T` | die Kugel an Ort und Stelle halten, bis der lose Körper oder das bewegliche Modulteil nächst X Y Z innerhalb D von QX QY QZ ist (höchstens T Takte) — eine Schaukel oder ein Aufzug im richtigen Moment |
+| `ride X Y Z QX QY QZ D T` | die Kugel über dem Körper oder Modulteil nächst X Y Z halten, bis es innerhalb D von QX QY QZ ist (höchstens T Takte) |
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
 
 Richtungen sind Weltrichtungen (X nach Osten, Z nach Norden, wie das Level gebaut ist), ein Hinweis hängt also nicht
@@ -230,11 +243,14 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 - Level 3: vom Start an geschafft in 7:45.48 (Hebel und Brücke in Sektor 4 wie beim Inhaber).
 - Level 4: vom Start an geschafft in 9:19.47 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
 - Level 5: vom Start an geschafft in 12:39.77 (Hinweise für beide Kisten und den Schieber).
-- Level 6: mit dem Lauf des Inhabers (er endet am gewölbten Baumstamm in Sektor 2) und dem Plan
-  `hints/Level_06.plan` kommt der Testspieler allein durch Sektor 2 und 3 und über den welligen Stamm von Sektor 4
-  bis zu seinem Stein-Transformator; als Nächstes sind die Kisten als Stein vom Absatz zu stoßen.
+- Level 6: vom Start an beendet in 8:01.22: Sektor 1 entlang der Linie des Inhabers, Sektoren 2–5 allein mit dem
+  Plan und den Hinweisen nach dem Storyboard des Videos (`hints/Level_06.txt`: der wellige Stamm als Holz hin und als
+  Stein schnell zurück, die Kisten heruntergerammt, der Stamm nach dem Sturz in Sektor 5).
 - Level 7: vom Start an geschafft in 12:04.28, dem geschafften Lauf des Inhabers folgend.
-- Level 8: allein mit dem Plan aus dem Video bis zum ersten Holz-Transformator (Weg 156 von 1072).
+- Level 8: vom Start an beendet, ganz ohne Lauf eines Spielers: allein durch den Plan aus dem Video
+  (`hints/Level_08.plan`, mit Orten auf dem Weg) und die nach seinem Storyboard geschriebenen Hinweise
+  (`hints/Level_08.txt`: Schienenpaare, auf der oberen lehnend gefahren, eine Spirale, eine Schaukel, die Zielscheiben,
+  die die Brücken des Labyrinths senken, weggerammte Kisten).
 - Level 9: vom Start an geschafft in 12:35.27, dem geschafften Lauf des Inhabers folgend (das Labyrinth der Schieber
   in Sektor 3 wird gelöst, wie der Inhaber es löste).
 - Level 10: vom Start an geschafft in 15:31.00, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.

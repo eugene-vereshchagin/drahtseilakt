@@ -1,0 +1,59 @@
+# Level 8 — the route (docs/drahtseilakt/autopilot-rules.md): sectors, stretches in order, the ball, the action.
+# From the walkthrough's storyboard (ref/video/frames/fast/level08); the plan and hints made from it are
+# Level_08.plan and Level_08.txt.
+
+sector 1 wood
+  start → main track east to the end platform (x 166) and back      pass, cruise
+  rails x 122 south → P_Trafo_Paper_01                               pass into it → paper
+  rails x 122 north to the L-platform → P_Modul_18_01 (fan)          wait over the grate → lifted onto the rails x 80
+  rails x 80 south → P_Trafo_Wood_01                                 press at a push (uphill) → wood
+  rails x 80 north, the U-turn over the fan                          pass (a wood ball is not lifted)
+  rails x 96 south past the drawbridge's block → PC_TwoFlames_01     press, cruise; over the sill onto the platform
+
+sector 2 wood
+  track z -98 east → the cube lattice → P_Trafo_Paper_03             pass into it → paper
+  lattice top north → the high rails along z -85 east                press, pass round onto them
+  rails' end → drop onto the track (x 415) → east to the box corner  pass
+  south over the tilting plates P_Modul_41_01..07 → PC_TwoFlames_02  pass, as paper (they tip under a heavier ball)
+
+sector 3 paper
+  → P_Trafo_Wood_04                                                  pass into it → wood
+  east past the sandbags P_Modul_26_01..03                           pass, cruise (a sack only while in the way)
+  → P_Trafo_Paper_04, the fans 18_03/04 lift it                      wait over the grate → up
+  → P_Trafo_Wood_03 over the drawbridge P_Modul_25_02                pass → wood
+  south along x 593, west to the L-track's corner                    pass
+  the rail-pair zigzag x 570 → z -288 → x 586 → z -310 → x 611        press each pair, leaning on the upper rail, fast
+                                                                     enough to carry onto the next; P_Extra_Life_01
+  the dome platform → PC_TwoFlames_03                                pass
+
+sector 4 wood
+  → P_Trafo_Paper_05                                                 pass into it → paper
+  past the breaking bridge, round the loop (east side up its trough)  press, cruise
+  rails along z -325.3 up to y 25, the hanging plates P_Modul_29_02   press at speed (a slow ball sinks into the plates)
+  the helix (centre 873 -321.3, radius 5.2) up to y 46               round
+  over the fan 18_05 between the blocks, south along x 890           pass
+  west along z -403 down to the maze, its west corridor south        pass
+  east along z -453, up the seesaw P_Modul_30_02 → P_Trafo_Wood_05   press → wood
+  down to the lower level, the ramp up to z -420, west, the dead end target: hold on x 802.3, press south, push
+  x 803 south into the target of P_Modul_37_02                         → its bridge falls
+  back down the ramp, round by the lower west corridors, the narrow  pass; press up the ramp
+  ramp up along z -472.8
+  the dead end x 823.6 north into the target of P_Modul_37_01        target → its bridge falls
+  the row along z -455 from its west end over both bridges           pass
+  P_Box_04/05 stacked on the row                                     ram east to the corner and off (six rams, then
+                                                                     four a little north of the middle, braking)
+  south along x 865 → over the gap → PC_TwoFlames_04                 pass; the gap with a short run-up
+
+sector 5 wood
+  north edge of the square → over the swing P_Modul_08_01            hold on the edge, cross north
+  east over the plank P_Modul_25_04, down the plates P_Modul_29_03   pass (wood: a stone ball breaks the plates)
+  the T, west into the target of P_Modul_37_03                       run-up from x 900, push → its bridge falls
+  back up the plates, over the plank, over the swing south           pass; cross south
+  → P_Trafo_Stone_02                                                 into it → stone
+  over the swing north, over the new bridge, the zigzag              cross; pass
+  P_Box_06..15 on the zigzag, P_Box_16..18 on the fan 18_06          ram south (five), then west (six), braking
+  back along the zigzag, over the swing south                        pass; cross south
+  → P_Trafo_Paper_06, over the swing north, the zigzag               cross; pass
+  P_Modul_18_06 (fan) → P_Extra_Life_02 → P_Trafo_Wood_07            wait over the grate → up → wood
+  the last rail-pair zigzag x 822 → z -733 → x 838 → z -755 → x 864   press each pair
+  the platform, the stairs → PE_Balloon_01                           pass

@@ -1,0 +1,55 @@
+# Level 8 — hints for the test player (docs/drahtseilakt/autopilot.md), from the walkthrough video's storyboard
+# (ref/video/frames/fast/level08) and tried out in the game.
+#
+# Sector 1: the paper ball, lifted by the fan P_Modul_18_01 onto the rails along x 80, climbs them south into the
+# wood transformer at their end at a push (slow, it rolls back short of it).
+at 79.8 20.6 -20 r 4 sector 1 kind paper : press 79.8 21 -37 0 0 20 200
+#
+# As wood, straight along the rails x 96 past the drawbridge's block (its plank stands beside the way).
+at 96 20.6 30 r 4 sector 1 kind wood : press 96 21 -55 0 0 9 600
+#
+# Sector 2: on the cube lattice's top the paper ball goes north to the high rails and round onto them.
+at 344.3 30.1 -123 r 3 sector 2 kind paper : press 344.3 30.1 -88 0 0 9 300 ; pass 360 30.1 -85.2 6
+#
+# Sector 3: out of the wood transformer east along the sandbags' track.
+at 537.4 1.7 -167 r 2 sector 3 kind wood : pass 545 1.6 -169.6 5 ; pass 552 0.2 -169.7 7
+#
+# Sector 3: the zigzag of rail pairs to the extra life (x 570 → z -288 → x 586 → z -310 → x 611 → the platform
+# with the dome). Each pair is two rails one above the other: the wooden ball rides on the lower one leaning on the
+# upper, from the end of one pair onto the next. Off the L-shaped track's corner, onto the first pair, south along
+# it fast enough to carry onto the crossing pair, then pair by pair, each to its corner.
+at 578 12 -237.5 r 4 sector 3 kind wood : pass 572 12 -237.5 4 ; goto 569.5 11.6 -238.2 ; via 568.5 13 -243 200 ; press 569.4 15.3 -288 0.8 0 12 600 ; press 585.1 15.7 -288.2 0 -1 10 300 ; press 586.2 15.7 -309.5 0.8 0 10 300 ; press 611 15.7 -309.5 0 -1 10 300 ; press 612 15.7 -335 0.8 0 10 200 ; press 632 12 -335.5 0 -1 8 300
+#
+# Sector 4: past the breaking bridge the paper ball goes round the loop (up its trough of an east side, west along
+# its south side, north along its west side) to its corner at x 758, z -326, and from there climbs the rails along
+# z -325.3 east (y 7 to 25) at a steady push along them, and on over the hanging plates (P_Modul_29_02, which
+# a slow ball sinks into) to the helix, round it up (centre 873 -321.3, radius 5.2) and off its top east.
+at 765 2.2 -335 r 5 sector 4 kind paper : goto 770.5 0.2 -338 ; press 770.5 4 -362 0 0 9 400 ; goto 770 4.8 -367.5 ; press 755 5 -367.5 0 0 8 300 ; goto 754 5 -364 ; press 754 7.2 -328 0 0 8 300 ; pass 758 7.2 -326 5
+at 758 7.2 -326 r 4 sector 4 kind paper : press 805 25.2 -325.3 0 0 30 400 ; press 864 25.2 -325.3 0 0 14 400 ; along 9 40 ; round 873 -321.3 5.2 8 600 46 ; press 887 47.2 -326 0 0 6 200 ; pass 890.5 49 -338 4 ; pass 890 47.2 -352 5
+# The maze: the paper ball comes down the maze's long west corridor, east along z -453 and up the seesaw
+# P_Modul_30_02 into the wood transformer. As wood it rolls fast into the targets at the ends of two dead ends
+# (south down x 802.3 into P_Modul_37_02's, north up x 823 into P_Modul_37_01's; a slow ball or one in the
+# corridor's middle misses the disc), so that both bridges fall into the gaps of the row along z -455, and rolls
+# along that row from its west end east over both, ramming the boxes off, to the last checkpoint.
+at 788 9.1 -455 r 3 sector 4 kind paper : goto 790.5 10.5 -458 ; press 790.5 9.2 -480 0 0 6 400
+at 790.5 9.2 -480 r 3 sector 4 kind wood : pass 791 9.1 -481 5 ; pass 793 -1.4 -483 5 ; pass 816 -1.4 -485 5 ; pass 817.4 -1.4 -470 5 ; pass 817.4 -1.4 -445 5 ; pass 819.4 -1.4 -435.9 5 ; pass 838 -1.4 -434 5 ; pass 842.5 0.4 -431 5
+at 842.5 0.4 -431 r 4 sector 4 kind wood : pass 842.5 0.4 -431 5 ; pass 842.5 4 -420.5 5 ; pass 820 9.1 -420.3 5 ; pass 806 9.1 -420 5 ; goto 802.3 11.1 -424 ; hold 802.3 11.1 -424 30 ; press 802.3 11.1 -445 0 0 12 150 ; push 0 -1 70 ; wait 8 ; pass 803 11.1 -428 5 ; pass 806 9.1 -420 5 ; pass 830 6.5 -420.3 5 ; pass 842.5 4 -420.5 5 ; pass 842.5 0.4 -431 5 ; pass 838 -1.4 -434 5 ; pass 819.4 -1.4 -435.9 5 ; pass 817.4 -1.4 -455 5 ; pass 817.4 -1.4 -478.8 5 ; pass 815.4 -1.4 -483.8 5 ; pass 800 -1.4 -485 5 ; pass 767 -1.4 -486 5 ; pass 743 -1.4 -484.8 5 ; pass 742 -1.4 -481 5 ; pass 742.5 -1.4 -474.5 5 ; goto 746 -1.4 -472.8 ; press 768.5 8.8 -472.8 0 0 6 300 ; pass 771.4 9.1 -478 5
+at 771.5 9.1 -482 r 3 sector 4 kind wood : pass 771 9.1 -489 5 ; pass 771.5 9.1 -495.5 5 ; pass 781 9.1 -495.5 5 ; pass 819 9.1 -495.5 5 ; goto 823.6 9.1 -494 ; hold 823.6 9.1 -494 30 ; press 823.6 9.1 -465 0 0 12 150 ; push 0 1 70 ; wait 8 ; pass 823 9.1 -490 5 ; pass 819 9.1 -495.5 5 ; pass 781 9.1 -495.5 5 ; pass 771.5 9.1 -495.5 5 ; pass 771 9.1 -489 5 ; pass 771 9.1 -470 5
+# The boxes P_Box_04/05 stacked on that row: rammed east from a run-up, again and again, to the corner where the
+# row turns south, and off its far side (rams a little north of the middle, braking after each).
+at 830 9.1 -455 r 4 sector 4 kind wood : goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 8 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 8 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 8 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 8 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 8 ; goto 826 9.1 -455.5 ; press 860 9.1 -455.5 0 0 12 90 ; wait 8 ; goto 845 9.1 -454 ; press 862 9.1 -454 0 0 10 80 ; push -1 0 15 ; wait 8 ; goto 845 9.1 -454 ; press 862 9.1 -454 0 0 10 80 ; push -1 0 15 ; wait 8 ; goto 845 9.1 -454 ; press 862 9.1 -454 0 0 10 80 ; push -1 0 15 ; wait 8 ; goto 845 9.1 -454 ; press 862 9.1 -454 0 0 10 80 ; push -1 0 15 ; wait 8 ; pass 850 9.1 -455.5 5
+#
+# Sector 5: the swing P_Modul_08_01 hangs in the gap between the square with the transformers and the square north
+# of it; its seat, a trough, swings along z between -566.74 and -576.76 every two seconds. The ball waits on the
+# edge and crosses at the moment, and with the push, found on copies of the run from there (cross). First as wood: north, east over the plank, down the hanging plates (a stone ball
+# would break them) to the T, west into the target of P_Modul_37_03 (its bridge falls across the gap south of the
+# north square), back and over the swing south. Then as stone north, over the bridge, ramming the boxes off the
+# zigzag and off the fan at its end, back and south. Then as paper north to the fan.
+at 865 -0.9 -562 r 4 sector 5 kind wood : goto 865 -0.9 -560 ; hold 865 -0.9 -560 40 ; cross 0 -1 865 -0.9 -590 5 ; pass 868 -2.9 -587 5 ; pass 879 -2.3 -587 6 ; pass 890 -2.2 -587 5 ; pass 892.5 -3 -598 5 ; pass 892.3 -2.2 -608.5 5 ; pass 900 -2.2 -609.5 3 ; push -1 0 120 ; wait 8 ; pass 892.3 -2.2 -608.5 5 ; pass 892.5 -3 -598 5 ; pass 890 -2.2 -587 5 ; pass 874.6 -2.3 -587 5 ; pass 865 -2.9 -588 5 ; goto 865 -0.5 -583 ; hold 865 -0.5 -583 40 ; cross 0 1 865 -0.9 -553 5 ; pass 860 -0.9 -554 4 ; become stone
+at 860 -0.9 -560 r 6 sector 5 kind stone : goto 865 -0.9 -560 ; hold 865 -0.9 -560 40 ; cross 0 -1 865 -0.9 -590 5 ; pass 865 -0.5 -596 5 ; pass 865 -1 -612 5 ; pass 865 -1 -616.5 5 ; pass 856 -2.2 -617.5 5 ; goto 855.3 -2.2 -616.5 ; press 855.3 -2.2 -626 0 0 9 90 ; push 0 1 25 ; wait 8 ; goto 855.3 -2.2 -616.5 ; press 855.3 -2.2 -626 0 0 9 90 ; push 0 1 25 ; wait 8 ; goto 855.3 -2.2 -616.5 ; press 855.3 -2.2 -626 0 0 9 90 ; push 0 1 25 ; wait 8 ; goto 855.3 -2.2 -616.5 ; press 855.3 -2.2 -626 0 0 9 90 ; push 0 1 25 ; wait 8 ; goto 855.3 -2.2 -616.5 ; press 855.3 -2.2 -626 0 0 9 90 ; push 0 1 25 ; wait 8 ; pass 855.3 -2.2 -631.5 5 ; goto 853 -2.2 -631.7 ; press 828 -2.2 -631.7 0 0 9 120 ; push 1 0 25 ; wait 8 ; goto 853 -2.2 -631.7 ; press 828 -2.2 -631.7 0 0 9 120 ; push 1 0 25 ; wait 8 ; goto 853 -2.2 -631.7 ; press 828 -2.2 -631.7 0 0 9 120 ; push 1 0 25 ; wait 8 ; goto 853 -2.2 -631.7 ; press 828 -2.2 -631.7 0 0 9 120 ; push 1 0 25 ; wait 8 ; goto 853 -2.2 -631.7 ; press 828 -2.2 -631.7 0 0 9 120 ; push 1 0 25 ; wait 8 ; goto 853 -2.2 -631.7 ; press 828 -2.2 -631.7 0 0 9 120 ; push 1 0 25 ; wait 8 ; pass 826 -2.2 -631.7 5 ; pass 821 -1.4 -636.5 5
+at 821 -1.4 -636.5 r 3 sector 5 kind stone : wait 8 ; pass 826 -2.2 -631.7 5 ; pass 855.3 -2.2 -631.5 5 ; pass 855.3 -2.2 -617.5 5 ; pass 865 -1 -617 5 ; pass 865 -0.5 -598 5 ; goto 865 -0.5 -583 ; hold 865 -0.5 -583 40 ; cross 0 1 865 -0.9 -553 5
+at 869 -0.9 -559 r 6 sector 5 kind paper : goto 865 -0.9 -560 ; hold 865 -0.9 -560 40 ; cross 0 -1 865 -0.9 -590 5
+#
+# The last rail zigzag to the balloon (pairs one rail above the other again, as in sector 3): south along x 822,
+# east along z -733, south along x 838, east along z -755, south along x 864 to the platform before the balloon.
+at 820 -0.5 -688 r 5 sector 5 kind wood : goto 821 -0.9 -695 ; press 822.4 -0.9 -733 0.8 0 12 400 ; press 838 -0.9 -733.2 0 -1 10 300 ; press 838.8 -0.9 -755 0.8 0 10 300 ; press 864 -0.9 -755.2 0 -1 10 300 ; press 864.3 -0.9 -778 0.8 0 10 300 ; pass 864 -6 -790 5
