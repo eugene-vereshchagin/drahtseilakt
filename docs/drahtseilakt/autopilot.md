@@ -29,7 +29,11 @@ arrows for a tenth and the player's keys after it, all tried on copies of the ru
 a puzzle's pushes (blocks in a maze of lanes, a lever, a board) are made as the player made them. Where its ball is
 more than 4 units from the player's, or the player's ball is being lost there, the line is taken up again further on
 where the player's ball passes near (after a lost ball, the new one's way back past here), or left to the way's
-search.
+search. A hint for the place still comes first (it was written where the player's line was not enough). The line
+is kept to into the player's last seconds before a lost ball, but for the last one: what the player did then may be
+what the level needs (a bridge knocked down as the ball fell with it). The way followed leaves out the player's last
+four seconds before a lost ball (the ball was rolling off), so a run that did not finish is followed to where the
+player still had the ball.
 
 `--then REPLAY` (up to 8 times) joins a run begun at a sector (a replay that starts with `start N`): from that sector
 on, the way, its transformers and the player's ticks are that run's. So a level is followed from its start with the
@@ -47,7 +51,8 @@ its try in its last sector that got furthest, and from there on the test player 
 taken in its order. The plans written from a walkthrough video are kept as `hints/Level_NN.plan`.
 
 The way is searched over the floor points of the level's floors, rails and modules. Besides rolling from point to
-point, climbing a little and dropping down (30 units at most):
+point, climbing a little (a step of 1.2, or a smooth slope up to 40 degrees: a wavy log) and dropping down (30
+units at most):
 
 - **Rails** hold the ball from the sides: a way goes onto or off a rail only along it (not across a rail crossing
   under or over, not sideways off it), drops off one only where it ends, and no gap is crossed onto a rail.
@@ -57,17 +62,22 @@ point, climbing a little and dropping down (30 units at most):
 - **Leaps**: where no way over the floors reaches the next goal, the search is made again allowing gaps of up to 20
   units at a high price, so the way crosses the narrowest one (a drawbridge to knock over, a part to wait for)
   instead of heading through the air.
+- The transformers not on the way (not in the plan, or not near the way found) are kept off where a way round them
+  is not much longer: rolling over one makes the ball over.
 - A transformer of the kind the ball already is (that the way came in with) changes nothing and is gone through
   at once.
 
 Stuck within 16 of a **drawbridge** (P_Modul_25, a plank standing up on a hinge) that the way passes over, the
 test player first tries a charge at it along the way (backing off for a run-up while it stands), when on a copy of
-the run the charge keeps the ball and gets on: some bridges fall when hit, others only by a lever.
+the run the charge keeps the ball and gets on: some bridges fall when hit, others only by a lever. Straight through
+first; then rams from a run-up of 8 or 14 along the way, braking at once after the hit (so as not to follow a plank
+that falls into the gap), a wait while it settles, and across.
 
 ## Going back and trying again
 
-The simulation is deterministic and can be copied, so the test player saves its run every two seconds (the ball on
-the ground; the saves thin out as they age, reaching back several minutes) and, when its ball is lost or its way
+The simulation is deterministic and can be copied, so the test player saves its run every two seconds (the saves
+thin out as they age, reaching back several minutes) and, when its ball is lost, a transformer it rolls over by a slip makes it another kind than its way's
+(off the player's line), or its way
 has not got on for 20 seconds, goes back to a save and tries again, varied: a short opening move of its own (a wait
 or a push of random length, before anything else, a running hint too, so moving parts are met at another phase) and,
 for some seconds, random additions to its choices' scores; from the third try on every third one leaves the
@@ -144,17 +154,18 @@ with ffmpeg (the frames go through a pipe, nothing large is kept; the game itsel
 Following the owner's runs (`--autopilot --follow`), with going back and keeping to the player's line, 2026-11-03
 (the finished runs are kept in `hints/runs/`, their videos outside the repository, made with `scripts/video.sh`):
 
-- Level 1: finished from the start in 6:28.87, no ball lost (hints for the ramp, the crate, the pushers and the rails).
+- Level 1: finished from the start in 6:19.50 (hints for the ramp, the crate, the pushers and the rails).
 - Level 2: finished from the start in 5:44.53 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
-- Level 3: finished from the start (the lever in sector 4 is hit four times).
+- Level 3: finished from the start in 7:32.08 (the lever and the bridge in sector 4 as the owner did them).
 - Level 4: finished from the start in 9:16.25 (`--follow` the owner's run, `--then` the one from sector 3).
-- Level 5: finished from the start (hints for both crates and the pusher).
+- Level 5: finished from the start in 13:06.93 (hints for both crates and the pusher).
 - Level 6: with the owner's run (it ends at the convex log in sector 2) and the plan `hints/Level_06.plan`, the test
-  player goes on by itself to the convex log, where the way down off it is not found.
-- Level 7: finished from the start in 11:28.38, following the owner's finished run.
+  player goes on by itself through sectors 2 and 3 to the wavy log of sector 4, whose waves the way over the floors
+  did not climb.
+- Level 7: finished from the start in 12:07.18, following the owner's finished run.
 - Level 8: by itself with the walkthrough's plan, to the first wood transformer (route 156 of 1072).
 - Level 9: finished from the start in 12:30.10, following the owner's finished run (the maze of pushers in sector 3
   is solved as the owner solved it).
-- Level 10: finished from the start in 14:55.75, following the owner's finished run with `hints/Level_10.txt`.
-- Levels 11–13: 11 in sector 1 (the bridges and pushers before the first checkpoint); 12 in sector 1 (the drop
-  after the sandbags); 13 in sector 2, where the stone ball stands at a fan it must ride as paper.
+- Level 10: finished from the start in 14:42.52, following the owner's finished run with `hints/Level_10.txt`.
+- Levels 11–13: 11 in sector 1 (the drawbridge the owner knocked down as his ball fell with it); 12 in sector 2 (its
+  thin rails); 13 in sector 2, at the paper transformer above the fan it must ride.

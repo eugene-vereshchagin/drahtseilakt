@@ -1385,10 +1385,11 @@ fn way_on(game: &Game, o: &Options, w: &mut Watched) -> Result<(), String> {
     let Some(&from) = w.path.last() else { return Ok(()) };
     let kind = w.gates.last().map_or(game.sim.ball.kind, |g| g.2);
     let up = from + glam::Vec3::Y * crate::sim::BALL_RADIUS;
-    let (route, gates) = found_way(game, o, up, last, &w.path, kind)?;
+    let took: Vec<glam::Vec3> = w.gates.iter().map(|g| g.1).collect();
+    let (route, gates) = found_way(game, o, up, last, &w.path, &took, kind)?;
     let n = w.path.len();
-    println!("the followed run ends unfinished at {from:?} (sector {}): the way on is found, {} points", last + 1,
-        route.points.len());
+    println!("the followed run ends unfinished at {from:?} (sector {}): the way on is found, {} points, transformers \
+        {gates:?}", last + 1, route.points.len());
     w.gates.extend(gates.iter().map(|g| (g.0 + n, g.1, g.2)));
     w.sectors.extend(std::iter::repeat_n(last, route.points.len()));
     w.path.extend(route.points);
@@ -1404,6 +1405,8 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
     let mut seen = Game::new(&watch, data)?;
     let mut path: Vec<glam::Vec3> = Vec::new();
     let mut sectors: Vec<usize> = Vec::new();
+    // the tick of each place of the way
+    let mut at_tick: Vec<u64> = Vec::new();
     let mut gates: Vec<crate::autopilot::Gate> = Vec::new();
     let mut demo = crate::autopilot::Demo::default();
     let mut lost = false;
@@ -1420,6 +1423,7 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
             push: crate::hints::world_push(run.input_at(s.tick + 1), s.camera.quarter),
             bits: run.input_at(s.tick + 1),
             quarter: s.camera.quarter,
+            doomed_in: None,
         });
         let before = seen.sim.events.len();
         seen.tick(0);
@@ -1427,10 +1431,23 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
             match e {
                 crate::sim::Event::Died => {
                     lost = true;
+                    // nor its way in them: the ball was rolling off (a try that did not finish is followed to
+                    // where it lost the ball, and the way on found from there)
+                    let doomed = seen.sim.tick.saturating_sub(DOOMED_TICKS as u64);
+                    while at_tick.last().is_some_and(|&t| t >= doomed) {
+                        at_tick.pop();
+                        path.pop();
+                        sectors.pop();
+                    }
+                    gates.retain(|g| g.0 <= path.len());
                     deaths.push(path.len());
                     // the player's last seconds before losing a ball are no line to follow
                     let n = demo.ticks.len();
-                    for t in demo.ticks.iter_mut().skip(n.saturating_sub(DOOMED_TICKS)) {
+                    let from = n.saturating_sub(DOOMED_TICKS);
+                    for (i, t) in demo.ticks.iter_mut().enumerate().skip(from) {
+                        if t.alive {
+                            t.doomed_in = u32::try_from(n - i).ok();
+                        }
                         t.alive = false;
                     }
                 }
@@ -1453,6 +1470,7 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
         if !lost && b.on_ground && path.last().is_none_or(|p| p.distance(floor) >= 1.5) {
             path.push(floor);
             sectors.push(seen.sim.sector);
+            at_tick.push(seen.sim.tick);
         }
     }
     let finished = seen.sim.finished;
@@ -1512,7 +1530,7 @@ fn failed_tries_out(
 /// prints how far it got.
 fn autopilot(game: &mut Game, data: &Data, o: &Options) -> Result<(), String> {
     let start = game.sim.ball.position;
-    let (route, gates) = found_way(game, o, start, game.sim.sector, &[], game.sim.ball.kind)?;
+    let (route, gates) = found_way(game, o, start, game.sim.sector, &[], &[], game.sim.ball.kind)?;
     println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
     if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
         for p in route.floor_points() {
@@ -1530,13 +1548,15 @@ fn autopilot(game: &mut Game, data: &Data, o: &Options) -> Result<(), String> {
 
 /// The way the test player finds by itself from `start` in `sector` (from 0) through the rest of the level's
 /// checkpoints to its end, and the transformers on it (its gates). A plan is followed from the start of the sector,
-/// but for the objects of it a player's way `passed` already came by (within 20: those and all before them).
+/// but for the objects of it a player's way `passed` already came by (within 20: those and all before them; a
+/// transformer only when the player's ball went into it, at one of `took`).
 fn found_way(
     game: &Game,
     o: &Options,
     start: glam::Vec3,
     sector: usize,
     passed: &[glam::Vec3],
+    took: &[glam::Vec3],
     kind: crate::sim::BallKind,
 ) -> Result<(crate::autopilot::Route, Vec<crate::autopilot::Gate>), String> {
     let level = &game.level.level;
@@ -1568,12 +1588,21 @@ fn found_way(
         let mut planned = read_plan(plan, level, sector)?;
         // (up to the sector's checkpoint: what comes after it is not passed yet)
         let end = stages.first().and_then(|c| planned.iter().position(|p| p.0.distance(*c) < 1.0));
+        let taken = |p: &(glam::Vec3, bool)| took.iter().any(|q| q.distance(p.0) < 8.0);
         let came = planned
             .iter()
             .take(end.unwrap_or(planned.len()))
-            .rposition(|p| passed.iter().any(|q| q.distance(p.0) < 20.0));
+            // (a transformer is passed when the player's ball went into it, not by)
+            .rposition(|p| if p.1 { taken(p) } else { passed.iter().any(|q| q.distance(p.0) < 20.0) });
         if let Some(k) = came {
-            planned.drain(..=k);
+            // but a transformer after the last one the player took, not taken, is still to go into (the player's
+            // ball went by it, or did not get to it before it was lost)
+            let last_taken = planned.iter().take(k + 1).rposition(|p| p.1 && taken(p));
+            let mut i = 0;
+            planned.retain(|p| {
+                i += 1;
+                i > k + 1 || (p.1 && !taken(p) && last_taken.is_none_or(|t| i > t + 1))
+            });
         }
         waypoints = planned.into_iter().map(|(p, trafo)| (0, p, trafo)).collect();
     }
@@ -1586,7 +1615,10 @@ fn found_way(
     let mut tries = 0;
     loop {
         let stages: Vec<glam::Vec3> = waypoints.iter().map(|w| w.1).collect();
-        let route = crate::autopilot::Route::find(level, &game.modules, &fans, start, &stages);
+        // the transformers not on the way are kept off (rolling over one makes the ball over)
+        let shun: Vec<glam::Vec3> =
+            game.sim.transformers().into_iter().filter(|t| stages.iter().all(|s| s.distance(*t) > 1.0)).collect();
+        let route = crate::autopilot::Route::find_shunning(level, &game.modules, &fans, start, &stages, &shun);
         let gates: Vec<crate::autopilot::Gate> = route
             .marks
             .iter()
@@ -1826,10 +1858,15 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
         if pilot.reached() > best {
             (best, since) = (pilot.reached(), game.sim.tick);
         }
-        let fell = game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::Died));
+        // (a transformer rolled over by a slip, making the ball another kind than the way's, counts as a fall)
+        let stray = game.sim.events.iter().skip(heard).any(|(_, e)| {
+            matches!(e, crate::sim::Event::Transform(k) if pilot.stray_transform(*k))
+        });
+        let fell = stray || game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::Died));
         // lost, or standing still too long: back to a state saved before, varied (a try of its own, reproducible)
         let still = game.sim.tick - since > give_up.min(crate::autopilot::REWIND_STILL);
-        let failed_at = if fell { Some(game.sim.tick) } else { still.then_some(since) };
+        // (standing still: from where it last got on, a state saved there too)
+        let failed_at = if fell { Some(game.sim.tick) } else { still.then_some(since + 60) };
         if let Some(at) = failed_at
             && let Some((state, attempt)) = rewinds.back(at, (game.sim.sector, pilot.reached()))
         {

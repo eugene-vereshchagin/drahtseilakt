@@ -1,12 +1,8 @@
 # Level 3 — hints for the test player (docs/drahtseilakt/autopilot.md), from the owner's finished run.
 #
-# Sector 4: the way north along x 1409 (from z -130) opens when the lever P_Modul_37 (1395.3, -494.3, -108.7) is hit;
-# the owner rolls east into it first, then goes on. A slow hit leaves its pole standing: it is hit again and again, with a
-# run-up from x 1374; four times, as the owner did over two balls (going back in the run restores the lever).
-at 1381 -492.3 -112 r 7 sector 4 : goto 1374 -492.3 -109.5 ; push 1 0 110 ; wait 40 ; goto 1374 -492.3 -109.5 ; push 1 0 110 ; wait 40 ; goto 1374 -492.3 -109.5 ; push 1 0 110 ; wait 40 ; goto 1374 -492.3 -109.5 ; push 1 0 110 ; wait 40 ; goto 1381 -492.3 -115
-# Then the bridge it lowers (P_Modul_25_04, 1372.2 -138) is crossed east at speed, as the owner does from (1353, -136);
-# rolling up to its edge slowly the test player stops there.
-at 1360.5 -492.3 -137.7 r 4 sector 4 : goto 1352.9 -492.3 -136 ; push 1 0 80
+# Sector 4: the way north along x 1409 (from z -130) opens when the lever P_Modul_37 (1395.3, -494.3, -108.7) is hit,
+# and the bridge it lowers (P_Modul_25_04, 1372.2 -138) is crossed east at speed. No hint: keeping to the owner's
+# line tick by tick hits the lever and crosses the bridge as the owner did (a hint's own hits left the pole standing).
 
 # Sector 4, the narrow way north along x 1409 from z -130 to -85 (a stone ball falls off it to the side): driven
 # straight along the owner's line, point by point, then east toward sector 5.

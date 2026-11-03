@@ -32,7 +32,12 @@ auf Kopien des Laufs probiert. Ein Ausrutscher wird sofort korrigiert, und die S
 Labyrinth aus Bahnen, ein Hebel, ein Brett) geschehen, wie der Spieler sie machte. Wo seine Kugel mehr als 4
 Einheiten von der des Spielers entfernt ist oder der Spieler dort seine Kugel verliert, wird die Linie weiter vorn
 wieder aufgenommen, wo die Kugel des Spielers nahe vorbeikommt (nach einer verlorenen Kugel: der Weg der neuen zurück
-an dieser Stelle vorbei), sonst steuert die Wegsuche.
+an dieser Stelle vorbei), sonst steuert die Wegsuche. Ein Hinweis für die Stelle kommt trotzdem zuerst (er wurde
+dort geschrieben, wo die Linie des Spielers nicht reichte). Die Linie wird auch in den letzten Sekunden des Spielers
+vor einer verlorenen Kugel gehalten, bis auf die letzte: was der Spieler dann tat, kann das sein, was das Level
+braucht (eine Brücke, die mit der fallenden Kugel umgestoßen wurde). Aus dem verfolgten Weg fallen auch die letzten vier Sekunden des Spielers vor
+einer verlorenen Kugel heraus (die Kugel rollte schon ab), ein nicht geschaffter Lauf wird also bis dorthin verfolgt,
+wo der Spieler die Kugel noch hatte.
 
 `--then REPLAY` (bis zu 8-mal) hängt einen Lauf an, der an einem Sektor beginnt (ein Replay, das mit `start N`
 anfängt): ab diesem Sektor sind der Weg, seine Transformatoren und die Takte des Spielers die dieses Laufs. So wird
@@ -53,7 +58,8 @@ Transformatoren innerhalb 30 vom gefundenen Weg in seiner Reihenfolge genommen. 
 Pläne liegen als `hints/Level_NN.plan` bereit.
 
 Der Weg wird über die Bodenpunkte der Böden, Schienen und Module des Levels gesucht. Außer von Punkt zu Punkt zu
-rollen, ein wenig zu steigen und hinabzufallen (höchstens 30 Einheiten):
+rollen, ein wenig zu steigen (eine Stufe von 1,2 oder ein glatter Hang bis 40 Grad: ein welliger Stamm) und
+hinabzufallen (höchstens 30 Einheiten):
 
 - **Schienen** halten die Kugel seitlich: auf eine Schiene und von ihr geht ein Weg nur entlang (nicht quer über eine
   kreuzende Schiene, nicht seitlich hinab), fällt nur dort von ihr, wo sie endet, und springt über keine Lücke auf eine.
@@ -63,18 +69,23 @@ rollen, ein wenig zu steigen und hinabzufallen (höchstens 30 Einheiten):
 - **Sprünge**: wo kein Weg über die Böden das nächste Ziel erreicht, wird mit Lücken bis 20 Einheiten zu hohem Preis
   erneut gesucht, sodass der Weg die schmalste überquert (eine Zugbrücke zum Umstoßen, ein Teil, auf das man wartet)
   statt durch die Luft zu führen.
+- Die Transformatoren, die nicht auf dem Weg liegen (nicht im Plan oder nicht nahe dem gefundenen Weg), umgeht der
+  Weg, wo der Umweg nicht viel länger ist: über einen zu rollen verwandelt die Kugel.
 - Ein Transformator der Art, die die Kugel schon ist (mit der der Weg ankam), ändert nichts und gilt sofort als passiert.
 
 Steckt er innerhalb 16 einer **Zugbrücke** (P_Modul_25, ein aufrecht stehendes Brett an einem Scharnier), über die
 der Weg führt, versucht der Testspieler zuerst einen Anlauf entlang des Wegs (zurück für Schwung, solange sie steht),
 wenn der Anlauf auf einer Kopie des Laufs die Kugel behält und weiterkommt: manche Brücken fallen beim Stoß, andere
-nur durch einen Hebel.
+nur durch einen Hebel. Zuerst geradewegs hindurch; dann Rammstöße aus einem Anlauf von 8 oder 14 entlang des Wegs,
+gleich nach dem Stoß gebremst (um einem Brett, das in die Lücke fällt, nicht zu folgen), ein Warten, bis es liegt,
+und hinüber.
 
 ## Zurück und noch einmal
 
 Die Simulation ist deterministisch und lässt sich kopieren, also speichert der Testspieler seinen Lauf alle zwei
-Sekunden (die Kugel am Boden; die Stände werden mit dem Alter ausgedünnt und reichen einige Minuten zurück) und geht,
-wenn die Kugel verloren ist oder sein Weg 20 Sekunden nicht weiterkommt, zu einem Stand zurück und versucht es
+Sekunden (die Stände werden mit dem Alter ausgedünnt und reichen einige Minuten zurück) und geht,
+wenn die Kugel verloren ist, ein versehentlich überrollter Transformator sie zu einer anderen Art
+gemacht hat, als der Weg braucht (abseits der Linie des Spielers), oder sein Weg 20 Sekunden nicht weiterkommt, zu einem Stand zurück und versucht es
 abgewandelt noch einmal: ein kurzer eigener erster Zug (ein Warten oder ein Stoß zufälliger Länge, vor allem anderen,
 auch einem laufenden Hinweis, sodass bewegte Teile in einer anderen Phase getroffen werden) und für einige Sekunden
 zufällige Zuschläge auf die Bewertungen seiner Wahlen; ab dem dritten Versuch verlässt jeder dritte die Linie des
@@ -155,17 +166,18 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 2026-11-03 (die geschafften Läufe liegen in `hints/runs/`, ihre Videos außerhalb des Repositorys, gemacht mit
 `scripts/video.sh`):
 
-- Level 1: vom Start an geschafft in 6:28.87, ohne verlorene Kugel (Hinweise für Rampe, Kiste, Schieber und Schienen).
+- Level 1: vom Start an geschafft in 6:19.50 (Hinweise für Rampe, Kiste, Schieber und Schienen).
 - Level 2: vom Start an geschafft in 5:44.53 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers ab Sektor 5).
-- Level 3: vom Start an geschafft (der Hebel in Sektor 4 wird viermal getroffen).
+- Level 3: vom Start an geschafft in 7:32.08 (Hebel und Brücke in Sektor 4 wie beim Inhaber).
 - Level 4: vom Start an geschafft in 9:16.25 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
-- Level 5: vom Start an geschafft (Hinweise für beide Kisten und den Schieber).
+- Level 5: vom Start an geschafft in 13:06.93 (Hinweise für beide Kisten und den Schieber).
 - Level 6: mit dem Lauf des Inhabers (er endet am gewölbten Baumstamm in Sektor 2) und dem Plan
-  `hints/Level_06.plan` kommt der Testspieler allein bis zum gewölbten Stamm, wo er den Weg hinunter nicht findet.
-- Level 7: vom Start an geschafft in 11:28.38, dem geschafften Lauf des Inhabers folgend.
+  `hints/Level_06.plan` kommt der Testspieler allein durch Sektor 2 und 3 bis zum welligen Stamm von Sektor 4,
+  dessen Wellen der Weg über die Böden nicht hinaufging.
+- Level 7: vom Start an geschafft in 12:07.18, dem geschafften Lauf des Inhabers folgend.
 - Level 8: allein mit dem Plan aus dem Video bis zum ersten Holz-Transformator (Weg 156 von 1072).
 - Level 9: vom Start an geschafft in 12:30.10, dem geschafften Lauf des Inhabers folgend (das Labyrinth der Schieber
   in Sektor 3 wird gelöst, wie der Inhaber es löste).
-- Level 10: vom Start an geschafft in 14:55.75, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
-- Level 11–13: 11 in Sektor 1 (die Brücken und Schieber vor dem ersten Kontrollpunkt); 12 in Sektor 1 (der Abstieg
-  nach den Sandsäcken); 13 in Sektor 2, wo die Steinkugel an einem Ventilator steht, den sie als Papier reiten muss.
+- Level 10: vom Start an geschafft in 14:42.52, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
+- Level 11–13: 11 in Sektor 1 (die Zugbrücke, die der Inhaber umstieß, als seine Kugel mit ihr fiel); 12 in Sektor 2
+  (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator über dem Ventilator, den sie reiten muss.
