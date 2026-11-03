@@ -134,7 +134,7 @@ Aufzeichnung), der durchkam, ohne die fehlgeschlagenen Versuche.
 
 ## Die Suche, wenn er feststeckt
 
-Vier Sekunden festgefahren, probiert der Testspieler auf Kopien des Laufs Rammstöße, Schaukeln (hin und her entlang
+Zwei Sekunden festgefahren (an einer Lücke, über die der Weg geht, oder am Rand des nächsten Transformators: eine Dreiviertelsekunde, und dann springt er sofort oder rollt hinein), probiert der Testspieler auf Kopien des Laufs Rammstöße, Schaukeln (hin und her entlang
 einer Wahl, zwei- oder viermal: aus einer Mulde zwischen Wellen, zu steil, um aus dem Stand hinaufzukommen) und
 zufällige Manöver. Festgefahren, wo weder Rammen noch Manöver, Brückensturm oder Sprung weiterkommen, sucht der Testspieler tiefer: eine
 Strahlsuche über Folgen gehaltener Pfeile (jeder eine Drittel-, Dreiviertel- oder anderthalb Sekunden lang, oder eine

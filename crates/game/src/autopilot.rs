@@ -1136,8 +1136,10 @@ const BRIDGE_CHARGES: usize = 3;
 /// Stuck this near the next transformer, the ball is taken into it.
 const GATE_STUCK: f32 = 10.0;
 /// Held up this long (ticks) right by a gap the way crosses or the next transformer, the test player takes it at
-/// once rather than after the four seconds it waits elsewhere, and this near the gap's edge counts as by it.
+/// once rather than after the two seconds it waits elsewhere, and this near the gap's edge counts as by it.
 const HELD_UP: u64 = 45;
+/// Stuck this long (ticks), rams, manoeuvres and the deeper search are tried, and again after as long.
+const STUCK_TRY: u64 = 120;
 const GAP_CLOSE: f32 = 10.0;
 
 /// Keeping to the player's line (`Pilot::track`): how far ahead the courses are compared, how far our ball may be
@@ -2413,7 +2415,7 @@ impl Pilot {
         // held up a moment right at a gap the way crosses, or at the next transformer's rim: no need to stand there
         // for the full four seconds (a steady player goes on at once): the leap, or into the transformer, now
         let held = sim.tick.saturating_sub(self.moved);
-        if held > HELD_UP && held <= 240 {
+        if held > HELD_UP && held <= STUCK_TRY {
             if self.gap_close(sim) && let Some(hint) = self.leap(sim) {
                 self.moved = sim.tick;
                 self.hints.add(hint);
@@ -2425,8 +2427,9 @@ impl Pilot {
                 return 0;
             }
         }
-        // stuck for four seconds: try rams and random manoeuvres and keep the best that gets on
-        if sim.tick.saturating_sub(self.moved) > 240 {
+        // stuck for two seconds: try rams and random manoeuvres and keep the best that gets on (a steady player does
+        // not stand about long)
+        if sim.tick.saturating_sub(self.moved) > STUCK_TRY {
             // found or not, the next try comes after four seconds more
             self.moved = sim.tick;
             // stuck at a drawbridge the way goes over: charge it along the way (backing off for a run-up while it

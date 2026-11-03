@@ -120,7 +120,7 @@ that got through, without the tries that failed.
 
 ## The search when stuck
 
-Stuck for four seconds, the test player tries rams, pumping (to and fro along a choice, two or four swings: out of a
+Stuck for two seconds (by a gap the way crosses or the next transformer's rim: three quarters of a second, and it takes the leap or rolls into the transformer at once), the test player tries rams, pumping (to and fro along a choice, two or four swings: out of a
 trough between waves too steep to climb from a standstill) and random manoeuvres on copies of the run. Stuck where
 no ram, manoeuvre, charge or leap gets on, the test player searches deeper: a beam search over
 sequences of held arrows (each held a third, three quarters or a second and a half, or no arrows for half a second),
@@ -226,7 +226,7 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
   player goes on by itself through sectors 2 and 3 and over the wavy log of sector 4 to its stone transformer; the
   boxes to push off the ledge as stone are next.
 - Level 7: finished from the start in 12:04.28, following the owner's finished run.
-- Level 8: finished from the start in 13:03.93 with no player's run at all: by itself through the walkthrough's
+- Level 8: finished from the start in 13:11.15 with no player's run at all: by itself through the walkthrough's
   plan (`hints/Level_08.plan`, with places on the way) and the hints written from its storyboard
   (`hints/Level_08.txt`: rail pairs ridden leaning on their upper rail, a helix, a swing, the targets that drop
   the maze's bridges, boxes rammed off).
