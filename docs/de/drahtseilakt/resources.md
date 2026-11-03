@@ -67,6 +67,13 @@ sie alle, und solange die eigene Oberfläche gewählt ist, werden die Oberfläch
   jedes Element und jeder Bildschirm kommt (Überlappung der Lab-Farbhistogramme, SSIM der unscharfen Helligkeit und der
   Kantenbilder); `scores.md` hält die Werte fest. Nichts vom Original ist kopiert, nachgezeichnet oder neu abgetastet,
   seine Bilder kommen nie ins Repository.
+- **Fototexturen** (Version 3 der Menüszene, 2026-11-03): ihr Beton (Böden, Block, Säulen), die Ziegelränder, die
+  hölzerne Rampe und Kiste und das Eisen (Manschetten, Sockel, Laternenstützen) entstehen aus frei lizenzierten
+  Fototexturen (CC0, ambientCG), von `make_menu_scene.py` auf die gemessene Palette und Körnung der Originaltexturen in
+  denselben Rollen abgestimmt, mit ihren Normal Maps. `assets/own/make/free_textures.py` legt jedes Quellarchiv mit
+  seinem SHA-256 fest (`fetch` lädt fehlende herunter, nichts wird entpackt oder ausgeführt); die Quellen werden nicht
+  mitgeliefert, die daraus gemachten Texturen schon. Quellen, Autoren und Lizenzen: `assets/own/CREDITS.md`;
+  Prüfsummen der mitgelieferten Dateien: `assets/own/SHA256SUMS`.
 - **Schrift**: Tektur (SIL OFL, `assets/fonts/Tektur-Variable.ttf`, Version und Prüfsumme in `assets/fonts/README.md`),
   eine eckige technische Schrift, im Charakter nahe an der breiten Menüschrift des Originals; Kleinbuchstaben als
   Kapitälchen, verbreitert und gesperrt nach den gemessenen Proportionen des Originals (Breite der Beschriftungen
@@ -84,6 +91,36 @@ Die Standard-Highscore-Listen der eigenen Oberfläche sind ebenfalls unsere (zeh
 Weiterhin aus der Kopie, bei jeder Oberfläche: die Standardtasten (DB_Options aus base.cmo; ohne sie Pfeile, Shift und
 Leertaste) und die Teile eines Levels (Kugeln, Partikel, der Schatten der Kugel, Himmel, Module), die spätere Stufen
 ersetzen.
+
+## Eigene Texturen
+
+Stufe 3 (2026-11-03): die Level, ihre Teile und die Kugeln werden standardmäßig mit unseren eigenen Texturen
+gezeichnet (decisions.md, „Eigene Texturen als Vorgabe“): `assets/own/Textures/<Name>.png` tritt an die Stelle der
+Originaltextur dieses Namens, welches Level sie auch anfordert — ein Originallevel, eine Community-Karte, ein Modul,
+die Kugeln —, verglichen ohne Groß- und Kleinschreibung, `_`, `-` und Leerzeichen (`BallWood.bmp` ist `Ball_Wood`).
+45 der 63 Texturen, mit denen die dreizehn Level zeichnen, sind unsere (die Böden und ihre Ziegelstreifen, der
+Checkpoint, die Säulen, Ziegel, alles Holz, das Metall, die Dächer, die Markierungen, die Spiegelungen, die drei
+Kugeln); Himmel, Partikel, Leuchten, Schatten und einige Bilder kommen weiter aus der Kopie. `assets/own/TEXTURES.md`
+listet jede Textur mit dem, was sie ist, ihrer Größe, wie oft sie benutzt wird und ob unsere eintritt. Sie entstehen
+durch `assets/own/make/make_textures.py` aus CC0-Fototexturen (`free_textures.py`, festgelegt und mit Prüfsummen;
+`assets/own/CREDITS.md`) und vom Skript gezeichneten Formen, nach Palette, Körnung und Anordnung, gemessen an der
+Originaltextur gleichen Namens (ihre Ziegelstreifen, Bänder, Ringe und Schattierungen als Anteile ihrer Seite), in
+doppelter Auflösung, kachelnd, wo sie kachelt, und die Kugeln so umhüllend wie sie. Der Schalter *Textures* der
+erweiterten Seite (`textures own|original`) zeichnet die der Kopie; der klassische Modus zeichnet immer unsere. Die
+eigenen Texturen eines Levels im offenen Format (Dateien in seinem Ordner) bleiben die seines Autors.
+`--textures original|own` wählt für einen Lauf; `--export` behält die der Kopie, außer mit `--textures own`, das
+unsere in das exportierte Level schreibt. Unsere Dateien werden mit dem Spiel geliefert und mit denselben
+Größengrenzen gelesen wie jede Textur; ein Name aus einem Level wählt nur unter ihnen, er wird nie zu einem Pfad.
+
+Welche Texturen unsere ersetzen, beim Laden eines Levels (so stimmen Zeichnen und Export überein): in den Leveln und
+Teilen der Kopie und in ihren Remastern (`levels/remastered/`) jede, für die wir eine haben, nach Namen; in einer
+fremden Karte (einer Community-`.nmo`) eine Textur, die sie per Datei nennt, wenn die Datei die der Kopie ist (eine
+Datei aus dem eigenen Ordner der Karte bleibt ihre), und mitgebrachte Pixel nur, wenn sie Pixel für Pixel die Textur
+der Kopie dieses Namens sind, sodass die eigenen Bilder einer Karte nie überdeckt werden; die eigenen Dateien eines
+Levels im offenen Format nie. Der Dateiname einer Textur aus einer `.nmo` ist immer nur sein letzter Teil, gesucht in
+den Texturordnern des Spiels; nur der eigene Ordner eines Levels im offenen Format wird per Pfad gelesen. Die
+Menüszene folgt der Oberfläche: unsere mit der eigenen Oberfläche, das MenuLevel der Kopie mit seinen eigenen
+Texturen mit der originalen.
 
 Eigenes kommt in Stufen: Oberfläche (Schriften, Knöpfe, Punktekasten, Lebenskugeln, Texte, Menüszene), dann Kugeln,
 Himmel, Partikel und Klänge (aus offenen Bibliotheken), Musik im Stil eines Mahjong-Spiels mit chinesischen

@@ -10,11 +10,15 @@ those first and these for what they lack. Sounds and music are not here: they ar
   places, life ball, points box and end screen's bar, each where the game's code takes it from the texture.
 - `3D Entities/MenuLevel/`: the 3D scene behind the menus and the loading screen, in the open level format
   (`level.gltf`, `level.bin`, `textures/`), standing for the original's `MenuLevel.nmo`.
+- `Textures/<name>.png` (all but the three buttons): our own textures for the levels, their parts and the balls, each
+  standing in for the original's texture of that name (`textures own`, the default); `TEXTURES.md` lists every texture
+  the levels use and which are ours, `CREDITS.md` the CC0 photo textures they are made from.
 - `Texts/menu.txt`: the interface's words in English, Russian, German, Simplified Chinese, French, Spanish and
   Italian (built into the game).
 - `make/make_interface.py`: draws the textures (`python3 -I assets/own/make/make_interface.py`, needs numpy and
-  Pillow); `make/make_menu_scene.py` builds the menu scene the same way. Their outputs are committed so the build
-  needs no Python. Change a script, run it, commit both.
+  Pillow); `make/make_menu_scene.py` builds the menu scene and `make/make_textures.py` the levels' textures the same way. Their outputs are committed so the build
+  needs no Python. Change a script, run it, commit both. The menu scene's concrete, brick, wood and iron come from
+  CC0 photo textures (`make/free_textures.py`: pinned, checksummed; `CREDITS.md`; `SHA256SUMS` for the shipped files).
 - `make/metric.py`: scores how close each element and screen comes to the original's (measured from the player's
   copy, never stored); `make/scores.md` is its latest report (how to make the comparison screenshots: its docstring
   and docs/drahtseilakt/menu.md, `DRAHTSEILAKT_SHOT_MENU`).

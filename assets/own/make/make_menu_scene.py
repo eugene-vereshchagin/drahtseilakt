@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Builds the own interface's 3D scene behind the menus (the role of the original's MenuLevel.nmo,
 docs/drahtseilakt/resources.md) in the game's open level format: `assets/own/3D Entities/MenuLevel/` with level.gltf,
-level.bin and its textures. Everything is made here from nothing: the geometry from a few measured proportions, the
-textures from noise and shading, the sky from a function of the direction.
+level.bin and its textures. The geometry is made here from a few measured proportions, the sky from a function of the
+direction; the concrete, brick, wood and iron are freely licensed (CC0) photo textures (free_textures.py: pinned,
+checksummed, credited in ../CREDITS.md) graded here to the measured palette and grain, the rest drawn from noise.
 
 What it shows is the same kind of place as the original's menu: an island of Ballance's track pieces hanging in a dusk
 sky, seen by a camera going round it. A central block with a dark bowl, four arms of track with raised borders, a
@@ -15,8 +16,9 @@ The camera's way is given as nodes the game reads (menuscene.rs): `I_MenuLevel_C
 curve), `Cam_MenuLevel_Target` (what it looks at); the flames burn at `FourFlames_Flame_A..D`; the sky is the
 `Sky_*` objects, drawn round the camera.
 
-Run from anywhere: python3 -I assets/own/make/make_menu_scene.py
-Needs Python 3 with numpy and Pillow. The output is deterministic (fixed noise seeds).
+Run from anywhere: python3 -I assets/own/make/make_menu_scene.py (--geometry: the meshes only, the textures kept)
+Needs Python 3 with numpy, scipy and Pillow, and the photo textures' archives (python3 -I free_textures.py fetch). The
+output is deterministic (fixed noise seeds, pinned sources).
 """
 
 import json
@@ -29,6 +31,9 @@ import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # free_textures.py beside this script (python3 -I leaves the script's folder out)
+import free_textures as ft  # noqa: E402
+
 OUT = os.path.join(os.path.dirname(HERE), "3D Entities", "MenuLevel")
 TEX = 512
 
@@ -90,41 +95,38 @@ def stone(base, seed, slabs=2, mottle=0.16, grain=0.07, seams=0.35):
     return img
 
 
-def strata(base, seed):
-    n = value_noise(TEX, TEX, (2, 16), seed)
-    rows = value_noise(TEX, 1, (24, 1), seed + 3, octaves=3)[:, :1]
-    img = base[None, None, :] * (0.84 + 0.22 * n)[..., None] * (0.9 + 0.2 * rows)[..., None]
-    y = np.arange(TEX)[:, None]
-    img = img * (1 - 0.25 * np.exp(-np.minimum(y % 128, 127 - y % 128) / 1.2))[..., None]
-    return img
+# The photo textures: each graded to the colour the piece has on the original's menu as rendered (the means the
+# procedural ones were set to) and to the grain of the original's texture of the same role, measured as the lightness's
+# standard deviation against its mean (Floor_Top_Border's middle 0.03, Floor_Side 0.15, Column_beige 0.085, the border
+# strip 0.18, Wood_Old 0.155, Metal_stained 0.10). The floor is a little livelier than the original's nearly plain one,
+# so the concrete reads as concrete at our resolution.
+PHOTO = {
+    # name: (source, mean RGB, relative std, hue kept, blotches flattened, quarter turns, normal strength)
+    "floor_top.png": ("Concrete047A", (160, 142, 112), 0.055, 0.25, 0.7, 0, 0.6),
+    "floor_side.png": ("Concrete012", (170, 146, 116), 0.12, 0.3, 0.3, 0, 0.8),
+    "column.png": ("Concrete012", (176, 152, 112), 0.085, 0.3, 0.5, 0, 0.6),
+    "floor_border.png": ("Bricks005", (132, 86, 62), 0.18, 0.5, 0.3, 1, 1.0),
+    "wood.png": ("WoodFloor040", (124, 82, 50), 0.16, 0.4, 0.3, 0, 0.8),
+    "oak.png": ("WoodFloor040", (170, 120, 70), 0.155, 0.4, 0.3, 0, 0.8),
+    "iron.png": ("Metal063", (118, 114, 122), 0.10, 0.6, 0.2, 0, 0.7),
+}
 
 
-def planks(base, seed, boards=6):
-    y, x = np.mgrid[0:TEX, 0:TEX]
-    k = TEX // boards
-    board = np.minimum(y // k, boards - 1)
-    rng = np.random.default_rng(seed)
-    shade = rng.uniform(0.82, 1.12, boards)[board]
-    grain = value_noise(TEX, TEX, (48, 3), seed + 1, octaves=3)
-    rings = 0.5 + 0.5 * np.sin(grain * 40.0 + y * 0.15)
-    img = base[None, None, :] * (shade * (0.85 + 0.2 * rings))[..., None]
-    gap = np.minimum(y % k, k - 1 - y % k)
-    img = img * (1 - 0.6 * np.exp(-gap / 1.0))[..., None]
-    return img
+def photo(name):
+    sid, mean, rel, hue, flat, turns, _strength = PHOTO[name]
+    img = np.rot90(ft.load(sid), turns)
+    return ft.resize(ft.tile_fix(ft.grade(img, mean, rel, hue, flat)), TEX)
 
 
 def make_textures():
-    save(stone(rgb(158, 140, 110), 11, slabs=2, seams=0.25), "floor_top.png")
-    save(stone(rgb(132, 86, 62), 12, slabs=0, mottle=0.22), "floor_border.png")
-    save(strata(rgb(176, 150, 122), 13), "floor_side.png")
-    col = value_noise(TEX, TEX, (1, 24), 14, octaves=4)
-    save(rgb(176, 152, 112)[None, None, :] * (0.78 + 0.32 * col)[..., None], "column.png")
-    save(planks(rgb(124, 82, 50), 15), "wood.png")
+    for name, (sid, *_r, turns, strength) in PHOTO.items():
+        save(photo(name), name)
+        if name[:-4] + "_n.png" in NORMALS.values():
+            save(ft.normal_map(sid, TEX, strength, turns), name[:-4] + "_n.png")
     save(stone(rgb(122, 134, 148), 16, slabs=4, mottle=0.25, seams=0.5), "bluestone.png")
-    # the transformers: granite, oak and paper-white plaster
+    # the transformers: granite and paper-white plaster (the oak is a photo texture)
     g = value_noise(TEX, TEX, (96, 96), 17, octaves=2)
     save(rgb(150, 150, 140)[None, None, :] * (0.65 + 0.6 * g)[..., None], "granite.png")
-    save(planks(rgb(170, 120, 70), 18, boards=4), "oak.png")
     save(stone(rgb(226, 220, 204), 19, slabs=0, mottle=0.1), "plaster.png")
     # the roof's slates
     y, x = np.mgrid[0:TEX, 0:TEX]
@@ -138,11 +140,12 @@ def make_textures():
     glow = 1 - 0.35 * np.hypot((x - TEX / 2) / TEX, (y - TEX / 2) / TEX)
     save(rgb(255, 214, 90)[None, None, :] * glow[..., None], "lantern.png")
     bars = ((x % 48 < 10) | (y % 48 < 10)).astype(np.float64)
-    save(rgb(70, 66, 60)[None, None, :] * (0.4 + 0.6 * bars)[..., None], "grate.png")
-    # the start's top: rings of stone round its middle
+    brushed = ft.resize(ft.grade(ft.load("Metal009"), (70, 66, 60), 0.12, 0.2), TEX)
+    save(brushed * (0.4 + 0.6 * bars)[..., None], "grate.png")
+    # the start's top: rings of the floor's concrete round its middle
     r = np.hypot(x - TEX / 2, y - TEX / 2) / (TEX / 2)
     ring = 0.88 + 0.12 * np.cos(r * 28)
-    pad = stone(rgb(172, 150, 116), 21, slabs=0) * ring[..., None]
+    pad = ft.resize(ft.grade(ft.load("Concrete047A"), (172, 150, 116), 0.06, 0.25, 0.7), TEX) * ring[..., None]
     pad = np.where((r > 0.8)[..., None], pad * np.array([0.9, 0.72, 0.6]), pad)
     save(pad, "pad_top.png")
     # the stone ball: grey green, mottled
@@ -265,10 +268,17 @@ def box(m, mat, lo, hi, scale=8.0, mats=None):
            [u(z0, y0), u(z1, y0), u(z1, y1), u(z0, y1)], np.array([1, 0, 0]))
 
 
-def cylinder(m, mat, base, r, h, seg=16, caps=True, cap_mat=None, vscale=8.0, r_top=None):
-    """An upright cylinder (or a cone, with r_top) standing on `base`."""
+def cylinder(m, mat, base, r, h, seg=16, caps=True, cap_mat=None, vscale=8.0, r_top=None, around=2):
+    """An upright cylinder (or a cone, with r_top) standing on `base`; its texture `around` times round it (None: as
+    often as keeps the texels square against `vscale`)."""
     bx, by, bz = base
     rt = r if r_top is None else r_top
+    if around is None:
+        around = max(1, round(2 * math.pi * r / vscale))
+    if mat == MAT["column"] and not caps:
+        # the columns' iron collars, as the original's columns have: one a little below the top, more further down
+        for y in np.arange(by + h - 9.0, by + 20.0, -70.0):
+            cylinder(m, MAT["iron"], (bx, float(y), bz), r * 1.22, 1.4, seg, vscale=4.0, around=None)
     ring = []
     for k in range(seg + 1):
         a = 2 * math.pi * k / seg
@@ -276,8 +286,8 @@ def cylinder(m, mat, base, r, h, seg=16, caps=True, cap_mat=None, vscale=8.0, r_
         slope = (r - rt) / h
         n = np.array([ca, slope, sa])
         n /= np.linalg.norm(n)
-        lo = m.vertex((bx + r * ca, by, bz + r * sa), n, (k / seg * 2, by / vscale))
-        hi = m.vertex((bx + rt * ca, by + h, bz + rt * sa), n, (k / seg * 2, (by + h) / vscale))
+        lo = m.vertex((bx + r * ca, by, bz + r * sa), n, (k / seg * around, by / vscale))
+        hi = m.vertex((bx + rt * ca, by + h, bz + rt * sa), n, (k / seg * around, (by + h) / vscale))
         ring.append((lo, hi))
     for k in range(seg):
         (a0, a1), (b0, b1) = ring[k], ring[k + 1]
@@ -354,8 +364,10 @@ def sweep(m, path, profile, mats, closed_profile=True, uscale=6.0, vscale=10.0):
             uvs = [(run[e] / uscale, along[i] / vscale), (run[e] / uscale, along[i + 1] / vscale),
                    (run[e + 1] / uscale, along[i + 1] / vscale), (run[e + 1] / uscale, along[i] / vscale)]
             if mat in ("top", "border_top"):
-                # the floor's top is mapped flat from above, so its slabs keep their size
-                uvs = [(qq[0] / 16.0, qq[2] / 16.0) for qq in q]
+                # the floor's top is mapped flat from above, a texture to a track's width as the original's floors
+                uvs = [(qq[0] / FLOOR_TILE, qq[2] / FLOOR_TILE) for qq in q]
+            elif mat in TILE:
+                uvs = [(uu * uscale / TILE[mat], vv * vscale / TILE[mat]) for uu, vv in uvs]
             m.quad(MAT[mat], q, uvs, nm)
     # the ends closed with the section's outline as a fan
     for i, sgn in ((0, -1), (len(fr) - 1, 1)):
@@ -376,6 +388,15 @@ def line_path(a, b, steps=4):
     return [tuple(a + (b - a) * k / steps) for k in range(steps + 1)]
 
 
+# How many units a texture covers (its grain then as large against the track as the original's): the floor's a
+# track's width, as the original's floor textures span one floor piece; the border's bricks a little over half a unit
+# high; the sides' and columns' concrete like the floor's.
+FLOOR_TILE = 10.0
+COLUMN_TILE = 10.0
+TILE = {"side": 10.0, "border": 10.0}
+# The ramp's boards: about four across its 4.4 (the source has thirteen across its width).
+WOOD_TILE = 4.4 * 13 / 4
+
 # A track's cross-section (across, up), measured against the ball: 10 wide, borders 1.2 high and 1.2 wide, 3 deep.
 TRACK = [(-5.0, -3.0), (-5.0, 1.2), (-3.8, 1.2), (-3.8, 0.0), (3.8, 0.0), (3.8, 1.2), (5.0, 1.2), (5.0, -3.0)]
 TRACK_MATS = ["side", "border_top", "border", "top", "border", "border_top", "side", "side"]
@@ -388,12 +409,15 @@ def tube(m, mat, path, r, seg=8):
     """A round tube along a path (rails, posts)."""
     fr = frames(path)
     rings = []
-    for p, f, s, u in fr:
+    along = 0.0
+    for i, (p, f, s, u) in enumerate(fr):
+        if i:
+            along += float(np.linalg.norm(p - fr[i - 1][0]))
         ring = []
         for k in range(seg + 1):
             a = 2 * math.pi * k / seg
             n = s * math.cos(a) + u * math.sin(a)
-            ring.append(m.vertex(p + n * r, n, (k / seg, 0)))
+            ring.append(m.vertex(p + n * r, n, (k / seg, along / 4.0)))
         rings.append(ring)
     for i in range(len(rings) - 1):
         for k in range(seg):
@@ -438,7 +462,12 @@ MATERIALS = [
     ("ball", "ball_stone.png", 1.0, 0.31, 0.29, 11, {}),
     ("steel", "steel_env.png", 0.4, 0.4, 0.82, 10, {"texgen": "chrome"}),
     ("bowl", "bowl_env.png", 0.3, 0.6, 0.9, 13, {"texgen": "reflect"}),
+    ("iron", "iron.png", 0.9, 0.3, 0.45, 20, {}),
 ]
+# The photo textures' relief (normal maps, glTF's normalTexture), by material.
+NORMALS = {"top": "floor_top_n.png", "border": "floor_border_n.png", "border_top": "floor_border_n.png",
+           "side": "floor_side_n.png", "column": "column_n.png", "wood": "wood_n.png", "oak": "wood_n.png",
+           "iron": "iron_n.png"}
 MAT = {name: i for i, (name, *_rest) in enumerate(MATERIALS)}
 SKY_MATS = {face: len(MATERIALS) + i for i, face in enumerate(FACES)}
 
@@ -462,7 +491,7 @@ def build():
     tube(hub, MAT["steel"], arc_path(0, 0, 6.8, 0, 360, 8.3, 8.3, 48), 0.45)
     for x in (-7.5, 7.5):
         for z in (-7.5, 7.5):
-            cylinder(hub, MAT["column"], (x, -260, z), 1.5, 238, caps=False, vscale=24.0)
+            cylinder(hub, MAT["column"], (x, -260, z), 1.5, 238, caps=False, vscale=COLUMN_TILE, around=None)
     add("Menu_Hub", hub)
 
     # The pieces stand where the original's do round the camera's target (measured: the heights of its floors'
@@ -484,7 +513,7 @@ def build():
           NARROW_MATS)
     box(low, MAT["top"], (-136, -9, -96), (-100, -4.9, -78), mats=(MAT["top"], MAT["side"], MAT["side"]))
     for x, z in ((20, -22.5), (-30, -22.5), (30, 18.5), (-30, 18.5), (-118, -87), (-80, -40)):
-        cylinder(low, MAT["column"], (x, -260, z), 1.2, 253, caps=False, vscale=24.0)
+        cylinder(low, MAT["column"], (x, -260, z), 1.2, 253, caps=False, vscale=COLUMN_TILE, around=None)
     add("Menu_Lower", low)
 
     # the platform at the east arm's end
@@ -492,15 +521,16 @@ def build():
     sweep(ends, line_path((36, 13, 0), (59, 13, 0)), TRACK, TRACK_MATS)
     sweep(ends, line_path((45, 13.02, -13), (45, 13.02, 13)), TRACK, TRACK_MATS)
     for x in (42, 54):
-        cylinder(ends, MAT["column"], (x, -240, 0), 1.2, 246, caps=False, vscale=24.0)
-    cylinder(ends, MAT["column"], (-70, -240, 0), 1.0, 252, caps=False, vscale=24.0)
+        cylinder(ends, MAT["column"], (x, -240, 0), 1.2, 246, caps=False, vscale=COLUMN_TILE, around=None)
+    cylinder(ends, MAT["column"], (-70, -240, 0), 1.0, 252, caps=False, vscale=COLUMN_TILE, around=None)
     add("Menu_Ends", ends)
 
     # three transformers: a cube of each ball's stuff on a steel-edged plinth, where the original's stand
     trafos = Mesh("Trafos")
     for (x, z), mat in (((45, -10), "granite"), ((55, 0), "oak"), ((45, 10), "plaster")):
-        box(trafos, MAT["steel"], (x - 2.8, 13.1, z - 2.8), (x + 2.8, 13.8, z + 2.8))
-        box(trafos, MAT[mat], (x - 2.4, 13.8, z - 2.4), (x + 2.4, 18.2, z + 2.4), scale=4.8)
+        box(trafos, MAT["iron"], (x - 2.8, 13.1, z - 2.8), (x + 2.8, 13.8, z + 2.8), scale=5.6)
+        box(trafos, MAT[mat], (x - 2.4, 13.8, z - 2.4), (x + 2.4, 18.2, z + 2.4),
+            scale=4.8 * 13 / 5 if mat == "oak" else 4.8)
         tube(trafos, MAT["steel"], arc_path(x, z, 1.5, 0, 360, 18.3, 18.3, 24), 0.3)
     add("Menu_Trafos", trafos)
 
@@ -517,7 +547,7 @@ def build():
         cylinder(pad, MAT["grate"], (cx, 6.72, cz), 1.5, 0.05, seg=16)
         tube(pad, MAT["border"], arc_path(cx, cz, 1.7, 0, 360, 6.8, 6.8, 20), 0.25)
         flames.append((cx, 7.0, cz))
-    cylinder(pad, MAT["column"], (sx, -250, sz), 1.4, 252.5, caps=False, vscale=24.0)
+    cylinder(pad, MAT["column"], (sx, -250, sz), 1.4, 252.5, caps=False, vscale=COLUMN_TILE, around=None)
     add("Menu_Start", pad)
     ball = Mesh("Ball")
     sphere(ball, MAT["ball"], (sx, 8.5, sz), 2.0)
@@ -527,14 +557,14 @@ def build():
     towers = Mesh("Towers")
     for x in (-14.4, 14.4):
         z = 53.2
-        cylinder(towers, MAT["column"], (x, -220, z), 0.9, 230, caps=False, vscale=24.0)
+        cylinder(towers, MAT["column"], (x, -220, z), 0.9, 230, caps=False, vscale=COLUMN_TILE, around=None)
         box(towers, MAT["bluestone"], (x - 1.9, 10, z - 1.9), (x + 1.9, 13.6, z + 1.9), scale=3.8)
         box(towers, MAT["border"], (x - 2.2, 13.6, z - 2.2), (x + 2.2, 14.1, z + 2.2))
         for dx in (-1.5, 1.5):
             for dz in (-1.5, 1.5):
-                tube(towers, MAT["steel"], [(x + dx, 14.1, z + dz), (x + dx, 19.4, z + dz)], 0.26, seg=6)
+                tube(towers, MAT["iron"], [(x + dx, 14.1, z + dz), (x + dx, 19.4, z + dz)], 0.26, seg=6)
         box(towers, MAT["lantern"], (x - 0.45, 15.6, z - 0.45), (x + 0.45, 17.6, z + 0.45), scale=1.0)
-        box(towers, MAT["steel"], (x - 0.5, 17.6, z - 0.5), (x + 0.5, 18.0, z + 0.5))
+        box(towers, MAT["iron"], (x - 0.5, 17.6, z - 0.5), (x + 0.5, 18.0, z + 0.5), scale=4.0)
         box(towers, MAT["plaster"], (x - 2.9, 19.4, z - 2.9), (x + 2.9, 19.8, z + 2.9), scale=5.8)
         cylinder(towers, MAT["slate"], (x, 19.8, z), 4.0, 3.2, seg=4, r_top=0.0, vscale=3.2)
         tube(towers, MAT["steel"], [(x, 22.6, z), (x, 26.4, z)], 0.14, seg=6)
@@ -555,9 +585,9 @@ def build():
     ramp = Mesh("Ramp")
     path = [(2.0 * math.sin(k / 3.0), -4 - 0.92 * k, 29 + 2.3 * k) for k in range(26)]
     plank = [(-2.2, -0.4), (-2.2, 0.0), (2.2, 0.0), (2.2, -0.4)]
-    sweep(ramp, path, plank, ["wood"] * 4, uscale=4.4, vscale=4.4)
+    sweep(ramp, path, plank, ["wood"] * 4, uscale=WOOD_TILE, vscale=WOOD_TILE)
     sweep(ramp, [(-75 + 2.5 * k, 15.4 + 1.2 * math.sin(k / 2.0), 0) for k in range(10)], plank, ["wood"] * 4,
-          uscale=4.4, vscale=4.4)
+          uscale=WOOD_TILE, vscale=WOOD_TILE)
     add("Menu_Ramp", ramp)
 
     # the far floors north, at -28, and a stack of them further on
@@ -570,7 +600,7 @@ def build():
         box(far, MAT["top"], (-53 - k, y - 3, 275 - k), (-16 + k, y + 0.1, 313 + k),
             mats=(MAT["top"], MAT["side"], MAT["side"]))
     for x, z in ((-45, 180), (-45, 260), (0, 180), (-100, 110), (0, 110), (-35, 294)):
-        cylinder(far, MAT["column"], (x, -340, z), 1.6, 310, caps=False, vscale=24.0)
+        cylinder(far, MAT["column"], (x, -340, z), 1.6, 310, caps=False, vscale=COLUMN_TILE, around=None)
     add("Menu_Far", far)
 
     # the sky: five faces round the camera
@@ -628,7 +658,7 @@ def write(meshes, objects, marks):
             prims.append({"attributes": attrs, "indices": ia, "material": mat})
         gl_meshes.append({"name": m.name, "primitives": prims})
 
-    images = [n for (_, n, *_r) in MATERIALS] + [f"sky_{f.lower()}.png" for f in FACES]
+    images = [n for (_, n, *_r) in MATERIALS] + list(NORMALS.values()) + [f"sky_{f.lower()}.png" for f in FACES]
     image_ids = {n: i for i, n in enumerate(dict.fromkeys(images))}
     materials = []
     for name, tex, diffuse, emissive, spec, power, extra in MATERIALS:
@@ -643,6 +673,8 @@ def write(meshes, objects, marks):
             "alphaMode": "OPAQUE",
             "extras": {"drahtseilakt": x},
         })
+        if name in NORMALS:
+            materials[-1]["normalTexture"] = {"index": image_ids[NORMALS[name]]}
     for face in FACES:
         materials.append({
             "name": f"Sky_{face}",

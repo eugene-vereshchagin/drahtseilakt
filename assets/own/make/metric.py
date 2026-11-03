@@ -222,8 +222,10 @@ def report(before, after, orig=None):
             return {}
     lines = ["# How close the own interface comes to the original", "",
              "Made by `metric.py` (its docstring says how a score is made: 40 % Lab colour histogram overlap, 30 %",
-             "SSIM of the heavily blurred lightness, 30 % SSIM of the edge maps; 0 to 100). *Before* is the first own",
-             "interface (purple pill buttons, a flat picture behind the menus), *now* this one. Screens are 1280x720",
+             "SSIM of the heavily blurred lightness, 30 % SSIM of the edge maps; 0 to 100). *Before* is the previous",
+             "version (v2: the menu scene's textures drawn from noise; v1, the first own interface, scored 51.7 for the",
+             "elements and 34 to 63 for the menu screens' regions), *now* this one (v3: its concrete, brick, wood and",
+             "iron from CC0 photo textures, graded to the measured palette and grain). Screens are 1280x720",
              "renders of the same moment (`DRAHTSEILAKT_SHOT_MENU`, the menu scene `DRAHTSEILAKT_SHOT_MENU_MS` into",
              "its round), English, the original's from the player's copy. The original's pictures never enter the",
              "repository; only these numbers do.", "", "## Elements of the interface textures", "",

@@ -309,3 +309,16 @@ ein Ordner“.
 Oberfläche der Kopie, wenn die Kopie des Spielers ihr Menü hat, sonst unsere. Vom Original wird dadurch nichts
 ausgeliefert: Sie kommt aus der eigenen Kopie des Spielers, wie die Level. Die Oberfläche bestimmt das Klangthema
 nicht mehr.
+
+## Eigene Texturen als Vorgabe
+
+2026-11-03, Entscheidung des Eigentümers: unsere eigenen Texturen für die Level, ihre Teile und die Kugeln (von einem
+Skript im Repository aus CC0-Fototexturen gemacht, auf die gemessene Palette, Körnung und Anordnung des Originals
+abgestimmt; nichts vom Original) sind das, womit jedes Level standardmäßig gezeichnet wird, im klassischen Modus
+immer; der Schalter „Texturen“ der erweiterten Seite (`textures original`) zeichnet die der Kopie. Der Eigentümer hat
+entschieden, sie ohne vorherige Durchsicht jeder einzelnen anzuwenden: eine, die nicht gefällt, wird später ersetzt.
+Unsere treten über den Namen der Originaltextur ein, welches Level auch immer sie anfordert (ein Originallevel, eine
+Community-Karte, ein Teil); wofür wir keine Textur haben (Himmel, Partikel, Leuchten, Schatten, einige Bilder), kommt
+weiter aus der Kopie. Die eigenen Texturen eines Levels im offenen Format bleiben die seines Autors. Ein Export mit
+`--textures own` schreibt unsere hinein, sodass es nur mit freien Ressourcen geteilt werden kann. (Nach der Prüfung präzisiert: in einer fremden Karte werden nur die Texturen der Kopie ersetzt, nie ihre eigenen
+Bilder; die Remaster der Level der Kopie werden wie die der Kopie ersetzt; die Menüszene folgt der Oberfläche.)

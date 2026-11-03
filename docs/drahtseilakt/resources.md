@@ -66,6 +66,12 @@ interface files are not even read while the own interface is in use.
   ours is drawn to those numbers, and `metric.py` scores how close each element and each screen comes (Lab colour
   histogram overlap, SSIM of the blurred lightness and of the edge maps); `scores.md` keeps the scores. Nothing of
   the original is copied, traced or resampled, and its pictures never enter the repository.
+- **Photo textures** (version 3 of the menu scene, 2026-11-03): its concrete (floors, block, columns), brick borders,
+  wooden ramp and crate and iron (collars, plinths, lantern posts) are made from freely licensed photo textures (CC0,
+  ambientCG), graded by `make_menu_scene.py` to the measured palette and grain of the original's textures in those
+  roles, with their normal maps. `assets/own/make/free_textures.py` pins each source archive by its SHA-256 (`fetch`
+  downloads the missing ones, nothing is extracted or run); the sources are not shipped, the textures made from them
+  are. Sources, authors and licences: `assets/own/CREDITS.md`; checksums of the shipped files: `assets/own/SHA256SUMS`.
 - **Font**: Tektur (SIL OFL, `assets/fonts/Tektur-Variable.ttf`, pinned and checksummed in `assets/fonts/README.md`),
   a squared technical face close in feel to the original's wide menu font, drawn with small capitals for the lower
   case, widened and spaced to the original's measured proportions (its labels' widths within 2 %). What it lacks comes from Noto Sans, Chinese from Noto Sans SC.
@@ -79,6 +85,32 @@ interface files are not even read while the own interface is in use.
 The own interface's default highscore lists are ours too (ten names, 3000 points down to 750). Still from the copy,
 whatever the interface: the default keys (base.cmo's DB_Options, the arrows, Shift and Space when it has none) and the
 parts of a level (balls, particles, the ball's shadow, skies, modules), which later stages replace.
+
+## Own textures
+
+Stage 3 (2026-11-03): the levels, their parts and the balls are drawn with our own textures by default (decisions.md,
+"Own textures by default"): `assets/own/Textures/<name>.png` stands in for the original's texture of that name,
+whichever level asks for it — an original level, a community map, a module, the balls — compared by name without case,
+`_`, `-` or spaces (`BallWood.bmp` is `Ball_Wood`). 45 of the 63 textures the thirteen levels draw with are ours (the
+floors and their brick strips, the checkpoint, the columns, bricks, every wood, the metal, the roofs, the markings, the
+reflections, the three balls); the skies, particles, glows, shadows and a few pictures still come from the copy.
+`assets/own/TEXTURES.md` lists every texture with what it is, its size, how often it is used and whether ours stands in.
+They are made by `assets/own/make/make_textures.py` from CC0 photo textures (`free_textures.py`, pinned and
+checksummed; `assets/own/CREDITS.md`) and shapes drawn by the script, to the palette, grain and layout measured on the
+original's texture of the same name (its brick strips, bands, rings and shading as fractions of its side), at twice its
+resolution, tiling where it tiles and wrapping the balls as it does. The extended page's *Textures* switch
+(`textures own|original`) draws the copy's instead; the classic mode always draws ours. An open-format level's own
+textures (files in its folder) stay its maker's. `--textures original|own` chooses for one run; `--export` keeps the
+copy's unless given `--textures own`, which writes ours into the exported level. Our files ship with the game and are
+read through the same size caps as any texture; a level's name only picks among them, never makes a path.
+
+Which textures ours replace, when a level is loaded (so drawing and export agree): in the copy's levels and parts, and
+in their remasters (`levels/remastered/`), every texture we have one of, by name; in a stranger's map (a community
+`.nmo`) a texture it names by file when that file is the copy's (a file its own folder brings stays its own), and
+pixels it carries only when they are the copy's texture of that name, pixel for pixel, so a map's own pictures are
+never covered; an open-format level's own files never. A texture's file name from a `.nmo` is only ever its last part,
+looked for in the game's texture folders; only an open-format level's own folder is read by path. The menu scene
+follows the interface: ours with the own interface, the copy's MenuLevel with its own textures with the original's.
 
 Own content comes in stages: interface (fonts, buttons, points box, life balls, texts, menu scene), then balls,
 skies, particles and sounds (from open libraries), music in the spirit of a mahjong game with Chinese motifs,

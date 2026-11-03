@@ -300,3 +300,15 @@ series becomes one folder per level. `drahtseilakt-toolbox import-maps` sorts a 
 original. Until the redone one convinces, the default — and the classic mode — plays the copy's own interface when
 the player's copy has its menu, else ours. Nothing of the original is shipped by this: it comes from the player's own
 copy, as the levels do. The interface no longer decides the sound theme.
+
+## Own textures by default
+
+2026-11-03, the owner's decision: our own textures for the levels, their parts and the balls (made by a script in the
+repository from CC0 photo textures, graded to the original's measured palette, grain and layout; nothing of the
+original) are what every level is drawn with by default, in the classic mode always; the extended page's Textures
+switch (`textures original`) draws the copy's. The owner chose to have them applied without reviewing each first:
+one that does not please is replaced later. Ours stand in by the original's texture name, whichever level asks (an
+original level, a community map, a part); what we have no texture for (skies, particles, glows, shadows, a few
+pictures) still comes from the copy. An open-format level's own textures stay its maker's. Exporting a level with
+`--textures own` writes ours into it, so it can be shared with free assets only. (Refined after review: in a stranger's map only the copy's own textures are replaced, never its own pictures; the
+remasters of the copy's levels are replaced like the copy's; the menu scene follows the interface.)

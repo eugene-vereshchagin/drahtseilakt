@@ -119,6 +119,8 @@ enum Line {
     DebugMenu,
     /// Where the interface's files come from: own, the original, its remaster (resources.rs).
     Interface,
+    /// Which textures the levels are drawn with: ours or the copy's (resources.rs).
+    Textures,
     /// The sound theme (sound_themes.rs): the arrows go round the themes found.
     SoundTheme,
     /// The Language page, and a language on it (by its place in lang::LANGUAGES).
@@ -161,6 +163,8 @@ pub enum Action {
     Volumes([f32; 2]),
     /// The interface's provider chosen (it takes effect on the next start).
     Interface(gamedata::resources::Provider),
+    /// The levels' textures chosen (the next level loads with them).
+    Textures(gamedata::resources::TextureSet),
     /// The sound theme chosen (its key).
     SoundTheme(String),
     /// The menus' language chosen (its code): the game saves it and speaks it at once.
@@ -212,6 +216,7 @@ fn valued(line: Line) -> bool {
             | Line::Invert
             | Line::Mode
             | Line::Interface
+            | Line::Textures
             | Line::SoundTheme
             | Line::Switch(_)
     )
@@ -424,7 +429,7 @@ impl Menu {
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(false))
-                .chain([Line::Interface, Line::SoundTheme, Line::DebugMenu, Line::Back])
+                .chain([Line::Interface, Line::Textures, Line::SoundTheme, Line::DebugMenu, Line::Back])
                 .collect(),
             Screen::Debug => switches(true).chain([Line::Back]).collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
@@ -542,6 +547,7 @@ impl Menu {
             (Screen::Controls, Some(Line::Invert)) => self.toggle_invert(),
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
+            (Screen::Extended, Some(Line::Textures)) => Action::Textures(next_textures()),
             (Screen::Extended, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (Screen::Extended | Screen::Debug, Some(Line::Switch(i))) => {
                 FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
@@ -609,6 +615,7 @@ impl Menu {
             Line::Map(i) => self.maps.get(i).map_or(Action::None, |p| Action::Map(p.level.clone())),
             Line::Mode => Action::ToggleDebug,
             Line::Interface => Action::Interface(next_provider(1)),
+            Line::Textures => Action::Textures(next_textures()),
             Line::SoundTheme => Action::SoundTheme(next_theme(1)),
             Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
             Line::Music | Line::Effects => Action::None,
@@ -917,6 +924,7 @@ impl Menu {
             Line::Mode => s.ours("extended mode"),
             Line::DebugMenu => s.ours("debug mode"),
             Line::Interface => s.ours("interface"),
+            Line::Textures => s.ours("textures"),
             Line::SoundTheme => s.ours("sounds"),
             Line::Switch(i) => FEATURES.get(i).map_or_else(String::new, |f| s.ours(&format!("feature {}", f.key()))),
             Line::Yes => s.get("Menu_Opt_Graphics Synch Yes", "Yes"),
@@ -1059,6 +1067,7 @@ impl Menu {
                 if self.features.mode {
                     f.extend(switches(false).map(|l| self.switch_field(l)));
                     f.push((self.label(Line::Interface), self.interface_value()));
+                    f.push((self.label(Line::Textures), self.textures_value()));
                     f.push((self.label(Line::SoundTheme), theme_value()));
                     f.push((self.label(Line::DebugMenu), ">".to_owned()));
                 }
@@ -1073,7 +1082,6 @@ impl Menu {
             }
             Screen::Credits => [
                 "Drahtseilakt by Veresk",
-                "",
                 "Ballance by Cyparade / Atari 2004",
                 "Started as a fork of OpenBallance by emdzej",
                 "Physics: IVP, ported from OpenBallance",
@@ -1083,6 +1091,7 @@ impl Menu {
                 "juskiddink, botpl (CC-BY), neolein, Tozan (CC0)",
                 "Sounds: Kenney, freesound and OpenGameArt authors",
                 "(CC0, CC-BY): assets/sounds/system/CREDITS.md",
+                "Textures: ambientCG.com (CC0), thank you",
             ]
             .iter()
             .map(|l| ((*l).to_owned(), String::new()))
@@ -1516,7 +1525,10 @@ impl Menu {
                         field(&mut out, 0.27, name, value, 0);
                     }
                     let rows = |l: &&Line| {
-                        matches!(l, Line::Switch(_) | Line::Interface | Line::SoundTheme | Line::DebugMenu)
+                        matches!(
+                            l,
+                            Line::Switch(_) | Line::Interface | Line::Textures | Line::SoundTheme | Line::DebugMenu
+                        )
                     };
                     let n = lines.iter().filter(rows).count();
                     let top = if first == 1 { 0.40 } else { 0.30 };
@@ -1765,6 +1777,15 @@ fn next_provider(by: i32) -> gamedata::resources::Provider {
     all.get((at + by).rem_euclid(n) as usize).copied().unwrap_or(Provider::Original)
 }
 
+/// The other choice of textures (there are two).
+fn next_textures() -> gamedata::resources::TextureSet {
+    use gamedata::resources::{TextureSet, textures};
+    match textures() {
+        TextureSet::Own => TextureSet::Original,
+        TextureSet::Original => TextureSet::Own,
+    }
+}
+
 /// The sound theme after the chosen one, `by` steps on (the arrows go round the themes found and "original").
 fn next_theme(by: i32) -> String {
     use gamedata::sound_themes::{SYSTEM, choices, chosen};
@@ -1780,6 +1801,14 @@ fn theme_value() -> String {
 }
 
 impl Menu {
+    /// The Textures line's value: ours or the copy's.
+    fn textures_value(&self) -> String {
+        match gamedata::resources::textures() {
+            gamedata::resources::TextureSet::Own => self.strings.ours("interface own"),
+            gamedata::resources::TextureSet::Original => self.strings.ours("interface original"),
+        }
+    }
+
     /// The Interface line's value: the provider chosen, marked when it waits for the next start.
     fn interface_value(&self) -> String {
         use gamedata::resources::{Provider, chosen, in_use};

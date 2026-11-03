@@ -89,6 +89,8 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
   - best times beside the levels;
   - levels by kind under Start;
   - Interface: own / original / remaster, where the interface's files come from ([resources.md](resources.md));
+  - Textures: own / original, what the levels, their parts and the balls are drawn with: ours (the default, and always
+    in the classic mode) or the copy's; the next level loads with the choice ([resources.md](resources.md));
   - Sounds: the sound theme — system, generated, original (made by the toolbox) or a player's own
     ([resources.md](resources.md)); the generated theme until the player chooses another, and always in the
     classic mode;
