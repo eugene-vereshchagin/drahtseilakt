@@ -111,3 +111,9 @@ watch zones | F12: show zones | F12: показать зоны | F12: Zonen zeig
 watch zones shown | F12: zones shown, hide | F12: зоны видны, скрыть | F12: Zonen sichtbar, ausblenden | F12:区域已显示,隐藏 | F12 : zones visibles, masquer | F12: zonas visibles, ocultar | F12: zone visibili, nascondi
 watch quit | Esc: menu, quit | Esc: меню, выход | Esc: Menü, beenden | Esc:菜单,退出 | Échap : menu, quitter | Esc: menú, salir | Esc: menu, esci
 watch box | F1: hide these keys | F1: скрыть подсказку | F1: diese Tasten ausblenden | F1:隐藏按键提示 | F1 : masquer ces touches | F1: ocultar estas teclas | F1: nascondi questi tasti
+mods | Mods | Моды | Mods | 模组 | Mods | Mods | Mod
+mod on | Switched on? | Включён? | Eingeschaltet? | 启用? | Activé ? | ¿Activado? | Attivato?
+mod refused | refused | отклонён | abgelehnt | 已拒绝 | refusé | rechazado | rifiutato
+mod modded | Changes the rules: its runs are marked modded, never a best run. | Меняет правила: забеги помечаются как модифицированные и не бывают лучшими. | Ändert die Regeln: Läufe gelten als gemoddet, nie als Bestzeit. | 改变规则：成绩标记为“已修改”，不计最佳。 | Change les règles : parties marquées moddées, jamais meilleures. | Cambia las reglas: partidas marcadas como modificadas, nunca mejores. | Cambia le regole: partite segnate come modificate, mai migliori.
+sector | Sector | Сектор | Sektor | 区段 | Secteur | Sector | Settore
+mod budget | Not switched on: the mods on would do too much work | Не включён: включённые моды делали бы слишком много работы | Nicht eingeschaltet: die aktiven Mods würden zu viel rechnen | 未启用：已启用模组的计算量将超出上限 | Non activé : les mods actifs feraient trop de calculs | No activado: los mods activos harían demasiado trabajo | Non attivato: le mod attive farebbero troppo lavoro

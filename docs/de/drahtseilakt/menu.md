@@ -93,8 +93,8 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
 ändert sich:
 
 - **Hauptmenü**: Start, Highscore, Options, Credits, Exit wie im Original; *Start* fragt zuerst, welche Level.
-- **Options** (die Debug-Schalter, Übungswerkzeuge und endlose Leben, liegen auf ihrem Unterbildschirm *Debug mode*):
-  die Seite *Extended* hat den Schalter des Modus und darunter je einen Schalter für jede seiner
+- **Options** (die Übungswerkzeuge und endlosen Leben liegen mit den Mods auf ihrem Bildschirm *Mods*,
+  [mods.md](mods.md)): die Seite *Extended* hat den Schalter des Modus und darunter je einen Schalter für jede seiner
   Ergänzungen (mit dem Modus alle an; die Einstellungen halten die ausgeschalteten als `extended.<key> off`):
   - alle Level offen, ohne Freischalten;
   - Bestzeiten neben den Leveln;
@@ -114,7 +114,9 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
     ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;
   - endlose Leben: die letzte Kugel geht nie verloren (ein so geretteter Lauf ist nie bester Lauf). Ein Zeitlimit zum
     Aufheben gibt es nicht: die Punkte zählen nur herunter und bleiben bei null stehen, wie im Original.
-  Weitere Schalter kommen mit den Funktionen des Fahrplans (Timer, Geist des besten Laufs).
+  - Mods: der Bildschirm der Übungswerkzeuge, der endlosen Leben und jedes gefundenen Mods (Werks-Mods und die des
+    Spielers), jeder mit Links und Rechts geschaltet, Enter öffnet seine Seite mit seinen Optionen
+    ([mods.md](mods.md)); im klassischen Modus aus.
 - **Graphics** fügt *Field of View* hinzu: die Breite der Spielkamera über 4:3, 40° bis 100° in Schritten von 2
   (`fov 58`; das Original hat 58°, die 1,0123 Radiant von InGameCam). Der klassische Modus zeichnet immer den des
   Originals.
@@ -127,8 +129,9 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   kleiner oder umbrochen, um auf seiner Schaltfläche zu bleiben. Ein Level, das nicht
   geladen werden kann, sagt warum und startet nicht; seine Läufe und Bestzeiten bleiben getrennt von den
   Original-Leveln. Später: Titel, Autor und Schwierigkeit aus dem Community-Katalog.
-- Texturpakete und unsere eigenen Mods kommen ebenfalls hierher, wenn es sie gibt, jeweils hinter einem eigenen
-  Schalter und mit dem Hinweis, dass Inhalte Dritter auf eigenes Risiko gespielt werden.
+- Texturpakete und Mods sind hier: die Pakete in den Zeilen Textures und Models ([packs.md](packs.md)), die Mods auf
+  dem Bildschirm Mods ([mods.md](mods.md)), jeweils hinter einem eigenen Schalter; Inhalte Dritter werden auf eigenes
+  Risiko gespielt.
 
 ## Profile
 

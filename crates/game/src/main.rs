@@ -30,6 +30,7 @@ mod lights;
 mod locate;
 mod menu;
 mod menuscene;
+mod modrt;
 mod modules;
 mod music;
 mod options;

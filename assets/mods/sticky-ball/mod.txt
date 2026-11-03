@@ -1,0 +1,39 @@
+# Sticky ball (after BallSticky): what the ball touches holds it, and pushing into a wall climbs it.
+# A rule variant: the run is marked modded and its replay names this mod.
+name.en Sticky ball
+name.ru Липкий шар
+name.de Klebriger Ball
+name.zh 粘性球
+name.fr Balle collante
+name.es Bola pegajosa
+name.it Palla appiccicosa
+description.en Holds to what it touches; push into a wall to climb it.
+description.ru Прилипает ко всему; толкайте в стену, чтобы залезть по ней.
+description.de Haftet an allem; gegen eine Wand drücken, um sie hochzuklettern.
+description.zh 会粘住接触的表面；朝墙推即可爬墙。
+description.fr Colle à ce qu'elle touche ; poussez contre un mur pour y grimper.
+description.es Se pega a lo que toca; empuja contra una pared para trepar.
+description.it Aderisce a ciò che tocca; spingi contro un muro per arrampicarti.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option strength number 10 100 10 60
+option wood_only switch off
+label strength en Stickiness
+label strength ru Липкость
+label strength de Haftkraft
+label strength zh 粘性
+label strength fr Adhérence
+label strength es Adherencia
+label strength it Aderenza
+label wood_only en Wooden ball only?
+label wood_only ru Только деревянный?
+label wood_only de Nur Holzball?
+label wood_only zh 仅木球?
+label wood_only fr Bois seulement ?
+label wood_only es ¿Solo madera?
+label wood_only it Solo legno?
+
+on tick
+do ball.stick if(opt.wood_only and ball.kind != 0, 0, opt.strength / 100)

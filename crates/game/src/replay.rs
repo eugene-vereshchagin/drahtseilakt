@@ -7,6 +7,9 @@
 //                                 the loose objects were made of their module file's mesh; each played so)
 //   level <file name> <fnv-1a 64 of the file, hex>
 //   start <sector> <ball kind or -> <x,y,z or ->   (optional: a run begun elsewhere than the level start)
+//   mod <key> <fnv-1a 64 of its mod.txt, hex> [<option>=<value>]...   (optional, at most MAX_MODS: a mod that
+//                                 changes the run, so the run is modded and plays back only with that very mod;
+//                                 docs/drahtseilakt/mods.md. A replay without them is a classic run, as before)
 //   <tick> <input bits, hex>      (from this tick on; tick 1 is the first)
 //   end <last tick>
 
@@ -34,6 +37,45 @@ pub struct Start {
     pub at: Option<[f32; 3]>,
 }
 
+/// A mod a run was played with (a `mod` line): its key, its mod.txt's hash and its option values.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModRef {
+    pub key: String,
+    pub hash: u64,
+    pub opts: Vec<(String, String)>,
+}
+
+/// The most `mod` lines a replay has, and options per line.
+const MAX_MODS: usize = 64;
+const MAX_MOD_OPTS: usize = 16;
+
+impl ModRef {
+    /// A `mod` line read: plain words only.
+    pub fn parse(line: &str) -> Option<ModRef> {
+        let mut f = line.split_whitespace();
+        if f.next()? != "mod" {
+            return None;
+        }
+        let word = |s: &str| {
+            !s.is_empty()
+                && s.len() <= 48
+                && s.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        };
+        let key = f.next().filter(|k| word(k))?.to_owned();
+        let hash = u64::from_str_radix(f.next()?, 16).ok()?;
+        let mut opts = Vec::new();
+        for o in f {
+            let (k, v) = o.split_once('=')?;
+            if !word(k) || !word(v) || opts.len() >= MAX_MOD_OPTS {
+                return None;
+            }
+            opts.push((k.to_owned(), v.to_owned()));
+        }
+        Some(ModRef { key, hash, opts })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Replay {
     /// The format it was recorded in (1 to 5).
@@ -41,6 +83,8 @@ pub struct Replay {
     pub level_name: String,
     pub level_hash: u64,
     pub start: Option<Start>,
+    /// The mods that changed the run (none: a classic run).
+    pub mods: Vec<String>,
     /// (first tick, input) in increasing tick order.
     pub changes: Vec<(u64, u8)>,
     pub end: u64,
@@ -53,9 +97,15 @@ impl Replay {
             level_name: level_name.to_owned(),
             level_hash,
             start: None,
+            mods: Vec::new(),
             changes: Vec::new(),
             end: 0,
         }
+    }
+
+    /// The mods it names, read.
+    pub fn mod_refs(&self) -> Vec<ModRef> {
+        self.mods.iter().filter_map(|l| ModRef::parse(l)).collect()
     }
 
     /// Records the input of `tick` (ticks must come in order).
@@ -90,6 +140,9 @@ impl Replay {
             let at = st.at.map_or("-".to_owned(), |[x, y, z]| format!("{x},{y},{z}"));
             let _ = writeln!(s, "start {} {} {at}", st.sector, st.ball.as_deref().unwrap_or("-"));
         }
+        for m in &self.mods {
+            let _ = writeln!(s, "{m}");
+        }
         for (t, i) in &self.changes {
             let _ = writeln!(s, "{t} {i:02x}");
         }
@@ -120,6 +173,7 @@ impl Replay {
             level_name,
             level_hash,
             start: None,
+            mods: Vec::new(),
             changes: Vec::new(),
             end: 0,
         };
@@ -128,6 +182,14 @@ impl Replay {
             let a = f.next().unwrap_or_default();
             if a == "start" && r.start.is_none() && r.changes.is_empty() {
                 r.start = Some(parse_start(f).ok_or_else(|| format!("bad start: {line}"))?);
+                continue;
+            }
+            if a == "mod" && r.changes.is_empty() {
+                if r.mods.len() >= MAX_MODS || ModRef::parse(line).is_none() {
+                    return Err(format!("bad mod line: {line}"));
+                }
+                r.mods
+                    .push(line.split_whitespace().collect::<Vec<_>>().join(" "));
                 continue;
             }
             let b = f.next().ok_or_else(|| format!("bad line: {line}"))?;
@@ -182,6 +244,34 @@ mod tests {
             (back.input_at(2), back.input_at(4), back.input_at(9)),
             (0, 1, 0)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_modded_run_names_its_mods_and_a_classic_one_none() -> Result<(), String> {
+        let mut r = Replay::new("Level_01.NMO", 0xabc);
+        r.record(1, 0);
+        assert!(
+            !r.to_text().contains("mod "),
+            "a classic replay is as before"
+        );
+        r.mods
+            .push("mod sticky-ball 00000000000000ff strength=60".into());
+        let back = Replay::parse(&r.to_text())?;
+        assert_eq!(back, r);
+        assert_eq!(
+            back.mod_refs()[0].opts,
+            vec![("strength".to_owned(), "60".to_owned())]
+        );
+        for bad in ["mod ../x 1", "mod a zz", "mod a 1 k", "mod a 1 k=../v"] {
+            assert!(
+                Replay::parse(&format!(
+                    "drahtseilakt-replay 5\nlevel a 1\n{bad}\n1 00\nend 1"
+                ))
+                .is_err(),
+                "{bad}"
+            );
+        }
         Ok(())
     }
 

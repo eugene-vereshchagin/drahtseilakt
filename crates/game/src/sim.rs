@@ -747,6 +747,10 @@ pub struct Sim {
     prev_pose: (Vec3, Quat),
     /// Sector changes due: at a tick, a sector's objects or modules leave or enter the physics.
     sector_changes: Vec<SectorChange>,
+    /// The mods' rules on the run's events (modrt.rs): cloned, rewound and replayed with the run.
+    pub mods: crate::modrt::SimMods,
+    /// What the ball touched at the last tick (for the mods): whether, and whether something steep.
+    touching: (bool, bool),
 }
 
 /// A change of a sector's bodies due at a tick: its objects or its modules, entering or leaving the physics.
@@ -1155,6 +1159,8 @@ impl Sim {
             points_resume: 0,
             prev_pose: (ball.position, ball.rotation),
             sector_changes: Vec::new(),
+            mods: crate::modrt::SimMods::default(),
+            touching: (false, false),
         }
     }
 
@@ -1214,7 +1220,151 @@ impl Sim {
         &self.loose
     }
 
+    /// One tick, with the mods' rules around it (modrt.rs): the start's and the tick's before it, the events' after.
     pub fn step(&mut self, input: u8) {
+        if self.mods.is_empty() || self.game_over || self.finished {
+            self.step_run(input);
+            return;
+        }
+        let before = self.events.len();
+        if self.tick == 0 {
+            self.fire_mods(gamedata::mods::Event::Start, input);
+        }
+        self.touching = self.touch();
+        self.fire_mods(gamedata::mods::Event::Tick, input);
+        let out = self.mods.out;
+        self.world.set_rules(out.gravity, out.time_factor);
+        self.step_run(input);
+        let events: Vec<Event> = self.events.iter().skip(before).map(|e| e.1).collect();
+        for e in events {
+            use gamedata::mods::Event as M;
+            let m = match e {
+                Event::Checkpoint(_) => M::Sector,
+                Event::Died => M::Lost,
+                Event::NewBall => M::NewBall,
+                Event::Transform(_) => M::Transform,
+                Event::ExtraPoint | Event::ExtraLife => M::Extra,
+                Event::Finished => M::Finish,
+                _ => continue,
+            };
+            self.fire_mods(m, input);
+        }
+    }
+
+    /// The run's values a mod reads (gamedata::mods::Value; the view's are 0 here).
+    pub fn mod_value(&self, v: gamedata::mods::Value, input: u8) -> f32 {
+        use gamedata::mods::Value as V;
+        let b = &self.ball;
+        let bit = |m: u8| if input & m != 0 { 1.0 } else { 0.0 };
+        match v {
+            V::BallX => b.position.x,
+            V::BallY => b.position.y,
+            V::BallZ => b.position.z,
+            V::BallSpeed => b.velocity.length(),
+            V::BallVy => b.velocity.y,
+            V::BallKind => match b.kind {
+                BallKind::Wood => 0.0,
+                BallKind::Stone => 1.0,
+                BallKind::Paper => 2.0,
+            },
+            V::BallTouching => {
+                if self.touching.0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            V::BallWall => {
+                if self.touching.1 {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            V::RunTick => self.tick as f32,
+            V::RunTime => self.tick as f32 / 60.0,
+            V::RunSector => (self.sector + 1) as f32,
+            V::RunLives => self.lives as f32,
+            V::RunPoints => self.points as f32,
+            V::InputForward => bit(input::UP),
+            V::InputBackward => bit(input::DOWN),
+            V::InputLeft => bit(input::LEFT),
+            V::InputRight => bit(input::RIGHT),
+            V::InputRotation => bit(input::SHIFT),
+            V::InputOverview => bit(input::LIFT),
+            _ => 0.0,
+        }
+    }
+
+    fn fire_mods(&mut self, event: gamedata::mods::Event, input: u8) {
+        let mut mods = std::mem::take(&mut self.mods);
+        mods.fire(event, &|v| self.mod_value(v, input));
+        self.mods = mods;
+    }
+
+    /// The directions from what the ball touches to its centre (one per contact near enough to be one).
+    fn contact_normals(&self) -> Vec<Vec3> {
+        let p = self.ball.position;
+        self.world
+            .ball_contacts()
+            .iter()
+            .filter_map(|c| {
+                let q = Vec3::new(c.point[0] as f32, c.point[1] as f32, c.point[2] as f32);
+                let d = p - q;
+                (d.length() < BALL_RADIUS * 1.5)
+                    .then(|| d.normalize_or_zero())
+                    .filter(|n| *n != Vec3::ZERO)
+            })
+            .collect()
+    }
+
+    fn touch(&self) -> (bool, bool) {
+        let n = self.contact_normals();
+        (!n.is_empty(), n.iter().any(|n| n.y < 0.5))
+    }
+
+    /// The sticky ball (a mod's `ball.stick`): what it touches holds it, against gravity, and a push into a wall
+    /// turns up along it, so a wall can be climbed. `push` is the arrows' direction, `force` the ball's push.
+    fn sticky_force(&self, push: Vec3, force: f32) -> Vec3 {
+        let k = self.mods.out.stick;
+        if k <= 0.0 || self.dying.is_some() || self.hold.is_some() {
+            return push * force;
+        }
+        let normals = self.contact_normals();
+        if normals.is_empty() {
+            return push * force;
+        }
+        let n = normals.iter().copied().sum::<Vec3>().normalize_or_zero();
+        // the ball's weight as the physics' impulses count it (one a PSI, 66 a second of its time)
+        let weight = self.ball.kind.params().mass * self.mods.out.gravity / 66.0;
+        let hold = -n * weight * k * 1.5 + Vec3::Y * weight * k * (1.0 - n.y.max(0.0));
+        let into = -push.dot(n);
+        let mut along = push - n * push.dot(n);
+        if into > 0.0 {
+            along += (Vec3::Y - n * n.y).normalize_or_zero() * into * k;
+        }
+        along * force + hold
+    }
+
+    /// The extra points and lives left in the current sector, and how many it has: (points, all, lives, all).
+    pub fn extras_left(&self) -> (u32, u32, u32, u32) {
+        let count = |list: &[(usize, Vec3)]| {
+            let here: Vec<usize> = list
+                .iter()
+                .filter(|(i, _)| {
+                    self.object_sectors.get(*i).copied().flatten() == Some(self.sector)
+                })
+                .map(|(i, _)| *i)
+                .collect();
+            let left = here.iter().filter(|i| !self.taken.contains(i)).count();
+            (left as u32, here.len() as u32)
+        };
+        let (p, pa) = count(&self.rules.extra_points);
+        let (l, la) = count(&self.rules.extra_lives);
+        (p, pa, l, la)
+    }
+
+    fn step_run(&mut self, input: u8) {
         if self.game_over {
             return;
         }
@@ -1290,7 +1440,12 @@ impl Sim {
         }
         self.push_keys = push_keys;
         let p = self.ball.kind.params();
-        self.world.set_push(0, push * p.force);
+        let force = if self.mods.out.stick > 0.0 {
+            self.sticky_force(push, p.force)
+        } else {
+            push * p.force
+        };
+        self.world.set_push(0, force);
         self.prev_pose = (self.ball.position, self.ball.rotation);
         self.world.step(None);
         // a kind's pieces start to fade 20 s after their burst, and go when their fade is over (in the order they were
@@ -2226,6 +2381,111 @@ pub(crate) mod tests {
             start_ball: None,
             settings: level::Settings::default(),
         }
+    }
+
+    /// The run's mods of a mod.txt (all on, at their defaults).
+    fn mods_of(text: &str) -> crate::modrt::SimMods {
+        let found = vec![gamedata::mods::Mod {
+            key: "m".into(),
+            factory: true,
+            parsed: gamedata::mods::parse_mod_txt(text),
+        }];
+        crate::modrt::Mods::load(found, |_| Some("on".into()))
+            .running(true)
+            .0
+    }
+
+    #[test]
+    fn a_mods_gravity_and_time_change_the_fall_and_replay_the_same() {
+        let mut level = flat_level();
+        level.objects[2].matrix[3][1] = 30.0;
+        let fall = |mods: &crate::modrt::SimMods| {
+            let mut sim = Sim::new(&level, BallKind::Wood);
+            sim.mods = mods.clone();
+            for _ in 0..30 {
+                sim.step(0);
+            }
+            sim.ball.position.y
+        };
+        let classic = fall(&crate::modrt::SimMods::default());
+        let moon_text = "name.en Moon\non start\ndo world.gravity 4\n";
+        let moon = fall(&mods_of(moon_text));
+        assert!(
+            moon > classic + 3.0,
+            "low gravity falls slower: {moon} against {classic}"
+        );
+        assert_eq!(
+            fall(&mods_of(moon_text)),
+            moon,
+            "the same mod plays the same run"
+        );
+        let slow = fall(&mods_of("name.en Slow\non start\ndo world.time 0.5\n"));
+        assert!(
+            slow > classic + 3.0,
+            "a slower physics falls less in as many ticks: {slow} against {classic}"
+        );
+    }
+
+    #[test]
+    fn the_sticky_ball_climbs_a_wall_it_is_pushed_into() {
+        let forward = Sim::new(&flat_level(), BallKind::Wood)
+            .camera
+            .push_forward()
+            .normalize();
+        let side = Vec3::Y.cross(forward).normalize();
+        let base = forward * 8.0;
+        let corner = |a: f32, h: f32| (base + side * a + Vec3::Y * h).to_array();
+        let mut level = flat_level();
+        level.meshes.push(Mesh {
+            name: "wall".into(),
+            channels: Vec::new(),
+            look: None,
+            positions: vec![
+                corner(-30.0, -1.0),
+                corner(30.0, -1.0),
+                corner(30.0, 60.0),
+                corner(-30.0, 60.0),
+            ],
+            normals: vec![(-forward).to_array(); 4],
+            uvs: vec![[0.0; 2]; 4],
+            parts: vec![Part {
+                material: Some(0),
+                indices: vec![0, 1, 2, 0, 2, 3, 0, 2, 1, 0, 3, 2],
+            }],
+        });
+        level.objects.push(Object {
+            name: "wall".into(),
+            matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            mesh: Some(1),
+            visible: true,
+            sprite: None,
+        });
+        level.groups[0].members.push(3);
+        let climb = |mods: crate::modrt::SimMods| {
+            let mut sim = Sim::new(&level, BallKind::Wood);
+            sim.mods = mods;
+            let mut top = 0.0f32;
+            for _ in 0..600 {
+                sim.step(input::UP);
+                top = top.max(sim.ball.position.y);
+            }
+            top
+        };
+        let plain = climb(crate::modrt::SimMods::default());
+        let sticky = climb(mods_of("name.en Sticky\non tick\ndo ball.stick 1\n"));
+        assert!(
+            plain < BALL_RADIUS + 1.0,
+            "the plain ball stays down: {plain}"
+        );
+        assert!(
+            sticky > BALL_RADIUS + 5.0,
+            "the sticky ball climbs: {sticky}"
+        );
     }
 
     #[test]

@@ -20,6 +20,8 @@ use std::path::{Path, PathBuf};
 pub const LEVELS: u32 = 13;
 /// Lines of a long list (custom levels) shown at once.
 const LIST_LINES: usize = 12;
+/// Rows of the Mods screen shown at once.
+const MODS_LINES: usize = 9;
 
 /// The Controls page's rows: the copy's names for them (Language.nmo), in options::ACTIONS' order.
 const KEY_NAMES: [(&str, &str); 6] = [
@@ -69,8 +71,10 @@ pub enum Screen {
     Controls,
     Sound,
     Extended,
-    /// The extended mode's debug additions (practice tools, endless lives).
-    Debug,
+    /// The mods (docs/drahtseilakt/mods.md): the practice tools and endless lives, then each mod found, on or off.
+    Mods,
+    /// One mod's page: on or off, its options, its description.
+    ModPage,
     /// The menus' language.
     Language,
     Credits,
@@ -117,8 +121,11 @@ enum Line {
     Music,
     Effects,
     Mode,
-    /// The Debug mode screen.
-    DebugMenu,
+    /// The Mods screen; a mod on it (by its place among those found); its page's switch and options.
+    ModsMenu,
+    Mod(usize),
+    ModOn,
+    ModOpt(usize),
     /// Where the interface's files come from: own, the original, its remaster (resources.rs).
     Interface,
     /// The texture pack the levels are drawn with (packs.rs): the arrows go round the packs found.
@@ -182,6 +189,10 @@ pub enum Action {
     Graphics(Graphics),
     /// The keys changed: the game takes and saves them.
     Bindings(Bindings),
+    /// A mod switched on or off (by its place among those found).
+    ModSwitch(usize),
+    /// A mod's option stepped: the mod, the option, the step.
+    ModOption(usize, usize, i32),
 }
 
 /// What a button under the cursor is: a line of the screen (by its place in the screen's lines), or one of the
@@ -227,6 +238,9 @@ fn valued(line: Line) -> bool {
             | Line::Models
             | Line::SoundTheme
             | Line::Switch(_)
+            | Line::Mod(_)
+            | Line::ModOn
+            | Line::ModOpt(_)
     )
 }
 
@@ -266,6 +280,9 @@ pub struct Menu {
     /// The Controls page's keys, and the action whose new key is awaited.
     pub bindings: Bindings,
     waiting: Option<usize>,
+    /// The mods found, which are on and their options (the game's, shown and changed here); the mod whose page is up.
+    pub mods: crate::modrt::Mods,
+    mod_page: usize,
     /// The first line a long list shows (the custom levels): it moves only as far as keeps the chosen line in view,
     /// so the line under the cursor stays where it is.
     top: usize,
@@ -314,6 +331,8 @@ impl Menu {
             resolutions: Vec::new(),
             bindings: Bindings::load(|_| None, strings.controls, strings.invert),
             waiting: None,
+            mods: crate::modrt::Mods::default(),
+            mod_page: 0,
             top: 0,
         };
         m.push(base);
@@ -346,23 +365,25 @@ impl Menu {
     /// How many lines of `screen` scroll as a list: the custom levels without their Back, else all of its lines.
     fn list_len(&self, screen: Screen) -> usize {
         let n = self.lines(screen).len();
-        if screen == Screen::Custom { n.saturating_sub(1) } else { n }
+        if matches!(screen, Screen::Custom | Screen::Mods) { n.saturating_sub(1) } else { n }
     }
 
     /// The lines of a list of `n` shown at once: all of a short one, else LIST_LINES from the list's top, moved as
     /// little as keeps the chosen line in view.
     fn shown(&self, n: usize) -> std::ops::Range<usize> {
-        if n <= LIST_LINES + 1 {
+        // the Mods screen keeps room under its rows for the chosen line's help
+        let lines = if self.screen() == Screen::Mods { MODS_LINES } else { LIST_LINES };
+        if n <= lines + 1 {
             return 0..n;
         }
-        let mut start = self.top.min(n - LIST_LINES);
+        let mut start = self.top.min(n - lines);
         let c = self.chosen();
         if c < start {
             start = c;
-        } else if c < n && c >= start + LIST_LINES {
-            start = c + 1 - LIST_LINES;
+        } else if c < n && c >= start + lines {
+            start = c + 1 - lines;
         }
-        start..start + LIST_LINES
+        start..start + lines
     }
 
     /// A newly shown screen's list starts with its chosen line in the middle.
@@ -446,9 +467,14 @@ impl Menu {
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(false))
-                .chain([Line::Interface, Line::Textures, Line::Models, Line::SoundTheme, Line::DebugMenu, Line::Back])
+                .chain([Line::Interface, Line::Textures, Line::Models, Line::SoundTheme, Line::ModsMenu, Line::Back])
                 .collect(),
-            Screen::Debug => switches(true).chain([Line::Back]).collect(),
+            Screen::Mods => switches(true).chain((0..self.mods.found.len()).map(Line::Mod)).chain([Line::Back]).collect(),
+            Screen::ModPage => [Line::ModOn]
+                .into_iter()
+                .chain((0..self.page_options().len()).map(Line::ModOpt))
+                .chain([Line::Back])
+                .collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
             Screen::Highscore if self.after_entry => vec![Line::Next],
             // the original's lines, the full screen (a window can be one), and the extended mode's field of view
@@ -567,7 +593,10 @@ impl Menu {
             (Screen::Extended, Some(Line::Textures)) => next_pack(gamedata::packs::Kind::Textures, by),
             (Screen::Extended, Some(Line::Models)) => next_pack(gamedata::packs::Kind::Models, by),
             (Screen::Extended, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
-            (Screen::Extended | Screen::Debug, Some(Line::Switch(i))) => {
+            (_, Some(Line::Mod(i))) => Action::ModSwitch(i),
+            (Screen::ModPage, Some(Line::ModOn)) => Action::ModSwitch(self.mod_page),
+            (Screen::ModPage, Some(Line::ModOpt(o))) => Action::ModOption(self.mod_page, o, by),
+            (Screen::Extended | Screen::Mods, Some(Line::Switch(i))) => {
                 FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
             }
             _ => Action::None,
@@ -615,7 +644,13 @@ impl Menu {
             Line::Controls => open(self, Screen::Controls),
             Line::Sound => open(self, Screen::Sound),
             Line::Extended => open(self, Screen::Extended),
-            Line::DebugMenu => open(self, Screen::Debug),
+            Line::ModsMenu => open(self, Screen::Mods),
+            Line::Mod(i) => {
+                self.mod_page = i;
+                open(self, Screen::ModPage)
+            }
+            Line::ModOn => Action::ModSwitch(self.mod_page),
+            Line::ModOpt(o) => Action::ModOption(self.mod_page, o, 1),
             Line::Language => open(self, Screen::Language),
             Line::Lang(i) => match LANGUAGES.get(i) {
                 Some(&(code, _)) => {
@@ -912,6 +947,61 @@ impl Menu {
         }
     }
 
+    /// The mod whose page is up, as read.
+    fn page_txt(&self) -> Option<&gamedata::mods::ModTxt> {
+        self.mods.found.get(self.mod_page).and_then(|m| m.parsed.as_ref().ok())
+    }
+
+    fn page_options(&self) -> Vec<gamedata::mods::OptSpec> {
+        self.page_txt().map(|t| t.options.clone()).unwrap_or_default()
+    }
+
+    /// The help under the Mods screen's rows: the chosen line's description (the practice tools' keys; a mod's
+    /// description, or why it was refused).
+    fn mods_help(&self) -> Vec<String> {
+        let s = &self.strings;
+        match self.lines(Screen::Mods).get(self.chosen()) {
+            Some(Line::Switch(i)) if FEATURES.get(*i) == Some(&Feature::Tools) => {
+                ["help 1", "help 2", "help 3"].iter().map(|l| s.ours(l)).collect()
+            }
+            Some(Line::Mod(i)) if self.screen() == Screen::Mods => match self.mods.found.get(*i).map(|m| &m.parsed) {
+                Some(Ok(t)) => {
+                    let mut v = vec![t.description(s.language())];
+                    if let Some((_, why)) = self.mods.note.as_ref().filter(|n| n.0 == *i) {
+                        v.push(format!("{}: {why}", s.ours("mod budget")));
+                    }
+                    if t.modded() {
+                        v.push(s.ours("mod modded"));
+                    }
+                    v
+                }
+                Some(Err(e)) => vec![format!("{}: {}", s.ours("mod refused"), e.chars().take(80).collect::<String>())],
+                None => Vec::new(),
+            },
+            _ => Vec::new(),
+        }
+    }
+
+    /// The help under a mod's page: its description, who made it, and whether it changes the rules.
+    fn page_help(&self) -> Vec<String> {
+        let s = &self.strings;
+        let Some(t) = self.page_txt() else {
+            return Vec::new();
+        };
+        let mut v = vec![t.description(s.language())];
+        let by: Vec<&str> = [t.author.as_str(), t.version.as_str(), t.licence.as_str()]
+            .into_iter()
+            .filter(|x| !x.is_empty())
+            .collect();
+        if !by.is_empty() {
+            v.push(by.join(" · "));
+        }
+        if t.modded() {
+            v.push(s.ours("mod modded"));
+        }
+        v
+    }
+
     /// The label of a line in the menus' words.
     fn label(&self, line: Line) -> String {
         let s = &self.strings;
@@ -952,7 +1042,13 @@ impl Menu {
             Line::Music => s.get("Menu_Opt_Sound Volume", "Music Volume"),
             Line::Effects => s.ours("sound volume"),
             Line::Mode => s.ours("extended mode"),
-            Line::DebugMenu => s.ours("debug mode"),
+            Line::ModsMenu => s.ours("mods"),
+            Line::Mod(i) => self.mods.found.get(i).map_or_else(String::new, |m| m.name(s.language())),
+            Line::ModOn => s.ours("mod on"),
+            Line::ModOpt(o) => {
+                let key = self.page_options().get(o).map(|o| o.key.clone()).unwrap_or_default();
+                self.page_txt().map_or(key.clone(), |t| t.label(&key, s.language()))
+            }
             Line::Interface => s.ours("interface"),
             Line::Textures => s.ours("textures"),
             Line::Models => s.ours("models"),
@@ -1005,7 +1101,8 @@ impl Menu {
             Screen::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Screen::Sound => s.get("Menu_Options Button Sound", "Sound"),
             Screen::Extended => s.ours("extended"),
-            Screen::Debug => s.ours("debug mode"),
+            Screen::Mods => s.ours("mods"),
+            Screen::ModPage => self.label(Line::Mod(self.mod_page)),
             Screen::Language => s.ours("language"),
             Screen::Kinds => s.ours("levels"),
             Screen::Custom if self.own_list => s.ours("own levels"),
@@ -1103,14 +1200,43 @@ impl Menu {
                     f.push((self.label(Line::Textures), self.pack_value(gamedata::packs::Kind::Textures)));
                     f.push((self.label(Line::Models), self.pack_value(gamedata::packs::Kind::Models)));
                     f.push((self.label(Line::SoundTheme), theme_value()));
-                    f.push((self.label(Line::DebugMenu), ">".to_owned()));
+                    f.push((self.label(Line::ModsMenu), ">".to_owned()));
                 }
                 f
             }
-            Screen::Debug => {
+            Screen::Mods => {
                 let mut f: Vec<(String, String)> = switches(true).map(|l| self.switch_field(l)).collect();
-                for l in ["help 1", "help 2", "help 3"] {
-                    f.push((s.ours(l), String::new()));
+                for (i, m) in self.mods.found.iter().enumerate() {
+                    let v = match &m.parsed {
+                        Err(_) => s.ours("mod refused"),
+                        Ok(_) => yes_no(self.mods.on.get(i).copied().unwrap_or(false)),
+                    };
+                    f.push((self.label(Line::Mod(i)), v));
+                }
+                // under the rows: what the chosen line is
+                for l in self.mods_help() {
+                    f.push((l, String::new()));
+                }
+                f
+            }
+            Screen::ModPage => {
+                let i = self.mod_page;
+                let mut f = vec![(self.label(Line::ModOn), yes_no(self.mods.on.get(i).copied().unwrap_or(false)))];
+                for (k, o) in self.page_options().iter().enumerate() {
+                    let v = self.mods.opts.get(i).and_then(|v| v.get(k)).copied().unwrap_or(o.default);
+                    let shown = match o.kind {
+                        gamedata::mods::OptKind::Switch => yes_no(v != 0.0),
+                        // a key by its name in the menus' words, else winit's without its "Key"
+                        gamedata::mods::OptKind::Key(_) => {
+                            let name = o.show(v);
+                            s.key(None, &name).unwrap_or_else(|| name.strip_prefix("Key").unwrap_or(&name).to_owned())
+                        }
+                        _ => o.show(v),
+                    };
+                    f.push((self.label(Line::ModOpt(k)), shown));
+                }
+                for l in self.page_help() {
+                    f.push((l, String::new()));
                 }
                 f
             }
@@ -1529,7 +1655,29 @@ impl Menu {
                 }
                 back_only(&mut out);
             }
-            Screen::Graphics | Screen::Controls | Screen::Sound | Screen::Extended | Screen::Debug => {
+            Screen::Mods | Screen::ModPage => {
+                title(&mut out);
+                let fields = self.fields(sc);
+                // the rows (a long list scrolls, as the custom levels do), then the help lines under them
+                let rows = lines.len().saturating_sub(1);
+                let shown: Vec<usize> = if sc == Screen::Mods { self.shown(rows).collect() } else { (0..rows).collect() };
+                let step = 0.045;
+                for (k, &i) in shown.iter().enumerate() {
+                    let Some((name, value)) = fields.get(i) else { continue };
+                    let y = 0.22 + k as f32 * step;
+                    let st = if self.chosen() == i { Button::Over } else { Button::Up };
+                    button(&mut out, [0.33, y, 0.67, y + 0.0396], KEY_UV, st, Some(Target::Line(i)));
+                    label(&mut out, name, [0.35, y, 0.56, y + 0.0396], &FONT_03);
+                    label(&mut out, value, [0.56, y, 0.66, y + 0.0396], &FONT_03);
+                }
+                let below = 0.22 + shown.len() as f32 * step + 0.01;
+                for (k, (l, _)) in fields.iter().skip(rows).take(3).enumerate() {
+                    let y = below + k as f32 * 0.04;
+                    label(&mut out, l, [0.29, y, 0.71, y + 0.04], &FONT_03);
+                }
+                back_only(&mut out);
+            }
+            Screen::Graphics | Screen::Controls | Screen::Sound | Screen::Extended => {
                 title(&mut out);
                 let fields = self.fields(sc);
                 if sc == Screen::Controls {
@@ -1551,7 +1699,7 @@ impl Menu {
                         label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
                         label(&mut out, key, [0.505, y, 0.65, y + 0.0396], &FONT_03);
                     }
-                } else if (sc == Screen::Extended && self.features.mode) || sc == Screen::Debug {
+                } else if sc == Screen::Extended && self.features.mode {
                     // Extended: the mode's field first; then the switches (and the Debug mode line) as the Controls
                     // page's rows, then lines of help or the folder
                     let first = usize::from(sc == Screen::Extended);
@@ -1566,7 +1714,7 @@ impl Menu {
                                 | Line::Textures
                                 | Line::Models
                                 | Line::SoundTheme
-                                | Line::DebugMenu
+                                | Line::ModsMenu
                         )
                     };
                     let n = lines.iter().filter(rows).count();
@@ -1954,10 +2102,43 @@ mod tests {
             resolutions: vec![(800, 600), (1280, 720), (1920, 1080)],
             bindings: Bindings::default(),
             waiting: None,
+            mods: crate::modrt::Mods::default(),
+            mod_page: 0,
             top: 0,
         };
         m.push(Screen::Main);
         m
+    }
+
+    #[test]
+    fn the_mods_screen_switches_mods_and_steps_their_options() {
+        let mut m = menu(&[true], true);
+        let text = "name.en Fov\noption strength number 10 100 10 50\nlabel strength en Strength\non frame\ndo camera.fov opt.strength\n";
+        let found = vec![
+            gamedata::mods::Mod { key: "fov".into(), factory: true, parsed: gamedata::mods::parse_mod_txt(text) },
+            gamedata::mods::Mod { key: "bad".into(), factory: false, parsed: Err("no mod.txt".into()) },
+        ];
+        m.mods = crate::modrt::Mods::load(found, |_| None);
+        m.push(Screen::Extended);
+        let at = m.lines(Screen::Extended).iter().position(|&l| l == Line::ModsMenu).unwrap();
+        m.set_chosen(at);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Mods);
+        let lines = m.lines(Screen::Mods);
+        assert_eq!(lines.iter().filter(|l| matches!(l, Line::Switch(_))).count(), 2, "practice tools, endless lives");
+        let fov = lines.iter().position(|&l| l == Line::Mod(0)).unwrap();
+        m.set_chosen(fov);
+        assert_eq!(m.adjust(1), Action::ModSwitch(0));
+        let fields = m.fields(Screen::Mods);
+        assert_eq!(fields[fov].0, "Fov");
+        assert_eq!(fields[fov + 1].1, "refused", "a refused mod says so");
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::ModPage);
+        m.set_chosen(1);
+        assert_eq!(m.label(Line::ModOpt(0)), "Strength");
+        assert_eq!(m.adjust(-1), Action::ModOption(0, 0, -1));
+        let _ = m.interface(None, crate::ui::Screen { w: 640.0, h: 480.0 });
+        let _ = m.overlay(640, 480);
     }
 
     /// Window sizes of every shape: the original's, wide, ultra-wide, portrait, tiny.

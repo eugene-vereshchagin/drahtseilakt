@@ -1,0 +1,89 @@
+# Info overlay (after PositionViewer, EnergyItemCounter and SysInfoDisplay): where the ball is, how fast, what is
+# left to take in this sector, the frame rate and the clock.
+name.en Info overlay
+name.ru Информация на экране
+name.de Info-Anzeige
+name.zh 信息叠加
+name.fr Infos à l'écran
+name.es Información en pantalla
+name.it Info a schermo
+description.en Position, speed, extras left in the sector, frames a second, clock.
+description.ru Позиция, скорость, бонусы в секторе, кадры в секунду, часы.
+description.de Position, Tempo, Extras im Sektor, Bilder pro Sekunde, Uhr.
+description.zh 位置、速度、本区段剩余奖励、帧率、时钟。
+description.fr Position, vitesse, bonus restants, images par seconde, horloge.
+description.es Posición, velocidad, extras restantes, fotogramas por segundo, reloj.
+description.it Posizione, velocità, extra rimasti, fotogrammi al secondo, orologio.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option position switch on
+option speed switch on
+option extras switch on
+option fps switch off
+option clock switch off
+label position en Position
+label position ru Позиция
+label position de Position
+label position zh 位置
+label position fr Position
+label position es Posición
+label position it Posizione
+label speed en Speed
+label speed ru Скорость
+label speed de Tempo
+label speed zh 速度
+label speed fr Vitesse
+label speed es Velocidad
+label speed it Velocità
+label extras en Extras
+label extras ru Бонусы
+label extras de Extras
+label extras zh 奖励
+label extras fr Bonus
+label extras es Extras
+label extras it Extra
+label points en Extra points
+label points ru Очки-бонусы
+label points de Extrapunkte
+label points zh 奖励分
+label points fr Points bonus
+label points es Puntos extra
+label points it Punti extra
+label lives en Extra lives
+label lives ru Доп. жизни
+label lives de Extraleben
+label lives zh 额外生命
+label lives fr Vies bonus
+label lives es Vidas extra
+label lives it Vite extra
+label fps en FPS
+label clock en Clock (UTC)
+label clock ru Часы (UTC)
+label clock de Uhr (UTC)
+label clock zh 时钟 (UTC)
+label clock fr Horloge (UTC)
+label clock es Reloj (UTC)
+label clock it Orologio (UTC)
+
+on frame
+if opt.position
+do show bottom-left position dec1 ball.x, ball.y, ball.z
+
+on frame
+if opt.speed
+do show bottom-left speed dec1 ball.speed
+
+on frame
+if opt.extras
+do show bottom-left points ratio extras.points, extras.points_all
+do show bottom-left lives ratio extras.lives, extras.lives_all
+
+on frame
+if opt.fps
+do show bottom-left fps int frame.fps
+
+on frame
+if opt.clock
+do show bottom-left clock clock clock.hour, clock.minute

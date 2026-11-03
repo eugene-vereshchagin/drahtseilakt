@@ -197,8 +197,9 @@ Done when: all thirteen levels can be finished, and each has a replay that passe
   block name and GUID and marked unsupported.
 - **Game profiles**: *Classic* — the original game only (twelve levels and level 13, original rules; replays
   and records count only here); *Extended* — third-party content at the player's own risk, with a clear
-  warning: community maps, texture packs, later mods. Mods means our own system — data and scripts in a
-  sandbox without file or network access; BML mods are Windows DLLs and are never loaded.
+  warning: community maps, texture packs, mods. Mods are our own data-only format: rules built from a fixed library
+  of the engine's building blocks, interpreted by our runtime, never code ([mods.md](mods.md)); BML mods are Windows
+  DLLs and are never loaded.
   The menus of both modes: [menu.md](menu.md).
 
 Done when: most maps play; the report lists the rest, each with its reason.
@@ -250,7 +251,11 @@ collector), its runs kept beside it and checked by a test, and the test level `a
 ## What players added with mods
 
 A static survey of thirty BML/BML+ mods (strings and readmes only; mods are never run) shows what players
-missed. Into the base engine: practice tools (spawn and sector select, quick restart, a ghost of the best run
+missed; the full table, mod by mod, and what we made of each is in [mods.md](mods.md). Done (2026-11-03): our own
+data-only mod format and its runtime, the Mods screen, and ten factory mods in it (sticky ball, physics lab, dynamic
+field of view, free view, segment timer with splits, info overlay, quick restart, screenshot, spirit trail,
+blackout); runs changed by a mod are marked modded in their replays. Queued: the companion (two balls), steering with
+the turned view, decoy balls, play-time statistics. Into the base engine: practice tools (spawn and sector select, quick restart, a ghost of the best run
 per sector, split and real-time timers); deterministic input recording and playback with fast-forward (TAS);
 an info overlay (ball position, extra lives and points left in the sector); the free camera and a field-of-view
 setting; no fixed sector limit and event hooks for map scripts; gravity, time factor and game speed as

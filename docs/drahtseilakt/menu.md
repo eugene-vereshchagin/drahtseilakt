@@ -87,8 +87,8 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
 
 - **Main menu**: Start, Highscore, Options, Credits, Exit, as the original; *Start* first asks which levels.
 - **Options**: the *Extended* page has the mode's switch and, under it, one switch for each of its additions
-  (all on with the mode; the settings keep those turned off as `extended.<key> off`); the debug ones (practice tools,
-  endless lives) are on its *Debug mode* screen, the others on the page itself:
+  (all on with the mode; the settings keep those turned off as `extended.<key> off`); the practice tools and endless
+  lives are on its *Mods* screen with the mods ([mods.md](mods.md)), the others on the page itself:
   - all levels open, without unlocking;
   - best times beside the levels;
   - levels by kind under Start;
@@ -107,7 +107,9 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
     way is kept but never a best run;
   - endless lives: the last ball is never lost (a run it saves is never a best run). There is no time limit to lift:
     the points only count down and stop at zero, as in the original.
-  More switches come with the features in the roadmap (timers, the ghost of the best run).
+  - Mods: the screen of the practice tools, endless lives and every mod found (factory and the player's), each
+    switched with left and right, Enter opening its page with its options ([mods.md](mods.md)); off in the classic
+    mode.
 - **Graphics** adds *Field of View*: the in-game camera's width across 4:3, 40° to 100° in steps of 2 (`fov 58`; the
   original's is 58°, InGameCam's 1.0123 radians). The classic mode always draws the original's.
 - **Controls** adds *Defaults*, back to the original's keys (arrows, Shift, Space) and no inverted turn.
@@ -117,8 +119,9 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
   shown), played like an original level. A title is at most 40 characters and shrinks or wraps to stay on its button. A level that cannot be loaded says
   why and is not started; its runs and best times are kept apart from the original levels. Later: title, author and
   difficulty from the community catalogue.
-- Texture packs and our own mods come here too when they exist, each behind its own switch and a warning that
-  third-party content is played at the player's own risk.
+- Texture packs and mods are here: the packs on the Textures and Models lines ([packs.md](packs.md)), the mods on the
+  Mods screen ([mods.md](mods.md)), each behind its own switch; third-party content is played at the player's own
+  risk.
 
 ## Profiles
 
