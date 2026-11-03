@@ -140,6 +140,15 @@ class LevelBuilder:
         K.box(m, self.mat_ids[mat], lo, hi, scale=8.0)
         return self.add(name, m, groups=self._floor_groups(sound) + self.sector(sector))
 
+    def fan_housing(self, name, at):
+        """A low steel frame round a fan on the floor at `at`, only for the look (the ball rolls through it)."""
+        x, y, z = at
+        m = K.Mesh(name)
+        for lo, hi in (((-2.2, -2.2), (2.2, -1.8)), ((-2.2, 1.8), (2.2, 2.2)), ((-2.2, -1.8), (-1.8, 1.8)),
+                       ((1.8, -1.8), (2.2, 1.8))):
+            K.box(m, self.mat_ids["rail"], (x + lo[0], y, z + lo[1]), (x + hi[0], y + 0.3, z + hi[1]))
+        return self.add(name, m)
+
     def stopper(self, name, lo, hi):
         """An unseen floor stopper (Phys_FloorStopper): it holds boxes and modules' parts, the ball passes it."""
         m = K.Mesh(name)

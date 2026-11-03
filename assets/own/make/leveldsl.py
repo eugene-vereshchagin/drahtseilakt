@@ -125,6 +125,8 @@ class Track:
         self.checkpoints = 0
         self.columns = 0.0
         self.column_run = 0.0
+        self.column_spots = []
+        self.floor_points = []
 
     # --- the cursor ---------------------------------------------------------------------------------------------
 
@@ -172,12 +174,13 @@ class Track:
                          top="wood_top" if self.surface == "wood" else "top")
         for p in pts[1:]:
             self.pilot.way(p)
+        self.floor_points.extend(pts)
         if self.columns and kind == "Floor":
             for a, c in zip(pts, pts[1:]):
                 self.column_run += float(np.linalg.norm(c - a))
                 if self.column_run >= self.columns:
                     self.column_run = 0.0
-                    self.b.column(f"Column_{self.n('column'):03d}", tuple(c), 60.0)
+                    self.column_spots.append(c)
 
     def move_along(self, pts, head_turn=0.0):
         self.pos = np.array(pts[-1], np.float64)
@@ -260,6 +263,7 @@ class Track:
             self.move_along(pts)
         elif cmd == "fan":
             q = self.module_at("P_Modul_18", float(opts.get("ahead", 0)), 0.6, 0.0, float(opts.get("side", 0)))
+            self.b.fan_housing(f"Fan_Housing_{self.n('housing'):02d}", tuple(q - np.array([0, 0.6, 0])))
             if "nopilot" not in opts:
                 self.pilot.step(STYLES, f"goto {fmt(q)}", q)
                 self.pilot.step(STYLES, "wait 150")
@@ -311,6 +315,16 @@ class Track:
         for p in pts[1:]:
             self.pilot.way(p)
         self.move_along(pts)
+
+    def place_columns(self, depth=60.0):
+        """The columns under the floors, but none that would pass through a floor or rails below it."""
+        below = np.array(self.floor_points) if self.floor_points else np.zeros((0, 3))
+        for c in self.column_spots:
+            if len(below):
+                flat = np.hypot(below[:, 0] - c[0], below[:, 2] - c[2])
+                if np.any((flat < 8.0) & (below[:, 1] < c[1] - 1.0) & (below[:, 1] > c[1] - depth - 3.0)):
+                    continue
+            self.b.column(f"Column_{self.n('column'):03d}", tuple(c), depth)
 
     def rise(self, opts, line):
         if "up" in opts:
@@ -483,6 +497,7 @@ def compile_level(path):
             t.run(*parsed, line=i)
     if not t.started or not t.finished:
         raise LevelError(f"{path}: a level needs a start and a finish")
+    t.place_columns()
     info = t.info
     titles = info["titles"]
     if "en" not in titles:
