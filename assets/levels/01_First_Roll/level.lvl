@@ -11,7 +11,7 @@ title.ru Первый разбег
 title.de Erster Lauf
 title.zh 初次滚动
 order 1
-sky A
+sky Mountains
 music 1
 bonus 100
 ball wood
@@ -20,15 +20,14 @@ columns 45
 # ---- sector 1: off the tower, a wooden bridge, the first rails (straight), boxes on a walled square, a narrow
 # way down to the stone transformer and back to wood, the square of paper balls, rails with points to the checkpoint
 safety gutter
+railing turns
 start
 width 14
 railing both
 floor 12
 width 10
 floor 40 down 5
-railing left
 right 90 18
-railing off
 floor 8
 surface wood
 floor 84
@@ -54,25 +53,23 @@ width 8
 floor 6
 safety gutter
 width 7
-railing right
 left 90 16 down 2
-railing off
 floor 44 down 3
 point
 floor 20
-railing left
 right 90 12
-railing off
 floor 10
 trafo stone
 # the stone ball has work at once: a loose stone ball on a bare square, too heavy for the wooden one, shoved off it
 floor 20 down 2
+railing noturns
 borders off
 width 10
 floor 12
 loose stone ahead -5 shove
 left 90 14
 borders on
+railing turns
 width 7
 floor 14
 # back to wood just before what the stone ball does badly: the climb, then the rails
@@ -129,7 +126,8 @@ width 8
 floor 12
 width 22
 floor 40
-dome ahead -20
+# the dome sits on the line to the rails' mouth: go round it and line up again
+dome ahead -10
 width 10
 floor 6
 rails-left 90 16
@@ -159,7 +157,7 @@ autopilot all
 right 90 8
 floor 10 up 2
 right 90 8 up 1.5
-width 6
+width 6.5
 floor 14 up 1.5
 right 90 8
 floor 15
@@ -171,9 +169,7 @@ box side 4 ahead -10
 box side -4 ahead -20
 life side 0 ahead -16
 width 9
-railing left
 left 90 18
-railing off
 floor 120
 checkpoint
 
@@ -181,9 +177,7 @@ checkpoint
 # rails to the wood transformer
 floor 7
 floor 60
-railing left
 right 90 16
-railing off
 width 22
 floor 10
 loose stone side 7 ahead 4 shove
@@ -237,9 +231,7 @@ checkpoint
 # down, the finish
 floor 7
 floor 110
-railing left
 right 90 16
-railing off
 floor 16
 surface wood
 floor 34 up 10

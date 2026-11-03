@@ -81,7 +81,7 @@ CUP_R, CUP_UP = 2.0, 0.3
 # an end each tube bends out over it, flat on its top (RAIL_FLARE: along, out), a mouth that leads a ball coming off
 # the middle onto them, kept on the floor's flat, clear of its borders and railings (on a gutter, which leads the ball
 # to its middle anyway, the mouth is narrower). No ties across between the tubes, as on the
-# original's first levels (posts under them hold them); `ties` gives them (a later level's nerves).
+# original's first levels (a few saddles on columns hold them, RAIL_SADDLE); `ties` gives them (a later level's nerves).
 RAIL_GAUGE, RAIL_TUBE = 3.9, 0.3
 RAIL_FLARE = (3.0, 1.4)
 RAIL_POSTS = 8.0
@@ -93,6 +93,13 @@ MIN_FREE = 5.5
 # under the lowest floor, reaching CLOUD_MARGIN past the level on every side, its texture repeating every CLOUD_TILE
 # (the original's: 160 or so below, 400 to 600 past, 675 a repeat; numbers only).
 CLOUD_BELOW, CLOUD_MARGIN, CLOUD_TILE = 165.0, 500.0, 675.0
+# The skies that are a sky over a sea of cloud, which the layer belongs to; the photographic skies with a land or a sea
+# of their own below have none.
+CLOUD_SKIES = ("A", "B", "C", "Sunset")
+# Rails' supports: a saddle under both tubes (its bar RAIL_SADDLE under their middles, below the ball riding between
+# them) on a column down into the haze, about every RAIL_SUPPORT of rails (the DSL picks where: not near their ends,
+# where the floors hold them, and not over another floor or rails).
+RAIL_SADDLE, RAIL_SUPPORT, RAIL_COLUMN = 1.4, 40.0, 60.0
 # Where the ball comes back after a fall, above the floor round the start or a checkpoint.
 RESET_UP = START_RESET - START_BOWL[-1][1]
 
@@ -433,7 +440,7 @@ class LevelBuilder:
         variant = "ABC"[s % 3]
         os.makedirs(self.tex, exist_ok=True)
         for name in (f"Track_Top_{variant}", f"Track_Kerb_{variant}", f"Track_Shade_{variant}",
-                     f"Track_Slope_{variant}", "Track_Side"):
+                     f"Track_Slope_{variant}", "Track_Side", "Track_Column"):
             shutil.copyfile(os.path.join(TRACK_SET, name + ".png"), os.path.join(self.tex, name + ".png"))
         for name in ("floor_border.png", "floor_border_n.png"):
             shutil.copyfile(os.path.join(MENU_SET, name), os.path.join(self.tex, "Track_" + name))
@@ -458,7 +465,7 @@ class LevelBuilder:
         self.mat("border", "Track_floor_border.png", diffuse=1.0, emissive=0.24, normal="Track_floor_border_n.png")
         self.mat("wood", "Wood_Plain.png", diffuse=1.0, emissive=0.25, specular=0.39, power=50)
         self.mat("rail", "Rail_Environment.png", diffuse=0.5, emissive=0.35, specular=0.8, power=10, texgen="chrome")
-        self.mat("post", "Column_beige.png", diffuse=0.8, emissive=0.3)
+        self.mat("post", "Track_Column.png", diffuse=0.8, emissive=0.3)
         self.mat("plate", "Floor_Top_Checkpoint.png", diffuse=1.0, emissive=0.2, specular=0.3, power=60)
 
     def mat(self, name, texture=None, **kw):
@@ -586,13 +593,13 @@ class LevelBuilder:
         return [phys, f"Sound_HitID_{sid}", f"Sound_RollID_{sid}", "Shadow"]
 
     def rails(self, name, path, gauge=RAIL_GAUGE, r=RAIL_TUBE, posts=RAIL_POSTS, sector=0, headings=None,
-              ends=(None, None), ties=False):
+              ends=(None, None), ties=False, supports=()):
         """Two steel tubes the ball rolls on, `gauge` apart (across the cursor's heading at each point, so rails laid
         piece after piece run on without a kink), lying on the path (the floor's top where they begin and end). `ends`:
         for each end, the floor running on from it ((width, safety, surface, (railing left, right)), its middle on the
         rails' line) or None;
-        over such a floor each tube bends out flat on its top (RAIL_FLARE). Under the tubes, every `posts`, a short
-        post each; with `ties`, a tie across between them instead."""
+        over such a floor each tube bends out flat on its top (RAIL_FLARE). At the path's points `supports`, a saddle
+        under the tubes on a column down into the haze; with `ties`, ties across between the tubes every `posts`."""
         m = K.Mesh(name)
         fr = ring_frames(path, headings)
         lift = np.array([0.0, r, 0.0])
@@ -620,18 +627,25 @@ class LevelBuilder:
                     bend.append(q)
                 line = (bend[::-1] + line) if end == 0 else (line + bend)
             K.tube(m, self.mat_ids["rail"], line, r, caps=True)
-        run = 0.0
-        for i in range(1, len(fr) - 1):
-            run += float(np.linalg.norm(fr[i][0] - fr[i - 1][0]))
-            if run >= posts:
-                run = 0.0
-                p, f, s, u, t = fr[i]
-                if ties:
-                    K.tube(m, self.mat_ids["rail"], [p - s * gauge / 2, p + s * gauge / 2], r * 0.7)
-                else:
-                    for sgn in (-1.0, 1.0):
-                        top = p + s * (sgn * gauge / 2)
-                        K.tube(m, self.mat_ids["rail"], [top, top - u * 1.4], r * 0.6, caps=True)
+        if ties:
+            run = 0.0
+            for i in range(1, len(fr) - 1):
+                run += float(np.linalg.norm(fr[i][0] - fr[i - 1][0]))
+                if run >= posts:
+                    run = 0.0
+                    p, f, s, u, t = fr[i]
+                    K.tube(m, self.mat_ids["rail"], [p - s * gauge / 2 + lift, p + s * gauge / 2 + lift], r * 0.7)
+        for i in supports:
+            p, f, s, u, t = fr[i]
+            c = p + lift
+            bar = c - u * RAIL_SADDLE
+            for sgn in (-1.0, 1.0):
+                K.tube(m, self.mat_ids["rail"], [c + s * (sgn * gauge / 2), bar + s * (sgn * gauge / 2)], r * 0.6,
+                       caps=True)
+            K.tube(m, self.mat_ids["rail"], [bar - s * (gauge / 2 + 0.2), bar + s * (gauge / 2 + 0.2)], r * 0.7,
+                   caps=True)
+            K.cylinder(m, self.mat_ids["post"], bar - u * RAIL_COLUMN, u, 0.45, RAIL_COLUMN - 0.2, seg=10,
+                       vscale=SLAB)
         return self.add(name, m, groups=self._floor_groups("metal") + self.sector(sector))
 
     def bowl_piece(self, name, centre, fwd, bowl, outer, joins, cups, along=0.0):
@@ -748,7 +762,7 @@ class LevelBuilder:
         """A stone column hanging under the floor from `top` down `depth`: only for the look (no physics)."""
         x, y, z = top
         m = K.Mesh(name)
-        K.cylinder(m, self.mat_ids["post"], (x, y - DEPTH - depth, z), (0, 1, 0), r, depth, seg=12)
+        K.cylinder(m, self.mat_ids["post"], (x, y - DEPTH - depth, z), (0, 1, 0), r, depth, seg=12, vscale=SLAB)
         K.cylinder(m, self.mat_ids["border"], (x, y - DEPTH - 1.2, z), (0, 1, 0), r * 1.35, 1.2, seg=12)
         return self.add(name, m)
 
@@ -887,7 +901,8 @@ class LevelBuilder:
         if self.narrow:
             raise ValueError(f"{len(self.narrow)} places leave the ball less than {MIN_FREE} across at the height of "
                              "its middle:\n  " + "\n  ".join(self.narrow))
-        self.cloud_layer()
+        if sky in CLOUD_SKIES:
+            self.cloud_layer()
         for m in self.meshes:
             orient(m)
         groups = sorted(self.groups.items())

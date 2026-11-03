@@ -210,6 +210,17 @@ Wolkenschicht wie die des Originals (`SkyLayer`, in der Datei verborgen, vom Spi
 haben, additiv über den Himmel gezeichnet): eine Ebene 165 unter dem tiefsten Boden, 500 über das Level hinaus nach
 allen Seiten, unsere eigenen grauen Wolken auf Schwarz, alle 675 wiederholt.
 
+**Stützen, Kurven und Aussehen** (2026-11-03, dritter Blick des Besitzers): Schienen halten ein paar Sättel unter
+beiden Rohren (unter der Kugel, die zwischen ihnen rollt) auf Säulen hinab in den Dunst, etwa einer alle 40 entlang,
+keiner nahe ihren Enden (dort halten sie die Böden) und keiner über einem anderen Boden; `railing turns` setzt von
+dort an ein Geländer an die Außenseite jeder Kurve (Level 1 hat es), und ein Geländer nur an der Innenseite einer
+Kurve wird abgelehnt. Die Wolkenschicht liegt nur unter den Himmeln, die ein Wolkenmeer sind (A, B, C, Sunset); Level
+1 liegt unter `Mountains`. Die Seiten der Bahn und die Säulen haben Regenspuren von ihrer Oberkante, die Säulen sind
+in Ringen gegossen (`Track_Column`). Das Netz eines Teils kann ein feineres Aussehen tragen (ownkit.py, `Mesh.look`:
+was das Spiel zeichnet, das Netz selbst bleibt der Physik): die Transformatoren sind wie die Platte des Originals
+gezeichnet (ein Chromrahmen um eine Scheibe aus dem Material der Kugel, farbige Knöpfe auf einer genieteten Platte),
+die Papierkugel als zerknülltes Blatt, die Seile der Ballons am Korb festgebunden.
+
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
 Flammenschalen an ihrem Rand; ein Checkpoint ein Bodenstück von 10 Länge mit einer 1,26 tief eingelassenen Schale von

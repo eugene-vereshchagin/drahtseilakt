@@ -39,7 +39,9 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
                              (the ball the way has there, no lighter than it, pushes it away)
     column [side S] [ahead A] [depth D]   a stone column under the floor, for the look
     railing left|right|both|off   railings along the floors' edges from here on, on any profile (safety railings
-                             gives both on the bare floor; another safety none)
+                             gives both on the bare floor; another safety none); a railing on a turn's inner side
+                             alone is refused
+    railing turns|noturns    a railing on the outer side of every turn from here on, or no more
     crateblock               the stone on the crate (P_Modul_34) in a slot of 6 across the way: the stone blocks
                              the way until a ball on a floor 5 lower (laid by the description, crossing under the
                              slot) pushes the crate out from under it; then it lies level with the way
@@ -192,6 +194,9 @@ class Track:
         self.floor_end_info = None
         # railings along the floors' left and right edges from here on (safety railings: both)
         self.rail_sides = (False, False)
+        # railings on the outer side of every turn from here on (railing turns), and the current turn's
+        self.rail_turns = False
+        self.turn_rail = (False, False)
         # rails being laid piece after piece (one object), and a checkpoint waiting for the floor after it
         self.rail_run = None
         self.pending = None
@@ -315,7 +320,7 @@ class Track:
             run += float(np.linalg.norm(b - a))
             st["path"].append(b)
             st["heads"].append(h)
-            st["rails"].append(self.rail_sides)
+            st["rails"].append((self.rail_sides[0] or self.turn_rail[0], self.rail_sides[1] or self.turn_rail[1]))
             st["widths"].append(w0 + (self.width - w0) * (run / length if length > 0 else 1.0))
             st["along"].append(st["along"][-1] + float(np.linalg.norm(b - a)))
         self.along = st["along"][-1]
@@ -366,7 +371,31 @@ class Track:
             end = (self.width, self.safety, self.surface, self.rail_sides)
         self.rail_ends += [r["path"][0], r["path"][-1]]
         self.b.rails(f"Rails_{self.n('Rails'):03d}", [tuple(p) for p in r["path"]], headings=r["heads"],
-                     ends=(r["start"], end), ties=r["ties"])
+                     ends=(r["start"], end), ties=r["ties"], supports=self.rail_supports(r["path"]))
+
+    def rail_supports(self, path):
+        """Where rails get a saddle on a column: about every RAIL_SUPPORT along them, none within RAIL_SUPPORT / 4 of
+        their ends (the floors there hold them), none over another floor or rails within the column's reach."""
+        run = [0.0]
+        for a, b in zip(path, path[1:]):
+            run.append(run[-1] + float(np.linalg.norm(b - a)))
+        total = run[-1]
+        keep = L.RAIL_SUPPORT / 4
+        if total < 2 * keep:
+            return []
+        count = max(1, int(round((total - 2 * keep) / L.RAIL_SUPPORT)))
+        want = [keep + (total - 2 * keep) * (k + 0.5) / count for k in range(count)]
+        below = np.array(self.floor_points) if self.floor_points else np.zeros((0, 3))
+        out = []
+        for d in want:
+            i = min(range(len(run)), key=lambda j: abs(run[j] - d))
+            c = path[i]
+            if len(below):
+                flat = np.hypot(below[:, 0] - c[0], below[:, 2] - c[2])
+                if np.any((flat < 6.0) & (below[:, 1] < c[1] - 1.0) & (below[:, 1] > c[1] - L.RAIL_COLUMN - 3.0)):
+                    continue
+            out.append(i)
+        return out
 
     def build_start(self, first=None):
         """The start, built with the first floor: joined to it when the floor runs on from the neck's front edge."""
@@ -423,7 +452,14 @@ class Track:
             angle, radius = num(args, 0, line), num(args, 1, line)
             angle = angle if cmd.endswith("left") else -angle
             pts, heads = self.arc(angle, radius, self.rise(opts, line))
+            # a turn's railing belongs on its outer side (a left turn's right)
+            inner = 0 if angle > 0 else 1
+            if not cmd.startswith("rails") and self.rail_sides[inner] and not self.rail_sides[1 - inner]:
+                raise LevelError(f"line {line}: a railing on the inner side of the turn (`railing turns` puts one on "
+                                 "the outer side of every turn)")
+            self.turn_rail = (angle < 0, angle > 0) if self.rail_turns else (False, False)
             self.lay(pts, heads, "Rails" if cmd.startswith("rails") else "Floor", ties="ties" in opts)
+            self.turn_rail = (False, False)
             self.move_along(pts, angle)
         elif cmd == "move":
             to = self.at(num(args, 0, line), num(args, 1, line), num(args, 2, line))
@@ -448,9 +484,14 @@ class Track:
         elif cmd == "railing":
             which = word(args, 0, line)
             sides = {"left": (True, False), "right": (False, True), "both": (True, True), "off": (False, False)}
-            if which not in sides:
-                raise LevelError(f"line {line}: railing left|right|both|off")
-            self.rail_sides = sides[which]
+            if which == "turns":
+                self.rail_turns = True
+            elif which == "noturns":
+                self.rail_turns = False
+            elif which not in sides:
+                raise LevelError(f"line {line}: railing left|right|both|off|turns|noturns")
+            else:
+                self.rail_sides = sides[which]
         elif cmd == "surface":
             self.surface = word(args, 0, line)
             if self.surface not in ("stone", "wood"):

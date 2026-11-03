@@ -750,10 +750,44 @@ def track_side(seed):
         img[k * n:(k + 1) * n] = joint(src[y0:y0 + n, x0:x0 + w] * slab_variety(n, w, seed * 17 + k, dirt=0.15), 0,
                                        width=2, depth=0.3)
     img *= np.linspace(0.84, 1.12, w)[None, :, None]
+    img = weather(img, seed + 3, along_rows=True)
     s, g = int(round(0.4 * PX)), 3
     img[:, :s] = brick_strip(h, s, seed + 9)
-    img[:, s:s + g] = rgb(90, 84, 78)
+    img[:, s:s + g] = rgb(70, 66, 62)
+    # the edge under the strip worn lighter in places
+    wear = np.clip((noise(h, 12, seed + 11)[:, :1] - 0.55) * 3, 0, 1)
+    img[:, s + g:s + g + 6] *= (1 + 0.12 * wear)[:, :, None]
     return img
+
+
+def weather(img, seed, along_rows):
+    """Rain streaks run down a concrete face from its top edge: darker stains, narrow and uneven, fading as they run
+    down, and a little grime all over. `along_rows`: the face's top edge is the texture's first column and down runs
+    along its rows' x (the track's sides); else its top is the first row and down runs along y (a column)."""
+    h, w = img.shape[:2]
+    n = max(h, w)
+    if along_rows:
+        streak = np.clip((noise(n, 48, seed, 3)[:h, :w].mean(1, keepdims=True) - 0.5) * 4, 0, 1)
+        fade = np.exp(-np.arange(w) / (w * 0.45))[None, :]
+        dark = 0.22 * streak * fade
+    else:
+        streak = np.clip((noise(n, 48, seed, 3)[:h, :w].mean(0, keepdims=True) - 0.5) * 4, 0, 1)
+        fade = np.exp(-np.arange(h) / (h * 0.6))[:, None]
+        dark = 0.22 * streak * fade
+    grime = 0.08 * noise(n, 6, seed + 1, 4)[:h, :w]
+    return img * (1 - dark - grime + 0.04)[..., None]
+
+
+def track_column(seed):
+    """The columns under the floors (u round, v down from the top, 5 units a repeat): the side's concrete, streaked
+    from the top, a joint where one cast ring meets the next."""
+    n = int(PX * 5)
+    src = photo("Concrete012", 1024, TRACK_SIDE, 0.12, 0.3, 0.4, fix=False)
+    rng = np.random.default_rng(seed)
+    y0, x0 = rng.integers(0, 1024 - n), rng.integers(0, 1024 - n)
+    img = src[y0:y0 + n, x0:x0 + n] * slab_variety(n, n, seed, dirt=0.18)
+    img = weather(img, seed + 1, along_rows=False)
+    return joint(img, 0, width=3, depth=0.35)
 
 
 def make_track():
@@ -765,6 +799,7 @@ def make_track():
         save_track(kerb(400 + 10 * k, int(PX * 1.25), bricks=False, shade=0.38), f"Track_Shade_{name}")
         save_track(track_slope(500 + 10 * k, int(PX * 2.5)), f"Track_Slope_{name}")
     save_track(track_side(600), "Track_Side")
+    save_track(track_column(700), "Track_Column")
 
 
 STEPS = {"floors": make_floors, "track": make_track, "stone": make_stone, "wood": make_wood, "marks": make_marks, "env": make_env,

@@ -125,6 +125,52 @@
      "indices": 8,
      "material": 2
     }
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "look": 2
+    }
+   }
+  },
+  {
+   "name": "P_Trafo_Paper_Look",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 9,
+      "NORMAL": 10,
+      "TEXCOORD_0": 11
+     },
+     "indices": 12,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 9,
+      "NORMAL": 10,
+      "TEXCOORD_0": 11
+     },
+     "indices": 13,
+     "material": 2
+    },
+    {
+     "attributes": {
+      "POSITION": 9,
+      "NORMAL": 10,
+      "TEXCOORD_0": 11
+     },
+     "indices": 14,
+     "material": 3
+    },
+    {
+     "attributes": {
+      "POSITION": 9,
+      "NORMAL": 10,
+      "TEXCOORD_0": 11
+     },
+     "indices": 15,
+     "material": 4
+    }
    ]
   }
  ],
@@ -251,6 +297,84 @@
      "texgen": "reflect"
     }
    }
+  },
+  {
+   "name": "Ball_Paper",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 2
+    }
+   },
+   "emissiveFactor": [
+    0.35,
+    0.35,
+    0.35
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.3,
+      0.3,
+      0.3
+     ],
+     "power": 20,
+     "z_write": true
+    }
+   }
+  },
+  {
+   "name": "P_Trafo_Base",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.75,
+     0.75,
+     0.75,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 3
+    }
+   },
+   "emissiveFactor": [
+    0.3,
+    0.3,
+    0.3
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.4,
+      0.4,
+      0.4
+     ],
+     "power": 25,
+     "z_write": true
+    }
+   }
   }
  ],
  "textures": [
@@ -260,6 +384,14 @@
   },
   {
    "source": 1,
+   "sampler": 0
+  },
+  {
+   "source": 2,
+   "sampler": 0
+  },
+  {
+   "source": 3,
    "sampler": 0
   }
  ],
@@ -271,6 +403,14 @@
   {
    "uri": "textures/Trafo_Environment.png",
    "name": "Trafo_Environment"
+  },
+  {
+   "uri": "textures/Ball_Paper.png",
+   "name": "Ball_Paper"
+  },
+  {
+   "uri": "textures/Metal_stained.png",
+   "name": "Metal_stained"
   }
  ],
  "samplers": [
@@ -284,7 +424,7 @@
  "buffers": [
   {
    "uri": "level.bin",
-   "byteLength": 29336
+   "byteLength": 110824
   }
  ],
  "bufferViews": [
@@ -340,6 +480,48 @@
    "buffer": 0,
    "byteOffset": 27800,
    "byteLength": 1536,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 29336,
+   "byteLength": 20820,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 50156,
+   "byteLength": 20820,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 70976,
+   "byteLength": 13880,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 84856,
+   "byteLength": 11280,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 96136,
+   "byteLength": 12288,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 108424,
+   "byteLength": 1488,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 109912,
+   "byteLength": 912,
    "target": 34963
   }
  ],
@@ -417,6 +599,58 @@
    "count": 384,
    "type": "SCALAR",
    "bufferView": 8
+  },
+  {
+   "componentType": 5126,
+   "count": 1735,
+   "type": "VEC3",
+   "min": [
+    -2.45,
+    0.0,
+    -2.45
+   ],
+   "max": [
+    2.45,
+    0.49021130325876955,
+    2.45
+   ],
+   "bufferView": 9
+  },
+  {
+   "componentType": 5126,
+   "count": 1735,
+   "type": "VEC3",
+   "bufferView": 10
+  },
+  {
+   "componentType": 5126,
+   "count": 1735,
+   "type": "VEC2",
+   "bufferView": 11
+  },
+  {
+   "componentType": 5125,
+   "count": 2820,
+   "type": "SCALAR",
+   "bufferView": 12
+  },
+  {
+   "componentType": 5125,
+   "count": 3072,
+   "type": "SCALAR",
+   "bufferView": 13
+  },
+  {
+   "componentType": 5125,
+   "count": 372,
+   "type": "SCALAR",
+   "bufferView": 14
+  },
+  {
+   "componentType": 5125,
+   "count": 228,
+   "type": "SCALAR",
+   "bufferView": 15
   }
  ]
 }

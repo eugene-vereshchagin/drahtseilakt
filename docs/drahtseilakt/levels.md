@@ -203,6 +203,16 @@ the original's (`SkyLayer`, hidden in the file, shown by the game when the optio
 sky): a plane 165 under the lowest floor, 500 past the level on every side, our own grey clouds on black repeating
 every 675.
 
+**Supports, turns and looks** (2026-11-03, the owner's third look): rails are held by a few saddles under both tubes
+(below the ball riding between them) on columns down into the haze, about one every 40 along them, none near their
+ends (the floors hold them there) nor over another floor; `railing turns` puts a railing on the outer side of every
+turn from there on (level 1 has it), and a railing on a turn's inner side alone is refused. The cloud layer is laid
+only under the skies that are a sea of cloud (A, B, C, Sunset); level 1 is under `Mountains`. The track's sides and
+the columns are streaked by rain from their top edge, the columns cast in rings (`Track_Column`). A part's mesh can
+carry a finer look (ownkit.py, `Mesh.look`: what the game draws, the mesh itself staying the physics'): the
+transformers are drawn as the original's kind of pad (a chrome frame round a disc of the ball's material, coloured
+studs on a riveted plate), the paper ball as a crumpled sheet, the balloons' ropes tied to the basket.
+
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
 its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26 into it (to a lip) and two flame

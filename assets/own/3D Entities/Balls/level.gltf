@@ -2643,7 +2643,12 @@
      "indices": 215,
      "material": 2
     }
-   ]
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "look": 55
+    }
+   }
   },
   {
    "name": "Ball_LightningSphere_Mesh",
@@ -2656,6 +2661,20 @@
      },
      "indices": 219,
      "material": 6
+    }
+   ]
+  },
+  {
+   "name": "Ball_Paper_Look",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 220,
+      "NORMAL": 221,
+      "TEXCOORD_0": 222
+     },
+     "indices": 223,
+     "material": 2
     }
    ]
   }
@@ -2998,7 +3017,7 @@
  "buffers": [
   {
    "uri": "level.bin",
-   "byteLength": 129040
+   "byteLength": 195888
   }
  ],
  "bufferViews": [
@@ -4320,6 +4339,30 @@
    "buffer": 0,
    "byteOffset": 125200,
    "byteLength": 3840,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 129040,
+   "byteLength": 14700,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 143740,
+   "byteLength": 14700,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 158440,
+   "byteLength": 9800,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 168240,
+   "byteLength": 27648,
    "target": 34963
   }
  ],
@@ -6193,6 +6236,40 @@
    "count": 960,
    "type": "SCALAR",
    "bufferView": 219
+  },
+  {
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC3",
+   "min": [
+    -2.039,
+    -2.03,
+    -1.96
+   ],
+   "max": [
+    1.9700000000000002,
+    1.968,
+    2.036
+   ],
+   "bufferView": 220
+  },
+  {
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC3",
+   "bufferView": 221
+  },
+  {
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC2",
+   "bufferView": 222
+  },
+  {
+   "componentType": 5125,
+   "count": 6912,
+   "type": "SCALAR",
+   "bufferView": 223
   }
  ]
 }
