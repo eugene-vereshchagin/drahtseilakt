@@ -2233,6 +2233,7 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     let data = &game.data;
     // the level's light colour (the level table's Light; white for a level without a row)
     renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
+    renderer.fog = game.level.level.settings.fog;
     let loader = |t: &level::Texture| data.texture(t);
     renderer.add_model(&game.level.level, &loader);
     renderer.add_model(&game.balls.level, &loader);

@@ -35,6 +35,12 @@ struct Globals {
     flash_color: [f32; 4],
     point_pos: [f32; 4],
     point_color: [f32; 4],
+    /// The level's fog (level::Fog): rgb its colour, a its density a unit of distance; x the height it begins below,
+    /// y the depth under that where it is whole, z 1 when there is fog.
+    fog_color: [f32; 4],
+    fog_height: [f32; 4],
+    /// The fog's colour seen straight down (rgb).
+    fog_down: [f32; 4],
 }
 
 #[repr(C)]
@@ -190,6 +196,8 @@ pub struct Renderer {
     pub flash: f32,
     /// The new ball's light (lights.rs): where it is and its colour, while it shows.
     pub point: Option<(Vec3, [f32; 3])>,
+    /// The level's fog (its settings); none for the original's levels.
+    pub fog: Option<level::Fog>,
     globals: wgpu::Buffer,
     globals_bind: wgpu::BindGroup,
     models_buf: wgpu::Buffer,
@@ -368,6 +376,7 @@ impl Renderer {
             material_layout,
             light: Light::default(),
             flash: 0.0,
+            fog: None,
             point: None,
             globals,
             globals_bind,
@@ -930,6 +939,9 @@ impl Renderer {
             flash_color: [self.flash, self.flash, self.flash, 0.0],
             point_pos: self.point.map_or([0.0; 4], |(p, _)| p.extend(crate::lights::POINT_RANGE).to_array()),
             point_color: self.point.map_or([0.0; 4], |(_, c)| [c[0], c[1], c[2], 0.0]),
+            fog_color: self.fog.map_or([0.0; 4], |f| [f.color[0], f.color[1], f.color[2], f.density]),
+            fog_height: self.fog.map_or([0.0; 4], |f| [f.below, f.depth, 1.0, 0.0]),
+            fog_down: self.fog.map_or([0.0; 4], |f| [f.color_down[0], f.color_down[1], f.color_down[2], 0.0]),
         };
         self.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));

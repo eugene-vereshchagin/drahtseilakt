@@ -18,6 +18,13 @@ struct Globals {
     flash_color: vec4<f32>,
     point_pos: vec4<f32>,
     point_color: vec4<f32>,
+    // The level's fog: rgb its colour, a its density a unit of distance; x the height it begins below, y the depth
+    // under that where it is whole, z 1 when there is fog. Only for what is lit (the sky, sprites and the clouds,
+    // drawn unlit, keep their own colour).
+    fog_color: vec4<f32>,
+    fog_height: vec4<f32>,
+    // rgb: the fog's colour seen straight down (the world far below), the colour above seen towards the horizon
+    fog_down: vec4<f32>,
 };
 
 struct Material {
@@ -216,5 +223,22 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         }
         spec = g.light_color.rgb * mat.specular.rgb * pow(max(dot(sn, h), 0.0), mat.specular.a);
     }
-    return vec4<f32>(min(base.rgb * lit + spec, vec3<f32>(1.0)), color.a);
+    let shaded = min(base.rgb * lit + spec, vec3<f32>(1.0));
+    return vec4<f32>(fogged(shaded, in.world), color.a);
+}
+
+// The air between the eye and a point: its distance thickens it, and so does its depth under the fog's height (the
+// world far below fades into the haze), each as the other were clear.
+fn fogged(c: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
+    if g.fog_height.z < 0.5 {
+        return c;
+    }
+    let ray = world - g.eye.xyz;
+    let dist = length(ray);
+    let far = 1.0 - exp(-g.fog_color.a * dist);
+    let deep = clamp((g.fog_height.x - world.y) / max(g.fog_height.y, 0.01), 0.0, 1.0);
+    let f = 1.0 - (1.0 - far) * (1.0 - deep * deep);
+    // the air's colour is what lies behind the point: the haze towards the horizon, the world below further down
+    let down = smoothstep(0.05, 0.7, -ray.y / max(dist, 1e-4));
+    return mix(c, mix(g.fog_color.rgb, g.fog_down.rgb, down), f);
 }
