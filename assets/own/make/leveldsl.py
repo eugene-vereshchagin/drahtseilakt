@@ -166,9 +166,10 @@ class Track:
             pts.append(np.array([p[0], self.pos[1] + rise * t, p[2]]))
         return pts
 
-    def lay(self, pts, kind):
+    def lay(self, pts, kind, straight=False):
         name = f"{kind}_{self.n(kind):03d}"
-        path = [tuple(p) for p in pts]
+        # a straight floor needs only its ends (the rails keep their points: their posts stand along them)
+        path = [tuple(p) for p in ((pts[0], pts[-1]) if straight and kind == "Floor" else pts)]
         if kind == "Rails":
             self.b.rails(name, path)
         else:
@@ -199,7 +200,7 @@ class Track:
             if cmd == "gap":
                 self.jump(pts[-1], opts)
             else:
-                self.lay(pts, "Rails" if cmd == "rails" else "Floor")
+                self.lay(pts, "Rails" if cmd == "rails" else "Floor", straight=True)
             self.move_along(pts)
         elif cmd in ("left", "right", "rails-left", "rails-right"):
             angle, radius = num(args, 0, line), num(args, 1, line)
