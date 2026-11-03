@@ -131,3 +131,5 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), 2026-11-02:
   Läufe des Inhabers enden (Sektor 1; Sektor 2, wo die Steinkugel an einem Ventilator steht, den sie als Papier
   nehmen muss).
 - Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
+- Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
+  Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).

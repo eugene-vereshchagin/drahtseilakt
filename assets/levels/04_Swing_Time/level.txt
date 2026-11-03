@@ -1,0 +1,8 @@
+title = Swing Time
+author = Drahtseilakt
+version = 1
+licence = GPL-3.0-only
+title.ru = Время качелей
+title.de = Schaukelzeit
+title.zh = 摇摆时刻
+order = 4

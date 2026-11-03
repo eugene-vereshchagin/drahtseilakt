@@ -124,3 +124,5 @@ Following the owner's runs (`--autopilot --follow`), 2026-11-02 (the finished ru
   sector 2; 11 in sector 1 (the bridges and pushers before the first checkpoint); 12 and 13 to where the owner's runs
   end (sector 1; sector 2, where the stone ball stands at a fan it must ride as paper).
 - Videos of the finished runs: `scripts/video.sh`, kept outside the repository.
+- Our ten levels (levels.md, "Our levels and how to edit them"), 2026-11-03: each finished from the start in three
+  styles, with the hint files their descriptions write (`assets/levels/<level>/pilot/`).

@@ -1,0 +1,8 @@
+title = Paper Winds
+author = Drahtseilakt
+version = 1
+licence = GPL-3.0-only
+title.ru = Бумажные ветра
+title.de = Papierwinde
+title.zh = 纸之风
+order = 3

@@ -241,8 +241,9 @@ Done when: most maps play; the report lists the rest, each with its reason.
 - **The test player** finishes each of them in several styles (careful, fast, ...), with videos of the runs.
 - **No copy needed**: the game starts and plays with no copy of the original at all; the import stays on offer.
 
-State: the game starts with no copy and plays our own test level `assets/levels/Parts_Test` with our own parts;
-the levels come next.
+State: the game starts with no copy and plays our own levels with our own parts: ten levels of graded difficulty
+(levels.md, "Our levels and how to edit them"), each finished by the test player in three styles (safe, speed,
+collector), its runs kept beside it and checked by a test, and the test level `assets/levels/Parts_Test`.
 
 ## What players added with mods
 

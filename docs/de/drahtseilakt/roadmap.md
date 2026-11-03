@@ -255,8 +255,10 @@ Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen 
 - **Der Testspieler** schafft jedes davon in mehreren Stilen (vorsichtig, schnell, ...), mit Videos der Läufe.
 - **Keine Kopie nötig**: Das Spiel startet und spielt ganz ohne Kopie des Originals; der Import bleibt angeboten.
 
-Stand: Das Spiel startet ohne Kopie und spielt unser Testlevel `assets/levels/Parts_Test` mit unseren Teilen; die
-Level kommen als Nächstes.
+Stand: Das Spiel startet ohne Kopie und spielt unsere eigenen Level mit unseren Teilen: zehn Level abgestufter
+Schwierigkeit (levels.md, „Unsere Level und wie man sie bearbeitet“), jedes vom Testspieler in drei Stilen geschafft
+(safe, speed, collector), seine Läufe daneben aufbewahrt und von einem Test geprüft, und das Testlevel
+`assets/levels/Parts_Test`.
 
 ## Was Spieler mit Mods ergänzt haben
 

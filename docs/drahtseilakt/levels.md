@@ -27,8 +27,9 @@ folders to open.
 - **A level is a folder directly in the kind's folder** holding exactly one level: one `.nmo` file, or a level in the
   open format (`level.gltf`, `level.bin`, `textures/`; open-format.md). The open format is the clear one, easy to
   finish or fix up by hand: plain glTF and PNG files.
-- Beside it, all optional: `level.txt`, simple `key = value` lines (`title`, `author`, `version`; `#` starts a comment,
-  other keys are ignored), a README (`README.txt` or `README.md`), a preview picture (`preview.png` or
+- Beside it, all optional: `level.txt`, simple `key = value` lines (`title`, `author`, `version`; `title.<code>`, its
+  title in another language, e.g. `title.ru`, shown when the menus speak it; `order`, a number placing it before the
+  levels without one, in its order; `#` starts a comment, other keys are ignored), a README (`README.txt` or `README.md`), a preview picture (`preview.png` or
   `preview.jpg`), and the folders of resources the level uses (`textures/`, `game/`).
 - **The title** is level.txt's `title`, else the folder's name. Either is cleaned (control characters, direction
   overrides and other invisible format characters removed, spaces made one) and cut to **40 characters** (characters,
@@ -57,6 +58,82 @@ under the extended mode's "Open format" always. They are made by scripts in `ass
 a level from track pieces and the stand-ins of the parts; `make_test_level.py` the first one, `Parts_Test`, a few
 hundred units of track with every part on it or beside it), whose outputs are committed. Their licence is the
 game's (GPL-3.0-only).
+
+## Our levels and how to edit them
+
+*2026-11-03.* Ten levels of our own, from a first roll to the gauntlet, ship with the game (the release criterion of
+roadmap.md). Each is new: its layout is ours, only the mechanics are the original's. The menu lists them in this
+order (`order` in level.txt), by their names in the menus' language:
+
+| # | Level | Sectors | Idea | Sky, music, bonus |
+|---|---|---|---|---|
+| 1 | First Roll | 3 | wide floors with borders, gentle turns and slopes, a first stretch of rails, one small hop | A, 1, 100 |
+| 2 | Wood and Stone | 4 | the wooden ball climbs the ramps the stone one cannot; the stone ball shoves crates and loose balls off ledges without borders | B, 2, 200 |
+| 3 | Paper Winds | 4 | the paper ball rides fans up to the floors above; plate bridges hold it | C, 3, 300 |
+| 4 | Swing Time | 4 | things that move: swinging sacks, turning arms, a flap wheel, swings that bridge a gap while they swing by | A, 4, 400 |
+| 5 | Bridges and Boards | 5 | seesaws under every ball; plate bridges that break under the stone one | B, 5, 500 |
+| 6 | Stone Work | 5 | crates, loose balls and domes in the way: shoved off by the stone ball, gone round by the wooden one | C, 1, 600 |
+| 7 | Rail Runner | 5 | long rails through curves, up and down; narrow floors without borders | A, 2, 700 |
+| 8 | Shifting Shapes | 5 | every sector wants another ball: paper for fans and plate bridges, stone for crates, wood for ramps and seesaws | B, 3, 800 |
+| 9 | Leap of Faith | 5 | speed and jumps: long runs down, ramps that throw the ball over gaps, rails taken fast | C, 4, 900 |
+| 10 | The Gauntlet | 6 | narrow ways, every ball and every part one after another | A, 5, 1000 |
+
+Every level starts with the wooden ball and has checkpoints with their flames, extra points and an extra life.
+
+**A level is written as text.** Each folder holds its description, `level.lvl`, a small language read by
+`assets/own/make/leveldsl.py`, which writes the level beside it (`level.gltf`, `level.bin`, `textures/`, `level.txt`)
+with `levelkit.py`. The description lays the track like a turtle: a cursor (a point on the floor's top and a heading,
+along +X at the start, left is +Z) moves on with each piece, and parts are put where it is. A line is a command; `#`
+begins a comment:
+
+```
+title Paper Winds            # the level's name; title.ru, title.de, title.zh: in other languages
+order 3                      # its place in the list
+sky C                        # A, B or C
+music 3                      # the theme, 1 to 5
+bonus 300                    # the level bonus
+ball wood                    # the start ball
+columns 45                   # columns under the floors every 45 units of way, for the look
+
+start                        # the start's platform; the way goes on from its front edge
+width 12                     # the floor's width (borders on|off, surface stone|wood)
+floor 30                     # a straight floor 30 long (floor 30 up 4, floor 30 down 6: a ramp)
+right 90 26                  # a floor turning 90 degrees to the right on a radius of 26 (left A R)
+point                        # an extra point here (life: an extra life; side S, ahead A: beside, further on)
+trafo paper                  # a transformer
+fan ahead -5                 # a fan 5 back from here: a paper ball rises on it to about 17 over its floor
+gap 4 up 12                  # 4 ahead and 12 up: nothing built (a jump, or the floor a fan carries the ball to)
+checkpoint                   # a checkpoint (the heading a multiple of 90): the next sector begins
+finish                       # the balloon, 22 ahead
+```
+
+Besides: `rails L`, `rails-left A R`, `rails-right A R` (rails, also up or down); `box`, `dome`, `loose wood|stone|paper`;
+`seesaw` (over a gap of its board's length), `platebridge` (a gap of 14.8), `swingbridge` (a swing in a gap of 5),
+`sack`, `arms`, `flaps`; `module P_Modul_NN` with `ahead`, `side`, `up`, `turn`, `tilt` for any other part; `move`,
+`turn`, `mark NAME` and `back NAME` to move the cursor without building. The whole list is at the top of
+leveldsl.py.
+
+**The test player's knowledge of a level** is in the same file. From the way laid, leveldsl.py writes the test
+player's hint files for three styles into the level's `pilot/` folder (autopilot.md, "Hint files"): `safe` (rolls
+from point to point and stops, takes every checkpoint, no risks), `speed` (rolls through the points without stopping)
+and `collector` (as safe, and fetches every extra point and life off the way). Gaps, seesaws and turning arms are
+taken at speed in every style (the careful ones with a run-up); a place that needs more says so with `pilot STYLES :
+STEPS` (the hint steps, their points as `ahead side up` about the cursor; e.g. a wait timed for a swing) and `nopilot
+STYLES` / `autopilot STYLES` around a stretch the styles take on their own.
+
+**To change a level**: edit its `level.lvl`, then
+
+```
+scripts/own-levels.sh assets/levels/03_Paper_Winds
+```
+
+builds it and lets the test player play it in each style; each run that finishes is kept as
+`pilot/<style>.replay` (the runs are played in a data folder of their own under `target/`). The test
+`crates/game/src/ownlevels.rs` plays every level's three runs with no copy of the original and fails when one does
+not finish, so a level is never shipped without a run that proves it can be finished. `scripts/video.sh
+assets/levels/03_Paper_Winds assets/levels/03_Paper_Winds/pilot/speed.replay out.mp4` renders a run as a video.
+A level weighs 1.1 to 1.5 MB, 0.6 MB of it the seven textures of our set it carries (the format keeps a level's
+textures in its own folder).
 
 ## The original game: copied by default
 

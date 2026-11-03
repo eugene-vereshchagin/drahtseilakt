@@ -1,0 +1,8 @@
+title = Stone Work
+author = Drahtseilakt
+version = 1
+licence = GPL-3.0-only
+title.ru = Каменная работа
+title.de = Steinarbeit
+title.zh = 石之工
+order = 6

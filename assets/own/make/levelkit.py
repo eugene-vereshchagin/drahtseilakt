@@ -126,9 +126,10 @@ class LevelBuilder:
 
     # --- track -------------------------------------------------------------------------------------------------
 
-    def floor(self, name, path, width, borders=True, sound="stone", sector=0):
-        """A floor along a path of points (its top's centre line), with its borders."""
+    def floor(self, name, path, width, borders=True, sound="stone", sector=0, top="top"):
+        """A floor along a path of points (its top's centre line), with its borders; `top` its top's material."""
         pts, edge = profile(width, borders)
+        edge = [top if e == "top" else e for e in edge]
         m = K.Mesh(name)
         K.sweep(m, path, pts, [self.mat_ids[e] for e in edge], uscale=8.0, vscale=8.0, end_mat=self.mat_ids["side"])
         return self.add(name, m, groups=self._floor_groups(sound) + self.sector(sector))
@@ -138,6 +139,21 @@ class LevelBuilder:
         m = K.Mesh(name)
         K.box(m, self.mat_ids[mat], lo, hi, scale=8.0)
         return self.add(name, m, groups=self._floor_groups(sound) + self.sector(sector))
+
+    def fan_housing(self, name, at):
+        """A low steel frame round a fan on the floor at `at`, only for the look (the ball rolls through it)."""
+        x, y, z = at
+        m = K.Mesh(name)
+        for lo, hi in (((-2.2, -2.2), (2.2, -1.8)), ((-2.2, 1.8), (2.2, 2.2)), ((-2.2, -1.8), (-1.8, 1.8)),
+                       ((1.8, -1.8), (2.2, 1.8))):
+            K.box(m, self.mat_ids["rail"], (x + lo[0], y, z + lo[1]), (x + hi[0], y + 0.3, z + hi[1]))
+        return self.add(name, m)
+
+    def stopper(self, name, lo, hi):
+        """An unseen floor stopper (Phys_FloorStopper): it holds boxes and modules' parts, the ball passes it."""
+        m = K.Mesh(name)
+        K.box(m, None, lo, hi)
+        return self.add(name, m, visible=False, groups=["Phys_FloorStopper"])
 
     def _floor_groups(self, sound):
         sid = {"stone": "01", "wood": "02", "metal": "03"}[sound]
@@ -183,27 +199,38 @@ class LevelBuilder:
         self.placeholder("PS_FourFlames_01", ["PS_Levelstart"], K.pose(at, (0, 0, 1)), (-8, 0, -7), (8, 6, 7))
         self.reset(1, at)
 
-    def reset(self, n, at):
+    def reset(self, n, at, xaxis=(0, 0, 1)):
         x, y, z = at
-        self.placeholder(f"PR_Resetpoint_{n:02d}", ["PR_Resetpoints"], K.pose((x, y + RESET_UP, z), (0, 0, 1)),
+        self.placeholder(f"PR_Resetpoint_{n:02d}", ["PR_Resetpoints"], K.pose((x, y + RESET_UP, z), xaxis),
                          (-2, -2, -2), (2, 2, 2))
 
-    def checkpoint(self, n, at, width=14.0):
+    def column(self, name, top, depth=40.0, r=2.2):
+        """A stone column hanging under the floor from `top` down `depth`: only for the look (no physics)."""
+        x, y, z = top
+        m = K.Mesh(name)
+        K.cylinder(m, self.mat_ids["post"], (x, y - DEPTH - depth, z), (0, 1, 0), r, depth, seg=12)
+        K.cylinder(m, self.mat_ids["border"], (x, y - DEPTH - 1.2, z), (0, 1, 0), r * 1.35, 1.2, seg=12)
+        return self.add(name, m)
+
+    def checkpoint(self, n, at, width=14.0, xaxis=(0, 0, 1)):
         """Checkpoint n (1, 2...): two flame posts across the track at `at` (the floor's top), a plate between them,
-        the stand-in of PC_TwoFlames, and the next sector's reset point."""
+        the stand-in of PC_TwoFlames, and the next sector's reset point. `xaxis` points across the track, to the
+        left of the way on (the frame's z axis then points back along the way, as the camera looks)."""
         x, y, z = at
         m = K.Mesh(f"Checkpoint_{n:02d}")
+        across = np.asarray(xaxis, np.float64)
         for sz in (-7.0, 7.0):
-            self.post(m, (x, y, z + sz), height=1.65)
+            px, _, pz = np.asarray(at, np.float64) + across * sz
+            self.post(m, (px, y, pz), height=1.65)
         K.cylinder(m, self.mat_ids["plate"], (x, y - 0.02, z), (0, 1, 0), 2.6, 0.06, seg=24)
         self.add(f"Checkpoint_{n:02d}", m, groups=["Shadow"])
-        self.placeholder(f"PC_TwoFlames_{n:02d}", ["PC_Checkpoints"], K.pose(at, (0, 0, 1)), (-4, 0, -8), (4, 6, 8))
-        self.reset(n + 1, at)
+        self.placeholder(f"PC_TwoFlames_{n:02d}", ["PC_Checkpoints"], K.pose(at, xaxis), (-4, 0, -8), (4, 6, 8))
+        self.reset(n + 1, at, xaxis)
 
-    def finish(self, at, sector):
+    def finish(self, at, sector, xaxis=(-1, 0, 0)):
         """The finish: the balloon's stand-in (PE_Balloon, group PE_Levelende) with its platform at `at`; its bridge
         of plates reaches back along -X from 9.5 to 21 (the part's measured plates), so the track ends 22 before."""
-        self.placeholder("PE_Balloon_01", ["PE_Levelende"] + self.sector(sector), K.pose(at, (-1, 0, 0)), (-4, -1, -4),
+        self.placeholder("PE_Balloon_01", ["PE_Levelende"] + self.sector(sector), K.pose(at, xaxis), (-4, -1, -4),
                          (4, 1, 4))
 
     # --- parts -------------------------------------------------------------------------------------------------
@@ -271,7 +298,9 @@ class LevelBuilder:
 
     # --- writing -----------------------------------------------------------------------------------------------
 
-    def write(self, title, author, sky, start_ball, music, light=(1.0, 1.0, 1.0), bonus=100, licence=None):
+    def write(self, title, author, sky, start_ball, music, light=(1.0, 1.0, 1.0), bonus=100, licence=None,
+              extra=None):
+        """Writes the level and its level.txt (with `extra` keys besides title, author, version, licence)."""
         groups = sorted(self.groups.items())
         K.write_open(self.out, self.meshes, self.nodes, self.materials, groups, sky=sky, start_ball=start_ball,
                      settings={"music": music, "light": list(light), "level_bonus": bonus, "tutorial": False,
@@ -280,3 +309,5 @@ class LevelBuilder:
             f.write(f"title = {title}\nauthor = {author}\nversion = 1\n")
             if licence:
                 f.write(f"licence = {licence}\n")
+            for k, v in (extra or {}).items():
+                f.write(f"{k} = {v}\n")
