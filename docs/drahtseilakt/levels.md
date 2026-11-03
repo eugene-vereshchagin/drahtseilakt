@@ -213,6 +213,15 @@ carry a finer look (ownkit.py, `Mesh.look`: what the game draws, the mesh itself
 transformers are drawn as the original's kind of pad (a chrome frame round a disc of the ball's material, coloured
 studs on a riveted plate), the paper ball as a crumpled sheet, the balloons' ropes tied to the basket.
 
+**Gates for the balls** (2026-11-03, measured in the sim on ramps 20 long): the wooden ball and the paper one climb a
+ramp of 33 degrees from rest; the stone ball stops on 19 degrees from rest and on 24 with a run-up of 30, so a ramp
+rising 10 over 20 (27 degrees) is a gate only wood (or paper) passes. Level 1 puts one right after each wood
+transformer, and a stone transformer right before what needs the stone ball (a loose stone ball, the crate, a crate on
+a bare stretch, the pushers); its long empty straights are cut and turned into bends. A dome must leave the room of a
+way on both sides of it (the DSL refuses a level where it does not, at the width the floor has there), and a box or a
+loose ball is checked at that width too. Columns under the floors and under rails keep clear of every floor below them
+by its own width.
+
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
 its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26 into it (to a lip) and two flame

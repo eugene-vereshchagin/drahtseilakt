@@ -196,7 +196,17 @@ def _shadow_soft():
     return np.zeros((TEX, TEX, 3)), _radial(1.2) * 0.85
 
 
+def track_slab(name, rows=256):
+    """One slab (5 units) of our track's texture (assets/own/Track, make_textures.py), for a part that becomes part
+    of the track (the crate puzzle's stone, which drops level with the way)."""
+    from PIL import Image
+    img = np.asarray(Image.open(os.path.join(OWN, "Track", name)).convert("RGB"), np.float64) / 255.0
+    return img[:rows]
+
+
 TEXTURE_MAKERS = {
+    "track_top.png": lambda: track_slab("Track_Top_A.png"),
+    "track_side.png": lambda: track_slab("Track_Side.png")[:224, 32:],  # below its brick strip
     "wood.png": lambda: k.planks(TEX, k.rgb(176, 128, 78), 11),
     "wood_dark.png": lambda: k.planks(TEX, k.rgb(120, 82, 50), 12, boards=3),
     "stone.png": lambda: k.stone(TEX, k.rgb(150, 144, 132), 13, slabs=1),
@@ -252,7 +262,6 @@ PACK_NAMES = {
     "P_Modul_25_Wood": "Wood_Raft", "P_Modul_25_HingeSide": "Wood_Misc", "P_Modul_25_Hinge": "Wood_Metal",
     "P_Modul_26_Sandsack": "sandsack", "P_Modul_26_Halter": "E_Holzbeschlag", "P_Modul_26_Seil": "sandsack",
     "P_Modul_29": "Wood_Old", "P_Modul_30_Board": "Modul30_d_Seiten",
-    "P_Modul_34_Floor_Side": "Floor_Side", "P_Modul34_Floor_Top_Flat": "Floor_Top_Flat",
     "P_Modul_34_Box": "E_Holzbeschlag",
     "P_Modul_37_WoodMisc": "Wood_Misc", "P_Modul_37_WoodAxis": "Wood_Metal", "P_Modul_37_Wood01": "Ball_Wood",
     "P_Modul_37_Target": "Target", "P_Modul_37_Metall_1": "Metal_stained",
@@ -418,7 +427,7 @@ def paper_look(name, mat):
     m = k.Mesh(name)
     k.sphere(m, mat, (0, 0, 0), 2.0, seg=48)
     rng = np.random.default_rng(152)
-    folds = [(v / np.linalg.norm(v), rng.uniform(0.03, 0.08), rng.uniform(3.0, 7.0))
+    folds = [(v / np.linalg.norm(v), rng.uniform(0.02, 0.05), rng.uniform(3.0, 7.0))
              for v in rng.normal(size=(36, 3))]
     pts = []
     for p in m.p:
@@ -428,9 +437,12 @@ def paper_look(name, mat):
             # a crease: a ridge where the direction crosses a plane through the middle, sharp at its line
             r += amp * (1 - min(1.0, abs(float(np.dot(d, v))) * freq)) ** 2
         pts.append(tuple(d * r))
-    m.p = pts
+    # as big as the physics' sphere (radius 2 round the middle): most of it on that sphere, only the creases' ridges
+    # a little out of it (no gap under it where it rests, and it does not sink in)
+    radii = sorted(float(np.linalg.norm(q)) for q in pts)
+    top = radii[int(0.9 * (len(radii) - 1))]
+    m.p = [tuple(np.array(q) * (2.0 / top)) for q in pts]
     smooth_normals(m)
-    fit_box(m, PAPER_BOX)
     return m
 
 
@@ -697,18 +709,31 @@ def make_animtrafo():
     ringc = p.mat("AnimTrafo_RingParts_Color", "chrome_env.png", diffuse=[0.09, 0.92, 0.58, 1], texgen="reflect")
     flash = p.mat("AnimTrafo_Flashfield", "flash.png", diffuse=[1, 1, 1, 0.65], emissive=1.0, alpha="BLEND",
                   blend=("one", "one"), double_sided=True)
-    # the cage of bars that rises out of the floor: eight bars round the pad with two rings, 5.5 tall
+    # the cage that rises out of the floor (5.5 tall), in the pad's style: a chrome post on each rounded corner, a
+    # thinner bar in the middle of each side, a chrome frame at its foot and head as the pad's, and a band of the
+    # kind's colour round its middle
     mb = k.Mesh("AnimTrafo_Bars_Mesh")
-    for a in range(8):
-        t = 2 * math.pi * a / 8 + math.pi / 8
-        k.cylinder(mb, bars, (2.15 * math.cos(t), -5.5, 2.15 * math.sin(t)), (0, 1, 0), 0.12, 5.49, seg=6)
-    for y in (-5.2, -0.4):
-        k.torus(mb, bars, (0, y, 0), (0, 1, 0), 2.15, 0.1, seg=24, tube_seg=6)
+    frame = rounded_square(2.1, 0.75, 6)
+    for x, z in ((1.8, 1.8), (-1.8, 1.8), (-1.8, -1.8), (1.8, -1.8)):
+        k.cylinder(mb, ring, (x, -5.5, z), (0, 1, 0), 0.17, 5.49, seg=12)
+        k.ellipsoid(mb, ring, (x, -0.02, z), (0.22, 0.12, 0.22), seg=12)
+    for x, z in ((2.25, 0), (-2.25, 0), (0, 2.25), (0, -2.25)):
+        k.cylinder(mb, bars, (x, -5.3, z), (0, 1, 0), 0.08, 5.1, seg=8)
+    for y, r, mat in ((-5.25, 0.14, ring), (-0.3, 0.14, ring), (-2.8, 0.09, ringc)):
+        k.tube(mb, mat, [(x, y, z) for x, z in frame + frame[:1]], r, seg=10)
+    smooth_normals(mb)
     mf = k.Mesh("AnimTrafo_Flashfield_Mesh")
     quad_xz(mf, flash, 2.46, y=-0.024)
-    # four quarters of the ring, each in its frame's own turn (they open outwards along their frame's (-1, 0, -1))
+    # four quarters of the pad's frame, each in its frame's own turn (they open outwards along their frame's
+    # (-1, 0, -1)): a quarter of the chrome tube round its rounded corner and that corner's coloured stud
     ring_mesh = k.Mesh("AnimTrafo_Ringpart1_Mesh")
-    trafo_ring(ring_mesh, ring, ringc, 180.0, 270.0, seg=32)
+    quarter = [(x, z) for x, z in rounded_square(1.95, 0.7, 12) if x <= 1e-6 and z <= 1e-6]
+    quarter.sort(key=lambda q: math.atan2(q[1], q[0]))
+    k.tube(ring_mesh, ring, [(x, 0.3, z) for x, z in [(-1.95, 0.0)] + quarter + [(0.0, -1.95)]], 0.2, seg=10,
+           caps=True)
+    k.cylinder(ring_mesh, ring, (-1.6, 0.1, -1.6), (0, 1, 0), 0.34, 0.16, seg=16)
+    k.ellipsoid(ring_mesh, ringc, (-1.6, 0.26, -1.6), (0.3, 0.18, 0.3), seg=16)
+    smooth_normals(ring_mesh)
     axes = [((1, 0, 0), 1), ((0, 0, 1), 2), ((-1, 0, 0), 3), ((0, 0, -1), 4)]
     for x, i in reversed(axes):
         m = k.Mesh(f"AnimTrafo_Ringpart{i}_Mesh")
@@ -1210,8 +1235,9 @@ def make_modul_34():
     """The stone-ball puzzle's block and crate: a stone cube that slides down onto a crate; both are bodies of
     their own meshes."""
     p = Part("PH/P_Modul_34")
-    side = p.mat("P_Modul_34_Floor_Side", "stone_side.png", diffuse=0.48, emissive=0.41)
-    top = p.mat("P_Modul34_Floor_Top_Flat", "stone_light.png", emissive=0.08, specular=0.3, power=50)
+    # the stone drops level with the way and becomes part of it: the track's own concrete on top, its side below
+    side = p.mat("P_Modul_34_Floor_Side", "track_side.png", diffuse=0.6, emissive=0.42)
+    top = p.mat("P_Modul34_Floor_Top_Flat", "track_top.png", diffuse=1.0, emissive=0.12, specular=0.3, power=100)
     box = p.mat("P_Modul_34_Box", "crate.png", diffuse=0.88, emissive=0.37)
     p.node("P_Modul_34_Slider_Frame01", pos=(-7.7, 5.0, 0), x=(-1, 0, 0))
     p.node("P_Modul_34_Slider_Frame02", pos=(-7.7, -10.0, 0), x=(-1, 0, 0))

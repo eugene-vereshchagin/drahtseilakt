@@ -85,6 +85,8 @@ BALLS = {"wood": "Wood", "stone": "Stone", "paper": "Paper"}
 BALL_MASS = {"wood": 1.9, "stone": 10.0, "paper": 0.2}
 LOOSE_MASS = {"wood": 2.0, "stone": 10.0, "paper": 0.2}
 BOX_MASS = 1.0
+# A dome's radius (13.3 across, measured on the original's).
+DOME_R = 6.65
 # No loose ball nearer than this to the end of rails.
 RAIL_KEEP = 14.0
 # The test player's automatic steps: a point every this many units along the way, by style.
@@ -222,6 +224,8 @@ class Track:
         # the length of floor laid since the last gap: the most a run-up to the next can take
         self.since_gap = 0.0
         self.floor_points = []
+        # each point's reach across (half the floor's width, or the rails'), for keeping columns clear of it
+        self.floor_reach = []
 
     # --- the cursor ---------------------------------------------------------------------------------------------
 
@@ -267,14 +271,17 @@ class Track:
             self.end_stretch()
             self.resolve_pending()
             self.extend_rails(pts, heads, ties)
-        else:
+        dense = pts
+        if kind != "Rails":
             self.end_rails(pts[0])
             if straight:
                 pts, heads = [pts[0], pts[-1]], [heads[0], heads[-1]]
             self.extend_stretch(pts, heads)
         for p in pts[1:]:
             self.pilot.way(p)
-        self.floor_points.extend(pts)
+        # every few units of it, for keeping columns clear of it
+        self.floor_points.extend(dense)
+        self.floor_reach.extend([L.RAIL_GAUGE / 2 + 1.0 if kind == "Rails" else self.width / 2] * len(dense))
         self.since_gap += sum(float(np.linalg.norm(b - a)) for a, b in zip(pts, pts[1:]))
         if self.columns and kind == "Floor":
             for a, c in zip(pts, pts[1:]):
@@ -386,13 +393,15 @@ class Track:
         count = max(1, int(round((total - 2 * keep) / L.RAIL_SUPPORT)))
         want = [keep + (total - 2 * keep) * (k + 0.5) / count for k in range(count)]
         below = np.array(self.floor_points) if self.floor_points else np.zeros((0, 3))
+        reach = np.array(self.floor_reach) if self.floor_reach else np.zeros(0)
         out = []
         for d in want:
             i = min(range(len(run)), key=lambda j: abs(run[j] - d))
             c = path[i]
             if len(below):
                 flat = np.hypot(below[:, 0] - c[0], below[:, 2] - c[2])
-                if np.any((flat < 6.0) & (below[:, 1] < c[1] - 1.0) & (below[:, 1] > c[1] - L.RAIL_COLUMN - 3.0)):
+                if np.any((flat < reach + 2.0) & (below[:, 1] < c[1] - 1.0)
+                          & (below[:, 1] > c[1] - L.RAIL_COLUMN - 3.0)):
                     continue
             out.append(i)
         return out
@@ -681,10 +690,11 @@ class Track:
     def place_columns(self, depth=60.0):
         """The columns under the floors, but none that would pass through a floor or rails below it."""
         below = np.array(self.floor_points) if self.floor_points else np.zeros((0, 3))
+        reach = np.array(self.floor_reach) if self.floor_reach else np.zeros(0)
         for c in self.column_spots:
             if len(below):
                 flat = np.hypot(below[:, 0] - c[0], below[:, 2] - c[2])
-                if np.any((flat < 8.0) & (below[:, 1] < c[1] - 1.0) & (below[:, 1] > c[1] - depth - 3.0)):
+                if np.any((flat < reach + 3.0) & (below[:, 1] < c[1] - 1.0) & (below[:, 1] > c[1] - depth - 3.0)):
                     continue
             self.b.column(f"Column_{self.n('column'):03d}", tuple(c), depth)
 
@@ -694,6 +704,23 @@ class Track:
         if "down" in opts:
             return -float(opts["down"])
         return 0.0
+
+    def width_at(self, ahead):
+        """The floor's width `ahead` of the cursor (on the stretch being laid, a width tapering over its last floor),
+        else the width set."""
+        st = self.stretch
+        if st is None or len(st["path"]) < 2:
+            return self.width
+        q = self.at(ahead)
+        best = None
+        for (a, b), (wa, wb) in zip(zip(st["path"], st["path"][1:]), zip(st["widths"], st["widths"][1:])):
+            a, b = np.asarray(a), np.asarray(b)
+            ab = b - a
+            t = float(np.clip(np.dot(q - a, ab) / (np.dot(ab, ab) + 1e-12), 0.0, 1.0))
+            d = float(np.linalg.norm(a + ab * t - q))
+            if best is None or d < best[0]:
+                best = (d, wa + (wb - wa) * t)
+        return best[1] if best[0] < 6.0 else self.width
 
     def check_room(self, cmd, kind, side, ahead, opts, line):
         """Notes a box or a loose ball for check_bodies; one marked `shove` must be no heavier than the ball the way
@@ -706,7 +733,7 @@ class Track:
                 raise LevelError(f"line {line}: a {self.ball_kind} ball ({mine}) cannot shove "
                                  f"a {kind or cmd} ({theirs})")
         self.bodies.append({"at": self.at(ahead, side), "centre": self.at(ahead), "across": self.left(), "r": body_r,
-                            "free": L.free_width(self.width, self.safety, self.rail_sides, self.surface),
+                            "free": L.free_width(self.width_at(ahead), self.safety, self.rail_sides, self.surface),
                             "shove": "shove" in opts, "rolls": cmd == "loose", "line": line, "what": kind or cmd})
 
     def check_bodies(self):
@@ -754,6 +781,13 @@ class Track:
             self.b.box(self.n("box"), tuple(p), s)
         elif cmd == "dome":
             self.b.dome(self.n("dome"), tuple(p), s)
+            # a dome is gone round, never over: it must leave the room of a way on both sides
+            free = L.free_width(self.width_at(ahead), self.safety, self.rail_sides, self.surface)
+            for sgn in (-1.0, 1.0):
+                room = free / 2 - sgn * side - DOME_R
+                if room < L.MIN_FREE:
+                    raise LevelError(f"line {line}: the dome leaves only {room:.1f} beside it on the "
+                                     f"{'left' if sgn > 0 else 'right'} (at least {L.MIN_FREE} on both sides)")
         elif cmd == "trafo":
             kind = BALLS.get(word(args, 0, line))
             if kind is None:

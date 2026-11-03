@@ -541,15 +541,31 @@ def make_env():
 
 def make_balls():
     n = 128 * SCALE
-    stone = photo("Rock030", n, (125, 131, 115), 0.17, 0.3, 0.2)
-    save(pits(stone, 61), "Ball_Stone")
+    save(pits(stone_ball(n, 61), 61, count=150, sizes=(0.6, 1.6), depth=0.16), "Ball_Stone")
     woodball = wood(n, (159, 126, 80), 0.34, 9, seed=18)
     save(woodball, "Ball_Wood")
     save(woodball, "P_Ball_Wood")
     save(collage(n), "Ball_Paper")
 
 
-def pits(img, seed, count=260):
+def stone_ball(n, seed):
+    """The stone ball's skin: one solid, worn stone (measured on the original's: mean colour (126, 132, 115), a fine
+    speckled grain, lightness std 27 of 255, most of it from texel to texel), soft clouding and a few faint veins, no
+    cracks (a photographed rock's cracks read as a ball fallen to pieces). Tiles both ways, so the sphere's seam does
+    not show."""
+    base = np.array([126, 132, 115]) / 255.0
+    fine = noise(n, n // 2, seed, 2) - 0.5
+    grain = noise(n, n // 8, seed + 1, 3) - 0.5
+    cloud = noise(n, 4, seed + 2, 5) - 0.5
+    # veins: thin soft lines where a warped field crosses a level
+    warp = noise(n, 3, seed + 3, 5)
+    vein = np.exp(-((np.sin(warp * 18.0) * 3.0) ** 2)) * (noise(n, 6, seed + 4, 3) > 0.55)
+    light = 1 + 0.42 * fine + 0.22 * grain + 0.16 * cloud - 0.10 * vein
+    tint = 1 + 0.04 * (noise(n, 5, seed + 5, 4)[..., None] - 0.5) * np.array([1.0, -0.6, 0.4])
+    return np.clip(base[None, None] * light[..., None] * tint, 0, 1)
+
+
+def pits(img, seed, count=260, sizes=(1.0, 3.0), depth=0.28):
     """Small hollows in a stone: dark on the side the light comes from, a light rim on the other (as the original's
     pitted stone ball, measured: about 260 pits, 1 to 3 texels of 128 across)."""
     n = img.shape[0]
@@ -558,14 +574,14 @@ def pits(img, seed, count=260):
     out = img.copy()
     for _ in range(count):
         cx, cy = rng.uniform(0, n, 2)
-        r = rng.uniform(1.0, 3.0) * SCALE
+        r = rng.uniform(*sizes) * SCALE
         dx = (xx - cx + n / 2) % n - n / 2
         dy = (yy - cy + n / 2) % n - n / 2
         d = np.hypot(dx / 1.3, dy) / r
         m = d < 1.4
         if not m.any():
             continue
-        shade = np.where(d < 1, 0.72 + 0.25 * (dx + dy) / (2 * r), 1 + 0.12 * np.clip(1.4 - d, 0, 0.4) / 0.4)
+        shade = np.where(d < 1, 1 - depth + 0.25 * (dx + dy) / (2 * r), 1 + 0.12 * np.clip(1.4 - d, 0, 0.4) / 0.4)
         out[m] = out[m] * shade[m][:, None]
     return np.clip(out, 0, 1)
 

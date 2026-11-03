@@ -221,6 +221,16 @@ was das Spiel zeichnet, das Netz selbst bleibt der Physik): die Transformatoren 
 gezeichnet (ein Chromrahmen um eine Scheibe aus dem Material der Kugel, farbige Knöpfe auf einer genieteten Platte),
 die Papierkugel als zerknülltes Blatt, die Seile der Ballons am Korb festgebunden.
 
+**Tore für die Kugeln** (2026-11-03, in der Simulation auf Rampen von 20 Länge gemessen): die Holz- und die
+Papierkugel steigen aus dem Stand eine Rampe von 33 Grad hinauf; die Steinkugel bleibt aus dem Stand bei 19 Grad
+stehen und mit 30 Anlauf bei 24, so ist eine Rampe, die auf 20 um 10 steigt (27 Grad), ein Tor, das nur Holz (oder
+Papier) passiert. Level 1 setzt eines gleich nach jeden Holz-Transformator und einen Stein-Transformator gleich vor
+das, wofür die Steinkugel gebraucht wird (eine lose Steinkugel, die Kiste, eine Kiste auf einem kahlen Stück, die
+Schieber); seine langen leeren Geraden sind gekürzt und zu Bögen geworden. Eine Kuppel muss auf beiden Seiten den
+Platz eines Wegs lassen (die DSL lehnt ein Level ab, wo sie es nicht tut, bei der Breite, die der Boden dort hat);
+Kisten und lose Kugeln werden bei derselben Breite geprüft. Säulen unter den Böden und unter Schienen halten Abstand
+zu jedem Boden unter ihnen, nach dessen eigener Breite.
+
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
 Flammenschalen an ihrem Rand; ein Checkpoint ein Bodenstück von 10 Länge mit einer 1,26 tief eingelassenen Schale von
