@@ -76,11 +76,13 @@ mod tests {
             .as_deref()
             .and_then(BallKind::from_name)
             .unwrap_or(BallKind::Wood);
-        let mut sim = Sim::with_modules(
+        // played by the rules of the format it was recorded in, as the game plays it
+        let mut sim = Sim::with_rules(
             &loaded.level,
             ball,
             &modules,
             loaded.level.settings.tutorial,
+            run.version,
         );
         let balls = data.part("3D Entities/Balls.nmo").expect("our balls");
         sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);

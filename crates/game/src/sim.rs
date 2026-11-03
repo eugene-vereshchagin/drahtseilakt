@@ -783,7 +783,15 @@ impl Sim {
 
     /// A run of a level, with the physics of the modules the port has (crate::modules) from their loaded files.
     /// `tutorial`: the level starts with the original's tutorial (level 1), which stops the level before the ball.
+    #[cfg(test)]
     pub fn with_modules(level: &Level, start_ball: BallKind, modules: &Modules, tutorial: bool) -> Sim {
+        Sim::with_rules(level, start_ball, modules, tutorial, crate::replay::VERSION)
+    }
+
+    /// A run of a level by the rules of a replay format (crate::replay), so that a replay plays as it was recorded:
+    /// format 5 made the loose objects (crates, paper balls, domes) of their module file's object, as the original
+    /// does; before, of the level's stand-in. `tutorial` as for `with_modules`.
+    pub fn with_rules(level: &Level, start_ball: BallKind, modules: &Modules, tutorial: bool, format: u32) -> Sim {
         // A placeholder whose module is loaded is not solid itself: the module is made of its parts when the port
         // has its physics, and an original module without an entry has none. A placeholder whose module file is
         // missing (a map's own module) stays solid.
@@ -886,6 +894,14 @@ impl Sim {
             // As the original physicalizes them: the pose without the scale, the mesh's points scaled.
             let Some((pos, rot, scale)) = pose_and_scale(&o.matrix) else {
                 continue;
+            };
+            // The original makes the object of its module file (`P_Dome_MF` of PH/P_Dome.nmo, with the stand-in's
+            // matrix) and physicalizes that one's mesh, which is not the stand-in's: the dome's is rounder (264
+            // points against 73), 0.12 higher off the floor and 0.12 taller; the paper ball's a crumpled 315 points
+            // against an 18-point ball. A level without the module file keeps its stand-in.
+            let mesh = match module_mesh(level, i, modules) {
+                Some(m) if format >= 5 => m,
+                _ => mesh,
             };
             let points: Vec<Vec3> = mesh.positions.iter().map(|p| Vec3::from(*p) * scale).collect();
             let sector = sector_of(i);
@@ -1901,6 +1917,16 @@ impl Sim {
     }
 }
 
+/// The mesh of the module file's object (`<module>_MF`) that the original makes in place of a loose object's
+/// stand-in (a crate, a paper ball, a dome), if the module file is loaded and has it.
+fn module_mesh<'a>(level: &Level, i: usize, modules: &'a Modules) -> Option<&'a level::Mesh> {
+    let name = level::module_name(&level.objects.get(i)?.name);
+    let (_, file) = modules.get(name)?;
+    let root = format!("{name}_MF");
+    let o = file.objects.iter().find(|o| o.name.eq_ignore_ascii_case(&root))?;
+    file.meshes.get(o.mesh?)
+}
+
 /// The most sectors a level has (the original's have up to 8; hints take sectors 1 to 64 as well).
 pub const MAX_SECTORS: usize = 64;
 
@@ -2524,6 +2550,67 @@ pub(crate) mod tests {
         obj
     }
 
+    /// A convex mesh: the box from `lo` to `hi`.
+    fn box_mesh(name: &str, lo: Vec3, hi: Vec3) -> Mesh {
+        let mut corners = Vec::new();
+        for x in [lo.x, hi.x] {
+            for y in [lo.y, hi.y] {
+                for z in [lo.z, hi.z] {
+                    corners.push([x, y, z]);
+                }
+            }
+        }
+        Mesh {
+            name: name.into(),
+            channels: Vec::new(),
+            look: None,
+            positions: corners,
+            normals: vec![[0.0, 1.0, 0.0]; 8],
+            uvs: vec![[0.0; 2]; 8],
+            parts: vec![],
+        }
+    }
+
+    /// The original physicalizes a dome (any loose object) as its module file's object `P_Dome_MF`, not as the
+    /// level's stand-in (the dome of level 1: the stand-in 3.55 high and coarse, the module's 3.68 and round). Here
+    /// the stand-in is a slab the ball rolls over and the module's object a wall it cannot climb: format 5 meets
+    /// the wall, a replay of format 4 rolls over the slab as it was recorded.
+    #[test]
+    fn a_dome_is_made_of_its_module_file_s_object() {
+        let mut level = flat_level();
+        let probe = Sim::new(&level, BallKind::Wood);
+        let forward = probe.camera.forward().with_y(0.0).normalize();
+        let at = forward * 15.0;
+        let stand_in = add_cube(&mut level, "P_Dome_01", at, &["P_Dome", "Sector_01"]);
+        let mesh = level.objects[stand_in].mesh.expect("a mesh");
+        level.meshes[mesh] = box_mesh("P_Dome_01_Mesh", Vec3::new(-6.6, 0.0, -6.6), Vec3::new(6.6, 0.05, 6.6));
+        level.objects[stand_in].matrix[3] = [at.x, 0.0, at.z, 1.0];
+        let mut file = Level::default();
+        file.meshes.push(box_mesh("P_Dome_MF_Mesh", Vec3::new(-6.6, 0.0, -6.6), Vec3::new(6.6, 8.0, 6.6)));
+        file.objects.push(Object {
+            name: "P_Dome_MF".into(),
+            matrix: Mat4::IDENTITY.to_cols_array_2d(),
+            mesh: Some(0),
+            visible: true,
+            sprite: None,
+        });
+        let modules = Modules {
+            models: vec![file],
+            names: vec!["P_Dome".into()],
+        };
+        let along = |format: u32| {
+            let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, false, format);
+            for _ in 0..360 {
+                sim.step(input::UP);
+            }
+            sim.ball.position.dot(forward)
+        };
+        let new = along(5);
+        assert!(new < 15.0 - 6.6, "the ball got past the module's wall: {new}");
+        let old = along(4);
+        assert!(old > 15.0 + 6.6, "a format 4 run did not roll over the stand-in: {old}");
+    }
+
     #[test]
     fn a_sector_s_objects_are_in_the_physics_only_while_it_is_current() {
         // A box in sector 1 and one in sector 2, and the first checkpoint on the ball's way.
@@ -2999,6 +3086,38 @@ pub(crate) mod tests {
         assert!(sim.game_over, "three balls lost, the run must be over");
     }
 
+    /// Level 1's dome (P_Dome_01, sector 2) with the player's copy (skipped without OPENBALLANCE_DATA): the wooden
+    /// ball at rest 6 in front of it and pushed straight at it climbs it and rolls over, as in the original (run
+    /// under Wine with the start moved there) and in the C reference, where it is 7.85 high 5 ticks after hitting
+    /// it and 10.71 high over its top at z -507.9. Made of the level's stand-in (format 4), the coarse, lower dome
+    /// stopped it.
+    #[test]
+    fn level_1_dome_is_climbed_as_in_the_original() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let modules = crate::scene::load_modules(&level, &data);
+        let run = |format: u32| {
+            let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, level.settings.tutorial, format);
+            sim.start_from(1, None, Some(Vec3::new(74.79, 8.0, -494.0)));
+            let mut top = (0.0f32, 0.0f32);
+            for t in 1..=560 {
+                sim.step(if t >= 367 { input::RIGHT } else { 0 });
+                let p = sim.ball.position;
+                if p.y > top.0 {
+                    top = (p.y, p.z);
+                }
+            }
+            (top, sim.ball.position)
+        };
+        let ((y, z), _) = run(5);
+        assert!(y > 10.5 && (z + 507.8).abs() < 1.5, "over the dome's top at y {y}, z {z}");
+        let ((y, _), p) = run(4);
+        assert!(y < 9.0 && p.z > -502.0, "format 4: up to y {y}, at {p:?}");
+    }
+
     /// Level 10's first sector with the player's copy (skipped without OPENBALLANCE_DATA): the way on from the spur
     /// at the hinged bridge (P_Modul_37_01), where a wooden ball is too light to tip it. Rammed by the wooden ball, the
     /// pusher (P_Modul_01_01) clears its pegs from the loop's west side enough to pass; the rails behind lead to the
@@ -3014,7 +3133,7 @@ pub(crate) mod tests {
         let modules = crate::scene::load_modules(&level, &data);
         let run = crate::replay::Replay::parse(include_str!("../../../hints/Level_10-s1-bridge.replay")).expect("replay");
         let start = run.start.clone().expect("a run from the spur");
-        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+        let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, false, run.version);
         sim.start_from(start.sector - 1, start.ball.as_deref().and_then(BallKind::from_name), start.at.map(Vec3::from));
         let mut stone_at = None;
         for t in 1..=run.end {

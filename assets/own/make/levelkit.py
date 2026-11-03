@@ -498,7 +498,8 @@ class LevelBuilder:
 
     def placeholder(self, name, groups, matrix, lo=(-1, -1, -1), hi=(1, 1, 1), mesh=None):
         """A part's stand-in: a mesh without any material, never drawn (the game puts the part there). For a box, a
-        dome or a loose ball its mesh is the body's shape, so it is given as `mesh`."""
+        dome or a loose ball its mesh is the body's shape for runs recorded in replay format 4 and before (from 5 the
+        body is the part file's `_MF` object, as in the original), so it is given as `mesh`."""
         if mesh is None:
             mesh = K.Mesh(name)
             K.box(mesh, None, lo, hi)
@@ -824,7 +825,8 @@ class LevelBuilder:
         return self.placeholder(f"P_Box_{n:02d}", ["P_Box"] + self.sector(sector), K.pose((x, y + 2.5, z)), mesh=m)
 
     def dome(self, n, at, sector):
-        """A dome bumper (P_Dome): its body is its stand-in's mesh, a low spherical cap 13.3 across, 3.55 high."""
+        """A dome bumper (P_Dome): a low spherical cap 13.3 across, 3.55 high, the body of runs recorded in replay
+        format 4 and before; from format 5 the body is the part's P_Dome_MF (13.3 across, 0.12 to 3.68 high)."""
         w, h = 13.29 / 2, 3.55
         rad = (w * w + h * h) / (2 * h)
         m = K.Mesh("dome")

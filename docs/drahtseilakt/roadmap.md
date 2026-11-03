@@ -44,7 +44,9 @@ new engine got level 1 playable, ahead of the phase order:
   (format 1) play without them, and those recorded before the 20 s (format 2) with the pieces lying until the ball
   is lost. The checkpoints open the sectors in the order of their names (PC_TwoFlames_01, _02, ...), however the
   level's group lists them (levels 11 and 12 list them out of order); replays recorded before (format 3) keep the
-  group's order. The ball's smoke puffs when it appears and when it
+  group's order. The loose objects (crates, paper balls, domes) are made of their module file's object
+  (`P_Dome_MF` of PH/P_Dome.nmo), as the original makes them, not of the level's coarser stand-in; replays
+  recorded before (format 4) keep the stand-ins. The ball's smoke puffs when it appears and when it
   bursts (BallParticle_Frame script).
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically. An exported level is whole:
   it carries its settings (music, light, bonus, tutorial, last level) and, in its `game/` folder, its modules, the
