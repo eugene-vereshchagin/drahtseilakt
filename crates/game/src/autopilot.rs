@@ -566,6 +566,18 @@ impl Route {
                         {
                             continue;
                         }
+                        // up more than a step only on a slope: a floor point half way up between them (a kerb as high
+                        // has none)
+                        let mid = (p + q) * 0.5;
+                        if dy > STEP
+                            && !near(mid).into_iter().filter_map(|w| pts.get(w)).any(|m| {
+                                Vec3::new(m.x - mid.x, 0.0, m.z - mid.z).length() < 1.2
+                                    && m.y > p.y + 0.25 * dy
+                                    && m.y < q.y - 0.25 * dy
+                            })
+                        {
+                            continue;
+                        }
                         if !rail_ok(u, v, dy) {
                             continue;
                         }

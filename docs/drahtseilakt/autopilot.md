@@ -54,7 +54,7 @@ taken in its order. The plans written from a walkthrough video are kept as `hint
 
 The way is searched over the floor points of the level's floors, rails and modules. Besides rolling from point to
 point, climbing a little (a step of 1.2; where the test player finds the way by itself, also a smooth slope up to 47
-degrees: a wavy log) and dropping down (30
+degrees, a wavy log: a link climbing more than a step needs a floor point half way up, which a kerb has not) and dropping down (30
 units at most):
 
 - **Rails** hold the ball from the sides: a way goes onto or off a rail only along it (not across a rail crossing

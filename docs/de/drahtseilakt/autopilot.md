@@ -61,7 +61,8 @@ Pläne liegen als `hints/Level_NN.plan` bereit.
 
 Der Weg wird über die Bodenpunkte der Böden, Schienen und Module des Levels gesucht. Außer von Punkt zu Punkt zu
 rollen, ein wenig zu steigen (eine Stufe von 1,2; wo der Testspieler den Weg selbst findet, auch ein glatter Hang bis 47
-Grad: ein welliger Stamm) und
+Grad, ein welliger Stamm: ein Anstieg über eine Stufe hinaus braucht einen Bodenpunkt auf halber Höhe, den eine
+Kante nicht hat) und
 hinabzufallen (höchstens 30 Einheiten):
 
 - **Schienen** halten die Kugel seitlich: auf eine Schiene und von ihr geht ein Weg nur entlang (nicht quer über eine
