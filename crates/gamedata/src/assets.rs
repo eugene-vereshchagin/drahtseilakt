@@ -21,6 +21,9 @@ const OVERLAY_PIXELS_MAX: u64 = 256 * 1024 * 1024;
 static OVERLAY_PIXELS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// The level's textures already counted (a texture decoded again, as a sky face is, counts once).
 static OVERLAY_COUNTED: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+/// The budgeted pictures already kept as a texture's pixels in the level or one of its parts: each further texture
+/// that keeps a copy of one is charged again (one picture standing in for many textures holds many copies).
+static STORED: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
 
 /// The game files a level's own folder may stand in for: its parts (the modules, the balls, the transformer), its
 /// sky, particles and shadow, and a run's sounds. The interface's files (the menus, the font, the level table, the
@@ -166,6 +169,9 @@ impl Data {
         OVERLAY_PIXELS.store(0, std::sync::atomic::Ordering::Relaxed);
         if let Ok(mut counted) = OVERLAY_COUNTED.lock() {
             counted.clear();
+        }
+        if let Ok(mut stored) = STORED.lock() {
+            stored.clear();
         }
         Data {
             root: self.root.clone(),
@@ -433,9 +439,15 @@ impl Data {
 
     /// RGBA pixels of a texture: its own pixels, or its file from the game's texture folders.
     pub fn texture(&self, t: &level::Texture) -> Option<(u32, u32, Vec<u8>)> {
-        let (w, h, mut rgba) = self.texture_pixels(t)?;
-        // the texture's transparent colour: those texels get alpha 0 (SetAlphaForTransparentColor)
-        if let Some(key) = t.color_key {
+        self.texture_with(t, &crate::packs::chain(crate::packs::Kind::Textures))
+    }
+
+    /// `texture` with the chain of texture packs given.
+    fn texture_with(&self, t: &level::Texture, chain: &[crate::packs::Pack]) -> Option<(u32, u32, Vec<u8>)> {
+        let (w, h, mut rgba, keyed) = self.texture_pixels(t, chain)?;
+        // the texture's transparent colour: those texels get alpha 0 (SetAlphaForTransparentColor); a player's pack's
+        // picture has real alpha instead
+        if let Some(key) = t.color_key.filter(|_| keyed) {
             for [r, g, b, a] in rgba.as_chunks_mut::<4>().0 {
                 if [*r, *g, *b] == key {
                     *a = 0;
@@ -445,22 +457,24 @@ impl Data {
         Some((w, h, rgba))
     }
 
-    fn texture_pixels(&self, t: &level::Texture) -> Option<(u32, u32, Vec<u8>)> {
+    /// A texture's pixels, and whether its transparent colour applies to them (not to a player's pack's picture).
+    fn texture_pixels(&self, t: &level::Texture, chain: &[crate::packs::Pack]) -> Option<(u32, u32, Vec<u8>, bool)> {
+        let keyed = |(w, h, px): (u32, u32, Vec<u8>)| (w, h, px, true);
         match &t.source {
             level::TextureSource::Pixels {
                 width,
                 height,
                 rgba,
-            } => Some((*width, *height, rgba.clone())),
+            } => Some((*width, *height, rgba.clone(), true)),
             // an open-format level's texture: a plain file of its folder, its size checked before it is decoded
             level::TextureSource::LevelFile(path) => {
                 // its folder a real one too (a link there would lead out of the level's folder)
                 let folder = path.parent().is_some_and(|d| std::fs::symlink_metadata(d).is_ok_and(|m| m.is_dir()));
                 let plain = folder && std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
-                if !plain || !self.overlay_pixels(path) {
+                if !plain || !self.overlay_pixels(path, false) {
                     return None;
                 }
-                decode_capped(path)
+                decode_capped(path).map(keyed)
             }
             // a texture a .nmo names: only the last part of its name, looked for in the game's texture folders (a
             // stranger's map may name any path there; it never reads one)
@@ -472,20 +486,20 @@ impl Data {
                 let own = self.overlay.as_deref().is_some_and(|o| path.starts_with(o));
                 if !own
                     && crate::resources::is_part(&rel)
-                    && let Some(found) = self.player_pack_picture(&file)
+                    && let Some((w, h, px)) = self.player_pack_picture(&file, chain)
                 {
-                    return Some(found);
+                    return Some((w, h, px, false));
                 }
                 // it may come from a level's game folder (a stranger's): its size checked before it is decoded
                 if !std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX) {
                     return None;
                 }
-                if !self.overlay_pixels(&path) {
+                if !self.overlay_pixels(&path, false) {
                     return None;
                 }
-                decode_capped(&path)
+                decode_capped(&path).map(keyed)
             }
-            level::TextureSource::Game(name) => self.game_texture(name),
+            level::TextureSource::Game(name) => self.game_texture(name, chain),
             level::TextureSource::None => None,
         }
     }
@@ -493,28 +507,32 @@ impl Data {
     /// The game's texture `name` (an open-format level's `game:` image): the level's own `game/Textures/` first (a
     /// level folder's picture of that name wins), then the texture packs' chain, then ours, then the copy's. The name
     /// is only compared with the files' names (resources::texture_key), never made a path.
-    fn game_texture(&self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
-        use crate::packs::{Kind, ORIGINAL, OWN};
+    fn game_texture(&self, name: &str, chain: &[crate::packs::Pack]) -> Option<(u32, u32, Vec<u8>, bool)> {
+        use crate::packs::{ORIGINAL, OWN};
+        // each candidate: its path, whether it is a player's pack's (budgeted, real alpha), whether it is the copy's
+        // (its transparent colour applies)
         let level_own = self.overlay.as_deref().and_then(|o| plain_path(o, "Textures"));
         let mut tried: Vec<PathBuf> = Vec::new();
+        let copy = |p: Option<PathBuf>| p.map(|p| (p, false, true));
         let candidates = level_own
             .and_then(|d| crate::packs::picture(&d, name))
+            .map(|p| (p, false, true))
             .into_iter()
-            .chain(crate::packs::chain(Kind::Textures).into_iter().filter_map(|p| match (p.key.as_str(), &p.dir) {
-                (_, Some(dir)) => crate::packs::picture(dir, name),
-                (OWN, None) => crate::resources::own_texture(name),
-                (ORIGINAL, None) => self.copy_picture(name),
+            .chain(chain.iter().filter_map(|p| match (p.key.as_str(), &p.dir) {
+                (_, Some(dir)) => crate::packs::picture(dir, name).map(|p| (p, true, false)),
+                (OWN, None) => crate::resources::own_texture(name).map(|p| (p, false, false)),
+                (ORIGINAL, None) => copy(self.copy_picture(name)),
                 _ => None,
             }))
-            .chain(crate::resources::own_texture(name))
-            .chain(self.copy_picture(name));
-        for path in candidates {
+            .chain(crate::resources::own_texture(name).map(|p| (p, false, false)))
+            .chain(copy(self.copy_picture(name)));
+        for (path, pack, keyed) in candidates {
             if tried.contains(&path) {
                 continue;
             }
             tried.push(path.clone());
-            if let Some(px) = self.decode_budgeted(&path) {
-                return Some(px);
+            if let Some((w, h, px)) = self.decode_budgeted(&path, pack) {
+                return Some((w, h, px, keyed));
             }
         }
         None
@@ -522,12 +540,12 @@ impl Data {
 
     /// The first picture of `name` among the player's texture packs that come before any built-in pack in the
     /// chain, decoded (a broken one is passed over for the next).
-    fn player_pack_picture(&self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
-        crate::packs::chain(crate::packs::Kind::Textures)
-            .into_iter()
-            .map_while(|p| p.dir)
+    fn player_pack_picture(&self, name: &str, chain: &[crate::packs::Pack]) -> Option<(u32, u32, Vec<u8>)> {
+        chain
+            .iter()
+            .map_while(|p| p.dir.clone())
             .filter_map(|dir| crate::packs::picture(&dir, name))
-            .find_map(|path| self.decode_budgeted(&path))
+            .find_map(|path| self.decode_budgeted(&path, true))
     }
 
     /// The copy's own picture of the texture `name`, found by its name as texture_key compares names (in its
@@ -538,10 +556,10 @@ impl Data {
     }
 
     /// A picture decoded through the caps: a plain file of at most IMAGE_MAX, within the pixel budget when it is a
-    /// level's, the toolbox's or a player's pack's.
-    fn decode_budgeted(&self, path: &Path) -> Option<(u32, u32, Vec<u8>)> {
+    /// level's, the toolbox's or a player's pack's (`pack`: it comes from a player's pack, wherever that is).
+    fn decode_budgeted(&self, path: &Path, pack: bool) -> Option<(u32, u32, Vec<u8>)> {
         let plain = std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
-        if !plain || !self.overlay_pixels(path) {
+        if !plain || !self.overlay_pixels(path, pack) {
             return None;
         }
         decode_capped(path)
@@ -668,13 +686,8 @@ pub fn attach_looks(base: &mut level::Level, look: level::Level) -> usize {
         return 0;
     }
     let (t0, m0) = (base.textures.len(), base.materials.len());
-    base.textures.extend(look.textures.iter().cloned());
-    base.materials.extend(look.materials.iter().cloned().map(|mut m| {
-        m.texture = m.texture.and_then(|t| t.checked_add(t0));
-        m.normal = m.normal.and_then(|t| t.checked_add(t0));
-        m
-    }));
-    let mut n = 0usize;
+    // the looks made first: a part none of whose looks could be moved into place is left as it was
+    let mut ready: Vec<(usize, level::Mesh)> = Vec::new();
     for (bm, lm, matrix) in pairs {
         let Some(src) = look.meshes.get(lm) else { continue };
         let mut mesh = src.look.as_deref().unwrap_or(src).clone();
@@ -685,9 +698,21 @@ pub fn attach_looks(base: &mut level::Level, look: level::Level) -> usize {
         for c in &mut mesh.channels {
             c.material = c.material.saturating_add(m0);
         }
-        if let Some(m) = matrix {
-            transform_mesh(&mut mesh, &m);
+        if matrix.is_none_or(|m| transform_mesh(&mut mesh, &m)) {
+            ready.push((bm, mesh));
         }
+    }
+    if ready.is_empty() {
+        return 0;
+    }
+    base.textures.extend(look.textures.iter().cloned());
+    base.materials.extend(look.materials.iter().cloned().map(|mut m| {
+        m.texture = m.texture.and_then(|t| t.checked_add(t0));
+        m.normal = m.normal.and_then(|t| t.checked_add(t0));
+        m
+    }));
+    let mut n = 0usize;
+    for (bm, mesh) in ready {
         if let Some(b) = base.meshes.get_mut(bm) {
             b.look = Some(Box::new(mesh));
             n = n.saturating_add(1);
@@ -707,7 +732,8 @@ fn mat(m: &[[f32; 4]; 4]) -> glam::Mat4 {
 fn relative_matrix(base: &[[f32; 4]; 4], look: &[[f32; 4]; 4]) -> Option<[[f32; 4]; 4]> {
     let inv = affine_inverse(base)?;
     let out = mat(&inv).mul_mat4(&mat(look));
-    if !out.is_finite() {
+    // a flattened move (the look's frame singular) would leave its normals unmoved: refused like the base's
+    if !out.is_finite() || affine_inverse(&out.to_cols_array_2d()).is_none() {
         return None;
     }
     Some(if out.abs_diff_eq(glam::Mat4::IDENTITY, 1e-6) { IDENTITY } else { out.to_cols_array_2d() })
@@ -735,15 +761,21 @@ fn affine_inverse(m: &[[f32; 4]; 4]) -> Option<[[f32; 4]; 4]> {
 }
 
 /// Moves a mesh by an affine matrix: its positions, and its normals by the inverse transpose (normalised again).
-fn transform_mesh(mesh: &mut level::Mesh, m: &[[f32; 4]; 4]) {
+/// False, the mesh left half moved, when the matrix cannot be inverted or a moved position is not finite (finite
+/// numbers moved far enough overflow): the look is not taken.
+fn transform_mesh(mesh: &mut level::Mesh, m: &[[f32; 4]; 4]) -> bool {
     if *m == IDENTITY {
-        return;
+        return true;
     }
+    let Some(inv) = affine_inverse(m) else { return false };
     let mm = mat(m);
     for p in &mut mesh.positions {
-        *p = mm.transform_point3(glam::Vec3::from(*p)).to_array();
+        let moved = mm.transform_point3(glam::Vec3::from(*p));
+        if !moved.is_finite() {
+            return false;
+        }
+        *p = moved.to_array();
     }
-    let Some(inv) = affine_inverse(m) else { return };
     let normal = glam::Mat3::from_mat4(mat(&inv)).transpose();
     for n in &mut mesh.normals {
         let t = normal.mul_vec3(glam::Vec3::from(*n));
@@ -751,6 +783,7 @@ fn transform_mesh(mesh: &mut level::Mesh, m: &[[f32; 4]; 4]) {
             *n = t.to_array();
         }
     }
+    true
 }
 
 /// Who made a level's (or part's) textures, for putting ours in their place.
@@ -809,6 +842,7 @@ impl Data {
     /// `put_pack_textures` with the chain of texture packs given.
     fn put_textures_of(&self, level: &mut level::Level, maker: Maker, chain: &[crate::packs::Pack]) {
         use crate::packs::{ORIGINAL, OWN, REMASTERED};
+        dedupe_game_textures(level);
         // the copy's textures as they are: nothing to do (the classic look of the copy, and the toolbox's default)
         if chain.first().is_none_or(|p| p.key == ORIGINAL) && !matches!(maker, Maker::Copy) {
             return;
@@ -838,6 +872,10 @@ impl Data {
             let mut copys: Option<bool> = None;
             let mut replaced = None;
             for pack in chain {
+                // a player's pack's pictures are budgeted wherever the pack is; the copy's picture keeps the texture's
+                // transparent colour (a remaster's texture carries the copy's)
+                let from_pack = pack.dir.is_some();
+                let keep_key = pack.key == ORIGINAL && pack.dir.is_none();
                 let path = match (pack.key.as_str(), &pack.dir) {
                     (_, Some(dir)) => names.iter().find_map(|n| crate::packs::picture(dir, n)),
                     (OWN, None) => names.iter().find_map(|n| crate::resources::own_texture(n)),
@@ -854,14 +892,18 @@ impl Data {
                 {
                     break;
                 }
-                if let Some(px) = self.decode_budgeted(&path) {
-                    replaced = Some(px);
+                if let Some(px) = self.decode_budgeted(&path, from_pack)
+                    && self.charge_stored(&path, from_pack, px.0, px.1)
+                {
+                    replaced = Some((px, keep_key));
                     break;
                 }
             }
-            if let Some((width, height, rgba)) = replaced {
+            if let Some(((width, height, rgba), keep_key)) = replaced {
                 t.source = level::TextureSource::Pixels { width, height, rgba };
-                t.color_key = None;
+                if !keep_key {
+                    t.color_key = None;
+                }
             }
         }
     }
@@ -894,14 +936,8 @@ impl Data {
 impl Data {
     /// A texture from the level's own game files still fits the budget of their pixels (read from its header, then
     /// counted as taken); any other texture always does.
-    fn overlay_pixels(&self, path: &Path) -> bool {
-        use std::sync::atomic::Ordering;
-        // the files of a level's own folder, of the toolbox's interface and of the player's packs share the budget; the
-        // copy's do not
-        let budgeted = self.overlay.as_deref().is_some_and(|o| path.starts_with(o))
-            || path.starts_with(crate::resources::remastered_root())
-            || crate::packs::in_player_packs(path);
-        if !budgeted {
+    fn overlay_pixels(&self, path: &Path, pack: bool) -> bool {
+        if !self.budgeted(path, pack) {
             return true;
         }
         if OVERLAY_COUNTED.lock().is_ok_and(|c| c.iter().any(|p| p == path)) {
@@ -914,22 +950,81 @@ impl Data {
         else {
             return false;
         };
-        let n = u64::from(w).saturating_mul(u64::from(h));
-        let mut taken = OVERLAY_PIXELS.load(Ordering::Relaxed);
-        loop {
-            let Some(next) = taken.checked_add(n).filter(|&t| t <= OVERLAY_PIXELS_MAX) else {
-                return false;
-            };
-            match OVERLAY_PIXELS.compare_exchange_weak(taken, next, Ordering::Relaxed, Ordering::Relaxed) {
-                Ok(_) => {
-                    if let Ok(mut counted) = OVERLAY_COUNTED.lock() {
-                        counted.push(path.to_path_buf());
-                    }
-                    return true;
-                }
-                Err(now) => taken = now,
-            }
+        if !charge(u64::from(w).saturating_mul(u64::from(h))) {
+            return false;
         }
+        if let Ok(mut counted) = OVERLAY_COUNTED.lock() {
+            counted.push(path.to_path_buf());
+        }
+        true
+    }
+
+    /// The files of a level's own folder, of the toolbox's interface and of the player's packs (`pack`, or by where
+    /// they are) share the budget; the copy's and ours do not.
+    fn budgeted(&self, path: &Path, pack: bool) -> bool {
+        pack || self.overlay.as_deref().is_some_and(|o| path.starts_with(o))
+            || path.starts_with(crate::resources::remastered_root())
+            || crate::packs::in_player_packs(path)
+    }
+
+    /// A budgeted picture decoded as `width` × `height` is kept as one more texture's pixels: the first copy was
+    /// counted when it was decoded, each further one is charged again (one picture a pack has for one name may stand in
+    /// for any number of the level's and its parts' textures of that name, each keeping a copy). False: over the budget,
+    /// the texture keeps its own.
+    fn charge_stored(&self, path: &Path, pack: bool, width: u32, height: u32) -> bool {
+        if !self.budgeted(path, pack) {
+            return true;
+        }
+        let Ok(mut stored) = STORED.lock() else { return false };
+        if !stored.iter().any(|p| p == path) {
+            stored.push(path.to_path_buf());
+            return true;
+        }
+        charge(u64::from(width).saturating_mul(u64::from(height)))
+    }
+}
+
+/// Takes `n` pixels from the level's budget, if they fit.
+fn charge(n: u64) -> bool {
+    use std::sync::atomic::Ordering;
+    let mut taken = OVERLAY_PIXELS.load(Ordering::Relaxed);
+    loop {
+        let Some(next) = taken.checked_add(n).filter(|&t| t <= OVERLAY_PIXELS_MAX) else {
+            return false;
+        };
+        match OVERLAY_PIXELS.compare_exchange_weak(taken, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => return true,
+            Err(now) => taken = now,
+        }
+    }
+}
+
+/// Points every material at the first of the level's `game:` textures of each name (as texture names compare), so a
+/// level naming one game texture many times draws it once (the others are left in the list, unused, and kept as
+/// they are by an export).
+fn dedupe_game_textures(level: &mut level::Level) {
+    let mut first: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut to: Vec<Option<usize>> = Vec::with_capacity(level.textures.len());
+    for (i, t) in level.textures.iter().enumerate() {
+        to.push(match &t.source {
+            level::TextureSource::Game(name) => {
+                let k = *first.entry(crate::resources::texture_key(name)).or_insert(i);
+                (k != i).then_some(k)
+            }
+            _ => None,
+        });
+    }
+    if to.iter().all(Option::is_none) {
+        return;
+    }
+    let map = |t: &mut Option<usize>| {
+        if let Some(k) = t.and_then(|i| to.get(i).copied().flatten()) {
+            *t = Some(k);
+        }
+    };
+    for m in &mut level.materials {
+        map(&mut m.texture);
+        map(&mut m.normal);
     }
 }
 
@@ -1459,10 +1554,99 @@ mod tests {
         }
     }
 
+    /// The tests that take from the level's pixel budget (a global, as the game has one level at a time) run one at a
+    /// time.
+    static BUDGET: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn budget_lock() -> std::sync::MutexGuard<'static, ()> {
+        BUDGET.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Found by review: one pack picture standing in for many textures kept a copy for each, beyond the budget. Each
+    /// further copy is charged; over the budget the textures keep their own.
+    #[test]
+    fn each_copy_of_a_pack_picture_is_charged() {
+        let _lock = budget_lock();
+        let root = std::env::temp_dir().join(format!("drahtseilakt-texpack-uses-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([10, 20, 30, 255])).save(root.join("Brick.png")).unwrap();
+        let data = Data::new(None).for_level(None);
+        // room for three copies of the 2 × 2 picture: the first counted when decoded, two more as copies
+        OVERLAY_PIXELS.store(OVERLAY_PIXELS_MAX - 12, std::sync::atomic::Ordering::Relaxed);
+        let mut level = level::Level {
+            textures: (0..6).map(|_| pixels("Brick", [9, 9, 9, 255])).collect(),
+            ..Default::default()
+        };
+        data.put_textures_of(&mut level, Maker::Copy, &[player_pack("p", &root, Some("none"))]);
+        let replaced = level.textures.iter().filter(|t| first_pixel(t) == Some([10, 20, 30, 255])).count();
+        assert_eq!(replaced, 3);
+        let _ = Data::new(None).for_level(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Found by review: a player's pack's sky face took the original's transparent colour; a pack's picture has real
+    /// alpha, the copy's file keeps the key.
+    #[test]
+    fn a_pack_sky_face_keeps_its_alpha() {
+        let _lock = budget_lock();
+        let root = std::env::temp_dir().join(format!("drahtseilakt-texpack-key-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("copy/Textures/Sky")).unwrap();
+        std::fs::create_dir_all(root.join("pack")).unwrap();
+        let key = image::Rgba([10, 20, 30, 255]);
+        image::RgbaImage::from_pixel(1, 1, key).save(root.join("copy/Textures/Sky/Sky_Z_Front.bmp")).unwrap();
+        image::RgbaImage::from_pixel(1, 1, key).save(root.join("pack/Sky_Z_Front.png")).unwrap();
+        let data = Data::new(Some(root.join("copy"))).for_level(None);
+        let face = level::Texture {
+            name: "Sky_Z_Front".into(),
+            source: level::TextureSource::File("Sky_Z_Front.bmp".into()),
+            color_key: Some([10, 20, 30]),
+        };
+        let alpha = |chain: &[crate::packs::Pack]| data.texture_with(&face, chain).and_then(|(_, _, px)| px.get(3).copied());
+        assert_eq!(alpha(&[player_pack("p", &root.join("pack"), None)]), Some(255));
+        assert_eq!(alpha(&[]), Some(0), "the copy's own face keeps its transparent colour");
+        let _ = Data::new(None).for_level(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Found by review: a look moved far enough overflowed to infinities, and a flattened look frame left its normals
+    /// unmoved; both are refused, and the part keeps its own look.
+    #[test]
+    fn a_look_that_cannot_be_moved_is_refused() {
+        let far = [[1e30, 0.0, 0.0, 0.0], [0.0, 1e30, 0.0, 0.0], [0.0, 0.0, 1e30, 0.0], [0.0, 0.0, 0.0, 1.0]];
+        let mut mesh = quad("q", 1e10);
+        assert!(!transform_mesh(&mut mesh, &far));
+        let flat = [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+        assert_eq!(relative_matrix(&IDENTITY, &flat), None);
+        let base = || level::Level {
+            meshes: vec![quad("Box", 1.0)],
+            materials: vec![material(None)],
+            objects: vec![object("P_Box_MF", 0, [0.0; 3])],
+            ..Default::default()
+        };
+        let mut look = level::Level {
+            meshes: vec![quad("Other", 1e10)],
+            materials: vec![material(None)],
+            objects: vec![object("P_Box_MF", 0, [0.0; 3])],
+            ..Default::default()
+        };
+        look.objects[0].matrix = far;
+        let mut b = base();
+        assert_eq!(attach_looks(&mut b, look), 0);
+        assert!(b.meshes[0].look.is_none() && b.materials.len() == 1, "left as it was");
+        let mut look = base();
+        look.objects[0].matrix = flat;
+        look.meshes[0].name = "Other".into();
+        let mut b = base();
+        assert_eq!(attach_looks(&mut b, look), 0);
+    }
+
     /// A player's texture pack replaces the copy's textures it has by name (any spelling), passes a broken or
     /// oversized picture over for the next pack, never touches a stranger's own pixels, and stops at `original`.
     #[test]
     fn a_texture_pack_replaces_by_name_and_fails_closed() {
+        let _lock = budget_lock();
         let root = std::env::temp_dir().join(format!("drahtseilakt-texpack-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let (a, b) = (root.join("a"), root.join("b"));

@@ -24,6 +24,10 @@ immer mit unseren Texturen und den Teilen, die jedes Level nimmt. Für einen Lau
 | Texturen | `own` („eigene“: unsere, frei), `original` („Original“: die Kopie des Spielers), `remastered` („Remaster“: die eigenen hochskalierten Bilder eines Remaster-Levels, sonst die der Kopie) | `own` |
 | Modelle | `level` („wie im Level“: jedes Level mit den Teilen, die es nimmt), `own` („eigene“: das Aussehen unserer Teile), `original` („Original“: das Aussehen der Teile der Kopie) | `level` |
 
+Mit den Paketen geändert (2026-11-03): `original` zeichnet in einem remasterten Level nun die Bilder der Kopie (mit
+ihren transparenten Farben); das Aussehen, das ein remastertes Level vorher mit `original` hatte, seine eigenen
+hochskalierten Bilder, ist nun die Wahl `remastered`.
+
 ## Wo Pakete liegen
 
 Im Datenordner, neben `sounds/`: `textures/<paket>/` und `models/<paket>/` (`~/.local/share/drahtseilakt/` unter Linux,
@@ -72,7 +76,7 @@ textures/
   (die „transparente Farbe“ des Originals wird auf das Bild eines Pakets nicht angewandt).
 - Gelesen werden nur gewöhnliche Dateien direkt im Ordner des Pakets, in `Sky/` und in `Particles/`; Verknüpfungen werden
   nie verfolgt. Ein Bild, das sich nicht lesen oder dekodieren lässt, wird zugunsten des nächsten Pakets übergangen. Die
-  Bilder eines Levels aus einem Levelordner und aus Paketen teilen sich ein Budget von 256 Millionen Pixeln.
+  Bilder eines Levels aus einem Levelordner und aus Paketen teilen sich ein Budget von 256 Millionen Pixeln; ein Bild, das für mehrere Texturen steht, zählt für jede.
 
 Welche Texturen ein Paket ersetzt (dieselbe Regel wie für unsere eigenen Texturen, [resources.md](resources.md), „Eigene
 Texturen“): jede Textur der Level, Teile und Kugeln der Kopie und ihrer Remasters; in einer fremden Karte nur die

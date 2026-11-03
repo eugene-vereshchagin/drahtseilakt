@@ -22,6 +22,10 @@ parts each level takes. For one run: `--textures KEY` and `--models KEY`.
 | Textures | `own` (ours, free), `original` (the player's copy), `remastered` (a remastered level's own upscaled pictures, else the copy's) | `own` |
 | Models | `level` (each level with the parts it takes), `own` (our parts' looks), `original` (the copy's parts' looks) | `level` |
 
+Changed with the packs (2026-11-03): `original` in a remastered level now draws the copy's pictures (with the copy's
+transparent colours); the look a remastered level had with `original` before, its own upscaled pictures, is now the
+`remastered` choice.
+
 ## Where packs live
 
 In the data folder, beside `sounds/`: `textures/<pack>/` and `models/<pack>/` (`~/.local/share/drahtseilakt/` on Linux,
@@ -68,7 +72,7 @@ textures/
   (the original's "transparent colour" is not applied to a pack's picture).
 - Only plain files directly in the pack's folder, `Sky/` and `Particles/` are read; links are never followed. A picture
   that cannot be read or decoded is passed over for the next pack. A level's pictures from a level folder and from
-  packs share one budget of 256 million pixels.
+  packs share one budget of 256 million pixels; a picture standing in for several textures counts for each.
 
 Which textures a pack replaces (the same rule as our own textures, [resources.md](resources.md), "Own textures"):
 every texture of the copy's levels, parts and balls and of their remasters; in a stranger's map only the copy's own
