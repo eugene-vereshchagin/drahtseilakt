@@ -1,6 +1,10 @@
 # Level 8 — hints for the test player (docs/drahtseilakt/autopilot.md), from the walkthrough video's storyboard
 # (ref/video/frames/fast/level08) and tried out in the game.
 #
+# Sector 1: the paper ball, lifted by the fan P_Modul_18_01 onto the rails along x 80, climbs them south into the
+# wood transformer at their end at a push (slow, it rolls back short of it).
+at 79.8 20.6 -20 r 4 sector 1 kind paper : press 79.8 21 -37 0 0 20 200
+#
 # Sector 3: the zigzag of rail pairs to the extra life (x 570 → z -288 → x 586 → z -310 → x 611 → the platform
 # with the dome). Each pair is two rails one above the other: the wooden ball rides on the lower one leaning on the
 # upper, from the end of one pair onto the next. Off the L-shaped track's corner, onto the first pair, south along
@@ -19,7 +23,8 @@ at 758 7.2 -326 r 4 sector 4 kind paper : press 805 25.2 -325.3 0 0 30 400 ; pre
 # corridor's middle misses the disc), so that both bridges fall into the gaps of the row along z -455, and rolls
 # along that row from its west end east over both, ramming the boxes off, to the last checkpoint.
 at 788 9.1 -455 r 3 sector 4 kind paper : goto 790.5 10.5 -458 ; press 790.5 9.2 -480 0 0 6 400 ; wait 30
-at 842.5 0.4 -431 r 4 sector 4 kind wood : goto 842.5 0.4 -431 ; goto 842.5 4 -420.5 ; goto 820 9.1 -420.3 ; goto 806 9.1 -420 ; goto 802.3 11.1 -424 ; press 802.3 11.1 -445 0 0 12 150 ; wait 30 ; goto 803 11.1 -428 ; goto 806 9.1 -420 ; goto 830 6.5 -420.3 ; goto 842.5 4 -420.5 ; goto 842.5 0.4 -431
+at 790.5 9.2 -480 r 3 sector 4 kind wood : goto 791 9.1 -481 ; goto 793 -1.4 -483 ; goto 816 -1.4 -485 ; goto 817.4 -1.4 -470 ; goto 817.4 -1.4 -445 ; goto 819.4 -1.4 -435.9 ; goto 838 -1.4 -434 ; goto 842.5 0.4 -431
+at 842.5 0.4 -431 r 4 sector 4 kind wood : goto 842.5 0.4 -431 ; goto 842.5 4 -420.5 ; goto 820 9.1 -420.3 ; goto 806 9.1 -420 ; goto 802.3 11.1 -424 ; press 802.3 11.1 -445 0 0 12 150 ; wait 30 ; goto 803 11.1 -428 ; goto 806 9.1 -420 ; goto 830 6.5 -420.3 ; goto 842.5 4 -420.5 ; goto 842.5 0.4 -431 ; goto 838 -1.4 -434 ; goto 819.4 -1.4 -435.9 ; goto 817.4 -1.4 -455 ; goto 817.4 -1.4 -478.8 ; goto 815.4 -1.4 -483.8 ; goto 800 -1.4 -485 ; goto 767 -1.4 -486 ; goto 743 -1.4 -484.8 ; goto 742 -1.4 -481 ; goto 742.5 -1.4 -474.5 ; goto 746 -1.4 -472.8 ; press 768.5 8.8 -472.8 0 0 6 300 ; goto 771.4 9.1 -478
 at 771.5 9.1 -482 r 3 sector 4 kind wood : goto 771 9.1 -489 ; goto 771.5 9.1 -495.5 ; goto 781 9.1 -495.5 ; goto 819 9.1 -495.5 ; goto 823.6 9.1 -494 ; press 823.6 9.1 -465 0 0 12 150 ; wait 30 ; goto 823 9.1 -490 ; goto 819 9.1 -495.5 ; goto 781 9.1 -495.5 ; goto 771.5 9.1 -495.5 ; goto 771 9.1 -489 ; goto 771 9.1 -470
 # The boxes P_Box_04/05 stacked on that row: rammed east from a run-up, again and again, to the corner where the
 # row turns south, and off its far side (rams a little north of the middle, braking after each).
