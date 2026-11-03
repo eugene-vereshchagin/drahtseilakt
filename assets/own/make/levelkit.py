@@ -434,6 +434,9 @@ class LevelBuilder:
         self.mat_ids = {}
         # the places where a way leaves the ball too little room (track): write() refuses the level while any are
         self.narrow = []
+        # the parts standing on the floors (node, half the side of their footprint, what): write() checks that the
+        # floor under each is flat, none of it through the part
+        self.standing = []
         self.seed = seed
         self._standard_materials()
 
@@ -905,7 +908,9 @@ class LevelBuilder:
         x, y, z = at
         m = K.Mesh("box")
         K.box(m, None, (-2.5, -2.5, -2.5), (2.5, 2.5, 2.5))
-        return self.placeholder(f"P_Box_{n:02d}", ["P_Box"] + self.sector(sector), K.pose((x, y + 2.5, z)), mesh=m)
+        i = self.placeholder(f"P_Box_{n:02d}", ["P_Box"] + self.sector(sector), K.pose((x, y + 2.5, z)), mesh=m)
+        self.standing.append((i, 2.5, 2.5, f"P_Box_{n:02d}"))
+        return i
 
     def dome(self, n, at, sector):
         """A dome bumper (P_Dome): a low spherical cap 13.3 across, 3.55 high, the body of runs recorded in replay
@@ -930,7 +935,9 @@ class LevelBuilder:
                 else:
                     m.face(None, [a, hi[k], hi[(k + 1) % seg], b])
         m.face(None, pts[0])
-        return self.placeholder(f"P_Dome_{n:02d}", ["P_Dome"] + self.sector(sector), K.pose(at), mesh=m)
+        i = self.placeholder(f"P_Dome_{n:02d}", ["P_Dome"] + self.sector(sector), K.pose(at), mesh=m)
+        self.standing.append((i, 4.7, 0.0, f"P_Dome_{n:02d}"))
+        return i
 
     def loose_ball(self, kind, n, at, sector):
         """A loose ball (P_Ball_Wood, _Stone, _Paper) lying on `at`; the wooden and stone ones are spheres of radius
@@ -945,8 +952,10 @@ class LevelBuilder:
         """A transformer (P_Trafo_Wood, _Stone, _Paper): its pad lies on `at`."""
         x, y, z = at
         name = f"P_Trafo_{kind}"
-        return self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), K.pose((x, y + 0.1, z)),
-                                (-2.5, -0.1, -2.5), (2.5, 2.4, 2.5))
+        i = self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), K.pose((x, y + 0.1, z)),
+                             (-2.5, -0.1, -2.5), (2.5, 2.4, 2.5))
+        self.standing.append((i, 2.47, 0.1, f"{name}_{n:02d}"))
+        return i
 
     def extra_point(self, n, at, sector):
         x, y, z = at
@@ -963,6 +972,64 @@ class LevelBuilder:
         return self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), matrix, lo, hi)
 
     # --- writing -----------------------------------------------------------------------------------------------
+
+    def floor_tops(self):
+        """The floors' tops (triangles facing up) by cells of 4 across the level, for heights under a point."""
+        cells = {}
+        tris = []
+        for i in self.groups.get("Phys_Floors", []):
+            m = self.meshes[self.nodes[i]["mesh"]]
+            P = np.asarray(m.p)
+            N = np.asarray(m.n)
+            for idx in m.parts.values():
+                for t in np.reshape(idx, (-1, 3)):
+                    q = P[list(t)]
+                    nrm = np.cross(q[1] - q[0], q[2] - q[0])
+                    # a top: facing up by its normals (its winding is set later, by orient)
+                    if np.linalg.norm(nrm) < 1e-9 or N[list(t)][:, 1].mean() < 0.3:
+                        continue
+                    tris.append(q)
+                    lo, hi = np.floor(q[:, [0, 2]].min(0) / 4).astype(int), np.floor(q[:, [0, 2]].max(0) / 4).astype(int)
+                    for a in range(lo[0], hi[0] + 1):
+                        for b in range(lo[1], hi[1] + 1):
+                            cells.setdefault((a, b), []).append(len(tris) - 1)
+        return tris, cells
+
+    def check_standing(self):
+        """Every part standing on the floors (a transformer's pad, a box, a dome) stands on a flat, level patch at its
+        own foot: sampled over its footprint, every floor top under it lies within 0.05 of the foot's height (no
+        gutter's slope, kerb, border or a floor's end through it, and nothing missing under it). A level with one
+        that does not is refused, and every such part is named."""
+        tris, cells = self.floor_tops()
+
+        def heights(x, z):
+            out = []
+            for k in cells.get((int(np.floor(x / 4)), int(np.floor(z / 4))), []):
+                a, b, c = tris[k]
+                d = (b[0] - a[0]) * (c[2] - a[2]) - (c[0] - a[0]) * (b[2] - a[2])
+                if abs(d) < 1e-12:
+                    continue
+                u = ((x - a[0]) * (c[2] - a[2]) - (c[0] - a[0]) * (z - a[2])) / d
+                v = ((b[0] - a[0]) * (z - a[2]) - (x - a[0]) * (b[2] - a[2])) / d
+                if u >= -1e-6 and v >= -1e-6 and u + v <= 1 + 1e-6:
+                    out.append(a[1] + u * (b[1] - a[1]) + v * (c[1] - a[1]))
+            return out
+
+        bad = []
+        for i, half, lift, what in self.standing:
+            M = self.nodes[i]["matrix"]
+            x, y, z = M[0, 3], M[1, 3] - lift, M[2, 3]
+            worst = 0.0
+            for sx in np.linspace(-half, half, 7):
+                for sz in np.linspace(-half, half, 7):
+                    hs = [h for h in heights(x + sx, z + sz) if abs(h - y) < 3.0]
+                    off = max((abs(h - y) for h in hs), default=9.0)
+                    worst = max(worst, off)
+            if worst > 0.05:
+                bad.append(f"{what} at ({x:.1f}, {y:.1f}, {z:.1f}): the floor under it is {worst:.2f} off its foot"
+                           + (" (or missing)" if worst >= 9.0 else ""))
+        if bad:
+            raise ValueError(f"{len(bad)} parts do not stand on a flat patch of floor:\n  " + "\n  ".join(bad))
 
     def floor_bounds(self):
         floors = set(self.groups.get("Phys_Floors", []))
@@ -1034,6 +1101,7 @@ class LevelBuilder:
         if self.narrow:
             raise ValueError(f"{len(self.narrow)} places leave the ball less than {MIN_FREE} across at the height of "
                              "its middle:\n  " + "\n  ".join(self.narrow))
+        self.check_standing()
         self.cloud_layer(CLOUD_COVER.get(sky, CLOUD_SCATTERED))
         fog = self.fog(sky)
         for m in self.meshes:

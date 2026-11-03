@@ -517,26 +517,72 @@ def fibonacci(n, seed):
     return out
 
 
-def pieces(part, kind, mat, n, size, inner, seed, stretch=1.0):
-    """A ball's pieces: curved shards of the shell round n directions, each its own node with its y along its
-    direction (the burst pushes along the piece's own up, pieces.rs), in the group Ball_<Kind>_Pieces."""
+def pieces(part, kind, mat, n, thick, seed, stretch=1.0):
+    """A ball's pieces: the ball's own skin peeled into n curved shell fragments that together cover the sphere (each
+    the part of the sphere nearest one of n directions; `stretch` draws the cells out along the poles, as staves),
+    `thick` deep, the ball's texture on the outside as the ball has it, a thin inner side and edges. Each is its own
+    node, at its centre with its y along its direction (the burst pushes along the piece's own up, pieces.rs), in
+    the group Ball_<Kind>_Pieces. Its mesh, whose points the physics takes as its hull, is cut from a coarse sphere
+    (a few dozen points); what is drawn, its look, from a fine one."""
     names = []
-    rng = np.random.default_rng(seed)
-    for i, d in enumerate(fibonacci(n, seed)):
+    dirs = fibonacci(n, seed)
+    squash = np.array([1.0, 1.0 / stretch, 1.0])
+    keys = [d * squash / np.linalg.norm(d * squash) for d in dirs]
+
+    def owner(q):
+        v = q / np.linalg.norm(q) * squash
+        v /= np.linalg.norm(v)
+        return int(np.argmax([np.dot(v, kk) for kk in keys]))
+
+    def shell(seg):
+        sph = k.Mesh("tmp")
+        k.sphere(sph, mat, (0, 0, 0), 2.0, seg=seg)
+        P = np.asarray(sph.p)
+        tris = [tuple(t) for idx in sph.parts.values() for t in np.reshape(idx, (-1, 3))]
+        own = [owner(P[list(t)].mean(0)) for t in tris]
+        return P, sph.uv, tris, own
+
+    coarse, fine = shell(10), shell(40)
+    inner = (2.0 - thick) / 2.0
+
+    def build(name, shell_, i, centre, rot):
+        P, UV, tris, own = shell_
+        m = k.Mesh(name)
+        local = lambda q: rot.T @ (q - centre)
+        edges = {}
+        for t, o in zip(tris, own):
+            if o != i:
+                continue
+            for x, y in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+                key = (min(x, y), max(x, y))
+                edges[key] = None if key in edges else (x, y)
+            m.tri(mat, *[m.vertex(local(P[j]), rot.T @ (P[j] / 2.0), UV[j]) for j in t])
+            inn = [m.vertex(local(P[j] * inner), -(rot.T @ (P[j] / 2.0)), UV[j]) for j in t]
+            m.tri(mat, inn[0], inn[2], inn[1])
+        # the edges: where the piece's skin ends (an edge only one of its triangles has), a strip down to its inside
+        for e in edges.values():
+            if e is None:
+                continue
+            x, y = e
+            q = [P[x], P[y], P[y] * inner, P[x] * inner]
+            m.face(mat, [local(v) for v in q], [UV[x], UV[y], UV[y], UV[x]], normal=rot.T @ np.cross(P[y] - P[x], P[x]))
+        return m
+
+    for i, d in enumerate(dirs):
+        P, _, tris, own = coarse
+        mine = [t for t, o in zip(tris, own) if o == i]
+        if not mine:
+            continue
+        pts = np.array([P[j] for t in mine for j in t])
+        centre = pts.mean(0) * (1 + inner) / 2
         ref = np.array([0.0, 1.0, 0.0]) if abs(d[1]) < 0.9 else np.array([1.0, 0.0, 0.0])
         t1 = np.cross(ref, d)
         t1 /= np.linalg.norm(t1)
-        t2 = np.cross(d, t1)
-        a, b = size * rng.uniform(0.75, 1.2), size * stretch * rng.uniform(0.75, 1.2)
-        outer = [d + t1 * sa * a / 2 + t2 * sb * b / 2 for sa, sb in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
-        outer = [2.0 * q / np.linalg.norm(q) for q in outer]
-        inn = [q * inner / 2.0 for q in outer]
-        centre = (sum(outer) + sum(inn)) / 8
-        # the piece's frame: at its centre, y outward, x along t1
         rot = np.stack([t1, d, np.cross(t1, d)], 1)
-        local = lambda q: rot.T @ (q - centre)
-        m = k.Mesh(f"Ball_{kind}_piece{i + 1:02d}_Mesh")
-        k.hexahedron(m, mat, [local(q) for q in inn] + [local(q) for q in outer], scale=2.0)
+        m = build(f"Ball_{kind}_piece{i + 1:02d}_Mesh", coarse, i, centre, rot)
+        look = build(f"Ball_{kind}_piece{i + 1:02d}_Look", fine, i, centre, rot)
+        if look.p:
+            m.look = look
         name = f"Ball_{kind}_piece{i + 1:02d}"
         part.node(name, part.mesh(m), centre, t1, d)
         names.append(name)
@@ -555,10 +601,11 @@ def make_balls():
     pp = p.mat("Ball_Paper_Pieces", "ball_paper.png", emissive=0.2, double_sided=True, **piece_mat)
     light = p.mat("Ball_LightningSphere", "glow.png", diffuse=[0, 0, 0, 1], emissive=1.0, alpha="BLEND",
                   blend=("one", "one"), double_sided=True)
-    # sixteen staves of wood, seventeen chunks of stone, eighteen thin crumples of paper, as many as the original's
-    wood_names = pieces(p, "Wood", wp, 16, 1.3, 1.25, 161, stretch=2.2)
-    stone_names = pieces(p, "Stone", sp, 17, 1.5, 0.8, 162)
-    paper_names = pieces(p, "Paper", pp, 18, 1.5, 1.75, 163)
+    # the skin peeled: sixteen staves of wood, seventeen shards of stone, eighteen scraps of paper, as many as the
+    # original's
+    wood_names = pieces(p, "Wood", wp, 16, 0.28, 161, stretch=2.2)
+    stone_names = pieces(p, "Stone", sp, 17, 0.4, 162)
+    paper_names = pieces(p, "Paper", pp, 18, 0.07, 163)
     balls = []
     for name, mat, kind in (("Ball_Wood", wood, "wood"), ("Ball_Stone", stone, "stone"), ("Ball_Paper", paper, "paper")):
         mesh_name = "Ball_Stone_HighRes_Mesh" if kind == "stone" else f"{name}_Mesh"

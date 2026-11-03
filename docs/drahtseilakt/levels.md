@@ -239,6 +239,11 @@ with its strap bent down under the ball's path to the other tube, and at the sup
 down into the haze (the fittings only drawn); the balls drawn smooth (their coarse meshes stay the physics'); the
 start on a stone tower down into the haze; lanterns on wooden posts at the start and beside every checkpoint.
 
+**Parts stand on flat floor** (2026-11-03): the kit refuses a level where a transformer's pad, a box or a dome does
+not stand on a flat, level patch at its own foot (its footprint sampled: every floor top under it within 0.05 of its
+foot, none missing) and names each; a gutter is widened, or the part moved, where one stands. A ball that changes
+sheds its skin: its pieces are curved fragments of its own shell, its texture outside, a thin inside.
+
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
 its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26 into it (to a lip) and two flame

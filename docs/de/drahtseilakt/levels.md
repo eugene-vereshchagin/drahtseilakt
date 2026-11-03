@@ -250,6 +250,12 @@ Stahlstab vom Bügel hinab in den Dunst (die Beschläge nur gezeichnet); die Kug
 bleiben der Physik); der Start auf einem Steinturm hinab in den Dunst; Laternen auf Holzpfosten am Start und neben
 jedem Checkpoint.
 
+**Teile stehen auf ebenem Boden** (2026-11-03): der Baukasten lehnt ein Level ab, in dem die Platte eines
+Transformators, eine Kiste oder eine Kuppel nicht auf einem ebenen, waagerechten Stück an ihrem Fuß steht (ihre
+Grundfläche wird abgetastet: jede Bodenoberseite darunter innerhalb von 0,05 ihres Fußes, nichts fehlt), und nennt
+jede; wo eine steht, wird die Rinne verbreitert oder das Teil versetzt. Eine Kugel, die wechselt, wirft ihre Haut ab:
+ihre Stücke sind gebogene Bruchstücke ihrer eigenen Schale, außen ihre Textur, innen eine dünne Seite.
+
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
 Flammenschalen an ihrem Rand; ein Checkpoint ein Bodenstück von 10 Länge mit einer 1,26 tief eingelassenen Schale von
