@@ -100,5 +100,12 @@ watch hands | F5: take over / give back | F5: взять управление / 
 watch driving | F5: you drive, give back | F5: ведёте вы, отдать | F5: Sie steuern, zurückgeben | F5:你在操控,交还 | F5 : vous conduisez, rendre la main | F5: conduces tú, devolver | F5: guidi tu, restituisci
 watch skip | F6: skip hint step | F6: пропустить шаг подсказки | F6: Hinweisschritt überspringen | F6:跳过提示步骤 | F6 : passer l'étape de l'indice | F6: saltar paso de la pista | F6: salta il passo del suggerimento
 watch stuck | F7: mark stuck here | F7: отметить «застрял здесь» | F7: „steckt hier fest“ markieren | F7:标记“卡在这里” | F7 : marquer « bloqué ici » | F7: marcar «atascado aquí» | F7: segna «bloccato qui»
+watch flow | F8: zone "don't dawdle here" | F8: зона «не мешкать здесь» | F8: Zone „hier nicht trödeln“ | F8:区域“这里别拖延” | F8 : zone « ne pas traîner ici » | F8: zona «no te entretengas aquí» | F8: zona «non indugiare qui»
+watch careful | F4: zone "slow, keep the middle" | F4: зона «медленно, по центру» | F4: Zone „langsam, in der Mitte“ | F4:区域“慢行,走中线” | F4 : zone « lentement, au milieu » | F4: zona «despacio, por el centro» | F4: zona «piano, al centro»
+watch mark how | F8/F4 tap: last {n} s · hold: extend | F8/F4 нажать: последние {n} с · держать: дальше | F8/F4 tippen: letzte {n} s · halten: weiter | F8/F4 轻按:最近 {n} 秒 · 按住:延长 | F8/F4 appui : {n} dernières s · maintenir : prolonger | F8/F4 pulsar: últimos {n} s · mantener: alargar | F8/F4 premi: ultimi {n} s · tieni: prolunga
+watch look back | [ ]: look back {n} s | [ ]: назад на {n} с | [ ]: {n} s zurück | [ ]:回溯 {n} 秒 | [ ] : remonter {n} s | [ ]: atrás {n} s | [ ]: indietro {n} s
+watch undo | Backspace: undo the last zone | Backspace: отменить последнюю зону | Rücktaste: letzte Zone zurücknehmen | 退格:撤销上一个区域 | Retour arrière : annuler la dernière zone | Retroceso: deshacer la última zona | Backspace: annulla l'ultima zona
+watch zones | F12: show zones | F12: показать зоны | F12: Zonen zeigen | F12:显示区域 | F12 : montrer les zones | F12: mostrar zonas | F12: mostra le zone
+watch zones shown | F12: zones shown, hide | F12: зоны видны, скрыть | F12: Zonen sichtbar, ausblenden | F12:区域已显示,隐藏 | F12 : zones visibles, masquer | F12: zonas visibles, ocultar | F12: zone visibili, nascondi
 watch quit | Esc: menu, quit | Esc: меню, выход | Esc: Menü, beenden | Esc:菜单,退出 | Échap : menu, quitter | Esc: menú, salir | Esc: menu, esci
 watch box | F1: hide these keys | F1: скрыть подсказку | F1: diese Tasten ausblenden | F1:隐藏按键提示 | F1 : masquer ces touches | F1: ocultar estas teclas | F1: nascondi questi tasti

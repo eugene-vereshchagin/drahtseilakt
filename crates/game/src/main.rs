@@ -24,6 +24,7 @@ mod highscore;
 mod hints;
 mod hud;
 mod lang;
+mod learned;
 mod levels;
 mod lights;
 mod locate;
@@ -48,6 +49,7 @@ mod trafo;
 mod ui;
 mod volume;
 mod watch;
+mod zones;
 
 use assets::{Data, Source};
 use std::path::PathBuf;
