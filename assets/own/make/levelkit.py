@@ -76,11 +76,15 @@ CHECK_BOWL = [(0.0, 0.0), (2.03, 0.22), (3.24, 0.51), (4.23, 0.86), (5.0, 1.02)]
 CHECK_LEN, CHECK_RESET, CHECK_FLAMES = 10.0, 3.33, 7.0
 CUP_R, CUP_UP = 2.0, 0.3
 # Rails, measured on the original's: two tubes 0.6 thick, their middles 3.9 apart (the ball, 4 across, sits deep
-# between them, its middle 1.22 over theirs), their tops level with the floor they leave; each end of a tube bends out
-# and up (RAIL_FLARE: along, out, up), a mouth that leads a ball coming off the middle onto them.
+# between them, its middle 1.22 over theirs). Ours lie on the floor they leave (the tubes' undersides level with its
+# top: the ball drops 0.48 onto them, not 1.08 as onto the original's, sunk 0.6 deeper), and where a floor runs on from
+# an end each tube bends out over it, flat on its top (RAIL_FLARE: along, out), a mouth that leads a ball coming off
+# the middle onto them, kept on the floor's flat, clear of its borders and railings (on a gutter, which leads the ball
+# to its middle anyway, the mouth is narrower). No ties across between the tubes, as on the
+# original's first levels (posts under them hold them); `ties` gives them (a later level's nerves).
 RAIL_GAUGE, RAIL_TUBE = 3.9, 0.3
-RAIL_DROP = RAIL_TUBE
-RAIL_FLARE = (3.0, 1.4, 1.6)
+RAIL_FLARE = (3.0, 1.4)
+RAIL_POSTS = 8.0
 # The ball's radius (every kind's) and the least room a way leaves it at the height of its middle, between borders or
 # railings: a way narrower than this wedges the ball (the kit refuses to build it).
 BALL_R = 2.0
@@ -581,32 +585,53 @@ class LevelBuilder:
         phys = "Phys_FloorRails" if sound == "metal" else "Phys_Floors"
         return [phys, f"Sound_HitID_{sid}", f"Sound_RollID_{sid}", "Shadow"]
 
-    def rails(self, name, path, gauge=RAIL_GAUGE, r=RAIL_TUBE, posts=6.0, sector=0, headings=None, flare=True):
+    def rails(self, name, path, gauge=RAIL_GAUGE, r=RAIL_TUBE, posts=RAIL_POSTS, sector=0, headings=None,
+              ends=(None, None), ties=False):
         """Two steel tubes the ball rolls on, `gauge` apart (across the cursor's heading at each point, so rails laid
-        piece after piece run on without a kink), their tops at the path's height (the floor's top where they begin
-        and end), with short posts under them; with `flare`, each tube's ends bend out and up (RAIL_FLARE)."""
+        piece after piece run on without a kink), lying on the path (the floor's top where they begin and end). `ends`:
+        for each end, the floor running on from it ((width, safety, surface, (railing left, right)), its middle on the
+        rails' line) or None;
+        over such a floor each tube bends out flat on its top (RAIL_FLARE). Under the tubes, every `posts`, a short
+        post each; with `ties`, a tie across between them instead."""
         m = K.Mesh(name)
         fr = ring_frames(path, headings)
-        down = np.array([0.0, -RAIL_DROP, 0.0])
+        lift = np.array([0.0, r, 0.0])
+        ahead, out = RAIL_FLARE
         for sgn in (-1.0, 1.0):
-            line = [p + s * (sgn * gauge / 2) + down for p, f, s, u, t in fr]
-            if flare:
-                ahead, out, rise = RAIL_FLARE
-                for end, k in ((0, -1.0), (-1, 1.0)):
-                    p, f, s, u, t = fr[end]
-                    t3 = t * k
-                    bend = [line[end] + t3 * (ahead * c) + s * (sgn * out * c * c) + u * (rise * c * c)
-                            for c in np.linspace(0.25, 1.0, 4)]
-                    line = (bend[::-1] + line) if end == 0 else (line + bend)
+            line = [p + s * (sgn * gauge / 2) + lift for p, f, s, u, t in fr]
+            for end, k, floor in ((0, -1.0, ends[0]), (-1, 1.0, ends[1])):
+                if floor is None:
+                    continue
+                width, safety, surface, railed = floor
+                # the mouth's tips stay inside the room the floor leaves (its borders, its railings)
+                # and on the floor's flat (a gutter's slope would bend them up; the gutter is a mouth of its own)
+                flat = 0.0
+                while flat < width / 2 and top_height(width, safety, flat + 0.05, surface) < 1e-6:
+                    flat += 0.05
+                room = min(free_width(width, safety, railed, surface) / 2, flat)
+                o = max(0.0, min(out, room - r - 0.1 - gauge / 2))
+                p, f, s, u, t = fr[end]
+                t3 = f * k
+                bend = []
+                for c in np.linspace(0.25, 1.0, 4):
+                    across = sgn * (gauge / 2 + o * c * c)
+                    q = p + t3 * (ahead * c) + s * across
+                    q[1] = p[1] + r
+                    bend.append(q)
+                line = (bend[::-1] + line) if end == 0 else (line + bend)
             K.tube(m, self.mat_ids["rail"], line, r, caps=True)
         run = 0.0
-        for i in range(1, len(fr)):
+        for i in range(1, len(fr) - 1):
             run += float(np.linalg.norm(fr[i][0] - fr[i - 1][0]))
             if run >= posts:
                 run = 0.0
                 p, f, s, u, t = fr[i]
-                K.tube(m, self.mat_ids["rail"], [p - s * gauge / 2 - u * r + down, p + s * gauge / 2 - u * r + down],
-                       r * 0.7)
+                if ties:
+                    K.tube(m, self.mat_ids["rail"], [p - s * gauge / 2, p + s * gauge / 2], r * 0.7)
+                else:
+                    for sgn in (-1.0, 1.0):
+                        top = p + s * (sgn * gauge / 2)
+                        K.tube(m, self.mat_ids["rail"], [top, top - u * 1.4], r * 0.6, caps=True)
         return self.add(name, m, groups=self._floor_groups("metal") + self.sector(sector))
 
     def bowl_piece(self, name, centre, fwd, bowl, outer, joins, cups, along=0.0):

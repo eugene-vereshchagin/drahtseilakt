@@ -22,7 +22,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     surface stone|wood       the floor's top and its sound
     floor L [up H|down H]    a straight floor L long, rising or falling H over it
     left A R [up H|down H]   a floor turning A degrees to the left on a radius R (right A R: to the right)
-    rails L [up H|down H]    a pair of rails L long (rails-left A R, rails-right A R: turning)
+    rails L [up H|down H] [ties]   a pair of rails L long (rails-left A R, rails-right A R: turning); with `ties`,
+                             ties across between the tubes (a harder ride, for later levels)
     gap L [up H|down H] [runup R]  the cursor jumps L ahead (and H up or down): nothing built; the test player
                              takes it at speed (the careful styles with a run-up of R, 14 if not given)
     move F S U               the cursor moves F ahead, S to the left, U up (nothing built)
@@ -31,7 +32,9 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     checkpoint               a checkpoint at the cursor (a piece 10 long with its bowl, taking 5 of the floors before
                              and after it): the next sector begins
     finish                   the balloon, 22 ahead of the cursor (the floor must end at the cursor)
-    point, life, box, dome, trafo KIND, loose KIND   a part at the cursor;  options: side S (to the left), ahead A
+    point, life, box, dome, trafo KIND, loose KIND   a part at the cursor;  options: side S (to the left), ahead A;
+                             a box or a loose ball must leave room for the ball beside it, or be marked `shove`
+                             (the ball the way has there, no lighter than it, pushes it away)
     column [side S] [ahead A] [depth D]   a stone column under the floor, for the look
     railing left|right|both|off   railings along the floors' edges from here on, on any profile (safety railings
                              gives both on the bare floor; another safety none)
@@ -73,6 +76,12 @@ LEVELS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "levels")
 STYLES = ("safe", "speed", "collector")
 LANGS = ("ru", "de", "zh")
 BALLS = {"wood": "Wood", "stone": "Stone", "paper": "Paper"}
+# The masses the game gives the balls, the loose balls and a box (crates/game/src/sim.rs): who can shove whom.
+BALL_MASS = {"wood": 1.9, "stone": 10.0, "paper": 0.2}
+LOOSE_MASS = {"wood": 2.0, "stone": 10.0, "paper": 0.2}
+BOX_MASS = 1.0
+# No loose ball nearer than this to the end of rails.
+RAIL_KEEP = 14.0
 # The test player's automatic steps: a point every this many units along the way, by style.
 SPACING = {"safe": 9.0, "speed": 14.0, "collector": 9.0}
 # scripts/own-levels.sh tries the speed style with other spacings and keeps the fastest run (LEVELDSL_SPEED_SPACING).
@@ -177,6 +186,7 @@ class Track:
         self.laid_width = None
         # where the last floor built ends (a floor beginning there runs on from its width)
         self.floor_end = None
+        self.floor_end_info = None
         # railings along the floors' left and right edges from here on (safety railings: both)
         self.rail_sides = (False, False)
         # rails being laid piece after piece (one object), and a checkpoint waiting for the floor after it
@@ -190,6 +200,10 @@ class Track:
         self.info = {"author": "Drahtseilakt", "sky": "A", "music": 1, "bonus": 100, "ball": "wood",
                      "light": (1.0, 1.0, 1.0), "titles": {}}
         self.started = self.finished = False
+        # the ball the way has from here on (the start's, then each transformer's)
+        self.ball_kind = "wood"
+        self.bodies = []
+        self.rail_ends = []
         self.start_at = None
         self.checkpoints = 0
         # the distance along the way where each sector ends (its checkpoint, the finish)
@@ -240,13 +254,13 @@ class Track:
         # the turn ends exactly where its last point says (the cursor goes on from there)
         return pts, heads
 
-    def lay(self, pts, heads, kind, straight=False):
+    def lay(self, pts, heads, kind, straight=False, ties=False):
         if kind == "Rails":
             self.end_stretch()
             self.resolve_pending()
-            self.extend_rails(pts, heads)
+            self.extend_rails(pts, heads, ties)
         else:
-            self.end_rails()
+            self.end_rails(pts[0])
             if straight:
                 pts, heads = [pts[0], pts[-1]], [heads[0], heads[-1]]
             self.extend_stretch(pts, heads)
@@ -320,22 +334,36 @@ class Track:
         self.b.checkpoint(cp["n"], tuple(cp["at"]), width=cp["width"], fwd=tuple(cp["fwd"]), back=cp["back"],
                           front=front, along=cp["along"])
 
-    def extend_rails(self, pts, heads):
-        """Rails laid piece after piece are one pair of tubes (no kink or gap where two pieces meet)."""
+    def extend_rails(self, pts, heads, ties=False):
+        """Rails laid piece after piece are one pair of tubes (no kink or gap where two pieces meet); the floor they
+        leave, if one ends where they begin, gets their mouth."""
         r = self.rail_run
         if r is not None and (np.linalg.norm(r["path"][-1] - pts[0]) > 1e-6
                               or np.linalg.norm(r["heads"][-1] - heads[0]) > 1e-6):
             self.end_rails()
             r = None
         if r is None:
-            r = self.rail_run = {"path": [np.asarray(pts[0], np.float64)], "heads": [heads[0]]}
+            start = None
+            if self.floor_end is not None and np.linalg.norm(self.floor_end - pts[0]) < 1e-6:
+                start = self.floor_end_info
+            r = self.rail_run = {"path": [np.asarray(pts[0], np.float64)], "heads": [heads[0]], "start": start,
+                                 "ties": False}
         r["path"].extend(np.asarray(p, np.float64) for p in pts[1:])
         r["heads"].extend(heads[1:])
+        r["ties"] |= ties
 
-    def end_rails(self):
+    def end_rails(self, next_floor=None):
+        """Builds the rails being laid; `next_floor`: where the floor laid next begins (its mouth there when it runs
+        on from their end)."""
         r, self.rail_run = self.rail_run, None
-        if r is not None:
-            self.b.rails(f"Rails_{self.n('Rails'):03d}", [tuple(p) for p in r["path"]], headings=r["heads"])
+        if r is None:
+            return
+        end = None
+        if next_floor is not None and np.linalg.norm(np.asarray(next_floor) - r["path"][-1]) < 1e-6:
+            end = (self.width, self.safety, self.surface, self.rail_sides)
+        self.rail_ends += [r["path"][0], r["path"][-1]]
+        self.b.rails(f"Rails_{self.n('Rails'):03d}", [tuple(p) for p in r["path"]], headings=r["heads"],
+                     ends=(r["start"], end), ties=r["ties"])
 
     def build_start(self, first=None):
         """The start, built with the first floor: joined to it when the floor runs on from the neck's front edge."""
@@ -357,6 +385,7 @@ class Track:
         if st is None or len(st["path"]) < 2:
             return None
         self.floor_end = np.asarray(st["path"][-1], np.float64)
+        self.floor_end_info = (st["widths"][-1], st["safety"], st["surface"], st["rails"][-1])
         begins_joined = st.get("joined") == "start" or st.get("from_start", False)
         try:
             self.b.track(f"Floor_{self.n('Floor'):03d}", [tuple(p) for p in st["path"]], st["widths"], st["along"],
@@ -385,13 +414,13 @@ class Track:
             if cmd == "gap":
                 self.jump(pts[-1], opts)
             else:
-                self.lay(pts, heads, "Rails" if cmd == "rails" else "Floor", straight=True)
+                self.lay(pts, heads, "Rails" if cmd == "rails" else "Floor", straight=True, ties="ties" in opts)
             self.move_along(pts)
         elif cmd in ("left", "right", "rails-left", "rails-right"):
             angle, radius = num(args, 0, line), num(args, 1, line)
             angle = angle if cmd.endswith("left") else -angle
             pts, heads = self.arc(angle, radius, self.rise(opts, line))
-            self.lay(pts, heads, "Rails" if cmd.startswith("rails") else "Floor")
+            self.lay(pts, heads, "Rails" if cmd.startswith("rails") else "Floor", ties="ties" in opts)
             self.move_along(pts, angle)
         elif cmd == "move":
             to = self.at(num(args, 0, line), num(args, 1, line), num(args, 2, line))
@@ -622,8 +651,53 @@ class Track:
             return -float(opts["down"])
         return 0.0
 
+    def check_room(self, cmd, kind, side, ahead, opts, line):
+        """Notes a box or a loose ball for check_bodies; one marked `shove` must be no heavier than the ball the way
+        has there."""
+        body_r = {"box": 2.5 * math.sqrt(2)}.get(cmd, 2.0)
+        if "shove" in opts:
+            mine = BALL_MASS[self.ball_kind]
+            theirs = {"box": BOX_MASS}.get(cmd, LOOSE_MASS.get(kind, 0.0))
+            if mine < theirs:
+                raise LevelError(f"line {line}: a {self.ball_kind} ball ({mine}) cannot shove "
+                                 f"a {kind or cmd} ({theirs})")
+        self.bodies.append({"at": self.at(ahead, side), "centre": self.at(ahead), "across": self.left(), "r": body_r,
+                            "free": L.free_width(self.width, self.safety, self.rail_sides, self.surface),
+                            "shove": "shove" in opts, "rolls": cmd == "loose", "line": line, "what": kind or cmd})
+
+    def check_bodies(self):
+        """The way must stay open past the boxes and loose balls on it: across the way where each lies, with the
+        others near it, a gap of the room of a way (levelkit.MIN_FREE), unless they are all there to be shoved; and
+        no loose ball within RAIL_KEEP of the end of rails (a ball rolls, and in the rails' mouth it blocks them)."""
+        for b in self.bodies:
+            # what lies across the way with it: within a ball's width along the way, and on the same way
+            fwd = np.array([b["across"][2], 0.0, -b["across"][0]])
+            near = [c for c in self.bodies if abs(float(np.dot(c["at"] - b["at"], fwd))) < 4.0 + c["r"]
+                    and np.linalg.norm(c["centre"] - b["centre"]) < 4.0 + b["free"]]
+            if all(c["shove"] for c in near):
+                continue
+            spans = sorted((float(np.dot(c["at"] - b["centre"], b["across"])) - c["r"],
+                            float(np.dot(c["at"] - b["centre"], b["across"])) + c["r"]) for c in near)
+            edge, best = -b["free"] / 2, 0.0
+            for lo, hi in spans:
+                best = max(best, lo - edge)
+                edge = max(edge, hi)
+            best = max(best, b["free"] / 2 - edge)
+            if best < L.MIN_FREE:
+                raise LevelError(f"line {b['line']}: the {b['what']} (with what lies near it) leaves the way only "
+                                 f"{best:.1f} open (at least {L.MIN_FREE}; or mark them `shove` where the ball there "
+                                 "can push them away)")
+            if b["rolls"] and not b["shove"]:
+                for e in self.rail_ends:
+                    if np.linalg.norm(e - b["at"]) < RAIL_KEEP:
+                        far = np.linalg.norm(e - b["at"])
+                        raise LevelError(f"line {b['line']}: a loose {b['what']} ball {far:.0f} "
+                                         f"from the end of rails (at least {RAIL_KEEP}: it rolls into their mouth)")
+
     def part(self, cmd, args, opts, line):
         side, ahead = float(opts.get("side", 0)), float(opts.get("ahead", 0))
+        if cmd in ("box", "loose"):
+            self.check_room(cmd, word(args, 0, line) if cmd == "loose" else None, side, ahead, opts, line)
         p = self.at(ahead, side)
         s = self.sector
         if cmd == "point":
@@ -641,6 +715,7 @@ class Track:
             if kind is None:
                 raise LevelError(f"line {line}: trafo wood|stone|paper")
             self.b.trafo(kind, self.n("trafo" + kind), tuple(p), s)
+            self.ball_kind = kind.lower()
             if "nopilot" not in opts:
                 self.pilot.step(STYLES, f"become {kind.lower()}", p)
         elif cmd == "loose":
@@ -727,7 +802,7 @@ def styles_of(text, line):
 
 
 OPTION_WORDS = ("up", "down", "side", "ahead", "depth", "turn", "tilt", "runup")
-FLAG_WORDS = ("nopilot",)
+FLAG_WORDS = ("nopilot", "ties", "shove")
 
 
 def parse_line(text):
@@ -777,6 +852,8 @@ def compile_level(path):
                 t.info[key] = int(value)
             else:
                 t.info[key] = value
+                if key == "ball":
+                    t.ball_kind = value
             continue
         try:
             parsed = parse_line(raw)
@@ -790,6 +867,7 @@ def compile_level(path):
     t.end_stretch()
     t.end_rails()
     t.resolve_pending()
+    t.check_bodies()
     t.place_columns()
     info = t.info
     titles = info["titles"]

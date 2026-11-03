@@ -176,14 +176,21 @@ depth with it, so its slopes stay the measured ones (a stone ball resting in a s
 **Room, rails and clouds** (2026-11-03, after the owner played level 1): a way must leave the ball (radius 2) at least
 5.5 across at the height of its middle, between its borders or its railings' rails (levelkit.MIN_FREE); the kit
 refuses to write a level that has a narrower place and lists every one (a way 6 wide with brick borders left 4, and
-the ball wedged). Rails are the original's, measured: tubes 0.6 thick, their middles 3.9 apart, so the ball sits deep
-between them, their tops level with the floor they leave, each tube's ends bent out and up into a mouth. Every
-profile's flat top is cut at the same places across (1, 1.25 and 2.5 in from the edges, the last at least 1.5 out from
-the middle, where a narrow gutter's foot is), so stretches of another profile meeting end to end share their vertices;
-every face turns the way its normal says (the tracks' faces were wound and their normals turned inwards before). Under
-every level lies a cloud layer as the original's (`SkyLayer`, hidden in the file, shown by the game when the options
-have clouds, drawn added over the sky): a plane 165 under the lowest floor, 500 past the level on every side, our own
-grey clouds on black repeating every 675.
+the ball wedged). A box or a loose ball must leave that much room beside it, with what lies across the way near it,
+unless it is marked `shove` and the ball the way has there (the start's, then each transformer's) is no lighter (wood
+1.9, stone 10, paper 0.2, a box 1); no loose ball lies within 14 of the end of rails (it rolls into their mouth).
+Rails are the original's width, measured: tubes 0.6 thick, their middles 3.9 apart, so the ball sits deep between
+them; ours lie on the floor they leave (the ball drops 0.48 onto them), and where a floor runs on from an end each
+tube bends out flat over the floor's flat, a mouth seen from above (none on a gutter, which leads the ball to the
+middle itself); posts under the tubes hold them, and ties across between them only with `rails ... ties`, for later
+levels. A transformer stands just before what its ball is for. Every profile's flat top is cut at the same places
+across (1, 1.25 and 2.5 in from the edges, the last at least 1.5 out from the middle, where a narrow gutter's foot
+is), so stretches of another profile meeting end to end share their vertices; every face turns the way its normal says
+(the tracks' faces were wound and their normals turned inwards before). The track's concrete is darker and greyer than
+the original's sandy tone and its slabs' joints fainter (the owner's wish). Under every level lies a cloud layer as
+the original's (`SkyLayer`, hidden in the file, shown by the game when the options have clouds, drawn added over the
+sky): a plane 165 under the lowest floor, 500 past the level on every side, our own grey clouds on black repeating
+every 675.
 
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on

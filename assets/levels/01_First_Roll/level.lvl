@@ -46,6 +46,8 @@ floor 6
 box side 6 ahead 4
 box side -5 ahead 12
 floor 36
+loose wood side -8 ahead -10
+loose wood side 7 ahead -16
 life side 9 ahead -4
 box side -8 ahead -12
 width 8
@@ -63,11 +65,17 @@ right 90 12
 railing off
 floor 10
 trafo stone
-floor 48 down 2
-railing right
+# the stone ball has work at once: a loose stone ball on a bare square, too heavy for the wooden one, shoved off it
+floor 20 down 2
+borders off
+width 10
+floor 12
+loose stone ahead -5 shove
 left 90 14
-railing off
+borders on
+width 7
 floor 14
+# back to wood just before what the stone ball does badly: the climb, then the rails
 trafo wood
 floor 12
 width 8
@@ -75,10 +83,10 @@ floor 34 up 5
 safety border
 width 24
 floor 6
-loose paper side 5 ahead 6
-loose paper side -4 ahead 10
-loose paper side 2 ahead 15
-loose paper side -6 ahead 19
+loose paper side 5 ahead 6 shove
+loose paper side -4 ahead 10 shove
+loose paper side 2 ahead 15 shove
+loose paper side -6 ahead 19 shove
 floor 30
 point side -7 ahead -6
 width 8
@@ -93,8 +101,6 @@ rails 16
 safety gutter
 width 12
 floor 12
-loose wood side 4 ahead -6
-loose wood side -4 ahead -6
 rails 28 down 3
 width 10
 floor 12
@@ -162,7 +168,7 @@ floor 10
 width 14
 floor 24
 box side 4 ahead -10
-box side -4 ahead -10
+box side -4 ahead -20
 life side 0 ahead -16
 width 9
 railing left
@@ -180,11 +186,11 @@ right 90 16
 railing off
 width 22
 floor 10
-loose stone side 7 ahead 4
-loose stone side 2.5 ahead 4
-loose stone side -2.5 ahead 4
-loose stone side -7 ahead 4
-loose paper side 0 ahead 10
+loose stone side 7 ahead 4 shove
+loose stone side 2.5 ahead 4 shove
+loose stone side -2.5 ahead 4 shove
+loose stone side -7 ahead 4 shove
+loose paper side 0 ahead 10 shove
 floor 34
 point side 8 ahead -4
 width 10
@@ -236,27 +242,27 @@ right 90 16
 railing off
 floor 16
 surface wood
-floor 34 up 9
+floor 34 up 10
 surface stone
 railing both
 point
 left 90 7
 surface wood
 railing off
-floor 34 up 9
+floor 34 up 10
 surface stone
 railing both
 point
 right 90 7
 surface wood
 railing off
-floor 34 up 9
+floor 34 up 10
 surface stone
 railing both
 left 90 7
 surface wood
 railing off
-floor 34 up 9
+floor 34 up 10
 surface stone
 railing both
 point

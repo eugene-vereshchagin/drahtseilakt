@@ -180,16 +180,23 @@ bleiben ihre Hänge die gemessenen (eine Steinkugel, die in einer steileren Scha
 **Platz, Schienen und Wolken** (2026-11-03, nachdem der Besitzer Level 1 gespielt hat): ein Weg muss der Kugel (Radius
 2) auf der Höhe ihrer Mitte mindestens 5,5 Breite lassen, zwischen seinen Rändern oder den Holmen seiner Geländer
 (levelkit.MIN_FREE); der Baukasten schreibt kein Level mit einer engeren Stelle und nennt jede (ein 6 breiter Weg mit
-Ziegelrändern ließ 4, und die Kugel klemmte). Schienen sind die des Originals, gemessen: Rohre 0,6 dick, ihre Mitten
-3,9 auseinander, so sitzt die Kugel tief zwischen ihnen, ihre Oberkanten bündig mit dem Boden, den sie verlassen, die
-Enden jedes Rohrs nach außen und oben gebogen, ein Trichter. Die flache Oberseite jedes Profils ist an denselben
-Stellen quer geschnitten (1, 1,25 und 2,5 von den Rändern, die letzte mindestens 1,5 von der Mitte, wo der Fuß einer
-schmalen Rinne liegt), so teilen Stücke verschiedener Profile, die Ende an Ende aufeinandertreffen, ihre Ecken; jede
-Fläche zeigt dahin, wohin ihre Normale zeigt (die Flächen der Bahn waren vorher verkehrt gewickelt, ihre Normalen
-zeigten nach innen). Unter jedem Level liegt eine Wolkenschicht wie die des Originals (`SkyLayer`, in der Datei
-verborgen, vom Spiel gezeigt, wenn die Optionen Wolken haben, additiv über den Himmel gezeichnet): eine Ebene 165
-unter dem tiefsten Boden, 500 über das Level hinaus nach allen Seiten, unsere eigenen grauen Wolken auf Schwarz, alle
-675 wiederholt.
+Ziegelrändern ließ 4, und die Kugel klemmte). Eine Kiste oder eine lose Kugel muss so viel Platz neben sich lassen,
+mit dem, was nahe bei ihr quer über dem Weg liegt, außer sie ist mit `shove` markiert und die Kugel, die der Weg dort
+hat (die des Starts, dann die jedes Transformators), ist nicht leichter (Holz 1,9, Stein 10, Papier 0,2, eine Kiste
+1); keine lose Kugel liegt näher als 14 am Ende von Schienen (sie rollt in ihren Trichter). Schienen haben die Breite
+des Originals, gemessen: Rohre 0,6 dick, ihre Mitten 3,9 auseinander, so sitzt die Kugel tief zwischen ihnen; unsere
+liegen auf dem Boden, den sie verlassen (die Kugel sinkt 0,48 auf sie), und wo von einem Ende ein Boden weiterläuft,
+biegt sich jedes Rohr flach über die ebene Fläche des Bodens nach außen, von oben ein Trichter (keiner auf einer
+Rinne, die die Kugel selbst zur Mitte führt); Pfosten unter den Rohren halten sie, Schwellen quer zwischen ihnen nur
+mit `rails ... ties`, für spätere Level. Ein Transformator steht gleich vor dem, wofür seine Kugel da ist. Die flache
+Oberseite jedes Profils ist an denselben Stellen quer geschnitten (1, 1,25 und 2,5 von den Rändern, die letzte
+mindestens 1,5 von der Mitte, wo der Fuß einer schmalen Rinne liegt), so teilen Stücke verschiedener Profile, die Ende
+an Ende aufeinandertreffen, ihre Ecken; jede Fläche zeigt dahin, wohin ihre Normale zeigt (die Flächen der Bahn waren
+vorher verkehrt gewickelt, ihre Normalen zeigten nach innen). Der Beton der Bahn ist dunkler und grauer als der
+sandige Ton des Originals, die Fugen der Platten schwächer (Wunsch des Besitzers). Unter jedem Level liegt eine
+Wolkenschicht wie die des Originals (`SkyLayer`, in der Datei verborgen, vom Spiel gezeigt, wenn die Optionen Wolken
+haben, additiv über den Himmel gezeichnet): eine Ebene 165 unter dem tiefsten Boden, 500 über das Level hinaus nach
+allen Seiten, unsere eigenen grauen Wolken auf Schwarz, alle 675 wiederholt.
 
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier

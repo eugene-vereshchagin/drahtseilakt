@@ -660,7 +660,11 @@ def collage(n):
 TRACK_OUT = os.path.join(os.path.dirname(HERE), "Track")
 PX = 256 / 5.0  # texels a unit (a slab of 5 units is 256 texels)
 SLABS = 4  # slabs along a texture: 20 units a repeat
-TRACK_FLOOR = (195, 176, 146)
+# The owner's wish (2026-11-03, after playing level 1): darker and greyer than the original's sandy (195, 176, 146),
+# more like concrete, and the slabs' grid less marked.
+TRACK_FLOOR = (152, 147, 139)
+TRACK_SIDE = (118, 112, 104)
+JOINT_DEPTH = 0.26
 
 
 def save_track(img, name):
@@ -681,11 +685,11 @@ def joint(img, axis, at_start=True, at_end=True, width=2, depth=0.5):
     return img * f.reshape(shape)
 
 
-def slab_variety(h, w, seed, tone=0.05, dirt=0.10, wear=0.06):
+def slab_variety(h, w, seed, tone=0.035, dirt=0.10, wear=0.06):
     """A slab's own look as a factor: its tone, blotches of dirt and lighter worn patches (tiling noise)."""
     rng = np.random.default_rng(seed)
     t = 1 + rng.uniform(-tone, tone)
-    warm = np.array([1.0, rng.uniform(0.985, 1.01), rng.uniform(0.96, 1.01)])
+    warm = np.array([1.0, rng.uniform(0.99, 1.01), rng.uniform(0.98, 1.01)])
     d = noise(max(h, w), 3, seed + 1, 5)[:h, :w]
     e = noise(max(h, w), 6, seed + 2, 3)[:h, :w]
     f = t * (1 - dirt * np.clip((d - 0.45) * 2.2, 0, 1)) * (1 + wear * np.clip((e - 0.55) * 3, 0, 1))
@@ -703,7 +707,7 @@ def track_concrete(seed, h, w, mean=TRACK_FLOOR, rel=0.045):
         y0, x0 = rng.integers(0, 1024 - n), rng.integers(0, 1024 - w)
         sl = src[y0:y0 + n, x0:x0 + w].copy()
         sl = sl * slab_variety(n, w, seed * 31 + k)
-        out[k * n:(k + 1) * n] = joint(sl, 0)
+        out[k * n:(k + 1) * n] = joint(sl, 0, depth=JOINT_DEPTH)
     return out
 
 
@@ -737,7 +741,7 @@ def track_side(seed):
     concrete lighter downwards."""
     h = int(PX * 5) * SLABS
     w = int(PX * 5)
-    src = photo("Concrete012", 1024, (141, 121, 95), 0.10, 0.3, 0.4, fix=False)
+    src = photo("Concrete012", 1024, TRACK_SIDE, 0.10, 0.3, 0.4, fix=False)
     rng = np.random.default_rng(seed)
     n = h // SLABS
     img = np.zeros((h, w, 3))
@@ -755,7 +759,8 @@ def track_side(seed):
 def make_track():
     h = int(PX * 5) * SLABS
     for k, name in enumerate("ABC"):
-        save_track(joint(track_concrete(200 + 10 * k, h, int(PX * 5)), 1, width=2, depth=0.4), f"Track_Top_{name}")
+        save_track(joint(track_concrete(200 + 10 * k, h, int(PX * 5)), 1, width=2, depth=JOINT_DEPTH),
+                   f"Track_Top_{name}")
         save_track(kerb(300 + 10 * k, int(PX * 1.25)), f"Track_Kerb_{name}")
         save_track(kerb(400 + 10 * k, int(PX * 1.25), bricks=False, shade=0.38), f"Track_Shade_{name}")
         save_track(track_slope(500 + 10 * k, int(PX * 2.5)), f"Track_Slope_{name}")
