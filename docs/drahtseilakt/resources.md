@@ -32,7 +32,7 @@ Chinese and Cyrillic names of community maps.
 | game font texture | `Textures/Font_1.tga` | Tektur, rasterised by the game |
 | buttons and the points box | `Textures/Button01_special/select/deselect.tga` | ours, same names |
 | ball shadow | `Textures/HardShadow.bmp` | ours: `Textures/HardShadow.png` |
-| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | ours for the letters A, B, C: `Textures/Sky/Sky_<letter>_<face>.png` |
+| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | ours for the letters A, B, C: `Textures/Sky/Sky_<letter>_<face>.png`; and the photographic skies by name (levels.md, "Skies"): `Mountains`, `Forest`, `Sea`, `Storm`, `Sunset`, `Night`, `Desert`, `Mist`, `Textures/Sky/Sky_<name>_<face>.jpg` with a sixth face, `Top` (`make/make_skies.py`, CC0 photographs from Poly Haven, `CREDITS.md`) |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | ours, the same names as `.png` |
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | sound themes (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | sound themes (assets/sounds) |

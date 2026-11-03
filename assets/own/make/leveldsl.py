@@ -9,7 +9,9 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
 
     title NAME...            the level's name (also title.ru, title.de, title.zh: its name in another language)
     order N                  its place in the list of our levels
-    author NAME... / sky A|B|C / music 1..5 / bonus N / ball wood|stone|paper / light R G B
+    author NAME... / sky NAME / music 1..5 / bonus N / ball wood|stone|paper / light R G B
+                             (sky: A, B, C (above the clouds), Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
+                             Mist; any Sky_<NAME>_* in the textures)
     start [X Y Z]            the start's platform, a bowl the ball sits in (its neck as wide as the first floor); the
                              cursor at its front edge (10 ahead of its middle)
     width W                  the floor's width from here on (with its borders); a change tapers over the next floor
@@ -49,6 +51,7 @@ Deterministic; needs Python 3 with numpy and Pillow (levelkit.py, ownkit.py besi
 
 import math
 import os
+import re
 import shlex
 import sys
 
@@ -616,6 +619,11 @@ def compile_level(path):
                 t.info["light"] = tuple(float(x) for x in value.split())
             elif key in ("music", "bonus", "order"):
                 t.info[key] = int(value)
+            elif key == "sky":
+                # the game takes letters, digits, _ and - (sky.rs, valid_name): it names texture files
+                if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", value):
+                    raise LevelError(f"line {i}: sky {value!r}: a sky's name is letters, digits, _ and -")
+                t.info[key] = value
             else:
                 t.info[key] = value
             continue
