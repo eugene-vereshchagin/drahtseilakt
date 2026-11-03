@@ -700,7 +700,10 @@ fn own_file(relative: &str) -> Option<PathBuf> {
     plain_path(&root, relative).or_else(|| {
         let l = relative.to_ascii_lowercase();
         let stem = relative.get(..relative.len().checked_sub(4)?)?;
-        (l.ends_with(".bmp") || l.ends_with(".tga")).then(|| plain_path(&root, &format!("{stem}.png"))).flatten()
+        // ours are PNG, the photographic skies JPEG (a photograph in PNG would be several times the size)
+        (l.ends_with(".bmp") || l.ends_with(".tga"))
+            .then(|| plain_path(&root, &format!("{stem}.png")).or_else(|| plain_path(&root, &format!("{stem}.jpg"))))
+            .flatten()
     })
 }
 

@@ -93,7 +93,7 @@ Teile werden dorthin gesetzt, wo er ist. Eine Zeile ist ein Befehl; `#` beginnt 
 ```
 title Paper Winds            # der Name des Levels; title.ru, title.de, title.zh: in anderen Sprachen
 order 3                      # sein Platz in der Liste
-sky C                        # A, B oder C
+sky C                        # A, B, C oder ein Himmel mit Namen: Mountains, Sea, ... (unten)
 music 3                      # das Thema, 1 bis 5
 bonus 300                    # der Levelbonus
 ball wood                    # die Startkugel
@@ -126,6 +126,18 @@ Stein hervor, und der Stein rutscht bündig mit dem Weg herab) und `pusher left|
 quer über einen höchstens 6 breiten Weg, der Block des Schiebers füllt den Weg, seine Zielscheibe steht auf dieser
 Seite 5 über den Rand hinaus über einem 2,5 tieferen Boden, von dem aus eine Kugel den Block aus dem Weg schiebt). Die
 Böden darunter werden mit `mark`, `move`, `turn` und `back` gelegt.
+
+**Himmel.** `sky` wählt die Himmelsbox um das Level: `A`, `B`, `C` (unsere, über einem Wolkenmeer, wie die Buchstaben
+des Originals) oder einen der fotografischen Himmel mit Namen: `Mountains` (ein Abendhimmel über dunstigen Bergen mit
+Schnee auf den Gipfeln), `Forest` (Sommerwolken über einem Blätterdach mit Lichtungen und Seen), `Sea` (ein ruhiges
+Meer im Sonnenuntergang, das die Wolken spiegelt), `Storm` (schwere Wolken über dunklem Meer mit Schaumkronen),
+`Sunset` (ein rosa Sonnenuntergang über einem Wolkenmeer), `Night` (die Milchstraße über einem dunklen See zwischen
+Hügeln), `Desert` (später Nachmittag über roten Canyons), `Mist` (Abendlicht über Hügeln mit Nebel in den Tälern).
+Ihr Himmel sind CC0-Fotos von Poly Haven; was unter dem Horizont liegt, zeichnet `assets/own/make/make_skies.py`, wie
+aus großer Höhe gesehen, sodass die Bahn hoch darüber schwebt (`assets/own/CREDITS.md`). Jeder andere Name ist ein
+Satz Dateien `Textures/Sky/Sky_<Name>_<Seite>` (Front, Right, Back, Left, Down und Top, falls vorhanden) aus dem
+Levelordner oder den Texturen; ein Name besteht aus Buchstaben, Ziffern, `_` und `-`. `--sky NAME` auf der
+Kommandozeile spielt jedes Level unter einem anderen Himmel.
 
 **Wie die Bahn den Ball hält** (`safety`): Im Original nimmt die Hilfe von Level zu Level ab, und unsere Level folgen
 dem. Gemessen an den dreizehn Leveln des Originals (die Kanten seiner Böden, nur Zahlen): in den Leveln 1, 3 und 5

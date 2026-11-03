@@ -502,7 +502,7 @@ pub fn instances(
             },
         })
         );
-    for mesh in 0..crate::sky::FACE_COUNT {
+    for mesh in 0..crate::sky::faces() {
         out.push(Instance {
             model: SKY_MODEL,
             mesh,

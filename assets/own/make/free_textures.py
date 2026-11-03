@@ -60,6 +60,38 @@ SOURCES = {
     "Fabric066": ("Fabric066_1K-JPG.zip", "bcd274190979010b2056cab1b10d0420da6e2f58a8e1cf37bc527d8a67772684",
                     9676056, "2021-12-12"),
 }
+# A palette for levels to come (themes: old stone blocks, worn planks, mossy rock, rope, rusty iron, lava;
+# docs/drahtseilakt/decisions.md "Own content by default"): pinned and fetched like the sources above, used by no
+# script yet, so nothing is made from them or shipped (and CREDITS.md lists them only once something is).
+PALETTE = {
+    "Bricks075B": ("Bricks075B_1K-JPG.zip", "d3ca2f8541b94626174829b82b3afba7d102d0a905f28fa084b633a10a827052",
+                   5513135, "2021-11-28"),
+    "Bricks106A": ("Bricks106A_1K-JPG.zip", "839ca840dd2fbb107e93cc5188c3b94bbd641a639af0c6b002212b28e9ebe898",
+                   8178310, "2026-10-20"),
+    "PavingStones150": ("PavingStones150_1K-JPG.zip",
+                        "bcaffad6b5ae522394a740b698dbf1b478ff9daca465a3acca20ddbc45e1442f", 5336973, "2025-11-03"),
+    "Rock064": ("Rock064_1K-JPG.zip", "560f23fdd24f4abe27f5c272b86e69fd026c3d111e22f60d7fb647306830367b",
+                8205462, "2026-04-14"),
+    "Moss002": ("Moss002_1K-JPG.zip", "727d4e3134f604837c2e11aa3bf12417a022d3c668a6d7339efa572fdbb056bb",
+                10391949, "2020-09-13"),
+    "Planks037A": ("Planks037A_1K-JPG.zip", "df255df16475bad251f194eb173017c46d5354d572348d435808717c478cf144",
+                   5823702, "2023-06-08"),
+    "Planks023A": ("Planks023A_1K-JPG.zip", "0d3e5649dcfd41239c9d34c3214c410faec32175d7d77e7de53fba450e33f669",
+                   6793089, "2022-01-16"),
+    "WoodFloor064": ("WoodFloor064_1K-JPG.zip", "edd177798c9fa641531ef32970418ff9781e3bf3ceb7808257d2b6c09d7d3cc1",
+                     4002335, "2025-04-18"),
+    "Rope001": ("Rope001_1K-JPG.zip", "0f4daf2c2720b9bd910369cab753090b0ad6560435526ec5aaab293bae5fdbfc",
+                4226862, "2018-03-11"),
+    "Rope002": ("Rope002_1K-JPG.zip", "872be328ca3cab1fd44b026b4d42a16eaf182c4eb99c0375d0cbfede85fe666e",
+                4545886, "2018-03-21"),
+    "Rust009": ("Rust009_1K-JPG.zip", "15b3189498576f145c6aed9b0e153e192ff8147f822be26a1f009f2afcdd6938",
+                7743455, "2024-08-05"),
+    "MetalPlates013": ("MetalPlates013_1K-JPG.zip", "fa2e438b7512470264ebd98c872ca2ea321a0cce4c0ac43264891beec6a21b7d",
+                       7022039, "2021-11-21"),
+    "Lava004": ("Lava004_1K-JPG.zip", "fee9256befd26b59a7ff452ab6379dab4cdace5d7bee7f78cd9ad8176dd67c28",
+                8986332, "2019-12-12"),
+}
+ALL = {**SOURCES, **PALETTE}
 MAX_ARCHIVE = 64 << 20
 
 
@@ -69,7 +101,7 @@ def sources_dir(arg=None):
 
 
 def archive_path(sid, root=None):
-    return os.path.join(sources_dir(root), sid, SOURCES[sid][0])
+    return os.path.join(sources_dir(root), sid, ALL[sid][0])
 
 
 def sha256(path):
@@ -91,14 +123,14 @@ def verified(sid, root=None):
     if not os.path.exists(path):
         raise SystemExit(f"{path} is missing: python3 -I {os.path.join(HERE, 'free_textures.py')} fetch")
     got = sha256(path)
-    if got != SOURCES[sid][1]:
-        raise SystemExit(f"{path}: SHA-256 {got}, expected {SOURCES[sid][1]}; refusing it")
+    if got != ALL[sid][1]:
+        raise SystemExit(f"{path}: SHA-256 {got}, expected {ALL[sid][1]}; refusing it")
     _checked.add(path)
     return path
 
 
 def fetch(root=None):
-    for sid, (name, digest, size, _date) in SOURCES.items():
+    for sid, (name, digest, size, _date) in ALL.items():
         path = archive_path(sid, root)
         if os.path.exists(path) and sha256(path) == digest:
             continue
@@ -115,7 +147,7 @@ def fetch(root=None):
 
 
 def check(root=None):
-    for sid in SOURCES:
+    for sid in ALL:
         print(sid, "ok", verified(sid, root))
 
 
