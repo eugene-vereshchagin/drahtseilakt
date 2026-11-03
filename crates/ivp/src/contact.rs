@@ -131,6 +131,12 @@ fn point_point(cp: &mut ContactPoint, p0: V3, p1: V3, t: &mut ContactInfo) {
     let mut d = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
     let len = math::normalize_len(&mut d);
     cp.gap = len as f32;
+    if len == 0.0 {
+        // The points coincide: there is no direction between them. The upstream leaves the normal zero, and an impact
+        // along a zero normal gives its bodies NaN speeds (see `point_edge`); an arbitrary axis instead, as the
+        // upstream's own edge-edge case takes for parallel edges.
+        d = [1.0, 0.0, 0.0];
+    }
     for k in 0..3 {
         t.n[k] = d[k] as f32;
     }
@@ -168,6 +174,15 @@ fn point_edge(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCache,
         }
     }
     t.n = [c[2] * e[1] - c[1] * e[2], e[2] * c[0] - c[2] * e[0], c[1] * e[0] - e[1] * c[0]];
+    if dotd(&t.n, &t.n) < C_1E19 {
+        // The point lies on the edge and the edge runs along x, the upstream's stand-in direction: the normal, x
+        // across the edge, is zero (the upstream's arithmetic, kept as it is everywhere else). An impact along a zero
+        // normal has infinite virtual masses and gives both bodies NaN speeds; their NaN event times then stop the
+        // physics clock for every body (crates made overlapping side by side, a corner exactly on the neighbour's
+        // edge). Across the edge along y instead, which is never parallel to it here.
+        c = [0.0, 1.0, 0.0];
+        t.n = [c[2] * e[1] - c[1] * e[2], e[2] * c[0] - c[2] * e[0], c[1] * e[0] - e[1] * c[0]];
+    }
     normize_f(&mut t.n);
     t.cp_ws = p0;
     t.span[0] = c;
