@@ -55,6 +55,7 @@ interface | Interface | Интерфейс | Oberfläche | 界面 | Interface | 
 interface own | own | свой | eigene | 自带 | propre | propia | propria
 interface original | original | оригинал | Original | 原版 | original | original | originale
 interface remaster | remaster | ремастер | Remaster | 重制 | remaster | remaster | remaster
+textures | Textures | Текстуры | Texturen | 纹理 | Textures | Texturas | Texture
 restart needed | (restart) | (перезапуск) | (Neustart) | （需重启） | (redémarrer) | (reiniciar) | (riavvia)
 sounds | Sounds | Звуки | Klänge | 音效 | Sons | Sonidos | Suoni
 levels | Levels | Уровни | Level | 关卡 | Niveaux | Niveles | Livelli

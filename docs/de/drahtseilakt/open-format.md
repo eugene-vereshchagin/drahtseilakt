@@ -4,7 +4,8 @@ Das eigene Levelformat der Engine: offen, dokumentiert, mit gewöhnlichen Werkze
 das das Spiel laden kann — die Originallevel aus der Kopie des Spielers, Community-Karten —, wird auf dem
 Rechner des Spielers darin umgewandelt (`drahtseilakt --level N --export DIR`, `--map FILE --export DIR`), und
 das Spiel spielt es (`drahtseilakt --open DIR`). Umgewandelte Level entstehen aus den eigenen Daten des
-Spielers und werden nicht verbreitet.
+Spielers und werden nicht verbreitet. Mit `--textures own` trägt ein Export unsere freien Texturen (resources.md, „Eigene Texturen“) statt
+deren der Kopie, wo wir eine haben: so lässt sich das Aussehen eines Levels nur mit freien Ressourcen teilen.
 
 ## Dateien
 

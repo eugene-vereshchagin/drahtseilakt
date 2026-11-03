@@ -244,22 +244,45 @@ impl Data {
         let stem = relative.strip_suffix(".nmo").or_else(|| relative.strip_suffix(".NMO")).unwrap_or(relative);
         let overlay = self.overlay.as_deref().filter(|_| overlay_serves(stem));
         if let Some(dir) = overlay.and_then(|o| plain_path(o, stem)) {
-            return load_open(&dir).ok();
+            let mut part = load_open(&dir).ok()?;
+            // a remastered original's parts are the copy's, remade; another level's are its maker's
+            let maker = if self.overlay.as_deref().is_some_and(|o| o.starts_with(remastered_levels())) {
+                Maker::Copy
+            } else {
+                Maker::Stranger
+            };
+            self.put_own_textures(&mut part.level, maker);
+            return Some(part);
         }
-        // ours, in the open format (`assets/own/3D Entities/PH/P_Box/`), before or after the copy's file
+        // ours, in the open format (`assets/own/3D Entities/PH/P_Box/`), before or after the copy's file; either way
+        // its textures that our texture set has by name are ours (`textures own`)
         let own = || {
             let root = crate::resources::own_root()?;
             load_open(&plain_path(&root, stem)?).ok()
         };
         let copy = || load_nmo(&self.copy_only(relative)?).ok();
-        let found = if self.own_parts { own().or_else(copy) } else { copy().or_else(own) };
-        if found.is_none() {
-            crate::resources::missing(relative);
+        let mut part = if self.own_parts { own().or_else(copy) } else { copy().or_else(own) };
+        match &mut part {
+            Some(p) => self.put_own_textures(&mut p.level, Maker::Copy),
+            None => crate::resources::missing(relative),
         }
-        found
+        part
     }
 
     pub fn load(&self, source: &Source) -> Result<LoadedLevel, String> {
+        let mut loaded = self.load_level(source)?;
+        // ours in place of the original's textures (`textures own`): the copy's levels (and their remasters) by name,
+        // a stranger's map only where it uses the copy's very textures
+        let maker = match source {
+            Source::Original(_) => Maker::Copy,
+            Source::Open(_) if source.remastered() => Maker::Copy,
+            Source::Nmo(_) | Source::Open(_) => Maker::Stranger,
+        };
+        self.put_own_textures(&mut loaded.level, maker);
+        Ok(loaded)
+    }
+
+    fn load_level(&self, source: &Source) -> Result<LoadedLevel, String> {
         let path = match source {
             Source::Original(n) => match self.original(*n) {
                 Some(Source::Nmo(p)) => p,
@@ -353,8 +376,7 @@ impl Data {
                 rgba,
             } => Some((*width, *height, rgba.clone())),
             // an open-format level's texture: a plain file of its folder, its size checked before it is decoded
-            level::TextureSource::File(name) if Path::new(name).is_absolute() => {
-                let path = Path::new(name);
+            level::TextureSource::LevelFile(path) => {
                 // its folder a real one too (a link there would lead out of the level's folder)
                 let folder = path.parent().is_some_and(|d| std::fs::symlink_metadata(d).is_ok_and(|m| m.is_dir()));
                 let plain = folder && std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
@@ -363,11 +385,10 @@ impl Data {
                 }
                 decode_capped(path)
             }
+            // a texture a .nmo names: only the last part of its name, looked for in the game's texture folders (a
+            // stranger's map may name any path there; it never reads one)
             level::TextureSource::File(name) => {
-                let file = Path::new(name).file_name()?.to_str()?.to_owned();
-                let path = ["Textures", "Textures/Sky", "Textures/Particles"]
-                    .iter()
-                    .find_map(|dir| self.file(&format!("{dir}/{file}")))?;
+                let path = self.texture_file(&bare_name(name)?)?;
                 // it may come from a level's game folder (a stranger's): its size checked before it is decoded
                 if !std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX) {
                     return None;
@@ -379,6 +400,102 @@ impl Data {
             }
             level::TextureSource::None => None,
         }
+    }
+}
+
+/// Who made a level's (or part's) textures, for putting ours in their place.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Maker {
+    /// The copy: an original level, a part of the copy, or a remaster of one.
+    Copy,
+    /// Anyone else: a community map, an open-format level of a player's.
+    Stranger,
+}
+
+/// The last part of a texture's name as a `.nmo` gives it (after any `/` or `\\`), if it is a plain file name.
+fn bare_name(name: &str) -> Option<String> {
+    let last = name.rsplit(['/', '\\']).next()?;
+    (!matches!(last, "" | "." | "..") && !last.contains(':')).then(|| last.to_owned())
+}
+
+/// The folder of the remastered levels (a remastered original's parts are the copy's, remade).
+fn remastered_levels() -> PathBuf {
+    crate::profile::dir(crate::profile::Kind::Remastered)
+}
+
+impl Data {
+    /// The file of a texture by its bare file name in the game's texture folders: the level's own first, then the
+    /// copy's.
+    fn texture_file(&self, file: &str) -> Option<PathBuf> {
+        ["Textures", "Textures/Sky", "Textures/Particles"].iter().find_map(|dir| self.file(&format!("{dir}/{file}")))
+    }
+
+    /// Puts our own textures in place of the original's (resources.rs, `textures own`), as pixels, when the level is
+    /// loaded (so the choice holds for everything drawn or exported from it):
+    /// - a texture a `.nmo` names by file: ours of that file's name, unless the level's own folder brings the file;
+    ///   by the texture's name only when no such file is found at all;
+    /// - pixels a `.nmo` carries: of the copy's levels and parts, ours of the texture's name; of a stranger's map only
+    ///   when they are the copy's own texture of that name, pixel for pixel (a map's own pictures stay its own);
+    /// - an open-format level's files: replaced only in a remaster of the copy's level, by name.
+    ///
+    /// Ours have real alpha: the original's transparent colour is not applied to them.
+    fn put_own_textures(&self, level: &mut level::Level, maker: Maker) {
+        if crate::resources::textures() != crate::resources::TextureSet::Own {
+            return;
+        }
+        for t in &mut level.textures {
+            let own = match &t.source {
+                level::TextureSource::File(name) => match bare_name(name) {
+                    Some(file) => match self.texture_file(&file) {
+                        Some(found) if self.overlay.as_deref().is_some_and(|o| found.starts_with(o)) => None,
+                        Some(_) => crate::resources::own_texture(&file),
+                        None => crate::resources::own_texture(&file).or_else(|| crate::resources::own_texture(&t.name)),
+                    },
+                    None => None,
+                },
+                level::TextureSource::Pixels { width, height, rgba } => {
+                    let ours = crate::resources::own_texture(&t.name);
+                    match maker {
+                        Maker::Copy => ours,
+                        Maker::Stranger => ours.filter(|_| self.is_copys_texture(&t.name, *width, *height, rgba)),
+                    }
+                }
+                level::TextureSource::LevelFile(_) if maker == Maker::Copy => crate::resources::own_texture(&t.name),
+                level::TextureSource::LevelFile(_) | level::TextureSource::None => None,
+            };
+            let Some(path) = own else { continue };
+            if !std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX) {
+                continue;
+            }
+            if let Some((width, height, rgba)) = decode_capped(&path) {
+                t.source = level::TextureSource::Pixels { width, height, rgba };
+                t.color_key = None;
+            }
+        }
+    }
+
+    /// Whether pixels a map carries under `name` are the copy's own texture of that name (its file in Textures/,
+    /// decoded; compared by size and hash, each of the copy's files decoded once).
+    fn is_copys_texture(&self, name: &str, width: u32, height: u32, rgba: &[u8]) -> bool {
+        type Seen = std::collections::HashMap<PathBuf, Option<(u32, u32, u64)>>;
+        static SEEN: std::sync::Mutex<Option<Seen>> = std::sync::Mutex::new(None);
+        let Some(file) = bare_name(name) else { return false };
+        let has_ext = file.rsplit_once('.').is_some_and(|(_, e)| e.len() <= 4);
+        let names = if has_ext { vec![file] } else { vec![format!("{file}.bmp"), format!("{file}.tga"), file] };
+        let Some(path) = names.iter().find_map(|n| self.copy_has_texture(n)) else { return false };
+        let Ok(mut seen) = SEEN.lock() else { return false };
+        let seen = seen.get_or_insert_with(Default::default);
+        let copy = *seen.entry(path.clone()).or_insert_with(|| {
+            let (w, h, px) = decode_capped(&path)?;
+            Some((w, h, crate::fnv1a(&px)))
+        });
+        copy == Some((width, height, crate::fnv1a(rgba)))
+    }
+
+    /// The copy's own file in Textures/ (not a level's folder's).
+    fn copy_has_texture(&self, file: &str) -> Option<PathBuf> {
+        let path = self.copy_only(&format!("Textures/{file}"))?;
+        std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX).then_some(path)
     }
 }
 
@@ -870,4 +987,32 @@ pub fn find(dir: &Path, name: &str) -> Option<PathBuf> {
         .flatten()
         .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name))
         .map(|e| e.path())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_maps_pixels_are_the_copys_only_when_equal_to_its_file() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-copytex-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("Textures")).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([9, 8, 7, 255])).save(root.join("Textures/Wood_Old.bmp")).unwrap();
+        let data = Data::new(Some(root.clone()));
+        let same = [9u8, 8, 7, 255].repeat(4);
+        let other = [9u8, 8, 6, 255].repeat(4);
+        assert!(data.is_copys_texture("Wood_Old", 2, 2, &same), "by the name without its extension");
+        assert!(data.is_copys_texture("wood_old.BMP", 2, 2, &same), "any case");
+        assert!(!data.is_copys_texture("Wood_Old", 2, 2, &other), "a map's own picture under the name");
+        assert!(!data.is_copys_texture("Wood_Old", 1, 4, &same), "another size");
+        assert!(!data.is_copys_texture("Brick", 2, 2, &same), "a name the copy lacks");
+        assert!(!data.is_copys_texture("../Textures/Wood_Old.bmp/..", 2, 2, &same));
+        assert_eq!(bare_name("C:\\maps\\x.bmp").as_deref(), Some("x.bmp"));
+        assert_eq!(bare_name("/a/b/../x.png").as_deref(), Some("x.png"));
+        assert_eq!(bare_name("a/.."), None);
+        assert_eq!(bare_name("x:y.bmp"), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

@@ -881,6 +881,16 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { default });
+    // the levels' textures: ours unless the extended mode chose the copy's, or the command line says; an export keeps
+    // the level's own (the copy's) unless `--textures own` asks for ours in it
+    let textures = if o.export.is_some() {
+        Some(gamedata::resources::TextureSet::Original)
+    } else if extended {
+        gamedata::resources::textures_from_settings()
+    } else {
+        None
+    };
+    gamedata::resources::set_textures(o.textures.or(textures).unwrap_or(gamedata::resources::TextureSet::Own));
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (the interface no longer implies the original's sounds: the copy's interface is now the default)
     let theme = if extended {
@@ -2803,6 +2813,11 @@ impl App {
             Action::Interface(p) => {
                 gamedata::resources::set_chosen(p);
                 save_settings(self.volumes, self.features, &self.player);
+            }
+            Action::Textures(t) => {
+                // the next level loads with them
+                gamedata::resources::set_textures(t);
+                put_settings(&[("textures".to_owned(), t.key().to_owned())]);
             }
             Action::Language(code) => {
                 // spoken at once: the menus' words again, in the new language
