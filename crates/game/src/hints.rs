@@ -59,8 +59,8 @@ pub enum Step {
     Lead(Vec3, f32, u64),
     /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most.
     Shove(Vec3, Vec3, u64),
-    /// No arrows until the loose body (or module part) nearest the first point is within the distance of the
-    /// second, for so many ticks at most: a swing or a lift to get on or off at the right moment.
+    /// Hold the ball where it is until the loose body (or module part) nearest the first point is within the
+    /// distance of the second, for so many ticks at most: a swing or a lift to get on or off at the right moment.
     Await(Vec3, Vec3, f32, u64),
     /// Keep the ball over the loose body (or module part) nearest the first point until it is within the distance
     /// of the second, for so many ticks at most: riding a swing across.
@@ -72,6 +72,8 @@ pub enum Step {
     /// Push along the way the ball is rolling, not faster than the speed, for so many ticks: rails that lead it
     /// (a helix) taken at speed.
     Along(f32, u64),
+    /// Keep the ball on the point for so many ticks: still where it must wait (a slope would roll it away).
+    Hold(Vec3, u64),
     /// Go round the upright axis through the point (x, z) at the radius, at the speed (one way round or, negative,
     /// the other), for so many ticks or until the ball is above the point's height: up a helix of rails.
     Round(Vec3, f32, f32, u64),
@@ -229,6 +231,10 @@ fn step(words: &[&str]) -> Result<Step, String> {
                 None => f32::INFINITY,
             };
             Step::Round(Vec3::new(c.x, top, c.z), r, speed, t)
+        }
+        "hold" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            Step::Hold(p, ticks(w.next())?)
         }
         "along" => {
             let speed = num(w.next())?;
@@ -754,9 +760,13 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             if t >= *n {
                 return None;
             }
+            if t == 0 {
+                run.from = ball.position;
+            }
             let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
             let st = sim.world().state(body)?;
-            (st.pos.distance(*q) > *d).then_some(0)
+            // the ball held where it was as the step began (an edge may slope)
+            (st.pos.distance(*q) > *d).then(|| towards(run.from))
         }
         Step::Ride(at, q, d, n) => {
             if t >= *n {
@@ -806,6 +816,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let f = if v.dot(around) < speed.abs() { 1.0 } else { -0.3 };
             Some(arrows(around * f + u * a.clamp(-1.0, 1.0), quarter))
         }
+        Step::Hold(p, n) => (t < *n).then(|| towards(*p)),
         Step::Along(speed, n) => {
             if t >= *n {
                 return None;
@@ -893,6 +904,7 @@ mod tests {
         assert_eq!(swing[0].steps[2], Step::Press(Vec3::new(1.0, 2.0, 3.0), Vec3::Z, 6.0, 200));
         assert!(parse("at 0 0 0 r 1 : press 1 2 3 0 4 6 200").is_err(), "too far off the line");
         assert_eq!(parse("at 0 0 0 r 1 : along 12 240").unwrap()[0].steps[0], Step::Along(12.0, 240));
+        assert_eq!(parse("at 0 0 0 r 1 : hold 1 2 3 60").unwrap()[0].steps[0], Step::Hold(Vec3::new(1.0, 2.0, 3.0), 60));
         assert_eq!(
             parse("at 0 0 0 r 1 : round 1 2 6 -9 300").unwrap()[0].steps[0],
             Step::Round(Vec3::new(1.0, f32::INFINITY, 2.0), 6.0, -9.0, 300)
