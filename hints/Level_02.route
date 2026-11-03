@@ -1,0 +1,45 @@
+# Level 2 — the route (docs/drahtseilakt/autopilot-rules.md): sectors, stretches in order, the ball, the action.
+# From the walkthrough's storyboard (ref/video/frames/fast/level02); the plan and hints made from it are
+# Level_02.plan and Level_02.txt.
+
+sector 1 wood
+  start → the wide wooden track east, past the paper balls            pass, cruise
+  P_Extra_Life_04, the climb north-east → PC_TwoFlames_01             pass
+
+sector 2 wood
+  the track east past the boxes P_Box_01..03                          pass (a box only while in the way)
+  up the wide wooden ramp between the stone transformers lying on it  pass, keeping off them (wood all the way)
+  P_Trafo_Stone_02..05
+  → PC_TwoFlames_02                                                   pass
+
+sector 3 wood
+  → P_Trafo_Paper_01 by the junction                                  pass into it → paper
+  east along z -346.7 over the hanging plates P_Modul_29_01, south    pass
+  P_Modul_18_01, P_Modul_18_12 (updrafts)                             wait over the grate → up to the stone
+  → P_Trafo_Stone_06 at the top                                       into it → stone
+  down off its platform, west along z -366.7 over the seesaw          pass (not z -346.7: stone breaks the plates)
+  the pusher P_Modul_01_03 (x 933.8)                                  press west into it: it slides out of the lane
+  round by the south lane z -386.7, north up the lane x 931           pass
+  the drawbridge P_Modul_25_01 (z -334)                               press into it: it falls
+  back to the junction → P_Trafo_Paper_01                             pass into it → paper
+  north over the bridge, across the square frame's hole (fan below)   press at a run
+  up the wooden ramp past P_Trafo_Paper_05 onto the frame (east side)  pass
+  west along its north edge to x 926.9                                hold, lined up
+  off it north at a run, off the first cube down onto the platform    press → P_Trafo_Stone_08 → stone
+  → PC_TwoFlames_03                                                   pass
+
+sector 4 stone
+  north, east through P_Trafo_Stone_01 (own kind), the little ramp     pass, cruise
+  east along z -56.5 to the pair of rails x 1055.4                    pass
+  the rails south beside the wavy track to z -213, west               press
+  the helix (centre 1017.7 -217.4) up onto the track's south end      round
+  the wavy track north at speed (a stone ball stuck in a trough       press at a push
+  cannot climb out) → P_Trafo_Paper_03                                → paper
+  → PC_TwoFlames_04                                                   pass
+
+sector 5 paper
+  east past P_Extra_Life_03                                           pass, cruise
+  the updrafts P_Modul_18_03..11 between the platforms                wait over each grate → lifted, on
+  P_Trafo_Paper_04 (own kind)
+  the track east at y 29 → P_Trafo_Wood_01                            pass into it → wood
+  → PE_Balloon_01                                                     pass

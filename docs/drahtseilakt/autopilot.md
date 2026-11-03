@@ -155,7 +155,8 @@ at X Y Z r R [sector N] [kind wood|stone|paper] : STEP ; STEP ; ...
 ```
 
 When the ball comes within R of the point (in that sector, as that ball), the steps run in order, once a life;
-then the test player finds its place on the way again (past the transformers, when the hint made the ball over). Steps:
+then the test player finds its place on the way again (past the transformers, when the hint made the ball over: the plan's
+transformers the hint rolled the ball into, in their order, count as gone through, even one the hint began in). Steps:
 
 | Step | What it does |
 |---|---|
@@ -221,8 +222,17 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 (the finished runs are kept in `hints/runs/`, their videos outside the repository, made with `scripts/video.sh`):
 
 - Level 1: finished from the start in 6:12.27 (hints for the ramp, the crate, the pushers and the rails).
+  By itself with no player's run, from the walkthrough's storyboard (`hints/Level_01.plan`, `.route`, `.txt`;
+  the hints that follow the owner's run are `Level_01-follow.txt`): 5:17.12, standing 9.1% of the time
+  (`hints/runs/Level_01-clean.replay`).
 - Level 2: finished from the start in 6:13.27 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
+  By itself with no player's run, from the walkthrough's storyboard (`hints/Level_02.plan`, `.route`, `.txt`;
+  the hints that follow the owner's run are `Level_02-follow.txt`): 5:23.90, standing 5.9% of the time
+  (`hints/runs/Level_02-clean.replay`).
 - Level 3: finished from the start in 7:45.48 (the lever and the bridge in sector 4 as the owner did them).
+  By itself with no player's run, from the walkthrough's storyboard (`hints/Level_03.plan`, `.route`, `.txt`;
+  the hints that follow the owner's run are `Level_03-follow.txt`): 5:58.97, standing 5.5% of the time
+  (`hints/runs/Level_03-clean.replay`).
 - Level 4: finished from the start in 9:19.47 (`--follow` the owner's run, `--then` the one from sector 3).
 - Level 5: finished from the start in 12:39.77 (hints for both crates and the pusher).
 - Level 6: finished from the start in 8:01.22: sector 1 along the owner's line, sectors 2–5 by itself with the

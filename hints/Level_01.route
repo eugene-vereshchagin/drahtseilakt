@@ -1,0 +1,33 @@
+# Level 1 — the route (docs/drahtseilakt/autopilot-rules.md): sectors, stretches in order, the ball, the action.
+# From the walkthrough's storyboard (ref/video/frames/fast/level01); the plan and hints made from it are
+# Level_01.plan and Level_01.txt.
+
+sector 1 wood
+  start → the track west, the rails down                               pass, cruise
+  the platform with the boxes P_Box_01..03, P_Extra_Life_04           pass (a box only while in the way)
+  → P_Trafo_Stone_02                                                  pass into it → stone
+  → P_Trafo_Wood_05 (a stone ball cannot climb the slope after it)    pass into it → wood
+  the ramp north, east along z -364, the rails → PC_TwoFlames_01      pass, cruise
+
+sector 2 wood
+  the track east and the drops south → P_Trafo_Stone_01               pass into it → stone
+  round west on the upper floor, off its edge at z -562.5             pass
+  the crate of P_Modul_34_01 under the sliding stone                  ram east and on south-east (it must leave the
+                                                                      stone free: the stone drops level with the lane)
+  north along the lower floor's east side, the wedge ramp x 157       press up it
+  the lane south over the long hump (P_Box_06 on top), P_Extra_Life_01 press at a steady push (a stone ball slowed on
+                                                                      it rolls back) → PC_TwoFlames_02
+
+sector 3 stone
+  the step down south off the checkpoint, the slope                   pass, no halt at the edge
+  east past the loose stone balls, north, east, down to the floor     pass
+  north of the pushers P_Modul_01_01/02
+  west, the side lane x 237 up and down onto the lower lane z -817     pass
+  over the hump north into each pusher's plate (x 263, then 272)      press: the pusher slides out of the lane
+  back, the side lane up, east along the lane z -793                  pass
+  the rails x 299.6 south → P_Trafo_Wood_01                           press into it → wood
+  → PC_TwoFlames_03                                                   pass
+
+sector 4 wood
+  the track east, the zigzag climb to y 76, the descent east          pass, cruise
+  → PE_Balloon_01                                                     pass

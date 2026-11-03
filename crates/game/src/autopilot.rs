@@ -2254,6 +2254,29 @@ impl Pilot {
     fn find_place(&mut self, sim: &Sim, began: u64) {
         // a hint knows the place better than the followed run: the player's line waits a while after one
         self.demo_after = sim.tick + DEMO_AFTER_HINT;
+        // the transformers of the way it made the ball over in, in their order, are gone through: the way is taken
+        // up after the last of them (a hint begun as the ball rolls into one has the pilot miss it, and a way that
+        // crosses itself would put the ball back before it)
+        let mut passed = None;
+        for (_, e) in sim.events.iter().filter(|(t, _)| *t >= began) {
+            if let crate::sim::Event::Transform(k) = e
+                && let Some(&(i, _, gk)) = self.gates.get(self.gate)
+                && gk == *k
+            {
+                passed = Some(i);
+                self.gate += 1;
+                self.kind = Some(*k);
+            }
+        }
+        if let Some(i) = passed {
+            // the place on from it nearest the ball, before the transformer next
+            let f = sim.ball.position - Vec3::Y * crate::sim::BALL_RADIUS;
+            let after = (i..self.until().min(self.route.points.len())).min_by(|&a, &b| {
+                let d = |k: usize| self.route.points.get(k).map_or(f32::INFINITY, |p| p.distance_squared(f));
+                d(a).total_cmp(&d(b))
+            });
+            self.at = self.at.max(after.unwrap_or(i));
+        }
         // the way's point nearest the ball before the next transformer; but a hint may have gone past
         // transformers, making the ball over itself: where that point is far from the ball, the way is taken up
         // at its first point on from here near the ball where the way's ball is of this kind
