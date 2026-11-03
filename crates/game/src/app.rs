@@ -2413,7 +2413,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     if let Some(ms) = menu_scene.filter(|m| m.model.is_some()) {
         let at = std::env::var("DRAHTSEILAKT_SHOT_MENU_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
         let (inst, particles, frame_view) = ms.frame(at);
-        r.hide_clouds = true;
+        r.menu_frame = true;
         r.draw(&view, w, h, &frame_view, &inst, &particles);
         let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
         let quads = menu.map(|m| m.interface(game.font.as_ref(), screen)).unwrap_or_default();
@@ -3605,7 +3605,7 @@ impl App {
         // With a menu up, the original's menu scene is behind it, its camera going round
         let menu_up = self.menu.as_ref().is_some_and(|m| !m.over_level()) || self.loading.is_some();
         let menu_scene = self.menu_scene.as_mut().filter(|m| m.model.is_some() && menu_up);
-        gpu.renderer.hide_clouds = menu_scene.is_some();
+        gpu.renderer.menu_frame = menu_scene.is_some();
         let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
             self.menu_ms += f64::from(step) * 1000.0;
             ms.effects.tick_menu(step * 1000.0);

@@ -67,8 +67,8 @@ fn density(p: vec3<f32>, detail: bool) -> f32 {
         return 0.0;
     }
     let size = c.slab.w;
-    let drift = vec3<f32>(c.wind.x, 0.0, c.wind.y) * c.eye.w;
-    let q = p - drift;
+    // the drift, wrapped by clouds.rs at a period every texture below repeats over
+    let q = p - vec3<f32>(c.wind.x, 0.0, c.wind.y);
     let w = textureSampleLevel(weather, rep, q.xz / (size * 30.0), 0.0);
     // how cloudy this place is: the level's cover, varied by the map into banks and gaps
     let local = clamp(c.slab.z + (w.r - 0.5) * 0.9, 0.0, 1.0);
@@ -82,7 +82,7 @@ fn density(p: vec3<f32>, detail: bool) -> f32 {
     let threshold = mix(1.0 - local, 1.0, clamp(pow(hr, 1.3), 0.0, 1.0)) - 0.1;
     var d = (body - threshold) * 14.0 * remap(h, 0.0, 0.08);
     if detail && d > -0.2 && d < 0.6 {
-        let m = textureSampleLevel(noise, rep, q / (size * 0.7), 0.0);
+        let m = textureSampleLevel(noise, rep, q / (size * 0.75), 0.0);
         let hf = m.g * 0.625 + m.b * 0.25 + m.a * 0.125;
         d -= (1.0 - hf) * 0.55;
     }
@@ -120,14 +120,17 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     let far = c.inv_view_proj * vec4<f32>(ndc, 1.0, 1.0);
     let eye = c.eye.xyz;
     let dir = normalize(far.xyz / far.w - eye);
-    // how far the scene is along this ray; the sky box (sky.rs, SIZE 1200 round the eye) is no farther than that, and
-    // is behind the clouds
+    // how far the scene is along this ray. The sky box (sky.rs: a cube SIZE round the eye) writes depth as an opaque
+    // mesh does, so where the depth is the box's own along this ray, there is only sky, behind the clouds: the box's
+    // distance is SIZE over the ray's largest component. Anything nearer is the level.
     let z = textureLoad(depth, px, 0);
     var scene = 1e9;
     if z < 1.0 {
         let wp = c.inv_view_proj * vec4<f32>(ndc, z, 1.0);
         scene = length(wp.xyz / wp.w - eye);
-        if scene > SKY * 0.995 {
+        let a = abs(dir);
+        let box = SKY / max(max(a.x, a.y), a.z);
+        if scene > box * 0.999 {
             scene = 1e9;
         }
     }
