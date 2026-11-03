@@ -29,7 +29,7 @@ checkpoint
 floor 15
 width 14
 floor 10
-arms ahead 10
+arms ahead 10 side 2
 floor 20
 right 90 24
 floor 10
@@ -37,7 +37,7 @@ flaps ahead 10
 floor 20
 point
 floor 15
-arms ahead 10
+arms ahead 10 side 2
 floor 20
 checkpoint
 

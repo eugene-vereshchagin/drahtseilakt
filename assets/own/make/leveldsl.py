@@ -273,7 +273,13 @@ class Track:
         elif cmd == "sack":
             self.module_at("P_Modul_26", float(opts.get("ahead", 0)), 3.0, 0.0, float(opts.get("side", 0)))
         elif cmd == "arms":
-            self.module_at("P_Modul_17", float(opts.get("ahead", 0)), 4.5, 0.0, float(opts.get("side", 0)))
+            ahead = float(opts.get("ahead", 0))
+            self.module_at("P_Modul_17", ahead, 4.5, 0.0, float(opts.get("side", 0)))
+            if "nopilot" not in opts:
+                # through the arms at some speed: a ball rolling up slowly does not turn them
+                for s in ("safe", "collector"):
+                    self.pilot.step([s], f"goto {fmt(self.at(ahead - 14))}", self.at(ahead - 14))
+                self.pilot.step(STYLES, f"via {fmt(self.at(ahead + 8))}", self.at(ahead + 8))
         elif cmd == "flaps":
             self.module_at("P_Modul_19", float(opts.get("ahead", 0)), 0.5, 90.0, float(opts.get("side", 0)))
         elif cmd in ("point", "life", "box", "dome", "trafo", "loose", "column", "module"):

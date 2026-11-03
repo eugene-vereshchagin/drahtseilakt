@@ -1,0 +1,8 @@
+title = The Gauntlet
+author = Drahtseilakt
+version = 1
+licence = GPL-3.0-only
+title.ru = Испытание
+title.de = Spießrutenlauf
+title.zh = 终极考验
+order = 10
