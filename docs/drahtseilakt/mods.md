@@ -45,7 +45,8 @@ run, never a highscore, never compared by the ghost or the splits. Its replay na
     mod sticky-ball 9c41f0a2be1377d0 strength=60 wood_only=off
 
 — its key, the hash of its mod.txt and its option values, so the replay plays back the same run, and only with that
-very mod: a replay whose mod is missing or has changed is refused with the reason. A classic run's replay has no such
+very mod: a replay whose mod is missing or has changed, or whose options are missing, unknown or out of range, is
+refused with the reason. A classic run's replay has no such
 line and is exactly as before. A mod that only changes what is seen (the camera, the HUD, the light) leaves the run
 classic.
 
@@ -70,9 +71,11 @@ UTF-8 text, one statement a line, `#` begins a comment line. In this order:
   `version`, `licence`, `requires <game version>` (e.g. `0.1`; a newer one than the game refuses the mod).
 - **Options** the player sets on the mod's page:
   - `option <name> switch on|off`
-  - `option <name> number <min> <max> <step> <default>`
+  - `option <name> number <min> <max> <step> <default>` (within ±1,000,000, a step of 0.001 or more, the default on
+    the steps from `min`)
   - `option <name> key <Key1,Key2,...>` — keys by winit's names (`KeyQ`, `F12`, `Backspace`, `Home`...); the first
-    is the default.
+    is the default. The game's own keys are refused: Escape, Enter, the arrows, Shift, Space, Tab, Alt, F11, and the
+    practice tools' R, F2, F3, F5, F9, `[` `]`; a key the player bound on the Controls page stays the game's.
 - **Labels** — `label <name> <lang> <text>`: an option's label is named like the option; HUD lines name theirs.
 - **Variables** — `var <name> <number>`: numbers the rules keep, from their first value at each start.
 - **Rules** — `on <event>`, then any `if <condition>` lines (all must hold), then `do <action>` lines, done in order.
@@ -130,7 +133,7 @@ View actions (only on `frame` or `key`):
   `ratio` (a/b).
 - `do splits <corner>` — the sectors' splits against the best run.
 - `do ghost <0..1>` — the best run as a translucent ball, so opaque.
-- `do screenshot`, `do restart`.
+- `do screenshot`, `do restart` — only on `key` (never every frame); one screenshot a second at most.
 
 Both: `do set <variable> = <expression>`. A variable a view rule sets belongs to the view; the run's rules may not set
 or read it.

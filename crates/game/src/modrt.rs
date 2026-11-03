@@ -414,7 +414,7 @@ impl Mods {
                     .map(|o| {
                         setting(&format!("mod.{}.{}", m.key, o.key))
                             .and_then(|v| o.parse(v.trim()))
-                            .unwrap_or(o.default)
+                            .map_or(o.default, |v| o.clamp(v))
                     })
                     .collect(),
                 Err(_) => Vec::new(),
@@ -486,6 +486,9 @@ impl Mods {
     pub fn for_replay(&self, refs: &[crate::replay::ModRef]) -> Result<SimMods, String> {
         let mut sim = SimMods::default();
         for r in refs {
+            if sim.runs.iter().any(|x| x.key == r.key) {
+                return Err(format!("the replay names the mod \"{}\" twice", r.key));
+            }
             let m = self.found.iter().find(|m| m.key == r.key).ok_or_else(|| {
                 format!(
                     "the replay needs the mod \"{}\", which is not installed",
@@ -502,6 +505,10 @@ impl Mods {
                     r.key
                 ));
             }
+            // every option given, each a value it takes, nothing else: a replay plays as recorded or not at all
+            if let Some((k, _)) = r.opts.iter().find(|(k, _)| !t.options.iter().any(|o| o.key == *k)) {
+                return Err(format!("the replay gives the mod \"{}\" an option it has not: {k}", r.key));
+            }
             let opts = t
                 .options
                 .iter()
@@ -510,9 +517,11 @@ impl Mods {
                         .iter()
                         .find(|(k, _)| *k == o.key)
                         .and_then(|(_, v)| o.parse(v))
-                        .unwrap_or(o.default)
+                        .ok_or_else(|| {
+                            format!("the replay's mod \"{}\": option {} missing or out of range", r.key, o.key)
+                        })
                 })
-                .collect();
+                .collect::<Result<Vec<f32>, String>>()?;
             sim.runs
                 .push(ModRun::new(&m.key, Arc::new(t.clone()), opts));
         }
@@ -692,6 +701,10 @@ mod tests {
         let line = sim.replay_lines()[0].clone();
         let r = crate::replay::ModRef::parse(&line).unwrap();
         assert_eq!(m.for_replay(&[r.clone()]).unwrap().runs[0].opts, vec![60.0]);
+        let mut bad = r.clone();
+        bad.opts[0].1 = "999".into();
+        assert!(m.for_replay(&[bad]).is_err(), "an option out of range");
+        assert!(m.for_replay(&[r.clone(), r.clone()]).is_err(), "a mod twice");
         let other = Mods::load(
             vec![found("sticky", &(STICKY.to_owned() + "# changed\n"))],
             |_| None,

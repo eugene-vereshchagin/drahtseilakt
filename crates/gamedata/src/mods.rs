@@ -21,7 +21,8 @@
 // A player's mod comes from a stranger, so it is hostile input: a folder of a plain name holding nothing but a small
 // mod.txt and at most a readme and a licence (a link, a sub-folder, any other file refuses the whole mod with the
 // reason shown); mod.txt is UTF-8, capped in bytes and lines; every line must be one the format knows; every count
-// is capped; an error names its line. This file is pure parsing and is fuzzed (crates/gamedata/tests/fuzz.rs).
+// is capped; an error names its line. This file is pure parsing, unit-tested here; its fuzz target comes later
+// (the owner's call, 2026-11-03: before any release).
 
 use std::path::{Path, PathBuf};
 
@@ -584,7 +585,7 @@ impl ModTxt {
 
     /// The label names in their order (`Show` refers to them by place).
     fn label_index(&self, name: &str) -> usize {
-        // the labels' names are kept in `vars`-like order in label_names
+        // a label's languages are kept together, so its first place names it
         match self.labels.iter().position(|(n, _, _)| n == name) {
             Some(i) => i,
             None => self.labels.len(),
@@ -968,15 +969,28 @@ fn parse_option(rest: &str) -> Result<OptSpec, String> {
         },
         ("number", [lo, hi, step, d]) => {
             let (min, max, step, default) = (number(lo)?, number(hi)?, number(step)?, number(d)?);
-            if !(min < max && step > 0.0 && (min..=max).contains(&default)) || (max - min) / step > 10_000.0 {
-                return Err("a number option needs min < max, a step > 0 and the default between".into());
+            // short values (a replay writes them as words) and a default on the steps (the run and its replay use the
+            // very same value)
+            if !(min < max && step >= 0.001 && (min..=max).contains(&default))
+                || (max - min) / step > 10_000.0
+                || min.abs() > 1e6
+                || max.abs() > 1e6
+            {
+                return Err("a number option needs min < max (within a million), a step of 0.001 or more and the default between".into());
             }
-            OptSpec { key: key.into(), kind: OptKind::Number { min, max, step }, default }
+            let o = OptSpec { key: key.into(), kind: OptKind::Number { min, max, step }, default };
+            if o.clamp(default) != default {
+                return Err("a number option's default must be on its steps from min".into());
+            }
+            o
         }
         ("key", [list]) => {
             let keys: Vec<String> = list.split(',').map(str::to_owned).collect();
             if keys.is_empty() || keys.len() > MAX_KEYS || !keys.iter().all(|k| key_name(k)) {
                 return Err(format!("a key option lists 1 to {MAX_KEYS} key names, comma-separated"));
+            }
+            if let Some(k) = keys.iter().find(|k| RESERVED_KEYS.contains(&k.as_str())) {
+                return Err(format!("{} is the game's own key", clip(k)));
             }
             OptSpec { key: key.into(), kind: OptKind::Key(keys), default: 0.0 }
         }
@@ -984,6 +998,13 @@ fn parse_option(rest: &str) -> Result<OptSpec, String> {
     };
     Ok(o)
 }
+
+/// Keys a mod may never take: the menu's and window's, the arrows, the game's default keys, the practice tools'.
+pub const RESERVED_KEYS: [&str; 22] = [
+    "Escape", "Enter", "NumpadEnter", "F11", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft",
+    "ShiftRight", "Space", "Tab", "KeyR", "F2", "F3", "F5", "F9", "BracketLeft", "BracketRight", "AltLeft", "AltRight",
+    "Backquote",
+];
 
 fn parse_event(rest: &str, options: &[OptSpec]) -> Result<Event, String> {
     let mut f = rest.split_whitespace();
@@ -1014,7 +1035,7 @@ fn parse_event(rest: &str, options: &[OptSpec]) -> Result<Event, String> {
     Ok(ev)
 }
 
-fn parse_action(rest: &str, m: &mut ModTxt, sim: bool) -> Result<Action, String> {
+fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Action, String> {
     let (verb, args) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
     let args = args.trim();
     let names_vars = m.vars.clone();
@@ -1101,6 +1122,10 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool) -> Result<Action, String>
         return Err(format!(
             "{verb} changes the run: only on a run's event (start, tick, sector, ...)"
         ));
+    }
+    // a screenshot or a restart is a single deed: only on a key, never every frame
+    if matches!(a, Action::Screenshot | Action::Restart) && !key {
+        return Err(format!("{verb} only on a key (on key <option>)"));
     }
     if !a.sim() && sim && !matches!(a, Action::Set(..)) {
         return Err(format!("{verb} is for the view: only on frame or key"));
@@ -1333,7 +1358,8 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
                     return Err(at(format!("more than {MAX_ALL_ACTIONS} actions")));
                 }
                 let sim = m.rules.last().is_some_and(|r| r.event.sim());
-                let a = parse_action(rest, &mut m, sim).map_err(at)?;
+                let key = m.rules.last().is_some_and(|r| matches!(r.event, Event::Key(_)));
+                let a = parse_action(rest, &mut m, sim, key).map_err(at)?;
                 let r = m
                     .rules
                     .last_mut()
@@ -1612,6 +1638,12 @@ mod tests {
             "name.en A\noption n number 5 1 1 3\n",
             "name.en A\nif 1\n",
             "name.en A\non frame\ndo restart\nif 1\n",
+            "name.en A\non frame\ndo restart\n",
+            "name.en A\non frame\ndo screenshot\n",
+            "name.en A\noption k key Escape\n",
+            "name.en A\noption k key KeyQ,ArrowUp\n",
+            "name.en A\noption n number 10 100 10 37\n",
+            "name.en A\noption n number 0 1 0.00001 0\n",
             "name.en A\nrequires 9.0\n",
             "name.en A\u{202e}B\n",
             "name.en A\x07\n",

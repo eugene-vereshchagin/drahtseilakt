@@ -1238,6 +1238,7 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
         best_splits: None,
         light_base: None,
         shot_due: false,
+        last_shot: None,
         menu_ms: 0.0,
         held: std::collections::HashSet::new(),
         pilot: pilot.map(|run| PilotWatch {
@@ -2823,8 +2824,9 @@ struct App {
     best_splits: Option<Vec<u64>>,
     /// The level's light as uploaded (a mod's `light` dims it).
     light_base: Option<crate::render::Light>,
-    /// A screenshot (a mod's `screenshot`) is due after this frame is drawn.
+    /// A screenshot (a mod's `screenshot`) is due after this frame is drawn; when the last was taken.
     shot_due: bool,
+    last_shot: Option<Instant>,
 }
 
 /// The level's best run played beside this one (a mod's `ghost`): its run, its input, and where its ball was at each
@@ -3186,7 +3188,10 @@ impl App {
         self.keys = 0;
         if let Some(gpu) = &mut self.gpu {
             gpu.renderer.models.clear();
+            // the light as the level sets it (a mod's dimming never carried into the next level)
+            gpu.renderer.light.ambient = crate::render::Light::default().ambient;
             upload(&mut gpu.renderer, &self.game);
+            self.light_base = Some(gpu.renderer.light);
             upload_menu_scene(&mut gpu.renderer, self.menu_scene.as_mut(), &self.data);
         }
         if let Some(w) = &self.window {
@@ -3198,13 +3203,15 @@ impl App {
 
     /// The mods switched on (in the extended mode) run: the run's side from the next start, the view's at once.
     fn apply_mods(&mut self) {
-        let (sim, view) = self.mods.running(self.features.mode);
+        let (sim, view) = self.running_mods();
         self.game.set_mods(sim);
         self.view_mods = view;
         self.reset_mod_run();
-        if let Some(gpu) = &self.gpu {
-            self.light_base = Some(gpu.renderer.light);
-        }
+    }
+
+    /// The mods that run: those switched on, in the extended mode, never while the test player plays (--watch).
+    fn running_mods(&self) -> (crate::modrt::SimMods, crate::modrt::ViewMods) {
+        self.mods.running(self.features.mode && self.pilot.is_none())
     }
 
     /// A new run for the mods: the view's variables as at first, the real time from now, no ghost yet.
@@ -3277,7 +3284,11 @@ impl App {
             self.saved = None;
         }
         if std::mem::take(&mut self.view_mods.out.screenshot) {
-            self.shot_due = true;
+            // at most one a second, however the key is held
+            if self.last_shot.is_none_or(|t| t.elapsed().as_secs_f32() >= 1.0) {
+                self.last_shot = Some(Instant::now());
+                self.shot_due = true;
+            }
         }
         self.keep_ghost();
     }
@@ -3285,6 +3296,10 @@ impl App {
     /// A key the mods take (one of their key options): its rules fire; true when some mod took it.
     fn mod_key(&mut self, code: KeyCode) -> bool {
         if self.view_mods.is_empty() {
+            return false;
+        }
+        // a key the player bound to the game's actions stays the game's (mod.txt already refuses the reserved ones)
+        if self.bindings.bits(code) != 0 {
             return false;
         }
         let name = format!("{code:?}");
@@ -4185,7 +4200,7 @@ impl App {
                 }
                 put_settings(&self.mods.lines());
                 // the view's side at once, the run's from the next start
-                let (sim, view) = self.mods.running(self.features.mode);
+                let (sim, view) = self.running_mods();
                 self.game.set_mods(sim);
                 let out = std::mem::take(&mut self.view_mods.out);
                 self.view_mods = view;

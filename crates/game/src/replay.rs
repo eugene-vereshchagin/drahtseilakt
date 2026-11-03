@@ -46,7 +46,7 @@ pub struct ModRef {
 }
 
 /// The most `mod` lines a replay has, and options per line.
-const MAX_MODS: usize = 16;
+const MAX_MODS: usize = 64;
 const MAX_MOD_OPTS: usize = 16;
 
 impl ModRef {

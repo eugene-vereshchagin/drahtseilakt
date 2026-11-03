@@ -242,3 +242,13 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 
 Die Grenzen des Originals, die diese Mods umgehen (Bildratengrenze, 4:3, niedrige Auflösungen, acht Sektoren, eine
 Bitmap-Schrift, anfälliges Timing des Kugelwechsels), übernehmen wir nicht.
+
+
+## Präzisierungen nach dem Review
+
+- Zahlenoption: Grenzen innerhalb von ±1 000 000, Schritt mindestens 0,001, der Standardwert liegt auf den Schritten ab `min`.
+- Eine Tastenoption darf keine Tasten des Spiels belegen: Escape, Enter, die Pfeiltasten, Shift, Space, Tab, Alt, F11
+  und die Tasten der Übungswerkzeuge (R, F2, F3, F5, F9, `[` `]`); eine vom Spieler auf der Seite Controls belegte Taste
+  bleibt beim Spiel.
+- `do screenshot` und `do restart` nur in `on key`-Regeln (nie in jedem Bild); höchstens ein Screenshot pro Sekunde.
+- Ein Replay, dessen Mod-Optionen fehlen, unbekannt oder außerhalb des Bereichs sind, wird mit Begründung abgelehnt.
