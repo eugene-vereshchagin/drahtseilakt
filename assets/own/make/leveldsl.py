@@ -126,6 +126,8 @@ class Track:
         self.columns = 0.0
         self.column_run = 0.0
         self.column_spots = []
+        # the length of floor laid since the last gap: the most a run-up to the next can take
+        self.since_gap = 0.0
         self.floor_points = []
 
     # --- the cursor ---------------------------------------------------------------------------------------------
@@ -175,6 +177,7 @@ class Track:
         for p in pts[1:]:
             self.pilot.way(p)
         self.floor_points.extend(pts)
+        self.since_gap += sum(float(np.linalg.norm(b - a)) for a, b in zip(pts, pts[1:]))
         if self.columns and kind == "Floor":
             for a, c in zip(pts, pts[1:]):
                 self.column_run += float(np.linalg.norm(c - a))
@@ -293,10 +296,11 @@ class Track:
         """A gap: the styles that go carefully take a run-up first; all go over it at speed."""
         if "nopilot" in opts:
             return
-        run = float(opts.get("runup", 14.0))
+        run = min(float(opts.get("runup", 14.0)), max(self.since_gap - 2.0, 0.0))
+        self.since_gap = 0.0
         take_off = self.pos.copy()
         for s in ("safe", "collector"):
-            if self.pilot.auto[s]:
+            if self.pilot.auto[s] and run > 0:
                 self.pilot.step([s], f"goto {fmt(self.at(-run))}", self.at(-run))
         on = land + (land - take_off) / (np.linalg.norm(land - take_off) + 1e-9) * 4.0
         self.pilot.step(STYLES, f"via {fmt(take_off)}", take_off)
