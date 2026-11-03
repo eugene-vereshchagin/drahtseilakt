@@ -266,7 +266,7 @@ class Track:
             self.b.fan_housing(f"Fan_Housing_{self.n('housing'):02d}", tuple(q - np.array([0, 0.6, 0])))
             if "nopilot" not in opts:
                 self.pilot.step(STYLES, f"goto {fmt(q)}", q)
-                self.pilot.step(STYLES, "wait 150")
+                self.pilot.step(STYLES, "wait 240")
         elif cmd == "sack":
             self.module_at("P_Modul_26", float(opts.get("ahead", 0)), 3.0, 0.0, float(opts.get("side", 0)))
         elif cmd == "arms":
