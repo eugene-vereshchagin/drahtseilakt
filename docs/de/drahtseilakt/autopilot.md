@@ -87,8 +87,8 @@ und hinüber.
 
 Die Simulation ist deterministisch und lässt sich kopieren, also speichert der Testspieler seinen Lauf alle zwei
 Sekunden (die Stände werden mit dem Alter ausgedünnt und reichen einige Minuten zurück) und geht,
-wenn die Kugel verloren ist, ein versehentlich überrollter Transformator sie zu einer anderen Art
-gemacht hat, als der Weg braucht (abseits der Linie des Spielers), oder sein Weg 20 Sekunden nicht weiterkommt, zu einem Stand zurück und versucht es
+wenn die Kugel verloren ist, ein anderer Transformator als der nächste des Wegs sie verwandelt hat,
+versehentlich überrollt (abseits der Linie des Spielers), oder sein Weg 20 Sekunden nicht weiterkommt, zu einem Stand zurück und versucht es
 abgewandelt noch einmal: ein kurzer eigener erster Zug (ein Warten oder ein Stoß zufälliger Länge, vor allem anderen,
 auch einem laufenden Hinweis, sodass bewegte Teile in einer anderen Phase getroffen werden) und für einige Sekunden
 zufällige Zuschläge auf die Bewertungen seiner Wahlen; ab dem dritten Versuch verlässt jeder dritte die Linie des
@@ -105,7 +105,9 @@ Aufzeichnung), der durchkam, ohne die fehlgeschlagenen Versuche.
 
 ## Die Suche, wenn er feststeckt
 
-Festgefahren, wo weder Rammen noch Manöver, Brückensturm oder Sprung weiterkommen, sucht der Testspieler tiefer: eine
+Vier Sekunden festgefahren, probiert der Testspieler auf Kopien des Laufs Rammstöße, Schaukeln (hin und her entlang
+einer Wahl, zwei- oder viermal: aus einer Mulde zwischen Wellen, zu steil, um aus dem Stand hinaufzukommen) und
+zufällige Manöver. Festgefahren, wo weder Rammen noch Manöver, Brückensturm oder Sprung weiterkommen, sucht der Testspieler tiefer: eine
 Strahlsuche über Folgen gehaltener Pfeile (jeder eine Drittel-, Dreiviertel- oder anderthalb Sekunden lang, oder eine
 halbe Sekunde ohne Pfeile), vier tief, mit den sechs besten Zuständen je Tiefe, einer je Ort. Jeder wird nach
 zwei Dritteln einer Sekunde Ausrollen danach bewertet, wie weit die Kugel auf dem Weg ist, abzüglich dessen, was vorn
@@ -178,12 +180,13 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 - Level 4: vom Start an geschafft in 9:16.25 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
 - Level 5: vom Start an geschafft in 13:06.93 (Hinweise für beide Kisten und den Schieber).
 - Level 6: mit dem Lauf des Inhabers (er endet am gewölbten Baumstamm in Sektor 2) und dem Plan
-  `hints/Level_06.plan` kommt der Testspieler allein durch Sektor 2 und 3 bis zum welligen Stamm von Sektor 4,
-  dessen Wellen der Weg über die Böden nicht hinaufging.
-- Level 7: vom Start an geschafft in 12:07.18, dem geschafften Lauf des Inhabers folgend.
+  `hints/Level_06.plan` kommt der Testspieler allein durch Sektor 2 und 3 und über den welligen Stamm von Sektor 4
+  bis zu seinem Stein-Transformator; als Nächstes sind die Kisten als Stein vom Absatz zu stoßen.
+- Level 7: vom Start an geschafft in 11:47.53, dem geschafften Lauf des Inhabers folgend.
 - Level 8: allein mit dem Plan aus dem Video bis zum ersten Holz-Transformator (Weg 156 von 1072).
 - Level 9: vom Start an geschafft in 12:30.10, dem geschafften Lauf des Inhabers folgend (das Labyrinth der Schieber
   in Sektor 3 wird gelöst, wie der Inhaber es löste).
 - Level 10: vom Start an geschafft in 14:42.52, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
-- Level 11–13: 11 in Sektor 1 (die Zugbrücke, die der Inhaber umstieß, als seine Kugel mit ihr fiel); 12 in Sektor 2
+- Level 11–13: 11 folgt dem Lauf des Inhabers durch Sektor 1–3 (verliert an der Zugbrücke eine Kugel wie der
+  Inhaber, was sie umstößt) und fährt in Sektor 4 allein weiter; 12 in Sektor 2
   (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator über dem Ventilator, den sie reiten muss.

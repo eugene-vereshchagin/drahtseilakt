@@ -1903,7 +1903,7 @@ fn pilot_run(game: &mut Game, data: &Data, o: &Options, mut pilot: crate::autopi
         }
         // (a transformer rolled over by a slip, making the ball another kind than the way's, counts as a fall)
         let stray = game.sim.events.iter().skip(heard).any(|(_, e)| {
-            matches!(e, crate::sim::Event::Transform(k) if pilot.stray_transform(*k))
+            matches!(e, crate::sim::Event::Transform(k) if pilot.stray_transform(*k, game.sim.ball.position))
         });
         let fell = stray || game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::Died));
         // (a ball lost as the player lost one there is not gone back from: it may be what the level needs)

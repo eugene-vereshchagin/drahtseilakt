@@ -1467,17 +1467,23 @@ impl Pilot {
         self.choice = 0;
     }
 
-    /// Whether the ball becoming `kind` now is a mistake: no hint made it, and the way's next transformer (or the one
-    /// just gone through) makes another kind. A flat transformer rolled over by a slip: a failure to go back from.
-    pub fn stray_transform(&self, kind: crate::sim::BallKind) -> bool {
-        let wanted = |i: usize| self.gates.get(i).map(|g| g.2);
+    /// Whether the ball becoming `kind` now at `at` is a mistake: no hint made it, and it is not the way's next
+    /// transformer (or the one just gone through) making that kind there. A flat transformer rolled over by a slip:
+    /// a failure to go back from.
+    pub fn stray_transform(&self, kind: crate::sim::BallKind, at: Vec3) -> bool {
+        // (the way's next transformer, or the one just gone through, making this kind here: no stray)
+        let wanted = |i: usize| {
+            self.gates
+                .get(i)
+                .is_some_and(|g| g.2 == kind && g.1.distance(at) < 2.0 * crate::sim::TRAFO_REACH)
+        };
         // (not on the player's line, which knows the way's kinds better than the gates found from it; not before the
         // way's first transformer, where the ball may first have to become the way's kind)
         self.hints.at().is_none()
             && self.tracking.is_none()
             && self.gate > 0
-            && wanted(self.gate) != Some(kind)
-            && self.gate.checked_sub(1).and_then(wanted) != Some(kind)
+            && !wanted(self.gate)
+            && !self.gate.checked_sub(1).is_some_and(wanted)
     }
 
     /// Whether a ball lost now was lost as the player lost one here: the player's line was kept to into the
@@ -1747,6 +1753,24 @@ impl Pilot {
                             (t + brake, opposite(c)),
                         ]);
                     }
+                }
+            }
+        }
+        // pumping: to and fro along a choice, swinging higher each time (out of a trough between waves too steep to
+        // climb from a standstill, a heavy ball above all)
+        for &c in CHOICES.iter().skip(1) {
+            for swing in [40u64, 70] {
+                for times in [2u64, 4] {
+                    let mut plan = Vec::new();
+                    let mut t = sim.tick;
+                    for _ in 0..times {
+                        t += swing;
+                        plan.push((t, opposite(c)));
+                        t += swing;
+                        plan.push((t, c));
+                    }
+                    plan.push((t + 2 * swing, c));
+                    plans.push(plan);
                 }
             }
         }

@@ -79,8 +79,8 @@ that falls into the gap), a wait while it settles, and across.
 ## Going back and trying again
 
 The simulation is deterministic and can be copied, so the test player saves its run every two seconds (the saves
-thin out as they age, reaching back several minutes) and, when its ball is lost, a transformer it rolls over by a slip makes it another kind than its way's
-(off the player's line), or its way
+thin out as they age, reaching back several minutes) and, when its ball is lost, a transformer other than the way's next one, rolled over by a slip, makes
+it over (off the player's line), or its way
 has not got on for 20 seconds, goes back to a save and tries again, varied: a short opening move of its own (a wait
 or a push of random length, before anything else, a running hint too, so moving parts are met at another phase) and,
 for some seconds, random additions to its choices' scores; from the third try on every third one leaves the
@@ -95,7 +95,9 @@ that got through, without the tries that failed.
 
 ## The search when stuck
 
-Stuck where no ram, manoeuvre, charge or leap gets on, the test player searches deeper: a beam search over
+Stuck for four seconds, the test player tries rams, pumping (to and fro along a choice, two or four swings: out of a
+trough between waves too steep to climb from a standstill) and random manoeuvres on copies of the run. Stuck where
+no ram, manoeuvre, charge or leap gets on, the test player searches deeper: a beam search over
 sequences of held arrows (each held a third, three quarters or a second and a half, or no arrows for half a second),
 four deep, keeping the six best states at each depth, one a place. Each is judged after a coast of two thirds of a
 second by how far along the way the ball is, less how much stands in the way ahead: loose boxes and balls, and the
@@ -165,12 +167,13 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 - Level 4: finished from the start in 9:16.25 (`--follow` the owner's run, `--then` the one from sector 3).
 - Level 5: finished from the start in 13:06.93 (hints for both crates and the pusher).
 - Level 6: with the owner's run (it ends at the convex log in sector 2) and the plan `hints/Level_06.plan`, the test
-  player goes on by itself through sectors 2 and 3 to the wavy log of sector 4, whose waves the way over the floors
-  did not climb.
-- Level 7: finished from the start in 12:07.18, following the owner's finished run.
+  player goes on by itself through sectors 2 and 3 and over the wavy log of sector 4 to its stone transformer; the
+  boxes to push off the ledge as stone are next.
+- Level 7: finished from the start in 11:47.53, following the owner's finished run.
 - Level 8: by itself with the walkthrough's plan, to the first wood transformer (route 156 of 1072).
 - Level 9: finished from the start in 12:30.10, following the owner's finished run (the maze of pushers in sector 3
   is solved as the owner solved it).
 - Level 10: finished from the start in 14:42.52, following the owner's finished run with `hints/Level_10.txt`.
-- Levels 11–13: 11 in sector 1 (the drawbridge the owner knocked down as his ball fell with it); 12 in sector 2 (its
+- Levels 11–13: 11 follows the owner's run through sectors 1–3 (losing a ball at the drawbridge as the owner did,
+  which knocks it down) and goes on by itself in sector 4; 12 in sector 2 (its
   thin rails); 13 in sector 2, at the paper transformer above the fan it must ride.
