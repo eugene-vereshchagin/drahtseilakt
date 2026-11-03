@@ -69,8 +69,8 @@ impl std::fmt::Display for Skipped {
     }
 }
 
-/// The levels of a custom levels folder, by their order and title (then by path), and the folders that are not levels. Hidden entries
-/// (a name beginning with a dot), links and other files are passed over silently.
+/// The levels of a custom levels folder, by their order and title (then by path), and the folders that are not
+/// levels. Hidden entries (a name beginning with a dot), links and other files are passed over silently.
 pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
     let (mut found, mut skipped) = (Vec::new(), Vec::new());
     for (path, kind) in entries(root, ENTRIES_MAX) {
@@ -454,10 +454,10 @@ mod tests {
         let (found, _) = scan(&root);
         let titles: Vec<&str> = found.iter().map(|p| p.title.as_str()).collect();
         assert_eq!(titles, ["Omega", "Zeta", "Alpha", "Beta"], "ordered ones first, by order; then by title");
-        let zeta = &found[1];
+        let zeta = found.get(1).unwrap();
         assert_eq!(zeta.title_in("ru"), "Зета", "cleaned; the first of a language kept");
         assert_eq!((zeta.title_in("de"), zeta.title_in("zh")), ("Zeta", "Zeta"), "an empty or missing one: the title");
-        assert!(found[0].titles.is_empty(), "codes are lowercase letters, at most 8");
+        assert!(found.first().unwrap().titles.is_empty(), "codes are lowercase letters, at most 8");
         let _ = std::fs::remove_dir_all(&root);
     }
 

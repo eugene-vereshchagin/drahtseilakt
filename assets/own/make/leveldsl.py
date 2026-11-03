@@ -61,6 +61,11 @@ LANGS = ("ru", "de", "zh")
 BALLS = {"wood": "Wood", "stone": "Stone", "paper": "Paper"}
 # The test player's automatic steps: a point every this many units along the way, by style.
 SPACING = {"safe": 9.0, "speed": 14.0, "collector": 9.0}
+# scripts/own-levels.sh tries the speed style with other spacings and keeps the fastest run (LEVELDSL_SPEED_SPACING).
+try:
+    SPACING["speed"] = min(max(float(os.environ.get("LEVELDSL_SPEED_SPACING", SPACING["speed"])), 4.0), 60.0)
+except ValueError:
+    pass
 # A hint's steps at most (hints.rs takes 64).
 HINT_STEPS = 60
 

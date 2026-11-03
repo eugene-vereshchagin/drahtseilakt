@@ -18,7 +18,12 @@ mod tests {
     /// Our levels: the shipped folders made from a level description.
     fn levels() -> Vec<PathBuf> {
         let mut v: Vec<PathBuf> = std::fs::read_dir(shipped())
-            .map(|r| r.flatten().map(|e| e.path()).filter(|p| p.join("level.lvl").is_file()).collect())
+            .map(|r| {
+                r.flatten()
+                    .map(|e| e.path())
+                    .filter(|p| p.join("level.lvl").is_file())
+                    .collect()
+            })
             .unwrap_or_default();
         v.sort();
         v
@@ -36,20 +41,47 @@ mod tests {
         let data = Data::new(None).for_source(&source);
         let loaded = data.load(&source).expect("the level loads");
         let data = data.with_parts(&loaded.level);
-        assert!(data.own_parts, "{}: our level is made for our parts", dir.display());
+        assert!(
+            data.own_parts,
+            "{}: our level is made for our parts",
+            dir.display()
+        );
         let text = std::fs::read_to_string(replay).expect("the replay reads");
         let run = Replay::parse(&text).expect("the replay parses");
-        assert_eq!(run.level_hash, loaded.hash, "{}: recorded on this level", replay.display());
-        assert!(run.start.is_none(), "{}: a run from the level's start", replay.display());
+        assert_eq!(
+            run.level_hash,
+            loaded.hash,
+            "{}: recorded on this level",
+            replay.display()
+        );
+        assert!(
+            run.start.is_none(),
+            "{}: a run from the level's start",
+            replay.display()
+        );
         let modules = crate::scene::load_modules(&loaded.level, &data);
         let named: std::collections::BTreeSet<String> = (0..loaded.level.objects.len())
             .filter_map(|i| crate::scene::module_of(&loaded.level, i).map(str::to_owned))
             .filter(|n| !n.starts_with("PR_"))
             .collect();
         let missing: Vec<&String> = named.iter().filter(|n| modules.get(n).is_none()).collect();
-        assert!(missing.is_empty(), "{}: parts not among ours: {missing:?}", dir.display());
-        let ball = loaded.level.start_ball.as_deref().and_then(BallKind::from_name).unwrap_or(BallKind::Wood);
-        let mut sim = Sim::with_modules(&loaded.level, ball, &modules, loaded.level.settings.tutorial);
+        assert!(
+            missing.is_empty(),
+            "{}: parts not among ours: {missing:?}",
+            dir.display()
+        );
+        let ball = loaded
+            .level
+            .start_ball
+            .as_deref()
+            .and_then(BallKind::from_name)
+            .unwrap_or(BallKind::Wood);
+        let mut sim = Sim::with_modules(
+            &loaded.level,
+            ball,
+            &modules,
+            loaded.level.settings.tutorial,
+        );
         let balls = data.part("3D Entities/Balls.nmo").expect("our balls");
         sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);
         sim.set_pieces(crate::pieces::Pieces::find(&balls.level));
@@ -57,7 +89,11 @@ mod tests {
         while sim.tick < run.end && !sim.finished && !sim.game_over {
             sim.step(run.input_at(sim.tick + 1));
         }
-        Outcome { finished: sim.finished.then_some(sim.tick), lives: sim.lives, sectors: sim.sector_count() }
+        Outcome {
+            finished: sim.finished.then_some(sim.tick),
+            lives: sim.lives,
+            sectors: sim.sector_count(),
+        }
     }
 
     /// Every one of our levels has its runs, in the three styles, and each finishes the level.
@@ -70,16 +106,30 @@ mod tests {
                 let replay = dir.join("pilot").join(format!("{style}.replay"));
                 assert!(replay.is_file(), "{}: no {style} run", dir.display());
                 let o = play(&dir, &replay);
-                assert!(o.finished.is_some(), "{}: the {style} run does not finish", dir.display());
-                assert!((3..=6).contains(&o.sectors), "{}: {} sectors", dir.display(), o.sectors);
+                assert!(
+                    o.finished.is_some(),
+                    "{}: the {style} run does not finish",
+                    dir.display()
+                );
+                assert!(
+                    (3..=6).contains(&o.sectors),
+                    "{}: {} sectors",
+                    dir.display(),
+                    o.sectors
+                );
                 println!(
                     "{} {style}: finished at {:.2} s, {} lives",
-                    dir.file_name().map(|n| n.to_string_lossy()).unwrap_or_default(),
+                    dir.file_name()
+                        .map(|n| n.to_string_lossy())
+                        .unwrap_or_default(),
                     o.finished.unwrap_or(0) as f32 / 60.0,
                     o.lives
                 );
             }
         }
-        assert!(count >= 10, "at least ten of our own levels ship with the game: {count}");
+        assert!(
+            count >= 10,
+            "at least ten of our own levels ship with the game: {count}"
+        );
     }
 }
