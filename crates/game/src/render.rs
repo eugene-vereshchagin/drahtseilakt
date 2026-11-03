@@ -200,8 +200,8 @@ pub struct Renderer {
     pub fog: Option<level::Fog>,
     /// The level's sea of cloud (clouds.rs) and how finely it is drawn; none for the original's levels.
     pub clouds: Option<crate::clouds::Layer>,
-    /// The frame shows another scene than the level (the menu's): no sea of cloud.
-    pub hide_clouds: bool,
+    /// The frame shows another scene than the level (the menu's): neither the level's sea of cloud nor its fog.
+    pub menu_frame: bool,
     /// The cloud pass, made the first time a level has clouds (its noise takes a moment).
     cloud_pass: Option<crate::clouds::Pass>,
     /// The clouds' clock (their drift).
@@ -386,7 +386,7 @@ impl Renderer {
             flash: 0.0,
             fog: None,
             clouds: None,
-            hide_clouds: false,
+            menu_frame: false,
             cloud_pass: None,
             started: std::time::Instant::now(),
             point: None,
@@ -951,6 +951,7 @@ impl Renderer {
         let aspect = width.max(1) as f32 / height.max(1) as f32;
         let proj = perspective_lh(view.fov_y, aspect, 0.5, 3000.0);
         let look = look_at_lh(view.eye, view.target, Vec3::Y);
+        let fog = self.fog.filter(|_| !self.menu_frame);
         let globals = Globals {
             view_proj: (proj * look).to_cols_array_2d(),
             light_dir: self.light.dir.normalize_or(Vec3::NEG_Y).extend(0.0).to_array(),
@@ -962,9 +963,9 @@ impl Renderer {
             flash_color: [self.flash, self.flash, self.flash, 0.0],
             point_pos: self.point.map_or([0.0; 4], |(p, _)| p.extend(crate::lights::POINT_RANGE).to_array()),
             point_color: self.point.map_or([0.0; 4], |(_, c)| [c[0], c[1], c[2], 0.0]),
-            fog_color: self.fog.map_or([0.0; 4], |f| [f.color[0], f.color[1], f.color[2], f.density]),
-            fog_height: self.fog.map_or([0.0; 4], |f| [f.below, f.depth, 1.0, 0.0]),
-            fog_down: self.fog.map_or([0.0; 4], |f| [f.color_down[0], f.color_down[1], f.color_down[2], 0.0]),
+            fog_color: fog.map_or([0.0; 4], |f| [f.color[0], f.color[1], f.color[2], f.density]),
+            fog_height: fog.map_or([0.0; 4], |f| [f.below, f.depth, 1.0, 0.0]),
+            fog_down: fog.map_or([0.0; 4], |f| [f.color_down[0], f.color_down[1], f.color_down[2], 0.0]),
         };
         self.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
@@ -1064,7 +1065,7 @@ impl Renderer {
         };
         // the sea of cloud goes between the opaque scene (whose depth it reads) and the blended one
         let quality = crate::clouds::quality();
-        let clouds = self.clouds.is_some() && !self.hide_clouds && quality != crate::clouds::Quality::Off;
+        let clouds = self.clouds.is_some() && !self.menu_frame && quality != crate::clouds::Quality::Off;
         if clouds && self.cloud_pass.is_none() {
             self.cloud_pass = Some(crate::clouds::Pass::new(&self.device, &self.queue, self.format));
             if let Some(ring) = self.clouds.as_ref().map(|l| l.ring.clone()) {
@@ -1083,7 +1084,7 @@ impl Renderer {
                 let frame = crate::clouds::Frame {
                     view_proj: proj * look,
                     eye: view.eye,
-                    time: self.started.elapsed().as_secs_f32(),
+                    time: self.started.elapsed().as_secs_f64(),
                     width,
                     height,
                     quality,

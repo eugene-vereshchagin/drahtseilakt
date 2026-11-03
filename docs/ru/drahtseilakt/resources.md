@@ -30,7 +30,7 @@
 | game font texture | `Textures/Font_1.tga` | Tektur, растеризует игра |
 | buttons and the points box | `Textures/Button01_special/select/deselect.tga` | наши, те же имена |
 | ball shadow | `Textures/HardShadow.bmp` | своя: `Textures/HardShadow.png` |
-| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | свои для букв A, B, C: `Textures/Sky/Sky_<letter>_<face>.png`; и фотографические небеса по имени (levels.md, «Небо»): `Mountains`, `Forest`, `Sea`, `Storm`, `Sunset`, `Night`, `Desert`, `Mist`, `Clouds`, `Textures/Sky/Sky_<name>_<face>.jpg` с шестой гранью `Top` (`make/make_skies.py`, фотографии CC0 с Poly Haven, `CREDITS.md`) |
+| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | свои для букв A, B, C: `Textures/Sky/Sky_<letter>_<face>.png`; и фотографические небеса по имени (levels.md, «Небо»): `Mountains`, `Forest`, `Sea`, `Storm`, `Sunset`, `Night`, `Desert`, `Mist`, `Clouds` (у `Sunset` и `Clouds` ниже горизонта только дымка: море облаков рисует игра, если оно есть у уровня), `Textures/Sky/Sky_<name>_<face>.jpg` с шестой гранью `Top` (`make/make_skies.py`, фотографии CC0 с Poly Haven, `CREDITS.md`) |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | свои, те же имена в `.png` |
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | звуковые темы (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | звуковые темы (assets/sounds) |

@@ -112,7 +112,7 @@ pub struct Layer {
 pub struct Frame {
     pub view_proj: Mat4,
     pub eye: Vec3,
-    pub time: f32,
+    pub time: f64,
     pub width: u32,
     pub height: u32,
     pub quality: Quality,
@@ -281,9 +281,10 @@ impl Pass {
     ) {
         let c = &layer.settings;
         let [steps, light, detail] = frame.quality.march();
+        let (offset, rise) = drift(c.wind, c.scale, frame.time);
         let u = Uniform {
             inv_view_proj: frame.view_proj.inverse().to_cols_array_2d(),
-            eye: frame.eye.extend(frame.time).to_array(),
+            eye: frame.eye.extend(rise).to_array(),
             sun: Vec3::from(c.sun)
                 .normalize_or(Vec3::Y)
                 .extend(0.0)
@@ -293,7 +294,7 @@ impl Pass {
             shadow: [c.shadow[0], c.shadow[1], c.shadow[2], 0.0],
             slab: [c.top - c.thickness, c.top, c.cover, c.scale],
             march: [steps, light, c.haze, c.under],
-            wind: [c.wind[0], c.wind[1], detail, frame.width as f32],
+            wind: [offset[0], offset[1], detail, frame.width as f32],
             haze: [
                 layer.haze[0],
                 layer.haze[1],
@@ -367,14 +368,33 @@ impl Pass {
     }
 }
 
-/// The shader: the built-in one, or for tuning the look (a developer's run) the file DRAHTSEILAKT_CLOUD_SHADER names.
+/// The shader: the built-in one, or in a debug build, for tuning the look, the file DRAHTSEILAKT_CLOUD_SHADER names.
 fn shader_source() -> String {
+    #[cfg(debug_assertions)]
     if let Some(text) =
         std::env::var_os("DRAHTSEILAKT_CLOUD_SHADER").and_then(|p| std::fs::read_to_string(p).ok())
     {
         return text;
     }
     include_str!("clouds.wgsl").to_owned()
+}
+
+/// Every texture of the layer repeats over this many clouds' sizes (clouds.wgsl: the map of banks every 30 and its
+/// heaps every 5, the noise every 4 and its billows every 0.75), so the drift is wrapped at it without a jump.
+const DRIFT_PERIOD: f32 = 60.0;
+/// The billows' slow rise repeats every this many seconds (clouds.wgsl: 0.004 of their texture a second).
+const RISE_PERIOD: f32 = 250.0;
+
+/// The drift after `time` seconds of `wind` (x, z a second) over clouds `size` across, wrapped at DRIFT_PERIOD, and
+/// the clock the billows rise by, wrapped at RISE_PERIOD: small numbers however long the run, where 32-bit floats keep
+/// their precision.
+fn drift(wind: [f32; 2], size: f32, time: f64) -> ([f32; 2], f32) {
+    let period = f64::from(DRIFT_PERIOD * size.max(1e-3));
+    let at = |w: f32| (f64::from(w) * time).rem_euclid(period) as f32;
+    (
+        [at(wind[0]), at(wind[1])],
+        time.rem_euclid(f64::from(RISE_PERIOD)) as f32,
+    )
 }
 
 fn texture(
@@ -649,6 +669,21 @@ pub fn horizon_ring(faces: &[Option<(u32, u32, Vec<u8>)>]) -> Option<(Vec<u8>, [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The drift stays small however long the run, and wrapping it moves every texture by whole repeats.
+    #[test]
+    fn the_drift_wraps_at_the_textures_period() {
+        let (o, r) = drift([7.0, -3.0], 85.0, 1.0e7);
+        assert!(
+            o.iter().all(|v| (0.0..DRIFT_PERIOD * 85.0).contains(v))
+                && (0.0..RISE_PERIOD).contains(&r)
+        );
+        for repeat in [30.0f32, 5.0, 4.0, 0.75] {
+            let n = DRIFT_PERIOD / repeat;
+            assert!((n - n.round()).abs() < 1e-4, "{repeat}");
+        }
+        assert_eq!(drift([2.0, 0.0], 10.0, 1.0).0, [2.0, 0.0]);
+    }
 
     #[test]
     fn qualities_read_back() {
