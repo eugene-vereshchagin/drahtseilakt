@@ -1,0 +1,19 @@
+PS_FourFlames_01
+P_Extra_Life_04          # sector 1: east past the paper balls
+PC_TwoFlames_01
+# sector 2: as wood up the wide ramp between the stone transformers lying on it
+PC_TwoFlames_02
+P_Trafo_Paper_01         # sector 3: paper
+P_Modul_18_01            # up the updraft, across onto the higher one
+P_Trafo_Stone_06         # stone up there; down, the pusher P_Modul_01_03 shoved out of the lane and the
+#                        drawbridge P_Modul_25_01 knocked over (hint)
+P_Trafo_Paper_01         # paper again, over the bridge north
+P_Trafo_Stone_08         # down the rail; stone at its foot
+PC_TwoFlames_03
+P_Trafo_Paper_03         # sector 4: south along the double rail, the wavy track north into it
+PC_TwoFlames_04
+P_Extra_Life_03          # sector 5: paper over the fans
+P_Modul_18_03
+P_Trafo_Paper_04
+P_Trafo_Wood_01
+PE_Balloon_01

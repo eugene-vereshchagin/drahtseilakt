@@ -1,18 +1,44 @@
-# Level 3 — hints for the test player (docs/drahtseilakt/autopilot.md), from the owner's finished run.
+# Level 3 — hints for the test player (docs/drahtseilakt/autopilot.md, the rules in autopilot-rules.md), written
+# from the walkthrough's storyboard (ref/video/frames/fast/level03) and the route in Level_03.route; the plan is
+# Level_03.plan. (The hints that follow the owner's run are Level_03-follow.txt.)
 #
-# Sector 4: the way north along x 1409 (from z -130) opens when the lever P_Modul_37 (1395.3, -494.3, -108.7) is hit,
-# and the bridge it lowers (P_Modul_25_04, 1372.2 -138) is crossed east at speed. No hint: keeping to the owner's
-# line tick by tick hits the lever and crosses the bridge as the owner did (a hint's own hits left the pole standing).
-
-# Sector 4, the narrow way north along x 1409 from z -130 to -85 (a stone ball falls off it to the side): driven
-# straight along the owner's line, point by point, then east toward sector 5.
-at 1404 -492.3 -137.6 r 5 sector 4 kind stone : goto 1409.1 -492.3 -137.5 ; wait 30 ; goto 1409.1 -492.3 -126 ; goto 1409.1 -492.3 -112 ; goto 1409.1 -492.3 -98 ; goto 1409.2 -492.3 -85 ; wait 20 ; goto 1424 -492.3 -85.8 ; goto 1440 -493.5 -86.2
-
-
-# Sector 5, the rails A05_Rail_01 east into the paper transformer (1551.3, -86.2): a stone or wood ball stops on them
-# short of it; it takes them with a run-up.
-at 1540 -498.2 -86.2 r 9 sector 5 : goto 1522 -498.3 -86.2 ; push 1 0 150 ; become paper
-
-# The finish: the balloon (1869.2, -466.2, -141.8) stands up a slope the ball rolls back down when it comes slowly;
-# a short run-up from x 1852 takes it up (only where it stops there: on its way it rolls in by itself).
-at 1863.5 -468 -142.2 r 2.5 sector 5 : goto 1852 -465.5 -141.7 ; push 1 0 60
+# Sector 1: the stone ball west over the seesaw P_Modul_30_01 (pivot at x 137.9) to the wood transformer at its far
+# end (123, 93.7): from a run-up at x 157.5, at a steady push (slowly the seesaw tips back under it).
+at 152.5 -29.9 92 r 6 sector 1 kind stone : pass 157.5 -29.9 93.8 3 ; press 125 -29 93.7 0 0 8 300
+#
+# Sector 4, three hits open the way, all with the stone ball (from the transformer at 1323.4 -101.3): the north end
+# of the turning pole P_Modul_17_01 (at 1357.5 -80, hit going east) swings it round onto the drawbridge P_Modul_25_05
+# (1356.7 -101.3) on the way east, which falls; the target of P_Modul_37_01 (1395.3 -108.7, at the end of the
+# corridor z -108.4, lined up and hit at speed, pushing on) lays its plank down as the narrow way north along x 1409;
+# the end of the pole P_Modul_17_02 by the corridor (1377.5 -116.5, hit going east) knocks the drawbridge
+# P_Modul_25_04 (1372.2 -138) down. Then back west, south round to that bridge's west end, east over it at a run,
+# north along the plank x 1409 (off its line a stone ball falls to the side), east toward the checkpoint.
+at 1323.4 -491 -101.3 r 5 sector 4 kind stone : pass 1336.5 -493 -100 5 ; pass 1337.3 -493 -86 5 ; pass 1339 -493 -79.8 4 ; press 1357.5 -493 -79.8 0 0 6 150 ; pass 1344 -493 -79.6 5 ; pass 1338 -493 -88 5 ; pass 1337 -493 -100 5 ; pass 1349 -492.3 -101.1 7 ; pass 1366 -492.9 -101.4 7 ; pass 1369.5 -492.3 -108.4 4 ; hold 1372 -492.3 -108.4 30 ; press 1392 -492.3 -108.4 0 0 7 200 ; push 1 0 30 ; pass 1380 -492.3 -110 5 ; pass 1371 -492.3 -113.5 4 ; press 1377.5 -492.3 -116.5 0 0 5 120 ; pass 1370 -492.3 -110 4 ; pass 1369.6 -492.8 -103 5 ; pass 1349 -492.3 -101 6 ; pass 1338 -493 -103 5 ; pass 1342 -493 -115 5 ; pass 1350 -493 -121 5 ; pass 1353 -492.3 -136 4 ; press 1410 -492.3 -137.5 0 0 9 300 ; pass 1409.2 -492.3 -130 5 ; press 1409.2 -492.3 -86 0 0 8 300 ; pass 1424 -492.3 -85.8 6 ; pass 1440 -493.5 -86.2 7
+#
+# Sector 2: from the stone transformer (372.4, -13, 75.2) east down the long rails along z 75.13 at full speed: at
+# their end (x 572) they turn up and throw the ball back west onto the start of the rail south (557.96, -120.2, 75.2)
+# — slower, it stays in the dip before it. Then south down that steep rail along x 557.96 past P_Extra_Life_03 at full
+# speed too: at its foot it dips and throws the ball up onto the ledge at (558, -239.4, -133) (slower, it stays in
+# the dip). The ledge is rail grooves: east along z -132.72, round the U at x 573 into the groove z -140.31,
+# west along it to its end at x 552, and back east down it at a push all the way to the checkpoint's platform.
+at 372.4 -10.6 75.2 r 5 sector 2 kind stone : press 548 -119 75.13 0 0 30 900 ; along 30 60 ; wait 100 ; pass 557.96 -120.2 74 3 ; press 557.96 -239.4 -126 0 0 30 900 ; wait 90 ; press 572 -239.7 -132.72 0 0 6 300 ; along 5 70 ; pass 557 -239.5 -140.31 4 ; hold 553.5 -239.5 -140.31 50 ; press 600 -251 -140.31 0 0 14 300 ; press 786 -359 -140.31 0 0 14 900 ; pass 800 -376 -140.3 8
+#
+# Sector 3: off the long descent onto the platform with the boxes P_Box_01..08 standing along its east edge, south
+# past them to the start of the rails at its south end (1096, -166), round their U east and north along x 1112.2
+# beside the boxes, off them onto the floor at z -65, east along z -66.8 past the paper transformer (south) and the
+# wood transformer (north), both open to the east (a gap lies between them and the lane), and round into the wood one.
+at 1101 -481 -139 r 8 sector 3 kind stone : pass 1096 -481.2 -150 5 ; pass 1096 -481.3 -162 4 ; press 1096.2 -480.2 -170 0 0 6 120 ; along 6 240 ; press 1112.2 -477.1 -75 0 0 8 900 ; pass 1112.3 -483.4 -64 5 ; pass 1125 -483.3 -66.8 6 ; pass 1150 -483.3 -66.8 6 ; pass 1170 -483.4 -66.8 5 ; pass 1174 -483.4 -61 4 ; pass 1167 -483.4 -57 4 ; become wood
+#
+# Sector 3, as wood from P_Trafo_Wood_03: east, south up the ramp beside the lane x 1178 to its south end (z -106),
+# round onto that lane and north along it to its end, east along z -31 shoving P_Ball_Wood_01 ahead and off the end,
+# down onto the floor at y -493 and east to the checkpoint.
+at 1159.5 -482 -56.5 r 4 sector 3 kind wood : pass 1166 -483.4 -57 5 ; pass 1174 -483.4 -60 5 ; pass 1176 -483.4 -70 5 ; pass 1172 -482 -86 6 ; pass 1174 -477.6 -101 5 ; pass 1176 -477.8 -106 3 ; pass 1177.5 -477.6 -95 4 ; pass 1178.2 -477.5 -80 6 ; pass 1178 -477.5 -50 6 ; pass 1177.5 -477.6 -34 5 ; pass 1180 -477.4 -32.5 4 ; press 1215 -477.9 -31 0 0 6 400 ; pass 1222 -480 -27 5 ; pass 1236 -492.7 -22 6
+#
+# Sector 5: the rails east into the paper transformer (1551.3, -86.2): a stone ball rolled slowly stops on them short
+# of it; at a steady push along them into it.
+at 1525 -498.3 -86.2 r 6 sector 5 kind stone : press 1551.3 -503.5 -86.2 0 0 8 300 ; become paper
+#
+# Sector 5, from the wood transformer: the drawbridge P_Modul_25_03 (1791.3) stands up across the track east; the
+# wood ball knocks it over only at speed: at a run straight into it, over it and on up the slope to the balloon
+# (slowly the ball rolls back down that slope).
+at 1762 -465.3 -141.8 r 4 sector 5 kind wood : press 1800 -464.2 -141.5 0 0 12 300 ; pass 1830 -464.7 -142.2 10 ; pass 1852 -465.5 -142.4 9 ; press 1869 -466.2 -141.8 0 0 8 200

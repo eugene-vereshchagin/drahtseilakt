@@ -170,7 +170,8 @@ at X Y Z r R [sector N] [kind wood|stone|paper] : SCHRITT ; SCHRITT ; ...
 ```
 
 Kommt die Kugel dem Punkt näher als R (in diesem Sektor, als diese Kugel), laufen die Schritte der Reihe nach,
-einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinter den Transformatoren, wenn der Hinweis die Kugel verwandelt hat). Schritte:
+einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinter den Transformatoren, wenn der Hinweis die Kugel verwandelt hat: die Transformatoren
+des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als durchfahren, auch einer, in dem er begann). Schritte:
 
 | Schritt | Was er tut |
 |---|---|
@@ -239,8 +240,17 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 `scripts/video.sh`):
 
 - Level 1: vom Start an geschafft in 6:12.27 (Hinweise für Rampe, Kiste, Schieber und Schienen).
+  Allein ohne Lauf eines Spielers, nach dem Storyboard des Walkthroughs (`hints/Level_01.plan`, `.route`, `.txt`;
+  die Hinweise zum Lauf des Inhabers heißen jetzt `Level_01-follow.txt`): 5:17.12, 9.1% der Zeit stehend
+  (`hints/runs/Level_01-clean.replay`).
 - Level 2: vom Start an geschafft in 6:13.27 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers ab Sektor 5).
+  Allein ohne Lauf eines Spielers, nach dem Storyboard des Walkthroughs (`hints/Level_02.plan`, `.route`, `.txt`;
+  die Hinweise zum Lauf des Inhabers heißen jetzt `Level_02-follow.txt`): 5:23.90, 5.9% der Zeit stehend
+  (`hints/runs/Level_02-clean.replay`).
 - Level 3: vom Start an geschafft in 7:45.48 (Hebel und Brücke in Sektor 4 wie beim Inhaber).
+  Allein ohne Lauf eines Spielers, nach dem Storyboard des Walkthroughs (`hints/Level_03.plan`, `.route`, `.txt`;
+  die Hinweise zum Lauf des Inhabers heißen jetzt `Level_03-follow.txt`): 5:58.97, 5.5% der Zeit stehend
+  (`hints/runs/Level_03-clean.replay`).
 - Level 4: vom Start an geschafft in 9:19.47 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
 - Level 5: vom Start an geschafft in 12:39.77 (Hinweise für beide Kisten und den Schieber).
 - Level 6: vom Start an beendet in 8:01.22: Sektor 1 entlang der Linie des Inhabers, Sektoren 2–5 allein mit dem
