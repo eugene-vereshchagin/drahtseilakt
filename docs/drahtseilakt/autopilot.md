@@ -114,7 +114,9 @@ for some seconds, random additions to its choices' scores; from the third try on
 player's line. Three tries go from the last save before the failure, then three from each save twice as far back
 (the cause may lie earlier: a run-up too slow, a bad line into a bend). After 30 tries at one place (a place: 6 way
 points further than the last), the failure is taken as it comes: the ball is lost, or the run is given up with its
-report (a stray transformer taken so: the ball goes into one making the way's kind, as a new ball does). The hints may fire again after going back, as for a new ball. A ball lost as the player lost one there (within
+report (a stray transformer taken so: the ball goes into one making the way's kind, as a new ball does). The hints may fire again after going back, as for a new ball. A hint whose ball ends a step 3 or more below
+the step's point (fallen to a floor beneath it) is off course: its further steps are no getting on, so it goes back
+from there as from a way that stands still, instead of playing the rest of the hint from the wrong floor. A ball lost as the player lost one there (within
 four seconds of keeping to the player's last seconds before a loss) is not gone back from, where the player's run got past that sector afterwards: what the
 player's ball did as it went may be what the level needs (a drawbridge knocked down as the ball fell with it). `--rewinds N` caps how often it goes back in
 a run (600; 0: never). The variation is seeded, so a run is reproducible; the run kept, and its replay, is the one
@@ -241,17 +243,28 @@ path in that sector.
 - **flow** — don't dawdle here. A hint's step that stops the ball goes without its stop: a `goto` is rolled through,
   a `wait` or `hold` left out, a `pass` or `press` slower than 5 taken at 5; but only when, on a copy of the run, the
   rest of the hint and a second after keep the ball (a stop the ball needs stays). The steering pays for rolling
-  slower than 0.8 of the floor's pace more than a wait is worth (a choice that loses the ball is still never taken).
+  slower than 0.8 of the floor's pace more than a wait is worth (a choice that loses the ball is still never taken),
+  except where the ball needs a run-up (a gap or a too steep climb ahead, as for a careful zone below): backing off
+  and stopping for it is no dawdling, so there the zone asks nothing (a hint's stop stays too).
 - **careful** — keep the speed limit here and don't cut corners. Not faster than `speed` (4.5 when not given; edit
   the line to change it): the steering pays four times as much for every unit over it, a hint's `pass`, `press`,
   `along` and `round` are capped to it, and whatever drives (the steering, a hint, the player's line), the arrows
   pushing along the ball's run are let go above the limit and the ball is braked above 1.25 times it. The way's
   line ahead (the middle the way's search found) is kept to: each unit off it costs 2, and off the middle of the
-  floor three times as much as elsewhere. Where the level needs speed (a climb, a gap), a careful zone holds the
-  ball back too: such a place is no place for one.
+  floor three times as much as elsewhere. Where the physics needs the ball's momentum the limit is let go and only
+  the line is kept: the way ahead (about 30 units) has a gap to cross or a climb steeper than the ball takes by its
+  own push at the limit (at 4.5: stone 12.6°, wood 26°, paper 31°; measured on the engine, a stone ball climbs
+  nothing steeper than 17° by its push, wood 37°, paper 46°), a sill comes just ahead, or the running hint says
+  speed (a `press`, `along` or `round` faster than the limit: a climb, rails, a ram; or a `pass` faster than it
+  within 25 units before one: its run-up). The status line says so (`[limit let go: a gap to cross ahead]`). A careful learned rule holds
+  back the same way, and is let go in the same places.
 
 Each mark also teaches the test player the kind of place it was, for every level: a rule of the learned table
 (`learned.txt` beside the hints; [autopilot-rules.md](autopilot-rules.md), "The learned table").
+
+`AUTOPILOT_SITUATION=1` prints, besides the place every second, each change of what the zones and rules ask, with
+the tick and the ball's place (`zone t14528 (137.9 -6.8 -554.8) [learned: ... → careful, at most 4.5]`, `none` when
+nothing holds), and why a limit is let go.
 
 A zones file is untrusted like a hint file: its size (64 KiB), the zones (256) and points (256 a zone) and every
 number are capped; a malformed line is left out with a note naming it, the other zones still count.
@@ -270,8 +283,10 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 
 - Level 1: finished from the start in 6:12.27 (hints for the ramp, the crate, the pushers and the rails).
   By itself with no player's run, from the walkthrough's storyboard (`hints/Level_01.plan`, `.route`, `.txt`;
-  the hints that follow the owner's run are `Level_01-follow.txt`): 5:17.12, standing 9.1% of the time
-  (`hints/runs/Level_01-clean.replay`).
+  the hints that follow the owner's run are `Level_01-follow.txt`): 5:17.12, standing 9.1% of the time.
+  With the owner's marks (`hints/Level_01.zones`, `hints/learned.txt`), 2026-11-03: 6:23.63, standing 9.7% of the
+  ticks (under 0.3 a second; the run before 9.7% by the same count), within 1 of an edge 4.3% (4.5%), speed 4.8 ± 3.6
+  (5.5 ± 4.0) (`hints/runs/Level_01-clean.replay`).
 - Level 2: finished from the start in 6:13.27 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
   By itself with no player's run, from the walkthrough's storyboard (`hints/Level_02.plan`, `.route`, `.txt`;
   the hints that follow the owner's run are `Level_02-follow.txt`): 5:23.90, standing 5.9% of the time

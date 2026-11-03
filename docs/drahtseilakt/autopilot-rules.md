@@ -74,9 +74,15 @@ beside the hints:
 
 - **flow** ("don't dawdle here"): no stop, wait or slowing down there that the ball does not need. A hint's `goto`
   is rolled through, its `wait` and `hold` left out, a slow `pass` or `press` taken at 5, each only when a copy of
-  the run shows the ball is kept so; the steering keeps at least 0.8 of the floor's pace.
+  the run shows the ball is kept so; the steering keeps at least 0.8 of the floor's pace, except before a gap or a
+  climb that needs a run-up: backing off and stopping for it is no dawdling, so there a flow zone asks nothing.
 - **careful** ("keep the speed limit here and don't cut corners"): not faster than the zone's speed (4.5 by
-  default), on the way's middle line, no racing line; whatever drives is held under the limit.
+  default), on the way's middle line, no racing line; whatever drives is held under the limit. **Never where the
+  physics needs momentum**: before a gap to cross or a climb steeper than the ball takes by its own push (stone
+  12.6°, wood 26°, paper 31° at 4.5; by its push alone stone climbs nothing steeper than 17°, wood 37°, paper
+  46°; the way read about 30 units ahead), at a sill, and where the running hint says speed (a
+  `press`, `along` or `round` faster than the limit, or a `pass` faster than it that is the run-up to one), the
+  limit is let go and only the line is kept. A mark meant to slow the ball down there could only lose it.
 
 A zone of the watcher's comes before the pace rules above: it is what the owner saw.
 
@@ -112,7 +118,10 @@ run reads the table and looks at the place each tick: where the ball is in none 
 first) and rules hold, flow if any of them is flow, the lowest limit of the careful ones; the status line names the
 most particular rule holding (`learned: rail, rail-end ahead, wood → don't dawdle`), and with F12 also the place as
 the rules see it (`here: surface=rail ...`). A rule names at least two features, one of them special to the place,
-so that none holds almost everywhere. Undoing a mark (Backspace) also takes out the rule it taught (by the mark's id in its evidence). A rule the table
+so that none holds almost everywhere; a careful rule names two special to the place, as it holds the ball back
+wherever it holds (a sharp bend alone is every level's every sharp corner; a bend near a reset point is not every
+bend). A careful mark along a stretch with only one special feature teaches no rule (its zone stays the level's
+own), and such a line in the table is left out with a note. Undoing a mark (Backspace) also takes out the rule it taught (by the mark's id in its evidence). A rule the table
 has already is not added again; a table full (512 rules) takes no more, and the screen says so. The table is
 plain text: a rule that turns out too wide is narrowed by adding a feature, or deleted. Read like a hint file, it is
 untrusted: size (64 KiB), rules (512) and numbers capped, values from the lists above, a malformed line left out with

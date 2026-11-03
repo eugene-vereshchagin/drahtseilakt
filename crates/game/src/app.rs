@@ -2136,9 +2136,10 @@ impl PilotRun {
         }
         self.heard = game.sim.events.len();
         // a hint going on to its next step gets on too (its steps lead off the way: round, back for a run-up), and so
-        // does one playing a recorded run
+        // does one playing a recorded run; not one gone off course (its ball fell to a floor beneath a step's point)
         let now_at = pilot.hints.at();
-        if fell || (now_at != self.hint_at && now_at.is_some()) || pilot.hints.replaying() {
+        let hint_on = now_at != self.hint_at && now_at.is_some() && !pilot.hints.off_course();
+        if fell || hint_on || pilot.hints.replaying() {
             self.since = game.sim.tick;
         }
         self.hint_at = now_at;

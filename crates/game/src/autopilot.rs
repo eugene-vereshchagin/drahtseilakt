@@ -1325,6 +1325,10 @@ pub struct Pilot {
     /// What it learned from the watcher's marks on every level (learned.rs), and the rule holding now.
     pub learned: std::sync::Arc<crate::learned::Learned>,
     learned_now: Option<String>,
+    /// What the zones and rules asked when AUTOPILOT_SITUATION last said it (it says each change).
+    zone_said: String,
+    /// Why a careful limit is let go here (the ball needs its momentum), if it is.
+    momentum: Option<&'static str>,
     /// The level's modules (their stand-ins' places and module names), for the situation of a place.
     pub modules: std::sync::Arc<Vec<(Vec3, String)>>,
 }
@@ -1341,6 +1345,25 @@ const SLOPE: f32 = 0.15;
 const DROP_STEP: f32 = 2.0;
 /// A sill rises this steeply at least (a ramp's start does not), a drop falls more than it goes across.
 const SILL_STEEP: f32 = 0.6;
+
+/// Where the physics needs momentum a careful zone keeps only its line (`Pilot::momentum`): the way is read this far
+/// ahead (points, about 30 units: a run-up from the limit).
+const MOMENTUM_AHEAD: usize = 20;
+/// How each ball climbs by its own push (measured on the engine, `a_ball_climbs_by_its_push_as_the_table_says`):
+/// the steepest slope it climbs at all (degrees), and how much speed it keeps per degree under that (its pace up a
+/// slope, pushed on, is about `(steepest - slope) * per_degree`). Stone 17° (at 4.5: 12.6°), wood 36.7° (26°),
+/// paper 45.9° (31°).
+const CLIMB: [(crate::sim::BallKind, f32, f32); 3] = [
+    (crate::sim::BallKind::Stone, 17.0, 1.05),
+    (crate::sim::BallKind::Wood, 36.7, 0.42),
+    (crate::sim::BallKind::Paper, 45.9, 0.30),
+];
+
+/// The steepest slope (degrees) ball `kind` climbs by its own push keeping `speed`: steeper needs a run-up.
+fn steepest_climb(kind: crate::sim::BallKind, speed: f32) -> f32 {
+    let (_, top, per) = CLIMB.iter().find(|c| c.0 == kind).copied().unwrap_or(CLIMB[0]);
+    (top - speed.max(0.0) / per).max(0.0)
+}
 
 /// How near the ball a point of the way must be to take the way up there (a run begun at a sector).
 const TAKE_UP_NEAR: f32 = 8.0;
@@ -1378,6 +1401,8 @@ impl Pilot {
             zone: crate::zones::Effect::default(),
             learned: std::sync::Arc::default(),
             learned_now: None,
+            zone_said: String::new(),
+            momentum: None,
             modules: std::sync::Arc::default(),
         }
     }
@@ -2434,30 +2459,8 @@ impl Pilot {
         }
         // what comes just ahead along the way, the first of: a gap, a drop, a rail's end or start, a sill, a
         // transformer
-        let rail = |q: Vec3| self.route.floor_point(q + Vec3::Y * crate::sim::BALL_RADIUS).is_some_and(|f| f.rail);
         let end = (at + SITUATION_AHEAD).min(pts.len().saturating_sub(1));
-        let mut ahead = "none";
-        for k in at..end {
-            let (Some(&a), Some(&b)) = (pts.get(k), pts.get(k + 1)) else { break };
-            let h = flat(b - a).length();
-            // (a step up out of the slope the way had before it, not a ramp's rise)
-            let before = k.checked_sub(1).and_then(|j| pts.get(j)).map_or(0.0, |&z| a.y - z.y);
-            let rise = b.y - a.y;
-            ahead = if h > GAP {
-                "gap"
-            } else if a.y - b.y > DROP_STEP && a.y - b.y > h {
-                "drop"
-            } else if rail(a) && !rail(b) {
-                "rail-end"
-            } else if !rail(a) && rail(b) {
-                "rail-start"
-            } else if rise > SILL_STEP && rise < crate::sim::BALL_RADIUS && rise > SILL_STEEP * h && before < rise / 3.0 {
-                "sill"
-            } else {
-                continue;
-            };
-            break;
-        }
+        let mut ahead = (at..end).find_map(|k| self.link(k)).unwrap_or("none");
         if ahead == "none"
             && self.gates.iter().any(|g| g.0 >= at && g.0 <= end + SITUATION_AHEAD && g.1.distance(p) < 12.0)
         {
@@ -2475,6 +2478,75 @@ impl Pilot {
         crate::learned::Situation { values: v }
     }
 
+    /// What the way's link from point `k` to the next is, if anything special: a gap, a drop, a rail's end or start,
+    /// a sill (for the situation of a place, and where a careful zone must let the ball keep its momentum).
+    fn link(&self, k: usize) -> Option<&'static str> {
+        let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+        let pts = &self.route.points;
+        let rail = |q: Vec3| self.route.floor_point(q + Vec3::Y * crate::sim::BALL_RADIUS).is_some_and(|f| f.rail);
+        let (Some(&a), Some(&b)) = (pts.get(k), pts.get(k + 1)) else { return None };
+        let h = flat(b - a).length();
+        // (a step up out of the slope the way had before it, not a ramp's rise)
+        let before = k.checked_sub(1).and_then(|j| pts.get(j)).map_or(0.0, |&z| a.y - z.y);
+        let rise = b.y - a.y;
+        if h > GAP {
+            Some("gap")
+        } else if a.y - b.y > DROP_STEP && a.y - b.y > h {
+            Some("drop")
+        } else if rail(a) && !rail(b) {
+            Some("rail-end")
+        } else if !rail(a) && rail(b) {
+            Some("rail-start")
+        } else if rise > SILL_STEP && rise < crate::sim::BALL_RADIUS && rise > SILL_STEEP * h && before < rise / 3.0 {
+            Some("sill")
+        } else {
+            None
+        }
+    }
+
+    /// Where a careful zone's (or careful rule's) speed limit `cap` must not hold, because the physics needs the
+    /// ball's momentum there (autopilot-rules.md, "Zones the watcher marks"): why, in words, or None. The same places
+    /// let a flow zone's pace go (no `cap`): backing off for a run-up there is no dawdling. A hint running
+    /// says speed (a push up a climb, along rails, a ram, or a pass that is the run-up to one), or the way ahead of the
+    /// ball (`MOMENTUM_AHEAD`) has a gap to cross or a climb steeper than the ball takes by its own push at the
+    /// limit (`steepest_climb`), or just ahead a sill. There the zone keeps only its line (no corner cut), not its limit.
+    fn momentum(&self, sim: &Sim, cap: Option<f32>) -> Option<&'static str> {
+        let p = sim.ball.position;
+        if let Some(why) = cap.and_then(|cap| self.hints.says_speed(p, cap)) {
+            return Some(why);
+        }
+        let pts = &self.route.points;
+        if pts.len() < 2 {
+            return None;
+        }
+        let foot = p - Vec3::Y * crate::sim::BALL_RADIUS;
+        // (the way's point nearest the ball a little on from `at`: the place on the way lags a hint)
+        let at = (self.at..(self.at + LOOK).min(pts.len()))
+            .min_by(|&a, &b| pts[a].distance_squared(foot).total_cmp(&pts[b].distance_squared(foot)))
+            .unwrap_or(self.at);
+        let end = (at + MOMENTUM_AHEAD).min(pts.len() - 1);
+        // (a flow zone: the climb the ball takes at a careful zone's pace)
+        let steep = steepest_climb(sim.ball.kind, cap.unwrap_or(crate::zones::CAREFUL_SPEED))
+            .to_radians()
+            .tan();
+        for k in at..end {
+            match self.link(k) {
+                Some("gap") => return Some("a gap to cross ahead"),
+                // (a sill is taken at the pace when the ball is at it; a rail is got on slowly, or by a climb)
+                Some("sill") if k < at + SITUATION_AHEAD => return Some("a sill ahead"),
+                _ => {}
+            }
+            // a climb over two links (about three units), not one point's noise
+            if let (Some(&a), Some(&c)) = (pts.get(k), pts.get(k + 2)) {
+                let run = Vec3::new(c.x - a.x, 0.0, c.z - a.z).length();
+                if run > 1.0 && (c.y - a.y) / run > steep {
+                    return Some("a climb that needs a run-up ahead");
+                }
+            }
+        }
+        None
+    }
+
     /// The way's point nearest the ball at `p` (for the situation of a place it passed).
     pub fn nearest_point(&self, p: Vec3) -> usize {
         self.route.nearest(p, usize::MAX).unwrap_or(self.at)
@@ -2488,6 +2560,12 @@ impl Pilot {
         });
         let mode = if self.tracking.is_some() { "keeping to the player's line" } else { self.mode };
         let hint = self.hints.describe().map_or_else(String::new, |h| format!("\n{h}"));
+        let zone = self.zone_words();
+        format!("{mode}{zone}   way {} / {}{gate}{hint}", self.at, self.route.points.len())
+    }
+
+    /// What the zones or the learned rules ask now, in words for the status line (empty: nothing).
+    fn zone_words(&self) -> String {
         let mut zone = String::new();
         if self.zone.flow {
             zone += "   [flow zone]";
@@ -2497,7 +2575,11 @@ impl Pilot {
         } else if let Some(c) = self.zone.cap {
             zone += &format!("   [careful zone, at most {c}]");
         }
-        format!("{mode}{zone}   way {} / {}{gate}{hint}", self.at, self.route.points.len())
+        if let Some(why) = self.momentum {
+            let what = if self.zone.cap.is_some() { "limit" } else { "pace" };
+            zone += &format!("   [{what} let go: {why}]");
+        }
+        zone
     }
 
     /// The input for the next tick of `sim`: as the steering, a hint or the player's line has it, kept under a
@@ -2513,18 +2595,45 @@ impl Pilot {
                 self.learned_now = Some(label);
             }
         }
-        self.hints.zone = self.zone;
-        // AUTOPILOT_SITUATION: the place as the learned rules see it, every second
-        if sim.tick.is_multiple_of(60) && std::env::var_os("AUTOPILOT_SITUATION").is_some() {
+        // where the physics needs the ball's momentum, a careful limit holds back nothing (only its line is kept), and
+        // a flow zone's pace does not forbid backing off for a run-up
+        self.momentum = if self.zone.cap.is_some() || self.zone.flow {
+            self.momentum(sim, self.zone.cap)
+        } else {
+            None
+        };
+        self.hints.zone = self.limit();
+        // AUTOPILOT_SITUATION: the place as the learned rules see it, every second, and each change of what the
+        // zones and rules ask (which zone or rule, from which tick)
+        if std::env::var_os("AUTOPILOT_SITUATION").is_some() {
             let p = sim.ball.position;
-            eprintln!("situation t{} ({:.1} {:.1} {:.1}) {}", sim.tick, p.x, p.y, p.z,
-                self.situation(p, self.at, sim.ball.kind).describe());
+            if sim.tick.is_multiple_of(60) {
+                eprintln!("situation t{} ({:.1} {:.1} {:.1}) {}", sim.tick, p.x, p.y, p.z,
+                    self.situation(p, self.at, sim.ball.kind).describe());
+            }
+            let said = self.zone_words();
+            if said != self.zone_said {
+                eprintln!("zone t{} ({:.1} {:.1} {:.1}) {}", sim.tick, p.x, p.y, p.z,
+                    if said.is_empty() { "none" } else { said.trim() });
+                self.zone_said = said;
+            }
         }
         let i = self.decide(sim);
-        match self.zone.cap {
+        match self.limit().cap {
             Some(cap) => under_cap(i, sim, cap),
             None => i,
         }
+    }
+
+    /// What the zones ask of the ball's speed and of the hints now: their effect, without the careful limit and the
+    /// flow where the ball needs its momentum (`momentum`): there a run-up's back-off and stop are no dawdling.
+    fn limit(&self) -> crate::zones::Effect {
+        let mut e = self.zone;
+        if self.momentum.is_some() {
+            e.cap = None;
+            e.flow = false;
+        }
+        e
     }
 
     /// The input for the next tick of `sim`, before a careful zone's limit.
@@ -2749,10 +2858,12 @@ impl Pilot {
             .chain(matched.map(|_| DEMO_CHOICE))
             .collect();
         let demo_k = matched.zip(self.demo.as_deref());
-        // in a careful zone the way's line ahead is the line kept to (no corner cut)
-        let zone = self.zone;
+        // in a careful zone the way's line ahead is the line kept to (no corner cut), also where its limit is let go
+        // for the ball's momentum
+        let zone = self.limit();
         let line_end = (self.at + LOOK).min(self.route.points.len());
-        let line = zone
+        let line = self
+            .zone
             .cap
             .and_then(|_| self.route.points.get(self.at.saturating_sub(2)..line_end))
             .filter(|l| l.len() >= 2);
@@ -3159,8 +3270,14 @@ mod tests {
     /// A pilot on the flat test floor with a straight way east and these hints and zones.
     #[allow(clippy::expect_used)]
     fn flat_pilot(hints: &str, zones: &str) -> (Pilot, Sim) {
-        let sim = Sim::new(&crate::sim::tests::flat_level(), crate::sim::BallKind::Wood);
         let points: Vec<Vec3> = (0..40).map(|i| Vec3::new(i as f32 * 1.5, 0.0, 0.0)).collect();
+        pilot_on(points, hints, zones)
+    }
+
+    /// The same with the way through `points`.
+    #[allow(clippy::expect_used)]
+    fn pilot_on(points: Vec<Vec3>, hints: &str, zones: &str) -> (Pilot, Sim) {
+        let sim = Sim::new(&crate::sim::tests::flat_level(), crate::sim::BallKind::Wood);
         let r = Route {
             points,
             marks: vec![39],
@@ -3225,6 +3342,83 @@ mod tests {
         let (mut p, mut sim) = flat_pilot("", "careful sector 1 r 20 speed 3 : -50 2 0 ; 150 2 0");
         let (_, own) = drive(&mut p, &mut sim, 400, 0);
         assert!(own < 3.0 * 1.3, "its own steering under the limit: {own}");
+    }
+
+    #[test]
+    fn a_careful_zone_lets_its_limit_go_where_the_ball_needs_momentum() {
+        // a hint's press at speed (a climb, rails, a ram) is not held back, though the line is still kept
+        let zone = "careful sector 1 r 20 speed 3 : -50 2 0 ; 150 2 0";
+        let (mut p, mut sim) = flat_pilot("at 0 2 0 r 10 : press 40 2 0 0 0 8 300", zone);
+        let _ = drive(&mut p, &mut sim, 2, 0);
+        assert!(p.status().contains("limit let go: the hint pushes on at speed"), "{}", p.status());
+        let (_, fast) = drive(&mut p, &mut sim, 200, 0);
+        assert!(fast > 3.0 * 1.5, "the press keeps its speed: {fast}");
+        // a pass faster than the limit just before such a press is its run-up; a slow press is no reason
+        let (mut p, mut sim) = flat_pilot("at 0 2 0 r 10 : pass 10 2 0 8 ; press 40 2 0 0 0 8 300", zone);
+        let _ = drive(&mut p, &mut sim, 2, 0);
+        assert!(p.status().contains("limit let go: the hint's run-up"), "{}", p.status());
+        let (mut p, mut sim) = flat_pilot("at 0 2 0 r 10 : press 40 2 0 0 0 2 300", zone);
+        let _ = drive(&mut p, &mut sim, 2, 0);
+        assert!(!p.status().contains("let go"), "{}", p.status());
+        // the way ahead: a gap to cross, a climb steeper than the ball takes by its push
+        let way = |rise: f32, gap_at: Option<usize>| {
+            let mut x = 0.0;
+            (0..40)
+                .map(|i| {
+                    x += if Some(i) == gap_at { 8.0 } else { 1.5 };
+                    Vec3::new(x - 1.5, if i > 5 { (i - 5) as f32 * rise } else { 0.0 }, 0.0)
+                })
+                .collect::<Vec<_>>()
+        };
+        let bare = |points: Vec<Vec3>| pilot_on(points, "", "");
+        let (p, sim) = bare(way(0.0, None));
+        assert_eq!(p.momentum(&sim, Some(3.0)), None, "a flat way");
+        let (p, sim) = bare(way(0.0, Some(12)));
+        assert_eq!(p.momentum(&sim, Some(3.0)), Some("a gap to cross ahead"));
+        // 0.45 in 1.5 is about 17 degrees: too steep for a stone ball at the limit, not for a wooden one
+        let (p, mut sim) = bare(way(0.45, None));
+        assert_eq!(p.momentum(&sim, Some(3.0)), None, "wood climbs it");
+        sim.ball.kind = crate::sim::BallKind::Stone;
+        assert_eq!(p.momentum(&sim, Some(3.0)), Some("a climb that needs a run-up ahead"));
+        // there a flow zone's pace is let go too: backing off for the run-up is no dawdling
+        let (mut p, mut sim) = pilot_on(way(0.45, None), "", "flow sector 1 r 50 : 0 2 0");
+        sim.ball.kind = crate::sim::BallKind::Stone;
+        let _ = p.next(&sim);
+        assert!(p.status().contains("[pace let go: a climb that needs a run-up ahead]"), "{}", p.status());
+    }
+
+    #[test]
+    fn a_hint_whose_ball_ends_a_step_well_below_its_point_is_off_course() {
+        for (y, off) in [(2.0, false), (8.0, true)] {
+            let (mut p, mut sim) = flat_pilot(&format!("at 0 2 0 r 10 : pass 6 {y} 0 5 40 ; wait 200"), "");
+            let _ = drive(&mut p, &mut sim, 120, 0);
+            assert_eq!(p.hints.at().map(|a| a.1), Some(1), "on the wait");
+            assert_eq!(p.hints.off_course(), off, "a pass to height {y}");
+        }
+    }
+
+    #[test]
+    fn a_ball_climbs_by_its_push_as_the_table_says() {
+        use crate::sim::BallKind;
+        // pushed uphill from a standstill for ten seconds on a plane tilted so: its pace up it then
+        let pace = |kind: BallKind, deg: f32| {
+            let mut level = crate::sim::tests::flat_level();
+            let t = deg.to_radians().tan();
+            for p in &mut level.meshes[0].positions {
+                p[1] = p[0] * t;
+            }
+            let mut sim = Sim::new(&level, kind);
+            for _ in 0..600 {
+                sim.step(crate::hints::arrows(Vec3::X, sim.camera.quarter));
+            }
+            sim.ball.velocity.x
+        };
+        for kind in [BallKind::Stone, BallKind::Wood, BallKind::Paper] {
+            let at = steepest_climb(kind, 4.5);
+            let (gentler, steeper) = (pace(kind, at - 1.5), pace(kind, at + 1.5));
+            assert!(gentler > 4.5 && steeper < 4.5, "{kind:?} at {at}: {gentler} {steeper}");
+            assert!(pace(kind, steepest_climb(kind, 0.0) + 1.5) < 0.0, "{kind:?} rolls back");
+        }
     }
 
     /// A way through `points` whose floor points are rails where `rail` says (else a floor 10 wide).
@@ -3294,3 +3488,4 @@ mod tests {
         assert!(own.iter().all(|&i| i == 0), "the level's zone first: {own:?}");
     }
 }
+

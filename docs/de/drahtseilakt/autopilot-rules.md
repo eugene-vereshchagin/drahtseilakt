@@ -81,9 +81,16 @@ F4; [autopilot.md](autopilot.md), „Zonen“), und die Markierung ist von da an
 - **flow** („hier nicht trödeln“): kein Halt, kein Warten, kein Langsamwerden, das die Kugel nicht braucht. Das
   `goto` eines Hinweises wird durchrollt, `wait` und `hold` ausgelassen, ein langsames `pass` oder `press` mit 5
   gefahren, jeweils nur, wenn eine Kopie des Laufs zeigt, dass die Kugel so bleibt; die Steuerung hält mindestens
-  0,8 des Tempos des Bodens.
+  0,8 des Tempos des Bodens, außer vor einer Lücke oder einem Anstieg, der Anlauf braucht (dafür zurückzurollen und
+  anzuhalten ist kein Trödeln, dort verlangt eine flow-Zone nichts).
 - **careful** („Tempolimit halten und keine Kurven schneiden“): nicht schneller als das Tempo der Zone (4,5 ohne
-  Angabe), auf der Mittellinie des Weges, keine Ideallinie; was auch steuert, bleibt unter dem Limit.
+  Angabe), auf der Mittellinie des Weges, keine Ideallinie; was auch steuert, bleibt unter dem Limit. **Nie, wo die
+  Physik Schwung braucht**: vor einer Lücke zum Überqueren oder einem Anstieg, steiler als die Kugel aus eigenem
+  Schub schafft (bei 4,5: Stein 12,6°, Holz 26°, Papier 31°; aus eigenem Schub allein schafft Stein
+  nichts Steileres als 17°, Holz 37°, Papier 46°; der Weg etwa 30 Einheiten voraus gelesen), an einer Schwelle und wo
+  der laufende Hinweis Tempo sagt (`press`, `along` oder `round` schneller als das Limit, oder ein `pass` schneller
+  als es als Anlauf dazu), wird das Limit losgelassen und nur die Linie gehalten. Eine Markierung, die die Kugel dort
+  bremsen sollte, könnte sie nur verlieren.
 
 Eine Zone des Zuschauers geht den Tempo-Regeln oben vor: sie ist, was der Besitzer gesehen hat.
 
@@ -120,7 +127,11 @@ Eine Regel gilt, wo jedes Merkmal, das sie nennt, diesen Wert hat; sie verlangt,
 des Levels ist (die gehen vor) und Regeln gelten, flow, wenn eine davon flow ist, das niedrigste Limit der careful;
 die Statuszeile nennt die genaueste geltende Regel (`learned: rail, rail-end ahead, wood → don't dawdle`), mit F12
 auch die Stelle, wie die Regeln sie sehen (`here: surface=rail ...`). Eine Regel nennt mindestens zwei Merkmale,
-eines davon besonders für die Stelle, damit keine fast überall gilt. Eine Markierung zurücknehmen (Rücktaste) nimmt
+eines davon besonders für die Stelle, damit keine fast überall gilt; eine careful-Regel zwei besondere, denn sie
+bremst die Kugel überall, wo sie gilt (eine scharfe Kurve allein ist jede scharfe Ecke jedes Levels; eine Kurve bei
+einem Rücksetzpunkt ist nicht jede Kurve). Eine careful-Markierung auf einer Strecke mit nur einem besonderen
+Merkmal lehrt keine Regel (ihre Zone bleibt die des Levels), und eine solche Zeile der Tabelle wird mit einem
+Vermerk ausgelassen. Eine Markierung zurücknehmen (Rücktaste) nimmt
 auch die Regel heraus, die sie lehrte (über die id der Markierung in ihrem Beleg). Eine Regel, die die Tabelle schon
 hat, kommt nicht noch einmal hinzu; eine volle Tabelle (512 Regeln) nimmt keine mehr, und der Bildschirm sagt es. Die Tabelle ist einfacher Text: eine zu weite Regel wird mit einem weiteren
 Merkmal enger gemacht oder gelöscht. Gelesen wie eine Hinweisdatei, ist sie nicht vertrauenswürdig: Größe (64 KiB),
