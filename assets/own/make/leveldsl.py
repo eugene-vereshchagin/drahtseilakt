@@ -11,7 +11,10 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     order N                  its place in the list of our levels
     author NAME... / sky NAME / music 1..5 / bonus N / ball wood|stone|paper / light R G B
                              (sky: A, B, C (above the clouds), Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
-                             Mist; any Sky_<NAME>_* in the textures)
+                             Mist, Clouds; any Sky_<NAME>_* in the textures)
+    clouds off | clouds [cover C] [below B] [thickness T] [size S]   the sea of cloud under the level (the game
+                             draws it): none, or the sky's (levelkit.py, CLOUD_SEA) with its cover (0..1), its tops B
+                             under the lowest floor, T deep, a cloud S across
     start [X Y Z]            the start's platform, a bowl the ball sits in (its neck as wide as the first floor); the
                              cursor at its front edge (10 ahead of its middle)
     width W                  the floor's width from here on (with its borders); a change tapers over the next floor
@@ -598,7 +601,33 @@ def parse_line(text):
     return cmd, args, opts, flags
 
 
-META = ("title", "order", "author", "sky", "music", "bonus", "ball", "light") + tuple(f"title.{x}" for x in LANGS)
+META = ("title", "order", "author", "sky", "music", "bonus", "ball", "light", "clouds") + tuple(f"title.{x}" for x in LANGS)
+
+
+CLOUD_KEYS = {"cover": ("cover", 0.0, 1.0), "below": ("below", -1000.0, 10000.0),
+              "thickness": ("thickness", 1.0, 10000.0), "size": ("scale", 1.0, 10000.0)}
+
+
+def parse_clouds(value, line):
+    """`clouds off` or `clouds [cover C] [below B] [thickness T] [size S]`: the level's choices for its sea of cloud."""
+    words = value.split()
+    if words == ["off"]:
+        return {"cover": 0.0}
+    if len(words) % 2:
+        raise LevelError(f"line {line}: clouds: off, or pairs of cover, below, thickness, size and a number")
+    out = {}
+    for k, v in zip(words[::2], words[1::2]):
+        if k not in CLOUD_KEYS:
+            raise LevelError(f"line {line}: clouds: no {k!r} (cover, below, thickness, size)")
+        name, lo, hi = CLOUD_KEYS[k]
+        try:
+            x = float(v)
+        except ValueError:
+            raise LevelError(f"line {line}: clouds: {k} {v!r} is not a number") from None
+        if not lo <= x <= hi:
+            raise LevelError(f"line {line}: clouds: {k} {v} is not in {lo:g}..{hi:g}")
+        out[name] = x
+    return out
 
 
 def compile_level(path):
@@ -617,6 +646,8 @@ def compile_level(path):
                 t.info["titles"][key[6:] or "en"] = value
             elif key == "light":
                 t.info["light"] = tuple(float(x) for x in value.split())
+            elif key == "clouds":
+                t.info["clouds"] = parse_clouds(value, i)
             elif key in ("music", "bonus", "order"):
                 t.info[key] = int(value)
             elif key == "sky":
@@ -644,6 +675,7 @@ def compile_level(path):
         raise LevelError(f"{path}: no title")
     t.b.write(titles["en"], info["author"], sky=info["sky"], start_ball=f"Ball_{BALLS[info['ball']]}",
               music=info["music"], light=info["light"], bonus=info["bonus"], licence="GPL-3.0-only",
+              clouds=info.get("clouds"),
               extra={**{f"title.{k}": v for k, v in titles.items() if k != "en"},
                      **({"order": info["order"]} if "order" in info else {})})
     write_pilot(folder, t)

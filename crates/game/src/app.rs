@@ -2233,6 +2233,7 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     let data = &game.data;
     // the level's light colour (the level table's Light; white for a level without a row)
     renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
+    renderer.fog = game.level.level.settings.fog;
     let loader = |t: &level::Texture| data.texture(t);
     renderer.add_model(&game.level.level, &loader);
     renderer.add_model(&game.balls.level, &loader);
@@ -2278,6 +2279,17 @@ fn upload(renderer: &mut Renderer, game: &Game) {
             renderer.add_named_texture(name, w, h, rgba);
         }
     }
+    // the sea of cloud, fading far off into the sky's own colour at the horizon; it takes the place of the level's
+    // flat cloud layer (SkyLayer)
+    renderer.clouds = game.level.level.settings.clouds.and_then(|settings| {
+        let faces: Vec<_> = sky.textures.iter().take(4).map(|t| data.texture(t)).collect();
+        let (ring, haze) = crate::clouds::horizon_ring(&faces)?;
+        Some(crate::clouds::Layer { settings, ring, haze })
+    });
+    if let Some(ring) = renderer.clouds.as_ref().map(|l| l.ring.clone()) {
+        renderer.set_cloud_ring(&ring);
+    }
+    scene::set_volume_clouds(renderer.clouds.is_some());
     // The zenith colour: the top row of the front texture, averaged.
     if let Some((w, _, rgba)) = sky.textures.first().and_then(|t| data.texture(t)) {
         let row = rgba.get(..(w as usize * 4)).unwrap_or_default();
@@ -2401,6 +2413,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     if let Some(ms) = menu_scene.filter(|m| m.model.is_some()) {
         let at = std::env::var("DRAHTSEILAKT_SHOT_MENU_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
         let (inst, particles, frame_view) = ms.frame(at);
+        r.menu_frame = true;
         r.draw(&view, w, h, &frame_view, &inst, &particles);
         let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
         let quads = menu.map(|m| m.interface(game.font.as_ref(), screen)).unwrap_or_default();
@@ -2426,6 +2439,26 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     }
     let particles = game.effects.batches(snap.eye, snap.target);
     r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
+    // DRAHTSEILAKT_BENCH=N: draws the frame N times more, with each quality of the clouds, and prints the time a frame
+    // takes (the GPU waited for after each batch), to measure what the sea of cloud costs
+    if let Some(n) = std::env::var("DRAHTSEILAKT_BENCH").ok().and_then(|v| v.parse::<u32>().ok()) {
+        let chosen = crate::clouds::quality();
+        for q in [crate::clouds::Quality::Off, crate::clouds::Quality::Low, crate::clouds::Quality::Medium,
+            crate::clouds::Quality::High]
+        {
+            crate::clouds::set_quality(q);
+            r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
+            let _ = r.device.poll(wgpu::PollType::wait_indefinitely());
+            let start = std::time::Instant::now();
+            for _ in 0..n {
+                r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
+            }
+            let _ = r.device.poll(wgpu::PollType::wait_indefinitely());
+            println!("clouds {}: {:.2} ms a frame at {w}x{h}", q.key(), start.elapsed().as_secs_f64() * 1000.0 / f64::from(n.max(1)));
+        }
+        crate::clouds::set_quality(chosen);
+        r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
+    }
     r.draw_overlay(
         &view,
         w,
@@ -2761,6 +2794,7 @@ fn set_fullscreen(window: &Window, how: crate::options::Fullscreen, size: Option
 /// The Graphics page's switches that the drawing reads: the clouds, and the field of view (the extended mode's).
 fn show_graphics(g: &crate::options::Graphics, features: crate::features::Features) {
     scene::set_clouds(g.clouds);
+    crate::clouds::set_quality(if g.clouds { g.cloud_quality } else { crate::clouds::Quality::Off });
     scene::set_fov((features.mode && g.fov != crate::options::FOV_ORIGINAL).then_some(g.fov));
 }
 
@@ -3571,6 +3605,7 @@ impl App {
         // With a menu up, the original's menu scene is behind it, its camera going round
         let menu_up = self.menu.as_ref().is_some_and(|m| !m.over_level()) || self.loading.is_some();
         let menu_scene = self.menu_scene.as_mut().filter(|m| m.model.is_some() && menu_up);
+        gpu.renderer.menu_frame = menu_scene.is_some();
         let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
             self.menu_ms += f64::from(step) * 1000.0;
             ms.effects.tick_menu(step * 1000.0);

@@ -83,6 +83,8 @@ pub struct Graphics {
     pub vsync: bool,
     /// The levels' cloud layer (their `SkyLayer` objects).
     pub clouds: bool,
+    /// How finely our levels' sea of cloud is drawn (`cloud-quality`: low, medium, high; off draws none).
+    pub cloud_quality: crate::clouds::Quality,
     /// The horizontal field of view across 4:3, degrees (the extended mode's; the classic mode keeps the original's).
     pub fov: u32,
 }
@@ -94,6 +96,7 @@ impl Default for Graphics {
             fullscreen: Fullscreen::Off,
             vsync: false,
             clouds: true,
+            cloud_quality: crate::clouds::Quality::Medium,
             fov: FOV_ORIGINAL,
         }
     }
@@ -127,6 +130,10 @@ impl Graphics {
                 .as_deref()
                 .and_then(on_off)
                 .unwrap_or(d.clouds),
+            cloud_quality: get("cloud-quality")
+                .as_deref()
+                .and_then(crate::clouds::Quality::from_key)
+                .unwrap_or(d.cloud_quality),
             fov: get("fov")
                 .and_then(|v| v.trim().parse::<u32>().ok())
                 .filter(|f| FOV_RANGE.contains(f))
@@ -143,6 +150,7 @@ impl Graphics {
         l.push(("fullscreen", self.fullscreen.key().to_owned()));
         l.push(("vsync", word(self.vsync)));
         l.push(("clouds", word(self.clouds)));
+        l.push(("cloud-quality", self.cloud_quality.key().to_owned()));
         l.push(("fov", self.fov.to_string()));
         l
     }
@@ -585,6 +593,7 @@ mod tests {
             fullscreen: Fullscreen::Exclusive,
             vsync: true,
             clouds: false,
+            cloud_quality: crate::clouds::Quality::High,
             fov: 70,
         };
         let text: String = g
@@ -593,7 +602,7 @@ mod tests {
             .map(|(k, v)| format!("{k} {v}\n"))
             .collect();
         assert_eq!(Graphics::load(from(&text)), g);
-        let bad = "resolution huge\nfullscreen maybe\nvsync 2\nclouds\nfov 500\n";
+        let bad = "resolution huge\nfullscreen maybe\nvsync 2\nclouds\ncloud-quality ultra\nfov 500\n";
         assert_eq!(Graphics::load(from(bad)), Graphics::default());
         assert_eq!(Fullscreen::Off.next(-1), Fullscreen::Exclusive);
         assert_eq!(Graphics { fov: 99, ..g }.fov_by(1), 100);

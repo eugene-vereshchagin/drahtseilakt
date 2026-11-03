@@ -23,7 +23,7 @@
 | game font texture | `Textures/Font_1.tga` | Tektur，由游戏光栅化 |
 | buttons and the points box | `Textures/Button01_special/select/deselect.tga` | 我们自己的，同名 |
 | ball shadow | `Textures/HardShadow.bmp` | 我们自己的：`Textures/HardShadow.png` |
-| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | 我们自己的，字母 A、B、C：`Textures/Sky/Sky_<letter>_<face>.png`；以及按名字的摄影天空（levels.md，“天空”）：`Mountains`、`Forest`、`Sea`、`Storm`、`Sunset`、`Night`、`Desert`、`Mist`，`Textures/Sky/Sky_<name>_<face>.jpg`，带第六个面 `Top`（`make/make_skies.py`，Poly Haven 的 CC0 照片，`CREDITS.md`） |
+| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | 我们自己的，字母 A、B、C：`Textures/Sky/Sky_<letter>_<face>.png`；以及按名字的摄影天空（levels.md，“天空”）：`Mountains`、`Forest`、`Sea`、`Storm`、`Sunset`、`Night`、`Desert`、`Mist`、`Clouds`（`Sunset` 和 `Clouds` 在地平线以下只有雾霭：关卡有云海时由游戏绘制），`Textures/Sky/Sky_<name>_<face>.jpg`，带第六个面 `Top`（`make/make_skies.py`，Poly Haven 的 CC0 照片，`CREDITS.md`） |
 | particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | 我们自己的，同名的 `.png` |
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | 音效主题（assets/sounds） |
 | menu sounds | `Sounds/Menu_click, Menu_load` | 音效主题（assets/sounds） |

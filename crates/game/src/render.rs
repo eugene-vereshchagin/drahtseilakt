@@ -35,6 +35,12 @@ struct Globals {
     flash_color: [f32; 4],
     point_pos: [f32; 4],
     point_color: [f32; 4],
+    /// The level's fog (level::Fog): rgb its colour, a its density a unit of distance; x the height it begins below,
+    /// y the depth under that where it is whole, z 1 when there is fog.
+    fog_color: [f32; 4],
+    fog_height: [f32; 4],
+    /// The fog's colour seen straight down (rgb).
+    fog_down: [f32; 4],
 }
 
 #[repr(C)]
@@ -190,6 +196,16 @@ pub struct Renderer {
     pub flash: f32,
     /// The new ball's light (lights.rs): where it is and its colour, while it shows.
     pub point: Option<(Vec3, [f32; 3])>,
+    /// The level's fog (its settings); none for the original's levels.
+    pub fog: Option<level::Fog>,
+    /// The level's sea of cloud (clouds.rs) and how finely it is drawn; none for the original's levels.
+    pub clouds: Option<crate::clouds::Layer>,
+    /// The frame shows another scene than the level (the menu's): neither the level's sea of cloud nor its fog.
+    pub menu_frame: bool,
+    /// The cloud pass, made the first time a level has clouds (its noise takes a moment).
+    cloud_pass: Option<crate::clouds::Pass>,
+    /// The clouds' clock (their drift).
+    started: std::time::Instant,
     globals: wgpu::Buffer,
     globals_bind: wgpu::BindGroup,
     models_buf: wgpu::Buffer,
@@ -368,6 +384,11 @@ impl Renderer {
             material_layout,
             light: Light::default(),
             flash: 0.0,
+            fog: None,
+            clouds: None,
+            menu_frame: false,
+            cloud_pass: None,
+            started: std::time::Instant::now(),
             point: None,
             globals,
             globals_bind,
@@ -837,13 +858,24 @@ impl Renderer {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: DEPTH_FORMAT,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                // the cloud pass reads it
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             });
             let view = tex.create_view(&Default::default());
             self.depth = Some((tex, view, width, height));
+            if let Some(p) = &mut self.cloud_pass {
+                p.depth_changed();
+            }
         }
         self.depth.as_ref().map(|d| d.1.clone())
+    }
+
+    /// The haze round the horizon the clouds fade into (clouds.rs, horizon_ring).
+    pub fn set_cloud_ring(&mut self, rgba: &[u8]) {
+        if let Some(p) = &mut self.cloud_pass {
+            p.set_ring(&self.device, &self.queue, rgba);
+        }
     }
 
     /// Draws flat rectangles (pixels, top left origin) over `target`, which keeps its content.
@@ -919,6 +951,7 @@ impl Renderer {
         let aspect = width.max(1) as f32 / height.max(1) as f32;
         let proj = perspective_lh(view.fov_y, aspect, 0.5, 3000.0);
         let look = look_at_lh(view.eye, view.target, Vec3::Y);
+        let fog = self.fog.filter(|_| !self.menu_frame);
         let globals = Globals {
             view_proj: (proj * look).to_cols_array_2d(),
             light_dir: self.light.dir.normalize_or(Vec3::NEG_Y).extend(0.0).to_array(),
@@ -930,6 +963,9 @@ impl Renderer {
             flash_color: [self.flash, self.flash, self.flash, 0.0],
             point_pos: self.point.map_or([0.0; 4], |(p, _)| p.extend(crate::lights::POINT_RANGE).to_array()),
             point_color: self.point.map_or([0.0; 4], |(_, c)| [c[0], c[1], c[2], 0.0]),
+            fog_color: fog.map_or([0.0; 4], |f| [f.color[0], f.color[1], f.color[2], f.density]),
+            fog_height: fog.map_or([0.0; 4], |f| [f.below, f.depth, 1.0, 0.0]),
+            fog_down: fog.map_or([0.0; 4], |f| [f.color_down[0], f.color_down[1], f.color_down[2], 0.0]),
         };
         self.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
@@ -1027,8 +1063,35 @@ impl Renderer {
         let Some(depth) = self.depth_view(width, height) else {
             return;
         };
+        // the sea of cloud goes between the opaque scene (whose depth it reads) and the blended one
+        let quality = crate::clouds::quality();
+        let clouds = self.clouds.is_some() && !self.menu_frame && quality != crate::clouds::Quality::Off;
+        if clouds && self.cloud_pass.is_none() {
+            self.cloud_pass = Some(crate::clouds::Pass::new(&self.device, &self.queue, self.format));
+            if let Some(ring) = self.clouds.as_ref().map(|l| l.ring.clone()) {
+                self.set_cloud_ring(&ring);
+            }
+        }
+        let opaque_count = draws.iter().take_while(|d| d.3.blend.is_none()).count();
         let mut enc = self.device.create_command_encoder(&Default::default());
-        {
+        let phases: &[(std::ops::Range<usize>, bool)] = if clouds {
+            &[(0..opaque_count, false), (opaque_count..draws.len(), true)]
+        } else {
+            &[(0..draws.len(), true)]
+        };
+        for (n, (range, last)) in phases.iter().enumerate() {
+            if let (true, Some(p), Some(layer)) = (n > 0, &mut self.cloud_pass, &self.clouds) {
+                let frame = crate::clouds::Frame {
+                    view_proj: proj * look,
+                    eye: view.eye,
+                    time: self.started.elapsed().as_secs_f64(),
+                    width,
+                    height,
+                    quality,
+                };
+                p.draw(&self.device, &self.queue, &mut enc, target, &depth, layer, &frame);
+            }
+            let keep = n > 0;
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("frame"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1036,14 +1099,14 @@ impl Renderer {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(self.clear),
+                        load: if keep { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(self.clear) },
                         store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &depth,
                     depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
+                        load: if keep { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(1.0) },
                         store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: None,
@@ -1053,7 +1116,7 @@ impl Renderer {
                 multiview_mask: None,
             });
             pass.set_bind_group(0, &self.globals_bind, &[]);
-            for &(_, i, p, key) in &draws {
+            for &(_, i, p, key) in &draws[range.clone()] {
                 let Some(inst) = instances.get(i) else {
                     continue;
                 };
@@ -1085,7 +1148,7 @@ impl Renderer {
                 pass.draw_indexed(0..part.count, 0, 0..1);
             }
             // Particles last, over everything, testing depth without writing it.
-            for (buf, count, key, texture) in &particle_draws {
+            for (buf, count, key, texture) in particle_draws.iter().filter(|_| *last) {
                 let Some(pipeline) = self.particle_pipelines.get(key) else {
                     continue;
                 };

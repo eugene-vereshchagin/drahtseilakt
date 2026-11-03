@@ -49,8 +49,8 @@ SOURCES = {
                                "Greg Zaal, Jarod Guest", "2022-11-26"),
     "kloppenheim_07_puresky": ("98a94dc8c290a89de0147642750beb9dae4c791ee33c1689bebbf58126e97f22", 19356904,
                                "Greg Zaal, Jarod Guest", "2022-12-18"),
-    "belfast_sunset_puresky": ("cafc52b99ce15d84bd039826a0333f5ab0259d8c1f4feb2f7faf5fafa039108a", 17420114,
-                               "Greg Zaal, Dimitrios Savva, Jarod Guest", "2022-10-19"),
+    "rocky_ridge_puresky": ("82efe60eea01151530c16f841270bfbdb5dd5eafdc3f285fb3cc368d8c0a7501", 18336135,
+                            "Greg Zaal, Jarod Guest", "2022-12-04"),
     "rogland_clear_night": ("133d77ddf6a69926a138574169e5cdf4c04b785e8d22545274aa285f1ec3d879", 27915523,
                             "Greg Zaal", "2024-10-08"),
     "qwantani_late_afternoon_puresky": ("d820fa7a84732f69641655dcbea33b01ff78e6a4833ee3ca6f3bc938a0c09bb7", 17745266,
@@ -65,7 +65,12 @@ MAX_FILE = 48 << 20
 # world drawn below it.
 #   cut: the lowest elevation (degrees) of the photograph kept; reach: how far it is stretched down (a band of distant
 #        land a few degrees deep, seen from higher up, fills more of the view below the horizon)
-#   below: "sea" (water mirroring the sky), "land" (lit relief with the kind's colours), "clouds" (a sea of cloud)
+#   below: "sea" (water mirroring the sky), "land" (lit relief with the kind's colours), "clouds" (a sea of cloud),
+#          "haze" (only the haze: a level under this sky has its sea of cloud drawn by the game, clouds.wgsl)
+#   grade: a golden-hour grade, (colour at the horizon, colour from 40 degrees up[, colour at the horizon away from
+#          the sun]) multiplying the photograph and the world below, blended by elevation (and round from the sun)
+#   lift: (gain, degrees, amount) a dusty band over the horizon cleared: towards the sky's colour above it (9 to 15
+#         degrees up, smoothed round the circle) times gain, `amount` of it at the horizon, none `degrees` up
 #   haze: the aerial haze's thickness (per altitude of the camera over the world below; 0.1 is clear air)
 SKIES = {
     "Mountains": dict(src="table_mountain_1_puresky", ev=0.0, below="land", kind="mountains", haze=0.10, seed=101),
@@ -75,12 +80,18 @@ SKIES = {
                 haze=0.06, seed=303),
     "Storm": dict(src="kloppenheim_07_puresky", ev=-0.5, below="sea", waves=0.08, wave_tile=2.0, wave_cells=24, water=(0.014, 0.022, 0.022),
                   foam=0.6, haze=0.12, tint=(0.86, 0.92, 1.0), seed=404),
-    "Sunset": dict(src="belfast_sunset_puresky", ev=-0.3, below="clouds", haze=0.10, seed=505),
+    "Sunset": dict(src="rocky_ridge_puresky", ev=0.3, below="haze", haze=0.10, cut=1.0, lift=(1.1, 12.0, 0.9),
+                   grade=((1.45, 1.02, 0.68), (0.97, 1.0, 1.06), (1.08, 0.97, 1.05)), seed=505),
     "Night": dict(src="rogland_clear_night", ev=-0.6, below="sea", waves=0.035, water=(0.004, 0.006, 0.010),
                   haze=0.05, seed=606),
     "Desert": dict(src="qwantani_late_afternoon_puresky", ev=-0.2, below="land", kind="canyon", haze=0.09, seed=707),
     "Mist": dict(src="kloppenheim_01_puresky", ev=0.1, below="land", kind="mist", haze=0.10, key=1.2, seed=808),
+    "Clouds": dict(src="kloofendal_48d_partly_cloudy_puresky", ev=-0.2, below="haze", haze=0.10, cut=1.0,
+                   lift=(1.2, 10.0, 0.85), seed=909),
 }
+# What the skies cast on the game's sea of cloud (levelkit.py makes a level's `clouds` settings from it): written by
+# `make` beside this script, the sun's direction (towards it, the game's axes) and colours in the faces' exposure.
+SKY_LIGHT = os.path.join(HERE, "sky_light.json")
 
 FACE = 1024  # the faces' size as shipped
 SS = 2  # drawn at twice that and averaged down
@@ -297,12 +308,28 @@ class Light:
             # the sun's irradiance on a surface facing it (clipped in the file perhaps; enough for shading)
             self.sun = (small * (domega * sun)[..., None]).sum((0, 1))
         else:
-            self.sun_dir = np.array([0.0, 1.0, 0.0])
-            self.sun = np.zeros(3)
+            # a sun behind cloud: the brightest part of the sky (its brightest few hundredths of a percent) is where
+            # it is, and its light what comes from there
+            near = up[:, None] & (lum >= np.quantile(lum[up], 0.9995))
+            wgt = lum * domega * near
+            s = (dirs * wgt[..., None]).sum((0, 1))
+            self.sun_dir = s / max(np.linalg.norm(s), 1e-12)
+            self.sun = (small * (domega * near)[..., None]).sum((0, 1))
+            sun = near
         sky = ~sun & up[:, None]
         self.sky = (small * (domega * cos * sky)[..., None]).sum((0, 1))
         # the horizon's colour by azimuth (just above it), smoothed round the circle: the haze's colour
-        band = (el > np.radians(0.5)) & (el < np.radians(5.0))
+        self.horizon = self.ring(small, (el > np.radians(0.5)) & (el < np.radians(5.0)))
+        # the same higher up, over a dusty band at the horizon (a sky's `lift`)
+        self.above = self.ring(small, (el > np.radians(9.0)) & (el < np.radians(15.0)), sigma=40.0)
+        # the exposure's reference: the sky's median luminance from 5 to 30 degrees
+        mid = (el > np.radians(5)) & (el < np.radians(30))
+        self.reference = float(np.median(lum[mid]))
+
+    @staticmethod
+    def ring(small, band, sigma=8.0):
+        """The colour of a band of elevations by azimuth, smoothed round the circle."""
+        w = small.shape[1]
         hz = small[band].mean(0)
         # the sun on the horizon is no haze: a column far brighter than the horizon's median is capped (else the sun's
         # thousandfold radiance would streak the haze all the way down)
@@ -310,20 +337,18 @@ class Light:
         cap = 4.0 * np.median(hl)
         hz = hz * np.minimum(1.0, cap / np.maximum(hl, 1e-12))[:, None]
         hz = np.concatenate([hz[-w // 4:], hz, hz[:w // 4]])
-        ker = np.exp(-0.5 * (np.arange(-24, 25) / 8.0) ** 2)
+        r = int(3 * sigma)
+        ker = np.exp(-0.5 * (np.arange(-r, r + 1) / sigma) ** 2)
         ker /= ker.sum()
-        hz = np.stack([np.convolve(hz[:, c], ker, "same") for c in range(3)], -1)[w // 4:w // 4 + w]
-        self.horizon = hz
-        # the exposure's reference: the sky's median luminance from 5 to 30 degrees
-        mid = (el > np.radians(5)) & (el < np.radians(30))
-        self.reference = float(np.median(lum[mid]))
+        return np.stack([np.convolve(hz[:, c], ker, "same") for c in range(3)], -1)[w // 4:w // 4 + w]
 
-    def haze(self, u):
-        w = len(self.horizon)
+    def haze(self, u, ring=None):
+        ring = self.horizon if ring is None else ring
+        w = len(ring)
         x = u * w - 0.5
         x0 = np.floor(x).astype(int)
         f = (x - x0)[..., None]
-        return self.horizon[x0 % w] * (1 - f) + self.horizon[(x0 + 1) % w] * f
+        return ring[x0 % w] * (1 - f) + ring[(x0 + 1) % w] * f
 
 
 # --- the worlds below ------------------------------------------------------------------------------------------------
@@ -481,6 +506,8 @@ class Below:
         if cfg["below"] in ("land", "clouds"):
             self.kind = cfg.get("kind", "clouds")
             self.detail = Pyramid(detail_map(self.kind, seed))
+        elif cfg["below"] == "haze":
+            pass
         else:
             self.wave_tile = cfg.get("wave_tile", 1.6)
             c = cfg.get("wave_cells", 6)
@@ -503,7 +530,10 @@ class Below:
         # every azimuth meets; by azimuth there it would draw a wedge pointing at the sun)
         side = ((1 - down) ** 1.5)[..., None]
         haze_col = light.horizon.mean(0) + (light.haze(u) - light.horizon.mean(0)) * side
-        if cfg["below"] in ("land", "clouds"):
+        if cfg["below"] == "haze":
+            # the deep air under a sea of cloud: the haze, a little of the sky's shade straight down
+            col = haze_col * 0.8 + light.sky / np.pi * 0.25 * np.ones_like(haze_col)
+        elif cfg["below"] in ("land", "clouds"):
             fp = footprint_angle / down ** 2 * (MAP / TILE)
             col = self.ground.sample(px / TILE, pz / TILE, fp)
             amount = DETAIL[self.kind][1]
@@ -598,6 +628,22 @@ def make_sky(name, root=None):
                 g = below.radiance(dd, angle, sky_fn)
                 o = out.reshape(-1, 3)
                 o[idx] = o[idx] * w[mix][:, None] + g * (1 - w[mix][:, None])
+        lift = cfg.get("lift")
+        if lift:
+            gain, top, amount = lift
+            w = (smooth(math.radians(top), 0.0, np.maximum(el, 0.0)) * amount)[..., None]
+            out = out + (light.haze(azimuth_u(d), light.above) * gain - out) * w
+        grade = cfg.get("grade")
+        if grade:
+            k = smooth(0.0, math.radians(40.0), np.maximum(el, 0.0))[..., None]
+            low_col = np.array(grade[0])
+            if len(grade) > 2:
+                # the horizon away from the sun: its own colour, round the circle from the sun's
+                sd = light.sun_dir[[0, 2]] / max(np.linalg.norm(light.sun_dir[[0, 2]]), 1e-9)
+                hd = d[..., [0, 2]] / np.maximum(np.linalg.norm(d[..., [0, 2]], axis=-1, keepdims=True), 1e-9)
+                toward = ((hd @ sd + 1) / 2)[..., None] ** 1.5
+                low_col = np.array(grade[2]) + (low_col - np.array(grade[2])) * toward
+            out = out * (low_col * (1 - k) + np.array(grade[1]) * k)
         return out * tint
 
     size = FACE * SS
@@ -615,7 +661,24 @@ def make_sky(name, root=None):
         Image.fromarray(a, "RGB").save(path, quality=JPEG_QUALITY, optimize=True)
         made.append(path)
     print(name, sum(os.path.getsize(p) for p in made), "bytes")
+    save_light(name, light, exposure * tint)
     return made
+
+
+def save_light(name, light, exposure):
+    """What the sky casts, in the faces' exposure (linear; 1 white): the sun (direction towards it, its light on a
+    surface facing it over pi, as a white cloud returns it), the sky's light from above, the horizon's haze."""
+    import json
+    table = {}
+    if os.path.exists(SKY_LIGHT):
+        with open(SKY_LIGHT) as f:
+            table = json.load(f)
+    r = lambda v: [round(float(x), 4) for x in v]  # noqa: E731
+    table[name] = {"sun": r(light.sun_dir), "sun_color": r(light.sun * exposure / np.pi),
+                   "sky": r(light.sky * exposure / np.pi), "horizon": r(light.horizon.mean(0) * exposure)}
+    with open(SKY_LIGHT, "w") as f:
+        json.dump(dict(sorted(table.items())), f, indent=1)
+        f.write("\n")
 
 
 def credits():

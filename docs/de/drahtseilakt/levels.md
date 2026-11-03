@@ -122,13 +122,30 @@ ohne zu bauen. Die ganze Liste steht oben in leveldsl.py.
 des Originals) oder einen der fotografischen Himmel mit Namen: `Mountains` (ein Abendhimmel über dunstigen Bergen mit
 Schnee auf den Gipfeln), `Forest` (Sommerwolken über einem Blätterdach mit Lichtungen und Seen), `Sea` (ein ruhiges
 Meer im Sonnenuntergang, das die Wolken spiegelt), `Storm` (schwere Wolken über dunklem Meer mit Schaumkronen),
-`Sunset` (ein rosa Sonnenuntergang über einem Wolkenmeer), `Night` (die Milchstraße über einem dunklen See zwischen
+`Sunset` (ein goldener Sonnenuntergang über einem Wolkenmeer), `Clouds` (ein Sommertag über einem
+Wolkenmeer), `Night` (die Milchstraße über einem dunklen See zwischen
 Hügeln), `Desert` (später Nachmittag über roten Canyons), `Mist` (Abendlicht über Hügeln mit Nebel in den Tälern).
 Ihr Himmel sind CC0-Fotos von Poly Haven; was unter dem Horizont liegt, zeichnet `assets/own/make/make_skies.py`, wie
 aus großer Höhe gesehen, sodass die Bahn hoch darüber schwebt (`assets/own/CREDITS.md`). Jeder andere Name ist ein
 Satz Dateien `Textures/Sky/Sky_<Name>_<Seite>` (Front, Right, Back, Left, Down und Top, falls vorhanden) aus dem
 Levelordner oder den Texturen; ein Name besteht aus Buchstaben, Ziffern, `_` und `-`. `--sky NAME` auf der
 Kommandozeile spielt jedes Level unter einem anderen Himmel.
+
+**Das Wolkenmeer.** Unter `Sunset` und `Clouds` schweben unsere Level über einem Meer aus Haufenwolken, das das Spiel
+als Volumen zeichnet (`crates/game/src/clouds.wgsl`): Wolkenballen aus kachelndem Rauschen, beleuchtet von der Sonne
+des Himmels (hell, wo sie sie trifft, blauviolett im Schatten) und vom Himmel darüber, in der Ferne im Dunst des
+Himmels am Horizont verschwindend; Säulen und Stützen tauchen in sie ein. Unter `Mountains`, `Forest`, `Mist` und
+`Desert` sind es aufgerissene Bänke mit Lücken, durch die tief unten das Land zu sehen ist. Der Levelbaukasten
+schreibt es in die Einstellungen des Levels (`clouds`, [open-format.md](open-format.md)), aus dem Licht des Himmels
+(`assets/own/make/sky_light.json`, geschrieben von `make_skies.py`) und seiner Tabelle (`levelkit.py`, `CLOUD_SEA`);
+ein Level ändert es mit `clouds cover C below B thickness T size S` (beliebige davon: wie viel davon Wolke ist, 0..1;
+die Kuppen B unter dem tiefsten Boden, sonst 35; T dick, 110; eine Wolke S breit, 85) oder hat mit `clouds off` keins.
+Die Level des Originals haben keins. `cloud-quality` in der Einstellungsdatei (`low`, `medium` (Vorgabe), `high`;
+`off` zeichnet keins) legt fest, wie fein es gezeichnet wird, und *Clouds?* aus blendet es ebenfalls aus
+([menu.md](menu.md)). Auf einer RTX 3060 bei 2560×1440 kostet es etwa 3,5, 4,5 und 6 ms je Bild (low, medium, high).
+`make_skies.py` macht `Sunset` und `Clouds` mit nur Dunst unter dem Horizont: ihr Wolkenmeer zeichnet das Spiel,
+und der Levelbaukasten schreibt es in ein Level unter ihnen; ein Level ohne es (`clouds off` oder anders gemacht)
+zeigt unten den Dunst.
 
 **Wie die Bahn den Ball hält** (`safety`): Im Original nimmt die Hilfe von Level zu Level ab, und unsere Level folgen
 dem. Gemessen an den dreizehn Leveln des Originals (die Kanten seiner Böden, nur Zahlen): in den Leveln 1, 3 und 5
