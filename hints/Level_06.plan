@@ -14,7 +14,7 @@ P_Trafo_Stone_01         # s202
 P_Box_04                 # push off with stone
 PC_TwoFlames_04          
 P_Trafo_Wood_03          # s234
-P_Modul_29_01            # ?
-P_Trafo_Stone_03         # s254
+P_Trafo_Stone_03         # s254: stone in the tower
+P_Modul_29_01            # the hanging plates break under the stone ball: down with them onto the rail below
 P_Trafo_Wood_09          # s282
 PE_Balloon_01            

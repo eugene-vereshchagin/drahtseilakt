@@ -1,8 +1,14 @@
 PS_FourFlames_01         
 P_Trafo_Paper_01         # s27 ?
 P_Trafo_Wood_01          # s50, with Extra_Point_03
+86 19 88                 # as wood back north on the rails (x 81) and round their U over the fan
+96.2 19 40               # south on the rails along x 96 (y 19), past the drawbridge's block
+96.2 19.1 -60
 PC_TwoFlames_01          
-P_Trafo_Paper_03         # s83 ?
+P_Trafo_Paper_03         # s83: paper in the cube lattice
+362 28.4 -85.3           # out of the lattice onto the high rails along z -85 (over the stone transformer and the pusher)
+405 28.4 -85.3
+425 18.3 -98.5            # off the rails' end down onto the track, east to the boxes' corner
 P_Modul_41_01            
 PC_TwoFlames_02          
 P_Trafo_Wood_04          # s105
@@ -12,12 +18,35 @@ P_Trafo_Wood_03          # s128
 P_Extra_Life_01          
 PC_TwoFlames_03          
 P_Trafo_Paper_05         # s165
-P_Modul_18_05            
+887 47.2 -326             # the helix's top (hint), then over the fan 18_05 between the blocks
+890 47.2 -350
+810 20.9 -403             # down the slope west along z -403 to the maze's west side
+770 9.1 -420             # south down its long west corridor
+770.5 9.1 -455.3
+788 9.1 -453              # east along z -453 to the seesaw P_Modul_30_02 below the wood transformer
+790 10.5 -459
 P_Trafo_Wood_05          # s211
+803 11.1 -424             # (hint) as wood south down the dead end x 803 into the target of P_Modul_37_02
+823 9.1 -492              # (hint) north up the dead end x 823 into the target of P_Modul_37_01
+788 9.1 -453              # the row along z -455 from its west end, over both bridges, the boxes rammed off
+830 9.1 -455
+850 9.1 -456
+865 9.1 -465
 PC_TwoFlames_04          
+865 -0.9 -560             # as wood over the swing north (hint)
+865 -2.9 -590
+874.6 -2.3 -587          # east over the plank P_Modul_25_04
+890 -2.2 -587
+892.5 -3 -598            # down the hanging plates P_Modul_29_03 to the T
+888 -2.2 -609.5          # (hint) west into the target of P_Modul_37_03, whose bridge falls; back over the swing
 P_Trafo_Stone_02         # s289
-P_Box_06                 # pushed off by stone
+865 -0.5 -592            # over the swing north (hint), south past the boxes
+865 -1 -612
+855 -2.2 -631.7          # the zigzag west, ramming its boxes off
+822 -1.4 -636.5          # the fan, its stacked boxes rammed off; back over the swing (hint)
 P_Trafo_Paper_06         # s343
+865 -0.5 -592            # over the swing north again (hint)
+855 -2.2 -631.7
 P_Modul_18_06            # lift to P_Extra_Life_02
 P_Trafo_Wood_07          # s355
-PE_Balloon_01            
+PE_Balloon_01

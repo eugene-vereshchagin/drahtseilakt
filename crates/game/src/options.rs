@@ -464,6 +464,9 @@ const STICK: f32 = 0.5;
 /// The gamepads, when the platform has them (gilrs: evdev on Linux, Windows Gaming Input, IOKit on macOS).
 pub struct Pads {
     gilrs: Option<gilrs::Gilrs>,
+    /// The pads whose stick has been seen at rest: a stick counts only after that, so a device whose axis rests
+    /// off centre (a joystick or trackball taken for a pad, a worn stick) does not roll the ball by itself.
+    centred: Vec<gilrs::GamepadId>,
 }
 
 impl Pads {
@@ -475,7 +478,7 @@ impl Pads {
                 None
             }
         };
-        Pads { gilrs }
+        Pads { gilrs, centred: Vec::new() }
     }
 
     /// The buttons pressed since the last call, and the game's keys every pad holds now: the left stick and the
@@ -502,8 +505,15 @@ impl Pads {
             }
         }
         let mut keys = 0;
-        for (_, pad) in g.gamepads() {
-            let (x, y) = (pad.value(Axis::LeftStickX), pad.value(Axis::LeftStickY));
+        for (id, pad) in g.gamepads() {
+            let (mut x, mut y) = (pad.value(Axis::LeftStickX), pad.value(Axis::LeftStickY));
+            if !self.centred.contains(&id) {
+                if x.abs() < STICK / 2.0 && y.abs() < STICK / 2.0 {
+                    self.centred.push(id);
+                } else {
+                    (x, y) = (0.0, 0.0);
+                }
+            }
             let held = |b: Button| pad.is_pressed(b);
             let mut k = 0;
             if held(Button::DPadUp) || y > STICK {
