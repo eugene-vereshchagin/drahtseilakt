@@ -189,9 +189,12 @@ fn valid(f: usize, v: &str) -> bool {
     VALUES.get(f).is_some_and(|vals| vals.contains(&v))
 }
 
-/// The conditions are enough for a rule: at least two, one of them saying something special about the place.
-fn enough(when: &[(usize, String)]) -> bool {
-    when.len() >= 2 && when.iter().any(|(f, v)| distinctive(*f, v))
+/// The conditions are enough for a rule: at least two, one of them saying something special about the place; for a
+/// careful rule two (it holds the ball back wherever it holds: a sharp bend alone, or a bend alone, is almost every
+/// level's every corner, and one bend near a reset point is not every bend).
+fn enough(when: &[(usize, String)], kind: Kind) -> bool {
+    let special = when.iter().filter(|(f, v)| distinctive(*f, v)).count();
+    when.len() >= 2 && special >= if kind == Kind::Careful { 2 } else { 1 }
 }
 
 fn rule(line: &str, evidence: &str) -> Result<Rule, String> {
@@ -238,10 +241,15 @@ fn rule(line: &str, evidence: &str) -> Result<Rule, String> {
         }
         when.push((k, v.to_owned()));
     }
-    if !enough(&when) {
-        return Err(
-            "too plain: a rule names two features or more, one special to the place".into(),
-        );
+    if !enough(&when, kind) {
+        return Err(match kind {
+            Kind::Careful => {
+                "too plain: a careful rule names two features special to the place (it holds the ball back \
+                 wherever it holds)"
+            }
+            Kind::Flow => "too plain: a rule names two features or more, one special to the place",
+        }
+        .into());
     }
     // (a plain line of words: no comment mark or control character in it, as it is written back)
     let evidence: String = evidence
@@ -352,7 +360,7 @@ pub fn learn(
             when.push((f, v.to_owned()));
         }
     }
-    enough(&when).then_some(Rule {
+    enough(&when, kind).then_some(Rule {
         kind,
         speed,
         when,
@@ -434,7 +442,7 @@ mod tests {
         let (l, notes) = parse(
             "# learned\nflow when surface=rail ahead=rail-end kind=wood   # Level_01 sector 2\n\
              careful speed 3.5 when surface=floor width=narrow curve=sharp\n\
-             careful when module=P_Modul_25 surface=floor\n",
+             careful when module=P_Modul_25 surface=floor curve=bend\n",
         );
         assert!(notes.is_empty(), "{notes:?}");
         assert_eq!(l.rules.len(), 3);
@@ -490,6 +498,9 @@ mod tests {
             "careful when module=../x surface=rail",
             "careful when module=P_Modul_0123456789012345678901234567 surface=rail",
             "fast when surface=rail ahead=gap",
+            // a careful rule names two features special to the place
+            "careful when surface=floor curve=sharp kind=wood",
+            "careful speed 3 when module=P_Modul_25 surface=floor",
         ] {
             let (l, notes) = parse(&format!("\nflow when surface=rail ahead=gap\n{bad}\n"));
             assert_eq!(l.rules.len(), 1, "{bad}");
@@ -540,6 +551,39 @@ mod tests {
         ];
         assert!(learn(&plain, Kind::Flow, None, String::new()).is_none());
         assert!(learn(&[], Kind::Flow, None, String::new()).is_none());
+        // one special feature teaches a flow rule, not a careful one (it would slow every sharp bend)
+        let sharp = vec![
+            sit(&[
+                ("surface", "floor"),
+                ("curve", "sharp"),
+                ("slope", "flat"),
+                ("kind", "wood")
+            ]);
+            5
+        ];
+        assert!(learn(&sharp, Kind::Flow, None, String::new()).is_some());
+        assert!(learn(&sharp, Kind::Careful, None, String::new()).is_none());
+    }
+
+    #[test]
+    fn a_rule_learned_by_a_module_holds_only_by_that_module() {
+        let (l, notes) =
+            parse("careful when surface=floor curve=bend module=PR_Resetpoint kind=wood\n");
+        assert!(notes.is_empty(), "{notes:?}");
+        let bend = |module: &str| {
+            sit(&[
+                ("surface", "floor"),
+                ("curve", "bend"),
+                ("module", module),
+                ("kind", "wood"),
+            ])
+        };
+        assert!(l.at(&bend("PR_Resetpoint")).is_some());
+        assert!(
+            l.at(&bend("none")).is_none(),
+            "a bend with no reset point near"
+        );
+        assert!(l.at(&bend("P_Box")).is_none());
     }
 
     #[test]

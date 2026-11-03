@@ -566,6 +566,21 @@ struct Running {
     flowed: bool,
 }
 
+/// A step ending with the ball this far below its point has lost it to a floor beneath (`Runner::off_course`).
+const OFF_COURSE_DROP: f32 = 3.0;
+
+/// The point a step rolls the ball to, if it has one.
+fn step_point(step: &Step) -> Option<Vec3> {
+    match *step {
+        Step::Goto(p, _) | Step::Via(p, _) | Step::Pass(p, _, _) | Step::Press(p, _, _, _) | Step::Hold(p, _) => Some(p),
+        _ => None,
+    }
+}
+
+/// A pass faster than a careful zone's limit this near before a push at speed (along the hint's points) is its
+/// run-up, which the zone does not hold back.
+const RUN_UP: f32 = 25.0;
+
 /// In a flow zone a pass or press slower than this is taken at it.
 pub const FLOW_SPEED: f32 = 5.0;
 /// A flowed step is tried on a copy of the run this long (the rest of the hint) and a second after.
@@ -587,12 +602,57 @@ pub struct Runner {
     pub zone: crate::zones::Effect,
     /// A copy of the runner trying a step on a copy of the run: says nothing.
     quiet: bool,
+    /// A step of the running hint ended well below its point (the ball fell to a floor beneath): the hint is off
+    /// course, and its further steps are no getting on (the test player goes back from there as from a way that
+    /// stands still).
+    off_course: bool,
 }
 
 impl Runner {
     /// Where a running hint is (its index and step), so that a hint going through its steps counts as getting on.
     pub fn at(&self) -> Option<(usize, usize)> {
         self.running.as_ref().map(|r| (r.hint, r.step))
+    }
+
+    /// Whether the step running says the ball needs speed above `cap` (a careful zone's limit), and why: a push up a
+    /// climb, along rails or into a ram (`press`, `along`, `round` faster than it), or a `pass` faster than it that
+    /// is the run-up to one of those within `RUN_UP` of the ball, along the hint's points. There the zone lets the
+    /// limit go (autopilot.rs, `Pilot::momentum`).
+    pub fn says_speed(&self, ball: Vec3, cap: f32) -> Option<&'static str> {
+        let run = self.running.as_ref()?;
+        let steps = self.hints.get(run.hint)?.steps.get(run.step..)?;
+        let mut from = ball;
+        let mut gone = 0.0;
+        for (i, step) in steps.iter().enumerate() {
+            let pushes = match *step {
+                Step::Press(_, _, v, _) | Step::Along(v, _) => v > cap,
+                Step::Round(_, _, v, _) => v.abs() > cap,
+                _ => false,
+            };
+            if pushes {
+                return Some(if i == 0 {
+                    "the hint pushes on at speed"
+                } else {
+                    "the hint's run-up"
+                });
+            }
+            match *step {
+                Step::Pass(p, v, _) if v > cap => {
+                    gone += from.distance(p);
+                    from = p;
+                    if gone > RUN_UP {
+                        return None;
+                    }
+                }
+                _ => return None,
+            }
+        }
+        None
+    }
+
+    /// Whether the running hint went off course: a step ended with the ball well below its point.
+    pub fn off_course(&self) -> bool {
+        self.running.is_some() && self.off_course
     }
 
     /// What runs now, for whoever watches: the hint's line, its step and the step, if a hint runs.
@@ -683,6 +743,7 @@ impl Runner {
             );
             }
             self.began = sim.tick;
+            self.off_course = false;
             self.running = Some(Running {
                 hint: i,
                 step: 0,
@@ -729,12 +790,19 @@ impl Runner {
             }
             run.step += 1;
             let p = sim.ball.position;
+            let below = step_point(&step).is_some_and(|q| q.y - p.y > OFF_COURSE_DROP);
             if !self.quiet {
                 eprintln!(
-                    "  step {} done at tick {} ball ({:.1} {:.1} {:.1})",
-                    run.step, sim.tick, p.x, p.y, p.z
+                    "  step {} done at tick {} ball ({:.1} {:.1} {:.1}){}",
+                    run.step,
+                    sim.tick,
+                    p.x,
+                    p.y,
+                    p.z,
+                    if below && !self.off_course { ", well below its point: off course" } else { "" }
                 );
             }
+            self.off_course |= below;
             self.begin(sim);
         }
     }

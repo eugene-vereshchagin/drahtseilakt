@@ -127,7 +127,10 @@ zurückliegenden (die Ursache kann früher liegen: ein zu langsamer Anlauf, eine
 Versuchen an einer Stelle (eine Stelle: 6 Wegpunkte weiter als die letzte) wird der Fehlschlag hingenommen: die Kugel
 geht verloren, oder der Lauf wird mit seinem Bericht aufgegeben (ein so hingenommener fremder Transformator: die Kugel
 fährt in einen, der die Art des Wegs macht, wie eine neue Kugel). Die Hinweise können nach dem Zurückgehen wieder
-auslösen, wie für eine neue Kugel. Eine Kugel, die verloren geht, wie der Spieler dort seine verlor (innerhalb vier
+auslösen, wie für eine neue Kugel. Ein Hinweis, dessen Kugel einen Schritt 3 oder mehr unter dessen Punkt beendet
+(auf einen Boden darunter gefallen), ist vom Kurs ab: seine weiteren Schritte zählen nicht als Vorankommen, also
+geht der Testspieler von dort zurück wie von einem Weg, der steht, statt den Hinweis vom falschen Boden zu Ende zu
+spielen. Eine Kugel, die verloren geht, wie der Spieler dort seine verlor (innerhalb vier
 Sekunden, nachdem er sich an die letzten Sekunden des Spielers vor einem Verlust hielt), führt nicht zurück, wo der Lauf des Spielers danach über diesen Sektor
 hinauskam: was die
 Kugel des Spielers im Gehen tat, kann das sein, was das Level braucht (eine Zugbrücke, mit der Kugel umgestoßen). `--rewinds N` begrenzt, wie oft er in einem Lauf zurückgeht (600; 0: nie). Die
@@ -259,17 +262,30 @@ diesem Weg in diesem Sektor.
   durchrollt, ein `wait` oder `hold` ausgelassen, ein `pass` oder `press` langsamer als 5 mit 5 gefahren; aber nur,
   wenn auf einer Kopie des Laufs der Rest des Hinweises und eine Sekunde danach die Kugel behalten (ein Halt, den die
   Kugel braucht, bleibt). Die Steuerung zahlt für Rollen langsamer als 0,8 des Tempos des Bodens mehr, als ein
-  Warten wert ist (eine Wahl, die die Kugel verliert, wird nie genommen).
+  Warten wert ist (eine Wahl, die die Kugel verliert, wird nie genommen), außer wo die Kugel Anlauf braucht (eine
+  Lücke oder ein zu steiler Anstieg voraus, wie bei einer careful-Zone unten): dafür zurückzurollen und
+  anzuhalten ist kein Trödeln, dort verlangt die Zone nichts (der Halt eines Hinweises bleibt auch).
 - **careful** — hier das Tempolimit halten und keine Kurven schneiden. Nicht schneller als `speed` (4,5 ohne Angabe;
   zum Ändern die Zeile bearbeiten): die Steuerung zahlt für jede Einheit darüber viermal so viel, `pass`, `press`,
   `along` und `round` eines Hinweises werden darauf begrenzt, und was auch steuert (die Steuerung, ein Hinweis, die
   Linie des Spielers), die Pfeile in Laufrichtung der Kugel werden über dem Limit losgelassen und über dem 1,25-Fachen
   wird gebremst. Die Linie des Weges voraus (die Mitte, die die Wegsuche fand) wird gehalten: jede Einheit daneben
-  kostet 2, neben der Mitte des Bodens dreimal so viel wie sonst. Wo das Level Tempo braucht (ein Anstieg, eine
-  Lücke), bremst eine careful-Zone die Kugel auch: dort gehört keine hin.
+  kostet 2, neben der Mitte des Bodens dreimal so viel wie sonst. Wo die Physik den Schwung der Kugel braucht, wird
+  das Limit losgelassen und nur die Linie gehalten: der Weg voraus (etwa 30 Einheiten) hat eine Lücke zum
+  Überqueren oder einen Anstieg, steiler als die Kugel aus eigenem Schub schafft am Limit (bei 4,5: Stein
+  12,6°, Holz 26°, Papier 31°; auf der Engine gemessen schafft Stein aus eigenem Schub nichts Steileres als 17°, Holz
+  37°, Papier 46°),
+  gleich voraus kommt eine Schwelle, oder der laufende Hinweis sagt Tempo (`press`, `along` oder `round` schneller
+  als das Limit: ein Anstieg, Schienen, ein Rammstoß; oder ein `pass` schneller als es bis 25 Einheiten davor: sein
+  Anlauf). Die Statuszeile sagt es (`[limit let go: a gap to cross ahead]`). Eine gelernte careful-Regel bremst
+  ebenso und wird an denselben Stellen losgelassen.
 
 Jede Markierung lehrt den Testspieler auch, was für eine Stelle es war, für jedes Level: eine Regel der gelernten
 Tabelle (`learned.txt` neben den Hinweisen; [autopilot-rules.md](autopilot-rules.md), „Die gelernte Tabelle“).
+
+`AUTOPILOT_SITUATION=1` druckt außer der Stelle jede Sekunde jeden Wechsel dessen, was Zonen und Regeln verlangen,
+mit dem Tick und dem Ort der Kugel (`zone t14528 (137.9 -6.8 -554.8) [learned: ... → careful, at most 4.5]`, `none`,
+wenn nichts gilt), und warum ein Limit losgelassen ist.
 
 Eine Zonendatei ist nicht vertrauenswürdig wie eine Hinweisdatei: ihre Größe (64 KiB), die Zonen (256) und Punkte
 (256 je Zone) und jede Zahl sind begrenzt; eine fehlerhafte Zeile wird mit einem Vermerk ausgelassen, die anderen
@@ -291,8 +307,10 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 
 - Level 1: vom Start an geschafft in 6:12.27 (Hinweise für Rampe, Kiste, Schieber und Schienen).
   Allein ohne Lauf eines Spielers, nach dem Storyboard des Walkthroughs (`hints/Level_01.plan`, `.route`, `.txt`;
-  die Hinweise zum Lauf des Inhabers heißen jetzt `Level_01-follow.txt`): 5:17.12, 9.1% der Zeit stehend
-  (`hints/runs/Level_01-clean.replay`).
+  die Hinweise zum Lauf des Inhabers heißen jetzt `Level_01-follow.txt`): 5:17.12, 9.1% der Zeit stehend. Mit den
+  Markierungen des Inhabers (`hints/Level_01.zones`, `hints/learned.txt`), 2026-11-03: 6:23.63, 9.7% der Ticks
+  stehend (unter 0,3 pro Sekunde; der Lauf davor 9.7% so gezählt), näher als 1 am Rand 4.3% (4.5%), Tempo 4.8 ± 3.6
+  (5.5 ± 4.0) (`hints/runs/Level_01-clean.replay`).
 - Level 2: vom Start an geschafft in 6:13.27 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers ab Sektor 5).
   Allein ohne Lauf eines Spielers, nach dem Storyboard des Walkthroughs (`hints/Level_02.plan`, `.route`, `.txt`;
   die Hinweise zum Lauf des Inhabers heißen jetzt `Level_02-follow.txt`): 5:23.90, 5.9% der Zeit stehend
