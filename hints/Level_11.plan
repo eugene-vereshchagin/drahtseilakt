@@ -1,30 +1,89 @@
-P_Trafo_Stone_01         
-P_Modul_26_01            # sack
-PC_TwoFlames_01          
-P_Trafo_Paper_01         
-P_Modul_18_01            
-P_Trafo_Wood_01          # ?
-P_Trafo_Stone_02         # ?
-P_Extra_Life_01          
-P_Trafo_Wood_03          # ?
+P_Trafo_Stone_01         # s9
+61 6 -130                # as stone along the wavy log south at speed (hint), east along the plank z -135
+115 -2.9 -134.5
+117 -10.9 -122           # off the plank down onto the plateau with the loose stone balls
+114 -11 -97              # its north edge's notch at x 114: the rails down into the castle maze
+111 -28.4 -77            # (hint) the floor between the drawbridges P_Modul_25_01/02: rammed down, the target of
+108.4 -28.4 -63          #   P_Modul_37_01 (its bridge falls across the north row), the pusher P_Modul_01_02 north
+121 -30.9 -55
+128.4 -28.4 -70        # back round by the ramp along x 128 onto the east plank
+98 -28.4 -75.5           # west over the fallen plank P_Modul_25_01
+90.5 -28.4 -66           # north along x 90 past the sacks P_Modul_26_01/02
+90.5 -28.4 -45
+107 -28.4 -45            # east along the north row over the target's bridge, the loose stone ball pushed ahead
+135 -29 -46.5
+187 -50 -47.5            # down the plank, over the gap
+PC_TwoFlames_01
+P_Trafo_Paper_01         # s73: south along x 310, west into it at the lane's end → paper
+P_Modul_18_01            # its fan lifts the paper ball onto the upper track (y -46)
+P_Trafo_Wood_01          # s93: the rails and the seesaw P_Modul_30_01 north to the west platform → wood
+P_Trafo_Stone_02         # s121: south over the flipping planks, east along z -128, north along x 386 → stone
+386.5 -48.8 -84          # (hint) the maze as stone: the flap P_Modul_19_01, the drawbridges P_Modul_25_03/04,
+420 -48.8 -57.5          #   the target of P_Modul_37_02 (its bridge falls across the gap in the lane x 443)
+443.5 -48.8 -95          # south along x 443.5 over the target's bridge
+P_Trafo_Wood_03          # s161: west onto the curved plank into it → wood
+443.5 -48.8 -133.5       # back, south, east to the checkpoint
 PC_TwoFlames_02          
-P_Trafo_Stone_03         
-P_Modul_34_02            # pushed out
-P_Trafo_Paper_02         
-P_Trafo_Wood_06          
-P_Trafo_Stone_04         
+P_Trafo_Stone_03         # s179: at the junction west of the twisted slide → stone
+672 -57.5 -197           # down the slide (past the sack P_Modul_26_03) to the grid of channels (hint)
+P_Trafo_Paper_02         # s221: after the three channels' stone balls are pushed east (hint) → paper
+690 -52.5 -230           # (hint) up the rail loop, south along the column's top, round to the lane x 720
+P_Trafo_Wood_06          # s234
+P_Trafo_Stone_04         # s249: (hint) over the seesaw P_Modul_30_02 as wood → stone, back over it
+807 -61 -156             # (hint) the loose stone ball P_Ball_Stone_10 pushed east along z -156 onto the rail to
+876 -75.7 -150           #   the target of P_Modul_37_03 (its bridge falls into the lane x 876); the flaps
+876 -75.7 -110           #   P_Modul_19_03, round to the lane x 876 and north
 PC_TwoFlames_03          
-P_Trafo_Wood_05          
-P_Modul_41_01            # drop through
-P_Extra_Life_02          
-P_Trafo_Paper_03         # ?
-P_Modul_18_02            
+P_Trafo_Wood_05          # s293
+P_Extra_Point_10         # s307: up the maze's corridors to the platform with the extra point (the big bubble)
+1057.5 -101.6 -73        # down its rails south past P_Trafo_Wood_04 onto the floor below
+1058 -103.9 -85          # round down to the lowest floor, the two pockets west of the lane x 1093
+1080 -108.3 -108         # (hint) the pushers P_Modul_01_04/03 pushed east out of the lane, each by its disc
+1080 -108.3 -129.5
+1080 -108.3 -108
+1058 -103.9 -85          # back up, north over the arched bridge to the junction at z -54
+1078 -95.6 -54
+1106 -105 -54            # east along the row, down the rails' loop onto the platform z -91
+1124 -105.1 -91          # (hint) west into the target of P_Modul_37_04: its bridge falls into the gap of the lane x 1093
+1106 -105 -54            # back up the loop, west to the junction
+1078 -95.6 -54
+P_Modul_41_01            # north over the row of flipping boxes as wood: they tip, the ball drops onto the rails below
+P_Extra_Life_02          # s345 (the way goes by it; the ball, flung east by the tipping boxes, misses it)
+998 -85.7 -30            # (hint) down the corridor x 998, the drawbridge P_Modul_25_07 rammed down west
+P_Trafo_Paper_03         # s367
+984 -85 -39              # as paper back up the rails, over the fallen plank, north along the corridor x 998
+998 -85.7 -26
+1023 -90.7 -13           # east and north down to the row z 6, east along it (not by the rails past P_Trafo_Wood_04)
+1050 -95.6 6
+1078 -95 2               # south over the box row (it holds a paper ball) to the junction
+1078 -95.6 -54
+1093 -105.1 -80          # east, south down the pier x 1093, over the target's bridge, down the lane between the
+1093 -105.1 -120         #   pushers' blocks pushed aside
+P_Modul_18_02            # the fans 18_02..04 carry it down to the checkpoint
+P_Modul_18_03
+P_Modul_18_04
 PC_TwoFlames_04          
-P_Modul_18_05            
-P_Modul_08_01            
-PC_TwoFlames_05          
-P_Trafo_Stone_06         
-P_Trafo_Paper_05         
-P_Modul_18_12            
-P_Trafo_Wood_09          
-PE_Balloon_01            
+P_Modul_18_05            # s405: the paper ball off the checkpoint's platform south over the fan, on south
+P_Modul_18_06            # down past it onto the rail pair below (x 1113.5, y -137)
+1113.5 -137 -315         # south along it into its loop up over the fan P_Modul_18_07
+P_Modul_18_07
+1113.5 -121.6 -305       # north along the rail pair above, round its hairpin (hint) and south along x 1129.5
+1129.5 -121.6 -315
+P_Modul_18_08            # up its loop over the fan onto the top rails, north
+1131 -105 -316
+1150 -108.5 -312         # the S of rails down to z -345 (P_Extra_Point_13), east along it
+1160 -110.5 -345
+P_Modul_18_09            # s423: off the rails' end into the swinging crates P_Modul_08_01/02, lifted inside
+PC_TwoFlames_05
+P_Trafo_Stone_06         # s441: as stone east to the floor's end, down the rails onto the stepped grid
+1560 -200.5 -499.5       # down the grid, onto the rails at its south foot (P_Extra_Point_14/15)
+1530 -200.5 -499.5       # west along them (z -499.5), round north
+1523.5 -201 -470         # north up the rails onto the block in the bridge's middle (the pusher P_Modul_01_05 shoved south by a loose ball)
+1540 -205 -459.6         # east over the seesaw P_Modul_30_04 to the grid's foot
+P_Trafo_Paper_05         # s497
+1540 -205 -459.6         # back west over the bridge (the seesaws P_Modul_30_04/03)
+1506 -205 -459.6
+P_Modul_18_12            # s505: the fan past the boxes
+P_Trafo_Wood_09          # s511
+1460.5 -211 -550         # south along the strip, down the rails to the balloon
+PE_Balloon_01

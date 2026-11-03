@@ -254,10 +254,14 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 - Level 9: vom Start an geschafft in 12:35.27, dem geschafften Lauf des Inhabers folgend (das Labyrinth der Schieber
   in Sektor 3 wird gelöst, wie der Inhaber es löste).
 - Level 10: vom Start an geschafft in 15:31.00, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
-- Level 11–13: 11 folgt dem Lauf des Inhabers durch Sektor 1–3 (verliert an der Zugbrücke eine Kugel wie der
-  Inhaber, was sie umstößt) und fährt in Sektor 4 allein weiter; 12 in Sektor 2
-  (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator vorbei und den Ventilator hinauf, am
-  Balken, an dem die Ventilatoren 18_10–12 entlangblasen.
+- Level 11: vom Start an in 13:43.73 beendet, ganz ohne Lauf eines Spielers, allein nach dem Plan aus dem
+  Walkthrough und den Hinweisen aus seinem Storyboard (`hints/Level_11.plan`, `.txt`, `.route`): die Bretter des
+  Burg-Labyrinths umgestoßen, eine lose Steinkugel auf die Schienen gestoßen, die einen Schieber treiben, die
+  Zielscheiben, die Kisten aus den Rinnen gestoßen, das Labyrinth von Sektor 4, die Ventilatoren und schwingenden
+  Kisten von Sektor 5, und in Sektor 6 zwei lose Steinkugeln vom Gitter gestoßen (eine schiebt den Schieber zwischen
+  den Wippen, eine öffnet eine Falltür) und die letzten Schienenpaare.
+- Level 12–13: 12 in Sektor 2 (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator vorbei und den
+  Ventilator hinauf, am Balken, an dem die Ventilatoren 18_10–12 entlangblasen.
 - Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
 - Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
   Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).

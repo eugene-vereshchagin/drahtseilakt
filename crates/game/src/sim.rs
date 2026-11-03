@@ -686,6 +686,13 @@ pub struct Sim {
     pub game_over: bool,
     /// Objects taken (extra points and lives) are hidden by the renderer.
     pub taken: Vec<usize>,
+    /// Level objects out of sight, by index: the members of a sector (groups `Sector_NN`) while it is not in play.
+    /// The original shows a sector's objects when it comes in (Activate Sector's Show) and hides them when it goes
+    /// (Deactivate Sector's Hide, or its module's script taking down its instance), so a passed sector's swings and
+    /// boxes are gone, not hanging still where a ball would fall through them.
+    pub unseen: Vec<bool>,
+    /// The sector of each level object (`None`: in no sector).
+    object_sectors: Vec<Option<usize>>,
     pub events: Vec<(u64, Event)>,
     prev_input: u8,
     /// The ball inside a transformer, if it is in one.
@@ -881,6 +888,7 @@ impl Sim {
         let sector_of = |i: usize| -> Option<usize> {
             level.groups.iter().find_map(|g| sector_number(&g.name).filter(|_| g.members.contains(&i)))
         };
+        let object_sectors: Vec<Option<usize>> = (0..level.objects.len()).map(sector_of).collect();
         // Loose objects that move, and the domes: boxes, the loose balls and P_Dome (their material table in
         // docs/physics.md, section 3).
         let mut loose = Vec::new();
@@ -1116,6 +1124,9 @@ impl Sim {
             level_bonus: 0,
             game_over: false,
             taken: Vec::new(),
+            // the first sector is in play from the start, as its objects are in the physics (above)
+            unseen: object_sectors.iter().map(|s| s.is_some_and(|n| n != 0)).collect(),
+            object_sectors,
             events: Vec::new(),
             prev_input: 0,
             hold: None,
@@ -1866,6 +1877,9 @@ impl Sim {
                     self.world.deactivate(b);
                 }
             }
+            for (u, _) in self.unseen.iter_mut().zip(&self.object_sectors).filter(|(_, s)| **s == Some(c.sector)) {
+                *u = !c.enter;
+            }
         }
     }
 
@@ -2615,13 +2629,15 @@ pub(crate) mod tests {
     fn a_sector_s_objects_are_in_the_physics_only_while_it_is_current() {
         // A box in sector 1 and one in sector 2, and the first checkpoint on the ball's way.
         let mut level = flat_level();
-        add_cube(&mut level, "P_Box_01", Vec3::new(-30.0, 1.0, 0.0), &["P_Box", "Sector_01"]);
-        add_cube(&mut level, "P_Box_02", Vec3::new(-30.0, 1.0, 20.0), &["P_Box", "Sector_02"]);
-        add_cube(&mut level, "PC_TwoFlames_01", Vec3::new(0.0, 0.0, 0.0), &["PC_Checkpoints"]);
+        let o1 = add_cube(&mut level, "P_Box_01", Vec3::new(-30.0, 1.0, 0.0), &["P_Box", "Sector_01"]);
+        let o2 = add_cube(&mut level, "P_Box_02", Vec3::new(-30.0, 1.0, 20.0), &["P_Box", "Sector_02"]);
+        let cp = add_cube(&mut level, "PC_TwoFlames_01", Vec3::new(0.0, 0.0, 0.0), &["PC_Checkpoints"]);
         let mut sim = Sim::new(&level, BallKind::Wood);
         let (b1, b2) = (sim.loose[0].1, sim.loose[1].1);
         assert!(sim.world.state(b1).is_some(), "the first sector's box is in the physics");
         assert!(sim.world.state(b2).is_none(), "the second sector's box is not yet");
+        // and they are seen only while their sector is in play (an object in no sector always)
+        assert!(!sim.unseen[o1] && sim.unseen[o2] && !sim.unseen[cp], "{:?}", sim.unseen);
         // the ball starts on the checkpoint: the sector changes at once
         sim.step(0);
         let t = sim.tick;
@@ -2631,10 +2647,12 @@ pub(crate) mod tests {
         }
         assert!(sim.world.state(b1).is_none(), "the passed sector's box left");
         assert!(sim.world.state(b2).is_none());
+        assert!(sim.unseen[o1], "the passed sector's box is gone from sight too");
         while sim.tick < t + SECTOR_BEGIN_TICKS {
             sim.step(0);
         }
         assert!(sim.world.state(b2).is_some(), "the next sector's box came");
+        assert!(!sim.unseen[o2] && !sim.unseen[cp]);
     }
 
     #[test]

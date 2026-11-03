@@ -48,6 +48,21 @@ Die Mechanik, auf der sie beruhen, steht in [autopilot.md](autopilot.md).
   Kiste nicht über die Kante folgt.
 - **Ventilatoren**: eine Papierkugel wartet über dem Gitter nur, bis sie gehoben wird.
 
+## Mechanismen
+
+- **Bretter auf einem Scharnier** (Zugbrücken, P_Modul_25) werden aus kurzem Anlauf umgestoßen, mit Bremsen gleich nach
+  dem Stoß, damit die Kugel dem Brett nicht in die Lücke folgt.
+- **Schieber** (P_Modul_01) bewegt ein Stoß gegen ihre Scheibe, nicht Andrücken; reicht einer nicht, mehrere.
+- **Eine lose Kugel als Schlüssel**: wo eine lose Kugel irgendwohin rollen muss, um einen Mechanismus auszulösen (die
+  Scheibe eines Schiebers, eine Falltür), wird sie mit einem streifenden Stoß entlang ihrer Reihe dorthin gestoßen,
+  die Kugel bremst sofort (Level 11: zwei Steinkugeln vom Gitter auf die Schienen darunter gestoßen).
+- **Wippen** (P_Modul_30) werden vom tiefen Ende mit Anlauf überquert: aus dem Stand kommt eine Steinkugel nicht über
+  die Achse.
+- **Ein Hinweis beginnt, nachdem ein Transformator die Kugel losgelassen hat**, nicht während er sie hält: der Platz auf
+  dem Weg wird nach dem Hinweis neu gefunden, und ein unter einem Hinweis passierter Transformator gilt nicht als
+  passiert.
+- **Ein passierter Sektor ist fort**: seine Objekte verlassen Physik und Bild, der Weg führt nie zurück hinein.
+
 ## Kugeln
 
 - **Papier** über Ventilatoren und an Luftwänden entlang; leicht: für Hänge und durchhängende Platten braucht sie

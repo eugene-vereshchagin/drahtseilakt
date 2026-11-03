@@ -447,6 +447,7 @@ pub fn shadows(receivers: &[ShadowReceiver], ball: Vec3, out: &mut Vec<Instance>
 pub fn instances(
     placements: &[Placement],
     taken: &[usize],
+    unseen: &[bool],
     bodies: &[crate::physics::Body],
     balls: &BallMeshes,
     trafo: Option<&crate::trafo::TrafoModel>,
@@ -487,7 +488,8 @@ pub fn instances(
     let clouds = CLOUDS.load(Ordering::Relaxed) && !VOLUME_CLOUDS.load(Ordering::Relaxed);
     out.extend(placements
         .iter()
-        .filter(|p| !taken.contains(&p.object) && !(p.marker.is_some() && hidden(p.object)))
+        .filter(|p| !taken.contains(&p.object) && !unseen.get(p.object).copied().unwrap_or(false))
+        .filter(|p| !(p.marker.is_some() && hidden(p.object)))
         .filter(|p| clouds || !p.cloud)
         .map(|p| Instance {
             model: p.model,

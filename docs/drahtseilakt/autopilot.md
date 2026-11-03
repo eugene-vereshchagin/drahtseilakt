@@ -236,10 +236,13 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 - Level 9: finished from the start in 12:35.27, following the owner's finished run (the maze of pushers in sector 3
   is solved as the owner solved it).
 - Level 10: finished from the start in 15:31.00, following the owner's finished run with `hints/Level_10.txt`.
-- Levels 11–13: 11 follows the owner's run through sectors 1–3 (losing a ball at the drawbridge as the owner did,
-  which knocks it down) and goes on by itself in sector 4; 12 in sector 2 (its
-  thin rails); 13 in sector 2, past the paper transformer and up the fan, at the beam the
-  fans 18_10–12 blow along.
+- Level 11: finished from the start in 13:43.73 with no player's run at all, by itself through the walkthrough's
+  plan and the hints written from its storyboard (`hints/Level_11.plan`, `.txt`, `.route`): the planks of the castle
+  maze rammed down, a loose stone ball rammed into the rails that drive a pusher, the targets, the crates rammed out
+  of the channels, the maze of sector 4, the fans and swinging crates of sector 5, and in sector 6 two loose stone balls
+  knocked off the grid (one shoves the pusher between the seesaws, one opens a trapdoor) and the last rail pairs.
+- Levels 12–13: 12 in sector 2 (its thin rails); 13 in sector 2, past the paper transformer and up the fan, at the
+  beam the fans 18_10–12 blow along.
 - Videos of the finished runs: `scripts/video.sh`, kept outside the repository.
 - Our ten levels (levels.md, "Our levels and how to edit them"), 2026-11-03: each finished from the start in three
   styles, with the hint files their descriptions write (`assets/levels/<level>/pilot/`).
