@@ -1,0 +1,25 @@
+# What the test player learned from the watcher's marks, for every level (autopilot-rules.md,
+# "The learned table"): KIND [speed V] when FEATURE=VALUE ...   # where it was learned
+careful when surface=floor curve=bend module=PR_Resetpoint kind=wood   # Level_01 sector 1 (21.1 15.2 -144.5) 2026-11-03: 3.0 s, stopping 42%, mostly a manoeuvre (stuck), off the middle 1.0
+flow when surface=floor ahead=gap kind=wood   # Level_01 sector 1 (-59.8 20.9 -179.6) 2026-11-03: 3.1 s, stopping 50%, mostly way search, off the middle 2.4
+flow when surface=floor ahead=gap kind=wood   # Level_01 sector 1 (-57.3 20.9 -179.7) 2026-11-03: 3.1 s, stopping 10%, mostly a manoeuvre (stuck), off the middle 2.7
+flow when surface=floor curve=bend module=P_Box kind=wood   # Level_01 sector 1 (-147.3 19.4 -151.7) 2026-11-03: 3.1 s, stopping 88%, mostly way search, off the middle 1.8
+flow when surface=floor curve=sharp slope=down ahead=drop kind=stone   # Level_01 sector 1 (-150.7 21.8 -285.3) 2026-11-03: 3.1 s, stopping 75%, mostly way search, off the middle 2.3
+flow when surface=floor curve=bend ahead=rail-start kind=stone   # Level_01 sector 1 (-151.2 19.2 -280.0) 2026-11-03: 3.1 s, stopping 30%, mostly a manoeuvre (stuck), off the middle 3.8
+flow when surface=rail curve=bend ahead=rail-end kind=wood   # Level_01 sector 1 (-185.6 19.9 -247.1) 2026-11-03: 3.1 s, stopping 23%, mostly way search, off the middle -0.0
+flow when curve=bend kind=wood   # Level_01 sector 1 (-195.0 20.7 -264.4) 2026-11-03: 3.1 s, stopping 27%, mostly a manoeuvre (stuck), off the middle 3.0
+flow when surface=floor curve=bend slope=up kind=wood   # Level_01 sector 1 (-152.0 25.5 -300.9) 2026-11-03: 3.1 s, stopping 40%, mostly way search, off the middle 1.0
+careful when surface=floor curve=sharp kind=wood   # Level_01 sector 1 (-140.8 22.1 -355.0) 2026-11-03: 3.2 s, stopping 0%, mostly hint, off the middle 1.1
+flow when surface=rail kind=wood   # Level_01 sector 1 (-69.8 20.9 -363.8) 2026-11-03: 3.1 s, stopping 27%, mostly way search, off the middle -0.0
+flow when surface=rail slope=down ahead=drop module=P_Ball_Wood kind=wood   # Level_01 sector 1 (-57.8 20.9 -363.8) 2026-11-03: 3.1 s, stopping 36%, mostly way search, off the middle -0.0
+flow when surface=rail ahead=rail-end module=PR_Resetpoint kind=wood   # Level_01 sector 2 (-24.5 14.5 -379.8) 2026-11-03: 3.1 s, stopping 42%, mostly way search, off the middle -0.0
+flow when module=PR_Resetpoint kind=wood   # Level_01 sector 2 (-18.6 13.7 -379.2) 2026-11-03: 3.1 s, stopping 42%, mostly way search, off the middle 3.0
+flow when surface=floor slope=down ahead=drop kind=wood   # Level_01 sector 2 (56.9 11.2 -457.4) 2026-11-03: 3.1 s, stopping 9%, mostly way search, off the middle 0.0
+flow when surface=floor ahead=rail-start kind=wood   # Level_01 sector 2 (75.2 7.2 -499.0) 2026-11-03: 3.0 s, stopping 68%, mostly way search, off the middle 0.4
+flow when surface=floor curve=bend slope=up kind=stone   # Level_01 sector 2 (131.7 -7.1 -578.7) 2026-11-03: 3.1 s, stopping 31%, mostly hint, off the middle 4.0
+flow when surface=floor curve=bend slope=up kind=stone   # Level_01 sector 2 (137.1 -7.1 -578.7) 2026-11-03: 3.1 s, stopping 69%, mostly hint, off the middle 4.0
+flow when surface=floor slope=up kind=stone   # Level_01 sector 2 (143.5 -7.1 -561.9) 2026-11-03: 3.4 s, stopping 100%, mostly hint, off the middle 4.0
+flow when surface=floor slope=up kind=stone   # Level_01 sector 2 (140.3 -7.1 -563.7) 2026-11-03: 6.1 s, stopping 90%, mostly hint, off the middle 3.8
+flow when surface=floor curve=bend slope=up kind=stone   # Level_01 sector 2 (133.6 -7.1 -578.7) 2026-11-03: 9.4 s, stopping 80%, mostly hint, off the middle 3.6
+flow when surface=floor curve=bend slope=up kind=stone   # Level_01 sector 2 (142.7 -7.1 -578.7) 2026-11-03: 17.5 s, stopping 100%, mostly hint, off the middle 3.0
+flow when surface=floor curve=bend slope=up kind=stone   # Level_01 sector 2 (142.7 -7.1 -578.7) 2026-11-03: 3.3 s, stopping 100%, mostly hint, off the middle 3.0
