@@ -38,6 +38,10 @@ const MAX_LEAD: f32 = 50.0;
 /// The fastest a press step rolls, and how far off its line it keeps at most.
 const MAX_PRESS_SPEED: f32 = 40.0;
 const MAX_PRESS_OFFSET: f32 = 3.0;
+/// A press is done once the ball, having rolled, has not moved faster than this for so many ticks (stopped at a
+/// rail's end).
+const PRESS_MOVING: f32 = 0.8;
+const PRESS_SETTLE: u64 = 20;
 /// The ticks a goto or become takes at most when the hint does not say.
 const GOTO_TICKS: u64 = 600;
 const BECOME_TICKS: u64 = 1200;
@@ -74,6 +78,9 @@ pub enum Step {
     Along(f32, u64),
     /// Keep the ball on the point for so many ticks: still where it must wait (a slope would roll it away).
     Hold(Vec3, u64),
+    /// Roll through the point without stopping, no faster than the speed (a corner, a rail's end, a transformer
+    /// rolled into on the way), for so many ticks at most.
+    Pass(Vec3, f32, u64),
     /// Go round the upright axis through the point (x, z) at the radius, at the speed (one way round or, negative,
     /// the other), for so many ticks or until the ball is above the point's height: up a helix of rails.
     Round(Vec3, f32, f32, u64),
@@ -231,6 +238,18 @@ fn step(words: &[&str]) -> Result<Step, String> {
                 None => f32::INFINITY,
             };
             Step::Round(Vec3::new(c.x, top, c.z), r, speed, t)
+        }
+        "pass" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
+                return Err(format!("pass is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            let t = match w.next() {
+                Some(t) => ticks(Some(t))?,
+                None => GOTO_TICKS,
+            };
+            Step::Pass(p, speed, t)
         }
         "hold" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
@@ -810,11 +829,20 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let along = line.normalize_or_zero();
             let across = Vec3::new(-along.z, 0.0, along.x);
             let rel = flat(ball.position - run.from);
-            // done there, or past it (the point is a rail's end: what comes after is another step's)
-            if t >= *n || flat(*p - ball.position).length() < 1.0 || rel.dot(along) >= line.length() {
+            let v = flat(ball.velocity);
+            // (still moving: the end of a pair of rails stops the ball short of the point, and then it is done)
+            if v.length() > PRESS_MOVING {
+                run.nearest_at = sim.tick;
+                run.flown = true;
+            }
+            // done there, or past it (the point is a rail's end: what comes after is another step's), or stopped
+            if t >= *n
+                || flat(*p - ball.position).length() < 1.0
+                || rel.dot(along) >= line.length()
+                || (run.flown && sim.tick > run.nearest_at + PRESS_SETTLE)
+            {
                 return None;
             }
-            let v = flat(ball.velocity);
             // across: to the line (and its offset), damped; along: on while slower than the speed
             let off = rel.dot(across) - side.dot(across);
             let a = -(1.5 * off + 0.8 * v.dot(across));
@@ -836,6 +864,19 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             Some(arrows(around * f + u * a.clamp(-1.0, 1.0), quarter))
         }
         Step::Hold(p, n) => (t < *n).then(|| towards(*p)),
+        Step::Pass(p, speed, n) => {
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let d = flat(*p - ball.position);
+            if t >= *n || d.length() < 1.5 {
+                return None;
+            }
+            let along = d.normalize_or_zero();
+            let v = flat(ball.velocity);
+            // sideways speed taken out; along: on while slower than the speed, held back when faster
+            let side = v - along * v.dot(along);
+            let f = if v.dot(along) < *speed { 1.0 } else { -0.5 };
+            Some(arrows(along * f - side * 0.4, quarter))
+        }
         Step::Along(speed, n) => {
             if t >= *n {
                 return None;
@@ -924,6 +965,7 @@ mod tests {
         assert!(parse("at 0 0 0 r 1 : press 1 2 3 0 4 6 200").is_err(), "too far off the line");
         assert_eq!(parse("at 0 0 0 r 1 : along 12 240").unwrap()[0].steps[0], Step::Along(12.0, 240));
         assert_eq!(parse("at 0 0 0 r 1 : hold 1 2 3 60").unwrap()[0].steps[0], Step::Hold(Vec3::new(1.0, 2.0, 3.0), 60));
+        assert_eq!(parse("at 0 0 0 r 1 : pass 1 2 3 5").unwrap()[0].steps[0], Step::Pass(Vec3::new(1.0, 2.0, 3.0), 5.0, GOTO_TICKS));
         assert_eq!(
             parse("at 0 0 0 r 1 : round 1 2 6 -9 300").unwrap()[0].steps[0],
             Step::Round(Vec3::new(1.0, f32::INFINITY, 2.0), 6.0, -9.0, 300)
