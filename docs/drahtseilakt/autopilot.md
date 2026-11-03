@@ -222,7 +222,10 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
   player goes on by itself through sectors 2 and 3 and over the wavy log of sector 4 to its stone transformer; the
   boxes to push off the ledge as stone are next.
 - Level 7: finished from the start in 12:04.28, following the owner's finished run.
-- Level 8: by itself with the walkthrough's plan, to the first wood transformer (route 156 of 1072).
+- Level 8: finished from the start in 13:03.93 with no player's run at all: by itself through the walkthrough's
+  plan (`hints/Level_08.plan`, with places on the way) and the hints written from its storyboard
+  (`hints/Level_08.txt`: rail pairs ridden leaning on their upper rail, a helix, a swing, the targets that drop
+  the maze's bridges, boxes rammed off).
 - Level 9: finished from the start in 12:35.27, following the owner's finished run (the maze of pushers in sector 3
   is solved as the owner solved it).
 - Level 10: finished from the start in 15:31.00, following the owner's finished run with `hints/Level_10.txt`.
