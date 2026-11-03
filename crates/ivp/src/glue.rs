@@ -23,7 +23,8 @@ pub struct Force {
 /// The game's listeners (`phys_set_listeners`). The impact event is the post-collision event of an impact; a listener
 /// may change its normal in place, and the change stays with the contact. The contact events come as a friction
 /// contact is created (`begin`) and as it is deleted.
-pub trait Listener {
+/// (Send: a world is copied into threads to try the test player's choices side by side.)
+pub trait Listener: Send + Sync {
     fn impact(&mut self, ev: &mut ImpactEvent);
     fn contact(&mut self, a: usize, b: usize, begin: bool);
 }
@@ -383,8 +384,7 @@ mod tests {
     use super::*;
     use crate::body::{BodyDesc, Shape};
     use crate::ledge::Surface;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use std::sync::{Arc, Mutex};
 
     const IDENTITY: crate::math::Quat = crate::math::Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
 
@@ -483,13 +483,15 @@ mod tests {
             begins: u32,
             ends: u32,
         }
-        struct Rec(Rc<RefCell<Log>>);
+        struct Rec(Arc<Mutex<Log>>);
         impl Listener for Rec {
             fn impact(&mut self, ev: &mut ImpactEvent) {
-                self.0.borrow_mut().impacts.push(ev.order);
+                if let Ok(mut l) = self.0.lock() {
+                    l.impacts.push(ev.order);
+                }
             }
             fn contact(&mut self, _a: usize, _b: usize, begin: bool) {
-                let mut l = self.0.borrow_mut();
+                let Ok(mut l) = self.0.lock() else { return };
                 if begin {
                     l.begins += 1;
                 } else {
@@ -497,7 +499,7 @@ mod tests {
                 }
             }
         }
-        let log = Rc::new(RefCell::new(Log::default()));
+        let log = Arc::new(Mutex::new(Log::default()));
         let mut w = World::new();
         w.time_start();
         w.set_gravity([0.0, -9.8, 0.0]);
@@ -505,7 +507,7 @@ mod tests {
         let f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
         let b = ball(&mut w, 3, [0.0, 2.0, 0.0]);
         w.advance(2.0);
-        let log = log.borrow();
+        let log = log.lock().unwrap();
         assert!(log.begins >= 1, "a contact begins when the ball lands");
         assert!(!log.impacts.is_empty(), "the landing is an impact");
         for o in &log.impacts {

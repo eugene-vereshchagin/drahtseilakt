@@ -1,3 +1,7 @@
-# Level 6 — hints for the test player (docs/drahtseilakt/autopilot.md). The owner's run (Level_06-owner.replay,
-# beside this file) ends at the convex log in sector 2; from there the test player finds the way itself, by the plan
-# Level_06.plan (the order of transformers and fans the walkthrough video takes).
+# Level 6 — hints for the test player (docs/drahtseilakt/autopilot.md), from the walkthrough video.
+#
+# Sector 4: at the corner of the plank along z -714.5 where the way turns south to the fourth checkpoint (x 409), the
+# boxes P_Box_04-07 (stacked two by two at x 403 and 409) and the loose stone ball P_Ball_Stone_01 (x 397.6) stand
+# in the way. As stone, the walkthrough rams them east off the end of the plank. Rams from a run-up at x 380, braking
+# after each, three times.
+at 392 8.3 -714.5 r 9 sector 4 kind stone : goto 380 8.3 -714.5 ; push 1 0 150 ; push -1 0 50 ; wait 30 ; goto 380 8.3 -714.5 ; push 1 0 150 ; push -1 0 50 ; wait 30 ; goto 380 8.3 -714.5 ; push 1 0 150 ; push -1 0 60 ; goto 400 8.3 -714.5

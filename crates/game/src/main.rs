@@ -69,6 +69,7 @@ usage: drahtseilakt [options]
   --then FILE         with --follow: from the sector this replay begins at, its way instead (up to 8 times)
   --plan FILE         the test player's way goes through the level objects named in FILE, in order
   --hints FILE        the test player's hints (default: hints/<level>.txt in the data folder; autopilot.md)
+  --rewinds N         the test player goes back to a saved state at most N times (lost or stuck; 0: never)
   --report DIR        where the test player writes a report each time it is stuck (default: the temp folder)
   --locate DIR        find the ball's way in a video's frames (DIR/s0001.jpg, four a second); track to --record
   --frames DIR        with --replay: draw four frames a second into DIR, with the ball's true places
@@ -127,6 +128,8 @@ pub struct Options {
     /// The test player gives up when its ball has not moved for this many seconds (or its way has not got on for
     /// four times as long): the run is dead, its report is written and it stops.
     pub give_up: u64,
+    /// How often the test player may go back to a saved state when its ball is lost or its way stands still.
+    pub rewinds: u32,
     /// Find the ball's way in the frames (s0001.jpg, `locate::RATE` a second) of a video of the original; the track is
     /// written to --record.
     pub locate: Option<PathBuf>,
@@ -169,6 +172,7 @@ fn parse_args() -> Result<Options, String> {
         hints: None,
         report: None,
         give_up: 30,
+        rewinds: 600,
         locate: None,
         frames: None,
         video: None,
@@ -239,6 +243,10 @@ fn parse_args() -> Result<Options, String> {
             "--give-up" => {
                 let s: u64 = value()?.parse().map_err(|_| "--give-up needs seconds".to_owned())?;
                 o.give_up = s.clamp(5, 3600);
+            }
+            "--rewinds" => {
+                let n: u32 = value()?.parse().map_err(|_| "--rewinds needs a number".to_owned())?;
+                o.rewinds = n.min(100_000);
             }
             "--then" => {
                 if o.then.len() >= MAX_THEN {
