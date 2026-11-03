@@ -222,7 +222,7 @@ der Sprache der Menüs (der eingeschaltete Zustand ist hervorgehoben):
 | F8 | eine Zone „hier nicht trödeln“ markieren (flow; siehe „Zonen“ unten): kurz getippt markiert die Taste den Weg der Kugel über die letzten 3 Sekunden bis zum Tippen; gehalten läuft die Zone weiter, solange die Taste unten ist (ab 3 Sekunden, bevor sie gedrückt wurde), und endet beim Loslassen |
 | F4 | ebenso eine Zone „hier das Tempolimit halten und keine Kurven schneiden“ (careful) markieren |
 | [ / ] | wie weit eine Markierung zurückreicht: 1 bis 10 Sekunden (3) |
-| Rücktaste | die zuletzt markierte Zone zurücknehmen (während eine Taste gehalten wird: diese Markierung verwerfen) |
+| Rücktaste | die zuletzt in diesem Fenster markierte Zone zurücknehmen, mit der Regel, die sie lehrte (die Zeilen jeder Markierung tragen ihre id, `# mark=<id>`, so werden Zeilen einer anderen Sitzung nie entfernt); während eine Taste gehalten wird: diese Markierung verwerfen |
 | F12 | die markierten Zonen in der Welt zeigen oder ausblenden, als durchscheinende Perlen entlang ihres Weges (flow grün, careful orange) |
 | F1 | den Tastenkasten aus- oder einblenden |
 | Esc | das Pausenmenü (Level verlassen, beenden) |
@@ -242,7 +242,10 @@ Strecke leuchtet ein paar Sekunden auf, eine Zone im Markieren ist zu sehen, wä
 nennt die Zone, in der die Kugel ist.
 
 Die Zonen werden sofort geschrieben, eine Zeile je Zone, nach `<level>.zones` neben der Hinweisdatei des Levels (mit
-`--hints hints/Level_01.txt`: `hints/Level_01.zones`), die jeder Lauf des Levels liest:
+`--hints hints/Level_01.txt`: `hints/Level_01.zones`), die jeder Lauf des Levels liest. Mit `--hints FILE` werden die Markierungen in den Ordner dieser Datei geschrieben
+(die gelernte Tabelle auch); ohne in `hints/` im Datenordner des Spiels. Eine Datei wird ganz oder gar nicht
+geschrieben (eine neue Datei daneben, an ihren Platz umbenannt), nie durch einen Link; eine volle Zonendatei (256
+Zonen) nimmt keine mehr, und der Bildschirm sagt es:
 
 ```
 flow sector 1 r 4 : X Y Z ; X Y Z ; ...

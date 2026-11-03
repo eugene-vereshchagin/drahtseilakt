@@ -233,11 +233,14 @@ fn zone(line: &str) -> Result<Zone, String> {
 
 /// The zones of a file's text, and a note for each line left out (malformed, or past the cap).
 pub fn parse(text: &str) -> (Zones, Vec<String>) {
+    // (a leading byte order mark, as some editors write, is no part of the first line)
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut zones = Vec::new();
     let mut notes = Vec::new();
+    // (the notes quote the file: shown with its control and format characters escaped)
     let mut note = |n: String| {
         if notes.len() < MAX_NOTES {
-            notes.push(n);
+            notes.push(gamedata::package::printable(&n));
         }
     };
     for (i, raw) in text.lines().enumerate() {
@@ -285,20 +288,38 @@ pub fn load(path: &Path) -> (Zones, Vec<String>) {
     }
 }
 
-/// The file's text as it is (empty when there is none yet); not a plain file is an error.
-fn read_text(path: &Path) -> Result<String, String> {
-    match std::fs::symlink_metadata(path) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
-        Err(e) => return Err(format!("{}: {e}", path.display())),
-        Ok(_) => {}
+/// A new mark's id: written after the line it adds (`# mark=<id>`), so that undoing it takes out that line and no
+/// other (a file may hold another session's marks after it).
+pub fn new_id() -> String {
+    let t = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in t
+        .to_le_bytes()
+        .into_iter()
+        .chain(std::process::id().to_le_bytes())
+    {
+        h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
     }
-    let bytes = crate::hints::read_plain(path, MAX_FILE)?;
-    String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))
+    format!("{:08x}", h as u32)
 }
 
-/// A zone marked now, added at the end of the file (made with a heading when new).
-pub fn append(path: &Path, z: &Zone) -> Result<(), String> {
-    let mut text = read_text(path)?;
+/// The tag of a mark's id, as written in a line's comment.
+fn tag(id: &str) -> String {
+    format!("mark={id}")
+}
+
+/// A zone marked now (with the mark's `id`), added at the end of the file (made with a heading when new). A file
+/// already holding MAX_ZONES zones is full: the zone is not added, and the error says so.
+pub fn append(path: &Path, z: &Zone, id: &str) -> Result<(), String> {
+    let mut text = crate::hints::read_text(path, MAX_FILE)?;
+    if parse(&text).0.zones.len() >= MAX_ZONES {
+        return Err(format!(
+            "{}: full ({MAX_ZONES} zones), delete some",
+            path.display()
+        ));
+    }
     if text.is_empty() {
         text = "# Zones the watcher marked for the test player (docs/drahtseilakt/autopilot.md, \"Zones\"):\n\
                 # flow = don't dawdle here; careful = keep under the speed, on the middle of the track.\n"
@@ -307,38 +328,36 @@ pub fn append(path: &Path, z: &Zone) -> Result<(), String> {
     if !text.ends_with('\n') {
         text.push('\n');
     }
-    text += &z.line();
-    text.push('\n');
+    text += &format!("{}   # {}\n", z.line(), tag(id));
     if u64::try_from(text.len()).map_or(true, |n| n > MAX_FILE) {
         return Err(format!("{}: full ({MAX_FILE} bytes)", path.display()));
     }
-    if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
-        std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    }
-    std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
+    crate::hints::write_plain(path, &text)
 }
 
-/// The last zone line of the file taken out (the comments stay): the line, or None when there was none.
-pub fn undo_last(path: &Path) -> Result<Option<String>, String> {
-    let text = read_text(path)?;
+/// The line of the mark `id` taken out of the file at `path` (a zones file or the learned table; the other lines
+/// stay as they are): the line, or None when no line has that id.
+pub fn remove_mark(path: &Path, id: &str) -> Result<Option<String>, String> {
+    let text = crate::hints::read_text(path, MAX_FILE)?;
+    let t = tag(id);
+    let has = |l: &str| {
+        l.split_once('#').is_some_and(|(_, c)| {
+            c.split_whitespace()
+                .any(|w| w.trim_end_matches([':', ',']) == t)
+        })
+    };
     let lines: Vec<&str> = text.lines().collect();
-    let Some(k) = lines
-        .iter()
-        .rposition(|l| !l.split('#').next().unwrap_or_default().trim().is_empty())
-    else {
+    let Some(k) = lines.iter().rposition(|l| has(l)) else {
         return Ok(None);
     };
     let gone = lines.get(k).map(|l| (*l).to_owned());
-    let mut out: String = lines
+    let out: String = lines
         .iter()
         .enumerate()
         .filter(|(i, _)| *i != k)
         .map(|(_, l)| format!("{l}\n"))
         .collect();
-    if out.trim().is_empty() {
-        out.clear();
-    }
-    std::fs::write(path, out).map_err(|e| format!("{}: {e}", path.display()))?;
+    crate::hints::write_plain(path, &out)?;
     Ok(gone)
 }
 
@@ -461,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    fn marks_are_appended_and_the_last_one_undone() {
+    fn marks_are_appended_and_undone_by_their_id() {
         let dir = std::env::temp_dir().join(format!("drahtseilakt-zones-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let path = dir.join("Level_01.zones");
@@ -479,20 +498,66 @@ mod tests {
             speed: Some(3.5),
             points: vec![Vec3::Z],
         };
-        append(&path, &a).unwrap();
-        append(&path, &b).unwrap();
+        append(&path, &a, "aaaa0001").unwrap();
+        append(&path, &b, "bbbb0002").unwrap();
+        // another session's mark after ours, by hand without an id
+        let mut text = std::fs::read_to_string(&path).unwrap();
+        text += "flow sector 3 r 2 : 1 1 1\n";
+        std::fs::write(&path, text).unwrap();
         let (z, notes) = load(&path);
         assert!(notes.is_empty(), "{notes:?}");
-        assert_eq!(z.zones, vec![a.clone(), b]);
+        assert_eq!(z.zones.len(), 3);
+        assert_eq!(z.zones[..2], [a.clone(), b]);
+        // ours goes, the later one stays
         assert!(
-            undo_last(&path)
+            remove_mark(&path, "bbbb0002")
                 .unwrap()
                 .is_some_and(|l| l.starts_with("careful"))
         );
-        assert_eq!(load(&path).0.zones, vec![a]);
-        assert!(undo_last(&path).unwrap().is_some());
-        assert!(undo_last(&path).unwrap().is_none());
-        assert!(load(&path).0.is_empty());
+        let left = load(&path).0.zones;
+        assert_eq!(
+            (left.len(), left[0].kind, left[1].sector),
+            (2, Kind::Flow, 3)
+        );
+        assert!(remove_mark(&path, "bbbb0002").unwrap().is_none());
+        assert!(remove_mark(&path, "aaaa0001").unwrap().is_some());
+        assert_eq!(load(&path).0.zones.len(), 1);
+        // a full file takes no more
+        let full: String = "flow sector 1 r 1 : 0 0 0\n".repeat(MAX_ZONES);
+        std::fs::write(&path, full).unwrap();
+        assert!(append(&path, &a, "cccc0003").unwrap_err().contains("full"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn a_link_is_never_written_through() {
+        let dir = std::env::temp_dir().join(format!("drahtseilakt-zlink-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("real")).unwrap();
+        let target = dir.join("real/target.txt");
+        std::fs::write(&target, "keep\n").unwrap();
+        let a = Zone {
+            kind: Kind::Flow,
+            sector: 1,
+            radius: 4.0,
+            speed: None,
+            points: vec![Vec3::ZERO],
+        };
+        // the file a link
+        std::os::unix::fs::symlink(&target, dir.join("Level_01.zones")).unwrap();
+        assert!(append(&dir.join("Level_01.zones"), &a, "x").is_err());
+        // a folder on the way a link
+        std::os::unix::fs::symlink(dir.join("real"), dir.join("hints")).unwrap();
+        assert!(append(&dir.join("hints/target.txt"), &a, "x").is_err());
+        assert!(append(&dir.join("hints/new.zones"), &a, "x").is_err());
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "keep\n");
+        assert!(!dir.join("real/new.zones").exists());
+        // a byte order mark before the first line is no part of it
+        assert_eq!(
+            parse("\u{feff}flow sector 1 r 4 : 0 0 0\n").0.zones.len(),
+            1
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

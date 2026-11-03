@@ -2686,8 +2686,9 @@ struct PilotWatch {
     zones_shown: bool,
     /// The zone marked last, shown a moment so the watcher sees what got marked.
     flash: Option<(crate::zones::Zone, Instant)>,
-    /// The zones marked in this window, last last: whether each also taught a rule (undone with it).
-    marked: Vec<bool>,
+    /// The zones marked in this window, last last: each mark's id (in its lines) and whether it also taught a rule
+    /// (undone with it).
+    marked: Vec<(String, bool)>,
 }
 
 /// A tick of the watched ball's trail: the tick, its place, sector, kind, speed and what steered.
@@ -2879,16 +2880,19 @@ fn save_hand(game: &Game, o: &Options, hand: (u64, glam::Vec3, usize, crate::sim
     let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
     let stem = level_stem(game);
     let name = format!("{stem}-hand-{from}.replay");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let file = dir.join(&name);
-    std::fs::write(&file, game.replay_out.to_text()).map_err(|e| format!("{}: {e}", file.display()))?;
+    crate::hints::write_plain(&file, &game.replay_out.to_text())?;
     let kind = format!("{kind:?}").to_ascii_lowercase();
     let line = format!("at {:.2} {:.2} {:.2} r 4 sector {} kind {kind} : replay {name} {from} {}\n", at.x, at.y,
         at.z, sector + 1, game.sim.tick);
     let hints = dir.join(format!("{stem}-hand.txt"));
-    let mut old = std::fs::read_to_string(&hints).unwrap_or_default();
+    // (read as a hint file is: a plain file, capped)
+    let mut old = crate::hints::read_text(&hints, crate::hints::MAX_FILE)?;
+    if !old.is_empty() && !old.ends_with('\n') {
+        old.push('\n');
+    }
     old += &line;
-    std::fs::write(&hints, old).map_err(|e| format!("{}: {e}", hints.display()))?;
+    crate::hints::write_plain(&hints, &old)?;
     Ok(format!("saved {} (hint in {})", shown_path(&file), shown_path(&hints)))
 }
 
@@ -3382,26 +3386,33 @@ impl App {
                     "mark cancelled".to_owned()
                 } else {
                     w.flash = None;
-                    let path = w.run.zones_path.clone();
-                    match crate::zones::undo_last(&path) {
-                        Ok(Some(line)) => {
+                    // the last mark of this window, by its id (the files may hold other sessions' marks after it)
+                    match w.marked.pop() {
+                        None => "no mark of this window to undo".to_owned(),
+                        Some((id, rule)) => {
+                            let path = w.run.zones_path.clone();
+                            let mut t = match crate::zones::remove_mark(&path, &id) {
+                                Ok(Some(line)) => {
+                                    let kind = line.split_whitespace().next().unwrap_or_default().to_owned();
+                                    format!("undone: the {kind} zone just marked, in {}", shown_path(&path))
+                                }
+                                Ok(None) => format!("its zone is no longer in {}", shown_path(&path)),
+                                Err(e) => format!("not undone: {e}"),
+                            };
                             w.run.pilot.zones = Arc::new(load_zones(&path));
                             w.pending = None;
-                            let kind = line.split_whitespace().next().unwrap_or_default().to_owned();
-                            let mut t = format!("undone: the last {kind} zone in {}", shown_path(&path));
                             // and the rule it taught
-                            if w.marked.pop() == Some(true) {
+                            if rule {
                                 let lp = w.run.learned_path.clone();
-                                match crate::zones::undo_last(&lp) {
-                                    Ok(_) => t += " and the rule it taught",
+                                match crate::zones::remove_mark(&lp, &id) {
+                                    Ok(Some(_)) => t += " and the rule it taught",
+                                    Ok(None) => t += " (its rule is no longer there)",
                                     Err(e) => t += &format!(" (its rule not undone: {e})"),
                                 }
                                 w.run.pilot.learned = Arc::new(load_learned(&lp));
                             }
                             t
                         }
-                        Ok(None) => "no zone to undo".to_owned(),
-                        Err(e) => format!("not undone: {e}"),
                     }
                 };
                 println!("{text}");
@@ -3456,7 +3467,8 @@ impl App {
         };
         let file = w.run.zones_path.clone();
         let secs = s.tick.saturating_sub(from) as f32 / 60.0;
-        let mut text = match crate::zones::append(&file, &zone) {
+        let id = crate::zones::new_id();
+        let mut text = match crate::zones::append(&file, &zone, &id) {
             Ok(()) => {
                 w.run.pilot.zones = Arc::new(load_zones(&file));
                 // (a decision on its way is made again, with the zone)
@@ -3493,16 +3505,20 @@ impl App {
         let mode = modes.iter().max_by_key(|m| m.1).map_or("-", |m| m.0);
         let at = zone.points.last().copied().unwrap_or_default();
         let evidence = format!(
-            "{} sector {} ({:.1} {:.1} {:.1}) {}: {secs:.1} s, stopping {:.0}%, mostly {mode}, off the middle {off:.1}",
+            "mark={id}: {} sector {} ({:.1} {:.1} {:.1}) {}: {secs:.1} s, stopping {:.0}%, mostly {mode}, off the middle {off:.1}",
             level_stem(&self.game), sector + 1, at.x, at.y, at.z, crate::learned::today(), 100.0 * stopping);
         let rule = crate::learned::learn(&samples, kind, None, evidence);
         let lp = w.run.learned_path.clone();
         let taught = match rule {
             Some(r) => match crate::learned::append(&lp, &r) {
-                Ok(()) => {
+                Ok(true) => {
                     w.run.pilot.learned = Arc::new(load_learned(&lp));
                     text += &format!("; learned: {}", r.label());
                     true
+                }
+                Ok(false) => {
+                    text += &format!("; known already: {}", r.label());
+                    false
                 }
                 Err(e) => {
                     text += &format!("; rule not saved: {e}");
@@ -3514,7 +3530,7 @@ impl App {
                 false
             }
         };
-        w.marked.push(taught);
+        w.marked.push((id, taught));
         println!("{text}");
         w.notice = Some((text, Instant::now()));
         w.flash = Some((zone, Instant::now()));

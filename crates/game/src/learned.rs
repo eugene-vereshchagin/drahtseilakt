@@ -260,11 +260,14 @@ fn rule(line: &str, evidence: &str) -> Result<Rule, String> {
 
 /// The rules of a file's text, and a note for each line left out.
 pub fn parse(text: &str) -> (Learned, Vec<String>) {
+    // (a leading byte order mark, as some editors write, is no part of the first line)
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut rules = Vec::new();
     let mut notes = Vec::new();
+    // (the notes quote the file: shown with its control and format characters escaped)
     let mut note = |n: String| {
         if notes.len() < MAX_NOTES {
-            notes.push(n);
+            notes.push(gamedata::package::printable(&n));
         }
     };
     for (i, raw) in text.lines().enumerate() {
@@ -357,14 +360,25 @@ pub fn learn(
     })
 }
 
-/// A rule learned now, added at the end of the file (made with a heading when new).
-pub fn append(path: &Path, r: &Rule) -> Result<(), String> {
-    let mut text = match std::fs::symlink_metadata(path) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("{}: {e}", path.display())),
-        Ok(_) => String::from_utf8(crate::hints::read_plain(path, MAX_FILE)?)
-            .map_err(|_| format!("{}: not UTF-8", path.display()))?,
-    };
+/// A rule learned now, added at the end of the file (made with a heading when new): true. False when the file has
+/// the same rule already (the same kind, limit and conditions): it is not added again. A file already holding
+/// MAX_RULES rules is full: the rule is not added, and the error says so.
+pub fn append(path: &Path, r: &Rule) -> Result<bool, String> {
+    let mut text = crate::hints::read_text(path, MAX_FILE)?;
+    let known = parse(&text).0;
+    if known
+        .rules
+        .iter()
+        .any(|k| k.kind == r.kind && k.speed == r.speed && k.when == r.when)
+    {
+        return Ok(false);
+    }
+    if known.rules.len() >= MAX_RULES {
+        return Err(format!(
+            "{}: full ({MAX_RULES} rules), delete some",
+            path.display()
+        ));
+    }
     if text.is_empty() {
         text = "# What the test player learned from the watcher's marks, for every level (autopilot-rules.md,\n\
                 # \"The learned table\"): KIND [speed V] when FEATURE=VALUE ...   # where it was learned\n"
@@ -378,10 +392,8 @@ pub fn append(path: &Path, r: &Rule) -> Result<(), String> {
     if u64::try_from(text.len()).map_or(true, |n| n > MAX_FILE) {
         return Err(format!("{}: full ({MAX_FILE} bytes)", path.display()));
     }
-    if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
-        std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    }
-    std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
+    crate::hints::write_plain(path, &text)?;
+    Ok(true)
 }
 
 /// Today's date (UTC), for a rule's evidence.
@@ -535,5 +547,46 @@ mod tests {
         let t = today();
         assert_eq!(t.len(), 10, "{t}");
         assert!(t.starts_with("20"), "{t}");
+    }
+
+    #[test]
+    fn a_rule_known_already_is_not_added_again_and_a_mark_undone_by_its_id() {
+        let dir = std::env::temp_dir().join(format!("drahtseilakt-learned-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let path = dir.join("learned.txt");
+        let (l, _) = parse(
+            "flow when surface=rail ahead=rail-end kind=wood\ncareful when surface=rail ahead=gap\n",
+        );
+        let mut a = l.rules[0].clone();
+        a.evidence = "mark=11112222: level A".into();
+        assert!(append(&path, &a).unwrap());
+        let mut again = a.clone();
+        again.evidence = "mark=33334444: level B".into();
+        assert!(
+            !append(&path, &again).unwrap(),
+            "the same rule is not added twice"
+        );
+        let mut b = l.rules[1].clone();
+        b.evidence = "mark=55556666: level C".into();
+        assert!(append(&path, &b).unwrap());
+        assert_eq!(load(&path).0.rules.len(), 2);
+        // undone by id: the first, though it is not the last line
+        assert!(
+            crate::zones::remove_mark(&path, "11112222")
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(load(&path).0.rules, vec![b]);
+        // a byte order mark before the first line is no part of it; notes show control characters escaped
+        assert_eq!(
+            parse("\u{feff}flow when surface=rail ahead=gap\n")
+                .0
+                .rules
+                .len(),
+            1
+        );
+        let (_, notes) = parse("flow when surface=\u{1b}[31m ahead=gap\n");
+        assert!(notes[0].contains("\\u{1b}"), "{notes:?}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -24,7 +24,7 @@ use crate::sim::{BallKind, Sim, input};
 use glam::Vec3;
 use std::path::{Path, PathBuf};
 
-const MAX_FILE: u64 = 64 * 1024;
+pub const MAX_FILE: u64 = 64 * 1024;
 const MAX_HINTS: usize = 256;
 const MAX_STEPS: usize = 64;
 /// The most replay steps a hint file may have (each plays its replay from the start to find the stretch).
@@ -420,6 +420,68 @@ pub fn read_plain(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
         return Err(format!("{}: more than {cap} bytes", path.display()));
     }
     Ok(bytes)
+}
+
+/// Whether a folder on the way to a file the watcher's keys write is a link: the folder itself and those above it,
+/// up to the current folder for a relative path, or within the home folder for an absolute one (above that the
+/// system's own layout is no concern of ours).
+fn linked_folder(dir: &Path) -> Option<PathBuf> {
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from);
+    for d in dir.ancestors() {
+        if d.as_os_str().is_empty() {
+            break;
+        }
+        if dir.is_absolute() && !home.as_ref().is_some_and(|h| d.starts_with(h) && d != h.as_path()) && d != dir {
+            break;
+        }
+        if std::fs::symlink_metadata(d).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Some(d.to_path_buf());
+        }
+    }
+    None
+}
+
+/// Writes `text` as the file at `path` for the watcher's keys (zones, the learned table, a hand-driven stretch and
+/// its hint): never through a link (the file, or a folder on the way: `linked_folder`), and whole or not at all:
+/// written to a new file beside it, synced, and renamed into place.
+pub fn write_plain(path: &Path, text: &str) -> Result<(), String> {
+    use std::io::Write as _;
+    let shown = |p: &Path| p.display().to_string();
+    if std::fs::symlink_metadata(path).is_ok_and(|m| !m.is_file()) {
+        return Err(format!("{}: not a plain file, not written", shown(path)));
+    }
+    let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+    if let Some(l) = linked_folder(&dir) {
+        return Err(format!("{}: a link on the way, not written", shown(&l)));
+    }
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", shown(&dir)))?;
+    let name = path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+    let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
+    let result = (|| {
+        // a leftover of an earlier run (a file or a link) is removed itself, never followed
+        if std::fs::symlink_metadata(&tmp).is_ok() {
+            std::fs::remove_file(&tmp)?;
+        }
+        let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
+        f.write_all(text.as_bytes())?;
+        f.sync_all()?;
+        drop(f);
+        std::fs::rename(&tmp, path)
+    })();
+    result.map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("{}: {e}", shown(path))
+    })
+}
+
+/// The text of a plain file the watcher's keys add to (empty when there is none yet), read up to `cap` bytes.
+pub fn read_text(path: &Path, cap: u64) -> Result<String, String> {
+    match std::fs::symlink_metadata(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+        Ok(_) => {}
+    }
+    String::from_utf8(read_plain(path, cap)?).map_err(|_| format!("{}: not UTF-8", path.display()))
 }
 
 /// A view at `quarter`, for the axes its arrows push along.

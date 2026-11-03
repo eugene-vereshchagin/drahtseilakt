@@ -121,7 +121,8 @@ des Levels ist (die gehen vor) und Regeln gelten, flow, wenn eine davon flow ist
 die Statuszeile nennt die genaueste geltende Regel (`learned: rail, rail-end ahead, wood → don't dawdle`), mit F12
 auch die Stelle, wie die Regeln sie sehen (`here: surface=rail ...`). Eine Regel nennt mindestens zwei Merkmale,
 eines davon besonders für die Stelle, damit keine fast überall gilt. Eine Markierung zurücknehmen (Rücktaste) nimmt
-auch die Regel heraus, die sie lehrte. Die Tabelle ist einfacher Text: eine zu weite Regel wird mit einem weiteren
+auch die Regel heraus, die sie lehrte (über die id der Markierung in ihrem Beleg). Eine Regel, die die Tabelle schon
+hat, kommt nicht noch einmal hinzu; eine volle Tabelle (512 Regeln) nimmt keine mehr, und der Bildschirm sagt es. Die Tabelle ist einfacher Text: eine zu weite Regel wird mit einem weiteren
 Merkmal enger gemacht oder gelöscht. Gelesen wie eine Hinweisdatei, ist sie nicht vertrauenswürdig: Größe (64 KiB),
 Regeln (512) und Zahlen begrenzt, Werte aus den Listen oben, eine fehlerhafte Zeile mit Vermerk ausgelassen.
 `AUTOPILOT_SITUATION=1` gibt die Stelle, wie die Regeln sie sehen, jede Sekunde eines Laufs aus.

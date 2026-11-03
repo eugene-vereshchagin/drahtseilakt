@@ -112,7 +112,8 @@ run reads the table and looks at the place each tick: where the ball is in none 
 first) and rules hold, flow if any of them is flow, the lowest limit of the careful ones; the status line names the
 most particular rule holding (`learned: rail, rail-end ahead, wood → don't dawdle`), and with F12 also the place as
 the rules see it (`here: surface=rail ...`). A rule names at least two features, one of them special to the place,
-so that none holds almost everywhere. Undoing a mark (Backspace) also takes out the rule it taught. The table is
+so that none holds almost everywhere. Undoing a mark (Backspace) also takes out the rule it taught (by the mark's id in its evidence). A rule the table
+has already is not added again; a table full (512 rules) takes no more, and the screen says so. The table is
 plain text: a rule that turns out too wide is narrowed by adding a feature, or deleted. Read like a hint file, it is
 untrusted: size (64 KiB), rules (512) and numbers capped, values from the lists above, a malformed line left out with
 a note. `AUTOPILOT_SITUATION=1` prints the place as the rules see it every second of a run.

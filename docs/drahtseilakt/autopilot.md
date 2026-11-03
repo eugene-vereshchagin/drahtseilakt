@@ -206,7 +206,7 @@ transformer. The watcher's keys, in a box bottom left in the menus' language (th
 | F8 | mark a zone "don't dawdle here" (flow; Zones below): a tap marks the ball's path over the last 3 seconds up to the tap; held, the zone goes on while the key is down (from 3 seconds before it went down) and ends when it is let go |
 | F4 | mark a zone "keep the speed limit here and don't cut corners" (careful), the same way |
 | [ / ] | how far back a mark reaches: 1 to 10 seconds (3) |
-| Backspace | undo the last zone marked (while a key is held: that mark is cancelled) |
+| Backspace | undo the last zone marked in this window, and the rule it taught (each mark's lines carry its id, `# mark=<id>`, so another session's lines are never taken out); while a key is held, that mark is cancelled |
 | F12 | show or hide the marked zones in the world, as translucent beads along their paths (flow green, careful orange) |
 | F1 | hide or show the box of keys |
 | Esc | the pause menu (leave the level, quit) |
@@ -225,7 +225,10 @@ The stretch just marked lights up for a few seconds, a zone being marked shows a
 names the zone the ball is in.
 
 The zones are written at once, a line each, to `<level>.zones` beside the level's hint file (with `--hints
-hints/Level_01.txt`: `hints/Level_01.zones`), which every run of the level reads:
+hints/Level_01.txt`: `hints/Level_01.zones`), which every run of the level reads. With `--hints FILE` the marks are written in that file's folder (the learned
+table too); without it, in `hints/` of the game's data folder. A file is written whole or not at all (a new file
+beside it renamed into place), never through a link; a zones file full (256 zones) takes no more, and the screen
+says so:
 
 ```
 flow sector 1 r 4 : X Y Z ; X Y Z ; ...
