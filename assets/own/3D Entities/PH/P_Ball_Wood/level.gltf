@@ -1,0 +1,208 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "drahtseilakt make_parts.py"
+ },
+ "extensionsUsed": [],
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "format": 1,
+     "groups": [
+      {
+       "name": "All_P_Ball_Wood",
+       "members": [
+        0
+       ]
+      }
+     ],
+     "sky": null,
+     "start_ball": null,
+     "settings": {
+      "tutorial": false,
+      "last_level": false
+     }
+    }
+   }
+  }
+ ],
+ "nodes": [
+  {
+   "name": "P_Ball_Wood_MF",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 0
+  }
+ ],
+ "meshes": [
+  {
+   "name": "P_Ball_Wood_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "P_Ball_Wood",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 0
+    }
+   },
+   "emissiveFactor": [
+    0.31,
+    0.31,
+    0.31
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.2,
+      0.2,
+      0.2
+     ],
+     "power": 15,
+     "z_write": true
+    }
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0,
+   "sampler": 0
+  }
+ ],
+ "images": [
+  {
+   "uri": "textures/P_Ball_Wood.png",
+   "name": "P_Ball_Wood"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987,
+   "wrapS": 10497,
+   "wrapT": 10497
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "level.bin",
+   "byteLength": 12192
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 2772,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 2772,
+   "byteLength": 2772,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 5544,
+   "byteLength": 1848,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 7392,
+   "byteLength": 4800,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "componentType": 5126,
+   "count": 231,
+   "type": "VEC3",
+   "min": [
+    -2.0,
+    -2.0,
+    -2.0
+   ],
+   "max": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bufferView": 0
+  },
+  {
+   "componentType": 5126,
+   "count": 231,
+   "type": "VEC3",
+   "bufferView": 1
+  },
+  {
+   "componentType": 5126,
+   "count": 231,
+   "type": "VEC2",
+   "bufferView": 2
+  },
+  {
+   "componentType": 5125,
+   "count": 1200,
+   "type": "SCALAR",
+   "bufferView": 3
+  }
+ ]
+}

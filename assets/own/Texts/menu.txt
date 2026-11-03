@@ -64,6 +64,8 @@ kind remastered | Remastered | Ремастер | Remastered | 重制版 | Remas
 kind community | Community maps | Карты сообщества | Community-Karten | 社区地图 | Cartes de la communauté | Mapas de la comunidad | Mappe della comunità
 kind open | Open format | Открытый формат | Offenes Format | 开放格式 | Format ouvert | Formato abierto | Formato aperto
 custom levels | Custom levels | Свои уровни | Eigene Level | 自定义关卡 | Niveaux perso | Niveles propios | Livelli personali
+import | Import | Импорт | Importieren | 导入 | Importer | Importar | Importa
+own levels | Our levels | Наши уровни | Unsere Level | 我们的关卡 | Nos niveaux | Nuestros niveles | I nostri livelli
 no levels | No levels here yet. Put them into | Здесь пока нет уровней. Положите их в | Noch keine Level hier. Lege sie in | 这里还没有关卡。请放入 | Aucun niveau ici. Placez-les dans | Aún no hay niveles. Ponlos en | Ancora nessun livello. Mettili in
 feature all-levels | All levels open? | Все уровни открыты? | Alle Level offen? | 开放全部关卡? | Tous les niveaux ouverts ? | ¿Todos los niveles abiertos? | Tutti i livelli aperti?
 feature best-times | Best times? | Лучшее время? | Bestzeiten? | 最佳时间? | Meilleurs temps ? | ¿Mejores tiempos? | Tempi migliori?

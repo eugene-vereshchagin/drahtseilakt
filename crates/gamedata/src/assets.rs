@@ -56,10 +56,17 @@ fn read_capped(path: &Path, cap: u64) -> Option<Vec<u8>> {
     (u64::try_from(bytes.len()).ok()? <= cap).then_some(bytes)
 }
 
+#[derive(Clone, Debug)]
 pub struct Data {
-    pub root: PathBuf,
+    /// The player's copy of the original, if there is one: the game starts and plays without it (decisions.md, "The
+    /// game plays out of the box").
+    pub root: Option<PathBuf>,
     /// The game files of the level being played (`<level>/game`), looked in before the copy.
     pub overlay: Option<PathBuf>,
+    /// The level's parts (modules, balls, transformer, sky, particles, shadow) are ours before the copy's: the level
+    /// is new content, made for our parts, so it plays the same with or without a copy. A level of the copy (or
+    /// converted from one) plays with the copy's parts, as it was made.
+    pub own_parts: bool,
 }
 
 /// Where a level comes from.
@@ -89,18 +96,40 @@ pub struct LoadedLevel {
 }
 
 impl Data {
+    /// The game's files with the player's copy at `root`, or with none.
+    pub fn new(root: Option<PathBuf>) -> Data {
+        Data { root, overlay: None, own_parts: false }
+    }
+
+    /// Whether the player's copy is there at all.
+    pub fn has_copy(&self) -> bool {
+        self.root.is_some()
+    }
+
+    /// The game's files: the player's copy where one is found (`explicit`, `OPENBALLANCE_DATA`, the profile's
+    /// `levels/original`, `./data`), else none; the game plays its own levels without it.
+    pub fn find(explicit: Option<PathBuf>) -> Data {
+        Data::locate(explicit).unwrap_or_else(|_| Data::new(None))
+    }
+
+    /// The player's copy in exactly the folder `root` (`--data DIR`): no other place is tried, a folder that is not a
+    /// playable copy is refused.
+    pub fn at(root: PathBuf) -> Result<Data, String> {
+        if playable(&root) {
+            Ok(Data::new(Some(root)))
+        } else {
+            Err(format!("{}: not a copy of Ballance (no 3D Entities/Level/Level_01.NMO in it)", root.display()))
+        }
+    }
+
     pub fn locate(explicit: Option<PathBuf>) -> Result<Data, String> {
         let candidates = explicit
             .into_iter()
             .chain(std::env::var_os("OPENBALLANCE_DATA").map(PathBuf::from))
             .chain([crate::profile::dir(crate::profile::Kind::Original), PathBuf::from("data")]);
-        // a copy counts when it has the first level, not only the folder: a half-made import is not a game
-        let playable = |root: &Path| {
-            ["3D Entities", "Level", "Level_01.NMO"].iter().try_fold(root.to_path_buf(), |d, p| find(&d, p)).is_some()
-        };
         for root in candidates {
             if playable(&root) {
-                return Ok(Data { root, overlay: None });
+                return Ok(Data::new(Some(root)));
             }
         }
         Err(
@@ -141,7 +170,21 @@ impl Data {
         Data {
             root: self.root.clone(),
             overlay: level_dir.map(|d| d.join(GAME_FILES)),
+            own_parts: self.own_parts,
         }
+    }
+
+    /// The same files for playing `source`: its own folder's game files first (which parts come next is the loaded
+    /// level's to say: `with_parts`).
+    pub fn for_source(&self, source: &Source) -> Data {
+        self.for_level(self.level_dir(source).as_deref())
+    }
+
+    /// The same files for the loaded `level`'s parts: ours before the copy's when the level says it is made for them
+    /// (its settings' `"parts": "own"`, which our level kit writes), else the copy's first. Only the level's own
+    /// marker decides, so a level made or exported before keeps the parts (and replays) it had.
+    pub fn with_parts(&self, level: &level::Level) -> Data {
+        Data { own_parts: level.settings.own_parts, ..self.clone() }
     }
 
     pub fn file(&self, relative: &str) -> Option<PathBuf> {
@@ -153,19 +196,25 @@ impl Data {
     }
 
     /// A file of the game's layout from its providers (never the level's own): our own files, the player's copy and
-    /// the toolbox's remaster of it, in the order the interface setting gives (resources.rs).
+    /// the toolbox's remaster of it, in the order the interface setting gives (resources.rs). A level's parts (its
+    /// modules, the balls, sky, particles, shadow) come from ours first for a new level, else from the copy first.
     fn copy_file(&self, relative: &str) -> Option<PathBuf> {
-        // our own files and the toolbox's remaster stand in for the interface's roles only: a level, a module, a
-        // level's texture or sound always comes from the copy
+        use crate::resources::Provider;
+        // our own files and the toolbox's remaster stand in for the interface's roles; ours also for a level's parts
+        // (a level itself, a level's own texture or sound always comes from the copy)
         let role = crate::resources::role_of(relative).is_some();
-        let found = crate::resources::in_use().order().into_iter().find_map(|p| match p {
-            crate::resources::Provider::Original => self.copy_only(relative),
-            crate::resources::Provider::Own if role => {
-                crate::resources::own_root().and_then(|r| plain_path(&r, relative))
-            }
-            crate::resources::Provider::Remastered if role => {
-                plain_path(&crate::resources::remastered_root(), relative)
-            }
+        let part = crate::resources::is_part(relative);
+        let order = if part && self.own_parts {
+            [Provider::Own, Provider::Original, Provider::Own]
+        } else if part && !role {
+            Provider::Original.order()
+        } else {
+            crate::resources::in_use().order()
+        };
+        let found = order.into_iter().find_map(|p| match p {
+            Provider::Original => self.copy_only(relative),
+            Provider::Own if role || part => own_file(relative),
+            Provider::Remastered if role => plain_path(&crate::resources::remastered_root(), relative),
             _ => None,
         });
         if found.is_none() {
@@ -181,7 +230,7 @@ impl Data {
 
     /// A file of the player's copy itself.
     fn copy_only(&self, relative: &str) -> Option<PathBuf> {
-        relative.split('/').try_fold(self.root.clone(), |dir, part| {
+        relative.split('/').try_fold(self.root.clone()?, |dir, part| {
             let plain = !matches!(part, "" | "." | "..") && !part.contains(['\\', ':']);
             plain.then(|| find(&dir, part)).flatten()
         })
@@ -213,9 +262,31 @@ impl Data {
             self.put_own_textures(&mut part.level, maker);
             return Some(part);
         }
-        let mut part = load_nmo(&self.copy_file(relative)?).ok()?;
-        self.put_own_textures(&mut part.level, Maker::Copy);
-        Some(part)
+        // ours, in the open format (`assets/own/3D Entities/PH/P_Box/`), before or after the copy's file; either way
+        // its textures that our texture set has by name are ours (`textures own`)
+        let own = || {
+            let root = crate::resources::own_root()?;
+            load_open(&plain_path(&root, stem)?).ok()
+        };
+        let copy = || load_nmo(&self.copy_only(relative)?).ok();
+        let mut part = if self.own_parts {
+            own().or_else(copy)
+        } else {
+            copy().or_else(|| {
+                let ours = own();
+                // a level of the copy plays with the copy's parts: ours standing in for one the copy lacks or cannot
+                // read is said once
+                if ours.is_some() && self.has_copy() {
+                    crate::resources::stand_in(relative);
+                }
+                ours
+            })
+        };
+        match &mut part {
+            Some(p) => self.put_own_textures(&mut p.level, Maker::Copy),
+            None => crate::resources::missing(relative),
+        }
+        part
     }
 
     pub fn load(&self, source: &Source) -> Result<LoadedLevel, String> {
@@ -236,7 +307,12 @@ impl Data {
             Source::Original(n) => match self.original(*n) {
                 Some(Source::Nmo(p)) => p,
                 Some(Source::Open(dir)) => return self.load_open_level(&dir),
-                _ => return Err(format!("Level_{n:02}.NMO is not in {}", self.root.display())),
+                _ => {
+                    return Err(match &self.root {
+                        Some(root) => format!("Level_{n:02}.NMO is not in {}", root.display()),
+                        None => format!("Level_{n:02}.NMO: no copy of the original (import it from the menu)"),
+                    });
+                }
             },
             Source::Nmo(p) => p.clone(),
             Source::Open(dir) => return self.load_open_level(dir),
@@ -255,6 +331,7 @@ impl Data {
             tutorial: loaded.name.eq_ignore_ascii_case("Level_01.NMO"),
             last_level: s.last,
             source_hash: Some(loaded.hash),
+            own_parts: false,
         };
         Ok(loaded)
     }
@@ -284,6 +361,7 @@ impl Data {
                     tutorial: k == 1,
                     last_level: s.last,
                     source_hash: None,
+                    own_parts: false,
                 };
                 loaded.warnings.push(format!(
                     "{}: made before levels kept their settings; they come from the game's table (remaster it again)",
@@ -611,7 +689,26 @@ impl Data {
     }
 }
 
+/// A copy counts when it has the first level, not only the folder: a half-made import is not a game.
+fn playable(root: &Path) -> bool {
+    ["3D Entities", "Level", "Level_01.NMO"].iter().try_fold(root.to_path_buf(), |d, p| find(&d, p)).is_some()
+}
+
+/// One of our own files by its path in the original's layout; a picture the original has as `.bmp` or `.tga` may be
+/// ours as `.png` (our textures are made as PNG).
+fn own_file(relative: &str) -> Option<PathBuf> {
+    let root = crate::resources::own_root()?;
+    plain_path(&root, relative).or_else(|| {
+        let l = relative.to_ascii_lowercase();
+        let stem = relative.get(..relative.len().checked_sub(4)?)?;
+        (l.ends_with(".bmp") || l.ends_with(".tga")).then(|| plain_path(&root, &format!("{stem}.png"))).flatten()
+    })
+}
+
 pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {
+    // its textures are named by their whole paths: a folder given relative to where the game was started would make
+    // them relative ones, which are taken for the game's own texture names
+    let dir = &std::path::absolute(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let (level, bytes) = level::open::import_read(dir)?;
     Ok(LoadedLevel {
         level,
@@ -921,7 +1018,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("Textures")).unwrap();
         image::RgbaImage::from_pixel(2, 2, image::Rgba([9, 8, 7, 255])).save(root.join("Textures/Wood_Old.bmp")).unwrap();
-        let data = Data { root: root.clone(), overlay: None };
+        let data = Data::new(Some(root.clone()));
         let same = [9u8, 8, 7, 255].repeat(4);
         let other = [9u8, 8, 6, 255].repeat(4);
         assert!(data.is_copys_texture("Wood_Old", 2, 2, &same), "by the name without its extension");

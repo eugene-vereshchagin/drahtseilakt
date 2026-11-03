@@ -310,6 +310,19 @@ Oberfläche der Kopie, wenn die Kopie des Spielers ihr Menü hat, sonst unsere. 
 ausgeliefert: Sie kommt aus der eigenen Kopie des Spielers, wie die Level. Die Oberfläche bestimmt das Klangthema
 nicht mehr.
 
+## Das Spiel läuft ohne Weiteres
+
+*2026-11-03, Bedingung des Eigentümers für die Veröffentlichung.* Der Aufbau eines Originallevels und die Modelle
+seiner Teile (`3D Entities/PH/*.nmo`, `Balls.nmo` und der Rest) sind Werk von Cyparade und Atari; die Mechanik ist
+frei. Vor der Veröffentlichung braucht das Spiel daher eigene Teile und eigene Level, und es muss *bevor* jemand
+etwas importiert spielbereit ausgeliefert werden: Es startet und spielt ganz ohne Kopie des Originals. Ohne Kopie
+bietet das Menü unsere eigenen Level (die mitgelieferten und die in `levels/open/`) und den Import einer Kopie an;
+alles, was ein Lauf braucht (Oberfläche, Klänge, Schriften, Menüszene, die Kugeln und ihre Bruchstücke, die Module,
+Himmel, Partikel, der Schatten der Kugel, Standardtasten, die Einstellungen eines Levels), kommt aus dem, was das
+Spiel mitbringt. Unsere Teile entstehen durch Skripte in `assets/own/make` nach den gemessenen Maßen des Originals,
+mit seinen unveränderten Physikwerten, und verhalten sich daher wie die des Originals; nichts von seiner Geometrie
+wird kopiert. Kriterien für die Veröffentlichung: [roadmap.md](roadmap.md), „Kriterien für die Veröffentlichung“.
+
 ## Eigene Texturen als Vorgabe
 
 2026-11-03, Entscheidung des Eigentümers: unsere eigenen Texturen für die Level, ihre Teile und die Kugeln (von einem

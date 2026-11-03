@@ -95,6 +95,8 @@ pub enum Ask {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Line {
     Start,
+    /// Bring in the player's copy of the original (shown while there is none).
+    Import,
     Highscore,
     Options,
     Credits,
@@ -151,6 +153,8 @@ pub enum Action {
     Continue,
     Play(u32),
     Map(PathBuf),
+    /// Open the window that brings in the player's copy of the original.
+    Import,
     Restart,
     /// Leave the level for the main menu.
     Home,
@@ -230,6 +234,10 @@ pub struct Menu {
     pub maps: Vec<Package>,
     /// The kind's folder the custom levels come from.
     folder: Option<PathBuf>,
+    /// The custom levels shown are our own (the shipped ones and the open-format folder's).
+    own_list: bool,
+    /// The player's copy of the original is there: without it the levels are our own and the menu offers the import.
+    copy: bool,
     /// The extended mode and its additions.
     pub features: Features,
     pub volumes: [f32; 2],
@@ -285,6 +293,8 @@ impl Menu {
             entries,
             maps: Vec::new(),
             folder: None,
+            own_list: false,
+            copy: data.has_copy(),
             features,
             volumes: [1.0; 2],
             strings: strings.clone(),
@@ -399,6 +409,9 @@ impl Menu {
     /// The lines of `screen`, in the order the arrows go through them.
     fn lines(&self, screen: Screen) -> Vec<Line> {
         match screen {
+            Screen::Main if !self.copy => {
+                vec![Line::Start, Line::Import, Line::Highscore, Line::Options, Line::Credits, Line::Exit]
+            }
             Screen::Main => vec![
                 Line::Start,
                 Line::Highscore,
@@ -569,13 +582,23 @@ impl Menu {
         match line {
             // in the extended mode the levels come by kind; the original ones are the classic list
             Line::Start if self.features.has(Feature::CustomLevels) => open(self, Screen::Kinds),
+            // without a copy the levels are our own (decisions.md, "The game plays out of the box")
+            Line::Start if !self.copy => {
+                self.maps = own_levels();
+                self.folder = Some(crate::levels::dir(Kind::Open));
+                self.own_list = true;
+                open(self, Screen::Custom)
+            }
             Line::Start => open(self, Screen::Start),
+            Line::Import => Action::Import,
             Line::Kind(k) => match LEVEL_KINDS.get(k) {
                 Some(Kind::Original) => open(self, Screen::Start),
                 Some(&kind) => {
                     let root = crate::levels::dir(kind);
-                    self.maps = maps_in(&root);
+                    // the open-format levels include those shipped with the game
+                    self.maps = if kind == Kind::Open { own_levels() } else { maps_in(&root) };
                     self.folder = Some(root);
+                    self.own_list = false;
                     open(self, Screen::Custom)
                 }
                 None => Action::None,
@@ -888,6 +911,7 @@ impl Menu {
         let s = &self.strings;
         match line {
             Line::Start => s.get("Menu_Main Button Start", "Start"),
+            Line::Import => s.ours("import"),
             Line::Kind(k) => match LEVEL_KINDS.get(k) {
                 Some(Kind::Original) => s.ours("kind original"),
                 Some(Kind::Remastered) => s.ours("kind remastered"),
@@ -976,6 +1000,7 @@ impl Menu {
             Screen::Debug => s.ours("debug mode"),
             Screen::Language => s.ours("language"),
             Screen::Kinds => s.ours("levels"),
+            Screen::Custom if self.own_list => s.ours("own levels"),
             Screen::Custom => match self.folder.as_ref().and_then(|root| {
                 LEVEL_KINDS.iter().position(|&k| crate::levels::dir(k) == *root)
             }) {
@@ -1830,6 +1855,13 @@ const LEVEL_KINDS: [Kind; 4] = [Kind::Original, Kind::Remastered, Kind::Communit
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
 /// it; folders that hold no level or several are not shown, and said so on the console.
+/// Our own levels: those shipped with the game, then the player's open-format levels.
+fn own_levels() -> Vec<Package> {
+    let mut v = crate::levels::shipped();
+    v.extend(maps_in(&crate::levels::dir(Kind::Open)));
+    v
+}
+
 fn maps_in(dir: &Path) -> Vec<Package> {
     let (levels, skipped) = gamedata::package::scan(dir);
     if !skipped.is_empty() {
@@ -1890,6 +1922,8 @@ mod tests {
                 .collect(),
             maps: Vec::new(),
             folder: None,
+            own_list: false,
+            copy: true,
             features: Features::new(extended),
             volumes: [1.0; 2],
             strings: Strings::default(),
@@ -2313,6 +2347,19 @@ mod tests {
         m.step(-1);
         m.step(-1);
         assert_eq!(m.enter(), Action::Play(2));
+    }
+
+    #[test]
+    fn without_a_copy_the_menu_offers_our_levels_and_the_import() {
+        let mut m = menu(&[false; 13], false);
+        m.copy = false;
+        assert_eq!(m.lines(Screen::Main), [Line::Start, Line::Import, Line::Highscore, Line::Options, Line::Credits,
+            Line::Exit]);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Custom, "Start shows our own levels");
+        m.back();
+        m.step(1);
+        assert_eq!(m.enter(), Action::Import);
     }
 
     #[test]

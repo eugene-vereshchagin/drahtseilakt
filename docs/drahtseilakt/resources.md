@@ -25,20 +25,20 @@ Chinese and Cyrillic names of community maps.
 | menu 3D scene | `3D Entities/MenuLevel.nmo` | ours in the open format: `3D Entities/MenuLevel/` |
 | texts in the copy's languages | `3D Entities/Language.nmo` | `Texts/menu.txt`, seven languages |
 | menu texts, level table defaults | `base.cmo` | planned |
-| level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | planned |
-| balls, pieces, shadows | `3D Entities/Balls.nmo` | planned |
-| transformer animation | `3D Entities/AnimTrafo.nmo` | planned |
-| modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | planned |
+| level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | a level of ours carries its own settings (open-format.md) |
+| balls, pieces, shadows | `3D Entities/Balls.nmo` | ours in the open format: `3D Entities/Balls/` |
+| transformer animation | `3D Entities/AnimTrafo.nmo` | ours: `3D Entities/AnimTrafo/` |
+| modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | ours: `3D Entities/PH/<module>/`, every module of the original |
 | game font texture | `Textures/Font_1.tga` | Tektur, rasterised by the game |
 | buttons and the points box | `Textures/Button01_special/select/deselect.tga` | ours, same names |
-| ball shadow | `Textures/HardShadow.bmp` | planned |
-| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | planned |
-| particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | planned |
+| ball shadow | `Textures/HardShadow.bmp` | ours: `Textures/HardShadow.png` |
+| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | ours for the letters A, B, C: `Textures/Sky/Sky_<letter>_<face>.png` |
+| particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | ours, the same names as `.png` |
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | sound themes (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | sound themes (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | sound themes (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: *system* eighteen tracks and eight atmospheres, Music/music.txt gives each part a pool (themes 1–3 the first nine tracks, themes 4 and 5 nine more); *neuro* fifteen synthesized phrases, one per part, its own atmospheres and end music |
-| original levels | `3D Entities/Level/Level_NN.NMO` | planned |
+| original levels | `3D Entities/Level/Level_NN.NMO` | our own levels, `assets/levels/` (levels.md) |
 
 ## The own interface
 
@@ -82,9 +82,25 @@ interface files are not even read while the own interface is in use.
   has one. With the original's interface its copy's texts come first in the copy's five languages; for Russian and
   Chinese (which the copy lacks) ours, drawn in the shipped fonts.
 
-The own interface's default highscore lists are ours too (ten names, 3000 points down to 750). Still from the copy,
-whatever the interface: the default keys (base.cmo's DB_Options, the arrows, Shift and Space when it has none) and the
-parts of a level (balls, particles, the ball's shadow, skies, modules), which later stages replace.
+The own interface's default highscore lists are ours too (ten names, 3000 points down to 750). Still from the copy when
+there is one: the default keys (base.cmo's DB_Options; the arrows, Shift and Space without it).
+
+## Our own parts
+
+Stage 3 (2026-11-03, decisions.md "The game plays out of the box"): every part a level can name has ours, in the open
+format under `assets/own/3D Entities/` (the modules of `PH/`, `Balls/`, `AnimTrafo/`) and `assets/own/Textures/`
+(skies, particles, the ball's shadow; a picture asked for as `.bmp` or `.tga` may be ours as `.png`), made by
+`assets/own/make/make_parts.py` from nothing but the script. They are made to the original's measured sizes: every
+object the game's code names (parts, joint frames, flame frames, the balls' meshes, whose boxes the physics uses) has
+the measured pose, every collision mesh the measured dimensions as a shape of our own (a box, a frustum, a prism,
+an ellipsoid), and the physics values (masses, frictions, joints, forces) are the game's own, unchanged
+(crates/game/src/modules.rs); only the looks are new. `crates/game/src/partcheck.rs` runs every module of levels 1
+to 12 with the copy's part and with ours from the same start and input and compares the ways.
+
+A level takes our parts first when it says it is made for them (its settings' `"parts": "own"`, which our level kit
+`assets/own/make/levelkit.py` writes), so it plays the same with or without a copy; any other level (the copy's, a
+community map, a converted, remastered or older open-format level) takes the copy's first, as it was made, and ours
+for what the copy lacks (with no copy, ours; with a copy, our part standing in is said once). A level's own `game/` folder comes before both.
 
 ## Own textures
 

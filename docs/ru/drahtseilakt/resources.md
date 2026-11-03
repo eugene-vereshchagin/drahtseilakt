@@ -23,20 +23,20 @@
 | menu 3D scene | `3D Entities/MenuLevel.nmo` | своя в открытом формате: `3D Entities/MenuLevel/` |
 | texts in the copy's languages | `3D Entities/Language.nmo` | `Texts/menu.txt`, семь языков |
 | menu texts, level table defaults | `base.cmo` | в планах |
-| level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | в планах |
-| balls, pieces, shadows | `3D Entities/Balls.nmo` | в планах |
-| transformer animation | `3D Entities/AnimTrafo.nmo` | в планах |
-| modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | в планах |
+| level table (sky, start ball, music, light, bonus) | `3D Entities/Levelinit.nmo` | наш уровень несёт свои настройки (open-format.md) |
+| balls, pieces, shadows | `3D Entities/Balls.nmo` | свои в открытом формате: `3D Entities/Balls/` |
+| transformer animation | `3D Entities/AnimTrafo.nmo` | своя: `3D Entities/AnimTrafo/` |
+| modules (boxes, fans, pushers...) | `3D Entities/PH/*.nmo` | свои: `3D Entities/PH/<module>/`, каждый модуль оригинала |
 | game font texture | `Textures/Font_1.tga` | Tektur, растеризует игра |
 | buttons and the points box | `Textures/Button01_special/select/deselect.tga` | наши, те же имена |
-| ball shadow | `Textures/HardShadow.bmp` | в планах |
-| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | в планах |
-| particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | в планах |
+| ball shadow | `Textures/HardShadow.bmp` | своя: `Textures/HardShadow.png` |
+| skies | `Textures/Sky/Sky_<letter>_<face>.bmp` | свои для букв A, B, C: `Textures/Sky/Sky_<letter>_<face>.png` |
+| particles | `Textures/Particles: Particle_Flames, Particle_Smoke, ExtraParticle, ExtraBall, P_Extra_Life_Particle` | свои, те же имена в `.png` |
 | event sounds | `Sounds/: Misc_StartLevel, Misc_Checkpoint, Misc_Fall, Misc_Lightning, Misc_Trafo, Misc_extraball, Extra_Life_Blob, Extra_Start, Extra_Hit, Misc_RopeTears, Misc_Ventilator, Music_thunder` | звуковые темы (assets/sounds) |
 | menu sounds | `Sounds/Menu_click, Menu_load` | звуковые темы (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | звуковые темы (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | свои: в *system* восемнадцать треков и восемь атмосфер, Music/music.txt даёт каждой части пул (темам 1–3 первые девять треков, темам 4 и 5 ещё девять); в *neuro* пятнадцать синтезированных фраз, по одной на часть, свои атмосферы и музыка финиша |
-| original levels | `3D Entities/Level/Level_NN.NMO` | в планах |
+| original levels | `3D Entities/Level/Level_NN.NMO` | наши собственные уровни, `assets/levels/` (levels.md) |
 
 ## Свой интерфейс
 
@@ -82,9 +82,26 @@
   оригинала, где они есть. С интерфейсом оригинала первыми идут тексты копии на её пяти языках; для русского и
   китайского (которых в копии нет) — наши, нарисованные поставляемыми шрифтами.
 
-Списки рекордов по умолчанию у своего интерфейса тоже наши (десять имён, от 3000 до 750 очков). По-прежнему из копии
-при любом интерфейсе: клавиши по умолчанию (DB_Options из base.cmo; без него — стрелки, Shift и пробел) и части
-уровня (шары, частицы, тень шара, небо, модули) — их заменят следующие этапы.
+Списки рекордов по умолчанию у своего интерфейса тоже наши (десять имён, от 3000 до 750 очков). По-прежнему из копии,
+если она есть: клавиши по умолчанию (DB_Options из base.cmo; без него — стрелки, Shift и пробел).
+
+## Свои части
+
+Этап 3 (2026-11-03, decisions.md «Игра играет из коробки»): у каждой части, которую может назвать уровень, есть наша,
+в открытом формате в `assets/own/3D Entities/` (модули `PH/`, `Balls/`, `AnimTrafo/`) и `assets/own/Textures/`
+(небо, частицы, тень шара; картинка, запрошенная как `.bmp` или `.tga`, может быть нашей в `.png`); их делает
+`assets/own/make/make_parts.py` только из самого скрипта. Они сделаны по измеренным размерам оригинала: каждый
+объект, который называет код игры (части, рамки сочленений, кадры пламени, меши шаров, чьи боксы берёт физика), стоит
+в измеренной позе, каждый меш столкновений имеет измеренные размеры как наша собственная фигура (бокс, усечённый
+конус, призма, эллипсоид), а физические величины (массы, трение, сочленения, силы) — самой игры, без изменений
+(crates/game/src/modules.rs); новый только вид. `crates/game/src/partcheck.rs` прогоняет каждый модуль уровней с 1
+по 12 с частью копии и с нашей из одного старта с одним вводом и сравнивает пути.
+
+Уровень берёт наши части первыми, когда сам говорит, что сделан под них (`"parts": "own"` в его настройках; это пишет
+наш набор для уровней `assets/own/make/levelkit.py`), так что играет одинаково с копией и без неё; любой другой
+уровень (уровень копии, карта сообщества, сконвертированный, ремастер или более старый уровень в открытом формате)
+берёт сначала части копии, как он и был сделан, а наши — для того, чего в копии нет (без копии — наши; при копии о
+подставленной нашей части говорится один раз). Собственная папка уровня `game/` идёт раньше обоих.
 
 ## Свои текстуры
 

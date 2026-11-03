@@ -719,3 +719,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 }
+
+/// The levels shipped with the game (`assets/levels/`, the open format, our own content): what the game plays
+/// without any copy of the original (decisions.md, "The game plays out of the box").
+pub fn shipped() -> Vec<gamedata::package::Package> {
+    gamedata::resources::shipped_levels_root().map_or_else(Vec::new, |r| gamedata::package::scan(&r).0)
+}

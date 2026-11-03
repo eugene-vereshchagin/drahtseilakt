@@ -6,7 +6,8 @@
 // `interface own|original|remastered` (the extended mode's Interface switch). The default, and what the classic
 // mode plays, is the copy's own interface when the copy has it, else ours (owner's decision 2026-11-03, while our
 // own interface is redone).
-// A role no provider fills is missing: logged once, never a crash.
+// A level's parts (modules, balls, sky, particles, shadow) are ours too: a new level takes ours first, a level of the
+// copy the copy's first (assets.rs, Data::own_parts). A role no provider fills is missing: logged once, never a crash.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -103,7 +104,7 @@ pub fn default_for(copy_has_menu: bool) -> Provider {
 }
 
 /// The game's own assets folder (fonts, own files): `DRAHTSEILAKT_ASSETS`, else `assets/` beside the program or
-/// three folders up (a build's target/release in the source tree).
+/// three folders up (a build's target/release in the source tree), or four (a test's target/release/deps).
 pub fn assets_root() -> Option<PathBuf> {
     static ROOT: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     ROOT.get_or_init(|| {
@@ -120,10 +121,19 @@ pub fn assets_root() -> Option<PathBuf> {
             .and_then(Path::parent)
             .and_then(Path::parent)
             .map(|d| d.join("assets"));
+        // a test's program sits one folder deeper, in target/<profile>/deps: only there, never for an installed
+        // program (whose folder four up could be anyone's)
+        let named = |p: Option<&Path>, n: &str| p.and_then(Path::file_name).is_some_and(|f| f == n);
+        let deps = exe
+            .as_deref()
+            .filter(|e| named(e.parent(), "deps") && named(e.ancestors().nth(3), "target"))
+            .and_then(|e| e.ancestors().nth(4))
+            .map(|d| d.join("assets"));
         from_env
             .into_iter()
             .chain(beside)
             .chain(tree)
+            .chain(deps)
             .find(|p| real(p))
     })
     .clone()
@@ -132,6 +142,24 @@ pub fn assets_root() -> Option<PathBuf> {
 /// Our own files, laid out as the original: `own/` in the assets folder.
 pub fn own_root() -> Option<PathBuf> {
     assets_root().map(|a| a.join("own"))
+}
+
+/// The levels shipped with the game, in the open format: `levels/` in the assets folder.
+pub fn shipped_levels_root() -> Option<PathBuf> {
+    assets_root().map(|a| a.join("levels"))
+}
+
+/// Whether a file of the original's layout is one of a level's parts, which our own files fill too (the modules, the
+/// balls, the transformer, the skies, the particles and the ball's shadow): asked from ours first for a new level, from
+/// the copy first for the copy's (assets.rs).
+pub fn is_part(relative: &str) -> bool {
+    let l = relative.to_ascii_lowercase();
+    l.starts_with("3d entities/ph/")
+        || l.starts_with("3d entities/balls.")
+        || l.starts_with("3d entities/animtrafo.")
+        || l.starts_with("textures/sky/")
+        || l.starts_with("textures/particles/")
+        || l.starts_with("textures/hardshadow.")
 }
 
 /// The toolbox's remaster of the copy's interface.
@@ -294,6 +322,17 @@ pub fn role_of(relative: &str) -> Option<&'static str> {
         .map(|(role, _)| *role)
 }
 
+/// Says once that our part stands in for one the copy lacks or cannot read, in a level made for the copy's parts.
+pub fn stand_in(relative: &str) {
+    static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    if let Ok(mut said) = SAID.lock()
+        && !said.iter().any(|s| s == relative)
+    {
+        said.push(relative.to_owned());
+        eprintln!("warning: {relative}: the copy lacks it or it does not read; our own part stands in");
+    }
+}
+
 /// Says once that a role has no provider (the game goes on without it).
 pub fn missing(relative: &str) {
     static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
@@ -324,6 +363,11 @@ mod tests {
         );
         assert_eq!(role_of("sounds/misc_fall.WAV"), Some("sound: ball lost"));
         assert_eq!(role_of("3D Entities/Level/Level_01.NMO"), None);
+        assert!(is_part("3D Entities/PH/P_Box.nmo") && is_part("Textures/Sky/Sky_A_Front.bmp"));
+        assert!(is_part("Textures/HardShadow.bmp") && is_part("3D Entities/Balls.nmo"));
+        assert!(
+            !is_part("3D Entities/Level/Level_01.NMO") && !is_part("Textures/Button01_select.tga")
+        );
     }
 
     #[test]

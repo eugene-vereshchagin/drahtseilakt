@@ -1,0 +1,194 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "drahtseilakt make_parts.py"
+ },
+ "extensionsUsed": [],
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "format": 1,
+     "groups": [
+      {
+       "name": "All_PS_FourFlames",
+       "members": [
+        4,
+        0,
+        3,
+        2,
+        1
+       ]
+      }
+     ],
+     "sky": null,
+     "start_ball": null,
+     "settings": {
+      "tutorial": false,
+      "last_level": false
+     }
+    }
+   }
+  }
+ ],
+ "nodes": [
+  {
+   "name": "PS_FourFlames_Flame_D",
+   "matrix": [
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -0.006999828506302368,
+    -0.9999755009003382,
+    0.0,
+    0.0,
+    -0.9999755009003382,
+    0.006999828506302368,
+    0.0,
+    7.334,
+    2.053,
+    6.132,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "PS_FourFlames_Flame_A",
+   "matrix": [
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -0.006999828506302368,
+    -0.9999755009003382,
+    0.0,
+    0.0,
+    -0.9999755009003382,
+    0.006999828506302368,
+    0.0,
+    7.334,
+    2.053,
+    -6.145,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "PS_FourFlames_Flame_B",
+   "matrix": [
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -0.006999828506302368,
+    -0.9999755009003382,
+    0.0,
+    0.0,
+    -0.9999755009003382,
+    0.006999828506302368,
+    0.0,
+    -7.221,
+    2.053,
+    -6.098,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "PS_FourFlames_Flame_C",
+   "matrix": [
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -0.006999828506302368,
+    -0.9999755009003382,
+    0.0,
+    0.0,
+    -0.9999755009003382,
+    0.006999828506302368,
+    0.0,
+    -7.221,
+    2.053,
+    6.132,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": true
+    }
+   }
+  },
+  {
+   "name": "PS_FourFlames_MF",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  }
+ ],
+ "meshes": [],
+ "materials": [],
+ "textures": [],
+ "images": [],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987,
+   "wrapS": 10497,
+   "wrapT": 10497
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "level.bin",
+   "byteLength": 0
+  }
+ ],
+ "bufferViews": [],
+ "accessors": []
+}

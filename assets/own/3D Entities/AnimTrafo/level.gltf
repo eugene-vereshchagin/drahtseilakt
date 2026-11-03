@@ -1,0 +1,1068 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "drahtseilakt make_parts.py"
+ },
+ "extensionsUsed": [],
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "format": 1,
+     "groups": [
+      {
+       "name": "All_AnimTrafo",
+       "members": [
+        10,
+        4,
+        5,
+        6,
+        7,
+        0,
+        1,
+        2,
+        3,
+        8,
+        9
+       ]
+      }
+     ],
+     "sky": null,
+     "start_ball": null,
+     "settings": {
+      "tutorial": false,
+      "last_level": false
+     }
+    }
+   }
+  }
+ ],
+ "nodes": [
+  {
+   "name": "AnimTrafo_Ringpart4",
+   "matrix": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 0
+  },
+  {
+   "name": "AnimTrafo_Ringpart3",
+   "matrix": [
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 1
+  },
+  {
+   "name": "AnimTrafo_Ringpart2",
+   "matrix": [
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 2
+  },
+  {
+   "name": "AnimTrafo_Ringpart1",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 3
+  },
+  {
+   "name": "AnimTrafo_Frame04",
+   "matrix": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  },
+  {
+   "name": "AnimTrafo_Frame03",
+   "matrix": [
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  },
+  {
+   "name": "AnimTrafo_Frame02",
+   "matrix": [
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  },
+  {
+   "name": "AnimTrafo_Frame01",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  },
+  {
+   "name": "AnimTrafo_Flashfield",
+   "matrix": [
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 4
+  },
+  {
+   "name": "AnimTrafo_Bars",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 5
+  },
+  {
+   "name": "AnimTrafo_MF",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "AnimTrafo_Ringpart4_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 4,
+     "material": 2
+    }
+   ]
+  },
+  {
+   "name": "AnimTrafo_Ringpart3_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 5,
+      "NORMAL": 6,
+      "TEXCOORD_0": 7
+     },
+     "indices": 8,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 5,
+      "NORMAL": 6,
+      "TEXCOORD_0": 7
+     },
+     "indices": 9,
+     "material": 2
+    }
+   ]
+  },
+  {
+   "name": "AnimTrafo_Ringpart2_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 10,
+      "NORMAL": 11,
+      "TEXCOORD_0": 12
+     },
+     "indices": 13,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 10,
+      "NORMAL": 11,
+      "TEXCOORD_0": 12
+     },
+     "indices": 14,
+     "material": 2
+    }
+   ]
+  },
+  {
+   "name": "AnimTrafo_Ringpart1_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 15,
+      "NORMAL": 16,
+      "TEXCOORD_0": 17
+     },
+     "indices": 18,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 15,
+      "NORMAL": 16,
+      "TEXCOORD_0": 17
+     },
+     "indices": 19,
+     "material": 2
+    }
+   ]
+  },
+  {
+   "name": "AnimTrafo_Flashfield_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 20,
+      "NORMAL": 21,
+      "TEXCOORD_0": 22
+     },
+     "indices": 23,
+     "material": 3
+    }
+   ]
+  },
+  {
+   "name": "AnimTrafo_Bars_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 24,
+      "NORMAL": 25,
+      "TEXCOORD_0": 26
+     },
+     "indices": 27,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "AnimTrafo_Bars",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.6,
+     0.65,
+     0.74,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 0
+    }
+   },
+   "emissiveFactor": [
+    0.37,
+    0.37,
+    0.37
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "power": 20,
+     "z_write": true
+    }
+   }
+  },
+  {
+   "name": "AnimTrafo_RingParts",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.77,
+     0.8,
+     0.85,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 0
+    }
+   },
+   "emissiveFactor": [
+    0.15,
+    0.15,
+    0.15
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": true,
+     "texgen": "reflect"
+    }
+   }
+  },
+  {
+   "name": "AnimTrafo_RingParts_Color",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.09,
+     0.92,
+     0.58,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 0
+    }
+   },
+   "emissiveFactor": [
+    0.3,
+    0.3,
+    0.3
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": true,
+     "texgen": "reflect"
+    }
+   }
+  },
+  {
+   "name": "AnimTrafo_Flashfield",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     0.65
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 1
+    }
+   },
+   "emissiveFactor": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "doubleSided": true,
+   "alphaMode": "BLEND",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "power": 0.0,
+     "z_write": false,
+     "blend": [
+      "one",
+      "one"
+     ]
+    }
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0,
+   "sampler": 0
+  },
+  {
+   "source": 1,
+   "sampler": 0
+  }
+ ],
+ "images": [
+  {
+   "uri": "textures/Trafo_Anim_Environment.png",
+   "name": "Trafo_Anim_Environment"
+  },
+  {
+   "uri": "textures/flash.png",
+   "name": "flash"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987,
+   "wrapS": 10497,
+   "wrapT": 10497
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "level.bin",
+   "byteLength": 56024
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 2304,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 2304,
+   "byteLength": 2304,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 4608,
+   "byteLength": 1536,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 6144,
+   "byteLength": 768,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 6912,
+   "byteLength": 384,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 7296,
+   "byteLength": 2304,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 9600,
+   "byteLength": 2304,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 11904,
+   "byteLength": 1536,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 13440,
+   "byteLength": 768,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 14208,
+   "byteLength": 384,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 14592,
+   "byteLength": 2304,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 16896,
+   "byteLength": 2304,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 19200,
+   "byteLength": 1536,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 20736,
+   "byteLength": 768,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 21504,
+   "byteLength": 384,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 21888,
+   "byteLength": 2304,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 24192,
+   "byteLength": 2304,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 26496,
+   "byteLength": 1536,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 28032,
+   "byteLength": 768,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 28800,
+   "byteLength": 384,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 29184,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 29232,
+   "byteLength": 48,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 29280,
+   "byteLength": 32,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 29312,
+   "byteLength": 24,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 29336,
+   "byteLength": 6696,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 36032,
+   "byteLength": 6696,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 42728,
+   "byteLength": 4464,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 47192,
+   "byteLength": 8832,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC3",
+   "min": [
+    -2.466,
+    -0.008,
+    -3.0199790066973735e-16
+   ],
+   "max": [
+    -2.2043642384652356e-16,
+    0.475,
+    2.466
+   ],
+   "bufferView": 0
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC3",
+   "bufferView": 1
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC2",
+   "bufferView": 2
+  },
+  {
+   "componentType": 5125,
+   "count": 192,
+   "type": "SCALAR",
+   "bufferView": 3
+  },
+  {
+   "componentType": 5125,
+   "count": 96,
+   "type": "SCALAR",
+   "bufferView": 4
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC3",
+   "min": [
+    -2.466,
+    -0.008,
+    -3.0199790066973735e-16
+   ],
+   "max": [
+    -2.2043642384652356e-16,
+    0.475,
+    2.466
+   ],
+   "bufferView": 5
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC3",
+   "bufferView": 6
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC2",
+   "bufferView": 7
+  },
+  {
+   "componentType": 5125,
+   "count": 192,
+   "type": "SCALAR",
+   "bufferView": 8
+  },
+  {
+   "componentType": 5125,
+   "count": 96,
+   "type": "SCALAR",
+   "bufferView": 9
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC3",
+   "min": [
+    -2.466,
+    -0.008,
+    -3.0199790066973735e-16
+   ],
+   "max": [
+    -2.2043642384652356e-16,
+    0.475,
+    2.466
+   ],
+   "bufferView": 10
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC3",
+   "bufferView": 11
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC2",
+   "bufferView": 12
+  },
+  {
+   "componentType": 5125,
+   "count": 192,
+   "type": "SCALAR",
+   "bufferView": 13
+  },
+  {
+   "componentType": 5125,
+   "count": 96,
+   "type": "SCALAR",
+   "bufferView": 14
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC3",
+   "min": [
+    -2.466,
+    -0.008,
+    -3.0199790066973735e-16
+   ],
+   "max": [
+    -2.2043642384652356e-16,
+    0.475,
+    2.466
+   ],
+   "bufferView": 15
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC3",
+   "bufferView": 16
+  },
+  {
+   "componentType": 5126,
+   "count": 192,
+   "type": "VEC2",
+   "bufferView": 17
+  },
+  {
+   "componentType": 5125,
+   "count": 192,
+   "type": "SCALAR",
+   "bufferView": 18
+  },
+  {
+   "componentType": 5125,
+   "count": 96,
+   "type": "SCALAR",
+   "bufferView": 19
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    -2.46,
+    -0.024,
+    -2.46
+   ],
+   "max": [
+    2.46,
+    -0.024,
+    2.46
+   ],
+   "bufferView": 20
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "bufferView": 21
+  },
+  {
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC2",
+   "bufferView": 22
+  },
+  {
+   "componentType": 5125,
+   "count": 6,
+   "type": "SCALAR",
+   "bufferView": 23
+  },
+  {
+   "componentType": 5126,
+   "count": 558,
+   "type": "VEC3",
+   "min": [
+    -2.25,
+    -5.5,
+    -2.25
+   ],
+   "max": [
+    2.25,
+    -0.009999999999999787,
+    2.25
+   ],
+   "bufferView": 24
+  },
+  {
+   "componentType": 5126,
+   "count": 558,
+   "type": "VEC3",
+   "bufferView": 25
+  },
+  {
+   "componentType": 5126,
+   "count": 558,
+   "type": "VEC2",
+   "bufferView": 26
+  },
+  {
+   "componentType": 5125,
+   "count": 2208,
+   "type": "SCALAR",
+   "bufferView": 27
+  }
+ ]
+}

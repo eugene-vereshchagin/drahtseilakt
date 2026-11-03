@@ -22,9 +22,10 @@ A folder holding:
   (`game/3D Entities/Balls/`, `game/3D Entities/AnimTrafo/`, `game/3D Entities/PH/P_Box/`...: the balls, the
   transformer and the module of every object named after one), and as they are its sky's faces
   (`game/Textures/Sky/`), the particles' textures (`game/Textures/Particles/`), the ball's shadow and the sounds a run
-  plays (`game/Sounds/`, not the menu's nor other levels' music). The game looks there first, then in the copy;
-  any part of a path in `game/` that is a link finds nothing. Only the interface (menus, font, buttons, the menu's
-  sounds and scene) still comes from the copy. `--export` and the toolbox write it.
+  plays (`game/Sounds/`, not the menu's nor other levels' music). The game looks there first, then, for a level made for our
+  own parts (its settings say `"parts": "own"`), in our own parts (`assets/own/`, [resources.md](resources.md)) and
+  then the copy, so it plays the same with or without a copy; for any other level in the copy and then in ours. Any part of a path in `game/` that is a link finds nothing.
+  `--export` and the toolbox write it.
 
 ## Contents
 
@@ -53,12 +54,13 @@ A folder holding:
   original takes from its level table and its rules by level number, so the level plays the same without the game's
   files — `music` (theme 1 to 1000), `light` (three numbers 0..1), `level_bonus` (points), `tutorial` and
   `last_level` (true or false: the original's first and last level), and `source_hash` (16 hex digits: the FNV-1a of
-  the `.nmo` it was converted from). A replay recorded on that file plays on the converted level (the same level, so
+  the `.nmo` it was converted from), and `parts` (`"own"`: the level is made for the game's own parts and takes them
+  before the copy's; `"copy"` or none: the copy's first; our level kit writes `"own"`). A replay recorded on that file plays on the converted level (the same level, so
   the same run); malformed settings refuse the level. Any level can name any hash, so a replay that plays on it is
   no proof of a run on the original. A level without settings (made before they were kept) plays with the defaults
   and says so; a remastered `Level_NN` takes them from the copy's table instead. The game files of `game/` stand in
   only for the level's own parts, sky, particles, shadow and a run's sounds: the interface's files (menus, font, the
-  level table, menu sounds) are always the copy's, and every file read is capped.
+  level table, menu sounds) never come from a level: they are the interface's (ours, or the copy's), and every file read is capped.
 
 ## Coordinates
 

@@ -10,6 +10,13 @@ those first and these for what they lack. Sounds and music are not here: they ar
   places, life ball, points box and end screen's bar, each where the game's code takes it from the texture.
 - `3D Entities/MenuLevel/`: the 3D scene behind the menus and the loading screen, in the open level format
   (`level.gltf`, `level.bin`, `textures/`), standing for the original's `MenuLevel.nmo`.
+- `3D Entities/PH/<module>/`, `3D Entities/Balls/`, `3D Entities/AnimTrafo/`: our own parts, every module of the
+  original (boxes, domes, transformers, fans, pushers, bridges, the balloon...), the three balls with their pieces and
+  the transformer's animation, in the open level format, made to the original's measured sizes with its physics
+  unchanged (docs/drahtseilakt/resources.md, "Our own parts"); `Textures/HardShadow.png`, `Textures/Particles/`,
+  `Textures/Sky/` (skies A, B, C) beside them. Made by `make/make_parts.py` (on `make/ownkit.py`).
+- `make/levelkit.py` builds levels of our own from track pieces and the parts' stand-ins; `make/make_test_level.py`
+  the shipped test level `assets/levels/Parts_Test/`.
 - `Textures/<name>.png` (all but the three buttons): our own textures for the levels, their parts and the balls, each
   standing in for the original's texture of that name (`textures own`, the default); `TEXTURES.md` lists every texture
   the levels use and which are ours, `CREDITS.md` the CC0 photo textures they are made from.

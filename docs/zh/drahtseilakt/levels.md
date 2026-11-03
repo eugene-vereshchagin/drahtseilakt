@@ -27,9 +27,13 @@
 - 没有“合集”这一概念：13 个旋转版原版关卡就是 13 个关卡文件夹（“45-Degree Rotated - Level 07”）。
 - `drahtseilakt-toolbox import-maps <文件夹>` 把下载的合集整理成这种结构：每张地图一个文件夹，包含它的 `.nmo`、作为预览的图片，以及说明来源的 level.txt（文件夹名不得不丢掉字符时还写入完整标题）。通用文件名（`Level_07.NMO`）按其合集命名；同一文件出现两次只算一个关卡；压缩包只列出、不打开；名称在 Linux、Windows 和 macOS 上都可用（无保留名称，末尾无点或空格，最多 40 个字符，第二个 “Hello Mars” 编号为 “(2)”）；源文件只读。再次运行只添加新内容。
 
+## 随游戏附带的关卡
+
+我们自己的关卡随游戏放在其 `assets/levels/` 中，每个关卡一个开放格式的文件夹，只用我们自己的部件制作（assets/own，[resources.md](resources.md)），因此完全不需要原版的副本也能游玩。菜单把它们与 `levels/open/` 中的开放格式关卡一起显示：没有副本时在 Start 下（列表“Our levels”），在扩展模式的“Open format”下则始终显示。它们由 `assets/own/make/` 中的脚本生成（`levelkit.py` 用轨道块和部件的替身搭建关卡；`make_test_level.py` 生成第一个关卡 `Parts_Test`：几百个单位长的轨道，每个部件都在轨道上或旁边），生成结果已提交到仓库。它们的许可证与游戏相同（GPL-3.0-only）。
+
 ## 原版游戏：默认复制
 
-游戏从玩家自己的副本中把所需内容一次性复制到 `levels/original/`：从已安装的游戏复制（`drahtseilakt --import <Ballance folder>`），或直接从游戏 CD 或其镜像复制（`drahtseilakt --import Ballance.cue`，也可以是 `.bin`、`.iso`：读取 `SETUP/` 中的 InstallShield 6 压缩包，由 `crates/cdimage` 实现）。没有找到游戏时启动会打开一个窗口完成同样的事：它列出在电脑上找到的内容（Windows、Wine、GOG、Heroic 和 Lutris 常用文件夹中已安装的游戏；光驱中的光盘；主文件夹、桌面和“下载”文件夹中的 CD 镜像），接受拖到窗口上的文件夹或镜像或输入的路径，然后用这份副本启动游戏。副本是玩家自己机器上的玩家自己的数据；不下载任何东西，也不往仓库里放任何东西。`--data DIR` 仍可不经复制直接从任意文件夹游玩。
+游戏从玩家自己的副本中把所需内容一次性复制到 `levels/original/`：从已安装的游戏复制（`drahtseilakt --import <Ballance folder>`），或直接从游戏 CD 或其镜像复制（`drahtseilakt --import Ballance.cue`，也可以是 `.bin`、`.iso`：读取 `SETUP/` 中的 InstallShield 6 压缩包，由 `crates/cdimage` 实现）。副本是可选的（decisions.md，“游戏开箱即玩”）：没有副本时游戏以自己的关卡启动，主菜单的 **Import** 会打开一个窗口完成同样的事：它列出在电脑上找到的内容（Windows、Wine、GOG、Heroic 和 Lutris 常用文件夹中已安装的游戏；光驱中的光盘；主文件夹、桌面和“下载”文件夹中的 CD 镜像），接受拖到窗口上的文件夹或镜像或输入的路径，然后用这份副本启动游戏。副本是玩家自己机器上的玩家自己的数据；不下载任何东西，也不往仓库里放任何东西。`--data DIR` 仍可不经复制直接从任意文件夹游玩。
 
 该文件夹的 README 列出了需要手动复制的内容：已安装的 Ballance 中的 `base.cmo` 以及 `3D Entities`、`Textures` 和 `Sounds` 文件夹（游戏不读取其他内容）；对于第 13 关，还需按其说明文件将 SuDu 扩展包安装到该副本中。
 

@@ -1,4 +1,4 @@
-// Drahtseilakt: the game. Loads a level from the player's own copy (an original level or any .nmo map), plays
+// Drahtseilakt: the game. Loads a level (its own, from the player's copy of the original, or any .nmo map), plays
 // it in a window, records and replays runs, and can run without a window (replay checks, screenshots).
 
 // Hostile input is parsed only by the `nmo` crate; this crate works on validated models, and geometry code
@@ -29,6 +29,7 @@ mod modules;
 mod music;
 mod options;
 mod particles;
+mod partcheck;
 mod physics;
 mod pieces;
 mod proximity;
@@ -317,28 +318,19 @@ fn parse_args() -> Result<Options, String> {
     Ok(o)
 }
 
-/// A start that opens the game's window (not a run without one, not a tool, not an explicit folder).
-fn windowed(o: &Options) -> bool {
-    o.data.is_none()
-        && !o.headless
-        && !o.autopilot
-        && o.screenshot.is_none()
-        && o.export.is_none()
-        && o.locate.is_none()
-        && o.frames.is_none()
-        && o.video.is_none()
-}
-
 /// How many --then runs may follow on.
 const MAX_THEN: usize = 8;
 
-/// Set in the game started again after an import.
-const RESTARTED: &str = "DRAHTSEILAKT_RESTARTED";
+/// Set in the process that opens the import window for the menu's Import.
+pub const IMPORT: &str = "DRAHTSEILAKT_IMPORT";
 
 /// Starts this program again with the same arguments, waits for it and ends with its exit code.
 fn restart() -> ! {
     let status = std::env::current_exe().and_then(|exe| {
-        std::process::Command::new(exe).args(std::env::args_os().skip(1)).env(RESTARTED, "1").status()
+        std::process::Command::new(exe)
+            .args(std::env::args_os().skip(1))
+            .env_remove(IMPORT)
+            .status()
     });
     match status {
         Ok(s) => std::process::exit(s.code().unwrap_or(1)),
@@ -357,19 +349,29 @@ fn main() -> ExitCode {
             println!("{copied} files copied to {}", levels::dir(levels::Kind::Original).display());
             return Ok(());
         }
-        let data = match Data::locate(o.data.clone()) {
-            Ok(d) => d,
-            // a plain start without the game: the window that brings it in, then the game again with it
-            // (not again in the game started after an import: that one would only open the window anew)
-            Err(e) if windowed(&o) && std::env::var_os(RESTARTED).is_none() => {
-                match setup::run(o.size) {
-                    Ok(false) => return Ok(()),
-                    Ok(true) => restart(),
-                    Err(w) => return Err(format!("{e}\n(the window to bring it in did not open: {w})")),
-                }
+        // the menu's Import: the window that brings in the player's copy, in a process of its own (winit runs one
+        // event loop a process), then the game again, with the copy or without it
+        if std::env::var_os(IMPORT).is_some() {
+            if let Err(w) = setup::run(o.size) {
+                eprintln!("drahtseilakt: the window to bring in the game did not open: {w}");
             }
-            Err(e) => return Err(e),
+            restart();
+        }
+        // the copy of the original is optional: without it the game plays its own levels (decisions.md, "The game
+        // plays out of the box"); a folder named with --data must itself be a copy (no other place is tried)
+        let data = match o.data.clone() {
+            Some(d) => Data::at(d)?,
+            None => Data::find(None),
         };
+        let mut o = o;
+        if !data.has_copy() && !o.chosen {
+            // the level behind the menu at the start: our first own level
+            let first = levels::shipped().into_iter().next().ok_or(
+                "no copy of Ballance and no levels of the game's own (assets/levels): import your Ballance with \
+                 --import DIR, or pass --data DIR",
+            )?;
+            o.source = Source::Open(first.level);
+        }
         app::run(o, data)
     });
     match result {

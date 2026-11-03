@@ -1,0 +1,364 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "drahtseilakt make_parts.py"
+ },
+ "extensionsUsed": [],
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "format": 1,
+     "groups": [
+      {
+       "name": "All_P_Modul_18",
+       "members": [
+        0,
+        1,
+        2,
+        3
+       ]
+      }
+     ],
+     "sky": null,
+     "start_ball": null,
+     "settings": {
+      "tutorial": false,
+      "last_level": false
+     }
+    }
+   }
+  }
+ ],
+ "nodes": [
+  {
+   "name": "P_Modul_18_Particle",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  },
+  {
+   "name": "P_Modul_18_Rotor",
+   "matrix": [
+    0.33594810002750897,
+    0.0069989187505731035,
+    -0.9418544947199804,
+    0.0,
+    -0.0005428067639480676,
+    0.49998730218085136,
+    0.0035217919772605193,
+    0.0,
+    0.9418798731957143,
+    -0.0013437886661278012,
+    0.3359471665319503,
+    0.0,
+    0.0,
+    -0.55,
+    -0.002,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 0
+  },
+  {
+   "name": "P_Modul_18_Kollisionsquader",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.9999920000959988,
+    0.0039999680003839945,
+    0.0,
+    0.0,
+    -0.0039999680003839945,
+    0.9999920000959988,
+    0.0,
+    0.0,
+    1.14,
+    0.001,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   },
+   "mesh": 1
+  },
+  {
+   "name": "P_Modul_18_MF",
+   "matrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "visible": false
+    }
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Modul_18_Rotor_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  },
+  {
+   "name": "Modul_18_Kollisionsquader_Mesh",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 4,
+      "NORMAL": 5,
+      "TEXCOORD_0": 6
+     },
+     "indices": 7
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "P_Modul_18_Rotor",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.62,
+     0.62,
+     0.62,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 0
+    }
+   },
+   "emissiveFactor": [
+    0.18,
+    0.18,
+    0.18
+   ],
+   "doubleSided": true,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "power": 20,
+     "z_write": true
+    }
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0,
+   "sampler": 0
+  }
+ ],
+ "images": [
+  {
+   "uri": "textures/Rail_Environment.png",
+   "name": "Rail_Environment"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987,
+   "wrapS": 10497,
+   "wrapT": 10497
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "level.bin",
+   "byteLength": 3648
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 792,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 792,
+   "byteLength": 792,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 1584,
+   "byteLength": 528,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 2112,
+   "byteLength": 624,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 2736,
+   "byteLength": 288,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 3024,
+   "byteLength": 288,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 3312,
+   "byteLength": 192,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 3504,
+   "byteLength": 144,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "componentType": 5126,
+   "count": 66,
+   "type": "VEC3",
+   "min": [
+    -1.767,
+    0.076,
+    -1.767
+   ],
+   "max": [
+    1.767,
+    1.044,
+    1.767
+   ],
+   "bufferView": 0
+  },
+  {
+   "componentType": 5126,
+   "count": 66,
+   "type": "VEC3",
+   "bufferView": 1
+  },
+  {
+   "componentType": 5126,
+   "count": 66,
+   "type": "VEC2",
+   "bufferView": 2
+  },
+  {
+   "componentType": 5125,
+   "count": 156,
+   "type": "SCALAR",
+   "bufferView": 3
+  },
+  {
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3",
+   "min": [
+    -1.0,
+    0.0,
+    -1.0
+   ],
+   "max": [
+    1.0,
+    16.0,
+    1.0
+   ],
+   "bufferView": 4
+  },
+  {
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3",
+   "bufferView": 5
+  },
+  {
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC2",
+   "bufferView": 6
+  },
+  {
+   "componentType": 5125,
+   "count": 36,
+   "type": "SCALAR",
+   "bufferView": 7
+  }
+ ]
+}
