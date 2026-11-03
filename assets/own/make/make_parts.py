@@ -204,7 +204,25 @@ def track_slab(name, rows=256):
     return img[:rows]
 
 
+def _wicker():
+    """A woven basket: willow rods under and over the stakes, each rod round in shade, the gaps dark."""
+    n = TEX
+    y, x = np.mgrid[0:n, 0:n] / n
+    rows, cols = 16, 8
+    ry = (y * rows) % 1.0
+    cx = (x * cols) % 1.0
+    over = ((np.floor(y * rows) + np.floor(x * cols)) % 2) == 0
+    # a rod is lit along its middle, dark at its edges; where it passes under a stake the stake's side shades it
+    rod = np.sin(ry * np.pi) ** 0.6
+    under = np.where(over, 1.0, 0.72 + 0.28 * np.abs(np.cos(cx * np.pi)))
+    tone = 0.85 + 0.15 * k.value_noise(n, n, (24, 6), 71, octaves=3)
+    base = np.array([0.62, 0.47, 0.28])
+    img = base[None, None] * (rod * under * tone)[..., None]
+    return np.clip(img + 0.04, 0, 1)
+
+
 TEXTURE_MAKERS = {
+    "wicker.png": _wicker,
     "track_top.png": lambda: track_slab("Track_Top_A.png"),
     "track_side.png": lambda: track_slab("Track_Side.png")[:224, 32:],  # below its brick strip
     "wood.png": lambda: k.planks(TEX, k.rgb(176, 128, 78), 11),
@@ -1394,6 +1412,38 @@ def make_balloon():
     k.torus(mp, metal, (0, 1.9, 0), (0, 1, 0), 8.0, 0.18, seg=32, tube_seg=6)
     for x, z in ((2.13, -7.99), (-5.84, -5.85), (-5.84, 5.85), (2.16, 7.98)):
         k.cylinder(mp, holder, (x, -1.8, z), (0, 1, 0), 0.3, 3.99, seg=8)
+    # what is drawn: a round woven basket (open where the bridge comes in), its rim, a planked deck inside, and the
+    # rails and the ramp the ball touches as wooden benches (the mesh above stays the physics')
+    wicker = p.mat("PE_Balloon_Wicker", "wicker.png", diffuse=1.0, emissive=0.3)
+    deckm = p.mat("PE_Balloon_Deck", "wood.png", diffuse=0.9, emissive=0.3)
+    look = k.Mesh("PE_Balloon_Look")
+    gap = math.radians(24)
+    for r_out, r_in in ((8.3, 7.95),):
+        rows = [(-2.6, 7.6), (-2.2, 8.1), (0.0, 8.3), (1.75, r_out)]
+        for i in range(len(rows) - 1):
+            (y0, a0), (y1, a1) = rows[i], rows[i + 1]
+            n = 40
+            for j in range(n):
+                t0 = gap + (2 * math.pi - 2 * gap) * j / n
+                t1 = gap + (2 * math.pi - 2 * gap) * (j + 1) / n
+                for rr0, rr1, inward in ((a0, a1, False), (a0 - 0.35, a1 - 0.35, True)):
+                    q = [(rr0 * math.cos(t0), y0, rr0 * math.sin(t0)), (rr0 * math.cos(t1), y0, rr0 * math.sin(t1)),
+                         (rr1 * math.cos(t1), y1, rr1 * math.sin(t1)), (rr1 * math.cos(t0), y1, rr1 * math.sin(t0))]
+                    uv = [(t0 * 2, y0 / 4), (t1 * 2, y0 / 4), (t1 * 2, y1 / 4), (t0 * 2, y1 / 4)]
+                    tm = (t0 + t1) / 2
+                    nrm = (math.cos(tm), 0, math.sin(tm)) if not inward else (-math.cos(tm), 0, -math.sin(tm))
+                    look.face(wicker, q if not inward else q[::-1], uv if not inward else uv[::-1], normal=nrm)
+    k.cylinder(look, deckm, (0, -2.6, 0), (0, 1, 0), 7.6, 0.26, seg=40)
+    k.torus(look, metal, (0, 1.9, 0), (0, 1, 0), 8.15, 0.2, seg=48, tube_seg=8)
+    for f in (rail1, rail3, back):
+        f(look, deckm)
+    floor(look, deckm)
+    entry(look, bridge)
+    ramp(look, deckm)
+    for x, z in ((2.13, -7.99), (-5.84, -5.85), (-5.84, 5.85), (2.16, 7.98)):
+        k.cylinder(look, holder, (x, -1.8, z), (0, 1, 0), 0.3, 3.99, seg=12)
+        k.ellipsoid(look, metal, (x, 2.2, z), (0.36, 0.22, 0.36), seg=12)
+    mp.look = look
     pi = p.mesh(mp)
     p.node("PE_Balloon_Platform", pi)
     hinge_a = [((2.132, 0.252, -7.989), (0.267, 0, -0.964)), ((-5.842, 0.252, -5.849), (-0.707, 0, -0.707)),
@@ -1414,6 +1464,15 @@ def make_balloon():
     for i, pos in enumerate(balloons, 1):
         mb = k.Mesh(f"PE_Balloon_Ballon0{i}_Mesh")
         lathe(mb, gores, BALLOON, 12)
+        # drawn smooth: the same envelope with many more gores and rows
+        fine = [(BALLOON[0][0], 0.0)]
+        for (y0, r0), (y1, r1) in zip(BALLOON, BALLOON[1:]):
+            for t in np.linspace(0, 1, 5)[1:]:
+                fine.append((y0 + (y1 - y0) * t, r0 + (r1 - r0) * t))
+        mbl = k.Mesh(f"PE_Balloon_Ballon0{i}_Look")
+        lathe(mbl, gores, fine, 36)
+        smooth_normals(mbl)
+        mb.look = mbl
         p.node(f"PE_Balloon_Ballon0{i}", p.mesh(mb), pos=pos)
     # each balloon's ropes: from the balloon's hinge under it down to the platform's rim (the joints' frames), in
     # the rope object's own frame half way between; three strands from one knot fanning out to the rim

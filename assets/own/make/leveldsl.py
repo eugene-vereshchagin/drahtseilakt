@@ -687,7 +687,7 @@ class Track:
         self.jump(pts[-1], {})
         self.move_along(pts)
 
-    def place_columns(self, depth=60.0):
+    def place_columns(self, depth=L.COLUMN_DEPTH):
         """The columns under the floors, but none that would pass through a floor or rails below it."""
         below = np.array(self.floor_points) if self.floor_points else np.zeros((0, 3))
         reach = np.array(self.floor_reach) if self.floor_reach else np.zeros(0)

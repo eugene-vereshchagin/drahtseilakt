@@ -73,12 +73,15 @@ left 90 14
 borders on
 railing turns
 width 7
+floor 6
+# a gate to find out: the stone ball comes to a climb it cannot make (a stone ball stops on a slope this steep,
+# run-up or not); the wood transformer stands to the side of the little square before it, in sight but off the line
+width 18
+floor 6
 floor 14
-# back to wood just before what the stone ball does badly: the climb, then the rails
-trafo wood
-floor 8
+trafo wood side 6 ahead -7
 width 8
-# the climb only the wooden ball makes (a stone ball stops on a slope this steep, run-up or not)
+floor 6
 floor 20 up 10
 safety border
 width 24
@@ -141,13 +144,11 @@ rails-left 90 16
 rails 16
 safety gutter
 width 8
-floor 10
-trafo stone
-floor 24
+floor 34
 mark drop
 # the stone on the crate: the way drops off its end onto a wide floor 5 lower, which runs under the lane the stone
 # blocks; the ball pushes the crate out from under the stone (and backs off), goes round and up to the lane
-pilot all : goto -3 0 0 ; push 1 0 40 ; goto 13 0 -5 ; goto 11 0 -5 ; push 1 0 110 ; push -1 0 100 ; goto 11 0 -5
+pilot all : goto -3 0 0 ; push 1 0 40 ; goto 13 0 -5 ; become stone ; goto 11 0 -5 ; push 1 0 110 ; push -1 0 100 ; goto 11 0 -5
 nopilot all
 move 42 0 -5
 turn 180
@@ -155,8 +156,11 @@ safety none
 railing both
 width 16
 floor 19.5
-width 10
+# the second gate to find out: the wooden ball cannot shift the crate; the stone transformer stands on this floor's
+# side, in sight of it, off the line the ball runs to the crate
+trafo stone side 5 ahead 12 nopilot
 floor 9.5
+width 10
 safety gutter
 railing off
 floor 5
@@ -193,7 +197,10 @@ checkpoint
 # ---- sector 3 (stone ball): a square of loose balls, the pushers (pushed from the lower floor beside their lane),
 # rails to the wood transformer
 floor 7
-floor 24
+floor 12
+# whatever the ball came with, this sector wants the stone one: its loose stone balls, its pushers
+trafo stone
+floor 12
 left 45 30
 right 45 30
 right 90 16

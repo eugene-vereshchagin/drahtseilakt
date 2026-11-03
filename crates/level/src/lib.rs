@@ -54,6 +54,22 @@ pub struct Settings {
     /// The level is made for the game's own parts (`"parts": "own"`): it takes ours before the copy's, so it plays the
     /// same with a copy or without one. Any other level takes the copy's parts first, as it was made.
     pub own_parts: bool,
+    /// The air between the camera and what it sees: none in the original's levels (their look has none); our own
+    /// levels set it so their columns and the world far below fade into the sky's haze. Only drawn.
+    pub fog: Option<Fog>,
+}
+
+/// A level's fog (only drawn, never the physics'): what is far from the camera fades into the air's colour, `color`
+/// seen towards the horizon and `color_down` seen straight down (the world far below), `density` of it a unit of
+/// distance (1 - e^(-density * distance)), and what lies below `below` fades into it as well, wholly at `depth` under
+/// it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Fog {
+    pub color: [f32; 3],
+    pub color_down: [f32; 3],
+    pub density: f32,
+    pub below: f32,
+    pub depth: f32,
 }
 
 #[derive(Debug, Clone, Default)]

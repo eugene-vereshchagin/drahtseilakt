@@ -58,7 +58,7 @@ Ein Ordner mit:
   (Punkte), `tutorial` und `last_level` (true oder false: erstes und letztes Level des Originals) und `source_hash`
   (16 Hexziffern: FNV-1a der `.nmo`, aus der es umgewandelt wurde) sowie `parts` (`"own"`: das Level ist für die
   eigenen Teile des Spiels gemacht und nimmt sie vor denen der Kopie; `"copy"` oder nichts: zuerst die der Kopie; unser
-  Levelbaukasten schreibt `"own"`). Ein auf dieser Datei aufgenommenes Replay läuft auf
+  Levelbaukasten schreibt `"own"`) und `fog` (nur gezeichnet: `color` und `color_down` je drei Zahlen 0..1, `density` 0..1 je Einheit Entfernung, `below` eine Höhe, `depth` eine Tiefe über 0: unsere Level haben ihn, die des Originals keinen; levels.md). Ein auf dieser Datei aufgenommenes Replay läuft auf
   dem umgewandelten Level (dasselbe Level, also derselbe Lauf); fehlerhafte Einstellungen lehnen das Level ab. Jedes
   Level kann jeden Hash nennen, ein darauf laufendes Replay beweist also keinen Lauf auf dem Original. Ein Level ohne
   Einstellungen (vor ihnen gemacht) läuft mit den Vorgaben und sagt es; ein Remaster `Level_NN` nimmt sie aus der

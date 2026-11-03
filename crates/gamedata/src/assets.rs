@@ -332,6 +332,7 @@ impl Data {
             last_level: s.last,
             source_hash: Some(loaded.hash),
             own_parts: false,
+            fog: None,
         };
         Ok(loaded)
     }
@@ -362,6 +363,7 @@ impl Data {
                     last_level: s.last,
                     source_hash: None,
                     own_parts: false,
+                    fog: None,
                 };
                 loaded.warnings.push(format!(
                     "{}: made before levels kept their settings; they come from the game's table (remaster it again)",

@@ -222,6 +222,17 @@ way on both sides of it (the DSL refuses a level where it does not, at the width
 loose ball is checked at that width too. Columns under the floors and under rails keep clear of every floor below them
 by its own width.
 
+**Air and gates to find** (2026-11-03): a level in the open format may carry a fog in its settings (`fog`: `color`
+towards the horizon, `color_down` straight down, `density` a unit of distance, and `below`/`depth`: under that height
+things fade wholly into it within that depth). The renderer draws it on everything lit (the sky, sprites and the cloud
+layer keep their colour); the physics never sees it, so replays are unchanged, and the original's levels have none.
+Our kit sets it from the sky's own colours (the haze just under its horizon, the world below) and lets the columns and
+the rails' supports reach 240 down into it, so they fade out instead of ending; every sky but Night gets the cloud
+layer, as two decks of scattered banks over a world of its own. Not every switch of ball stands on the line: in level
+1 the stone ball comes to a climb it cannot make, with the wood transformer to the side of the square before it, and
+the wooden ball comes to a crate it cannot shift, with the stone transformer on the side of the floor below (a fast
+wooden ball can shift it now and then); each sector that needs a ball still gives one.
+
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
 its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26 into it (to a lip) and two flame

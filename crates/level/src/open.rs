@@ -248,6 +248,10 @@ fn settings_json(s: &crate::Settings) -> Value {
     if s.own_parts {
         v["parts"] = json!("own");
     }
+    if let Some(f) = s.fog {
+        v["fog"] = json!({"color": f.color, "color_down": f.color_down, "density": f.density, "below": f.below,
+            "depth": f.depth});
+    }
     v
 }
 
@@ -313,7 +317,45 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
         Value::String(p) if p == "copy" => false,
         _ => return Err("settings: parts is not \"own\" or \"copy\"".into()),
     };
+    let fog = match &v["fog"] {
+        Value::Null => None,
+        f => {
+            if !f.is_object() {
+                return Err("settings: fog is not an object".into());
+            }
+            let num = |k: &str, lo: f32, hi: f32| -> Result<f32, String> {
+                let x = f[k].as_f64().ok_or_else(|| format!("settings: fog's {k} is not a number"))? as f32;
+                if x.is_finite() { Ok(x.clamp(lo, hi)) } else { Err(format!("settings: fog's {k} is not finite")) }
+            };
+            let colour = |k: &str| -> Result<[f32; 3], String> {
+                let a = f[k]
+                    .as_array()
+                    .filter(|a| a.len() == 3)
+                    .ok_or_else(|| format!("settings: fog's {k} is not three numbers"))?;
+                let mut out = [0.0f32; 3];
+                for (o, x) in out.iter_mut().zip(a) {
+                    let x = x.as_f64().ok_or_else(|| format!("settings: fog's {k} is not three numbers"))? as f32;
+                    if !x.is_finite() {
+                        return Err(format!("settings: fog's {k} is not finite"));
+                    }
+                    *o = x.clamp(0.0, 1.0);
+                }
+                Ok(out)
+            };
+            let color = colour("color")?;
+            // a fog without its colour seen downwards (missing or null) has one colour all round
+            let color_down = if f["color_down"].is_null() { color } else { colour("color_down")? };
+            Some(crate::Fog {
+                color,
+                color_down,
+                density: num("density", 0.0, 1.0)?,
+                below: num("below", -1.0e6, 1.0e6)?,
+                depth: num("depth", 0.01, 1.0e6)?,
+            })
+        }
+    };
     Ok(crate::Settings {
+        fog,
         own_parts,
         music,
         light,

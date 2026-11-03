@@ -93,13 +93,20 @@ MIN_FREE = 5.5
 # under the lowest floor, reaching CLOUD_MARGIN past the level on every side, its texture repeating every CLOUD_TILE
 # (the original's: 160 or so below, 400 to 600 past, 675 a repeat; numbers only).
 CLOUD_BELOW, CLOUD_MARGIN, CLOUD_TILE = 165.0, 500.0, 675.0
-# The skies that are a sky over a sea of cloud, which the layer belongs to; the photographic skies with a land or a sea
-# of their own below have none.
-CLOUD_SKIES = ("A", "B", "C", "Sunset")
+# How much of the sky the cloud layer covers, by sky (1 a full sea of cloud; the photographic skies with a land or a
+# sea of their own below get scattered banks over it, drifting between the track and the world below).
+CLOUD_COVER = {"A": 1.0, "B": 1.0, "C": 1.0, "Sunset": 1.0, "Night": 0.0}
+CLOUD_SCATTERED = 0.45
+# The fog our levels have (level settings `fog`; the renderer's): the sky's haze just under its horizon is its colour;
+# FOG_DENSITY of it a unit of distance; under the lowest floor less FOG_BELOW it thickens, whole FOG_DEPTH further down,
+# so the columns and the supports, which reach far down (COLUMN_DEPTH), fade out of sight instead of ending.
+FOG_DENSITY, FOG_BELOW, FOG_DEPTH = 0.0011, 12.0, 150.0
+COLUMN_DEPTH = 240.0
+SKY_DIR = os.path.join(OWN, "Textures", "Sky")
 # Rails' supports: a saddle under both tubes (its bar RAIL_SADDLE under their middles, below the ball riding between
 # them) on a column down into the haze, about every RAIL_SUPPORT of rails (the DSL picks where: not near their ends,
 # where the floors hold them, and not over another floor or rails).
-RAIL_SADDLE, RAIL_SUPPORT, RAIL_COLUMN = 1.4, 40.0, 60.0
+RAIL_SADDLE, RAIL_SUPPORT, RAIL_COLUMN = 1.4, 40.0, 240.0
 # Where the ball comes back after a fall, above the floor round the start or a checkpoint.
 RESET_UP = START_RESET - START_BOWL[-1][1]
 
@@ -872,28 +879,69 @@ class LevelBuilder:
 
     # --- writing -----------------------------------------------------------------------------------------------
 
-    def cloud_layer(self):
-        """The level's cloud layer (SkyLayer, hidden in the file as the original's: the game shows it when the
-        options have clouds, drawn added over the sky): a plane under the lowest floor, past the level on every side,
-        with our own clouds, grey wisps on black."""
+    def floor_bounds(self):
         floors = set(self.groups.get("Phys_Floors", []))
         pts = np.array([q for i in floors for q in self.meshes[self.nodes[i]["mesh"]].p]) if floors else None
         if pts is None or not len(pts):
+            return None
+        return pts.min(0), pts.max(0)
+
+    def cloud_layer(self, cover):
+        """The level's cloud layer (SkyLayer, hidden in the file as the original's: the game shows it when the
+        options have clouds, drawn added over the sky): two decks under the lowest floor, past the level on every side,
+        with our own clouds, grey on black; `cover` how much of the sky they cover (1 a sea of cloud, less scattered
+        banks)."""
+        bounds = self.floor_bounds()
+        if bounds is None or cover <= 0:
             return
-        lo, hi = pts.min(0), pts.max(0)
-        y = lo[1] - CLOUD_BELOW
+        lo, hi = bounds
         x0, z0, x1, z1 = lo[0] - CLOUD_MARGIN, lo[2] - CLOUD_MARGIN, hi[0] + CLOUD_MARGIN, hi[2] + CLOUD_MARGIN
         size = 256
         wisps = K.value_noise(size, size, (4, 4), self.seed + 9, octaves=6)
         streak = K.value_noise(size, size, (2, 8), self.seed + 10, octaves=4)
-        v = np.clip((wisps * 0.7 + streak * 0.3 - 0.47) * 3.2, 0, 1) ** 1.6 * 0.68
+        cut = 0.47 + (1.0 - cover) * 0.16
+        v = np.clip((wisps * 0.7 + streak * 0.3 - cut) * 3.2, 0, 1) ** 1.6 * 0.72
         K.save_png(self.tex, "SkyLayer.png", np.repeat(v[..., None], 3, axis=2))
         mat = self.mat("SkyLayer", "SkyLayer.png", diffuse=1.0, emissive=1.0)
         m = K.Mesh("SkyLayer")
-        q = [(x0, y, z0), (x0, y, z1), (x1, y, z1), (x1, y, z0)]
-        uv = [((x - x0) / CLOUD_TILE, (z - z0) / CLOUD_TILE) for x, _, z in q]
-        m.face(mat, q, uv, normal=(0, 1, 0))
+        # a nearer deck and a farther one, the farther larger and turned, so the banks drift over each other
+        for below, tile, shift in ((CLOUD_BELOW * 0.7, CLOUD_TILE, 0.0), (CLOUD_BELOW * 1.4, CLOUD_TILE * 1.6, 0.37)):
+            y = lo[1] - below
+            q = [(x0, y, z0), (x0, y, z1), (x1, y, z1), (x1, y, z0)]
+            uv = [((z - z0) / tile + shift, (x - x0) / tile + shift) for x, _, z in q]
+            m.face(mat, q, uv, normal=(0, 1, 0))
         self.add("SkyLayer", m, visible=False)
+
+    def fog(self, sky):
+        """The level's fog (settings `fog`): the colour of the sky's haze just under its horizon (the side faces'
+        rows from 52 to 60 of a hundred down) and of the world straight below (the down face's middle), FOG_DENSITY,
+        thickening under the lowest floor (FOG_BELOW, FOG_DEPTH)."""
+        from PIL import Image
+        rows = []
+        for face in ("Front", "Right", "Back", "Left"):
+            for ext in ("jpg", "png"):
+                f = os.path.join(SKY_DIR, f"Sky_{sky}_{face}.{ext}")
+                if os.path.isfile(f):
+                    a = np.asarray(Image.open(f).convert("RGB"), np.float64) / 255.0
+                    h = a.shape[0]
+                    rows.append(a[int(h * 0.52):int(h * 0.60)].reshape(-1, 3))
+                    break
+        bounds = self.floor_bounds()
+        if not rows or bounds is None:
+            return None
+        colour = np.concatenate(rows).mean(0)
+        # seen straight down: the middle of the down face (the world below, or the sea of cloud)
+        down = colour
+        for ext in ("jpg", "png"):
+            f = os.path.join(SKY_DIR, f"Sky_{sky}_Down.{ext}")
+            if os.path.isfile(f):
+                a = np.asarray(Image.open(f).convert("RGB"), np.float64) / 255.0
+                h, w = a.shape[:2]
+                down = a[h // 4:3 * h // 4, w // 4:3 * w // 4].reshape(-1, 3).mean(0)
+                break
+        return {"color": [round(float(c), 4) for c in colour], "color_down": [round(float(c), 4) for c in down],
+                "density": FOG_DENSITY,
+                "below": round(float(bounds[0][1]) - FOG_BELOW, 2), "depth": FOG_DEPTH}
 
     def write(self, title, author, sky, start_ball, music, light=(1.0, 1.0, 1.0), bonus=100, licence=None,
               extra=None):
@@ -901,14 +949,14 @@ class LevelBuilder:
         if self.narrow:
             raise ValueError(f"{len(self.narrow)} places leave the ball less than {MIN_FREE} across at the height of "
                              "its middle:\n  " + "\n  ".join(self.narrow))
-        if sky in CLOUD_SKIES:
-            self.cloud_layer()
+        self.cloud_layer(CLOUD_COVER.get(sky, CLOUD_SCATTERED))
+        fog = self.fog(sky)
         for m in self.meshes:
             orient(m)
         groups = sorted(self.groups.items())
         K.write_open(self.out, self.meshes, self.nodes, self.materials, groups, sky=sky, start_ball=start_ball,
                      settings={"music": music, "light": list(light), "level_bonus": bonus, "tutorial": False,
-                               "last_level": False, "parts": "own"},
+                               "last_level": False, "parts": "own", **({"fog": fog} if fog else {})},
                      generator=f"drahtseilakt levelkit.py {KIT_VERSION}")
         with open(os.path.join(self.out, "level.txt"), "w") as f:
             f.write(f"title = {title}\nauthor = {author}\nversion = 1\n")

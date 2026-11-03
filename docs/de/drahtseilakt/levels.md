@@ -231,6 +231,18 @@ Platz eines Wegs lassen (die DSL lehnt ein Level ab, wo sie es nicht tut, bei de
 Kisten und lose Kugeln werden bei derselben Breite geprüft. Säulen unter den Böden und unter Schienen halten Abstand
 zu jedem Boden unter ihnen, nach dessen eigener Breite.
 
+**Luft und Tore zum Herausfinden** (2026-11-03): ein Level im offenen Format kann in seinen Einstellungen Nebel tragen
+(`fog`: `color` zum Horizont, `color_down` gerade hinab, `density` je Einheit Entfernung, und `below`/`depth`: unter
+dieser Höhe vergeht alles innerhalb dieser Tiefe ganz in ihm). Der Renderer zeichnet ihn auf allem Beleuchteten (der
+Himmel, Sprites und die Wolkenschicht behalten ihre Farbe); die Physik sieht ihn nie, so bleiben Wiederholungen
+gleich, und die Level des Originals haben keinen. Unser Baukasten nimmt ihn aus den Farben des Himmels selbst (der
+Dunst gleich unter seinem Horizont, die Welt darunter) und lässt die Säulen und die Stützen der Schienen 240 tief in
+ihn reichen, so verblassen sie, statt abzubrechen; jeder Himmel außer Night bekommt die Wolkenschicht, als zwei Decks
+verstreuter Wolkenbänke über einer eigenen Welt. Nicht jeder Wechsel der Kugel liegt auf dem Weg: in Level 1 kommt die
+Steinkugel an einen Anstieg, den sie nicht schafft, der Holz-Transformator steht seitlich auf dem Platz davor; die
+Holzkugel kommt an eine Kiste, die sie nicht verschiebt, der Stein-Transformator steht seitlich auf dem Boden darunter
+(eine schnelle Holzkugel verschiebt sie manchmal doch); jeder Sektor, der eine Kugel braucht, gibt sie weiterhin.
+
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
 Flammenschalen an ihrem Rand; ein Checkpoint ein Bodenstück von 10 Länge mit einer 1,26 tief eingelassenen Schale von
