@@ -10,7 +10,8 @@
 # Nothing large is kept: the pipe and the WAV live in a temporary folder beside OUT and are removed.
 #
 # Beside the video goes OUT's name with .README.md: the level, the engine, the textures, the sounds and the
-# interface it was made with (read from the settings file the game used), as every published video carries.
+# interface it was made with (read from the settings file the game used), and the run's mode (VIDEO_MODE: test,
+# calm, speedrun or collector; test by default), as every published video carries.
 set -eu
 level=$1; replay=$2; out=$3; size=${4:-1920x1080}
 here=$(dirname "$0")

@@ -4,9 +4,19 @@
 # (XDG_DATA_HOME, as for the run). scripts/video.sh calls it; run it alone for a video made before.
 #
 #   scripts/video-readme.sh LEVEL REPLAY OUT.mp4 [WxH]
+#
+# VIDEO_MODE names the run's style: test (the default: test runs and early tries), calm, speedrun or collector.
 set -eu
 level=$1; replay=$2; out=$3; size=${4:-1920x1080}
 here=$(dirname "$0")
+mode=${VIDEO_MODE:-test}
+case $mode in
+    test) mode_line="test run (an early try, not a polished run)" ;;
+    calm) mode_line="calm: steady and safe, every checkpoint" ;;
+    speedrun) mode_line="speedrun: the fastest way found, risky tricks allowed" ;;
+    collector) mode_line="collector: every extra point and life" ;;
+    *) echo "VIDEO_MODE: test, calm, speedrun or collector" >&2; exit 1 ;;
+esac
 # The video's README: what it shows and what it was made with (the same choices the game made from its settings).
 settings=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/settings.txt
 setting() { [ -f "$settings" ] && sed -n "s/^$1 //p" "$settings" | head -n 1; }
@@ -43,6 +53,7 @@ cat > "${out%.*}.README.md" <<EOF2
 - **Textures:** $textures
 - **Sounds:** $sounds
 - **Interface:** $interface
+- **Mode:** $mode_line
 - **Played by:** the Drahtseilakt test player (autopilot), replay \`$(basename "$replay")\`
 - **Video:** $size, 60 fps, H.264 with AAC sound, made $(date -u +%Y-%m-%d)
 
