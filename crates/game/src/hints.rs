@@ -35,6 +35,9 @@ const MAX_COORD: f32 = 100_000.0;
 const MAX_TICKS: u64 = 60 * 60 * 10;
 const MAX_RADIUS: f32 = 200.0;
 const MAX_LEAD: f32 = 50.0;
+/// The fastest a press step rolls, and how far off its line it keeps at most.
+const MAX_PRESS_SPEED: f32 = 40.0;
+const MAX_PRESS_OFFSET: f32 = 3.0;
 /// The ticks a goto or become takes at most when the hint does not say.
 const GOTO_TICKS: u64 = 600;
 const BECOME_TICKS: u64 = 1200;
@@ -56,6 +59,22 @@ pub enum Step {
     Lead(Vec3, f32, u64),
     /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most.
     Shove(Vec3, Vec3, u64),
+    /// No arrows until the loose body (or module part) nearest the first point is within the distance of the
+    /// second, for so many ticks at most: a swing or a lift to get on or off at the right moment.
+    Await(Vec3, Vec3, f32, u64),
+    /// Keep the ball over the loose body (or module part) nearest the first point until it is within the distance
+    /// of the second, for so many ticks at most: riding a swing across.
+    Ride(Vec3, Vec3, f32, u64),
+    /// Roll along the straight line from where the step begins to the point, kept to it sideways (with the offset
+    /// from it, a vector across: rails ridden leaning on their upper rail), not faster than the speed, for so many
+    /// ticks at most.
+    Press(Vec3, Vec3, f32, u64),
+    /// Push along the way the ball is rolling, not faster than the speed, for so many ticks: rails that lead it
+    /// (a helix) taken at speed.
+    Along(f32, u64),
+    /// Go round the upright axis through the point (x, z) at the radius, at the speed (one way round or, negative,
+    /// the other), for so many ticks or until the ball is above the point's height: up a helix of rails.
+    Round(Vec3, f32, f32, u64),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -178,6 +197,58 @@ fn step(words: &[&str]) -> Result<Step, String> {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let to = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             Step::Shove(p, to, ticks(w.next())?)
+        }
+        "await" | "ride" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let q = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let d = num(w.next())?;
+            if !(0.0..=MAX_LEAD).contains(&d) {
+                return Err(format!("{name} is within {MAX_LEAD} units at most"));
+            }
+            let t = ticks(w.next())?;
+            if name == "await" {
+                Step::Await(p, q, d, t)
+            } else {
+                Step::Ride(p, q, d, t)
+            }
+        }
+        "round" => {
+            let c = Vec3::new(num(w.next())?, 0.0, num(w.next())?);
+            let r = num(w.next())?;
+            if !(0.5..=MAX_LEAD).contains(&r) {
+                return Err(format!("round is 0.5 to {MAX_LEAD} units across"));
+            }
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed.abs()) {
+                return Err(format!("round is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            let t = ticks(w.next())?;
+            // (done above this height, when given)
+            let top = match w.next() {
+                Some(y) => num(Some(y))?,
+                None => f32::INFINITY,
+            };
+            Step::Round(Vec3::new(c.x, top, c.z), r, speed, t)
+        }
+        "along" => {
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
+                return Err(format!("along is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            Step::Along(speed, ticks(w.next())?)
+        }
+        "press" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            // (the offset from the straight line, in units: which side of the rails' middle the ball keeps to)
+            let side = Vec3::new(num(w.next())?, 0.0, num(w.next())?);
+            if side.length() > MAX_PRESS_OFFSET {
+                return Err(format!("press keeps {MAX_PRESS_OFFSET} units off the line at most"));
+            }
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
+                return Err(format!("press is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            Step::Press(p, side, speed, ticks(w.next())?)
         }
         "become" => {
             Step::Become(kind_of(w.next().ok_or("become needs a kind")?).ok_or("not a ball kind")?)
@@ -384,6 +455,8 @@ struct Running {
     back_until: u64,
     /// The loose body a lead keeps to.
     body: Option<usize>,
+    /// Where a press step began.
+    from: Vec3,
 }
 
 /// Runs the hints for the test player.
@@ -483,6 +556,7 @@ impl Runner {
                 nearest_at: sim.tick,
                 back_until: 0,
                 body: None,
+                from: Vec3::ZERO,
             });
             self.begin(sim);
         }
@@ -533,6 +607,7 @@ impl Runner {
         run.nearest_at = sim.tick;
         run.back_until = 0;
         run.body = None;
+        run.from = Vec3::ZERO;
         if let Some(Step::Inputs(q, _)) =
             self.hints.get(run.hint).and_then(|h| h.steps.get(run.step))
         {
@@ -675,6 +750,69 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let rel = Vec3::new(ball.velocity.x, 0.0, ball.velocity.z) - v;
             Some(arrows(off.clamp_length_max(6.0) - 0.8 * rel, quarter))
         }
+        Step::Await(at, q, d, n) => {
+            if t >= *n {
+                return None;
+            }
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
+            let st = sim.world().state(body)?;
+            (st.pos.distance(*q) > *d).then_some(0)
+        }
+        Step::Ride(at, q, d, n) => {
+            if t >= *n {
+                return None;
+            }
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
+            let st = sim.world().state(body)?;
+            if st.pos.distance(*q) <= *d {
+                return None;
+            }
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let off = flat(st.pos - ball.position);
+            let rel = flat(ball.velocity - st.vel);
+            Some(arrows(off.clamp_length_max(6.0) - 0.8 * rel, quarter))
+        }
+        Step::Press(p, side, speed, n) => {
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            if t == 0 {
+                run.from = ball.position;
+            }
+            let line = flat(*p - run.from);
+            let along = line.normalize_or_zero();
+            let across = Vec3::new(-along.z, 0.0, along.x);
+            let rel = flat(ball.position - run.from);
+            // done there, or past it (the point is a rail's end: what comes after is another step's)
+            if t >= *n || flat(*p - ball.position).length() < 1.0 || rel.dot(along) >= line.length() {
+                return None;
+            }
+            let v = flat(ball.velocity);
+            // across: to the line (and its offset), damped; along: on while slower than the speed
+            let off = rel.dot(across) - side.dot(across);
+            let a = -(1.5 * off + 0.8 * v.dot(across));
+            let f = if v.dot(along) < *speed { 1.0 } else { -0.3 };
+            Some(arrows(along * f + across * a.clamp(-1.0, 1.0), quarter))
+        }
+        Step::Round(c, r, speed, n) => {
+            if t >= *n || ball.position.y > c.y {
+                return None;
+            }
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let out = flat(ball.position - *c);
+            let u = out.normalize_or_zero();
+            let around = Vec3::new(-u.z, 0.0, u.x) * speed.signum();
+            let v = flat(ball.velocity);
+            // across: to the radius, damped; around: on while slower than the speed
+            let a = -(1.5 * (out.length() - *r) + 0.8 * v.dot(u));
+            let f = if v.dot(around) < speed.abs() { 1.0 } else { -0.3 };
+            Some(arrows(around * f + u * a.clamp(-1.0, 1.0), quarter))
+        }
+        Step::Along(speed, n) => {
+            if t >= *n {
+                return None;
+            }
+            let v = Vec3::new(ball.velocity.x, 0.0, ball.velocity.z);
+            Some(if v.length() < *speed { arrows(v, quarter) } else { 0 })
+        }
         Step::Replay(..) => None,
         Step::Inputs(_, inputs) => {
             // a transformer holding the ball as the step begins holds its recorded run too: it starts as the ball
@@ -748,6 +886,21 @@ mod tests {
         let moving = parse("at 0 0 0 r 1 : lead 1 2 3 -4 300 ; shove 1 2 3 7 8 9 500").unwrap();
         assert_eq!(moving[0].steps[0], Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300));
         assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500));
+        let swing =
+            parse("at 0 0 0 r 1 : await 1 2 3 4 5 6 0.5 200 ; ride 1 2 3 4 5 6 0.5 90 ; press 1 2 3 0 1 6 200").unwrap();
+        assert_eq!(swing[0].steps[0], Step::Await(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 200));
+        assert_eq!(swing[0].steps[1], Step::Ride(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 90));
+        assert_eq!(swing[0].steps[2], Step::Press(Vec3::new(1.0, 2.0, 3.0), Vec3::Z, 6.0, 200));
+        assert!(parse("at 0 0 0 r 1 : press 1 2 3 0 4 6 200").is_err(), "too far off the line");
+        assert_eq!(parse("at 0 0 0 r 1 : along 12 240").unwrap()[0].steps[0], Step::Along(12.0, 240));
+        assert_eq!(
+            parse("at 0 0 0 r 1 : round 1 2 6 -9 300").unwrap()[0].steps[0],
+            Step::Round(Vec3::new(1.0, f32::INFINITY, 2.0), 6.0, -9.0, 300)
+        );
+        assert_eq!(
+            parse("at 0 0 0 r 1 : round 1 2 6 9 300 45").unwrap()[0].steps[0],
+            Step::Round(Vec3::new(1.0, 45.0, 2.0), 6.0, 9.0, 300)
+        );
         assert!(parse("at 0 0 0 r 1 : lead 1 2 3 99 300").is_err(), "a lead is 50 units at most");
     }
 

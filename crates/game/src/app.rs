@@ -1695,7 +1695,7 @@ fn found_way(
 const FAN_PAPER_TRIES: usize = 4;
 const FAN_PAPER_NEAR: f32 = 150.0;
 
-/// A plan: one level object a line (`NAME  # note`), in the order the way goes through them; blank lines and
+/// A plan: one level object a line (`NAME  # note`, or a place `X Y Z`), in the order the way goes through them; blank lines and
 /// `#` comments are skipped. Returns where each is and whether it is a transformer, from the checkpoint sector
 /// `sector` (from 0) begins at on (PC_TwoFlames_0N; all of it for the first).
 fn read_plan(path: &Path, level: &level::Level, sector: usize) -> Result<Vec<(glam::Vec3, bool)>, String> {
@@ -1705,6 +1705,13 @@ fn read_plan(path: &Path, level: &level::Level, sector: usize) -> Result<Vec<(gl
     for line in text.lines() {
         let name = line.split('#').next().unwrap_or_default().trim().trim_end_matches('?').trim();
         if name.is_empty() {
+            continue;
+        }
+        // a place on the way written as `X Y Z` (a rail to take rather than another, a point the way must come by)
+        let xyz: Vec<f32> =
+            name.split_whitespace().filter_map(|w| w.parse().ok()).filter(|v: &f32| v.is_finite()).collect();
+        if xyz.len() == 3 && name.split_whitespace().count() == 3 {
+            out.push((glam::Vec3::new(xyz[0], xyz[1], xyz[2]), false));
             continue;
         }
         let i = level

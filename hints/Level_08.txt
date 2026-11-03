@@ -1,0 +1,28 @@
+# Level 8 — hints for the test player (docs/drahtseilakt/autopilot.md), from the walkthrough video's storyboard
+# (ref/video/frames/fast/level08) and tried out in the game.
+#
+# Sector 3: the zigzag of rail pairs to the extra life (x 570 → z -288 → x 586 → z -310 → x 611 → the platform
+# with the dome). Each pair is two rails one above the other: the wooden ball rides on the lower one leaning on the
+# upper, from the end of one pair onto the next. Off the L-shaped track's corner, onto the first pair, south along
+# it fast enough to carry onto the crossing pair, then pair by pair, each to its corner.
+at 578 12 -237.5 r 4 sector 3 kind wood : goto 572 12 -237.5 ; goto 569.5 11.6 -238.2 ; via 568.5 13 -243 200 ; press 569.4 15.3 -288 0.8 0 12 600 ; press 585.1 15.7 -288.2 0 -1 10 300 ; press 586.2 15.7 -309.5 0.8 0 10 300 ; press 611 15.7 -309.5 0 -1 10 300 ; press 612 15.7 -335 0.8 0 10 200 ; press 632 12 -335.5 0 -1 8 300
+#
+# Sector 4: past the breaking bridge the paper ball goes round the loop (up its trough of an east side, west along
+# its south side, north along its west side) to its corner at x 758, z -326, and from there climbs the rails along
+# z -325.3 east (y 7 to 25) at a steady push along them, and on over the hanging plates (P_Modul_29_02, which
+# a slow ball sinks into) to the helix, round it up (centre 873 -321.3, radius 5.2) and off its top east.
+at 765 2.2 -335 r 5 sector 4 kind paper : goto 770.5 0.2 -338 ; press 770.5 4 -362 0 0 9 400 ; goto 770 4.8 -367.5 ; press 755 5 -367.5 0 0 8 300 ; goto 754 5 -364 ; press 754 7.2 -328 0 0 8 300 ; goto 758 7.2 -326
+at 758 7.2 -326 r 4 sector 4 kind paper : press 805 25.2 -325.3 0 0 30 400 ; press 864 25.2 -325.3 0 0 14 400 ; along 9 40 ; round 873 -321.3 5.2 8 600 46 ; press 887 47.2 -326 0 0 6 200
+#
+# Sector 5: the swing P_Modul_08_01 hangs in the gap between the square with the transformers and the square north
+# of it; its seat, a trough, swings along z between -565.6 and -577.4 every two seconds. The ball waits settled on
+# the near edge until the seat is at its far end, then rolls on as it comes back and rides it over (each ball its
+# own timing, found by trying). First as wood: north, east over the plank, down the hanging plates (a stone ball
+# would break them) to the T, west into the target of P_Modul_37_03 (its bridge falls across the gap south of the
+# north square), back and over the swing south. Then as stone north, over the bridge, ramming the boxes off the
+# zigzag and off the fan at its end, back and south. Then as paper north to the fan.
+at 865 -0.9 -562 r 4 sector 5 kind wood : goto 865 -0.9 -560 ; wait 30 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 400 ; wait 30 ; push 0 -1 60 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 300 ; push 0 -1 50
+at 888 -2.2 -609.5 r 4 sector 5 kind wood : goto 892.3 -2.2 -608.5 ; goto 900 -2.2 -609.5 ; push -1 0 120 ; wait 60 ; goto 892.3 -2.2 -608.5 ; goto 892.5 -3 -598 ; goto 890 -2.2 -587 ; goto 874.6 -2.3 -587 ; goto 865 -2.9 -588 ; goto 865 -0.5 -583 ; wait 30 ; await 865.1 -4 -571 865.1 -2.8 -565.6 0.7 400 ; wait 16 ; push 0 1 30 ; await 865.1 -4 -571 865.1 -2.8 -565.6 0.7 300 ; push 0 1 50
+at 865 -0.9 -562 r 4 sector 5 kind stone : goto 865 -0.9 -560 ; wait 30 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 400 ; push 0 -1 95 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 300 ; push 0 -1 50
+at 822 -1.4 -636.5 r 4 sector 5 kind stone : via 826 -2.2 -631.7 ; via 855 -2.2 -631.7 ; via 855 -2.2 -618 ; via 865 -1 -617 ; via 865 -0.5 -598 ; goto 865 -0.5 -583 ; wait 30 ; await 865.1 -4 -571 865.1 -2.8 -565.6 0.7 400 ; push 0 1 115 ; await 865.1 -4 -571 865.1 -2.8 -565.6 0.7 300 ; push 0 1 50
+at 865 -0.9 -562 r 4 sector 5 kind paper : goto 865 -0.9 -560 ; wait 30 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 400 ; wait 40 ; push 0 -1 70 ; await 865.1 -4 -571 865.1 -3 -577.4 0.7 300 ; push 0 -1 50

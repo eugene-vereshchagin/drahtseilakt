@@ -49,7 +49,8 @@ player's line ends there too), and from there on the test player finds the way b
 ## The way's search
 
 `--plan FILE` names the level's objects to pass through, in order, one a line (transformers, fans, checkpoints,
-`#` comments), as a player who knows the level does; without one the transformers within 30 of the way found are
+`#` comments), or places on the way as `X Y Z` (a rail to take rather than another, a point the way must come by),
+as a player who knows the level does; without one the transformers within 30 of the way found are
 taken in its order. The plans written from a walkthrough video are kept as `hints/Level_NN.plan`.
 
 The way is searched over the floor points of the level's floors, rails and modules. Besides rolling from point to
@@ -142,6 +143,11 @@ then the test player finds its place on the way again (past the transformers, wh
 | `become KIND` | roll into the nearest transformer of that kind (1200 ticks at most) |
 | `lead X Y Z D T` | keep D units ahead of the loose body nearest the point as it rolls (behind it, when D is negative), for T ticks: a stone ball pushing the paper one through fans, a ball to wait for |
 | `shove X Y Z TX TY TZ T` | push the loose body (or a module's moving part) nearest X Y Z to TX TY TZ: round it to behind it, then on into it slowly (T ticks at most) — a board shoved into place, a ball rolled where it is wanted |
+| `press X Y Z SX SZ V T` | roll along the straight line from where the step begins to the point, kept to it sideways (SX SZ: an offset across it, in units, 3 at most: the side of a rail pair the ball keeps to), on while slower than V; done there, past it, or after T ticks — rails ridden leaning on their upper rail, a steady climb |
+| `along V T` | push along the way the ball is rolling, not faster than V, for T ticks: rails that lead it (a helix) taken at speed |
+| `round X Z R V T [Y]` | go round the upright axis through (X, Z) at radius R and speed V (one way round, or the other when V is negative) for T ticks, or until the ball is above Y: up a helix of rails |
+| `await X Y Z QX QY QZ D T` | no arrows until the loose body or module part nearest X Y Z is within D of QX QY QZ (T ticks at most): a swing or a lift met at the right moment |
+| `ride X Y Z QX QY QZ D T` | keep the ball over the loose body or module part nearest X Y Z until it is within D of QX QY QZ (T ticks at most) |
 | `replay FILE FROM TO` | a player's inputs of ticks FROM..TO of the replay FILE (beside the hint file), turned to the test player's view; begun with the ball held in a transformer, it starts as the ball is let go (FROM: the player's transform tick + 149), in step with the player |
 
 Directions are world directions (X east, Z north as the level is built), so a hint does not depend on where the
