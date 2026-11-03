@@ -92,7 +92,9 @@ the nearest edge as high, and how far the middle of its floor is (the clearest p
   the line is smooth, not a zig-zag. And it rolls at a steady player's speed for its floor: on a rail or a narrow
   track a moderate one (6), on a wide floor more (up to 10, with the floor's width); faster costs, and so does
   rolling slower than half of it where nothing calls for a wait (a wait the level needs is still taken: a choice
-  that loses the ball is never worth it).
+  that loses the ball is never worth it). Held up a moment where the way goes off a rail onto a floor or up a
+  small step (a sill), it backs off a little and takes it at speed. This steady style is for a way of its own;
+  following a player's run, the player's pace is the measure.
 - **Keeping to a player's line**, where the player's ball came nearer than 3 to an edge, its ball may keep up to 1.5
   off that line toward the middle, when as fast; elsewhere the line is the player's.
 
@@ -167,7 +169,8 @@ then the test player finds its place on the way again (past the transformers, wh
 | `lead X Y Z D T` | keep D units ahead of the loose body nearest the point as it rolls (behind it, when D is negative), for T ticks: a stone ball pushing the paper one through fans, a ball to wait for |
 | `shove X Y Z TX TY TZ T` | push the loose body (or a module's moving part) nearest X Y Z to TX TY TZ: round it to behind it, then on into it slowly (T ticks at most) — a board shoved into place, a ball rolled where it is wanted |
 | `press X Y Z SX SZ V T` | roll along the straight line from where the step begins to the point, kept to it sideways (SX SZ: an offset across it, in units, 3 at most: the side of a rail pair the ball keeps to), on while slower than V; done there, past it, or after T ticks — rails ridden leaning on their upper rail, a steady climb |
-| `pass X Y Z V [T]` | roll through the point without stopping, no faster than V (a corner, a rail's end, a transformer on the way) |
+| `pass X Y Z V [T]` | roll through the point without stopping, no faster than V (a corner, a rail's end, a transformer on the way), kept to the line from the point the hint's last `pass` went through (a chain of them follows rails and tracks) |
+| `cross DX DZ X Y Z R` | cross a moving part (a swing) toward the point: the moment and the length of the push along DX DZ are found on copies of the run from here (wait, push, let it carry, push off), the first that ends within R of the point on a floor, then played |
 | `hold X Y Z T` | keep the ball on the point for T ticks: still where it must wait (on a slope, or come in at speed) |
 | `along V T` | push along the way the ball is rolling, not faster than V, for T ticks: rails that lead it (a helix) taken at speed |
 | `round X Z R V T [Y]` | go round the upright axis through (X, Z) at radius R and speed V (one way round, or the other when V is negative) for T ticks, or until the ball is above Y: up a helix of rails |
@@ -226,7 +229,7 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
   player goes on by itself through sectors 2 and 3 and over the wavy log of sector 4 to its stone transformer; the
   boxes to push off the ledge as stone are next.
 - Level 7: finished from the start in 12:04.28, following the owner's finished run.
-- Level 8: finished from the start in 13:11.15 with no player's run at all: by itself through the walkthrough's
+- Level 8: finished from the start in 9:59.40 with no player's run at all: by itself through the walkthrough's
   plan (`hints/Level_08.plan`, with places on the way) and the hints written from its storyboard
   (`hints/Level_08.txt`: rail pairs ridden leaning on their upper rail, a helix, a swing, the targets that drop
   the maze's bridges, boxes rammed off).

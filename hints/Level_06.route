@@ -1,0 +1,39 @@
+# Level 6 — the route (docs/drahtseilakt/autopilot-rules.md): sectors, stretches in order, the ball, the action.
+# From the walkthrough's storyboard (ref/video/frames/fast/level06); the plan and hints made from it are
+# Level_06.plan and Level_06.txt.
+
+sector 1 wood
+  rails and beams from the start                                     pass, cruise
+  → P_Trafo_Paper_01                                                 pass into it → paper
+  P_Modul_18_01 (fan)                                                wait over the grate → lifted to PC_TwoFlames_01
+
+sector 2 paper
+  the long stepped log, the fans 18_02..05 under its gaps            pass; over each gap on its fan
+  P_Extra_Life_01                                                    pass
+  → P_Trafo_Wood_01                                                  pass into it → wood
+  → PC_TwoFlames_02                                                  pass
+
+sector 3 wood
+  → P_Trafo_Paper_04                                                 pass into it → paper
+  the fan field P_Modul_18_06..13 onto the boxes, P_Extra_Life_03     wait over each grate → lifted
+  → PC_TwoFlames_03                                                  pass
+
+sector 4 paper
+  → P_Trafo_Wood_02                                                  pass into it → wood
+  the plank east, the wavy log south in three stretches (x 384,      press at a push that carries over the waves,
+  404, 383), between the flat transformers lying on it               pass across the joining strips (z -789, -852)
+  → P_Trafo_Stone_01 at its end                                      into it → stone
+  back north the same way                                            press, faster (a stone ball stuck in a trough
+                                                                     cannot climb out)
+  the plank along z -714.5: P_Ball_Stone_01 and P_Box_04..07          ram east off the end from x 380, six times,
+  stacked at its corner                                              braking after each
+  north → PC_TwoFlames_04                                            pass
+
+sector 5 stone
+  → P_Trafo_Wood_03                                                  pass into it → wood
+  the rail spirals to the towers with the plank bridges              pass, press along the rails
+  → P_Trafo_Stone_03 in the tower                                    into it → stone
+  P_Modul_29_01/02 (hanging plates)                                  onto them: they break under the stone ball, and
+                                                                     it drops with them onto the rail below
+  the wavy log, the platform                                         press, cruise
+  → P_Trafo_Wood_09 → PE_Balloon_01                                  pass into it → wood → the balloon

@@ -101,7 +101,9 @@ freieste Punkt in der Nähe: die halbe Breite des Bodens).
   losgelassene Pfeil kostet auch etwas, so wird die Linie glatt, kein Zickzack. Und sie rollt mit der Geschwindigkeit
   eines sicheren Spielers für ihren Boden: auf einer Schiene oder schmalen Bahn mäßig (6), auf breitem Boden schneller
   (bis 10, mit der Breite des Bodens); schneller kostet, und langsamer als die Hälfte davon auch, wo nichts ein Warten
-  verlangt (ein Warten, das das Level verlangt, wird trotzdem genommen: eine Wahl, die die Kugel verliert, ist nie etwas wert).
+  verlangt (ein Warten, das das Level verlangt, wird trotzdem genommen: eine Wahl, die die Kugel verliert, ist nie etwas wert). Kurz aufgehalten, wo der Weg von einer Schiene auf einen
+  Boden geht oder eine kleine Stufe hinauf (eine Schwelle), setzt sie etwas zurück und nimmt sie mit Anlauf. Dieser
+  ruhige Stil gilt für einen eigenen Weg; folgt sie dem Lauf eines Spielers, ist dessen Tempo das Maß.
 - **Beim Halten der Linie eines Spielers** darf seine Kugel dort, wo die Kugel des Spielers einem Rand näher als 3
   kam, bis zu 1,5 von dieser Linie zur Mitte hin bleiben, wenn es ebenso schnell ist; sonst ist die Linie die des
   Spielers.
@@ -184,7 +186,8 @@ einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinte
 | `press X Y Z SX SZ V T` | entlang der Geraden vom Ort, an dem der Schritt beginnt, zum Punkt rollen, seitlich an ihr gehalten (SX SZ: ein Versatz quer dazu, höchstens 3: auf welcher Seite eines Schienenpaars), solange langsamer als V; fertig am Punkt, dahinter oder nach T Takten — Schienen, auf der oberen lehnend gefahren, ein gleichmäßiger Anstieg |
 | `round X Z R V T [Y]` | um die senkrechte Achse durch (X, Z) im Radius R mit der Geschwindigkeit V rollen (in eine Richtung, bei negativem V in die andere), T Takte lang oder bis die Kugel über Y ist — eine Schienenspirale hinauf |
 | `along V T` | in die Richtung schieben, in die die Kugel rollt, nicht schneller als V, T Takte lang — Schienen, die sie führen |
-| `pass X Y Z V [T]` | durch den Punkt rollen, ohne anzuhalten, nicht schneller als V (eine Kurve, ein Schienenende, ein Transformator unterwegs) |
+| `pass X Y Z V [T]` | durch den Punkt rollen, ohne anzuhalten, nicht schneller als V (eine Kurve, ein Schienenende, ein Transformator unterwegs); an der Linie vom Punkt gehalten, durch den das letzte `pass` des Hinweises ging (eine Kette davon folgt Schienen und Bahnen) |
+| `cross DX DZ X Y Z R` | über ein bewegliches Teil (eine Schaukel) zum Punkt: der Moment und die Länge des Stoßes entlang DX DZ werden auf Kopien des Laufs von hier gefunden (warten, stoßen, tragen lassen, abstoßen), der erste, nach dem die Kugel innerhalb R vom Punkt auf einem Boden ist, und dann gespielt |
 | `hold X Y Z T` | die Kugel T Takte auf dem Punkt halten — still, wo gewartet werden muss (auf einem Hang, oder nach schneller Ankunft) |
 | `await X Y Z QX QY QZ D T` | die Kugel an Ort und Stelle halten, bis der lose Körper oder das bewegliche Modulteil nächst X Y Z innerhalb D von QX QY QZ ist (höchstens T Takte) — eine Schaukel oder ein Aufzug im richtigen Moment |
 | `ride X Y Z QX QY QZ D T` | die Kugel über dem Körper oder Modulteil nächst X Y Z halten, bis es innerhalb D von QX QY QZ ist (höchstens T Takte) |
