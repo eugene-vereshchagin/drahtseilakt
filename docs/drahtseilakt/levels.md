@@ -139,7 +139,7 @@ which the land shows far below. The level kit writes it into the level's setting
 floor, 35 if not given; T deep, 110; a cloud S across, 85) or has none with `clouds off`. The original's levels have
 none. The settings file's `cloud-quality` (`low`, `medium` (the default), `high`; `off` draws none) sets how finely
 it is drawn, and *Clouds?* off hides it as well ([menu.md](menu.md)). On an RTX 3060 at 2560×1440 it costs about
-COST.
+3.5, 4.5 and 6 ms a frame (low, medium, high).
 
 **How the track keeps the ball on** (`safety`): the original's help shrinks from level to level, and ours follows
 it. Measured on the original's thirteen levels (its floors' edges, numbers only): in levels 1, 3 and 5 about two
