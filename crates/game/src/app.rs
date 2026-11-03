@@ -93,6 +93,9 @@ struct Game {
     level_bonus: i64,
     /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
     assisted: bool,
+    /// The mods that run on the run's side (modrt.rs), as each new run starts with them: a replay's own (its `mod`
+    /// lines), else what the window sets (the mods switched on).
+    mods: crate::modrt::SimMods,
     last_level: bool,
     /// Where the level's runs are kept: the original levels' in replays/, a custom level's under replays/maps/ in its
     /// folder's name (community, open, remastered), so no two kinds share runs.
@@ -200,6 +203,23 @@ impl Game {
         sim.checkpoints_by_name = replay_in.as_ref().is_none_or(|r| r.version >= 4);
         let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
+        // a replay played with mods that changed the run plays with the very same mods, or not at all
+        let mods = match &replay_in {
+            Some(r) if !r.mods.is_empty() => {
+                crate::modrt::Mods::load(gamedata::mods::scan(), setting)
+                    .for_replay(&r.mod_refs())
+                    .map_err(|e| {
+                        format!(
+                            "{}: {e}",
+                            o.replay
+                                .as_ref()
+                                .map_or(String::new(), |p| p.display().to_string())
+                        )
+                    })?
+            }
+            _ => crate::modrt::SimMods::default(),
+        };
+        sim.mods = mods.clone();
         let start = match &replay_in {
             Some(r) => r.start.clone(),
             None => start_of(o, &level.level)?,
@@ -212,6 +232,7 @@ impl Game {
         }
         let mut replay_out = Replay::new(&level.name, level.hash);
         replay_out.start = start.clone();
+        replay_out.mods = mods.replay_lines();
         // a run re-recorded from an old replay plays by its rules, so it keeps its format
         if let Some(r) = &replay_in {
             replay_out.version = r.version;
@@ -254,6 +275,7 @@ impl Game {
             music_theme: level.level.settings.music,
             level_bonus,
             assisted: false,
+            mods,
             last_level: level.level.settings.last_level,
             runs_root: {
                 let (root, old) = runs_root(&o.source);
@@ -282,19 +304,8 @@ impl Game {
     fn restart(&mut self) {
         self.save_attempt();
         self.assisted = false;
-        self.sim = Sim::with_rules(
-            &self.level.level,
-            self.start_ball,
-            &self.modules,
-            self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
-            self.replay_in.as_ref().map_or(crate::replay::VERSION, |r| r.version),
-        );
-        self.sim.set_ball_boxes(self.ball_meshes.boxes);
-        self.sim.set_pieces(self.pieces.clone());
-        self.sim.bursts = self.replay_in.as_ref().is_none_or(|r| r.version >= 2);
-        self.sim.pieces_expire = self.replay_in.as_ref().is_none_or(|r| r.version >= 3);
-        self.sim.checkpoints_by_name = self.replay_in.as_ref().is_none_or(|r| r.version >= 4);
-        self.sim.level_bonus = self.level_bonus;
+        self.sim = self.fresh_sim(self.replay_in.as_ref().map_or(crate::replay::VERSION, |r| r.version));
+        self.sim.mods = self.mods.clone();
         self.ball_sound.silence(&mut self.sound_out);
         self.fan_sound.silence(&mut self.sound_out);
         if let Some(st) = &self.start {
@@ -304,6 +315,7 @@ impl Game {
         self.watch = Watch::default();
         self.replay_out = Replay::new(&self.level.name, self.level.hash);
         self.replay_out.start = self.start.clone();
+        self.replay_out.mods = self.mods.replay_lines();
         if let Some(r) = &self.replay_in {
             self.replay_out.version = r.version;
         }
@@ -582,9 +594,19 @@ impl Game {
             .ok()
             .and_then(|t| Replay::parse(&t).ok())
             .map(|r| r.end);
-        // A run begun elsewhere than the level start is a test, never the level's best.
-        if self.start.is_none() && !self.assisted && best_ticks.is_none_or(|b| self.sim.tick < b) {
+        // A run begun elsewhere than the level start is a test, never the level's best; nor is a modded run.
+        if self.start.is_none()
+            && !self.assisted
+            && !self.sim.mods.modded()
+            && best_ticks.is_none_or(|b| self.sim.tick < b)
+        {
             targets.push(best.clone());
+            let splits: Vec<String> = crate::modrt::split_ticks(&self.sim.events)
+                .iter()
+                .map(u64::to_string)
+                .collect();
+            let _ = std::fs::create_dir_all(&dir);
+            let _ = std::fs::write(dir.join("splits.txt"), splits.join(" ") + "\n");
             println!(
                 "best run of {} so far: {}",
                 self.level.name,
@@ -600,6 +622,86 @@ impl Game {
                 Err(e) => eprintln!("could not save the run to {}: {e}", shown_path(&path)),
             }
         }
+    }
+
+    /// The mods the window has switched on, for the runs from the next start (a replay keeps its own). A run not yet
+    /// begun takes them at once.
+    fn set_mods(&mut self, mods: crate::modrt::SimMods) {
+        if self.replay_in.is_some() {
+            return;
+        }
+        self.mods = mods;
+        if self.sim.tick == 0 {
+            self.sim.mods = self.mods.clone();
+            self.replay_out.mods = self.mods.replay_lines();
+        }
+    }
+
+    /// The run so far could become the best: begun at the level start, not modded, not a replay (a ghost and splits
+    /// compare only such runs).
+    fn counts_so_far(&self) -> bool {
+        self.start.is_none() && !self.sim.mods.modded() && self.replay_in.is_none()
+    }
+
+    /// The best run's sector times (each sector reached, then the finish), as the best run left them.
+    fn best_splits(&self) -> Vec<u64> {
+        let path = self.runs_dir(&level_stem(self)).join("splits.txt");
+        crate::hints::read_plain(&path, 4096)
+            .ok()
+            .and_then(|b| String::from_utf8(b).ok())
+            .map(|t| {
+                t.split_whitespace()
+                    .take(256)
+                    .filter_map(|w| w.parse().ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// A fresh run of this level by `version`'s rules, as `restart` makes it (no mods: for the ghost).
+    fn fresh_sim(&self, version: u32) -> Sim {
+        let mut sim = Sim::with_rules(
+            &self.level.level,
+            self.start_ball,
+            &self.modules,
+            self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
+            version,
+        );
+        sim.set_ball_boxes(self.ball_meshes.boxes);
+        sim.set_pieces(self.pieces.clone());
+        sim.bursts = version >= 2;
+        sim.pieces_expire = version >= 3;
+        sim.checkpoints_by_name = version >= 4;
+        sim.level_bonus = self.level_bonus;
+        sim
+    }
+
+    /// The level's best run as a ghost: its replay (on this very level file, from the start, not modded) and a run
+    /// to play it in.
+    fn ghost(&self) -> Option<Ghost> {
+        let path = self.runs_dir(&level_stem(self)).join("best.replay");
+        let text =
+            String::from_utf8(crate::hints::read_plain(&path, crate::hints::MAX_REPLAY_FILE).ok()?)
+                .ok()?;
+        let replay = Replay::parse(&text).ok()?;
+        if replay.level_hash != self.level.hash || replay.start.is_some() || !replay.mods.is_empty()
+        {
+            return None;
+        }
+        let sim = self.fresh_sim(replay.version);
+        Some(Ghost {
+            sim,
+            replay,
+            path: Vec::new(),
+        })
+    }
+
+    /// The run counts (a best run, a highscore): begun at the level start, not helped, not modded, not a replay.
+    fn counts(&self) -> bool {
+        self.start.is_none()
+            && !self.assisted
+            && !self.sim.mods.modded()
+            && self.replay_in.is_none()
     }
 
     fn title(&self) -> String {
@@ -774,6 +876,7 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
     m.volumes = load_volumes();
     m.graphics = load_graphics();
     m.bindings = load_bindings(&strings);
+    m.mods = crate::modrt::Mods::load(gamedata::mods::scan(), setting);
     m.resolutions = crate::options::WINDOWED.to_vec();
     for k in keys.chars() {
         match k {
@@ -1053,11 +1156,21 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
     let graphics = load_graphics();
     let bindings = load_bindings(&strings);
     show_graphics(&graphics, features);
+    let mods = crate::modrt::Mods::load(gamedata::mods::scan(), setting);
+    for m in &mods.found {
+        if let Err(e) = &m.parsed {
+            eprintln!("mod {}: refused: {e}", m.key);
+        }
+    }
+    // the test player (--watch) plays the original's rules: no mod changes its run
+    let (sim_mods, view_mods) = mods.running(features.mode && pilot.is_none());
+    game.set_mods(sim_mods);
     let menu = (!o.chosen && o.replay.is_none()).then(|| {
         let mut m = Menu::new(&data, &strings, crate::menu::Screen::Main, Some(1), features);
         m.volumes = load_volumes();
         m.graphics = graphics;
         m.bindings = bindings;
+        m.mods = mods.clone();
         m
     });
     let mut app = App {
@@ -1115,6 +1228,16 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
         prev: None,
         error: None,
         menu_scene: None,
+        mods,
+        view_mods,
+        mod_began: Instant::now(),
+        mouse: (0.0, 0.0),
+        fps: 60.0,
+        ghost: None,
+        ghost_tried: false,
+        best_splits: None,
+        light_base: None,
+        shot_due: false,
         menu_ms: 0.0,
         held: std::collections::HashSet::new(),
         pilot: pilot.map(|run| PilotWatch {
@@ -2251,8 +2374,11 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
         .or(caps.formats.first().copied())
         .ok_or("no surface format")?;
     let size = window.inner_size();
+    // read back for the screenshots where the surface allows it
+    let usage =
+        wgpu::TextureUsages::RENDER_ATTACHMENT | (caps.usages & wgpu::TextureUsages::COPY_SRC);
     let config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        usage,
         format,
         width: size.width.clamp(1, crate::options::SURFACE_MAX),
         height: size.height.clamp(1, crate::options::SURFACE_MAX),
@@ -2683,6 +2809,30 @@ struct App {
     cursor_shown: Option<bool>,
     /// The test player playing in the window (--watch), while it plays.
     pilot: Option<PilotWatch>,
+    /// The mods (modrt.rs, docs/drahtseilakt/mods.md): those found, which are on and their options; their view side
+    /// running; when this run began (real time); the mouse's motion this frame; the frames a second.
+    mods: crate::modrt::Mods,
+    view_mods: crate::modrt::ViewMods,
+    mod_began: Instant,
+    mouse: (f32, f32),
+    fps: f32,
+    /// The best run as a ghost (a mod's `ghost`), and whether it was looked for in this run.
+    ghost: Option<Box<Ghost>>,
+    ghost_tried: bool,
+    /// The best run's sector times (a mod's `splits`), read once a run.
+    best_splits: Option<Vec<u64>>,
+    /// The level's light as uploaded (a mod's `light` dims it).
+    light_base: Option<crate::render::Light>,
+    /// A screenshot (a mod's `screenshot`) is due after this frame is drawn.
+    shot_due: bool,
+}
+
+/// The level's best run played beside this one (a mod's `ghost`): its run, its input, and where its ball was at each
+/// tick (so a run taken back still finds it).
+struct Ghost {
+    sim: Sim,
+    replay: Replay,
+    path: Vec<(glam::Vec3, glam::Quat, Option<crate::sim::BallKind>)>,
 }
 
 /// The test player in the window (--watch): its run, and what the watcher does with it.
@@ -2991,6 +3141,7 @@ impl App {
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
         let Gpu { surface, config, mut renderer, modes } = window_gpu(&window)?;
         upload(&mut renderer, &self.game);
+        self.light_base = Some(renderer.light);
         if self.menu_scene.is_none() {
             self.menu_scene = load_menu_scene(&self.data);
         }
@@ -3041,7 +3192,296 @@ impl App {
         if let Some(w) = &self.window {
             w.set_title(&self.game.title());
         }
+        self.apply_mods();
         Ok(())
+    }
+
+    /// The mods switched on (in the extended mode) run: the run's side from the next start, the view's at once.
+    fn apply_mods(&mut self) {
+        let (sim, view) = self.mods.running(self.features.mode);
+        self.game.set_mods(sim);
+        self.view_mods = view;
+        self.reset_mod_run();
+        if let Some(gpu) = &self.gpu {
+            self.light_base = Some(gpu.renderer.light);
+        }
+    }
+
+    /// A new run for the mods: the view's variables as at first, the real time from now, no ghost yet.
+    fn reset_mod_run(&mut self) {
+        self.view_mods.reset();
+        self.mod_began = Instant::now();
+        self.ghost = None;
+        self.ghost_tried = false;
+        self.best_splits = None;
+    }
+
+    /// A value a mod reads: the run's from the Sim, the view's from the window.
+    fn mod_value(&self, v: gamedata::mods::Value) -> f32 {
+        use gamedata::mods::Value as V;
+        let sim = &self.game.sim;
+        let now = || {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs())
+        };
+        match v {
+            V::RealTime => self.mod_began.elapsed().as_secs_f32(),
+            V::FrameDt => 1.0 / self.fps.max(1.0),
+            V::Fps => self.fps,
+            // the clock is UTC: the game knows no time zone (no locale data is read)
+            V::ClockHour => ((now() / 3600) % 24) as f32,
+            V::ClockMinute => ((now() / 60) % 60) as f32,
+            V::ClockSecond => (now() % 60) as f32,
+            V::MouseDx => self.mouse.0,
+            V::MouseDy => self.mouse.1,
+            V::ExtrasPoints => sim.extras_left().0 as f32,
+            V::ExtrasPointsAll => sim.extras_left().1 as f32,
+            V::ExtrasLives => sim.extras_left().2 as f32,
+            V::ExtrasLivesAll => sim.extras_left().3 as f32,
+            V::BestTime => self
+                .best_splits
+                .as_ref()
+                .and_then(|b| b.last())
+                .map_or(-1.0, |&t| t as f32 / 60.0),
+            _ => sim.mod_value(v, self.bindings.turn(self.keys | self.pad_keys)),
+        }
+    }
+
+    /// The view's mods for this frame: their frame rules, what they ask done, the ghost kept up with the run.
+    fn mod_frame(&mut self, step: f32) {
+        if step > 0.0 {
+            self.fps = self.fps * 0.9 + (1.0 / step) * 0.1;
+        }
+        if self.view_mods.is_empty() || self.menu.is_some() || self.loading.is_some() {
+            self.mouse = (0.0, 0.0);
+            return;
+        }
+        if self.best_splits.is_none() {
+            self.best_splits = Some(self.game.best_splits());
+        }
+        let mut view = std::mem::take(&mut self.view_mods);
+        view.out.lines.clear();
+        view.out.splits.clear();
+        let lang = self.strings.language();
+        view.fire(
+            gamedata::mods::Event::Frame,
+            &|v| self.mod_value(v),
+            &self.game.sim.mods,
+            lang,
+        );
+        self.view_mods = view;
+        self.mouse = (0.0, 0.0);
+        if std::mem::take(&mut self.view_mods.out.restart) {
+            self.restart();
+            self.saved = None;
+        }
+        if std::mem::take(&mut self.view_mods.out.screenshot) {
+            self.shot_due = true;
+        }
+        self.keep_ghost();
+    }
+
+    /// A key the mods take (one of their key options): its rules fire; true when some mod took it.
+    fn mod_key(&mut self, code: KeyCode) -> bool {
+        if self.view_mods.is_empty() {
+            return false;
+        }
+        let name = format!("{code:?}");
+        let mut view = std::mem::take(&mut self.view_mods);
+        let taken = view.runs.iter().any(|r| {
+            r.txt.options.iter().zip(&r.opts).any(|(o, v)| {
+                matches!(o.kind, gamedata::mods::OptKind::Key(_)) && o.show(*v) == name
+            })
+        });
+        if taken {
+            let lang = self.strings.language();
+            view.press(&name, &|v| self.mod_value(v), &self.game.sim.mods, lang);
+        }
+        self.view_mods = view;
+        taken
+    }
+
+    /// The ghost of the best run, played up to this run's tick (a few ticks a frame, so a long run catches up).
+    fn keep_ghost(&mut self) {
+        if self.view_mods.out.ghost <= 0.0 || !self.game.counts_so_far() {
+            self.ghost = None;
+            return;
+        }
+        if self.ghost.is_none() && !self.ghost_tried {
+            self.ghost_tried = true;
+            self.ghost = self.game.ghost().map(Box::new);
+        }
+        let Some(g) = &mut self.ghost else { return };
+        let want = usize::try_from(self.game.sim.tick).unwrap_or(usize::MAX);
+        let mut steps = 0;
+        while g.path.len() <= want && steps < 240 {
+            let next = g.sim.tick + 1;
+            g.sim.step(if next <= g.replay.end {
+                g.replay.input_at(next)
+            } else {
+                0
+            });
+            g.path
+                .push((g.sim.ball.position, g.sim.ball.rotation, g.sim.drawn_ball()));
+            steps += 1;
+        }
+    }
+
+    /// The ghost's ball at this run's tick, as a translucent instance.
+    fn ghost_instance(&self) -> Option<crate::render::Instance> {
+        let g = self.ghost.as_ref()?;
+        let at = usize::try_from(self.game.sim.tick).ok()?;
+        let &(pos, rot, kind) = g.path.get(at).or(g.path.last())?;
+        let b = &self.game.ball_meshes;
+        let mesh = match kind? {
+            crate::sim::BallKind::Wood => b.wood,
+            crate::sim::BallKind::Stone => b.stone,
+            crate::sim::BallKind::Paper => b.paper,
+        }?;
+        let a = self.view_mods.out.ghost;
+        Some(crate::render::Instance {
+            model: scene::BALLS_MODEL,
+            mesh,
+            matrix: glam::Mat4::from_rotation_translation(rot, pos),
+            marker: None,
+            uv_offset: [0.0; 2],
+            diffuse: Some([0.7, 0.85, 1.0, a]),
+            unlit: false,
+            shadow: None,
+        })
+    }
+
+    /// The mods' HUD lines and the splits, in their corners, in the interface's font.
+    fn mod_hud(&self, f: &crate::ui::Face, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
+        use gamedata::mods::Corner;
+        let out = &self.view_mods.out;
+        let mut by: Vec<(Corner, String, [f32; 4])> = out
+            .lines
+            .iter()
+            .map(|(c, t)| (*c, t.clone(), [1.0, 1.0, 1.0, 1.0]))
+            .collect();
+        for c in &out.splits {
+            for (t, color) in self.split_lines() {
+                by.push((*c, t, color));
+            }
+        }
+        let mut q = Vec::new();
+        for corner in [
+            Corner::TopLeft,
+            Corner::TopRight,
+            Corner::BottomLeft,
+            Corner::BottomRight,
+        ] {
+            let lines: Vec<&(Corner, String, [f32; 4])> =
+                by.iter().filter(|l| l.0 == corner).collect();
+            let right = matches!(corner, Corner::TopRight | Corner::BottomRight);
+            let bottom = matches!(corner, Corner::BottomLeft | Corner::BottomRight);
+            for (k, (_, text, color)) in lines.iter().enumerate() {
+                let step = 0.034;
+                // the top left keeps clear of the points counter, the bottom right of the lives
+                let y = if bottom {
+                    0.86 - step * (lines.len() - k) as f32
+                } else {
+                    0.02 + if right { 0.0 } else { 0.10 } + step * k as f32
+                };
+                let style = crate::ui::Style {
+                    scale: [0.5, 0.55],
+                    spacing: [1.0, 1.0],
+                    align: (if right {
+                        crate::ui::ALIGN_RIGHT
+                    } else {
+                        crate::ui::ALIGN_LEFT
+                    }) | crate::ui::ALIGN_TOP,
+                    flags: crate::ui::TEXT_SCREEN,
+                    margins: [0.0; 4],
+                    color: *color,
+                    v2: true,
+                    shadow: Some(([1.0, 1.0], [0.0, 0.0, 0.0, 0.8])),
+                };
+                let quads = f.layout(
+                    text,
+                    crate::ui::homogeneous([0.015, y, 0.985, y + step]),
+                    &style,
+                );
+                let anchor = if right {
+                    crate::ui::Anchor::Right
+                } else {
+                    crate::ui::Anchor::Left
+                };
+                q.extend(crate::ui::place(quads, screen, anchor));
+            }
+        }
+        q
+    }
+
+    /// The splits: each sector reached (and the finish) with its time, and the difference to the best run's
+    /// (green ahead, red behind); the sector being played with its time so far.
+    fn split_lines(&self) -> Vec<(String, [f32; 4])> {
+        let sim = &self.game.sim;
+        let reached = crate::modrt::split_ticks(&sim.events);
+        let best = self.best_splits.clone().unwrap_or_default();
+        let sector = self.strings.ours("sector");
+        let mut v = Vec::new();
+        for (k, &t) in reached.iter().enumerate() {
+            let mut line = format!("{sector} {}  {}", k + 1, clock(t));
+            let mut color = [1.0, 1.0, 1.0, 1.0];
+            if let Some(&b) = best.get(k) {
+                let d = (t as f64 - b as f64) / 60.0;
+                line.push_str(&format!(
+                    "  {}{:.2}",
+                    if d < 0.0 { "-" } else { "+" },
+                    d.abs()
+                ));
+                color = if d <= 0.0 {
+                    [0.5, 1.0, 0.5, 1.0]
+                } else {
+                    [1.0, 0.5, 0.45, 1.0]
+                };
+            }
+            v.push((line, color));
+        }
+        if !sim.finished {
+            v.push((
+                format!("{sector} {}  {}", reached.len() + 1, clock(sim.tick)),
+                [1.0, 0.85, 0.3, 1.0],
+            ));
+        }
+        v
+    }
+
+    /// Saves the frame just drawn as a PNG in the data folder's screenshots/ (a mod's `screenshot`).
+    fn save_screenshot(texture: &wgpu::Texture, gpu: &Gpu) {
+        let (w, h) = (gpu.config.width, gpu.config.height);
+        let pixels = match read_back(&gpu.renderer, texture, w, h) {
+            Ok(p) => p,
+            Err(e) => return eprintln!("screenshot: {e}"),
+        };
+        let mut pixels = pixels;
+        let bgra = matches!(
+            gpu.config.format,
+            wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb
+        );
+        for px in pixels.as_chunks_mut::<4>().0 {
+            if bgra {
+                px.swap(0, 2);
+            }
+            // the surface's alpha means nothing in a picture
+            px[3] = 255;
+        }
+        let dir = gamedata::profile::data_dir().join("screenshots");
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis());
+        let path = dir.join(format!("drahtseilakt-{stamp}.png"));
+        let _ = std::fs::create_dir_all(&dir);
+        match image::save_buffer(&path, &pixels, w, h, image::ExtendedColorType::Rgba8) {
+            Ok(()) => println!("screenshot saved to {}", shown_path(&path)),
+            Err(e) => eprintln!(
+                "could not save the screenshot to {}: {e}",
+                shown_path(&path)
+            ),
+        }
     }
 
     /// The sounds of what happened in the run since the last frame, as the original's Sound_Manager plays them on
@@ -3155,6 +3595,7 @@ impl App {
     /// The run starts again: its music and its start sound too.
     fn restart(&mut self) {
         self.game.restart();
+        self.reset_mod_run();
         self.started = false;
         self.prev = None;
         if let (Some(a), Some(m)) = (&mut self.audio, &mut self.music) {
@@ -3189,6 +3630,7 @@ impl App {
         menu.graphics = self.graphics;
         menu.bindings = self.bindings;
         menu.resolutions = self.resolutions.clone();
+        menu.mods = self.mods.clone();
         if let Some(gpu) = &self.gpu {
             menu.resolution = (gpu.config.width, gpu.config.height);
         }
@@ -3592,7 +4034,7 @@ impl App {
             self.open_menu(crate::menu::Screen::Dead);
         } else if crate::endscreen::over(&self.game.sim) {
             self.open_menu(crate::menu::Screen::End);
-            let counts = self.game.start.is_none() && !self.game.assisted && self.game.replay_in.is_none();
+            let counts = self.game.counts();
             let points = crate::endscreen::score(&self.game.sim);
             if let (Some(m), Some(n), true) = (&mut self.menu, self.number, counts)
                 && m.scores.place(n, points).is_some()
@@ -3728,11 +4170,33 @@ impl App {
                 if let Some(m) = &mut self.menu {
                     m.set_features(self.features, &self.data);
                 }
+                self.apply_mods();
             }
             Action::Graphics(g) => self.set_graphics(g),
             Action::Bindings(b) => {
                 self.bindings = b;
                 put_settings(&b.lines());
+            }
+            Action::ModSwitch(_) | Action::ModOption(..) => {
+                match action {
+                    Action::ModSwitch(i) => self.mods.toggle(i),
+                    Action::ModOption(i, o, by) => self.mods.step_option(i, o, by),
+                    _ => {}
+                }
+                put_settings(&self.mods.lines());
+                // the view's side at once, the run's from the next start
+                let (sim, view) = self.mods.running(self.features.mode);
+                self.game.set_mods(sim);
+                let out = std::mem::take(&mut self.view_mods.out);
+                self.view_mods = view;
+                self.view_mods.out = crate::modrt::ViewOut {
+                    lines: Vec::new(),
+                    splits: Vec::new(),
+                    ..out
+                };
+                if let Some(m) = &mut self.menu {
+                    m.mods = self.mods.clone();
+                }
             }
             Action::Score(name) => {
                 self.player = name.clone();
@@ -3755,6 +4219,10 @@ impl App {
             if down {
                 self.menu_key(code, typed, event_loop);
             }
+            return;
+        }
+        // a key one of the mods' key options names (modrt.rs) is the mod's
+        if down && self.fly.is_none() && self.pilot.is_none() && self.mod_key(code) {
             return;
         }
         if code == KeyCode::F2 && down && self.tools() {
@@ -3931,6 +4399,7 @@ impl App {
         }
         let simulated = started.elapsed();
         self.run_over();
+        self.mod_frame(step);
         if let Some(a) = &mut self.audio {
             a.pass(f64::from(ticks) * f64::from(TICK));
         }
@@ -3953,6 +4422,21 @@ impl App {
         }
         self.last_view = (snap.eye, snap.target);
         let tools = self.tools();
+        let ghost = self.ghost_instance();
+        let mod_quads = match (&self.gpu, self.game.font.as_ref()) {
+            (Some(g), Some(f))
+                if self.menu.is_none() && self.loading.is_none() && !self.view_mods.is_empty() =>
+            {
+                self.mod_hud(
+                    f,
+                    crate::ui::Screen {
+                        w: g.config.width as f32,
+                        h: g.config.height as f32,
+                    },
+                )
+            }
+            _ => Vec::new(),
+        };
         let Some(gpu) = &mut self.gpu else { return };
         let acquire_started = Instant::now();
         let frame = match gpu.surface.get_current_texture() {
@@ -3992,12 +4476,32 @@ impl App {
             if let Some(w) = self.pilot.as_ref().filter(|w| !w.done) {
                 w.zone_instances(&self.game, &mut inst);
             }
+            inst.extend(ghost);
             let particles = self.game.effects.batches(snap.eye, snap.target);
-            (inst, particles, scene::view(&snap))
+            let mut view = scene::view(&snap);
+            // the mods' camera (modrt.rs): turned about the ball, nearer or farther, a wider or narrower view
+            let out = &self.view_mods.out;
+            if self.fly.is_none() && !self.view_mods.is_empty() {
+                let back = glam::Quat::from_rotation_y(out.yaw.to_radians()) * (view.eye - view.target);
+                view.eye = view.target + back * out.distance;
+                let across = 2.0 * ((view.fov_y / 2.0).tan() / 0.75).atan() + out.fov.to_radians();
+                view.fov_y = 2.0 * ((across.clamp(0.2, 3.0) / 2.0).tan() * 0.75).atan();
+            }
+            (inst, particles, view)
         };
         let built = build_started.elapsed();
         let draw_started = Instant::now();
         (gpu.renderer.flash, gpu.renderer.point) = if menu_up { (0.0, None) } else { (flash, point) };
+        // the mods' light: the level's dimmed, a light over the ball
+        if let Some(base) = self.light_base {
+            let k = if menu_up { 1.0 } else { self.view_mods.out.light };
+            gpu.renderer.light.color = base.color.map(|c| c * k);
+            gpu.renderer.light.ambient = base.ambient.map(|c| c * k);
+        }
+        let lantern = self.view_mods.out.lantern;
+        if !menu_up && lantern > 0.0 && gpu.renderer.point.is_none() {
+            gpu.renderer.point = Some((snap.ball + glam::Vec3::Y * 4.0, [lantern; 3]));
+        }
         gpu.renderer.draw(&view, gpu.config.width, gpu.config.height, &frame_view, &inst, &particles);
         let drawn = draw_started.elapsed();
         let overlay_started = Instant::now();
@@ -4064,6 +4568,7 @@ impl App {
                 if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
                     q.extend(crate::endscreen::interface(&t, f, &self.strings, screen));
                 }
+                q.extend(mod_quads);
                 // the watched test player's status, small in the top left corner (--watch)
                 if let (Some(w), Some(f)) = (self.pilot.as_ref().filter(|w| !w.done), font) {
                     q.extend(watch_overlay(&w.status(&self.game), f, screen));
@@ -4081,6 +4586,13 @@ impl App {
         gpu.renderer.draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();
+        if std::mem::take(&mut self.shot_due) {
+            if gpu.config.usage.contains(wgpu::TextureUsages::COPY_SRC) {
+                Self::save_screenshot(&frame.texture, gpu);
+            } else {
+                eprintln!("screenshot: this display's surface cannot be read back");
+            }
+        }
         gpu.renderer.queue.present(frame);
         let presented = present_started.elapsed();
         if let Some(t) = &mut self.timing {
@@ -4240,6 +4752,21 @@ impl App {
 }
 
 impl ApplicationHandler for App {
+    /// The mouse's raw motion: the mods read it (`mouse.dx`, `mouse.dy`) while a run is up.
+    fn device_event(
+        &mut self,
+        _: &ActiveEventLoop,
+        _: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        if let winit::event::DeviceEvent::MouseMotion { delta } = event
+            && self.menu.is_none()
+        {
+            self.mouse.0 += delta.0 as f32;
+            self.mouse.1 += delta.1 as f32;
+        }
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none()
             && let Err(e) = self.init(event_loop)

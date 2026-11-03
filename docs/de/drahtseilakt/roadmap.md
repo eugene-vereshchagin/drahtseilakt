@@ -211,8 +211,9 @@ Fertig, wenn: sich alle dreizehn Level beenden lassen und jedes ein bestehendes 
   Sie wird mit Name und GUID des Blocks gemeldet und als nicht unterstützt markiert.
 - **Spielprofile**: *Klassisch* — nur das Originalspiel (zwölf Level und Level 13, Originalregeln; Replays und
   Rekorde zählen nur hier); *Erweitert* — Inhalte Dritter auf eigenes Risiko mit deutlicher Warnung:
-  Community-Karten, Texturpakete, später Mods. Mods heißt unser eigenes System — Daten und Skripte in einer
-  Sandbox ohne Datei- oder Netzzugriff; BML-Mods sind Windows-DLLs und werden nie geladen.
+  Community-Karten, Texturpakete, Mods. Mods sind unser eigenes Format aus reinen Daten: Regeln aus einer festen
+  Bibliothek von Bausteinen der Engine, von unserer Laufzeit interpretiert, nie Code ([mods.md](mods.md)); BML-Mods
+  sind Windows-DLLs und werden nie geladen.
   Die Menüs beider Modi: [menu.md](menu.md).
 
 Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen auf, jede mit Grund.
@@ -266,7 +267,12 @@ Schwierigkeit (levels.md, „Unsere Level und wie man sie bearbeitet“), jedes 
 ## Was Spieler mit Mods ergänzt haben
 
 Eine statische Durchsicht von dreißig BML/BML+-Mods (nur Zeichenketten und Readmes; Mods werden nie
-ausgeführt) zeigt, was Spielern fehlte. Ins Grundspiel: Übungswerkzeuge (Start an Punkt und Sektor nach Wahl,
+ausgeführt) zeigt, was Spielern fehlte; die vollständige Tabelle, Mod für Mod, und was wir aus jedem gemacht haben,
+steht in [mods.md](mods.md). Erledigt (2026-11-03): unser eigenes Mod-Format aus reinen Daten und seine Laufzeit, der
+Bildschirm Mods und zehn Werks-Mods darin (klebende Kugel, Physiklabor, dynamisches Sichtfeld, freie Ansicht,
+Segment-Timer mit Zwischenzeiten, Info-Einblendung, schneller Neustart, Bildschirmfoto, Geisterspur, Verdunkelung);
+von einem Mod geänderte Läufe werden in ihren Replays als gemoddet markiert. Vorgemerkt: der Begleiter (zwei Kugeln),
+Steuern mit der gedrehten Ansicht, Täuschkugeln, Statistik der Spielzeit. Ins Grundspiel: Übungswerkzeuge (Start an Punkt und Sektor nach Wahl,
 schneller Neustart, ein Geist des besten Laufs je Sektor, Zwischenzeiten und Echtzeituhr); deterministische
 Aufnahme und Wiedergabe der Eingaben mit Vorspulen (TAS); eine Info-Einblendung (Position der Kugel, im Sektor
 verbleibende Extraleben und -punkte); die freie Kamera und eine Einstellung des Sichtfelds; keine feste Grenze

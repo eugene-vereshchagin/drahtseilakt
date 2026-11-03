@@ -21,7 +21,7 @@ pub const SURFACE_FRICTION: f32 = 0.7;
 const TICK: f64 = 1.0 / 60.0;
 /// The physics runs this many times faster than the frames while playing: the original's "Set Physics Globals" sets
 /// the time factor to 2 (checked in the C game: its physics time advances 2 s for every second of frames).
-const TIME_FACTOR: f64 = 2.0;
+pub const TIME_FACTOR: f64 = 2.0;
 
 /// The collision group of the player's ball and of the floor stoppers (docs/physics.md 3.4).
 pub const GROUP_BALL: &str = "Ball";
@@ -95,6 +95,9 @@ pub struct World {
     pub grounded: bool,
     /// The push controller of each body that has been pushed (see `set_push`).
     pushers: Vec<Option<usize>>,
+    /// The gravity and time factor in use: the original's unless a mod's rule changes them (modrt.rs).
+    gravity: f32,
+    time_factor: f64,
     /// The IVP bodies of the level's physical objects, with whether the player's ball collides with them.
     statics: Vec<(usize, bool, SoundIds)>,
     /// How each game body is made, for the ones that come and go (a sector's objects); none for the ball.
@@ -196,6 +199,8 @@ impl World {
             bodies: Vec::new(),
             grounded: false,
             pushers: Vec::new(),
+            gravity: GRAVITY,
+            time_factor: TIME_FACTOR,
             statics: Vec::new(),
             spawns: Vec::new(),
         };
@@ -596,6 +601,18 @@ impl World {
     }
 
     /// The contact points the ball takes part in, for the watch log: those whose entities include the ball (entity 1).
+    /// A mod's gravity and time factor (modrt.rs SimOut): set only when they change.
+    pub fn set_rules(&mut self, gravity: f32, time_factor: f32) {
+        if gravity != self.gravity {
+            self.gravity = gravity;
+            self.physics.set_gravity([0.0, -gravity, 0.0]);
+        }
+        let t = f64::from(time_factor);
+        if t != self.time_factor {
+            self.time_factor = t;
+        }
+    }
+
     pub fn ball_contacts(&self) -> Vec<ivp::glue::ContactReadout> {
         self.physics.contacts_of(1)
     }
@@ -627,7 +644,7 @@ impl World {
             self.physics
                 .body_impulse(id, centre, [impulse.x, impulse.y, impulse.z]);
         }
-        self.physics.advance(TIME_FACTOR * TICK);
+        self.physics.advance(self.time_factor * TICK);
         self.listen_ball();
         for (i, id) in self.handles.iter().enumerate() {
             let Some(id) = *id else {

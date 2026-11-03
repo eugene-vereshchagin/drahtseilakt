@@ -1,0 +1,42 @@
+# Blackout (after Blackout): the level in the dark, a faint light over the ball. Only the look changes.
+name.en Blackout
+name.ru Затемнение
+name.de Verdunkelung
+name.zh 黑暗模式
+name.fr Obscurité
+name.es Apagón
+name.it Blackout
+description.en The level goes dark; a faint light hangs over the ball.
+description.ru Уровень погружается во тьму; над шаром слабый свет.
+description.de Das Level wird dunkel; über dem Ball ein schwaches Licht.
+description.zh 关卡变暗，球上方有微弱光源。
+description.fr Le niveau s'assombrit ; une faible lumière suit la balle.
+description.es El nivel se oscurece; una luz tenue sigue a la bola.
+description.it Il livello si oscura; una luce fioca segue la palla.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option darkness number 50 100 10 90
+option lantern switch on
+label darkness en Darkness %
+label darkness ru Темнота %
+label darkness de Dunkelheit %
+label darkness zh 黑暗程度 %
+label darkness fr Obscurité %
+label darkness es Oscuridad %
+label darkness it Oscurità %
+label lantern en Light over the ball?
+label lantern ru Свет над шаром?
+label lantern de Licht über dem Ball?
+label lantern zh 球上方光源?
+label lantern fr Lumière sur la balle ?
+label lantern es ¿Luz sobre la bola?
+label lantern it Luce sulla palla?
+
+on frame
+do light 1 - opt.darkness / 100
+
+on frame
+if opt.lantern
+do lantern 0.8

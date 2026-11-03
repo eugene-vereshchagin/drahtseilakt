@@ -1,0 +1,30 @@
+# Quick restart (after SpeedrunShortcuts): a key starts the level again at once, without the practice tools.
+name.en Quick restart
+name.ru Быстрый перезапуск
+name.de Schneller Neustart
+name.zh 快速重来
+name.fr Redémarrage rapide
+name.es Reinicio rápido
+name.it Riavvio rapido
+description.en A key starts the level again at once.
+description.ru Клавиша сразу начинает уровень заново.
+description.de Eine Taste startet das Level sofort neu.
+description.zh 一键立即重新开始本关。
+description.fr Une touche relance aussitôt le niveau.
+description.es Una tecla reinicia el nivel al instante.
+description.it Un tasto ricomincia subito il livello.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option key key Backspace,Delete,F4,KeyQ
+label key en Key
+label key ru Клавиша
+label key de Taste
+label key zh 按键
+label key fr Touche
+label key es Tecla
+label key it Tasto
+
+on key key
+do restart

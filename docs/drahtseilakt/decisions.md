@@ -336,3 +336,19 @@ the copy's levels, ours for our levels), so play and replays never change. Our o
 as the game's (`game:` images, open-format.md) instead of carrying copies, so packs change them too and each level is
 about half the size. The classic mode stays as it was: our textures, the parts each level takes. `original` now means
 the copy's pictures in a remastered level too; the remaster's own upscaled pictures are `remastered`.
+
+## Our own data-only mod format
+
+2026-11-03, the owner's decision: the game has mods — additions of behaviour and features each player switches on
+or off — in a format of our own, and the features themselves are mods: the game ships *factory mods*
+(`assets/mods/`) written in the very format a player uses, which serve as the examples ([mods.md](mods.md)). A mod is
+data: a mod.txt of rules (`on <event>`, `if <condition>`, `do <action>`) over a fixed library of the engine's
+building blocks, with options, labels, variables and small total expressions, interpreted by our runtime as the
+original's behaviour graphs are by its runtime. Nothing in a mod is run as code: no scripts, no paths, no links, no
+assets; a mod folder holds a mod.txt and at most a readme and a licence, and anything else refuses it. Strangers'
+mods are hostile input: strict parsing, caps on every count, an error naming the line. Rules on the run's events read
+only the run and are the only ones that may change it, so runs stay deterministic; a mod that changes the run marks
+it modded, and its replay names the mod with its hash and options (never a best run, never a highscore; classic runs
+and their replays are unchanged). Sound themes, texture and model packs and levels are not mods: they keep their own
+menus. BML mods are Windows DLLs: they were surveyed statically as requirements and are never loaded, run or
+imported — not even under Wine.

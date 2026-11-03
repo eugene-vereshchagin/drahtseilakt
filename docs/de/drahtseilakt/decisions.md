@@ -348,3 +348,20 @@ und Wiederholungen sich nie ändern. Unsere Level nennen die Texturen, die sie t
 open-format.md), statt Kopien mitzuführen, sodass Pakete auch sie ändern und jedes Level etwa halb so groß ist. Der
 klassische Modus bleibt, wie er war: unsere Texturen, die Teile, die jedes Level nimmt. `original` bedeutet nun auch in
 einem remasterten Level die Bilder der Kopie; die eigenen hochskalierten Bilder des Remasters sind `remastered`.
+
+## Unser eigenes Mod-Format aus reinen Daten
+
+2026-11-03, Entscheidung des Eigentümers: das Spiel hat Mods — Ergänzungen von Verhalten und Funktionen, die jeder
+Spieler ein- oder ausschaltet — in einem eigenen Format, und die Funktionen selbst sind Mods: das Spiel liefert
+*Werks-Mods* (`assets/mods/`) mit, geschrieben in genau dem Format, das ein Spieler nutzt, und sie dienen als Beispiele
+([mods.md](mods.md)). Ein Mod ist Daten: eine mod.txt mit Regeln (`on <event>`, `if <condition>`, `do <action>`) über
+einer festen Bibliothek von Bausteinen der Engine, mit Optionen, Beschriftungen, Variablen und kleinen totalen
+Ausdrücken, von unserer Laufzeit interpretiert, so wie die Verhaltensgraphen des Originals von seiner. Nichts in einem
+Mod wird als Code ausgeführt: keine Skripte, keine Pfade, keine Verknüpfungen, keine Ressourcen; ein Mod-Ordner enthält
+eine mod.txt und höchstens eine Readme und eine Lizenz, alles andere lehnt ihn ab. Die Mods Fremder sind feindselige
+Eingaben: strenges Parsen, Grenzen für jede Anzahl, ein Fehler, der die Zeile nennt. Regeln auf den Ereignissen des
+Laufs lesen nur den Lauf und sind die einzigen, die ihn ändern dürfen, sodass Läufe deterministisch bleiben; ein Mod,
+der den Lauf ändert, markiert ihn als gemoddet, und sein Replay nennt den Mod mit Hash und Optionen (nie ein bester
+Lauf, nie ein Highscore; klassische Läufe und ihre Replays bleiben unverändert). Klangthemen, Textur- und Modellpakete
+und Level sind keine Mods: sie behalten ihre eigenen Menüs. BML-Mods sind Windows-DLLs: sie wurden statisch als
+Anforderungen durchgesehen und werden nie geladen, ausgeführt oder importiert — auch nicht unter Wine.
