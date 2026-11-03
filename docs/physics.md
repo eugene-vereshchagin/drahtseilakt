@@ -218,6 +218,17 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   | P_Ball_Wood | | 0.6 / 0.2 | 2 | 0.6 / 0.1 | 2 |
   | P_Ball_Stone | | 0.7 / 0.1 | 10 | 0.2 / 0.1 | 2 |
 
+  The body is not the level's stand-in (`P_Dome_01`) but the module file's object put at its matrix
+  (`P_Dome_MF` of PH/P_Dome.nmo; the C build shows only these `_MF` instances), physicalized with that object's
+  mesh. For the dome the two differ: the stand-in's mesh has 73 points from y 0 to 3.55, the module's 264 points
+  from y 0.12 to 3.68; the paper ball's stand-in is an 18-point ball, its module a crumpled 315 points; the crate's
+  are the same box. Measured on level 1 (2026-11-03) with the start and the first checkpoint moved in front of the
+  dome (the level file patched, the same file in all three): the wooden ball pushed straight at it climbs it and
+  rolls over its top, and falls off the platform behind, in the original under Wine (from 6 and from 24 in front)
+  and in the C build (7.85 high 5 frames after the hit, 10.71 over the top at z -507.9); our port matched it
+  frame by frame once it used the module's mesh, while the stand-in's lower, faceted dome stopped the ball at its
+  foot. Replays of format 4 and before keep the stand-ins.
+
   A sector's objects (groups `Sector_01`, `Sector_02`, ...) are in the physics only while it is the current sector.
   Measured in the C build at level 1 (frames of 1/60 s):
   - Level start: the physics runs at time factor 1 with the level's geometry only; at 9.90 s of its time the first

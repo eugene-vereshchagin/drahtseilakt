@@ -48,7 +48,10 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   Manager aus Gameplay.nmo) oder bis zum Verlust der Kugel, dann ausgeblendet); vor den Stücken aufgenommene Replays
   (Format 1) laufen ohne sie, vor den 20 s aufgenommene (Format 2) mit Stücken, die bis zum Verlust der Kugel liegen. Die Checkpoints öffnen die Sektoren in der Reihenfolge ihrer Namen
   (PC_TwoFlames_01, _02, ...), wie auch immer die Gruppe des Levels sie aufzählt (Level 11 und 12 zählen sie
-  durcheinander auf); früher aufgenommene Replays (Format 3) behalten die Reihenfolge der Gruppe. Der Rauch der Kugel pufft, wenn sie erscheint und
+  durcheinander auf); früher aufgenommene Replays (Format 3) behalten die Reihenfolge der Gruppe. Die losen
+  Objekte (Kisten, Papierkugeln, Kuppeln) entstehen aus dem Objekt ihrer Moduldatei (`P_Dome_MF` aus PH/P_Dome.nmo),
+  wie das Original sie macht, nicht aus dem gröberen Platzhalter des Levels; früher aufgenommene Replays (Format 4)
+  behalten die Platzhalter. Der Rauch der Kugel pufft, wenn sie erscheint und
   wenn sie zerspringt (BallParticle_Frame script).
 - **Phase 6**: offenes Format v1 mit Export und Import; Level 1 übersteht den Hin- und Rückweg unverändert. Ein
   exportiertes Level ist vollständig: es trägt seine Einstellungen (Musik, Licht, Bonus, Tutorial, letztes Level) und

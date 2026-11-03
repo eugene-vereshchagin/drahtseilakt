@@ -189,7 +189,8 @@ impl Game {
         // settings say so: an .nmo's from the game's table, an open-format level's its own).
         let tutorial = level.level.settings.tutorial;
         let ball_meshes = BallMeshes::find(&balls.level);
-        let mut sim = Sim::with_modules(&level.level, start_ball, &modules, tutorial);
+        let format = replay_in.as_ref().map_or(crate::replay::VERSION, |r| r.version);
+        let mut sim = Sim::with_rules(&level.level, start_ball, &modules, tutorial, format);
         sim.set_ball_boxes(ball_meshes.boxes);
         let pieces = crate::pieces::Pieces::find(&balls.level);
         sim.set_pieces(pieces.clone());
@@ -281,11 +282,12 @@ impl Game {
     fn restart(&mut self) {
         self.save_attempt();
         self.assisted = false;
-        self.sim = Sim::with_modules(
+        self.sim = Sim::with_rules(
             &self.level.level,
             self.start_ball,
             &self.modules,
             self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
+            self.replay_in.as_ref().map_or(crate::replay::VERSION, |r| r.version),
         );
         self.sim.set_ball_boxes(self.ball_meshes.boxes);
         self.sim.set_pieces(self.pieces.clone());
