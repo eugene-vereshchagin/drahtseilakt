@@ -225,9 +225,9 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 - Level 3: finished from the start in 7:45.48 (the lever and the bridge in sector 4 as the owner did them).
 - Level 4: finished from the start in 9:19.47 (`--follow` the owner's run, `--then` the one from sector 3).
 - Level 5: finished from the start in 12:39.77 (hints for both crates and the pusher).
-- Level 6: with the owner's run (it ends at the convex log in sector 2) and the plan `hints/Level_06.plan`, the test
-  player goes on by itself through sectors 2 and 3 and over the wavy log of sector 4 to its stone transformer; the
-  boxes to push off the ledge as stone are next.
+- Level 6: finished from the start in 8:01.22: sector 1 along the owner's line, sectors 2–5 by itself with the
+  plan and the hints from the walkthrough's storyboard (`hints/Level_06.txt`: the wavy log there as wood and back
+  as stone at speed, the boxes rammed off, the log after the drop in sector 5).
 - Level 7: finished from the start in 12:04.28, following the owner's finished run.
 - Level 8: finished from the start in 9:59.40 with no player's run at all: by itself through the walkthrough's
   plan (`hints/Level_08.plan`, with places on the way) and the hints written from its storyboard

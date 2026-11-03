@@ -243,9 +243,9 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 - Level 3: vom Start an geschafft in 7:45.48 (Hebel und Brücke in Sektor 4 wie beim Inhaber).
 - Level 4: vom Start an geschafft in 9:19.47 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
 - Level 5: vom Start an geschafft in 12:39.77 (Hinweise für beide Kisten und den Schieber).
-- Level 6: mit dem Lauf des Inhabers (er endet am gewölbten Baumstamm in Sektor 2) und dem Plan
-  `hints/Level_06.plan` kommt der Testspieler allein durch Sektor 2 und 3 und über den welligen Stamm von Sektor 4
-  bis zu seinem Stein-Transformator; als Nächstes sind die Kisten als Stein vom Absatz zu stoßen.
+- Level 6: vom Start an beendet in 8:01.22: Sektor 1 entlang der Linie des Inhabers, Sektoren 2–5 allein mit dem
+  Plan und den Hinweisen nach dem Storyboard des Videos (`hints/Level_06.txt`: der wellige Stamm als Holz hin und als
+  Stein schnell zurück, die Kisten heruntergerammt, der Stamm nach dem Sturz in Sektor 5).
 - Level 7: vom Start an geschafft in 12:04.28, dem geschafften Lauf des Inhabers folgend.
 - Level 8: vom Start an beendet, ganz ohne Lauf eines Spielers: allein durch den Plan aus dem Video
   (`hints/Level_08.plan`, mit Orten auf dem Weg) und die nach seinem Storyboard geschriebenen Hinweise
