@@ -880,6 +880,24 @@ pub fn replay_dir() -> PathBuf {
     crate::levels::data_dir().join("replays")
 }
 
+/// The texture and model packs: found, and `textures` and `models` chosen when they are there, else the defaults (our
+/// textures, the level's own parts).
+fn start_packs(textures: Option<&str>, models: Option<&str>) {
+    use gamedata::packs::{Kind, LEVEL, OWN, start};
+    start(Kind::Textures, textures, OWN);
+    start(Kind::Models, models, LEVEL);
+}
+
+/// The packs chosen again without looking for them again (the mode switch).
+fn restore_packs(textures: Option<&str>, models: Option<&str>) {
+    use gamedata::packs::{Kind, LEVEL, OWN, choose};
+    // the default first: a saved pack that is not there leaves it
+    choose(Kind::Textures, OWN);
+    choose(Kind::Models, LEVEL);
+    textures.inspect(|k| choose(Kind::Textures, k));
+    models.inspect(|k| choose(Kind::Models, k));
+}
+
 pub fn run(o: Options, data: Data) -> Result<(), String> {
     // where the interface's files come from: the copy's own when it has its menu, else ours (resources.rs); the
     // extended mode may choose another
@@ -889,16 +907,24 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { default });
-    // the levels' textures: ours unless the extended mode chose the copy's, or the command line says; an export keeps
-    // the level's own (the copy's) unless `--textures own` asks for ours in it
-    let textures = if o.export.is_some() {
-        Some(gamedata::resources::TextureSet::Original)
+    // the levels' texture and model packs (packs.rs): the extended mode's choice, the command line's for one run; ours
+    // and the level's own parts otherwise (the classic mode always). An export keeps the level's own (the copy's
+    // textures) unless `--textures` asks for a pack in it.
+    let (textures, models) = if o.export.is_some() {
+        (Some(gamedata::packs::ORIGINAL.to_owned()), None)
     } else if extended {
-        gamedata::resources::textures_from_settings()
+        (setting("textures"), setting("models"))
     } else {
-        None
+        (None, None)
     };
-    gamedata::resources::set_textures(o.textures.or(textures).unwrap_or(gamedata::resources::TextureSet::Own));
+    start_packs(o.textures.clone().or(textures).as_deref(), o.models.clone().or(models).as_deref());
+    for (asked, kind) in [(&o.textures, gamedata::packs::Kind::Textures), (&o.models, gamedata::packs::Kind::Models)] {
+        if let Some(k) = asked
+            && gamedata::packs::chosen(kind) != *k
+        {
+            return Err(format!("--{} {k}: no such pack (docs/drahtseilakt/packs.md)", kind.key()));
+        }
+    }
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (the interface no longer implies the original's sounds: the copy's interface is now the default)
     let theme = if extended {
@@ -3655,10 +3681,10 @@ impl App {
                 gamedata::resources::set_chosen(p);
                 save_settings(self.volumes, self.features, &self.player);
             }
-            Action::Textures(t) => {
-                // the next level loads with them
-                gamedata::resources::set_textures(t);
-                put_settings(&[("textures".to_owned(), t.key().to_owned())]);
+            Action::Pack(kind, key) => {
+                // the next level loads with it
+                gamedata::packs::choose(kind, &key);
+                put_settings(&[(kind.key().to_owned(), key)]);
             }
             Action::Language(code) => {
                 // spoken at once: the menus' words again, in the new language
@@ -3685,6 +3711,9 @@ impl App {
                 // (taken before the settings are written, which keep the extended mode's choice)
                 let theme = if self.features.mode { setting("sound-theme") } else { None };
                 gamedata::sound_themes::restore(theme.as_deref());
+                // the packs too (from the next level): the saved choice in the extended mode, the defaults else
+                let packs = |k: gamedata::packs::Kind| if self.features.mode { setting(k.key()) } else { None };
+                restore_packs(packs(gamedata::packs::Kind::Textures).as_deref(), packs(gamedata::packs::Kind::Models).as_deref());
                 if let Some(a) = &mut self.audio {
                     a.forget_sounds();
                 }

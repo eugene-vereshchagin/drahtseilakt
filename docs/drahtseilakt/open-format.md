@@ -14,7 +14,15 @@ A folder holding:
 - `level.gltf` — [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) (JSON);
 - `level.bin` — its binary buffer (the only buffer, referenced by that name);
 - `textures/NNNN_name.png` — one image per texture; an image's `uri` must name a plain file directly in `textures/`
-  (no further folders), else the level is refused;
+  (no further folders), or be `game:<name>`, else the level is refused. `game:<name>` names **the game's texture of
+  that name** instead of a file: no file is read for it; the game draws it with the chosen texture pack
+  ([packs.md](packs.md)): the level's own `game/Textures/` picture of that name first, then the pack and its fallbacks,
+  then ours, then the copy's (names compared as texture names are: without case, `_`, `-`, spaces or extension). The
+  name is 1 to 128 characters, none of them `/`, `\`, `:` or a control character, not beginning with a dot; it is only
+  compared with the textures' names, never made a path. Our levels name the textures they share this way (the track's
+  sides, the borders' bricks, wood, rails, posts, checkpoint plates), so a texture pack changes them too, and keep their
+  own special textures as files. `--export` keeps a `game:` image as it is. Levels made before keep working: their
+  files are theirs;
 - `level.txt` (optional) — its title, author and version as `key = value` lines; a level in `levels/` is a folder
   holding one level, named by this title ([levels.md](levels.md), "A level is a folder");
 - `game/` — the game's files the level uses, by their paths in the player's copy, so that it plays without the

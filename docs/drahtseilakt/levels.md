@@ -85,7 +85,9 @@ Every level starts with the wooden ball and has checkpoints with their flames, e
 
 **A level is written as text.** Each folder holds its description, `level.lvl`, a small language read by
 `assets/own/make/leveldsl.py`, which writes the level beside it (`level.gltf`, `level.bin`, `textures/`, `level.txt`)
-with `levelkit.py`. The description lays the track like a turtle: a cursor (a point on the floor's top and a heading,
+with `levelkit.py`. Only the level's own textures (its set of slabs, kerbs, shade and slopes) are files of its
+`textures/`; the textures every level shares are named as the game's (`game:` images, open-format.md) and drawn with
+the chosen texture pack ([packs.md](packs.md)). The description lays the track like a turtle: a cursor (a point on the floor's top and a heading,
 along +X at the start, left is +Z) moves on with each piece, and parts are put where it is. A line is a command; `#`
 begins a comment:
 

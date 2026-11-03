@@ -170,54 +170,6 @@ pub fn remastered_root() -> PathBuf {
         .clone()
 }
 
-/// Which textures the levels, their parts and the balls are drawn with (`textures own|original`, the extended mode's
-/// Textures switch). Our own stand in for the original's texture of the same name, whichever level asks for it (an
-/// original level, a community map, a part); a texture we have none for comes from the copy as before. The default,
-/// and what the classic mode plays, is ours (owner's decision 2026-11-03, decisions.md "Own textures by default").
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TextureSet {
-    Own,
-    Original,
-}
-
-impl TextureSet {
-    pub const ALL: [TextureSet; 2] = [TextureSet::Own, TextureSet::Original];
-
-    /// Its name in the settings file and on the command line.
-    pub fn key(self) -> &'static str {
-        match self {
-            TextureSet::Own => "own",
-            TextureSet::Original => "original",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<TextureSet> {
-        TextureSet::ALL.into_iter().find(|t| t.key() == s.trim())
-    }
-}
-
-/// The textures drawn now (they are read as each level loads, so a change applies to the next level). The game sets
-/// them at its start (ours by default); a program that only uses this library, such as the toolbox remastering the
-/// copy, reads the copy's unless it sets them.
-static TEXTURES: AtomicU8 = AtomicU8::new(0);
-
-pub fn set_textures(t: TextureSet) {
-    TEXTURES.store(u8::from(t == TextureSet::Own), Ordering::Relaxed);
-}
-
-pub fn textures() -> TextureSet {
-    if TEXTURES.load(Ordering::Relaxed) == 0 {
-        TextureSet::Original
-    } else {
-        TextureSet::Own
-    }
-}
-
-/// The settings' choice (`textures ...`), if the player made one.
-pub fn textures_from_settings() -> Option<TextureSet> {
-    crate::profile::setting("textures").and_then(|s| TextureSet::parse(&s))
-}
-
 /// How a texture's name is compared: its file name without the folder and the extension, in lower case, without
 /// `_`, `-` and spaces (the balls' module names its textures "BallWood.bmp", the copy's file is "Ball_Wood.bmp").
 pub fn texture_key(name: &str) -> String {
@@ -253,10 +205,18 @@ pub fn texture_index(dir: &Path) -> std::collections::HashMap<String, PathBuf> {
 }
 
 /// Our own texture standing in for the original's texture `name` (a texture's name or its file's), if we have one:
-/// `own/Textures/<name>.png` among the game's assets. The name only picks among our files; it never makes a path.
+/// `own/Textures/<name>.png` among the game's assets, or the track's own `own/Track/<name>.png`. The name only picks among our files; it never makes a path.
 pub fn own_texture(name: &str) -> Option<PathBuf> {
     static INDEX: std::sync::OnceLock<std::collections::HashMap<String, PathBuf>> = std::sync::OnceLock::new();
-    let index = INDEX.get_or_init(|| own_root().map(|r| texture_index(&r.join("Textures"))).unwrap_or_default());
+    // the stand-ins for the original's textures, and the track's own (our levels name them: open-format.md, `game:`)
+    let index = INDEX.get_or_init(|| {
+        let Some(root) = own_root() else { return Default::default() };
+        let mut index = texture_index(&root.join("Textures"));
+        for (k, v) in texture_index(&root.join("Track")) {
+            index.entry(k).or_insert(v);
+        }
+        index
+    });
     index.get(&texture_key(name)).cloned()
 }
 
@@ -377,8 +337,6 @@ mod tests {
         assert_eq!(texture_key("C:\\Ballance\\Textures\\Floor_Side"), "floorside");
         assert_eq!(texture_key("floor_top_Checkpoint"), "floortopcheckpoint");
         assert_eq!(texture_key("Floor.Top.Strange"), "floor.top.strange");
-        assert_eq!(TextureSet::parse(" original "), Some(TextureSet::Original));
-        assert_eq!(TextureSet::parse("remastered"), None);
     }
 
     #[test]

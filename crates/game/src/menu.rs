@@ -121,8 +121,10 @@ enum Line {
     DebugMenu,
     /// Where the interface's files come from: own, the original, its remaster (resources.rs).
     Interface,
-    /// Which textures the levels are drawn with: ours or the copy's (resources.rs).
+    /// The texture pack the levels are drawn with (packs.rs): the arrows go round the packs found.
     Textures,
+    /// The model pack the parts and balls are drawn with (packs.rs).
+    Models,
     /// The sound theme (sound_themes.rs): the arrows go round the themes found.
     SoundTheme,
     /// The Language page, and a language on it (by its place in lang::LANGUAGES).
@@ -168,7 +170,8 @@ pub enum Action {
     /// The interface's provider chosen (it takes effect on the next start).
     Interface(gamedata::resources::Provider),
     /// The levels' textures chosen (the next level loads with them).
-    Textures(gamedata::resources::TextureSet),
+    /// A texture or model pack chosen (by its key).
+    Pack(gamedata::packs::Kind, String),
     /// The sound theme chosen (its key).
     SoundTheme(String),
     /// The menus' language chosen (its code): the game saves it and speaks it at once.
@@ -221,6 +224,7 @@ fn valued(line: Line) -> bool {
             | Line::Mode
             | Line::Interface
             | Line::Textures
+            | Line::Models
             | Line::SoundTheme
             | Line::Switch(_)
     )
@@ -442,7 +446,7 @@ impl Menu {
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(false))
-                .chain([Line::Interface, Line::Textures, Line::SoundTheme, Line::DebugMenu, Line::Back])
+                .chain([Line::Interface, Line::Textures, Line::Models, Line::SoundTheme, Line::DebugMenu, Line::Back])
                 .collect(),
             Screen::Debug => switches(true).chain([Line::Back]).collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
@@ -560,7 +564,8 @@ impl Menu {
             (Screen::Controls, Some(Line::Invert)) => self.toggle_invert(),
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
-            (Screen::Extended, Some(Line::Textures)) => Action::Textures(next_textures()),
+            (Screen::Extended, Some(Line::Textures)) => next_pack(gamedata::packs::Kind::Textures, by),
+            (Screen::Extended, Some(Line::Models)) => next_pack(gamedata::packs::Kind::Models, by),
             (Screen::Extended, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (Screen::Extended | Screen::Debug, Some(Line::Switch(i))) => {
                 FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
@@ -638,7 +643,8 @@ impl Menu {
             Line::Map(i) => self.maps.get(i).map_or(Action::None, |p| Action::Map(p.level.clone())),
             Line::Mode => Action::ToggleDebug,
             Line::Interface => Action::Interface(next_provider(1)),
-            Line::Textures => Action::Textures(next_textures()),
+            Line::Textures => next_pack(gamedata::packs::Kind::Textures, 1),
+            Line::Models => next_pack(gamedata::packs::Kind::Models, 1),
             Line::SoundTheme => Action::SoundTheme(next_theme(1)),
             Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
             Line::Music | Line::Effects => Action::None,
@@ -949,6 +955,7 @@ impl Menu {
             Line::DebugMenu => s.ours("debug mode"),
             Line::Interface => s.ours("interface"),
             Line::Textures => s.ours("textures"),
+            Line::Models => s.ours("models"),
             Line::SoundTheme => s.ours("sounds"),
             Line::Switch(i) => FEATURES.get(i).map_or_else(String::new, |f| s.ours(&format!("feature {}", f.key()))),
             Line::Yes => s.get("Menu_Opt_Graphics Synch Yes", "Yes"),
@@ -1093,7 +1100,8 @@ impl Menu {
                 if self.features.mode {
                     f.extend(switches(false).map(|l| self.switch_field(l)));
                     f.push((self.label(Line::Interface), self.interface_value()));
-                    f.push((self.label(Line::Textures), self.textures_value()));
+                    f.push((self.label(Line::Textures), self.pack_value(gamedata::packs::Kind::Textures)));
+                    f.push((self.label(Line::Models), self.pack_value(gamedata::packs::Kind::Models)));
                     f.push((self.label(Line::SoundTheme), theme_value()));
                     f.push((self.label(Line::DebugMenu), ">".to_owned()));
                 }
@@ -1553,7 +1561,12 @@ impl Menu {
                     let rows = |l: &&Line| {
                         matches!(
                             l,
-                            Line::Switch(_) | Line::Interface | Line::Textures | Line::SoundTheme | Line::DebugMenu
+                            Line::Switch(_)
+                                | Line::Interface
+                                | Line::Textures
+                                | Line::Models
+                                | Line::SoundTheme
+                                | Line::DebugMenu
                         )
                     };
                     let n = lines.iter().filter(rows).count();
@@ -1803,13 +1816,9 @@ fn next_provider(by: i32) -> gamedata::resources::Provider {
     all.get((at + by).rem_euclid(n) as usize).copied().unwrap_or(Provider::Original)
 }
 
-/// The other choice of textures (there are two).
-fn next_textures() -> gamedata::resources::TextureSet {
-    use gamedata::resources::{TextureSet, textures};
-    match textures() {
-        TextureSet::Own => TextureSet::Original,
-        TextureSet::Original => TextureSet::Own,
-    }
+/// The pack of a kind `by` steps after the chosen one (the arrows go round the packs found).
+fn next_pack(kind: gamedata::packs::Kind, by: i32) -> Action {
+    Action::Pack(kind, gamedata::packs::next(kind, by))
 }
 
 /// The sound theme after the chosen one, `by` steps on (the arrows go round the themes found and "original").
@@ -1827,11 +1836,16 @@ fn theme_value() -> String {
 }
 
 impl Menu {
-    /// The Textures line's value: ours or the copy's.
-    fn textures_value(&self) -> String {
-        match gamedata::resources::textures() {
-            gamedata::resources::TextureSet::Own => self.strings.ours("interface own"),
-            gamedata::resources::TextureSet::Original => self.strings.ours("interface original"),
+    /// The Textures or Models line's value: the chosen pack's name in the menus' language (a built-in pack's in ours).
+    fn pack_value(&self, kind: gamedata::packs::Kind) -> String {
+        use gamedata::packs::{LEVEL, ORIGINAL, OWN, REMASTERED, chosen, packs};
+        let key = chosen(kind);
+        match key.as_str() {
+            OWN => self.strings.ours("interface own"),
+            ORIGINAL => self.strings.ours("interface original"),
+            REMASTERED => self.strings.ours("interface remaster"),
+            LEVEL => self.strings.ours("models level"),
+            _ => packs(kind).iter().find(|p| p.key == key).map_or(key.clone(), |p| p.name(self.strings.language())),
         }
     }
 

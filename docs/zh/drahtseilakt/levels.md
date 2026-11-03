@@ -50,7 +50,7 @@
 
 每个关卡都以木球开始，并有带火焰的检查点、额外分数和一条额外生命。
 
-**关卡以文本编写。** 每个文件夹中有它的描述 `level.lvl`，用一种小语言写成，由 `assets/own/make/leveldsl.py` 读取；它借助 `levelkit.py` 在旁边写出关卡（`level.gltf`、`level.bin`、`textures/`、`level.txt`）。描述像海龟绘图一样铺设轨道：一个光标（地面顶面上的一个点和一个朝向，开始时沿 +X，左边是 +Z）随每一段前移，部件放在光标所在之处。一行是一条命令；`#` 开始注释：
+**关卡以文本编写。** 每个文件夹中有它的描述 `level.lvl`，用一种小语言写成，由 `assets/own/make/leveldsl.py` 读取；它借助 `levelkit.py` 在旁边写出关卡（`level.gltf`、`level.bin`、`textures/`、`level.txt`）。关卡 `textures/` 中只有它自己的纹理文件（它那一套地板、路缘、阴影和斜坡）；所有关卡共用的纹理以游戏纹理名称引用（`game:` 图片，open-format.md），由所选纹理包绘制（[packs.md](packs.md)）。描述像海龟绘图一样铺设轨道：一个光标（地面顶面上的一个点和一个朝向，开始时沿 +X，左边是 +Z）随每一段前移，部件放在光标所在之处。一行是一条命令；`#` 开始注释：
 
 ```
 title Paper Winds            # 关卡名称；title.ru、title.de、title.zh：其他语言中的名称

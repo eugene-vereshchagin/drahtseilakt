@@ -204,6 +204,10 @@ pub enum TextureSource {
     /// A file of an open-format level's own `textures/` folder: its full path, made by the reader from the level's
     /// folder (made absolute) and a plain name it checked. Only this source names a path to read.
     LevelFile(std::path::PathBuf),
+    /// The game's texture of this name (an open-format level's image `game:<name>`): looked up by name through the
+    /// texture packs (docs/drahtseilakt/packs.md), never read as a path. Our levels name the textures they share
+    /// this way instead of carrying copies.
+    Game(String),
     /// Pixels stored with the level: width, height, RGBA.
     Pixels {
         width: u32,

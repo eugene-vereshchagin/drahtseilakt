@@ -450,10 +450,16 @@ def sweep(m, path, profile, mats, closed=True, uscale=4.0, vscale=8.0, end_mat=N
 S = np.diag([1.0, 1.0, -1.0, 1.0])
 
 
+# An image naming the game's texture by name instead of a file of the level's (open-format.md, `game:`).
+GAME = "game:"
+
+
 def material(name, texture=None, diffuse=1.0, emissive=0.3, ambient=0.1, specular=0.0, power=0.0,
              double_sided=False, alpha="OPAQUE", cutoff=0.5, blend=None, texgen=None, unlit=False, z_write=None,
              normal=None):
-    """A material's description for write_open: `texture` a file in the folder's textures/ (made with save_png),
+    """A material's description for write_open: `texture` a file in the folder's textures/ (made with save_png), or
+    `game:<name>` for the game's texture of that name (no file: the game takes it from the chosen texture pack, ours by
+    default; docs/drahtseilakt/open-format.md),
     `normal` its relief (a normal map there, glTF's normalTexture, on the same texture coordinates), the
     colours scalars (grey) or rgb(a) lists, `alpha` OPAQUE, MASK (with `cutoff`) or BLEND (with `blend`, a pair of
     the format's factor names), `texgen` reflect or chrome."""
@@ -575,7 +581,8 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
         "meshes": gl_meshes,
         "materials": gl_mats,
         "textures": [{"source": i, "sampler": 0} for i in range(len(images))],
-        "images": [{"uri": f"textures/{n}", "name": os.path.splitext(n)[0]} for n in images],
+        "images": [{"uri": n, "name": n[len(GAME):]} if n.startswith(GAME)
+                   else {"uri": f"textures/{n}", "name": os.path.splitext(n)[0]} for n in images],
         "samplers": [{"magFilter": 9729, "minFilter": 9987, "wrapS": 10497, "wrapT": 10497}],
         "buffers": [{"uri": "level.bin", "byteLength": len(bin_)}],
         "bufferViews": views,
@@ -583,7 +590,7 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
     }
     os.makedirs(out_dir, exist_ok=True)
     for n in images:
-        if not os.path.isfile(os.path.join(out_dir, "textures", n)):
+        if not n.startswith(GAME) and not os.path.isfile(os.path.join(out_dir, "textures", n)):
             raise FileNotFoundError(f"{out_dir}/textures/{n} not made")
     with open(os.path.join(out_dir, "level.gltf"), "w") as f:
         json.dump(doc, f, indent=1)
