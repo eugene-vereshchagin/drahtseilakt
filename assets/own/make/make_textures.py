@@ -542,7 +542,7 @@ def make_env():
 def make_balls():
     n = 128 * SCALE
     save(pits(stone_ball(n, 61), 61, count=150, sizes=(0.6, 1.6), depth=0.16), "Ball_Stone")
-    woodball = wood_ball(2 * n, 18)
+    woodball = wood(n, (159, 126, 80), 0.34, 9, seed=18)
     save(woodball, "Ball_Wood")
     save(woodball, "P_Ball_Wood")
     save(collage(n), "Ball_Paper")

@@ -661,32 +661,46 @@ class LevelBuilder:
         count = int(total // RAIL_CLAMP)
         spots = [RAIL_CLAMP * (k + 0.5) + (total - RAIL_CLAMP * count) / 2 for k in range(count)]
         spots = [d for d in spots if RAIL_CLAMP / 2 <= d <= total - RAIL_CLAMP / 2]
-        held = {min(range(len(run)), key=lambda j: abs(run[j] - run[i])) for i in supports}
-        for d in spots:
+        # the rods hang from the straps: each support moves to the clamp nearest it
+        held = {min(range(len(spots)), key=lambda k: abs(spots[k] - run[i])) for i in supports} if spots else set()
+        for k, d in enumerate(spots):
             j = int(np.searchsorted(run, d))
             j = min(max(j, 1), len(fr) - 1)
             c0 = (d - run[j - 1]) / max(run[j] - run[j - 1], 1e-9)
+            # the very point and frame the tubes have there (the tubes run straight between the path's points)
             p = fr[j - 1][0] * (1 - c0) + fr[j][0] * c0
-            f, s_, u = fr[j][1], fr[j][2], fr[j][3]
+            # (the side's blend unnormalised: the tubes' points between two of the path's are exactly that blend)
+            s_lin = fr[j - 1][2] * (1 - c0) + fr[j][2] * c0
+            s_ = s_lin / np.linalg.norm(s_lin)
+            t = fr[j][0] - fr[j - 1][0]
+            t = t / (np.linalg.norm(t) + 1e-12)
+            u = np.array([0.0, 1.0, 0.0])
+            # the clamp's plane square to the tube (on a slope too)
+            up_t = u - t * np.dot(u, t)
+            up_t = up_t / np.linalg.norm(up_t)
             c = p + lift
             for sgn in (-1.0, 1.0):
-                tube_c = c + s_ * (sgn * gauge / 2)
+                tube_c = c + s_lin * (sgn * gauge / 2)
                 inward = -s_ * sgn
-                # round the tube's outer side and underneath, clear of where the ball rests on it (above, inward)
+                inward = inward - t * np.dot(inward, t)
+                inward = inward / np.linalg.norm(inward)
+                # round the tube's outer side and underneath, clear of where the ball rests on it (above, inward),
+                # its band touching the tube all round
                 for off in (-0.12, 0.12):
-                    arc = [tube_c + f * off + (inward * math.cos(a) + u * math.sin(a)) * (r + 0.06)
-                           for a in np.radians(np.linspace(110, 330, 9))]
+                    arc = [tube_c + t * off + (inward * math.cos(a) + up_t * math.sin(a)) * (r + 0.05)
+                           for a in np.radians(np.linspace(110, 330, 12))]
                     K.tube(fit, steel, arc, 0.05, seg=6)
-                K.sphere(fit, steel, tuple(tube_c + (inward * math.cos(math.radians(110)) + u * 0.94) * (r + 0.1)),
-                         0.07, seg=6)
-            strap = [c + s_ * (-gauge / 2) - u * (r + 0.06), c + s_ * (-0.8) - u * RAIL_SADDLE,
-                     c + s_ * 0.8 - u * RAIL_SADDLE, c + s_ * (gauge / 2) - u * (r + 0.06)]
+                K.sphere(fit, steel, tuple(tube_c + (inward * math.cos(math.radians(110))
+                                                     + up_t * math.sin(math.radians(110))) * (r + 0.1)), 0.07, seg=6)
+            # the strap from one clamp's foot to the other's, bent down under the ball's path
+            foot = {sgn: c + s_lin * (sgn * gauge / 2) - up_t * (r + 0.05) for sgn in (-1.0, 1.0)}
+            bar = c - u * RAIL_SADDLE
+            strap = [foot[-1.0], bar - s_ * 0.8, bar + s_ * 0.8, foot[1.0]]
             K.tube(fit, steel, strap, 0.08, seg=6, caps=True)
-        for i in supports:
-            p, f, s_, u, t = fr[i]
-            bar = p + lift - u * RAIL_SADDLE
-            K.tube(fit, steel, [bar - f * 0.12, bar + f * 0.12], 0.09, seg=6, caps=True)
-            K.cylinder(fit, steel, bar - u * RAIL_COLUMN, u, 0.13, RAIL_COLUMN, seg=8)
+            if k in held:
+                # a thin rod from the strap's middle down into the haze, a collar where it meets the strap
+                K.cylinder(fit, steel, bar - u * 0.25, u, 0.16, 0.3, seg=8)
+                K.cylinder(fit, steel, bar - u * RAIL_COLUMN, u, 0.12, RAIL_COLUMN, seg=8)
         if fit.p:
             self.add(f"{name}_Fittings", fit)
         return rail_id

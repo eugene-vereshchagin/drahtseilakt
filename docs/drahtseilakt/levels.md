@@ -235,10 +235,9 @@ wooden ball can shift it now and then); each sector that needs a ball still give
 
 **After the owner's concept art** (2026-11-03, his pictures as a reference only): rails of worn, brushed galvanised
 steel with a light rust tint and its relief (`Track_Rail`, a normal map), a clamp round each tube every 9 along them
-with its strap bent down under the ball's path to the other tube, and at the supports a thin steel rod down into the
-haze (the fittings only drawn); the wooden ball turned from one log, its year rings round its poles and fine cracks
-running out from them; the balls drawn smooth (their coarse meshes stay the physics'); the start on a stone tower down
-into the haze; lanterns on wooden posts at the start and beside every checkpoint.
+with its strap bent down under the ball's path to the other tube, and at the supports a thin steel rod from the strap
+down into the haze (the fittings only drawn); the balls drawn smooth (their coarse meshes stay the physics'); the
+start on a stone tower down into the haze; lanterns on wooden posts at the start and beside every checkpoint.
 
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on

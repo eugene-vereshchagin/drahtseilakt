@@ -246,9 +246,9 @@ Holzkugel kommt an eine Kiste, die sie nicht verschiebt, der Stein-Transformator
 **Nach den Konzeptbildern des Besitzers** (2026-11-03, seine Bilder nur als Vorbild): Schienen aus abgenutztem,
 gebürstetem verzinktem Stahl mit leichtem Rostton und Relief (`Track_Rail`, eine Normal-Map), eine Schelle um jedes
 Rohr alle 9 entlang, ihr Bügel unter dem Weg der Kugel zum anderen Rohr hinab gebogen, und an den Stützen ein dünner
-Stahlstab hinab in den Dunst (die Beschläge nur gezeichnet); die Holzkugel aus einem Stamm gedreht, ihre Jahresringe
-um ihre Pole und feine Risse von dort aus; die Kugeln glatt gezeichnet (ihre groben Netze bleiben der Physik); der
-Start auf einem Steinturm hinab in den Dunst; Laternen auf Holzpfosten am Start und neben jedem Checkpoint.
+Stahlstab vom Bügel hinab in den Dunst (die Beschläge nur gezeichnet); die Kugeln glatt gezeichnet (ihre groben Netze
+bleiben der Physik); der Start auf einem Steinturm hinab in den Dunst; Laternen auf Holzpfosten am Start und neben
+jedem Checkpoint.
 
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier
