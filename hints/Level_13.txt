@@ -67,3 +67,22 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # stands above the paper ball, which is stopped there). The storyboard's paper ball comes up out of it on top of the
 # loose stone balls that follow it down the channel; this needs all three blocks sunk at the crates (with one of
 # them still standing, the stones stop against it) and a wait at the pit's end.
+#
+# 2026-11-09 (second session, sector 3's end; stopped by the two-approaches rule, nothing new driven):
+# Run: --level 13 --sector 3 --autopilot --follow hints/Level_13-s2.replay --plan hints/Level_13.plan --hints
+# hints/Level_13.txt --ticks 20000 --give-up 40 (the copy without the mod line; the owner's own file needs --debug;
+# without --follow the way's search alone stops at (-724.2 -210.4 -238), just before the channel's end, which it
+# cannot leave). With --follow: sector 2, the beam, the chute and the side troughs go through in ~4 min of wall time,
+# the three crates are rammed (steps 6..14, ball -725 -220.5 -308), the stone transformer and the press west at
+# z -256 (step 17) FALL SHORT as before: the ball lands in the channel at (-720.3 -219.3 -292) and stays at
+# (-721.6 -219.4 -293.9) (speed 0, "stuck" every 2 s, rewinds to 00:59 of the sector do not change it). So the
+# crossing to the west half-pipe (the paper transformer P_Trafo_Paper_03) is the open spot, not the pit.
+# Approach 1: the previous press (-737 -219.4 -256 at 7). Approach 2: the way's search from the channel (cannot leave:
+# too low). Not tried: a run-up from further north of z -256 on the east half-pipe at 9..10, or crossing over a sunk block.
+# The video (dense frames 8-12 fps, 960x540, ref/video/frames/dense/level13/s3cross t=296..331 and s3end t=330..358):
+# CP2 at t~310; the ball waits on the wide platform at the channel's head until t~330 while the stones roll down the
+# channel (the platform's two corner transformers: one at t~313, the one at t~330 turns it to paper); the channel's
+# stretch to the flames/CP3 seen at t~337 and the stones queued on rails from t~340 (sector 4 starts there) pass in
+# 7 s of the video's timer, so the video is cut there (870 units of channel in 7 s is not physical) and gives no
+# line for the channel itself or the pit; --locate was not run (RATE is 4 a second in locate.rs, not configurable,
+# and the earlier real tracks of level 2 were lost after 35 s). Dense frames kept for sector 4's start (t 340..358).
