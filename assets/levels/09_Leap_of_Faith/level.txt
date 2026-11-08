@@ -6,3 +6,4 @@ title.ru = Прыжок веры
 title.de = Sprung ins Ungewisse
 title.zh = 信仰之跃
 order = 9
+difficulty = 9

@@ -21,18 +21,20 @@ The classic mode sees only `original/`; the extended mode sees all four (menu.md
 ## A level is a folder
 
 *Owner's decision of 2026-11-03* (decisions.md, "A level is a folder"). `community/` and `open/` (and `remastered/`) hold
-levels, not whatever an archive unpacked: the custom levels menu shows a flat list of levels, sorted by title, and no
-folders to open.
+levels, not whatever an archive unpacked: the custom levels menu shows a flat list of levels, sorted by difficulty
+and title, and no folders to open. Everything a level's author and a player need to know is gathered on
+[making-levels.md](making-levels.md).
 
 - **A level is a folder directly in the kind's folder** holding exactly one level: one `.nmo` file, or a level in the
   open format (`level.gltf`, `level.bin`, `textures/`; open-format.md). The open format is the clear one, easy to
   finish or fix up by hand: plain glTF and PNG files.
 - Beside it, all optional: `level.txt`, simple `key = value` lines (`title`, `author`, `version`; `title.<code>`, its
   title in another language, e.g. `title.ru`, shown when the menus speak it; `order`, a number placing it before the
-  levels without one, in its order; `hidden = yes`, kept out of the list of the levels shipped with the game, as the
-  test level is; `#` starts a comment, other keys are ignored), a README (`README.txt` or `README.md`), a preview picture (`preview.png` or
+  levels without one, in its order; `difficulty`, how hard it is, a whole number 1 (easy) to 10, anything else read as
+  unknown; `hidden = yes`, kept out of the list of the levels shipped with the game, as the test level is; `#` starts
+  a comment, other keys are ignored), a README (`README.txt` or `README.md`), a preview picture (`preview.png` or
   `preview.jpg`), and the folders of resources the level uses (`textures/`, `game/`).
-- **The title** is level.txt's `title`, else the folder's name. Either is cleaned (control characters, direction
+- **The title** is level.txt's `title` (in English; other languages as `title.<code>`), else the folder's name. Either is cleaned (control characters, direction
   overrides and other invisible format characters removed, spaces made one) and cut to **40 characters** (characters,
   not bytes) at a word, ending in "…", which the game's font draws as "...". Everywhere the game shows a level's name
   (the menu, the loading screen, the window's title) it shows this title. level.txt is read only when it is a plain
@@ -48,7 +50,13 @@ folders to open.
   folder's name had to lose characters). A generic file name (`Level_07.NMO`) is named after its collection; the same
   file found twice becomes one level; packed archives are named, not opened; names are made safe for Linux, Windows
   and macOS (no reserved names, no trailing dots or spaces, at most 40 characters, a second "Hello Mars" numbered
-  "(2)"); the source is only read. A second run adds only what is new.
+  "(2)"); the source is only read. A second run adds only what is new. With `--catalogue CustomMapList.md` (the
+  community's map list) it fills level.txt from the catalogue: the English title, the original name as `title.zh`, the
+  author and the difficulty (the catalogue's 1–5 doubled); a map that is neither in the catalogue nor has a readme is
+  not imported but set aside, with packed archives and folders that are not one level, in `levels/community-unsorted/`
+  with a README.txt saying why (`--unsorted DIR` chooses another folder); `--refresh` does the same to a folder
+  imported before, rewriting only its level.txt files. The menu lists by difficulty, then title; levels of unknown
+  difficulty after, levels with no `title` (named by their folder) last.
 
 ## Levels shipped with the game
 
@@ -66,7 +74,7 @@ game's (GPL-3.0-only).
 
 *2026-11-03.* Ten levels of our own, from a first roll to the gauntlet, ship with the game (the release criterion of
 roadmap.md). Each is new: its layout is ours, only the mechanics are the original's. The menu lists them in this
-order (`order` in level.txt), by their names in the menus' language:
+order (`order` in level.txt; their difficulty, `difficulty`, runs 1 to 10 with it), by their names in the menus' language:
 
 | # | Level | Sectors | Idea | Sky, music, bonus |
 |---|---|---|---|---|
@@ -94,6 +102,7 @@ begins a comment:
 ```
 title Paper Winds            # the level's name; title.ru, title.de, title.zh: in other languages
 order 3                      # its place in the list
+difficulty 3                 # how hard, 1 to 10 (level.txt's difficulty: the menu sorts by it)
 sky C                        # A, B, C or a sky by name: Mountains, Sea, ... (below)
 music 3                      # the theme, 1 to 5
 bonus 300                    # the level bonus

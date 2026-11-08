@@ -141,9 +141,19 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Light(e)
         | Action::Lantern(e)
         | Action::Ghost(e)
+        | Action::EndlessLives(e)
+        | Action::Rewind(e)
         | Action::Set(_, e) => vec![e],
         Action::Show(_, _, _, v) => v.iter().collect(),
-        Action::Splits(_) | Action::Screenshot | Action::Restart => Vec::new(),
+        Action::Splits(_)
+        | Action::Keys(_)
+        | Action::Screenshot
+        | Action::Restart
+        | Action::SaveMoment
+        | Action::LoadMoment
+        | Action::Slower
+        | Action::Faster
+        | Action::FreeCam => Vec::new(),
     }
 }
 
@@ -156,6 +166,8 @@ pub struct SimOut {
     pub stick: f32,
     pub gravity: f32,
     pub time_factor: f32,
+    /// The last ball is never lost (god-mode's `lives.endless`).
+    pub endless: bool,
 }
 
 impl Default for SimOut {
@@ -164,6 +176,7 @@ impl Default for SimOut {
             stick: 0.0,
             gravity: crate::physics::GRAVITY,
             time_factor: crate::physics::TIME_FACTOR as f32,
+            endless: false,
         }
     }
 }
@@ -190,6 +203,7 @@ impl SimMods {
                     Action::Stick(_) => out.stick = x.clamp(0.0, 1.0),
                     Action::Gravity(_) => out.gravity = x.clamp(0.0, 60.0),
                     Action::TimeFactor(_) => out.time_factor = x.clamp(0.5, 4.0),
+                    Action::EndlessLives(_) => out.endless = x != 0.0,
                     _ => {}
                 }
             });
@@ -239,6 +253,20 @@ pub struct ViewOut {
     pub splits: Vec<Corner>,
     pub screenshot: bool,
     pub restart: bool,
+    /// The practice's deeds asked for by a key, in order (the window does them).
+    pub practice: Vec<Practice>,
+}
+
+/// A practice deed (god-mode's keys): the window does it, outside the run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Practice {
+    /// So many seconds back (1 to 30).
+    Rewind(f32),
+    Save,
+    Load,
+    Slower,
+    Faster,
+    FreeCam,
 }
 
 impl Default for ViewOut {
@@ -254,6 +282,7 @@ impl Default for ViewOut {
             splits: Vec::new(),
             screenshot: false,
             restart: false,
+            practice: Vec::new(),
         }
     }
 }
@@ -263,6 +292,17 @@ impl Default for ViewOut {
 pub struct ViewMods {
     pub runs: Vec<ModRun>,
     pub out: ViewOut,
+}
+
+/// A key's name on screen: winit's, short ("KeyR" R, "Digit1" 1, "BracketLeft" [).
+pub fn key_text(name: &str) -> String {
+    match name {
+        "BracketLeft" => "[".to_owned(),
+        "BracketRight" => "]".to_owned(),
+        "Minus" => "-".to_owned(),
+        "Equal" => "=".to_owned(),
+        _ => name.strip_prefix("Key").or_else(|| name.strip_prefix("Digit")).unwrap_or(name).to_owned(),
+    }
 }
 
 /// Formats a HUD line's numbers.
@@ -291,6 +331,11 @@ impl ViewMods {
         self.runs.is_empty()
     }
 
+    /// One of them has practice deeds (god-mode): the window keeps the run's moments for going back.
+    pub fn practice(&self) -> bool {
+        self.runs.iter().any(|r| r.txt.practice())
+    }
+
     /// A run (re)starts: the view's variables and settings as at first.
     pub fn reset(&mut self) {
         for r in &mut self.runs {
@@ -305,6 +350,7 @@ impl ViewMods {
         for run in &mut self.runs {
             let run_vars = sim.vars_of(&run.key);
             let txt = Arc::clone(&run.txt);
+            let opts = run.opts.clone();
             fire(run, event, values, run_vars, &mut |a, v| {
                 let x = v.first().copied().unwrap_or(0.0);
                 match a {
@@ -337,8 +383,36 @@ impl ViewMods {
                             out.splits.push(*c);
                         }
                     }
+                    Action::Keys(c) => {
+                        // the mod's key options: "label: key", as many as a corner holds
+                        for (o, v) in txt.options.iter().zip(&opts) {
+                            if !matches!(o.kind, gamedata::mods::OptKind::Key(_)) {
+                                continue;
+                            }
+                            if out.lines.iter().filter(|l| l.0 == *c).count() >= 12 {
+                                break;
+                            }
+                            let name = o.show(*v);
+                            let key = key_text(&name);
+                            out.lines.push((*c, format!("{}: {key}", txt.label(&o.key, lang))));
+                        }
+                    }
                     Action::Screenshot => out.screenshot = true,
                     Action::Restart => out.restart = true,
+                    Action::Rewind(_) if out.practice.len() < 16 => {
+                        out.practice.push(Practice::Rewind(x.clamp(1.0, 30.0)));
+                    }
+                    Action::SaveMoment | Action::LoadMoment | Action::Slower | Action::Faster | Action::FreeCam
+                        if out.practice.len() < 16 =>
+                    {
+                        out.practice.push(match a {
+                            Action::SaveMoment => Practice::Save,
+                            Action::LoadMoment => Practice::Load,
+                            Action::Slower => Practice::Slower,
+                            Action::Faster => Practice::Faster,
+                            _ => Practice::FreeCam,
+                        });
+                    }
                     _ => {}
                 }
             });
@@ -589,6 +663,35 @@ mod tests {
     const FOV: &str = "name.en Fov\noption strength number 0 100 10 50\nvar seen 0\n\
         on frame\ndo camera.fov min(ball.speed, 30) * opt.strength / 100\ndo set seen = seen + 1\n\
         do show top-right - int seen\n";
+
+    #[test]
+    fn god_modes_keys_ask_for_its_deeds_and_its_hint_shows_them() {
+        let text = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/mods-dev/god-mode/mod.txt"),
+        )
+        .unwrap();
+        let m = Mods::load(vec![found("god-mode", &text)], |_| Some("on".into()));
+        let (sim, mut view) = m.running(true);
+        assert!(view.practice() && sim.modded(), "god-mode is a practice mod and its runs are modded");
+        assert!(sim.replay_lines()[0].starts_with("mod god-mode "));
+        let zero = |_: Value| 0.0;
+        for (key, deed) in [
+            ("F3", Practice::Rewind(5.0)),
+            ("F5", Practice::Save),
+            ("F9", Practice::Load),
+            ("BracketLeft", Practice::Slower),
+            ("BracketRight", Practice::Faster),
+            ("F2", Practice::FreeCam),
+        ] {
+            view.press(key, &zero, &sim, "en");
+            assert_eq!(std::mem::take(&mut view.out.practice), vec![deed], "{key}");
+        }
+        view.press("KeyR", &zero, &sim, "en");
+        assert!(view.out.restart);
+        view.fire(Event::Frame, &|v| if v == Value::PracticeSpeed { 1.0 } else { 0.0 }, &sim, "de");
+        let hint: Vec<&str> = view.out.lines.iter().filter(|l| l.0 == Corner::BottomLeft).map(|l| l.1.as_str()).collect();
+        assert!(hint.contains(&"Zurück: F3") && hint.contains(&"Langsamer: ["), "{hint:?}");
+    }
 
     #[test]
     fn on_off_and_options_persist_through_the_settings() {

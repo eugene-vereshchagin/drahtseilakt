@@ -6,3 +6,4 @@ title.ru = Бумажные ветра
 title.de = Papierwinde
 title.zh = 纸之风
 order = 3
+difficulty = 3

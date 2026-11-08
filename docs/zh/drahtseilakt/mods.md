@@ -10,10 +10,11 @@
 
 ## 打开和关闭模组
 
-*Options → Extended → Mods*（仅限扩展模式；经典模式不运行任何模组，与原版一样游玩）。该界面列出练习工具和无限生命（它们
-以前位于 *Debug mode* 界面，并保留其设置 `extended.tools off`、`extended.endless-lives off`），然后是找到的每个模组：
-先是内置模组，再是玩家的模组，每个显示 *Yes* 或 *No*，无法读取的模组显示 *refused*（列表下方的一行说明原因）。左右键
-切换所选模组；Enter 打开它的页面：*Switched on?*、它的选项、它的描述、作者、版本和许可证，以及当它改变规则时的警告。
+*Options → Extended → Mods*（仅限扩展模式；经典模式不运行任何模组，与原版一样游玩）。该界面列出找到的每个模组：
+先是内置模组，调试运行中接着是开发用模组（上帝模式，见下文），再是玩家的模组，每个显示 *Yes* 或 *No*，无法读取的模组显示
+*refused*（列表下方的帮助说明原因）。较长的列表可以滚动，旁边有滚动条和“▲ / ▼ 还有 N 项”（menu.md）。左右键切换所选
+模组；Enter 打开它的页面：*Switched on?*、它的选项（按键选项显示其按键）、它的描述、作者、版本和许可证，以及当它改变规则
+时的警告。
 设置中保存 `mod.<key> on|off` 和 `mod.<key>.<option> <value>`。模组的视图部分立即生效；改变游玩的部分从关卡下一次开始时
 生效。
 
@@ -32,10 +33,31 @@
 | `spirit-trail` | SpiritTrail | 关卡的最佳成绩以半透明球的形式在本次游玩旁边滚动；选项：不透明度 | 否 |
 | `blackout` | Blackout | 关卡变暗，球上方有一束微光；选项：暗度、光 | 否 |
 
+## 上帝模式
+
+*2026-11-03，所有者的决定*（decisions.md，“上帝模式是一个开发用模组”）。原来扩展模式的练习工具和无限生命合成一个模组
+`god-mode`，正是用这种格式、由下文的构件编写的。它是一个**开发用模组**：放在 `assets/mods-dev/` 中，游戏只有以 `--debug`
+运行时才读取该文件夹，发布包不包含它，因此游戏在没有它的情况下游玩。它的页面（Options → Extended → Mods → God mode）显示
+它的开关和按键；开启时，它的按键显示在左下角（选项 *Keys on screen?*），小节和 tick 显示在左上角。
+
+| 选项 | 默认 | 作用 |
+|---|---|---|
+| Endless lives? | yes | 最后一个球永远不会丢失 |
+| Seconds back | 5 | *Back* 后退多远（1–30） |
+| Back | F3（B、Z） | 后退这么多秒；再按一次，再往前退（游戏保留最近半分钟，每秒一个时刻） |
+| Save / Load | F5（K）/ F9（L） | 保存当前时刻，回到该时刻；失败的游玩会等待 Load |
+| Restart | R（T） | 重新开始关卡 |
+| Slower / Faster | `[`（`-`）/ `]`（`=`） | 游戏以一半的速度运行，最低到八分之一，以及恢复 |
+| Free camera | F2（C） | 相机自由飞行（方向键飞行和转向，A/D 横移，PageUp/PageDown，Home/End，Shift 加快）；游玩暂停等待 |
+| Keys on screen? | yes | 显示按键的提示 |
+
+上帝模式会改变游玩：它的游玩是 modded（见下文）——会被保存，但不解锁任何关卡，永远不算最佳成绩或高分——其回放写明该模组，
+因此回放只能在启用相同上帝模式的调试运行中播放。旧设置 `extended.tools` 和 `extended.endless-lives` 不再被读取。
+
 ## modded 游玩与回放
 
 改变游玩的模组（任何*游玩动作*，见下文）会使游玩成为 **modded**：它会被保存，但永远不算关卡的最佳成绩，永远不进高分榜，
-永远不被幽灵球或分段拿来比较，也不会解锁下一关（`Level_NN-<ticks>-modded.replay`；调试模式中的 “All levels” 可解锁全部）。它的回放在文件头中写明每个这样的模组——
+永远不被幽灵球或分段拿来比较，也不会解锁下一关（`Level_NN-<ticks>-modded.replay`；调试运行的 “All levels open” 可解锁全部）。它的回放在文件头中写明每个这样的模组——
 
     mod sticky-ball 9c41f0a2be1377d0 strength=60 wood_only=off
 
@@ -87,6 +109,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | `ball.kind` | 0 木球、1 石球、2 纸球 | `clock.hour` `clock.minute` `clock.second` | 时钟，UTC * |
 | `ball.touching` `ball.wall` | 它碰到了某物；碰到了陡峭的东西 | `mouse.dx` `mouse.dy` | 本帧鼠标的移动 * |
 | `run.tick` `run.time` | 游玩的 tick 数、秒数 | `extras.points` `extras.points_all` | 本小节剩余的额外分，以及全部 * |
+| `practice.speed` | 游戏的速度（1，最低到 1/8） * | `practice.saved` | 已保存一个时刻（1 或 0） * |
 | `run.sector` `run.lives` `run.points` | 小节（从 1 开始）、生命、分数 | `extras.lives` `extras.lives_all` | 剩余的额外生命，以及全部 * |
 | `input.forward` `input.backward` `input.left` `input.right` `input.rotation` `input.overview` | 按住的游戏按键（1 或 0） | `best.time` | 关卡的最佳时间，秒（-1：无） * |
 
@@ -106,6 +129,14 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 - `do ball.stick <0..1>` — 球以此强度粘住它碰到的东西，抵抗重力，推向墙壁时会沿墙向上转。
 - `do world.gravity <0..60>` — 重力的拉力（原版为 20）。
 - `do world.time <0.5..4>` — 物理的时间因子（原版为 2）。
+- `do lives.endless <0|1>` — 最后一个球永远不会丢失（god-mode）。
+
+练习动作（只能用于 `key`；它们从游玩外部介入游玩，因此含有这类动作的模组同样是 modded，并且在它开启时，游戏会保存游玩的
+时刻，最近半分钟内每秒一个）：
+
+- `do rewind <1..30>` — 后退这么多秒；`do save`、`do load` — 保存当前时刻，回到该时刻；
+- `do slower`、`do faster` — 游戏速度减半（最低到 1/8）或加倍（最高恢复原速）；
+- `do freecam` — 开启或关闭自由相机。
 
 视图动作（只能用于 `frame` 或 `key`）：
 
@@ -116,6 +147,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 - `do show <corner> <label|-> <format> <value>[, <value>[, <value>]]` — 本帧的一行 HUD；角落 `top-left top-right
   bottom-left bottom-right`；格式 `time`（由秒数得到 mm:ss.hh）、`int`、`dec1`、`dec2`、`clock`（hh:mm）、`ratio`（a/b）。
 - `do splits <corner>` — 各小节相对最佳成绩的分段。
+- `do keys <corner>` — 以 HUD 行显示模组自己的按键选项，“标签: 按键”（上帝模式的提示）。
 - `do ghost <0..1>` — 以半透明球显示最佳成绩，不透明度为此值。
 - `do screenshot`、`do restart`。
 
@@ -169,8 +201,8 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 - **随转动的视角转向**（FreeViewRotation 也会转动操控方向）：这需要把鼠标的转动记录在回放中；目前 `camera.yaw` 只转动
   视角。
 - **诱饵球**（Interference）、**变形球**（DeformedWB）：用于额外球和网格噪声的绘制构件。
-- **传送到出生点、在游玩中设置小节**（NewSpawn、SpeedrunShortcuts）：练习工具的 F5/F9 和 `--sector` 已覆盖练习用途；
-  游玩中的构件会使其成为模组。
+- **传送到出生点、在游玩中设置小节**（NewSpawn、SpeedrunShortcuts）：上帝模式的保存和读取以及 `--sector` 已覆盖练习
+  用途；设置小节的构件会使其成为模组。
 - **每关游戏时长**（WatchYourTime 的统计）：一个保存的计数器构件。
 - mod.txt 的模糊测试目标（解析器严格、有上限并有单元测试；模糊测试随发布工作一起进行）。
 
@@ -181,9 +213,9 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 | BML mod | 作用 | 我们的 |
 |---|---|---|
-| AdvancedTravelCam | 可以飞到任何地方的漫游相机，用鼠标选点，电影式平滑 | 练习工具的自由相机（F2）；`free-view`（距离、转动）；平滑排队中 |
+| AdvancedTravelCam | 可以飞到任何地方的漫游相机，用鼠标选点，电影式平滑 | 上帝模式的自由相机（F2）；`free-view`（距离、转动）；平滑排队中 |
 | BallanceOptiFine | 为旧的自制地图强制开启阴影和过渡柱；纹理格式 | 渲染器在每个地面上绘制球的阴影；不是模组 |
-| BaseCmoCfg | 编辑 base.cmo 的 GameSettings（God mode、Debug） | 扩展模式；Mods 界面上的无限生命 |
+| BaseCmoCfg | 编辑 base.cmo 的 GameSettings（God mode、Debug） | `--debug` 及其上帝模式（无限生命等） |
 | Blackout | 让一切变暗，球上方有一束微光 | 内置 `blackout` |
 | Coredump | 把运行中的 Virtools 上下文转储为 .nmo | 不需要（我们的运行时是自己的；`--export` 写出关卡） |
 | CursorClipper | 把光标限制在窗口内 | 不需要：游玩不从光标获取任何东西，`mouse.dx` 读取原始移动 |
@@ -197,17 +229,17 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | Interference | 球周围的半透明诱饵球 | 排队中 |
 | LanternFader | 对灯笼材质做 alpha 测试以防掉帧 | 不需要（我们的渲染器） |
 | MapScripts | 运行地图的回调脚本 | 引擎把地图的行为图作为数据运行；不是模组 |
-| NewSpawn | 设置出生点、传送到那里、录制灵魂球 | 练习工具（F5/F9、`--sector`、`--at`）；`spirit-trail` |
-| PhysicsEditor | 重力、物理时间因子、游戏速度 | 内置 `physics-lab`（modded）；游戏速度是练习工具的 `[` `]` |
+| NewSpawn | 设置出生点、传送到那里、录制灵魂球 | 上帝模式（F5/F9）、`--sector`、`--at`；`spirit-trail` |
+| PhysicsEditor | 重力、物理时间因子、游戏速度 | 内置 `physics-lab`（modded）；游戏速度是上帝模式的 `[` `]` |
 | PositionViewer | 球的坐标 | 内置 `info-overlay` |
 | RealTimeMeter | 跨关卡的真实游戏时间 | 内置 `segment-timer`（真实时间） |
 | ScreenCapturer | 一个键保存截图（PNG/JPEG、剪贴板） | 内置 `screenshot`（PNG；无剪贴板） |
 | Segment | 每个小节相对纪录的时间 | 内置 `segment-timer` |
-| SpeedrunShortcuts | 作弊模式、设置出生点、重开、设置小节 | 内置 `quick-restart`；练习工具；设置小节排队中 |
+| SpeedrunShortcuts | 作弊模式、设置出生点、重开、设置小节 | 内置 `quick-restart`；上帝模式；设置小节排队中 |
 | SpiritTrail | 以半透明球显示纪录游玩 | 内置 `spirit-trail` |
 | StickyAccess | 在作弊模式下切换到粘性球 | 内置 `sticky-ball` |
 | SysInfoDisplay | 屏幕上显示系统时间和电量 | 内置 `info-overlay`（时钟，UTC）；无电量 |
-| TASSupport | 录制和播放输入、跳过渲染、结束时退出 | 引擎：回放是确定性的输入录制（`--record`、`--replay`、`--headless`），以及练习工具的慢动作 |
+| TASSupport | 录制和播放输入、跳过渲染、结束时退出 | 引擎：回放是确定性的输入录制（`--record`、`--replay`、`--headless`），以及上帝模式的慢动作 |
 | WatchYourTime | 每关游戏时长 | 排队中（统计） |
 | BallSticky | 能爬墙的粘性球类型 | 内置 `sticky-ball`（modded） |
 | BMLModuls | 新模块（木制落板和旋转板） | 关卡部件，不是模组：开放格式的部件（[open-format.md](open-format.md)） |
@@ -218,8 +250,9 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 ## 审查后的补充说明
 
 - 数值选项：上下限在 ±1 000 000 以内，步长不小于 0.001，默认值须落在从 `min` 起的步长上。
-- 按键选项不能占用游戏自身的按键：Escape、Enter、方向键、Shift、Space、Tab、Alt、F11，以及练习工具的按键
-  （R、F2、F3、F5、F9、`[` `]`）；玩家在 Controls 页面绑定的按键仍归游戏所有。
+- 按键选项不能占用游戏自身的按键：Escape、Enter、方向键、Shift、Space、Tab、Alt、F11 和 Backquote；玩家在
+  Controls 页面绑定的按键仍归游戏所有。（R、F2、F3、F5、F9、`[` `]` 原是练习工具的按键；现在它们是上帝模式的按键，
+  任何模组都可以使用。）
 - `do screenshot` 与 `do restart` 只能用于 `on key` 规则（不能每帧执行）；每秒最多一张截图。
 - 回放中模组选项缺失、未知或超出范围时，回放会被拒绝并给出原因。
 - 计算预算：所有已启用模组的表达式节点总数不超过 20 000（读取模组时统计）；会超出预算的模组不会被启用，Mods 页面会说明原因。

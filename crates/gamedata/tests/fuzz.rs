@@ -99,6 +99,10 @@ pub fn run_level_txt(input: &[u8]) {
     }
     assert!(!gamedata::package::printable(&text).chars().any(char::is_control), "printable() kept a control character");
     let info = gamedata::package::parse_info(input);
+    assert!(
+        info.difficulty.is_none_or(|d| (1..=gamedata::package::DIFFICULTY_MAX).contains(&d)),
+        "a difficulty out of 1..10"
+    );
     for (v, max) in [
         (&info.title, gamedata::package::TITLE_MAX),
         (&info.author, gamedata::package::FIELD_MAX),
@@ -116,6 +120,7 @@ fn level_txt_seeds() -> Vec<Vec<u8>> {
         b"title = A level\nauthor = Someone\nversion = 1.2\n".to_vec(),
         b"\xef\xbb\xbf# comment\nTITLE=x\n".to_vec(),
         "title = \u{202e}汉字 level with a very long title that goes on and on\n".as_bytes().to_vec(),
+        b"difficulty = 7\ndifficulty=11\ndifficulty = -1\n".to_vec(),
     ];
     let mut roots = fuzzkit::real_roots();
     if let Some(home) = std::env::var_os("HOME") {

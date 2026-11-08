@@ -6,3 +6,4 @@ title.ru = Дерево и камень
 title.de = Holz und Stein
 title.zh = 木与石
 order = 2
+difficulty = 2

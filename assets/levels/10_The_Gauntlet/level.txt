@@ -6,3 +6,4 @@ title.ru = Испытание
 title.de = Spießrutenlauf
 title.zh = 终极考验
 order = 10
+difficulty = 10

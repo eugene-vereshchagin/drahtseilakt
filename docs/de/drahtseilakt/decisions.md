@@ -365,3 +365,30 @@ der den Lauf ändert, markiert ihn als gemoddet, und sein Replay nennt den Mod m
 Lauf, nie ein Highscore; klassische Läufe und ihre Replays bleiben unverändert). Klangthemen, Textur- und Modellpakete
 und Level sind keine Mods: sie behalten ihre eigenen Menüs. BML-Mods sind Windows-DLLs: sie wurden statisch als
 Anforderungen durchgesehen und werden nie geladen, ausgeführt oder importiert — auch nicht unter Wine.
+
+## Der Gottmodus ist ein Entwicklungs-Mod
+
+*2026-11-03, Entscheidung des Eigentümers* („unsere Debug-Werkzeuge sollen ein besonderer Mod werden, der Gottmodus,
+mit freiem Speichern, endlosen Leben und Zurückgehen; vielleicht liefern wir ihn mit dem Hauptspiel gar nicht aus,
+damit das Spielen spannender ist“). Die Übungswerkzeuge des erweiterten Modus (den Moment speichern und laden, Sekunden
+zurück, langsamer und schneller, die freie Kamera, Neustart, Sektor und Takt auf dem Bildschirm) und die endlosen Leben
+sind keine Ergänzungen des Spiels mehr: sie sind ein Mod, `god-mode`, geschrieben in unserem Mod-Format aus reinen
+Daten aus Bausteinen, die das Format dafür bekam (`lives.endless`, `rewind`, `save`, `load`, `slower`, `faster`,
+`freecam`, `keys`), sodass seine Tasten Optionen auf seiner Seite sind und auf dem Bildschirm stehen, solange er an ist.
+Er ist ein *Entwicklungs-Mod*: er liegt in `assets/mods-dev/`, wird nur in einem mit `--debug` gestarteten Lauf gelesen,
+und das Paket eines Releases lässt diesen Ordner weg. „Alle Level offen“ gibt es ebenso nur in einem Debug-Lauf; im
+Spiel eines Spielers werden die Level durch Spielen freigeschaltet. Ein Lauf mit Gottmodus ändert den Lauf, ist also
+gemoddet: behalten, aber er öffnet kein Level und ist nie ein bester Lauf oder ein Highscore, und sein Replay nennt den
+Mod. Einzelheiten: [mods.md](mods.md), „Gottmodus“.
+
+## Level werden nach Schwierigkeit gelistet, mit englischen Titeln
+
+*2026-11-03, Entscheidung des Eigentümers* („die eigenen Level in ein Format bringen, damit es kein Haufen ist“). Die
+level.txt eines Levels gibt seine `difficulty`, eine ganze Zahl von 1 bis 10 (alles andere ist unbekannt), und seinen
+`title` auf Englisch, mit seinen Namen in anderen Sprachen als `title.<Code>`. Das Menü zeigt Schwierigkeit und Titel
+jedes Levels und sortiert nach Schwierigkeit, dann Titel; Level unbekannter Schwierigkeit danach, Level ohne Titel
+(nach ihrem Ordner benannt) zuletzt. Unsere zehn Level sind mit 1 bis 10 bewertet. Die Toolbox füllt level.txt aus dem
+Katalog der Community (sein englischer Name, der Originalname, der Autor, seine Schwierigkeit 1–5 verdoppelt), und was
+weder im Katalog steht noch mit einem Readme kommt, sowie Archive und Ordner, die nicht genau ein Level sind, werden in
+`levels/community-unsorted/` beiseitegelegt, damit der Spieler sie von Hand ansieht, und nicht gelistet. Die Regeln für
+Autoren und Spieler stehen auf einer Seite: [making-levels.md](making-levels.md).

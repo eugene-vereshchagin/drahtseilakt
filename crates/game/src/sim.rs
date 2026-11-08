@@ -672,9 +672,7 @@ pub struct Sim {
     pub camera: Camera,
     pub tick: u64,
     pub lives: u32,
-    /// Practice (extended mode): the last ball is not lost, and `lives_spared` says it happened (the run is then
-    /// helped). Off for every replay, so runs replay as recorded.
-    pub endless_lives: bool,
+    /// The last ball was kept by god-mode's endless lives (the mods' `lives.endless`): the run is helped.
     pub lives_spared: bool,
     pub points: i64,
     pub sector: usize,
@@ -1118,7 +1116,6 @@ impl Sim {
             camera,
             tick: 0,
             lives: 3,
-            endless_lives: false,
             lives_spared: false,
             // the points counter takes its first point as the level starts (C game, level 2: 999 when the ball comes)
             points: START_POINTS - 1,
@@ -1612,7 +1609,7 @@ impl Sim {
             if self.tick == d + DEATH_REMOVE_TICKS {
                 self.world.remove(0);
                 // Lives are balls: the last ball lost ends the run (in practice the last one is kept).
-                if self.endless_lives && self.lives <= 1 {
+                if self.mods.out.endless && self.lives <= 1 {
                     self.lives_spared = true;
                 } else {
                     self.lives = self.lives.saturating_sub(1);
@@ -3362,6 +3359,25 @@ pub(crate) mod tests {
         }
         assert_eq!(sim.lives, 0);
         assert!(sim.game_over, "three balls lost, the run must be over");
+    }
+
+    #[test]
+    fn god_modes_endless_lives_keep_the_last_ball() {
+        let level = flat_level();
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        sim.mods = mods_of("name.en God\non tick\ndo lives.endless 1\n");
+        for lost in 1..=5 {
+            sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
+            for _ in 0..600 {
+                sim.step(0);
+                if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost && sim.dying.is_none() {
+                    break;
+                }
+            }
+        }
+        assert!(!sim.game_over && sim.lives == 1, "five balls lost, the last one kept: {} lives", sim.lives);
+        assert!(sim.lives_spared, "the run says it was helped");
+        assert!(sim.mods.modded(), "and is modded");
     }
 
     /// Level 1's dome (P_Dome_01, sector 2) with the player's copy (skipped without OPENBALLANCE_DATA): the wooden

@@ -57,13 +57,14 @@ ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bil
 beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
 Stelle, mit `--ball wood|stone|paper`; ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
 Bis der erweiterte Modus eingeschaltet ist (Options, Extended, oder `--debug` für einen Start), ist das Spiel so
-genau wie möglich das Original. Der *erweiterte Modus* öffnet alle Level, zeigt Bestzeiten und
-Level nach Art unter Start (Original, Remaster, Community-Karten und Level im
-offenen Format aus `levels/`) und fügt unsere Werkzeuge hinzu: R startet neu, F2 nimmt eine freie
-Kamera auf, um durch das Level zu fliegen, während der Lauf wartet, `[` und `]` verlangsamen den Lauf und
-beschleunigen ihn wieder (der Lauf selbst bleibt Takt für Takt derselbe), F5 speichert den Moment und F9 kehrt
-dorthin zurück (die Aufzeichnung wird bis dorthin gekürzt, so lässt sich ein langes Level stückweise aufnehmen),
-und Sektor und Takt werden angezeigt. Ein so unterstützter Lauf wird behalten, ist aber nie der beste. Zum Testen lässt `--autopilot` einen Testspieler das Level ohne
+genau wie möglich das Original. Der *erweiterte Modus* zeigt Bestzeiten und Level nach Art unter Start (Original,
+Remaster, Community-Karten und Level im offenen Format aus `levels/`, jedes mit seiner Schwierigkeit; wie man eines
+baut und teilt: [Level bauen und teilen](docs/de/drahtseilakt/making-levels.md)) und die Mods
+([Mods](docs/de/drahtseilakt/mods.md)). Ein Debug-Lauf (`--debug`) öffnet zudem alle Level und bietet den
+Entwicklungs-Mod *Gottmodus*: endlose Leben, F5 speichert den Moment und F9 kehrt dorthin zurück, F3 geht Sekunden
+zurück, R startet neu, `[` und `]` verlangsamen den Lauf und beschleunigen ihn wieder, F2 nimmt eine freie Kamera auf,
+und Sektor und Takt werden angezeigt; seine Läufe werden als gemoddet behalten, nie als beste. Ein Release liefert ihn
+nicht mit. Zum Testen lässt `--autopilot` einen Testspieler das Level ohne
 Fenster versuchen (mit `--record FILE` bleibt sein Lauf erhalten); `--follow FILE` lässt ihn dem Weg der Kugel im Replay eines
 Spielers folgen; wo er steckt, schreibt er einen Bericht, und er folgt Hinweisen ([der Testspieler](docs/de/drahtseilakt/autopilot.md)). `--locate DIR --record TRACK` findet den Weg der Kugel in den Bildern eines Videos des Originals (DIR/s0001.jpg usw., vier pro Sekunde, z. B. `ffmpeg -vf fps=4,scale=640:480`): Das Level wird von den möglichen Orten der Kugel aus gezeichnet und mit dem Bild verglichen; einer solchen Spur folgt der Testspieler mit `--follow TRACK`. `--frames DIR --replay FILE` zeichnet ein Replay als solche Bilder, mit den wahren Orten der Kugel, zum Prüfen. `drahtseilakt --help` zeigt alles.
 

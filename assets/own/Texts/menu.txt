@@ -72,11 +72,6 @@ no levels | No levels here yet. Put them into | Здесь пока нет ур�
 feature all-levels | All levels open? | Все уровни открыты? | Alle Level offen? | 开放全部关卡? | Tous les niveaux ouverts ? | ¿Todos los niveles abiertos? | Tutti i livelli aperti?
 feature best-times | Best times? | Лучшее время? | Bestzeiten? | 最佳时间? | Meilleurs temps ? | ¿Mejores tiempos? | Tempi migliori?
 feature custom-levels | Levels by kind? | Уровни по видам? | Level nach Art? | 按类别选关? | Niveaux par type ? | ¿Niveles por tipo? | Livelli per tipo?
-feature tools | Practice tools? | Тренировка? | Trainingswerkzeuge? | 练习工具? | Outils d'entraînement ? | ¿Herramientas de práctica? | Strumenti di allenamento?
-feature endless-lives | Endless lives? | Бесконечные жизни? | Unendliche Leben? | 无限生命? | Vies infinies ? | ¿Vidas infinitas? | Vite infinite?
-help 1 | R restart, F2 free camera, [ ] speed, | R заново, F2 свободная камера, [ ] скорость, | R neu, F2 freie Kamera, [ ] Tempo, | R 重来，F2 自由视角，[ ] 速度， | R recommencer, F2 caméra libre, [ ] vitesse, | R reiniciar, F2 cámara libre, [ ] velocidad, | R ricomincia, F2 camera libera, [ ] velocità,
-help 2 | F3 five seconds back, F5 / F9 save and back. | F3 на 5 секунд назад, F5 / F9 сохранить и вернуться. | F3 fünf Sekunden zurück, F5 / F9 sichern und zurück. | F3 后退五秒，F5 / F9 保存与返回。 | F3 cinq secondes en arrière, F5 / F9 sauver et revenir. | F3 cinco segundos atrás, F5 / F9 guardar y volver. | F3 cinque secondi indietro, F5 / F9 salva e torna.
-help 3 | Helped runs are kept, never the best. | Такие забеги хранятся, но не лучшие. | Solche Läufe zählen nie als beste. | 辅助过的成绩会保存，但不算最佳。 | Ces parties ne comptent jamais comme meilleures. | Estas partidas nunca cuentan como mejores. | Queste partite non contano mai come migliori.
 loading | Loading {name} | Загрузка: {name} | Lade {name} | 正在加载 {name} | Chargement : {name} | Cargando {name} | Caricamento: {name}
 level bonus | Level Bonus: | Бонус уровня: | Levelbonus: | 关卡奖励： | Bonus du niveau : | Bonus de nivel: | Bonus livello:
 time points | Time Points: | Очки за время: | Zeitpunkte: | 时间得分： | Points de temps : | Puntos de tiempo: | Punti tempo:
@@ -117,3 +112,8 @@ mod refused | refused | отклонён | abgelehnt | 已拒绝 | refusé | rec
 mod modded | Changes the rules: its runs are marked modded, never a best run. | Меняет правила: забеги помечаются как модифицированные и не бывают лучшими. | Ändert die Regeln: Läufe gelten als gemoddet, nie als Bestzeit. | 改变规则：成绩标记为“已修改”，不计最佳。 | Change les règles : parties marquées moddées, jamais meilleures. | Cambia las reglas: partidas marcadas como modificadas, nunca mejores. | Cambia le regole: partite segnate come modificate, mai migliori.
 sector | Sector | Сектор | Sektor | 区段 | Secteur | Sector | Settore
 mod budget | Not switched on: the mods on would do too much work | Не включён: включённые моды делали бы слишком много работы | Nicht eingeschaltet: die aktiven Mods würden zu viel rechnen | 未启用：已启用模组的计算量将超出上限 | Non activé : les mods actifs feraient trop de calculs | No activado: los mods activos harían demasiado trabajo | Non attivato: le mod attive farebbero troppo lavoro
+more | {n} more | ещё {n} | {n} weitere | 还有 {n} 项 | {n} de plus | {n} más | altri {n}
+key BracketLeft | [ | [ | [ | [ | [ | [ | [
+key BracketRight | ] | ] | ] | ] | ] | ] | ]
+key Minus | - | - | - | - | - | - | -
+key Equal | = | = | = | = | = | = | =

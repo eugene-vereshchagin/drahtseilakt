@@ -22,18 +22,19 @@ Der klassische Modus sieht nur `original/`, der erweiterte alle vier (menu.md).
 
 *Entscheidung des Eigentümers vom 2026-11-03* (decisions.md, „Ein Level ist ein Ordner“). In `community/` und `open/`
 (und `remastered/`) liegen Level, nicht alles, was ein Archiv entpackt hat: das Menü der eigenen Level zeigt eine
-flache Liste der Level, nach Titel sortiert, ohne Ordner zum Öffnen.
+flache Liste der Level, nach Schwierigkeit und Titel sortiert, ohne Ordner zum Öffnen. Alles, was der Autor eines
+Levels und ein Spieler wissen müssen, steht gesammelt auf [making-levels.md](making-levels.md).
 
 - **Ein Level ist ein Ordner direkt im Ordner seiner Art** mit genau einem Level: einer `.nmo`-Datei oder einem Level im
   offenen Format (`level.gltf`, `level.bin`, `textures/`; open-format.md). Das offene Format ist das klare, leicht von
   Hand fertigzustellen oder nachzubessern: gewöhnliche glTF- und PNG-Dateien.
 - Daneben, alles freiwillig: `level.txt`, einfache Zeilen `Schlüssel = Wert` (`title`, `author`, `version`;
   `title.<Code>`, sein Titel in einer anderen Sprache, z. B. `title.ru`, gezeigt, wenn die Menüs sie sprechen; `order`,
-  eine Zahl, die es vor die Level ohne eine stellt, in ihrer Reihenfolge; `hidden = yes`, nicht in der Liste der mit
-  dem Spiel gelieferten Level, wie das Testlevel; `#` beginnt einen Kommentar, andere
-  Schlüssel werden übergangen), ein README (`README.txt` oder `README.md`), ein Vorschaubild (`preview.png` oder
+  eine Zahl, die es vor die Level ohne eine stellt, in ihrer Reihenfolge; `difficulty`, wie schwer es ist, eine ganze Zahl von 1
+  (leicht) bis 10, alles andere gilt als unbekannt; `hidden = yes`, nicht in der Liste der mit dem Spiel gelieferten
+  Level, wie das Testlevel; `#` beginnt einen Kommentar, andere Schlüssel werden übergangen), ein README (`README.txt` oder `README.md`), ein Vorschaubild (`preview.png` oder
   `preview.jpg`) und die Ordner der Ressourcen, die das Level nutzt (`textures/`, `game/`).
-- **Der Titel** ist `title` aus level.txt, sonst der Ordnername. Er wird bereinigt (Steuerzeichen,
+- **Der Titel** ist `title` aus level.txt (auf Englisch; andere Sprachen als `title.<Code>`), sonst der Ordnername. Er wird bereinigt (Steuerzeichen,
   Richtungsumschalter und andere unsichtbare Formatzeichen entfernt, Leerzeichen zu einem) und auf **40 Zeichen**
   (Zeichen, nicht Bytes) an einer Wortgrenze gekürzt, mit „…“ am Ende, das die Schrift des Spiels als "..." zeichnet.
   Überall, wo das Spiel den Namen eines Levels zeigt (Menü, Ladebildschirm, Fenstertitel), zeigt es diesen Titel.
@@ -50,7 +51,14 @@ flache Liste der Level, nach Titel sortiert, ohne Ordner zum Öffnen.
   Ordnername Zeichen verlieren musste). Ein nichtssagender Dateiname (`Level_07.NMO`) wird nach seiner Sammlung
   benannt; dieselbe Datei zweimal gefunden ist ein Level; gepackte Archive werden genannt, nicht geöffnet; Namen
   taugen für Linux, Windows und macOS (keine reservierten Namen, keine Punkte oder Leerzeichen am Ende, höchstens 40
-  Zeichen, ein zweites „Hello Mars“ mit „(2)“); die Quelle wird nur gelesen. Ein zweiter Lauf fügt nur Neues hinzu.
+  Zeichen, ein zweites „Hello Mars“ mit „(2)“); die Quelle wird nur gelesen. Ein zweiter Lauf fügt nur Neues hinzu. Mit `--catalogue CustomMapList.md` (der
+  Kartenliste der Community) füllt es level.txt aus dem Katalog: den englischen Titel, den Originalnamen als
+  `title.zh`, den Autor und die Schwierigkeit (die 1–5 des Katalogs verdoppelt); eine Karte, die weder im Katalog
+  steht noch ein Readme hat, wird nicht importiert, sondern mit gepackten Archiven und Ordnern, die nicht genau ein
+  Level sind, in `levels/community-unsorted/` beiseitegelegt, mit einer README.txt, die sagt, warum
+  (`--unsorted DIR` wählt einen anderen Ordner); `--refresh` tut dasselbe mit einem früher importierten Ordner und
+  schreibt nur seine level.txt-Dateien neu. Das Menü listet nach Schwierigkeit, dann Titel; Level unbekannter
+  Schwierigkeit danach, Level ohne `title` (nach ihrem Ordner benannt) zuletzt.
 
 ## Level, die mit dem Spiel kommen
 
@@ -67,7 +75,7 @@ Sicherungsart, für die Tests; es ist durch `hidden = yes` in seiner level.txt a
 
 *2026-11-03.* Zehn eigene Level, vom ersten Rollen bis zum Spießrutenlauf, kommen mit dem Spiel (das
 Release-Kriterium aus roadmap.md). Jedes ist neu: sein Verlauf ist unserer, nur die Mechanik ist die des Originals.
-Das Menü listet sie in dieser Reihenfolge (`order` in level.txt), unter ihren Namen in der Sprache der Menüs:
+Das Menü listet sie in dieser Reihenfolge (`order` in level.txt; ihre Schwierigkeit, `difficulty`, läuft mit ihr von 1 bis 10), unter ihren Namen in der Sprache der Menüs:
 
 | # | Level | Sektoren | Idee | Himmel, Musik, Bonus |
 |---|---|---|---|---|
@@ -96,6 +104,7 @@ Teile werden dorthin gesetzt, wo er ist. Eine Zeile ist ein Befehl; `#` beginnt 
 ```
 title Paper Winds            # der Name des Levels; title.ru, title.de, title.zh: in anderen Sprachen
 order 3                      # sein Platz in der Liste
+difficulty 3                 # wie schwer, 1 bis 10 (difficulty in level.txt: das Menü sortiert danach)
 sky C                        # A, B, C oder ein Himmel mit Namen: Mountains, Sea, ... (unten)
 music 3                      # das Thema, 1 bis 5
 bonus 300                    # der Levelbonus

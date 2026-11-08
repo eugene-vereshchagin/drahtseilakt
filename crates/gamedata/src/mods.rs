@@ -139,9 +139,12 @@ pub enum Value {
     ExtrasLivesAll,
     /// The level's best time in seconds (-1: none yet).
     BestTime,
+    /// The practice blocks' state: the game's speed (1 as it is, down to 1/8) and whether a moment is saved (1 or 0).
+    PracticeSpeed,
+    PracticeSaved,
 }
 
-const VALUES: [(&str, Value); 35] = [
+const VALUES: [(&str, Value); 37] = [
     ("ball.x", Value::BallX),
     ("ball.y", Value::BallY),
     ("ball.z", Value::BallZ),
@@ -174,6 +177,8 @@ const VALUES: [(&str, Value); 35] = [
     ("extras.lives", Value::ExtrasLives),
     ("extras.lives_all", Value::ExtrasLivesAll),
     ("best.time", Value::BestTime),
+    ("practice.speed", Value::PracticeSpeed),
+    ("practice.saved", Value::PracticeSaved),
     // aliases kept short for HUD lines
     ("run.ticks", Value::RunTick),
     ("ball.v", Value::BallSpeed),
@@ -432,15 +437,45 @@ pub enum Action {
     Splits(Corner),
     /// The best run as a translucent ball, so opaque (0 to 1; 0 hides it).
     Ghost(Expr),
+    /// The mod's own key options as HUD lines in a corner ("label: key"): its keys shown while it is on.
+    Keys(Corner),
     Screenshot,
     Restart,
+    // the run's (sim) action of the practice: the last ball is never lost (0 or 1)
+    EndlessLives(Expr),
+    // the practice's deeds, only on a key (on key <option>): they reach into the run from outside it, so a mod that
+    // has one is modded as a run action makes it
+    /// So many seconds back (1 to 30), from the moments the game keeps each second while such a mod is on.
+    Rewind(Expr),
+    /// Keep the moment; back to the moment kept.
+    SaveMoment,
+    LoadMoment,
+    /// The game slower (half, down to an eighth) or faster (double, up to as it is).
+    Slower,
+    Faster,
+    /// The free camera taken up or put down (the run waits while it flies).
+    FreeCam,
 }
 
 impl Action {
     pub fn sim(&self) -> bool {
         matches!(
             self,
-            Action::Stick(_) | Action::Gravity(_) | Action::TimeFactor(_)
+            Action::Stick(_) | Action::Gravity(_) | Action::TimeFactor(_) | Action::EndlessLives(_)
+        )
+    }
+
+    /// One of the practice's deeds (rewind, save, load, speed, free camera): only on a key, and it makes the mod
+    /// modded.
+    pub fn practice(&self) -> bool {
+        matches!(
+            self,
+            Action::Rewind(_)
+                | Action::SaveMoment
+                | Action::LoadMoment
+                | Action::Slower
+                | Action::Faster
+                | Action::FreeCam
         )
     }
 
@@ -455,9 +490,19 @@ impl Action {
             | Action::CameraYaw(e)
             | Action::Light(e)
             | Action::Lantern(e)
-            | Action::Ghost(e) => vec![e],
+            | Action::Ghost(e)
+            | Action::EndlessLives(e)
+            | Action::Rewind(e) => vec![e],
             Action::Show(_, _, _, v) => v.iter().collect(),
-            Action::Splits(_) | Action::Screenshot | Action::Restart => Vec::new(),
+            Action::Splits(_)
+            | Action::Keys(_)
+            | Action::Screenshot
+            | Action::Restart
+            | Action::SaveMoment
+            | Action::LoadMoment
+            | Action::Slower
+            | Action::Faster
+            | Action::FreeCam => Vec::new(),
         }
     }
 }
@@ -594,9 +639,14 @@ impl ModTxt {
             .unwrap_or_else(|| name.to_owned())
     }
 
-    /// It changes the run (any sim action): its runs are modded.
+    /// It changes the run (any sim action, or a practice deed that reaches into it): its runs are modded.
     pub fn modded(&self) -> bool {
-        self.rules.iter().any(|r| r.actions.iter().any(Action::sim))
+        self.rules.iter().any(|r| r.actions.iter().any(|a| a.sim() || a.practice()))
+    }
+
+    /// It has a practice deed: while it is on, the game keeps the run's moments for going back.
+    pub fn practice(&self) -> bool {
+        self.rules.iter().any(|r| r.actions.iter().any(Action::practice))
     }
 
     /// The label names in their order (`Show` refers to them by place).
@@ -1016,10 +1066,9 @@ fn parse_option(rest: &str) -> Result<OptSpec, String> {
 }
 
 /// Keys a mod may never take: the menu's and window's, the arrows, the game's default keys, the practice tools'.
-pub const RESERVED_KEYS: [&str; 22] = [
+pub const RESERVED_KEYS: [&str; 15] = [
     "Escape", "Enter", "NumpadEnter", "F11", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft",
-    "ShiftRight", "Space", "Tab", "KeyR", "F2", "F3", "F5", "F9", "BracketLeft", "BracketRight", "AltLeft", "AltRight",
-    "Backquote",
+    "ShiftRight", "Space", "Tab", "AltLeft", "AltRight", "Backquote",
 ];
 
 fn parse_event(rest: &str, options: &[OptSpec]) -> Result<Event, String> {
@@ -1083,6 +1132,20 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "ghost" => Action::Ghost(e(args)?),
         "screenshot" if args.is_empty() => Action::Screenshot,
         "restart" if args.is_empty() => Action::Restart,
+        "lives.endless" => Action::EndlessLives(e(args)?),
+        "rewind" => Action::Rewind(e(args)?),
+        "save" if args.is_empty() => Action::SaveMoment,
+        "load" if args.is_empty() => Action::LoadMoment,
+        "slower" if args.is_empty() => Action::Slower,
+        "faster" if args.is_empty() => Action::Faster,
+        "freecam" if args.is_empty() => Action::FreeCam,
+        "keys" => {
+            let c = CORNERS
+                .iter()
+                .find(|c| c.0 == args)
+                .ok_or("keys <corner>")?;
+            Action::Keys(c.1)
+        }
         "splits" => {
             let c = CORNERS
                 .iter()
@@ -1139,8 +1202,8 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
             "{verb} changes the run: only on a run's event (start, tick, sector, ...)"
         ));
     }
-    // a screenshot or a restart is a single deed: only on a key, never every frame
-    if matches!(a, Action::Screenshot | Action::Restart) && !key {
+    // a screenshot, a restart or a practice deed is a single deed: only on a key, never every frame
+    if (matches!(a, Action::Screenshot | Action::Restart) || a.practice()) && !key {
         return Err(format!("{verb} only on a key (on key <option>)"));
     }
     if !a.sim() && sim && !matches!(a, Action::Set(..)) {
@@ -1441,6 +1504,12 @@ pub fn factory_root() -> Option<PathBuf> {
     crate::resources::assets_root().map(|a| a.join("mods"))
 }
 
+/// The development mods (god-mode): beside the factory ones, read only when the game runs with `--debug`, and left
+/// out of a release's package (docs/drahtseilakt/mods.md, "God mode").
+pub fn dev_root() -> Option<PathBuf> {
+    crate::resources::assets_root().map(|a| a.join("mods-dev"))
+}
+
 /// The files a mod's folder may hold beside mod.txt (never read by the game).
 const SIDE_FILES: [&str; 6] = [
     "readme.txt",
@@ -1550,11 +1619,19 @@ pub fn mods_in(root: &Path, factory: bool) -> Vec<Mod> {
         .collect()
 }
 
-/// Every mod: the factory ones, then the player's (a player's folder named like a factory mod is left out).
-pub fn scan() -> Vec<Mod> {
+/// Every mod: the factory ones, with `dev` (a `--debug` run) the development ones, then the player's (a folder named
+/// like one before it is left out).
+pub fn scan(dev: bool) -> Vec<Mod> {
     let mut all = factory_root()
         .map(|r| mods_in(&r, true))
         .unwrap_or_default();
+    if dev {
+        for m in dev_root().map(|r| mods_in(&r, true)).unwrap_or_default() {
+            if !all.iter().any(|f| f.key == m.key) {
+                all.push(m);
+            }
+        }
+    }
     for m in mods_in(&user_root(), false) {
         if all.len() < MAX_MODS.saturating_mul(2) && !all.iter().any(|f| f.key == m.key) {
             all.push(m);
@@ -1739,6 +1816,41 @@ mod tests {
             assert!(get(k).unwrap().parsed.is_err(), "{k}");
         }
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn practice_deeds_are_keys_only_and_make_the_mod_modded() {
+        let ok = parse_mod_txt(
+            "name.en P\noption back key F3\noption rewind_s number 1 30 1 5\non key back\ndo rewind opt.rewind_s\n\
+             do save\ndo load\ndo slower\ndo faster\ndo freecam\non frame\ndo keys bottom-left\n",
+        )
+        .unwrap();
+        assert!(ok.practice() && ok.modded(), "a practice deed reaches into the run");
+        for bad in [
+            "name.en P\non frame\ndo rewind 5\n",
+            "name.en P\non tick\ndo save\n",
+            "name.en P\noption k key F3\non key k\ndo save now\n",
+            "name.en P\non frame\ndo lives.endless 1\n",
+            "name.en P\non frame\ndo keys middle\n",
+        ] {
+            assert!(parse_mod_txt(bad).is_err(), "{bad:?}");
+        }
+        let lives = parse_mod_txt("name.en L\non tick\ndo lives.endless 1\n").unwrap();
+        assert!(lives.modded() && !lives.practice(), "endless lives is a run action");
+        // the practice's keys are the god-mode's now, no longer the game's
+        assert!(parse_mod_txt("name.en K\noption k key F3,F5,F9,KeyR,F2,BracketLeft\n").is_ok());
+    }
+
+    #[test]
+    fn god_mode_is_a_development_mod_and_reads() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let god = read_mod(&root.join("mods-dev/god-mode")).unwrap();
+        assert!(god.practice() && god.modded());
+        assert!(!root.join("mods/god-mode").exists(), "god-mode is not a factory mod: a release ships no mods-dev");
+        let keys: Vec<&str> = god.options.iter().map(|o| o.key.as_str()).collect();
+        for k in ["lives", "back", "rewind", "save", "load", "restart", "slower", "faster", "camera"] {
+            assert!(keys.contains(&k), "{k}");
+        }
     }
 
     #[test]
