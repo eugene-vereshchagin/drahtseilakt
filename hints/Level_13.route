@@ -70,3 +70,16 @@ sector 4 paper                                                       (walkthroug
 
 sector 5 stone                                                       (walkthrough notes only)
   roller-coaster loops, the wooden beam → P_Trafo_Wood_01, the vertical spiral at speed → PE_Balloon_01
+
+# 2026-11-09, from the owner's run of sectors 2 and 3 (hints/runs/owner/Level_13-s2-s3.replay):
+# sector 2  CP1 (paper, from sector 1) → the stepped floor → P_Trafo_Stone_03 → the wood strip → the planks: ram five
+#           into a bridge, leave 04 → back up → the crate: rammed out, set on the strip's line → stone 18 rolls; the
+#           crate pushed under each rail crossing (z 733, 719, 713, 707) before the stone comes → P_Trafo_Paper_02 →
+#           into the helix's mouth after the stone → fan slot 18_10, 18_11 (launched by the stone), over 18_12 → ride
+#           the stone down the chute over the hole → CP2. Driven from the sector's start with no rewinds.
+# sector 3  the side troughs past the stones (the owner's line) → down the channel → P_Trafo_Stone_01 (east half-pipe)
+#           → ram the three crates west so their blocks sink → over to the west half-pipe → P_Trafo_Paper_03 → the fan
+#           18_13 lifts the ball into the channel (life 03) → down the channel → P_Trafo_Stone_04, the sandbags,
+#           P_Trafo_Paper_04 → down → P_Trafo_Stone_05, P_Trafo_Paper_06 → the pit before CP3 (open: wait for the
+#           stones to lift the paper ball out)
+

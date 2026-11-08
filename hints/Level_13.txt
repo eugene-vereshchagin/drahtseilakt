@@ -42,7 +42,7 @@ at -862 -101.5 687 r 1.5 sector 2 kind stone : pass -868 -101 691 5 ; pass -873.
 # over the fan 18_12, where it floats until the stone has gone into the chute below, then onto the stone, riding it
 # down the chute: the stone and the loose paper ball P_Ball_Paper_01 ahead fall into the hole at z 584 and the paper
 # ball rolls over them to CP2.
-at -803.84 -143.18 669.73 r 2 sector 2 kind paper : hold -803.84 -143.18 669.73 30 ; await -835 -128 678 -819.2 -139.2 669.7 2 1200 ; replay Level_13-s2.replay 7200 7325 ; pass -785 -139 670.5 13 ; pass -763.85 -147.16 669.79 6 ; hold -763.85 -147.16 669.79 20 ; await -790 -139.7 669.7 -768.9 -143.4 669.7 2 900 ; replay Level_13-s2.replay 7500 7565 ; pass -752 -139.5 676 12 ; pass -726 -146 675.6 6 ; hold -724.7 -133 675.8 30 ; await -735 -147 669.7 -723.98 -151 666.3 2 600 ; press -724.7 -146.5 661.5 0 0 4 120 ; ride -724 -151.4 662 -724 -157.5 590 2 900 ; pass -723.9 -154.8 570 8 ; pass -724.1 -155.2 533 5
+at -803.84 -143.18 669.73 r 2 sector 2 kind paper : hold -803.84 -143.18 669.73 30 ; await -835 -128 678 -819.2 -139.2 669.7 2 1200 ; replay Level_13-s2.replay 7200 7325 ; pass -785 -139 670.5 13 ; pass -763.85 -147.16 669.79 6 ; hold -763.85 -147.16 669.79 20 ; await -790 -139.7 669.7 -768.9 -143.4 669.7 2 900 ; replay Level_13-s2.replay 7500 7565 ; pass -752 -139.5 676 12 ; pass -726 -146 675.6 6 ; hold -724.7 -142 675.8 30 ; await -735 -147 669.7 -723.98 -151 666.3 2 600 ; press -724.7 -146.5 661.5 0 0 4 120 ; ride -724 -151.4 662 -724 -157.5 590 2 900 ; pass -723.9 -154.8 570 8 ; pass -724.1 -155.2 533 5
 #
 # Sector 3 (not yet driven through; 2026-11-08). The ten loose stone balls start rolling down the channel x -724.2
 # as the sector begins, about 11 units a second, ahead of the paper ball; followed in the channel they pile up
@@ -57,7 +57,13 @@ at -803.84 -143.18 669.73 r 2 sector 2 kind paper : hold -803.84 -143.18 669.73 
 #
 # Sector 3, the crates: as stone (P_Trafo_Stone_01, in the east half-pipe) each of the three crates P_Modul_34 under
 # the blocks standing in the channel (z -278.3, -293.3, -308.3) is rammed west from the half-pipe, braking at once:
-# its block sinks into the channel's gap. Then as paper (P_Trafo_Paper_03, west half-pipe, through the crates' gaps)
+# its block sinks into the channel's gap. Then to the west half-pipe (a run found its way across on a sunk block,
+# after the press across at z -256 fell short: not yet reliable), as paper (P_Trafo_Paper_03)
 # over the fan 18_13, which lifts it above the channel's wall, and east into the channel, on down it.
-at -716.1 -219.1 -261.8 r 3 sector 3 kind stone : pass -713.5 -218.4 -272 4 ; goto -713.5 -218.7 -278.3 ; hold -713.5 -218.7 -278.3 20 ; press -726 -218.7 -278.3 0 0 7 90 ; push 1 0 25 ; goto -713.5 -219.6 -293.3 ; hold -713.5 -219.6 -293.3 20 ; press -726 -219.6 -293.3 0 0 7 90 ; push 1 0 25 ; goto -713.5 -220.6 -308.3 ; hold -713.5 -220.6 -308.3 20 ; press -726 -220.6 -308.3 0 0 7 90 ; push 1 0 25 ; hold -714 -220.6 -306 30
+at -716.1 -219.1 -261.8 r 3 sector 3 kind stone : pass -713.5 -218.4 -272 4 ; goto -713.5 -218.7 -278.3 ; hold -713.5 -218.7 -278.3 20 ; press -726 -218.7 -278.3 0 0 7 90 ; push 1 0 25 ; goto -713.5 -219.6 -293.3 ; hold -713.5 -219.6 -293.3 20 ; press -726 -219.6 -293.3 0 0 7 90 ; push 1 0 25 ; goto -713.5 -220.6 -308.3 ; hold -713.5 -220.6 -308.3 20 ; press -726 -220.6 -308.3 0 0 7 90 ; push 1 0 25 ; pass -713 -219.5 -280 5 ; pass -712 -218.6 -257 5 ; hold -712 -218.6 -256 30 ; press -737 -219.4 -256 0 0 7 200 ; pass -733.5 -221 -290 5 ; become paper
 at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -732.5 -219.5 -270 5 ; goto -732 -218 -263.2 ; hold -732 -210 -263.2 150 ; press -724.6 -211 -263.2 0 0 4 120 ; pass -724.2 -213.5 -285 5 ; pass -724.2 -215 -320 6
+#
+# Sector 3's end (worked out, not yet driven through): the channel ends in a pit before CP3 (its east wall at x -645.6
+# stands above the paper ball, which is stopped there). The storyboard's paper ball comes up out of it on top of the
+# loose stone balls that follow it down the channel; this needs all three blocks sunk at the crates (with one of
+# them still standing, the stones stop against it) and a wait at the pit's end.
