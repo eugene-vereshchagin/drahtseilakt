@@ -64,7 +64,7 @@ Persönliche ist der Name in der Highscore-Liste.
     wo die Plattform es kann (Wayland nicht: randlos). F11 wechselt zwischen Fenster und randlos.
 - **Controls**: Enter auf der Zeile einer Taste wartet auf eine Taste („Press a key"); die gedrückte wird belegt, Esc
   bricht ab. Eine Taste, die eine andere Aktion hat, wird getauscht, so tut keine Taste zwei Dinge. Esc und F11
-  gehören dem Spiel und lassen sich nicht belegen; eine belegte Taste geht den Übungstasten des erweiterten Modus vor.
+  gehören dem Spiel und lassen sich nicht belegen; eine belegte Taste geht den Tasten der Mods vor.
   Invert Rotation? dreht die Kamera andersherum. Die Tasten werden als `key.forward ArrowUp` … `key.overview Space`
   und `invert-rotation on|off` gespeichert (die Tastennamen von winit); ohne sie gelten die Tasten aus `DB_Options`
   der Kopie. Jede Shift-Taste tut, was die belegte tut, solange die andere nicht selbst belegt ist. Die Seite zeigt
@@ -89,14 +89,15 @@ Persönliche ist der Name in der Highscore-Liste.
 
 ## Unser erweiterter Modus
 
-Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalten das Aussehen des Originals; es
+Eingeschaltet in Options oder für einen Start mit `--debug` (ein Debug-Lauf, der außerdem *Alle Level offen* und den
+Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Menüs behalten das Aussehen des Originals; es
 ändert sich:
 
 - **Hauptmenü**: Start, Highscore, Options, Credits, Exit wie im Original; *Start* fragt zuerst, welche Level.
-- **Options** (die Übungswerkzeuge und endlosen Leben liegen mit den Mods auf ihrem Bildschirm *Mods*,
-  [mods.md](mods.md)): die Seite *Extended* hat den Schalter des Modus und darunter je einen Schalter für jede seiner
+- **Options**: die Seite *Extended* hat den Schalter des Modus und darunter je einen Schalter für jede seiner
   Ergänzungen (mit dem Modus alle an; die Einstellungen halten die ausgeschalteten als `extended.<key> off`):
-  - alle Level offen, ohne Freischalten;
+  - alle Level offen, ohne Freischalten: nur in einem Debug-Lauf (`--debug`); im Spiel eines Spielers öffnen sich die
+    Level durch Spielen;
   - Bestzeiten neben den Leveln;
   - Level nach Art unter Start;
   - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
@@ -109,29 +110,56 @@ Eingeschaltet in Options oder für einen Start mit `--debug`. Die Menüs behalte
   - Sounds: das Klangthema — System, generiert, original (von der Toolbox gemacht) oder ein eigenes des Spielers
     ([resources.md](resources.md)); das generierte, bis der Spieler ein anderes wählt, und im klassischen Modus
     immer;
-  - Übungswerkzeuge: freie Kamera (F2), langsamer und schneller (`[` `]`), den Moment sichern und dorthin zurück
-    (F5 / F9), fünf Sekunden zurück (F3, nochmals weiter, bis eine halbe Minute), Sektor und Tick auf dem Bildschirm;
-    ein so unterstützter Lauf wird behalten, ist aber nie bester Lauf;
-  - endlose Leben: die letzte Kugel geht nie verloren (ein so geretteter Lauf ist nie bester Lauf). Ein Zeitlimit zum
-    Aufheben gibt es nicht: die Punkte zählen nur herunter und bleiben bei null stehen, wie im Original.
-  - Mods: der Bildschirm der Übungswerkzeuge, der endlosen Leben und jedes gefundenen Mods (Werks-Mods und die des
-    Spielers), jeder mit Links und Rechts geschaltet, Enter öffnet seine Seite mit seinen Optionen
-    ([mods.md](mods.md)); im klassischen Modus aus.
+  - Mods: der Bildschirm jedes gefundenen Mods (Werks-Mods und die des Spielers; in einem Debug-Lauf auch god-mode,
+    der enthält, was die Übungswerkzeuge und die endlosen Leben waren), jeder mit Links und Rechts geschaltet, Enter
+    öffnet seine Seite mit seinen Optionen und Tasten ([mods.md](mods.md)); im klassischen Modus aus. Ein Zeitlimit
+    zum Aufheben gibt es nicht: die Punkte zählen nur herunter und bleiben bei null stehen, wie im Original.
 - **Graphics** fügt *Field of View* hinzu: die Breite der Spielkamera über 4:3, 40° bis 100° in Schritten von 2
   (`fov 58`; das Original hat 58°, die 1,0123 Radiant von InGameCam). Der klassische Modus zeichnet immer den des
   Originals.
 - **Controls** fügt *Defaults* hinzu: zurück zu den Tasten des Originals (Pfeile, Shift, Leertaste), ohne gedrehte
   Kamera.
 - **Level nach Art**: Start bietet *Original* (die klassische Levelliste), *Remastered*, *Community maps* und
-  *Open format*, die Ordner von `levels/` ([levels.md](levels.md)). In jedem eine flache Liste seiner Level nach Titel (ein
+  *Open format*, die Ordner von `levels/` ([levels.md](levels.md)). In jedem eine flache Liste seiner Level (ein
   Level ist ein Ordner mit einem Level oder eine einzelne `.nmo`: levels.md, „Ein Level ist ein Ordner“; keine Ordner
-  zum Öffnen, nichts anderes gezeigt), gespielt wie ein Original-Level. Ein Titel hat höchstens 40 Zeichen und wird
-  kleiner oder umbrochen, um auf seiner Schaltfläche zu bleiben. Ein Level, das nicht
+  zum Öffnen, nichts anderes gezeigt), gespielt wie ein Original-Level. Jede Zeile zeigt die
+  **Schwierigkeit** des Levels, einen Stern und 1 bis 10 (`difficulty` aus level.txt; „★?“, wenn unbekannt), und
+  seinen **Titel** auf Englisch (`title` aus level.txt) oder in der Sprache der Menüs, wenn level.txt einen gibt
+  (`title.ru`, ...). Die Liste ist nach Schwierigkeit, dann Titel sortiert; Level unbekannter Schwierigkeit nach denen
+  bekannter, und ein Level, das sich nur nach seinem Ordner nennt (kein `title`), zuletzt. Ein Titel hat höchstens 40
+  Zeichen und wird kleiner gezeichnet oder in der Mitte gekürzt, um in seiner Zeile zu bleiben. Ein Level, das nicht
   geladen werden kann, sagt warum und startet nicht; seine Läufe und Bestzeiten bleiben getrennt von den
-  Original-Leveln. Später: Titel, Autor und Schwierigkeit aus dem Community-Katalog.
+  Original-Leveln. Wie man ein Level baut und ablegt: [making-levels.md](making-levels.md).
 - Texturpakete und Mods sind hier: die Pakete in den Zeilen Textures und Models ([packs.md](packs.md)), die Mods auf
   dem Bildschirm Mods ([mods.md](mods.md)), jeweils hinter einem eigenen Schalter; Inhalte Dritter werden auf eigenes
   Risiko gespielt.
+
+## Wörter, die passen, Listen, die sagen, dass sie scrollen
+
+*2026-11-03, nach den Notizen des Eigentümers („der Text passt nicht überall“, „zwei Zeilen in einer niedrigen
+Schaltfläche“, „es ist unklar, dass nur die Hälfte der Mods gezeigt wird“).*
+
+- **Eine Beschriftung bleibt immer auf ihrer Schaltfläche**, in jeder Sprache und jedem Fenster (das Menü ist im
+  640×480-Rahmen des Originals angelegt und wird als Ganzes skaliert, so ändern Größe oder Seitenverhältnis nie, was
+  passt). Eine zu breite Beschriftung wird kleiner gezeichnet, bis auf drei Viertel ihrer Größe; dann, nur wo die
+  Schaltfläche hoch genug für zwei Zeilen in dieser Größe oder mehr ist (die großen Schaltflächen, die Felder), auf
+  zwei Zeilen, umbrochen am Leerzeichen nächst der Mitte; sonst noch kleiner, bis 60 %, und was dann noch nicht passt,
+  verliert seine Mitte an „..“. Eine niedrige Schaltfläche hält nie zwei Zeilen.
+- **Unsere eigenen Bildschirme nutzen eine Größe kleiner** als die kleine Schrift des Originals: die Seite Extended,
+  der Bildschirm Mods, die Seite eines Mods, die eigenen Level und die Zeilen der Seite Controls, damit die längsten
+  deutschen, russischen und französischen Beschriftungen passen und mehr Zeilen zu sehen sind (13 Level, 10 Mods). Die
+  Hilfe unter dem Bildschirm Mods und der Seite eines Mods ist ein Absatz: sie bricht um und wird, wenn sie muss,
+  kleiner, um in ihren Kasten zu passen. Die Zeilen dieser Bildschirme werden ohne die Mittelmarke der Tastenleiste
+  gezeichnet (das „≡“, das auf der Seite Controls den Namen einer Taste von der Taste trennt; unter einer Beschriftung
+  las es sich als Streifen).
+- **Jede Liste, die scrollt, sagt es**: ein schmaler Balken neben ihren Zeilen, sein Griff so lang wie der gezeigte
+  Teil und dort, wo er ist, und „▲ 3 weitere“ über der ersten Zeile und „▼ 12 weitere“ unter der letzten. Das Mausrad
+  scrollt die Liste (die eigenen Level, die Mods, die Seite eines Mods), ein Klick auf den Balken scrollt dorthin.
+- Der Test `every_label_fits_its_button_in_every_language_and_window` (menu.rs) zeichnet jeden Bildschirm (die Seite
+  jedes Mods, den Bildschirm Mods mit jedem gewählten Mod) in allen sieben Sprachen bei 640×480, 1280×720, 1920×1080,
+  3440×1440 und 1080×1920, mit dem Schriftbild der eigenen Oberfläche, und schlägt fehl, wenn eine Beschriftung ihren
+  Rahmen oder ihre Schaltfläche verlässt, unter 60 % gezeichnet wird oder unter drei Vierteln ihrer Größe auf zwei
+  Zeilen steht.
 
 ## Profile
 

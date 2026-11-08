@@ -268,7 +268,7 @@ fn run_settings(input: &[u8]) {
     }
     let _ = crate::options::Bindings::load(get, [0, 1, 2, 3, 4, 5], false);
     let _ = crate::options::Bindings::load(get, [usize::MAX, 7, 7, 1000, 2, 3], true);
-    let _ = crate::features::Features::load(true, get);
+    let _ = crate::features::Features::load(true, false, get);
     let _ = crate::lang::chosen(get("language").as_deref());
     let _ = crate::lang::docs_language(get("language").as_deref());
     let _ = get("interface").and_then(|s| gamedata::resources::Provider::parse(&s));

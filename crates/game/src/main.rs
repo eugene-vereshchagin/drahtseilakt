@@ -95,8 +95,10 @@ usage: drahtseilakt [options]
                       the sector is the nearest object's unless --sector is given
   --ball KIND         begin with a wood, stone or paper ball
                       (a run begun elsewhere is recorded with its start and is never a level's best run)
-  --debug             debug mode: F2 takes up the free camera (the run waits; arrows fly and turn, A/D move
-                      sideways, PageUp/PageDown up and down, Home/End look up and down, Shift faster)
+  --debug             debug run: the extended mode, all levels open, and the development mod god-mode
+                      (assets/mods-dev; switch it on under Options > Extended > Mods): endless lives, F5 / F9 save
+                      and load the moment, F3 seconds back, R restart, [ ] slower and faster, F2 the free camera
+                      (arrows fly and turn, A/D sideways, PageUp/PageDown up and down, Home/End look, Shift faster)
   --sky NAME          play under another sky (A, B, C, Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
                       Mist, Clouds, or any Sky_<NAME>_* the textures have) instead of the level's own
   --size WxH          window or screenshot size (default 1600x900)
@@ -109,8 +111,8 @@ its drive or an image of it (found on this computer, dropped on the window or ty
 
 keys: arrows roll the ball (relative to the camera), Shift+Left/Right turn the camera,
       Space lifts the camera, F11 full screen, Esc pauses; Options > Controls binds other keys; a gamepad's
-      left stick rolls, its shoulder buttons turn the camera, A lifts it, Start pauses; in the extended mode
-      R restarts, F2 free camera, [ ] slower and faster, F5 / F9 save the moment and back to it";
+      left stick rolls, its shoulder buttons turn the camera, A lifts it, Start pauses; the mods' keys are
+      on each mod's page (god-mode's in a debug run)";
 
 #[derive(Clone)]
 pub struct Options {

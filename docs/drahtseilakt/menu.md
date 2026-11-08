@@ -61,7 +61,7 @@ per-player thing is the name in the highscore list.
     it where the platform can (Wayland cannot: borderless). F11 switches between a window and borderless.
 - **Controls**: Enter on a key's line waits for a key ("Press a key"); the key pressed is bound, Esc gives up.
   A key another action has is swapped onto it, so no key does two things. Esc and F11 are the game's and cannot be
-  bound; a bound key comes before the extended mode's practice keys. Invert Rotation? turns the camera the other way.
+  bound; a bound key comes before the mods' keys. Invert Rotation? turns the camera the other way.
   The keys are saved as `key.forward ArrowUp` … `key.overview Space` and `invert-rotation on|off` (winit's key
   names); without them the copy's `DB_Options` keys count. Either Shift does what the bound one does unless the
   other is bound itself. The page shows a key by the copy's name for it, else ours.
@@ -83,13 +83,14 @@ per-player thing is the name in the highscore list.
 
 ## Ours: the extended mode
 
-Turned on in Options, or for one run with `--debug`. The menus keep the original's look; what changes:
+Turned on in Options, or for one run with `--debug` (a debug run, which also offers *All levels open* and the
+development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the original's look; what changes:
 
 - **Main menu**: Start, Highscore, Options, Credits, Exit, as the original; *Start* first asks which levels.
 - **Options**: the *Extended* page has the mode's switch and, under it, one switch for each of its additions
-  (all on with the mode; the settings keep those turned off as `extended.<key> off`); the practice tools and endless
-  lives are on its *Mods* screen with the mods ([mods.md](mods.md)), the others on the page itself:
-  - all levels open, without unlocking;
+  (all on with the mode; the settings keep those turned off as `extended.<key> off`):
+  - all levels open, without unlocking: only in a debug run (`--debug`); a player's game opens the levels by playing
+    them;
   - best times beside the levels;
   - levels by kind under Start;
   - Interface: own / original / remaster, where the interface's files come from ([resources.md](resources.md));
@@ -102,26 +103,49 @@ Turned on in Options, or for one run with `--debug`. The menus keep the original
   - Sounds: the sound theme — system, generated, original (made by the toolbox) or a player's own
     ([resources.md](resources.md)); the generated theme until the player chooses another, and always in the
     classic mode;
-  - practice tools: free camera (F2), slower and faster (`[` `]`), save the moment and go back to it (F5 / F9),
-    five seconds back (F3, again for further, up to half a minute), the sector and tick on screen; a run helped this
-    way is kept but never a best run;
-  - endless lives: the last ball is never lost (a run it saves is never a best run). There is no time limit to lift:
-    the points only count down and stop at zero, as in the original.
-  - Mods: the screen of the practice tools, endless lives and every mod found (factory and the player's), each
-    switched with left and right, Enter opening its page with its options ([mods.md](mods.md)); off in the classic
-    mode.
+  - Mods: the screen of every mod found (factory and the player's; in a debug run god-mode too, which holds what were
+    the practice tools and endless lives), each switched with left and right, Enter opening its page with its options
+    and keys ([mods.md](mods.md)); off in the classic mode. There is no time limit to lift: the points only count down
+    and stop at zero, as in the original.
 - **Graphics** adds *Field of View*: the in-game camera's width across 4:3, 40° to 100° in steps of 2 (`fov 58`; the
   original's is 58°, InGameCam's 1.0123 radians). The classic mode always draws the original's.
 - **Controls** adds *Defaults*, back to the original's keys (arrows, Shift, Space) and no inverted turn.
 - **Levels by kind**: Start offers *Original* (the classic list of levels), *Remastered*, *Community maps* and
-  *Open format*, the folders of `levels/` ([levels.md](levels.md)). In each, a flat list of its levels by title (a level is a
+  *Open format*, the folders of `levels/` ([levels.md](levels.md)). In each, a flat list of its levels (a level is a
   folder holding one level, or a loose `.nmo`: levels.md, "A level is a folder"; no folders to open, nothing else
-  shown), played like an original level. A title is at most 40 characters and shrinks or wraps to stay on its button. A level that cannot be loaded says
-  why and is not started; its runs and best times are kept apart from the original levels. Later: title, author and
-  difficulty from the community catalogue.
+  shown), played like an original level. Each row shows the level's **difficulty**, a star and 1 to 10 (level.txt's
+  `difficulty`; "★?" when unknown), and its **title** in English (level.txt's `title`), or in the menus' language when
+  level.txt gives one (`title.ru`, ...). The list is sorted by difficulty, then title; levels of unknown difficulty
+  after those of a known one, and a level that names itself only by its folder (no `title`) last. A title is at most 40
+  characters and is drawn smaller, or shortened in its middle, to stay on its row. A level that cannot be loaded says
+  why and is not started; its runs and best times are kept apart from the original levels. How to make and place a
+  level: [making-levels.md](making-levels.md).
 - Texture packs and mods are here: the packs on the Textures and Models lines ([packs.md](packs.md)), the mods on the
   Mods screen ([mods.md](mods.md)), each behind its own switch; third-party content is played at the player's own
   risk.
+
+## Words that fit, lists that say they scroll
+
+*2026-11-03, after the owner's notes ("the text does not fit everywhere", "two lines in a low button", "it is unclear
+that only half the mods are shown").*
+
+- **A label always stays on its button**, in every language and every window (the menu is laid out in the original's
+  640×480 frame and scaled whole, so a size or aspect never changes what fits). A label too wide is drawn smaller,
+  down to three quarters of its size; then, only where the button is tall enough for two lines at that size or more
+  (the big buttons, the fields), on two lines broken at the space nearest the middle; else smaller still, down to 60 %,
+  and what still does not fit loses its middle to "..". A low button never holds two lines.
+- **Our own screens use a size smaller** than the original's small font: the Extended page, the Mods screen, a mod's
+  page, the custom levels and the Controls page's rows, so the longest German, Russian and French labels fit and more
+  rows show (13 levels, 10 mods). The help under the Mods screen and a mod's page is a paragraph: it wraps and, if it
+  must, gets smaller to fit its box. The rows of these screens are drawn without the key bar's middle mark (the "≡"
+  that parts a key's name from the key on the Controls page; under a label it read as stripes).
+- **Every list that scrolls says so**: a slim bar beside its rows, its thumb as long as the part shown and where it
+  is, and "▲ 3 more" above the first row and "▼ 12 more" under the last. The wheel scrolls the list (the custom
+  levels, the mods, a mod's page), a click on the bar scrolls there.
+- The test `every_label_fits_its_button_in_every_language_and_window` (menu.rs) draws every screen (each mod's page,
+  the Mods screen with each mod chosen) in all seven languages at 640×480, 1280×720, 1920×1080, 3440×1440 and
+  1080×1920, with the own interface's face, and fails when a label leaves its frame or its button, is drawn below 60 %,
+  or stands on two lines below three quarters of its size.
 
 ## Profiles
 

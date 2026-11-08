@@ -15,13 +15,14 @@ Klangthemen, Textur- und Modellpakete und Level sind keine Mods: Sie haben ihre 
 ## Mods ein- und ausschalten
 
 *Options → Extended → Mods* (nur im erweiterten Modus; der klassische Modus führt keinen Mod aus und spielt wie das
-Original). Der Bildschirm listet die Übungswerkzeuge und endlosen Leben (die vorher auf dem Bildschirm *Debug mode*
-lagen und ihre Einstellungen `extended.tools off`, `extended.endless-lives off` behalten), dann jeden gefundenen Mod:
-zuerst die Werks-Mods, dann die des Spielers, jeder mit *Yes* oder *No*, oder *refused* für einen Mod, der sich nicht
-lesen ließ (die Zeile unter der Liste sagt, warum). Links und Rechts schalten den gewählten Mod; Enter öffnet seine
-Seite: *Switched on?*, seine Optionen, seine Beschreibung, Autor, Version und Lizenz und eine Warnung, wenn er die
-Regeln ändert. Die Einstellungen halten `mod.<key> on|off` und `mod.<key>.<option> <value>`. Die Ansichtsseite eines
-Mods wirkt sofort; einer, der den Lauf ändert, ab dem nächsten Start des Levels.
+Original). Der Bildschirm listet jeden gefundenen Mod: zuerst die Werks-Mods, in einem Debug-Lauf dann die
+Entwicklungs-Mods (god-mode, unten), dann die des Spielers, jeder mit *Yes* oder *No*, oder *refused* für einen Mod,
+der sich nicht lesen ließ (die Hilfe unter der Liste sagt, warum). Eine lange Liste scrollt, mit einem Balken daneben
+und „▲ / ▼ N weitere“ (menu.md). Links und Rechts schalten den gewählten Mod; Enter öffnet seine Seite:
+*Switched on?*, seine Optionen (eine Tastenoption zeigt ihre Taste), seine Beschreibung, Autor, Version und Lizenz und
+eine Warnung, wenn er die Regeln ändert. Die Einstellungen halten `mod.<key> on|off` und
+`mod.<key>.<option> <value>`. Die Ansichtsseite eines Mods wirkt sofort; einer, der den Lauf ändert, ab dem nächsten
+Start des Levels.
 
 ## Die Werks-Mods
 
@@ -38,11 +39,36 @@ Mods wirkt sofort; einer, der den Lauf ändert, ab dem nächsten Start des Level
 | `spirit-trail` | SpiritTrail | der beste Lauf des Levels rollt als durchscheinende Kugel neben diesem; Option: Deckkraft | nein |
 | `blackout` | Blackout | das Level wird dunkel, ein schwaches Licht über der Kugel; Optionen: Dunkelheit, Licht | nein |
 
+## Gottmodus
+
+*2026-11-03, Entscheidung des Eigentümers* (decisions.md, „Der Gottmodus ist ein Entwicklungs-Mod“). Was die
+Übungswerkzeuge und die endlosen Leben des erweiterten Modus waren, ist ein Mod, `god-mode`, geschrieben in genau diesem
+Format aus den Bausteinen unten. Er ist ein **Entwicklungs-Mod**: er liegt in `assets/mods-dev/`, den das Spiel nur
+liest, wenn es mit `--debug` läuft, und das Paket eines Releases lässt diesen Ordner weg, sodass das Spiel ohne ihn
+gespielt wird. Seine Seite (Options → Extended → Mods → God mode) zeigt seine Schalter und Tasten; solange er an ist,
+stehen seine Tasten unten links (Option *Keys on screen?*) und Sektor und Takt oben links.
+
+| Option | Vorgabe | Was |
+|---|---|---|
+| Endless lives? | ja | die letzte Kugel geht nie verloren |
+| Seconds back | 5 | wie weit *Back* zurückgeht (1–30) |
+| Back | F3 (B, Z) | so viele Sekunden zurück; nochmals gedrückt, weiter (das Spiel behält die letzte halbe Minute, einen Moment je Sekunde) |
+| Save / Load | F5 (K) / F9 (L) | den Moment behalten, zu ihm zurück; ein verlorener Lauf wartet auf Load |
+| Restart | R (T) | das Level noch einmal |
+| Slower / Faster | `[` (`-`) / `]` (`=`) | das Spiel mit halbem Tempo, bis zu einem Achtel, und zurück |
+| Free camera | F2 (C) | die Kamera fliegt (Pfeile fliegen und drehen, A/D seitwärts, PageUp/PageDown, Home/End, Shift schneller); der Lauf wartet |
+| Keys on screen? | ja | der Hinweis mit den Tasten |
+
+Der Gottmodus ändert den Lauf: seine Läufe sind gemoddet (unten) — behalten, aber sie öffnen kein Level und sind nie
+ein bester Lauf oder ein Highscore —, und sein Replay nennt ihn, sodass das Replay nur in einem Debug-Lauf mit
+demselben god-mode abspielt. Die alten Einstellungen `extended.tools` und `extended.endless-lives` werden nicht mehr
+gelesen.
+
 ## Gemoddete Läufe und Replays
 
 Ein Mod, der den Lauf ändert (jede *Laufaktion*, unten), macht den Lauf **gemoddet**: Er wird behalten, ist aber nie
 der beste Lauf des Levels, nie ein Highscore, wird nie vom Geist oder von den Zwischenzeiten verglichen und öffnet
-nicht das nächste Level (`Level_NN-<ticks>-modded.replay`; „All levels“ im Debug-Modus öffnet alle). Sein Replay
+nicht das nächste Level (`Level_NN-<ticks>-modded.replay`; „Alle Level offen“ eines Debug-Laufs öffnet alle). Sein Replay
 nennt jeden solchen Mod in seinem Kopf —
 
     mod sticky-ball 9c41f0a2be1377d0 strength=60 wood_only=off
@@ -75,7 +101,10 @@ Text in UTF-8, eine Anweisung je Zeile, `#` beginnt eine Kommentarzeile. In dies
   - `option <name> switch on|off`
   - `option <name> number <min> <max> <step> <default>`
   - `option <name> key <Key1,Key2,...>` — Tasten mit den Namen von winit (`KeyQ`, `F12`, `Backspace`, `Home`...); die
-    erste ist die Vorgabe.
+    erste ist die Vorgabe. Die eigenen Tasten des Spiels werden abgelehnt: Escape, Enter, die Pfeile, Shift, Space,
+    Tab, Alt, F11 und Backquote; eine Taste, die der Spieler auf der Seite Controls belegt hat, bleibt beim Spiel.
+    (R, F2, F3, F5, F9, `[` `]` gehörten den Übungswerkzeugen; jetzt sind es die Tasten von god-mode und für jeden Mod
+    frei.)
 - **Beschriftungen** — `label <name> <lang> <text>`: Die Beschriftung einer Option heißt wie die Option;
   Einblendungszeilen nennen ihre.
 - **Variablen** — `var <name> <number>`: Zahlen, die die Regeln behalten, bei jedem Start ab ihrem ersten Wert.
@@ -103,6 +132,7 @@ Mods gedrückt).
 | `ball.kind` | 0 Holz, 1 Stein, 2 Papier | `clock.hour` `clock.minute` `clock.second` | die Uhr, UTC * |
 | `ball.touching` `ball.wall` | sie berührt etwas; etwas Steiles | `mouse.dx` `mouse.dy` | die Bewegung der Maus in diesem Bild * |
 | `run.tick` `run.time` | die Ticks des Laufs, Sekunden | `extras.points` `extras.points_all` | im Sektor verbleibende Extrapunkte, und alle * |
+| `practice.speed` | das Tempo des Spiels (1, oder bis 1/8) * | `practice.saved` | ein Moment ist gespeichert (1 oder 0) * |
 | `run.sector` `run.lives` `run.points` | Sektor (1 der erste), Leben, Punkte | `extras.lives` `extras.lives_all` | verbleibende Extraleben, und alle * |
 | `input.forward` `input.backward` `input.left` `input.right` `input.rotation` `input.overview` | die gehaltenen Tasten des Spiels (1 oder 0) | `best.time` | die Bestzeit des Levels, Sekunden (-1: keine) * |
 
@@ -125,6 +155,14 @@ Laufaktionen (nur auf einem Ereignis des Laufs; sie machen den Mod *gemoddet*):
   Druck gegen eine Wand lenkt sie an ihr hinauf.
 - `do world.gravity <0..60>` — die Zugkraft der Schwerkraft (im Original 20).
 - `do world.time <0.5..4>` — der Zeitfaktor der Physik (im Original 2).
+- `do lives.endless <0|1>` — die letzte Kugel geht nie verloren (god-mode).
+
+Übungshandlungen (nur auf `key`; sie greifen von außen in den Lauf ein, also ist ein Mod mit einer davon ebenfalls
+gemoddet, und solange er an ist, behält das Spiel die Momente des Laufs, einen je Sekunde für die letzte halbe Minute):
+
+- `do rewind <1..30>` — so viele Sekunden zurück; `do save`, `do load` — den Moment behalten, zu ihm zurück;
+- `do slower`, `do faster` — das Tempo des Spiels halbiert (bis 1/8) oder verdoppelt (bis zum normalen);
+- `do freecam` — die freie Kamera aufgenommen oder abgelegt.
 
 Ansichtsaktionen (nur auf `frame` oder `key`):
 
@@ -137,6 +175,8 @@ Ansichtsaktionen (nur auf `frame` oder `key`):
   `top-left top-right bottom-left bottom-right`; Formate `time` (mm:ss.hh aus Sekunden), `int`, `dec1`, `dec2`,
   `clock` (hh:mm), `ratio` (a/b).
 - `do splits <corner>` — die Zwischenzeiten der Sektoren gegen den besten Lauf.
+- `do keys <corner>` — die eigenen Tastenoptionen des Mods als Einblendungszeilen, „Beschriftung: Taste“ (der Hinweis
+  von god-mode).
 - `do ghost <0..1>` — der beste Lauf als durchscheinende Kugel, so deckend.
 - `do screenshot`, `do restart`.
 
@@ -197,8 +237,8 @@ Ein Mod kommt von einem Fremden, also liest das Spiel ihn als feindselig und leh
   Replay aufgezeichnet werden; heute dreht `camera.yaw` nur die Ansicht.
 - **Täuschkugeln** (Interference), **eine verformte Kugel** (DeformedWB): Zeichenbausteine für zusätzliche Kugeln und
   Rauschen im Netz.
-- **Zu einem Startpunkt springen, den Sektor im Lauf setzen** (NewSpawn, SpeedrunShortcuts): F5/F9 der
-  Übungswerkzeuge und `--sector` decken das Üben ab; Bausteine im Lauf würden daraus einen Mod machen.
+- **Zu einem Startpunkt springen, den Sektor im Lauf setzen** (NewSpawn, SpeedrunShortcuts): Save und Load von
+  god-mode und `--sector` decken das Üben ab; ein Baustein, der den Sektor setzt, würde daraus einen Mod machen.
 - **Spielzeit je Level** (die Statistik von WatchYourTime): ein Baustein für einen behaltenen Zähler.
 - Ein Fuzz-Ziel für mod.txt (der Parser ist streng, begrenzt und mit Unit-Tests geprüft; das Fuzzing kommt mit der
   Arbeit am Release).
@@ -210,9 +250,9 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 
 | BML-Mod | Was er tut | Bei uns |
 |---|---|---|
-| AdvancedTravelCam | eine Reisekamera, um überallhin zu fliegen, einen Punkt mit der Maus wählen, filmische Glättung | die freie Kamera der Übungswerkzeuge (F2); `free-view` (Abstand, Drehung); Glättung vorgemerkt |
+| AdvancedTravelCam | eine Reisekamera, um überallhin zu fliegen, einen Punkt mit der Maus wählen, filmische Glättung | die freie Kamera von god-mode (F2); `free-view` (Abstand, Drehung); Glättung vorgemerkt |
 | BallanceOptiFine | erzwingt Schatten und eine Übergangssäule in alten Community-Karten; Texturformat | der Renderer zeichnet den Schatten der Kugel auf jeden Boden; kein Mod |
-| BaseCmoCfg | bearbeitet die GameSettings von base.cmo (God-Modus, Debug) | der erweiterte Modus; endlose Leben auf dem Bildschirm Mods |
+| BaseCmoCfg | bearbeitet die GameSettings von base.cmo (God-Modus, Debug) | `--debug` und sein god-mode (endlose Leben und der Rest) |
 | Blackout | verdunkelt alles, ein schwaches Licht über der Kugel | Werks-Mod `blackout` |
 | Coredump | schreibt den laufenden Virtools-Kontext in eine .nmo | nicht nötig (unsere Laufzeit ist unsere; `--export` schreibt Level) |
 | CursorClipper | hält den Zeiger im Fenster | nicht nötig: Ein Lauf nimmt nichts vom Zeiger, `mouse.dx` liest die rohe Bewegung |
@@ -226,17 +266,17 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 | Interference | durchscheinende Täuschkugeln um die Kugel | vorgemerkt |
 | LanternFader | Alpha-Test auf dem Material der Laternen gegen Bildeinbrüche | nicht nötig (unser Renderer) |
 | MapScripts | führt die Callback-Skripte von Karten aus | die Engine führt die Verhaltensgraphen von Karten als Daten aus; kein Mod |
-| NewSpawn | einen Startpunkt setzen, dorthin springen, eine Geisterkugel aufzeichnen | die Übungswerkzeuge (F5/F9, `--sector`, `--at`); `spirit-trail` |
-| PhysicsEditor | Schwerkraft, Zeitfaktor der Physik, Spieltempo | Werks-Mod `physics-lab` (gemoddet); das Spieltempo ist `[` `]` der Übungswerkzeuge |
+| NewSpawn | einen Startpunkt setzen, dorthin springen, eine Geisterkugel aufzeichnen | god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
+| PhysicsEditor | Schwerkraft, Zeitfaktor der Physik, Spieltempo | Werks-Mod `physics-lab` (gemoddet); das Spieltempo ist `[` `]` von god-mode |
 | PositionViewer | die Koordinaten der Kugel | Werks-Mod `info-overlay` |
 | RealTimeMeter | echte Spielzeit, über Level hinweg | Werks-Mod `segment-timer` (Echtzeit) |
 | ScreenCapturer | eine Taste speichert ein Bildschirmfoto (PNG/JPEG, Zwischenablage) | Werks-Mod `screenshot` (PNG; keine Zwischenablage) |
 | Segment | die Zeit jedes Sektors gegen den Rekord | Werks-Mod `segment-timer` |
-| SpeedrunShortcuts | Cheat-Modus, Startpunkt setzen, Neustart, Sektor setzen | Werks-Mod `quick-restart`; die Übungswerkzeuge; Sektor setzen vorgemerkt |
+| SpeedrunShortcuts | Cheat-Modus, Startpunkt setzen, Neustart, Sektor setzen | Werks-Mod `quick-restart`; god-mode; Sektor setzen vorgemerkt |
 | SpiritTrail | der Rekordlauf als durchscheinende Kugel | Werks-Mod `spirit-trail` |
 | StickyAccess | im Cheat-Modus zur klebenden Kugel wechseln | Werks-Mod `sticky-ball` |
 | SysInfoDisplay | Systemzeit und Akku auf dem Bildschirm | Werks-Mod `info-overlay` (Uhr, UTC); kein Akku |
-| TASSupport | Eingaben aufnehmen und abspielen, Zeichnen überspringen, am Ende beenden | die Engine: Replays sind deterministische Aufnahmen der Eingaben (`--record`, `--replay`, `--headless`), die Zeitlupe der Übungswerkzeuge |
+| TASSupport | Eingaben aufnehmen und abspielen, Zeichnen überspringen, am Ende beenden | die Engine: Replays sind deterministische Aufnahmen der Eingaben (`--record`, `--replay`, `--headless`), die Zeitlupe von god-mode |
 | WatchYourTime | Spielzeit je Level | vorgemerkt (Statistik) |
 | BallSticky | ein klebender Kugeltyp, der Wände hinaufklettert | Werks-Mod `sticky-ball` (gemoddet) |
 | BMLModuls | neue Module (hölzerner Fall und drehende Bretter) | Levelteile, keine Mods: die Teile des offenen Formats ([open-format.md](open-format.md)) |
@@ -249,8 +289,8 @@ Bitmap-Schrift, anfälliges Timing des Kugelwechsels), übernehmen wir nicht.
 
 - Zahlenoption: Grenzen innerhalb von ±1 000 000, Schritt mindestens 0,001, der Standardwert liegt auf den Schritten ab `min`.
 - Eine Tastenoption darf keine Tasten des Spiels belegen: Escape, Enter, die Pfeiltasten, Shift, Space, Tab, Alt, F11
-  und die Tasten der Übungswerkzeuge (R, F2, F3, F5, F9, `[` `]`); eine vom Spieler auf der Seite Controls belegte Taste
-  bleibt beim Spiel.
+  und Backquote; eine vom Spieler auf der Seite Controls belegte Taste bleibt beim Spiel (R, F2, F3, F5, F9, `[` `]`
+  sind jetzt die Tasten von god-mode und für jeden Mod frei).
 - `do screenshot` und `do restart` nur in `on key`-Regeln (nie in jedem Bild); höchstens ein Screenshot pro Sekunde.
 - Ein Replay, dessen Mod-Optionen fehlen, unbekannt oder außerhalb des Bereichs sind, wird mit Begründung abgelehnt.
 - Arbeitsbudget: die Ausdrucksknoten aller eingeschalteten Mods zusammen höchstens 20 000 (beim Lesen gezählt); ein Mod, der es überschreiten würde, wird nicht eingeschaltet, und der Bildschirm Mods sagt warum.

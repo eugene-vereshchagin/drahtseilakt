@@ -14,11 +14,11 @@ model packs and levels are not mods: they have their own menus and folders ([sou
 ## Switching mods on and off
 
 *Options → Extended → Mods* (the extended mode only; the classic mode runs no mod and plays as the original). The
-screen lists the practice tools and endless lives (which were on the *Debug mode* screen before, and keep their
-settings `extended.tools off`, `extended.endless-lives off`), then every mod found: factory mods first, then the
-player's, each with *Yes* or *No*, or *refused* for a mod that could not be read (the line under the list says why).
-Left and right switch the chosen mod; Enter opens its page: *Switched on?*, its options, its description, author,
-version and licence, and a warning when it changes the rules. The settings keep `mod.<key> on|off` and
+screen lists every mod found: factory mods first, in a debug run the development mods (god-mode, below), then the
+player's, each with *Yes* or *No*, or *refused* for a mod that could not be read (the help under the list says why).
+A long list scrolls, with a bar beside it and "▲ / ▼ N more" (menu.md). Left and right switch the chosen mod; Enter
+opens its page: *Switched on?*, its options (a key option shows its key), its description, author, version and
+licence, and a warning when it changes the rules. The settings keep `mod.<key> on|off` and
 `mod.<key>.<option> <value>`. A mod's view side takes effect at once; one that changes the run from the next start of
 the level.
 
@@ -37,11 +37,35 @@ the level.
 | `spirit-trail` | SpiritTrail | the level's best run rolls beside this one as a translucent ball; option: opacity | no |
 | `blackout` | Blackout | the level goes dark, a faint light over the ball; options: darkness, light | no |
 
+## God mode
+
+*2026-11-03, the owner's decision* (decisions.md, "God mode is a development mod"). What were the extended mode's
+practice tools and endless lives are one mod, `god-mode`, written in this very format from the building blocks below.
+It is a **development mod**: it lies in `assets/mods-dev/`, which the game reads only when it runs with `--debug`, and a
+release's package leaves that folder out, so the game is played without it. Its page (Options → Extended → Mods →
+God mode) shows its switches and keys; while it is on, its keys are shown in the bottom-left corner (option *Keys on
+screen?*), and the sector and tick in the top-left.
+
+| Option | Default | What |
+|---|---|---|
+| Endless lives? | yes | the last ball is never lost |
+| Seconds back | 5 | how far *Back* goes (1–30) |
+| Back | F3 (B, Z) | so many seconds back; pressed again, further (the game keeps the last half minute, a moment a second) |
+| Save / Load | F5 (K) / F9 (L) | keep the moment, go back to it; a lost run waits for Load |
+| Restart | R (T) | the level again |
+| Slower / Faster | `[` (`-`) / `]` (`=`) | the game at half the speed, down to an eighth, and back |
+| Free camera | F2 (C) | the camera flies (arrows fly and turn, A/D sideways, PageUp/PageDown, Home/End, Shift faster); the run waits |
+| Keys on screen? | yes | the hint with the keys |
+
+God mode changes the run: its runs are modded (below) — kept, but they open no level and are never a best run or a
+highscore — and its replay names it, so the replay plays only in a debug run with the same god-mode. The old settings
+`extended.tools` and `extended.endless-lives` are no longer read.
+
 ## Modded runs and replays
 
 A mod that changes the run (any *run action*, below) makes the run **modded**: it is kept, but never the level's best
 run, never a highscore, never compared by the ghost or the splits, and it does not open the next level
-(`Level_NN-<ticks>-modded.replay`; the debug mode's "All levels" opens them all). Its replay names each such mod in its header —
+(`Level_NN-<ticks>-modded.replay`; a debug run's "All levels open" opens them all). Its replay names each such mod in its header —
 
     mod sticky-ball 9c41f0a2be1377d0 strength=60 wood_only=off
 
@@ -75,8 +99,9 @@ UTF-8 text, one statement a line, `#` begins a comment line. In this order:
   - `option <name> number <min> <max> <step> <default>` (within ±1,000,000, a step of 0.001 or more, the default on
     the steps from `min`)
   - `option <name> key <Key1,Key2,...>` — keys by winit's names (`KeyQ`, `F12`, `Backspace`, `Home`...); the first
-    is the default. The game's own keys are refused: Escape, Enter, the arrows, Shift, Space, Tab, Alt, F11, and the
-    practice tools' R, F2, F3, F5, F9, `[` `]`; a key the player bound on the Controls page stays the game's.
+    is the default. The game's own keys are refused: Escape, Enter, the arrows, Shift, Space, Tab, Alt, F11 and
+    Backquote; a key the player bound on the Controls page stays the game's. (R, F2, F3, F5, F9, `[` `]` were the
+    practice tools'; they are god-mode's keys now and free for any mod.)
 - **Labels** — `label <name> <lang> <text>`: an option's label is named like the option; HUD lines name theirs.
 - **Variables** — `var <name> <number>`: numbers the rules keep, from their first value at each start.
 - **Rules** — `on <event>`, then any `if <condition>` lines (all must hold), then `do <action>` lines, done in order.
@@ -100,6 +125,7 @@ The view's events: `frame` (every frame drawn), `key <option>` (the key of one o
 | `ball.kind` | 0 wood, 1 stone, 2 paper | `clock.hour` `clock.minute` `clock.second` | the clock, UTC * |
 | `ball.touching` `ball.wall` | it touches something; something steep | `mouse.dx` `mouse.dy` | the mouse's motion this frame * |
 | `run.tick` `run.time` | the run's ticks, seconds | `extras.points` `extras.points_all` | extra points left in the sector, and all * |
+| `practice.speed` | the game's speed (1, or down to 1/8) * | `practice.saved` | a moment is saved (1 or 0) * |
 | `run.sector` `run.lives` `run.points` | sector (1 first), lives, points | `extras.lives` `extras.lives_all` | extra lives left, and all * |
 | `input.forward` `input.backward` `input.left` `input.right` `input.rotation` `input.overview` | the game's keys held (1 or 0) | `best.time` | the level's best time, seconds (-1: none) * |
 
@@ -121,6 +147,14 @@ Run actions (only on a run's event; they make the mod *modded*):
   wall turns up along it.
 - `do world.gravity <0..60>` — gravity's pull (the original's 20).
 - `do world.time <0.5..4>` — the physics' time factor (the original's 2).
+- `do lives.endless <0|1>` — the last ball is never lost (god-mode).
+
+Practice deeds (only on `key`; they reach into the run from outside it, so a mod with one is modded too, and while it
+is on the game keeps the run's moments, one a second for the last half minute):
+
+- `do rewind <1..30>` — so many seconds back; `do save`, `do load` — keep the moment, back to it;
+- `do slower`, `do faster` — the game's speed halved (down to 1/8) or doubled (up to as it is);
+- `do freecam` — the free camera taken up or put down.
 
 View actions (only on `frame` or `key`):
 
@@ -133,6 +167,7 @@ View actions (only on `frame` or `key`):
   top-right bottom-left bottom-right`; formats `time` (mm:ss.hh from seconds), `int`, `dec1`, `dec2`, `clock` (hh:mm),
   `ratio` (a/b).
 - `do splits <corner>` — the sectors' splits against the best run.
+- `do keys <corner>` — the mod's own key options as HUD lines, "label: key" (god-mode's hint).
 - `do ghost <0..1>` — the best run as a translucent ball, so opaque.
 - `do screenshot`, `do restart` — only on `key` (never every frame); one screenshot a second at most.
 
@@ -192,8 +227,8 @@ A mod comes from a stranger, so the game reads it as hostile and fails closed:
 - **Steering with the turned view** (FreeViewRotation turns the steering too): it needs the mouse's turn recorded in
   the replay; today `camera.yaw` turns only the view.
 - **Decoy balls** (Interference), **a deformed ball** (DeformedWB): drawing blocks for extra balls and mesh noise.
-- **Teleport to a spawn point, set the sector in a run** (NewSpawn, SpeedrunShortcuts): the practice tools' F5/F9
-  and `--sector` cover the practice; in-run blocks would make it a mod.
+- **Teleport to a spawn point, set the sector in a run** (NewSpawn, SpeedrunShortcuts): god-mode's save and load and
+  `--sector` cover the practice; a block to set the sector would make it a mod.
 - **Play time per level** (WatchYourTime's statistics): a kept counter block.
 - A fuzz target for mod.txt (the parser is strict, capped and unit-tested; fuzzing comes with the release work).
 
@@ -204,9 +239,9 @@ What each does, whether we have it, and how it maps to our engine:
 
 | BML mod | What it does | Ours |
 |---|---|---|
-| AdvancedTravelCam | a travel camera to fly anywhere, pick a point with the mouse, cinematic smoothing | the practice tools' free camera (F2); `free-view` (distance, turn); smoothing queued |
+| AdvancedTravelCam | a travel camera to fly anywhere, pick a point with the mouse, cinematic smoothing | god-mode's free camera (F2); `free-view` (distance, turn); smoothing queued |
 | BallanceOptiFine | forces shadows and a transitional column onto old custom maps; texture format | the renderer draws the ball's shadow on every floor; not a mod |
-| BaseCmoCfg | edits base.cmo's GameSettings (God mode, Debug) | the extended mode; endless lives on the Mods screen |
+| BaseCmoCfg | edits base.cmo's GameSettings (God mode, Debug) | `--debug` and its god-mode (endless lives and the rest) |
 | Blackout | darkens everything, a faint light above the ball | factory `blackout` |
 | Coredump | dumps the running Virtools context into an .nmo | not needed (our runtime is ours; `--export` writes levels) |
 | CursorClipper | keeps the cursor inside the window | not needed: a run takes nothing from the cursor, `mouse.dx` reads raw motion |
@@ -220,17 +255,17 @@ What each does, whether we have it, and how it maps to our engine:
 | Interference | translucent decoy balls around the ball | queued |
 | LanternFader | alpha test on the lanterns' material against frame drops | not needed (our renderer) |
 | MapScripts | runs maps' callback scripts | the engine runs maps' behaviour graphs as data; not a mod |
-| NewSpawn | set a spawn point, teleport to it, record a spirit ball | the practice tools (F5/F9, `--sector`, `--at`); `spirit-trail` |
-| PhysicsEditor | gravity, physics time factor, game speed | factory `physics-lab` (modded); the game speed is the practice tools' `[` `]` |
+| NewSpawn | set a spawn point, teleport to it, record a spirit ball | god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
+| PhysicsEditor | gravity, physics time factor, game speed | factory `physics-lab` (modded); the game speed is god-mode's `[` `]` |
 | PositionViewer | the ball's coordinates | factory `info-overlay` |
 | RealTimeMeter | real time of play, across levels | factory `segment-timer` (real time) |
 | ScreenCapturer | a key saves a screenshot (PNG/JPEG, clipboard) | factory `screenshot` (PNG; no clipboard) |
 | Segment | each sector's time against the record | factory `segment-timer` |
-| SpeedrunShortcuts | cheat mode, set spawn, restart, set sector | factory `quick-restart`; the practice tools; set sector queued |
+| SpeedrunShortcuts | cheat mode, set spawn, restart, set sector | factory `quick-restart`; god-mode; set sector queued |
 | SpiritTrail | the record run as a translucent ball | factory `spirit-trail` |
 | StickyAccess | switch to the sticky ball under cheat mode | factory `sticky-ball` |
 | SysInfoDisplay | system time and battery on screen | factory `info-overlay` (clock, UTC); no battery |
-| TASSupport | record and play input, skip rendering, exit at the end | the engine: replays are deterministic input recordings (`--record`, `--replay`, `--headless`), the practice tools' slow motion |
+| TASSupport | record and play input, skip rendering, exit at the end | the engine: replays are deterministic input recordings (`--record`, `--replay`, `--headless`), god-mode's slow motion |
 | WatchYourTime | time played per level | queued (statistics) |
 | BallSticky | a sticky ball type that climbs walls | factory `sticky-ball` (modded) |
 | BMLModuls | new modules (wooden drop and rotating boards) | level parts, not mods: the open format's parts ([open-format.md](open-format.md)) |

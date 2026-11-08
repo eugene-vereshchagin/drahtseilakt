@@ -206,7 +206,7 @@ impl Game {
         // a replay played with mods that changed the run plays with the very same mods, or not at all
         let mods = match &replay_in {
             Some(r) if !r.mods.is_empty() => {
-                crate::modrt::Mods::load(gamedata::mods::scan(), setting)
+                crate::modrt::Mods::load(gamedata::mods::scan(o.debug), setting)
                     .for_replay(&r.mod_refs())
                     .map_err(|e| {
                         format!(
@@ -751,8 +751,7 @@ fn load_volumes() -> [f32; 2] {
 /// The level's start sound is played when the run is seen within its first second.
 const START_SOUND_WITHIN: u64 = 60;
 
-/// F3 goes this far back (five seconds); the run is kept once a second for the last half minute.
-const REWIND_TICKS: u64 = 300;
+/// The run is kept once a second for the last half minute while a practice mod is on (god-mode rewinds from these).
 const HISTORY_EVERY: u64 = 60;
 const HISTORY_KEPT: usize = 31;
 
@@ -770,7 +769,7 @@ fn load_player() -> Vec<u8> {
 
 /// The extended mode (from the settings, or `--debug` for one run) and the additions the settings turn off.
 fn load_features(debug: bool) -> crate::features::Features {
-    crate::features::Features::load(debug || load_extended(), setting)
+    crate::features::Features::load(debug || load_extended(), debug, setting)
 }
 
 /// The Graphics page's choices kept in the settings.
@@ -878,7 +877,7 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
     m.volumes = load_volumes();
     m.graphics = load_graphics();
     m.bindings = load_bindings(&strings);
-    m.mods = crate::modrt::Mods::load(gamedata::mods::scan(), setting);
+    m.mods = crate::modrt::Mods::load(gamedata::mods::scan(o.debug), setting);
     m.resolutions = crate::options::WINDOWED.to_vec();
     for k in keys.chars() {
         match k {
@@ -1158,7 +1157,7 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
     let graphics = load_graphics();
     let bindings = load_bindings(&strings);
     show_graphics(&graphics, features);
-    let mods = crate::modrt::Mods::load(gamedata::mods::scan(), setting);
+    let mods = crate::modrt::Mods::load(gamedata::mods::scan(o.debug), setting);
     for m in &mods.found {
         if let Err(e) = &m.parsed {
             eprintln!("mod {}: refused: {e}", m.key);
@@ -3216,6 +3215,13 @@ impl App {
         self.game.set_mods(sim);
         self.view_mods = view;
         self.reset_mod_run();
+        // without a practice mod nothing of the practice stays: the speed, the saved moment, the free camera
+        if !self.practice() {
+            self.time_scale = 1.0;
+            self.saved = None;
+            self.fly = None;
+            self.history.clear();
+        }
     }
 
     /// The mods that run: those switched on, in the extended mode, never while the test player plays (--watch).
@@ -3249,6 +3255,8 @@ impl App {
             V::ClockHour => ((now() / 3600) % 24) as f32,
             V::ClockMinute => ((now() / 60) % 60) as f32,
             V::ClockSecond => (now() % 60) as f32,
+            V::PracticeSpeed => self.time_scale,
+            V::PracticeSaved => f32::from(u8::from(self.saved.is_some())),
             V::MouseDx => self.mouse.0,
             V::MouseDy => self.mouse.1,
             V::ExtrasPoints => sim.extras_left().0 as f32,
@@ -3610,8 +3618,7 @@ impl App {
     /// Practice: keeps the run as it is once a second (the last half minute) for F3, and the last ball when endless
     /// lives are on. A run that went back (its tick behind the moments kept) starts the history again.
     fn keep_history(&mut self) {
-        let tools = self.tools() && self.game.replay_in.is_none();
-        self.game.sim.endless_lives = tools && self.features.has(crate::features::Feature::EndlessLives);
+        let tools = self.practice() && self.game.replay_in.is_none();
         if self.game.sim.lives_spared {
             self.game.assisted = true;
         }
@@ -4060,8 +4067,65 @@ impl App {
         }
     }
 
-    fn tools(&self) -> bool {
-        self.features.has(crate::features::Feature::Tools)
+    /// A mod with practice deeds is on (god-mode, assets/mods-dev): the game keeps the run's moments for going back,
+    /// shows the sector and tick, and a lost run waits for the saved moment.
+    fn practice(&self) -> bool {
+        self.view_mods.practice()
+    }
+
+    /// The practice deeds the mods' keys asked for: back so many seconds, save and load the moment, slower and faster,
+    /// the free camera. Each helps the run (it is kept, never a best one; its mods already make it modded).
+    fn do_practice(&mut self) {
+        use crate::modrt::Practice;
+        for deed in std::mem::take(&mut self.view_mods.out.practice) {
+            match deed {
+                Practice::Rewind(secs) => {
+                    // back from the moments kept each second; pressed again it goes on further back
+                    let ticks = (secs.clamp(1.0, 30.0) * 60.0).round() as u64;
+                    let to = self.game.sim.tick.saturating_sub(ticks);
+                    while self.history.len() > 1 && self.history.back().is_some_and(|(s, _)| s.tick > to) {
+                        self.history.pop_back();
+                    }
+                    if let Some((sim, replay)) = self.history.back() {
+                        self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
+                        self.game.sim = sim.clone();
+                        self.game.replay_out = replay.clone();
+                        self.game.assisted = true;
+                        self.prev = None;
+                        self.menu = None;
+                    }
+                }
+                Practice::Save => self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone())),
+                Practice::Load => {
+                    if let Some((sim, replay)) = &self.saved {
+                        // the run goes on from the saved moment: its record is cut back to it, and what happened
+                        // after it did not happen
+                        self.game.sim = sim.clone();
+                        self.game.replay_out = replay.clone();
+                        self.game.assisted = true;
+                        self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
+                        self.prev = None;
+                        self.menu = None;
+                    }
+                }
+                Practice::Slower | Practice::Faster => {
+                    let slower = deed == Practice::Slower;
+                    self.time_scale =
+                        if slower { (self.time_scale / 2.0).max(0.125) } else { (self.time_scale * 2.0).min(1.0) };
+                    if self.time_scale < 1.0 {
+                        self.game.assisted = true;
+                    }
+                }
+                Practice::FreeCam => {
+                    self.fly = match self.fly {
+                        Some(_) => None,
+                        None => Some(FreeCam::at(self.last_view.0, self.last_view.1)),
+                    };
+                    self.keys = 0;
+                    self.fly_keys = 0;
+                }
+            }
+        }
     }
 
     fn run_over(&mut self) {
@@ -4069,7 +4133,7 @@ impl App {
             return;
         }
         // with a saved moment (extended mode) a lost run waits for F9 or R; Esc opens the dead menu
-        if self.game.sim.game_over && !(self.tools() && self.saved.is_some()) {
+        if self.game.sim.game_over && !(self.practice() && self.saved.is_some()) {
             self.open_menu(crate::menu::Screen::Dead);
         } else if crate::endscreen::over(&self.game.sim) {
             self.open_menu(crate::menu::Screen::End);
@@ -4201,11 +4265,6 @@ impl App {
                 save_settings(self.volumes, self.features, &self.player);
                 // the field of view is the extended mode's: the classic one plays at the original's
                 show_graphics(&load_graphics(), self.features);
-                if !self.features.has(crate::features::Feature::Tools) {
-                    self.time_scale = 1.0;
-                    self.saved = None;
-                    self.fly = None;
-                }
                 if let Some(m) = &mut self.menu {
                     m.set_features(self.features, &self.data);
                 }
@@ -4260,17 +4319,10 @@ impl App {
             }
             return;
         }
-        // a key one of the mods' key options names (modrt.rs) is the mod's
-        if down && self.fly.is_none() && self.pilot.is_none() && self.mod_key(code) {
-            return;
-        }
-        if code == KeyCode::F2 && down && self.tools() {
-            self.fly = match self.fly {
-                Some(_) => None,
-                None => Some(FreeCam::at(self.last_view.0, self.last_view.1)),
-            };
-            self.keys = 0;
-            self.fly_keys = 0;
+        // a key one of the mods' key options names (modrt.rs) is the mod's, also while the free camera flies (its
+        // own key puts it down)
+        if down && self.pilot.is_none() && self.mod_key(code) {
+            self.do_practice();
             return;
         }
         if self.fly.is_some() && code != KeyCode::Escape && code != KeyCode::F11 {
@@ -4311,52 +4363,6 @@ impl App {
                 let lost = self.game.sim.game_over;
                 self.open_menu(if lost { crate::menu::Screen::Dead } else { crate::menu::Screen::Pause });
                 return;
-            }
-            KeyCode::KeyR if down && self.tools() => {
-                self.restart();
-                self.saved = None;
-                0
-            }
-            // the extended profile's practice keys: slower or faster, save the moment, back to it
-            KeyCode::BracketLeft | KeyCode::BracketRight if down && self.tools() => {
-                let slower = code == KeyCode::BracketLeft;
-                self.time_scale = if slower { (self.time_scale / 2.0).max(0.125) } else { (self.time_scale * 2.0).min(1.0) };
-                if self.time_scale < 1.0 {
-                    self.game.assisted = true;
-                }
-                0
-            }
-            KeyCode::F3 if down && self.tools() => {
-                // five seconds back, from the moments kept each second; pressed again it goes on further back
-                let to = self.game.sim.tick.saturating_sub(REWIND_TICKS);
-                while self.history.len() > 1 && self.history.back().is_some_and(|(s, _)| s.tick > to) {
-                    self.history.pop_back();
-                }
-                if let Some((sim, replay)) = self.history.back() {
-                    self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
-                    self.game.sim = sim.clone();
-                    self.game.replay_out = replay.clone();
-                    self.game.assisted = true;
-                    self.prev = None;
-                    self.menu = None;
-                }
-                0
-            }
-            KeyCode::F5 if down && self.tools() => {
-                self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone()));
-                0
-            }
-            KeyCode::F9 if down && self.tools() => {
-                if let Some((sim, replay)) = &self.saved {
-                    // the run goes on from the saved moment: its record is cut back to it
-                    self.game.sim = sim.clone();
-                    self.game.replay_out = replay.clone();
-                    self.game.assisted = true;
-                    // what happened after the saved moment did not happen
-                    self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
-                    self.prev = None;
-                }
-                0
             }
             // the full screen on or off, as the Graphics page sets it
             KeyCode::F11 if down => {
@@ -4460,7 +4466,7 @@ impl App {
             (snap.eye, snap.target) = c.view();
         }
         self.last_view = (snap.eye, snap.target);
-        let tools = self.tools();
+        let tools = self.practice();
         let ghost = self.ghost_instance();
         let mod_quads = match (&self.gpu, self.game.font.as_ref()) {
             (Some(g), Some(f))
@@ -4566,7 +4572,7 @@ impl App {
                     if tools && (self.time_scale < 1.0 || self.saved.is_some()) {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
                         let slow = if self.time_scale < 1.0 { format!("SLOW 1/{}", (1.0 / self.time_scale).round()) } else { String::new() };
-                        let saved = if self.saved.is_some() { "   SAVED: F9 BACK" } else { "" };
+                        let saved = if self.saved.is_some() { "   SAVED" } else { "" };
                         crate::hud::text(&mut o, &format!("{slow}{saved}"), scale, scale * 21.0, scale, [0.6, 0.9, 1.0, 1.0]);
                     }
                     if let Some(w) = self.pilot.as_ref().filter(|w| !w.done && self.game.font.is_none()) {
@@ -4578,7 +4584,7 @@ impl App {
                     }
                     if let Some(c) = &self.fly {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
-                        let line = format!("FREE CAMERA   {:.1} {:.1} {:.1}   F2 BACK", c.pos.x, c.pos.y, c.pos.z);
+                        let line = format!("FREE CAMERA   {:.1} {:.1} {:.1}", c.pos.x, c.pos.y, c.pos.z);
                         crate::hud::text(&mut o, &line, scale, scale * 11.0, scale, [1.0, 0.85, 0.3, 1.0]);
                     }
                     o

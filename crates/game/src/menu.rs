@@ -19,9 +19,9 @@ use std::path::{Path, PathBuf};
 /// The original game's levels: 1 to 12, and 13 of the add-on when the copy has it.
 pub const LEVELS: u32 = 13;
 /// Lines of a long list (custom levels) shown at once.
-const LIST_LINES: usize = 12;
-/// Rows of the Mods screen shown at once.
-const MODS_LINES: usize = 9;
+const LIST_LINES: usize = 13;
+/// Rows of the Mods screen and a mod's page shown at once (the help under them).
+const MODS_LINES: usize = 10;
 
 /// The Controls page's rows: the copy's names for them (Language.nmo), in options::ACTIONS' order.
 const KEY_NAMES: [(&str, &str); 6] = [
@@ -201,6 +201,8 @@ pub enum Action {
 pub enum Target {
     Line(usize),
     Arrow(i32),
+    /// A scrolling list's bar: a click scrolls the list there.
+    Bar,
 }
 
 /// A button where it is drawn: its rectangle in window pixels (left, top, right, bottom).
@@ -362,18 +364,17 @@ impl Menu {
         self.top = self.shown(self.list_len(self.screen())).start;
     }
 
-    /// How many lines of `screen` scroll as a list: the custom levels without their Back, else all of its lines.
+    /// How many lines of `screen` scroll as a list: a list's without its Back, else all of its lines.
     fn list_len(&self, screen: Screen) -> usize {
         let n = self.lines(screen).len();
-        if matches!(screen, Screen::Custom | Screen::Mods) { n.saturating_sub(1) } else { n }
+        if scrolls(screen) { n.saturating_sub(1) } else { n }
     }
 
-    /// The lines of a list of `n` shown at once: all of a short one, else LIST_LINES from the list's top, moved as
+    /// The lines of a list of `n` shown at once: all of a short one, else a page of it from the list's top, moved as
     /// little as keeps the chosen line in view.
     fn shown(&self, n: usize) -> std::ops::Range<usize> {
-        // the Mods screen keeps room under its rows for the chosen line's help
-        let lines = if self.screen() == Screen::Mods { MODS_LINES } else { LIST_LINES };
-        if n <= lines + 1 {
+        let lines = page(self.screen());
+        if n <= lines {
             return 0..n;
         }
         let mut start = self.top.min(n - lines);
@@ -388,7 +389,23 @@ impl Menu {
 
     /// A newly shown screen's list starts with its chosen line in the middle.
     fn centre_list(&mut self) {
-        self.top = self.chosen().saturating_sub(LIST_LINES / 2);
+        self.top = self.chosen().saturating_sub(page(self.screen()) / 2);
+    }
+
+    /// The list scrolled to `top` (clamped), its chosen line kept within the rows shown.
+    fn scroll_to(&mut self, top: usize) {
+        let n = self.list_len(self.screen());
+        let lines = page(self.screen());
+        if n <= lines {
+            return;
+        }
+        self.top = top.min(n - lines);
+        let c = self.chosen();
+        if c < n
+            && let Some(s) = self.stack.last_mut()
+        {
+            s.1 = c.clamp(self.top, self.top + lines - 1);
+        }
     }
 
     /// Opens `screen` over the current one, its line chosen as the original chooses it.
@@ -466,10 +483,10 @@ impl Menu {
             Screen::Sound => vec![Line::Music, Line::Effects, Line::Back],
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
-                .chain(switches(false))
+                .chain(switches(self.features))
                 .chain([Line::Interface, Line::Textures, Line::Models, Line::SoundTheme, Line::ModsMenu, Line::Back])
                 .collect(),
-            Screen::Mods => switches(true).chain((0..self.mods.found.len()).map(Line::Mod)).chain([Line::Back]).collect(),
+            Screen::Mods => (0..self.mods.found.len()).map(Line::Mod).chain([Line::Back]).collect(),
             Screen::ModPage => [Line::ModOn]
                 .into_iter()
                 .chain((0..self.page_options().len()).map(Line::ModOpt))
@@ -596,7 +613,7 @@ impl Menu {
             (_, Some(Line::Mod(i))) => Action::ModSwitch(i),
             (Screen::ModPage, Some(Line::ModOn)) => Action::ModSwitch(self.mod_page),
             (Screen::ModPage, Some(Line::ModOpt(o))) => Action::ModOption(self.mod_page, o, by),
-            (Screen::Extended | Screen::Mods, Some(Line::Switch(i))) => {
+            (Screen::Extended, Some(Line::Switch(i))) => {
                 FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f))
             }
             _ => Action::None,
@@ -758,7 +775,7 @@ impl Menu {
     pub fn hits(&self, interface: bool, screen: crate::ui::Screen) -> Vec<Hit> {
         if interface {
             let hits = std::cell::RefCell::new(Vec::new());
-            self.draw(None, screen, &hits);
+            self.draw(None, screen, &hits, None);
             hits.into_inner()
         } else {
             let mut hits = Vec::new();
@@ -799,6 +816,14 @@ impl Menu {
         let hit = self.hit(p)?;
         match hit.target {
             Target::Arrow(by) => Some(self.adjust(by)),
+            Target::Bar => {
+                // the list's page centred where the bar was clicked
+                let n = self.list_len(self.screen());
+                let f = ((p.y - hit.rect[1]) / (hit.rect[3] - hit.rect[1]).max(1.0)).clamp(0.0, 1.0);
+                let at = (f * n as f32).round() as usize;
+                self.scroll_to(at.saturating_sub(page(self.screen()) / 2));
+                Some(Action::None)
+            }
             Target::Line(i) => {
                 let sc = self.screen();
                 if !self.selectable(sc, i) {
@@ -827,15 +852,9 @@ impl Menu {
         match sc {
             Screen::Highscore => return self.adjust(by),
             Screen::Entry => {}
-            Screen::Custom if n > LIST_LINES + 1 => {
+            _ if scrolls(sc) && n > page(sc) => {
                 let start = self.shown(n).start;
-                self.top = start.saturating_add_signed(by as isize).min(n - LIST_LINES);
-                let c = self.chosen();
-                if c < n
-                    && let Some(s) = self.stack.last_mut()
-                {
-                    s.1 = c.clamp(self.top, self.top + LIST_LINES - 1);
-                }
+                self.scroll_to(start.saturating_add_signed(by as isize));
                 if let Some(p) = at {
                     self.hover(p);
                 }
@@ -961,9 +980,6 @@ impl Menu {
     fn mods_help(&self) -> Vec<String> {
         let s = &self.strings;
         match self.lines(Screen::Mods).get(self.chosen()) {
-            Some(Line::Switch(i)) if FEATURES.get(*i) == Some(&Feature::Tools) => {
-                ["help 1", "help 2", "help 3"].iter().map(|l| s.ours(l)).collect()
-            }
             Some(Line::Mod(i)) if self.screen() == Screen::Mods => match self.mods.found.get(*i).map(|m| &m.parsed) {
                 Some(Ok(t)) => {
                     let mut v = vec![t.description(s.language())];
@@ -1195,7 +1211,7 @@ impl Menu {
                 // the mode, then each addition's switch, then where things are
                 let mut f = vec![(self.label(Line::Mode), yes_no(self.features.mode))];
                 if self.features.mode {
-                    f.extend(switches(false).map(|l| self.switch_field(l)));
+                    f.extend(switches(self.features).map(|l| self.switch_field(l)));
                     f.push((self.label(Line::Interface), self.interface_value()));
                     f.push((self.label(Line::Textures), self.pack_value(gamedata::packs::Kind::Textures)));
                     f.push((self.label(Line::Models), self.pack_value(gamedata::packs::Kind::Models)));
@@ -1205,7 +1221,7 @@ impl Menu {
                 f
             }
             Screen::Mods => {
-                let mut f: Vec<(String, String)> = switches(true).map(|l| self.switch_field(l)).collect();
+                let mut f: Vec<(String, String)> = Vec::new();
                 for (i, m) in self.mods.found.iter().enumerate() {
                     let v = match &m.parsed {
                         Err(_) => s.ours("mod refused"),
@@ -1226,10 +1242,10 @@ impl Menu {
                     let v = self.mods.opts.get(i).and_then(|v| v.get(k)).copied().unwrap_or(o.default);
                     let shown = match o.kind {
                         gamedata::mods::OptKind::Switch => yes_no(v != 0.0),
-                        // a key by its name in the menus' words, else winit's without its "Key"
+                        // a key by its name in the menus' words, else winit's, short
                         gamedata::mods::OptKind::Key(_) => {
                             let name = o.show(v);
-                            s.key(None, &name).unwrap_or_else(|| name.strip_prefix("Key").unwrap_or(&name).to_owned())
+                            s.key(None, &name).unwrap_or_else(|| crate::modrt::key_text(&name))
                         }
                         _ => o.show(v),
                     };
@@ -1388,7 +1404,7 @@ impl Menu {
 /// game's fonts (GameFont_01 for the main buttons, GameFont_03 and the grey GameFont_03a for the small ones).
 impl Menu {
     pub fn interface(&self, font: Option<&crate::ui::Face>, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
-        self.draw(font, screen, &std::cell::RefCell::new(Vec::new()))
+        self.draw(font, screen, &std::cell::RefCell::new(Vec::new()), None)
     }
 
     /// The interface's quads, and in `hits` the buttons a click or the cursor can choose, where they are drawn.
@@ -1397,6 +1413,7 @@ impl Menu {
         font: Option<&crate::ui::Face>,
         screen: crate::ui::Screen,
         hits: &std::cell::RefCell<Vec<Hit>>,
+        probe: Option<&std::cell::RefCell<Vec<Probe>>>,
     ) -> Vec<crate::ui::Quad> {
         use crate::ui::{Anchor, Quad, homogeneous};
         // behind the menus the game draws the interface's 3D scene (the original's or our own, menuscene.rs)
@@ -1414,61 +1431,24 @@ impl Menu {
             bottom: [1.0, 1.0, 1.0, 0.61],
             ..quad([0.3, 0.0, 0.7, 1.0], [0.0, 0.99, 1.0, 1.0], SPECIAL)
         });
-        // a label wider than its frame is drawn smaller, down to SHRINK of its size, and what still does not fit
-        // loses its middle to ".."
+        // a label is fitted to its frame (fit_label): smaller, on two lines where the frame is tall enough, or
+        // shortened; what was drawn is told to `probe` (the layout tests)
         let label = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style| {
             let Some(f) = font else { return };
             let frame = homogeneous(r);
-            let avail = frame[2] - frame[0] - style.margins[0] - style.margins[2];
-            let wide = |q: &[Quad]| {
-                q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max)
-                    - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
-            };
-            let tall = |q: &[Quad]| {
-                q.iter().map(|q| q.rect[3]).fold(f32::MIN, f32::max)
-                    - q.iter().map(|q| q.rect[1]).fold(f32::MAX, f32::min)
-            };
-            let scaled = |k: f32| {
-                let mut st = *style;
-                st.scale = [st.scale[0] * k, st.scale[1] * k];
-                st
-            };
-            let mut quads = f.layout(t, frame, style);
-            let w = wide(&quads);
-            if style.flags & crate::ui::TEXT_WORDWRAP == 0 && w > avail && avail > 0.0 {
-                let k = avail / w;
-                if k >= FIT_SHRINK {
-                    // a little smaller is enough
-                    quads = f.layout(t, frame, &scaled(k));
-                } else if let Some((a, b)) = two_lines(t) {
-                    // two lines, each in its half of the frame, as large as both fit
-                    let (wa, wb) = (wide(&f.layout(&a, frame, style)), wide(&f.layout(&b, frame, style)));
-                    let half = (frame[3] - frame[1]) / 2.0;
-                    let k2 = (avail / wa.max(wb)).min(half / tall(&quads).max(1e-6)).min(1.0);
-                    let mid = (frame[1] + frame[3]) / 2.0;
-                    let st = scaled(k2.max(WRAP_SHRINK));
-                    // each line still too wide at the smallest size loses its middle to ".."
-                    let fit = |mut text: String, r: [f32; 4]| {
-                        let mut q = f.layout(&text, r, &st);
-                        while wide(&q) > avail && text.chars().count() > 4 {
-                            text = shorten(&text);
-                            q = f.layout(&text, r, &st);
-                        }
-                        q
-                    };
-                    quads = fit(a, [frame[0], frame[1], frame[2], mid]);
-                    quads.extend(fit(b, [frame[0], mid, frame[2], frame[3]]));
-                } else {
-                    let st = scaled(k.max(SHRINK));
-                    let mut text = t.to_owned();
-                    quads = f.layout(&text, frame, &st);
-                    while wide(&quads) > avail && text.chars().count() > 4 {
-                        text = shorten(&text);
-                        quads = f.layout(&text, frame, &st);
-                    }
-                }
+            let (quads, k) = fit_label(f, t, frame, style);
+            let placed = crate::ui::place(quads, screen, Anchor::Center);
+            if let Some(p) = probe {
+                p.borrow_mut().push(Probe {
+                    text: t.to_owned(),
+                    frame: screen.rect(frame, Anchor::Center),
+                    quads: placed.iter().map(|q| q.rect).collect(),
+                    scale: k,
+                    wrap: style.flags & crate::ui::TEXT_WORDWRAP != 0,
+                    line: screen.y(line_height(style) * k) - screen.y(0.0),
+                });
             }
-            out.extend(crate::ui::place(quads, screen, Anchor::Center));
+            out.extend(placed);
         };
         let button = |out: &mut Vec<Quad>, r: [f32; 4], uv: [f32; 4], state: Button, at: Option<Target>| {
             if let Some(target) = at {
@@ -1480,6 +1460,48 @@ impl Menu {
                 Button::Inactive => SPECIAL,
             };
             out.push(quad(r, uv, tex));
+        };
+        // a row of our own screens: the key row's bar without the mark in its middle (that mark parts a key's name
+        // from the key on the Controls page; under a label it reads as stripes), stitched from the bar's two ends
+        let row = |out: &mut Vec<Quad>, r: [f32; 4], state: Button, at: Option<Target>| {
+            if let Some(target) = at {
+                hits.borrow_mut().push(Hit { rect: screen.rect(homogeneous(r), Anchor::Center), target });
+            }
+            let tex = match state {
+                Button::Over => SELECT_TEX,
+                Button::Up => DESELECT_TEX,
+                Button::Inactive => SPECIAL,
+            };
+            let mid = (r[0] + r[2]) / 2.0;
+            let [u0, v0, u1, v1] = KEY_UV;
+            out.push(quad([r[0], r[1], mid, r[3]], [u0, v0, ROW_CUT[0], v1], tex));
+            out.push(quad([mid, r[1], r[2], r[3]], [ROW_CUT[1], v0, u1, v1], tex));
+        };
+        // a scrolling list's indicator: a slim bar beside the rows, its thumb as long as the part shown, and how many
+        // rows are above and below ("▲ 3 more", "▼ 12 more"); the bar is a button (a click scrolls there)
+        let scroll = |out: &mut Vec<Quad>, x: f32, top: f32, bottom: f32, shown: std::ops::Range<usize>, total: usize| {
+            if total <= shown.len() || total == 0 {
+                return;
+            }
+            let plain = |out: &mut Vec<Quad>, r: [f32; 4], a: f32| {
+                out.push(Quad { top: [1.0, 1.0, 1.0, a], bottom: [1.0, 1.0, 1.0, a], ..quad(r, [0.0, 0.0, 1.0, 1.0], PLAIN) });
+            };
+            let track = [x, top, x + SCROLL_W, bottom];
+            hits.borrow_mut().push(Hit { rect: screen.rect(homogeneous(track), Anchor::Center), target: Target::Bar });
+            plain(out, track, 0.18);
+            let h = bottom - top;
+            let t0 = top + h * shown.start as f32 / total as f32;
+            let t1 = top + h * shown.end as f32 / total as f32;
+            plain(out, [x, t0, x + SCROLL_W, t1.max(t0 + 0.01)], 0.7);
+            let more = |n: usize| self.strings.ours("more").replace("{n}", &n.to_string());
+            let mut st = FONT_HINT;
+            st.align = crate::ui::ALIGN_RIGHT;
+            if shown.start > 0 {
+                label(out, &format!("▲ {}", more(shown.start)), [x - 0.3, top - HINT_H, x + SCROLL_W, top], &st);
+            }
+            if shown.end < total {
+                label(out, &format!("▼ {}", more(total - shown.end)), [x - 0.3, bottom, x + SCROLL_W, bottom + HINT_H], &st);
+            }
         };
         let sc = self.screen();
         let lines = self.lines(sc);
@@ -1592,18 +1614,26 @@ impl Menu {
             }
             Screen::Custom => {
                 title(&mut out);
-                let shown = self.shown(self.list_len(sc));
-                for (row, i) in shown.enumerate() {
-                    let y = 0.27 + row as f32 * 0.045;
-                    let r = [0.36, y, 0.64, y + 0.04];
-                    button(&mut out, r, LEVEL_UV, state(i), Some(Target::Line(i)));
-                    // a long name smaller or on two lines, to stay on its button (the label does it)
-                    let mut name = self.label(lines[i]);
-                    if name.chars().count() > 60 {
-                        name = name.chars().take(58).collect::<String>() + "..";
+                // each level: its difficulty (a star and 1 to 10, "?" unknown), its title in the menus' language
+                let n = self.list_len(sc);
+                let shown = self.shown(n);
+                for (k, i) in shown.clone().enumerate() {
+                    let y = LIST_TOP + k as f32 * ROW_STEP;
+                    let r = [LIST_X[0], y, LIST_X[1], y + ROW_H];
+                    row(&mut out, r, state(i), Some(Target::Line(i)));
+                    let x = LIST_X[0] + ROW_INDENT;
+                    if let Line::Map(m) = lines[i] {
+                        let d = self.maps.get(m).and_then(|p| p.difficulty).map_or_else(|| "?".to_owned(), |d| d.to_string());
+                        let mut st = FONT_HINT;
+                        st.align = crate::ui::ALIGN_LEFT;
+                        label(&mut out, &format!("★{d}"), [x, y, x + 0.045, y + ROW_H], &st);
                     }
-                    label(&mut out, &name, [0.42, y, 0.615, y + 0.04], &FONT_03);
+                    let mut st = FONT_ROW;
+                    st.align = crate::ui::ALIGN_LEFT;
+                    label(&mut out, &self.label(lines[i]), [x + 0.045, y, LIST_X[1] - 0.012, y + ROW_H], &st);
                 }
+                let bottom = LIST_TOP + shown.len().saturating_sub(1) as f32 * ROW_STEP + ROW_H;
+                scroll(&mut out, LIST_X[1] + 0.006, LIST_TOP, bottom, shown, n);
                 for (row, (l, _)) in self.fields(sc).iter().enumerate() {
                     let y = 0.30 + row as f32 * 0.05;
                     label(&mut out, l, [0.31, y, 0.69, y + 0.05], &FONT_03);
@@ -1658,22 +1688,27 @@ impl Menu {
             Screen::Mods | Screen::ModPage => {
                 title(&mut out);
                 let fields = self.fields(sc);
-                // the rows (a long list scrolls, as the custom levels do), then the help lines under them
+                // the rows (a long list scrolls), then the help under them as a paragraph
                 let rows = lines.len().saturating_sub(1);
-                let shown: Vec<usize> = if sc == Screen::Mods { self.shown(rows).collect() } else { (0..rows).collect() };
-                let step = 0.045;
-                for (k, &i) in shown.iter().enumerate() {
+                let shown = self.shown(rows);
+                for (k, i) in shown.clone().enumerate() {
                     let Some((name, value)) = fields.get(i) else { continue };
-                    let y = 0.22 + k as f32 * step;
+                    let y = MODS_TOP + k as f32 * ROW_STEP;
                     let st = if self.chosen() == i { Button::Over } else { Button::Up };
-                    button(&mut out, [0.33, y, 0.67, y + 0.0396], KEY_UV, st, Some(Target::Line(i)));
-                    label(&mut out, name, [0.35, y, 0.56, y + 0.0396], &FONT_03);
-                    label(&mut out, value, [0.56, y, 0.66, y + 0.0396], &FONT_03);
+                    row(&mut out, [ROWS_X[0], y, ROWS_X[1], y + ROW_H], st, Some(Target::Line(i)));
+                    let split = ROWS_X[0] + (ROWS_X[1] - ROWS_X[0]) * 0.66;
+                    let mut left = FONT_ROW;
+                    left.align = crate::ui::ALIGN_LEFT;
+                    label(&mut out, name, [ROWS_X[0] + ROW_INDENT, y, split, y + ROW_H], &left);
+                    label(&mut out, value, [split, y, ROWS_X[1] - 0.01, y + ROW_H], &FONT_ROW);
                 }
-                let below = 0.22 + shown.len() as f32 * step + 0.01;
-                for (k, (l, _)) in fields.iter().skip(rows).take(3).enumerate() {
-                    let y = below + k as f32 * 0.04;
-                    label(&mut out, l, [0.29, y, 0.71, y + 0.04], &FONT_03);
+                let bottom = MODS_TOP + shown.len().saturating_sub(1) as f32 * ROW_STEP + ROW_H;
+                scroll(&mut out, ROWS_X[1] + 0.006, MODS_TOP, bottom, shown, rows);
+                let help: Vec<&str> = fields.iter().skip(rows).map(|(l, _)| l.as_str()).filter(|l| !l.is_empty()).collect();
+                if !help.is_empty() {
+                    let mut st = FONT_HELP;
+                    st.flags |= crate::ui::TEXT_WORDWRAP;
+                    label(&mut out, &help.join("\n"), HELP_RECT, &st);
                 }
                 back_only(&mut out);
             }
@@ -1690,14 +1725,17 @@ impl Menu {
                             continue;
                         }
                         let y = 0.30 + k as f32 * 0.06;
+                        // the rows a little wider than the original's and their words a size smaller, so the
+                        // longest names (Russian, French) fit either side of the bar's middle mark
+                        let r = [0.32, y, 0.68, y + 0.0396];
                         if *line == Line::Defaults {
-                            button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st, Some(Target::Line(k)));
-                            label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
+                            row(&mut out, r, st, Some(Target::Line(k)));
+                            label(&mut out, name, [0.32 + ROW_INDENT, y, 0.67, y + 0.0396], &FONT_ROW);
                             continue;
                         }
-                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st, Some(Target::Line(k)));
-                        label(&mut out, name, [0.375, y, 0.505, y + 0.0396], &FONT_03);
-                        label(&mut out, key, [0.505, y, 0.65, y + 0.0396], &FONT_03);
+                        button(&mut out, r, KEY_UV, st, Some(Target::Line(k)));
+                        label(&mut out, name, [0.32 + ROW_INDENT, y, 0.494, y + 0.0396], &FONT_ROW);
+                        label(&mut out, key, [0.508, y, 0.67, y + 0.0396], &FONT_ROW);
                     }
                 } else if sc == Screen::Extended && self.features.mode {
                     // Extended: the mode's field first; then the switches (and the Debug mode line) as the Controls
@@ -1727,9 +1765,11 @@ impl Menu {
                             Button::Up
                         };
                         let at = Some(Target::Line(k + first));
-                        button(&mut out, [0.35, y, 0.65, y + 0.0396], KEY_UV, st, at);
-                        label(&mut out, name, [0.375, y, 0.55, y + 0.0396], &FONT_03);
-                        label(&mut out, value, [0.55, y, 0.65, y + 0.0396], &FONT_03);
+                        row(&mut out, [0.33, y, 0.67, y + 0.0396], st, at);
+                        let mut left = FONT_ROW;
+                        left.align = crate::ui::ALIGN_LEFT;
+                        label(&mut out, name, [0.33 + ROW_INDENT, y, 0.555, y + 0.0396], &left);
+                        label(&mut out, value, [0.555, y, 0.66, y + 0.0396], &FONT_ROW);
                     }
                     for (k, (l, _)) in fields.iter().skip(first + n).enumerate() {
                         let y = top + n as f32 * 0.05 + 0.03 + k as f32 * 0.045;
@@ -1829,11 +1869,104 @@ impl Menu {
     }
 }
 
-/// The smallest a label is drawn to fit, against its style's size.
+/// A label as drawn, for the layout tests: its text, its frame and its glyphs' rectangles (window pixels), the size
+/// it was drawn at against its style's, and whether it is a paragraph (word-wrapped).
+#[derive(Clone, Debug)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct Probe {
+    pub text: String,
+    pub frame: [f32; 4],
+    pub quads: Vec<[f32; 4]>,
+    pub scale: f32,
+    pub wrap: bool,
+    /// A line's height at the size drawn (window pixels).
+    pub line: f32,
+}
+
+/// The smallest a one-line label is drawn to fit, against its style's size; below it the label loses its middle.
 const SHRINK: f32 = 0.6;
-/// A label is drawn a little smaller to fit down to this; below it, it goes on two lines (down to WRAP_SHRINK).
+/// A label is drawn smaller down to this before two lines are tried, and two lines are drawn only this large or more
+/// (so a low button never holds two tiny lines).
 const FIT_SHRINK: f32 = 0.75;
-const WRAP_SHRINK: f32 = 0.45;
+/// The smallest a paragraph (word-wrapped help) is drawn to fit its box.
+const PARA_SHRINK: f32 = 0.55;
+
+/// The height of a line of `style` in context pixels: the font's cell, a sixteenth of the size (ui.rs, fallback.rs).
+fn line_height(style: &crate::ui::Style) -> f32 {
+    let base = if style.flags & crate::ui::TEXT_SCREEN != 0 { crate::ui::CONTEXT_H } else { 512.0 };
+    style.scale[1] * base / 16.0
+}
+
+/// `t` laid out to stay inside `frame` (context pixels, the style's margins kept): as it is when it fits; else a
+/// little smaller (down to FIT_SHRINK); else on two lines when the frame is tall enough for two at that size or more;
+/// else smaller still (down to SHRINK) and, if it must, shortened in its middle (".."). A word-wrapped paragraph
+/// is drawn smaller until its lines fit the frame's height (down to PARA_SHRINK). Returns the glyphs and the size
+/// drawn at against the style's.
+fn fit_label(
+    f: &crate::ui::Face,
+    t: &str,
+    frame: [f32; 4],
+    style: &crate::ui::Style,
+) -> (Vec<crate::ui::Quad>, f32) {
+    use crate::ui::Quad;
+    let m = style.margins;
+    let avail_w = frame[2] - frame[0] - m[0] - m[2];
+    let avail_h = frame[3] - frame[1] - m[1] - m[3];
+    let line = line_height(style);
+    if avail_w <= 0.0 || avail_h <= 0.0 || line <= 0.0 || t.trim().is_empty() {
+        return (Vec::new(), 1.0);
+    }
+    let wide = |q: &[Quad]| {
+        q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max) - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
+    };
+    let scaled = |k: f32| {
+        let mut st = *style;
+        st.scale = [st.scale[0] * k, st.scale[1] * k];
+        st
+    };
+    if style.flags & crate::ui::TEXT_WORDWRAP != 0 {
+        // a paragraph: as many lines as it needs, smaller until they fit the frame's height
+        let mut k = (avail_h / line).min(1.0);
+        loop {
+            let q = f.layout(t, frame, &scaled(k));
+            let tall = q.iter().map(|q| q.rect[3]).fold(f32::MIN, f32::max)
+                - q.iter().map(|q| q.rect[1]).fold(f32::MAX, f32::min);
+            if tall <= avail_h + m[1] + m[3] || k <= PARA_SHRINK {
+                return (q, k);
+            }
+            k = (k * 0.92).max(PARA_SHRINK);
+        }
+    }
+    let one = f.layout(t, frame, style);
+    let w = wide(&one);
+    let fits_h = (avail_h / line).min(1.0);
+    let k1 = if w > 0.0 { (avail_w / w).min(fits_h) } else { fits_h };
+    if k1 >= 1.0 {
+        return (one, 1.0);
+    }
+    if k1 >= FIT_SHRINK {
+        return (f.layout(t, frame, &scaled(k1)), k1);
+    }
+    // two lines, each at most the frame's width, both within its height
+    if let Some((a, b)) = two_lines(t) {
+        let wa = wide(&f.layout(&a, frame, style));
+        let wb = wide(&f.layout(&b, frame, style));
+        let k2 = (avail_w / wa.max(wb).max(1e-3)).min(avail_h / (2.0 * line)).min(1.0);
+        if k2 >= FIT_SHRINK && k2 > k1 {
+            return (f.layout(&format!("{a}\n{b}"), frame, &scaled(k2)), k2);
+        }
+    }
+    // one line, smaller, and what still does not fit loses its middle
+    let k = k1.max(SHRINK).min(fits_h);
+    let st = scaled(k);
+    let mut text = t.to_owned();
+    let mut q = f.layout(&text, frame, &st);
+    while wide(&q) > avail_w && text.chars().count() > 4 {
+        text = shorten(&text);
+        q = f.layout(&text, frame, &st);
+    }
+    (q, k)
+}
 
 /// A label in two lines, broken at the space nearest its middle, or for a text without spaces in a script that
 /// needs none (Chinese) at its middle character; None for one word.
@@ -1898,6 +2031,24 @@ const PLACE_UV: [f32; 4] = [0.0, 0.0627, 1.0, 0.1686];
 const ARROW_LEFT_UV: [f32; 4] = [0.6392, 0.2471, 0.7882, 0.4039];
 const ARROW_RIGHT_UV: [f32; 4] = [0.7921, 0.2471, 0.9412, 0.4039];
 const BACK_RECT: [f32; 4] = [0.4031, 0.85, 0.5906, 0.9438];
+/// Where the key row's bar is cut to leave its middle mark out (texture u of the left end's end, the right's start).
+const ROW_CUT: [f32; 2] = [0.46, 0.58];
+/// A texture no interface has: drawn as plain white, tinted (the scroll bar).
+const PLAIN: &str = "plain";
+/// Our list screens' rows: their height and spacing, the custom levels' and the mods' first row, their left and
+/// right edges, the scroll bar's width and the hint's height (fractions of the 4:3 frame).
+const ROW_H: f32 = 0.036;
+const ROW_STEP: f32 = 0.042;
+const LIST_TOP: f32 = 0.27;
+const LIST_X: [f32; 2] = [0.315, 0.67];
+const MODS_TOP: f32 = 0.26;
+const ROWS_X: [f32; 2] = [0.32, 0.67];
+const SCROLL_W: f32 = 0.008;
+/// A row's label begins after the ball at the row's left end.
+const ROW_INDENT: f32 = 0.042;
+const HINT_H: f32 = 0.032;
+/// The help under the Mods screen and a mod's page: a paragraph above Back.
+const HELP_RECT: [f32; 4] = [0.31, 0.725, 0.69, 0.845];
 const YES_RECT: [f32; 4] = [0.395, 0.52667, 0.485, 0.57207];
 const NO_RECT: [f32; 4] = [0.52, 0.52667, 0.61, 0.57207];
 
@@ -1914,6 +2065,12 @@ const fn font_style(scale: [f32; 2], color: [f32; 4]) -> crate::ui::Style {
     }
 }
 const FONT_01: crate::ui::Style = font_style([0.45, 0.55], WHITE);
+/// Our list screens' rows (the Extended page, the mods, a mod's page, the custom levels): a size smaller than the
+/// original's small font, so the longest labels (German, Russian, French) fit and more rows show; the help under
+/// them and the scroll hints smaller still.
+const FONT_ROW: crate::ui::Style = font_style([0.3, 0.34], WHITE);
+const FONT_HELP: crate::ui::Style = font_style([0.27, 0.31], [0.85, 0.85, 0.85, 1.0]);
+const FONT_HINT: crate::ui::Style = font_style([0.26, 0.3], [0.8, 0.8, 0.8, 1.0]);
 const FONT_03: crate::ui::Style = font_style([0.35, 0.4], WHITE);
 const FONT_03A: crate::ui::Style = font_style([0.35, 0.4], [0.514, 0.514, 0.514, 1.0]);
 const FONT_03_GOLD: crate::ui::Style = font_style([0.35, 0.4], GOLD);
@@ -1952,9 +2109,22 @@ fn finished(number: u32) -> bool {
     })
 }
 
-/// The switch lines of the extended mode's additions: the debug ones, or the others.
-fn switches(debug: bool) -> impl Iterator<Item = Line> {
-    FEATURES.iter().enumerate().filter(move |(_, f)| f.debug() == debug).map(|(i, _)| Line::Switch(i))
+/// The screens whose lines scroll as a list above their Back.
+fn scrolls(screen: Screen) -> bool {
+    matches!(screen, Screen::Custom | Screen::Mods | Screen::ModPage)
+}
+
+/// The rows a screen's list shows at once.
+fn page(screen: Screen) -> usize {
+    match screen {
+        Screen::Mods | Screen::ModPage => MODS_LINES,
+        _ => LIST_LINES,
+    }
+}
+
+/// The switch lines of the extended mode's additions offered (a debug-only one in a debug run alone).
+fn switches(features: Features) -> impl Iterator<Item = Line> {
+    FEATURES.iter().enumerate().filter(move |(_, f)| features.offered(**f)).map(|(i, _)| Line::Switch(i))
 }
 
 /// The interface's provider after the chosen one, `by` steps on (the arrows go round the three).
@@ -2060,12 +2230,13 @@ mod tests {
         m.folder = Some(root.clone());
         m.maps = maps_in(&root);
         m.stack.push((Screen::Custom, 0));
-        // by title; no folders to open, nested levels and junk not shown
+        // by title, a level named by level.txt before one named by its file; no folders to open, nested levels and
+        // junk not shown
         let titles: Vec<String> = (0..m.maps.len()).map(|i| m.label(Line::Map(i))).collect();
-        assert_eq!(titles, ["Alone", "Alpha Road"]);
-        assert_eq!(m.enter(), Action::Map(root.join("Alone.NMO")));
-        m.set_chosen(1);
+        assert_eq!(titles, ["Alpha Road", "Alone"]);
         assert_eq!(m.enter(), Action::Map(root.join("Zeta/Level_07.NMO")));
+        m.set_chosen(1);
+        assert_eq!(m.enter(), Action::Map(root.join("Alone.NMO")));
         // Esc leaves the screen at once
         m.back();
         assert_ne!(m.screen(), Screen::Custom);
@@ -2127,7 +2298,7 @@ mod tests {
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Mods);
         let lines = m.lines(Screen::Mods);
-        assert_eq!(lines.iter().filter(|l| matches!(l, Line::Switch(_))).count(), 2, "practice tools, endless lives");
+        assert!(!lines.iter().any(|l| matches!(l, Line::Switch(_))), "the practice is god-mode's now, a mod");
         let fov = lines.iter().position(|&l| l == Line::Mod(0)).unwrap();
         m.set_chosen(fov);
         assert_eq!(m.adjust(1), Action::ModSwitch(0));
@@ -2290,6 +2461,8 @@ mod tests {
                 titles: Vec::new(),
                 order: None,
                 hidden: false,
+                difficulty: None,
+                titled: true,
             })
             .collect();
         m.push(Screen::Custom);
@@ -2299,8 +2472,8 @@ mod tests {
             let line = |h: &Hit| if let Target::Line(i) = h.target { Some(i) } else { None };
             m.hits(true, screen).iter().filter_map(line).collect()
         };
-        // twelve maps and Back
-        assert_eq!(rows(&m), (0..12).chain([30]).collect::<Vec<_>>());
+        // a page of maps and Back
+        assert_eq!(rows(&m), (0..LIST_LINES).chain([30]).collect::<Vec<_>>());
         // the cursor down the rows: the list does not move under it
         for i in [3, 11, 7] {
             assert!(m.hover(at(&m, true, w, h, Target::Line(i), 0.5)));
@@ -2317,14 +2490,119 @@ mod tests {
         for _ in 0..40 {
             m.wheel(1, None);
         }
-        assert_eq!(rows(&m)[0], 18);
-        assert_eq!(m.chosen(), 18);
+        let end = 30 - LIST_LINES;
+        assert_eq!(rows(&m)[0], end);
+        assert_eq!(m.chosen(), end);
         m.wheel(-1, None);
-        assert_eq!(rows(&m)[0], 17);
+        assert_eq!(rows(&m)[0], end - 1);
         // the arrows still move the view only as far as the chosen line needs
         m.step(1);
-        assert_eq!((m.chosen(), rows(&m)[0]), (19, 17));
+        assert_eq!((m.chosen(), rows(&m)[0]), (end + 1, end - 1));
         assert_eq!(m.click(at(&m, true, w, h, Target::Line(20), 0.5)), Some(Action::Map(PathBuf::from("20.nmo"))));
+    }
+
+    /// Every screen in every language at windows of several shapes: each label's glyphs inside its frame, a label on
+    /// a button inside that button, never smaller than SHRINK, two lines only at FIT_SHRINK or more (no two tiny lines
+    /// in a low button). The own interface's face (the copy's font is laid out to the same cells).
+    #[test]
+    fn every_label_fits_its_button_in_every_language_and_window() {
+        if !crate::fallback::available() {
+            eprintln!("skipped: the shipped fonts (assets/fonts) are not there");
+            return;
+        }
+        let face = crate::ui::Face::Own;
+        let long = |i: usize| Package {
+            level: PathBuf::from(format!("{i}.nmo")),
+            folder: PathBuf::from(format!("{i}.nmo")),
+            title: ["W".repeat(40), "超长的社区地图名称超长的社区地图名称超长的社区地图名称超长的社区地".to_owned(),
+                "Der längste Titel einer Karte überhaupt!".to_owned()][i % 3].clone(),
+            author: None,
+            version: None,
+            titles: Vec::new(),
+            order: None,
+            hidden: false,
+            difficulty: if i % 2 == 0 { Some(10) } else { None },
+            titled: true,
+        };
+        let mods = gamedata::mods::scan(true);
+        assert!(mods.iter().any(|m| m.key == "god-mode" && m.parsed.is_ok()), "god-mode is read in a debug run");
+        let screens = |m: &Menu| -> Vec<(Screen, usize)> {
+            let mut v = Vec::new();
+            for sc in [
+                Screen::Main, Screen::Kinds, Screen::Start, Screen::Custom, Screen::Highscore, Screen::Options,
+                Screen::Graphics, Screen::Controls, Screen::Sound, Screen::Extended, Screen::Language,
+                Screen::Credits, Screen::Pause, Screen::Dead, Screen::End, Screen::Ask(Ask::Quit),
+                Screen::Ask(Ask::Restart), Screen::Ask(Ask::Exit), Screen::Entry,
+            ] {
+                v.push((sc, 0));
+            }
+            // the Mods screen with each mod chosen (its help under the rows), and each mod's page
+            for i in 0..m.lines(Screen::Mods).len() {
+                v.push((Screen::Mods, i));
+            }
+            v
+        };
+        let mut checked = 0;
+        for &(lang, _) in &LANGUAGES {
+            let mut m = menu(&[true; 13], true);
+            m.features.debug = true;
+            m.strings = Strings::ours_in(lang);
+            m.mods = crate::modrt::Mods::load(mods.clone(), |_| None);
+            m.maps = own_levels().into_iter().chain((0..20).map(long)).collect();
+            m.name = b"WWWWWWWWWWWWWWWWWWWW".to_vec();
+            let mut states = screens(&m);
+            for page in 0..m.mods.found.len() {
+                states.push((Screen::ModPage, page));
+            }
+            for (sc, i) in states {
+                if sc == Screen::ModPage {
+                    m.mod_page = i;
+                }
+                m.stack = vec![(Screen::Main, 0), (sc, if sc == Screen::ModPage { 0 } else { i })];
+                m.top = 0;
+                for (w, h) in [(640.0, 480.0), (1280.0, 720.0), (1920.0, 1080.0), (3440.0, 1440.0), (1080.0, 1920.0)] {
+                    let screen = crate::ui::Screen { w, h };
+                    let hits = std::cell::RefCell::new(Vec::new());
+                    let probe = std::cell::RefCell::new(Vec::new());
+                    m.draw(Some(&face), screen, &hits, Some(&probe));
+                    let hits = hits.into_inner();
+                    for p in probe.into_inner() {
+                        if p.quads.is_empty() {
+                            continue;
+                        }
+                        let b = p.quads.iter().fold([f32::MAX, f32::MAX, f32::MIN, f32::MIN], |a, q| {
+                            [a[0].min(q[0]), a[1].min(q[1]), a[2].max(q[2]), a[3].max(q[3])]
+                        });
+                        let at = format!("{lang} {sc:?}/{i} {w}x{h} {:?} drawn {b:?} in {:?}", p.text, p.frame);
+                        let tol = 1.5;
+                        assert!(
+                            b[0] >= p.frame[0] - tol && b[2] <= p.frame[2] + tol && b[1] >= p.frame[1] - tol
+                                && b[3] <= p.frame[3] + tol,
+                            "a label out of its frame: {at}"
+                        );
+                        let centre = [(p.frame[0] + p.frame[2]) / 2.0, (p.frame[1] + p.frame[3]) / 2.0];
+                        if let Some(hit) = hits.iter().find(|h| {
+                            centre[0] >= h.rect[0] && centre[0] <= h.rect[2] && centre[1] >= h.rect[1] && centre[1] <= h.rect[3]
+                        }) {
+                            let r = hit.rect;
+                            assert!(
+                                b[0] >= r[0] - tol && b[2] <= r[2] + tol && b[1] >= r[1] - tol && b[3] <= r[3] + tol,
+                                "a label off its button {r:?}: {at}"
+                            );
+                        }
+                        if !p.wrap {
+                            assert!(p.scale >= SHRINK - 1e-3, "a label drawn at {} of its size: {at}", p.scale);
+                            if b[3] - b[1] > 1.4 * p.line {
+                                assert!(p.scale >= FIT_SHRINK - 1e-3, "two small lines: {at}");
+                            }
+                        }
+                        checked += 1;
+                    }
+                }
+            }
+        }
+        eprintln!("{checked} labels checked");
+        assert!(checked > 10_000, "only {checked} labels checked");
     }
 
     #[test]
