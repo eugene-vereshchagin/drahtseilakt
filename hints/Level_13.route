@@ -29,6 +29,11 @@ sector 2 paper                                                       (worked out
                                                                      the test player takes the paper ball down the
                                                                      helix, along the beam past the fans 18_10, 18_11
                                                                      to x -738.6, where it stops: stone 18 is missing)
+                                                                     2026-11-08 (owner): planks rammed into a bridge
+                                                                     all but 04 (driven on copies); the crate pushed
+                                                                     from under the block (driven); the crate under
+                                                                     the rails at the strip's first crossing (open);
+                                                                     paper, into the helix ahead of stone 18
   CP1 → the rails south, the stepped floor east, the platform        pass
   → P_Trafo_Stone_03 (-879.8, 761.5)                                 pass into it → stone
   the wood strip x -873.6 south to the lower floor                   pass, steady
@@ -52,6 +57,9 @@ sector 3 paper                                                       (walkthroug
                                                                      the paper ball stops behind them, too low to leave
                                                                      the channel for the east half-pipe and
                                                                      P_Trafo_Stone_01; Level_13.txt says more)
+                                                                     2026-11-08 (owner): overtake the stones by the
+                                                                     side troughs (west 335..405, east 240..300, west
+                                                                     180..200, east 80..140); two passed in the first
   the row of stone balls 19..28, P_Trafo_Stone_01 (boxes 34 aside), P_Trafo_Paper_03, fan 18_13 (life 03),
   P_Trafo_Stone_04 over the sandbags 26, P_Trafo_Paper_04, P_Trafo_Stone_05, P_Trafo_Paper_06; the paper ball rides on
   top of the column of stone balls down the rail channel → PC_TwoFlames_03
