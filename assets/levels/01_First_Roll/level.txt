@@ -1,9 +1,9 @@
-title = First Roll
+title = From the Tower to the Lighthouse
 author = Drahtseilakt
 version = 1
 licence = GPL-3.0-only
-title.ru = Первый разбег
-title.de = Erster Lauf
-title.zh = 初次滚动
+title.ru = От Башни к Маяку
+title.de = Vom Turm zum Leuchtturm
+title.zh = 从塔到灯塔
 order = 1
 difficulty = 1

@@ -1,815 +1,556 @@
-# First Roll: the first of our levels, twice the length of the original's first and harder, in its spirit (its order of
-# lessons, its kinds of parts, its help; measured, not traced: the layout, turns, heights and lengths are ours). Four
-# long sectors that teach the wooden ball, the paper one and the stone one and then use them:
-#  1. (wood, paper, wood) off the tower over a wooden bridge, the first rails, boxes on a walled square, a wavy road,
-#     curving rails, crates shoved off a bare stretch, the stone transformer and a loose stone ball, the wood one
-#     hidden beside a climb the stone ball cannot make, loose paper balls, the paper transformer and three fans up to
-#     the floors above, a plate bridge, back to wood, rails;
-#  2. (wood, stone) a loop of rails, a wooden bridge, a seesaw, a terrace of short turns, a second loop, turning arms,
-#     a dome, long rails, the stone on the crate (rammed out from under it from the floor below, the stone
-#     transformer there), stacked boxes, crates shoved off a bare stretch, humps, loose balls, long rails;
-#  3. (stone) a square of loose balls, humps, rails, two pairs of pushers pushed from the floors beside their lanes,
-#     crates shoved off, a bare terrace, a second stone on its crate, a long rail descent, the wood transformer;
-#  4. (wood) a wavy way, wooden ramps up between railed landings, a seesaw, a plate bridge, swinging sacks over a
-#     railed stretch, a terrace, rails, rails spiralling down, loose balls on the long way down, the finish.
-# Gutters along most floors; railings at the start, round the outer side of the turns, on the landings and where a
-# floor below the way has a drop; bare stretches and long rails grow towards the end.
+# From the Tower to the Lighthouse: the first of our levels, built from the designer's concept (twice the length of
+# the original's first, in its spirit: a groove track with straight pieces and hard square corners, railings only
+# where a drop or a landing asks for them, no sacks). Four sectors, each its own courtyard of towers and columns,
+# all of them turning toward the Lighthouse standing at the far edge of the map:
+#  1. (wood) the tower's stair of corners, a ledge along a wall, a wooden ball led to a pier over a pool, the first
+#     rails, a zigzag terrace, a wooden bridge, a square with a dome, a checkpoint;
+#  2. (wood, stone, wood, paper, wood) a courtyard of choices, a stone road, a balcony over the clouds, rails that
+#     snake, a gallery of boards with a crate, a checkpoint;
+#  3. (stone) the stone ball's road, a lane with a loose stone ball held by a pusher and a pit the ball plugs, a
+#     train of five stones, a terrace, rails that curve, the wood transformer, a checkpoint;
+#  4. (wood) a long descent of nine corners, a jump, terraces, a bowling floor, a quay of boards and a boarded path
+#     round the Lighthouse to the balloon's pier.
 # Edit this file and run `scripts/own-levels.sh assets/levels/01_First_Roll`.
-title First Roll
-title.ru Первый разбег
-title.de Erster Lauf
-title.zh 初次滚动
+title From the Tower to the Lighthouse
+title.ru От Башни к Маяку
+title.de Vom Turm zum Leuchtturm
+title.zh 从塔到灯塔
 order 1
 difficulty 1
 sky Sunset
 music 1
 bonus 100
 ball wood
-columns 80
+columns 60
 
-# ---- sector 1 (wood, paper, wood)
+# ---- sector 1: the tower's dawn (wood)
 safety gutter
-railing turns
+width 7.5
 start
-width 14
-railing both
-floor 12
-width 10
-floor 28 down 5
-right 90 18
-floor 8
-surface wood
-floor 56
-surface stone
-floor 8
-railing off
-left 40 36 down 2
-right 40 36 down 2
+lamptower side 17 ahead -8 height 24 r 2.8
+mast side -16 ahead -4 height 26
+floor 140 down 3
+corner left
+lamptower side -9 ahead -9 height 18 r 2.4
+floor 90 down 3
+corner right rail
+mast side 9 ahead 12 height 20
+floor 140 down 3
+point ahead -2 side -1.2
+corner right
+floor 60 down 2
+# the ledge: the groove narrows, a blank wall of the tower block on the left, a drop on the right, no railings
+width 5.5
+wallblock side 3.6 ahead 8 long 60 height 16 thick 14
+wlamp side 3.3 ahead 24
+wlamp side 3.3 ahead 56
+floor 60
+width 7.5
 floor 20
-point
-# the first rails: the way narrows between railings to their mouth, then straight and gently down
-railing both
-width 7
-floor 10
-railing off
-rails 30 down 7
-rails 14 down 2
-safety border
-width 26
-floor 6
-box side 6 ahead 4
-box side -5 ahead 12
-floor 36
-loose wood side -8 ahead -10
-life side 9 ahead -4
-box side -9 ahead -24
-width 10
-floor 6
-safety gutter
-width 7
-left 90 16 down 2
-floor 14 down 1
-# the first humps: a wavy road
-width 9
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 10
-left 30 30 down 1
-right 30 30 down 1
-point
-floor 20
-# rails that curve
-railing both
-width 7
-floor 8
-railing off
-rails-right 90 20
-rails 30 down 3
-rails-left 90 20
-rails 20
-safety gutter
-width 10
+corner left
+# the guide: a wooden ball lies in the groove at the top of the pier's way and rolls on ahead of you
 floor 12
-
+loose wood ahead -3 lead
+floor 140 down 4
+# the pier: railings both sides, an open end; the pool lies 5 under it with a brick rim, a life in it
 railing both
-width 7
-floor 8
+floor 26 down 1
 railing off
-rails 20 down 2
-rails-left 60 30 down 2
-rails 20 down 2
-rails-right 120 30 down 2
-rails 20
-rails-left 60 30
-rails 30 down 3
-rails 16
-safety gutter
-width 10
+point ahead -2
+plaza 20 20 brick gap back 0 20 gap right 12 8 ahead 0 up -5
+life ahead 10 side 0 up -5
+lamptower side 16 ahead 9 up -5 height 22 r 2.4
+mast side -14 ahead 14 up -5 height 22
+# the way on is the ramp out of the pool (12 degrees) back up to the groove
+move 12 -10 -5
+turn -90
+floor 24 up 5
 floor 16
-# boxes across a bare stretch: the wooden ball shoves them off
-railing noturns
-borders off
-width 9
-floor 36
-box ahead -26 side 1.5 shove
-box ahead -12 side -1.5 shove
-borders on
-railing turns
+corner left
+# the first rails: the way narrows, the rails run 240 to the east and gently down, one soft bend in the middle
+width 7
+railing both
+floor 12
+railing off
+rails 100 down 5
+rails-left 30 60 down 1
+point
+rails-right 30 60 down 1
+rails 60 down 3
+safety gutter
+width 10
+railing both
+floor 22
+railing off
+# a zigzag terrace: four pieces of 40, a corner and a little step down after each
+width 7.5
+floor 14
+corner right
+floor 6
+move 0 0 -2
+floor 34
+corner left
+floor 6
+move 0 0 -2
+floor 34
+corner right
+mark z3
+turn 90
+plaza 8 8 kerb gap back 0 8 ahead 3.75 side 0
+life ahead 7.75
+back z3
+floor 6
+move 0 0 -2
+floor 34
+corner left
+floor 30
+# the wooden bridge: boards, three humps, thick columns and cables under it
+safety none
+width 6
+surface wood
+columns 0
+column ahead 22 depth 70 r 3.2
+column ahead 46 depth 70 r 3.2
+column ahead 70 depth 70 r 3.2
+garland ahead 0 side 3.3 up -2.8 ahead2 92 side2 3.3 up2 -2.8 sag 9 nolamps
+garland ahead 0 side -3.3 up -2.8 ahead2 92 side2 -3.3 up2 -2.8 sag 9 nolamps
 floor 10
-right 90 12
-# a transformer stands on a flat patch: the gutter widens round it
+floor 12 up 2
+floor 12 down 2
+floor 12 up 2
+point
+floor 12 down 2
+floor 12 up 2
+floor 12 down 2
+floor 10
+surface stone
+safety gutter
+columns 60
+width 7.5
+floor 12
+# the square with the dome: a low kerb, the way in at the middle of the back edge, the way out at a far corner
+width 36
+plaza 36 36 kerb gap back 0 7.5 gap front 13 8
+dome ahead 18
+point ahead 18 side 1.6 up 3.3
+point ahead 18 side -1.6 up 3.3
+lamptower side 16.5 ahead 1.5 height 8 r 1.1
+lamptower side -16.5 ahead 1.5 height 8 r 1.1
+lamptower side 16.5 ahead 34.5 height 8 r 1.1
+lamptower side -16.5 ahead 34.5 height 8 r 1.1
+pilot all : goto 6 0 0 ; goto 18 -9 0 ; goto 30 6 0 ; goto 38 13 0
+move 36 13 0
+width 7.5
+# the way to the first checkpoint: two corners over the drop with railings outside, a stretch with its edge bare
+floor 100 down 3
+corner left rail
+floor 60
+corner right rail
+safety none
+floor 60
+safety gutter
+floor 40
+width 14
+lamptower side 14 ahead 6 height 34 r 3.2
+checkpoint
+
+# ---- sector 2: the courtyard of choices (wood, stone, wood, paper, wood)
+width 7.5
+floor 60 down 3
+corner left
+floor 40 down 4
+corner right
+floor 56 down 6
+# the courtyard: 40 x 40 with a brick rim, four corner columns and a lamp tower; in at the middle of the west side, a
+# steep ramp north to a balcony, a corridor east with four stones in it, and in the near corner a plate with the stone
+# transformer on a step
+mark yard
+plaza 40 40 brick gap back 0 7.5 gap left 20 7 gap front 0 8 gap right 8 5.5
+lamptower side 19 ahead 1 height 7 r 1.2
+lamptower side -19 ahead 1 height 7 r 1.2
+lamptower side 19 ahead 39 height 7 r 1.2
+lamptower side -19 ahead 39 height 7 r 1.2
+lamptower side -30 ahead 46 height 36 r 3.0
+mast side 28 ahead -10 height 26
+mast side 26 ahead 52 height 22
+nopilot all
+# the plate with the transformer, outside the south rim: a step-ramp 8 long out of a gap in it, then the plate
+move 8 -20 0
+turn -90
+safety none
+width 5.5
+floor 8 up 1.2
+plaza 12 12 kerb gap back 0 5.5
+trafo stone ahead 6 nopilot
+back yard
+# the balcony: the steep ramp (18 degrees, wood only) out of the north gap, a railed square with two points and a life
+move 20 20 0
+turn 90
+safety gutter
+width 6
+floor 22 up 7
+plaza 12 12 kerb fence left right front gap back 0 6
+point ahead 4 side 3
+point ahead 8 side -3
+life ahead 10 side 0
+back yard
+autopilot all
+pilot all : goto 6 0 0 ; goto 18 -6 0
+pilot safe,speed : goto 8 -14 0 ; goto 8 -26 1.2 ; goto 8 -33 1.2 ; become stone ; goto 8 -26 1.2 ; goto 8 -14 0 ; goto 20 -8 0 ; goto 38 0 0
+pilot collector : goto 20 8 0 ; goto 20 20 0 ; goto 20 33 7 ; goto 24 40 7 ; goto 20 33 7 ; goto 20 18 0 ; goto 8 -14 0 ; goto 8 -26 1.2 ; goto 8 -33 1.2 ; become stone ; goto 8 -26 1.2 ; goto 8 -14 0 ; goto 20 -8 0 ; goto 38 0 0
+move 40 0 0
+pilot safe,speed,collector : goto -2 0 0 ; push 1 0 600
+nopilot all
+# the corridor: 8 wide, brick rim, a gentle climb; four stones in single file at its mouth, a bay at its end
+safety border
+width 8
+loose stone ahead 3 plug
+loose stone ahead 7.5 plug
+loose stone ahead 12 plug
+loose stone ahead 16.5 plug
+floor 22
+floor 38 up 2
+autopilot all
+plaza 20 20 brick gap back 0 8 gap right 10 7.5 ahead 0 side 0
+lamptower side 12 ahead 21 height 24 r 2.4
+pilot all : goto 6 0 0 ; goto 10 -4 0 ; goto 10 -9 0
+move 10 -10 0
+turn -90
+safety gutter
+width 7.5
+floor 30
+# the stone road: a hump the stone must hold its push over, a corner, then the wood transformer at the pass
+floor 24 up 3
+floor 24 down 3
+floor 42 down 3
+corner left
+floor 50 down 3
+width 11
+floor 4
+floor 6
+trafo wood ahead -3
+floor 20 down 2
+width 7.5
+floor 36 down 3
+# the drop: a balcony with railings on two sides and an open end over the clouds; the road goes on 6 lower
+plaza 10 14 fence left right gap back 0 7.5 gap front 0 10
+column side 3 ahead 12 depth 60 r 1.8
+column side -3 ahead 12 depth 60 r 1.8
+column side 3 ahead 4 depth 60 r 1.8
+column side -3 ahead 4 depth 60 r 1.8
+lamptower side 9 ahead 13 height 20 r 2.2
+pilot all : goto 6 0 0 ; goto 13 0 0 ; air 1 0 30
+move 14 0 -6
+floor 40 down 2
+point ahead -30
+point ahead -22
+floor 20 down 1
+# the snake: rails 260, a right bend of 60 degrees on 50, then a left one, down all the way, the posts in the clouds
+width 7
+railing both
+floor 10
+railing off
+rails 30 down 2
+rails-right 60 50 down 2
+point
+rails-left 60 50 down 2
+rails 60 down 4
+safety gutter
+width 10
+railing both
+floor 22
+railing off
+# the paper transformer in the groove, which widens round it
+width 7.5
+floor 14
+width 11
+floor 4
+floor 6
+trafo paper ahead -3
+floor 8
+width 7.5
+floor 14
+# the gallery: boards 7 wide between railings, two corners, lamps on posts strung with garlands; at the end of it a
+# crate fills the way (paper cannot move it), and 20 before it a ramp down to a plate with the wood transformer
+safety railings
+surface wood
+width 7
+mast side 4.4 ahead 8 height 7
+mast side -4.4 ahead 8 height 7
+mast side 4.4 ahead 30 height 7
+mast side -4.4 ahead 30 height 7
+garland ahead 8 side 4.4 up 7 ahead2 8 side2 -4.4 up2 7 sag 0.8
+garland ahead 30 side 4.4 up 7 ahead2 30 side2 -4.4 up2 7 sag 0.8
+garland ahead 8 side 4.4 up 7 ahead2 30 side2 4.4 up2 7 sag 2.0
+garland ahead 8 side -4.4 up 7 ahead2 30 side2 -4.4 up2 7 sag 2.0
+floor 40 down 1
+corner left
+floor 50 down 1
+corner right
+floor 20 down 1
+railing left
+floor 4
+mark gb
+floor 4
+railing both
+nopilot all
+move 0 -3.5 0
+turn -90
+safety none
+width 5.5
+floor 8 down 2.5
+plaza 12 12 kerb gap back 0 5.5
+trafo wood ahead 6 nopilot
+life ahead 8 side 3
+back gb
+safety railings
+surface wood
+width 7
+autopilot all
+pilot safe,speed : goto -4 0 0 ; goto 4 -3.5 0 ; goto 6 -9 -2.5 ; goto 6 -18 -2.5 ; become wood ; goto 6 -9 -2.5 ; goto 4 0 0
+floor 6
+box ahead -3 plug
+floor 4
+floor 22
+railing right
+floor 14
+railing off
+# the crate is shoved off the open end; the way goes on by a ramp down on the left, 12 long
+move -7 3.5 0
+turn 90
+safety none
+width 5.5
+floor 12 down 5
+safety gutter
+surface stone
+width 7.5
+corner right
+floor 60 down 2
+corner left rail
+floor 70 down 2
+corner right rail
+floor 50
+width 14
+lamptower side 14 ahead 6 height 40 r 3.4
+checkpoint
+
+# ---- sector 3: stone and the plug (stone)
+width 7.5
+floor 14
 width 11
 floor 4
 floor 6
 trafo stone ahead -3
-# the stone ball has work at once: a loose stone ball on a bare square, too heavy for the wooden one, shoved off it
-floor 20 down 2
-railing noturns
-borders off
-width 10
-floor 12
-loose stone ahead -5 shove
-left 90 14
-borders on
-railing turns
-width 7
-floor 6
-# a gate to find out: the stone ball comes to a climb it cannot make; the wood transformer stands to the side of the
-# little square before it, in sight but off the line
-width 18
-floor 6
-safety border
-floor 14
-trafo wood side 5 ahead -7
-safety gutter
-width 8
-floor 6
-floor 20 up 10
-safety border
-width 24
-floor 6
-loose paper side 5 ahead 6 shove
-loose paper side -4 ahead 10 shove
-loose paper side 2 ahead 15 shove
-loose paper side -6 ahead 19 shove
-floor 30
-width 8
-floor 6
-rails 16
-point
-rails 16
-point
-rails-right 90 16
-point
-rails 16
-safety gutter
-width 11
-floor 10
-# the paper ball: its transformer, then a fan that lifts it to the floor above (the only way on)
-floor 4
-floor 6
-trafo paper ahead -3
-floor 6
-safety border
-width 12
-floor 20
-fan ahead -5
-gap 4 up 12 nopilot
-floor 16
-point
-# a plate bridge: it holds the paper ball (and the wooden one)
-width 10
-floor 10
-platebridge
-floor 12
-borders off
-width 9
-floor 20
-left 60 20
-right 60 20
-floor 16
-borders on
-safety border
-width 12
-floor 20
-fan ahead -5
-gap 4 up 12 nopilot
-floor 16
-point
-floor 4
-fan ahead -5
-gap 4 up 12 nopilot
-floor 16
-safety gutter
-width 10
-floor 30 down 4
-left 90 20
-floor 20 down 2
-right 90 16
-floor 10
-width 11
-floor 4
-floor 6
-# back to wood for the rails
-trafo wood ahead -3
 floor 8
-width 9
-floor 6
-rails 40 down 4
-rails-left 90 18
-rails 30 down 2
-rails-right 90 18
-rails 16
-safety gutter
-width 10
-floor 24
-checkpoint
-
-# ---- sector 2 (wood, stone)
-floor 7
-# the loop of rails, now the ball knows rails
-rails 14 down 2
-rails-left 360 14 down 7
-rails 12 down 2
-safety gutter
-width 9
-floor 6
-surface wood
-floor 44
-point ahead -22
-left 30 40
-right 30 40
-floor 10
-surface stone
-floor 12
-# a seesaw: the ball rolls up its raised end and it tips
-seesaw
-floor 16
-# a bare terrace: short sharp turns stepping down (railings on their outer side)
-borders off
-width 9
-floor 8
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-floor 8
-borders on
-floor 16
-rails 14 down 2
-rails-right 360 14 down 7
-rails 12 down 2
-rails-right 90 20 down 2
-rails 30 down 3
-rails-left 90 20 down 2
-safety gutter
-width 9
-floor 10
-safety border
-width 18
-floor 30
-arms ahead -15 side 2
-point
-width 8
-floor 12
-width 32
-floor 10
-floor 34
-# the dome sits on the line to the rails' mouth: go round it and line up again
-dome ahead -14
-point side 11 ahead -14
-loose wood side -11 ahead -26
-width 10
-floor 10
-rails-left 90 16
-rails 30 down 3
-rails-right 90 22 down 3
-rails 20
-safety gutter
-width 9
-floor 20
-left 45 24 down 1
-right 45 24 down 1
-floor 20
-width 8
-floor 34
-mark drop
-# the stone on the crate: the way drops off its end onto a wide floor 5 lower, which runs under the lane the stone
-# blocks; the ball pushes the crate out from under the stone (and backs off), goes round and up to the lane
-pilot all : goto -3 0 0 ; push 1 0 40 ; goto 13 0 -5 ; become stone ; goto 9 0 -5 ; wait 90 ; press 30.5 0 -5 0 0 12 200 ; push -1 0 80 ; goto 11 0 -5
+width 7.5
+floor 90 down 3
+corner right
+floor 100 down 3
+floor 15 up 2
+floor 15 down 2
+floor 30 down 1
+# the plug. The lane (left, 2.5 above the alley, 100 long, two degrees down) holds a stone ball behind a pusher; the
+# alley beside it, 2.5 lower, passes the pusher's plate, climbs, bridges over the lane's lower end and comes down to
+# the road, which crosses the lane's end where a pit is: the released stone ball lies in the pit and is the road
+width 5.5
+mark A
 nopilot all
-move 42 0 -5
-turn 180
-safety none
-railing both
-width 16
+move 0 8 2.5
+loose stone ahead 3 up -0.1 plug
+floor 8 down 0.28
+pusher right
+floor 90.4 down 3.16
+back A
+autopilot all
+floor 8
+pilot all : goto 8.8 0 0 ; push 0 1 80 ; goto 10 0 0 ; wait 120
+floor 6
+floor 30 up 9.8
+corner left
+floor 30
+corner right
+floor 58.75 down 10.74
+corner right
 floor 19.5
-# the second gate to find out: the wooden ball cannot shift the crate; the stone transformer stands on this floor's
-# side near where the ball lands, in sight of it, off the line the ball runs to the crate
-trafo stone side 5 ahead 3.5 nopilot
-floor 9.5
-width 10
-safety gutter
-railing off
-floor 5
-autopilot all
-right 90 8
-floor 10 up 2
-right 90 8 up 1.5
-width 6.5
-floor 14 up 1.5
-right 90 8
-floor 15
-crateblock
-floor 10
-width 10
-floor 10
-right 60 24
-left 60 24
-floor 20
-width 15
-floor 6
-floor 24
-# two boxes stacked: the top one falls when the bottom one is shoved
-box side 2.2 ahead -10
-box side 2.2 ahead -10 up 5
-box side -2.2 ahead -20
-life side 0 ahead -16
-width 9
-left 90 18
-floor 20
-# crates across a bare stretch: the stone ball shoves them off
-railing noturns
-borders off
-width 9
-floor 40
-box ahead -32 side 1.5 shove
-box ahead -20 side -1.5 shove
-box ahead -8 side 1.5 shove
-borders on
-railing turns
-floor 10
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 10
-point
-# a field of loose wooden balls, light for the stone ball
-safety border
-width 26
-floor 6
-loose wood side 6 ahead 6 shove
-loose wood side -6 ahead 10 shove
-loose wood side 0 ahead 16 shove
-loose wood side 7 ahead 22 shove
-loose wood side -5 ahead 26 shove
-floor 30
-width 8
-floor 6
-safety gutter
-width 10
-floor 10
-# long rails round and down
-rails 30 down 3
-rails-left 90 24 down 2
-rails 40 down 4
-rails-left 90 24 down 2
-rails 30 down 3
-rails-right 180 20 down 4
-rails 30 down 2
-safety gutter
-width 10
-floor 16
-life
-floor 10
-left 90 16
-floor 20
-point
-floor 14
-checkpoint
-
-# ---- sector 3 (stone): loose balls, two pairs of pushers, a second stone on its crate, a long way down on rails
-floor 7
-width 11
-floor 12
-# whatever the ball came with, this sector wants the stone one: its loose stone balls, its pushers
-trafo stone
-floor 12
-left 45 30
-right 45 30
-right 90 16
-width 22
-floor 10
-loose stone side 8.5 ahead 4 shove
-loose stone side 4.25 ahead 4 shove
-loose stone ahead 4 shove
-loose stone side -4.25 ahead 4 shove
-loose stone side -8.5 ahead 4 shove
-loose paper side 0 ahead 10 shove
-floor 34
-point side 8 ahead -4
-width 10
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-
-width 10
-floor 10
-rails-left 90 20
-rails 30 down 3
-rails-right 90 20
-rails 20
-rails-right 90 20
-rails 30 down 3
-rails-left 90 20
-safety gutter
-width 10
-floor 10
-left 30 30
-right 30 30
-floor 15 down 2.5
-# the lower floor beside the pushers' lane: the plates stand over it on the left, 28 and 12 on from here
+pit 5 wall 8 side 1
+floor 24 down 1
+corner left
+# the train: five stones in single file on a flat start, then 160 of slope; the corner at its foot hangs over the drop
+# with a railing outside that is open for 10 along the way straight on, where the train flies out
+width 7.5
+floor 28
+loose stone ahead -24 shove
+loose stone ahead -19.5 shove
+loose stone ahead -15 shove
+loose stone ahead -10.5 shove
+loose stone ahead -6 shove
+floor 160 down 11
+corner right rail gap 10
+floor 60 down 2
+# the terrace: three corners over the drop, a stretch with its edge bare, a balcony with a life
+corner left rail
+floor 50 down 2
+corner right rail
+floor 20 down 1
+mark bal
+move 0 3.75 0
+turn 90
+plaza 8 8 kerb gap back 0 8 fence left right front
+life ahead 4
+back bal
 safety none
-railing right
-width 20
-floor 8
-pilot all : goto 6 -4 0 ; goto 12 -4 0 ; push 0 1 80 ; goto 12 -4 0 ; goto 28 -4 0 ; push 0 1 80 ; goto 28 -4 0
-nopilot all
-floor 40
+floor 60 down 2
+safety gutter
+lamptower side 12 ahead -20 height 30 r 2.8
+floor 40 down 3
+# rails for the stone: a long bend of 90 on 80 with the posts deepest of the level
 width 7
-floor 8
-autopilot all
-safety gutter
-railing off
-left 90 7 up 1.25
-left 90 7 up 1.25
-railing right
-floor 8
-floor 11.2
-pusher left
-floor 14.4
-pusher left
-floor 11.2
-floor 10
 railing both
-right 90 10
-width 11
-floor 16
+floor 12
 railing off
-point ahead -10
-life
-floor 10
-left 90 16 down 2
-floor 20 down 2
-floor 30 down 3
-right 90 24 down 2
-floor 20
-left 90 24 down 2
-floor 40
-# the second pair of pushers: their plates over a lower floor on the right this time
-floor 15 down 2.5
-safety none
-railing left
-width 20
-floor 8
-pilot all : goto 6 4 0 ; goto 12 4 0 ; push 0 -1 80 ; goto 12 4 0 ; goto 28 4 0 ; push 0 -1 80 ; goto 28 4 0
-nopilot all
-floor 40
-width 7
-floor 8
-autopilot all
-safety gutter
-railing off
-right 90 7 up 1.25
-right 90 7 up 1.25
-railing left
-floor 8
-floor 11.2
-pusher right
-floor 14.4
-pusher right
-floor 11.2
-floor 10
-railing both
-left 90 10
-width 10
-floor 20
+rails 60 down 5
 point
-railing off
-# crates across a bare stretch for the stone ball, then a bare terrace with sharp turns
-railing noturns
-borders off
-width 9
-floor 60
-box ahead -52 side 1.5 shove
-box ahead -42 side -1.5 shove
-box ahead -32 side 1.5 shove
-box ahead -22 side -1.5 shove
-box ahead -12 side 1.5 shove
-borders on
-railing turns
-width 10
-floor 30
-life
-floor 6
-borders off
-width 9
-floor 8
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-floor 8
-borders on
-width 10
-floor 10
-# the second stone on its crate: the stone ball pushes the crate from the floor below
-width 8
-floor 24
-pilot all : goto -3 0 0 ; push 1 0 40 ; goto 9 0 -5 ; wait 90 ; press 30.5 0 -5 0 0 12 200 ; push -1 0 80 ; goto 11 0 -5
-nopilot all
-move 42 0 -5
-turn 180
-safety none
-railing both
-width 16
-floor 29
-width 10
-safety gutter
-railing off
-floor 5
-autopilot all
-right 90 8
-floor 10 up 2
-right 90 8 up 1.5
-width 6.5
-floor 14 up 1.5
-right 90 8
-floor 15
-crateblock
-floor 10
-width 10
-floor 20
+rails-right 90 80 down 18
 point
-# a long way down on rails
-floor 6
-rails 30 down 4
-rails-left 90 24 down 3
-rails 40 down 5
-rails 40 down 4
-rails-right 90 24 down 3
-rails 30 down 4
+rails 174 down 12
+point
 safety gutter
 width 10
-floor 10
-# a bare ridge: the stone ball keeps its line
-borders off
-width 8
-floor 24
-right 45 24
-left 90 24
-right 45 24
-floor 20
-borders on
-width 11
-floor 20
-point
-# back to wood for the climb, which the stone ball cannot make
-floor 4
-floor 6
-trafo wood ahead -3
+railing both
+floor 22
+railing off
+width 7.5
 floor 8
-width 8
-floor 20 up 10
-width 9
-floor 10
-rails 24 down 2
-rails-left 90 18
-rails-right 90 18
-rails 16
-safety gutter
-width 10
-floor 24
-checkpoint
-
-# ---- sector 4 (wood): a wavy way, wooden ramps up between railed landings, a seesaw, a plate bridge, sacks, a
-# terrace, rails spiralling down, loose balls on the long way down, the finish
-floor 7
-floor 14
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 8 up 2
-floor 8 down 2
-floor 10
-left 60 30
-right 60 30
-right 90 16
-floor 16
-surface wood
-floor 28 up 13
-surface stone
-railing both
-point
-floor 5
-left 90 7
-floor 3
-surface wood
-railing off
-floor 28 up 13
-surface stone
-railing both
-floor 5
-right 90 7
-floor 3
-surface wood
-railing off
-floor 28 up 13
-surface stone
-railing both
-floor 5
-left 90 7
-floor 3
-surface wood
-railing off
-floor 28 up 13
-surface stone
-railing both
-floor 5
-right 90 7
-floor 3
-surface wood
-railing off
-floor 28 up 13
-surface stone
-railing both
-floor 5
-left 90 7
-floor 3
-surface wood
-railing off
-floor 28 up 13
-surface stone
-railing both
-floor 5
-right 90 7
-floor 3
-railing off
+disc 9 ahead 8.19
+trafo wood ahead 8.19
+lamptower side 12 ahead 8 height 30 r 2.8
+move 16.38 0 0
+floor 40 down 2
+corner left
+floor 40 down 2
 width 14
-floor 36
-life
-loose stone side 4 ahead -10
-width 10
-floor 12
-seesaw
-floor 16
-point
-floor 10
-platebridge
-floor 12
-# swinging sacks over a railed stretch
-railing both
-width 12
-floor 46
-sack ahead -32
-sack ahead -16
+lamptower side 14 ahead 6 height 44 r 3.4
+checkpoint
+
+# ---- sector 4: the descent to the Lighthouse (wood)
+safety gutter
+width 8.5
+floor 14
+floor 60 down 3
+corner left
+floor 60 down 3
+corner right
+floor 10 up 2
+floor 10 down 2
+floor 40 down 3
+corner left
+point ahead 3 side 2.2
+floor 60 down 3
+corner right rail
+floor 60 down 3
+corner left
+lamptower side -12 ahead -20 height 34 r 3.0
+floor 60 down 3
+corner right
+point ahead 3 side -2.2
+floor 10 up 2
+floor 10 down 2
+floor 40 down 3
+corner left rail
+floor 60 down 3
+corner right
+floor 60 down 3
+corner left
+floor 40 down 2
+# the jump: a run-up with a little lift, ten units of nothing, a railed landing with a life
+floor 20 up 1.5
+gap 10 down 1 runup 14
+plaza 14 14 kerb fence left front gap back 0 14 gap right 7 7.5
+life ahead 7
+lamptower side -10 ahead 14 height 30 r 2.6
+mast side 9 ahead 20 height 26
+pilot all : goto 7 0 0 ; goto 7 -7 0
+move 7 -7 0
+turn -90
+floor 40 down 2
+corner left
+floor 40 down 3
+width 5.5
+safety none
+floor 60 down 1
+safety gutter
+width 8.5
+corner right
+floor 30 down 2
+# the bowling floor: 30 wide with a brick rim on its long sides, open at the far end; ten wooden pins on the flat in
+# a triangle; the way on leaves at the far left corner
+move 0.01 0 0
+safety border
+width 30
+floor 55 down 3.2
+floor 35
+loose wood ahead -30 side -6.9 plug
+loose wood ahead -30 side -2.3 plug
+loose wood ahead -30 side 2.3 plug
+loose wood ahead -30 side 6.9 plug
+loose wood ahead -26 side -4.6 plug
+loose wood ahead -26 side 0 plug
+loose wood ahead -26 side 4.6 plug
+loose wood ahead -22 side -2.3 plug
+loose wood ahead -22 side 2.3 plug
+loose wood ahead -18 side 0 plug
+point ahead -10 side 9.5
+move 0.01 9.5 0
+safety gutter
+width 8.5
+floor 30 down 1
+# the quay: boards 6 wide without railings, one hump, thick columns and cables under it, on to the Lighthouse
+safety none
+surface wood
+width 6.2
+columns 0
+column ahead 20 depth 70 r 3.2
+column ahead 50 depth 70 r 3.2
+column ahead 80 depth 70 r 3.2
+column ahead 110 depth 70 r 3.2
+garland ahead 0 side 3.3 up -2.8 ahead2 122 side2 3.3 up2 -2.8 sag 10 nolamps
+garland ahead 0 side -3.3 up -2.8 ahead2 122 side2 -3.3 up2 -2.8 sag 10 nolamps
+floor 50
+floor 10 up 2
+floor 10 down 2
+floor 52
+# the Lighthouse: a square tower, the boards wind round it twice, 36 a side, climbing 3 a side, its wall inside, the
+# drop outside (railings on the first two sides only)
+lighthouse side 18 ahead 18 r 13 height 44
+railing right
+floor 36 up 3
+corner left
+floor 36 up 3
 railing off
-width 10
-floor 6
-point
-# boxes on a bare stretch, then a bare terrace
-railing noturns
-borders off
-width 9
-floor 30
-box ahead -20 side 1.5 shove
-box ahead -10 side -1.5 shove
-borders on
-railing turns
-floor 6
-borders off
-width 9
-floor 8
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-left 90 5 down 0.4
-floor 5 down 0.4
-right 90 5 down 0.4
-floor 5 down 0.4
-floor 8
-borders on
-width 10
+corner left
+floor 36 up 3
+corner left
+point ahead -2 side 1.5
+floor 36 up 3
+corner left
+floor 36 up 3
+corner left
+point ahead -2 side 1.5
+floor 36 up 3
+corner left
+floor 36 up 3
+corner left
+mark bal6
+floor 36 up 3
+corner left
+point ahead -2 side 1.5
+floor 12
+# the quay's end: a round pier of 24 with a railing ring open at both ends, two striped masts with a garland
+mast side 14 ahead 12 height 24
+mast side -14 ahead 12 height 24
+garland ahead 12 side 14 up 24 ahead2 12 side2 -14 up2 24 sag 4
+disc 12 ahead 12 ring gap 8
+move 24 0 0
 floor 10
-life
-floor 10
-rails 30 down 3
-rails-left 90 20
-rails 30 down 3
-rails-right 90 20
-rails 40 down 4
-rails-left 180 16 down 2
-rails 40
-safety gutter
-width 10
-floor 10
-# rails spiralling down
-rails 14 down 2
-rails-right 360 16 down 10
-rails 14 down 2
-safety gutter
-floor 20
-life
-floor 24 down 4
-loose stone side -3 ahead -12
-right 90 20 down 3
-floor 44 down 7
-loose stone side -3 ahead -26
-loose paper side -3 ahead -14
-right 90 20 down 3
-floor 30 down 6
-loose paper side 3 ahead -14
-loose wood side -3 ahead -24
-left 45 30 down 2
-right 45 30 down 2
-loose wood side 3 ahead -30
-point
-left 90 20 down 3
-rails 30 down 8
-rails-left 60 30 down 2
-rails-right 120 30 down 3
-rails-left 60 30 down 2
-rails 20
-rails-right 90 20 down 2
-rails 40 down 4
-rails-left 90 20 down 2
-rails 20
-safety gutter
-width 10
-floor 30 down 4
-loose paper side -3 ahead -10
-point
-floor 30
 finish
+scatter 85
