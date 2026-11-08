@@ -214,6 +214,20 @@ def lamp_tower(b, name, base, r, height, depth=L.COLUMN_DEPTH):
     return b.add(name, m)
 
 
+def pillar(b, name, base, r, height, depth=L.COLUMN_DEPTH):
+    """A plain stone pillar from deep in the haze up to `height` over `base`, a brick cornice and a flat cap
+    (distant scenery: no lamp, no stripes)."""
+    materials(b)
+    x, y, z = base
+    top = y + height
+    m = K.Mesh(name)
+    _shaft(m, b, x, top, z, r, depth + height, mat="beige", seg=16)
+    for dy in (0.0, -height * 0.5):
+        K.cylinder(m, b.mat_ids["border"], (x, top - 1.6 + dy, z), UP, r * 1.25, 1.6, seg=16, vscale=L.BRICK)
+    K.cylinder(m, b.mat_ids["top"], (x, top, z), UP, r * 1.25, 0.5, seg=16)
+    return b.add(name, m)
+
+
 def mast(b, name, base, height, r=0.55, depth=L.COLUMN_DEPTH, flag=True):
     """A striped mast from deep in the haze to `height` over `base`, with a pennant and a small lamp on its top."""
     materials(b)
@@ -318,7 +332,7 @@ def lighthouse(b, name, base, half, height, sector, depth=L.COLUMN_DEPTH):
     return node
 
 
-def scatter(b, rng, path, reach, sectors_heights, every, avoid, keep_off=None):
+def scatter(b, rng, path, reach, sectors_heights, every, avoid, keep_off=None, pillars=False):
     """Distant scenery along the way: about one object every `every` units of `path` (its points), left or right of
     it 24 to 75 away and up or down from its level, kept clear of every point of the floors (`avoid`: points and their
     reach), of each other, and of the `keep_off` boxes. Towers, masts and plinths, never two of a kind in a row."""
@@ -328,6 +342,8 @@ def scatter(b, rng, path, reach, sectors_heights, every, avoid, keep_off=None):
     R = np.asarray([r for _, r in avoid], np.float64)
     placed, kinds, run, made = [], [], 0.0, 0
     kinds_cycle = ("tower", "mast", "plinth", "tower", "mast", "plinth", "mast", "tower")
+    if pillars:
+        kinds_cycle = ("pillar", "pillar", "plinth")
     for i in range(1, len(P)):
         run += float(np.linalg.norm(P[i] - P[i - 1]))
         if run < every:
@@ -342,18 +358,23 @@ def scatter(b, rng, path, reach, sectors_heights, every, avoid, keep_off=None):
             off = lft * side * rng.uniform(26.0, 75.0) + d * rng.uniform(-14.0, 14.0)
             c = P[i] + off
             kind = kinds_cycle[(made + attempt) % len(kinds_cycle)]
-            r = {"tower": rng.uniform(2.2, 3.4), "mast": 0.6, "plinth": rng.uniform(4.0, 6.5)}[kind]
+            r = {"tower": rng.uniform(2.2, 3.4), "mast": 0.6, "plinth": rng.uniform(4.0, 6.5),
+                 "pillar": rng.uniform(2.6, 4.2)}[kind]
             flat = np.hypot(A[:, 0] - c[0], A[:, 2] - c[2])
             if np.any(flat < R + r + 9.0):
                 continue
             if any(np.hypot(c[0] - q[0], c[2] - q[1]) < 22.0 for q in placed):
                 continue
             y = P[i][1] + rng.uniform(-20.0, 8.0)
+            if kind == "pillar":
+                y = P[i][1] + rng.uniform(-12.0, 14.0)
             placed.append((c[0], c[2]))
             made += 1
             n = f"Scenery_{made:03d}"
             if kind == "tower":
                 lamp_tower(b, n, (c[0], y, c[2]), r, rng.uniform(9.0, 30.0))
+            elif kind == "pillar":
+                pillar(b, n, (c[0], y, c[2]), r, 0.0)
             elif kind == "mast":
                 mast(b, n, (c[0], y, c[2]), rng.uniform(16.0, 34.0))
             else:

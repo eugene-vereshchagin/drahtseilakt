@@ -68,8 +68,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     disc R [rim] [ring [gap W]]   a round floor, a railing ring open at both ends;  pit L [depth D] [wall LEN] [side S]
                              a pit in the way with a stop wall;  mark NAME / back NAME also begin and end a branch
     lamptower, mast, plinth, wallblock, wlamp, lighthouse, garland   free standing scenery (options side, ahead, up, r,
-                             height, long, thick; garland: ahead2 side2 up2 sag);  scatter D: distant scenery
-                             about every D units of way
+                             height, long, thick; garland: ahead2 side2 up2 sag);  scatter D [pillars]: distant scenery
+                             about every D units of way (pillars: plain stone pillars and plinths only)
     loose KIND lead|plug     a ball the way's ball leads (rolls on ahead), a body that plugs the way: no room check
     seesaw                   a seesaw over a gap of its length (14.8): the cursor goes over it
     platebridge              a plate bridge over a gap of 14.8 (a stone ball breaks it)
@@ -272,6 +272,7 @@ class Track:
         self.sector_ends = []
         self.columns = 0.0
         self.scatter_every = 0.0
+        self.scatter_pillars = False
         self.lighthouse_at = None
         self.column_run = 0.0
         self.column_spots = []
@@ -624,10 +625,11 @@ class Track:
                             [(h + 180.0, w), (h, w)])
         elif cmd == "pit":
             self.pit(args, opts, line)
-        elif cmd in ("lamptower", "mast", "plinth", "wallblock", "lighthouse", "garland", "wlamp"):
+        elif cmd in ("lamptower", "mast", "plinth", "pillar", "wallblock", "lighthouse", "garland", "wlamp"):
             self.scenery(cmd, args, opts, line)
         elif cmd == "scatter":
             self.scatter_every = num(args, 0, line)
+            self.scatter_pillars = "pillars" in args
         elif cmd == "start":
             if args:
                 self.pos = np.array([num(args, i, line) for i in range(3)])
@@ -818,6 +820,8 @@ class Track:
             P.mast(self.b, n, tuple(p), float(opts.get("height", 22)))
         elif cmd == "plinth":
             P.plinth(self.b, n, tuple(p), float(opts.get("r", 4.5)))
+        elif cmd == "pillar":
+            P.pillar(self.b, n, tuple(p), float(opts.get("r", 3.0)), float(opts.get("height", 10)))
         elif cmd == "wallblock":
             P.wall_block(self.b, n, tuple(p), self.fwd(), float(opts.get("long", 40)), float(opts.get("height", 14)),
                          float(opts.get("thick", 6)), self.sector)
@@ -940,7 +944,7 @@ class Track:
         # the way, in order, as a path
         order = sorted(range(len(self.floor_points)), key=lambda k: self.floor_along[k])
         path = [self.floor_points[k] for k in order]
-        P.scatter(self.b, rng, path, None, None, self.scatter_every, avoid)
+        P.scatter(self.b, rng, path, None, None, self.scatter_every, avoid, pillars=self.scatter_pillars)
 
     def rise(self, opts, line):
         if "up" in opts:

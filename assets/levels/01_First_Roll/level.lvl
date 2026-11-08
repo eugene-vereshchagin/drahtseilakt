@@ -1,20 +1,13 @@
-# From the Tower to the Lighthouse: the first of our levels, built from the designer's concept (twice the length of
-# the original's first, in its spirit: a groove track with straight pieces and hard square corners, railings only
-# where a drop or a landing asks for them, no sacks). Four sectors, each its own courtyard of towers and columns,
-# all of them turning toward the Lighthouse standing at the far edge of the map:
-#  1. (wood) the tower's stair of corners, a ledge along a wall, a wooden ball led to a pier over a pool, the first
-#     rails, a zigzag terrace, a wooden bridge, a square with a dome, a checkpoint;
-#  2. (wood, stone, wood, paper, wood) a courtyard of choices, a stone road, a balcony over the clouds, rails that
-#     snake, a gallery of boards with a crate, a checkpoint;
-#  3. (stone) the stone ball's road, a lane with a loose stone ball held by a pusher and a pit the ball plugs, a
-#     train of five stones, a terrace, rails that curve, the wood transformer, a checkpoint;
-#  4. (wood) a long descent of nine corners, a jump, terraces, a bowling floor, a quay of boards and a boarded path
-#     round the Lighthouse to the balloon's pier.
+# First Steps (sector 1 only, for the owner's look; the temporary finish stands right after checkpoint 1).
+# Concept v3, sector 1 "First steps": steering only, in order -- the start, a first corner, a stair of little steps,
+# a hairpin, a hump and a descent with a pocket holding an extra life, straight rails, a zigzag, a ledge along a
+# wall, rails with a bend, a planked bridge, a balcony and the way to checkpoint 1. Railings both sides almost
+# everywhere (they thin out in the zigzag, the first time), a wide groove track, a sunset over a sea of cloud.
 # Edit this file and run `scripts/own-levels.sh assets/levels/01_First_Roll`.
-title From the Tower to the Lighthouse
-title.ru От Башни к Маяку
-title.de Vom Turm zum Leuchtturm
-title.zh 从塔到灯塔
+title First Steps
+title.ru Первые шаги
+title.de Erste Schritte
+title.zh 第一步
 order 1
 difficulty 1
 sky Sunset
@@ -23,548 +16,151 @@ bonus 100
 ball wood
 columns 60
 smooth
+scatter 70 pillars
 
-# ---- sector 1: the tower's dawn (wood)
 safety gutter
 width 7.5
+railing both
+
+# ---- 1. the start: a bowl on a stone tower, a lamp tower, a level groove of 30
 start
 lamptower side 17 ahead -8 height 24 r 2.8
-mast side -16 ahead -4 height 26
-floor 140 down 3
+floor 30
+
+# ---- 2. the first corner: one square corner left, 30 down by 2, a corner right, 30 on; a point just after the first
 corner left
-lamptower side -9 ahead -9 height 18 r 2.4
-floor 90 down 3
-corner right rail
-mast side 9 ahead 12 height 20
-floor 140 down 3
-point ahead -2 side -1.2
+column depth 90
+point ahead 14
+floor 30 down 2
 corner right
-floor 60 down 2
-# the ledge: the groove narrows, a blank wall of the tower block on the left, a drop on the right, no railings
-width 5.5
-wallblock side 3.6 ahead 8 long 60 height 16 thick 14
-wlamp side 3.3 ahead 24
-wlamp side 3.3 ahead 56
-floor 60
-width 7.5
-floor 20
+column depth 90
+floor 30
+
+# ---- 3. the little stair: three pieces of 30 with a step of 1.5 down between them, then a corner
+floor 30
+move 0 0 -1.5
+floor 30
+move 0 0 -1.5
+point ahead 12
+floor 30
 corner left
-# the guide: a wooden ball lies in the groove at the top of the pier's way and rolls on ahead of you
-floor 12
-loose wood ahead -3 lead
-floor 140 down 4
-# the pier: railings both sides, an open end; the pool lies 5 under it with a brick rim, a life in it
-railing both
-floor 26 down 1
-railing off
-point ahead -2
-plaza 20 20 brick gap back 0 20 gap right 12 8 ahead 0 up -5
-life ahead 10 side 0 up -5
-lamptower side 16 ahead 9 up -5 height 22 r 2.4
-mast side -14 ahead 14 up -5 height 22
-# the way on is the ramp out of the pool (12 degrees) back up to the groove
-move 12 -10 -5
-turn -90
-floor 24 up 5
-floor 16
+
+# ---- 4. the hairpin: two corners 18 apart turn the way right round, 30 back alongside
+floor 14
+corner right
+floor 18
+corner right
+floor 30
+
+# ---- 5. the hump and the descent: +3 / -3 over 40, then down 4 over 40; at the foot a pocket with a life
+floor 20 up 3
+floor 20 down 3
+floor 10
+floor 40 down 4
+mark foot
+turn 90
+plaza 6 6 kerb gap back 0 6 ahead 3.75 fence left right
+life ahead 7.0
+back foot
+floor 10
 corner left
-# the first rails: the way narrows, the rails run 240 to the east and gently down, one soft bend in the middle
+
+# ---- 6. the first rails: 180 to the east, going gently down, held on columns into the clouds; a point halfway
 width 7
-railing both
 floor 12
 railing off
-rails 100 down 5
+rails 90 down 4
+point
+rails 90 down 4
+width 10
+railing both
+floor 24
+width 7.5
+floor 12
+
+# ---- 7. the zigzag: 40 / 30 / 40 / 30 / 40 with corners left, right, left, right; railings only outside the corners
+railing off
+floor 40
+corner left rail
+floor 30
+corner right rail
+plinth side 11 ahead 10 height 3 r 1.4
+floor 40
+corner left rail
+point ahead 8 side 2.0
+floor 30
+corner right rail
+floor 40
+railing both
+
+# ---- 8. the ledge: the groove narrows to 6 along a blank wall on the left, a railing on the right
+railing right
+width 6.1
+wallblock side 3.9 ahead 14 long 40 height 16 thick 10
+floor 14
+floor 40
+width 7.5
+floor 16
+railing both
+
+# ---- 9. rails with a bend: 240 in all, left 30, right 60 and left 30 back, going down
+width 7
+floor 12
+railing off
+rails 70 down 3
 rails-left 30 60 down 1
 point
-rails-right 30 60 down 1
-rails 60 down 3
-safety gutter
+rails-right 60 60 down 2
+rails-left 30 60 down 1
+rails 70 down 3
 width 10
 railing both
-floor 22
-railing off
-# a zigzag terrace: four pieces of 40, a corner and a little step down after each
+floor 24
 width 7.5
-floor 14
-corner right
-floor 6
-move 0 0 -2
-floor 34
-corner left
-floor 6
-move 0 0 -2
-floor 34
-corner right
-mark z3
-turn 90
-plaza 8 8 kerb gap back 0 8 ahead 3.75 side 0
-life ahead 7.75
-back z3
-floor 6
-move 0 0 -2
-floor 34
-corner left
-floor 30
-# the wooden bridge: boards, three humps, thick columns and cables under it
-safety none
-width 6
-surface wood
-columns 0
-column ahead 22 depth 70 r 3.2
-column ahead 46 depth 70 r 3.2
-column ahead 70 depth 70 r 3.2
-garland ahead 0 side 3.3 up -2.8 ahead2 92 side2 3.3 up2 -2.8 sag 9 nolamps
-garland ahead 0 side -3.3 up -2.8 ahead2 92 side2 -3.3 up2 -2.8 sag 9 nolamps
+
+# ---- 10. the planked bridge: boards 6 wide, two humps, railings both sides, thick columns under it
 floor 10
+surface wood
+safety none
+railing both
+width 6.6
+columns 0
+column ahead 20 depth 90 r 3.0
+column ahead 52 depth 90 r 3.0
+floor 8
 floor 12 up 2
 floor 12 down 2
+floor 8
 floor 12 up 2
 point
 floor 12 down 2
-floor 12 up 2
-floor 12 down 2
-floor 10
+floor 8
 surface stone
 safety gutter
+width 7.5
 columns 60
-width 7.5
-floor 12
-# the square with the dome: a low kerb, the way in at the middle of the back edge, the way out at a far corner
-width 36
-plaza 36 36 kerb gap back 0 7.5 gap front 13 8
-dome ahead 18
-point ahead 18 side 1.6 up 3.3
-point ahead 18 side -1.6 up 3.3
-lamptower side 16.5 ahead 1.5 height 8 r 1.1
-lamptower side -16.5 ahead 1.5 height 8 r 1.1
-lamptower side 16.5 ahead 34.5 height 8 r 1.1
-lamptower side -16.5 ahead 34.5 height 8 r 1.1
-pilot all : goto 6 0 0 ; goto 18 -9 0 ; goto 30 6 0 ; goto 38 13 0
-move 36 13 0
-width 7.5
-# the way to the first checkpoint: two corners over the drop with railings outside, a stretch with its edge bare
-floor 160 down 4
-corner left rail
-floor 90 down 1
-corner right rail
-safety none
-floor 80
-safety gutter
-floor 50
-width 14
-floor 12
 floor 10
-lamptower side 14 ahead 6 height 34 r 3.2
-checkpoint
 
-# ---- sector 2: the courtyard of choices (wood, stone, wood, paper, wood)
-width 7.5
-floor 110 down 4
-corner left
-floor 70 down 5
-corner right
-floor 56 down 6
-# the courtyard: 40 x 40 with a brick rim, four corner columns and a lamp tower; in at the middle of the west side, a
-# steep ramp north to a balcony, a corridor east with four stones in it, and in the near corner a plate with the stone
-# transformer on a step
-mark yard
-plaza 40 40 brick gap back 0 7.5 gap left 20 7 gap front 0 8 gap right 8 5.5
-lamptower side 19 ahead 1 height 7 r 1.2
-lamptower side -19 ahead 1 height 7 r 1.2
-lamptower side 19 ahead 39 height 7 r 1.2
-lamptower side -19 ahead 39 height 7 r 1.2
-lamptower side -30 ahead 46 height 36 r 3.0
-mast side 28 ahead -10 height 26
-mast side 26 ahead 52 height 22
-nopilot all
-# the plate with the transformer, outside the south rim: a step-ramp 8 long out of a gap in it, then the plate
-move 8 -20 -0.06
-turn -90
-safety none
-width 5.5
-floor 8 up 1.2
-plaza 12 12 kerb gap back 0 5.5
-trafo stone ahead 6 nopilot
-back yard
-# the balcony: the steep ramp (18 degrees, wood only) out of the north gap, a railed square with two points and a life
-move 20 20 -0.06
+# ---- 11. the balcony: a dead end 20 off the way, level with it, railings on three sides, a life and a point
+mark gate
 turn 90
-safety gutter
-width 6
-floor 22 up 7
-plaza 12 12 kerb fence left right front gap back 0 6
-point ahead 4 side 3
-point ahead 8 side -3
-life ahead 10 side 0
-back yard
-autopilot all
-pilot all : goto 6 0 0 ; goto 18 -6 0
-pilot safe,speed : goto 8 -14 0 ; goto 8 -26 1.2 ; goto 8 -33 1.2 ; become stone ; goto 8 -26 1.2 ; goto 8 -14 0 ; goto 20 -8 0 ; goto 38 0 0
-pilot collector : goto 20 8 0 ; goto 20 20 0 ; goto 20 33 7 ; goto 24 40 7 ; goto 20 33 7 ; goto 20 18 0 ; goto 8 -14 0 ; goto 8 -26 1.2 ; goto 8 -33 1.2 ; become stone ; goto 8 -26 1.2 ; goto 8 -14 0 ; goto 20 -8 0 ; goto 38 0 0
-move 40 0 0
-pilot safe,speed,collector : goto -2 0 0 ; push 1 0 600
-nopilot all
-# the corridor: a groove 8 wide (it keeps the stones in single file), a gentle climb; four stones at its mouth, a bay at its end
-safety gutter
-width 8
-loose stone ahead 3 plug
-loose stone ahead 7.5 plug
-loose stone ahead 12 plug
-loose stone ahead 16.5 plug
-floor 22
-floor 38 up 2
-autopilot all
-plaza 20 20 brick gap back 0 8 gap right 10 7.5 ahead 0 side 0
-lamptower side 12 ahead 21 height 24 r 2.4
-pilot all : goto 6 0 0 ; goto 10 -4 0 ; goto 10 -9 0
-move 10 -10 0
-turn -90
-safety gutter
-width 7.5
-floor 30
-# the stone road: a hump the stone must hold its push over, a corner, then the wood transformer at the pass
-floor 24 up 3
-floor 24 down 3
-floor 62 down 3
-corner left
-floor 90 down 4
-width 11
-floor 4
-floor 6
-trafo wood ahead -3
-floor 20 down 2
-width 7.5
-floor 36 down 3
-# the drop: a balcony with railings on two sides and an open end over the clouds; the road goes on 6 lower
-plaza 10 14 fence left right gap back 0 7.5 gap front 0 10
-column side 3 ahead 12 depth 60 r 1.8
-column side -3 ahead 12 depth 60 r 1.8
-column side 3 ahead 4 depth 60 r 1.8
-column side -3 ahead 4 depth 60 r 1.8
-lamptower side 9 ahead 13 height 20 r 2.2
-pilot all : goto 6 0 0 ; goto 13 0 0 ; air 1 0 30
-move 14 0 -6
-floor 40 down 2
-point ahead -30
-point ahead -22
+plaza 10 24 kerb gap back 0 7.5 ahead 3.75 fence left right front
+life ahead 17.0
+point ahead 11.0
+back gate
+
+# ---- 12. to checkpoint 1: two corners with railings outside, then the checkpoint
 floor 60 down 2
-# the snake: rails 260, a right bend of 60 degrees on 50, then a left one, down all the way, the posts in the clouds
-width 7
-railing both
-floor 10
-railing off
-rails 30 down 2
-rails-right 60 50 down 2
-point
-rails-left 60 50 down 2
-rails 110 down 6
-safety gutter
-width 10
-railing both
-floor 22
-railing off
-# the paper transformer in the groove, which widens round it
-width 7.5
-floor 14
-width 11
-floor 4
-floor 6
-trafo paper ahead -3
-floor 8
-width 7.5
-floor 14
-# the gallery: boards 7 wide between railings, two corners, lamps on posts strung with garlands; at the end of it a
-# crate fills the way (paper cannot move it), and 20 before it a ramp down to a plate with the wood transformer
-safety railings
-surface wood
-width 7
-mast side 4.4 ahead 8 height 7
-mast side -4.4 ahead 8 height 7
-mast side 4.4 ahead 30 height 7
-mast side -4.4 ahead 30 height 7
-garland ahead 8 side 4.4 up 7 ahead2 8 side2 -4.4 up2 7 sag 0.8
-garland ahead 30 side 4.4 up 7 ahead2 30 side2 -4.4 up2 7 sag 0.8
-garland ahead 8 side 4.4 up 7 ahead2 30 side2 4.4 up2 7 sag 2.0
-garland ahead 8 side -4.4 up 7 ahead2 30 side2 -4.4 up2 7 sag 2.0
-floor 70 down 2
-corner left
-floor 90 down 2
-corner right
-floor 20 down 1
-railing left
-floor 4
-mark gb
-floor 4
-railing both
-nopilot all
-move 0 -3.5 -0.03
-turn -90
-safety none
-width 5.5
-floor 8 down 2.5
-plaza 12 12 kerb gap back 0 5.5
-trafo wood ahead 6 nopilot
-life ahead 8 side 3
-back gb
-safety railings
-surface wood
-width 7
-autopilot all
-pilot safe,speed : goto -4 0 0 ; goto 4 -3.5 0 ; goto 6 -9 -2.5 ; goto 6 -18 -2.5 ; become wood ; goto 6 -9 -2.5 ; goto 4 0 0
-floor 6
-box ahead -3 plug
-floor 4
-floor 22
-railing right
-floor 14
-railing off
-# the crate is shoved off the open end; the way goes on by a ramp down on the left, 12 long
-move -7 3.5 -0.03
-turn 90
-safety none
-width 5.5
-floor 12 down 5
-width 7.5
-floor 10
-corner right
-floor 10
-safety gutter
-surface stone
-floor 90 down 3
 corner left rail
-floor 100 down 3
+floor 50 down 2
 corner right rail
-floor 80 down 2
-width 14
-floor 12
-floor 10
-lamptower side 14 ahead 6 height 40 r 3.4
-checkpoint
-
-# ---- sector 3: stone and the plug (stone)
-width 7.5
-floor 14
-width 11
-floor 4
-floor 6
-trafo stone ahead -3
-floor 8
-width 7.5
-floor 130 down 4
-corner right
-floor 130 down 4
-floor 15 up 2
-floor 15 down 2
-floor 30 down 1
-# the plug. The lane (left, 2.5 above the alley, 100 long, two degrees down) holds a stone ball behind a pusher; the
-# alley beside it, 2.5 lower, passes the pusher's plate, climbs, bridges over the lane's lower end and comes down to
-# the road, which crosses the lane's end where a pit is: the released stone ball lies in the pit and is the road
-width 5.5
-mark A
-nopilot all
-move 0 8 2.5
-loose stone ahead 3 up -0.1 plug
-floor 8 down 0.28
-pusher right
-floor 90.4 down 3.16
-back A
-autopilot all
-width 12
-floor 8
-pilot all : goto 0.5 -3.5 0 ; push 0 1 160 ; wait 200 ; goto 2 0 0
-floor 6
-width 5.5
-floor 30 up 9.8
-corner left
 floor 30
-corner right
-floor 58.75 down 10.74
-corner right
-floor 19.5
-pit 5 wall 8 side 1
-floor 24 down 1
-corner left
-# the train: five stones in single file on a flat start, then 160 of slope; the corner at its foot hangs over the drop
-# with a railing outside that is open for 10 along the way straight on, where the train flies out
-width 7.5
-floor 28
-loose stone ahead -24 shove
-loose stone ahead -19.5 shove
-loose stone ahead -15 shove
-loose stone ahead -10.5 shove
-loose stone ahead -6 shove
-floor 160 down 11
-corner right rail gap 10
-floor 90 down 3
-# the terrace: three corners over the drop, a stretch with its edge bare, a balcony with a life
-corner left rail
-floor 80 down 3
-corner right rail
-floor 20 down 1
-mark bal
-move 0 3.75 0
-turn 90
-plaza 8 8 kerb gap back 0 8 fence left right front
-life ahead 4
-back bal
-safety none
-floor 60 down 2
-safety gutter
-lamptower side 12 ahead -20 height 30 r 2.8
-floor 80 down 4
-# rails for the stone: a long bend of 90 on 80 with the posts deepest of the level
-width 7
-railing both
-floor 12
-railing off
-rails 60 down 5
-point
-rails-right 90 80 down 18
-point
-rails 174 down 12
-point
-safety gutter
 width 10
-railing both
-floor 22
-railing off
-width 7.5
-floor 8
-disc 9 ahead 8.19
-trafo wood ahead 8.19
-lamptower side 12 ahead 8 height 30 r 2.8
-move 16.38 0 0
-floor 70 down 3
-corner left
-floor 80 down 3
-width 14
 floor 12
-floor 10
-lamptower side 14 ahead 6 height 44 r 3.4
+lamptower side -13 ahead 6 height 30 r 3.0
+wallblock side 11 ahead -4 long 24 height 14 thick 5
 checkpoint
 
-# ---- sector 4: the descent to the Lighthouse (wood)
-safety gutter
-width 8.5
+# ---- a short temporary finish right after it
 floor 14
-floor 88 down 4
-corner left
-floor 88 down 4
-corner right
-floor 10 up 2
-floor 10 down 2
-floor 40 down 3
-corner left
-point ahead 3 side 2.2
-floor 88 down 4
-corner right rail
-floor 88 down 4
-corner left
-lamptower side -12 ahead -20 height 34 r 3.0
-floor 88 down 4
-corner right
-point ahead 3 side -2.2
-floor 10 up 2
-floor 10 down 2
-floor 40 down 3
-corner left rail
-floor 88 down 4
-corner right
-floor 88 down 4
-corner left
-floor 40 down 2
-# the jump: a run-up with a little lift, ten units of nothing, a railed landing with a life
-floor 20 up 1.5
-gap 10 down 1 runup 14
-plaza 14 14 kerb fence left front gap back 0 14 gap right 7 7.5
-life ahead 7
-lamptower side -10 ahead 14 height 30 r 2.6
-mast side 9 ahead 20 height 26
-pilot all : goto 7 0 0 ; goto 7 -7 0
-move 7 -7 0
-turn -90
-floor 40 down 2
-corner left
-floor 40 down 3
-width 5.5
-safety none
-floor 60 down 1
-width 8.5
-floor 14 down 1
-corner right
-floor 12 down 1
-safety gutter
-floor 30 down 2
-# the bowling floor: 30 wide with a brick rim on its long sides, open at the far end; ten wooden pins on the flat in
-# a triangle; the way on leaves at the far left corner
-move 0.01 0 0
-safety border
-width 30
-floor 55 down 3.2
-floor 35
-loose wood ahead -30 side -6.9 plug
-loose wood ahead -30 side -2.3 plug
-loose wood ahead -30 side 2.3 plug
-loose wood ahead -30 side 6.9 plug
-loose wood ahead -26 side -4.6 plug
-loose wood ahead -26 side 0 plug
-loose wood ahead -26 side 4.6 plug
-loose wood ahead -22 side -2.3 plug
-loose wood ahead -22 side 2.3 plug
-loose wood ahead -18 side 0 plug
-point ahead -10 side 9.5
-move 0.01 9.5 0
-safety gutter
-width 8.5
-floor 70 down 2
-# the quay: boards 6 wide without railings, one hump, thick columns and cables under it, on to the Lighthouse
-safety none
-surface wood
-width 6.2
-columns 0
-column ahead 20 depth 70 r 3.2
-column ahead 50 depth 70 r 3.2
-column ahead 80 depth 70 r 3.2
-column ahead 110 depth 70 r 3.2
-column ahead 140 depth 70 r 3.2
-garland ahead 0 side 3.3 up -2.8 ahead2 162 side2 3.3 up2 -2.8 sag 12 nolamps
-garland ahead 0 side -3.3 up -2.8 ahead2 162 side2 -3.3 up2 -2.8 sag 12 nolamps
-floor 70
-floor 10 up 2
-floor 10 down 2
-floor 72
-# the Lighthouse: a square tower, the boards wind round it twice, 36 a side, climbing 3 a side, its wall inside, the
-# drop outside (railings on the first two sides only)
-lighthouse side 18 ahead 18 r 13 height 44
-railing right
-floor 36 up 3
-corner left
-floor 36 up 3
-railing off
-corner left
-floor 36 up 3
-corner left
-point ahead -2 side 1.5
-floor 36 up 3
-corner left
-floor 36 up 3
-corner left
-point ahead -2 side 1.5
-floor 36 up 3
-corner left
-floor 36 up 3
-corner left
-mark bal6
-floor 36 up 3
-corner left
-point ahead -2 side 1.5
-floor 12
-# the quay's end: a round pier of 24 with a railing ring open at both ends, two striped masts with a garland
-mast side 14 ahead 12 height 24
-mast side -14 ahead 12 height 24
-garland ahead 12 side 14 up 24 ahead2 12 side2 -14 up2 24 sag 4
-disc 12 ahead 12 ring gap 8
-move 24 0 0
-floor 10
 finish
-scatter 85

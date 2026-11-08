@@ -1,9 +1,9 @@
-title = From the Tower to the Lighthouse
+title = First Steps
 author = Drahtseilakt
 version = 1
 licence = GPL-3.0-only
-title.ru = От Башни к Маяку
-title.de = Vom Turm zum Leuchtturm
-title.zh = 从塔到灯塔
+title.ru = Первые шаги
+title.de = Erste Schritte
+title.zh = 第一步
 order = 1
 difficulty = 1
