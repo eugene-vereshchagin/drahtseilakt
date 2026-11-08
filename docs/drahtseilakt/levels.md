@@ -78,7 +78,7 @@ order (`order` in level.txt; their difficulty, `difficulty`, runs 1 to 10 with i
 
 | # | Level | Sectors | Idea | Sky, music, bonus |
 |---|---|---|---|---|
-| 1 | First Roll | 4 | the original's first level in spirit: a wooden bridge, the first rails and a loop of them, boxes, the stone transformer and back, loose balls, a dome, the stone on the crate, two pushers, wooden ramps up between railed landings; gutters everywhere, railings where a fall is possible | A, 1, 100 |
+| 1 | First Roll | 4 | the original's first level in spirit, twice its length: a wooden bridge, rails straight, curving and in loops, boxes and crates shoved off bare stretches, the stone transformer and back, loose balls, the paper ball up three fans and over a plate bridge, a dome, seesaws, two stones on their crates, four pushers, bare terraces of sharp turns, wooden ramps up between railed landings, rails spiralling down; gutters on most floors, railings where a fall is possible | Sunset, 1, 100 |
 | 2 | Wood and Stone | 4 | the wooden ball climbs the ramps the stone one cannot; the stone ball shoves crates and loose balls off ledges without borders | B, 2, 200 |
 | 3 | Paper Winds | 4 | the paper ball rides fans up to the floors above; plate bridges hold it | C, 3, 300 |
 | 4 | Swing Time | 4 | things that move: swinging sacks, turning arms, a flap wheel, swings that bridge a gap while they swing by | A, 4, 400 |

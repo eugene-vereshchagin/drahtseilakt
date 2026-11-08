@@ -79,7 +79,7 @@ Das Menü listet sie in dieser Reihenfolge (`order` in level.txt; ihre Schwierig
 
 | # | Level | Sektoren | Idee | Himmel, Musik, Bonus |
 |---|---|---|---|---|
-| 1 | First Roll (Erster Lauf) | 4 | das erste Level des Originals im Geist: eine Holzbrücke, die ersten Schienen und eine Schleife davon, Kisten, der Stein-Transformator und zurück, lose Kugeln, eine Kuppel, der Stein auf der Kiste, zwei Schieber, Holzrampen hinauf zwischen Absätzen mit Geländer; überall Rinnen, Geländer, wo man fallen kann | A, 1, 100 |
+| 1 | First Roll (Erster Lauf) | 4 | das erste Level des Originals im Geist, doppelt so lang: eine Holzbrücke, Schienen gerade, in Kurven und Schleifen, Kisten, die von kahlen Strecken geschoben werden, der Stein-Transformator und zurück, lose Kugeln, die Papierkugel über drei Ventilatoren und eine Plattenbrücke, eine Kuppel, Wippen, zwei Steine auf ihren Kisten, vier Schieber, kahle Terrassen mit scharfen Kurven, Holzrampen hinauf zwischen Absätzen mit Geländer, Schienen in einer Spirale hinab; Rinnen auf den meisten Böden, Geländer, wo man fallen kann | Sunset, 1, 100 |
 | 2 | Wood and Stone (Holz und Stein) | 4 | die Holzkugel erklimmt die Rampen, die die Steinkugel nicht schafft; die Steinkugel schiebt Kisten und lose Kugeln über Kanten ohne Rand | B, 2, 200 |
 | 3 | Paper Winds (Papierwinde) | 4 | die Papierkugel fährt auf Ventilatoren zu den Böden darüber; Plattenbrücken tragen sie | C, 3, 300 |
 | 4 | Swing Time (Schaukelzeit) | 4 | was sich bewegt: schwingende Säcke, drehende Arme, ein Klappenrad, Schaukeln, die eine Lücke überbrücken, während sie vorbeischwingen | A, 4, 400 |
