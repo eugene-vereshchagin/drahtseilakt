@@ -285,6 +285,18 @@ Grundfläche wird abgetastet: jede Bodenoberseite darunter innerhalb von 0,05 ih
 jede; wo eine steht, wird die Rinne verbreitert oder das Teil versetzt. Eine Kugel, die wechselt, wirft ihre Haut ab:
 ihre Stücke sind gebogene Bruchstücke ihrer eigenen Schale, außen ihre Textur, innen eine dünne Seite.
 
+**Lose Körper liegen auf dem Boden, nicht darin** (2026-11-09): der Platz eines Teils (`ahead`, `side`) ist ein
+Punkt auf der Geraden des Cursors in seiner Höhe, hinter einem Gefälle, neben einer Kurve oder an der Schräge einer
+Rinne also nicht auf dem Boden: Level 1 hatte lose Kugeln bis 2,4 tief darin, und die Physik stieß jede zu Beginn
+ihres Sektors heraus und schleuderte den Ball des Spielers, der sie berührte, mit Hunderten Einheiten pro Sekunde
+davon. Der Baukasten legt jetzt jede lose Kugel auf das, was unter ihr ist (aus einem Boden gehoben, auf einen
+gesenkt; die Papierkugel als Kugel von 2,04, der Reichweite ihrer Hülle), und lehnt ein Level ab, in dem eine lose
+Kugel oder eine Kiste mehr als 0,05 in Böden, Schienen oder Stoppern beginnt oder eine lose Kugel auf nichts liegt,
+und nennt jede (`levelkit.py --check ORDNER` prüft ein fertiges Level). Eine auf ein Gefälle gelegte Kugel wird
+gemeldet (sie rollt zu Beginn ihres Sektors davon). Das Spiel selbst hebt einen losen Körper, der mehr als 0,1 in der
+statischen Geometrie beginnt, vor dem Erzeugen auf sie hinauf; die Level des Originals haben keinen tiefer als 0,031
+(die Papierkugeln von Level 10), es bewegt also keinen der ihren.
+
 **Raum über der Kugel** (2026-11-03): über einem Transformator (sein Käfig hebt und hält die Kugel), einem Ventilator
 und dem Ballon darf nichts von Böden oder Schienen innerhalb von 12 hängen; und ein Weg darf unter einem anderen Boden
 oder Schienen nur verlaufen, wenn deren Unterseite höchstens 3,6 über ihm liegt (eine Wand, auf die die Kugel trifft)

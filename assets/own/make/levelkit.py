@@ -21,10 +21,12 @@ Needs Python 3 with numpy and Pillow; ownkit.py beside it.
 import math
 import os
 import shutil
+import sys
 
 import numpy as np
 
-import ownkit as K
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ownkit as K  # noqa: E402
 
 TEX = 256
 # The kit's version, written into each level it makes (asset.generator): 2 since the floors are seamless (one mesh
@@ -91,6 +93,14 @@ RAIL_POSTS = 8.0
 # railings: a way narrower than this wedges the ball (the kit refuses to build it).
 BALL_R = 2.0
 MIN_FREE = 5.5
+# A loose ball's reach to the physics: the wooden and stone ones are spheres of BALL_R, the paper one the hull of its
+# part's P_Ball_Paper_MF (2.04 from its middle at most, 2.03 below it), so it is rested as a sphere of this radius.
+LOOSE_R = {"Wood": BALL_R, "Stone": BALL_R, "Paper": 2.04}
+# How deep a loose body may start in the floors: the original puts its paper balls 0.031 into the floor (level 10; its
+# crumpled hull reaches lower than the stand-in's sphere), which does no harm; 1 and more deep, the game's physics
+# shoves the body out as its sector begins, and the player's ball touching it then is thrown away at hundreds of units
+# a second (check_clear).
+SUNK_TOLERANCE = 0.05
 # The cloud layer under a level (the original's SkyLayer, which the game draws added over the sky): a plane CLOUD_BELOW
 # under the lowest floor, reaching CLOUD_MARGIN past the level on every side, its texture repeating every CLOUD_TILE
 # (the original's: 160 or so below, 400 to 600 past, 675 a repeat; numbers only).
@@ -476,6 +486,127 @@ def zipper(inner, outer):
     return tris
 
 
+def _tris_near(tris, c, reach):
+    """Which of the triangles (n, 3, 3) come within `reach` of point `c` (by their bounding boxes)."""
+    if not len(tris):
+        return np.zeros(0, bool)
+    lo, hi = tris.min(1), tris.max(1)
+    return np.all((lo < c + reach) & (hi > c - reach), axis=1)
+
+
+def _closest_points(tris, p):
+    """The point of each triangle (n, 3, 3) nearest to `p`, and whether `p` lies over the triangle's face (its
+    projection inside it)."""
+    a, b, c = tris[:, 0], tris[:, 1], tris[:, 2]
+    n = np.cross(b - a, c - a)
+    nn = np.linalg.norm(n, axis=1)
+    ok = nn > 1e-12
+    n = n / np.where(ok, nn, 1.0)[:, None]
+    d = np.einsum("ij,ij->i", p - a, n)
+    q = p - d[:, None] * n
+    # barycentric test of the projection
+    v0, v1, v2 = b - a, c - a, q - a
+    d00, d01, d11 = (np.einsum("ij,ij->i", v0, v0), np.einsum("ij,ij->i", v0, v1), np.einsum("ij,ij->i", v1, v1))
+    d20, d21 = np.einsum("ij,ij->i", v2, v0), np.einsum("ij,ij->i", v2, v1)
+    den = d00 * d11 - d01 * d01
+    den = np.where(np.abs(den) > 1e-18, den, 1.0)
+    v = (d11 * d20 - d01 * d21) / den
+    w = (d00 * d21 - d01 * d20) / den
+    inside = ok & (v >= 0) & (w >= 0) & (v + w <= 1)
+    best = np.where(inside[:, None], q, np.inf)
+    for e0, e1 in ((a, b), (b, c), (c, a)):
+        e = e1 - e0
+        t = np.clip(np.einsum("ij,ij->i", p - e0, e) / np.maximum(np.einsum("ij,ij->i", e, e), 1e-18), 0, 1)
+        on = e0 + t[:, None] * e
+        closer = ~inside & (np.linalg.norm(p - on, axis=1) < np.linalg.norm(p - best, axis=1))
+        best[closer] = on[closer]
+    return best, inside, d
+
+
+def _sphere_depth(tris, c, r):
+    """How deep a sphere reaches into the triangles (0 when clear): the most of r less its distance to one, or r and
+    more with its centre behind a face it lies over (inside the solid). As the game measures it (collide.rs)."""
+    if not len(tris):
+        return 0.0
+    q, inside, d = _closest_points(tris, c)
+    dist = np.linalg.norm(c - q, axis=1)
+    near = dist < r
+    depth = np.where(inside & (d < 0), r + dist, r - dist)
+    return float(max(0.0, depth[near].max())) if near.any() else 0.0
+
+
+def _sphere_gap(tris, c, r):
+    """How far a sphere is from touching the triangles (its least distance to them less r; inf with none)."""
+    if not len(tris):
+        return math.inf
+    q, _, _ = _closest_points(tris, c)
+    return float(np.linalg.norm(c - q, axis=1).min() - r)
+
+
+def _contact_offset(tris, c):
+    """How far beside the centre (across, not below) the triangles' nearest point lies: 0 on a level floor."""
+    q, _, _ = _closest_points(tris, c)
+    k = int(np.argmin(np.linalg.norm(c - q, axis=1)))
+    off = q[k] - c
+    return float(math.hypot(off[0], off[2]))
+
+
+def _rest_height(tris, c, r):
+    """How far to move a sphere up (or down, negative) from `c` to rest on the triangles: out of them when it is in
+    them (up to 4 r), down onto them when it is over them (up to 8); None when neither finds a resting place."""
+    def depth(dy):
+        return _sphere_depth(tris, c + np.array([0.0, dy, 0.0]), r)
+
+    step = 0.05
+    if depth(0.0) > 0.0:
+        below, dy = 0.0, step
+        while dy <= 4 * r and depth(dy) > 0.0:
+            below, dy = dy, dy + step
+        if dy > 4 * r:
+            return None
+        hi = dy
+        lo = below
+    else:
+        dy = -step
+        while dy >= -8.0 and depth(dy) <= 0.0:
+            dy -= step
+        if dy < -8.0:
+            return None
+        lo, hi = dy, dy + step
+    # lo is in the floor, hi clear: halve down to where it just touches
+    for _ in range(30):
+        mid = (lo + hi) / 2
+        if depth(mid) > 0.0:
+            lo = mid
+        else:
+            hi = mid
+    return hi + 0.005
+
+
+def _hull_depth(tris, pts, axes):
+    """How deep a convex body (its corner points, its own axes as columns) reaches into the triangles: for each one
+    it overlaps, the least overlap over the separating axes (the triangle's normal, the body's axes, their edges
+    crossed); the most of those (0 when clear)."""
+    worst = 0.0
+    for t in tris:
+        cand = [np.cross(t[1] - t[0], t[2] - t[0])] + [axes[:, k] for k in range(3)]
+        for e in (t[1] - t[0], t[2] - t[1], t[0] - t[2]):
+            cand += [np.cross(e, axes[:, k]) for k in range(3)]
+        least = math.inf
+        for ax in cand:
+            n = np.linalg.norm(ax)
+            if n < 1e-9:
+                continue
+            ax = ax / n
+            a, b = pts @ ax, t @ ax
+            least = min(least, a.max() - b.min(), b.max() - a.min())
+            if least <= 0:
+                break
+        if least > 0 and least != math.inf:
+            worst = max(worst, least)
+    return worst
+
+
 class LevelBuilder:
     """A level being built: its meshes, objects, materials and groups, written by `write`."""
 
@@ -494,6 +625,10 @@ class LevelBuilder:
         self.standing = []
         # parts that lift or hold the ball, not standing on a floor's top (a fan, the balloon): checked for headroom
         self.lifting = []
+        # the loose balls (node, radius, what): write() rests each on the floor under it (rest_loose), and the loose
+        # boxes (node, what): neither may start inside the floors (check_clear)
+        self.loose = []
+        self.boxes = []
         self.seed = seed
         self._standard_materials()
 
@@ -960,6 +1095,7 @@ class LevelBuilder:
         i = self.placeholder(f"P_Box_{n:02d}", ["P_Box"] + self.sector(sector), K.pose((x, y + 2.5, z)), mesh=m)
         if on_floor:
             self.standing.append((i, 2.5, 2.5, f"P_Box_{n:02d}"))
+        self.boxes.append((i, f"P_Box_{n:02d}"))
         return i
 
     def dome(self, n, at, sector):
@@ -996,7 +1132,11 @@ class LevelBuilder:
         m = K.Mesh("ball")
         K.sphere(m, None, (0, 0, 0), 2.0, seg=12)
         name = f"P_Ball_{kind}"
-        return self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), K.pose((x, y + 2.0, z)), mesh=m)
+        i = self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), K.pose((x, y + 2.0, z)), mesh=m)
+        # `at` is a point on the cursor's way, which need not be on the floor there (behind a slope or a bend, at a
+        # gutter's side): write() rests the ball on what is under it
+        self.loose.append((i, LOOSE_R.get(kind, BALL_R), f"{name}_{n:02d}"))
+        return i
 
     def trafo(self, kind, n, at, sector):
         """A transformer (P_Trafo_Wood, _Stone, _Paper): its pad lies on `at`."""
@@ -1120,6 +1260,82 @@ class LevelBuilder:
             raise ValueError(f"{len(bad)} parts do not stand on a flat patch of floor with room over it:\n  "
                              + "\n  ".join(bad))
 
+    def solid_triangles(self):
+        """The triangles a loose body collides with in the game (its static geometry: floors, rails, the floors'
+        stoppers), in world space, as an array (n, 3, 3)."""
+        tris = []
+        for g in ("Phys_Floors", "Phys_FloorRails", "Phys_FloorStopper"):
+            for i in self.groups.get(g, []):
+                node = self.nodes[i]
+                if node.get("mesh") is None:
+                    continue
+                m = self.meshes[node["mesh"]]
+                if not m.p:
+                    continue
+                M = node["matrix"]
+                P = np.asarray(m.p, np.float64) @ M[:3, :3].T + M[:3, 3]
+                for idx in m.parts.values():
+                    tris.append(P[np.reshape(idx, (-1, 3))])
+        return np.concatenate(tris) if tris else np.zeros((0, 3, 3))
+
+    def rest_loose(self):
+        """Rests each loose ball on the floor under it: one put into a floor (a slope or a gutter's side under it, a
+        bend's floor beside the cursor's straight line) is lifted out of it, one over the floor is let down onto it;
+        one that already touches stays as it is. A ball with nothing under it, or that no lift frees, is refused."""
+        if not self.loose:
+            return
+        tris = self.solid_triangles()
+        bad = []
+        for i, r, what in self.loose:
+            M = self.nodes[i]["matrix"]
+            c = M[:3, 3].astype(np.float64)
+            near = tris[_tris_near(tris, c, r + max(4 * r, 8.0))]
+            depth = _sphere_depth(near, c, r)
+            gap = _sphere_gap(near, c, r)
+            if depth <= 0.005 and gap <= 0.005:
+                continue
+            lift = _rest_height(near, c, r)
+            if lift is None:
+                bad.append(f"{what} at ({c[0]:.1f}, {c[1]:.1f}, {c[2]:.1f}): "
+                           + ("no floor under it" if depth <= 0.005 else f"{depth:.2f} deep in a floor"))
+                continue
+            M[1, 3] = c[1] + lift
+        if bad:
+            raise ValueError(f"{len(bad)} loose balls cannot be rested on a floor:\n  " + "\n  ".join(bad))
+
+    def check_clear(self):
+        """No loose body (a loose ball or a box) starts in the floors, rails or stoppers deeper than SUNK_TOLERANCE:
+        the game's physics would shove it out as the run begins, and throw the player's ball touching it far away;
+        and every loose ball lies on something. A level with one that does not is refused, and each is named."""
+        tris = self.solid_triangles()
+        bad = []
+        for i, r, what in self.loose:
+            c = self.nodes[i]["matrix"][:3, 3].astype(np.float64)
+            d = _sphere_depth(tris[_tris_near(tris, c, r)], c, r)
+            gap = _sphere_gap(tris[_tris_near(tris, c, r + 0.1)], c, r)
+            if d > SUNK_TOLERANCE:
+                bad.append(f"{what} at ({c[0]:.1f}, {c[1]:.1f}, {c[2]:.1f}): {d:.2f} deep")
+            elif gap > 0.05:
+                bad.append(f"{what} at ({c[0]:.1f}, {c[1]:.1f}, {c[2]:.1f}): on nothing (it falls as its sector "
+                           "begins)")
+            else:
+                # resting: on a slope it rolls away as the sector begins (allowed, but said)
+                off = _contact_offset(tris[_tris_near(tris, c, r + 0.1)], c)
+                if off > 0.1:
+                    print(f"note: {what} at ({c[0]:.1f}, {c[1]:.1f}, {c[2]:.1f}) lies on a slope "
+                          f"({math.degrees(math.asin(min(1.0, off / r))):.0f} degrees): it rolls away", file=sys.stderr)
+        for i, what in self.boxes:
+            M = self.nodes[i]["matrix"]
+            corners = np.array([[x, y, z] for x in (-2.5, 2.5) for y in (-2.5, 2.5) for z in (-2.5, 2.5)])
+            pts = corners @ M[:3, :3].T + M[:3, 3]
+            c = M[:3, 3]
+            d = _hull_depth(tris[_tris_near(tris, c, 4.4)], pts, M[:3, :3])
+            if d > SUNK_TOLERANCE:
+                bad.append(f"{what} at ({c[0]:.1f}, {c[1]:.1f}, {c[2]:.1f}): {d:.2f} deep")
+        if bad:
+            raise ValueError(f"{len(bad)} loose bodies start inside the floors (at most {SUNK_TOLERANCE}):\n  "
+                             + "\n  ".join(bad))
+
     def floor_bounds(self):
         floors = set(self.groups.get("Phys_Floors", []))
         pts = np.array([q for i in floors for q in self.meshes[self.nodes[i]["mesh"]].p]) if floors else None
@@ -1191,7 +1407,9 @@ class LevelBuilder:
         if self.narrow:
             raise ValueError(f"{len(self.narrow)} places leave the ball less than {MIN_FREE} across at the height of "
                              "its middle:\n  " + "\n  ".join(self.narrow))
+        self.rest_loose()
         self.check_standing()
+        self.check_clear()
         lowest = self.lowest_floor()
         sea = cloud_sea(sky, lowest, **(clouds or {})) if lowest is not None else None
         # the flat cloud layer only where no sea of cloud is drawn as a volume
@@ -1212,3 +1430,80 @@ class LevelBuilder:
                 f.write(f"licence = {licence}\n")
             for k, v in (extra or {}).items():
                 f.write(f"{k} = {v}\n")
+
+
+# --- checking a level already made ---------------------------------------------------------------------------------
+
+
+class _Made:
+    """A level folder already written (level.gltf and level.bin), read back into the builder's shapes (nodes with
+    their matrices and meshes, meshes with their points and triangles, the groups) and its loose bodies, for
+    check_clear."""
+
+    def __init__(self, folder):
+        import json
+
+        with open(os.path.join(folder, "level.gltf")) as f:
+            doc = json.load(f)
+        with open(os.path.join(folder, "level.bin"), "rb") as f:
+            blob = f.read()
+
+        def accessor(i):
+            a = doc["accessors"][i]
+            v = doc["bufferViews"][a["bufferView"]]
+            width = {"SCALAR": 1, "VEC2": 2, "VEC3": 3}[a["type"]]
+            kind = {5126: np.float32, 5125: np.uint32, 5123: np.uint16}[a["componentType"]]
+            arr = np.frombuffer(blob, kind, a["count"] * width, v.get("byteOffset", 0) + a.get("byteOffset", 0))
+            return arr.reshape(-1, width) if width > 1 else arr
+
+        mirror = np.diag([1.0, 1.0, -1.0, 1.0])
+        self.meshes = []
+        for m in doc["meshes"]:
+            mesh = K.Mesh(m["name"])
+            pts, parts = [], {}
+            for k, prim in enumerate(m["primitives"]):
+                p = accessor(prim["attributes"]["POSITION"]).astype(np.float64) * (1.0, 1.0, -1.0)
+                base = len(pts)
+                pts.extend(p.tolist())
+                tri = np.asarray(accessor(prim["indices"]), np.int64).reshape(-1, 3)[:, [0, 2, 1]] + base
+                parts[k] = tri.flatten().tolist()
+            mesh.p, mesh.parts = pts, parts
+            self.meshes.append(mesh)
+        self.nodes = []
+        for nd in doc["nodes"]:
+            mg = np.asarray(nd["matrix"], np.float64).reshape(4, 4).T
+            self.nodes.append({"name": nd["name"], "mesh": nd.get("mesh"), "matrix": mirror @ mg @ mirror})
+        scene = doc["scenes"][0]["extras"]["drahtseilakt"]
+        self.groups = {g["name"]: list(g["members"]) for g in scene["groups"]}
+        self.loose, self.boxes = [], []
+        for i, nd in enumerate(self.nodes):
+            parts = nd["name"].split("_")
+            if nd["name"].startswith("P_Ball_") and len(parts) >= 3 and parts[2] in LOOSE_R:
+                self.loose.append((i, LOOSE_R[parts[2]], nd["name"]))
+            elif nd["name"].startswith("P_Box_"):
+                self.boxes.append((i, nd["name"]))
+
+    solid_triangles = LevelBuilder.solid_triangles
+    check_clear = LevelBuilder.check_clear
+
+
+def main(argv):
+    """`levelkit.py --check FOLDER...`: check_clear on levels already made (their loose bodies against their
+    floors); 1 when one is refused."""
+    if len(argv) < 3 or argv[1] != "--check":
+        print("usage: levelkit.py --check LEVEL_FOLDER...", file=sys.stderr)
+        return 2
+    status = 0
+    for folder in argv[2:]:
+        try:
+            made = _Made(folder)
+            made.check_clear()
+            print(f"{folder}: {len(made.loose)} loose balls and {len(made.boxes)} boxes clear of the floors")
+        except ValueError as e:
+            print(f"{folder}: {e}", file=sys.stderr)
+            status = 1
+    return status
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -668,6 +668,11 @@ pub struct Sim {
     world: World,
     /// The loose bodies (boxes and loose balls): (level object index, body index in the world).
     loose: Vec<(usize, usize)>,
+    /// How deep each loose object (box or loose ball, by level object index) was placed in the level's static
+    /// geometry (collide::start_depth), and how far it was lifted out of it (`rest_out_of`); read by the checks of
+    /// our levels and the original's.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub start_depths: Vec<(usize, f32, f32)>,
     pub ball: Ball,
     pub camera: Camera,
     pub tick: u64,
@@ -894,6 +899,8 @@ impl Sim {
         // Loose objects that move, and the domes: boxes, the loose balls and P_Dome (their material table in
         // docs/physics.md, section 3).
         let mut loose = Vec::new();
+        let mut start_depths = Vec::new();
+        let static_triangles: Vec<Triangle> = statics.iter().flat_map(StaticMesh::world_triangles).collect();
         let mut sectors: Vec<Vec<usize>> = Vec::new();
         let mut unsectored = Vec::new();
         for (i, o) in level.objects.iter().enumerate() {
@@ -914,6 +921,24 @@ impl Sim {
                 _ => mesh,
             };
             let points: Vec<Vec3> = mesh.positions.iter().map(|p| Vec3::from(*p) * scale).collect();
+            // A loose object made inside a floor or a wall (deeper than the original's levels ever have one) is
+            // lifted out onto it before it is made (`rest_out_of`): the physics' penetration recovery would shove
+            // it out, and the player's ball touching it while it does is thrown away at hundreds of units a second.
+            let is_box = level.members("P_Box").any(|(k, _)| k == i);
+            let sphere = name
+                .strip_prefix("p_ball_")
+                .and_then(|_| BallKind::from_name(&name))
+                .filter(|k| *k != BallKind::Paper)
+                .map(|_| BALL_RADIUS * scale.x);
+            let mut pos = pos;
+            if is_box || name.starts_with("p_ball_") {
+                let (depth, lift) = rest_out_of(&static_triangles, &points, sphere, pos, rot.quat());
+                if lift > 0.0 {
+                    eprintln!("{}: made {depth:.2} inside the floors, lifted {lift:.2} onto them", o.name);
+                }
+                pos.y += lift;
+                start_depths.push((i, depth, lift));
+            }
             let sector = sector_of(i);
             // Every object is made at the level start (below); here it is only placed.
             let active = false;
@@ -1112,6 +1137,7 @@ impl Sim {
             rules,
             world,
             loose,
+            start_depths,
             ball,
             camera,
             tick: 0,
@@ -2083,6 +2109,71 @@ impl Sim {
     }
 }
 
+/// Deeper than this in the level's static geometry a loose object is lifted out before it is made. The original's
+/// levels place every loose object at most 0.031 deep (the paper balls of level 10; all others touch or are clear),
+/// so none of theirs is moved; our levels' builder refuses anything deeper than 0.05 (levelkit.py, check_clear).
+pub const SUNK_DEPTH: f32 = 0.1;
+
+/// How deep a loose object (its points about `pos`, or a sphere of `sphere`'s radius) starts in the static
+/// `triangles`, and how far up it is moved so that it rests on them instead (0 when it is not deeper than
+/// SUNK_DEPTH, or no lift up to four times its reach frees it).
+fn rest_out_of(triangles: &[Triangle], points: &[Vec3], sphere: Option<f32>, pos: Vec3, rot: Quat) -> (f32, f32) {
+    let world: Vec<Vec3> = points.iter().map(|p| pos + rot * *p).collect();
+    let (middle, reach) = match sphere {
+        Some(r) => (pos, r),
+        None => crate::collide::Shape::Hull(&world).bounds(),
+    };
+    let top = 4.0 * reach;
+    let near: Vec<Triangle> = triangles
+        .iter()
+        .filter(|t| {
+            let lo = t.a.min(t.b).min(t.c);
+            let hi = t.a.max(t.b).max(t.c);
+            lo.x < middle.x + reach && hi.x > middle.x - reach && lo.z < middle.z + reach && hi.z > middle.z - reach
+                && lo.y < middle.y + reach + top && hi.y > middle.y - reach
+        })
+        .copied()
+        .collect();
+    let depth_at = |lift: f32, scratch: &mut Vec<Vec3>| -> f32 {
+        let up = Vec3::Y * lift;
+        let s = match sphere {
+            Some(r) => crate::collide::Shape::Sphere(pos + up, r),
+            None => {
+                scratch.clear();
+                scratch.extend(world.iter().map(|p| *p + up));
+                crate::collide::Shape::Hull(scratch)
+            }
+        };
+        crate::collide::start_depth(&s, &near)
+    };
+    let mut scratch = Vec::new();
+    let depth = depth_at(0.0, &mut scratch);
+    if depth <= SUNK_DEPTH {
+        return (depth, 0.0);
+    }
+    // up in steps until it is clear, then halved down to where it just rests
+    let step = 0.05;
+    let mut below = 0.0;
+    let mut lift = step;
+    while lift <= top {
+        if depth_at(lift, &mut scratch) <= 0.0 {
+            for _ in 0..12 {
+                let mid = (below + lift) * 0.5;
+                if depth_at(mid, &mut scratch) <= 0.0 {
+                    lift = mid;
+                } else {
+                    below = mid;
+                }
+            }
+            // a hair over, so that it settles onto the floor rather than starting in it
+            return (depth, lift + 0.005);
+        }
+        below = lift;
+        lift += step;
+    }
+    (depth, 0.0)
+}
+
 /// The mesh of the module file's object (`<module>_MF`) that the original makes in place of a loose object's
 /// stand-in (a crate, a paper ball, a dome), if the module file is loaded and has it.
 fn module_mesh<'a>(level: &Level, i: usize, modules: &'a Modules) -> Option<&'a level::Mesh> {
@@ -2880,6 +2971,32 @@ pub(crate) mod tests {
         assert!(new < 15.0 - 6.6, "the ball got past the module's wall: {new}");
         let old = along(4);
         assert!(old > 15.0 + 6.6, "a format 4 run did not roll over the stand-in: {old}");
+    }
+
+    /// A loose ball placed 1.5 into the floor (a level's mistake: our level 1 had them, up to 2.4 deep) is lifted
+    /// out onto it before it is made; the ball rolled into it pushes it away instead of being thrown off the level by
+    /// the physics' penetration recovery (seen at 740 units a second before the lift).
+    #[test]
+    fn a_loose_ball_made_in_the_floor_is_lifted_out_onto_it() {
+        let mut level = flat_level();
+        let probe = Sim::new(&level, BallKind::Wood);
+        let forward = probe.camera.forward().with_y(0.0).normalize();
+        let at = probe.ball.position.with_y(0.5) + forward * 12.0;
+        let stone = add_cube(&mut level, "P_Ball_Stone_01", at, &["P_Ball_Stone", "Sector_01"]);
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        let &(i, depth, lift) = sim.start_depths.first().expect("the loose ball measured");
+        assert_eq!(i, stone);
+        assert!((depth - 1.5).abs() < 0.01 && (lift - 1.5).abs() < 0.02, "{depth} deep, lifted {lift}");
+        let body = sim.loose[0].1;
+        let mut fastest = (0.0f32, 0.0f32);
+        for _ in 0..240 {
+            sim.step(input::UP);
+            fastest.0 = fastest.0.max(sim.ball.velocity.length());
+            fastest.1 = fastest.1.max(sim.world.state(body).map_or(0.0, |s| s.vel.length()));
+        }
+        assert!(fastest.0 < 15.0 && fastest.1 < 15.0, "thrown: ball {}, loose ball {}", fastest.0, fastest.1);
+        let moved = sim.world.state(body).map_or(Vec3::ZERO, |s| s.pos) - at;
+        assert!(moved.dot(forward) > 1.0, "the ball pushed it on: {moved}");
     }
 
     #[test]
