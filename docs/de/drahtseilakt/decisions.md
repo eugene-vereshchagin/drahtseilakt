@@ -87,12 +87,20 @@ wird ohne ausdrückliche Anweisung des Inhabers veröffentlicht, getaggt oder pu
 zur Seite den Absturz bedeutet. Genau das ist eine Kugel auf einer Schiene über dem Abgrund. Deutsch als
 Verbeugung vor Cyparade, dem deutschen Studio, das Ballance gemacht hat.
 
+## Dokumentation in zwei Sprachen
+
+*Ersetzt durch „Dokumentation in mehreren Sprachen“ unten.*
+
+Die Dokumentation wird auf Englisch und Russisch geschrieben. Englisch ist die Hauptversion (die Sprache von Code,
+Kommentaren und Commits); die russische spiegelt deren Struktur unter `docs/ru/` und in `README.ru.md`. Beide ändern
+sich in derselben Änderung. Die Website wird aus `docs/` mit zwei Locales gebaut.
+
 ## Dokumentation in mehreren Sprachen
 
 Die Dokumentation wird auf Englisch, Russisch, Deutsch und vereinfachtem Chinesisch geschrieben (am 2026-11-02 für die große chinesische Community hinzugekommen). Englisch ist die Hauptversion (die
 Sprache von Code, Kommentaren und Commits); die anderen spiegeln deren Struktur unter `docs/<sprache>/` und in
 `README.<sprache>.md`. Alle Versionen ändern sich in derselben Änderung. Die Website wird aus `docs/` mit einer
-Locale pro Sprache gebaut. (Ersetzt den früheren Eintrag zu zwei Sprachen.)
+Locale pro Sprache gebaut. Deutsch, weil das Spiel und der Name deutsch sind. (Ersetzt den Eintrag zu zwei Sprachen.)
 
 ## Offen: OpenBallance oder Ballanced als Basis
 

@@ -1,0 +1,74 @@
+# Level 12 — the route (docs/drahtseilakt/autopilot-rules.md): sectors, stretches in order, the ball, the action.
+# From the walkthrough's storyboard (ref/video/frames/fast/level12) and the level's floors; the plan and hints made
+# from it are Level_12.plan and Level_12.txt.
+
+sector 1 wood
+  start → east along the thin rail z 121.8                          pass, cruise (6)
+  the serpentine x 308..450: nine rows 8 apart; the rows east hump   pass at 8 over the humps and dips, 4 round each U
+  over the rail x 377.8 past the sacks P_Modul_26, the rows west     (the single rail ends in a U of two rails: the
+  dip under it                                                       ball rolls between them, radius 4)
+  the last row z 57.8 → the curl at (382, 54)                        pass round it, three quarters clockwise
+  the rail x 377.8 north → the curl at (382, 185.5)                  pass, cruise; round the curl
+  the row z 181.4 west → the curl at (252.5, 185.5)                  pass; round the curl
+  the rail x 256.9 south (P_Extra_Life_01) → PC_TwoFlames_01         pass, cruise
+
+sector 2 wood
+  the rail x 256.6 south over the small platform (point 16)          pass, cruise
+  its end over the gap onto the long floor z -92                     straight on at 7, then turn west
+  the floor west to x 234, the rail x 234 south → PC_TwoFlames_02    pass at 6 (faster, the ball flies off near its
+                                                                     end); the storyboard's grid of rails is skipped
+
+sector 3 wood
+  the rail x 234 south → P_Trafo_Stone_03                            pass into it → stone
+  the rail z -318.2 east, the half-pipe in its middle line           pass, cruise (between its transformers)
+  the platform x 487..506, round the two pins north of the line      pass slowly
+  the target of P_Modul_37_01 at its east end                        hold, press, push: its board falls across the
+                                                                     gap of the rail pair x 519.3
+  the rail pair x 501.5 south, its U east, x 519.3 north → CP3       pass
+
+sector 4 stone
+  → P_Trafo_Wood_02, the rails z -243 east, the curl south           pass → wood
+  → P_Trafo_Paper_02 (cube on the rail pair x 987.4)                 pass → paper; on off the pair's end down onto the
+                                                                     cross platform
+  the cross platform (tilted cubes) west along their crease          pass at 6 on the crease's line over the hump
+                                                                     x 929..917 (off it the ball wedges)
+  → P_Trafo_Wood_03, north of the hole of the fan P_Modul_18_01      pass round the hole → wood
+  west: the gap x 850, the step x 815, down at x 800                 at once at 10 (a leap), over the step at 10
+  the rails x 774 north                                              pass
+  → P_Trafo_Stone_08 by the fan P_Modul_18_02                        become stone (the lift to the extra life above is
+                                                                     for points)
+  the fan's pit → the floor below, north along x 774.4 → CP4         pass, drop, pass
+
+sector 5 stone
+  CP4 north along the floor's middle → P_Trafo_Wood_05               pass → wood
+  north into the lift P_Modul_03_01                                  pass
+  the four lifts (west, north, west)                                 ram the cage's walls off from the middle (8 rams),
+                                                                     hold while the disc rises, cross at a push
+  off the last north onto the rail pair x 733.7, up it               press at 6 → P_Trafo_Stone_09 → stone
+  the flat rail to its end z 304.7                                   slowly off the end: the ball drops onto the rail
+                                                                     below (y -248)
+  → P_Trafo_Paper_04a                                                pass → paper
+  the fans 03, 05, 06, 04, 12, 07, 11, 08, 10a, 09, 13 → CP5         over each until lifted, across at 12
+
+sector 6 paper
+  → P_Trafo_Wood_06, north on the upper floor (y -150)               pass → wood
+  P_Ball_Stone_04 west, _02 north, _03 north into the helices        shove / press: their targets drop the boards
+  off the upper row's east end down to the lower row, east over the  pass → paper
+  board → P_Trafo_Paper_05
+  west, north along x 717.5, east along z 744.5, north along x 759   pass over the boards
+  the fans 18_14..18, then 19, 21, 20 → CP6                          over each until lifted, across at 7 (from 18's
+                                                                     top 21's grate is level: by 19, higher); off 20
+                                                                     onto CP6's floor at 10
+
+sector 7 paper
+  → P_Trafo_Wood_08, the U of rails, the rail x 574.6, its curl,      pass → wood
+  the rail z 790 west, past the pins at its end
+  → P_Trafo_Stone_05                                                 become stone
+  the rail x 521.3 south, the U, the rail x 513 north                pass; press at 12 for the hump
+  the boxes P_Box_01..04 at the hump's far end                       press at 6, brake: they fall off north
+  the rail z 845 west → PC_TwoFlames_07                              pass, cruise
+
+sector 8 stone
+  → P_Trafo_Stone_10, the log half-pipes (x 289 south, z 770.5 west,  pass → stone; dropping from one into the next
+  x 220.5 south, z 646 west)
+  the middle socket P_Trafo_Wood_07a, the rail west → PE_Balloon_01  pass → wood

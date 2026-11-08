@@ -74,7 +74,7 @@ nennt jeden solchen Mod in seinem Kopf —
     mod sticky-ball 9c41f0a2be1377d0 strength=60 wood_only=off
 
 — seinen Schlüssel, den Hash seiner mod.txt und die Werte seiner Optionen, sodass das Replay denselben Lauf abspielt,
-und nur mit genau diesem Mod: Ein Replay, dessen Mod fehlt oder sich geändert hat, wird mit Angabe des Grundes
+und nur mit genau diesem Mod: Ein Replay, dessen Mod fehlt oder sich geändert hat oder dessen Optionen fehlen, unbekannt oder außerhalb des Bereichs sind, wird mit Angabe des Grundes
 abgelehnt. Das Replay eines klassischen Laufs hat keine solche Zeile und ist genau wie vorher. Ein Mod, der nur ändert,
 was zu sehen ist (die Kamera, die Einblendungen, das Licht), lässt den Lauf klassisch.
 
@@ -99,7 +99,8 @@ Text in UTF-8, eine Anweisung je Zeile, `#` beginnt eine Kommentarzeile. In dies
   `version`, `licence`, `requires <game version>` (z. B. `0.1`; eine neuere als die des Spiels lehnt den Mod ab).
 - **Optionen**, die der Spieler auf der Seite des Mods setzt:
   - `option <name> switch on|off`
-  - `option <name> number <min> <max> <step> <default>`
+  - `option <name> number <min> <max> <step> <default>` (innerhalb von ±1 000 000, ein Schritt von mindestens 0,001, der
+    Standardwert auf den Schritten ab `min`)
   - `option <name> key <Key1,Key2,...>` — Tasten mit den Namen von winit (`KeyQ`, `F12`, `Backspace`, `Home`...); die
     erste ist die Vorgabe. Die eigenen Tasten des Spiels werden abgelehnt: Escape, Enter, die Pfeile, Shift, Space,
     Tab, Alt, F11 und Backquote; eine Taste, die der Spieler auf der Seite Controls belegt hat, bleibt beim Spiel.
@@ -178,7 +179,7 @@ Ansichtsaktionen (nur auf `frame` oder `key`):
 - `do keys <corner>` — die eigenen Tastenoptionen des Mods als Einblendungszeilen, „Beschriftung: Taste“ (der Hinweis
   von god-mode).
 - `do ghost <0..1>` — der beste Lauf als durchscheinende Kugel, so deckend.
-- `do screenshot`, `do restart`.
+- `do screenshot`, `do restart` — nur bei `key` (nie in jedem Bild); höchstens ein Screenshot pro Sekunde.
 
 Beide: `do set <variable> = <expression>`. Eine Variable, die eine Ansichtsregel setzt, gehört der Ansicht; die Regeln
 des Laufs dürfen sie weder setzen noch lesen.
@@ -225,6 +226,8 @@ Ein Mod kommt von einem Fremden, also liest das Spiel ihn als feindselig und leh
 - höchstens 16 Optionen, 32 Variablen, 128 Beschriftungen, 64 Regeln, 8 Bedingungen und 16 Aktionen je Regel, 256
   Aktionen; ein Ausdruck höchstens 64 Teile und 16 tief; eine Tastenoption höchstens 8 Tasten; höchstens 32 Mods je
   Ordner;
+- ein Arbeitsbudget: die Ausdrucksknoten aller zusammen eingeschalteten Mods höchstens 20 000 (die jedes Mods werden
+  beim Lesen gezählt); ein Mod, der es überschreiten würde, wird nicht eingeschaltet, und der Bildschirm Mods sagt warum;
 - keine Pfade, keine Verknüpfungen, keine Dateinamen, kein Netz: Ein Mod kann nur die Bausteine oben nennen.
 
 ## Noch nicht (vorgemerkt)
@@ -283,14 +286,3 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 
 Die Grenzen des Originals, die diese Mods umgehen (Bildratengrenze, 4:3, niedrige Auflösungen, acht Sektoren, eine
 Bitmap-Schrift, anfälliges Timing des Kugelwechsels), übernehmen wir nicht.
-
-
-## Präzisierungen nach dem Review
-
-- Zahlenoption: Grenzen innerhalb von ±1 000 000, Schritt mindestens 0,001, der Standardwert liegt auf den Schritten ab `min`.
-- Eine Tastenoption darf keine Tasten des Spiels belegen: Escape, Enter, die Pfeiltasten, Shift, Space, Tab, Alt, F11
-  und Backquote; eine vom Spieler auf der Seite Controls belegte Taste bleibt beim Spiel (R, F2, F3, F5, F9, `[` `]`
-  sind jetzt die Tasten von god-mode und für jeden Mod frei).
-- `do screenshot` und `do restart` nur in `on key`-Regeln (nie in jedem Bild); höchstens ein Screenshot pro Sekunde.
-- Ein Replay, dessen Mod-Optionen fehlen, unbekannt oder außerhalb des Bereichs sind, wird mit Begründung abgelehnt.
-- Arbeitsbudget: die Ausdrucksknoten aller eingeschalteten Mods zusammen höchstens 20 000 (beim Lesen gezählt); ein Mod, der es überschreiten würde, wird nicht eingeschaltet, und der Bildschirm Mods sagt warum.

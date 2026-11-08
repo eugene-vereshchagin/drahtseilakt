@@ -62,6 +62,16 @@ Die Mechanik, auf der sie beruhen, steht in [autopilot.md](autopilot.md).
   dem Weg wird nach dem Hinweis neu gefunden, und ein unter einem Hinweis passierter Transformator gilt nicht als
   passiert.
 - **Ein passierter Sektor ist fort**: seine Objekte verlassen Physik und Bild, der Weg führt nie zurück hinein.
+- **Aufzüge mit Käfig** (P_Modul_03): eine Scheibe auf einer Feder, niedergehalten von den Wänden ihres Käfigs, die
+  lose auf ihr stehen. Die Wände werden aus der Mitte einzeln weggerammt (kurze Stöße mit Bremsen, damit die Kugel auf
+  der Scheibe bleibt); die Scheibe steigt auf die Höhe der nächsten, und die Kugel rollt mit Schwung hinüber (Level 12).
+- **Eine Treppe aus Ventilatoren**: die Luftsäule jedes Ventilators ist schmal (2 breit) und hält eine Papierkugel an
+  ihrer Spitze (17 über dem Gitter). Von dort geht die Kugel mit Schwung zum nächsten Gitter unter dieser Höhe; langsam
+  fällt sie zwischen den Säulen. Über dem nächsten Gitter muss sie höher als dieses ankommen: reicht die Spitze einer
+  Säule nur bis auf seine Höhe, nimmt die Kugel zuerst den Weg über eine höhere Säule (Level 12, Sektor 6).
+- **Stifte am Ende einer Schiene** auf einer Plattform stehen enger, als die Kugel breit ist: die Kugel umrundet sie.
+- **Eine Schiene, die über einer anderen weit unten endet**: langsam vom Ende gerollt, fällt die Kugel genau auf die
+  untere.
 
 ## Kugeln
 

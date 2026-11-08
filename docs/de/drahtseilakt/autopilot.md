@@ -188,11 +188,11 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `lead X Y Z D T` | D Einheiten vor dem losen Körper nächst dem Punkt bleiben, während er rollt (hinter ihm bei negativem D), T Takte lang: eine Steinkugel schiebt die Papierkugel durch Ventilatoren, eine Kugel, auf die man wartet |
 | `shove X Y Z TX TY TZ T` | den losen Körper (oder das bewegliche Teil eines Moduls) nächst X Y Z nach TX TY TZ schieben: um ihn herum hinter ihn, dann langsam hinein (höchstens T Takte) — ein Brett an seinen Platz geschoben, eine Kugel dorthin gerollt, wo man sie braucht |
 | `press X Y Z SX SZ V T` | entlang der Geraden vom Ort, an dem der Schritt beginnt, zum Punkt rollen, seitlich an ihr gehalten (SX SZ: ein Versatz quer dazu, höchstens 3: auf welcher Seite eines Schienenpaars), solange langsamer als V; fertig am Punkt, dahinter oder nach T Takten — Schienen, auf der oberen lehnend gefahren, ein gleichmäßiger Anstieg |
-| `round X Z R V T [Y]` | um die senkrechte Achse durch (X, Z) im Radius R mit der Geschwindigkeit V rollen (in eine Richtung, bei negativem V in die andere), T Takte lang oder bis die Kugel über Y ist — eine Schienenspirale hinauf |
-| `along V T` | in die Richtung schieben, in die die Kugel rollt, nicht schneller als V, T Takte lang — Schienen, die sie führen |
 | `pass X Y Z V [T]` | durch den Punkt rollen, ohne anzuhalten, nicht schneller als V (eine Kurve, ein Schienenende, ein Transformator unterwegs); an der Linie vom Punkt gehalten, durch den das letzte `pass` des Hinweises ging (eine Kette davon folgt Schienen und Bahnen) |
 | `cross DX DZ X Y Z R` | über ein bewegliches Teil (eine Schaukel) zum Punkt: der Moment und die Länge des Stoßes entlang DX DZ werden auf Kopien des Laufs von hier gefunden (warten, stoßen, tragen lassen, abstoßen), der erste, nach dem die Kugel innerhalb R vom Punkt auf einem Boden ist, und dann gespielt |
 | `hold X Y Z T` | die Kugel T Takte auf dem Punkt halten — still, wo gewartet werden muss (auf einem Hang, oder nach schneller Ankunft) |
+| `along V T` | in die Richtung schieben, in die die Kugel rollt, nicht schneller als V, T Takte lang — Schienen, die sie führen |
+| `round X Z R V T [Y]` | um die senkrechte Achse durch (X, Z) im Radius R mit der Geschwindigkeit V rollen (in eine Richtung, bei negativem V in die andere), T Takte lang oder bis die Kugel über Y ist — eine Schienenspirale hinauf |
 | `await X Y Z QX QY QZ D T` | die Kugel an Ort und Stelle halten, bis der lose Körper oder das bewegliche Modulteil nächst X Y Z innerhalb D von QX QY QZ ist (höchstens T Takte) — eine Schaukel oder ein Aufzug im richtigen Moment |
 | `ride X Y Z QX QY QZ D T` | die Kugel über dem Körper oder Modulteil nächst X Y Z halten, bis es innerhalb D von QX QY QZ ist (höchstens T Takte) |
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
@@ -325,7 +325,7 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
   Plan und den Hinweisen nach dem Storyboard des Videos (`hints/Level_06.txt`: der wellige Stamm als Holz hin und als
   Stein schnell zurück, die Kisten heruntergerammt, der Stamm nach dem Sturz in Sektor 5).
 - Level 7: vom Start an geschafft in 12:04.28, dem geschafften Lauf des Inhabers folgend.
-- Level 8: vom Start an beendet, ganz ohne Lauf eines Spielers: allein durch den Plan aus dem Video
+- Level 8: vom Start an in 9:59.40 beendet, ganz ohne Lauf eines Spielers: allein durch den Plan aus dem Video
   (`hints/Level_08.plan`, mit Orten auf dem Weg) und die nach seinem Storyboard geschriebenen Hinweise
   (`hints/Level_08.txt`: Schienenpaare, auf der oberen lehnend gefahren, eine Spirale, eine Schaukel, die Zielscheiben,
   die die Brücken des Labyrinths senken, weggerammte Kisten).
@@ -338,8 +338,16 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
   Zielscheiben, die Kisten aus den Rinnen gestoßen, das Labyrinth von Sektor 4, die Ventilatoren und schwingenden
   Kisten von Sektor 5, und in Sektor 6 zwei lose Steinkugeln vom Gitter gestoßen (eine schiebt den Schieber zwischen
   den Wippen, eine öffnet eine Falltür) und die letzten Schienenpaare.
-- Level 12–13: 12 in Sektor 2 (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator vorbei und den
-  Ventilator hinauf, am Balken, an dem die Ventilatoren 18_10–12 entlangblasen.
+- Level 12: vom Start an in 12:35.68 beendet, ganz ohne Lauf eines Spielers, allein nach dem Plan und den Hinweisen
+  aus dem Storyboard des Walkthroughs (`hints/Level_12.plan`, `.txt`, `.route`; `hints/runs/Level_12.replay`): die
+  Serpentine der dünnen Schiene, das Ziel, das die Brücke in Sektor 3 senkt, die Rinne gekippter Würfel und ihre Lücke,
+  die vier Aufzüge mit Käfig, die Ventilatortreppen, die in die Spiralen geschobenen Steinkugeln, die Kisten auf dem
+  Buckel, die Halbröhren aus Stämmen. Stillstand 5,7 % der Ticks (1,4 % außerhalb von Transformatoren), näher als 1 am
+  Rand 14,1 %, Geschwindigkeit 5,3 ± 3,8.
+- Level 13: Sektor 1 nach den Hinweisen; in Sektor 2 kommt die Papierkugel allein die Spirale hinab und den Balken
+  entlang an den Ventilatoren 18_10 und 18_11 vorbei und hält vor 18_12, dessen Schacht sie nur hinabgeht, wenn die
+  Steinkugel P_Ball_Stone_18 sie schiebt (freigegeben von der Kiste unter dem Block, noch nicht gelöst). Sektor 3 von
+  seinem Checkpoint an: steckt hinter dem Haufen loser Steinkugeln in der Rinne fest (`hints/Level_13.txt`, `.route`).
 - Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
 - Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
   Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).
