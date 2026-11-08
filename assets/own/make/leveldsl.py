@@ -233,6 +233,7 @@ class Track:
         self.b = L.LevelBuilder(out_dir, seed=sum(map(ord, os.path.basename(out_dir))))
         self.pos = np.zeros(3)
         self.head = 0.0
+        self.new_cuts = []
         self.width = 10.0
         # the level's safety (its first `safety`), and the current stretch's
         self.level_safety = None
@@ -324,6 +325,7 @@ class Track:
         return pts, heads
 
     def lay(self, pts, heads, kind, straight=False, ties=False):
+        self.road_head = self.head
         if kind == "Rails":
             self.end_stretch()
             self.resolve_pending()
@@ -790,6 +792,12 @@ class Track:
             else:
                 raise LevelError(f"line {line}: plaza: what is {a!r}")
             i += 1
+        # a plaza that opens off the way's side (its back gap, at right angles to the way): the way's railings leave a
+        # gap at its mouth (found on a first pass, applied on the second: compile_level)
+        rh = getattr(self, "road_head", None)
+        if rh is not None and "back" in gaps and abs(((self.head - rh) % 180.0) - 90.0) < 1.0:
+            mouth = self.pos + self.fwd() * (self.width / 2)
+            self.new_cuts.append((float(mouth[0]), float(mouth[2]), width / 2 + 0.8))
         at = self.at(float(opts.get("ahead", 0)), float(opts.get("side", 0)), float(opts.get("up", 0)))
         P.plaza(self.b, f"Plaza_{self.n('plaza'):02d}", at, self.fwd(), width, length, rim, gaps, fence, self.sector,
                 surf)
@@ -1232,11 +1240,19 @@ def parse_clouds(value, line):
     return out
 
 
-def compile_level(path):
+def compile_level(path, cuts=None):
+    """Compiles a level; a plaza opening off the way's side asks for a gap in the way's railing at its mouth, which
+    is made on a second pass (the first one finds the openings)."""
+    found = _compile_level(path, cuts or [], dry=True)
+    _compile_level(path, found)
+
+
+def _compile_level(path, cuts, dry=False):
     folder = os.path.dirname(os.path.abspath(path))
     with open(path, encoding="utf-8") as f:
         lines = f.read().splitlines()
     t = Track(folder)
+    t.b.rail_cuts = list(cuts)
     for i, raw in enumerate(lines, 1):
         stripped = raw.strip()
         if not stripped or stripped.startswith("#"):
@@ -1282,6 +1298,8 @@ def compile_level(path):
     t.check_overpasses()
     t.place_columns()
     t.place_scatter()
+    if dry:
+        return list(t.new_cuts)
     info = t.info
     titles = info["titles"]
     if "en" not in titles:
@@ -1299,6 +1317,7 @@ def compile_level(path):
     lengths = [b - a for a, b in zip([0.0] + t.sector_ends, t.sector_ends)]
     print(f"{folder}: {len(t.b.nodes)} objects, {t.sector} sectors, the way {t.sector_ends[-1]:.0f} long "
           f"(sectors {', '.join(f'{x:.0f}' for x in lengths)}; moves and gaps included)")
+    return list(t.new_cuts)
 
 
 def write_pilot(folder, t):

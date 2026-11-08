@@ -389,10 +389,89 @@ def check_shortcuts(b):
                          f"{SKIP_MIN:.0f} or more ahead (an intended drop is marked `drop`): {shown}")
 
 
+# --- 4. pickups and transformers reachable -------------------------------------------------------------------------
+
+# A ball's centre keeps this far (across) from a railing or a wall, over the floor between these heights.
+REACH_CLEAR = 1.6
+REACH_BAND = (0.3, 3.5)
+REACH_STEP = 1.0
+# A part counts as reached when a free point of floor lies this near it across (pickups are 2.5 across) and this close
+# in height.
+REACH_NEAR = 3.0
+REACH_DY = 7.0
+SEED = re.compile(r"^(Floor_\d+|Rails_\d+|Start_Platform)$")
+TARGET = re.compile(r"^(P_Extra_Point|P_Extra_Life|P_Trafo_\w+?)_\d+$")
+
+
+def check_reachable(b):
+    """Every extra point, extra life and transformer can be reached by a ball over the floors from the route: a flood
+    over points of floor (a step of up to 2 up or down, 1.6 between points) from the route's own floors, where a point
+    of floor within REACH_CLEAR of a railing, a fence or a wall (over it between REACH_BAND) is not free."""
+    from scipy.spatial import cKDTree
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    pts, owner, block = [], [], []
+    for g in ("Phys_Floors", "Phys_FloorRails"):
+        for i in _floors(b, g):
+            name = b.nodes[i]["name"]
+            t, up = _tris_of(b, i)
+            if not len(t):
+                continue
+            if "_Railing" in name or "_Fence" in name or name.startswith("Wallblock"):
+                block.append(_sample_tris(t, 0.7))
+                continue
+            if name.startswith("Lighthouse"):
+                continue
+            s = _sample_tris(t[up > 0.3], REACH_STEP) if (up > 0.3).any() else np.zeros((0, 3))
+            pts.append(s)
+            owner += [i] * len(s)
+    if not pts:
+        return
+    P = np.vstack(pts)
+    owner = np.array(owner)
+    free = np.ones(len(P), bool)
+    if block:
+        B = np.vstack(block)
+        tb = cKDTree(B[:, [0, 2]])
+        for c0 in range(0, len(P), 4000):
+            for k, near in enumerate(tb.query_ball_point(P[c0:c0 + 4000, [0, 2]], REACH_CLEAR), c0):
+                if near:
+                    dy = B[near, 1] - P[k, 1]
+                    if ((dy > REACH_BAND[0]) & (dy < REACH_BAND[1])).any():
+                        free[k] = False
+    idx = np.nonzero(free)[0]
+    F = P[idx]
+    tree = cKDTree(F * np.array([1.0, 0.6, 1.0]))
+    pairs = tree.query_pairs(1.7, output_type="ndarray")
+    pairs = pairs[np.abs(F[pairs[:, 0], 1] - F[pairs[:, 1], 1]) <= 2.0]
+    n = len(F)
+    g = coo_matrix((np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])), shape=(n, n))
+    _, lab = connected_components(g, directed=False)
+    seeds = {lab[k] for k in range(n) if SEED.match(b.nodes[owner[idx[k]]]["name"])}
+    ok = np.isin(lab, list(seeds))
+    R = F[ok]
+    if not len(R):
+        return
+    rt = cKDTree(R[:, [0, 2]])
+    bad = []
+    for node in b.nodes:
+        m = TARGET.match(node["name"])
+        if not m:
+            continue
+        c = node["matrix"][:3, 3]
+        reached = any(abs(R[j, 1] - c[1]) < REACH_DY for j in rt.query_ball_point(c[[0, 2]], REACH_NEAR))
+        if not reached:
+            bad.append(f"{node['name']} at {_fmt(c)}")
+    if bad:
+        raise ValueError(f"{len(bad)} parts the ball cannot reach from the route (a railing, a wall or a gap in the way "
+                         f"in), e.g. " + "; ".join(bad[:SHOW]))
+
+
 def check_all(b):
     """Runs the three checks; returns the messages of those that fail (empty: all pass)."""
     msgs = []
-    for fn in (check_seams, check_scenery, check_shortcuts):
+    for fn in (check_seams, check_scenery, check_shortcuts, check_reachable):
         try:
             fn(b)
         except ValueError as e:

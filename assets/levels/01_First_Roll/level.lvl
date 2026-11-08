@@ -1,4 +1,4 @@
-# First Steps (sector 1 only, for the owner's look; the temporary finish stands right after checkpoint 1).
+# First Steps (sectors 1 and 2; the temporary finish stands right after checkpoint 2).
 # Concept v3, sector 1 "First steps": steering only, in order -- the start, a first corner, a stair of little steps,
 # a hairpin, a hump and a descent with a pocket holding an extra life, straight rails, a zigzag, a ledge along a
 # wall, rails with a bend, a planked bridge, a balcony and the way to checkpoint 1. Railings both sides almost
@@ -159,6 +159,118 @@ width 10
 floor 12
 lamptower side -13 ahead 6 height 30 r 3.0
 wallblock side 11 ahead -4 long 24 height 14 thick 5
+checkpoint
+
+# ==== sector 2 "Push": the ball moves things (a crate, another ball, a crate into a pit). Railings only outside the
+# corners, on the landings and beside the rails.
+width 7.5
+railing off
+
+# ---- 1. rails down: 40 straight, a quarter circle left of radius 80 going down, 50 more; a point on the bend
+floor 14
+rails 40 down 4
+rails-left 45 80 down 4
+point
+rails-left 45 80 down 4
+rails 50 down 4
+width 10
+railing both
+floor 24
+railing off
+width 11
+floor 10
+
+# ---- 2. the crate: a crate stands in the groove 20 on; push it 40 on to the corner, where the railing is open straight
+# ahead (a pier): it drops off into the clouds, the way turns right; a point on the inside of the corner
+floor 20
+box ahead 6 shove
+floor 40
+corner right rail gap 9
+point ahead 5 side -2.2
+floor 30
+
+# ---- 3. the ball ahead: a wooden ball lies in the groove and rolls on ahead of you down 80 with a corner right, into a
+# bowl of 20 by 20 (a brick rim, 3 lower, a life in the far corner); a ramp up out of the bowl's side
+width 7.5
+floor 10
+loose wood ahead -3 lead
+floor 36 down 3
+corner right rail
+floor 28 down 2
+floor 17 down 3
+plaza 20 20 brick gap back 0 8 gap left 14 8 ahead 0
+life ahead 16 side -7
+move 14 10 0
+turn 90
+floor 17 up 3
+
+# ---- 4. three humps: +2 / -2 on 20 each, a point on the middle one, then a corner
+floor 10
+floor 10 up 2
+floor 10 down 2
+floor 10 up 2
+point ahead 6
+floor 10 down 2
+floor 10 up 2
+floor 10 down 2
+floor 10
+corner left
+floor 14
+
+# ---- 5. the square with the dome: a low kerb round, the way in at the middle of the back edge, out at a far corner; two
+# points on the dome's crown
+width 30
+plaza 30 30 kerb gap back 0 7.5 gap front 11 7.5
+dome ahead 15
+point ahead 15 side 1.6 up 3.3
+point ahead 15 side -1.6 up 3.3
+move 30 11 0
+drop 14
+width 7.5
+
+# ---- 6. rails that snake: two bends right and left, a point on the first crest; a landing with railings
+floor 16
+rails 20 down 2
+rails-right 60 60 down 2
+point
+rails-left 60 60 down 2
+rails-left 60 60 down 2
+rails-right 60 60 down 2
+rails 20 down 2
+width 10
+railing both
+floor 24
+railing off
+width 7.5
+floor 14
+
+# ---- 7. the pit: the groove stops at a pit just the crate's size; to the right a plate with a brick rim holds the crate
+# at the pit's edge; go round behind it and push it left into the pit, the bridge; a life stands past the pit
+floor 24
+pilot all : shove 3 -6.5 2.5 3 1 2.5 700
+mark pitgate
+turn -90
+plaza 16 12 brick gap back 0 16 ahead 3.75 side 3
+box ahead 6.5 side 3 shove
+back pitgate
+pit 6 depth 4.7 wall 8 side 1
+floor 10
+life ahead 4
+floor 6
+
+# ---- 8. to checkpoint 2: three corners with railings outside, a point on the inside of the second
+floor 40 down 2
+corner left rail
+floor 40
+corner right rail
+point ahead 6 side -2.0
+floor 40
+corner left rail
+floor 24
+width 10
+floor 12
+lamptower side -13 ahead 6 height 30 r 3.0
+wallblock side 15 ahead -4 long 24 height 14 thick 5
 checkpoint
 
 # ---- a short temporary finish right after it

@@ -749,6 +749,47 @@ class LevelBuilder:
                               scales=None if scales is None else scales[sl])
         return i
 
+    def _rail_runs(self, base):
+        """The railing's base points as runs left after the openings `rail_cuts` ((x, z, r): a side opening, a pocket's
+        or a balcony's mouth, where a railing must leave a gap)."""
+        cuts = getattr(self, "rail_cuts", None)
+        if not cuts:
+            return [base]
+        pts = [np.asarray(base[0], np.float64)]
+        for a, c in zip(base[:-1], base[1:]):
+            a, c = np.asarray(a, np.float64), np.asarray(c, np.float64)
+            n = max(1, int(math.ceil(np.linalg.norm(c - a) / 0.5)))
+            pts += [a + (c - a) * (k / n) for k in range(1, n + 1)]
+        runs, cur = [], []
+        for p in pts:
+            inside = any(math.hypot(p[0] - x, p[2] - z) < r for x, z, r in cuts)
+            if inside:
+                if len(cur) > 1:
+                    runs.append(cur)
+                cur = []
+            else:
+                cur.append(p)
+        if len(cur) > 1:
+            runs.append(cur)
+        return runs
+
+    def _rail_run(self, m, rail, base, up):
+        for h in RAIL_HEIGHTS:
+            K.tube(m, rail, [b + up * h for b in base], RAIL_R, caps=True)
+        # posts at the ends and about every POST_EVERY between
+        seg = [float(np.linalg.norm(base[j + 1] - base[j])) for j in range(len(base) - 1)]
+        total = sum(seg)
+        count = max(1, int(round(total / POST_EVERY)))
+        for j in range(count + 1):
+            t = total * j / count
+            q = 0
+            while q < len(seg) - 1 and t > seg[q]:
+                t -= seg[q]
+                q += 1
+            c = t / seg[q] if seg[q] > 0 else 0.0
+            p = base[q] * (1 - c) + base[q + 1] * c
+            K.tube(m, rail, [p, p + up * (RAIL_HEIGHTS[-1] + RAIL_R)], RAIL_R * 0.8, caps=True)
+
     def railings(self, name, path, widths, headings=None, safety="railings", surface="stone", sides=(0, 1),
                  scales=None):
         """Steel railings along the edges of a stretch (`sides`: 0 its left, 1 its right): two rails on posts
@@ -762,22 +803,8 @@ class LevelBuilder:
             off = [sgn * (w / 2 - RAIL_IN) for w in widths]
             base = [p + s_ * o + u * top_height(w, safety, o, surface)
                     for (p, f, s_, u, t), o, w in zip(fr, off, widths)]
-            for h in RAIL_HEIGHTS:
-                K.tube(m, rail, [b + fr[0][3] * h for b in base], RAIL_R, caps=True)
-            # posts at the ends and about every POST_EVERY between
-            seg = [float(np.linalg.norm(base[j + 1] - base[j])) for j in range(len(base) - 1)]
-            total = sum(seg)
-            count = max(1, int(round(total / POST_EVERY)))
-            for j in range(count + 1):
-                t = total * j / count
-                q = 0
-                while q < len(seg) - 1 and t > seg[q]:
-                    t -= seg[q]
-                    q += 1
-                c = t / seg[q] if seg[q] > 0 else 0.0
-                p = base[q] * (1 - c) + base[q + 1] * c
-                up = fr[0][3]
-                K.tube(m, rail, [p, p + up * (RAIL_HEIGHTS[-1] + RAIL_R)], RAIL_R * 0.8, caps=True)
+            for run in self._rail_runs(base):
+                self._rail_run(m, rail, run, fr[0][3])
         return self.add(name, m, groups=self._floor_groups("metal"))
 
     def slab(self, name, lo, hi, mat="top", sound="stone", sector=0):
