@@ -58,6 +58,15 @@ they rest on are in [autopilot.md](autopilot.md).
 - **A hint begins after a transformer has let the ball go**, not while it holds it: the way's place is found again
   after the hint, and a transformer passed under a hint is not known as passed.
 - **A passed sector is gone**: its objects leave the physics and the picture, so the way never leads back into it.
+- **Lifts with a cage** (P_Modul_03): a disc on a spring, held down by the walls of its cage standing loose on it.
+  The walls are rammed off from the middle one by one (short rams, braking, so the ball stays on the disc); the disc
+  rises to the next one's height, and the ball crosses onto it at a push (level 12).
+- **A stair of fans**: each fan's column is narrow (2 wide) and holds a paper ball at its top (17 above the grate).
+  From there the ball crosses at a push to the next grate below that height; slowly it falls between the columns.
+  It must come over the next grate above it: where a column's top only reaches the next grate's height, the ball goes
+  by a higher column first (level 12, sector 6).
+- **Pins at a rail's end** on a platform stand closer than a ball is wide: the ball goes round them, not between.
+- **A rail ending over another far below**: rolled off its end slowly, the ball drops straight onto the lower one.
 
 ## Balls
 

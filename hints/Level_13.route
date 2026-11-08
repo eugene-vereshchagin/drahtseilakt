@@ -1,0 +1,64 @@
+# Level 13 (SuDu add-on, ref/Ballance-13) — the route (docs/drahtseilakt/autopilot-rules.md): sectors, stretches in
+# order, the ball, the action. From the storyboard of the 4K video (ref/video/frames/fast/level13) and the level's
+# objects; the hints made from it are Level_13.txt. Sector 1 is finished by the hints; sector 2 is worked out below
+# but not yet driven through; sectors 3-5 are from the walkthrough notes only.
+
+sector 1 stone
+  start → the loose stone ball P_Ball_Stone_04 (-1290.9, 940.6)      push it south from its north side, slowly (3): it
+                                                                     drops into the plateau's groove z 935.7 and rolls
+                                                                     east down it by itself (harder: off the edge)
+  → P_Trafo_Paper_01 (-1235.6, 950.8)                                pass into it → paper
+  the rails down to the beam, over the fan 18_01                     wait over it: the stone ball rolling behind
+                                                                     knocks the paper ball on
+  the beam z 935.7 east, the fan 18_02                               lead 6 ahead of the stone ball (the stubs' fans
+                                                                     18_04..06 would lift it off the line), wait over
+                                                                     18_02 until knocked down onto the lower beam
+  the lower beam: a raised rail pair over a wide floor, with three   the paper ball sits in each gap (x -1034, -1005,
+  gaps in the rails (x -1034, -1005, -976)                           -976) while the stone ball rolls over it (an empty
+                                                                     gap swallows the stone, which veers off); then it
+                                                                     passes on the floor beside, at speed (posts under
+                                                                     the rails stop a slow ball), into the next gap
+  the fan 18_03 (-929.5): the last gap, P_Ball_Stone_05 just east    hold just west of stone 05 touching it; stone 04
+                                                                     hits the paper ball, which knocks stone 05 east
+                                                                     down its ridge; at once east along the floor
+                                                                     z 940.4 to the fan 18_08, lifted, down onto the
+                                                                     chute x -908.6 ahead of stone 05
+  the chute south, the fans 18_07, 18_09 → PC_TwoFlames_01           wait over each until stone 05 pushes it on
+
+sector 2 paper                                                       (worked out, not yet driven through; by itself
+                                                                     the test player takes the paper ball down the
+                                                                     helix, along the beam past the fans 18_10, 18_11
+                                                                     to x -738.6, where it stops: stone 18 is missing)
+  CP1 → the rails south, the stepped floor east, the platform        pass
+  → P_Trafo_Stone_03 (-879.8, 761.5)                                 pass into it → stone
+  the wood strip x -873.6 south to the lower floor                   pass, steady
+  the planks P_Modul_25 (x -855.6: 02, 05, 04 fall east; x -845.6:   ram each from a short run-up, braking; cross on
+  03, 01, 06 fall west) → a bridge over the gap                      02 to the strip x -844 and back on 01
+  back up the wood strip                                             press at 6 (a stone climbs it)
+  the crate of P_Modul_34_02 under the block between the rail pair   push it west out from under the block (the block
+  x -864.7 (P_Ball_Stone_18 rolls down from CP1 and waits on the     sinks only with the crate pushed well clear, past
+  rails north of the block)                                          x -873); then nudge stone 18 south slowly: fast,
+                                                                     it jumps the serpentine onto the wood strip and
+                                                                     off its foot; slow, it rides the serpentine down
+  → P_Trafo_Paper_02 (-868.1, 670.2)                                 pass into it → paper
+  into the gap between the planks (-851.5, 686) → the helix → the    the helix rails carry it down to the beam
+  beam z 669.7 east
+  the fans 18_10, 18_11 in the beam's slots                          wait over each until stone 18 pushes it on (a
+                                                                     paper ball alone is blown back and forth there)
+  the fan 18_12, the chute x -724 south (P_Ball_Paper_01 in it)      pushed down by stone 18 → PC_TwoFlames_02
+
+sector 3 paper                                                       (walkthrough notes; tried from CP2: the loose
+                                                                     stones pile up against the crates in the channel,
+                                                                     the paper ball stops behind them, too low to leave
+                                                                     the channel for the east half-pipe and
+                                                                     P_Trafo_Stone_01; Level_13.txt says more)
+  the row of stone balls 19..28, P_Trafo_Stone_01 (boxes 34 aside), P_Trafo_Paper_03, fan 18_13 (life 03),
+  P_Trafo_Stone_04 over the sandbags 26, P_Trafo_Paper_04, P_Trafo_Stone_05, P_Trafo_Paper_06; the paper ball rides on
+  top of the column of stone balls down the rail channel → PC_TwoFlames_03
+
+sector 4 paper                                                       (walkthrough notes only)
+  rafts of stone and wood balls down parallel rails (Stone_10..13 + Wood_05/06, Stone_16/17 + Wood_09/10), the life
+  02, the rotating bars P_Modul_17, fans 18_14..18, P_Trafo_Stone_07 → PC_TwoFlames_04
+
+sector 5 stone                                                       (walkthrough notes only)
+  roller-coaster loops, the wooden beam → P_Trafo_Wood_01, the vertical spiral at speed → PE_Balloon_01
