@@ -21,8 +21,7 @@ wind of repeated upward sweeps (a noise band with a few harmonics gliding up hal
 gusts coming faster and starting higher as the ball drops away; the paper ball landing is a dense, almost white
 scrunch of overlapping friction grains, one crunch and a few settling rustles; the stone ball against an iron post is
 a short heavy clank — a dense field of short metal partials struck by a chatter of five or six impacts; rolling on
-iron rails is a low hum with a grinding clatter of bright bursts; rolling on wood is a smooth deep rumble of dense
-soft contacts in hollow planks whose colour drifts, without knocks.
+wood is a smooth deep rumble of dense soft contacts in hollow planks whose colour drifts, without knocks.
 
 The level music (`Music/Music_Theme_<n>_<part>.ogg`, five themes of three parts) is synthesized the same way: short,
 quiet East-Asian plucked-string phrases, each composed by its own seeded rules (a pentatonic contour arching up and
@@ -43,3 +42,12 @@ rings the shell's low modes (stone: a 390/440 Hz pair over a 98 Hz body; wood: a
 after a short knock; the level loading is a struck high bell (2.67 kHz with a slow beat) under thin tones sweeping
 upward; the thunder is a dry crack and a long rumble of overlapping low rolls; the three atmospheres are a quiet
 swell and fade of glassy sustained tones, of a breathing band of wind, and of a breathy pad with faint tones in it.
+
+Rolling on iron rails, redone a third time (2026-11-09) after the owner said it was not at all what it should be: the
+old loops were a regular clatter of about ten bursts a second, like a train over rail joints, with no ringing in them.
+Now the rail sings: a smooth rolling-contact noise drives a dense bank of narrow, long-ringing rail modes (modal
+synthesis), and the level swells softly and irregularly as the ball turns, never in a beat. The wooden ball
+(`Roll_Wood_Metal`) is a singing whirr of many close lines between about 130 and 900 Hz, strongest from 160 to 520 Hz,
+with a faint contact hiss on the swells; the stone ball (`Roll_Stone_Metal`) is a rough growl of beating lines round
+120 Hz in blobs, a 450–900 Hz ring that small irregular scrapes strike, and a faint grind (each the first of three
+variants made).
