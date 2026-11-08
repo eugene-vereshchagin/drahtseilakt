@@ -26,6 +26,7 @@ mod hud;
 mod lang;
 mod learned;
 mod levels;
+mod levelstats;
 mod lights;
 mod locate;
 mod menu;
@@ -103,6 +104,8 @@ usage: drahtseilakt [options]
   --sky NAME          play under another sky (A, B, C, Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
                       Mist, Clouds, or any Sky_<NAME>_* the textures have) instead of the level's own
   --size WxH          window or screenshot size (default 1600x900)
+  --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in ./hints
+                      for designing our own: DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
 Without --level, --map or --open the window opens with the level menu.
@@ -173,6 +176,8 @@ pub struct Options {
     pub at: Option<String>,
     pub ball: Option<String>,
     pub look: Option<[f32; 6]>,
+    /// Measure the original levels into this folder (levelstats.rs) and stop.
+    pub level_stats: Option<PathBuf>,
 }
 
 /// Until the release, a played game is a debug run unless `--no-debug` says otherwise (the owner's decision,
@@ -216,6 +221,7 @@ fn parse_args() -> Result<Options, String> {
         ball: None,
         debug: false,
         look: None,
+        level_stats: None,
     };
     // `--name=value` is the same as `--name value` (handy for values that start with a minus).
     let mut args = std::env::args()
@@ -299,6 +305,7 @@ fn parse_args() -> Result<Options, String> {
             }
             "--debug" => debug = Some(true),
             "--no-debug" => debug = Some(false),
+            "--level-stats" => o.level_stats = Some(value()?.into()),
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--sky" => {
                 let name = value()?;

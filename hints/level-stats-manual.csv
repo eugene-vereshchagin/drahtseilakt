@@ -1,0 +1,29 @@
+# Hand annotations for the level statistics (scripts/level-stats.py), one line a level: what needs judgement and
+# cannot be read off part types and geometry. Counts of places along the route, not of objects.
+#   hidden_routes  places where the right way is hard to find: a fork with a wrong branch, a way that is not seen
+#                  (a side lane, a drop that is meant), a mechanism to trigger elsewhere first, a choice of transformer
+#   maze           0 none, 1 a small maze or grid of lanes, 2 a real maze with dead ends
+#   backtracks     times the route goes back the way it came (after a mechanism, for another ball)
+#   centrifugal    stretches held on by speed: helices, loops, vertical or steep rails, half-pipe walls, throws off
+#                  a rail's end onto another
+#   balls_as_keys  loose balls (or boxes) put somewhere to fill a gap, trip a pusher, a trapdoor or a target
+#   balls_ahead    loose balls rolled or pushed ahead of the ball along the way
+#   timing         crossings that wait for a moving part (swing, swinging crate, sacks over a narrow way)
+#   expert_time_s  the walkthrough video's chapter for the level (ref/video/frames/chapters.txt; level 13: its own
+#                  video, 2496 frames at 4 a second), end screen included (about 10-20 s)
+#   confidence     high: from a written route (hints/Level_NN.route) checked by a finished run; medium: from hints,
+#                  a plan and the storyboard; low: from the plan and the storyboard only
+level,hidden_routes,maze,backtracks,centrifugal,balls_as_keys,balls_ahead,timing,expert_time_s,confidence,source,notes_ru
+1,2,0,1,0,0,0,0,268,high,route,"С2: ящик P_Modul_34 из-под камня таранить снизу (камень падает и становится дорогой); С3: толкатели P_Modul_01 сдвигаются с нижней дорожки, к ней ведёт неочевидный боковой спуск x 237; С1: после каменного шара сразу снова деревянный - камень не взберётся на склон"
+2,3,0,2,1,0,0,0,230,high,route,"С3 - главная головоломка: бумага, плиты, вентиляторы наверх к камню, качели, толкатель, разводной мост, назад к бумаге, прыжок через отверстие рамы; С4: спираль вверх и волнистая дорога (камень застревает во впадине)"
+3,3,0,2,2,0,1,0,251,high,route,"С1: каменный шар катится впереди по рельсу; С2: конец рельса на скорости перебрасывает шар на другой рельс, подножие крутого рельса - на выступ; С4: шест P_Modul_17 надо столкнуть на разводной мост, мишень P_Modul_37 роняет доску узкого пути"
+4,1,0,1,0,1,1,0,272,medium,hints+storyboard,"Деревянные полутрубы, решётки с дырами; С3: из 4 каменных шаров на бревне 3 сталкиваются вниз и становятся дорогой (столкнуть все 4 - путь закрыт); пирамида со спуском по рельсам"
+5,2,1,2,2,0,0,0,374,medium,hints+storyboard,"Много рельсов и спиралей; С3: ящик P_Modul_34 таранить мягко много раз (сильный удар заклинивает); С4: ящик и толкатель, обход кругом; рамы с мишенями и возвратами"
+6,1,0,1,1,0,0,0,287,high,route,"С2: бревно со ступенями, через щели - на вентиляторах; С3: поле вентиляторов на ящики; С4: волнистое бревно туда и обратно (дерево, назад камнем), шесть таранов шара и ящиков с края; С5: камень нарочно ломает висячие плиты и падает с ними на рельс ниже"
+7,3,2,2,2,0,0,0,352,low,replay+storyboard,"Поле платформ на вентиляторах; большой лабиринт из бортовых дорожек с тупиками и возвратами; спираль, U-рельсы, полутруба; мишень и толкатель с ящиками в конце"
+8,4,2,4,2,0,0,4,377,high,route,"С3 и С5: зигзаги из пар рельсов одна над другой (шар едет по нижнему, опираясь на верхний); С4: петля-жёлоб, спираль, лабиринт с двумя мишенями в тупиках; С5: качели P_Modul_08 четыре раза в нужный момент, мишень, камнем сбросить 11 ящиков"
+9,3,1,2,3,0,0,1,417,low,plan+storyboard,"Около 14 превращений, узлы с несколькими трансформаторами (какой брать - неочевидно, в плане много '?'); подъёмники P_Modul_03, мешки, откидные плиты; спирали; вращающиеся круглые площадки"
+10,4,1,3,1,1,1,2,489,medium,hints+plan+storyboard,"С1: мост P_Modul_37 опрокидывается только камнем, а камень лежит за штырями толкателя - три круга по петле; свободный шар сбросить, ящики сбить (P_Modul_34), цепь плит P_Modul_41; качающиеся ящики P_Modul_08 (ждать внутри), подъёмник"
+11,6,1,4,2,4,1,2,535,high,route,"С1: каменный шар загнать в выемку - он скатывается по рельсам в диск толкателя; замок-лабиринт, доски-разводные мосты таранить; С3: решётка ящиков под блоками (5+5+8 таранов), шар по рельсу в мишень; С4: толкатели по 6 таранов; С5: петли пар рельсов над вентиляторами, качающиеся ящики; С6: два каменных шара сбить на дорожки - один двигает толкатель, другой открывает люк"
+12,4,1,1,3,0,0,1,735,low,plan+storyboard,"Длинные участки одиночного тонкого рельса (монорельс) с U-поворотами, мешки над рельсами; решётка пересекающихся рельсов (где сворачивать - неочевидно); бревно с трансформаторами, полутрубные гнёзда, подъём на вентиляторах сквозь отверстие, поля вентиляторов, вертикальные спиральные башни"
+13,3,0,1,4,2,2,1,624,low,plan+storyboard,"Шар толкать перед собой со старта; ряды свободных шаров в рельсовых дорожках (заполняют путь, их выталкивают вперёд); узкие гребни и края полутруб; мешки над рельсами, шест P_Modul_17; клубки рельсовых петель и вертикальная спираль в конце"

@@ -1037,6 +1037,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         None
     };
     gamedata::sound_themes::start(theme.as_deref());
+    if let Some(dir) = &o.level_stats {
+        return crate::levelstats::run(&o, &data, dir, Path::new("hints"));
+    }
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_source(&o.source);
     if let Some(dir) = &o.export {
@@ -4966,4 +4969,74 @@ mod follow_tests {
         assert_eq!(p.len(), 6);
         assert_eq!(d, vec![4]);
     }
+}
+
+/// For the level statistics (levelstats.rs): the level and its modules as a run loads them, and the ball's way
+/// through it — a replay (`o.replay`) played without a window, tick by tick, or else the way the test player would
+/// find through the objects of a plan (`plan`), with no run behind it.
+pub(crate) fn stats_run(
+    o: &Options,
+    data: &Data,
+    plan: Option<&Path>,
+) -> Result<crate::levelstats::Run, String> {
+    use crate::levelstats::{Run, TickRec};
+    let mut game = Game::new(o, data)?;
+    let mut run = Run {
+        level: game.level.level.clone(),
+        modules: game.modules.clone(),
+        ticks: Vec::new(),
+        events: Vec::new(),
+        moved: Vec::new(),
+        finished: false,
+        begun_elsewhere: game.start.as_ref().is_some_and(|s| s.sector > 1 || s.at.is_some()),
+        route: None,
+        checkpoints: game.sim.stages(),
+    };
+    if let Some(plan) = plan {
+        let start = game.sim.ball.position;
+        let mut stages: Vec<glam::Vec3> = read_plan(plan, &game.level.level, 0)?.into_iter().map(|p| p.0).collect();
+        if let Some(&end) = run.checkpoints.last() {
+            stages.push(end);
+        }
+        let route = crate::autopilot::Route::find(&game.level.level, &game.modules, &game.sim.updrafts(), start, &stages);
+        run.route = Some(route.points.clone());
+        return Ok(run);
+    }
+    let end = game.replay_in.as_ref().map(|r| r.end).ok_or("level statistics need a replay or a plan")?;
+    // each loose thing's first place and how far it got from it (sampled twice a second)
+    let mut loose: std::collections::HashMap<usize, (glam::Vec3, f32)> = std::collections::HashMap::new();
+    let mut seen = 0;
+    while game.sim.tick < end && !game.sim.finished && !game.sim.game_over {
+        game.tick(0);
+        let s = &game.sim;
+        run.ticks.push(TickRec {
+            pos: s.ball.position,
+            ground: s.ball.on_ground,
+            sector: s.sector + 1,
+            kind: s.ball.kind,
+            updraft: s.in_updraft(),
+            held: s.is_held(),
+            dying: s.is_dying(),
+        });
+        for e in s.events.iter().skip(seen) {
+            run.events.push((e.0, e.1, s.sector + 1));
+        }
+        seen = s.events.len();
+        if s.tick % 30 == 1 {
+            for &(obj, body) in s.loose() {
+                if let Some(st) = s.world().state(body) {
+                    let e = loose.entry(obj).or_insert((st.pos, 0.0));
+                    e.1 = e.1.max(st.pos.distance(e.0));
+                }
+            }
+        }
+    }
+    run.finished = game.sim.finished;
+    let mut moved: Vec<(usize, f32)> = loose.into_iter().map(|(o, (_, d))| (o, d)).collect();
+    moved.sort_by_key(|m| m.0);
+    run.moved = moved
+        .into_iter()
+        .filter_map(|(o, d)| Some((game.level.level.objects.get(o)?.name.clone(), d)))
+        .collect();
+    Ok(run)
 }
