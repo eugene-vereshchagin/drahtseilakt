@@ -1572,8 +1572,10 @@ impl Menu {
             let r = [0.35, y, 0.65, y + 0.1];
             let st = if self.chosen() == i { Button::Over } else { Button::Up };
             button(out, r, FIELD_UV, st, Some(Target::Line(i)));
-            label_ball(out, name, [0.35, y + 0.005, 0.65, y + 0.045], &FONT_03, BALL_MAIN);
-            label(out, value, [0.40, y + 0.045, 0.60, y + 0.085], &FONT_03);
+            // both lines inside the field's frame, clear of its rim (the owner, 2026-11-08: the top line sat on
+            // the rim)
+            label_ball(out, name, [0.35, y + FIELD_NAME[0], 0.65 - FIELD_RIM, y + FIELD_NAME[1]], &FONT_03, BALL_MAIN);
+            label(out, value, [0.40, y + FIELD_VALUE[0], 0.60, y + FIELD_VALUE[1]], &FONT_03);
         };
         match sc {
             Screen::Main | Screen::Pause | Screen::Dead | Screen::End => big(&mut out, 0.15),
@@ -2052,7 +2054,12 @@ const ARROW_RIGHT_UV: [f32; 4] = [0.7921, 0.2471, 0.9412, 0.4039];
 const BACK_RECT: [f32; 4] = [0.4031, 0.85, 0.5906, 0.9438];
 /// The width of the ball at the left end of a big button or a field (MAIN_UV, FIELD_UV), and of Back's (BACK_UV),
 /// measured on the drawn buttons: a label stays right of it.
-const BALL_MAIN: f32 = 0.05;
+const BALL_MAIN: f32 = 0.058;
+/// A field's two lines (its name, its value) from the field's top: inside the rim, the pair centred on the ball.
+const FIELD_NAME: [f32; 2] = [0.02, 0.05];
+const FIELD_VALUE: [f32; 2] = [0.05, 0.08];
+/// The field's bracket at its right end: a name stays left of it.
+const FIELD_RIM: f32 = 0.014;
 const BALL_BACK: f32 = 0.042;
 /// Where the key row's bar is cut to leave its middle mark out (texture u of the left end's end, the right's start).
 const ROW_CUT: [f32; 2] = [0.46, 0.58];
