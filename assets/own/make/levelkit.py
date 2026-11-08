@@ -308,11 +308,21 @@ def ear_clip(poly):
 
 
 def join_points(width, safety, surface="stone"):
-    """Where a stretch's end meets a flat piece (the start's or a checkpoint's): the points of its cross-section at the
-    floor's top level (0), by their distance across (to the right); the piece's edge has its corners there, so the
-    two share every vertex along the join."""
+    """Where a stretch's end meets a flat piece (the start's or a checkpoint's): the points of the flat middle of its
+    cross-section at the floor's top level (0), the run of them that holds the middle, by their distance across (to
+    the right); the piece's edge has its corners there, so the two share every vertex along the join. The profile's
+    slopes, kerbs and borders beside the flat are not joined (a flat piece's edge there would be a step under them):
+    the piece's outline leaves them and its own sides go on from theirs."""
     pts, _ = section(width, safety, surface)
-    return sorted({round(x, 9) for x, y in pts if abs(y) < 1e-9})
+    run, best = [], None
+    for x, y in pts + [(0.0, 1.0)]:
+        if abs(y) < 1e-9:
+            run.append(round(x, 9))
+            continue
+        if run and min(run) <= 1e-9 and max(run) >= -1e-9:
+            best = sorted(set(run))
+        run = []
+    return best if best else sorted({round(x, 9) for x, y in pts if abs(y) < 1e-9})
 
 
 def orient(m):
@@ -629,6 +639,11 @@ class LevelBuilder:
         # boxes (node, what): neither may start inside the floors (check_clear)
         self.loose = []
         self.boxes = []
+        # the route (levelcheck.py): floor node -> (from, to) distance along the way; scenery marked `obstacle`
+        # (by name); landings marked `drop` ((point, radius))
+        self.route = {}
+        self.intended = set()
+        self.drops = []
         self.seed = seed
         self._standard_materials()
 
@@ -1009,7 +1024,7 @@ class LevelBuilder:
         self.reset(1, reset)
         return reset
 
-    def lantern(self, at, out):
+    def lantern(self, at, out, name="Fixture"):
         """A lantern on a wooden post standing at `at` (on the floor's level, just outside its edge, on a stone corbel
         set into the floor's side), its arm reaching over `out`'s way, its glass glowing: only drawn."""
         m = K.Mesh("lantern")
@@ -1026,7 +1041,7 @@ class LevelBuilder:
         K.cylinder(m, self.mat_ids["rail"], lamp + up * 0.62, up, 0.05, 0.18, seg=6)
         K.cylinder(m, self.mat_ids["lamp"], lamp - up * 0.3, up, 0.28, 0.6, seg=8, cap_mat=self.mat_ids["rail"])
         K.cylinder(m, self.mat_ids["rail"], lamp + up * 0.3, up, 0.36, 0.08, seg=8, r_top=0.12)
-        self.add(f"Lantern_{len(self.nodes):03d}", m)
+        self.add(f"{name}_{len(self.nodes):03d}", m)
 
     def reset(self, n, point, xaxis=(-1, 0, 0)):
         """Reset point n at `point` (where the ball comes back). As in the original levels, the way on is along the
@@ -1337,6 +1352,14 @@ class LevelBuilder:
             raise ValueError(f"{len(bad)} loose bodies start inside the floors (at most {SUNK_TOLERANCE}):\n  "
                              + "\n  ".join(bad))
 
+    def mark_route(self, first, s0, s1):
+        """Gives the floors made since node `first` that have no place on the route yet the stretch s0..s1."""
+        phys = set(self.groups.get("Phys_Floors", [])) | set(self.groups.get("Phys_FloorRails", []))
+        for i in range(first, len(self.nodes)):
+            if i in phys and i not in self.route and "_Railing" not in self.nodes[i]["name"] \
+                    and "_Fence" not in self.nodes[i]["name"]:
+                self.route[i] = (s0, s1)
+
     def floor_bounds(self):
         floors = set(self.groups.get("Phys_Floors", []))
         pts = np.array([q for i in floors for q in self.meshes[self.nodes[i]["mesh"]].p]) if floors else None
@@ -1411,6 +1434,10 @@ class LevelBuilder:
         self.rest_loose()
         self.check_standing()
         self.check_clear()
+        import levelcheck
+        found = levelcheck.check_all(self)
+        if found:
+            raise ValueError("\n  ".join([f"{len(found)} geometry checks fail:"] + found))
         lowest = self.lowest_floor()
         sea = cloud_sea(sky, lowest, **(clouds or {})) if lowest is not None else None
         # the flat cloud layer only where no sea of cloud is drawn as a volume

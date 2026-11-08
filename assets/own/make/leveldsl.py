@@ -13,6 +13,10 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     author NAME... / sky NAME / music 1..5 / bonus N / ball wood|stone|paper / light R G B
                              (sky: A, B, C (above the clouds), Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
                              Mist, Clouds; any Sky_<NAME>_* in the textures)
+    drop [R]                 an intended landing at the cursor: floors within R (20) of it may be reached by a fall or a
+                             flight from earlier in the route (levelcheck.py, check_shortcuts)
+    obstacle                 (an option of lamptower, mast, plinth, wallblock, lighthouse, garland) the object stands in
+                             the ball's way on purpose (levelcheck.py, check_scenery)
     clouds off | clouds [cover C] [below B] [thickness T] [size S]   the sea of cloud under the level (the game
                              draws it): none, or the sky's (levelkit.py, CLOUD_SEA) with its cover (0..1), its tops B
                              under the lowest floor, T deep, a cloud S across
@@ -122,6 +126,8 @@ except ValueError:
     pass
 # The slots the stone on the crate and a pusher stand in (crateblock, pusher): the stone is 5 on a side, the pusher's
 # beam 1.2 wide in its channel.
+# How far a floor's end may be from a checkpoint piece's edge and still join it (the path drifts by a few thousandths).
+JOIN_TOL = 0.02
 CORNER_RAIL = 8.0
 CRATE_SLOT = 6.0
 PUSHER_SLOT = 1.6
@@ -404,12 +410,15 @@ class Track:
         front = None
         if st is not None:
             edge = np.asarray(cp["at"]) + np.asarray(cp["fwd"]) * L.CHECK_LEN / 2
-            if (np.linalg.norm(st["path"][0] - edge) < 1e-6 and np.linalg.norm(st["heads"][0] - cp["fwd"]) < 1e-6
+            if (np.linalg.norm(st["path"][0] - edge) < JOIN_TOL and np.linalg.norm(st["heads"][0] - cp["fwd"]) < 1e-6
                     and abs(st["widths"][0] - cp["width"]) < 1e-6):
+                st["path"][0] = edge
                 front = L.join_points(st["widths"][0], st["safety"], st["surface"])
                 st["joined"] = "start"
+        n0 = len(self.b.nodes)
         self.b.checkpoint(cp["n"], tuple(cp["at"]), width=cp["width"], fwd=tuple(cp["fwd"]), back=cp["back"],
                           front=front, along=cp["along"])
+        self.b.mark_route(n0, cp["along"] - L.CHECK_LEN / 2, cp["along"] + L.CHECK_LEN / 2)
 
     def extend_rails(self, pts, heads, ties=False):
         """Rails laid piece after piece are one pair of tubes (no kink or gap where two pieces meet); the floor they
@@ -424,6 +433,7 @@ class Track:
             if self.floor_end is not None and np.linalg.norm(self.floor_end - pts[0]) < 1e-6:
                 start = self.floor_end_info
             r = self.rail_run = {"path": [np.asarray(pts[0], np.float64)], "heads": [heads[0]], "start": start,
+                                 "along": self.along,
                                  "ties": False}
         r["path"].extend(np.asarray(p, np.float64) for p in pts[1:])
         r["heads"].extend(heads[1:])
@@ -439,8 +449,10 @@ class Track:
         if next_floor is not None and np.linalg.norm(np.asarray(next_floor) - r["path"][-1]) < 1e-6:
             end = (self.width, self.safety, self.surface, self.rail_sides)
         self.rail_ends += [r["path"][0], r["path"][-1]]
+        n0 = len(self.b.nodes)
         self.b.rails(f"Rails_{self.n('Rails'):03d}", [tuple(p) for p in r["path"]], headings=r["heads"],
                      ends=(r["start"], end), ties=r["ties"], supports=self.rail_supports(r["path"]))
+        self.b.mark_route(n0, r.get("along", self.along), self.along)
 
     def rail_supports(self, path):
         """Where rails get a saddle on a column: about every RAIL_SUPPORT along them, none within RAIL_SUPPORT / 4 of
@@ -474,7 +486,9 @@ class Track:
             join = None
             if first is not None and np.linalg.norm(first - (self.start_at + np.array([L.START_RADIUS, 0, 0]))) < 1e-6:
                 join = L.join_points(self.width, self.safety, self.surface)
+            n0 = len(self.b.nodes)
             self.b.start(tuple(self.start_at), width=self.width, join=join, along=self.along - L.START_RADIUS)
+            self.b.mark_route(n0, self.along - 2 * L.START_RADIUS, self.along)
             self.start_at = None
             return join is not None
         return False
@@ -491,9 +505,11 @@ class Track:
         self.floor_end_info = (st["widths"][-1], st["safety"], st["surface"], st["rails"][-1])
         begins_joined = st.get("joined") == "start" or st.get("from_start", False)
         try:
-            self.b.track(f"Floor_{self.n('Floor'):03d}", [tuple(p) for p in st["path"]], st["widths"], st["along"],
-                         st["safety"], st["surface"], caps=(not begins_joined, not st.get("ends_joined", False)),
-                         headings=st["heads"], railings=st["rails"], scales=st["scales"])
+            node = self.b.track(f"Floor_{self.n('Floor'):03d}", [tuple(p) for p in st["path"]], st["widths"],
+                                st["along"], st["safety"], st["surface"],
+                                caps=(not begins_joined, not st.get("ends_joined", False)),
+                                headings=st["heads"], railings=st["rails"], scales=st["scales"])
+            self.b.route[node] = (min(st["along"]), max(st["along"]))
         except ValueError as e:
             raise LevelError(str(e)) from None
         return st
@@ -510,6 +526,11 @@ class Track:
     # --- the description's commands ----------------------------------------------------------------------------
 
     def run(self, cmd, args, opts, flags, line):
+        n0, a0 = len(self.b.nodes), self.along
+        self.run_command(cmd, args, opts, flags, line)
+        self.b.mark_route(n0, a0, max(self.along, a0))
+
+    def run_command(self, cmd, args, opts, flags, line):
         if cmd in ("floor", "rails", "gap"):
             length = num(args, 0, line)
             rise = self.rise(opts, line)
@@ -538,6 +559,9 @@ class Track:
             self.pos = to
         elif cmd == "turn":
             self.head += num(args, 0, line)
+        elif cmd == "drop":
+            # an intended landing here: floors within R (20) of the cursor may be reached by falling or flying
+            self.b.drops.append((self.pos.copy(), float(args[0]) if args else 20.0))
         elif cmd == "columns":
             self.columns = num(args, 0, line)
         elif cmd == "width":
@@ -627,11 +651,12 @@ class Track:
             back = None
             if st is not None:
                 st = trim_end(st, L.CHECK_LEN / 2)
-                if (len(st["path"]) >= 2 and np.linalg.norm(st["path"][-1] - back_edge) < 1e-6
+                if (len(st["path"]) >= 2 and np.linalg.norm(st["path"][-1] - back_edge) < JOIN_TOL
                         and np.linalg.norm(st["heads"][-1] - self.fwd()) < 1e-6
                         and abs(st["widths"][-1] - self.width) < 1e-6):
                     back = L.join_points(st["widths"][-1], st["safety"], st["surface"])
                     st["ends_joined"] = True
+                    st["path"][-1] = back_edge
                 self.build_stretch(st)
             self.skip = L.CHECK_LEN / 2
             self.pending = {"n": self.checkpoints, "at": self.pos.copy(), "width": self.width,
@@ -785,6 +810,8 @@ class Track:
     def scenery(self, cmd, args, opts, line):
         p = self.at(float(opts.get("ahead", 0)), float(opts.get("side", 0)), float(opts.get("up", 0)))
         n = f"{cmd.capitalize()}_{self.n(cmd):02d}"
+        if "obstacle" in opts:
+            self.b.intended.add(n)
         if cmd == "lamptower":
             P.lamp_tower(self.b, n, tuple(p), float(opts.get("r", 2.6)), float(opts.get("height", 20)))
         elif cmd == "mast":
@@ -803,7 +830,7 @@ class Track:
         elif cmd == "wlamp":
             # a lantern on a wall: `side` is out from the wall toward the lamp (turn: the direction it faces)
             out = self.fwd(self.head + float(opts.get("turn", 90)))
-            self.b.lantern(tuple(p), tuple(out))
+            self.b.lantern(tuple(p), tuple(out), "Lantern")
 
     def set_safety(self, kind):
         """The floors' profile from here on, and their railings: both sides for railings (on the bare floor), none
@@ -1145,7 +1172,7 @@ def styles_of(text, line):
 
 OPTION_WORDS = ("up", "down", "side", "ahead", "depth", "turn", "tilt", "runup", "r", "height", "wall", "sag", "ahead2",
                 "side2", "up2", "thick", "long", "hole", "gap")
-FLAG_WORDS = ("nopilot", "ties", "shove", "lead", "nolamps", "plug")
+FLAG_WORDS = ("obstacle", "nopilot", "ties", "shove", "lead", "nolamps", "plug")
 
 
 def parse_line(text):

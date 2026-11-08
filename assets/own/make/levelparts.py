@@ -19,10 +19,9 @@ import levelkit as L  # noqa: E402
 import ownkit as K  # noqa: E402
 
 UP = np.array([0.0, 1.0, 0.0])
-# A plaza's, a pedestal's and a pit's tops lie this far under the floors that run on from them: where two flat pieces
-# meet at one height, their edges are a crack to the kit's seam test (crates/game/src/ownlevels.rs); a step of 3 hundredths
-# is no seam and none to a ball
-FLUSH = 0.03
+# A plaza's, a pedestal's and a pit's tops lie exactly at the height of the floors that run on from them (the kit once
+# put them 0.03 under to dodge the seam test; levelcheck.py now refuses such steps and cracks).
+FLUSH = 0.0
 SIDES = ("back", "front", "left", "right")
 # a brick rim (1 wide, 2.2 high: the ball is turned back by its face) and a low kerb (0.8 wide, 0.7 high, as a gutter's)
 RIMS = {"brick": (L.BORDER_W, L.BORDER_H, "border"), "kerb": (0.8, 0.7, "kerb")}

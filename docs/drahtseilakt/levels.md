@@ -305,6 +305,8 @@ nothing of the floors or rails may hang within 12; and a way may run under anoth
 underside at most 3.6 over it (a wall the ball meets) or 6 and more (room to pass), never between, where a ball
 wedges. The kit refuses a level that breaks either and names the places. A box may stand on another (`box ... up 5`).
 
+**Geometry checks** (2026-11-09, after the owner's play of level 1): the kit refuses a level that fails one of three checks (`levelcheck.py`), naming what and where. *Seams:* no crack and no step of 0.005 to 0.05 where two pieces of floor meet (plazas, discs, branches, corners lie exactly at the floor's height; a flat piece meets a profile only along the profile's flat middle). *Scenery:* no lamp tower, mast, plinth, garland, wall block or column within 5 over the top of a floor (the ball's 4 and a margin of 1; 0.3 beside it, 2 round rails), unless the description marks it `obstacle`. *Shortcuts:* no floor 30 or more further on the route can be reached from an earlier one by a fall or a flight off an edge (a ball at 20 units a second, gravity 20; the measured top speeds are 13.9 paper, 15.9 wood, 17.9 stone; a tilted piece adds a rise; an edge with railings or a border is not a launch) or from a fan's top (17 over its floor), unless the landing is marked `drop [R]` in the description. Loose bodies in the floors (`check_clear`) are still refused.
+
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
 its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26 into it (to a lip) and two flame
