@@ -201,6 +201,7 @@ impl Game {
         sim.bursts = replay_in.as_ref().is_none_or(|r| r.version >= 2);
         sim.pieces_expire = replay_in.as_ref().is_none_or(|r| r.version >= 3);
         sim.checkpoints_by_name = replay_in.as_ref().is_none_or(|r| r.version >= 4);
+        sim.respawn_faces_on = replay_in.as_ref().is_none_or(|r| r.version >= 6);
         let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
         // a replay played with mods that changed the run plays with the very same mods, or not at all
@@ -674,6 +675,7 @@ impl Game {
         sim.bursts = version >= 2;
         sim.pieces_expire = version >= 3;
         sim.checkpoints_by_name = version >= 4;
+        sim.respawn_faces_on = version >= 6;
         sim.level_bonus = self.level_bonus;
         sim
     }
