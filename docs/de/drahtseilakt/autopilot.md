@@ -338,8 +338,14 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
   Zielscheiben, die Kisten aus den Rinnen gestoßen, das Labyrinth von Sektor 4, die Ventilatoren und schwingenden
   Kisten von Sektor 5, und in Sektor 6 zwei lose Steinkugeln vom Gitter gestoßen (eine schiebt den Schieber zwischen
   den Wippen, eine öffnet eine Falltür) und die letzten Schienenpaare.
-- Level 12–13: 12 in Sektor 2 (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator vorbei und den
-  Ventilator hinauf, am Balken, an dem die Ventilatoren 18_10–12 entlangblasen.
+- Level 12: vom Start an in 12:35.68 beendet, ganz ohne Lauf eines Spielers, allein nach dem Plan und den Hinweisen
+  aus dem Storyboard des Walkthroughs (`hints/Level_12.plan`, `.txt`, `.route`; `hints/runs/Level_12.replay`): die
+  Serpentine der dünnen Schiene, das Ziel, das die Brücke in Sektor 3 senkt, die Rinne gekippter Würfel und ihre Lücke,
+  die vier Aufzüge mit Käfig, die Ventilatortreppen, die in die Spiralen geschobenen Steinkugeln, die Kisten auf dem
+  Buckel, die Halbröhren aus Stämmen. Stillstand 5,7 % der Ticks (1,4 % außerhalb von Transformatoren), näher als 1 am
+  Rand 14,1 %, Geschwindigkeit 5,3 ± 3,8.
+- Level 13: in Sektor 2, am Papier-Transformator vorbei und den Ventilator hinauf, am Balken, an dem die Ventilatoren
+  18_10–12 entlangblasen.
 - Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
 - Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
   Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).

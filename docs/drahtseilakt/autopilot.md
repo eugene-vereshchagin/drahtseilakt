@@ -313,8 +313,12 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
   maze rammed down, a loose stone ball rammed into the rails that drive a pusher, the targets, the crates rammed out
   of the channels, the maze of sector 4, the fans and swinging crates of sector 5, and in sector 6 two loose stone balls
   knocked off the grid (one shoves the pusher between the seesaws, one opens a trapdoor) and the last rail pairs.
-- Levels 12–13: 12 in sector 2 (its thin rails); 13 in sector 2, past the paper transformer and up the fan, at the
-  beam the fans 18_10–12 blow along.
+- Level 12: finished from the start in 12:35.68 with no player's run at all, by itself through the walkthrough's plan
+  and the hints written from its storyboard (`hints/Level_12.plan`, `.txt`, `.route`; `hints/runs/Level_12.replay`):
+  the thin rail's serpentine, the target that drops the bridge of sector 3, the crease of tilted cubes and its gap, the
+  four lifts with cages, the stairs of fans, the stone balls shoved into the helices, the boxes on the hump, the log
+  half-pipes. Standing 5.7% of the ticks (1.4% outside transformers), within 1 of an edge 14.1%, speed 5.3 ± 3.8.
+- Level 13: in sector 2, past the paper transformer and up the fan, at the beam the fans 18_10–12 blow along.
 - Videos of the finished runs: `scripts/video.sh`, kept outside the repository.
 - Our ten levels (levels.md, "Our levels and how to edit them"), 2026-11-03: each finished from the start in three
   styles, with the hint files their descriptions write (`assets/levels/<level>/pilot/`).
