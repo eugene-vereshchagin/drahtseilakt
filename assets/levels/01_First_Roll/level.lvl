@@ -142,23 +142,25 @@ pilot all : goto 6 0 0 ; goto 18 -9 0 ; goto 30 6 0 ; goto 38 13 0
 move 36 13 0
 width 7.5
 # the way to the first checkpoint: two corners over the drop with railings outside, a stretch with its edge bare
-floor 100 down 3
+floor 160 down 4
 corner left rail
-floor 60
+floor 90 down 1
 corner right rail
 safety none
-floor 60
+floor 80
 safety gutter
-floor 40
+floor 50
 width 14
+floor 12
+floor 10
 lamptower side 14 ahead 6 height 34 r 3.2
 checkpoint
 
 # ---- sector 2: the courtyard of choices (wood, stone, wood, paper, wood)
 width 7.5
-floor 60 down 3
+floor 110 down 4
 corner left
-floor 40 down 4
+floor 70 down 5
 corner right
 floor 56 down 6
 # the courtyard: 40 x 40 with a brick rim, four corner columns and a lamp tower; in at the middle of the west side, a
@@ -175,7 +177,7 @@ mast side 28 ahead -10 height 26
 mast side 26 ahead 52 height 22
 nopilot all
 # the plate with the transformer, outside the south rim: a step-ramp 8 long out of a gap in it, then the plate
-move 8 -20 0
+move 8 -20 -0.06
 turn -90
 safety none
 width 5.5
@@ -184,7 +186,7 @@ plaza 12 12 kerb gap back 0 5.5
 trafo stone ahead 6 nopilot
 back yard
 # the balcony: the steep ramp (18 degrees, wood only) out of the north gap, a railed square with two points and a life
-move 20 20 0
+move 20 20 -0.06
 turn 90
 safety gutter
 width 6
@@ -201,8 +203,8 @@ pilot collector : goto 20 8 0 ; goto 20 20 0 ; goto 20 33 7 ; goto 24 40 7 ; got
 move 40 0 0
 pilot safe,speed,collector : goto -2 0 0 ; push 1 0 600
 nopilot all
-# the corridor: 8 wide, brick rim, a gentle climb; four stones in single file at its mouth, a bay at its end
-safety border
+# the corridor: a groove 8 wide (it keeps the stones in single file), a gentle climb; four stones at its mouth, a bay at its end
+safety gutter
 width 8
 loose stone ahead 3 plug
 loose stone ahead 7.5 plug
@@ -222,9 +224,9 @@ floor 30
 # the stone road: a hump the stone must hold its push over, a corner, then the wood transformer at the pass
 floor 24 up 3
 floor 24 down 3
-floor 42 down 3
+floor 62 down 3
 corner left
-floor 50 down 3
+floor 90 down 4
 width 11
 floor 4
 floor 6
@@ -244,7 +246,7 @@ move 14 0 -6
 floor 40 down 2
 point ahead -30
 point ahead -22
-floor 20 down 1
+floor 60 down 2
 # the snake: rails 260, a right bend of 60 degrees on 50, then a left one, down all the way, the posts in the clouds
 width 7
 railing both
@@ -254,7 +256,7 @@ rails 30 down 2
 rails-right 60 50 down 2
 point
 rails-left 60 50 down 2
-rails 60 down 4
+rails 110 down 6
 safety gutter
 width 10
 railing both
@@ -283,9 +285,9 @@ garland ahead 8 side 4.4 up 7 ahead2 8 side2 -4.4 up2 7 sag 0.8
 garland ahead 30 side 4.4 up 7 ahead2 30 side2 -4.4 up2 7 sag 0.8
 garland ahead 8 side 4.4 up 7 ahead2 30 side2 4.4 up2 7 sag 2.0
 garland ahead 8 side -4.4 up 7 ahead2 30 side2 -4.4 up2 7 sag 2.0
-floor 40 down 1
+floor 70 down 2
 corner left
-floor 50 down 1
+floor 90 down 2
 corner right
 floor 20 down 1
 railing left
@@ -294,7 +296,7 @@ mark gb
 floor 4
 railing both
 nopilot all
-move 0 -3.5 0
+move 0 -3.5 -0.03
 turn -90
 safety none
 width 5.5
@@ -316,7 +318,7 @@ railing right
 floor 14
 railing off
 # the crate is shoved off the open end; the way goes on by a ramp down on the left, 12 long
-move -7 3.5 0
+move -7 3.5 -0.03
 turn 90
 safety none
 width 5.5
@@ -325,12 +327,14 @@ safety gutter
 surface stone
 width 7.5
 corner right
-floor 60 down 2
+floor 90 down 3
 corner left rail
-floor 70 down 2
+floor 100 down 3
 corner right rail
-floor 50
+floor 80 down 2
 width 14
+floor 12
+floor 10
 lamptower side 14 ahead 6 height 40 r 3.4
 checkpoint
 
@@ -343,9 +347,9 @@ floor 6
 trafo stone ahead -3
 floor 8
 width 7.5
-floor 90 down 3
+floor 130 down 4
 corner right
-floor 100 down 3
+floor 130 down 4
 floor 15 up 2
 floor 15 down 2
 floor 30 down 1
@@ -386,10 +390,10 @@ loose stone ahead -10.5 shove
 loose stone ahead -6 shove
 floor 160 down 11
 corner right rail gap 10
-floor 60 down 2
+floor 90 down 3
 # the terrace: three corners over the drop, a stretch with its edge bare, a balcony with a life
 corner left rail
-floor 50 down 2
+floor 80 down 3
 corner right rail
 floor 20 down 1
 mark bal
@@ -402,7 +406,7 @@ safety none
 floor 60 down 2
 safety gutter
 lamptower side 12 ahead -20 height 30 r 2.8
-floor 40 down 3
+floor 80 down 4
 # rails for the stone: a long bend of 90 on 80 with the posts deepest of the level
 width 7
 railing both
@@ -425,10 +429,12 @@ disc 9 ahead 8.19
 trafo wood ahead 8.19
 lamptower side 12 ahead 8 height 30 r 2.8
 move 16.38 0 0
-floor 40 down 2
+floor 70 down 3
 corner left
-floor 40 down 2
+floor 80 down 3
 width 14
+floor 12
+floor 10
 lamptower side 14 ahead 6 height 44 r 3.4
 checkpoint
 
@@ -436,30 +442,30 @@ checkpoint
 safety gutter
 width 8.5
 floor 14
-floor 60 down 3
+floor 88 down 4
 corner left
-floor 60 down 3
+floor 88 down 4
 corner right
 floor 10 up 2
 floor 10 down 2
 floor 40 down 3
 corner left
 point ahead 3 side 2.2
-floor 60 down 3
+floor 88 down 4
 corner right rail
-floor 60 down 3
+floor 88 down 4
 corner left
 lamptower side -12 ahead -20 height 34 r 3.0
-floor 60 down 3
+floor 88 down 4
 corner right
 point ahead 3 side -2.2
 floor 10 up 2
 floor 10 down 2
 floor 40 down 3
 corner left rail
-floor 60 down 3
+floor 88 down 4
 corner right
-floor 60 down 3
+floor 88 down 4
 corner left
 floor 40 down 2
 # the jump: a run-up with a little lift, ten units of nothing, a railed landing with a life
@@ -478,8 +484,9 @@ floor 40 down 3
 width 5.5
 safety none
 floor 60 down 1
-safety gutter
 width 8.5
+floor 14 down 1
+safety gutter
 corner right
 floor 30 down 2
 # the bowling floor: 30 wide with a brick rim on its long sides, open at the far end; ten wooden pins on the flat in
@@ -503,7 +510,7 @@ point ahead -10 side 9.5
 move 0.01 9.5 0
 safety gutter
 width 8.5
-floor 30 down 1
+floor 70 down 2
 # the quay: boards 6 wide without railings, one hump, thick columns and cables under it, on to the Lighthouse
 safety none
 surface wood
@@ -513,12 +520,13 @@ column ahead 20 depth 70 r 3.2
 column ahead 50 depth 70 r 3.2
 column ahead 80 depth 70 r 3.2
 column ahead 110 depth 70 r 3.2
-garland ahead 0 side 3.3 up -2.8 ahead2 122 side2 3.3 up2 -2.8 sag 10 nolamps
-garland ahead 0 side -3.3 up -2.8 ahead2 122 side2 -3.3 up2 -2.8 sag 10 nolamps
-floor 50
+column ahead 140 depth 70 r 3.2
+garland ahead 0 side 3.3 up -2.8 ahead2 162 side2 3.3 up2 -2.8 sag 12 nolamps
+garland ahead 0 side -3.3 up -2.8 ahead2 162 side2 -3.3 up2 -2.8 sag 12 nolamps
+floor 70
 floor 10 up 2
 floor 10 down 2
-floor 52
+floor 72
 # the Lighthouse: a square tower, the boards wind round it twice, 36 a side, climbing 3 a side, its wall inside, the
 # drop outside (railings on the first two sides only)
 lighthouse side 18 ahead 18 r 13 height 44
