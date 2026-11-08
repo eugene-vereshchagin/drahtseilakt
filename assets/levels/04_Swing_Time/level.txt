@@ -6,3 +6,4 @@ title.ru = Время качелей
 title.de = Schaukelzeit
 title.zh = 摇摆时刻
 order = 4
+difficulty = 4

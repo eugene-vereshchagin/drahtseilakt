@@ -6,3 +6,4 @@ title.ru = Мосты и доски
 title.de = Brücken und Bretter
 title.zh = 桥与板
 order = 5
+difficulty = 5

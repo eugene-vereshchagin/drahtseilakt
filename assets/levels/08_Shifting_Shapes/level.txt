@@ -6,3 +6,4 @@ title.ru = Смена обличий
 title.de = Wechselnde Gestalten
 title.zh = 形态变换
 order = 8
+difficulty = 8
