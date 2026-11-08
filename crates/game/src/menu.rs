@@ -1433,11 +1433,24 @@ impl Menu {
         });
         // a label is fitted to its frame (fit_label): smaller, on two lines where the frame is tall enough, or
         // shortened; what was drawn is told to `probe` (the layout tests)
-        let label = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style| {
+        // a label on a button with its ball at the left end (`ball`: the ball's width): centred on the whole
+        // button while it clears the ball, else centred on what lies right of the ball (the owner's report,
+        // 2026-11-08: long Russian labels ran over the ball)
+        let label_ball = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style, ball: f32| {
             let Some(f) = font else { return };
-            let frame = homogeneous(r);
-            let (quads, k) = fit_label(f, t, frame, style);
-            let placed = crate::ui::place(quads, screen, Anchor::Center);
+            let fit = |r: [f32; 4]| {
+                let frame = homogeneous(r);
+                let (quads, k) = fit_label(f, t, frame, style);
+                (frame, crate::ui::place(quads, screen, Anchor::Center), k)
+            };
+            let left = |q: &[Quad]| q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min);
+            let clear = (ball > 0.0).then(|| screen.rect(homogeneous([r[0] + ball, r[1], r[2], r[3]]), Anchor::Center)[0]);
+            let (mut frame, mut placed, mut k) = fit(r);
+            if let Some(c) = clear {
+                if !placed.is_empty() && left(&placed) < c {
+                    (frame, placed, k) = fit([r[0] + ball, r[1], r[2], r[3]]);
+                }
+            }
             if let Some(p) = probe {
                 p.borrow_mut().push(Probe {
                     text: t.to_owned(),
@@ -1446,9 +1459,13 @@ impl Menu {
                     scale: k,
                     wrap: style.flags & crate::ui::TEXT_WORDWRAP != 0,
                     line: screen.y(line_height(style) * k) - screen.y(0.0),
+                    clear_left: clear,
                 });
             }
             out.extend(placed);
+        };
+        let label = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style| {
+            label_ball(out, t, r, style, 0.0)
         };
         let button = |out: &mut Vec<Quad>, r: [f32; 4], uv: [f32; 4], state: Button, at: Option<Target>| {
             if let Some(target) = at {
@@ -1526,13 +1543,13 @@ impl Menu {
             for (i, &l) in lines.iter().enumerate() {
                 if l == Line::Back {
                     button(out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
-                    label(out, &self.label(l), BACK_RECT, &FONT_01);
+                    label_ball(out, &self.label(l), BACK_RECT, &FONT_01, BALL_BACK);
                     continue;
                 }
                 let y = top + k as f32 * step;
                 let r = [0.35, y, 0.65, y + 0.0938];
                 button(out, r, MAIN_UV, state(i), Some(Target::Line(i)));
-                label(out, &self.label(l), r, &FONT_01);
+                label_ball(out, &self.label(l), r, &FONT_01, BALL_MAIN);
                 k += 1;
             }
         };
@@ -1547,7 +1564,7 @@ impl Menu {
                 .position(|&l| l == Line::Back || l == Line::Next)
             {
                 button(out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
-                label(out, &self.label(lines[i]), BACK_RECT, &FONT_01);
+                label_ball(out, &self.label(lines[i]), BACK_RECT, &FONT_01, BALL_BACK);
             }
         };
         // a field: its label at the top, its value under it (a yes/no pair, or text between arrows)
@@ -1555,7 +1572,7 @@ impl Menu {
             let r = [0.35, y, 0.65, y + 0.1];
             let st = if self.chosen() == i { Button::Over } else { Button::Up };
             button(out, r, FIELD_UV, st, Some(Target::Line(i)));
-            label(out, name, [0.35, y + 0.005, 0.65, y + 0.045], &FONT_03);
+            label_ball(out, name, [0.35, y + 0.005, 0.65, y + 0.045], &FONT_03, BALL_MAIN);
             label(out, value, [0.40, y + 0.045, 0.60, y + 0.085], &FONT_03);
         };
         match sc {
@@ -1570,7 +1587,7 @@ impl Menu {
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Lang(k) = l else {
                         button(&mut out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
-                        label(&mut out, &self.label(l), BACK_RECT, &FONT_01);
+                        label_ball(&mut out, &self.label(l), BACK_RECT, &FONT_01, BALL_BACK);
                         continue;
                     };
                     let y = 0.28 + k as f32 * 0.065;
@@ -1588,7 +1605,7 @@ impl Menu {
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Level(k) = l else {
                         button(&mut out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
-                        label(&mut out, &self.label(l), BACK_RECT, &FONT_01);
+                        label_ball(&mut out, &self.label(l), BACK_RECT, &FONT_01, BALL_BACK);
                         continue;
                     };
                     let y = 0.09 + k as f32 * step;
@@ -1881,6 +1898,8 @@ pub struct Probe {
     pub wrap: bool,
     /// A line's height at the size drawn (window pixels).
     pub line: f32,
+    /// On a button with a ball at its left end: where the ball ends (window pixels); the glyphs stay right of it.
+    pub clear_left: Option<f32>,
 }
 
 /// The smallest a one-line label is drawn to fit, against its style's size; below it the label loses its middle.
@@ -2031,6 +2050,10 @@ const PLACE_UV: [f32; 4] = [0.0, 0.0627, 1.0, 0.1686];
 const ARROW_LEFT_UV: [f32; 4] = [0.6392, 0.2471, 0.7882, 0.4039];
 const ARROW_RIGHT_UV: [f32; 4] = [0.7921, 0.2471, 0.9412, 0.4039];
 const BACK_RECT: [f32; 4] = [0.4031, 0.85, 0.5906, 0.9438];
+/// The width of the ball at the left end of a big button or a field (MAIN_UV, FIELD_UV), and of Back's (BACK_UV),
+/// measured on the drawn buttons: a label stays right of it.
+const BALL_MAIN: f32 = 0.05;
+const BALL_BACK: f32 = 0.042;
 /// Where the key row's bar is cut to leave its middle mark out (texture u of the left end's end, the right's start).
 const ROW_CUT: [f32; 2] = [0.46, 0.58];
 /// A texture no interface has: drawn as plain white, tinted (the scroll bar).
@@ -2589,6 +2612,9 @@ mod tests {
                                 b[0] >= r[0] - tol && b[2] <= r[2] + tol && b[1] >= r[1] - tol && b[3] <= r[3] + tol,
                                 "a label off its button {r:?}: {at}"
                             );
+                        }
+                        if let Some(c) = p.clear_left {
+                            assert!(b[0] >= c - tol, "a label over its button's ball (ends at {c}): {at}");
                         }
                         if !p.wrap {
                             assert!(p.scale >= SHRINK - 1e-3, "a label drawn at {} of its size: {at}", p.scale);
