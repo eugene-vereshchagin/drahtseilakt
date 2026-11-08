@@ -511,8 +511,9 @@ class LevelBuilder:
         self.reset(1, reset)
         return reset
 
-    def reset(self, n, point, xaxis=(0, 0, 1)):
-        """Reset point n at `point` (where the ball comes back)."""
+    def reset(self, n, point, xaxis=(-1, 0, 0)):
+        """Reset point n at `point` (where the ball comes back). As in the original levels, the way on is along the
+        point's -x axis: the camera looks that way after a respawn (give the track's direction negated)."""
         self.placeholder(f"PR_Resetpoint_{n:02d}", ["PR_Resetpoints"], K.pose(point, xaxis), (-2, -2, -2), (2, 2, 2))
 
     def column(self, name, top, depth=40.0, r=2.2):
@@ -547,7 +548,7 @@ class LevelBuilder:
         self.placeholder(f"PC_TwoFlames_{n:02d}", ["PC_Checkpoints"], K.pose(tuple(bottom), tuple(f)), (-4, 0, -8),
                          (4, 6, 8))
         reset = tuple(bottom + np.array([0.0, CHECK_RESET, 0.0]))
-        self.reset(n + 1, reset, tuple(left))
+        self.reset(n + 1, reset, tuple(-f))
         return reset
 
     def finish(self, at, sector, xaxis=(-1, 0, 0)):

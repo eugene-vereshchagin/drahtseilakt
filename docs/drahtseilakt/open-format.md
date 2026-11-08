@@ -39,6 +39,10 @@ A folder holding:
 
 - **Nodes**: one per object of the level, in order, with its name, its world `matrix` and, if it is drawn,
   its `mesh`. `extras.drahtseilakt.visible` tells whether the object is shown.
+- **Reset points** (group `PR_Resetpoints`, nodes `PR_Resetpoint_NN`, one per sector, the first at the start):
+  where the ball comes back in sector NN. The node's rotation also says which way the track runs: the camera looks
+  along the point's **-x axis** (as in the original levels), snapped to the nearest quarter turn on the ground, after
+  a respawn, so the view hints at the way on. Our level builder writes each point with its -x axis along the track.
 - **Meshes**: one per mesh with geometry; one primitive per material, all primitives of a mesh sharing the
   same `POSITION`, `NORMAL` and `TEXCOORD_0` accessors (floats), `indices` as 32-bit integers. A mesh's
   material channels (passes over the whole mesh with another material) are `extras.drahtseilakt.channels`:

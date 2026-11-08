@@ -2075,8 +2075,10 @@ impl Sim {
         // The rig comes back as it was at the start (TT Restore IC on Cam_MF, put at the reset point): the start
         // heading, not lifted, the look-at point at the ball; InGameCam springs there from where it was, its speed
         // forgotten.
-        self.camera.quarter = START_QUARTER;
-        self.camera.yaw = START_QUARTER as f32 * std::f32::consts::FRAC_PI_2;
+        // It looks along the reset point's own heading (its local -X, as the start's does), the way on to roll next.
+        let quarter = quarter_of_turn(turn);
+        self.camera.quarter = quarter;
+        self.camera.yaw = quarter as f32 * std::f32::consts::FRAC_PI_2;
         self.camera.lift = 0.0;
         self.camera.step = Vec3::ZERO;
         self.camera.target = self.ball.position;
@@ -2163,6 +2165,16 @@ fn sorted_turns_by_name(level: &Level, group: &str) -> Vec<Mat3> {
         .collect();
     v.sort_by(|a, b| name_order(&a.0, &b.0));
     v.into_iter().map(|x| x.1).collect()
+}
+
+/// The view heading, in quarter turns, of an object turned by `turn`: the quarter nearest to where its local -X axis
+/// points on the ground (1 is world +X, as `START_QUARTER`); an upright-less turn falls back to the start's.
+fn quarter_of_turn(turn: Mat3) -> i32 {
+    let f = turn * Vec3::NEG_X;
+    if f.x.abs() + f.z.abs() < 1e-3 {
+        return START_QUARTER;
+    }
+    (f.x.atan2(f.z) / std::f32::consts::FRAC_PI_2).round() as i32
 }
 
 /// An object's turn: its matrix without scale.
@@ -2358,7 +2370,17 @@ pub(crate) mod tests {
             objects: vec![
                 object("floor", Some(0), at(0.0, 0.0, 0.0)),
                 object("PS_FourFlames_01", None, at(0.0, 0.0, 0.0)),
-                object("PR_Resetpoint_01", None, at(0.0, BALL_RADIUS, 0.0)),
+                // as the original's: turned half about y, so its -x axis (the way on) points along +x
+                object(
+                    "PR_Resetpoint_01",
+                    None,
+                    [
+                        [-1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, -1.0, 0.0],
+                        [0.0, BALL_RADIUS, 0.0, 1.0],
+                    ],
+                ),
             ],
             groups: vec![
                 Group {
@@ -2592,6 +2614,33 @@ pub(crate) mod tests {
         assert_eq!(sim.camera.quarter, START_QUARTER);
         assert!((sim.camera.yaw - START_QUARTER as f32 * std::f32::consts::FRAC_PI_2).abs() < 1e-6);
         assert_eq!(sim.camera.lift, 0.0);
+    }
+
+    #[test]
+    fn a_respawn_looks_along_the_reset_points_way_on() {
+        // A reset point turned so that its -x axis points along -z: the view after a respawn looks that way, and
+        // "up" pushes that way.
+        let mut level = flat_level();
+        let r = level.objects.iter().position(|o| o.name == "PR_Resetpoint_01").unwrap();
+        level.objects[r].matrix = [
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [-1.0, 0.0, 0.0, 0.0],
+            [0.0, BALL_RADIUS, 0.0, 1.0],
+        ];
+        let mut sim = Sim::new(&level, BallKind::Paper);
+        sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
+        for _ in 0..600 {
+            sim.step(0);
+            if sim.lives < 3 {
+                break;
+            }
+        }
+        for _ in 0..DEATH_RESPAWN_TICKS {
+            sim.step(0);
+        }
+        assert_eq!(sim.camera.quarter.rem_euclid(4), 2);
+        assert_eq!(sim.camera.push_forward(), Vec3::NEG_Z);
     }
 
     #[test]
