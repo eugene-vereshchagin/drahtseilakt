@@ -22,6 +22,7 @@ music 1
 bonus 100
 ball wood
 columns 60
+smooth
 
 # ---- sector 1: the tower's dawn (wood)
 safety gutter

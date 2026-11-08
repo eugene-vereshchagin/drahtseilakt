@@ -54,6 +54,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     pusher left|right        a pusher (P_Modul_01) in a slot of 1.6 across the way: its block fills the way (at
                              most 6 wide), its target plate stands 5 out past the way's edge on that side, over a
                              floor 2.5 lower (laid by the description) from where a ball pushes the block out
+    smooth                   the careful styles' hints roll through the way's points (`pass`, no stop at each; a
+                             hard corner at a set speed)
     corner left|right [rail] [gap G]   a hard 90 degree corner at the end of a floor (a mitred ring: the outer corner
                              filled, the profile unbroken); `rail`: a railing on its outer side 8 either side, open
                              for G along the way straight on
@@ -137,6 +139,8 @@ class Pilot:
     def __init__(self):
         self.sectors = []  # [(trigger point, sector number, {style: [steps]})]
         self.auto = {s: True for s in STYLES}
+        # `smooth`: the careful styles roll through the way's points (hint step `pass`) instead of stopping at each
+        self.smooth = False
         self.last = {s: None for s in STYLES}
 
     def begin(self, at, sector):
@@ -159,6 +163,8 @@ class Pilot:
             if force or np.linalg.norm(p - self.last[s]) >= SPACING[s]:
                 if s == "speed":
                     self.step([s], f"via {fmt(p)}", p)
+                elif not self.smooth:
+                    self.step([s], f"goto {fmt(p)}", p)
                 else:
                     # rolling on through the point, no faster than PASS_V: a smooth ride (no stop at each point)
                     self.step([s], f"pass {fmt(p)} {PASS_V[s]:g}", p)
@@ -166,6 +172,8 @@ class Pilot:
     def corner(self, p, v):
         """A hard corner at `p`: every style takes it through (the last point of the floor before it, when it is this
         one, is replaced), no faster than v."""
+        if not self.smooth:
+            return
         for s in STYLES:
             if not self.auto[s] or not self.sectors:
                 continue
@@ -323,7 +331,7 @@ class Track:
         way = [pts[0]]
         for q in pts[1:]:
             d = float(np.linalg.norm(q - way[-1]))
-            k = int(d // 30.0)
+            k = int(d // 30.0) if self.pilot.smooth else 0
             way += [way[-1] + (q - way[-1]) * (j / (k + 1)) for j in range(1, k + 1)]
             way.append(q)
         for p in way[1:]:
@@ -575,6 +583,8 @@ class Track:
             self.floor_end = None
         elif cmd == "corner":
             self.corner(args, opts, line)
+        elif cmd == "smooth":
+            self.pilot.smooth = True
         elif cmd == "plaza":
             self.plaza(args, opts, line)
         elif cmd == "disc":

@@ -133,7 +133,7 @@ def plaza(b, name, at, fwd, width, length, rim, gaps, fence, sector, surface="st
                 centre = (p0 + p1) / 2 - out * rw / 2 + UP * h / 2
                 solid(m, b.mat_ids[rmat], b.mat_ids[rmat], centre, (along, UP, out), ((c - a) / 2, h / 2, rw / 2),
                       scale=L.BRICK)
-    groups = b._floor_groups("wood" if surface == "wood" else "stone") + b.sector(sector)
+    groups = b._floor_groups("wood" if surface == "wood" else "stone")
     node = b.add(name, m, groups=groups)
     for side in fence:
         o, along, span, out = edge[side]
@@ -154,7 +154,7 @@ def disc(b, name, centre, r, sector, thick=L.DEPTH, surface="stone", rim=False):
     K.cylinder(m, b.mat_ids["side"], (x, y - thick, z), UP, r, thick, seg=40, cap_mat=top, vscale=L.SLAB)
     if rim:
         K.cylinder(m, b.mat_ids["border"], (x, y - 0.6, z), UP, r + 0.25, 1.0, seg=40, vscale=L.BRICK)
-    return b.add(name, m, groups=b._floor_groups(surface) + b.sector(sector))
+    return b.add(name, m, groups=b._floor_groups(surface))
 
 
 def pit(b, name, at, fwd, width, length, depth, wall_len, wall_h, wall_side, sector):
@@ -181,7 +181,7 @@ def pit(b, name, at, fwd, width, length, depth, wall_len, wall_h, wall_side, sec
     if wall_len > 0:
         solid(m, b.mat_ids["border"], b.mat_ids["border"], mid + lft * wall_side * (width / 2 + 0.5) + UP * wall_h / 2,
               axes, (wall_len / 2, wall_h / 2, 0.5), scale=L.BRICK)
-    return b.add(name, m, groups=b._floor_groups("stone") + b.sector(sector))
+    return b.add(name, m, groups=b._floor_groups("stone"))
 
 
 # --- scenery ---------------------------------------------------------------------------------------------------------
@@ -265,7 +265,7 @@ def wall_block(b, name, at, fwd, length, height, thick, sector, depth=L.DEPTH + 
           scale=L.SLAB)
     solid(m, b.mat_ids["border"], b.mat_ids["border"], c + UP * ((height + depth) / 2 - 0.4), (f, UP, lft),
           (length / 2 + 0.3, 0.5, thick / 2 + 0.3), scale=L.BRICK)
-    return b.add(name, m, groups=b._floor_groups("stone") + b.sector(sector))
+    return b.add(name, m, groups=b._floor_groups("stone"))
 
 
 def lighthouse(b, name, base, half, height, sector, depth=L.COLUMN_DEPTH):
@@ -283,7 +283,7 @@ def lighthouse(b, name, base, half, height, sector, depth=L.COLUMN_DEPTH):
     bottom = y - 12.0
     solid(body, b.mat_ids["beige"], b.mat_ids["beige"], (x, (top + bottom) / 2, z), axes,
           (half, (top - bottom) / 2, half), scale=L.SLAB)
-    node = b.add(name, body, groups=b._floor_groups("stone") + b.sector(sector))
+    node = b.add(name, body, groups=b._floor_groups("stone"))
     deep = K.Mesh(name + "_Deep")
     lo = y - depth
     solid(deep, b.mat_ids["beige"], b.mat_ids["beige"], (x, (lo + bottom) / 2, z), axes,
