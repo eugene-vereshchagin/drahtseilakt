@@ -327,7 +327,7 @@ def check_bowl(width):
     return [(r * k, h * k) for r, h in CHECK_BOWL]
 
 
-def ring_frames(path, headings=None):
+def ring_frames(path, headings=None, scales=None):
     """Each point of a track's path with its heading (horizontal, along the way), the direction to its right and up
     (the world's), and its direction along the path (with the slope). A cross-section stands upright across the
     heading, so two pieces meeting at a point with the same heading (a straight into a turn, a ramp into a flat) have
@@ -348,17 +348,20 @@ def ring_frames(path, headings=None):
             t = f
         t = t / np.linalg.norm(t)
         side = np.array([f[2], 0.0, -f[0]])
+        if scales is not None:
+            # a mitred corner: the ring stands on the bisector and reaches 1/cos 45 degrees further across
+            side = side * scales[i]
         out.append((p, f, side, up, t))
     return out
 
 
-def track_sweep(m, mats, path, widths, along, safety, surface, caps=(True, True), headings=None):
+def track_sweep(m, mats, path, widths, along, safety, surface, caps=(True, True), headings=None, scales=None):
     """A stretch of track: its cross-section (section) carried along `path`, each point with its width (a width
     changing between two points tapers), its heading and its distance along the whole track (`along`), by which every
     texture runs on from one piece into the next with no seam. One strip of quads for each edge of the cross-section,
     the points of each ring shared by the quads before and after it (no cracks, no T-junctions along the way). Ends
     closed where `caps` says (a stretch running on into another piece is not)."""
-    fr = ring_frames(path, headings)
+    fr = ring_frames(path, headings, scales)
     secs = [section(w, safety, surface) for w in widths]
     edges = secs[0][1]
     n = len(secs[0][0])
@@ -563,7 +566,7 @@ class LevelBuilder:
     # --- track -------------------------------------------------------------------------------------------------
 
     def track(self, name, path, widths, along, safety="border", surface="stone", caps=(True, True), headings=None,
-              railings=None):
+              railings=None, scales=None):
         """A stretch of track along a path of points (its top's centre line), each with its width, its heading and its
         distance along the whole track (track_sweep). `railings`: for each point, whether a railing runs on its left
         and on its right from the point before to it ((left, right) pairs); none given, both sides have them when the
@@ -577,7 +580,7 @@ class LevelBuilder:
         for p, w, f in narrow:
             self.narrow.append(f"{name} at ({p[0]:.1f}, {p[1]:.1f}, {p[2]:.1f}): {w:.1f} wide, {f:.2f} free ({safety})")
         m = K.Mesh(name)
-        track_sweep(m, self.mat_ids, path, widths, along, safety, surface, caps, headings)
+        track_sweep(m, self.mat_ids, path, widths, along, safety, surface, caps, headings, scales)
         i = self.add(name, m, groups=self._floor_groups("wood" if surface == "wood" else "stone"))
         for k, side in ((0, "Left"), (1, "Right")):
             runs, cur = [], None
@@ -592,15 +595,17 @@ class LevelBuilder:
             for r, (j0, j1) in enumerate(runs):
                 sl = slice(j0, j1 + 1)
                 self.railings(f"{name}_Railing_{side}{r + 1}", path[sl], widths[sl],
-                              None if headings is None else headings[sl], safety, surface, sides=(k,))
+                              None if headings is None else headings[sl], safety, surface, sides=(k,),
+                              scales=None if scales is None else scales[sl])
         return i
 
-    def railings(self, name, path, widths, headings=None, safety="railings", surface="stone", sides=(0, 1)):
+    def railings(self, name, path, widths, headings=None, safety="railings", surface="stone", sides=(0, 1),
+                 scales=None):
         """Steel railings along the edges of a stretch (`sides`: 0 its left, 1 its right): two rails on posts
         (RAIL_HEIGHTS over the floor's top where they stand), solid to the ball (the original's railings are in the
         rails' physics group too)."""
         m = K.Mesh(name)
-        fr = ring_frames(path, headings)
+        fr = ring_frames(path, headings, scales)
         rail = self.mat_ids["rail"]
         for k in sides:
             sgn = -1.0 if k == 0 else 1.0

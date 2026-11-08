@@ -80,6 +80,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import levelkit as L  # noqa: E402
+import levelparts as P  # noqa: E402
 import ownkit as K  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -104,6 +105,7 @@ except ValueError:
     pass
 # The slots the stone on the crate and a pusher stand in (crateblock, pusher): the stone is 5 on a side, the pusher's
 # beam 1.2 wide in its channel.
+CORNER_RAIL = 8.0
 CRATE_SLOT = 6.0
 PUSHER_SLOT = 1.6
 # A hint's steps at most (hints.rs takes 64).
@@ -175,7 +177,7 @@ def trim_end(st, cut):
             along[-1] = along[-2] + seg * t
             return st
         cut -= seg
-        for k in ("path", "widths", "along", "heads", "rails"):
+        for k in ("path", "widths", "along", "heads", "rails", "scales"):
             st[k].pop()
     return st
 
@@ -225,6 +227,8 @@ class Track:
         # the distance along the way where each sector ends (its checkpoint, the finish)
         self.sector_ends = []
         self.columns = 0.0
+        self.scatter_every = 0.0
+        self.lighthouse_at = None
         self.column_run = 0.0
         self.column_spots = []
         # the length of floor laid since the last gap: the most a run-up to the next can take
@@ -319,7 +323,7 @@ class Track:
         st = self.stretch
         runs_on = (st is not None and st["safety"] == self.safety and st["surface"] == self.surface
                    and np.linalg.norm(st["path"][-1] - pts[0]) < 1e-6
-                   and np.linalg.norm(st["heads"][-1] - heads[0]) < 1e-6)
+                   and np.linalg.norm(st.get("tail", st["heads"][-1]) - heads[0]) < 1e-6)
         if not runs_on:
             self.end_stretch()
             from_start = self.build_start(pts[0])
@@ -328,7 +332,7 @@ class Track:
             if self.pending is None and (self.floor_end is None or np.linalg.norm(self.floor_end - pts[0]) > 1e-6):
                 self.laid_width = self.width
             st = self.stretch = {"path": [pts[0]], "widths": [self.laid_width or self.width], "along": [self.along],
-                                 "heads": [heads[0]], "rails": [self.rail_sides], "safety": self.safety,
+                                 "heads": [heads[0]], "rails": [self.rail_sides], "scales": [1.0], "safety": self.safety,
                                  "surface": self.surface, "from_start": from_start}
             self.resolve_pending(st)
         w0 = self.laid_width if self.laid_width is not None else self.width
@@ -338,11 +342,13 @@ class Track:
             run += float(np.linalg.norm(b - a))
             st["path"].append(b)
             st["heads"].append(h)
+            st["scales"].append(1.0)
             st["rails"].append((self.rail_sides[0] or self.turn_rail[0], self.rail_sides[1] or self.turn_rail[1]))
             st["widths"].append(w0 + (self.width - w0) * (run / length if length > 0 else 1.0))
             st["along"].append(st["along"][-1] + float(np.linalg.norm(b - a)))
         self.along = st["along"][-1]
         self.laid_width = self.width
+        st.pop("tail", None)
 
     def resolve_pending(self, st=None):
         """Builds the checkpoint waiting for the floor after it: joined to that floor when it runs on from the
@@ -442,7 +448,7 @@ class Track:
         try:
             self.b.track(f"Floor_{self.n('Floor'):03d}", [tuple(p) for p in st["path"]], st["widths"], st["along"],
                          st["safety"], st["surface"], caps=(not begins_joined, not st.get("ends_joined", False)),
-                         headings=st["heads"], railings=st["rails"])
+                         headings=st["heads"], railings=st["rails"], scales=st["scales"])
         except ValueError as e:
             raise LevelError(str(e)) from None
         return st
@@ -517,12 +523,34 @@ class Track:
             if self.surface not in ("stone", "wood"):
                 raise LevelError(f"line {line}: surface is stone or wood")
         elif cmd == "mark":
-            self.marks[word(args, 0, line)] = (self.pos.copy(), self.head)
+            self.marks[word(args, 0, line)] = (self.pos.copy(), self.head, self.along, self.width)
         elif cmd == "back":
+            # a branch ends here: nothing laid after runs on from what was before
             name = word(args, 0, line)
             if name not in self.marks:
                 raise LevelError(f"line {line}: no mark {name}")
+            self.end_stretch()
+            self.end_rails()
             self.pos, self.head = self.marks[name][0].copy(), self.marks[name][1]
+            self.along = self.marks[name][2]
+            if "keepwidth" not in args:
+                self.width = self.marks[name][3]
+            self.floor_end = None
+        elif cmd == "corner":
+            self.corner(args, line)
+        elif cmd == "plaza":
+            self.plaza(args, opts, line)
+        elif cmd == "disc":
+            self.end_stretch()
+            c = self.at(float(opts.get("ahead", 0)), float(opts.get("side", 0)), float(opts.get("up", 0)))
+            self.b.disc_node = P.disc(self.b, f"Disc_{self.n('disc'):02d}", tuple(c), num(args, 0, line), self.sector,
+                                      surface=self.surface, rim="rim" in args)
+        elif cmd == "pit":
+            self.pit(args, opts, line)
+        elif cmd in ("lamptower", "mast", "plinth", "wallblock", "lighthouse", "garland", "wlamp"):
+            self.scenery(cmd, args, opts, line)
+        elif cmd == "scatter":
+            self.scatter_every = num(args, 0, line)
         elif cmd == "start":
             if args:
                 self.pos = np.array([num(args, i, line) for i in range(3)])
@@ -611,6 +639,111 @@ class Track:
                 self.pilot.auto[s] = cmd == "autopilot"
         else:
             raise LevelError(f"line {line}: unknown command {cmd}")
+
+    def corner(self, args, line):
+        """A hard 90 degree corner: the last floor's end becomes a mitre ring (the cross-section standing on the
+        bisector, 1/cos 45 wider across) shared with the floor that follows, whose heading is turned 90: the outer
+        corner filled, the profile continuous. `rail`: a railing 8 either side of it on the outer side."""
+        d = word(args, 0, line)
+        if d not in ("left", "right"):
+            raise LevelError(f"line {line}: corner left|right")
+        sgn = 1.0 if d == "left" else -1.0
+        st = self.stretch
+        if st is None or len(st["path"]) < 2 or np.linalg.norm(st["path"][-1] - self.pos) > 1e-6:
+            raise LevelError(f"line {line}: a corner must come at the end of a floor")
+        outer = (False, True) if sgn > 0 else (True, False)
+        reach = CORNER_RAIL
+        if "rail" in args:
+            seg = st["along"][-1] - st["along"][-2]
+            r = min(reach, seg * 0.5)
+            t = 1 - r / seg
+            P0, P1 = st["path"][-2], st["path"][-1]
+            st["path"].insert(-1, P0 + (P1 - P0) * t)
+            st["widths"].insert(-1, st["widths"][-2] + (st["widths"][-1] - st["widths"][-2]) * t)
+            st["along"].insert(-1, st["along"][-1] - r)
+            st["heads"].insert(-1, st["heads"][-2])
+            st["scales"].insert(-1, 1.0)
+            st["rails"].insert(-1, st["rails"][-1])
+            old = st["rails"][-1]
+            st["rails"][-1] = (old[0] or outer[0], old[1] or outer[1])
+        st["heads"][-1] = self.fwd(self.head + 45.0 * sgn)
+        st["scales"][-1] = math.sqrt(2.0)
+        self.head += 90.0 * sgn
+        st["tail"] = self.fwd()
+        if "rail" in args:
+            self.turn_rail = outer
+            pts, heads = self.straight(reach, 0.0)
+            self.lay(pts, heads, "Floor", straight=True)
+            self.turn_rail = (False, False)
+            self.move_along(pts)
+
+    def plaza(self, args, opts, line):
+        """plaza W L [brick|kerb] [stone|wood] [gap SIDE C W]... [fence SIDE...]: a flat square of floor from the middle
+        of its back edge (at the cursor, moved by side/ahead/up), the cursor staying."""
+        self.end_stretch()
+        width, length = num(args, 0, line), num(args, 1, line)
+        rim, gaps, fence, surf = None, {}, [], self.surface
+        i = 2
+        while i < len(args):
+            a = args[i]
+            if a in ("brick", "kerb"):
+                rim = a
+            elif a in ("stone", "wood"):
+                surf = a
+            elif a == "gap":
+                side = word(args, i + 1, line)
+                if side not in P.SIDES:
+                    raise LevelError(f"line {line}: plaza gap back|front|left|right C W")
+                gaps.setdefault(side, []).append((num(args, i + 2, line), num(args, i + 3, line)))
+                i += 3
+            elif a == "fence":
+                while i + 1 < len(args) and args[i + 1] in P.SIDES:
+                    fence.append(args[i + 1])
+                    i += 1
+            else:
+                raise LevelError(f"line {line}: plaza: what is {a!r}")
+            i += 1
+        at = self.at(float(opts.get("ahead", 0)), float(opts.get("side", 0)), float(opts.get("up", 0)))
+        P.plaza(self.b, f"Plaza_{self.n('plaza'):02d}", at, self.fwd(), width, length, rim, gaps, fence, self.sector,
+                surf)
+        # the floor under it counts for columns and overpasses
+        for a in np.linspace(0, length, max(2, int(length / 6) + 1)):
+            self.floor_points.append(at + self.fwd() * a)
+            self.floor_reach.append(max(width, 2.0) / 2 + 0.0)
+            self.floor_along.append(self.along + a)
+            self.floor_rails.append(False)
+
+    def pit(self, args, opts, line):
+        """pit L [depth D] [wall LEN] [side S]: the way stops for L; a flat bottom D (4.3) under it, its walls, and a
+        stop wall LEN long, 2 high, on side S (1 left, -1 right) of the way beyond its kerb."""
+        length = num(args, 0, line)
+        depth = float(opts.get("depth", 4.3))
+        P.pit(self.b, f"Pit_{self.n('pit'):02d}", self.pos.copy(), self.fwd(), self.width, length, depth,
+              float(opts.get("wall", 0)), 2.0, float(opts.get("side", 1)), self.sector)
+        self.slot(length)
+
+    def scenery(self, cmd, args, opts, line):
+        p = self.at(float(opts.get("ahead", 0)), float(opts.get("side", 0)), float(opts.get("up", 0)))
+        n = f"{cmd.capitalize()}_{self.n(cmd):02d}"
+        if cmd == "lamptower":
+            P.lamp_tower(self.b, n, tuple(p), float(opts.get("r", 2.6)), float(opts.get("height", 20)))
+        elif cmd == "mast":
+            P.mast(self.b, n, tuple(p), float(opts.get("height", 22)))
+        elif cmd == "plinth":
+            P.plinth(self.b, n, tuple(p), float(opts.get("r", 4.5)))
+        elif cmd == "wallblock":
+            P.wall_block(self.b, n, tuple(p), self.fwd(), float(opts.get("long", 40)), float(opts.get("height", 14)),
+                         float(opts.get("thick", 6)), self.sector)
+        elif cmd == "lighthouse":
+            P.lighthouse(self.b, n, tuple(p), float(opts.get("r", 13)), float(opts.get("height", 40)), self.sector)
+            self.lighthouse_at = p
+        elif cmd == "garland":
+            q = self.at(float(opts.get("ahead2", 0)), float(opts.get("side2", 0)), float(opts.get("up2", 0)))
+            P.garland(self.b, n, tuple(p), tuple(q), float(opts.get("sag", 2.0)), lamps="nolamps" not in args)
+        elif cmd == "wlamp":
+            # a lantern on a wall: `side` is out from the wall toward the lamp (turn: the direction it faces)
+            out = self.fwd(self.head + float(opts.get("turn", 90)))
+            self.b.lantern(tuple(p), tuple(out))
 
     def set_safety(self, kind):
         """The floors' profile from here on, and their railings: both sides for railings (on the bare floor), none
@@ -708,6 +841,19 @@ class Track:
                 if np.any((flat < reach + 3.0) & (below[:, 1] < c[1] - 1.0) & (below[:, 1] > c[1] - depth - 3.0)):
                     continue
             self.b.column(f"Column_{self.n('column'):03d}", tuple(c), depth)
+
+    def place_scatter(self):
+        """The distant scenery (`scatter D`): one object every D units of the way, clear of every floor."""
+        if not self.scatter_every:
+            return
+        rng = np.random.default_rng(sum(map(ord, os.path.basename(self.b.out))) + 7)
+        avoid = list(zip(self.floor_points, self.floor_reach))
+        if self.lighthouse_at is not None:
+            avoid += [(self.lighthouse_at, 40.0)]
+        # the way, in order, as a path
+        order = sorted(range(len(self.floor_points)), key=lambda k: self.floor_along[k])
+        path = [self.floor_points[k] for k in order]
+        P.scatter(self.b, rng, path, None, None, self.scatter_every, avoid)
 
     def rise(self, opts, line):
         if "up" in opts:
@@ -930,7 +1076,8 @@ def styles_of(text, line):
     return out
 
 
-OPTION_WORDS = ("up", "down", "side", "ahead", "depth", "turn", "tilt", "runup")
+OPTION_WORDS = ("up", "down", "side", "ahead", "depth", "turn", "tilt", "runup", "r", "height", "wall", "sag", "ahead2",
+                "side2", "up2", "thick", "long", "hole")
 FLAG_WORDS = ("nopilot", "ties", "shove")
 
 
@@ -1036,6 +1183,7 @@ def compile_level(path):
     t.check_bodies()
     t.check_overpasses()
     t.place_columns()
+    t.place_scatter()
     info = t.info
     titles = info["titles"]
     if "en" not in titles:
