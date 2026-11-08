@@ -736,6 +736,9 @@ pub struct Sim {
     /// The checkpoints follow their names: off only to play a replay recorded before (formats 1 to 3), when they
     /// followed their group's list, and a level that lists them out of order (11, 12) never opened some sectors.
     pub checkpoints_by_name: bool,
+    /// After a lost ball the camera looks along the reset point's way on: off only to play a replay recorded before
+    /// (formats 1 to 5), when it came back to the start heading and the keys pushed along that.
+    pub respawn_faces_on: bool,
     /// The points counter's ticks counted, and the tick it goes on from after a lost ball.
     points_clock: u64,
     points_resume: u64,
@@ -1151,6 +1154,7 @@ impl Sim {
             pieces_expire: true,
             bursts: true,
             checkpoints_by_name: true,
+            respawn_faces_on: true,
             depth_from: DEPTH_PHASE,
             points_clock: 0,
             points_resume: 0,
@@ -2076,7 +2080,7 @@ impl Sim {
         // heading, not lifted, the look-at point at the ball; InGameCam springs there from where it was, its speed
         // forgotten.
         // It looks along the reset point's own heading (its local -X, as the start's does), the way on to roll next.
-        let quarter = quarter_of_turn(turn);
+        let quarter = if self.respawn_faces_on { quarter_of_turn(turn) } else { START_QUARTER };
         self.camera.quarter = quarter;
         self.camera.yaw = quarter as f32 * std::f32::consts::FRAC_PI_2;
         self.camera.lift = 0.0;
