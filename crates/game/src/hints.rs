@@ -61,8 +61,10 @@ pub enum Step {
     Inputs(i32, Vec<u8>),
     /// Keep this far ahead of (behind, when negative) the loose body nearest the point as it rolls, for so many ticks.
     Lead(Vec3, f32, u64),
-    /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most.
-    Shove(Vec3, Vec3, u64),
+    /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most; going
+    /// round it this far from its middle (a ball's size by default; a crate is bigger), and pushing only while it
+    /// is slower than the speed, when one is given (a crate on a slope slides on by itself).
+    Shove(Vec3, Vec3, u64, f32, Option<f32>),
     /// Hold the ball where it is until the loose body (or module part) nearest the first point is within the
     /// distance of the second, for so many ticks at most: a swing or a lift to get on or off at the right moment.
     Await(Vec3, Vec3, f32, u64),
@@ -209,7 +211,25 @@ fn step(words: &[&str]) -> Result<Step, String> {
         "shove" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let to = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
-            Step::Shove(p, to, ticks(w.next())?)
+            let n = ticks(w.next())?;
+            let round = match w.next() {
+                Some(r) => num(Some(r))?,
+                None => SHOVE_BEHIND,
+            };
+            if !(SHOVE_BEHIND..=MAX_SHOVE_ROUND).contains(&round) {
+                return Err(format!("shove goes round at {SHOVE_BEHIND} to {MAX_SHOVE_ROUND}"));
+            }
+            let cap = match w.next() {
+                Some(v) => {
+                    let v = num(Some(v))?;
+                    if !(0.5..=MAX_PRESS_SPEED).contains(&v) {
+                        return Err(format!("shove is 0.5 to {MAX_PRESS_SPEED} fast"));
+                    }
+                    Some(v)
+                }
+                None => None,
+            };
+            Step::Shove(p, to, n, round, cap)
         }
         "await" | "ride" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
@@ -972,6 +992,8 @@ fn cross_plan(sim: &Sim, dir: Vec3, to: Vec3, r: f32) -> Vec<Vec3> {
 /// A shove is done with the body this near its place; the ball pushes it from this far behind its middle.
 const SHOVE_NEAR: f32 = 1.0;
 const SHOVE_BEHIND: f32 = 3.5;
+/// The farthest a shove goes round its body (a large crate).
+const MAX_SHOVE_ROUND: f32 = 10.0;
 
 /// The input of `step` for this tick, or None when it is done.
 fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
@@ -1044,7 +1066,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             })?;
             Some(towards(near.0))
         }
-        Step::Shove(at, to, n) => {
+        Step::Shove(at, to, n, round, cap) => {
             if t >= *n {
                 return None;
             }
@@ -1058,19 +1080,32 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let dir = left.normalize();
             // behind the body as seen from where it must go, then on into it
             let rel = flat(ball.position - st.pos);
-            let behind = st.pos - dir * SHOVE_BEHIND;
+            let behind = st.pos - dir * *round;
             let off = flat(behind - ball.position);
             let v = flat(ball.velocity);
-            let ahead = rel.dot(dir) > -0.5 * SHOVE_BEHIND;
+            let ahead = rel.dot(dir) > -0.5 * *round;
             if ahead || (off.length() > 2.0 && rel.normalize_or_zero().dot(-dir) < 0.9) {
                 // round it on the side the ball is: to beside it, then behind
                 let perp = Vec3::new(-dir.z, 0.0, dir.x);
                 let side = perp * rel.dot(perp).signum();
-                let round = if ahead { st.pos + side * SHOVE_BEHIND } else { behind };
-                let d = flat(round - ball.position);
+                // (beside it, then on round by its corner: going straight from beside to behind would cut across a
+                // large body's corner)
+                let beside = st.pos + side * *round;
+                let to = if !ahead {
+                    behind
+                } else if flat(beside - ball.position).length() > 1.5 {
+                    beside
+                } else {
+                    st.pos + (side - dir).normalize_or_zero() * *round
+                };
+                let d = flat(to - ball.position);
                 return Some(arrows(d.clamp_length_max(6.0) - 0.8 * v, quarter));
             }
-            // pushing: slowly, so the body is not knocked past the place or off the floor
+            // pushing: slowly, so the body is not knocked past the place or off the floor; with a speed, not while the
+            // body goes faster (the ball holds back)
+            if cap.is_some_and(|c| flat(st.vel).length() > c) {
+                return Some(arrows(-0.8 * v, quarter));
+            }
             let along = dir * 3.0 + (off - dir * off.dot(dir));
             Some(arrows(along - 0.8 * (v - flat(st.vel)), quarter))
         }
@@ -1269,7 +1304,10 @@ mod tests {
         assert_eq!(h[1].line, 3);
         let moving = parse("at 0 0 0 r 1 : lead 1 2 3 -4 300 ; shove 1 2 3 7 8 9 500").unwrap();
         assert_eq!(moving[0].steps[0], Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300));
-        assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500));
+        assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500, SHOVE_BEHIND, None));
+        let crate_ = parse("at 0 0 0 r 1 : shove 1 2 3 7 8 9 500 5.5 2").unwrap();
+        assert_eq!(crate_[0].steps[0], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500, 5.5, Some(2.0)));
+        assert!(parse("at 0 0 0 r 1 : shove 1 2 3 7 8 9 500 99").is_err());
         let swing =
             parse("at 0 0 0 r 1 : await 1 2 3 4 5 6 0.5 200 ; ride 1 2 3 4 5 6 0.5 90 ; press 1 2 3 0 1 6 200").unwrap();
         assert_eq!(swing[0].steps[0], Step::Await(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 200));

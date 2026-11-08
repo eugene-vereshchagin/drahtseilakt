@@ -9,9 +9,8 @@ P_Trafo_Paper_02
 P_Modul_18_10            
 PC_TwoFlames_02          
 P_Trafo_Stone_01         
-P_Modul_34_01            
-P_Trafo_Paper_03         
-P_Modul_18_13            
+P_Trafo_Paper_03         # after the crates (hint); the fan 18_13 lifts it into the channel (hint)
+-724.2 -217 -335         # the channel below the crates
 P_Trafo_Stone_04         
 P_Modul_26_01            # sandbags
 P_Trafo_Paper_04         

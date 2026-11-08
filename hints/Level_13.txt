@@ -13,24 +13,36 @@ at -1313.3 14 944 r 4 sector 1 kind stone : pass -1300 14 944.5 5 ; goto -1290.6
 # that one follows the paper ball down the chute x -908.6 and pushes it through the fans 18_08, 18_07, 18_09 to CP1.
 at -1205 -6.8 935.7 r 4 sector 1 kind paper : lead -1210 -6.8 935.7 6 700 ; pass -1076 -24 935.8 8 900 ; goto -1034.3 -30.2 936.3 400 ; await -1050 -25 935.8 -1031 -27 935.8 1.5 900 ; pass -1033.4 -30.2 937.7 4 ; pass -1027 -31 937.8 10 ; pass -1017 -32 931 12 ; pass -1007 -34.7 931 9 ; pass -1005.3 -32.7 935.15 5 ; hold -1005.3 -32.7 935.15 20 ; await -1020 -28 935.8 -998 -29.6 935.8 2.5 900 ; pass -1002 -33.3 931.7 6 ; pass -991 -34 937.4 9 ; pass -978 -35.4 940.3 8 ; goto -976.6 -35.2 936.3 300 ; await -990 -31 935.8 -969 -32.4 935.8 2.5 900 ; pass -975.6 -35.4 937.9 5 ; pass -968 -36.6 940 9 ; pass -955 -39 939.7 9 ; pass -940.4 -41.8 937.6 8 ; goto -929.4 -38.8 936.2 300 ; hold -929.3 -38.8 935.8 20 ; await -950 -40 935.76 -933 -38.5 935.76 2.5 900 ; wait 15 ; pass -922 -44.4 940.4 12 ; pass -911.5 -44 940.8 10 ; wait 40 ; pass -908.6 -41 928 6 ; pass -908.6 -42 905 6
 #
-# Sector 2 (not yet driven through; worked out 2026-11-08 from the owner's words and the storyboard, frames
-# s0273-s0630 of ref/video/frames/fast/level13). The loose stone ball P_Ball_Stone_18 starts at CP1 and rolls by
-# itself down to the rails x -864.7 on the upper platform, where the block (P_Modul_34_Schiebestein, -864.7 -87.0
-# 750.6) stands on its crate (P_Modul_34_Kiste, -864.7 -91.5 750.9) and holds it back (it arrives there about 50 s
-# after the sector begins). The way: paper from CP1 to P_Trafo_Stone_03 (stone); down the wood strip x -873.6 to the
-# lower platform; there the six planks P_Modul_25 over the gap above the helix fall into a bridge, all but the
-# southernmost 04, whose place stays open as the helix's mouth. Found on copies of the run (stone ball, braking after
-# each ram), from the lower platform: hold at x -864 on the plank's line, press east to -853.5 at 6, push west 45
-# ticks (02 at z 691.2, 05 at 680.8, falling east); across fallen 02 to the east strip (press to -842.5 at 4: it is
-# narrow, x -846..-840); from x -841.5 press west to -846.5 at 5, push east 30 ticks (03 at z 696.4, 01 at 686, 06
-# at 675.6, falling west); back west over fallen 01. Then up the strip to the crate: two rams from the north-east
-# (from -856 754.5 toward -868 748.5, and from -857 754.5 toward -871 747.5, at 9, braking) push the crate west
-# from under the block, which sinks (y -87.0 -> -91.1) and lets stone 18 on. Without help stone 18 leaves the rails
-# where the serpentine first crosses the strip (-873.5 -91.5 729.7) and rolls down the strip: the crate has to stand
-# there under the rails, on the strip's middle (x -873.6), so the stone rolls on along them. Pushing the crate there
-# is the open part: pushed by the ball it slides off line to the west and sticks at the strip's top edge (x -877);
-# its place after the rams also varies with how the ball comes up to the block. After that: P_Trafo_Paper_02 (south-
-# west corner of the lower platform) and into the helix's mouth ahead of stone 18, which follows over the bridge.
+# Sector 2 from sector 1: the ball comes to CP1 as paper (the owner's run of sector 2 began there as stone). Down the
+# stepped floor the way the owner went and into P_Trafo_Stone_03 on the upper platform (stone), then at once down the
+# wood strip to the planks (the crate by the block is left alone till they are down).
+at -908.5 -47.5 848.5 r 8 sector 2 kind paper : pass -908.6 -58.4 832.8 6 ; pass -908.6 -60.1 816.8 5 ; pass -908.2 -60.9 807.3 5 ; pass -901.7 -61.5 801.5 5 ; pass -892.9 -63.2 801.3 5 ; pass -877.5 -64 799.7 6 ; pass -872.1 -64.4 798.3 5 ; pass -871.7 -65.9 794.8 4 ; pass -869.8 -72.4 785.8 5 ; pass -870.9 -78.6 774.6 6 ; pass -877.3 -83 768.9 6 ; become stone
+at -879.8 -92.6 761.5 r 3 sector 2 kind stone : pass -878.5 -92.2 750 5 ; pass -876.5 -92.5 741 5 ; pass -874.3 -92.9 734 5 ; pass -873.6 -97 714 6 ; pass -872.5 -100.5 695 5 ; pass -866 -101 692 4
+#
+# Sector 2, as the owner showed it (his run of the sector, hints/runs/owner/Level_13-s2-s3.replay; its copy without
+# the god-mode line, which it never used, is Level_13-s2.replay beside this file, followed by the test player and
+# replayed here). The loose stone ball P_Ball_Stone_18 rolls by itself from CP1 down to the rails x -864.7 on the upper
+# platform, where the block on its crate (P_Modul_34_02) holds it. As stone (P_Trafo_Stone_03): first the six planks
+# P_Modul_25 over the gap above the helix are rammed into a bridge, all but the southernmost 04, whose place stays
+# open as the helix's mouth; the platform tilts south, so each ram brakes at once. West row (02 z 691.2, 05 z 680.8)
+# from the lower platform; across fallen 02 to the narrow east strip, the east row (03, 01, 06) rammed west from it;
+# back over fallen 01.
+at -866 -101 692 r 4 sector 2 kind stone : goto -864 -101 691.2 ; hold -864 -101 691.2 30 ; press -853.5 -101 691.2 0 0 6 90 ; push -1 0 45 ; hold -860 -101 690 60 ; goto -864 -102 680.8 ; hold -864 -102 680.8 40 ; press -853.5 -102 680.8 0 0 6 90 ; push -1 0 45 ; hold -860 -102 681 60 ; goto -860 -101 692 ; hold -860 -101 692 30 ; press -842.5 -101 692 0 0 4 200 ; hold -842.5 -101 692 60 ; goto -841.5 -101 696.4 ; hold -841.5 -101 696.4 40 ; press -846.5 -101 696.4 0 0 5 60 ; push 1 0 30 ; hold -842 -101 694 40 ; goto -841.5 -101.5 686 ; hold -841.5 -101.5 686 40 ; press -846.5 -101.5 686 0 0 5 60 ; push 1 0 30 ; hold -842 -101.5 686 40 ; goto -841.5 -102.5 675.6 ; hold -841.5 -102.5 675.6 40 ; press -846.5 -102.5 675.6 0 0 5 60 ; push 1 0 30 ; hold -842 -102.5 677 40 ; goto -843 -101.5 686.5 ; hold -843 -101.5 686.5 30 ; press -862 -101.5 686.5 0 0 4 200 ; hold -862 -101.5 687 120
+# Then up the wood strip to the crate: one ram from the east knocks it from under the block (it slides out to the
+# west), a push from the north-west sets it east of the block, and a push from the north-east takes it onto the strip's
+# line (x -873.6): the block sinks, stone 18 rolls on along the serpentine. Where the serpentine crosses the strip
+# (z 729, 721, 713, 705) one of its rails is missing; the crate is the stone's support there, pushed down the strip
+# to just under each crossing before the stone comes (z 733.2, 719.3, 712.6, 707: slowly, at 2.8, or it slides on),
+# each push waiting until the stone has left the strip on the crossing before, the ball backing off after it so as
+# not to touch the stone. Then into P_Trafo_Paper_02 (paper), and after stone 18 into the helix's mouth, by the line
+# the owner took (straight in, the ball wedges between the rails), down the short helix to the beam's first fan slot.
+at -862 -101.5 687 r 1.5 sector 2 kind stone : pass -868 -101 691 5 ; pass -873.4 -97.7 710.6 6 ; press -873.3 -93.4 731.4 0 0 6 400 ; pass -868 -92.3 740 4 ; pass -860 -92 745 4 ; goto -856 -92 754.5 ; hold -856 -92 754.5 90 ; press -868 -91.6 748.5 0 0 9 150 ; push 0.9 0.45 30 ; goto -860 -91.5 744 ; goto -876 -92 746 ; goto -876 -91 757.5 ; goto -870.2 -91 757.5 ; hold -870.2 -91 757.5 20 ; press -870.2 -91.7 750.5 0 0 3 200 ; push 0 1 10 ; goto -870 -91 757 ; goto -860.2 -91.2 756 ; hold -860.2 -91.2 755.5 20 ; shove -866.8 -91.6 749.5 -873.6 -92.4 741.8 400 5.5 3 ; push 0.66 0.75 10 ; shove -873.6 -92.4 741.8 -873.8 -93.1 732.4 400 5.5 2 ; push 0 1 15 ; await -868 -89 733 -881 -90 728 3 900 ; press -874.3 -94.5 724.8 0 0 3.5 200 ; push 0 1 40 ; await -880 -91 722 -869 -91.4 721 2 600 ; press -873.2 -96.1 718.5 0 0 2.8 200 ; push 0 1 25 ; await -866 -92 717 -878.5 -93 713 2 600 ; press -873.2 -97.2 713.1 0 0 2.8 200 ; push 0 1 25 ; await -881 -94 710 -869 -94.8 705 2.5 600 ; pass -871.8 -100.4 696 7 ; pass -866 -102 683 7 ; become paper ; pass -854.9 -102.8 675.7 5 ; pass -852.2 -102.6 677.6 3 ; await -849.6 -104 676 -841 -118.6 670.3 3 300 ; pass -851.6 -103.2 672.6 4 ; pass -850.9 -106.6 670.9 2 ; pass -850.6 -110.7 670.1 3 ; pass -847.4 -116.9 669.7 6 ; pass -841.5 -118.6 670.2 7 ; pass -834.6 -118.7 675.8 9 ; pass -824.3 -124.5 679.6 12 ; pass -812.8 -138.3 673.2 8 ; pass -803.9 -143.1 669.8 3
+# The beam: the paper ball sits in the slot of the fan 18_10 until stone 18 comes; the owner's keys from there launch
+# it as the stone hits (2:00 to 2:02 of his run), and it rolls on into the slot of 18_11; again as the stone comes,
+# over the fan 18_12, where it floats until the stone has gone into the chute below, then onto the stone, riding it
+# down the chute: the stone and the loose paper ball P_Ball_Paper_01 ahead fall into the hole at z 584 and the paper
+# ball rolls over them to CP2.
+at -803.84 -143.18 669.73 r 2 sector 2 kind paper : hold -803.84 -143.18 669.73 30 ; await -835 -128 678 -819.2 -139.2 669.7 2 1200 ; replay Level_13-s2.replay 7200 7325 ; pass -785 -139 670.5 13 ; pass -763.85 -147.16 669.79 6 ; hold -763.85 -147.16 669.79 20 ; await -790 -139.7 669.7 -768.9 -143.4 669.7 2 900 ; replay Level_13-s2.replay 7500 7565 ; pass -752 -139.5 676 12 ; pass -726 -146 675.6 6 ; hold -724.7 -133 675.8 30 ; await -735 -147 669.7 -723.98 -151 666.3 2 600 ; press -724.7 -146.5 661.5 0 0 4 120 ; ride -724 -151.4 662 -724 -157.5 590 2 900 ; pass -723.9 -154.8 570 8 ; pass -724.1 -155.2 533 5
 #
 # Sector 3 (not yet driven through; 2026-11-08). The ten loose stone balls start rolling down the channel x -724.2
 # as the sector begins, about 11 units a second, ahead of the paper ball; followed in the channel they pile up
@@ -42,3 +54,10 @@ at -1205 -6.8 935.7 r 4 sector 1 kind paper : lead -1210 -6.8 935.7 6 700 ; pass
 # back into the channel where a stone is, it is knocked off. Passing all ten needs the ball fast already at each
 # trough's start; not yet done. Then, ahead of them, out of the channel's end into the east half-pipe (from z -255;
 # north of that is sky) and into P_Trafo_Stone_01 (-716.1, -219.1, -261.8).
+#
+# Sector 3, the crates: as stone (P_Trafo_Stone_01, in the east half-pipe) each of the three crates P_Modul_34 under
+# the blocks standing in the channel (z -278.3, -293.3, -308.3) is rammed west from the half-pipe, braking at once:
+# its block sinks into the channel's gap. Then as paper (P_Trafo_Paper_03, west half-pipe, through the crates' gaps)
+# over the fan 18_13, which lifts it above the channel's wall, and east into the channel, on down it.
+at -716.1 -219.1 -261.8 r 3 sector 3 kind stone : pass -713.5 -218.4 -272 4 ; goto -713.5 -218.7 -278.3 ; hold -713.5 -218.7 -278.3 20 ; press -726 -218.7 -278.3 0 0 7 90 ; push 1 0 25 ; goto -713.5 -219.6 -293.3 ; hold -713.5 -219.6 -293.3 20 ; press -726 -219.6 -293.3 0 0 7 90 ; push 1 0 25 ; goto -713.5 -220.6 -308.3 ; hold -713.5 -220.6 -308.3 20 ; press -726 -220.6 -308.3 0 0 7 90 ; push 1 0 25 ; hold -714 -220.6 -306 30
+at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -732.5 -219.5 -270 5 ; goto -732 -218 -263.2 ; hold -732 -210 -263.2 150 ; press -724.6 -211 -263.2 0 0 4 120 ; pass -724.2 -213.5 -285 5 ; pass -724.2 -215 -320 6
