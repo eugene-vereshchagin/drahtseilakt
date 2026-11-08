@@ -1,0 +1,22 @@
+# Level 13 — hints for the test player (docs/drahtseilakt/autopilot.md)
+# From the walkthrough video's storyboard (ref/video/frames/fast/level13), the rules in autopilot-rules.md.
+#
+# Sector 1: the loose stone ball P_Ball_Stone_04 is rammed east down the sloping start plateau; the ball turns paper
+# at P_Trafo_Paper_01 and goes ahead of it down the rails onto the beam: each fan along the beam (18_01, 18_02, 18_03)
+# holds the paper ball up until the stone ball, rolling down behind, knocks it on.
+at -1313.3 14 944 r 4 sector 1 kind stone : pass -1300 14 944.5 5 ; goto -1290.6 13.7 946 ; hold -1290.6 13.7 946 20 ; press -1290.6 13.7 938 0 0 3 200 ; push 0 1 25 ; wait 10 ; become paper
+# Down the rails onto the beam, the paper ball keeps ahead of the stone ball rolling behind it along z 935.7 (the
+# stubs' fans 18_04..06 beside the beam would lift it off the line), waits over the fan 18_02 until the stone knocks it
+# down onto the lower beam. There three pockets in the beam (x -1034, -1005, -976) each hold the paper ball while the
+# stone ball rolls over it (a stone ball falling into one veers off the beam); the paper ball then passes it on the
+# side to the next. Over the fan 18_03 it waits for the stone ball to knock the loose stone ball P_Ball_Stone_05 on:
+# that one follows the paper ball down the chute x -908.6 and pushes it through the fans 18_08, 18_07, 18_09 to CP1.
+at -1205 -6.8 935.7 r 4 sector 1 kind paper : lead -1210 -6.8 935.7 6 700 ; pass -1076 -24 935.8 8 900 ; goto -1034.3 -30.2 936.3 400 ; await -1050 -25 935.8 -1031 -27 935.8 1.5 900 ; pass -1033.4 -30.2 937.7 4 ; pass -1027 -31 937.8 10 ; pass -1017 -32 931 12 ; pass -1007 -34.7 931 9 ; pass -1005.3 -32.7 935.15 5 ; hold -1005.3 -32.7 935.15 20 ; await -1020 -28 935.8 -998 -29.6 935.8 2.5 900 ; pass -1002 -33.3 931.7 6 ; pass -991 -34 937.4 9 ; pass -978 -35.4 940.3 8 ; goto -976.6 -35.2 936.3 300 ; await -990 -31 935.8 -969 -32.4 935.8 2.5 900 ; pass -975.6 -35.4 937.9 5 ; pass -968 -36.6 940 9 ; pass -955 -39 939.7 9 ; pass -940.4 -41.8 937.6 8 ; goto -929.4 -38.8 936.2 300 ; hold -929.3 -38.8 935.8 20 ; await -950 -40 935.76 -933 -38.5 935.76 2.5 900 ; wait 15 ; pass -922 -44.4 940.4 12 ; pass -911.5 -44 940.8 10 ; wait 40 ; pass -908.6 -41 928 6 ; pass -908.6 -42 905 6
+#
+# Sector 3 (not yet driven through; what was tried, 2026-11-08): ten loose stone balls lie in the long channel x -724.2
+# below CP2. Let go, they roll down it ahead of the paper ball and pile up against the three crates P_Modul_34 in the
+# channel's end (z -286..-316); the paper ball following them stops behind the pile (z -234, y -210.2) or, overtaking
+# some, wedged in among them, low in the channel. Its walls stand too high to hop out of from there, and pressing on
+# does not ride up onto the pile. The way on is the east half-pipe beside the channel (from z -255; north of that is
+# sky) into P_Trafo_Stone_01 (-716.1, -219.1, -261.8); the storyboard's ball gets there, how is not seen (frames
+# 2540-2536 of ref/video/frames/fast/level13: it sits in that socket). A hint needs the owner's run of this sector.

@@ -318,7 +318,10 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
   the thin rail's serpentine, the target that drops the bridge of sector 3, the crease of tilted cubes and its gap, the
   four lifts with cages, the stairs of fans, the stone balls shoved into the helices, the boxes on the hump, the log
   half-pipes. Standing 5.7% of the ticks (1.4% outside transformers), within 1 of an edge 14.1%, speed 5.3 ± 3.8.
-- Level 13: in sector 2, past the paper transformer and up the fan, at the beam the fans 18_10–12 blow along.
+- Level 13: sector 1 by the hints; in sector 2 the paper ball gets down the helix and along the beam past the fans
+  18_10 and 18_11 by itself, and stops before 18_12, whose chute it goes down only pushed by the stone ball
+  P_Ball_Stone_18 (released by the crate under the block, not yet done). Sector 3 from its checkpoint: stuck behind
+  the pile of loose stone balls in the channel (`hints/Level_13.txt`, `.route`).
 - Videos of the finished runs: `scripts/video.sh`, kept outside the repository.
 - Our ten levels (levels.md, "Our levels and how to edit them"), 2026-11-03: each finished from the start in three
   styles, with the hint files their descriptions write (`assets/levels/<level>/pilot/`).

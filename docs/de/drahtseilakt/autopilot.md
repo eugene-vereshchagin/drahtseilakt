@@ -344,8 +344,10 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
   die vier Aufzüge mit Käfig, die Ventilatortreppen, die in die Spiralen geschobenen Steinkugeln, die Kisten auf dem
   Buckel, die Halbröhren aus Stämmen. Stillstand 5,7 % der Ticks (1,4 % außerhalb von Transformatoren), näher als 1 am
   Rand 14,1 %, Geschwindigkeit 5,3 ± 3,8.
-- Level 13: in Sektor 2, am Papier-Transformator vorbei und den Ventilator hinauf, am Balken, an dem die Ventilatoren
-  18_10–12 entlangblasen.
+- Level 13: Sektor 1 nach den Hinweisen; in Sektor 2 kommt die Papierkugel allein die Spirale hinab und den Balken
+  entlang an den Ventilatoren 18_10 und 18_11 vorbei und hält vor 18_12, dessen Schacht sie nur hinabgeht, wenn die
+  Steinkugel P_Ball_Stone_18 sie schiebt (freigegeben von der Kiste unter dem Block, noch nicht gelöst). Sektor 3 von
+  seinem Checkpoint an: steckt hinter dem Haufen loser Steinkugeln in der Rinne fest (`hints/Level_13.txt`, `.route`).
 - Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
 - Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
   Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).
