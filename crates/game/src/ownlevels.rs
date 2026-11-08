@@ -393,4 +393,70 @@ mod tests {
             "at least ten of our own levels ship with the game: {count}"
         );
     }
+
+    /// No loose body of our levels (boxes, loose balls) starts inside the floors (levelkit.py, check_clear): the
+    /// physics would shove it out as its sector begins and throw the player's ball touching it far away (the game
+    /// lifts one out if it does, sim.rs `rest_out_of`; this checks that none has to be). Measured before that lift,
+    /// with the bodies the game makes (the paper ball's hull from its part file).
+    #[test]
+    fn our_loose_bodies_start_clear_of_the_floors() {
+        let mut dirs = levels();
+        dirs.push(shipped().join("Parts_Test"));
+        let mut sunk = Vec::new();
+        for dir in dirs {
+            let source = Source::Open(dir.clone());
+            let data = Data::new(None).for_source(&source);
+            let loaded = data.load(&source).expect("the level loads");
+            let data = data.with_parts(&loaded.level);
+            let modules = crate::scene::load_modules(&loaded.level, &data);
+            let sim = Sim::with_modules(&loaded.level, BallKind::Wood, &modules, false);
+            for &(i, depth, _) in &sim.start_depths {
+                if depth > 0.05 {
+                    let name = loaded
+                        .level
+                        .objects
+                        .get(i)
+                        .map(|o| o.name.clone())
+                        .unwrap_or_default();
+                    sunk.push(format!("{}: {name} {depth:.2} deep", dir.display()));
+                }
+            }
+        }
+        assert!(
+            sunk.is_empty(),
+            "loose bodies made inside the floors:\n{}",
+            sunk.join("\n")
+        );
+    }
+
+    /// The original's levels (with the player's copy; skipped without OPENBALLANCE_DATA) place no loose body deeper
+    /// than sim::SUNK_DEPTH in their floors (the deepest are level 10's paper balls, 0.031), so the lift of a sunk
+    /// one never moves any of theirs and their runs play as before.
+    #[test]
+    fn the_original_never_starts_a_loose_body_sunk() {
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
+        else {
+            return;
+        };
+        for n in 1..=13 {
+            let Ok(loaded) = data.load(&Source::Original(n)) else {
+                continue;
+            };
+            let modules = crate::scene::load_modules(&loaded.level, &data);
+            let sim = Sim::with_modules(&loaded.level, BallKind::Wood, &modules, n == 1);
+            for &(i, depth, lift) in &sim.start_depths {
+                let name = loaded
+                    .level
+                    .objects
+                    .get(i)
+                    .map(|o| o.name.as_str())
+                    .unwrap_or_default();
+                assert!(
+                    depth <= crate::sim::SUNK_DEPTH && lift == 0.0,
+                    "level {n}: {name} {depth:.3} deep"
+                );
+            }
+        }
+    }
 }

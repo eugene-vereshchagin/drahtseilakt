@@ -271,6 +271,17 @@ not stand on a flat, level patch at its own foot (its footprint sampled: every f
 foot, none missing) and names each; a gutter is widened, or the part moved, where one stands. A ball that changes
 sheds its skin: its pieces are curved fragments of its own shell, its texture outside, a thin inside.
 
+**Loose bodies lie on the floor, not in it** (2026-11-09): a part's place (`ahead`, `side`) is a point on the
+cursor's straight line at the cursor's height, so behind a slope, beside a bend or on a gutter's side it was not on the
+floor: level 1 had loose balls up to 2.4 deep in it, and the physics shoved each out as its sector began, throwing the
+player's ball that touched it away at hundreds of units a second. The kit now rests every loose ball on what is under
+it (lifted out of a floor, let down onto one; the paper ball as a sphere of 2.04, its hull's reach) and refuses a level
+where a loose ball or a box starts more than 0.05 inside the floors, rails or stoppers, or a loose ball lies on nothing,
+naming each (`levelkit.py --check FOLDER` checks a level already made). A ball rested on a slope is said (it rolls away
+as its sector begins). The game itself lifts a loose body that starts more than 0.1 inside the static geometry out
+onto it before making it; the original's levels have none deeper than 0.031 (level 10's paper balls), so it never moves
+one of theirs.
+
 **Room over the ball** (2026-11-03): over a transformer (its cage lifts and holds the ball), a fan and the balloon
 nothing of the floors or rails may hang within 12; and a way may run under another floor or rails only with its
 underside at most 3.6 over it (a wall the ball meets) or 6 and more (room to pass), never between, where a ball

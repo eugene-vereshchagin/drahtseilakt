@@ -41,7 +41,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     point, life, box, dome, trafo KIND, loose KIND   a part at the cursor;  options: side S (to the left), ahead A
                              (a box also up U: on another box, `up 5`);
                              a box or a loose ball must leave room for the ball beside it, or be marked `shove`
-                             (the ball the way has there, no lighter than it, pushes it away)
+                             (the ball the way has there, no lighter than it, pushes it away); a loose ball is
+                             rested on the floor under it (levelkit.rest_loose), and refused with nothing under it
     column [side S] [ahead A] [depth D]   a stone column under the floor, for the look
     railing left|right|both|off   railings along the floors' edges from here on, on any profile (safety railings
                              gives both on the bare floor; another safety none); a railing on a turn's inner side
