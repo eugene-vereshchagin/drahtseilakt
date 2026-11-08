@@ -95,6 +95,7 @@ usage: drahtseilakt [options]
                       the sector is the nearest object's unless --sector is given
   --ball KIND         begin with a wood, stone or paper ball
                       (a run begun elsewhere is recorded with its start and is never a level's best run)
+  --no-debug          a plain run (until the release a played game is a debug run by default)
   --debug             debug run: the extended mode, all levels open, and the development mod god-mode
                       (assets/mods-dev; switch it on under Options > Extended > Mods): endless lives, F5 / F9 save
                       and load the moment, F3 seconds back, R restart, [ ] slower and faster, F2 the free camera
@@ -174,7 +175,13 @@ pub struct Options {
     pub look: Option<[f32; 6]>,
 }
 
+/// Until the release, a played game is a debug run unless `--no-debug` says otherwise (the owner's decision,
+/// 2026-11-08: easier to start). Runs without a player (replays, headless, autopilot, video, screenshots) stay
+/// plain unless `--debug` is given, so recorded runs and tests are unchanged. The release cleanup sets this false.
+const DEBUG_BY_DEFAULT: bool = true;
+
 fn parse_args() -> Result<Options, String> {
+    let mut debug: Option<bool> = None;
     let mut o = Options {
         data: None,
         import: None,
@@ -290,7 +297,8 @@ fn parse_args() -> Result<Options, String> {
                 o.follow = Some(value()?.into());
                 o.autopilot = true;
             }
-            "--debug" => o.debug = true,
+            "--debug" => debug = Some(true),
+            "--no-debug" => debug = Some(false),
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--sky" => {
                 let name = value()?;
@@ -363,6 +371,14 @@ fn parse_args() -> Result<Options, String> {
             _ => return Err(format!("unknown option {a}\n\n{USAGE}")),
         }
     }
+    let unattended = o.replay.is_some()
+        || o.headless
+        || o.autopilot
+        || o.video.is_some()
+        || o.frames.is_some()
+        || o.screenshot.is_some()
+        || o.export.is_some();
+    o.debug = debug.unwrap_or(DEBUG_BY_DEFAULT && !unattended);
     Ok(o)
 }
 
