@@ -24,6 +24,10 @@ RU = {
 # how hard a unit of each kind of track is to roll along (the owner's order: corridor easiest, rails hardest)
 WEIGHT = {"corridor": 0.3, "wide": 0.4, "trough": 0.6, "curbs": 0.8, "posts": 1.0, "open": 1.2, "module": 1.5,
           "air": 1.5, "narrow": 2.0, "rails": 2.0, "siderail": 3.0, "monorail": 3.0}
+# The track's share of the index: the owner's decision (2026-11-09) is that the track is about 20% of the index
+# (it was about 47% of the originals' sum, 100 of 215 a level on average); the weights above are scaled by this, so
+# the originals' average is 28 of the track against 110 of the rest. The other parts are as they were.
+TRACK_SCALE = 0.29
 GROUPS = [("лёгкая (коридор, широкий, жёлоб)", ["corridor", "wide", "trough"]),
           ("с бортиками/столбиками", ["curbs", "posts"]),
           ("открытый край / узкая", ["open", "narrow"]),
@@ -118,7 +122,7 @@ def L(d, c):
 # the difficulty index: five parts, added up
 def index(n):
     d, m = data[(n, 0)], manual[n]
-    track = sum(L(d, c) * w for c, w in WEIGHT.items()) / 100.0
+    track = TRACK_SCALE * sum(L(d, c) * w for c, w in WEIGHT.items()) / 100.0
     puzzles = (1.0 * d.get("loose_moved", 0) + 2.0 * (d.get("m01_pushers", 0) + d.get("m34_boxstone", 0)
                + d.get("m25_drawbridges", 0) + d.get("m37_targets", 0) + d.get("m03_lifts", 0))
                + 1.0 * (d.get("m30_seesaws", 0) + d.get("m29_plates", 0) + d.get("m41_tipplates", 0)
@@ -326,7 +330,7 @@ p("")
 p("## Индекс сложности")
 p("")
 p("Индекс - сумма пяти частей в «очках». Веса подобраны так, чтобы трасса (управление шаром) давала около "
-  "половины, остальное - головоломки, техники, поиск пути и опасности:")
+  "20% (с 2026-11-09; раньше половину; веса ниже умножены на 0,29), остальное - головоломки, техники, поиск пути и опасности:")
 p("")
 p("- **Трасса** = сумма по типам (длина / 100 × вес). Вес: коридор 0,3, широкий пол 0,4, жёлоб 0,6, бортики 0,8, "
   "столбики 1,0, открытый край 1,2, механизмы и воздух 1,5, узкая без перил 2, два рельса 2, монорельс и рельсы "
