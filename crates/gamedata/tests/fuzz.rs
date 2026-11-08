@@ -4,6 +4,7 @@
 //                budget reads it;
 //   level_txt    a level folder's level.txt;
 //   theme_txt    a sound theme's theme.txt;
+//   pack_txt     a texture or model pack's pack.txt (the same shape, read through packs.rs);
 //   sound_table  a sound theme's table (sounds.txt / music.txt).
 // #[ignore]: `FUZZ_SECS=600 cargo test --release --offline -p gamedata --test fuzz -- --ignored`. Seeds: synthetic
 // files made here, the game's own shipped files (assets/), and the player's files when present (never committed).
@@ -98,6 +99,10 @@ pub fn run_level_txt(input: &[u8]) {
     }
     assert!(!gamedata::package::printable(&text).chars().any(char::is_control), "printable() kept a control character");
     let info = gamedata::package::parse_info(input);
+    assert!(
+        info.difficulty.is_none_or(|d| (1..=gamedata::package::DIFFICULTY_MAX).contains(&d)),
+        "a difficulty out of 1..10"
+    );
     for (v, max) in [
         (&info.title, gamedata::package::TITLE_MAX),
         (&info.author, gamedata::package::FIELD_MAX),
@@ -115,6 +120,7 @@ fn level_txt_seeds() -> Vec<Vec<u8>> {
         b"title = A level\nauthor = Someone\nversion = 1.2\n".to_vec(),
         b"\xef\xbb\xbf# comment\nTITLE=x\n".to_vec(),
         "title = \u{202e}汉字 level with a very long title that goes on and on\n".as_bytes().to_vec(),
+        b"difficulty = 7\ndifficulty=11\ndifficulty = -1\n".to_vec(),
     ];
     let mut roots = fuzzkit::real_roots();
     if let Some(home) = std::env::var_os("HOME") {
@@ -156,6 +162,31 @@ fn fuzz_theme_txt() {
     fuzzkit::fuzz(t, theme_seeds, run_theme_txt);
 }
 
+pub fn run_pack_txt(input: &[u8]) {
+    let (names, fallback) = gamedata::packs::parse_pack_txt(&String::from_utf8_lossy(input));
+    assert!(names.len() <= 64);
+    assert!(names.iter().all(|(lang, name)| ["en", "ru", "de", "zh"].contains(&lang.as_str()) && name.chars().count() <= 64));
+    if let Some(f) = fallback {
+        assert!(gamedata::packs::plain(&f), "a fallback that is not a plain name: {f:?}");
+    }
+}
+
+fn pack_seeds() -> Vec<Vec<u8>> {
+    vec![
+        b"name.en Stone\nname.zh \xe7\x9f\xb3\nauthor A\nlicence CC0 1.0\nfallback own\n".to_vec(),
+        b"\xef\xbb\xbfname.de X\nfallback none\n# c\n".to_vec(),
+    ]
+}
+
+#[test]
+#[ignore]
+fn fuzz_pack_txt() {
+    let mut t = Target::new("pack_txt", test_name!("fuzz_pack_txt"), Kind::Text);
+    t.max_len = 16 * 1024;
+    t.dict = &["name.en", "name.ru", "name.de", "name.zh", "author", "licence", "fallback", "none", "..", "/"];
+    fuzzkit::fuzz(t, pack_seeds, run_pack_txt);
+}
+
 pub fn run_sound_table(input: &[u8]) {
     let t = gamedata::sound_themes::parse_table(input);
     for (role, files) in &t.roles {
@@ -190,5 +221,6 @@ fn fuzz_regressions() {
     fuzzkit::regressions("image", run_image);
     fuzzkit::regressions("level_txt", run_level_txt);
     fuzzkit::regressions("theme_txt", run_theme_txt);
+    fuzzkit::regressions("pack_txt", run_pack_txt);
     fuzzkit::regressions("sound_table", run_sound_table);
 }

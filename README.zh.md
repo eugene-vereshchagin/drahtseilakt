@@ -44,13 +44,13 @@ Options、Credits、Exit；在关卡中按 Esc 打开暂停菜单，失败的一
 FILE.png` 渲染一帧。要测试某个位置，`--sector N` 从某个检查点开始，`--at X,Y,Z`（或关卡
 对象的名称）可从任意位置开始，配合 `--ball wood|stone|paper`；这样的一局会把起点保存在回放中，并且永远不会
 算作最佳成绩。在开启扩展模式之前（Options、Extended，或用 `--debug` 开启一次），游戏会尽可能
-贴近原版。*扩展模式*会解锁所有关卡，显示最佳时间，并在 Start 下按类别列出关卡
-（`levels/` 中的原版、重制、自制地图和开放格式关卡），还会
-加入我们的工具：R 重新开始，F2 启用自由相机在关卡中飞行，
-同时这一局暂停等待，`[` 和 `]` 让游戏变慢和重新加快（这一局本身逐 tick
-保持不变），F5 保存当前时刻，F9 回到该时刻（这一局的记录会截断到那里，因此长关卡可以
-分段录制），并显示小节和 tick。以这种方式辅助的一局会被保存，但永远不算最佳成绩。用于测试时，`--autopilot` 让测试玩家在无窗口的情况下尝试通关
-（配合 `--record FILE` 保存其过程）；`--follow FILE` 让它沿着玩家回放中球的路线前进；卡住时它会写报告，并遵循提示（[测试玩家](docs/zh/drahtseilakt/autopilot.md)）。`--locate DIR --record TRACK` 在原版视频的帧中找出球的路线（DIR/s0001.jpg 起，每秒四帧，例如 `ffmpeg -vf fps=4,scale=640:480`），方法是从球可能所在的位置绘制关卡并进行比较；测试玩家用 `--follow TRACK` 沿着这样的轨迹前进。`--frames DIR --replay FILE` 把回放绘制成这样的帧，带有真实位置，用于检验。`drahtseilakt --help` 列出全部选项。
+贴近原版。*扩展模式*会显示最佳时间，并在 Start 下按类别列出关卡
+（`levels/` 中的原版、重制、自制地图和开放格式关卡，每个关卡标有难度；如何制作和分享关卡：
+[制作与分享关卡](docs/zh/drahtseilakt/making-levels.md)），以及模组（[模组](docs/zh/drahtseilakt/mods.md)）。
+调试运行（`--debug`）还会解锁所有关卡，并提供开发用模组*上帝模式*：无限生命，F5 保存当前时刻，F9 回到该时刻，
+F3 后退数秒，R 重新开始，`[` 和 `]` 让游戏变慢和重新加快，F2 启用自由相机，并显示小节和 tick；这样的一局作为已修改
+的一局保存，永远不算最佳成绩。正式发布版不包含它。用于测试时，`--autopilot` 让测试玩家在无窗口的情况下尝试通关
+（配合 `--record FILE` 保存其过程）；`--follow FILE` 让它沿着玩家回放中球的路线前进；卡住时它会写报告，并遵循提示（[测试玩家](docs/zh/drahtseilakt/autopilot.md)）。`--locate DIR --record TRACK` 在原版视频的帧中找出球的路线（DIR/s0001.jpg 起，每秒四帧，例如 `ffmpeg -vf fps=4,scale=640:480`），方法是从球可能所在的位置绘制关卡并进行比较；测试玩家用 `--follow TRACK` 沿着这样的轨迹前进。`--frames DIR --replay FILE` 把回放绘制成这样的帧，带有真实位置，用于检验。`--level-stats DIR` 测量原版关卡，用于设计我们自己的关卡（沿 `hints/` 中完成的回放和计划，逐个区段统计球滚过的路面）；`scripts/level-stats.py` 据此生成报告。`drahtseilakt --help` 列出全部选项。
 
 ## 谁做的
 

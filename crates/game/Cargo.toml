@@ -30,6 +30,10 @@ ab_glyph = "=0.2.32"
 # gamepads (Linux evdev, Windows Gaming Input, macOS IOKit), read into the same digital keys as the keyboard
 gilrs = "=0.11.2"
 
+[target.'cfg(unix)'.dependencies]
+# O_NOFOLLOW for writing screenshots never through a link (app.rs); already in the lock through gamedata and wgpu
+libc = "=0.2.189"
+
 [lints]
 workspace = true
 

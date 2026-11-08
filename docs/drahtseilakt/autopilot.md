@@ -114,7 +114,9 @@ for some seconds, random additions to its choices' scores; from the third try on
 player's line. Three tries go from the last save before the failure, then three from each save twice as far back
 (the cause may lie earlier: a run-up too slow, a bad line into a bend). After 30 tries at one place (a place: 6 way
 points further than the last), the failure is taken as it comes: the ball is lost, or the run is given up with its
-report (a stray transformer taken so: the ball goes into one making the way's kind, as a new ball does). The hints may fire again after going back, as for a new ball. A ball lost as the player lost one there (within
+report (a stray transformer taken so: the ball goes into one making the way's kind, as a new ball does). The hints may fire again after going back, as for a new ball. A hint whose ball ends a step 3 or more below
+the step's point (fallen to a floor beneath it) is off course: its further steps are no getting on, so it goes back
+from there as from a way that stands still, instead of playing the rest of the hint from the wrong floor. A ball lost as the player lost one there (within
 four seconds of keeping to the player's last seconds before a loss) is not gone back from, where the player's run got past that sector afterwards: what the
 player's ball did as it went may be what the level needs (a drawbridge knocked down as the ball fell with it). `--rewinds N` caps how often it goes back in
 a run (600; 0: never). The variation is seeded, so a run is reproducible; the run kept, and its replay, is the one
@@ -155,7 +157,8 @@ at X Y Z r R [sector N] [kind wood|stone|paper] : STEP ; STEP ; ...
 ```
 
 When the ball comes within R of the point (in that sector, as that ball), the steps run in order, once a life;
-then the test player finds its place on the way again (past the transformers, when the hint made the ball over). Steps:
+then the test player finds its place on the way again (past the transformers, when the hint made the ball over: the plan's
+transformers the hint rolled the ball into, in their order, count as gone through, even one the hint began in). Steps:
 
 | Step | What it does |
 |---|---|
@@ -202,11 +205,69 @@ transformer. The watcher's keys, in a box bottom left in the menus' language (th
 | F5 | take over: the arrows drive, the test player watches; F5 again hands the ball back from where it is now. The stretch is saved beside the hints as `<level>-hand-<tick>.replay` (the run up to then, so it replays exactly) and a hint line playing it (`at … : replay <file> FROM TO`) is added to `<level>-hand.txt`, both named on the screen; copied into the level's hint file, the test player plays it there next time. The saved states before it are not gone back to |
 | F6 | skip the running hint's step |
 | F7 | a stuck report of this place (as for a dead run, into `--report`) |
+| F8 | mark a zone "don't dawdle here" (flow; Zones below): a tap marks the ball's path over the last 3 seconds up to the tap; held, the zone goes on while the key is down (from 3 seconds before it went down) and ends when it is let go |
+| F4 | mark a zone "keep the speed limit here and don't cut corners" (careful), the same way |
+| [ / ] | how far back a mark reaches: 1 to 10 seconds (3) |
+| Backspace | undo the last zone marked in this window, and the rule it taught (each mark's lines carry its id, `# mark=<id>`, so another session's lines are never taken out); while a key is held, that mark is cancelled |
+| F12 | show or hide the marked zones in the world, as translucent beads along their paths (flow green, careful orange) |
 | F1 | hide or show the box of keys |
 | Esc | the pause menu (leave the level, quit) |
 
 At the end, or when the window is closed, the run's summary is printed and the whole run, the hand-driven stretches
 too, is saved at `--record`.
+
+## Zones
+
+The watcher teaches the test player while watching (`--watch`): a key marks the stretch the ball just went as a
+zone, and the test player obeys it from then on, in this run and every later one, headless too. A mark reaches back
+(3 seconds by default, `[` and `]` change it) because one first has to notice that the ball rolls wrong: a tap of
+F8 or F4 marks the ball's path over the last seconds up to the tap; held, the zone goes on while the key is down and
+ends when it is let go, so no zone is ever left open. Paused (Space), a tap marks the last seconds before the pause.
+The stretch just marked lights up for a few seconds, a zone being marked shows as it grows, and the status line
+names the zone the ball is in.
+
+The zones are written at once, a line each, to `<level>.zones` beside the level's hint file (with `--hints
+hints/Level_01.txt`: `hints/Level_01.zones`), which every run of the level reads. With `--hints FILE` the marks are written in that file's folder (the learned
+table too); without it, in `hints/` of the game's data folder. A file is written whole or not at all (a new file
+beside it renamed into place), never through a link; a zones file full (256 zones) takes no more, and the screen
+says so:
+
+```
+flow sector 1 r 4 : X Y Z ; X Y Z ; ...
+careful sector 2 r 4 [speed V] : X Y Z ; ...
+```
+
+The points are the ball's path through the stretch (one point: a place); the zone is everything within `r` of that
+path in that sector.
+
+- **flow** — don't dawdle here. A hint's step that stops the ball goes without its stop: a `goto` is rolled through,
+  a `wait` or `hold` left out, a `pass` or `press` slower than 5 taken at 5; but only when, on a copy of the run, the
+  rest of the hint and a second after keep the ball (a stop the ball needs stays). The steering pays for rolling
+  slower than 0.8 of the floor's pace more than a wait is worth (a choice that loses the ball is still never taken),
+  except where the ball needs a run-up (a gap or a too steep climb ahead, as for a careful zone below): backing off
+  and stopping for it is no dawdling, so there the zone asks nothing (a hint's stop stays too).
+- **careful** — keep the speed limit here and don't cut corners. Not faster than `speed` (4.5 when not given; edit
+  the line to change it): the steering pays four times as much for every unit over it, a hint's `pass`, `press`,
+  `along` and `round` are capped to it, and whatever drives (the steering, a hint, the player's line), the arrows
+  pushing along the ball's run are let go above the limit and the ball is braked above 1.25 times it. The way's
+  line ahead (the middle the way's search found) is kept to: each unit off it costs 2, and off the middle of the
+  floor three times as much as elsewhere. Where the physics needs the ball's momentum the limit is let go and only
+  the line is kept: the way ahead (about 30 units) has a gap to cross or a climb steeper than the ball takes by its
+  own push at the limit (at 4.5: stone 12.6°, wood 26°, paper 31°; measured on the engine, a stone ball climbs
+  nothing steeper than 17° by its push, wood 37°, paper 46°), a sill comes just ahead, or the running hint says
+  speed (a `press`, `along` or `round` faster than the limit: a climb, rails, a ram; or a `pass` faster than it
+  within 25 units before one: its run-up). The status line says so (`[limit let go: a gap to cross ahead]`). A careful learned rule holds
+  back the same way, and is let go in the same places.
+
+Each mark also teaches the test player the kind of place it was, for every level: a rule of the learned table
+(`learned.txt` beside the hints; [autopilot-rules.md](autopilot-rules.md), "The learned table").
+
+`AUTOPILOT_SITUATION=1` prints, besides the place every second, each change of what the zones and rules ask, with
+the tick and the ball's place (`zone t14528 (137.9 -6.8 -554.8) [learned: ... → careful, at most 4.5]`, `none` when
+nothing holds), and why a limit is let go.
+
+A zones file is untrusted like a hint file: its size (64 KiB), the zones (256) and points (256 a zone) and every
+number are capped; a malformed line is left out with a note naming it, the other zones still count.
 
 ## Videos of its runs
 
@@ -221,8 +282,19 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 (the finished runs are kept in `hints/runs/`, their videos outside the repository, made with `scripts/video.sh`):
 
 - Level 1: finished from the start in 6:12.27 (hints for the ramp, the crate, the pushers and the rails).
+  By itself with no player's run, from the walkthrough's storyboard (`hints/Level_01.plan`, `.route`, `.txt`;
+  the hints that follow the owner's run are `Level_01-follow.txt`): 5:17.12, standing 9.1% of the time.
+  With the owner's marks (`hints/Level_01.zones`, `hints/learned.txt`), 2026-11-03: 6:23.63, standing 9.7% of the
+  ticks (under 0.3 a second; the run before 9.7% by the same count), within 1 of an edge 4.3% (4.5%), speed 4.8 ± 3.6
+  (5.5 ± 4.0) (`hints/runs/Level_01-clean.replay`).
 - Level 2: finished from the start in 6:13.27 (with `--then Level_02-s5.replay`, the owner's run of sector 5).
+  By itself with no player's run, from the walkthrough's storyboard (`hints/Level_02.plan`, `.route`, `.txt`;
+  the hints that follow the owner's run are `Level_02-follow.txt`): 5:23.90, standing 5.9% of the time
+  (`hints/runs/Level_02-clean.replay`).
 - Level 3: finished from the start in 7:45.48 (the lever and the bridge in sector 4 as the owner did them).
+  By itself with no player's run, from the walkthrough's storyboard (`hints/Level_03.plan`, `.route`, `.txt`;
+  the hints that follow the owner's run are `Level_03-follow.txt`): 5:58.97, standing 5.5% of the time
+  (`hints/runs/Level_03-clean.replay`).
 - Level 4: finished from the start in 9:19.47 (`--follow` the owner's run, `--then` the one from sector 3).
 - Level 5: finished from the start in 12:39.77 (hints for both crates and the pusher).
 - Level 6: finished from the start in 8:01.22: sector 1 along the owner's line, sectors 2–5 by itself with the
@@ -236,10 +308,13 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 - Level 9: finished from the start in 12:35.27, following the owner's finished run (the maze of pushers in sector 3
   is solved as the owner solved it).
 - Level 10: finished from the start in 15:31.00, following the owner's finished run with `hints/Level_10.txt`.
-- Levels 11–13: 11 follows the owner's run through sectors 1–3 (losing a ball at the drawbridge as the owner did,
-  which knocks it down) and goes on by itself in sector 4; 12 in sector 2 (its
-  thin rails); 13 in sector 2, past the paper transformer and up the fan, at the beam the
-  fans 18_10–12 blow along.
+- Level 11: finished from the start in 13:43.73 with no player's run at all, by itself through the walkthrough's
+  plan and the hints written from its storyboard (`hints/Level_11.plan`, `.txt`, `.route`): the planks of the castle
+  maze rammed down, a loose stone ball rammed into the rails that drive a pusher, the targets, the crates rammed out
+  of the channels, the maze of sector 4, the fans and swinging crates of sector 5, and in sector 6 two loose stone balls
+  knocked off the grid (one shoves the pusher between the seesaws, one opens a trapdoor) and the last rail pairs.
+- Levels 12–13: 12 in sector 2 (its thin rails); 13 in sector 2, past the paper transformer and up the fan, at the
+  beam the fans 18_10–12 blow along.
 - Videos of the finished runs: `scripts/video.sh`, kept outside the repository.
 - Our ten levels (levels.md, "Our levels and how to edit them"), 2026-11-03: each finished from the start in three
   styles, with the hint files their descriptions write (`assets/levels/<level>/pilot/`).

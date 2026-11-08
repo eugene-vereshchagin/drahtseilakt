@@ -24,11 +24,14 @@ mod highscore;
 mod hints;
 mod hud;
 mod lang;
+mod learned;
 mod levels;
+mod levelstats;
 mod lights;
 mod locate;
 mod menu;
 mod menuscene;
+mod modrt;
 mod modules;
 mod music;
 mod options;
@@ -48,6 +51,7 @@ mod trafo;
 mod ui;
 mod volume;
 mod watch;
+mod zones;
 
 use assets::{Data, Source};
 use std::path::PathBuf;
@@ -63,8 +67,11 @@ usage: drahtseilakt [options]
   --map FILE.nmo      play a level file: a community map or any .nmo
   --open DIR          play a level in the open format (a folder with level.gltf)
   --export DIR        convert the chosen level to the open format in DIR (textures as PNG) and exit
-  --textures SET      own (our free textures; the default for playing) or original (the copy's; the default for
-                      --export): the textures the levels are drawn, or exported, with
+  --textures PACK     the texture pack the levels are drawn, or exported, with: own (our free textures; the default
+                      for playing), original (the copy's; the default for --export), remastered, or a pack of the
+                      data folder's textures/ (docs/drahtseilakt/packs.md)
+  --models PACK       the model pack the parts and balls are drawn with: level (as the level takes them; the
+                      default), own, original, or a pack of the data folder's models/ (the physics never changes)
   --record FILE       write a replay of the run (also written automatically on finishing a level)
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
@@ -89,11 +96,16 @@ usage: drahtseilakt [options]
                       the sector is the nearest object's unless --sector is given
   --ball KIND         begin with a wood, stone or paper ball
                       (a run begun elsewhere is recorded with its start and is never a level's best run)
-  --debug             debug mode: F2 takes up the free camera (the run waits; arrows fly and turn, A/D move
-                      sideways, PageUp/PageDown up and down, Home/End look up and down, Shift faster)
+  --no-debug          a plain run (until the release a played game is a debug run by default)
+  --debug             debug run: the extended mode, all levels open, and the development mod god-mode
+                      (assets/mods-dev; switch it on under Options > Extended > Mods): endless lives, F5 / F9 save
+                      and load the moment, F3 seconds back, R restart, [ ] slower and faster, F2 the free camera
+                      (arrows fly and turn, A/D sideways, PageUp/PageDown up and down, Home/End look, Shift faster)
   --sky NAME          play under another sky (A, B, C, Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
                       Mist, Clouds, or any Sky_<NAME>_* the textures have) instead of the level's own
   --size WxH          window or screenshot size (default 1600x900)
+  --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in ./hints
+                      for designing our own: DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
 Without --level, --map or --open the window opens with the level menu.
@@ -103,8 +115,8 @@ its drive or an image of it (found on this computer, dropped on the window or ty
 
 keys: arrows roll the ball (relative to the camera), Shift+Left/Right turn the camera,
       Space lifts the camera, F11 full screen, Esc pauses; Options > Controls binds other keys; a gamepad's
-      left stick rolls, its shoulder buttons turn the camera, A lifts it, Start pauses; in the extended mode
-      R restarts, F2 free camera, [ ] slower and faster, F5 / F9 save the moment and back to it";
+      left stick rolls, its shoulder buttons turn the camera, A lifts it, Start pauses; the mods' keys are
+      on each mod's page (god-mode's in a debug run)";
 
 #[derive(Clone)]
 pub struct Options {
@@ -116,8 +128,10 @@ pub struct Options {
     pub chosen: bool,
     pub record: Option<PathBuf>,
     pub export: Option<PathBuf>,
-    /// The textures the levels are drawn (and exported) with, instead of the settings' (resources.rs).
-    pub textures: Option<gamedata::resources::TextureSet>,
+    /// The texture pack the levels are drawn (and exported) with, instead of the settings' (packs.rs).
+    pub textures: Option<String>,
+    /// The model pack the parts are drawn with, instead of the settings'.
+    pub models: Option<String>,
     pub replay: Option<PathBuf>,
     pub headless: bool,
     /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
@@ -162,9 +176,17 @@ pub struct Options {
     pub at: Option<String>,
     pub ball: Option<String>,
     pub look: Option<[f32; 6]>,
+    /// Measure the original levels into this folder (levelstats.rs) and stop.
+    pub level_stats: Option<PathBuf>,
 }
 
+/// Until the release, a played game is a debug run unless `--no-debug` says otherwise (the owner's decision,
+/// 2026-11-08: easier to start). Runs without a player (replays, headless, autopilot, video, screenshots) stay
+/// plain unless `--debug` is given, so recorded runs and tests are unchanged. The release cleanup sets this false.
+const DEBUG_BY_DEFAULT: bool = true;
+
 fn parse_args() -> Result<Options, String> {
+    let mut debug: Option<bool> = None;
     let mut o = Options {
         data: None,
         import: None,
@@ -173,6 +195,7 @@ fn parse_args() -> Result<Options, String> {
         record: None,
         export: None,
         textures: None,
+        models: None,
         replay: None,
         headless: false,
         autopilot: false,
@@ -198,6 +221,7 @@ fn parse_args() -> Result<Options, String> {
         ball: None,
         debug: false,
         look: None,
+        level_stats: None,
     };
     // `--name=value` is the same as `--name value` (handy for values that start with a minus).
     let mut args = std::env::args()
@@ -232,11 +256,17 @@ fn parse_args() -> Result<Options, String> {
                 o.chosen = true;
             }
             "--export" => o.export = Some(value()?.into()),
-            "--textures" => {
+            // a pack's key: checked against the packs found when the game starts (an unknown one is refused there)
+            "--textures" | "--models" => {
                 let v = value()?;
-                o.textures = Some(
-                    gamedata::resources::TextureSet::parse(&v).ok_or("--textures is own or original".to_owned())?,
-                );
+                if !gamedata::packs::plain(&v) {
+                    return Err(format!("{a}: not a pack's name: {v}"));
+                }
+                if a == "--textures" {
+                    o.textures = Some(v);
+                } else {
+                    o.models = Some(v);
+                }
             }
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),
@@ -273,7 +303,9 @@ fn parse_args() -> Result<Options, String> {
                 o.follow = Some(value()?.into());
                 o.autopilot = true;
             }
-            "--debug" => o.debug = true,
+            "--debug" => debug = Some(true),
+            "--no-debug" => debug = Some(false),
+            "--level-stats" => o.level_stats = Some(value()?.into()),
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--sky" => {
                 let name = value()?;
@@ -346,6 +378,14 @@ fn parse_args() -> Result<Options, String> {
             _ => return Err(format!("unknown option {a}\n\n{USAGE}")),
         }
     }
+    let unattended = o.replay.is_some()
+        || o.headless
+        || o.autopilot
+        || o.video.is_some()
+        || o.frames.is_some()
+        || o.screenshot.is_some()
+        || o.export.is_some();
+    o.debug = debug.unwrap_or(DEBUG_BY_DEFAULT && !unattended);
     Ok(o)
 }
 

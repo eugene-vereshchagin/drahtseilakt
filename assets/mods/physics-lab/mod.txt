@@ -1,0 +1,40 @@
+# Physics lab (after PhysicsEditor): gravity and the physics' time factor as options. A rule variant: the run is
+# marked modded and its replay names this mod with the values, so it plays back the same.
+name.en Physics lab
+name.ru Физическая лаборатория
+name.de Physiklabor
+name.zh 物理实验室
+name.fr Labo de physique
+name.es Laboratorio de física
+name.it Laboratorio di fisica
+description.en Gravity and the physics' time factor to try (originals: 20 and 2.0).
+description.ru Гравитация и множитель времени физики (в оригинале 20 и 2,0).
+description.de Schwerkraft und Zeitfaktor der Physik (Original: 20 und 2,0).
+description.zh 可调重力与物理时间倍率（原版为 20 与 2.0）。
+description.fr Gravité et facteur de temps physique (originaux : 20 et 2,0).
+description.es Gravedad y factor de tiempo físico (originales: 20 y 2,0).
+description.it Gravità e fattore di tempo fisico (originali: 20 e 2,0).
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option gravity number 0 60 2 20
+option time number 5 40 1 20
+label gravity en Gravity
+label gravity ru Гравитация
+label gravity de Schwerkraft
+label gravity zh 重力
+label gravity fr Gravité
+label gravity es Gravedad
+label gravity it Gravità
+label time en Time factor x10
+label time ru Время физики x10
+label time de Zeitfaktor x10
+label time zh 时间倍率 x10
+label time fr Facteur de temps x10
+label time es Factor de tiempo x10
+label time it Fattore tempo x10
+
+on start
+do world.gravity opt.gravity
+do world.time opt.time / 10

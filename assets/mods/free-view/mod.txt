@@ -1,0 +1,53 @@
+# Free view (after FreeViewRotation and AdvancedTravelCam): turn the view about the ball with the mouse, change the
+# camera's distance. Only the look changes: the arrows still push along the camera's own heading.
+name.en Free view
+name.ru Свободный обзор
+name.de Freie Sicht
+name.zh 自由视角
+name.fr Vue libre
+name.es Vista libre
+name.it Vista libera
+description.en The mouse turns the view about the ball; a key turns it back.
+description.ru Мышь вращает обзор вокруг шара; клавиша возвращает его.
+description.de Die Maus dreht die Sicht um den Ball; eine Taste dreht sie zurück.
+description.zh 鼠标绕球旋转视角；按键复位。
+description.fr La souris tourne la vue autour de la balle ; une touche la remet.
+description.es El ratón gira la vista alrededor de la bola; una tecla la restablece.
+description.it Il mouse ruota la visuale attorno alla palla; un tasto la riporta.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option sensitivity number 1 20 1 4
+option distance number 50 200 10 100
+option reset key KeyV,KeyB,KeyN,Home
+label sensitivity en Mouse sensitivity
+label sensitivity ru Чувствительность мыши
+label sensitivity de Mausempfindlichkeit
+label sensitivity zh 鼠标灵敏度
+label sensitivity fr Sensibilité souris
+label sensitivity es Sensibilidad del ratón
+label sensitivity it Sensibilità mouse
+label distance en Camera distance %
+label distance ru Дальность камеры %
+label distance de Kameraabstand %
+label distance zh 镜头距离 %
+label distance fr Distance caméra %
+label distance es Distancia de cámara %
+label distance it Distanza camera %
+label reset en Turn back key
+label reset ru Клавиша возврата
+label reset de Zurück-Taste
+label reset zh 复位键
+label reset fr Touche de retour
+label reset es Tecla de retorno
+label reset it Tasto di ritorno
+var yaw 0
+
+on frame
+do set yaw = yaw + mouse.dx * opt.sensitivity / 20
+do camera.yaw yaw
+do camera.distance opt.distance / 100
+
+on key reset
+do set yaw = 0

@@ -875,6 +875,13 @@ def make_track():
     rail, rail_n = track_rail(800)
     save_track(rail, "Track_Rail")
     save_track(rail_n, "Track_Rail_n")
+    # the borders' bricks are the menu scene's (make_menu_scene.py), kept here by the track's names too, so that every
+    # texture our levels name as the game's (`game:<name>`, levelkit.py) is one of the game's own
+    menu = os.path.join(os.path.dirname(HERE), "3D Entities", "MenuLevel", "textures")
+    for name in ("floor_border", "floor_border_n"):
+        with open(os.path.join(menu, name + ".png"), "rb") as src, \
+                open(os.path.join(TRACK_OUT, f"Track_{name}.png"), "wb") as dst:
+            dst.write(src.read())
 
 
 STEPS = {"floors": make_floors, "track": make_track, "stone": make_stone, "wood": make_wood, "marks": make_marks, "env": make_env,

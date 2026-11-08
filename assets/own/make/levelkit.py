@@ -34,9 +34,11 @@ KIT_VERSION = 2
 OWN = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The game's own texture set (CC0), by the original's texture names.
 TEXTURE_SET = os.path.join(OWN, "Textures")
-# The track's own textures (make_textures.py, step track) and the menu scene's bricks, which the borders share.
+# The track's own textures and the menu scene's bricks, which the borders share (make_textures.py, step track).
 TRACK_SET = os.path.join(OWN, "Track")
-MENU_SET = os.path.join(OWN, "3D Entities", "MenuLevel", "textures")
+# The textures every level shares, named as the game's (`game:<name>`) instead of copied into each level.
+SHARED = ("Track_Side", "Track_floor_border", "Track_floor_border_n", "Wood_Plain", "Track_Rail", "Track_Rail_n",
+          "Track_Column", "Laterne_Glas", "Floor_Top_Checkpoint")
 # The track's cross-section (across, up): its top at 0, 2.5 deep.
 DEPTH = 2.5
 # How a stretch of track keeps the ball on (decisions in docs/drahtseilakt/levels.md, "Safety"), measured on the
@@ -495,45 +497,34 @@ class LevelBuilder:
     # --- materials ---------------------------------------------------------------------------------------------
 
     def _standard_materials(self):
-        """The track's materials: its own textures (assets/own/Track, made by make_textures.py: slabs, kerbs with the
-        brick strip, shade, gutter slopes, sides; one of three sets of slabs by the level's seed), the menu scene's
-        bricks for the borders, and the game's own texture set (assets/own/Textures, CC0) by the original's texture
-        names for the rest, each copied into the level so it carries its own free textures; a procedural stand-in
-        where the set lacks one."""
+        """The track's materials: the slabs, kerbs (with the brick strip), shade and gutter slopes of one of three sets
+        by the level's seed (assets/own/Track, made by make_textures.py), copied into the level as its own; and the
+        textures every level shares named as the game's (`game:<name>`, open-format.md): the track's sides and the
+        borders' bricks (assets/own/Track) and, by the original's texture names, the wood, rails, posts and
+        checkpoint plates of the game's own texture set (assets/own/Textures, CC0). The game draws those with the
+        player's texture pack (ours by default), so a pack changes our levels too."""
         s = self.seed
         variant = "ABC"[s % 3]
         os.makedirs(self.tex, exist_ok=True)
         for name in (f"Track_Top_{variant}", f"Track_Kerb_{variant}", f"Track_Shade_{variant}",
-                     f"Track_Slope_{variant}", "Track_Side", "Track_Column", "Track_Rail", "Track_Rail_n"):
+                     f"Track_Slope_{variant}"):
             shutil.copyfile(os.path.join(TRACK_SET, name + ".png"), os.path.join(self.tex, name + ".png"))
-        for name in ("floor_border.png", "floor_border_n.png"):
-            shutil.copyfile(os.path.join(MENU_SET, name), os.path.join(self.tex, "Track_" + name))
-        textures = {
-            "Laterne_Glas.png": lambda: K.stone(TEX, K.rgb(250, 200, 120), s + 8, slabs=0),
-            "Wood_Plain.png": lambda: K.planks(TEX, K.rgb(150, 104, 62), s + 4),
-            "Rail_Environment.png": lambda: K.metal(TEX, K.rgb(196, 200, 210), s + 5),
-            "Column_beige.png": lambda: K.stone(TEX, K.rgb(120, 112, 104), s + 6, slabs=0),
-            "Floor_Top_Checkpoint.png": lambda: K.stone(TEX, K.rgb(176, 150, 96), s + 7, slabs=1, seams=0.5),
-        }
-        for name, make in textures.items():
-            src = os.path.join(TEXTURE_SET, name)
-            if os.path.isfile(src):
-                shutil.copyfile(src, os.path.join(self.tex, name))
-            else:
-                K.save_png(self.tex, name, make())
+        for name in SHARED:
+            if not any(os.path.isfile(os.path.join(d, name + ".png")) for d in (TRACK_SET, TEXTURE_SET)):
+                raise FileNotFoundError(f"{name}.png: not among the game's own textures (run make_textures.py)")
+        g = K.GAME
         self.mat("top", f"Track_Top_{variant}.png", diffuse=1.0, emissive=0.12, specular=0.3, power=100)
         self.mat("kerb", f"Track_Kerb_{variant}.png", diffuse=1.0, emissive=0.12, specular=0.3, power=100)
         self.mat("shade", f"Track_Shade_{variant}.png", diffuse=1.0, emissive=0.12, specular=0.3, power=100)
         self.mat("slope", f"Track_Slope_{variant}.png", diffuse=1.0, emissive=0.12, specular=0.3, power=100)
-        self.mat("side", "Track_Side.png", diffuse=0.6, emissive=0.42)
+        self.mat("side", g + "Track_Side", diffuse=0.6, emissive=0.42)
         # the borders: the menu scene's brick, with its relief
-        self.mat("border", "Track_floor_border.png", diffuse=1.0, emissive=0.24, normal="Track_floor_border_n.png")
-        self.mat("wood", "Wood_Plain.png", diffuse=1.0, emissive=0.25, specular=0.39, power=50)
-        self.mat("rail", "Track_Rail.png", diffuse=1.0, emissive=0.22, specular=0.85, power=40,
-                 normal="Track_Rail_n.png")
-        self.mat("post", "Track_Column.png", diffuse=0.8, emissive=0.3)
-        self.mat("lamp", "Laterne_Glas.png", diffuse=1.0, emissive=1.0)
-        self.mat("plate", "Floor_Top_Checkpoint.png", diffuse=1.0, emissive=0.2, specular=0.3, power=60)
+        self.mat("border", g + "Track_floor_border", diffuse=1.0, emissive=0.24, normal=g + "Track_floor_border_n")
+        self.mat("wood", g + "Wood_Plain", diffuse=1.0, emissive=0.25, specular=0.39, power=50)
+        self.mat("rail", g + "Track_Rail", diffuse=1.0, emissive=0.22, specular=0.85, power=40, normal=g + "Track_Rail_n")
+        self.mat("post", g + "Track_Column", diffuse=0.8, emissive=0.3)
+        self.mat("lamp", g + "Laterne_Glas", diffuse=1.0, emissive=1.0)
+        self.mat("plate", g + "Floor_Top_Checkpoint", diffuse=1.0, emissive=0.2, specular=0.3, power=60)
 
     def mat(self, name, texture=None, **kw):
         if name not in self.mat_ids:

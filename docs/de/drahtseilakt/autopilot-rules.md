@@ -48,6 +48,21 @@ Die Mechanik, auf der sie beruhen, steht in [autopilot.md](autopilot.md).
   Kiste nicht über die Kante folgt.
 - **Ventilatoren**: eine Papierkugel wartet über dem Gitter nur, bis sie gehoben wird.
 
+## Mechanismen
+
+- **Bretter auf einem Scharnier** (Zugbrücken, P_Modul_25) werden aus kurzem Anlauf umgestoßen, mit Bremsen gleich nach
+  dem Stoß, damit die Kugel dem Brett nicht in die Lücke folgt.
+- **Schieber** (P_Modul_01) bewegt ein Stoß gegen ihre Scheibe, nicht Andrücken; reicht einer nicht, mehrere.
+- **Eine lose Kugel als Schlüssel**: wo eine lose Kugel irgendwohin rollen muss, um einen Mechanismus auszulösen (die
+  Scheibe eines Schiebers, eine Falltür), wird sie mit einem streifenden Stoß entlang ihrer Reihe dorthin gestoßen,
+  die Kugel bremst sofort (Level 11: zwei Steinkugeln vom Gitter auf die Schienen darunter gestoßen).
+- **Wippen** (P_Modul_30) werden vom tiefen Ende mit Anlauf überquert: aus dem Stand kommt eine Steinkugel nicht über
+  die Achse.
+- **Ein Hinweis beginnt, nachdem ein Transformator die Kugel losgelassen hat**, nicht während er sie hält: der Platz auf
+  dem Weg wird nach dem Hinweis neu gefunden, und ein unter einem Hinweis passierter Transformator gilt nicht als
+  passiert.
+- **Ein passierter Sektor ist fort**: seine Objekte verlassen Physik und Bild, der Weg führt nie zurück hinein.
+
 ## Kugeln
 
 - **Papier** über Ventilatoren und an Luftwänden entlang; leicht: für Hänge und durchhängende Platten braucht sie
@@ -56,6 +71,75 @@ Die Mechanik, auf der sie beruhen, steht in [autopilot.md](autopilot.md).
   Zielscheibe umzulegen.
 - **Stein** zum Rammen von Kisten und Schieben von Kugeln; er zerbricht hängende Platten (P_Modul_29): er fährt nicht
   darüber, außer das Level will, dass er mit den Platten hindurchfällt (die Türme von Level 6).
+
+## Zonen, die der Zuschauer markiert
+
+Wo der Besitzer sieht, dass der Testspieler falsch fährt, markiert er die Strecke beim Zusehen (`--watch`, F8 und
+F4; [autopilot.md](autopilot.md), „Zonen“), und die Markierung ist von da an eine Regel für diese Strecke, in
+`<level>.zones` neben den Hinweisen:
+
+- **flow** („hier nicht trödeln“): kein Halt, kein Warten, kein Langsamwerden, das die Kugel nicht braucht. Das
+  `goto` eines Hinweises wird durchrollt, `wait` und `hold` ausgelassen, ein langsames `pass` oder `press` mit 5
+  gefahren, jeweils nur, wenn eine Kopie des Laufs zeigt, dass die Kugel so bleibt; die Steuerung hält mindestens
+  0,8 des Tempos des Bodens, außer vor einer Lücke oder einem Anstieg, der Anlauf braucht (dafür zurückzurollen und
+  anzuhalten ist kein Trödeln, dort verlangt eine flow-Zone nichts).
+- **careful** („Tempolimit halten und keine Kurven schneiden“): nicht schneller als das Tempo der Zone (4,5 ohne
+  Angabe), auf der Mittellinie des Weges, keine Ideallinie; was auch steuert, bleibt unter dem Limit. **Nie, wo die
+  Physik Schwung braucht**: vor einer Lücke zum Überqueren oder einem Anstieg, steiler als die Kugel aus eigenem
+  Schub schafft (bei 4,5: Stein 12,6°, Holz 26°, Papier 31°; aus eigenem Schub allein schafft Stein
+  nichts Steileres als 17°, Holz 37°, Papier 46°; der Weg etwa 30 Einheiten voraus gelesen), an einer Schwelle und wo
+  der laufende Hinweis Tempo sagt (`press`, `along` oder `round` schneller als das Limit, oder ein `pass` schneller
+  als es als Anlauf dazu), wird das Limit losgelassen und nur die Linie gehalten. Eine Markierung, die die Kugel dort
+  bremsen sollte, könnte sie nur verlieren.
+
+Eine Zone des Zuschauers geht den Tempo-Regeln oben vor: sie ist, was der Besitzer gesehen hat.
+
+## Die gelernte Tabelle: `hints/learned.txt`
+
+Eine Zone lehrt den Testspieler auch, was für eine Stelle es war, für jedes Level, auch noch nicht geschaffte (12, 13,
+unsere eigenen). Bei jeder Markierung liest er die Stelle entlang der markierten Strecke, jede Zehntelsekunde, nach
+acht Merkmalen:
+
+| Merkmal | Werte |
+|---|---|
+| surface | `floor`, `rail`, `off` (auf keinem Boden des Weges: ein Modulteil, in der Luft) |
+| width | die des Bodens: `narrow` (unter 4), `medium` (unter 10), `wide` |
+| border | die nächste Kante des Bodens innerhalb 8: `walls` (dort steht eine Wand), `open` (es geht hinunter), `far` |
+| curve | die Drehung des Weges über die nächsten 8 Punkte: `straight` (unter 20°), `bend` (unter 60°), `sharp` |
+| slope | sein Anstieg darüber: `flat`, `up`, `down` (mehr als 0,15) |
+| ahead | das Erste darin: `gap`, `drop`, `rail-end`, `rail-start`, `sill`, `transformer` oder `none` |
+| module | das nächste Modul innerhalb 8 (`P_Modul_25`, `P_Box`, ...) oder `none` |
+| kind | `wood`, `stone`, `paper` |
+
+Was über den größten Teil (60 %) der Strecke gleich war, wird eine Regel: die Oberfläche, die Kugel und die Werte,
+die die Stelle besonders machen (kein gewöhnlicher mittlerer oder breiter Boden, gerade, eben, nichts voraus, kein
+Modul); die gewöhnlichen bleiben weg, sie würden die Regel nur seltener gelten lassen. Eine Strecke ohne Besonderes
+lehrt nichts (ihre Zone bleibt die des Levels). Die Regel kommt in `learned.txt` neben den Hinweisen, eine Datei für
+alle Level, mit dem Ort, wo sie gelernt wurde, und was der Testspieler dort tat:
+
+```
+flow when surface=rail ahead=rail-end kind=wood   # Level_01 sector 2 (147.2 -2.1 -552.0) 2026-11-03: 3.0 s, stopping 40%, mostly hint, off the middle 0.0
+careful speed 4.5 when surface=floor width=narrow curve=sharp kind=stone
+```
+
+Eine Regel gilt, wo jedes Merkmal, das sie nennt, diesen Wert hat; sie verlangt, was eine Zone ihrer Art verlangt
+(flow, careful). Jeder Lauf liest die Tabelle und sieht jeden Takt auf die Stelle: wo die Kugel in keiner eigenen Zone
+des Levels ist (die gehen vor) und Regeln gelten, flow, wenn eine davon flow ist, das niedrigste Limit der careful;
+die Statuszeile nennt die genaueste geltende Regel (`learned: rail, rail-end ahead, wood → don't dawdle`), mit F12
+auch die Stelle, wie die Regeln sie sehen (`here: surface=rail ...`). Eine Regel nennt mindestens zwei Merkmale,
+eines davon besonders für die Stelle, damit keine fast überall gilt; eine careful-Regel zwei besondere, denn sie
+bremst die Kugel überall, wo sie gilt (eine scharfe Kurve allein ist jede scharfe Ecke jedes Levels; eine Kurve bei
+einem Rücksetzpunkt ist nicht jede Kurve). Eine careful-Markierung auf einer Strecke mit nur einem besonderen
+Merkmal lehrt keine Regel (ihre Zone bleibt die des Levels), und eine solche Zeile der Tabelle wird mit einem
+Vermerk ausgelassen. Eine Markierung zurücknehmen (Rücktaste) nimmt
+auch die Regel heraus, die sie lehrte (über die id der Markierung in ihrem Beleg). Eine Regel, die die Tabelle schon
+hat, kommt nicht noch einmal hinzu; eine volle Tabelle (512 Regeln) nimmt keine mehr, und der Bildschirm sagt es. Die Tabelle ist einfacher Text: eine zu weite Regel wird mit einem weiteren
+Merkmal enger gemacht oder gelöscht. Gelesen wie eine Hinweisdatei, ist sie nicht vertrauenswürdig: Größe (64 KiB),
+Regeln (512) und Zahlen begrenzt, Werte aus den Listen oben, eine fehlerhafte Zeile mit Vermerk ausgelassen.
+`AUTOPILOT_SITUATION=1` gibt die Stelle, wie die Regeln sie sehen, jede Sekunde eines Laufs aus.
+
+Die Merkmale unterscheiden 2079 Arten von Stellen ohne das Modul (1701 auf Böden, 189 auf Schienen, 189 abseits),
+jede davon noch mit jedem Modul in der Nähe.
 
 ## Die Route eines Levels: `hints/Level_NN.route`
 

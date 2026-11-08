@@ -4179,31 +4179,31 @@
    "name": "Track_Slope_C"
   },
   {
-   "uri": "textures/Track_Side.png",
+   "uri": "game:Track_Side",
    "name": "Track_Side"
   },
   {
-   "uri": "textures/Track_floor_border.png",
+   "uri": "game:Track_floor_border",
    "name": "Track_floor_border"
   },
   {
-   "uri": "textures/Wood_Plain.png",
+   "uri": "game:Wood_Plain",
    "name": "Wood_Plain"
   },
   {
-   "uri": "textures/Rail_Environment.png",
+   "uri": "game:Rail_Environment",
    "name": "Rail_Environment"
   },
   {
-   "uri": "textures/Column_beige.png",
+   "uri": "game:Column_beige",
    "name": "Column_beige"
   },
   {
-   "uri": "textures/Floor_Top_Checkpoint.png",
+   "uri": "game:Floor_Top_Checkpoint",
    "name": "Floor_Top_Checkpoint"
   },
   {
-   "uri": "textures/Track_floor_border_n.png",
+   "uri": "game:Track_floor_border_n",
    "name": "Track_floor_border_n"
   }
  ],

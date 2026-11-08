@@ -127,7 +127,10 @@ zurückliegenden (die Ursache kann früher liegen: ein zu langsamer Anlauf, eine
 Versuchen an einer Stelle (eine Stelle: 6 Wegpunkte weiter als die letzte) wird der Fehlschlag hingenommen: die Kugel
 geht verloren, oder der Lauf wird mit seinem Bericht aufgegeben (ein so hingenommener fremder Transformator: die Kugel
 fährt in einen, der die Art des Wegs macht, wie eine neue Kugel). Die Hinweise können nach dem Zurückgehen wieder
-auslösen, wie für eine neue Kugel. Eine Kugel, die verloren geht, wie der Spieler dort seine verlor (innerhalb vier
+auslösen, wie für eine neue Kugel. Ein Hinweis, dessen Kugel einen Schritt 3 oder mehr unter dessen Punkt beendet
+(auf einen Boden darunter gefallen), ist vom Kurs ab: seine weiteren Schritte zählen nicht als Vorankommen, also
+geht der Testspieler von dort zurück wie von einem Weg, der steht, statt den Hinweis vom falschen Boden zu Ende zu
+spielen. Eine Kugel, die verloren geht, wie der Spieler dort seine verlor (innerhalb vier
 Sekunden, nachdem er sich an die letzten Sekunden des Spielers vor einem Verlust hielt), führt nicht zurück, wo der Lauf des Spielers danach über diesen Sektor
 hinauskam: was die
 Kugel des Spielers im Gehen tat, kann das sein, was das Level braucht (eine Zugbrücke, mit der Kugel umgestoßen). `--rewinds N` begrenzt, wie oft er in einem Lauf zurückgeht (600; 0: nie). Die
@@ -170,7 +173,8 @@ at X Y Z r R [sector N] [kind wood|stone|paper] : SCHRITT ; SCHRITT ; ...
 ```
 
 Kommt die Kugel dem Punkt näher als R (in diesem Sektor, als diese Kugel), laufen die Schritte der Reihe nach,
-einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinter den Transformatoren, wenn der Hinweis die Kugel verwandelt hat). Schritte:
+einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinter den Transformatoren, wenn der Hinweis die Kugel verwandelt hat: die Transformatoren
+des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als durchfahren, auch einer, in dem er begann). Schritte:
 
 | Schritt | Was er tut |
 |---|---|
@@ -218,11 +222,74 @@ der Sprache der Menüs (der eingeschaltete Zustand ist hervorgehoben):
 | F5 | selbst steuern: die Pfeile steuern, der Testspieler schaut zu; wieder F5 gibt ihm die Kugel zurück, wo sie gerade ist. Die Strecke wird neben den Hinweisen als `<level>-hand-<tick>.replay` gespeichert (der Lauf bis dahin, so spielt er genau nach), und eine Hinweiszeile, die sie abspielt (`at … : replay <Datei> FROM TO`), kommt in `<level>-hand.txt`; beide werden am Bildschirm genannt. In die Hinweisdatei des Levels kopiert, spielt der Testspieler sie dort beim nächsten Mal. Zu den Ständen davor geht er nicht mehr zurück |
 | F6 | den Schritt des laufenden Hinweises überspringen |
 | F7 | ein Bericht über diese Stelle (wie bei einem toten Lauf, nach `--report`) |
+| F8 | eine Zone „hier nicht trödeln“ markieren (flow; siehe „Zonen“ unten): kurz getippt markiert die Taste den Weg der Kugel über die letzten 3 Sekunden bis zum Tippen; gehalten läuft die Zone weiter, solange die Taste unten ist (ab 3 Sekunden, bevor sie gedrückt wurde), und endet beim Loslassen |
+| F4 | ebenso eine Zone „hier das Tempolimit halten und keine Kurven schneiden“ (careful) markieren |
+| [ / ] | wie weit eine Markierung zurückreicht: 1 bis 10 Sekunden (3) |
+| Rücktaste | die zuletzt in diesem Fenster markierte Zone zurücknehmen, mit der Regel, die sie lehrte (die Zeilen jeder Markierung tragen ihre id, `# mark=<id>`, so werden Zeilen einer anderen Sitzung nie entfernt); während eine Taste gehalten wird: diese Markierung verwerfen |
+| F12 | die markierten Zonen in der Welt zeigen oder ausblenden, als durchscheinende Perlen entlang ihres Weges (flow grün, careful orange) |
 | F1 | den Tastenkasten aus- oder einblenden |
 | Esc | das Pausenmenü (Level verlassen, beenden) |
 
 Am Ende, oder wenn das Fenster geschlossen wird, wird die Zusammenfassung des Laufs ausgegeben und der ganze Lauf,
 auch die von Hand gesteuerten Strecken, unter `--record` gespeichert.
+
+## Zonen
+
+Der Zuschauer bringt dem Testspieler beim Zusehen (`--watch`) etwas bei: eine Taste markiert die Strecke, die die
+Kugel gerade gerollt ist, als Zone, und der Testspieler hält sich von da an daran, in diesem Lauf und jedem späteren,
+auch ohne Fenster. Eine Markierung reicht zurück (3 Sekunden, `[` und `]` ändern das), denn erst muss man bemerken,
+dass die Kugel falsch rollt: F8 oder F4 kurz getippt markiert den Weg der Kugel über die letzten Sekunden bis zum
+Tippen; gehalten läuft die Zone weiter, solange die Taste unten ist, und endet beim Loslassen, so bleibt nie eine
+Zone offen. Angehalten (Leertaste) markiert ein Tippen die letzten Sekunden vor der Pause. Die gerade markierte
+Strecke leuchtet ein paar Sekunden auf, eine Zone im Markieren ist zu sehen, während sie wächst, und die Statuszeile
+nennt die Zone, in der die Kugel ist.
+
+Die Zonen werden sofort geschrieben, eine Zeile je Zone, nach `<level>.zones` neben der Hinweisdatei des Levels (mit
+`--hints hints/Level_01.txt`: `hints/Level_01.zones`), die jeder Lauf des Levels liest. Mit `--hints FILE` werden die Markierungen in den Ordner dieser Datei geschrieben
+(die gelernte Tabelle auch); ohne in `hints/` im Datenordner des Spiels. Eine Datei wird ganz oder gar nicht
+geschrieben (eine neue Datei daneben, an ihren Platz umbenannt), nie durch einen Link; eine volle Zonendatei (256
+Zonen) nimmt keine mehr, und der Bildschirm sagt es:
+
+```
+flow sector 1 r 4 : X Y Z ; X Y Z ; ...
+careful sector 2 r 4 [speed V] : X Y Z ; ...
+```
+
+Die Punkte sind der Weg der Kugel durch die Strecke (ein Punkt: eine Stelle); die Zone ist alles innerhalb `r` von
+diesem Weg in diesem Sektor.
+
+- **flow** — hier nicht trödeln. Ein Hinweisschritt, der die Kugel anhält, läuft ohne Halt: ein `goto` wird
+  durchrollt, ein `wait` oder `hold` ausgelassen, ein `pass` oder `press` langsamer als 5 mit 5 gefahren; aber nur,
+  wenn auf einer Kopie des Laufs der Rest des Hinweises und eine Sekunde danach die Kugel behalten (ein Halt, den die
+  Kugel braucht, bleibt). Die Steuerung zahlt für Rollen langsamer als 0,8 des Tempos des Bodens mehr, als ein
+  Warten wert ist (eine Wahl, die die Kugel verliert, wird nie genommen), außer wo die Kugel Anlauf braucht (eine
+  Lücke oder ein zu steiler Anstieg voraus, wie bei einer careful-Zone unten): dafür zurückzurollen und
+  anzuhalten ist kein Trödeln, dort verlangt die Zone nichts (der Halt eines Hinweises bleibt auch).
+- **careful** — hier das Tempolimit halten und keine Kurven schneiden. Nicht schneller als `speed` (4,5 ohne Angabe;
+  zum Ändern die Zeile bearbeiten): die Steuerung zahlt für jede Einheit darüber viermal so viel, `pass`, `press`,
+  `along` und `round` eines Hinweises werden darauf begrenzt, und was auch steuert (die Steuerung, ein Hinweis, die
+  Linie des Spielers), die Pfeile in Laufrichtung der Kugel werden über dem Limit losgelassen und über dem 1,25-Fachen
+  wird gebremst. Die Linie des Weges voraus (die Mitte, die die Wegsuche fand) wird gehalten: jede Einheit daneben
+  kostet 2, neben der Mitte des Bodens dreimal so viel wie sonst. Wo die Physik den Schwung der Kugel braucht, wird
+  das Limit losgelassen und nur die Linie gehalten: der Weg voraus (etwa 30 Einheiten) hat eine Lücke zum
+  Überqueren oder einen Anstieg, steiler als die Kugel aus eigenem Schub schafft am Limit (bei 4,5: Stein
+  12,6°, Holz 26°, Papier 31°; auf der Engine gemessen schafft Stein aus eigenem Schub nichts Steileres als 17°, Holz
+  37°, Papier 46°),
+  gleich voraus kommt eine Schwelle, oder der laufende Hinweis sagt Tempo (`press`, `along` oder `round` schneller
+  als das Limit: ein Anstieg, Schienen, ein Rammstoß; oder ein `pass` schneller als es bis 25 Einheiten davor: sein
+  Anlauf). Die Statuszeile sagt es (`[limit let go: a gap to cross ahead]`). Eine gelernte careful-Regel bremst
+  ebenso und wird an denselben Stellen losgelassen.
+
+Jede Markierung lehrt den Testspieler auch, was für eine Stelle es war, für jedes Level: eine Regel der gelernten
+Tabelle (`learned.txt` neben den Hinweisen; [autopilot-rules.md](autopilot-rules.md), „Die gelernte Tabelle“).
+
+`AUTOPILOT_SITUATION=1` druckt außer der Stelle jede Sekunde jeden Wechsel dessen, was Zonen und Regeln verlangen,
+mit dem Tick und dem Ort der Kugel (`zone t14528 (137.9 -6.8 -554.8) [learned: ... → careful, at most 4.5]`, `none`,
+wenn nichts gilt), und warum ein Limit losgelassen ist.
+
+Eine Zonendatei ist nicht vertrauenswürdig wie eine Hinweisdatei: ihre Größe (64 KiB), die Zonen (256) und Punkte
+(256 je Zone) und jede Zahl sind begrenzt; eine fehlerhafte Zeile wird mit einem Vermerk ausgelassen, die anderen
+Zonen gelten.
 
 ## Videos seiner Läufe
 
@@ -239,8 +306,19 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 `scripts/video.sh`):
 
 - Level 1: vom Start an geschafft in 6:12.27 (Hinweise für Rampe, Kiste, Schieber und Schienen).
+  Allein ohne Lauf eines Spielers, nach dem Storyboard des Walkthroughs (`hints/Level_01.plan`, `.route`, `.txt`;
+  die Hinweise zum Lauf des Inhabers heißen jetzt `Level_01-follow.txt`): 5:17.12, 9.1% der Zeit stehend. Mit den
+  Markierungen des Inhabers (`hints/Level_01.zones`, `hints/learned.txt`), 2026-11-03: 6:23.63, 9.7% der Ticks
+  stehend (unter 0,3 pro Sekunde; der Lauf davor 9.7% so gezählt), näher als 1 am Rand 4.3% (4.5%), Tempo 4.8 ± 3.6
+  (5.5 ± 4.0) (`hints/runs/Level_01-clean.replay`).
 - Level 2: vom Start an geschafft in 6:13.27 (mit `--then Level_02-s5.replay`, dem Lauf des Inhabers ab Sektor 5).
+  Allein ohne Lauf eines Spielers, nach dem Storyboard des Walkthroughs (`hints/Level_02.plan`, `.route`, `.txt`;
+  die Hinweise zum Lauf des Inhabers heißen jetzt `Level_02-follow.txt`): 5:23.90, 5.9% der Zeit stehend
+  (`hints/runs/Level_02-clean.replay`).
 - Level 3: vom Start an geschafft in 7:45.48 (Hebel und Brücke in Sektor 4 wie beim Inhaber).
+  Allein ohne Lauf eines Spielers, nach dem Storyboard des Walkthroughs (`hints/Level_03.plan`, `.route`, `.txt`;
+  die Hinweise zum Lauf des Inhabers heißen jetzt `Level_03-follow.txt`): 5:58.97, 5.5% der Zeit stehend
+  (`hints/runs/Level_03-clean.replay`).
 - Level 4: vom Start an geschafft in 9:19.47 (`--follow` der Lauf des Inhabers, `--then` der ab Sektor 3).
 - Level 5: vom Start an geschafft in 12:39.77 (Hinweise für beide Kisten und den Schieber).
 - Level 6: vom Start an beendet in 8:01.22: Sektor 1 entlang der Linie des Inhabers, Sektoren 2–5 allein mit dem
@@ -254,10 +332,14 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 - Level 9: vom Start an geschafft in 12:35.27, dem geschafften Lauf des Inhabers folgend (das Labyrinth der Schieber
   in Sektor 3 wird gelöst, wie der Inhaber es löste).
 - Level 10: vom Start an geschafft in 15:31.00, dem geschafften Lauf des Inhabers folgend, mit `hints/Level_10.txt`.
-- Level 11–13: 11 folgt dem Lauf des Inhabers durch Sektor 1–3 (verliert an der Zugbrücke eine Kugel wie der
-  Inhaber, was sie umstößt) und fährt in Sektor 4 allein weiter; 12 in Sektor 2
-  (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator vorbei und den Ventilator hinauf, am
-  Balken, an dem die Ventilatoren 18_10–12 entlangblasen.
+- Level 11: vom Start an in 13:43.73 beendet, ganz ohne Lauf eines Spielers, allein nach dem Plan aus dem
+  Walkthrough und den Hinweisen aus seinem Storyboard (`hints/Level_11.plan`, `.txt`, `.route`): die Bretter des
+  Burg-Labyrinths umgestoßen, eine lose Steinkugel auf die Schienen gestoßen, die einen Schieber treiben, die
+  Zielscheiben, die Kisten aus den Rinnen gestoßen, das Labyrinth von Sektor 4, die Ventilatoren und schwingenden
+  Kisten von Sektor 5, und in Sektor 6 zwei lose Steinkugeln vom Gitter gestoßen (eine schiebt den Schieber zwischen
+  den Wippen, eine öffnet eine Falltür) und die letzten Schienenpaare.
+- Level 12–13: 12 in Sektor 2 (seine dünnen Schienen); 13 in Sektor 2, am Papier-Transformator vorbei und den
+  Ventilator hinauf, am Balken, an dem die Ventilatoren 18_10–12 entlangblasen.
 - Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
 - Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
   Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).

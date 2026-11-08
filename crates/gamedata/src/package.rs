@@ -42,6 +42,11 @@ pub struct Package {
     pub order: Option<u32>,
     /// Kept out of the players' lists (level.txt's `hidden = yes`): a level for tests, still loadable by its path.
     pub hidden: bool,
+    /// How hard it is, 1 (easy) to 10 (level.txt's `difficulty`, a whole number in that range; anything else is
+    /// unknown).
+    pub difficulty: Option<u8>,
+    /// level.txt gives its title (else it is named by its folder or file, and listed after the titled ones).
+    pub titled: bool,
 }
 
 impl Package {
@@ -86,7 +91,11 @@ pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
         }
     }
     found.sort_by(|a, b| {
-        let key = |p: &Package| (p.order.is_none(), p.order, p.title.to_lowercase());
+        // titled levels first, by difficulty (unknown after the known), then by order, then by title; a level named
+        // only by its folder comes last
+        let key = |p: &Package| {
+            (!p.titled, p.difficulty.is_none(), p.difficulty, p.order.is_none(), p.order, p.title.to_lowercase())
+        };
         key(a).cmp(&key(b)).then_with(|| a.level.cmp(&b.level))
     });
     (found, skipped)
@@ -116,6 +125,8 @@ pub fn examine(folder: &Path) -> Result<Package, Skipped> {
     Ok(Package {
         level,
         folder: folder.to_path_buf(),
+        titled: info.title.is_some(),
+        difficulty: info.difficulty,
         title: info.title.unwrap_or_else(|| clean(&fallback, TITLE_MAX)),
         author: info.author,
         version: info.version,
@@ -140,6 +151,8 @@ fn loose(file: &Path) -> Package {
         titles: Vec::new(),
         order: None,
         hidden: false,
+        difficulty: None,
+        titled: false,
     }
 }
 
@@ -174,6 +187,20 @@ pub struct Info {
     pub titles: Vec<(String, String)>,
     pub order: Option<u32>,
     pub hidden: bool,
+    pub difficulty: Option<u8>,
+}
+
+/// The easiest and hardest a level.txt's `difficulty` says.
+pub const DIFFICULTY_MAX: u8 = 10;
+
+/// A `difficulty` value: a whole number 1 to DIFFICULTY_MAX, at most two digits (no sign, no fraction, no
+/// spaces inside); anything else is unknown.
+fn difficulty(v: &str) -> Option<u8> {
+    let v = v.trim();
+    if v.is_empty() || v.len() > 2 || !v.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    v.parse::<u8>().ok().filter(|d| (1..=DIFFICULTY_MAX).contains(d))
 }
 
 fn read_info(path: &Path) -> Info {
@@ -199,6 +226,10 @@ pub fn parse_info(bytes: &[u8]) -> Info {
         let key = key.trim().to_ascii_lowercase();
         if key == "order" {
             info.order = info.order.or_else(|| value.trim().parse().ok());
+            continue;
+        }
+        if key == "difficulty" {
+            info.difficulty = info.difficulty.or_else(|| difficulty(value));
             continue;
         }
         if key == "hidden" {
@@ -474,6 +505,41 @@ mod tests {
         assert_eq!(zeta.title_in("ru"), "Зета", "cleaned; the first of a language kept");
         assert_eq!((zeta.title_in("de"), zeta.title_in("zh")), ("Zeta", "Zeta"), "an empty or missing one: the title");
         assert!(found.first().unwrap().titles.is_empty(), "codes are lowercase letters, at most 8");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn difficulty_is_a_whole_number_from_one_to_ten() {
+        let d = |t: &str| parse_info(t.as_bytes()).difficulty;
+        assert_eq!((d("difficulty = 1"), d("Difficulty=10"), d("difficulty = 07")), (Some(1), Some(10), Some(7)));
+        for bad in ["0", "11", "-3", "+3", "3.5", "1e1", "３", "", "5 stars", "999999999999999999999", "٣"] {
+            assert_eq!(d(&format!("difficulty = {bad}")), None, "{bad:?}");
+        }
+        assert_eq!(d("difficulty = 4\ndifficulty = 9"), Some(4), "the first one counts");
+    }
+
+    #[test]
+    fn levels_sort_by_difficulty_then_title_and_untitled_last() {
+        let root = temp("difficulty");
+        let level = |name: &str, info: Option<&str>| {
+            let d = root.join(name);
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join("x.nmo"), b"").unwrap();
+            if let Some(i) = info {
+                std::fs::write(d.join(INFO_FILE), i).unwrap();
+            }
+        };
+        level("a", Some("title = Hard\ndifficulty = 9\n"));
+        level("b", Some("title = Easy B\ndifficulty = 2\n"));
+        level("c", Some("title = Easy A\ndifficulty = 2\n"));
+        level("d", Some("title = Unknown\n"));
+        level("AAA folder", None);
+        level("e", Some("difficulty = 1\n"));
+        let (found, _) = scan(&root);
+        let titles: Vec<&str> = found.iter().map(|p| p.title.as_str()).collect();
+        assert_eq!(titles, ["Easy A", "Easy B", "Hard", "Unknown", "e", "AAA folder"]);
+        assert_eq!(found.first().unwrap().difficulty, Some(2));
+        assert!(!found.last().unwrap().titled);
         let _ = std::fs::remove_dir_all(&root);
     }
 

@@ -75,6 +75,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "pack_txt"
+path = "fuzz_targets/pack_txt.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "sound_table"
 path = "fuzz_targets/sound_table.rs"
 test = false

@@ -10614,39 +10614,39 @@
    "name": "Track_Slope_B"
   },
   {
-   "uri": "textures/Track_Side.png",
+   "uri": "game:Track_Side",
    "name": "Track_Side"
   },
   {
-   "uri": "textures/Track_floor_border.png",
+   "uri": "game:Track_floor_border",
    "name": "Track_floor_border"
   },
   {
-   "uri": "textures/Wood_Plain.png",
+   "uri": "game:Wood_Plain",
    "name": "Wood_Plain"
   },
   {
-   "uri": "textures/Track_Rail.png",
+   "uri": "game:Track_Rail",
    "name": "Track_Rail"
   },
   {
-   "uri": "textures/Track_Column.png",
+   "uri": "game:Track_Column",
    "name": "Track_Column"
   },
   {
-   "uri": "textures/Laterne_Glas.png",
+   "uri": "game:Laterne_Glas",
    "name": "Laterne_Glas"
   },
   {
-   "uri": "textures/Floor_Top_Checkpoint.png",
+   "uri": "game:Floor_Top_Checkpoint",
    "name": "Floor_Top_Checkpoint"
   },
   {
-   "uri": "textures/Track_floor_border_n.png",
+   "uri": "game:Track_floor_border_n",
    "name": "Track_floor_border_n"
   },
   {
-   "uri": "textures/Track_Rail_n.png",
+   "uri": "game:Track_Rail_n",
    "name": "Track_Rail_n"
   }
  ],

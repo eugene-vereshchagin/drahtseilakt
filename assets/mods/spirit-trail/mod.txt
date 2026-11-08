@@ -1,0 +1,30 @@
+# Spirit trail (after SpiritTrail): the level's best run rolls beside this one as a translucent ball.
+name.en Spirit trail
+name.ru Призрак рекорда
+name.de Geisterball
+name.zh 幽灵球
+name.fr Fantôme du record
+name.es Fantasma del récord
+name.it Fantasma del record
+description.en Your best run of the level rolls beside you as a translucent ball.
+description.ru Ваш лучший забег катится рядом полупрозрачным шаром.
+description.de Ihr bester Lauf rollt als durchsichtiger Ball mit.
+description.zh 本关最佳成绩以半透明球的形式同行。
+description.fr Votre meilleure partie roule à côté en balle translucide.
+description.es Tu mejor partida rueda a tu lado como bola translúcida.
+description.it La tua migliore partita rotola accanto come palla traslucida.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option opacity number 10 90 10 40
+label opacity en Opacity %
+label opacity ru Непрозрачность %
+label opacity de Deckkraft %
+label opacity zh 不透明度 %
+label opacity fr Opacité %
+label opacity es Opacidad %
+label opacity it Opacità %
+
+on frame
+do ghost opt.opacity / 100

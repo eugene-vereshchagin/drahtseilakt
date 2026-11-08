@@ -1,0 +1,30 @@
+# Dynamic field of view (after DynamicFov): the faster the ball, the wider the view. Only the look changes.
+name.en Dynamic field of view
+name.ru Динамический обзор
+name.de Dynamisches Sichtfeld
+name.zh 动态视野
+name.fr Champ de vision dynamique
+name.es Campo de visión dinámico
+name.it Campo visivo dinamico
+description.en The view widens with the ball's speed.
+description.ru Обзор расширяется с ростом скорости шара.
+description.de Das Sichtfeld wird mit der Geschwindigkeit weiter.
+description.zh 球速越快，视野越宽。
+description.fr La vue s'élargit avec la vitesse de la balle.
+description.es La vista se amplía con la velocidad de la bola.
+description.it La visuale si allarga con la velocità della palla.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option strength number 10 100 10 50
+label strength en Strength
+label strength ru Сила
+label strength de Stärke
+label strength zh 强度
+label strength fr Intensité
+label strength es Intensidad
+label strength it Intensità
+
+on frame
+do camera.fov clamp((ball.speed - 5) * opt.strength / 50, 0, 40)

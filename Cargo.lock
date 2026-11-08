@@ -494,6 +494,7 @@ dependencies = [
  "ivp",
  "level",
  "lewton",
+ "libc",
  "nmo",
  "pollster",
  "serde_json",
@@ -615,6 +616,7 @@ name = "gamedata"
 version = "0.1.0"
 dependencies = [
  "fuzzkit",
+ "glam",
  "image",
  "level",
  "libc",

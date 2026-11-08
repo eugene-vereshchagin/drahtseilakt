@@ -3,7 +3,9 @@
 // loading and exporting levels.
 
 pub mod assets;
+pub mod mods;
 pub mod package;
+pub mod packs;
 pub mod profile;
 pub mod resources;
 pub mod sound_themes;

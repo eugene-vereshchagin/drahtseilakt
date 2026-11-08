@@ -335,3 +335,60 @@ Community-Karte, ein Teil); wofür wir keine Textur haben (Himmel, Partikel, Leu
 weiter aus der Kopie. Die eigenen Texturen eines Levels im offenen Format bleiben die seines Autors. Ein Export mit
 `--textures own` schreibt unsere hinein, sodass es nur mit freien Ressourcen geteilt werden kann. (Nach der Prüfung präzisiert: in einer fremden Karte werden nur die Texturen der Kopie ersetzt, nie ihre eigenen
 Bilder; die Remaster der Level der Kopie werden wie die der Kopie ersetzt; die Menüszene folgt der Oberfläche.)
+
+## Textur- und Modellpakete
+
+2026-11-03, Wunsch des Eigentümers: wie die Level aussehen, kommt in Paketen, die der Spieler wählt, wie die Klänge in
+Themen kommen ([packs.md](packs.md)): Texturpakete (eingebaut: `own`, `original`, `remastered`) und Modellpakete
+(eingebaut: `level`, `own`, `original`), jedes mit einer eigenen Zeile auf der erweiterten Seite, und jeder Ordner, den
+ein Spieler in `textures/` oder `models/` des Datenordners legt, ist ein neues Paket. Ein Paket ersetzt nur, was es hat;
+was ihm fehlt, kommt aus seinem Rückfall, dann aus der Vorgabe. Ein Modellpaket ändert nur die gezeichneten Netze: die
+Physik behält die gemessenen Formen (die des Originals für die Level der Kopie, unsere für unsere Level), sodass Spiel
+und Wiederholungen sich nie ändern. Unsere Level nennen die Texturen, die sie teilen, als die des Spiels (`game:`-Bilder,
+open-format.md), statt Kopien mitzuführen, sodass Pakete auch sie ändern und jedes Level etwa halb so groß ist. Der
+klassische Modus bleibt, wie er war: unsere Texturen, die Teile, die jedes Level nimmt. `original` bedeutet nun auch in
+einem remasterten Level die Bilder der Kopie; die eigenen hochskalierten Bilder des Remasters sind `remastered`.
+
+## Unser eigenes Mod-Format aus reinen Daten
+
+2026-11-03, Entscheidung des Eigentümers: das Spiel hat Mods — Ergänzungen von Verhalten und Funktionen, die jeder
+Spieler ein- oder ausschaltet — in einem eigenen Format, und die Funktionen selbst sind Mods: das Spiel liefert
+*Werks-Mods* (`assets/mods/`) mit, geschrieben in genau dem Format, das ein Spieler nutzt, und sie dienen als Beispiele
+([mods.md](mods.md)). Ein Mod ist Daten: eine mod.txt mit Regeln (`on <event>`, `if <condition>`, `do <action>`) über
+einer festen Bibliothek von Bausteinen der Engine, mit Optionen, Beschriftungen, Variablen und kleinen totalen
+Ausdrücken, von unserer Laufzeit interpretiert, so wie die Verhaltensgraphen des Originals von seiner. Nichts in einem
+Mod wird als Code ausgeführt: keine Skripte, keine Pfade, keine Verknüpfungen, keine Ressourcen; ein Mod-Ordner enthält
+eine mod.txt und höchstens eine Readme und eine Lizenz, alles andere lehnt ihn ab. Die Mods Fremder sind feindselige
+Eingaben: strenges Parsen, Grenzen für jede Anzahl, ein Fehler, der die Zeile nennt. Regeln auf den Ereignissen des
+Laufs lesen nur den Lauf und sind die einzigen, die ihn ändern dürfen, sodass Läufe deterministisch bleiben; ein Mod,
+der den Lauf ändert, markiert ihn als gemoddet, und sein Replay nennt den Mod mit Hash und Optionen (nie ein bester
+Lauf, nie ein Highscore; klassische Läufe und ihre Replays bleiben unverändert). Klangthemen, Textur- und Modellpakete
+und Level sind keine Mods: sie behalten ihre eigenen Menüs. BML-Mods sind Windows-DLLs: sie wurden statisch als
+Anforderungen durchgesehen und werden nie geladen, ausgeführt oder importiert — auch nicht unter Wine.
+
+## Der Gottmodus ist ein Entwicklungs-Mod
+
+*2026-11-03, Entscheidung des Eigentümers* („unsere Debug-Werkzeuge sollen ein besonderer Mod werden, der Gottmodus,
+mit freiem Speichern, endlosen Leben und Zurückgehen; vielleicht liefern wir ihn mit dem Hauptspiel gar nicht aus,
+damit das Spielen spannender ist“). Die Übungswerkzeuge des erweiterten Modus (den Moment speichern und laden, Sekunden
+zurück, langsamer und schneller, die freie Kamera, Neustart, Sektor und Takt auf dem Bildschirm) und die endlosen Leben
+sind keine Ergänzungen des Spiels mehr: sie sind ein Mod, `god-mode`, geschrieben in unserem Mod-Format aus reinen
+Daten aus Bausteinen, die das Format dafür bekam (`lives.endless`, `rewind`, `save`, `load`, `slower`, `faster`,
+`freecam`, `keys`), sodass seine Tasten Optionen auf seiner Seite sind und auf dem Bildschirm stehen, solange er an ist.
+Er ist ein *Entwicklungs-Mod*: er liegt in `assets/mods-dev/`, wird nur in einem mit `--debug` gestarteten Lauf gelesen,
+und das Paket eines Releases lässt diesen Ordner weg. „Alle Level offen“ gibt es ebenso nur in einem Debug-Lauf; im
+Spiel eines Spielers werden die Level durch Spielen freigeschaltet. Ein Lauf mit Gottmodus ändert den Lauf, ist also
+gemoddet: behalten, aber er öffnet kein Level und ist nie ein bester Lauf oder ein Highscore, und sein Replay nennt den
+Mod. Einzelheiten: [mods.md](mods.md), „Gottmodus“.
+
+## Level werden nach Schwierigkeit gelistet, mit englischen Titeln
+
+*2026-11-03, Entscheidung des Eigentümers* („die eigenen Level in ein Format bringen, damit es kein Haufen ist“). Die
+level.txt eines Levels gibt seine `difficulty`, eine ganze Zahl von 1 bis 10 (alles andere ist unbekannt), und seinen
+`title` auf Englisch, mit seinen Namen in anderen Sprachen als `title.<Code>`. Das Menü zeigt Schwierigkeit und Titel
+jedes Levels und sortiert nach Schwierigkeit, dann Titel; Level unbekannter Schwierigkeit danach, Level ohne Titel
+(nach ihrem Ordner benannt) zuletzt. Unsere zehn Level sind mit 1 bis 10 bewertet. Die Toolbox füllt level.txt aus dem
+Katalog der Community (sein englischer Name, der Originalname, der Autor, seine Schwierigkeit 1–5 verdoppelt), und was
+weder im Katalog steht noch mit einem Readme kommt, sowie Archive und Ordner, die nicht genau ein Level sind, werden in
+`levels/community-unsorted/` beiseitegelegt, damit der Spieler sie von Hand ansieht, und nicht gelistet. Die Regeln für
+Autoren und Spieler stehen auf einer Seite: [making-levels.md](making-levels.md).

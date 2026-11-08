@@ -1,0 +1,30 @@
+# Screenshot (after ScreenCapturer): a key saves the frame as a PNG in the data folder's screenshots/.
+name.en Screenshot key
+name.ru Клавиша скриншота
+name.de Screenshot-Taste
+name.zh 截图键
+name.fr Touche capture
+name.es Tecla de captura
+name.it Tasto screenshot
+description.en A key saves the frame as a PNG in the data folder's screenshots.
+description.ru Клавиша сохраняет кадр в PNG в папку screenshots.
+description.de Eine Taste speichert das Bild als PNG im Ordner screenshots.
+description.zh 一键将画面保存为 PNG（screenshots 文件夹）。
+description.fr Une touche enregistre l'image en PNG dans screenshots.
+description.es Una tecla guarda la imagen en PNG en screenshots.
+description.it Un tasto salva l'immagine in PNG in screenshots.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option key key F12,F10,PrintScreen,KeyP
+label key en Key
+label key ru Клавиша
+label key de Taste
+label key zh 按键
+label key fr Touche
+label key es Tecla
+label key it Tasto
+
+on key key
+do screenshot

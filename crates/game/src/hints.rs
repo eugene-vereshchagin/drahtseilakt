@@ -24,7 +24,7 @@ use crate::sim::{BallKind, Sim, input};
 use glam::Vec3;
 use std::path::{Path, PathBuf};
 
-const MAX_FILE: u64 = 64 * 1024;
+pub const MAX_FILE: u64 = 64 * 1024;
 const MAX_HINTS: usize = 256;
 const MAX_STEPS: usize = 64;
 /// The most replay steps a hint file may have (each plays its replay from the start to find the stretch).
@@ -422,6 +422,68 @@ pub fn read_plain(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
+/// Whether a folder on the way to a file the watcher's keys write is a link: the folder itself and those above it,
+/// up to the current folder for a relative path, or within the home folder for an absolute one (above that the
+/// system's own layout is no concern of ours).
+fn linked_folder(dir: &Path) -> Option<PathBuf> {
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from);
+    for d in dir.ancestors() {
+        if d.as_os_str().is_empty() {
+            break;
+        }
+        if dir.is_absolute() && !home.as_ref().is_some_and(|h| d.starts_with(h) && d != h.as_path()) && d != dir {
+            break;
+        }
+        if std::fs::symlink_metadata(d).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Some(d.to_path_buf());
+        }
+    }
+    None
+}
+
+/// Writes `text` as the file at `path` for the watcher's keys (zones, the learned table, a hand-driven stretch and
+/// its hint): never through a link (the file, or a folder on the way: `linked_folder`), and whole or not at all:
+/// written to a new file beside it, synced, and renamed into place.
+pub fn write_plain(path: &Path, text: &str) -> Result<(), String> {
+    use std::io::Write as _;
+    let shown = |p: &Path| p.display().to_string();
+    if std::fs::symlink_metadata(path).is_ok_and(|m| !m.is_file()) {
+        return Err(format!("{}: not a plain file, not written", shown(path)));
+    }
+    let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+    if let Some(l) = linked_folder(&dir) {
+        return Err(format!("{}: a link on the way, not written", shown(&l)));
+    }
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", shown(&dir)))?;
+    let name = path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+    let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
+    let result = (|| {
+        // a leftover of an earlier run (a file or a link) is removed itself, never followed
+        if std::fs::symlink_metadata(&tmp).is_ok() {
+            std::fs::remove_file(&tmp)?;
+        }
+        let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
+        f.write_all(text.as_bytes())?;
+        f.sync_all()?;
+        drop(f);
+        std::fs::rename(&tmp, path)
+    })();
+    result.map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("{}: {e}", shown(path))
+    })
+}
+
+/// The text of a plain file the watcher's keys add to (empty when there is none yet), read up to `cap` bytes.
+pub fn read_text(path: &Path, cap: u64) -> Result<String, String> {
+    match std::fs::symlink_metadata(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+        Ok(_) => {}
+    }
+    String::from_utf8(read_plain(path, cap)?).map_err(|_| format!("{}: not UTF-8", path.display()))
+}
+
 /// A view at `quarter`, for the axes its arrows push along.
 fn view(quarter: i32) -> crate::sim::Camera {
     crate::sim::Camera {
@@ -499,7 +561,31 @@ struct Running {
     pushes: Vec<Vec3>,
     /// The point the last pass step went through (kept from step to step: the next pass keeps to the line from it).
     passed: Option<Vec3>,
+    /// In a flow zone (zones.rs) the step is run without its stop: a goto rolled through, a wait or hold left out,
+    /// a slow pass or press taken at `FLOW_SPEED`, when a copy of the run shows the ball is kept so.
+    flowed: bool,
 }
+
+/// A step ending with the ball this far below its point has lost it to a floor beneath (`Runner::off_course`).
+const OFF_COURSE_DROP: f32 = 3.0;
+
+/// The point a step rolls the ball to, if it has one.
+fn step_point(step: &Step) -> Option<Vec3> {
+    match *step {
+        Step::Goto(p, _) | Step::Via(p, _) | Step::Pass(p, _, _) | Step::Press(p, _, _, _) | Step::Hold(p, _) => Some(p),
+        _ => None,
+    }
+}
+
+/// A pass faster than a careful zone's limit this near before a push at speed (along the hint's points) is its
+/// run-up, which the zone does not hold back.
+const RUN_UP: f32 = 25.0;
+
+/// In a flow zone a pass or press slower than this is taken at it.
+pub const FLOW_SPEED: f32 = 5.0;
+/// A flowed step is tried on a copy of the run this long (the rest of the hint) and a second after.
+const FLOW_CHECK: u64 = 600;
+const FLOW_COAST: u64 = 60;
 
 /// Runs the hints for the test player.
 #[derive(Debug, Clone, Default)]
@@ -512,12 +598,61 @@ pub struct Runner {
     pub ended: bool,
     /// The tick the last hint began.
     pub began: u64,
+    /// What the watcher's zones ask where the ball is now (set by the test player each tick).
+    pub zone: crate::zones::Effect,
+    /// A copy of the runner trying a step on a copy of the run: says nothing.
+    quiet: bool,
+    /// A step of the running hint ended well below its point (the ball fell to a floor beneath): the hint is off
+    /// course, and its further steps are no getting on (the test player goes back from there as from a way that
+    /// stands still).
+    off_course: bool,
 }
 
 impl Runner {
     /// Where a running hint is (its index and step), so that a hint going through its steps counts as getting on.
     pub fn at(&self) -> Option<(usize, usize)> {
         self.running.as_ref().map(|r| (r.hint, r.step))
+    }
+
+    /// Whether the step running says the ball needs speed above `cap` (a careful zone's limit), and why: a push up a
+    /// climb, along rails or into a ram (`press`, `along`, `round` faster than it), or a `pass` faster than it that
+    /// is the run-up to one of those within `RUN_UP` of the ball, along the hint's points. There the zone lets the
+    /// limit go (autopilot.rs, `Pilot::momentum`).
+    pub fn says_speed(&self, ball: Vec3, cap: f32) -> Option<&'static str> {
+        let run = self.running.as_ref()?;
+        let steps = self.hints.get(run.hint)?.steps.get(run.step..)?;
+        let mut from = ball;
+        let mut gone = 0.0;
+        for (i, step) in steps.iter().enumerate() {
+            let pushes = match *step {
+                Step::Press(_, _, v, _) | Step::Along(v, _) => v > cap,
+                Step::Round(_, _, v, _) => v.abs() > cap,
+                _ => false,
+            };
+            if pushes {
+                return Some(if i == 0 {
+                    "the hint pushes on at speed"
+                } else {
+                    "the hint's run-up"
+                });
+            }
+            match *step {
+                Step::Pass(p, v, _) if v > cap => {
+                    gone += from.distance(p);
+                    from = p;
+                    if gone > RUN_UP {
+                        return None;
+                    }
+                }
+                _ => return None,
+            }
+        }
+        None
+    }
+
+    /// Whether the running hint went off course: a step ended with the ball well below its point.
+    pub fn off_course(&self) -> bool {
+        self.running.is_some() && self.off_course
     }
 
     /// What runs now, for whoever watches: the hint's line, its step and the step, if a hint runs.
@@ -600,12 +735,15 @@ impl Runner {
             if let Some(f) = self.fired.get_mut(i) {
                 *f = true;
             }
-            eprintln!(
+            if !self.quiet {
+                eprintln!(
                 "hint (line {}) at tick {}",
                 self.hints.get(i).map_or(0, |h| h.line),
                 sim.tick
             );
+            }
             self.began = sim.tick;
+            self.off_course = false;
             self.running = Some(Running {
                 hint: i,
                 step: 0,
@@ -620,6 +758,7 @@ impl Runner {
                 from: Vec3::ZERO,
                 pushes: Vec::new(),
                 passed: None,
+                flowed: false,
             });
             self.begin(sim);
         }
@@ -630,7 +769,8 @@ impl Runner {
                 self.ended = true;
                 return None;
             };
-            if let Some(i) = drive(step, run, sim) {
+            let step = adjust(step, run.flowed, self.zone.cap);
+            if let Some(i) = drive(&step, run, sim) {
                 // HINTS_TRACE: the ball every ten ticks while a hint drives, to write hints by
                 if std::env::var_os("HINTS_TRACE").is_some() && sim.tick.is_multiple_of(10) {
                     let (p, v) = (sim.ball.position, sim.ball.velocity);
@@ -650,10 +790,19 @@ impl Runner {
             }
             run.step += 1;
             let p = sim.ball.position;
-            eprintln!(
-                "  step {} done at tick {} ball ({:.1} {:.1} {:.1})",
-                run.step, sim.tick, p.x, p.y, p.z
-            );
+            let below = step_point(&step).is_some_and(|q| q.y - p.y > OFF_COURSE_DROP);
+            if !self.quiet {
+                eprintln!(
+                    "  step {} done at tick {} ball ({:.1} {:.1} {:.1}){}",
+                    run.step,
+                    sim.tick,
+                    p.x,
+                    p.y,
+                    p.z,
+                    if below && !self.off_course { ", well below its point: off course" } else { "" }
+                );
+            }
+            self.off_course |= below;
             self.begin(sim);
         }
     }
@@ -672,12 +821,93 @@ impl Runner {
         run.body = None;
         run.from = Vec3::ZERO;
         run.pushes.clear();
-        if let Some(Step::Inputs(q, _)) =
-            self.hints.get(run.hint).and_then(|h| h.steps.get(run.step))
-        {
+        run.flowed = false;
+        let step = self.hints.get(run.hint).and_then(|h| h.steps.get(run.step));
+        if let Some(Step::Inputs(q, _)) = step {
             run.quarter = *q;
         }
+        // in a flow zone a step that stops the ball goes without its stop, when a copy of the run keeps the ball so
+        if self.zone.flow && step.is_some_and(|s| flowing(s).is_some()) && self.flow_keeps_ball(sim) {
+            if let Some(run) = self.running.as_mut() {
+                run.flowed = true;
+            }
+            if !self.quiet {
+                eprintln!("  step {} without its stop (a flow zone)", run_step(self));
+            }
+        }
     }
+
+    /// Whether the running step, flowed (`adjust`), keeps the ball: the rest of the hint and a second after, on a
+    /// copy of the run (as written from there on: one step at a time is flowed).
+    fn flow_keeps_ball(&self, sim: &Sim) -> bool {
+        let mut r = self.clone();
+        r.zone = crate::zones::Effect::default();
+        r.quiet = true;
+        let Some(run) = r.running.as_mut() else { return false };
+        run.flowed = true;
+        let mut s = sim.clone();
+        let lives = s.lives;
+        let gone = |s: &Sim| s.lives < lives || s.is_dying() || s.game_over;
+        let mut coast = 0;
+        for _ in 0..FLOW_CHECK + FLOW_COAST {
+            let i = if r.running.is_some() { r.input(&s).unwrap_or(0) } else { 0 };
+            if r.running.is_none() {
+                coast += 1;
+                if coast > FLOW_COAST {
+                    break;
+                }
+            }
+            s.step(i);
+            if gone(&s) {
+                return false;
+            }
+            if s.finished {
+                break;
+            }
+        }
+        true
+    }
+}
+
+/// The running step's number (from 1), for the log.
+fn run_step(r: &Runner) -> usize {
+    r.running.as_ref().map_or(0, |run| run.step + 1)
+}
+
+/// What a step does without its stop in a flow zone: a goto rolled through, a wait or hold left out, a slow pass or
+/// press at `FLOW_SPEED`; None for a step that has no stop to leave out.
+fn flowing(step: &Step) -> Option<Step> {
+    match *step {
+        Step::Goto(p, n) => Some(Step::Via(p, n)),
+        Step::Wait(_) => Some(Step::Wait(0)),
+        Step::Hold(p, _) => Some(Step::Hold(p, 0)),
+        Step::Pass(p, v, n) if v < FLOW_SPEED => Some(Step::Pass(p, FLOW_SPEED, n)),
+        Step::Press(p, side, v, n) if v < FLOW_SPEED => Some(Step::Press(p, side, FLOW_SPEED, n)),
+        _ => None,
+    }
+}
+
+/// The step as the zones have it run: without its stop (`flowed`), and with its speed not above a careful zone's
+/// limit (`cap`).
+fn adjust(step: &Step, flowed: bool, cap: Option<f32>) -> std::borrow::Cow<'_, Step> {
+    use std::borrow::Cow;
+    let mut out = Cow::Borrowed(step);
+    if flowed && let Some(f) = flowing(step) {
+        out = Cow::Owned(f);
+    }
+    if let Some(c) = cap {
+        let capped = match *out {
+            Step::Pass(p, v, n) if v > c => Some(Step::Pass(p, c, n)),
+            Step::Press(p, side, v, n) if v > c => Some(Step::Press(p, side, c, n)),
+            Step::Along(v, n) if v > c => Some(Step::Along(c, n)),
+            Step::Round(p, r, v, n) if v.abs() > c => Some(Step::Round(p, r, c * v.signum(), n)),
+            _ => None,
+        };
+        if let Some(s) = capped {
+            out = Cow::Owned(s);
+        }
+    }
+    out
 }
 
 /// The loose body (and, with `parts`, the module part) nearest `at`; usize::MAX for none.

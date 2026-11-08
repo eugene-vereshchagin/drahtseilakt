@@ -9,6 +9,7 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
 
     title NAME...            the level's name (also title.ru, title.de, title.zh: its name in another language)
     order N                  its place in the list of our levels
+    difficulty N             how hard it is, 1 (easy) to 10 (level.txt's difficulty; the menu sorts by it)
     author NAME... / sky NAME / music 1..5 / bonus N / ball wood|stone|paper / light R G B
                              (sky: A, B, C (above the clouds), Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
                              Mist, Clouds; any Sky_<NAME>_* in the textures)
@@ -943,7 +944,7 @@ def parse_line(text):
     return cmd, args, opts, flags
 
 
-META = ("title", "order", "author", "sky", "music", "bonus", "ball", "light", "clouds") + tuple(f"title.{x}" for x in LANGS)
+META = ("title", "order", "difficulty", "author", "sky", "music", "bonus", "ball", "light", "clouds") + tuple(f"title.{x}" for x in LANGS)
 
 
 CLOUD_KEYS = {"cover": ("cover", 0.0, 1.0), "below": ("below", -1000.0, 10000.0),
@@ -992,6 +993,10 @@ def compile_level(path):
                 t.info["clouds"] = parse_clouds(value, i)
             elif key in ("music", "bonus", "order"):
                 t.info[key] = int(value)
+            elif key == "difficulty":
+                if not re.fullmatch(r"(10|[1-9])", value):
+                    raise LevelError(f"line {i}: difficulty is a whole number 1 to 10")
+                t.info[key] = int(value)
             elif key == "sky":
                 # the game takes letters, digits, _ and - (sky.rs, valid_name): it names texture files
                 if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", value):
@@ -1026,7 +1031,8 @@ def compile_level(path):
                   music=info["music"], light=info["light"], bonus=info["bonus"], licence="GPL-3.0-only",
                   clouds=info.get("clouds"),
                   extra={**{f"title.{k}": v for k, v in titles.items() if k != "en"},
-                         **({"order": info["order"]} if "order" in info else {})})
+                         **({"order": info["order"]} if "order" in info else {}),
+                         **({"difficulty": info["difficulty"]} if "difficulty" in info else {})})
     except ValueError as e:
         raise LevelError(f"{path}: {e}") from None
     write_pilot(folder, t)

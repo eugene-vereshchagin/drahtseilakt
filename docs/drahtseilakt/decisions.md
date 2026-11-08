@@ -324,3 +324,55 @@ original level, a community map, a part); what we have no texture for (skies, pa
 pictures) still comes from the copy. An open-format level's own textures stay its maker's. Exporting a level with
 `--textures own` writes ours into it, so it can be shared with free assets only. (Refined after review: in a stranger's map only the copy's own textures are replaced, never its own pictures; the
 remasters of the copy's levels are replaced like the copy's; the menu scene follows the interface.)
+
+## Texture and model packs
+
+2026-11-03, the owner's request: what the levels look like comes in packs the player chooses, as the sounds come in
+themes ([packs.md](packs.md)): texture packs (built in: `own`, `original`, `remastered`) and model packs (built in:
+`level`, `own`, `original`), each its own line on the extended page, and any folder a player drops into the data
+folder's `textures/` or `models/` is a new pack. A pack only replaces what it has; what it lacks comes from its fallback,
+then the default. A model pack changes only the meshes drawn: the physics keeps the measured shapes (the original's for
+the copy's levels, ours for our levels), so play and replays never change. Our own levels name the textures they share
+as the game's (`game:` images, open-format.md) instead of carrying copies, so packs change them too and each level is
+about half the size. The classic mode stays as it was: our textures, the parts each level takes. `original` now means
+the copy's pictures in a remastered level too; the remaster's own upscaled pictures are `remastered`.
+
+## Our own data-only mod format
+
+2026-11-03, the owner's decision: the game has mods — additions of behaviour and features each player switches on
+or off — in a format of our own, and the features themselves are mods: the game ships *factory mods*
+(`assets/mods/`) written in the very format a player uses, which serve as the examples ([mods.md](mods.md)). A mod is
+data: a mod.txt of rules (`on <event>`, `if <condition>`, `do <action>`) over a fixed library of the engine's
+building blocks, with options, labels, variables and small total expressions, interpreted by our runtime as the
+original's behaviour graphs are by its runtime. Nothing in a mod is run as code: no scripts, no paths, no links, no
+assets; a mod folder holds a mod.txt and at most a readme and a licence, and anything else refuses it. Strangers'
+mods are hostile input: strict parsing, caps on every count, an error naming the line. Rules on the run's events read
+only the run and are the only ones that may change it, so runs stay deterministic; a mod that changes the run marks
+it modded, and its replay names the mod with its hash and options (never a best run, never a highscore; classic runs
+and their replays are unchanged). Sound themes, texture and model packs and levels are not mods: they keep their own
+menus. BML mods are Windows DLLs: they were surveyed statically as requirements and are never loaded, run or
+imported — not even under Wine.
+
+## God mode is a development mod
+
+*2026-11-03, the owner's decision* ("our debug tools should become a special mod, god mode, with free saves, endless
+lives and going back; we may not ship it with the main game at all, so playing is more interesting"). The extended
+mode's practice tools (save and load the moment, seconds back, slower and faster, the free camera, restart, the sector
+and tick on screen) and endless lives are no longer additions of the game: they are one mod, `god-mode`, written in our
+data-only mod format from building blocks the format gained for it (`lives.endless`, `rewind`, `save`, `load`,
+`slower`, `faster`, `freecam`, `keys`), so its keys are options on its page and on screen while it is on. It is a
+*development mod*: it lies in `assets/mods-dev/`, read only in a run started with `--debug`, and a release's package
+leaves that folder out. "All levels open" is likewise a debug run's only; a player's game unlocks the levels by playing
+them. A god-mode run changes the run, so it is modded: kept, but it opens no level and is never a best run or a
+highscore, and its replay names the mod. Details: [mods.md](mods.md), "God mode".
+
+## Levels are listed by difficulty, with English titles
+
+*2026-11-03, the owner's decision* ("tidy up the custom levels into a format, so it isn't a dump"). A level's level.txt
+gives its `difficulty`, a whole number 1 to 10 (anything else is unknown), and its `title` in English, with its names in
+other languages as `title.<code>`. The menu shows each level's difficulty and title and sorts by difficulty, then title;
+levels of unknown difficulty after, levels with no title (named by their folder) last. Our ten levels are rated 1 to 10.
+The toolbox fills level.txt from the community's catalogue (its English name, the original name, the author, its 1–5
+difficulty doubled), and what is neither catalogued nor comes with a readme, archives and folders that are not one level
+are set aside in `levels/community-unsorted/` for the player to look at by hand, not listed. The rules for authors and
+players are on one page: [making-levels.md](making-levels.md).

@@ -93,6 +93,9 @@ struct Game {
     level_bonus: i64,
     /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
     assisted: bool,
+    /// The mods that run on the run's side (modrt.rs), as each new run starts with them: a replay's own (its `mod`
+    /// lines), else what the window sets (the mods switched on).
+    mods: crate::modrt::SimMods,
     last_level: bool,
     /// Where the level's runs are kept: the original levels' in replays/, a custom level's under replays/maps/ in its
     /// folder's name (community, open, remastered), so no two kinds share runs.
@@ -200,6 +203,23 @@ impl Game {
         sim.checkpoints_by_name = replay_in.as_ref().is_none_or(|r| r.version >= 4);
         let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
+        // a replay played with mods that changed the run plays with the very same mods, or not at all
+        let mods = match &replay_in {
+            Some(r) if !r.mods.is_empty() => {
+                crate::modrt::Mods::load(gamedata::mods::scan(o.debug), setting)
+                    .for_replay(&r.mod_refs())
+                    .map_err(|e| {
+                        format!(
+                            "{}: {e}",
+                            o.replay
+                                .as_ref()
+                                .map_or(String::new(), |p| p.display().to_string())
+                        )
+                    })?
+            }
+            _ => crate::modrt::SimMods::default(),
+        };
+        sim.mods = mods.clone();
         let start = match &replay_in {
             Some(r) => r.start.clone(),
             None => start_of(o, &level.level)?,
@@ -212,6 +232,7 @@ impl Game {
         }
         let mut replay_out = Replay::new(&level.name, level.hash);
         replay_out.start = start.clone();
+        replay_out.mods = mods.replay_lines();
         // a run re-recorded from an old replay plays by its rules, so it keeps its format
         if let Some(r) = &replay_in {
             replay_out.version = r.version;
@@ -254,6 +275,7 @@ impl Game {
             music_theme: level.level.settings.music,
             level_bonus,
             assisted: false,
+            mods,
             last_level: level.level.settings.last_level,
             runs_root: {
                 let (root, old) = runs_root(&o.source);
@@ -282,19 +304,8 @@ impl Game {
     fn restart(&mut self) {
         self.save_attempt();
         self.assisted = false;
-        self.sim = Sim::with_rules(
-            &self.level.level,
-            self.start_ball,
-            &self.modules,
-            self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
-            self.replay_in.as_ref().map_or(crate::replay::VERSION, |r| r.version),
-        );
-        self.sim.set_ball_boxes(self.ball_meshes.boxes);
-        self.sim.set_pieces(self.pieces.clone());
-        self.sim.bursts = self.replay_in.as_ref().is_none_or(|r| r.version >= 2);
-        self.sim.pieces_expire = self.replay_in.as_ref().is_none_or(|r| r.version >= 3);
-        self.sim.checkpoints_by_name = self.replay_in.as_ref().is_none_or(|r| r.version >= 4);
-        self.sim.level_bonus = self.level_bonus;
+        self.sim = self.fresh_sim(self.replay_in.as_ref().map_or(crate::replay::VERSION, |r| r.version));
+        self.sim.mods = self.mods.clone();
         self.ball_sound.silence(&mut self.sound_out);
         self.fan_sound.silence(&mut self.sound_out);
         if let Some(st) = &self.start {
@@ -304,6 +315,7 @@ impl Game {
         self.watch = Watch::default();
         self.replay_out = Replay::new(&self.level.name, self.level.hash);
         self.replay_out.start = self.start.clone();
+        self.replay_out.mods = self.mods.replay_lines();
         if let Some(r) = &self.replay_in {
             self.replay_out.version = r.version;
         }
@@ -573,7 +585,9 @@ impl Game {
             .trim_end_matches(".nmo")
             .to_owned();
         let dir = self.runs_dir(&stem);
-        let mut targets = vec![dir.join(format!("{}-{}.replay", stem, self.sim.tick))];
+        // a modded run is kept as such and opens no level (menu.rs `finished`)
+        let tag = if self.sim.mods.modded() { "-modded" } else { "" };
+        let mut targets = vec![dir.join(format!("{}-{}{tag}.replay", stem, self.sim.tick))];
         if let Some(r) = &self.record {
             targets.push(r.clone());
         }
@@ -582,9 +596,19 @@ impl Game {
             .ok()
             .and_then(|t| Replay::parse(&t).ok())
             .map(|r| r.end);
-        // A run begun elsewhere than the level start is a test, never the level's best.
-        if self.start.is_none() && !self.assisted && best_ticks.is_none_or(|b| self.sim.tick < b) {
+        // A run begun elsewhere than the level start is a test, never the level's best; nor is a modded run.
+        if self.start.is_none()
+            && !self.assisted
+            && !self.sim.mods.modded()
+            && best_ticks.is_none_or(|b| self.sim.tick < b)
+        {
             targets.push(best.clone());
+            let splits: Vec<String> = crate::modrt::split_ticks(&self.sim.events)
+                .iter()
+                .map(u64::to_string)
+                .collect();
+            let _ = std::fs::create_dir_all(&dir);
+            let _ = std::fs::write(dir.join("splits.txt"), splits.join(" ") + "\n");
             println!(
                 "best run of {} so far: {}",
                 self.level.name,
@@ -600,6 +624,86 @@ impl Game {
                 Err(e) => eprintln!("could not save the run to {}: {e}", shown_path(&path)),
             }
         }
+    }
+
+    /// The mods the window has switched on, for the runs from the next start (a replay keeps its own). A run not yet
+    /// begun takes them at once.
+    fn set_mods(&mut self, mods: crate::modrt::SimMods) {
+        if self.replay_in.is_some() {
+            return;
+        }
+        self.mods = mods;
+        if self.sim.tick == 0 {
+            self.sim.mods = self.mods.clone();
+            self.replay_out.mods = self.mods.replay_lines();
+        }
+    }
+
+    /// The run so far could become the best: begun at the level start, not modded, not a replay (a ghost and splits
+    /// compare only such runs).
+    fn counts_so_far(&self) -> bool {
+        self.start.is_none() && !self.sim.mods.modded() && self.replay_in.is_none()
+    }
+
+    /// The best run's sector times (each sector reached, then the finish), as the best run left them.
+    fn best_splits(&self) -> Vec<u64> {
+        let path = self.runs_dir(&level_stem(self)).join("splits.txt");
+        crate::hints::read_plain(&path, 4096)
+            .ok()
+            .and_then(|b| String::from_utf8(b).ok())
+            .map(|t| {
+                t.split_whitespace()
+                    .take(256)
+                    .filter_map(|w| w.parse().ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// A fresh run of this level by `version`'s rules, as `restart` makes it (no mods: for the ghost).
+    fn fresh_sim(&self, version: u32) -> Sim {
+        let mut sim = Sim::with_rules(
+            &self.level.level,
+            self.start_ball,
+            &self.modules,
+            self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
+            version,
+        );
+        sim.set_ball_boxes(self.ball_meshes.boxes);
+        sim.set_pieces(self.pieces.clone());
+        sim.bursts = version >= 2;
+        sim.pieces_expire = version >= 3;
+        sim.checkpoints_by_name = version >= 4;
+        sim.level_bonus = self.level_bonus;
+        sim
+    }
+
+    /// The level's best run as a ghost: its replay (on this very level file, from the start, not modded) and a run
+    /// to play it in.
+    fn ghost(&self) -> Option<Ghost> {
+        let path = self.runs_dir(&level_stem(self)).join("best.replay");
+        let text =
+            String::from_utf8(crate::hints::read_plain(&path, crate::hints::MAX_REPLAY_FILE).ok()?)
+                .ok()?;
+        let replay = Replay::parse(&text).ok()?;
+        if replay.level_hash != self.level.hash || replay.start.is_some() || !replay.mods.is_empty()
+        {
+            return None;
+        }
+        let sim = self.fresh_sim(replay.version);
+        Some(Ghost {
+            sim,
+            replay,
+            path: Vec::new(),
+        })
+    }
+
+    /// The run counts (a best run, a highscore): begun at the level start, not helped, not modded, not a replay.
+    fn counts(&self) -> bool {
+        self.start.is_none()
+            && !self.assisted
+            && !self.sim.mods.modded()
+            && self.replay_in.is_none()
     }
 
     fn title(&self) -> String {
@@ -647,8 +751,7 @@ fn load_volumes() -> [f32; 2] {
 /// The level's start sound is played when the run is seen within its first second.
 const START_SOUND_WITHIN: u64 = 60;
 
-/// F3 goes this far back (five seconds); the run is kept once a second for the last half minute.
-const REWIND_TICKS: u64 = 300;
+/// The run is kept once a second for the last half minute while a practice mod is on (god-mode rewinds from these).
 const HISTORY_EVERY: u64 = 60;
 const HISTORY_KEPT: usize = 31;
 
@@ -666,7 +769,7 @@ fn load_player() -> Vec<u8> {
 
 /// The extended mode (from the settings, or `--debug` for one run) and the additions the settings turn off.
 fn load_features(debug: bool) -> crate::features::Features {
-    crate::features::Features::load(debug || load_extended(), setting)
+    crate::features::Features::load(debug || load_extended(), debug, setting)
 }
 
 /// The Graphics page's choices kept in the settings.
@@ -774,6 +877,7 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
     m.volumes = load_volumes();
     m.graphics = load_graphics();
     m.bindings = load_bindings(&strings);
+    m.mods = crate::modrt::Mods::load(gamedata::mods::scan(o.debug), setting);
     m.resolutions = crate::options::WINDOWED.to_vec();
     for k in keys.chars() {
         match k {
@@ -880,6 +984,24 @@ pub fn replay_dir() -> PathBuf {
     crate::levels::data_dir().join("replays")
 }
 
+/// The texture and model packs: found, and `textures` and `models` chosen when they are there, else the defaults (our
+/// textures, the level's own parts).
+fn start_packs(textures: Option<&str>, models: Option<&str>) {
+    use gamedata::packs::{Kind, LEVEL, OWN, start};
+    start(Kind::Textures, textures, OWN);
+    start(Kind::Models, models, LEVEL);
+}
+
+/// The packs chosen again without looking for them again (the mode switch).
+fn restore_packs(textures: Option<&str>, models: Option<&str>) {
+    use gamedata::packs::{Kind, LEVEL, OWN, choose};
+    // the default first: a saved pack that is not there leaves it
+    choose(Kind::Textures, OWN);
+    choose(Kind::Models, LEVEL);
+    textures.inspect(|k| choose(Kind::Textures, k));
+    models.inspect(|k| choose(Kind::Models, k));
+}
+
 pub fn run(o: Options, data: Data) -> Result<(), String> {
     // where the interface's files come from: the copy's own when it has its menu, else ours (resources.rs); the
     // extended mode may choose another
@@ -889,16 +1011,24 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     gamedata::resources::set_chosen(chosen);
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { default });
-    // the levels' textures: ours unless the extended mode chose the copy's, or the command line says; an export keeps
-    // the level's own (the copy's) unless `--textures own` asks for ours in it
-    let textures = if o.export.is_some() {
-        Some(gamedata::resources::TextureSet::Original)
+    // the levels' texture and model packs (packs.rs): the extended mode's choice, the command line's for one run; ours
+    // and the level's own parts otherwise (the classic mode always). An export keeps the level's own (the copy's
+    // textures) unless `--textures` asks for a pack in it.
+    let (textures, models) = if o.export.is_some() {
+        (Some(gamedata::packs::ORIGINAL.to_owned()), None)
     } else if extended {
-        gamedata::resources::textures_from_settings()
+        (setting("textures"), setting("models"))
     } else {
-        None
+        (None, None)
     };
-    gamedata::resources::set_textures(o.textures.or(textures).unwrap_or(gamedata::resources::TextureSet::Own));
+    start_packs(o.textures.clone().or(textures).as_deref(), o.models.clone().or(models).as_deref());
+    for (asked, kind) in [(&o.textures, gamedata::packs::Kind::Textures), (&o.models, gamedata::packs::Kind::Models)] {
+        if let Some(k) = asked
+            && gamedata::packs::chosen(kind) != *k
+        {
+            return Err(format!("--{} {k}: no such pack (docs/drahtseilakt/packs.md)", kind.key()));
+        }
+    }
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (the interface no longer implies the original's sounds: the copy's interface is now the default)
     let theme = if extended {
@@ -907,6 +1037,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         None
     };
     gamedata::sound_themes::start(theme.as_deref());
+    if let Some(dir) = &o.level_stats {
+        return crate::levelstats::run(&o, &data, dir, Path::new("hints"));
+    }
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_source(&o.source);
     if let Some(dir) = &o.export {
@@ -1027,11 +1160,21 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
     let graphics = load_graphics();
     let bindings = load_bindings(&strings);
     show_graphics(&graphics, features);
+    let mods = crate::modrt::Mods::load(gamedata::mods::scan(o.debug), setting);
+    for m in &mods.found {
+        if let Err(e) = &m.parsed {
+            eprintln!("mod {}: refused: {e}", m.key);
+        }
+    }
+    // the test player (--watch) plays the original's rules: no mod changes its run
+    let (sim_mods, view_mods) = mods.running(features.mode && pilot.is_none());
+    game.set_mods(sim_mods);
     let menu = (!o.chosen && o.replay.is_none()).then(|| {
         let mut m = Menu::new(&data, &strings, crate::menu::Screen::Main, Some(1), features);
         m.volumes = load_volumes();
         m.graphics = graphics;
         m.bindings = bindings;
+        m.mods = mods.clone();
         m
     });
     let mut app = App {
@@ -1089,6 +1232,17 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
         prev: None,
         error: None,
         menu_scene: None,
+        mods,
+        view_mods,
+        mod_began: Instant::now(),
+        mouse: (0.0, 0.0),
+        fps: 60.0,
+        ghost: None,
+        ghost_tried: false,
+        best_splits: None,
+        light_base: None,
+        shot_due: false,
+        last_shot: None,
         menu_ms: 0.0,
         held: std::collections::HashSet::new(),
         pilot: pilot.map(|run| PilotWatch {
@@ -1100,6 +1254,12 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
             notice: None,
             done: false,
             keys_shown: true,
+            trail: std::collections::VecDeque::new(),
+            marking: None,
+            look_back: LOOK_BACK,
+            zones_shown: false,
+            flash: None,
+            marked: Vec::new(),
         }),
     };
     if let Some(path) = video {
@@ -1141,6 +1301,7 @@ fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
         let mut inst = scene::instances(
             &game.placements,
             &game.sim.taken,
+            &game.sim.unseen,
             &game.sim.world().bodies,
             &game.ball_meshes,
             game.trafo.as_ref().map(|t| &t.1),
@@ -1200,6 +1361,7 @@ fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
         let inst = scene::instances(
             &game.placements,
             &game.sim.taken,
+            &game.sim.unseen,
             &game.sim.world().bodies,
             &game.ball_meshes,
             None,
@@ -1787,6 +1949,40 @@ fn hints_path(game: &Game, o: &Options) -> PathBuf {
     })
 }
 
+/// The level's zones file (zones.rs): `<level>.zones` beside its hint file.
+fn zones_path(game: &Game, o: &Options) -> PathBuf {
+    let hints = hints_path(game, o);
+    let dir = hints.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+    dir.join(format!("{}.zones", level_stem(game)))
+}
+
+/// The learned table's file name, beside the hints: one for every level.
+const LEARNED: &str = "learned.txt";
+
+/// The learned table, the lines left out said.
+fn load_learned(path: &Path) -> crate::learned::Learned {
+    let (l, notes) = crate::learned::load(path);
+    for n in notes {
+        eprintln!("learned: {n}");
+    }
+    if !l.is_empty() {
+        println!("{} learned rules from {}", l.rules.len(), path.display());
+    }
+    l
+}
+
+/// The zones of the level, the lines left out said.
+fn load_zones(path: &Path) -> crate::zones::Zones {
+    let (zones, notes) = crate::zones::load(path);
+    for n in notes {
+        eprintln!("zones: {n}");
+    }
+    if !zones.is_empty() {
+        println!("{} zones from {}", zones.zones.len(), path.display());
+    }
+    zones
+}
+
 /// The hints of the level, a replay stretch read into the view's quarter at its start and its inputs (the replay is
 /// played to its first tick to know the quarter).
 fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints::Hint>, String> {
@@ -1939,11 +2135,28 @@ struct PilotRun {
     near_edges: crate::edges::EdgeStats,
     /// The last time it went back, for whoever watches: what failed, where, and back to when.
     went_back: Option<String>,
+    /// The watcher's zones file beside the hints (zones.rs), and the learned table shared by the levels (learned.rs).
+    zones_path: PathBuf,
+    learned_path: PathBuf,
 }
 
 impl PilotRun {
     fn new(game: &Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<PilotRun, String> {
         pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
+        let zones_path = zones_path(game, o);
+        pilot.zones = Arc::new(load_zones(&zones_path));
+        let learned_path = zones_path.with_file_name(LEARNED);
+        pilot.learned = Arc::new(load_learned(&learned_path));
+        let level = &game.level.level;
+        pilot.modules = Arc::new(
+            (0..level.objects.len())
+                .filter_map(|i| {
+                    let name = crate::scene::module_of(level, i)?;
+                    let ob = level.objects.get(i)?;
+                    Some((glam::Vec3::from(ob.position()), name.to_owned()))
+                })
+                .collect(),
+        );
         let level = &game.level.level;
         pilot.bridges = (0..level.objects.len())
             .filter(|&i| crate::scene::module_of(level, i) == Some("P_Modul_25"))
@@ -1974,6 +2187,8 @@ impl PilotRun {
             edges,
             near_edges: crate::edges::EdgeStats::default(),
             went_back: None,
+            zones_path,
+            learned_path,
         })
     }
 
@@ -2031,7 +2246,11 @@ impl PilotRun {
             self.went_back = Some(line);
             game.sim = sim;
             game.replay_out = replay;
+            // (the zones as they are now: the watcher may have marked one since that state was saved)
+            let (zones, learned) = (self.pilot.zones.clone(), self.pilot.learned.clone());
             self.pilot = p;
+            self.pilot.zones = zones;
+            self.pilot.learned = learned;
             self.pilot.perturb(&game.sim, attempt);
             (self.best, self.since, self.hint_at, self.near_edges) = (b, game.sim.tick.max(sn), h, ne);
             self.heard = game.sim.events.len();
@@ -2045,9 +2264,10 @@ impl PilotRun {
         }
         self.heard = game.sim.events.len();
         // a hint going on to its next step gets on too (its steps lead off the way: round, back for a run-up), and so
-        // does one playing a recorded run
+        // does one playing a recorded run; not one gone off course (its ball fell to a floor beneath a step's point)
         let now_at = pilot.hints.at();
-        if fell || (now_at != self.hint_at && now_at.is_some()) || pilot.hints.replaying() {
+        let hint_on = now_at != self.hint_at && now_at.is_some() && !pilot.hints.off_course();
+        if fell || hint_on || pilot.hints.replaying() {
             self.since = game.sim.tick;
         }
         self.hint_at = now_at;
@@ -2160,8 +2380,11 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
         .or(caps.formats.first().copied())
         .ok_or("no surface format")?;
     let size = window.inner_size();
+    // read back for the screenshots where the surface allows it
+    let usage =
+        wgpu::TextureUsages::RENDER_ATTACHMENT | (caps.usages & wgpu::TextureUsages::COPY_SRC);
     let config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        usage,
         format,
         width: size.width.clamp(1, crate::options::SURFACE_MAX),
         height: size.height.clamp(1, crate::options::SURFACE_MAX),
@@ -2426,6 +2649,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     let inst = scene::instances(
         &game.placements,
         &game.sim.taken,
+        &game.sim.unseen,
         &game.sim.world().bodies,
         &game.ball_meshes,
         game.trafo.as_ref().map(|t| &t.1),
@@ -2499,6 +2723,12 @@ fn save_target(r: &Renderer, target: &wgpu::Texture, (w, h): (u32, u32), path: &
         tick
     );
     Ok(())
+}
+
+/// O_NOFOLLOW: the screenshot is never written through a link.
+#[cfg(unix)]
+fn libc_nofollow() -> i32 {
+    libc::O_NOFOLLOW
 }
 
 /// The scene behind the menus: the original's (MenuLevel.nmo) with the copy's interface, else ours.
@@ -2591,6 +2821,31 @@ struct App {
     cursor_shown: Option<bool>,
     /// The test player playing in the window (--watch), while it plays.
     pilot: Option<PilotWatch>,
+    /// The mods (modrt.rs, docs/drahtseilakt/mods.md): those found, which are on and their options; their view side
+    /// running; when this run began (real time); the mouse's motion this frame; the frames a second.
+    mods: crate::modrt::Mods,
+    view_mods: crate::modrt::ViewMods,
+    mod_began: Instant,
+    mouse: (f32, f32),
+    fps: f32,
+    /// The best run as a ghost (a mod's `ghost`), and whether it was looked for in this run.
+    ghost: Option<Box<Ghost>>,
+    ghost_tried: bool,
+    /// The best run's sector times (a mod's `splits`), read once a run.
+    best_splits: Option<Vec<u64>>,
+    /// The level's light as uploaded (a mod's `light` dims it).
+    light_base: Option<crate::render::Light>,
+    /// A screenshot (a mod's `screenshot`) is due after this frame is drawn; when the last was taken.
+    shot_due: bool,
+    last_shot: Option<Instant>,
+}
+
+/// The level's best run played beside this one (a mod's `ghost`): its run, its input, and where its ball was at each
+/// tick (so a run taken back still finds it).
+struct Ghost {
+    sim: Sim,
+    replay: Replay,
+    path: Vec<(glam::Vec3, glam::Quat, Option<crate::sim::BallKind>)>,
 }
 
 /// The test player in the window (--watch): its run, and what the watcher does with it.
@@ -2609,7 +2864,34 @@ struct PilotWatch {
     done: bool,
     /// The box of the watcher's keys is shown (F1).
     keys_shown: bool,
+    /// The ball's path of the last seconds (tick, place, sector), for the zones marked (F8, F4).
+    /// (And the ball's kind, its speed and what steered then, for what a marked stretch was like: learned.rs.)
+    trail: std::collections::VecDeque<Trail>,
+    /// A zone being marked: its kind, the key held, from which tick of the trail, in which sector, since when.
+    marking: Option<(crate::zones::Kind, KeyCode, u64, usize, Instant)>,
+    /// How far back a mark reaches before its key went down, in seconds ([ and ]).
+    look_back: u32,
+    /// The zones are shown in the world (F12).
+    zones_shown: bool,
+    /// The zone marked last, shown a moment so the watcher sees what got marked.
+    flash: Option<(crate::zones::Zone, Instant)>,
+    /// The zones marked in this window, last last: each mark's id (in its lines) and whether it also taught a rule
+    /// (undone with it).
+    marked: Vec<(String, bool)>,
 }
+
+/// A tick of the watched ball's trail: the tick, its place, sector, kind, speed and what steered.
+type Trail = (u64, glam::Vec3, usize, crate::sim::BallKind, f32, &'static str);
+
+/// A mark reaches this far back before its key went down by default, and at most (seconds); the trail is kept a
+/// little longer; a key held longer than `MARK_HELD_MAX` ends its zone (a release the window never heard).
+const LOOK_BACK: u32 = 3;
+const LOOK_BACK_MAX: u32 = 10;
+const TRAIL_TICKS: u64 = 60 * 12;
+const MARK_HELD_MAX: std::time::Duration = std::time::Duration::from_secs(120);
+/// A zone just marked is shown this long; the trail is thinned to a point every so many units.
+const FLASH: std::time::Duration = std::time::Duration::from_secs(4);
+const MARK_STEP: f32 = 1.5;
 
 /// The lines of the watched test player's status in the top left corner, in the interface's font.
 fn watch_overlay(text: &str, f: &crate::ui::Face, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
@@ -2635,6 +2917,7 @@ fn watch_overlay(text: &str, f: &crate::ui::Face, screen: crate::ui::Screen) -> 
 /// The watcher's keys' box: a line a key, from this high in the window down to just over the lives.
 const KEYS_LINE: f32 = 0.03;
 const KEYS_BOTTOM: f32 = 0.85;
+const KEYS_RIGHT: f32 = 0.62;
 
 impl PilotWatch {
     /// The box of the watcher's keys, bottom left, in the menus' language: the state that is on (paused, driven by
@@ -2652,13 +2935,19 @@ impl PilotWatch {
             (strings.ours(if self.hand.is_some() { "watch driving" } else { "watch hands" }), self.hand.is_some()),
             (strings.ours("watch skip"), false),
             (strings.ours("watch stuck"), false),
+            (strings.ours("watch flow"), self.marking.is_some_and(|m| m.0 == crate::zones::Kind::Flow)),
+            (strings.ours("watch careful"), self.marking.is_some_and(|m| m.0 == crate::zones::Kind::Careful)),
+            (strings.ours("watch mark how").replace("{n}", &self.look_back.to_string()), false),
+            (strings.ours("watch look back").replace("{n}", &self.look_back.to_string()), self.look_back != LOOK_BACK),
+            (strings.ours("watch undo"), false),
+            (strings.ours(if self.zones_shown { "watch zones shown" } else { "watch zones" }), self.zones_shown),
             (strings.ours("watch quit"), false),
             (strings.ours("watch box"), false),
         ];
         let top = KEYS_BOTTOM - KEYS_LINE * lines.len() as f32 - 0.01;
         let shade = [0.0, 0.0, 0.0, 0.55];
         let mut q = vec![crate::ui::Quad {
-            rect: crate::ui::homogeneous([0.01, top, 0.42, KEYS_BOTTOM]),
+            rect: crate::ui::homogeneous([0.01, top, KEYS_RIGHT, KEYS_BOTTOM]),
             uv: [0.0, 0.0, 1.0, 1.0],
             top: shade,
             bottom: shade,
@@ -2678,9 +2967,57 @@ impl PilotWatch {
         for (k, (line, on)) in lines.iter().enumerate() {
             let y = top + 0.005 + KEYS_LINE * k as f32;
             style.color = if *on { [1.0, 0.85, 0.3, 1.0] } else { [0.85, 0.85, 0.85, 1.0] };
-            q.extend(f.layout(line, crate::ui::homogeneous([0.02, y, 0.42, y + KEYS_LINE]), &style));
+            q.extend(f.layout(line, crate::ui::homogeneous([0.02, y, KEYS_RIGHT, y + KEYS_LINE]), &style));
         }
         crate::ui::place(q, screen, crate::ui::Anchor::Left)
+    }
+
+    /// The zones drawn in the world as translucent beads along their paths: all of this sector's with F12 (flow
+    /// green, careful orange), the one being marked and the one just marked brighter and larger.
+    fn zone_instances(&self, game: &Game, out: &mut Vec<crate::render::Instance>) {
+        use crate::zones::Kind;
+        let Some(mesh) = game.ball_meshes.wood.or(game.ball_meshes.stone).or(game.ball_meshes.paper) else { return };
+        let color = |k: Kind, a: f32| match k {
+            Kind::Flow => [0.2, 0.95, 0.45, a],
+            Kind::Careful => [1.0, 0.55, 0.1, a],
+        };
+        let mut bead = |p: glam::Vec3, r: f32, c: [f32; 4]| {
+            let m = glam::Mat4::from_scale_rotation_translation(
+                glam::Vec3::splat(r / crate::sim::BALL_RADIUS),
+                glam::Quat::IDENTITY,
+                p,
+            );
+            out.push(crate::render::Instance {
+                marker: Some(c),
+                ..crate::render::Instance::plain(scene::BALLS_MODEL, mesh, m)
+            });
+        };
+        let sector = game.sim.sector + 1;
+        if self.zones_shown {
+            for z in self.run.pilot.zones.zones.iter().filter(|z| z.sector == sector) {
+                if let [p] = z.points.as_slice() {
+                    bead(*p, z.radius, color(z.kind, 0.15));
+                }
+                for &p in &z.points {
+                    bead(p, 0.5, color(z.kind, 0.4));
+                }
+            }
+        }
+        if let Some((z, at)) = self.flash.as_ref().filter(|f| f.1.elapsed() < FLASH && f.0.sector == sector) {
+            // fading out
+            // (in steps of a twentieth: each colour is a material of its own)
+            let a = 0.7 * (1.0 - at.elapsed().as_secs_f32() / FLASH.as_secs_f32());
+            let a = (a * 20.0).round() / 20.0;
+            for &p in &z.points {
+                bead(p, 0.9, color(z.kind, a.max(0.1)));
+            }
+        }
+        if let Some((kind, _, from, sec, _)) = self.marking {
+            let path: Vec<glam::Vec3> = self.trail.iter().filter(|t| t.0 >= from && t.2 == sec).map(|t| t.1).collect();
+            for p in crate::zones::thin(&path, MARK_STEP) {
+                bead(p, 0.9, color(kind, 0.6));
+            }
+        }
     }
 
     /// What the watcher reads: the speed and state, the sector, lives and the edge, what the test player does and
@@ -2697,6 +3034,9 @@ impl PilotWatch {
         if self.pending.as_ref().is_some_and(|p| p.1.elapsed() > THINKING) {
             state += "  thinking...";
         }
+        if let Some((kind, ..)) = self.marking {
+            state += &format!("  MARKING {} ZONE (release the key to end)", kind.word().to_uppercase());
+        }
         let edge = self.run.edges.ball_clearance(s.ball.position).map_or("-".into(), |d| format!("{d:.1}"));
         let mut t = format!(
             "{state}\n{}  sector {}  lives {}  edge {edge}  rewinds {}\n{}",
@@ -2706,6 +3046,11 @@ impl PilotWatch {
             self.run.rewinds.total(),
             self.run.pilot.status()
         );
+        // (with the zones shown, the place as the learned rules see it)
+        if self.zones_shown {
+            let p = &self.run.pilot;
+            t += &format!("\nhere: {}", p.situation(s.ball.position, p.reached(), s.ball.kind).describe());
+        }
         if let Some((n, at)) = &self.notice
             && at.elapsed() < NOTICE
         {
@@ -2724,16 +3069,19 @@ fn save_hand(game: &Game, o: &Options, hand: (u64, glam::Vec3, usize, crate::sim
     let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
     let stem = level_stem(game);
     let name = format!("{stem}-hand-{from}.replay");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let file = dir.join(&name);
-    std::fs::write(&file, game.replay_out.to_text()).map_err(|e| format!("{}: {e}", file.display()))?;
+    crate::hints::write_plain(&file, &game.replay_out.to_text())?;
     let kind = format!("{kind:?}").to_ascii_lowercase();
     let line = format!("at {:.2} {:.2} {:.2} r 4 sector {} kind {kind} : replay {name} {from} {}\n", at.x, at.y,
         at.z, sector + 1, game.sim.tick);
     let hints = dir.join(format!("{stem}-hand.txt"));
-    let mut old = std::fs::read_to_string(&hints).unwrap_or_default();
+    // (read as a hint file is: a plain file, capped)
+    let mut old = crate::hints::read_text(&hints, crate::hints::MAX_FILE)?;
+    if !old.is_empty() && !old.ends_with('\n') {
+        old.push('\n');
+    }
     old += &line;
-    std::fs::write(&hints, old).map_err(|e| format!("{}: {e}", hints.display()))?;
+    crate::hints::write_plain(&hints, &old)?;
     Ok(format!("saved {} (hint in {})", shown_path(&file), shown_path(&hints)))
 }
 
@@ -2806,6 +3154,7 @@ impl App {
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
         let Gpu { surface, config, mut renderer, modes } = window_gpu(&window)?;
         upload(&mut renderer, &self.game);
+        self.light_base = Some(renderer.light);
         if self.menu_scene.is_none() {
             self.menu_scene = load_menu_scene(&self.data);
         }
@@ -2850,13 +3199,339 @@ impl App {
         self.keys = 0;
         if let Some(gpu) = &mut self.gpu {
             gpu.renderer.models.clear();
+            // the light as the level sets it (a mod's dimming never carried into the next level)
+            gpu.renderer.light.ambient = crate::render::Light::default().ambient;
             upload(&mut gpu.renderer, &self.game);
+            self.light_base = Some(gpu.renderer.light);
             upload_menu_scene(&mut gpu.renderer, self.menu_scene.as_mut(), &self.data);
         }
         if let Some(w) = &self.window {
             w.set_title(&self.game.title());
         }
+        self.apply_mods();
         Ok(())
+    }
+
+    /// The mods switched on (in the extended mode) run: the run's side from the next start, the view's at once.
+    fn apply_mods(&mut self) {
+        let (sim, view) = self.running_mods();
+        self.game.set_mods(sim);
+        self.view_mods = view;
+        self.reset_mod_run();
+        // without a practice mod nothing of the practice stays: the speed, the saved moment, the free camera
+        if !self.practice() {
+            self.time_scale = 1.0;
+            self.saved = None;
+            self.fly = None;
+            self.history.clear();
+        }
+    }
+
+    /// The mods that run: those switched on, in the extended mode, never while the test player plays (--watch).
+    fn running_mods(&self) -> (crate::modrt::SimMods, crate::modrt::ViewMods) {
+        self.mods.running(self.features.mode && self.pilot.is_none())
+    }
+
+    /// A new run for the mods: the view's variables as at first, the real time from now, no ghost yet.
+    fn reset_mod_run(&mut self) {
+        self.view_mods.reset();
+        self.mod_began = Instant::now();
+        self.ghost = None;
+        self.ghost_tried = false;
+        self.best_splits = None;
+    }
+
+    /// A value a mod reads: the run's from the Sim, the view's from the window.
+    fn mod_value(&self, v: gamedata::mods::Value) -> f32 {
+        use gamedata::mods::Value as V;
+        let sim = &self.game.sim;
+        let now = || {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs())
+        };
+        match v {
+            V::RealTime => self.mod_began.elapsed().as_secs_f32(),
+            V::FrameDt => 1.0 / self.fps.max(1.0),
+            V::Fps => self.fps,
+            // the clock is UTC: the game knows no time zone (no locale data is read)
+            V::ClockHour => ((now() / 3600) % 24) as f32,
+            V::ClockMinute => ((now() / 60) % 60) as f32,
+            V::ClockSecond => (now() % 60) as f32,
+            V::PracticeSpeed => self.time_scale,
+            V::PracticeSaved => f32::from(u8::from(self.saved.is_some())),
+            V::MouseDx => self.mouse.0,
+            V::MouseDy => self.mouse.1,
+            V::ExtrasPoints => sim.extras_left().0 as f32,
+            V::ExtrasPointsAll => sim.extras_left().1 as f32,
+            V::ExtrasLives => sim.extras_left().2 as f32,
+            V::ExtrasLivesAll => sim.extras_left().3 as f32,
+            V::BestTime => self
+                .best_splits
+                .as_ref()
+                .and_then(|b| b.last())
+                .map_or(-1.0, |&t| t as f32 / 60.0),
+            _ => sim.mod_value(v, self.bindings.turn(self.keys | self.pad_keys)),
+        }
+    }
+
+    /// The view's mods for this frame: their frame rules, what they ask done, the ghost kept up with the run.
+    fn mod_frame(&mut self, step: f32) {
+        if step > 0.0 {
+            self.fps = self.fps * 0.9 + (1.0 / step) * 0.1;
+        }
+        if self.view_mods.is_empty() || self.menu.is_some() || self.loading.is_some() {
+            self.mouse = (0.0, 0.0);
+            return;
+        }
+        if self.best_splits.is_none() {
+            self.best_splits = Some(self.game.best_splits());
+        }
+        let mut view = std::mem::take(&mut self.view_mods);
+        view.out.lines.clear();
+        view.out.splits.clear();
+        let lang = self.strings.language();
+        view.fire(
+            gamedata::mods::Event::Frame,
+            &|v| self.mod_value(v),
+            &self.game.sim.mods,
+            lang,
+        );
+        self.view_mods = view;
+        self.mouse = (0.0, 0.0);
+        if std::mem::take(&mut self.view_mods.out.restart) {
+            self.restart();
+            self.saved = None;
+        }
+        if std::mem::take(&mut self.view_mods.out.screenshot) {
+            // at most one a second, however the key is held
+            if self.last_shot.is_none_or(|t| t.elapsed().as_secs_f32() >= 1.0) {
+                self.last_shot = Some(Instant::now());
+                self.shot_due = true;
+            }
+        }
+        self.keep_ghost();
+    }
+
+    /// A key the mods take (one of their key options): its rules fire; true when some mod took it.
+    fn mod_key(&mut self, code: KeyCode) -> bool {
+        if self.view_mods.is_empty() {
+            return false;
+        }
+        // a key the player bound to the game's actions stays the game's (mod.txt already refuses the reserved ones)
+        if self.bindings.bits(code) != 0 {
+            return false;
+        }
+        let name = format!("{code:?}");
+        let mut view = std::mem::take(&mut self.view_mods);
+        let taken = view.runs.iter().any(|r| {
+            r.txt.options.iter().zip(&r.opts).any(|(o, v)| {
+                matches!(o.kind, gamedata::mods::OptKind::Key(_)) && o.show(*v) == name
+            })
+        });
+        if taken {
+            let lang = self.strings.language();
+            view.press(&name, &|v| self.mod_value(v), &self.game.sim.mods, lang);
+        }
+        self.view_mods = view;
+        taken
+    }
+
+    /// The ghost of the best run, played up to this run's tick (a few ticks a frame, so a long run catches up).
+    fn keep_ghost(&mut self) {
+        if self.view_mods.out.ghost <= 0.0 || !self.game.counts_so_far() {
+            self.ghost = None;
+            return;
+        }
+        if self.ghost.is_none() && !self.ghost_tried {
+            self.ghost_tried = true;
+            self.ghost = self.game.ghost().map(Box::new);
+        }
+        let Some(g) = &mut self.ghost else { return };
+        let want = usize::try_from(self.game.sim.tick).unwrap_or(usize::MAX);
+        let mut steps = 0;
+        while g.path.len() <= want && steps < 240 {
+            let next = g.sim.tick + 1;
+            g.sim.step(if next <= g.replay.end {
+                g.replay.input_at(next)
+            } else {
+                0
+            });
+            g.path
+                .push((g.sim.ball.position, g.sim.ball.rotation, g.sim.drawn_ball()));
+            steps += 1;
+        }
+    }
+
+    /// The ghost's ball at this run's tick, as a translucent instance.
+    fn ghost_instance(&self) -> Option<crate::render::Instance> {
+        let g = self.ghost.as_ref()?;
+        let at = usize::try_from(self.game.sim.tick).ok()?;
+        let &(pos, rot, kind) = g.path.get(at).or(g.path.last())?;
+        let b = &self.game.ball_meshes;
+        let mesh = match kind? {
+            crate::sim::BallKind::Wood => b.wood,
+            crate::sim::BallKind::Stone => b.stone,
+            crate::sim::BallKind::Paper => b.paper,
+        }?;
+        let a = self.view_mods.out.ghost;
+        Some(crate::render::Instance {
+            model: scene::BALLS_MODEL,
+            mesh,
+            matrix: glam::Mat4::from_rotation_translation(rot, pos),
+            marker: None,
+            uv_offset: [0.0; 2],
+            diffuse: Some([0.7, 0.85, 1.0, a]),
+            unlit: false,
+            shadow: None,
+        })
+    }
+
+    /// The mods' HUD lines and the splits, in their corners, in the interface's font.
+    fn mod_hud(&self, f: &crate::ui::Face, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
+        use gamedata::mods::Corner;
+        let out = &self.view_mods.out;
+        let mut by: Vec<(Corner, String, [f32; 4])> = out
+            .lines
+            .iter()
+            .map(|(c, t)| (*c, t.clone(), [1.0, 1.0, 1.0, 1.0]))
+            .collect();
+        for c in &out.splits {
+            for (t, color) in self.split_lines() {
+                by.push((*c, t, color));
+            }
+        }
+        let mut q = Vec::new();
+        for corner in [
+            Corner::TopLeft,
+            Corner::TopRight,
+            Corner::BottomLeft,
+            Corner::BottomRight,
+        ] {
+            let lines: Vec<&(Corner, String, [f32; 4])> =
+                by.iter().filter(|l| l.0 == corner).collect();
+            let right = matches!(corner, Corner::TopRight | Corner::BottomRight);
+            let bottom = matches!(corner, Corner::BottomLeft | Corner::BottomRight);
+            for (k, (_, text, color)) in lines.iter().enumerate() {
+                let step = 0.034;
+                // the top left keeps clear of the points counter, the bottom right of the lives
+                let y = if bottom {
+                    0.86 - step * (lines.len() - k) as f32
+                } else {
+                    0.02 + if right { 0.0 } else { 0.10 } + step * k as f32
+                };
+                let style = crate::ui::Style {
+                    scale: [0.5, 0.55],
+                    spacing: [1.0, 1.0],
+                    align: (if right {
+                        crate::ui::ALIGN_RIGHT
+                    } else {
+                        crate::ui::ALIGN_LEFT
+                    }) | crate::ui::ALIGN_TOP,
+                    flags: crate::ui::TEXT_SCREEN,
+                    margins: [0.0; 4],
+                    color: *color,
+                    v2: true,
+                    shadow: Some(([1.0, 1.0], [0.0, 0.0, 0.0, 0.8])),
+                };
+                let quads = f.layout(
+                    text,
+                    crate::ui::homogeneous([0.015, y, 0.985, y + step]),
+                    &style,
+                );
+                let anchor = if right {
+                    crate::ui::Anchor::Right
+                } else {
+                    crate::ui::Anchor::Left
+                };
+                q.extend(crate::ui::place(quads, screen, anchor));
+            }
+        }
+        q
+    }
+
+    /// The splits: each sector reached (and the finish) with its time, and the difference to the best run's
+    /// (green ahead, red behind); the sector being played with its time so far.
+    fn split_lines(&self) -> Vec<(String, [f32; 4])> {
+        let sim = &self.game.sim;
+        let reached = crate::modrt::split_ticks(&sim.events);
+        let best = self.best_splits.clone().unwrap_or_default();
+        let sector = self.strings.ours("sector");
+        let mut v = Vec::new();
+        for (k, &t) in reached.iter().enumerate() {
+            let mut line = format!("{sector} {}  {}", k + 1, clock(t));
+            let mut color = [1.0, 1.0, 1.0, 1.0];
+            if let Some(&b) = best.get(k) {
+                let d = (t as f64 - b as f64) / 60.0;
+                line.push_str(&format!(
+                    "  {}{:.2}",
+                    if d < 0.0 { "-" } else { "+" },
+                    d.abs()
+                ));
+                color = if d <= 0.0 {
+                    [0.5, 1.0, 0.5, 1.0]
+                } else {
+                    [1.0, 0.5, 0.45, 1.0]
+                };
+            }
+            v.push((line, color));
+        }
+        if !sim.finished {
+            v.push((
+                format!("{sector} {}  {}", reached.len() + 1, clock(sim.tick)),
+                [1.0, 0.85, 0.3, 1.0],
+            ));
+        }
+        v
+    }
+
+    /// Saves the frame just drawn as a PNG in the data folder's screenshots/ (a mod's `screenshot`).
+    fn save_screenshot(texture: &wgpu::Texture, gpu: &Gpu) {
+        use wgpu::TextureFormat as F;
+        // only the 8-bit formats are read back as they are (any other would need converting: said, not guessed)
+        let bgra = match gpu.config.format {
+            F::Bgra8Unorm | F::Bgra8UnormSrgb => true,
+            F::Rgba8Unorm | F::Rgba8UnormSrgb => false,
+            other => return eprintln!("screenshot: this display's format ({other:?}) cannot be saved yet"),
+        };
+        let (w, h) = (gpu.config.width, gpu.config.height);
+        let mut pixels = match read_back(&gpu.renderer, texture, w, h) {
+            Ok(p) => p,
+            Err(e) => return eprintln!("screenshot: {e}"),
+        };
+        for px in pixels.as_chunks_mut::<4>().0 {
+            if bgra {
+                px.swap(0, 2);
+            }
+            // the surface's alpha means nothing in a picture
+            px[3] = 255;
+        }
+        let dir = gamedata::profile::data_dir().join("screenshots");
+        let _ = std::fs::create_dir_all(&dir);
+        // a real folder, not a link to elsewhere
+        if !std::fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir()) {
+            return eprintln!("screenshot: {} is not a folder", shown_path(&dir));
+        }
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
+        let path = dir.join(format!("drahtseilakt-{stamp}.png"));
+        let mut open = std::fs::OpenOptions::new();
+        // a new file only, never through a link
+        open.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            open.custom_flags(libc_nofollow());
+        }
+        let written = open.open(&path).map_err(|e| e.to_string()).and_then(|f| {
+            use image::ImageEncoder;
+            image::codecs::png::PngEncoder::new(std::io::BufWriter::new(f))
+                .write_image(&pixels, w, h, image::ExtendedColorType::Rgba8)
+                .map_err(|e| e.to_string())
+        });
+        match written {
+            Ok(()) => println!("screenshot saved to {}", shown_path(&path)),
+            Err(e) => eprintln!("could not save the screenshot to {}: {e}", shown_path(&path)),
+        }
     }
 
     /// The sounds of what happened in the run since the last frame, as the original's Sound_Manager plays them on
@@ -2946,8 +3621,7 @@ impl App {
     /// Practice: keeps the run as it is once a second (the last half minute) for F3, and the last ball when endless
     /// lives are on. A run that went back (its tick behind the moments kept) starts the history again.
     fn keep_history(&mut self) {
-        let tools = self.tools() && self.game.replay_in.is_none();
-        self.game.sim.endless_lives = tools && self.features.has(crate::features::Feature::EndlessLives);
+        let tools = self.practice() && self.game.replay_in.is_none();
         if self.game.sim.lives_spared {
             self.game.assisted = true;
         }
@@ -2970,6 +3644,7 @@ impl App {
     /// The run starts again: its music and its start sound too.
     fn restart(&mut self) {
         self.game.restart();
+        self.reset_mod_run();
         self.started = false;
         self.prev = None;
         if let (Some(a), Some(m)) = (&mut self.audio, &mut self.music) {
@@ -3004,6 +3679,7 @@ impl App {
         menu.graphics = self.graphics;
         menu.bindings = self.bindings;
         menu.resolutions = self.resolutions.clone();
+        menu.mods = self.mods.clone();
         if let Some(gpu) = &self.gpu {
             menu.resolution = (gpu.config.width, gpu.config.height);
         }
@@ -3089,6 +3765,7 @@ impl App {
             let mut inst = scene::instances(
                 &g.placements,
                 &sim.taken,
+                &sim.unseen,
                 &sim.world().bodies,
                 &g.ball_meshes,
                 g.trafo.as_ref().map(|t| &t.1),
@@ -3208,6 +3885,56 @@ impl App {
                 w.run.pilot.hints.skip_step(&self.game.sim);
                 w.notice = Some(("hint step skipped".into(), now));
             }
+            // a zone: from the look-back before the key went down to where the ball is when it is let go (a tap: the
+            // last seconds; held: on while held)
+            KeyCode::F8 | KeyCode::F4 => {
+                if w.marking.is_none() {
+                    let kind = if code == KeyCode::F8 { crate::zones::Kind::Flow } else { crate::zones::Kind::Careful };
+                    let s = &self.game.sim;
+                    let from = s.tick.saturating_sub(u64::from(w.look_back) * 60);
+                    w.marking = Some((kind, code, from, s.sector, now));
+                }
+            }
+            KeyCode::BracketLeft => w.look_back = w.look_back.saturating_sub(1).max(1),
+            KeyCode::BracketRight => w.look_back = (w.look_back + 1).min(LOOK_BACK_MAX),
+            KeyCode::F12 => w.zones_shown = !w.zones_shown,
+            KeyCode::Backspace => {
+                let text = if w.marking.take().is_some() {
+                    "mark cancelled".to_owned()
+                } else {
+                    w.flash = None;
+                    // the last mark of this window, by its id (the files may hold other sessions' marks after it)
+                    match w.marked.pop() {
+                        None => "no mark of this window to undo".to_owned(),
+                        Some((id, rule)) => {
+                            let path = w.run.zones_path.clone();
+                            let mut t = match crate::zones::remove_mark(&path, &id) {
+                                Ok(Some(line)) => {
+                                    let kind = line.split_whitespace().next().unwrap_or_default().to_owned();
+                                    format!("undone: the {kind} zone just marked, in {}", shown_path(&path))
+                                }
+                                Ok(None) => format!("its zone is no longer in {}", shown_path(&path)),
+                                Err(e) => format!("not undone: {e}"),
+                            };
+                            w.run.pilot.zones = Arc::new(load_zones(&path));
+                            w.pending = None;
+                            // and the rule it taught
+                            if rule {
+                                let lp = w.run.learned_path.clone();
+                                match crate::zones::remove_mark(&lp, &id) {
+                                    Ok(Some(_)) => t += " and the rule it taught",
+                                    Ok(None) => t += " (its rule is no longer there)",
+                                    Err(e) => t += &format!(" (its rule not undone: {e})"),
+                                }
+                                w.run.pilot.learned = Arc::new(load_learned(&lp));
+                            }
+                            t
+                        }
+                    }
+                };
+                println!("{text}");
+                w.notice = Some((text, now));
+            }
             KeyCode::F7 => {
                 let (pilot, dir) = (w.run.pilot.clone(), w.run.report.clone());
                 let text = match stuck_report(&mut self.game, &self.data, &self.opts, &pilot, &dir) {
@@ -3223,8 +3950,185 @@ impl App {
         true
     }
 
-    fn tools(&self) -> bool {
-        self.features.has(crate::features::Feature::Tools)
+    /// A watcher's key let go: the end of the zone being marked with it. True when it was that key.
+    fn watch_key_up(&mut self, code: KeyCode) -> bool {
+        if self.pilot.as_ref().and_then(|w| w.marking).is_some_and(|m| m.1 == code) {
+            self.end_mark();
+            return true;
+        }
+        false
+    }
+
+    /// The zone being marked is done: the ball's path from its look-back to now (in the sector it was marked in),
+    /// written to the zones file at once, obeyed from now on, and shown a moment.
+    fn end_mark(&mut self) {
+        let Some(w) = self.pilot.as_mut() else { return };
+        let Some((kind, _, from, sector, _)) = w.marking.take() else { return };
+        let s = &self.game.sim;
+        let mut path: Vec<glam::Vec3> =
+            w.trail.iter().filter(|t| t.0 >= from && t.2 == sector).map(|t| t.1).collect();
+        if s.sector == sector {
+            path.push(s.ball.position);
+        }
+        let points = crate::zones::thin(&path, MARK_STEP);
+        if points.is_empty() {
+            w.notice = Some(("no path to mark (another sector)".into(), Instant::now()));
+            return;
+        }
+        let zone = crate::zones::Zone {
+            kind,
+            sector: sector + 1,
+            radius: crate::zones::MARK_RADIUS,
+            speed: None,
+            points,
+        };
+        let file = w.run.zones_path.clone();
+        let secs = s.tick.saturating_sub(from) as f32 / 60.0;
+        let id = crate::zones::new_id();
+        let mut text = match crate::zones::append(&file, &zone, &id) {
+            Ok(()) => {
+                w.run.pilot.zones = Arc::new(load_zones(&file));
+                // (a decision on its way is made again, with the zone)
+                w.pending = None;
+                format!("marked a {} zone: {secs:.1} s, {} points, in {}", kind.word(), zone.points.len(),
+                    shown_path(&file))
+            }
+            Err(e) => {
+                let t = format!("zone not saved: {e}");
+                println!("{t}");
+                w.notice = Some((t, Instant::now()));
+                return;
+            }
+        };
+        // what kind of place it was, for every level: a rule of the learned table (learned.rs)
+        let stretch: Vec<&Trail> = w.trail.iter().filter(|t| t.0 >= from && t.2 == sector).collect();
+        let pilot = &w.run.pilot;
+        let samples: Vec<crate::learned::Situation> = stretch
+            .iter()
+            .step_by(6)
+            .map(|t| pilot.situation(t.1, pilot.nearest_point(t.1), t.3))
+            .collect();
+        let n = stretch.len().max(1) as f32;
+        let stopping = stretch.iter().filter(|t| t.4 < 1.0).count() as f32 / n;
+        let off: Vec<f32> = stretch.iter().filter_map(|t| pilot.route.off_middle(t.1).map(|o| o.0)).collect();
+        let off = off.iter().sum::<f32>() / off.len().max(1) as f32;
+        let mut modes: Vec<(&str, usize)> = Vec::new();
+        for t in &stretch {
+            match modes.iter_mut().find(|m| m.0 == t.5) {
+                Some(m) => m.1 += 1,
+                None => modes.push((t.5, 1)),
+            }
+        }
+        let mode = modes.iter().max_by_key(|m| m.1).map_or("-", |m| m.0);
+        let at = zone.points.last().copied().unwrap_or_default();
+        let evidence = format!(
+            "mark={id}: {} sector {} ({:.1} {:.1} {:.1}) {}: {secs:.1} s, stopping {:.0}%, mostly {mode}, off the middle {off:.1}",
+            level_stem(&self.game), sector + 1, at.x, at.y, at.z, crate::learned::today(), 100.0 * stopping);
+        let rule = crate::learned::learn(&samples, kind, None, evidence);
+        let lp = w.run.learned_path.clone();
+        let taught = match rule {
+            Some(r) => match crate::learned::append(&lp, &r) {
+                Ok(true) => {
+                    w.run.pilot.learned = Arc::new(load_learned(&lp));
+                    text += &format!("; learned: {}", r.label());
+                    true
+                }
+                Ok(false) => {
+                    text += &format!("; known already: {}", r.label());
+                    false
+                }
+                Err(e) => {
+                    text += &format!("; rule not saved: {e}");
+                    false
+                }
+            },
+            None => {
+                text += "; nothing special to learn there (the zone stays this level's)";
+                false
+            }
+        };
+        w.marked.push((id, taught));
+        println!("{text}");
+        w.notice = Some((text, Instant::now()));
+        w.flash = Some((zone, Instant::now()));
+    }
+
+    /// After a tick of the watched run: the ball's place kept in the trail (cut back when the run went back), and a
+    /// zone whose key has been held too long ended.
+    fn watch_trail(&mut self) {
+        let Some(w) = self.pilot.as_mut() else { return };
+        let s = &self.game.sim;
+        while w.trail.back().is_some_and(|t| t.0 >= s.tick) {
+            w.trail.pop_back();
+        }
+        w.trail.push_back((s.tick, s.ball.position, s.sector, s.ball.kind, s.ball.velocity.length(), w.run.pilot.mode()));
+        while w.trail.front().is_some_and(|t| t.0 + TRAIL_TICKS < s.tick) {
+            w.trail.pop_front();
+        }
+        if w.marking.is_some_and(|m| m.4.elapsed() > MARK_HELD_MAX) {
+            self.end_mark();
+        }
+    }
+
+    /// A mod with practice deeds is on (god-mode, assets/mods-dev): the game keeps the run's moments for going back,
+    /// shows the sector and tick, and a lost run waits for the saved moment.
+    fn practice(&self) -> bool {
+        self.view_mods.practice()
+    }
+
+    /// The practice deeds the mods' keys asked for: back so many seconds, save and load the moment, slower and faster,
+    /// the free camera. Each helps the run (it is kept, never a best one; its mods already make it modded).
+    fn do_practice(&mut self) {
+        use crate::modrt::Practice;
+        for deed in std::mem::take(&mut self.view_mods.out.practice) {
+            match deed {
+                Practice::Rewind(secs) => {
+                    // back from the moments kept each second; pressed again it goes on further back
+                    let ticks = (secs.clamp(1.0, 30.0) * 60.0).round() as u64;
+                    let to = self.game.sim.tick.saturating_sub(ticks);
+                    while self.history.len() > 1 && self.history.back().is_some_and(|(s, _)| s.tick > to) {
+                        self.history.pop_back();
+                    }
+                    if let Some((sim, replay)) = self.history.back() {
+                        self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
+                        self.game.sim = sim.clone();
+                        self.game.replay_out = replay.clone();
+                        self.game.assisted = true;
+                        self.prev = None;
+                        self.menu = None;
+                    }
+                }
+                Practice::Save => self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone())),
+                Practice::Load => {
+                    if let Some((sim, replay)) = &self.saved {
+                        // the run goes on from the saved moment: its record is cut back to it, and what happened
+                        // after it did not happen
+                        self.game.sim = sim.clone();
+                        self.game.replay_out = replay.clone();
+                        self.game.assisted = true;
+                        self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
+                        self.prev = None;
+                        self.menu = None;
+                    }
+                }
+                Practice::Slower | Practice::Faster => {
+                    let slower = deed == Practice::Slower;
+                    self.time_scale =
+                        if slower { (self.time_scale / 2.0).max(0.125) } else { (self.time_scale * 2.0).min(1.0) };
+                    if self.time_scale < 1.0 {
+                        self.game.assisted = true;
+                    }
+                }
+                Practice::FreeCam => {
+                    self.fly = match self.fly {
+                        Some(_) => None,
+                        None => Some(FreeCam::at(self.last_view.0, self.last_view.1)),
+                    };
+                    self.keys = 0;
+                    self.fly_keys = 0;
+                }
+            }
+        }
     }
 
     fn run_over(&mut self) {
@@ -3232,11 +4136,11 @@ impl App {
             return;
         }
         // with a saved moment (extended mode) a lost run waits for F9 or R; Esc opens the dead menu
-        if self.game.sim.game_over && !(self.tools() && self.saved.is_some()) {
+        if self.game.sim.game_over && !(self.practice() && self.saved.is_some()) {
             self.open_menu(crate::menu::Screen::Dead);
         } else if crate::endscreen::over(&self.game.sim) {
             self.open_menu(crate::menu::Screen::End);
-            let counts = self.game.start.is_none() && !self.game.assisted && self.game.replay_in.is_none();
+            let counts = self.game.counts();
             let points = crate::endscreen::score(&self.game.sim);
             if let (Some(m), Some(n), true) = (&mut self.menu, self.number, counts)
                 && m.scores.place(n, points).is_some()
@@ -3325,10 +4229,10 @@ impl App {
                 gamedata::resources::set_chosen(p);
                 save_settings(self.volumes, self.features, &self.player);
             }
-            Action::Textures(t) => {
-                // the next level loads with them
-                gamedata::resources::set_textures(t);
-                put_settings(&[("textures".to_owned(), t.key().to_owned())]);
+            Action::Pack(kind, key) => {
+                // the next level loads with it
+                gamedata::packs::choose(kind, &key);
+                put_settings(&[(kind.key().to_owned(), key)]);
             }
             Action::Language(code) => {
                 // spoken at once: the menus' words again, in the new language
@@ -3355,25 +4259,45 @@ impl App {
                 // (taken before the settings are written, which keep the extended mode's choice)
                 let theme = if self.features.mode { setting("sound-theme") } else { None };
                 gamedata::sound_themes::restore(theme.as_deref());
+                // the packs too (from the next level): the saved choice in the extended mode, the defaults else
+                let packs = |k: gamedata::packs::Kind| if self.features.mode { setting(k.key()) } else { None };
+                restore_packs(packs(gamedata::packs::Kind::Textures).as_deref(), packs(gamedata::packs::Kind::Models).as_deref());
                 if let Some(a) = &mut self.audio {
                     a.forget_sounds();
                 }
                 save_settings(self.volumes, self.features, &self.player);
                 // the field of view is the extended mode's: the classic one plays at the original's
                 show_graphics(&load_graphics(), self.features);
-                if !self.features.has(crate::features::Feature::Tools) {
-                    self.time_scale = 1.0;
-                    self.saved = None;
-                    self.fly = None;
-                }
                 if let Some(m) = &mut self.menu {
                     m.set_features(self.features, &self.data);
                 }
+                self.apply_mods();
             }
             Action::Graphics(g) => self.set_graphics(g),
             Action::Bindings(b) => {
                 self.bindings = b;
                 put_settings(&b.lines());
+            }
+            Action::ModSwitch(_) | Action::ModOption(..) => {
+                match action {
+                    Action::ModSwitch(i) => self.mods.toggle(i),
+                    Action::ModOption(i, o, by) => self.mods.step_option(i, o, by),
+                    _ => {}
+                }
+                put_settings(&self.mods.lines());
+                // the view's side at once, the run's from the next start
+                let (sim, view) = self.running_mods();
+                self.game.set_mods(sim);
+                let out = std::mem::take(&mut self.view_mods.out);
+                self.view_mods = view;
+                self.view_mods.out = crate::modrt::ViewOut {
+                    lines: Vec::new(),
+                    splits: Vec::new(),
+                    ..out
+                };
+                if let Some(m) = &mut self.menu {
+                    m.mods = self.mods.clone();
+                }
             }
             Action::Score(name) => {
                 self.player = name.clone();
@@ -3398,13 +4322,10 @@ impl App {
             }
             return;
         }
-        if code == KeyCode::F2 && down && self.tools() {
-            self.fly = match self.fly {
-                Some(_) => None,
-                None => Some(FreeCam::at(self.last_view.0, self.last_view.1)),
-            };
-            self.keys = 0;
-            self.fly_keys = 0;
+        // a key one of the mods' key options names (modrt.rs) is the mod's, also while the free camera flies (its
+        // own key puts it down)
+        if down && self.pilot.is_none() && self.mod_key(code) {
+            self.do_practice();
             return;
         }
         if self.fly.is_some() && code != KeyCode::Escape && code != KeyCode::F11 {
@@ -3433,6 +4354,9 @@ impl App {
         if self.pilot.as_ref().is_some_and(|w| !w.done) && down && self.watch_key(code) {
             return;
         }
+        if !down && self.watch_key_up(code) {
+            return;
+        }
         // the keys bound to the game's actions (the Controls page) come before the practice keys
         let bound = self.bindings.bits(code);
         let bit = match code {
@@ -3442,52 +4366,6 @@ impl App {
                 let lost = self.game.sim.game_over;
                 self.open_menu(if lost { crate::menu::Screen::Dead } else { crate::menu::Screen::Pause });
                 return;
-            }
-            KeyCode::KeyR if down && self.tools() => {
-                self.restart();
-                self.saved = None;
-                0
-            }
-            // the extended profile's practice keys: slower or faster, save the moment, back to it
-            KeyCode::BracketLeft | KeyCode::BracketRight if down && self.tools() => {
-                let slower = code == KeyCode::BracketLeft;
-                self.time_scale = if slower { (self.time_scale / 2.0).max(0.125) } else { (self.time_scale * 2.0).min(1.0) };
-                if self.time_scale < 1.0 {
-                    self.game.assisted = true;
-                }
-                0
-            }
-            KeyCode::F3 if down && self.tools() => {
-                // five seconds back, from the moments kept each second; pressed again it goes on further back
-                let to = self.game.sim.tick.saturating_sub(REWIND_TICKS);
-                while self.history.len() > 1 && self.history.back().is_some_and(|(s, _)| s.tick > to) {
-                    self.history.pop_back();
-                }
-                if let Some((sim, replay)) = self.history.back() {
-                    self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
-                    self.game.sim = sim.clone();
-                    self.game.replay_out = replay.clone();
-                    self.game.assisted = true;
-                    self.prev = None;
-                    self.menu = None;
-                }
-                0
-            }
-            KeyCode::F5 if down && self.tools() => {
-                self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone()));
-                0
-            }
-            KeyCode::F9 if down && self.tools() => {
-                if let Some((sim, replay)) = &self.saved {
-                    // the run goes on from the saved moment: its record is cut back to it
-                    self.game.sim = sim.clone();
-                    self.game.replay_out = replay.clone();
-                    self.game.assisted = true;
-                    // what happened after the saved moment did not happen
-                    self.game.ball_lost_at = self.game.ball_lost_at.filter(|&t| t <= sim.tick);
-                    self.prev = None;
-                }
-                0
             }
             // the full screen on or off, as the Graphics page sets it
             KeyCode::F11 if down => {
@@ -3551,6 +4429,7 @@ impl App {
                     self.acc = self.acc.min(TICK);
                     break;
                 }
+                self.watch_trail();
                 self.acc -= TICK;
                 ticks += 1;
                 continue;
@@ -3560,6 +4439,7 @@ impl App {
             self.game.tick(self.bindings.turn(self.keys | self.pad_keys));
             if let Some(w) = self.pilot.as_mut().filter(|w| !w.done) {
                 w.run.near_edges.tick(&w.run.edges, &self.game.sim.ball);
+                self.watch_trail();
             }
             self.keep_history();
             self.acc -= TICK;
@@ -3567,6 +4447,7 @@ impl App {
         }
         let simulated = started.elapsed();
         self.run_over();
+        self.mod_frame(step);
         if let Some(a) = &mut self.audio {
             a.pass(f64::from(ticks) * f64::from(TICK));
         }
@@ -3588,7 +4469,22 @@ impl App {
             (snap.eye, snap.target) = c.view();
         }
         self.last_view = (snap.eye, snap.target);
-        let tools = self.tools();
+        let tools = self.practice();
+        let ghost = self.ghost_instance();
+        let mod_quads = match (&self.gpu, self.game.font.as_ref()) {
+            (Some(g), Some(f))
+                if self.menu.is_none() && self.loading.is_none() && !self.view_mods.is_empty() =>
+            {
+                self.mod_hud(
+                    f,
+                    crate::ui::Screen {
+                        w: g.config.width as f32,
+                        h: g.config.height as f32,
+                    },
+                )
+            }
+            _ => Vec::new(),
+        };
         let Some(gpu) = &mut self.gpu else { return };
         let acquire_started = Instant::now();
         let frame = match gpu.surface.get_current_texture() {
@@ -3614,6 +4510,7 @@ impl App {
             let mut inst = scene::instances(
                 &self.game.placements,
                 &self.game.sim.taken,
+                &self.game.sim.unseen,
                 &self.game.sim.world().bodies,
                 &self.game.ball_meshes,
                 self.game.trafo.as_ref().map(|t| &t.1),
@@ -3624,12 +4521,35 @@ impl App {
             if snap.kind.is_some() {
                 scene::shadows(&self.game.shadow_receivers, snap.ball, &mut inst);
             }
+            if let Some(w) = self.pilot.as_ref().filter(|w| !w.done) {
+                w.zone_instances(&self.game, &mut inst);
+            }
+            inst.extend(ghost);
             let particles = self.game.effects.batches(snap.eye, snap.target);
-            (inst, particles, scene::view(&snap))
+            let mut view = scene::view(&snap);
+            // the mods' camera (modrt.rs): turned about the ball, nearer or farther, a wider or narrower view
+            let out = &self.view_mods.out;
+            if self.fly.is_none() && !self.view_mods.is_empty() {
+                let back = glam::Quat::from_rotation_y(out.yaw.to_radians()) * (view.eye - view.target);
+                view.eye = view.target + back * out.distance;
+                let across = 2.0 * ((view.fov_y / 2.0).tan() / 0.75).atan() + out.fov.to_radians();
+                view.fov_y = 2.0 * ((across.clamp(0.2, 3.0) / 2.0).tan() * 0.75).atan();
+            }
+            (inst, particles, view)
         };
         let built = build_started.elapsed();
         let draw_started = Instant::now();
         (gpu.renderer.flash, gpu.renderer.point) = if menu_up { (0.0, None) } else { (flash, point) };
+        // the mods' light: the level's dimmed, a light over the ball
+        if let Some(base) = self.light_base {
+            let k = if menu_up { 1.0 } else { self.view_mods.out.light };
+            gpu.renderer.light.color = base.color.map(|c| c * k);
+            gpu.renderer.light.ambient = base.ambient.map(|c| c * k);
+        }
+        let lantern = self.view_mods.out.lantern;
+        if !menu_up && lantern > 0.0 && gpu.renderer.point.is_none() {
+            gpu.renderer.point = Some((snap.ball + glam::Vec3::Y * 4.0, [lantern; 3]));
+        }
         gpu.renderer.draw(&view, gpu.config.width, gpu.config.height, &frame_view, &inst, &particles);
         let drawn = draw_started.elapsed();
         let overlay_started = Instant::now();
@@ -3655,7 +4575,7 @@ impl App {
                     if tools && (self.time_scale < 1.0 || self.saved.is_some()) {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
                         let slow = if self.time_scale < 1.0 { format!("SLOW 1/{}", (1.0 / self.time_scale).round()) } else { String::new() };
-                        let saved = if self.saved.is_some() { "   SAVED: F9 BACK" } else { "" };
+                        let saved = if self.saved.is_some() { "   SAVED" } else { "" };
                         crate::hud::text(&mut o, &format!("{slow}{saved}"), scale, scale * 21.0, scale, [0.6, 0.9, 1.0, 1.0]);
                     }
                     if let Some(w) = self.pilot.as_ref().filter(|w| !w.done && self.game.font.is_none()) {
@@ -3667,7 +4587,7 @@ impl App {
                     }
                     if let Some(c) = &self.fly {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
-                        let line = format!("FREE CAMERA   {:.1} {:.1} {:.1}   F2 BACK", c.pos.x, c.pos.y, c.pos.z);
+                        let line = format!("FREE CAMERA   {:.1} {:.1} {:.1}", c.pos.x, c.pos.y, c.pos.z);
                         crate::hud::text(&mut o, &line, scale, scale * 11.0, scale, [1.0, 0.85, 0.3, 1.0]);
                     }
                     o
@@ -3696,6 +4616,7 @@ impl App {
                 if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
                     q.extend(crate::endscreen::interface(&t, f, &self.strings, screen));
                 }
+                q.extend(mod_quads);
                 // the watched test player's status, small in the top left corner (--watch)
                 if let (Some(w), Some(f)) = (self.pilot.as_ref().filter(|w| !w.done), font) {
                     q.extend(watch_overlay(&w.status(&self.game), f, screen));
@@ -3713,6 +4634,13 @@ impl App {
         gpu.renderer.draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();
+        if std::mem::take(&mut self.shot_due) {
+            if gpu.config.usage.contains(wgpu::TextureUsages::COPY_SRC) {
+                Self::save_screenshot(&frame.texture, gpu);
+            } else {
+                eprintln!("screenshot: this display's surface cannot be read back");
+            }
+        }
         gpu.renderer.queue.present(frame);
         let presented = present_started.elapsed();
         if let Some(t) = &mut self.timing {
@@ -3872,6 +4800,21 @@ impl App {
 }
 
 impl ApplicationHandler for App {
+    /// The mouse's raw motion: the mods read it (`mouse.dx`, `mouse.dy`) while a run is up.
+    fn device_event(
+        &mut self,
+        _: &ActiveEventLoop,
+        _: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        if let winit::event::DeviceEvent::MouseMotion { delta } = event
+            && self.menu.is_none()
+        {
+            self.mouse.0 += delta.0 as f32;
+            self.mouse.1 += delta.1 as f32;
+        }
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none()
             && let Err(e) = self.init(event_loop)
@@ -4026,4 +4969,74 @@ mod follow_tests {
         assert_eq!(p.len(), 6);
         assert_eq!(d, vec![4]);
     }
+}
+
+/// For the level statistics (levelstats.rs): the level and its modules as a run loads them, and the ball's way
+/// through it — a replay (`o.replay`) played without a window, tick by tick, or else the way the test player would
+/// find through the objects of a plan (`plan`), with no run behind it.
+pub(crate) fn stats_run(
+    o: &Options,
+    data: &Data,
+    plan: Option<&Path>,
+) -> Result<crate::levelstats::Run, String> {
+    use crate::levelstats::{Run, TickRec};
+    let mut game = Game::new(o, data)?;
+    let mut run = Run {
+        level: game.level.level.clone(),
+        modules: game.modules.clone(),
+        ticks: Vec::new(),
+        events: Vec::new(),
+        moved: Vec::new(),
+        finished: false,
+        begun_elsewhere: game.start.as_ref().is_some_and(|s| s.sector > 1 || s.at.is_some()),
+        route: None,
+        checkpoints: game.sim.stages(),
+    };
+    if let Some(plan) = plan {
+        let start = game.sim.ball.position;
+        let mut stages: Vec<glam::Vec3> = read_plan(plan, &game.level.level, 0)?.into_iter().map(|p| p.0).collect();
+        if let Some(&end) = run.checkpoints.last() {
+            stages.push(end);
+        }
+        let route = crate::autopilot::Route::find(&game.level.level, &game.modules, &game.sim.updrafts(), start, &stages);
+        run.route = Some(route.points.clone());
+        return Ok(run);
+    }
+    let end = game.replay_in.as_ref().map(|r| r.end).ok_or("level statistics need a replay or a plan")?;
+    // each loose thing's first place and how far it got from it (sampled twice a second)
+    let mut loose: std::collections::HashMap<usize, (glam::Vec3, f32)> = std::collections::HashMap::new();
+    let mut seen = 0;
+    while game.sim.tick < end && !game.sim.finished && !game.sim.game_over {
+        game.tick(0);
+        let s = &game.sim;
+        run.ticks.push(TickRec {
+            pos: s.ball.position,
+            ground: s.ball.on_ground,
+            sector: s.sector + 1,
+            kind: s.ball.kind,
+            updraft: s.in_updraft(),
+            held: s.is_held(),
+            dying: s.is_dying(),
+        });
+        for e in s.events.iter().skip(seen) {
+            run.events.push((e.0, e.1, s.sector + 1));
+        }
+        seen = s.events.len();
+        if s.tick % 30 == 1 {
+            for &(obj, body) in s.loose() {
+                if let Some(st) = s.world().state(body) {
+                    let e = loose.entry(obj).or_insert((st.pos, 0.0));
+                    e.1 = e.1.max(st.pos.distance(e.0));
+                }
+            }
+        }
+    }
+    run.finished = game.sim.finished;
+    let mut moved: Vec<(usize, f32)> = loose.into_iter().map(|(o, (_, d))| (o, d)).collect();
+    moved.sort_by_key(|m| m.0);
+    run.moved = moved
+        .into_iter()
+        .filter_map(|(o, d)| Some((game.level.level.objects.get(o)?.name.clone(), d)))
+        .collect();
+    Ok(run)
 }

@@ -173,6 +173,18 @@ impl Strings {
         s
     }
 
+    /// Our words in `language`, without a copy (the layout tests).
+    #[cfg(test)]
+    pub fn ours_in(language: &str) -> Strings {
+        let mut s = Strings {
+            controls: [68, 69, 70, 71, 39, 53],
+            lang: LANGUAGES.iter().position(|l| l.0 == language).unwrap_or(0),
+            ..Strings::default()
+        };
+        s.own_highscores();
+        s
+    }
+
     /// The own interface's default highscore list of every original level: ten names, 3000 points down to 750.
     fn own_highscores(&mut self) {
         const NAMES: [&str; PLACES] = [

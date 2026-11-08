@@ -14,7 +14,16 @@ Ein Ordner mit:
 - `level.gltf` — [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) (JSON);
 - `level.bin` — sein Binärpuffer (der einzige, unter diesem Namen);
 - `textures/NNNN_name.png` — ein Bild je Textur; die `uri` eines Bildes muss eine einfache Datei direkt in `textures/`
-  nennen (keine weiteren Ordner), sonst wird das Level abgelehnt;
+  nennen (keine weiteren Ordner) oder `game:<name>` sein, sonst wird das Level abgelehnt. `game:<name>` nennt **die
+  Textur des Spiels mit diesem Namen** statt einer Datei: keine Datei wird dafür gelesen; das Spiel zeichnet sie mit dem
+  gewählten Texturpaket ([packs.md](packs.md)): zuerst das Bild dieses Namens im eigenen `game/Textures/` des Levels,
+  dann das Paket und seine Rückfälle, dann unsere, dann die der Kopie (Namen verglichen wie Texturnamen: ohne Groß- und
+  Kleinschreibung, `_`, `-`, Leerzeichen und Endung). Der Name hat 1 bis 128 Zeichen, keines davon `/`, `\`, `:` oder
+  ein Steuerzeichen, und beginnt nicht mit einem Punkt; er wird nur mit den Namen der Texturen verglichen, nie zu einem
+  Pfad. Unsere Level nennen so die Texturen, die sie teilen (die Seiten der Bahn, die Ziegel der Ränder, Holz, Schienen,
+  Pfosten, Checkpoint-Platten), sodass ein Texturpaket auch sie ändert, und behalten ihre eigenen besonderen Texturen als
+  Dateien. `--export` lässt ein `game:`-Bild wie es ist. Früher gemachte Level funktionieren weiter: ihre Dateien sind
+  ihre;
 - `level.txt` (freiwillig) — Titel, Autor und Version als Zeilen `Schlüssel = Wert`; ein Level in `levels/` ist ein
   Ordner mit einem Level, nach diesem Titel benannt ([levels.md](levels.md), „Ein Level ist ein Ordner“);
 - `game/` — die Dateien des Spiels, die das Level benutzt, nach ihren Pfaden in der Kopie des Spielers, damit es

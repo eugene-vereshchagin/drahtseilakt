@@ -21,8 +21,8 @@ scripts/fuzz.sh 3600 2 nmo_file    # ein Ziel, eine Stunde
 FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -- --ignored --nocapture
 ```
 
-Ziele: `nmo_file`, `nmo_chunk`, `open_level` (Crate `level`); `image`, `level_txt`, `theme_txt`, `sound_table`
-(`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `wav`, `ogg`, `highscore`,
+Ziele: `nmo_file`, `nmo_chunk`, `open_level` (Crate `level`); `image`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
+(`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `zones`, `learned`, `wav`, `ogg`, `highscore`,
 `settings`, `level_sim` — ein Level geladen und eine Sekunde gespielt, womit eine fremde Karte über den Leser
 hinaus in Physik und Regeln gelangt — und `module_sim` — eine Moduldatei anstelle einer, die ein Original-Level
 benutzt (ein Levelordner darf eigene mitbringen), mit der Kopie des Spielers (das Spiel, `crates/game/src/fuzz_tests.rs`).
@@ -51,4 +51,4 @@ cd fuzz && cargo +nightly fuzz run nmo_file corpus/nmo_file
 ```
 
 Das Spiel ist ein Binär-Crate; von seinen eigenen Parsern hat daher nur `replay` (der für sich steht) ein
-cargo-fuzz-Ziel, die übrigen (`hints`, `wav`, `ogg`, `highscore`, `settings`, `level_sim`, `module_sim`) laufen auf dem stabilen Fuzzer.
+cargo-fuzz-Ziel, die übrigen (`hints`, `zones`, `learned`, `wav`, `ogg`, `highscore`, `settings`, `level_sim`, `module_sim`) laufen auf dem stabilen Fuzzer.

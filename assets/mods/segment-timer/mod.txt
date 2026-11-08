@@ -1,0 +1,61 @@
+# Segment timer (after Segment, RealTimeMeter and WatchYourTime): the run's time, the real time, and each sector's
+# split against the best run (green ahead, red behind).
+name.en Segment timer
+name.ru Таймер по секторам
+name.de Abschnitts-Timer
+name.zh 分段计时器
+name.fr Chrono par secteur
+name.es Cronómetro por sectores
+name.it Cronometro a settori
+description.en Run time, real time and sector splits against your best run.
+description.ru Время забега, реальное время и сплиты секторов против лучшего забега.
+description.de Laufzeit, echte Zeit und Abschnittszeiten gegen den besten Lauf.
+description.zh 本局用时、真实时间及各区段与最佳成绩的对比。
+description.fr Temps de course, temps réel et temps par secteur face au meilleur.
+description.es Tiempo de partida, tiempo real y parciales frente a tu mejor marca.
+description.it Tempo di gara, tempo reale e parziali contro il tuo migliore.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option real_time switch on
+option splits switch on
+label time en Time
+label time ru Время
+label time de Zeit
+label time zh 用时
+label time fr Temps
+label time es Tiempo
+label time it Tempo
+label real en Real
+label real ru Реальное
+label real de Echt
+label real zh 真实
+label real fr Réel
+label real es Real
+label real it Reale
+label real_time en Real time?
+label real_time ru Реальное время?
+label real_time de Echte Zeit?
+label real_time zh 真实时间?
+label real_time fr Temps réel ?
+label real_time es ¿Tiempo real?
+label real_time it Tempo reale?
+label splits en Sector splits?
+label splits ru Сплиты секторов?
+label splits de Abschnittszeiten?
+label splits zh 区段分段?
+label splits fr Temps par secteur ?
+label splits es ¿Parciales?
+label splits it Parziali?
+
+on frame
+do show top-right time time run.time
+
+on frame
+if opt.real_time
+do show top-right real time real.time
+
+on frame
+if opt.splits
+do splits top-right

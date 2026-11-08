@@ -21,6 +21,8 @@ const OUT: f32 = 0.35;
 const JOIN: f32 = 0.6;
 /// An edge counts for a place within this height of it.
 const LEVEL: f32 = 1.0;
+/// A wall's foot this near the nearest edge makes it a wall, not a drop.
+const WALL_NEAR: f32 = 1.0;
 /// The cell of the lookups.
 const CELL: f32 = 4.0;
 
@@ -31,8 +33,8 @@ type Cache = Mutex<Vec<(u64, Arc<Edges>)>>;
 
 /// The edges of a level's floors, and its floor triangles to tell what is under a place.
 pub struct Edges {
-    /// Pieces of edges (each end, at the floor's height), by cell.
-    edges: Cells<(Vec3, Vec3)>,
+    /// Pieces of edges (each end, at the floor's height, and whether it is a wall's foot), by cell.
+    edges: Cells<(Vec3, Vec3, bool)>,
     /// Up-facing triangles, and whether each is a rail's, by cell.
     floors: Cells<([Vec3; 3], bool)>,
 }
@@ -147,7 +149,7 @@ impl Edges {
                         );
                         let m = (p + q) * 0.5 + out * OUT;
                         if !e.floor_at(m, JOIN, false) {
-                            pieces.push((p, q));
+                            pieces.push((p, q, false));
                         }
                     }
                 }
@@ -164,13 +166,13 @@ impl Edges {
                     }
                 }
                 if let [a, b] = cut[..] {
-                    pieces.push((Vec3::new(a.x, y0, a.z), Vec3::new(b.x, y0, b.z)));
+                    pieces.push((Vec3::new(a.x, y0, a.z), Vec3::new(b.x, y0, b.z), true));
                 }
             }
         }
-        for (a, b) in pieces {
+        for (a, b, wall) in pieces {
             for c in cells(a.min(b), a.max(b)) {
-                e.edges.entry(c).or_default().push((a, b));
+                e.edges.entry(c).or_default().push((a, b, wall));
             }
         }
         e
@@ -222,7 +224,7 @@ impl Edges {
         let hi = p + Vec3::new(FAR, 0.0, FAR);
         let mut d = FAR;
         for c in cells(lo, hi) {
-            for &(a, b) in self.edges.get(&c).into_iter().flatten() {
+            for &(a, b, _) in self.edges.get(&c).into_iter().flatten() {
                 let (h, y) = across(p, a, b);
                 if h < d && (y - p.y).abs() < LEVEL {
                     d = h;
@@ -230,6 +232,29 @@ impl Edges {
             }
         }
         d
+    }
+
+    /// What borders the place `p` on a floor within `FAR` across (the test player's situations, learned.rs): its
+    /// nearest edge as high, and whether a wall's foot is within `WALL_NEAR` of that (a wall stands there, the ball
+    /// is held) or not (the floor drops away). None: no edge that near.
+    pub fn border(&self, p: Vec3) -> Option<bool> {
+        let lo = p - Vec3::new(FAR, 0.0, FAR);
+        let hi = p + Vec3::new(FAR, 0.0, FAR);
+        let mut near: Option<f32> = None;
+        let mut walls: Vec<f32> = Vec::new();
+        for c in cells(lo, hi) {
+            for &(a, b, wall) in self.edges.get(&c).into_iter().flatten() {
+                let (h, y) = across(p, a, b);
+                if h < FAR && (y - p.y).abs() < LEVEL {
+                    near = Some(near.map_or(h, |n| n.min(h)));
+                    if wall {
+                        walls.push(h);
+                    }
+                }
+            }
+        }
+        let d = near?;
+        Some(walls.iter().any(|&w| w < d + WALL_NEAR))
     }
 
     /// How far the ball at `ball` (its centre) on the ground is from an edge, for a run's summary: `None` on a rail

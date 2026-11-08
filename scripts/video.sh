@@ -8,6 +8,10 @@
 # LEVEL is an original level's number, or a level folder in the open format (one of ours in assets/levels).
 #
 # Nothing large is kept: the pipe and the WAV live in a temporary folder beside OUT and are removed.
+#
+# Beside the video goes OUT's name with .README.txt: the level, the engine, the textures, the sounds and the
+# interface it was made with (read from the settings file the game used), and the run's mode (VIDEO_MODE: test,
+# calm, speedrun or collector; test by default), as every published video carries.
 set -eu
 level=$1; replay=$2; out=$3; size=${4:-1920x1080}
 here=$(dirname "$0")
@@ -23,4 +27,6 @@ DRAHTSEILAKT_SOUND_FILE="$work/sound.wav" "$game" "$which" "$level" --replay "$r
     --video "$work/frames"
 wait "$encoder"
 ffmpeg -loglevel error -y -i "$work/picture.mp4" -i "$work/sound.wav" -c:v copy -c:a aac -b:a 192k -shortest "$out"
+
+sh "$here/video-readme.sh" "$level" "$replay" "$out" "$size"
 echo "$out"

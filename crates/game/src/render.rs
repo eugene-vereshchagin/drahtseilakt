@@ -423,10 +423,18 @@ impl Renderer {
 
     /// Uploads a model; returns its index for `Instance::model`.
     pub fn add_model(&mut self, level: &Level, load: &TextureLoader<'_>) -> usize {
+        // only the textures a material draws with are loaded (a level may list textures it never uses: the loader
+        // points a texture named twice at one of them)
+        let used: std::collections::HashSet<usize> =
+            level.materials.iter().flat_map(|m| m.texture.into_iter().chain(m.normal)).collect();
         let textures: Vec<Option<wgpu::TextureView>> = level
             .textures
             .iter()
-            .map(|t| {
+            .enumerate()
+            .map(|(i, t)| {
+                if !used.contains(&i) {
+                    return None;
+                }
                 load(t).map(|(w, h, rgba)| upload_texture(&self.device, &self.queue, w, h, rgba))
             })
             .collect();

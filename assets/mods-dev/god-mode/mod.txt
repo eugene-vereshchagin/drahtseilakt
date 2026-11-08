@@ -1,0 +1,172 @@
+# God mode: the practice tools, gathered in one mod. Free saves, endless lives, seconds back, slow motion, the free
+# camera, the sector and tick on screen. A development mod (assets/mods-dev): only a game run with --debug finds it,
+# and a release does not ship it. It changes the run: its runs are modded (no level opens, never a best or a
+# highscore).
+name.en God mode
+name.ru Режим бога
+name.de Gottmodus
+name.zh 上帝模式
+name.fr Mode dieu
+name.es Modo dios
+name.it Modalità dio
+description.en Practice: endless lives, save and load the moment, seconds back, slow motion, free camera. Runs are modded.
+description.ru Тренировка: бесконечные жизни, сохранение и загрузка, отмотка назад, замедление, свободная камера. Забеги модифицированы.
+description.de Training: unendliche Leben, Moment sichern und laden, Sekunden zurück, Zeitlupe, freie Kamera. Läufe gelten als gemoddet.
+description.zh 练习：无限生命、保存与读取、倒退数秒、慢动作、自由视角。成绩标记为已修改。
+description.fr Entraînement : vies infinies, sauver et charger, retour en arrière, ralenti, caméra libre. Parties moddées.
+description.es Práctica: vidas infinitas, guardar y cargar, segundos atrás, cámara lenta, cámara libre. Partidas modificadas.
+description.it Allenamento: vite infinite, salva e carica, secondi indietro, rallentatore, camera libera. Partite modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option lives switch on
+option back number 1 30 1 5
+option rewind key F3,KeyB,KeyZ
+option save key F5,KeyK
+option load key F9,KeyL
+option restart key KeyR,KeyT
+option slower key BracketLeft,Minus
+option faster key BracketRight,Equal
+option camera key F2,KeyC
+option hint switch on
+label lives en Endless lives?
+label lives ru Бесконечные жизни?
+label lives de Unendliche Leben?
+label lives zh 无限生命?
+label lives fr Vies infinies ?
+label lives es ¿Vidas infinitas?
+label lives it Vite infinite?
+label back en Seconds back
+label back ru Секунд назад
+label back de Sekunden zurück
+label back zh 倒退秒数
+label back fr Secondes en arrière
+label back es Segundos atrás
+label back it Secondi indietro
+label rewind en Back
+label rewind ru Назад
+label rewind de Zurück
+label rewind zh 倒退
+label rewind fr Retour
+label rewind es Atrás
+label rewind it Indietro
+label save en Save
+label save ru Сохранить
+label save de Sichern
+label save zh 保存
+label save fr Sauver
+label save es Guardar
+label save it Salva
+label load en Load
+label load ru Загрузить
+label load de Laden
+label load zh 读取
+label load fr Charger
+label load es Cargar
+label load it Carica
+label restart en Restart
+label restart ru Заново
+label restart de Neu
+label restart zh 重来
+label restart fr Recommencer
+label restart es Reiniciar
+label restart it Ricomincia
+label slower en Slower
+label slower ru Медленнее
+label slower de Langsamer
+label slower zh 减速
+label slower fr Plus lent
+label slower es Más lento
+label slower it Più lento
+label faster en Faster
+label faster ru Быстрее
+label faster de Schneller
+label faster zh 加速
+label faster fr Plus vite
+label faster es Más rápido
+label faster it Più veloce
+label camera en Free camera
+label camera ru Свободная камера
+label camera de Freie Kamera
+label camera zh 自由视角
+label camera fr Caméra libre
+label camera es Cámara libre
+label camera it Camera libera
+label hint en Keys on screen?
+label hint ru Клавиши на экране?
+label hint de Tasten auf dem Schirm?
+label hint zh 屏幕显示按键?
+label hint fr Touches à l'écran ?
+label hint es ¿Teclas en pantalla?
+label hint it Tasti a schermo?
+label sector en Sector
+label sector ru Сектор
+label sector de Sektor
+label sector zh 区段
+label sector fr Secteur
+label sector es Sector
+label sector it Settore
+label tick en Tick
+label tick ru Тик
+label tick de Tick
+label tick zh 帧
+label tick fr Tick
+label tick es Tick
+label tick it Tick
+label speed en Speed 1/
+label speed ru Скорость 1/
+label speed de Tempo 1/
+label speed zh 速度 1/
+label speed fr Vitesse 1/
+label speed es Velocidad 1/
+label speed it Velocità 1/
+label saved en Saved at
+label saved ru Сохранено:
+label saved de Gesichert:
+label saved zh 已保存:
+label saved fr Sauvé :
+label saved es Guardado:
+label saved it Salvato:
+var saved_at 0
+
+on tick
+do lives.endless opt.lives
+
+on key rewind
+do rewind opt.back
+
+on key save
+do save
+do set saved_at = run.time
+
+on key load
+do load
+
+on key restart
+do restart
+
+on key slower
+do slower
+
+on key faster
+do faster
+
+on key camera
+do freecam
+
+on frame
+do show top-left sector int run.sector
+do show top-left tick int run.tick
+
+on frame
+if practice.speed < 1
+do show top-left speed int 1 / practice.speed
+
+on frame
+if practice.saved
+do show top-left saved time saved_at
+
+on frame
+if opt.hint
+do keys bottom-left
