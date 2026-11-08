@@ -50,7 +50,7 @@ FILE.png` 渲染一帧。要测试某个位置，`--sector N` 从某个检查点
 调试运行（`--debug`）还会解锁所有关卡，并提供开发用模组*上帝模式*：无限生命，F5 保存当前时刻，F9 回到该时刻，
 F3 后退数秒，R 重新开始，`[` 和 `]` 让游戏变慢和重新加快，F2 启用自由相机，并显示小节和 tick；这样的一局作为已修改
 的一局保存，永远不算最佳成绩。正式发布版不包含它。用于测试时，`--autopilot` 让测试玩家在无窗口的情况下尝试通关
-（配合 `--record FILE` 保存其过程）；`--follow FILE` 让它沿着玩家回放中球的路线前进；卡住时它会写报告，并遵循提示（[测试玩家](docs/zh/drahtseilakt/autopilot.md)）。`--locate DIR --record TRACK` 在原版视频的帧中找出球的路线（DIR/s0001.jpg 起，每秒四帧，例如 `ffmpeg -vf fps=4,scale=640:480`），方法是从球可能所在的位置绘制关卡并进行比较；测试玩家用 `--follow TRACK` 沿着这样的轨迹前进。`--frames DIR --replay FILE` 把回放绘制成这样的帧，带有真实位置，用于检验。`--level-stats DIR` 测量原版关卡，用于设计我们自己的关卡（沿 `hints/` 中完成的回放和计划，逐个区段统计球滚过的路面）；`scripts/level-stats.py` 据此生成报告。`drahtseilakt --help` 列出全部选项。
+（配合 `--record FILE` 保存其过程）；`--follow FILE` 让它沿着玩家回放中球的路线前进；卡住时它会写报告，并遵循提示（[测试玩家](docs/zh/drahtseilakt/autopilot.md)）。`--locate DIR --record TRACK` 在原版视频的帧中找出球的路线（DIR/s0001.jpg 起，每秒四帧，例如 `ffmpeg -vf fps=4,scale=640:480`），方法是从球可能所在的位置绘制关卡并进行比较；测试玩家用 `--follow TRACK` 沿着这样的轨迹前进。`--frames DIR --replay FILE` 把回放绘制成这样的帧，带有真实位置，用于检验。`--level-stats DIR` 测量原版关卡，用于设计我们自己的关卡（沿 `hints/` 中完成的回放和计划，逐个区段统计球滚过的路面）；`scripts/level-stats.py` 据此生成报告；加上 `--open LEVEL --replay RUN` 时，它沿一次回放测量我们自己的一个关卡，`scripts/level-stats.py --own` 再把结果与该关卡的目标对比（配合 `hints/level-stats-manual-own.csv`）。`drahtseilakt --help` 列出全部选项。
 
 ## 谁做的
 

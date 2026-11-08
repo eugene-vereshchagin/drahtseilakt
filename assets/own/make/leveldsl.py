@@ -62,7 +62,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
                              heading, turned A to the left and tilted T up)
     pilot STYLES : STEP ; STEP    the test player's steps here (STYLES: safe,speed,collector or all), points as
                              `F S U` about the cursor: goto F S U [T] | via F S U [T] | push F S T | air F S T |
-                             wait T | become KIND | turn N | shove F S U F2 S2 U2 T | lead F S U D T
+                             wait T | become KIND | turn N | shove F S U F2 S2 U2 T | lead F S U D T |
+                             press F S U OF OS V T | pass F S U V [T] | hold F S U T
     nopilot STYLES           no automatic steps from here (until `autopilot STYLES`)
 
 Run: python3 -I assets/own/make/leveldsl.py assets/levels/<Level>/level.lvl ...   (or --all)
@@ -875,6 +876,19 @@ class Track:
                 elif verb == "lead":
                     a = self.at(w[0], w[1], w[2])
                     self.pilot.step(styles, f"lead {fmt(a)} {w[3]:.2f} {int(w[4])}")
+                elif verb == "press":
+                    # press F S U OA OS V T: along the line to the point, kept to it (an offset OA OS across it, turned
+                    # as push's direction), on while slower than V
+                    p = self.at(w[0], w[1], w[2])
+                    o = self.fwd() * w[3] + self.left() * w[4]
+                    self.pilot.step(styles, f"press {fmt(p)} {o[0]:.3f} {o[2]:.3f} {w[5]:g} {int(w[6])}", p)
+                elif verb == "pass":
+                    p = self.at(w[0], w[1], w[2])
+                    t = f" {int(w[4])}" if len(w) > 4 else ""
+                    self.pilot.step(styles, f"pass {fmt(p)} {w[3]:g}{t}", p)
+                elif verb == "hold":
+                    p = self.at(w[0], w[1], w[2])
+                    self.pilot.step(styles, f"hold {fmt(p)} {int(w[3])}", p)
                 elif verb in ("wait", "turn"):
                     self.pilot.step(styles, f"{verb} {int(w[0])}")
                 elif verb == "become":
