@@ -109,6 +109,9 @@ def plaza(b, name, at, fwd, width, length, rim, gaps, fence, sector, surface="st
     solid(m, b.mat_ids[top], b.mat_ids["side"], mid - UP * thick / 2, axes, (length / 2, thick / 2, width / 2))
     edge = {"back": (at, lft, width, -f), "front": (at + f * length, lft, width, f),
             "left": (at + lft * width / 2, f, length, lft), "right": (at - lft * width / 2, f, length, -lft)}
+    # a gap on the back or front edge is given across from the edge's middle (to the left); the edge is measured from
+    # its right end
+    gaps = {k: ([(c + width / 2, w) for c, w in v] if k in ("back", "front") else v) for k, v in gaps.items()}
     if rim:
         rw, rh, rmat = RIMS[rim]
         for side in SIDES:
@@ -358,3 +361,25 @@ def plinth(b, name, top, r, depth=L.COLUMN_DEPTH):
     K.cylinder(m, b.mat_ids["lamp"], (x, y + 5.0, z), UP, 0.7, 1.3, seg=8, cap_mat=b.mat_ids["rail"])
     K.cylinder(m, b.mat_ids["roof"], (x, y + 6.3, z), UP, 1.0, 0.9, seg=8, r_top=0.05)
     return b.add(name, m)
+
+
+def rail_ring(b, name, centre, r, gaps, top=0.0):
+    """A railing round a circle of radius r about `centre` (at the floor's top), open at `gaps`: (angle in degrees from
+    +x, width in units of arc)."""
+    x, y, z = centre
+    cuts = [(math.radians(a), w / r) for a, w in gaps]
+    n = 72
+    arcs, run = [], []
+    for k in range(n + 1):
+        a = 2 * math.pi * k / n
+        inside = any(abs((a - c + math.pi) % (2 * math.pi) - math.pi) < w / 2 for c, w in cuts)
+        if inside:
+            if len(run) > 1:
+                arcs.append(run)
+            run = []
+        else:
+            run.append(np.array([x + math.cos(a) * (r - L.RAIL_IN), y, z + math.sin(a) * (r - L.RAIL_IN)]))
+    if len(run) > 1:
+        arcs.append(run)
+    for i, run in enumerate(arcs):
+        rail_line(b, f"{name}_{i + 1}", run, post_every=3.0)

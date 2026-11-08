@@ -98,6 +98,9 @@ DOME_R = 6.65
 RAIL_KEEP = 14.0
 # The test player's automatic steps: a point every this many units along the way, by style.
 SPACING = {"safe": 9.0, "speed": 14.0, "collector": 9.0}
+# the speeds the careful styles roll through the way's points at, and through a hard corner (hint step `pass`)
+PASS_V = {"safe": 8.0, "collector": 8.0}
+CORNER_V = 5.0
 # scripts/own-levels.sh tries the speed style with other spacings and keeps the fastest run (LEVELDSL_SPEED_SPACING).
 try:
     SPACING["speed"] = min(max(float(os.environ.get("LEVELDSL_SPEED_SPACING", SPACING["speed"])), 4.0), 60.0)
@@ -142,8 +145,23 @@ class Pilot:
             if not self.auto[s] or not self.sectors:
                 continue
             if force or np.linalg.norm(p - self.last[s]) >= SPACING[s]:
-                verb = "via" if s == "speed" else "goto"
-                self.step([s], f"{verb} {fmt(p)}", p)
+                if s == "speed":
+                    self.step([s], f"via {fmt(p)}", p)
+                else:
+                    # rolling on through the point, no faster than PASS_V: a smooth ride (no stop at each point)
+                    self.step([s], f"pass {fmt(p)} {PASS_V[s]:g}", p)
+
+    def corner(self, p, v):
+        """A hard corner at `p`: every style takes it through (the last point of the floor before it, when it is this
+        one, is replaced), no faster than v."""
+        for s in STYLES:
+            if not self.auto[s] or not self.sectors:
+                continue
+            steps = self.sectors[-1][2][s]
+            if steps and steps[-1].split()[0] in ("pass", "via", "goto") and \
+                    np.linalg.norm(np.array(steps[-1].split()[1:4], float) - p) < 0.02:
+                steps.pop()
+            self.step([s], f"pass {fmt(p)} {v if s != 'speed' else v + 3:g}", p)
 
 
 def fmt(p):
@@ -537,7 +555,7 @@ class Track:
                 self.width = self.marks[name][3]
             self.floor_end = None
         elif cmd == "corner":
-            self.corner(args, line)
+            self.corner(args, opts, line)
         elif cmd == "plaza":
             self.plaza(args, opts, line)
         elif cmd == "disc":
@@ -545,6 +563,12 @@ class Track:
             c = self.at(float(opts.get("ahead", 0)), float(opts.get("side", 0)), float(opts.get("up", 0)))
             self.b.disc_node = P.disc(self.b, f"Disc_{self.n('disc'):02d}", tuple(c), num(args, 0, line), self.sector,
                                       surface=self.surface, rim="rim" in args)
+            if "ring" in args:
+                # a railing ring with two openings, toward the way in (behind) and the way on (ahead)
+                w = float(opts.get("gap", 8.0))
+                h = self.head
+                P.rail_ring(self.b, f"Ring_{self.n('ring'):02d}", tuple(c), num(args, 0, line),
+                            [(h + 180.0, w), (h, w)])
         elif cmd == "pit":
             self.pit(args, opts, line)
         elif cmd in ("lamptower", "mast", "plinth", "wallblock", "lighthouse", "garland", "wlamp"):
@@ -640,7 +664,7 @@ class Track:
         else:
             raise LevelError(f"line {line}: unknown command {cmd}")
 
-    def corner(self, args, line):
+    def corner(self, args, opts, line):
         """A hard 90 degree corner: the last floor's end becomes a mitre ring (the cross-section standing on the
         bisector, 1/cos 45 wider across) shared with the floor that follows, whose heading is turned 90: the outer
         corner filled, the profile continuous. `rail`: a railing 8 either side of it on the outer side."""
@@ -666,11 +690,18 @@ class Track:
             st["rails"].insert(-1, st["rails"][-1])
             old = st["rails"][-1]
             st["rails"][-1] = (old[0] or outer[0], old[1] or outer[1])
+        self.pilot.corner(self.pos.copy(), CORNER_V)
         st["heads"][-1] = self.fwd(self.head + 45.0 * sgn)
         st["scales"][-1] = math.sqrt(2.0)
         self.head += 90.0 * sgn
         st["tail"] = self.fwd()
         if "rail" in args:
+            gap = float(opts.get("gap", 0))
+            if gap > 0:
+                # an opening in the outer railing along the first `gap` of the way out: the way straight on
+                pts, heads = self.straight(gap, 0.0)
+                self.lay(pts, heads, "Floor", straight=True)
+                self.move_along(pts)
             self.turn_rail = outer
             pts, heads = self.straight(reach, 0.0)
             self.lay(pts, heads, "Floor", straight=True)
@@ -883,7 +914,13 @@ class Track:
         """Notes a box or a loose ball for check_bodies; one marked `shove` must be no heavier than the ball the way
         has there."""
         body_r = {"box": 2.5 * math.sqrt(2)}.get(cmd, 2.0)
-        if "shove" in opts:
+        if "plug" in opts:
+            # put there to block the way until the right ball comes: the room check does not apply
+            return
+        if "lead" in opts:
+            # a ball the way's ball leads: it rolls on ahead of the player, never blocks
+            opts = dict(opts, shove=True)
+        elif "shove" in opts:
             mine = BALL_MASS[self.ball_kind]
             theirs = {"box": BOX_MASS}.get(cmd, LOOSE_MASS.get(kind, 0.0))
             if mine < theirs:
@@ -951,7 +988,7 @@ class Track:
         side, ahead = float(opts.get("side", 0)), float(opts.get("ahead", 0))
         if cmd in ("box", "loose"):
             self.check_room(cmd, word(args, 0, line) if cmd == "loose" else None, side, ahead, opts, line)
-        p = self.at(ahead, side)
+        p = self.at(ahead, side, float(opts.get("up", 0)) if cmd in ("point", "life", "trafo", "loose") else 0.0)
         s = self.sector
         if cmd == "point":
             self.b.extra_point(self.n("point"), tuple(p), s)
@@ -986,7 +1023,8 @@ class Track:
                 raise LevelError(f"line {line}: loose wood|stone|paper")
             self.b.loose_ball(kind, self.n("loose" + kind), tuple(p), s)
         elif cmd == "column":
-            self.b.column(f"Column_{self.n('column'):03d}", tuple(p), float(opts.get("depth", 40)))
+            self.b.column(f"Column_{self.n('column'):03d}", tuple(p), float(opts.get("depth", 40)),
+                          float(opts.get("r", 2.2)))
         elif cmd == "module":
             name = word(args, 0, line)
             if not name.startswith("P_Modul_"):
@@ -1077,8 +1115,8 @@ def styles_of(text, line):
 
 
 OPTION_WORDS = ("up", "down", "side", "ahead", "depth", "turn", "tilt", "runup", "r", "height", "wall", "sag", "ahead2",
-                "side2", "up2", "thick", "long", "hole")
-FLAG_WORDS = ("nopilot", "ties", "shove")
+                "side2", "up2", "thick", "long", "hole", "gap")
+FLAG_WORDS = ("nopilot", "ties", "shove", "lead", "nolamps", "plug")
 
 
 def parse_line(text):
