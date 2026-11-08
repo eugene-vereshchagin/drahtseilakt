@@ -54,6 +54,17 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     pusher left|right        a pusher (P_Modul_01) in a slot of 1.6 across the way: its block fills the way (at
                              most 6 wide), its target plate stands 5 out past the way's edge on that side, over a
                              floor 2.5 lower (laid by the description) from where a ball pushes the block out
+    corner left|right [rail] [gap G]   a hard 90 degree corner at the end of a floor (a mitred ring: the outer corner
+                             filled, the profile unbroken); `rail`: a railing on its outer side 8 either side, open
+                             for G along the way straight on
+    plaza W L [brick|kerb] [stone|wood] [gap SIDE C W]... [fence SIDE...]   a flat square from the middle of its back
+                             edge (side/ahead/up move it), a rim round it but at its gaps, railings on the fence sides
+    disc R [rim] [ring [gap W]]   a round floor, a railing ring open at both ends;  pit L [depth D] [wall LEN] [side S]
+                             a pit in the way with a stop wall;  mark NAME / back NAME also begin and end a branch
+    lamptower, mast, plinth, wallblock, wlamp, lighthouse, garland   free standing scenery (options side, ahead, up, r,
+                             height, long, thick; garland: ahead2 side2 up2 sag);  scatter D: distant scenery
+                             about every D units of way
+    loose KIND lead|plug     a ball the way's ball leads (rolls on ahead), a body that plugs the way: no room check
     seesaw                   a seesaw over a gap of its length (14.8): the cursor goes over it
     platebridge              a plate bridge over a gap of 14.8 (a stone ball breaks it)
     swingbridge [ahead G]    a swing hanging in a gap of G (5) that it bridges as it swings across the way
@@ -308,7 +319,14 @@ class Track:
             if straight:
                 pts, heads = [pts[0], pts[-1]], [heads[0], heads[-1]]
             self.extend_stretch(pts, heads)
-        for p in pts[1:]:
+        # a straight piece has only its two ends; a hint's step takes at most 600 ticks, so a long one gets points on it
+        way = [pts[0]]
+        for q in pts[1:]:
+            d = float(np.linalg.norm(q - way[-1]))
+            k = int(d // 30.0)
+            way += [way[-1] + (q - way[-1]) * (j / (k + 1)) for j in range(1, k + 1)]
+            way.append(q)
+        for p in way[1:]:
             self.pilot.way(p)
         # every few units of it, for keeping columns clear of it
         self.floor_points.extend(dense)

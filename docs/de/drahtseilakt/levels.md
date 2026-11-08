@@ -139,6 +139,18 @@ quer über einen höchstens 6 breiten Weg, der Block des Schiebers füllt den We
 Seite 5 über den Rand hinaus über einem 2,5 tieferen Boden, von dem aus eine Kugel den Block aus dem Weg schiebt). Die
 Böden darunter werden mit `mark`, `move`, `turn` und `back` gelegt.
 
+**Ecken, Plätze und Kulissen** (2026-11, Neubau von Level 1; `assets/own/make/levelparts.py`). `corner left|right [rail]
+[gap G]` ist eine harte rechtwinklige Ecke: das Ende des letzten Bodens ist ein Gehrungsring (der Querschnitt steht auf
+der Winkelhalbierenden, 1/cos 45 breiter), gemeinsam mit dem folgenden Boden; die Außenecke ist gefüllt, das Profil läuft
+ohne Bruch weiter; `rail` setzt außen ein Geländer 8 beiderseits, `gap` lässt es G lang geradeaus offen. `plaza W L
+[brick|kerb] [stone|wood] [gap SIDE C W]... [fence SIDE...]` ist eine ebene Fläche ab der Mitte ihrer Hinterkante mit
+Ziegelrand oder niedriger Kante außer an den Lücken und Geländern an den Seiten in `fence`; `disc R [rim] [ring [gap W]]`
+eine runde Fläche; `pit L [depth D] [wall LEN] [side S]` eine Grube im Weg mit Prellwand; `mark`/`back` beginnen und
+beenden einen Seitenast. Freistehende Kulissen (nur gezeichnet): `lamptower`, `mast`, `plinth`, `garland`, `wallblock`,
+`wlamp`, `lighthouse`; `scatter D` verteilt Türme, Masten und Sockel entlang des Wegs abseits der Böden. `loose KIND lead`
+und `plug` sind vom Platzcheck ausgenommen. Plätze, Scheiben und Gruben liegen 0,03 unter den anschließenden Böden
+(zwei ebene Teile auf gleicher Höhe wären ein Riss für den Nahttest).
+
 **Himmel.** `sky` wählt die Himmelsbox um das Level: `A`, `B`, `C` (unsere, über einem Wolkenmeer, wie die Buchstaben
 des Originals) oder einen der fotografischen Himmel mit Namen: `Mountains` (ein Abendhimmel über dunstigen Bergen mit
 Schnee auf den Gipfeln), `Forest` (Sommerwolken über einem Blätterdach mit Lichtungen und Seen), `Sea` (ein ruhiges

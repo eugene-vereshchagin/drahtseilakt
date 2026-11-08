@@ -137,6 +137,24 @@ at most 6 wide, the pusher's block filling the way, its target plate standing 5 
 floor 2.5 lower, from where a ball pushes the block out of the way). The floors under them are laid with `mark`,
 `move`, `turn` and `back`.
 
+**Corners, plazas and scenery** (2026-11, level 1's rebuild; `assets/own/make/levelparts.py`). `corner left|right [rail]
+[gap G]` is a hard square corner: the last floor ends in a mitred ring (its cross-section standing on the bisector,
+1/cos 45 wider across), shared with the floor that follows, so the outer corner is filled and the profile (a groove
+with its kerbs, boards) runs on without a break; `rail` puts a railing on the outer side 8 either side of it, `gap`
+leaves that railing open for G along the way straight on (a train of stones flies out there). `plaza W L [brick|kerb]
+[stone|wood] [gap SIDE C W]... [fence SIDE...]` is a flat square from the middle of its back edge (moved by `side`,
+`ahead`, `up`), with a brick rim or a low kerb round it except at its gaps (back and front: the centre across, to the
+left; left and right: along from the back edge) and a railing along the sides in `fence`; `disc R [rim] [ring [gap W]]`
+a round floor (with a railing ring open at both ends); `pit L [depth D] [wall LEN] [side S]` a pit in the way
+(its bottom 4.3 under it, its walls, a stop wall 2 high on the far kerb); `mark` and `back` begin and end a side branch
+(nothing runs on from what was laid before). Free standing scenery, only drawn: `lamptower`, `mast` (striped),
+`plinth`, `garland` (a wire with lamps, from `ahead side up` to `ahead2 side2 up2`, `sag`), `wallblock` and `wlamp`
+(a lantern on a wall), `lighthouse` (a square tower, its shaft solid); `scatter D` puts a lamp tower, a mast or a
+plinth about every D units of way, clear of the floors, on the way's far sides. `loose KIND lead` (a ball the way's ball
+leads, rolling on ahead) and `plug` (a body put there to block the way until the right ball comes) are not held to the
+room check. Plazas, discs and pits lie 0.03 under the floors that run on from them (two flat pieces meeting at one
+height are a crack to the seam test).
+
 **Skies.** `sky` names the sky box round the level: `A`, `B`, `C` (ours, drawn above a sea of cloud, as the
 original's letters) or one of the photographic skies by name: `Mountains` (a sunset sky over hazy mountains with
 snow on the peaks), `Forest` (summer clouds over a forest canopy with glades and lakes), `Sea` (a calm sea at
