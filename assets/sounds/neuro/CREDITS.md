@@ -47,7 +47,7 @@ Rolling on iron rails, redone a third time (2026-11-09) after the owner said it 
 old loops were a regular clatter of about ten bursts a second, like a train over rail joints, with no ringing in them.
 Now the rail sings: a smooth rolling-contact noise drives a dense bank of narrow, long-ringing rail modes (modal
 synthesis), and the level swells softly and irregularly as the ball turns, never in a beat. The wooden ball
-(`Roll_Wood_Metal`) is a singing whirr of many close lines between about 130 and 900 Hz, strongest from 160 to 520 Hz,
-with a faint contact hiss on the swells; the stone ball (`Roll_Stone_Metal`) is a rough growl of beating lines round
-120 Hz in blobs, a 450–900 Hz ring that small irregular scrapes strike, and a faint grind (each the first of three
-variants made).
+(`Roll_Wood_Metal`, variant C, the owner's choice by ear) is a hollow, darker tube-like hum with longer-ringing
+modes; the stone ball (`Roll_Stone_Metal`) is a rough growl of beating lines round
+120 Hz in blobs, a 450–900 Hz ring that small irregular scrapes strike, and a faint grind (variant A, the owner's choice; three
+variants were made of each).
