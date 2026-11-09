@@ -182,3 +182,9 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # Raft 1 then jams at x -305 (stones) / -326 (woods) on the bar platform's bumper; raft 2 runs on to the rail's end (x -164 at 90 s).
 # The video agrees: sheet01 raft 2 trails the ball's raft, sheet02 (3768..3757) it draws level, sheet03 the ball is level with raft 2
 # at board 2. Verdict: no fidelity bug found (geometry explains the stagger); the C reference was not run.
+# 2026-11-09 (sector 4 end, NOT solved): CP4 PR_Resetpoint_05 at (121.8 -334.7 -1133.6); stone transformer P_Trafo_Stone_06/07 at
+# (89.4 -336.1 -1133.6) on A04_Tower1 (x 86..92.5, z -1151..-1115). A04_Floor_03 (x 46..127, y -341..-333): a ramp 20 wide (z -1146..
+# -1126) from x 46 to 72 narrowing to a 5-wide path (z -1136..-1131, x 80..112) to the CP, then A05_Rail_01 from x 126. With the
+# current s4 hint the ball rides raft 2 to x 54 (y -335.5, speed 3.9, slope -0.4/3.9) and falls at x 62 (y -337 -> -342, dies at
+# 1:59) although it keeps z -1133.9: it sinks below the ramp's surface line - next: read A04_Floor_03's surface at x 55..75 (is it a
+# trough, where is the top at z -1133.9?) and step off the raft sideways (video: rolls into the transformer cage at ~408 s).
