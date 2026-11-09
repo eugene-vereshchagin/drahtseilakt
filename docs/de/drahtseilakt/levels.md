@@ -320,3 +320,5 @@ Deutsch.
    ohne die Leveldateien der Kopie spielt (open-format.md) (Real-ESRGAN, wenn installiert, sonst Lanczos; Phase 7). Ein Originallevel,
    das der Kopie fehlt (eine Kopie ohne Level 13), wird im Levelmenü aus seinem Export in `remastered/` gespielt.
 5. Level, die mit dem Spiel kommen, sobald Autoren sie anbieten.
+
+**Angezeigte Titel.** Der Titel eines Levels (und die Namen der Community-, Open-Format-, heruntergeladenen und Challenge-Level) wird in höchstens 40 Zeichen angezeigt: Ein längerer wird an einer Wortgrenze gekürzt und endet auf „…“, und das Spiel schreibt eine Warnung ins Protokoll.

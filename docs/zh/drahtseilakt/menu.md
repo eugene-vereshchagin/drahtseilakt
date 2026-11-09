@@ -66,10 +66,10 @@
   - 所有关卡开放，无需解锁：仅限调试运行（`--debug`）；玩家的游戏通过游玩来解锁关卡；
   - 关卡旁显示最佳时间；
   - （自 2026-11-09 起 Start 在两种模式下相同；不再有此开关）；
-  - Interface：own / original / remaster，界面文件的来源（[resources.md](resources.md)）；
-  - Textures：绘制关卡、关卡部件和球所用的纹理包——own（默认）、original、remaster 或玩家的纹理包，按其名称显示；下一个关卡按所选纹理包加载（[packs.md](packs.md)）；
-  - Models：绘制部件和球所用的模型包（只改变外观，绝不改变物理）——关卡自带（每个关卡使用它自己采用的部件：默认）、own、original 或玩家的模型包（[packs.md](packs.md)）；
-  - Sounds：音效主题——系统、生成、原版（由 toolbox 制作）或玩家自己的主题（[resources.md](resources.md)）；在玩家选择其他主题之前播放生成主题；
+  - Interface：Drahtseilakt / Ballance / Remaster，界面文件的来源（[resources.md](resources.md)）；
+  - Textures：绘制关卡、关卡部件和球所用的纹理包——Drahtseilakt（默认）、Ballance、Remaster 或玩家的纹理包，按其名称显示；下一个关卡按所选纹理包加载（[packs.md](packs.md)）；
+  - Models：绘制部件和球所用的模型包（只改变外观，绝不改变物理）——关卡自带（每个关卡使用它自己采用的部件：默认）、Drahtseilakt、Ballance 或玩家的模型包（[packs.md](packs.md)）；
+  - Sounds：音效主题——系统、生成、Ballance（由 toolbox 制作）或玩家自己的主题（[resources.md](resources.md)）；在玩家选择其他主题之前播放生成主题；
   - Mods：找到的每个模组所在的界面（内置模组和玩家的模组；调试运行中还有上帝模式，它包含原来的练习工具和无限生命），每项用左右键切换，Enter 打开其页面及选项和按键（[mods.md](mods.md)）；经典模式下关闭。没有需要取消的时间限制：分数只会递减并停在零，与原版相同。
 - **Graphics** 增加 *Field of View*：游戏相机在 4:3 上的视野宽度，40° 到 100°，步长 2（`fov 58`；原版为 58°，即 InGameCam 的
   1.0123 弧度）。经典模式始终使用原版的视野。
@@ -92,8 +92,8 @@ Start 在经典模式和扩展模式下相同；为空或不可用的项目不�
 | &nbsp;&nbsp;*精选*（en *Best*） | 随游戏附带的 13 张社区地图，附作者和致谢 | |
 | &nbsp;&nbsp;*已下载*（en *Downloaded*） | 玩家的文件夹 `levels/downloaded/`（显示其路径）：社区 `.nmo` 地图和开放格式关卡合为一个列表，并包含仍会读取的旧文件夹 `levels/community/` 和 `levels/open/` | |
 
-文字提供全部七种语言。*Remastered* 不再是一种关卡类别：Options 有一行 *外观：原版 / 重制版*（en *Look: original /
-remastered*），仅在 `levels/remastered/` 中有导出时显示。选 *重制版* 时，经典 Ballance 从其导出游玩每个原版关卡
+文字提供全部七种语言。*Remastered* 不再是一种关卡类别：Options 有一行 *外观：Ballance / Remaster*（en *Look: Ballance /
+Remaster*），仅在 `levels/remastered/` 中有导出时显示。选 *重制版* 时，经典 Ballance 从其导出游玩每个原版关卡
 （设置 `look remastered`）；外观是一项设置而非列表，以便日后由纹理包和模型包取代。
 
 ## 放得下的文字，会说明自己可滚动的列表
@@ -131,3 +131,5 @@ remastered*），仅在 `levels/remastered/` 中有导出时显示。选 *重制
 
 `DRAHTSEILAKT_SHOT_MENU=base:keys` 配合 `--screenshot` 可以在没有窗口的情况下把菜单画在画面上（base 为 `main`、`pause`、`dead` 或 `end`；
 keys 中 `u d l r` 表示方向键，`e` 表示 Enter，`b` 表示 Esc，`n` 表示名字输入，`w` 表示在等待按键时按下 W 键），用来查看每一个界面。不在关卡之上的菜单画在界面的菜单 3D 场景前，场景取其镜头环绕一周中的第 `DRAHTSEILAKT_SHOT_MENU_MS` 毫秒（默认 0）。
+
+**外观各值的名称**（所有者 2026-11-09 的决定）：凡是在原版游戏的东西、我们的东西和重制版之间选择的地方，值一律叫 **Ballance**（玩家的副本）、**Drahtseilakt**（我们的）和 **Remaster**（toolbox 的重制版），各语言相同（专有名称，不翻译）。只改了显示的名称：设置键和文件夹名仍是 `own`、`original`、`remastered`，已保存的设置照常有效。玩家的包或主题保留自己的名称，最多显示 16 个字符（[packs.md](packs.md)）。

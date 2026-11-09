@@ -110,13 +110,13 @@ Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Men�
     Level durch Spielen;
   - Bestzeiten neben den Leveln;
   - (Start ist seit 2026-11-09 in beiden Modi gleich; den Schalter gibt es nicht mehr);
-  - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
-  - Textures: das Texturpaket, womit die Level, ihre Teile und die Kugeln gezeichnet werden — own (Vorgabe), original, remaster oder ein Paket des Spielers, mit seinem Namen; das nächste Level lädt
+  - Interface: Drahtseilakt / Ballance / Remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
+  - Textures: das Texturpaket, womit die Level, ihre Teile und die Kugeln gezeichnet werden — Drahtseilakt (Vorgabe), Ballance, Remaster oder ein Paket des Spielers, mit seinem Namen; das nächste Level lädt
     mit der Wahl ([packs.md](packs.md));
   - Models: das Modellpaket, womit die Teile und Kugeln gezeichnet werden (nur ihr Aussehen, nie ihre Physik) — wie im
-    Level (jedes Level mit den Teilen, die es nimmt: Vorgabe), own, original oder ein Paket
+    Level (jedes Level mit den Teilen, die es nimmt: Vorgabe), Drahtseilakt, Ballance oder ein Paket
     des Spielers ([packs.md](packs.md));
-  - Sounds: das Klangthema — System, generiert, original (von der Toolbox gemacht) oder ein eigenes des Spielers
+  - Sounds: das Klangthema — System, generiert, Ballance (von der Toolbox gemacht) oder ein eigenes des Spielers
     ([resources.md](resources.md)); das generierte, bis der Spieler ein anderes wählt;
   - Mods: der Bildschirm jedes gefundenen Mods (Werks-Mods und die des Spielers; in einem Debug-Lauf auch god-mode,
     der enthält, was die Übungswerkzeuge und die endlosen Leben waren), jeder mit Links und Rechts geschaltet, Enter
@@ -158,7 +158,7 @@ und Unterpunkt sagt im Hinweisfeld, was er ist und woher er kommt.
 | &nbsp;&nbsp;*Heruntergeladen* (en *Downloaded*) | der Ordner des Spielers `levels/downloaded/` (sein Pfad wird gezeigt): Community-`.nmo`-Karten und Level im offenen Format in einer Liste, samt den früheren `levels/community/` und `levels/open/`, die weiter gelesen werden | |
 
 Die Texte gibt es in allen sieben Sprachen. *Remastered* ist keine Level-Art mehr: Options hat die Zeile *Aussehen:
-original / remastered* (en *Look: original / remastered*), nur sichtbar, wenn `levels/remastered/` einen Export enthält.
+Ballance / Remaster* (en *Look: Ballance / Remaster*), nur sichtbar, wenn `levels/remastered/` einen Export enthält.
 Mit *remastered* spielt Klassisches Ballance jedes Original-Level aus seinem Export (die Einstellung `look
 remastered`); das Aussehen ist eine Einstellung, keine Liste, damit später Textur- und Modellpakete es ersetzen können.
 
@@ -213,3 +213,5 @@ Jede wählbare Zeile jedes Bildschirms sagt auf dem Notizfeld, was sie ist, wie 
 Taste W, während eine erwartet wird), um jeden
 Bildschirm anzusehen. Ein Menü, das nicht über einem Level liegt, steht über der 3D-Menüszene der Oberfläche,
 `DRAHTSEILAKT_SHOT_MENU_MS` Millisekunden (Vorgabe 0) in die Runde ihrer Kamera.
+
+**Namen der Aussehen-Werte** (Entscheidung des Eigentümers 2026-11-09): Wo eine Wahl zwischen den Dingen des Originalspiels, unseren und dem Remaster entscheidet, heißen die Werte **Ballance** (die Kopie des Spielers), **Drahtseilakt** (unsere) und **Remaster** (das Remaster der Toolbox), in jeder Sprache (Eigennamen, nicht übersetzt). Nur die angezeigten Namen haben sich geändert: Die Einstellungsschlüssel und Ordnernamen bleiben `own`, `original`, `remastered`, gespeicherte Einstellungen funktionieren also weiter. Ein Paket oder Thema des Spielers behält seinen Namen, angezeigt mit höchstens 16 Buchstaben ([packs.md](packs.md)).

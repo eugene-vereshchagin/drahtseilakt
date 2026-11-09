@@ -21,6 +21,8 @@ use std::sync::Mutex;
 const MAX_THEMES: usize = 32;
 const MAX_THEME_TXT: u64 = 4096;
 const MAX_NAME: usize = 64;
+/// The most letters of a pack's or theme's name the menus show.
+pub const NAME_SHOWN: usize = 16;
 /// The theme every theme falls back to (and the one played when the default theme is not there).
 pub const SYSTEM: &str = "system";
 /// The theme played when the player has not chosen one: the generated theme (decisions.md, 2026-11-02).
@@ -54,7 +56,7 @@ impl Theme {
         };
         find(lang)
             .or_else(|| find("en"))
-            .unwrap_or_else(|| self.key.clone())
+            .unwrap_or_else(|| crate::package::clean_noted(&self.key, NAME_SHOWN).0)
     }
 }
 
@@ -142,7 +144,14 @@ pub fn parse_theme_txt(text: &str) -> (Vec<(String, String)>, Option<String>) {
             .collect();
         if let Some(lang) = k.strip_prefix("name.") {
             if matches!(lang, "en" | "ru" | "de" | "zh") && !v.is_empty() {
-                names.push((lang.to_owned(), v));
+                // shown in the menus' rows, so at most NAME_SHOWN letters: cut at a word, ending in "…"
+                let (shown, cut) = crate::package::clean_noted(&v, NAME_SHOWN);
+                if cut {
+                    eprintln!("name.{lang} \"{v}\" shortened to {NAME_SHOWN} characters: {shown}");
+                }
+                if !shown.is_empty() {
+                    names.push((lang.to_owned(), shown));
+                }
             }
         } else if k == "fallback" && plain(&v) {
             fallback = Some(v);

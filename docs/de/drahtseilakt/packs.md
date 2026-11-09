@@ -20,8 +20,8 @@ wird in den Einstellungen gespeichert (`textures KEY`, `models KEY` in `settings
 
 | Art | Eingebaute Pakete | Voreinstellung |
 |---|---|---|
-| Texturen | `own` („eigene“: unsere, frei), `original` („Original“: die Kopie des Spielers), `remastered` („Remaster“: die eigenen hochskalierten Bilder eines Remaster-Levels, sonst die der Kopie) | `own` |
-| Modelle | `level` („wie im Level“: jedes Level mit den Teilen, die es nimmt), `own` („eigene“: das Aussehen unserer Teile), `original` („Original“: das Aussehen der Teile der Kopie) | `level` |
+| Texturen | `own` („Drahtseilakt“: unsere, frei), `original` („Ballance“: die Kopie des Spielers), `remastered` („Remaster“: die eigenen hochskalierten Bilder eines Remaster-Levels, sonst die der Kopie) | `own` |
+| Modelle | `level` („wie im Level“: jedes Level mit den Teilen, die es nimmt), `own` („Drahtseilakt“: das Aussehen unserer Teile), `original` („Ballance“: das Aussehen der Teile der Kopie) | `level` |
 
 Mit den Paketen geändert (2026-11-03): `original` zeichnet in einem remasterten Level nun die Bilder der Kopie (mit
 ihren transparenten Farben); das Aussehen, das ein remastertes Level vorher mit `original` hatte, seine eigenen
@@ -152,3 +152,5 @@ models/
   (`put_pack_textures`, `game_texture`, `put_pack_looks`, `load_pack_part`).
 - Gefuzzt: `pack_txt` ([fuzzing.md](fuzzing.md)); das Teil eines Modellpakets läuft durch den Leser des offenen Formats
   (`open_level`).
+
+**Angezeigte Namen.** Die eingebauten Pakete werden in jeder Sprache als **Drahtseilakt** (`own`), **Ballance** (`original`) und **Remaster** (`remastered`) angezeigt (Eigennamen; die Schlüssel in den Einstellungen und die Ordnernamen bleiben). Ein Paket des Spielers zeigt sein `name.<Sprache>` (oder den Ordnernamen) in **höchstens 16 Buchstaben**: Ein längerer Name wird an einer Wortgrenze gekürzt und endet auf „…“, und das Spiel schreibt eine Warnung ins Protokoll. Die 64 Zeichen des Ordnerschlüssels bleiben die Grenze für die Einstellungen.

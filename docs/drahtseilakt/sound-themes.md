@@ -199,3 +199,5 @@ Every line passed over is reported on the terminal (standard error), e.g.
   atmospheres in three parts, eighteen level tracks (themes 1 to 3 three each, themes 4 and 5 nine more in pools) and
   the finish music; made by `prepare.py`; authors, licences and changes in its `CREDITS.md`.
 - *neuro* (`assets/sounds/neuro/`): every role synthesized by code for the game, GPL-3.0-only, `fallback none`.
+
+**Shown names.** The theme `original` is shown as **Ballance** in every language; *neuro* and *system* keep their names. A player's theme shows its `name.<lang>` (or its folder's name) in **at most 16 letters**: a longer name is cut at a word and ends in "…", and the game logs a warning. The folder key's limit (64 characters) stays.

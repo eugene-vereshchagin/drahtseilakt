@@ -210,3 +210,5 @@ Jede übergangene Zeile wird im Terminal gemeldet (Standardfehler), z. B.
   Atmosphären in drei Teilen, achtzehn Levelstücke (Themen 1 bis 3 je drei, Themen 4 und 5 neun weitere in Pools) und
   die Zielmusik; gemacht von `prepare.py`; Autoren, Lizenzen und Änderungen in ihrer `CREDITS.md`.
 - *neuro* (`assets/sounds/neuro/`): jede Rolle für das Spiel durch Code synthetisiert, GPL-3.0-only, `fallback none`.
+
+**Angezeigte Namen.** Das Thema `original` wird in jeder Sprache als **Ballance** angezeigt; *neuro* und *system* behalten ihre Namen. Ein Thema des Spielers zeigt sein `name.<Sprache>` (oder den Ordnernamen) in **höchstens 16 Buchstaben**: Ein längerer Name wird an einer Wortgrenze gekürzt und endet auf „…“, das Spiel schreibt eine Warnung ins Protokoll. Die Grenze des Ordnerschlüssels (64 Zeichen) bleibt.

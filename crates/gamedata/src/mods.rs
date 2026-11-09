@@ -1434,7 +1434,13 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
         };
         if let Some(lang) = lang_of("name.") {
             once(key)?;
-            m.names.push((lang, text_value(rest).map_err(at)?));
+            // shown in the mods' list: at most 40 characters, cut at a word with "…"
+            let name = text_value(rest).map_err(at)?;
+            let (shown, cut) = crate::package::clean_noted(&name, crate::package::TITLE_MAX);
+            if cut {
+                eprintln!("mod name.{lang} shortened to {} characters: {shown}", crate::package::TITLE_MAX);
+            }
+            m.names.push((lang, shown));
             continue;
         }
         if let Some(lang) = lang_of("description.") {

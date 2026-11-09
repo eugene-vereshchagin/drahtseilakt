@@ -185,3 +185,5 @@ Music_Final fanfare_a.ogg fanfare_b.ogg
   八段氛围，十八首关卡乐曲（主题 1 到 3 各三首，主题 4 和 5 另有九首，放在池中）以及终点音乐；由 `prepare.py`
   制作；作者、许可证和改动见其 `CREDITS.md`。
 - *neuro*（`assets/sounds/neuro/`）：所有角色都由代码为游戏合成，GPL-3.0-only，`fallback none`。
+
+**显示的名称。** 主题 `original` 在所有语言中显示为 **Ballance**；*neuro* 和 *system* 保持原名。玩家的主题显示其 `name.<语言>`（或文件夹名），**最多 16 个字符**：更长的名称在词边界处截断并以“…”结尾，游戏会在日志中给出警告。文件夹键的上限（64 个字符）不变。

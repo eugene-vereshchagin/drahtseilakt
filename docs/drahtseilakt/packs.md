@@ -18,7 +18,7 @@ settings (`textures KEY`, `models KEY` in `settings.txt`). The classic mode has 
 
 | Kind | Built-in packs | The default |
 |---|---|---|
-| Textures | `own` (ours, free), `original` (the player's copy), `remastered` (a remastered level's own upscaled pictures, else the copy's) | `own` |
+| Textures | `own` ("Drahtseilakt": ours, free), `original` ("Ballance": the player's copy), `remastered` ("Remaster": a remastered level's own upscaled pictures, else the copy's) | `own` |
 | Models | `level` (each level with the parts it takes), `own` (our parts' looks), `original` (the copy's parts' looks) | `level` |
 
 Changed with the packs (2026-11-03): `original` in a remastered level now draws the copy's pictures (with the copy's
@@ -145,3 +145,5 @@ models/
   (`put_pack_textures`, `game_texture`, `put_pack_looks`, `load_pack_part`).
 - Fuzzed: `pack_txt` ([fuzzing.md](fuzzing.md)); a model pack's part goes through the open format's reader
   (`open_level`).
+
+**Shown names.** The built-in packs are shown as **Drahtseilakt** (`own`), **Ballance** (`original`) and **Remaster** (`remastered`) in every language (proper names; the keys in the settings and the folder names stay). A player's pack shows its `name.<lang>` (or its folder's name) in **at most 16 letters**: a longer name is cut at a word and ends in "…", and the game logs a warning that it shortened it. The 64 characters of the folder's key stay the limit for the settings.

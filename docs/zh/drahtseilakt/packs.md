@@ -16,8 +16,8 @@ Options → Graphics 页（两种模式）有 **纹理** 和 **模型** 两行�
 
 | 类型 | 内置包 | 默认 |
 |---|---|---|
-| 纹理 | `own`（“自带”：我们的，自由许可）、`original`（“原版”：玩家的拷贝）、`remastered`（“重制”：重制版关卡自带的放大图片，否则用拷贝中的） | `own` |
-| 模型 | `level`（“关卡自带”：每个关卡使用它自己的部件）、`own`（“自带”：我们的部件的外观）、`original`（“原版”：拷贝中部件的外观） | `level` |
+| 纹理 | `own`（“Drahtseilakt”：我们的，自由许可）、`original`（“Ballance”：玩家的拷贝）、`remastered`（“Remaster”：重制版关卡自带的放大图片，否则用拷贝中的） | `own` |
+| 模型 | `level`（“关卡自带”：每个关卡使用它自己的部件）、`own`（“Drahtseilakt”：我们的部件的外观）、`original`（“Ballance”：拷贝中部件的外观） | `level` |
 
 随纹理包一起更改（2026-11-03）：在重制关卡中，`original` 现在绘制拷贝的图片（带拷贝的透明色）；重制关卡以前在 `original` 下的外观——它自己的放大图片——现在是 `remastered` 选项。
 
@@ -130,3 +130,5 @@ models/
 - 代码：`crates/gamedata/src/packs.rs`（查找和选择包、pack.txt）、`crates/gamedata/src/assets.rs`
   （`put_pack_textures`、`game_texture`、`put_pack_looks`、`load_pack_part`）。
 - 已做模糊测试：`pack_txt`（[fuzzing.md](fuzzing.md)）；模型包的部件会经过开放格式的读取器（`open_level`）。
+
+**显示的名称。** 内置包在所有语言中显示为 **Drahtseilakt**（`own`）、**Ballance**（`original`）和 **Remaster**（`remastered`）（专有名称；设置中的键和文件夹名不变）。玩家的包显示其 `name.<语言>`（或文件夹名），**最多 16 个字符**：更长的名称在词边界处截断并以“…”结尾，游戏会在日志中给出警告。文件夹键的 64 个字符上限对设置仍然有效。

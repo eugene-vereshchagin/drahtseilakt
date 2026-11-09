@@ -101,13 +101,13 @@ development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the or
     them;
   - best times beside the levels;
   - (Start is the same in both modes since 2026-11-09; the switch no longer exists);
-  - Interface: own / original / remaster, where the interface's files come from ([resources.md](resources.md));
-  - Textures: the texture pack the levels, their parts and the balls are drawn with — own (the default), original, remaster or a player's pack, by its name; the next level loads with the choice
+  - Interface: Drahtseilakt / Ballance / Remaster, where the interface's files come from ([resources.md](resources.md));
+  - Textures: the texture pack the levels, their parts and the balls are drawn with — Drahtseilakt (the default), Ballance, Remaster or a player's pack, by its name; the next level loads with the choice
     ([packs.md](packs.md));
   - Models: the model pack the parts and balls are drawn with (their look only, never their physics) — the level's
-    (each level with the parts it takes: the default), own, original or a player's
+    (each level with the parts it takes: the default), Drahtseilakt, Ballance or a player's
     pack ([packs.md](packs.md));
-  - Sounds: the sound theme — system, generated, original (made by the toolbox) or a player's own
+  - Sounds: the sound theme — system, generated, Ballance (made by the toolbox) or a player's own
     ([resources.md](resources.md)); the generated theme until the player chooses another;
   - Mods: the screen of every mod found (factory and the player's; in a debug run god-mode too, which holds what were
     the practice tools and endless lives), each switched with left and right, Enter opening its page with its options
@@ -146,7 +146,7 @@ and each submenu item says on the notes panel what it is and where it comes from
 | &nbsp;&nbsp;*Downloaded* (ru «Скачанные») | the player's folder `levels/downloaded/` (its path is shown): community `.nmo` maps and open-format levels in one list, with those of the earlier folders `levels/community/` and `levels/open/`, which are still read | |
 
 The strings are in all seven languages. *Remastered* is no longer a kind of level: Options has the line *Look:
-original / remastered* (ru «Вид: оригинал / ремастер»), shown only when `levels/remastered/` holds an export. With
+Ballance / Remaster* (ru «Вид: Ballance / Remaster»), shown only when `levels/remastered/` holds an export. With
 *remastered*, Classic Ballance plays each original level from its export (the setting `look remastered`); the look is
 a setting, not a list, so that texture and model packs can take its place later.
 
@@ -196,3 +196,5 @@ Every selectable line on every screen says on the notes panel what it is, how it
 `pause`, `dead` or `end`; keys `u d l r` for the arrows, `e` Enter, `b` Esc, `n` the name entry, `w` the key W
 pressed while one is awaited), to look at every screen. A menu not over a level stands over the interface's menu
 scene, `DRAHTSEILAKT_SHOT_MENU_MS` milliseconds (default 0) into its camera's round.
+
+**Names of the look choices** (owner's decision 2026-11-09): wherever a choice picks between the original game's things, ours and the remaster, the values are named **Ballance** (the player's copy), **Drahtseilakt** (ours) and **Remaster** (the toolbox's remaster), in every language (proper names, not translated). Only the shown names changed: the settings keys and the folder names stay `own`, `original`, `remastered`, so saved settings keep working. A player's pack or theme keeps its own name, shown in at most 16 letters ([packs.md](packs.md)).

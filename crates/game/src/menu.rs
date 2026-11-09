@@ -1860,7 +1860,7 @@ impl Menu {
                 vec![
                     (self.label(Line::Music), pct(self.volumes[1])),
                     (self.label(Line::Effects), pct(self.volumes[0])),
-                    (self.label(Line::SoundTheme), theme_value()),
+                    (self.label(Line::SoundTheme), theme_value(&self.strings)),
                 ]
             }
             Screen::Extended => {
@@ -1877,7 +1877,7 @@ impl Menu {
                         self.label(Line::Models),
                         self.pack_value(gamedata::packs::Kind::Models),
                     ));
-                    f.push((self.label(Line::SoundTheme), theme_value()));
+                    f.push((self.label(Line::SoundTheme), theme_value(&self.strings)));
                     f.push((self.label(Line::ModsMenu), ">".to_owned()));
                 }
                 f
@@ -2790,13 +2790,34 @@ impl Menu {
                         row(&mut out, [0.32, y, 0.68, y + 0.0396], st, at);
                         let mut left = FONT_ROW;
                         left.align = crate::ui::ALIGN_LEFT;
-                        label(
-                            &mut out,
-                            name,
-                            [0.32 + ROW_INDENT, y, 0.56, y + 0.0396],
-                            &left,
-                        );
-                        label(&mut out, value, [0.56, y, 0.668, y + 0.0396], &FONT_ROW);
+                        // the name and the value share the row by what each needs: the value keeps its usual
+                        // place (right of 0.56) unless it is wider, then the name gives way, down to the share
+                        // the two words have of the room
+                        let mut mid = 0.56;
+                        let mut x0 = 0.32 + ROW_INDENT;
+                        let x1 = 0.32 + 0.36 * text_right(KEY_UV);
+                        if let Some(f) = font {
+                            let nat = |t: &str| {
+                                quads_wide(&f.layout(t, crate::ui::homogeneous([0.0, y, 1.0, y + 0.0396]), &left))
+                            };
+                            let (nw, vw) = (nat(name), nat(value));
+                                                        let room = (x1 - x0) * crate::ui::CONTEXT_W;
+                            if vw > (x1 - 0.56) * crate::ui::CONTEXT_W - 4.0 && nw + vw > 0.0 {
+                                let want = if nw + vw + 6.0 <= room {
+                                    x1 - (vw + 6.0) / crate::ui::CONTEXT_W
+                                } else {
+                                    // too much for the row at full size: both are drawn as small as allowed
+                                    // (the name gets what it needs at that size, the value the rest)
+                                    x0 = 0.326;
+                                    let k = floor_k(&left);
+                                    let m = left.margins[0] + left.margins[2];
+                                    x0 + (nw * k + m) / crate::ui::CONTEXT_W
+                                };
+                                mid = want.clamp(x0 + 0.04, 0.56);
+                            }
+                        }
+                        label(&mut out, name, [x0, y, mid, y + 0.0396], &left);
+                        label(&mut out, value, [mid, y, 0.668, y + 0.0396], &FONT_ROW);
                     }
                 }
                 help_panel(&mut out, NOTE_BOTTOM, true, NOTE_BOTTOM - help_top);
@@ -3033,6 +3054,8 @@ fn shown_path(path: &str) -> String {
 #[cfg(test)]
 thread_local! {
     static TEST_PATH: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+    /// A player's pack or theme name the Extended screen shows in place of the chosen one's.
+    static TEST_NAME: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Whether a word is a folder path: it has a separator.
@@ -3589,8 +3612,13 @@ fn next_theme(by: i32) -> String {
 }
 
 /// The Sounds line's value: the chosen theme's key (its folder's name).
-fn theme_value() -> String {
-    gamedata::sound_themes::chosen()
+fn theme_value(s: &Strings) -> String {
+    let key = gamedata::sound_themes::chosen();
+    #[cfg(test)]
+    if let Some(n) = TEST_NAME.with(|n| n.borrow().clone()) {
+        return n;
+    }
+    if key == gamedata::sound_themes::ORIGINAL { s.ours("interface original") } else { key }
 }
 
 impl Menu {
@@ -3598,6 +3626,10 @@ impl Menu {
     fn pack_value(&self, kind: gamedata::packs::Kind) -> String {
         use gamedata::packs::{LEVEL, ORIGINAL, OWN, REMASTERED, chosen, packs};
         let key = chosen(kind);
+        #[cfg(test)]
+        if let Some(n) = TEST_NAME.with(|n| n.borrow().clone()) {
+            return n;
+        }
         match key.as_str() {
             OWN => self.strings.ours("interface own"),
             ORIGINAL => self.strings.ours("interface original"),
@@ -4207,6 +4239,13 @@ mod tests {
         // mod texts shortened in their middle (the mod page's labels and values, the mods' names)
         let mut cut = std::collections::BTreeSet::new();
         for &(lang, _) in &LANGUAGES {
+            // a player's pack or theme with a name of the longest allowed (16 letters), of wide ones
+            let wide = match lang {
+                "ru" => "Щ".repeat(16),
+                "zh" => "汉".repeat(16),
+                _ => "W".repeat(16),
+            };
+            TEST_NAME.with(|n| *n.borrow_mut() = Some(wide));
             for mode in [true, false] {
                 for (list, kind, maps) in &lists {
                     let mut m = menu(&[true; 13], mode);
@@ -4526,7 +4565,7 @@ mod tests {
                                 if !matches!(sc, Screen::Custom | Screen::Highscore | Screen::Entry) && !p.wrap && p.panel.is_none() {
                                     let letters = p.text.chars().filter(|c| !c.is_whitespace()).count();
                                     if p.cut || p.quads.len() < letters {
-                                        cut.insert(format!("{lang} {:?} ({w}x{h})", p.text));
+                                        cut.insert(format!("{lang} {id} {:?} ({w}x{h})", p.text));
                                     }
                                 }
                                 checked += 1;
@@ -4543,6 +4582,7 @@ mod tests {
         assert!(seen_hints > 100, "only {seen_hints} Esc hints checked");
         assert!(seen_paths > 50, "only {seen_paths} path lines checked");
         TEST_PATH.with(|p| *p.borrow_mut() = None);
+        TEST_NAME.with(|n| *n.borrow_mut() = None);
     }
 
     /// The screens whose lines have a help on the notes panel.
@@ -5091,6 +5131,23 @@ mod tests {
     }
 
     #[test]
+    fn look_values_are_proper_names() {
+        let want = [
+            ("interface own", "Drahtseilakt"),
+            ("interface original", "Ballance"),
+            ("interface remaster", "Remaster"),
+            ("look original", "Ballance"),
+            ("look remastered", "Remaster"),
+        ];
+        for lang in ["en", "ru", "de", "zh", "fr", "es", "it"] {
+            let s = crate::lang::Strings::ours_in(lang);
+            for (key, name) in want {
+                assert_eq!(s.ours(key), name, "{lang} {key}");
+            }
+        }
+    }
+
+    #[test]
     fn every_start_item_says_what_it_is() {
         let m = menu(&[true], false);
         for l in [
@@ -5136,9 +5193,9 @@ mod tests {
         assert!(!m.lines(Screen::Options).contains(&Line::Look));
         m.look_offered = true;
         assert!(m.lines(Screen::Options).contains(&Line::Look));
-        assert_eq!(m.label(Line::Look), "Look: original");
+        assert_eq!(m.label(Line::Look), "Look: Ballance");
         assert_eq!(m.toggle_look(), Action::Look(true));
-        assert_eq!(m.label(Line::Look), "Look: remastered");
+        assert_eq!(m.label(Line::Look), "Look: Remaster");
         assert_eq!(m.toggle_look(), Action::Look(false));
     }
 

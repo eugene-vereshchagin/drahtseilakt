@@ -310,3 +310,5 @@ docs and the folders' READMEs are also in Simplified Chinese, next to English, R
    plays without the copy's level files (open-format.md) (Real-ESRGAN when installed, else Lanczos; phase 7). An original level
    the copy lacks (a copy without level 13) is played in the levels menu from its export in `remastered/`.
 5. Levels that come with the game, as authors offer them.
+
+**Shown titles.** A level's title (and the names of community, open-format, downloaded and challenge levels) is shown in at most 40 characters: a longer one is cut at a word and ends in "…", and the game logs a warning that it shortened it.

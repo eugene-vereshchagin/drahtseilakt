@@ -375,6 +375,15 @@ pub fn printable(s: &str) -> String {
 /// joiners, no line breaks), runs of spaces made one, trimmed, and at most `max` characters, a cut one cut at a
 /// word and ending in "…" (the menu draws it as "...", which the game's font has).
 pub fn clean(s: &str, max: usize) -> String {
+    let (out, cut) = clean_noted(s, max);
+    if cut {
+        eprintln!("text shortened to {max} characters: {out}");
+    }
+    out
+}
+
+/// `clean`, and whether the text had to be cut (the caller says so in the log).
+pub fn clean_noted(s: &str, max: usize) -> (String, bool) {
     let mut out = String::new();
     let mut space = false;
     for c in s.chars() {
@@ -392,9 +401,9 @@ pub fn clean(s: &str, max: usize) -> String {
         out.push(c);
     }
     if out.chars().count() <= max {
-        return out;
+        return (out, false);
     }
-    cut_words(&out, max)
+    (cut_words(&out, max), true)
 }
 
 /// `s` in at most `max` characters: when longer, cut at the last word boundary that leaves it at least half its

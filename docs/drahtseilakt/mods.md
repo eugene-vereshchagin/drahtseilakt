@@ -304,3 +304,5 @@ What each does, whether we have it, and how it maps to our engine:
 
 The original's limits these mods work around (frame rate cap, 4:3, low resolutions, eight sectors, a bitmap font,
 fragile ball-change timing) are not ours to copy.
+
+**Shown names.** A mod's `name.<lang>` is shown in at most 40 characters: a longer one is cut at a word and ends in "…", and the game logs a warning.

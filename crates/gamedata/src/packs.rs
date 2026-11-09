@@ -116,7 +116,7 @@ impl Pack {
         };
         find(lang)
             .or_else(|| find("en"))
-            .unwrap_or_else(|| self.key.clone())
+            .unwrap_or_else(|| crate::package::clean_noted(&self.key, crate::sound_themes::NAME_SHOWN).0)
     }
 
     /// One of the game's own packs (not a folder of the player's).
@@ -420,7 +420,16 @@ mod tests {
         assert_eq!(names, vec![("de".to_owned(), "AB".to_owned())]);
         assert_eq!(fallback, None);
         let long = format!("name.en {}\n", "x".repeat(500));
-        assert_eq!(parse_pack_txt(&long).0[0].1.chars().count(), 64);
+        assert_eq!(parse_pack_txt(&long).0[0].1.chars().count(), 16);
+        // a longer name is cut at a word, ending in the ellipsis; a name of 16 letters stays whole
+        let (names, _) = parse_pack_txt("name.en Wonderful big pack of things\nname.ru Ш\n");
+        assert_eq!(names[0].1, "Wonderful big…");
+        let (names, _) = parse_pack_txt(&format!("name.de {}\n", "W".repeat(16)));
+        assert_eq!(names[0].1, "W".repeat(16));
+        let (cut_text, cut) = crate::package::clean_noted(&"汉".repeat(20), 16);
+        assert!(cut && cut_text.chars().count() <= 16);
+        assert!(!crate::package::clean_noted(&"汉".repeat(16), 16).1);
+        assert!(crate::package::clean_noted(&"x y ".repeat(30), 40).1);
     }
 
     #[test]

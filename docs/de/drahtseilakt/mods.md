@@ -307,3 +307,5 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 
 Die Grenzen des Originals, die diese Mods umgehen (Bildratengrenze, 4:3, niedrige Auflösungen, acht Sektoren, eine
 Bitmap-Schrift, anfälliges Timing des Kugelwechsels), übernehmen wir nicht.
+
+**Angezeigte Namen.** Das `name.<Sprache>` eines Mods wird in höchstens 40 Zeichen angezeigt: Ein längerer wird an einer Wortgrenze gekürzt und endet auf „…“, das Spiel schreibt eine Warnung ins Protokoll.
