@@ -396,12 +396,7 @@ impl Menu {
     fn describe(&self, line: Option<Line>) -> String {
         let s = &self.strings;
         let mine = |s: &Strings| {
-            let dir = crate::levels::dir(Kind::Community).display().to_string();
-            let home = std::env::var("HOME").unwrap_or_default();
-            let dir = match dir.strip_prefix(&home) {
-                Some(rest) if !home.is_empty() => format!("~{rest}"),
-                _ => dir,
-            };
+            let dir = shown_path(&crate::levels::dir(Kind::Community).display().to_string());
             format!("{}\n{dir}", s.ours("note mine"))
         };
         match line {
@@ -2054,10 +2049,9 @@ impl Menu {
                 button(out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
                 label_ball(out, &self.label(lines[i]), BACK_RECT, &FONT_01, BALL_BACK);
                 // Esc leaves a long list from any row
+                // (on a panel of its own under Back, in the dark strip, never over the plain background)
                 if scrolls(sc) {
-                    let mut st = FONT_HINT;
-                    st.align = crate::ui::ALIGN_LEFT;
-                    label(out, &self.strings.ours("esc back"), [0.595, 0.875, 0.698, 0.92], &st);
+                    note(out, &self.strings.ours("esc back"), HINT_TOP, false, 1.0 - HINT_TOP);
                 }
             }
         };
@@ -2653,6 +2647,59 @@ fn text_wide(f: &crate::ui::Face, t: &str, style: &crate::ui::Style) -> f32 {
     quads_wide(&f.layout(t, [0.0, 0.0, 4000.0, 100.0], &scaled_style(style, 1.0)))
 }
 
+/// A folder as the player knows it: the home folder written `~` (Windows: `%USERPROFILE%`, and the roaming data
+/// folder `%APPDATA%`), the rest as it is. A test may put a long path in its place.
+fn shown_path(path: &str) -> String {
+    #[cfg(test)]
+    if let Some(p) = TEST_PATH.with(|p| p.borrow().clone()) {
+        return p;
+    }
+    let env = |k: &str| std::env::var(k).ok().filter(|v| v.len() > 1);
+    let under = |base: Option<String>, name: &str| {
+        let base = base?;
+        let base = base.trim_end_matches(['/', '\\']);
+        let rest = path.strip_prefix(base)?;
+        (rest.is_empty() || rest.starts_with(['/', '\\'])).then(|| format!("{name}{rest}"))
+    };
+    under(env("APPDATA"), "%APPDATA%")
+        .or_else(|| under(env("HOME"), "~"))
+        .or_else(|| under(env("USERPROFILE"), "%USERPROFILE%"))
+        .unwrap_or_else(|| path.to_owned())
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_PATH: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Whether a word is a folder path: it has a separator.
+fn is_path(word: &str) -> bool {
+    !word.contains(' ') && word.contains(['/', '\\'])
+}
+
+/// The path of `text` (a line of it) with its middle shortened by one more segment (".../"), `None` when only its
+/// first and last segments are left.
+fn shorten_path(text: &str) -> Option<String> {
+    let mut lines: Vec<String> = text.split('\n').map(str::to_owned).collect();
+    let line = lines.iter_mut().rev().find(|l| is_path(l))?;
+    let sep = line.chars().find(|c| matches!(c, '/' | '\\'))?;
+    let mark = format!("...{sep}");
+    let mut segs: Vec<String> = line.split_inclusive(sep).map(str::to_owned).collect();
+    let n = segs.len();
+    match segs.iter().position(|s| *s == mark) {
+        None if n > 3 => segs[n / 2] = mark,
+        Some(m) if m + 2 < n => {
+            segs.remove(m + 1);
+        }
+        Some(m) if m >= 2 => {
+            segs.remove(m - 1);
+        }
+        _ => return None,
+    }
+    *line = segs.concat();
+    Some(lines.join("\n"))
+}
+
 /// A line of text: where a long one may be broken (at spaces, between the characters of a script without any).
 fn is_wide_char(c: char) -> bool {
     u32::from(c) >= 0x2E80
@@ -2682,6 +2729,21 @@ fn wrap_lines(f: &crate::ui::Face, text: &str, w: f32, style: &crate::ui::Style)
         if !word.is_empty() {
             pieces.push((word, true));
         }
+        // a folder path breaks only after a separator, never inside a name
+        let pieces: Vec<(String, bool)> = pieces
+            .into_iter()
+            .flat_map(|(p, spaced)| {
+                if spaced && is_path(&p) {
+                    let sep = p.chars().find(|c| matches!(c, '/' | '\\')).unwrap_or('/');
+                    p.split_inclusive(sep)
+                        .enumerate()
+                        .map(|(i, seg)| (seg.to_owned(), i == 0))
+                        .collect()
+                } else {
+                    vec![(p, spaced)]
+                }
+            })
+            .collect();
         let mut cur = String::new();
         for (p, spaced) in pieces {
             let joined = if cur.is_empty() {
@@ -2730,14 +2792,20 @@ fn fit_lines(
 ) -> (Vec<String>, f32) {
     let kmin = floor_k(style);
     let mut k = 1.0f32;
+    let mut text = text.to_owned();
     loop {
         let st = scaled_style(style, k);
-        let mut lines = wrap_lines(f, text, w, &st);
+        let mut lines = wrap_lines(f, &text, w, &st);
         let room = (h / row_pitch(&st)).floor().max(1.0) as usize;
         if lines.len() <= room {
             return (lines, k);
         }
         if k <= kmin + 1e-4 {
+            // at the least size a long folder path loses its middle, at a separator
+            if let Some(shorter) = shorten_path(&text) {
+                text = shorter;
+                continue;
+            }
             lines.truncate(room);
             if let Some(last) = lines.last_mut() {
                 let mut t = last.trim_end().to_owned();
@@ -2954,6 +3022,8 @@ const HINT_H: f32 = 0.032;
 /// The notes' panels: at most this wide (inside the dark centre strip), their bottom above Back.
 const NOTE_X: [f32; 2] = [0.31, 0.69];
 const NOTE_BOTTOM: f32 = 0.838;
+/// The Esc hint's panel: its top, under Back.
+const HINT_TOP: f32 = 0.9447;
 /// The credits' text: its left and right edges (the bar right of them), its top and bottom.
 const CREDITS_X: [f32; 2] = [0.318, 0.672];
 const CREDITS_TOP: f32 = 0.10;
@@ -3692,6 +3762,13 @@ mod tests {
         ];
         let mut checked = 0;
         let mut seen_notes = 0;
+        let (mut seen_hints, mut seen_paths) = (0, 0);
+        // the folder note's path: long, so that it must wrap (at its separators only)
+        TEST_PATH.with(|p| {
+            *p.borrow_mut() = Some(
+                "~/.local/share/drahtseilakt-with-a-long-profile/community-maps/levels/community".to_owned(),
+            );
+        });
         // mod texts shortened in their middle (the mod page's labels and values, the mods' names)
         let mut cut = std::collections::BTreeSet::new();
         for &(lang, _) in &LANGUAGES {
@@ -3812,9 +3889,36 @@ mod tests {
                                 .iter()
                                 .filter_map(|p| p.art_right.map(|a| (p.frame, a)))
                                 .collect();
+                            // a folder path inside a note: every line of it but the last ends at a separator
+                            let mut path_end: Option<bool> = None;
+                            let esc = Strings::ours_in(lang).ours("esc back");
                             for p in probes {
                                 if p.quads.is_empty() {
                                     continue;
+                                }
+                                if p.panel.is_some() {
+                                    let t = p.text.as_str();
+                                    let like = !t.contains(' ')
+                                        && (t.starts_with(['~', '/', '%']) || t.contains(['/', '\\']));
+                                    if !t.contains(' ') && (like || path_end.is_some()) {
+                                        if let Some(ends) = path_end {
+                                            assert!(
+                                                ends,
+                                                "a path breaks inside a name: {id} {t:?} follows a line not ending at a separator"
+                                            );
+                                        }
+                                        seen_paths += 1;
+                                        path_end = Some(t.ends_with(['/', '\\']));
+                                    } else {
+                                        path_end = None;
+                                    }
+                                } else {
+                                    path_end = None;
+                                }
+                                // a hint is on a note panel, not over the plain background
+                                if p.text == esc {
+                                    assert!(p.panel.is_some(), "the Esc hint is not on a panel: {id} {:?}", p.text);
+                                    seen_hints += 1;
                                 }
                                 let b = p.quads.iter().fold(
                                     [f32::MAX, f32::MAX, f32::MIN, f32::MIN],
@@ -3913,6 +4017,9 @@ mod tests {
         eprintln!("{checked} texts checked, {seen_notes} of them on notes");
         assert!(checked > 50_000, "only {checked} texts checked");
         assert!(seen_notes > 500, "only {seen_notes} note lines checked");
+        assert!(seen_hints > 100, "only {seen_hints} Esc hints checked");
+        assert!(seen_paths > 50, "only {seen_paths} path lines checked");
+        TEST_PATH.with(|p| *p.borrow_mut() = None);
     }
 
     #[test]
