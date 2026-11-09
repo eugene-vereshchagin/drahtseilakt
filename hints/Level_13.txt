@@ -188,3 +188,22 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # current s4 hint the ball rides raft 2 to x 54 (y -335.5, speed 3.9, slope -0.4/3.9) and falls at x 62 (y -337 -> -342, dies at
 # 1:59) although it keeps z -1133.9: it sinks below the ramp's surface line - next: read A04_Floor_03's surface at x 55..75 (is it a
 # trough, where is the top at z -1133.9?) and step off the raft sideways (video: rolls into the transformer cage at ~408 s).
+# 2026-11-09 (sixth session, raft 1's jam traced; NOT fixed). What stops raft 1 is the rotating arm P_Modul_17
+# (Modul17_Dreharme, a bar along z through a vertical hinge, paddles at both ends; module group Floor), not the rail.
+# Arm _01 (hub -325.9 -297.8 -1115.5, beam z -1123.3..-1107.8, paddle z -1127.1..-1124.1 over raft 1's column
+# z -1125.38): Wood_05 pushes it, it turns 6 deg about y and stops dead (spin 0), the column jams at x -326.6. The arm's
+# beam hits Floor_Stopper (group Phys_FloorStopper = Ball, so it collides with the Floor arm): that object has a copy of
+# A04_RailBumber here = two thin upright horseshoe hoops (x -327.5..-326.8 and -302.9..-302.3, z -1117.1..-1109.3,
+# y -301..-296.8), 0.3 beside the beam at rest, below the beam's height. The Floor A04_RailBumber itself does not
+# collide with the arm. Without the stopper (debug run only) arm _01 swings ~47 deg and raft 1's column 1 passes, but
+# arm _02 (hub -301.0 -299.1 -1120.5, paddle z -1132.1..-1129.1 y -300.5..-297.7) turns 45 deg and wedges on Wood_06's
+# top (paddle bottom 0.6 into the ball; contact normal through the axis): column 2 jams at x -298.3 instead.
+# Video (sheet05, 3732..3721): both arms spin through wide angles (near 90 deg, parallel to the rails) as the 2-row x
+# 4-column block passes; the ball crosses the bar platform itself and gets onto the block after it. So in the original
+# the arms do not catch on the hoops (open question why: the arm's real group in P_Modul_17.nmo's Physicalize, which
+# docs/physics.md gives as Floor, was not re-read - the file is compressed; or the C build, which runs the scripts, could
+# show it) and the block pushes them aside together. Raft speeds: ours go as the slope (raft 1 230 u over 12.0 drop
+# = 5.2 %, 3.9 u/s; raft 2's ledge 1.6 %, 1.2 u/s; ratio 0.31 both), as damping-limited rolling (stone lin damp 0.2,
+# wood 0.6, gravity 20, time factor 2) predicts; not measured against the video yet. Riding raft 2's top past the
+# boards does not work (knocked off at B2 x -365 onto the rails, then wedged behind raft 1's jam at x -303.7): an
+# on-top ride to the cage needs raft 1 past the arms (boards alternate lanes; B4 at -188.8 covers all of raft 2).

@@ -1260,7 +1260,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
                         let Some(st) = game.sim.world().state(m.body) else { continue };
                         if st.pos.distance(b.position) < trace_r {
                             let (o, p) = (&m.object, st.pos);
-                            println!("    {o} #{} ({:8.2} {:8.2} {:8.2})", m.body, p.x, p.y, p.z);
+                            let (r, w) = (st.rot, st.spin);
+                            println!(
+                                "    {o} #{} ({:8.2} {:8.2} {:8.2}) rot ({:.3} {:.3} {:.3} {:.3}) spin ({:.2} {:.2} {:.2})",
+                                m.body, p.x, p.y, p.z, r.x, r.y, r.z, r.w, w.x, w.y, w.z
+                            );
                         }
                     }
                 }
