@@ -256,6 +256,8 @@ fn valued(line: Line) -> bool {
 }
 
 pub struct Menu {
+    /// The rows the open list with a note under it shows: as many as leave the note whole (set by `draw`).
+    note_rows: std::cell::Cell<usize>,
     /// The screens open, the first the menu's base, each with its chosen line.
     stack: Vec<(Screen, usize)>,
     pub entries: Vec<Entry>,
@@ -329,6 +331,7 @@ impl Menu {
             })
             .collect();
         let mut m = Menu {
+            note_rows: std::cell::Cell::new(COMMUNITY_LINES),
             stack: Vec::new(),
             entries,
             maps: Vec::new(),
@@ -377,7 +380,7 @@ impl Menu {
     /// The rows a list shows at once: the community maps leave room under them for the author and the notice.
     fn page_len(&self) -> usize {
         match self.screen() {
-            Screen::Custom if self.note_below() => COMMUNITY_LINES,
+            Screen::Custom if self.note_below() => self.note_rows.get().clamp(1, COMMUNITY_LINES),
             sc => page(sc),
         }
     }
@@ -390,6 +393,50 @@ impl Menu {
                 .folder
                 .as_ref()
                 .is_some_and(|f| *f == crate::levels::dir(Kind::Community))
+    }
+
+    /// The note under an open list with one: the picks' (what they are, the chosen map's author, the authors' notice)
+    /// or the player's folder's.
+    fn list_note(&self, chosen: Option<Line>) -> String {
+        if self.community {
+            let by = match chosen {
+                Some(Line::Map(m)) => self.credit(m),
+                _ => String::new(),
+            };
+            let notice = self.strings.ours("community notice");
+            let about = self.strings.ours("note picks");
+            if by.is_empty() {
+                format!("{about}\n{notice}")
+            } else {
+                format!("{about}\n{by}\n{notice}")
+            }
+        } else {
+            self.describe(Some(Line::Kind(
+                LEVEL_KINDS.iter().position(|&k| k == Kind::Community).unwrap_or(0),
+            )))
+        }
+    }
+
+    /// How many rows the list can show so that its note stays whole for every chosen map (the text shrinks to
+    /// MIN_TEXT first; rows are given up only after that), so that the rows do not change as the choice moves.
+    fn fit_rows(&self, f: &crate::ui::Face) -> usize {
+        let texts: Vec<String> = if self.community {
+            (0..self.maps.len())
+                .map(|m| self.list_note(Some(Line::Map(m))))
+                .chain([self.list_note(None)])
+                .collect()
+        } else {
+            vec![self.list_note(None)]
+        };
+        let max_w = (NOTE_X[1] - NOTE_X[0]) * crate::ui::CONTEXT_W - 2.0 * NOTE_PAD[0];
+        for rows in (1..=COMMUNITY_LINES).rev() {
+            let top = LIST_TOP + rows as f32 * ROW_STEP + HINT_H + 0.008;
+            let h = (NOTE_BOTTOM - top) * crate::ui::CONTEXT_H - 2.0 * NOTE_PAD[1];
+            if texts.iter().all(|t| fit_whole(f, t, max_w, h, &FONT_HELP).2) {
+                return rows;
+            }
+        }
+        1
     }
 
     /// What a list or kind line is, in a sentence (the player's folder with its place), empty for the others.
@@ -1791,6 +1838,7 @@ impl Menu {
                         panel: None,
                         cut: LAST_CUT.with(|c| c.get()),
                         art_right: None,
+                        fill: None,
                     });
                 }
                 out.extend(placed);
@@ -1826,6 +1874,7 @@ impl Menu {
                         panel: None,
                         cut: false,
                         art_right: Some(px[0] + (px[2] - px[0]) * text_right(uv)),
+                        fill: None,
                     });
                 }
                 out.push(quad(r, uv, tex));
@@ -1859,6 +1908,7 @@ impl Menu {
                     panel: None,
                     cut: false,
                     art_right: Some(px[0] + (px[2] - px[0]) * text_right(KEY_UV)),
+                    fill: None,
                 });
             }
             let mid = (r[0] + r[2]) / 2.0;
@@ -1922,10 +1972,11 @@ impl Menu {
             if text.trim().is_empty() {
                 return;
             }
-            let (pad_x, pad_y, corner) = (8.0f32, 7.0f32, 7.0f32);
+            let (pad_x, pad_y, corner) = (NOTE_PAD[0], NOTE_PAD[1], 7.0f32);
             let st = FONT_HELP;
             let max_w = (NOTE_X[1] - NOTE_X[0]) * crate::ui::CONTEXT_W - 2.0 * pad_x;
-            let (lines, k) = fit_lines(f, text, max_w, max_h * crate::ui::CONTEXT_H - 2.0 * pad_y, &st);
+            // a note is never cut: smaller down to MIN_TEXT, then taller than `max_h` (the layouts leave room)
+            let (lines, k, _) = fit_whole(f, text, max_w, max_h * crate::ui::CONTEXT_H - 2.0 * pad_y, &st);
             let st = scaled_style(&st, k);
             let pitch = row_pitch(&st);
             let wide = lines
@@ -1949,11 +2000,30 @@ impl Menu {
                     d / crate::ui::CONTEXT_H,
                 ]
             };
-            out.push(Quad {
-                top: [0.0, 0.0, 0.0, 0.78],
-                bottom: [0.0, 0.0, 0.0, 0.78],
-                ..quad(fr(x0 + 3.0, y0 + 3.0, x1 - 3.0, y1 - 3.0), [0.0, 0.0, 1.0, 1.0], PLAIN)
-            });
+            // the dark fill: exactly the rim's inner opening (the nine's middle), its corners rounded in steps so it
+            // meets the rim and never pokes out of it; pieces that do not overlap (the fill is translucent)
+            let (fx0, fy0, fx1, fy1) = (x0 + corner, y0 + corner, x1 - corner, y1 - corner);
+            let r = 3.0f32.min((fx1 - fx0) / 2.0).min((fy1 - fy0) / 2.0);
+            let dark = |out: &mut Vec<Quad>, a: f32, b: f32, c: f32, d: f32| {
+                if c > a && d > b {
+                    out.push(Quad {
+                        top: [0.0, 0.0, 0.0, 0.78],
+                        bottom: [0.0, 0.0, 0.0, 0.78],
+                        ..quad(fr(a, b, c, d), [0.0, 0.0, 1.0, 1.0], PLAIN)
+                    });
+                }
+            };
+            dark(out, fx0, fy0 + r, fx1, fy1 - r);
+            dark(out, fx0 + r * 0.5, fy0 + r * 0.25, fx1 - r * 0.5, fy0 + r);
+            dark(out, fx0 + r * 0.5, fy1 - r, fx1 - r * 0.5, fy1 - r * 0.25);
+            dark(out, fx0 + r, fy0, fx1 - r, fy0 + r * 0.25);
+            dark(out, fx0 + r, fy1 - r * 0.25, fx1 - r, fy1);
+            let fill_box = [
+                screen.x(fx0, Anchor::Center),
+                screen.y(fy0),
+                screen.x(fx1, Anchor::Center),
+                screen.y(fy1),
+            ];
             // the rim: the Yes/No button's rounded box (metal, no ball) cut in nine, its corners kept
             let [u0, v0, u1, v1] = YES_NO_UV;
             let d = 9.0 / 256.0;
@@ -1998,6 +2068,7 @@ impl Menu {
                         panel: Some(panel),
                         cut: false,
                         art_right: None,
+                        fill: Some(fill_box),
                     });
                 }
                 out.extend(q);
@@ -2157,6 +2228,9 @@ impl Menu {
             Screen::Custom => {
                 title(&mut out);
                 // each level: its difficulty (a star and 1 to 10, "?" unknown), its title in the menus' language
+                if let (true, Some(f)) = (self.note_below(), font) {
+                    self.note_rows.set(self.fit_rows(f));
+                }
                 let n = self.list_len(sc);
                 let shown = self.shown(n);
                 for (k, i) in shown.clone().enumerate() {
@@ -2195,24 +2269,8 @@ impl Menu {
                 if self.note_below() {
                     // what the list is; the chosen map's author and the authors' notice (the shipped picks), or where
                     // the player's folder is, on one panel under the list
-                    let text = if self.community {
-                        let by = match lines.get(self.chosen()).copied() {
-                            Some(Line::Map(m)) => self.credit(m),
-                            _ => String::new(),
-                        };
-                        let notice = self.strings.ours("community notice");
-                        let about = self.strings.ours("note picks");
-                        if by.is_empty() {
-                            format!("{about}\n{notice}")
-                        } else {
-                            format!("{about}\n{by}\n{notice}")
-                        }
-                    } else {
-                        self.describe(Some(Line::Kind(
-                            LEVEL_KINDS.iter().position(|&k| k == Kind::Community).unwrap_or(0),
-                        )))
-                    };
-                    let top = LIST_TOP + COMMUNITY_LINES as f32 * ROW_STEP + HINT_H + 0.008;
+                    let text = self.list_note(lines.get(self.chosen()).copied());
+                    let top = LIST_TOP + self.page_len() as f32 * ROW_STEP + HINT_H + 0.008;
                     note(&mut out, &text, NOTE_BOTTOM, true, NOTE_BOTTOM - top);
                 }
                 back_only(&mut out);
@@ -2595,6 +2653,8 @@ pub struct Probe {
     pub art_right: Option<f32>,
     /// The text lost its middle to fit (".."): the layout test refuses that for the game's own texts.
     pub cut: bool,
+    /// On a note: the bounding box of its dark fill (window pixels), which must lie inside the panel's rim.
+    pub fill: Option<[f32; 4]>,
 }
 
 thread_local! {
@@ -2820,6 +2880,31 @@ fn fit_lines(
     }
 }
 
+/// `text` as lines at most `w` wide, whole: at the style's size, else smaller down to its floor. Returns the lines,
+/// the size drawn at and whether they stay within `h`; when they do not, all of them still come back (never cut).
+fn fit_whole(
+    f: &crate::ui::Face,
+    text: &str,
+    w: f32,
+    h: f32,
+    style: &crate::ui::Style,
+) -> (Vec<String>, f32, bool) {
+    let kmin = floor_k(style);
+    let mut k = 1.0f32;
+    loop {
+        let st = scaled_style(style, k);
+        let lines = wrap_lines(f, text, w, &st);
+        let room = (h / row_pitch(&st)).floor().max(1.0) as usize;
+        if lines.len() <= room {
+            return (lines, k, true);
+        }
+        if k <= kmin + 1e-4 {
+            return (lines, k, false);
+        }
+        k = (k * 0.96).max(kmin);
+    }
+}
+
 /// A word-wrapped paragraph in `frame` (context pixels, the style's margins kept): the lines centred, as a block, in
 /// the frame; smaller down to the style's floor, then cut. Returns the glyphs and the size drawn at.
 fn paragraph(
@@ -3022,6 +3107,8 @@ const HINT_H: f32 = 0.032;
 /// The notes' panels: at most this wide (inside the dark centre strip), their bottom above Back.
 const NOTE_X: [f32; 2] = [0.31, 0.69];
 const NOTE_BOTTOM: f32 = 0.838;
+/// A note panel's padding (context pixels): sideways, up and down.
+const NOTE_PAD: [f32; 2] = [12.0, 7.0];
 /// The Esc hint's panel: its top, under Back.
 const HINT_TOP: f32 = 0.9447;
 /// The credits' text: its left and right edges (the bar right of them), its top and bottom.
@@ -3293,6 +3380,7 @@ mod tests {
 
     fn menu(open: &[bool], extended: bool) -> Menu {
         let mut m = Menu {
+            note_rows: std::cell::Cell::new(COMMUNITY_LINES),
             stack: Vec::new(),
             entries: open
                 .iter()
@@ -3959,6 +4047,18 @@ mod tests {
                                             "a panel over a button {r:?} (Back too): {at} {panel:?}"
                                         );
                                     }
+                                    // the fill lies inside the rim: within the panel, clear of its edges by the rim
+                                    let fill = p.fill.expect("a note has its fill");
+                                    assert!(inside(fill, panel), "a note's fill out of its rim: {at} {fill:?} {panel:?}");
+                                    assert!(
+                                        fill[0] > panel[0] && fill[1] > panel[1] && fill[2] < panel[2] && fill[3] < panel[3],
+                                        "a note's fill touches the rim's outer edge: {at} {fill:?} {panel:?}"
+                                    );
+                                    // a note is never cut or ellipsized
+                                    assert!(
+                                        !p.cut && !p.text.trim_end().ends_with(".."),
+                                        "a note cut: {at}"
+                                    );
                                     seen_notes += 1;
                                 }
                                 let centre = [
