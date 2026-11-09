@@ -220,10 +220,15 @@ impl World {
                 group: group(mesh.group),
                 ..BodyDesc::default()
             };
-            let id = world
-                .physics
-                .add_body(desc, Shape::Surface(surface), vec3_f64(mesh.pos), mesh.rot.ivp());
-            world.statics.push((id, mesh.group != GROUP_BALL, mesh.sound));
+            let id = world.physics.add_body(
+                desc,
+                Shape::Surface(surface),
+                vec3_f64(mesh.pos),
+                mesh.rot.ivp(),
+            );
+            world
+                .statics
+                .push((id, mesh.group != GROUP_BALL, mesh.sound));
         }
         world
     }
@@ -268,7 +273,9 @@ impl World {
             rot_damp: s.m.rot_damp,
             ..BodyDesc::default()
         };
-        let id = self.physics.add_body(desc, s.shape, vec3_f64(s.pos), s.rot.ivp());
+        let id = self
+            .physics
+            .add_body(desc, s.shape, vec3_f64(s.pos), s.rot.ivp());
         self.handles[i] = Some(id);
         self.bodies[i] = Body {
             pos: s.pos,
@@ -317,7 +324,14 @@ impl World {
     /// Puts a new ball in place of body `i`, at rest, as the original physicalizes a new ball after a death or in a
     /// transformer: the old body is destroyed and a new one made with the new material. The game index and the entity
     /// number stay the same.
-    pub fn replace_ball(&mut self, i: usize, radius: f32, m: Material, pos: Vec3, rot: impl Into<Rot>) {
+    pub fn replace_ball(
+        &mut self,
+        i: usize,
+        radius: f32,
+        m: Material,
+        pos: Vec3,
+        rot: impl Into<Rot>,
+    ) {
         if i >= self.handles.len() {
             return;
         }
@@ -333,9 +347,14 @@ impl World {
             rot_damp: m.rot_damp,
             ..BodyDesc::default()
         };
-        let id = self.physics.add_body(desc, Shape::Sphere(radius), vec3_f64(pos), rot.ivp());
+        let id = self
+            .physics
+            .add_body(desc, Shape::Sphere(radius), vec3_f64(pos), rot.ivp());
         self.handles[i] = Some(id);
-        self.bodies[i] = Body { pos, rot: rot.quat() };
+        self.bodies[i] = Body {
+            pos,
+            rot: rot.quat(),
+        };
     }
 
     /// The player's push on a body, as the original steers its ball: a force that the physics applies at every PSI
@@ -387,11 +406,19 @@ impl World {
                 }
             }
         }
-        self.add_convex(&corners, m, pos, rot, false, true).expect("a box has a hull")
+        self.add_convex(&corners, m, pos, rot, false, true)
+            .expect("a box has a hull")
     }
 
     /// A loose sphere, its mass centre its centre; made in the physics now when `active`.
-    pub fn add_sphere(&mut self, radius: f32, m: Material, pos: Vec3, rot: impl Into<Rot>, active: bool) -> usize {
+    pub fn add_sphere(
+        &mut self,
+        radius: f32,
+        m: Material,
+        pos: Vec3,
+        rot: impl Into<Rot>,
+        active: bool,
+    ) -> usize {
         let spawn = Spawn {
             shape: Shape::Sphere(radius),
             m,
@@ -482,22 +509,32 @@ impl World {
 
     /// A slider of body `a` to body `b` along the world axis from `p0` to `p1`, limited to lo..hi along it when
     /// asked (Set Physics Slider). None when either body is not in the physics.
-    pub fn add_slider(&mut self, a: usize, b: usize, p0: Vec3, p1: Vec3, limits: Option<(f32, f32)>) -> Option<usize> {
+    pub fn add_slider(
+        &mut self,
+        a: usize,
+        b: usize,
+        p0: Vec3,
+        p1: Vec3,
+        limits: Option<(f32, f32)>,
+    ) -> Option<usize> {
         let (ia, ib) = self.pair(a, b)?;
         let (lim, lo, hi) = limits.map_or((false, -1.0, 1.0), |(lo, hi)| (true, lo, hi));
-        self.physics.slider_create(Some(ia), Some(ib), p3(p0), p3(p1), lim, lo, hi)
+        self.physics
+            .slider_create(Some(ia), Some(ib), p3(p0), p3(p1), lim, lo, hi)
     }
 
     /// A hinge of body `a` to body `b` at a world anchor about a world axis (Set Physics Hinge).
     pub fn add_hinge(&mut self, a: usize, b: usize, anchor: Vec3, axis: Vec3) -> Option<usize> {
         let (ia, ib) = self.pair(a, b)?;
-        self.physics.hinge_create(Some(ia), Some(ib), p3(anchor), p3(axis))
+        self.physics
+            .hinge_create(Some(ia), Some(ib), p3(anchor), p3(axis))
     }
 
     /// A ball joint of body `a` to body `b` at a world anchor (Set Physics Ball Joint).
     pub fn add_ball_joint(&mut self, a: usize, b: usize, anchor: Vec3) -> Option<usize> {
         let (ia, ib) = self.pair(a, b)?;
-        self.physics.balljoint_create(Some(ia), Some(ib), p3(anchor))
+        self.physics
+            .balljoint_create(Some(ia), Some(ib), p3(anchor))
     }
 
     /// A spring between world anchors on bodies `a` and `b` (Set Physics Spring): rest length, constant, and the
@@ -515,7 +552,16 @@ impl World {
         glob_damp: f32,
     ) -> Option<usize> {
         let (ia, ib) = self.pair(a, b)?;
-        Some(self.physics.spring_create(Some(ia), p3(pa), Some(ib), p3(pb), length, constant, lin_damp, glob_damp))
+        Some(self.physics.spring_create(
+            Some(ia),
+            p3(pa),
+            Some(ib),
+            p3(pb),
+            length,
+            constant,
+            lin_damp,
+            glob_damp,
+        ))
     }
 
     /// A constant force on body `i` at a world point (SetPhysicsForce): `force` is a world vector, given to the body
@@ -524,7 +570,10 @@ impl World {
         let Some(&Some(id)) = self.handles.get(i) else {
             return None;
         };
-        Some(self.physics.force_create(id, p3(force), vec3_f64(point), false))
+        Some(
+            self.physics
+                .force_create(id, p3(force), vec3_f64(point), false),
+        )
     }
 
     /// Removes a force made by `add_force` (SetPhysicsForce's Destroy).
@@ -545,7 +594,9 @@ impl World {
             return s.2;
         }
         let i = self.handles.iter().position(|h| *h == Some(id));
-        i.and_then(|i| self.sounds.get(i)).copied().unwrap_or_default()
+        i.and_then(|i| self.sounds.get(i))
+            .copied()
+            .unwrap_or_default()
     }
 
     /// The ball's impacts and contacts of the step just taken (every impact is taken, so the list does not grow).
@@ -565,7 +616,12 @@ impl World {
             let speed = (rel[0] * rel[0] + rel[1] * rel[1] + rel[2] * rel[2]).sqrt();
             s.impacts.push((self.sound_of(other).hit, speed));
         }
-        s.rolls = self.physics.friction_partners(ball).into_iter().map(|o| self.sound_of(o).roll).collect();
+        s.rolls = self
+            .physics
+            .friction_partners(ball)
+            .into_iter()
+            .map(|o| self.sound_of(o).roll)
+            .collect();
         self.ball_sounds = s;
     }
 
@@ -587,7 +643,10 @@ impl World {
             let (pos, rot) = self.physics.body_pose(id);
             let (pos, rot) = (vec3(pos), quat(rot));
             let local = rot.inverse() * (p - pos);
-            for t in self.physics.surface_triangles_near(id, vec3_f64(local), f64::from(r)) {
+            for t in self
+                .physics
+                .surface_triangles_near(id, vec3_f64(local), f64::from(r))
+            {
                 out.push(t.map(|v| pos + rot * vec3(v)));
             }
         }
@@ -597,7 +656,10 @@ impl World {
     /// The movement state of a body's core (the upstream's 0 moving .. 8 not simulated), for the session log.
     pub fn movement_state(&self, i: usize) -> Option<i32> {
         let id = (*self.handles.get(i)?)?;
-        self.physics.cores.get(id).map(|c| i32::from(c.movement_state))
+        self.physics
+            .cores
+            .get(id)
+            .map(|c| i32::from(c.movement_state))
     }
 
     /// A mod's gravity and time factor (modrt.rs SimOut): set only when they change.
@@ -631,7 +693,8 @@ impl World {
     /// An impulse on body `i` at a world point (Physics Impulse), applied at the next PSI; the body is woken.
     pub fn impulse_at(&mut self, i: usize, point: Vec3, impulse: Vec3) {
         if let Some(&Some(id)) = self.handles.get(i) {
-            self.physics.body_impulse(id, vec3_f64(point), [impulse.x, impulse.y, impulse.z]);
+            self.physics
+                .body_impulse(id, vec3_f64(point), [impulse.x, impulse.y, impulse.z]);
         }
     }
 
@@ -656,7 +719,12 @@ impl World {
                 rot: quat(rot),
             };
         }
-        self.grounded = self.handles.first().copied().flatten().is_some_and(|id| self.physics.body_touching(id));
+        self.grounded = self
+            .handles
+            .first()
+            .copied()
+            .flatten()
+            .is_some_and(|id| self.physics.body_touching(id));
     }
 }
 
@@ -734,7 +802,10 @@ mod tests {
         let s = w.state(ball).unwrap();
         assert!((s.pos.y - 12.0).abs() < 0.05, "the ball is at {:?}", s.pos);
         let near = w.floor_near(Vec3::new(0.0, 10.0, 0.0), 200.0);
-        assert!(near.iter().flatten().all(|v| (v.y - 10.0).abs() < 1e-4), "the triangles in the world: {near:?}");
+        assert!(
+            near.iter().flatten().all(|v| (v.y - 10.0).abs() < 1e-4),
+            "the triangles in the world: {near:?}"
+        );
     }
 
     #[test]
@@ -744,8 +815,16 @@ mod tests {
         let w = |y: f32, z: f32| Vec3::new(10.0, y, z);
         statics.push(StaticMesh {
             triangles: vec![
-                Triangle { a: w(0.0, -50.0), b: w(4.0, 50.0), c: w(4.0, -50.0) },
-                Triangle { a: w(0.0, -50.0), b: w(0.0, 50.0), c: w(4.0, 50.0) },
+                Triangle {
+                    a: w(0.0, -50.0),
+                    b: w(4.0, 50.0),
+                    c: w(4.0, -50.0),
+                },
+                Triangle {
+                    a: w(0.0, -50.0),
+                    b: w(0.0, 50.0),
+                    c: w(4.0, 50.0),
+                },
             ],
             pos: Vec3::ZERO,
             rot: Quat::IDENTITY.into(),
@@ -754,7 +833,12 @@ mod tests {
         });
         let mut world = World::new(&statics);
         let ball = world.add_ball(2.0, wood(), Vec3::new(0.0, 2.0, 8.0), Quat::IDENTITY);
-        let bx = world.add_box(Vec3::splat(1.0), crate_material(), Vec3::new(0.0, 1.0, -8.0), Quat::IDENTITY);
+        let bx = world.add_box(
+            Vec3::splat(1.0),
+            crate_material(),
+            Vec3::new(0.0, 1.0, -8.0),
+            Quat::IDENTITY,
+        );
         for _ in 0..240 {
             world.set_push(ball, Vec3::X * 0.43);
             world.set_push(bx, Vec3::X * 0.3);
@@ -763,7 +847,13 @@ mod tests {
         let (b, x) = (world.state(ball).unwrap().pos, world.state(bx).unwrap().pos);
         assert!(b.x > 14.0, "the ball did not pass the stopper: {b:?}");
         assert!(x.x < 10.0, "the box went through the stopper: {x:?}");
-        assert!(world.floor_near(Vec3::new(10.0, 2.0, 0.0), 60.0).iter().all(|t| t.iter().all(|v| v.y == 0.0)), "the stopper is not the ball's floor");
+        assert!(
+            world
+                .floor_near(Vec3::new(10.0, 2.0, 0.0), 60.0)
+                .iter()
+                .all(|t| t.iter().all(|v| v.y == 0.0)),
+            "the stopper is not the ball's floor"
+        );
     }
 
     #[test]
@@ -773,8 +863,19 @@ mod tests {
         let turn = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
         let q = Rot::Basis(glam::Mat3::from_quat(turn)).ivp();
         let h = std::f64::consts::FRAC_1_SQRT_2;
-        assert!((q.x).abs() < 1e-6 && (q.y - h).abs() < 1e-6 && (q.z).abs() < 1e-6 && (q.w - h).abs() < 1e-6, "{q:?}");
-        assert!(Rot::Basis(glam::Mat3::from_quat(turn)).quat().angle_between(turn) < 1e-5);
+        assert!(
+            (q.x).abs() < 1e-6
+                && (q.y - h).abs() < 1e-6
+                && (q.z).abs() < 1e-6
+                && (q.w - h).abs() < 1e-6,
+            "{q:?}"
+        );
+        assert!(
+            Rot::Basis(glam::Mat3::from_quat(turn))
+                .quat()
+                .angle_between(turn)
+                < 1e-5
+        );
     }
 
     #[test]
@@ -819,20 +920,33 @@ mod tests {
         // floated at a constant speed. The ball, falling far away, must keep falling as gravity says.
         let mut w = World::new(&floor());
         for x in [0.0, 4.0] {
-            w.add_box(Vec3::splat(2.5), crate_material(), Vec3::new(x, 2.7, 0.0), Quat::IDENTITY);
+            w.add_box(
+                Vec3::splat(2.5),
+                crate_material(),
+                Vec3::new(x, 2.7, 0.0),
+                Quat::IDENTITY,
+            );
         }
         let ball = w.add_ball(2.0, wood(), Vec3::new(60.0, 150.0, 0.0), Quat::IDENTITY);
         let mut ys = Vec::new();
         for _ in 0..120 {
             w.step(None);
             let s = w.state(ball).unwrap();
-            assert!(s.pos.is_finite() && s.vel.is_finite(), "the ball is at {:?}, speed {:?}", s.pos, s.vel);
+            assert!(
+                s.pos.is_finite() && s.vel.is_finite(),
+                "the ball is at {:?}, speed {:?}",
+                s.pos,
+                s.vel
+            );
             ys.push(s.pos.y);
         }
         // the fall speeds up every tick (the drag of a wooden ball is far from cancelling gravity at these speeds)
         for k in 2..ys.len() {
             let (d0, d1) = (ys[k - 1] - ys[k - 2], ys[k] - ys[k - 1]);
-            assert!(d1 < d0 - 1e-4, "tick {k}: the ball moves {d0} then {d1}: it floats at a constant speed");
+            assert!(
+                d1 < d0 - 1e-4,
+                "tick {k}: the ball moves {d0} then {d1}: it floats at a constant speed"
+            );
         }
         for (i, b) in w.bodies.iter().enumerate() {
             assert!(b.pos.is_finite(), "body {i} is at {:?}", b.pos);
@@ -904,7 +1018,10 @@ mod tests {
         // The impact restitutes at sqrt(e) (docs/ivp_contact.md 6): the pair's elasticity is 0.2 × 0.3 = 0.06, and
         // sqrt(0.06) = 0.245 of the impact speed comes back.
         let ratio = after / before;
-        assert!((ratio - 0.06f32.sqrt()).abs() < 0.02, "rebound {after} from impact {before}, ratio {ratio}");
+        assert!(
+            (ratio - 0.06f32.sqrt()).abs() < 0.02,
+            "rebound {after} from impact {before}, ratio {ratio}"
+        );
     }
 
     #[test]
@@ -966,6 +1083,9 @@ mod tests {
         let contacts = w.ball_contacts();
         assert!(!contacts.is_empty(), "the ball on the floor has contacts");
         assert!(contacts.iter().all(|c| c.entities.contains(&1)));
-        assert!(contacts.iter().any(|c| c.entities.contains(&0)), "the floor is entity 0: {contacts:?}");
+        assert!(
+            contacts.iter().any(|c| c.entities.contains(&0)),
+            "the floor is entity 0: {contacts:?}"
+        );
     }
 }

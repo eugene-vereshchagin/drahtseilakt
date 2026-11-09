@@ -32,7 +32,16 @@ impl Rng {
     }
 }
 
-const EDGES: [u32; 8] = [0, 1, 0xffff_ffff, 0x7fff_ffff, 0x8000_0000, 0xffff, 0x1_0000, 0x40];
+const EDGES: [u32; 8] = [
+    0,
+    1,
+    0xffff_ffff,
+    0x7fff_ffff,
+    0x8000_0000,
+    0xffff,
+    0x1_0000,
+    0x40,
+];
 
 /// Damages `part` a few times: a flipped byte, or an aligned word set to an edge value.
 fn damage(part: &mut [u8], rng: &mut Rng) {
@@ -93,8 +102,13 @@ fn damaged_game_files_never_panic() {
         eprintln!("OPENBALLANCE_DATA not set; skipped");
         return;
     };
-    let iters: u64 = std::env::var("MUTATION_ITERS").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
-    let only: Option<u64> = std::env::var("MUTATION_SEED").ok().and_then(|v| v.parse().ok());
+    let iters: u64 = std::env::var("MUTATION_ITERS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(300);
+    let only: Option<u64> = std::env::var("MUTATION_SEED")
+        .ok()
+        .and_then(|v| v.parse().ok());
     let filter = std::env::var("MUTATION_FILE").unwrap_or_default();
     let trace = std::env::var_os("MUTATION_TRACE").is_some();
     let files = [
@@ -118,7 +132,9 @@ fn damaged_game_files_never_panic() {
         let file = nmo::read(&bytes).unwrap_or_else(|e| panic!("{path}: {e}"));
         let seeds: Vec<u64> = match only {
             Some(s) => vec![s],
-            None => (0..iters).map(|i| ((k as u64) << 32) ^ (i * 0x9e37_79b9) ^ 0x5eed).collect(),
+            None => (0..iters)
+                .map(|i| ((k as u64) << 32) ^ (i * 0x9e37_79b9) ^ 0x5eed)
+                .collect(),
         };
         for seed in seeds {
             if trace {

@@ -140,7 +140,10 @@ mod tests {
                 }
             }
             let (at, lost) = thrown(kind, 1, 6.0, false);
-            assert!(!lost && at.z.abs() < 3.5, "{kind:?} drifting into the gutter: {at:?}");
+            assert!(
+                !lost && at.z.abs() < 3.5,
+                "{kind:?} drifting into the gutter: {at:?}"
+            );
             let (_, lost) = thrown(kind, 3, 25.0, true);
             assert!(lost, "{kind:?} thrown off the bare floor");
         }

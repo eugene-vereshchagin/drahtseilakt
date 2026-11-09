@@ -132,7 +132,9 @@ pub fn generate(pts: &[Point], tri: &[[usize; 3]], pierce: &[usize]) -> Option<L
             let (a, b) = (t[k], t[(k + 1) % 3]);
             // the twin: the first edge b -> a of the list
             let twin = tri.iter().enumerate().find_map(|(j, u)| {
-                (0..3).find(|&m| u[m] == b && u[(m + 1) % 3] == a).map(|m| Edge { tri: j, slot: m })
+                (0..3)
+                    .find(|&m| u[m] == b && u[(m + 1) % 3] == a)
+                    .map(|m| Edge { tri: j, slot: m })
             })?;
             opposite[k] = twin;
         }
@@ -310,11 +312,7 @@ fn build(arena: &mut Vec<Sphere>, list: &[usize], guards: &mut u32) -> usize {
         cost[k] = box_volume(arena, &low[k]) + box_volume(arena, &high[k]);
     }
     let ks = if cost[1] <= cost[0] {
-        if cost[1] < cost[2] {
-            1
-        } else {
-            2
-        }
+        if cost[1] < cost[2] { 1 } else { 2 }
     } else if cost[0] < cost[2] {
         0
     } else {
@@ -356,10 +354,18 @@ fn second_moments(ledges: &[&Ledge], mc: V3) -> V3 {
                 }
             }
             let [a, b, c] = a;
-            let v6 = a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+            let v6 = a[0] * (b[1] * c[2] - b[2] * c[1])
+                + a[1] * (b[2] * c[0] - b[0] * c[2])
+                + a[2] * (b[0] * c[1] - b[1] * c[0]);
             vol += v6 / 6.0;
             for k in 0..3 {
-                inte[k] += v6 / 60.0 * (a[k] * a[k] + b[k] * b[k] + c[k] * c[k] + a[k] * b[k] + a[k] * c[k] + b[k] * c[k]);
+                inte[k] += v6 / 60.0
+                    * (a[k] * a[k]
+                        + b[k] * b[k]
+                        + c[k] * c[k]
+                        + a[k] * b[k]
+                        + a[k] * c[k]
+                        + b[k] * c[k]);
             }
         }
     }
@@ -433,7 +439,11 @@ impl Surface {
         let mut c = [0.0f32; 3];
         for l in &ledges {
             for t in &l.tris {
-                let (p0, p1, p2) = (l.points[t.start[0]], l.points[t.start[1]], l.points[t.start[2]]);
+                let (p0, p1, p2) = (
+                    l.points[t.start[0]],
+                    l.points[t.start[1]],
+                    l.points[t.start[2]],
+                );
                 let mut u = [0.0f32; 3];
                 let mut v = [0.0f32; 3];
                 for k in 0..3 {
@@ -445,8 +455,12 @@ impl Surface {
                     u[2] * v[0] - u[0] * v[2],
                     u[0] * v[1] - u[1] * v[0],
                 ];
-                s2 += f64::from(n[0]) * f64::from(n[0]) + f64::from(n[1]) * f64::from(n[1]) + f64::from(n[2]) * f64::from(n[2]);
-                let d = f64::from(n[0]) * f64::from(p0[0]) + f64::from(n[1]) * f64::from(p0[1]) + f64::from(n[2]) * f64::from(p0[2]);
+                s2 += f64::from(n[0]) * f64::from(n[0])
+                    + f64::from(n[1]) * f64::from(n[1])
+                    + f64::from(n[2]) * f64::from(n[2]);
+                let d = f64::from(n[0]) * f64::from(p0[0])
+                    + f64::from(n[1]) * f64::from(p0[1])
+                    + f64::from(n[2]) * f64::from(p0[2]);
                 s6 += d;
                 let f = (d * 0.25) as f32;
                 for k in 0..3 {
@@ -504,8 +518,16 @@ impl Surface {
             for t in &l.tris {
                 let p = |e: usize| l.points[t.start[e]];
                 let (p0, p1, p2) = (p(0), p(1), p(2));
-                let u = [f64::from(p1[0]) - f64::from(p0[0]), f64::from(p1[1]) - f64::from(p0[1]), f64::from(p1[2]) - f64::from(p0[2])];
-                let v = [f64::from(p2[0]) - f64::from(p0[0]), f64::from(p2[1]) - f64::from(p0[1]), f64::from(p2[2]) - f64::from(p0[2])];
+                let u = [
+                    f64::from(p1[0]) - f64::from(p0[0]),
+                    f64::from(p1[1]) - f64::from(p0[1]),
+                    f64::from(p1[2]) - f64::from(p0[2]),
+                ];
+                let v = [
+                    f64::from(p2[0]) - f64::from(p0[0]),
+                    f64::from(p2[1]) - f64::from(p0[1]),
+                    f64::from(p2[2]) - f64::from(p0[2]),
+                ];
                 let n = [
                     u[1] * v[2] - u[2] * v[1],
                     u[2] * v[0] - u[0] * v[2],
@@ -514,12 +536,20 @@ impl Surface {
                 let nn = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
                 for e in 0..3 {
                     let q = p(e);
-                    let d = [f64::from(q[0]) - mc[0], f64::from(q[1]) - mc[1], f64::from(q[2]) - mc[2]];
+                    let d = [
+                        f64::from(q[0]) - mc[0],
+                        f64::from(q[1]) - mc[1],
+                        f64::from(q[2]) - mc[2],
+                    ];
                     let r = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
                     if r > big_r {
                         big_r = r;
                     }
-                    let x = [n[1] * d[2] - n[2] * d[1], n[2] * d[0] - n[0] * d[2], n[0] * d[1] - n[1] * d[0]];
+                    let x = [
+                        n[1] * d[2] - n[2] * d[1],
+                        n[2] * d[0] - n[0] * d[2],
+                        n[0] * d[1] - n[1] * d[0],
+                    ];
                     if nn > 0.0 {
                         let a = ((x[0] * x[0] + x[1] * x[1] + x[2] * x[2]) / nn).sqrt();
                         if a > dev {
@@ -554,7 +584,8 @@ impl Surface {
         }
         let d = d2.sqrt() as f32;
         let radius = self.upper_limit_radius + d;
-        let dev = f32::from(self.max_factor_surface_deviation) * self.upper_limit_radius * 0.004f32 + d;
+        let dev =
+            f32::from(self.max_factor_surface_deviation) * self.upper_limit_radius * 0.004f32 + d;
         (radius, dev)
     }
 
@@ -596,7 +627,11 @@ impl Surface {
 fn write_tree(arena: &[Sphere], s: usize, tree: &mut Vec<LedgeNode>) -> usize {
     let sp = &arena[s];
     let idx = tree.len();
-    let center = [sp.center[0] as f32, sp.center[1] as f32, sp.center[2] as f32];
+    let center = [
+        sp.center[0] as f32,
+        sp.center[1] as f32,
+        sp.center[2] as f32,
+    ];
     let kind = match (sp.ledge, sp.children) {
         (Some(ledge), _) => NodeKind::Leaf { ledge },
         (None, Some((l, r))) => {
@@ -662,15 +697,27 @@ mod tests {
     fn cube_surface_has_its_centroid_and_unit_inertia() {
         let s = Surface::compile(vec![unit_cube()]).expect("a surface");
         for k in 0..3 {
-            assert!((s.mass_center[k] - 0.5).abs() < 1e-5, "centre {k}: {}", s.mass_center[k]);
+            assert!(
+                (s.mass_center[k] - 0.5).abs() < 1e-5,
+                "centre {k}: {}",
+                s.mass_center[k]
+            );
         }
         // a unit cube's second moment about its centre is 1/12 on each axis; I_x = sqrt(1/12^2 + 1/12^2)
         let expected = (2.0f32).sqrt() / 12.0;
         for k in 0..3 {
-            assert!((s.rotation_inertia[k] - expected).abs() < 1e-4, "inertia {k}: {}", s.rotation_inertia[k]);
+            assert!(
+                (s.rotation_inertia[k] - expected).abs() < 1e-4,
+                "inertia {k}: {}",
+                s.rotation_inertia[k]
+            );
         }
         // the corners are sqrt(3)/2 from the centre
-        assert!((s.upper_limit_radius - 0.75f32.sqrt()).abs() < 1e-5, "radius {}", s.upper_limit_radius);
+        assert!(
+            (s.upper_limit_radius - 0.75f32.sqrt()).abs() < 1e-5,
+            "radius {}",
+            s.upper_limit_radius
+        );
         assert!(s.single_convex().is_some());
     }
 

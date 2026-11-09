@@ -200,12 +200,19 @@ const OWN_TEXTURES_MAX: usize = 4096;
 /// Our own textures by their key: the PNG files of `dir` (plain files only; a link or a folder is passed over).
 pub fn texture_index(dir: &Path) -> std::collections::HashMap<String, PathBuf> {
     let mut index = std::collections::HashMap::new();
-    let Ok(listed) = std::fs::read_dir(dir) else { return index };
+    let Ok(listed) = std::fs::read_dir(dir) else {
+        return index;
+    };
     for entry in listed.flatten().take(OWN_TEXTURES_MAX) {
         let path = entry.path();
         let plain = std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_file());
-        let png = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("png"));
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        let png = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("png"));
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
         let key = texture_key(name);
         if plain && png && !key.is_empty() {
             index.entry(key).or_insert(path);
@@ -217,10 +224,13 @@ pub fn texture_index(dir: &Path) -> std::collections::HashMap<String, PathBuf> {
 /// Our own texture standing in for the original's texture `name` (a texture's name or its file's), if we have one:
 /// `own/Textures/<name>.png` among the game's assets, or the track's own `own/Track/<name>.png`. The name only picks among our files; it never makes a path.
 pub fn own_texture(name: &str) -> Option<PathBuf> {
-    static INDEX: std::sync::OnceLock<std::collections::HashMap<String, PathBuf>> = std::sync::OnceLock::new();
+    static INDEX: std::sync::OnceLock<std::collections::HashMap<String, PathBuf>> =
+        std::sync::OnceLock::new();
     // the stand-ins for the original's textures, and the track's own (our levels name them: open-format.md, `game:`)
     let index = INDEX.get_or_init(|| {
-        let Some(root) = own_root() else { return Default::default() };
+        let Some(root) = own_root() else {
+            return Default::default();
+        };
         let mut index = texture_index(&root.join("Textures"));
         for (k, v) in texture_index(&root.join("Track")) {
             index.entry(k).or_insert(v);
@@ -299,7 +309,9 @@ pub fn stand_in(relative: &str) {
         && !said.iter().any(|s| s == relative)
     {
         said.push(relative.to_owned());
-        eprintln!("warning: {relative}: the copy lacks it or it does not read; our own part stands in");
+        eprintln!(
+            "warning: {relative}: the copy lacks it or it does not read; our own part stands in"
+        );
     }
 }
 
@@ -344,7 +356,10 @@ mod tests {
     fn a_texture_is_known_by_its_name_whatever_its_spelling() {
         assert_eq!(texture_key("BallWood.bmp"), texture_key("Ball_Wood.BMP"));
         assert_eq!(texture_key("Textures/Floor_Side.bmp"), "floorside");
-        assert_eq!(texture_key("C:\\Ballance\\Textures\\Floor_Side"), "floorside");
+        assert_eq!(
+            texture_key("C:\\Ballance\\Textures\\Floor_Side"),
+            "floorside"
+        );
         assert_eq!(texture_key("floor_top_Checkpoint"), "floortopcheckpoint");
         assert_eq!(texture_key("Floor.Top.Strange"), "floor.top.strange");
     }

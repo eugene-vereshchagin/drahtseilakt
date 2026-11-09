@@ -13,8 +13,10 @@
 // f32 and f64 steps, where those steps are what the numbers depend on.
 
 use crate::ledge::{Edge, Ledge, Surface};
-use crate::math::{self, isqrt4, isqrt5, normalize4, normalize_len};
-use crate::mindist::{Feat, Mindist, ObjCache, MDF_SORT, ST_BACKSIDE, ST_BALL, ST_EDGE, ST_FACE, ST_POINT};
+use crate::math::{self, isqrt4, isqrt5, normalize_len, normalize4};
+use crate::mindist::{
+    Feat, MDF_SORT, Mindist, ObjCache, ST_BACKSIDE, ST_BALL, ST_EDGE, ST_FACE, ST_POINT,
+};
 
 type V3 = [f64; 3];
 type P3 = [f32; 3];
@@ -24,12 +26,20 @@ fn dot3(a: V3, b: V3) -> f64 {
 }
 
 fn cross3(a: V3, b: V3) -> V3 {
-    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
 }
 
 /// `a - b` of two f32 points, the differences formed exactly and stored in f64 (`fsub_d`).
 fn fsub_d(a: P3, b: P3) -> V3 {
-    [f64::from(a[0]) - f64::from(b[0]), f64::from(a[1]) - f64::from(b[1]), f64::from(a[2]) - f64::from(b[2])]
+    [
+        f64::from(a[0]) - f64::from(b[0]),
+        f64::from(a[1]) - f64::from(b[1]),
+        f64::from(a[2]) - f64::from(b[2]),
+    ]
 }
 
 /// `|q - p|^2` of two f32 points, summed in f64 and stored f32 (`flen2`).
@@ -58,7 +68,9 @@ fn pos_other_space(e: Edge, a: &Info, b: &Info) -> V3 {
     let p = a.p(e);
     let mut w = [0.0f64; 3];
     for k in 0..3 {
-        let s = (a.cache.r[k][0] as f32) * p[0] + (a.cache.r[k][1] as f32) * p[1] + (a.cache.r[k][2] as f32) * p[2];
+        let s = (a.cache.r[k][0] as f32) * p[0]
+            + (a.cache.r[k][1] as f32) * p[1]
+            + (a.cache.r[k][2] as f32) * p[2];
         w[k] = f64::from(s) + a.cache.vv[k];
     }
     world_to_obj(&b.cache, w)
@@ -66,7 +78,10 @@ fn pos_other_space(e: Edge, a: &Info, b: &Info) -> V3 {
 
 /// A point given in `a`'s object space, in `b`'s (`0x100208f0`, in f64).
 fn fpos_other_space(p: P3, a: &Info, b: &Info) -> V3 {
-    let w = obj_to_world(&a.cache, [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])]);
+    let w = obj_to_world(
+        &a.cache,
+        [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])],
+    );
     world_to_obj(&b.cache, w)
 }
 
@@ -78,17 +93,29 @@ fn dir_other_space(v: V3, a: &Info, b: &Info) -> V3 {
 
 /// The f64 differences of the object's own points. Shared by the cases below.
 fn lerp3(a: V3, b: V3, t: f64) -> V3 {
-    [a[0] * (1.0 - t) + b[0] * t, a[1] * (1.0 - t) + b[1] * t, a[2] * (1.0 - t) + b[2] * t]
+    [
+        a[0] * (1.0 - t) + b[0] * t,
+        a[1] * (1.0 - t) + b[1] * t,
+        a[2] * (1.0 - t) + b[2] * t,
+    ]
 }
 
 /// The barycentric weights of X's projection in the triangle of `e` (`0x10020ad0`): the weights of the edges `e`,
 /// next(e), prev(e) in the order the caller reads them, and the determinant. Only the four outputs are f32.
 pub(crate) fn tri_qr_vals(l: &Ledge, e: Edge, x: V3) -> [f32; 4] {
     let t = &l.tris[e.tri];
-    let (q0, q1, q2) = (l.points[t.start[0]], l.points[t.start[1]], l.points[t.start[2]]);
+    let (q0, q1, q2) = (
+        l.points[t.start[0]],
+        l.points[t.start[1]],
+        l.points[t.start[2]],
+    );
     let a = fsub_d(q0, q1);
     let b = fsub_d(q2, q1);
-    let d = [x[0] - f64::from(q1[0]), x[1] - f64::from(q1[1]), x[2] - f64::from(q1[2])];
+    let d = [
+        x[0] - f64::from(q1[0]),
+        x[1] - f64::from(q1[1]),
+        x[2] - f64::from(q1[2]),
+    ];
     let aa = dot3(a, a);
     let bb = dot3(b, b);
     let ab = dot3(a, b);
@@ -112,8 +139,16 @@ fn kvals(l: &Ledge, e: Edge, x: V3) -> [f32; 2] {
     let p = l.p(e);
     let n = l.p(Ledge::next(e));
     let d = fsub_d(n, p);
-    let a = [x[0] - f64::from(p[0]), x[1] - f64::from(p[1]), x[2] - f64::from(p[2])];
-    let b = [f64::from(n[0]) - x[0], f64::from(n[1]) - x[1], f64::from(n[2]) - x[2]];
+    let a = [
+        x[0] - f64::from(p[0]),
+        x[1] - f64::from(p[1]),
+        x[2] - f64::from(p[2]),
+    ];
+    let b = [
+        f64::from(n[0]) - x[0],
+        f64::from(n[1]) - x[1],
+        f64::from(n[2]) - x[2],
+    ];
     [dot3(a, d) as f32, dot3(b, d) as f32]
 }
 
@@ -131,7 +166,11 @@ fn hesse(l: &Ledge, e: Edge) -> V3 {
 fn line_dist2(l: &Ledge, e: Edge, x: V3) -> f64 {
     let p = l.p(e);
     let n = l.p(Ledge::next(e));
-    let a = [x[0] - f64::from(p[0]), x[1] - f64::from(p[1]), x[2] - f64::from(p[2])];
+    let a = [
+        x[0] - f64::from(p[0]),
+        x[1] - f64::from(p[1]),
+        x[2] - f64::from(p[2]),
+    ];
     let d = fsub_d(n, p);
     let c = cross3(a, d);
     dot3(c, c) * (1.0 / dot3(d, d))
@@ -140,7 +179,11 @@ fn line_dist2(l: &Ledge, e: Edge, x: V3) -> f64 {
 /// Squared distance to the start point of `e` (`0x100216f0`).
 fn point_dist2(l: &Ledge, e: Edge, x: V3) -> f64 {
     let p = l.p(e);
-    let a = [x[0] - f64::from(p[0]), x[1] - f64::from(p[1]), x[2] - f64::from(p[2])];
+    let a = [
+        x[0] - f64::from(p[0]),
+        x[1] - f64::from(p[1]),
+        x[2] - f64::from(p[2]),
+    ];
     dot3(a, a)
 }
 
@@ -200,7 +243,9 @@ fn kk_setup<'a>(k: Edge, l: Edge, ik: Info<'a>, il: Info<'a>) -> Kk<'a> {
 /// where the parameters are sampled (`0x10063880`, `0x10020ecd` .. `0x10020fbe`).
 fn kk_params(kk: &Kk, r: &mut [f32; 4]) -> i32 {
     if dot3(kk.cross, kk.cross) <= 1e-18 {
-        const TBL: [f32; 11] = [-1.0, 0.5, 2.0, 0.0, 1.0, -0.001, 0.001, 0.999, 1.001, -1e-6, 1e-6];
+        const TBL: [f32; 11] = [
+            -1.0, 0.5, 2.0, 0.0, 1.0, -0.001, 0.001, 0.999, 1.001, -1e-6, 1e-6,
+        ];
         let mut best = 1e101;
         for &t in &TBL {
             let x = lerp3(kk.k0, kk.k1, f64::from(t));
@@ -230,8 +275,16 @@ fn kk_params(kk: &Kk, r: &mut [f32; 4]) -> i32 {
         }
         return 0;
     }
-    let l0 = [f64::from(kk.l0[0]), f64::from(kk.l0[1]), f64::from(kk.l0[2])];
-    let l1 = [f64::from(kk.l1[0]), f64::from(kk.l1[1]), f64::from(kk.l1[2])];
+    let l0 = [
+        f64::from(kk.l0[0]),
+        f64::from(kk.l0[1]),
+        f64::from(kk.l0[2]),
+    ];
+    let l1 = [
+        f64::from(kk.l1[0]),
+        f64::from(kk.l1[1]),
+        f64::from(kk.l1[2]),
+    ];
     let nk = cross3(kk.kdir, kk.cross);
     let nl = cross3(kk.ldir, kk.cross);
     let a = dot3(l0, nk);
@@ -252,7 +305,11 @@ fn kk_params(kk: &Kk, r: &mut [f32; 4]) -> i32 {
 fn kk_qlen(kk: &Kk) -> f64 {
     let c2 = dot3(kk.cross, kk.cross);
     if c2 > 1e-24 {
-        let l0 = [f64::from(kk.l0[0]), f64::from(kk.l0[1]), f64::from(kk.l0[2])];
+        let l0 = [
+            f64::from(kk.l0[0]),
+            f64::from(kk.l0[1]),
+            f64::from(kk.l0[2]),
+        ];
         let d = dot3(kk.k0, kk.cross) - dot3(l0, kk.cross);
         return d * d / c2;
     }
@@ -436,9 +493,14 @@ impl<'a, 'm> Solver<'a, 'm> {
 
     /// The core offset along the normal (`dot_diff`).
     fn dot_diff(&mut self, a: &ObjCache, b: &ObjCache) {
-        let d = [a.core_pos[0] - b.core_pos[0], a.core_pos[1] - b.core_pos[1], a.core_pos[2] - b.core_pos[2]];
+        let d = [
+            a.core_pos[0] - b.core_pos[0],
+            a.core_pos[1] - b.core_pos[1],
+            a.core_pos[2] - b.core_pos[2],
+        ];
         let n = self.md.normal;
-        self.md.contact_dot_diff_center = (d[0] * f64::from(n[0]) + d[1] * f64::from(n[1]) + d[2] * f64::from(n[2])) as f32;
+        self.md.contact_dot_diff_center =
+            (d[0] * f64::from(n[0]) + d[1] * f64::from(n[1]) + d[2] * f64::from(n[2])) as f32;
     }
 
     /// The loop check of a step (`LOOP_CHECK`): counts the step, and from the countdown on remembers the pairs; true
@@ -482,7 +544,8 @@ impl<'a, 'm> Solver<'a, 'm> {
         let n_w = math::rmul(&b.cache.r, &h);
         let mut n_a = math::rtmul(&a.cache.r, &n_w);
         let f0 = b.p(f);
-        let dist = dot3(h, x) - (h[0] * f64::from(f0[0]) + h[1] * f64::from(f0[1]) + h[2] * f64::from(f0[2]));
+        let dist = dot3(h, x)
+            - (h[0] * f64::from(f0[0]) + h[1] * f64::from(f0[1]) + h[2] * f64::from(f0[2]));
         self.md.len_numerator = dist as f32;
         self.store_n(n_w);
         if self.md.len_numerator < 0.0 {
@@ -587,7 +650,11 @@ impl<'a, 'm> Solver<'a, 'm> {
         let d = fsub_d(b.p(Ledge::next(k)), k0);
         let t1 = fsub_d(b.p(Ledge::prev(k)), k0);
         let t2 = fsub_d(b.p(Ledge::prev(b.l.opp(k))), k0);
-        let xs = [x[0] - f64::from(k0[0]), x[1] - f64::from(k0[1]), x[2] - f64::from(k0[2])];
+        let xs = [
+            x[0] - f64::from(k0[0]),
+            x[1] - f64::from(k0[1]),
+            x[2] - f64::from(k0[2]),
+        ];
         let n1 = cross3(d, t1);
         let n2 = cross3(t2, d);
         let s1 = dot3(xs, n1);
@@ -629,7 +696,11 @@ impl<'a, 'm> Solver<'a, 'm> {
         self.md.len_numerator = (si * q - f64::from(self.md.sum_extra_radius)) as f32;
         let dc = cross3(d, c);
         let n_w = math::rmul(&b.cache.r, &dc);
-        let n = [n_w[0] * (-si * id), n_w[1] * (-si * id), n_w[2] * (-si * id)];
+        let n = [
+            n_w[0] * (-si * id),
+            n_w[1] * (-si * id),
+            n_w[2] * (-si * id),
+        ];
         self.store_n(n);
         self.dot_diff(&a.cache, &b.cache);
         // is a neighbour of P closer (n_w, unscaled, points from P toward the edge)?
@@ -693,11 +764,17 @@ impl<'a, 'm> Solver<'a, 'm> {
         let other = [xb_a, xa_b];
         for k in 0..2 {
             let p = is[k].p(ps[k]);
-            let v = [other[k][0] - f64::from(p[0]), other[k][1] - f64::from(p[1]), other[k][2] - f64::from(p[2])];
+            let v = [
+                other[k][0] - f64::from(p[0]),
+                other[k][1] - f64::from(p[1]),
+                other[k][2] - f64::from(p[2]),
+            ];
             let base = f64::from(p[0]) * v[0] + f64::from(p[1]) * v[1] + f64::from(p[2]) * v[2];
             for g in ring(is[k].l, ps[k]) {
                 let qv = is[k].p(g);
-                let proj = (f64::from(qv[0]) * v[0] + f64::from(qv[1]) * v[1] + f64::from(qv[2]) * v[2]) - base;
+                let proj =
+                    (f64::from(qv[0]) * v[0] + f64::from(qv[1]) * v[1] + f64::from(qv[2]) * v[2])
+                        - base;
                 if proj > 0.0 {
                     let val = isqrt4(flen2(qv, p)) * proj;
                     if val > best {
@@ -777,12 +854,15 @@ impl<'a, 'm> Solver<'a, 'm> {
             return 2;
         }
         let c = kk.cross;
-        let sf = ((f64::from(kk.l0[0]) - kk.k0[0]) * c[0] + (f64::from(kk.l0[1]) - kk.k0[1]) * c[1] + (f64::from(kk.l0[2]) - kk.k0[2]) * c[2]) as f32;
+        let sf = ((f64::from(kk.l0[0]) - kk.k0[0]) * c[0]
+            + (f64::from(kk.l0[1]) - kk.k0[1]) * c[1]
+            + (f64::from(kk.l0[2]) - kk.k0[2]) * c[2]) as f32;
         let neg: i32 = i32::from(sf.is_sign_negative());
         let inv = isqrt5(dot3(c, c));
         let n_w = math::rmul(&b.cache.r, &c);
         let n_a = math::rtmul(&a.cache.r, &n_w);
-        self.md.len_numerator = ((f64::from(sf) * inv).abs() - f64::from(self.md.sum_extra_radius)) as f32;
+        self.md.len_numerator =
+            ((f64::from(sf) * inv).abs() - f64::from(self.md.sum_extra_radius)) as f32;
         let kf = (neg as f32 - 0.5f32) * 2.0f32;
         let kscale = f64::from(kf) * inv;
         self.store_n([n_w[0] * kscale, n_w[1] * kscale, n_w[2] * kscale]);
@@ -875,13 +955,21 @@ impl<'a, 'm> Solver<'a, 'm> {
             if flag[0] + flag[1] == 2 {
                 self.set(&a, ka, ST_BACKSIDE);
                 self.set(&b, kb, ST_FACE);
-                self.pos = lerp3(kb0_a, kb1_a, f64::from(r[2]) / (f64::from(r[2]) + f64::from(r[3])));
+                self.pos = lerp3(
+                    kb0_a,
+                    kb1_a,
+                    f64::from(r[2]) / (f64::from(r[2]) + f64::from(r[3])),
+                );
                 return 3;
             }
             if flag[2] + flag[3] == 2 {
                 self.set(&a, ka, ST_FACE);
                 self.set(&b, kb, ST_BACKSIDE);
-                self.pos = lerp3(kk.k0, kk.k1, f64::from(r[0]) / (f64::from(r[0]) + f64::from(r[1])));
+                self.pos = lerp3(
+                    kk.k0,
+                    kk.k1,
+                    f64::from(r[0]) / (f64::from(r[0]) + f64::from(r[1])),
+                );
                 return 3;
             }
             return 1;
@@ -903,14 +991,24 @@ impl<'a, 'm> Solver<'a, 'm> {
         // the upstream passes a stack address as the second call's first edge (3.13.R2.4); `other` is meant
         let q1 = qlen_kk(other, Ledge::next(tri), oi, ow);
         let q2 = qlen_kk(other, ow.l.opp(Ledge::prev(tri)), oi, ow);
-        let next = if q2 < q1 { Ledge::prev(tri) } else { Ledge::next(tri) };
+        let next = if q2 < q1 {
+            Ledge::prev(tri)
+        } else {
+            Ledge::next(tri)
+        };
         self.kk(other, next, oi, ow)
     }
 
     /// FF init (`0x10019aa0`): the brute-force restart for face-face.
     fn ff(&mut self, fa: Edge, fb: Edge, a: Info, b: Info) -> i32 {
-        let ea = |i: usize| Edge { tri: fa.tri, slot: i };
-        let eb = |j: usize| Edge { tri: fb.tri, slot: j };
+        let ea = |i: usize| Edge {
+            tri: fa.tri,
+            slot: i,
+        };
+        let eb = |j: usize| Edge {
+            tri: fb.tri,
+            slot: j,
+        };
         let mut best = 1e101;
         for i in 0..3 {
             for j in 0..3 {
@@ -930,13 +1028,19 @@ impl<'a, 'm> Solver<'a, 'm> {
         let ft = [fb, fa];
         let pt = [fa, fb];
         for f in 0..2 {
-            let face = Edge { tri: ft[f].tri, slot: 0 };
+            let face = Edge {
+                tri: ft[f].tri,
+                slot: 0,
+            };
             let mut n = hesse(faces[f].l, face);
             normalize4(&mut n);
             let p0 = faces[f].p(face);
             let dd = -(n[0] * f64::from(p0[0]) + n[1] * f64::from(p0[1]) + n[2] * f64::from(p0[2]));
             for i in 0..3 {
-                let e = Edge { tri: pt[f].tri, slot: i };
+                let e = Edge {
+                    tri: pt[f].tri,
+                    slot: i,
+                };
                 let x = pos_other_space(e, &pts[f], &faces[f]);
                 let w = tri_qr_vals(faces[f].l, face, x);
                 if !all_inside(&w) {
@@ -1007,7 +1111,8 @@ impl<'a, 'm> Solver<'a, 'm> {
         self.store_n(n_w);
         self.set(i, e, ST_FACE);
         let p = i.p(e);
-        let h = dot3(n, x) - (n[0] * f64::from(p[0]) + n[1] * f64::from(p[1]) + n[2] * f64::from(p[2]));
+        let h =
+            dot3(n, x) - (n[0] * f64::from(p[0]) + n[1] * f64::from(p[1]) + n[2] * f64::from(p[2]));
         if h >= 0.0 {
             self.md.len_numerator = (h - f64::from(self.md.sum_extra_radius)) as f32;
             self.dot_diff(bi, &i.cache);
@@ -1028,7 +1133,11 @@ impl<'a, 'm> Solver<'a, 'm> {
         let d = fsub_d(i.p(Ledge::next(e)), p);
         let r = fsub_d(i.p(Ledge::prev(e)), p);
         let sv = fsub_d(i.p(Ledge::prev(i.l.opp(e))), p);
-        let xs = [x[0] - f64::from(p[0]), x[1] - f64::from(p[1]), x[2] - f64::from(p[2])];
+        let xs = [
+            x[0] - f64::from(p[0]),
+            x[1] - f64::from(p[1]),
+            x[2] - f64::from(p[2]),
+        ];
         let n1 = cross3(d, r);
         let n2 = cross3(sv, d);
         let h1 = dot3(xs, n1);
@@ -1050,7 +1159,11 @@ impl<'a, 'm> Solver<'a, 'm> {
                 self.md.len_numerator = (is * q - f64::from(self.md.sum_extra_radius)) as f32;
                 let dc = cross3(d, c);
                 let wv = math::rmul(&i.cache.r, &dc);
-                let n = [-(is * id2) * wv[0], -(is * id2) * wv[1], -(is * id2) * wv[2]];
+                let n = [
+                    -(is * id2) * wv[0],
+                    -(is * id2) * wv[1],
+                    -(is * id2) * wv[2],
+                ];
                 self.store_n(n);
                 self.dot_diff(bi, &i.cache);
                 self.set(i, e, ST_EDGE);
@@ -1090,13 +1203,18 @@ impl<'a, 'm> Solver<'a, 'm> {
         self.md.len_numerator = (len - f64::from(self.md.sum_extra_radius)) as f32;
         self.dot_diff(bi, &i.cache);
         let p = i.p(e);
-        let xd = [x[0] - f64::from(p[0]), x[1] - f64::from(p[1]), x[2] - f64::from(p[2])];
+        let xd = [
+            x[0] - f64::from(p[0]),
+            x[1] - f64::from(p[1]),
+            x[2] - f64::from(p[2]),
+        ];
         let c0 = f64::from(p[0]) * xd[0] + f64::from(p[1]) * xd[1] + f64::from(p[2]) * xd[2];
         let mut best: Option<Edge> = None;
         let mut bestv = 0.0;
         for g in ring(i.l, e) {
             let n = i.p(g);
-            let f = (f64::from(n[0]) * xd[0] + f64::from(n[1]) * xd[1] + f64::from(n[2]) * xd[2]) - c0;
+            let f =
+                (f64::from(n[0]) * xd[0] + f64::from(n[1]) * xd[1] + f64::from(n[2]) * xd[2]) - c0;
             if f > 0.0 {
                 let wv = isqrt4(flen2(n, p)) * f;
                 if wv > bestv {
@@ -1108,7 +1226,11 @@ impl<'a, 'm> Solver<'a, 'm> {
         if let Some(b) = best {
             let ab = kvals(i.l, b, x);
             if ab[1] > 0.0 {
-                return if ab[0] >= 0.0 { self.bk(bi, b, i) } else { self.bp(bi, b, i) };
+                return if ab[0] >= 0.0 {
+                    self.bk(bi, b, i)
+                } else {
+                    self.bp(bi, b, i)
+                };
             }
         }
         self.set(i, e, ST_POINT);
@@ -1124,8 +1246,14 @@ impl<'a, 'm> Solver<'a, 'm> {
             (ca.vv[1] - cb.vv[1]) as f32,
             (ca.vv[2] - cb.vv[2]) as f32,
         ];
-        let q = f64::from(v[0]) * f64::from(v[0]) + f64::from(v[1]) * f64::from(v[1]) + f64::from(v[2]) * f64::from(v[2]);
-        let inv = if q.abs() <= f64::from(1e-19f32) { 1.0 } else { isqrt5(q) };
+        let q = f64::from(v[0]) * f64::from(v[0])
+            + f64::from(v[1]) * f64::from(v[1])
+            + f64::from(v[2]) * f64::from(v[2]);
+        let inv = if q.abs() <= f64::from(1e-19f32) {
+            1.0
+        } else {
+            isqrt5(q)
+        };
         self.md.len_numerator = (inv * q - f64::from(self.md.sum_extra_radius)) as f32;
         for k in 0..3 {
             self.md.normal[k] = (f64::from(v[k]) * inv) as f32;
@@ -1169,8 +1297,12 @@ impl<'a, 'm> Solver<'a, 'm> {
         // 0x10019ff0: the sorted pair
         let ka = self.md.sorted(0);
         let kb = self.md.sorted(1);
-        let (Some(ia), Some(ib)) = (self.info(ka), self.info(kb)) else { return 2 };
-        let (Some(ea), Some(eb)) = (self.edge_of(ka), self.edge_of(kb)) else { return 2 };
+        let (Some(ia), Some(ib)) = (self.info(ka), self.info(kb)) else {
+            return 2;
+        };
+        let (Some(ea), Some(eb)) = (self.edge_of(ka), self.edge_of(kb)) else {
+            return 2;
+        };
         let code = self.md.syn[ka].status * 4 + self.md.syn[kb].status;
         match code {
             0 => self.pp(ea, eb, ia, ib),
@@ -1215,9 +1347,15 @@ impl<'a, 'm> Solver<'a, 'm> {
     /// Moves the backside synapse onto the face the walk reaches (`0x10019790`).
     pub fn fix_backside(&mut self) {
         let a = self.md.sorted(0);
-        let k = if self.md.syn[a].status == ST_BACKSIDE { a } else { self.md.sorted(1) };
+        let k = if self.md.syn[a].status == ST_BACKSIDE {
+            a
+        } else {
+            self.md.sorted(1)
+        };
         let Some(i) = self.info(k) else { return };
-        let Some(e) = self.pierce_walk(&i) else { return };
+        let Some(e) = self.pierce_walk(&i) else {
+            return;
+        };
         self.md.syn[k].feat = Some(Feat {
             ledge: i.feat,
             edge: e,
@@ -1235,7 +1373,6 @@ fn fsub_point(p: P3) -> V3 {
 fn fobj_world(i: &Info, e: Edge) -> V3 {
     obj_to_world(&i.cache, fsub_point(i.p(e)))
 }
-
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
@@ -1323,9 +1460,16 @@ mod tests {
         let b = unit_cube();
         let (rc, md) = solve(&a, [0.0; 3], &b, [2.0, 0.0, 0.0]);
         assert_eq!(rc, 1, "the solve converges");
-        assert!((md.len_numerator - 1.0).abs() < 1e-4, "gap {}", md.len_numerator);
+        assert!(
+            (md.len_numerator - 1.0).abs() < 1e-4,
+            "gap {}",
+            md.len_numerator
+        );
         let n = md.normal;
-        assert!((n[0].abs() - 1.0).abs() < 1e-4 && n[1].abs() < 1e-4 && n[2].abs() < 1e-4, "normal {n:?}");
+        assert!(
+            (n[0].abs() - 1.0).abs() < 1e-4 && n[1].abs() < 1e-4 && n[2].abs() < 1e-4,
+            "normal {n:?}"
+        );
     }
 
     #[test]
@@ -1335,7 +1479,11 @@ mod tests {
         let (rc, md) = solve(&a, [0.0; 3], &b, [2.0, 2.0, 0.0]);
         assert_eq!(rc, 1, "the solve converges");
         let want = 2f32.sqrt();
-        assert!((md.len_numerator - want).abs() < 1e-3 * want, "gap {} want {want}", md.len_numerator);
+        assert!(
+            (md.len_numerator - want).abs() < 1e-3 * want,
+            "gap {} want {want}",
+            md.len_numerator
+        );
     }
 
     #[test]
@@ -1344,8 +1492,15 @@ mod tests {
         let b = unit_cube();
         let (rc, md) = solve(&a, [0.0; 3], &b, [0.25, 0.25, 1.5]);
         assert_eq!(rc, 1, "the solve converges");
-        assert!((md.len_numerator - 0.5).abs() < 1e-3, "gap {}", md.len_numerator);
-        assert!((md.normal[2].abs() - 1.0).abs() < 1e-3, "normal {:?}", md.normal);
+        assert!(
+            (md.len_numerator - 0.5).abs() < 1e-3,
+            "gap {}",
+            md.len_numerator
+        );
+        assert!(
+            (md.normal[2].abs() - 1.0).abs() < 1e-3,
+            "normal {:?}",
+            md.normal
+        );
     }
 }
-

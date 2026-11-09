@@ -99,7 +99,14 @@ fn scenario_text() -> String {
     let _ = writeln!(out, "ball -6 2.5 -12");
     for t in 1..=TICKS {
         let (f, wake) = input(t);
-        let _ = writeln!(out, "tick {t} {} {} {} {}", f[0], f[1], f[2], u8::from(wake));
+        let _ = writeln!(
+            out,
+            "tick {t} {} {} {} {}",
+            f[0],
+            f[1],
+            f[2],
+            u8::from(wake)
+        );
     }
     out
 }
@@ -200,6 +207,9 @@ fn the_ball_takes_the_c_reference_path() {
     for (t, c) in C_TRACK {
         let p = track[t as usize - 1];
         let d = ((p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2) + (p[2] - c[2]).powi(2)).sqrt();
-        assert!(d < 1e-3, "tick {t}: the port's ball at {p:?}, the C ball at {c:?}");
+        assert!(
+            d < 1e-3,
+            "tick {t}: the port's ball at {p:?}, the C ball at {c:?}"
+        );
     }
 }

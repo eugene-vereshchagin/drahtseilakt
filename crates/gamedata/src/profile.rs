@@ -108,7 +108,11 @@ pub fn settings_path() -> PathBuf {
 pub fn settings_text() -> String {
     const MAX: u64 = 64 * 1024;
     let small = std::fs::metadata(settings_path()).is_ok_and(|m| m.len() <= MAX);
-    let bytes = if small { std::fs::read(settings_path()).unwrap_or_default() } else { Vec::new() };
+    let bytes = if small {
+        std::fs::read(settings_path()).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     settings_from_bytes(&bytes)
 }
 

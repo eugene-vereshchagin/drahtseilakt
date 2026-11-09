@@ -123,7 +123,13 @@ impl Extra {
             rot: self.rot,
             fired: self.fired(),
             flying: self.flying,
-            balls: self.balls.iter().enumerate().filter(|(_, b)| b.alive && self.state != State::Done).map(|(k, b)| (k, b.pos)).collect(),
+            balls: self
+                .balls
+                .iter()
+                .enumerate()
+                .filter(|(_, b)| b.alive && self.state != State::Done)
+                .map(|(k, b)| (k, b.pos))
+                .collect(),
         }
     }
 

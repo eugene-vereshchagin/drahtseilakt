@@ -1,0 +1,554 @@
+// The runtime: runs a map's scripts one tick at a time the way the original's behaviour manager does
+// (docs/ck-runtime.md, "Execution"): each active script is executed; a graph fires the links from its active
+// IOs (a zero-delay link in the same tick, a delayed one that many ticks later), runs its active sub-behaviours
+// from a priority stack, and stays active while links are queued or sub-behaviours active. Building blocks run
+// through blocks.rs. Messages sent in a tick reach their waiters in the next. All order is by index, so a run is
+// deterministic. The state is small and cloned with the run (rewind, replays); the graph is shared.
+
+use crate::blocks::{self, Flow};
+use crate::{Graph, Id, Node, ObjKind, Value};
+use std::sync::Arc;
+
+/// An entity of the engine a block acts on: a level object by index, or the ball.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ent {
+    Object(usize),
+    Ball,
+}
+
+/// The engine's side of the scripts: what blocks read and change. Positions are world coordinates; matrices are
+/// column-major with the position in the last column, as the level's objects.
+pub trait Host {
+    /// The tick's length in milliseconds (the original's delta time).
+    fn delta_ms(&self) -> f32;
+    fn matrix(&self, e: Ent) -> Option<[[f32; 4]; 4]>;
+    /// The entity's matrix as the level was loaded (its initial conditions).
+    fn initial_matrix(&self, e: Ent) -> Option<[[f32; 4]; 4]>;
+    fn set_matrix(&mut self, e: Ent, m: [[f32; 4]; 4]);
+    fn set_visible(&mut self, e: Ent, on: bool);
+    /// The world-axis bounding box of the entity.
+    fn bounds(&self, e: Ent) -> Option<([f32; 3], [f32; 3])>;
+    fn delete(&mut self, e: Ent);
+    fn physicalize(&mut self, e: Ent, on: bool);
+    fn particles(&mut self, e: Ent, on: bool);
+    /// The level mesh of an entity, by index.
+    fn mesh_of(&self, e: Ent) -> Option<usize>;
+    /// The members of a level group, by index.
+    fn group_members(&self, group: usize) -> Vec<usize>;
+    /// A cell of one of the game's own arrays (`CurrentLevel`...), which live in the engine, not in the map.
+    fn game_cell(&self, array: &str, row: usize, column: usize) -> Option<Value>;
+    /// A message a script sends (to an entity, or to all): the engine may act on the game's own messages.
+    fn message(&mut self, name: &str, to: Option<Ent>);
+    fn sound(&mut self, name: &str, on: bool);
+    fn text(&mut self, name: &str, text: &str, on: bool);
+    /// A line for the log: what a script did, or what the runtime could not do.
+    fn note(&mut self, text: &str);
+}
+
+/// Per-block state a block keeps between ticks.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum Scratch {
+    #[default]
+    None,
+    /// An iterator's next index.
+    Index(i64),
+    /// A delayer's or timer's time left or elapsed, in ms.
+    Time(f32),
+    /// A proximity test's last state: inside, and ticks until the next test.
+    Proximity {
+        inside: Option<bool>,
+        wait: i64,
+    },
+    /// A message waiter: received.
+    Received(bool),
+    Flag(bool),
+}
+
+#[derive(Debug, Clone, Default)]
+struct BlockState {
+    active: bool,
+    stacked: bool,
+    scratch: Scratch,
+}
+
+#[derive(Debug, Clone, Default)]
+struct LinkState {
+    current: u16,
+    queued: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Runtime {
+    pub graph: Arc<Graph>,
+    blocks: Vec<BlockState>,
+    links: Vec<LinkState>,
+    io: Vec<bool>,
+    pub values: Vec<Value>,
+    /// The maps' arrays' rows, which Set Cell and Add Row change (the graph's are the file's).
+    arrays: Vec<Vec<Vec<Value>>>,
+    /// Messages sent this tick, delivered at the next: (name, receiver or all).
+    outbox: Vec<(String, Option<Id>)>,
+    inbox: Vec<(String, Option<Id>)>,
+    pub tick: u64,
+    /// Prototypes met that the runtime does not know, reported once each.
+    unknown: Vec<crate::Guid>,
+}
+
+/// The most pops of the execution stack in one graph in one tick (the original's BehaviorMaxIteration).
+const MAX_ITERATIONS: usize = 8_000;
+const MAX_DEPTH: usize = 48;
+
+impl Runtime {
+    /// A runtime with every script active and reset, as scripts of a loaded level start.
+    pub fn new(graph: Arc<Graph>) -> Runtime {
+        let n = graph.nodes.len();
+        let values = graph
+            .nodes
+            .iter()
+            .map(|n| match n {
+                Node::Param(p) => p.value.clone(),
+                _ => Value::None,
+            })
+            .collect();
+        let mut rt = Runtime {
+            blocks: vec![BlockState::default(); n],
+            links: vec![LinkState::default(); n],
+            io: vec![false; n],
+            values,
+            arrays: graph.arrays.iter().map(|a| a.rows.clone()).collect(),
+            graph,
+            outbox: Vec::new(),
+            inbox: Vec::new(),
+            tick: 0,
+            unknown: Vec::new(),
+        };
+        let scripts = rt.graph.scripts.clone();
+        for s in scripts {
+            rt.activate(s, true, true, 0);
+        }
+        rt
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.graph.scripts.is_empty()
+    }
+
+    pub fn is_active(&self, block: Id) -> bool {
+        self.blocks.get(block).is_some_and(|b| b.active)
+    }
+
+    pub fn io_active(&self, io: Id) -> bool {
+        self.io.get(io).copied().unwrap_or(false)
+    }
+
+    pub fn set_io(&mut self, io: Id, on: bool) {
+        if let Some(x) = self.io.get_mut(io) {
+            *x = on;
+        }
+    }
+
+    pub fn scratch(&self, block: Id) -> &Scratch {
+        static NONE: Scratch = Scratch::None;
+        self.blocks.get(block).map_or(&NONE, |b| &b.scratch)
+    }
+
+    pub fn set_scratch(&mut self, block: Id, s: Scratch) {
+        if let Some(b) = self.blocks.get_mut(block) {
+            b.scratch = s;
+        }
+    }
+
+    /// `CKBehavior::Activate`: `reset` puts the behaviour back to its start (links, IOs, sub-behaviours), and a
+    /// script's first input is activated.
+    pub fn activate(&mut self, block: Id, active: bool, reset: bool, depth: usize) {
+        if depth > MAX_DEPTH {
+            return;
+        }
+        let Some(b) = self.graph.block(block).cloned() else {
+            return;
+        };
+        let was_off = !self.is_active(block);
+        if reset || was_off {
+            for &l in &b.links {
+                if let (Some(link), Some(st)) = (self.graph.link(l), self.links.get_mut(l)) {
+                    st.current = link.delay;
+                    st.queued = false;
+                }
+            }
+            for &s in &b.sub {
+                self.activate(s, false, true, depth.saturating_add(1));
+            }
+            for &io in b.inputs.iter().chain(&b.outputs) {
+                self.set_io(io, false);
+            }
+            if let Some(st) = self.blocks.get_mut(block) {
+                st.scratch = Scratch::None;
+                st.stacked = false;
+            }
+            if b.parent.is_none()
+                && let Some(&first) = b.inputs.first()
+            {
+                self.set_io(first, true);
+            }
+        }
+        if let Some(st) = self.blocks.get_mut(block) {
+            st.active = active;
+        }
+    }
+
+    /// Every script's scripts of an object (its graphs attached): activated or deactivated.
+    pub fn activate_object(&mut self, object: Id, active: bool, reset: bool) {
+        let scripts: Vec<Id> = self
+            .graph
+            .scripts
+            .iter()
+            .copied()
+            .filter(|&s| self.graph.block(s).is_some_and(|b| b.owner == Some(object)))
+            .collect();
+        for s in scripts {
+            self.activate(s, active, reset, 0);
+        }
+    }
+
+    pub fn send(&mut self, name: &str, to: Option<Id>) {
+        if self.outbox.len() < 4_096 {
+            self.outbox.push((name.to_string(), to));
+        }
+    }
+
+    /// Whether a message of this name reached the block's owner (or everyone) this tick.
+    pub fn received(&self, name: &str, owner: Option<Id>) -> bool {
+        self.inbox
+            .iter()
+            .any(|(n, to)| n.eq_ignore_ascii_case(name) && (to.is_none() || *to == owner))
+    }
+
+    /// One tick of every active script, in file order.
+    pub fn tick(&mut self, host: &mut dyn Host) {
+        self.tick = self.tick.saturating_add(1);
+        self.inbox = std::mem::take(&mut self.outbox);
+        let scripts = self.graph.scripts.clone();
+        for s in scripts {
+            if self.is_active(s) {
+                let keep = self.execute(s, host, 0);
+                if let Some(st) = self.blocks.get_mut(s) {
+                    st.active = keep;
+                }
+            }
+        }
+    }
+
+    /// `CKBehavior::Execute`: a building block runs its prototype; a graph fires links and runs its stack.
+    /// Returns whether the behaviour stays active.
+    fn execute(&mut self, block: Id, host: &mut dyn Host, depth: usize) -> bool {
+        if depth > MAX_DEPTH {
+            return false;
+        }
+        let Some(b) = self.graph.block(block).cloned() else {
+            return false;
+        };
+        if let Some(proto) = b.proto {
+            return match blocks::run(self, block, &b, proto, host) {
+                Flow::Done => false,
+                Flow::Continue => true,
+                Flow::Unknown => {
+                    if !self.unknown.contains(&proto) {
+                        self.unknown.push(proto);
+                        host.note(&format!(
+                            "script block not known: {} ({proto}) in {}",
+                            b.name,
+                            self.graph.name(block)
+                        ));
+                    }
+                    // Its inputs are cleared so the graph does not spin on it; nothing comes out.
+                    for &io in &b.inputs {
+                        self.set_io(io, false);
+                    }
+                    false
+                }
+            };
+        }
+        // Prepare: fire the links from active IOs, then stack the active sub-behaviours (first on top).
+        let mut sources = Vec::new();
+        let mut to_activate = Vec::new();
+        for &l in &b.links {
+            let Some(link) = self.graph.link(l) else {
+                continue;
+            };
+            if self.io_active(link.src) {
+                sources.push(link.src);
+                if link.delay == 0 {
+                    to_activate.push(link.dst);
+                } else {
+                    self.queue(l, link.delay);
+                }
+            }
+        }
+        for s in sources {
+            self.set_io(s, false);
+        }
+        for dst in to_activate {
+            self.activate_io(dst, block);
+        }
+        let mut stack: Vec<Id> = Vec::new();
+        for &s in b.sub.iter().rev() {
+            if self.is_active(s) {
+                stack.push(s);
+                if let Some(st) = self.blocks.get_mut(s) {
+                    st.stacked = true;
+                }
+            }
+        }
+        // Loop: run the top, propagate its outputs, until the stack is empty.
+        let mut iterations = 0usize;
+        while let Some(top) = stack.pop() {
+            iterations = iterations.saturating_add(1);
+            if iterations > MAX_ITERATIONS {
+                host.note(&format!("script loop stopped in {}", b.name));
+                break;
+            }
+            if let Some(st) = self.blocks.get_mut(top) {
+                st.stacked = false;
+            }
+            let keep = self.execute(top, host, depth.saturating_add(1));
+            if let Some(st) = self.blocks.get_mut(top) {
+                st.active = keep;
+            }
+            let Some(tb) = self.graph.block(top) else {
+                continue;
+            };
+            let outputs = tb.outputs.clone();
+            for out in outputs {
+                if !self.io_active(out) {
+                    continue;
+                }
+                self.set_io(out, false);
+                let links = self.graph.links_from.get(out).cloned().unwrap_or_default();
+                for l in links {
+                    let Some(link) = self.graph.link(l) else {
+                        continue;
+                    };
+                    // only this graph's links carry the activation on
+                    if !b.links.contains(&l) {
+                        continue;
+                    }
+                    if link.delay == 0 {
+                        if let Some(c) = self.activate_io(link.dst, block) {
+                            let stacked = self.blocks.get(c).is_some_and(|s| s.stacked);
+                            if !stacked {
+                                self.push_by_priority(&mut stack, c);
+                            }
+                        }
+                    } else {
+                        self.queue(l, link.delay);
+                    }
+                }
+            }
+        }
+        // End: delayed links count down; the graph stays active while any is queued or a sub-behaviour is.
+        let mut keep = false;
+        for &l in &b.links {
+            let Some(link) = self.graph.link(l) else {
+                continue;
+            };
+            let Some(st) = self.links.get_mut(l) else {
+                continue;
+            };
+            if !st.queued {
+                continue;
+            }
+            st.current = st.current.saturating_sub(1);
+            if st.current == 0 {
+                st.queued = false;
+                self.activate_io(link.dst, block);
+            } else {
+                keep = true;
+            }
+        }
+        keep || b.sub.iter().any(|&s| self.is_active(s))
+    }
+
+    fn queue(&mut self, link: Id, delay: u16) {
+        if let Some(st) = self.links.get_mut(link) {
+            if st.current == 0 {
+                st.current = delay;
+            }
+            st.queued = true;
+        }
+    }
+
+    /// Activates an IO; an input of a sub-behaviour activates that behaviour too, which is returned.
+    fn activate_io(&mut self, io: Id, graph: Id) -> Option<Id> {
+        self.set_io(io, true);
+        let info = self.graph.io(io)?;
+        let owner = info.owner?;
+        if info.is_input && owner != graph {
+            if let Some(st) = self.blocks.get_mut(owner) {
+                st.active = true;
+            }
+            return Some(owner);
+        }
+        None
+    }
+
+    /// Inserts a behaviour into the stack above every entry of a priority not above its own.
+    fn push_by_priority(&mut self, stack: &mut Vec<Id>, block: Id) {
+        let prio = self.graph.block(block).map_or(0, |b| b.priority);
+        let mut at = stack.len();
+        while at > 0 {
+            let below = stack.get(at.wrapping_sub(1)).copied();
+            let p = below
+                .and_then(|x| self.graph.block(x))
+                .map_or(0, |b| b.priority);
+            if p <= prio {
+                break;
+            }
+            at = at.wrapping_sub(1);
+        }
+        stack.insert(at.min(stack.len()), block);
+        if let Some(st) = self.blocks.get_mut(block) {
+            st.stacked = true;
+        }
+    }
+
+    // ---- arrays -----------------------------------------------------------------------------------------------
+
+    pub fn rows(&self, array: usize) -> &[Vec<Value>] {
+        self.arrays.get(array).map_or(&[], Vec::as_slice)
+    }
+
+    pub fn cell(&self, array: usize, row: usize, column: usize) -> Option<Value> {
+        self.arrays.get(array)?.get(row)?.get(column).cloned()
+    }
+
+    pub fn set_cell(&mut self, array: usize, row: usize, column: usize, v: Value) {
+        if let Some(c) = self
+            .arrays
+            .get_mut(array)
+            .and_then(|a| a.get_mut(row))
+            .and_then(|r| r.get_mut(column))
+        {
+            *c = v;
+        }
+    }
+
+    pub fn add_row(&mut self, array: usize, row: Vec<Value>) {
+        if let Some(a) = self.arrays.get_mut(array)
+            && a.len() < crate::MAX_ARRAY_ROWS
+        {
+            a.push(row);
+        }
+    }
+
+    pub fn clear_rows(&mut self, array: usize) {
+        if let Some(a) = self.arrays.get_mut(array) {
+            a.clear();
+        }
+    }
+
+    // ---- parameters -------------------------------------------------------------------------------------------
+
+    /// Reads a parameter: an input follows its source (running the operation that computes it first).
+    pub fn read(&mut self, param: Id, host: &mut dyn Host) -> Value {
+        self.read_depth(param, host, 0)
+    }
+
+    fn read_depth(&mut self, param: Id, host: &mut dyn Host, depth: usize) -> Value {
+        if depth > MAX_DEPTH {
+            return Value::None;
+        }
+        let Some(p) = self.graph.param(param).cloned() else {
+            return Value::None;
+        };
+        if let Some(src) = p.source {
+            return self.read_depth(src, host, depth.saturating_add(1));
+        }
+        if let Some(op) = p.op {
+            self.run_op(op, host, depth.saturating_add(1));
+        }
+        self.values.get(param).cloned().unwrap_or_default()
+    }
+
+    /// Writes a parameter and copies it on to its destinations.
+    pub fn write(&mut self, param: Id, v: Value) {
+        self.write_depth(param, v, 0);
+    }
+
+    fn write_depth(&mut self, param: Id, v: Value, depth: usize) {
+        if depth > 8 {
+            return;
+        }
+        let Some(slot) = self.values.get_mut(param) else {
+            return;
+        };
+        *slot = v.clone();
+        let dests = self
+            .graph
+            .param(param)
+            .map(|p| p.destinations.clone())
+            .unwrap_or_default();
+        for d in dests {
+            self.write_depth(d, v.clone(), depth.saturating_add(1));
+        }
+    }
+
+    fn run_op(&mut self, op: Id, host: &mut dyn Host, depth: usize) {
+        let Some(Node::Op(o)) = self.graph.nodes.get(op).cloned() else {
+            return;
+        };
+        let a = o.inputs[0].map_or(Value::None, |i| self.read_depth(i, host, depth));
+        let b = o.inputs[1].map_or(Value::None, |i| self.read_depth(i, host, depth));
+        let out_guid = o.output.and_then(|x| self.graph.param(x)).map(|p| p.guid);
+        let a_guid = o.inputs[0]
+            .and_then(|x| self.graph.param(x))
+            .map(|p| p.guid);
+        let r = blocks::operation(self, host, o.guid, out_guid, a_guid, &a, &b);
+        if let Some(out) = o.output {
+            self.write(out, r);
+        }
+    }
+
+    /// The pin of a block by name (case-insensitively), else by index.
+    pub fn pin(&self, block: &crate::Block, name: &str, index: usize) -> Option<Id> {
+        block
+            .pins
+            .iter()
+            .copied()
+            .find(|&p| {
+                self.graph
+                    .param(p)
+                    .is_some_and(|q| q.name.eq_ignore_ascii_case(name))
+            })
+            .or_else(|| block.pins.get(index).copied())
+    }
+
+    pub fn pout(&self, block: &crate::Block, name: &str, index: usize) -> Option<Id> {
+        block
+            .pouts
+            .iter()
+            .copied()
+            .find(|&p| {
+                self.graph
+                    .param(p)
+                    .is_some_and(|q| q.name.eq_ignore_ascii_case(name))
+            })
+            .or_else(|| block.pouts.get(index).copied())
+    }
+
+    /// The entity a block acts on: its target parameter, else the script's owner.
+    pub fn target(&mut self, block: &crate::Block, host: &mut dyn Host) -> Option<Id> {
+        match block.target {
+            Some(t) => self.read(t, host).as_obj(),
+            None => block.owner,
+        }
+    }
+
+    /// An object of the graph as an engine entity, when it is one.
+    pub fn ent(&self, id: Option<Id>) -> Option<Ent> {
+        match self.graph.objects.get(id?)?.kind {
+            ObjKind::Entity(i) => Some(Ent::Object(i)),
+            ObjKind::Ball => Some(Ent::Ball),
+            _ => None,
+        }
+    }
+}

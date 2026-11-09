@@ -76,10 +76,23 @@ mod tests {
 
     #[test]
     fn the_closest_point_is_inside_on_an_edge_or_a_corner() {
-        let t = [Vec3::ZERO, Vec3::new(4.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 4.0)];
-        assert_eq!(closest_point(&t, Vec3::new(1.0, 3.0, 1.0)), Vec3::new(1.0, 0.0, 1.0));
-        assert_eq!(closest_point(&t, Vec3::new(2.0, -1.0, -5.0)), Vec3::new(2.0, 0.0, 0.0));
+        let t = [
+            Vec3::ZERO,
+            Vec3::new(4.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 4.0),
+        ];
+        assert_eq!(
+            closest_point(&t, Vec3::new(1.0, 3.0, 1.0)),
+            Vec3::new(1.0, 0.0, 1.0)
+        );
+        assert_eq!(
+            closest_point(&t, Vec3::new(2.0, -1.0, -5.0)),
+            Vec3::new(2.0, 0.0, 0.0)
+        );
         assert_eq!(closest_point(&t, Vec3::new(-3.0, 2.0, -3.0)), Vec3::ZERO);
-        assert_eq!(closest_point(&t, Vec3::new(4.0, 0.0, 4.0)), Vec3::new(2.0, 0.0, 2.0));
+        assert_eq!(
+            closest_point(&t, Vec3::new(4.0, 0.0, 4.0)),
+            Vec3::new(2.0, 0.0, 2.0)
+        );
     }
 }

@@ -3,9 +3,9 @@
 
 use crate::render::{Instance, View};
 use crate::sim::{BallKind, Sim};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use glam::{Mat4, Quat, Vec3};
 use level::Level;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 pub const LEVEL_MODEL: usize = 0;
 pub const BALLS_MODEL: usize = 1;
@@ -78,12 +78,16 @@ impl BallMeshes {
         );
         let bounds = |m: Option<usize>| {
             let sphere = (Vec3::splat(-2.0), Vec3::splat(2.0));
-            let Some(m) = m.and_then(|i| balls.meshes.get(i)).filter(|m| !m.positions.is_empty()) else {
+            let Some(m) = m
+                .and_then(|i| balls.meshes.get(i))
+                .filter(|m| !m.positions.is_empty())
+            else {
                 return sphere;
             };
-            m.positions.iter().fold((Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)), |(lo, hi), p| {
-                (lo.min(Vec3::from(*p)), hi.max(Vec3::from(*p)))
-            })
+            m.positions.iter().fold(
+                (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)),
+                |(lo, hi), p| (lo.min(Vec3::from(*p)), hi.max(Vec3::from(*p))),
+            )
         };
         BallMeshes {
             wood,
@@ -192,8 +196,15 @@ pub fn sprite_matrix(place: &Mat4, s: &level::Sprite, eye: Vec3, target: Vec3) -
         ),
     };
     let (rt, upv) = (x * s.size[0], y * s.size[1]);
-    let origin = place.w_axis.truncate() + rt * ((s.offset[0] - 1.0) * 0.5) + upv * ((s.offset[1] - 1.0) * 0.5);
-    Mat4::from_cols(rt.extend(0.0), upv.extend(0.0), z.extend(0.0), origin.extend(1.0))
+    let origin = place.w_axis.truncate()
+        + rt * ((s.offset[0] - 1.0) * 0.5)
+        + upv * ((s.offset[1] - 1.0) * 0.5);
+    Mat4::from_cols(
+        rt.extend(0.0),
+        upv.extend(0.0),
+        z.extend(0.0),
+        origin.extend(1.0),
+    )
 }
 
 /// The extra points' meshes (the P_Extra_Point module): the centre sprite, the six small balls' sprites and the floor
@@ -221,7 +232,9 @@ impl ExtraModel {
         Some(ExtraModel {
             model: FIRST_MODULE_MODEL + index,
             center: sprite("P_Extra_Point_Ball0"),
-            balls: (1..=6).filter_map(|k| sprite(&format!("P_Extra_Point_Ball{k}"))).collect(),
+            balls: (1..=6)
+                .filter_map(|k| sprite(&format!("P_Extra_Point_Ball{k}")))
+                .collect(),
             floor,
         })
     }
@@ -241,7 +254,10 @@ pub struct Modules {
 impl Modules {
     /// The model of a module by its name (`P_Modul_34`).
     pub fn get(&self, name: &str) -> Option<(usize, &Level)> {
-        let i = self.names.iter().position(|n| n.eq_ignore_ascii_case(name))?;
+        let i = self
+            .names
+            .iter()
+            .position(|n| n.eq_ignore_ascii_case(name))?;
         Some((i, self.models.get(i)?))
     }
 }
@@ -285,7 +301,9 @@ pub fn load_modules(level: &Level, data: &crate::assets::Data) -> Modules {
     let mut modules = Modules::default();
     let mut tried: Vec<String> = Vec::new();
     for i in 0..level.objects.len() {
-        let Some(name) = module_of(level, i) else { continue };
+        let Some(name) = module_of(level, i) else {
+            continue;
+        };
         if tried.iter().any(|t| t == name) {
             continue;
         }
@@ -369,9 +387,14 @@ pub fn placements(
             .then(|| module.group(&format!("All_{name}")))
             .flatten();
         for (k, mo) in module.objects.iter().enumerate() {
-            let part = parts.iter().find(|p| p.placeholder == i && p.object == mo.name);
+            let part = parts
+                .iter()
+                .find(|p| p.placeholder == i && p.object == mo.name);
             let in_all = all.is_some_and(|g| g.members.contains(&k));
-            let spin = SPINNING.iter().find(|s| s.0.eq_ignore_ascii_case(&mo.name)).map(|s| (s.1, s.2));
+            let spin = SPINNING
+                .iter()
+                .find(|s| s.0.eq_ignore_ascii_case(&mo.name))
+                .map(|s| (s.1, s.2));
             if !(mo.visible || in_all || body.is_some() || part.is_some()) {
                 continue;
             }
@@ -415,16 +438,31 @@ pub struct ShadowReceiver {
 
 /// The level's shadow receivers: the visible members of its `Shadow` group with a mesh.
 pub fn shadow_receivers(level: &Level) -> Vec<ShadowReceiver> {
-    let Some(g) = level.group("Shadow") else { return Vec::new() };
+    let Some(g) = level.group("Shadow") else {
+        return Vec::new();
+    };
     g.members
         .iter()
         .filter_map(|&i| {
             let o = level.objects.get(i).filter(|o| o.visible)?;
             let mesh = o.mesh?;
             let m = Mat4::from_cols_array_2d(&o.matrix);
-            let pts = level.meshes.get(mesh)?.positions.iter().map(|&p| m.transform_point3(Vec3::from(p)));
-            let (min, max) = pts.fold((Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)), |(a, b), p| (a.min(p), b.max(p)));
-            (min.x <= max.x).then_some(ShadowReceiver { mesh, matrix: m, min, max })
+            let pts = level
+                .meshes
+                .get(mesh)?
+                .positions
+                .iter()
+                .map(|&p| m.transform_point3(Vec3::from(p)));
+            let (min, max) = pts.fold(
+                (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)),
+                |(a, b), p| (a.min(p), b.max(p)),
+            );
+            (min.x <= max.x).then_some(ShadowReceiver {
+                mesh,
+                matrix: m,
+                min,
+                max,
+            })
         })
         .collect()
 }
@@ -436,9 +474,15 @@ pub fn shadows(receivers: &[ShadowReceiver], ball: Vec3, out: &mut Vec<Instance>
     let r = crate::sim::BALL_RADIUS;
     let side = 2.0 * r * 1.3;
     for f in receivers {
-        let over = f.min.x <= ball.x + r && f.max.x >= ball.x - r && f.min.z <= ball.z + r && f.max.z >= ball.z - r;
+        let over = f.min.x <= ball.x + r
+            && f.max.x >= ball.x - r
+            && f.min.z <= ball.z + r
+            && f.max.z >= ball.z - r;
         if over && f.min.y <= ball.y + r && (ball.y - r) - f.max.y <= 20.0 {
-            out.push(Instance { shadow: Some([ball.x, ball.z, side]), ..Instance::plain(LEVEL_MODEL, f.mesh, f.matrix) });
+            out.push(Instance {
+                shadow: Some([ball.x, ball.z, side]),
+                ..Instance::plain(LEVEL_MODEL, f.mesh, f.matrix)
+            });
         }
     }
 }
@@ -454,7 +498,9 @@ pub fn instances(
     extras: (&[crate::extra::ExtraView], Option<&ExtraModel>),
     s: &Snapshot,
     pieces: &[(usize, usize, f32)],
+    scripted: (&[bool], &[Option<Mat4>]),
 ) -> Vec<Instance> {
+    let (script_hidden, script_moved) = scripted;
     let (views, extra_model) = extras;
     let mut out: Vec<Instance> = Vec::new();
     // The extra points with their module: the centre sprite and the floor glow until one fires, its small balls
@@ -464,7 +510,8 @@ pub fn instances(
             let place = Mat4::from_rotation_translation(v.rot, v.center);
             if !v.fired {
                 if let Some((mesh, sp)) = &m.center {
-                    let mut i = Instance::plain(m.model, *mesh, sprite_matrix(&place, sp, s.eye, s.target));
+                    let mut i =
+                        Instance::plain(m.model, *mesh, sprite_matrix(&place, sp, s.eye, s.target));
                     i.unlit = true;
                     out.push(i);
                 }
@@ -477,7 +524,8 @@ pub fn instances(
             for &(k, pos) in &v.balls {
                 if let Some((mesh, sp)) = m.balls.get(k) {
                     let at = Mat4::from_translation(pos);
-                    let mut i = Instance::plain(m.model, *mesh, sprite_matrix(&at, sp, s.eye, s.target));
+                    let mut i =
+                        Instance::plain(m.model, *mesh, sprite_matrix(&at, sp, s.eye, s.target));
                     i.unlit = true;
                     out.push(i);
                 }
@@ -486,31 +534,43 @@ pub fn instances(
     }
     let hidden = |object: usize| extra_model.is_some() && views.iter().any(|v| v.object == object);
     let clouds = CLOUDS.load(Ordering::Relaxed) && !VOLUME_CLOUDS.load(Ordering::Relaxed);
-    out.extend(placements
-        .iter()
-        .filter(|p| !taken.contains(&p.object) && !unseen.get(p.object).copied().unwrap_or(false))
-        .filter(|p| !(p.marker.is_some() && hidden(p.object)))
-        .filter(|p| clouds || !p.cloud)
-        .map(|p| Instance {
-            model: p.model,
-            mesh: p.mesh,
-            matrix: match (p.body.and_then(|b| bodies.get(b)), p.spin, &p.sprite) {
-                (Some(b), _, _) => Mat4::from_rotation_translation(b.rot, b.pos) * p.matrix,
-                (None, Some((axis, rate)), _) => p.matrix * Mat4::from_axis_angle(axis, rate * s.time),
-                (None, None, Some(sp)) => sprite_matrix(&p.matrix, sp, s.eye, s.target),
-                (None, None, None) => p.matrix,
-            },
-            marker: p.marker,
-            uv_offset: [0.0; 2],
-            unlit: p.sprite.is_some(),
-            shadow: None,
-            // a transformer's shadow fades while its kind's animation plays (Set Diffuse on its material)
-            diffuse: match (p.trafo_shadow, s.trafo) {
-                (Some(k), Some((_, age, kind))) if k == kind => crate::trafo::shadow_alpha(age).map(|a| [1.0, 1.0, 1.0, a]),
-                _ => None,
-            },
-        })
-        );
+    out.extend(
+        placements
+            .iter()
+            .filter(|p| {
+                !taken.contains(&p.object) && !unseen.get(p.object).copied().unwrap_or(false)
+            })
+            .filter(|p| !script_hidden.get(p.object).copied().unwrap_or(false))
+            .filter(|p| !(p.marker.is_some() && hidden(p.object)))
+            .filter(|p| clouds || !p.cloud)
+            .map(|p| Instance {
+                model: p.model,
+                mesh: p.mesh,
+                matrix: match (p.body.and_then(|b| bodies.get(b)), p.spin, &p.sprite) {
+                    (Some(b), _, _) => Mat4::from_rotation_translation(b.rot, b.pos) * p.matrix,
+                    (None, Some((axis, rate)), _) => {
+                        p.matrix * Mat4::from_axis_angle(axis, rate * s.time)
+                    }
+                    (None, None, Some(sp)) => sprite_matrix(&p.matrix, sp, s.eye, s.target),
+                    (None, None, None) => script_moved
+                        .get(p.object)
+                        .copied()
+                        .flatten()
+                        .unwrap_or(p.matrix),
+                },
+                marker: p.marker,
+                uv_offset: [0.0; 2],
+                unlit: p.sprite.is_some(),
+                shadow: None,
+                // a transformer's shadow fades while its kind's animation plays (Set Diffuse on its material)
+                diffuse: match (p.trafo_shadow, s.trafo) {
+                    (Some(k), Some((_, age, kind))) if k == kind => {
+                        crate::trafo::shadow_alpha(age).map(|a| [1.0, 1.0, 1.0, a])
+                    }
+                    _ => None,
+                },
+            }),
+    );
     for mesh in 0..crate::sky::faces() {
         out.push(Instance {
             model: SKY_MODEL,

@@ -44,7 +44,11 @@ impl FreeCam {
     }
 
     fn forward(&self) -> Vec3 {
-        Vec3::new(self.yaw.cos() * self.pitch.cos(), self.pitch.sin(), self.yaw.sin() * self.pitch.cos())
+        Vec3::new(
+            self.yaw.cos() * self.pitch.cos(),
+            self.pitch.sin(),
+            self.yaw.sin() * self.pitch.cos(),
+        )
     }
 
     /// Flies `dt` seconds with the keys held.
@@ -52,7 +56,8 @@ impl FreeCam {
         let on = |k: u16| if held & k != 0 { 1.0 } else { 0.0 };
         self.yaw += (on(keys::TURN_RIGHT) - on(keys::TURN_LEFT)) * TURN * dt;
         let limit = 85f32.to_radians();
-        self.pitch = (self.pitch + (on(keys::LOOK_UP) - on(keys::LOOK_DOWN)) * TURN * dt).clamp(-limit, limit);
+        self.pitch = (self.pitch + (on(keys::LOOK_UP) - on(keys::LOOK_DOWN)) * TURN * dt)
+            .clamp(-limit, limit);
         let speed = SPEED * if held & keys::FAST != 0 { FAST } else { 1.0 } * dt;
         let ahead = self.forward();
         let side = Vec3::new(-self.yaw.sin(), 0.0, self.yaw.cos());

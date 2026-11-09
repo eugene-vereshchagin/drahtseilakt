@@ -2,11 +2,11 @@
 // is identified by a hash of its file, so a replay never runs against the wrong data. A replay holds only our
 // input, never game data, so it can live in the repository.
 //
-//   drahtseilakt-replay 7        (1: recorded before the ball burst into pieces in transformers, 2: before the
+//   drahtseilakt-replay 8        (1: recorded before the ball burst into pieces in transformers, 2: before the
 //                                 pieces went after 20 s, 3: before the checkpoints followed their names, 4: before
 //                                 the loose objects were made of their module file's mesh, 5: before the camera
 //                                 looked along the reset point after a lost ball, 6: before a run begun at a sector took the
-//                                 sector's own ball; each played so)
+//                                 sector's own ball, 7: before a map's own scripts ran; each played so)
 //   level <file name> <fnv-1a 64 of the file, hex>
 //   start <sector> <ball kind or -> <x,y,z or ->   (optional: a run begun elsewhere than the level start)
 //   mod <key> <fnv-1a 64 of its mod.txt, hex> [<option>=<value>]...   (optional, at most MAX_MODS: a mod that
@@ -17,18 +17,20 @@
 
 use std::fmt::Write as _;
 
-pub const FORMAT: &str = "drahtseilakt-replay 7";
+pub const FORMAT: &str = "drahtseilakt-replay 8";
 /// The format written (the number in `FORMAT`).
-pub const VERSION: u32 = 7;
+pub const VERSION: u32 = 8;
 /// The formats read: 1 (no bursts), 2 (the pieces lie until the ball is lost), 3 (the checkpoints in their group's
-/// order), 4 (the loose objects of their stand-ins' meshes), 5 (the respawn at the start heading), 6 and 7.
-const FORMATS: [&str; 7] = [
+/// order), 4 (the loose objects of their stand-ins' meshes), 5 (the respawn at the start heading), 6, 7 (a run begun
+/// at a sector keeps the level's start ball) and 8 (a map's own scripts run; before, they did not).
+const FORMATS: [&str; 8] = [
     "drahtseilakt-replay 1",
     "drahtseilakt-replay 2",
     "drahtseilakt-replay 3",
     "drahtseilakt-replay 4",
     "drahtseilakt-replay 5",
     "drahtseilakt-replay 6",
+    "drahtseilakt-replay 7",
     FORMAT,
 ];
 
@@ -134,15 +136,25 @@ impl Replay {
 
     pub fn to_text(&self) -> String {
         // the format the run was played in (a run going on from an older replay keeps that replay's rules)
-        let head = usize::try_from(self.version.saturating_sub(1)).ok().and_then(|i| FORMATS.get(i)).unwrap_or(&FORMAT);
+        let head = usize::try_from(self.version.saturating_sub(1))
+            .ok()
+            .and_then(|i| FORMATS.get(i))
+            .unwrap_or(&FORMAT);
         let mut s = format!(
             "{head}\nlevel {} {:016x}\n",
             self.level_name.replace(' ', "_"),
             self.level_hash
         );
         if let Some(st) = &self.start {
-            let at = st.at.map_or("-".to_owned(), |[x, y, z]| format!("{x},{y},{z}"));
-            let _ = writeln!(s, "start {} {} {at}", st.sector, st.ball.as_deref().unwrap_or("-"));
+            let at = st
+                .at
+                .map_or("-".to_owned(), |[x, y, z]| format!("{x},{y},{z}"));
+            let _ = writeln!(
+                s,
+                "start {} {} {at}",
+                st.sector,
+                st.ball.as_deref().unwrap_or("-")
+            );
         }
         for m in &self.mods {
             let _ = writeln!(s, "{m}");
@@ -227,7 +239,10 @@ fn parse_start<'a>(mut f: impl Iterator<Item = &'a str>) -> Option<Start> {
 
 /// A point written `x,y,z`, all finite.
 pub fn parse_point(v: &str) -> Option<[f32; 3]> {
-    let p: Vec<f32> = v.split(',').map(|c| c.trim().parse::<f32>().ok().filter(|c| c.is_finite())).collect::<Option<_>>()?;
+    let p: Vec<f32> = v
+        .split(',')
+        .map(|c| c.trim().parse::<f32>().ok().filter(|c| c.is_finite()))
+        .collect::<Option<_>>()?;
     p.try_into().ok()
 }
 
@@ -282,30 +297,54 @@ mod tests {
     #[test]
     fn a_start_elsewhere_round_trips() -> Result<(), String> {
         let mut r = Replay::new("Level_02.NMO", 0xabc);
-        r.start = Some(Start { sector: 3, ball: Some("stone".into()), at: Some([1.5, -2.0, 300.25]) });
+        r.start = Some(Start {
+            sector: 3,
+            ball: Some("stone".into()),
+            at: Some([1.5, -2.0, 300.25]),
+        });
         r.record(1, 0);
         assert_eq!(Replay::parse(&r.to_text())?, r);
-        r.start = Some(Start { sector: 2, ball: None, at: None });
+        r.start = Some(Start {
+            sector: 2,
+            ball: None,
+            at: None,
+        });
         assert_eq!(Replay::parse(&r.to_text())?, r);
         assert!(Replay::parse("drahtseilakt-replay 1\nlevel a 1\nstart 0 - -\nend 1").is_err());
-        let old = Replay::parse("drahtseilakt-replay 1\nlevel a 1\n1 01\nend 5").expect("format 1 still reads");
+        let old = Replay::parse("drahtseilakt-replay 1\nlevel a 1\n1 01\nend 5")
+            .expect("format 1 still reads");
         assert_eq!(old.version, 1);
-        let two = Replay::parse("drahtseilakt-replay 2\nlevel a 1\n1 01\nend 5").expect("format 2 still reads");
+        let two = Replay::parse("drahtseilakt-replay 2\nlevel a 1\n1 01\nend 5")
+            .expect("format 2 still reads");
         assert_eq!(two.version, 2);
-        let three = Replay::parse("drahtseilakt-replay 3\nlevel a 1\n1 01\nend 5").expect("format 3 still reads");
+        let three = Replay::parse("drahtseilakt-replay 3\nlevel a 1\n1 01\nend 5")
+            .expect("format 3 still reads");
         assert_eq!(three.version, 3);
-        let four = Replay::parse("drahtseilakt-replay 4\nlevel a 1\n1 01\nend 5").expect("format 4 still reads");
+        let four = Replay::parse("drahtseilakt-replay 4\nlevel a 1\n1 01\nend 5")
+            .expect("format 4 still reads");
         assert_eq!(four.version, 4);
-        let five = Replay::parse("drahtseilakt-replay 5\nlevel a 1\n1 01\nend 5").expect("format 5 still reads");
+        let five = Replay::parse("drahtseilakt-replay 5\nlevel a 1\n1 01\nend 5")
+            .expect("format 5 still reads");
         assert_eq!(five.version, 5);
-        let six = Replay::parse("drahtseilakt-replay 6\nlevel a 1\n1 01\nend 5").expect("format 6 still reads");
+        let six = Replay::parse("drahtseilakt-replay 6\nlevel a 1\n1 01\nend 5")
+            .expect("format 6 still reads");
         assert_eq!(six.version, 6);
-        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 7");
-        assert_eq!(new.version, 7);
-        assert!(Replay::parse("drahtseilakt-replay 8\nlevel a 1\nend 1").is_err(), "a later format is refused");
+        let seven = Replay::parse("drahtseilakt-replay 7\nlevel a 1\n1 01\nend 5")
+            .expect("format 7 still reads");
+        assert_eq!(seven.version, 7);
+        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 8");
+        assert_eq!(new.version, 8);
+        assert!(
+            Replay::parse("drahtseilakt-replay 9\nlevel a 1\nend 1").is_err(),
+            "a later format is refused"
+        );
         let mut kept = Replay::new("a", 1);
         kept.version = 2;
-        assert_eq!(Replay::parse(&kept.to_text())?.version, 2, "an older format is written as it is");
+        assert_eq!(
+            Replay::parse(&kept.to_text())?.version,
+            2,
+            "an older format is written as it is"
+        );
         assert!(Replay::parse("drahtseilakt-replay 1\nlevel a 1\nstart 1 - 1,2\nend 1").is_err());
         Ok(())
     }

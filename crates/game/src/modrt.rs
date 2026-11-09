@@ -301,7 +301,11 @@ pub fn key_text(name: &str) -> String {
         "BracketRight" => "]".to_owned(),
         "Minus" => "-".to_owned(),
         "Equal" => "=".to_owned(),
-        _ => name.strip_prefix("Key").or_else(|| name.strip_prefix("Digit")).unwrap_or(name).to_owned(),
+        _ => name
+            .strip_prefix("Key")
+            .or_else(|| name.strip_prefix("Digit"))
+            .unwrap_or(name)
+            .to_owned(),
     }
 }
 
@@ -394,7 +398,8 @@ impl ViewMods {
                             }
                             let name = o.show(*v);
                             let key = key_text(&name);
-                            out.lines.push((*c, format!("{}: {key}", txt.label(&o.key, lang))));
+                            out.lines
+                                .push((*c, format!("{}: {key}", txt.label(&o.key, lang))));
                         }
                     }
                     Action::Screenshot => out.screenshot = true,
@@ -402,7 +407,11 @@ impl ViewMods {
                     Action::Rewind(_) if out.practice.len() < 16 => {
                         out.practice.push(Practice::Rewind(x.clamp(1.0, 30.0)));
                     }
-                    Action::SaveMoment | Action::LoadMoment | Action::Slower | Action::Faster | Action::FreeCam
+                    Action::SaveMoment
+                    | Action::LoadMoment
+                    | Action::Slower
+                    | Action::Faster
+                    | Action::FreeCam
                         if out.practice.len() < 16 =>
                     {
                         out.practice.push(match a {
@@ -486,12 +495,17 @@ impl Mods {
             .map(|m| {
                 let want = setting(&format!("mod.{}", m.key)).as_deref() == Some("on");
                 match (&m.parsed, want) {
-                    (Ok(t), true) if spent.saturating_add(t.cost) <= gamedata::mods::MAX_TOTAL_COST => {
+                    (Ok(t), true)
+                        if spent.saturating_add(t.cost) <= gamedata::mods::MAX_TOTAL_COST =>
+                    {
                         spent = spent.saturating_add(t.cost);
                         true
                     }
                     (Ok(_), true) => {
-                        eprintln!("mod {}: not switched on: the mods on would do too much work a tick", m.key);
+                        eprintln!(
+                            "mod {}: not switched on: the mods on would do too much work a tick",
+                            m.key
+                        );
                         false
                     }
                     _ => false,
@@ -513,7 +527,12 @@ impl Mods {
                 Err(_) => Vec::new(),
             })
             .collect();
-        Mods { found, on, opts, note: None }
+        Mods {
+            found,
+            on,
+            opts,
+            note: None,
+        }
     }
 
     /// The settings lines of every mod (on or off, and the options set otherwise than their defaults).
@@ -559,7 +578,10 @@ impl Mods {
             } else if spent.saturating_add(cost) <= gamedata::mods::MAX_TOTAL_COST {
                 *on = true;
             } else {
-                self.note = Some((i, format!("{spent} + {cost} > {}", gamedata::mods::MAX_TOTAL_COST)));
+                self.note = Some((
+                    i,
+                    format!("{spent} + {cost} > {}", gamedata::mods::MAX_TOTAL_COST),
+                ));
             }
         }
     }
@@ -622,8 +644,15 @@ impl Mods {
                 ));
             }
             // every option given, each a value it takes, nothing else: a replay plays as recorded or not at all
-            if let Some((k, _)) = r.opts.iter().find(|(k, _)| !t.options.iter().any(|o| o.key == *k)) {
-                return Err(format!("the replay gives the mod \"{}\" an option it has not: {k}", r.key));
+            if let Some((k, _)) = r
+                .opts
+                .iter()
+                .find(|(k, _)| !t.options.iter().any(|o| o.key == *k))
+            {
+                return Err(format!(
+                    "the replay gives the mod \"{}\" an option it has not: {k}",
+                    r.key
+                ));
             }
             let opts = t
                 .options
@@ -634,7 +663,10 @@ impl Mods {
                         .find(|(k, _)| *k == o.key)
                         .and_then(|(_, v)| o.parse(v))
                         .ok_or_else(|| {
-                            format!("the replay's mod \"{}\": option {} missing or out of range", r.key, o.key)
+                            format!(
+                                "the replay's mod \"{}\": option {} missing or out of range",
+                                r.key, o.key
+                            )
                         })
                 })
                 .collect::<Result<Vec<f32>, String>>()?;
@@ -667,12 +699,16 @@ mod tests {
     #[test]
     fn god_modes_keys_ask_for_its_deeds_and_its_hint_shows_them() {
         let text = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/mods-dev/god-mode/mod.txt"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../assets/mods-dev/god-mode/mod.txt"),
         )
         .unwrap();
         let m = Mods::load(vec![found("god-mode", &text)], |_| Some("on".into()));
         let (sim, mut view) = m.running(true);
-        assert!(view.practice() && sim.modded(), "god-mode is a practice mod and its runs are modded");
+        assert!(
+            view.practice() && sim.modded(),
+            "god-mode is a practice mod and its runs are modded"
+        );
         assert!(sim.replay_lines()[0].starts_with("mod god-mode "));
         let zero = |_: Value| 0.0;
         for (key, deed) in [
@@ -688,9 +724,23 @@ mod tests {
         }
         view.press("KeyR", &zero, &sim, "en");
         assert!(view.out.restart);
-        view.fire(Event::Frame, &|v| if v == Value::PracticeSpeed { 1.0 } else { 0.0 }, &sim, "de");
-        let hint: Vec<&str> = view.out.lines.iter().filter(|l| l.0 == Corner::BottomLeft).map(|l| l.1.as_str()).collect();
-        assert!(hint.contains(&"Zurück: F3") && hint.contains(&"Langsamer: ["), "{hint:?}");
+        view.fire(
+            Event::Frame,
+            &|v| if v == Value::PracticeSpeed { 1.0 } else { 0.0 },
+            &sim,
+            "de",
+        );
+        let hint: Vec<&str> = view
+            .out
+            .lines
+            .iter()
+            .filter(|l| l.0 == Corner::BottomLeft)
+            .map(|l| l.1.as_str())
+            .collect();
+        assert!(
+            hint.contains(&"Zurück: F3") && hint.contains(&"Langsamer: ["),
+            "{hint:?}"
+        );
     }
 
     #[test]
@@ -851,18 +901,30 @@ mod tests {
             }
         }
         let big = gamedata::mods::parse_mod_txt(&text).unwrap();
-        assert!(big.cost > gamedata::mods::MAX_TOTAL_COST / 2 && big.cost <= gamedata::mods::MAX_TOTAL_COST, "{}", big.cost);
+        assert!(
+            big.cost > gamedata::mods::MAX_TOTAL_COST / 2
+                && big.cost <= gamedata::mods::MAX_TOTAL_COST,
+            "{}",
+            big.cost
+        );
         let found = || vec![found("a", &text), found("b", &text)];
         let mut m = Mods::load(found(), |_| None);
         m.toggle(0);
         m.toggle(1);
         assert_eq!(m.on, vec![true, false]);
-        assert!(m.note.as_ref().is_some_and(|n| n.0 == 1), "the Mods screen says why");
+        assert!(
+            m.note.as_ref().is_some_and(|n| n.0 == 1),
+            "the Mods screen says why"
+        );
         m.toggle(0);
         m.toggle(1);
         assert_eq!(m.on, vec![false, true]);
         let back = Mods::load(found(), |_| Some("on".into()));
-        assert_eq!(back.on, vec![true, false], "the settings cannot pass the budget either");
+        assert_eq!(
+            back.on,
+            vec![true, false],
+            "the settings cannot pass the budget either"
+        );
     }
 
     #[test]
@@ -875,7 +937,10 @@ mod tests {
         let mut bad = r.clone();
         bad.opts[0].1 = "999".into();
         assert!(m.for_replay(&[bad]).is_err(), "an option out of range");
-        assert!(m.for_replay(&[r.clone(), r.clone()]).is_err(), "a mod twice");
+        assert!(
+            m.for_replay(&[r.clone(), r.clone()]).is_err(),
+            "a mod twice"
+        );
         let other = Mods::load(
             vec![found("sticky", &(STICKY.to_owned() + "# changed\n"))],
             |_| None,

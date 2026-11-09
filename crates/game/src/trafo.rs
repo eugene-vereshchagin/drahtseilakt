@@ -88,7 +88,11 @@ impl TrafoModel {
                 // The ring parts hang from the bars.
                 Role::Ring(dir) => lift + dir * 0.5 * ring_open(age),
             };
-            let mut inst = Instance::plain(self.model, mesh, *at * Mat4::from_translation(offset) * local);
+            let mut inst = Instance::plain(
+                self.model,
+                mesh,
+                *at * Mat4::from_translation(offset) * local,
+            );
             if matches!(role, Role::Flash) {
                 inst.uv_offset = [flash_scroll(age), 0.0];
             }

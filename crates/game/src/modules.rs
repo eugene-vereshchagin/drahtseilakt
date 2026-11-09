@@ -161,7 +161,13 @@ pub struct ModuleSpec {
     pub breaks: Option<BreakSpec>,
 }
 
-const fn material(friction: f32, elasticity: f32, mass: f32, lin_damp: f32, rot_damp: f32) -> Material {
+const fn material(
+    friction: f32,
+    elasticity: f32,
+    mass: f32,
+    lin_damp: f32,
+    rot_damp: f32,
+) -> Material {
     Material {
         friction,
         elasticity,
@@ -186,7 +192,11 @@ const MODULES: &[ModuleSpec] = &[
                 start_frozen: false,
                 collide: true,
                 shift: [0.0, 0.0, 0.0],
-                meshes: &["P_Modul_01_Rinne_01_Mesh", "P_Modul_01_Rinne_02_Mesh", "P_Modul_01_Rinne_03_Mesh"],
+                meshes: &[
+                    "P_Modul_01_Rinne_01_Mesh",
+                    "P_Modul_01_Rinne_02_Mesh",
+                    "P_Modul_01_Rinne_03_Mesh",
+                ],
             },
             PartSpec {
                 object: "P_Modul_01_Filler",
@@ -206,12 +216,21 @@ const MODULES: &[ModuleSpec] = &[
                 start_frozen: true,
                 collide: true,
                 shift: [0.0, 0.0, 0.0],
-                meshes: &["P_Modul_01_Col01_Mesh", "P_Modul_01_Col02_Mesh", "P_Modul_01_Col03_Mesh"],
+                meshes: &[
+                    "P_Modul_01_Col01_Mesh",
+                    "P_Modul_01_Col02_Mesh",
+                    "P_Modul_01_Col03_Mesh",
+                ],
             },
         ],
-        joints: &[
-        ],
-        wake: Some(WakeSpec { part: "P_Modul_01_Pusher", near: "P_Modul_01_Pusher", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
+        joints: &[],
+        wake: Some(WakeSpec {
+            part: "P_Modul_01_Pusher",
+            near: "P_Modul_01_Pusher",
+            distance: 50.0,
+            exact: (55.0, 100.0),
+            frames: (10, 60),
+        }),
         forces: &[],
         finish: None,
         updraft: None,
@@ -229,7 +248,11 @@ const MODULES: &[ModuleSpec] = &[
                 start_frozen: true,
                 collide: true,
                 shift: [0.0, 0.0, 0.0],
-                meshes: &["P_Modul_03_Gate_Coll01_Mesh", "P_Modul_03_Gate_Coll02_Mesh", "P_Modul_03_Gate_Coll03_Mesh"],
+                meshes: &[
+                    "P_Modul_03_Gate_Coll01_Mesh",
+                    "P_Modul_03_Gate_Coll02_Mesh",
+                    "P_Modul_03_Gate_Coll03_Mesh",
+                ],
             },
             PartSpec {
                 object: "P_Modul_03_Wall01",
@@ -313,10 +336,35 @@ const MODULES: &[ModuleSpec] = &[
             },
         ],
         joints: &[
-            JointSpec::Slider { a: "P_Modul_03_Floor", b: "FixCube", from: "P_Modul_03_frame_low", to: "P_Modul_03_frame_high", limits: false, lo: -1.0, hi: 1.0 },
-            JointSpec::Spring { a: "P_Modul_03_Floor", pos_a: [0.0, 0.0, 0.0], frame_a: "P_Modul_03_frame_low", b: "FixCube", pos_b: [0.0, 0.0, 0.0], frame_b: "P_Modul_03_frame_high", length: 0.0, constant: 15.0, lin_damp: 0.1, glob_damp: 1.0 },
+            JointSpec::Slider {
+                a: "P_Modul_03_Floor",
+                b: "FixCube",
+                from: "P_Modul_03_frame_low",
+                to: "P_Modul_03_frame_high",
+                limits: false,
+                lo: -1.0,
+                hi: 1.0,
+            },
+            JointSpec::Spring {
+                a: "P_Modul_03_Floor",
+                pos_a: [0.0, 0.0, 0.0],
+                frame_a: "P_Modul_03_frame_low",
+                b: "FixCube",
+                pos_b: [0.0, 0.0, 0.0],
+                frame_b: "P_Modul_03_frame_high",
+                length: 0.0,
+                constant: 15.0,
+                lin_damp: 0.1,
+                glob_damp: 1.0,
+            },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_03_Floor", near: "P_Modul_03_MF", distance: 35.0, exact: (35.0, 50.0), frames: (10, 60) }),
+        wake: Some(WakeSpec {
+            part: "P_Modul_03_Floor",
+            near: "P_Modul_03_MF",
+            distance: 35.0,
+            exact: (35.0, 50.0),
+            frames: (10, 60),
+        }),
         forces: &[],
         finish: None,
         updraft: None,
@@ -325,21 +373,28 @@ const MODULES: &[ModuleSpec] = &[
     },
     ModuleSpec {
         name: "P_Modul_08",
-        parts: &[
-            PartSpec {
-                object: "P_Modul_08_Schaukel",
-                fixed: false,
-                material: material(0.7, 0.4, 10.0, 0.4, 0.1),
-                group: "Floor",
-                start_frozen: true,
-                collide: true,
-                shift: [0.0, 0.0, 0.0],
-                meshes: &["P_Modul_08_Col1_Mesh", "P_Modul_08_Col2_Mesh", "P_Modul_08_Col3_Mesh", "P_Modul_08_Col4_Mesh", "P_Modul_08_Col5_Mesh", "P_Modul_08_Col6_Mesh"],
-            },
-        ],
-        joints: &[
-            JointSpec::Hinge { a: "P_Modul_08_Schaukel", b: "FixCube", frame: "P_Modul_08_HingeFrame" },
-        ],
+        parts: &[PartSpec {
+            object: "P_Modul_08_Schaukel",
+            fixed: false,
+            material: material(0.7, 0.4, 10.0, 0.4, 0.1),
+            group: "Floor",
+            start_frozen: true,
+            collide: true,
+            shift: [0.0, 0.0, 0.0],
+            meshes: &[
+                "P_Modul_08_Col1_Mesh",
+                "P_Modul_08_Col2_Mesh",
+                "P_Modul_08_Col3_Mesh",
+                "P_Modul_08_Col4_Mesh",
+                "P_Modul_08_Col5_Mesh",
+                "P_Modul_08_Col6_Mesh",
+            ],
+        }],
+        joints: &[JointSpec::Hinge {
+            a: "P_Modul_08_Schaukel",
+            b: "FixCube",
+            frame: "P_Modul_08_HingeFrame",
+        }],
         wake: None,
         forces: &[],
         finish: None,
@@ -357,21 +412,38 @@ const MODULES: &[ModuleSpec] = &[
     },
     ModuleSpec {
         name: "P_Modul_17",
-        parts: &[
-            PartSpec {
-                object: "Modul17_Dreharme",
-                fixed: false,
-                material: material(0.7, 0.4, 3.0, 3.0, 0.005),
-                group: "Floor",
-                start_frozen: false,
-                collide: true,
-                shift: [0.0, 0.0, 0.0],
-                meshes: &["P_Modul_17_Col01_Mesh", "P_Modul_17_Col02_Mesh", "P_Modul_17_Col03_Mesh"],
-            },
-        ],
+        parts: &[PartSpec {
+            object: "Modul17_Dreharme",
+            fixed: false,
+            material: material(0.7, 0.4, 3.0, 3.0, 0.005),
+            group: "Floor",
+            start_frozen: false,
+            collide: true,
+            shift: [0.0, 0.0, 0.0],
+            meshes: &[
+                "P_Modul_17_Col01_Mesh",
+                "P_Modul_17_Col02_Mesh",
+                "P_Modul_17_Col03_Mesh",
+            ],
+        }],
         joints: &[
-            JointSpec::Hinge { a: "Modul17_Dreharme", b: "FixCube", frame: "P_Modul_17_HingeFrame" },
-            JointSpec::Spring { a: "Modul17_Dreharme", pos_a: [0.0, 4.0, 0.0], frame_a: "P_Modul_17_HingeFrame", b: "FixCube", pos_b: [0.0, 0.0, -4.0], frame_b: "Modul17_Dreharme", length: 0.0, constant: 0.32, lin_damp: 0.1, glob_damp: 0.1 },
+            JointSpec::Hinge {
+                a: "Modul17_Dreharme",
+                b: "FixCube",
+                frame: "P_Modul_17_HingeFrame",
+            },
+            JointSpec::Spring {
+                a: "Modul17_Dreharme",
+                pos_a: [0.0, 4.0, 0.0],
+                frame_a: "P_Modul_17_HingeFrame",
+                b: "FixCube",
+                pos_b: [0.0, 0.0, -4.0],
+                frame_b: "Modul17_Dreharme",
+                length: 0.0,
+                constant: 0.32,
+                lin_damp: 0.1,
+                glob_damp: 0.1,
+            },
         ],
         wake: None,
         forces: &[],
@@ -398,22 +470,33 @@ const MODULES: &[ModuleSpec] = &[
     },
     ModuleSpec {
         name: "P_Modul_19",
-        parts: &[
-            PartSpec {
-                object: "P_Modul_19_Flaps",
-                fixed: false,
-                material: material(0.7, 0.4, 3.0, 1.0, 0.05),
-                group: "Floor",
-                start_frozen: true,
-                collide: true,
-                shift: [1.0, 1.0, 0.0],
-                meshes: &["P_Modul_19_Col1_Mesh", "P_Modul_19_Col2_Mesh", "P_Modul_19_Col3_Mesh", "P_Modul_19_Col4_Mesh"],
-            },
-        ],
-        joints: &[
-            JointSpec::Hinge { a: "P_Modul_19_Flaps", b: "FixCube", frame: "P_Modul_19_HingeFrame" },
-        ],
-        wake: Some(WakeSpec { part: "P_Modul_19_Flaps", near: "P_Modul_19_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
+        parts: &[PartSpec {
+            object: "P_Modul_19_Flaps",
+            fixed: false,
+            material: material(0.7, 0.4, 3.0, 1.0, 0.05),
+            group: "Floor",
+            start_frozen: true,
+            collide: true,
+            shift: [1.0, 1.0, 0.0],
+            meshes: &[
+                "P_Modul_19_Col1_Mesh",
+                "P_Modul_19_Col2_Mesh",
+                "P_Modul_19_Col3_Mesh",
+                "P_Modul_19_Col4_Mesh",
+            ],
+        }],
+        joints: &[JointSpec::Hinge {
+            a: "P_Modul_19_Flaps",
+            b: "FixCube",
+            frame: "P_Modul_19_HingeFrame",
+        }],
+        wake: Some(WakeSpec {
+            part: "P_Modul_19_Flaps",
+            near: "P_Modul_19_MF",
+            distance: 50.0,
+            exact: (55.0, 100.0),
+            frames: (10, 60),
+        }),
         forces: &[],
         finish: None,
         updraft: None,
@@ -422,22 +505,28 @@ const MODULES: &[ModuleSpec] = &[
     },
     ModuleSpec {
         name: "P_Modul_25",
-        parts: &[
-            PartSpec {
-                object: "P_Modul_25_Bridge",
-                fixed: false,
-                material: material(0.7, 1.0, 3.0, 1.0, 0.05),
-                group: "",
-                start_frozen: true,
-                collide: true,
-                shift: [-2.5, 0.2, 0.0],
-                meshes: &["P_Modul_25_Col01_Mesh", "P_Modul_25_Col02_Mesh"],
-            },
-        ],
-        joints: &[
-            JointSpec::Hinge { a: "P_Modul_25_Bridge", b: "FixCube", frame: "P_Modul_25_HingeFrame" },
-        ],
-        wake: Some(WakeSpec { part: "P_Modul_25_Bridge", near: "P_Modul_25_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
+        parts: &[PartSpec {
+            object: "P_Modul_25_Bridge",
+            fixed: false,
+            material: material(0.7, 1.0, 3.0, 1.0, 0.05),
+            group: "",
+            start_frozen: true,
+            collide: true,
+            shift: [-2.5, 0.2, 0.0],
+            meshes: &["P_Modul_25_Col01_Mesh", "P_Modul_25_Col02_Mesh"],
+        }],
+        joints: &[JointSpec::Hinge {
+            a: "P_Modul_25_Bridge",
+            b: "FixCube",
+            frame: "P_Modul_25_HingeFrame",
+        }],
+        wake: Some(WakeSpec {
+            part: "P_Modul_25_Bridge",
+            near: "P_Modul_25_MF",
+            distance: 50.0,
+            exact: (55.0, 100.0),
+            frames: (10, 60),
+        }),
         forces: &[],
         finish: None,
         updraft: None,
@@ -469,8 +558,18 @@ const MODULES: &[ModuleSpec] = &[
             },
         ],
         joints: &[
-            JointSpec::Ball { a: "P_Modul_26_Rope", b: "FixCube", frame: "P_Modul_26_Balljoint_oben", pos: [0.0, 0.0, 0.0] },
-            JointSpec::Ball { a: "P_Modul_26_Rope", b: "P_Modul_26_Sack", frame: "P_Modul_26_Balljoint_unten", pos: [0.0, 0.0, 0.0] },
+            JointSpec::Ball {
+                a: "P_Modul_26_Rope",
+                b: "FixCube",
+                frame: "P_Modul_26_Balljoint_oben",
+                pos: [0.0, 0.0, 0.0],
+            },
+            JointSpec::Ball {
+                a: "P_Modul_26_Rope",
+                b: "P_Modul_26_Sack",
+                frame: "P_Modul_26_Balljoint_unten",
+                pos: [0.0, 0.0, 0.0],
+            },
         ],
         wake: None,
         forces: &[],
@@ -582,18 +681,64 @@ const MODULES: &[ModuleSpec] = &[
             },
         ],
         joints: &[
-            JointSpec::Hinge { a: "P_Modul_29_Platte01", b: "FixCube", frame: "P_Modul_29_HingeFrame01" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte02", b: "P_Modul_29_Platte01", frame: "P_Modul_29_HingeFrame02" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte03", b: "P_Modul_29_Platte02", frame: "P_Modul_29_HingeFrame03" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte04", b: "P_Modul_29_Platte03", frame: "P_Modul_29_HingeFrame04" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte05", b: "P_Modul_29_Platte04", frame: "P_Modul_29_HingeFrame05" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte06", b: "P_Modul_29_Platte05", frame: "P_Modul_29_HingeFrame06" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte08", b: "P_Modul_29_Platte07", frame: "P_Modul_29_HingeFrame08" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte09", b: "P_Modul_29_Platte08", frame: "P_Modul_29_HingeFrame09" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte09", b: "FixCube", frame: "P_Modul_29_HingeFrame10" },
-            JointSpec::Hinge { a: "P_Modul_29_Platte07", b: "P_Modul_29_Platte06", frame: "P_Modul_29_HingeFrame07" },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte01",
+                b: "FixCube",
+                frame: "P_Modul_29_HingeFrame01",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte02",
+                b: "P_Modul_29_Platte01",
+                frame: "P_Modul_29_HingeFrame02",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte03",
+                b: "P_Modul_29_Platte02",
+                frame: "P_Modul_29_HingeFrame03",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte04",
+                b: "P_Modul_29_Platte03",
+                frame: "P_Modul_29_HingeFrame04",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte05",
+                b: "P_Modul_29_Platte04",
+                frame: "P_Modul_29_HingeFrame05",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte06",
+                b: "P_Modul_29_Platte05",
+                frame: "P_Modul_29_HingeFrame06",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte08",
+                b: "P_Modul_29_Platte07",
+                frame: "P_Modul_29_HingeFrame08",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte09",
+                b: "P_Modul_29_Platte08",
+                frame: "P_Modul_29_HingeFrame09",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte09",
+                b: "FixCube",
+                frame: "P_Modul_29_HingeFrame10",
+            },
+            JointSpec::Hinge {
+                a: "P_Modul_29_Platte07",
+                b: "P_Modul_29_Platte06",
+                frame: "P_Modul_29_HingeFrame07",
+            },
         ],
-        wake: Some(WakeSpec { part: "P_Modul_29_Platte04", near: "P_Modul_29_MF", distance: 80.0, exact: (85.0, 100.0), frames: (10, 60) }),
+        wake: Some(WakeSpec {
+            part: "P_Modul_29_Platte04",
+            near: "P_Modul_29_MF",
+            distance: 80.0,
+            exact: (85.0, 100.0),
+            frames: (10, 60),
+        }),
         forces: &[],
         finish: None,
         updraft: None,
@@ -609,22 +754,28 @@ const MODULES: &[ModuleSpec] = &[
     },
     ModuleSpec {
         name: "P_Modul_30",
-        parts: &[
-            PartSpec {
-                object: "P_Modul_30_Wippe",
-                fixed: false,
-                material: material(0.7, 0.4, 3.0, 1.0, 1.0),
-                group: "Floor",
-                start_frozen: true,
-                collide: true,
-                shift: [0.0, 4.0, 0.0],
-                meshes: &["P_Modul_30_Col1_Mesh", "P_Modul_30_Col2_Mesh"],
-            },
-        ],
-        joints: &[
-            JointSpec::Hinge { a: "P_Modul_30_Wippe", b: "FixCube", frame: "P_Modul_30_HingeFrame" },
-        ],
-        wake: Some(WakeSpec { part: "P_Modul_30_Wippe", near: "P_Modul_30_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
+        parts: &[PartSpec {
+            object: "P_Modul_30_Wippe",
+            fixed: false,
+            material: material(0.7, 0.4, 3.0, 1.0, 1.0),
+            group: "Floor",
+            start_frozen: true,
+            collide: true,
+            shift: [0.0, 4.0, 0.0],
+            meshes: &["P_Modul_30_Col1_Mesh", "P_Modul_30_Col2_Mesh"],
+        }],
+        joints: &[JointSpec::Hinge {
+            a: "P_Modul_30_Wippe",
+            b: "FixCube",
+            frame: "P_Modul_30_HingeFrame",
+        }],
+        wake: Some(WakeSpec {
+            part: "P_Modul_30_Wippe",
+            near: "P_Modul_30_MF",
+            distance: 50.0,
+            exact: (55.0, 100.0),
+            frames: (10, 60),
+        }),
         forces: &[],
         finish: None,
         updraft: None,
@@ -655,10 +806,22 @@ const MODULES: &[ModuleSpec] = &[
                 meshes: &["P_Modul_34_Schiebestein_Mesh"],
             },
         ],
-        joints: &[
-            JointSpec::Slider { a: "P_Modul_34_Schiebestein", b: "FixCube", from: "P_Modul_34_Slider_Frame01", to: "P_Modul_34_Slider_Frame02", limits: false, lo: -1.0, hi: 1.0 },
-        ],
-        wake: Some(WakeSpec { part: "P_Modul_34_Schiebestein", near: "P_Modul_34_Schiebestein", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
+        joints: &[JointSpec::Slider {
+            a: "P_Modul_34_Schiebestein",
+            b: "FixCube",
+            from: "P_Modul_34_Slider_Frame01",
+            to: "P_Modul_34_Slider_Frame02",
+            limits: false,
+            lo: -1.0,
+            hi: 1.0,
+        }],
+        wake: Some(WakeSpec {
+            part: "P_Modul_34_Schiebestein",
+            near: "P_Modul_34_Schiebestein",
+            distance: 50.0,
+            exact: (55.0, 100.0),
+            frames: (10, 60),
+        }),
         forces: &[],
         finish: None,
         updraft: None,
@@ -667,22 +830,32 @@ const MODULES: &[ModuleSpec] = &[
     },
     ModuleSpec {
         name: "P_Modul_37",
-        parts: &[
-            PartSpec {
-                object: "P_Modul_37_Bridge",
-                fixed: false,
-                material: material(0.7, 1.0, 3.0, 1.0, 0.05),
-                group: "",
-                start_frozen: true,
-                collide: true,
-                shift: [-7.5, 0.0, 0.0],
-                meshes: &["P_Modul_37_Col1_Mesh", "P_Modul_37_Col2_Mesh", "P_Modul_37_Col3_Mesh"],
-            },
-        ],
-        joints: &[
-            JointSpec::Hinge { a: "P_Modul_37_Bridge", b: "FixCube", frame: "P_Modul_37_HingeFrame" },
-        ],
-        wake: Some(WakeSpec { part: "P_Modul_37_Bridge", near: "P_Modul_37_MF", distance: 50.0, exact: (55.0, 100.0), frames: (10, 60) }),
+        parts: &[PartSpec {
+            object: "P_Modul_37_Bridge",
+            fixed: false,
+            material: material(0.7, 1.0, 3.0, 1.0, 0.05),
+            group: "",
+            start_frozen: true,
+            collide: true,
+            shift: [-7.5, 0.0, 0.0],
+            meshes: &[
+                "P_Modul_37_Col1_Mesh",
+                "P_Modul_37_Col2_Mesh",
+                "P_Modul_37_Col3_Mesh",
+            ],
+        }],
+        joints: &[JointSpec::Hinge {
+            a: "P_Modul_37_Bridge",
+            b: "FixCube",
+            frame: "P_Modul_37_HingeFrame",
+        }],
+        wake: Some(WakeSpec {
+            part: "P_Modul_37_Bridge",
+            near: "P_Modul_37_MF",
+            distance: 50.0,
+            exact: (55.0, 100.0),
+            frames: (10, 60),
+        }),
         forces: &[],
         finish: None,
         updraft: None,
@@ -691,21 +864,21 @@ const MODULES: &[ModuleSpec] = &[
     },
     ModuleSpec {
         name: "P_Modul_41",
-        parts: &[
-            PartSpec {
-                object: "P_Modul_41",
-                fixed: false,
-                material: material(0.7, 0.4, 1.0, 0.1, 0.1),
-                group: "Floor",
-                start_frozen: false,
-                collide: true,
-                shift: [0.0, 0.0, 0.0],
-                meshes: &["P_Modul_41_Col1_Mesh", "P_Modul_41_Col2_Mesh"],
-            },
-        ],
-        joints: &[
-            JointSpec::Hinge { a: "P_Modul_41", b: "FixCube", frame: "P_Modul_41_HingeFrame" },
-        ],
+        parts: &[PartSpec {
+            object: "P_Modul_41",
+            fixed: false,
+            material: material(0.7, 0.4, 1.0, 0.1, 0.1),
+            group: "Floor",
+            start_frozen: false,
+            collide: true,
+            shift: [0.0, 0.0, 0.0],
+            meshes: &["P_Modul_41_Col1_Mesh", "P_Modul_41_Col2_Mesh"],
+        }],
+        joints: &[JointSpec::Hinge {
+            a: "P_Modul_41",
+            b: "FixCube",
+            frame: "P_Modul_41_HingeFrame",
+        }],
         wake: None,
         forces: &[],
         finish: None,
@@ -724,7 +897,14 @@ const MODULES: &[ModuleSpec] = &[
                 start_frozen: true,
                 collide: true,
                 shift: [0.0, 2.0, 0.0],
-                meshes: &["PE_Balloon_Col_01_Mesh", "PE_Balloon_Col_02_Mesh", "PE_Balloon_Col_03_Mesh", "PE_Balloon_Col_04_Mesh", "PE_Balloon_Col_05_Mesh", "PE_Balloon_Col_06_Mesh"],
+                meshes: &[
+                    "PE_Balloon_Col_01_Mesh",
+                    "PE_Balloon_Col_02_Mesh",
+                    "PE_Balloon_Col_03_Mesh",
+                    "PE_Balloon_Col_04_Mesh",
+                    "PE_Balloon_Col_05_Mesh",
+                    "PE_Balloon_Col_06_Mesh",
+                ],
             },
             PartSpec {
                 object: "PE_Balloon_Platte01",
@@ -928,27 +1108,101 @@ const MODULES: &[ModuleSpec] = &[
                 lin_damp: 0.6,
                 glob_damp: 1.0,
             },
-            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Ballon_Seil01", frame: "PE_Balloon_Ballon01_hinge_a" },
-            JointSpec::Hinge { a: "PE_Balloon_Ballon_Seil01", b: "PE_Balloon_Ballon01", frame: "PE_Balloon_Ballon01_hinge_b" },
-            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Ballon_Seil02", frame: "PE_Balloon_Ballon02_hinge_a" },
-            JointSpec::Hinge { a: "PE_Balloon_Ballon_Seil02", b: "PE_Balloon_Ballon02", frame: "PE_Balloon_Ballon02_hinge_b" },
-            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Ballon_Seil03", frame: "PE_Balloon_Ballon03_hinge_a" },
-            JointSpec::Hinge { a: "PE_Balloon_Ballon_Seil03", b: "PE_Balloon_Ballon03", frame: "PE_Balloon_Ballon03_hinge_b" },
-            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Ballon_Seil04", frame: "PE_Balloon_Ballon04_hinge_a" },
-            JointSpec::Hinge { a: "PE_Balloon_Ballon_Seil04", b: "PE_Balloon_Ballon04", frame: "PE_Balloon_Ballon04_hinge_b" },
-            JointSpec::Hinge { a: "PE_Balloon_Platform", b: "PE_Balloon_Platte01", frame: "PE_Balloon_Hinge01" },
-            JointSpec::Hinge { a: "PE_Balloon_Platte01", b: "PE_Balloon_Platte02", frame: "PE_Balloon_Hinge02" },
-            JointSpec::Hinge { a: "PE_Balloon_Platte02", b: "PE_Balloon_Platte03", frame: "PE_Balloon_Hinge03" },
-            JointSpec::Hinge { a: "PE_Balloon_Platte03", b: "PE_Balloon_Platte04", frame: "PE_Balloon_Hinge04" },
-            JointSpec::Hinge { a: "PE_Balloon_Platte04", b: "PE_Balloon_Platte05", frame: "PE_Balloon_Hinge05" },
-            JointSpec::Hinge { a: "PE_Balloon_Platte05", b: "PE_Balloon_Platte06", frame: "PE_Balloon_Hinge06" },
-            JointSpec::Hinge { a: "PE_Balloon_Platte06", b: "PE_Balloon_Platte07", frame: "PE_Balloon_Hinge07" },
-            JointSpec::Hinge { a: "PE_Balloon_Platte07", b: "PE_Balloon_Platte08", frame: "PE_Balloon_Hinge08" },
-            JointSpec::Hinge { a: "PE_Balloon_Platte08", b: "FixCube", frame: "PE_Balloon_Hinge09" },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platform",
+                b: "PE_Balloon_Ballon_Seil01",
+                frame: "PE_Balloon_Ballon01_hinge_a",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Ballon_Seil01",
+                b: "PE_Balloon_Ballon01",
+                frame: "PE_Balloon_Ballon01_hinge_b",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platform",
+                b: "PE_Balloon_Ballon_Seil02",
+                frame: "PE_Balloon_Ballon02_hinge_a",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Ballon_Seil02",
+                b: "PE_Balloon_Ballon02",
+                frame: "PE_Balloon_Ballon02_hinge_b",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platform",
+                b: "PE_Balloon_Ballon_Seil03",
+                frame: "PE_Balloon_Ballon03_hinge_a",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Ballon_Seil03",
+                b: "PE_Balloon_Ballon03",
+                frame: "PE_Balloon_Ballon03_hinge_b",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platform",
+                b: "PE_Balloon_Ballon_Seil04",
+                frame: "PE_Balloon_Ballon04_hinge_a",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Ballon_Seil04",
+                b: "PE_Balloon_Ballon04",
+                frame: "PE_Balloon_Ballon04_hinge_b",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platform",
+                b: "PE_Balloon_Platte01",
+                frame: "PE_Balloon_Hinge01",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platte01",
+                b: "PE_Balloon_Platte02",
+                frame: "PE_Balloon_Hinge02",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platte02",
+                b: "PE_Balloon_Platte03",
+                frame: "PE_Balloon_Hinge03",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platte03",
+                b: "PE_Balloon_Platte04",
+                frame: "PE_Balloon_Hinge04",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platte04",
+                b: "PE_Balloon_Platte05",
+                frame: "PE_Balloon_Hinge05",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platte05",
+                b: "PE_Balloon_Platte06",
+                frame: "PE_Balloon_Hinge06",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platte06",
+                b: "PE_Balloon_Platte07",
+                frame: "PE_Balloon_Hinge07",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platte07",
+                b: "PE_Balloon_Platte08",
+                frame: "PE_Balloon_Hinge08",
+            },
+            JointSpec::Hinge {
+                a: "PE_Balloon_Platte08",
+                b: "FixCube",
+                frame: "PE_Balloon_Hinge09",
+            },
         ],
         // The platform is woken when the ball comes within 70 (exactness 75 to 100, every 10 to 60 frames), and the
         // balloons' forces start then.
-        wake: Some(WakeSpec { part: "PE_Balloon_Platform", near: "PE_Balloon_Platform", distance: 70.0, exact: (75.0, 100.0), frames: (10, 60) }),
+        wake: Some(WakeSpec {
+            part: "PE_Balloon_Platform",
+            near: "PE_Balloon_Platform",
+            distance: 70.0,
+            exact: (75.0, 100.0),
+            frames: (10, 60),
+        }),
         forces: &[
             ForceSpec {
                 part: "PE_Balloon_Ballon01",
@@ -1029,7 +1283,17 @@ const MODULES: &[ModuleSpec] = &[
                 dir_frame: "PE_Box_slide",
                 value: 0.2,
             },
-            breaks: &["PE_Balloon_Hinge01", "PE_Balloon_Hinge02", "PE_Balloon_Hinge03", "PE_Balloon_Hinge04", "PE_Balloon_Hinge05", "PE_Balloon_Hinge06", "PE_Balloon_Hinge07", "PE_Balloon_Hinge08", "PE_Balloon_Hinge09"],
+            breaks: &[
+                "PE_Balloon_Hinge01",
+                "PE_Balloon_Hinge02",
+                "PE_Balloon_Hinge03",
+                "PE_Balloon_Hinge04",
+                "PE_Balloon_Hinge05",
+                "PE_Balloon_Hinge06",
+                "PE_Balloon_Hinge07",
+                "PE_Balloon_Hinge08",
+                "PE_Balloon_Hinge09",
+            ],
         }),
     },
 ];
@@ -1049,17 +1313,27 @@ mod tests {
         assert!(spec("P_Modul_99").is_none());
         for m in MODULES {
             let named = |n: &str| n == FIXCUBE || m.parts.iter().any(|p| p.object == n);
-            assert!(m.joints.iter().all(|j| match j {
-                JointSpec::Slider { a, b, .. } | JointSpec::Hinge { a, b, .. } | JointSpec::Ball { a, b, .. } => {
-                    named(a) && named(b)
-                }
-                JointSpec::Spring { a, b, .. } => named(a) && named(b),
-            }), "{}", m.name);
+            assert!(
+                m.joints.iter().all(|j| match j {
+                    JointSpec::Slider { a, b, .. }
+                    | JointSpec::Hinge { a, b, .. }
+                    | JointSpec::Ball { a, b, .. } => {
+                        named(a) && named(b)
+                    }
+                    JointSpec::Spring { a, b, .. } => named(a) && named(b),
+                }),
+                "{}",
+                m.name
+            );
             assert!(m.forces.iter().all(|f| named(f.part)), "{}", m.name);
             if let Some(f) = &m.finish {
                 assert!(named(f.near) && named(f.force.part), "{}", m.name);
                 // every hinge it breaks is one of the module's
-                let hinge = |fr: &str| m.joints.iter().any(|j| matches!(j, JointSpec::Hinge { frame, .. } if *frame == fr));
+                let hinge = |fr: &str| {
+                    m.joints
+                        .iter()
+                        .any(|j| matches!(j, JointSpec::Hinge { frame, .. } if *frame == fr))
+                };
                 assert!(f.breaks.iter().all(|b| hinge(b)), "{}", m.name);
             }
         }

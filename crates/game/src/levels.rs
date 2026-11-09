@@ -54,7 +54,10 @@ fn write(folder: &Path, text: &str, replace: bool) {
         if std::fs::symlink_metadata(&tmp).is_ok() {
             std::fs::remove_file(&tmp)?;
         }
-        let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
         std::io::Write::write_all(&mut f, text.as_bytes())?;
         f.sync_all()?;
         drop(f);
@@ -592,8 +595,8 @@ fn copy(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use gamedata::profile::resolve;
     use super::*;
+    use gamedata::profile::resolve;
 
     #[test]
     fn what_is_found_is_told_by_its_contents() {
@@ -636,7 +639,10 @@ mod tests {
     fn earlier_readmes_are_brought_up_to_date_and_players_ones_kept() {
         for l in ["en", "ru", "de", "zh"] {
             for k in KINDS {
-                assert!(!outdated(&about(l, k)), "{l} {k:?}: the current text is not replaced again");
+                assert!(
+                    !outdated(&about(l, k)),
+                    "{l} {k:?}: the current text is not replaced again"
+                );
             }
         }
         assert!(SUPERSEDED.iter().all(|t| outdated(t) && t.len() < 4096));
@@ -659,20 +665,31 @@ mod tests {
         std::os::unix::fs::symlink(outside.join("made.txt"), folder.join(README)).unwrap();
         write(&folder, "text", true);
         assert!(!outside.join("made.txt").exists());
-        assert!(std::fs::symlink_metadata(folder.join(README)).unwrap().file_type().is_symlink());
+        assert!(
+            std::fs::symlink_metadata(folder.join(README))
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
         // a link to an existing file: neither it nor its target is changed
         std::fs::write(outside.join("target.txt"), "theirs").unwrap();
         std::fs::remove_file(folder.join(README)).unwrap();
         std::os::unix::fs::symlink(outside.join("target.txt"), folder.join(README)).unwrap();
         write(&folder, "text", true);
-        assert_eq!(std::fs::read_to_string(outside.join("target.txt")).unwrap(), "theirs");
+        assert_eq!(
+            std::fs::read_to_string(outside.join("target.txt")).unwrap(),
+            "theirs"
+        );
         // a plain README: written atomically, replaced only when asked, no temporary file left
         let plain = root.join("plain");
         write(&plain, "one", false);
         write(&plain, "two", false);
         assert_eq!(std::fs::read_to_string(plain.join(README)).unwrap(), "one");
         write(&plain, "three", true);
-        assert_eq!(std::fs::read_to_string(plain.join(README)).unwrap(), "three");
+        assert_eq!(
+            std::fs::read_to_string(plain.join(README)).unwrap(),
+            "three"
+        );
         assert_eq!(std::fs::read_dir(&plain).unwrap().count(), 1);
         let _ = std::fs::remove_dir_all(&root);
     }

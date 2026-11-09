@@ -52,7 +52,10 @@ pub struct Package {
 impl Package {
     /// The title in the language `lang` (a code such as "ru") when level.txt gives one, else the title.
     pub fn title_in(&self, lang: &str) -> &str {
-        self.titles.iter().find(|(l, _)| l == lang).map_or(&self.title, |(_, t)| t)
+        self.titles
+            .iter()
+            .find(|(l, _)| l == lang)
+            .map_or(&self.title, |(_, t)| t)
     }
 }
 
@@ -70,7 +73,11 @@ impl std::fmt::Display for Skipped {
         match self {
             Skipped::Empty(p) => write!(f, "{}: no level in it", printable(&p.to_string_lossy())),
             Skipped::Several(p, n) => {
-                write!(f, "{}: {n} level files, a level folder holds one", printable(&p.to_string_lossy()))
+                write!(
+                    f,
+                    "{}: {n} level files, a level folder holds one",
+                    printable(&p.to_string_lossy())
+                )
             }
         }
     }
@@ -94,7 +101,14 @@ pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
         // titled levels first, by difficulty (unknown after the known), then by order, then by title; a level named
         // only by its folder comes last
         let key = |p: &Package| {
-            (!p.titled, p.difficulty.is_none(), p.difficulty, p.order.is_none(), p.order, p.title.to_lowercase())
+            (
+                !p.titled,
+                p.difficulty.is_none(),
+                p.difficulty,
+                p.order.is_none(),
+                p.order,
+                p.title.to_lowercase(),
+            )
         };
         key(a).cmp(&key(b)).then_with(|| a.level.cmp(&b.level))
     });
@@ -105,7 +119,9 @@ pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
 pub fn examine(folder: &Path) -> Result<Package, Skipped> {
     let list = entries(folder, FOLDER_ENTRIES_MAX);
     // exactly "level.gltf", the name the loader opens (a "LEVEL.GLTF" would not load on a case-sensitive system)
-    let open = list.iter().any(|(p, k)| k.is_file() && p.file_name().is_some_and(|n| n == "level.gltf"));
+    let open = list
+        .iter()
+        .any(|(p, k)| k.is_file() && p.file_name().is_some_and(|n| n == "level.gltf"));
     let nmos: Vec<&PathBuf> = list
         .iter()
         .filter(|(p, k)| k.is_file() && is_nmo(p))
@@ -115,7 +131,12 @@ pub fn examine(folder: &Path) -> Result<Package, Skipped> {
         (true, []) => folder.to_path_buf(),
         (false, [one]) => (*one).clone(),
         (false, []) => return Err(Skipped::Empty(folder.to_path_buf())),
-        (o, more) => return Err(Skipped::Several(folder.to_path_buf(), more.len().saturating_add(usize::from(o)))),
+        (o, more) => {
+            return Err(Skipped::Several(
+                folder.to_path_buf(),
+                more.len().saturating_add(usize::from(o)),
+            ));
+        }
     };
     let info = read_info(&folder.join(INFO_FILE));
     let fallback = folder
@@ -161,10 +182,15 @@ fn loose(file: &Path) -> Package {
 /// or is itself one, else its file's name; cleaned and capped either way.
 pub fn title_of(level: &Path, roots: &[PathBuf], lang: &str) -> String {
     let same = |a: &Path, b: &Path| {
-        a == b || matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y)
+        a == b
+            || matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y)
     };
     let in_roots = |p: Option<&Path>| p.is_some_and(|p| roots.iter().any(|r| same(p, r)));
-    let folder = if is_nmo(level) { level.parent() } else { Some(level) };
+    let folder = if is_nmo(level) {
+        level.parent()
+    } else {
+        Some(level)
+    };
     if let Some(folder) = folder.filter(|f| in_roots(f.parent()))
         && let Ok(p) = examine(folder)
         && same(&p.level, level)
@@ -200,7 +226,9 @@ fn difficulty(v: &str) -> Option<u8> {
     if v.is_empty() || v.len() > 2 || !v.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    v.parse::<u8>().ok().filter(|d| (1..=DIFFICULTY_MAX).contains(d))
+    v.parse::<u8>()
+        .ok()
+        .filter(|d| (1..=DIFFICULTY_MAX).contains(d))
 }
 
 fn read_info(path: &Path) -> Info {
@@ -233,13 +261,22 @@ pub fn parse_info(bytes: &[u8]) -> Info {
             continue;
         }
         if key == "hidden" {
-            info.hidden = matches!(value.trim().to_ascii_lowercase().as_str(), "yes" | "true" | "1");
+            info.hidden = matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "yes" | "true" | "1"
+            );
             continue;
         }
         if let Some(code) = key.strip_prefix("title.") {
             let v = clean(value, TITLE_MAX);
-            let fits = !code.is_empty() && code.len() <= LANG_CODE_MAX && code.bytes().all(|b| b.is_ascii_lowercase());
-            if fits && !v.is_empty() && info.titles.len() < TITLES_MAX && !info.titles.iter().any(|(c, _)| c == code) {
+            let fits = !code.is_empty()
+                && code.len() <= LANG_CODE_MAX
+                && code.bytes().all(|b| b.is_ascii_lowercase());
+            if fits
+                && !v.is_empty()
+                && info.titles.len() < TITLES_MAX
+                && !info.titles.iter().any(|(c, _)| c == code)
+            {
                 info.titles.push((code.to_owned(), v));
             }
             continue;
@@ -266,7 +303,9 @@ pub fn read_small(path: &Path, cap: u64) -> Option<Vec<u8>> {
     }
     let file = open_plain(path, &meta).ok()?;
     let mut bytes = Vec::new();
-    file.take(cap.saturating_add(1)).read_to_end(&mut bytes).ok()?;
+    file.take(cap.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .ok()?;
     (u64::try_from(bytes.len()).ok()? <= cap).then_some(bytes)
 }
 
@@ -274,7 +313,12 @@ pub fn read_small(path: &Path, cap: u64) -> Option<Vec<u8>> {
 /// (O_NOFOLLOW, or the reparse point itself on Windows), never blocking on a FIFO swapped in (O_NONBLOCK), and the
 /// file opened checked to be the same one (device and inode on Unix) and a regular file.
 pub fn open_plain(path: &Path, seen: &std::fs::Metadata) -> std::io::Result<std::fs::File> {
-    let refused = || std::io::Error::new(std::io::ErrorKind::InvalidData, "not the plain file looked at");
+    let refused = || {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "not the plain file looked at",
+        )
+    };
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -307,7 +351,13 @@ pub fn open_plain(path: &Path, seen: &std::fs::Metadata) -> std::io::Result<std:
 /// overrides) shown as `\u{..}` escapes.
 pub fn printable(s: &str) -> String {
     s.chars()
-        .map(|c| if c.is_control() || is_format(c) { c.escape_unicode().to_string() } else { c.to_string() })
+        .map(|c| {
+            if c.is_control() || is_format(c) {
+                c.escape_unicode().to_string()
+            } else {
+                c.to_string()
+            }
+        })
         .collect()
 }
 
@@ -385,7 +435,10 @@ mod tests {
     use super::*;
 
     fn temp(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("drahtseilakt-package-{name}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!(
+            "drahtseilakt-package-{name}-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
@@ -473,13 +526,19 @@ mod tests {
         assert_eq!(p.title.chars().count(), TITLE_MAX);
         // an empty or invisible title, broken UTF-8, and a huge file fall back to the folder's name
         assert_eq!(level("c", b"title = \xe2\x80\x8b\n").title, "c");
-        assert_eq!(level("d", b"title = \xff\xfe ok\n").title, "\u{fffd}\u{fffd} ok");
+        assert_eq!(
+            level("d", b"title = \xff\xfe ok\n").title,
+            "\u{fffd}\u{fffd} ok"
+        );
         let mut huge = b"title = Huge\n".to_vec();
         huge.resize(usize::try_from(INFO_MAX).unwrap() + 1, b' ');
         assert_eq!(level("e", &huge).title, "e");
         // a folder name is cleaned and capped like a title
         let long = format!("{}\u{202e}", "N".repeat(60));
-        assert_eq!(level(&long, b"").title, format!("{}…", "N".repeat(TITLE_MAX - 1)));
+        assert_eq!(
+            level(&long, b"").title,
+            format!("{}…", "N".repeat(TITLE_MAX - 1))
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -492,30 +551,77 @@ mod tests {
             std::fs::write(d.join("x.nmo"), b"").unwrap();
             std::fs::write(d.join(INFO_FILE), info).unwrap();
         };
-        level("z", "title = Zeta\norder = 2\ntitle.ru = Зета \u{202e}\ntitle.RU = no\ntitle.de=\n");
+        level(
+            "z",
+            "title = Zeta\norder = 2\ntitle.ru = Зета \u{202e}\ntitle.RU = no\ntitle.de=\n",
+        );
         level("y", "title = Alpha\n");
-        level("x", "title = Omega\norder = 1\ntitle.../x = no\ntitle.toolongcode = no\n");
+        level(
+            "x",
+            "title = Omega\norder = 1\ntitle.../x = no\ntitle.toolongcode = no\n",
+        );
         level("w", "title = Beta\norder = nonsense\nhidden = maybe\n");
         let (found, _) = scan(&root);
-        assert!(found.iter().all(|p| !p.hidden), "hidden only when it says yes");
+        assert!(
+            found.iter().all(|p| !p.hidden),
+            "hidden only when it says yes"
+        );
         assert!(parse_info(b"hidden = Yes\n").hidden && parse_info(b"hidden=1").hidden);
         let titles: Vec<&str> = found.iter().map(|p| p.title.as_str()).collect();
-        assert_eq!(titles, ["Omega", "Zeta", "Alpha", "Beta"], "ordered ones first, by order; then by title");
+        assert_eq!(
+            titles,
+            ["Omega", "Zeta", "Alpha", "Beta"],
+            "ordered ones first, by order; then by title"
+        );
         let zeta = found.get(1).unwrap();
-        assert_eq!(zeta.title_in("ru"), "Зета", "cleaned; the first of a language kept");
-        assert_eq!((zeta.title_in("de"), zeta.title_in("zh")), ("Zeta", "Zeta"), "an empty or missing one: the title");
-        assert!(found.first().unwrap().titles.is_empty(), "codes are lowercase letters, at most 8");
+        assert_eq!(
+            zeta.title_in("ru"),
+            "Зета",
+            "cleaned; the first of a language kept"
+        );
+        assert_eq!(
+            (zeta.title_in("de"), zeta.title_in("zh")),
+            ("Zeta", "Zeta"),
+            "an empty or missing one: the title"
+        );
+        assert!(
+            found.first().unwrap().titles.is_empty(),
+            "codes are lowercase letters, at most 8"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
     fn difficulty_is_a_whole_number_from_one_to_ten() {
         let d = |t: &str| parse_info(t.as_bytes()).difficulty;
-        assert_eq!((d("difficulty = 1"), d("Difficulty=10"), d("difficulty = 07")), (Some(1), Some(10), Some(7)));
-        for bad in ["0", "11", "-3", "+3", "3.5", "1e1", "３", "", "5 stars", "999999999999999999999", "٣"] {
+        assert_eq!(
+            (
+                d("difficulty = 1"),
+                d("Difficulty=10"),
+                d("difficulty = 07")
+            ),
+            (Some(1), Some(10), Some(7))
+        );
+        for bad in [
+            "0",
+            "11",
+            "-3",
+            "+3",
+            "3.5",
+            "1e1",
+            "３",
+            "",
+            "5 stars",
+            "999999999999999999999",
+            "٣",
+        ] {
             assert_eq!(d(&format!("difficulty = {bad}")), None, "{bad:?}");
         }
-        assert_eq!(d("difficulty = 4\ndifficulty = 9"), Some(4), "the first one counts");
+        assert_eq!(
+            d("difficulty = 4\ndifficulty = 9"),
+            Some(4),
+            "the first one counts"
+        );
     }
 
     #[test]
@@ -537,7 +643,10 @@ mod tests {
         level("e", Some("difficulty = 1\n"));
         let (found, _) = scan(&root);
         let titles: Vec<&str> = found.iter().map(|p| p.title.as_str()).collect();
-        assert_eq!(titles, ["Easy A", "Easy B", "Hard", "Unknown", "e", "AAA folder"]);
+        assert_eq!(
+            titles,
+            ["Easy A", "Easy B", "Hard", "Unknown", "e", "AAA folder"]
+        );
         assert_eq!(found.first().unwrap().difficulty, Some(2));
         assert!(!found.last().unwrap().titled);
         let _ = std::fs::remove_dir_all(&root);
@@ -562,7 +671,10 @@ mod tests {
         symlink(outside.join("secret.nmo"), d.join("second.nmo")).unwrap();
         let (found, skipped) = scan(&root);
         assert_eq!(found.len(), 1);
-        assert_eq!((found[0].title.as_str(), &found[0].level), ("Real", &d.join("x.nmo")));
+        assert_eq!(
+            (found[0].title.as_str(), &found[0].level),
+            ("Real", &d.join("x.nmo"))
+        );
         assert!(skipped.is_empty());
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&outside);
@@ -570,7 +682,10 @@ mod tests {
 
     #[test]
     fn printed_names_cannot_drive_the_terminal() {
-        assert_eq!(printable("a\u{1b}]0;x\u{7}b\u{202e}c"), "a\\u{1b}]0;x\\u{7}b\\u{202e}c");
+        assert_eq!(
+            printable("a\u{1b}]0;x\u{7}b\u{202e}c"),
+            "a\\u{1b}]0;x\\u{7}b\\u{202e}c"
+        );
         let s = Skipped::Empty(PathBuf::from("lv/\u{1b}[2J"));
         assert!(!s.to_string().contains('\u{1b}'));
     }
@@ -580,7 +695,10 @@ mod tests {
         let root = temp("gltf-case");
         std::fs::create_dir_all(root.join("Upper")).unwrap();
         std::fs::write(root.join("Upper/LEVEL.GLTF"), b"").unwrap();
-        assert_eq!(examine(&root.join("Upper")), Err(Skipped::Empty(root.join("Upper"))));
+        assert_eq!(
+            examine(&root.join("Upper")),
+            Err(Skipped::Empty(root.join("Upper")))
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -599,7 +717,10 @@ mod tests {
         std::fs::write(&a, b"a").unwrap();
         std::fs::write(&b, b"b").unwrap();
         let seen = std::fs::symlink_metadata(&a).unwrap();
-        assert!(open_plain(&b, &seen).is_err(), "another file than the one looked at");
+        assert!(
+            open_plain(&b, &seen).is_err(),
+            "another file than the one looked at"
+        );
         assert!(open_plain(&a, &seen).is_ok());
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -612,8 +733,14 @@ mod tests {
         std::fs::write(d.join("Level_07.NMO"), b"").unwrap();
         std::fs::write(root.join("Loose One.nmo"), b"").unwrap();
         let roots = [root.clone()];
-        assert_eq!(title_of(&d.join("Level_07.NMO"), &roots, "en"), "Folder Name");
-        assert_eq!(title_of(&root.join("Loose One.nmo"), &roots, "en"), "Loose One");
+        assert_eq!(
+            title_of(&d.join("Level_07.NMO"), &roots, "en"),
+            "Folder Name"
+        );
+        assert_eq!(
+            title_of(&root.join("Loose One.nmo"), &roots, "en"),
+            "Loose One"
+        );
         // outside the levels folders a level is named by its file
         assert_eq!(title_of(&d.join("Level_07.NMO"), &[], "en"), "Level_07");
         let _ = std::fs::remove_dir_all(&root);

@@ -100,14 +100,25 @@ impl Core {
     /// slerped from the last PSI, its position, and the object's shift rotated into the world.
     pub fn object_pose_at(&self, t: f64) -> Matrix {
         let dt = t - self.time_of_last_psi;
-        let q = math::quat_slerp(&self.q_last, &self.q_next, dt * f64::from(self.i_delta_time));
+        let q = math::quat_slerp(
+            &self.q_last,
+            &self.q_next,
+            dt * f64::from(self.i_delta_time),
+        );
         let r = math::quat_to_matrix(&q);
         let mut vv = [0.0; 3];
         for k in 0..3 {
             vv[k] = self.pos_last[k] + f64::from(self.delta_pos[k]) * dt;
         }
         if self.shift != [0.0; 3] {
-            let s = math::rmul(&r, &[f64::from(self.shift[0]), f64::from(self.shift[1]), f64::from(self.shift[2])]);
+            let s = math::rmul(
+                &r,
+                &[
+                    f64::from(self.shift[0]),
+                    f64::from(self.shift[1]),
+                    f64::from(self.shift[2]),
+                ],
+            );
             for k in 0..3 {
                 vv[k] += s[k];
             }
@@ -132,12 +143,21 @@ pub struct SimUnit {
 #[derive(Clone, Debug)]
 pub enum Controller {
     /// The gravity controller (1.7, priority 1000): the game's gravity vector.
-    Gravity { g: [f32; 3] },
+    Gravity {
+        g: [f32; 3],
+    },
     /// One of a friction system's three controllers (`crate::friction`).
-    Friction { fs: usize, kind: FrictionKind },
+    Friction {
+        fs: usize,
+        kind: FrictionKind,
+    },
     /// A spring (`crate::constraint`, priority 1500) and a constraint (priority 405) acting on a joint.
-    Spring { joint: usize },
-    Constraint { joint: usize },
+    Spring {
+        joint: usize,
+    },
+    Constraint {
+        joint: usize,
+    },
     /// SetPhysicsForce's controller (`crate::glue`, priority 1500): a force on one body every PSI.
     Force(crate::glue::Force),
 }

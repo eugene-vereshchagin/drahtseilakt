@@ -2,6 +2,7 @@
 // Every input is treated as hostile (community maps come from strangers' file shares): reads are
 // bounds-checked, sizes are capped before allocating, and a malformed file is an error, never a panic.
 
+pub mod behavior;
 mod bytes;
 mod checksum;
 pub mod chunk;

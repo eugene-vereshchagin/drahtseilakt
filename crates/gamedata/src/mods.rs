@@ -350,7 +350,10 @@ impl Expr {
         1usize.saturating_add(match self {
             Expr::Neg(e) | Expr::Not(e) => e.size(),
             Expr::Bin(_, a, b) => a.size().saturating_add(b.size()),
-            Expr::Call(_, args) => args.iter().map(Expr::size).fold(0usize, usize::saturating_add),
+            Expr::Call(_, args) => args
+                .iter()
+                .map(Expr::size)
+                .fold(0usize, usize::saturating_add),
             _ => 0,
         })
     }
@@ -641,12 +644,16 @@ impl ModTxt {
 
     /// It changes the run (any sim action, or a practice deed that reaches into it): its runs are modded.
     pub fn modded(&self) -> bool {
-        self.rules.iter().any(|r| r.actions.iter().any(|a| a.sim() || a.practice()))
+        self.rules
+            .iter()
+            .any(|r| r.actions.iter().any(|a| a.sim() || a.practice()))
     }
 
     /// It has a practice deed: while it is on, the game keeps the run's moments for going back.
     pub fn practice(&self) -> bool {
-        self.rules.iter().any(|r| r.actions.iter().any(Action::practice))
+        self.rules
+            .iter()
+            .any(|r| r.actions.iter().any(Action::practice))
     }
 
     /// The label names in their order (`Show` refers to them by place).
@@ -1067,8 +1074,21 @@ fn parse_option(rest: &str) -> Result<OptSpec, String> {
 
 /// Keys a mod may never take: the menu's and window's, the arrows, the game's default keys, the practice tools'.
 pub const RESERVED_KEYS: [&str; 15] = [
-    "Escape", "Enter", "NumpadEnter", "F11", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft",
-    "ShiftRight", "Space", "Tab", "AltLeft", "AltRight", "Backquote",
+    "Escape",
+    "Enter",
+    "NumpadEnter",
+    "F11",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ShiftLeft",
+    "ShiftRight",
+    "Space",
+    "Tab",
+    "AltLeft",
+    "AltRight",
+    "Backquote",
 ];
 
 fn parse_event(rest: &str, options: &[OptSpec]) -> Result<Event, String> {
@@ -1437,7 +1457,10 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
                     return Err(at(format!("more than {MAX_ALL_ACTIONS} actions")));
                 }
                 let sim = m.rules.last().is_some_and(|r| r.event.sim());
-                let key = m.rules.last().is_some_and(|r| matches!(r.event, Event::Key(_)));
+                let key = m
+                    .rules
+                    .last()
+                    .is_some_and(|r| matches!(r.event, Event::Key(_)));
                 let a = parse_action(rest, &mut m, sim, key).map_err(at)?;
                 let r = m
                     .rules
@@ -1456,11 +1479,20 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
         .rules
         .iter()
         .map(|r| {
-            let conds = r.conditions.iter().map(Expr::size).fold(0usize, usize::saturating_add);
+            let conds = r
+                .conditions
+                .iter()
+                .map(Expr::size)
+                .fold(0usize, usize::saturating_add);
             let acts = r
                 .actions
                 .iter()
-                .map(|a| a.exprs().iter().map(|e| e.size()).fold(1usize, usize::saturating_add))
+                .map(|a| {
+                    a.exprs()
+                        .iter()
+                        .map(|e| e.size())
+                        .fold(1usize, usize::saturating_add)
+                })
                 .fold(0usize, usize::saturating_add);
             conds.saturating_add(acts)
         })
@@ -1825,7 +1857,10 @@ mod tests {
              do save\ndo load\ndo slower\ndo faster\ndo freecam\non frame\ndo keys bottom-left\n",
         )
         .unwrap();
-        assert!(ok.practice() && ok.modded(), "a practice deed reaches into the run");
+        assert!(
+            ok.practice() && ok.modded(),
+            "a practice deed reaches into the run"
+        );
         for bad in [
             "name.en P\non frame\ndo rewind 5\n",
             "name.en P\non tick\ndo save\n",
@@ -1836,7 +1871,10 @@ mod tests {
             assert!(parse_mod_txt(bad).is_err(), "{bad:?}");
         }
         let lives = parse_mod_txt("name.en L\non tick\ndo lives.endless 1\n").unwrap();
-        assert!(lives.modded() && !lives.practice(), "endless lives is a run action");
+        assert!(
+            lives.modded() && !lives.practice(),
+            "endless lives is a run action"
+        );
         // the practice's keys are the god-mode's now, no longer the game's
         assert!(parse_mod_txt("name.en K\noption k key F3,F5,F9,KeyR,F2,BracketLeft\n").is_ok());
     }
@@ -1846,9 +1884,14 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
         let god = read_mod(&root.join("mods-dev/god-mode")).unwrap();
         assert!(god.practice() && god.modded());
-        assert!(!root.join("mods/god-mode").exists(), "god-mode is not a factory mod: a release ships no mods-dev");
+        assert!(
+            !root.join("mods/god-mode").exists(),
+            "god-mode is not a factory mod: a release ships no mods-dev"
+        );
         let keys: Vec<&str> = god.options.iter().map(|o| o.key.as_str()).collect();
-        for k in ["lives", "back", "rewind", "save", "load", "restart", "slower", "faster", "camera"] {
+        for k in [
+            "lives", "back", "rewind", "save", "load", "restart", "slower", "faster", "camera",
+        ] {
             assert!(keys.contains(&k), "{k}");
         }
     }

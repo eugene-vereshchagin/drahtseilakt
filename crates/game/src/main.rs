@@ -36,14 +36,15 @@ mod modules;
 mod music;
 mod options;
 mod ownlevels;
-mod particles;
 mod partcheck;
+mod particles;
 mod physics;
 mod pieces;
 mod proximity;
 mod render;
 mod replay;
 mod scene;
+mod scripting;
 mod setup;
 mod sim;
 mod sky;
@@ -253,7 +254,9 @@ fn parse_args() -> Result<Options, String> {
             "--open" => {
                 // known by its full path (its own files are, and a remaster by where it lies)
                 let dir = PathBuf::from(value()?);
-                o.source = Source::Open(level::open::full_path(&dir).map_err(|e| format!("{}: {e}", dir.display()))?);
+                o.source = Source::Open(
+                    level::open::full_path(&dir).map_err(|e| format!("{}: {e}", dir.display()))?,
+                );
                 o.chosen = true;
             }
             "--export" => o.export = Some(value()?.into()),
@@ -287,11 +290,15 @@ fn parse_args() -> Result<Options, String> {
             "--hints" => o.hints = Some(value()?.into()),
             "--report" => o.report = Some(value()?.into()),
             "--give-up" => {
-                let s: u64 = value()?.parse().map_err(|_| "--give-up needs seconds".to_owned())?;
+                let s: u64 = value()?
+                    .parse()
+                    .map_err(|_| "--give-up needs seconds".to_owned())?;
                 o.give_up = s.clamp(5, 3600);
             }
             "--rewinds" => {
-                let n: u32 = value()?.parse().map_err(|_| "--rewinds needs a number".to_owned())?;
+                let n: u32 = value()?
+                    .parse()
+                    .map_err(|_| "--rewinds needs a number".to_owned())?;
                 o.rewinds = n.min(100_000);
             }
             "--then" => {
@@ -311,7 +318,9 @@ fn parse_args() -> Result<Options, String> {
             "--sky" => {
                 let name = value()?;
                 if !sky::valid_name(&name) {
-                    return Err(format!("--sky {name}: a sky's name is letters, digits, _ and - (e.g. Mountains)"));
+                    return Err(format!(
+                        "--sky {name}: a sky's name is letters, digits, _ and - (e.g. Mountains)"
+                    ));
                 }
                 sky::set_override(name);
             }
@@ -415,12 +424,17 @@ fn restart() -> ! {
 
 /// Where the game found its shipped assets and keeps the player's data (and whether the copy is portable).
 fn paths_line() -> String {
-    let shown = |p: Option<std::path::PathBuf>| p.map_or("(none)".into(), |p| p.display().to_string());
+    let shown =
+        |p: Option<std::path::PathBuf>| p.map_or("(none)".into(), |p| p.display().to_string());
     format!(
         "paths: assets {} | data {} ({})",
         shown(gamedata::resources::assets_root()),
         gamedata::profile::data_dir().display(),
-        if gamedata::profile::portable_root().is_some() { "portable" } else { "per-user" }
+        if gamedata::profile::portable_root().is_some() {
+            "portable"
+        } else {
+            "per-user"
+        }
     )
 }
 

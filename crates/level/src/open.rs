@@ -10,7 +10,9 @@
 // just above; slices are only indexed through `chunks_exact`, whose chunks have the exact length.
 #![allow(clippy::indexing_slicing)]
 
-use crate::{Blend, Channel, Group, Level, Material, Mesh, Object, Part, TexGen, Texture, TextureSource};
+use crate::{
+    Blend, Channel, Group, Level, Material, Mesh, Object, Part, TexGen, Texture, TextureSource,
+};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -76,7 +78,9 @@ pub fn game_texture_name(name: &str) -> bool {
     !name.is_empty()
         && name.chars().count() <= 128
         && !name.starts_with('.')
-        && !name.chars().any(|c| matches!(c, '/' | '\\' | ':') || c.is_control())
+        && !name
+            .chars()
+            .any(|c| matches!(c, '/' | '\\' | ':') || c.is_control())
 }
 
 pub fn texture_file(index: usize, name: &str) -> String {
@@ -123,8 +127,12 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
     }
     // a mesh's finer look is one more mesh after all the level's own, named in the mesh's extras
     for (m, at) in level.meshes.iter().zip(&mesh_index) {
-        let (Some(look), Some(at)) = (&m.look, *at) else { continue };
-        let Some(v) = mesh_json(look, &mut push) else { continue };
+        let (Some(look), Some(at)) = (&m.look, *at) else {
+            continue;
+        };
+        let Some(v) = mesh_json(look, &mut push) else {
+            continue;
+        };
         meshes.push(v);
         let k = meshes.len().saturating_sub(1);
         if let Some(mesh) = meshes.get_mut(at) {
@@ -284,7 +292,10 @@ fn number(o: &Value, what: &str, k: &str, lo: f32, hi: f32) -> Result<Option<f32
     match &o[k] {
         Value::Null => Ok(None),
         x => {
-            let x = x.as_f64().ok_or_else(|| format!("settings: {what}'s {k} is not a number"))? as f32;
+            let x = x
+                .as_f64()
+                .ok_or_else(|| format!("settings: {what}'s {k} is not a number"))?
+                as f32;
             if x.is_finite() {
                 Ok(Some(x.clamp(lo, hi)))
             } else {
@@ -295,7 +306,13 @@ fn number(o: &Value, what: &str, k: &str, lo: f32, hi: f32) -> Result<Option<f32
 }
 
 /// N numbers of a settings object, each finite and held to lo..hi; `None` when they are missing (null).
-fn numbers<const N: usize>(o: &Value, what: &str, k: &str, lo: f32, hi: f32) -> Result<Option<[f32; N]>, String> {
+fn numbers<const N: usize>(
+    o: &Value,
+    what: &str,
+    k: &str,
+    lo: f32,
+    hi: f32,
+) -> Result<Option<[f32; N]>, String> {
     if o[k].is_null() {
         return Ok(None);
     }
@@ -324,7 +341,11 @@ fn clouds_from(c: &Value) -> Result<crate::Clouds, String> {
     let sun = numbers::<3>(c, what, "sun", -1.0, 1.0)?
         .map(|s| {
             let l = (s[0] * s[0] + s[1] * s[1] + s[2] * s[2]).sqrt();
-            if l > 1e-3 { [s[0] / l, s[1] / l, s[2] / l] } else { d.sun }
+            if l > 1e-3 {
+                [s[0] / l, s[1] / l, s[2] / l]
+            } else {
+                d.sun
+            }
         })
         .unwrap_or(d.sun);
     Ok(crate::Clouds {
@@ -374,10 +395,20 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
     let light = match &v["light"] {
         Value::Null => None,
         l => {
-            let a = l.as_array().filter(|a| a.len() == 3).ok_or("settings: light is not three numbers")?;
+            let a = l
+                .as_array()
+                .filter(|a| a.len() == 3)
+                .ok_or("settings: light is not three numbers")?;
             let c = |i: usize| -> Result<f32, String> {
-                let x = a.get(i).and_then(Value::as_f64).ok_or("settings: light is not three numbers")? as f32;
-                if x.is_finite() { Ok(x.clamp(0.0, 1.0)) } else { Err("settings: light is not finite".into()) }
+                let x = a
+                    .get(i)
+                    .and_then(Value::as_f64)
+                    .ok_or("settings: light is not three numbers")? as f32;
+                if x.is_finite() {
+                    Ok(x.clamp(0.0, 1.0))
+                } else {
+                    Err("settings: light is not finite".into())
+                }
             };
             Some([c(0)?, c(1)?, c(2)?])
         }
@@ -394,8 +425,14 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
     let source_hash = match &v["source_hash"] {
         Value::Null => None,
         h => {
-            let s = h.as_str().filter(|s| s.len() == 16).ok_or("settings: source_hash is not 16 hex digits")?;
-            Some(u64::from_str_radix(s, 16).map_err(|_| "settings: source_hash is not 16 hex digits".to_owned())?)
+            let s = h
+                .as_str()
+                .filter(|s| s.len() == 16)
+                .ok_or("settings: source_hash is not 16 hex digits")?;
+            Some(
+                u64::from_str_radix(s, 16)
+                    .map_err(|_| "settings: source_hash is not 16 hex digits".to_owned())?,
+            )
         }
     };
     let own_parts = match &v["parts"] {
@@ -411,8 +448,15 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
                 return Err("settings: fog is not an object".into());
             }
             let num = |k: &str, lo: f32, hi: f32| -> Result<f32, String> {
-                let x = f[k].as_f64().ok_or_else(|| format!("settings: fog's {k} is not a number"))? as f32;
-                if x.is_finite() { Ok(x.clamp(lo, hi)) } else { Err(format!("settings: fog's {k} is not finite")) }
+                let x = f[k]
+                    .as_f64()
+                    .ok_or_else(|| format!("settings: fog's {k} is not a number"))?
+                    as f32;
+                if x.is_finite() {
+                    Ok(x.clamp(lo, hi))
+                } else {
+                    Err(format!("settings: fog's {k} is not finite"))
+                }
             };
             let colour = |k: &str| -> Result<[f32; 3], String> {
                 let a = f[k]
@@ -421,7 +465,10 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
                     .ok_or_else(|| format!("settings: fog's {k} is not three numbers"))?;
                 let mut out = [0.0f32; 3];
                 for (o, x) in out.iter_mut().zip(a) {
-                    let x = x.as_f64().ok_or_else(|| format!("settings: fog's {k} is not three numbers"))? as f32;
+                    let x = x
+                        .as_f64()
+                        .ok_or_else(|| format!("settings: fog's {k} is not three numbers"))?
+                        as f32;
                     if !x.is_finite() {
                         return Err(format!("settings: fog's {k} is not finite"));
                     }
@@ -431,7 +478,11 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
             };
             let color = colour("color")?;
             // a fog without its colour seen downwards (missing or null) has one colour all round
-            let color_down = if f["color_down"].is_null() { color } else { colour("color_down")? };
+            let color_down = if f["color_down"].is_null() {
+                color
+            } else {
+                colour("color_down")?
+            };
             Some(crate::Fog {
                 color,
                 color_down,
@@ -451,7 +502,9 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
             .iter()
             .map(|b| match b {
                 Value::Null => Ok(None),
-                Value::String(s) if ["wood", "stone", "paper"].contains(&s.as_str()) => Ok(Some(s.clone())),
+                Value::String(s) if ["wood", "stone", "paper"].contains(&s.as_str()) => {
+                    Ok(Some(s.clone()))
+                }
                 _ => Err("settings: sector_balls holds wood, stone, paper or null"),
             })
             .collect::<Result<_, _>>()?,
@@ -527,8 +580,14 @@ fn mesh_json(m: &Mesh, push: &mut impl FnMut(&[u8], u64, Value) -> usize) -> Opt
     let mut attributes = json!({"POSITION": p_acc, "NORMAL": n_acc, "TEXCOORD_0": t_acc});
     let mut channels = Vec::new();
     for (k, c) in (1usize..).zip(&m.channels) {
-        let uv: Vec<f32> = (0..n).flat_map(|i| c.uvs.get(i).copied().unwrap_or([0.0; 2])).collect();
-        let acc = push(&f32_bytes(&uv), 34962, json!({"componentType": FLOAT, "count": n, "type": "VEC2"}));
+        let uv: Vec<f32> = (0..n)
+            .flat_map(|i| c.uvs.get(i).copied().unwrap_or([0.0; 2]))
+            .collect();
+        let acc = push(
+            &f32_bytes(&uv),
+            34962,
+            json!({"componentType": FLOAT, "count": n, "type": "VEC2"}),
+        );
         attributes[format!("TEXCOORD_{k}")] = json!(acc);
         channels.push(json!({"material": c.material, "blend": [blend_name(c.blend.0), blend_name(c.blend.1)], "texcoord": k}));
     }
@@ -588,7 +647,10 @@ fn attach_looks(meshes: &mut Vec<Mesh>, looks: &[Option<u64>]) -> Result<(), Str
     }
     let mut extra: Vec<Option<Mesh>> = extra.into_iter().map(Some).collect();
     for (i, k) in wanted {
-        let look = k.checked_sub(first).and_then(|j| extra.get_mut(j)).and_then(Option::take);
+        let look = k
+            .checked_sub(first)
+            .and_then(|j| extra.get_mut(j))
+            .and_then(Option::take);
         if let (Some(m), Some(look)) = (meshes.get_mut(i), look) {
             m.look = Some(Box::new(look));
         }
@@ -604,7 +666,9 @@ fn f32_bytes(v: &[f32]) -> Vec<u8> {
 /// length is does not count; a file that grows while read is refused).
 fn read_capped(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
     use std::io::Read;
-    let plain = std::fs::symlink_metadata(path).map_err(|e| format!("{}: {e}", path.display()))?.is_file();
+    let plain = std::fs::symlink_metadata(path)
+        .map_err(|e| format!("{}: {e}", path.display()))?
+        .is_file();
     if !plain {
         return Err(format!("{}: not a plain file", path.display()));
     }
@@ -614,7 +678,10 @@ fn read_capped(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
         .read_to_end(&mut bytes)
         .map_err(|e| format!("{}: {e}", path.display()))?;
     if u64::try_from(bytes.len()).map_or(true, |n| n > cap) {
-        return Err(format!("{}: above the limit of {cap} bytes", path.display()));
+        return Err(format!(
+            "{}: above the limit of {cap} bytes",
+            path.display()
+        ));
     }
     Ok(bytes)
 }
@@ -660,7 +727,11 @@ impl Reader<'_> {
         if needed > length {
             return Err(format!("accessor {index}: larger than its view"));
         }
-        let left = self.budget.get().checked_sub(needed).ok_or("accessors read more than twice the buffer")?;
+        let left = self
+            .budget
+            .get()
+            .checked_sub(needed)
+            .ok_or("accessors read more than twice the buffer")?;
         self.budget.set(left);
         let end = offset.checked_add(needed).ok_or("view overflows")?;
         let bytes = self
@@ -708,7 +779,11 @@ fn sprite_of(v: &serde_json::Value) -> Option<crate::Sprite> {
         let y = a.get(1)?.as_f64()? as f32;
         (x.is_finite() && y.is_finite()).then_some([x, y])
     };
-    Some(crate::Sprite { mode: u32::try_from(v["mode"].as_u64()?).ok()?, size: pair("size")?, offset: pair("offset")? })
+    Some(crate::Sprite {
+        mode: u32::try_from(v["mode"].as_u64()?).ok()?,
+        size: pair("size")?,
+        offset: pair("offset")?,
+    })
 }
 
 /// `dir` as a full path with `.` and `..` worked out by name (no link followed): what the level's own files are known by.
@@ -743,7 +818,9 @@ pub fn import_read(dir: &Path) -> Result<(Level, Vec<u8>), String> {
 /// Reads an open level from the bytes of its level.gltf and level.bin (the fuzz targets' entry: no files), its
 /// textures named as files of `dir`.
 pub fn import_bytes(dir: &Path, gltf: &[u8], bin: &[u8]) -> Result<Level, String> {
-    if u64::try_from(gltf.len()).map_or(true, |n| n > MAX_JSON) || u64::try_from(bin.len()).map_or(true, |n| n > MAX_BIN) {
+    if u64::try_from(gltf.len()).map_or(true, |n| n > MAX_JSON)
+        || u64::try_from(bin.len()).map_or(true, |n| n > MAX_BIN)
+    {
         return Err("above the size limits".into());
     }
     import_from(dir, gltf.to_vec(), || Ok(bin.to_vec())).map(|(level, _)| level)
@@ -782,7 +859,9 @@ fn import_from(
         // the game's texture by name: no file of the level's
         if let Some(name) = uri.strip_prefix(GAME_URI) {
             if !game_texture_name(name) {
-                return Err(format!("image {i}: not a plain name of the game's textures"));
+                return Err(format!(
+                    "image {i}: not a plain name of the game's textures"
+                ));
             }
             level.textures.push(Texture {
                 name: img["name"].as_str().unwrap_or(name).to_owned(),
@@ -794,10 +873,16 @@ fn import_from(
         // A texture is a file of the level's textures/ folder, by a plain name (no further folders: a link among them
         // could lead out of the level's folder).
         let plain = uri.strip_prefix("textures/").is_some_and(|n| {
-            !n.is_empty() && !n.starts_with('.') && !n.chars().any(|c| matches!(c, '/' | '\\' | ':') || c.is_control())
+            !n.is_empty()
+                && !n.starts_with('.')
+                && !n
+                    .chars()
+                    .any(|c| matches!(c, '/' | '\\' | ':') || c.is_control())
         });
         if !plain {
-            return Err(format!("image {i}: not a plain file of the level's textures/ folder"));
+            return Err(format!(
+                "image {i}: not a plain file of the level's textures/ folder"
+            ));
         }
         level.textures.push(Texture {
             name: img["name"].as_str().unwrap_or(uri).to_owned(),
@@ -856,16 +941,27 @@ fn import_from(
                     .and_then(|t| tex_image.get(usize::try_from(t).ok()?).copied().flatten());
                 match image.filter(|&i| i < level.textures.len()) {
                     Some(i) => Some(i),
-                    None => return Err("a material's normal map is not one of the level's textures".into()),
+                    None => {
+                        return Err(
+                            "a material's normal map is not one of the level's textures".into()
+                        );
+                    }
                 }
             }
         };
         // a parallax depth needs a normal map (its alpha is the height) and a sane depth; anything else is refused
         let parallax = match &x["parallax"] {
             Value::Null => 0.0,
-            p => match p.as_f64().filter(|p| p.is_finite() && *p > 0.0 && *p <= MAX_PARALLAX) {
+            p => match p
+                .as_f64()
+                .filter(|p| p.is_finite() && *p > 0.0 && *p <= MAX_PARALLAX)
+            {
                 Some(p) if normal.is_some() => p as f32,
-                _ => return Err("a material's parallax depth is not a depth over its normal map".into()),
+                _ => {
+                    return Err(
+                        "a material's parallax depth is not a depth over its normal map".into(),
+                    );
+                }
             },
         };
         level.materials.push(Material {
@@ -876,7 +972,10 @@ fn import_from(
             ambient: rgb(&x["ambient"]),
             emissive: rgb(&m["emissiveFactor"]),
             specular: rgb(&x["specular"]),
-            power: x["power"].as_f64().filter(|p| p.is_finite()).map_or(0.0, |p| p.clamp(0.0, 1000.0) as f32),
+            power: x["power"]
+                .as_f64()
+                .filter(|p| p.is_finite())
+                .map_or(0.0, |p| p.clamp(0.0, 1000.0) as f32),
             texture: pbr["baseColorTexture"]["index"]
                 .as_u64()
                 .and_then(|t| tex_image.get(t as usize).copied().flatten()),
@@ -946,7 +1045,10 @@ fn import_from(
             return Err("vertex attributes of different lengths".into());
         }
         let mut channels = Vec::new();
-        let listed = m["extras"]["drahtseilakt"]["channels"].as_array().cloned().unwrap_or_default();
+        let listed = m["extras"]["drahtseilakt"]["channels"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
         if listed.len() > nmo::scene::MAX_CHANNELS {
             return Err("too many channels on a mesh".into());
         }
@@ -956,17 +1058,30 @@ fn import_from(
                 .map(|v| v as usize)
                 .filter(|&v| v < level.materials.len())
                 .ok_or("channel without a material")?;
-            let b = |k: usize| c["blend"].get(k).and_then(Value::as_str).and_then(blend_from);
+            let b = |k: usize| {
+                c["blend"]
+                    .get(k)
+                    .and_then(Value::as_str)
+                    .and_then(blend_from)
+            };
             let (Some(s), Some(d)) = (b(0), b(1)) else {
                 return Err("channel without its blend".into());
             };
-            let k = c["texcoord"].as_u64().ok_or("channel without texture coordinates")?;
-            let acc = attr[format!("TEXCOORD_{k}")].as_u64().ok_or("channel coordinates missing")?;
+            let k = c["texcoord"]
+                .as_u64()
+                .ok_or("channel without texture coordinates")?;
+            let acc = attr[format!("TEXCOORD_{k}")]
+                .as_u64()
+                .ok_or("channel coordinates missing")?;
             let uvs = r.floats::<2>(acc, "VEC2")?;
             if uvs.len() != positions.len() {
                 return Err("channel coordinates of another length".into());
             }
-            channels.push(Channel { material, blend: (s, d), uvs });
+            channels.push(Channel {
+                material,
+                blend: (s, d),
+                uvs,
+            });
         }
         looks.push(m["extras"]["drahtseilakt"]["look"].as_u64());
         level.meshes.push(Mesh {
