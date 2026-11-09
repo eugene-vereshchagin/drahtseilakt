@@ -10,13 +10,17 @@ pub enum Kind {
     Community,
     Remastered,
     Open,
+    /// Community remakes of the original levels (rotated, reversed, invisible): the original's geometry, so never
+    /// shipped, played only from the player's files and with their copy of the original.
+    Modified,
 }
 
-pub const KINDS: [Kind; 4] = [
+pub const KINDS: [Kind; 5] = [
     Kind::Original,
     Kind::Community,
     Kind::Remastered,
     Kind::Open,
+    Kind::Modified,
 ];
 
 impl Kind {
@@ -26,6 +30,7 @@ impl Kind {
             Kind::Community => "community",
             Kind::Remastered => "remastered",
             Kind::Open => "open",
+            Kind::Modified => "modified",
         }
     }
 }

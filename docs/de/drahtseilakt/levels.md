@@ -15,8 +15,31 @@ geteilt nach Herkunft und Format:
 | `levels/community/` | Community-Karten: ein Ordner je Level, darin eine `.nmo` oder ein Level im offenen Format (unten) | der Spieler lädt sie selbst, `drahtseilakt-toolbox import-maps` sortiert einen Download in Ordner; das README des Ordners sagt, wo | erweitert |
 | `levels/remastered/` | die Original-Level im offenen Format, mit auf 4K–8K vergrößerten Texturen und was ein modernes Aussehen sonst braucht | auf dem Rechner des Spielers von `drahtseilakt-toolbox remaster` aus `original/` erzeugt; nie weitergegeben | erweitert |
 | `levels/open/` | Level im offenen Format: darin gebaut oder umgewandelte Community-Karten | von Spielern gemacht; einige kommen mit dem Spiel | erweitert |
+| `levels/modified/` | modifizierte Originale: Community-Umbauten der 13 Original-Level, ein Ordner je Satz | eigene Dateien des Spielers; `drahtseilakt-toolbox import-maps` sortiert einen Download ein; nie mitgeliefert | klassisch und erweitert, mit Kopie des Originals |
 
 Der klassische Modus sieht nur `original/`, der erweiterte alle vier (menu.md).
+
+## Modifizierte Originale
+
+Community-Umbauten der Original-Level (der Satz 45-Degree Rotated, die Reverse Maps, die Invisible Maps und ähnliche)
+behalten Geometrie und Texturen des Originals. Darum liefert das Spiel sie nie mit und zeigt sie nur, wenn der Spieler
+eine Kopie des Originals hat (wie bei `original/`); gespielt werden sie aus den eigenen Dateien des Spielers. Aufbau:
+`levels/modified/<Satz>/<Levelordner>/<Datei>.nmo`, ein Ordner je Satz, darin wie überall ein Ordner je Level (Regeln
+von `community/` oben). Das Menü (Start, "Modifizierte Originale"; im klassischen Modus eine Zeile neben dem Original)
+zeigt die Sätze nacheinander: 45 Grad gedreht, Rückwärts, Unsichtbar, dann andere Ordner nach Namen; im Satz nach
+Nummer des Original-Levels, Variante und Autor.
+
+Der Titel kommt aus dem Datei- oder Ordnernamen, in der Sprache des Menüs, sofern das Level keine eigene `level.txt` hat.
+Ein Name wie `反向Level_11(普通-fiype).NMO` wird so gelesen: das Präfix `反向` (rückwärts) entfällt, `Level_11` ist Level 11
+des Originals, die Klammer ist `(Variante-Autor)`: Variante 新 ist Neu, 困难 Schwer, 简单 Leicht, 普通 Normal, der Autor
+(hier fiype) kommt in die Namenszeile; eine Klammer ohne bekannte Variante ist nur der Autor. Eine Karte ohne Levelnummer
+(`反向蓝星序曲.NMO`) zeigt ihren Namen. Läufe werden je Satz gespeichert, wie bei den anderen Arten.
+
+Was die Sätze sind, im Vergleich mit den Originalen: **Invisible** sind die Original-Level mit gelöschtem
+Sichtbarkeits-Flag jedes Objekts (Physik unverändert, die Kugel sieht man vor dem Himmel), **Reverse** vertauscht Start
+und Ziel und kehrt die Kontrollpunkte um (teils mit zusätzlichen Schienen oder ohne Kisten), **45-Degree Rotated** sind
+die um 45 Grad gedrehten Originale. Die Pro-Racing-Saisons sind keine solche Art: neue Geometrie, sie gehören nach
+`community/`.
 
 ## Ein Level ist ein Ordner
 

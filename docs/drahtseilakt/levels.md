@@ -15,8 +15,30 @@ they come from and what format they are in:
 | `levels/community/` | community maps: a folder per level, a `.nmo` or an open-format level in it (below) | the player downloads them, `drahtseilakt-toolbox import-maps` sorts a download into folders; the folder's README says where | extended |
 | `levels/remastered/` | the original levels converted to the open format, with textures upscaled to 4K–8K and what else a modern look needs | made on the player's machine by `drahtseilakt-toolbox remaster` from `original/`; never distributed | extended |
 | `levels/open/` | levels in the open format: made in it, or converted community maps | made by players; some come with the game | extended |
+| `levels/modified/` | modified originals: community remakes of the 13 original levels, in a folder per set | the player's own files; `drahtseilakt-toolbox import-maps` sorts a download; never shipped | classic and extended, with a copy of the original |
 
 The classic mode sees only `original/`; the extended mode sees all four (menu.md).
+
+## Modified originals
+
+Community remakes of the original levels (the 45-Degree Rotated set, the Reverse Maps, the Invisible Maps and the like)
+keep the original's geometry and textures. So the game never ships them and lists them only when the player has a copy
+of the original (the same rule as `original/`); they are played from the player's own files. Layout:
+`levels/modified/<set>/<level folder>/<file>.nmo`, one folder per set, in it a folder per level as everywhere
+(`community/` rules above). The menu (Start, "Modified originals"; in the classic mode a line beside the original) lists
+the sets one after the other: 45-Degree Rotated, Reverse, Invisible, then any other folder by its name; inside a set by
+the original level's number, variant and author.
+
+The entry's title comes from the file or folder name, in the menu's language, unless the level has a `level.txt` of its
+own. A name such as `反向Level_11(普通-fiype).NMO` is read as: the prefix `反向` (reverse) dropped, `Level_11` is the
+original's level 11, the bracket is `(variant-author)`: the variant 新 is New, 困难 Hard, 简单 Easy, 普通 Normal, and the
+author (here fiype) goes to the credit line; a bracket without a known variant is the author alone. A map that is no
+numbered level (`反向蓝星序曲.NMO`) shows its name. Runs are kept by set, as for other kinds.
+
+What the sets are, found by comparing with the originals: the **Invisible** maps are the original levels with every
+object's visibility flag cleared (physics unchanged; the ball is seen over the sky), the **Reverse** maps swap start and
+finish and reverse the checkpoints (some add rails or remove boxes), the **45-Degree Rotated** maps are the originals
+turned by 45 degrees. Pro Racing seasons are not of this kind: they are new geometry and belong to `community/`.
 
 ## A level is a folder
 

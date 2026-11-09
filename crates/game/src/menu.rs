@@ -265,6 +265,8 @@ pub struct Menu {
     community: bool,
     /// The player's copy of the original is there: without it the levels are our own and the menu offers the import.
     copy: bool,
+    /// There are modified originals (levels/modified) to offer; they are listed only with a copy too.
+    modified: bool,
     /// The extended mode and its additions.
     pub features: Features,
     pub volumes: [f32; 2],
@@ -326,6 +328,7 @@ impl Menu {
             own_list: false,
             community: false,
             copy: data.has_copy(),
+            modified: crate::modified::offered(data.has_copy()),
             features,
             volumes: [1.0; 2],
             strings: strings.clone(),
@@ -471,10 +474,19 @@ impl Menu {
             ],
             // the extended mode: every kind, then the shipped community maps; the classic mode: the original (with a
             // copy) or our own levels (without), and the shipped community maps
-            Screen::Kinds if self.features.has(Feature::CustomLevels) => {
-                (0..LEVEL_KINDS.len()).map(Line::Kind).chain([Line::Community, Line::Back]).collect()
+            Screen::Kinds if self.features.has(Feature::CustomLevels) => (0..LEVEL_KINDS.len())
+                .filter(|&k| LEVEL_KINDS.get(k) != Some(&Kind::Modified) || self.modified)
+                .map(Line::Kind)
+                .chain([Line::Community, Line::Back])
+                .collect(),
+            // the modified originals need the copy (their geometry is the original's) and a folder of them
+            Screen::Kinds if self.copy => {
+                let modified = LEVEL_KINDS.iter().position(|&k| k == Kind::Modified).filter(|_| self.modified);
+                [Some(Line::Kind(0)), modified.map(Line::Kind), Some(Line::Community), Some(Line::Back)]
+                    .into_iter()
+                    .flatten()
+                    .collect()
             }
-            Screen::Kinds if self.copy => vec![Line::Kind(0), Line::Community, Line::Back],
             Screen::Kinds => vec![Line::Ours, Line::Community, Line::Back],
             Screen::Start => (0..self.entries.len())
                 .map(Line::Level)
@@ -668,7 +680,12 @@ impl Menu {
                 Some(&kind) => {
                     let root = crate::levels::dir(kind);
                     // the open-format levels include those shipped with the game
-                    self.maps = if kind == Kind::Open { own_levels() } else { maps_in(&root) };
+                    self.maps = match kind {
+                        Kind::Open => own_levels(),
+                        // grouped by set, titled from the names (modified.rs)
+                        Kind::Modified => crate::modified::levels(&root),
+                        _ => maps_in(&root),
+                    };
                     self.folder = Some(root);
                     self.own_list = false;
                     self.community = false;
@@ -1054,6 +1071,7 @@ impl Menu {
                 Some(Kind::Remastered) => s.ours("kind remastered"),
                 Some(Kind::Community) => s.ours("kind community"),
                 Some(Kind::Open) => s.ours("kind open"),
+                Some(Kind::Modified) => s.ours("kind modified"),
                 None => String::new(),
             },
             Line::Highscore => s.get("Menu_Main Button Highscore", "Highscore"),
@@ -2269,7 +2287,7 @@ impl Menu {
 }
 
 /// The kinds of levels the extended mode offers, in the menu's order (levels.md).
-const LEVEL_KINDS: [Kind; 4] = [Kind::Original, Kind::Remastered, Kind::Community, Kind::Open];
+const LEVEL_KINDS: [Kind; 5] = [Kind::Original, Kind::Remastered, Kind::Community, Kind::Open, Kind::Modified];
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
 /// it; folders that hold no level or several are not shown, and said so on the console.
@@ -2344,6 +2362,7 @@ mod tests {
             own_list: false,
             community: false,
             copy: true,
+            modified: false,
             features: Features::new(extended),
             volumes: [1.0; 2],
             strings: Strings::default(),
@@ -2935,6 +2954,32 @@ mod tests {
         m.back();
         m.step(1);
         assert_eq!(m.enter(), Action::Import);
+    }
+
+    #[test]
+    fn the_modified_originals_are_offered_only_with_a_copy_and_levels() {
+        let kinds = |m: &Menu| m.lines(Screen::Kinds);
+        // nothing in the folder: not listed, in either mode
+        assert!(!kinds(&menu(&[true], true)).contains(&Line::Kind(4)));
+        assert_eq!(kinds(&menu(&[true], false)), [Line::Kind(0), Line::Community, Line::Back]);
+        // levels and a copy: after the original in the classic mode, after the other kinds in the extended one
+        let mut m = menu(&[true], false);
+        m.modified = true;
+        assert_eq!(kinds(&m), [Line::Kind(0), Line::Kind(4), Line::Community, Line::Back]);
+        assert_eq!(m.label(Line::Kind(4)), "Modified originals");
+        let mut m = menu(&[true], true);
+        m.modified = true;
+        assert_eq!(kinds(&m)[4], Line::Kind(4));
+        // the flag is only ever set with a copy (modified::offered); without one the classic list is ours
+        let mut m = menu(&[true], false);
+        m.copy = false;
+        m.modified = true;
+        assert_eq!(kinds(&m), [Line::Ours, Line::Community, Line::Back]);
+        assert!(!crate::modified::offered(false));
+        for lang in ["en", "ru", "de", "zh", "fr", "es", "it"] {
+            let s = crate::lang::Strings::ours_in(lang);
+            assert_ne!(s.ours("kind modified"), "kind modified", "{lang}");
+        }
     }
 
     #[test]
