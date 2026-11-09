@@ -86,3 +86,9 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # 7 s of the video's timer, so the video is cut there (870 units of channel in 7 s is not physical) and gives no
 # line for the channel itself or the pit; --locate was not run (RATE is 4 a second in locate.rs, not configurable,
 # and the earlier real tracks of level 2 were lost after 35 s). Dense frames kept for sector 4's start (t 340..358).
+
+# Owner, 2026-11-09 (sector 3): the puzzle's goal is to lead the row of ten stone balls down to the pit before CP3,
+# where they fill it, and the paper ball crosses over them. He reached the pit without the stones and couldn't go on.
+# Sector 3 starts as PAPER (start sectors with the right ball!). When he knocked out the first crate, its upper block
+# did not drop though it should have: either a physics bug or part of the puzzle (open the stones' way BEFORE they
+# arrive). To check against the C reference on his next replay.
