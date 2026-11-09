@@ -65,7 +65,7 @@
 - **Options**：*Extended* 页面上有该模式的开关，其下每项新增内容各有一个开关（随模式全部打开；设置中以 `extended.<key> off` 记录被关闭的项）：
   - 所有关卡开放，无需解锁：仅限调试运行（`--debug`）；玩家的游戏通过游玩来解锁关卡；
   - 关卡旁显示最佳时间；
-  - Start 下按类别列出关卡；
+  - （自 2026-11-09 起 Start 在两种模式下相同；不再有此开关）；
   - Interface：own / original / remaster，界面文件的来源（[resources.md](resources.md)）；
   - Textures：绘制关卡、关卡部件和球所用的纹理包——own（默认）、original、remaster 或玩家的纹理包，按其名称显示；下一个关卡按所选纹理包加载（[packs.md](packs.md)）；
   - Models：绘制部件和球所用的模型包（只改变外观，绝不改变物理）——关卡自带（每个关卡使用它自己采用的部件：默认）、own、original 或玩家的模型包（[packs.md](packs.md)）；
@@ -74,9 +74,27 @@
 - **Graphics** 增加 *Field of View*：游戏相机在 4:3 上的视野宽度，40° 到 100°，步长 2（`fov 58`；原版为 58°，即 InGameCam 的
   1.0123 弧度）。经典模式始终使用原版的视野。
 - **Controls** 增加 *Defaults*：恢复原版的按键（方向键、Shift、Space），并取消相机反转。
-- **按类别的关卡**：Start 提供 *Original*（经典关卡列表）、*Remastered*、*Community maps* 和 *Open format*，即 `levels/`（[levels.md](levels.md)）中的各个文件夹。每一类中是扁平的关卡列表（一个关卡是只含一个关卡的文件夹，或单独的 `.nmo`：levels.md，“一个关卡就是一个文件夹”；没有要打开的文件夹，也不显示其他东西），像原版关卡一样游玩。每一行显示关卡的**难度**，一颗星和 1 到 10（level.txt 的 `difficulty`；未知时为“★?”），以及其英文**标题**（level.txt 的 `title`），若 level.txt 提供了菜单语言的标题（`title.zh`……）则显示该标题。列表按难度排序，其次按标题；难度未知的关卡排在难度已知的之后，只以文件夹命名（没有 `title`）的关卡排在最后。标题最多 40 个字符，会缩小绘制或从中间缩短，以留在其行内。无法加载的关卡会说明原因且不会启动；其游玩记录和最佳时间与原版关卡分开保存。如何制作和放置关卡：[making-levels.md](making-levels.md)。
+- **关卡列表**（列表从 Start 打开，见下）：每一类中是扁平的关卡列表（一个关卡是只含一个关卡的文件夹，或单独的 `.nmo`：levels.md，“一个关卡就是一个文件夹”；没有要打开的文件夹，也不显示其他东西），像原版关卡一样游玩。每一行显示关卡的**难度**，一颗星和 1 到 10（level.txt 的 `difficulty`；未知时为“★?”），以及其英文**标题**（level.txt 的 `title`），若 level.txt 提供了菜单语言的标题（`title.zh`……）则显示该标题。列表按难度排序，其次按标题；难度未知的关卡排在难度已知的之后，只以文件夹命名（没有 `title`）的关卡排在最后。标题最多 40 个字符，会缩小绘制或从中间缩短，以留在其行内。无法加载的关卡会说明原因且不会启动；其游玩记录和最佳时间与原版关卡分开保存。如何制作和放置关卡：[making-levels.md](making-levels.md)。
 - 材质包和模组都在这里：包在 Textures 和 Models 两行（[packs.md](packs.md)），模组在 Mods 界面（[mods.md](mods.md)），每个都有自己的开关；第三方内容的游玩风险由玩家自行承担。
 - **长列表**（开始 > 我的地图文件夹、模组、修改版原版）：在任意一行按 Esc 或 Backspace（手柄的返回键）即可返回；Back 固定在列表下方，旁边有“Esc：返回”提示。PageUp / PageDown 翻一页，Home / End 跳到第一行 / 最后一行，按住上 / 下键会重复（0.35 秒后每秒 12 行，再过一秒后 30 行），滚轮滚动，输入字母跳到下一个以该字母开头的标题。*社区精选*是随游戏附带的 13 张地图（注明作者）；*我的地图文件夹*列出放在游戏数据文件夹 `levels/community/` 中的地图（路径显示在列表下方）。
+
+
+## 按含义划分的 Start（所有者 2026-11-09 的决定）
+
+Start 在经典模式和扩展模式下相同；为空或不可用的项目不显示。每个项目和子菜单项都在说明面板上写明它是什么、来自哪里。
+
+| 项目 | 打开 | 需要 |
+|---|---|---|
+| *经典 Ballance*（en *Classic Ballance*） | 玩家副本中的 13 个原版关卡，按原版方式解锁 | 副本 |
+| *Drahtseilakt* | 我们自己的 13 个关卡，随游戏附带 | |
+| *Ballance 挑战*（en *Ballance Challenges*） | 社区改造的原版关卡：视角旋转 45°、反向通关、隐形道路（`levels/modified/`） | 副本和该文件夹中的关卡 |
+| *社区地图*（en *Community maps*） | 子菜单 | |
+| &nbsp;&nbsp;*精选*（en *Best*） | 随游戏附带的 13 张社区地图，附作者和致谢 | |
+| &nbsp;&nbsp;*已下载*（en *Downloaded*） | 玩家的文件夹 `levels/downloaded/`（显示其路径）：社区 `.nmo` 地图和开放格式关卡合为一个列表，并包含仍会读取的旧文件夹 `levels/community/` 和 `levels/open/` | |
+
+文字提供全部七种语言。*Remastered* 不再是一种关卡类别：Options 有一行 *外观：原版 / 重制版*（en *Look: original /
+remastered*），仅在 `levels/remastered/` 中有导出时显示。选 *重制版* 时，经典 Ballance 从其导出游玩每个原版关卡
+（设置 `look remastered`）；外观是一项设置而非列表，以便日后由纹理包和模型包取代。
 
 ## 放得下的文字，会说明自己可滚动的列表
 

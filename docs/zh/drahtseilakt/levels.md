@@ -12,9 +12,10 @@
 | `levels/community/` | 自制地图：每个关卡一个文件夹，里面是一个 `.nmo` 或一个开放格式关卡（见下文） | 由玩家下载，`drahtseilakt-toolbox import-maps` 把下载内容整理成文件夹；文件夹中的 README 说明去哪里获取 | 扩展模式 |
 | `levels/remastered/` | 转换为开放格式的原版关卡，纹理放大到 4K–8K，并加上现代画面所需的其他内容 | 由 `drahtseilakt-toolbox remaster` 在玩家机器上根据 `original/` 生成；从不分发 | 扩展模式 |
 | `levels/open/` | 开放格式的关卡：直接用它制作的，或转换后的自制地图 | 由玩家制作；部分随游戏附带 | 扩展模式 |
+| `levels/downloaded/` | 玩家下载的关卡：社区 `.nmo` 地图和开放格式关卡，每个关卡一个文件夹（见下文）；旧的 `levels/community/` 和 `levels/open/` 仍会一并读取，不会被移动 | 由玩家下载，`drahtseilakt-toolbox import-maps` 把下载内容整理成文件夹；文件夹的 README 说明获取途径 | 经典和扩展模式 |
 | `levels/modified/` | 修改版原版关卡：社区对 13 个原版关卡的改版，每个合集一个文件夹 | 玩家自己的文件；`drahtseilakt-toolbox import-maps` 整理下载内容；从不随游戏发行 | 经典与扩展模式，需有原版副本 |
 
-经典模式只看到 `original/`；扩展模式看到全部四个（menu.md）。
+Start 在两种模式下都按含义列出它们（menu.md，“按含义划分的 Start”）：`original/`、我们自己的关卡、`modified/`，以及社区地图（随游戏附带的精选和 `downloaded/`，连同它所取代的 `community/` 和 `open/`）。自 2026-11-09 起玩家的文件夹是 `levels/downloaded/`；旧的两个文件夹若存在仍然有效，其关卡的成绩保留原有的键（见下文）。
 
 ## 修改版原版关卡
 
@@ -149,6 +150,8 @@ scripts/own-levels.sh assets/levels/03_Paper_Winds
 ## 按类别记录成绩和高分榜
 
 回放、最佳时间和高分榜按类别分别保存，因此与原版关卡同名的自制地图绝不会被算作原版关卡：原版关卡为 `replays/<level>/`，其他为 `replays/maps/<kind>/<map>/`（`community`、`open`、`remastered`），关卡文件夹的为 `replays/levels/<kind>/<关卡文件夹>/<map>/`，这样两个文件夹中的 `Level_07.NMO` 不会共用成绩，单独的 `Foo.nmo` 和文件夹 `Foo/` 也不会。旧版本保存在 `replays/maps/<关卡文件夹>/` 中的成绩会在首次游玩该关卡时移到那里（只经过真实文件夹，绝不覆盖已有的成绩）。
+
+*自 2026-11-09 起：* 旧文件夹 `community/` 或 `open/` 中的关卡沿用以该文件夹名命名的键，因此已有成绩和最佳时间保留；`downloaded/` 中的关卡记在 `downloaded` 下。把关卡从旧文件夹移到 `downloaded/` 会让它的成绩重新开始。
 
 ## 语言
 

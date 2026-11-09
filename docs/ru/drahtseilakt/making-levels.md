@@ -9,22 +9,24 @@
 
 Все уровни лежат в `levels/` папки данных игры (`~/.local/share/drahtseilakt/` на Linux,
 `%APPDATA%\drahtseilakt\` на Windows, `~/Library/Application Support/drahtseilakt/` на macOS). Свой или чужой уровень
-кладётся в одну из двух папок:
+кладётся в `levels/downloaded/`, двух видов:
 
-- `levels/community/` — любительские карты (файлы Virtools `.nmo`, формат оригинала);
-- `levels/open/` — уровни в [открытом формате](open-format.md) (обычные файлы glTF и PNG, их легко доделать или
+- любительские карты (файлы Virtools `.nmo`, формат оригинала);
+- уровни в [открытом формате](open-format.md) (обычные файлы glTF и PNG, их легко доделать или
   поправить руками).
 
 **Один уровень — одна папка, прямо в этой папке:**
 
+*С 2026-11-09 оба вида кладутся в `levels/downloaded/`; прежние `levels/community/` и `levels/open/` по-прежнему читаются, ничего не переносится.* В меню: *Start, Карты сообщества, Скачанные*.
+
 ```
-levels/community/
+levels/downloaded/
   Green Dam/                 папка уровня: простое имя, не длиннее 40 знаков
     Green Dam.NMO            уровень: ровно один .nmo ...
     level.txt                его название, автор, сложность (ниже; по желанию, но без названия он в конце списка)
     README.txt               по желанию: что это, как в него играть, его лицензия
     preview.png              по желанию: его картинка (или preview.jpg)
-levels/open/
+levels/downloaded/
   Sky Road/
     level.gltf level.bin     ... или один уровень в открытом формате
     textures/                его собственные текстуры (PNG), прямо в textures/
@@ -32,7 +34,7 @@ levels/open/
     level.txt  README.md  preview.jpg
 ```
 
-Одиночный `.nmo`, положенный прямо в `levels/community/`, — тоже уровень, по имени файла: самый быстрый способ
+Одиночный `.nmo`, положенный прямо в `levels/downloaded/`, — тоже уровень, по имени файла: самый быстрый способ
 попробовать карту.
 
 ## level.txt
@@ -110,7 +112,7 @@ Toolbox (`drahtseilakt-toolbox`, отдельная программа; сама
 drahtseilakt-toolbox import-maps ~/Downloads/Maps --catalogue CustomMapList.md
 ```
 
-- каждый `.nmo` в папке (в папках любой глубины) становится папкой уровня в `levels/community/` (`--to ПАПКА` — в
+- каждый `.nmo` в папке (в папках любой глубины) становится папкой уровня в `levels/downloaded/` (`--to ПАПКА` — в
   другой), с картой, её картинкой как preview и level.txt, где сказано, откуда она;
 - с `--catalogue` (список карт сообщества, `CustomMapList.md`) найденная в нём карта получает своё английское
   название, оригинальное название (`title.zh` у китайской), автора и сложность (каталог оценивает от 1 до 5 с

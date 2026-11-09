@@ -388,3 +388,16 @@ textures, the level's parts, the default theme). Gameplay and rules stay the ori
 the look. Rendering fixes (any resolution, widescreen, filtering, smoothing) are always on and not switchable. This
 supersedes the earlier notes that the classic mode always draws our textures and the parts each level takes and always
 plays the default theme.
+
+## Start by meaning
+
+*Owner's decision, 2026-11-09.* Start no longer shows levels by folder (Original, Remastered, Open format, Modified
+originals, Community picks, My maps) but by meaning, the same in the classic and the extended mode, with an item left
+out when it is empty or unavailable: *Classic Ballance* (the 13 originals of the player's copy), *Drahtseilakt* (our own
+13 levels), *Ballance Challenges* (the community's remakes of the originals, formerly "Modified originals"; needs the
+copy) and *Community maps* (a submenu: *Best*, the 13 shipped picks with their authors, and *Downloaded*, the player's
+folder). The player's folder is `levels/downloaded/` and takes both community `.nmo` maps and open-format levels;
+`levels/community/` and `levels/open/` are still read next to it and never moved, and the keys under which runs are
+kept follow the folder a level is in, so existing runs stay. *Remastered* leaves Start: it becomes the Options line
+*Look: original / remastered* (shown only when an export exists), a setting rather than a kind of level; phase 2 turns
+the remaster into texture and model packs. Every item says on the notes panel what it is and where it comes from.

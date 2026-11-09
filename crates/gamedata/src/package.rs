@@ -99,9 +99,14 @@ pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
             }
         }
     }
+    sort(&mut found);
+    (found, skipped)
+}
+
+/// Levels in the menus' order: titled levels first, by difficulty (unknown after the known), then by order, then by
+/// title; a level named only by its folder comes last. Used for one folder and for several merged.
+pub fn sort(found: &mut [Package]) {
     found.sort_by(|a, b| {
-        // titled levels first, by difficulty (unknown after the known), then by order, then by title; a level named
-        // only by its folder comes last
         let key = |p: &Package| {
             (
                 !p.titled,
@@ -114,7 +119,6 @@ pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
         };
         key(a).cmp(&key(b)).then_with(|| a.level.cmp(&b.level))
     });
-    (found, skipped)
 }
 
 /// The level a folder holds: exactly one `.nmo` directly in it, or it is an open-format level (level.gltf).

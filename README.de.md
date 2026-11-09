@@ -57,8 +57,8 @@ ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bil
 beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
 Stelle, mit der Kugel, mit der der Sektor beginnt (`--ball wood|stone|paper` überschreibt sie); ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
 Bis der erweiterte Modus eingeschaltet ist (Options, Extended, oder `--debug` für einen Start), ist das Spiel so
-genau wie möglich das Original. Der *erweiterte Modus* zeigt Bestzeiten und Level nach Art unter Start (Original,
-Remaster, Community-Karten und Level im offenen Format aus `levels/`, jedes mit seiner Schwierigkeit; wie man eines
+genau wie möglich das Original. Der *erweiterte Modus* zeigt Bestzeiten. Start listet die Level in beiden Modi nach Bedeutung (Klassisches Ballance aus Ihrer Kopie, Drahtseilakt,
+Ballance-Prüfungen, Community-Karten: die mitgelieferten besten und Ihr `levels/downloaded/`, jedes mit seiner Schwierigkeit; wie man eines
 baut und teilt: [Level bauen und teilen](docs/de/drahtseilakt/making-levels.md)) und die Mods
 ([Mods](docs/de/drahtseilakt/mods.md)). Ein Debug-Lauf (`--debug`) öffnet zudem alle Level und bietet den
 Entwicklungs-Mod *Gottmodus*: endlose Leben, F5 speichert den Moment und F9 kehrt dorthin zurück, F3 geht Sekunden

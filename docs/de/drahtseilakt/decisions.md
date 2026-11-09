@@ -413,3 +413,16 @@ Standardthema). Spielablauf und Regeln bleiben die des Originals, Replays hänge
 Darstellungskorrekturen (jede Auflösung, Breitbild, Filterung, Glättung) sind immer an und nicht umschaltbar. Das löst
 die früheren Notizen ab, der klassische Modus zeichne immer unsere Texturen und die Teile des Levels und spiele immer
 das Standardthema.
+
+## Start nach Bedeutung
+
+*Entscheidung des Besitzers, 2026-11-09.* Start zeigt Level nicht mehr nach Ordnern (Original, Remastered, Open format,
+Modified originals, Community picks, My maps), sondern nach Bedeutung, im klassischen und erweiterten Modus gleich; ein
+leerer oder nicht verfügbarer Punkt entfällt: *Klassisches Ballance* (die 13 Originale der Kopie), *Drahtseilakt* (unsere
+13 Level), *Ballance-Prüfungen* (Umbauten der Originale durch die Community, früher „Modifizierte Originale“; braucht
+die Kopie) und *Community-Karten* (Untermenü: *Beste*, die 13 mitgelieferten Karten mit Autoren, und *Heruntergeladen*,
+der Ordner des Spielers). Der Ordner des Spielers ist `levels/downloaded/` und nimmt `.nmo`-Karten und Level im offenen
+Format; `levels/community/` und `levels/open/` werden weiter gelesen und nie verschoben, die Schlüssel der Läufe folgen
+dem Ordner des Levels, bestehende Läufe bleiben also. *Remastered* verlässt Start: es wird die Options-Zeile *Aussehen:
+original / remastered* (nur mit Export), eine Einstellung statt einer Level-Art; Phase 2 macht daraus Textur- und
+Modellpakete.

@@ -109,7 +109,7 @@ Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Men�
   - alle Level offen, ohne Freischalten: nur in einem Debug-Lauf (`--debug`); im Spiel eines Spielers öffnen sich die
     Level durch Spielen;
   - Bestzeiten neben den Leveln;
-  - Level nach Art unter Start;
+  - (Start ist seit 2026-11-09 in beiden Modi gleich; den Schalter gibt es nicht mehr);
   - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
   - Textures: das Texturpaket, womit die Level, ihre Teile und die Kugeln gezeichnet werden — own (Vorgabe), original, remaster oder ein Paket des Spielers, mit seinem Namen; das nächste Level lädt
     mit der Wahl ([packs.md](packs.md));
@@ -127,8 +127,7 @@ Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Men�
   Originals.
 - **Controls** fügt *Defaults* hinzu: zurück zu den Tasten des Originals (Pfeile, Shift, Leertaste), ohne gedrehte
   Kamera.
-- **Level nach Art**: Start bietet *Original* (die klassische Levelliste), *Remastered*, *Community maps* und
-  *Open format*, die Ordner von `levels/` ([levels.md](levels.md)). In jedem eine flache Liste seiner Level (ein
+- **Level-Listen** (eine Liste öffnet sich aus Start, unten): In jedem eine flache Liste seiner Level (ein
   Level ist ein Ordner mit einem Level oder eine einzelne `.nmo`: levels.md, „Ein Level ist ein Ordner“; keine Ordner
   zum Öffnen, nichts anderes gezeigt), gespielt wie ein Original-Level. Jede Zeile zeigt die
   **Schwierigkeit** des Levels, einen Stern und 1 bis 10 (`difficulty` aus level.txt; „★?“, wenn unbekannt), und
@@ -142,6 +141,26 @@ Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Men�
   dem Bildschirm Mods ([mods.md](mods.md)), jeweils hinter einem eigenen Schalter; Inhalte Dritter werden auf eigenes
   Risiko gespielt.
 - **Lange Listen** (Start > Mein Kartenordner, Mods, modifizierte Originale): Esc oder Backspace (die Zurück-Taste des Pads) verlässt jede Zeile; Back bleibt unter der Liste fest, daneben der Hinweis "Esc: zurück". PageUp / PageDown blättern eine Seite, Home / End springen zur ersten / letzten Zeile, gehaltenes Hoch / Runter wiederholt sich (nach 0,35 s, 12 Zeilen pro Sekunde, 30 nach einer weiteren Sekunde), das Rad scrollt, ein getippter Buchstabe springt zum nächsten Titel mit diesem Anfang. *Community-Auswahl* sind die 13 mitgelieferten Karten (mit Autoren); *Mein Kartenordner* zeigt die Karten aus `levels/community/` im Datenordner des Spiels (der Pfad steht unter der Liste).
+
+
+## Start nach Bedeutung (Entscheidung des Besitzers 2026-11-09)
+
+Start ist im klassischen und im erweiterten Modus gleich; ein leerer oder nicht verfügbarer Punkt entfällt. Jeder Punkt
+und Unterpunkt sagt im Hinweisfeld, was er ist und woher er kommt.
+
+| Punkt | Öffnet | Braucht |
+|---|---|---|
+| *Klassisches Ballance* (en *Classic Ballance*) | die 13 Original-Level der Kopie des Spielers, freigeschaltet wie im Original | eine Kopie |
+| *Drahtseilakt* | unsere eigenen 13 Level, mit dem Spiel geliefert | |
+| *Ballance-Prüfungen* (en *Ballance Challenges*) | die Original-Level, von der Community umgebaut: Kamera um 45° gedreht, der Weg zurück, die Bahn unsichtbar (`levels/modified/`) | eine Kopie und Level im Ordner |
+| *Community-Karten* (en *Community maps*) | ein Untermenü | |
+| &nbsp;&nbsp;*Beste* (en *Best*) | die 13 mit dem Spiel gelieferten Community-Karten, mit Autoren und Dank | |
+| &nbsp;&nbsp;*Heruntergeladen* (en *Downloaded*) | der Ordner des Spielers `levels/downloaded/` (sein Pfad wird gezeigt): Community-`.nmo`-Karten und Level im offenen Format in einer Liste, samt den früheren `levels/community/` und `levels/open/`, die weiter gelesen werden | |
+
+Die Texte gibt es in allen sieben Sprachen. *Remastered* ist keine Level-Art mehr: Options hat die Zeile *Aussehen:
+original / remastered* (en *Look: original / remastered*), nur sichtbar, wenn `levels/remastered/` einen Export enthält.
+Mit *remastered* spielt Klassisches Ballance jedes Original-Level aus seinem Export (die Einstellung `look
+remastered`); das Aussehen ist eine Einstellung, keine Liste, damit später Textur- und Modellpakete es ersetzen können.
 
 ## Wörter, die passen, Listen, die sagen, dass sie scrollen
 

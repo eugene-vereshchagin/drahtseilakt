@@ -3,7 +3,8 @@
 // turned off (`extended.<key> off`); everything is on with the mode unless turned off. "All levels open" is a debug
 // run's only (`--debug`), as god-mode is (mods.md): a player's game unlocks the levels by playing them. The practice
 // tools and endless lives were additions here; they are god-mode's now, and their old `extended.tools` and
-// `extended.endless-lives` lines are simply not read.
+// `extended.endless-lives` lines are simply not read. Nor is `extended.custom-levels`: Start lists levels by meaning in
+// both modes (menu.md, "Start, by meaning").
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Feature {
@@ -11,24 +12,17 @@ pub enum Feature {
     AllLevels,
     /// Best times beside the levels.
     BestTimes,
-    /// Custom levels in the main menu.
-    CustomLevels,
 }
 
 // (the sound volume beside the music's was one; it is the original's own setting and always there now: an old
 // `extended.sound-volume off` line is simply not read)
-pub const FEATURES: [Feature; 3] = [
-    Feature::AllLevels,
-    Feature::BestTimes,
-    Feature::CustomLevels,
-];
+pub const FEATURES: [Feature; 2] = [Feature::AllLevels, Feature::BestTimes];
 
 impl Feature {
     pub fn key(self) -> &'static str {
         match self {
             Feature::AllLevels => "all-levels",
             Feature::BestTimes => "best-times",
-            Feature::CustomLevels => "custom-levels",
         }
     }
 

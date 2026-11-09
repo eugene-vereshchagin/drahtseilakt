@@ -13,15 +13,24 @@ pub enum Kind {
     /// Community remakes of the original levels (rotated, reversed, invisible): the original's geometry, so never
     /// shipped, played only from the player's files and with their copy of the original.
     Modified,
+    /// The player's downloaded levels: community `.nmo` maps and open-format levels (owner's decision 2026-11-09).
+    /// The earlier `community` and `open` folders are still read next to it.
+    Downloaded,
 }
 
-pub const KINDS: [Kind; 5] = [
+/// Every folder the game reads levels from (the first of them the original's). `Community` and `Open` are the
+/// earlier names of what is now `Downloaded`: still read, no longer made.
+pub const KINDS: [Kind; 6] = [
     Kind::Original,
+    Kind::Downloaded,
     Kind::Community,
-    Kind::Remastered,
     Kind::Open,
+    Kind::Remastered,
     Kind::Modified,
 ];
+
+/// The folders whose levels are the player's downloaded ones: the new folder, then the two it replaces.
+pub const DOWNLOADED: [Kind; 3] = [Kind::Downloaded, Kind::Community, Kind::Open];
 
 impl Kind {
     pub fn folder(self) -> &'static str {
@@ -31,6 +40,7 @@ impl Kind {
             Kind::Remastered => "remastered",
             Kind::Open => "open",
             Kind::Modified => "modified",
+            Kind::Downloaded => "downloaded",
         }
     }
 }

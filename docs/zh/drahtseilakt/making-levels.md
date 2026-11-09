@@ -7,22 +7,24 @@
 ## 关卡放在哪里
 
 所有关卡都位于游戏数据文件夹中的 `levels/`（Linux 上为 `~/.local/share/drahtseilakt/`，Windows 上为
-`%APPDATA%\drahtseilakt\`，macOS 上为 `~/Library/Application Support/drahtseilakt/`）。你自己的或别人的关卡放进以下
-两个文件夹之一：
+`%APPDATA%\drahtseilakt\`，macOS 上为 `~/Library/Application Support/drahtseilakt/`）。你自己的或别人的关卡放进 `levels/downloaded/`，分两种：
 
-- `levels/community/` — 社区地图（Virtools `.nmo` 文件，原版的格式）；
-- `levels/open/` — [开放格式](open-format.md)的关卡（普通的 glTF 和 PNG 文件，便于手工完成或修改）。
+
+- 社区地图（Virtools `.nmo` 文件，原版的格式）；
+- [开放格式](open-format.md)的关卡（普通的 glTF 和 PNG 文件，便于手工完成或修改）。
 
 **一个关卡，一个文件夹，直接放在该文件夹中：**
 
+*自 2026-11-09 起两者都放入 `levels/downloaded/`；旧的 `levels/community/` 和 `levels/open/` 仍会读取，不会移动任何文件。* 菜单中：*Start，社区地图，已下载*。
+
 ```
-levels/community/
+levels/downloaded/
   Green Dam/                 关卡的文件夹：简单的名称，最多 40 个字符
     Green Dam.NMO            关卡：恰好一个 .nmo ……
     level.txt                它的名称、作者、难度（见下；可选，但没有标题的关卡排在最后）
     README.txt               可选：它是什么、怎么玩、它的许可证
     preview.png              可选：它的图片（也可以是 preview.jpg）
-levels/open/
+levels/downloaded/
   Sky Road/
     level.gltf level.bin     …… 或一个开放格式的关卡
     textures/                它自己的纹理（PNG），直接放在 textures/ 中
@@ -30,7 +32,7 @@ levels/open/
     level.txt  README.md  preview.jpg
 ```
 
-直接放进 `levels/community/` 的单个 `.nmo` 也是一个关卡，以其文件名命名：试玩地图最快的方式。
+直接放进 `levels/downloaded/` 的单个 `.nmo` 也是一个关卡，以其文件名命名：试玩地图最快的方式。
 
 ## level.txt
 
@@ -101,7 +103,7 @@ toolbox（`drahtseilakt-toolbox`，一个单独的程序；游戏本身从不运
 drahtseilakt-toolbox import-maps ~/Downloads/Maps --catalogue CustomMapList.md
 ```
 
-- 该文件夹下（任意深度的文件夹中）的每个 `.nmo` 都成为 `levels/community/` 中的一个关卡文件夹（`--to 文件夹` 可指定
+- 该文件夹下（任意深度的文件夹中）的每个 `.nmo` 都成为 `levels/downloaded/` 中的一个关卡文件夹（`--to 文件夹` 可指定
   另一个），其中有地图、作为预览的图片，以及说明来源的 level.txt；
 - 使用 `--catalogue`（社区的地图列表 `CustomMapList.md`）时，在其中找到的地图会得到英文标题、原名（中文地图为
   `title.zh`）、作者和难度（目录以半级为单位评定 1–5；乘以二得到我们的 1–10）；

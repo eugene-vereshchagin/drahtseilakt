@@ -66,8 +66,11 @@ pub struct Entry {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Screen {
     Main,
-    /// The extended mode's choice of levels: the original, remastered, community and open-format ones.
+    /// Start: which levels (by meaning, the same in both modes): Classic Ballance, Drahtseilakt, Ballance Challenges,
+    /// Community maps.
     Kinds,
+    /// Start, Community maps: the best (shipped) and the downloaded ones.
+    Community,
     Start,
     Custom,
     Highscore,
@@ -120,12 +123,21 @@ enum Line {
     Sound,
     Extended,
     Level(usize),
-    /// A kind of levels, by its place in LEVEL_KINDS.
-    Kind(usize),
-    /// Our own levels (the shipped ones and the open-format folder's), offered in the classic mode.
+    /// Classic Ballance: the 13 original levels of the player's copy (the list of Start).
+    Classic,
+    /// Drahtseilakt: our own levels, shipped with the game.
     Ours,
-    /// The community maps shipped with the game, credited to their authors (assets/levels/community).
+    /// Ballance Challenges: the community remakes of the original levels (levels/modified).
+    Challenges,
+    /// Community maps: the submenu of the best and the downloaded ones.
     Community,
+    /// The best community maps, shipped with the game and credited to their authors (assets/levels/community).
+    Best,
+    /// The player's downloaded levels: community maps and open-format levels (levels/downloaded and the folders it
+    /// replaces).
+    Downloaded,
+    /// Options: the look of the original levels, original or remastered (shown when a remastered export exists).
+    Look,
     Map(usize),
     Music,
     Effects,
@@ -181,6 +193,8 @@ pub enum Action {
     ToggleDebug,
     /// One of the extended mode's additions on or off.
     Switch(Feature),
+    /// The look of the original levels chosen: true plays them from their remastered export.
+    Look(bool),
     /// The volumes changed: sound and music, 0 to 1.
     Volumes([f32; 2]),
     /// The interface's provider chosen (it takes effect on the next start).
@@ -244,6 +258,7 @@ fn valued(line: Line) -> bool {
             | Line::Fov
             | Line::Invert
             | Line::Mode
+            | Line::Look
             | Line::Interface
             | Line::Textures
             | Line::Models
@@ -265,11 +280,15 @@ pub struct Menu {
     pub maps: Vec<Package>,
     /// The kind's folder the custom levels come from.
     folder: Option<PathBuf>,
-    /// The custom levels shown are our own (the shipped ones and the open-format folder's).
-    own_list: bool,
-    /// The custom levels shown are the community maps shipped with the game (each with its author's name and the
-    /// thanks notice).
-    community: bool,
+    /// Which list the custom levels shown are.
+    list: List,
+    /// Our own levels and the best community maps are shipped (the Start items are left out when not).
+    has_ours: bool,
+    has_best: bool,
+    /// The remastered export is there, so the Options page offers the look of the original levels.
+    look_offered: bool,
+    /// The original levels are played from their remastered export (the setting `look remastered`).
+    pub look_remastered: bool,
     /// The player's copy of the original is there: without it the levels are our own and the menu offers the import.
     copy: bool,
     /// There are modified originals (levels/modified) to offer; they are listed only with a copy too.
@@ -336,8 +355,11 @@ impl Menu {
             entries,
             maps: Vec::new(),
             folder: None,
-            own_list: false,
-            community: false,
+            list: List::None,
+            has_ours: !crate::levels::shipped().is_empty(),
+            has_best: !crate::levels::community().is_empty(),
+            look_offered: remastered_offered(),
+            look_remastered: crate::app::setting("look").as_deref() == Some("remastered"),
             copy: data.has_copy(),
             modified: crate::modified::offered(data.has_copy()),
             features,
@@ -388,17 +410,13 @@ impl Menu {
     /// Whether the open list has a note on a panel under its rows: the shipped community picks (author and thanks)
     /// and the player's own maps folder (what it is, where it is).
     fn note_below(&self) -> bool {
-        self.community
-            || self
-                .folder
-                .as_ref()
-                .is_some_and(|f| *f == crate::levels::dir(Kind::Community))
+        matches!(self.list, List::Best | List::Downloaded)
     }
 
     /// The note under an open list with one: the picks' (what they are, the chosen map's author, the authors' notice)
     /// or the player's folder's.
     fn list_note(&self, chosen: Option<Line>) -> String {
-        if self.community {
+        if self.list == List::Best {
             let by = match chosen {
                 Some(Line::Map(m)) => self.credit(m),
                 _ => String::new(),
@@ -411,16 +429,14 @@ impl Menu {
                 format!("{about}\n{by}\n{notice}")
             }
         } else {
-            self.describe(Some(Line::Kind(
-                LEVEL_KINDS.iter().position(|&k| k == Kind::Community).unwrap_or(0),
-            )))
+            self.describe(Some(Line::Downloaded))
         }
     }
 
     /// How many rows the list can show so that its note stays whole for every chosen map (the text shrinks to
     /// MIN_TEXT first; rows are given up only after that), so that the rows do not change as the choice moves.
     fn fit_rows(&self, f: &crate::ui::Face) -> usize {
-        let texts: Vec<String> = if self.community {
+        let texts: Vec<String> = if self.list == List::Best {
             (0..self.maps.len())
                 .map(|m| self.list_note(Some(Line::Map(m))))
                 .chain([self.list_note(None)])
@@ -442,13 +458,17 @@ impl Menu {
     /// What a list or kind line is, in a sentence (the player's folder with its place), empty for the others.
     fn describe(&self, line: Option<Line>) -> String {
         let s = &self.strings;
-        let mine = |s: &Strings| {
-            let dir = shown_path(&crate::levels::dir(Kind::Community).display().to_string());
-            format!("{}\n{dir}", s.ours("note mine"))
-        };
         match line {
-            Some(Line::Community) => s.ours("note picks"),
-            Some(Line::Kind(k)) if LEVEL_KINDS.get(k) == Some(&Kind::Community) => mine(s),
+            Some(Line::Classic) => s.ours("note classic"),
+            Some(Line::Ours) => s.ours("note ours"),
+            Some(Line::Challenges) => s.ours("note challenges"),
+            Some(Line::Community) => s.ours("note community"),
+            Some(Line::Best) => s.ours("note picks"),
+            // where the folder is, as the player finds it in the game's data folder
+            Some(Line::Downloaded) => {
+                let dir = shown_path(&crate::levels::dir(Kind::Downloaded).display().to_string());
+                format!("{}\n{dir}", s.ours("note downloaded"))
+            }
             _ => String::new(),
         }
     }
@@ -574,30 +594,26 @@ impl Menu {
                 Line::Credits,
                 Line::Exit,
             ],
-            // the extended mode: every kind, then the shipped community maps; the classic mode: the original (with a
-            // copy) or our own levels (without), and the shipped community maps
-            Screen::Kinds if self.features.has(Feature::CustomLevels) => (0..LEVEL_KINDS.len())
-                .filter(|&k| LEVEL_KINDS.get(k) != Some(&Kind::Modified) || self.modified)
-                .map(Line::Kind)
-                .chain([Line::Community, Line::Back])
-                .collect(),
-            // the modified originals need the copy (their geometry is the original's) and a folder of them
-            Screen::Kinds if self.copy => {
-                let modified = LEVEL_KINDS
-                    .iter()
-                    .position(|&k| k == Kind::Modified)
-                    .filter(|_| self.modified);
-                [
-                    Some(Line::Kind(0)),
-                    modified.map(Line::Kind),
-                    Some(Line::Community),
-                    Some(Line::Back),
-                ]
-                .into_iter()
-                .flatten()
-                .collect()
-            }
-            Screen::Kinds => vec![Line::Ours, Line::Community, Line::Back],
+            // by meaning, the same in both modes (owner's decision 2026-11-09); what is empty or unavailable is
+            // left out: the original needs the copy, the challenges the copy and their folder
+            Screen::Kinds => [
+                self.copy.then_some(Line::Classic),
+                self.has_ours.then_some(Line::Ours),
+                (self.copy && self.modified).then_some(Line::Challenges),
+                Some(Line::Community),
+                Some(Line::Back),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+            Screen::Community => [
+                self.has_best.then_some(Line::Best),
+                Some(Line::Downloaded),
+                Some(Line::Back),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
             Screen::Start => (0..self.entries.len())
                 .map(Line::Level)
                 .chain([Line::Back])
@@ -606,14 +622,18 @@ impl Menu {
                 .map(Line::Map)
                 .chain([Line::Back])
                 .collect(),
-            Screen::Options => vec![
-                Line::Graphics,
-                Line::Controls,
-                Line::Sound,
-                Line::Language,
-                Line::Extended,
-                Line::Back,
-            ],
+            Screen::Options => [
+                Some(Line::Graphics),
+                Some(Line::Controls),
+                Some(Line::Sound),
+                Some(Line::Language),
+                self.look_offered.then_some(Line::Look),
+                Some(Line::Extended),
+                Some(Line::Back),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
             Screen::Language => (0..LANGUAGES.len())
                 .map(Line::Lang)
                 .chain([Line::Back])
@@ -843,6 +863,7 @@ impl Menu {
                 self.step(by as isize);
                 Action::None
             }
+            (_, Some(Line::Look)) => self.toggle_look(),
             (_, Some(Line::Textures)) => next_pack(gamedata::packs::Kind::Textures, by),
             (_, Some(Line::Models)) => next_pack(gamedata::packs::Kind::Models, by),
             (_, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
@@ -871,42 +892,34 @@ impl Menu {
             Action::None
         };
         match line {
-            // the levels come by kind: the original ones (the classic list) or, without a copy, our own (decisions.md,
-            // "The game plays out of the box"), and the community maps shipped with the game
+            // the levels come by meaning (decisions.md, "Start by meaning"): the original ones (the classic list),
+            // ours, the challenges, and the community maps in a submenu
             Line::Start => open(self, Screen::Kinds),
+            Line::Classic => open(self, Screen::Start),
+            Line::Community => open(self, Screen::Community),
             Line::Ours => {
-                self.maps = own_levels();
-                self.folder = Some(crate::levels::dir(Kind::Open));
-                self.own_list = true;
-                self.community = false;
+                self.maps = crate::levels::shipped();
+                self.show(List::Ours, None);
                 open(self, Screen::Custom)
             }
-            Line::Community => {
+            Line::Best => {
                 self.maps = crate::levels::community();
-                self.folder = None;
-                self.own_list = false;
-                self.community = true;
+                self.show(List::Best, None);
+                open(self, Screen::Custom)
+            }
+            Line::Downloaded => {
+                self.maps = downloaded_levels();
+                self.show(List::Downloaded, Some(crate::levels::dir(Kind::Downloaded)));
+                open(self, Screen::Custom)
+            }
+            // grouped by set, titled from the names (modified.rs)
+            Line::Challenges => {
+                let root = crate::levels::dir(Kind::Modified);
+                self.maps = crate::modified::levels(&root);
+                self.show(List::Challenges, Some(root));
                 open(self, Screen::Custom)
             }
             Line::Import => Action::Import,
-            Line::Kind(k) => match LEVEL_KINDS.get(k) {
-                Some(Kind::Original) => open(self, Screen::Start),
-                Some(&kind) => {
-                    let root = crate::levels::dir(kind);
-                    // the open-format levels include those shipped with the game
-                    self.maps = match kind {
-                        Kind::Open => own_levels(),
-                        // grouped by set, titled from the names (modified.rs)
-                        Kind::Modified => crate::modified::levels(&root),
-                        _ => maps_in(&root),
-                    };
-                    self.folder = Some(root);
-                    self.own_list = false;
-                    self.community = false;
-                    open(self, Screen::Custom)
-                }
-                None => Action::None,
-            },
             Line::Highscore => open(self, Screen::Highscore),
             Line::Options => open(self, Screen::Options),
             Line::Credits => open(self, Screen::Credits),
@@ -950,6 +963,7 @@ impl Menu {
                 .get(i)
                 .map_or(Action::None, |p| Action::Map(p.level.clone())),
             Line::Mode => Action::ToggleDebug,
+            Line::Look => self.toggle_look(),
             Line::Interface => Action::Interface(next_provider(1)),
             Line::Textures => next_pack(gamedata::packs::Kind::Textures, 1),
             Line::Models => next_pack(gamedata::packs::Kind::Models, 1),
@@ -981,6 +995,18 @@ impl Menu {
         }
     }
 
+    /// The list the Custom screen shows, and the folder it comes from (for its empty message).
+    fn show(&mut self, list: List, folder: Option<PathBuf>) {
+        self.list = list;
+        self.folder = folder;
+    }
+
+    /// The Look line: the original levels played as they are, or from their remastered export.
+    fn toggle_look(&mut self) -> Action {
+        self.look_remastered = !self.look_remastered;
+        Action::Look(self.look_remastered)
+    }
+
     /// Esc: back a screen; the pause menu back to the run. A key being awaited is left as it was.
     pub fn back(&mut self) -> Action {
         if self.waiting.take().is_some() {
@@ -993,7 +1019,7 @@ impl Menu {
             _ => {
                 if self.screen() == Screen::Custom {
                     self.folder = None;
-                    self.community = false;
+                    self.list = List::None;
                 }
                 self.pop();
                 Action::None
@@ -1302,16 +1328,17 @@ impl Menu {
         match line {
             Line::Start => s.get("Menu_Main Button Start", "Start"),
             Line::Import => s.ours("import"),
-            Line::Ours => s.ours("own levels"),
+            Line::Classic => s.ours("classic ballance"),
+            Line::Ours => s.ours("drahtseilakt"),
+            Line::Challenges => s.ours("ballance challenges"),
             Line::Community => s.ours("community maps"),
-            Line::Kind(k) => match LEVEL_KINDS.get(k) {
-                Some(Kind::Original) => s.ours("kind original"),
-                Some(Kind::Remastered) => s.ours("kind remastered"),
-                Some(Kind::Community) => s.ours("kind community"),
-                Some(Kind::Open) => s.ours("kind open"),
-                Some(Kind::Modified) => s.ours("kind modified"),
-                None => String::new(),
-            },
+            Line::Best => s.ours("best maps"),
+            Line::Downloaded => s.ours("downloaded maps"),
+            Line::Look => format!(
+                "{}: {}",
+                s.ours("look"),
+                s.ours(if self.look_remastered { "look remastered" } else { "look original" })
+            ),
             Line::Highscore => s.get("Menu_Main Button Highscore", "Highscore"),
             Line::Options => s.get("Menu_Main Button Options", "Options"),
             Line::Credits => s.get("Menu_Main Button Credits", "Credits"),
@@ -1441,15 +1468,13 @@ impl Menu {
             Screen::ModPage => self.label(Line::Mod(self.mod_page)),
             Screen::Language => s.ours("language"),
             Screen::Kinds => s.ours("levels"),
-            Screen::Custom if self.community => s.ours("community maps"),
-            Screen::Custom if self.own_list => s.ours("own levels"),
-            Screen::Custom => match self.folder.as_ref().and_then(|root| {
-                LEVEL_KINDS
-                    .iter()
-                    .position(|&k| crate::levels::dir(k) == *root)
-            }) {
-                Some(k) => self.label(Line::Kind(k)),
-                None => s.ours("custom levels"),
+            Screen::Community => s.ours("community maps"),
+            Screen::Custom => match self.list {
+                List::Ours => self.label(Line::Ours),
+                List::Best => self.label(Line::Best),
+                List::Downloaded => self.label(Line::Downloaded),
+                List::Challenges => self.label(Line::Challenges),
+                List::None => s.ours("custom levels"),
             },
             Screen::Highscore => s.numbered("Highscore Title (+ SPACE!)", self.shown),
             Screen::Ask(Ask::Quit) => {
@@ -2153,11 +2178,12 @@ impl Menu {
         };
         match sc {
             Screen::Main | Screen::Pause | Screen::Dead | Screen::End => big(&mut out, 0.15, 0.74),
-            Screen::Options | Screen::Kinds => {
+            Screen::Options | Screen::Kinds | Screen::Community => {
                 title(&mut out);
+                let about_it = matches!(sc, Screen::Kinds | Screen::Community);
                 // the kinds leave room under them for what the chosen one is
-                big(&mut out, 0.30, if sc == Screen::Kinds { 0.62 } else { 0.74 });
-                if sc == Screen::Kinds {
+                big(&mut out, 0.30, if about_it { 0.62 } else { 0.74 });
+                if about_it {
                     // what the chosen list is
                     let about = self.describe(lines.get(self.chosen()).copied());
                     note(&mut out, &about, NOTE_BOTTOM, true, NOTE_BOTTOM - 0.72);
@@ -3311,24 +3337,51 @@ impl Menu {
     }
 }
 
-/// The kinds of levels the extended mode offers, in the menu's order (levels.md).
-const LEVEL_KINDS: [Kind; 5] = [
-    Kind::Original,
-    Kind::Remastered,
-    Kind::Community,
-    Kind::Open,
-    Kind::Modified,
-];
+/// Which list the Custom screen shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum List {
+    None,
+    /// Drahtseilakt: our own levels.
+    Ours,
+    /// The best community maps (shipped).
+    Best,
+    /// The player's downloaded levels.
+    Downloaded,
+    /// Ballance Challenges.
+    Challenges,
+}
+
+/// Whether the remastered export is there (levels/remastered holds a level), so that the original levels can be played
+/// with that look.
+fn remastered_offered() -> bool {
+    let Ok(read) = std::fs::read_dir(crate::levels::dir(Kind::Remastered)) else {
+        return false;
+    };
+    read.flatten()
+        .take(64)
+        .any(|e| e.path().join("level.gltf").is_file())
+}
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
 /// it; folders that hold no level or several are not shown, and said so on the console.
-/// Our own levels: those shipped with the game, then the player's open-format levels.
-fn own_levels() -> Vec<Package> {
-    let mut v = crate::levels::shipped();
-    v.extend(maps_in(&crate::levels::dir(Kind::Open)));
+/// The player's downloaded levels: the downloaded folder's and those of the folders it replaced (community, open),
+/// each read where it is, in one list.
+fn downloaded_levels() -> Vec<Package> {
+    let mut seen: Vec<PathBuf> = Vec::new();
+    let mut v = Vec::new();
+    for kind in gamedata::profile::DOWNLOADED {
+        let root = crate::levels::dir(kind);
+        if !seen.contains(&root) {
+            v.extend(maps_in(&root));
+            seen.push(root);
+        }
+    }
+    gamedata::package::sort(&mut v);
     v
 }
 
+/// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
+/// it; folders that hold no level or several are not shown, and said so on the console.
 fn maps_in(dir: &Path) -> Vec<Package> {
     let (levels, skipped) = gamedata::package::scan(dir);
     if !skipped.is_empty() {
@@ -3394,8 +3447,11 @@ mod tests {
                 .collect(),
             maps: Vec::new(),
             folder: None,
-            own_list: false,
-            community: false,
+            list: List::None,
+            has_ours: true,
+            has_best: true,
+            look_offered: false,
+            look_remastered: false,
             copy: true,
             modified: false,
             features: Features::new(extended),
@@ -3825,15 +3881,16 @@ mod tests {
         };
         let community = crate::levels::community();
         assert_eq!(community.len(), 13, "the thirteen shipped community maps");
-        let lists: Vec<(&str, bool, Vec<Package>)> = vec![
+        let lists: Vec<(&str, List, Vec<Package>)> = vec![
             (
                 "own",
-                false,
-                own_levels().into_iter().chain((0..20).map(long)).collect(),
+                List::Ours,
+                crate::levels::shipped().into_iter().chain((0..20).map(long)).collect(),
             ),
-            ("community", true, community),
-            ("modified", false, crate::modified::sample_packages()),
-            ("none", false, Vec::new()),
+            ("best", List::Best, community),
+            ("downloaded", List::Downloaded, (0..20).map(long).collect()),
+            ("challenges", List::Challenges, crate::modified::sample_packages()),
+            ("none", List::Downloaded, Vec::new()),
         ];
         let mods = gamedata::mods::scan(true);
         assert!(
@@ -3861,14 +3918,15 @@ mod tests {
         let mut cut = std::collections::BTreeSet::new();
         for &(lang, _) in &LANGUAGES {
             for mode in [true, false] {
-                for (list, community, maps) in &lists {
+                for (list, kind, maps) in &lists {
                     let mut m = menu(&[true; 13], mode);
                     m.features.debug = true;
                     m.strings = Strings::ours_in(lang);
                     m.mods = crate::modrt::Mods::load(mods.clone(), |_| None);
                     m.maps = maps.clone();
-                    m.community = *community;
+                    m.list = *kind;
                     m.modified = true;
+                    m.look_offered = true;
                     m.name = b"WWWWWWWWWWWWWWWW".to_vec();
                     m.points = 99_999_999;
                     for level in 1..=13 {
@@ -3888,6 +3946,7 @@ mod tests {
                         for sc in [
                             Screen::Main,
                             Screen::Kinds,
+                            Screen::Community,
                             Screen::Start,
                             Screen::Highscore,
                             Screen::Options,
@@ -4284,7 +4343,7 @@ mod tests {
         assert_eq!(
             m.screen(),
             Screen::Kinds,
-            "levels by kind in the extended mode only"
+            "Start asks which levels, in either mode"
         );
         let kinds: Vec<String> = m
             .lines(Screen::Kinds)
@@ -4292,17 +4351,8 @@ mod tests {
             .map(|l| m.label(l))
             .collect();
         assert_eq!(
-            kinds[..4],
-            [
-                "Original",
-                "Remastered",
-                "My maps folder",
-                "Open format"
-            ]
-        );
-        assert_eq!(
-            kinds[4], "Community picks",
-            "the maps shipped with the game come after the kinds"
+            kinds,
+            ["Classic Ballance", "Drahtseilakt", "Community maps", "Back"]
         );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
@@ -4443,6 +4493,7 @@ mod tests {
         );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom, "our own levels");
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Drahtseilakt"));
         m.back();
         m.back();
         m.step(1);
@@ -4450,35 +4501,121 @@ mod tests {
     }
 
     #[test]
-    fn the_modified_originals_are_offered_only_with_a_copy_and_levels() {
+    fn the_challenges_are_offered_only_with_a_copy_and_levels() {
         let kinds = |m: &Menu| m.lines(Screen::Kinds);
         // nothing in the folder: not listed, in either mode
-        assert!(!kinds(&menu(&[true], true)).contains(&Line::Kind(4)));
+        assert!(!kinds(&menu(&[true], true)).contains(&Line::Challenges));
         assert_eq!(
             kinds(&menu(&[true], false)),
-            [Line::Kind(0), Line::Community, Line::Back]
+            [Line::Classic, Line::Ours, Line::Community, Line::Back],
+            "the same in both modes"
         );
-        // levels and a copy: after the original in the classic mode, after the other kinds in the extended one
+        assert_eq!(kinds(&menu(&[true], false)), kinds(&menu(&[true], true)));
+        // levels and a copy
         let mut m = menu(&[true], false);
         m.modified = true;
         assert_eq!(
             kinds(&m),
-            [Line::Kind(0), Line::Kind(4), Line::Community, Line::Back]
+            [
+                Line::Classic,
+                Line::Ours,
+                Line::Challenges,
+                Line::Community,
+                Line::Back
+            ]
         );
-        assert_eq!(m.label(Line::Kind(4)), "Modified originals");
-        let mut m = menu(&[true], true);
-        m.modified = true;
-        assert_eq!(kinds(&m)[4], Line::Kind(4));
+        assert_eq!(m.label(Line::Challenges), "Ballance Challenges");
+        assert_eq!(m.label(Line::Classic), "Classic Ballance");
         // the flag is only ever set with a copy (modified::offered); without one the classic list is ours
         let mut m = menu(&[true], false);
         m.copy = false;
         m.modified = true;
         assert_eq!(kinds(&m), [Line::Ours, Line::Community, Line::Back]);
         assert!(!crate::modified::offered(false));
+        // an empty shipped set leaves its item out
+        let mut m = menu(&[true], false);
+        m.has_ours = false;
+        m.has_best = false;
+        assert_eq!(kinds(&m), [Line::Classic, Line::Community, Line::Back]);
+        assert_eq!(m.lines(Screen::Community), [Line::Downloaded, Line::Back]);
         for lang in ["en", "ru", "de", "zh", "fr", "es", "it"] {
             let s = crate::lang::Strings::ours_in(lang);
-            assert_ne!(s.ours("kind modified"), "kind modified", "{lang}");
+            for key in [
+                "classic ballance",
+                "drahtseilakt",
+                "ballance challenges",
+                "community maps",
+                "best maps",
+                "downloaded maps",
+                "look",
+                "look original",
+                "look remastered",
+                "note classic",
+                "note ours",
+                "note challenges",
+                "note community",
+                "note downloaded",
+                "note picks",
+            ] {
+                assert_ne!(s.ours(key), key, "{lang} {key}");
+            }
         }
+        let ru = crate::lang::Strings::ours_in("ru");
+        assert_eq!(ru.ours("classic ballance"), "Классический Ballance");
+        assert_eq!(ru.ours("ballance challenges"), "Испытания Ballance");
+        assert_eq!(ru.ours("community maps"), "Карты сообщества");
+    }
+
+    #[test]
+    fn every_start_item_says_what_it_is() {
+        let m = menu(&[true], false);
+        for l in [
+            Line::Classic,
+            Line::Ours,
+            Line::Challenges,
+            Line::Community,
+            Line::Best,
+            Line::Downloaded,
+        ] {
+            assert!(m.describe(Some(l)).len() > 20, "{l:?}");
+        }
+        // the downloaded folder's place is shown
+        assert!(
+            m.describe(Some(Line::Downloaded))
+                .ends_with("downloaded")
+        );
+    }
+
+    #[test]
+    fn the_community_submenu_has_the_best_and_the_downloaded() {
+        let mut m = menu(&[true], false);
+        m.stack.clear();
+        m.push(Screen::Kinds);
+        m.set_chosen(2);
+        assert_eq!(m.lines(Screen::Kinds)[2], Line::Community);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Community);
+        assert_eq!(
+            m.lines(Screen::Community),
+            [Line::Best, Line::Downloaded, Line::Back]
+        );
+        m.step(1);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Custom);
+        assert_eq!(m.list, List::Downloaded);
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Downloaded"));
+    }
+
+    #[test]
+    fn the_look_line_is_offered_only_with_a_remastered_export_and_toggles() {
+        let mut m = menu(&[true], false);
+        assert!(!m.lines(Screen::Options).contains(&Line::Look));
+        m.look_offered = true;
+        assert!(m.lines(Screen::Options).contains(&Line::Look));
+        assert_eq!(m.label(Line::Look), "Look: original");
+        assert_eq!(m.toggle_look(), Action::Look(true));
+        assert_eq!(m.label(Line::Look), "Look: remastered");
+        assert_eq!(m.toggle_look(), Action::Look(false));
     }
 
     #[test]
@@ -4487,13 +4624,16 @@ mod tests {
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
             m.lines(Screen::Kinds),
-            [Line::Kind(0), Line::Community, Line::Back],
+            [Line::Classic, Line::Ours, Line::Community, Line::Back],
             "the classic mode too"
         );
         m.step(1);
+        m.step(1);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Community);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom);
-        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Community picks"));
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Best"));
         assert_eq!(m.maps.len(), 13, "the thirteen shipped maps");
         let orders: Vec<_> = m.maps.iter().map(|p| p.order).collect();
         assert_eq!(
@@ -4519,7 +4659,7 @@ mod tests {
                 .contains("спасибо им")
         );
         m.back();
-        assert!(!m.community);
+        assert_eq!(m.list, List::None);
     }
 
     #[test]

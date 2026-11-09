@@ -100,7 +100,7 @@ development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the or
   - all levels open, without unlocking: only in a debug run (`--debug`); a player's game opens the levels by playing
     them;
   - best times beside the levels;
-  - levels by kind under Start;
+  - (Start is the same in both modes since 2026-11-09; the switch no longer exists);
   - Interface: own / original / remaster, where the interface's files come from ([resources.md](resources.md));
   - Textures: the texture pack the levels, their parts and the balls are drawn with — own (the default), original, remaster or a player's pack, by its name; the next level loads with the choice
     ([packs.md](packs.md));
@@ -116,8 +116,7 @@ development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the or
 - **Graphics** adds *Field of View*: the in-game camera's width across 4:3, 40° to 100° in steps of 2 (`fov 58`; the
   original's is 58°, InGameCam's 1.0123 radians). The classic mode always draws the original's.
 - **Controls** adds *Defaults*, back to the original's keys (arrows, Shift, Space) and no inverted turn.
-- **Levels by kind**: Start offers *Original* (the classic list of levels), *Remastered*, *Community maps* and
-  *Open format*, the folders of `levels/` ([levels.md](levels.md)). In each, a flat list of its levels (a level is a
+- **Lists of levels** (a list opens from Start, below): In each, a flat list of its levels (a level is a
   folder holding one level, or a loose `.nmo`: levels.md, "A level is a folder"; no folders to open, nothing else
   shown), played like an original level. Each row shows the level's **difficulty**, a star and 1 to 10 (level.txt's
   `difficulty`; "★?" when unknown), and its **title** in English (level.txt's `title`), or in the menus' language when
@@ -130,6 +129,26 @@ development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the or
   Mods screen ([mods.md](mods.md)), each behind its own switch; third-party content is played at the player's own
   risk.
 - **Long lists** (Start > My maps folder, mods, modified originals): Esc or Backspace (the pad's back button) leaves from any row; Back stays pinned under the list, with an "Esc: back" hint beside it. PageUp / PageDown move a page, Home / End jump to the first / last row, a held Up / Down repeats (after 0.35 s, 12 rows a second, 30 after a second more), the wheel scrolls, and a typed letter jumps to the next title starting with it. *Community picks* are the 13 maps shipped with the game (credited); *My maps folder* lists the maps you put in `levels/community/` of the game's data folder (its path is shown under the list).
+
+
+## Start, by meaning (owner's decision 2026-11-09)
+
+Start is the same in the classic and the extended mode; an item that is empty or unavailable is left out. Each item
+and each submenu item says on the notes panel what it is and where it comes from.
+
+| Item | Opens | Needs |
+|---|---|---|
+| *Classic Ballance* (ru «Классический Ballance») | the 13 original levels of the player's copy, unlocking as in the original | a copy |
+| *Drahtseilakt* | our own 13 levels, shipped with the game | |
+| *Ballance Challenges* (ru «Испытания Ballance») | the original levels remade by the community: the camera turned 45 degrees, the way backwards, the road invisible (`levels/modified/`) | a copy and levels in the folder |
+| *Community maps* (ru «Карты сообщества») | a submenu | |
+| &nbsp;&nbsp;*Best* (ru «Лучшие») | the 13 community maps shipped with the game, with their authors and the thanks notice | |
+| &nbsp;&nbsp;*Downloaded* (ru «Скачанные») | the player's folder `levels/downloaded/` (its path is shown): community `.nmo` maps and open-format levels in one list, with those of the earlier folders `levels/community/` and `levels/open/`, which are still read | |
+
+The strings are in all seven languages. *Remastered* is no longer a kind of level: Options has the line *Look:
+original / remastered* (ru «Вид: оригинал / ремастер»), shown only when `levels/remastered/` holds an export. With
+*remastered*, Classic Ballance plays each original level from its export (the setting `look remastered`); the look is
+a setting, not a list, so that texture and model packs can take its place later.
 
 ## Words that fit, lists that say they scroll
 

@@ -44,8 +44,8 @@ Options、Credits、Exit；在关卡中按 Esc 打开暂停菜单，失败的一
 FILE.png` 渲染一帧。要测试某个位置，`--sector N` 从某个检查点开始，`--at X,Y,Z`（或关卡
 对象的名称）可从任意位置开始，使用该分段开始时的球（`--ball wood|stone|paper` 可覆盖）；这样的一局会把起点保存在回放中，并且永远不会
 算作最佳成绩。在开启扩展模式之前（Options、Extended，或用 `--debug` 开启一次），游戏会尽可能
-贴近原版。*扩展模式*会显示最佳时间，并在 Start 下按类别列出关卡
-（`levels/` 中的原版、重制、自制地图和开放格式关卡，每个关卡标有难度；如何制作和分享关卡：
+贴近原版。*扩展模式*会显示最佳时间。Start 在两种模式下都按含义列出关卡
+（你副本中的经典 Ballance、Drahtseilakt、Ballance 挑战、社区地图：随游戏附带的精选和你的 `levels/downloaded/`，每个关卡标有难度；如何制作和分享关卡：
 [制作与分享关卡](docs/zh/drahtseilakt/making-levels.md)），以及模组（[模组](docs/zh/drahtseilakt/mods.md)）。
 调试运行（`--debug`）还会解锁所有关卡，并提供开发用模组*上帝模式*：无限生命，F5 保存当前时刻，F9 回到该时刻，
 F3 后退数秒，R 重新开始，`[` 和 `]` 让游戏变慢和重新加快，F2 启用自由相机，并显示小节和 tick；这样的一局作为已修改

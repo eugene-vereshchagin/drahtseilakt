@@ -10,22 +10,24 @@ Standard, das Original auf Wunsch des Spielers“).
 
 Alle Level liegen in `levels/` im Datenordner des Spiels (`~/.local/share/drahtseilakt/` unter Linux,
 `%APPDATA%\drahtseilakt\` unter Windows, `~/Library/Application Support/drahtseilakt/` unter macOS). Ein eigenes Level
-oder das eines anderen kommt in einen von zwei Ordnern:
+oder das eines anderen kommt nach `levels/downloaded/`, in zwei Arten:
 
-- `levels/community/` — Community-Karten (Virtools-`.nmo`-Dateien, das Format des Originals);
-- `levels/open/` — Level im [offenen Format](open-format.md) (gewöhnliche glTF- und PNG-Dateien, leicht von Hand
+- Community-Karten (Virtools-`.nmo`-Dateien, das Format des Originals);
+- Level im [offenen Format](open-format.md) (gewöhnliche glTF- und PNG-Dateien, leicht von Hand
   fertigzustellen oder nachzubessern).
 
 **Ein Level, ein Ordner, direkt in diesem Ordner:**
 
+*Seit 2026-11-09 kommen beide nach `levels/downloaded/`; die früheren `levels/community/` und `levels/open/` werden weiter gelesen, nichts wird verschoben.* Im Menü: *Start, Community-Karten, Heruntergeladen*.
+
 ```
-levels/community/
+levels/downloaded/
   Green Dam/                 der Ordner des Levels: ein schlichter Name, höchstens 40 Zeichen
     Green Dam.NMO            das Level: genau eine .nmo ...
     level.txt                sein Name, Autor, Schwierigkeit (unten; freiwillig, aber ohne Titel steht es zuletzt)
     README.txt               freiwillig: was es ist, wie man es spielt, seine Lizenz
     preview.png              freiwillig: ein Bild davon (auch preview.jpg)
-levels/open/
+levels/downloaded/
   Sky Road/
     level.gltf level.bin     ... oder ein Level im offenen Format
     textures/                seine eigenen Texturen (PNG), direkt in textures/
@@ -33,7 +35,7 @@ levels/open/
     level.txt  README.md  preview.jpg
 ```
 
-Eine einzelne `.nmo`, direkt in `levels/community/` gelegt, ist auch ein Level, nach ihrer Datei benannt: der
+Eine einzelne `.nmo`, direkt in `levels/downloaded/` gelegt, ist auch ein Level, nach ihrer Datei benannt: der
 schnellste Weg, eine Karte auszuprobieren.
 
 ## level.txt
@@ -113,7 +115,7 @@ heruntergeladene Sammlung in diese Form:
 drahtseilakt-toolbox import-maps ~/Downloads/Maps --catalogue CustomMapList.md
 ```
 
-- jede `.nmo` unter dem Ordner (Ordner beliebiger Tiefe) wird ein Level-Ordner in `levels/community/` (`--to DIR` für
+- jede `.nmo` unter dem Ordner (Ordner beliebiger Tiefe) wird ein Level-Ordner in `levels/downloaded/` (`--to DIR` für
   einen anderen), mit der Karte, ihrem Bild als Vorschau und einer level.txt, die sagt, woher sie kommt;
 - mit `--catalogue` (der Kartenliste der Community, `CustomMapList.md`) bekommt eine Karte, die darin steht, ihren
   englischen Titel, ihren Originalnamen (`title.zh` für eine chinesische), ihren Autor und ihre Schwierigkeit (der

@@ -9,22 +9,24 @@ it well, and share it. The details behind each rule are in [levels.md](levels.md
 
 All levels live in `levels/` in the game's data folder (`~/.local/share/drahtseilakt/` on Linux,
 `%APPDATA%\drahtseilakt\` on Windows, `~/Library/Application Support/drahtseilakt/` on macOS). A level of your own or
-someone else's goes into one of two folders:
+someone else's goes into `levels/downloaded/`, either of two kinds:
 
-- `levels/community/` — community maps (Virtools `.nmo` files, the original's format);
-- `levels/open/` — levels in the [open format](open-format.md) (plain glTF and PNG files, easy to finish or fix up by
+- community maps (Virtools `.nmo` files, the original's format);
+- levels in the [open format](open-format.md) (plain glTF and PNG files, easy to finish or fix up by
   hand).
 
 **One level, one folder, directly in that folder:**
 
+*Since 2026-11-09 both go into `levels/downloaded/`; the earlier `levels/community/` and `levels/open/` are still read, and nothing is moved.* In the menu: *Start, Community maps, Downloaded*.
+
 ```
-levels/community/
+levels/downloaded/
   Green Dam/                 the level's folder: a plain name, at most 40 characters
     Green Dam.NMO            the level: exactly one .nmo ...
     level.txt                its name, author, difficulty (below; optional, but without a title it is listed last)
     README.txt               optional: what it is, how to play it, its licence
     preview.png              optional: a picture of it (preview.jpg also)
-levels/open/
+levels/downloaded/
   Sky Road/
     level.gltf level.bin     ... or one level in the open format
     textures/                its own textures (PNG), directly in textures/
@@ -32,7 +34,7 @@ levels/open/
     level.txt  README.md  preview.jpg
 ```
 
-A single `.nmo` dropped straight into `levels/community/` is a level too, named by its file: the quickest way to try
+A single `.nmo` dropped straight into `levels/downloaded/` is a level too, named by its file: the quickest way to try
 a map.
 
 ## level.txt
@@ -77,7 +79,7 @@ difficulty = 3
 
 ## What the menu shows, in which order
 
-Under *Start → Community maps* (or *Open format*) in the extended mode, a flat list, one row a level: a star and its
+Under *Start → Community maps → Downloaded*, a flat list, one row a level: a star and its
 difficulty (★7; ★? when unknown) and its title (in the menus' language when level.txt has it). The list is sorted:
 
 1. by difficulty, easiest first; levels of unknown difficulty after all those with one;
@@ -108,7 +110,7 @@ into this shape:
 drahtseilakt-toolbox import-maps ~/Downloads/Maps --catalogue CustomMapList.md
 ```
 
-- every `.nmo` under the folder (folders of any depth) becomes a level folder in `levels/community/` (`--to DIR` for
+- every `.nmo` under the folder (folders of any depth) becomes a level folder in `levels/downloaded/` (`--to DIR` for
   another), with the map, its picture as the preview and a level.txt saying where it came from;
 - with `--catalogue` (the community's map list, `CustomMapList.md`) a map found in it gets its English title, its
   original name (`title.zh` for a Chinese one), its author and its difficulty (the catalogue rates 1–5 in halves; it

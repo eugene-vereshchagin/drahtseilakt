@@ -1043,6 +1043,18 @@ fn loading_name(source: &crate::assets::Source) -> String {
     }
 }
 
+/// Original level `n` from its remastered export, when the look is set to remastered (Options, Look) and the export
+/// has the level: the look is a setting, not a kind of level (phase 2 turns it into texture and model packs).
+fn look_source(n: u32) -> Option<crate::assets::Source> {
+    if setting("look").as_deref() != Some("remastered") {
+        return None;
+    }
+    let dir = crate::levels::dir(crate::levels::Kind::Remastered).join(format!("Level_{n:02}"));
+    dir.join("level.gltf")
+        .is_file()
+        .then_some(crate::assets::Source::Open(dir))
+}
+
 /// The custom levels' folders (all but the original's), and the levels shipped with the game.
 fn custom_roots() -> Vec<PathBuf> {
     crate::levels::KINDS
@@ -4504,7 +4516,7 @@ impl App {
         if self.number == Some(n) {
             self.restart();
         } else {
-            self.load(crate::assets::Source::Original(n));
+            self.load(look_source(n).unwrap_or(crate::assets::Source::Original(n)));
         }
     }
 
@@ -5230,6 +5242,11 @@ impl App {
                 // the next level loads with it
                 gamedata::packs::choose(kind, &key);
                 put_settings(&[(kind.key().to_owned(), key)]);
+            }
+            Action::Look(remastered) => {
+                // the next original level plays with it
+                let look = if remastered { "remastered" } else { "original" };
+                put_settings(&[("look".to_owned(), look.to_owned())]);
             }
             Action::Language(code) => {
                 // spoken at once: the menus' words again, in the new language

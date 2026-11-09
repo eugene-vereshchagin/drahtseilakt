@@ -15,9 +15,10 @@ they come from and what format they are in:
 | `levels/community/` | community maps: a folder per level, a `.nmo` or an open-format level in it (below) | the player downloads them, `drahtseilakt-toolbox import-maps` sorts a download into folders; the folder's README says where | extended |
 | `levels/remastered/` | the original levels converted to the open format, with textures upscaled to 4K–8K and what else a modern look needs | made on the player's machine by `drahtseilakt-toolbox remaster` from `original/`; never distributed | extended |
 | `levels/open/` | levels in the open format: made in it, or converted community maps | made by players; some come with the game | extended |
+| `levels/downloaded/` | the player's downloaded levels: community `.nmo` maps and open-format levels, a folder per level (below); the earlier `levels/community/` and `levels/open/` are still read next to it, never moved | the player downloads them, `drahtseilakt-toolbox import-maps` sorts a download into folders; the folder's README says where | classic and extended |
 | `levels/modified/` | modified originals: community remakes of the 13 original levels, in a folder per set | the player's own files; `drahtseilakt-toolbox import-maps` sorts a download; never shipped | classic and extended, with a copy of the original |
 
-The classic mode sees only `original/`; the extended mode sees all four (menu.md).
+Start lists them by meaning, in both modes (menu.md, "Start, by meaning"): `original/`, our own levels, `modified/`, and the community maps (the shipped best ones and `downloaded/`, with `community/` and `open/`, the folders it replaces). Since 2026-11-09 a player's folder is `levels/downloaded/`; the older two keep working where they exist, and runs of their levels keep their keys (below).
 
 ## Modified originals
 
@@ -289,6 +290,8 @@ counts as one: `replays/<level>/` for the original levels, `replays/maps/<kind>/
 under `replays/levels/<kind>/<level folder>/<map>/`, so two folders' `Level_07.NMO` keep their runs apart and a
 loose `Foo.nmo` and a folder `Foo/` never share. Runs an earlier version kept in `replays/maps/<level folder>/` are
 moved there the first time the level is played (only through real folders, never over runs already there).
+
+*Since 2026-11-09:* a level in the old `community/` or `open/` folder keeps the key of that folder's name, so existing runs and best times stay; a level in `downloaded/` is kept under `downloaded`. Moving a level from an old folder into `downloaded/` starts it with new runs.
 
 ## Languages
 

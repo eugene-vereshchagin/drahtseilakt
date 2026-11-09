@@ -52,8 +52,8 @@ fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it wit
 FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
 object's name) anywhere, with the ball that sector begins with (`--ball wood|stone|paper` overrides it); such a run keeps its start in its replay and is never a
 best run. Until the extended mode is turned on (Options, Extended, or `--debug` for one run) the game is the
-original as closely as it can be. The *extended mode* shows best times and levels by kind under Start (the
-original, remastered, community and open-format levels in `levels/`, each with its difficulty; how to make and share
+original as closely as it can be. The *extended mode* shows best times. Start lists levels by meaning in both modes (Classic Ballance from your copy, Drahtseilakt, Ballance
+Challenges, Community maps: the best shipped ones and your `levels/downloaded/`, each with its difficulty; how to make and share
 one: [making and sharing levels](docs/drahtseilakt/making-levels.md)) and the mods ([mods](docs/drahtseilakt/mods.md)).
 A debug run (`--debug`) also opens every level and offers the development mod *god mode*: endless lives, F5 saves the
 moment and F9 goes back to it, F3 goes seconds back, R restarts, `[` and `]` slow the run down and speed it up again,

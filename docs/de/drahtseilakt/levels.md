@@ -15,9 +15,10 @@ geteilt nach Herkunft und Format:
 | `levels/community/` | Community-Karten: ein Ordner je Level, darin eine `.nmo` oder ein Level im offenen Format (unten) | der Spieler lädt sie selbst, `drahtseilakt-toolbox import-maps` sortiert einen Download in Ordner; das README des Ordners sagt, wo | erweitert |
 | `levels/remastered/` | die Original-Level im offenen Format, mit auf 4K–8K vergrößerten Texturen und was ein modernes Aussehen sonst braucht | auf dem Rechner des Spielers von `drahtseilakt-toolbox remaster` aus `original/` erzeugt; nie weitergegeben | erweitert |
 | `levels/open/` | Level im offenen Format: darin gebaut oder umgewandelte Community-Karten | von Spielern gemacht; einige kommen mit dem Spiel | erweitert |
+| `levels/downloaded/` | die vom Spieler heruntergeladenen Level: Community-`.nmo`-Karten und Level im offenen Format, ein Ordner je Level (unten); die früheren `levels/community/` und `levels/open/` werden daneben weiter gelesen, nichts wird verschoben | der Spieler lädt sie selbst, `drahtseilakt-toolbox import-maps` sortiert einen Download in Ordner; das README des Ordners sagt, wo | klassisch und erweitert |
 | `levels/modified/` | modifizierte Originale: Community-Umbauten der 13 Original-Level, ein Ordner je Satz | eigene Dateien des Spielers; `drahtseilakt-toolbox import-maps` sortiert einen Download ein; nie mitgeliefert | klassisch und erweitert, mit Kopie des Originals |
 
-Der klassische Modus sieht nur `original/`, der erweiterte alle vier (menu.md).
+Start listet sie nach Bedeutung, in beiden Modi (menu.md, „Start nach Bedeutung“): `original/`, unsere Level, `modified/` und die Community-Karten (die mitgelieferten besten und `downloaded/` samt `community/` und `open/`, die es ersetzt). Seit 2026-11-09 ist der Ordner des Spielers `levels/downloaded/`; die beiden älteren funktionieren weiter, wo sie existieren, und die Läufe ihrer Level behalten ihre Schlüssel (unten).
 
 ## Modifizierte Originale
 
@@ -297,6 +298,8 @@ anderen (`community`, `open`, `remastered`), die eines Level-Ordners unter `repl
 damit `Level_07.NMO` aus zwei Ordnern ihre Läufe getrennt halten. Auch eine einzelne `Foo.nmo` und ein Ordner `Foo/`
 teilen keine Läufe. Läufe, die eine frühere Version in `replays/maps/<Level-Ordner>/` hielt, werden beim ersten Spielen
 des Levels dorthin verschoben (nur durch echte Ordner, nie über schon vorhandene).
+
+*Seit 2026-11-09:* ein Level im alten Ordner `community/` oder `open/` behält den Schlüssel nach dem Namen dieses Ordners, damit bestehende Läufe und Bestzeiten bleiben; ein Level in `downloaded/` wird unter `downloaded` geführt. Ein Level aus einem alten Ordner nach `downloaded/` zu verschieben beginnt seine Läufe neu.
 
 ## Sprachen
 

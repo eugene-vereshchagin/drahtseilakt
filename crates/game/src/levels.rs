@@ -17,6 +17,10 @@ const MOVED_MARK: &str = "[drahtseilakt: moved]\n";
 pub fn prepare(language: &str) {
     for kind in KINDS {
         let (here, default) = (dir(kind), default_dir(kind));
+        // the folders `downloaded` replaced are read where the player has them, never made again
+        if matches!(kind, Kind::Community | Kind::Open) && !here.is_dir() {
+            continue;
+        }
         if here != default {
             write(&default, &moved(language, &here), true);
         }
@@ -85,8 +89,37 @@ fn moved(language: &str, to: &Path) -> String {
     text + MOVED_MARK
 }
 
+/// The README of the downloaded levels' folder: what it is, and that the earlier folders still work, then what a
+/// level folder holds (as the earlier community folder's README said).
+fn downloaded(language: &str) -> String {
+    let head = match language {
+        "ru" => {
+            "Скачанные уровни: любительские карты .nmo и уровни в открытом формате (Старт, Карты сообщества, Скачанные).\n\n\
+             Прежние папки community/ и open/ работают по-прежнему: игра читает и их, ничего не переносится.\n\n"
+        }
+        "de" => {
+            "Heruntergeladene Level: Community-Karten (.nmo) und Level im offenen Format (Start, Community-Karten, Heruntergeladen).\n\n\
+             Die früheren Ordner community/ und open/ funktionieren weiter: das Spiel liest auch sie, nichts wird verschoben.\n\n"
+        }
+        "zh" => {
+            "已下载的关卡：社区 .nmo 地图和开放格式关卡（开始，社区地图，已下载）。\n\n\
+             旧的 community/ 和 open/ 文件夹仍然有效：游戏也会读取它们，不会移动任何文件。\n\n"
+        }
+        _ => {
+            "Downloaded levels: community .nmo maps and open-format levels (Start, Community maps, Downloaded).\n\n\
+             The earlier folders community/ and open/ still work: the game reads them too, nothing is moved.\n\n"
+        }
+    };
+    let body = about(language, Kind::Community);
+    let body = body.split_once("\n\n").map_or(body.as_str(), |(_, rest)| rest);
+    format!("{head}{body}")
+}
+
 /// A folder's README: what belongs there and where to get it.
 fn about(language: &str, kind: Kind) -> String {
+    if kind == Kind::Downloaded {
+        return downloaded(language);
+    }
     let text = match (language, kind) {
         ("ru", Kind::Original) => {
             "Оригинальная Ballance — ваша собственная копия.\n\nСкопируйте сюда из установленной игры base.cmo и папки \
@@ -219,6 +252,7 @@ fn about(language: &str, kind: Kind) -> String {
              level.gltf.\n\nSome come with the game, with their authors' permission and under a free licence (LICENSE \
              in the level's folder).\n"
         }
+        (_, Kind::Downloaded) => return downloaded(language),
     };
     text.to_owned()
 }
