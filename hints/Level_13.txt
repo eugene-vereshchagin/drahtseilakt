@@ -305,3 +305,18 @@ at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 
 # 2026-11-09 (main session): tried matching the trace at transformers by "held, then new kind" (jump run.k to the run's first tick
 # with the ball's new kind): it misfires in sector 2 (jumped to run tick 5053, 90 off, deaths at 1:30) — reverted. Such a jump
 # must be bounded (only to a held stretch within a few seconds of the matched tick, same transformer place). Not retried.
+# 2026-11-10 (sector 3's sacks, chain from the level start): the chain's sector 3 fails at the four swinging sacks
+# P_Modul_26 (z -822, -832, -842, -852): only 5-6 of the ten stone balls reach the pit before CP3 (the swinging sacks
+# knock the rest off the channel at z -817..-822), so the pile stays low and the paper ball sticks at x -671..-690.
+# The owner's way (his run, 1:17-1:24): as stone, out of P_Trafo_Stone (-709.2 -248.5 -807) at once, then along the
+# channel's east side (x -718) at 2-4 u/s, reaching each sack's z 0.4-0.5 s after it turned at its east end (-717.8):
+# swinging back, it settles against the ball and stays at x -720.8 (all four by 1:24); then the stones pass. Their
+# phase is all that matters (the owner: stalling desyncs them). From --sector 3 the owner's trace does this; in the
+# chain the sacks swing differently from the start (sack 34 gets a sideways z wobble from 3:38, 5 s after CP2, and
+# a smaller swing, west end -729.8 instead of -730.4), so the replayed keys meet them out of phase.
+# Tried (reverted): (1) a wait before the stone transformer for sack 34's west turn (new step `swing`) then N ticks:
+# from --sector 3 N 138-144 settles all four, in the chain no N does (best 129: three). (2) per sack: hold 2.5-4.5
+# north of it at x -718, `swing` for its east turn, pass on at 3-6 u/s: 2-3 of four settle, some on the west side
+# (-728), and they come loose again later. Next: find why the chain's sacks start differently from --sector 3's
+# (what touches them at 3:38, or how a sector's modules are reset when it is entered from the checkpoint); with
+# the same start the owner's trace should work as it does from --sector 3.

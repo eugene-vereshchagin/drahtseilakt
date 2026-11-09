@@ -81,6 +81,10 @@ pub enum Step {
     /// Hold the ball where it is until the loose body (or module part) nearest the first point is within the
     /// distance of the second, for so many ticks at most: a swing or a lift to get on or off at the right moment.
     Await(Vec3, Vec3, f32, u64),
+    /// Hold the ball where it is until the loose body (or module part) nearest the first point has turned back at
+    /// the end of its swing near the second (within the distance, no longer moving toward it), for so many ticks at
+    /// most: a pendulum's phase met however wide it swings.
+    Swing(Vec3, Vec3, f32, u64),
     /// Keep the ball over the loose body (or module part) nearest the first point until it is within the distance
     /// of the second, for so many ticks at most: riding a swing across.
     Ride(Vec3, Vec3, f32, u64),
@@ -456,7 +460,7 @@ fn step(words: &[&str]) -> Result<Step, String> {
             };
             Step::Shove(p, to, n, round, cap)
         }
-        "await" | "ride" => {
+        "await" | "ride" | "swing" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let q = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let d = num(w.next())?;
@@ -466,6 +470,8 @@ fn step(words: &[&str]) -> Result<Step, String> {
             let t = ticks(w.next())?;
             if name == "await" {
                 Step::Await(p, q, d, t)
+            } else if name == "swing" {
+                Step::Swing(p, q, d, t)
             } else {
                 Step::Ride(p, q, d, t)
             }
@@ -1455,6 +1461,18 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             // the ball held where it was as the step began (an edge may slope)
             (st.pos.distance(*q) > *d).then(|| towards(run.from))
         }
+        Step::Swing(at, q, d, n) => {
+            if t >= *n {
+                return None;
+            }
+            if t == 0 {
+                run.from = ball.position;
+            }
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
+            let st = sim.world().state(body)?;
+            let turned = st.pos.distance(*q) <= *d && st.vel.dot(*q - st.pos) <= 0.0;
+            (!turned).then(|| towards(run.from))
+        }
         Step::Ride(at, q, d, n) => {
             if t >= *n {
                 return None;
@@ -1773,6 +1791,8 @@ mod tests {
         assert!(parse("at 0 0 0 r 1 : shove 1 2 3 7 8 9 500 99").is_err());
         let swing =
             parse("at 0 0 0 r 1 : await 1 2 3 4 5 6 0.5 200 ; ride 1 2 3 4 5 6 0.5 90 ; press 1 2 3 0 1 6 200").unwrap();
+        let swing_end = parse("at 0 0 0 r 1 : swing 1 2 3 4 5 6 1.5 300").unwrap();
+        assert_eq!(swing_end[0].steps[0], Step::Swing(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 1.5, 300));
         assert_eq!(
             swing[0].steps[0],
             Step::Await(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 200)

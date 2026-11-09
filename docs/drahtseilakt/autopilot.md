@@ -178,6 +178,7 @@ transformers the hint rolled the ball into, in their order, count as gone throug
 | `along V T` | push along the way the ball is rolling, not faster than V, for T ticks: rails that lead it (a helix) taken at speed |
 | `round X Z R V T [Y]` | go round the upright axis through (X, Z) at radius R and speed V (one way round, or the other when V is negative) for T ticks, or until the ball is above Y: up a helix of rails |
 | `await X Y Z QX QY QZ D T` | hold the ball where it is until the loose body or module part nearest X Y Z is within D of QX QY QZ (T ticks at most): a swing or a lift met at the right moment |
+| `swing X Y Z QX QY QZ D T` | hold the ball where it is until the loose body or module part nearest X Y Z has turned back at the end of its swing near QX QY QZ (within D, no longer moving toward it; T ticks at most): a pendulum's phase met however wide it swings |
 | `ride X Y Z QX QY QZ D T` | keep the ball over the loose body or module part nearest X Y Z until it is within D of QX QY QZ (T ticks at most) |
 | `replay FILE FROM TO` | a player's inputs of ticks FROM..TO of the replay FILE (beside the hint file), turned to the test player's view; begun with the ball held in a transformer, it starts as the ball is let go (FROM: the player's transform tick + 149), in step with the player |
 | `sync X Y Z [T]` | keep the ball on the point until the sector's loose objects and modules have entered (a checkpoint's sector begins 48 ticks after it; T at most, 600): the state a `--sector N` run starts from |
