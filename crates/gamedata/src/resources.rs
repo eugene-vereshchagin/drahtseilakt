@@ -103,8 +103,10 @@ pub fn default_for(copy_has_menu: bool) -> Provider {
     }
 }
 
-/// The game's own assets folder (fonts, own files): `DRAHTSEILAKT_ASSETS`, else `assets/` beside the program or
-/// three folders up (a build's target/release in the source tree), or four (a test's target/release/deps).
+/// The game's own assets folder (fonts, own files), in this order: `DRAHTSEILAKT_ASSETS`; `assets/` beside the
+/// program; `../Resources/assets` (a macOS .app bundle); then, only as a developer's fallback, the source tree (three
+/// folders up from a build's target/release, four from a test's target/release/deps, and last the path the program
+/// was compiled in). One answer for the whole game, found once.
 pub fn assets_root() -> Option<PathBuf> {
     static ROOT: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     ROOT.get_or_init(|| {
@@ -129,11 +131,19 @@ pub fn assets_root() -> Option<PathBuf> {
             .filter(|e| named(e.parent(), "deps") && named(e.ancestors().nth(3), "target"))
             .and_then(|e| e.ancestors().nth(4))
             .map(|d| d.join("assets"));
+        let bundle = exe
+            .as_deref()
+            .and_then(Path::parent)
+            .and_then(Path::parent)
+            .map(|d| d.join("Resources/assets"));
+        let compiled = Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets"));
         from_env
             .into_iter()
             .chain(beside)
+            .chain(bundle)
             .chain(tree)
             .chain(deps)
+            .chain(compiled)
             .find(|p| real(p))
     })
     .clone()

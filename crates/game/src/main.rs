@@ -91,7 +91,8 @@ usage: drahtseilakt [options]
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
   --from N            with --replay: play the replay up to tick N without a window, then hand over the keys
-  --sector N          begin at sector N's reset point (testing a place; 1 is the level start)
+  --sector N          begin at sector N's reset point with the ball that sector begins with (testing a place;
+                      1 is the level start; --ball overrides the ball)
   --at X,Y,Z|OBJECT   begin with the ball at rest at a point, or 4 above a level object (e.g. P_Modul_34_01);
                       the sector is the nearest object's unless --sector is given
   --ball KIND         begin with a wood, stone or paper ball
@@ -412,8 +413,20 @@ fn restart() -> ! {
     }
 }
 
+/// Where the game found its shipped assets and keeps the player's data (and whether the copy is portable).
+fn paths_line() -> String {
+    let shown = |p: Option<std::path::PathBuf>| p.map_or("(none)".into(), |p| p.display().to_string());
+    format!(
+        "paths: assets {} | data {} ({})",
+        shown(gamedata::resources::assets_root()),
+        gamedata::profile::data_dir().display(),
+        if gamedata::profile::portable_root().is_some() { "portable" } else { "per-user" }
+    )
+}
+
 fn main() -> ExitCode {
     let result = parse_args().and_then(|o| {
+        println!("{}", paths_line());
         if let Some(from) = &o.import {
             let copied = levels::import(from)?;
             levels::prepare(&lang::docs_language(app::setting("language").as_deref()));

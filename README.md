@@ -50,7 +50,7 @@ the name entry for a new highscore and the end menu.
 Every finished run is saved as a replay (on Linux in `~/.local/share/drahtseilakt/replays/<level>/`, the
 fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it without a window, `--screenshot
 FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
-object's name) anywhere, with `--ball wood|stone|paper`; such a run keeps its start in its replay and is never a
+object's name) anywhere, with the ball that sector begins with (`--ball wood|stone|paper` overrides it); such a run keeps its start in its replay and is never a
 best run. Until the extended mode is turned on (Options, Extended, or `--debug` for one run) the game is the
 original as closely as it can be. The *extended mode* shows best times and levels by kind under Start (the
 original, remastered, community and open-format levels in `levels/`, each with its difficulty; how to make and share
@@ -75,3 +75,5 @@ Drahtseilakt is licensed under the GPL-3.0, like OpenBallance it began from. It 
 game and never ships Ballance's data. (While this repository is private, `levels/` keeps a backup of the
 original levels for development; the public repository will not contain it.) Ballance is © 2004 Cyparade /
 Atari. This project is not affiliated with them.
+
+Where the game keeps its files (portable folder with `portable.txt`, or installed with per-user data): [files.md](docs/drahtseilakt/files.md).

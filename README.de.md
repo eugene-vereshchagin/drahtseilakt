@@ -55,7 +55,7 @@ Jeder beendete Lauf wird als Replay gespeichert (unter Linux in
 `~/.local/share/drahtseilakt/replays/<Level>/`, der schnellste als `best.replay`); `--replay FILE` spielt eines
 ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bild. Um eine Stelle zu testen,
 beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
-Stelle, mit `--ball wood|stone|paper`; ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
+Stelle, mit der Kugel, mit der der Sektor beginnt (`--ball wood|stone|paper` überschreibt sie); ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
 Bis der erweiterte Modus eingeschaltet ist (Options, Extended, oder `--debug` für einen Start), ist das Spiel so
 genau wie möglich das Original. Der *erweiterte Modus* zeigt Bestzeiten und Level nach Art unter Start (Original,
 Remaster, Community-Karten und Level im offenen Format aus `levels/`, jedes mit seiner Schwierigkeit; wie man eines
@@ -82,3 +82,5 @@ Drahtseilakt steht unter der GPL-3.0, wie OpenBallance, mit dem es begann. Es br
 Spiels und liefert nie Daten von Ballance aus. (Solange dieses Repository privat ist, hält `levels/` eine
 Sicherung der Originallevel für die Entwicklung; das öffentliche Repository enthält sie nicht.) Ballance ist
 © 2004 Cyparade / Atari. Dieses Projekt steht in keiner Verbindung zu ihnen.
+
+Wo das Spiel seine Dateien ablegt (portabler Ordner mit `portable.txt` oder Installation mit Daten im Benutzerordner): [files.md](docs/de/drahtseilakt/files.md).

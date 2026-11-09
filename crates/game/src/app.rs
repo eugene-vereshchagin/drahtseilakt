@@ -383,6 +383,12 @@ impl Game {
                 let mut w = std::io::BufWriter::new(f);
                 use std::io::Write as _;
                 let _ = writeln!(w, "# {} from tick {} ({})", self.level.name, self.sim.tick, clock(self.sim.tick));
+                let _ = writeln!(
+                    w,
+                    "# assets {} | data {}",
+                    gamedata::resources::assets_root().map_or("(none)".into(), |p| p.display().to_string()),
+                    gamedata::profile::data_dir().display()
+                );
                 self.session = Some(w);
                 println!("session log: {}", path.display());
             }

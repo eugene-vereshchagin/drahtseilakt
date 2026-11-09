@@ -391,6 +391,13 @@ impl Data {
             own_parts: false,
             fog: None,
             clouds: None,
+            sector_balls: loaded
+                .name
+                .strip_prefix("Level_")
+                .and_then(|r| r.split('.').next())
+                .and_then(|n| n.parse().ok())
+                .map(level::sectorballs::original)
+                .unwrap_or_default(),
         };
         Ok(loaded)
     }
@@ -423,6 +430,7 @@ impl Data {
                     own_parts: false,
                     fog: None,
                     clouds: None,
+                    sector_balls: level::sectorballs::original(k),
                 };
                 loaded.warnings.push(format!(
                     "{}: made before levels kept their settings; they come from the game's table (remaster it again)",

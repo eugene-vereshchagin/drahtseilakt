@@ -6,6 +6,7 @@
 
 pub mod from_nmo;
 pub mod open;
+pub mod sectorballs;
 
 /// The module a level object is named after: its name without the trailing `_NN` (digits, then any letters:
 /// `P_Box_03` is `P_Box`, `P_Trafo_Stone_03a` is `P_Trafo_Stone`); a name without one is its own.
@@ -59,6 +60,10 @@ pub struct Settings {
     pub fog: Option<Fog>,
     /// A sea of cloud under the track, drawn as a volume (only drawn): none in the original's levels.
     pub clouds: Option<Clouds>,
+    /// The ball each sector begins with (index 0 is sector 1), for a run begun at a sector (`--sector`): `wood`,
+    /// `stone` or `paper`; none (or past the end) takes the level's start ball. A level run from its start ignores
+    /// them: the ball carries its kind from the transformers.
+    pub sector_balls: Vec<Option<String>>,
 }
 
 /// A level's cloud layer (only drawn, never the physics'): a slab of cumulus whose tops are at `top` and whose

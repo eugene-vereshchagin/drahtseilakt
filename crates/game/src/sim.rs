@@ -739,6 +739,10 @@ pub struct Sim {
     /// After a lost ball the camera looks along the reset point's way on: off only to play a replay recorded before
     /// (formats 1 to 5), when it came back to the start heading and the keys pushed along that.
     pub respawn_faces_on: bool,
+    /// The ball each sector begins with (index 0 is sector 1), from the level's settings, and whether a run begun at a
+    /// sector takes it (format 7 on; before, such a run kept the level's start ball unless one was asked for).
+    sector_balls: Vec<Option<BallKind>>,
+    sector_ball_rule: bool,
     /// The points counter's ticks counted, and the tick it goes on from after a lost ball.
     points_clock: u64,
     points_resume: u64,
@@ -1155,6 +1159,8 @@ impl Sim {
             bursts: true,
             checkpoints_by_name: true,
             respawn_faces_on: true,
+            sector_balls: level.settings.sector_balls.iter().map(|b| b.as_deref().and_then(BallKind::from_name)).collect(),
+            sector_ball_rule: format >= 7,
             depth_from: DEPTH_PHASE,
             points_clock: 0,
             points_resume: 0,
@@ -1171,8 +1177,8 @@ impl Sim {
     }
 
     /// Begins the run elsewhere than the level start, for testing a place: `sector` (0 is the first) becomes the
-    /// current one, as if its checkpoint had just been passed, and a new ball of `kind` (the current one if `None`)
-    /// is made at rest at `at` (the sector's reset point if `None`), in the start view.
+    /// current one, as if its checkpoint had just been passed, and a new ball of `kind` (the sector's own ball from
+    /// the level's settings, else the current one, if `None`) is made at rest at `at` (the sector's reset point if `None`), in the start view.
     pub fn start_from(&mut self, sector: usize, kind: Option<BallKind>, at: Option<Vec3>) {
         let sector = sector.min(self.sector_count() - 1);
         if sector != self.sector {
@@ -1185,6 +1191,13 @@ impl Sim {
             self.apply_sector_changes();
             self.sector = sector;
         }
+        // the sector's own ball unless one is asked for (replays of formats before 7 keep the current one)
+        let kind = kind.or_else(|| {
+            if !self.sector_ball_rule {
+                return None;
+            }
+            self.sector_balls.get(sector).copied().flatten()
+        });
         if let Some(k) = kind {
             self.ball.kind = k;
         }
@@ -2416,6 +2429,20 @@ pub(crate) mod tests {
         crate::modrt::Mods::load(found, |_| Some("on".into()))
             .running(true)
             .0
+    }
+
+    #[test]
+    fn a_run_begun_at_a_sector_takes_the_sectors_ball() {
+        let mut level = flat_level();
+        level.settings.sector_balls = vec![Some("paper".into())];
+        let begin = |format: u32, kind: Option<BallKind>| {
+            let mut sim = Sim::with_rules(&level, BallKind::Wood, &Modules::default(), false, format);
+            sim.start_from(0, kind, None);
+            sim.ball.kind
+        };
+        assert_eq!(begin(7, None), BallKind::Paper);
+        assert_eq!(begin(7, Some(BallKind::Stone)), BallKind::Stone, "--ball overrides");
+        assert_eq!(begin(6, None), BallKind::Wood, "an older replay keeps the start ball");
     }
 
     #[test]
