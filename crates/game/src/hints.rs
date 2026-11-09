@@ -14,6 +14,9 @@
 //   wait T                  no arrows for T ticks
 //   turn N                  turn the view N quarters (negative: to the left)
 //   become wood|stone|paper roll into the nearest transformer of that kind (1200 ticks at most)
+//   sync X Y Z [T]         keep the ball on the point until the sector's loose objects have been put in their places
+//                           (a checkpoint's sector begins 48 ticks after it): the state a run begun at that sector
+//                           (`--sector N`) starts a recorded replay hint from, so those hints hold in a chain
 //   replay FILE FROM TO     a player's inputs of ticks FROM..TO of the replay FILE (a plain name beside the hint file),
 //                           turned to the test player's view
 //
@@ -80,6 +83,8 @@ pub enum Step {
     Along(f32, u64),
     /// Keep the ball on the point for so many ticks: still where it must wait (a slope would roll it away).
     Hold(Vec3, u64),
+    /// Keep the ball on the point until the current sector's objects have entered the physics (at most so many ticks).
+    Sync(Vec3, u64),
     /// Roll through the point without stopping, no faster than the speed (a corner, a rail's end, a transformer
     /// rolled into on the way), for so many ticks at most.
     Pass(Vec3, f32, u64),
@@ -291,6 +296,14 @@ fn step(words: &[&str]) -> Result<Step, String> {
         "hold" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             Step::Hold(p, ticks(w.next())?)
+        }
+        "sync" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let n = match w.next() {
+                Some(t) => ticks(Some(t))?,
+                None => GOTO_TICKS,
+            };
+            Step::Sync(p, n)
         }
         "along" => {
             let speed = num(w.next())?;
@@ -618,7 +631,8 @@ fn step_point(step: &Step) -> Option<Vec3> {
         | Step::Via(p, _)
         | Step::Pass(p, _, _)
         | Step::Press(p, _, _, _)
-        | Step::Hold(p, _) => Some(p),
+        | Step::Hold(p, _)
+        | Step::Sync(p, _) => Some(p),
         _ => None,
     }
 }
@@ -1259,6 +1273,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             Some(arrows(around * f + u * a.clamp(-1.0, 1.0), quarter))
         }
         Step::Hold(p, n) => (t < *n).then(|| towards(*p)),
+        Step::Sync(p, n) => (t < *n && sim.sector_entering()).then(|| towards(*p)),
         Step::Cross(d, p, r) => {
             if t == 0 {
                 run.pushes = cross_plan(sim, *d, *p, *r);
@@ -1327,6 +1342,13 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn a_sync_step_parses_with_its_default_ticks() {
+        let h = parse("at 0 0 0 r 5 : sync 1 2 3 ; sync 1 2 3 40").unwrap();
+        assert_eq!(h[0].steps[0], Step::Sync(Vec3::new(1.0, 2.0, 3.0), GOTO_TICKS));
+        assert_eq!(h[0].steps[1], Step::Sync(Vec3::new(1.0, 2.0, 3.0), 40));
+    }
+
     #[test]
     fn replay_names_are_plain_and_their_steps_few() {
         for good in ["run.replay", "Level_02-owner.replay", "a.b.replay"] {

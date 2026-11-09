@@ -1404,6 +1404,13 @@ impl Sim {
         self.scripts = Some(scripts);
     }
 
+    /// Whether the current sector's objects or modules are still to enter the physics (a checkpoint was just passed).
+    pub fn sector_entering(&self) -> bool {
+        self.sector_changes
+            .iter()
+            .any(|c| c.enter && c.sector == self.sector)
+    }
+
     /// The number of sectors (at least 1).
     pub fn sector_count(&self) -> usize {
         self.rules
