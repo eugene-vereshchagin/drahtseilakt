@@ -1109,9 +1109,10 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
                 );
                 // the loose things near the ball (boxes, balls, modules' parts), with DRAHTSEILAKT_TRACE_LOOSE set
                 if std::env::var_os("DRAHTSEILAKT_TRACE_LOOSE").is_some() {
+                    let trace_r: f32 = std::env::var("DRAHTSEILAKT_TRACE_R").ok().and_then(|v| v.parse().ok()).unwrap_or(40.0);
                     for &(o, body) in game.sim.loose() {
                         let Some(st) = game.sim.world().state(body) else { continue };
-                        if st.pos.distance(b.position) < 40.0 {
+                        if st.pos.distance(b.position) < trace_r {
                             let name = game.level.level.objects.get(o).map_or("?", |ob| ob.name.as_str());
                             println!("    {name} ({:8.2} {:8.2} {:8.2})", st.pos.x, st.pos.y, st.pos.z);
                         }
@@ -1119,7 +1120,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
                     // and the modules' moving parts
                     for m in game.sim.module_bodies() {
                         let Some(st) = game.sim.world().state(m.body) else { continue };
-                        if st.pos.distance(b.position) < 40.0 {
+                        if st.pos.distance(b.position) < trace_r {
                             let (o, p) = (&m.object, st.pos);
                             println!("    {o} #{} ({:8.2} {:8.2} {:8.2})", m.body, p.x, p.y, p.z);
                         }

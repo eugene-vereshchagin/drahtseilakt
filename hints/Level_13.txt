@@ -92,3 +92,39 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # Sector 3 starts as PAPER (start sectors with the right ball!). When he knocked out the first crate, its upper block
 # did not drop though it should have: either a physics bug or part of the puzzle (open the stones' way BEFORE they
 # arrive). To check against the C reference on his next replay.
+
+# 2026-11-09 (third session, sector 3 as PAPER, the owner's best try hints/runs/owner/attempt-1794184731-28217.replay;
+# NOT solved, stopped by the two-approaches rule). Read off with `--debug --level 13 --replay F --headless --trace 30`
+# and DRAHTSEILAKT_TRACE_LOOSE=1 DRAHTSEILAKT_TRACE_R=3000 (new: the radius of the loose things listed; 40 before).
+# The replay holds the run's final line (his F3/F9 rewinds are cut out), so it replays exactly: 28217 ticks, ends at
+# (-675 -286 -1124.8) with 7 of the 10 stones (19,21,22,24,25,27,28) in the pit, stuck. Timeline of his line:
+#  0:00-0:36  the start (-724.2 -162 453), down the chute at ~14.7, the ten stones P_Ball_Stone_19..28 (x -724.2, z 311..446,
+#             15 apart, ahead of the ball at the start) are overtaken; ball at (-716.1 -216 -261.8) at 0:36 = into
+#             P_Trafo_Stone_01 (idle ~2.5 s = the transform), the stones' leader is then at z -46.
+#  0:38.5-1:04 as STONE in the channel's head: blocks (Schiebestein) of the crates z -278.3 / -293.3 / -308.3 sink at ~0:47,
+#             ~0:55, ~1:03 (y -212..-214 -> -217..-219) by bumping the crates from x -716..-733 back and forth; the leading
+#             stones are at z -278 at ~0:58, so it is a race of ~10 s that he won by 1-2 s (stone 23 rode the third block
+#             while it sank (1:02-1:04, z -292..-295), went east to x -713 and fell off the channel at z -327..-340 at ~1:10).
+#  1:04.5     paper again in the channel at (-732 -220.4 -323.6) (= the hint's "at -732 -223.4 -323.6 kind paper": the
+#             paper transformer is on the channel's west side below the crates; he got there over the sunk blocks, no
+#             crossing at z -256); waits ~3 s, respawn-like jump to (-739 -215.9 -275.7) at 1:10, launch at tick 4455
+#             (-723.7 -213.6 -297.4) and rides the channel at ~14.7 to z -806 by 1:36 (ahead of the stones).
+#  1:40-4:32  the sacks: P_Modul_26 Sack/Rope pairs hang at z -821.95, -831.95(-832.4), -841.9, -852.3 (x -724.2, rope top
+#             y -243, sack y -250/-252, they swing across the channel); the stones queue behind the first sack from
+#             z -806 (the first two stopped there at 1:52), the ball sits among them (speed 0) pushing slowly for ~3 min;
+#             four stones got through the sacks by 4:16-4:28 (z -869..-857), then stones 20 and 26 fell off the channel's west
+#             side at x -743 (z -836 / -868) at 4:46; three stones stayed at z -851..-843 until 6:10.
+#  4:32-5:44  ball runs on to the pit (z -1124.8); stones arrive at the pit's north wall z -1124.83 one by one and lie in a
+#             row along x: -647.7, -651.7 ... -671.7 (4 apart = touching), the pit's east wall is at x -645.6; the row of
+#             ten would reach x ~-687. The ball ended at (-675 -286 -1124.8) at the row's end (y -286 = on the pit floor,
+#             not above the stones): 7 stones are too few, the owner counted on the missing ones.
+# The owner's two other attempts (attempt-1794183905-13573: 3303 bytes, attempt-1794183348-1966: 369 bytes) are copied beside.
+# Autopilot, sector 3 from its start (`--level 13 --sector 3 --autopilot --plan hints/Level_13.plan --hints hints/Level_13.txt`):
+# the paper ball arrives at z -250 only at 1:00 (the owner at 0:36), the stones have overtaken it, and it wedges between
+# two of them at (-724.1 -211.2 -250.0) ("stuck", 3 rewinds to 00:59 do not help). So the first thing missing is the
+# owner's fast, clean run to P_Trafo_Stone_01 (his keys of ticks 0..2150 as a `replay` hint at the sector's start).
+# Approach 1: his keys from tick 2324 on shifted 120 ticks earlier (to win time at the crates): the ball fell at 0:42,
+# because the idle 0:36.5-0:38.5 IS the stone transform (it takes ~150 ticks) - cannot be cut.
+# Approach 2: the autopilot alone (above). Next: `replay hints/runs/owner/<his copy without the mod line> 0 2150` at the sector
+# start, then the crates as stone with the existing hint (go sooner: 3rd block by ~0:59), the paper transformer over the sunk
+# blocks, the channel at speed, and for the sacks `lead`/`shove` on the first stones so that they pass one by one.
