@@ -1824,6 +1824,10 @@ impl Menu {
         // button while it clears the ball, else centred on what lies right of the ball (the owner's report,
         // 2026-11-08: long Russian labels ran over the ball)
         let areas: std::cell::RefCell<Vec<([f32; 4], f32)>> = std::cell::RefCell::new(Vec::new());
+        // while a column of labels is sized (no probe record, nothing kept), and the column's number (0: none)
+        let dry = std::cell::Cell::new(false);
+        let group = std::cell::Cell::new(0u32);
+        let groups = std::cell::Cell::new(0u32);
         let label_ball =
             |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style, ball: f32| {
                 let Some(f) = font else { return };
@@ -1850,7 +1854,7 @@ impl Menu {
                         (frame, placed, k) = fit([r[0] + ball, r[1], r[2], r[3]]);
                     }
                 }
-                if let Some(p) = probe {
+                if let (Some(p), false) = (probe, dry.get()) {
                     p.borrow_mut().push(Probe {
                         text: t.to_owned(),
                         frame: screen.rect(frame, Anchor::Center),
@@ -1864,6 +1868,7 @@ impl Menu {
                         cut: LAST_CUT.with(|c| c.get()),
                         art_right: None,
                         fill: None,
+                        group: group.get(),
                     });
                 }
                 out.extend(placed);
@@ -1871,6 +1876,43 @@ impl Menu {
         let label = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style| {
             label_ball(out, t, r, style, 0.0)
         };
+        // a column of buttons of one kind: the labels share one size, on one line each if that stays readable, else
+        // on two lines each (where a text has a place to break); (text, frame, style, ball)
+        let label_group =
+            |out: &mut Vec<Quad>, items: &[(String, [f32; 4], &crate::ui::Style, f32)]| {
+                if items.len() < 2 {
+                    for (t, r, st, b) in items {
+                        label_ball(out, t, *r, st, *b);
+                    }
+                    return;
+                }
+                dry.set(true);
+                let mut scratch = Vec::new();
+                let mut cands = Vec::new();
+                for (t, r, st, b) in items {
+                    label_ball(&mut scratch, t, *r, st, *b);
+                    cands.push((CAND.with(|c| c.get()), floor_k(st).max(FIT_SHRINK), floor_k(st)));
+                }
+                dry.set(false);
+                let one = cands.iter().map(|c| c.0.0).fold(1.0f32, f32::min);
+                let fit_min = cands.iter().map(|c| c.1).fold(0.0f32, f32::max);
+                let kmin = cands.iter().map(|c| c.2).fold(0.0f32, f32::max);
+                // a hair under, so that the text that sets the size does not run a rounding error past its frame
+                let force = if one >= fit_min {
+                    (one * 0.999, false)
+                } else {
+                    let two = cands.iter().map(|c| c.0.1.unwrap_or(c.0.0)).fold(1.0f32, f32::min);
+                    ((two * 0.999).max(kmin), true)
+                };
+                groups.set(groups.get() + 1);
+                group.set(groups.get());
+                FORCE.with(|c| c.set(Some(force)));
+                for (t, r, st, b) in items {
+                    label_ball(out, t, *r, st, *b);
+                }
+                FORCE.with(|c| c.set(None));
+                group.set(0);
+            };
         let button =
             |out: &mut Vec<Quad>, r: [f32; 4], uv: [f32; 4], state: Button, at: Option<Target>| {
                 if let Some(target) = at {
@@ -1900,6 +1942,7 @@ impl Menu {
                         cut: false,
                         art_right: Some(px[0] + (px[2] - px[0]) * text_right(uv)),
                         fill: None,
+                        group: 0,
                     });
                 }
                 out.push(quad(r, uv, tex));
@@ -1934,6 +1977,7 @@ impl Menu {
                     cut: false,
                     art_right: Some(px[0] + (px[2] - px[0]) * text_right(KEY_UV)),
                     fill: None,
+                    group: 0,
                 });
             }
             let mid = (r[0] + r[2]) / 2.0;
@@ -2094,6 +2138,7 @@ impl Menu {
                         cut: false,
                         art_right: None,
                         fill: Some(fill_box),
+                        group: 0,
                     });
                 }
                 out.extend(q);
@@ -2119,6 +2164,7 @@ impl Menu {
                 (last - top) / (n as f32 - 1.0).max(1.0)
             };
             let mut k = 0;
+            let mut column = Vec::new();
             for (i, &l) in lines.iter().enumerate() {
                 if l == Line::Back {
                     button(out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
@@ -2128,9 +2174,10 @@ impl Menu {
                 let y = top + k as f32 * step;
                 let r = [0.35, y, 0.65, y + (step - 0.004).min(0.0938)];
                 button(out, r, MAIN_UV, state(i), Some(Target::Line(i)));
-                label_ball(out, &self.label(l), r, &FONT_01, BALL_MAIN);
+                column.push((self.label(l), r, &FONT_01, BALL_MAIN));
                 k += 1;
             }
+            label_group(out, &column);
         };
         let title = |out: &mut Vec<Quad>| {
             if let Some(t) = self.title(sc) {
@@ -2223,6 +2270,7 @@ impl Menu {
                 // 0.06 apart from 0.09 (twelve levels); a thirteenth closes them up
                 let n = self.entries.len().max(1);
                 let step = if n <= 12 { 0.06 } else { 0.72 / n as f32 };
+                let mut column = Vec::new();
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Level(k) = l else {
                         button(
@@ -2243,13 +2291,14 @@ impl Menu {
                     } else {
                         &FONT_03A
                     };
-                    label(&mut out, &self.label(l), r, style);
+                    column.push((self.label(l), r, style, 0.0));
                     if let Some(t) = self.entries.get(k).and_then(|e| e.best) {
                         let mut st = FONT_03A;
                         st.align = crate::ui::ALIGN_LEFT;
                         label(&mut out, &clock(t), [0.6, y, 0.7, y + step - 0.01], &st);
                     }
                 }
+                label_group(&mut out, &column);
             }
             Screen::Custom => {
                 title(&mut out);
@@ -2581,10 +2630,12 @@ impl Menu {
                     st.flags |= crate::ui::TEXT_WORDWRAP;
                     label(&mut out, &t, [0.35, 0.30, 0.65, 0.50], &st);
                 }
+                let mut column = Vec::new();
                 for (i, r) in [YES_RECT, NO_RECT].into_iter().enumerate() {
                     button(&mut out, r, YES_NO_UV, state(i), Some(Target::Line(i)));
-                    label(&mut out, &self.label(lines[i]), r, &FONT_03);
+                    column.push((self.label(lines[i]), r, &FONT_03, 0.0));
                 }
+                label_group(&mut out, &column);
             }
             Screen::Entry => {
                 if let Some(t) = self.title(sc) {
@@ -2681,11 +2732,18 @@ pub struct Probe {
     pub cut: bool,
     /// On a note: the bounding box of its dark fill (window pixels), which must lie inside the panel's rim.
     pub fill: Option<[f32; 4]>,
+    /// The labels of one column of buttons (one kind, one screen) share a group (nonzero) and one size.
+    pub group: u32,
 }
 
 thread_local! {
     /// Whether the last `fit_label` shortened its text (read by the layout probe).
     static LAST_CUT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A size and form every label of a column is laid out at (`fit_label` obeys it): the size against the
+    /// style's, and whether on two lines (where a text has a place to break).
+    static FORCE: std::cell::Cell<Option<(f32, bool)>> = const { std::cell::Cell::new(None) };
+    /// What the last `fit_label` could do: the size on one line, on two lines (None for one word), both at most 1.
+    static CAND: std::cell::Cell<(f32, Option<f32>)> = const { std::cell::Cell::new((1.0, None)) };
 }
 
 /// The smallest text the menus draw (a style's y scale, as FONT_ROW's 0.34 and FONT_01's 0.55 are): a label is
@@ -2990,6 +3048,30 @@ fn fit_label(
     } else {
         fits_h
     };
+    let split = two_lines(t).map(|(a, b)| {
+        let wa = wide(&f.layout(&a, frame, style));
+        let wb = wide(&f.layout(&b, frame, style));
+        let k2 = (avail_w / wa.max(wb).max(1e-3))
+            .min(avail_h / (2.0 * line))
+            .min(1.0);
+        (a, b, k2)
+    });
+    CAND.with(|c| c.set((k1.min(1.0), split.as_ref().map(|s| s.2))));
+    if let Some((k, two)) = FORCE.with(|c| c.get()) {
+        let st = scaled(k);
+        let fitted = |s: &str| {
+            let mut s = s.to_owned();
+            while wide(&f.layout(&s, frame, &st)) > avail_w && s.chars().count() > 4 {
+                s = shorten(&s);
+                LAST_CUT.with(|c| c.set(true));
+            }
+            s
+        };
+        return match split {
+            Some((a, b, _)) if two => (f.layout(&format!("{}\n{}", fitted(&a), fitted(&b)), frame, &st), k),
+            _ => (f.layout(&fitted(t), frame, &st), k),
+        };
+    }
     if k1 >= 1.0 {
         return (one, 1.0);
     }
@@ -2997,12 +3079,7 @@ fn fit_label(
         return (f.layout(t, frame, &scaled(k1)), k1);
     }
     // two lines, each at most the frame's width, both within its height
-    if let Some((a, b)) = two_lines(t) {
-        let wa = wide(&f.layout(&a, frame, style));
-        let wb = wide(&f.layout(&b, frame, style));
-        let k2 = (avail_w / wa.max(wb).max(1e-3))
-            .min(avail_h / (2.0 * line))
-            .min(1.0);
+    if let Some((a, b, k2)) = split {
         if k2 >= fit_min && k2 > k1 {
             return (f.layout(&format!("{a}\n{b}"), frame, &scaled(k2)), k2);
         }
@@ -4037,6 +4114,20 @@ mod tests {
                                 .filter_map(|p| p.art_right.map(|a| (p.frame, a)))
                                 .collect();
                             // a folder path inside a note: every line of it but the last ends at a separator
+                            // the labels of one column of buttons share one size
+                            let mut sizes_of: std::collections::BTreeMap<u32, (f32, String)> =
+                                std::collections::BTreeMap::new();
+                            for p in probes.iter().filter(|p| p.group != 0 && !p.quads.is_empty()) {
+                                let (s0, t0) = sizes_of
+                                    .entry(p.group)
+                                    .or_insert_with(|| (p.size, p.text.clone()));
+                                assert!(
+                                    (p.size - *s0).abs() < 1e-3,
+                                    "buttons of one column in different sizes: {id} {:?} at {} but {t0:?} at {s0}",
+                                    p.text,
+                                    p.size
+                                );
+                            }
                             let mut path_end: Option<bool> = None;
                             let esc = Strings::ours_in(lang).ours("esc back");
                             for p in probes {
@@ -4532,6 +4623,19 @@ mod tests {
         m.modified = true;
         assert_eq!(kinds(&m), [Line::Ours, Line::Community, Line::Back]);
         assert!(!crate::modified::offered(false));
+        // the original's two entries are listed only with the copy there (owner's reminder), in every mode
+        for mode in [false, true] {
+            for modified in [false, true] {
+                let mut m = menu(&[true], mode);
+                m.copy = false;
+                m.modified = modified;
+                let l = kinds(&m);
+                assert!(!l.contains(&Line::Classic) && !l.contains(&Line::Challenges), "{l:?}");
+                m.copy = true;
+                assert!(kinds(&m).contains(&Line::Classic));
+                assert_eq!(kinds(&m).contains(&Line::Challenges), modified);
+            }
+        }
         // an empty shipped set leaves its item out
         let mut m = menu(&[true], false);
         m.has_ours = false;
