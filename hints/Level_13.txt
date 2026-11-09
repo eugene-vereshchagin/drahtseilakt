@@ -296,3 +296,9 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 at -724.1 -154.2 537.2 r 6 sector 3 kind paper : sync -724.1 -154.2 537.2 200 ; trace Level_13-s3.replay 0 9900
 at -595.2 -285 -1124.9 r 4 sector 4 kind paper : sync -595.2 -285 -1124.9 200 ; trace Level_13-s4.replay 0 7466 2
 at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 ; trace Level_13-s5.replay 0 5300 ; push 0 1 40 ; round 340 -614.5 4 25 2400 -614
+#
+# 2026-11-09 (main session, chain from the level start): s1-s2 fine with the s2 line at r 16 (sync fires; CP2 at 3:33, no loss).
+# Sector 3 in the chain: the trace gets lost (4.0-4.3 off) at run ticks ~2937-3273 near the paper transformer (-717 -220 -307),
+# the weak lost-mode push wanders ~25 s and the stones are gone; GAIN 4 does not help. Tried TRACE_LOST 8 + full push when lost:
+# breaks sector 2 (lost at s2 run tick 32, the ball pushed off; game over) — reverted. Next: handle the transformer hold
+# (ball held in the air at the trafo) in `trace`'s matching (match by trafo events/progress, not position), keep the gentle lost mode.
