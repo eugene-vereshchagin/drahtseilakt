@@ -157,6 +157,9 @@ pub struct Camera {
     /// Target heading in quarter turns, and the heading the view has turned to (radians).
     pub quarter: i32,
     pub yaw: f32,
+    /// The heading's offset from whole quarters (radians): 0 unless a reset point is turned by other than a multiple
+    /// of 90 degrees (the 45-degree maps); the view turns step from there, and the keys push along the exact heading.
+    pub base: f32,
     /// Space held: 1, else 0.
     pub lift: f32,
     pub position: Vec3,
@@ -184,6 +187,10 @@ impl Camera {
     /// The world axis "up" pushes along: the camera's heading in whole quarters, at once, even while the view is
     /// still turning (the original's four navigation forces are along world axes).
     pub fn push_forward(&self) -> Vec3 {
+        if self.base != 0.0 {
+            let h = self.quarter as f32 * std::f32::consts::FRAC_PI_2 + self.base;
+            return Vec3::new(h.sin(), 0.0, h.cos());
+        }
         match self.quarter.rem_euclid(4) {
             0 => Vec3::Z,
             1 => Vec3::X,
@@ -741,6 +748,9 @@ pub struct Sim {
     /// After a lost ball the camera looks along the reset point's way on: off only to play a replay recorded before
     /// (formats 1 to 5), when it came back to the start heading and the keys pushed along that.
     pub respawn_faces_on: bool,
+    /// The start and respawn heading is the reset point's exact one (format 8); off only to play a replay recorded
+    /// before, when it was rounded to a quarter (the start always +X). Set from the format.
+    pub heading_exact_on: bool,
     /// The ball each sector begins with (index 0 is sector 1), from the level's settings, and whether a run begun at a
     /// sector takes it (format 7 on; before, such a run kept the level's start ball unless one was asked for).
     sector_balls: Vec<Option<BallKind>>,
@@ -873,8 +883,14 @@ impl Sim {
         // The camera starts looking along +X. The original sets it from the shared camera object (Camera.nmo,
         // Cam_Orient): its axis points along +X at every start, which the C game shows at the level 1 start. The
         // earlier guess from the floors turned it 180 degrees.
-        let quarter = START_QUARTER;
-        let yaw = quarter as f32 * std::f32::consts::FRAC_PI_2;
+        // A reset point turned by other than a quarter (the 45-degree maps) gives the exact heading (format 8, else the start
+        // is +X; the original levels' first reset points all look along +X, as START_QUARTER).
+        let (quarter, base) = if format >= 8 {
+            split_heading(rules.reset_turns.first().copied().unwrap_or(Mat3::IDENTITY))
+        } else {
+            (START_QUARTER, 0.0)
+        };
+        let yaw = quarter as f32 * std::f32::consts::FRAC_PI_2 + base;
         // The ball appears at the first reset point (its centre), else just above the start.
         let spawn = rules
             .resets
@@ -1111,6 +1127,7 @@ impl Sim {
         let mut camera = Camera {
             quarter,
             yaw,
+            base,
             lift: 0.0,
             position: Vec3::ZERO,
             step: Vec3::ZERO,
@@ -1162,6 +1179,7 @@ impl Sim {
             bursts: true,
             checkpoints_by_name: true,
             respawn_faces_on: true,
+            heading_exact_on: format >= 8,
             sector_balls: level.settings.sector_balls.iter().map(|b| b.as_deref().and_then(BallKind::from_name)).collect(),
             sector_ball_rule: format >= 7,
             depth_from: DEPTH_PHASE,
@@ -1415,7 +1433,7 @@ impl Sim {
             }
         }
         // a quarter in 250 ms at an even rate (the turn's Bezier progression is linear)
-        let goal_yaw = self.camera.quarter as f32 * std::f32::consts::FRAC_PI_2;
+        let goal_yaw = self.camera.quarter as f32 * std::f32::consts::FRAC_PI_2 + self.camera.base;
         let rate = std::f32::consts::FRAC_PI_2 / CAM_TURN_TICKS;
         self.camera.yaw += (goal_yaw - self.camera.yaw).clamp(-rate, rate);
         self.camera.lift = if input & input::LIFT != 0 { 1.0 } else { 0.0 };
@@ -2103,9 +2121,16 @@ impl Sim {
         // heading, not lifted, the look-at point at the ball; InGameCam springs there from where it was, its speed
         // forgotten.
         // It looks along the reset point's own heading (its local -X, as the start's does), the way on to roll next.
-        let quarter = if self.respawn_faces_on { quarter_of_turn(turn) } else { START_QUARTER };
+        let (quarter, base) = if !self.respawn_faces_on {
+            (START_QUARTER, 0.0)
+        } else if self.heading_exact_on {
+            split_heading(turn)
+        } else {
+            (quarter_of_turn(turn), 0.0)
+        };
         self.camera.quarter = quarter;
-        self.camera.yaw = quarter as f32 * std::f32::consts::FRAC_PI_2;
+        self.camera.base = base;
+        self.camera.yaw = quarter as f32 * std::f32::consts::FRAC_PI_2 + base;
         self.camera.lift = 0.0;
         self.camera.step = Vec3::ZERO;
         self.camera.target = self.ball.position;
@@ -2202,6 +2227,20 @@ fn quarter_of_turn(turn: Mat3) -> i32 {
         return START_QUARTER;
     }
     (f.x.atan2(f.z) / std::f32::consts::FRAC_PI_2).round() as i32
+}
+
+/// The view heading of an object turned by `turn` as whole quarters and the rest in radians (0 for a quarter within
+/// rounding, so the original levels keep exact axes); the same upright-less fallback as `quarter_of_turn`.
+fn split_heading(turn: Mat3) -> (i32, f32) {
+    let f = turn * Vec3::NEG_X;
+    if f.x.abs() + f.z.abs() < 1e-3 {
+        return (START_QUARTER, 0.0);
+    }
+    let q = std::f32::consts::FRAC_PI_2;
+    let h = f.x.atan2(f.z);
+    let quarter = (h / q).round();
+    let base = h - quarter * q;
+    (quarter as i32, if base.abs() < 1e-3 { 0.0 } else { base })
 }
 
 /// An object's turn: its matrix without scale.
@@ -2642,7 +2681,7 @@ pub(crate) mod tests {
     #[test]
     fn the_camera_lags_behind_a_rolling_ball_as_the_original() {
         let mut c =
-            Camera { quarter: 0, yaw: 0.0, lift: 0.0, position: Vec3::ZERO, step: Vec3::ZERO, target: Vec3::ZERO };
+            Camera { quarter: 0, yaw: 0.0, base: 0.0, lift: 0.0, position: Vec3::ZERO, step: Vec3::ZERO, target: Vec3::ZERO };
         c.position = camera_goal(&c, Vec3::ZERO);
         let v = 10.0;
         let mut ball = Vec3::ZERO;
@@ -2707,6 +2746,49 @@ pub(crate) mod tests {
         }
         assert_eq!(sim.camera.quarter.rem_euclid(4), 2);
         assert_eq!(sim.camera.push_forward(), Vec3::NEG_Z);
+    }
+
+    /// A reset point turned 45 degrees off the way (as the community set "45-Degree Rotated Maps" has): the camera
+    /// starts and respawns along its exact heading, the keys push that way, and view turns step from it.
+    #[test]
+    fn a_reset_point_turned_45_degrees_gives_the_exact_heading() {
+        let mut level = flat_level();
+        let r = level.objects.iter().position(|o| o.name == "PR_Resetpoint_01").unwrap();
+        // local -x along (1, 0, 1) / sqrt 2: heading 45 degrees from +z towards +x
+        let c = std::f32::consts::FRAC_1_SQRT_2;
+        level.objects[r].matrix = [
+            [-c, 0.0, -c, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [c, 0.0, -c, 0.0],
+            [0.0, BALL_RADIUS, 0.0, 1.0],
+        ];
+        let quarter_45 = std::f32::consts::FRAC_PI_4;
+        let mut sim = Sim::new(&level, BallKind::Paper);
+        assert!((sim.camera.yaw - quarter_45).abs() < 1e-5, "start yaw {}", sim.camera.yaw);
+        assert!((sim.camera.push_forward() - Vec3::new(c, 0.0, c)).length() < 1e-5);
+        // an older format keeps the start heading (+x)
+        let old = Sim::with_rules(&level, BallKind::Paper, &Modules::default(), false, 7);
+        assert_eq!(old.camera.quarter, START_QUARTER);
+        assert!((old.camera.yaw - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
+        // a view turn steps a quarter from there
+        for _ in 0..40 {
+            sim.step(input::SHIFT | input::RIGHT);
+        }
+        let turned = quarter_45 + std::f32::consts::FRAC_PI_2;
+        assert!((sim.camera.yaw - turned).abs() < 1e-4, "turned yaw {}", sim.camera.yaw);
+        // a respawn comes back to the reset point's heading
+        sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
+        for _ in 0..600 {
+            sim.step(0);
+            if sim.lives < 3 {
+                break;
+            }
+        }
+        for _ in 0..DEATH_RESPAWN_TICKS {
+            sim.step(0);
+        }
+        assert!((sim.camera.yaw - quarter_45).abs() < 1e-4, "respawn yaw {}", sim.camera.yaw);
+        assert!((sim.camera.push_forward() - Vec3::new(c, 0.0, c)).length() < 1e-4);
     }
 
     #[test]
