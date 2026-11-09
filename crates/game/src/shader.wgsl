@@ -110,6 +110,20 @@ fn parallax(uv: vec2<f32>, to_eye: vec3<f32>, depth: f32, dx: vec2<f32>, dy: vec
     return mix(cur, prev, w);
 }
 
+// A texture read as the filter asks (g.fog_height.w, a view mod's `render.filter`): 0 as ever (mipmaps, anisotropic),
+// 1 bilinear from the largest level only, 2 the nearest texel. The mode is the same for the whole frame.
+fn sample_tex(t: texture_2d<f32>, uv: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>, moved: bool) -> vec4<f32> {
+    if g.fog_height.w > 1.5 {
+        let d = vec2<f32>(textureDimensions(t, 0));
+        let at = vec2<i32>(floor((uv - floor(uv)) * d));
+        return textureLoad(t, min(at, vec2<i32>(d) - vec2<i32>(1)), 0);
+    }
+    if g.fog_height.w > 0.5 {
+        return textureSampleLevel(t, samp, uv, 0.0);
+    }
+    return select(textureSample(t, samp, uv), textureSampleGrad(t, samp, uv, dx, dy), moved);
+}
+
 @fragment
 fn fs(in: VsOut) -> @location(0) vec4<f32> {
     let uv_dx = dpdx(in.uv);
@@ -156,7 +170,7 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     }
     var base = vec4<f32>(1.0);
     if mat.emissive.a > 0.5 {
-        base = select(textureSample(tex, samp, uv), textureSampleGrad(tex, samp, uv, tex_dx, tex_dy), moved);
+        base = sample_tex(tex, uv, tex_dx, tex_dy, moved);
     }
     var diffuse = mat.diffuse;
     if inst.diffuse.a >= 0.0 {
@@ -178,7 +192,7 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     // green towards -v as glTF has it). Without a map it is exactly the interpolated normal, as the original's.
     var surface = normalize(in.normal);
     if mat.params.w > 0.5 {
-        let sampled = select(textureSample(relief, samp, uv), textureSampleGrad(relief, samp, uv, tex_dx, tex_dy), moved);
+        let sampled = sample_tex(relief, uv, tex_dx, tex_dy, moved);
         let m = sampled.xyz * 2.0 - vec3<f32>(1.0);
         // the tangent, square to the normal; interpolated across a face it can vanish or lie along the normal (mirrored
         // coordinates), and then the surface stays as it is rather than turn into NaN

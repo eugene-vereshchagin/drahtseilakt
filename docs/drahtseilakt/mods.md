@@ -39,6 +39,7 @@ the level.
 | `smooth-camera` | AdvancedTravelCam (cinematic smoothing) | the camera eases into the view's turns, distance and field of view, and the free camera glides; option: smoothness | no |
 | `interference` | Interference | translucent decoy balls wander around the ball; option: how many | no |
 | `deformed-ball` | DeformedWB | the wooden ball's look is squeezed and stretched at random (the physics keeps its round ball); option: amount | no |
+| `back-to-2004` | (a joke; undoes our rendering fixes) | the game as on a PC of 2004: a low resolution (640x480, 800x600 or 1024x768) scaled up with hard pixels in a 4:3 frame with black bars, textures without mipmaps or anisotropy (bilinear or nearest: the distant shimmer), a frame cap (off, 60, 30), optional 16-bit colour banding; glasses for tears of blood included | no |
 | `play-time` | WatchYourTime | the time played, per level and in all, on screen and kept in the data folder's `playtime.txt`; option: show it | no |
 | `sector-jump` | SpeedrunShortcuts (set sector) | keys (F7 / PageUp, F6 / PageDown) start the level again at the next or the previous sector | yes (modded) |
 | `free-steering` | FreeViewRotation (the steering too) | like `free-view`, but the arrows push along the turned view; the view's turn is recorded in the replay | yes (modded) |
@@ -186,6 +187,10 @@ View actions (only on `frame` or `key`):
 - `do view.turn <degrees>` — the view's turn handed to the run as whole degrees (0 to 359): the run reads it as
   `input.turn`. It is a second input of the run, recorded in the replay as `turn <tick> <degrees>` lines where it
   changes (none in a run that does not use it), so a replay plays the same steering without a mouse.
+- `do render.scale <width> <height>` — the picture drawn at this size (160x120 to 4096x4096, never above the window's) and scaled up to the window with the nearest pixel. `do render.aspect <w>:<h>` — the picture keeps this shape, black bars where the window is wider or taller.
+- `do render.filter default|bilinear|nearest` — the textures' filtering: ours (mipmaps, anisotropic), bilinear from the largest level only (no mipmaps: distant textures shimmer), or the nearest texel.
+- `do render.fps_cap <n>` — at most n frames a second (0: no cap; the run's ticks keep their clock). `do render.colour_bits 16` — the colour cut to 5-6-5 bits without dithering (any other value: full colour).
+  These render actions are the view's only: the run stays classic and replays play the same. The game has no edge antialiasing to undo.
 - `do light <0..1>` — the level's light; `do lantern <0..1>` — a light over the ball.
 - `do show <corner> <label|-> <format> <value>[, <value>[, <value>]]` — a HUD line this frame; corners `top-left
   top-right bottom-left bottom-right`; formats `time` (mm:ss.hh from seconds), `int`, `dec1`, `dec2`, `clock` (hh:mm),

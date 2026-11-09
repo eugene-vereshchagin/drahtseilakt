@@ -136,6 +136,8 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::SteerYaw(e)
         | Action::ViewTurn(e)
         | Action::CameraSmooth(e)
+        | Action::RenderFpsCap(e)
+        | Action::RenderColourBits(e)
         | Action::Decoys(e)
         | Action::BallDeform(e)
         | Action::SetSector(e)
@@ -151,6 +153,8 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Rewind(e)
         | Action::Set(_, e) => vec![e],
         Action::Show(_, _, _, v) => v.iter().collect(),
+        Action::RenderScale(a, b) | Action::RenderAspect(a, b) => vec![a, b],
+        Action::RenderFilter(_) => Vec::new(),
         Action::Splits(_)
         | Action::Keys(_)
         | Action::Screenshot
@@ -262,6 +266,8 @@ pub struct ViewOut {
     /// The camera's easing (0 none), the decoy balls, the wooden ball's deformation, the view's turn for the run (whole
     /// degrees; None: not handed on), and whether this frame counts as time played.
     pub smooth: f32,
+    /// The picture's look (`render.*`): low size, filtering, shape, frame cap, colour depth.
+    pub look: crate::render::RenderLook,
     pub decoys: u8,
     pub deform: f32,
     pub turn: Option<u16>,
@@ -299,6 +305,7 @@ impl Default for ViewOut {
             lantern: 0.0,
             ghost: 0.0,
             smooth: 0.0,
+            look: crate::render::RenderLook::default(),
             decoys: 0,
             deform: 0.0,
             turn: None,
@@ -390,6 +397,20 @@ impl ViewMods {
                     Action::Lantern(_) => out.lantern = x.clamp(0.0, 1.0),
                     Action::Ghost(_) => out.ghost = x.clamp(0.0, 1.0),
                     Action::CameraSmooth(_) => out.smooth = x.clamp(0.0, 1.0),
+                    Action::RenderScale(..) => {
+                        let (w, h) = (v.first().copied().unwrap_or(0.0), v.get(1).copied().unwrap_or(0.0));
+                        // from 160x120 up to 4096x4096; anything else is no scaling
+                        out.look.scale = (w.is_finite() && h.is_finite() && (160.0..=4096.0).contains(&w) && (120.0..=4096.0).contains(&h))
+                            .then(|| (w.round() as u32, h.round() as u32));
+                    }
+                    Action::RenderFilter(f) => out.look.filter = *f,
+                    Action::RenderAspect(..) => {
+                        let (w, h) = (v.first().copied().unwrap_or(0.0), v.get(1).copied().unwrap_or(0.0));
+                        out.look.aspect = (w.is_finite() && h.is_finite() && w >= 1.0 && h >= 1.0 && w / h < 8.0 && h / w < 8.0)
+                            .then_some((w, h));
+                    }
+                    Action::RenderFpsCap(_) => out.look.fps_cap = x.clamp(0.0, 1000.0).round() as u32,
+                    Action::RenderColourBits(_) => out.look.colour_bits = if x.round() == 16.0 { 16 } else { 0 },
                     Action::Decoys(_) => out.decoys = x.clamp(0.0, 8.0).round() as u8,
                     Action::BallDeform(_) => out.deform = x.clamp(0.0, 1.0),
                     Action::ViewTurn(_) => out.turn = Some(x.rem_euclid(360.0).floor() as u16),
@@ -895,6 +916,11 @@ mod tests {
         view.fire(Event::Frame, &values, &sim, "en");
         let out = &view.out;
         assert!(out.fov > 0.0, "dynamic fov");
+        let look = out.look;
+        assert_eq!(look.scale, Some((640, 480)), "back to 2004: the resolution");
+        assert_eq!((look.filter, look.fps_cap, look.colour_bits), (1, 60, 0), "its defaults");
+        assert_eq!(look.aspect, Some((4.0, 3.0)));
+        assert!(look.post() && look.size(1920, 1080) == (640, 480) && look.placed(1920, 1080) == (240, 0, 1440, 1080));
         assert!((out.yaw - 20.0).abs() < 1e-4, "free view: {}", out.yaw);
         assert!(
             (out.light - 0.1).abs() < 1e-4 && out.lantern > 0.0,

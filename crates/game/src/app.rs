@@ -3201,7 +3201,23 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     });
-    let view = target.create_view(&Default::default());
+    let full_view = target.create_view(&Default::default());
+    // DRAHTSEILAKT_SHOT_MOD=key: the view mods' look of that mod switched on (e.g. back-to-2004), not for menu shots
+    let look = match (std::env::var("DRAHTSEILAKT_SHOT_MOD"), std::env::var("DRAHTSEILAKT_SHOT_MENU")) {
+        (Ok(key), Err(_)) => shot_look(&key, o.debug),
+        _ => crate::render::RenderLook::default(),
+    };
+    r.look = look;
+    let ((fw, fh), (w, h)) = ((w, h), look.size(w, h));
+    let view = if look.post() {
+        let format = r.format;
+        let device = r.device.clone();
+        r.retro
+            .get_or_insert_with(|| crate::retro::Retro::new(&device, format))
+            .target(&device, format, w, h)
+    } else {
+        full_view.clone()
+    };
     // DRAHTSEILAKT_SHOT_MENU=base:keys draws a menu over the frame, to look at the menus without a window: base is
     // main, pause, dead or end, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options. A
     // menu not over the level has the menu scene behind it, DRAHTSEILAKT_SHOT_MENU_MS (default 0) into the menu.
@@ -3314,7 +3330,20 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
     }
     r.draw_ui(&view, w, h, &quads);
-    save_target(&r, &target, (w, h), path, game.sim.tick)
+    if let (true, Some(retro)) = (look.post(), &r.retro) {
+        let place = look.placed(fw, fh);
+        retro.present(&r.device, &r.queue, &full_view, place, look.colour_bits == 16);
+    }
+    save_target(&r, &target, (fw, fh), path, game.sim.tick)
+}
+
+/// The look a view mod asks of the picture, with its options as they come (a screenshot's `DRAHTSEILAKT_SHOT_MOD`).
+fn shot_look(key: &str, debug: bool) -> crate::render::RenderLook {
+    let want = format!("mod.{key}");
+    let mods = crate::modrt::Mods::load(gamedata::mods::scan(debug), |k| (k == want).then(|| "on".to_owned()));
+    let (sim, mut view) = mods.running(true);
+    view.fire(gamedata::mods::Event::Frame, &|_| 0.0, &sim, "en");
+    view.out.look
 }
 
 /// Reads the rendered frame back and writes it to a PNG.
@@ -5214,6 +5243,7 @@ impl App {
                 self.view_mods.out = crate::modrt::ViewOut {
                     lines: Vec::new(),
                     splits: Vec::new(),
+                    look: Default::default(),
                     ..out
                 };
                 if let Some(m) = &mut self.menu {
@@ -5439,6 +5469,9 @@ impl App {
         self.last_view = (snap.eye, snap.target);
         let tools = self.practice();
         let ghost = self.ghost_instance();
+        // a mod's `render.*`: the picture's look; drawn at its own (low) size, then scaled onto the window
+        let look = self.view_mods.out.look;
+        let (rw, rh) = self.gpu.as_ref().map_or((1, 1), |g| look.size(g.config.width, g.config.height));
         let mod_quads = match (&self.gpu, self.game.font.as_ref()) {
             (Some(g), Some(f))
                 if self.menu.is_none() && self.loading.is_none() && !self.view_mods.is_empty() =>
@@ -5446,8 +5479,8 @@ impl App {
                 self.mod_hud(
                     f,
                     crate::ui::Screen {
-                        w: g.config.width as f32,
-                        h: g.config.height as f32,
+                        w: rw as f32,
+                        h: rh as f32,
                     },
                 )
             }
@@ -5464,7 +5497,16 @@ impl App {
             }
         };
         let acquired = acquire_started.elapsed();
-        let view = frame.texture.create_view(&Default::default());
+        gpu.renderer.look = look;
+        let window_view = frame.texture.create_view(&Default::default());
+        let view = if look.post() {
+            let format = gpu.renderer.format;
+            let device = gpu.renderer.device.clone();
+            let retro = gpu.renderer.retro.get_or_insert_with(|| crate::retro::Retro::new(&device, format));
+            retro.target(&device, format, rw, rh)
+        } else {
+            window_view.clone()
+        };
         let build_started = Instant::now();
         // With a menu up, the original's menu scene is behind it, its camera going round
         let menu_up = self.menu.as_ref().is_some_and(|m| !m.over_level()) || self.loading.is_some();
@@ -5553,8 +5595,8 @@ impl App {
         }
         gpu.renderer.draw(
             &view,
-            gpu.config.width,
-            gpu.config.height,
+            rw,
+            rh,
             &frame_view,
             &inst,
             &particles,
@@ -5563,27 +5605,27 @@ impl App {
         let overlay_started = Instant::now();
         gpu.renderer.draw_overlay(
             &view,
-            gpu.config.width,
-            gpu.config.height,
+            rw,
+            rh,
             &match (&self.menu, &self.loading) {
                 // with the game's font the menus are the original's (drawn below), else the prototype's
                 (_, Some(_)) | (Some(_), None) if self.game.font.is_some() => Vec::new(),
                 (_, Some((source, _))) => Menu::loading_overlay(
-                    gpu.config.width,
-                    gpu.config.height,
+                    rw,
+                    rh,
                     &loading_name(source),
                 ),
-                (Some(m), None) => m.overlay(gpu.config.width, gpu.config.height),
+                (Some(m), None) => m.overlay(rw, rh),
                 (None, None) => {
                     let mut o = crate::hud::overlay(
                         &self.game.sim,
-                        gpu.config.width,
-                        gpu.config.height,
+                        rw,
+                        rh,
                         tools,
                         self.game.font.is_some(),
                     );
                     if tools && (self.time_scale < 1.0 || self.saved.is_some()) {
-                        let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
+                        let scale = (rh as f32 / 240.0).round().max(2.0);
                         let slow = if self.time_scale < 1.0 {
                             format!("SLOW 1/{}", (1.0 / self.time_scale).round())
                         } else {
@@ -5604,14 +5646,14 @@ impl App {
                         .as_ref()
                         .filter(|w| !w.done && self.game.font.is_none())
                     {
-                        let scale = (gpu.config.height as f32 / 360.0).round().max(1.0);
+                        let scale = (rh as f32 / 360.0).round().max(1.0);
                         for (k, line) in w.status(&self.game).lines().enumerate() {
                             let y = scale * (21.0 + 9.0 * k as f32);
                             crate::hud::text(&mut o, line, scale, y, scale, [0.7, 1.0, 0.7, 1.0]);
                         }
                     }
                     if let Some(c) = &self.fly {
-                        let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
+                        let scale = (rh as f32 / 240.0).round().max(2.0);
                         let line =
                             format!("FREE CAMERA   {:.1} {:.1} {:.1}", c.pos.x, c.pos.y, c.pos.z);
                         crate::hud::text(
@@ -5628,8 +5670,8 @@ impl App {
             },
         );
         let screen = crate::ui::Screen {
-            w: gpu.config.width as f32,
-            h: gpu.config.height as f32,
+            w: rw as f32,
+            h: rh as f32,
         };
         let font = self.game.font.as_ref();
         let quads = match (&self.menu, &self.loading, font) {
@@ -5675,7 +5717,13 @@ impl App {
                 .add_named_texture(crate::fallback::TEXTURE, w, h, rgba);
         }
         gpu.renderer
-            .draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
+            .draw_ui(&view, rw, rh, &quads);
+        if look.post() {
+            if let Some(retro) = &gpu.renderer.retro {
+                let place = look.placed(gpu.config.width, gpu.config.height);
+                retro.present(&gpu.renderer.device, &gpu.renderer.queue, &window_view, place, look.colour_bits == 16);
+            }
+        }
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();
         if std::mem::take(&mut self.shot_due) {
@@ -5718,6 +5766,13 @@ impl App {
                     ms(t.stages[4]),
                 );
                 *t = Timing::default();
+            }
+        }
+        // a mod's `render.fps_cap`: the picture's frames at most so many a second (the run's ticks keep their clock)
+        if look.fps_cap > 0 {
+            let frame = std::time::Duration::from_secs_f64(1.0 / f64::from(look.fps_cap));
+            if let Some(rest) = frame.checked_sub(started.elapsed()) {
+                std::thread::sleep(rest);
             }
         }
         if let Some(w) = &self.window {

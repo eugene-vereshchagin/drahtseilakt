@@ -191,6 +191,67 @@ fn overlay_pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu:
     })
 }
 
+/// What view mods ask of the picture's look (`render.*` actions); the default is ours, untouched.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderLook {
+    /// The size the picture is drawn at before it is scaled up to the window (nearest), if lower than the window.
+    pub scale: Option<(u32, u32)>,
+    /// The picture's shape (width, height): the scaled picture keeps it, with black bars.
+    pub aspect: Option<(f32, f32)>,
+    /// 0 as ours, 1 bilinear without mipmaps, 2 nearest.
+    pub filter: u8,
+    /// Frames a second at most (0: none).
+    pub fps_cap: u32,
+    /// 16: the colour cut to 5-6-5 bits, no dither.
+    pub colour_bits: u8,
+}
+
+impl Default for RenderLook {
+    fn default() -> RenderLook {
+        RenderLook {
+            scale: None,
+            aspect: None,
+            filter: 0,
+            fps_cap: 0,
+            colour_bits: 0,
+        }
+    }
+}
+
+impl RenderLook {
+    /// The picture must go through the scaling pass (a lower size, bars, or banded colour).
+    pub fn post(&self) -> bool {
+        self.scale.is_some() || self.aspect.is_some() || self.colour_bits == 16
+    }
+
+    /// The size to draw at for a window of `w` x `h`: the asked size (never larger than the window); with only a
+    /// shape asked, the window's part that shape takes; else the window's.
+    pub fn size(&self, w: u32, h: u32) -> (u32, u32) {
+        match self.scale {
+            Some((sw, sh)) if sw > 0 && sh > 0 => (sw.min(w.max(1)), sh.min(h.max(1))),
+            _ => {
+                let p = self.placed(w, h);
+                (p.2, p.3)
+            }
+        }
+    }
+
+    /// Where the drawn picture lands in a window of `w` x `h`: x, y, width, height (centred, in its shape).
+    pub fn placed(&self, w: u32, h: u32) -> (u32, u32, u32, u32) {
+        let (w, h) = (w.max(1), h.max(1));
+        let shape = match self.aspect {
+            Some((a, b)) if a > 0.0 && b > 0.0 => a / b,
+            _ => return (0, 0, w, h),
+        };
+        let (mut pw, mut ph) = (w, (w as f32 / shape).round() as u32);
+        if ph > h {
+            (pw, ph) = ((h as f32 * shape).round() as u32, h);
+        }
+        let (pw, ph) = (pw.clamp(1, w), ph.clamp(1, h));
+        ((w - pw) / 2, (h - ph) / 2, pw, ph)
+    }
+}
+
 pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -240,9 +301,13 @@ pub struct Renderer {
     /// The original's 2D interface: its pipeline over the frame (named textures, alpha blended, no depth).
     ui_pipeline: wgpu::RenderPipeline,
     clamp: wgpu::Sampler,
+    /// How a view mod wants the picture to look (a 2004 PC's: low resolution, plain filtering, banded colour).
+    pub look: RenderLook,
     /// The colour behind everything (the sky's zenith).
     pub clear: wgpu::Color,
     depth: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
+    /// The scaling pass of `look` (retro.rs), made when first needed.
+    pub retro: Option<crate::retro::Retro>,
 }
 
 /// Loads a texture's pixels: a file is looked up by the caller-supplied function.
@@ -421,6 +486,7 @@ impl Renderer {
             particle_white,
             ui_pipeline,
             clamp,
+            look: RenderLook::default(),
             clear: wgpu::Color {
                 r: 0.4,
                 g: 0.45,
@@ -428,6 +494,7 @@ impl Renderer {
                 a: 1.0,
             },
             depth: None,
+            retro: None,
         }
     }
 
@@ -1102,7 +1169,9 @@ impl Renderer {
             fog_color: fog.map_or([0.0; 4], |f| {
                 [f.color[0], f.color[1], f.color[2], f.density]
             }),
-            fog_height: fog.map_or([0.0; 4], |f| [f.below, f.depth, 1.0, 0.0]),
+            fog_height: fog.map_or([0.0, 0.0, 0.0, self.look.filter as f32], |f| {
+                [f.below, f.depth, 1.0, self.look.filter as f32]
+            }),
             fog_down: fog.map_or([0.0; 4], |f| {
                 [f.color_down[0], f.color_down[1], f.color_down[2], 0.0]
             }),

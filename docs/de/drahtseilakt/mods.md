@@ -41,6 +41,7 @@ Start des Levels.
 | `smooth-camera` | AdvancedTravelCam (filmische Glättung) | die Kamera gleitet in Drehungen, Abstand und Sichtfeld, die freie Kamera schwebt; Option: Sanftheit | nein |
 | `interference` | Interference | durchscheinende Täuschkugeln kreisen um die Kugel; Option: wie viele | nein |
 | `deformed-ball` | DeformedWB | das Aussehen der Holzkugel wird zufällig gestaucht und gedehnt (die Physik behält die runde Kugel); Option: Stärke | nein |
+| `back-to-2004` | (ein Scherz; macht unsere Bildverbesserungen rückgängig) | das Spiel wie auf einem PC von 2004: niedrige Auflösung (640x480, 800x600 oder 1024x768) in harten Pixeln in einem 4:3-Bild mit schwarzen Balken, Texturen ohne Mipmaps und Anisotropie (bilinear oder nächster Nachbar: das Flimmern in der Ferne), Bildratenbegrenzung (aus, 60, 30), wahlweise 16-Bit-Farbbänder; Brille für Blutstränen inklusive | nein |
 | `play-time` | WatchYourTime | die Spielzeit je Level und gesamt, auf dem Bildschirm und in der `playtime.txt` des Datenordners; Option: anzeigen | nein |
 | `sector-jump` | SpeedrunShortcuts (Sektor setzen) | Tasten (F7 / PageUp, F6 / PageDown) starten das Level im nächsten oder vorigen Sektor neu | ja (gemoddet) |
 | `free-steering` | FreeViewRotation (auch die Steuerung) | wie `free-view`, aber die Pfeile schieben entlang der gedrehten Sicht; die Drehung der Sicht steht im Replay | ja (gemoddet) |
@@ -185,6 +186,10 @@ Ansichtsaktionen (nur auf `frame` oder `key`):
 - `do camera.distance <0.5..2>` — die Kamera näher oder weiter weg.
 - `do camera.yaw <degrees>` — die Ansicht um die Kugel gedreht (die Pfeile schieben weiter entlang der eigenen
   Richtung der Kamera).
+- `do render.scale <Breite> <Höhe>` — das Bild in dieser Größe gezeichnet (160x120 bis 4096x4096, nie über dem Fenster) und mit dem nächsten Pixel aufs Fenster gezogen. `do render.aspect <b>:<h>` — das Bild behält diese Form, schwarze Balken, wo das Fenster breiter oder höher ist.
+- `do render.filter default|bilinear|nearest` — die Texturfilterung: unsere (Mipmaps, anisotrop), bilinear nur aus der größten Stufe (ohne Mipmaps flimmert die Ferne) oder der nächste Texel.
+- `do render.fps_cap <n>` — höchstens n Bilder pro Sekunde (0: keine Grenze; die Takte des Laufs behalten ihre Uhr). `do render.colour_bits 16` — die Farbe auf 5-6-5 Bit ohne Dithering gekappt (jeder andere Wert: volle Farbe).
+  Diese Aktionen betreffen nur die Ansicht: der Lauf bleibt klassisch, Wiedergaben laufen gleich. Eine Kantenglättung zum Rückgängigmachen gibt es im Spiel nicht.
 - `do light <0..1>` — das Licht des Levels; `do lantern <0..1>` — ein Licht über der Kugel.
 - `do show <corner> <label|-> <format> <value>[, <value>[, <value>]]` — eine Einblendungszeile in diesem Bild; Ecken
   `top-left top-right bottom-left bottom-right`; Formate `time` (mm:ss.hh aus Sekunden), `int`, `dec1`, `dec2`,
