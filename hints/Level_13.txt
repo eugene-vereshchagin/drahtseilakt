@@ -167,3 +167,18 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # inside the rail meshes (A04_Rail_01 at -513.5 -286.1 -1133.9 (glTF z is the game's z negated), A04_Rail_02 at -382.8 -293.8 -1127.5):
 # `--export DIR --level 13` writes level.gltf (node `matrix` translation = position), the boards' x must be read from those meshes'
 # vertices (not done); the first board known: x ~ -386 over raft 1.
+#
+# 2026-11-09 (fifth session, sector 4 measured; supersedes the lane-switch notes above). Rails (glTF z negated): A04_Rail_01
+# (x -551..-172) holds BOTH lanes: lane 1 (z -1123..-1132, raft 1) from x -551; lane 2 (z -1132..-1140, raft 2) starts at x -500 on a
+# shallower ledge (y -288.2, 1.7 %) and ramps down 4 units at x -445..-420 into the 3 % slope of lane 1; lane 1 ENDS at x -172 (dead
+# end, ball falls); A04_Rail_03 (x -172..67, 6 deg, z -1140.5..-1131.7, lane 2 only) is the way on to the stone transformer
+# (89 -336 -1133.6). Boards (A04_Rail_02 mesh, 2.6 thick in x, 8.4 wide in z, hoop top y ~ ball-top level): B1 x -382.8 z -1131.7..-1123.3
+# (lane 1), B2 x -364.6 z -1140.9..-1132.4 (lane 2), B3 x -277.4 z -1135.3..-1128.5 (the inner columns of both), B4 x -188.8 z -1140.3
+# ..-1131.8 (lane 2). Raft columns z: raft 1 -1125.38 / -1129.65, raft 2 -1133.95 / -1138.22. Bar platform A04_Floor_01 (x -447, z
+# -1112), P_Modul_17_01 (-325.8 -294.8 -1115.5), _02 (-300.8 -296.1 -1120.5), A04_RailBumber (-322 -297.5 -1111.5).
+# Simulated rafts (idle ball, 1 s samples of Stone_10 / Stone_16 x): t=1 s -543/-493, 15 s -493/-479, 25 s -455/-467, 35 s -416/-454,
+# 41 s -392.5/-391.7 (LEVEL), 45 s -377/-372, 49 s -362/-356. Raft 1 runs 3.9 u/s from ~5 s; raft 2 creeps at ~1 u/s on its ledge to
+# x -454 (t 36 s), drops down the ramp and catches up: the rafts are level at x -392..-372 (t 41-45 s), i.e. exactly at boards 1/2.
+# Raft 1 then jams at x -305 (stones) / -326 (woods) on the bar platform's bumper; raft 2 runs on to the rail's end (x -164 at 90 s).
+# The video agrees: sheet01 raft 2 trails the ball's raft, sheet02 (3768..3757) it draws level, sheet03 the ball is level with raft 2
+# at board 2. Verdict: no fidelity bug found (geometry explains the stagger); the C reference was not run.

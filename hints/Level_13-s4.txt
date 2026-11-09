@@ -1,3 +1,8 @@
+# 2026-11-09 (fifth session): the whole raft stretch is driven. The ball rides raft 1 (stone column z -1125.4) to x -410, steps to
+# raft 2's inner column (z -1134) before board 1, stays on raft 2 past boards 2..4 (it is never knocked off there: raft 2's ride
+# is lower; see hints/Level_13.txt), and rides on to the end of rail 3 (x ~60, ball y -335) in ~2:00 (route 252/1223).
+# The raft's final step onto the bar platform P_Modul_17 is NOT needed: the way goes on along lane 2 / A04_Rail_03 to the stone
+# transformer at (89 -336 -1133.6); the run dies at ~x 63 (rail 3's end), the next open spot.
 # Level 13 sector 4 (CP3 -> CP4), 2026-11-09, PARTLY driven: onto the raft and along it as far as the first board.
 # The sector starts as paper on the wooden neck (-595.2 -285 -1124.9) before the U-shaped platform. The raft (stones 10..13,
 # woods 05/06) sits in the U's hollow on the rails and slides off east by itself (accelerating to ~3.9 units a second after
@@ -10,4 +15,4 @@
 # get over/past that board (the video, fast frames s1500..s1650, shows the ball atop the raft passing boards one after
 # another, then a platform with rotating bars, P_Modul_17, at x ~ -326, then the raft goes on, flanked by
 # a second raft Stone_16/17 + Wood_09/10). Not solved.
-at -595.2 -285 -1124.9 r 4 sector 4 kind paper : pass -565 -285 -1124.9 8 ; pass -556 -285 -1120.5 8 ; pass -546 -285 -1120.3 8 ; ride -542 -289 -1125.4 -392 -295.6 -1125.4 1 3000
+at -595.2 -285 -1124.9 r 4 sector 4 kind paper : pass -565 -285 -1124.9 8 ; pass -556 -285 -1120.5 8 ; pass -546 -285 -1120.3 8 ; ride -542 -289 -1125.4 -410 -295.6 -1125.4 4 3000 ; ride -410 -296 -1134 -374 -297.5 -1134 4 900 ; ride -374 -298 -1129.65 -332 -299.5 -1129.65 4 1500 ; pass -230 -304 -1125.4 7 ; pass -200 -308 -1125.4 7 ; pass -178 -312 -1136.2 7 ; pass -150 -320 -1136.2 8 ; hold -140 -321 -1136.2 1
