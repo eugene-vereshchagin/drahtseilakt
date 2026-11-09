@@ -376,3 +376,15 @@ The toolbox fills level.txt from the community's catalogue (its English name, th
 difficulty doubled), and what is neither catalogued nor comes with a readme, archives and folders that are not one level
 are set aside in `levels/community-unsorted/` for the player to look at by hand, not listed. The rules for authors and
 players are on one page: [making-levels.md](making-levels.md).
+
+## Classic mode offers the look choices
+
+*2026-11-09, the owner's decision.* The classic mode also offers the look choices that were the extended mode's alone:
+*Textures* and *Models* on its Graphics page and *Sound theme* on its Sound page (the original's lines first, in
+their order; ours below, like *Fullscreen?*), with the same settings keys (`textures`, `models`, `sound-theme`). Every
+pack found appears: the built-in `own`, `original` (only when the player's copy is present), `remastered`, and any
+pack in the data folder, so resources a player converts himself just show up. The defaults are unchanged (own
+textures, the level's parts, the default theme). Gameplay and rules stay the original's, and replays do not depend on
+the look. Rendering fixes (any resolution, widescreen, filtering, smoothing) are always on and not switchable. This
+supersedes the earlier notes that the classic mode always draws our textures and the parts each level takes and always
+plays the default theme.

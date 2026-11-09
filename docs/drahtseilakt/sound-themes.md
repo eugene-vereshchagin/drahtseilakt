@@ -176,7 +176,7 @@ Every line passed over is reported on the terminal (standard error), e.g.
 
 1. Put the folder in the data folder's `sounds/` and start the game.
 2. Switch to the extended mode and choose the theme on the **Sounds** line of the extended options page (the setting
-   `sound-theme NAME` in `settings.txt`). The classic mode always plays the default theme.
+   `sound-theme NAME` in `settings.txt`). The classic mode has the same choice on its Sound page (the **Sound theme** line).
 3. Play a level; watch the terminal for table notes. A missing role is filled by the fallback theme, so a theme with
    `fallback none` should be checked for gaps: every role in the tables above.
 4. To listen without playing, run a replay with the mix written to a file:

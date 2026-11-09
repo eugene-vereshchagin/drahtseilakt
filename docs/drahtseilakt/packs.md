@@ -12,10 +12,9 @@ a level plays, and every replay plays the same with any pack. This page is for p
 
 ## Choosing a pack
 
-In the extended mode, Options → Extended has the lines **Textures** and **Models**; the arrows go round every pack
+Options → Graphics (both modes) has the lines **Textures** and **Models**, and Options → Extended repeats them; the arrows go round every pack
 found, each shown by its name in the menu's language. The choice applies from the next level loaded and is kept in the
-settings (`textures KEY`, `models KEY` in `settings.txt`). The classic mode always draws with our textures and the
-parts each level takes. For one run: `--textures KEY` and `--models KEY`.
+settings (`textures KEY`, `models KEY` in `settings.txt`). The classic mode has the same lines, on its Graphics page (the Models line too); the defaults are ours and the parts each level takes. For one run: `--textures KEY` and `--models KEY`.
 
 | Kind | Built-in packs | The default |
 |---|---|---|

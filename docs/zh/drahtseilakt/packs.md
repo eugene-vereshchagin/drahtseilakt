@@ -11,9 +11,8 @@
 
 ## 选择包
 
-在扩展模式下，Options → Extended 页面有 **纹理** 和 **模型** 两行；箭头循环切换找到的每个包，每个包以菜单语言下的名称
-显示。选择从下一个加载的关卡起生效，并保存在设置中（`settings.txt` 中的 `textures KEY`、`models KEY`）。经典模式始终
-使用我们的纹理和每个关卡自带的部件绘制。仅运行一次：`--textures KEY` 和 `--models KEY`。
+Options → Graphics 页（两种模式）有 **纹理** 和 **模型** 两行，Options → Extended 页重复这两行；箭头循环切换找到的每个包，每个包以菜单语言下的名称
+显示。选择从下一个加载的关卡起生效，并保存在设置中（`settings.txt` 中的 `textures KEY`、`models KEY`）。经典模式在其 Graphics 页有同样的行；默认是我们的纹理和每个关卡自带的部件。仅运行一次：`--textures KEY` 和 `--models KEY`。
 
 | 类型 | 内置包 | 默认 |
 |---|---|---|

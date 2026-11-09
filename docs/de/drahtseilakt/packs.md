@@ -14,10 +14,9 @@ Diese Seite ist für Paketautoren und Spieler.
 
 ## Ein Paket wählen
 
-Im erweiterten Modus hat Options → Extended die Zeilen **Texturen** und **Modelle**; die Pfeile gehen durch alle
+Options → Graphics (in beiden Modi) hat die Zeilen **Texturen** und **Modelle**, und Options → Extended wiederholt sie; die Pfeile gehen durch alle
 gefundenen Pakete, jedes mit seinem Namen in der Sprache des Menüs. Die Wahl gilt ab dem nächsten geladenen Level und
-wird in den Einstellungen gespeichert (`textures KEY`, `models KEY` in `settings.txt`). Der klassische Modus zeichnet
-immer mit unseren Texturen und den Teilen, die jedes Level nimmt. Für einen Lauf: `--textures KEY` und `--models KEY`.
+wird in den Einstellungen gespeichert (`textures KEY`, `models KEY` in `settings.txt`). Der klassische Modus hat dieselben Zeilen auf seiner Seite Graphics; Vorgabe sind unsere Texturen und die Teile, die jedes Level nimmt. Für einen Lauf: `--textures KEY` und `--models KEY`.
 
 | Art | Eingebaute Pakete | Voreinstellung |
 |---|---|---|

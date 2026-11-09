@@ -400,3 +400,16 @@ Katalog der Community (sein englischer Name, der Originalname, der Autor, seine 
 weder im Katalog steht noch mit einem Readme kommt, sowie Archive und Ordner, die nicht genau ein Level sind, werden in
 `levels/community-unsorted/` beiseitegelegt, damit der Spieler sie von Hand ansieht, und nicht gelistet. Die Regeln für
 Autoren und Spieler stehen auf einer Seite: [making-levels.md](making-levels.md).
+
+## Der klassische Modus bietet die Wahl des Aussehens
+
+*2026-11-09, Entscheidung des Eigentümers.* Die Wahl des Aussehens, die bisher dem erweiterten Modus gehörte, gibt es
+auch im klassischen: *Textures* und *Models* auf der Seite Graphics und *Sound theme* auf der Seite Sound (zuerst die
+Zeilen des Originals in ihrer Reihenfolge, unsere darunter, wie *Fullscreen?*), mit denselben Einstellungsschlüsseln
+(`textures`, `models`, `sound-theme`). Alle gefundenen Pakete erscheinen: das eingebaute `own`, `original` (nur wenn
+die Kopie des Spielers da ist), `remastered` und jedes Paket im Datenordner, sodass vom Spieler selbst umgewandelte
+Ressourcen einfach zur Wahl erscheinen. Die Vorgaben bleiben (unsere Texturen, die Teile des Levels, das
+Standardthema). Spielablauf und Regeln bleiben die des Originals, Replays hängen nicht vom Aussehen ab.
+Darstellungskorrekturen (jede Auflösung, Breitbild, Filterung, Glättung) sind immer an und nicht umschaltbar. Das löst
+die früheren Notizen ab, der klassische Modus zeichne immer unsere Texturen und die Teile des Levels und spiele immer
+das Standardthema.

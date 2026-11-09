@@ -43,6 +43,7 @@
   - `cloud-quality low|medium|high|off`（设置文件；默认 `medium`）：我们关卡的云海绘制得多精细（见 levels.md“云海”）：穿过它的步数、朝向太阳的步数、边缘的小云团；`off` 不绘制，关闭 *Clouds?* 也会隐藏它；
   - *Fullscreen?*（`fullscreen off|borderless|exclusive`）：无边框使用桌面的显示模式，独占在平台允许时更改它（Wayland 不允许：改为无边框）。
     F11 在窗口和无边框之间切换。
+- **外观选择**（所有者 2026-11-09 的决定）在经典模式下同样提供，设置键与扩展模式的各行相同：*Textures* 和 *Models* 在 Graphics 页的各行之下，*Sound theme* 在 Sound 页的两个音量之下（先是原版的各行，顺序不变，我们的在其下，如同 *Fullscreen?*）。箭头循环切换找到的每个包：内置的 `own`、`original`（仅当玩家的副本存在时）、`remastered`，以及数据文件夹中的任何包，因此玩家自己转换的资源会直接出现在选项中（[packs.md](packs.md)、[sound-themes.md](sound-themes.md)）。默认值不变（我们的纹理、关卡自带的部件、默认主题）。只改变外观：规则和玩法仍是原版的，回放不依赖外观。渲染修正（任意分辨率、宽屏、过滤、平滑）始终开启，不可切换。
 - **Controls**：在某个按键的行上按 Enter 会等待按键（“Press a key”）；按下的键被绑定，Esc 取消。已被其他动作占用的键会互换，所以没有一个键
   同时做两件事。Esc 和 F11 属于游戏本身，不能绑定；绑定的键优先于模组的按键。Invert Rotation? 让相机反向转动。按键保存为
   `key.forward ArrowUp` … `key.overview Space` 和 `invert-rotation on|off`（winit 的按键名）；没有这些行时使用副本 `DB_Options`
@@ -66,9 +67,9 @@
   - 关卡旁显示最佳时间；
   - Start 下按类别列出关卡；
   - Interface：own / original / remaster，界面文件的来源（[resources.md](resources.md)）；
-  - Textures：绘制关卡、关卡部件和球所用的纹理包——own（默认，经典模式下始终如此）、original、remaster 或玩家的纹理包，按其名称显示；下一个关卡按所选纹理包加载（[packs.md](packs.md)）；
-  - Models：绘制部件和球所用的模型包（只改变外观，绝不改变物理）——关卡自带（每个关卡使用它自己采用的部件：默认，经典模式下始终如此）、own、original 或玩家的模型包（[packs.md](packs.md)）；
-  - Sounds：音效主题——系统、生成、原版（由 toolbox 制作）或玩家自己的主题（[resources.md](resources.md)）；在玩家选择其他主题之前（经典模式下始终）播放生成主题；
+  - Textures：绘制关卡、关卡部件和球所用的纹理包——own（默认）、original、remaster 或玩家的纹理包，按其名称显示；下一个关卡按所选纹理包加载（[packs.md](packs.md)）；
+  - Models：绘制部件和球所用的模型包（只改变外观，绝不改变物理）——关卡自带（每个关卡使用它自己采用的部件：默认）、own、original 或玩家的模型包（[packs.md](packs.md)）；
+  - Sounds：音效主题——系统、生成、原版（由 toolbox 制作）或玩家自己的主题（[resources.md](resources.md)）；在玩家选择其他主题之前播放生成主题；
   - Mods：找到的每个模组所在的界面（内置模组和玩家的模组；调试运行中还有上帝模式，它包含原来的练习工具和无限生命），每项用左右键切换，Enter 打开其页面及选项和按键（[mods.md](mods.md)）；经典模式下关闭。没有需要取消的时间限制：分数只会递减并停在零，与原版相同。
 - **Graphics** 增加 *Field of View*：游戏相机在 4:3 上的视野宽度，40° 到 100°，步长 2（`fov 58`；原版为 58°，即 InGameCam 的
   1.0123 弧度）。经典模式始终使用原版的视野。

@@ -59,6 +59,14 @@ per-player thing is the name in the highscore list.
     edges; `off` draws none, and *Clouds?* off hides it too;
   - *Fullscreen?* (`fullscreen off|borderless|exclusive`): borderless takes the desktop's mode, exclusive changes
     it where the platform can (Wayland cannot: borderless). F11 switches between a window and borderless.
+- **The look choices** (owner's decision 2026-11-09), in the classic mode too, with the same settings as the
+  extended mode's lines: *Textures* and *Models* under the Graphics page's lines, *Sound theme* under the Sound
+  page's two volumes (the original's lines first, in their order; ours below them, like *Fullscreen?*). The arrows
+  go round every pack found: the built-in `own`, `original` (only when the player's copy is present), `remastered`,
+  and any pack in the data folder, so resources a player converts himself just show up ([packs.md](packs.md),
+  [sound-themes.md](sound-themes.md)). The defaults are unchanged (own textures, the level's parts, the default
+  theme). Only the look changes: the rules and the gameplay stay the original's, and replays do not depend on the
+  look. The rendering fixes (any resolution, widescreen, filtering, smoothing) are always on and not switchable.
 - **Controls**: Enter on a key's line waits for a key ("Press a key"); the key pressed is bound, Esc gives up.
   A key another action has is swapped onto it, so no key does two things. Esc and F11 are the game's and cannot be
   bound; a bound key comes before the mods' keys. Invert Rotation? turns the camera the other way.
@@ -94,15 +102,13 @@ development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the or
   - best times beside the levels;
   - levels by kind under Start;
   - Interface: own / original / remaster, where the interface's files come from ([resources.md](resources.md));
-  - Textures: the texture pack the levels, their parts and the balls are drawn with — own (the default, and always
-    in the classic mode), original, remaster or a player's pack, by its name; the next level loads with the choice
+  - Textures: the texture pack the levels, their parts and the balls are drawn with — own (the default), original, remaster or a player's pack, by its name; the next level loads with the choice
     ([packs.md](packs.md));
   - Models: the model pack the parts and balls are drawn with (their look only, never their physics) — the level's
-    (each level with the parts it takes: the default, and always in the classic mode), own, original or a player's
+    (each level with the parts it takes: the default), own, original or a player's
     pack ([packs.md](packs.md));
   - Sounds: the sound theme — system, generated, original (made by the toolbox) or a player's own
-    ([resources.md](resources.md)); the generated theme until the player chooses another, and always in the
-    classic mode;
+    ([resources.md](resources.md)); the generated theme until the player chooses another;
   - Mods: the screen of every mod found (factory and the player's; in a debug run god-mode too, which holds what were
     the practice tools and endless lives), each switched with left and right, Enter opening its page with its options
     and keys ([mods.md](mods.md)); off in the classic mode. There is no time limit to lift: the points only count down

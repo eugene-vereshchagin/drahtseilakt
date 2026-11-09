@@ -62,6 +62,16 @@ Persönliche ist der Name in der Highscore-Liste.
     `off` zeichnet keins, und *Clouds?* aus blendet es ebenfalls aus;
   - *Fullscreen?* (`fullscreen off|borderless|exclusive`): randlos nimmt den Modus des Desktops, exklusiv ändert ihn,
     wo die Plattform es kann (Wayland nicht: randlos). F11 wechselt zwischen Fenster und randlos.
+- **Die Wahl des Aussehens** (Entscheidung des Eigentümers 2026-11-09) gibt es auch im klassischen Modus, mit
+  denselben Einstellungsschlüsseln wie die Zeilen des erweiterten: *Textures* und *Models* unter den Zeilen der Seite
+  Graphics, *Sound theme* unter den zwei Lautstärken der Seite Sound (zuerst die Zeilen des Originals in ihrer
+  Reihenfolge, unsere darunter, wie *Fullscreen?*). Die Pfeile gehen durch alle gefundenen Pakete: das eingebaute
+  `own`, `original` (nur wenn die Kopie des Spielers da ist), `remastered` und jedes Paket im Datenordner, sodass vom
+  Spieler selbst umgewandelte Ressourcen einfach zur Wahl erscheinen ([packs.md](packs.md),
+  [sound-themes.md](sound-themes.md)). Die Vorgaben bleiben (unsere Texturen, die Teile des Levels, das
+  Standardthema). Nur das Aussehen ändert sich: Regeln und Spielablauf bleiben die des Originals, Replays hängen
+  nicht vom Aussehen ab. Die Darstellungskorrekturen (jede Auflösung, Breitbild, Filterung, Glättung) sind immer an
+  und nicht umschaltbar.
 - **Controls**: Enter auf der Zeile einer Taste wartet auf eine Taste („Press a key"); die gedrückte wird belegt, Esc
   bricht ab. Eine Taste, die eine andere Aktion hat, wird getauscht, so tut keine Taste zwei Dinge. Esc und F11
   gehören dem Spiel und lassen sich nicht belegen; eine belegte Taste geht den Tasten der Mods vor.
@@ -101,15 +111,13 @@ Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Men�
   - Bestzeiten neben den Leveln;
   - Level nach Art unter Start;
   - Interface: own / original / remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
-  - Textures: das Texturpaket, womit die Level, ihre Teile und die Kugeln gezeichnet werden — own (Vorgabe, im
-    klassischen Modus immer), original, remaster oder ein Paket des Spielers, mit seinem Namen; das nächste Level lädt
+  - Textures: das Texturpaket, womit die Level, ihre Teile und die Kugeln gezeichnet werden — own (Vorgabe), original, remaster oder ein Paket des Spielers, mit seinem Namen; das nächste Level lädt
     mit der Wahl ([packs.md](packs.md));
   - Models: das Modellpaket, womit die Teile und Kugeln gezeichnet werden (nur ihr Aussehen, nie ihre Physik) — wie im
-    Level (jedes Level mit den Teilen, die es nimmt: Vorgabe, im klassischen Modus immer), own, original oder ein Paket
+    Level (jedes Level mit den Teilen, die es nimmt: Vorgabe), own, original oder ein Paket
     des Spielers ([packs.md](packs.md));
   - Sounds: das Klangthema — System, generiert, original (von der Toolbox gemacht) oder ein eigenes des Spielers
-    ([resources.md](resources.md)); das generierte, bis der Spieler ein anderes wählt, und im klassischen Modus
-    immer;
+    ([resources.md](resources.md)); das generierte, bis der Spieler ein anderes wählt;
   - Mods: der Bildschirm jedes gefundenen Mods (Werks-Mods und die des Spielers; in einem Debug-Lauf auch god-mode,
     der enthält, was die Übungswerkzeuge und die endlosen Leben waren), jeder mit Links und Rechts geschaltet, Enter
     öffnet seine Seite mit seinen Optionen und Tasten ([mods.md](mods.md)); im klassischen Modus aus. Ein Zeitlimit

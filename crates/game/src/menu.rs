@@ -496,11 +496,19 @@ impl Menu {
                 .collect(),
             // the modified originals need the copy (their geometry is the original's) and a folder of them
             Screen::Kinds if self.copy => {
-                let modified = LEVEL_KINDS.iter().position(|&k| k == Kind::Modified).filter(|_| self.modified);
-                [Some(Line::Kind(0)), modified.map(Line::Kind), Some(Line::Community), Some(Line::Back)]
-                    .into_iter()
-                    .flatten()
-                    .collect()
+                let modified = LEVEL_KINDS
+                    .iter()
+                    .position(|&k| k == Kind::Modified)
+                    .filter(|_| self.modified);
+                [
+                    Some(Line::Kind(0)),
+                    modified.map(Line::Kind),
+                    Some(Line::Community),
+                    Some(Line::Back),
+                ]
+                .into_iter()
+                .flatten()
+                .collect()
             }
             Screen::Kinds => vec![Line::Ours, Line::Community, Line::Back],
             Screen::Start => (0..self.entries.len())
@@ -524,7 +532,8 @@ impl Menu {
                 .chain([Line::Back])
                 .collect(),
             // the original's two volumes: the music's and the effects'
-            Screen::Sound => vec![Line::Music, Line::Effects, Line::Back],
+            // the original's two volumes, and ours: the sound theme
+            Screen::Sound => vec![Line::Music, Line::Effects, Line::SoundTheme, Line::Back],
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(self.features))
@@ -548,13 +557,16 @@ impl Menu {
                 .collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
             Screen::Highscore if self.after_entry => vec![Line::Next],
-            // the original's lines, the full screen (a window can be one), and the extended mode's field of view
+            // the original's lines, ours (the full screen, the texture and model packs: either mode), and the extended
+            // mode's field of view
             Screen::Graphics => {
                 let mut l = vec![
                     Line::Resolution,
                     Line::Synch,
                     Line::Clouds,
                     Line::Fullscreen,
+                    Line::Textures,
+                    Line::Models,
                 ];
                 if self.features.mode {
                     l.push(Line::Fov);
@@ -662,15 +674,13 @@ impl Menu {
                 self.step(by as isize);
                 Action::None
             }
+            (_, Some(Line::Textures)) => next_pack(gamedata::packs::Kind::Textures, by),
+            (_, Some(Line::Models)) => next_pack(gamedata::packs::Kind::Models, by),
+            (_, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (Screen::Graphics, Some(l)) => self.change_graphics(l, by),
             (Screen::Controls, Some(Line::Invert)) => self.toggle_invert(),
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
-            (Screen::Extended, Some(Line::Textures)) => {
-                next_pack(gamedata::packs::Kind::Textures, by)
-            }
-            (Screen::Extended, Some(Line::Models)) => next_pack(gamedata::packs::Kind::Models, by),
-            (Screen::Extended, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (_, Some(Line::Mod(i))) => Action::ModSwitch(i),
             (Screen::ModPage, Some(Line::ModOn)) => Action::ModSwitch(self.mod_page),
             (Screen::ModPage, Some(Line::ModOpt(o))) => Action::ModOption(self.mod_page, o, by),
@@ -1216,7 +1226,9 @@ impl Menu {
 
     /// The community map `i`'s credit line: its author, version and year, as its level.txt gives them.
     fn credit(&self, i: usize) -> String {
-        let Some(p) = self.maps.get(i) else { return String::new() };
+        let Some(p) = self.maps.get(i) else {
+            return String::new();
+        };
         let mut parts: Vec<String> = Vec::new();
         if let Some(a) = &p.author {
             parts.push(format!("{} {a}", self.strings.ours("by")));
@@ -1315,6 +1327,14 @@ impl Menu {
                     (self.label(Line::Synch), yes_no(g.vsync)),
                     (self.label(Line::Clouds), yes_no(g.clouds)),
                     (self.label(Line::Fullscreen), full),
+                    (
+                        self.label(Line::Textures),
+                        self.pack_value(gamedata::packs::Kind::Textures),
+                    ),
+                    (
+                        self.label(Line::Models),
+                        self.pack_value(gamedata::packs::Kind::Models),
+                    ),
                 ];
                 if self.features.mode {
                     f.push((self.label(Line::Fov), format!("{}", g.fov)));
@@ -1347,6 +1367,7 @@ impl Menu {
                 vec![
                     (self.label(Line::Music), pct(self.volumes[1])),
                     (self.label(Line::Effects), pct(self.volumes[0])),
+                    (self.label(Line::SoundTheme), theme_value()),
                 ]
             }
             Screen::Extended => {
@@ -1901,11 +1922,21 @@ impl Menu {
                 if self.community {
                     // the chosen map's author under the list, the authors' notice at the bottom
                     if let Line::Map(m) = lines.get(self.chosen()).copied().unwrap_or(Line::Back) {
-                        label(&mut out, &self.credit(m), [LIST_X[0], 0.81, LIST_X[1], 0.85], &FONT_HELP);
+                        label(
+                            &mut out,
+                            &self.credit(m),
+                            [LIST_X[0], 0.81, LIST_X[1], 0.85],
+                            &FONT_HELP,
+                        );
                     }
                     let mut st = FONT_HINT;
                     st.flags |= crate::ui::TEXT_WORDWRAP;
-                    label(&mut out, &self.strings.ours("community notice"), [0.27, 0.945, 0.73, 0.995], &st);
+                    label(
+                        &mut out,
+                        &self.strings.ours("community notice"),
+                        [0.27, 0.945, 0.73, 0.995],
+                        &st,
+                    );
                 }
                 back_only(&mut out);
             }
@@ -2092,15 +2123,47 @@ impl Menu {
                         label(&mut out, l, [0.31, y, 0.69, y + 0.045], &FONT_03);
                     }
                 } else {
-                    // the original's fields 0.15 apart; the extended mode's fifth closes them up
-                    let (top, step) = if fields.len() > 4 {
-                        (0.25, 0.12)
-                    } else {
-                        (0.295, 0.15)
+                    // the original's fields 0.15 apart; ours (the packs and the theme) are rows under them, and the
+                    // fields close up when the Graphics page has the extended mode's fifth
+                    let is_row =
+                        |l: &Line| matches!(l, Line::Textures | Line::Models | Line::SoundTheme);
+                    let n = lines
+                        .iter()
+                        .filter(|l| !is_row(l) && **l != Line::Back)
+                        .count();
+                    let (top, step) = match (sc, n) {
+                        (Screen::Graphics, _) => (0.25, 0.10),
+                        _ => (0.295, 0.15),
                     };
-                    for (k, (name, value)) in fields.iter().enumerate() {
-                        let y = top + k as f32 * step;
-                        field(&mut out, y, name, value, k);
+                    let (mut rows_at, mut fields_at) = (0, 0);
+                    for (k, ((name, value), l)) in fields.iter().zip(&lines).enumerate() {
+                        if is_row(l) {
+                            let y = top + n as f32 * step + 0.008 + rows_at as f32 * 0.045;
+                            rows_at += 1;
+                            let st = if self.chosen() == k {
+                                Button::Over
+                            } else {
+                                Button::Up
+                            };
+                            row(
+                                &mut out,
+                                [0.33, y, 0.67, y + 0.0396],
+                                st,
+                                Some(Target::Line(k)),
+                            );
+                            let mut left = FONT_ROW;
+                            left.align = crate::ui::ALIGN_LEFT;
+                            label(
+                                &mut out,
+                                name,
+                                [0.33 + ROW_INDENT, y, 0.555, y + 0.0396],
+                                &left,
+                            );
+                            label(&mut out, value, [0.555, y, 0.66, y + 0.0396], &FONT_ROW);
+                        } else {
+                            field(&mut out, top + fields_at as f32 * step, name, value, k);
+                            fields_at += 1;
+                        }
                     }
                 }
                 back_only(&mut out);
@@ -2550,7 +2613,13 @@ impl Menu {
 }
 
 /// The kinds of levels the extended mode offers, in the menu's order (levels.md).
-const LEVEL_KINDS: [Kind; 5] = [Kind::Original, Kind::Remastered, Kind::Community, Kind::Open, Kind::Modified];
+const LEVEL_KINDS: [Kind; 5] = [
+    Kind::Original,
+    Kind::Remastered,
+    Kind::Community,
+    Kind::Open,
+    Kind::Modified,
+];
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
 /// it; folders that hold no level or several are not shown, and said so on the console.
@@ -3113,11 +3182,21 @@ mod tests {
                 Line::Synch,
                 Line::Clouds,
                 Line::Fullscreen,
+                Line::Textures,
+                Line::Models,
                 Line::Back
             ]
         );
+        assert_eq!(
+            m.lines(Screen::Sound),
+            [Line::Music, Line::Effects, Line::SoundTheme, Line::Back]
+        );
+        // a line's value is shown for each, and the arrows ask for the pack or theme (the same keys as extended)
+        assert_eq!(m.fields(Screen::Graphics).len(), 6);
+        assert_eq!(m.fields(Screen::Sound).len(), 3);
         let e = menu(&[true], true);
         assert!(e.lines(Screen::Graphics).contains(&Line::Fov));
+        assert_eq!(e.fields(Screen::Graphics).len(), 7);
         assert!(!m.lines(Screen::Controls).contains(&Line::Defaults));
         assert!(e.lines(Screen::Controls).contains(&Line::Defaults));
     }
@@ -3151,6 +3230,17 @@ mod tests {
                 ..Graphics::default()
             })
         );
+        // ours: the models and the textures (the packs, not the graphics), then the full screen
+        m.step(-1);
+        assert!(matches!(
+            m.adjust(1),
+            Action::Pack(gamedata::packs::Kind::Models, _)
+        ));
+        m.step(-1);
+        assert!(matches!(
+            m.adjust(1),
+            Action::Pack(gamedata::packs::Kind::Textures, _)
+        ));
         m.step(-1);
         let g = graphics(m.adjust(1)).unwrap();
         assert_eq!(g.fullscreen, Fullscreen::Borderless);
@@ -3233,10 +3323,29 @@ mod tests {
         assert_eq!(labels, ["Start", "Highscore", "Options", "Credits", "Exit"]);
         let mut m = menu(&[true], true);
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.screen(), Screen::Kinds, "levels by kind in the extended mode only");
-        let kinds: Vec<String> = m.lines(Screen::Kinds).into_iter().map(|l| m.label(l)).collect();
-        assert_eq!(kinds[..4], ["Original", "Remastered", "Your community maps", "Open format"]);
-        assert_eq!(kinds[4], "Community maps", "the maps shipped with the game come after the kinds");
+        assert_eq!(
+            m.screen(),
+            Screen::Kinds,
+            "levels by kind in the extended mode only"
+        );
+        let kinds: Vec<String> = m
+            .lines(Screen::Kinds)
+            .into_iter()
+            .map(|l| m.label(l))
+            .collect();
+        assert_eq!(
+            kinds[..4],
+            [
+                "Original",
+                "Remastered",
+                "Your community maps",
+                "Open format"
+            ]
+        );
+        assert_eq!(
+            kinds[4], "Community maps",
+            "the maps shipped with the game come after the kinds"
+        );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
             m.screen(),
@@ -3265,7 +3374,11 @@ mod tests {
     fn locked_levels_are_skipped() {
         let mut m = menu(&[true, false, true], false);
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.screen(), Screen::Kinds, "the classic mode: the original levels and the community maps");
+        assert_eq!(
+            m.screen(),
+            Screen::Kinds,
+            "the classic mode: the original levels and the community maps"
+        );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Start);
         m.step(1);
@@ -3361,8 +3474,15 @@ mod tests {
             ]
         );
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.screen(), Screen::Kinds, "Start offers our levels and the community maps");
-        assert_eq!(m.lines(Screen::Kinds), [Line::Ours, Line::Community, Line::Back]);
+        assert_eq!(
+            m.screen(),
+            Screen::Kinds,
+            "Start offers our levels and the community maps"
+        );
+        assert_eq!(
+            m.lines(Screen::Kinds),
+            [Line::Ours, Line::Community, Line::Back]
+        );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom, "our own levels");
         m.back();
@@ -3376,11 +3496,17 @@ mod tests {
         let kinds = |m: &Menu| m.lines(Screen::Kinds);
         // nothing in the folder: not listed, in either mode
         assert!(!kinds(&menu(&[true], true)).contains(&Line::Kind(4)));
-        assert_eq!(kinds(&menu(&[true], false)), [Line::Kind(0), Line::Community, Line::Back]);
+        assert_eq!(
+            kinds(&menu(&[true], false)),
+            [Line::Kind(0), Line::Community, Line::Back]
+        );
         // levels and a copy: after the original in the classic mode, after the other kinds in the extended one
         let mut m = menu(&[true], false);
         m.modified = true;
-        assert_eq!(kinds(&m), [Line::Kind(0), Line::Kind(4), Line::Community, Line::Back]);
+        assert_eq!(
+            kinds(&m),
+            [Line::Kind(0), Line::Kind(4), Line::Community, Line::Back]
+        );
         assert_eq!(m.label(Line::Kind(4)), "Modified originals");
         let mut m = menu(&[true], true);
         m.modified = true;
@@ -3401,22 +3527,39 @@ mod tests {
     fn the_community_maps_are_listed_in_order_with_their_authors() {
         let mut m = menu(&[true], false);
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.lines(Screen::Kinds), [Line::Kind(0), Line::Community, Line::Back], "the classic mode too");
+        assert_eq!(
+            m.lines(Screen::Kinds),
+            [Line::Kind(0), Line::Community, Line::Back],
+            "the classic mode too"
+        );
         m.step(1);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom);
         assert_eq!(m.title(Screen::Custom).as_deref(), Some("Community maps"));
         assert_eq!(m.maps.len(), 13, "the thirteen shipped maps");
         let orders: Vec<_> = m.maps.iter().map(|p| p.order).collect();
-        assert_eq!(orders, (1..=13).map(Some).collect::<Vec<_>>(), "in the order of the levels' own numbers");
-        assert!(m.maps.iter().all(|p| p.author.is_some() && p.posted.is_some()), "each credits its author");
+        assert_eq!(
+            orders,
+            (1..=13).map(Some).collect::<Vec<_>>(),
+            "in the order of the levels' own numbers"
+        );
+        assert!(
+            m.maps
+                .iter()
+                .all(|p| p.author.is_some() && p.posted.is_some()),
+            "each credits its author"
+        );
         assert!(m.credit(0).starts_with("by "), "{}", m.credit(0));
         for lang in ["en", "ru", "de", "zh", "fr", "es", "it"] {
             let s = crate::lang::Strings::ours_in(lang);
             assert!(s.ours("community notice").len() > 30, "{lang}");
             assert_ne!(s.ours("community notice"), "community notice", "{lang}");
         }
-        assert!(crate::lang::Strings::ours_in("ru").ours("community notice").contains("спасибо им"));
+        assert!(
+            crate::lang::Strings::ours_in("ru")
+                .ours("community notice")
+                .contains("спасибо им")
+        );
         m.back();
         assert!(!m.community);
     }

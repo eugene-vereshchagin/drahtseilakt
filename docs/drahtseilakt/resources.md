@@ -118,7 +118,7 @@ resolution, tiling where it tiles and wrapping the balls as it does. Our texture
 the extended page's *Textures* line chooses among the texture packs ([packs.md](packs.md): `own`, `original` the
 copy's, `remastered` a remastered level's own upscaled pictures, and the player's packs in the data folder's
 `textures/`), its *Models* line among the model packs (the parts' and balls' looks only, never their physics); the
-classic mode always draws ours and the parts each level takes. An open-format level's own textures (files in its folder)
+classic mode offers the same lines on its Graphics page, with ours and the parts each level takes as the defaults. An open-format level's own textures (files in its folder)
 stay its maker's; the textures it names as the game's (`game:` images, open-format.md) follow the pack. `--textures
 PACK` chooses for one run; `--export` keeps the copy's unless given `--textures own`, which writes ours into the
 exported level. Our files ship with the game and are

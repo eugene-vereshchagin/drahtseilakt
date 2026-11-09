@@ -933,11 +933,11 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
         v[0],
         v[1],
         gamedata::resources::chosen().key(),
-        // the sound theme is the extended mode's choice, written only once the player made one (until then the
-        // default plays, whichever it is); the classic mode (the default theme) keeps the line as it was
+        // the sound theme, in either mode, written only once the player made a choice (until then the default
+        // plays, whichever it is)
         match gamedata::sound_themes::wanted() {
-            Some(w) if features.mode => format!("sound-theme {w}\n"),
-            _ => String::new(),
+            Some(w) => format!("sound-theme {w}\n"),
+            None => String::new(),
         },
         features.lines()
     );
@@ -945,18 +945,14 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
         text.push_str(&format!("player {}\n", crate::lang::latin1(player)));
     }
     // the lines only the file sets (language, the level folders) are kept as they are
-    let ours: &[&str] = if features.mode {
-        &[
-            "sound",
-            "music",
-            "profile",
-            "player",
-            "interface",
-            "sound-theme",
-        ]
-    } else {
-        &["sound", "music", "profile", "player", "interface"]
-    };
+    let ours: &[&str] = &[
+        "sound",
+        "music",
+        "profile",
+        "player",
+        "interface",
+        "sound-theme",
+    ];
     for line in settings_text().lines() {
         let key = line.split_once(' ').map_or(line, |(k, _)| k);
         if !ours.contains(&key) && !key.starts_with("extended.") && !line.trim().is_empty() {
@@ -1045,7 +1041,9 @@ fn custom_roots() -> Vec<PathBuf> {
         .filter(|&k| k != crate::levels::Kind::Original)
         .map(crate::levels::dir)
         // the modified originals lie one folder deeper, in a folder per set (modified.rs)
-        .chain(crate::modified::set_folders(&crate::levels::dir(crate::levels::Kind::Modified)))
+        .chain(crate::modified::set_folders(&crate::levels::dir(
+            crate::levels::Kind::Modified,
+        )))
         .chain(gamedata::resources::shipped_levels_root())
         .collect()
 }
@@ -1139,16 +1137,6 @@ fn start_packs(textures: Option<&str>, models: Option<&str>) {
     start(Kind::Models, models, LEVEL);
 }
 
-/// The packs chosen again without looking for them again (the mode switch).
-fn restore_packs(textures: Option<&str>, models: Option<&str>) {
-    use gamedata::packs::{Kind, LEVEL, OWN, choose};
-    // the default first: a saved pack that is not there leaves it
-    choose(Kind::Textures, OWN);
-    choose(Kind::Models, LEVEL);
-    textures.inspect(|k| choose(Kind::Textures, k));
-    models.inspect(|k| choose(Kind::Models, k));
-}
-
 pub fn run(o: Options, data: Data) -> Result<(), String> {
     // where the interface's files come from: the copy's own when it has its menu, else ours (resources.rs); the
     // extended mode may choose another
@@ -1163,10 +1151,8 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     // textures) unless `--textures` asks for a pack in it.
     let (textures, models) = if o.export.is_some() {
         (Some(gamedata::packs::ORIGINAL.to_owned()), None)
-    } else if extended {
-        (setting("textures"), setting("models"))
     } else {
-        (None, None)
+        (setting("textures"), setting("models"))
     };
     start_packs(
         o.textures.clone().or(textures).as_deref(),
@@ -1187,11 +1173,7 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     }
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (the interface no longer implies the original's sounds: the copy's interface is now the default)
-    let theme = if extended {
-        setting("sound-theme")
-    } else {
-        None
-    };
+    let theme = setting("sound-theme");
     gamedata::sound_themes::start(theme.as_deref());
     if let Some(dir) = &o.level_stats {
         return crate::levelstats::run(&o, &data, dir, Path::new("hints"));
@@ -4078,7 +4060,11 @@ impl App {
         self.view_mods = view;
         self.mouse = (0.0, 0.0);
         self.game.view_turn = self.view_mods.out.turn.unwrap_or(0);
-        if std::mem::take(&mut self.view_mods.out.playtime) && self.fly.is_none() && !self.game.sim.game_over && !self.game.sim.finished {
+        if std::mem::take(&mut self.view_mods.out.playtime)
+            && self.fly.is_none()
+            && !self.game.sim.game_over
+            && !self.game.sim.finished
+        {
             self.playtimes.add(&self.game.level.name, step);
         }
         if self.playtimes.dirty && self.playtime_saved.elapsed().as_secs() >= 10 {
@@ -5043,7 +5029,11 @@ impl App {
                     // the run begun again at that sector, as --sector does; the next ordinary restart is the level's
                     let was = self.game.start.take();
                     let top = self.game.sim.sector_count();
-                    self.game.start = Some(crate::replay::Start { sector: (n as usize).clamp(1, top.max(1)), ball: None, at: None });
+                    self.game.start = Some(crate::replay::Start {
+                        sector: (n as usize).clamp(1, top.max(1)),
+                        ball: None,
+                        at: None,
+                    });
                     self.restart();
                     self.game.start = was;
                     self.saved = None;
@@ -5195,29 +5185,6 @@ impl App {
                 match action {
                     Action::Switch(f) => self.features.toggle(f),
                     _ => self.features.mode = !self.features.mode,
-                }
-                // the sound theme follows the mode: the saved choice in the extended mode, the default theme else
-                // (taken before the settings are written, which keep the extended mode's choice)
-                let theme = if self.features.mode {
-                    setting("sound-theme")
-                } else {
-                    None
-                };
-                gamedata::sound_themes::restore(theme.as_deref());
-                // the packs too (from the next level): the saved choice in the extended mode, the defaults else
-                let packs = |k: gamedata::packs::Kind| {
-                    if self.features.mode {
-                        setting(k.key())
-                    } else {
-                        None
-                    }
-                };
-                restore_packs(
-                    packs(gamedata::packs::Kind::Textures).as_deref(),
-                    packs(gamedata::packs::Kind::Models).as_deref(),
-                );
-                if let Some(a) = &mut self.audio {
-                    a.forget_sounds();
                 }
                 save_settings(self.volumes, self.features, &self.player);
                 // the field of view is the extended mode's: the classic one plays at the original's
@@ -5448,7 +5415,11 @@ impl App {
         // a mod's `camera.smooth`: how fast the camera follows what it is asked (a time constant of up to ~0.65 s)
         let ease = {
             let m = self.view_mods.out.smooth;
-            if m > 0.0 && self.menu.is_none() { 1.0 - (-step / (0.05 + m * 0.6)).exp() } else { 1.0 }
+            if m > 0.0 && self.menu.is_none() {
+                1.0 - (-step / (0.05 + m * 0.6)).exp()
+            } else {
+                1.0
+            }
         };
         if let Some(c) = &self.fly {
             (snap.eye, snap.target) = c.view();
@@ -5458,7 +5429,8 @@ impl App {
                     *t += (snap.target - *t) * ease;
                     (snap.eye, snap.target) = (*e, *t);
                 } else {
-                    self.eased.get_or_insert(([0.0, 1.0, 0.0], None)).1 = Some((snap.eye, snap.target));
+                    self.eased.get_or_insert(([0.0, 1.0, 0.0], None)).1 =
+                        Some((snap.eye, snap.target));
                 }
             }
         } else if let Some(x) = self.eased.as_mut() {
@@ -5529,7 +5501,14 @@ impl App {
             let (deform, decoys) = (self.view_mods.out.deform, self.view_mods.out.decoys);
             if deform > 0.0 || decoys > 0 {
                 let t = self.mod_began.elapsed().as_secs_f32();
-                crate::scene::ball_looks(&mut inst, &snap, &self.game.ball_meshes, t, deform, decoys);
+                crate::scene::ball_looks(
+                    &mut inst,
+                    &snap,
+                    &self.game.ball_meshes,
+                    t,
+                    deform,
+                    decoys,
+                );
             }
             let particles = self.game.effects.batches(snap.eye, snap.target);
             let mut view = scene::view(&snap);
