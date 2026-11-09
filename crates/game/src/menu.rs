@@ -350,7 +350,7 @@ impl Menu {
             })
             .collect();
         let mut m = Menu {
-            note_rows: std::cell::Cell::new(COMMUNITY_LINES),
+            note_rows: std::cell::Cell::new(LIST_LINES),
             stack: Vec::new(),
             entries,
             maps: Vec::new(),
@@ -402,9 +402,14 @@ impl Menu {
     /// The rows a list shows at once: the community maps leave room under them for the author and the notice.
     fn page_len(&self) -> usize {
         match self.screen() {
-            Screen::Custom if self.note_below() => self.note_rows.get().clamp(1, COMMUNITY_LINES),
+            Screen::Custom => self.note_rows.get().clamp(1, self.max_rows()),
             sc => page(sc),
         }
+    }
+
+    /// The most rows the open list shows: the community maps leave room for a longer note.
+    fn max_rows(&self) -> usize {
+        if self.note_below() { COMMUNITY_LINES } else { LIST_LINES }
     }
 
     /// Whether the open list has a note on a panel under its rows: the shipped community picks (author and thanks)
@@ -413,9 +418,18 @@ impl Menu {
         matches!(self.list, List::Best | List::Downloaded)
     }
 
+    /// A note's text with the Esc hint as its last line (the hint alone when there is no note).
+    fn with_hint(&self, note: String) -> String {
+        let hint = self.strings.ours("esc back");
+        if note.trim().is_empty() { hint } else { format!("{note}\n{hint}") }
+    }
+
     /// The note under an open list with one: the picks' (what they are, the chosen map's author, the authors' notice)
     /// or the player's folder's.
     fn list_note(&self, chosen: Option<Line>) -> String {
+        if !self.note_below() {
+            return String::new();
+        }
         if self.list == List::Best {
             let by = match chosen {
                 Some(Line::Map(m)) => self.credit(m),
@@ -444,11 +458,16 @@ impl Menu {
         } else {
             vec![self.list_note(None)]
         };
+        let texts: Vec<String> = texts.into_iter().map(|t| self.with_hint(t)).collect();
         let max_w = (NOTE_X[1] - NOTE_X[0]) * crate::ui::CONTEXT_W - 2.0 * NOTE_PAD[0];
-        for rows in (1..=COMMUNITY_LINES).rev() {
+        for rows in (1..=self.max_rows()).rev() {
             let top = LIST_TOP + rows as f32 * ROW_STEP + HINT_H + 0.008;
             let h = (NOTE_BOTTOM - top) * crate::ui::CONTEXT_H - 2.0 * NOTE_PAD[1];
-            if texts.iter().all(|t| fit_whole(f, t, max_w, h, &FONT_HELP).2) {
+            let room = |t: &String| {
+                let (lines, k, ok) = fit_whole(f, t, max_w, h, &FONT_HELP);
+                ok && lines.len() as f32 * row_pitch(&scaled_style(&FONT_HELP, k)) <= h + 1e-3
+            };
+            if texts.iter().all(room) {
                 return rows;
             }
         }
@@ -1844,16 +1863,12 @@ impl Menu {
                     let (quads, k) = fit_label(f, t, frame, style);
                     (frame, crate::ui::place(quads, screen, Anchor::Center), k)
                 };
-                let left = |q: &[Quad]| q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min);
+                // the text area: right of the ball (the art's text limit at the right); every line of every label
+                // is centred on this area's middle, the block in its height
                 let clear = (ball > 0.0).then(|| {
                     screen.rect(homogeneous([r[0] + ball, r[1], r[2], r[3]]), Anchor::Center)[0]
                 });
-                let (mut frame, mut placed, mut k) = fit(r);
-                if let Some(c) = clear {
-                    if !placed.is_empty() && left(&placed) < c {
-                        (frame, placed, k) = fit([r[0] + ball, r[1], r[2], r[3]]);
-                    }
-                }
+                let (frame, placed, k) = fit([r[0] + ball, r[1], r[2], r[3]]);
                 if let (Some(p), false) = (probe, dry.get()) {
                     p.borrow_mut().push(Probe {
                         text: t.to_owned(),
@@ -2191,11 +2206,6 @@ impl Menu {
             {
                 button(out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
                 label_ball(out, &self.label(lines[i]), BACK_RECT, &FONT_01, BALL_BACK);
-                // Esc leaves a long list from any row
-                // (on a panel of its own under Back, in the dark strip, never over the plain background)
-                if scrolls(sc) {
-                    note(out, &self.strings.ours("esc back"), HINT_TOP, false, 1.0 - HINT_TOP);
-                }
             }
         };
         // a field: its label at the top, its value under it (a yes/no pair, or text between arrows)
@@ -2303,7 +2313,7 @@ impl Menu {
             Screen::Custom => {
                 title(&mut out);
                 // each level: its difficulty (a star and 1 to 10, "?" unknown), its title in the menus' language
-                if let (true, Some(f)) = (self.note_below(), font) {
+                if let Some(f) = font {
                     self.note_rows.set(self.fit_rows(f));
                 }
                 let n = self.list_len(sc);
@@ -2341,13 +2351,15 @@ impl Menu {
                 scroll(&mut out, LIST_X[1] + 0.006, LIST_TOP, bottom, shown, n);
                 let said: Vec<String> = self.fields(sc).into_iter().map(|f| f.0).collect();
                 note(&mut out, &said.join("\n"), 0.30, false, 0.3);
-                if self.note_below() {
-                    // what the list is; the chosen map's author and the authors' notice (the shipped picks), or where
-                    // the player's folder is, on one panel under the list
-                    let text = self.list_note(lines.get(self.chosen()).copied());
-                    let top = LIST_TOP + self.page_len() as f32 * ROW_STEP + HINT_H + 0.008;
-                    note(&mut out, &text, NOTE_BOTTOM, true, NOTE_BOTTOM - top);
-                }
+                // the list's note (what it is, the chosen map's author, where the folder is), Esc's hint its last
+                // line; without a note the hint alone takes the note's place
+                let text = if self.note_below() {
+                    self.list_note(lines.get(self.chosen()).copied())
+                } else {
+                    String::new()
+                };
+                let top = LIST_TOP + self.page_len() as f32 * ROW_STEP + HINT_H + 0.008;
+                note(&mut out, &self.with_hint(text), NOTE_BOTTOM, true, NOTE_BOTTOM - top);
                 back_only(&mut out);
             }
             Screen::Highscore => {
@@ -2451,7 +2463,7 @@ impl Menu {
                     .filter(|l| !l.is_empty())
                     .collect();
                 let top = MODS_TOP + shown_n as f32 * ROW_STEP + HINT_H + 0.008;
-                note(&mut out, &help.join("\n"), NOTE_BOTTOM, true, NOTE_BOTTOM - top);
+                note(&mut out, &self.with_hint(help.join("\n")), NOTE_BOTTOM, true, NOTE_BOTTOM - top);
                 back_only(&mut out);
             }
             Screen::Graphics | Screen::Controls | Screen::Sound | Screen::Extended => {
@@ -3212,8 +3224,6 @@ const NOTE_X: [f32; 2] = [0.31, 0.69];
 const NOTE_BOTTOM: f32 = 0.838;
 /// A note panel's padding (context pixels): sideways, up and down.
 const NOTE_PAD: [f32; 2] = [12.0, 7.0];
-/// The Esc hint's panel: its top, under Back.
-const HINT_TOP: f32 = 0.9447;
 /// The credits' text: its left and right edges (the bar right of them), its top and bottom.
 const CREDITS_X: [f32; 2] = [0.318, 0.672];
 const CREDITS_TOP: f32 = 0.10;
@@ -3510,7 +3520,7 @@ mod tests {
 
     fn menu(open: &[bool], extended: bool) -> Menu {
         let mut m = Menu {
-            note_rows: std::cell::Cell::new(COMMUNITY_LINES),
+            note_rows: std::cell::Cell::new(LIST_LINES),
             stack: Vec::new(),
             entries: open
                 .iter()
@@ -4128,6 +4138,14 @@ mod tests {
                                     p.size
                                 );
                             }
+                            // where Back is (its top): nothing of a note lies under it
+                            let back = hits
+                                .iter()
+                                .find(|h| {
+                                    matches!(h.target, Target::Line(k)
+                                        if matches!(m.lines(sc).get(k), Some(Line::Back | Line::Next)))
+                                })
+                                .map(|h| h.rect);
                             let mut path_end: Option<bool> = None;
                             let esc = Strings::ours_in(lang).ours("esc back");
                             for p in probes {
@@ -4138,7 +4156,7 @@ mod tests {
                                     let t = p.text.as_str();
                                     let like = !t.contains(' ')
                                         && (t.starts_with(['~', '/', '%']) || t.contains(['/', '\\']));
-                                    if !t.contains(' ') && (like || path_end.is_some()) {
+                                    if !t.contains(' ') && t != esc && (like || path_end.is_some()) {
                                         if let Some(ends) = path_end {
                                             assert!(
                                                 ends,
@@ -4244,6 +4262,58 @@ mod tests {
                                         b[0] >= c - tol,
                                         "a text over its button's ball (ends at {c}): {at}"
                                     );
+                                }
+                                // no note and no hint lies below Back
+                                if let (Some(panel), Some(bk)) = (p.panel, back) {
+                                    assert!(panel[3] <= bk[1] + tol, "a note below Back {bk:?}: {at} {panel:?}");
+                                }
+                                // a button's label (ball at its left end): every line centred on the one axis of
+                                // the text area (right of the ball, left of the art's limit), the block centred
+                                // in the button's height
+                                if let (Some(c), None, false, Some(&(r, right))) = (
+                                    p.clear_left,
+                                    p.panel,
+                                    p.wrap,
+                                    buttons.iter().rev().find(|(r, _)| {
+                                        centre[0] >= r[0] && centre[0] <= r[2] && centre[1] >= r[1] && centre[1] <= r[3]
+                                    }),
+                                ) {
+                                    let axis = (c + right.min(r[2])) / 2.0;
+                                    let mut qs = p.quads.clone();
+                                    qs.sort_by(|a, b| a[1].total_cmp(&b[1]));
+                                    let mut lines: Vec<[f32; 4]> = Vec::new();
+                                    let mut top = f32::MIN;
+                                    for q in qs {
+                                        match lines.last_mut() {
+                                            Some(l) if q[1] - top < 0.5 * p.line => {
+                                                l[0] = l[0].min(q[0]);
+                                                l[2] = l[2].max(q[2]);
+                                                l[1] = l[1].min(q[1]);
+                                                l[3] = l[3].max(q[3]);
+                                            }
+                                            _ => {
+                                                top = q[1];
+                                                lines.push(q);
+                                            }
+                                        }
+                                    }
+                                    for l in &lines {
+                                        let mid = (l[0] + l[2]) / 2.0;
+                                        // (the last glyph's trailing spacing: a tenth of a line at most)
+                                        assert!(
+                                            (mid - axis).abs() <= tol + 0.1 * p.line,
+                                            "a label line off the button's text axis {axis} (at {mid}): {at}"
+                                        );
+                                    }
+                                    if (p.frame[1] - r[1]).abs() <= tol && (p.frame[3] - r[3]).abs() <= tol {
+                                        let mid = (b[1] + b[3]) / 2.0;
+                                        let want = (r[1] + r[3]) / 2.0;
+                                        // the glyph cells carry the font's own asymmetry (about a fifth of a line)
+                                        assert!(
+                                            (mid - want).abs() <= tol + 0.25 * p.line,
+                                            "a label block not centred in its button's height ({mid} vs {want}): {at}"
+                                        );
+                                    }
                                 }
                                 if !p.wrap && p.panel.is_none() && b[3] - b[1] > 1.4 * p.line {
                                     assert!(p.scale >= FIT_SHRINK - 1e-3, "two small lines: {at}");
