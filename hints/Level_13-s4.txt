@@ -1,2 +1,2 @@
 # Level 13 sector 4 (CP3 -> CP4): the test player's arms solution (hints/Level_13-s4-arms.txt) to tick 4920, then the owner's end (lane switch at the end of lane 1, on to CP4 at 2:04.18) — together hints/Level_13-s4.replay (copy of hints/runs/owner/Level_13-s4-finish-8218.replay).
-at -595.2 -285 -1124.9 r 4 sector 4 kind paper : sync -595.2 -285 -1124.9 200 ; replay Level_13-s4.replay 0 7500
+at -595.2 -285 -1124.9 r 4 sector 4 kind paper : sync -595.2 -285 -1124.9 200 ; trace Level_13-s4.replay 0 7466 2

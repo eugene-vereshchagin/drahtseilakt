@@ -115,7 +115,105 @@ pub struct Track {
     pub vel: Vec<Vec3>,
     pub push: Vec<Vec3>,
     pub lift: Vec<bool>,
+    /// The loose body the ball rode at each tick, if any (its object, and the ball's place and speed relative to it):
+    /// on a raft the run is followed relative to the raft, wherever the raft is now.
+    pub on: Vec<Option<(usize, Vec3, Vec3)>>,
+    /// Before a loose body touches the ball (within `TRACE_MEET` ticks): that body's object and its place at the tick,
+    /// so the trace waits where the run is when the body comes later than it did in the run.
+    pub meet: Vec<Option<(usize, Vec3)>>,
     pub gain: f32,
+}
+
+/// A loose body carries the ball when its middle is below the ball's and this near across.
+const CARRY_ACROSS: f32 = 3.5;
+const CARRY_BELOW: f32 = 0.5;
+/// A carrier this far from its place in the run is not followed.
+const CARRY_TRUST: f32 = 8.0;
+
+/// The loose body carrying the ball now, if any: its object and the ball's place and speed relative to it.
+pub fn carrier(sim: &Sim) -> Option<(usize, Vec3, Vec3)> {
+    let world = sim.world();
+    let b = sim.ball.position;
+    sim.loose()
+        .iter()
+        .filter_map(|&(object, body)| {
+            let st = world.state(body)?;
+            let d = b - st.pos;
+            let across = Vec3::new(d.x, 0.0, d.z).length();
+            (d.y > CARRY_BELOW && across < CARRY_ACROSS).then_some((object, d, sim.ball.velocity - st.vel, across))
+        })
+        .min_by(|a, c| a.3.total_cmp(&c.3))
+        .map(|(o, d, v, _)| (o, d, v))
+}
+
+/// The loose body touching the ball at tick `i` of the run (its middle within `TOUCH` of the ball's), if any.
+fn touch(track: &Track, bodies: &[Vec<(usize, Vec3)>], i: usize) -> Option<usize> {
+    let ball = *track.pos.get(i)?;
+    bodies
+        .get(i)?
+        .iter()
+        .map(|&(o, p)| (o, p.distance(ball)))
+        .filter(|b| b.1 < TOUCH)
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|b| b.0)
+}
+
+/// Fills `track.meet` from the loose bodies' places at each tick of the run (`bodies`, object and place).
+pub fn fill_meet(track: &mut Track, bodies: &[Vec<(usize, Vec3)>]) {
+    let n = track.on.len();
+    track.meet = vec![None; n];
+    for j in 0..n {
+        if touch(track, bodies, j).is_some() {
+            continue;
+        }
+        let next = (j + 1..(j + TRACE_MEET).min(n)).find_map(|i| touch(track, bodies, i));
+        if let Some(object) = next
+            && let Some(&(_, p)) = bodies.get(j).and_then(|b| b.iter().find(|b| b.0 == object))
+        {
+            track.meet[j] = Some((object, p));
+        }
+    }
+}
+
+/// How many ticks late the body about to touch the ball is, against the run (negative: early; 0 if none).
+fn meet_late(track: &Track, k: usize, sim: &Sim) -> i64 {
+    let Some(Some((object, _))) = track.meet.get(k) else {
+        return 0;
+    };
+    let Some(body) = sim.loose().iter().find(|l| l.0 == *object).map(|l| l.1) else {
+        return 0;
+    };
+    let Some(now) = sim.world().state(body).map(|s| s.pos) else {
+        return 0;
+    };
+    // the run's tick whose place of the body is nearest where it is now (ties to the nearest tick)
+    let mut best = (k, f32::INFINITY);
+    for j in k.saturating_sub(TRACE_MEET)..(k + TRACE_MEET).min(track.meet.len()) {
+        if let Some(Some((o, p))) = track.meet.get(j)
+            && o == object
+        {
+            let cost = p.distance(now) + 0.002 * (j as f32 - k as f32).abs();
+            if cost < best.1 {
+                best = (j, cost);
+            }
+        }
+    }
+    k as i64 - best.0 as i64
+}
+
+/// Where the run had the ball at tick `k`, and its speed, as they are now: relative to the body it rode, when that
+/// body is in the world, otherwise as recorded.
+fn reference(track: &Track, k: usize, sim: &Sim) -> Option<(Vec3, Vec3)> {
+    let (at, v) = (*track.pos.get(k)?, *track.vel.get(k)?);
+    let Some(Some((object, d, dv))) = track.on.get(k) else {
+        return Some((at, v));
+    };
+    let body = sim.loose().iter().find(|l| l.0 == *object).map(|l| l.1);
+    // (a body far from where it was in the run, one put away or gone another way, is no guide)
+    match body.and_then(|b| sim.world().state(b)) {
+        Some(st) if (st.pos + *d).distance(at) < CARRY_TRUST => Some((st.pos + *d, st.vel + *dv)),
+        _ => Some((at, v)),
+    }
 }
 
 impl std::fmt::Debug for Track {
@@ -130,9 +228,16 @@ const TRACE_KD: f32 = 0.25;
 /// The matching point is looked for this many ticks ahead of the last; skipping ahead costs this many units a
 /// second skipped (so a wait in the run, the ball still, is kept as time, not jumped over).
 const TRACE_WINDOW: usize = 90;
-const TRACE_SKIP_COST: f32 = 1.5;
+const TRACE_SKIP_COST: f32 = 30.0;
 /// Further off the run than this the ball is lost: steered to the run's way this far ahead, looked for wider.
 const TRACE_LOST: f32 = 4.0;
+/// A lost ball is on the run again this near it.
+const TRACE_FOUND: f32 = 2.5;
+/// How far ahead of getting on a body the trace looks for it, and how late it may be (ticks) before the trace waits.
+pub const TRACE_MEET: usize = 150;
+/// A loose body this near the ball (middle to middle; balls touch at 4) touches it: a ball knocked on, a raft got on.
+const TOUCH: f32 = 4.5;
+const MEET_LATE: i64 = 3;
 const TRACE_AHEAD: usize = 30;
 const TRACE_SEARCH: usize = 600;
 /// Lost this long, the trace ends (the autopilot takes over).
@@ -185,19 +290,21 @@ pub fn nearest_arrows(want: Vec3, forward: Vec3, right: Vec3) -> (u8, Vec3) {
     (best.0, best.1)
 }
 
-/// The tick of `track` the ball matches, from `k` on: the nearest recorded place within the window, a skip ahead
-/// and staying costing `TRACE_SKIP_COST` units a second off one tick a tick; `wide` looks further
-/// and without the cost (a lost ball found again).
-pub fn match_tick(track: &Track, k: usize, ball: Vec3, wide: bool) -> usize {
+/// The tick of `track` the ball matches, `next` being the tick due now (one on from the last matched): the nearest
+/// recorded place from the last matched on, within the window, a tick off the due one costing `TRACE_SKIP_COST`
+/// units a second (so a wait in the run stays a wait); `wide` looks further and without the cost (a lost ball found
+/// again).
+pub fn match_tick(track: &Track, next: usize, ball: Vec3, wide: bool) -> usize {
     let n = track.pos.len();
     if n == 0 {
         return 0;
     }
-    let end = (k + if wide { TRACE_SEARCH } else { TRACE_WINDOW }).min(n - 1);
-    let mut best = (k.min(n - 1), f32::INFINITY);
-    for j in k.min(n - 1)..=end {
+    let first = next.saturating_sub(1).min(n - 1);
+    let end = (next + if wide { TRACE_SEARCH } else { TRACE_WINDOW }).min(n - 1);
+    let mut best = (next.min(n - 1), f32::INFINITY);
+    for j in first..=end {
         let Some(p) = track.pos.get(j) else { break };
-        let skip = (j as f32 - (k + 1) as f32).abs() / 60.0;
+        let skip = (j as f32 - next as f32).abs() / 60.0;
         let cost = p.distance(ball) + if wide { 0.0 } else { TRACE_SKIP_COST * skip };
         if cost < best.1 {
             best = (j, cost);
@@ -743,7 +850,7 @@ struct Running {
     /// In a flow zone (zones.rs) the step is run without its stop: a goto rolled through, a wait or hold left out,
     /// a slow pass or press taken at `FLOW_SPEED`, when a copy of the run shows the ball is kept so.
     flowed: bool,
-    /// A trace's matching tick of its run, what its arrows left of the push wanted, and since when it is lost.
+    /// A trace's tick of its run due next, what its arrows left of the push wanted, and since when it is lost.
     k: usize,
     residual: Vec3,
     lost_since: Option<u64>,
@@ -1489,21 +1596,34 @@ fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
     let n = track.pos.len();
     let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
     let ball = &sim.ball;
-    if n == 0 || run.k + 1 >= n || t > n as u64 + TRACE_GIVE_UP * 2 {
+    if n == 0 || run.k >= n || t > n as u64 + TRACE_GIVE_UP * 2 {
         return None;
     }
     let lost = run.lost_since.is_some();
-    run.k = match_tick(track, run.k, ball.position, lost);
-    let k = run.k;
-    let at = *track.pos.get(k)?;
+    let k = match_tick(track, run.k, ball.position, lost);
+    // the body that touches the ball next (knocks it on, carries it) comes later than in the run: wait at this tick
+    let lag = if lost { 0 } else { meet_late(track, k, sim) };
+    let late = lag > MEET_LATE;
+    run.k = if late { k } else { k + 1 };
+    let (at, v_at) = reference(track, k, sim)?;
     let off = at.distance(ball.position);
+    if std::env::var_os("TRACE_LOG").is_some() && t.is_multiple_of(30) {
+        let (p, v) = (ball.position, ball.velocity);
+        let w = v_at;
+        eprintln!(
+            "    trace t {t} k {k}{}{} off {off:.2} ball ({:.1} {:.1} {:.1}) run ({:.1} {:.1} {:.1}) v ({:.1} {:.1}) run v ({:.1} {:.1})",
+            if track.on.get(k).is_some_and(Option::is_some) { " on" } else { "" },
+            if late { " waits".to_string() } else if lag != 0 { format!(" lag {lag}") } else { String::new() },
+            p.x, p.y, p.z, at.x, at.y, at.z, v.x, v.z, w.x, w.z
+        );
+    }
     let (fwd, right) = (sim.camera.push_forward(), sim.camera.push_right());
     let lift = if track.lift.get(k).copied().unwrap_or(false) {
         input::LIFT
     } else {
         0
     };
-    if off > TRACE_LOST {
+    if off > TRACE_LOST || (lost && off > TRACE_FOUND) {
         if run.lost_since.is_none() {
             eprintln!("  trace lost at tick {} (run tick {k}, {off:.1} off)", sim.tick);
         }
@@ -1519,8 +1639,11 @@ fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
     if run.lost_since.take().is_some() {
         eprintln!("  trace on its run again at tick {} (run tick {k})", sim.tick);
     }
-    let ff = track.push.get(k).copied().unwrap_or(Vec3::ZERO);
-    let v_at = track.vel.get(k).copied().unwrap_or(Vec3::ZERO);
+    let ff = if late {
+        Vec3::ZERO
+    } else {
+        track.push.get(k).copied().unwrap_or(Vec3::ZERO)
+    };
     let pull = (TRACE_KP * flat(at - ball.position) + TRACE_KD * flat(v_at - ball.velocity))
         .clamp_length_max(1.5)
         * track.gain;
@@ -1568,12 +1691,13 @@ mod tests {
         for i in 0..40 {
             track.pos.push(Vec3::new((i.max(10) - 10) as f32, 0.0, 0.0));
         }
-        // still at the start: one tick on, not to the wait's end
-        assert_eq!(match_tick(&track, 0, Vec3::ZERO, false), 1);
+        // still in the wait: the tick due, not the wait's end
+        assert_eq!(match_tick(&track, 0, Vec3::ZERO, false), 0);
+        assert_eq!(match_tick(&track, 5, Vec3::ZERO, false), 5);
         // the ball ahead of the run: matched ahead
-        assert_eq!(match_tick(&track, 12, Vec3::new(8.0, 0.0, 0.0), false), 18);
-        // never back
-        assert_eq!(match_tick(&track, 30, Vec3::ZERO, false), 30);
+        assert_eq!(match_tick(&track, 13, Vec3::new(8.0, 0.0, 0.0), false), 18);
+        // never further back than the last matched
+        assert_eq!(match_tick(&track, 31, Vec3::ZERO, false), 30);
         // lost: found again further
         assert_eq!(match_tick(&track, 0, Vec3::new(25.0, 0.0, 0.0), true), 35);
     }

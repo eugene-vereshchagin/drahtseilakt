@@ -2464,6 +2464,7 @@ fn load_track(
     };
     let mut changes = run.changes.iter().peekable();
     let mut input = 0u8;
+    let mut bodies = Vec::new();
     for t in 0..to {
         // the input of tick t + 1 is the one the replay plays from the state at tick t (as for a replay step)
         while let Some(&&(_, i)) = changes.peek().filter(|c| c.0 <= t + 1) {
@@ -2481,8 +2482,39 @@ fn load_track(
         track.vel.push(seen.sim.ball.velocity);
         track.push.push(crate::hints::push_of(input, cam.push_forward(), cam.push_right()));
         track.lift.push(input & crate::sim::input::LIFT != 0);
+        track.on.push(crate::hints::carrier(&seen.sim));
+        let world = seen.sim.world();
+        bodies.push(
+            seen.sim
+                .loose()
+                .iter()
+                .filter_map(|&(o, b)| world.state(b).map(|st| (o, st.pos)))
+                .collect::<Vec<_>>(),
+        );
         seen.tick(0);
     }
+    crate::hints::fill_meet(&mut track, &bodies);
+    if std::env::var_os("TRACE_LOG").is_some() {
+        let mut near = std::collections::BTreeMap::new();
+        for (i, b) in bodies.iter().enumerate() {
+            for &(o, p) in b {
+                let d = track.pos.get(i).map_or(f32::INFINITY, |q| q.distance(p));
+                let e = near.entry(o).or_insert((f32::INFINITY, 0usize));
+                if d < e.0 {
+                    *e = (d, i);
+                }
+            }
+        }
+        eprintln!("trace bodies nearest the ball (object: distance, tick): {near:?}");
+    }
+    println!(
+        "trace {} {from}..{to}: {} ticks, {} on a body, {} before a body touches the ball ({} loose bodies)",
+        file.display(),
+        track.pos.len(),
+        track.on.iter().filter(|o| o.is_some()).count(),
+        track.meet.iter().filter(|o| o.is_some()).count(),
+        bodies.first().map_or(0, Vec::len)
+    );
     Ok(track)
 }
 

@@ -17,7 +17,10 @@ at -1205 -6.8 935.7 r 4 sector 1 kind paper : lead -1210 -6.8 935.7 6 700 ; pass
 # stepped floor the way the owner went and into P_Trafo_Stone_03 on the upper platform (stone), then at once down the
 # wood strip to the planks (the crate by the block is left alone till they are down).
 at -908.5 -47.5 848.5 r 8 sector 2 kind paper : pass -908.6 -58.4 832.8 6 ; pass -908.6 -60.1 816.8 5 ; pass -908.2 -60.9 807.3 5 ; pass -901.7 -61.5 801.5 5 ; pass -892.9 -63.2 801.3 5 ; pass -877.5 -64 799.7 6 ; pass -872.1 -64.4 798.3 5 ; pass -871.7 -65.9 794.8 4 ; pass -869.8 -72.4 785.8 5 ; pass -870.9 -78.6 774.6 6 ; pass -877.3 -83 768.9 6 ; become stone
-at -879.8 -92.6 761.5 r 3 sector 2 kind stone : pass -878.5 -92.2 750 5 ; pass -876.5 -92.5 741 5 ; pass -874.3 -92.9 734 5 ; pass -873.6 -97 714 6 ; pass -872.5 -100.5 695 5 ; pass -866 -101 692 4
+# 2026-11-09: from the stone transformer on, the owner's whole sector 2 (planks, beam, fans, chute) as a closed-loop trace;
+# the hand-written steps below (lines from "at -866 -101 692" on) only run if the trace gives the ball back. Old line kept:
+# at -879.8 -92.6 761.5 r 3 sector 2 kind stone : pass -878.5 -92.2 750 5 ; pass -876.5 -92.5 741 5 ; pass -874.3 -92.9 734 5 ; pass -873.6 -97 714 6 ; pass -872.5 -100.5 695 5 ; pass -866 -101 692 4
+at -879.8 -92.6 761.5 r 3 sector 2 kind stone : trace Level_13-s2.replay 930 8700 2
 #
 # Sector 2, as the owner showed it (his run of the sector, hints/runs/owner/Level_13-s2-s3.replay; its copy without
 # the god-mode line, which it never used, is Level_13-s2.replay beside this file, followed by the test player and
@@ -281,3 +284,15 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # (x -313, the rotating bar). Shifting the sync target (x -596.4: 0.04 apart at t 106, z +-0.4) or waiting 2-4 ticks only moves
 # the divergence (3..7 units at t 300). Conclusion: a time-based replay hint is valid only from a dropped ball; for chains the
 # s4 replay must be re-recorded from the sync state (arms hint reactive, owner's end re-anchored), not tuned.
+#
+# 2026-11-09 (CHAIN SOLVED with the closed-loop `trace` step): sectors 3-5 follow the owner's recordings (from `--sector N`)
+# closed-loop, so they hold when the ball comes in from the sector before. Each starts with `sync` (wait on the reset point
+# until the sector's objects are in, so the run's moving objects are where they were in the recording), then `trace`:
+# recorded keys as feed-forward plus a pull to the recorded ball (relative to the raft it rides, when it rides one),
+# matched near one tick a tick; lost (> 4 off) it steers to the run ahead and finds it again (s5: the ball comes into CP4
+# at 10 u/s, sync cannot stop it on the point, the trace finds the owner's ball further on). s4 needs GAIN 2 (the wait
+# at (-288 -1120) beside the arms is on an edge) and ends at CP4 (its tick 7466), so s5's hint fires there.
+# --sector 3 with these three lines: finished 06:34.95 (23697 ticks); see hints/runs/pilot-L13-full.replay for --level 13.
+at -724.1 -154.2 537.2 r 6 sector 3 kind paper : sync -724.1 -154.2 537.2 200 ; trace Level_13-s3.replay 0 9900
+at -595.2 -285 -1124.9 r 4 sector 4 kind paper : sync -595.2 -285 -1124.9 200 ; trace Level_13-s4.replay 0 7466 2
+at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 ; trace Level_13-s5.replay 0 5300 ; push 0 1 40 ; round 340 -614.5 4 25 2400 -614

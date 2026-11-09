@@ -1,1 +1,1 @@
-at -724.1 -154.2 537.2 r 6 sector 3 kind paper : replay Level_13-s3.replay 0 9900
+at -724.1 -154.2 537.2 r 6 sector 3 kind paper : sync -724.1 -154.2 537.2 200 ; trace Level_13-s3.replay 0 9900
