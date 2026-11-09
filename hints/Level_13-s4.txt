@@ -1,0 +1,13 @@
+# Level 13 sector 4 (CP3 -> CP4), 2026-11-09, PARTLY driven: onto the raft and along it as far as the first board.
+# The sector starts as paper on the wooden neck (-595.2 -285 -1124.9) before the U-shaped platform. The raft (stones 10..13,
+# woods 05/06) sits in the U's hollow on the rails and slides off east by itself (accelerating to ~3.9 units a second after
+# ~5 s). The U's base ends at x ~ -557; behind the raft the ball falls to the rails and is left behind (the plain autopilot
+# does that). Solution: along the neck, then onto the U's SOUTH-EAST arm (z -1120.4; the arms' top is level with the stones'
+# top and the ball's centre y -285) alongside the raft, and across onto the raft's top at x ~ -545 (the `ride` step then
+# keeps the ball over the nearest stone, the raft column z -1125.4; z -1129.65 works the same).
+# Then it rides with the raft (ball y 4 above the stones) to x ~ -385, where the first board (a block on a hoop across
+# the rails, level with the ball on top of the stones) knocks the ball off the raft back onto the rails: the ball must
+# get over/past that board (the video, fast frames s1500..s1650, shows the ball atop the raft passing boards one after
+# another, then a platform with rotating bars, P_Modul_17, at x ~ -326, then the raft goes on, flanked by
+# a second raft Stone_16/17 + Wood_09/10). Not solved.
+at -595.2 -285 -1124.9 r 4 sector 4 kind paper : pass -565 -285 -1124.9 8 ; pass -556 -285 -1120.5 8 ; pass -546 -285 -1120.3 8 ; ride -542 -289 -1125.4 -392 -295.6 -1125.4 1 3000

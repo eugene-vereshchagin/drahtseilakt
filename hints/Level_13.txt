@@ -142,3 +142,14 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # lets the stones through one at a time); the remaining work is a closed loop for that (`lead`/`shove` on the nearest stone
 # at z -806..-852, ball held at x -724.2 in the channel, never letting a stone reach x -743 on the west side), then a
 # `become`-free wait west of the pit's entrance (x ~-690, z -1124) until all stones lie in the row, and the crossing over them.
+#
+# 2026-11-09 (fourth session, sector 4): hints/Level_13-s4.txt, PARTLY solved (see its comment). Run:
+# `--level 13 --sector 4 --autopilot --plan hints/Level_13.plan --hints hints/Level_13-s4.txt --ticks 2700 --give-up 600 --headless`
+# (--give-up 600: the ride is slow, 4 units a second, and the default 30 s ends the run as "dead"; the plain autopilot without a
+# hint never gets onto the raft: it falls off the U's base behind it and follows it at its pace). With the hint the ball is on the
+# raft's top from tick ~250 to ~2600 (x -545 -> -386, ride quality: standing 0%, speed 2.4 +- 1.6, slow 0.7%).
+# Chain: `--sector 3 ... --hints hints/Level_13-s3.txt` reaches sector 4 (CP3) at the start place of the hint (chain run to 11500 ticks
+# in the sector 4 at the raft's rear like the plain autopilot); the s3 and s4 hints are not yet in one file for one run.
+# Open spot (where the owner could record): the first board at x ~ -386 (z -1125, y ~ -293, block on a hoop across the raft's rails)
+# pushes the ball off the raft's back (both columns, z -1125.4 and -1129.65); beyond it the video's boards, the rotating-bar platform
+# (x ~ -326, P_Modul_17 at -326 -297.8 -1115.5) and the raft's way on to the finish platform are not driven.
