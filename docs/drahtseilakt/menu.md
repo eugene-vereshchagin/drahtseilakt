@@ -180,6 +180,10 @@ and replays, so that several people can share one computer. It is not needed for
 keeps the original's single name in the highscore entry. Open question for the owner: whether profiles come
 later as an extended-mode feature.
 
+## Help on every line
+
+Every selectable line on every screen says on the notes panel what it is, how it works and what it gives: the main menu, Start and its submenus, Options and all its pages (Graphics, Controls, Sound, Language, Extended), the pause, dead and end menus and the Yes/No questions. A line with a value (a switch, a choice: *Look*, *Textures*, *Models*, *Sound theme*, *Interface*, *Fullscreen?*, *Clouds?*, *Field of View*, *Extended mode?*, *All levels open?*, *Best times?*...) also explains the value chosen now, and the text changes as Left and Right change it. A player's own texture pack, model pack or sound theme shows the `description` (`description.<lang>`, else `description.en`) of its `pack.txt` or `theme.txt` when it has one; a mod shows its own description. The words are in `assets/own/Texts/menu.txt` (`help <line>`, `help <line> <value>`), in all seven languages; a test fails when a line or a value has no text in a language, and the all-screens fit test walks every line and every value. The panel is as tall as the longest help of its screen, so the rows above it do not move with the cursor; to make room, the pages with a panel (Graphics, Controls, Sound, Extended) show their lines as rows, and the main menu, Options and Start draw their buttons closer together.
+
 ## Order of work
 
 1. Done (2026-11-02): classic by default; the main menu and Options as in the table; the *Extended* page.

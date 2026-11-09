@@ -196,6 +196,10 @@ Highscores und Replays bündeln, damit mehrere Personen einen Rechner teilen kö
 es nicht; er behält wie das Original einen Namen beim Highscore-Eintrag. Offene Frage an den Eigentümer: ob
 Profile später als Funktion des erweiterten Modus kommen.
 
+## Hilfe zu jeder Zeile
+
+Jede wählbare Zeile jedes Bildschirms sagt auf dem Notizfeld, was sie ist, wie sie funktioniert und was sie bringt: Hauptmenü, Start mit Untermenüs, Optionen mit allen Seiten (Grafik, Steuerung, Sound, Sprache, Erweitert), Pause-, Tod- und Endmenü sowie die Ja/Nein-Fragen. Eine Zeile mit Wert (Schalter, Auswahl: *Aussehen*, *Texturen*, *Modelle*, *Klänge*, *Oberfläche*, *Vollbild?*, *Wolken?*, *Blickwinkel*, *Erweiterter Modus?*, *Alle Level offen?*, *Bestzeiten?* ...) erklärt auch den jetzt gewählten Wert; der Text ändert sich mit Links und Rechts. Für ein eigenes Textur- oder Modellpaket oder Klangthema des Spielers erscheint die `description` (`description.<Sprache>`, sonst `description.en`) aus seiner `pack.txt` oder `theme.txt`, falls vorhanden; ein Mod zeigt seine eigene Beschreibung. Die Texte stehen in `assets/own/Texts/menu.txt` (`help <Zeile>`, `help <Zeile> <Wert>`) in allen sieben Sprachen; ein Test schlägt fehl, wenn für eine Zeile oder einen Wert in einer Sprache der Text fehlt, und der Alle-Bildschirme-Test geht jede Zeile und jeden Wert durch. Das Feld ist so hoch wie die längste Hilfe seines Bildschirms, damit die Zeilen darüber dem Cursor nicht folgen; für den Platz zeigen die Seiten mit Feld (Grafik, Steuerung, Sound, Erweitert) ihre Zeilen als Reihen, und Hauptmenü, Optionen und Start rücken ihre Knöpfe enger zusammen.
+
 ## Reihenfolge der Arbeit
 
 1. Erledigt (2026-11-02): klassisch als Vorgabe; Hauptmenü und Options wie in der Tabelle; die Seite *Extended*.

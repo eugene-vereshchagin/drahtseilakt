@@ -46,6 +46,7 @@ Plain text, UTF-8, at most 4 KiB, one `key value` per line; lines beginning with
 |---|---|
 | `name.en`, `name.ru`, `name.de`, `name.zh` | The theme's name in the settings, per language (at most 64 characters). A language without one shows the English name, else the folder's name. |
 | `author` | Who made it (for people; the game does not show it yet). |
+| `description.en`, `description.ru`, ... , `description` | A short text the notes panel of the Sound theme line shows when the theme is chosen (the menu's language, else `description.en`, else `description`; at most 220 characters). |
 | `licence` | Its licence, e.g. `CC0 1.0` or `CC-BY 4.0, per file in CREDITS.md` (for people). |
 | `fallback` | The theme a role this theme lacks comes from: a theme's key, or `none` for no other theme (the theme is complete). Without it, *system*. |
 

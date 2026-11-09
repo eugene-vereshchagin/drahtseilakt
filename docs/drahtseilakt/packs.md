@@ -44,6 +44,7 @@ comment.
 |---|---|
 | `name.en`, `name.ru`, `name.de`, `name.zh` | The pack's name in the menu, per language (at most 64 characters); without one the English name, else the folder's name. |
 | `author`, `licence` | Who made it and under which licence (for people). |
+| `description.en`, `description.ru`, ... , `description` | A short text the notes panel of the Textures or Models line shows when the pack is chosen (the menu's language, else `description.en`, else `description`; at most 220 characters). |
 | `fallback` | The pack what this one lacks comes from: a pack's key, or `none`. Without it: textures `own`, models `level`. |
 
 The order a texture or a part is looked for in: the chosen pack, its fallback, that pack's fallback (at most eight, each

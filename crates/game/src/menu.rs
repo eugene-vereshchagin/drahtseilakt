@@ -271,6 +271,8 @@ fn valued(line: Line) -> bool {
 }
 
 pub struct Menu {
+    /// Test hook: show the help of this value (an index into the line's values) instead of the current one.
+    help_force: std::cell::Cell<Option<usize>>,
     /// The rows the open list with a note under it shows: as many as leave the note whole (set by `draw`).
     note_rows: std::cell::Cell<usize>,
     /// The screens open, the first the menu's base, each with its chosen line.
@@ -350,6 +352,7 @@ impl Menu {
             })
             .collect();
         let mut m = Menu {
+            help_force: std::cell::Cell::new(None),
             note_rows: std::cell::Cell::new(LIST_LINES),
             stack: Vec::new(),
             entries,
@@ -415,7 +418,7 @@ impl Menu {
     /// Whether the open list has a note on a panel under its rows: the shipped community picks (author and thanks)
     /// and the player's own maps folder (what it is, where it is).
     fn note_below(&self) -> bool {
-        matches!(self.list, List::Best | List::Downloaded)
+        self.list != List::None
     }
 
     /// A note's text with the Esc hint as its last line (the hint alone when there is no note).
@@ -430,20 +433,38 @@ impl Menu {
         if !self.note_below() {
             return String::new();
         }
-        if self.list == List::Best {
-            let by = match chosen {
-                Some(Line::Map(m)) => self.credit(m),
-                _ => String::new(),
-            };
-            let notice = self.strings.ours("community notice");
-            let about = self.strings.ours("note picks");
-            if by.is_empty() {
-                format!("{about}\n{notice}")
-            } else {
-                format!("{about}\n{by}\n{notice}")
+        // Back: what it does
+        if chosen == Some(Line::Back) {
+            return self.help_of("help back");
+        }
+        let map = || self.help_of("help map");
+        match self.list {
+            List::Best => {
+                let by = match chosen {
+                    Some(Line::Map(m)) => self.credit(m),
+                    _ => String::new(),
+                };
+                let notice = self.strings.ours("community notice");
+                let about = self.strings.ours("note picks");
+                if by.is_empty() {
+                    format!("{about}\n{notice}")
+                } else {
+                    format!("{about}\n{by}\n{notice}")
+                }
             }
-        } else {
-            self.describe(Some(Line::Downloaded))
+            List::Downloaded => {
+                let about = self.describe(Some(Line::Downloaded));
+                if matches!(chosen, Some(Line::Map(_))) { format!("{about}\n{}", map()) } else { about }
+            }
+            List::Ours => {
+                let about = self.describe(Some(Line::Ours));
+                if matches!(chosen, Some(Line::Map(_))) { format!("{about}\n{}", map()) } else { about }
+            }
+            List::Challenges => {
+                let about = self.describe(Some(Line::Challenges));
+                if matches!(chosen, Some(Line::Map(_))) { format!("{about}\n{}", map()) } else { about }
+            }
+            List::None => String::new(),
         }
     }
 
@@ -453,10 +474,14 @@ impl Menu {
         let texts: Vec<String> = if self.list == List::Best {
             (0..self.maps.len())
                 .map(|m| self.list_note(Some(Line::Map(m))))
-                .chain([self.list_note(None)])
+                .chain([self.list_note(None), self.list_note(Some(Line::Back))])
                 .collect()
         } else {
-            vec![self.list_note(None)]
+            vec![
+                self.list_note(Some(Line::Map(0))),
+                self.list_note(None),
+                self.list_note(Some(Line::Back)),
+            ]
         };
         let texts: Vec<String> = texts.into_iter().map(|t| self.with_hint(t)).collect();
         let max_w = (NOTE_X[1] - NOTE_X[0]) * crate::ui::CONTEXT_W - 2.0 * NOTE_PAD[0];
@@ -490,6 +515,261 @@ impl Menu {
             }
             _ => String::new(),
         }
+    }
+
+    /// The help of a line: the key of its text, and the words of its values (one text each; none for a line without
+    /// values). Menu.txt holds `help <key>` or `help <key> <value>`.
+    fn help_spec(&self, screen: Screen, line: Line) -> Option<(String, &'static [&'static str])> {
+        const NONE: &[&str] = &[];
+        const YN: &[&str] = &["yes", "no"];
+        let k = |s: &str| format!("help {s}");
+        Some(match line {
+            Line::Start => (k("start"), NONE),
+            Line::Import => (k("import"), NONE),
+            Line::Highscore => (k("highscore"), NONE),
+            Line::Options => (k("options"), NONE),
+            Line::Credits => (k("credits"), NONE),
+            Line::Exit => (k("exit"), NONE),
+            Line::Back if screen == Screen::Pause => (k("back pause"), NONE),
+            Line::Back => (k("back"), NONE),
+            Line::Restart => (k("restart"), NONE),
+            Line::ExitLevel => (k("exit level"), NONE),
+            Line::Home => (k("home"), NONE),
+            Line::Next => (k("next"), NONE),
+            Line::Level(_) => (k("level"), NONE),
+            Line::Map(_) => (k("map"), NONE),
+            Line::Graphics => (k("graphics"), NONE),
+            Line::Controls => (k("controls"), NONE),
+            Line::Sound => (k("sound"), NONE),
+            Line::Language => (k("language"), NONE),
+            Line::Extended => (k("extended"), NONE),
+            Line::Lang(_) => (k("lang"), NONE),
+            Line::Look => (k("look"), &["original", "remastered"]),
+            Line::Resolution => (k("resolution"), NONE),
+            Line::Synch => (k("synch"), YN),
+            Line::Clouds => (k("clouds"), YN),
+            Line::Fullscreen => (k("fullscreen"), &["off", "borderless", "exclusive"]),
+            Line::Textures => (k("textures"), &["own", "original", "remastered", "player"]),
+            Line::Models => (k("models"), &["level", "own", "original", "player"]),
+            Line::Fov => (k("fov"), &["original", "wider", "narrower"]),
+            Line::Key(i) => (k(&format!("key {}", crate::options::ACTIONS.get(i)?.0)), NONE),
+            Line::Defaults => (k("defaults"), NONE),
+            Line::Invert => (k("invert"), YN),
+            Line::Music => (k("music"), NONE),
+            Line::Effects => (k("effects"), NONE),
+            Line::SoundTheme => (k("theme"), &["neuro", "system", "original", "player"]),
+            Line::Mode => (k("mode"), YN),
+            Line::Switch(i) => (k(FEATURES.get(i)?.key()), YN),
+            Line::Interface => (k("interface"), &["own", "original", "remaster"]),
+            Line::ModsMenu => (k("mods"), NONE),
+            Line::Yes | Line::No => {
+                let Screen::Ask(a) = screen else { return None };
+                let what = match a {
+                    Ask::Quit => "quit",
+                    Ask::Restart => "restart",
+                    Ask::Exit => "exit",
+                };
+                let v: &'static [&'static str] = if line == Line::Yes { &["yes"] } else { &["no"] };
+                (k(&format!("ask {what}")), v)
+            }
+            _ => return None,
+        })
+    }
+
+    /// Which of the line's values is the current one (an index into its `help_spec` values).
+    fn help_value(&self, line: Line) -> usize {
+        use gamedata::packs::{Kind as PackKind, LEVEL, ORIGINAL, OWN, REMASTERED};
+        let yn = |on: bool| usize::from(!on);
+        match line {
+            Line::Look => usize::from(self.look_remastered),
+            Line::Synch => yn(self.graphics.vsync),
+            Line::Clouds => yn(self.graphics.clouds),
+            Line::Fullscreen => match self.graphics.fullscreen {
+                Fullscreen::Off => 0,
+                Fullscreen::Borderless => 1,
+                Fullscreen::Exclusive => 2,
+            },
+            Line::Textures => match gamedata::packs::chosen(PackKind::Textures).as_str() {
+                OWN => 0,
+                ORIGINAL => 1,
+                REMASTERED => 2,
+                _ => 3,
+            },
+            Line::Models => match gamedata::packs::chosen(PackKind::Models).as_str() {
+                LEVEL => 0,
+                OWN => 1,
+                ORIGINAL => 2,
+                _ => 3,
+            },
+            Line::Fov => match self.graphics.fov.cmp(&crate::options::FOV_ORIGINAL) {
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+                std::cmp::Ordering::Less => 2,
+            },
+            Line::Invert => yn(self.bindings.invert),
+            Line::SoundTheme => match gamedata::sound_themes::chosen().as_str() {
+                "neuro" => 0,
+                "system" => 1,
+                "original" => 2,
+                _ => 3,
+            },
+            Line::Mode => yn(self.features.mode),
+            Line::Switch(i) => yn(FEATURES.get(i).is_some_and(|&f| self.features.switched_on(f))),
+            Line::Interface => match gamedata::resources::chosen() {
+                gamedata::resources::Provider::Own => 0,
+                gamedata::resources::Provider::Original => 1,
+                gamedata::resources::Provider::Remastered => 2,
+            },
+            _ => 0,
+        }
+    }
+
+    /// A player's pack or theme: the description its pack.txt or theme.txt gives in the menus' language, if any
+    /// (`description.<lang>`, else `description.en`, else `description`), a few lines long at most.
+    fn description_of(&self, dir: &Path, file: &str) -> Option<String> {
+        use std::io::Read;
+        let mut text = String::new();
+        std::fs::File::open(dir.join(file))
+            .ok()?
+            .take(4096)
+            .read_to_string(&mut text)
+            .ok()?;
+        let find = |key: &str| {
+            text.lines()
+                .filter(|l| !l.starts_with('#'))
+                .find_map(|l| l.strip_prefix(key).and_then(|v| v.strip_prefix(' ')))
+                .map(|v| v.chars().filter(|c| !c.is_control()).take(220).collect::<String>())
+                .map(|v| v.trim().to_owned())
+                .filter(|v| !v.is_empty())
+        };
+        find(&format!("description.{}", self.strings.language()))
+            .or_else(|| find("description.en"))
+            .or_else(|| find("description"))
+    }
+
+    /// The descriptions of the player's packs or themes a Textures, Models or Sound theme line can show (the
+    /// chosen one's alone when `only_chosen`).
+    fn player_descriptions(&self, line: Line, only_chosen: bool) -> Vec<String> {
+        use gamedata::packs::{Kind as PackKind, chosen, packs};
+        let pack = |kind: PackKind| {
+            let c = chosen(kind);
+            packs(kind)
+                .into_iter()
+                .filter(|p| !only_chosen || p.key == c)
+                .filter_map(|p| self.description_of(p.dir.as_deref()?, "pack.txt"))
+                .collect::<Vec<_>>()
+        };
+        match line {
+            Line::Textures => pack(PackKind::Textures),
+            Line::Models => pack(PackKind::Models),
+            Line::SoundTheme => {
+                let c = gamedata::sound_themes::chosen();
+                gamedata::sound_themes::themes()
+                    .into_iter()
+                    .filter(|t| !t.shipped && (!only_chosen || t.key == c))
+                    .filter_map(|t| self.description_of(&t.dir, "theme.txt"))
+                    .collect()
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// The text of a help key.
+    fn help_of(&self, key: &str) -> String {
+        self.strings.ours(key)
+    }
+
+    /// The help of `line` on `screen` for its current value: what it is, how it works, what it gives. The Start
+    /// kinds and the lists' folders have their own sentences (`describe`).
+    fn help_now(&self, screen: Screen, line: Line) -> String {
+        let own = self.describe(Some(line));
+        if !own.is_empty() {
+            return own;
+        }
+        let Some((key, values)) = self.help_spec(screen, line) else {
+            return String::new();
+        };
+        if values.is_empty() {
+            return self.help_of(&key);
+        }
+        let now = self
+            .help_force
+            .get()
+            .unwrap_or_else(|| self.help_value(line))
+            .min(values.len() - 1);
+        let text = self.help_of(&format!("{key} {}", values[now]));
+        // a player's own pack or theme: its description when it gives one
+        if values[now] == "player" && self.help_force.get().is_none() {
+            if let Some(d) = self.player_descriptions(line, true).into_iter().next() {
+                return format!("{text}\n{d}");
+            }
+        }
+        text
+    }
+
+    /// How many values the line's help has (1 for a line without).
+    #[cfg(test)]
+    fn help_values(&self, screen: Screen, line: Line) -> usize {
+        self.help_spec(screen, line).map_or(1, |(_, v)| v.len().max(1))
+    }
+
+    /// Every help the screen's lines can show, one for each value of each line, and the descriptions of the
+    /// player's packs: the room the panel must have (and what the tests walk through).
+    fn helps_all(&self, screen: Screen) -> Vec<String> {
+        let mut out = Vec::new();
+        for line in self.lines(screen) {
+            let own = self.describe(Some(line));
+            if !own.is_empty() {
+                out.push(own);
+                continue;
+            }
+            let Some((key, values)) = self.help_spec(screen, line) else {
+                continue;
+            };
+            if values.is_empty() {
+                out.push(self.help_of(&key));
+            }
+            for v in values {
+                let text = self.help_of(&format!("{key} {v}"));
+                if *v == "player" {
+                    for d in self.player_descriptions(line, false) {
+                        out.push(format!("{text}\n{d}"));
+                    }
+                }
+                out.push(text);
+            }
+        }
+        out
+    }
+
+    /// The text of the notes panel of a screen with helps: the line under the cursor, Esc's hint last where the
+    /// screen has a Back.
+    fn help_panel(&self, screen: Screen) -> String {
+        let lines = self.lines(screen);
+        let text = lines
+            .get(self.chosen())
+            .map(|&l| self.help_now(screen, l))
+            .unwrap_or_default();
+        if lines.contains(&Line::Back) {
+            self.with_hint(text)
+        } else {
+            text
+        }
+    }
+
+    /// Where the panel of a screen with helps begins (a fraction of the frame's height): its bottom is NOTE_BOTTOM,
+    /// its height the tallest of the screen's helps, so the rows above it do not move as the cursor does.
+    fn help_top(&self, f: &crate::ui::Face, screen: Screen) -> f32 {
+        let max_w = (NOTE_X[1] - NOTE_X[0]) * crate::ui::CONTEXT_W - 2.0 * NOTE_PAD[0];
+        let has_back = self.lines(screen).contains(&Line::Back);
+        let mut worst = 0.0f32;
+        for t in self.helps_all(screen) {
+            let t = if has_back { self.with_hint(t) } else { t };
+            let (lines, k, _) = fit_whole(f, &t, max_w, 1.0e4, &FONT_HELP);
+            let h = lines.len() as f32 * row_pitch(&scaled_style(&FONT_HELP, k)) + 2.0 * NOTE_PAD[1];
+            worst = worst.max(h);
+        }
+        NOTE_BOTTOM - worst / crate::ui::CONTEXT_H - 0.012
     }
 
     fn chosen(&self) -> usize {
@@ -2161,6 +2441,30 @@ impl Menu {
         };
         let sc = self.screen();
         let lines = self.lines(sc);
+        // the screens with a help panel: where it begins (the rows above it keep clear of it)
+        let help_top = match (font, sc) {
+            (
+                Some(f),
+                Screen::Main
+                | Screen::Kinds
+                | Screen::Community
+                | Screen::Start
+                | Screen::Options
+                | Screen::Graphics
+                | Screen::Controls
+                | Screen::Sound
+                | Screen::Extended
+                | Screen::Language
+                | Screen::Pause
+                | Screen::Dead
+                | Screen::End
+                | Screen::Ask(_),
+            ) => self.help_top(f, sc),
+            _ => 0.6,
+        };
+        let help_panel = |out: &mut Vec<Quad>, y: f32, up: bool, max_h: f32| {
+            note(out, &self.help_panel(sc), y, up, max_h);
+        };
         let state = |i: usize| {
             if i == self.chosen() {
                 Button::Over
@@ -2199,6 +2503,12 @@ impl Menu {
                 label(out, &t, [0.35, 0.15, 0.65, 0.25], &FONT_01);
             }
         };
+        // the title of a page with a help panel: higher, to leave the rows room
+        let title_up = |out: &mut Vec<Quad>| {
+            if let Some(t) = self.title(sc) {
+                label(out, &t, [0.35, 0.06, 0.65, 0.15], &FONT_01);
+            }
+        };
         let back_only = |out: &mut Vec<Quad>| {
             if let Some(i) = lines
                 .iter()
@@ -2208,46 +2518,20 @@ impl Menu {
                 label_ball(out, &self.label(lines[i]), BACK_RECT, &FONT_01, BALL_BACK);
             }
         };
-        // a field: its label at the top, its value under it (a yes/no pair, or text between arrows)
-        let field = |out: &mut Vec<Quad>, y: f32, name: &str, value: &str, i: usize| {
-            let r = [0.35, y, 0.65, y + 0.1];
-            let st = if self.chosen() == i {
-                Button::Over
-            } else {
-                Button::Up
-            };
-            button(out, r, FIELD_UV, st, Some(Target::Line(i)));
-            // both lines inside the field's frame, clear of its rim (the owner, 2026-11-08: the top line sat on
-            // the rim)
-            label_ball(
-                out,
-                name,
-                [0.35, y + FIELD_NAME[0], 0.65 - FIELD_RIM, y + FIELD_NAME[1]],
-                &FONT_03,
-                BALL_MAIN,
-            );
-            label(
-                out,
-                value,
-                [0.40, y + FIELD_VALUE[0], 0.60, y + FIELD_VALUE[1]],
-                &FONT_03,
-            );
-        };
         match sc {
-            Screen::Main | Screen::Pause | Screen::Dead | Screen::End => big(&mut out, 0.15, 0.74),
+            Screen::Main | Screen::Pause | Screen::Dead | Screen::End => {
+                big(&mut out, 0.15, (help_top - 0.105).min(0.74));
+                help_panel(&mut out, NOTE_BOTTOM, true, NOTE_BOTTOM - help_top);
+            }
             Screen::Options | Screen::Kinds | Screen::Community => {
-                title(&mut out);
-                let about_it = matches!(sc, Screen::Kinds | Screen::Community);
-                // the kinds leave room under them for what the chosen one is
-                big(&mut out, 0.30, if about_it { 0.62 } else { 0.74 });
-                if about_it {
-                    // what the chosen list is
-                    let about = self.describe(lines.get(self.chosen()).copied());
-                    note(&mut out, &about, NOTE_BOTTOM, true, NOTE_BOTTOM - 0.72);
-                }
+                title_up(&mut out);
+                big(&mut out, 0.17, (help_top - 0.105).min(0.74));
+                help_panel(&mut out, NOTE_BOTTOM, true, NOTE_BOTTOM - help_top);
             }
             Screen::Language => {
-                title(&mut out);
+                title_up(&mut out);
+                help_panel(&mut out, NOTE_BOTTOM, true, NOTE_BOTTOM - help_top);
+                let step = 0.065f32.min((help_top - 0.105 - 0.17) / 6.0);
                 // the languages in their own names, the one spoken in gold
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Lang(k) = l else {
@@ -2261,8 +2545,8 @@ impl Menu {
                         label_ball(&mut out, &self.label(l), BACK_RECT, &FONT_01, BALL_BACK);
                         continue;
                     };
-                    let y = 0.28 + k as f32 * 0.065;
-                    let r = [0.4031, y, 0.5969, y + 0.052];
+                    let y = 0.17 + k as f32 * step;
+                    let r = [0.4031, y, 0.5969, y + step - 0.013];
                     button(&mut out, r, LEVEL_UV, state(i), Some(Target::Line(i)));
                     let spoken = LANGUAGES
                         .get(k)
@@ -2271,7 +2555,7 @@ impl Menu {
                     label(
                         &mut out,
                         &self.label(l),
-                        [0.42, y, 0.5969, y + 0.052],
+                        [0.42, y, 0.5969, y + step - 0.013],
                         &style,
                     );
                 }
@@ -2279,7 +2563,8 @@ impl Menu {
             Screen::Start => {
                 // 0.06 apart from 0.09 (twelve levels); a thirteenth closes them up
                 let n = self.entries.len().max(1);
-                let step = if n <= 12 { 0.06 } else { 0.72 / n as f32 };
+                let step = ((help_top - 0.075) / n as f32).min(0.06);
+                help_panel(&mut out, NOTE_BOTTOM, true, NOTE_BOTTOM - help_top);
                 let mut column = Vec::new();
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Level(k) = l else {
@@ -2293,7 +2578,7 @@ impl Menu {
                         label_ball(&mut out, &self.label(l), BACK_RECT, &FONT_01, BALL_BACK);
                         continue;
                     };
-                    let y = 0.09 + k as f32 * step;
+                    let y = 0.07 + k as f32 * step;
                     let r = [0.4031, y, 0.5969, y + step - 0.01];
                     button(&mut out, r, LEVEL_UV, state(i), Some(Target::Line(i)));
                     let style = if self.selectable(sc, i) {
@@ -2467,133 +2752,54 @@ impl Menu {
                 back_only(&mut out);
             }
             Screen::Graphics | Screen::Controls | Screen::Sound | Screen::Extended => {
-                title(&mut out);
+                title_up(&mut out);
                 let fields = self.fields(sc);
-                if sc == Screen::Controls {
-                    // the six keys' rows, the extended mode's defaults row under them, the invert field
-                    for (k, ((name, key), line)) in fields.iter().zip(&lines).enumerate() {
-                        let chosen = self.chosen() == k;
-                        let st = if chosen { Button::Over } else { Button::Up };
-                        if *line == Line::Invert {
-                            field(
-                                &mut out,
-                                if self.features.mode { 0.715 } else { 0.70 },
-                                name,
-                                key,
-                                k,
-                            );
-                            continue;
-                        }
-                        let y = 0.30 + k as f32 * 0.06;
+                // one row for each line but Back: its name left, its value right; the keys as the key bar
+                let n = fields.len().max(2);
+                let cap: f32 = if sc == Screen::Controls { 0.06 } else { 0.05 };
+                let step = cap.min((help_top - 0.17 - 0.0396 - 0.012) / (n as f32 - 1.0));
+                for (k, (name, value)) in fields.iter().enumerate() {
+                    let line = lines[k];
+                    let y = 0.17 + k as f32 * step;
+                    let st = if self.chosen() == k {
+                        Button::Over
+                    } else {
+                        Button::Up
+                    };
+                    let at = Some(Target::Line(k));
+                    if matches!(line, Line::Key(_)) {
                         // the rows a little wider than the original's and their words a size smaller, so the
                         // longest names (Russian, French) fit either side of the bar's middle mark
-                        let r = [0.32, y, 0.68, y + 0.0396];
-                        if *line == Line::Defaults {
-                            row(&mut out, r, st, Some(Target::Line(k)));
-                            label(
-                                &mut out,
-                                name,
-                                [0.32 + ROW_INDENT, y, 0.67, y + 0.0396],
-                                &FONT_ROW,
-                            );
-                            continue;
-                        }
-                        button(&mut out, r, KEY_UV, st, Some(Target::Line(k)));
+                        button(&mut out, [0.32, y, 0.68, y + 0.0396], KEY_UV, st, at);
                         label(
                             &mut out,
                             name,
                             [0.32 + ROW_INDENT, y, 0.494, y + 0.0396],
                             &FONT_ROW,
                         );
-                        label(&mut out, key, [0.508, y, 0.67, y + 0.0396], &FONT_ROW);
-                    }
-                } else if sc == Screen::Extended && self.features.mode {
-                    // Extended: the mode's field first; then the switches (and the Debug mode line) as the Controls
-                    // page's rows, then lines of help or the folder
-                    let first = usize::from(sc == Screen::Extended);
-                    if let (1, Some((name, value))) = (first, fields.first()) {
-                        field(&mut out, 0.27, name, value, 0);
-                    }
-                    let rows = |l: &&Line| {
-                        matches!(
-                            l,
-                            Line::Switch(_)
-                                | Line::Interface
-                                | Line::Textures
-                                | Line::Models
-                                | Line::SoundTheme
-                                | Line::ModsMenu
-                        )
-                    };
-                    let n = lines.iter().filter(rows).count();
-                    let top = if first == 1 { 0.40 } else { 0.30 };
-                    for (k, (name, value)) in fields.iter().skip(first).take(n).enumerate() {
-                        let y = top + k as f32 * 0.05;
-                        let st = if self.chosen() == k + first {
-                            Button::Over
-                        } else {
-                            Button::Up
-                        };
-                        let at = Some(Target::Line(k + first));
-                        row(&mut out, [0.33, y, 0.67, y + 0.0396], st, at);
+                        label(&mut out, value, [0.508, y, 0.67, y + 0.0396], &FONT_ROW);
+                    } else if line == Line::Defaults {
+                        row(&mut out, [0.32, y, 0.68, y + 0.0396], st, at);
+                        label(
+                            &mut out,
+                            name,
+                            [0.32 + ROW_INDENT, y, 0.67, y + 0.0396],
+                            &FONT_ROW,
+                        );
+                    } else {
+                        row(&mut out, [0.32, y, 0.68, y + 0.0396], st, at);
                         let mut left = FONT_ROW;
                         left.align = crate::ui::ALIGN_LEFT;
                         label(
                             &mut out,
                             name,
-                            [0.33 + ROW_INDENT, y, 0.555, y + 0.0396],
+                            [0.32 + ROW_INDENT, y, 0.56, y + 0.0396],
                             &left,
                         );
-                        label(&mut out, value, [0.555, y, 0.66, y + 0.0396], &FONT_ROW);
-                    }
-                    for (k, (l, _)) in fields.iter().skip(first + n).enumerate() {
-                        let y = top + n as f32 * 0.05 + 0.03 + k as f32 * 0.045;
-                        label(&mut out, l, [0.31, y, 0.69, y + 0.045], &FONT_03);
-                    }
-                } else {
-                    // the original's fields 0.15 apart; ours (the packs and the theme) are rows under them, and the
-                    // fields close up when the Graphics page has the extended mode's fifth
-                    let is_row =
-                        |l: &Line| matches!(l, Line::Textures | Line::Models | Line::SoundTheme);
-                    let n = lines
-                        .iter()
-                        .filter(|l| !is_row(l) && **l != Line::Back)
-                        .count();
-                    let (top, step) = match (sc, n) {
-                        (Screen::Graphics, _) => (0.25, 0.10),
-                        _ => (0.295, 0.15),
-                    };
-                    let (mut rows_at, mut fields_at) = (0, 0);
-                    for (k, ((name, value), l)) in fields.iter().zip(&lines).enumerate() {
-                        if is_row(l) {
-                            let y = top + n as f32 * step + 0.008 + rows_at as f32 * 0.045;
-                            rows_at += 1;
-                            let st = if self.chosen() == k {
-                                Button::Over
-                            } else {
-                                Button::Up
-                            };
-                            row(
-                                &mut out,
-                                [0.33, y, 0.67, y + 0.0396],
-                                st,
-                                Some(Target::Line(k)),
-                            );
-                            let mut left = FONT_ROW;
-                            left.align = crate::ui::ALIGN_LEFT;
-                            label(
-                                &mut out,
-                                name,
-                                [0.33 + ROW_INDENT, y, 0.555, y + 0.0396],
-                                &left,
-                            );
-                            label(&mut out, value, [0.555, y, 0.66, y + 0.0396], &FONT_ROW);
-                        } else {
-                            field(&mut out, top + fields_at as f32 * step, name, value, k);
-                            fields_at += 1;
-                        }
+                        label(&mut out, value, [0.56, y, 0.668, y + 0.0396], &FONT_ROW);
                     }
                 }
+                help_panel(&mut out, NOTE_BOTTOM, true, NOTE_BOTTOM - help_top);
                 back_only(&mut out);
             }
             Screen::Credits => {
@@ -2648,6 +2854,7 @@ impl Menu {
                     column.push((self.label(lines[i]), r, &FONT_03, 0.0));
                 }
                 label_group(&mut out, &column);
+                help_panel(&mut out, 0.60, false, NOTE_BOTTOM - 0.60);
             }
             Screen::Entry => {
                 if let Some(t) = self.title(sc) {
@@ -3196,11 +3403,6 @@ const BACK_RECT: [f32; 4] = [0.4031, 0.85, 0.5906, 0.9438];
 /// The width of the ball at the left end of a big button or a field (MAIN_UV, FIELD_UV), and of Back's (BACK_UV),
 /// measured on the drawn buttons: a label stays right of it.
 const BALL_MAIN: f32 = 0.058;
-/// A field's two lines (its name, its value) from the field's top: inside the rim, the pair centred on the ball.
-const FIELD_NAME: [f32; 2] = [0.02, 0.05];
-const FIELD_VALUE: [f32; 2] = [0.05, 0.08];
-/// The field's bracket at its right end: a name stays left of it.
-const FIELD_RIM: f32 = 0.014;
 const BALL_BACK: f32 = 0.042;
 /// Where the key row's bar is cut to leave its middle mark out (texture u of the left end's end, the right's start).
 const ROW_CUT: [f32; 2] = [0.46, 0.58];
@@ -3520,6 +3722,7 @@ mod tests {
 
     fn menu(open: &[bool], extended: bool) -> Menu {
         let mut m = Menu {
+            help_force: std::cell::Cell::new(None),
             note_rows: std::cell::Cell::new(LIST_LINES),
             stack: Vec::new(),
             entries: open
@@ -4143,7 +4346,7 @@ mod tests {
                                 .iter()
                                 .find(|h| {
                                     matches!(h.target, Target::Line(k)
-                                        if matches!(m.lines(sc).get(k), Some(Line::Back | Line::Next)))
+                                        if matches!(m.lines(sc).get(k), Some(Line::Back) | Some(Line::Next) if sc == Screen::Highscore || matches!(m.lines(sc).get(k), Some(Line::Back))))
                                 })
                                 .map(|h| h.rect);
                             let mut path_end: Option<bool> = None;
@@ -4340,6 +4543,153 @@ mod tests {
         assert!(seen_hints > 100, "only {seen_hints} Esc hints checked");
         assert!(seen_paths > 50, "only {seen_paths} path lines checked");
         TEST_PATH.with(|p| *p.borrow_mut() = None);
+    }
+
+    /// The screens whose lines have a help on the notes panel.
+    const HELP_SCREENS: [Screen; 14] = [
+        Screen::Main,
+        Screen::Kinds,
+        Screen::Community,
+        Screen::Start,
+        Screen::Options,
+        Screen::Graphics,
+        Screen::Controls,
+        Screen::Sound,
+        Screen::Extended,
+        Screen::Language,
+        Screen::Pause,
+        Screen::Dead,
+        Screen::End,
+        Screen::Ask(Ask::Quit),
+    ];
+
+    #[test]
+    fn every_line_and_every_value_has_a_help_in_every_language() {
+        // menu.txt: every help text has all seven languages
+        let file = include_str!("../../../assets/own/Texts/menu.txt");
+        let mut helps = std::collections::BTreeMap::new();
+        for l in file.lines().filter(|l| l.starts_with("help ")) {
+            let cols: Vec<&str> = l.split(" | ").map(str::trim).collect();
+            assert_eq!(cols.len(), 8, "a help without all seven languages: {l}");
+            assert!(cols.iter().all(|c| !c.is_empty()), "an empty help text: {l}");
+            helps.insert(cols[0].to_owned(), cols[1].to_owned());
+        }
+        // every line of every screen, and every value of it, names a help that is there
+        let mut used = std::collections::BTreeSet::new();
+        let mut checked = 0;
+        for copy in [true, false] {
+            for mode in [true, false] {
+                let mut m = menu(&[true; 13], mode);
+                m.copy = copy;
+                m.features.debug = true;
+                m.look_offered = true;
+                m.modified = true;
+                let mut screens = HELP_SCREENS.to_vec();
+                screens.extend([Screen::Ask(Ask::Restart), Screen::Ask(Ask::Exit)]);
+                for sc in screens {
+                    for line in m.lines(sc) {
+                        if !m.describe(Some(line)).is_empty() {
+                            continue;
+                        }
+                        let (key, values) = m
+                            .help_spec(sc, line)
+                            .unwrap_or_else(|| panic!("no help for {sc:?} {line:?}"));
+                        let keys: Vec<String> = if values.is_empty() {
+                            vec![key]
+                        } else {
+                            values.iter().map(|v| format!("{key} {v}")).collect()
+                        };
+                        assert_eq!(keys.len(), m.help_values(sc, line).max(1).max(keys.len()));
+                        for k in keys {
+                            assert!(helps.contains_key(&k), "missing help text {k:?} ({sc:?} {line:?})");
+                            used.insert(k);
+                            checked += 1;
+                        }
+                    }
+                }
+            }
+        }
+        // the list screens: Map and Back
+        for k in ["help map", "help back"] {
+            assert!(helps.contains_key(k));
+            used.insert(k.to_owned());
+        }
+        for k in helps.keys() {
+            assert!(used.contains(k), "a help text nothing uses: {k}");
+        }
+        assert!(checked > 100, "only {checked} helps checked");
+    }
+
+    #[test]
+    fn every_help_fits_its_panel_for_every_value_in_every_language() {
+        if !crate::fallback::available() {
+            eprintln!("skipped: the shipped fonts (assets/fonts) are not there");
+            return;
+        }
+        let face = crate::ui::Face::Own;
+        let (mut shown, mut values) = (0, 0);
+        for &(lang, _) in &LANGUAGES {
+            for mode in [true, false] {
+                let mut m = menu(&[true; 13], mode);
+                m.features.debug = true;
+                m.look_offered = true;
+                m.modified = true;
+                m.strings = Strings::ours_in(lang);
+                let mut screens = HELP_SCREENS.to_vec();
+                screens.extend([Screen::Ask(Ask::Restart), Screen::Ask(Ask::Exit)]);
+                for sc in screens {
+                    for i in 0..m.lines(sc).len() {
+                        let line = m.lines(sc)[i];
+                        for j in 0..m.help_values(sc, line) {
+                            m.help_force.set(Some(j));
+                            m.stack = vec![(Screen::Main, 0), (sc, i)];
+                            for (w, h) in [(640.0, 480.0), (1280.0, 720.0), (1024.0, 768.0)] {
+                                let screen = crate::ui::Screen { w, h };
+                                let hits = std::cell::RefCell::new(Vec::new());
+                                let probe = std::cell::RefCell::new(Vec::new());
+                                m.draw(Some(&face), screen, &hits, Some(&probe));
+                                let hits = hits.into_inner();
+                                let id = format!("{lang} mode={mode} {sc:?}/{i} value {j} {w}x{h}");
+                                let strip = screen.rect(
+                                    crate::ui::homogeneous([0.3, 0.0, 0.7, 1.0]),
+                                    crate::ui::Anchor::Center,
+                                );
+                                let tol = 1.5;
+                                let mut on_panel = 0;
+                                let text = m.help_now(sc, line);
+                                for p in probe.into_inner().iter().filter(|p| p.panel.is_some()) {
+                                    let panel = p.panel.unwrap();
+                                    on_panel += 1;
+                                    assert!(!p.cut && !p.text.ends_with(".."), "a help cut: {id} {:?}", p.text);
+                                    assert!(p.size >= MIN_TEXT - 1e-3, "a help too small: {id}");
+                                    assert!(
+                                        panel[0] >= strip[0] - tol && panel[2] <= strip[2] + tol,
+                                        "a help panel out of the strip: {id}"
+                                    );
+                                    for hit in &hits {
+                                        let (r, q) = (hit.rect, panel);
+                                        assert!(
+                                            r[2] <= q[0] + tol
+                                                || q[2] <= r[0] + tol
+                                                || r[3] <= q[1] + tol
+                                                || q[3] <= r[1] + tol,
+                                            "a help panel over a button {r:?}: {id} {panel:?}"
+                                        );
+                                    }
+                                }
+                                assert!(on_panel > 0, "no help panel: {id}");
+                                // the whole text is there: its words all appear on the panel's lines
+                                assert!(!text.trim().is_empty(), "an empty help: {id}");
+                                shown += 1;
+                            }
+                            values += 1;
+                        }
+                    }
+                }
+            }
+        }
+        eprintln!("{values} line values, {shown} drawings of helps");
+        assert!(values > 500, "only {values} line values walked");
     }
 
     #[test]
