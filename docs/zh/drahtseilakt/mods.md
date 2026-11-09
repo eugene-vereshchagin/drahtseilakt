@@ -35,6 +35,7 @@
 | `smooth-camera` | AdvancedTravelCam（电影式平滑） | 镜头在转动、距离和视野上平滑过渡，自由相机滑行；选项：平滑度 | 否 |
 | `interference` | Interference | 半透明的诱饵球绕球游走；选项：数量 | 否 |
 | `deformed-ball` | DeformedWB | 木球的外观随机被压扁、拉长（物理仍是圆球）；选项：程度 | 否 |
+| `back-to-2004` | （玩笑；撤销我们的画面改进） | 像2004年的电脑：低分辨率（640x480、800x600或1024x768）的硬像素，4:3画面带黑边，纹理无mipmap和各向异性（双线性或最近邻：远处闪烁），帧率上限（关、60、30），可选16位色彩条纹；附赠一副用于流血泪的眼镜 | 否 |
 | `play-time` | WatchYourTime | 每关和总计的游戏时长，显示在屏幕上，并保存在数据文件夹的 `playtime.txt`；选项：是否显示 | 否 |
 | `sector-jump` | SpeedrunShortcuts（设置小节） | 按键（F7 / PageUp、F6 / PageDown）从下一个或上一个小节重新开始关卡 | 是（modded） |
 | `free-steering` | FreeViewRotation（含操控） | 类似 `free-view`，但方向键沿转动后的视角推动；视角的转动记录在回放中 | 是（modded） |
@@ -160,6 +161,10 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 - `do camera.fov <degrees>` — 视野加宽这么多度（-30 到 60）。
 - `do camera.distance <0.5..2>` — 相机拉近或拉远。
 - `do camera.yaw <degrees>` — 视角绕球转动（方向键仍沿相机自身的朝向推动）。
+- `do render.scale <宽> <高>` — 以此大小绘制画面（160x120 至 4096x4096，不超过窗口），再用最近邻像素放大到窗口。`do render.aspect <宽>:<高>` — 画面保持此比例，窗口更宽或更高处为黑边。
+- `do render.filter default|bilinear|nearest` — 纹理过滤：我们的（mipmap、各向异性）、仅取最大级的双线性（无mipmap，远处闪烁）或最近邻纹素。
+- `do render.fps_cap <n>` — 每秒最多 n 帧（0：不限；对局的 tick 仍按自己的时钟）。`do render.colour_bits 16` — 颜色截为 5-6-5 位且不抖动（其他值：全彩）。
+  这些动作只影响画面：对局保持经典，回放不变。游戏中没有可撤销的边缘抗锯齿。
 - `do light <0..1>` — 关卡的光；`do lantern <0..1>` — 球上方的灯光。
 - `do show <corner> <label|-> <format> <value>[, <value>[, <value>]]` — 本帧的一行 HUD；角落 `top-left top-right
   bottom-left bottom-right`；格式 `time`（由秒数得到 mm:ss.hh）、`int`、`dec1`、`dec2`、`clock`（hh:mm）、`ratio`（a/b）。

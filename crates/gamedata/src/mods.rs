@@ -439,6 +439,16 @@ pub enum Action {
     ViewTurn(Expr),
     /// The camera eased (0 none to 1 slow): its turn, distance, field of view and the free camera follow smoothly.
     CameraSmooth(Expr),
+    /// The picture drawn at this many pixels wide and high and scaled up to the window (view only).
+    RenderScale(Expr, Expr),
+    /// How the textures are filtered: 0 as ours, 1 bilinear without mipmaps, 2 nearest (view only).
+    RenderFilter(u8),
+    /// The picture's shape (width, height): bars where the window is wider or taller (view only).
+    RenderAspect(Expr, Expr),
+    /// At most this many frames a second, 0 for no cap (view only).
+    RenderFpsCap(Expr),
+    /// The colour depth of the picture: 16 shows the 5-6-5 bands, anything else full colour (view only).
+    RenderColourBits(Expr),
     /// So many translucent decoy balls wandering around the ball (0 to 8; view only).
     Decoys(Expr),
     /// The wooden ball's look deformed at random, 0 (round) to 1 (view only; the physics keeps its round ball).
@@ -519,6 +529,8 @@ impl Action {
             | Action::SteerYaw(e)
             | Action::ViewTurn(e)
             | Action::CameraSmooth(e)
+            | Action::RenderFpsCap(e)
+            | Action::RenderColourBits(e)
             | Action::Decoys(e)
             | Action::BallDeform(e)
             | Action::SetSector(e)
@@ -531,6 +543,8 @@ impl Action {
             | Action::EndlessLives(e)
             | Action::Rewind(e) => vec![e],
             Action::Show(_, _, _, v) => v.iter().collect(),
+            Action::RenderScale(a, b) | Action::RenderAspect(a, b) => vec![a, b],
+            Action::RenderFilter(_) => Vec::new(),
             Action::Splits(_)
             | Action::Keys(_)
             | Action::Screenshot
@@ -1153,6 +1167,11 @@ fn parse_event(rest: &str, options: &[OptSpec]) -> Result<Event, String> {
     Ok(ev)
 }
 
+/// Two or three words split at spaces (each an expression without spaces: a number or a name).
+fn split_args_ws(s: &str) -> Vec<&str> {
+    s.split_whitespace().collect()
+}
+
 fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Action, String> {
     let (verb, args) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
     let args = args.trim();
@@ -1181,6 +1200,29 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "camera.distance" => Action::CameraDistance(e(args)?),
         "camera.yaw" => Action::CameraYaw(e(args)?),
         "camera.smooth" => Action::CameraSmooth(e(args)?),
+        "render.scale" => {
+            let p = split_args_ws(args);
+            let [w, h] = p.as_slice() else {
+                return Err("expected: render.scale <width> <height>".into());
+            };
+            Action::RenderScale(e(w)?, e(h)?)
+        }
+        "render.aspect" => {
+            // 4:3 (or two numbers, 4 3)
+            let (w, h) = args
+                .split_once(':')
+                .or_else(|| args.split_once(char::is_whitespace))
+                .ok_or("expected: render.aspect <width>:<height>")?;
+            Action::RenderAspect(e(w.trim())?, e(h.trim())?)
+        }
+        "render.filter" => Action::RenderFilter(match args {
+            "default" => 0,
+            "bilinear" => 1,
+            "nearest" => 2,
+            _ => return Err("expected: render.filter default|bilinear|nearest".into()),
+        }),
+        "render.fps_cap" => Action::RenderFpsCap(e(args)?),
+        "render.colour_bits" => Action::RenderColourBits(e(args)?),
         "steer.yaw" => Action::SteerYaw(e(args)?),
         "view.turn" => Action::ViewTurn(e(args)?),
         "decoys" => Action::Decoys(e(args)?),
@@ -1772,6 +1814,38 @@ mod tests {
         assert!(jump.modded() && !jump.practice());
         assert!(parse_mod_txt(&format!("{head}on frame\ndo sector.set 2\n")).is_err(), "only on a key");
         assert!(parse_mod_txt(&format!("{head}on frame\ndo playtime 5\n")).is_err());
+    }
+
+    #[test]
+    fn the_render_blocks_are_the_views() {
+        let head = "name.en T\noption k number 0 2 1 1\n";
+        let m = parse_mod_txt(&format!(
+            "{head}on frame\ndo render.scale 640 480\ndo render.filter nearest\ndo render.aspect 4:3\ndo render.fps_cap 30\ndo render.colour_bits 16\n"
+        ))
+        .unwrap();
+        assert!(!m.modded(), "looks only: the run stays classic");
+        let acts = &m.rules[0].actions;
+        assert!(matches!(acts[0], Action::RenderScale(..)));
+        assert_eq!(acts[1], Action::RenderFilter(2));
+        let Action::RenderAspect(w, h) = &acts[2] else { panic!() };
+        assert_eq!((w.eval(&S), h.eval(&S)), (4.0, 3.0));
+        for bad in [
+            "render.scale 640",
+            "render.scale 1 2 3",
+            "render.filter sharp",
+            "render.filter",
+            "render.aspect 43",
+            "render.fps_cap",
+            "render.colour_bits 1 2",
+        ] {
+            assert!(parse_mod_txt(&format!("{head}on frame\ndo {bad}\n")).is_err(), "{bad}");
+        }
+        for ok in ["render.scale opt.k 480", "render.fps_cap opt.k"] {
+            assert!(parse_mod_txt(&format!("{head}on frame\ndo {ok}\n")).is_ok(), "{ok}");
+        }
+        // a run's rule may not do them
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo render.filter nearest\n")).is_err());
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo render.fps_cap 30\n")).is_err());
     }
 
     #[test]

@@ -44,6 +44,7 @@ mod pieces;
 mod playtime;
 mod proximity;
 mod render;
+mod retro;
 mod replay;
 mod scene;
 mod scripting;
