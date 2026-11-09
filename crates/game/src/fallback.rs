@@ -166,14 +166,27 @@ impl Atlas {
             return None;
         }
         let rgba = &mut self.rgba;
-        outline.draw(|gx, gy, cover| {
+        // Tektur's D has the same square box as its O at menu sizes (7 pixels): the D is drawn with its right corners
+        // cut well off and its left corners square, so that it reads as a D (see `d_cover`)
+        let first = std::ptr::eq(font, &self.fonts[0]);
+        let own_d = c == 'D' && first;
+        let mut put = |gx: u32, gy: u32, cover: f32| {
             let (px, py) = (x + gx, y + gy);
             let i = ((py * SIDE + px) * 4) as usize;
             if let Some(texel) = rgba.get_mut(i..i + 4) {
                 let a = (cover.clamp(0.0, 1.0) * 255.0) as u8;
                 texel.copy_from_slice(&[255, 255, 255, a]);
             }
-        });
+        };
+        if own_d {
+            for gy in 0..h {
+                for gx in 0..w {
+                    put(gx, gy, d_cover(gx, gy, b.width(), b.height()));
+                }
+            }
+        } else {
+            outline.draw(&mut put);
+        }
         self.at = (x + w + 1, y, row.max(h));
         self.changed = true;
         let s = SIDE as f32;
@@ -188,6 +201,34 @@ impl Atlas {
             advance,
         })
     }
+}
+
+/// The coverage of texel (gx, gy) by a D of w by h pixels with stems 0.24 of the height wide: square on the left, the right corners cut
+/// at 45 degrees by 0.30 of the height (outer outline and counter, the wall a stem thick), 6 by 6 samples a texel.
+fn d_cover(gx: u32, gy: u32, w: f32, h: f32) -> f32 {
+    let (k, t) = (0.30 * h, 0.24 * h);
+    let inside = |x: f32, y: f32| -> bool {
+        // outer outline: the box less the two right corners
+        let (dx, dy) = (w - x, y.min(h - y));
+        if !(0.0..=w).contains(&x) || !(0.0..=h).contains(&y) || dx + dy < k {
+            return false;
+        }
+        // counter: the box inset by t, its right corners cut a stem inside the outer cut
+        let (cx, cy) = (x - t, y - t);
+        let (cdx, cdy) = (w - t - x, y.min(h - y) - t);
+        let counter = cx > 0.0 && cy > 0.0 && cdx > 0.0 && cdy > 0.0 && cdx + cdy > k - t * 0.4142;
+        !counter
+    };
+    let n = 6;
+    let mut hits = 0;
+    for sy in 0..n {
+        for sx in 0..n {
+            if inside(gx as f32 + (sx as f32 + 0.5) / n as f32, gy as f32 + (sy as f32 + 0.5) / n as f32) {
+                hits += 1;
+            }
+        }
+    }
+    hits as f32 / (n * n) as f32
 }
 
 /// A character as drawn: the glyph of its capital at small-capital size for a lower-case letter that has one capital
