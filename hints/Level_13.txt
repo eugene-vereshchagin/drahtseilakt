@@ -207,3 +207,31 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # wood 0.6, gravity 20, time factor 2) predicts; not measured against the video yet. Riding raft 2's top past the
 # boards does not work (knocked off at B2 x -365 onto the rails, then wedged behind raft 1's jam at x -303.7): an
 # on-top ride to the cage needs raft 1 past the arms (boards alternate lanes; B4 at -188.8 covers all of raft 2).
+# 2026-11-09 (seventh session, the arms puzzle; engine NOT changed). Truth from the files (nmo-dump --params / --arrays):
+# P_Modul_17.nmo physicalizes Modul17_Dreharme with group "Floor", friction .7, elasticity .4, mass 3, lin damp 3, rot damp
+# .005, 3 convex (Col01..03), not frozen; hinge to FixCube about P_Modul_17_HingeFrame, "Limitations" 0 (limits -45/45 set
+# but off); spring (0,4,0)@HingeFrame to (0,0,-4)@arm, 0 / .32 / .1 / .1. Levelinit (both copies) Physicalize_Floors:
+# Phys_FloorStopper group "Ball". IVP's group filter (equal non-empty strings do not collide) => the arm (Floor) DOES hit
+# Floor_Stopper's hoops (Ball) in the original too: no fidelity bug. The hoops stand 1.2 (arm 1) / 1.6 (arm 2) west of the
+# hubs on the north side, so an arm turns freely only one way (north paddle east, ~0..169 deg); pushed by the raft (south
+# paddle east) it jams at once. That is the puzzle (owner): the player turns both arms first.
+# Video, 12 fps sheets ref/video/frames/dense/level13/s4-arms (384-400 s; counter 3756..3725): 384-386.2 the ball rides the
+# block's left (north, raft 1) lane on top; 386.3-386.5 it steps left (north) onto the bar platform's narrow part, ahead
+# of the block; 387.0 rolls east along the platform's north edge past the notch; 387.4-388 meets arm 1's NORTH paddle
+# from the west and pushes it east: arm 1 turns clockwise seen from behind (north end east, south paddle swings west over
+# the platform), 389.7 parallel to the rails, ball following the bar beside the hub (the stopper hoop stays west of the
+# ball); 390-392 arm 1 on to ~135 deg (north paddle over the rails ahead, south paddle on the platform behind), the
+# block's woods come into view behind; 393-394 the ball rolls on east along the north edge to arm 2, 394.5-395 pushes its
+# north paddle east the same way (arm 2 to ~90..135 deg); 396-398 the block passes arm 1 and arm 2 (the arms swing on
+# where the block touches them); 399.7-400 the ball rolls south off the platform onto the block beside arm 2's hub (third
+# column, raft 2's inner one), rides it past B3 on the outer column (400-404), takes extra points by fan/updraft cages
+# P_Modul_18 (404-420, optional), rides raft 1's inner column past B4 (424-426) and at 426.4 rolls right onto raft 2's
+# woods, level with raft 1's, while raft 1 falls off lane 1's dead end (427). Simulation with hints/Level_13-s4.txt: the
+# ball leaves raft 1 at x -349 (49.6 s), arm 1 to 152 deg at 54 s (springs back to ~0 by 60 s, after the block passed),
+# arm 2 to ~120 deg; raft 1 passes both arms (Wood_05 -326 at 57 s, -275 at 69.5 s); the ball climbs on at x -290 (66 s,
+# y -298.9 = 4 above the stones) and rides to B4. Open: in the video the rafts stay level up to B4; in ours raft 2 draws
+# ahead after x -390 (Wood_09 vs Wood_05: 0 at 41 s, +5.3 at 66 s, +10 at 88 s), so the cross at x -185 dips into the gap
+# (ball falls between the lanes). Raft speed vs video: board B1 (x -382.8, ~379 s) to the platform's start (x -353,
+# 386.4 s) = 30 units in 7.4 s = 4.0 u/s; ours 3.9 u/s (ticks 2580 -> 3040) - raft 1 matches. Raft 2's relative drift
+# (ours ~0.2 u/s faster after the ramp) is the suspect; not measured in the video yet (mixed raft: 2 stones + 2 woods
+# should be the slower one by damping; check rail-3 slope/friction of lane 2 vs lane 1 between x -390 and -185).
