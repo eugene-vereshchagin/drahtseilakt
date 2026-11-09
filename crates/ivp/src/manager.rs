@@ -9,15 +9,18 @@
 
 use crate::collision::{CollKind, ObjKind};
 use crate::core::{Core, World};
-use crate::event::{self, CoreInfo, EventSide, Motion, COLL_DIST, MIN_FRICTION_DIST, REAL_COLL_DIST};
-use crate::hull::{encode_listener, ListenerKind};
+use crate::event::{
+    self, COLL_DIST, CoreInfo, EventSide, MIN_FRICTION_DIST, Motion, REAL_COLL_DIST,
+};
+use crate::hull::{ListenerKind, encode_listener};
 use crate::ledge::{Edge, NodeKind, Surface};
 use crate::math::Matrix;
-use crate::minimize::{Side, Solver};
 use crate::mindist::{
-    syn_ref, Feat, Mindist, ObjCache, Synapse, MDF_COLL_DIST, MDF_COLL_DIST_SHIFT, MDF_COLL_TYPE, MDF_FUNCTION, MDF_RECALC,
-    MDF_STATUS, MD_EXACT, MD_HULL, MD_HULL_RECURSIVE, MD_INVALID, ST_BALL, ST_POINT,
+    Feat, MD_EXACT, MD_HULL, MD_HULL_RECURSIVE, MD_INVALID, MDF_COLL_DIST, MDF_COLL_DIST_SHIFT,
+    MDF_COLL_TYPE, MDF_FUNCTION, MDF_RECALC, MDF_STATUS, Mindist, ObjCache, ST_BALL, ST_POINT,
+    Synapse, syn_ref,
 };
+use crate::minimize::{Side, Solver};
 
 /// The threshold speed the upstream calls IVP_SPEED_AFTER_KEEPER (phys_coll.h).
 const SPEED_AFTER_KEEPER: f32 = 0.50503469;
@@ -142,7 +145,13 @@ fn solve_loop(md: &mut Mindist, sides: [Side; 2], count: i32, tries: u32) -> i32
 
 impl World {
     /// The object's collision geometry and extra radius, set by the glue before the object is enabled.
-    pub fn set_object_geometry(&mut self, obj: usize, kind: ObjKind, surface: Option<Surface>, extra_radius: f32) {
+    pub fn set_object_geometry(
+        &mut self,
+        obj: usize,
+        kind: ObjKind,
+        surface: Option<Surface>,
+        extra_radius: f32,
+    ) {
         self.ensure_object(obj);
         let o = &mut self.coll.objs[obj];
         o.kind = Some(kind);
@@ -174,7 +183,10 @@ impl World {
         self.ensure_object(obj);
         let now = self.env.current_time;
         let time_code = self.time_code;
-        let simulated = self.cores.get(obj).is_some_and(|c| i32::from(c.movement_state) < 8);
+        let simulated = self
+            .cores
+            .get(obj)
+            .is_some_and(|c| i32::from(c.movement_state) < 8);
         let o = &self.coll.objs[obj];
         let stale = !o.cache_valid || (simulated && o.cache_time_code < time_code);
         if stale {
@@ -183,10 +195,18 @@ impl World {
                     let m = c.object_pose_at(now);
                     (m.r, m.vv, core_pos_at(c, now))
                 }
-                None => ([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], [0.0; 3], [0.0; 3]),
+                None => (
+                    [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                    [0.0; 3],
+                    [0.0; 3],
+                ),
             };
             let o = &mut self.coll.objs[obj];
-            o.cache = ObjCache { r, vv, core_pos: pos };
+            o.cache = ObjCache {
+                r,
+                vv,
+                core_pos: pos,
+            };
             o.cache_time_code = time_code;
             o.cache_valid = true;
         }
@@ -221,7 +241,11 @@ impl World {
         md_push(&mut self.coll.mds, &mut self.coll.exact, m);
         for k in 0..2 {
             let obj = self.coll.mds[m].syn[k].obj;
-            syn_push(&mut self.coll.mds, &mut self.coll.objs[obj].exact_syn, syn_ref(m, k));
+            syn_push(
+                &mut self.coll.mds,
+                &mut self.coll.objs[obj].exact_syn,
+                syn_ref(m, k),
+            );
         }
     }
 
@@ -233,7 +257,11 @@ impl World {
         md_unlink(&mut self.coll.mds, &mut self.coll.exact, m);
         for k in 0..2 {
             let obj = self.coll.mds[m].syn[k].obj;
-            syn_unlink(&mut self.coll.mds, &mut self.coll.objs[obj].exact_syn, syn_ref(m, k));
+            syn_unlink(
+                &mut self.coll.mds,
+                &mut self.coll.objs[obj].exact_syn,
+                syn_ref(m, k),
+            );
         }
     }
 
@@ -243,7 +271,11 @@ impl World {
         md_push(&mut self.coll.mds, &mut self.coll.invalid, m);
         for k in 0..2 {
             let obj = self.coll.mds[m].syn[k].obj;
-            syn_push(&mut self.coll.mds, &mut self.coll.objs[obj].invalid_syn, syn_ref(m, k));
+            syn_push(
+                &mut self.coll.mds,
+                &mut self.coll.objs[obj].invalid_syn,
+                syn_ref(m, k),
+            );
         }
     }
 
@@ -252,7 +284,11 @@ impl World {
         md_unlink(&mut self.coll.mds, &mut self.coll.invalid, m);
         for k in 0..2 {
             let obj = self.coll.mds[m].syn[k].obj;
-            syn_unlink(&mut self.coll.mds, &mut self.coll.objs[obj].invalid_syn, syn_ref(m, k));
+            syn_unlink(
+                &mut self.coll.mds,
+                &mut self.coll.objs[obj].invalid_syn,
+                syn_ref(m, k),
+            );
         }
     }
 
@@ -278,16 +314,22 @@ impl World {
             let h = &self.coll.hulls[obj];
             let dte = now - h.last_time;
             dt[k] = dte as f32;
-            let key = (dte * f64::from(h.gradient) + f64::from(h.hull_value) + f64::from(s[k])) as f32;
-            let slot = self.coll.hulls[obj].insert(encode_listener(ListenerKind::Synapse, syn_ref(m, k) as u32), key);
+            let key =
+                (dte * f64::from(h.gradient) + f64::from(h.hull_value) + f64::from(s[k])) as f32;
+            let slot = self.coll.hulls[obj].insert(
+                encode_listener(ListenerKind::Synapse, syn_ref(m, k) as u32),
+                key,
+            );
             self.coll.mds[m].syn[k].hull_slot = Some(slot);
         }
         let oa = self.coll.mds[m].syn[0].obj;
         let ob = self.coll.mds[m].syn[1].obj;
         let ha = &self.coll.hulls[oa];
         let hb = &self.coll.hulls[ob];
-        let t1 = (hb.gradient - hb.center_gradient) * dt[1] + (hb.hull_value - hb.center_hull_value);
-        let t2 = (ha.gradient - ha.center_gradient) * dt[0] + (ha.hull_value - ha.center_hull_value);
+        let t1 =
+            (hb.gradient - hb.center_gradient) * dt[1] + (hb.hull_value - hb.center_hull_value);
+        let t2 =
+            (ha.gradient - ha.center_gradient) * dt[0] + (ha.hull_value - ha.center_hull_value);
         self.coll.mds[m].sum_angular_hull_time = f64::from(t1 + t2);
     }
 
@@ -296,15 +338,20 @@ impl World {
     fn insert_hull(&mut self, m: usize, dist: f32) {
         let oa = self.coll.mds[m].syn[0].obj;
         let ob = self.coll.mds[m].syn[1].obj;
-        let moving = |w: &World, o: usize| w.cores.get(o).is_some_and(|c| (c.movement_state & 7) != 0);
+        let moving =
+            |w: &World, o: usize| w.cores.get(o).is_some_and(|c| (c.movement_state & 7) != 0);
         if !moving(self, oa) {
             self.hull_insert(m, 0.0, dist);
         } else if !moving(self, ob) {
             self.hull_insert(m, dist, 0.0);
         } else {
             let (ca, cb) = (&self.cores[oa], &self.cores[ob]);
-            let ra = f64::from(ca.max_surface_rot_speed) + f64::from(ca.current_speed) + f64::from(1e-10f32);
-            let rb = f64::from(cb.max_surface_rot_speed) + f64::from(cb.current_speed) + f64::from(1e-10f32);
+            let ra = f64::from(ca.max_surface_rot_speed)
+                + f64::from(ca.current_speed)
+                + f64::from(1e-10f32);
+            let rb = f64::from(cb.max_surface_rot_speed)
+                + f64::from(cb.current_speed)
+                + f64::from(1e-10f32);
             let wa = (rb * f64::from(0.1f32) + ra) as f32;
             let wb = ra * f64::from(0.1f32) + rb;
             let f = (f64::from(dist) / (wb + f64::from(wa))) as f32;
@@ -326,7 +373,8 @@ impl World {
         if recalc_ok(&self.coll.mds[m]) {
             let a = self.coll.mds[m].syn[0].obj;
             let b = self.coll.mds[m].syn[1].obj;
-            let st = (self.cores[a].movement_state as u8 | self.cores[b].movement_state as u8) as i8;
+            let st =
+                (self.cores[a].movement_state as u8 | self.cores[b].movement_state as u8) as i8;
             self.update_events(m, i32::from(st) < 0x21, 0);
         } else {
             self.went_invalid(m);
@@ -352,8 +400,16 @@ impl World {
     pub(crate) fn mindist_create(&mut self, a: usize, b: usize) -> Option<usize> {
         let ka = self.coll.objs.get(a)?.kind?;
         let kb = self.coll.objs.get(b)?.kind?;
-        let feat_a = if ka == ObjKind::Polygon { Some(self.single_feat(a)?) } else { None };
-        let feat_b = if kb == ObjKind::Polygon { Some(self.single_feat(b)?) } else { None };
+        let feat_a = if ka == ObjKind::Polygon {
+            Some(self.single_feat(a)?)
+        } else {
+            None
+        };
+        let feat_b = if kb == ObjKind::Polygon {
+            Some(self.single_feat(b)?)
+        } else {
+            None
+        };
         let m = self.mindist_create_with(None, a, b, feat_a, feat_b)?;
         let c = self.collision_new(CollKind::Mindist, [a, b], m);
         self.coll.mds[m].collision = Some(c);
@@ -363,7 +419,14 @@ impl World {
     /// Creates a mindist between two pieces, owned by a watcher (`owner`) or by the pair's collision record (None).
     /// The features are the pieces' first edges, or None for a ball. Solves it and schedules it (the body of
     /// `ivp_mindist_create`).
-    pub(crate) fn mindist_create_with(&mut self, owner: Option<usize>, a: usize, b: usize, feat_a: Option<Feat>, feat_b: Option<Feat>) -> Option<usize> {
+    pub(crate) fn mindist_create_with(
+        &mut self,
+        owner: Option<usize>,
+        a: usize,
+        b: usize,
+        feat_a: Option<Feat>,
+        feat_b: Option<Feat>,
+    ) -> Option<usize> {
         let ka = self.coll.objs.get(a)?.kind?;
         let kb = self.coll.objs.get(b)?.kind?;
         let mut md = Mindist {
@@ -399,7 +462,11 @@ impl World {
         md.syn[first] = Synapse {
             obj: a,
             feat: feat_a,
-            status: if ka == ObjKind::Polygon { ST_POINT } else { ST_BALL },
+            status: if ka == ObjKind::Polygon {
+                ST_POINT
+            } else {
+                ST_BALL
+            },
             ..Synapse::default()
         };
         let m = self.md_alloc(md);
@@ -487,15 +554,20 @@ impl World {
             return;
         }
         let n = md.normal;
-        let proj_v = (f64::from(n[2]) * f64::from(b.speed[2]) + f64::from(n[1]) * f64::from(b.speed[1]) + f64::from(n[0]) * f64::from(b.speed[0]))
-            - (f64::from(n[2]) * f64::from(a.speed[2]) + f64::from(n[1]) * f64::from(a.speed[1]) + f64::from(n[0]) * f64::from(a.speed[0]));
+        let proj_v = (f64::from(n[2]) * f64::from(b.speed[2])
+            + f64::from(n[1]) * f64::from(b.speed[1])
+            + f64::from(n[0]) * f64::from(b.speed[0]))
+            - (f64::from(n[2]) * f64::from(a.speed[2])
+                + f64::from(n[1]) * f64::from(a.speed[1])
+                + f64::from(n[0]) * f64::from(a.speed[0]));
         let da = f64::from(a.rotation_axis_world[0]) * f64::from(n[0])
             + f64::from(a.rotation_axis_world[1]) * f64::from(n[1])
             + f64::from(a.rotation_axis_world[2]) * f64::from(n[2]);
         let db = f64::from(b.rotation_axis_world[0]) * f64::from(n[0])
             + f64::from(b.rotation_axis_world[1]) * f64::from(n[1])
             + f64::from(b.rotation_axis_world[2]) * f64::from(n[2]);
-        let worst_approach = (1.001_000_046_730_041_1 - da * da).sqrt() * f64::from(a.max_surface_rot_speed)
+        let worst_approach = (1.001_000_046_730_041_1 - da * da).sqrt()
+            * f64::from(a.max_surface_rot_speed)
             + (1.001_000_046_730_041_1 - db * db).sqrt() * f64::from(b.max_surface_rot_speed)
             + proj_v;
         let t_now = self.env.current_time;
@@ -516,7 +588,8 @@ impl World {
             self.coll.coll_dist_counter = counter.wrapping_add(1);
             if counter > 2 {
                 idx -= 1;
-                self.coll.mds[m].flags = (self.coll.mds[m].flags & !MDF_COLL_DIST) | (idx << MDF_COLL_DIST_SHIFT);
+                self.coll.mds[m].flags =
+                    (self.coll.mds[m].flags & !MDF_COLL_DIST) | (idx << MDF_COLL_DIST_SHIFT);
                 self.coll.coll_dist_counter = 0;
             }
         }
@@ -537,7 +610,15 @@ impl World {
             },
         ];
         let poses = CorePoses { cores: &self.cores };
-        let ev = event::solve(&md, sides, &poses, t_now, t_max, worst_approach, worst_total);
+        let ev = event::solve(
+            &md,
+            sides,
+            &poses,
+            t_now,
+            t_max,
+            worst_approach,
+            worst_total,
+        );
         if ev.code == 0 {
             return;
         }
@@ -594,7 +675,8 @@ impl World {
     /// The angular hull value of an object now: (h - ch) + (g - cg)(t - t_h) (phys_mindist.c, `angular_hull`).
     fn angular_hull(&self, obj: usize, t: f64) -> f64 {
         let h = &self.coll.hulls[obj];
-        f64::from(h.hull_value - h.center_hull_value) + (t - h.last_time) * f64::from(h.gradient - h.center_gradient)
+        f64::from(h.hull_value - h.center_hull_value)
+            + (t - h.last_time) * f64::from(h.gradient - h.center_gradient)
     }
 
     /// A synapse of a HULL mindist fired (`ivp_mindist_hull_exceeded`, 0x10017d70): the halfspace re-estimate re-arms
@@ -617,11 +699,16 @@ impl World {
             let n = md.normal;
             let proj = f64::from(n[1]) * d[1] + f64::from(n[2]) * d[2] + f64::from(n[0]) * d[0];
             let ang = self.angular_hull(oa, now) + self.angular_hull(ob, now);
-            let nw = f64::from(md.len_numerator) - (ang - md.sum_angular_hull_time) - (f64::from(md.contact_dot_diff_center) - proj)
+            let nw = f64::from(md.len_numerator)
+                - (ang - md.sum_angular_hull_time)
+                - (f64::from(md.contact_dot_diff_center) - proj)
                 + f64::from(intrusion);
             if nw > self.env.delta_psi * sum * 6.0 {
                 let ratio = nw / sum;
-                let (slot_a, slot_b) = (self.coll.mds[m].syn[sorted[0]].hull_slot, self.coll.mds[m].syn[sorted[1]].hull_slot);
+                let (slot_a, slot_b) = (
+                    self.coll.mds[m].syn[sorted[0]].hull_slot,
+                    self.coll.mds[m].syn[sorted[1]].hull_slot,
+                );
                 let md = &mut self.coll.mds[m];
                 md.sum_angular_hull_time = ang;
                 md.contact_dot_diff_center = proj as f32;
@@ -630,13 +717,19 @@ impl World {
                     self.coll.hulls[oa].remove(s);
                 }
                 let va = self.coll.hulls[oa].value_at(now);
-                let slot = self.coll.hulls[oa].insert(encode_listener(ListenerKind::Synapse, syn_ref(m, sorted[0]) as u32), (f64::from(va) + ratio * ra) as f32);
+                let slot = self.coll.hulls[oa].insert(
+                    encode_listener(ListenerKind::Synapse, syn_ref(m, sorted[0]) as u32),
+                    (f64::from(va) + ratio * ra) as f32,
+                );
                 self.coll.mds[m].syn[sorted[0]].hull_slot = Some(slot);
                 if let Some(s) = slot_b {
                     self.coll.hulls[ob].remove(s);
                 }
                 let vb = self.coll.hulls[ob].value_at(now);
-                let slot = self.coll.hulls[ob].insert(encode_listener(ListenerKind::Synapse, syn_ref(m, sorted[1]) as u32), (f64::from(vb) + ratio * rb) as f32);
+                let slot = self.coll.hulls[ob].insert(
+                    encode_listener(ListenerKind::Synapse, syn_ref(m, sorted[1]) as u32),
+                    (f64::from(vb) + ratio * rb) as f32,
+                );
                 self.coll.mds[m].syn[sorted[1]].hull_slot = Some(slot);
                 return;
             }
@@ -671,7 +764,9 @@ impl World {
                 if !(d < 0.0) {
                     break;
                 }
-                let Some((_, payload)) = h.list.first() else { break };
+                let Some((_, payload)) = h.list.first() else {
+                    break;
+                };
                 self.listener_exceeded(obj, payload, d);
                 let stop = k < 0;
                 k -= 1;
@@ -743,7 +838,9 @@ impl World {
     /// After the controllers: an INVALID mindist whose solve succeeds goes back to EXACT, unscheduled
     /// (`0x100099a0`).
     pub(crate) fn object_after_controllers(&mut self, obj: usize) {
-        let Some(mut cur) = self.coll.objs.get(obj).and_then(|o| o.invalid_syn) else { return };
+        let Some(mut cur) = self.coll.objs.get(obj).and_then(|o| o.invalid_syn) else {
+            return;
+        };
         loop {
             let next = self.coll.mds[cur / 2].syn[cur % 2].next;
             let m = cur / 2;
@@ -806,7 +903,12 @@ mod tests {
 
     fn two_cubes() -> World {
         let mut w = World::new();
-        let q = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        let q = Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
         for (i, x) in [0.0, 2.0].into_iter().enumerate() {
             let c = w.core_init(i, q, [x, 0.0, 0.0], false);
             w.cores[c].upper_limit_radius = 0.866;
@@ -818,7 +920,9 @@ mod tests {
     }
 
     fn live_mindists(w: &World) -> Vec<usize> {
-        (0..w.coll.mds.len()).filter(|&m| w.coll.mds[m].alive).collect()
+        (0..w.coll.mds.len())
+            .filter(|&m| w.coll.mds[m].alive)
+            .collect()
     }
 
     #[test]
@@ -830,7 +934,11 @@ mod tests {
         let live = live_mindists(&w);
         assert_eq!(live.len(), 1, "one mindist for the pair");
         let md = &w.coll.mds[live[0]];
-        assert!((md.len_numerator - 1.0).abs() < 1e-3, "gap {}", md.len_numerator);
+        assert!(
+            (md.len_numerator - 1.0).abs() < 1e-3,
+            "gap {}",
+            md.len_numerator
+        );
         // a gap of 1 is beyond what one PSI can close at the objects' speeds, so the budget goes to the hulls
         assert_eq!(md.status(), MD_HULL, "the pair waits on the hull listeners");
         // each hull holds its object's OV element and the pair's synapse on that object

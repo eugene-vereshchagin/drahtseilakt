@@ -119,7 +119,8 @@ fn a_parallax_depth_survives_and_bad_ones_are_refused() {
     let back = level::open::import(&d).unwrap();
     assert!((back.materials[0].parallax - 0.04).abs() < 1e-6);
     let path = d.join("level.gltf");
-    let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let doc: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
     for (name, depth, keep_normal) in [
         ("negative", serde_json::json!(-0.1), true),
         ("deep", serde_json::json!(5.0), true),
@@ -129,7 +130,10 @@ fn a_parallax_depth_survives_and_bad_ones_are_refused() {
         let mut doc = doc.clone();
         doc["materials"][0]["extras"]["drahtseilakt"]["parallax"] = depth;
         if !keep_normal {
-            doc["materials"][0].as_object_mut().unwrap().remove("normalTexture");
+            doc["materials"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("normalTexture");
         }
         std::fs::write(&path, serde_json::to_string(&doc).unwrap()).unwrap();
         assert!(level::open::import(&d).is_err(), "{name}");

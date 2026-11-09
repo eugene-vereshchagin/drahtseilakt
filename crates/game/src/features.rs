@@ -17,7 +17,11 @@ pub enum Feature {
 
 // (the sound volume beside the music's was one; it is the original's own setting and always there now: an old
 // `extended.sound-volume off` line is simply not read)
-pub const FEATURES: [Feature; 3] = [Feature::AllLevels, Feature::BestTimes, Feature::CustomLevels];
+pub const FEATURES: [Feature; 3] = [
+    Feature::AllLevels,
+    Feature::BestTimes,
+    Feature::CustomLevels,
+];
 
 impl Feature {
     pub fn key(self) -> &'static str {
@@ -51,7 +55,11 @@ pub struct Features {
 impl Features {
     #[cfg(test)]
     pub fn new(mode: bool) -> Features {
-        Features { mode, off: 0, debug: false }
+        Features {
+            mode,
+            off: 0,
+            debug: false,
+        }
     }
 
     /// The mode as given and the additions the settings turn off (`setting` reads a key); `debug` a debug run.
@@ -106,10 +114,17 @@ mod tests {
         f.toggle(Feature::BestTimes);
         assert!(!f.has(Feature::BestTimes) && f.has(Feature::AllLevels));
         assert_eq!(f.lines(), "extended.best-times off\n");
-        let back = Features::load(true, true, |k| (k == "extended.best-times").then(|| "off".to_owned()));
+        let back = Features::load(true, true, |k| {
+            (k == "extended.best-times").then(|| "off".to_owned())
+        });
         assert_eq!(back, f);
         // an old practice line is not read
-        assert_eq!(Features::load(true, true, |k| (k == "extended.tools").then(|| "off".to_owned())).lines(), "");
+        assert_eq!(
+            Features::load(true, true, |k| (k == "extended.tools")
+                .then(|| "off".to_owned()))
+            .lines(),
+            ""
+        );
     }
 
     #[test]

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use crate::collision::{CollKind, Collision};
 use crate::core::World;
-use crate::hull::{encode_listener, ListenerKind};
+use crate::hull::{ListenerKind, encode_listener};
 
 /// 2^e, exact for the exponents the tree uses. The upstream's powerlist (2.1.9) holds 2^(j-40) for j in 0..81.
 fn pow2(e: i32) -> f64 {
@@ -31,7 +31,11 @@ const COORD_MAX: f64 = (1u64 << 30) as f64;
 /// A centre's coordinate as the tree takes it: within REACH, NaN as 0 (as the cast took it).
 fn bounded(c: f32) -> f64 {
     let c = f64::from(c);
-    if c.is_nan() { 0.0 } else { c.clamp(-REACH, REACH) }
+    if c.is_nan() {
+        0.0
+    } else {
+        c.clamp(-REACH, REACH)
+    }
 }
 
 /// A radius as the tree takes it: at most REACH (NaN as REACH).
@@ -323,7 +327,8 @@ impl OvTree {
             let rem = rc[k] % 2;
             if rem == -1 {
                 pc[k] -= 1;
-            } else if rem == 0 && f64::from(nc[k]) * pow2(nk.l) < f64::from(pc[k]) * pow2(rk.l + 1) {
+            } else if rem == 0 && f64::from(nc[k]) * pow2(nk.l) < f64::from(pc[k]) * pow2(rk.l + 1)
+            {
                 pc[k] -= 1;
             }
         }
@@ -368,7 +373,13 @@ impl OvTree {
 
     /// Puts element `b` into the tree at the box of radius `r` (or `big_r`), returning the radius chosen. With
     /// `want_cand`, also returns the elements whose spheres touch it (0x1002ec10).
-    fn insert_element(&mut self, b: usize, rmin: f64, rmax: f64, want_cand: bool) -> (f64, Vec<usize>) {
+    fn insert_element(
+        &mut self,
+        b: usize,
+        rmin: f64,
+        rmax: f64,
+        want_cand: bool,
+    ) -> (f64, Vec<usize>) {
         let center = match self.element(b) {
             Some(e) => e.center,
             None => return (rmin, Vec::new()),
@@ -491,8 +502,12 @@ impl OvTree {
     /// The elements of the tree that touch element `b`, as the recheck sees them (for tests and for the pair code).
     #[cfg(test)]
     pub(crate) fn touching(&self, b: usize) -> Vec<usize> {
-        let Some(root) = self.root else { return Vec::new() };
-        let Some(n) = self.element(b).and_then(|e| e.node) else { return Vec::new() };
+        let Some(root) = self.root else {
+            return Vec::new();
+        };
+        let Some(n) = self.element(b).and_then(|e| e.node) else {
+            return Vec::new();
+        };
         let mut out = Vec::new();
         self.collect(b, root, n, &mut out);
         out
@@ -519,11 +534,7 @@ impl World {
         x -= self.env.delta_psi * s;
         // the floor includes the radius (a quirk of the upstream that the game's timing depends on)
         let floor = s * 0.1 + f64::from(c.upper_limit_radius);
-        if x > floor {
-            x
-        } else {
-            floor
-        }
+        if x > floor { x } else { floor }
     }
 
     /// The range two objects' elements allow between each other (0x1002d990): the share of `x` each one takes, with
@@ -587,13 +598,18 @@ impl World {
     /// Sets the element's sphere from the object's core and puts the element on the object's hull (`ov_hull_add`,
     /// 0x1002dd00): the listener's threshold is the hull value at the current time plus the budget `delta`.
     fn ov_hull_add(&mut self, obj: usize, delta: f64) {
-        let old = self.coll.ov.element_mut(obj).and_then(|e| e.hull_slot.take());
+        let old = self
+            .coll
+            .ov
+            .element_mut(obj)
+            .and_then(|e| e.hull_slot.take());
         if let Some(slot) = old {
             self.coll.hulls[obj].remove(slot);
         }
         let now = self.env.current_time;
         let h = &mut self.coll.hulls[obj];
-        let key = ((now - h.last_time) * f64::from(h.gradient) + f64::from(h.hull_value) + delta) as f32;
+        let key =
+            ((now - h.last_time) * f64::from(h.gradient) + f64::from(h.hull_value) + delta) as f32;
         let slot = h.insert(encode_listener(ListenerKind::Ov, obj as u32), key);
         if let Some(e) = self.coll.ov.element_mut(obj) {
             e.hull_slot = Some(slot);
@@ -621,12 +637,19 @@ impl World {
 
     /// Removes an object's element with its collisions and listener (0x1002dc70, 0x1002f3b0).
     pub fn disable_collision_detection(&mut self, obj: usize) {
-        let Some(e) = self.coll.ov.element(obj) else { return };
+        let Some(e) = self.coll.ov.element(obj) else {
+            return;
+        };
         let colls = e.collisions.clone();
         for c in colls.into_iter().rev() {
             self.collision_delete(c);
         }
-        if let Some(slot) = self.coll.ov.element_mut(obj).and_then(|e| e.hull_slot.take()) {
+        if let Some(slot) = self
+            .coll
+            .ov
+            .element_mut(obj)
+            .and_then(|e| e.hull_slot.take())
+        {
             self.coll.hulls[obj].remove(slot);
         }
         self.coll.ov.remove_element(obj);
@@ -705,15 +728,26 @@ impl World {
 
     /// Creates the pairs of two objects that have no collision yet (0x1002f430): their mindist, when there is one.
     fn object_pairs_may_collide(&mut self, a: usize, b: usize) {
-        let Some(c) = self.mindist_create(a, b).or_else(|| self.watcher_pair(a, b)) else { return };
+        let Some(c) = self
+            .mindist_create(a, b)
+            .or_else(|| self.watcher_pair(a, b))
+        else {
+            return;
+        };
         self.ov_add_collision(a, c);
         self.ov_add_collision(b, c);
     }
 
     /// Adds collision `c` to object `obj`'s element (0x1002dde0): the slot is the element's first free one.
     pub(crate) fn ov_add_collision(&mut self, obj: usize, c: usize) {
-        let slot = if self.coll.collisions[c].fvec[0] < 0 { 0 } else { 1 };
-        let Some(e) = self.coll.ov.element_mut(obj) else { return };
+        let slot = if self.coll.collisions[c].fvec[0] < 0 {
+            0
+        } else {
+            1
+        };
+        let Some(e) = self.coll.ov.element_mut(obj) else {
+            return;
+        };
         self.coll.collisions[c].fvec[slot] = e.collisions.len() as i32;
         e.collisions.push(c);
     }
@@ -729,7 +763,9 @@ impl World {
 
     /// Swaps two of an element's collisions, keeping their slots in step (0x100188c0).
     fn swap_element_collisions(&mut self, obj: usize, i: usize, j: usize) {
-        let Some(e) = self.coll.ov.element_mut(obj) else { return };
+        let Some(e) = self.coll.ov.element_mut(obj) else {
+            return;
+        };
         let (a, b) = (e.collisions[i], e.collisions[j]);
         e.collisions.swap(i, j);
         let sa = self.slot_of(a, i);
@@ -740,8 +776,12 @@ impl World {
 
     /// Takes collision `c` out of object `obj`'s element, moving the last one into its place (0x1002f3b0's helper).
     fn ov_remove_collision(&mut self, obj: usize, c: usize) {
-        let Some(e) = self.coll.ov.element(obj) else { return };
-        let Some(i) = e.collisions.iter().position(|&x| x == c) else { return };
+        let Some(e) = self.coll.ov.element(obj) else {
+            return;
+        };
+        let Some(i) = e.collisions.iter().position(|&x| x == c) else {
+            return;
+        };
         let last = e.collisions.len() - 1;
         let slot = self.slot_of(c, i);
         self.coll.collisions[c].fvec[slot] = -1;
@@ -792,7 +832,12 @@ impl World {
     }
 
     /// Creates a collision record for mindist `m` of objects `objs` and returns its index.
-    pub(crate) fn collision_new(&mut self, kind: CollKind, objs: [usize; 2], index: usize) -> usize {
+    pub(crate) fn collision_new(
+        &mut self,
+        kind: CollKind,
+        objs: [usize; 2],
+        index: usize,
+    ) -> usize {
         let c = Collision {
             kind,
             objs,
@@ -821,7 +866,12 @@ mod tests {
     use crate::math::Quat;
 
     fn unit_q() -> Quat {
-        Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }
+        Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        }
     }
 
     /// A world with `n` unit-radius objects on the x axis, `gap` apart, all with collision detection.
@@ -863,7 +913,12 @@ mod tests {
     /// is kept at its edge, and every object near the origin keeps its exact box.
     #[test]
     fn objects_at_absurd_places_are_kept_at_the_edge() {
-        let w = world_with(&[[0.0, 0.0, 0.0], [1e30, -1e30, 3.0], [f64::from(f32::MAX), 0.0, 0.0], [7.3, -2.9, 4.1]]);
+        let w = world_with(&[
+            [0.0, 0.0, 0.0],
+            [1e30, -1e30, 3.0],
+            [f64::from(f32::MAX), 0.0, 0.0],
+            [7.3, -2.9, 4.1],
+        ]);
         assert!(box_contains_sphere(&w, 0));
         assert!(box_contains_sphere(&w, 3));
         assert!(w.coll.ov.nodes.iter().filter(|n| n.alive).count() < 200);
@@ -884,7 +939,12 @@ mod tests {
 
     #[test]
     fn disabling_everything_empties_the_tree() {
-        let mut w = world_with(&[[0.0, 0.0, 0.0], [3.0, 0.0, 0.0], [-40.0, 5.0, 2.0], [400.0, 0.0, 0.0]]);
+        let mut w = world_with(&[
+            [0.0, 0.0, 0.0],
+            [3.0, 0.0, 0.0],
+            [-40.0, 5.0, 2.0],
+            [400.0, 0.0, 0.0],
+        ]);
         for obj in 0..4 {
             w.disable_collision_detection(obj);
         }

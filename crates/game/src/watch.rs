@@ -3,7 +3,7 @@
 // level. The game writes each finding to the level's watch log and saves the replay up to that tick, so the case
 // replays exactly with --headless.
 
-use crate::sim::{input, TICK};
+use crate::sim::{TICK, input};
 use glam::Vec3;
 
 /// Seconds the ball must stay (almost) still while pushed before it counts as stuck.
@@ -61,7 +61,8 @@ pub struct Finding {
 
 /// Whether the input pushes the ball: the arrows, except Left and Right while Shift turns the camera.
 pub fn pushing(input: u8) -> bool {
-    input & (input::UP | input::DOWN) != 0 || (input & input::SHIFT == 0 && input & (input::LEFT | input::RIGHT) != 0)
+    input & (input::UP | input::DOWN) != 0
+        || (input & input::SHIFT == 0 && input & (input::LEFT | input::RIGHT) != 0)
 }
 
 /// The state of one run's watch: each fault is reported once per episode.
@@ -82,8 +83,23 @@ impl Watch {
     /// Looks at the state after tick `tick` and returns the findings that begin there. An episode ends when the
     /// fault is gone: the ball moves on, the push stops, the ball lands, it slows down again, or it is out of the
     /// floor. `sink` is how deep the ball is in the floor (its radius less its distance to the nearest floor triangle).
-    pub fn observe(&mut self, tick: u64, pos: Vec3, vel: Vec3, input: u8, on_ground: bool, sink: f32) -> Vec<Finding> {
-        let found = |kind| Finding { kind, tick, pos, vel, input, on_ground };
+    pub fn observe(
+        &mut self,
+        tick: u64,
+        pos: Vec3,
+        vel: Vec3,
+        input: u8,
+        on_ground: bool,
+        sink: f32,
+    ) -> Vec<Finding> {
+        let found = |kind| Finding {
+            kind,
+            tick,
+            pos,
+            vel,
+            input,
+            on_ground,
+        };
         let mut out = Vec::new();
 
         // stuck: pushed and still, for a while
@@ -162,7 +178,10 @@ mod tests {
     fn a_ball_that_is_not_pushed_is_not_stuck() {
         let mut w = Watch::default();
         for t in 1..=400 {
-            assert!(w.observe(t, Vec3::ZERO, Vec3::ZERO, 0, true, 0.0).is_empty());
+            assert!(
+                w.observe(t, Vec3::ZERO, Vec3::ZERO, 0, true, 0.0)
+                    .is_empty()
+            );
         }
     }
 
@@ -176,12 +195,25 @@ mod tests {
     #[test]
     fn a_flight_of_six_ticks_from_an_upward_takeoff_is_a_launch_reported_once() {
         let mut w = Watch::default();
-        assert!(w.observe(1, Vec3::ZERO, Vec3::new(5.0, 0.0, 0.0), 0, true, 0.0).is_empty());
+        assert!(
+            w.observe(1, Vec3::ZERO, Vec3::new(5.0, 0.0, 0.0), 0, true, 0.0)
+                .is_empty()
+        );
         let mut found = Vec::new();
         for t in 2..=12 {
-            found.extend(w.observe(t, Vec3::ZERO, Vec3::new(5.0, 6.0 - t as f32, 0.0), 0, false, 0.0));
+            found.extend(w.observe(
+                t,
+                Vec3::ZERO,
+                Vec3::new(5.0, 6.0 - t as f32, 0.0),
+                0,
+                false,
+                0.0,
+            ));
         }
-        assert_eq!(found.iter().map(|f| f.kind).collect::<Vec<_>>(), vec![Kind::Launch]);
+        assert_eq!(
+            found.iter().map(|f| f.kind).collect::<Vec<_>>(),
+            vec![Kind::Launch]
+        );
         assert_eq!(found[0].tick, 7, "the sixth tick in the air");
     }
 
@@ -189,16 +221,28 @@ mod tests {
     fn a_one_tick_flicker_of_the_contact_is_not_a_launch() {
         let mut w = Watch::default();
         w.observe(1, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, true, 0.0);
-        assert!(w.observe(2, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, false, 0.0).is_empty());
-        assert!(w.observe(3, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, true, 0.0).is_empty());
-        assert!(w.observe(4, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, false, 0.0).is_empty());
+        assert!(
+            w.observe(2, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, false, 0.0)
+                .is_empty()
+        );
+        assert!(
+            w.observe(3, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, true, 0.0)
+                .is_empty()
+        );
+        assert!(
+            w.observe(4, Vec3::ZERO, Vec3::new(13.0, 4.0, 0.0), 0, false, 0.0)
+                .is_empty()
+        );
     }
 
     #[test]
     fn running_off_an_edge_downward_is_not_a_launch() {
         let mut w = Watch::default();
         w.observe(1, Vec3::ZERO, Vec3::new(9.0, 0.0, 0.0), 0, true, 0.0);
-        assert!(w.observe(2, Vec3::ZERO, Vec3::new(9.0, -4.0, 0.0), 0, false, 0.0).is_empty());
+        assert!(
+            w.observe(2, Vec3::ZERO, Vec3::new(9.0, -4.0, 0.0), 0, false, 0.0)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -206,7 +250,10 @@ mod tests {
         let mut w = Watch::default();
         for t in 1..=60 {
             let vy = 0.5 * t as f32;
-            assert!(w.observe(t, Vec3::ZERO, Vec3::new(9.0, vy, 0.0), 0, true, 0.0).is_empty());
+            assert!(
+                w.observe(t, Vec3::ZERO, Vec3::new(9.0, vy, 0.0), 0, true, 0.0)
+                    .is_empty()
+            );
         }
     }
 
@@ -220,13 +267,20 @@ mod tests {
         assert_eq!(fast, vec![Kind::Fast]);
         w.observe(11, Vec3::ZERO, Vec3::new(5.0, 0.0, 0.0), 0, true, 0.0);
         let again = w.observe(12, Vec3::ZERO, Vec3::new(98.0, 0.0, 0.0), 0, true, 0.0);
-        assert_eq!(again.iter().map(|f| f.kind).collect::<Vec<_>>(), vec![Kind::Fast]);
+        assert_eq!(
+            again.iter().map(|f| f.kind).collect::<Vec<_>>(),
+            vec![Kind::Fast]
+        );
     }
 
     #[test]
     fn a_ball_deep_in_the_floor_sinks_once_until_it_is_out() {
         let mut w = Watch::default();
-        assert!(w.observe(1, Vec3::ZERO, Vec3::ZERO, 0, true, 0.02).is_empty(), "resting contact depth");
+        assert!(
+            w.observe(1, Vec3::ZERO, Vec3::ZERO, 0, true, 0.02)
+                .is_empty(),
+            "resting contact depth"
+        );
         let found: Vec<Kind> = (2..=5)
             .flat_map(|t| w.observe(t, Vec3::ZERO, Vec3::new(0.0, -5.0, 0.0), 0, false, 0.8))
             .map(|f| f.kind)

@@ -155,8 +155,15 @@ fn an_image_outside_the_textures_folder_is_refused() {
     });
     level::open::export(&l, &d).unwrap();
     let path = d.join("level.gltf");
-    let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    for bad in ["textures/x/evil.png", "other/a.png", "textures/", "textures/.hidden", "a.png"] {
+    let doc: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    for bad in [
+        "textures/x/evil.png",
+        "other/a.png",
+        "textures/",
+        "textures/.hidden",
+        "a.png",
+    ] {
         let mut doc = doc.clone();
         doc["images"][0]["uri"] = serde_json::json!(bad);
         std::fs::write(&path, serde_json::to_string(&doc).unwrap()).unwrap();

@@ -6,10 +6,18 @@ const TABLE: &str = include_str!("../../../hints/sector-balls.txt");
 /// The balls of original level `level` by sector (index 0 is sector 1, which takes the level's start ball: none here).
 pub fn original(level: u32) -> Vec<Option<String>> {
     let mut v: Vec<Option<String>> = Vec::new();
-    for line in TABLE.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+    for line in TABLE
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+    {
         let mut w = line.split_whitespace();
-        let (Some(l), Some(s), Some(b)) = (w.next(), w.next(), w.next()) else { continue };
-        let (Ok(l), Ok(s)) = (l.parse::<u32>(), s.parse::<usize>()) else { continue };
+        let (Some(l), Some(s), Some(b)) = (w.next(), w.next(), w.next()) else {
+            continue;
+        };
+        let (Ok(l), Ok(s)) = (l.parse::<u32>(), s.parse::<usize>()) else {
+            continue;
+        };
         if l != level || s == 0 {
             continue;
         }
@@ -31,7 +39,10 @@ mod tests {
         assert_eq!(l13[2].as_deref(), Some("paper"));
         assert!(super::original(99).is_empty());
         for n in 1..=13 {
-            assert!(super::original(n).iter().skip(1).all(Option::is_some), "level {n}");
+            assert!(
+                super::original(n).iter().skip(1).all(Option::is_some),
+                "level {n}"
+            );
         }
     }
 }

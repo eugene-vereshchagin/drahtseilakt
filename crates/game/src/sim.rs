@@ -6,8 +6,8 @@
 // what the C game does, measured in its C reference build.
 
 use crate::collide::{StaticMesh, Triangle};
-use crate::proximity::{ACROSS, ALL_AXES, Proximity, Range};
 use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, Rot, World};
+use crate::proximity::{ACROSS, ALL_AXES, Proximity, Range};
 use crate::scene::{ModuleBody, Modules, module_of};
 use crate::volume::Obb;
 use glam::{Mat3, Mat4, Quat, Vec3};
@@ -144,7 +144,6 @@ impl Ball {
             rot_damp: BALL_ROT_DAMP,
         }
     }
-
 }
 
 /// The game camera, as the original's rig moves it (Camera.nmo's frames, Gameplay.nmo's two TT Set Dynamic Position
@@ -308,7 +307,13 @@ struct SwingRun {
 impl SwingRun {
     fn new(sector: Option<usize>, at: SwingInst, now: bool) -> SwingRun {
         // the level's load took the Sequencer's first step
-        let mut w = SwingRun { sector, at, since: None, steps: 1, push: None };
+        let mut w = SwingRun {
+            sector,
+            at,
+            since: None,
+            steps: 1,
+            push: None,
+        };
         if now {
             w.enter(0);
         }
@@ -322,7 +327,9 @@ impl SwingRun {
 
     /// The push its script wants `age` ticks after the module came in: +1, -1 or none.
     fn wanted(&self, age: u64) -> i8 {
-        let Some(t) = age.checked_sub(self.at.start) else { return 0 };
+        let Some(t) = age.checked_sub(self.at.start) else {
+            return 0;
+        };
         let phase = t / self.at.phase.max(1);
         if self.at.pauses {
             [1, 0, -1, 0][(phase % 4) as usize]
@@ -419,7 +426,11 @@ struct FinishTrigger {
 impl FinishTrigger {
     /// Switched on, with the physics' joints its module just made.
     fn arm(&mut self, made: &[Option<usize>]) {
-        self.joints = self.breaks.iter().filter_map(|&k| made.get(k).copied().flatten()).collect();
+        self.joints = self
+            .breaks
+            .iter()
+            .filter_map(|&k| made.get(k).copied().flatten())
+            .collect();
         self.prox.switch_on();
     }
 }
@@ -440,10 +451,34 @@ struct WakeTrigger {
 /// A module's joint between two game bodies, its points and axes in the world.
 #[derive(Clone, Copy, Debug)]
 enum JointInst {
-    Slider { a: usize, b: usize, p0: Vec3, p1: Vec3, limits: Option<(f32, f32)> },
-    Hinge { a: usize, b: usize, anchor: Vec3, axis: Vec3 },
-    Ball { a: usize, b: usize, anchor: Vec3 },
-    Spring { a: usize, pa: Vec3, b: usize, pb: Vec3, length: f32, constant: f32, lin_damp: f32, glob_damp: f32 },
+    Slider {
+        a: usize,
+        b: usize,
+        p0: Vec3,
+        p1: Vec3,
+        limits: Option<(f32, f32)>,
+    },
+    Hinge {
+        a: usize,
+        b: usize,
+        anchor: Vec3,
+        axis: Vec3,
+    },
+    Ball {
+        a: usize,
+        b: usize,
+        anchor: Vec3,
+    },
+    Spring {
+        a: usize,
+        pa: Vec3,
+        b: usize,
+        pb: Vec3,
+        length: f32,
+        constant: f32,
+        lin_damp: f32,
+        glob_damp: f32,
+    },
 }
 
 impl ModuleInst {
@@ -456,12 +491,25 @@ impl ModuleInst {
         let mut made = Vec::new();
         for j in &self.joints {
             made.push(match *j {
-                JointInst::Slider { a, b, p0, p1, limits } => world.add_slider(a, b, p0, p1, limits),
+                JointInst::Slider {
+                    a,
+                    b,
+                    p0,
+                    p1,
+                    limits,
+                } => world.add_slider(a, b, p0, p1, limits),
                 JointInst::Hinge { a, b, anchor, axis } => world.add_hinge(a, b, anchor, axis),
                 JointInst::Ball { a, b, anchor } => world.add_ball_joint(a, b, anchor),
-                JointInst::Spring { a, pa, b, pb, length, constant, lin_damp, glob_damp } => {
-                    world.add_spring(a, pa, b, pb, length, constant, lin_damp, glob_damp)
-                }
+                JointInst::Spring {
+                    a,
+                    pa,
+                    b,
+                    pb,
+                    length,
+                    constant,
+                    lin_damp,
+                    glob_damp,
+                } => world.add_spring(a, pa, b, pb, length, constant, lin_damp, glob_damp),
             });
         }
         made
@@ -554,15 +602,31 @@ fn module_parts(
     // A force's direction turned by its frame and normalised (a near-zero one is +x), times its value.
     let force = |f: &ForceSpec| -> Option<ForceInst> {
         let dir = at(f.dir_frame)?.transform_vector3(Vec3::from(f.dir));
-        let dir = if dir.length_squared() <= 1e-4 { Vec3::X } else { dir.normalize() };
-        Some(ForceInst { body: body(f.part)?, force: dir * f.value, point: point(f.pos_frame, f.pos)? })
+        let dir = if dir.length_squared() <= 1e-4 {
+            Vec3::X
+        } else {
+            dir.normalize()
+        };
+        Some(ForceInst {
+            body: body(f.part)?,
+            force: dir * f.value,
+            point: point(f.pos_frame, f.pos)?,
+        })
     };
     for f in spec.forces {
         inst.forces.push(force(f)?);
     }
     for j in spec.joints {
         inst.joints.push(match *j {
-            JointSpec::Slider { a, b, from, to, limits, lo, hi } => JointInst::Slider {
+            JointSpec::Slider {
+                a,
+                b,
+                from,
+                to,
+                limits,
+                lo,
+                hi,
+            } => JointInst::Slider {
                 a: body(a)?,
                 b: body(b)?,
                 p0: point(from, [0.0; 3])?,
@@ -580,26 +644,36 @@ fn module_parts(
                 b: body(b)?,
                 anchor: point(frame, pos)?,
             },
-            JointSpec::Spring { a, pos_a, frame_a, b, pos_b, frame_b, length, constant, lin_damp, glob_damp } => {
-                JointInst::Spring {
-                    a: body(a)?,
-                    pa: point(frame_a, pos_a)?,
-                    b: body(b)?,
-                    pb: point(frame_b, pos_b)?,
-                    length,
-                    constant,
-                    lin_damp,
-                    glob_damp,
-                }
-            }
+            JointSpec::Spring {
+                a,
+                pos_a,
+                frame_a,
+                b,
+                pos_b,
+                frame_b,
+                length,
+                constant,
+                lin_damp,
+                glob_damp,
+            } => JointInst::Spring {
+                a: body(a)?,
+                pa: point(frame_a, pos_a)?,
+                b: body(b)?,
+                pb: point(frame_b, pos_b)?,
+                length,
+                constant,
+                lin_damp,
+                glob_damp,
+            },
         });
     }
     if let Some(u) = &spec.updraft {
         let o = file.objects.iter().find(|o| o.name == u.volume)?;
         let mesh = file.meshes.get(o.mesh?)?;
-        let (lo, hi) = mesh.positions.iter().fold((Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)), |(lo, hi), p| {
-            (lo.min(Vec3::from(*p)), hi.max(Vec3::from(*p)))
-        });
+        let (lo, hi) = mesh.positions.iter().fold(
+            (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)),
+            |(lo, hi), p| (lo.min(Vec3::from(*p)), hi.max(Vec3::from(*p))),
+        );
         inst.updraft = Some(UpdraftInst {
             point: at(u.near)?.w_axis.truncate(),
             volume: Obb::from_box(lo, hi, &at(u.volume)?),
@@ -608,7 +682,11 @@ fn module_parts(
     }
     if let Some(w) = &spec.swing {
         let dir = at(w.dir_frame)?.transform_vector3(Vec3::from(w.dir));
-        let dir = if dir.length_squared() <= 1e-4 { Vec3::X } else { dir.normalize() };
+        let dir = if dir.length_squared() <= 1e-4 {
+            Vec3::X
+        } else {
+            dir.normalize()
+        };
         inst.swing = Some(SwingInst {
             body: body(w.part)?,
             force: dir * w.value,
@@ -635,12 +713,19 @@ fn module_parts(
             .joints
             .iter()
             .enumerate()
-            .filter(|(_, j)| matches!(j, JointSpec::Hinge { frame, .. } if f.breaks.contains(frame)))
+            .filter(
+                |(_, j)| matches!(j, JointSpec::Hinge { frame, .. } if f.breaks.contains(frame)),
+            )
             .map(|(k, _)| k)
             .collect();
         // the finish's proximity: tested every frame within 5, every 10 frames beyond 10
         let prox = Proximity::new(f.distance, ALL_AXES, 5.0, 10.0, (1, 10));
-        inst.finish = Some(FinishInst { near: body(f.near)?, prox, force: force(&f.force)?, breaks });
+        inst.finish = Some(FinishInst {
+            near: body(f.near)?,
+            prox,
+            force: force(&f.force)?,
+            breaks,
+        });
     }
     Some(inst)
 }
@@ -768,6 +853,9 @@ pub struct Sim {
     pub mods: crate::modrt::SimMods,
     /// What the ball touched at the last tick (for the mods): whether, and whether something steep.
     touching: (bool, bool),
+    /// The map's own scripts (scripting.rs), run each tick before the physics; none for a level without them, or
+    /// for a replay recorded before format 9, when scripts did not run.
+    pub scripts: Option<crate::scripting::Scripts>,
 }
 
 /// A change of a sector's bodies due at a tick: its objects or its modules, entering or leaving the physics.
@@ -812,14 +900,25 @@ impl Sim {
     /// A run of a level, with the physics of the modules the port has (crate::modules) from their loaded files.
     /// `tutorial`: the level starts with the original's tutorial (level 1), which stops the level before the ball.
     #[cfg(test)]
-    pub fn with_modules(level: &Level, start_ball: BallKind, modules: &Modules, tutorial: bool) -> Sim {
+    pub fn with_modules(
+        level: &Level,
+        start_ball: BallKind,
+        modules: &Modules,
+        tutorial: bool,
+    ) -> Sim {
         Sim::with_rules(level, start_ball, modules, tutorial, crate::replay::VERSION)
     }
 
     /// A run of a level by the rules of a replay format (crate::replay), so that a replay plays as it was recorded:
     /// format 5 made the loose objects (crates, paper balls, domes) of their module file's object, as the original
     /// does; before, of the level's stand-in. `tutorial` as for `with_modules`.
-    pub fn with_rules(level: &Level, start_ball: BallKind, modules: &Modules, tutorial: bool, format: u32) -> Sim {
+    pub fn with_rules(
+        level: &Level,
+        start_ball: BallKind,
+        modules: &Modules,
+        tutorial: bool,
+        format: u32,
+    ) -> Sim {
         // A placeholder whose module is loaded is not solid itself: the module is made of its parts when the port
         // has its physics, and an original module without an entry has none. A placeholder whose module file is
         // missing (a map's own module) stays solid.
@@ -827,7 +926,9 @@ impl Sim {
         let made: Vec<usize> = (0..level.objects.len())
             .filter(|&i| loaded(i).is_some_and(|n| crate::modules::spec(n).is_some()))
             .collect();
-        let not_solid: Vec<usize> = (0..level.objects.len()).filter(|&i| loaded(i).is_some()).collect();
+        let not_solid: Vec<usize> = (0..level.objects.len())
+            .filter(|&i| loaded(i).is_some())
+            .collect();
         let statics = static_meshes(level, &not_solid);
         let pos = |name: &str| -> Vec<(usize, Vec3)> {
             level
@@ -846,7 +947,12 @@ impl Sim {
             {
                 for &m in &g.members {
                     if let Some(o) = level.objects.get(m) {
-                        trafos.push((m, Vec3::from(o.position()), kind, Mat4::from_cols_array_2d(&o.matrix)));
+                        trafos.push((
+                            m,
+                            Vec3::from(o.position()),
+                            kind,
+                            Mat4::from_cols_array_2d(&o.matrix),
+                        ));
                     }
                 }
             }
@@ -866,8 +972,14 @@ impl Sim {
             },
             resets: sorted_by_name(level, "PR_Resetpoints"),
             reset_turns: sorted_turns_by_name(level, "PR_Resetpoints"),
-            resets_listed: by_bytes(level, "PR_Resetpoints").into_iter().map(|o| Vec3::from(o.position())).collect(),
-            reset_turns_listed: by_bytes(level, "PR_Resetpoints").into_iter().map(turn_of).collect(),
+            resets_listed: by_bytes(level, "PR_Resetpoints")
+                .into_iter()
+                .map(|o| Vec3::from(o.position()))
+                .collect(),
+            reset_turns_listed: by_bytes(level, "PR_Resetpoints")
+                .into_iter()
+                .map(turn_of)
+                .collect(),
             end: pos("PE_Levelende").first().map(|p| p.1),
             extra_points: pos("P_Extra_Point"),
             extra_lives: pos("P_Extra_Life"),
@@ -913,7 +1025,10 @@ impl Sim {
         // The sector of each level object (groups Sector_01, Sector_02, ...): a sector's objects are in the physics
         // only while it is the current one; an object in no sector always is.
         let sector_of = |i: usize| -> Option<usize> {
-            level.groups.iter().find_map(|g| sector_number(&g.name).filter(|_| g.members.contains(&i)))
+            level
+                .groups
+                .iter()
+                .find_map(|g| sector_number(&g.name).filter(|_| g.members.contains(&i)))
         };
         let object_sectors: Vec<Option<usize>> = (0..level.objects.len()).map(sector_of).collect();
         // Loose objects that move, and the domes: boxes, the loose balls and P_Dome (their material table in
@@ -938,7 +1053,11 @@ impl Sim {
                 Some(m) if format >= 5 => m,
                 _ => mesh,
             };
-            let points: Vec<Vec3> = mesh.positions.iter().map(|p| Vec3::from(*p) * scale).collect();
+            let points: Vec<Vec3> = mesh
+                .positions
+                .iter()
+                .map(|p| Vec3::from(*p) * scale)
+                .collect();
             let sector = sector_of(i);
             // Every object is made at the level start (below); here it is only placed.
             let active = false;
@@ -1034,11 +1153,22 @@ impl Sim {
         let mut unsectored_modules = Vec::new();
         let mut module_bodies = Vec::new();
         for &i in &made {
-            let Some(name) = module_of(level, i) else { continue };
-            let (Some(spec), Some((_, file))) = (crate::modules::spec(name), modules.get(name)) else {
+            let Some(name) = module_of(level, i) else {
                 continue;
             };
-            let Some(inst) = module_parts(&mut world, level, i, spec, file, fixcube, &mut module_bodies) else {
+            let (Some(spec), Some((_, file))) = (crate::modules::spec(name), modules.get(name))
+            else {
+                continue;
+            };
+            let Some(inst) = module_parts(
+                &mut world,
+                level,
+                i,
+                spec,
+                file,
+                fixcube,
+                &mut module_bodies,
+            ) else {
                 continue;
             };
             match sector_of(i) {
@@ -1052,7 +1182,10 @@ impl Sim {
             }
         }
         world.run(LEVEL_INTRO_SECONDS);
-        for &b in unsectored.iter().chain(sectors.first().map(Vec::as_slice).unwrap_or(&[])) {
+        for &b in unsectored
+            .iter()
+            .chain(sectors.first().map(Vec::as_slice).unwrap_or(&[]))
+        {
             world.activate(b);
         }
         // The modules come one frame after the sector's objects, then the ball.
@@ -1069,10 +1202,17 @@ impl Sim {
         let mut updrafts = Vec::new();
         let mut swings = Vec::new();
         let mut breaks = Vec::new();
-        let sectored = module_sectors.iter().enumerate().flat_map(|(n, v)| v.iter().map(move |m| (Some(n), m)));
+        let sectored = module_sectors
+            .iter()
+            .enumerate()
+            .flat_map(|(n, v)| v.iter().map(move |m| (Some(n), m)));
         for (sector, inst) in unsectored_modules.iter().map(|m| (None, m)).chain(sectored) {
             let now = sector.is_none_or(|n| n == 0);
-            let joints = if now { inst.enter(&mut world) } else { Vec::new() };
+            let joints = if now {
+                inst.enter(&mut world)
+            } else {
+                Vec::new()
+            };
             if let Some(at) = inst.swing {
                 swings.push(SwingRun::new(sector, at, now));
             }
@@ -1092,7 +1232,14 @@ impl Sim {
                 if now {
                     prox.switch_on();
                 }
-                wake_triggers.push(WakeTrigger { sector, body, then, forces: inst.forces.clone(), near, prox });
+                wake_triggers.push(WakeTrigger {
+                    sector,
+                    body,
+                    then,
+                    forces: inst.forces.clone(),
+                    near,
+                    prox,
+                });
             }
             if let Some(f) = &inst.finish {
                 let mut t = FinishTrigger {
@@ -1112,18 +1259,32 @@ impl Sim {
         let mut extras = Vec::new();
         if let Some((_, file)) = modules.get("P_Extra_Point") {
             let local: Vec<Vec3> = (1..=6)
-                .filter_map(|k| file.objects.iter().find(|o| o.name == format!("P_Extra_Point_Frame{k}")))
+                .filter_map(|k| {
+                    file.objects
+                        .iter()
+                        .find(|o| o.name == format!("P_Extra_Point_Frame{k}"))
+                })
                 .map(|o| Vec3::from(o.position()))
                 .collect();
             if local.len() == 6 {
                 for &(i, q) in &rules.extra_points {
-                    let rot = level.objects.get(i).and_then(|o| pose_and_scale(&o.matrix)).map_or(Quat::IDENTITY, |p| p.1.quat());
+                    let rot = level
+                        .objects
+                        .get(i)
+                        .and_then(|o| pose_and_scale(&o.matrix))
+                        .map_or(Quat::IDENTITY, |p| p.1.quat());
                     extras.push(crate::extra::Extra::new(i, q, rot, &local));
                 }
             }
         }
         world.run(until_ball - frame);
-        world.replace_ball(0, BALL_RADIUS, ball.material(), ball.position, Rot::Basis(turn));
+        world.replace_ball(
+            0,
+            BALL_RADIUS,
+            ball.material(),
+            ball.position,
+            Rot::Basis(turn),
+        );
         let mut camera = Camera {
             quarter,
             yaw,
@@ -1152,7 +1313,10 @@ impl Sim {
             game_over: false,
             taken: Vec::new(),
             // the first sector is in play from the start, as its objects are in the physics (above)
-            unseen: object_sectors.iter().map(|s| s.is_some_and(|n| n != 0)).collect(),
+            unseen: object_sectors
+                .iter()
+                .map(|s| s.is_some_and(|n| n != 0))
+                .collect(),
             object_sectors,
             events: Vec::new(),
             prev_input: 0,
@@ -1189,12 +1353,65 @@ impl Sim {
             sector_changes: Vec::new(),
             mods: crate::modrt::SimMods::default(),
             touching: (false, false),
+            scripts: if format >= 9 {
+                crate::scripting::Scripts::new(level)
+            } else {
+                None
+            },
         }
+    }
+
+    /// Objects a map's scripts hid or deleted, by level object index (empty without scripts).
+    pub fn script_hidden(&self) -> &[bool] {
+        self.scripts.as_ref().map_or(&[], |s| s.hidden.as_slice())
+    }
+
+    /// Objects a map's scripts moved: their matrices now (empty without scripts).
+    pub fn script_moved(&self) -> &[Option<Mat4>] {
+        self.scripts.as_ref().map_or(&[], |s| s.moved.as_slice())
+    }
+
+    /// One tick of the map's scripts, before the physics (the original runs its behaviours first in a frame); a
+    /// script that sets the ball's position puts a new ball there at rest, as the original re-physicalizes it.
+    fn run_scripts(&mut self) {
+        let Some(mut scripts) = self.scripts.take() else {
+            return;
+        };
+        let mut view = crate::scripting::RunView {
+            tick: self.tick,
+            ball: self.ball.position,
+            ball_radius: BALL_RADIUS,
+            points: self.points,
+            in_play: self.dying.is_none() && self.hold.is_none() && !self.finished,
+            teleport: None,
+        };
+        scripts.tick(&mut view);
+        if let Some(p) = view.teleport {
+            self.ball.position = p;
+            self.ball.velocity = Vec3::ZERO;
+            self.ball.spin = Vec3::ZERO;
+            self.world.replace_ball(
+                0,
+                BALL_RADIUS,
+                self.ball.material(),
+                p,
+                Rot::Quat(self.ball.rotation),
+            );
+            self.prev_pose = (p, self.ball.rotation);
+            self.camera.target = p;
+            self.camera.position = camera_goal(&self.camera, p);
+        }
+        self.scripts = Some(scripts);
     }
 
     /// The number of sectors (at least 1).
     pub fn sector_count(&self) -> usize {
-        self.rules.resets.len().max(self.sectors.len()).max(self.module_sectors.len()).max(1)
+        self.rules
+            .resets
+            .len()
+            .max(self.sectors.len())
+            .max(self.module_sectors.len())
+            .max(1)
     }
 
     /// Begins the run elsewhere than the level start, for testing a place: `sector` (0 is the first) becomes the
@@ -1206,7 +1423,12 @@ impl Sim {
             let tick = self.tick;
             for (sector, enter) in [(self.sector, false), (sector, true)] {
                 for modules in [false, true] {
-                    self.sector_changes.push(SectorChange { tick, sector, enter, modules });
+                    self.sector_changes.push(SectorChange {
+                        tick,
+                        sector,
+                        enter,
+                        modules,
+                    });
                 }
             }
             self.apply_sector_changes();
@@ -1225,7 +1447,13 @@ impl Sim {
         self.respawn();
         if let Some(p) = at {
             self.ball.position = p;
-            self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), p, Rot::Quat(self.ball.rotation));
+            self.world.replace_ball(
+                0,
+                BALL_RADIUS,
+                self.ball.material(),
+                p,
+                Rot::Quat(self.ball.rotation),
+            );
             self.camera.position = camera_goal(&self.camera, p);
             self.camera.target = p;
         }
@@ -1243,7 +1471,13 @@ impl Sim {
     fn put_ball(&mut self, pos: Vec3) {
         self.ball.position = pos;
         self.ball.velocity = Vec3::ZERO;
-        self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), pos, self.ball.rotation);
+        self.world.replace_ball(
+            0,
+            BALL_RADIUS,
+            self.ball.material(),
+            pos,
+            self.ball.rotation,
+        );
     }
 
     /// The rigid bodies: index 0 is the ball, then the loose ones. Each is (level object index, body index).
@@ -1416,10 +1650,12 @@ impl Sim {
                 self.ball.rotation = s.rot;
                 self.ball.spin = s.spin;
             }
-            self.camera.target += (self.ball.position - self.camera.target) * CAM_TARGET_FORCE * TICK;
+            self.camera.target +=
+                (self.ball.position - self.camera.target) * CAM_TARGET_FORCE * TICK;
             return;
         }
         self.tick += 1;
+        self.run_scripts();
         let pressed = input & !self.prev_input;
         self.prev_input = input;
 
@@ -1494,7 +1730,12 @@ impl Sim {
         // made, so kinds going on the same tick leave the physics as they always did)
         let mut gone = [false; 3];
         let (tick, expire) = (self.tick, self.pieces_expire);
-        for ((burst, fade), go) in self.pieces_burst.iter_mut().zip(&mut self.pieces_fade).zip(&mut gone) {
+        for ((burst, fade), go) in self
+            .pieces_burst
+            .iter_mut()
+            .zip(&mut self.pieces_fade)
+            .zip(&mut gone)
+        {
             if let (Some(b), None) = (*burst, *fade)
                 && expire
                 && tick >= b + crate::pieces::LIE_TICKS
@@ -1510,7 +1751,10 @@ impl Sim {
         if gone.contains(&true) {
             let world = &mut self.world;
             self.flying.retain(|&(kind, _, body)| {
-                let go = gone.get(crate::pieces::index(kind)).copied().unwrap_or(false);
+                let go = gone
+                    .get(crate::pieces::index(kind))
+                    .copied()
+                    .unwrap_or(false);
                 if go {
                     world.remove(body);
                 }
@@ -1519,7 +1763,9 @@ impl Sim {
         }
         if let Some(h) = self.hold {
             // the old ball bursts as it is hidden in the transformer
-            if self.tick == h.start + crate::trafo::BEGIN + crate::trafo::OLD_BALL_HIDDEN as u64 && self.bursts {
+            if self.tick == h.start + crate::trafo::BEGIN + crate::trafo::OLD_BALL_HIDDEN as u64
+                && self.bursts
+            {
                 self.burst(h.old, self.ball.position);
             }
             // Out of the physics, the ball is drawn moving to the transformer's hold point.
@@ -1530,7 +1776,13 @@ impl Sim {
                 self.ball.position = h.at;
                 self.ball.velocity = Vec3::ZERO;
                 self.ball.spin = Vec3::ZERO;
-                self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), h.at, self.ball.rotation);
+                self.world.replace_ball(
+                    0,
+                    BALL_RADIUS,
+                    self.ball.material(),
+                    h.at,
+                    self.ball.rotation,
+                );
                 self.drop_ball_forces();
             }
         } else if let Some(s) = self.world.state(0) {
@@ -1543,11 +1795,16 @@ impl Sim {
 
         self.follow_camera();
         self.apply_rules();
-        if self.trafo_anim.is_some_and(|a| self.tick as f32 > (a.start + crate::trafo::BEGIN) as f32 + crate::trafo::END) {
+        if self.trafo_anim.is_some_and(|a| {
+            self.tick as f32 > (a.start + crate::trafo::BEGIN) as f32 + crate::trafo::END
+        }) {
             self.trafo_anim = None;
         }
         // The points counter, every 30 ticks from tick 32, waiting while a ball is lost.
-        if self.tick > POINTS_FROM - POINTS_EVERY && self.dying.is_none() && self.tick >= self.points_resume {
+        if self.tick > POINTS_FROM - POINTS_EVERY
+            && self.dying.is_none()
+            && self.tick >= self.points_resume
+        {
             self.points_clock += 1;
             if self.points_clock.is_multiple_of(POINTS_EVERY) && self.points > 0 {
                 self.points -= 1;
@@ -1619,7 +1876,11 @@ impl Sim {
                     from: p,
                     old,
                 });
-                self.trafo_anim = Some(TrafoAnim { at, start: self.tick, kind });
+                self.trafo_anim = Some(TrafoAnim {
+                    at,
+                    start: self.tick,
+                    kind,
+                });
                 self.events.push((self.tick, Event::Transform(kind)));
             }
         }
@@ -1688,11 +1949,19 @@ impl Sim {
         if cubes.is_empty() {
             return self.ball.position.y < self.rules.death_y;
         }
-        let Some(age) = self.tick.checked_sub(self.depth_from) else { return false };
-        let Some(cube) = cubes.get((age % (cubes.len() as u64 + 1)) as usize) else { return false };
+        let Some(age) = self.tick.checked_sub(self.depth_from) else {
+            return false;
+        };
+        let Some(cube) = cubes.get((age % (cubes.len() as u64 + 1)) as usize) else {
+            return false;
+        };
         let (lo, hi) = self.ball_boxes[self.ball.kind as usize];
         let (pos, rot) = self.prev_pose;
-        cube.overlaps(&Obb::from_box(lo, hi, &glam::Mat4::from_rotation_translation(rot, pos)))
+        cube.overlaps(&Obb::from_box(
+            lo,
+            hi,
+            &glam::Mat4::from_rotation_translation(rot, pos),
+        ))
     }
 
     fn die(&mut self) {
@@ -1746,34 +2015,56 @@ impl Sim {
         let hidden = crate::trafo::BEGIN + crate::trafo::OLD_BALL_HIDDEN as u64;
         let burst = self.hold.is_some_and(|h| self.tick == h.start + hidden);
         let new_ball = self.tick == 1
-            || self.tick.checked_sub(SMOKE_AFTER_NEW_BALL).is_some_and(|t| {
-                self.events.iter().rev().take(64).any(|&(at, e)| at == t && e == Event::NewBall)
-            });
+            || self
+                .tick
+                .checked_sub(SMOKE_AFTER_NEW_BALL)
+                .is_some_and(|t| {
+                    self.events
+                        .iter()
+                        .rev()
+                        .take(64)
+                        .any(|&(at, e)| at == t && e == Event::NewBall)
+                });
         (burst || new_ball).then_some(self.ball.position)
     }
 
     /// The pieces lying about: each one's mesh in the balls' model, its body and how opaque it is.
     pub fn pieces_view(&self) -> Vec<(usize, usize, f32)> {
         let alpha = |kind: BallKind| {
-            let fade = self.pieces_fade.get(crate::pieces::index(kind)).copied().flatten();
+            let fade = self
+                .pieces_fade
+                .get(crate::pieces::index(kind))
+                .copied()
+                .flatten();
             fade.map_or(1.0, |f| crate::pieces::fade(self.tick.saturating_sub(f)))
         };
         self.flying
             .iter()
-            .filter_map(|&(kind, p, body)| self.pieces.of(kind).get(p).map(|piece| (piece.mesh, body, alpha(kind))))
+            .filter_map(|&(kind, p, body)| {
+                self.pieces
+                    .of(kind)
+                    .get(p)
+                    .map(|piece| (piece.mesh, body, alpha(kind)))
+            })
             .collect()
     }
 
     /// The old ball bursts at `at` into its pieces (Ball_Explosion_<kind>): the pieces of that kind lying about are
     /// taken up again, set about the ball, made bodies and pushed along their own up.
     fn burst(&mut self, kind: BallKind, at: Vec3) {
-        let again: Vec<usize> = self.flying.iter().filter(|f| f.0 == kind).map(|f| f.2).collect();
+        let again: Vec<usize> = self
+            .flying
+            .iter()
+            .filter(|f| f.0 == kind)
+            .map(|f| f.2)
+            .collect();
         for body in again {
             self.world.remove(body);
         }
         self.flying.retain(|f| f.0 != kind);
         let k = crate::pieces::index(kind);
-        if let (Some(at), Some(fade)) = (self.pieces_burst.get_mut(k), self.pieces_fade.get_mut(k)) {
+        if let (Some(at), Some(fade)) = (self.pieces_burst.get_mut(k), self.pieces_fade.get_mut(k))
+        {
             *at = Some(self.tick);
             *fade = None;
         }
@@ -1790,10 +2081,13 @@ impl Sim {
                 rot_damp: b.rot_damp,
             };
             let pieces = [piece.hull.clone()];
-            let made = self.world.add_part(&pieces, m, pos, rot, false, GROUP_BALL, false, true, [0.0; 3], true);
+            let made = self.world.add_part(
+                &pieces, m, pos, rot, false, GROUP_BALL, false, true, [0.0; 3], true,
+            );
             let Some(body) = made else { continue };
             let up = rot * Vec3::Y;
-            self.world.impulse_at(body, pos + rot * b.point, up * rng.range(b.impulse));
+            self.world
+                .impulse_at(body, pos + rot * b.point, up * rng.range(b.impulse));
             self.flying.push((kind, k, body));
         }
     }
@@ -1806,14 +2100,24 @@ impl Sim {
     /// The transformer animation playing: the transformer's matrix, the animation's age in ticks and the kind it
     /// makes.
     pub fn trafo_anim(&self) -> Option<(Mat4, f32, BallKind)> {
-        self.trafo_anim
-            .map(|a| (a.at, self.tick as f32 - (a.start + crate::trafo::BEGIN) as f32, a.kind))
+        self.trafo_anim.map(|a| {
+            (
+                a.at,
+                self.tick as f32 - (a.start + crate::trafo::BEGIN) as f32,
+                a.kind,
+            )
+        })
     }
 
     /// The ball to draw: in a transformer the old kind until the old ball is hidden, then none until the new one.
     pub fn drawn_ball(&self) -> Option<BallKind> {
         match self.hold {
-            Some(h) if self.tick >= h.start + crate::trafo::BEGIN + crate::trafo::OLD_BALL_HIDDEN as u64 => None,
+            Some(h)
+                if self.tick
+                    >= h.start + crate::trafo::BEGIN + crate::trafo::OLD_BALL_HIDDEN as u64 =>
+            {
+                None
+            }
             Some(h) => Some(h.old),
             None => Some(self.ball.kind),
         }
@@ -1831,7 +2135,9 @@ impl Sim {
             .iter()
             .map(|u| {
                 let v = &u.at.volume;
-                let reach = |f: fn(Vec3) -> f32| (0..3).map(|i| f(v.axes[i]).abs() * v.half[i]).sum::<f32>();
+                let reach = |f: fn(Vec3) -> f32| {
+                    (0..3).map(|i| f(v.axes[i]).abs() * v.half[i]).sum::<f32>()
+                };
                 let across = reach(|a| a.x).min(reach(|a| a.z)).min(7.0);
                 (u.at.point, v.center.y + reach(|a| a.y), across)
             })
@@ -1845,7 +2151,11 @@ impl Sim {
 
     /// The fans in the physics now (their points), for their sound.
     pub fn fans(&self) -> Vec<Vec3> {
-        self.updrafts.iter().filter(|u| u.outer.on || u.inner.on).map(|u| u.at.point).collect()
+        self.updrafts
+            .iter()
+            .filter(|u| u.outer.on || u.inner.on)
+            .map(|u| u.at.point)
+            .collect()
     }
 
     /// The score of a finished level, as the original's end screen counts it: the points left (time points), the
@@ -1856,12 +2166,20 @@ impl Sim {
 
     /// The checkpoints in the order the sectors pass them.
     fn checkpoints(&self) -> &[(usize, Vec3)] {
-        if self.checkpoints_by_name { &self.rules.checkpoints } else { &self.rules.checkpoints_listed }
+        if self.checkpoints_by_name {
+            &self.rules.checkpoints
+        } else {
+            &self.rules.checkpoints_listed
+        }
     }
 
     /// The checkpoints in the order the sectors pass them, then the level's end.
     pub fn stages(&self) -> Vec<Vec3> {
-        self.checkpoints().iter().map(|c| c.1).chain(self.rules.end).collect()
+        self.checkpoints()
+            .iter()
+            .map(|c| c.1)
+            .chain(self.rules.end)
+            .collect()
     }
 
     /// Where the transformers are.
@@ -1881,7 +2199,10 @@ impl Sim {
 
     /// Whether the checkpoint at level object `object` has been passed.
     pub fn checkpoint_passed(&self, object: usize) -> bool {
-        self.checkpoints().iter().position(|c| c.0 == object).is_some_and(|k| k < self.sector)
+        self.checkpoints()
+            .iter()
+            .position(|c| c.0 == object)
+            .is_some_and(|k| k < self.sector)
     }
 
     /// Whether the last checkpoint has been passed (the level's last stage), and where the level ends.
@@ -1917,7 +2238,9 @@ impl Sim {
         let alive = self.hold.is_none() && self.dying.is_none();
         let tick = self.tick;
         for b in &mut self.breaks {
-            let Some(near) = self.world.bodies.get(b.at.near).map(|x| x.pos) else { continue };
+            let Some(near) = self.world.bodies.get(b.at.near).map(|x| x.pos) else {
+                continue;
+            };
             if b.at.prox.frame(ball, near) == Some(Range::Enter) && alive && kind == b.at.kind {
                 b.at.prox.switch_off();
                 if let Some(j) = b.joint.take() {
@@ -1941,11 +2264,16 @@ impl Sim {
                 self.world.remove_force(f);
             }
             if want != 0 {
-                let Some(origin) = self.world.bodies.get(w.at.body).map(|b| b.pos) else { continue };
+                let Some(origin) = self.world.bodies.get(w.at.body).map(|b| b.pos) else {
+                    continue;
+                };
                 if want > 0 {
                     self.world.wake(w.at.body);
                 }
-                if let Some(f) = self.world.add_force(w.at.body, w.at.force * f32::from(want), origin) {
+                if let Some(f) =
+                    self.world
+                        .add_force(w.at.body, w.at.force * f32::from(want), origin)
+                {
                     w.push = Some((want, f));
                 }
             }
@@ -1957,7 +2285,11 @@ impl Sim {
     fn check_updrafts(&mut self) {
         let ball = self.ball.position;
         let (lo, hi) = self.ball_boxes[self.ball.kind as usize];
-        let ball_box = Obb::from_box(lo, hi, &Mat4::from_rotation_translation(self.ball.rotation, ball));
+        let ball_box = Obb::from_box(
+            lo,
+            hi,
+            &Mat4::from_rotation_translation(self.ball.rotation, ball),
+        );
         let alive = self.hold.is_none() && self.dying.is_none();
         for u in &mut self.updrafts {
             match u.outer.frame(ball, u.at.point) {
@@ -1991,7 +2323,9 @@ impl Sim {
         let ball = self.ball.position;
         let mut fired = None;
         for t in &mut self.finishes {
-            let Some(near) = self.world.bodies.get(t.near) else { continue };
+            let Some(near) = self.world.bodies.get(t.near) else {
+                continue;
+            };
             if t.prox.frame(ball, near.pos) == Some(Range::Enter) {
                 t.prox.switch_off();
                 fired = Some((t.force, t.joints.clone()));
@@ -2012,11 +2346,20 @@ impl Sim {
     /// The sector changes due at this tick, in the order they were made.
     fn apply_sector_changes(&mut self) {
         let tick = self.tick;
-        let due: Vec<SectorChange> = self.sector_changes.iter().copied().filter(|c| c.tick == tick).collect();
+        let due: Vec<SectorChange> = self
+            .sector_changes
+            .iter()
+            .copied()
+            .filter(|c| c.tick == tick)
+            .collect();
         self.sector_changes.retain(|c| c.tick > tick);
         for c in due {
             if c.modules {
-                let insts = self.module_sectors.get(c.sector).cloned().unwrap_or_default();
+                let insts = self
+                    .module_sectors
+                    .get(c.sector)
+                    .cloned()
+                    .unwrap_or_default();
                 for inst in &insts {
                     if c.enter {
                         let joints = inst.enter(&mut self.world);
@@ -2044,21 +2387,33 @@ impl Sim {
                         }
                     }
                 }
-                for w in self.wake_triggers.iter_mut().filter(|w| w.sector == Some(c.sector)) {
+                for w in self
+                    .wake_triggers
+                    .iter_mut()
+                    .filter(|w| w.sector == Some(c.sector))
+                {
                     if c.enter {
                         w.prox.switch_on();
                     } else {
                         w.prox.switch_off();
                     }
                 }
-                for w in self.swings.iter_mut().filter(|w| w.sector == Some(c.sector)) {
+                for w in self
+                    .swings
+                    .iter_mut()
+                    .filter(|w| w.sector == Some(c.sector))
+                {
                     if c.enter {
                         w.enter(tick);
                     } else {
                         w.stop(&mut self.world, tick);
                     }
                 }
-                for u in self.updrafts.iter_mut().filter(|u| u.sector == Some(c.sector)) {
+                for u in self
+                    .updrafts
+                    .iter_mut()
+                    .filter(|u| u.sector == Some(c.sector))
+                {
                     if c.enter {
                         u.outer.switch_on();
                     } else {
@@ -2074,7 +2429,12 @@ impl Sim {
                     self.world.deactivate(b);
                 }
             }
-            for (u, _) in self.unseen.iter_mut().zip(&self.object_sectors).filter(|(_, s)| **s == Some(c.sector)) {
+            for (u, _) in self
+                .unseen
+                .iter_mut()
+                .zip(&self.object_sectors)
+                .filter(|(_, s)| **s == Some(c.sector))
+            {
                 *u = !c.enter;
             }
         }
@@ -2095,7 +2455,13 @@ impl Sim {
 
     /// The new ball's body at the place it was put, at rest.
     fn make_ball(&mut self) {
-        self.world.replace_ball(0, BALL_RADIUS, self.ball.material(), self.ball.position, Rot::Quat(self.ball.rotation));
+        self.world.replace_ball(
+            0,
+            BALL_RADIUS,
+            self.ball.material(),
+            self.ball.position,
+            Rot::Quat(self.ball.rotation),
+        );
         self.drop_ball_forces();
         // the new ball starts the depth-test cubes' iterator again
         self.depth_from = self.tick + DEPTH_PHASE;
@@ -2109,7 +2475,10 @@ impl Sim {
         } else {
             (&self.rules.resets_listed, &self.rules.reset_turns_listed)
         };
-        let spawn = resets.get(self.sector).copied().unwrap_or(self.rules.start + Vec3::Y * BALL_RADIUS);
+        let spawn = resets
+            .get(self.sector)
+            .copied()
+            .unwrap_or(self.rules.start + Vec3::Y * BALL_RADIUS);
         let turn = turns.get(self.sector).copied().unwrap_or(Mat3::IDENTITY);
         self.ball.position = spawn;
         self.ball.rotation = Rot::Basis(turn).quat();
@@ -2143,7 +2512,10 @@ fn module_mesh<'a>(level: &Level, i: usize, modules: &'a Modules) -> Option<&'a 
     let name = level::module_name(&level.objects.get(i)?.name);
     let (_, file) = modules.get(name)?;
     let root = format!("{name}_MF");
-    let o = file.objects.iter().find(|o| o.name.eq_ignore_ascii_case(&root))?;
+    let o = file
+        .objects
+        .iter()
+        .find(|o| o.name.eq_ignore_ascii_case(&root))?;
     file.meshes.get(o.mesh?)
 }
 
@@ -2180,7 +2552,15 @@ pub fn sector_near(level: &Level, p: Vec3) -> Option<usize> {
 /// One tick of the camera rig toward the ball at `ball` (see `Camera`).
 fn rig_step(c: &mut Camera, ball: Vec3) {
     let goal = camera_goal(c, c.target);
-    let force = Vec3::new(CAM_FORCE.x, if c.lift > 0.5 { CAM_LIFT_FORCE } else { CAM_FORCE.y }, CAM_FORCE.z);
+    let force = Vec3::new(
+        CAM_FORCE.x,
+        if c.lift > 0.5 {
+            CAM_LIFT_FORCE
+        } else {
+            CAM_FORCE.y
+        },
+        CAM_FORCE.z,
+    );
     let next = c.position + c.step * CAM_DAMP + (goal - c.position) * force * TICK;
     c.step = next - c.position;
     c.position = next;
@@ -2204,7 +2584,8 @@ fn depth_cubes(level: &Level) -> Vec<Obb> {
                 min = min.min(Vec3::from(*p));
                 max = max.max(Vec3::from(*p));
             }
-            (min.x <= max.x).then(|| Obb::from_box(min, max, &glam::Mat4::from_cols_array_2d(&o.matrix)))
+            (min.x <= max.x)
+                .then(|| Obb::from_box(min, max, &glam::Mat4::from_cols_array_2d(&o.matrix)))
         })
         .collect()
 }
@@ -2288,7 +2669,11 @@ fn sorted_by_name(level: &Level, group: &str) -> Vec<Vec3> {
 /// splits them. None for a mirrored or degenerate matrix, which has no rotation.
 fn pose_and_scale(matrix: &[[f32; 4]; 4]) -> Option<(Vec3, Rot, Vec3)> {
     let mat = glam::Mat4::from_cols_array_2d(matrix);
-    let axes = [mat.x_axis.truncate(), mat.y_axis.truncate(), mat.z_axis.truncate()];
+    let axes = [
+        mat.x_axis.truncate(),
+        mat.y_axis.truncate(),
+        mat.z_axis.truncate(),
+    ];
     let scale = Vec3::new(axes[0].length(), axes[1].length(), axes[2].length());
     if scale.min_element() <= 1e-6 {
         return None;
@@ -2311,7 +2696,10 @@ fn sound_ids(level: &Level, i: usize) -> crate::physics::SoundIds {
             .find_map(|g| g.strip_prefix(prefix).and_then(|n| n.parse::<u8>().ok()))
             .unwrap_or(0)
     };
-    crate::physics::SoundIds { hit: id("Sound_HitID_"), roll: id("Sound_RollID_") }
+    crate::physics::SoundIds {
+        hit: id("Sound_HitID_"),
+        roll: id("Sound_RollID_"),
+    }
 }
 
 fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
@@ -2341,11 +2729,21 @@ fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
             // A mirrored or degenerate matrix has no rotation; such an object keeps its world triangles at the origin.
             let mat = glam::Mat4::from_cols_array_2d(&o.matrix);
             let (pos, rot, local): (Vec3, Rot, Vec<Vec3>) = match pose_and_scale(&o.matrix) {
-                Some((pos, rot, scale)) => (pos, rot, mesh.positions.iter().map(|p| Vec3::from(*p) * scale).collect()),
+                Some((pos, rot, scale)) => (
+                    pos,
+                    rot,
+                    mesh.positions
+                        .iter()
+                        .map(|p| Vec3::from(*p) * scale)
+                        .collect(),
+                ),
                 None => (
                     Vec3::ZERO,
                     Rot::Quat(Quat::IDENTITY),
-                    mesh.positions.iter().map(|p| mat.transform_point3(Vec3::from(*p))).collect(),
+                    mesh.positions
+                        .iter()
+                        .map(|p| mat.transform_point3(Vec3::from(*p)))
+                        .collect(),
                 ),
             };
             let mut triangles = Vec::new();
@@ -2382,6 +2780,114 @@ fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
 pub(crate) mod tests {
     use super::*;
     use level::{Group, Level, Material, Mesh, Object, Part};
+
+    /// A community map by its folder name under OPENBALLANCE_MAPS, with its scripts; `None` without the maps.
+    fn community_map(folder: &str) -> Option<Level> {
+        let root = std::path::PathBuf::from(std::env::var_os("OPENBALLANCE_MAPS")?);
+        let dir = root.join(folder);
+        let file = std::fs::read_dir(&dir)
+            .ok()?
+            .flatten()
+            .map(|e| e.path())
+            .find(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("nmo")))?;
+        let bytes = std::fs::read(file).ok()?;
+        Some(level::from_nmo::load(&bytes).ok()?.level)
+    }
+
+    /// Runs a scripted map for `ticks` without input and returns its script log.
+    fn script_log(level: &Level, ticks: u64) -> (Sim, Vec<(u64, String)>) {
+        let start = level
+            .start_ball
+            .as_deref()
+            .and_then(BallKind::from_name)
+            .unwrap_or(BallKind::Wood);
+        let mut sim = Sim::with_rules(
+            level,
+            start,
+            &Modules::default(),
+            false,
+            crate::replay::VERSION,
+        );
+        assert!(sim.scripts.is_some(), "the map carries scripts");
+        for _ in 0..ticks {
+            sim.step(0);
+        }
+        let log = sim
+            .scripts
+            .as_ref()
+            .map(|s| s.log.clone())
+            .unwrap_or_default();
+        (sim, log)
+    }
+
+    /// The flame template (148 maps): its proximity test finds the ball at the start and switches the four
+    /// flame scripts on, whose particle systems report to the engine. Skipped without OPENBALLANCE_MAPS.
+    #[test]
+    fn the_flame_template_switches_its_particles_on_near_the_start() {
+        let Some(level) = community_map("Take the leap") else {
+            eprintln!("OPENBALLANCE_MAPS not set or the map is missing: skipped");
+            return;
+        };
+        let (sim, log) = script_log(&level, 30);
+        let on: Vec<&str> = log
+            .iter()
+            .filter(|(_, l)| l.starts_with("particles on"))
+            .map(|(_, l)| l.as_str())
+            .collect();
+        assert_eq!(on.len(), 4, "the four flames: {log:?}");
+        assert!(
+            log.iter()
+                .all(|(_, l)| !l.starts_with("script block not known")),
+            "{log:?}"
+        );
+        assert!(
+            sim.scripts
+                .as_ref()
+                .is_some_and(|s| s.hidden.iter().all(|h| !h)),
+            "the template hides nothing"
+        );
+    }
+
+    /// A map with scripts of its own, run headless: the ones named in SCRIPT_MAPS (comma-separated folders) have
+    /// their logs printed, so a map's behaviour can be read off without a window. Skipped without the variables.
+    #[test]
+    fn scripted_maps_run_headless_and_report() {
+        let Some(list) = std::env::var_os("SCRIPT_MAPS") else {
+            return;
+        };
+        let ticks: u64 = std::env::var("SCRIPT_TICKS")
+            .ok()
+            .and_then(|t| t.parse().ok())
+            .unwrap_or(600);
+        for folder in list
+            .to_string_lossy()
+            .split(',')
+            .map(str::trim)
+            .filter(|f| !f.is_empty())
+        {
+            let Some(level) = community_map(folder) else {
+                eprintln!("{folder}: not found");
+                continue;
+            };
+            let (sim, log) = script_log(&level, ticks);
+            let hidden = sim
+                .scripts
+                .as_ref()
+                .map_or(0, |s| s.hidden.iter().filter(|h| **h).count());
+            let moved = sim
+                .scripts
+                .as_ref()
+                .map_or(0, |s| s.moved.iter().filter(|m| m.is_some()).count());
+            eprintln!(
+                "== {folder}: {} log lines, {hidden} hidden, {moved} moved, ball at {:.1}",
+                log.len(),
+                sim.ball.position
+            );
+            for (t, l) in log.iter().take(60) {
+                eprintln!("  {t:5} {l}");
+            }
+        }
+    }
 
     /// A flat 200×200 floor at y = 0 in Phys_Floors, a start at the origin, a reset point a ball's radius up.
     pub(crate) fn flat_level() -> Level {
@@ -2465,6 +2971,7 @@ pub(crate) mod tests {
             sky: None,
             start_ball: None,
             settings: level::Settings::default(),
+            scripts: None,
         }
     }
 
@@ -2485,13 +2992,22 @@ pub(crate) mod tests {
         let mut level = flat_level();
         level.settings.sector_balls = vec![Some("paper".into())];
         let begin = |format: u32, kind: Option<BallKind>| {
-            let mut sim = Sim::with_rules(&level, BallKind::Wood, &Modules::default(), false, format);
+            let mut sim =
+                Sim::with_rules(&level, BallKind::Wood, &Modules::default(), false, format);
             sim.start_from(0, kind, None);
             sim.ball.kind
         };
         assert_eq!(begin(7, None), BallKind::Paper);
-        assert_eq!(begin(7, Some(BallKind::Stone)), BallKind::Stone, "--ball overrides");
-        assert_eq!(begin(6, None), BallKind::Wood, "an older replay keeps the start ball");
+        assert_eq!(
+            begin(7, Some(BallKind::Stone)),
+            BallKind::Stone,
+            "--ball overrides"
+        );
+        assert_eq!(
+            begin(6, None),
+            BallKind::Wood,
+            "an older replay keeps the start ball"
+        );
     }
 
     #[test]
@@ -2646,7 +3162,10 @@ pub(crate) mod tests {
         // travel, at speed / radius.
         let v = sim.ball.velocity;
         let rolling = Vec3::Y.cross(v) / BALL_RADIUS;
-        assert!(v.dot(forward) > 5.0, "the ball does not roll forward: {v:?}");
+        assert!(
+            v.dot(forward) > 5.0,
+            "the ball does not roll forward: {v:?}"
+        );
         assert!(
             (sim.ball.spin - rolling).length() < 0.1 * rolling.length(),
             "spin {:?}, rolling without slipping {rolling:?}",
@@ -2656,7 +3175,11 @@ pub(crate) mod tests {
         let before = sim.ball.rotation;
         sim.step(input::UP);
         let (axis, angle) = (sim.ball.rotation * before.inverse()).to_axis_angle();
-        let axis = if angle > std::f32::consts::PI { -axis } else { axis };
+        let axis = if angle > std::f32::consts::PI {
+            -axis
+        } else {
+            axis
+        };
         assert!(
             axis.dot(sim.ball.spin.normalize()) > 0.99,
             "turned about {axis:?}, spin {:?}",
@@ -2726,7 +3249,11 @@ pub(crate) mod tests {
         // A reset point turned so that its -x axis points along -z: the view after a respawn looks that way, and
         // "up" pushes that way.
         let mut level = flat_level();
-        let r = level.objects.iter().position(|o| o.name == "PR_Resetpoint_01").unwrap();
+        let r = level
+            .objects
+            .iter()
+            .position(|o| o.name == "PR_Resetpoint_01")
+            .unwrap();
         level.objects[r].matrix = [
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
@@ -2910,7 +3437,11 @@ pub(crate) mod tests {
         for _ in 0..30 {
             sim.step(input::UP);
         }
-        assert!(sim.ball.velocity.x < v.x, "the falling ball was still pushed: {:?} from {v:?}", sim.ball.velocity);
+        assert!(
+            sim.ball.velocity.x < v.x,
+            "the falling ball was still pushed: {:?} from {v:?}",
+            sim.ball.velocity
+        );
         while sim.tick < t + DEATH_REMOVE_TICKS {
             sim.step(0);
         }
@@ -2939,9 +3470,15 @@ pub(crate) mod tests {
         };
         let (up, diag) = (run(input::UP), run(input::UP | input::RIGHT));
         let ratio = diag.length() / up.length();
-        assert!((ratio - 2f32.sqrt()).abs() < 0.05, "diagonal {diag:?} against up {up:?}: {ratio}");
+        assert!(
+            (ratio - 2f32.sqrt()).abs() < 0.05,
+            "diagonal {diag:?} against up {up:?}: {ratio}"
+        );
         let along = diag.normalize();
-        assert!((along.x - along.z.abs()).abs() < 0.02, "not diagonal: {along:?}");
+        assert!(
+            (along.x - along.z.abs()).abs() < 0.02,
+            "not diagonal: {along:?}"
+        );
     }
 
     #[test]
@@ -2965,12 +3502,19 @@ pub(crate) mod tests {
         for _ in 0..1200 {
             sim.step(0);
         }
-        assert_eq!(sim.world.movement_state(0), Some(8), "the ball is asleep after 20 s");
+        assert_eq!(
+            sim.world.movement_state(0),
+            Some(8),
+            "the ball is asleep after 20 s"
+        );
         let start = sim.ball.position;
         for _ in 0..30 {
             sim.step(input::UP);
         }
-        assert!(sim.ball.position.distance(start) > 1.0, "the push did not move a sleeping ball");
+        assert!(
+            sim.ball.position.distance(start) > 1.0,
+            "the push did not move a sleeping ball"
+        );
     }
 
     /// A unit cube mesh (corners at -1..1) added to the level, and an object of it at `at` in the given groups.
@@ -3051,10 +3595,18 @@ pub(crate) mod tests {
         let at = forward * 15.0;
         let stand_in = add_cube(&mut level, "P_Dome_01", at, &["P_Dome", "Sector_01"]);
         let mesh = level.objects[stand_in].mesh.expect("a mesh");
-        level.meshes[mesh] = box_mesh("P_Dome_01_Mesh", Vec3::new(-6.6, 0.0, -6.6), Vec3::new(6.6, 0.05, 6.6));
+        level.meshes[mesh] = box_mesh(
+            "P_Dome_01_Mesh",
+            Vec3::new(-6.6, 0.0, -6.6),
+            Vec3::new(6.6, 0.05, 6.6),
+        );
         level.objects[stand_in].matrix[3] = [at.x, 0.0, at.z, 1.0];
         let mut file = Level::default();
-        file.meshes.push(box_mesh("P_Dome_MF_Mesh", Vec3::new(-6.6, 0.0, -6.6), Vec3::new(6.6, 8.0, 6.6)));
+        file.meshes.push(box_mesh(
+            "P_Dome_MF_Mesh",
+            Vec3::new(-6.6, 0.0, -6.6),
+            Vec3::new(6.6, 8.0, 6.6),
+        ));
         file.objects.push(Object {
             name: "P_Dome_MF".into(),
             matrix: Mat4::IDENTITY.to_cols_array_2d(),
@@ -3074,24 +3626,55 @@ pub(crate) mod tests {
             sim.ball.position.dot(forward)
         };
         let new = along(5);
-        assert!(new < 15.0 - 6.6, "the ball got past the module's wall: {new}");
+        assert!(
+            new < 15.0 - 6.6,
+            "the ball got past the module's wall: {new}"
+        );
         let old = along(4);
-        assert!(old > 15.0 + 6.6, "a format 4 run did not roll over the stand-in: {old}");
+        assert!(
+            old > 15.0 + 6.6,
+            "a format 4 run did not roll over the stand-in: {old}"
+        );
     }
 
     #[test]
     fn a_sector_s_objects_are_in_the_physics_only_while_it_is_current() {
         // A box in sector 1 and one in sector 2, and the first checkpoint on the ball's way.
         let mut level = flat_level();
-        let o1 = add_cube(&mut level, "P_Box_01", Vec3::new(-30.0, 1.0, 0.0), &["P_Box", "Sector_01"]);
-        let o2 = add_cube(&mut level, "P_Box_02", Vec3::new(-30.0, 1.0, 20.0), &["P_Box", "Sector_02"]);
-        let cp = add_cube(&mut level, "PC_TwoFlames_01", Vec3::new(0.0, 0.0, 0.0), &["PC_Checkpoints"]);
+        let o1 = add_cube(
+            &mut level,
+            "P_Box_01",
+            Vec3::new(-30.0, 1.0, 0.0),
+            &["P_Box", "Sector_01"],
+        );
+        let o2 = add_cube(
+            &mut level,
+            "P_Box_02",
+            Vec3::new(-30.0, 1.0, 20.0),
+            &["P_Box", "Sector_02"],
+        );
+        let cp = add_cube(
+            &mut level,
+            "PC_TwoFlames_01",
+            Vec3::new(0.0, 0.0, 0.0),
+            &["PC_Checkpoints"],
+        );
         let mut sim = Sim::new(&level, BallKind::Wood);
         let (b1, b2) = (sim.loose[0].1, sim.loose[1].1);
-        assert!(sim.world.state(b1).is_some(), "the first sector's box is in the physics");
-        assert!(sim.world.state(b2).is_none(), "the second sector's box is not yet");
+        assert!(
+            sim.world.state(b1).is_some(),
+            "the first sector's box is in the physics"
+        );
+        assert!(
+            sim.world.state(b2).is_none(),
+            "the second sector's box is not yet"
+        );
         // and they are seen only while their sector is in play (an object in no sector always)
-        assert!(!sim.unseen[o1] && sim.unseen[o2] && !sim.unseen[cp], "{:?}", sim.unseen);
+        assert!(
+            !sim.unseen[o1] && sim.unseen[o2] && !sim.unseen[cp],
+            "{:?}",
+            sim.unseen
+        );
         // the ball starts on the checkpoint: the sector changes at once
         sim.step(0);
         let t = sim.tick;
@@ -3099,9 +3682,15 @@ pub(crate) mod tests {
         while sim.tick < t + SECTOR_END_TICKS {
             sim.step(0);
         }
-        assert!(sim.world.state(b1).is_none(), "the passed sector's box left");
+        assert!(
+            sim.world.state(b1).is_none(),
+            "the passed sector's box left"
+        );
         assert!(sim.world.state(b2).is_none());
-        assert!(sim.unseen[o1], "the passed sector's box is gone from sight too");
+        assert!(
+            sim.unseen[o1],
+            "the passed sector's box is gone from sight too"
+        );
         while sim.tick < t + SECTOR_BEGIN_TICKS {
             sim.step(0);
         }
@@ -3113,17 +3702,34 @@ pub(crate) mod tests {
     fn checkpoints_go_by_their_names_whatever_order_their_group_lists() {
         // as level 11 lists them: the second first, the first (under the ball) after it
         let mut level = flat_level();
-        let far = add_cube(&mut level, "PC_TwoFlames_02", Vec3::new(0.0, 0.0, 300.0), &["PC_Checkpoints"]);
-        let near = add_cube(&mut level, "PC_TwoFlames_01", Vec3::new(0.0, 0.0, 0.0), &["PC_Checkpoints"]);
+        let far = add_cube(
+            &mut level,
+            "PC_TwoFlames_02",
+            Vec3::new(0.0, 0.0, 300.0),
+            &["PC_Checkpoints"],
+        );
+        let near = add_cube(
+            &mut level,
+            "PC_TwoFlames_01",
+            Vec3::new(0.0, 0.0, 0.0),
+            &["PC_Checkpoints"],
+        );
         let mut sim = Sim::new(&level, BallKind::Wood);
         sim.step(0);
-        assert!(sim.events.contains(&(sim.tick, Event::Checkpoint(1))), "the first by name is passed");
+        assert!(
+            sim.events.contains(&(sim.tick, Event::Checkpoint(1))),
+            "the first by name is passed"
+        );
         assert!(sim.checkpoint_passed(near) && !sim.checkpoint_passed(far));
         // a replay of format 3 or older keeps the group's order: the far one is first, the ball not at it
         let mut old = Sim::new(&level, BallKind::Wood);
         old.checkpoints_by_name = false;
         old.step(0);
-        assert!(!old.events.iter().any(|e| matches!(e.1, Event::Checkpoint(_))));
+        assert!(
+            !old.events
+                .iter()
+                .any(|e| matches!(e.1, Event::Checkpoint(_)))
+        );
     }
 
     #[test]
@@ -3131,9 +3737,20 @@ pub(crate) mod tests {
         use std::cmp::Ordering::Less;
         assert_eq!(name_order("PR_Resetpoint_9", "PR_Resetpoint_10"), Less);
         assert_eq!(name_order("PC_TwoFlames_03", "PC_TwoFlames_04"), Less);
-        assert_eq!(name_order("PC_TwoFlames_01", "PC_TwoFlames_1"), Less, "equal numbers: by the whole name");
-        assert_eq!(name_order("PC_TwoFlames_02", "PC_TwoFlames_1"), std::cmp::Ordering::Greater);
-        assert_eq!(name_order("X_1", "X_99999999999999999999999"), Less, "numbers longer than any integer");
+        assert_eq!(
+            name_order("PC_TwoFlames_01", "PC_TwoFlames_1"),
+            Less,
+            "equal numbers: by the whole name"
+        );
+        assert_eq!(
+            name_order("PC_TwoFlames_02", "PC_TwoFlames_1"),
+            std::cmp::Ordering::Greater
+        );
+        assert_eq!(
+            name_order("X_1", "X_99999999999999999999999"),
+            Less,
+            "numbers longer than any integer"
+        );
         assert_eq!(name_order("X_00000000000000000000000009", "X_10"), Less);
         assert_eq!(name_order("A_2", "B_1"), Less, "the stem first");
         assert_eq!(name_order("PC_TwoFlames", "PC_TwoFlames_01"), Less);
@@ -3144,11 +3761,15 @@ pub(crate) mod tests {
     /// ticks, the ball 0.72 behind the platform's centre, as in the C game (docs/physics.md, the balloon).
     #[test]
     fn the_balloon_finishes_level_1_and_carries_the_ball_away() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let level = data
+            .load(&crate::assets::Source::Original(1))
+            .expect("level 1")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
         sim.start_from(3, None, Some(Vec3::new(704.0, -9.0, -873.7)));
@@ -3158,7 +3779,11 @@ pub(crate) mod tests {
                 break;
             }
         }
-        assert!(sim.finished, "not finished, the ball at {:?}", sim.ball.position);
+        assert!(
+            sim.finished,
+            "not finished, the ball at {:?}",
+            sim.ball.position
+        );
         let platform = sim.finishes[0].near;
         let p0 = sim.world.bodies[platform].pos;
         for _ in 0..200 {
@@ -3166,20 +3791,32 @@ pub(crate) mod tests {
         }
         let p1 = sim.world.bodies[platform].pos;
         let speed = (p1.x - p0.x) / 10.0;
-        assert!((speed - 1.1).abs() < 0.3, "the platform went {:?} -> {:?}", p0, p1);
+        assert!(
+            (speed - 1.1).abs() < 0.3,
+            "the platform went {:?} -> {:?}",
+            p0,
+            p1
+        );
         let behind = sim.ball.position - p1;
-        assert!((behind.x + 0.72).abs() < 0.2 && behind.y.abs() < 0.5, "the ball at {behind:?} from the platform");
+        assert!(
+            (behind.x + 0.72).abs() < 0.2 && behind.y.abs() < 0.5,
+            "the ball at {behind:?} from the platform"
+        );
     }
 
     /// Level 2's first fan with the player's copy (skipped without OPENBALLANCE_DATA): its updraft lifts a paper
     /// ball to the top of its volume (62.8) and holds it there, its box's top touching it; a wooden ball stays down.
     #[test]
     fn a_fan_holds_a_paper_ball_at_the_top_of_its_updraft() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
+        let level = data
+            .load(&crate::assets::Source::Original(2))
+            .expect("level 2")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let at = Vec3::new(1016.67, 49.0, -366.74);
         let height = |kind| {
@@ -3207,15 +3844,27 @@ pub(crate) mod tests {
     /// their sector came in (the C build with the checkpoints moved under the ball).
     #[test]
     fn level_8_s_sack_and_swing_swing_as_in_the_c_game() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(8)).expect("level 8").level;
+        let level = data
+            .load(&crate::assets::Source::Original(8))
+            .expect("level 8")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let cases: [(usize, f32, &[(u64, f32)]); 2] = [
-            (2, 572.15, &[(135, 1.86), (255, -5.31), (510, 7.26), (600, -7.54)]),
-            (4, 865.12, &[(30, 2.53), (105, -5.13), (180, 6.33), (480, -4.57)]),
+            (
+                2,
+                572.15,
+                &[(135, 1.86), (255, -5.31), (510, 7.26), (600, -7.54)],
+            ),
+            (
+                4,
+                865.12,
+                &[(30, 2.53), (105, -5.13), (180, 6.33), (480, -4.57)],
+            ),
         ];
         for (sector, x, samples) in cases {
             let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
@@ -3235,7 +3884,10 @@ pub(crate) mod tests {
                     t += 1;
                 }
                 let got = sim.world.bodies[body].pos.z - z0;
-                assert!((got - dz).abs() < 0.15, "part at x {x}, frame {frame}: {got} against {dz}");
+                assert!(
+                    (got - dz).abs() < 0.15,
+                    "part at x {x}, frame {frame}: {got} against {dz}"
+                );
             }
         }
     }
@@ -3245,11 +3897,15 @@ pub(crate) mod tests {
     /// the bridge (about 3.7).
     #[test]
     fn a_stone_ball_breaks_the_plate_bridge_and_a_wooden_one_does_not() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
+        let level = data
+            .load(&crate::assets::Source::Original(2))
+            .expect("level 2")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let drop = |kind| {
             let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
@@ -3270,10 +3926,16 @@ pub(crate) mod tests {
             (deepest, sim.breaks[0].joint.is_none())
         };
         let (stone, broken) = drop(BallKind::Stone);
-        assert!(broken && stone > 6.0, "under the stone ball: broken {broken}, the plate fell {stone}");
+        assert!(
+            broken && stone > 6.0,
+            "under the stone ball: broken {broken}, the plate fell {stone}"
+        );
         // the wooden ball only bends the bridge
         let (wood, broken) = drop(BallKind::Wood);
-        assert!(!broken && wood < 5.0, "under the wooden ball: broken {broken}, the plate fell {wood}");
+        assert!(
+            !broken && wood < 5.0,
+            "under the wooden ball: broken {broken}, the plate fell {wood}"
+        );
     }
 
     /// A short route off level 2 with the player's copy (skipped without OPENBALLANCE_DATA): the ball is lost at
@@ -3282,14 +3944,28 @@ pub(crate) mod tests {
     /// the counter having waited while the ball was lost.
     #[test]
     fn a_ball_leaving_level_2_is_lost_on_the_c_game_s_tick() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(2)).expect("level 2").level;
+        let level = data
+            .load(&crate::assets::Source::Original(2))
+            .expect("level 2")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
-        let route: [(u64, u8); 9] = [(1, 0), (40, 1), (140, 0), (170, 8), (230, 0), (260, 2), (330, 0), (360, 4), (400, 0)];
+        let route: [(u64, u8); 9] = [
+            (1, 0),
+            (40, 1),
+            (140, 0),
+            (170, 8),
+            (230, 0),
+            (260, 2),
+            (330, 0),
+            (360, 4),
+            (400, 0),
+        ];
         let input = |t: u64| route.iter().rev().find(|r| r.0 <= t).map_or(0, |r| r.1);
         while sim.tick < 400 && !sim.events.iter().any(|e| e.1 == Event::Died) {
             sim.step(input(sim.tick + 1));
@@ -3303,7 +3979,10 @@ pub(crate) mod tests {
                 heights.push(sim.ball.position.y);
             }
         }
-        assert!((heights[0] - 10.33).abs() < 0.02 && (heights[1] - 10.07).abs() < 0.03, "{heights:?}");
+        assert!(
+            (heights[0] - 10.33).abs() < 0.02 && (heights[1] - 10.07).abs() < 0.03,
+            "{heights:?}"
+        );
         assert_eq!((sim.points, sim.lives), (988, 2));
     }
 
@@ -3312,16 +3991,26 @@ pub(crate) mod tests {
     /// brought back next to the box by a moved reset point); a stone ball pushes the box out and the stone drops.
     #[test]
     fn module_34_s_box_gives_way_to_a_stone_ball_only() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let level = data
+            .load(&crate::assets::Source::Original(1))
+            .expect("level 1")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let push = |kind| {
             let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
             sim.start_from(1, Some(kind), Some(Vec3::new(132.0, -7.0, -563.03)));
-            let part = |n: &str| sim.module_bodies.iter().find(|b| b.object == n).map(|b| b.body).expect(n);
+            let part = |n: &str| {
+                sim.module_bodies
+                    .iter()
+                    .find(|b| b.object == n)
+                    .map(|b| b.body)
+                    .expect(n)
+            };
             let (kiste, stein) = (part("P_Modul_34_Kiste"), part("P_Modul_34_Schiebestein"));
             for t in 0..300 {
                 sim.step(if t < 120 { input::UP } else { 0 });
@@ -3329,28 +4018,52 @@ pub(crate) mod tests {
             (sim.world.bodies[kiste].pos.x, sim.world.bodies[stein].pos.y)
         };
         let (x, y) = push(BallKind::Wood);
-        assert!((x - 148.88).abs() < 0.2 && (y + 2.50).abs() < 0.05, "wooden ball: box at x {x}, stone at y {y}");
+        assert!(
+            (x - 148.88).abs() < 0.2 && (y + 2.50).abs() < 0.05,
+            "wooden ball: box at x {x}, stone at y {y}"
+        );
         let (x, y) = push(BallKind::Stone);
-        assert!(x > 155.0 && y < -6.0, "stone ball: box at x {x}, stone at y {y}");
+        assert!(
+            x > 155.0 && y < -6.0,
+            "stone ball: box at x {x}, stone at y {y}"
+        );
     }
 
     /// Level 1's start with the player's copy (skipped without OPENBALLANCE_DATA): the ball dropped onto the floor
     /// hits it, and rolling on it touches a material the original's sound scripts know (its groups).
     #[test]
     fn the_ball_meets_sound_materials_on_level_1() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let level = data
+            .load(&crate::assets::Source::Original(1))
+            .expect("level 1")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
         sim.start_from(0, None, Some(sim.ball.position + Vec3::Y * 6.0));
         let (mut hits, mut rolls) = (Vec::new(), Vec::new());
         for t in 0..240 {
             sim.step(if t > 60 { input::UP } else { 0 });
-            hits.extend(sim.world.ball_sounds.impacts.iter().map(|i| i.0).filter(|&m| m > 0));
-            rolls.extend(sim.world.ball_sounds.rolls.iter().copied().filter(|&m| m > 0));
+            hits.extend(
+                sim.world
+                    .ball_sounds
+                    .impacts
+                    .iter()
+                    .map(|i| i.0)
+                    .filter(|&m| m > 0),
+            );
+            rolls.extend(
+                sim.world
+                    .ball_sounds
+                    .rolls
+                    .iter()
+                    .copied()
+                    .filter(|&m| m > 0),
+            );
         }
         assert!(!hits.is_empty(), "no hit on a known material");
         assert!(!rolls.is_empty(), "no rolling on a known material");
@@ -3362,11 +4075,15 @@ pub(crate) mod tests {
     /// all six by 200.
     #[test]
     fn an_extra_point_gives_its_points_as_in_the_c_game() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let level = data
+            .load(&crate::assets::Source::Original(1))
+            .expect("level 1")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
         assert!(!sim.extras.is_empty(), "the module's small balls");
@@ -3379,14 +4096,19 @@ pub(crate) mod tests {
             for (t, e) in sim.events.iter() {
                 match e {
                     Event::ExtraPoint if fired.is_none() => fired = Some(*t),
-                    Event::ExtraHits(n) if *t == sim.tick => hits.extend(std::iter::repeat_n(*t, *n as usize)),
+                    Event::ExtraHits(n) if *t == sim.tick => {
+                        hits.extend(std::iter::repeat_n(*t, *n as usize))
+                    }
                     _ => {}
                 }
             }
         }
         let f = fired.expect("fired");
         let by = |d: u64| hits.iter().filter(|&&t| t <= f + d).count();
-        eprintln!("fired {f} hits {:?}", hits.iter().map(|t| t - f).collect::<Vec<_>>());
+        eprintln!(
+            "fired {f} hits {:?}",
+            hits.iter().map(|t| t - f).collect::<Vec<_>>()
+        );
         assert_eq!((by(60), by(200)), (0, 6));
         assert!(by(120) >= 4, "{} by 120", by(120));
     }
@@ -3397,9 +4119,24 @@ pub(crate) mod tests {
     #[test]
     fn an_absurd_sector_number_is_no_sector() {
         let mut level = flat_level();
-        add_cube(&mut level, "P_Box_01", Vec3::new(-30.0, 1.0, 0.0), &["P_Box", "Sector_1000000000"]);
-        add_cube(&mut level, "P_Box_02", Vec3::new(-30.0, 1.0, 20.0), &["P_Box", "Sector_18446744073709551615"]);
-        add_cube(&mut level, "P_Box_03", Vec3::new(-30.0, 1.0, 40.0), &["P_Box", "Sector_02"]);
+        add_cube(
+            &mut level,
+            "P_Box_01",
+            Vec3::new(-30.0, 1.0, 0.0),
+            &["P_Box", "Sector_1000000000"],
+        );
+        add_cube(
+            &mut level,
+            "P_Box_02",
+            Vec3::new(-30.0, 1.0, 20.0),
+            &["P_Box", "Sector_18446744073709551615"],
+        );
+        add_cube(
+            &mut level,
+            "P_Box_03",
+            Vec3::new(-30.0, 1.0, 40.0),
+            &["P_Box", "Sector_02"],
+        );
         let sim = Sim::new(&level, BallKind::Wood);
         assert_eq!(sim.sector_count(), 2);
         assert_eq!(sector_near(&level, Vec3::new(-30.0, 1.0, 0.0)), Some(1));
@@ -3408,8 +4145,18 @@ pub(crate) mod tests {
     #[test]
     fn a_run_can_begin_at_a_later_sector_and_place() {
         let mut level = flat_level();
-        add_cube(&mut level, "P_Box_01", Vec3::new(-30.0, 1.0, 0.0), &["P_Box", "Sector_01"]);
-        add_cube(&mut level, "P_Box_02", Vec3::new(-30.0, 1.0, 20.0), &["P_Box", "Sector_02"]);
+        add_cube(
+            &mut level,
+            "P_Box_01",
+            Vec3::new(-30.0, 1.0, 0.0),
+            &["P_Box", "Sector_01"],
+        );
+        add_cube(
+            &mut level,
+            "P_Box_02",
+            Vec3::new(-30.0, 1.0, 20.0),
+            &["P_Box", "Sector_02"],
+        );
         let mut sim = Sim::new(&level, BallKind::Wood);
         let (b1, b2) = (sim.loose[0].1, sim.loose[1].1);
         let at = Vec3::new(-20.0, 3.0, 20.0);
@@ -3417,7 +4164,10 @@ pub(crate) mod tests {
         sim.start_from(1, Some(BallKind::Stone), Some(at));
         assert_eq!((sim.sector, sim.ball.kind), (1, BallKind::Stone));
         assert!(sim.world.state(b1).is_none(), "the first sector's box left");
-        assert!(sim.world.state(b2).is_some(), "the chosen sector's box is in");
+        assert!(
+            sim.world.state(b2).is_some(),
+            "the chosen sector's box is in"
+        );
         assert!((sim.world.state(0).expect("a ball").pos - at).length() < 1e-4);
     }
 
@@ -3436,7 +4186,10 @@ pub(crate) mod tests {
         }
         sim.world.set_push(b, Vec3::ZERO);
         let moved = sim.world.state(b).unwrap().pos;
-        assert!(moved.distance(start) > 3.0, "the box did not move: {moved:?}");
+        assert!(
+            moved.distance(start) > 3.0,
+            "the box did not move: {moved:?}"
+        );
         sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
         let mut died = None;
         for _ in 0..600 {
@@ -3451,7 +4204,10 @@ pub(crate) mod tests {
             sim.step(0);
         }
         let back = sim.world.state(b).unwrap().pos;
-        assert!(back.distance(start) < 0.1, "the box is at {back:?}, its place is {start:?}");
+        assert!(
+            back.distance(start) < 0.1,
+            "the box is at {back:?}, its place is {start:?}"
+        );
     }
 
     #[test]
@@ -3461,16 +4217,34 @@ pub(crate) mod tests {
         let mut file = flat_level();
         file.objects.clear();
         file.groups.clear();
-        let kiste = add_cube(&mut file, "P_Modul_34_Kiste", Vec3::new(-7.0, 1.0, 0.0), &[]);
-        let stein = add_cube(&mut file, "P_Modul_34_Schiebestein", Vec3::new(-7.0, 3.0, 0.0), &[]);
+        let kiste = add_cube(
+            &mut file,
+            "P_Modul_34_Kiste",
+            Vec3::new(-7.0, 1.0, 0.0),
+            &[],
+        );
+        let stein = add_cube(
+            &mut file,
+            "P_Modul_34_Schiebestein",
+            Vec3::new(-7.0, 3.0, 0.0),
+            &[],
+        );
         file.meshes[file.objects[kiste].mesh.unwrap()].name = "P_Modul_34_Kiste_Mesh".into();
         file.meshes[file.objects[stein].mesh.unwrap()].name = "P_Modul_34_Schiebestein_Mesh".into();
-        for (name, y) in [("P_Modul_34_Slider_Frame01", 6.0), ("P_Modul_34_Slider_Frame02", -6.0)] {
+        for (name, y) in [
+            ("P_Modul_34_Slider_Frame01", 6.0),
+            ("P_Modul_34_Slider_Frame02", -6.0),
+        ] {
             let o = add_cube(&mut file, name, Vec3::new(-7.0, y, 0.0), &[]);
             file.objects[o].mesh = None;
         }
         let mut level = flat_level();
-        let stand_in = add_cube(&mut level, "P_Modul_34_01", Vec3::ZERO, &["P_Modul_34", "Sector_01"]);
+        let stand_in = add_cube(
+            &mut level,
+            "P_Modul_34_01",
+            Vec3::ZERO,
+            &["P_Modul_34", "Sector_01"],
+        );
         level.objects[stand_in].matrix = [
             [0.0, 0.0, -1.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
@@ -3485,17 +4259,27 @@ pub(crate) mod tests {
         assert_eq!(parts.len(), 2);
         // the stand-in's matrix times the part's: (-7, 1, 0) turned a quarter about y is (0, 1, 7), moved to x = 20
         let k = sim.world.state(parts[0].body).expect("the box is made").pos;
-        assert!((k - Vec3::new(20.0, 1.0, 7.0)).length() < 1e-4, "box at {k:?}");
+        assert!(
+            (k - Vec3::new(20.0, 1.0, 7.0)).length() < 1e-4,
+            "box at {k:?}"
+        );
         // the ball is within 50 of the stone: the module's script wakes it, once
         sim.step(0);
-        assert_ne!(sim.world.movement_state(parts[1].body), Some(8), "the stone was not woken");
+        assert_ne!(
+            sim.world.movement_state(parts[1].body),
+            Some(8),
+            "the stone was not woken"
+        );
         // take the box away: the stone drops along its slider onto the floor, straight down
         sim.world.deactivate(parts[0].body);
         for _ in 0..120 {
             sim.step(0);
         }
         let st = sim.world.state(parts[1].body).unwrap().pos;
-        assert!((st - Vec3::new(20.0, 1.0, 7.0)).length() < 0.05, "stone at {st:?}");
+        assert!(
+            (st - Vec3::new(20.0, 1.0, 7.0)).length() < 0.05,
+            "stone at {st:?}"
+        );
     }
 
     #[test]
@@ -3549,7 +4333,9 @@ pub(crate) mod tests {
             sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
             for _ in 0..600 {
                 sim.step(0);
-                if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost && sim.dying.is_none() {
+                if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost
+                    && sim.dying.is_none()
+                {
                     break;
                 }
             }
@@ -3567,12 +4353,18 @@ pub(crate) mod tests {
             sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
             for _ in 0..600 {
                 sim.step(0);
-                if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost && sim.dying.is_none() {
+                if sim.events.iter().filter(|e| e.1 == Event::Died).count() >= lost
+                    && sim.dying.is_none()
+                {
                     break;
                 }
             }
         }
-        assert!(!sim.game_over && sim.lives == 1, "five balls lost, the last one kept: {} lives", sim.lives);
+        assert!(
+            !sim.game_over && sim.lives == 1,
+            "five balls lost, the last one kept: {} lives",
+            sim.lives
+        );
         assert!(sim.lives_spared, "the run says it was helped");
         assert!(sim.mods.modded(), "and is modded");
     }
@@ -3584,14 +4376,24 @@ pub(crate) mod tests {
     /// stopped it.
     #[test]
     fn level_1_dome_is_climbed_as_in_the_original() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(1)).expect("level 1").level;
+        let level = data
+            .load(&crate::assets::Source::Original(1))
+            .expect("level 1")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
         let run = |format: u32| {
-            let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, level.settings.tutorial, format);
+            let mut sim = Sim::with_rules(
+                &level,
+                BallKind::Wood,
+                &modules,
+                level.settings.tutorial,
+                format,
+            );
             sim.start_from(1, None, Some(Vec3::new(74.79, 8.0, -494.0)));
             let mut top = (0.0f32, 0.0f32);
             for t in 1..=560 {
@@ -3604,7 +4406,10 @@ pub(crate) mod tests {
             (top, sim.ball.position)
         };
         let ((y, z), _) = run(5);
-        assert!(y > 10.5 && (z + 507.8).abs() < 1.5, "over the dome's top at y {y}, z {z}");
+        assert!(
+            y > 10.5 && (z + 507.8).abs() < 1.5,
+            "over the dome's top at y {y}, z {z}"
+        );
         let ((y, _), p) = run(4);
         assert!(y < 9.0 && p.z > -502.0, "format 4: up to y {y}, at {p:?}");
     }
@@ -3616,16 +4421,26 @@ pub(crate) mod tests {
     /// rolls on south (hints/Level_10.txt; the inputs of hints/Level_10-s1-bridge.replay, from the spur as wood).
     #[test]
     fn level_10_s_bridge_is_crossed_after_the_stone_transformer_behind_the_pusher() {
-        let Some(data) = std::env::var_os("OPENBALLANCE_DATA").and_then(|_| crate::assets::Data::locate(None).ok())
+        let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
+            .and_then(|_| crate::assets::Data::locate(None).ok())
         else {
             return;
         };
-        let level = data.load(&crate::assets::Source::Original(10)).expect("level 10").level;
+        let level = data
+            .load(&crate::assets::Source::Original(10))
+            .expect("level 10")
+            .level;
         let modules = crate::scene::load_modules(&level, &data);
-        let run = crate::replay::Replay::parse(include_str!("../../../hints/Level_10-s1-bridge.replay")).expect("replay");
+        let run =
+            crate::replay::Replay::parse(include_str!("../../../hints/Level_10-s1-bridge.replay"))
+                .expect("replay");
         let start = run.start.clone().expect("a run from the spur");
         let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, false, run.version);
-        sim.start_from(start.sector - 1, start.ball.as_deref().and_then(BallKind::from_name), start.at.map(Vec3::from));
+        sim.start_from(
+            start.sector - 1,
+            start.ball.as_deref().and_then(BallKind::from_name),
+            start.at.map(Vec3::from),
+        );
         let mut stone_at = None;
         for t in 1..=run.end {
             sim.step(run.input_at(t));
@@ -3641,7 +4456,9 @@ pub(crate) mod tests {
         let p = sim.ball.position;
         assert_eq!(sim.lives, 3, "a ball was lost");
         // south of the gap the bridge spans (z -78 to -65 at x 291.5), on the floor
-        assert!(p.z > -60.0 && (p.x - 291.5).abs() < 2.0 && p.y > -9.0, "the ball at {p:?}");
+        assert!(
+            p.z > -60.0 && (p.x - 291.5).abs() < 2.0 && p.y > -9.0,
+            "the ball at {p:?}"
+        );
     }
-
 }

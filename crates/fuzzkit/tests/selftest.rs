@@ -3,7 +3,11 @@
 // purpose): `FUZZ_SECS=5 cargo test --release --offline -p fuzzkit --test selftest -- --ignored --test-threads=1`;
 // every test here is expected to fail with "new findings".
 
-#![allow(clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+#![allow(
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
 use fuzzkit::{Kind, Target, test_name};
 
@@ -18,21 +22,29 @@ fn planted(input: &[u8]) -> bool {
 #[test]
 #[ignore]
 fn selftest_panic() {
-    fuzzkit::fuzz(Target::new("selftest_panic", test_name!("selftest_panic"), Kind::Text), seeds, |b| {
-        if planted(b) {
-            panic!("planted");
-        }
-    });
+    fuzzkit::fuzz(
+        Target::new("selftest_panic", test_name!("selftest_panic"), Kind::Text),
+        seeds,
+        |b| {
+            if planted(b) {
+                panic!("planted");
+            }
+        },
+    );
 }
 
 #[test]
 #[ignore]
 fn selftest_hang() {
-    fuzzkit::fuzz(Target::new("selftest_hang", test_name!("selftest_hang"), Kind::Text), seeds, |b| {
-        if planted(b) {
-            std::thread::sleep(std::time::Duration::from_secs(3600));
-        }
-    });
+    fuzzkit::fuzz(
+        Target::new("selftest_hang", test_name!("selftest_hang"), Kind::Text),
+        seeds,
+        |b| {
+            if planted(b) {
+                std::thread::sleep(std::time::Duration::from_secs(3600));
+            }
+        },
+    );
 }
 
 #[test]
@@ -51,15 +63,24 @@ fn selftest_oom() {
 
 fn deep(n: u64) -> u64 {
     let pad = [n; 64];
-    if n == 0 { 0 } else { std::hint::black_box(deep(std::hint::black_box(n - 1))).wrapping_add(std::hint::black_box(&pad)[(n % 64) as usize]) }
+    if n == 0 {
+        0
+    } else {
+        std::hint::black_box(deep(std::hint::black_box(n - 1)))
+            .wrapping_add(std::hint::black_box(&pad)[(n % 64) as usize])
+    }
 }
 
 #[test]
 #[ignore]
 fn selftest_abort() {
-    fuzzkit::fuzz(Target::new("selftest_abort", test_name!("selftest_abort"), Kind::Text), seeds, |b| {
-        if planted(b) {
-            std::hint::black_box(deep(std::hint::black_box(u64::MAX)));
-        }
-    });
+    fuzzkit::fuzz(
+        Target::new("selftest_abort", test_name!("selftest_abort"), Kind::Text),
+        seeds,
+        |b| {
+            if planted(b) {
+                std::hint::black_box(deep(std::hint::black_box(u64::MAX)));
+            }
+        },
+    );
 }

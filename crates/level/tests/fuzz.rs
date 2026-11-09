@@ -15,7 +15,9 @@
 )]
 
 use fuzzkit::{Kind, Target, test_name};
-use level::{Blend, Channel, Group, Level, Material, Mesh, Object, Part, Settings, Sprite, TexGen, Texture};
+use level::{
+    Blend, Channel, Group, Level, Material, Mesh, Object, Part, Settings, Sprite, TexGen, Texture,
+};
 use nmo::chunk::{Chunk, OPTION_FILE};
 use nmo::{Document, class, scene};
 use std::path::PathBuf;
@@ -35,7 +37,11 @@ fn decode_all(doc: &Document) {
 /// zero-sized texture is a wgpu validation error, which panics).
 fn check_pixels(w: u32, h: u32, rgba: &[u8]) {
     assert!(w >= 1 && h >= 1, "an embedded picture of {w}x{h}");
-    assert_eq!(rgba.len() as u64, u64::from(w) * u64::from(h) * 4, "an embedded picture's bytes");
+    assert_eq!(
+        rgba.len() as u64,
+        u64::from(w) * u64::from(h) * 4,
+        "an embedded picture's bytes"
+    );
 }
 
 fn decode_chunk(c: &Chunk) {
@@ -81,9 +87,17 @@ pub fn run_nmo_file(bytes: &[u8]) {
             })
             .sum();
         let input = file.header1.len() + file.data.len();
-        assert!(floats * 4 <= 64 * input + (1 << 20), "a model of {floats} numbers from {input} bytes");
+        assert!(
+            floats * 4 <= 64 * input + (1 << 20),
+            "a model of {floats} numbers from {input} bytes"
+        );
         for t in &loaded.level.textures {
-            if let level::TextureSource::Pixels { width, height, rgba } = &t.source {
+            if let level::TextureSource::Pixels {
+                width,
+                height,
+                rgba,
+            } = &t.source
+            {
                 check_pixels(*width, *height, rgba);
             }
         }
@@ -103,7 +117,9 @@ fn chunk_raw(c: &Chunk) -> Vec<u8> {
         | u32::from(c.options & OPTION_FILE) << 24;
     let mut out = version.to_le_bytes().to_vec();
     out.extend_from_slice(&(c.words.len() as u32).to_le_bytes());
-    c.words.iter().for_each(|w| out.extend_from_slice(&w.to_le_bytes()));
+    c.words
+        .iter()
+        .for_each(|w| out.extend_from_slice(&w.to_le_bytes()));
     out
 }
 
@@ -113,16 +129,28 @@ fn chunk_of(sections: &[(u32, Vec<u32>)]) -> Chunk {
     for (k, (id, data)) in sections.iter().enumerate() {
         let next = words.len() + 2 + data.len();
         words.push(*id);
-        words.push(if k + 1 == sections.len() { 0 } else { next as u32 });
+        words.push(if k + 1 == sections.len() {
+            0
+        } else {
+            next as u32
+        });
         words.extend(data);
     }
-    Chunk { data_version: 7, class_id: 0, chunk_version: 7, options: OPTION_FILE, words }
+    Chunk {
+        data_version: 7,
+        class_id: 0,
+        chunk_version: 7,
+        options: OPTION_FILE,
+        words,
+    }
 }
 
 /// Plausible small payloads under every identifier the decoders read.
 fn synthetic_chunks() -> Vec<Chunk> {
     let f = |v: f32| v.to_bits();
-    let small: Vec<u32> = (0..24).map(|i| if i % 3 == 0 { 2 } else { f(i as f32 * 0.5) }).collect();
+    let small: Vec<u32> = (0..24)
+        .map(|i| if i % 3 == 0 { 2 } else { f(i as f32 * 0.5) })
+        .collect();
     let ids = [
         0x0010_0000u32,
         0x0002_0000,
@@ -140,14 +168,24 @@ fn synthetic_chunks() -> Vec<Chunk> {
         0x000F_FFFF,
         0x2000,
     ];
-    let mut out: Vec<Chunk> = ids.iter().map(|&id| chunk_of(&[(id, small.clone())])).collect();
+    let mut out: Vec<Chunk> = ids
+        .iter()
+        .map(|&id| chunk_of(&[(id, small.clone())]))
+        .collect();
     // a mesh: flags, 3 vertices, 1 face
     let mut verts = vec![0u32, 3];
     for i in 0..3 {
         verts.extend([f(i as f32), f(0.0), f(1.0)]);
     }
-    out.push(chunk_of(&[(0x0010_0000, verts), (0x0001_0000, vec![1, 0, 1, 2, 0]), (0x2000, vec![1, 2, 3])]));
-    out.push(chunk_of(&[(0x1000, (0..40).map(|i| f(i as f32 / 40.0)).collect())]));
+    out.push(chunk_of(&[
+        (0x0010_0000, verts),
+        (0x0001_0000, vec![1, 0, 1, 2, 0]),
+        (0x2000, vec![1, 2, 3]),
+    ]));
+    out.push(chunk_of(&[(
+        0x1000,
+        (0..40).map(|i| f(i as f32 / 40.0)).collect(),
+    )]));
     out
 }
 
@@ -169,7 +207,13 @@ const CLASSES: [u32; 14] = [
 ];
 
 /// A plain (uncompressed) file of the given header 1, data, counts and included files.
-fn plain_file(h1: &[u8], data: &[u8], managers: u32, objects: u32, included: &[nmo::IncludedFile]) -> Vec<u8> {
+fn plain_file(
+    h1: &[u8],
+    data: &[u8],
+    managers: u32,
+    objects: u32,
+    included: &[nmo::IncludedFile],
+) -> Vec<u8> {
     let fields: [u32; 14] = [
         0,
         0x1302_2002,
@@ -187,7 +231,9 @@ fn plain_file(h1: &[u8], data: &[u8], managers: u32, objects: u32, included: &[n
         h1.len() as u32,
     ];
     let mut out = b"Nemo Fi\0".to_vec();
-    fields.iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes()));
+    fields
+        .iter()
+        .for_each(|v| out.extend_from_slice(&v.to_le_bytes()));
     out.extend_from_slice(h1);
     out.extend_from_slice(data);
     for i in included {
@@ -240,7 +286,13 @@ fn nmo_seeds() -> Vec<Vec<u8>> {
     for bytes in real_nmo() {
         if let Ok(f) = nmo::read(&bytes) {
             let h = &f.header;
-            out.push(plain_file(&f.header1, &f.data, h.manager_count, h.object_count, &f.included));
+            out.push(plain_file(
+                &f.header1,
+                &f.data,
+                h.manager_count,
+                h.object_count,
+                &f.included,
+            ));
         }
         out.push(bytes);
     }
@@ -253,7 +305,9 @@ fn chunk_seeds() -> Vec<Vec<u8>> {
     let mut per_class: std::collections::HashMap<u32, usize> = Default::default();
     for bytes in real_nmo() {
         let Ok(f) = nmo::read(&bytes) else { continue };
-        let Ok(doc) = Document::parse(&f) else { continue };
+        let Ok(doc) = Document::parse(&f) else {
+            continue;
+        };
         for o in &doc.objects {
             let Some(c) = &o.chunk else { continue };
             let n = per_class.entry(o.class_id).or_default();
@@ -303,12 +357,24 @@ pub fn run_open_level(input: &[u8]) {
                     + m.parts.iter().map(|p| p.indices.len()).sum::<usize>()
             })
             .sum();
-        assert!(numbers * 4 <= 2 * parts[1].len() + (1 << 16), "{numbers} numbers from a buffer of {}", parts[1].len());
+        assert!(
+            numbers * 4 <= 2 * parts[1].len() + (1 << 16),
+            "{numbers} numbers from a buffer of {}",
+            parts[1].len()
+        );
         // what the game takes as it is: points it adds, a light colour, a theme number
         let s = &l.settings;
-        assert!(s.level_bonus.is_none_or(|b| b.unsigned_abs() <= 1_000_000_000), "level bonus {:?}", s.level_bonus);
+        assert!(
+            s.level_bonus
+                .is_none_or(|b| b.unsigned_abs() <= 1_000_000_000),
+            "level bonus {:?}",
+            s.level_bonus
+        );
         assert!(s.music.is_none_or(|m| m <= 1000));
-        assert!(s.light.is_none_or(|c| c.iter().all(|x| (0.0..=1.0).contains(x))));
+        assert!(
+            s.light
+                .is_none_or(|c| c.iter().all(|x| (0.0..=1.0).contains(x)))
+        );
     }
 }
 
@@ -317,14 +383,29 @@ fn synthetic_level() -> Level {
     let mut l = Level::default();
     let mut mesh = Mesh {
         name: "m".into(),
-        positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]],
+        positions: vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+        ],
         normals: vec![[0.0, 0.0, 1.0]; 4],
         uvs: vec![[0.0, 1.0]; 4],
         parts: vec![
-            Part { material: Some(0), indices: vec![0, 1, 2] },
-            Part { material: Some(1), indices: vec![1, 3, 2] },
+            Part {
+                material: Some(0),
+                indices: vec![0, 1, 2],
+            },
+            Part {
+                material: Some(1),
+                indices: vec![1, 3, 2],
+            },
         ],
-        channels: vec![Channel { material: 1, blend: (Blend::SrcAlpha, Blend::One), uvs: vec![[0.5, 0.5]; 4] }],
+        channels: vec![Channel {
+            material: 1,
+            blend: (Blend::SrcAlpha, Blend::One),
+            uvs: vec![[0.5, 0.5]; 4],
+        }],
         look: None,
     };
     let mut look = mesh.clone();
@@ -356,16 +437,34 @@ fn synthetic_level() -> Level {
             texgen: (k == 1).then_some(TexGen::Chrome),
         });
     }
-    let id = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [1.0, 2.0, 3.0, 1.0]];
-    l.objects.push(Object { name: "P_Box_01".into(), matrix: id, mesh: Some(0), visible: true, sprite: None });
+    let id = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [1.0, 2.0, 3.0, 1.0],
+    ];
+    l.objects.push(Object {
+        name: "P_Box_01".into(),
+        matrix: id,
+        mesh: Some(0),
+        visible: true,
+        sprite: None,
+    });
     l.objects.push(Object {
         name: "Sprite".into(),
         matrix: id,
         mesh: None,
         visible: false,
-        sprite: Some(Sprite { mode: 1, size: [1.0, 2.0], offset: [0.0, 0.5] }),
+        sprite: Some(Sprite {
+            mode: 1,
+            size: [1.0, 2.0],
+            offset: [0.0, 0.5],
+        }),
     });
-    l.groups.push(Group { name: "Phys_Floors".into(), members: vec![0, 1] });
+    l.groups.push(Group {
+        name: "Phys_Floors".into(),
+        members: vec![0, 1],
+    });
     l.sky = Some("A".into());
     l.start_ball = Some("Ball_Wood".into());
     l.settings = Settings {
@@ -423,10 +522,36 @@ fn fuzz_open_level() {
     let mut t = Target::new("open_level", test_name!("fuzz_open_level"), Kind::Text);
     t.max_len = 16 << 20;
     t.dict = &[
-        "\"accessors\"", "\"bufferViews\"", "\"byteOffset\"", "\"byteLength\"", "\"byteStride\"", "\"count\"",
-        "\"componentType\"", "\"VEC2\"", "\"VEC3\"", "\"SCALAR\"", "5126", "5125", "\"TEXCOORD_1\"", "\"look\"",
-        "\"channels\"", "\"parallax\"", "\"normalTexture\"", "\"BLEND\"", "\"MASK\"", "\"matrix\"", "\"members\"",
-        "\"sprite\"", "\"settings\"", "textures/", "\"textures/../x\"", "null", "true", "false", "[]", "{}",
+        "\"accessors\"",
+        "\"bufferViews\"",
+        "\"byteOffset\"",
+        "\"byteLength\"",
+        "\"byteStride\"",
+        "\"count\"",
+        "\"componentType\"",
+        "\"VEC2\"",
+        "\"VEC3\"",
+        "\"SCALAR\"",
+        "5126",
+        "5125",
+        "\"TEXCOORD_1\"",
+        "\"look\"",
+        "\"channels\"",
+        "\"parallax\"",
+        "\"normalTexture\"",
+        "\"BLEND\"",
+        "\"MASK\"",
+        "\"matrix\"",
+        "\"members\"",
+        "\"sprite\"",
+        "\"settings\"",
+        "textures/",
+        "\"textures/../x\"",
+        "null",
+        "true",
+        "false",
+        "[]",
+        "{}",
     ];
     fuzzkit::fuzz(t, open_seeds, run_open_level);
 }

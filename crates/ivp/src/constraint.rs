@@ -83,7 +83,11 @@ fn rtmul_f(r: &[[f64; 3]; 3], v: &P3) -> P3 {
 }
 
 fn cross(a: &P3, b: &P3) -> P3 {
-    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
 }
 
 /// Gauss elimination with partial pivoting and back substitution of an n x n system (`lin_solve`, 0x10033e50).
@@ -153,7 +157,11 @@ impl World {
     fn joint_core_f_object(&self, obj: Option<usize>) -> Matrix {
         let mut m = identity();
         if let Some(o) = obj {
-            m.vv = [f64::from(self.cores[o].shift[0]), f64::from(self.cores[o].shift[1]), f64::from(self.cores[o].shift[2])];
+            m.vv = [
+                f64::from(self.cores[o].shift[0]),
+                f64::from(self.cores[o].shift[1]),
+                f64::from(self.cores[o].shift[2]),
+            ];
         }
         m
     }
@@ -166,7 +174,11 @@ impl World {
         let p = math::rmul(&mi.r, &to_v3(&pos_ws));
         let p = [p[0] + mi.vv[0], p[1] + mi.vv[1], p[2] + mi.vv[2]];
         let shift = self.cores[o].shift;
-        [p[0] as f32 + shift[0], p[1] as f32 + shift[1], p[2] as f32 + shift[2]]
+        [
+            p[0] as f32 + shift[0],
+            p[1] as f32 + shift[1],
+            p[2] as f32 + shift[2],
+        ]
     }
 
     /// The surface speed of a body at a core-space point, zero for the world or a fixed body (`vsurf`, 0x1000c0b0).
@@ -182,7 +194,11 @@ impl World {
         let core = &self.cores[c];
         let t = cross(&core.rot_speed, p_cs);
         let tw = rmul_f(&core.m_world_f_core.r, &t);
-        [core.speed[0] + tw[0], core.speed[1] + tw[1], core.speed[2] + tw[2]]
+        [
+            core.speed[0] + tw[0],
+            core.speed[1] + tw[1],
+            core.speed[2] + tw[2],
+        ]
     }
 
     /// A world-space impulse at a world point, applied to the core's speed changes (`ivp_async_push_core_ws`, 0x1000a4c0):
@@ -199,7 +215,9 @@ impl World {
             core.rot_speed_change[i] += core.inv_rot_inertia[i] * tc[i];
         }
         for i in 0..3 {
-            core.speed_change[i] = (f64::from(core.speed_change[i]) + f64::from(imp_ws[i]) * f64::from(core.inv_mass)) as f32;
+            core.speed_change[i] = (f64::from(core.speed_change[i])
+                + f64::from(imp_ws[i]) * f64::from(core.inv_mass))
+                as f32;
         }
     }
 
@@ -264,11 +282,23 @@ impl World {
 
     /// Set Physics Spring: anchors on two bodies (or the world), a rest length, a constant and two dampings
     /// (`phys_spring_create`, 0x10013700 / 0x10014250).
-    pub fn spring_create(&mut self, a: Option<usize>, pa: P3, b: Option<usize>, pb: P3, length: f32, constant: f32, lin_damp: f32, glob_damp: f32) -> usize {
+    pub fn spring_create(
+        &mut self,
+        a: Option<usize>,
+        pa: P3,
+        b: Option<usize>,
+        pb: P3,
+        length: f32,
+        constant: f32,
+        lin_damp: f32,
+        glob_damp: f32,
+    ) -> usize {
         let anchor0 = self.anchor_init(a, pa);
         let anchor1 = self.anchor_init(b, pb);
         let cores = self.joint_cores_of(a, b);
-        let ctrl = self.add_controller(Controller::Spring { joint: self.joints.len() });
+        let ctrl = self.add_controller(Controller::Spring {
+            joint: self.joints.len(),
+        });
         let j = self.joint_alloc(Joint {
             alive: true,
             kind: JointKind::Spring,
@@ -297,7 +327,11 @@ impl World {
             None => to_v3(&jo.anchor_core[0]),
         };
         let p0 = match jo.a {
-            Some(a) => [p0[0] + self.cores[a].m_world_f_core.vv[0], p0[1] + self.cores[a].m_world_f_core.vv[1], p0[2] + self.cores[a].m_world_f_core.vv[2]],
+            Some(a) => [
+                p0[0] + self.cores[a].m_world_f_core.vv[0],
+                p0[1] + self.cores[a].m_world_f_core.vv[1],
+                p0[2] + self.cores[a].m_world_f_core.vv[2],
+            ],
             None => p0,
         };
         let p1 = match jo.b {
@@ -305,10 +339,18 @@ impl World {
             None => to_v3(&jo.anchor_core[1]),
         };
         let p1 = match jo.b {
-            Some(b) => [p1[0] + self.cores[b].m_world_f_core.vv[0], p1[1] + self.cores[b].m_world_f_core.vv[1], p1[2] + self.cores[b].m_world_f_core.vv[2]],
+            Some(b) => [
+                p1[0] + self.cores[b].m_world_f_core.vv[0],
+                p1[1] + self.cores[b].m_world_f_core.vv[1],
+                p1[2] + self.cores[b].m_world_f_core.vv[2],
+            ],
             None => p1,
         };
-        let mut d = [(p0[0] - p1[0]) as f32, (p0[1] - p1[1]) as f32, (p0[2] - p1[2]) as f32];
+        let mut d = [
+            (p0[0] - p1[0]) as f32,
+            (p0[1] - p1[1]) as f32,
+            (p0[2] - p1[2]) as f32,
+        ];
         let len = math::normalize_f(&mut d);
         if len < 1e-10 {
             return;
@@ -317,7 +359,10 @@ impl World {
         let u1 = self.joint_vsurf(jo.b, &jo.anchor_core[1]);
         let u0 = self.joint_vsurf(jo.a, &jo.anchor_core[0]);
         let u = [u1[0] - u0[0], u1[1] - u0[1], u1[2] - u0[2]];
-        let s = (f - f64::from(jo.c_lin) * (f64::from(d[0]) * f64::from(u[0]) + f64::from(d[1]) * f64::from(u[1]) + f64::from(d[2]) * f64::from(u[2])))
+        let s = (f - f64::from(jo.c_lin)
+            * (f64::from(d[0]) * f64::from(u[0])
+                + f64::from(d[1]) * f64::from(u[1])
+                + f64::from(d[2]) * f64::from(u[2])))
             * ev.delta_time;
         let cr = f64::from(jo.c_rel) * ev.delta_time;
         let mut imp = [0.0f32; 3];
@@ -339,7 +384,16 @@ impl World {
 
     /// The constraint between two bodies: the frames of the anchor on each side, and the axes it locks
     /// (`constraint_create`, 0x10012570 and 0x100129c0).
-    fn constraint_create(&mut self, kind: JointKind, r: Option<usize>, a: Option<usize>, anchor: P3, axis: Option<V3>, ntrans: u32, nrot: u32) -> Option<usize> {
+    fn constraint_create(
+        &mut self,
+        kind: JointKind,
+        r: Option<usize>,
+        a: Option<usize>,
+        anchor: P3,
+        axis: Option<V3>,
+        ntrans: u32,
+        nrot: u32,
+    ) -> Option<usize> {
         if r.is_none() && a.is_none() {
             return None;
         }
@@ -375,7 +429,9 @@ impl World {
         let m_rcs_f_rcore = math::mat_inverse_general(&t, 1e-19).unwrap_or_else(identity);
         let m_acs_f_acore = math::mat_mul(&m_rcs_f_rcore, &rcore_f_acore);
         let cores = self.joint_cores_of(r, a);
-        let ctrl = self.add_controller(Controller::Constraint { joint: self.joints.len() });
+        let ctrl = self.add_controller(Controller::Constraint {
+            joint: self.joints.len(),
+        });
         let j = self.joint_alloc(Joint {
             alive: true,
             kind,
@@ -430,7 +486,13 @@ impl World {
     }
 
     /// Set Physics Hinge: three translations and two rotations locked about the axis (`0x100059d0`).
-    pub fn hinge_create(&mut self, a: Option<usize>, b: Option<usize>, anchor: P3, axis: P3) -> Option<usize> {
+    pub fn hinge_create(
+        &mut self,
+        a: Option<usize>,
+        b: Option<usize>,
+        anchor: P3,
+        axis: P3,
+    ) -> Option<usize> {
         let ax = [f64::from(axis[0]), f64::from(axis[1]), f64::from(axis[2])];
         let j = self.constraint_create(JointKind::Hinge, a, b, anchor, Some(ax), 3, 2)?;
         self.constraint_register(j);
@@ -439,8 +501,21 @@ impl World {
 
     /// Set Physics Slider: the axis from p0 to p1, two translations and three rotations locked, with limits on the
     /// translation along the axis when asked (`0x10005f10`, 0x10012960).
-    pub fn slider_create(&mut self, a: Option<usize>, b: Option<usize>, p0: P3, p1: P3, limits: bool, lo: f32, hi: f32) -> Option<usize> {
-        let ax = [f64::from(p1[0]) - f64::from(p0[0]), f64::from(p1[1]) - f64::from(p0[1]), f64::from(p1[2]) - f64::from(p0[2])];
+    pub fn slider_create(
+        &mut self,
+        a: Option<usize>,
+        b: Option<usize>,
+        p0: P3,
+        p1: P3,
+        limits: bool,
+        lo: f32,
+        hi: f32,
+    ) -> Option<usize> {
+        let ax = [
+            f64::from(p1[0]) - f64::from(p0[0]),
+            f64::from(p1[1]) - f64::from(p0[1]),
+            f64::from(p1[2]) - f64::from(p0[2]),
+        ];
         let j = self.constraint_create(JointKind::Slider, a, b, p0, Some(ax), 2, 3)?;
         if limits {
             let jj = &mut self.joints[j];
@@ -453,7 +528,12 @@ impl World {
     }
 
     /// Set Physics Ball Joint: three translations locked (`0x100052f0`).
-    pub fn balljoint_create(&mut self, a: Option<usize>, b: Option<usize>, anchor: P3) -> Option<usize> {
+    pub fn balljoint_create(
+        &mut self,
+        a: Option<usize>,
+        b: Option<usize>,
+        anchor: P3,
+    ) -> Option<usize> {
         let j = self.constraint_create(JointKind::BallJoint, a, b, anchor, None, 3, 0)?;
         self.constraint_register(j);
         Some(j)
@@ -510,7 +590,11 @@ impl World {
                     }
                 }
             } else {
-                let (o0, o1, o2) = (jo.rot_order[0] as usize, jo.rot_order[1] as usize, jo.rot_order[2] as usize);
+                let (o0, o1, o2) = (
+                    jo.rot_order[0] as usize,
+                    jo.rot_order[1] as usize,
+                    jo.rot_order[2] as usize,
+                );
                 let b = [q_mat[0][o2], q_mat[1][o2], q_mat[2][o2]];
                 erot[o0] = -b[o1].atan2(b[o2]);
                 erot[o1] = b[o0].atan2(b[o2]);
@@ -519,16 +603,32 @@ impl World {
         }
 
         // the linear part: the anchors' points in world space and their surface speeds
-        let neg_rcs = [-jo.m_rcs_f_rcore.vv[0], -jo.m_rcs_f_rcore.vv[1], -jo.m_rcs_f_rcore.vv[2]];
-        let neg_acs = [-jo.m_acs_f_acore.vv[0], -jo.m_acs_f_acore.vv[1], -jo.m_acs_f_acore.vv[2]];
+        let neg_rcs = [
+            -jo.m_rcs_f_rcore.vv[0],
+            -jo.m_rcs_f_rcore.vv[1],
+            -jo.m_rcs_f_rcore.vv[2],
+        ];
+        let neg_acs = [
+            -jo.m_acs_f_acore.vv[0],
+            -jo.m_acs_f_acore.vv[1],
+            -jo.m_acs_f_acore.vv[2],
+        ];
         let a_r = rtmul_fd(&rr, &neg_rcs);
         let a_a = rtmul_fd(&ra, &neg_acs);
         let p_r = math::rmul(&wr.r, &to_v3(&a_r));
         let p_r = [p_r[0] + wr.vv[0], p_r[1] + wr.vv[1], p_r[2] + wr.vv[2]];
         let p_a = math::rmul(&wa.r, &to_v3(&a_a));
         let p_a = [p_a[0] + wa.vv[0], p_a[1] + wa.vv[1], p_a[2] + wa.vv[2]];
-        let v_r = if r_obj.is_some() { self.surface_speed(r_obj.unwrap_or(0), &a_r) } else { [0.0; 3] };
-        let v_a = if a_obj.is_some() { self.surface_speed(a_obj.unwrap_or(0), &a_a) } else { [0.0; 3] };
+        let v_r = if r_obj.is_some() {
+            self.surface_speed(r_obj.unwrap_or(0), &a_r)
+        } else {
+            [0.0; 3]
+        };
+        let v_a = if a_obj.is_some() {
+            self.surface_speed(a_obj.unwrap_or(0), &a_a)
+        } else {
+            [0.0; 3]
+        };
         let d = [p_a[0] - p_r[0], p_a[1] - p_r[1], p_a[2] - p_r[2]];
         let err = math::rmul(&cs_w, &d);
         let cv_a = rmul_ff(&cs_w, &v_a);
@@ -543,10 +643,12 @@ impl World {
             if axis_type[i] & 2 != 0 {
                 if b < f64::from(jo.lo[i]) {
                     axis_type[i] |= 1;
-                    b = f64::from(dt) * relv[i] + (err[i] - f64::from(jo.lo[i])) * f64::from(jo.limit_factor);
+                    b = f64::from(dt) * relv[i]
+                        + (err[i] - f64::from(jo.lo[i])) * f64::from(jo.limit_factor);
                 } else if b > f64::from(jo.hi[i]) {
                     axis_type[i] |= 1;
-                    b = f64::from(dt) * relv[i] + (err[i] - f64::from(jo.hi[i])) * f64::from(jo.limit_factor);
+                    b = f64::from(dt) * relv[i]
+                        + (err[i] - f64::from(jo.hi[i])) * f64::from(jo.limit_factor);
                 } else {
                     axis_type[i] &= !1;
                 }
@@ -555,18 +657,28 @@ impl World {
         }
 
         // the angular part
-        let w_a = if a_obj.is_some() { rmul_ff(&cs_a, &self.cores[a_obj.unwrap_or(0)].rot_speed) } else { [0.0; 3] };
-        let w_r = if r_obj.is_some() { rmul_ff(&rr, &self.cores[r_obj.unwrap_or(0)].rot_speed) } else { [0.0; 3] };
+        let w_a = if a_obj.is_some() {
+            rmul_ff(&cs_a, &self.cores[a_obj.unwrap_or(0)].rot_speed)
+        } else {
+            [0.0; 3]
+        };
+        let w_r = if r_obj.is_some() {
+            rmul_ff(&rr, &self.cores[r_obj.unwrap_or(0)].rot_speed)
+        } else {
+            [0.0; 3]
+        };
         let relw = [w_a[0] - w_r[0], w_a[1] - w_r[1], w_a[2] - w_r[2]];
         for i in 0..3 {
             let mut c = erot[i] + kd * relw[i];
             if axis_type[3 + i] & 2 != 0 {
                 if c < f64::from(jo.lo[3 + i]) {
                     axis_type[3 + i] |= 1;
-                    c = f64::from(dt) * relw[i] + (erot[i] - f64::from(jo.lo[3 + i])) * f64::from(jo.limit_factor);
+                    c = f64::from(dt) * relw[i]
+                        + (erot[i] - f64::from(jo.lo[3 + i])) * f64::from(jo.limit_factor);
                 } else if c > f64::from(jo.hi[3 + i]) {
                     axis_type[3 + i] |= 1;
-                    c = f64::from(dt) * relw[i] + (erot[i] - f64::from(jo.hi[3 + i])) * f64::from(jo.limit_factor);
+                    c = f64::from(dt) * relw[i]
+                        + (erot[i] - f64::from(jo.hi[3 + i])) * f64::from(jo.limit_factor);
                 } else {
                     axis_type[3 + i] &= !1;
                 }
@@ -739,7 +851,12 @@ mod tests {
     use crate::math::Quat;
 
     fn at(w: &mut World, x: f64) -> usize {
-        let q = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        let q = Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
         let c = w.core_init(w.cores.len(), q, [x, 0.0, 0.0], false);
         w.cores[c].upper_limit_radius = 0.5;
         w.cores[c].movement_state = crate::core::MT_MOVING;
@@ -758,7 +875,16 @@ mod tests {
         let b = at(&mut w, 2.0);
         // rest length 1, stretched to 2: the bodies are pulled toward each other along x
         // the anchors are world points: the centre of each body
-        let j = w.spring_create(Some(a), [0.0; 3], Some(b), [2.0, 0.0, 0.0], 1.0, 10.0, 0.0, 0.0);
+        let j = w.spring_create(
+            Some(a),
+            [0.0; 3],
+            Some(b),
+            [2.0, 0.0, 0.0],
+            1.0,
+            10.0,
+            0.0,
+            0.0,
+        );
         let ev = EventSim {
             delta_time: 1.0 / 66.0,
             i_delta_time: 66.0,
@@ -766,8 +892,16 @@ mod tests {
         };
         w.spring_simulate(j, &ev);
         // the pending speed changes pull a towards b (+x) and b towards a (-x)
-        assert!(w.cores[a].speed_change[0] > 0.0, "a {:?}", w.cores[a].speed_change);
-        assert!(w.cores[b].speed_change[0] < 0.0, "b {:?}", w.cores[b].speed_change);
+        assert!(
+            w.cores[a].speed_change[0] > 0.0,
+            "a {:?}",
+            w.cores[a].speed_change
+        );
+        assert!(
+            w.cores[b].speed_change[0] < 0.0,
+            "b {:?}",
+            w.cores[b].speed_change
+        );
     }
 
     #[test]
@@ -775,8 +909,13 @@ mod tests {
         let mut w = World::new();
         let a = at(&mut w, 0.0);
         let b = at(&mut w, 1.0);
-        let j = w.balljoint_create(Some(a), Some(b), [0.5, 0.0, 0.0]).expect("a ball joint");
-        assert_eq!(w.joints[j].nactive, 0, "nothing active before the first solve");
+        let j = w
+            .balljoint_create(Some(a), Some(b), [0.5, 0.0, 0.0])
+            .expect("a ball joint");
+        assert_eq!(
+            w.joints[j].nactive, 0,
+            "nothing active before the first solve"
+        );
         let ev = EventSim {
             delta_time: 1.0 / 66.0,
             i_delta_time: 66.0,

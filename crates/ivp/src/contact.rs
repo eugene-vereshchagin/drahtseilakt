@@ -90,7 +90,8 @@ pub const SET_KEEPER_DIST: f32 = f32::from_bits(0x3cbc_6a7f);
 pub(crate) const C_1E19: f64 = 1e-19;
 
 fn dotd(a: &P3, b: &P3) -> f64 {
-    (f64::from(a[2]) * f64::from(b[2]) + f64::from(a[1]) * f64::from(b[1])) + f64::from(a[0]) * f64::from(b[0])
+    (f64::from(a[2]) * f64::from(b[2]) + f64::from(a[1]) * f64::from(b[1]))
+        + f64::from(a[0]) * f64::from(b[0])
 }
 
 /// The triangle normal (P1 - P0) x (P2 - P0) of an edge's triangle, object space (`tri_normal`, 0x10021280).
@@ -98,9 +99,21 @@ pub(crate) fn tri_normal(l: &Ledge, e: Edge) -> V3 {
     let p0 = l.p(e);
     let p1 = l.p(Ledge::next(e));
     let p2 = l.p(Ledge::prev(e));
-    let a = [f64::from(p1[0]) - f64::from(p0[0]), f64::from(p1[1]) - f64::from(p0[1]), f64::from(p1[2]) - f64::from(p0[2])];
-    let b = [f64::from(p2[0]) - f64::from(p0[0]), f64::from(p2[1]) - f64::from(p0[1]), f64::from(p2[2]) - f64::from(p0[2])];
-    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+    let a = [
+        f64::from(p1[0]) - f64::from(p0[0]),
+        f64::from(p1[1]) - f64::from(p0[1]),
+        f64::from(p1[2]) - f64::from(p0[2]),
+    ];
+    let b = [
+        f64::from(p2[0]) - f64::from(p0[0]),
+        f64::from(p2[1]) - f64::from(p0[1]),
+        f64::from(p2[2]) - f64::from(p0[2]),
+    ];
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
 }
 
 /// A unit vector in f32, unchanged below 1e-19 (`normize_f`, 0x1000e030).
@@ -141,14 +154,25 @@ fn point_point(cp: &mut ContactPoint, p0: V3, p1: V3, t: &mut ContactInfo) {
         t.n[k] = d[k] as f32;
     }
     let n = t.n;
-    let (ax, az): (f32, f32) = if n[0] * n[0] < 0.9 { (1.0, 0.0) } else { (0.0, 1.0) };
+    let (ax, az): (f32, f32) = if n[0] * n[0] < 0.9 {
+        (1.0, 0.0)
+    } else {
+        (0.0, 1.0)
+    };
     t.span[0] = [n[1] * az, n[2] * ax - n[0] * az, 0.0 - n[1] * ax];
     normize_f(&mut t.span[0]);
     t.cp_ws = p0;
 }
 
 /// POINT or BALL against EDGE (`point_edge`, 0x1001f160).
-fn point_edge(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCache, t: &mut ContactInfo) {
+fn point_edge(
+    cp: &mut ContactPoint,
+    p0: V3,
+    l: &Ledge,
+    g1: Edge,
+    c1: &ObjCache,
+    t: &mut ContactInfo,
+) {
     let a = world_point(c1, l, g1);
     let b = world_point(c1, l, Ledge::next(g1));
     let mut e = [0.0f32; 3];
@@ -157,7 +181,11 @@ fn point_edge(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCache,
         e[k] = (b[k] - a[k]) as f32;
         r[k] = (p0[k] - a[k]) as f32;
     }
-    let inv_len = math::isqrt5(f64::from(e[2]) * f64::from(e[2]) + f64::from(e[1]) * f64::from(e[1]) + f64::from(e[0]) * f64::from(e[0]));
+    let inv_len = math::isqrt5(
+        f64::from(e[2]) * f64::from(e[2])
+            + f64::from(e[1]) * f64::from(e[1])
+            + f64::from(e[0]) * f64::from(e[0]),
+    );
     let mut c = [
         r[2] * e[1] - e[2] * r[1],
         e[2] * r[0] - r[2] * e[0],
@@ -173,7 +201,11 @@ fn point_edge(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCache,
             *v = (f64::from(*v) * k) as f32;
         }
     }
-    t.n = [c[2] * e[1] - c[1] * e[2], e[2] * c[0] - c[2] * e[0], c[1] * e[0] - e[1] * c[0]];
+    t.n = [
+        c[2] * e[1] - c[1] * e[2],
+        e[2] * c[0] - c[2] * e[0],
+        c[1] * e[0] - e[1] * c[0],
+    ];
     if dotd(&t.n, &t.n) < C_1E19 {
         // The point lies on the edge and the edge runs along x, the upstream's stand-in direction: the normal, x
         // across the edge, is zero (the upstream's arithmetic, kept as it is everywhere else). An impact along a zero
@@ -181,14 +213,22 @@ fn point_edge(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCache,
         // physics clock for every body (crates made overlapping side by side, a corner exactly on the neighbour's
         // edge). Across the edge along y instead, which is never parallel to it here.
         c = [0.0, 1.0, 0.0];
-        t.n = [c[2] * e[1] - c[1] * e[2], e[2] * c[0] - c[2] * e[0], c[1] * e[0] - e[1] * c[0]];
+        t.n = [
+            c[2] * e[1] - c[1] * e[2],
+            e[2] * c[0] - c[2] * e[0],
+            c[1] * e[0] - e[1] * c[0],
+        ];
     }
     normize_f(&mut t.n);
     t.cp_ws = p0;
     t.span[0] = c;
     if cp.recheck == 1 {
         cp.recheck = 0;
-        let u = (f64::from(e[2]) * f64::from(r[2]) + f64::from(r[1]) * f64::from(e[1]) + f64::from(r[0]) * f64::from(e[0])) * inv_len * inv_len;
+        let u = (f64::from(e[2]) * f64::from(r[2])
+            + f64::from(r[1]) * f64::from(e[1])
+            + f64::from(r[0]) * f64::from(e[0]))
+            * inv_len
+            * inv_len;
         if u < 0.0 || !(u <= 1.0) {
             left_feature(t);
         }
@@ -196,7 +236,14 @@ fn point_edge(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCache,
 }
 
 /// POINT or BALL against TRIANGLE (`point_triangle`, 0x1001ee70).
-fn point_triangle(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCache, t: &mut ContactInfo) {
+fn point_triangle(
+    cp: &mut ContactPoint,
+    p0: V3,
+    l: &Ledge,
+    g1: Edge,
+    c1: &ObjCache,
+    t: &mut ContactInfo,
+) {
     t.cp_ws = p0;
     let d = [p0[0] - c1.vv[0], p0[1] - c1.vv[1], p0[2] - c1.vv[2]];
     let p_os = math::rtmul(&c1.r, &d);
@@ -214,7 +261,8 @@ fn point_triangle(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCa
     let p0v = l.p(g1);
     let p1v = l.p(Ledge::next(g1));
     let q0 = p0v.map(f64::from);
-    cp.gap = ((p_os[2] * n_os[2] + p_os[1] * n_os[1] + p_os[0] * n_os[0]) - ((q0[1] * n_os[1] + q0[0] * n_os[0]) + q0[2] * n_os[2])) as f32;
+    cp.gap = ((p_os[2] * n_os[2] + p_os[1] * n_os[1] + p_os[0] * n_os[0])
+        - ((q0[1] * n_os[1] + q0[0] * n_os[0]) + q0[2] * n_os[2])) as f32;
     for k in 0..3 {
         t.n[k] = (n_ws[k] * -1.0) as f32;
     }
@@ -223,7 +271,16 @@ fn point_triangle(cp: &mut ContactPoint, p0: V3, l: &Ledge, g1: Edge, c1: &ObjCa
 }
 
 /// EDGE against EDGE (`edge_edge`, 0x1001f3b0).
-fn edge_edge(cp: &mut ContactPoint, l0: &Ledge, g0: Edge, c0: &ObjCache, l1: &Ledge, g1: Edge, c1: &ObjCache, t: &mut ContactInfo) {
+fn edge_edge(
+    cp: &mut ContactPoint,
+    l0: &Ledge,
+    g0: Edge,
+    c0: &ObjCache,
+    l1: &Ledge,
+    g1: Edge,
+    c1: &ObjCache,
+    t: &mut ContactInfo,
+) {
     let a0 = world_point(c0, l0, g0);
     let a1 = world_point(c0, l0, Ledge::next(g0));
     let b0 = world_point(c1, l1, g1);
@@ -232,7 +289,11 @@ fn edge_edge(cp: &mut ContactPoint, l0: &Ledge, g0: Edge, c0: &ObjCache, l1: &Le
     let mut ea = [a1[0] - a0[0], a1[1] - a0[1], a1[2] - a0[2]];
     math::normalize4(&mut eb);
     math::normalize4(&mut ea);
-    let c = [ea[1] * eb[2] - ea[2] * eb[1], ea[2] * eb[0] - ea[0] * eb[2], ea[0] * eb[1] - ea[1] * eb[0]];
+    let c = [
+        ea[1] * eb[2] - ea[2] * eb[1],
+        ea[2] * eb[0] - ea[0] * eb[2],
+        ea[0] * eb[1] - ea[1] * eb[0],
+    ];
     let cc = c[0] * c[0] + c[1] * c[1] + c[2] * c[2];
     if cc <= 1e-24 {
         // parallel edges (0x100634e8): the keeper distance, an arbitrary normal
@@ -243,8 +304,16 @@ fn edge_edge(cp: &mut ContactPoint, l0: &Ledge, g0: Edge, c0: &ObjCache, l1: &Le
         t.span[0] = [0.0, 1.0, 0.0];
         return;
     }
-    let na = [ea[1] * c[2] - ea[2] * c[1], ea[2] * c[0] - ea[0] * c[2], ea[0] * c[1] - ea[1] * c[0]];
-    let nb = [eb[1] * c[2] - eb[2] * c[1], eb[2] * c[0] - eb[0] * c[2], eb[0] * c[1] - eb[1] * c[0]];
+    let na = [
+        ea[1] * c[2] - ea[2] * c[1],
+        ea[2] * c[0] - ea[0] * c[2],
+        ea[0] * c[1] - ea[1] * c[0],
+    ];
+    let nb = [
+        eb[1] * c[2] - eb[2] * c[1],
+        eb[2] * c[0] - eb[0] * c[2],
+        eb[0] * c[1] - eb[1] * c[0],
+    ];
     let d3 = |a: V3, b: V3| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     let tb = (d3(na, b0) - d3(na, a0)) * (1.0 / (d3(na, b0) - d3(na, b1)));
     let ta = (d3(nb, a0) - d3(nb, b0)) * (1.0 / (d3(nb, a0) - d3(nb, a1)));
@@ -285,9 +354,20 @@ fn edge_edge(cp: &mut ContactPoint, l0: &Ledge, g0: Edge, c0: &ObjCache, l1: &Le
 /// The velocity of a core's point (`ivp_core_point_velocity`, 0x1000bf90): the rotation's cross product in f32, the
 /// rotation to world in f64, and the core's speed added.
 pub fn core_point_velocity(world_r: &[[f64; 3]; 3], p_cs: &P3, v: &P3, w: &P3) -> P3 {
-    let x = [w[1] * p_cs[2] - w[2] * p_cs[1], w[2] * p_cs[0] - w[0] * p_cs[2], w[0] * p_cs[1] - w[1] * p_cs[0]];
-    let d = math::rmul(world_r, &[f64::from(x[0]), f64::from(x[1]), f64::from(x[2])]);
-    [(d[0] + f64::from(v[0])) as f32, (d[1] + f64::from(v[1])) as f32, (d[2] + f64::from(v[2])) as f32]
+    let x = [
+        w[1] * p_cs[2] - w[2] * p_cs[1],
+        w[2] * p_cs[0] - w[0] * p_cs[2],
+        w[0] * p_cs[1] - w[1] * p_cs[0],
+    ];
+    let d = math::rmul(
+        world_r,
+        &[f64::from(x[0]), f64::from(x[1]), f64::from(x[2])],
+    );
+    [
+        (d[0] + f64::from(v[0])) as f32,
+        (d[1] + f64::from(v[1])) as f32,
+        (d[2] + f64::from(v[2])) as f32,
+    ]
 }
 
 /// The worst-case virtual mass at a core-space point (`ivp_worst_vm`, 0x1000c200).
@@ -308,7 +388,14 @@ pub fn worst_vm(inv_rot_inertia: &P3, inv_mass: f32, p: &P3) -> f64 {
 impl World {
     /// The start point of a feature's edge in its object's ledge: the point identity the upstream compares.
     fn feat_point(&self, obj: usize, f: Feat) -> Option<usize> {
-        let l = self.coll.objs.get(obj)?.surface.as_ref()?.ledges.get(f.ledge)?;
+        let l = self
+            .coll
+            .objs
+            .get(obj)?
+            .surface
+            .as_ref()?
+            .ledges
+            .get(f.ledge)?;
         l.tris.get(f.edge.tri).map(|t| t.start[f.edge.slot])
     }
 
@@ -327,7 +414,13 @@ impl World {
                 match cs.typ {
                     ST_POINT => self.feat_point(cs.obj, a) == self.feat_point(cs.obj, b),
                     ST_EDGE => {
-                        let Some(l) = self.coll.objs.get(cs.obj).and_then(|o| o.surface.as_ref()).and_then(|s| s.ledges.get(a.ledge)) else {
+                        let Some(l) = self
+                            .coll
+                            .objs
+                            .get(cs.obj)
+                            .and_then(|o| o.surface.as_ref())
+                            .and_then(|s| s.ledges.get(a.ledge))
+                        else {
                             return false;
                         };
                         b.edge == a.edge || b.edge == l.opp(a.edge)
@@ -377,10 +470,14 @@ impl World {
             };
         }
         if cp.syn[1].typ == ST_FACE {
-            if let (Some(f), Some(surface)) = (cp.syn[1].feat, self.coll.objs[cp.syn[1].obj].surface.as_ref()) {
+            if let (Some(f), Some(surface)) = (
+                cp.syn[1].feat,
+                self.coll.objs[cp.syn[1].obj].surface.as_ref(),
+            ) {
                 if let Some(l) = surface.ledges.get(f.ledge) {
                     let n = tri_normal(l, f.edge);
-                    cp.inv_tri_det = (1.0 / (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt()) as f32;
+                    cp.inv_tri_det =
+                        (1.0 / (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt()) as f32;
                 }
             }
         }
@@ -434,8 +531,12 @@ impl World {
         let mut t = std::mem::take(&mut cp.info);
         t.pushes = 0;
         t.flags &= !0x3ff;
-        let l0 = cp.syn[0].feat.and_then(|f| self.coll.objs[o0].surface.as_ref()?.ledges.get(f.ledge));
-        let l1 = cp.syn[1].feat.and_then(|f| self.coll.objs[o1].surface.as_ref()?.ledges.get(f.ledge));
+        let l0 = cp.syn[0]
+            .feat
+            .and_then(|f| self.coll.objs[o0].surface.as_ref()?.ledges.get(f.ledge));
+        let l1 = cp.syn[1]
+            .feat
+            .and_then(|f| self.coll.objs[o1].surface.as_ref()?.ledges.get(f.ledge));
         let mut skip_second = false;
         let p0: V3 = match cp.syn[0].typ {
             ST_POINT => match (l0, cp.syn[0].feat) {
@@ -447,7 +548,9 @@ impl World {
                 c0.vv
             }
             ST_EDGE => {
-                if let (Some(a), Some(b), Some(fa), Some(fb)) = (l0, l1, cp.syn[0].feat, cp.syn[1].feat) {
+                if let (Some(a), Some(b), Some(fa), Some(fb)) =
+                    (l0, l1, cp.syn[0].feat, cp.syn[1].feat)
+                {
                     edge_edge(&mut cp, a, fa.edge, &c0, b, fb.edge, &c1, &mut t);
                 }
                 skip_second = true;
@@ -490,7 +593,11 @@ impl World {
         normize_f(&mut t.span[0]);
         let n = t.n;
         let v0 = t.span[0];
-        t.span[1] = [n[1] * v0[2] - v0[1] * n[2], v0[0] * n[2] - n[0] * v0[2], n[0] * v0[1] - n[1] * v0[0]];
+        t.span[1] = [
+            n[1] * v0[2] - v0[1] * n[2],
+            v0[0] * n[2] - n[0] * v0[2],
+            n[0] * v0[1] - n[1] * v0[0],
+        ];
         let mut vel = [[0.0f32; 3]; 2];
         let mut inv = [0.0f64; 2];
         let objs = [o0, o1];
@@ -503,17 +610,26 @@ impl World {
                 continue;
             }
             let r = core.m_world_f_core.r;
-            let d = [t.cp_ws[0] - core.m_world_f_core.vv[0], t.cp_ws[1] - core.m_world_f_core.vv[1], t.cp_ws[2] - core.m_world_f_core.vv[2]];
+            let d = [
+                t.cp_ws[0] - core.m_world_f_core.vv[0],
+                t.cp_ws[1] - core.m_world_f_core.vv[1],
+                t.cp_ws[2] - core.m_world_f_core.vv[2],
+            ];
             let cs_d = math::rtmul(&r, &d);
             let cs: P3 = [cs_d[0] as f32, cs_d[1] as f32, cs_d[2] as f32];
             let ncs_d = math::rtmul(&r, &[f64::from(n[0]), f64::from(n[1]), f64::from(n[2])]);
             let ncs: P3 = [ncs_d[0] as f32, ncs_d[1] as f32, ncs_d[2] as f32];
             t.cp_cs[k] = cs;
-            let cr = [cs[1] * ncs[2] - cs[2] * ncs[1], cs[2] * ncs[0] - cs[0] * ncs[2], ncs[1] * cs[0] - ncs[0] * cs[1]];
+            let cr = [
+                cs[1] * ncs[2] - cs[2] * ncs[1],
+                cs[2] * ncs[0] - cs[0] * ncs[2],
+                ncs[1] * cs[0] - ncs[0] * cs[1],
+            ];
             t.cross_cs[k] = cr;
             vel[k] = core_point_velocity(&core.m_world_f_core.r, &cs, &core.speed, &core.rot_speed);
             let ii = core.inv_rot_inertia;
-            inv[k] = ((f64::from(cr[2] * ii[2]) * f64::from(cr[2]) + f64::from(cr[1] * ii[1]) * f64::from(cr[1]))
+            inv[k] = ((f64::from(cr[2] * ii[2]) * f64::from(cr[2])
+                + f64::from(cr[1] * ii[1]) * f64::from(cr[1]))
                 + f64::from(cr[0] * ii[0]) * f64::from(cr[0]))
                 + f64::from(core.inv_mass);
             t.core[k] = Some(objs[k]);
@@ -521,9 +637,17 @@ impl World {
         // the virtual mass: the inverses add for two movable cores (f32, as the upstream)
         let inv0 = inv[0] as f32;
         let inv1 = inv[1] as f32;
-        t.inv_virt_mass = if t.core[1].is_some() { inv1 + inv0 } else { inv0 };
+        t.inv_virt_mass = if t.core[1].is_some() {
+            inv1 + inv0
+        } else {
+            inv0
+        };
         let vrel = if t.core[1].is_some() {
-            [vel[0][0] - vel[1][0], vel[0][1] - vel[1][1], vel[0][2] - vel[1][2]]
+            [
+                vel[0][0] - vel[1][0],
+                vel[0][1] - vel[1][1],
+                vel[0][2] - vel[1][2],
+            ]
         } else {
             vel[0]
         };
@@ -564,7 +688,9 @@ impl World {
         let (o0, o1) = (cp.syn[0].obj, cp.syn[1].obj);
         let (cs0, cs1) = (cp.info.cp_cs[0], cp.info.cp_cs[1]);
         let (f0, f1) = (self.cores[o0].unmovable, self.cores[o1].unmovable);
-        let vm = |w: &World, o: usize, p: &P3| worst_vm(&w.cores[o].inv_rot_inertia, w.cores[o].inv_mass, p);
+        let vm = |w: &World, o: usize, p: &P3| {
+            worst_vm(&w.cores[o].inv_rot_inertia, w.cores[o].inv_mass, p)
+        };
         let inv = if f0 {
             1.0 / vm(self, o1, &cs1)
         } else if f1 {
@@ -611,7 +737,17 @@ mod tests {
     #[test]
     fn point_on_a_face_has_the_face_normal_and_gap() {
         // a point on the top face of a box, at height 0.25 above the surface: the normal points out of the face
-        let l = convex::hull(&[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 1.0, 1.0]]).expect("a cube");
+        let l = convex::hull(&[
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0],
+        ])
+        .expect("a cube");
         let surface = unit_cube();
         assert!(surface.ledges_within_radius([0.5; 3], 0.1).contains(&0));
         let c1 = ObjCache {
@@ -622,7 +758,9 @@ mod tests {
         // find the first triangle on the top face (z = 1) and a point above it
         let face = (0..l.tris.len())
             .map(|t| Edge { tri: t, slot: 0 })
-            .find(|&e| l.p(e)[2] == 1.0 && l.p(Ledge::next(e))[2] == 1.0 && l.p(Ledge::prev(e))[2] == 1.0)
+            .find(|&e| {
+                l.p(e)[2] == 1.0 && l.p(Ledge::next(e))[2] == 1.0 && l.p(Ledge::prev(e))[2] == 1.0
+            })
             .expect("a top triangle");
         // the creation sets the inverse of the triangle normal's length (cp_new)
         let nn = tri_normal(&l, face);

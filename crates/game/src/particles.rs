@@ -656,7 +656,8 @@ impl Effects {
             seed: 1,
         };
         let seed = fx.next_seed();
-        fx.emitters.push((System::new(BALL_SMOKE, Mat4::IDENTITY, seed), When::Smoke));
+        fx.emitters
+            .push((System::new(BALL_SMOKE, Mat4::IDENTITY, seed), When::Smoke));
         for (group, file) in [
             ("PS_Levelstart", "PS_FourFlames"),
             ("PC_Checkpoints", "PC_TwoFlames"),
@@ -711,14 +712,20 @@ impl Effects {
     /// The menu scene's flames: the start's four flames at its frames `FourFlames_Flame_A..D` (or with the `PS_`
     /// prefix), burning all the time.
     pub fn menu(level: &level::Level) -> Effects {
-        let mut fx = Effects { emitters: Vec::new(), extras: Vec::new(), seed: 7 };
-        for spec in SPECS.iter().filter(|s| s.frame.starts_with("PS_FourFlames_Flame_")) {
+        let mut fx = Effects {
+            emitters: Vec::new(),
+            extras: Vec::new(),
+            seed: 7,
+        };
+        for spec in SPECS
+            .iter()
+            .filter(|s| s.frame.starts_with("PS_FourFlames_Flame_"))
+        {
             let short = spec.frame.trim_start_matches("PS_");
-            let Some(o) = level
-                .objects
-                .iter()
-                .find(|o| o.name.trim().eq_ignore_ascii_case(short) || o.name.trim().eq_ignore_ascii_case(spec.frame))
-            else {
+            let Some(o) = level.objects.iter().find(|o| {
+                o.name.trim().eq_ignore_ascii_case(short)
+                    || o.name.trim().eq_ignore_ascii_case(spec.frame)
+            }) else {
                 continue;
             };
             let seed = fx.next_seed();
@@ -769,7 +776,11 @@ impl Effects {
                 }
                 When::Smoke => {
                     if let Some(p) = sim.smoke() {
-                        s.frame = Mat4::from_scale_rotation_translation(Vec3::splat(1.5), glam::Quat::IDENTITY, p);
+                        s.frame = Mat4::from_scale_rotation_translation(
+                            Vec3::splat(1.5),
+                            glam::Quat::IDENTITY,
+                            p,
+                        );
                         // on for six frames: three emissions fill the pool of sixty
                         s.pulses = 3;
                     }

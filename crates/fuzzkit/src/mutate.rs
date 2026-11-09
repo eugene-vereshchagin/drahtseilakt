@@ -23,7 +23,11 @@ impl Rng {
 
     /// 0..n (0 when n is 0).
     pub fn below(&mut self, n: usize) -> usize {
-        if n == 0 { 0 } else { (self.next() % n as u64) as usize }
+        if n == 0 {
+            0
+        } else {
+            (self.next() % n as u64) as usize
+        }
     }
 
     /// A length up to `max`, small ones much likelier.
@@ -38,22 +42,125 @@ impl Rng {
 }
 
 const U32S: [u32; 40] = [
-    0, 1, 2, 3, 4, 7, 8, 15, 16, 31, 32, 63, 64, 127, 128, 255, 256, 511, 512, 1023, 1024, 4095, 4096, 65535, 65536,
-    0x00ff_ffff, 0x0100_0000, 0x3fff_ffff, 0x7fff_ffff, 0x8000_0000, 0xffff_fffe, 0xffff_ffff, 0x7fc0_0000,
-    0x7f80_0000, 0xff80_0000, 0x7f7f_ffff, 0x0000_0001, 0x7149_f2ca, 0xbf80_0000, 0x1000_0000,
+    0,
+    1,
+    2,
+    3,
+    4,
+    7,
+    8,
+    15,
+    16,
+    31,
+    32,
+    63,
+    64,
+    127,
+    128,
+    255,
+    256,
+    511,
+    512,
+    1023,
+    1024,
+    4095,
+    4096,
+    65535,
+    65536,
+    0x00ff_ffff,
+    0x0100_0000,
+    0x3fff_ffff,
+    0x7fff_ffff,
+    0x8000_0000,
+    0xffff_fffe,
+    0xffff_ffff,
+    0x7fc0_0000,
+    0x7f80_0000,
+    0xff80_0000,
+    0x7f7f_ffff,
+    0x0000_0001,
+    0x7149_f2ca,
+    0xbf80_0000,
+    0x1000_0000,
 ];
 
 const NUMBERS: [&str; 40] = [
-    "0", "1", "-1", "2", "3", "255", "256", "65535", "65536", "2147483647", "2147483648", "-2147483648",
-    "4294967295", "4294967296", "9223372036854775807", "9223372036854775808", "18446744073709551615",
-    "18446744073709551616", "1e308", "1e309", "-1e309", "NaN", "nan", "inf", "-inf", "infinity", "0.0", "-0.0",
-    "1e-45", "3.4028235e38", "0x10", "1.5", "007", "00000000000000000000001", "99999999999999999999999999999",
-    "-0", "+1", "1,2,3", "1e", ".",
+    "0",
+    "1",
+    "-1",
+    "2",
+    "3",
+    "255",
+    "256",
+    "65535",
+    "65536",
+    "2147483647",
+    "2147483648",
+    "-2147483648",
+    "4294967295",
+    "4294967296",
+    "9223372036854775807",
+    "9223372036854775808",
+    "18446744073709551615",
+    "18446744073709551616",
+    "1e308",
+    "1e309",
+    "-1e309",
+    "NaN",
+    "nan",
+    "inf",
+    "-inf",
+    "infinity",
+    "0.0",
+    "-0.0",
+    "1e-45",
+    "3.4028235e38",
+    "0x10",
+    "1.5",
+    "007",
+    "00000000000000000000001",
+    "99999999999999999999999999999",
+    "-0",
+    "+1",
+    "1,2,3",
+    "1e",
+    ".",
 ];
 
 const SPECIAL: [&str; 34] = [
-    "\0", "\r", "\r\n", "\n", "\t", " ", "\u{feff}", "\u{202e}", "\u{200b}", "é", "汉字", "\u{10ffff}", "#", ":",
-    ";", "=", ",", "\"", "\\", "{", "}", "[", "]", "../", "/", "..", "-", "_", "\u{85}", "\u{2028}", "%s", "*", "~",
+    "\0",
+    "\r",
+    "\r\n",
+    "\n",
+    "\t",
+    " ",
+    "\u{feff}",
+    "\u{202e}",
+    "\u{200b}",
+    "é",
+    "汉字",
+    "\u{10ffff}",
+    "#",
+    ":",
+    ";",
+    "=",
+    ",",
+    "\"",
+    "\\",
+    "{",
+    "}",
+    "[",
+    "]",
+    "../",
+    "/",
+    "..",
+    "-",
+    "_",
+    "\u{85}",
+    "\u{2028}",
+    "%s",
+    "*",
+    "~",
     "\u{1b}[",
 ];
 
@@ -75,7 +182,11 @@ impl Dict {
                         lines.push(line.to_vec());
                     }
                     for w in line.split(|b| !is_word(*b)) {
-                        if w.len() >= 2 && w.len() <= 64 && words.len() < 8192 && seen.insert(w.to_vec()) {
+                        if w.len() >= 2
+                            && w.len() <= 64
+                            && words.len() < 8192
+                            && seen.insert(w.to_vec())
+                        {
                             words.push(w.to_vec());
                         }
                     }
@@ -91,7 +202,14 @@ fn is_word(b: u8) -> bool {
 }
 
 /// Input number `iter` of a run.
-pub fn input(corpus: &[Vec<u8>], dict: &Dict, kind: Kind, seed: u64, iter: u64, max_len: usize) -> Vec<u8> {
+pub fn input(
+    corpus: &[Vec<u8>],
+    dict: &Dict,
+    kind: Kind,
+    seed: u64,
+    iter: u64,
+    max_len: usize,
+) -> Vec<u8> {
     let mut rng = Rng::new(seed ^ iter.wrapping_mul(0x2127_599b_f432_5c37).rotate_left(17));
     let mut buf = rng.pick(corpus).clone();
     let stack = 1 << rng.below(4);
@@ -124,14 +242,22 @@ fn bytes(buf: &mut Vec<u8>, rng: &mut Rng, corpus: &[Vec<u8>]) {
         2 if len > 0 => buf[pos] = *rng.pick(&[0u8, 1, 0x7f, 0x80, 0xff, b'0', b' ', b'\n']),
         3 => {
             let v = *rng.pick(&U32S) as u16;
-            let b = if rng.below(2) == 0 { v.to_le_bytes() } else { v.to_be_bytes() };
+            let b = if rng.below(2) == 0 {
+                v.to_le_bytes()
+            } else {
+                v.to_be_bytes()
+            };
             put(buf, pos, &b);
         }
         4 | 5 => {
             // aligned words more often: the formats are made of them
             let at = if rng.below(2) == 0 { pos & !3 } else { pos };
             let v = *rng.pick(&U32S);
-            let b = if rng.below(4) == 0 { v.to_be_bytes() } else { v.to_le_bytes() };
+            let b = if rng.below(4) == 0 {
+                v.to_be_bytes()
+            } else {
+                v.to_le_bytes()
+            };
             put(buf, at, &b);
         }
         6 => {
@@ -143,7 +269,11 @@ fn bytes(buf: &mut Vec<u8>, rng: &mut Rng, corpus: &[Vec<u8>]) {
             let at = rng.below(len - 3);
             let v = u32::from_le_bytes([buf[at], buf[at + 1], buf[at + 2], buf[at + 3]]);
             let d = rng.below(64) as u32 + 1;
-            let v = if rng.below(2) == 0 { v.wrapping_add(d) } else { v.wrapping_sub(d) };
+            let v = if rng.below(2) == 0 {
+                v.wrapping_add(d)
+            } else {
+                v.wrapping_sub(d)
+            };
             put(buf, at, &v.to_le_bytes());
         }
         8 => {
@@ -153,7 +283,11 @@ fn bytes(buf: &mut Vec<u8>, rng: &mut Rng, corpus: &[Vec<u8>]) {
         }
         9 => {
             let n = rng.len(1 << 16);
-            let b = if rng.below(2) == 0 { 0 } else { rng.next() as u8 };
+            let b = if rng.below(2) == 0 {
+                0
+            } else {
+                rng.next() as u8
+            };
             buf.splice(pos..pos, std::iter::repeat_n(b, n));
         }
         10 if len > 0 => {
@@ -261,7 +395,9 @@ fn lines(buf: &[u8]) -> Vec<(usize, usize)> {
 fn text(buf: &mut Vec<u8>, rng: &mut Rng, corpus: &[Vec<u8>], dict: &Dict) {
     let ws = words(buf);
     let ls = lines(buf);
-    let word = |rng: &mut Rng| -> Option<(usize, usize)> { (!ws.is_empty()).then(|| ws[rng.below(ws.len())]) };
+    let word = |rng: &mut Rng| -> Option<(usize, usize)> {
+        (!ws.is_empty()).then(|| ws[rng.below(ws.len())])
+    };
     let line = |rng: &mut Rng| ls[rng.below(ls.len())];
     match rng.below(12) {
         0 => {
@@ -301,7 +437,10 @@ fn text(buf: &mut Vec<u8>, rng: &mut Rng, corpus: &[Vec<u8>], dict: &Dict) {
             let (a, b) = (line(rng), line(rng));
             let (first, second) = if a.0 <= b.0 { (a, b) } else { (b, a) };
             if first.1 < second.0 {
-                let (x, y) = (buf[first.0..first.1].to_vec(), buf[second.0..second.1].to_vec());
+                let (x, y) = (
+                    buf[first.0..first.1].to_vec(),
+                    buf[second.0..second.1].to_vec(),
+                );
                 buf.splice(second.0..second.1, x);
                 buf.splice(first.0..first.1, y);
             }
@@ -345,7 +484,10 @@ fn text(buf: &mut Vec<u8>, rng: &mut Rng, corpus: &[Vec<u8>], dict: &Dict) {
                     0 => [b"-".as_slice(), &w].concat(),
                     1 => [w.as_slice(), b"000000000"].concat(),
                     2 => [w.as_slice(), b"e999"].concat(),
-                    3 => w.iter().map(|c| if c.is_ascii_digit() { b'9' } else { *c }).collect(),
+                    3 => w
+                        .iter()
+                        .map(|c| if c.is_ascii_digit() { b'9' } else { *c })
+                        .collect(),
                     _ => w.to_ascii_uppercase(),
                 };
                 buf.splice(s..e, new);

@@ -1,7 +1,10 @@
 // Loading a level from a Virtools file into the engine's model. Objects that fail to decode are skipped and
 // reported, so one broken object in a community map costs that object, not the level.
 
-use crate::{Blend, Channel, Group, Level, Material, Mesh, Object, Part, Sprite, TexGen, Texture, TextureSource};
+use crate::{
+    Blend, Channel, Group, Level, Material, Mesh, Object, Part, Sprite, TexGen, Texture,
+    TextureSource,
+};
 use nmo::{Document, class, scene};
 use std::collections::HashMap;
 
@@ -51,7 +54,9 @@ fn build(doc: &Document) -> Loaded {
                 level.textures.push(Texture {
                     name: name(o),
                     source,
-                    color_key: t.transparent.map(|c| [(c >> 16) as u8, (c >> 8) as u8, c as u8]),
+                    color_key: t
+                        .transparent
+                        .map(|c| [(c >> 16) as u8, (c >> 8) as u8, c as u8]),
                 });
             }
             Err(e) => warn(o, e),
@@ -126,7 +131,8 @@ fn build(doc: &Document) -> Loaded {
                 let [x, y, z, p] = e.matrix;
                 let hidden = chunk.section(0x4).is_some() || chunk.section(0x18).is_some();
                 // A sprite is drawn as a quad of its own: a unit square with its texture rectangle and material.
-                let (mut mesh_index, mut sprite) = (e.mesh.and_then(|m| meshes.get(&m).copied()), None);
+                let (mut mesh_index, mut sprite) =
+                    (e.mesh.and_then(|m| meshes.get(&m).copied()), None);
                 if o.class_id == class::SPRITE_3D {
                     match scene::sprite(chunk) {
                         Ok(s) => {
@@ -136,7 +142,12 @@ fn build(doc: &Document) -> Loaded {
                                 channels: Vec::new(),
                                 look: None,
                                 name: format!("{}_Sprite", name(o)),
-                                positions: vec![[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 0.0, 0.0]],
+                                positions: vec![
+                                    [0.0, 0.0, 0.0],
+                                    [0.0, 1.0, 0.0],
+                                    [1.0, 1.0, 0.0],
+                                    [1.0, 0.0, 0.0],
+                                ],
                                 normals: vec![[0.0, 0.0, -1.0]; 4],
                                 uvs: vec![[u0, v1], [u0, v0], [u1, v0], [u1, v1]],
                                 parts: vec![Part {
@@ -144,7 +155,11 @@ fn build(doc: &Document) -> Loaded {
                                     indices: vec![0, 1, 2, 0, 2, 3],
                                 }],
                             });
-                            sprite = Some(Sprite { mode: s.mode, size: s.size, offset: s.offset });
+                            sprite = Some(Sprite {
+                                mode: s.mode,
+                                size: s.size,
+                                offset: s.offset,
+                            });
                         }
                         Err(err) => warn(o, err),
                     }
@@ -167,7 +182,8 @@ fn build(doc: &Document) -> Loaded {
         }
     }
 
-    for (_, o) in doc.of_class(class::GROUP) {
+    let mut group_indices = HashMap::new();
+    for (i, o) in doc.of_class(class::GROUP) {
         let Some(chunk) = &o.chunk else { continue };
         match scene::group(chunk) {
             Ok(members) => level.groups.push(Group {
@@ -179,8 +195,33 @@ fn build(doc: &Document) -> Loaded {
             }),
             Err(e) => warn(o, e),
         }
+        if level.groups.len() > group_indices.len() {
+            group_indices.insert(i, level.groups.len().saturating_sub(1));
+        }
     }
-
+    // The map's own scripts, if any, with each file object's meaning to the engine.
+    let kind = |i: usize| -> script::ObjKind {
+        if let Some(&e) = objects.get(&i) {
+            return script::ObjKind::Entity(e);
+        }
+        if let Some(&m) = meshes.get(&i) {
+            return script::ObjKind::Mesh(m);
+        }
+        if let Some(&m) = materials.get(&i) {
+            return script::ObjKind::Material(m);
+        }
+        if let Some(&t) = textures.get(&i) {
+            return script::ObjKind::Texture(t);
+        }
+        if let Some(g) = group_indices.get(&i) {
+            return script::ObjKind::Group(*g);
+        }
+        script::ObjKind::Other
+    };
+    let graph = script::Graph::from_document(doc, &kind);
+    if !graph.scripts.is_empty() {
+        level.scripts = Some(std::sync::Arc::new(graph));
+    }
     Loaded { level, warnings }
 }
 
@@ -216,7 +257,11 @@ fn material(name: String, m: &scene::Material, textures: &HashMap<usize, usize>)
         ambient: rgb(m.ambient),
         emissive: rgb(m.emissive),
         specular: rgb(m.specular),
-        power: if m.specular_power.is_finite() { m.specular_power.clamp(0.0, 1000.0) } else { 0.0 },
+        power: if m.specular_power.is_finite() {
+            m.specular_power.clamp(0.0, 1000.0)
+        } else {
+            0.0
+        },
         texture: m.texture.and_then(|t| textures.get(&t).copied()),
         blend: m
             .alpha_blend
@@ -235,7 +280,12 @@ fn material(name: String, m: &scene::Material, textures: &HashMap<usize, usize>)
 /// effect's setting may be.
 const PARAMETER_CLASSES: [u32; 4] = [2, 3, 45, 46];
 
-fn mesh(name: String, m: scene::Mesh, channels: &[scene::Channel], materials: &HashMap<usize, usize>) -> Mesh {
+fn mesh(
+    name: String,
+    m: scene::Mesh,
+    channels: &[scene::Channel],
+    materials: &HashMap<usize, usize>,
+) -> Mesh {
     let mut parts: Vec<Part> = Vec::new();
     for (idx, slot) in &m.faces {
         let material = m
@@ -274,8 +324,16 @@ fn mesh(name: String, m: scene::Mesh, channels: &[scene::Channel], materials: &H
         .filter(|c| c.flags & 1 != 0)
         .filter_map(|c| {
             let material = c.material.and_then(|i| materials.get(&i).copied())?;
-            let uvs = if c.uvs.len() == m.positions.len() { c.uvs.clone() } else { uvs.clone() };
-            Some(Channel { material, blend: (blend(c.src_blend), blend(c.dest_blend)), uvs })
+            let uvs = if c.uvs.len() == m.positions.len() {
+                c.uvs.clone()
+            } else {
+                uvs.clone()
+            };
+            Some(Channel {
+                material,
+                blend: (blend(c.src_blend), blend(c.dest_blend)),
+                uvs,
+            })
         })
         .collect();
     Mesh {

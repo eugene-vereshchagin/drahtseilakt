@@ -1,5 +1,6 @@
 // nmo-dump: prints what a Virtools file holds. Default: the container; --objects: every object with its class;
-// --check: decode every scene object and print only what fails (for runs over whole map collections).
+// --check: decode every scene object and print only what fails (for runs over whole map collections);
+// --scripts: the behaviour graphs' building blocks by prototype, with counts (the survey of community maps).
 
 use nmo::{Document, class, scene};
 use std::process::ExitCode;
@@ -19,7 +20,9 @@ fn decode(doc: &Document) -> Vec<String> {
             | class::TARGET_CAMERA
             | class::LIGHT
             | class::TARGET_LIGHT => scene::entity(chunk).map(|_| ()),
-            class::SPRITE_3D => scene::entity(chunk).and_then(|_| scene::sprite(chunk)).map(|_| ()),
+            class::SPRITE_3D => scene::entity(chunk)
+                .and_then(|_| scene::sprite(chunk))
+                .map(|_| ()),
             _ => Ok(()),
         };
         if let Err(e) = result {
@@ -36,11 +39,11 @@ fn decode(doc: &Document) -> Vec<String> {
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mode = match args.first().map(String::as_str) {
-        Some("--objects") | Some("--check") => args.remove(0),
+        Some("--objects") | Some("--check") | Some("--scripts") => args.remove(0),
         _ => String::new(),
     };
     if args.is_empty() {
-        eprintln!("usage: nmo-dump [--objects | --check] FILE...");
+        eprintln!("usage: nmo-dump [--objects | --check | --scripts] FILE...");
         return ExitCode::from(2);
     }
     let mut failed = false;
@@ -65,6 +68,32 @@ fn main() -> ExitCode {
                 for e in decode(&doc) {
                     eprintln!("{path}: {e}");
                     failed = true;
+                }
+            }
+            "--scripts" => {
+                let mut protos: Vec<(nmo::behavior::Guid, String, usize)> = Vec::new();
+                let mut scripts = 0usize;
+                for o in &doc.objects {
+                    let Some(chunk) = &o.chunk else { continue };
+                    if o.class_id != nmo::behavior::class::BEHAVIOR {
+                        continue;
+                    }
+                    let Ok(b) = nmo::behavior::behavior(chunk) else {
+                        continue;
+                    };
+                    if b.flags & nmo::behavior::FLAG_SCRIPT != 0 {
+                        scripts = scripts.saturating_add(1);
+                    }
+                    let Some((guid, _)) = b.proto else { continue };
+                    match protos.iter_mut().find(|p| p.0 == guid) {
+                        Some(p) => p.2 = p.2.saturating_add(1),
+                        None => protos.push((guid, o.name_lossy(), 1)),
+                    }
+                }
+                protos.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.cmp(&b.1)));
+                println!("{path}: {scripts} scripts, {} block kinds", protos.len());
+                for (guid, name, n) in protos {
+                    println!("  {n:5} {guid} {name}");
                 }
             }
             "--objects" => {

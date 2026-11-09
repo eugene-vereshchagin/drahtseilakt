@@ -115,7 +115,8 @@ impl World {
         let dt = now - h.last_time;
         h.hull_value = (f64::from(h.hull_value) + dt * f64::from(h.gradient)) as f32;
         h.gradient = 0.0;
-        h.center_hull_value = (f64::from(h.center_hull_value) + dt * f64::from(h.center_gradient)) as f32;
+        h.center_hull_value =
+            (f64::from(h.center_hull_value) + dt * f64::from(h.center_gradient)) as f32;
         h.center_gradient = 0.0;
         self.hull_reset(c);
         self.coll.objs[c].cache_valid = false;

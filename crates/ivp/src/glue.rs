@@ -4,7 +4,7 @@
 // entities are the game's ids, kept with the body for the readouts.
 
 use crate::collision::ObjKind;
-use crate::core::{Controller, World, MT_MOVING};
+use crate::core::{Controller, MT_MOVING, World};
 use crate::impact::ImpactEvent;
 use crate::math;
 
@@ -42,7 +42,11 @@ impl Clone for Listeners {
 
 impl std::fmt::Debug for Listeners {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Listeners({})", if self.0.is_some() { "set" } else { "empty" })
+        write!(
+            f,
+            "Listeners({})",
+            if self.0.is_some() { "set" } else { "empty" }
+        )
     }
 }
 
@@ -175,7 +179,8 @@ impl World {
             return;
         }
         for ctrl in 0..self.controllers.len() {
-            if matches!(self.controllers[ctrl], Controller::Force(Force { body: Some(b), .. }) if b == c) {
+            if matches!(self.controllers[ctrl], Controller::Force(Force { body: Some(b), .. }) if b == c)
+            {
                 self.force_destroy(ctrl);
             }
         }
@@ -210,7 +215,9 @@ impl World {
 
     /// The bodies in the order the C body list has them: the newest first. Removed bodies are skipped.
     fn body_indices(&self) -> impl Iterator<Item = usize> + '_ {
-        (0..self.cores.len()).rev().filter(|&c| !self.cores[c].removed)
+        (0..self.cores.len())
+            .rev()
+            .filter(|&c| !self.cores[c].removed)
     }
 
     /// The body count, the awake count and the contact count (`phys_debug`).
@@ -222,14 +229,24 @@ impl World {
                 k.awake += 1;
             }
         }
-        k.contacts = self.coll.cps.iter().filter(|p| p.alive && p.fs.is_some()).count() as u32;
+        k.contacts = self
+            .coll
+            .cps
+            .iter()
+            .filter(|p| p.alive && p.fs.is_some())
+            .count() as u32;
         k
     }
 
     /// The i-th body's readout (`phys_debug_body`), in the order of `debug_counts`.
     pub fn debug_body(&self, i: usize) -> Option<BodyReadout> {
         let c = self.body_indices().nth(i)?;
-        let shape = self.coll.objs.get(c).and_then(|o| o.kind).unwrap_or(ObjKind::Ball);
+        let shape = self
+            .coll
+            .objs
+            .get(c)
+            .and_then(|o| o.kind)
+            .unwrap_or(ObjKind::Ball);
         let triangles = self
             .coll
             .objs
@@ -266,7 +283,10 @@ impl World {
             .filter(|p| p.alive && p.fs.is_some())
             .nth(i)?;
         Some(ContactReadout {
-            entities: [self.cores[p.syn[0].obj].entity, self.cores[p.syn[1].obj].entity],
+            entities: [
+                self.cores[p.syn[0].obj].entity,
+                self.cores[p.syn[1].obj].entity,
+            ],
             types: [p.syn[0].typ, p.syn[1].typ],
             gap: p.gap,
             pressure: p.pressure,
@@ -278,7 +298,11 @@ impl World {
     /// The post-collision events since the last call (`PhysImpactEvent`, what PhysicsCollDetection listens to): the
     /// two objects and their relative velocity at the impact. Taking them empties the list.
     pub fn take_impacts(&mut self) -> Vec<([usize; 2], P3)> {
-        self.coll.impact_events.drain(..).map(|e| (e.obj, e.rel)).collect()
+        self.coll
+            .impact_events
+            .drain(..)
+            .map(|e| (e.obj, e.rel))
+            .collect()
     }
 
     /// The objects an object has friction contacts with now (one entry per contact point), as PhysicsContinuousContact
@@ -303,12 +327,15 @@ impl World {
             .iter()
             .filter(|p| p.alive && p.fs.is_some())
             .filter_map(|p| {
-                let entities = [self.cores[p.syn[0].obj].entity, self.cores[p.syn[1].obj].entity];
+                let entities = [
+                    self.cores[p.syn[0].obj].entity,
+                    self.cores[p.syn[1].obj].entity,
+                ];
                 (entities[0] == entity || entities[1] == entity).then(|| ContactReadout {
                     entities,
                     types: [p.syn[0].typ, p.syn[1].typ],
                     gap: p.gap,
-            pressure: p.pressure,
+                    pressure: p.pressure,
                     normal: p.info.n,
                     point: p.info.cp_ws,
                 })
@@ -326,7 +353,11 @@ impl World {
         for l in &surface.ledges {
             for t in 0..l.tris.len() {
                 let e = crate::ledge::Edge { tri: t, slot: 0 };
-                let corners = [l.p(e), l.p(crate::ledge::Ledge::next(e)), l.p(crate::ledge::Ledge::prev(e))];
+                let corners = [
+                    l.p(e),
+                    l.p(crate::ledge::Ledge::next(e)),
+                    l.p(crate::ledge::Ledge::prev(e)),
+                ];
                 let c: Vec<V3> = corners.iter().map(|v| to_v3(*v)).collect();
                 let near = c.iter().any(|v| {
                     let d = [v[0] - p[0], v[1] - p[1], v[2] - p[2]];
@@ -386,20 +417,34 @@ mod tests {
     use crate::ledge::Surface;
     use std::sync::{Arc, Mutex};
 
-    const IDENTITY: crate::math::Quat = crate::math::Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+    const IDENTITY: crate::math::Quat = crate::math::Quat {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 1.0,
+    };
 
     /// A floor of two triangles at height 0 spanning [-10, 10] in x and z.
     fn floor() -> Surface {
-        let p = [[-10.0, 0.0, -10.0], [10.0, 0.0, -10.0], [10.0, 0.0, 10.0], [-10.0, 0.0, 10.0]];
+        let p = [
+            [-10.0, 0.0, -10.0],
+            [10.0, 0.0, -10.0],
+            [10.0, 0.0, 10.0],
+            [-10.0, 0.0, 10.0],
+        ];
         let mut ledges = Vec::new();
         for tri in [[0, 1, 2], [0, 2, 3]] {
-            ledges.push(crate::ledge::triangle(p[tri[0]], p[tri[1]], p[tri[2]]).expect("a triangle"));
+            ledges
+                .push(crate::ledge::triangle(p[tri[0]], p[tri[1]], p[tri[2]]).expect("a triangle"));
         }
         Surface::compile(ledges).expect("a floor")
     }
 
     fn ball(w: &mut World, entity: u32, pos: [f64; 3]) -> usize {
-        let desc = BodyDesc { entity, ..BodyDesc::default() };
+        let desc = BodyDesc {
+            entity,
+            ..BodyDesc::default()
+        };
         w.add_body(desc, Shape::Sphere(1.0), pos, IDENTITY)
     }
 
@@ -424,10 +469,16 @@ mod tests {
         // the upstream pushes the force as an impulse at every PSI, so a second of 66 PSIs gives 66 F / m
         let v = speed(&w, b);
         let psis = 1.0 / w.env.delta_psi;
-        assert!((f64::from(v) - 2.0 * psis).abs() < 0.02 * psis, "66 pushes of 2, got {v}");
+        assert!(
+            (f64::from(v) - 2.0 * psis).abs() < 0.02 * psis,
+            "66 pushes of 2, got {v}"
+        );
         w.force_destroy(f);
         w.advance(1.0);
-        assert!((speed(&w, b) - v).abs() < 1e-3, "a destroyed force pushes no more");
+        assert!(
+            (speed(&w, b) - v).abs() < 1e-3,
+            "a destroyed force pushes no more"
+        );
         w.force_destroy(f);
     }
 
@@ -443,9 +494,17 @@ mod tests {
         local.advance(0.5);
         let (sa, sb) = (world.body_state(a).spin, local.body_state(b).spin);
         for k in 0..3 {
-            assert!((sa[k] - sb[k]).abs() < 1e-3, "spin {k}: world {} local {}", sa[k], sb[k]);
+            assert!(
+                (sa[k] - sb[k]).abs() < 1e-3,
+                "spin {k}: world {} local {}",
+                sa[k],
+                sb[k]
+            );
         }
-        assert!(sa[1].abs() > 0.1, "the force at a lever arm spins the ball: {sa:?}");
+        assert!(
+            sa[1].abs() > 0.1,
+            "the force at a lever arm spins the ball: {sa:?}"
+        );
     }
 
     #[test]
@@ -455,7 +514,10 @@ mod tests {
         w.body_impulse_local(b, [0.0; 3], [3.0, 0.0, 0.0]);
         w.advance(1.0 / 66.0);
         let v = w.body_state(b).vel;
-        assert!((v[0] - 3.0).abs() < 1e-3, "an impulse of 3 on mass 1: {v:?}");
+        assert!(
+            (v[0] - 3.0).abs() < 1e-3,
+            "an impulse of 3 on mass 1: {v:?}"
+        );
     }
 
     #[test]
@@ -504,19 +566,36 @@ mod tests {
         w.time_start();
         w.set_gravity([0.0, -9.8, 0.0]);
         w.set_listener(Some(Box::new(Rec(log.clone()))));
-        let f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
+        let f = w.add_body(
+            BodyDesc {
+                fixed: true,
+                ..BodyDesc::default()
+            },
+            Shape::Surface(floor()),
+            [0.0; 3],
+            IDENTITY,
+        );
         let b = ball(&mut w, 3, [0.0, 2.0, 0.0]);
         w.advance(2.0);
         let log = log.lock().unwrap();
         assert!(log.begins >= 1, "a contact begins when the ball lands");
         assert!(!log.impacts.is_empty(), "the landing is an impact");
         for o in &log.impacts {
-            assert!(o.contains(&f) && o.contains(&b), "the impact's order is the two bodies: {o:?}");
+            assert!(
+                o.contains(&f) && o.contains(&b),
+                "the impact's order is the two bodies: {o:?}"
+            );
         }
         assert_eq!(w.coll.impact_events.len(), log.impacts.len());
-        assert!(w.debug_counts().contacts >= 1, "the ball rests on the floor");
+        assert!(
+            w.debug_counts().contacts >= 1,
+            "the ball rests on the floor"
+        );
         let c = w.debug_contact(0).expect("a readout for the contact");
-        assert!(c.entities.contains(&3), "the readout names the ball's entity: {c:?}");
+        assert!(
+            c.entities.contains(&3),
+            "the readout names the ball's entity: {c:?}"
+        );
     }
 
     #[test]
@@ -528,22 +607,41 @@ mod tests {
         let reached = w.frame(16.0);
         // the smoothed frame time of the first frame is a quarter of its own: 4 ms, scaled by the factor 0.5 in
         // thousandths of a second per millisecond
-        assert!((reached - (t0 + f64::from(4.0_f32 * 0.5 * 0.001))).abs() < 1e-9, "reached {reached}");
-        assert!((w.time() - reached).abs() < 1e-9, "the simulation ends at the time reached");
+        assert!(
+            (reached - (t0 + f64::from(4.0_f32 * 0.5 * 0.001))).abs() < 1e-9,
+            "reached {reached}"
+        );
+        assert!(
+            (w.time() - reached).abs() < 1e-9,
+            "the simulation ends at the time reached"
+        );
     }
 
     #[test]
     fn the_readouts_count_the_awake_bodies_and_their_shapes() {
         let mut w = weightless();
         ball(&mut w, 5, [0.0; 3]);
-        w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
+        w.add_body(
+            BodyDesc {
+                fixed: true,
+                ..BodyDesc::default()
+            },
+            Shape::Surface(floor()),
+            [0.0; 3],
+            IDENTITY,
+        );
         let counts = w.debug_counts();
         assert_eq!(counts.bodies, 2);
         assert_eq!(counts.awake, 1, "the fixed floor never wakes");
-        let readout = w.debug_body(1).expect("the ball is the newest body's neighbour");
+        let readout = w
+            .debug_body(1)
+            .expect("the ball is the newest body's neighbour");
         assert_eq!(readout.entity, 5);
         let floor_readout = w.debug_body(0);
-        assert!(floor_readout.is_some_and(|r| r.fixed && r.triangles == 2), "floor readout: {floor_readout:?}");
+        assert!(
+            floor_readout.is_some_and(|r| r.fixed && r.triangles == 2),
+            "floor readout: {floor_readout:?}"
+        );
         assert_eq!(w.debug_core(1).map(|c| c.speed), Some([0.0; 3]));
         assert!(w.debug_collision()[1] >= w.debug_collision()[0]);
     }

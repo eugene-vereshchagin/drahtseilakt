@@ -4,19 +4,19 @@
 
 use crate::Options;
 use crate::assets::{Data, LoadedLevel};
-pub use gamedata::profile::setting;
-use gamedata::profile::{settings_path, settings_text};
-use crate::render::Renderer;
-use crate::replay::Replay;
 use crate::audio::Audio;
 use crate::ballsound::{BallSound, FanSound, SoundCmd};
-use crate::freecam::FreeCam;
-use crate::music::Music;
-use crate::menu::{Action, Menu};
-use crate::scene::{self, BallMeshes, Snapshot};
 use crate::collide::closest_point;
+use crate::freecam::FreeCam;
+use crate::menu::{Action, Menu};
+use crate::music::Music;
+use crate::render::Renderer;
+use crate::replay::Replay;
+use crate::scene::{self, BallMeshes, Snapshot};
 use crate::sim::{BALL_RADIUS, Event, Sim, TICK};
 use crate::watch::{Finding, Watch};
+pub use gamedata::profile::setting;
+use gamedata::profile::{settings_path, settings_text};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -133,7 +133,10 @@ fn start_of(o: &Options, level: &level::Level) -> Result<Option<crate::replay::S
     };
     let sector = o
         .sector
-        .or_else(|| at.and_then(|p| crate::sim::sector_near(level, glam::Vec3::from(p))).map(|n| n + 1))
+        .or_else(|| {
+            at.and_then(|p| crate::sim::sector_near(level, glam::Vec3::from(p)))
+                .map(|n| n + 1)
+        })
         .unwrap_or(1);
     Ok(Some(crate::replay::Start {
         sector,
@@ -155,14 +158,36 @@ impl Game {
         for w in &level.warnings {
             eprintln!("warning: {w}");
         }
+        // a map's own scripts: say what they are made of, and which blocks this engine does not know yet
+        if let Some(graph) = &level.level.scripts {
+            let protos = graph.prototypes();
+            let unknown: Vec<String> = protos
+                .iter()
+                .filter(|(g, _, _)| !script::blocks::known(*g))
+                .map(|(g, name, n)| format!("{name} ({g}) x{n}"))
+                .collect();
+            eprintln!(
+                "scripts: {} of them, {} blocks of {} kinds{}",
+                graph.scripts.len(),
+                protos.iter().map(|p| p.2).sum::<usize>(),
+                protos.len(),
+                if unknown.is_empty() {
+                    String::new()
+                } else {
+                    format!("; not known: {}", unknown.join(", "))
+                }
+            );
+        }
         // the shared parts (balls, modules, transformer): the level folder's own when it has them, else ours or the
         // copy's (assets.rs); without any the ball is drawn plain and bursts into nothing (said once, never fatal)
-        let balls = data.part("3D Entities/Balls.nmo").unwrap_or_else(|| crate::assets::LoadedLevel {
-            level: level::Level::default(),
-            name: "Balls".into(),
-            hash: 0,
-            warnings: Vec::new(),
-        });
+        let balls =
+            data.part("3D Entities/Balls.nmo")
+                .unwrap_or_else(|| crate::assets::LoadedLevel {
+                    level: level::Level::default(),
+                    name: "Balls".into(),
+                    hash: 0,
+                    warnings: Vec::new(),
+                });
         let replay_in = match &o.replay {
             Some(p) => {
                 let text =
@@ -171,7 +196,9 @@ impl Game {
                 let r = Replay::parse(&text).map_err(|e| format!("{}: {e}", p.display()))?;
                 // a replay plays on its level file, or on a level converted from that file (an open-format export
                 // records its source's hash): the same level, so the same run
-                if r.level_hash != level.hash && Some(r.level_hash) != level.level.settings.source_hash {
+                if r.level_hash != level.hash
+                    && Some(r.level_hash) != level.level.settings.source_hash
+                {
                     return Err(format!(
                         "{}: recorded on another level file than {}",
                         p.display(),
@@ -194,7 +221,9 @@ impl Game {
         // settings say so: an .nmo's from the game's table, an open-format level's its own).
         let tutorial = level.level.settings.tutorial;
         let ball_meshes = BallMeshes::find(&balls.level);
-        let format = replay_in.as_ref().map_or(crate::replay::VERSION, |r| r.version);
+        let format = replay_in
+            .as_ref()
+            .map_or(crate::replay::VERSION, |r| r.version);
         let mut sim = Sim::with_rules(&level.level, start_ball, &modules, tutorial, format);
         sim.set_ball_boxes(ball_meshes.boxes);
         let pieces = crate::pieces::Pieces::find(&balls.level);
@@ -240,15 +269,20 @@ impl Game {
         if let Some(r) = &replay_in {
             replay_out.version = r.version;
         }
-        let module_file = |name: &str| data.part(&format!("3D Entities/PH/{name}.nmo")).map(|m| m.level);
+        let module_file = |name: &str| {
+            data.part(&format!("3D Entities/PH/{name}.nmo"))
+                .map(|m| m.level)
+        };
         let effects = crate::particles::Effects::new(&level.level, &module_file);
-        let mut placements = scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
+        let mut placements =
+            scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
         if effects.has_flames() {
             // the flames are drawn, so their stand-ins need no markers
             placements.retain(|p| {
                 p.marker.is_none()
                     || !level.level.groups_of(p.object).any(|g| {
-                        g.eq_ignore_ascii_case("PC_Checkpoints") || g.eq_ignore_ascii_case("PS_Levelstart")
+                        g.eq_ignore_ascii_case("PC_Checkpoints")
+                            || g.eq_ignore_ascii_case("PS_Levelstart")
                     })
             });
         }
@@ -285,15 +319,21 @@ impl Game {
                 let (root, old) = runs_root(&o.source);
                 let stem = level.name.trim_end_matches(".NMO").trim_end_matches(".nmo");
                 match old.map(|old| move_runs(&old, &root, stem)) {
-                    Some(Ok(true)) => println!("runs of {} moved to {}", shown(stem), shown_path(&root)),
-                    Some(Err(e)) => eprintln!("could not move the runs of {}: {}", shown(stem), shown(&e)),
+                    Some(Ok(true)) => {
+                        println!("runs of {} moved to {}", shown(stem), shown_path(&root))
+                    }
+                    Some(Err(e)) => {
+                        eprintln!("could not move the runs of {}: {}", shown(stem), shown(&e))
+                    }
                     _ => {}
                 }
                 root
             },
             shown_name: match &o.source {
                 crate::assets::Source::Original(_) => level.name.clone(),
-                crate::assets::Source::Nmo(_) | crate::assets::Source::Open(_) => loading_name(&o.source),
+                crate::assets::Source::Nmo(_) | crate::assets::Source::Open(_) => {
+                    loading_name(&o.source)
+                }
             },
             ball_sound: BallSound::default(),
             fan_sound: FanSound::default(),
@@ -308,7 +348,11 @@ impl Game {
     fn restart(&mut self) {
         self.save_attempt();
         self.assisted = false;
-        self.sim = self.fresh_sim(self.replay_in.as_ref().map_or(crate::replay::VERSION, |r| r.version));
+        self.sim = self.fresh_sim(
+            self.replay_in
+                .as_ref()
+                .map_or(crate::replay::VERSION, |r| r.version),
+        );
         self.sim.mods = self.mods.clone();
         self.ball_sound.silence(&mut self.sound_out);
         self.fan_sound.silence(&mut self.sound_out);
@@ -327,7 +371,11 @@ impl Game {
 
     /// The folder of this level's runs, attempts, watch log and findings.
     fn run_dir(&self) -> PathBuf {
-        let stem = self.level.name.trim_end_matches(".NMO").trim_end_matches(".nmo");
+        let stem = self
+            .level
+            .name
+            .trim_end_matches(".NMO")
+            .trim_end_matches(".nmo");
         replay_dir().join(stem)
     }
 
@@ -363,14 +411,22 @@ impl Game {
         let dir = self.run_dir();
         let _ = std::fs::create_dir_all(&dir);
         use std::io::Write as _;
-        if let Ok(mut log) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("watch.log")) {
+        if let Ok(mut log) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(dir.join("watch.log"))
+        {
             for l in &lines {
                 let _ = writeln!(log, "{l}");
             }
         }
         let snapshot = dir.join(format!("{}-{}.replay", f.kind.name(), f.tick));
         if let Err(e) = std::fs::write(&snapshot, self.replay_out.to_text()) {
-            eprintln!("could not save the replay of the {} to {}: {e}", f.kind.name(), snapshot.display());
+            eprintln!(
+                "could not save the replay of the {} to {}: {e}",
+                f.kind.name(),
+                snapshot.display()
+            );
         }
     }
 
@@ -379,17 +435,27 @@ impl Game {
     fn start_session(&mut self) {
         let dir = self.run_dir();
         let _ = std::fs::create_dir_all(&dir);
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         let path = dir.join(format!("session-{stamp}.log"));
         match std::fs::File::create(&path) {
             Ok(f) => {
                 let mut w = std::io::BufWriter::new(f);
                 use std::io::Write as _;
-                let _ = writeln!(w, "# {} from tick {} ({})", self.level.name, self.sim.tick, clock(self.sim.tick));
+                let _ = writeln!(
+                    w,
+                    "# {} from tick {} ({})",
+                    self.level.name,
+                    self.sim.tick,
+                    clock(self.sim.tick)
+                );
                 let _ = writeln!(
                     w,
                     "# assets {} | data {}",
-                    gamedata::resources::assets_root().map_or("(none)".into(), |p| p.display().to_string()),
+                    gamedata::resources::assets_root()
+                        .map_or("(none)".into(), |p| p.display().to_string()),
                     gamedata::profile::data_dir().display()
                 );
                 self.session = Some(w);
@@ -427,13 +493,21 @@ impl Game {
             let _ = writeln!(
                 w,
                 "  contact {:?} types {:?} gap {:.4} pressure {:.3} normal {:.3} {:.3} {:.3} point {:.3} {:.3} {:.3}",
-                c.entities, c.types, c.gap, c.pressure, c.normal[0], c.normal[1], c.normal[2], c.point[0], c.point[1], c.point[2]
+                c.entities,
+                c.types,
+                c.gap,
+                c.pressure,
+                c.normal[0],
+                c.normal[1],
+                c.normal[2],
+                c.point[0],
+                c.point[1],
+                c.point[2]
             );
         }
         if self.sim.tick.is_multiple_of(60) {
             let _ = w.flush();
         }
-
     }
 
     /// A landing that takes more than 3 rad/s of spin in one tick: the floor around the ball is written to the level's
@@ -542,14 +616,24 @@ impl Game {
         if self.sim.drawn_ball() == Some(self.sim.ball.kind) && !self.sim.game_over {
             let world = self.sim.world();
             let speed = self.sim.ball.velocity.length();
-            self.ball_sound.tick(&world.ball_sounds, self.sim.ball.kind, speed, world.time(), &mut self.sound_out);
+            self.ball_sound.tick(
+                &world.ball_sounds,
+                self.sim.ball.kind,
+                speed,
+                world.time(),
+                &mut self.sound_out,
+            );
         } else {
             self.ball_sound.silence(&mut self.sound_out);
         }
         if self.sim.finished || self.sim.game_over {
             self.fan_sound.silence(&mut self.sound_out);
         } else {
-            self.fan_sound.tick(&self.sim.fans(), self.sim.ball.position, &mut self.sound_out);
+            self.fan_sound.tick(
+                &self.sim.fans(),
+                self.sim.ball.position,
+                &mut self.sound_out,
+            );
         }
         if self.sound_out.len() > 4096 {
             // nobody plays them (a run without a window)
@@ -568,8 +652,19 @@ impl Game {
             .iter()
             .map(|t| ball.position.distance(closest_point(t, ball.position)))
             .fold(f32::INFINITY, f32::min);
-        let sink = if sink.is_finite() { BALL_RADIUS - sink } else { 0.0 };
-        let found = self.watch.observe(self.sim.tick, ball.position, ball.velocity, input, ball.on_ground, sink);
+        let sink = if sink.is_finite() {
+            BALL_RADIUS - sink
+        } else {
+            0.0
+        };
+        let found = self.watch.observe(
+            self.sim.tick,
+            ball.position,
+            ball.velocity,
+            input,
+            ball.on_ground,
+            sink,
+        );
         if !found.is_empty() {
             let contacts = self.sim.world().ball_contacts();
             for f in &found {
@@ -603,7 +698,11 @@ impl Game {
             .to_owned();
         let dir = self.runs_dir(&stem);
         // a modded run is kept as such and opens no level (menu.rs `finished`)
-        let tag = if self.sim.mods.modded() { "-modded" } else { "" };
+        let tag = if self.sim.mods.modded() {
+            "-modded"
+        } else {
+            ""
+        };
         let mut targets = vec![dir.join(format!("{}-{}{tag}.replay", stem, self.sim.tick))];
         if let Some(r) = &self.record {
             targets.push(r.clone());
@@ -750,7 +849,6 @@ fn clock(tick: u64) -> String {
     format!("{:02}:{:05.2}", (secs / 60.0) as u64, secs % 60.0)
 }
 
-
 /// The sound and music volumes from the settings file, full where it has none.
 fn load_volumes() -> [f32; 2] {
     let text = settings_text();
@@ -764,7 +862,6 @@ fn load_volumes() -> [f32; 2] {
     };
     [get("sound"), get("music")]
 }
-
 
 /// The level's start sound is played when the run is seen within its first second.
 const START_SOUND_WITHIN: u64 = 60;
@@ -781,7 +878,12 @@ fn load_extended() -> bool {
 /// The name last entered for a highscore, in the game's Latin-1.
 fn load_player() -> Vec<u8> {
     setting("player")
-        .map(|n| n.chars().filter_map(|c| u8::try_from(u32::from(c)).ok()).take(crate::highscore::NAME_MAX).collect())
+        .map(|n| {
+            n.chars()
+                .filter_map(|c| u8::try_from(u32::from(c)).ok())
+                .take(crate::highscore::NAME_MAX)
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -798,7 +900,11 @@ fn load_graphics() -> crate::options::Graphics {
 /// The menus' words in the chosen language (lang.rs): the copy's for the original's interface, else ours.
 fn load_strings(data: &Data) -> crate::lang::Strings {
     let copy = gamedata::resources::in_use() != gamedata::resources::Provider::Own;
-    crate::lang::Strings::load(data, &crate::lang::chosen(setting("language").as_deref()), copy)
+    crate::lang::Strings::load(
+        data,
+        &crate::lang::chosen(setting("language").as_deref()),
+        copy,
+    )
 }
 
 /// The keys kept in the settings, else the copy's (its DB_Options), else the original's.
@@ -840,7 +946,14 @@ fn save_settings(v: [f32; 2], features: crate::features::Features, player: &[u8]
     }
     // the lines only the file sets (language, the level folders) are kept as they are
     let ours: &[&str] = if features.mode {
-        &["sound", "music", "profile", "player", "interface", "sound-theme"]
+        &[
+            "sound",
+            "music",
+            "profile",
+            "player",
+            "interface",
+            "sound-theme",
+        ]
     } else {
         &["sound", "music", "profile", "player", "interface"]
     };
@@ -947,22 +1060,29 @@ fn runs_root(source: &crate::assets::Source) -> (PathBuf, Option<PathBuf>) {
         crate::assets::Source::Original(_) => (replay_dir(), None),
         crate::assets::Source::Nmo(p) => {
             let folder = p.parent();
-            let kind = folder.and_then(Path::parent).filter(|k| custom_roots().iter().any(|r| r == k));
+            let kind = folder
+                .and_then(Path::parent)
+                .filter(|k| custom_roots().iter().any(|r| r == k));
             match (kind.and_then(name), folder.and_then(name)) {
                 (Some(kind), Some(folder)) => {
                     // the old place was named by the folder alone, and a loose map's by its kind's folder's name (that
                     // folder may be moved, ~/MyMaps): a level folder named like one of those shared it then
                     let kinds = crate::levels::KINDS.into_iter().map(crate::levels::dir);
-                    let shared = folder == "other" || kinds.filter_map(|d| name(&d)).any(|k| k == folder);
+                    let shared =
+                        folder == "other" || kinds.filter_map(|d| name(&d)).any(|k| k == folder);
                     let old = (!shared).then(|| maps.join(&folder));
                     (replay_dir().join("levels").join(kind).join(folder), old)
                 }
-                _ => (maps.join(folder.and_then(name).unwrap_or_else(|| "other".into())), None),
+                _ => (
+                    maps.join(folder.and_then(name).unwrap_or_else(|| "other".into())),
+                    None,
+                ),
             }
         }
-        crate::assets::Source::Open(p) => {
-            (maps.join(p.parent().and_then(name).unwrap_or_else(|| "other".into())), None)
-        }
+        crate::assets::Source::Open(p) => (
+            maps.join(p.parent().and_then(name).unwrap_or_else(|| "other".into())),
+            None,
+        ),
     }
 }
 
@@ -978,7 +1098,9 @@ fn shown_path(p: &Path) -> String {
 /// Moves a level's runs from where an earlier version kept them (`old`/`stem`) to `new`/`stem`, once: only real
 /// folders (no link anywhere on the way is followed), never over runs already in the new place.
 fn move_runs(old: &Path, new: &Path, stem: &str) -> Result<bool, String> {
-    let real_dir = |p: &Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink());
+    let real_dir = |p: &Path| {
+        std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink())
+    };
     let (from, to) = (old.join(stem), new.join(stem));
     let maps = old.parent().map(Path::to_path_buf).unwrap_or_default();
     if stem.is_empty() || !real_dir(&maps) || !real_dir(old) || !real_dir(&from) {
@@ -1044,12 +1166,21 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     } else {
         (None, None)
     };
-    start_packs(o.textures.clone().or(textures).as_deref(), o.models.clone().or(models).as_deref());
-    for (asked, kind) in [(&o.textures, gamedata::packs::Kind::Textures), (&o.models, gamedata::packs::Kind::Models)] {
+    start_packs(
+        o.textures.clone().or(textures).as_deref(),
+        o.models.clone().or(models).as_deref(),
+    );
+    for (asked, kind) in [
+        (&o.textures, gamedata::packs::Kind::Textures),
+        (&o.models, gamedata::packs::Kind::Models),
+    ] {
         if let Some(k) = asked
             && gamedata::packs::chosen(kind) != *k
         {
-            return Err(format!("--{} {k}: no such pack (docs/drahtseilakt/packs.md)", kind.key()));
+            return Err(format!(
+                "--{} {k}: no such pack (docs/drahtseilakt/packs.md)",
+                kind.key()
+            ));
         }
     }
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
@@ -1104,8 +1235,16 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         // how near the floors' edges the ball rolls (edges.rs), for comparing runs
         let edges = crate::autopilot::level_edges(&game.level.level, &game.modules);
         let mut near_edges = crate::edges::EdgeStats::default();
+        let mut script_lines = 0usize;
         while game.sim.tick < end && !game.sim.finished && !game.sim.game_over {
             game.tick(0);
+            // what the map's scripts did this tick
+            if let Some(s) = &game.sim.scripts {
+                while let Some((t, line)) = s.log.get(script_lines) {
+                    println!("{} script: {line}", clock(*t));
+                    script_lines = script_lines.saturating_add(1);
+                }
+            }
             near_edges.tick(&edges, &game.sim.ball);
             if end_music.is_none() && crate::music::near_end(&game.sim) {
                 end_music = Some(game.sim.tick);
@@ -1125,15 +1264,27 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
                 // the loose things near the ball (boxes, balls, modules' parts), with DRAHTSEILAKT_TRACE_LOOSE set
                 if std::env::var_os("DRAHTSEILAKT_TRACE_LOOSE").is_some() {
                     for &(o, body) in game.sim.loose() {
-                        let Some(st) = game.sim.world().state(body) else { continue };
+                        let Some(st) = game.sim.world().state(body) else {
+                            continue;
+                        };
                         if st.pos.distance(b.position) < 40.0 {
-                            let name = game.level.level.objects.get(o).map_or("?", |ob| ob.name.as_str());
-                            println!("    {name} ({:8.2} {:8.2} {:8.2})", st.pos.x, st.pos.y, st.pos.z);
+                            let name = game
+                                .level
+                                .level
+                                .objects
+                                .get(o)
+                                .map_or("?", |ob| ob.name.as_str());
+                            println!(
+                                "    {name} ({:8.2} {:8.2} {:8.2})",
+                                st.pos.x, st.pos.y, st.pos.z
+                            );
                         }
                     }
                     // and the modules' moving parts
                     for m in game.sim.module_bodies() {
-                        let Some(st) = game.sim.world().state(m.body) else { continue };
+                        let Some(st) = game.sim.world().state(m.body) else {
+                            continue;
+                        };
                         if st.pos.distance(b.position) < 40.0 {
                             let (o, p) = (&m.object, st.pos);
                             println!("    {o} #{} ({:8.2} {:8.2} {:8.2})", m.body, p.x, p.y, p.z);
@@ -1160,8 +1311,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         );
         println!("{}", near_edges.line());
         match end_music {
-            Some(t) => println!("end music: Music_EndCheckpoint loops from {} ({} before the end)", clock(t),
-                clock(s.tick.saturating_sub(t))),
+            Some(t) => println!(
+                "end music: Music_EndCheckpoint loops from {} ({} before the end)",
+                clock(t),
+                clock(s.tick.saturating_sub(t))
+            ),
             None => println!("end music: Music_EndCheckpoint never began"),
         }
         return Ok(());
@@ -1173,7 +1327,12 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
 }
 
 /// The game in its window (`pilot`: the test player plays it, with --watch).
-fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>) -> Result<(), String> {
+fn window(
+    mut game: Game,
+    data: Data,
+    o: &Options,
+    pilot: Option<Box<PilotRun>>,
+) -> Result<(), String> {
     game.start_session();
     let video = o.video.clone();
     // Without a level named, the window opens with the main menu over the first level.
@@ -1193,7 +1352,13 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
     let (sim_mods, view_mods) = mods.running(features.mode && pilot.is_none());
     game.set_mods(sim_mods);
     let menu = (!o.chosen && o.replay.is_none()).then(|| {
-        let mut m = Menu::new(&data, &strings, crate::menu::Screen::Main, Some(1), features);
+        let mut m = Menu::new(
+            &data,
+            &strings,
+            crate::menu::Screen::Main,
+            Some(1),
+            features,
+        );
         m.volumes = load_volumes();
         m.graphics = graphics;
         m.bindings = bindings;
@@ -1236,7 +1401,9 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
         rolling: [None; 3 + crate::ballsound::FAN_SLOTS],
         music: None,
         blitz: crate::lights::Blitz::new(
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(1, |d| d.as_nanos() as u64),
         ),
         volumes: load_volumes(),
         game,
@@ -1310,7 +1477,11 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
 /// ball's place and the view's quarter. A video with a known answer, to check `--locate` with.
 fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let end = game.replay_in.as_ref().map(|r| r.end).ok_or("--frames needs --replay")?;
+    let end = game
+        .replay_in
+        .as_ref()
+        .map(|r| r.end)
+        .ok_or("--frames needs --replay")?;
     let (_, device, queue) = pollster::block_on(device(None))?;
     let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
     upload(&mut r, game);
@@ -1319,7 +1490,11 @@ fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
     let mut k = 0;
     while game.sim.tick < end && !game.sim.game_over {
         game.tick(0);
-        if !game.sim.tick.is_multiple_of(u64::from(60 / crate::locate::RATE)) {
+        if !game
+            .sim
+            .tick
+            .is_multiple_of(u64::from(60 / crate::locate::RATE))
+        {
             continue;
         }
         k += 1;
@@ -1334,18 +1509,25 @@ fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
             (&game.sim.extra_views(), game.extra_model.as_ref()),
             &snap,
             &game.sim.pieces_view(),
+            (game.sim.script_hidden(), game.sim.script_moved()),
         );
         if snap.kind.is_some() {
             scene::shadows(&game.shadow_receivers, snap.ball, &mut inst);
         }
         let screen = crate::ui::Screen { w: 640.0, h: 480.0 };
         let quads = crate::hud::interface(&game.sim, game.font.as_ref(), screen);
-        let px = off.pixels(&mut r, &scene::view(&snap), &inst, &quads).ok_or("the frame could not be read back")?;
+        let px = off
+            .pixels(&mut r, &scene::view(&snap), &inst, &quads)
+            .ok_or("the frame could not be read back")?;
         let img = image::RgbaImage::from_raw(640, 480, px).ok_or("frame size")?;
         let rgb = image::DynamicImage::ImageRgba8(img).to_rgb8();
-        rgb.save(dir.join(format!("s{k:04}.jpg"))).map_err(|e| e.to_string())?;
+        rgb.save(dir.join(format!("s{k:04}.jpg")))
+            .map_err(|e| e.to_string())?;
         let b = game.sim.ball.position;
-        truth.push_str(&format!("{k} {:.2} {:.2} {:.2} {}\n", b.x, b.y, b.z, game.sim.camera.quarter));
+        truth.push_str(&format!(
+            "{k} {:.2} {:.2} {:.2} {}\n",
+            b.x, b.y, b.z, game.sim.camera.quarter
+        ));
     }
     std::fs::write(dir.join("truth.txt"), truth).map_err(|e| e.to_string())?;
     println!("{k} frames in {}", dir.display());
@@ -1358,12 +1540,15 @@ fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
     let mut names: Vec<PathBuf> = std::fs::read_dir(dir)
         .map_err(|e| format!("{}: {e}", dir.display()))?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with('s') && n.ends_with(".jpg")))
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with('s') && n.ends_with(".jpg"))
+        })
         .collect();
     // in the frames' order (s0001.jpg, ..., s10000.jpg: by number, not by name)
-    let number = |p: &PathBuf| -> Option<u64> {
-        p.file_stem()?.to_str()?.strip_prefix('s')?.parse().ok()
-    };
+    let number =
+        |p: &PathBuf| -> Option<u64> { p.file_stem()?.to_str()?.strip_prefix('s')?.parse().ok() };
     names.retain(|p| number(p).is_some());
     names.sort_by_key(|p| number(p));
     if let Some(n) = o.ticks {
@@ -1371,11 +1556,19 @@ fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
     }
     let frames: Vec<Vec<f32>> = names
         .iter()
-        .map(|p| crate::locate::frame_edges(p).ok_or_else(|| format!("{}: not a picture", p.display())))
+        .map(|p| {
+            crate::locate::frame_edges(p).ok_or_else(|| format!("{}: not a picture", p.display()))
+        })
         .collect::<Result<_, _>>()?;
     println!("{} frames", frames.len());
     let start = game.sim.ball.position;
-    let route = crate::autopilot::Route::find(&game.level.level, &game.modules, &game.sim.updrafts(), start, &[]);
+    let route = crate::autopilot::Route::find(
+        &game.level.level,
+        &game.modules,
+        &game.sim.updrafts(),
+        start,
+        &[],
+    );
     let floor: Vec<glam::Vec3> = route.floor_points().collect();
     let (_, device, queue) = pollster::block_on(device(None))?;
     let mut r = Renderer::new(device, queue, wgpu::TextureFormat::Rgba8Unorm);
@@ -1383,7 +1576,12 @@ fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
     let off = crate::locate::Offscreen::new(&r);
     let base = Snapshot::of(&game.sim);
     let mut draw = |view: &crate::render::View, ball: glam::Vec3| {
-        let snap = Snapshot { ball, eye: view.eye, target: view.target, ..base };
+        let snap = Snapshot {
+            ball,
+            eye: view.eye,
+            target: view.target,
+            ..base
+        };
         let inst = scene::instances(
             &game.placements,
             &game.sim.taken,
@@ -1394,6 +1592,7 @@ fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
             (&[], None),
             &snap,
             &game.sim.pieces_view(),
+            (game.sim.script_hidden(), game.sim.script_moved()),
         );
         off.edges(&mut r, view, &inst)
     };
@@ -1402,7 +1601,13 @@ fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
     let mut text = format!("{}\n", crate::locate::TRACK_HEAD);
     for (k, f) in fixes.iter().enumerate() {
         let (b, q, s) = (f.ball, f.quarter, f.score);
-        text.push_str(&format!("{} {:.2} {:.2} {:.2} {q} {s:.3}\n", k + 1, b.x, b.y, b.z));
+        text.push_str(&format!(
+            "{} {:.2} {:.2} {:.2} {q} {s:.3}\n",
+            k + 1,
+            b.x,
+            b.y,
+            b.z
+        ));
     }
     match &o.record {
         Some(p) => std::fs::write(p, &text).map_err(|e| format!("{}: {e}", p.display()))?,
@@ -1427,20 +1632,34 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     // (the level's objects where they start: the bodies of later sectors are not in the physics yet)
     // (a module's part is placed by the module, not a level object: where its body is made, or else the module's)
     let objects = &game.level.level.objects;
-    let at = |o: usize| objects.get(o).map(|o| glam::Vec4::from(o.matrix[3]).truncate());
-    let parts = game
+    let at = |o: usize| {
+        objects
+            .get(o)
+            .map(|o| glam::Vec4::from(o.matrix[3]).truncate())
+    };
+    let parts = game.sim.module_bodies().iter().filter_map(|m| {
+        game.sim
+            .world()
+            .state(m.body)
+            .map(|s| s.pos)
+            .or_else(|| at(m.placeholder))
+    });
+    let loose: Vec<glam::Vec3> = game
         .sim
-        .module_bodies()
+        .loose()
         .iter()
-        .filter_map(|m| game.sim.world().state(m.body).map(|s| s.pos).or_else(|| at(m.placeholder)));
-    let loose: Vec<glam::Vec3> = game.sim.loose().iter().filter_map(|l| at(l.0)).chain(parts).collect();
+        .filter_map(|l| at(l.0))
+        .chain(parts)
+        .collect();
     let mut kind = game.sim.ball.kind;
     let mut path: Vec<glam::Vec3> = Vec::new();
     let mut gates: Vec<crate::autopilot::Gate> = Vec::new();
     let mut last: Option<glam::Vec3> = None;
     for line in text.lines().filter(|l| !l.starts_with('#')) {
         let v: Option<Vec<f32>> = line.split_whitespace().map(|x| x.parse().ok()).collect();
-        let Some([_, x, y, z, _, likeness]) = v.as_deref().and_then(|v| <[f32; 6]>::try_from(v).ok()) else {
+        let Some([_, x, y, z, _, likeness]) =
+            v.as_deref().and_then(|v| <[f32; 6]>::try_from(v).ok())
+        else {
             return Err(format!("not a track line: {line}"));
         };
         let ball = glam::Vec3::new(x, y, z);
@@ -1456,7 +1675,11 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
             continue;
         }
         let kept = gates.last().map_or(0, |g| g.0);
-        if let Some(i) = path.iter().skip(kept).rposition(|p| p.distance(floor) < 2.5) {
+        if let Some(i) = path
+            .iter()
+            .skip(kept)
+            .rposition(|p| p.distance(floor) < 2.5)
+        {
             // a loop to a loose object (a box to push, say) did something there: it stays
             let pushed = |p: &glam::Vec3| loose.iter().any(|o| o.distance(*p) < PUSH);
             if !path.get(kept + i..).unwrap_or_default().iter().any(pushed) {
@@ -1466,7 +1689,9 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
             }
         }
         path.push(floor);
-        let trafo = trafos.iter().find(|t| t.1 != kind && t.0.distance(ball) < crate::sim::TRAFO_REACH);
+        let trafo = trafos
+            .iter()
+            .find(|t| t.1 != kind && t.0.distance(ball) < crate::sim::TRAFO_REACH);
         if let Some(&(q, k)) = trafo {
             gates.push((path.len() - 1, q, k));
             kind = k;
@@ -1482,7 +1707,9 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
         let gate = gates.iter().find(|g| g.0 == i);
         // (by a loose object every place is a stage: how far the player went to push it matters)
         let near_loose = loose.iter().any(|o| o.distance(p) < PUSH);
-        let apart = stages.last().is_none_or(|l| l.distance(p) >= if near_loose { 1.5 } else { STAGE });
+        let apart = stages
+            .last()
+            .is_none_or(|l| l.distance(p) >= if near_loose { 1.5 } else { STAGE });
         if gate.is_some() || i + 1 == path.len() || apart {
             stages.push(p);
         }
@@ -1509,11 +1736,17 @@ fn follow_track(o: &Options, data: &Data, text: &str) -> Result<(), String> {
     }
     let start = game.sim.ball.position;
     let fans = game.sim.updrafts();
-    let route = crate::autopilot::Route::through(&game.level.level, &game.modules, &fans, start, &stages);
-    let gates: Vec<crate::autopilot::Gate> =
-        gate_stages.iter().filter_map(|&(k, q, kind)| route.marks.get(k).map(|&m| (m, q, kind))).collect();
+    let route =
+        crate::autopilot::Route::through(&game.level.level, &game.modules, &fans, start, &stages);
+    let gates: Vec<crate::autopilot::Gate> = gate_stages
+        .iter()
+        .filter_map(|&(k, q, kind)| route.marks.get(k).map(|&m| (m, q, kind)))
+        .collect();
     let (places, ways) = (path.len(), route.points.len());
-    println!("track: {places} places, {} stages, way {ways} points, transformers {gates:?}", stages.len());
+    println!(
+        "track: {places} places, {} stages, way {ways} points, transformers {gates:?}",
+        stages.len()
+    );
     if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
         for p in route.floor_points() {
             eprintln!("floor {:.1} {:.1} {:.1}", p.x, p.y, p.z);
@@ -1561,23 +1794,40 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         let text = std::fs::read_to_string(more).map_err(|e| format!("{}: {e}", more.display()))?;
         let m = watch_run(o, data, more, &text)?;
         let Some(from) = m.run.start.as_ref().map(|st| st.sector.saturating_sub(1)) else {
-            return Err(format!("{}: --then needs a run begun at a sector", more.display()));
+            return Err(format!(
+                "{}: --then needs a run begun at a sector",
+                more.display()
+            ));
         };
         // the followed way up to that sector, then the other run's
-        let cut = w.sectors.iter().position(|&s| s >= from).unwrap_or(w.path.len());
+        let cut = w
+            .sectors
+            .iter()
+            .position(|&s| s >= from)
+            .unwrap_or(w.path.len());
         w.path.truncate(cut);
         w.sectors.truncate(cut);
         w.gates.retain(|g| g.0 < cut);
-        w.gates.extend(m.gates.iter().map(|g| (g.0 + cut, g.1, g.2)));
+        w.gates
+            .extend(m.gates.iter().map(|g| (g.0 + cut, g.1, g.2)));
         w.path.extend(m.path);
         w.sectors.extend(m.sectors);
-        let ticks = w.demo.ticks.iter().position(|t| t.sector >= from).unwrap_or(w.demo.ticks.len());
+        let ticks = w
+            .demo
+            .ticks
+            .iter()
+            .position(|t| t.sector >= from)
+            .unwrap_or(w.demo.ticks.len());
         w.demo.ticks.truncate(ticks);
         w.demo.ticks.extend(m.demo.ticks);
         w.deaths = m.deaths.iter().map(|d| d + cut).collect();
         w.finished = m.finished;
     }
-    println!("followed: {} points, transformers {:?}", w.path.len(), w.gates);
+    println!(
+        "followed: {} points, transformers {:?}",
+        w.path.len(),
+        w.gates
+    );
     // the test player's own run begins where the followed one began
     let mut own = o.clone();
     own.replay = None;
@@ -1592,8 +1842,13 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         way_on(&game, &own, &mut w)?;
     }
     // (a way partly found by the test player takes the steeper floors that way was found over)
-    let route =
-        crate::autopilot::Route::along(&game.level.level, &game.modules, &game.sim.updrafts(), w.path, !w.finished);
+    let route = crate::autopilot::Route::along(
+        &game.level.level,
+        &game.modules,
+        &game.sim.updrafts(),
+        w.path,
+        !w.finished,
+    );
     let mut pilot = crate::autopilot::Pilot::new(route, w.gates);
     pilot.demo = Some(std::sync::Arc::new(w.demo));
     pilot_run(game, data, &own, pilot)
@@ -1603,21 +1858,36 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
 /// ball furthest from where it came into that sector), then the way the test player finds by itself from there to
 /// the end.
 fn way_on(game: &Game, o: &Options, w: &mut Watched) -> Result<(), String> {
-    let Some(&last) = w.sectors.last() else { return Ok(()) };
+    let Some(&last) = w.sectors.last() else {
+        return Ok(());
+    };
     let first = w.sectors.iter().position(|&s| s == last).unwrap_or(0);
     let entry = w.path.get(first).copied().unwrap_or_default();
     // its tries in that sector, each from where it came in (or a new ball) to where it lost the ball
-    let mut ends: Vec<usize> = w.deaths.iter().copied().filter(|&d| d > first && d <= w.path.len()).collect();
+    let mut ends: Vec<usize> = w
+        .deaths
+        .iter()
+        .copied()
+        .filter(|&d| d > first && d <= w.path.len())
+        .collect();
     ends.push(w.path.len());
-    let tries: Vec<(usize, usize)> = std::iter::once(first).chain(ends.iter().copied()).zip(ends.iter().copied())
+    let tries: Vec<(usize, usize)> = std::iter::once(first)
+        .chain(ends.iter().copied())
+        .zip(ends.iter().copied())
         .filter(|(a, b)| b > a)
         .collect();
     let far = |t: &(usize, usize)| w.path.get(t.1 - 1).map_or(0.0, |p| p.distance(entry));
     if let Some(&(a, b)) = tries.iter().max_by(|x, y| far(x).total_cmp(&far(y))) {
         let mut path: Vec<glam::Vec3> = w.path.get(..first).unwrap_or_default().to_vec();
         path.extend(w.path.get(a..b).unwrap_or_default());
-        let mut gates: Vec<crate::autopilot::Gate> = w.gates.iter().copied().filter(|g| g.0 < first).collect();
-        gates.extend(w.gates.iter().filter(|g| g.0 >= a && g.0 < b).map(|g| (g.0 - a + first, g.1, g.2)));
+        let mut gates: Vec<crate::autopilot::Gate> =
+            w.gates.iter().copied().filter(|g| g.0 < first).collect();
+        gates.extend(
+            w.gates
+                .iter()
+                .filter(|g| g.0 >= a && g.0 < b)
+                .map(|g| (g.0 - a + first, g.1, g.2)),
+        );
         w.sectors.truncate(first);
         w.sectors.extend(std::iter::repeat_n(last, b - a));
         w.path = path;
@@ -1630,7 +1900,11 @@ fn way_on(game: &Game, o: &Options, w: &mut Watched) -> Result<(), String> {
         let cut = (g + LAST_GATE_ON).min(w.path.len());
         w.path.truncate(cut);
         w.sectors.truncate(cut);
-        let made = w.demo.ticks.iter().rposition(|t| t.sector == last && t.kind == kind && t.pos.distance(at) < 6.0);
+        let made = w
+            .demo
+            .ticks
+            .iter()
+            .rposition(|t| t.sector == last && t.kind == kind && t.pos.distance(at) < 6.0);
         if let Some(k) = made {
             for t in w.demo.ticks.iter_mut().skip(k + LAST_GATE_TICKS) {
                 t.alive = false;
@@ -1638,7 +1912,9 @@ fn way_on(game: &Game, o: &Options, w: &mut Watched) -> Result<(), String> {
             }
         }
     }
-    let Some(&from) = w.path.last() else { return Ok(()) };
+    let Some(&from) = w.path.last() else {
+        return Ok(());
+    };
     let kind = w.gates.last().map_or(game.sim.ball.kind, |g| g.2);
     let up = from + glam::Vec3::Y * crate::sim::BALL_RADIUS;
     let took: Vec<glam::Vec3> = w.gates.iter().map(|g| g.1).collect();
@@ -1649,10 +1925,15 @@ fn way_on(game: &Game, o: &Options, w: &mut Watched) -> Result<(), String> {
             eprintln!("way on {} {:.1} {:.1} {:.1}", i + n, p.x, p.y, p.z);
         }
     }
-    println!("the followed run ends unfinished at {from:?} (sector {}): the way on is found, {} points, transformers \
-        {gates:?}", last + 1, route.points.len());
+    println!(
+        "the followed run ends unfinished at {from:?} (sector {}): the way on is found, {} points, transformers \
+        {gates:?}",
+        last + 1,
+        route.points.len()
+    );
     w.gates.extend(gates.iter().map(|g| (g.0 + n, g.1, g.2)));
-    w.sectors.extend(std::iter::repeat_n(last, route.points.len()));
+    w.sectors
+        .extend(std::iter::repeat_n(last, route.points.len()));
     w.path.extend(route.points);
     Ok(())
 }
@@ -1722,10 +2003,18 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
         }
         let b = &seen.sim.ball;
         // AUTOPILOT_TRACE_FOLLOW: the followed ball's place every half second, to find a stretch for a hint
-        if std::env::var_os("AUTOPILOT_TRACE_FOLLOW").is_some() && seen.sim.tick.is_multiple_of(30) {
+        if std::env::var_os("AUTOPILOT_TRACE_FOLLOW").is_some() && seen.sim.tick.is_multiple_of(30)
+        {
             let p = b.position;
-            eprintln!("follow t {} s {} ({:.1} {:.1} {:.1}) q {}", seen.sim.tick, seen.sim.sector + 1, p.x, p.y, p.z,
-                seen.sim.camera.quarter);
+            eprintln!(
+                "follow t {} s {} ({:.1} {:.1} {:.1}) q {}",
+                seen.sim.tick,
+                seen.sim.sector + 1,
+                p.x,
+                p.y,
+                p.z,
+                seen.sim.camera.quarter
+            );
         }
         let floor = b.position - glam::Vec3::Y * crate::sim::BALL_RADIUS;
         if !lost && b.on_ground && path.last().is_none_or(|p| p.distance(floor) >= 1.5) {
@@ -1738,7 +2027,11 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
     // the player's last seconds before a loss are kept to only where the run got on past that sector afterwards (a
     // loss that served the level), not in the sector a run that did not finish ended in
     let last = seen.sim.sector;
-    for t in demo.ticks.iter_mut().filter(|t| !finished && t.sector >= last) {
+    for t in demo
+        .ticks
+        .iter_mut()
+        .filter(|t| !finished && t.sector >= last)
+    {
         t.doomed_in = None;
     }
     let (path, sectors, gates, deaths) = failed_tries_out(path, sectors, gates, deaths, finished);
@@ -1762,15 +2055,26 @@ fn failed_tries_out(
     gates: Vec<crate::autopilot::Gate>,
     deaths: Vec<usize>,
     finished: bool,
-) -> (Vec<glam::Vec3>, Vec<usize>, Vec<crate::autopilot::Gate>, Vec<usize>) {
+) -> (
+    Vec<glam::Vec3>,
+    Vec<usize>,
+    Vec<crate::autopilot::Gate>,
+    Vec<usize>,
+) {
     let last = sectors.last().copied().unwrap_or(0);
     let mut keep = vec![true; path.len()];
     let mut try_start = 0;
     for &d in &deaths {
         let d = d.min(path.len());
-        let s = d.checked_sub(1).and_then(|i| sectors.get(i)).copied().unwrap_or(0);
+        let s = d
+            .checked_sub(1)
+            .and_then(|i| sectors.get(i))
+            .copied()
+            .unwrap_or(0);
         if finished || s != last {
-            let from = (try_start..d).find(|&i| sectors.get(i) == Some(&s)).unwrap_or(d);
+            let from = (try_start..d)
+                .find(|&i| sectors.get(i) == Some(&s))
+                .unwrap_or(d);
             keep.iter_mut().take(d).skip(from).for_each(|k| *k = false);
         }
         try_start = d;
@@ -1784,12 +2088,27 @@ fn failed_tries_out(
     }
     at.push(n);
     let new = |i: usize| at.get(i).copied().unwrap_or(n);
-    let gates = gates.into_iter().filter(|g| keep.get(g.0).copied().unwrap_or(true)).map(|g| (new(g.0), g.1, g.2));
+    let gates = gates
+        .into_iter()
+        .filter(|g| keep.get(g.0).copied().unwrap_or(true))
+        .map(|g| (new(g.0), g.1, g.2));
     let in_last = |d: usize| sectors.get(d.saturating_sub(1)) == Some(&last);
-    let deaths = deaths.iter().filter(|&&d| d >= keep.len() || !finished && in_last(d));
+    let deaths = deaths
+        .iter()
+        .filter(|&&d| d >= keep.len() || !finished && in_last(d));
     let deaths: Vec<usize> = deaths.map(|&d| new(d)).collect();
-    let path = path.into_iter().zip(&keep).filter(|p| *p.1).map(|p| p.0).collect();
-    let sectors = sectors.into_iter().zip(&keep).filter(|p| *p.1).map(|p| p.0).collect();
+    let path = path
+        .into_iter()
+        .zip(&keep)
+        .filter(|p| *p.1)
+        .map(|p| p.0)
+        .collect();
+    let sectors = sectors
+        .into_iter()
+        .zip(&keep)
+        .filter(|p| *p.1)
+        .map(|p| p.0)
+        .collect();
     (path, sectors, gates.collect(), deaths)
 }
 
@@ -1797,8 +2116,20 @@ fn failed_tries_out(
 /// prints how far it got.
 fn autopilot(game: Game, data: &Data, o: &Options) -> Result<(), String> {
     let start = game.sim.ball.position;
-    let (route, gates) = found_way(&game, o, start, game.sim.sector, &[], &[], game.sim.ball.kind)?;
-    println!("route: {} points, stages at {:?}", route.points.len(), route.marks);
+    let (route, gates) = found_way(
+        &game,
+        o,
+        start,
+        game.sim.sector,
+        &[],
+        &[],
+        game.sim.ball.kind,
+    )?;
+    println!(
+        "route: {} points, stages at {:?}",
+        route.points.len(),
+        route.marks
+    );
     if std::env::var_os("AUTOPILOT_FLOOR").is_some() {
         for p in route.floor_points() {
             eprintln!("floor {:.1} {:.1} {:.1}", p.x, p.y, p.z);
@@ -1830,14 +2161,20 @@ fn found_way(
     let stages: Vec<glam::Vec3> = game.sim.stages().into_iter().skip(sector).collect();
     // The transformers the way passes (within 30) are part of the way, in its order: a player rolls into them
     // rather than around them.
-    let base = crate::autopilot::Route::find(level, &game.modules, &game.sim.updrafts(), start, &stages);
+    let base =
+        crate::autopilot::Route::find(level, &game.modules, &game.sim.updrafts(), start, &stages);
     let mut waypoints: Vec<(usize, glam::Vec3, bool)> = Vec::new();
     for t in game.sim.transformers() {
         let near = base
             .points
             .iter()
             .enumerate()
-            .map(|(i, p)| (i, glam::Vec3::new(p.x - t.x, 0.0, p.z - t.z).length() + (p.y - t.y).abs()))
+            .map(|(i, p)| {
+                (
+                    i,
+                    glam::Vec3::new(p.x - t.x, 0.0, p.z - t.z).length() + (p.y - t.y).abs(),
+                )
+            })
             .min_by(|a, b| a.1.total_cmp(&b.1));
         if let Some((i, _)) = near.filter(|n| n.1 < 30.0) {
             waypoints.push((i, t, true));
@@ -1854,13 +2191,21 @@ fn found_way(
     if let Some(plan) = &o.plan {
         let mut planned = read_plan(plan, level, sector)?;
         // (up to the sector's checkpoint: what comes after it is not passed yet)
-        let end = stages.first().and_then(|c| planned.iter().position(|p| p.0.distance(*c) < 1.0));
+        let end = stages
+            .first()
+            .and_then(|c| planned.iter().position(|p| p.0.distance(*c) < 1.0));
         let taken = |p: &(glam::Vec3, bool)| took.iter().any(|q| q.distance(p.0) < 8.0);
         let came = planned
             .iter()
             .take(end.unwrap_or(planned.len()))
             // (a transformer is passed when the player's ball went into it, not by)
-            .rposition(|p| if p.1 { taken(p) } else { passed.iter().any(|q| q.distance(p.0) < 20.0) });
+            .rposition(|p| {
+                if p.1 {
+                    taken(p)
+                } else {
+                    passed.iter().any(|q| q.distance(p.0) < 20.0)
+                }
+            });
         if let Some(k) = came {
             // but a transformer after the last one the player took, not taken, is still to go into (the player's
             // ball went by it, or did not get to it before it was lost)
@@ -1871,13 +2216,19 @@ fn found_way(
                 i > k + 1 || (p.1 && !taken(p) && last_taken.is_none_or(|t| i > t + 1))
             });
         }
-        waypoints = planned.into_iter().map(|(p, trafo)| (0, p, trafo)).collect();
+        waypoints = planned
+            .into_iter()
+            .map(|(p, trafo)| (0, p, trafo))
+            .collect();
     }
     let fans = game.sim.updrafts();
     // the transformers' places on the way: their gates
     // (each with the ball its transformer makes: the level's transformer at that place)
     let kind_at = |p: glam::Vec3| {
-        game.sim.trafos().min_by(|a, b| a.0.distance(p).total_cmp(&b.0.distance(p))).map(|t| t.1)
+        game.sim
+            .trafos()
+            .min_by(|a, b| a.0.distance(p).total_cmp(&b.0.distance(p)))
+            .map(|t| t.1)
     };
     let mut tries = 0;
     // the stretches of the way (by goal) found without riding a fan
@@ -1885,10 +2236,21 @@ fn found_way(
     loop {
         let stages: Vec<glam::Vec3> = waypoints.iter().map(|w| w.1).collect();
         // the transformers not on the way are kept off (rolling over one makes the ball over)
-        let shun: Vec<glam::Vec3> =
-            game.sim.transformers().into_iter().filter(|t| stages.iter().all(|s| s.distance(*t) > 1.0)).collect();
-        let route =
-            crate::autopilot::Route::find_shunning(level, &game.modules, &fans, start, &stages, &shun, &grounded);
+        let shun: Vec<glam::Vec3> = game
+            .sim
+            .transformers()
+            .into_iter()
+            .filter(|t| stages.iter().all(|s| s.distance(*t) > 1.0))
+            .collect();
+        let route = crate::autopilot::Route::find_shunning(
+            level,
+            &game.modules,
+            &fans,
+            start,
+            &stages,
+            &shun,
+            &grounded,
+        );
         let gates: Vec<crate::autopilot::Gate> = route
             .marks
             .iter()
@@ -1898,29 +2260,50 @@ fn found_way(
             .collect();
         // Only a paper ball rides an updraft: a lift on the way taken as another ball is preceded by the paper
         // transformer nearest the fan, and the way is found again (a few times at most).
-        let ball_at = |i: usize| gates.iter().take_while(|g| g.0 <= i).last().map_or(kind, |g| g.2);
-        let wrong = route.lifts.iter().find(|&&(i, _)| ball_at(i) != crate::sim::BallKind::Paper);
+        let ball_at = |i: usize| {
+            gates
+                .iter()
+                .take_while(|g| g.0 <= i)
+                .last()
+                .map_or(kind, |g| g.2)
+        };
+        let wrong = route
+            .lifts
+            .iter()
+            .find(|&&(i, _)| ball_at(i) != crate::sim::BallKind::Paper);
         let paper = wrong.and_then(|&(i, f)| {
             let base = fans.get(f)?.0;
-            let t = game.sim.trafos().filter(|t| t.1 == crate::sim::BallKind::Paper).min_by(|a, b| {
-                a.0.distance(base).total_cmp(&b.0.distance(base))
-            })?;
+            let t = game
+                .sim
+                .trafos()
+                .filter(|t| t.1 == crate::sim::BallKind::Paper)
+                .min_by(|a, b| a.0.distance(base).total_cmp(&b.0.distance(base)))?;
             (t.0.distance(base) < FAN_PAPER_NEAR).then_some((i, t.0))
         });
         tries += 1;
-        let Some((i, at)) = paper.filter(|_| tries <= FAN_PAPER_TRIES) else { return Ok((route, gates)) };
-        let before = route.marks.iter().position(|&m| m >= i).unwrap_or(waypoints.len());
+        let Some((i, at)) = paper.filter(|_| tries <= FAN_PAPER_TRIES) else {
+            return Ok((route, gates));
+        };
+        let before = route
+            .marks
+            .iter()
+            .position(|&m| m >= i)
+            .unwrap_or(waypoints.len());
         if waypoints.iter().any(|w| w.1.distance(at) < 1.0) {
             // the paper transformer is on the way already, after this lift: the stretch the lift is on is found
             // again over the floors only (its goal may be that very transformer, up where the lift would lead)
             if grounded.contains(&before) {
                 return Ok((route, gates));
             }
-            println!("the way rides a fan at {i} not as paper: that stretch is found again without lifts");
+            println!(
+                "the way rides a fan at {i} not as paper: that stretch is found again without lifts"
+            );
             grounded.push(before);
             continue;
         }
-        println!("the way rides a fan at {i} not as paper: into the paper transformer at {at:?} first");
+        println!(
+            "the way rides a fan at {i} not as paper: into the paper transformer at {at:?} first"
+        );
         waypoints.insert(before, (0, at, true));
     }
 }
@@ -1932,18 +2315,31 @@ const FAN_PAPER_NEAR: f32 = 150.0;
 /// A plan: one level object a line (`NAME  # note`, or a place `X Y Z`), in the order the way goes through them; blank lines and
 /// `#` comments are skipped. Returns where each is and whether it is a transformer, from the checkpoint sector
 /// `sector` (from 0) begins at on (PC_TwoFlames_0N; all of it for the first).
-fn read_plan(path: &Path, level: &level::Level, sector: usize) -> Result<Vec<(glam::Vec3, bool)>, String> {
+fn read_plan(
+    path: &Path,
+    level: &level::Level,
+    sector: usize,
+) -> Result<Vec<(glam::Vec3, bool)>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut out = Vec::new();
     let begins = format!("PC_TwoFlames_{sector:02}");
     for line in text.lines() {
-        let name = line.split('#').next().unwrap_or_default().trim().trim_end_matches('?').trim();
+        let name = line
+            .split('#')
+            .next()
+            .unwrap_or_default()
+            .trim()
+            .trim_end_matches('?')
+            .trim();
         if name.is_empty() {
             continue;
         }
         // a place on the way written as `X Y Z` (a rail to take rather than another, a point the way must come by)
-        let xyz: Vec<f32> =
-            name.split_whitespace().filter_map(|w| w.parse().ok()).filter(|v: &f32| v.is_finite()).collect();
+        let xyz: Vec<f32> = name
+            .split_whitespace()
+            .filter_map(|w| w.parse().ok())
+            .filter(|v: &f32| v.is_finite())
+            .collect();
         if xyz.len() == 3 && name.split_whitespace().count() == 3 {
             out.push((glam::Vec3::new(xyz[0], xyz[1], xyz[2]), false));
             continue;
@@ -1965,13 +2361,17 @@ fn read_plan(path: &Path, level: &level::Level, sector: usize) -> Result<Vec<(gl
 
 /// The level file's name without its extension (Level_01 for Level_01.NMO).
 fn level_stem(game: &Game) -> String {
-    Path::new(&game.level.name).file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned())
+    Path::new(&game.level.name)
+        .file_stem()
+        .map_or_else(String::new, |s| s.to_string_lossy().into_owned())
 }
 
 /// The level's hint file: --hints, else hints/<level>.txt in the data folder.
 fn hints_path(game: &Game, o: &Options) -> PathBuf {
     o.hints.clone().unwrap_or_else(|| {
-        crate::levels::data_dir().join("hints").join(format!("{}.txt", level_stem(game)))
+        crate::levels::data_dir()
+            .join("hints")
+            .join(format!("{}.txt", level_stem(game)))
     })
 }
 
@@ -2017,10 +2417,13 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
     let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
     for h in &mut hints {
         for step in &mut h.steps {
-            let crate::hints::Step::Replay(file, from, to) = step else { continue };
+            let crate::hints::Step::Replay(file, from, to) = step else {
+                continue;
+            };
             let file = dir.join(&*file);
             let bytes = crate::hints::read_plain(&file, crate::hints::MAX_REPLAY_FILE)?;
-            let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
+            let text =
+                String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
             let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
             let mut watch = o.clone();
             watch.replay = Some(file.clone());
@@ -2052,7 +2455,6 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
     Ok(hints)
 }
 
-
 /// A report of where the test player is stuck, for whoever writes its hints: what it knows of the place, and two
 /// pictures, its own view and the place from above.
 fn stuck_report(
@@ -2070,7 +2472,11 @@ fn stuck_report(
     let stem = format!("{}-t{}", level_stem(game), s.tick);
     let mut folder = None;
     for k in 0..100u32 {
-        let f = dir.join(if k == 0 { stem.clone() } else { format!("{stem}-{k}") });
+        let f = dir.join(if k == 0 {
+            stem.clone()
+        } else {
+            format!("{stem}-{k}")
+        });
         match std::fs::create_dir(&f) {
             Ok(()) => {
                 folder = Some(f);
@@ -2080,31 +2486,76 @@ fn stuck_report(
             Err(e) => return Err(format!("{}: {e}", f.display())),
         }
     }
-    let folder = folder.ok_or_else(|| format!("{}: no new folder for the report", dir.display()))?;
+    let folder =
+        folder.ok_or_else(|| format!("{}: no new folder for the report", dir.display()))?;
     let mut t = String::new();
-    let _ = writeln!(t, "level {}  tick {} ({})  sector {}  lives {}", game.level.name, s.tick, clock(s.tick),
-        s.sector + 1, s.lives);
+    let _ = writeln!(
+        t,
+        "level {}  tick {} ({})  sector {}  lives {}",
+        game.level.name,
+        s.tick,
+        clock(s.tick),
+        s.sector + 1,
+        s.lives
+    );
     let v = s.ball.velocity;
-    let _ = writeln!(t, "ball {:?} at ({:.2} {:.2} {:.2}) velocity ({:.2} {:.2} {:.2}) on ground {}", s.ball.kind,
-        b.x, b.y, b.z, v.x, v.y, v.z, s.ball.on_ground);
-    let _ = writeln!(t, "view quarter {} (up pushes along {:?})", s.camera.quarter, s.camera.push_forward());
-    let _ = writeln!(t, "route {} / {}; ahead:", pilot.reached(), pilot.route.points.len());
-    for p in pilot.route.points.iter().skip(pilot.reached()).step_by(5).take(12) {
+    let _ = writeln!(
+        t,
+        "ball {:?} at ({:.2} {:.2} {:.2}) velocity ({:.2} {:.2} {:.2}) on ground {}",
+        s.ball.kind, b.x, b.y, b.z, v.x, v.y, v.z, s.ball.on_ground
+    );
+    let _ = writeln!(
+        t,
+        "view quarter {} (up pushes along {:?})",
+        s.camera.quarter,
+        s.camera.push_forward()
+    );
+    let _ = writeln!(
+        t,
+        "route {} / {}; ahead:",
+        pilot.reached(),
+        pilot.route.points.len()
+    );
+    for p in pilot
+        .route
+        .points
+        .iter()
+        .skip(pilot.reached())
+        .step_by(5)
+        .take(12)
+    {
         let _ = writeln!(t, "  ({:.1} {:.1} {:.1})", p.x, p.y, p.z);
     }
     let _ = writeln!(t, "transformers:");
     for (p, k) in s.trafos() {
         if p.distance(b) < 80.0 {
-            let _ = writeln!(t, "  {k:?} at ({:.1} {:.1} {:.1}) {:.1} away", p.x, p.y, p.z, p.distance(b));
+            let _ = writeln!(
+                t,
+                "  {k:?} at ({:.1} {:.1} {:.1}) {:.1} away",
+                p.x,
+                p.y,
+                p.z,
+                p.distance(b)
+            );
         }
     }
     let level = &game.level.level;
     let _ = writeln!(t, "loose bodies:");
     for &(obj, body) in s.loose() {
-        let (Some(o), Some(st)) = (level.objects.get(obj), s.world().state(body)) else { continue };
+        let (Some(o), Some(st)) = (level.objects.get(obj), s.world().state(body)) else {
+            continue;
+        };
         if st.pos.distance(b) < 60.0 {
             let p = st.pos;
-            let _ = writeln!(t, "  {} at ({:.1} {:.1} {:.1}) {:.1} away", o.name, p.x, p.y, p.z, p.distance(b));
+            let _ = writeln!(
+                t,
+                "  {} at ({:.1} {:.1} {:.1}) {:.1} away",
+                o.name,
+                p.x,
+                p.y,
+                p.z,
+                p.distance(b)
+            );
         }
     }
     let _ = writeln!(t, "objects within 40:");
@@ -2117,8 +2568,18 @@ fn stuck_report(
             let p = glam::Vec3::from(ob.position());
             let d = p.distance(b);
             (d < 40.0).then(|| {
-                let groups: Vec<&str> = level.groups_of(i).filter(|g| !g.starts_with("Sector")).take(4).collect();
-                (d, format!("  {} at ({:.1} {:.1} {:.1}) {:.1} away {:?}", ob.name, p.x, p.y, p.z, d, groups))
+                let groups: Vec<&str> = level
+                    .groups_of(i)
+                    .filter(|g| !g.starts_with("Sector"))
+                    .take(4)
+                    .collect();
+                (
+                    d,
+                    format!(
+                        "  {} at ({:.1} {:.1} {:.1}) {:.1} away {:?}",
+                        ob.name, p.x, p.y, p.z, d, groups
+                    ),
+                )
             })
         })
         .collect();
@@ -2142,7 +2603,15 @@ fn stuck_report(
 
 /// A state the test player goes back to: the run, its record, the player, how far it got and since when, the hint
 /// at, how near the edges it rolled.
-type Saved = (Sim, Replay, crate::autopilot::Pilot, usize, u64, Option<(usize, usize)>, crate::edges::EdgeStats);
+type Saved = (
+    Sim,
+    Replay,
+    crate::autopilot::Pilot,
+    usize,
+    u64,
+    Option<(usize, usize)>,
+    crate::edges::EdgeStats,
+);
 
 /// The test player's run, tick by tick (headless in `pilot_run`, or in the window with --watch): its hints and
 /// reports, going back when the ball is lost, giving up when the way stands still.
@@ -2167,7 +2636,12 @@ struct PilotRun {
 }
 
 impl PilotRun {
-    fn new(game: &Game, data: &Data, o: &Options, mut pilot: crate::autopilot::Pilot) -> Result<PilotRun, String> {
+    fn new(
+        game: &Game,
+        data: &Data,
+        o: &Options,
+        mut pilot: crate::autopilot::Pilot,
+    ) -> Result<PilotRun, String> {
         pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
         let zones_path = zones_path(game, o);
         pilot.zones = Arc::new(load_zones(&zones_path));
@@ -2186,7 +2660,12 @@ impl PilotRun {
         let level = &game.level.level;
         pilot.bridges = (0..level.objects.len())
             .filter(|&i| crate::scene::module_of(level, i) == Some("P_Modul_25"))
-            .filter_map(|i| level.objects.get(i).map(|ob| glam::Vec3::from(ob.position())))
+            .filter_map(|i| {
+                level
+                    .objects
+                    .get(i)
+                    .map(|ob| glam::Vec3::from(ob.position()))
+            })
             .collect();
         if game.start.is_some() {
             pilot.take_up(&game.sim);
@@ -2197,7 +2676,10 @@ impl PilotRun {
         Ok(PilotRun {
             pilot,
             // the player's own data folder, not a shared temporary one
-            report: o.report.clone().unwrap_or_else(|| crate::levels::data_dir().join("stuck")),
+            report: o
+                .report
+                .clone()
+                .unwrap_or_else(|| crate::levels::data_dir().join("stuck")),
             limit: o.ticks.unwrap_or(60 * 60 * 20),
             // a dead run: the ball neither falls nor gets on along the way for --give-up seconds (it stands or goes
             // to and fro, not knowing where to go); its report is written and the run stops, for whoever writes the
@@ -2227,9 +2709,15 @@ impl PilotRun {
     fn before(&mut self, game: &Game) {
         let s = &game.sim;
         if self.rewinds.due(s) {
-            let state =
-                (s.clone(), game.replay_out.clone(), self.pilot.clone(), self.best, self.since, self.hint_at,
-                    self.near_edges);
+            let state = (
+                s.clone(),
+                game.replay_out.clone(),
+                self.pilot.clone(),
+                self.best,
+                self.since,
+                self.hint_at,
+                self.near_edges,
+            );
             self.rewinds.save(s.tick, state);
         }
     }
@@ -2248,7 +2736,13 @@ impl PilotRun {
         let stray = game.sim.events.iter().skip(heard).any(|(_, e)| {
             matches!(e, crate::sim::Event::Transform(k) if pilot.stray_transform(*k, game.sim.ball.position))
         });
-        let fell = stray || game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::Died));
+        let fell = stray
+            || game
+                .sim
+                .events
+                .iter()
+                .skip(heard)
+                .any(|(_, e)| matches!(e, crate::sim::Event::Died));
         // (a ball lost as the player lost one there is not gone back from: it may be what the level needs)
         let as_the_player = fell && !stray && pilot.lost_as_the_player(&game.sim);
         // lost, or standing still too long: back to a state saved before, varied (a try of its own, reproducible)
@@ -2262,12 +2756,20 @@ impl PilotRun {
             still.then_some(self.since + 60)
         };
         if let Some(at) = failed_at
-            && let Some((state, attempt)) = self.rewinds.back(at, (game.sim.sector, pilot.reached()))
+            && let Some((state, attempt)) =
+                self.rewinds.back(at, (game.sim.sector, pilot.reached()))
         {
             let (sim, replay, p, b, sn, h, ne) = state;
-            let line = format!("{} {} at ({:.1} {:.1} {:.1}): back to {} (try {attempt}, {} rewinds)",
-                clock(game.sim.tick), if fell { "lost" } else { "stuck" }, game.sim.ball.position.x,
-                game.sim.ball.position.y, game.sim.ball.position.z, clock(sim.tick), self.rewinds.total());
+            let line = format!(
+                "{} {} at ({:.1} {:.1} {:.1}): back to {} (try {attempt}, {} rewinds)",
+                clock(game.sim.tick),
+                if fell { "lost" } else { "stuck" },
+                game.sim.ball.position.x,
+                game.sim.ball.position.y,
+                game.sim.ball.position.z,
+                clock(sim.tick),
+                self.rewinds.total()
+            );
             println!("{line}");
             self.went_back = Some(line);
             game.sim = sim;
@@ -2278,12 +2780,20 @@ impl PilotRun {
             self.pilot.zones = zones;
             self.pilot.learned = learned;
             self.pilot.perturb(&game.sim, attempt);
-            (self.best, self.since, self.hint_at, self.near_edges) = (b, game.sim.tick.max(sn), h, ne);
+            (self.best, self.since, self.hint_at, self.near_edges) =
+                (b, game.sim.tick.max(sn), h, ne);
             self.heard = game.sim.events.len();
             return;
         }
         // (a stray transformer taken as it came: back into one making the way's kind, as for a new ball)
-        if stray || game.sim.events.iter().skip(heard).any(|(_, e)| matches!(e, crate::sim::Event::NewBall)) {
+        if stray
+            || game
+                .sim
+                .events
+                .iter()
+                .skip(heard)
+                .any(|(_, e)| matches!(e, crate::sim::Event::NewBall))
+        {
             pilot.new_ball(&game.sim);
             // back at the reset point: getting on is counted from there again
             self.best = pilot.reached();
@@ -2299,8 +2809,13 @@ impl PilotRun {
         self.hint_at = now_at;
         if game.sim.tick - self.since > self.give_up {
             let b = game.sim.ball.position;
-            println!("dead run: ball at ({:.1} {:.1} {:.1}), not falling and the way not on for {} s", b.x, b.y, b.z,
-                (game.sim.tick - self.since) / 60);
+            println!(
+                "dead run: ball at ({:.1} {:.1} {:.1}), not falling and the way not on for {} s",
+                b.x,
+                b.y,
+                b.z,
+                (game.sim.tick - self.since) / 60
+            );
             if let Err(e) = stuck_report(game, data, o, &self.pilot, &self.report) {
                 eprintln!("stuck report: {e}");
             }
@@ -2309,8 +2824,17 @@ impl PilotRun {
         }
         if game.sim.tick.is_multiple_of(600) {
             let b = game.sim.ball.position;
-            println!("{} sector {} lives {} route {} / {} ball ({:.1} {:.1} {:.1})", clock(game.sim.tick),
-                game.sim.sector + 1, game.sim.lives, pilot.reached(), pilot.route.points.len(), b.x, b.y, b.z);
+            println!(
+                "{} sector {} lives {} route {} / {} ball ({:.1} {:.1} {:.1})",
+                clock(game.sim.tick),
+                game.sim.sector + 1,
+                game.sim.lives,
+                pilot.reached(),
+                pilot.route.points.len(),
+                b.x,
+                b.y,
+                b.z
+            );
         }
     }
 
@@ -2336,11 +2860,19 @@ impl PilotRun {
         } else {
             "not finished"
         };
-        println!("result: {what} after {} ({}), sector {}, lives {}, route {} / {}", s.tick, clock(s.tick),
-            s.sector + 1, s.lives, self.pilot.reached(), self.pilot.route.points.len());
+        println!(
+            "result: {what} after {} ({}), sector {}, lives {}, route {} / {}",
+            s.tick,
+            clock(s.tick),
+            s.sector + 1,
+            s.lives,
+            self.pilot.reached(),
+            self.pilot.route.points.len()
+        );
         println!("{}", self.near_edges.line());
         if let Some(path) = &o.record {
-            std::fs::write(path, game.replay_out.to_text()).map_err(|e| format!("{}: {e}", path.display()))?;
+            std::fs::write(path, game.replay_out.to_text())
+                .map_err(|e| format!("{}: {e}", path.display()))?;
             println!("saved {}", path.display());
         }
         Ok(())
@@ -2349,7 +2881,12 @@ impl PilotRun {
 
 /// Runs the test player to --ticks (or the finish), prints how far it got and saves its run at --record. Where it
 /// is stuck it writes a report (--report), and it follows the level's hints. With --watch it plays in the window.
-fn pilot_run(mut game: Game, data: &Data, o: &Options, pilot: crate::autopilot::Pilot) -> Result<(), String> {
+fn pilot_run(
+    mut game: Game,
+    data: &Data,
+    o: &Options,
+    pilot: crate::autopilot::Pilot,
+) -> Result<(), String> {
     let mut run = PilotRun::new(&game, data, o, pilot)?;
     if o.watch {
         return window(game, data.clone(), o, Some(Box::new(run)));
@@ -2394,8 +2931,7 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
     let surface = instance
         .create_surface(window.clone())
         .map_err(|e| e.to_string())?;
-    let (adapter, device, queue) =
-        pollster::block_on(adapter_device(&instance, Some(&surface)))?;
+    let (adapter, device, queue) = pollster::block_on(adapter_device(&instance, Some(&surface)))?;
     let caps = surface.get_capabilities(&adapter);
     // Gamma-space output, as the original (see render.rs).
     let format = caps
@@ -2417,10 +2953,10 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
         present_mode: present_mode(&caps.present_modes, load_graphics().vsync),
         desired_maximum_frame_latency: 2,
         alpha_mode: caps
-        .alpha_modes
-        .first()
-        .copied()
-        .unwrap_or(wgpu::CompositeAlphaMode::Auto),
+            .alpha_modes
+            .first()
+            .copied()
+            .unwrap_or(wgpu::CompositeAlphaMode::Auto),
         view_formats: vec![],
         color_space: wgpu::SurfaceColorSpace::Auto,
     };
@@ -2435,7 +2971,12 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
     );
     surface.configure(&device, &config);
     let renderer = Renderer::new(device, queue, format);
-    Ok(Gpu { surface, config, renderer, modes: caps.present_modes })
+    Ok(Gpu {
+        surface,
+        config,
+        renderer,
+        modes: caps.present_modes,
+    })
 }
 
 async fn device(
@@ -2470,7 +3011,11 @@ async fn adapter_device(
 }
 
 /// Uploads the menu scene's model (after the game's, whose model numbers it must not take).
-fn upload_menu_scene(renderer: &mut Renderer, scene: Option<&mut crate::menuscene::MenuScene>, data: &Data) {
+fn upload_menu_scene(
+    renderer: &mut Renderer,
+    scene: Option<&mut crate::menuscene::MenuScene>,
+    data: &Data,
+) {
     if let Some(ms) = scene {
         let loader = |t: &level::Texture| data.texture(t);
         ms.model = Some(renderer.add_model(&ms.level, &loader));
@@ -2491,7 +3036,12 @@ fn upload(renderer: &mut Renderer, game: &Game) {
         .or_else(|| game.level.level.sky.clone())
         .filter(|n| crate::sky::valid_name(n))
         .unwrap_or_else(|| "A".into());
-    let top = data.file(&format!("Textures/Sky/{}", crate::sky::face_file(&letter, "Top"))).is_some();
+    let top = data
+        .file(&format!(
+            "Textures/Sky/{}",
+            crate::sky::face_file(&letter, "Top")
+        ))
+        .is_some();
     let sky = crate::sky::model(&letter, top);
     renderer.add_model(&sky, &loader);
     crate::sky::set_faces(sky.meshes.len());
@@ -2511,17 +3061,24 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     }
     // the interface's textures
     let own = gamedata::resources::in_use() == gamedata::resources::Provider::Own;
-    let interface = ["Font_1", "Button01_special", "Button01_select", "Button01_deselect"];
+    let interface = [
+        "Font_1",
+        "Button01_special",
+        "Button01_select",
+        "Button01_deselect",
+    ];
     // the own interface draws its texts in the shipped fonts: the copy's font is not read
     let fonts = interface.into_iter().filter(|n| !(own && *n == "Font_1"));
     for name in crate::particles::textures().into_iter().chain(fonts) {
         let t = level::Texture {
             name: name.to_owned(),
-            source: level::TextureSource::File(if name.starts_with("Font_") || name.starts_with("Button") {
-                format!("{name}.tga")
-            } else {
-                format!("{name}.bmp")
-            }),
+            source: level::TextureSource::File(
+                if name.starts_with("Font_") || name.starts_with("Button") {
+                    format!("{name}.tga")
+                } else {
+                    format!("{name}.bmp")
+                },
+            ),
             color_key: None,
         };
         if let Some((w, h, rgba)) = data.texture(&t) {
@@ -2531,9 +3088,18 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     // the sea of cloud, fading far off into the sky's own colour at the horizon; it takes the place of the level's
     // flat cloud layer (SkyLayer)
     renderer.clouds = game.level.level.settings.clouds.and_then(|settings| {
-        let faces: Vec<_> = sky.textures.iter().take(4).map(|t| data.texture(t)).collect();
+        let faces: Vec<_> = sky
+            .textures
+            .iter()
+            .take(4)
+            .map(|t| data.texture(t))
+            .collect();
         let (ring, haze) = crate::clouds::horizon_ring(&faces)?;
-        Some(crate::clouds::Layer { settings, ring, haze })
+        Some(crate::clouds::Layer {
+            settings,
+            ring,
+            haze,
+        })
     });
     if let Some(ring) = renderer.clouds.as_ref().map(|l| l.ring.clone()) {
         renderer.set_cloud_ring(&ring);
@@ -2657,15 +3223,26 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     // menu not over the level has the menu scene behind it, DRAHTSEILAKT_SHOT_MENU_MS (default 0) into the menu.
     let shot = std::env::var("DRAHTSEILAKT_SHOT_MENU").ok();
     let menu = shot.and_then(|spec| shot_menu(&spec, data, game, o, (w, h)));
-    let mut menu_scene = menu.as_ref().filter(|m| !m.over_level()).and_then(|_| load_menu_scene(data));
+    let mut menu_scene = menu
+        .as_ref()
+        .filter(|m| !m.over_level())
+        .and_then(|_| load_menu_scene(data));
     upload_menu_scene(&mut r, menu_scene.as_mut(), data);
     if let Some(ms) = menu_scene.filter(|m| m.model.is_some()) {
-        let at = std::env::var("DRAHTSEILAKT_SHOT_MENU_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+        let at = std::env::var("DRAHTSEILAKT_SHOT_MENU_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.0);
         let (inst, particles, frame_view) = ms.frame(at);
         r.menu_frame = true;
         r.draw(&view, w, h, &frame_view, &inst, &particles);
-        let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
-        let quads = menu.map(|m| m.interface(game.font.as_ref(), screen)).unwrap_or_default();
+        let screen = crate::ui::Screen {
+            w: w as f32,
+            h: h as f32,
+        };
+        let quads = menu
+            .map(|m| m.interface(game.font.as_ref(), screen))
+            .unwrap_or_default();
         if let Some((aw, ah, rgba)) = crate::fallback::take_changed() {
             r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
         }
@@ -2682,6 +3259,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         (&game.sim.extra_views(), game.extra_model.as_ref()),
         &snap,
         &game.sim.pieces_view(),
+        (game.sim.script_hidden(), game.sim.script_moved()),
     );
     let mut inst = inst;
     if snap.kind.is_some() {
@@ -2691,11 +3269,17 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
     // DRAHTSEILAKT_BENCH=N: draws the frame N times more, with each quality of the clouds, and prints the time a frame
     // takes (the GPU waited for after each batch), to measure what the sea of cloud costs
-    if let Some(n) = std::env::var("DRAHTSEILAKT_BENCH").ok().and_then(|v| v.parse::<u32>().ok()) {
+    if let Some(n) = std::env::var("DRAHTSEILAKT_BENCH")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+    {
         let chosen = crate::clouds::quality();
-        for q in [crate::clouds::Quality::Off, crate::clouds::Quality::Low, crate::clouds::Quality::Medium,
-            crate::clouds::Quality::High]
-        {
+        for q in [
+            crate::clouds::Quality::Off,
+            crate::clouds::Quality::Low,
+            crate::clouds::Quality::Medium,
+            crate::clouds::Quality::High,
+        ] {
             crate::clouds::set_quality(q);
             r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
             let _ = r.device.poll(wgpu::PollType::wait_indefinitely());
@@ -2704,7 +3288,11 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
                 r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
             }
             let _ = r.device.poll(wgpu::PollType::wait_indefinitely());
-            println!("clouds {}: {:.2} ms a frame at {w}x{h}", q.key(), start.elapsed().as_secs_f64() * 1000.0 / f64::from(n.max(1)));
+            println!(
+                "clouds {}: {:.2} ms a frame at {w}x{h}",
+                q.key(),
+                start.elapsed().as_secs_f64() * 1000.0 / f64::from(n.max(1))
+            );
         }
         crate::clouds::set_quality(chosen);
         r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
@@ -2715,11 +3303,20 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         h,
         &crate::hud::overlay(&game.sim, w, h, true, game.font.is_some()),
     );
-    let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
+    let screen = crate::ui::Screen {
+        w: w as f32,
+        h: h as f32,
+    };
     let mut quads = crate::hud::interface(&game.sim, game.font.as_ref(), screen);
     let strings = load_strings(data);
     let lost = strings.ours("ball lost");
-    quads.extend(crate::hud::ball_lost(&game.sim, game.ball_lost_at, &lost, game.font.as_ref(), screen));
+    quads.extend(crate::hud::ball_lost(
+        &game.sim,
+        game.ball_lost_at,
+        &lost,
+        game.font.as_ref(),
+        screen,
+    ));
     if let (Some(t), Some(f)) = (crate::endscreen::of(&game.sim), game.font.as_ref()) {
         quads.extend(crate::endscreen::interface(&t, f, &strings, screen));
     }
@@ -2737,17 +3334,17 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
 }
 
 /// Reads the rendered frame back and writes it to a PNG.
-fn save_target(r: &Renderer, target: &wgpu::Texture, (w, h): (u32, u32), path: &Path, tick: u64) -> Result<(), String> {
+fn save_target(
+    r: &Renderer,
+    target: &wgpu::Texture,
+    (w, h): (u32, u32),
+    path: &Path,
+    tick: u64,
+) -> Result<(), String> {
     let pixels = read_back(r, target, w, h)?;
     image::save_buffer(path, &pixels, w, h, image::ExtendedColorType::Rgba8)
         .map_err(|e| e.to_string())?;
-    println!(
-        "{} written ({}x{}, tick {})",
-        path.display(),
-        w,
-        h,
-        tick
-    );
+    println!("{} written ({}x{}, tick {})", path.display(), w, h, tick);
     Ok(())
 }
 
@@ -2760,7 +3357,9 @@ fn libc_nofollow() -> i32 {
 /// The scene behind the menus: the original's (MenuLevel.nmo) with the copy's interface, else ours.
 fn load_menu_scene(data: &Data) -> Option<crate::menuscene::MenuScene> {
     if gamedata::resources::in_use() == gamedata::resources::Provider::Own {
-        let dir = gamedata::resources::own_root()?.join("3D Entities").join("MenuLevel");
+        let dir = gamedata::resources::own_root()?
+            .join("3D Entities")
+            .join("MenuLevel");
         return crate::menuscene::MenuScene::load_open(&dir);
     }
     crate::menuscene::MenuScene::load(data)
@@ -2888,7 +3487,10 @@ struct PilotWatch {
     /// Driven by hand (F5) since this tick, from this place, in this sector, as this ball.
     hand: Option<(u64, glam::Vec3, usize, crate::sim::BallKind)>,
     /// The test player deciding the next tick's input on its own thread (its searches take a while), since when.
-    pending: Option<(std::sync::mpsc::Receiver<(crate::autopilot::Pilot, u8)>, Instant)>,
+    pending: Option<(
+        std::sync::mpsc::Receiver<(crate::autopilot::Pilot, u8)>,
+        Instant,
+    )>,
     /// A message for the watcher, and since when it shows.
     notice: Option<(String, Instant)>,
     /// The run is over and summed up: the window plays on as the game.
@@ -2912,7 +3514,14 @@ struct PilotWatch {
 }
 
 /// A tick of the watched ball's trail: the tick, its place, sector, kind, speed and what steered.
-type Trail = (u64, glam::Vec3, usize, crate::sim::BallKind, f32, &'static str);
+type Trail = (
+    u64,
+    glam::Vec3,
+    usize,
+    crate::sim::BallKind,
+    f32,
+    &'static str,
+);
 
 /// A mark reaches this far back before its key went down by default, and at most (seconds); the trail is kept a
 /// little longer; a key held longer than `MARK_HELD_MAX` ends its zone (a release the window never heard).
@@ -2925,7 +3534,11 @@ const FLASH: std::time::Duration = std::time::Duration::from_secs(4);
 const MARK_STEP: f32 = 1.5;
 
 /// The lines of the watched test player's status in the top left corner, in the interface's font.
-fn watch_overlay(text: &str, f: &crate::ui::Face, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
+fn watch_overlay(
+    text: &str,
+    f: &crate::ui::Face,
+    screen: crate::ui::Screen,
+) -> Vec<crate::ui::Quad> {
     let style = crate::ui::Style {
         scale: [0.45, 0.5],
         spacing: [1.0, 1.0],
@@ -2939,7 +3552,11 @@ fn watch_overlay(text: &str, f: &crate::ui::Face, screen: crate::ui::Screen) -> 
     let mut q = Vec::new();
     for (k, line) in text.lines().enumerate() {
         let y = 0.01 + 0.032 * k as f32;
-        let quads = f.layout(line, crate::ui::homogeneous([0.01, y, 0.99, y + 0.032]), &style);
+        let quads = f.layout(
+            line,
+            crate::ui::homogeneous([0.01, y, 0.99, y + 0.032]),
+            &style,
+        );
         q.extend(crate::ui::place(quads, screen, crate::ui::Anchor::Left));
     }
     q
@@ -2961,17 +3578,59 @@ impl PilotWatch {
     ) -> Vec<crate::ui::Quad> {
         let speed = format!("{}", self.speed);
         let lines = [
-            (strings.ours(if self.paused { "watch paused" } else { "watch pause" }), self.paused),
-            (strings.ours("watch speed").replace("{n}", &speed), self.speed != 1.0),
-            (strings.ours(if self.hand.is_some() { "watch driving" } else { "watch hands" }), self.hand.is_some()),
+            (
+                strings.ours(if self.paused {
+                    "watch paused"
+                } else {
+                    "watch pause"
+                }),
+                self.paused,
+            ),
+            (
+                strings.ours("watch speed").replace("{n}", &speed),
+                self.speed != 1.0,
+            ),
+            (
+                strings.ours(if self.hand.is_some() {
+                    "watch driving"
+                } else {
+                    "watch hands"
+                }),
+                self.hand.is_some(),
+            ),
             (strings.ours("watch skip"), false),
             (strings.ours("watch stuck"), false),
-            (strings.ours("watch flow"), self.marking.is_some_and(|m| m.0 == crate::zones::Kind::Flow)),
-            (strings.ours("watch careful"), self.marking.is_some_and(|m| m.0 == crate::zones::Kind::Careful)),
-            (strings.ours("watch mark how").replace("{n}", &self.look_back.to_string()), false),
-            (strings.ours("watch look back").replace("{n}", &self.look_back.to_string()), self.look_back != LOOK_BACK),
+            (
+                strings.ours("watch flow"),
+                self.marking
+                    .is_some_and(|m| m.0 == crate::zones::Kind::Flow),
+            ),
+            (
+                strings.ours("watch careful"),
+                self.marking
+                    .is_some_and(|m| m.0 == crate::zones::Kind::Careful),
+            ),
+            (
+                strings
+                    .ours("watch mark how")
+                    .replace("{n}", &self.look_back.to_string()),
+                false,
+            ),
+            (
+                strings
+                    .ours("watch look back")
+                    .replace("{n}", &self.look_back.to_string()),
+                self.look_back != LOOK_BACK,
+            ),
             (strings.ours("watch undo"), false),
-            (strings.ours(if self.zones_shown { "watch zones shown" } else { "watch zones" }), self.zones_shown),
+            (
+                strings.ours(if self.zones_shown {
+                    "watch zones shown"
+                } else {
+                    "watch zones"
+                }),
+                self.zones_shown,
+            ),
             (strings.ours("watch quit"), false),
             (strings.ours("watch box"), false),
         ];
@@ -2997,8 +3656,16 @@ impl PilotWatch {
         };
         for (k, (line, on)) in lines.iter().enumerate() {
             let y = top + 0.005 + KEYS_LINE * k as f32;
-            style.color = if *on { [1.0, 0.85, 0.3, 1.0] } else { [0.85, 0.85, 0.85, 1.0] };
-            q.extend(f.layout(line, crate::ui::homogeneous([0.02, y, KEYS_RIGHT, y + KEYS_LINE]), &style));
+            style.color = if *on {
+                [1.0, 0.85, 0.3, 1.0]
+            } else {
+                [0.85, 0.85, 0.85, 1.0]
+            };
+            q.extend(f.layout(
+                line,
+                crate::ui::homogeneous([0.02, y, KEYS_RIGHT, y + KEYS_LINE]),
+                &style,
+            ));
         }
         crate::ui::place(q, screen, crate::ui::Anchor::Left)
     }
@@ -3007,7 +3674,14 @@ impl PilotWatch {
     /// green, careful orange), the one being marked and the one just marked brighter and larger.
     fn zone_instances(&self, game: &Game, out: &mut Vec<crate::render::Instance>) {
         use crate::zones::Kind;
-        let Some(mesh) = game.ball_meshes.wood.or(game.ball_meshes.stone).or(game.ball_meshes.paper) else { return };
+        let Some(mesh) = game
+            .ball_meshes
+            .wood
+            .or(game.ball_meshes.stone)
+            .or(game.ball_meshes.paper)
+        else {
+            return;
+        };
         let color = |k: Kind, a: f32| match k {
             Kind::Flow => [0.2, 0.95, 0.45, a],
             Kind::Careful => [1.0, 0.55, 0.1, a],
@@ -3025,7 +3699,14 @@ impl PilotWatch {
         };
         let sector = game.sim.sector + 1;
         if self.zones_shown {
-            for z in self.run.pilot.zones.zones.iter().filter(|z| z.sector == sector) {
+            for z in self
+                .run
+                .pilot
+                .zones
+                .zones
+                .iter()
+                .filter(|z| z.sector == sector)
+            {
                 if let [p] = z.points.as_slice() {
                     bead(*p, z.radius, color(z.kind, 0.15));
                 }
@@ -3034,7 +3715,11 @@ impl PilotWatch {
                 }
             }
         }
-        if let Some((z, at)) = self.flash.as_ref().filter(|f| f.1.elapsed() < FLASH && f.0.sector == sector) {
+        if let Some((z, at)) = self
+            .flash
+            .as_ref()
+            .filter(|f| f.1.elapsed() < FLASH && f.0.sector == sector)
+        {
             // fading out
             // (in steps of a twentieth: each colour is a material of its own)
             let a = 0.7 * (1.0 - at.elapsed().as_secs_f32() / FLASH.as_secs_f32());
@@ -3044,7 +3729,12 @@ impl PilotWatch {
             }
         }
         if let Some((kind, _, from, sec, _)) = self.marking {
-            let path: Vec<glam::Vec3> = self.trail.iter().filter(|t| t.0 >= from && t.2 == sec).map(|t| t.1).collect();
+            let path: Vec<glam::Vec3> = self
+                .trail
+                .iter()
+                .filter(|t| t.0 >= from && t.2 == sec)
+                .map(|t| t.1)
+                .collect();
             for p in crate::zones::thin(&path, MARK_STEP) {
                 bead(p, 0.9, color(kind, 0.6));
             }
@@ -3062,13 +3752,24 @@ impl PilotWatch {
         if let Some((t, ..)) = self.hand {
             state += &format!("  YOUR HANDS since {} (F5 hands back)", clock(t));
         }
-        if self.pending.as_ref().is_some_and(|p| p.1.elapsed() > THINKING) {
+        if self
+            .pending
+            .as_ref()
+            .is_some_and(|p| p.1.elapsed() > THINKING)
+        {
             state += "  thinking...";
         }
         if let Some((kind, ..)) = self.marking {
-            state += &format!("  MARKING {} ZONE (release the key to end)", kind.word().to_uppercase());
+            state += &format!(
+                "  MARKING {} ZONE (release the key to end)",
+                kind.word().to_uppercase()
+            );
         }
-        let edge = self.run.edges.ball_clearance(s.ball.position).map_or("-".into(), |d| format!("{d:.1}"));
+        let edge = self
+            .run
+            .edges
+            .ball_clearance(s.ball.position)
+            .map_or("-".into(), |d| format!("{d:.1}"));
         let mut t = format!(
             "{state}\n{}  sector {}  lives {}  edge {edge}  rewinds {}\n{}",
             clock(s.tick),
@@ -3080,7 +3781,11 @@ impl PilotWatch {
         // (with the zones shown, the place as the learned rules see it)
         if self.zones_shown {
             let p = &self.run.pilot;
-            t += &format!("\nhere: {}", p.situation(s.ball.position, p.reached(), s.ball.kind).describe());
+            t += &format!(
+                "\nhere: {}",
+                p.situation(s.ball.position, p.reached(), s.ball.kind)
+                    .describe()
+            );
         }
         if let Some((n, at)) = &self.notice
             && at.elapsed() < NOTICE
@@ -3094,7 +3799,11 @@ impl PilotWatch {
 /// The stretch the watcher drove by hand (`hand`: since which tick, from where, in which sector, as which ball),
 /// saved beside the level's hints as `<level>-hand-<tick>.replay` (the run up to now, so it replays exactly), with
 /// a hint line playing it from that place appended to `<level>-hand.txt`: what is said on the screen.
-fn save_hand(game: &Game, o: &Options, hand: (u64, glam::Vec3, usize, crate::sim::BallKind)) -> Result<String, String> {
+fn save_hand(
+    game: &Game,
+    o: &Options,
+    hand: (u64, glam::Vec3, usize, crate::sim::BallKind),
+) -> Result<String, String> {
     let (from, at, sector, kind) = hand;
     let path = hints_path(game, o);
     let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
@@ -3103,8 +3812,14 @@ fn save_hand(game: &Game, o: &Options, hand: (u64, glam::Vec3, usize, crate::sim
     let file = dir.join(&name);
     crate::hints::write_plain(&file, &game.replay_out.to_text())?;
     let kind = format!("{kind:?}").to_ascii_lowercase();
-    let line = format!("at {:.2} {:.2} {:.2} r 4 sector {} kind {kind} : replay {name} {from} {}\n", at.x, at.y,
-        at.z, sector + 1, game.sim.tick);
+    let line = format!(
+        "at {:.2} {:.2} {:.2} r 4 sector {} kind {kind} : replay {name} {from} {}\n",
+        at.x,
+        at.y,
+        at.z,
+        sector + 1,
+        game.sim.tick
+    );
     let hints = dir.join(format!("{stem}-hand.txt"));
     // (read as a hint file is: a plain file, capped)
     let mut old = crate::hints::read_text(&hints, crate::hints::MAX_FILE)?;
@@ -3113,7 +3828,11 @@ fn save_hand(game: &Game, o: &Options, hand: (u64, glam::Vec3, usize, crate::sim
     }
     old += &line;
     crate::hints::write_plain(&hints, &old)?;
-    Ok(format!("saved {} (hint in {})", shown_path(&file), shown_path(&hints)))
+    Ok(format!(
+        "saved {} (hint in {})",
+        shown_path(&file),
+        shown_path(&hints)
+    ))
 }
 
 /// A decision taking longer than this shows "thinking"; a notice shows this long.
@@ -3125,12 +3844,19 @@ const WATCH_BUDGET: std::time::Duration = std::time::Duration::from_millis(12);
 /// The sizes the Graphics page offers: the monitor's modes and the window sizes that fit on it, smallest first.
 fn sizes(window: &Window) -> Vec<(u32, u32)> {
     let monitor = window.current_monitor();
-    let fits = monitor.as_ref().map(|m| m.size()).map_or((u32::MAX, u32::MAX), |s| (s.width, s.height));
+    let fits = monitor
+        .as_ref()
+        .map(|m| m.size())
+        .map_or((u32::MAX, u32::MAX), |s| (s.width, s.height));
     let mut v: Vec<(u32, u32)> = monitor
         .iter()
         .flat_map(|m| m.video_modes())
         .map(|m| (m.size().width, m.size().height))
-        .chain(crate::options::WINDOWED.into_iter().filter(|s| s.0 <= fits.0 && s.1 <= fits.1))
+        .chain(
+            crate::options::WINDOWED
+                .into_iter()
+                .filter(|s| s.0 <= fits.0 && s.1 <= fits.1),
+        )
         .filter(|&(w, h)| crate::options::parse_size(&format!("{w}x{h}")).is_some())
         .collect();
     v.sort_by_key(|&(w, h)| (u64::from(w) * u64::from(h), w));
@@ -3144,13 +3870,20 @@ fn set_fullscreen(window: &Window, how: crate::options::Fullscreen, size: Option
     use crate::options::Fullscreen as Full;
     let exclusive = || {
         let modes: Vec<_> = window.current_monitor()?.video_modes().collect();
-        let area = |m: &winit::monitor::VideoModeHandle| u64::from(m.size().width) * u64::from(m.size().height);
-        let wanted = |m: &&winit::monitor::VideoModeHandle| Some((m.size().width, m.size().height)) == size;
+        let area = |m: &winit::monitor::VideoModeHandle| {
+            u64::from(m.size().width) * u64::from(m.size().height)
+        };
+        let wanted =
+            |m: &&winit::monitor::VideoModeHandle| Some((m.size().width, m.size().height)) == size;
         let best = modes
             .iter()
             .filter(wanted)
             .max_by_key(|m| m.refresh_rate_millihertz())
-            .or_else(|| modes.iter().max_by_key(|m| (area(m), m.refresh_rate_millihertz())))?;
+            .or_else(|| {
+                modes
+                    .iter()
+                    .max_by_key(|m| (area(m), m.refresh_rate_millihertz()))
+            })?;
         Some(Fullscreen::Exclusive(best.clone()))
     };
     match how {
@@ -3173,7 +3906,11 @@ fn set_fullscreen(window: &Window, how: crate::options::Fullscreen, size: Option
 /// The Graphics page's switches that the drawing reads: the clouds, and the field of view (the extended mode's).
 fn show_graphics(g: &crate::options::Graphics, features: crate::features::Features) {
     scene::set_clouds(g.clouds);
-    crate::clouds::set_quality(if g.clouds { g.cloud_quality } else { crate::clouds::Quality::Off });
+    crate::clouds::set_quality(if g.clouds {
+        g.cloud_quality
+    } else {
+        crate::clouds::Quality::Off
+    });
     scene::set_fov((features.mode && g.fov != crate::options::FOV_ORIGINAL).then_some(g.fov));
 }
 
@@ -3183,7 +3920,12 @@ impl App {
             .with_title(self.game.title())
             .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
-        let Gpu { surface, config, mut renderer, modes } = window_gpu(&window)?;
+        let Gpu {
+            surface,
+            config,
+            mut renderer,
+            modes,
+        } = window_gpu(&window)?;
         upload(&mut renderer, &self.game);
         self.light_base = Some(renderer.light);
         if self.menu_scene.is_none() {
@@ -3260,7 +4002,8 @@ impl App {
 
     /// The mods that run: those switched on, in the extended mode, never while the test player plays (--watch).
     fn running_mods(&self) -> (crate::modrt::SimMods, crate::modrt::ViewMods) {
-        self.mods.running(self.features.mode && self.pilot.is_none())
+        self.mods
+            .running(self.features.mode && self.pilot.is_none())
     }
 
     /// A new run for the mods: the view's variables as at first, the real time from now, no ghost yet.
@@ -3346,7 +4089,10 @@ impl App {
         }
         if std::mem::take(&mut self.view_mods.out.screenshot) {
             // at most one a second, however the key is held
-            if self.last_shot.is_none_or(|t| t.elapsed().as_secs_f32() >= 1.0) {
+            if self
+                .last_shot
+                .is_none_or(|t| t.elapsed().as_secs_f32() >= 1.0)
+            {
                 self.last_shot = Some(Instant::now());
                 self.shot_due = true;
             }
@@ -3533,7 +4279,11 @@ impl App {
         let bgra = match gpu.config.format {
             F::Bgra8Unorm | F::Bgra8UnormSrgb => true,
             F::Rgba8Unorm | F::Rgba8UnormSrgb => false,
-            other => return eprintln!("screenshot: this display's format ({other:?}) cannot be saved yet"),
+            other => {
+                return eprintln!(
+                    "screenshot: this display's format ({other:?}) cannot be saved yet"
+                );
+            }
         };
         let (w, h) = (gpu.config.width, gpu.config.height);
         let mut pixels = match read_back(&gpu.renderer, texture, w, h) {
@@ -3553,7 +4303,9 @@ impl App {
         if !std::fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir()) {
             return eprintln!("screenshot: {} is not a folder", shown_path(&dir));
         }
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis());
         let path = dir.join(format!("drahtseilakt-{stamp}.png"));
         let mut open = std::fs::OpenOptions::new();
         // a new file only, never through a link
@@ -3571,7 +4323,10 @@ impl App {
         });
         match written {
             Ok(()) => println!("screenshot saved to {}", shown_path(&path)),
-            Err(e) => eprintln!("could not save the screenshot to {}: {e}", shown_path(&path)),
+            Err(e) => eprintln!(
+                "could not save the screenshot to {}: {e}",
+                shown_path(&path)
+            ),
         }
     }
 
@@ -3619,10 +4374,20 @@ impl App {
         }
         if self.music.is_none() && sim.tick >= 1 {
             // a replay plays its music in the same order each time; a run of the player's, in a new one
-            let now = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos());
+            let now = || {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(1, |d| d.as_nanos())
+            };
             let replay = self.game.replay_in.as_ref();
-            let seed = replay.map_or_else(|| now() as u64, |r| r.level_hash ^ r.end.rotate_left(32));
-            self.music = Some(Music::new(self.game.music_theme, self.game.last_level, seed, sim.tick));
+            let seed =
+                replay.map_or_else(|| now() as u64, |r| r.level_hash ^ r.end.rotate_left(32));
+            self.music = Some(Music::new(
+                self.game.music_theme,
+                self.game.last_level,
+                seed,
+                sim.tick,
+            ));
             // the sounds' picks from the same seed, their pools' other files decoded ahead
             audio.seed_sounds(seed.rotate_left(29) ^ 0x5851_f42d_4c95_7f2d);
             audio.preload_sound_pools(&self.data);
@@ -3674,8 +4439,13 @@ impl App {
         if self.history.back().is_some_and(|(s, _)| s.tick > tick) {
             self.history.clear();
         }
-        if self.history.back().is_none_or(|(s, _)| tick >= s.tick + HISTORY_EVERY) {
-            self.history.push_back((self.game.sim.clone(), self.game.replay_out.clone()));
+        if self
+            .history
+            .back()
+            .is_none_or(|(s, _)| tick >= s.tick + HISTORY_EVERY)
+        {
+            self.history
+                .push_back((self.game.sim.clone(), self.game.replay_out.clone()));
             if self.history.len() > HISTORY_KEPT {
                 self.history.pop_front();
             }
@@ -3747,7 +4517,11 @@ impl App {
         if let Some(m) = &mut self.menu {
             m.graphics = g;
         }
-        let lines: Vec<(String, String)> = g.lines().into_iter().map(|(k, v)| (k.to_owned(), v)).collect();
+        let lines: Vec<(String, String)> = g
+            .lines()
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect();
         put_settings(&lines);
     }
 
@@ -3766,7 +4540,11 @@ impl App {
         upload(&mut r, &self.game);
         let target = r.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("video"),
-            size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width: w,
+                height: h,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -3777,9 +4555,17 @@ impl App {
         let view = target.create_view(&Default::default());
         let file = std::fs::File::create(out).map_err(|e| format!("{}: {e}", out.display()))?;
         let mut sink = std::io::BufWriter::with_capacity(1 << 22, file);
-        let end = self.game.replay_in.as_ref().map(|r| r.end).ok_or("--video needs --replay")?;
+        let end = self
+            .game
+            .replay_in
+            .as_ref()
+            .map(|r| r.end)
+            .ok_or("--video needs --replay")?;
         let lost = self.strings.ours("ball lost");
-        let screen = crate::ui::Screen { w: w as f32, h: h as f32 };
+        let screen = crate::ui::Screen {
+            w: w as f32,
+            h: h as f32,
+        };
         let mut frames = 0u64;
         loop {
             let sim = &self.game.sim;
@@ -3798,7 +4584,12 @@ impl App {
                 let (flash, began) = self.blitz.step(sim.tick);
                 r.flash = flash;
                 if let (true, Some(a)) = (began, &mut self.audio) {
-                    a.play(&self.data, "Music_thunder", 1.0, crate::lights::THUNDER_DELAY);
+                    a.play(
+                        &self.data,
+                        "Music_thunder",
+                        1.0,
+                        crate::lights::THUNDER_DELAY,
+                    );
                 }
             }
             let sim = &self.game.sim;
@@ -3814,16 +4605,28 @@ impl App {
                 (&sim.extra_views(), g.extra_model.as_ref()),
                 &snap,
                 &sim.pieces_view(),
+                (sim.script_hidden(), sim.script_moved()),
             );
             if snap.kind.is_some() {
                 scene::shadows(&g.shadow_receivers, snap.ball, &mut inst);
             }
             let particles = g.effects.batches(snap.eye, snap.target);
             r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
-            r.draw_overlay(&view, w, h, &crate::hud::overlay(sim, w, h, false, g.font.is_some()));
+            r.draw_overlay(
+                &view,
+                w,
+                h,
+                &crate::hud::overlay(sim, w, h, false, g.font.is_some()),
+            );
             let font = g.font.as_ref();
             let mut quads = crate::hud::interface(sim, font, screen);
-            quads.extend(crate::hud::ball_lost(sim, g.ball_lost_at, &lost, font, screen));
+            quads.extend(crate::hud::ball_lost(
+                sim,
+                g.ball_lost_at,
+                &lost,
+                font,
+                screen,
+            ));
             if let (Some(t), Some(f)) = (crate::endscreen::of(sim), font) {
                 quads.extend(crate::endscreen::interface(&t, f, &self.strings, screen));
             }
@@ -3832,21 +4635,33 @@ impl App {
             }
             r.draw_ui(&view, w, h, &quads);
             let px = read_back(&r, &target, w, h)?;
-            let rgb: Vec<u8> = px.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
-            sink.write_all(&rgb).map_err(|e| format!("{}: {e}", out.display()))?;
+            let rgb: Vec<u8> = px
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .flat_map(|p| [p[0], p[1], p[2]])
+                .collect();
+            sink.write_all(&rgb)
+                .map_err(|e| format!("{}: {e}", out.display()))?;
             frames += 1;
         }
-        sink.flush().map_err(|e| format!("{}: {e}", out.display()))?;
+        sink.flush()
+            .map_err(|e| format!("{}: {e}", out.display()))?;
         // the sound file is written as the mix is let go
         self.audio = None;
-        println!("video: {frames} frames of {w}x{h} at 60 a second into {}", out.display());
+        println!(
+            "video: {frames} frames of {w}x{h} at 60 a second into {}",
+            out.display()
+        );
         Ok(())
     }
 
     /// One tick of the watched test player: its decision (on its own thread, waited for within this frame's
     /// budget), then the tick. False when the decision is not ready yet (the view holds) or the run is over.
     fn watch_tick(&mut self, started: Instant) -> bool {
-        let Some(w) = self.pilot.as_mut() else { return false };
+        let Some(w) = self.pilot.as_mut() else {
+            return false;
+        };
         if !w.run.going(&self.game) {
             w.done = true;
             w.pending = None;
@@ -3865,7 +4680,9 @@ impl App {
             });
             w.pending = Some((rx, Instant::now()));
         }
-        let Some((rx, _)) = &w.pending else { return false };
+        let Some((rx, _)) = &w.pending else {
+            return false;
+        };
         let (p, i) = match rx.recv_timeout(WATCH_BUDGET.saturating_sub(started.elapsed())) {
             Ok(r) => r,
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => return false,
@@ -3894,7 +4711,9 @@ impl App {
     /// The watcher's keys (--watch): Space pause, + and - faster and slower, F5 the hands take over and give back,
     /// F6 the hint's step skipped, F7 a stuck report. True when the key was one of them.
     fn watch_key(&mut self, code: KeyCode) -> bool {
-        let Some(w) = self.pilot.as_mut() else { return false };
+        let Some(w) = self.pilot.as_mut() else {
+            return false;
+        };
         let now = Instant::now();
         match code {
             KeyCode::Space if w.hand.is_none() => w.paused = !w.paused,
@@ -3931,7 +4750,11 @@ impl App {
             // last seconds; held: on while held)
             KeyCode::F8 | KeyCode::F4 => {
                 if w.marking.is_none() {
-                    let kind = if code == KeyCode::F8 { crate::zones::Kind::Flow } else { crate::zones::Kind::Careful };
+                    let kind = if code == KeyCode::F8 {
+                        crate::zones::Kind::Flow
+                    } else {
+                        crate::zones::Kind::Careful
+                    };
                     let s = &self.game.sim;
                     let from = s.tick.saturating_sub(u64::from(w.look_back) * 60);
                     w.marking = Some((kind, code, from, s.sector, now));
@@ -3952,10 +4775,19 @@ impl App {
                             let path = w.run.zones_path.clone();
                             let mut t = match crate::zones::remove_mark(&path, &id) {
                                 Ok(Some(line)) => {
-                                    let kind = line.split_whitespace().next().unwrap_or_default().to_owned();
-                                    format!("undone: the {kind} zone just marked, in {}", shown_path(&path))
+                                    let kind = line
+                                        .split_whitespace()
+                                        .next()
+                                        .unwrap_or_default()
+                                        .to_owned();
+                                    format!(
+                                        "undone: the {kind} zone just marked, in {}",
+                                        shown_path(&path)
+                                    )
                                 }
-                                Ok(None) => format!("its zone is no longer in {}", shown_path(&path)),
+                                Ok(None) => {
+                                    format!("its zone is no longer in {}", shown_path(&path))
+                                }
                                 Err(e) => format!("not undone: {e}"),
                             };
                             w.run.pilot.zones = Arc::new(load_zones(&path));
@@ -3979,7 +4811,8 @@ impl App {
             }
             KeyCode::F7 => {
                 let (pilot, dir) = (w.run.pilot.clone(), w.run.report.clone());
-                let text = match stuck_report(&mut self.game, &self.data, &self.opts, &pilot, &dir) {
+                let text = match stuck_report(&mut self.game, &self.data, &self.opts, &pilot, &dir)
+                {
                     Ok(()) => format!("stuck report written in {}", shown_path(&dir)),
                     Err(e) => format!("stuck report: {e}"),
                 };
@@ -3994,7 +4827,12 @@ impl App {
 
     /// A watcher's key let go: the end of the zone being marked with it. True when it was that key.
     fn watch_key_up(&mut self, code: KeyCode) -> bool {
-        if self.pilot.as_ref().and_then(|w| w.marking).is_some_and(|m| m.1 == code) {
+        if self
+            .pilot
+            .as_ref()
+            .and_then(|w| w.marking)
+            .is_some_and(|m| m.1 == code)
+        {
             self.end_mark();
             return true;
         }
@@ -4005,10 +4843,16 @@ impl App {
     /// written to the zones file at once, obeyed from now on, and shown a moment.
     fn end_mark(&mut self) {
         let Some(w) = self.pilot.as_mut() else { return };
-        let Some((kind, _, from, sector, _)) = w.marking.take() else { return };
+        let Some((kind, _, from, sector, _)) = w.marking.take() else {
+            return;
+        };
         let s = &self.game.sim;
-        let mut path: Vec<glam::Vec3> =
-            w.trail.iter().filter(|t| t.0 >= from && t.2 == sector).map(|t| t.1).collect();
+        let mut path: Vec<glam::Vec3> = w
+            .trail
+            .iter()
+            .filter(|t| t.0 >= from && t.2 == sector)
+            .map(|t| t.1)
+            .collect();
         if s.sector == sector {
             path.push(s.ball.position);
         }
@@ -4032,8 +4876,12 @@ impl App {
                 w.run.pilot.zones = Arc::new(load_zones(&file));
                 // (a decision on its way is made again, with the zone)
                 w.pending = None;
-                format!("marked a {} zone: {secs:.1} s, {} points, in {}", kind.word(), zone.points.len(),
-                    shown_path(&file))
+                format!(
+                    "marked a {} zone: {secs:.1} s, {} points, in {}",
+                    kind.word(),
+                    zone.points.len(),
+                    shown_path(&file)
+                )
             }
             Err(e) => {
                 let t = format!("zone not saved: {e}");
@@ -4043,7 +4891,11 @@ impl App {
             }
         };
         // what kind of place it was, for every level: a rule of the learned table (learned.rs)
-        let stretch: Vec<&Trail> = w.trail.iter().filter(|t| t.0 >= from && t.2 == sector).collect();
+        let stretch: Vec<&Trail> = w
+            .trail
+            .iter()
+            .filter(|t| t.0 >= from && t.2 == sector)
+            .collect();
         let pilot = &w.run.pilot;
         let samples: Vec<crate::learned::Situation> = stretch
             .iter()
@@ -4052,7 +4904,10 @@ impl App {
             .collect();
         let n = stretch.len().max(1) as f32;
         let stopping = stretch.iter().filter(|t| t.4 < 1.0).count() as f32 / n;
-        let off: Vec<f32> = stretch.iter().filter_map(|t| pilot.route.off_middle(t.1).map(|o| o.0)).collect();
+        let off: Vec<f32> = stretch
+            .iter()
+            .filter_map(|t| pilot.route.off_middle(t.1).map(|o| o.0))
+            .collect();
         let off = off.iter().sum::<f32>() / off.len().max(1) as f32;
         let mut modes: Vec<(&str, usize)> = Vec::new();
         for t in &stretch {
@@ -4065,7 +4920,14 @@ impl App {
         let at = zone.points.last().copied().unwrap_or_default();
         let evidence = format!(
             "mark={id}: {} sector {} ({:.1} {:.1} {:.1}) {}: {secs:.1} s, stopping {:.0}%, mostly {mode}, off the middle {off:.1}",
-            level_stem(&self.game), sector + 1, at.x, at.y, at.z, crate::learned::today(), 100.0 * stopping);
+            level_stem(&self.game),
+            sector + 1,
+            at.x,
+            at.y,
+            at.z,
+            crate::learned::today(),
+            100.0 * stopping
+        );
         let rule = crate::learned::learn(&samples, kind, None, evidence);
         let lp = w.run.learned_path.clone();
         let taught = match rule {
@@ -4103,7 +4965,14 @@ impl App {
         while w.trail.back().is_some_and(|t| t.0 >= s.tick) {
             w.trail.pop_back();
         }
-        w.trail.push_back((s.tick, s.ball.position, s.sector, s.ball.kind, s.ball.velocity.length(), w.run.pilot.mode()));
+        w.trail.push_back((
+            s.tick,
+            s.ball.position,
+            s.sector,
+            s.ball.kind,
+            s.ball.velocity.length(),
+            w.run.pilot.mode(),
+        ));
         while w.trail.front().is_some_and(|t| t.0 + TRAIL_TICKS < s.tick) {
             w.trail.pop_front();
         }
@@ -4128,7 +4997,9 @@ impl App {
                     // back from the moments kept each second; pressed again it goes on further back
                     let ticks = (secs.clamp(1.0, 30.0) * 60.0).round() as u64;
                     let to = self.game.sim.tick.saturating_sub(ticks);
-                    while self.history.len() > 1 && self.history.back().is_some_and(|(s, _)| s.tick > to) {
+                    while self.history.len() > 1
+                        && self.history.back().is_some_and(|(s, _)| s.tick > to)
+                    {
                         self.history.pop_back();
                     }
                     if let Some((sim, replay)) = self.history.back() {
@@ -4140,7 +5011,9 @@ impl App {
                         self.menu = None;
                     }
                 }
-                Practice::Save => self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone())),
+                Practice::Save => {
+                    self.saved = Some((self.game.sim.clone(), self.game.replay_out.clone()))
+                }
                 Practice::Load => {
                     if let Some((sim, replay)) = &self.saved {
                         // the run goes on from the saved moment: its record is cut back to it, and what happened
@@ -4155,8 +5028,11 @@ impl App {
                 }
                 Practice::Slower | Practice::Faster => {
                     let slower = deed == Practice::Slower;
-                    self.time_scale =
-                        if slower { (self.time_scale / 2.0).max(0.125) } else { (self.time_scale * 2.0).min(1.0) };
+                    self.time_scale = if slower {
+                        (self.time_scale / 2.0).max(0.125)
+                    } else {
+                        (self.time_scale * 2.0).min(1.0)
+                    };
                     if self.time_scale < 1.0 {
                         self.game.assisted = true;
                     }
@@ -4204,8 +5080,17 @@ impl App {
 
     fn menu_key(&mut self, code: KeyCode, typed: Option<&str>, event_loop: &ActiveEventLoop) {
         // every key the menu takes clicks, as the original's menu sends Menu_Click
-        if matches!(code, KeyCode::ArrowUp | KeyCode::ArrowDown | KeyCode::ArrowLeft | KeyCode::ArrowRight | KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape)
-            && let Some(a) = &mut self.audio
+        if matches!(
+            code,
+            KeyCode::ArrowUp
+                | KeyCode::ArrowDown
+                | KeyCode::ArrowLeft
+                | KeyCode::ArrowRight
+                | KeyCode::Enter
+                | KeyCode::NumpadEnter
+                | KeyCode::Space
+                | KeyCode::Escape
+        ) && let Some(a) = &mut self.audio
         {
             a.play(&self.data, "Menu_click", 1.0, 0.0);
         }
@@ -4217,7 +5102,9 @@ impl App {
             return;
         }
         // the name entry takes what is typed
-        if menu.screen() == crate::menu::Screen::Entry && !matches!(code, KeyCode::Enter | KeyCode::NumpadEnter) {
+        if menu.screen() == crate::menu::Screen::Entry
+            && !matches!(code, KeyCode::Enter | KeyCode::NumpadEnter)
+        {
             match code {
                 KeyCode::Backspace => menu.erase(),
                 _ => menu.typed(typed.unwrap_or_default()),
@@ -4309,11 +5196,24 @@ impl App {
                 }
                 // the sound theme follows the mode: the saved choice in the extended mode, the default theme else
                 // (taken before the settings are written, which keep the extended mode's choice)
-                let theme = if self.features.mode { setting("sound-theme") } else { None };
+                let theme = if self.features.mode {
+                    setting("sound-theme")
+                } else {
+                    None
+                };
                 gamedata::sound_themes::restore(theme.as_deref());
                 // the packs too (from the next level): the saved choice in the extended mode, the defaults else
-                let packs = |k: gamedata::packs::Kind| if self.features.mode { setting(k.key()) } else { None };
-                restore_packs(packs(gamedata::packs::Kind::Textures).as_deref(), packs(gamedata::packs::Kind::Models).as_deref());
+                let packs = |k: gamedata::packs::Kind| {
+                    if self.features.mode {
+                        setting(k.key())
+                    } else {
+                        None
+                    }
+                };
+                restore_packs(
+                    packs(gamedata::packs::Kind::Textures).as_deref(),
+                    packs(gamedata::packs::Kind::Models).as_deref(),
+                );
                 if let Some(a) = &mut self.audio {
                     a.forget_sounds();
                 }
@@ -4364,7 +5264,13 @@ impl App {
         }
     }
 
-    fn key(&mut self, code: KeyCode, down: bool, typed: Option<&str>, event_loop: &ActiveEventLoop) {
+    fn key(
+        &mut self,
+        code: KeyCode,
+        down: bool,
+        typed: Option<&str>,
+        event_loop: &ActiveEventLoop,
+    ) {
         if self.loading.is_some() {
             return;
         }
@@ -4416,15 +5322,25 @@ impl App {
             // the run waits under the pause menu; a finished or lost run has its own menu
             KeyCode::Escape if down && !self.game.sim.finished => {
                 let lost = self.game.sim.game_over;
-                self.open_menu(if lost { crate::menu::Screen::Dead } else { crate::menu::Screen::Pause });
+                self.open_menu(if lost {
+                    crate::menu::Screen::Dead
+                } else {
+                    crate::menu::Screen::Pause
+                });
                 return;
             }
             // the full screen on or off, as the Graphics page sets it
             KeyCode::F11 if down => {
                 use crate::options::Fullscreen as Full;
-                let on = self.window.as_ref().is_some_and(|w| w.fullscreen().is_some());
+                let on = self
+                    .window
+                    .as_ref()
+                    .is_some_and(|w| w.fullscreen().is_some());
                 let how = if on { Full::Off } else { Full::Borderless };
-                self.set_graphics(crate::options::Graphics { fullscreen: how, ..self.graphics });
+                self.set_graphics(crate::options::Graphics {
+                    fullscreen: how,
+                    ..self.graphics
+                });
                 0
             }
             _ => 0,
@@ -4476,7 +5392,11 @@ impl App {
         let mut ticks = 0u32;
         while self.acc >= TICK {
             // the test player plays (--watch), unless the watcher drives by hand
-            if self.pilot.as_ref().is_some_and(|w| !w.done && w.hand.is_none()) {
+            if self
+                .pilot
+                .as_ref()
+                .is_some_and(|w| !w.done && w.hand.is_none())
+            {
                 if !self.watch_tick(started) {
                     self.acc = self.acc.min(TICK);
                     break;
@@ -4488,7 +5408,8 @@ impl App {
             }
             self.prev = Some(Snapshot::of(&self.game.sim));
             // the gamepads press the same keys; the camera's turn inverted as chosen
-            self.game.tick(self.bindings.turn(self.keys | self.pad_keys));
+            self.game
+                .tick(self.bindings.turn(self.keys | self.pad_keys));
             if let Some(w) = self.pilot.as_mut().filter(|w| !w.done) {
                 w.run.near_edges.tick(&w.run.edges, &self.game.sim.ball);
                 self.watch_trail();
@@ -4513,7 +5434,12 @@ impl App {
             let began;
             (flash, began) = self.blitz.step(sim.tick);
             if let (true, Some(a)) = (began, &mut self.audio) {
-                a.play(&self.data, "Music_thunder", 1.0, crate::lights::THUNDER_DELAY);
+                a.play(
+                    &self.data,
+                    "Music_thunder",
+                    1.0,
+                    crate::lights::THUNDER_DELAY,
+                );
             }
         }
         let point = crate::lights::point(&sim.events, sim.tick, snap.ball);
@@ -4568,7 +5494,10 @@ impl App {
         let build_started = Instant::now();
         // With a menu up, the original's menu scene is behind it, its camera going round
         let menu_up = self.menu.as_ref().is_some_and(|m| !m.over_level()) || self.loading.is_some();
-        let menu_scene = self.menu_scene.as_mut().filter(|m| m.model.is_some() && menu_up);
+        let menu_scene = self
+            .menu_scene
+            .as_mut()
+            .filter(|m| m.model.is_some() && menu_up);
         gpu.renderer.menu_frame = menu_scene.is_some();
         let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
             self.menu_ms += f64::from(step) * 1000.0;
@@ -4585,6 +5514,7 @@ impl App {
                 (&self.game.sim.extra_views(), self.game.extra_model.as_ref()),
                 &snap,
                 &self.game.sim.pieces_view(),
+                (self.game.sim.script_hidden(), self.game.sim.script_moved()),
             );
             if snap.kind.is_some() {
                 scene::shadows(&self.game.shadow_receivers, snap.ball, &mut inst);
@@ -4624,10 +5554,15 @@ impl App {
         };
         let built = build_started.elapsed();
         let draw_started = Instant::now();
-        (gpu.renderer.flash, gpu.renderer.point) = if menu_up { (0.0, None) } else { (flash, point) };
+        (gpu.renderer.flash, gpu.renderer.point) =
+            if menu_up { (0.0, None) } else { (flash, point) };
         // the mods' light: the level's dimmed, a light over the ball
         if let Some(base) = self.light_base {
-            let k = if menu_up { 1.0 } else { self.view_mods.out.light };
+            let k = if menu_up {
+                1.0
+            } else {
+                self.view_mods.out.light
+            };
             gpu.renderer.light.color = base.color.map(|c| c * k);
             gpu.renderer.light.ambient = base.ambient.map(|c| c * k);
         }
@@ -4635,7 +5570,14 @@ impl App {
         if !menu_up && lantern > 0.0 && gpu.renderer.point.is_none() {
             gpu.renderer.point = Some((snap.ball + glam::Vec3::Y * 4.0, [lantern; 3]));
         }
-        gpu.renderer.draw(&view, gpu.config.width, gpu.config.height, &frame_view, &inst, &particles);
+        gpu.renderer.draw(
+            &view,
+            gpu.config.width,
+            gpu.config.height,
+            &frame_view,
+            &inst,
+            &particles,
+        );
         let drawn = draw_started.elapsed();
         let overlay_started = Instant::now();
         gpu.renderer.draw_overlay(
@@ -4645,9 +5587,11 @@ impl App {
             &match (&self.menu, &self.loading) {
                 // with the game's font the menus are the original's (drawn below), else the prototype's
                 (_, Some(_)) | (Some(_), None) if self.game.font.is_some() => Vec::new(),
-                (_, Some((source, _))) => {
-                    Menu::loading_overlay(gpu.config.width, gpu.config.height, &loading_name(source))
-                }
+                (_, Some((source, _))) => Menu::loading_overlay(
+                    gpu.config.width,
+                    gpu.config.height,
+                    &loading_name(source),
+                ),
                 (Some(m), None) => m.overlay(gpu.config.width, gpu.config.height),
                 (None, None) => {
                     let mut o = crate::hud::overlay(
@@ -4659,11 +5603,26 @@ impl App {
                     );
                     if tools && (self.time_scale < 1.0 || self.saved.is_some()) {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
-                        let slow = if self.time_scale < 1.0 { format!("SLOW 1/{}", (1.0 / self.time_scale).round()) } else { String::new() };
+                        let slow = if self.time_scale < 1.0 {
+                            format!("SLOW 1/{}", (1.0 / self.time_scale).round())
+                        } else {
+                            String::new()
+                        };
                         let saved = if self.saved.is_some() { "   SAVED" } else { "" };
-                        crate::hud::text(&mut o, &format!("{slow}{saved}"), scale, scale * 21.0, scale, [0.6, 0.9, 1.0, 1.0]);
+                        crate::hud::text(
+                            &mut o,
+                            &format!("{slow}{saved}"),
+                            scale,
+                            scale * 21.0,
+                            scale,
+                            [0.6, 0.9, 1.0, 1.0],
+                        );
                     }
-                    if let Some(w) = self.pilot.as_ref().filter(|w| !w.done && self.game.font.is_none()) {
+                    if let Some(w) = self
+                        .pilot
+                        .as_ref()
+                        .filter(|w| !w.done && self.game.font.is_none())
+                    {
                         let scale = (gpu.config.height as f32 / 360.0).round().max(1.0);
                         for (k, line) in w.status(&self.game).lines().enumerate() {
                             let y = scale * (21.0 + 9.0 * k as f32);
@@ -4672,14 +5631,25 @@ impl App {
                     }
                     if let Some(c) = &self.fly {
                         let scale = (gpu.config.height as f32 / 240.0).round().max(2.0);
-                        let line = format!("FREE CAMERA   {:.1} {:.1} {:.1}", c.pos.x, c.pos.y, c.pos.z);
-                        crate::hud::text(&mut o, &line, scale, scale * 11.0, scale, [1.0, 0.85, 0.3, 1.0]);
+                        let line =
+                            format!("FREE CAMERA   {:.1} {:.1} {:.1}", c.pos.x, c.pos.y, c.pos.z);
+                        crate::hud::text(
+                            &mut o,
+                            &line,
+                            scale,
+                            scale * 11.0,
+                            scale,
+                            [1.0, 0.85, 0.3, 1.0],
+                        );
                     }
                     o
                 }
             },
         );
-        let screen = crate::ui::Screen { w: gpu.config.width as f32, h: gpu.config.height as f32 };
+        let screen = crate::ui::Screen {
+            w: gpu.config.width as f32,
+            h: gpu.config.height as f32,
+        };
         let font = self.game.font.as_ref();
         let quads = match (&self.menu, &self.loading, font) {
             (_, Some((source, _)), Some(f)) => {
@@ -4697,7 +5667,13 @@ impl App {
             (None, None, _) => {
                 let mut q = crate::hud::interface(&self.game.sim, font, screen);
                 let lost = self.strings.ours("ball lost");
-                q.extend(crate::hud::ball_lost(&self.game.sim, self.game.ball_lost_at, &lost, font, screen));
+                q.extend(crate::hud::ball_lost(
+                    &self.game.sim,
+                    self.game.ball_lost_at,
+                    &lost,
+                    font,
+                    screen,
+                ));
                 if let (Some(t), Some(f)) = (crate::endscreen::of(&self.game.sim), font) {
                     q.extend(crate::endscreen::interface(&t, f, &self.strings, screen));
                 }
@@ -4714,9 +5690,11 @@ impl App {
             _ => Vec::new(),
         };
         if let Some((w, h, rgba)) = crate::fallback::take_changed() {
-            gpu.renderer.add_named_texture(crate::fallback::TEXTURE, w, h, rgba);
+            gpu.renderer
+                .add_named_texture(crate::fallback::TEXTURE, w, h, rgba);
         }
-        gpu.renderer.draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
+        gpu.renderer
+            .draw_ui(&view, gpu.config.width, gpu.config.height, &quads);
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();
         if std::mem::take(&mut self.shot_due) {
@@ -4814,7 +5792,10 @@ impl App {
         let gpu = self.gpu.as_ref()?;
         Some(crate::menu::Pointer {
             interface: self.game.font.is_some(),
-            screen: crate::ui::Screen { w: gpu.config.width as f32, h: gpu.config.height as f32 },
+            screen: crate::ui::Screen {
+                w: gpu.config.width as f32,
+                h: gpu.config.height as f32,
+            },
             x: x as f32,
             y: y as f32,
         })
@@ -4847,7 +5828,9 @@ impl App {
                     self.menu_action(action, event_loop);
                 }
             }
-            MouseButton::Right | MouseButton::Back => self.menu_key(KeyCode::Escape, None, event_loop),
+            MouseButton::Right | MouseButton::Back => {
+                self.menu_key(KeyCode::Escape, None, event_loop)
+            }
             _ => {}
         }
     }
@@ -4954,9 +5937,11 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::CursorLeft { .. } => self.cursor = None,
-            WindowEvent::MouseInput { state: ElementState::Pressed, button, .. } => {
-                self.mouse_button(button, event_loop)
-            }
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button,
+                ..
+            } => self.mouse_button(button, event_loop),
             WindowEvent::MouseWheel { delta, .. } => self.mouse_wheel(delta, event_loop),
             // a key let go while the window was not ours may never be reported released
             WindowEvent::Focused(false) => self.held.clear(),
@@ -4982,7 +5967,10 @@ mod runs_tests {
     fn runs_move_once_from_the_old_place_and_never_over_new_ones() {
         let root = std::env::temp_dir().join(format!("drahtseilakt-runs-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let (old, new) = (root.join("maps/Folder"), root.join("levels/community/Folder"));
+        let (old, new) = (
+            root.join("maps/Folder"),
+            root.join("levels/community/Folder"),
+        );
         std::fs::create_dir_all(old.join("Level_07")).unwrap();
         std::fs::write(old.join("Level_07/run-1.replay"), "r").unwrap();
         assert_eq!(move_runs(&old, &new, "Level_07"), Ok(true));
@@ -4994,19 +5982,30 @@ mod runs_tests {
         std::fs::create_dir_all(old.join("Level_07")).unwrap();
         std::fs::write(old.join("Level_07/run-2.replay"), "o").unwrap();
         assert_eq!(move_runs(&old, &new, "Level_07"), Ok(false));
-        assert!(old.join("Level_07/run-2.replay").is_file() && !new.join("Level_07/run-2.replay").exists());
+        assert!(
+            old.join("Level_07/run-2.replay").is_file()
+                && !new.join("Level_07/run-2.replay").exists()
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
     #[cfg(unix)]
     #[test]
     fn runs_behind_a_link_are_not_moved() {
-        let root = std::env::temp_dir().join(format!("drahtseilakt-runs-link-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("drahtseilakt-runs-link-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("elsewhere/Level_07")).unwrap();
         std::fs::create_dir_all(root.join("maps")).unwrap();
         std::os::unix::fs::symlink(root.join("elsewhere"), root.join("maps/Folder")).unwrap();
-        assert_eq!(move_runs(&root.join("maps/Folder"), &root.join("levels/c/Folder"), "Level_07"), Ok(false));
+        assert_eq!(
+            move_runs(
+                &root.join("maps/Folder"),
+                &root.join("levels/c/Folder"),
+                "Level_07"
+            ),
+            Ok(false)
+        );
         assert!(root.join("elsewhere/Level_07").is_dir());
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -5015,15 +6014,24 @@ mod runs_tests {
     fn a_loose_map_and_a_level_folder_of_one_name_keep_their_runs_apart() {
         let community = crate::levels::dir(crate::levels::Kind::Community);
         let (loose, _) = runs_root(&crate::assets::Source::Nmo(community.join("Foo.nmo")));
-        let (folder, old) = runs_root(&crate::assets::Source::Nmo(community.join("Foo").join("Foo.nmo")));
+        let (folder, old) = runs_root(&crate::assets::Source::Nmo(
+            community.join("Foo").join("Foo.nmo"),
+        ));
         // the loose map's runs are in <loose>/Foo, the folder's in <folder>/Foo: neither inside the other
-        assert!(!folder.join("Foo").starts_with(loose.join("Foo")) && !loose.join("Foo").starts_with(&folder));
+        assert!(
+            !folder.join("Foo").starts_with(loose.join("Foo"))
+                && !loose.join("Foo").starts_with(&folder)
+        );
         assert_eq!(old, Some(replay_dir().join("maps").join("Foo")));
         // a level folder named exactly like a kind's folder (wherever it is moved) shared its old place: not moved
         let kind_name = community.file_name().unwrap().to_owned();
-        let (_, none) = runs_root(&crate::assets::Source::Nmo(community.join(&kind_name).join("x.nmo")));
+        let (_, none) = runs_root(&crate::assets::Source::Nmo(
+            community.join(&kind_name).join("x.nmo"),
+        ));
         assert_eq!(none, None);
-        let (_, some) = runs_root(&crate::assets::Source::Nmo(community.join("Community-like").join("x.nmo")));
+        let (_, some) = runs_root(&crate::assets::Source::Nmo(
+            community.join("Community-like").join("x.nmo"),
+        ));
         assert!(some.is_some());
         assert_eq!(shown("a\u{1b}[2J"), "a\\u{1b}[2J");
     }
@@ -5041,16 +6049,23 @@ mod follow_tests {
         let path: Vec<Vec3> = (0..10).map(|i| Vec3::new(i as f32, 0.0, 0.0)).collect();
         // sector 1 (0..3), the try lost in sector 2 (3..6), the new ball's try through sector 2 (6..10)
         let sectors = vec![0, 0, 0, 1, 1, 1, 1, 1, 1, 1];
-        let gates = vec![(4, Vec3::ZERO, crate::sim::BallKind::Paper), (7, Vec3::X, crate::sim::BallKind::Stone)];
+        let gates = vec![
+            (4, Vec3::ZERO, crate::sim::BallKind::Paper),
+            (7, Vec3::X, crate::sim::BallKind::Stone),
+        ];
         let (p, s, g, d) = failed_tries_out(path, sectors, gates, vec![6], true);
-        assert_eq!(p.iter().map(|v| v.x as i32).collect::<Vec<_>>(), vec![0, 1, 2, 6, 7, 8, 9]);
+        assert_eq!(
+            p.iter().map(|v| v.x as i32).collect::<Vec<_>>(),
+            vec![0, 1, 2, 6, 7, 8, 9]
+        );
         assert_eq!(s.len(), 7);
         assert_eq!(g.len(), 1);
         assert_eq!(g[0].0, 4, "the transformer at old 7 is now at 4");
         assert!(d.is_empty());
         // unfinished, the tries in its last sector are kept for way_on to choose from
         let path: Vec<Vec3> = (0..6).map(|i| Vec3::new(i as f32, 0.0, 0.0)).collect();
-        let (p, _, _, d) = failed_tries_out(path, vec![0, 0, 1, 1, 1, 1], Vec::new(), vec![4], false);
+        let (p, _, _, d) =
+            failed_tries_out(path, vec![0, 0, 1, 1, 1, 1], Vec::new(), vec![4], false);
         assert_eq!(p.len(), 6);
         assert_eq!(d, vec![4]);
     }
@@ -5073,23 +6088,40 @@ pub(crate) fn stats_run(
         events: Vec::new(),
         moved: Vec::new(),
         finished: false,
-        begun_elsewhere: game.start.as_ref().is_some_and(|s| s.sector > 1 || s.at.is_some()),
+        begun_elsewhere: game
+            .start
+            .as_ref()
+            .is_some_and(|s| s.sector > 1 || s.at.is_some()),
         route: None,
         checkpoints: game.sim.stages(),
     };
     if let Some(plan) = plan {
         let start = game.sim.ball.position;
-        let mut stages: Vec<glam::Vec3> = read_plan(plan, &game.level.level, 0)?.into_iter().map(|p| p.0).collect();
+        let mut stages: Vec<glam::Vec3> = read_plan(plan, &game.level.level, 0)?
+            .into_iter()
+            .map(|p| p.0)
+            .collect();
         if let Some(&end) = run.checkpoints.last() {
             stages.push(end);
         }
-        let route = crate::autopilot::Route::find(&game.level.level, &game.modules, &game.sim.updrafts(), start, &stages);
+        let route = crate::autopilot::Route::find(
+            &game.level.level,
+            &game.modules,
+            &game.sim.updrafts(),
+            start,
+            &stages,
+        );
         run.route = Some(route.points.clone());
         return Ok(run);
     }
-    let end = game.replay_in.as_ref().map(|r| r.end).ok_or("level statistics need a replay or a plan")?;
+    let end = game
+        .replay_in
+        .as_ref()
+        .map(|r| r.end)
+        .ok_or("level statistics need a replay or a plan")?;
     // each loose thing's first place and how far it got from it (sampled twice a second)
-    let mut loose: std::collections::HashMap<usize, (glam::Vec3, f32)> = std::collections::HashMap::new();
+    let mut loose: std::collections::HashMap<usize, (glam::Vec3, f32)> =
+        std::collections::HashMap::new();
     let mut seen = 0;
     while game.sim.tick < end && !game.sim.finished && !game.sim.game_over {
         game.tick(0);

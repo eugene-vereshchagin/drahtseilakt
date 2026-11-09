@@ -11,7 +11,7 @@
 // synapse's ledge reference. The functor's `eval` is the upstream's table of distance functors.
 
 use crate::ledge::{Edge, Ledge, Surface};
-use crate::math::{self, isqrt4, normalize4, Matrix};
+use crate::math::{self, Matrix, isqrt4, normalize4};
 use crate::mindist::{Mindist, ObjCache, ST_BALL, ST_EDGE, ST_FACE, ST_POINT};
 
 type V3 = [f64; 3];
@@ -92,11 +92,19 @@ fn dot3(a: V3, b: V3) -> f64 {
 }
 
 fn cross3(a: V3, b: V3) -> V3 {
-    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
 }
 
 fn fsub_d(a: P3, b: P3) -> V3 {
-    [f64::from(a[0]) - f64::from(b[0]), f64::from(a[1]) - f64::from(b[1]), f64::from(a[2]) - f64::from(b[2])]
+    [
+        f64::from(a[0]) - f64::from(b[0]),
+        f64::from(a[1]) - f64::from(b[1]),
+        f64::from(a[2]) - f64::from(b[2]),
+    ]
 }
 
 fn to_v3(a: P3) -> V3 {
@@ -209,11 +217,7 @@ impl Functor {
                 let d = fsub_v(pb, pa);
                 let s = 1.2000000476837158 * dot3(d, self.c);
                 let d2 = dot3(d, d);
-                if s * s.abs() < d2 {
-                    s
-                } else {
-                    d2.sqrt()
-                }
+                if s * s.abs() < d2 { s } else { d2.sqrt() }
             }
             // 0x1002abc0: (M2 p2 - M1 p1) . (R2 v)
             Kind::PlaneThrough => {
@@ -231,11 +235,7 @@ impl Functor {
                 let w = cross3(fsub_v(q, p), e);
                 let len = dot3(w, w).sqrt();
                 let x = dot3(w, c) + self.h;
-                if len < x {
-                    len
-                } else {
-                    x
-                }
+                if len < x { len } else { x }
             }
             // 0x1002ac40: (RA v) . normalize(((RB e) x d) x (RB e)), d = MA p - MB q
             Kind::EdgeTurn => {
@@ -339,7 +339,17 @@ impl<'a, 'm> Ev<'a, 'm> {
 
     /// The first time the functor drops to `target` or below, by the regula falsi between two grid points, with the
     /// poses computed fresh (`regula_falsi`, 0x10037790).
-    fn regula_falsi(&self, f: &Functor, mut t_lo: f64, mut t_hi: f64, target: f64, mut f_lo: f64, mut f_hi: f64, a: usize, b: usize) -> f64 {
+    fn regula_falsi(
+        &self,
+        f: &Functor,
+        mut t_lo: f64,
+        mut t_hi: f64,
+        target: f64,
+        mut f_lo: f64,
+        mut f_hi: f64,
+        a: usize,
+        b: usize,
+    ) -> f64 {
         let (oa, ob) = (self.sims[a].obj, self.sims[b].obj);
         let mut count = 0u32;
         loop {
@@ -369,7 +379,17 @@ impl<'a, 'm> Ev<'a, 'm> {
 
     /// The first t with f(t) <= target, by conservative advancement on the 5 ms grid from slot `i` (`search_below`,
     /// 0x10037910). `t_max` is the bound; `f_start` the value at `t` when the caller has it.
-    fn search_below(&mut self, f: &Functor, target: f64, t: f64, t_max: f64, i: usize, a: usize, b: usize, f_start: Option<f64>) -> Option<f64> {
+    fn search_below(
+        &mut self,
+        f: &Functor,
+        target: f64,
+        t: f64,
+        t_max: f64,
+        i: usize,
+        a: usize,
+        b: usize,
+        f_start: Option<f64>,
+    ) -> Option<f64> {
         let mut fv = f_start.unwrap_or_else(|| self.fx0(f, a, b));
         if fv <= target {
             return Some(t);
@@ -412,7 +432,17 @@ impl<'a, 'm> Ev<'a, 'm> {
 
     /// As `search_below`, with the branch for a start already within the target: `v2` is the close-in distance
     /// (`find_event`, 0x10037b30).
-    fn find_event(&mut self, f: &Functor, target: f64, v2: f64, t_start: f64, t_max: f64, a: usize, b: usize, f_start: Option<f64>) -> Option<f64> {
+    fn find_event(
+        &mut self,
+        f: &Functor,
+        target: f64,
+        v2: f64,
+        t_start: f64,
+        t_max: f64,
+        a: usize,
+        b: usize,
+        f_start: Option<f64>,
+    ) -> Option<f64> {
         let f0 = f_start.unwrap_or_else(|| self.fx0(f, a, b));
         if f0 > target {
             return self.search_below(f, target, t_start, t_max, 0, a, b, Some(f0));
@@ -469,7 +499,16 @@ impl<'a, 'm> Ev<'a, 'm> {
         normalize4(&mut f.b);
         f.c = to_v3(l.p(e));
         let f0 = r + len;
-        if let Some(t) = self.find_event(&f, r + f64::from(COLL_DIST), 0.5 * r + f64::from(REAL_COLL_DIST), self.t_now, self.t_max, 0, 1, Some(f0)) {
+        if let Some(t) = self.find_event(
+            &f,
+            r + f64::from(COLL_DIST),
+            0.5 * r + f64::from(REAL_COLL_DIST),
+            self.t_now,
+            self.t_max,
+            0,
+            1,
+            Some(f0),
+        ) {
             self.time = t;
             self.code = 0x20;
         }
@@ -486,7 +525,16 @@ impl<'a, 'm> Ev<'a, 'm> {
         for k in 0..3 {
             f1.c[k] = f64::from(md.normal[k]) * -1.0;
         }
-        if let Some(t) = self.find_event(&f1, r + cd, 0.5 * r + f64::from(REAL_COLL_DIST), self.t_now, self.t_max, 0, 1, None) {
+        if let Some(t) = self.find_event(
+            &f1,
+            r + cd,
+            0.5 * r + f64::from(REAL_COLL_DIST),
+            self.t_now,
+            self.t_max,
+            0,
+            1,
+            None,
+        ) {
             self.time = t;
             self.code = 0x10;
         }
@@ -494,9 +542,17 @@ impl<'a, 'm> Ev<'a, 'm> {
         let dmax = (self.time - self.t_now) * self.worst_total + len;
         let pc = self.sims[1].core;
         let bcore = self.sims[0].core;
-        let plen = (f64::from(pf[0]) * f64::from(pf[0]) + f64::from(pf[1]) * f64::from(pf[1]) + f64::from(pf[2]) * f64::from(pf[2])).sqrt();
-        let speed = plen * pc.abs_omega + pc.current_speed + pc.abs_omega * dmax + bcore.current_speed;
-        let m2 = if dmax * dmax < cd * cd { dmax * dmax } else { cd * cd };
+        let plen = (f64::from(pf[0]) * f64::from(pf[0])
+            + f64::from(pf[1]) * f64::from(pf[1])
+            + f64::from(pf[2]) * f64::from(pf[2]))
+        .sqrt();
+        let speed =
+            plen * pc.abs_omega + pc.current_speed + pc.abs_omega * dmax + bcore.current_speed;
+        let m2 = if dmax * dmax < cd * cd {
+            dmax * dmax
+        } else {
+            cd * cd
+        };
         let k = -m2 * pc.inv_object_diameter;
         let mut f2 = Functor::new(Kind::PlaneThrough, speed);
         f2.b = to_v3(pf);
@@ -540,7 +596,16 @@ impl<'a, 'm> Ev<'a, 'm> {
         let x = cross3(d, ew);
         f1.b = math::rtmul(&sp.r, &x);
         math::normalize_d(&mut f1.b);
-        if let Some(t) = self.find_event(&f1, r + cd, 0.9 * r + f64::from(REAL_COLL_DIST), self.t_now, self.t_max, 0, 1, None) {
+        if let Some(t) = self.find_event(
+            &f1,
+            r + cd,
+            0.9 * r + f64::from(REAL_COLL_DIST),
+            self.t_now,
+            self.t_max,
+            0,
+            1,
+            None,
+        ) {
             self.time = t;
             self.code = 0x30;
         }
@@ -555,7 +620,16 @@ impl<'a, 'm> Ev<'a, 'm> {
             f2.b = cross3(qp, nt);
             math::normalize_d(&mut f2.b);
             f2.c = to_v3(l.p(ei));
-            if let Some(t) = self.search_below(&f2, -f64::from(MIN_FRICTION_DIST), self.t_now, self.time, 0, 0, 1, None) {
+            if let Some(t) = self.search_below(
+                &f2,
+                -f64::from(MIN_FRICTION_DIST),
+                self.t_now,
+                self.time,
+                0,
+                0,
+                1,
+                None,
+            ) {
                 self.time = t;
                 self.code = 0x31;
             }
@@ -583,7 +657,16 @@ impl<'a, 'm> Ev<'a, 'm> {
             f.c[k] = vv_b[k] - vv_a[k];
         }
         math::normalize_d(&mut f.c);
-        if let Some(t) = self.find_event(&f, r + f64::from(COLL_DIST), 0.5 * r + f64::from(REAL_COLL_DIST), self.t_now, self.t_max, 0, 1, None) {
+        if let Some(t) = self.find_event(
+            &f,
+            r + f64::from(COLL_DIST),
+            0.5 * r + f64::from(REAL_COLL_DIST),
+            self.t_now,
+            self.t_max,
+            0,
+            1,
+            None,
+        ) {
             self.time = t;
             self.code = 0x10;
         }
@@ -601,7 +684,16 @@ impl<'a, 'm> Ev<'a, 'm> {
         normalize4(&mut f.b);
         f.c = to_v3(lb.p(eb));
         let f_now = c.xr + c.len;
-        if let Some(t) = self.find_event(&f, c.xr + c.cd, 0.5 * c.xr + c.rcd, self.t_now, self.time, 0, 1, Some(f_now)) {
+        if let Some(t) = self.find_event(
+            &f,
+            c.xr + c.cd,
+            0.5 * c.xr + c.rcd,
+            self.t_now,
+            self.time,
+            0,
+            1,
+            Some(f_now),
+        ) {
             self.time = t;
             self.code = 0x20;
         }
@@ -609,7 +701,9 @@ impl<'a, 'm> Ev<'a, 'm> {
         let mut g = Functor::new(Kind::DirDir, c.rotsum + 1e-19);
         g.b = f.b;
         let mn = if c.len < c.cd { c.len } else { c.cd };
-        let lim = (-(c.eps * self.sims[1].core.inv_object_diameter)) * (c.xr * f64::from(0.1f32) + mn) / c.cd;
+        let lim = (-(c.eps * self.sims[1].core.inv_object_diameter))
+            * (c.xr * f64::from(0.1f32) + mn)
+            / c.cd;
         let nw = math::rmul(&self.sims[1].m0.r, &f.b);
         let na = math::rtmul(&self.sims[0].m0.r, &nw);
         let maxdev = (self.time - self.t_now) * (c.rotsum + 1e-19);
@@ -622,7 +716,9 @@ impl<'a, 'm> Ev<'a, 'm> {
                 for j in 0..3 {
                     g.a[j] = v[j] * k;
                 }
-                if let Some(t) = self.search_below(&g, lim, self.t_now, self.time, 0, 0, 1, Some(c0)) {
+                if let Some(t) =
+                    self.search_below(&g, lim, self.t_now, self.time, 0, 0, 1, Some(c0))
+                {
                     self.time = t;
                     self.code = 0x21;
                 }
@@ -643,7 +739,16 @@ impl<'a, 'm> Ev<'a, 'm> {
         for k in 0..3 {
             pf.c[k] = -f64::from(md.normal[k]);
         }
-        if let Some(t) = self.find_event(&pf, c.cd + c.xr, 0.5 * c.xr + c.rcd, self.t_now, self.t_max, 0, 1, None) {
+        if let Some(t) = self.find_event(
+            &pf,
+            c.cd + c.xr,
+            0.5 * c.xr + c.rcd,
+            self.t_now,
+            self.t_max,
+            0,
+            1,
+            None,
+        ) {
             self.time = t;
             self.code = 0x10;
         }
@@ -656,12 +761,23 @@ impl<'a, 'm> Ev<'a, 'm> {
         let sb = lb * cb.abs_omega + cb.current_speed;
         let spd_b = cb.abs_omega * maxd + sb + sa;
         let spd_a = ca.abs_omega * maxd + sb + sa;
-        let r = if ca.upper_limit_radius > cb.upper_limit_radius { ca.upper_limit_radius } else { cb.upper_limit_radius };
-        let m2 = if maxd * maxd < c.cd * c.cd { maxd * maxd } else { c.cd * c.cd };
+        let r = if ca.upper_limit_radius > cb.upper_limit_radius {
+            ca.upper_limit_radius
+        } else {
+            cb.upper_limit_radius
+        };
+        let m2 = if maxd * maxd < c.cd * c.cd {
+            maxd * maxd
+        } else {
+            c.cd * c.cd
+        };
         let k = -0.5 * m2 / r;
         // (edge in its object's ledge, that object's sim index, the other object's sim index, its start point, the
         // other point, speed)
-        let sides = [(eb, 1usize, pb, pa, 0usize, spd_b), (ea, 0usize, pa, pb, 1usize, spd_a)];
+        let sides = [
+            (eb, 1usize, pb, pa, 0usize, spd_b),
+            (ea, 0usize, pa, pb, 1usize, spd_a),
+        ];
         for (e0, own, p0, po, other, spd) in sides {
             let mut q = Functor::new(Kind::PlaneThrough, spd);
             q.a = to_v3(po);
@@ -677,7 +793,9 @@ impl<'a, 'm> Ev<'a, 'm> {
                 let target = (l2 * ki) * k;
                 // the functor's first pose is the point's object: sim `other` when Po is in it
                 let (sa_i, sb_i) = if other == 0 { (0, 1) } else { (1, 0) };
-                if let Some(t) = self.search_below(&q, target, self.t_now, self.time, 0, sa_i, sb_i, None) {
+                if let Some(t) =
+                    self.search_below(&q, target, self.t_now, self.time, 0, sa_i, sb_i, None)
+                {
                     self.time = t;
                     self.code = 0x11;
                 }
@@ -710,7 +828,16 @@ impl<'a, 'm> Ev<'a, 'm> {
         rf.a = e;
         rf.b = math::rtmul(&mb.r, &x);
         math::normalize_d(&mut rf.b);
-        if let Some(t) = self.find_event(&rf, c.cd + c.xr, 0.9 * c.xr + c.rcd, self.t_now, self.t_max, 0, 1, None) {
+        if let Some(t) = self.find_event(
+            &rf,
+            c.cd + c.xr,
+            0.9 * c.xr + c.rcd,
+            self.t_now,
+            self.t_max,
+            0,
+            1,
+            None,
+        ) {
             self.time = t;
             self.code = 0x30;
         }
@@ -773,7 +900,9 @@ impl<'a, 'm> Ev<'a, 'm> {
         let wa = math::rmul(&self.sims[0].m0.r, &da);
         let wb = math::rmul(&self.sims[1].m0.r, &db);
         let cr = cross3(wa, wb);
-        let nc = f64::from(md.normal[0]) * cr[0] + f64::from(md.normal[1]) * cr[1] + f64::from(md.normal[2]) * cr[2];
+        let nc = f64::from(md.normal[0]) * cr[0]
+            + f64::from(md.normal[1]) * cr[1]
+            + f64::from(md.normal[2]) * cr[2];
         let flag = if -nc > 0.0 { 0 } else { 1 };
         let sign = if flag == 0 { -1.0 } else { 1.0 };
         let mut h = Functor::new(Kind::LineLine, self.worst_approach);
@@ -826,25 +955,43 @@ static EMPTY_LEDGE: Ledge = Ledge {
 
 /// The event solver (`ivp_event_solve`, table 0x1007632c): the earliest event of the mindist within
 /// [t_now, t_max], by the sorted statuses. `sides` are the two synapses' objects in synapse order.
-pub fn solve<'a>(md: &Mindist, sides: [EventSide<'a>; 2], motion: &dyn Motion, t_now: f64, t_max: f64, worst_approach: f64, worst_total: f64) -> Event {
+pub fn solve<'a>(
+    md: &Mindist,
+    sides: [EventSide<'a>; 2],
+    motion: &dyn Motion,
+    t_now: f64,
+    t_max: f64,
+    worst_approach: f64,
+    worst_total: f64,
+) -> Event {
     let ka = md.sorted(0);
     let kb = md.sorted(1);
     let sa = md.syn[ka].status;
     let sb = md.syn[kb].status;
-    let none = Event { code: 0, time: t_max };
-    let (sims_order, ledges): ([usize; 2], [Option<&Ledge>; 2]) = if sa == ST_BALL && sb == ST_BALL {
+    let none = Event {
+        code: 0,
+        time: t_max,
+    };
+    let (sims_order, ledges): ([usize; 2], [Option<&Ledge>; 2]) = if sa == ST_BALL && sb == ST_BALL
+    {
         ([0, 1], [None, None])
     } else if sa == ST_BALL && sb <= ST_FACE {
         ([0, 1], [None, feat_ledge(md, &sides, 1)])
     } else if sa <= sb && sb <= ST_FACE && !(sa == ST_EDGE && sb == ST_FACE) {
-        ([ka, kb], [feat_ledge(md, &sides, ka), feat_ledge(md, &sides, kb)])
+        (
+            [ka, kb],
+            [feat_ledge(md, &sides, ka), feat_ledge(md, &sides, kb)],
+        )
     } else {
         // the upstream asserts on this pairing (0x1002d850)
         return none;
     };
     let mut ev = Ev {
         motion,
-        sims: [Sim::new(&sides[sims_order[0]]), Sim::new(&sides[sims_order[1]])],
+        sims: [
+            Sim::new(&sides[sims_order[0]]),
+            Sim::new(&sides[sims_order[1]]),
+        ],
         ledges,
         t_now,
         t_max,
@@ -942,7 +1089,11 @@ mod tests {
 
     impl Motion for Line {
         fn matrix_at(&self, obj: usize, t: f64) -> Matrix {
-            let vv = if obj == 0 { [0.0; 3] } else { [2.0 + self.vx * t, 0.0, 0.0] };
+            let vv = if obj == 0 {
+                [0.0; 3]
+            } else {
+                [2.0 + self.vx * t, 0.0, 0.0]
+            };
             Matrix { r: identity(), vv }
         }
     }
@@ -1015,10 +1166,22 @@ mod tests {
     fn an_approaching_cube_meets_the_other_at_the_gap_time() {
         let cube = unit_cube();
         let md = gap_one_mindist(&cube);
-        assert!((md.len_numerator - 1.0).abs() < 1e-4, "gap {}", md.len_numerator);
+        assert!(
+            (md.len_numerator - 1.0).abs() < 1e-4,
+            "gap {}",
+            md.len_numerator
+        );
         // the gap closes at speed 10 to the collision distance 0.01: t = 0.99 / 10. The search covers 20 grid steps
         // of 5 ms from t_now, so the window is 0.1 s
-        let ev = solve(&md, event_sides(&cube, -10.0), &Line { vx: -10.0 }, 0.0, 0.1, 10.0, 10.0);
+        let ev = solve(
+            &md,
+            event_sides(&cube, -10.0),
+            &Line { vx: -10.0 },
+            0.0,
+            0.1,
+            10.0,
+            10.0,
+        );
         assert!(ev.code != 0, "an event is found");
         assert!((ev.time - 0.099).abs() < 0.005, "time {}", ev.time);
     }
@@ -1027,7 +1190,15 @@ mod tests {
     fn a_cube_moving_away_has_no_event_in_the_psi() {
         let cube = unit_cube();
         let md = gap_one_mindist(&cube);
-        let ev = solve(&md, event_sides(&cube, 10.0), &Line { vx: 10.0 }, 0.0, 0.1, 10.0, 10.0);
+        let ev = solve(
+            &md,
+            event_sides(&cube, 10.0),
+            &Line { vx: 10.0 },
+            0.0,
+            0.1,
+            10.0,
+            10.0,
+        );
         assert_eq!(ev.code, 0, "no event: {ev:?}");
     }
 }

@@ -15,6 +15,7 @@ path = "src/main.rs"
 level = { path = "../level" }
 gamedata = { path = "../gamedata" }
 nmo = { path = "../nmo" }
+script = { path = "../script" }
 cdimage = { path = "../cdimage" }
 wgpu = "=30.0.1"
 winit = "=0.30.13"

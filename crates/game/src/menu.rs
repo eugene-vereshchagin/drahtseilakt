@@ -41,11 +41,14 @@ fn step_size(sizes: &[(u32, u32)], now: (u32, u32), by: i32) -> Option<(u32, u32
         Some(i) => i64::try_from(i).ok()?,
         // between two sizes: one step lands on the size next to it in that direction
         None => {
-            let after = i64::try_from(sizes.iter().filter(|s| area(s) < area(&now)).count()).ok()?;
+            let after =
+                i64::try_from(sizes.iter().filter(|s| area(s) < area(&now)).count()).ok()?;
             if by > 0 { after - 1 } else { after }
         }
     };
-    sizes.get(usize::try_from((at + i64::from(by)).rem_euclid(n)).ok()?).copied()
+    sizes
+        .get(usize::try_from((at + i64::from(by)).rem_euclid(n)).ok()?)
+        .copied()
 }
 
 pub struct Entry {
@@ -375,7 +378,11 @@ impl Menu {
     /// How many lines of `screen` scroll as a list: a list's without its Back, else all of its lines.
     fn list_len(&self, screen: Screen) -> usize {
         let n = self.lines(screen).len();
-        if scrolls(screen) { n.saturating_sub(1) } else { n }
+        if scrolls(screen) {
+            n.saturating_sub(1)
+        } else {
+            n
+        }
     }
 
     /// The lines of a list of `n` shown at once: all of a short one, else a page of it from the list's top, moved as
@@ -434,9 +441,10 @@ impl Menu {
                 .iter()
                 .position(|e| e.number == self.level && e.available && e.open)
                 .and_then(|i| at(Line::Level(i))),
-            Screen::Language => {
-                LANGUAGES.iter().position(|l| l.0 == self.strings.language()).and_then(|i| at(Line::Lang(i)))
-            }
+            Screen::Language => LANGUAGES
+                .iter()
+                .position(|l| l.0 == self.strings.language())
+                .and_then(|i| at(Line::Lang(i))),
             _ => None,
         };
         if screen == Screen::Highscore {
@@ -460,7 +468,14 @@ impl Menu {
     fn lines(&self, screen: Screen) -> Vec<Line> {
         match screen {
             Screen::Main if !self.copy => {
-                vec![Line::Start, Line::Import, Line::Highscore, Line::Options, Line::Credits, Line::Exit]
+                vec![
+                    Line::Start,
+                    Line::Import,
+                    Line::Highscore,
+                    Line::Options,
+                    Line::Credits,
+                    Line::Exit,
+                ]
             }
             Screen::Main => vec![
                 Line::Start,
@@ -492,15 +507,28 @@ impl Menu {
                 Line::Extended,
                 Line::Back,
             ],
-            Screen::Language => (0..LANGUAGES.len()).map(Line::Lang).chain([Line::Back]).collect(),
+            Screen::Language => (0..LANGUAGES.len())
+                .map(Line::Lang)
+                .chain([Line::Back])
+                .collect(),
             // the original's two volumes: the music's and the effects'
             Screen::Sound => vec![Line::Music, Line::Effects, Line::Back],
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(self.features))
-                .chain([Line::Interface, Line::Textures, Line::Models, Line::SoundTheme, Line::ModsMenu, Line::Back])
+                .chain([
+                    Line::Interface,
+                    Line::Textures,
+                    Line::Models,
+                    Line::SoundTheme,
+                    Line::ModsMenu,
+                    Line::Back,
+                ])
                 .collect(),
-            Screen::Mods => (0..self.mods.found.len()).map(Line::Mod).chain([Line::Back]).collect(),
+            Screen::Mods => (0..self.mods.found.len())
+                .map(Line::Mod)
+                .chain([Line::Back])
+                .collect(),
             Screen::ModPage => [Line::ModOn]
                 .into_iter()
                 .chain((0..self.page_options().len()).map(Line::ModOpt))
@@ -510,7 +538,12 @@ impl Menu {
             Screen::Highscore if self.after_entry => vec![Line::Next],
             // the original's lines, the full screen (a window can be one), and the extended mode's field of view
             Screen::Graphics => {
-                let mut l = vec![Line::Resolution, Line::Synch, Line::Clouds, Line::Fullscreen];
+                let mut l = vec![
+                    Line::Resolution,
+                    Line::Synch,
+                    Line::Clouds,
+                    Line::Fullscreen,
+                ];
                 if self.features.mode {
                     l.push(Line::Fov);
                 }
@@ -621,7 +654,9 @@ impl Menu {
             (Screen::Controls, Some(Line::Invert)) => self.toggle_invert(),
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
-            (Screen::Extended, Some(Line::Textures)) => next_pack(gamedata::packs::Kind::Textures, by),
+            (Screen::Extended, Some(Line::Textures)) => {
+                next_pack(gamedata::packs::Kind::Textures, by)
+            }
             (Screen::Extended, Some(Line::Models)) => next_pack(gamedata::packs::Kind::Models, by),
             (Screen::Extended, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (_, Some(Line::Mod(i))) => Action::ModSwitch(i),
@@ -668,7 +703,11 @@ impl Menu {
                 Some(&kind) => {
                     let root = crate::levels::dir(kind);
                     // the open-format levels include those shipped with the game
-                    self.maps = if kind == Kind::Open { own_levels() } else { maps_in(&root) };
+                    self.maps = if kind == Kind::Open {
+                        own_levels()
+                    } else {
+                        maps_in(&root)
+                    };
                     self.folder = Some(root);
                     self.own_list = false;
                     self.community = false;
@@ -714,7 +753,10 @@ impl Menu {
                 Some(e) if e.available && e.open => Action::Play(e.number),
                 _ => Action::None,
             },
-            Line::Map(i) => self.maps.get(i).map_or(Action::None, |p| Action::Map(p.level.clone())),
+            Line::Map(i) => self
+                .maps
+                .get(i)
+                .map_or(Action::None, |p| Action::Map(p.level.clone())),
             Line::Mode => Action::ToggleDebug,
             Line::Interface => Action::Interface(next_provider(1)),
             Line::Textures => next_pack(gamedata::packs::Kind::Textures, 1),
@@ -809,7 +851,8 @@ impl Menu {
 
     /// The button under the cursor.
     fn hit(&self, p: Pointer) -> Option<Hit> {
-        let inside = |h: &Hit| p.x >= h.rect[0] && p.x < h.rect[2] && p.y >= h.rect[1] && p.y < h.rect[3];
+        let inside =
+            |h: &Hit| p.x >= h.rect[0] && p.x < h.rect[2] && p.y >= h.rect[1] && p.y < h.rect[3];
         self.hits(p.interface, p.screen).into_iter().find(inside)
     }
 
@@ -819,7 +862,11 @@ impl Menu {
         if self.waiting() {
             return false;
         }
-        let Some(Hit { target: Target::Line(i), .. }) = self.hit(p) else {
+        let Some(Hit {
+            target: Target::Line(i),
+            ..
+        }) = self.hit(p)
+        else {
             return false;
         };
         if i == self.chosen() || !self.selectable(self.screen(), i) {
@@ -842,7 +889,8 @@ impl Menu {
             Target::Bar => {
                 // the list's page centred where the bar was clicked
                 let n = self.list_len(self.screen());
-                let f = ((p.y - hit.rect[1]) / (hit.rect[3] - hit.rect[1]).max(1.0)).clamp(0.0, 1.0);
+                let f =
+                    ((p.y - hit.rect[1]) / (hit.rect[3] - hit.rect[1]).max(1.0)).clamp(0.0, 1.0);
                 let at = (f * n as f32).round() as usize;
                 self.scroll_to(at.saturating_sub(page(self.screen()) / 2));
                 Some(Action::None)
@@ -853,7 +901,11 @@ impl Menu {
                     return None;
                 }
                 self.set_chosen(i);
-                let by = if p.x < (hit.rect[0] + hit.rect[2]) / 2.0 { -1 } else { 1 };
+                let by = if p.x < (hit.rect[0] + hit.rect[2]) / 2.0 {
+                    -1
+                } else {
+                    1
+                };
                 Some(match self.lines(sc).get(i) {
                     Some(&l) if valued(l) => self.adjust(by),
                     _ => self.enter(),
@@ -991,11 +1043,16 @@ impl Menu {
 
     /// The mod whose page is up, as read.
     fn page_txt(&self) -> Option<&gamedata::mods::ModTxt> {
-        self.mods.found.get(self.mod_page).and_then(|m| m.parsed.as_ref().ok())
+        self.mods
+            .found
+            .get(self.mod_page)
+            .and_then(|m| m.parsed.as_ref().ok())
     }
 
     fn page_options(&self) -> Vec<gamedata::mods::OptSpec> {
-        self.page_txt().map(|t| t.options.clone()).unwrap_or_default()
+        self.page_txt()
+            .map(|t| t.options.clone())
+            .unwrap_or_default()
     }
 
     /// The help under the Mods screen's rows: the chosen line's description (the practice tools' keys; a mod's
@@ -1003,20 +1060,26 @@ impl Menu {
     fn mods_help(&self) -> Vec<String> {
         let s = &self.strings;
         match self.lines(Screen::Mods).get(self.chosen()) {
-            Some(Line::Mod(i)) if self.screen() == Screen::Mods => match self.mods.found.get(*i).map(|m| &m.parsed) {
-                Some(Ok(t)) => {
-                    let mut v = vec![t.description(s.language())];
-                    if let Some((_, why)) = self.mods.note.as_ref().filter(|n| n.0 == *i) {
-                        v.push(format!("{}: {why}", s.ours("mod budget")));
+            Some(Line::Mod(i)) if self.screen() == Screen::Mods => {
+                match self.mods.found.get(*i).map(|m| &m.parsed) {
+                    Some(Ok(t)) => {
+                        let mut v = vec![t.description(s.language())];
+                        if let Some((_, why)) = self.mods.note.as_ref().filter(|n| n.0 == *i) {
+                            v.push(format!("{}: {why}", s.ours("mod budget")));
+                        }
+                        if t.modded() {
+                            v.push(s.ours("mod modded"));
+                        }
+                        v
                     }
-                    if t.modded() {
-                        v.push(s.ours("mod modded"));
-                    }
-                    v
+                    Some(Err(e)) => vec![format!(
+                        "{}: {}",
+                        s.ours("mod refused"),
+                        e.chars().take(80).collect::<String>()
+                    )],
+                    None => Vec::new(),
                 }
-                Some(Err(e)) => vec![format!("{}: {}", s.ours("mod refused"), e.chars().take(80).collect::<String>())],
-                None => Vec::new(),
-            },
+            }
             _ => Vec::new(),
         }
     }
@@ -1063,7 +1126,9 @@ impl Menu {
             Line::Back => s.get("Menu_Start Button Back", "Back"),
             Line::Restart => s.get("Menu_Pause Button Restart", "Restart Level"),
             Line::ExitLevel => s.get("Menu_Pause Button Exit", "Exit Level"),
-            Line::Next if self.screen() == Screen::Highscore => s.get("Menu_Highscore \"Next\"", "Next"),
+            Line::Next if self.screen() == Screen::Highscore => {
+                s.get("Menu_Highscore \"Next\"", "Next")
+            }
             Line::Next => s.get("Menu_End Next Level", "Next level"),
             Line::Home => s.get("Menu_Dead Home", "Home"),
             Line::Graphics => s.get("Menu_Options Button Graphics", "Graphics"),
@@ -1076,7 +1141,11 @@ impl Menu {
                 let n = self.entries.get(i).map_or(0, |e| e.number);
                 // the copy's own label for the level, else ours
                 let copy = s.get(&format!("Menu_Start Button Level{n}"), "");
-                if copy.is_empty() { s.numbered("level", n) } else { copy }
+                if copy.is_empty() {
+                    s.numbered("level", n)
+                } else {
+                    copy
+                }
             }
             // the level's title (cleaned and capped, package.rs), any script
             Line::Map(i) => self.map_text(i).unwrap_or_default(),
@@ -1084,17 +1153,28 @@ impl Menu {
             Line::Effects => s.ours("sound volume"),
             Line::Mode => s.ours("extended mode"),
             Line::ModsMenu => s.ours("mods"),
-            Line::Mod(i) => self.mods.found.get(i).map_or_else(String::new, |m| m.name(s.language())),
+            Line::Mod(i) => self
+                .mods
+                .found
+                .get(i)
+                .map_or_else(String::new, |m| m.name(s.language())),
             Line::ModOn => s.ours("mod on"),
             Line::ModOpt(o) => {
-                let key = self.page_options().get(o).map(|o| o.key.clone()).unwrap_or_default();
-                self.page_txt().map_or(key.clone(), |t| t.label(&key, s.language()))
+                let key = self
+                    .page_options()
+                    .get(o)
+                    .map(|o| o.key.clone())
+                    .unwrap_or_default();
+                self.page_txt()
+                    .map_or(key.clone(), |t| t.label(&key, s.language()))
             }
             Line::Interface => s.ours("interface"),
             Line::Textures => s.ours("textures"),
             Line::Models => s.ours("models"),
             Line::SoundTheme => s.ours("sounds"),
-            Line::Switch(i) => FEATURES.get(i).map_or_else(String::new, |f| s.ours(&format!("feature {}", f.key()))),
+            Line::Switch(i) => FEATURES
+                .get(i)
+                .map_or_else(String::new, |f| s.ours(&format!("feature {}", f.key()))),
             Line::Yes => s.get("Menu_Opt_Graphics Synch Yes", "Yes"),
             Line::No => s.get("Menu_Opt_Graphics Synch No", "No"),
             Line::Ok => s.get("Menu_YesNo YES", "OK"),
@@ -1115,7 +1195,9 @@ impl Menu {
     /// A custom level's title as it is (any script), in the menus' language when it has one in it, a cut one's "…"
     /// as "..." (the game's font has no "…").
     fn map_text(&self, i: usize) -> Option<String> {
-        self.maps.get(i).map(|p| p.title_in(self.strings.language()).replace('…', "..."))
+        self.maps
+            .get(i)
+            .map(|p| p.title_in(self.strings.language()).replace('…', "..."))
     }
 
     /// The community map `i`'s credit line: its author, version and year, as its level.txt gives them.
@@ -1137,7 +1219,9 @@ impl Menu {
     /// A switch's row: its label and yes or no.
     fn switch_field(&self, line: Line) -> (String, String) {
         let on = match line {
-            Line::Switch(i) => FEATURES.get(i).is_some_and(|&f| self.features.switched_on(f)),
+            Line::Switch(i) => FEATURES
+                .get(i)
+                .is_some_and(|&f| self.features.switched_on(f)),
             _ => false,
         };
         let s = &self.strings;
@@ -1165,7 +1249,9 @@ impl Menu {
             Screen::Custom if self.community => s.ours("community maps"),
             Screen::Custom if self.own_list => s.ours("own levels"),
             Screen::Custom => match self.folder.as_ref().and_then(|root| {
-                LEVEL_KINDS.iter().position(|&k| crate::levels::dir(k) == *root)
+                LEVEL_KINDS
+                    .iter()
+                    .position(|&k| crate::levels::dir(k) == *root)
             }) {
                 Some(k) => self.label(Line::Kind(k)),
                 None => s.ours("custom levels"),
@@ -1255,8 +1341,14 @@ impl Menu {
                 if self.features.mode {
                     f.extend(switches(self.features).map(|l| self.switch_field(l)));
                     f.push((self.label(Line::Interface), self.interface_value()));
-                    f.push((self.label(Line::Textures), self.pack_value(gamedata::packs::Kind::Textures)));
-                    f.push((self.label(Line::Models), self.pack_value(gamedata::packs::Kind::Models)));
+                    f.push((
+                        self.label(Line::Textures),
+                        self.pack_value(gamedata::packs::Kind::Textures),
+                    ));
+                    f.push((
+                        self.label(Line::Models),
+                        self.pack_value(gamedata::packs::Kind::Models),
+                    ));
                     f.push((self.label(Line::SoundTheme), theme_value()));
                     f.push((self.label(Line::ModsMenu), ">".to_owned()));
                 }
@@ -1279,15 +1371,25 @@ impl Menu {
             }
             Screen::ModPage => {
                 let i = self.mod_page;
-                let mut f = vec![(self.label(Line::ModOn), yes_no(self.mods.on.get(i).copied().unwrap_or(false)))];
+                let mut f = vec![(
+                    self.label(Line::ModOn),
+                    yes_no(self.mods.on.get(i).copied().unwrap_or(false)),
+                )];
                 for (k, o) in self.page_options().iter().enumerate() {
-                    let v = self.mods.opts.get(i).and_then(|v| v.get(k)).copied().unwrap_or(o.default);
+                    let v = self
+                        .mods
+                        .opts
+                        .get(i)
+                        .and_then(|v| v.get(k))
+                        .copied()
+                        .unwrap_or(o.default);
                     let shown = match o.kind {
                         gamedata::mods::OptKind::Switch => yes_no(v != 0.0),
                         // a key by its name in the menus' words, else winit's, short
                         gamedata::mods::OptKind::Key(_) => {
                             let name = o.show(v);
-                            s.key(None, &name).unwrap_or_else(|| crate::modrt::key_text(&name))
+                            s.key(None, &name)
+                                .unwrap_or_else(|| crate::modrt::key_text(&name))
                         }
                         _ => o.show(v),
                     };
@@ -1375,13 +1477,13 @@ impl Menu {
         }
         let total = 6.0 + fields.len() as f32 + 1.2 * shown.len() as f32;
         let mut y = ((h - total * line) / 2.0).max(0.0);
-        let title = self.title(screen).map_or_else(|| "DRAHTSEILAKT".to_owned(), |t| t.trim().to_uppercase());
+        let title = self
+            .title(screen)
+            .map_or_else(|| "DRAHTSEILAKT".to_owned(), |t| t.trim().to_uppercase());
         centre(&mut out, &title, y, s * 1.5, GOLD);
         y += 2.5 * line;
         for (l, v) in &fields {
-            let t = format!("{}  {}", l.trim(), v)
-                .trim()
-                .to_uppercase();
+            let t = format!("{}  {}", l.trim(), v).trim().to_uppercase();
             centre(&mut out, &t, y, s, WHITE);
             y += line;
         }
@@ -1408,7 +1510,10 @@ impl Menu {
                 h: line,
                 color: SELECT,
             };
-            hits.push(Hit { rect: [band.x, band.y, band.x + band.w, band.y + band.h], target: Target::Line(i) });
+            hits.push(Hit {
+                rect: [band.x, band.y, band.x + band.w, band.y + band.h],
+                target: Target::Line(i),
+            });
             if i == self.chosen() {
                 out.push(band);
             }
@@ -1442,12 +1547,15 @@ impl Menu {
     }
 }
 
-
 /// The original's menu screens (Menu.nmo's 2D frames, measured in the C game): a dark band down the middle, the
 /// buttons over Button01_select (chosen), Button01_deselect or Button01_special (not playable), their labels in the
 /// game's fonts (GameFont_01 for the main buttons, GameFont_03 and the grey GameFont_03a for the small ones).
 impl Menu {
-    pub fn interface(&self, font: Option<&crate::ui::Face>, screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
+    pub fn interface(
+        &self,
+        font: Option<&crate::ui::Face>,
+        screen: crate::ui::Screen,
+    ) -> Vec<crate::ui::Quad> {
         self.draw(font, screen, &std::cell::RefCell::new(Vec::new()), None)
     }
 
@@ -1480,53 +1588,63 @@ impl Menu {
         // a label on a button with its ball at the left end (`ball`: the ball's width): centred on the whole
         // button while it clears the ball, else centred on what lies right of the ball (the owner's report,
         // 2026-11-08: long Russian labels ran over the ball)
-        let label_ball = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style, ball: f32| {
-            let Some(f) = font else { return };
-            let fit = |r: [f32; 4]| {
-                let frame = homogeneous(r);
-                let (quads, k) = fit_label(f, t, frame, style);
-                (frame, crate::ui::place(quads, screen, Anchor::Center), k)
-            };
-            let left = |q: &[Quad]| q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min);
-            let clear = (ball > 0.0).then(|| screen.rect(homogeneous([r[0] + ball, r[1], r[2], r[3]]), Anchor::Center)[0]);
-            let (mut frame, mut placed, mut k) = fit(r);
-            if let Some(c) = clear {
-                if !placed.is_empty() && left(&placed) < c {
-                    (frame, placed, k) = fit([r[0] + ball, r[1], r[2], r[3]]);
-                }
-            }
-            if let Some(p) = probe {
-                p.borrow_mut().push(Probe {
-                    text: t.to_owned(),
-                    frame: screen.rect(frame, Anchor::Center),
-                    quads: placed.iter().map(|q| q.rect).collect(),
-                    scale: k,
-                    wrap: style.flags & crate::ui::TEXT_WORDWRAP != 0,
-                    line: screen.y(line_height(style) * k) - screen.y(0.0),
-                    clear_left: clear,
+        let label_ball =
+            |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style, ball: f32| {
+                let Some(f) = font else { return };
+                let fit = |r: [f32; 4]| {
+                    let frame = homogeneous(r);
+                    let (quads, k) = fit_label(f, t, frame, style);
+                    (frame, crate::ui::place(quads, screen, Anchor::Center), k)
+                };
+                let left = |q: &[Quad]| q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min);
+                let clear = (ball > 0.0).then(|| {
+                    screen.rect(homogeneous([r[0] + ball, r[1], r[2], r[3]]), Anchor::Center)[0]
                 });
-            }
-            out.extend(placed);
-        };
+                let (mut frame, mut placed, mut k) = fit(r);
+                if let Some(c) = clear {
+                    if !placed.is_empty() && left(&placed) < c {
+                        (frame, placed, k) = fit([r[0] + ball, r[1], r[2], r[3]]);
+                    }
+                }
+                if let Some(p) = probe {
+                    p.borrow_mut().push(Probe {
+                        text: t.to_owned(),
+                        frame: screen.rect(frame, Anchor::Center),
+                        quads: placed.iter().map(|q| q.rect).collect(),
+                        scale: k,
+                        wrap: style.flags & crate::ui::TEXT_WORDWRAP != 0,
+                        line: screen.y(line_height(style) * k) - screen.y(0.0),
+                        clear_left: clear,
+                    });
+                }
+                out.extend(placed);
+            };
         let label = |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style| {
             label_ball(out, t, r, style, 0.0)
         };
-        let button = |out: &mut Vec<Quad>, r: [f32; 4], uv: [f32; 4], state: Button, at: Option<Target>| {
-            if let Some(target) = at {
-                hits.borrow_mut().push(Hit { rect: screen.rect(homogeneous(r), Anchor::Center), target });
-            }
-            let tex = match state {
-                Button::Over => SELECT_TEX,
-                Button::Up => DESELECT_TEX,
-                Button::Inactive => SPECIAL,
+        let button =
+            |out: &mut Vec<Quad>, r: [f32; 4], uv: [f32; 4], state: Button, at: Option<Target>| {
+                if let Some(target) = at {
+                    hits.borrow_mut().push(Hit {
+                        rect: screen.rect(homogeneous(r), Anchor::Center),
+                        target,
+                    });
+                }
+                let tex = match state {
+                    Button::Over => SELECT_TEX,
+                    Button::Up => DESELECT_TEX,
+                    Button::Inactive => SPECIAL,
+                };
+                out.push(quad(r, uv, tex));
             };
-            out.push(quad(r, uv, tex));
-        };
         // a row of our own screens: the key row's bar without the mark in its middle (that mark parts a key's name
         // from the key on the Controls page; under a label it reads as stripes), stitched from the bar's two ends
         let row = |out: &mut Vec<Quad>, r: [f32; 4], state: Button, at: Option<Target>| {
             if let Some(target) = at {
-                hits.borrow_mut().push(Hit { rect: screen.rect(homogeneous(r), Anchor::Center), target });
+                hits.borrow_mut().push(Hit {
+                    rect: screen.rect(homogeneous(r), Anchor::Center),
+                    target,
+                });
             }
             let tex = match state {
                 Button::Over => SELECT_TEX,
@@ -1540,15 +1658,27 @@ impl Menu {
         };
         // a scrolling list's indicator: a slim bar beside the rows, its thumb as long as the part shown, and how many
         // rows are above and below ("▲ 3 more", "▼ 12 more"); the bar is a button (a click scrolls there)
-        let scroll = |out: &mut Vec<Quad>, x: f32, top: f32, bottom: f32, shown: std::ops::Range<usize>, total: usize| {
+        let scroll = |out: &mut Vec<Quad>,
+                      x: f32,
+                      top: f32,
+                      bottom: f32,
+                      shown: std::ops::Range<usize>,
+                      total: usize| {
             if total <= shown.len() || total == 0 {
                 return;
             }
             let plain = |out: &mut Vec<Quad>, r: [f32; 4], a: f32| {
-                out.push(Quad { top: [1.0, 1.0, 1.0, a], bottom: [1.0, 1.0, 1.0, a], ..quad(r, [0.0, 0.0, 1.0, 1.0], PLAIN) });
+                out.push(Quad {
+                    top: [1.0, 1.0, 1.0, a],
+                    bottom: [1.0, 1.0, 1.0, a],
+                    ..quad(r, [0.0, 0.0, 1.0, 1.0], PLAIN)
+                });
             };
             let track = [x, top, x + SCROLL_W, bottom];
-            hits.borrow_mut().push(Hit { rect: screen.rect(homogeneous(track), Anchor::Center), target: Target::Bar });
+            hits.borrow_mut().push(Hit {
+                rect: screen.rect(homogeneous(track), Anchor::Center),
+                target: Target::Bar,
+            });
             plain(out, track, 0.18);
             let h = bottom - top;
             let t0 = top + h * shown.start as f32 / total as f32;
@@ -1558,10 +1688,20 @@ impl Menu {
             let mut st = FONT_HINT;
             st.align = crate::ui::ALIGN_RIGHT;
             if shown.start > 0 {
-                label(out, &format!("▲ {}", more(shown.start)), [x - 0.3, top - HINT_H, x + SCROLL_W, top], &st);
+                label(
+                    out,
+                    &format!("▲ {}", more(shown.start)),
+                    [x - 0.3, top - HINT_H, x + SCROLL_W, top],
+                    &st,
+                );
             }
             if shown.end < total {
-                label(out, &format!("▼ {}", more(total - shown.end)), [x - 0.3, bottom, x + SCROLL_W, bottom + HINT_H], &st);
+                label(
+                    out,
+                    &format!("▼ {}", more(total - shown.end)),
+                    [x - 0.3, bottom, x + SCROLL_W, bottom + HINT_H],
+                    &st,
+                );
             }
         };
         let sc = self.screen();
@@ -1614,12 +1754,27 @@ impl Menu {
         // a field: its label at the top, its value under it (a yes/no pair, or text between arrows)
         let field = |out: &mut Vec<Quad>, y: f32, name: &str, value: &str, i: usize| {
             let r = [0.35, y, 0.65, y + 0.1];
-            let st = if self.chosen() == i { Button::Over } else { Button::Up };
+            let st = if self.chosen() == i {
+                Button::Over
+            } else {
+                Button::Up
+            };
             button(out, r, FIELD_UV, st, Some(Target::Line(i)));
             // both lines inside the field's frame, clear of its rim (the owner, 2026-11-08: the top line sat on
             // the rim)
-            label_ball(out, name, [0.35, y + FIELD_NAME[0], 0.65 - FIELD_RIM, y + FIELD_NAME[1]], &FONT_03, BALL_MAIN);
-            label(out, value, [0.40, y + FIELD_VALUE[0], 0.60, y + FIELD_VALUE[1]], &FONT_03);
+            label_ball(
+                out,
+                name,
+                [0.35, y + FIELD_NAME[0], 0.65 - FIELD_RIM, y + FIELD_NAME[1]],
+                &FONT_03,
+                BALL_MAIN,
+            );
+            label(
+                out,
+                value,
+                [0.40, y + FIELD_VALUE[0], 0.60, y + FIELD_VALUE[1]],
+                &FONT_03,
+            );
         };
         match sc {
             Screen::Main | Screen::Pause | Screen::Dead | Screen::End => big(&mut out, 0.15),
@@ -1632,16 +1787,29 @@ impl Menu {
                 // the languages in their own names, the one spoken in gold
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Lang(k) = l else {
-                        button(&mut out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
+                        button(
+                            &mut out,
+                            BACK_RECT,
+                            BACK_UV,
+                            state(i),
+                            Some(Target::Line(i)),
+                        );
                         label_ball(&mut out, &self.label(l), BACK_RECT, &FONT_01, BALL_BACK);
                         continue;
                     };
                     let y = 0.28 + k as f32 * 0.065;
                     let r = [0.4031, y, 0.5969, y + 0.052];
                     button(&mut out, r, LEVEL_UV, state(i), Some(Target::Line(i)));
-                    let spoken = LANGUAGES.get(k).is_some_and(|c| c.0 == self.strings.language());
+                    let spoken = LANGUAGES
+                        .get(k)
+                        .is_some_and(|c| c.0 == self.strings.language());
                     let style = if spoken { FONT_03_GOLD } else { FONT_03 };
-                    label(&mut out, &self.label(l), [0.42, y, 0.5969, y + 0.052], &style);
+                    label(
+                        &mut out,
+                        &self.label(l),
+                        [0.42, y, 0.5969, y + 0.052],
+                        &style,
+                    );
                 }
             }
             Screen::Start => {
@@ -1650,7 +1818,13 @@ impl Menu {
                 let step = if n <= 12 { 0.06 } else { 0.72 / n as f32 };
                 for (i, &l) in lines.iter().enumerate() {
                     let Line::Level(k) = l else {
-                        button(&mut out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
+                        button(
+                            &mut out,
+                            BACK_RECT,
+                            BACK_UV,
+                            state(i),
+                            Some(Target::Line(i)),
+                        );
                         label_ball(&mut out, &self.label(l), BACK_RECT, &FONT_01, BALL_BACK);
                         continue;
                     };
@@ -1666,12 +1840,7 @@ impl Menu {
                     if let Some(t) = self.entries.get(k).and_then(|e| e.best) {
                         let mut st = FONT_03A;
                         st.align = crate::ui::ALIGN_LEFT;
-                        label(
-                            &mut out,
-                            &clock(t),
-                            [0.6, y, 0.7, y + step - 0.01],
-                            &st,
-                        );
+                        label(&mut out, &clock(t), [0.6, y, 0.7, y + step - 0.01], &st);
                     }
                 }
             }
@@ -1686,14 +1855,28 @@ impl Menu {
                     row(&mut out, r, state(i), Some(Target::Line(i)));
                     let x = LIST_X[0] + ROW_INDENT;
                     if let Line::Map(m) = lines[i] {
-                        let d = self.maps.get(m).and_then(|p| p.difficulty).map_or_else(|| "?".to_owned(), |d| d.to_string());
+                        let d = self
+                            .maps
+                            .get(m)
+                            .and_then(|p| p.difficulty)
+                            .map_or_else(|| "?".to_owned(), |d| d.to_string());
                         let mut st = FONT_HINT;
                         st.align = crate::ui::ALIGN_LEFT;
-                        label(&mut out, &format!("★{d}"), [x, y, x + 0.045, y + ROW_H], &st);
+                        label(
+                            &mut out,
+                            &format!("★{d}"),
+                            [x, y, x + 0.045, y + ROW_H],
+                            &st,
+                        );
                     }
                     let mut st = FONT_ROW;
                     st.align = crate::ui::ALIGN_LEFT;
-                    label(&mut out, &self.label(lines[i]), [x + 0.045, y, LIST_X[1] - 0.012, y + ROW_H], &st);
+                    label(
+                        &mut out,
+                        &self.label(lines[i]),
+                        [x + 0.045, y, LIST_X[1] - 0.012, y + ROW_H],
+                        &st,
+                    );
                 }
                 let bottom = LIST_TOP + shown.len().saturating_sub(1) as f32 * ROW_STEP + ROW_H;
                 scroll(&mut out, LIST_X[1] + 0.006, LIST_TOP, bottom, shown, n);
@@ -1764,19 +1947,45 @@ impl Menu {
                 let rows = lines.len().saturating_sub(1);
                 let shown = self.shown(rows);
                 for (k, i) in shown.clone().enumerate() {
-                    let Some((name, value)) = fields.get(i) else { continue };
+                    let Some((name, value)) = fields.get(i) else {
+                        continue;
+                    };
                     let y = MODS_TOP + k as f32 * ROW_STEP;
-                    let st = if self.chosen() == i { Button::Over } else { Button::Up };
-                    row(&mut out, [ROWS_X[0], y, ROWS_X[1], y + ROW_H], st, Some(Target::Line(i)));
+                    let st = if self.chosen() == i {
+                        Button::Over
+                    } else {
+                        Button::Up
+                    };
+                    row(
+                        &mut out,
+                        [ROWS_X[0], y, ROWS_X[1], y + ROW_H],
+                        st,
+                        Some(Target::Line(i)),
+                    );
                     let split = ROWS_X[0] + (ROWS_X[1] - ROWS_X[0]) * 0.66;
                     let mut left = FONT_ROW;
                     left.align = crate::ui::ALIGN_LEFT;
-                    label(&mut out, name, [ROWS_X[0] + ROW_INDENT, y, split, y + ROW_H], &left);
-                    label(&mut out, value, [split, y, ROWS_X[1] - 0.01, y + ROW_H], &FONT_ROW);
+                    label(
+                        &mut out,
+                        name,
+                        [ROWS_X[0] + ROW_INDENT, y, split, y + ROW_H],
+                        &left,
+                    );
+                    label(
+                        &mut out,
+                        value,
+                        [split, y, ROWS_X[1] - 0.01, y + ROW_H],
+                        &FONT_ROW,
+                    );
                 }
                 let bottom = MODS_TOP + shown.len().saturating_sub(1) as f32 * ROW_STEP + ROW_H;
                 scroll(&mut out, ROWS_X[1] + 0.006, MODS_TOP, bottom, shown, rows);
-                let help: Vec<&str> = fields.iter().skip(rows).map(|(l, _)| l.as_str()).filter(|l| !l.is_empty()).collect();
+                let help: Vec<&str> = fields
+                    .iter()
+                    .skip(rows)
+                    .map(|(l, _)| l.as_str())
+                    .filter(|l| !l.is_empty())
+                    .collect();
                 if !help.is_empty() {
                     let mut st = FONT_HELP;
                     st.flags |= crate::ui::TEXT_WORDWRAP;
@@ -1793,7 +2002,13 @@ impl Menu {
                         let chosen = self.chosen() == k;
                         let st = if chosen { Button::Over } else { Button::Up };
                         if *line == Line::Invert {
-                            field(&mut out, if self.features.mode { 0.715 } else { 0.70 }, name, key, k);
+                            field(
+                                &mut out,
+                                if self.features.mode { 0.715 } else { 0.70 },
+                                name,
+                                key,
+                                k,
+                            );
                             continue;
                         }
                         let y = 0.30 + k as f32 * 0.06;
@@ -1802,11 +2017,21 @@ impl Menu {
                         let r = [0.32, y, 0.68, y + 0.0396];
                         if *line == Line::Defaults {
                             row(&mut out, r, st, Some(Target::Line(k)));
-                            label(&mut out, name, [0.32 + ROW_INDENT, y, 0.67, y + 0.0396], &FONT_ROW);
+                            label(
+                                &mut out,
+                                name,
+                                [0.32 + ROW_INDENT, y, 0.67, y + 0.0396],
+                                &FONT_ROW,
+                            );
                             continue;
                         }
                         button(&mut out, r, KEY_UV, st, Some(Target::Line(k)));
-                        label(&mut out, name, [0.32 + ROW_INDENT, y, 0.494, y + 0.0396], &FONT_ROW);
+                        label(
+                            &mut out,
+                            name,
+                            [0.32 + ROW_INDENT, y, 0.494, y + 0.0396],
+                            &FONT_ROW,
+                        );
                         label(&mut out, key, [0.508, y, 0.67, y + 0.0396], &FONT_ROW);
                     }
                 } else if sc == Screen::Extended && self.features.mode {
@@ -1840,7 +2065,12 @@ impl Menu {
                         row(&mut out, [0.33, y, 0.67, y + 0.0396], st, at);
                         let mut left = FONT_ROW;
                         left.align = crate::ui::ALIGN_LEFT;
-                        label(&mut out, name, [0.33 + ROW_INDENT, y, 0.555, y + 0.0396], &left);
+                        label(
+                            &mut out,
+                            name,
+                            [0.33 + ROW_INDENT, y, 0.555, y + 0.0396],
+                            &left,
+                        );
                         label(&mut out, value, [0.555, y, 0.66, y + 0.0396], &FONT_ROW);
                     }
                     for (k, (l, _)) in fields.iter().skip(first + n).enumerate() {
@@ -1849,7 +2079,11 @@ impl Menu {
                     }
                 } else {
                     // the original's fields 0.15 apart; the extended mode's fifth closes them up
-                    let (top, step) = if fields.len() > 4 { (0.25, 0.12) } else { (0.295, 0.15) };
+                    let (top, step) = if fields.len() > 4 {
+                        (0.25, 0.12)
+                    } else {
+                        (0.295, 0.15)
+                    };
                     for (k, (name, value)) in fields.iter().enumerate() {
                         let y = top + k as f32 * step;
                         field(&mut out, y, name, value, k);
@@ -1881,7 +2115,12 @@ impl Menu {
                 }
                 let fields = self.fields(sc);
                 if let Some((l, p)) = fields.first() {
-                    label(&mut out, &format!("{l}: {p}"), [0.38, 0.43133, 0.62, 0.50133], &FONT_01);
+                    label(
+                        &mut out,
+                        &format!("{l}: {p}"),
+                        [0.38, 0.43133, 0.62, 0.50133],
+                        &FONT_01,
+                    );
                 }
                 out.push(Quad {
                     top: [0.0, 0.0, 0.0, 0.43],
@@ -1967,7 +2206,11 @@ const PARA_SHRINK: f32 = 0.55;
 
 /// The height of a line of `style` in context pixels: the font's cell, a sixteenth of the size (ui.rs, fallback.rs).
 fn line_height(style: &crate::ui::Style) -> f32 {
-    let base = if style.flags & crate::ui::TEXT_SCREEN != 0 { crate::ui::CONTEXT_H } else { 512.0 };
+    let base = if style.flags & crate::ui::TEXT_SCREEN != 0 {
+        crate::ui::CONTEXT_H
+    } else {
+        512.0
+    };
     style.scale[1] * base / 16.0
 }
 
@@ -1991,7 +2234,8 @@ fn fit_label(
         return (Vec::new(), 1.0);
     }
     let wide = |q: &[Quad]| {
-        q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max) - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
+        q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max)
+            - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
     };
     let scaled = |k: f32| {
         let mut st = *style;
@@ -2014,7 +2258,11 @@ fn fit_label(
     let one = f.layout(t, frame, style);
     let w = wide(&one);
     let fits_h = (avail_h / line).min(1.0);
-    let k1 = if w > 0.0 { (avail_w / w).min(fits_h) } else { fits_h };
+    let k1 = if w > 0.0 {
+        (avail_w / w).min(fits_h)
+    } else {
+        fits_h
+    };
     if k1 >= 1.0 {
         return (one, 1.0);
     }
@@ -2025,7 +2273,9 @@ fn fit_label(
     if let Some((a, b)) = two_lines(t) {
         let wa = wide(&f.layout(&a, frame, style));
         let wb = wide(&f.layout(&b, frame, style));
-        let k2 = (avail_w / wa.max(wb).max(1e-3)).min(avail_h / (2.0 * line)).min(1.0);
+        let k2 = (avail_w / wa.max(wb).max(1e-3))
+            .min(avail_h / (2.0 * line))
+            .min(1.0);
         if k2 >= FIT_SHRINK && k2 > k1 {
             return (f.layout(&format!("{a}\n{b}"), frame, &scaled(k2)), k2);
         }
@@ -2054,10 +2304,14 @@ fn two_lines(t: &str) -> Option<(String, String)> {
         .map(|(i, _)| i)
         .min_by_key(|&i| i.abs_diff(mid));
     let (a, b): (String, String) = match at {
-        Some(at) => (chars.iter().take(at).collect(), chars.iter().skip(at + 1).collect()),
-        None if chars.iter().any(|&c| u32::from(c) >= 0x2E80) && chars.len() > 1 => {
-            (chars.iter().take(mid).collect(), chars.iter().skip(mid).collect())
-        }
+        Some(at) => (
+            chars.iter().take(at).collect(),
+            chars.iter().skip(at + 1).collect(),
+        ),
+        None if chars.iter().any(|&c| u32::from(c) >= 0x2E80) && chars.len() > 1 => (
+            chars.iter().take(mid).collect(),
+            chars.iter().skip(mid).collect(),
+        ),
         None => return None,
     };
     let (a, b) = (a.trim().to_owned(), b.trim().to_owned());
@@ -2187,7 +2441,9 @@ fn finished(number: u32) -> bool {
         d.flatten().any(|e| {
             let n = e.file_name().to_string_lossy().into_owned();
             n == "best.replay"
-                || (n.starts_with(&prefix) && n.ends_with(".replay") && !n.ends_with("-modded.replay"))
+                || (n.starts_with(&prefix)
+                    && n.ends_with(".replay")
+                    && !n.ends_with("-modded.replay"))
         })
     })
 }
@@ -2207,7 +2463,11 @@ fn page(screen: Screen) -> usize {
 
 /// The switch lines of the extended mode's additions offered (a debug-only one in a debug run alone).
 fn switches(features: Features) -> impl Iterator<Item = Line> {
-    FEATURES.iter().enumerate().filter(move |(_, f)| features.offered(**f)).map(|(i, _)| Line::Switch(i))
+    FEATURES
+        .iter()
+        .enumerate()
+        .filter(move |(_, f)| features.offered(**f))
+        .map(|(i, _)| Line::Switch(i))
 }
 
 /// The interface's provider after the chosen one, `by` steps on (the arrows go round the three).
@@ -2216,7 +2476,9 @@ fn next_provider(by: i32) -> gamedata::resources::Provider {
     let all = Provider::ALL;
     let at = all.iter().position(|&p| p == chosen()).unwrap_or(1) as i32;
     let n = all.len() as i32;
-    all.get((at + by).rem_euclid(n) as usize).copied().unwrap_or(Provider::Original)
+    all.get((at + by).rem_euclid(n) as usize)
+        .copied()
+        .unwrap_or(Provider::Original)
 }
 
 /// The pack of a kind `by` steps after the chosen one (the arrows go round the packs found).
@@ -2230,7 +2492,9 @@ fn next_theme(by: i32) -> String {
     let all = choices();
     let at = all.iter().position(|k| *k == chosen()).unwrap_or(0) as i32;
     let n = all.len().max(1) as i32;
-    all.get((at + by).rem_euclid(n) as usize).cloned().unwrap_or_else(|| SYSTEM.to_owned())
+    all.get((at + by).rem_euclid(n) as usize)
+        .cloned()
+        .unwrap_or_else(|| SYSTEM.to_owned())
 }
 
 /// The Sounds line's value: the chosen theme's key (its folder's name).
@@ -2248,7 +2512,10 @@ impl Menu {
             ORIGINAL => self.strings.ours("interface original"),
             REMASTERED => self.strings.ours("interface remaster"),
             LEVEL => self.strings.ours("models level"),
-            _ => packs(kind).iter().find(|p| p.key == key).map_or(key.clone(), |p| p.name(self.strings.language())),
+            _ => packs(kind)
+                .iter()
+                .find(|p| p.key == key)
+                .map_or(key.clone(), |p| p.name(self.strings.language())),
         }
     }
 
@@ -2269,7 +2536,12 @@ impl Menu {
 }
 
 /// The kinds of levels the extended mode offers, in the menu's order (levels.md).
-const LEVEL_KINDS: [Kind; 4] = [Kind::Original, Kind::Remastered, Kind::Community, Kind::Open];
+const LEVEL_KINDS: [Kind; 4] = [
+    Kind::Original,
+    Kind::Remastered,
+    Kind::Community,
+    Kind::Open,
+];
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
 /// it; folders that hold no level or several are not shown, and said so on the console.
@@ -2284,7 +2556,10 @@ fn maps_in(dir: &Path) -> Vec<Package> {
     let (levels, skipped) = gamedata::package::scan(dir);
     if !skipped.is_empty() {
         let shown = gamedata::package::printable(&dir.to_string_lossy());
-        eprintln!("{shown}: {} folders are not levels (a level folder holds one level):", skipped.len());
+        eprintln!(
+            "{shown}: {} folders are not levels (a level folder holds one level):",
+            skipped.len()
+        );
         for s in skipped.iter().take(10) {
             eprintln!("  {s}");
         }
@@ -2372,17 +2647,32 @@ mod tests {
         let mut m = menu(&[true], true);
         let text = "name.en Fov\noption strength number 10 100 10 50\nlabel strength en Strength\non frame\ndo camera.fov opt.strength\n";
         let found = vec![
-            gamedata::mods::Mod { key: "fov".into(), factory: true, parsed: gamedata::mods::parse_mod_txt(text) },
-            gamedata::mods::Mod { key: "bad".into(), factory: false, parsed: Err("no mod.txt".into()) },
+            gamedata::mods::Mod {
+                key: "fov".into(),
+                factory: true,
+                parsed: gamedata::mods::parse_mod_txt(text),
+            },
+            gamedata::mods::Mod {
+                key: "bad".into(),
+                factory: false,
+                parsed: Err("no mod.txt".into()),
+            },
         ];
         m.mods = crate::modrt::Mods::load(found, |_| None);
         m.push(Screen::Extended);
-        let at = m.lines(Screen::Extended).iter().position(|&l| l == Line::ModsMenu).unwrap();
+        let at = m
+            .lines(Screen::Extended)
+            .iter()
+            .position(|&l| l == Line::ModsMenu)
+            .unwrap();
         m.set_chosen(at);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Mods);
         let lines = m.lines(Screen::Mods);
-        assert!(!lines.iter().any(|l| matches!(l, Line::Switch(_))), "the practice is god-mode's now, a mod");
+        assert!(
+            !lines.iter().any(|l| matches!(l, Line::Switch(_))),
+            "the practice is god-mode's now, a mod"
+        );
         let fov = lines.iter().position(|&l| l == Line::Mod(0)).unwrap();
         m.set_chosen(fov);
         assert_eq!(m.adjust(1), Action::ModSwitch(0));
@@ -2399,14 +2689,28 @@ mod tests {
     }
 
     /// Window sizes of every shape: the original's, wide, ultra-wide, portrait, tiny.
-    const WINDOWS: [(f32, f32); 5] =
-        [(640.0, 480.0), (1920.0, 1080.0), (3440.0, 1080.0), (1080.0, 1920.0), (320.0, 200.0)];
+    const WINDOWS: [(f32, f32); 5] = [
+        (640.0, 480.0),
+        (1920.0, 1080.0),
+        (3440.0, 1080.0),
+        (1080.0, 1920.0),
+        (320.0, 200.0),
+    ];
 
     fn at(m: &Menu, interface: bool, w: f32, h: f32, target: Target, fx: f32) -> Pointer {
         let screen = crate::ui::Screen { w, h };
-        let hit = m.hits(interface, screen).into_iter().find(|h| h.target == target).unwrap();
+        let hit = m
+            .hits(interface, screen)
+            .into_iter()
+            .find(|h| h.target == target)
+            .unwrap();
         let r = hit.rect;
-        Pointer { interface, screen, x: r[0] + (r[2] - r[0]) * fx, y: (r[1] + r[3]) / 2.0 }
+        Pointer {
+            interface,
+            screen,
+            x: r[0] + (r[2] - r[0]) * fx,
+            y: (r[1] + r[3]) / 2.0,
+        }
     }
 
     fn line_of(m: &Menu, l: Line) -> Target {
@@ -2424,7 +2728,12 @@ mod tests {
             let quads = m.interface(None, screen);
             for hit in &hits {
                 assert!(quads.iter().any(|q| q.rect == hit.rect), "{w}x{h}: {hit:?}");
-                assert!(hit.rect[0] >= 0.0 && hit.rect[2] <= w && hit.rect[1] >= 0.0 && hit.rect[3] <= h);
+                assert!(
+                    hit.rect[0] >= 0.0
+                        && hit.rect[2] <= w
+                        && hit.rect[1] >= 0.0
+                        && hit.rect[3] <= h
+                );
             }
             // a click on Options opens it, wherever the window puts it
             let mut m = menu(&[true, true], true);
@@ -2453,7 +2762,11 @@ mod tests {
         assert_eq!(m.click(level2), None);
         assert_eq!(m.click(level3), Some(Action::Play(3)));
         // between the buttons nothing is hit
-        let gap = Pointer { x: 5.0, y: 5.0, ..level3 };
+        let gap = Pointer {
+            x: 5.0,
+            y: 5.0,
+            ..level3
+        };
         assert!(!m.hover(gap));
         assert_eq!(m.click(gap), None);
     }
@@ -2465,8 +2778,14 @@ mod tests {
         m.push(Screen::Sound);
         m.volumes = [0.5, 0.5];
         let music = line_of(&m, Line::Music);
-        assert_eq!(m.click(at(&m, true, 1600.0, 900.0, music, 0.2)), Some(Action::Volumes([0.5, 0.4])));
-        assert_eq!(m.click(at(&m, true, 1600.0, 900.0, music, 0.8)), Some(Action::Volumes([0.5, 0.5])));
+        assert_eq!(
+            m.click(at(&m, true, 1600.0, 900.0, music, 0.2)),
+            Some(Action::Volumes([0.5, 0.4]))
+        );
+        assert_eq!(
+            m.click(at(&m, true, 1600.0, 900.0, music, 0.8)),
+            Some(Action::Volumes([0.5, 0.5]))
+        );
         m.back();
         m.push(Screen::Graphics);
         let fov = m.graphics.fov;
@@ -2480,7 +2799,10 @@ mod tests {
         assert_eq!(graphics(m.click(p).unwrap()).unwrap().vsync, !synch);
         // the resolution goes through the sizes
         let p = at(&m, true, 1600.0, 900.0, line_of(&m, Line::Resolution), 0.9);
-        assert_eq!(graphics(m.click(p).unwrap()).unwrap().resolution, Some((800, 600)));
+        assert_eq!(
+            graphics(m.click(p).unwrap()).unwrap().resolution,
+            Some((800, 600))
+        );
         // Back is a button like any other
         let p = at(&m, true, 1600.0, 900.0, line_of(&m, Line::Back), 0.5);
         m.click(p);
@@ -2554,7 +2876,13 @@ mod tests {
         let (w, h) = (2560.0, 1440.0);
         let rows = |m: &Menu| -> Vec<usize> {
             let screen = crate::ui::Screen { w, h };
-            let line = |h: &Hit| if let Target::Line(i) = h.target { Some(i) } else { None };
+            let line = |h: &Hit| {
+                if let Target::Line(i) = h.target {
+                    Some(i)
+                } else {
+                    None
+                }
+            };
             m.hits(true, screen).iter().filter_map(line).collect()
         };
         // a page of maps and Back
@@ -2583,7 +2911,10 @@ mod tests {
         // the arrows still move the view only as far as the chosen line needs
         m.step(1);
         assert_eq!((m.chosen(), rows(&m)[0]), (end + 1, end - 1));
-        assert_eq!(m.click(at(&m, true, w, h, Target::Line(20), 0.5)), Some(Action::Map(PathBuf::from("20.nmo"))));
+        assert_eq!(
+            m.click(at(&m, true, w, h, Target::Line(20), 0.5)),
+            Some(Action::Map(PathBuf::from("20.nmo")))
+        );
     }
 
     /// Every screen in every language at windows of several shapes: each label's glyphs inside its frame, a label on
@@ -2599,8 +2930,12 @@ mod tests {
         let long = |i: usize| Package {
             level: PathBuf::from(format!("{i}.nmo")),
             folder: PathBuf::from(format!("{i}.nmo")),
-            title: ["W".repeat(40), "超长的社区地图名称超长的社区地图名称超长的社区地图名称超长的社区地".to_owned(),
-                "Der längste Titel einer Karte überhaupt!".to_owned()][i % 3].clone(),
+            title: [
+                "W".repeat(40),
+                "超长的社区地图名称超长的社区地图名称超长的社区地图名称超长的社区地".to_owned(),
+                "Der längste Titel einer Karte überhaupt!".to_owned(),
+            ][i % 3]
+                .clone(),
             author: None,
             version: None,
             posted: None,
@@ -2611,14 +2946,32 @@ mod tests {
             titled: true,
         };
         let mods = gamedata::mods::scan(true);
-        assert!(mods.iter().any(|m| m.key == "god-mode" && m.parsed.is_ok()), "god-mode is read in a debug run");
+        assert!(
+            mods.iter().any(|m| m.key == "god-mode" && m.parsed.is_ok()),
+            "god-mode is read in a debug run"
+        );
         let screens = |m: &Menu| -> Vec<(Screen, usize)> {
             let mut v = Vec::new();
             for sc in [
-                Screen::Main, Screen::Kinds, Screen::Start, Screen::Custom, Screen::Highscore, Screen::Options,
-                Screen::Graphics, Screen::Controls, Screen::Sound, Screen::Extended, Screen::Language,
-                Screen::Credits, Screen::Pause, Screen::Dead, Screen::End, Screen::Ask(Ask::Quit),
-                Screen::Ask(Ask::Restart), Screen::Ask(Ask::Exit), Screen::Entry,
+                Screen::Main,
+                Screen::Kinds,
+                Screen::Start,
+                Screen::Custom,
+                Screen::Highscore,
+                Screen::Options,
+                Screen::Graphics,
+                Screen::Controls,
+                Screen::Sound,
+                Screen::Extended,
+                Screen::Language,
+                Screen::Credits,
+                Screen::Pause,
+                Screen::Dead,
+                Screen::End,
+                Screen::Ask(Ask::Quit),
+                Screen::Ask(Ask::Restart),
+                Screen::Ask(Ask::Exit),
+                Screen::Entry,
             ] {
                 v.push((sc, 0));
             }
@@ -2644,9 +2997,18 @@ mod tests {
                 if sc == Screen::ModPage {
                     m.mod_page = i;
                 }
-                m.stack = vec![(Screen::Main, 0), (sc, if sc == Screen::ModPage { 0 } else { i })];
+                m.stack = vec![
+                    (Screen::Main, 0),
+                    (sc, if sc == Screen::ModPage { 0 } else { i }),
+                ];
                 m.top = 0;
-                for (w, h) in [(640.0, 480.0), (1280.0, 720.0), (1920.0, 1080.0), (3440.0, 1440.0), (1080.0, 1920.0)] {
+                for (w, h) in [
+                    (640.0, 480.0),
+                    (1280.0, 720.0),
+                    (1920.0, 1080.0),
+                    (3440.0, 1440.0),
+                    (1080.0, 1920.0),
+                ] {
                     let screen = crate::ui::Screen { w, h };
                     let hits = std::cell::RefCell::new(Vec::new());
                     let probe = std::cell::RefCell::new(Vec::new());
@@ -2656,31 +3018,60 @@ mod tests {
                         if p.quads.is_empty() {
                             continue;
                         }
-                        let b = p.quads.iter().fold([f32::MAX, f32::MAX, f32::MIN, f32::MIN], |a, q| {
-                            [a[0].min(q[0]), a[1].min(q[1]), a[2].max(q[2]), a[3].max(q[3])]
-                        });
-                        let at = format!("{lang} {sc:?}/{i} {w}x{h} {:?} drawn {b:?} in {:?}", p.text, p.frame);
+                        let b = p.quads.iter().fold(
+                            [f32::MAX, f32::MAX, f32::MIN, f32::MIN],
+                            |a, q| {
+                                [
+                                    a[0].min(q[0]),
+                                    a[1].min(q[1]),
+                                    a[2].max(q[2]),
+                                    a[3].max(q[3]),
+                                ]
+                            },
+                        );
+                        let at = format!(
+                            "{lang} {sc:?}/{i} {w}x{h} {:?} drawn {b:?} in {:?}",
+                            p.text, p.frame
+                        );
                         let tol = 1.5;
                         assert!(
-                            b[0] >= p.frame[0] - tol && b[2] <= p.frame[2] + tol && b[1] >= p.frame[1] - tol
+                            b[0] >= p.frame[0] - tol
+                                && b[2] <= p.frame[2] + tol
+                                && b[1] >= p.frame[1] - tol
                                 && b[3] <= p.frame[3] + tol,
                             "a label out of its frame: {at}"
                         );
-                        let centre = [(p.frame[0] + p.frame[2]) / 2.0, (p.frame[1] + p.frame[3]) / 2.0];
+                        let centre = [
+                            (p.frame[0] + p.frame[2]) / 2.0,
+                            (p.frame[1] + p.frame[3]) / 2.0,
+                        ];
                         if let Some(hit) = hits.iter().find(|h| {
-                            centre[0] >= h.rect[0] && centre[0] <= h.rect[2] && centre[1] >= h.rect[1] && centre[1] <= h.rect[3]
+                            centre[0] >= h.rect[0]
+                                && centre[0] <= h.rect[2]
+                                && centre[1] >= h.rect[1]
+                                && centre[1] <= h.rect[3]
                         }) {
                             let r = hit.rect;
                             assert!(
-                                b[0] >= r[0] - tol && b[2] <= r[2] + tol && b[1] >= r[1] - tol && b[3] <= r[3] + tol,
+                                b[0] >= r[0] - tol
+                                    && b[2] <= r[2] + tol
+                                    && b[1] >= r[1] - tol
+                                    && b[3] <= r[3] + tol,
                                 "a label off its button {r:?}: {at}"
                             );
                         }
                         if let Some(c) = p.clear_left {
-                            assert!(b[0] >= c - tol, "a label over its button's ball (ends at {c}): {at}");
+                            assert!(
+                                b[0] >= c - tol,
+                                "a label over its button's ball (ends at {c}): {at}"
+                            );
                         }
                         if !p.wrap {
-                            assert!(p.scale >= SHRINK - 1e-3, "a label drawn at {} of its size: {at}", p.scale);
+                            assert!(
+                                p.scale >= SHRINK - 1e-3,
+                                "a label drawn at {} of its size: {at}",
+                                p.scale
+                            );
                             if b[3] - b[1] > 1.4 * p.line {
                                 assert!(p.scale >= FIT_SHRINK - 1e-3, "two small lines: {at}");
                             }
@@ -2707,7 +3098,13 @@ mod tests {
         let m = menu(&[true], false);
         assert_eq!(
             m.lines(Screen::Graphics),
-            [Line::Resolution, Line::Synch, Line::Clouds, Line::Fullscreen, Line::Back]
+            [
+                Line::Resolution,
+                Line::Synch,
+                Line::Clouds,
+                Line::Fullscreen,
+                Line::Back
+            ]
         );
         let e = menu(&[true], true);
         assert!(e.lines(Screen::Graphics).contains(&Line::Fov));
@@ -2716,11 +3113,19 @@ mod tests {
     }
 
     fn graphics(a: Action) -> Option<Graphics> {
-        if let Action::Graphics(g) = a { Some(g) } else { None }
+        if let Action::Graphics(g) = a {
+            Some(g)
+        } else {
+            None
+        }
     }
 
     fn bindings(a: Action) -> Option<Bindings> {
-        if let Action::Bindings(b) = a { Some(b) } else { None }
+        if let Action::Bindings(b) = a {
+            Some(b)
+        } else {
+            None
+        }
     }
 
     #[test]
@@ -2729,7 +3134,13 @@ mod tests {
         m.push(Screen::Graphics);
         // Back is chosen first, as the original's; up to Fov, then the others
         m.step(-1);
-        assert_eq!(m.adjust(1), Action::Graphics(Graphics { fov: 60, ..Graphics::default() }));
+        assert_eq!(
+            m.adjust(1),
+            Action::Graphics(Graphics {
+                fov: 60,
+                ..Graphics::default()
+            })
+        );
         m.step(-1);
         let g = graphics(m.adjust(1)).unwrap();
         assert_eq!(g.fullscreen, Fullscreen::Borderless);
@@ -2767,7 +3178,10 @@ mod tests {
         m.set_chosen(0);
         assert_eq!(m.enter(), Action::None);
         assert!(m.waiting());
-        assert_eq!(m.fields(Screen::Controls)[0].1, m.strings.ours("press a key"));
+        assert_eq!(
+            m.fields(Screen::Controls)[0].1,
+            m.strings.ours("press a key")
+        );
         // Esc: nothing changes, the page stays
         assert_eq!(m.capture(KeyCode::Escape), Action::None);
         assert!(!m.waiting());
@@ -2806,10 +3220,7 @@ mod tests {
             .into_iter()
             .map(|l| m.label(l))
             .collect();
-        assert_eq!(
-            labels,
-            ["Start", "Highscore", "Options", "Credits", "Exit"]
-        );
+        assert_eq!(labels, ["Start", "Highscore", "Options", "Credits", "Exit"]);
         let mut m = menu(&[true], true);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Kinds, "levels by kind in the extended mode only");
@@ -2817,7 +3228,11 @@ mod tests {
         assert_eq!(kinds[..4], ["Original", "Remastered", "Your community maps", "Open format"]);
         assert_eq!(kinds[4], "Community maps", "the maps shipped with the game come after the kinds");
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.screen(), Screen::Start, "the original levels are the classic list");
+        assert_eq!(
+            m.screen(),
+            Screen::Start,
+            "the original levels are the classic list"
+        );
     }
 
     #[test]
@@ -2924,8 +3339,17 @@ mod tests {
     fn without_a_copy_the_menu_offers_our_levels_and_the_import() {
         let mut m = menu(&[false; 13], false);
         m.copy = false;
-        assert_eq!(m.lines(Screen::Main), [Line::Start, Line::Import, Line::Highscore, Line::Options, Line::Credits,
-            Line::Exit]);
+        assert_eq!(
+            m.lines(Screen::Main),
+            [
+                Line::Start,
+                Line::Import,
+                Line::Highscore,
+                Line::Options,
+                Line::Credits,
+                Line::Exit
+            ]
+        );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Kinds, "Start offers our levels and the community maps");
         assert_eq!(m.lines(Screen::Kinds), [Line::Ours, Line::Community, Line::Back]);
@@ -2985,11 +3409,18 @@ mod tests {
     fn a_long_label_breaks_at_the_space_nearest_its_middle() {
         let pair = |a: &str, b: &str| Some((a.to_owned(), b.to_owned()));
         assert_eq!(two_lines("Levels by kind?"), pair("Levels", "by kind?"));
-        assert_eq!(two_lines("Interface: remaster"), pair("Interface:", "remaster"));
+        assert_eq!(
+            two_lines("Interface: remaster"),
+            pair("Interface:", "remaster")
+        );
         assert_eq!(two_lines("Word"), None);
         assert_eq!(two_lines(" Word "), None);
         assert_eq!(two_lines(""), None);
-        assert_eq!(two_lines("确定退出游戏"), pair("确定退", "出游戏"), "Chinese at its middle character");
+        assert_eq!(
+            two_lines("确定退出游戏"),
+            pair("确定退", "出游戏"),
+            "Chinese at its middle character"
+        );
     }
 
     #[test]

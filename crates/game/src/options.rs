@@ -486,7 +486,10 @@ impl Pads {
                 None
             }
         };
-        Pads { gilrs, centred: Vec::new() }
+        Pads {
+            gilrs,
+            centred: Vec::new(),
+        }
     }
 
     /// The buttons pressed since the last call, and the game's keys every pad holds now: the left stick and the
@@ -602,7 +605,8 @@ mod tests {
             .map(|(k, v)| format!("{k} {v}\n"))
             .collect();
         assert_eq!(Graphics::load(from(&text)), g);
-        let bad = "resolution huge\nfullscreen maybe\nvsync 2\nclouds\ncloud-quality ultra\nfov 500\n";
+        let bad =
+            "resolution huge\nfullscreen maybe\nvsync 2\nclouds\ncloud-quality ultra\nfov 500\n";
         assert_eq!(Graphics::load(from(bad)), Graphics::default());
         assert_eq!(Fullscreen::Off.next(-1), Fullscreen::Exclusive);
         assert_eq!(Graphics { fov: 99, ..g }.fov_by(1), 100);

@@ -148,14 +148,18 @@ fn direction(x: Option<&str>, z: Option<&str>) -> Result<Vec3, String> {
 /// A replay's file name beside the hint file: letters, digits, `_`, `-` and `.` only, ending in `.replay`, not
 /// beginning with a dot, and no Windows device name (CON, NUL, COM1...).
 fn plain_name(s: &str) -> Result<&str, String> {
-    let stem = s.strip_suffix(".replay").unwrap_or_default().to_ascii_uppercase();
+    let stem = s
+        .strip_suffix(".replay")
+        .unwrap_or_default()
+        .to_ascii_uppercase();
     let base = stem.split('.').next().unwrap_or_default();
     let device = matches!(base, "CON" | "PRN" | "AUX" | "NUL")
         || ((base.starts_with("COM") || base.starts_with("LPT")) && base.len() == 4);
     let plain = !stem.is_empty()
         && !s.starts_with('.')
         && s.len() <= 128
-        && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
         && !device;
     if plain {
         Ok(s)
@@ -280,7 +284,9 @@ fn step(words: &[&str]) -> Result<Step, String> {
             // (the offset from the straight line, in units: which side of the rails' middle the ball keeps to)
             let side = Vec3::new(num(w.next())?, 0.0, num(w.next())?);
             if side.length() > MAX_PRESS_OFFSET {
-                return Err(format!("press keeps {MAX_PRESS_OFFSET} units off the line at most"));
+                return Err(format!(
+                    "press keeps {MAX_PRESS_OFFSET} units off the line at most"
+                ));
             }
             let speed = num(w.next())?;
             if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
@@ -426,12 +432,19 @@ pub fn read_plain(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
 /// up to the current folder for a relative path, or within the home folder for an absolute one (above that the
 /// system's own layout is no concern of ours).
 fn linked_folder(dir: &Path) -> Option<PathBuf> {
-    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from);
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from);
     for d in dir.ancestors() {
         if d.as_os_str().is_empty() {
             break;
         }
-        if dir.is_absolute() && !home.as_ref().is_some_and(|h| d.starts_with(h) && d != h.as_path()) && d != dir {
+        if dir.is_absolute()
+            && !home
+                .as_ref()
+                .is_some_and(|h| d.starts_with(h) && d != h.as_path())
+            && d != dir
+        {
             break;
         }
         if std::fs::symlink_metadata(d).is_ok_and(|m| m.file_type().is_symlink()) {
@@ -450,19 +463,27 @@ pub fn write_plain(path: &Path, text: &str) -> Result<(), String> {
     if std::fs::symlink_metadata(path).is_ok_and(|m| !m.is_file()) {
         return Err(format!("{}: not a plain file, not written", shown(path)));
     }
-    let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+    let dir = path
+        .parent()
+        .filter(|d| !d.as_os_str().is_empty())
+        .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
     if let Some(l) = linked_folder(&dir) {
         return Err(format!("{}: a link on the way, not written", shown(&l)));
     }
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", shown(&dir)))?;
-    let name = path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+    let name = path
+        .file_name()
+        .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
     let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
     let result = (|| {
         // a leftover of an earlier run (a file or a link) is removed itself, never followed
         if std::fs::symlink_metadata(&tmp).is_ok() {
             std::fs::remove_file(&tmp)?;
         }
-        let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
         f.write_all(text.as_bytes())?;
         f.sync_all()?;
         drop(f);
@@ -573,7 +594,11 @@ const OFF_COURSE_DROP: f32 = 3.0;
 /// The point a step rolls the ball to, if it has one.
 fn step_point(step: &Step) -> Option<Vec3> {
     match *step {
-        Step::Goto(p, _) | Step::Via(p, _) | Step::Pass(p, _, _) | Step::Press(p, _, _, _) | Step::Hold(p, _) => Some(p),
+        Step::Goto(p, _)
+        | Step::Via(p, _)
+        | Step::Pass(p, _, _)
+        | Step::Press(p, _, _, _)
+        | Step::Hold(p, _) => Some(p),
         _ => None,
     }
 }
@@ -664,7 +689,12 @@ impl Runner {
             let t = format!("{s:?}");
             t.chars().take(48).collect()
         });
-        Some(format!("hint line {} step {}/{}: {step}", h.line, r.step + 1, h.steps.len()))
+        Some(format!(
+            "hint line {} step {}/{}: {step}",
+            h.line,
+            r.step + 1,
+            h.steps.len()
+        ))
     }
 
     /// The running hint's step is skipped (the watcher sees it will not do): on with the next one.
@@ -711,7 +741,6 @@ impl Runner {
         }
     }
 
-
     /// The input of a hint for this tick, or None when no hint drives.
     pub fn input(&mut self, sim: &Sim) -> Option<u8> {
         // a lost ball: the hints may fire again for the new one
@@ -738,10 +767,10 @@ impl Runner {
             }
             if !self.quiet {
                 eprintln!(
-                "hint (line {}) at tick {}",
-                self.hints.get(i).map_or(0, |h| h.line),
-                sim.tick
-            );
+                    "hint (line {}) at tick {}",
+                    self.hints.get(i).map_or(0, |h| h.line),
+                    sim.tick
+                );
             }
             self.began = sim.tick;
             self.off_course = false;
@@ -800,7 +829,11 @@ impl Runner {
                     p.x,
                     p.y,
                     p.z,
-                    if below && !self.off_course { ", well below its point: off course" } else { "" }
+                    if below && !self.off_course {
+                        ", well below its point: off course"
+                    } else {
+                        ""
+                    }
                 );
             }
             self.off_course |= below;
@@ -828,7 +861,8 @@ impl Runner {
             run.quarter = *q;
         }
         // in a flow zone a step that stops the ball goes without its stop, when a copy of the run keeps the ball so
-        if self.zone.flow && step.is_some_and(|s| flowing(s).is_some()) && self.flow_keeps_ball(sim) {
+        if self.zone.flow && step.is_some_and(|s| flowing(s).is_some()) && self.flow_keeps_ball(sim)
+        {
             if let Some(run) = self.running.as_mut() {
                 run.flowed = true;
             }
@@ -844,14 +878,20 @@ impl Runner {
         let mut r = self.clone();
         r.zone = crate::zones::Effect::default();
         r.quiet = true;
-        let Some(run) = r.running.as_mut() else { return false };
+        let Some(run) = r.running.as_mut() else {
+            return false;
+        };
         run.flowed = true;
         let mut s = sim.clone();
         let lives = s.lives;
         let gone = |s: &Sim| s.lives < lives || s.is_dying() || s.game_over;
         let mut coast = 0;
         for _ in 0..FLOW_CHECK + FLOW_COAST {
-            let i = if r.running.is_some() { r.input(&s).unwrap_or(0) } else { 0 };
+            let i = if r.running.is_some() {
+                r.input(&s).unwrap_or(0)
+            } else {
+                0
+            };
             if r.running.is_none() {
                 coast += 1;
                 if coast > FLOW_COAST {
@@ -951,7 +991,11 @@ fn cross_plan(sim: &Sim, dir: Vec3, to: Vec3, r: f32) -> Vec<Vec3> {
                 let mut plan: Vec<Vec3> = vec![Vec3::ZERO; usize::try_from(wait).unwrap_or(0)];
                 let mut lost = false;
                 for k in 0..push + coast + CROSS_OFF + CROSS_SETTLE {
-                    let p = if k < push || (k >= push + coast && k < push + coast + CROSS_OFF) { dir } else { Vec3::ZERO };
+                    let p = if k < push || (k >= push + coast && k < push + coast + CROSS_OFF) {
+                        dir
+                    } else {
+                        Vec3::ZERO
+                    };
                     if k < push + coast + CROSS_OFF {
                         plan.push(p);
                     }
@@ -961,7 +1005,11 @@ fn cross_plan(sim: &Sim, dir: Vec3, to: Vec3, r: f32) -> Vec<Vec3> {
                         break;
                     }
                 }
-                if !lost && s.ball.on_ground && flat(s.ball.position - to).length() < r && s.ball.position.y > to.y - 2.0 {
+                if !lost
+                    && s.ball.on_ground
+                    && flat(s.ball.position - to).length() < r
+                    && s.ball.position.y > to.y - 2.0
+                {
                     return plan;
                 }
             }
@@ -1033,7 +1081,11 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 return None;
             }
             let key = if *n > 0 { input::RIGHT } else { input::LEFT };
-            Some(if t.is_multiple_of(4) { input::SHIFT | key } else { 0 })
+            Some(if t.is_multiple_of(4) {
+                input::SHIFT | key
+            } else {
+                0
+            })
         }
         Step::Become(k) => {
             if ball.kind == *k || t >= BECOME_TICKS {
@@ -1067,7 +1119,11 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 // round it on the side the ball is: to beside it, then behind
                 let perp = Vec3::new(-dir.z, 0.0, dir.x);
                 let side = perp * rel.dot(perp).signum();
-                let round = if ahead { st.pos + side * SHOVE_BEHIND } else { behind };
+                let round = if ahead {
+                    st.pos + side * SHOVE_BEHIND
+                } else {
+                    behind
+                };
                 let d = flat(round - ball.position);
                 return Some(arrows(d.clamp_length_max(6.0) - 0.8 * v, quarter));
             }
@@ -1080,14 +1136,17 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 return None;
             }
             let world = sim.world();
-            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, false));
+            let body = *run
+                .body
+                .get_or_insert_with(|| nearest_body(sim, *at, false));
             let st = world.state(body)?;
             let v = Vec3::new(st.vel.x, 0.0, st.vel.z);
             // ahead along where it rolls (or, still, on the side the ball is), a little ahead of where it will be
             let along = if v.length() > 1.0 {
                 v.normalize()
             } else {
-                Vec3::new(ball.position.x - st.pos.x, 0.0, ball.position.z - st.pos.z).normalize_or_zero()
+                Vec3::new(ball.position.x - st.pos.x, 0.0, ball.position.z - st.pos.z)
+                    .normalize_or_zero()
                     * d.signum()
             };
             let p = st.pos + along * *d + v * 0.3;
@@ -1161,7 +1220,11 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let v = flat(ball.velocity);
             // across: to the radius, damped; around: on while slower than the speed
             let a = -(1.5 * (out.length() - *r) + 0.8 * v.dot(u));
-            let f = if v.dot(around) < speed.abs() { 1.0 } else { -0.3 };
+            let f = if v.dot(around) < speed.abs() {
+                1.0
+            } else {
+                -0.3
+            };
             Some(arrows(around * f + u * a.clamp(-1.0, 1.0), quarter))
         }
         Step::Hold(p, n) => (t < *n).then(|| towards(*p)),
@@ -1181,7 +1244,10 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             }
             // kept to the line from the point passed before (a chain of points is a way along rails and tracks:
             // the ball on it, not cutting across), or straight to the point for the first
-            let from = run.passed.filter(|f| flat(*p - *f).length() > 1.0).unwrap_or(ball.position);
+            let from = run
+                .passed
+                .filter(|f| flat(*p - *f).length() > 1.0)
+                .unwrap_or(ball.position);
             let line = flat(*p - from);
             let along = line.normalize_or_zero();
             let across = Vec3::new(-along.z, 0.0, along.x);
@@ -1196,7 +1262,11 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 return None;
             }
             let v = Vec3::new(ball.velocity.x, 0.0, ball.velocity.z);
-            Some(if v.length() < *speed { arrows(v, quarter) } else { 0 })
+            Some(if v.length() < *speed {
+                arrows(v, quarter)
+            } else {
+                0
+            })
         }
         Step::Replay(..) => None,
         Step::Inputs(_, inputs) => {
@@ -1231,14 +1301,28 @@ mod tests {
         for good in ["run.replay", "Level_02-owner.replay", "a.b.replay"] {
             assert!(plain_name(good).is_ok(), "{good}");
         }
-        for bad in ["../x.replay", "a/b.replay", "x.txt", ".replay", ".hidden.replay", "CON.replay", "nul.replay",
-            "COM1.replay", "aux.x.replay", "a b.replay", "a:b.replay", "a\\b.replay"]
-        {
+        for bad in [
+            "../x.replay",
+            "a/b.replay",
+            "x.txt",
+            ".replay",
+            ".hidden.replay",
+            "CON.replay",
+            "nul.replay",
+            "COM1.replay",
+            "aux.x.replay",
+            "a b.replay",
+            "a:b.replay",
+            "a\\b.replay",
+        ] {
             assert!(plain_name(bad).is_err(), "{bad}");
         }
         let line = "at 0 0 0 r 5 : replay run.replay 1 2";
         assert!(parse(&vec![line; 16].join("\n")).is_ok());
-        assert!(parse(&vec![line; 17].join("\n")).is_err(), "too many replay steps");
+        assert!(
+            parse(&vec![line; 17].join("\n")).is_err(),
+            "too many replay steps"
+        );
     }
 
     use super::*;
@@ -1269,17 +1353,44 @@ mod tests {
         assert_eq!(h[1].steps[2], Step::Become(BallKind::Paper));
         assert_eq!(h[1].line, 3);
         let moving = parse("at 0 0 0 r 1 : lead 1 2 3 -4 300 ; shove 1 2 3 7 8 9 500").unwrap();
-        assert_eq!(moving[0].steps[0], Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300));
-        assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500));
+        assert_eq!(
+            moving[0].steps[0],
+            Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300)
+        );
+        assert_eq!(
+            moving[0].steps[1],
+            Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500)
+        );
         let swing =
             parse("at 0 0 0 r 1 : await 1 2 3 4 5 6 0.5 200 ; ride 1 2 3 4 5 6 0.5 90 ; press 1 2 3 0 1 6 200").unwrap();
-        assert_eq!(swing[0].steps[0], Step::Await(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 200));
-        assert_eq!(swing[0].steps[1], Step::Ride(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 90));
-        assert_eq!(swing[0].steps[2], Step::Press(Vec3::new(1.0, 2.0, 3.0), Vec3::Z, 6.0, 200));
-        assert!(parse("at 0 0 0 r 1 : press 1 2 3 0 4 6 200").is_err(), "too far off the line");
-        assert_eq!(parse("at 0 0 0 r 1 : along 12 240").unwrap()[0].steps[0], Step::Along(12.0, 240));
-        assert_eq!(parse("at 0 0 0 r 1 : hold 1 2 3 60").unwrap()[0].steps[0], Step::Hold(Vec3::new(1.0, 2.0, 3.0), 60));
-        assert_eq!(parse("at 0 0 0 r 1 : pass 1 2 3 5").unwrap()[0].steps[0], Step::Pass(Vec3::new(1.0, 2.0, 3.0), 5.0, GOTO_TICKS));
+        assert_eq!(
+            swing[0].steps[0],
+            Step::Await(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 200)
+        );
+        assert_eq!(
+            swing[0].steps[1],
+            Step::Ride(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 90)
+        );
+        assert_eq!(
+            swing[0].steps[2],
+            Step::Press(Vec3::new(1.0, 2.0, 3.0), Vec3::Z, 6.0, 200)
+        );
+        assert!(
+            parse("at 0 0 0 r 1 : press 1 2 3 0 4 6 200").is_err(),
+            "too far off the line"
+        );
+        assert_eq!(
+            parse("at 0 0 0 r 1 : along 12 240").unwrap()[0].steps[0],
+            Step::Along(12.0, 240)
+        );
+        assert_eq!(
+            parse("at 0 0 0 r 1 : hold 1 2 3 60").unwrap()[0].steps[0],
+            Step::Hold(Vec3::new(1.0, 2.0, 3.0), 60)
+        );
+        assert_eq!(
+            parse("at 0 0 0 r 1 : pass 1 2 3 5").unwrap()[0].steps[0],
+            Step::Pass(Vec3::new(1.0, 2.0, 3.0), 5.0, GOTO_TICKS)
+        );
         assert_eq!(
             parse("at 0 0 0 r 1 : cross 0 -1 1 2 3 4").unwrap()[0].steps[0],
             Step::Cross(-Vec3::Z, Vec3::new(1.0, 2.0, 3.0), 4.0)
@@ -1292,7 +1403,10 @@ mod tests {
             parse("at 0 0 0 r 1 : round 1 2 6 9 300 45").unwrap()[0].steps[0],
             Step::Round(Vec3::new(1.0, 45.0, 2.0), 6.0, 9.0, 300)
         );
-        assert!(parse("at 0 0 0 r 1 : lead 1 2 3 99 300").is_err(), "a lead is 50 units at most");
+        assert!(
+            parse("at 0 0 0 r 1 : lead 1 2 3 99 300").is_err(),
+            "a lead is 50 units at most"
+        );
     }
 
     #[test]

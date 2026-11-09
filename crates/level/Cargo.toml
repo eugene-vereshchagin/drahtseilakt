@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 nmo = { path = "../nmo" }
+script = { path = "../script" }
 serde_json = "=1.0.154"
 
 [lints]

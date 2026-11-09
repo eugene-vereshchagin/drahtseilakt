@@ -78,7 +78,8 @@ const MOVED: f32 = 2.0;
 
 /// The classes of track, easiest first (the report's order), with their CSV names.
 pub const CLASSES: [&str; 12] = [
-    "corridor", "wide", "trough", "posts", "curbs", "open", "narrow", "rails", "monorail", "siderail", "module", "air",
+    "corridor", "wide", "trough", "posts", "curbs", "open", "narrow", "rails", "monorail",
+    "siderail", "module", "air",
 ];
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -167,7 +168,10 @@ impl Geo {
             let Some(name) = crate::scene::module_of(level, i) else {
                 continue;
             };
-            if ["P_Ball", "P_Box", "P_Extra"].iter().any(|k| name.starts_with(k)) {
+            if ["P_Ball", "P_Box", "P_Extra"]
+                .iter()
+                .any(|k| name.starts_with(k))
+            {
                 continue;
             }
             let kind = if name.starts_with("P_Modul") {
@@ -181,7 +185,12 @@ impl Geo {
             let place = Mat4::from_cols_array_2d(&o.matrix);
             for mo in &module.objects {
                 if let Some(mesh) = mo.mesh.and_then(|k| module.meshes.get(k)) {
-                    add(&mut tris, mesh, place * Mat4::from_cols_array_2d(&mo.matrix), kind);
+                    add(
+                        &mut tris,
+                        mesh,
+                        place * Mat4::from_cols_array_2d(&mo.matrix),
+                        kind,
+                    );
                 }
             }
         }
@@ -214,7 +223,13 @@ impl Geo {
 
     /// The nearest hit of a ray from `o` along `d` (a unit vector) within `max`, among the triangles `take` keeps:
     /// how far, the hit triangle's normal (facing against the ray) and its kind.
-    fn ray(&self, o: Vec3, d: Vec3, max: f32, take: impl Fn(Kind) -> bool) -> Option<(f32, Vec3, Kind)> {
+    fn ray(
+        &self,
+        o: Vec3,
+        d: Vec3,
+        max: f32,
+        take: impl Fn(Kind) -> bool,
+    ) -> Option<(f32, Vec3, Kind)> {
         let e = o + d * max;
         let mut best: Option<(f32, Vec3, Kind)> = None;
         for (t, kind) in self.within(o.min(e), o.max(e)) {
@@ -302,11 +317,18 @@ fn classify(geo: &Geo, c: Vec3, fwd: Vec3) -> (usize, f32, [Option<Side>; 2]) {
         return (class("module"), 0.0, [None, None]);
     }
     let right = Vec3::new(-fwd.z, 0.0, fwd.x);
-    let rails: Vec<Vec3> = contacts.iter().filter(|x| x.1 == Kind::Rail).map(|x| x.0).collect();
+    let rails: Vec<Vec3> = contacts
+        .iter()
+        .filter(|x| x.1 == Kind::Rail)
+        .map(|x| x.0)
+        .collect();
     if !rails.is_empty() {
-        let up: Vec<f32> = rails.iter().map(|p| (c - *p).normalize_or_zero().y).collect();
-        let vspread =
-            rails.iter().map(|p| p.y).fold(f32::MIN, f32::max) - rails.iter().map(|p| p.y).fold(f32::MAX, f32::min);
+        let up: Vec<f32> = rails
+            .iter()
+            .map(|p| (c - *p).normalize_or_zero().y)
+            .collect();
+        let vspread = rails.iter().map(|p| p.y).fold(f32::MIN, f32::max)
+            - rails.iter().map(|p| p.y).fold(f32::MAX, f32::min);
         // the rails beside the ball at its height or under it, further out: a pair is two of them a ball apart
         // (a way's floor point lies on one of a pair, the ball itself between them)
         let lat: Vec<f32> = geo
@@ -315,7 +337,8 @@ fn classify(geo: &Geo, c: Vec3, fwd: Vec3) -> (usize, f32, [Option<Side>; 2]) {
             .filter(|x| x.1 == Kind::Rail && x.0.y <= c.y + 0.5 && x.0.y >= c.y - BALL_RADIUS - 1.0)
             .map(|x| (x.0 - c).dot(right))
             .collect();
-        let spread = lat.iter().copied().fold(f32::MIN, f32::max) - lat.iter().copied().fold(f32::MAX, f32::min);
+        let spread = lat.iter().copied().fold(f32::MIN, f32::max)
+            - lat.iter().copied().fold(f32::MAX, f32::min);
         // no rail holds the ball from below: it rides them on their side (a pair one above the other, a steep
         // or vertical rail, kept on by its speed)
         let carried = up.iter().copied().fold(f32::MIN, f32::max);
@@ -468,7 +491,13 @@ fn samples(run: &Run, geo: &Geo) -> Vec<Sample> {
                 let foot = geo
                     .ray(p + Vec3::Y * 3.0, -Vec3::Y, 6.0, statics)
                     .map_or(p, |h| p + Vec3::Y * (3.0 - h.0));
-                pts.push((foot + Vec3::Y * BALL_RADIUS, sector, true, false, BallKind::Wood));
+                pts.push((
+                    foot + Vec3::Y * BALL_RADIUS,
+                    sector,
+                    true,
+                    false,
+                    BallKind::Wood,
+                ));
                 along += STEP;
             }
             along -= len;
@@ -518,7 +547,12 @@ fn samples(run: &Run, geo: &Geo) -> Vec<Sample> {
 /// within 4 units and walled in others.
 fn mark_posts(s: &mut [Sample]) {
     let posts = CLASSES.iter().position(|c| *c == "posts").unwrap_or(0);
-    let floorish = |c: usize| matches!(CLASSES[c], "open" | "narrow" | "wide" | "curbs" | "corridor");
+    let floorish = |c: usize| {
+        matches!(
+            CLASSES[c],
+            "open" | "narrow" | "wide" | "curbs" | "corridor"
+        )
+    };
     let w = (4.0 / STEP) as usize;
     let mut out = Vec::with_capacity(s.len());
     for i in 0..s.len() {
@@ -598,12 +632,18 @@ const THINGS: [(&str, &str); 21] = [
     ("P_Modul_30", "m30_seesaws"),
     ("P_Modul_34", "m34_boxstone"),
 ];
-const MORE_THINGS: [(&str, &str); 2] = [("P_Modul_37", "m37_targets"), ("P_Modul_41", "m41_tipplates")];
+const MORE_THINGS: [(&str, &str); 2] = [
+    ("P_Modul_37", "m37_targets"),
+    ("P_Modul_41", "m41_tipplates"),
+];
 
 /// The sector (from 1) of a level object: its `Sector_NN` group, else the sector of the nearest object in one.
 fn sector_of(level: &level::Level, i: usize) -> usize {
     for g in level.groups_of(i) {
-        if let Some(n) = g.strip_prefix("Sector_").and_then(|n| n.parse::<usize>().ok()) {
+        if let Some(n) = g
+            .strip_prefix("Sector_")
+            .and_then(|n| n.parse::<usize>().ok())
+        {
             return n;
         }
     }
@@ -645,7 +685,12 @@ fn measure(run: &Run, sectors: usize) -> (Vec<Tally>, Vec<Sample>) {
             .filter(|n| n.sector == x.sector)
             .map_or(STEP, |n| n.pos.distance(x.pos).min(5.0));
         both(&mut t, x.sector, "path_len", step as f64);
-        both(&mut t, x.sector, &format!("len_{}", CLASSES[x.class]), step as f64);
+        both(
+            &mut t,
+            x.sector,
+            &format!("len_{}", CLASSES[x.class]),
+            step as f64,
+        );
         if x.updraft {
             both(&mut t, x.sector, "len_fan_flight", step as f64);
         }
@@ -699,9 +744,12 @@ fn measure(run: &Run, sectors: usize) -> (Vec<Tally>, Vec<Sample>) {
                 let sector = ground[i].sector;
                 both(&mut t, sector, "sharp_turns", 1.0);
                 // at an edge: a turn where the track drops away or is rails
-                let edgy = ground[i..=i + n]
-                    .iter()
-                    .any(|x| matches!(CLASSES[x.class], "open" | "narrow" | "rails" | "monorail" | "siderail"));
+                let edgy = ground[i..=i + n].iter().any(|x| {
+                    matches!(
+                        CLASSES[x.class],
+                        "open" | "narrow" | "rails" | "monorail" | "siderail"
+                    )
+                });
                 if edgy {
                     both(&mut t, sector, "sharp_turns_at_edge", 1.0);
                 }
@@ -771,7 +819,12 @@ fn measure(run: &Run, sectors: usize) -> (Vec<Tally>, Vec<Sample>) {
                 lift |= r.updraft;
             } else {
                 if air >= FLIGHT_TICKS {
-                    both(&mut t, r.sector, if lift { "fan_flights" } else { "jumps" }, 1.0);
+                    both(
+                        &mut t,
+                        r.sector,
+                        if lift { "fan_flights" } else { "jumps" },
+                        1.0,
+                    );
                     both(&mut t, r.sector, "air_time_s", air as f64 / 60.0);
                 }
                 air = 0;
@@ -860,7 +913,11 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
                     let ticks = run.ticks.len();
                     println!(
                         "level {n}: {name}: {} after {:.1} s{}",
-                        if run.finished { "finished" } else { "not finished" },
+                        if run.finished {
+                            "finished"
+                        } else {
+                            "not finished"
+                        },
                         ticks as f64 / 60.0,
                         if run.begun_elsewhere {
                             " (begun at a sector)"
@@ -891,12 +948,21 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
             let (mut tallies, samples) = measure(run, sectors);
             for t in tallies.iter_mut() {
                 t.set("finished", run.finished as u8 as f64);
-                t.set("level_bonus", run.level.settings.level_bonus.unwrap_or(0) as f64);
+                t.set(
+                    "level_bonus",
+                    run.level.settings.level_bonus.unwrap_or(0) as f64,
+                );
             }
-            let kind = if source.starts_with("run") { "run" } else { "plan" };
+            let kind = if source.starts_with("run") {
+                "run"
+            } else {
+                "plan"
+            };
             let mut text = String::from("x,y,z,sector,class,width,left,right,ball\n");
             for x in &samples {
-                let side = |s: Option<Side>| s.map_or_else(String::new, |s| format!("{s:?}").replace(',', ";"));
+                let side = |s: Option<Side>| {
+                    s.map_or_else(String::new, |s| format!("{s:?}").replace(',', ";"))
+                };
                 let _ = writeln!(
                     text,
                     "{:.2},{:.2},{:.2},{},{},{:.2},{},{},{:?}",

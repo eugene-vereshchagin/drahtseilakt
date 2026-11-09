@@ -6,11 +6,11 @@
 // The cores are referred to by their object index. A pair of a friction system is found by its two cores, since the
 // system's pair list changes as points come and go.
 
+use crate::contact::ContactInfo;
 use crate::core::World;
+use crate::friction::C_01F;
 use crate::math::{self, Quat};
 use crate::mindist::{Mindist, ST_BALL};
-use crate::contact::ContactInfo;
-use crate::friction::C_01F;
 
 type P3 = [f32; 3];
 type V3 = [f64; 3];
@@ -66,11 +66,13 @@ struct Solver {
 }
 
 fn ndot(n: &P3, v: &P3) -> f64 {
-    (f64::from(v[2]) * f64::from(n[2]) + f64::from(v[1]) * f64::from(n[1])) + f64::from(v[0]) * f64::from(n[0])
+    (f64::from(v[2]) * f64::from(n[2]) + f64::from(v[1]) * f64::from(n[1]))
+        + f64::from(v[0]) * f64::from(n[0])
 }
 
 fn dotd(a: &P3, b: &P3) -> f64 {
-    (f64::from(a[2]) * f64::from(b[2]) + f64::from(a[1]) * f64::from(b[1])) + f64::from(a[0]) * f64::from(b[0])
+    (f64::from(a[2]) * f64::from(b[2]) + f64::from(a[1]) * f64::from(b[1]))
+        + f64::from(a[0]) * f64::from(b[0])
 }
 
 /// The f32 vector normalized in place (`normize`, 0x1000e030).
@@ -153,7 +155,10 @@ impl World {
             if w2 > 0.25 {
                 w2 = 0.25;
             }
-            s = (f64::from(s) + (1.0 - w2.sqrt().cos()) * f64::from(core.upper_limit_radius) * self.env.inv_delta_psi) as f32;
+            s = (f64::from(s)
+                + (1.0 - w2.sqrt().cos())
+                    * f64::from(core.upper_limit_radius)
+                    * self.env.inv_delta_psi) as f32;
         }
         s
     }
@@ -207,7 +212,14 @@ impl World {
     /// The change of velocity of a core for an impulse in world space at its point (`test_push`, 0x1000ca80).
     fn test_push(&self, c: usize, p_cs: P3, imp_ws: P3) -> (P3, P3) {
         let r = self.cores[c].m_world_f_core.r;
-        let imp_cs_d = math::rtmul(&r, &[f64::from(imp_ws[0]), f64::from(imp_ws[1]), f64::from(imp_ws[2])]);
+        let imp_cs_d = math::rtmul(
+            &r,
+            &[
+                f64::from(imp_ws[0]),
+                f64::from(imp_ws[1]),
+                f64::from(imp_ws[2]),
+            ],
+        );
         let imp_cs = [imp_cs_d[0] as f32, imp_cs_d[1] as f32, imp_cs_d[2] as f32];
         self.calc_push_core(c, p_cs, imp_cs, imp_ws)
     }
@@ -219,7 +231,11 @@ impl World {
             if !self.movable(s.core[i]) {
                 continue;
             }
-            let im = if i == 1 { [-imp[0], -imp[1], -imp[2]] } else { imp };
+            let im = if i == 1 {
+                [-imp[0], -imp[1], -imp[2]]
+            } else {
+                imp
+            };
             let (dv, dw) = self.test_push(s.core[i], s.p_cs[i], im);
             s.dv[i] = dv;
             s.dw[i] = dw;
@@ -316,7 +332,8 @@ impl World {
             if self.movable(s.core[i]) {
                 // a count the upstream keeps in 16 bits and lets wrap; a map's pile of bodies can pass 32767 impacts
                 // in one PSI (found by fuzzing a level played), which overflowed here
-                self.cores[s.core[i]].impacts_psi = self.cores[s.core[i]].impacts_psi.wrapping_add(1);
+                self.cores[s.core[i]].impacts_psi =
+                    self.cores[s.core[i]].impacts_psi.wrapping_add(1);
             }
         }
         if s.allow_delaying {
@@ -325,7 +342,12 @@ impl World {
             if let Some(ph) = pushed[h] {
                 if self.movable(ph) {
                     let ch = s.core[h];
-                    let vh = self.point_velocity(ch, s.p_cs[h], self.cores[ch].speed, self.cores[ch].rot_speed);
+                    let vh = self.point_velocity(
+                        ch,
+                        s.p_cs[h],
+                        self.cores[ch].speed,
+                        self.cores[ch].rot_speed,
+                    );
                     let vl = self.point_velocity(s.core[l], s.p_cs[l], s.speed[l], s.rot[l]);
                     let r = v3sub(vh, vl);
                     let mut q = ndot(&s.n, &r);
@@ -359,7 +381,15 @@ impl World {
 
     /// The impact solve: compression in steps within the friction cone, restitution, the minimum separation, the
     /// anomaly limits, and the result (`impact_solve`, 0x10022ed0).
-    fn impact_solve(&mut self, s: &mut Solver, pushed: &mut [Option<usize>; 2], allow_delaying: bool, pushes: i16, rescue_addon: f32, rel_out: &mut P3) {
+    fn impact_solve(
+        &mut self,
+        s: &mut Solver,
+        pushed: &mut [Option<usize>; 2],
+        allow_delaying: bool,
+        pushes: i16,
+        rescue_addon: f32,
+        rel_out: &mut P3,
+    ) {
         let inv_pushes = 1.0f32 / (f32::from(pushes) * 0.5f32 + 1.0f32);
         let e_eff = f64::from(1.0f32 - (1.0f32 - s.e) * inv_pushes);
         s.allow_delaying = allow_delaying;
@@ -396,7 +426,11 @@ impl World {
                 self.push(s, 1.0);
                 self.calc_rel(s);
                 let d = ndot(&s.n, &s.rel) + vn;
-                let k = if d.abs() <= C_DIFF_EPS { 0.0 } else { target / d };
+                let k = if d.abs() <= C_DIFF_EPS {
+                    0.0
+                } else {
+                    target / d
+                };
                 self.undo_push(s);
                 self.push(s, k);
             }
@@ -416,7 +450,9 @@ impl World {
                 self.max_angular_velocity_exceeded(&mut v);
                 s.rot[i] = v;
             }
-            if dotd(&s.speed[i], &s.speed[i]) > f64::from(self.env.max_velocity) * f64::from(self.env.max_velocity) {
+            if dotd(&s.speed[i], &s.speed[i])
+                > f64::from(self.env.max_velocity) * f64::from(self.env.max_velocity)
+            {
                 let mut v = s.speed[i];
                 self.max_velocity_exceeded(&mut v);
                 s.speed[i] = v;
@@ -476,9 +512,15 @@ impl World {
         let fs = sys.fs;
         let n = self.coll.fss[fs].pairs.len();
         for i in (0..n).rev() {
-            let Some(q) = self.coll.fss[fs].pairs.get(i).cloned() else { continue };
+            let Some(q) = self.coll.fss[fs].pairs.get(i).cloned() else {
+                continue;
+            };
             let key = (q.c[0].min(q.c[1]), q.c[0].max(q.c[1]));
-            if (q.c[0] == c || q.c[1] == c) && key != exclude && !sys.pairs.contains(&key) && self.fs_recalc_pair_key(fs, key) > 0 {
+            if (q.c[0] == c || q.c[1] == c)
+                && key != exclude
+                && !sys.pairs.contains(&key)
+                && self.fs_recalc_pair_key(fs, key) > 0
+            {
                 sys.pairs.push(key);
             }
         }
@@ -486,7 +528,9 @@ impl World {
 
     /// Recomputes a pair's points by its cores, dropping the ones that left their feature (`0x1001cc20`).
     fn fs_recalc_pair_key(&mut self, fs: usize, key: (usize, usize)) -> usize {
-        let Some(i) = self.fs_find_pair(fs, key.0, key.1) else { return 0 };
+        let Some(i) = self.fs_find_pair(fs, key.0, key.1) else {
+            return 0;
+        };
         self.fs_recalc_pair(fs, i)
     }
 
@@ -509,9 +553,12 @@ impl World {
             vc = dotd(&self.cores[c].rot_speed, &t.cross_cs[0]) + dotd(&self.cores[c].speed, &t.n);
         }
         if let Some(c) = t.core[1] {
-            vc = vc - (dotd(&self.cores[c].rot_speed, &t.cross_cs[1]) + dotd(&self.cores[c].speed, &t.n));
+            vc = vc
+                - (dotd(&self.cores[c].rot_speed, &t.cross_cs[1])
+                    + dotd(&self.cores[c].speed, &t.n));
         }
-        self.coll.cps[cp].info.pred_gap = (f64::from(gap) - (vc + f64::from(rescue * 0.5)) * self.env.delta_psi) as f32;
+        self.coll.cps[cp].info.pred_gap =
+            (f64::from(gap) - (vc + f64::from(rescue * 0.5)) * self.env.delta_psi) as f32;
     }
 
     fn fixed_or_tu(&self, c: usize) -> bool {
@@ -530,7 +577,9 @@ impl World {
             if self.fixed_or_tu(key.0) && self.fixed_or_tu(key.1) {
                 continue;
             }
-            let Some(pi) = self.fs_find_pair(fs, key.0, key.1) else { continue };
+            let Some(pi) = self.fs_find_pair(fs, key.0, key.1) else {
+                continue;
+            };
             let cps = self.coll.fss[fs].pairs[pi].cps.clone();
             for &cp in cps.iter().rev() {
                 if (self.coll.cps[cp].info.flags & 0xff) != 1 {
@@ -544,7 +593,9 @@ impl World {
                 }
             }
         }
-        let (Some(cp), Some(pair)) = (best_cp, best_pair) else { return 0 };
+        let (Some(cp), Some(pair)) = (best_cp, best_pair) else {
+            return 0;
+        };
         let t = self.coll.cps[cp].info.clone();
         for c in [t.core[1], t.core[0]].into_iter().flatten() {
             if self.cores[c].synced {
@@ -577,7 +628,9 @@ impl World {
 
     /// The core's points are predicted again (`reset_processed`, 0x10024700).
     fn reset_processed(&mut self, sys: &ImpactSys, c: usize) {
-        let Some(fi) = self.core_fi(c, sys.fs) else { return };
+        let Some(fi) = self.core_fi(c, sys.fs) else {
+            return;
+        };
         for cp in self.coll.fis[fi].cps.clone() {
             self.coll.cps[cp].info.flags &= !0xff;
         }
@@ -586,7 +639,9 @@ impl World {
     /// The other points of a pair are updated and dropped when they left their feature (`recalc_other_contacts`,
     /// 0x100242c0).
     fn recalc_other_contacts(&mut self, sys: &ImpactSys, pair: (usize, usize), skip: usize) {
-        let Some(pi) = self.fs_find_pair(sys.fs, pair.0, pair.1) else { return };
+        let Some(pi) = self.fs_find_pair(sys.fs, pair.0, pair.1) else {
+            return;
+        };
         let cps = self.coll.fss[sys.fs].pairs[pi].cps.clone();
         for &cp in cps.iter().rev() {
             if cp == skip {
@@ -610,7 +665,11 @@ impl World {
             self.cores[c].synced = false;
         }
         let dt = self.env.time_of_next_psi - self.env.current_time;
-        let idt = if dt <= 1e-10 { 9_999_999_866.485_682 } else { 1.0 / dt };
+        let idt = if dt <= 1e-10 {
+            9_999_999_866.485_682
+        } else {
+            1.0 / dt
+        };
         for c in sys.pushed.clone() {
             if !self.movable(c) {
                 continue;
@@ -632,7 +691,13 @@ impl World {
 
     /// The impact system of a pair: its cores push, their pairs' other points are predicted and impacted in turn
     /// (`impact_system`, 0x10024320). Returns false when the mindist must go.
-    fn impact_system(&mut self, md: Option<usize>, fs: usize, pair: (usize, usize), cp: usize) -> bool {
+    fn impact_system(
+        &mut self,
+        md: Option<usize>,
+        fs: usize,
+        pair: (usize, usize),
+        cp: usize,
+    ) -> bool {
         let mut sys = ImpactSys {
             fs,
             iter: 0,
@@ -677,7 +742,11 @@ impl World {
     fn impact_two_objects(&mut self, m: usize) {
         let md: Mindist = self.coll.mds[m].clone();
         let (o0, o1) = (md.syn[0].obj, md.syn[1].obj);
-        let keep = if i32::from(self.cores[o0].movement_state) >= 8 { self.cores[o0].unit } else { self.cores[o1].unit };
+        let keep = if i32::from(self.cores[o0].movement_state) >= 8 {
+            self.cores[o0].unit
+        } else {
+            self.cores[o1].unit
+        };
         let (cp, _created, fs) = self.try_generate_friction(&md, Some(keep), true);
         let rescue = self.cp_rescue_speed(cp);
         let mut pushed: [Option<usize>; 2] = [None, None];
@@ -758,7 +827,12 @@ impl World {
         let md = self.coll.mds[m].clone();
         let (a, b) = (md.syn[0].obj, md.syn[1].obj);
         let g = self.gravity_vector();
-        let push = (2.0 * (f64::from(g[0]) * f64::from(g[0]) + f64::from(g[1]) * f64::from(g[1]) + f64::from(g[2]) * f64::from(g[2])).sqrt() * self.env.delta_psi) as f32;
+        let push = (2.0
+            * (f64::from(g[0]) * f64::from(g[0])
+                + f64::from(g[1]) * f64::from(g[1])
+                + f64::from(g[2]) * f64::from(g[2]))
+            .sqrt()
+            * self.env.delta_psi) as f32;
         let fa = self.cores[a].unmovable;
         let fb = self.cores[b].unmovable;
         if fa != fb {
@@ -772,8 +846,12 @@ impl World {
                 let cp_c = self.cores[mov].m_world_f_core.vv;
                 let d = [cp_c[0] - c.vv[0], cp_c[1] - c.vv[1], cp_c[2] - c.vv[2]];
                 let x = math::rtmul(&c.r, &d);
-                let Some(surface) = self.coll.objs[obj].surface.as_ref() else { return };
-                let Some(l) = surface.ledges.get(feat.ledge) else { return };
+                let Some(surface) = self.coll.objs[obj].surface.as_ref() else {
+                    return;
+                };
+                let Some(l) = surface.ledges.get(feat.ledge) else {
+                    return;
+                };
                 let mut best = -1e101;
                 let mut nrm = [1.0, 0.0, 0.0];
                 for t in 0..l.tris.len() {
@@ -783,14 +861,18 @@ impl World {
                         continue;
                     }
                     let q0 = l.p(e);
-                    let dd = (x[0] - f64::from(q0[0])) * mv[0] + (x[1] - f64::from(q0[1])) * mv[1] + (x[2] - f64::from(q0[2])) * mv[2];
+                    let dd = (x[0] - f64::from(q0[0])) * mv[0]
+                        + (x[1] - f64::from(q0[1])) * mv[1]
+                        + (x[2] - f64::from(q0[2])) * mv[2];
                     if dd > best {
                         best = dd;
                         nrm = mv;
                     }
                 }
                 let nw = math::rmul(&c.r, &nrm);
-                if !self.cores[mov].unmovable && self.cores[mov].movement_state < crate::core::MT_STATIC {
+                if !self.cores[mov].unmovable
+                    && self.cores[mov].movement_state < crate::core::MT_STATIC
+                {
                     let core = &mut self.cores[mov];
                     for k in 0..3 {
                         core.speed_change[k] += (nw[k] * f64::from(push)) as f32;
@@ -803,7 +885,11 @@ impl World {
         // the line of centres: both movable objects are pushed apart
         let pa = self.cores[a].m_world_f_core.vv;
         let pb = self.cores[b].m_world_f_core.vv;
-        let mut dir = [(pb[0] - pa[0]) as f32, (pb[1] - pa[1]) as f32, (pb[2] - pa[2]) as f32];
+        let mut dir = [
+            (pb[0] - pa[0]) as f32,
+            (pb[1] - pa[1]) as f32,
+            (pb[2] - pa[2]) as f32,
+        ];
         if math::normalize_f(&mut dir) == 0.0 {
             return;
         }
@@ -821,9 +907,23 @@ impl World {
     /// An asynchronous push of a core in world space at a world point (`ivp_body_async_push_ws`, 0x1000a3e0).
     fn async_push_ws(&mut self, c: usize, p_ws: [f64; 3], imp_ws: P3) {
         let core = &self.cores[c];
-        let p_cs_d = math::rtmul(&core.m_world_f_core.r, &[p_ws[0] - core.m_world_f_core.vv[0], p_ws[1] - core.m_world_f_core.vv[1], p_ws[2] - core.m_world_f_core.vv[2]]);
+        let p_cs_d = math::rtmul(
+            &core.m_world_f_core.r,
+            &[
+                p_ws[0] - core.m_world_f_core.vv[0],
+                p_ws[1] - core.m_world_f_core.vv[1],
+                p_ws[2] - core.m_world_f_core.vv[2],
+            ],
+        );
         let p_cs = [p_cs_d[0] as f32, p_cs_d[1] as f32, p_cs_d[2] as f32];
-        let imp_cs_d = math::rtmul(&core.m_world_f_core.r, &[f64::from(imp_ws[0]), f64::from(imp_ws[1]), f64::from(imp_ws[2])]);
+        let imp_cs_d = math::rtmul(
+            &core.m_world_f_core.r,
+            &[
+                f64::from(imp_ws[0]),
+                f64::from(imp_ws[1]),
+                f64::from(imp_ws[2]),
+            ],
+        );
         let imp_cs = [imp_cs_d[0] as f32, imp_cs_d[1] as f32, imp_cs_d[2] as f32];
         self.async_push_core(c, p_cs, imp_cs, imp_ws);
     }
@@ -872,7 +972,12 @@ mod tests {
     /// Two cubes touching at a 0.01 gap, the upper one falling onto the lower one at speed 2.
     fn falling_pair() -> World {
         let mut w = World::new();
-        let q = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        let q = Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
         for (i, z) in [0.0, 1.01].into_iter().enumerate() {
             let c = w.core_init(i, q, [0.0, 0.0, z], false);
             w.cores[c].upper_limit_radius = 0.866;
@@ -891,7 +996,9 @@ mod tests {
         let mut w = falling_pair();
         w.enable_collision_detection(0);
         w.enable_collision_detection(1);
-        let m = (0..w.coll.mds.len()).find(|&m| w.coll.mds[m].alive).expect("a mindist");
+        let m = (0..w.coll.mds.len())
+            .find(|&m| w.coll.mds[m].alive)
+            .expect("a mindist");
         w.cores[0].impacts_psi = i16::MAX;
         w.cores[1].impacts_psi = i16::MAX;
         w.do_impact_mindist(m);
@@ -903,18 +1010,38 @@ mod tests {
         let mut w = falling_pair();
         w.enable_collision_detection(0);
         w.enable_collision_detection(1);
-        let m = (0..w.coll.mds.len()).find(|&m| w.coll.mds[m].alive).expect("a mindist");
+        let m = (0..w.coll.mds.len())
+            .find(|&m| w.coll.mds[m].alive)
+            .expect("a mindist");
         // the gap has closed to the impact: make the impact directly, as the event would
         w.do_impact_mindist(m);
-        for c in 0..2 { eprintln!("IMP core {c} speed {:?} sc {:?} rot {:?} rc {:?} impacts_psi {}", w.cores[c].speed, w.cores[c].speed_change, w.cores[c].rot_speed, w.cores[c].rot_speed_change, w.cores[c].impacts_psi); }
+        for c in 0..2 {
+            eprintln!(
+                "IMP core {c} speed {:?} sc {:?} rot {:?} rc {:?} impacts_psi {}",
+                w.cores[c].speed,
+                w.cores[c].speed_change,
+                w.cores[c].rot_speed,
+                w.cores[c].rot_speed_change,
+                w.cores[c].impacts_psi
+            );
+        }
         // The contact is a corner of the falling cube on the other's face (the closest feature), so the impact also
         // spins the cubes and their centres need not share the speed. What must hold: the momentum of the pair (-2)
         // is kept, and the translational energy is lost in the inelastic contact (the delayed response of the heavier
         // side is pending, so its change counts).
-        let (v0, v1) = (w.cores[0].speed[2] + w.cores[0].speed_change[2], w.cores[1].speed[2] + w.cores[1].speed_change[2]);
-        assert!((v0 + v1 + 2.0).abs() < 0.05, "momentum after impact {v0} {v1}");
+        let (v0, v1) = (
+            w.cores[0].speed[2] + w.cores[0].speed_change[2],
+            w.cores[1].speed[2] + w.cores[1].speed_change[2],
+        );
+        assert!(
+            (v0 + v1 + 2.0).abs() < 0.05,
+            "momentum after impact {v0} {v1}"
+        );
         let energy_after = 0.5 * (v0 * v0 + v1 * v1);
-        assert!(energy_after < 2.0 - 0.1, "kinetic energy after {energy_after} from 2.0");
+        assert!(
+            energy_after < 2.0 - 0.1,
+            "kinetic energy after {energy_after} from 2.0"
+        );
         assert_eq!(w.coll.impact_events.len(), 1, "one post-collision event");
     }
 }

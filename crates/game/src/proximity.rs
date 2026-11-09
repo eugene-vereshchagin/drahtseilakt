@@ -40,7 +40,13 @@ pub struct Proximity {
 
 impl Proximity {
     /// A block switched off, with its distance, the axes it measures over and its exactness.
-    pub const fn new(distance: f32, axes: u8, near: f32, far: f32, frames: (u32, u32)) -> Proximity {
+    pub const fn new(
+        distance: f32,
+        axes: u8,
+        near: f32,
+        far: f32,
+        frames: (u32, u32),
+    ) -> Proximity {
         Proximity {
             distance,
             axes,
@@ -118,7 +124,11 @@ mod tests {
             assert_eq!(p.frame(Vec3::ZERO, Vec3::X * 50.0), None);
         }
         assert_eq!(p.frame(Vec3::ZERO, Vec3::X * 5.0), Some(Range::Enter));
-        assert_eq!(p.frame(Vec3::ZERO, Vec3::X * 5.0), None, "every 2 frames within 20");
+        assert_eq!(
+            p.frame(Vec3::ZERO, Vec3::X * 5.0),
+            None,
+            "every 2 frames within 20"
+        );
         assert_eq!(p.frame(Vec3::ZERO, Vec3::X * 5.0), Some(Range::In));
         // half way in the squared distance between 20 and 40: 2 + 8 * (900 - 400) / 1200, truncated
         assert_eq!(p.frame(Vec3::ZERO, Vec3::X * 30.0), None);
@@ -130,6 +140,9 @@ mod tests {
     fn across_ignores_the_height() {
         let mut p = Proximity::new(10.0, ACROSS, 20.0, 40.0, (1, 1));
         p.switch_on();
-        assert_eq!(p.frame(Vec3::ZERO, Vec3::new(3.0, 500.0, 4.0)), Some(Range::Enter));
+        assert_eq!(
+            p.frame(Vec3::ZERO, Vec3::new(3.0, 500.0, 4.0)),
+            Some(Range::Enter)
+        );
     }
 }
