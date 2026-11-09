@@ -1,0 +1,41 @@
+# Sector jump (after SpeedrunShortcuts' set sector): keys start the level again at the next or the previous sector. Changes the run: modded.
+name.en Sector jump
+name.ru Прыжок по секторам
+name.de Sprung zwischen Sektoren
+name.zh 跳转区段
+name.fr Saut de secteur
+name.es Salto de sector
+name.it Salto di settore
+description.en Keys start the level over at the next or the previous sector. Such runs are modded.
+description.ru Клавиши начинают уровень заново со следующего или предыдущего сектора. Такие прохождения помечаются как с модами.
+description.de Tasten starten das Level im nächsten oder vorigen Sektor neu. Solche Läufe sind modifiziert.
+description.zh 按键从下一区段或上一区段重新开始，此类通关记为改动。
+description.fr Des touches relancent le niveau au secteur suivant ou précédent. Ces parties sont modifiées.
+description.es Las teclas reinician el nivel en el sector siguiente o anterior. Esas partidas se marcan como modificadas.
+description.it I tasti riavviano il livello dal settore successivo o precedente. Tali partite sono modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option next key F7,PageUp
+option prev key F6,PageDown
+label next en Next sector key
+label next ru Клавиша: следующий сектор
+label next de Taste: nächster Sektor
+label next zh 下一区段键
+label next fr Touche : secteur suivant
+label next es Tecla: sector siguiente
+label next it Tasto: settore successivo
+label prev en Previous sector key
+label prev ru Клавиша: предыдущий сектор
+label prev de Taste: voriger Sektor
+label prev zh 上一区段键
+label prev fr Touche : secteur précédent
+label prev es Tecla: sector anterior
+label prev it Tasto: settore precedente
+
+on key next
+do sector.set run.sector + 1
+
+on key prev
+do sector.set max(1, run.sector - 1)

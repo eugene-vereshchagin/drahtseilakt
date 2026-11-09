@@ -1,0 +1,48 @@
+# Free steering (after FreeViewRotation, which turns the steering too): like free-view, but the arrows push along the turned view. The view's turn is recorded in the replay. Changes the run: modded.
+name.en Free steering
+name.ru Свободное управление
+name.de Freie Steuerung
+name.zh 自由操控
+name.fr Pilotage libre
+name.es Control libre
+name.it Guida libera
+description.en The mouse turns the view and the arrows steer along it. Such runs are modded.
+description.ru Мышь вращает обзор, а стрелки толкают шар по повёрнутому обзору. Такие прохождения помечаются как с модами.
+description.de Die Maus dreht die Sicht, die Pfeile steuern entlang der gedrehten Sicht. Solche Läufe sind modifiziert.
+description.zh 鼠标旋转视角，方向键沿旋转后的视角推动球。此类通关记为改动。
+description.fr La souris tourne la vue et les flèches poussent selon la vue tournée. Ces parties sont modifiées.
+description.es El ratón gira la vista y las flechas empujan según la vista girada. Esas partidas se marcan como modificadas.
+description.it Il mouse ruota la visuale e le frecce spingono lungo la visuale ruotata. Tali partite sono modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option sensitivity number 1 20 1 4
+option reset key KeyV,KeyB,KeyN,Home
+label sensitivity en Mouse sensitivity
+label sensitivity ru Чувствительность мыши
+label sensitivity de Mausempfindlichkeit
+label sensitivity zh 鼠标灵敏度
+label sensitivity fr Sensibilité souris
+label sensitivity es Sensibilidad del ratón
+label sensitivity it Sensibilità mouse
+label reset en Turn back key
+label reset ru Клавиша возврата
+label reset de Zurück-Taste
+label reset zh 复位键
+label reset fr Touche de retour
+label reset es Tecla de retorno
+label reset it Tasto di ritorno
+
+var yaw 0
+
+on frame
+do set yaw = yaw + mouse.dx * opt.sensitivity / 20
+do camera.yaw yaw
+do view.turn yaw
+
+on key reset
+do set yaw = 0
+
+on tick
+do steer.yaw input.turn

@@ -133,6 +133,12 @@ fn fire(
 fn action_exprs(a: &Action) -> Vec<&Expr> {
     match a {
         Action::Stick(e)
+        | Action::SteerYaw(e)
+        | Action::ViewTurn(e)
+        | Action::CameraSmooth(e)
+        | Action::Decoys(e)
+        | Action::BallDeform(e)
+        | Action::SetSector(e)
         | Action::Gravity(e)
         | Action::TimeFactor(e)
         | Action::CameraFov(e)
@@ -153,6 +159,7 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::LoadMoment
         | Action::Slower
         | Action::Faster
+        | Action::PlayTime
         | Action::FreeCam => Vec::new(),
     }
 }
@@ -168,6 +175,8 @@ pub struct SimOut {
     pub time_factor: f32,
     /// The last ball is never lost (god-mode's `lives.endless`).
     pub endless: bool,
+    /// Degrees the steering is turned about the vertical (`steer.yaw`).
+    pub steer_yaw: f32,
 }
 
 impl Default for SimOut {
@@ -177,6 +186,7 @@ impl Default for SimOut {
             gravity: crate::physics::GRAVITY,
             time_factor: crate::physics::TIME_FACTOR as f32,
             endless: false,
+            steer_yaw: 0.0,
         }
     }
 }
@@ -204,6 +214,7 @@ impl SimMods {
                     Action::Gravity(_) => out.gravity = x.clamp(0.0, 60.0),
                     Action::TimeFactor(_) => out.time_factor = x.clamp(0.5, 4.0),
                     Action::EndlessLives(_) => out.endless = x != 0.0,
+                    Action::SteerYaw(_) => out.steer_yaw = x.rem_euclid(360.0),
                     _ => {}
                 }
             });
@@ -248,6 +259,13 @@ pub struct ViewOut {
     pub lantern: f32,
     /// The ghost's opacity (0 none).
     pub ghost: f32,
+    /// The camera's easing (0 none), the decoy balls, the wooden ball's deformation, the view's turn for the run (whole
+    /// degrees; None: not handed on), and whether this frame counts as time played.
+    pub smooth: f32,
+    pub decoys: u8,
+    pub deform: f32,
+    pub turn: Option<u16>,
+    pub playtime: bool,
     /// This frame's HUD lines by corner, and the corners showing the splits.
     pub lines: Vec<(Corner, String)>,
     pub splits: Vec<Corner>,
@@ -267,6 +285,8 @@ pub enum Practice {
     Slower,
     Faster,
     FreeCam,
+    /// The run begun again at this sector (1 first).
+    Sector(u32),
 }
 
 impl Default for ViewOut {
@@ -278,6 +298,11 @@ impl Default for ViewOut {
             light: 1.0,
             lantern: 0.0,
             ghost: 0.0,
+            smooth: 0.0,
+            decoys: 0,
+            deform: 0.0,
+            turn: None,
+            playtime: false,
             lines: Vec::new(),
             splits: Vec::new(),
             screenshot: false,
@@ -360,6 +385,14 @@ impl ViewMods {
                     Action::Light(_) => out.light = x.clamp(0.0, 1.0),
                     Action::Lantern(_) => out.lantern = x.clamp(0.0, 1.0),
                     Action::Ghost(_) => out.ghost = x.clamp(0.0, 1.0),
+                    Action::CameraSmooth(_) => out.smooth = x.clamp(0.0, 1.0),
+                    Action::Decoys(_) => out.decoys = x.clamp(0.0, 8.0).round() as u8,
+                    Action::BallDeform(_) => out.deform = x.clamp(0.0, 1.0),
+                    Action::ViewTurn(_) => out.turn = Some(x.rem_euclid(360.0).floor() as u16),
+                    Action::PlayTime => out.playtime = true,
+                    Action::SetSector(_) if out.practice.len() < 16 => {
+                        out.practice.push(Practice::Sector(x.clamp(1.0, 64.0).round() as u32));
+                    }
                     Action::Show(c, label, f, _) => {
                         // a corner holds at most a few lines
                         if out.lines.iter().filter(|l| l.0 == *c).count() < 12 {
@@ -788,7 +821,7 @@ mod tests {
             .collect();
         assert_eq!(
             modded,
-            vec!["physics-lab", "sticky-ball"],
+            vec!["free-steering", "physics-lab", "sector-jump", "sticky-ball"],
             "only the rule variants change the run"
         );
         // each does its part: switched on, fired, its output set
@@ -829,6 +862,12 @@ mod tests {
             "{:?}",
             out.lines
         );
+        assert!((out.smooth - 0.4).abs() < 1e-4 && out.decoys == 3 && (out.deform - 0.6).abs() < 1e-4, "looks");
+        assert!(out.playtime && out.turn == Some(20), "play time, the view's turn");
+        assert!(out.lines.iter().any(|l| l.1.starts_with("Played, level")), "{:?}", out.lines);
+        view.press("F7", &values, &sim, "en");
+        assert_eq!(view.out.practice, vec![Practice::Sector(1)], "sector jump");
+        view.out.practice.clear();
         view.press("Backspace", &values, &sim, "en");
         assert!(view.out.restart, "quick restart");
         view.press("F12", &values, &sim, "en");

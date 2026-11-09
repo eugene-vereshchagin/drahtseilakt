@@ -40,6 +40,7 @@ mod particles;
 mod partcheck;
 mod physics;
 mod pieces;
+mod playtime;
 mod proximity;
 mod render;
 mod replay;

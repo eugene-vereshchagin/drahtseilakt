@@ -12,6 +12,7 @@
 //   mod <key> <fnv-1a 64 of its mod.txt, hex> [<option>=<value>]...   (optional, at most MAX_MODS: a mod that
 //                                 changes the run, so the run is modded and plays back only with that very mod;
 //                                 docs/drahtseilakt/mods.md. A replay without them is a classic run, as before)
+//   turn <tick> <degrees>         (optional, 0-359: the view's turn a `view.turn` mod hands the run, from this tick on)
 //   <tick> <input bits, hex>      (from this tick on; tick 1 is the first)
 //   end <last tick>
 
@@ -91,6 +92,9 @@ pub struct Replay {
     pub mods: Vec<String>,
     /// (first tick, input) in increasing tick order.
     pub changes: Vec<(u64, u8)>,
+    /// (first tick, the view's turn in whole degrees) where it changes: a second input channel, only for a run whose
+    /// mod hands its view's turn to the run (`view.turn`); empty otherwise.
+    pub turns: Vec<(u64, u16)>,
     pub end: u64,
 }
 
@@ -103,6 +107,7 @@ impl Replay {
             start: None,
             mods: Vec::new(),
             changes: Vec::new(),
+            turns: Vec::new(),
             end: 0,
         }
     }
@@ -118,6 +123,21 @@ impl Replay {
             self.changes.push((tick, input));
         }
         self.end = tick;
+    }
+
+    /// Records the view's turn of `tick` (only where it changes).
+    pub fn record_turn(&mut self, tick: u64, turn: u16) {
+        if self.turns.last().map_or(0, |c| c.1) != turn {
+            self.turns.push((tick, turn));
+        }
+    }
+
+    /// The view's turn at a tick, degrees.
+    pub fn turn_at(&self, tick: u64) -> u16 {
+        match self.turns.partition_point(|c| c.0 <= tick) {
+            0 => 0,
+            n => self.turns.get(n.saturating_sub(1)).map_or(0, |c| c.1),
+        }
     }
 
     /// The input at a tick.
@@ -147,8 +167,16 @@ impl Replay {
         for m in &self.mods {
             let _ = writeln!(s, "{m}");
         }
+        // the input changes, with the view's turns in their tick order among them
+        let mut turns = self.turns.iter().peekable();
         for (t, i) in &self.changes {
+            while let Some((tt, d)) = turns.next_if(|c| c.0 <= *t) {
+                let _ = writeln!(s, "turn {tt} {d}");
+            }
             let _ = writeln!(s, "{t} {i:02x}");
+        }
+        for (tt, d) in turns {
+            let _ = writeln!(s, "turn {tt} {d}");
         }
         let _ = writeln!(s, "end {}", self.end);
         s
@@ -179,6 +207,7 @@ impl Replay {
             start: None,
             mods: Vec::new(),
             changes: Vec::new(),
+            turns: Vec::new(),
             end: 0,
         };
         for line in lines {
@@ -194,6 +223,15 @@ impl Replay {
                 }
                 r.mods
                     .push(line.split_whitespace().collect::<Vec<_>>().join(" "));
+                continue;
+            }
+            if a == "turn" {
+                let tick: u64 = f.next().and_then(|v| v.parse().ok()).ok_or_else(|| format!("bad turn: {line}"))?;
+                let deg: u16 = f.next().and_then(|v| v.parse().ok()).filter(|d| *d < 360).ok_or_else(|| format!("bad turn: {line}"))?;
+                if r.turns.last().is_some_and(|c| c.0 >= tick) {
+                    return Err(format!("ticks out of order: {line}"));
+                }
+                r.turns.push((tick, deg));
                 continue;
             }
             let b = f.next().ok_or_else(|| format!("bad line: {line}"))?;
@@ -248,6 +286,24 @@ mod tests {
             (back.input_at(2), back.input_at(4), back.input_at(9)),
             (0, 1, 0)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn the_views_turn_is_a_second_channel_and_a_run_without_it_is_as_before() -> Result<(), String> {
+        let mut r = Replay::new("Level_01.NMO", 0xabc);
+        for t in 1..=6 {
+            r.record(t, 0);
+            r.record_turn(t, if t >= 4 { 90 } else { 0 });
+        }
+        assert_eq!(r.turns, vec![(4, 90)]);
+        let back = Replay::parse(&r.to_text())?;
+        assert_eq!(back, r);
+        assert_eq!((back.turn_at(3), back.turn_at(4), back.turn_at(6)), (0, 90, 90));
+        let mut plain = Replay::new("Level_01.NMO", 0xabc);
+        plain.record(1, 0);
+        assert!(!plain.to_text().contains("turn"));
+        assert!(Replay::parse("drahtseilakt-replay 7\nlevel a 1\nturn 1 400\nend 1\n").is_err());
         Ok(())
     }
 
