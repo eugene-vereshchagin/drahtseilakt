@@ -235,3 +235,35 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # 386.4 s) = 30 units in 7.4 s = 4.0 u/s; ours 3.9 u/s (ticks 2580 -> 3040) - raft 1 matches. Raft 2's relative drift
 # (ours ~0.2 u/s faster after the ramp) is the suspect; not measured in the video yet (mixed raft: 2 stones + 2 woods
 # should be the slower one by damping; check rail-3 slope/friction of lane 2 vs lane 1 between x -390 and -185).
+#
+# 2026-11-09 (SECTOR 5, ORIGINAL level 13: video read, NOT driven through; the owner's "simple descent down vertical rails" is wrong:
+# the stretch is three helices of rails, a long beam, a transformer and a vertical coil). Dense sheets (ref/video/frames/dense/level13/
+# s5-coarse 0.5 fps 400-624 s, s5-cp 6 fps 440-474 s, s5-helix 4 fps 462-498 s, s5-helix8 8 fps 481.5-484.5 s; counter shows time).
+# Video, ball kind per stretch:
+#  400-417 s  sector 4's block of woods/stones, ball (paper) on top; 417-440 extra-point cages (fans), counter 4099 at 424 s.
+#  440-456    ball (paper) rides the raft block down the end of the rails; steps onto a U-shaped ledge, rolls north along a narrow path.
+#  458-459    cube transformer on the path (P_Trafo_Stone_06/07): paper -> STONE (ball grey from 4269).
+#  460-476    the CP4 pod (round, two pink flames) at the path's east end: the ball rolls into it (4260, CP4), goes back west along the
+#             path (extra points 4353 at ~470 s), then east again over the pod (474 s) onto TWO white rails running east (x 126 ff).
+#  477-482    stone ball east along the two rails (straight, ~5 u/s), enters a helix of rails.
+#  482-496    helix 1 (a coil of ~5 turns, r 10, centre (185.6, -1143.6), top y -337, the ball rides on the inner side of one tube),
+#             then helix 2, 3 (a long coiled chain, ~3900 units of rail, x 126..346, y -337..-562), 462-520 s in all.
+#  520-545    wooden beam (A05_Wood_01/02, x 343.7, z -1098 -> -652, y -560 -> -675), seen end-on: a long slope straight down.
+#  548-552    the ball rolls into a box transformer (P_Trafo_Wood, (343.7 -673.8 -632.4)) and turns WOOD (4755).
+#  552-584    wood ball down the vertical coil A05_Rail_04 (r ~10, y -614 -> -676, z -629..-609) onto the balloon platform; 584 s the
+#             balloon (ufo) lifts it away, score screen at ~602 s (time 5104, level bonus 1300).
+# Engine (plain autopilot, --level 13 --sector 5 --autopilot --plan hints/Level_13.plan --give-up 600): the sector starts at CP4
+# (121.8 -334.7 -1133.6) as stone, rolls east along the pair of rails (130 -> 183 at y -336.4, z -1133.64), laps helix 1 twice
+# (fast, 9-13 u/s, mostly in the air from turn to turn), stalls at (173.0 -359.6 -1138.8) and (166 -376.2 -1133.7) and falls off
+# near (168 -380 -1151) at ~36 s (dies, speed 45 in air); the route has only 939 points, helices are not in it.
+# Rail geometry (python from the exported level.gltf, glTF z negated, vertex rings of 8 along the tube, two tubes interleaved):
+# A05_Rail_01 (126..270, -336..-442, z -1154..-1067), A05_Rail_02 (252..336, -439..-513), A05_Rail_03 (315..347, -508..-562): one
+# chain, start (182.8 -337.8 -1133.6), ends (269 -439 -1084), (329 -513 -1100), (344 -558 -1103). The tubes alternate every ring:
+# at the helix's start the pair is split radially (r 8.8 / 11.1, dy 1.6) and goes over into r 10 / 10 with dy 3.8 (one above the
+# other); ball centre on the straight is 1.4 above the pair's mean, i.e. the ball is ~1.1 radius.
+# Attempt 1 (centre line of the tube pairs as `pass` points every 3-10 units, speed 2-6, radial/vertical offsets -1..+2.5 / -0.5..+1):
+# the ball always leaves the helix at (193 -340 -1144) .. (192.6 -345.6 -1147), i.e. 100-150 degrees into turn 1 (y falls 4 units
+# in the air, 'ground' -> 'air' at speed 5-10): the same spot whatever the speed; the plain run passes it at 9-10 u/s. Next: read the
+# tube geometry at (190..196, -337..-346, -1135..-1148) (is the pair a groove whose lower tube is the track? where does the inner tube
+# end?), try faster (9-10) on the first turn, or record the owner's ride there (--record from CP4, 477-484 s of the video).
+# Not done: hints/Level_13-s5.txt, the chain s3+s4+s5 in one file, hints/runs/pilot-L13-full.replay.
