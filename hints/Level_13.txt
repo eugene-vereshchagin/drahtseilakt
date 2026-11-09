@@ -128,3 +128,17 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # Approach 2: the autopilot alone (above). Next: `replay hints/runs/owner/<his copy without the mod line> 0 2150` at the sector
 # start, then the crates as stone with the existing hint (go sooner: 3rd block by ~0:59), the paper transformer over the sunk
 # blocks, the channel at speed, and for the sacks `lead`/`shove` on the first stones so that they pass one by one.
+#
+# 2026-11-09 (third session, continued): the owner's line as a hint. hints/Level_13-s3.txt (one hint, `at -724.1 -154.2 537.2 r 6
+# sector 3 kind paper : replay Level_13-s3.replay 0 5500`; the replay is his best try without the mod line) fires at tick 0 of
+# `--level 13 --sector 3 --autopilot --plan hints/Level_13.plan --hints hints/Level_13-s3.txt` and reproduces his run exactly
+# (stones, crates, the paper transformer, the channel) to ~1:36; the sector's real start is (-724.1 -154.2 537.2), the ball
+# lands at z 532 and is let go at tick ~46 (his first key). Stone 23 is still lost at 1:10 (z -330) as in his run.
+# After the hint (tick 5500) the test player drives the ball on alone: it rides the channel through the sacks at once,
+# stops in the pit's east end (-647.6 -288.3 -1125.3, y -288 = on the floor) and the stones, with no ball among them to brake
+# them, tumble through the sacks (z -806..-860) and are lost one after the other (8 of 9 gone by 2:30, the rest roll past the
+# pit's north wall to z -1142 and fall): 0 stones in the pit. Wall time: the stuck state makes the run ~20 ticks/s.
+# So the sacks need the ball among the stones as in his 1:40-4:32 stretch (it sits in front of the first sack at z ~-810 and
+# lets the stones through one at a time); the remaining work is a closed loop for that (`lead`/`shove` on the nearest stone
+# at z -806..-852, ball held at x -724.2 in the channel, never letting a stone reach x -743 on the west side), then a
+# `become`-free wait west of the pit's entrance (x ~-690, z -1124) until all stones lie in the row, and the crossing over them.
