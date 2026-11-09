@@ -15,7 +15,16 @@ use crate::replay::Replay;
 use crate::scene::{self, BallMeshes, Snapshot};
 use crate::sim::{BALL_RADIUS, Event, Sim, TICK};
 use crate::watch::{Finding, Watch};
-pub use gamedata::profile::setting;
+/// The language `--screenshot` draws the menus in (DRAHTSEILAKT_SHOT_LANG), else the settings'.
+static SHOT_LANG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// A value of the settings file; the language of a menu screenshot may be set apart from it.
+pub fn setting(key: &str) -> Option<String> {
+    match (key, SHOT_LANG.get()) {
+        ("language", Some(l)) => Some(l.clone()),
+        _ => gamedata::profile::setting(key),
+    }
+}
 use gamedata::profile::{settings_path, settings_text};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -3162,6 +3171,9 @@ fn read_back(r: &Renderer, target: &wgpu::Texture, w: u32, h: u32) -> Result<Vec
 }
 
 fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<(), String> {
+    if let Ok(l) = std::env::var("DRAHTSEILAKT_SHOT_LANG") {
+        let _ = SHOT_LANG.set(l);
+    }
     let ticks = o
         .ticks
         .or(game.replay_in.as_ref().map(|r| r.end))

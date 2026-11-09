@@ -21,7 +21,9 @@ pub const LEVELS: u32 = 13;
 /// Lines of a long list (custom levels) shown at once.
 const LIST_LINES: usize = 13;
 /// Rows of the Mods screen and a mod's page shown at once (the help under them).
-const MODS_LINES: usize = 10;
+const MODS_LINES: usize = 9;
+/// Rows of the community maps' list (the author and the thanks are under them).
+const COMMUNITY_LINES: usize = 9;
 
 /// The Controls page's rows: the copy's names for them (Language.nmo), in options::ACTIONS' order.
 const KEY_NAMES: [(&str, &str); 6] = [
@@ -300,6 +302,9 @@ pub struct Menu {
     /// The first line a long list shows (the custom levels): it moves only as far as keeps the chosen line in view,
     /// so the line under the cursor stays where it is.
     top: usize,
+    /// The Credits' first line shown, and how far they scroll (set when they are drawn).
+    credits_top: usize,
+    credits_max: std::cell::Cell<usize>,
 }
 
 impl Menu {
@@ -350,6 +355,8 @@ impl Menu {
             mods: crate::modrt::Mods::default(),
             mod_page: 0,
             top: 0,
+            credits_top: 0,
+            credits_max: std::cell::Cell::new(0),
         };
         m.push(base);
         m
@@ -365,6 +372,14 @@ impl Menu {
             self.stack.first(),
             Some((Screen::Pause | Screen::Dead | Screen::End, _))
         )
+    }
+
+    /// The rows a list shows at once: the community maps leave room under them for the author and the notice.
+    fn page_len(&self) -> usize {
+        match self.screen() {
+            Screen::Custom if self.community => COMMUNITY_LINES,
+            sc => page(sc),
+        }
     }
 
     fn chosen(&self) -> usize {
@@ -391,7 +406,7 @@ impl Menu {
     /// The lines of a list of `n` shown at once: all of a short one, else a page of it from the list's top, moved as
     /// little as keeps the chosen line in view.
     fn shown(&self, n: usize) -> std::ops::Range<usize> {
-        let lines = page(self.screen());
+        let lines = self.page_len();
         if n <= lines {
             return 0..n;
         }
@@ -407,13 +422,13 @@ impl Menu {
 
     /// A newly shown screen's list starts with its chosen line in the middle.
     fn centre_list(&mut self) {
-        self.top = self.chosen().saturating_sub(page(self.screen()) / 2);
+        self.top = self.chosen().saturating_sub(self.page_len() / 2);
     }
 
     /// The list scrolled to `top` (clamped), its chosen line kept within the rows shown.
     fn scroll_to(&mut self, top: usize) {
         let n = self.list_len(self.screen());
-        let lines = page(self.screen());
+        let lines = self.page_len();
         if n <= lines {
             return;
         }
@@ -453,6 +468,7 @@ impl Menu {
         if screen == Screen::Highscore {
             self.shown = self.level;
         }
+        self.credits_top = 0;
         self.stack.push((screen, first.unwrap_or(0)));
         self.centre_list();
         if !self.selectable(screen, self.chosen()) {
@@ -629,6 +645,14 @@ impl Menu {
     /// Up (-1) or down (+1): the next line that can be chosen.
     pub fn step(&mut self, by: isize) {
         let screen = self.screen();
+        if screen == Screen::Credits {
+            // the credits scroll a line a press
+            self.credits_top = self
+                .credits_top
+                .saturating_add_signed(by)
+                .min(self.credits_max.get());
+            return;
+        }
         let n = self.lines(screen).len() as isize;
         let mut i = self.chosen() as isize;
         for _ in 0..n {
@@ -915,7 +939,7 @@ impl Menu {
                 let f =
                     ((p.y - hit.rect[1]) / (hit.rect[3] - hit.rect[1]).max(1.0)).clamp(0.0, 1.0);
                 let at = (f * n as f32).round() as usize;
-                self.scroll_to(at.saturating_sub(page(self.screen()) / 2));
+                self.scroll_to(at.saturating_sub(self.page_len() / 2));
                 Some(Action::None)
             }
             Target::Line(i) => {
@@ -950,7 +974,7 @@ impl Menu {
         match sc {
             Screen::Highscore => return self.adjust(by),
             Screen::Entry => {}
-            _ if scrolls(sc) && n > page(sc) => {
+            _ if scrolls(sc) && n > self.page_len() => {
                 let start = self.shown(n).start;
                 self.scroll_to(start.saturating_add_signed(by as isize));
                 if let Some(p) = at {
@@ -1436,21 +1460,23 @@ impl Menu {
                 f
             }
             Screen::Credits => [
-                "Drahtseilakt by Veresk",
-                "Ballance by Cyparade / Atari 2004",
-                "Started as a fork of OpenBallance by emdzej",
-                "Physics: IVP, ported from OpenBallance",
-                "Music: Kevin MacLeod (incompetech.com, CC-BY 4.0),",
-                "elerya, Hitctrl, Spring Spring, WakianTech (K-ManZ),",
-                "Tsorthan Grove, robcro6010, CarlosCarty, Amingliang,",
-                "juskiddink, botpl (CC-BY), neolein, Tozan (CC0)",
-                "Sounds: Kenney, freesound and OpenGameArt authors",
-                "(CC0, CC-BY): assets/sounds/system/CREDITS.md",
-                "Textures: ambientCG.com (CC0), thank you",
+                "Drahtseilakt by Veresk".to_owned(),
+                "Ballance by Cyparade / Atari 2004".to_owned(),
+                "Started as a fork of OpenBallance by emdzej".to_owned(),
+                "Physics: IVP, ported from OpenBallance".to_owned(),
+                "Music: Kevin MacLeod (incompetech.com, CC-BY 4.0), elerya, Hitctrl, Spring Spring, WakianTech \
+                 (K-ManZ), Tsorthan Grove, robcro6010, CarlosCarty, Amingliang, juskiddink, botpl (CC-BY), \
+                 neolein, Tozan (CC0)"
+                    .to_owned(),
+                "Sounds: Kenney, freesound and OpenGameArt authors (CC0, CC-BY): assets/sounds/system/CREDITS.md"
+                    .to_owned(),
+                "Textures: ambientCG.com (CC0), thank you".to_owned(),
+                (1..=3)
+                    .map(|k| s.ours(&format!("community credit {k}")))
+                    .collect::<Vec<_>>()
+                    .join(" "),
             ]
-            .iter()
-            .map(|l| (*l).to_owned())
-            .chain((1..=3).map(|k| s.ours(&format!("community credit {k}"))))
+            .into_iter()
             .map(|l| (l, String::new()))
             .collect(),
             Screen::Highscore => self
@@ -1623,9 +1649,18 @@ impl Menu {
         // a label on a button with its ball at the left end (`ball`: the ball's width): centred on the whole
         // button while it clears the ball, else centred on what lies right of the ball (the owner's report,
         // 2026-11-08: long Russian labels ran over the ball)
+        let areas: std::cell::RefCell<Vec<([f32; 4], f32)>> = std::cell::RefCell::new(Vec::new());
         let label_ball =
             |out: &mut Vec<Quad>, t: &str, r: [f32; 4], style: &crate::ui::Style, ball: f32| {
                 let Some(f) = font else { return };
+                // on a button: no further right than its art lets text go
+                let mut r = r;
+                let centre = [(r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0];
+                if let Some(&(b, right)) = areas.borrow().iter().rev().find(|(b, _)| {
+                    centre[0] >= b[0] && centre[0] <= b[2] && centre[1] >= b[1] && centre[1] <= b[3]
+                }) {
+                    r[2] = r[2].min(b[0] + (b[2] - b[0]) * right);
+                }
                 let fit = |r: [f32; 4]| {
                     let frame = homogeneous(r);
                     let (quads, k) = fit_label(f, t, frame, style);
@@ -1650,6 +1685,9 @@ impl Menu {
                         wrap: style.flags & crate::ui::TEXT_WORDWRAP != 0,
                         line: screen.y(line_height(style) * k) - screen.y(0.0),
                         clear_left: clear,
+                        size: style.scale[1] * k,
+                        panel: None,
+                        art_right: None,
                     });
                 }
                 out.extend(placed);
@@ -1670,6 +1708,22 @@ impl Menu {
                     Button::Up => DESELECT_TEX,
                     Button::Inactive => SPECIAL,
                 };
+                areas.borrow_mut().push((r, text_right(uv)));
+                if let Some(p) = probe {
+                    let px = screen.rect(homogeneous(r), Anchor::Center);
+                    p.borrow_mut().push(Probe {
+                        text: String::new(),
+                        frame: px,
+                        quads: Vec::new(),
+                        scale: 1.0,
+                        wrap: false,
+                        line: 0.0,
+                        clear_left: None,
+                        size: 1.0,
+                        panel: None,
+                        art_right: Some(px[0] + (px[2] - px[0]) * text_right(uv)),
+                    });
+                }
                 out.push(quad(r, uv, tex));
             };
         // a row of our own screens: the key row's bar without the mark in its middle (that mark parts a key's name
@@ -1686,6 +1740,22 @@ impl Menu {
                 Button::Up => DESELECT_TEX,
                 Button::Inactive => SPECIAL,
             };
+            areas.borrow_mut().push((r, text_right(KEY_UV)));
+            if let Some(p) = probe {
+                let px = screen.rect(homogeneous(r), Anchor::Center);
+                p.borrow_mut().push(Probe {
+                    text: String::new(),
+                    frame: px,
+                    quads: Vec::new(),
+                    scale: 1.0,
+                    wrap: false,
+                    line: 0.0,
+                    clear_left: None,
+                    size: 1.0,
+                    panel: None,
+                    art_right: Some(px[0] + (px[2] - px[0]) * text_right(KEY_UV)),
+                });
+            }
             let mid = (r[0] + r[2]) / 2.0;
             let [u0, v0, u1, v1] = KEY_UV;
             out.push(quad([r[0], r[1], mid, r[3]], [u0, v0, ROW_CUT[0], v1], tex));
@@ -1739,6 +1809,94 @@ impl Menu {
                 );
             }
         };
+        // a note: help or thanks as lines centred on a panel sized to them (a dark, rounded box with the buttons' rim),
+        // its bottom (`up`) or its top at `y`, at most `max_h` high, in the centre strip; the box is drawn over
+        // nothing else (the layouts keep it clear of the rows and of Back)
+        let note = |out: &mut Vec<Quad>, text: &str, y: f32, up: bool, max_h: f32| {
+            let Some(f) = font else { return };
+            if text.trim().is_empty() {
+                return;
+            }
+            let (pad_x, pad_y, corner) = (8.0f32, 7.0f32, 7.0f32);
+            let st = FONT_HELP;
+            let max_w = (NOTE_X[1] - NOTE_X[0]) * crate::ui::CONTEXT_W - 2.0 * pad_x;
+            let (lines, k) = fit_lines(f, text, max_w, max_h * crate::ui::CONTEXT_H - 2.0 * pad_y, &st);
+            let st = scaled_style(&st, k);
+            let pitch = row_pitch(&st);
+            let wide = lines
+                .iter()
+                .map(|l| text_wide(f, l, &st))
+                .fold(0.0f32, f32::max);
+            let pw = (wide + 2.0 * pad_x).max(60.0);
+            let ph = lines.len() as f32 * pitch + 2.0 * pad_y;
+            let cx = crate::ui::CONTEXT_W / 2.0;
+            let y0 = if up {
+                y * crate::ui::CONTEXT_H - ph
+            } else {
+                y * crate::ui::CONTEXT_H
+            };
+            let (x0, x1, y1) = (cx - pw / 2.0, cx + pw / 2.0, y0 + ph);
+            let fr = |a: f32, b: f32, c: f32, d: f32| {
+                [
+                    a / crate::ui::CONTEXT_W,
+                    b / crate::ui::CONTEXT_H,
+                    c / crate::ui::CONTEXT_W,
+                    d / crate::ui::CONTEXT_H,
+                ]
+            };
+            out.push(Quad {
+                top: [0.0, 0.0, 0.0, 0.78],
+                bottom: [0.0, 0.0, 0.0, 0.78],
+                ..quad(fr(x0 + 3.0, y0 + 3.0, x1 - 3.0, y1 - 3.0), [0.0, 0.0, 1.0, 1.0], PLAIN)
+            });
+            // the rim: the Yes/No button's rounded box (metal, no ball) cut in nine, its corners kept
+            let [u0, v0, u1, v1] = YES_NO_UV;
+            let d = 9.0 / 256.0;
+            let xs = [x0, x0 + corner, x1 - corner, x1];
+            let ys = [y0, y0 + corner, y1 - corner, y1];
+            let us = [u0, u0 + d, u1 - d, u1];
+            let vs = [v0, v0 + d, v1 - d, v1];
+            for r in 0..3 {
+                for c in 0..3 {
+                    if (r, c) == (1, 1) {
+                        continue;
+                    }
+                    out.push(quad(
+                        fr(xs[c], ys[r], xs[c + 1], ys[r + 1]),
+                        [us[c], vs[r], us[c + 1], vs[r + 1]],
+                        DESELECT_TEX,
+                    ));
+                }
+            }
+            let panel = [
+                screen.x(x0, Anchor::Center),
+                screen.y(y0),
+                screen.x(x1, Anchor::Center),
+                screen.y(y1),
+            ];
+            let m = st.margins;
+            for (i, l) in lines.iter().enumerate() {
+                let ly = y0 + pad_y + i as f32 * pitch;
+                let _ = m;
+                let frame = [x0, ly, x1, ly + pitch];
+                let q = crate::ui::place(f.layout(l, frame, &st), screen, Anchor::Center);
+                if let Some(p) = probe {
+                    p.borrow_mut().push(Probe {
+                        text: l.clone(),
+                        frame: screen.rect(frame, Anchor::Center),
+                        quads: q.iter().map(|q| q.rect).collect(),
+                        scale: k,
+                        wrap: false,
+                        line: screen.y(line_height(&st)) - screen.y(0.0),
+                        clear_left: None,
+                        size: st.scale[1],
+                        panel: Some(panel),
+                        art_right: None,
+                    });
+                }
+                out.extend(q);
+            }
+        };
         let sc = self.screen();
         let lines = self.lines(sc);
         let state = |i: usize| {
@@ -1766,7 +1924,7 @@ impl Menu {
                     continue;
                 }
                 let y = top + k as f32 * step;
-                let r = [0.35, y, 0.65, y + 0.0938];
+                let r = [0.35, y, 0.65, y + (step - 0.004).min(0.0938)];
                 button(out, r, MAIN_UV, state(i), Some(Target::Line(i)));
                 label_ball(out, &self.label(l), r, &FONT_01, BALL_MAIN);
                 k += 1;
@@ -1915,28 +2073,18 @@ impl Menu {
                 }
                 let bottom = LIST_TOP + shown.len().saturating_sub(1) as f32 * ROW_STEP + ROW_H;
                 scroll(&mut out, LIST_X[1] + 0.006, LIST_TOP, bottom, shown, n);
-                for (row, (l, _)) in self.fields(sc).iter().enumerate() {
-                    let y = 0.30 + row as f32 * 0.05;
-                    label(&mut out, l, [0.31, y, 0.69, y + 0.05], &FONT_03);
-                }
+                let said: Vec<String> = self.fields(sc).into_iter().map(|f| f.0).collect();
+                note(&mut out, &said.join("\n"), 0.30, false, 0.3);
                 if self.community {
-                    // the chosen map's author under the list, the authors' notice at the bottom
-                    if let Line::Map(m) = lines.get(self.chosen()).copied().unwrap_or(Line::Back) {
-                        label(
-                            &mut out,
-                            &self.credit(m),
-                            [LIST_X[0], 0.81, LIST_X[1], 0.85],
-                            &FONT_HELP,
-                        );
-                    }
-                    let mut st = FONT_HINT;
-                    st.flags |= crate::ui::TEXT_WORDWRAP;
-                    label(
-                        &mut out,
-                        &self.strings.ours("community notice"),
-                        [0.27, 0.945, 0.73, 0.995],
-                        &st,
-                    );
+                    // the chosen map's author and the authors' notice, on one panel under the list
+                    let by = match lines.get(self.chosen()).copied() {
+                        Some(Line::Map(m)) => self.credit(m),
+                        _ => String::new(),
+                    };
+                    let notice = self.strings.ours("community notice");
+                    let text = if by.is_empty() { notice } else { format!("{by}\n{notice}") };
+                    let top = LIST_TOP + COMMUNITY_LINES as f32 * ROW_STEP + HINT_H + 0.008;
+                    note(&mut out, &text, NOTE_BOTTOM, true, NOTE_BOTTOM - top);
                 }
                 back_only(&mut out);
             }
@@ -2007,7 +2155,15 @@ impl Menu {
                         st,
                         Some(Target::Line(i)),
                     );
-                    let split = ROWS_X[0] + (ROWS_X[1] - ROWS_X[0]) * 0.66;
+                    // the value gets what its longest needs (a switch's Yes or No, a number, a key), the name the rest
+                    let split = font.map_or(ROWS_X[0] + (ROWS_X[1] - ROWS_X[0]) * 0.74, |f| {
+                        let need = fields
+                            .iter()
+                            .map(|(_, v)| text_wide(f, v, &FONT_ROW))
+                            .fold(0.0f32, f32::max);
+                        let value = (need + 14.0) / crate::ui::CONTEXT_W;
+                        (ROWS_X[1] - 0.03 - value.clamp(0.06, 0.12)).max(ROWS_X[0] + 0.15)
+                    });
                     let mut left = FONT_ROW;
                     left.align = crate::ui::ALIGN_LEFT;
                     label(
@@ -2024,6 +2180,7 @@ impl Menu {
                     );
                 }
                 let bottom = MODS_TOP + shown.len().saturating_sub(1) as f32 * ROW_STEP + ROW_H;
+                let shown_n = shown.len();
                 scroll(&mut out, ROWS_X[1] + 0.006, MODS_TOP, bottom, shown, rows);
                 let help: Vec<&str> = fields
                     .iter()
@@ -2031,11 +2188,8 @@ impl Menu {
                     .map(|(l, _)| l.as_str())
                     .filter(|l| !l.is_empty())
                     .collect();
-                if !help.is_empty() {
-                    let mut st = FONT_HELP;
-                    st.flags |= crate::ui::TEXT_WORDWRAP;
-                    label(&mut out, &help.join("\n"), HELP_RECT, &st);
-                }
+                let top = MODS_TOP + shown_n as f32 * ROW_STEP + HINT_H + 0.008;
+                note(&mut out, &help.join("\n"), NOTE_BOTTOM, true, NOTE_BOTTOM - top);
                 back_only(&mut out);
             }
             Screen::Graphics | Screen::Controls | Screen::Sound | Screen::Extended => {
@@ -2169,9 +2323,42 @@ impl Menu {
                 back_only(&mut out);
             }
             Screen::Credits => {
-                for (k, (l, _)) in self.fields(sc).iter().enumerate() {
-                    let y = 0.20 + k as f32 * 0.045;
-                    label(&mut out, l, [0.25, y, 0.75, y + 0.045], &FONT_HELP);
+                // the lines of each paragraph wrapped to the centre strip, scrolled a line at a time
+                if let Some(f) = font {
+                    let mut st = FONT_ROW;
+                    st.align = crate::ui::ALIGN_LEFT;
+                    let w = (CREDITS_X[1] - CREDITS_X[0]) * crate::ui::CONTEXT_W - 4.0;
+                    let mut all: Vec<String> = Vec::new();
+                    let mut before = 1;
+                    for (l, _) in self.fields(sc) {
+                        // a blank line parts the paragraphs of several lines; one-line ones follow each other
+                        let part = wrap_lines(f, &l, w, &st);
+                        if !all.is_empty() && (before > 1 || part.len() > 1) {
+                            all.push(String::new());
+                        }
+                        before = part.len();
+                        all.extend(part);
+                    }
+                    let pitch = row_pitch(&st) / crate::ui::CONTEXT_H;
+                    let cap = (((CREDITS_BOTTOM - CREDITS_TOP) / pitch).floor() as usize).max(1);
+                    self.credits_max.set(all.len().saturating_sub(cap));
+                    let from = self.credits_top.min(self.credits_max.get());
+                    let shown = from..(from + cap).min(all.len());
+                    for (k, i) in shown.clone().enumerate() {
+                        let y = CREDITS_TOP + k as f32 * pitch;
+                        if let Some(t) = all.get(i) {
+                            let m = 2.0 / crate::ui::CONTEXT_H;
+                            label(&mut out, t, [CREDITS_X[0], y - m, CREDITS_X[1], y + pitch + m], &st);
+                        }
+                    }
+                    scroll(
+                        &mut out,
+                        CREDITS_X[1] + 0.004,
+                        CREDITS_TOP,
+                        CREDITS_BOTTOM,
+                        shown,
+                        all.len(),
+                    );
                 }
                 back_only(&mut out);
             }
@@ -2271,15 +2458,22 @@ pub struct Probe {
     pub line: f32,
     /// On a button with a ball at its left end: where the ball ends (window pixels); the glyphs stay right of it.
     pub clear_left: Option<f32>,
+    /// The size the text was drawn at, a line's height in the font's units (compared with MIN_TEXT).
+    pub size: f32,
+    /// On a note: the panel it is drawn on (window pixels), the glyphs inside it and the panel clear of every button.
+    pub panel: Option<[f32; 4]>,
+    /// On a record of a button (no text): where the button's art lets text end, window x (its `frame` is the button).
+    pub art_right: Option<f32>,
 }
 
+/// The smallest text the menus draw (a style's y scale, as FONT_ROW's 0.34 and FONT_01's 0.55 are): a label is
+/// shortened rather than drawn smaller, a paragraph is cut rather than drawn smaller.
+pub const MIN_TEXT: f32 = 0.30;
 /// The smallest a one-line label is drawn to fit, against its style's size; below it the label loses its middle.
 const SHRINK: f32 = 0.6;
 /// A label is drawn smaller down to this before two lines are tried, and two lines are drawn only this large or more
 /// (so a low button never holds two tiny lines).
 const FIT_SHRINK: f32 = 0.75;
-/// The smallest a paragraph (word-wrapped help) is drawn to fit its box.
-const PARA_SHRINK: f32 = 0.55;
 
 /// The height of a line of `style` in context pixels: the font's cell, a sixteenth of the size (ui.rs, fallback.rs).
 fn line_height(style: &crate::ui::Style) -> f32 {
@@ -2291,11 +2485,160 @@ fn line_height(style: &crate::ui::Style) -> f32 {
     style.scale[1] * base / 16.0
 }
 
+/// The smallest a style is drawn at, against its own size: MIN_TEXT, and a big label no further than SHRINK.
+fn floor_k(style: &crate::ui::Style) -> f32 {
+    (MIN_TEXT / style.scale[1].max(1e-3)).clamp(SHRINK, 1.0)
+}
+
+/// `style` drawn `k` times its size, one line at a time.
+fn scaled_style(style: &crate::ui::Style, k: f32) -> crate::ui::Style {
+    let mut st = *style;
+    st.scale = [st.scale[0] * k, st.scale[1] * k];
+    st.flags &= !crate::ui::TEXT_WORDWRAP;
+    st
+}
+
+/// The width of glyph quads.
+fn quads_wide(q: &[crate::ui::Quad]) -> f32 {
+    if q.is_empty() {
+        return 0.0;
+    }
+    q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max) - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
+}
+
+/// How wide `t` is drawn in `style` on one line (context pixels).
+fn text_wide(f: &crate::ui::Face, t: &str, style: &crate::ui::Style) -> f32 {
+    quads_wide(&f.layout(t, [0.0, 0.0, 4000.0, 100.0], &scaled_style(style, 1.0)))
+}
+
+/// A line of text: where a long one may be broken (at spaces, between the characters of a script without any).
+fn is_wide_char(c: char) -> bool {
+    u32::from(c) >= 0x2E80
+}
+
+/// `text` broken into lines at most `w` wide in `style` (explicit newlines kept); a word longer than a line is cut.
+fn wrap_lines(f: &crate::ui::Face, text: &str, w: f32, style: &crate::ui::Style) -> Vec<String> {
+    let mut lines = Vec::new();
+    for part in text.split('\n') {
+        // the pieces: a word, or one character of a script without spaces
+        let mut pieces: Vec<(String, bool)> = Vec::new();
+        let mut word = String::new();
+        for c in part.chars() {
+            if c == ' ' {
+                if !word.is_empty() {
+                    pieces.push((std::mem::take(&mut word), true));
+                }
+            } else if is_wide_char(c) {
+                if !word.is_empty() {
+                    pieces.push((std::mem::take(&mut word), true));
+                }
+                pieces.push((c.to_string(), false));
+            } else {
+                word.push(c);
+            }
+        }
+        if !word.is_empty() {
+            pieces.push((word, true));
+        }
+        let mut cur = String::new();
+        for (p, spaced) in pieces {
+            let joined = if cur.is_empty() {
+                p.clone()
+            } else if spaced {
+                format!("{cur} {p}")
+            } else {
+                format!("{cur}{p}")
+            };
+            if cur.is_empty() || text_wide(f, &joined, style) <= w {
+                cur = joined;
+                // a word wider than the line is cut where it fills it
+                while text_wide(f, &cur, style) > w && cur.chars().count() > 1 {
+                    let mut head = cur.clone();
+                    let mut tail = Vec::new();
+                    while text_wide(f, &head, style) > w && head.chars().count() > 1 {
+                        tail.push(head.pop().unwrap_or(' '));
+                    }
+                    lines.push(head);
+                    cur = tail.into_iter().rev().collect();
+                }
+            } else {
+                lines.push(std::mem::take(&mut cur));
+                cur = p;
+            }
+        }
+        lines.push(cur);
+    }
+    lines
+}
+
+/// The height of a line's row in a paragraph (context pixels) at `style`.
+fn row_pitch(style: &crate::ui::Style) -> f32 {
+    line_height(style) * 1.15
+}
+
+/// `text` as lines at most `w` wide that stay within `h` (context pixels): at the style's size, else smaller down
+/// to its floor; what still does not fit loses its last lines, the last one ending in "..". Returns the lines and
+/// the size drawn at against the style's.
+fn fit_lines(
+    f: &crate::ui::Face,
+    text: &str,
+    w: f32,
+    h: f32,
+    style: &crate::ui::Style,
+) -> (Vec<String>, f32) {
+    let kmin = floor_k(style);
+    let mut k = 1.0f32;
+    loop {
+        let st = scaled_style(style, k);
+        let mut lines = wrap_lines(f, text, w, &st);
+        let room = (h / row_pitch(&st)).floor().max(1.0) as usize;
+        if lines.len() <= room {
+            return (lines, k);
+        }
+        if k <= kmin + 1e-4 {
+            lines.truncate(room);
+            if let Some(last) = lines.last_mut() {
+                let mut t = last.trim_end().to_owned();
+                while text_wide(f, &format!("{t}.."), &st) > w && t.chars().count() > 1 {
+                    t.pop();
+                }
+                *last = format!("{t}..");
+            }
+            return (lines, k);
+        }
+        k = (k * 0.96).max(kmin);
+    }
+}
+
+/// A word-wrapped paragraph in `frame` (context pixels, the style's margins kept): the lines centred, as a block, in
+/// the frame; smaller down to the style's floor, then cut. Returns the glyphs and the size drawn at.
+fn paragraph(
+    f: &crate::ui::Face,
+    t: &str,
+    frame: [f32; 4],
+    style: &crate::ui::Style,
+) -> (Vec<crate::ui::Quad>, f32) {
+    let m = style.margins;
+    let (w, h) = (frame[2] - frame[0] - m[0] - m[2], frame[3] - frame[1] - m[1] - m[3]);
+    if w <= 0.0 || h <= 0.0 || t.trim().is_empty() {
+        return (Vec::new(), 1.0);
+    }
+    let (lines, k) = fit_lines(f, t, w, h, style);
+    let st = scaled_style(style, k);
+    let pitch = row_pitch(&st);
+    let top = (frame[1] + frame[3]) / 2.0 - pitch * lines.len() as f32 / 2.0;
+    let mut out = Vec::new();
+    for (i, l) in lines.iter().enumerate() {
+        let y = top + i as f32 * pitch;
+        out.extend(f.layout(l, [frame[0], y, frame[2], y + pitch], &st));
+    }
+    (out, k)
+}
+
 /// `t` laid out to stay inside `frame` (context pixels, the style's margins kept): as it is when it fits; else a
-/// little smaller (down to FIT_SHRINK); else on two lines when the frame is tall enough for two at that size or more;
-/// else smaller still (down to SHRINK) and, if it must, shortened in its middle (".."). A word-wrapped paragraph
-/// is drawn smaller until its lines fit the frame's height (down to PARA_SHRINK). Returns the glyphs and the size
-/// drawn at against the style's.
+/// little smaller (down to the style's floor, MIN_TEXT); else on two lines when the frame is tall enough for two at
+/// that size or more; else shortened in its middle (".."). A word-wrapped paragraph is `paragraph`. Returns the
+/// glyphs and the size drawn at against the style's.
 fn fit_label(
     f: &crate::ui::Face,
     t: &str,
@@ -2310,28 +2653,13 @@ fn fit_label(
     if avail_w <= 0.0 || avail_h <= 0.0 || line <= 0.0 || t.trim().is_empty() {
         return (Vec::new(), 1.0);
     }
-    let wide = |q: &[Quad]| {
-        q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max)
-            - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
-    };
-    let scaled = |k: f32| {
-        let mut st = *style;
-        st.scale = [st.scale[0] * k, st.scale[1] * k];
-        st
-    };
     if style.flags & crate::ui::TEXT_WORDWRAP != 0 {
-        // a paragraph: as many lines as it needs, smaller until they fit the frame's height
-        let mut k = (avail_h / line).min(1.0);
-        loop {
-            let q = f.layout(t, frame, &scaled(k));
-            let tall = q.iter().map(|q| q.rect[3]).fold(f32::MIN, f32::max)
-                - q.iter().map(|q| q.rect[1]).fold(f32::MAX, f32::min);
-            if tall <= avail_h + m[1] + m[3] || k <= PARA_SHRINK {
-                return (q, k);
-            }
-            k = (k * 0.92).max(PARA_SHRINK);
-        }
+        return paragraph(f, t, frame, style);
     }
+    let wide = |q: &[Quad]| quads_wide(q);
+    let scaled = |k: f32| scaled_style(style, k);
+    let kmin = floor_k(style);
+    let fit_min = kmin.max(FIT_SHRINK);
     let one = f.layout(t, frame, style);
     let w = wide(&one);
     let fits_h = (avail_h / line).min(1.0);
@@ -2343,7 +2671,7 @@ fn fit_label(
     if k1 >= 1.0 {
         return (one, 1.0);
     }
-    if k1 >= FIT_SHRINK {
+    if k1 >= fit_min {
         return (f.layout(t, frame, &scaled(k1)), k1);
     }
     // two lines, each at most the frame's width, both within its height
@@ -2353,12 +2681,12 @@ fn fit_label(
         let k2 = (avail_w / wa.max(wb).max(1e-3))
             .min(avail_h / (2.0 * line))
             .min(1.0);
-        if k2 >= FIT_SHRINK && k2 > k1 {
+        if k2 >= fit_min && k2 > k1 {
             return (f.layout(&format!("{a}\n{b}"), frame, &scaled(k2)), k2);
         }
     }
-    // one line, smaller, and what still does not fit loses its middle
-    let k = k1.max(SHRINK).min(fits_h);
+    // one line, as small as allowed, and what still does not fit loses its middle
+    let k = k1.max(kmin).min(fits_h);
     let st = scaled(k);
     let mut text = t.to_owned();
     let mut q = f.layout(&text, frame, &st);
@@ -2435,6 +2763,23 @@ const YES_NO_UV: [f32; 4] = [0.0, 0.8235, 0.226, 0.9098];
 const PLACE_UV: [f32; 4] = [0.0, 0.0627, 1.0, 0.1686];
 const ARROW_LEFT_UV: [f32; 4] = [0.6392, 0.2471, 0.7882, 0.4039];
 const ARROW_RIGHT_UV: [f32; 4] = [0.7921, 0.2471, 0.9412, 0.4039];
+/// Where the art of each button ends for text, as a fraction of the button's width from its left: the rounded or
+/// bracketed right end (measured on Button01_*: the art stops short of its rect, and the end caps hold a bracket).
+fn text_right(uv: [f32; 4]) -> f32 {
+    if uv == MAIN_UV {
+        0.92
+    } else if uv == BACK_UV {
+        0.86
+    } else if uv == FIELD_UV {
+        0.93
+    } else if uv == LEVEL_UV {
+        0.94
+    } else if uv == YES_NO_UV {
+        0.94
+    } else {
+        0.96
+    }
+}
 const BACK_RECT: [f32; 4] = [0.4031, 0.85, 0.5906, 0.9438];
 /// The width of the ball at the left end of a big button or a field (MAIN_UV, FIELD_UV), and of Back's (BACK_UV),
 /// measured on the drawn buttons: a label stays right of it.
@@ -2462,7 +2807,13 @@ const SCROLL_W: f32 = 0.008;
 const ROW_INDENT: f32 = 0.042;
 const HINT_H: f32 = 0.032;
 /// The help under the Mods screen and a mod's page: a paragraph above Back.
-const HELP_RECT: [f32; 4] = [0.31, 0.725, 0.69, 0.845];
+/// The notes' panels: at most this wide (inside the dark centre strip), their bottom above Back.
+const NOTE_X: [f32; 2] = [0.31, 0.69];
+const NOTE_BOTTOM: f32 = 0.838;
+/// The credits' text: its left and right edges (the bar right of them), its top and bottom.
+const CREDITS_X: [f32; 2] = [0.318, 0.672];
+const CREDITS_TOP: f32 = 0.10;
+const CREDITS_BOTTOM: f32 = 0.815;
 const YES_RECT: [f32; 4] = [0.395, 0.52667, 0.485, 0.57207];
 const NO_RECT: [f32; 4] = [0.52, 0.52667, 0.61, 0.57207];
 
@@ -2483,8 +2834,8 @@ const FONT_01: crate::ui::Style = font_style([0.45, 0.55], WHITE);
 /// original's small font, so the longest labels (German, Russian, French) fit and more rows show; the help under
 /// them and the scroll hints smaller still.
 const FONT_ROW: crate::ui::Style = font_style([0.3, 0.34], WHITE);
-const FONT_HELP: crate::ui::Style = font_style([0.27, 0.31], [0.85, 0.85, 0.85, 1.0]);
-const FONT_HINT: crate::ui::Style = font_style([0.26, 0.3], [0.8, 0.8, 0.8, 1.0]);
+const FONT_HELP: crate::ui::Style = font_style([0.3, 0.34], [0.85, 0.85, 0.85, 1.0]);
+const FONT_HINT: crate::ui::Style = font_style([0.3, 0.34], [0.8, 0.8, 0.8, 1.0]);
 const FONT_03: crate::ui::Style = font_style([0.35, 0.4], WHITE);
 const FONT_03A: crate::ui::Style = font_style([0.35, 0.4], [0.514, 0.514, 0.514, 1.0]);
 const FONT_03_GOLD: crate::ui::Style = font_style([0.35, 0.4], GOLD);
@@ -2716,6 +3067,8 @@ mod tests {
             mods: crate::modrt::Mods::default(),
             mod_page: 0,
             top: 0,
+            credits_top: 0,
+            credits_max: std::cell::Cell::new(0),
         };
         m.push(Screen::Main);
         m
@@ -2996,11 +3349,14 @@ mod tests {
         );
     }
 
-    /// Every screen in every language at windows of several shapes: each label's glyphs inside its frame, a label on
-    /// a button inside that button, never smaller than SHRINK, two lines only at FIT_SHRINK or more (no two tiny lines
-    /// in a low button). The own interface's face (the copy's font is laid out to the same cells).
+    /// Every screen and list the menu can show, in every language, at windows of several shapes, as the interface
+    /// really draws it (the glyph quads of `draw` with the own font, not estimates). Each text: inside its frame and
+    /// its button or row, right of the ball on a button, inside the dark centre strip and the window, at least
+    /// MIN_TEXT (two lines only at FIT_SHRINK or more); a note: on a panel inside the strip that touches no button
+    /// (Back included); no two buttons overlap. Lists are filled with the long real data: the thirteen community
+    /// maps, the modified originals in every language, long titles, every mod, a long highscore name.
     #[test]
-    fn every_label_fits_its_button_in_every_language_and_window() {
+    fn every_text_of_every_screen_fits_in_every_language_and_window() {
         if !crate::fallback::available() {
             eprintln!("skipped: the shipped fonts (assets/fonts) are not there");
             return;
@@ -3015,153 +3371,252 @@ mod tests {
                 "Der längste Titel einer Karte überhaupt!".to_owned(),
             ][i % 3]
                 .clone(),
-            author: None,
-            version: None,
-            posted: None,
+            author: Some("An Author With A Very Long Name Indeed".to_owned()),
+            version: Some("12.3.4-beta".to_owned()),
+            posted: Some("2012-03-01".to_owned()),
             titles: Vec::new(),
             order: None,
             hidden: false,
             difficulty: if i % 2 == 0 { Some(10) } else { None },
             titled: true,
         };
+        let community = crate::levels::community();
+        assert_eq!(community.len(), 13, "the thirteen shipped community maps");
+        let lists: Vec<(&str, bool, Vec<Package>)> = vec![
+            (
+                "own",
+                false,
+                own_levels().into_iter().chain((0..20).map(long)).collect(),
+            ),
+            ("community", true, community),
+            ("modified", false, crate::modified::sample_packages()),
+            ("none", false, Vec::new()),
+        ];
         let mods = gamedata::mods::scan(true);
         assert!(
             mods.iter().any(|m| m.key == "god-mode" && m.parsed.is_ok()),
             "god-mode is read in a debug run"
         );
-        let screens = |m: &Menu| -> Vec<(Screen, usize)> {
-            let mut v = Vec::new();
-            for sc in [
-                Screen::Main,
-                Screen::Kinds,
-                Screen::Start,
-                Screen::Custom,
-                Screen::Highscore,
-                Screen::Options,
-                Screen::Graphics,
-                Screen::Controls,
-                Screen::Sound,
-                Screen::Extended,
-                Screen::Language,
-                Screen::Credits,
-                Screen::Pause,
-                Screen::Dead,
-                Screen::End,
-                Screen::Ask(Ask::Quit),
-                Screen::Ask(Ask::Restart),
-                Screen::Ask(Ask::Exit),
-                Screen::Entry,
-            ] {
-                v.push((sc, 0));
-            }
-            // the Mods screen with each mod chosen (its help under the rows), and each mod's page
-            for i in 0..m.lines(Screen::Mods).len() {
-                v.push((Screen::Mods, i));
-            }
-            v
-        };
+        let sizes = [
+            (640.0, 480.0),
+            (1024.0, 768.0),
+            (1280.0, 720.0),
+            (1920.0, 1080.0),
+            (3440.0, 1440.0),
+            (1080.0, 1920.0),
+        ];
         let mut checked = 0;
+        let mut seen_notes = 0;
         for &(lang, _) in &LANGUAGES {
-            let mut m = menu(&[true; 13], true);
-            m.features.debug = true;
-            m.strings = Strings::ours_in(lang);
-            m.mods = crate::modrt::Mods::load(mods.clone(), |_| None);
-            m.maps = own_levels().into_iter().chain((0..20).map(long)).collect();
-            m.name = b"WWWWWWWWWWWWWWWWWWWW".to_vec();
-            let mut states = screens(&m);
-            for page in 0..m.mods.found.len() {
-                states.push((Screen::ModPage, page));
-            }
-            for (sc, i) in states {
-                if sc == Screen::ModPage {
-                    m.mod_page = i;
-                }
-                m.stack = vec![
-                    (Screen::Main, 0),
-                    (sc, if sc == Screen::ModPage { 0 } else { i }),
-                ];
-                m.top = 0;
-                for (w, h) in [
-                    (640.0, 480.0),
-                    (1280.0, 720.0),
-                    (1920.0, 1080.0),
-                    (3440.0, 1440.0),
-                    (1080.0, 1920.0),
-                ] {
-                    let screen = crate::ui::Screen { w, h };
-                    let hits = std::cell::RefCell::new(Vec::new());
-                    let probe = std::cell::RefCell::new(Vec::new());
-                    m.draw(Some(&face), screen, &hits, Some(&probe));
-                    let hits = hits.into_inner();
-                    for p in probe.into_inner() {
-                        if p.quads.is_empty() {
-                            continue;
+            for mode in [true, false] {
+                for (list, community, maps) in &lists {
+                    let mut m = menu(&[true; 13], mode);
+                    m.features.debug = true;
+                    m.strings = Strings::ours_in(lang);
+                    m.mods = crate::modrt::Mods::load(mods.clone(), |_| None);
+                    m.maps = maps.clone();
+                    m.community = *community;
+                    m.modified = true;
+                    m.name = b"WWWWWWWWWWWWWWWW".to_vec();
+                    m.points = 99_999_999;
+                    for level in 1..=13 {
+                        for k in 0..10 {
+                            m.scores
+                                .insert(level, b"WWWWWWWWWWWWWWWW", 9_000_000_000 + k);
                         }
-                        let b = p.quads.iter().fold(
-                            [f32::MAX, f32::MAX, f32::MIN, f32::MIN],
-                            |a, q| {
-                                [
-                                    a[0].min(q[0]),
-                                    a[1].min(q[1]),
-                                    a[2].max(q[2]),
-                                    a[3].max(q[3]),
-                                ]
-                            },
-                        );
-                        let at = format!(
-                            "{lang} {sc:?}/{i} {w}x{h} {:?} drawn {b:?} in {:?}",
-                            p.text, p.frame
-                        );
-                        let tol = 1.5;
-                        assert!(
-                            b[0] >= p.frame[0] - tol
-                                && b[2] <= p.frame[2] + tol
-                                && b[1] >= p.frame[1] - tol
-                                && b[3] <= p.frame[3] + tol,
-                            "a label out of its frame: {at}"
-                        );
-                        let centre = [
-                            (p.frame[0] + p.frame[2]) / 2.0,
-                            (p.frame[1] + p.frame[3]) / 2.0,
-                        ];
-                        if let Some(hit) = hits.iter().find(|h| {
-                            centre[0] >= h.rect[0]
-                                && centre[0] <= h.rect[2]
-                                && centre[1] >= h.rect[1]
-                                && centre[1] <= h.rect[3]
-                        }) {
-                            let r = hit.rect;
-                            assert!(
+                    }
+                    let only_lists = *list != "own";
+                    let mut states: Vec<(Screen, usize, usize)> = Vec::new();
+                    if only_lists {
+                        states.push((Screen::Custom, 0, 0));
+                        states.push((Screen::Custom, 3, 0));
+                        states.push((Screen::Custom, 12, 0));
+                        states.push((Screen::Custom, 100, 0));
+                    } else {
+                        for sc in [
+                            Screen::Main,
+                            Screen::Kinds,
+                            Screen::Start,
+                            Screen::Highscore,
+                            Screen::Options,
+                            Screen::Graphics,
+                            Screen::Controls,
+                            Screen::Sound,
+                            Screen::Extended,
+                            Screen::Language,
+                            Screen::Credits,
+                            Screen::Pause,
+                            Screen::Dead,
+                            Screen::End,
+                            Screen::Ask(Ask::Quit),
+                            Screen::Ask(Ask::Restart),
+                            Screen::Ask(Ask::Exit),
+                            Screen::Entry,
+                            Screen::Custom,
+                        ] {
+                            for i in 0..m.lines(sc).len().max(1) {
+                                states.push((sc, i, 0));
+                            }
+                        }
+                        // the credits at their end too
+                        states.push((Screen::Credits, 0, 10_000));
+                        for i in 0..m.lines(Screen::Mods).len() {
+                            states.push((Screen::Mods, i, 0));
+                        }
+                        for page in 0..m.mods.found.len() {
+                            for i in 0..=m.mods.found.get(page).map_or(0, |f| {
+                                f.parsed.as_ref().map_or(0, |t| t.options.len())
+                            }) {
+                                states.push((Screen::ModPage, i, page));
+                            }
+                        }
+                    }
+                    for (sc, i, extra) in states {
+                        m.mod_page = if sc == Screen::ModPage { extra } else { 0 };
+                        m.credits_top = if sc == Screen::Credits { extra } else { 0 };
+                        let n = m.lines(sc).len();
+                        m.stack = vec![(Screen::Main, 0), (sc, i.min(n.saturating_sub(1)))];
+                        m.top = 0;
+                        m.top = m.shown(m.list_len(sc)).start;
+                        if sc == Screen::Custom && i > 0 {
+                            m.top = i.saturating_sub(4);
+                        }
+                        for (w, h) in sizes {
+                            let screen = crate::ui::Screen { w, h };
+                            let hits = std::cell::RefCell::new(Vec::new());
+                            let probe = std::cell::RefCell::new(Vec::new());
+                            m.draw(Some(&face), screen, &hits, Some(&probe));
+                            let hits = hits.into_inner();
+                            let strip = screen.rect(
+                                crate::ui::homogeneous([0.3, 0.0, 0.7, 1.0]),
+                                crate::ui::Anchor::Center,
+                            );
+                            let tol = 1.5;
+                            let inside = |b: [f32; 4], r: [f32; 4]| {
                                 b[0] >= r[0] - tol
                                     && b[2] <= r[2] + tol
                                     && b[1] >= r[1] - tol
-                                    && b[3] <= r[3] + tol,
-                                "a label off its button {r:?}: {at}"
-                            );
-                        }
-                        if let Some(c) = p.clear_left {
-                            assert!(
-                                b[0] >= c - tol,
-                                "a label over its button's ball (ends at {c}): {at}"
-                            );
-                        }
-                        if !p.wrap {
-                            assert!(
-                                p.scale >= SHRINK - 1e-3,
-                                "a label drawn at {} of its size: {at}",
-                                p.scale
-                            );
-                            if b[3] - b[1] > 1.4 * p.line {
-                                assert!(p.scale >= FIT_SHRINK - 1e-3, "two small lines: {at}");
+                                    && b[3] <= r[3] + tol
+                            };
+                            let id = format!("{lang} mode={mode} {list} {sc:?}/{i}/{extra} {w}x{h}");
+                            // the buttons: on the window, none on another (the scroll bar lies beside its rows)
+                            for (a, ha) in hits.iter().enumerate() {
+                                assert!(
+                                    inside(ha.rect, [0.0, 0.0, w, h]),
+                                    "a button off the window: {id} {:?}",
+                                    ha.rect
+                                );
+                                for hb in hits.iter().skip(a + 1) {
+                                    if ha.target == Target::Bar || hb.target == Target::Bar {
+                                        continue;
+                                    }
+                                    let (r, q) = (ha.rect, hb.rect);
+                                    assert!(
+                                        r[2] <= q[0] + tol
+                                            || q[2] <= r[0] + tol
+                                            || r[3] <= q[1] + tol
+                                            || q[3] <= r[1] + tol,
+                                        "two buttons overlap: {id} {r:?} {q:?}"
+                                    );
+                                }
+                            }
+                            let probes = probe.into_inner();
+                            let buttons: Vec<([f32; 4], f32)> = probes
+                                .iter()
+                                .filter_map(|p| p.art_right.map(|a| (p.frame, a)))
+                                .collect();
+                            for p in probes {
+                                if p.quads.is_empty() {
+                                    continue;
+                                }
+                                let b = p.quads.iter().fold(
+                                    [f32::MAX, f32::MAX, f32::MIN, f32::MIN],
+                                    |a, q| {
+                                        [
+                                            a[0].min(q[0]),
+                                            a[1].min(q[1]),
+                                            a[2].max(q[2]),
+                                            a[3].max(q[3]),
+                                        ]
+                                    },
+                                );
+                                let at = format!("{id} {:?} drawn {b:?} in {:?}", p.text, p.frame);
+                                assert!(inside(b, p.frame), "a text out of its frame: {at}");
+                                assert!(inside(b, [0.0, 0.0, w, h]), "a text off the window: {at}");
+                                assert!(
+                                    b[0] >= strip[0] - tol && b[2] <= strip[2] + tol,
+                                    "a text out of the dark centre strip {strip:?}: {at}"
+                                );
+                                assert!(
+                                    p.size >= MIN_TEXT - 1e-3,
+                                    "a text smaller than the least readable ({} < {MIN_TEXT}): {at}",
+                                    p.size
+                                );
+                                if let Some(panel) = p.panel {
+                                    assert!(inside(b, panel), "a note out of its panel {panel:?}: {at}");
+                                    assert!(
+                                        inside(panel, strip),
+                                        "a panel out of the centre strip {strip:?}: {at} {panel:?}"
+                                    );
+                                    for hit in &hits {
+                                        let (r, q) = (hit.rect, panel);
+                                        assert!(
+                                            r[2] <= q[0] + tol
+                                                || q[2] <= r[0] + tol
+                                                || r[3] <= q[1] + tol
+                                                || q[3] <= r[1] + tol,
+                                            "a panel over a button {r:?} (Back too): {at} {panel:?}"
+                                        );
+                                    }
+                                    seen_notes += 1;
+                                }
+                                let centre = [
+                                    (p.frame[0] + p.frame[2]) / 2.0,
+                                    (p.frame[1] + p.frame[3]) / 2.0,
+                                ];
+                                if let Some(hit) = hits.iter().find(|h| {
+                                    centre[0] >= h.rect[0]
+                                        && centre[0] <= h.rect[2]
+                                        && centre[1] >= h.rect[1]
+                                        && centre[1] <= h.rect[3]
+                                }) {
+                                    assert!(
+                                        inside(b, hit.rect),
+                                        "a text off its button {:?}: {at}",
+                                        hit.rect
+                                    );
+                                }
+                                // the art of a button ends before its rect does (its rounded or bracketed end)
+                                if let Some(&(r, right)) = buttons.iter().rev().find(|(r, _)| {
+                                    centre[0] >= r[0]
+                                        && centre[0] <= r[2]
+                                        && centre[1] >= r[1]
+                                        && centre[1] <= r[3]
+                                }) {
+                                    assert!(
+                                        b[2] <= right + tol,
+                                        "a text past the end of its button's art ({right}, rect {r:?}): {at}"
+                                    );
+                                }
+                                if let Some(c) = p.clear_left {
+                                    assert!(
+                                        b[0] >= c - tol,
+                                        "a text over its button's ball (ends at {c}): {at}"
+                                    );
+                                }
+                                if !p.wrap && p.panel.is_none() && b[3] - b[1] > 1.4 * p.line {
+                                    assert!(p.scale >= FIT_SHRINK - 1e-3, "two small lines: {at}");
+                                }
+                                checked += 1;
                             }
                         }
-                        checked += 1;
                     }
                 }
             }
         }
-        eprintln!("{checked} labels checked");
-        assert!(checked > 10_000, "only {checked} labels checked");
+        eprintln!("{checked} texts checked, {seen_notes} of them on notes");
+        assert!(checked > 50_000, "only {checked} texts checked");
+        assert!(seen_notes > 500, "only {seen_notes} note lines checked");
     }
 
     #[test]

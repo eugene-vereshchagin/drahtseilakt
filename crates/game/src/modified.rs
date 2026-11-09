@@ -223,6 +223,43 @@ pub fn any(root: &Path) -> bool {
     set_folders(root).iter().any(|f| !gamedata::package::scan(f).0.is_empty())
 }
 
+/// Every set, level and variant a name can give, titled in every language and credited to a long author: what the
+/// menu's layout test lists (the player's own folder is never read there).
+#[cfg(test)]
+pub fn sample_packages() -> Vec<Package> {
+    let mut v = Vec::new();
+    for set in [Set::Rotated, Set::Reverse, Set::Invisible, Set::Other("A long collection's name".to_owned())] {
+        for level in [Some(1), Some(11), Some(13), None] {
+            for variant in [None, Some(Variant::Easy), Some(Variant::Normal), Some(Variant::Hard), Some(Variant::New)] {
+                let name = Name {
+                    level,
+                    variant,
+                    author: Some("fiype-and-friends".to_owned()),
+                    rest: "Double Track World.Level".to_owned(),
+                };
+                let mut titles: Vec<(String, String)> = Vec::new();
+                for (code, _) in crate::lang::LANGUAGES.iter().filter(|l| l.0 != "en") {
+                    titles.push(((*code).to_owned(), title_in(code, &set, &name)));
+                }
+                v.push(Package {
+                    level: PathBuf::from("x.nmo"),
+                    folder: PathBuf::from("x.nmo"),
+                    title: title_in("en", &set, &name),
+                    author: name.author.clone(),
+                    version: None,
+                    posted: None,
+                    titles,
+                    order: None,
+                    hidden: false,
+                    difficulty: level.map(|l| u8::try_from(l % 10 + 1).unwrap_or(1)),
+                    titled: true,
+                });
+            }
+        }
+    }
+    v
+}
+
 /// Wheter to offer the kind: a copy of the original is there and so are the levels.
 pub fn offered(copy: bool) -> bool {
     copy && any(&crate::levels::dir(Kind::Modified))
