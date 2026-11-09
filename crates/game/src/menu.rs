@@ -1691,6 +1691,7 @@ impl Menu {
                         clear_left: clear,
                         size: style.scale[1] * k,
                         panel: None,
+                        cut: LAST_CUT.with(|c| c.get()),
                         art_right: None,
                     });
                 }
@@ -1725,6 +1726,7 @@ impl Menu {
                         clear_left: None,
                         size: 1.0,
                         panel: None,
+                        cut: false,
                         art_right: Some(px[0] + (px[2] - px[0]) * text_right(uv)),
                     });
                 }
@@ -1757,6 +1759,7 @@ impl Menu {
                     clear_left: None,
                     size: 1.0,
                     panel: None,
+                    cut: false,
                     art_right: Some(px[0] + (px[2] - px[0]) * text_right(KEY_UV)),
                 });
             }
@@ -1895,6 +1898,7 @@ impl Menu {
                         clear_left: None,
                         size: st.scale[1],
                         panel: Some(panel),
+                        cut: false,
                         art_right: None,
                     });
                 }
@@ -2468,6 +2472,13 @@ pub struct Probe {
     pub panel: Option<[f32; 4]>,
     /// On a record of a button (no text): where the button's art lets text end, window x (its `frame` is the button).
     pub art_right: Option<f32>,
+    /// The text lost its middle to fit (".."): the layout test refuses that for the game's own texts.
+    pub cut: bool,
+}
+
+thread_local! {
+    /// Whether the last `fit_label` shortened its text (read by the layout probe).
+    static LAST_CUT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// The smallest text the menus draw (a style's y scale, as FONT_ROW's 0.34 and FONT_01's 0.55 are): a label is
@@ -2650,6 +2661,7 @@ fn fit_label(
     style: &crate::ui::Style,
 ) -> (Vec<crate::ui::Quad>, f32) {
     use crate::ui::Quad;
+    LAST_CUT.with(|c| c.set(false));
     let m = style.margins;
     let avail_w = frame[2] - frame[0] - m[0] - m[2];
     let avail_h = frame[3] - frame[1] - m[1] - m[3];
@@ -2696,6 +2708,7 @@ fn fit_label(
     let mut q = f.layout(&text, frame, &st);
     while wide(&q) > avail_w && text.chars().count() > 4 {
         text = shorten(&text);
+        LAST_CUT.with(|c| c.set(true));
         q = f.layout(&text, frame, &st);
     }
     (q, k)
@@ -3613,10 +3626,11 @@ mod tests {
                                 if !p.wrap && p.panel.is_none() && b[3] - b[1] > 1.4 * p.line {
                                     assert!(p.scale >= FIT_SHRINK - 1e-3, "two small lines: {at}");
                                 }
-                                // a mod page's option labels and values (and the mods' names) are never shortened
-                                if matches!(sc, Screen::ModPage | Screen::Mods) && !p.wrap && p.panel.is_none() {
+                                // no label or value of the game's own texts is ever shortened (only list rows of
+                                // levels and the highscores' names, which come from outside, may be)
+                                if !matches!(sc, Screen::Custom | Screen::Highscore | Screen::Entry) && !p.wrap && p.panel.is_none() {
                                     let letters = p.text.chars().filter(|c| !c.is_whitespace()).count();
-                                    if p.quads.len() < letters {
+                                    if p.cut || p.quads.len() < letters {
                                         cut.insert(format!("{lang} {:?} ({w}x{h})", p.text));
                                     }
                                 }
@@ -3627,7 +3641,7 @@ mod tests {
                 }
             }
         }
-        assert!(cut.is_empty(), "mod texts are ellipsized: {cut:#?}");
+        assert!(cut.is_empty(), "texts are ellipsized: {cut:#?}");
         eprintln!("{checked} texts checked, {seen_notes} of them on notes");
         assert!(checked > 50_000, "only {checked} texts checked");
         assert!(seen_notes > 500, "only {seen_notes} note lines checked");

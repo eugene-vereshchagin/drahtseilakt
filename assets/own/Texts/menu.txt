@@ -24,7 +24,7 @@ Menu_Opt_Graphics Synch Yes | Yes | Да | Ja | 是 | Oui | Sí | Sì
 Menu_Opt_Graphics Synch No | No | Нет | Nein | 否 | Non | No | No
 Menu_YesNo YES | OK | ОК | OK | 确定 | OK | Aceptar | OK
 Menu_Opt_Graphics Resolution | Screen Resolution | Разрешение экрана | Auflösung | 屏幕分辨率 | Résolution | Resolución | Risoluzione
-Menu_Opt_Graphics Synch | Sync to Screen? | Вертикальная синхронизация? | Bildsynchronisation? | 垂直同步? | Synchro verticale ? | ¿Sincronización vertical? | Sincronia verticale?
+Menu_Opt_Graphics Synch | Sync to Screen? | Синхронизация? | Bildsynchronisation? | 垂直同步? | Synchro verticale ? | ¿Sincronización vertical? | Sincronia verticale?
 Menu_Opt_Graphics Clouds | Clouds? | Облака? | Wolken? | 云层? | Nuages ? | ¿Nubes? | Nuvole?
 Menu_Opt_Keys Forward | Forward | Вперёд | Vorwärts | 前进 | Avancer | Adelante | Avanti
 Menu_Opt_Keys Backward | Backward | Назад | Rückwärts | 后退 | Reculer | Atrás | Indietro
@@ -57,7 +57,7 @@ interface original | original | оригинал | Original | 原版 | original 
 interface remaster | remaster | ремастер | Remaster | 重制 | remaster | remaster | remaster
 textures | Textures | Текстуры | Texturen | 纹理 | Textures | Texturas | Texture
 models | Models | Модели | Modelle | 模型 | Modèles | Modelos | Modelli
-models level | level's | как в уровне | wie im Level | 关卡自带 | du niveau | del nivel | del livello
+models level | level's | из уровня | vom Level | 关卡自带 | du niveau | del nivel | del livello
 restart needed | (restart) | (перезапуск) | (Neustart) | （需重启） | (redémarrer) | (reiniciar) | (riavvia)
 sounds | Sounds | Звуки | Klänge | 音效 | Sons | Sonidos | Suoni
 levels | Levels | Уровни | Level | 关卡 | Niveaux | Niveles | Livelli
@@ -84,7 +84,7 @@ community credit 1 | Community maps (Start, Community maps): | Карты соо
 community credit 2 | by their authors, shown with thanks; | принадлежат своим авторам, показаны с благодарностью; | gehören ihren Autoren, mit Dank gezeigt; | 属于其作者，在此致谢展示； | à leurs auteurs, présentées avec gratitude ; | de sus autores, con agradecimiento; | dei loro autori, con gratitudine;
 community credit 3 | if an author objects, we remove the level. | если автор против, мы удалим уровень. | wenn ein Autor widerspricht, entfernen wir es. | 如作者反对，我们将移除。 | si un auteur s'y oppose, nous la retirons. | si un autor se opone, la retiramos. | se un autore si oppone, la rimuoviamo.
 no levels | No levels here yet. Put them into | Здесь пока нет уровней. Положите их в | Noch keine Level hier. Lege sie in | 这里还没有关卡。请放入 | Aucun niveau ici. Placez-les dans | Aún no hay niveles. Ponlos en | Ancora nessun livello. Mettili in
-feature all-levels | All levels open? | Все уровни открыты? | Alle Level offen? | 开放全部关卡? | Tous les niveaux ouverts ? | ¿Todos los niveles abiertos? | Tutti i livelli aperti?
+feature all-levels | All levels open? | Все уровни открыты? | Alle Level offen? | 开放全部关卡? | Niveaux ouverts ? | ¿Niveles abiertos? | Livelli aperti?
 feature best-times | Best times? | Лучшее время? | Bestzeiten? | 最佳时间? | Meilleurs temps ? | ¿Mejores tiempos? | Tempi migliori?
 feature custom-levels | Levels by kind? | Уровни по видам? | Level nach Art? | 按类别选关? | Niveaux par type ? | ¿Niveles por tipo? | Livelli per tipo?
 loading | Loading {name} | Загрузка: {name} | Lade {name} | 正在加载 {name} | Chargement : {name} | Cargando {name} | Caricamento: {name}
