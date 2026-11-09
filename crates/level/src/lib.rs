@@ -9,8 +9,22 @@ pub mod open;
 pub mod sectorballs;
 
 /// The module a level object is named after: its name without the trailing `_NN` (digits, then any letters:
-/// `P_Box_03` is `P_Box`, `P_Trafo_Stone_03a` is `P_Trafo_Stone`); a name without one is its own.
+/// `P_Box_03` is `P_Box`, `P_Trafo_Stone_03a` is `P_Trafo_Stone`); a name without one is its own. A copy made in
+/// the editor carries `.Copy`, `.Copy001`... after the name (the reversed maps' duplicates), which does not
+/// change what the object is, so those suffixes are left off first.
 pub fn module_name(object: &str) -> &str {
+    let mut object = object;
+    while let Some((head, tail)) = object.rsplit_once('.') {
+        let t = tail.to_ascii_lowercase();
+        let copy = t
+            .strip_prefix("copy")
+            .is_some_and(|d| d.bytes().all(|b| b.is_ascii_digit()));
+        if copy && !head.is_empty() {
+            object = head;
+        } else {
+            break;
+        }
+    }
     match object.rsplit_once('_') {
         Some((head, tail)) => {
             let digits = tail.trim_end_matches(|c: char| c.is_ascii_alphabetic());
@@ -319,5 +333,12 @@ mod tests {
             "letters alone are no number"
         );
         assert_eq!(super::module_name("Floor"), "Floor");
+        assert_eq!(super::module_name("P_Modul_01_02.Copy"), "P_Modul_01");
+        assert_eq!(
+            super::module_name("P_Modul_18_18.Copy.Copy003"),
+            "P_Modul_18"
+        );
+        assert_eq!(super::module_name("P_Box_06.copy"), "P_Box");
+        assert_eq!(super::module_name("A.Cop"), "A.Cop");
     }
 }
