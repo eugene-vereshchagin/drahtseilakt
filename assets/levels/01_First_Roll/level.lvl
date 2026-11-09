@@ -247,16 +247,17 @@ floor 14
 # ---- 7. the pit: the groove stops at a pit just the crate's size; to the right a plate with a brick rim holds the crate
 # at the pit's edge; go round behind it and push it left into the pit, the bridge; a life stands past the pit
 floor 24
-corner left rail
-floor 9
-pilot all : shove 2.8 -6.5 2.5 2.8 1 2.5 700
+corner left
+floor 5
+pilot all : shove 2.5 -6.5 2.5 2.5 1 2.5 700
 mark pitgate
-move -1.2 0 0
+move -1.9 0 0
 turn -90
-plaza 16 14 brick gap back -0.6 14.8 ahead 3.75
-box ahead 6.5 side 4.0 shove
+plaza 16 14 brick gap back 0 14 ahead 3.75
+box ahead 6.5 side 4.4 shove
 back pitgate
-pit 5.6 depth 4.7 wall 8 side 1
+pit 5.1 depth 5 side 1
+move 0 0 1
 floor 10
 life ahead 4
 floor 6
