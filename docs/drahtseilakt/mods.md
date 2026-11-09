@@ -109,6 +109,11 @@ UTF-8 text, one statement a line, `#` begins a comment line. In this order:
     is the default. The game's own keys are refused: Escape, Enter, the arrows, Shift, Space, Tab, Alt, F11 and
     Backquote; a key the player bound on the Controls page stays the game's. (R, F2, F3, F5, F9, `[` `]` were the
     practice tools'; they are god-mode's keys now and free for any mod.)
+  - `option <name> choice <default> <name1> <name2> ...` — one of 2 to 12 named choices (lower-case letters, digits, `_`);
+    in rules the option is the choice's place (0 for the first listed), so `if opt.quality == 1` works; settings and
+    replays keep the name (`mod.<mod>.<option> <name>`, `<option>=<name>`), so reordering the choices needs a changed
+    mod.txt (and so a new hash). Each choice needs `label <option>.<name> <lang> <text>` (English required): the mod
+    page shows that label as the value; keep both labels short, the legend belongs in the description.
 - **Labels** — `label <name> <lang> <text>`: an option's label is named like the option; HUD lines name theirs.
 - **Variables** — `var <name> <number>`: numbers the rules keep, from their first value at each start.
 - **Rules** — `on <event>`, then any `if <condition>` lines (all must hold), then `do <action>` lines, done in order.

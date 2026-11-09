@@ -97,6 +97,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
     是默认值。游戏自身的按键会被拒绝：Escape、Enter、方向键、Shift、Space、Tab、Alt、F11 和 Backquote；玩家在
     Controls 页面绑定的按键仍归游戏所有。（R、F2、F3、F5、F9、`[` `]` 原是练习工具的按键；现在它们是上帝模式的按键，
     任何模组都可以使用。）
+  - `option <name> choice <default> <name1> <name2> ...` — 2 到 12 个有名字的选项之一（小写字母、数字、`_`）；规则里该选项的值是选择的序号（第一个为 0），如 `if opt.quality == 1`；设置和回放保存名字（`mod.<mod>.<option> <name>`、`<option>=<name>`）。每个选择需要 `label <option>.<name> <lang> <text>`（必须有英文）：模组页把该标签显示为值；请保持简短，说明写进 description。
 - **标签** — `label <name> <lang> <text>`：选项的标签与选项同名；HUD 行为自己的标签命名。
 - **变量** — `var <name> <number>`：规则保存的数值，每次开始时从初始值开始。
 - **规则** — `on <event>`，然后是任意条 `if <condition>` 行（必须全部成立），然后是按顺序执行的 `do <action>` 行。

@@ -20,7 +20,7 @@ requires 0.1
 option shown switch on
 label shown en Show on screen?
 label shown ru Показывать на экране?
-label shown de Auf dem Bildschirm zeigen?
+label shown de Anzeigen?
 label shown zh 屏幕显示？
 label shown fr Afficher à l'écran ?
 label shown es ¿Mostrar en pantalla?

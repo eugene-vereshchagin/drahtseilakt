@@ -113,6 +113,11 @@ Text in UTF-8, eine Anweisung je Zeile, `#` beginnt eine Kommentarzeile. In dies
     Tab, Alt, F11 und Backquote; eine Taste, die der Spieler auf der Seite Controls belegt hat, bleibt beim Spiel.
     (R, F2, F3, F5, F9, `[` `]` gehörten den Übungswerkzeugen; jetzt sind es die Tasten von god-mode und für jeden Mod
     frei.)
+  - `option <name> choice <default> <name1> <name2> ...` — eine von 2 bis 12 benannten Auswahlmöglichkeiten (Kleinbuchstaben,
+    Ziffern, `_`); in den Regeln ist die Option die Stelle der Auswahl (0 für die erste), also `if opt.quality == 1`;
+    Einstellungen und Wiederholungen speichern den Namen (`mod.<mod>.<option> <name>`, `<option>=<name>`). Jede Auswahl
+    braucht `label <option>.<name> <lang> <text>` (Englisch Pflicht): die Modseite zeigt diese Beschriftung als Wert;
+    beide kurz halten, die Legende gehört in die Beschreibung.
 - **Beschriftungen** — `label <name> <lang> <text>`: Die Beschriftung einer Option heißt wie die Option;
   Einblendungszeilen nennen ihre.
 - **Variablen** — `var <name> <number>`: Zahlen, die die Regeln behalten, bei jedem Start ab ihrem ersten Wert.

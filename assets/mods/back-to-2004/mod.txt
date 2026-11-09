@@ -19,46 +19,84 @@ author Drahtseilakt
 version 1.0
 licence GPL-3.0-only
 requires 0.1
-option resolution number 0 2 1 0
-label resolution en Resolution (0 640x480, 1 800x600, 2 1024x768)
-label resolution ru Разрешение (0 640x480, 1 800x600, 2 1024x768)
-label resolution de Auflösung (0 640x480, 1 800x600, 2 1024x768)
-label resolution zh 分辨率 (0 640x480, 1 800x600, 2 1024x768)
-label resolution fr Résolution (0 640x480, 1 800x600, 2 1024x768)
-label resolution es Resolución (0 640x480, 1 800x600, 2 1024x768)
-label resolution it Risoluzione (0 640x480, 1 800x600, 2 1024x768)
+option resolution choice r640 r640 r800 r1024
+label resolution en Resolution
+label resolution ru Разрешение
+label resolution de Auflösung
+label resolution zh 分辨率
+label resolution fr Résolution
+label resolution es Resolución
+label resolution it Risoluzione
+label resolution.r640 en 640x480
+label resolution.r800 en 800x600
+label resolution.r1024 en 1024x768
 option bars switch on
-label bars en Black bars (4:3 frame)
-label bars ru Чёрные полосы (кадр 4:3)
-label bars de Schwarze Balken (4:3-Bild)
-label bars zh 黑边（4:3画面）
-label bars fr Bandes noires (image 4:3)
-label bars es Barras negras (imagen 4:3)
-label bars it Bande nere (immagine 4:3)
-option filter number 1 2 1 1
-label filter en Textures (1 bilinear, 2 nearest)
-label filter ru Текстуры (1 билинейная, 2 ближайший)
-label filter de Texturen (1 bilinear, 2 nächster Nachbar)
-label filter zh 纹理（1 双线性，2 最近邻）
-label filter fr Textures (1 bilinéaire, 2 plus proche)
-label filter es Texturas (1 bilineal, 2 más cercano)
-label filter it Texture (1 bilineare, 2 più vicino)
-option cap number 0 2 1 1
-label cap en Frame cap (0 off, 1 60, 2 30)
-label cap ru Лимит кадров (0 выкл., 1 — 60, 2 — 30)
-label cap de Bildratenbegrenzung (0 aus, 1 60, 2 30)
-label cap zh 帧率上限（0 关，1 60，2 30）
-label cap fr Limite d'images (0 non, 1 60, 2 30)
-label cap es Límite de fotogramas (0 no, 1 60, 2 30)
-label cap it Limite di fotogrammi (0 no, 1 60, 2 30)
+label bars en 4:3 bars
+label bars ru Рамка 4:3
+label bars de 4:3-Balken
+label bars zh 4:3黑边
+label bars fr Bandes 4:3
+label bars es Barras 4:3
+label bars it Bande 4:3
+option filter choice bilinear bilinear nearest
+label filter en Textures
+label filter ru Текстуры
+label filter de Texturen
+label filter zh 纹理
+label filter fr Textures
+label filter es Texturas
+label filter it Texture
+label filter.bilinear en Bilinear
+label filter.bilinear ru Билинейная
+label filter.bilinear de Bilinear
+label filter.bilinear zh 双线性
+label filter.bilinear fr Bilinéaire
+label filter.bilinear es Bilineal
+label filter.bilinear it Bilineare
+label filter.nearest en Nearest
+label filter.nearest ru Ближайший
+label filter.nearest de Nächster
+label filter.nearest zh 最近邻
+label filter.nearest fr Proche
+label filter.nearest es Cercano
+label filter.nearest it Vicino
+option cap choice fps60 off fps60 fps30
+label cap en Frame cap
+label cap ru Лимит кадров
+label cap de Bildrate
+label cap zh 帧率上限
+label cap fr Limite d'images
+label cap es Límite de FPS
+label cap it Limite FPS
+label cap.off en Off
+label cap.off ru Нет
+label cap.off de Aus
+label cap.off zh 关
+label cap.off fr Aucune
+label cap.off es Ninguno
+label cap.off it Nessuno
+label cap.fps60 en 60 fps
+label cap.fps60 ru 60 к/с
+label cap.fps60 de 60 fps
+label cap.fps60 zh 60 帧
+label cap.fps60 fr 60 i/s
+label cap.fps60 es 60 fps
+label cap.fps60 it 60 fps
+label cap.fps30 en 30 fps
+label cap.fps30 ru 30 к/с
+label cap.fps30 de 30 fps
+label cap.fps30 zh 30 帧
+label cap.fps30 fr 30 i/s
+label cap.fps30 es 30 fps
+label cap.fps30 it 30 fps
 option banding switch off
-label banding en 16-bit colour banding
-label banding ru Полосатость 16-битного цвета
-label banding de 16-Bit-Farbbänder
-label banding zh 16位色彩条纹
-label banding fr Bandes de couleur 16 bits
-label banding es Bandas de color de 16 bits
-label banding it Bande di colore a 16 bit
+label banding en 16-bit banding
+label banding ru 16-бит цвет
+label banding de 16-Bit-Farbe
+label banding zh 16位色
+label banding fr Couleur 16 bits
+label banding es Color 16 bits
+label banding it Colore 16 bit
 
 on frame
 if opt.resolution == 0
@@ -77,11 +115,11 @@ if opt.bars
 do render.aspect 4:3
 
 on frame
-if opt.filter == 1
+if opt.filter == 0
 do render.filter bilinear
 
 on frame
-if opt.filter == 2
+if opt.filter == 1
 do render.filter nearest
 
 on frame

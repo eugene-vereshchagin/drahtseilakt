@@ -44,6 +44,8 @@ pub const MAX_ALL_ACTIONS: usize = 256;
 pub const MAX_DEPTH: usize = 16;
 pub const MAX_NODES: usize = 64;
 pub const MAX_KEYS: usize = 8;
+/// The most choices of a choice option.
+pub const MAX_CHOICES: usize = 12;
 /// The largest readme or licence beside mod.txt (never read by the game, only allowed to be there).
 pub const MAX_SIDE_FILE: u64 = 64 * 1024;
 /// The most entries of a mods folder looked at (a guard against a folder of millions; real ones hold a few).
@@ -578,6 +580,9 @@ pub enum OptKind {
     },
     /// One of a few keys (winit's names); the value is its place.
     Key(Vec<String>),
+    /// One of a few named choices (names like option names); the value is its place, so rules compare with 0, 1, ...;
+    /// settings and replays keep the name, the mod page shows the choice's label `<option>.<name>`.
+    Choice(Vec<String>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -602,7 +607,7 @@ impl OptSpec {
                     v
                 }
             }
-            OptKind::Key(list) => v.round().clamp(0.0, list.len().saturating_sub(1) as f32),
+            OptKind::Key(list) | OptKind::Choice(list) => v.round().clamp(0.0, list.len().saturating_sub(1) as f32),
         }
     }
 
@@ -611,7 +616,7 @@ impl OptSpec {
         match &self.kind {
             OptKind::Switch => if truth(v) { "on" } else { "off" }.to_owned(),
             OptKind::Number { .. } => format!("{}", self.clamp(v)),
-            OptKind::Key(list) => list
+            OptKind::Key(list) | OptKind::Choice(list) => list
                 .get(self.clamp(v) as usize)
                 .cloned()
                 .unwrap_or_default(),
@@ -630,7 +635,7 @@ impl OptSpec {
                 let v: f32 = s.parse().ok().filter(|v: &f32| v.is_finite())?;
                 (*min..=*max).contains(&v).then(|| self.clamp(v))
             }
-            OptKind::Key(list) => list.iter().position(|k| k == s).map(|i| i as f32),
+            OptKind::Key(list) | OptKind::Choice(list) => list.iter().position(|k| k == s).map(|i| i as f32),
         }
     }
 
@@ -639,7 +644,7 @@ impl OptSpec {
         match &self.kind {
             OptKind::Switch => flag(!truth(v)),
             OptKind::Number { step, .. } => self.clamp(v + step * by as f32),
-            OptKind::Key(list) => {
+            OptKind::Key(list) | OptKind::Choice(list) => {
                 let n = list.len().max(1) as i64;
                 ((v as i64).saturating_add(i64::from(by)).rem_euclid(n)) as f32
             }
@@ -689,6 +694,11 @@ impl ModTxt {
         find(lang)
             .or_else(|| find("en"))
             .unwrap_or_else(|| name.to_owned())
+    }
+
+    /// The label of an option's choice (its name when there is none).
+    pub fn choice_label(&self, option: &str, choice: &str, lang: &str) -> String {
+        self.label(&format!("{option}.{choice}"), lang)
     }
 
     /// It changes the run (any sim action, or a practice deed that reaches into it): its runs are modded.
@@ -1114,7 +1124,22 @@ fn parse_option(rest: &str) -> Result<OptSpec, String> {
             }
             OptSpec { key: key.into(), kind: OptKind::Key(keys), default: 0.0 }
         }
-        _ => return Err("expected: option <name> switch on|off, number <min> <max> <step> <default>, key <K1,K2,...>".into()),
+        ("choice", [d, names @ ..]) => {
+            if names.len() < 2 || names.len() > MAX_CHOICES || !names.iter().all(|k| ident(k)) {
+                return Err(format!(
+                    "a choice option lists 2 to {MAX_CHOICES} choice names (lower-case letters, digits, _) after its default"
+                ));
+            }
+            let list: Vec<String> = names.iter().map(|k| (*k).to_owned()).collect();
+            if list.iter().enumerate().any(|(i, k)| list[..i].contains(k)) {
+                return Err("a choice named twice".into());
+            }
+            let Some(default) = list.iter().position(|k| k == d) else {
+                return Err("a choice option's default must be one of its choices".into());
+            };
+            OptSpec { key: key.into(), kind: OptKind::Choice(list), default: default as f32 }
+        }
+        _ => return Err("expected: option <name> switch on|off, number <min> <max> <step> <default>, choice <default> <name1> <name2> ..., key <K1,K2,...>".into()),
     };
     Ok(o)
 }
@@ -1473,7 +1498,12 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
                     .trim()
                     .split_once(char::is_whitespace)
                     .ok_or_else(|| at("expected: label <name> <lang> <text>".into()))?;
-                if !ident(name) || !LANGUAGES.contains(&lang) {
+                // `<option>.<choice>` labels a choice of a choice option
+                let named = match name.split_once('.') {
+                    Some((o, c)) => ident(o) && ident(c) && o.len() + c.len() < MAX_KEY,
+                    None => ident(name),
+                };
+                if !named || !LANGUAGES.contains(&lang) {
                     return Err(at("a bad label name or language".into()));
                 }
                 if m.labels.iter().any(|(n, l, _)| n == name && l == lang) {
@@ -1579,6 +1609,16 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
             conds.saturating_add(acts)
         })
         .fold(0usize, usize::saturating_add);
+    for o in &m.options {
+        if let OptKind::Choice(list) = &o.kind {
+            for c in list {
+                let n = format!("{}.{c}", o.key);
+                if !m.labels.iter().any(|(l, lang, _)| *l == n && lang == "en") {
+                    return Err(format!("choice \"{n}\" has no English label (label {n} en ...)"));
+                }
+            }
+        }
+    }
     if m.names.is_empty() {
         return Err("mod.txt names the mod in no language (name.en ...)".into());
     }
@@ -1791,6 +1831,45 @@ mod tests {
         };
         assert_eq!(e.eval(&S), 0.6);
         assert_eq!(m.label("strength", "de"), "Strength");
+    }
+
+    #[test]
+    fn a_choice_option_keeps_its_name_and_counts_from_zero() {
+        let t = "name.en T\noption q choice mid low mid high\nlabel q en Quality\nlabel q.low en Low\n\
+                 label q.mid en Mid\nlabel q.high en High\nlabel q.high ru Высоко\n";
+        let m = parse_mod_txt(t).unwrap();
+        let o = &m.options[0];
+        assert_eq!(o.default, 1.0);
+        assert_eq!(o.show(2.0), "high");
+        assert_eq!(o.parse("low"), Some(0.0));
+        assert_eq!(o.parse("1"), None);
+        assert_eq!(o.parse("nope"), None);
+        assert_eq!(o.stepped(2.0, 1), 0.0);
+        assert_eq!(o.stepped(0.0, -1), 2.0);
+        assert_eq!(o.clamp(9.0), 2.0);
+        assert_eq!(m.choice_label("q", "high", "ru"), "Высоко");
+        assert_eq!(m.choice_label("q", "high", "de"), "High");
+        for bad in [
+            "option q choice a a\n",
+            "option q choice a b\n",
+            "option q choice c a b\n",
+            "option q choice a a a\n",
+            "option q choice a a B\n",
+            "option q choice a\n",
+            "option q choice\n",
+            "option q choice a a b c d e f g h i j k l m\n",
+        ] {
+            assert!(
+                parse_mod_txt(&format!("name.en T\n{bad}label q.a en A\nlabel q.b en B\n")).is_err(),
+                "{bad}"
+            );
+        }
+        // a choice without an English label, a dotted label of no option's shape
+        assert!(parse_mod_txt("name.en T\noption q choice a a b\nlabel q.a en A\n").is_err());
+        assert!(parse_mod_txt("name.en T\nlabel q..a en A\n").is_err());
+        assert!(parse_mod_txt("name.en T\nlabel q.a.b en A\n").is_err());
+        let long = format!("name.en T\noption q choice a a {}\nlabel q.a en A\n", "b".repeat(60));
+        assert!(parse_mod_txt(&long).is_err());
     }
 
     #[test]

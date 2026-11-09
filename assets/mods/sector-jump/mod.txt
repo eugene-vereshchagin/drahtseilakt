@@ -20,14 +20,14 @@ requires 0.1
 option next key F7,PageUp
 option prev key F6,PageDown
 label next en Next sector key
-label next ru Клавиша: следующий сектор
+label next ru Сектор вперёд
 label next de Taste: nächster Sektor
 label next zh 下一区段键
 label next fr Touche : secteur suivant
 label next es Tecla: sector siguiente
 label next it Tasto: settore successivo
 label prev en Previous sector key
-label prev ru Клавиша: предыдущий сектор
+label prev ru Сектор назад
 label prev de Taste: voriger Sektor
 label prev zh 上一区段键
 label prev fr Touche : secteur précédent

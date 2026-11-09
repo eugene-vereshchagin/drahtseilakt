@@ -1450,6 +1450,10 @@ impl Menu {
                             s.key(None, &name)
                                 .unwrap_or_else(|| crate::modrt::key_text(&name))
                         }
+                        gamedata::mods::OptKind::Choice(_) => self.page_txt().map_or_else(
+                            || o.show(v),
+                            |t| t.choice_label(&o.key, &o.show(v), s.language()),
+                        ),
                         _ => o.show(v),
                     };
                     f.push((self.label(Line::ModOpt(k)), shown));
@@ -3407,6 +3411,8 @@ mod tests {
         ];
         let mut checked = 0;
         let mut seen_notes = 0;
+        // mod texts shortened in their middle (the mod page's labels and values, the mods' names)
+        let mut cut = std::collections::BTreeSet::new();
         for &(lang, _) in &LANGUAGES {
             for mode in [true, false] {
                 for (list, community, maps) in &lists {
@@ -3607,6 +3613,13 @@ mod tests {
                                 if !p.wrap && p.panel.is_none() && b[3] - b[1] > 1.4 * p.line {
                                     assert!(p.scale >= FIT_SHRINK - 1e-3, "two small lines: {at}");
                                 }
+                                // a mod page's option labels and values (and the mods' names) are never shortened
+                                if matches!(sc, Screen::ModPage | Screen::Mods) && !p.wrap && p.panel.is_none() {
+                                    let letters = p.text.chars().filter(|c| !c.is_whitespace()).count();
+                                    if p.quads.len() < letters {
+                                        cut.insert(format!("{lang} {:?} ({w}x{h})", p.text));
+                                    }
+                                }
                                 checked += 1;
                             }
                         }
@@ -3614,6 +3627,7 @@ mod tests {
                 }
             }
         }
+        assert!(cut.is_empty(), "mod texts are ellipsized: {cut:#?}");
         eprintln!("{checked} texts checked, {seen_notes} of them on notes");
         assert!(checked > 50_000, "only {checked} texts checked");
         assert!(seen_notes > 500, "only {seen_notes} note lines checked");
