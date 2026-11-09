@@ -302,3 +302,6 @@ at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 
 # the weak lost-mode push wanders ~25 s and the stones are gone; GAIN 4 does not help. Tried TRACE_LOST 8 + full push when lost:
 # breaks sector 2 (lost at s2 run tick 32, the ball pushed off; game over) — reverted. Next: handle the transformer hold
 # (ball held in the air at the trafo) in `trace`'s matching (match by trafo events/progress, not position), keep the gentle lost mode.
+# 2026-11-09 (main session): tried matching the trace at transformers by "held, then new kind" (jump run.k to the run's first tick
+# with the ball's new kind): it misfires in sector 2 (jumped to run tick 5053, 90 off, deaths at 1:30) — reverted. Such a jump
+# must be bounded (only to a held stretch within a few seconds of the matched tick, same transformer place). Not retried.
