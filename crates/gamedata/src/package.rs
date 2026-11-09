@@ -35,6 +35,8 @@ pub struct Package {
     pub title: String,
     pub author: Option<String>,
     pub version: Option<String>,
+    /// When it came out, as level.txt's `posted` says ("2012-03-01"), cleaned and capped like the version.
+    pub posted: Option<String>,
     /// Its title in other languages (level.txt's `title.<code>`, e.g. `title.ru`), each cleaned and capped as the
     /// title is: (language code, title).
     pub titles: Vec<(String, String)>,
@@ -130,6 +132,7 @@ pub fn examine(folder: &Path) -> Result<Package, Skipped> {
         title: info.title.unwrap_or_else(|| clean(&fallback, TITLE_MAX)),
         author: info.author,
         version: info.version,
+        posted: info.posted,
         titles: info.titles,
         order: info.order,
         hidden: info.hidden,
@@ -148,6 +151,7 @@ fn loose(file: &Path) -> Package {
         title: clean(&stem, TITLE_MAX),
         author: None,
         version: None,
+        posted: None,
         titles: Vec::new(),
         order: None,
         hidden: false,
@@ -184,6 +188,7 @@ pub struct Info {
     pub title: Option<String>,
     pub author: Option<String>,
     pub version: Option<String>,
+    pub posted: Option<String>,
     pub titles: Vec<(String, String)>,
     pub order: Option<u32>,
     pub hidden: bool,
@@ -248,6 +253,7 @@ pub fn parse_info(bytes: &[u8]) -> Info {
             "title" => (&mut info.title, TITLE_MAX),
             "author" => (&mut info.author, FIELD_MAX),
             "version" => (&mut info.version, FIELD_MAX),
+            "posted" => (&mut info.posted, FIELD_MAX),
             _ => continue,
         };
         let v = clean(value, slot.1);

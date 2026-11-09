@@ -1,0 +1,14 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Scary Maze v1.2
+title.zh = 恐怖迷宫V1.2
+author = Sterd
+version = 1.2
+posted = 2012-08-05
+difficulty = 6
+order = 9
+catalogue-difficulty = 3
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=gJif4Ky08VI (桜埜叶毣)
+video = https://www.youtube.com/watch?v=VDM9vq7OqhM (LacuS: Custom Level 47)

@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Totole Chicken (Bouillon)
+title.zh = 太太乐鸡(精)
+author = 傲骨银狼ヶ璇
+posted = 2010-08-27
+difficulty = 4
+order = 5
+catalogue-difficulty = 2
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=xSRaipnKJYE (桜埜叶毣)
+video = https://www.youtube.com/watch?v=wrAAQPa5ezs (LacuS: Custom Level 7)

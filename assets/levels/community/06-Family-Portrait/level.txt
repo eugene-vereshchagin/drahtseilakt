@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Family Portrait
+title.zh = 全家福
+author = vipeazone
+posted = 2012-03-01
+difficulty = 4
+order = 6
+catalogue-difficulty = 2
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=qdq8hBLqN_0 (桜埜叶毣)
+video = https://www.youtube.com/watch?v=53tTdt3YMwE (LacuS: Custom Level 54)

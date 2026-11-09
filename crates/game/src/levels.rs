@@ -730,3 +730,14 @@ pub fn shipped() -> Vec<gamedata::package::Package> {
         .filter(|p| !p.hidden)
         .collect()
 }
+
+/// The community maps shipped with the game (`assets/levels/community/NN-name/`: one map's `.nmo` and its level.txt,
+/// naming the author), in the order their level.txt gives. They are the maps of strangers, shown with thanks and
+/// credited in CREDITS.md; the folder is not one of the open-format levels (`shipped` does not list it).
+pub fn community() -> Vec<gamedata::package::Package> {
+    gamedata::resources::shipped_levels_root()
+        .map_or_else(Vec::new, |r| gamedata::package::scan(&r.join("community")).0)
+        .into_iter()
+        .filter(|p| !p.hidden)
+        .collect()
+}

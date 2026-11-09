@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Scarborough Fair
+title.zh = 斯卡布罗集市
+author = yyc12345
+posted = 2020-07-16
+difficulty = 2
+order = 1
+catalogue-difficulty = 1
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=k-GHCgitasM (桜埜叶毣)
+video = https://www.youtube.com/watch?v=YiMWDjlkOiQ (LacuS: Custom Level 42)

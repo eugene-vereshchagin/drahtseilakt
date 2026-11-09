@@ -117,6 +117,10 @@ enum Line {
     Level(usize),
     /// A kind of levels, by its place in LEVEL_KINDS.
     Kind(usize),
+    /// Our own levels (the shipped ones and the open-format folder's), offered in the classic mode.
+    Ours,
+    /// The community maps shipped with the game, credited to their authors (assets/levels/community).
+    Community,
     Map(usize),
     Music,
     Effects,
@@ -256,6 +260,9 @@ pub struct Menu {
     folder: Option<PathBuf>,
     /// The custom levels shown are our own (the shipped ones and the open-format folder's).
     own_list: bool,
+    /// The custom levels shown are the community maps shipped with the game (each with its author's name and the
+    /// thanks notice).
+    community: bool,
     /// The player's copy of the original is there: without it the levels are our own and the menu offers the import.
     copy: bool,
     /// The extended mode and its additions.
@@ -317,6 +324,7 @@ impl Menu {
             maps: Vec::new(),
             folder: None,
             own_list: false,
+            community: false,
             copy: data.has_copy(),
             features,
             volumes: [1.0; 2],
@@ -461,7 +469,13 @@ impl Menu {
                 Line::Credits,
                 Line::Exit,
             ],
-            Screen::Kinds => (0..LEVEL_KINDS.len()).map(Line::Kind).chain([Line::Back]).collect(),
+            // the extended mode: every kind, then the shipped community maps; the classic mode: the original (with a
+            // copy) or our own levels (without), and the shipped community maps
+            Screen::Kinds if self.features.has(Feature::CustomLevels) => {
+                (0..LEVEL_KINDS.len()).map(Line::Kind).chain([Line::Community, Line::Back]).collect()
+            }
+            Screen::Kinds if self.copy => vec![Line::Kind(0), Line::Community, Line::Back],
+            Screen::Kinds => vec![Line::Ours, Line::Community, Line::Back],
             Screen::Start => (0..self.entries.len())
                 .map(Line::Level)
                 .chain([Line::Back])
@@ -631,16 +645,23 @@ impl Menu {
             Action::None
         };
         match line {
-            // in the extended mode the levels come by kind; the original ones are the classic list
-            Line::Start if self.features.has(Feature::CustomLevels) => open(self, Screen::Kinds),
-            // without a copy the levels are our own (decisions.md, "The game plays out of the box")
-            Line::Start if !self.copy => {
+            // the levels come by kind: the original ones (the classic list) or, without a copy, our own (decisions.md,
+            // "The game plays out of the box"), and the community maps shipped with the game
+            Line::Start => open(self, Screen::Kinds),
+            Line::Ours => {
                 self.maps = own_levels();
                 self.folder = Some(crate::levels::dir(Kind::Open));
                 self.own_list = true;
+                self.community = false;
                 open(self, Screen::Custom)
             }
-            Line::Start => open(self, Screen::Start),
+            Line::Community => {
+                self.maps = crate::levels::community();
+                self.folder = None;
+                self.own_list = false;
+                self.community = true;
+                open(self, Screen::Custom)
+            }
             Line::Import => Action::Import,
             Line::Kind(k) => match LEVEL_KINDS.get(k) {
                 Some(Kind::Original) => open(self, Screen::Start),
@@ -650,6 +671,7 @@ impl Menu {
                     self.maps = if kind == Kind::Open { own_levels() } else { maps_in(&root) };
                     self.folder = Some(root);
                     self.own_list = false;
+                    self.community = false;
                     open(self, Screen::Custom)
                 }
                 None => Action::None,
@@ -737,6 +759,7 @@ impl Menu {
             _ => {
                 if self.screen() == Screen::Custom {
                     self.folder = None;
+                    self.community = false;
                 }
                 self.pop();
                 Action::None
@@ -1024,6 +1047,8 @@ impl Menu {
         match line {
             Line::Start => s.get("Menu_Main Button Start", "Start"),
             Line::Import => s.ours("import"),
+            Line::Ours => s.ours("own levels"),
+            Line::Community => s.ours("community maps"),
             Line::Kind(k) => match LEVEL_KINDS.get(k) {
                 Some(Kind::Original) => s.ours("kind original"),
                 Some(Kind::Remastered) => s.ours("kind remastered"),
@@ -1093,6 +1118,22 @@ impl Menu {
         self.maps.get(i).map(|p| p.title_in(self.strings.language()).replace('…', "..."))
     }
 
+    /// The community map `i`'s credit line: its author, version and year, as its level.txt gives them.
+    fn credit(&self, i: usize) -> String {
+        let Some(p) = self.maps.get(i) else { return String::new() };
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(a) = &p.author {
+            parts.push(format!("{} {a}", self.strings.ours("by")));
+        }
+        if let Some(v) = &p.version {
+            parts.push(format!("v{v}"));
+        }
+        if let Some(y) = &p.posted {
+            parts.push(y.chars().take(4).collect());
+        }
+        parts.join(", ").replace('…', "...")
+    }
+
     /// A switch's row: its label and yes or no.
     fn switch_field(&self, line: Line) -> (String, String) {
         let on = match line {
@@ -1121,6 +1162,7 @@ impl Menu {
             Screen::ModPage => self.label(Line::Mod(self.mod_page)),
             Screen::Language => s.ours("language"),
             Screen::Kinds => s.ours("levels"),
+            Screen::Custom if self.community => s.ours("community maps"),
             Screen::Custom if self.own_list => s.ours("own levels"),
             Screen::Custom => match self.folder.as_ref().and_then(|root| {
                 LEVEL_KINDS.iter().position(|&k| crate::levels::dir(k) == *root)
@@ -1270,7 +1312,9 @@ impl Menu {
                 "Textures: ambientCG.com (CC0), thank you",
             ]
             .iter()
-            .map(|l| ((*l).to_owned(), String::new()))
+            .map(|l| (*l).to_owned())
+            .chain((1..=3).map(|k| s.ours(&format!("community credit {k}"))))
+            .map(|l| (l, String::new()))
             .collect(),
             Screen::Highscore => self
                 .scores
@@ -1657,6 +1701,15 @@ impl Menu {
                     let y = 0.30 + row as f32 * 0.05;
                     label(&mut out, l, [0.31, y, 0.69, y + 0.05], &FONT_03);
                 }
+                if self.community {
+                    // the chosen map's author under the list, the authors' notice at the bottom
+                    if let Line::Map(m) = lines.get(self.chosen()).copied().unwrap_or(Line::Back) {
+                        label(&mut out, &self.credit(m), [LIST_X[0], 0.81, LIST_X[1], 0.85], &FONT_HELP);
+                    }
+                    let mut st = FONT_HINT;
+                    st.flags |= crate::ui::TEXT_WORDWRAP;
+                    label(&mut out, &self.strings.ours("community notice"), [0.27, 0.945, 0.73, 0.995], &st);
+                }
                 back_only(&mut out);
             }
             Screen::Highscore => {
@@ -1806,8 +1859,8 @@ impl Menu {
             }
             Screen::Credits => {
                 for (k, (l, _)) in self.fields(sc).iter().enumerate() {
-                    let y = 0.30 + k as f32 * 0.05;
-                    label(&mut out, l, [0.31, y, 0.69, y + 0.05], &FONT_03);
+                    let y = 0.20 + k as f32 * 0.045;
+                    label(&mut out, l, [0.25, y, 0.75, y + 0.045], &FONT_HELP);
                 }
                 back_only(&mut out);
             }
@@ -2289,6 +2342,7 @@ mod tests {
             maps: Vec::new(),
             folder: None,
             own_list: false,
+            community: false,
             copy: true,
             features: Features::new(extended),
             volumes: [1.0; 2],
@@ -2488,6 +2542,7 @@ mod tests {
                 title: format!("Level number {i} with a rather long title"),
                 author: None,
                 version: None,
+                posted: None,
                 titles: Vec::new(),
                 order: None,
                 hidden: false,
@@ -2548,6 +2603,7 @@ mod tests {
                 "Der längste Titel einer Karte überhaupt!".to_owned()][i % 3].clone(),
             author: None,
             version: None,
+            posted: None,
             titles: Vec::new(),
             order: None,
             hidden: false,
@@ -2758,7 +2814,8 @@ mod tests {
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Kinds, "levels by kind in the extended mode only");
         let kinds: Vec<String> = m.lines(Screen::Kinds).into_iter().map(|l| m.label(l)).collect();
-        assert_eq!(kinds[..4], ["Original", "Remastered", "Community maps", "Open format"]);
+        assert_eq!(kinds[..4], ["Original", "Remastered", "Your community maps", "Open format"]);
+        assert_eq!(kinds[4], "Community maps", "the maps shipped with the game come after the kinds");
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Start, "the original levels are the classic list");
     }
@@ -2782,6 +2839,8 @@ mod tests {
     #[test]
     fn locked_levels_are_skipped() {
         let mut m = menu(&[true, false, true], false);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Kinds, "the classic mode: the original levels and the community maps");
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Start);
         m.step(1);
@@ -2868,10 +2927,38 @@ mod tests {
         assert_eq!(m.lines(Screen::Main), [Line::Start, Line::Import, Line::Highscore, Line::Options, Line::Credits,
             Line::Exit]);
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.screen(), Screen::Custom, "Start shows our own levels");
+        assert_eq!(m.screen(), Screen::Kinds, "Start offers our levels and the community maps");
+        assert_eq!(m.lines(Screen::Kinds), [Line::Ours, Line::Community, Line::Back]);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Custom, "our own levels");
+        m.back();
         m.back();
         m.step(1);
         assert_eq!(m.enter(), Action::Import);
+    }
+
+    #[test]
+    fn the_community_maps_are_listed_in_order_with_their_authors() {
+        let mut m = menu(&[true], false);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.lines(Screen::Kinds), [Line::Kind(0), Line::Community, Line::Back], "the classic mode too");
+        m.step(1);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Custom);
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Community maps"));
+        assert_eq!(m.maps.len(), 13, "the thirteen shipped maps");
+        let orders: Vec<_> = m.maps.iter().map(|p| p.order).collect();
+        assert_eq!(orders, (1..=13).map(Some).collect::<Vec<_>>(), "in the order of the levels' own numbers");
+        assert!(m.maps.iter().all(|p| p.author.is_some() && p.posted.is_some()), "each credits its author");
+        assert!(m.credit(0).starts_with("by "), "{}", m.credit(0));
+        for lang in ["en", "ru", "de", "zh", "fr", "es", "it"] {
+            let s = crate::lang::Strings::ours_in(lang);
+            assert!(s.ours("community notice").len() > 30, "{lang}");
+            assert_ne!(s.ours("community notice"), "community notice", "{lang}");
+        }
+        assert!(crate::lang::Strings::ours_in("ru").ours("community notice").contains("спасибо им"));
+        m.back();
+        assert!(!m.community);
     }
 
     #[test]

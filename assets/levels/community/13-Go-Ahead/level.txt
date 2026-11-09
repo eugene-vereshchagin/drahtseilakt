@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Go Ahead v2.0
+title.zh = 勇往直前V2.0
+author = Gamepiaynmo
+version = 2.0
+posted = 2011-11-06
+difficulty = 10
+order = 13
+catalogue-difficulty = 5
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=LbRHsCtyPKo (桜埜叶毣)
