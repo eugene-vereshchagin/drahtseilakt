@@ -1452,7 +1452,7 @@ class LevelBuilder:
                 "below": round(float(bounds[0][1]) - FOG_BELOW, 2), "depth": FOG_DEPTH}
 
     def write(self, title, author, sky, start_ball, music, light=(1.0, 1.0, 1.0), bonus=100, licence=None,
-              extra=None, clouds=None):
+              extra=None, clouds=None, sector_balls=None):
         """Writes the level and its level.txt (with `extra` keys besides title, author, version, licence). `clouds`:
         the level's own choices for its sea of cloud (cloud_sea's cover, below, thickness, scale; cover 0 none)."""
         if self.narrow:
@@ -1477,7 +1477,8 @@ class LevelBuilder:
         K.write_open(self.out, self.meshes, self.nodes, self.materials, groups, sky=sky, start_ball=start_ball,
                      settings={"music": music, "light": list(light), "level_bonus": bonus, "tutorial": False,
                                "last_level": False, "parts": "own", **({"fog": fog} if fog else {}),
-                               **({"clouds": sea} if sea else {})},
+                               **({"clouds": sea} if sea else {}),
+                               **({"sector_balls": list(sector_balls)} if sector_balls and any(sector_balls) else {})},
                      generator=f"drahtseilakt levelkit.py {KIT_VERSION}")
         with open(os.path.join(self.out, "level.txt"), "w") as f:
             f.write(f"title = {title}\nauthor = {author}\nversion = 1\n")

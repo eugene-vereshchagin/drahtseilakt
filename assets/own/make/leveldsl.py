@@ -265,6 +265,9 @@ class Track:
         self.started = self.finished = False
         # the ball the way has from here on (the start's, then each transformer's)
         self.ball_kind = "wood"
+        # the ball each sector begins with: the ball the description has at its checkpoint (sector 1: none, the level's
+        # start ball); written as the level's settings `sector_balls`, for a run begun at a sector (--sector)
+        self.sector_balls = [None]
         self.bodies = []
         self.rail_ends = []
         self.start_at = None
@@ -644,6 +647,7 @@ class Track:
             if abs(self.head % 90) > 1e-6:
                 raise LevelError(f"line {line}: a checkpoint's heading must be a multiple of 90 (the camera's)")
             self.checkpoints += 1
+            self.sector_balls.append(self.ball_kind)
             self.sector_ends.append(self.along)
             self.pilot.way(self.pos, force=True)
             self.end_rails()
@@ -1307,7 +1311,7 @@ def _compile_level(path, cuts, dry=False):
     try:
         t.b.write(titles["en"], info["author"], sky=info["sky"], start_ball=f"Ball_{BALLS[info['ball']]}",
                   music=info["music"], light=info["light"], bonus=info["bonus"], licence="GPL-3.0-only",
-                  clouds=info.get("clouds"),
+                  clouds=info.get("clouds"), sector_balls=t.sector_balls,
                   extra={**{f"title.{k}": v for k, v in titles.items() if k != "en"},
                          **({"order": info["order"]} if "order" in info else {}),
                          **({"difficulty": info["difficulty"]} if "difficulty" in info else {})})
