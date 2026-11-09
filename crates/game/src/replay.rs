@@ -2,11 +2,11 @@
 // is identified by a hash of its file, so a replay never runs against the wrong data. A replay holds only our
 // input, never game data, so it can live in the repository.
 //
-//   drahtseilakt-replay 7        (1: recorded before the ball burst into pieces in transformers, 2: before the
+//   drahtseilakt-replay 8        (1: recorded before the ball burst into pieces in transformers, 2: before the
 //                                 pieces went after 20 s, 3: before the checkpoints followed their names, 4: before
 //                                 the loose objects were made of their module file's mesh, 5: before the camera
 //                                 looked along the reset point after a lost ball, 6: before a run begun at a sector took the
-//                                 sector's own ball; each played so)
+//                                 sector's own ball, 7: before the camera's start and respawn heading was the reset point's exact one; each played so)
 //   level <file name> <fnv-1a 64 of the file, hex>
 //   start <sector> <ball kind or -> <x,y,z or ->   (optional: a run begun elsewhere than the level start)
 //   mod <key> <fnv-1a 64 of its mod.txt, hex> [<option>=<value>]...   (optional, at most MAX_MODS: a mod that
@@ -17,18 +17,19 @@
 
 use std::fmt::Write as _;
 
-pub const FORMAT: &str = "drahtseilakt-replay 7";
+pub const FORMAT: &str = "drahtseilakt-replay 8";
 /// The format written (the number in `FORMAT`).
-pub const VERSION: u32 = 7;
+pub const VERSION: u32 = 8;
 /// The formats read: 1 (no bursts), 2 (the pieces lie until the ball is lost), 3 (the checkpoints in their group's
-/// order), 4 (the loose objects of their stand-ins' meshes), 5 (the respawn at the start heading), 6 and 7.
-const FORMATS: [&str; 7] = [
+/// order), 4 (the loose objects of their stand-ins' meshes), 5 (the respawn at the start heading), 6, 7 and 8.
+const FORMATS: [&str; 8] = [
     "drahtseilakt-replay 1",
     "drahtseilakt-replay 2",
     "drahtseilakt-replay 3",
     "drahtseilakt-replay 4",
     "drahtseilakt-replay 5",
     "drahtseilakt-replay 6",
+    "drahtseilakt-replay 7",
     FORMAT,
 ];
 
@@ -252,6 +253,18 @@ mod tests {
     }
 
     #[test]
+    fn format_8_round_trips_and_older_formats_still_read() -> Result<(), String> {
+        let mut r = Replay::new("Level_01.NMO", 0xabc);
+        r.record(1, 0);
+        assert_eq!(r.version, 8);
+        assert!(r.to_text().starts_with("drahtseilakt-replay 8\n"));
+        assert_eq!(Replay::parse(&r.to_text())?, r);
+        let old = Replay::parse("drahtseilakt-replay 7\nlevel a 1\n1 00\nend 1")?;
+        assert_eq!(old.version, 7);
+        Ok(())
+    }
+
+    #[test]
     fn a_modded_run_names_its_mods_and_a_classic_one_none() -> Result<(), String> {
         let mut r = Replay::new("Level_01.NMO", 0xabc);
         r.record(1, 0);
@@ -300,9 +313,9 @@ mod tests {
         assert_eq!(five.version, 5);
         let six = Replay::parse("drahtseilakt-replay 6\nlevel a 1\n1 01\nend 5").expect("format 6 still reads");
         assert_eq!(six.version, 6);
-        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 7");
-        assert_eq!(new.version, 7);
-        assert!(Replay::parse("drahtseilakt-replay 8\nlevel a 1\nend 1").is_err(), "a later format is refused");
+        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 8");
+        assert_eq!(new.version, 8);
+        assert!(Replay::parse("drahtseilakt-replay 9\nlevel a 1\nend 1").is_err(), "a later format is refused");
         let mut kept = Replay::new("a", 1);
         kept.version = 2;
         assert_eq!(Replay::parse(&kept.to_text())?.version, 2, "an older format is written as it is");

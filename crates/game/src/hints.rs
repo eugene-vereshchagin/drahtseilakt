@@ -489,6 +489,7 @@ fn view(quarter: i32) -> crate::sim::Camera {
     crate::sim::Camera {
         quarter,
         yaw: 0.0,
+        base: 0.0,
         lift: 0.0,
         position: Vec3::ZERO,
         step: Vec3::ZERO,
