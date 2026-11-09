@@ -267,3 +267,7 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # tube geometry at (190..196, -337..-346, -1135..-1148) (is the pair a groove whose lower tube is the track? where does the inner tube
 # end?), try faster (9-10) on the first turn, or record the owner's ride there (--record from CP4, 477-484 s of the video).
 # Not done: hints/Level_13-s5.txt, the chain s3+s4+s5 in one file, hints/runs/pilot-L13-full.replay.
+# 2026-11-09 SECTOR 5 SOLVED (hints/Level_13-s5.txt, run hints/runs/pilot-L13-s5.replay, finished 01:50.48 from CP4): the coil A05_Rail_04 goes UP
+# (video 551-590 s, export): one thin tube, axis (340.0, -614.5), centre line r 5.6, 3.6 a turn, ~16 turns, ccw from above; ball wedged at r ~4;
+# `round 340 -614.5 4 25 2400 -614` climbs it in ~20 s (speed 10 stalls and falls at y -666) and the top throws it to the balloon (z -586.7).
+# Chain from --sector 3 with s3+s4+s5 hint files concatenated does NOT work yet: stuck in sector 4 (the s4 replay hint needs the exact CP3 state).
