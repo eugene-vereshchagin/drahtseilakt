@@ -19,6 +19,12 @@
 //                           (`--sector N`) starts a recorded replay hint from, so those hints hold in a chain
 //   replay FILE FROM TO     a player's inputs of ticks FROM..TO of the replay FILE (a plain name beside the hint file),
 //                           turned to the test player's view
+//   trace FILE FROM TO [GAIN] the same stretch closed-loop: the replay is run once as the hints load, for the ball's
+//                           place and speed at each of its ticks; each tick the recorded arrows are the feed-forward,
+//                           plus a correction (times GAIN, 1 if not given; 0 is none) toward the recorded place and
+//                           speed at the matching point of the run (by progress along it, kept near one tick a tick),
+//                           turned into the arrows nearest it in the view now. Lost (over 4 units off): it steers to
+//                           the run's way ahead until it is on it again (or gives the ball back to the autopilot)
 //
 // The file is untrusted (hints may be shared): its size, the number of hints and steps and every number are capped,
 // and a malformed line refuses the whole file with its line number.
@@ -62,6 +68,10 @@ pub enum Step {
     Replay(PathBuf, u64, u64),
     /// A replay stretch read: the view's quarter at its first tick and the inputs of its ticks.
     Inputs(i32, Vec<u8>),
+    /// As written: a replay stretch to follow closed-loop, its file, ticks and correction gain.
+    Trace(PathBuf, u64, u64, f32),
+    /// A trace read: the recorded run's ball and pushes, a tick each.
+    Track(Box<Track>),
     /// Keep this far ahead of (behind, when negative) the loose body nearest the point as it rolls, for so many ticks.
     Lead(Vec3, f32, u64),
     /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most; going
@@ -95,6 +105,105 @@ pub enum Step {
     /// Go round the upright axis through the point (x, z) at the radius, at the speed (one way round or, negative,
     /// the other), for so many ticks or until the ball is above the point's height: up a helix of rails.
     Round(Vec3, f32, f32, u64),
+}
+
+/// A recorded run as a `trace` step follows it: for each tick of the stretch, the ball's place and speed before it,
+/// the world push the player's arrows gave in it, and whether the view was lifted.
+#[derive(Clone, PartialEq, Default)]
+pub struct Track {
+    pub pos: Vec<Vec3>,
+    pub vel: Vec<Vec3>,
+    pub push: Vec<Vec3>,
+    pub lift: Vec<bool>,
+    pub gain: f32,
+}
+
+impl std::fmt::Debug for Track {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Track({} ticks, gain {})", self.pos.len(), self.gain)
+    }
+}
+
+/// How a trace keeps to its run: the correction's pull per unit off the recorded place and per unit/s off its speed.
+const TRACE_KP: f32 = 0.35;
+const TRACE_KD: f32 = 0.25;
+/// The matching point is looked for this many ticks ahead of the last; skipping ahead costs this many units a
+/// second skipped (so a wait in the run, the ball still, is kept as time, not jumped over).
+const TRACE_WINDOW: usize = 90;
+const TRACE_SKIP_COST: f32 = 1.5;
+/// Further off the run than this the ball is lost: steered to the run's way this far ahead, looked for wider.
+const TRACE_LOST: f32 = 4.0;
+const TRACE_AHEAD: usize = 30;
+const TRACE_SEARCH: usize = 600;
+/// Lost this long, the trace ends (the autopilot takes over).
+const TRACE_GIVE_UP: u64 = 600;
+
+/// The nine arrow sets a trace chooses from (no Shift: the view is not turned).
+const ARROW_SETS: [u8; 9] = [
+    0,
+    input::UP,
+    input::DOWN,
+    input::LEFT,
+    input::RIGHT,
+    input::UP | input::LEFT,
+    input::UP | input::RIGHT,
+    input::DOWN | input::LEFT,
+    input::DOWN | input::RIGHT,
+];
+
+/// The world push of arrows with the view's axes (forward, right), as the sim gives it.
+pub fn push_of(bits: u8, forward: Vec3, right: Vec3) -> Vec3 {
+    let mut v = Vec3::ZERO;
+    if bits & input::UP != 0 {
+        v += forward;
+    }
+    if bits & input::DOWN != 0 {
+        v -= forward;
+    }
+    if bits & input::SHIFT == 0 {
+        if bits & input::RIGHT != 0 {
+            v += right;
+        }
+        if bits & input::LEFT != 0 {
+            v -= right;
+        }
+    }
+    v
+}
+
+/// The arrow set whose push is nearest `want` (flat) with the view's axes, and what is left of `want`.
+pub fn nearest_arrows(want: Vec3, forward: Vec3, right: Vec3) -> (u8, Vec3) {
+    let want = Vec3::new(want.x, 0.0, want.z);
+    let mut best = (0u8, want, f32::INFINITY);
+    for bits in ARROW_SETS {
+        let left = want - push_of(bits, forward, right);
+        let d = left.length_squared();
+        if d < best.2 - 1e-6 {
+            best = (bits, left, d);
+        }
+    }
+    (best.0, best.1)
+}
+
+/// The tick of `track` the ball matches, from `k` on: the nearest recorded place within the window, a skip ahead
+/// and staying costing `TRACE_SKIP_COST` units a second off one tick a tick; `wide` looks further
+/// and without the cost (a lost ball found again).
+pub fn match_tick(track: &Track, k: usize, ball: Vec3, wide: bool) -> usize {
+    let n = track.pos.len();
+    if n == 0 {
+        return 0;
+    }
+    let end = (k + if wide { TRACE_SEARCH } else { TRACE_WINDOW }).min(n - 1);
+    let mut best = (k.min(n - 1), f32::INFINITY);
+    for j in k.min(n - 1)..=end {
+        let Some(p) = track.pos.get(j) else { break };
+        let skip = (j as f32 - (k + 1) as f32).abs() / 60.0;
+        let cost = p.distance(ball) + if wide { 0.0 } else { TRACE_SKIP_COST * skip };
+        if cost < best.1 {
+            best = (j, cost);
+        }
+    }
+    best.0
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -338,6 +447,21 @@ fn step(words: &[&str]) -> Result<Step, String> {
             }
             Step::Replay(PathBuf::from(file), from, to)
         }
+        "trace" => {
+            let file = plain_name(w.next().ok_or("trace needs a file")?)?;
+            let (from, to) = (ticks(w.next())?, ticks(w.next())?);
+            if to <= from {
+                return Err("trace's ticks must grow".into());
+            }
+            let gain = match w.next() {
+                Some(g) => num(Some(g))?,
+                None => 1.0,
+            };
+            if !(0.0..=4.0).contains(&gain) {
+                return Err("trace's gain is 0 to 4".into());
+            }
+            Step::Trace(PathBuf::from(file), from, to, gain)
+        }
         other => return Err(format!("unknown step \"{other}\"")),
     };
     if w.next().is_some() {
@@ -419,7 +543,7 @@ pub fn parse(text: &str) -> Result<Vec<Hint>, String> {
     let replays = out
         .iter()
         .flat_map(|h| &h.steps)
-        .filter(|s| matches!(s, Step::Replay(..)))
+        .filter(|s| matches!(s, Step::Replay(..) | Step::Trace(..)))
         .count();
     if replays > MAX_REPLAY_STEPS {
         return Err(format!("more than {MAX_REPLAY_STEPS} replay steps"));
@@ -619,6 +743,10 @@ struct Running {
     /// In a flow zone (zones.rs) the step is run without its stop: a goto rolled through, a wait or hold left out,
     /// a slow pass or press taken at `FLOW_SPEED`, when a copy of the run shows the ball is kept so.
     flowed: bool,
+    /// A trace's matching tick of its run, what its arrows left of the push wanted, and since when it is lost.
+    k: usize,
+    residual: Vec3,
+    lost_since: Option<u64>,
 }
 
 /// A step ending with the ball this far below its point has lost it to a floor beneath (`Runner::off_course`).
@@ -743,7 +871,10 @@ impl Runner {
     pub fn replaying(&self) -> bool {
         self.running.as_ref().is_some_and(|r| {
             let step = self.hints.get(r.hint).and_then(|h| h.steps.get(r.step));
-            matches!(step, Some(Step::Replay(..) | Step::Inputs(..)))
+            matches!(
+                step,
+                Some(Step::Replay(..) | Step::Inputs(..) | Step::Trace(..) | Step::Track(..))
+            )
         })
     }
 }
@@ -823,6 +954,9 @@ impl Runner {
                 pushes: Vec::new(),
                 passed: None,
                 flowed: false,
+                k: 0,
+                residual: Vec3::ZERO,
+                lost_since: None,
             });
             self.begin(sim);
         }
@@ -890,6 +1024,9 @@ impl Runner {
         run.from = Vec3::ZERO;
         run.pushes.clear();
         run.flowed = false;
+        run.k = 0;
+        run.residual = Vec3::ZERO;
+        run.lost_since = None;
         let step = self.hints.get(run.hint).and_then(|h| h.steps.get(run.step));
         if let Some(Step::Inputs(q, _)) = step {
             run.quarter = *q;
@@ -1314,7 +1451,14 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 0
             })
         }
-        Step::Replay(..) => None,
+        Step::Replay(..) | Step::Trace(..) => None,
+        Step::Track(track) => {
+            if t == 0 && sim.is_held() {
+                run.start = run.start.saturating_add(1);
+                return Some(0);
+            }
+            trace(track, run, sim, t)
+        }
         Step::Inputs(_, inputs) => {
             // a transformer holding the ball as the step begins holds its recorded run too: it starts as the ball
             // is let go, in step with the player's whatever way the ball came in (later holds are the player's own)
@@ -1339,9 +1483,101 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     }
 }
 
+/// A trace's input this tick: the recorded push where the ball is along the run, plus the pull back onto it, as the
+/// arrows nearest (the part they miss carried to the next tick); lost, toward the run's way ahead.
+fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
+    let n = track.pos.len();
+    let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+    let ball = &sim.ball;
+    if n == 0 || run.k + 1 >= n || t > n as u64 + TRACE_GIVE_UP * 2 {
+        return None;
+    }
+    let lost = run.lost_since.is_some();
+    run.k = match_tick(track, run.k, ball.position, lost);
+    let k = run.k;
+    let at = *track.pos.get(k)?;
+    let off = at.distance(ball.position);
+    let (fwd, right) = (sim.camera.push_forward(), sim.camera.push_right());
+    let lift = if track.lift.get(k).copied().unwrap_or(false) {
+        input::LIFT
+    } else {
+        0
+    };
+    if off > TRACE_LOST {
+        if run.lost_since.is_none() {
+            eprintln!("  trace lost at tick {} (run tick {k}, {off:.1} off)", sim.tick);
+        }
+        let since = *run.lost_since.get_or_insert(sim.tick);
+        if sim.tick > since + TRACE_GIVE_UP {
+            return None;
+        }
+        run.residual = Vec3::ZERO;
+        let q = *track.pos.get((k + TRACE_AHEAD).min(n - 1))?;
+        let want = flat(q - ball.position).clamp_length_max(6.0) / 6.0 - 0.15 * flat(ball.velocity);
+        return Some(nearest_arrows(want, fwd, right).0 | lift);
+    }
+    if run.lost_since.take().is_some() {
+        eprintln!("  trace on its run again at tick {} (run tick {k})", sim.tick);
+    }
+    let ff = track.push.get(k).copied().unwrap_or(Vec3::ZERO);
+    let v_at = track.vel.get(k).copied().unwrap_or(Vec3::ZERO);
+    let pull = (TRACE_KP * flat(at - ball.position) + TRACE_KD * flat(v_at - ball.velocity))
+        .clamp_length_max(1.5)
+        * track.gain;
+    let (bits, left) = nearest_arrows(ff + pull + run.residual, fwd, right);
+    run.residual = left.clamp_length_max(1.0);
+    Some(bits | lift)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn a_trace_step_parses_with_its_gain() {
+        let h = parse("at 0 0 0 r 5 : trace run.replay 10 90 ; trace run.replay 0 5 0.5").unwrap();
+        assert_eq!(h[0].steps[0], Step::Trace(PathBuf::from("run.replay"), 10, 90, 1.0));
+        assert_eq!(h[0].steps[1], Step::Trace(PathBuf::from("run.replay"), 0, 5, 0.5));
+        assert!(parse("at 0 0 0 r 5 : trace run.replay 9 9").is_err());
+        assert!(parse("at 0 0 0 r 5 : trace run.replay 0 9 5").is_err());
+        assert!(parse("at 0 0 0 r 5 : trace ../run.replay 0 9").is_err());
+        let line = "at 0 0 0 r 5 : trace run.replay 1 2";
+        assert!(parse(&vec![line; 17].join("\n")).is_err(), "traces count as replays");
+    }
+
+    #[test]
+    fn a_trace_picks_the_arrows_nearest_its_push() {
+        let (f, r) = (Vec3::Z, Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(nearest_arrows(Vec3::Z, f, r).0, input::UP);
+        assert_eq!(nearest_arrows(Vec3::new(0.9, 0.0, 0.9), f, r).0, input::UP | input::RIGHT);
+        assert_eq!(nearest_arrows(Vec3::new(-1.0, 0.0, -0.1), f, r).0, input::LEFT);
+        assert_eq!(nearest_arrows(Vec3::new(0.1, 0.0, 0.0), f, r).0, 0);
+        // a view turned: forward is world -X
+        let (f, r) = (Vec3::NEG_X, Vec3::new(0.0, 0.0, 1.0));
+        assert_eq!(nearest_arrows(Vec3::NEG_X, f, r).0, input::UP);
+        assert_eq!(nearest_arrows(Vec3::Z, f, r).0, input::RIGHT);
+        // a half push left over: carried, so two ticks give one arrow press
+        let (bits, left) = nearest_arrows(Vec3::new(0.0, 0.0, 0.4), Vec3::Z, Vec3::X);
+        assert_eq!(bits, 0);
+        assert_eq!(nearest_arrows(Vec3::new(0.0, 0.0, 0.4) + left, Vec3::Z, Vec3::X).0, input::UP);
+    }
+
+    #[test]
+    fn a_trace_matches_by_progress_but_keeps_a_wait() {
+        let mut track = Track::default();
+        // ten ticks still at the origin, then one unit a tick along x
+        for i in 0..40 {
+            track.pos.push(Vec3::new((i.max(10) - 10) as f32, 0.0, 0.0));
+        }
+        // still at the start: one tick on, not to the wait's end
+        assert_eq!(match_tick(&track, 0, Vec3::ZERO, false), 1);
+        // the ball ahead of the run: matched ahead
+        assert_eq!(match_tick(&track, 12, Vec3::new(8.0, 0.0, 0.0), false), 18);
+        // never back
+        assert_eq!(match_tick(&track, 30, Vec3::ZERO, false), 30);
+        // lost: found again further
+        assert_eq!(match_tick(&track, 0, Vec3::new(25.0, 0.0, 0.0), true), 35);
+    }
+
     #[test]
     fn a_sync_step_parses_with_its_default_ticks() {
         let h = parse("at 0 0 0 r 5 : sync 1 2 3 ; sync 1 2 3 40").unwrap();

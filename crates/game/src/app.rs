@@ -2394,6 +2394,11 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
     let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
     for h in &mut hints {
         for step in &mut h.steps {
+            if let crate::hints::Step::Trace(file, from, to, gain) = step {
+                let track = load_track(&dir.join(&*file), *from, *to, *gain, data, o)?;
+                *step = crate::hints::Step::Track(Box::new(track));
+                continue;
+            }
             let crate::hints::Step::Replay(file, from, to) = step else {
                 continue;
             };
@@ -2430,6 +2435,55 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
         println!("{} hints from {}", hints.len(), path.display());
     }
     Ok(hints)
+}
+
+/// A trace step's run: the replay `file` played (headless, from its own start) to tick `from`, then the ball's place
+/// and speed and the push of the player's arrows at each tick to `to`.
+fn load_track(
+    file: &Path,
+    from: u64,
+    to: u64,
+    gain: f32,
+    data: &Data,
+    o: &Options,
+) -> Result<crate::hints::Track, String> {
+    let bytes = crate::hints::read_plain(file, crate::hints::MAX_REPLAY_FILE)?;
+    let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
+    let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
+    let mut watch = o.clone();
+    watch.replay = Some(file.to_path_buf());
+    watch.follow = None;
+    watch.autopilot = false;
+    let mut seen = Game::new(&watch, data)?;
+    while seen.sim.tick < from && !seen.sim.game_over {
+        seen.tick(0);
+    }
+    let mut track = crate::hints::Track {
+        gain,
+        ..Default::default()
+    };
+    let mut changes = run.changes.iter().peekable();
+    let mut input = 0u8;
+    for t in 0..to {
+        // the input of tick t + 1 is the one the replay plays from the state at tick t (as for a replay step)
+        while let Some(&&(_, i)) = changes.peek().filter(|c| c.0 <= t + 1) {
+            input = i;
+            changes.next();
+        }
+        if t < from {
+            continue;
+        }
+        if seen.sim.game_over || seen.sim.finished {
+            break;
+        }
+        let cam = &seen.sim.camera;
+        track.pos.push(seen.sim.ball.position);
+        track.vel.push(seen.sim.ball.velocity);
+        track.push.push(crate::hints::push_of(input, cam.push_forward(), cam.push_right()));
+        track.lift.push(input & crate::sim::input::LIFT != 0);
+        seen.tick(0);
+    }
+    Ok(track)
 }
 
 /// A report of where the test player is stuck, for whoever writes its hints: what it knows of the place, and two
