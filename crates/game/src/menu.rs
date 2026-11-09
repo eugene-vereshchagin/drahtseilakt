@@ -377,8 +377,37 @@ impl Menu {
     /// The rows a list shows at once: the community maps leave room under them for the author and the notice.
     fn page_len(&self) -> usize {
         match self.screen() {
-            Screen::Custom if self.community => COMMUNITY_LINES,
+            Screen::Custom if self.note_below() => COMMUNITY_LINES,
             sc => page(sc),
+        }
+    }
+
+    /// Whether the open list has a note on a panel under its rows: the shipped community picks (author and thanks)
+    /// and the player's own maps folder (what it is, where it is).
+    fn note_below(&self) -> bool {
+        self.community
+            || self
+                .folder
+                .as_ref()
+                .is_some_and(|f| *f == crate::levels::dir(Kind::Community))
+    }
+
+    /// What a list or kind line is, in a sentence (the player's folder with its place), empty for the others.
+    fn describe(&self, line: Option<Line>) -> String {
+        let s = &self.strings;
+        let mine = |s: &Strings| {
+            let dir = crate::levels::dir(Kind::Community).display().to_string();
+            let home = std::env::var("HOME").unwrap_or_default();
+            let dir = match dir.strip_prefix(&home) {
+                Some(rest) if !home.is_empty() => format!("~{rest}"),
+                _ => dir,
+            };
+            format!("{}\n{dir}", s.ours("note mine"))
+        };
+        match line {
+            Some(Line::Community) => s.ours("note picks"),
+            Some(Line::Kind(k)) if LEVEL_KINDS.get(k) == Some(&Kind::Community) => mine(s),
+            _ => String::new(),
         }
     }
 
@@ -659,6 +688,80 @@ impl Menu {
             i = (i + by).rem_euclid(n.max(1));
             if self.selectable(screen, i as usize) {
                 self.set_chosen(i as usize);
+                return;
+            }
+        }
+    }
+
+    /// PageUp (-1) or PageDown (+1): a list moves by a page (the chosen row with it); the credits by a page of lines.
+    pub fn page_by(&mut self, by: isize) {
+        let sc = self.screen();
+        if sc == Screen::Credits {
+            for _ in 0..10 {
+                self.step(by);
+            }
+            return;
+        }
+        let n = self.list_len(sc);
+        let lines = self.page_len();
+        if !scrolls(sc) || n <= lines {
+            // a short screen: the first or the last line
+            return self.edge(by);
+        }
+        let c = self.chosen().min(n - 1);
+        let start = self.shown(n).start;
+        let moved = lines as isize * by;
+        let top = start.saturating_add_signed(moved).min(n - lines);
+        let at = c.saturating_add_signed(moved).min(n - 1);
+        self.top = top;
+        if let Some(s) = self.stack.last_mut() {
+            s.1 = at.clamp(top, top + lines - 1);
+        }
+    }
+
+    /// Home (-1) or End (+1): the first or the last line of the list (the last row, not Back).
+    pub fn edge(&mut self, by: isize) {
+        let sc = self.screen();
+        if sc == Screen::Credits {
+            self.credits_top = if by < 0 { 0 } else { self.credits_max.get() };
+            return;
+        }
+        let n = if scrolls(sc) {
+            self.list_len(sc)
+        } else {
+            self.lines(sc).len()
+        };
+        let order: Vec<usize> = if by < 0 { (0..n).collect() } else { (0..n).rev().collect() };
+        if let Some(i) = order.into_iter().find(|&i| self.selectable(sc, i)) {
+            self.set_chosen(i);
+            if scrolls(sc) {
+                self.top = if by < 0 { 0 } else { n.saturating_sub(self.page_len()) };
+            }
+        }
+    }
+
+    /// A letter typed on a long list: the next row (after the chosen one, round the list) whose title starts with it.
+    pub fn letter(&mut self, typed: &str) {
+        let sc = self.screen();
+        let Some(c) = typed.chars().next().filter(|c| c.is_alphanumeric()) else {
+            return;
+        };
+        if !scrolls(sc) || self.waiting() {
+            return;
+        }
+        let lines = self.lines(sc);
+        let n = self.list_len(sc);
+        let start = self.chosen();
+        let first = |l: Line| {
+            self.label(l)
+                .chars()
+                .find(|c| c.is_alphanumeric())
+                .is_some_and(|f| f.to_lowercase().eq(c.to_lowercase()))
+        };
+        for k in 1..=n {
+            let i = (start + k) % n.max(1);
+            if lines.get(i).is_some_and(|&l| first(l)) && self.selectable(sc, i) {
+                self.set_chosen(i);
                 return;
             }
         }
@@ -1917,12 +2020,12 @@ impl Menu {
             }
         };
         // the big buttons from 0.15 (or under a title from 0.30), 0.15 apart; Back at the bottom
-        let big = |out: &mut Vec<Quad>, top: f32| {
+        let big = |out: &mut Vec<Quad>, top: f32, last: f32| {
             let n = lines.iter().filter(|&&l| l != Line::Back).count().max(1);
-            let step = if top + 0.15 * (n as f32 - 1.0) <= 0.76 {
+            let step = if top + 0.15 * (n as f32 - 1.0) <= last + 0.02 {
                 0.15
             } else {
-                (0.74 - top) / (n as f32 - 1.0).max(1.0)
+                (last - top) / (n as f32 - 1.0).max(1.0)
             };
             let mut k = 0;
             for (i, &l) in lines.iter().enumerate() {
@@ -1950,6 +2053,12 @@ impl Menu {
             {
                 button(out, BACK_RECT, BACK_UV, state(i), Some(Target::Line(i)));
                 label_ball(out, &self.label(lines[i]), BACK_RECT, &FONT_01, BALL_BACK);
+                // Esc leaves a long list from any row
+                if scrolls(sc) {
+                    let mut st = FONT_HINT;
+                    st.align = crate::ui::ALIGN_LEFT;
+                    label(out, &self.strings.ours("esc back"), [0.595, 0.875, 0.698, 0.92], &st);
+                }
             }
         };
         // a field: its label at the top, its value under it (a yes/no pair, or text between arrows)
@@ -1978,10 +2087,16 @@ impl Menu {
             );
         };
         match sc {
-            Screen::Main | Screen::Pause | Screen::Dead | Screen::End => big(&mut out, 0.15),
+            Screen::Main | Screen::Pause | Screen::Dead | Screen::End => big(&mut out, 0.15, 0.74),
             Screen::Options | Screen::Kinds => {
                 title(&mut out);
-                big(&mut out, 0.30);
+                // the kinds leave room under them for what the chosen one is
+                big(&mut out, 0.30, if sc == Screen::Kinds { 0.62 } else { 0.74 });
+                if sc == Screen::Kinds {
+                    // what the chosen list is
+                    let about = self.describe(lines.get(self.chosen()).copied());
+                    note(&mut out, &about, NOTE_BOTTOM, true, NOTE_BOTTOM - 0.72);
+                }
             }
             Screen::Language => {
                 title(&mut out);
@@ -2083,14 +2198,26 @@ impl Menu {
                 scroll(&mut out, LIST_X[1] + 0.006, LIST_TOP, bottom, shown, n);
                 let said: Vec<String> = self.fields(sc).into_iter().map(|f| f.0).collect();
                 note(&mut out, &said.join("\n"), 0.30, false, 0.3);
-                if self.community {
-                    // the chosen map's author and the authors' notice, on one panel under the list
-                    let by = match lines.get(self.chosen()).copied() {
-                        Some(Line::Map(m)) => self.credit(m),
-                        _ => String::new(),
+                if self.note_below() {
+                    // what the list is; the chosen map's author and the authors' notice (the shipped picks), or where
+                    // the player's folder is, on one panel under the list
+                    let text = if self.community {
+                        let by = match lines.get(self.chosen()).copied() {
+                            Some(Line::Map(m)) => self.credit(m),
+                            _ => String::new(),
+                        };
+                        let notice = self.strings.ours("community notice");
+                        let about = self.strings.ours("note picks");
+                        if by.is_empty() {
+                            format!("{about}\n{notice}")
+                        } else {
+                            format!("{about}\n{by}\n{notice}")
+                        }
+                    } else {
+                        self.describe(Some(Line::Kind(
+                            LEVEL_KINDS.iter().position(|&k| k == Kind::Community).unwrap_or(0),
+                        )))
                     };
-                    let notice = self.strings.ours("community notice");
-                    let text = if by.is_empty() { notice } else { format!("{by}\n{notice}") };
                     let top = LIST_TOP + COMMUNITY_LINES as f32 * ROW_STEP + HINT_H + 0.008;
                     note(&mut out, &text, NOTE_BOTTOM, true, NOTE_BOTTOM - top);
                 }
@@ -2893,6 +3020,53 @@ fn finished(number: u32) -> bool {
     })
 }
 
+/// How long a held arrow or page key waits before it repeats, and how fast it repeats then (rows a second, more
+/// after a second of repeating).
+pub const REPEAT_DELAY: f32 = 0.35;
+const REPEAT_SLOW: f32 = 12.0;
+const REPEAT_FAST: f32 = 30.0;
+const REPEAT_FASTER_AT: f32 = 1.35;
+
+/// The menu's key repeat: the platform marks no repeats for us, so a held Up, Down, PageUp or PageDown is counted
+/// here from the time it has been down.
+#[derive(Default)]
+pub struct KeyRepeat {
+    held: Option<(winit::keyboard::KeyCode, f32, u32)>,
+}
+
+impl KeyRepeat {
+    /// A key went down: the repeatable ones start counting.
+    pub fn press(&mut self, code: winit::keyboard::KeyCode) {
+        use winit::keyboard::KeyCode as K;
+        self.held = matches!(code, K::ArrowUp | K::ArrowDown | K::PageUp | K::PageDown)
+            .then_some((code, 0.0, 0));
+    }
+
+    /// A key went up.
+    pub fn release(&mut self, code: winit::keyboard::KeyCode) {
+        if self.held.is_some_and(|h| h.0 == code) {
+            self.held = None;
+        }
+    }
+
+    /// Nothing is held (the menu closed).
+    pub fn clear(&mut self) {
+        self.held = None;
+    }
+
+    /// `dt` seconds passed: the held key and how many times it repeats in them.
+    pub fn advance(&mut self, dt: f32) -> Option<(winit::keyboard::KeyCode, u32)> {
+        let (code, t, done) = self.held.as_mut()?;
+        *t += dt;
+        let slow = (t.min(REPEAT_FASTER_AT) - REPEAT_DELAY).max(0.0) * REPEAT_SLOW;
+        let fast = (*t - REPEAT_FASTER_AT).max(0.0) * REPEAT_FAST;
+        let total = if *t < REPEAT_DELAY { 0 } else { 1 + (slow + fast) as u32 };
+        let due = total.saturating_sub(*done);
+        *done = total;
+        (due > 0).then_some((*code, due))
+    }
+}
+
 /// The screens whose lines scroll as a list above their Back.
 fn scrolls(screen: Screen) -> bool {
     matches!(screen, Screen::Custom | Screen::Mods | Screen::ModPage)
@@ -3301,6 +3475,100 @@ mod tests {
         assert_eq!(m.click(yes), Some(Action::Quit));
         m.click(no);
         assert_eq!(m.screen(), Screen::Main);
+    }
+
+    #[test]
+    fn a_held_key_repeats_after_a_delay_then_faster() {
+        use winit::keyboard::KeyCode as K;
+        let mut r = KeyRepeat::default();
+        r.press(K::ArrowDown);
+        assert_eq!(r.advance(0.30), None, "nothing before the delay");
+        assert_eq!(r.advance(0.06), Some((K::ArrowDown, 1)), "the first repeat at 0.35 s");
+        let mut n = 1;
+        for _ in 0..60 {
+            n += r.advance(1.0 / 60.0).map_or(0, |h| h.1);
+        }
+        // a second on: 12 rows a second until 1.35 s
+        assert!((12..=14).contains(&n), "{n}");
+        let before = n;
+        for _ in 0..60 {
+            n += r.advance(1.0 / 60.0).map_or(0, |h| h.1);
+        }
+        assert!(n - before >= 25, "faster after a second: {}", n - before);
+        r.release(K::ArrowDown);
+        assert_eq!(r.advance(1.0), None);
+        r.press(K::KeyA);
+        assert_eq!(r.advance(1.0), None, "a letter does not repeat");
+    }
+
+    #[test]
+    fn pages_ends_letters_and_back_work_on_a_long_list() {
+        let mut m = menu(&[true], true);
+        m.maps = (0..100)
+            .map(|i| Package {
+                level: PathBuf::from(format!("{i}.nmo")),
+                folder: PathBuf::from(format!("{i}.nmo")),
+                title: if i == 60 { "Zebra".to_owned() } else { format!("Level {i}") },
+                author: None,
+                version: None,
+                posted: None,
+                titles: Vec::new(),
+                order: None,
+                hidden: false,
+                difficulty: None,
+                titled: true,
+            })
+            .collect();
+        m.push(Screen::Custom);
+        m.page_by(1);
+        assert_eq!(m.chosen(), LIST_LINES);
+        m.page_by(1);
+        assert_eq!(m.chosen(), 2 * LIST_LINES);
+        m.page_by(-1);
+        assert_eq!(m.chosen(), LIST_LINES);
+        m.edge(1);
+        assert_eq!(m.chosen(), 99, "End: the last row, not Back");
+        assert_eq!(m.shown(100).end, 100);
+        m.edge(-1);
+        assert_eq!(m.chosen(), 0);
+        assert_eq!(m.shown(100).start, 0);
+        m.letter("z");
+        assert_eq!(m.chosen(), 60);
+        assert!(m.shown(100).contains(&60));
+        // Esc from a row deep in the list goes back at once
+        assert_eq!(m.back(), Action::None);
+        assert_ne!(m.screen(), Screen::Custom);
+    }
+
+    #[test]
+    fn back_stays_pinned_under_a_scrolling_list() {
+        let mut m = menu(&[true], true);
+        m.maps = (0..100)
+            .map(|i| Package {
+                level: PathBuf::from(format!("{i}.nmo")),
+                folder: PathBuf::from(format!("{i}.nmo")),
+                title: format!("Level {i}"),
+                author: None,
+                version: None,
+                posted: None,
+                titles: Vec::new(),
+                order: None,
+                hidden: false,
+                difficulty: None,
+                titled: true,
+            })
+            .collect();
+        m.push(Screen::Custom);
+        let screen = crate::ui::Screen { w: 1920.0, h: 1080.0 };
+        for _ in 0..3 {
+            m.page_by(1);
+            let rows: Vec<usize> = m
+                .hits(true, screen)
+                .iter()
+                .filter_map(|h| if let Target::Line(i) = h.target { Some(i) } else { None })
+                .collect();
+            assert_eq!(rows.last(), Some(&100), "Back is drawn after every scroll");
+        }
     }
 
     #[test]
@@ -3821,12 +4089,12 @@ mod tests {
             [
                 "Original",
                 "Remastered",
-                "Your community maps",
+                "My maps folder",
                 "Open format"
             ]
         );
         assert_eq!(
-            kinds[4], "Community maps",
+            kinds[4], "Community picks",
             "the maps shipped with the game come after the kinds"
         );
         assert_eq!(m.enter(), Action::None);
@@ -4018,7 +4286,7 @@ mod tests {
         m.step(1);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom);
-        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Community maps"));
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Community picks"));
         assert_eq!(m.maps.len(), 13, "the thirteen shipped maps");
         let orders: Vec<_> = m.maps.iter().map(|p| p.order).collect();
         assert_eq!(

@@ -1431,6 +1431,8 @@ fn window(
         last_shot: None,
         menu_ms: 0.0,
         held: std::collections::HashSet::new(),
+        key_repeat: Default::default(),
+        repeat_at: Instant::now(),
         pilot: pilot.map(|run| PilotWatch {
             run,
             paused: false,
@@ -3454,6 +3456,9 @@ struct App {
     history: std::collections::VecDeque<(Sim, Replay)>,
     /// The keys down now.
     held: std::collections::HashSet<KeyCode>,
+    /// A held arrow or page key in the menus repeats (menu.rs).
+    key_repeat: crate::menu::KeyRepeat,
+    repeat_at: Instant,
     /// The Graphics page's choices, and the sizes its resolution offers.
     graphics: crate::options::Graphics,
     resolutions: Vec<(u32, u32)>,
@@ -5156,8 +5161,28 @@ impl App {
             KeyCode::ArrowLeft => menu.adjust(-1),
             KeyCode::ArrowRight => menu.adjust(1),
             KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space => menu.enter(),
-            KeyCode::Escape => menu.back(),
-            _ => Action::None,
+            // Esc and Backspace leave any screen from any row
+            KeyCode::Escape | KeyCode::Backspace => menu.back(),
+            KeyCode::PageUp => {
+                menu.page_by(-1);
+                Action::None
+            }
+            KeyCode::PageDown => {
+                menu.page_by(1);
+                Action::None
+            }
+            KeyCode::Home => {
+                menu.edge(-1);
+                Action::None
+            }
+            KeyCode::End => {
+                menu.edge(1);
+                Action::None
+            }
+            _ => {
+                menu.letter(typed.unwrap_or_default());
+                Action::None
+            }
         };
         self.menu_action(action, event_loop);
     }
@@ -5287,10 +5312,14 @@ impl App {
         }
         if self.menu.is_some() {
             if down {
+                self.key_repeat.press(code);
                 self.menu_key(code, typed, event_loop);
+            } else {
+                self.key_repeat.release(code);
             }
             return;
         }
+        self.key_repeat.clear();
         // a key one of the mods' key options names (modrt.rs) is the mod's, also while the free camera flies (its
         // own key puts it down)
         if down && self.pilot.is_none() && self.mod_key(code) {
@@ -5975,7 +6004,19 @@ impl ApplicationHandler for App {
                 }
                 self.key(code, down, text.as_deref(), event_loop)
             }
-            WindowEvent::RedrawRequested => self.frame(),
+            WindowEvent::RedrawRequested => {
+                // a held arrow or page key in the menu repeats
+                let dt = self.repeat_at.elapsed().as_secs_f32().min(0.25);
+                self.repeat_at = Instant::now();
+                if self.menu.is_some()
+                    && let Some((code, n)) = self.key_repeat.advance(dt)
+                {
+                    for _ in 0..n {
+                        self.menu_key(code, None, event_loop);
+                    }
+                }
+                self.frame()
+            }
             // the mouse in the menus: the cursor chooses (only when it moves), a click presses, the wheel scrolls
             WindowEvent::CursorMoved { position, .. } => {
                 let at = Some((position.x, position.y));

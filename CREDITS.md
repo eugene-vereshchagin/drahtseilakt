@@ -4,7 +4,7 @@ Other credit files: `assets/own/CREDITS.md` (photo textures), `assets/sounds/sys
 
 ## Community maps shipped with the game
 
-Thirteen maps made by players of Ballance are shipped in `assets/levels/community/` and listed in the game under Start > Community maps (in the classic and the extended mode), in the order below: the catalogue's difficulty rises from 1 to 5. **These maps belong to their authors; they are shown here with thanks. If an author objects, we will remove the map.** (The same notice is shown in the game's menu and Credits screen, in every language of the interface.) The maps are the authors' unmodified files; each folder's `level.txt` names the author, the version, the date posted and the source. They are not covered by the game's licence.
+Thirteen maps made by players of Ballance are shipped in `assets/levels/community/` and listed in the game under Start > Community picks (in the classic and the extended mode), in the order below: the catalogue's difficulty rises from 1 to 5. **These maps belong to their authors; they are shown here with thanks. If an author objects, we will remove the map.** (The same notice is shown in the game's menu and Credits screen, in every language of the interface.) The maps are the authors' unmodified files; each folder's `level.txt` names the author, the version, the date posted and the source. They are not covered by the game's licence.
 
 Source of the list: the community catalogue [BallanceCustomMaps](https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md) by pseudoacetyl (MIT). Dates are the catalogue's "Posted"; difficulty is the catalogue's (1 easiest, 5 hardest).
 

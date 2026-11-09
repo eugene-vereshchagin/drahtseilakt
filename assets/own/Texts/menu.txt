@@ -63,7 +63,7 @@ sounds | Sounds | Звуки | Klänge | 音效 | Sons | Sonidos | Suoni
 levels | Levels | Уровни | Level | 关卡 | Niveaux | Niveles | Livelli
 kind original | Original | Оригинальные | Original | 原版 | Originaux | Originales | Originali
 kind remastered | Remastered | Ремастер | Remastered | 重制版 | Remasterisés | Remasterizados | Rimasterizzati
-kind community | Your community maps | Ваши карты сообщества | Eigene Community-Karten | 你的社区地图 | Vos cartes de la communauté | Tus mapas de la comunidad | Le tue mappe della comunità
+kind community | My maps folder | Мои карты | Mein Kartenordner | 我的地图文件夹 | Mes cartes | Mi carpeta de mapas | La mia cartella mappe
 kind open | Open format | Открытый формат | Offenes Format | 开放格式 | Format ouvert | Formato abierto | Formato aperto
 kind modified | Modified originals | Модифицированные оригиналы | Modifizierte Originale | 修改版原版 | Originaux modifiés | Originales modificados | Originali modificati
 modified set rotated | 45-Degree Rotated | Поворот на 45 градусов | 45 Grad gedreht | 旋转45度 | Rotation 45 degrés | Rotado 45 grados | Ruotato di 45 gradi
@@ -77,12 +77,15 @@ modified normal | Normal | Обычная | Normal | 普通 | Normal | Normal | 
 custom levels | Custom levels | Свои уровни | Eigene Level | 自定义关卡 | Niveaux perso | Niveles propios | Livelli personali
 import | Import | Импорт | Importieren | 导入 | Importer | Importar | Importa
 own levels | Our levels | Наши уровни | Unsere Level | 我们的关卡 | Nos niveaux | Nuestros niveles | I nostri livelli
-community maps | Community maps | Карты сообщества | Community-Karten | 社区地图 | Cartes de la communauté | Mapas de la comunidad | Mappe della comunità
+community maps | Community picks | Лучшие карты сообщества | Community-Auswahl | 社区精选 | Sélection communauté | Mapas destacados | Mappe scelte
 by | by | автор | von | 作者 | de | de | di
 community notice | These levels belong to their authors, shown here with thanks. If an author objects, we will remove the level. | Эти уровни принадлежат их авторам — спасибо им! Если автор против, мы удалим уровень. | Diese Level gehören ihren Autoren und sind hier mit Dank gezeigt. Wenn ein Autor widerspricht, entfernen wir das Level. | 这些关卡属于其作者，在此致谢展示。如作者反对，我们将移除该关卡。 | Ces niveaux appartiennent à leurs auteurs, présentés ici avec gratitude. Si un auteur s'y oppose, nous retirerons le niveau. | Estos niveles pertenecen a sus autores y se muestran aquí con agradecimiento. Si un autor se opone, retiraremos el nivel. | Questi livelli appartengono ai loro autori e sono mostrati qui con gratitudine. Se un autore si oppone, rimuoveremo il livello.
-community credit 1 | Community maps (Start, Community maps): | Карты сообщества (Старт, Карты сообщества): | Community-Karten (Start, Community-Karten): | 社区地图（开始，社区地图）： | Cartes de la communauté (Jouer, Cartes de la communauté) : | Mapas de la comunidad (Jugar, Mapas de la comunidad): | Mappe della comunità (Gioca, Mappe della comunità):
+community credit 1 | Community picks (Start, Community picks): | Лучшие карты сообщества (Старт, Лучшие карты сообщества): | Community-Auswahl (Start, Community-Auswahl): | 社区精选（开始，社区精选）： | Sélection communauté (Jouer, Sélection communauté) : | Mapas destacados (Jugar, Mapas destacados): | Mappe scelte (Gioca, Mappe scelte):
 community credit 2 | by their authors, shown with thanks; | принадлежат своим авторам, показаны с благодарностью; | gehören ihren Autoren, mit Dank gezeigt; | 属于其作者，在此致谢展示； | à leurs auteurs, présentées avec gratitude ; | de sus autores, con agradecimiento; | dei loro autori, con gratitudine;
 community credit 3 | if an author objects, we remove the level. | если автор против, мы удалим уровень. | wenn ein Autor widerspricht, entfernen wir es. | 如作者反对，我们将移除。 | si un auteur s'y oppose, nous la retirons. | si un autor se opone, la retiramos. | se un autore si oppone, la rimuoviamo.
+note picks | 13 maps by community authors, chosen and shipped with the game. | 13 карт от авторов сообщества, отобраны и идут вместе с игрой. | 13 Karten von Community-Autoren, ausgewählt und mit dem Spiel geliefert. | 13张社区作者的地图，精选并随游戏附带。 | 13 cartes d'auteurs de la communauté, choisies et fournies avec le jeu. | 13 mapas de autores de la comunidad, elegidos e incluidos con el juego. | 13 mappe di autori della comunità, scelte e incluse nel gioco.
+note mine | Your own maps: any map you put in this folder is listed here. | Ваши карты: любая карта из этой папки появится здесь. | Deine Karten: jede Karte in diesem Ordner erscheint hier. | 你自己的地图：放入此文件夹的地图都会列在这里。 | Vos cartes : toute carte placée dans ce dossier apparaît ici. | Tus mapas: cualquier mapa que pongas en esta carpeta aparece aquí. | Le tue mappe: ogni mappa messa in questa cartella compare qui.
+esc back | Esc: back | Esc: назад | Esc: zurück | Esc：返回 | Esc: retour | Esc: atrás | Esc: torna
 no levels | No levels here yet. Put them into | Здесь пока нет уровней. Положите их в | Noch keine Level hier. Lege sie in | 这里还没有关卡。请放入 | Aucun niveau ici. Placez-les dans | Aún no hay niveles. Ponlos en | Ancora nessun livello. Mettili in
 feature all-levels | All levels open? | Все уровни открыты? | Alle Level offen? | 开放全部关卡? | Niveaux ouverts ? | ¿Niveles abiertos? | Livelli aperti?
 feature best-times | Best times? | Лучшее время? | Bestzeiten? | 最佳时间? | Meilleurs temps ? | ¿Mejores tiempos? | Tempi migliori?

@@ -141,6 +141,7 @@ Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Men�
 - Texturpakete und Mods sind hier: die Pakete in den Zeilen Textures und Models ([packs.md](packs.md)), die Mods auf
   dem Bildschirm Mods ([mods.md](mods.md)), jeweils hinter einem eigenen Schalter; Inhalte Dritter werden auf eigenes
   Risiko gespielt.
+- **Lange Listen** (Start > Mein Kartenordner, Mods, modifizierte Originale): Esc oder Backspace (die Zurück-Taste des Pads) verlässt jede Zeile; Back bleibt unter der Liste fest, daneben der Hinweis "Esc: zurück". PageUp / PageDown blättern eine Seite, Home / End springen zur ersten / letzten Zeile, gehaltenes Hoch / Runter wiederholt sich (nach 0,35 s, 12 Zeilen pro Sekunde, 30 nach einer weiteren Sekunde), das Rad scrollt, ein getippter Buchstabe springt zum nächsten Titel mit diesem Anfang. *Community-Auswahl* sind die 13 mitgelieferten Karten (mit Autoren); *Mein Kartenordner* zeigt die Karten aus `levels/community/` im Datenordner des Spiels (der Pfad steht unter der Liste).
 
 ## Wörter, die passen, Listen, die sagen, dass sie scrollen
 

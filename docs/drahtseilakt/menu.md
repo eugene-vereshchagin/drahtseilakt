@@ -129,6 +129,7 @@ development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the or
 - Texture packs and mods are here: the packs on the Textures and Models lines ([packs.md](packs.md)), the mods on the
   Mods screen ([mods.md](mods.md)), each behind its own switch; third-party content is played at the player's own
   risk.
+- **Long lists** (Start > My maps folder, mods, modified originals): Esc or Backspace (the pad's back button) leaves from any row; Back stays pinned under the list, with an "Esc: back" hint beside it. PageUp / PageDown move a page, Home / End jump to the first / last row, a held Up / Down repeats (after 0.35 s, 12 rows a second, 30 after a second more), the wheel scrolls, and a typed letter jumps to the next title starting with it. *Community picks* are the 13 maps shipped with the game (credited); *My maps folder* lists the maps you put in `levels/community/` of the game's data folder (its path is shown under the list).
 
 ## Words that fit, lists that say they scroll
 
