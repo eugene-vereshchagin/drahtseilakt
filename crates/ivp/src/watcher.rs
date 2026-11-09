@@ -9,7 +9,7 @@
 
 use crate::collision::CollKind;
 use crate::core::World;
-use crate::hull::{encode_listener, ListenerKind};
+use crate::hull::{ListenerKind, encode_listener};
 use crate::ledge::Edge;
 use crate::math;
 use crate::mindist::{Feat, Mindist, ObjCache};
@@ -44,8 +44,10 @@ impl World {
         let now = self.env.current_time;
         for k in 0..2 {
             let obj = self.coll.watchers[w].objs[k];
-            let key = (f64::from(self.coll.hulls[obj].value_at(now)) + 1.000_000_020_040_877_3e20) as f32;
-            let slot = self.coll.hulls[obj].insert(encode_listener(ListenerKind::Watcher, w as u32), key);
+            let key =
+                (f64::from(self.coll.hulls[obj].value_at(now)) + 1.000_000_020_040_877_3e20) as f32;
+            let slot =
+                self.coll.hulls[obj].insert(encode_listener(ListenerKind::Watcher, w as u32), key);
             self.coll.watchers[w].hl_slots[k] = Some(slot);
         }
         self.watcher_check(w);
@@ -84,7 +86,8 @@ impl World {
         }
         let now = self.env.current_time;
         let key = (f64::from(self.coll.hulls[obj].value_at(now)) + r) as f32;
-        let slot = self.coll.hulls[obj].insert(encode_listener(ListenerKind::Watcher, w as u32), key);
+        let slot =
+            self.coll.hulls[obj].insert(encode_listener(ListenerKind::Watcher, w as u32), key);
         self.coll.watchers[w].hl_slots[k] = Some(slot);
     }
 
@@ -102,10 +105,16 @@ impl World {
             let me = objs[k];
             let other = objs[k ^ 1];
             let c_other = crate::manager::core_pos_at(&self.cores[other], now);
-            let reach = f64::from(self.coll.objs[me].extra_radius + self.cores[other].upper_limit_radius) + dist;
+            let reach =
+                f64::from(self.coll.objs[me].extra_radius + self.cores[other].upper_limit_radius)
+                    + dist;
             let ca = &caches[k];
             if self.coll.objs[me].kind == Some(crate::collision::ObjKind::Ball) {
-                let d = [c_other[0] - ca.vv[0], c_other[1] - ca.vv[1], c_other[2] - ca.vv[2]];
+                let d = [
+                    c_other[0] - ca.vv[0],
+                    c_other[1] - ca.vv[1],
+                    c_other[2] - ca.vv[2],
+                ];
                 let x = math::rtmul(&ca.r, &d);
                 let d2 = x[0] * x[0] + x[1] * x[1] + x[2] * x[2];
                 if !(reach * reach < d2) {
@@ -113,7 +122,11 @@ impl World {
                 }
                 continue;
             }
-            let d = [c_other[0] - ca.vv[0], c_other[1] - ca.vv[1], c_other[2] - ca.vv[2]];
+            let d = [
+                c_other[0] - ca.vv[0],
+                c_other[1] - ca.vv[1],
+                c_other[2] - ca.vv[2],
+            ];
             let c_os = math::rtmul(&ca.r, &d);
             let found = match self.coll.objs[me].surface.as_ref() {
                 Some(s) => s.ledges_within_radius(c_os, reach),
@@ -136,7 +149,10 @@ impl World {
                 if let Some(found) = found {
                     if keep < found {
                         self.coll.watchers[w].children.swap(keep, found);
-                        let (x, y) = (self.coll.watchers[w].children[keep], self.coll.watchers[w].children[found]);
+                        let (x, y) = (
+                            self.coll.watchers[w].children[keep],
+                            self.coll.watchers[w].children[found],
+                        );
                         self.coll.mds[x].child_index = keep as i32;
                         self.coll.mds[y].child_index = found as i32;
                     }
@@ -238,12 +254,18 @@ mod tests {
     #[test]
     fn a_two_piece_object_pairs_through_a_watcher_with_children_in_reach() {
         let mut w = World::new();
-        let q = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        let q = Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
         // object 0: two cubes, at x 0 and x 3 (two ledges of one surface)
         let a = w.core_init(0, q, [0.0; 3], false);
         w.cores[a].upper_limit_radius = 4.0;
         w.cores[a].movement_state = crate::core::MT_STATIC;
-        let two = Surface::compile(vec![cube_ledge([0.0; 3]), cube_ledge([3.0, 0.0, 0.0])]).expect("a surface");
+        let two = Surface::compile(vec![cube_ledge([0.0; 3]), cube_ledge([3.0, 0.0, 0.0])])
+            .expect("a surface");
         w.set_object_geometry(a, ObjKind::Polygon, Some(two), 0.0);
         // object 1: one cube at x 4 (its piece spans 4..5), moving; the core radius of object 0 covers its pieces
         let b = w.core_init(1, q, [4.0, 0.0, 0.0], false);
@@ -255,7 +277,9 @@ mod tests {
         w.enable_collision_detection(a);
         w.enable_collision_detection(b);
 
-        let watchers: Vec<usize> = (0..w.coll.watchers.len()).filter(|&i| w.coll.watchers[i].alive).collect();
+        let watchers: Vec<usize> = (0..w.coll.watchers.len())
+            .filter(|&i| w.coll.watchers[i].alive)
+            .collect();
         assert_eq!(watchers.len(), 1, "one watcher for the two-piece pair");
         let children = w.coll.watchers[watchers[0]].children.clone();
         assert!(!children.is_empty(), "the piece at x 3 is within reach");

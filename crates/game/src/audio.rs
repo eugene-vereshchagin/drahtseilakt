@@ -61,10 +61,18 @@ fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
     // another file of a pool is that file or nothing: falling back to the role's first could play a track twice in a
     // row (music.rs drops a track that does not decode; a sound plays its first file instead)
     if k > 0 {
-        let variant = if copy { None } else { gamedata::sound_themes::pool(name).into_iter().nth(k) };
+        let variant = if copy {
+            None
+        } else {
+            gamedata::sound_themes::pool(name).into_iter().nth(k)
+        };
         return variant.and_then(|path| decode_file(&path));
     }
-    let themed = if copy { Vec::new() } else { gamedata::sound_themes::files(name) };
+    let themed = if copy {
+        Vec::new()
+    } else {
+        gamedata::sound_themes::files(name)
+    };
     for path in own.chain(themed) {
         // a broken file is passed over for the next theme's
         if let Some(s) = decode_file(&path) {
@@ -88,7 +96,9 @@ fn load(data: &Data, name: &str) -> Option<Arc<Sound>> {
 
 /// A theme's sound file decoded (Ogg Vorbis or WAV, by its extension); none, with a note, when it is broken.
 fn decode_file(path: &std::path::Path) -> Option<Arc<Sound>> {
-    let ogg = path.extension().is_some_and(|x| x.eq_ignore_ascii_case("ogg"));
+    let ogg = path
+        .extension()
+        .is_some_and(|x| x.eq_ignore_ascii_case("ogg"));
     let decoded = read_capped(path)
         .ok_or_else(|| "unreadable".to_owned())
         .and_then(|b| if ogg { parse_ogg(&b) } else { parse_wav(&b) });
@@ -372,7 +382,14 @@ impl Variants {
         self.pools.entry(name.to_owned()).or_insert_with(|| {
             let own = data.level_own(&format!("Sounds/{name}.wav")).is_some();
             let copy = gamedata::sound_themes::plays_copy();
-            (if own || copy { 1 } else { gamedata::sound_themes::pool(name).len() }, None)
+            (
+                if own || copy {
+                    1
+                } else {
+                    gamedata::sound_themes::pool(name).len()
+                },
+                None,
+            )
         })
     }
 
@@ -426,7 +443,9 @@ impl Audio {
         // PipeWire at start), so only the 1st, 10th, 100th ... of them are printed.
         let errors = std::sync::atomic::AtomicU64::new(0);
         let err = move |e| {
-            let n = errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed).saturating_add(1);
+            let n = errors
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                .saturating_add(1);
             let mut k = n;
             while k >= 10 && k % 10 == 0 {
                 k /= 10;
@@ -574,7 +593,10 @@ impl Audio {
     /// always), so that a pick is not decoded while the game runs.
     pub fn preload_sound_pools(&mut self, data: &Data) {
         let mut keys = Vec::new();
-        for name in gamedata::sound_themes::KNOWN_SOUNDS.iter().filter(|n| !is_music(n)) {
+        for name in gamedata::sound_themes::KNOWN_SOUNDS
+            .iter()
+            .filter(|n| !is_music(n))
+        {
             let n = self.variants.size(data, name);
             keys.extend((1..n).map(|k| crate::music::key(name, k)));
         }
@@ -592,21 +614,20 @@ impl Audio {
         if wanted.is_empty() {
             return;
         }
-        let (send, data) = (
-            self.decoded.0.clone(),
-            data.clone(),
-        );
+        let (send, data) = (self.decoded.0.clone(), data.clone());
         self.pending.extend(wanted.iter().cloned());
         let names = wanted.clone();
-        let started = std::thread::Builder::new().name("music decoding".into()).spawn(move || {
-            for n in wanted {
-                // a decoder that fails hard leaves that piece silent, never the game stopped or the name pending
-                let s = std::panic::catch_unwind(|| load(&data, &n)).unwrap_or(None);
-                if send.send((n, s)).is_err() {
-                    return;
+        let started = std::thread::Builder::new()
+            .name("music decoding".into())
+            .spawn(move || {
+                for n in wanted {
+                    // a decoder that fails hard leaves that piece silent, never the game stopped or the name pending
+                    let s = std::panic::catch_unwind(|| load(&data, &n)).unwrap_or(None);
+                    if send.send((n, s)).is_err() {
+                        return;
+                    }
                 }
-            }
-        });
+            });
         if started.is_err() {
             // no thread to be had: they are decoded when first played instead
             for n in names {
@@ -726,7 +747,8 @@ mod tests {
 
     #[test]
     fn the_generated_themes_sounds_decode() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/sounds/neuro/Sounds");
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../assets/sounds/neuro/Sounds");
         let mut n = 0;
         for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
             let bytes = std::fs::read(e.path()).unwrap_or_default();
@@ -757,7 +779,11 @@ mod tests {
         ]
         .map(str::to_owned)
         .to_vec();
-        for kind in [crate::sim::BallKind::Wood, crate::sim::BallKind::Stone, crate::sim::BallKind::Paper] {
+        for kind in [
+            crate::sim::BallKind::Wood,
+            crate::sim::BallKind::Stone,
+            crate::sim::BallKind::Paper,
+        ] {
             let (rolls, hits) = crate::ballsound::table(kind);
             v.extend(rolls.iter().chain(hits.iter()).map(|s| (*s).to_owned()));
         }
@@ -773,9 +799,13 @@ mod tests {
 
     #[test]
     fn the_generated_theme_holds_every_role_without_a_fallback() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/sounds/neuro");
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/sounds/neuro");
         let txt = std::fs::read_to_string(dir.join("theme.txt")).unwrap_or_default();
-        assert!(txt.lines().any(|l| l.trim() == "fallback none"), "the neuro theme takes nothing from another");
+        assert!(
+            txt.lines().any(|l| l.trim() == "fallback none"),
+            "the neuro theme takes nothing from another"
+        );
         let roles = every_role();
         assert!(roles.len() >= 50, "{} roles", roles.len());
         for name in &roles {
@@ -783,7 +813,11 @@ mod tests {
             assert!(p.is_some(), "neuro lacks {name}");
             let bytes = p.and_then(|p| std::fs::read(p).ok()).unwrap_or_default();
             let decoded = parse_ogg(&bytes);
-            assert!(decoded.as_ref().is_ok_and(|s| !s.frames.is_empty()), "{name}: {:?}", decoded.err());
+            assert!(
+                decoded.as_ref().is_ok_and(|s| !s.frames.is_empty()),
+                "{name}: {:?}",
+                decoded.err()
+            );
         }
     }
 
@@ -828,7 +862,11 @@ mod tests {
         for file in &named {
             assert!(own().join("Music").join(file).is_file(), "{file}");
         }
-        for e in std::fs::read_dir(own().join("Music")).into_iter().flatten().flatten() {
+        for e in std::fs::read_dir(own().join("Music"))
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             let f = e.file_name().to_string_lossy().into_owned();
             let role = f.trim_end_matches(".ogg");
             if f.ends_with(".ogg") && !gamedata::sound_themes::known_role(role) {
@@ -844,25 +882,46 @@ mod tests {
         // decoding, the level music's pools apart from one another, and themes 4 and 5 with tracks of their own
         let roles = every_role();
         for name in &roles {
-            assert!(gamedata::sound_themes::known_role(name), "{name} is a role the tables accept");
+            assert!(
+                gamedata::sound_themes::known_role(name),
+                "{name} is a role the tables accept"
+            );
             let pool = gamedata::sound_themes::pool_in_theme(&own(), name);
             assert!(!pool.is_empty(), "system lacks {name}");
             for p in &pool {
                 let bytes = std::fs::read(p).unwrap_or_default();
                 let decoded = parse_ogg(&bytes);
-                assert!(decoded.as_ref().is_ok_and(|s| !s.frames.is_empty()), "{}: {:?}", p.display(), decoded.err());
+                assert!(
+                    decoded.as_ref().is_ok_and(|s| !s.frames.is_empty()),
+                    "{}: {:?}",
+                    p.display(),
+                    decoded.err()
+                );
             }
         }
         let pool = |name: &str| gamedata::sound_themes::pool_in_theme(&own(), name);
-        let atmos: Vec<_> = (1..=3).flat_map(|k| pool(&format!("Music_Atmo_{k}"))).collect();
+        let atmos: Vec<_> = (1..=3)
+            .flat_map(|k| pool(&format!("Music_Atmo_{k}")))
+            .collect();
         assert_eq!(atmos.len(), 8, "the eight atmospheres");
-        let theme = |n: u32| -> Vec<_> { (1..=3).flat_map(|k| pool(&format!("Music_Theme_{n}_{k}"))).collect() };
+        let theme = |n: u32| -> Vec<_> {
+            (1..=3)
+                .flat_map(|k| pool(&format!("Music_Theme_{n}_{k}")))
+                .collect()
+        };
         for n in 1..=5 {
             for m in 1..n {
-                assert!(theme(n).iter().all(|t| !theme(m).contains(t)), "themes {m} and {n} share a track");
+                assert!(
+                    theme(n).iter().all(|t| !theme(m).contains(t)),
+                    "themes {m} and {n} share a track"
+                );
             }
         }
-        assert_eq!(theme(4).len() + theme(5).len(), 9, "the third round's nine tracks");
+        assert_eq!(
+            theme(4).len() + theme(5).len(),
+            9,
+            "the third round's nine tracks"
+        );
     }
 
     fn wav(channels: u16, bits: u16, rate: u32, samples: &[u8]) -> Vec<u8> {

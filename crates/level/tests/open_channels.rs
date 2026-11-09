@@ -1,7 +1,12 @@
 // The open format keeps a mesh's material channels and a material's TexGen through export and import, and refuses
 // channel lists that are too long or point nowhere (synthetic levels; no game data needed).
 
-#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::panic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing
+)]
 
 use level::{Blend, Channel, Level, Material, Mesh, Object, Part, TexGen};
 use std::path::PathBuf;
@@ -36,7 +41,10 @@ fn level() -> Level {
         positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
         normals: vec![[0.0, 0.0, 1.0]; 3],
         uvs: vec![[0.0; 2]; 3],
-        parts: vec![Part { material: Some(0), indices: vec![0, 1, 2] }],
+        parts: vec![Part {
+            material: Some(0),
+            indices: vec![0, 1, 2],
+        }],
         look: None,
         channels: vec![Channel {
             material: 1,
@@ -46,7 +54,12 @@ fn level() -> Level {
     });
     l.objects.push(Object {
         name: "dome".into(),
-        matrix: [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]],
+        matrix: [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
         mesh: Some(0),
         visible: true,
         sprite: None,
@@ -77,7 +90,8 @@ fn import_with(name: &str, channels: serde_json::Value) -> Result<Level, String>
     let d = dir(name);
     level::open::export(&level(), &d).unwrap();
     let path = d.join("level.gltf");
-    let mut doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let mut doc: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
     doc["meshes"][0]["extras"]["drahtseilakt"]["channels"] = channels;
     std::fs::write(&path, doc.to_string()).unwrap();
     let r = level::open::import(&d);
@@ -89,7 +103,9 @@ fn import_with(name: &str, channels: serde_json::Value) -> Result<Level, String>
 fn bad_channel_lists_are_refused() {
     let one = serde_json::json!({"material": 1, "blend": ["zero", "src_color"], "texcoord": 1});
     assert!(import_with("ok", serde_json::json!([one.clone()])).is_ok());
-    let many: Vec<serde_json::Value> = (0..=nmo::scene::MAX_CHANNELS).map(|_| one.clone()).collect();
+    let many: Vec<serde_json::Value> = (0..=nmo::scene::MAX_CHANNELS)
+        .map(|_| one.clone())
+        .collect();
     assert!(import_with("many", serde_json::json!(many)).is_err());
     let nowhere = serde_json::json!({"material": 9, "blend": ["zero", "src_color"], "texcoord": 1});
     assert!(import_with("material", serde_json::json!([nowhere])).is_err());

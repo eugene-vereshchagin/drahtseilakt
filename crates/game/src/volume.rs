@@ -2,9 +2,9 @@
 // level when the box of its mesh overlaps one of the level's depth-test cubes (docs/gameplay_bbs.md, the box tests
 // and their use in BallManager).
 
-use glam::{Mat4, Vec3};
 #[cfg(test)]
 use glam::Mat3;
+use glam::{Mat4, Vec3};
 
 /// An oriented box: centre, unit axes and half extents along them.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -18,9 +18,19 @@ impl Obb {
     /// The box of local corners `min`..`max` under a world matrix, as `VxOBB` builds it: the centre transformed, the
     /// axes the matrix's normalised axes, the scale folded into the extents.
     pub fn from_box(min: Vec3, max: Vec3, m: &Mat4) -> Obb {
-        let cols = [m.x_axis.truncate(), m.y_axis.truncate(), m.z_axis.truncate()];
+        let cols = [
+            m.x_axis.truncate(),
+            m.y_axis.truncate(),
+            m.z_axis.truncate(),
+        ];
         let len = cols.map(|c| c.length());
-        let axes = [0, 1, 2].map(|i| if len[i] > 0.0 { cols[i] / len[i] } else { Vec3::ZERO });
+        let axes = [0, 1, 2].map(|i| {
+            if len[i] > 0.0 {
+                cols[i] / len[i]
+            } else {
+                Vec3::ZERO
+            }
+        });
         let ext = (max - min) * 0.5;
         Obb {
             center: m.transform_point3((max + min) * 0.5),
@@ -72,7 +82,10 @@ impl Obb {
             for j in 0..3 {
                 let (j1, j2) = ((j + 1) % 3, (j + 2) % 3);
                 let proj = (ta[i2] * r[i1][j] - ta[i1] * r[i2][j]).abs();
-                let rad = ae[i1] * ar[i2][j] + ae[i2] * ar[i1][j] + be[j1] * ar[i][j2] + be[j2] * ar[i][j1];
+                let rad = ae[i1] * ar[i2][j]
+                    + ae[i2] * ar[i1][j]
+                    + be[j1] * ar[i][j2]
+                    + be[j2] * ar[i][j1];
                 if rad < proj {
                     return false;
                 }
@@ -95,14 +108,21 @@ mod tests {
     fn boxes_apart_do_not_overlap_and_touching_ones_do() {
         let a = unit_at(Vec3::ZERO);
         assert!(!a.overlaps(&unit_at(Vec3::new(2.01, 0.0, 0.0))));
-        assert!(a.overlaps(&unit_at(Vec3::new(2.0, 0.0, 0.0))), "touching counts");
+        assert!(
+            a.overlaps(&unit_at(Vec3::new(2.0, 0.0, 0.0))),
+            "touching counts"
+        );
         assert!(a.overlaps(&unit_at(Vec3::new(1.0, 1.0, 1.0))));
     }
 
     #[test]
     fn a_turned_box_reaches_further_along_its_diagonal() {
         // Turned 45 degrees about y, a unit cube reaches sqrt(2) along x.
-        let turned = Obb::cube(Vec3::ZERO, 1.0, Mat3::from_quat(Quat::from_rotation_y(std::f32::consts::FRAC_PI_4)));
+        let turned = Obb::cube(
+            Vec3::ZERO,
+            1.0,
+            Mat3::from_quat(Quat::from_rotation_y(std::f32::consts::FRAC_PI_4)),
+        );
         assert!(turned.overlaps(&unit_at(Vec3::new(2.4, 0.0, 0.0))));
         assert!(!turned.overlaps(&unit_at(Vec3::new(2.5, 0.0, 0.0))));
     }
@@ -110,7 +130,11 @@ mod tests {
     #[test]
     fn a_scaled_matrix_scales_the_extents() {
         // A box of local corners -1..1 scaled by 10 in x and moved to x = 100 spans 90..110.
-        let m = Mat4::from_scale_rotation_translation(Vec3::new(10.0, 1.0, 1.0), Quat::IDENTITY, Vec3::new(100.0, 0.0, 0.0));
+        let m = Mat4::from_scale_rotation_translation(
+            Vec3::new(10.0, 1.0, 1.0),
+            Quat::IDENTITY,
+            Vec3::new(100.0, 0.0, 0.0),
+        );
         let b = Obb::from_box(Vec3::splat(-1.0), Vec3::splat(1.0), &m);
         assert_eq!(b.half, Vec3::new(10.0, 1.0, 1.0));
         assert!(b.overlaps(&unit_at(Vec3::new(89.0, 0.0, 0.0))));

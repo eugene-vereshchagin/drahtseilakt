@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Temporarily Nameless
+title.zh = 暂无名图
+author = lydjjlyd
+posted = 2018-12-28
+difficulty = 8
+order = 10
+catalogue-difficulty = 4
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=r8caOxLiLDo (桜埜叶毣)
+video = https://www.youtube.com/watch?v=k198cRwEc7k (LacuS: Custom Level 91)

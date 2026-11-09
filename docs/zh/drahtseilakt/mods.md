@@ -32,6 +32,13 @@
 | `screenshot` | ScreenCapturer | 一个键（F12、F10、Print Screen 或 P）把当前画面保存为 PNG，放在数据文件夹的 `screenshots/` 中 | 否 |
 | `spirit-trail` | SpiritTrail | 关卡的最佳成绩以半透明球的形式在本次游玩旁边滚动；选项：不透明度 | 否 |
 | `blackout` | Blackout | 关卡变暗，球上方有一束微光；选项：暗度、光 | 否 |
+| `smooth-camera` | AdvancedTravelCam（电影式平滑） | 镜头在转动、距离和视野上平滑过渡，自由相机滑行；选项：平滑度 | 否 |
+| `interference` | Interference | 半透明的诱饵球绕球游走；选项：数量 | 否 |
+| `deformed-ball` | DeformedWB | 木球的外观随机被压扁、拉长（物理仍是圆球）；选项：程度 | 否 |
+| `back-to-2004` | （玩笑；撤销我们的画面改进） | 像2004年的电脑：低分辨率（640x480、800x600或1024x768）的硬像素，4:3画面带黑边，纹理无mipmap和各向异性（双线性或最近邻：远处闪烁），帧率上限（关、60、30），可选16位色彩条纹；附赠一副用于流血泪的眼镜 | 否 |
+| `play-time` | WatchYourTime | 每关和总计的游戏时长，显示在屏幕上，并保存在数据文件夹的 `playtime.txt`；选项：是否显示 | 否 |
+| `sector-jump` | SpeedrunShortcuts（设置小节） | 按键（F7 / PageUp、F6 / PageDown）从下一个或上一个小节重新开始关卡 | 是（modded） |
+| `free-steering` | FreeViewRotation（含操控） | 类似 `free-view`，但方向键沿转动后的视角推动；视角的转动记录在回放中 | 是（modded） |
 
 ## 上帝模式
 
@@ -114,6 +121,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | `run.tick` `run.time` | 游玩的 tick 数、秒数 | `extras.points` `extras.points_all` | 本小节剩余的额外分，以及全部 * |
 | `practice.speed` | 游戏的速度（1，最低到 1/8） * | `practice.saved` | 已保存一个时刻（1 或 0） * |
 | `run.sector` `run.lives` `run.points` | 小节（从 1 开始）、生命、分数 | `extras.lives` `extras.lives_all` | 剩余的额外生命，以及全部 * |
+| `input.turn` | 由 `view.turn` 传给游玩的视角转动，度 | `playtime.level` `playtime.all` | 本关、所有关卡已玩的秒数 * |
 | `input.forward` `input.backward` `input.left` `input.right` `input.rotation` `input.overview` | 按住的游戏按键（1 或 0） | `best.time` | 关卡的最佳时间，秒（-1：无） * |
 
 `opt.<name>` 是选项的值；变量按其名称读取。标有 * 的值属于视图：基于游玩事件的规则不能读取它们（游玩不能依赖所见的
@@ -133,6 +141,8 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 - `do world.gravity <0..60>` — 重力的拉力（原版为 20）。
 - `do world.time <0.5..4>` — 物理的时间因子（原版为 2）。
 - `do lives.endless <0|1>` — 最后一个球永远不会丢失（god-mode）。
+- `do steer.yaw <度>` — 方向键的推力绕竖直轴转过这么多度（相机以同样的旋转转动，所以方向键沿转动后的视角推动）。
+  配合 `input.turn`，它跟随视角（见下）。
 
 练习动作（只能用于 `key`；它们从游玩外部介入游玩，因此含有这类动作的模组同样是 modded，并且在它开启时，游戏会保存游玩的
 时刻，最近半分钟内每秒一个）：
@@ -141,11 +151,20 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 - `do slower`、`do faster` — 游戏速度减半（最低到 1/8）或加倍（最高恢复原速）；
 - `do freecam` — 开启或关闭自由相机。
 
+跳转（仅用于 `key`；使模组成为 modded，但不保留练习的时刻）：
+
+- `do sector.set <n>` — 游玩从小节 n（1 为第一个）重新开始，使用该小节的球，如同 `--sector`；回放记录起点。
+  下一次普通重开又是关卡的起点。
+
 视图动作（只能用于 `frame` 或 `key`）：
 
 - `do camera.fov <degrees>` — 视野加宽这么多度（-30 到 60）。
 - `do camera.distance <0.5..2>` — 相机拉近或拉远。
 - `do camera.yaw <degrees>` — 视角绕球转动（方向键仍沿相机自身的朝向推动）。
+- `do render.scale <宽> <高>` — 以此大小绘制画面（160x120 至 4096x4096，不超过窗口），再用最近邻像素放大到窗口。`do render.aspect <宽>:<高>` — 画面保持此比例，窗口更宽或更高处为黑边。
+- `do render.filter default|bilinear|nearest` — 纹理过滤：我们的（mipmap、各向异性）、仅取最大级的双线性（无mipmap，远处闪烁）或最近邻纹素。
+- `do render.fps_cap <n>` — 每秒最多 n 帧（0：不限；对局的 tick 仍按自己的时钟）。`do render.colour_bits 16` — 颜色截为 5-6-5 位且不抖动（其他值：全彩）。
+  这些动作只影响画面：对局保持经典，回放不变。游戏中没有可撤销的边缘抗锯齿。
 - `do light <0..1>` — 关卡的光；`do lantern <0..1>` — 球上方的灯光。
 - `do show <corner> <label|-> <format> <value>[, <value>[, <value>]]` — 本帧的一行 HUD；角落 `top-left top-right
   bottom-left bottom-right`；格式 `time`（由秒数得到 mm:ss.hh）、`int`、`dec1`、`dec2`、`clock`（hh:mm）、`ratio`（a/b）。
@@ -200,16 +219,12 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 ## 尚未实现（排队中）
 
-- **同伴 / 两个球**（DualBallControl）：用按键切换到的第二个球需要游玩中的第二个玩家物体——它自己的一个构件，并把切换
-  记录在回放中。
-- **专门的粘性球种类**及其变球器（BallSticky 的 `P_Trafo_Sticky`）：目前任何球都可以变得有粘性。
-- **随转动的视角转向**（FreeViewRotation 也会转动操控方向）：这需要把鼠标的转动记录在回放中；目前 `camera.yaw` 只转动
-  视角。
-- **诱饵球**（Interference）、**变形球**（DeformedWB）：用于额外球和网格噪声的绘制构件。
-- **传送到出生点、在游玩中设置小节**（NewSpawn、SpeedrunShortcuts）：上帝模式的保存和读取以及 `--sector` 已覆盖练习
-  用途；设置小节的构件会使其成为模组。
-- **每关游戏时长**（WatchYourTime 的统计）：一个保存的计数器构件。
-- mod.txt 的模糊测试目标（解析器严格、有上限并有单元测试；模糊测试随发布工作一起进行）。
+- **同伴 / 双球**（DualBallControl）：按键切换到的第二个球需要游玩中有第二个玩家刚体（物理、操控、相机、检查点和死亡都只认
+  一个球）——一个独立的构件，切换要记录在回放中。原版 mod 通过第二个起点对象（`PS_FourFlames_01_Dual`）识别双球地图；
+  手头的社区地图中尚不知有这样的（文件是压缩的，简单搜索说明不了什么）。留作单独的工作。
+- **独立的粘性球类型**及其变形器（BallSticky 的 `P_Trafo_Sticky`）：目前任何球都可以变粘。
+- **传送到出生点**（NewSpawn）：上帝模式的保存与读取和 `--sector` 已覆盖练习。
+- mod.txt 的 fuzz 目标（解析器严格、有上限并有单元测试；fuzz 随发布工作一起做）。
 
 ## 调查过的 BML mod
 
@@ -218,34 +233,34 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 | BML mod | 作用 | 我们的 |
 |---|---|---|
-| AdvancedTravelCam | 可以飞到任何地方的漫游相机，用鼠标选点，电影式平滑 | 上帝模式的自由相机（F2）；`free-view`（距离、转动）；平滑排队中 |
+| AdvancedTravelCam | 可以飞到任何地方的漫游相机，用鼠标选点，电影式平滑 | 上帝模式的自由相机（F2）；`free-view`（距离、转动）；内置 `smooth-camera`（电影式平滑） |
 | BallanceOptiFine | 为旧的自制地图强制开启阴影和过渡柱；纹理格式 | 渲染器在每个地面上绘制球的阴影；不是模组 |
 | BaseCmoCfg | 编辑 base.cmo 的 GameSettings（God mode、Debug） | `--debug` 及其上帝模式（无限生命等） |
 | Blackout | 让一切变暗，球上方有一束微光 | 内置 `blackout` |
 | Coredump | 把运行中的 Virtools 上下文转储为 .nmo | 不需要（我们的运行时是自己的；`--export` 写出关卡） |
 | CursorClipper | 把光标限制在窗口内 | 不需要：游玩不从光标获取任何东西，`mouse.dx` 读取原始移动 |
-| DeformedWB | 随机使木球的外观变形 | 排队中 |
-| DualBallControl | 双球地图，用一个键切换球 | 排队中（同伴构件） |
+| DeformedWB | 随机使木球的外观变形 | 内置 `deformed-ball` |
+| DualBallControl | 双球地图，用一个键切换球 | 排队中（需要第二个玩家刚体） |
 | DynamicFov | 视野随球的速度变化 | 内置 `dynamic-fov`；固定视野在 Graphics 中 |
 | EnergyItemCounter | 本小节剩余的额外分和生命 | 内置 `info-overlay` |
 | ExtraSector | 加载超过八个小节的地图 | 引擎：最多 64 个小节，无需加载器 |
 | FontCraft | 界面的另一种字体 | 我们自己的界面和自由许可的字体，支持任何文字；不是模组 |
-| FreeViewRotation | 鼠标转动视角 | 内置 `free-view`（仅视角；转向排队中） |
-| Interference | 球周围的半透明诱饵球 | 排队中 |
+| FreeViewRotation | 鼠标转动视角 | 内置 `free-view`（仅视角），`free-steering`（转向跟随；modded） |
+| Interference | 球周围的半透明诱饵球 | 内置 `interference` |
 | LanternFader | 对灯笼材质做 alpha 测试以防掉帧 | 不需要（我们的渲染器） |
-| MapScripts | 运行地图的回调脚本 | 引擎把地图的行为图作为数据运行；不是模组 |
+| MapScripts | 运行地图的回调脚本 | 计划中：地图脚本解释器（scripts.md）；不是模组 |
 | NewSpawn | 设置出生点、传送到那里、录制灵魂球 | 上帝模式（F5/F9）、`--sector`、`--at`；`spirit-trail` |
 | PhysicsEditor | 重力、物理时间因子、游戏速度 | 内置 `physics-lab`（modded）；游戏速度是上帝模式的 `[` `]` |
 | PositionViewer | 球的坐标 | 内置 `info-overlay` |
 | RealTimeMeter | 跨关卡的真实游戏时间 | 内置 `segment-timer`（真实时间） |
 | ScreenCapturer | 一个键保存截图（PNG/JPEG、剪贴板） | 内置 `screenshot`（PNG；无剪贴板） |
 | Segment | 每个小节相对纪录的时间 | 内置 `segment-timer` |
-| SpeedrunShortcuts | 作弊模式、设置出生点、重开、设置小节 | 内置 `quick-restart`；上帝模式；设置小节排队中 |
+| SpeedrunShortcuts | 作弊模式、设置出生点、重开、设置小节 | 内置 `quick-restart`；上帝模式；`sector-jump`（设置小节；modded） |
 | SpiritTrail | 以半透明球显示纪录游玩 | 内置 `spirit-trail` |
 | StickyAccess | 在作弊模式下切换到粘性球 | 内置 `sticky-ball` |
 | SysInfoDisplay | 屏幕上显示系统时间和电量 | 内置 `info-overlay`（时钟，UTC）；无电量 |
 | TASSupport | 录制和播放输入、跳过渲染、结束时退出 | 引擎：回放是确定性的输入录制（`--record`、`--replay`、`--headless`），以及上帝模式的慢动作 |
-| WatchYourTime | 每关游戏时长 | 排队中（统计） |
+| WatchYourTime | 每关游戏时长 | 内置 `play-time`（`playtime.txt`；另有 `segment-timer`） |
 | BallSticky | 能爬墙的粘性球类型 | 内置 `sticky-ball`（modded） |
 | BMLModuls | 新模块（木制落板和旋转板） | 关卡部件，不是模组：开放格式的部件（[open-format.md](open-format.md)） |
 

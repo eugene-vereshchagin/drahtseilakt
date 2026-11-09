@@ -1,6 +1,6 @@
 # 自制地图：现状
 
-对项目所有者 `levels/community/` 中 579 张自制地图的调查（2026-11-02；[CustomMapList](community-maps.md) 中的地图：Custom Maps 408、Pro Racing 97、Reverse Maps 35、45-Degree Rotated Maps 13、Invisible Maps 13、Original Maps 13）。每张地图都在无窗口模式下加载并运行 300 个 tick，导出为开放格式后再次加载，并列出其 Virtools 脚本（按名称列出构建块）。这是脚本解释器和模组的计划；解释器尚未开始。
+对项目所有者 `levels/community/` 中 579 张自制地图的调查（2026-11-02；[CustomMapList](community-maps.md) 中的地图：Custom Maps 408、Pro Racing 97、Reverse Maps 35、45-Degree Rotated Maps 13、Invisible Maps 13、Original Maps 13）。每张地图都在无窗口模式下加载并运行 300 个 tick，导出为开放格式后再次加载，并列出其 Virtools 脚本（按名称列出构建块）。这是脚本解释器和模组的计划；**2026-11-09：**解释器第一阶段已完成（[scripts.md](scripts.md)）：核心、模板的构建块以及其余最常用的构建块；184 张带脚本的地图（连同 `community-unsorted/` 共 584 张）中有 173 张的所有构建块均已知，36 张自带脚本的地图中有 8 张的每个构建块都已完整生效。
 
 | | 地图数 |
 |---|---|

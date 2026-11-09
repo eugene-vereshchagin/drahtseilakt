@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Cross Lift
+title.zh = 十字升降
+author = 失衡技师
+posted = 2009-08-26
+difficulty = 2
+order = 3
+catalogue-difficulty = 1
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=a9G-BC3krCc (桜埜叶毣)
+video = https://www.youtube.com/watch?v=TIDXMaaKnQ8 (LacuS: Custom Level 6)

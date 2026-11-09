@@ -186,7 +186,7 @@ Jede übergangene Zeile wird im Terminal gemeldet (Standardfehler), z. B.
 
 1. Den Ordner in `sounds/` des Datenordners legen und das Spiel starten.
 2. In den erweiterten Modus wechseln und das Thema in der Zeile **Sounds** der erweiterten Einstellungsseite wählen (die
-   Einstellung `sound-theme NAME` in `settings.txt`). Der klassische Modus spielt immer das voreingestellte Thema.
+   Einstellung `sound-theme NAME` in `settings.txt`). Der klassische Modus hat dieselbe Wahl auf seiner Seite Sound (Zeile **Sound theme**).
 3. Ein Level spielen und das Terminal auf Tabellenhinweise beobachten. Eine fehlende Rolle füllt das Ersatzthema, daher
    sollte ein Thema mit `fallback none` auf Lücken geprüft werden: alle Rollen der Tabellen oben.
 4. Zum Anhören ohne zu spielen eine Aufzeichnung abspielen und die Mischung in eine Datei schreiben:

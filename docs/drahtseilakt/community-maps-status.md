@@ -4,7 +4,9 @@ A survey of the 579 community maps in the owner's `levels/community/` (2026-11-0
 [CustomMapList](community-maps.md): Custom Maps 408, Pro Racing 97, Reverse Maps 35, 45-Degree Rotated Maps 13,
 Invisible Maps 13, Original Maps 13). Each was loaded and played for 300 ticks without a window, exported to the
 open format and loaded again, and its Virtools scripts listed (building block by name). It is the plan for the
-script interpreter and for mods; the interpreter is not started.
+script interpreter and for mods. **2026-11-09:** the interpreter's phase 1 is in ([scripts.md](scripts.md)): its core, the
+template's blocks and the most used others; 173 of the 184 scripted maps (584 maps counted with `community-unsorted/`) have
+every block known, 8 of the 36 with scripts of their own run with every block's full effect.
 
 | | maps |
 |---|---|
@@ -30,6 +32,6 @@ maps.
 fewer than 8 maps each (among them physics forces and impulses, text and font, keys and mouse, timers and counters,
 lights, textures and sounds).
 
-**What this means.** The native rules play every map; an interpreter for the template's nine blocks and the next
+**What this means.** The native rules play every map; the interpreter for the template's nine blocks and the next
 twenty would cover what the scripted maps add (moving and hidden objects, physics changes, copies, messages, text,
 sounds). Maps are never run half-way: a map that needs a block not implemented is reported with its name.

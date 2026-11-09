@@ -69,7 +69,11 @@ fn iso_image() -> Vec<u8> {
     sectors[20][..4].copy_from_slice(b"ISc(");
     sectors[21][..5].copy_from_slice(b"plain");
     sectors[22][..5].copy_from_slice(b"hello");
-    sectors[23] = dir(&[rec(&[0], 23, SECTOR as u32, true), rec(&[1], 19, SECTOR as u32, true), rec(b"DEEP", 23, SECTOR as u32, true)]);
+    sectors[23] = dir(&[
+        rec(&[0], 23, SECTOR as u32, true),
+        rec(&[1], 19, SECTOR as u32, true),
+        rec(b"DEEP", 23, SECTOR as u32, true),
+    ]);
     sectors.concat()
 }
 
@@ -91,8 +95,16 @@ fn raw(iso: &[u8]) -> Vec<u8> {
 
 /// What the game does with an image: its archive's files by path, every folder listed (bounded), the files read.
 fn walk_image(path: &std::path::Path) {
-    let Ok(mut img) = Image::open(path) else { return };
-    for p in ["SETUP/DATA1.HDR", "SETUP/DATA2.CAB", "setup", "SETUP/DEEP/DEEP/DEEP/x", ""] {
+    let Ok(mut img) = Image::open(path) else {
+        return;
+    };
+    for p in [
+        "SETUP/DATA1.HDR",
+        "SETUP/DATA2.CAB",
+        "setup",
+        "SETUP/DEEP/DEEP/DEEP/x",
+        "",
+    ] {
         if let Ok(Some(e)) = iso::find(&mut img, p)
             && !e.dir
         {
@@ -107,7 +119,9 @@ fn walk_image(path: &std::path::Path) {
             if seen > 64 {
                 break;
             }
-            let Ok(list) = iso::list(&mut img, &d) else { continue };
+            let Ok(list) = iso::list(&mut img, &d) else {
+                continue;
+            };
             for e in list.into_iter().take(64) {
                 if e.dir && depth < 4 {
                     stack.push((e, depth + 1));
@@ -121,7 +135,9 @@ fn walk_image(path: &std::path::Path) {
 
 /// The first byte says how the rest is written: a plain iso (padded to whole sectors), raw sectors, or as it is.
 pub fn run_disc_image(input: &[u8]) {
-    let Some((&how, bytes)) = input.split_first() else { return };
+    let Some((&how, bytes)) = input.split_first() else {
+        return;
+    };
     let mut data = bytes.to_vec();
     match how % 3 {
         0 => data.resize(data.len().div_ceil(SECTOR) * SECTOR, 0),
@@ -161,7 +177,8 @@ pub fn run_cue_sheet(input: &[u8]) {
     let mut bin = parts[1].to_vec();
     bin.resize(bin.len().div_ceil(RAW) * RAW, 0);
     let cue = dir.join("disc.cue");
-    if std::fs::write(&cue, parts[0]).is_ok() && std::fs::write(dir.join("disc.bin"), &bin).is_ok() {
+    if std::fs::write(&cue, parts[0]).is_ok() && std::fs::write(dir.join("disc.bin"), &bin).is_ok()
+    {
         walk_image(&cue);
     }
 }
@@ -183,7 +200,18 @@ fn cue_seeds() -> Vec<Vec<u8>> {
 fn fuzz_cue_sheet() {
     let mut t = Target::new("cue_sheet", test_name!("fuzz_cue_sheet"), Kind::Text);
     t.max_len = 1 << 20;
-    t.dict = &["FILE", "BINARY", "TRACK", "MODE1/2352", "MODE2/2352", "INDEX", "\"", "disc.bin", "..", "/"];
+    t.dict = &[
+        "FILE",
+        "BINARY",
+        "TRACK",
+        "MODE1/2352",
+        "MODE2/2352",
+        "INDEX",
+        "\"",
+        "disc.bin",
+        "..",
+        "/",
+    ];
     fuzzkit::fuzz(t, cue_seeds, run_cue_sheet);
 }
 
@@ -200,7 +228,8 @@ fn header(files: &[(&str, u16, u64, u64, u64)]) -> Vec<u8> {
     h[..4].copy_from_slice(b"ISc(");
     h[4..8].copy_from_slice(&0x0100_600cu32.to_le_bytes());
     h[0x0c..0x10].copy_from_slice(&(desc as u32).to_le_bytes());
-    let put32 = |h: &mut Vec<u8>, at: usize, v: u32| h[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    let put32 =
+        |h: &mut Vec<u8>, at: usize, v: u32| h[at..at + 4].copy_from_slice(&v.to_le_bytes());
     put32(&mut h, desc + 0x0c, table_off);
     put32(&mut h, desc + 0x1c, 1);
     put32(&mut h, desc + 0x28, files.len() as u32);
@@ -235,11 +264,17 @@ fn chunks(data: &[u8]) -> Vec<u8> {
 
 pub fn run_iscab(input: &[u8]) {
     let parts = fuzzkit::split_parts(input, 2);
-    let Ok(cab) = iscab::parse(parts[0]) else { return };
+    let Ok(cab) = iscab::parse(parts[0]) else {
+        return;
+    };
     for f in cab.files.iter().filter(|f| f.stored()).take(64) {
         let _ = f.parts();
         if let Ok(bytes) = iscab::extract(f, parts[1]) {
-            assert_eq!(bytes.len() as u64, f.expanded, "an extracted file of another size than its own");
+            assert_eq!(
+                bytes.len() as u64,
+                f.expanded,
+                "an extracted file of another size than its own"
+            );
         }
     }
 }
@@ -257,7 +292,10 @@ fn iscab_seeds() -> Vec<Vec<u8>> {
         ("", 8, 0, 0, 0),
         ("split.bin", 1, 5, 5, plain_at),
     ]);
-    vec![fuzzkit::join_parts(&[&h, &volume]), fuzzkit::join_parts(&[&header(&[("a", 0, 1, 1, 1)]), b"xy"])]
+    vec![
+        fuzzkit::join_parts(&[&h, &volume]),
+        fuzzkit::join_parts(&[&header(&[("a", 0, 1, 1, 1)]), b"xy"]),
+    ]
 }
 
 #[test]

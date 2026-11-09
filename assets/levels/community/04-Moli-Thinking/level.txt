@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Moli Thinking
+title.zh = 茉莉思考
+author = ZYL
+posted = 2013-02-23
+difficulty = 4
+order = 4
+catalogue-difficulty = 2
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=PHLZ7g5aGFs (桜埜叶毣)
+video = https://www.youtube.com/watch?v=qsTTOyHRzM0 (LacuS: Custom Level 89)

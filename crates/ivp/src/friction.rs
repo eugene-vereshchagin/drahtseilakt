@@ -83,7 +83,8 @@ struct Rel {
 }
 
 fn dotd(a: &P3, b: &P3) -> f64 {
-    (f64::from(a[2]) * f64::from(b[2]) + f64::from(a[1]) * f64::from(b[1])) + f64::from(a[0]) * f64::from(b[0])
+    (f64::from(a[2]) * f64::from(b[2]) + f64::from(a[1]) * f64::from(b[1]))
+        + f64::from(a[0]) * f64::from(b[0])
 }
 
 fn dotf(a: &P3, b: &P3) -> f32 {
@@ -152,7 +153,10 @@ impl World {
     pub(crate) fn core_fi(&self, obj: usize, fs: usize) -> Option<usize> {
         let o = self.coll.objs.get(obj)?;
         if self.cores[obj].unmovable {
-            o.fixed_fis.iter().copied().find(|&fi| self.coll.fis[fi].fs == fs)
+            o.fixed_fis
+                .iter()
+                .copied()
+                .find(|&fi| self.coll.fis[fi].fs == fs)
         } else {
             o.fi.filter(|&fi| self.coll.fis[fi].fs == fs)
         }
@@ -224,9 +228,18 @@ impl World {
                     ..FrictionSystem::default()
                 };
                 fs.ctrl = [
-                    self.add_controller(Controller::Friction { fs: 0, kind: FrictionKind::Normal }),
-                    self.add_controller(Controller::Friction { fs: 0, kind: FrictionKind::Spring }),
-                    self.add_controller(Controller::Friction { fs: 0, kind: FrictionKind::Update }),
+                    self.add_controller(Controller::Friction {
+                        fs: 0,
+                        kind: FrictionKind::Normal,
+                    }),
+                    self.add_controller(Controller::Friction {
+                        fs: 0,
+                        kind: FrictionKind::Spring,
+                    }),
+                    self.add_controller(Controller::Friction {
+                        fs: 0,
+                        kind: FrictionKind::Update,
+                    }),
                 ];
                 self.coll.fss.push(fs);
                 let i = self.coll.fss.len() - 1;
@@ -239,7 +252,11 @@ impl World {
     /// Points the three controller records of a system at it.
     fn set_fs_controllers(&mut self, fs: usize) {
         let ctrl = self.coll.fss[fs].ctrl;
-        let kinds = [FrictionKind::Normal, FrictionKind::Spring, FrictionKind::Update];
+        let kinds = [
+            FrictionKind::Normal,
+            FrictionKind::Spring,
+            FrictionKind::Update,
+        ];
         for k in 0..3 {
             self.controllers[ctrl[k]] = Controller::Friction { fs, kind: kinds[k] };
         }
@@ -325,7 +342,9 @@ impl World {
     /// Takes a point out of its pair; true when the pair died (`0x1000b210`).
     fn fs_pair_remove(&mut self, fs: usize, cp: usize) -> bool {
         let (a, b) = (self.coll.cps[cp].syn[0].obj, self.coll.cps[cp].syn[1].obj);
-        let Some(i) = self.fs_find_pair(fs, a, b) else { return false };
+        let Some(i) = self.fs_find_pair(fs, a, b) else {
+            return false;
+        };
         remove_value(&mut self.coll.fss[fs].pairs[i].cps, cp);
         if !self.coll.fss[fs].pairs[i].cps.is_empty() {
             return false;
@@ -344,7 +363,9 @@ impl World {
             self.coll.fss[fs].uf_needed = true;
         }
         for k in 0..2 {
-            let Some(fi) = self.core_fi(c[k], fs) else { continue };
+            let Some(fi) = self.core_fi(c[k], fs) else {
+                continue;
+            };
             remove_value(&mut self.coll.fis[fi].cps, cp);
             if !self.coll.fis[fi].cps.is_empty() {
                 continue;
@@ -388,7 +409,9 @@ impl World {
         let n = self.coll.fss[src].cores.len();
         for i in (0..n).rev() {
             let c = self.coll.fss[src].cores[i];
-            let Some(fi_s) = self.core_fi(c, src) else { continue };
+            let Some(fi_s) = self.core_fi(c, src) else {
+                continue;
+            };
             match self.core_fi(c, dst) {
                 None => {
                     self.coll.fis[fi_s].fs = dst;
@@ -410,7 +433,12 @@ impl World {
 
     /// The contact point of a mindist, creating it and its friction system when it is new (`0x10022180`, the
     /// try-to-generate of the manager). Returns (point, created, system). `keep` is the unit a merge must keep.
-    pub(crate) fn try_generate_friction(&mut self, md: &Mindist, keep: Option<usize>, update: bool) -> (usize, bool, usize) {
+    pub(crate) fn try_generate_friction(
+        &mut self,
+        md: &Mindist,
+        keep: Option<usize>,
+        update: bool,
+    ) -> (usize, bool, usize) {
         let (oa, ob) = (md.syn[md.sorted(0)].obj, md.syn[md.sorted(1)].obj);
         let (mut cm, mut co) = (oa, ob);
         if self.cores[cm].unmovable {
@@ -445,7 +473,11 @@ impl World {
             fi_o = match self.core_fi(co, fs) {
                 Some(f) => f,
                 None => {
-                    let f2 = if self.cores[co].unmovable { None } else { self.coll.objs[co].fi };
+                    let f2 = if self.cores[co].unmovable {
+                        None
+                    } else {
+                        self.coll.objs[co].fi
+                    };
                     match f2 {
                         Some(f2) => {
                             self.fs_merge(fs, self.coll.fis[f2].fs);
@@ -465,7 +497,11 @@ impl World {
         } else {
             let f_m = self.fi_new(0);
             fi_m_now = f_m;
-            let f2 = if self.cores[co].unmovable { None } else { self.coll.objs[co].fi };
+            let f2 = if self.cores[co].unmovable {
+                None
+            } else {
+                self.coll.objs[co].fi
+            };
             if let Some(f2) = f2 {
                 fs = self.coll.fis[f2].fs;
                 fi_o = f2;
@@ -591,9 +627,18 @@ impl World {
             imp[1] = (f64::from(imp[1]) * k) as f32;
         }
         // the speeds are written straight into the cores (0x10033ad0)
-        let mut speed = [ra.as_ref().map_or([0.0; 3], |c| c.speed), rb.as_ref().map_or([0.0; 3], |c| c.speed)];
-        let mut rot = [ra.as_ref().map_or([0.0; 3], |c| c.rot_speed), rb.as_ref().map_or([0.0; 3], |c| c.rot_speed)];
-        let inv_mass = [ra.as_ref().map_or(0.0, |c| f64::from(c.inv_mass)), rb.as_ref().map_or(0.0, |c| f64::from(c.inv_mass))];
+        let mut speed = [
+            ra.as_ref().map_or([0.0; 3], |c| c.speed),
+            rb.as_ref().map_or([0.0; 3], |c| c.speed),
+        ];
+        let mut rot = [
+            ra.as_ref().map_or([0.0; 3], |c| c.rot_speed),
+            rb.as_ref().map_or([0.0; 3], |c| c.rot_speed),
+        ];
+        let inv_mass = [
+            ra.as_ref().map_or(0.0, |c| f64::from(c.inv_mass)),
+            rb.as_ref().map_or(0.0, |c| f64::from(c.inv_mass)),
+        ];
         core_reaction_push2(&tcb, [1.0, -1.0], inv_mass, imp, &mut speed, &mut rot);
         if let Some(c) = c0 {
             self.cores[c].speed = speed[0];
@@ -619,7 +664,8 @@ impl World {
             return;
         }
         let r = 1.0 / f64::from(s2 as f32).sqrt();
-        p.destroyed = ((r * s2 - f64::from(t)) * f64::from(p.pressure) * f64::from(p.mu) + f64::from(p.destroyed)) as f32;
+        p.destroyed = ((r * s2 - f64::from(t)) * f64::from(p.pressure) * f64::from(p.mu)
+            + f64::from(p.destroyed)) as f32;
         p.recheck = 1;
         let k = r * f64::from(t);
         p.s[0] = (f64::from(p.s[0]) * k) as f32;
@@ -631,7 +677,11 @@ impl World {
     fn ease_two(&self, a: usize, b: usize, f: f64) -> (P3, P3) {
         let pa = &self.coll.cps[a];
         let pb = &self.coll.cps[b];
-        let sg: f32 = if pa.syn[0].obj == pb.syn[0].obj { 1.0 } else { -1.0 };
+        let sg: f32 = if pa.syn[0].obj == pb.syn[0].obj {
+            1.0
+        } else {
+            -1.0
+        };
         let ff = f as f32;
         let (ta, tb) = (&pa.info, &pb.info);
         let mut sa = [0.0f32; 3];
@@ -727,9 +777,12 @@ impl World {
             }
             return;
         }
-        let Some(&cp) = self.coll.fss[fs].cps.first() else { return };
+        let Some(&cp) = self.coll.fss[fs].cps.first() else {
+            return;
+        };
         let p = &self.coll.cps[cp];
-        let t = (f64::from(p.inv_vm_no_dir) * f64::from(p.pressure) * f64::from(p.mu) * dt * dt) as f32;
+        let t =
+            (f64::from(p.inv_vm_no_dir) * f64::from(p.pressure) * f64::from(p.mu) * dt * dt) as f32;
         let th = f64::from(t) * f64::from(t) + f64::from(1e-6f32);
         self.clamp_spring(cp, t, th);
         self.friction_2d(cp, es);
@@ -739,7 +792,11 @@ impl World {
 
     /// The relative motion of two cores (`rel_setup`, 0x1001cdb0 and 0x1001d060).
     fn rel_setup(&self, a: usize, b: usize) -> Rel {
-        let (c0, c1) = if self.cores[b].unmovable { (b, a) } else { (a, b) };
+        let (c0, c1) = if self.cores[b].unmovable {
+            (b, a)
+        } else {
+            (a, b)
+        };
         let (k0, k1) = (&self.cores[c0], &self.cores[c1]);
         let mut dv = [0.0f32; 3];
         for k in 0..3 {
@@ -753,7 +810,11 @@ impl World {
         let ax0 = rtmul_f(&k0.m_world_f_core.r, &w);
         let mw = [w[0] * -1.0, w[1] * -1.0, w[2] * -1.0];
         let ax1 = rtmul_f(&k1.m_world_f_core.r, &mw);
-        let t0 = [k0.rot_inertia[0] * ax0[0], k0.rot_inertia[1] * ax0[1], k0.rot_inertia[2] * ax0[2]];
+        let t0 = [
+            k0.rot_inertia[0] * ax0[0],
+            k0.rot_inertia[1] * ax0[1],
+            k0.rot_inertia[2] * ax0[2],
+        ];
         let mut ir0 = len3(&t0);
         let mut iir0 = if ir0 < C_1E19 {
             ir0 = 1.0;
@@ -761,7 +822,11 @@ impl World {
         } else {
             1.0 / ir0
         };
-        let t1 = [ax1[0] * k1.rot_inertia[0], ax1[1] * k1.rot_inertia[1], ax1[2] * k1.rot_inertia[2]];
+        let t1 = [
+            ax1[0] * k1.rot_inertia[0],
+            ax1[1] * k1.rot_inertia[1],
+            ax1[2] * k1.rot_inertia[2],
+        ];
         let mut ir1 = len3(&t1);
         let iir1 = if ir1 < C_1E19 {
             ir1 = 1.0;
@@ -808,10 +873,13 @@ impl World {
         if !self.cores[r.c0].unmovable {
             let c0 = &mut self.cores[r.c0];
             for k in 0..3 {
-                c0.speed_change[k] = (f64::from(c0.speed_change[k]) + f64::from(r.dv[k]) * (il * r.im0)) as f32;
+                c0.speed_change[k] =
+                    (f64::from(c0.speed_change[k]) + f64::from(r.dv[k]) * (il * r.im0)) as f32;
             }
             for k in 0..3 {
-                c0.rot_speed_change[k] = (f64::from(c0.rot_speed_change[k]) + f64::from(r.ax0[k]) * (ir * r.iir0)) as f32;
+                c0.rot_speed_change[k] = (f64::from(c0.rot_speed_change[k])
+                    + f64::from(r.ax0[k]) * (ir * r.iir0))
+                    as f32;
             }
         }
         for k in 0..3 {
@@ -819,10 +887,12 @@ impl World {
         }
         let c1 = &mut self.cores[r.c1];
         for k in 0..3 {
-            c1.speed_change[k] = (f64::from(c1.speed_change[k]) + f64::from(r.dv[k]) * (il * r.im1)) as f32;
+            c1.speed_change[k] =
+                (f64::from(c1.speed_change[k]) + f64::from(r.dv[k]) * (il * r.im1)) as f32;
         }
         for k in 0..3 {
-            c1.rot_speed_change[k] = (f64::from(c1.rot_speed_change[k]) + f64::from(r.ax1[k]) * (ir * r.iir1)) as f32;
+            c1.rot_speed_change[k] =
+                (f64::from(c1.rot_speed_change[k]) + f64::from(r.ax1[k]) * (ir * r.iir1)) as f32;
         }
     }
 
@@ -833,7 +903,10 @@ impl World {
         if !(e > 0.0) {
             return;
         }
-        let c = [self.coll.fss[fs].pairs[pair].c[0], self.coll.fss[fs].pairs[pair].c[1]];
+        let c = [
+            self.coll.fss[fs].pairs[pair].c[0],
+            self.coll.fss[fs].pairs[pair].c[1],
+        ];
         let mut r = self.rel_setup(c[0], c[1]);
         if e > r.etot * C_01F {
             e = r.etot * C_01F;
@@ -865,7 +938,9 @@ impl World {
             for &cp in cps.iter().rev() {
                 let g_old = self.coll.cps[cp].gap;
                 self.cp_update(cp);
-                e = ((f64::from(g_old) - f64::from(self.coll.cps[cp].gap)) * f64::from(self.coll.cps[cp].pressure) + f64::from(e)) as f32;
+                e = ((f64::from(g_old) - f64::from(self.coll.cps[cp].gap))
+                    * f64::from(self.coll.cps[cp].pressure)
+                    + f64::from(e)) as f32;
             }
             if e > 0.0 {
                 let p = &mut self.coll.fss[fs].pairs[i];
@@ -915,7 +990,9 @@ impl World {
         if let Some(c) = c0 {
             let core = &mut self.cores[c];
             for i in 0..3 {
-                core.rot_speed[i] = (f64::from(core.rot_speed[i]) + f64::from(t.cross_cs[0][i] * core.inv_rot_inertia[i]) * -imp) as f32;
+                core.rot_speed[i] = (f64::from(core.rot_speed[i])
+                    + f64::from(t.cross_cs[0][i] * core.inv_rot_inertia[i]) * -imp)
+                    as f32;
             }
             let s = -(f64::from(core.inv_mass) * imp);
             for i in 0..3 {
@@ -925,7 +1002,9 @@ impl World {
         if let Some(c) = c1 {
             let core = &mut self.cores[c];
             for i in 0..3 {
-                core.rot_speed[i] = (f64::from(core.rot_speed[i]) + f64::from(t.cross_cs[1][i] * core.inv_rot_inertia[i]) * imp) as f32;
+                core.rot_speed[i] = (f64::from(core.rot_speed[i])
+                    + f64::from(t.cross_cs[1][i] * core.inv_rot_inertia[i]) * imp)
+                    as f32;
             }
             let s = f64::from(core.inv_mass) * imp;
             for i in 0..3 {
@@ -994,7 +1073,9 @@ impl World {
             let nw = self.fs_new();
             let ncores = self.coll.fss[fs].cores.len();
             for i in (0..ncores).rev() {
-                let Some(&c) = self.coll.fss[fs].cores.get(i) else { continue };
+                let Some(&c) = self.coll.fss[fs].cores.get(i) else {
+                    continue;
+                };
                 if !self.cores[c].unmovable {
                     if self.uf_root(c) != root {
                         continue;
@@ -1012,8 +1093,14 @@ impl World {
             }
             let npairs = self.coll.fss[fs].pairs.len();
             for i in (0..npairs).rev() {
-                let Some(p) = self.coll.fss[fs].pairs.get(i).cloned() else { continue };
-                let mc = if self.cores[p.c[0]].unmovable { p.c[1] } else { p.c[0] };
+                let Some(p) = self.coll.fss[fs].pairs.get(i).cloned() else {
+                    continue;
+                };
+                let mc = if self.cores[p.c[0]].unmovable {
+                    p.c[1]
+                } else {
+                    p.c[0]
+                };
                 if self.uf_root(mc) != root {
                     continue;
                 }
@@ -1039,7 +1126,9 @@ impl World {
             }
             let ncores = self.coll.fss[fs].cores.len();
             for i in (0..ncores).rev() {
-                let Some(&c) = self.coll.fss[fs].cores.get(i) else { continue };
+                let Some(&c) = self.coll.fss[fs].cores.get(i) else {
+                    continue;
+                };
                 if !self.cores[c].unmovable {
                     continue;
                 }
@@ -1149,10 +1238,12 @@ impl World {
             let key = self.coll.cps[cp].key;
             let mut vrel = 0.0f64;
             if let Some(c) = t.core[0] {
-                vrel = dotd(&self.cores[c].rot_speed, &t.cross_cs[0]) + dotd(&self.cores[c].speed, &t.n);
+                vrel = dotd(&self.cores[c].rot_speed, &t.cross_cs[0])
+                    + dotd(&self.cores[c].speed, &t.n);
             }
             if let Some(c) = t.core[1] {
-                vrel -= dotd(&self.cores[c].rot_speed, &t.cross_cs[1]) + dotd(&self.cores[c].speed, &t.n);
+                vrel -= dotd(&self.cores[c].rot_speed, &t.cross_cs[1])
+                    + dotd(&self.cores[c].speed, &t.n);
             }
             let d = f64::from(SET_FRICTION_DIST) - f64::from(self.coll.cps[cp].gap);
             let factor = if d < 0.0 { 20.0 } else { 1.0 };
@@ -1186,7 +1277,11 @@ impl World {
                     if j < 0 {
                         continue;
                     }
-                    let (s, kk) = if tj.core[0] == Some(c) { (-1.0, 0) } else { (1.0, 1) };
+                    let (s, kk) = if tj.core[0] == Some(c) {
+                        (-1.0, 0)
+                    } else {
+                        (1.0, 1)
+                    };
                     if tj.core[kk].is_none() {
                         continue;
                     }
@@ -1208,7 +1303,11 @@ impl World {
                 maxb = bvec[i].abs();
             }
         }
-        let (s_b, scale) = if maxb > C_1E19 { (1.0 / maxb, s_a * maxb) } else { (1.0, s_a) };
+        let (s_b, scale) = if maxb > C_1E19 {
+            (1.0 / maxb, s_a * maxb)
+        } else {
+            (1.0, s_a)
+        };
         for v in a.iter_mut() {
             *v *= s_a;
         }
@@ -1302,21 +1401,27 @@ impl World {
             if let Some(c) = t.core[0] {
                 let core = &mut self.cores[c];
                 for q in 0..3 {
-                    core.rot_speed_change[q] = (f64::from(core.rot_speed_change[q]) + f64::from(t.cross_cs[0][q] * core.inv_rot_inertia[q]) * -xi) as f32;
+                    core.rot_speed_change[q] = (f64::from(core.rot_speed_change[q])
+                        + f64::from(t.cross_cs[0][q] * core.inv_rot_inertia[q]) * -xi)
+                        as f32;
                 }
                 let s = -(f64::from(core.inv_mass) * xi);
                 for q in 0..3 {
-                    core.speed_change[q] = (f64::from(core.speed_change[q]) + f64::from(t.n[q]) * s) as f32;
+                    core.speed_change[q] =
+                        (f64::from(core.speed_change[q]) + f64::from(t.n[q]) * s) as f32;
                 }
             }
             if let Some(c) = t.core[1] {
                 let core = &mut self.cores[c];
                 for q in 0..3 {
-                    core.rot_speed_change[q] = (f64::from(core.rot_speed_change[q]) + f64::from(t.cross_cs[1][q] * core.inv_rot_inertia[q]) * xi) as f32;
+                    core.rot_speed_change[q] = (f64::from(core.rot_speed_change[q])
+                        + f64::from(t.cross_cs[1][q] * core.inv_rot_inertia[q]) * xi)
+                        as f32;
                 }
                 let s = f64::from(core.inv_mass) * xi;
                 for q in 0..3 {
-                    core.speed_change[q] = (f64::from(core.speed_change[q]) + f64::from(t.n[q]) * s) as f32;
+                    core.speed_change[q] =
+                        (f64::from(core.speed_change[q]) + f64::from(t.n[q]) * s) as f32;
                 }
             }
             let p = if xi < 0.0 { 0.0 } else { xi };
@@ -1345,7 +1450,10 @@ impl World {
     /// The gravity magnitude as the friction solve reads it (0x10036d70's sqrt of the world gravity).
     fn gravity_magnitude(&self) -> f64 {
         let g = self.gravity_vector();
-        (f64::from(g[0]) * f64::from(g[0]) + f64::from(g[1]) * f64::from(g[1]) + f64::from(g[2]) * f64::from(g[2])).sqrt()
+        (f64::from(g[0]) * f64::from(g[0])
+            + f64::from(g[1]) * f64::from(g[1])
+            + f64::from(g[2]) * f64::from(g[2]))
+        .sqrt()
     }
 
     /// The points of a system in the order of their warm-start key, stable, ascending (`0x10036c60`).
@@ -1382,7 +1490,10 @@ impl World {
         for &c in movable.iter().rev() {
             let mut k = 0;
             for p in &self.coll.fss[fs].pairs {
-                if (p.c[0] == c || p.c[1] == c) && !self.cores[p.c[0]].unmovable && !self.cores[p.c[1]].unmovable {
+                if (p.c[0] == c || p.c[1] == c)
+                    && !self.cores[p.c[0]].unmovable
+                    && !self.cores[p.c[1]].unmovable
+                {
                     k += 1;
                 }
             }
@@ -1406,7 +1517,6 @@ fn remove_value(v: &mut Vec<usize>, x: usize) {
         v.remove(i);
     }
 }
-
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
@@ -1432,7 +1542,12 @@ mod tests {
     #[test]
     fn a_touching_pair_gets_a_friction_system_with_its_point() {
         let mut w = World::new();
-        let q = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        let q = Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
         for (i, x) in [0.0, 1.01].into_iter().enumerate() {
             let c = w.core_init(i, q, [x, 0.0, 0.0], false);
             w.cores[c].upper_limit_radius = 0.866;
@@ -1442,14 +1557,23 @@ mod tests {
         }
         w.enable_collision_detection(0);
         w.enable_collision_detection(1);
-        let m = (0..w.coll.mds.len()).find(|&m| w.coll.mds[m].alive).expect("a mindist");
+        let m = (0..w.coll.mds.len())
+            .find(|&m| w.coll.mds[m].alive)
+            .expect("a mindist");
         let md = w.coll.mds[m].clone();
-        assert!(md.len_numerator < SET_MAX_DIST_FOR_FRICTION, "gap {}", md.len_numerator);
+        assert!(
+            md.len_numerator < SET_MAX_DIST_FOR_FRICTION,
+            "gap {}",
+            md.len_numerator
+        );
         let (cp, created, fs) = w.try_generate_friction(&md, None, true);
         assert!(created, "a new point");
         assert_eq!(w.coll.fss[fs].n_contacts, 1);
         assert!(w.coll.cps[cp].fs == Some(fs));
-        assert!(w.coll.objs[0].fi.is_some() && w.coll.objs[1].fi.is_some(), "both movable cores have their info");
+        assert!(
+            w.coll.objs[0].fi.is_some() && w.coll.objs[1].fi.is_some(),
+            "both movable cores have their info"
+        );
         // the same features again find the point rather than making another
         let (cp2, created2, _) = w.try_generate_friction(&md, None, true);
         assert!(!created2 && cp2 == cp);

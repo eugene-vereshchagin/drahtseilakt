@@ -6,7 +6,7 @@
 // core's position plus its rotated shift, which is the negated mass centre (`Core::shift`).
 
 use crate::collision::ObjKind;
-use crate::core::{Controller, World, MT_NOT_SIM, MT_STATIC};
+use crate::core::{Controller, MT_NOT_SIM, MT_STATIC, World};
 use crate::glue::to_p3;
 use crate::ledge::Surface;
 use crate::math::{self, Matrix, Quat};
@@ -64,11 +64,21 @@ fn spin_turn(w: &[f64; 3], dt: f64) -> math::Quat {
     let (wx, wy, wz) = (w[0], w[1], w[2]);
     let speed = (wx * wx + wy * wy + wz * wz).sqrt();
     if speed < 1e-12 {
-        return math::Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        return math::Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
     }
     let half = 0.5 * speed * dt;
     let k = half.sin() / speed;
-    math::Quat { x: wx * k, y: wy * k, z: wz * k, w: half.cos() }
+    math::Quat {
+        x: wx * k,
+        y: wy * k,
+        z: wz * k,
+        w: half.cos(),
+    }
 }
 
 /// The state the game reads and writes: the object origin, the rotation, the speed of the mass centre and the spin in
@@ -86,7 +96,10 @@ fn to_v3(v: [f32; 3]) -> V3 {
 }
 
 fn len3(v: &[f32; 3]) -> f32 {
-    ((f64::from(v[0]) * f64::from(v[0]) + f64::from(v[1]) * f64::from(v[1]) + f64::from(v[2]) * f64::from(v[2])).sqrt()) as f32
+    ((f64::from(v[0]) * f64::from(v[0])
+        + f64::from(v[1]) * f64::from(v[1])
+        + f64::from(v[2]) * f64::from(v[2]))
+    .sqrt()) as f32
 }
 
 impl World {
@@ -301,19 +314,29 @@ impl World {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    
+
     /// A floor of two triangles at height 0 spanning [-10, 10] in x and z, as one compact surface.
     fn floor() -> Surface {
-        let p = [[-10.0, 0.0, -10.0], [10.0, 0.0, -10.0], [10.0, 0.0, 10.0], [-10.0, 0.0, 10.0]];
+        let p = [
+            [-10.0, 0.0, -10.0],
+            [10.0, 0.0, -10.0],
+            [10.0, 0.0, 10.0],
+            [-10.0, 0.0, 10.0],
+        ];
         let mut ledges = Vec::new();
         for tri in [[0, 1, 2], [0, 2, 3]] {
-            ledges.push(crate::ledge::triangle(p[tri[0]], p[tri[1]], p[tri[2]]).expect("a triangle"));
+            ledges
+                .push(crate::ledge::triangle(p[tri[0]], p[tri[1]], p[tri[2]]).expect("a triangle"));
         }
         Surface::compile(ledges).expect("a floor")
     }
 
-
-    const IDENTITY: Quat = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+    const IDENTITY: Quat = Quat {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 1.0,
+    };
 
     fn world() -> World {
         let mut w = World::new();
@@ -325,7 +348,15 @@ mod tests {
     #[test]
     fn a_fixed_floor_is_a_static_body_with_its_surface() {
         let mut w = world();
-        let f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
+        let f = w.add_body(
+            BodyDesc {
+                fixed: true,
+                ..BodyDesc::default()
+            },
+            Shape::Surface(floor()),
+            [0.0; 3],
+            IDENTITY,
+        );
         assert!(w.cores[f].unmovable);
         assert_eq!(w.body_pose(f).0, [0.0, 0.0, 0.0]);
     }
@@ -335,8 +366,24 @@ mod tests {
         // The rotation's share of the hull growth is spin times the surface deviation: none for a ball (the upstream
         // leaves it 0), the surface's own for a polygon, never the core's initial 1000.
         let mut w = world();
-        let f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
-        let ball = w.add_body(BodyDesc { mass: 1.0, ..BodyDesc::default() }, Shape::Sphere(2.0), [0.0, 5.0, 0.0], IDENTITY);
+        let f = w.add_body(
+            BodyDesc {
+                fixed: true,
+                ..BodyDesc::default()
+            },
+            Shape::Surface(floor()),
+            [0.0; 3],
+            IDENTITY,
+        );
+        let ball = w.add_body(
+            BodyDesc {
+                mass: 1.0,
+                ..BodyDesc::default()
+            },
+            Shape::Sphere(2.0),
+            [0.0, 5.0, 0.0],
+            IDENTITY,
+        );
         assert_eq!(w.cores[ball].max_surface_deviation, 0.0);
         // a ball's inertias are equal, and its inverse diameter is that of its radius
         assert!(w.cores[ball].rot_inertias_equal);
@@ -349,9 +396,27 @@ mod tests {
     #[test]
     fn a_ball_falls_onto_the_floor_and_rests_on_it() {
         let mut w = world();
-        let _floor = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(floor()), [0.0; 3], IDENTITY);
+        let _floor = w.add_body(
+            BodyDesc {
+                fixed: true,
+                ..BodyDesc::default()
+            },
+            Shape::Surface(floor()),
+            [0.0; 3],
+            IDENTITY,
+        );
         let radius = 1.0f32;
-        let ball = w.add_body(BodyDesc { mass: 1.0, elasticity: 0.1, friction: 0.5, ..BodyDesc::default() }, Shape::Sphere(radius), [0.0, 5.0, 0.0], IDENTITY);
+        let ball = w.add_body(
+            BodyDesc {
+                mass: 1.0,
+                elasticity: 0.1,
+                friction: 0.5,
+                ..BodyDesc::default()
+            },
+            Shape::Sphere(radius),
+            [0.0, 5.0, 0.0],
+            IDENTITY,
+        );
         // three seconds of falling and settling, in game ticks of 1/60 s
         for _ in 0..180 {
             w.advance(1.0 / 60.0);
@@ -366,15 +431,41 @@ mod tests {
     fn a_ball_rolling_off_an_edge_does_not_launch() {
         let mut w = world();
         // a 20 x 20 plate at y = 0, centred on the origin
-        let p = [[-10.0, 0.0, -10.0], [10.0, 0.0, -10.0], [10.0, 0.0, 10.0], [-10.0, 0.0, 10.0]];
+        let p = [
+            [-10.0, 0.0, -10.0],
+            [10.0, 0.0, -10.0],
+            [10.0, 0.0, 10.0],
+            [-10.0, 0.0, 10.0],
+        ];
         let plate = Surface::compile(vec![
             crate::ledge::triangle(p[0], p[2], p[1]).unwrap(),
             crate::ledge::triangle(p[0], p[3], p[2]).unwrap(),
         ])
         .unwrap();
-        let _f = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(plate), [0.0; 3], IDENTITY);
-        let ball = w.add_body(BodyDesc::default(), Shape::Sphere(1.0), [5.0, 1.0, 0.0], IDENTITY);
-        w.set_body_state(ball, BodyState { pos: [5.0, 1.0, 0.0], rot: IDENTITY, vel: [3.0, 0.0, 0.0], spin: [0.0; 3] });
+        let _f = w.add_body(
+            BodyDesc {
+                fixed: true,
+                ..BodyDesc::default()
+            },
+            Shape::Surface(plate),
+            [0.0; 3],
+            IDENTITY,
+        );
+        let ball = w.add_body(
+            BodyDesc::default(),
+            Shape::Sphere(1.0),
+            [5.0, 1.0, 0.0],
+            IDENTITY,
+        );
+        w.set_body_state(
+            ball,
+            BodyState {
+                pos: [5.0, 1.0, 0.0],
+                rot: IDENTITY,
+                vel: [3.0, 0.0, 0.0],
+                spin: [0.0; 3],
+            },
+        );
         let mut max_up = 0.0f32;
         let mut max_x = 0.0f64;
         for _ in 0..180 {
@@ -386,7 +477,10 @@ mod tests {
             }
         }
         assert!(max_x > 10.5, "the ball left the plate: x {max_x}");
-        assert!(max_up < 0.5, "the ball launched upward after the edge: vy {max_up}");
+        assert!(
+            max_up < 0.5,
+            "the ball launched upward after the edge: vy {max_up}"
+        );
     }
 
     /// The same off a box's top edge: a convex block, not a plate.
@@ -402,9 +496,30 @@ mod tests {
             }
         }
         let block = Surface::compile(vec![crate::convex::hull(&corners).unwrap()]).unwrap();
-        let _b = w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(block), [0.0; 3], IDENTITY);
-        let ball = w.add_body(BodyDesc::default(), Shape::Sphere(1.0), [5.0, 3.0, 0.0], IDENTITY);
-        w.set_body_state(ball, BodyState { pos: [5.0, 3.0, 0.0], rot: IDENTITY, vel: [3.0, 0.0, 0.0], spin: [0.0; 3] });
+        let _b = w.add_body(
+            BodyDesc {
+                fixed: true,
+                ..BodyDesc::default()
+            },
+            Shape::Surface(block),
+            [0.0; 3],
+            IDENTITY,
+        );
+        let ball = w.add_body(
+            BodyDesc::default(),
+            Shape::Sphere(1.0),
+            [5.0, 3.0, 0.0],
+            IDENTITY,
+        );
+        w.set_body_state(
+            ball,
+            BodyState {
+                pos: [5.0, 3.0, 0.0],
+                rot: IDENTITY,
+                vel: [3.0, 0.0, 0.0],
+                spin: [0.0; 3],
+            },
+        );
         let mut max_up = 0.0f32;
         let mut max_x = 0.0f64;
         for _ in 0..180 {
@@ -416,7 +531,10 @@ mod tests {
             }
         }
         assert!(max_x > 10.5, "the ball left the block: x {max_x}");
-        assert!(max_up < 0.5, "the ball launched upward after the edge: vy {max_up}");
+        assert!(
+            max_up < 0.5,
+            "the ball launched upward after the edge: vy {max_up}"
+        );
     }
 
     /// A ball falling onto a tilted triangle, its lowest corner under the centre, with a sideways speed. The contact
@@ -427,13 +545,37 @@ mod tests {
         let mut w = world();
         w.set_gravity([0.0, -20.0, 0.0]);
         let slope = Surface::compile(vec![
-            crate::ledge::triangle([0.0, -2.0, -1.4], [2.5, -2.7, 1.1], [0.0, -2.0, 1.1]).expect("a triangle"),
+            crate::ledge::triangle([0.0, -2.0, -1.4], [2.5, -2.7, 1.1], [0.0, -2.0, 1.1])
+                .expect("a triangle"),
         ])
         .expect("a slope");
-        w.add_body(BodyDesc { fixed: true, ..BodyDesc::default() }, Shape::Surface(slope), [0.0; 3], IDENTITY);
-        let desc = BodyDesc { mass: 1.9, friction: 0.8, elasticity: 0.2, lin_damp: 0.9, rot_damp: 0.1, ..BodyDesc::default() };
+        w.add_body(
+            BodyDesc {
+                fixed: true,
+                ..BodyDesc::default()
+            },
+            Shape::Surface(slope),
+            [0.0; 3],
+            IDENTITY,
+        );
+        let desc = BodyDesc {
+            mass: 1.9,
+            friction: 0.8,
+            elasticity: 0.2,
+            lin_damp: 0.9,
+            rot_damp: 0.1,
+            ..BodyDesc::default()
+        };
         let ball = w.add_body(desc, Shape::Sphere(2.0), [0.0; 3], IDENTITY);
-        w.set_body_state(ball, BodyState { pos: [0.0; 3], rot: IDENTITY, vel: [-2.3, -2.7, 0.0], spin: [0.0; 3] });
+        w.set_body_state(
+            ball,
+            BodyState {
+                pos: [0.0; 3],
+                rot: IDENTITY,
+                vel: [-2.3, -2.7, 0.0],
+                spin: [0.0; 3],
+            },
+        );
         let mut top = 0.0f32;
         for _ in 0..120 {
             w.advance(1.0 / 60.0);
@@ -451,12 +593,23 @@ mod tests {
         let mut w = world();
         let ball = w.add_body(BodyDesc::default(), Shape::Sphere(2.0), [0.0; 3], IDENTITY);
         let spin = [0.0, 0.0, -6.0];
-        w.set_body_state(ball, BodyState { pos: [0.0; 3], rot: IDENTITY, vel: [12.0, 0.0, 0.0], spin });
+        w.set_body_state(
+            ball,
+            BodyState {
+                pos: [0.0; 3],
+                rot: IDENTITY,
+                vel: [12.0, 0.0, 0.0],
+                spin,
+            },
+        );
         w.advance(1.0 / 60.0);
         let s = w.body_state(ball);
         w.set_body_state(ball, s);
         w.core_sync(ball);
         let got = w.cores[ball].rot_speed;
-        assert!((got[2] + 6.0).abs() < 0.05, "the synchronised spin is {got:?}, expected the spin of -6 about z");
+        assert!(
+            (got[2] + 6.0).abs() < 0.05,
+            "the synchronised spin is {got:?}, expected the spin of -6 about z"
+        );
     }
 }

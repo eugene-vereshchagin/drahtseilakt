@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Dangerous Sections of Roads
+title.zh = 危险路段
+author = 平衡总统
+posted = 2015-06-29
+difficulty = 8
+order = 11
+catalogue-difficulty = 4
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=r6y3J4xm7Ng (桜埜叶毣)
+video = https://www.youtube.com/watch?v=oKxlqBXKp7Y (LacuS: Custom Level 81)

@@ -239,8 +239,12 @@ fn a_maps_texture_name_never_reads_a_path() {
     std::fs::create_dir_all(copy.join("Textures")).unwrap();
     std::fs::create_dir_all(&outside).unwrap();
     let px = |c: [u8; 4]| image::RgbaImage::from_pixel(2, 2, image::Rgba(c));
-    px([200, 0, 0, 255]).save(copy.join("Textures/Inside.png")).unwrap();
-    px([0, 200, 0, 255]).save(outside.join("Secret.png")).unwrap();
+    px([200, 0, 0, 255])
+        .save(copy.join("Textures/Inside.png"))
+        .unwrap();
+    px([0, 200, 0, 255])
+        .save(outside.join("Secret.png"))
+        .unwrap();
     let data = Data::new(Some(copy.clone()));
     let named = |name: String| level::Texture {
         name: "T".into(),
@@ -260,7 +264,9 @@ fn a_maps_texture_name_never_reads_a_path() {
         assert!(data.texture(&named(n.clone())).is_none(), "{n} read a file");
     }
     // a path's last part is a texture of the game's folders
-    let (_, _, rgba) = data.texture(&named(format!("{}/Inside.png", outside.display()))).unwrap();
+    let (_, _, rgba) = data
+        .texture(&named(format!("{}/Inside.png", outside.display())))
+        .unwrap();
     assert_eq!(&rgba[..4], &[200, 0, 0, 255]);
     let (_, _, rgba) = data.texture(&named("D:\\Maps\\Inside.png".into())).unwrap();
     assert_eq!(&rgba[..4], &[200, 0, 0, 255]);
@@ -277,7 +283,10 @@ fn a_maps_texture_name_never_reads_a_path() {
     };
     let out = r.join("export");
     gamedata::assets::export(&data, &loaded, &out).unwrap();
-    let written: Vec<_> = std::fs::read_dir(out.join("textures")).unwrap().flatten().collect();
+    let written: Vec<_> = std::fs::read_dir(out.join("textures"))
+        .unwrap()
+        .flatten()
+        .collect();
     assert_eq!(written.len(), 1, "only the copy's texture");
     let img = image::open(written[0].path()).unwrap().to_rgba8();
     assert_eq!(img.get_pixel(0, 0).0, [200, 0, 0, 255]);
@@ -293,7 +302,11 @@ fn an_open_levels_textures_are_its_own_files() {
     let mut lvl = level::Level::default();
     lvl.textures.push(level::Texture {
         name: "A".into(),
-        source: level::TextureSource::Pixels { width: 1, height: 1, rgba: vec![1, 2, 3, 255] },
+        source: level::TextureSource::Pixels {
+            width: 1,
+            height: 1,
+            rgba: vec![1, 2, 3, 255],
+        },
         color_key: None,
     });
     level::open::export(&lvl, &out).unwrap();

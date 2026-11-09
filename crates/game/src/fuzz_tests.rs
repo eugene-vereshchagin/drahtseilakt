@@ -44,7 +44,9 @@ fn profile(sub: &str) -> Vec<PathBuf> {
 // --- replays and hints -------------------------------------------------------------------------------------------
 
 fn run_replay(input: &[u8]) {
-    let Ok(text) = std::str::from_utf8(input) else { return };
+    let Ok(text) = std::str::from_utf8(input) else {
+        return;
+    };
     if let Ok(r) = crate::replay::Replay::parse(text) {
         // what is read is written back readable
         let again = crate::replay::Replay::parse(&r.to_text());
@@ -61,7 +63,12 @@ fn replay_seeds() -> Vec<Vec<u8>> {
     ];
     let mut roots = vec![repo().join("hints")];
     roots.extend(profile("replays"));
-    out.extend(fuzzkit::read_all(&fuzzkit::files_under(&roots, &["replay"], 40, 256 * 1024)));
+    out.extend(fuzzkit::read_all(&fuzzkit::files_under(
+        &roots,
+        &["replay"],
+        40,
+        256 * 1024,
+    )));
     out
 }
 
@@ -74,7 +81,9 @@ fn fuzz_replay() {
 }
 
 fn run_hints(input: &[u8]) {
-    let Ok(text) = std::str::from_utf8(input) else { return };
+    let Ok(text) = std::str::from_utf8(input) else {
+        return;
+    };
     let _ = crate::hints::parse(text);
 }
 
@@ -85,12 +94,19 @@ fn hint_seeds() -> Vec<Vec<u8>> {
     ];
     let mut roots = vec![repo().join("hints")];
     roots.extend(profile("hints"));
-    out.extend(fuzzkit::read_all(&fuzzkit::files_under(&roots, &["txt"], 40, 64 * 1024)));
+    out.extend(fuzzkit::read_all(&fuzzkit::files_under(
+        &roots,
+        &["txt"],
+        40,
+        64 * 1024,
+    )));
     out
 }
 
 fn run_zones(input: &[u8]) {
-    let Ok(text) = std::str::from_utf8(input) else { return };
+    let Ok(text) = std::str::from_utf8(input) else {
+        return;
+    };
     let (zones, _) = crate::zones::parse(text);
     // every zone written back reads the same
     for z in &zones.zones {
@@ -107,12 +123,19 @@ fn zone_seeds() -> Vec<Vec<u8>> {
     ];
     let mut roots = vec![repo().join("hints")];
     roots.extend(profile("hints"));
-    out.extend(fuzzkit::read_all(&fuzzkit::files_under(&roots, &["zones"], 40, 64 * 1024)));
+    out.extend(fuzzkit::read_all(&fuzzkit::files_under(
+        &roots,
+        &["zones"],
+        40,
+        64 * 1024,
+    )));
     out
 }
 
 fn run_learned(input: &[u8]) {
-    let Ok(text) = std::str::from_utf8(input) else { return };
+    let Ok(text) = std::str::from_utf8(input) else {
+        return;
+    };
     let (learned, _) = crate::learned::parse(text);
     // every rule written back reads the same, and holds where its features are
     for r in &learned.rules {
@@ -146,8 +169,8 @@ fn learned_seeds() -> Vec<Vec<u8>> {
 fn fuzz_learned() {
     let mut t = Target::new("learned", test_name!("fuzz_learned"), Kind::Text);
     t.dict = &[
-        "flow", "careful", "speed", "when", "surface=", "width=", "border=", "curve=", "slope=", "ahead=", "module=",
-        "kind=", "rail", "floor", "rail-end", "narrow", "#",
+        "flow", "careful", "speed", "when", "surface=", "width=", "border=", "curve=", "slope=",
+        "ahead=", "module=", "kind=", "rail", "floor", "rail-end", "narrow", "#",
     ];
     fuzzkit::fuzz(t, learned_seeds, run_learned);
 }
@@ -165,8 +188,8 @@ fn fuzz_zones() {
 fn fuzz_hints() {
     let mut t = Target::new("hints", test_name!("fuzz_hints"), Kind::Text);
     t.dict = &[
-        "at", "r", "sector", "kind", "wood", "stone", "paper", ":", ";", "goto", "via", "push", "air", "wait", "turn",
-        "become", "replay", "#",
+        "at", "r", "sector", "kind", "wood", "stone", "paper", ":", ";", "goto", "via", "push",
+        "air", "wait", "turn", "become", "replay", "#",
     ];
     fuzzkit::fuzz(t, hint_seeds, run_hints);
 }
@@ -200,7 +223,12 @@ fn wav_seeds() -> Vec<Vec<u8>> {
     let mut out = vec![wav(1, 8, &data), wav(2, 16, &data), wav(1, 16, &data[..63])];
     let mut roots = fuzzkit::real_roots();
     roots.push(repo().join("assets/sounds"));
-    out.extend(fuzzkit::read_all(&fuzzkit::files_under(&roots, &["wav"], 24, 256 * 1024)));
+    out.extend(fuzzkit::read_all(&fuzzkit::files_under(
+        &roots,
+        &["wav"],
+        24,
+        256 * 1024,
+    )));
     out
 }
 
@@ -237,7 +265,10 @@ fn run_highscore(input: &[u8]) {
     for level in 1..=70u32 {
         let list = t.list(level);
         assert!(list.len() <= crate::lang::PLACES);
-        assert!(list.iter().all(|(name, _)| name.len() <= crate::highscore::NAME_MAX));
+        assert!(
+            list.iter()
+                .all(|(name, _)| name.len() <= crate::highscore::NAME_MAX)
+        );
     }
 }
 
@@ -245,7 +276,8 @@ fn highscore_seeds() -> Vec<Vec<u8>> {
     let mut out = vec![b"1 100 Mr. Default\n1 90 b\r\n13 5 zz\n".to_vec()];
     if std::env::var_os("FUZZ_NO_REAL").is_none()
         && let Some(home) = std::env::var_os("HOME")
-        && let Ok(b) = std::fs::read(PathBuf::from(home).join(".local/share/drahtseilakt/highscores.txt"))
+        && let Ok(b) =
+            std::fs::read(PathBuf::from(home).join(".local/share/drahtseilakt/highscores.txt"))
     {
         out.push(b);
     }
@@ -275,7 +307,10 @@ fn run_settings(input: &[u8]) {
     let _ = get("sound-theme").map(|s| gamedata::sound_themes::plain(&s));
     let _ = get("player").map(|n| crate::lang::latin1(n.as_bytes()));
     for k in ["sound", "music"] {
-        let _ = get(k).and_then(|v| v.trim().parse::<f32>().ok()).filter(|v| v.is_finite()).map(|v| v.clamp(0.0, 1.0));
+        let _ = get(k)
+            .and_then(|v| v.trim().parse::<f32>().ok())
+            .filter(|v| v.is_finite())
+            .map(|v| v.clamp(0.0, 1.0));
     }
 }
 
@@ -286,7 +321,8 @@ fn settings_seeds() -> Vec<Vec<u8>> {
     ];
     if std::env::var_os("FUZZ_NO_REAL").is_none()
         && let Some(home) = std::env::var_os("HOME")
-        && let Ok(b) = std::fs::read(PathBuf::from(home).join(".local/share/drahtseilakt/settings.txt"))
+        && let Ok(b) =
+            std::fs::read(PathBuf::from(home).join(".local/share/drahtseilakt/settings.txt"))
     {
         out.push(b);
     }
@@ -298,9 +334,30 @@ fn settings_seeds() -> Vec<Vec<u8>> {
 fn fuzz_settings() {
     let mut t = Target::new("settings", test_name!("fuzz_settings"), Kind::Text);
     t.dict = &[
-        "resolution", "fullscreen", "exclusive", "borderless", "vsync", "on", "off", "key.forward", "key.left",
-        "invert-rotation", "extended.", "profile", "extended", "classic", "interface", "copy", "remastered", "own",
-        "language", "player", "sound", "music", "x", "*",
+        "resolution",
+        "fullscreen",
+        "exclusive",
+        "borderless",
+        "vsync",
+        "on",
+        "off",
+        "key.forward",
+        "key.left",
+        "invert-rotation",
+        "extended.",
+        "profile",
+        "extended",
+        "classic",
+        "interface",
+        "copy",
+        "remastered",
+        "own",
+        "language",
+        "player",
+        "sound",
+        "music",
+        "x",
+        "*",
     ];
     fuzzkit::fuzz(t, settings_seeds, run_settings);
 }
@@ -323,7 +380,9 @@ fn run_level_sim(input: &[u8]) {
     // fuzzed level's objects), half with none
     static DATA: std::sync::OnceLock<Option<crate::assets::Data>> = std::sync::OnceLock::new();
     let data = DATA.get_or_init(|| {
-        (std::env::var_os("FUZZ_NO_REAL").is_none()).then(|| crate::assets::Data::locate(None).ok()).flatten()
+        (std::env::var_os("FUZZ_NO_REAL").is_none())
+            .then(|| crate::assets::Data::locate(None).ok())
+            .flatten()
     });
     let mut sim = match data {
         Some(d) if fuzzkit::fnv(input) & 1 == 0 => {
@@ -334,7 +393,10 @@ fn run_level_sim(input: &[u8]) {
     };
     // a second of play, the arrows and the camera keys taken from the input's last bytes
     for k in 0..60usize {
-        let bits = input.get(input.len().saturating_sub(1 + k % 16)).copied().unwrap_or(0);
+        let bits = input
+            .get(input.len().saturating_sub(1 + k % 16))
+            .copied()
+            .unwrap_or(0);
         sim.step(bits);
     }
 }
@@ -344,7 +406,10 @@ fn level_sim_seeds() -> Vec<Vec<u8>> {
     let d = fuzzkit::scratch().join("seed");
     let _ = std::fs::create_dir_all(&d);
     if level::open::export(&crate::sim::tests::flat_level(), &d).is_ok()
-        && let (Ok(g), Ok(b)) = (std::fs::read(d.join("level.gltf")), std::fs::read(d.join("level.bin")))
+        && let (Ok(g), Ok(b)) = (
+            std::fs::read(d.join("level.gltf")),
+            std::fs::read(d.join("level.bin")),
+        )
     {
         out.push(fuzzkit::join_parts(&[&g, &b]));
     }
@@ -390,7 +455,9 @@ fn plain_nmo(f: &nmo::File) -> Vec<u8> {
         h1.len() as u32,
     ];
     let mut out = b"Nemo Fi\0".to_vec();
-    fields.iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes()));
+    fields
+        .iter()
+        .for_each(|v| out.extend_from_slice(&v.to_le_bytes()));
     out.extend_from_slice(h1);
     out.extend_from_slice(data);
     out
@@ -402,10 +469,32 @@ fn fuzz_level_sim() {
     // text mutations too: the open format's names and numbers (a group "Sector_1000000000", a far position)
     let mut t = Target::new("level_sim", test_name!("fuzz_level_sim"), Kind::Text);
     t.dict = &[
-        "Sector_", "Sector_01", "PC_Checkpoints", "PC_TwoFlames_01", "PS_Levelstart", "PS_FourFlames_01",
-        "PR_Resetpoints", "PR_Resetpoint_01", "PE_Levelende", "P_Box", "P_Box_01", "P_Dome", "P_Extra_Point",
-        "P_Trafo_Stone", "P_Ball_Paper", "Phys_Floors", "Phys_FloorRails", "Phys_FloorStopper", "P_Modul_01",
-        "\"members\"", "\"matrix\"", "\"groups\"", "\"name\"", "1e30", "-1e30", "3.4e38",
+        "Sector_",
+        "Sector_01",
+        "PC_Checkpoints",
+        "PC_TwoFlames_01",
+        "PS_Levelstart",
+        "PS_FourFlames_01",
+        "PR_Resetpoints",
+        "PR_Resetpoint_01",
+        "PE_Levelende",
+        "P_Box",
+        "P_Box_01",
+        "P_Dome",
+        "P_Extra_Point",
+        "P_Trafo_Stone",
+        "P_Ball_Paper",
+        "Phys_Floors",
+        "Phys_FloorRails",
+        "Phys_FloorStopper",
+        "P_Modul_01",
+        "\"members\"",
+        "\"matrix\"",
+        "\"groups\"",
+        "\"name\"",
+        "1e30",
+        "-1e30",
+        "3.4e38",
     ];
     t.max_len = 16 << 20;
     t.rss_mb = 1024;
@@ -414,9 +503,16 @@ fn fuzz_level_sim() {
 
 /// The player's copy, and some of its levels with the modules they use (none without a copy).
 #[allow(clippy::type_complexity)]
-fn copy_levels() -> &'static Option<(crate::assets::Data, Vec<(level::Level, crate::scene::Modules)>)> {
-    static COPY: std::sync::OnceLock<Option<(crate::assets::Data, Vec<(level::Level, crate::scene::Modules)>)>> =
-        std::sync::OnceLock::new();
+fn copy_levels() -> &'static Option<(
+    crate::assets::Data,
+    Vec<(level::Level, crate::scene::Modules)>,
+)> {
+    static COPY: std::sync::OnceLock<
+        Option<(
+            crate::assets::Data,
+            Vec<(level::Level, crate::scene::Modules)>,
+        )>,
+    > = std::sync::OnceLock::new();
     COPY.get_or_init(|| {
         if std::env::var_os("FUZZ_NO_REAL").is_some() {
             return None;
@@ -438,10 +534,18 @@ fn copy_levels() -> &'static Option<(crate::assets::Data, Vec<(level::Level, cra
 /// format) in place of one an original level uses, and the level played for a second: the first byte picks the
 /// level, the second the module, the rest is the module's file.
 fn run_module_sim(input: &[u8]) {
-    let Some((_, levels)) = copy_levels() else { return };
-    let (Some(&a), Some(&b)) = (input.first(), input.get(1)) else { return };
-    let Some((level, modules)) = levels.get(usize::from(a) % levels.len().max(1)) else { return };
-    let Some(model) = input.get(2..).and_then(level_of) else { return };
+    let Some((_, levels)) = copy_levels() else {
+        return;
+    };
+    let (Some(&a), Some(&b)) = (input.first(), input.get(1)) else {
+        return;
+    };
+    let Some((level, modules)) = levels.get(usize::from(a) % levels.len().max(1)) else {
+        return;
+    };
+    let Some(model) = input.get(2..).and_then(level_of) else {
+        return;
+    };
     let mut modules = modules.clone();
     if modules.models.is_empty() {
         return;
@@ -450,16 +554,25 @@ fn run_module_sim(input: &[u8]) {
     modules.models[k] = model;
     let mut sim = crate::sim::Sim::with_modules(level, crate::sim::BallKind::Wood, &modules, false);
     for k in 0..60usize {
-        sim.step(input.get(input.len().saturating_sub(1 + k % 16)).copied().unwrap_or(0));
+        sim.step(
+            input
+                .get(input.len().saturating_sub(1 + k % 16))
+                .copied()
+                .unwrap_or(0),
+        );
     }
 }
 
 fn module_sim_seeds() -> Vec<Vec<u8>> {
-    let Some((data, levels)) = copy_levels() else { return Vec::new() };
+    let Some((data, levels)) = copy_levels() else {
+        return Vec::new();
+    };
     let mut out = Vec::new();
     for (a, (_, modules)) in levels.iter().enumerate() {
         for (b, name) in modules.names.iter().enumerate().take(12) {
-            let Some(path) = data.file(&format!("3D Entities/PH/{name}.nmo")) else { continue };
+            let Some(path) = data.file(&format!("3D Entities/PH/{name}.nmo")) else {
+                continue;
+            };
             if let Ok(bytes) = std::fs::read(&path)
                 && let Ok(f) = nmo::read(&bytes)
             {

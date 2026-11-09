@@ -173,6 +173,12 @@ impl Strings {
         s
     }
 
+    /// Our text of `key` in `language` (the key itself when there is none), for text made outside the menus' language.
+    pub fn ours_for(key: &str, language: &str) -> String {
+        let lang = LANGUAGES.iter().position(|l| l.0 == language).unwrap_or(0);
+        ours(key, lang).unwrap_or(key).to_owned()
+    }
+
     /// Our words in `language`, without a copy (the layout tests).
     #[cfg(test)]
     pub fn ours_in(language: &str) -> Strings {

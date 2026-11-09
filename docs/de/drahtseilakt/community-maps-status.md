@@ -4,7 +4,9 @@ Eine Übersicht über die 579 Community-Karten in `levels/community/` des Inhabe
 [CustomMapList](community-maps.md): Custom Maps 408, Pro Racing 97, Reverse Maps 35, 45-Degree Rotated Maps 13,
 Invisible Maps 13, Original Maps 13). Jede wurde ohne Fenster geladen und 300 Ticks gespielt, ins offene Format
 exportiert und wieder geladen, und ihre Virtools-Skripte aufgelistet (Bausteine nach Namen). Das ist der Plan für den
-Skript-Interpreter und für Mods; der Interpreter ist nicht begonnen.
+Skript-Interpreter und für Mods; **2026-11-09:** Phase 1 des Interpreters ist da ([scripts.md](scripts.md)): der Kern, die Bausteine der
+Vorlage und die meistgenutzten übrigen; 173 der 184 Karten mit Skripten (584 Karten mit `community-unsorted/`) haben nur bekannte Bausteine,
+8 der 36 mit eigenen Skripten laufen mit der vollen Wirkung jedes Bausteins.
 
 | | Karten |
 |---|---|

@@ -2,7 +2,11 @@
 // large accessor would turn one buffer into many copies of it. What is read stays within the buffer's size (found by
 // review while fuzzing the open format; synthetic levels, no game data needed).
 
-#![allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
 use serde_json::json;
 
@@ -38,7 +42,13 @@ fn meshes_sharing_an_accessor_read_no_more_than_the_buffer() {
     let dir = std::env::temp_dir();
     // a few meshes on one accessor read fine (glTF allows sharing)
     let (gltf, bin) = shared(2, 1000);
-    assert_eq!(level::open::import_bytes(&dir, &gltf, &bin).unwrap().meshes.len(), 2);
+    assert_eq!(
+        level::open::import_bytes(&dir, &gltf, &bin)
+            .unwrap()
+            .meshes
+            .len(),
+        2
+    );
     // ten thousand meshes on a 100 000-vertex accessor would be 32 GB of vertices out of a 3 MB buffer
     let (gltf, bin) = shared(10_000, 100_000);
     assert!(level::open::import_bytes(&dir, &gltf, &bin).is_err());

@@ -1,0 +1,14 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Cross Street v1.9
+title.zh = 十字街道1.9
+author = 平衡四边球
+version = 1.9
+posted = 2016-08-07
+difficulty = 6
+order = 8
+catalogue-difficulty = 3
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=nOBH4PcsDy8 (桜埜叶毣)
+video = https://www.youtube.com/watch?v=MZCdxCSu-0w (LacuS: Custom Level 88)

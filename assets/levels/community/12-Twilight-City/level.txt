@@ -1,0 +1,13 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = Twilight City
+title.zh = 暮光之城
+author = Nice_melodies
+posted = 2016-08-07
+difficulty = 8
+order = 12
+catalogue-difficulty = 4
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=AkTcUX4IO9w (桜埜叶毣)
+video = https://www.youtube.com/watch?v=CLGyRIvb298 (LacuS: Custom Level 31)

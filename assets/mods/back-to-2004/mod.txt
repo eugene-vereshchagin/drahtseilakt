@@ -1,0 +1,97 @@
+# Back to 2004: undoes our rendering fixes, so the game looks as it did on a PC of the year of its release: a low
+# resolution scaled up with hard pixels in a 4:3 frame, textures without mipmaps or anisotropy (the distant shimmer),
+# a frame cap and, if you dare, 16-bit colour. Only the look changes; the run stays classic, replays play the same.
+name.en Back to 2004
+name.ru Назад в 2004
+name.de Zurück ins Jahr 2004
+name.zh 回到2004年
+name.fr Retour en 2004
+name.es De vuelta a 2004
+name.it Ritorno al 2004
+description.en The game as on a PC of 2004: a low resolution blown up into hard pixels, shimmering distant textures. Glasses for tears of blood included.
+description.ru Игра как на компьютере 2004 года: низкое разрешение в крупных пикселях, мерцающие дали. Очки для кровавых слёз в комплекте.
+description.de Das Spiel wie auf einem PC von 2004: niedrige Auflösung in groben Pixeln, flimmernde Ferne. Brille für Blutstränen inklusive.
+description.zh 像2004年的电脑一样：低分辨率的大像素，远处纹理闪烁。附赠一副用于流血泪的眼镜。
+description.fr Le jeu comme sur un PC de 2004 : basse résolution en gros pixels, lointain qui scintille. Lunettes pour larmes de sang incluses.
+description.es El juego como en un PC de 2004: baja resolución en píxeles grandes, lejanías que parpadean. Gafas para lágrimas de sangre incluidas.
+description.it Il gioco come su un PC del 2004: bassa risoluzione a pixel grossi, lontananze che sfarfallano. Occhiali per lacrime di sangue inclusi.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option resolution number 0 2 1 0
+label resolution en Resolution (0 640x480, 1 800x600, 2 1024x768)
+label resolution ru Разрешение (0 640x480, 1 800x600, 2 1024x768)
+label resolution de Auflösung (0 640x480, 1 800x600, 2 1024x768)
+label resolution zh 分辨率 (0 640x480, 1 800x600, 2 1024x768)
+label resolution fr Résolution (0 640x480, 1 800x600, 2 1024x768)
+label resolution es Resolución (0 640x480, 1 800x600, 2 1024x768)
+label resolution it Risoluzione (0 640x480, 1 800x600, 2 1024x768)
+option bars switch on
+label bars en Black bars (4:3 frame)
+label bars ru Чёрные полосы (кадр 4:3)
+label bars de Schwarze Balken (4:3-Bild)
+label bars zh 黑边（4:3画面）
+label bars fr Bandes noires (image 4:3)
+label bars es Barras negras (imagen 4:3)
+label bars it Bande nere (immagine 4:3)
+option filter number 1 2 1 1
+label filter en Textures (1 bilinear, 2 nearest)
+label filter ru Текстуры (1 билинейная, 2 ближайший)
+label filter de Texturen (1 bilinear, 2 nächster Nachbar)
+label filter zh 纹理（1 双线性，2 最近邻）
+label filter fr Textures (1 bilinéaire, 2 plus proche)
+label filter es Texturas (1 bilineal, 2 más cercano)
+label filter it Texture (1 bilineare, 2 più vicino)
+option cap number 0 2 1 1
+label cap en Frame cap (0 off, 1 60, 2 30)
+label cap ru Лимит кадров (0 выкл., 1 — 60, 2 — 30)
+label cap de Bildratenbegrenzung (0 aus, 1 60, 2 30)
+label cap zh 帧率上限（0 关，1 60，2 30）
+label cap fr Limite d'images (0 non, 1 60, 2 30)
+label cap es Límite de fotogramas (0 no, 1 60, 2 30)
+label cap it Limite di fotogrammi (0 no, 1 60, 2 30)
+option banding switch off
+label banding en 16-bit colour banding
+label banding ru Полосатость 16-битного цвета
+label banding de 16-Bit-Farbbänder
+label banding zh 16位色彩条纹
+label banding fr Bandes de couleur 16 bits
+label banding es Bandas de color de 16 bits
+label banding it Bande di colore a 16 bit
+
+on frame
+if opt.resolution == 0
+do render.scale 640 480
+
+on frame
+if opt.resolution == 1
+do render.scale 800 600
+
+on frame
+if opt.resolution == 2
+do render.scale 1024 768
+
+on frame
+if opt.bars
+do render.aspect 4:3
+
+on frame
+if opt.filter == 1
+do render.filter bilinear
+
+on frame
+if opt.filter == 2
+do render.filter nearest
+
+on frame
+if opt.cap == 1
+do render.fps_cap 60
+
+on frame
+if opt.cap == 2
+do render.fps_cap 30
+
+on frame
+if opt.banding
+do render.colour_bits 16

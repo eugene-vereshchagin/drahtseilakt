@@ -10,13 +10,17 @@ pub enum Kind {
     Community,
     Remastered,
     Open,
+    /// Community remakes of the original levels (rotated, reversed, invisible): the original's geometry, so never
+    /// shipped, played only from the player's files and with their copy of the original.
+    Modified,
 }
 
-pub const KINDS: [Kind; 4] = [
+pub const KINDS: [Kind; 5] = [
     Kind::Original,
     Kind::Community,
     Kind::Remastered,
     Kind::Open,
+    Kind::Modified,
 ];
 
 impl Kind {
@@ -26,6 +30,7 @@ impl Kind {
             Kind::Community => "community",
             Kind::Remastered => "remastered",
             Kind::Open => "open",
+            Kind::Modified => "modified",
         }
     }
 }
@@ -108,7 +113,11 @@ pub fn settings_path() -> PathBuf {
 pub fn settings_text() -> String {
     const MAX: u64 = 64 * 1024;
     let small = std::fs::metadata(settings_path()).is_ok_and(|m| m.len() <= MAX);
-    let bytes = if small { std::fs::read(settings_path()).unwrap_or_default() } else { Vec::new() };
+    let bytes = if small {
+        std::fs::read(settings_path()).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     settings_from_bytes(&bytes)
 }
 

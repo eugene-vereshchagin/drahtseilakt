@@ -63,11 +63,26 @@ sounds | Sounds | Звуки | Klänge | 音效 | Sons | Sonidos | Suoni
 levels | Levels | Уровни | Level | 关卡 | Niveaux | Niveles | Livelli
 kind original | Original | Оригинальные | Original | 原版 | Originaux | Originales | Originali
 kind remastered | Remastered | Ремастер | Remastered | 重制版 | Remasterisés | Remasterizados | Rimasterizzati
-kind community | Community maps | Карты сообщества | Community-Karten | 社区地图 | Cartes de la communauté | Mapas de la comunidad | Mappe della comunità
+kind community | Your community maps | Ваши карты сообщества | Eigene Community-Karten | 你的社区地图 | Vos cartes de la communauté | Tus mapas de la comunidad | Le tue mappe della comunità
 kind open | Open format | Открытый формат | Offenes Format | 开放格式 | Format ouvert | Formato abierto | Formato aperto
+kind modified | Modified originals | Модифицированные оригиналы | Modifizierte Originale | 修改版原版 | Originaux modifiés | Originales modificados | Originali modificati
+modified set rotated | 45-Degree Rotated | Поворот на 45 градусов | 45 Grad gedreht | 旋转45度 | Rotation 45 degrés | Rotado 45 grados | Ruotato di 45 gradi
+modified set reverse | Reverse | Обратные | Rückwärts | 反向 | Inversé | Inverso | Inverso
+modified set invisible | Invisible | Невидимые | Unsichtbar | 隐形 | Invisible | Invisible | Invisibile
+modified level | Level | Уровень | Level | 关卡 | Niveau | Nivel | Livello
+modified new | New | Новая | Neu | 新 | Nouveau | Nuevo | Nuovo
+modified hard | Hard | Сложная | Schwer | 困难 | Difficile | Difícil | Difficile
+modified easy | Easy | Легкая | Leicht | 简单 | Facile | Fácil | Facile
+modified normal | Normal | Обычная | Normal | 普通 | Normal | Normal | Normale
 custom levels | Custom levels | Свои уровни | Eigene Level | 自定义关卡 | Niveaux perso | Niveles propios | Livelli personali
 import | Import | Импорт | Importieren | 导入 | Importer | Importar | Importa
 own levels | Our levels | Наши уровни | Unsere Level | 我们的关卡 | Nos niveaux | Nuestros niveles | I nostri livelli
+community maps | Community maps | Карты сообщества | Community-Karten | 社区地图 | Cartes de la communauté | Mapas de la comunidad | Mappe della comunità
+by | by | автор | von | 作者 | de | de | di
+community notice | These levels belong to their authors, shown here with thanks. If an author objects, we will remove the level. | Эти уровни принадлежат их авторам — спасибо им! Если автор против, мы удалим уровень. | Diese Level gehören ihren Autoren und sind hier mit Dank gezeigt. Wenn ein Autor widerspricht, entfernen wir das Level. | 这些关卡属于其作者，在此致谢展示。如作者反对，我们将移除该关卡。 | Ces niveaux appartiennent à leurs auteurs, présentés ici avec gratitude. Si un auteur s'y oppose, nous retirerons le niveau. | Estos niveles pertenecen a sus autores y se muestran aquí con agradecimiento. Si un autor se opone, retiraremos el nivel. | Questi livelli appartengono ai loro autori e sono mostrati qui con gratitudine. Se un autore si oppone, rimuoveremo il livello.
+community credit 1 | Community maps (Start, Community maps): | Карты сообщества (Старт, Карты сообщества): | Community-Karten (Start, Community-Karten): | 社区地图（开始，社区地图）： | Cartes de la communauté (Jouer, Cartes de la communauté) : | Mapas de la comunidad (Jugar, Mapas de la comunidad): | Mappe della comunità (Gioca, Mappe della comunità):
+community credit 2 | by their authors, shown with thanks; | принадлежат своим авторам, показаны с благодарностью; | gehören ihren Autoren, mit Dank gezeigt; | 属于其作者，在此致谢展示； | à leurs auteurs, présentées avec gratitude ; | de sus autores, con agradecimiento; | dei loro autori, con gratitudine;
+community credit 3 | if an author objects, we remove the level. | если автор против, мы удалим уровень. | wenn ein Autor widerspricht, entfernen wir es. | 如作者反对，我们将移除。 | si un auteur s'y oppose, nous la retirons. | si un autor se opone, la retiramos. | se un autore si oppone, la rimuoviamo.
 no levels | No levels here yet. Put them into | Здесь пока нет уровней. Положите их в | Noch keine Level hier. Lege sie in | 这里还没有关卡。请放入 | Aucun niveau ici. Placez-les dans | Aún no hay niveles. Ponlos en | Ancora nessun livello. Mettili in
 feature all-levels | All levels open? | Все уровни открыты? | Alle Level offen? | 开放全部关卡? | Tous les niveaux ouverts ? | ¿Todos los niveles abiertos? | Tutti i livelli aperti?
 feature best-times | Best times? | Лучшее время? | Bestzeiten? | 最佳时间? | Meilleurs temps ? | ¿Mejores tiempos? | Tempi migliori?

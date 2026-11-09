@@ -163,7 +163,13 @@ pub fn mesh_channels(chunk: &Chunk, vertices: usize) -> Result<Vec<Channel>> {
             }
             let words = w.take(count.checked_mul(2).ok_or(malformed("channel uv data"))?)?;
             let uvs = words.as_chunks::<2>().0.iter().map(|c| uv2(c)).collect();
-            out.push(Channel { material, flags, src_blend, dest_blend, uvs });
+            out.push(Channel {
+                material,
+                flags,
+                src_blend,
+                dest_blend,
+                uvs,
+            });
         }
     }
     Ok(out)
@@ -403,7 +409,11 @@ pub fn curve(chunk: &Chunk) -> Result<Option<Curve>> {
     }
     w.u32()?; // the step count of its line mesh
     let open = w.u32()? != 0;
-    Ok(Some(Curve { points, fitting, open }))
+    Ok(Some(Curve {
+        points,
+        fitting,
+        open,
+    }))
 }
 
 /// A curve's control point (CKCurvePoint, class 36; section 0x10000000 of data version 5 and later): TCB or
@@ -429,11 +439,20 @@ pub fn curve_point(chunk: &Chunk) -> Result<Option<CurvePoint>> {
     let linear = w.u32()? != 0;
     let mut f = || -> Result<f32> {
         let v = w.f32()?;
-        if v.is_finite() { Ok(v) } else { Err(malformed("curve point value")) }
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(malformed("curve point value"))
+        }
     };
     let tcb_values = [f()?, f()?, f()?];
     let tangents = [[f()?, f()?, f()?], [f()?, f()?, f()?]];
-    Ok(Some(CurvePoint { tcb, linear, tcb_values, tangents }))
+    Ok(Some(CurvePoint {
+        tcb,
+        linear,
+        tcb_values,
+        tangents,
+    }))
 }
 
 /// An object animation (CKObjectAnimation, class 15; section 0x4000000 of data version 1 and later,
@@ -472,8 +491,14 @@ pub fn object_animation(chunk: &Chunk) -> Result<Option<ObjectAnimation>> {
     if flags & 0x80 != 0 {
         w.take(3)?; // merge factor and the two merged animations
     }
-    let mut anim =
-        ObjectAnimation { entity, flags, length, position: Vec::new(), rotation: Vec::new(), scale: Vec::new() };
+    let mut anim = ObjectAnimation {
+        entity,
+        flags,
+        length,
+        position: Vec::new(),
+        rotation: Vec::new(),
+        scale: Vec::new(),
+    };
     for _ in 0..MAX_CONTROLLERS {
         let kind = w.u32()?;
         if kind == 0 {
@@ -525,7 +550,12 @@ pub struct Camera {
 }
 
 pub fn camera(chunk: &Chunk) -> Result<Camera> {
-    let mut cam = Camera { fov: 0.5, near: 1.0, far: 4000.0, target: None };
+    let mut cam = Camera {
+        fov: 0.5,
+        near: 1.0,
+        far: 4000.0,
+        target: None,
+    };
     if chunk.data_version >= 5
         && let Some(mut w) = chunk.section(0x0fc0_0000)
     {
@@ -560,12 +590,24 @@ pub struct Sprite {
 
 /// The sprite's part, or the constructor's values (2 × 2, no offset, the whole texture) when the file has none.
 pub fn sprite(chunk: &Chunk) -> Result<Sprite> {
-    let mut s = Sprite { mode: 0, size: [2.0; 2], offset: [0.0; 2], uv: [0.0, 0.0, 1.0, 1.0], material: None };
+    let mut s = Sprite {
+        mode: 0,
+        size: [2.0; 2],
+        offset: [0.0; 2],
+        uv: [0.0, 0.0, 1.0, 1.0],
+        material: None,
+    };
     let Some(mut w) = chunk.section(0x0040_0000) else {
         return Ok(s);
     };
     s.mode = w.u32()?;
-    let finite = |v: f32| if v.is_finite() { Ok(v) } else { Err(malformed("sprite value")) };
+    let finite = |v: f32| {
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(malformed("sprite value"))
+        }
+    };
     s.size = [finite(w.f32()? * 2.0)?, finite(w.f32()? * 2.0)?];
     s.offset = [finite(w.f32()?)?, finite(w.f32()?)?];
     for v in &mut s.uv {
@@ -610,7 +652,11 @@ pub fn parameter_floats(chunk: &Chunk) -> Result<Option<Vec<f32>>> {
     if size == 0 || !size.is_multiple_of(4) || size > 64 {
         return Ok(None);
     }
-    let v: Vec<f32> = w.take(size / 4)?.iter().map(|&x| f32::from_bits(x)).collect();
+    let v: Vec<f32> = w
+        .take(size / 4)?
+        .iter()
+        .map(|&x| f32::from_bits(x))
+        .collect();
     Ok(v.iter().all(|x| x.is_finite()).then_some(v))
 }
 
@@ -689,7 +735,13 @@ pub fn data_array(chunk: &Chunk) -> Result<DataArray> {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used, clippy::arithmetic_side_effects, clippy::indexing_slicing, clippy::panic)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
 mod tests {
     use super::*;
     use crate::chunk::OPTION_FILE;
@@ -700,10 +752,20 @@ mod tests {
         for (k, (id, data)) in sections.iter().enumerate() {
             let next = words.len() + 2 + data.len();
             words.push(*id);
-            words.push(if k + 1 == sections.len() { 0 } else { next as u32 });
+            words.push(if k + 1 == sections.len() {
+                0
+            } else {
+                next as u32
+            });
             words.extend(data);
         }
-        Chunk { data_version: 7, class_id: 0, chunk_version: 7, options: OPTION_FILE, words }
+        Chunk {
+            data_version: 7,
+            class_id: 0,
+            chunk_version: 7,
+            options: OPTION_FILE,
+            words,
+        }
     }
 
     /// Record Anim's layout (docs/animation.md 5.2): linear position, rotation and scale, then the end of the list;
@@ -717,29 +779,88 @@ mod tests {
             chunk(&[(0x0400_0000, v)])
         };
         let ok = head(&[
-            0x637c_4301, 9, 2, f(0.0), f(1.0), f(2.0), f(3.0), f(100.0), f(4.0), f(5.0), f(6.0),
-            0x347e_4a01, 3, 1, 0, 0,
-            0x49ed_4002, 6, 1, f(0.0), f(0.0), f(0.0), f(0.0), f(1.0),
-            0x654a_3a04, 5, 1, f(0.0), f(1.0), f(1.0), f(1.0),
+            0x637c_4301,
+            9,
+            2,
+            f(0.0),
+            f(1.0),
+            f(2.0),
+            f(3.0),
+            f(100.0),
+            f(4.0),
+            f(5.0),
+            f(6.0),
+            0x347e_4a01,
+            3,
+            1,
+            0,
+            0,
+            0x49ed_4002,
+            6,
+            1,
+            f(0.0),
+            f(0.0),
+            f(0.0),
+            f(0.0),
+            f(1.0),
+            0x654a_3a04,
+            5,
+            1,
+            f(0.0),
+            f(1.0),
+            f(1.0),
+            f(1.0),
             0,
         ]);
         let a = object_animation(&ok).expect("animation").expect("its part");
         assert_eq!((a.entity, a.length), (Some(5), 100.0));
-        assert_eq!(a.position, vec![(0.0, [1.0, 2.0, 3.0]), (100.0, [4.0, 5.0, 6.0])]);
+        assert_eq!(
+            a.position,
+            vec![(0.0, [1.0, 2.0, 3.0]), (100.0, [4.0, 5.0, 6.0])]
+        );
         assert_eq!(a.rotation, vec![(0.0, [0.0, 0.0, 0.0, 1.0])]);
         assert_eq!(a.scale, vec![(0.0, [1.0; 3])]);
         let disagree = head(&[0x637c_4301, 9, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-        assert!(object_animation(&disagree).is_err(), "count and size disagree");
-        assert!(object_animation(&head(&[0x637c_4301, 5, 1, f(f32::NAN), 0, 0, 0, 0])).is_err(), "not a number");
-        assert!(object_animation(&head(&[0x637c_4301, 1000, 1])).is_err(), "cut short");
-        assert!(object_animation(&head(&[0x1234, 0])).is_err(), "no end to the list");
-        assert_eq!(object_animation(&chunk(&[(0x4, vec![])])).expect("none"), None);
+        assert!(
+            object_animation(&disagree).is_err(),
+            "count and size disagree"
+        );
+        assert!(
+            object_animation(&head(&[0x637c_4301, 5, 1, f(f32::NAN), 0, 0, 0, 0])).is_err(),
+            "not a number"
+        );
+        assert!(
+            object_animation(&head(&[0x637c_4301, 1000, 1])).is_err(),
+            "cut short"
+        );
+        assert!(
+            object_animation(&head(&[0x1234, 0])).is_err(),
+            "no end to the list"
+        );
+        assert_eq!(
+            object_animation(&chunk(&[(0x4, vec![])])).expect("none"),
+            None
+        );
     }
 
     #[test]
     fn a_sprite_is_read_and_one_without_its_part_takes_the_defaults() {
         let f = f32::to_bits;
-        let c = chunk(&[(0x0040_0000, vec![2, f(0.25), f(0.5), f(0.1), f(-0.2), f(0.0), f(0.5), f(1.0), f(0.75), 9])]);
+        let c = chunk(&[(
+            0x0040_0000,
+            vec![
+                2,
+                f(0.25),
+                f(0.5),
+                f(0.1),
+                f(-0.2),
+                f(0.0),
+                f(0.5),
+                f(1.0),
+                f(0.75),
+                9,
+            ],
+        )]);
         let s = sprite(&c).expect("sprite");
         assert_eq!(s.mode, 2);
         assert_eq!(s.size, [0.5, 1.0]);
@@ -754,19 +875,39 @@ mod tests {
     #[test]
     fn a_mesh_s_material_channels_are_read_and_bad_ones_refused() {
         let f = f32::to_bits;
-        let verts = (0x0002_0000, vec![2, 0x10 | 0x4 | 0x1 | 0x2, 0, 0, 0, 0, 0, 0, 0]);
-        let ok = chunk(&[(0x0000_4000, vec![1, 6, 0x0200_0001, 1, 3, 2, f(0.5), f(0.25), f(0.75), f(1.0)]), verts.clone()]);
+        let verts = (
+            0x0002_0000,
+            vec![2, 0x10 | 0x4 | 0x1 | 0x2, 0, 0, 0, 0, 0, 0, 0],
+        );
+        let ok = chunk(&[
+            (
+                0x0000_4000,
+                vec![1, 6, 0x0200_0001, 1, 3, 2, f(0.5), f(0.25), f(0.75), f(1.0)],
+            ),
+            verts.clone(),
+        ]);
         let m = mesh(&ok).expect("mesh");
         assert_eq!(m.positions.len(), 2);
         let chans = mesh_channels(&ok, 2).expect("channels");
         let c = chans.first().expect("a channel");
-        assert_eq!((c.material, c.flags, c.src_blend, c.dest_blend), (Some(6), 0x0200_0001, Blend::Zero, Blend::SrcColor));
+        assert_eq!(
+            (c.material, c.flags, c.src_blend, c.dest_blend),
+            (Some(6), 0x0200_0001, Blend::Zero, Blend::SrcColor)
+        );
         assert_eq!(c.uvs, [[0.5, 0.25], [0.75, 1.0]]);
         // no coordinates of its own: allowed
         assert!(mesh_channels(&chunk(&[(0x0000_4000, vec![1, 6, 1, 1, 3, 0])]), 2).is_ok());
         // a count that is neither 0 nor the vertex count, data cut short, too many channels; the mesh stays
-        assert!(mesh_channels(&chunk(&[(0x0000_4000, vec![1, 6, 1, 1, 3, 1, f(0.5), f(0.5)])]), 2).is_err());
-        assert!(mesh_channels(&chunk(&[(0x0000_4000, vec![1, 6, 1, 1, 3, 2, f(0.5)])]), 2).is_err());
+        assert!(
+            mesh_channels(
+                &chunk(&[(0x0000_4000, vec![1, 6, 1, 1, 3, 1, f(0.5), f(0.5)])]),
+                2
+            )
+            .is_err()
+        );
+        assert!(
+            mesh_channels(&chunk(&[(0x0000_4000, vec![1, 6, 1, 1, 3, 2, f(0.5)])]), 2).is_err()
+        );
         let many = chunk(&[(0x0000_4000, vec![u32::MAX]), verts]);
         assert!(mesh_channels(&many, 2).is_err());
         assert!(mesh(&many).is_ok());
@@ -776,21 +917,71 @@ mod tests {
     #[test]
     fn curves_points_and_cameras_are_read_and_bad_ones_refused() {
         let f = f32::to_bits;
-        let v10 = |sections: &[(u32, Vec<u32>)]| Chunk { data_version: 10, ..chunk(sections) };
+        let v10 = |sections: &[(u32, Vec<u32>)]| Chunk {
+            data_version: 10,
+            ..chunk(sections)
+        };
         let c = v10(&[(0xffc0_0000, vec![2, 7, 8, f(0.0), 100, 0])]);
-        assert_eq!(curve(&c).expect("curve"), Some(Curve { points: vec![7, 8], fitting: 0.0, open: false }));
-        assert!(curve(&v10(&[(0xffc0_0000, vec![5000])])).is_err(), "too many points");
-        assert!(curve(&v10(&[(0xffc0_0000, vec![2, 7, 8])])).is_err(), "cut short");
-        assert!(curve(&v10(&[(0xffc0_0000, vec![1, 7, f(f32::NAN), 100, 0])])).is_err(), "fitting not a number");
-        let old = Chunk { data_version: 4, ..chunk(&[(0xffc0_0000, vec![0, f(0.0), 1, 0])]) };
-        assert_eq!(curve(&old).expect("old"), None, "data version 4: another layout");
-        let p = v10(&[(0x1000_0000, vec![3, 0, 0, f(-0.6), f(0.0), f(0.0), 0, 0, 0, 0, 0, 0])]);
+        assert_eq!(
+            curve(&c).expect("curve"),
+            Some(Curve {
+                points: vec![7, 8],
+                fitting: 0.0,
+                open: false
+            })
+        );
+        assert!(
+            curve(&v10(&[(0xffc0_0000, vec![5000])])).is_err(),
+            "too many points"
+        );
+        assert!(
+            curve(&v10(&[(0xffc0_0000, vec![2, 7, 8])])).is_err(),
+            "cut short"
+        );
+        assert!(
+            curve(&v10(&[(0xffc0_0000, vec![1, 7, f(f32::NAN), 100, 0])])).is_err(),
+            "fitting not a number"
+        );
+        let old = Chunk {
+            data_version: 4,
+            ..chunk(&[(0xffc0_0000, vec![0, f(0.0), 1, 0])])
+        };
+        assert_eq!(
+            curve(&old).expect("old"),
+            None,
+            "data version 4: another layout"
+        );
+        let p = v10(&[(
+            0x1000_0000,
+            vec![3, 0, 0, f(-0.6), f(0.0), f(0.0), 0, 0, 0, 0, 0, 0],
+        )]);
         let cp = curve_point(&p).expect("point").expect("its part");
         assert!(cp.tcb && !cp.linear && cp.tcb_values == [-0.6, 0.0, 0.0]);
         assert!(curve_point(&v10(&[(0x1000_0000, vec![3, 0, 0, f(f32::INFINITY)])])).is_err());
-        let cam = Chunk { class_id: 35, ..v10(&[(0x0fc0_0000, vec![0, f(0.95), f(1.0), 0, f(20.0), f(550.0)]), (0x1000_0000, vec![4])]) };
-        assert_eq!(camera(&cam).expect("camera"), Camera { fov: 0.95, near: 20.0, far: 550.0, target: Some(4) });
-        assert!(camera(&Chunk { class_id: 35, ..v10(&[(0x0fc0_0000, vec![0, f(0.95)])]) }).is_err(), "cut short");
+        let cam = Chunk {
+            class_id: 35,
+            ..v10(&[
+                (0x0fc0_0000, vec![0, f(0.95), f(1.0), 0, f(20.0), f(550.0)]),
+                (0x1000_0000, vec![4]),
+            ])
+        };
+        assert_eq!(
+            camera(&cam).expect("camera"),
+            Camera {
+                fov: 0.95,
+                near: 20.0,
+                far: 550.0,
+                target: Some(4)
+            }
+        );
+        assert!(
+            camera(&Chunk {
+                class_id: 35,
+                ..v10(&[(0x0fc0_0000, vec![0, f(0.95)])])
+            })
+            .is_err(),
+            "cut short"
+        );
     }
 
     /// The dome's material effect (TexGen, its parameter object 4) and that parameter's value (3, Chrome).
@@ -798,11 +989,17 @@ mod tests {
     fn a_material_effect_and_a_parameter_word_are_read() {
         let mat = chunk(&[(0x1000, vec![0; 9]), (0x0001_0000, vec![4, 1])]);
         assert_eq!(material_effect(&mat).expect("effect"), Some((1, Some(4))));
-        assert_eq!(material_effect(&chunk(&[(0x1000, vec![0; 9])])).expect("plain"), None);
+        assert_eq!(
+            material_effect(&chunk(&[(0x1000, vec![0; 9])])).expect("plain"),
+            None
+        );
         assert!(material_effect(&chunk(&[(0x1000, vec![0; 9]), (0x0001_0000, vec![4])])).is_err());
         let par = chunk(&[(0x40, vec![0x7dbc_28f5, 0x3f16_1e80, 1, 4, 3])]);
         assert_eq!(parameter_word(&par).expect("parameter"), Some(3));
-        assert_eq!(parameter_word(&chunk(&[(0x40, vec![0, 0, 1, 8, 1, 2])])).expect("wide"), None);
+        assert_eq!(
+            parameter_word(&chunk(&[(0x40, vec![0, 0, 1, 8, 1, 2])])).expect("wide"),
+            None
+        );
         assert!(parameter_word(&chunk(&[(0x40, vec![0, 0, 1, 4])])).is_err());
     }
 
@@ -810,17 +1007,26 @@ mod tests {
     fn a_broken_sprite_is_refused() {
         let short = chunk(&[(0x0040_0000, vec![0, 0])]);
         assert!(sprite(&short).is_err());
-        let nan = chunk(&[(0x0040_0000, vec![0, f32::NAN.to_bits(), 0, 0, 0, 0, 0, 0, 0, 0])]);
+        let nan = chunk(&[(
+            0x0040_0000,
+            vec![0, f32::NAN.to_bits(), 0, 0, 0, 0, 0, 0, 0, 0],
+        )]);
         assert!(sprite(&nan).is_err());
     }
 
     #[test]
     fn a_texture_s_transparent_colour_is_read_as_its_options_say() {
-        let with = chunk(&[(0x0001_0000, vec![1, 0]), (0x002F_F000, vec![0x101, 0xFF00_0000, 0, 0])]);
+        let with = chunk(&[
+            (0x0001_0000, vec![1, 0]),
+            (0x002F_F000, vec![0x101, 0xFF00_0000, 0, 0]),
+        ]);
         // no file name slot words here: the 0x10000 section above is only a slot count of 1 and an empty string
         assert_eq!(texture(&with).expect("texture").transparent, Some(0));
         let magenta = chunk(&[(0x002F_F000, vec![0x100, 0x00FF_00FF])]);
-        assert_eq!(texture(&magenta).expect("texture").transparent, Some(0x00FF_00FF));
+        assert_eq!(
+            texture(&magenta).expect("texture").transparent,
+            Some(0x00FF_00FF)
+        );
         let none = chunk(&[(0x002F_F000, vec![0x001, 0x00FF_00FF])]);
         assert_eq!(texture(&none).expect("texture").transparent, None);
     }
@@ -835,7 +1041,9 @@ mod tests {
             data.extend(masks);
             data.extend([0, w * h]);
             data.extend(std::iter::repeat_n(0x8040_2010u32, (w * h) as usize));
-            texture(&chunk(&[(0x0002_0000, data)])).expect("texture").embedded
+            texture(&chunk(&[(0x0002_0000, data)]))
+                .expect("texture")
+                .embedded
         };
         assert_eq!(pictured(8192, 0), None);
         assert_eq!(pictured(0, 5), None);
@@ -863,4 +1071,3 @@ mod tests {
         assert!(made(1000, all & !NO_POSITION, 2000).is_err());
     }
 }
-

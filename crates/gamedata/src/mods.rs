@@ -120,6 +120,8 @@ pub enum Value {
     InputRight,
     InputRotation,
     InputOverview,
+    /// The view's turn handed to the run (`view.turn`), whole degrees 0 to 359; recorded in the replay.
+    InputTurn,
     // view-only values
     /// Real seconds since the run began (pauses and menus included).
     RealTime,
@@ -142,9 +144,12 @@ pub enum Value {
     /// The practice blocks' state: the game's speed (1 as it is, down to 1/8) and whether a moment is saved (1 or 0).
     PracticeSpeed,
     PracticeSaved,
+    /// Time played of this level and of all levels, seconds, from the kept statistics (`playtime`).
+    PlaytimeLevel,
+    PlaytimeAll,
 }
 
-const VALUES: [(&str, Value); 37] = [
+const VALUES: [(&str, Value); 40] = [
     ("ball.x", Value::BallX),
     ("ball.y", Value::BallY),
     ("ball.z", Value::BallZ),
@@ -164,6 +169,7 @@ const VALUES: [(&str, Value); 37] = [
     ("input.right", Value::InputRight),
     ("input.rotation", Value::InputRotation),
     ("input.overview", Value::InputOverview),
+    ("input.turn", Value::InputTurn),
     ("real.time", Value::RealTime),
     ("frame.dt", Value::FrameDt),
     ("frame.fps", Value::Fps),
@@ -179,6 +185,8 @@ const VALUES: [(&str, Value); 37] = [
     ("best.time", Value::BestTime),
     ("practice.speed", Value::PracticeSpeed),
     ("practice.saved", Value::PracticeSaved),
+    ("playtime.level", Value::PlaytimeLevel),
+    ("playtime.all", Value::PlaytimeAll),
     // aliases kept short for HUD lines
     ("run.ticks", Value::RunTick),
     ("ball.v", Value::BallSpeed),
@@ -209,6 +217,7 @@ impl Value {
                 | Value::InputRight
                 | Value::InputRotation
                 | Value::InputOverview
+                | Value::InputTurn
         )
     }
 }
@@ -350,7 +359,10 @@ impl Expr {
         1usize.saturating_add(match self {
             Expr::Neg(e) | Expr::Not(e) => e.size(),
             Expr::Bin(_, a, b) => a.size().saturating_add(b.size()),
-            Expr::Call(_, args) => args.iter().map(Expr::size).fold(0usize, usize::saturating_add),
+            Expr::Call(_, args) => args
+                .iter()
+                .map(Expr::size)
+                .fold(0usize, usize::saturating_add),
             _ => 0,
         })
     }
@@ -420,7 +432,29 @@ pub enum Action {
     Gravity(Expr),
     /// The physics' time factor, 0.5 to 4 (the original's 2).
     TimeFactor(Expr),
+    /// The steering turned about the vertical by so many degrees (the arrows push along the turned view).
+    SteerYaw(Expr),
     // the view's actions
+    /// The view's turn, in degrees, handed to the run as `input.turn` (recorded in the replay, whole degrees).
+    ViewTurn(Expr),
+    /// The camera eased (0 none to 1 slow): its turn, distance, field of view and the free camera follow smoothly.
+    CameraSmooth(Expr),
+    /// The picture drawn at this many pixels wide and high and scaled up to the window (view only).
+    RenderScale(Expr, Expr),
+    /// How the textures are filtered: 0 as ours, 1 bilinear without mipmaps, 2 nearest (view only).
+    RenderFilter(u8),
+    /// The picture's shape (width, height): bars where the window is wider or taller (view only).
+    RenderAspect(Expr, Expr),
+    /// At most this many frames a second, 0 for no cap (view only).
+    RenderFpsCap(Expr),
+    /// The colour depth of the picture: 16 shows the 5-6-5 bands, anything else full colour (view only).
+    RenderColourBits(Expr),
+    /// So many translucent decoy balls wandering around the ball (0 to 8; view only).
+    Decoys(Expr),
+    /// The wooden ball's look deformed at random, 0 (round) to 1 (view only; the physics keeps its round ball).
+    BallDeform(Expr),
+    /// This frame counts as time played: the level's and the total play time, kept in the data folder.
+    PlayTime,
     /// The field of view widened by so many degrees (-30 to 60).
     CameraFov(Expr),
     /// The camera's distance from the ball, as a factor (0.5 to 2).
@@ -455,18 +489,25 @@ pub enum Action {
     Faster,
     /// The free camera taken up or put down (the run waits while it flies).
     FreeCam,
+    /// The run begun again at a sector (1 first), as `--sector` does.
+    SetSector(Expr),
 }
 
 impl Action {
     pub fn sim(&self) -> bool {
         matches!(
             self,
-            Action::Stick(_) | Action::Gravity(_) | Action::TimeFactor(_) | Action::EndlessLives(_)
+            Action::Stick(_) | Action::Gravity(_) | Action::TimeFactor(_) | Action::EndlessLives(_) | Action::SteerYaw(_)
         )
     }
 
     /// One of the practice's deeds (rewind, save, load, speed, free camera): only on a key, and it makes the mod
     /// modded.
+    /// A single deed on a key that reaches into the run from outside (practice, or a jump to a sector).
+    pub fn deed(&self) -> bool {
+        self.practice() || matches!(self, Action::SetSector(_))
+    }
+
     pub fn practice(&self) -> bool {
         matches!(
             self,
@@ -485,6 +526,14 @@ impl Action {
             | Action::Stick(e)
             | Action::Gravity(e)
             | Action::TimeFactor(e)
+            | Action::SteerYaw(e)
+            | Action::ViewTurn(e)
+            | Action::CameraSmooth(e)
+            | Action::RenderFpsCap(e)
+            | Action::RenderColourBits(e)
+            | Action::Decoys(e)
+            | Action::BallDeform(e)
+            | Action::SetSector(e)
             | Action::CameraFov(e)
             | Action::CameraDistance(e)
             | Action::CameraYaw(e)
@@ -494,6 +543,8 @@ impl Action {
             | Action::EndlessLives(e)
             | Action::Rewind(e) => vec![e],
             Action::Show(_, _, _, v) => v.iter().collect(),
+            Action::RenderScale(a, b) | Action::RenderAspect(a, b) => vec![a, b],
+            Action::RenderFilter(_) => Vec::new(),
             Action::Splits(_)
             | Action::Keys(_)
             | Action::Screenshot
@@ -502,6 +553,7 @@ impl Action {
             | Action::LoadMoment
             | Action::Slower
             | Action::Faster
+            | Action::PlayTime
             | Action::FreeCam => Vec::new(),
         }
     }
@@ -641,12 +693,14 @@ impl ModTxt {
 
     /// It changes the run (any sim action, or a practice deed that reaches into it): its runs are modded.
     pub fn modded(&self) -> bool {
-        self.rules.iter().any(|r| r.actions.iter().any(|a| a.sim() || a.practice()))
+        self.rules.iter().any(|r| r.actions.iter().any(|a| a.sim() || a.deed()))
     }
 
     /// It has a practice deed: while it is on, the game keeps the run's moments for going back.
     pub fn practice(&self) -> bool {
-        self.rules.iter().any(|r| r.actions.iter().any(Action::practice))
+        self.rules
+            .iter()
+            .any(|r| r.actions.iter().any(Action::practice))
     }
 
     /// The label names in their order (`Show` refers to them by place).
@@ -1067,8 +1121,21 @@ fn parse_option(rest: &str) -> Result<OptSpec, String> {
 
 /// Keys a mod may never take: the menu's and window's, the arrows, the game's default keys, the practice tools'.
 pub const RESERVED_KEYS: [&str; 15] = [
-    "Escape", "Enter", "NumpadEnter", "F11", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft",
-    "ShiftRight", "Space", "Tab", "AltLeft", "AltRight", "Backquote",
+    "Escape",
+    "Enter",
+    "NumpadEnter",
+    "F11",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ShiftLeft",
+    "ShiftRight",
+    "Space",
+    "Tab",
+    "AltLeft",
+    "AltRight",
+    "Backquote",
 ];
 
 fn parse_event(rest: &str, options: &[OptSpec]) -> Result<Event, String> {
@@ -1100,6 +1167,11 @@ fn parse_event(rest: &str, options: &[OptSpec]) -> Result<Event, String> {
     Ok(ev)
 }
 
+/// Two or three words split at spaces (each an expression without spaces: a number or a name).
+fn split_args_ws(s: &str) -> Vec<&str> {
+    s.split_whitespace().collect()
+}
+
 fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Action, String> {
     let (verb, args) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
     let args = args.trim();
@@ -1127,6 +1199,36 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "camera.fov" => Action::CameraFov(e(args)?),
         "camera.distance" => Action::CameraDistance(e(args)?),
         "camera.yaw" => Action::CameraYaw(e(args)?),
+        "camera.smooth" => Action::CameraSmooth(e(args)?),
+        "render.scale" => {
+            let p = split_args_ws(args);
+            let [w, h] = p.as_slice() else {
+                return Err("expected: render.scale <width> <height>".into());
+            };
+            Action::RenderScale(e(w)?, e(h)?)
+        }
+        "render.aspect" => {
+            // 4:3 (or two numbers, 4 3)
+            let (w, h) = args
+                .split_once(':')
+                .or_else(|| args.split_once(char::is_whitespace))
+                .ok_or("expected: render.aspect <width>:<height>")?;
+            Action::RenderAspect(e(w.trim())?, e(h.trim())?)
+        }
+        "render.filter" => Action::RenderFilter(match args {
+            "default" => 0,
+            "bilinear" => 1,
+            "nearest" => 2,
+            _ => return Err("expected: render.filter default|bilinear|nearest".into()),
+        }),
+        "render.fps_cap" => Action::RenderFpsCap(e(args)?),
+        "render.colour_bits" => Action::RenderColourBits(e(args)?),
+        "steer.yaw" => Action::SteerYaw(e(args)?),
+        "view.turn" => Action::ViewTurn(e(args)?),
+        "decoys" => Action::Decoys(e(args)?),
+        "ball.deform" => Action::BallDeform(e(args)?),
+        "playtime" if args.is_empty() => Action::PlayTime,
+        "sector.set" => Action::SetSector(e(args)?),
         "light" => Action::Light(e(args)?),
         "lantern" => Action::Lantern(e(args)?),
         "ghost" => Action::Ghost(e(args)?),
@@ -1203,7 +1305,7 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         ));
     }
     // a screenshot, a restart or a practice deed is a single deed: only on a key, never every frame
-    if (matches!(a, Action::Screenshot | Action::Restart) || a.practice()) && !key {
+    if (matches!(a, Action::Screenshot | Action::Restart) || a.deed()) && !key {
         return Err(format!("{verb} only on a key (on key <option>)"));
     }
     if !a.sim() && sim && !matches!(a, Action::Set(..)) {
@@ -1437,7 +1539,10 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
                     return Err(at(format!("more than {MAX_ALL_ACTIONS} actions")));
                 }
                 let sim = m.rules.last().is_some_and(|r| r.event.sim());
-                let key = m.rules.last().is_some_and(|r| matches!(r.event, Event::Key(_)));
+                let key = m
+                    .rules
+                    .last()
+                    .is_some_and(|r| matches!(r.event, Event::Key(_)));
                 let a = parse_action(rest, &mut m, sim, key).map_err(at)?;
                 let r = m
                     .rules
@@ -1456,11 +1561,20 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
         .rules
         .iter()
         .map(|r| {
-            let conds = r.conditions.iter().map(Expr::size).fold(0usize, usize::saturating_add);
+            let conds = r
+                .conditions
+                .iter()
+                .map(Expr::size)
+                .fold(0usize, usize::saturating_add);
             let acts = r
                 .actions
                 .iter()
-                .map(|a| a.exprs().iter().map(|e| e.size()).fold(1usize, usize::saturating_add))
+                .map(|a| {
+                    a.exprs()
+                        .iter()
+                        .map(|e| e.size())
+                        .fold(1usize, usize::saturating_add)
+                })
                 .fold(0usize, usize::saturating_add);
             conds.saturating_add(acts)
         })
@@ -1680,6 +1794,61 @@ mod tests {
     }
 
     #[test]
+    fn the_new_blocks_keep_the_run_and_the_view_apart() {
+        let head = "name.en T\noption k key KeyJ\n";
+        // looks, statistics and the view's turn are the view's: the mod stays classic
+        let view = parse_mod_txt(&format!(
+            "{head}on frame\ndo decoys 3\ndo ball.deform 0.5\ndo camera.smooth 0.4\ndo playtime\ndo view.turn 90\n"
+        ))
+        .unwrap();
+        assert!(!view.modded());
+        // steering turned with the view changes the run, and reads the view's turn the run keeps (input.turn)
+        let steer = parse_mod_txt(&format!("{head}on tick\ndo steer.yaw input.turn\n")).unwrap();
+        assert!(steer.modded() && !steer.practice());
+        assert!(parse_mod_txt(&format!("{head}on frame\ndo steer.yaw 5\n")).is_err(), "a run action on the view's event");
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo view.turn 5\n")).is_err(), "a view action on the run's event");
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo steer.yaw mouse.dx\n")).is_err(), "the run reads no view value");
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo steer.yaw playtime.all\n")).is_err());
+        // a jump to a sector is a deed on a key: modded, but not the practice's keeping of moments
+        let jump = parse_mod_txt(&format!("{head}on key k\ndo sector.set run.sector + 1\n")).unwrap();
+        assert!(jump.modded() && !jump.practice());
+        assert!(parse_mod_txt(&format!("{head}on frame\ndo sector.set 2\n")).is_err(), "only on a key");
+        assert!(parse_mod_txt(&format!("{head}on frame\ndo playtime 5\n")).is_err());
+    }
+
+    #[test]
+    fn the_render_blocks_are_the_views() {
+        let head = "name.en T\noption k number 0 2 1 1\n";
+        let m = parse_mod_txt(&format!(
+            "{head}on frame\ndo render.scale 640 480\ndo render.filter nearest\ndo render.aspect 4:3\ndo render.fps_cap 30\ndo render.colour_bits 16\n"
+        ))
+        .unwrap();
+        assert!(!m.modded(), "looks only: the run stays classic");
+        let acts = &m.rules[0].actions;
+        assert!(matches!(acts[0], Action::RenderScale(..)));
+        assert_eq!(acts[1], Action::RenderFilter(2));
+        let Action::RenderAspect(w, h) = &acts[2] else { panic!() };
+        assert_eq!((w.eval(&S), h.eval(&S)), (4.0, 3.0));
+        for bad in [
+            "render.scale 640",
+            "render.scale 1 2 3",
+            "render.filter sharp",
+            "render.filter",
+            "render.aspect 43",
+            "render.fps_cap",
+            "render.colour_bits 1 2",
+        ] {
+            assert!(parse_mod_txt(&format!("{head}on frame\ndo {bad}\n")).is_err(), "{bad}");
+        }
+        for ok in ["render.scale opt.k 480", "render.fps_cap opt.k"] {
+            assert!(parse_mod_txt(&format!("{head}on frame\ndo {ok}\n")).is_ok(), "{ok}");
+        }
+        // a run's rule may not do them
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo render.filter nearest\n")).is_err());
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo render.fps_cap 30\n")).is_err());
+    }
+
+    #[test]
     fn expressions_are_total() {
         let names = Names {
             vars: &[("v".into(), 0.0, false)],
@@ -1825,7 +1994,10 @@ mod tests {
              do save\ndo load\ndo slower\ndo faster\ndo freecam\non frame\ndo keys bottom-left\n",
         )
         .unwrap();
-        assert!(ok.practice() && ok.modded(), "a practice deed reaches into the run");
+        assert!(
+            ok.practice() && ok.modded(),
+            "a practice deed reaches into the run"
+        );
         for bad in [
             "name.en P\non frame\ndo rewind 5\n",
             "name.en P\non tick\ndo save\n",
@@ -1836,7 +2008,10 @@ mod tests {
             assert!(parse_mod_txt(bad).is_err(), "{bad:?}");
         }
         let lives = parse_mod_txt("name.en L\non tick\ndo lives.endless 1\n").unwrap();
-        assert!(lives.modded() && !lives.practice(), "endless lives is a run action");
+        assert!(
+            lives.modded() && !lives.practice(),
+            "endless lives is a run action"
+        );
         // the practice's keys are the god-mode's now, no longer the game's
         assert!(parse_mod_txt("name.en K\noption k key F3,F5,F9,KeyR,F2,BracketLeft\n").is_ok());
     }
@@ -1846,9 +2021,14 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
         let god = read_mod(&root.join("mods-dev/god-mode")).unwrap();
         assert!(god.practice() && god.modded());
-        assert!(!root.join("mods/god-mode").exists(), "god-mode is not a factory mod: a release ships no mods-dev");
+        assert!(
+            !root.join("mods/god-mode").exists(),
+            "god-mode is not a factory mod: a release ships no mods-dev"
+        );
         let keys: Vec<&str> = god.options.iter().map(|o| o.key.as_str()).collect();
-        for k in ["lives", "back", "rewind", "save", "load", "restart", "slower", "faster", "camera"] {
+        for k in [
+            "lives", "back", "rewind", "save", "load", "restart", "slower", "faster", "camera",
+        ] {
             assert!(keys.contains(&k), "{k}");
         }
     }

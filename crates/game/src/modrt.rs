@@ -133,6 +133,14 @@ fn fire(
 fn action_exprs(a: &Action) -> Vec<&Expr> {
     match a {
         Action::Stick(e)
+        | Action::SteerYaw(e)
+        | Action::ViewTurn(e)
+        | Action::CameraSmooth(e)
+        | Action::RenderFpsCap(e)
+        | Action::RenderColourBits(e)
+        | Action::Decoys(e)
+        | Action::BallDeform(e)
+        | Action::SetSector(e)
         | Action::Gravity(e)
         | Action::TimeFactor(e)
         | Action::CameraFov(e)
@@ -145,6 +153,8 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Rewind(e)
         | Action::Set(_, e) => vec![e],
         Action::Show(_, _, _, v) => v.iter().collect(),
+        Action::RenderScale(a, b) | Action::RenderAspect(a, b) => vec![a, b],
+        Action::RenderFilter(_) => Vec::new(),
         Action::Splits(_)
         | Action::Keys(_)
         | Action::Screenshot
@@ -153,6 +163,7 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::LoadMoment
         | Action::Slower
         | Action::Faster
+        | Action::PlayTime
         | Action::FreeCam => Vec::new(),
     }
 }
@@ -168,6 +179,8 @@ pub struct SimOut {
     pub time_factor: f32,
     /// The last ball is never lost (god-mode's `lives.endless`).
     pub endless: bool,
+    /// Degrees the steering is turned about the vertical (`steer.yaw`).
+    pub steer_yaw: f32,
 }
 
 impl Default for SimOut {
@@ -177,6 +190,7 @@ impl Default for SimOut {
             gravity: crate::physics::GRAVITY,
             time_factor: crate::physics::TIME_FACTOR as f32,
             endless: false,
+            steer_yaw: 0.0,
         }
     }
 }
@@ -204,6 +218,7 @@ impl SimMods {
                     Action::Gravity(_) => out.gravity = x.clamp(0.0, 60.0),
                     Action::TimeFactor(_) => out.time_factor = x.clamp(0.5, 4.0),
                     Action::EndlessLives(_) => out.endless = x != 0.0,
+                    Action::SteerYaw(_) => out.steer_yaw = x.rem_euclid(360.0),
                     _ => {}
                 }
             });
@@ -248,6 +263,15 @@ pub struct ViewOut {
     pub lantern: f32,
     /// The ghost's opacity (0 none).
     pub ghost: f32,
+    /// The camera's easing (0 none), the decoy balls, the wooden ball's deformation, the view's turn for the run (whole
+    /// degrees; None: not handed on), and whether this frame counts as time played.
+    pub smooth: f32,
+    /// The picture's look (`render.*`): low size, filtering, shape, frame cap, colour depth.
+    pub look: crate::render::RenderLook,
+    pub decoys: u8,
+    pub deform: f32,
+    pub turn: Option<u16>,
+    pub playtime: bool,
     /// This frame's HUD lines by corner, and the corners showing the splits.
     pub lines: Vec<(Corner, String)>,
     pub splits: Vec<Corner>,
@@ -267,6 +291,8 @@ pub enum Practice {
     Slower,
     Faster,
     FreeCam,
+    /// The run begun again at this sector (1 first).
+    Sector(u32),
 }
 
 impl Default for ViewOut {
@@ -278,6 +304,12 @@ impl Default for ViewOut {
             light: 1.0,
             lantern: 0.0,
             ghost: 0.0,
+            smooth: 0.0,
+            look: crate::render::RenderLook::default(),
+            decoys: 0,
+            deform: 0.0,
+            turn: None,
+            playtime: false,
             lines: Vec::new(),
             splits: Vec::new(),
             screenshot: false,
@@ -301,7 +333,11 @@ pub fn key_text(name: &str) -> String {
         "BracketRight" => "]".to_owned(),
         "Minus" => "-".to_owned(),
         "Equal" => "=".to_owned(),
-        _ => name.strip_prefix("Key").or_else(|| name.strip_prefix("Digit")).unwrap_or(name).to_owned(),
+        _ => name
+            .strip_prefix("Key")
+            .or_else(|| name.strip_prefix("Digit"))
+            .unwrap_or(name)
+            .to_owned(),
     }
 }
 
@@ -360,6 +396,28 @@ impl ViewMods {
                     Action::Light(_) => out.light = x.clamp(0.0, 1.0),
                     Action::Lantern(_) => out.lantern = x.clamp(0.0, 1.0),
                     Action::Ghost(_) => out.ghost = x.clamp(0.0, 1.0),
+                    Action::CameraSmooth(_) => out.smooth = x.clamp(0.0, 1.0),
+                    Action::RenderScale(..) => {
+                        let (w, h) = (v.first().copied().unwrap_or(0.0), v.get(1).copied().unwrap_or(0.0));
+                        // from 160x120 up to 4096x4096; anything else is no scaling
+                        out.look.scale = (w.is_finite() && h.is_finite() && (160.0..=4096.0).contains(&w) && (120.0..=4096.0).contains(&h))
+                            .then(|| (w.round() as u32, h.round() as u32));
+                    }
+                    Action::RenderFilter(f) => out.look.filter = *f,
+                    Action::RenderAspect(..) => {
+                        let (w, h) = (v.first().copied().unwrap_or(0.0), v.get(1).copied().unwrap_or(0.0));
+                        out.look.aspect = (w.is_finite() && h.is_finite() && w >= 1.0 && h >= 1.0 && w / h < 8.0 && h / w < 8.0)
+                            .then_some((w, h));
+                    }
+                    Action::RenderFpsCap(_) => out.look.fps_cap = x.clamp(0.0, 1000.0).round() as u32,
+                    Action::RenderColourBits(_) => out.look.colour_bits = if x.round() == 16.0 { 16 } else { 0 },
+                    Action::Decoys(_) => out.decoys = x.clamp(0.0, 8.0).round() as u8,
+                    Action::BallDeform(_) => out.deform = x.clamp(0.0, 1.0),
+                    Action::ViewTurn(_) => out.turn = Some(x.rem_euclid(360.0).floor() as u16),
+                    Action::PlayTime => out.playtime = true,
+                    Action::SetSector(_) if out.practice.len() < 16 => {
+                        out.practice.push(Practice::Sector(x.clamp(1.0, 64.0).round() as u32));
+                    }
                     Action::Show(c, label, f, _) => {
                         // a corner holds at most a few lines
                         if out.lines.iter().filter(|l| l.0 == *c).count() < 12 {
@@ -394,7 +452,8 @@ impl ViewMods {
                             }
                             let name = o.show(*v);
                             let key = key_text(&name);
-                            out.lines.push((*c, format!("{}: {key}", txt.label(&o.key, lang))));
+                            out.lines
+                                .push((*c, format!("{}: {key}", txt.label(&o.key, lang))));
                         }
                     }
                     Action::Screenshot => out.screenshot = true,
@@ -402,7 +461,11 @@ impl ViewMods {
                     Action::Rewind(_) if out.practice.len() < 16 => {
                         out.practice.push(Practice::Rewind(x.clamp(1.0, 30.0)));
                     }
-                    Action::SaveMoment | Action::LoadMoment | Action::Slower | Action::Faster | Action::FreeCam
+                    Action::SaveMoment
+                    | Action::LoadMoment
+                    | Action::Slower
+                    | Action::Faster
+                    | Action::FreeCam
                         if out.practice.len() < 16 =>
                     {
                         out.practice.push(match a {
@@ -486,12 +549,17 @@ impl Mods {
             .map(|m| {
                 let want = setting(&format!("mod.{}", m.key)).as_deref() == Some("on");
                 match (&m.parsed, want) {
-                    (Ok(t), true) if spent.saturating_add(t.cost) <= gamedata::mods::MAX_TOTAL_COST => {
+                    (Ok(t), true)
+                        if spent.saturating_add(t.cost) <= gamedata::mods::MAX_TOTAL_COST =>
+                    {
                         spent = spent.saturating_add(t.cost);
                         true
                     }
                     (Ok(_), true) => {
-                        eprintln!("mod {}: not switched on: the mods on would do too much work a tick", m.key);
+                        eprintln!(
+                            "mod {}: not switched on: the mods on would do too much work a tick",
+                            m.key
+                        );
                         false
                     }
                     _ => false,
@@ -513,7 +581,12 @@ impl Mods {
                 Err(_) => Vec::new(),
             })
             .collect();
-        Mods { found, on, opts, note: None }
+        Mods {
+            found,
+            on,
+            opts,
+            note: None,
+        }
     }
 
     /// The settings lines of every mod (on or off, and the options set otherwise than their defaults).
@@ -559,7 +632,10 @@ impl Mods {
             } else if spent.saturating_add(cost) <= gamedata::mods::MAX_TOTAL_COST {
                 *on = true;
             } else {
-                self.note = Some((i, format!("{spent} + {cost} > {}", gamedata::mods::MAX_TOTAL_COST)));
+                self.note = Some((
+                    i,
+                    format!("{spent} + {cost} > {}", gamedata::mods::MAX_TOTAL_COST),
+                ));
             }
         }
     }
@@ -622,8 +698,15 @@ impl Mods {
                 ));
             }
             // every option given, each a value it takes, nothing else: a replay plays as recorded or not at all
-            if let Some((k, _)) = r.opts.iter().find(|(k, _)| !t.options.iter().any(|o| o.key == *k)) {
-                return Err(format!("the replay gives the mod \"{}\" an option it has not: {k}", r.key));
+            if let Some((k, _)) = r
+                .opts
+                .iter()
+                .find(|(k, _)| !t.options.iter().any(|o| o.key == *k))
+            {
+                return Err(format!(
+                    "the replay gives the mod \"{}\" an option it has not: {k}",
+                    r.key
+                ));
             }
             let opts = t
                 .options
@@ -634,7 +717,10 @@ impl Mods {
                         .find(|(k, _)| *k == o.key)
                         .and_then(|(_, v)| o.parse(v))
                         .ok_or_else(|| {
-                            format!("the replay's mod \"{}\": option {} missing or out of range", r.key, o.key)
+                            format!(
+                                "the replay's mod \"{}\": option {} missing or out of range",
+                                r.key, o.key
+                            )
                         })
                 })
                 .collect::<Result<Vec<f32>, String>>()?;
@@ -667,12 +753,16 @@ mod tests {
     #[test]
     fn god_modes_keys_ask_for_its_deeds_and_its_hint_shows_them() {
         let text = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/mods-dev/god-mode/mod.txt"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../assets/mods-dev/god-mode/mod.txt"),
         )
         .unwrap();
         let m = Mods::load(vec![found("god-mode", &text)], |_| Some("on".into()));
         let (sim, mut view) = m.running(true);
-        assert!(view.practice() && sim.modded(), "god-mode is a practice mod and its runs are modded");
+        assert!(
+            view.practice() && sim.modded(),
+            "god-mode is a practice mod and its runs are modded"
+        );
         assert!(sim.replay_lines()[0].starts_with("mod god-mode "));
         let zero = |_: Value| 0.0;
         for (key, deed) in [
@@ -688,9 +778,23 @@ mod tests {
         }
         view.press("KeyR", &zero, &sim, "en");
         assert!(view.out.restart);
-        view.fire(Event::Frame, &|v| if v == Value::PracticeSpeed { 1.0 } else { 0.0 }, &sim, "de");
-        let hint: Vec<&str> = view.out.lines.iter().filter(|l| l.0 == Corner::BottomLeft).map(|l| l.1.as_str()).collect();
-        assert!(hint.contains(&"Zurück: F3") && hint.contains(&"Langsamer: ["), "{hint:?}");
+        view.fire(
+            Event::Frame,
+            &|v| if v == Value::PracticeSpeed { 1.0 } else { 0.0 },
+            &sim,
+            "de",
+        );
+        let hint: Vec<&str> = view
+            .out
+            .lines
+            .iter()
+            .filter(|l| l.0 == Corner::BottomLeft)
+            .map(|l| l.1.as_str())
+            .collect();
+        assert!(
+            hint.contains(&"Zurück: F3") && hint.contains(&"Langsamer: ["),
+            "{hint:?}"
+        );
     }
 
     #[test]
@@ -788,7 +892,7 @@ mod tests {
             .collect();
         assert_eq!(
             modded,
-            vec!["physics-lab", "sticky-ball"],
+            vec!["free-steering", "physics-lab", "sector-jump", "sticky-ball"],
             "only the rule variants change the run"
         );
         // each does its part: switched on, fired, its output set
@@ -812,6 +916,11 @@ mod tests {
         view.fire(Event::Frame, &values, &sim, "en");
         let out = &view.out;
         assert!(out.fov > 0.0, "dynamic fov");
+        let look = out.look;
+        assert_eq!(look.scale, Some((640, 480)), "back to 2004: the resolution");
+        assert_eq!((look.filter, look.fps_cap, look.colour_bits), (1, 60, 0), "its defaults");
+        assert_eq!(look.aspect, Some((4.0, 3.0)));
+        assert!(look.post() && look.size(1920, 1080) == (640, 480) && look.placed(1920, 1080) == (240, 0, 1440, 1080));
         assert!((out.yaw - 20.0).abs() < 1e-4, "free view: {}", out.yaw);
         assert!(
             (out.light - 0.1).abs() < 1e-4 && out.lantern > 0.0,
@@ -829,6 +938,12 @@ mod tests {
             "{:?}",
             out.lines
         );
+        assert!((out.smooth - 0.4).abs() < 1e-4 && out.decoys == 3 && (out.deform - 0.6).abs() < 1e-4, "looks");
+        assert!(out.playtime && out.turn == Some(20), "play time, the view's turn");
+        assert!(out.lines.iter().any(|l| l.1.starts_with("Played, level")), "{:?}", out.lines);
+        view.press("F7", &values, &sim, "en");
+        assert_eq!(view.out.practice, vec![Practice::Sector(1)], "sector jump");
+        view.out.practice.clear();
         view.press("Backspace", &values, &sim, "en");
         assert!(view.out.restart, "quick restart");
         view.press("F12", &values, &sim, "en");
@@ -851,18 +966,30 @@ mod tests {
             }
         }
         let big = gamedata::mods::parse_mod_txt(&text).unwrap();
-        assert!(big.cost > gamedata::mods::MAX_TOTAL_COST / 2 && big.cost <= gamedata::mods::MAX_TOTAL_COST, "{}", big.cost);
+        assert!(
+            big.cost > gamedata::mods::MAX_TOTAL_COST / 2
+                && big.cost <= gamedata::mods::MAX_TOTAL_COST,
+            "{}",
+            big.cost
+        );
         let found = || vec![found("a", &text), found("b", &text)];
         let mut m = Mods::load(found(), |_| None);
         m.toggle(0);
         m.toggle(1);
         assert_eq!(m.on, vec![true, false]);
-        assert!(m.note.as_ref().is_some_and(|n| n.0 == 1), "the Mods screen says why");
+        assert!(
+            m.note.as_ref().is_some_and(|n| n.0 == 1),
+            "the Mods screen says why"
+        );
         m.toggle(0);
         m.toggle(1);
         assert_eq!(m.on, vec![false, true]);
         let back = Mods::load(found(), |_| Some("on".into()));
-        assert_eq!(back.on, vec![true, false], "the settings cannot pass the budget either");
+        assert_eq!(
+            back.on,
+            vec![true, false],
+            "the settings cannot pass the budget either"
+        );
     }
 
     #[test]
@@ -875,7 +1002,10 @@ mod tests {
         let mut bad = r.clone();
         bad.opts[0].1 = "999".into();
         assert!(m.for_replay(&[bad]).is_err(), "an option out of range");
-        assert!(m.for_replay(&[r.clone(), r.clone()]).is_err(), "a mod twice");
+        assert!(
+            m.for_replay(&[r.clone(), r.clone()]).is_err(),
+            "a mod twice"
+        );
         let other = Mods::load(
             vec![found("sticky", &(STICKY.to_owned() + "# changed\n"))],
             |_| None,

@@ -1,0 +1,12 @@
+# Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
+# if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+title = The SBlender
+author = speedystoneball
+posted = 2023-05-28
+difficulty = 6
+order = 7
+catalogue-difficulty = 3
+type = Comprehensive
+catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
+video = https://www.youtube.com/watch?v=W-55ViQ7OOo (桜埜叶毣)
+video = https://www.youtube.com/watch?v=LUBit343Gso (LacuS: Custom Level 104)

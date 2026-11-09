@@ -223,7 +223,10 @@ impl<'a> Lcs<'a> {
             let m = m as usize;
             self.q1 %= m;
             self.q2 %= m;
-            self.swap_pos(self.q1 + 1 + self.ignored_pos, self.q2 + 1 + self.ignored_pos);
+            self.swap_pos(
+                self.q1 + 1 + self.ignored_pos,
+                self.q2 + 1 + self.ignored_pos,
+            );
         }
     }
 
@@ -762,7 +765,13 @@ pub struct CoreReaction {
 
 /// Adds core `k`'s share of a reaction at point `p_ws` for the direction pair (`reaction_add_core`, 0x10033560). `core`
 /// is the core's world pose and speeds: its rotation, centre, inertia, mass and speeds.
-pub fn reaction_add_core(t: &mut CoreReaction, k: usize, core: &crate::core::Core, p_ws: [f64; 3], sign: f32) {
+pub fn reaction_add_core(
+    t: &mut CoreReaction,
+    k: usize,
+    core: &crate::core::Core,
+    p_ws: [f64; 3],
+    sign: f32,
+) {
     let r: [f32; 3] = [
         (p_ws[0] - core.m_world_f_core.vv[0]) as f32,
         (p_ws[1] - core.m_world_f_core.vv[1]) as f32,
@@ -777,32 +786,50 @@ pub fn reaction_add_core(t: &mut CoreReaction, k: usize, core: &crate::core::Cor
             r[2] * dir[0] - r[0] * dir[2],
             r[0] * dir[1] - r[1] * dir[0],
         ];
-        let rot = crate::math::rtmul(&core.m_world_f_core.r, &[f64::from(x[0]), f64::from(x[1]), f64::from(x[2])]);
+        let rot = crate::math::rtmul(
+            &core.m_world_f_core.r,
+            &[f64::from(x[0]), f64::from(x[1]), f64::from(x[2])],
+        );
         let out = [rot[0] as f32, rot[1] as f32, rot[2] as f32, 1.0f32];
         let mut mult = [0.0f32; 4];
         for i in 0..3 {
             mult[i] = out[i] * core.inv_rot_inertia[i];
         }
         mult[3] = core.inv_mass;
-        let d4 = f64::from(out[0]) * f64::from(mult[0]) + f64::from(out[1]) * f64::from(mult[1]) + f64::from(out[2]) * f64::from(mult[2]) + f64::from(out[3]) * f64::from(mult[3]);
+        let d4 = f64::from(out[0]) * f64::from(mult[0])
+            + f64::from(out[1]) * f64::from(mult[1])
+            + f64::from(out[2]) * f64::from(mult[2])
+            + f64::from(out[3]) * f64::from(mult[3]);
         if d == 0 {
             t.m00 += d4;
         } else {
             t.m11 += d4;
             // the upstream's ivp_dotd: three components only
             let c0 = t.cr_out[k][0];
-            t.m01 += f64::from(mult[2]) * f64::from(c0[2]) + f64::from(mult[1]) * f64::from(c0[1]) + f64::from(mult[0]) * f64::from(c0[0]);
+            t.m01 += f64::from(mult[2]) * f64::from(c0[2])
+                + f64::from(mult[1]) * f64::from(c0[1])
+                + f64::from(mult[0]) * f64::from(c0[0]);
         }
         t.cr_out[k][d] = out;
         t.cr_mult[k][d] = mult;
-        let dv = f64::from(core.rot_speed[2]) * f64::from(out[2]) + f64::from(core.rot_speed[1]) * f64::from(out[1]) + f64::from(core.rot_speed[0]) * f64::from(out[0]);
-        let sv = f64::from(dir[2]) * f64::from(core.speed[2]) + f64::from(dir[1]) * f64::from(core.speed[1]) + f64::from(dir[0]) * f64::from(core.speed[0]);
+        let dv = f64::from(core.rot_speed[2]) * f64::from(out[2])
+            + f64::from(core.rot_speed[1]) * f64::from(out[1])
+            + f64::from(core.rot_speed[0]) * f64::from(out[0]);
+        let sv = f64::from(dir[2]) * f64::from(core.speed[2])
+            + f64::from(dir[1]) * f64::from(core.speed[1])
+            + f64::from(dir[0]) * f64::from(core.speed[0]);
         t.dv[d] = (f64::from(t.dv[d]) + f64::from(sign) * (dv + sv)) as f32;
     }
 }
 
 /// The reaction of a pair of cores for two directions at point `p_ws` (`ivp_core_reaction_init`, 0x10033a30).
-pub fn core_reaction_init(c0: Option<&crate::core::Core>, c1: Option<&crate::core::Core>, p_ws: [f64; 3], d0: [f32; 3], d1: [f32; 3]) -> CoreReaction {
+pub fn core_reaction_init(
+    c0: Option<&crate::core::Core>,
+    c1: Option<&crate::core::Core>,
+    p_ws: [f64; 3],
+    d0: [f32; 3],
+    d1: [f32; 3],
+) -> CoreReaction {
     let mut t = CoreReaction {
         dir: [d0, d1],
         nd: 2,
@@ -819,7 +846,14 @@ pub fn core_reaction_init(c0: Option<&crate::core::Core>, c1: Option<&crate::cor
 
 /// Pushes the cores by impulses `imp` along the two directions, straight into the speeds (`ivp_core_reaction_push2`,
 /// 0x10033ad0). Returns the cores' changes as (speed, rot speed) for core 0 and core 1 in the caller's order.
-pub fn core_reaction_push2(t: &CoreReaction, sign_side: [f32; 2], inv_mass: [f64; 2], imp: [f32; 2], speed: &mut [[f32; 3]; 2], rot: &mut [[f32; 3]; 2]) {
+pub fn core_reaction_push2(
+    t: &CoreReaction,
+    sign_side: [f32; 2],
+    inv_mass: [f64; 2],
+    imp: [f32; 2],
+    speed: &mut [[f32; 3]; 2],
+    rot: &mut [[f32; 3]; 2],
+) {
     for k in 0..2 {
         let sg = sign_side[k];
         let im = inv_mass[k];
@@ -831,7 +865,9 @@ pub fn core_reaction_push2(t: &CoreReaction, sign_side: [f32; 2], inv_mass: [f64
         }
         for d in 0..2 {
             for i in 0..3 {
-                rot[k][i] = (f64::from(rot[k][i]) + f64::from(t.cr_mult[k][d][i]) * f64::from(sg * imp[d])) as f32;
+                rot[k][i] = (f64::from(rot[k][i])
+                    + f64::from(t.cr_mult[k][d][i]) * f64::from(sg * imp[d]))
+                    as f32;
             }
         }
     }
@@ -849,7 +885,10 @@ mod tests {
         let mut b = vec![5.0, 10.0];
         let mut x = vec![0.0; 2];
         assert_eq!(gauss_solve(2, &mut a, &mut b, &mut x, 1e-12), 1);
-        assert!((x[0] - 1.0).abs() < 1e-9 && (x[1] - 3.0).abs() < 1e-9, "{x:?}");
+        assert!(
+            (x[0] - 1.0).abs() < 1e-9 && (x[1] - 3.0).abs() < 1e-9,
+            "{x:?}"
+        );
     }
 
     #[test]

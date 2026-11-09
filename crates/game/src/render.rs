@@ -2,8 +2,8 @@
 // frame, to a window surface or to an offscreen texture (screenshots, later video). Any size and aspect ratio:
 // the projection always uses the real one.
 
-use glam::{Mat4, Vec3};
 use crate::particles::Blend as PBlend;
+use glam::{Mat4, Vec3};
 use level::{Blend, Level};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
@@ -125,7 +125,16 @@ pub struct Instance {
 impl Instance {
     /// A mesh drawn with its own materials as they are.
     pub fn plain(model: usize, mesh: usize, matrix: Mat4) -> Instance {
-        Instance { model, mesh, matrix, marker: None, uv_offset: [0.0; 2], diffuse: None, unlit: false, shadow: None }
+        Instance {
+            model,
+            mesh,
+            matrix,
+            marker: None,
+            uv_offset: [0.0; 2],
+            diffuse: None,
+            unlit: false,
+            shadow: None,
+        }
     }
 }
 
@@ -182,6 +191,67 @@ fn overlay_pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu:
     })
 }
 
+/// What view mods ask of the picture's look (`render.*` actions); the default is ours, untouched.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderLook {
+    /// The size the picture is drawn at before it is scaled up to the window (nearest), if lower than the window.
+    pub scale: Option<(u32, u32)>,
+    /// The picture's shape (width, height): the scaled picture keeps it, with black bars.
+    pub aspect: Option<(f32, f32)>,
+    /// 0 as ours, 1 bilinear without mipmaps, 2 nearest.
+    pub filter: u8,
+    /// Frames a second at most (0: none).
+    pub fps_cap: u32,
+    /// 16: the colour cut to 5-6-5 bits, no dither.
+    pub colour_bits: u8,
+}
+
+impl Default for RenderLook {
+    fn default() -> RenderLook {
+        RenderLook {
+            scale: None,
+            aspect: None,
+            filter: 0,
+            fps_cap: 0,
+            colour_bits: 0,
+        }
+    }
+}
+
+impl RenderLook {
+    /// The picture must go through the scaling pass (a lower size, bars, or banded colour).
+    pub fn post(&self) -> bool {
+        self.scale.is_some() || self.aspect.is_some() || self.colour_bits == 16
+    }
+
+    /// The size to draw at for a window of `w` x `h`: the asked size (never larger than the window); with only a
+    /// shape asked, the window's part that shape takes; else the window's.
+    pub fn size(&self, w: u32, h: u32) -> (u32, u32) {
+        match self.scale {
+            Some((sw, sh)) if sw > 0 && sh > 0 => (sw.min(w.max(1)), sh.min(h.max(1))),
+            _ => {
+                let p = self.placed(w, h);
+                (p.2, p.3)
+            }
+        }
+    }
+
+    /// Where the drawn picture lands in a window of `w` x `h`: x, y, width, height (centred, in its shape).
+    pub fn placed(&self, w: u32, h: u32) -> (u32, u32, u32, u32) {
+        let (w, h) = (w.max(1), h.max(1));
+        let shape = match self.aspect {
+            Some((a, b)) if a > 0.0 && b > 0.0 => a / b,
+            _ => return (0, 0, w, h),
+        };
+        let (mut pw, mut ph) = (w, (w as f32 / shape).round() as u32);
+        if ph > h {
+            (pw, ph) = ((h as f32 * shape).round() as u32, h);
+        }
+        let (pw, ph) = (pw.clamp(1, w), ph.clamp(1, h));
+        ((w - pw) / 2, (h - ph) / 2, pw, ph)
+    }
+}
+
 pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -231,9 +301,13 @@ pub struct Renderer {
     /// The original's 2D interface: its pipeline over the frame (named textures, alpha blended, no depth).
     ui_pipeline: wgpu::RenderPipeline,
     clamp: wgpu::Sampler,
+    /// How a view mod wants the picture to look (a 2004 PC's: low resolution, plain filtering, banded colour).
+    pub look: RenderLook,
     /// The colour behind everything (the sky's zenith).
     pub clear: wgpu::Color,
     depth: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
+    /// The scaling pass of `look` (retro.rs), made when first needed.
+    pub retro: Option<crate::retro::Retro>,
 }
 
 /// Loads a texture's pixels: a file is looked up by the caller-supplied function.
@@ -339,27 +413,28 @@ impl Renderer {
             label: Some("particles"),
             source: wgpu::ShaderSource::Wgsl(include_str!("particles.wgsl").into()),
         });
-        let particle_tex_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("particle texture"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
+        let particle_tex_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("particle texture"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
         let particle_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("particles"),
             bind_group_layouts: &[Some(&globals_layout), Some(&particle_tex_layout)],
@@ -411,6 +486,7 @@ impl Renderer {
             particle_white,
             ui_pipeline,
             clamp,
+            look: RenderLook::default(),
             clear: wgpu::Color {
                 r: 0.4,
                 g: 0.45,
@@ -418,6 +494,7 @@ impl Renderer {
                 a: 1.0,
             },
             depth: None,
+            retro: None,
         }
     }
 
@@ -425,8 +502,11 @@ impl Renderer {
     pub fn add_model(&mut self, level: &Level, load: &TextureLoader<'_>) -> usize {
         // only the textures a material draws with are loaded (a level may list textures it never uses: the loader
         // points a texture named twice at one of them)
-        let used: std::collections::HashSet<usize> =
-            level.materials.iter().flat_map(|m| m.texture.into_iter().chain(m.normal)).collect();
+        let used: std::collections::HashSet<usize> = level
+            .materials
+            .iter()
+            .flat_map(|m| m.texture.into_iter().chain(m.normal))
+            .collect();
         let textures: Vec<Option<wgpu::TextureView>> = level
             .textures
             .iter()
@@ -446,7 +526,10 @@ impl Renderer {
                     .texture
                     .and_then(|t| textures.get(t))
                     .and_then(Option::as_ref);
-                let relief = m.normal.and_then(|t| textures.get(t)).and_then(Option::as_ref);
+                let relief = m
+                    .normal
+                    .and_then(|t| textures.get(t))
+                    .and_then(Option::as_ref);
                 let uniform = MaterialUniform {
                     diffuse: m.diffuse,
                     emissive: [
@@ -457,7 +540,11 @@ impl Renderer {
                     ],
                     params: [
                         // a texture with a transparent colour turns the alpha test on, dropping alpha 0
-                        match m.texture.and_then(|t| level.textures.get(t)).and_then(|t| t.color_key) {
+                        match m
+                            .texture
+                            .and_then(|t| level.textures.get(t))
+                            .and_then(|t| t.color_key)
+                        {
                             Some(_) => 0.0,
                             None => m.alpha_cutoff.unwrap_or(-1.0),
                         },
@@ -474,7 +561,11 @@ impl Renderer {
                         m.ambient[0],
                         m.ambient[1],
                         m.ambient[2],
-                        if relief.is_some() && m.parallax.is_finite() { m.parallax.clamp(0.0, 0.25) } else { 0.0 },
+                        if relief.is_some() && m.parallax.is_finite() {
+                            m.parallax.clamp(0.0, 0.25)
+                        } else {
+                            0.0
+                        },
                     ],
                     specular: [m.specular[0], m.specular[1], m.specular[2], m.power],
                 };
@@ -505,7 +596,9 @@ impl Renderer {
                         },
                         wgpu::BindGroupEntry {
                             binding: 3,
-                            resource: wgpu::BindingResource::TextureView(relief.unwrap_or(&self.flat_normal)),
+                            resource: wgpu::BindingResource::TextureView(
+                                relief.unwrap_or(&self.flat_normal),
+                            ),
                         },
                     ],
                 });
@@ -566,7 +659,11 @@ impl Renderer {
                     })
                     .collect();
                 // the material channels: every face again, with the channel's material, coordinates and blend
-                let all: Vec<u32> = m.parts.iter().flat_map(|p| p.indices.iter().copied()).collect();
+                let all: Vec<u32> = m
+                    .parts
+                    .iter()
+                    .flat_map(|p| p.indices.iter().copied())
+                    .collect();
                 for c in &m.channels {
                     if all.is_empty() || c.material >= default_material {
                         continue;
@@ -574,22 +671,35 @@ impl Renderer {
                     let vertices: Vec<Vertex> = vertices
                         .iter()
                         .enumerate()
-                        .map(|(i, v)| Vertex { uv: c.uvs.get(i).copied().unwrap_or_default(), ..*v })
+                        .map(|(i, v)| Vertex {
+                            uv: c.uvs.get(i).copied().unwrap_or_default(),
+                            ..*v
+                        })
                         .collect();
-                    let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some(&m.name),
-                        contents: bytemuck::cast_slice(&vertices),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
-                    parts.push(GpuPart {
-                        index: self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    let buf = self
+                        .device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                             label: Some(&m.name),
-                            contents: bytemuck::cast_slice(&all),
-                            usage: wgpu::BufferUsages::INDEX,
-                        }),
+                            contents: bytemuck::cast_slice(&vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
+                    parts.push(GpuPart {
+                        index: self
+                            .device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some(&m.name),
+                                contents: bytemuck::cast_slice(&all),
+                                usage: wgpu::BufferUsages::INDEX,
+                            }),
                         count: all.len() as u32,
                         material: c.material,
-                        channel: Some((buf, PipelineKey { blend: Some(c.blend), z_write: false })),
+                        channel: Some((
+                            buf,
+                            PipelineKey {
+                                blend: Some(c.blend),
+                                z_write: false,
+                            },
+                        )),
                     });
                 }
                 Some(GpuMesh { vertex, parts })
@@ -611,24 +721,41 @@ impl Renderer {
             ambient: [0.0; 4],
             specular: [0.0; 4],
         };
-        let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("shadow material"),
-            contents: bytemuck::bytes_of(&uniform),
-            usage: wgpu::BufferUsages::UNIFORM,
-        });
+        let buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("shadow material"),
+                contents: bytemuck::bytes_of(&uniform),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
         let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("shadow material"),
             layout: &self.material_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: buf.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&self.clamp) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&self.flat_normal) },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&self.clamp),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&self.flat_normal),
+                },
             ],
         });
         self.shadow_material = Some(GpuMaterial {
             bind,
-            key: PipelineKey { blend: Some((Blend::Zero, Blend::SrcColor)), z_write: false },
+            key: PipelineKey {
+                blend: Some((Blend::Zero, Blend::SrcColor)),
+                z_write: false,
+            },
         });
     }
 
@@ -695,7 +822,11 @@ impl Renderer {
                 Blend::InvDestColor => wgpu::BlendFactor::OneMinusDst,
             };
             let blend = key.blend.map(|(s, d)| {
-                let c = wgpu::BlendComponent { src_factor: factor(s), dst_factor: factor(d), operation: wgpu::BlendOperation::Add };
+                let c = wgpu::BlendComponent {
+                    src_factor: factor(s),
+                    dst_factor: factor(d),
+                    operation: wgpu::BlendOperation::Add,
+                };
                 wgpu::BlendState { color: c, alpha: c }
             });
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -713,7 +844,10 @@ impl Renderer {
                         ],
                     })],
                 },
-                primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
+                primitive: wgpu::PrimitiveState {
+                    cull_mode: None,
+                    ..Default::default()
+                },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: DEPTH_FORMAT,
                     depth_write_enabled: Some(key.z_write),
@@ -726,7 +860,11 @@ impl Renderer {
                     module: shader,
                     entry_point: Some("fs"),
                     compilation_options: Default::default(),
-                    targets: &[Some(wgpu::ColorTargetState { format, blend, write_mask: wgpu::ColorWrites::ALL })],
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format,
+                        blend,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
                 }),
                 multiview_mask: None,
                 cache: None,
@@ -735,7 +873,13 @@ impl Renderer {
     }
 
     /// Uploads a particle texture under its name (particles.rs names them).
-    pub fn add_named_texture(&mut self, name: &'static str, width: u32, height: u32, rgba: Vec<u8>) {
+    pub fn add_named_texture(
+        &mut self,
+        name: &'static str,
+        width: u32,
+        height: u32,
+        rgba: Vec<u8>,
+    ) {
         let view = upload_texture(&self.device, &self.queue, width, height, rgba);
         let bind = particle_bind(&self.device, &self.particle_tex_layout, &view, &self.clamp);
         self.named_textures.insert(name, bind);
@@ -743,7 +887,13 @@ impl Renderer {
 
     /// Draws the original's 2D interface over `target`, which keeps its content: quads in window pixels, each
     /// with a named texture (white when the copy lacks it).
-    pub fn draw_ui(&self, target: &wgpu::TextureView, width: u32, height: u32, quads: &[crate::ui::Quad]) {
+    pub fn draw_ui(
+        &self,
+        target: &wgpu::TextureView,
+        width: u32,
+        height: u32,
+        quads: &[crate::ui::Quad],
+    ) {
         if quads.is_empty() {
             return;
         }
@@ -752,9 +902,18 @@ impl Renderer {
         let mut runs: Vec<(&'static str, u32, u32)> = Vec::new();
         for q in quads {
             let [x0, y0, x1, y1] = q.rect;
-            let (cx0, cy0, cx1, cy1) = (x0 / w * 2.0 - 1.0, 1.0 - y0 / h * 2.0, x1 / w * 2.0 - 1.0, 1.0 - y1 / h * 2.0);
+            let (cx0, cy0, cx1, cy1) = (
+                x0 / w * 2.0 - 1.0,
+                1.0 - y0 / h * 2.0,
+                x1 / w * 2.0 - 1.0,
+                1.0 - y1 / h * 2.0,
+            );
             let [u0, v0, u1, v1] = q.uv;
-            let v = |x: f32, y: f32, u: f32, t: f32, color: [f32; 4]| UiVertex { pos: [x, y], uv: [u, t], color };
+            let v = |x: f32, y: f32, u: f32, t: f32, color: [f32; 4]| UiVertex {
+                pos: [x, y],
+                uv: [u, t],
+                color,
+            };
             let first = verts.len() as u32;
             verts.extend([
                 v(cx0, cy0, u0, v0, q.top),
@@ -769,11 +928,13 @@ impl Renderer {
                 _ => runs.push((q.texture, first, 6)),
             }
         }
-        let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("ui"),
-            contents: bytemuck::cast_slice(&verts),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("ui"),
+                contents: bytemuck::cast_slice(&verts),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
         let mut enc = self.device.create_command_encoder(&Default::default());
         {
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -782,7 +943,10 @@ impl Renderer {
                     view: target,
                     depth_slice: None,
                     resolve_target: None,
-                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
@@ -792,7 +956,13 @@ impl Renderer {
             pass.set_pipeline(&self.ui_pipeline);
             pass.set_vertex_buffer(0, buf.slice(..));
             for (texture, first, count) in runs {
-                pass.set_bind_group(0, self.named_textures.get(texture).unwrap_or(&self.particle_white), &[]);
+                pass.set_bind_group(
+                    0,
+                    self.named_textures
+                        .get(texture)
+                        .unwrap_or(&self.particle_white),
+                    &[],
+                );
                 pass.draw(first..first + count, 0..1);
             }
         }
@@ -800,7 +970,12 @@ impl Renderer {
     }
 
     fn particle_pipeline(&mut self, key: (PBlend, bool)) {
-        let (device, shader, layout, format) = (&self.device, &self.particle_shader, &self.particle_layout, self.format);
+        let (device, shader, layout, format) = (
+            &self.device,
+            &self.particle_shader,
+            &self.particle_layout,
+            self.format,
+        );
         self.particle_pipelines.entry(key).or_insert_with(|| {
             let (src, dst) = match key.0 {
                 PBlend::AlphaAdd => (wgpu::BlendFactor::SrcAlpha, wgpu::BlendFactor::One),
@@ -867,7 +1042,8 @@ impl Renderer {
                 dimension: wgpu::TextureDimension::D2,
                 format: DEPTH_FORMAT,
                 // the cloud pass reads it
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             });
             let view = tex.create_view(&Default::default());
@@ -962,18 +1138,43 @@ impl Renderer {
         let fog = self.fog.filter(|_| !self.menu_frame);
         let globals = Globals {
             view_proj: (proj * look).to_cols_array_2d(),
-            light_dir: self.light.dir.normalize_or(Vec3::NEG_Y).extend(0.0).to_array(),
-            ambient: [self.light.ambient[0], self.light.ambient[1], self.light.ambient[2], 1.0],
+            light_dir: self
+                .light
+                .dir
+                .normalize_or(Vec3::NEG_Y)
+                .extend(0.0)
+                .to_array(),
+            ambient: [
+                self.light.ambient[0],
+                self.light.ambient[1],
+                self.light.ambient[2],
+                1.0,
+            ],
             view: look.to_cols_array_2d(),
             eye: [view.eye.x, view.eye.y, view.eye.z, 1.0],
-            light_color: [self.light.color[0], self.light.color[1], self.light.color[2], 1.0],
+            light_color: [
+                self.light.color[0],
+                self.light.color[1],
+                self.light.color[2],
+                1.0,
+            ],
             flash_dir: crate::lights::FLASH_DIR.normalize().extend(0.0).to_array(),
             flash_color: [self.flash, self.flash, self.flash, 0.0],
-            point_pos: self.point.map_or([0.0; 4], |(p, _)| p.extend(crate::lights::POINT_RANGE).to_array()),
-            point_color: self.point.map_or([0.0; 4], |(_, c)| [c[0], c[1], c[2], 0.0]),
-            fog_color: fog.map_or([0.0; 4], |f| [f.color[0], f.color[1], f.color[2], f.density]),
-            fog_height: fog.map_or([0.0; 4], |f| [f.below, f.depth, 1.0, 0.0]),
-            fog_down: fog.map_or([0.0; 4], |f| [f.color_down[0], f.color_down[1], f.color_down[2], 0.0]),
+            point_pos: self.point.map_or([0.0; 4], |(p, _)| {
+                p.extend(crate::lights::POINT_RANGE).to_array()
+            }),
+            point_color: self
+                .point
+                .map_or([0.0; 4], |(_, c)| [c[0], c[1], c[2], 0.0]),
+            fog_color: fog.map_or([0.0; 4], |f| {
+                [f.color[0], f.color[1], f.color[2], f.density]
+            }),
+            fog_height: fog.map_or([0.0, 0.0, 0.0, self.look.filter as f32], |f| {
+                [f.below, f.depth, 1.0, self.look.filter as f32]
+            }),
+            fog_down: fog.map_or([0.0; 4], |f| {
+                [f.color_down[0], f.color_down[1], f.color_down[2], 0.0]
+            }),
         };
         self.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
@@ -1053,29 +1254,37 @@ impl Renderer {
         for d in &draws {
             self.pipeline(d.3);
         }
-        let particle_draws: Vec<(wgpu::Buffer, u32, (PBlend, bool), Option<&'static str>)> = particles
-            .iter()
-            .filter(|b| !b.vertices.is_empty())
-            .map(|b| {
-                let key = (b.blend, b.lines);
-                self.particle_pipeline(key);
-                let buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("particles"),
-                    contents: bytemuck::cast_slice(&b.vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-                (buf, b.vertices.len() as u32, key, b.texture)
-            })
-            .collect();
+        let particle_draws: Vec<(wgpu::Buffer, u32, (PBlend, bool), Option<&'static str>)> =
+            particles
+                .iter()
+                .filter(|b| !b.vertices.is_empty())
+                .map(|b| {
+                    let key = (b.blend, b.lines);
+                    self.particle_pipeline(key);
+                    let buf = self
+                        .device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("particles"),
+                            contents: bytemuck::cast_slice(&b.vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
+                    (buf, b.vertices.len() as u32, key, b.texture)
+                })
+                .collect();
 
         let Some(depth) = self.depth_view(width, height) else {
             return;
         };
         // the sea of cloud goes between the opaque scene (whose depth it reads) and the blended one
         let quality = crate::clouds::quality();
-        let clouds = self.clouds.is_some() && !self.menu_frame && quality != crate::clouds::Quality::Off;
+        let clouds =
+            self.clouds.is_some() && !self.menu_frame && quality != crate::clouds::Quality::Off;
         if clouds && self.cloud_pass.is_none() {
-            self.cloud_pass = Some(crate::clouds::Pass::new(&self.device, &self.queue, self.format));
+            self.cloud_pass = Some(crate::clouds::Pass::new(
+                &self.device,
+                &self.queue,
+                self.format,
+            ));
             if let Some(ring) = self.clouds.as_ref().map(|l| l.ring.clone()) {
                 self.set_cloud_ring(&ring);
             }
@@ -1097,7 +1306,15 @@ impl Renderer {
                     height,
                     quality,
                 };
-                p.draw(&self.device, &self.queue, &mut enc, target, &depth, layer, &frame);
+                p.draw(
+                    &self.device,
+                    &self.queue,
+                    &mut enc,
+                    target,
+                    &depth,
+                    layer,
+                    &frame,
+                );
             }
             let keep = n > 0;
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1107,14 +1324,22 @@ impl Renderer {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: if keep { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(self.clear) },
+                        load: if keep {
+                            wgpu::LoadOp::Load
+                        } else {
+                            wgpu::LoadOp::Clear(self.clear)
+                        },
                         store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &depth,
                     depth_ops: Some(wgpu::Operations {
-                        load: if keep { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(1.0) },
+                        load: if keep {
+                            wgpu::LoadOp::Load
+                        } else {
+                            wgpu::LoadOp::Clear(1.0)
+                        },
                         store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: None,
@@ -1151,7 +1376,13 @@ impl Renderer {
                 pass.set_pipeline(pipeline);
                 pass.set_bind_group(1, &self.models_bind, &[(i as u64 * UNIFORM_ALIGN) as u32]);
                 pass.set_bind_group(2, &mat.bind, &[]);
-                pass.set_vertex_buffer(0, part.channel.as_ref().map_or(&mesh.vertex, |c| &c.0).slice(..));
+                pass.set_vertex_buffer(
+                    0,
+                    part.channel
+                        .as_ref()
+                        .map_or(&mesh.vertex, |c| &c.0)
+                        .slice(..),
+                );
                 pass.set_index_buffer(part.index.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..part.count, 0, 0..1);
             }
@@ -1160,7 +1391,9 @@ impl Renderer {
                 let Some(pipeline) = self.particle_pipelines.get(key) else {
                     continue;
                 };
-                let bind = texture.and_then(|t| self.named_textures.get(t)).unwrap_or(&self.particle_white);
+                let bind = texture
+                    .and_then(|t| self.named_textures.get(t))
+                    .unwrap_or(&self.particle_white);
                 pass.set_pipeline(pipeline);
                 pass.set_bind_group(1, bind, &[]);
                 pass.set_vertex_buffer(0, buf.slice(..));
@@ -1206,7 +1439,11 @@ struct UiVertex {
     color: [f32; 4],
 }
 
-fn ui_pipeline(device: &wgpu::Device, textures: &wgpu::BindGroupLayout, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+fn ui_pipeline(
+    device: &wgpu::Device,
+    textures: &wgpu::BindGroupLayout,
+    format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("ui"),
         source: wgpu::ShaderSource::Wgsl(include_str!("ui.wgsl").into()),
@@ -1257,8 +1494,14 @@ fn particle_bind(
         label: Some("particle texture"),
         layout,
         entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(view) },
-            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
         ],
     })
 }
@@ -1297,10 +1540,16 @@ fn tangents(m: &level::Mesh) -> Vec<[f32; 4]> {
     let n = m.positions.len();
     let (mut tan, mut bit) = (vec![Vec3::ZERO; n], vec![Vec3::ZERO; n]);
     let at = |i: u32| -> Option<(Vec3, glam::Vec2)> {
-        Some((Vec3::from(*m.positions.get(i as usize)?), glam::Vec2::from(*m.uvs.get(i as usize)?)))
+        Some((
+            Vec3::from(*m.positions.get(i as usize)?),
+            glam::Vec2::from(*m.uvs.get(i as usize)?),
+        ))
     };
     for t in m.parts.iter().flat_map(|p| p.indices.as_chunks::<3>().0) {
-        let (Some((p0, w0)), Some((p1, w1)), Some((p2, w2))) = (at(t[0]), at(t[1]), at(t[2])) else { continue };
+        let (Some((p0, w0)), Some((p1, w1)), Some((p2, w2))) = (at(t[0]), at(t[1]), at(t[2]))
+        else {
+            continue;
+        };
         let (e1, e2, d1, d2) = (p1 - p0, p2 - p0, w1 - w0, w2 - w0);
         let det = d1.x * d2.y - d2.x * d1.y;
         if det.abs() < 1e-12 || !det.is_finite() {
@@ -1316,10 +1565,18 @@ fn tangents(m: &level::Mesh) -> Vec<[f32; 4]> {
     }
     (0..n)
         .map(|i| {
-            let nrm = m.normals.get(i).map(|&v| Vec3::from(v).normalize_or(Vec3::Y)).unwrap_or(Vec3::Y);
+            let nrm = m
+                .normals
+                .get(i)
+                .map(|&v| Vec3::from(v).normalize_or(Vec3::Y))
+                .unwrap_or(Vec3::Y);
             let u = tan.get(i).copied().unwrap_or_default();
             let t = (u - nrm * nrm.dot(u)).normalize_or_zero();
-            let t = if t == Vec3::ZERO { nrm.any_orthonormal_vector() } else { t };
+            let t = if t == Vec3::ZERO {
+                nrm.any_orthonormal_vector()
+            } else {
+                t
+            };
             let b = bit.get(i).copied().unwrap_or_default();
             let w = if nrm.cross(t).dot(b) < 0.0 { -1.0 } else { 1.0 };
             [t.x, t.y, t.z, w]

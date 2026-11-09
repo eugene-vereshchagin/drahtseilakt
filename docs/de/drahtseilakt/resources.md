@@ -128,7 +128,7 @@ doppelter Auflösung, kachelnd, wo sie kachelt, und die Kugeln so umhüllend wie
 Texturpaket `own`: die Zeile *Textures* der erweiterten Seite wählt unter den Texturpaketen ([packs.md](packs.md):
 `own`, `original` die der Kopie, `remastered` die eigenen hochskalierten Bilder eines remasterten Levels, und die Pakete
 des Spielers im Ordner `textures/` des Datenordners), die Zeile *Models* unter den Modellpaketen (nur das Aussehen der
-Teile und Kugeln, nie ihre Physik); der klassische Modus zeichnet immer unsere Texturen und die Teile, die jedes Level
+Teile und Kugeln, nie ihre Physik); der klassische Modus bietet dieselben Zeilen auf seiner Seite Graphics, mit unseren Texturen und die Teile, die jedes Level
 nimmt. Die eigenen Texturen eines Levels im offenen Format (Dateien in seinem Ordner) bleiben die seines Autors; die
 Texturen, die es als die des Spiels nennt (`game:`-Bilder, open-format.md), folgen dem Paket.
 `--textures PAKET` wählt für einen Lauf; `--export` behält die der Kopie, außer mit `--textures own`, das

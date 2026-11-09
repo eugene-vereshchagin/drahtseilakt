@@ -17,7 +17,11 @@ fn dot(a: V3, b: V3) -> f64 {
 }
 
 fn cross(u: V3, v: V3) -> V3 {
-    [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+    [
+        u[1] * v[2] - u[2] * v[1],
+        u[2] * v[0] - u[0] * v[2],
+        u[0] * v[1] - u[1] * v[0],
+    ]
 }
 
 fn len(a: V3) -> f64 {
@@ -42,7 +46,11 @@ fn face_plane(p: &[V3], f: &mut Face) {
     let a = p[f.v[0]];
     let n = cross(sub(p[f.v[1]], a), sub(p[f.v[2]], a));
     let l = len(n);
-    let n = if l > 0.0 { [n[0] / l, n[1] / l, n[2] / l] } else { n };
+    let n = if l > 0.0 {
+        [n[0] / l, n[1] / l, n[2] / l]
+    } else {
+        n
+    };
     f.n = n;
     f.d = dot(n, a);
 }
@@ -70,7 +78,11 @@ fn manifold(faces: &[Face]) -> bool {
             let twins: usize = faces
                 .iter()
                 .filter(|g| g.alive)
-                .map(|g| (0..3).filter(|&m| g.v[m] == b && g.v[(m + 1) % 3] == a).count())
+                .map(|g| {
+                    (0..3)
+                        .filter(|&m| g.v[m] == b && g.v[(m + 1) % 3] == a)
+                        .count()
+                })
                 .sum();
             if twins != 1 {
                 return false;
@@ -181,11 +193,7 @@ fn hull3d(p: &[V3], eps: f64) -> Option<Vec<Face>> {
         }
     }
     faces.retain(|f| f.alive);
-    if manifold(&faces) {
-        Some(faces)
-    } else {
-        None
-    }
+    if manifold(&faces) { Some(faces) } else { None }
 }
 
 /// A convex polygon of merged coplanar facets: its boundary loop (outward winding) and its normal.
@@ -222,7 +230,8 @@ fn merge_polys(p: &[V3], faces: &[Face], tol: f64) -> Option<Vec<Poly>> {
                         continue;
                     }
                     let c = dot(gf.n, seed.n);
-                    let cop = c > 1.0 - 1e-9 && (0..3).all(|m| face_dist(&seed, p[gf.v[m]]).abs() <= tol);
+                    let cop =
+                        c > 1.0 - 1e-9 && (0..3).all(|m| face_dist(&seed, p[gf.v[m]]).abs() <= tol);
                     if !cop {
                         continue;
                     }
@@ -440,7 +449,10 @@ pub fn hull(p: &[V3]) -> Option<Ledge> {
     }
 
     // fan every polygon (outward winding follows the loop), the list in reverse creation order
-    let ntri: usize = polys.iter().map(|pl| if pl.v.len() >= 3 { pl.v.len() - 2 } else { 0 }).sum();
+    let ntri: usize = polys
+        .iter()
+        .map(|pl| if pl.v.len() >= 3 { pl.v.len() - 2 } else { 0 })
+        .sum();
     let mut tri: Vec<[usize; 3]> = vec![[0; 3]; ntri];
     let mut t = ntri;
     for pl in &polys {
@@ -509,7 +521,12 @@ mod tests {
 
     #[test]
     fn tetrahedron_has_four_triangles() {
-        let p = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let p = [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ];
         let l = hull(&p).expect("a tetrahedron has a hull");
         assert_eq!(l.tris.len(), 4);
         assert!(twins_are_closed(&l));
@@ -517,7 +534,12 @@ mod tests {
 
     #[test]
     fn flat_input_has_no_hull() {
-        let p = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]];
+        let p = [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+        ];
         assert!(hull(&p).is_none());
     }
 }

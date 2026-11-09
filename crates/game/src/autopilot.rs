@@ -1361,7 +1361,11 @@ const CLIMB: [(crate::sim::BallKind, f32, f32); 3] = [
 
 /// The steepest slope (degrees) ball `kind` climbs by its own push keeping `speed`: steeper needs a run-up.
 fn steepest_climb(kind: crate::sim::BallKind, speed: f32) -> f32 {
-    let (_, top, per) = CLIMB.iter().find(|c| c.0 == kind).copied().unwrap_or(CLIMB[0]);
+    let (_, top, per) = CLIMB
+        .iter()
+        .find(|c| c.0 == kind)
+        .copied()
+        .unwrap_or(CLIMB[0]);
     (top - speed.max(0.0) / per).max(0.0)
 }
 
@@ -1945,7 +1949,10 @@ impl Pilot {
             radius: 6.0,
             sector: Some(sim.sector + 1),
             kind: Some(sim.ball.kind),
-            steps: vec![crate::hints::Step::Via(t, 900), crate::hints::Step::Become(k)],
+            steps: vec![
+                crate::hints::Step::Via(t, 900),
+                crate::hints::Step::Become(k),
+            ],
             line: 0,
         })
     }
@@ -1989,7 +1996,8 @@ impl Pilot {
         let end = (self.at + LOOK).min(self.route.points.len());
         self.route.points.get(self.at..end).is_some_and(|ahead| {
             ahead.windows(2).any(|w| {
-                flat(w[1] - w[0]).length() > GAP && flat(w[0] - sim.ball.position).length() < GAP_CLOSE
+                flat(w[1] - w[0]).length() > GAP
+                    && flat(w[0] - sim.ball.position).length() < GAP_CLOSE
             })
         })
     }
@@ -2335,7 +2343,12 @@ impl Pilot {
             // the place on from it nearest the ball, before the transformer next
             let f = sim.ball.position - Vec3::Y * crate::sim::BALL_RADIUS;
             let after = (i..self.until().min(self.route.points.len())).min_by(|&a, &b| {
-                let d = |k: usize| self.route.points.get(k).map_or(f32::INFINITY, |p| p.distance_squared(f));
+                let d = |k: usize| {
+                    self.route
+                        .points
+                        .get(k)
+                        .map_or(f32::INFINITY, |p| p.distance_squared(f))
+                };
                 d(a).total_cmp(&d(b))
             });
             self.at = self.at.max(after.unwrap_or(i));
@@ -2394,12 +2407,9 @@ impl Pilot {
     pub fn resume(&mut self, sim: &Sim, began: u64) {
         self.find_place(sim, began);
         self.kind = Some(sim.ball.kind);
-        self.gate = self.gate.max(
-            self.gates
-                .iter()
-                .take_while(|g| g.0 <= self.at)
-                .count(),
-        );
+        self.gate = self
+            .gate
+            .max(self.gates.iter().take_while(|g| g.0 <= self.at).count());
         self.tracking = None;
         self.track_keys.clear();
         self.demo_run = None;
@@ -2408,12 +2418,21 @@ impl Pilot {
 
     /// What steers now, in a word (for the evidence of a learned rule).
     pub fn mode(&self) -> &'static str {
-        if self.tracking.is_some() { "keeping to the player's line" } else { self.mode }
+        if self.tracking.is_some() {
+            "keeping to the player's line"
+        } else {
+            self.mode
+        }
     }
 
     /// The situation of the ball at `p` (as `kind`), the way read from its point `at` (learned.rs): what it is on,
     /// the floor's width, what borders it, the way's bend and slope ahead, what comes just ahead, the module near.
-    pub fn situation(&self, p: Vec3, at: usize, kind: crate::sim::BallKind) -> crate::learned::Situation {
+    pub fn situation(
+        &self,
+        p: Vec3,
+        at: usize,
+        kind: crate::sim::BallKind,
+    ) -> crate::learned::Situation {
         let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
         let foot = p - Vec3::Y * crate::sim::BALL_RADIUS;
         let mut v: [Option<String>; 8] = Default::default();
@@ -2425,36 +2444,85 @@ impl Pilot {
             }
         };
         let under = self.route.floor_point(p);
-        set(&mut v, "surface", match under {
-            Some(q) if q.rail => "rail",
-            Some(_) => "floor",
-            None => "off",
-        });
+        set(
+            &mut v,
+            "surface",
+            match under {
+                Some(q) if q.rail => "rail",
+                Some(_) => "floor",
+                None => "off",
+            },
+        );
         if let Some(q) = under.filter(|q| !q.rail) {
             let w = 2.0 * q.half;
-            set(&mut v, "width", if w < NARROW { "narrow" } else if w < MEDIUM { "medium" } else { "wide" });
-            set(&mut v, "border", match self.route.edges.border(foot) {
-                Some(true) => "walls",
-                Some(false) => "open",
-                None => "far",
-            });
+            set(
+                &mut v,
+                "width",
+                if w < NARROW {
+                    "narrow"
+                } else if w < MEDIUM {
+                    "medium"
+                } else {
+                    "wide"
+                },
+            );
+            set(
+                &mut v,
+                "border",
+                match self.route.edges.border(foot) {
+                    Some(true) => "walls",
+                    Some(false) => "open",
+                    None => "far",
+                },
+            );
         }
         let pts = &self.route.points;
         // (the way read from its point nearest the ball a little on from `at`: the place on the way lags a hint)
         let at = (at..(at + LOOK).min(pts.len()))
-            .min_by(|&a, &b| pts[a].distance_squared(foot).total_cmp(&pts[b].distance_squared(foot)))
+            .min_by(|&a, &b| {
+                pts[a]
+                    .distance_squared(foot)
+                    .total_cmp(&pts[b].distance_squared(foot))
+            })
             .unwrap_or(at);
         let pt = |k: usize| pts.get(k.min(pts.len().saturating_sub(1))).copied();
-        if let (Some(a), Some(b), Some(c)) = (pt(at), pt(at + SITUATION_AHEAD / 2), pt(at + SITUATION_AHEAD)) {
-            let (d1, d2) = (flat(b - a).normalize_or_zero(), flat(c - b).normalize_or_zero());
+        if let (Some(a), Some(b), Some(c)) = (
+            pt(at),
+            pt(at + SITUATION_AHEAD / 2),
+            pt(at + SITUATION_AHEAD),
+        ) {
+            let (d1, d2) = (
+                flat(b - a).normalize_or_zero(),
+                flat(c - b).normalize_or_zero(),
+            );
             if d1 != Vec3::ZERO && d2 != Vec3::ZERO {
                 let angle = d1.dot(d2).clamp(-1.0, 1.0).acos().to_degrees();
-                set(&mut v, "curve", if angle < BEND { "straight" } else if angle < SHARP { "bend" } else { "sharp" });
+                set(
+                    &mut v,
+                    "curve",
+                    if angle < BEND {
+                        "straight"
+                    } else if angle < SHARP {
+                        "bend"
+                    } else {
+                        "sharp"
+                    },
+                );
             }
             let run = flat(c - a).length();
             if run > 1.0 {
                 let s = (c.y - a.y) / run;
-                set(&mut v, "slope", if s > SLOPE { "up" } else if s < -SLOPE { "down" } else { "flat" });
+                set(
+                    &mut v,
+                    "slope",
+                    if s > SLOPE {
+                        "up"
+                    } else if s < -SLOPE {
+                        "down"
+                    } else {
+                        "flat"
+                    },
+                );
             }
         }
         // what comes just ahead along the way, the first of: a gap, a drop, a rail's end or start, a sill, a
@@ -2462,7 +2530,10 @@ impl Pilot {
         let end = (at + SITUATION_AHEAD).min(pts.len().saturating_sub(1));
         let mut ahead = (at..end).find_map(|k| self.link(k)).unwrap_or("none");
         if ahead == "none"
-            && self.gates.iter().any(|g| g.0 >= at && g.0 <= end + SITUATION_AHEAD && g.1.distance(p) < 12.0)
+            && self
+                .gates
+                .iter()
+                .any(|g| g.0 >= at && g.0 <= end + SITUATION_AHEAD && g.1.distance(p) < 12.0)
         {
             ahead = "transformer";
         }
@@ -2483,11 +2554,20 @@ impl Pilot {
     fn link(&self, k: usize) -> Option<&'static str> {
         let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
         let pts = &self.route.points;
-        let rail = |q: Vec3| self.route.floor_point(q + Vec3::Y * crate::sim::BALL_RADIUS).is_some_and(|f| f.rail);
-        let (Some(&a), Some(&b)) = (pts.get(k), pts.get(k + 1)) else { return None };
+        let rail = |q: Vec3| {
+            self.route
+                .floor_point(q + Vec3::Y * crate::sim::BALL_RADIUS)
+                .is_some_and(|f| f.rail)
+        };
+        let (Some(&a), Some(&b)) = (pts.get(k), pts.get(k + 1)) else {
+            return None;
+        };
         let h = flat(b - a).length();
         // (a step up out of the slope the way had before it, not a ramp's rise)
-        let before = k.checked_sub(1).and_then(|j| pts.get(j)).map_or(0.0, |&z| a.y - z.y);
+        let before = k
+            .checked_sub(1)
+            .and_then(|j| pts.get(j))
+            .map_or(0.0, |&z| a.y - z.y);
         let rise = b.y - a.y;
         if h > GAP {
             Some("gap")
@@ -2497,7 +2577,11 @@ impl Pilot {
             Some("rail-end")
         } else if !rail(a) && rail(b) {
             Some("rail-start")
-        } else if rise > SILL_STEP && rise < crate::sim::BALL_RADIUS && rise > SILL_STEEP * h && before < rise / 3.0 {
+        } else if rise > SILL_STEP
+            && rise < crate::sim::BALL_RADIUS
+            && rise > SILL_STEEP * h
+            && before < rise / 3.0
+        {
             Some("sill")
         } else {
             None
@@ -2522,7 +2606,11 @@ impl Pilot {
         let foot = p - Vec3::Y * crate::sim::BALL_RADIUS;
         // (the way's point nearest the ball a little on from `at`: the place on the way lags a hint)
         let at = (self.at..(self.at + LOOK).min(pts.len()))
-            .min_by(|&a, &b| pts[a].distance_squared(foot).total_cmp(&pts[b].distance_squared(foot)))
+            .min_by(|&a, &b| {
+                pts[a]
+                    .distance_squared(foot)
+                    .total_cmp(&pts[b].distance_squared(foot))
+            })
             .unwrap_or(self.at);
         let end = (at + MOMENTUM_AHEAD).min(pts.len() - 1);
         // (a flow zone: the climb the ball takes at a careful zone's pace)
@@ -2556,12 +2644,26 @@ impl Pilot {
     /// transformer, the hint running.
     pub fn status(&self) -> String {
         let gate = self.gates.get(self.gate).map_or_else(String::new, |g| {
-            format!("   next: {:?} transformer at ({:.0} {:.0} {:.0})", g.2, g.1.x, g.1.y, g.1.z)
+            format!(
+                "   next: {:?} transformer at ({:.0} {:.0} {:.0})",
+                g.2, g.1.x, g.1.y, g.1.z
+            )
         });
-        let mode = if self.tracking.is_some() { "keeping to the player's line" } else { self.mode };
-        let hint = self.hints.describe().map_or_else(String::new, |h| format!("\n{h}"));
+        let mode = if self.tracking.is_some() {
+            "keeping to the player's line"
+        } else {
+            self.mode
+        };
+        let hint = self
+            .hints
+            .describe()
+            .map_or_else(String::new, |h| format!("\n{h}"));
         let zone = self.zone_words();
-        format!("{mode}{zone}   way {} / {}{gate}{hint}", self.at, self.route.points.len())
+        format!(
+            "{mode}{zone}   way {} / {}{gate}{hint}",
+            self.at,
+            self.route.points.len()
+        )
     }
 
     /// What the zones or the learned rules ask now, in words for the status line (empty: nothing).
@@ -2576,7 +2678,11 @@ impl Pilot {
             zone += &format!("   [careful zone, at most {c}]");
         }
         if let Some(why) = self.momentum {
-            let what = if self.zone.cap.is_some() { "limit" } else { "pace" };
+            let what = if self.zone.cap.is_some() {
+                "limit"
+            } else {
+                "pace"
+            };
             zone += &format!("   [{what} let go: {why}]");
         }
         zone
@@ -2608,13 +2714,25 @@ impl Pilot {
         if std::env::var_os("AUTOPILOT_SITUATION").is_some() {
             let p = sim.ball.position;
             if sim.tick.is_multiple_of(60) {
-                eprintln!("situation t{} ({:.1} {:.1} {:.1}) {}", sim.tick, p.x, p.y, p.z,
-                    self.situation(p, self.at, sim.ball.kind).describe());
+                eprintln!(
+                    "situation t{} ({:.1} {:.1} {:.1}) {}",
+                    sim.tick,
+                    p.x,
+                    p.y,
+                    p.z,
+                    self.situation(p, self.at, sim.ball.kind).describe()
+                );
             }
             let said = self.zone_words();
             if said != self.zone_said {
-                eprintln!("zone t{} ({:.1} {:.1} {:.1}) {}", sim.tick, p.x, p.y, p.z,
-                    if said.is_empty() { "none" } else { said.trim() });
+                eprintln!(
+                    "zone t{} ({:.1} {:.1} {:.1}) {}",
+                    sim.tick,
+                    p.x,
+                    p.y,
+                    p.z,
+                    if said.is_empty() { "none" } else { said.trim() }
+                );
                 self.zone_said = said;
             }
         }
@@ -2764,9 +2882,15 @@ impl Pilot {
         let held = sim.tick.saturating_sub(self.moved);
         // (following a player's run, the player's pace is the measure: the steady style is for a way of its own)
         let steady = self.demo.is_none();
-        let stuck_try = if steady { STUCK_TRY } else { STUCK_TRY_FOLLOWING };
+        let stuck_try = if steady {
+            STUCK_TRY
+        } else {
+            STUCK_TRY_FOLLOWING
+        };
         if steady && held > HELD_UP && held <= stuck_try {
-            if self.gap_close(sim) && let Some(hint) = self.leap(sim) {
+            if self.gap_close(sim)
+                && let Some(hint) = self.leap(sim)
+            {
                 self.moved = sim.tick;
                 self.hints.add(hint);
                 return 0;
@@ -2959,7 +3083,11 @@ impl Pilot {
                 sim.ball.velocity.length()
             );
         }
-        self.mode = if demo_won { "the player's keys" } else { "way search" };
+        self.mode = if demo_won {
+            "the player's keys"
+        } else {
+            "way search"
+        };
         if demo_won && let Some(k) = matched {
             self.demo_run = Some((k, sim.tick));
             self.choice = 0;
@@ -3043,7 +3171,11 @@ fn rollouts(
         {
             lost = true;
         }
-        let middle = if line.is_some() { MIDDLE * CAREFUL_MIDDLE } else { MIDDLE };
+        let middle = if line.is_some() {
+            MIDDLE * CAREFUL_MIDDLE
+        } else {
+            MIDDLE
+        };
         let edge = (middle * off + EDGE * near) / samples.max(1) as f32
             + CAREFUL_LINE * astray / line_samples.max(1) as f32;
         (s, lost, edge)
@@ -3071,7 +3203,11 @@ fn off_line(f: Vec3, l: &[Vec3]) -> f32 {
             let (a, b) = (w[0], w[1]);
             let ab = b - a;
             let len2 = ab.length_squared();
-            let t = if len2 > 1e-9 { ((f - a).dot(ab) / len2).clamp(0.0, 1.0) } else { 0.0 };
+            let t = if len2 > 1e-9 {
+                ((f - a).dot(ab) / len2).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
             f.distance(a + ab * t)
         })
         .fold(f32::INFINITY, f32::min)
@@ -3270,7 +3406,9 @@ mod tests {
     /// A pilot on the flat test floor with a straight way east and these hints and zones.
     #[allow(clippy::expect_used)]
     fn flat_pilot(hints: &str, zones: &str) -> (Pilot, Sim) {
-        let points: Vec<Vec3> = (0..40).map(|i| Vec3::new(i as f32 * 1.5, 0.0, 0.0)).collect();
+        let points: Vec<Vec3> = (0..40)
+            .map(|i| Vec3::new(i as f32 * 1.5, 0.0, 0.0))
+            .collect();
         pilot_on(points, hints, zones)
     }
 
@@ -3321,7 +3459,10 @@ mod tests {
         // in a flow zone the wait goes: pushing at once
         let (mut p, mut sim) = flat_pilot(hint, "flow sector 1 r 10 : 0 2 0");
         let (i, _) = drive(&mut p, &mut sim, 10, 0);
-        assert!(i.iter().take(3).any(|&i| i != 0), "the wait is left out in a flow zone: {i:?}");
+        assert!(
+            i.iter().take(3).any(|&i| i != 0),
+            "the wait is left out in a flow zone: {i:?}"
+        );
         // but not where leaving it out would lose the ball: a push that runs off the floor's edge
         let off = "at 0 2 0 r 10 : wait 120 ; push 1 0 3000";
         let (mut p, mut sim) = flat_pilot(off, "flow sector 1 r 10 : 0 2 0");
@@ -3335,7 +3476,8 @@ mod tests {
         let (mut p, mut sim) = flat_pilot(hint, "");
         let (_, free) = drive(&mut p, &mut sim, 400, 0);
         assert!(free > 8.0, "pushed freely it runs fast: {free}");
-        let (mut p, mut sim) = flat_pilot(hint, "careful sector 1 r 20 speed 3 : -50 2 0 ; 150 2 0");
+        let (mut p, mut sim) =
+            flat_pilot(hint, "careful sector 1 r 20 speed 3 : -50 2 0 ; 150 2 0");
         let (_, kept) = drive(&mut p, &mut sim, 400, 0);
         assert!(kept < 3.0 * 1.3, "kept under the limit: {kept}");
         // and the pilot's own steering too, with no hint
@@ -3350,13 +3492,25 @@ mod tests {
         let zone = "careful sector 1 r 20 speed 3 : -50 2 0 ; 150 2 0";
         let (mut p, mut sim) = flat_pilot("at 0 2 0 r 10 : press 40 2 0 0 0 8 300", zone);
         let _ = drive(&mut p, &mut sim, 2, 0);
-        assert!(p.status().contains("limit let go: the hint pushes on at speed"), "{}", p.status());
+        assert!(
+            p.status()
+                .contains("limit let go: the hint pushes on at speed"),
+            "{}",
+            p.status()
+        );
         let (_, fast) = drive(&mut p, &mut sim, 200, 0);
         assert!(fast > 3.0 * 1.5, "the press keeps its speed: {fast}");
         // a pass faster than the limit just before such a press is its run-up; a slow press is no reason
-        let (mut p, mut sim) = flat_pilot("at 0 2 0 r 10 : pass 10 2 0 8 ; press 40 2 0 0 0 8 300", zone);
+        let (mut p, mut sim) = flat_pilot(
+            "at 0 2 0 r 10 : pass 10 2 0 8 ; press 40 2 0 0 0 8 300",
+            zone,
+        );
         let _ = drive(&mut p, &mut sim, 2, 0);
-        assert!(p.status().contains("limit let go: the hint's run-up"), "{}", p.status());
+        assert!(
+            p.status().contains("limit let go: the hint's run-up"),
+            "{}",
+            p.status()
+        );
         let (mut p, mut sim) = flat_pilot("at 0 2 0 r 10 : press 40 2 0 0 0 2 300", zone);
         let _ = drive(&mut p, &mut sim, 2, 0);
         assert!(!p.status().contains("let go"), "{}", p.status());
@@ -3366,7 +3520,11 @@ mod tests {
             (0..40)
                 .map(|i| {
                     x += if Some(i) == gap_at { 8.0 } else { 1.5 };
-                    Vec3::new(x - 1.5, if i > 5 { (i - 5) as f32 * rise } else { 0.0 }, 0.0)
+                    Vec3::new(
+                        x - 1.5,
+                        if i > 5 { (i - 5) as f32 * rise } else { 0.0 },
+                        0.0,
+                    )
                 })
                 .collect::<Vec<_>>()
         };
@@ -3379,18 +3537,27 @@ mod tests {
         let (p, mut sim) = bare(way(0.45, None));
         assert_eq!(p.momentum(&sim, Some(3.0)), None, "wood climbs it");
         sim.ball.kind = crate::sim::BallKind::Stone;
-        assert_eq!(p.momentum(&sim, Some(3.0)), Some("a climb that needs a run-up ahead"));
+        assert_eq!(
+            p.momentum(&sim, Some(3.0)),
+            Some("a climb that needs a run-up ahead")
+        );
         // there a flow zone's pace is let go too: backing off for the run-up is no dawdling
         let (mut p, mut sim) = pilot_on(way(0.45, None), "", "flow sector 1 r 50 : 0 2 0");
         sim.ball.kind = crate::sim::BallKind::Stone;
         let _ = p.next(&sim);
-        assert!(p.status().contains("[pace let go: a climb that needs a run-up ahead]"), "{}", p.status());
+        assert!(
+            p.status()
+                .contains("[pace let go: a climb that needs a run-up ahead]"),
+            "{}",
+            p.status()
+        );
     }
 
     #[test]
     fn a_hint_whose_ball_ends_a_step_well_below_its_point_is_off_course() {
         for (y, off) in [(2.0, false), (8.0, true)] {
-            let (mut p, mut sim) = flat_pilot(&format!("at 0 2 0 r 10 : pass 6 {y} 0 5 40 ; wait 200"), "");
+            let (mut p, mut sim) =
+                flat_pilot(&format!("at 0 2 0 r 10 : pass 6 {y} 0 5 40 ; wait 200"), "");
             let _ = drive(&mut p, &mut sim, 120, 0);
             assert_eq!(p.hints.at().map(|a| a.1), Some(1), "on the wait");
             assert_eq!(p.hints.off_course(), off, "a pass to height {y}");
@@ -3416,8 +3583,14 @@ mod tests {
         for kind in [BallKind::Stone, BallKind::Wood, BallKind::Paper] {
             let at = steepest_climb(kind, 4.5);
             let (gentler, steeper) = (pace(kind, at - 1.5), pace(kind, at + 1.5));
-            assert!(gentler > 4.5 && steeper < 4.5, "{kind:?} at {at}: {gentler} {steeper}");
-            assert!(pace(kind, steepest_climb(kind, 0.0) + 1.5) < 0.0, "{kind:?} rolls back");
+            assert!(
+                gentler > 4.5 && steeper < 4.5,
+                "{kind:?} at {at}: {gentler} {steeper}"
+            );
+            assert!(
+                pace(kind, steepest_climb(kind, 0.0) + 1.5) < 0.0,
+                "{kind:?} rolls back"
+            );
         }
     }
 
@@ -3427,7 +3600,12 @@ mod tests {
         for (k, &at) in points.iter().enumerate() {
             let cell = ((at.x / CELL).floor() as i32, (at.z / CELL).floor() as i32);
             let rail = rail(k);
-            floor.entry(cell).or_default().push(FloorPoint { at, coarse: 3.0, rail, half: if rail { 0.5 } else { 5.0 } });
+            floor.entry(cell).or_default().push(FloorPoint {
+                at,
+                coarse: 3.0,
+                rail,
+                half: if rail { 0.5 } else { 5.0 },
+            });
         }
         let marks = vec![points.len() - 1];
         Route {
@@ -3446,7 +3624,12 @@ mod tests {
     fn a_mark_on_one_level_teaches_the_same_kind_of_place_on_another() {
         use crate::sim::BallKind;
         // level A: rails east from x 50, ending at their tenth point; the watcher marked the stretch before the end
-        let a = railed_route((0..30).map(|i| Vec3::new(50.0 + 1.5 * i as f32, 0.0, 40.0)).collect(), |k| k < 10);
+        let a = railed_route(
+            (0..30)
+                .map(|i| Vec3::new(50.0 + 1.5 * i as f32, 0.0, 40.0))
+                .collect(),
+            |k| k < 10,
+        );
         let pa = Pilot::new(a, Vec::new());
         let samples: Vec<_> = (3..9)
             .map(|k| {
@@ -3454,12 +3637,23 @@ mod tests {
                 pa.situation(p, pa.nearest_point(p), BallKind::Wood)
             })
             .collect();
-        let rule = crate::learned::learn(&samples, crate::zones::Kind::Flow, None, "level A".into())
-            .expect("a rule from the rail's end");
-        assert_eq!(rule.line(), "flow when surface=rail ahead=rail-end kind=wood   # level A");
+        let rule =
+            crate::learned::learn(&samples, crate::zones::Kind::Flow, None, "level A".into())
+                .expect("a rule from the rail's end");
+        assert_eq!(
+            rule.line(),
+            "flow when surface=rail ahead=rail-end kind=wood   # level A"
+        );
         let table = std::sync::Arc::new(crate::learned::Learned { rules: vec![rule] });
         // level B: other rails, north through the start, ending a few points on; a hint waits there
-        let b = || railed_route((0..30).map(|i| Vec3::new(0.0, 0.0, -9.0 + 1.5 * i as f32)).collect(), |k| k < 10);
+        let b = || {
+            railed_route(
+                (0..30)
+                    .map(|i| Vec3::new(0.0, 0.0, -9.0 + 1.5 * i as f32))
+                    .collect(),
+                |k| k < 10,
+            )
+        };
         let hint = crate::hints::parse("at 0 2 0 r 10 : wait 120 ; push 0 1 60").expect("hint");
         let run = |learned: Option<std::sync::Arc<crate::learned::Learned>>| {
             let mut sim = Sim::new(&crate::sim::tests::flat_level(), BallKind::Wood);
@@ -3473,10 +3667,19 @@ mod tests {
             (i, p.status())
         };
         let (plain, _) = run(None);
-        assert!(plain.iter().all(|&i| i == 0), "not taught: the wait is kept");
+        assert!(
+            plain.iter().all(|&i| i == 0),
+            "not taught: the wait is kept"
+        );
         let (taught, status) = run(Some(table.clone()));
-        assert!(taught.iter().take(3).any(|&i| i != 0), "taught on level A: no dawdling on level B: {taught:?}");
-        assert!(status.contains("learned: rail, rail-end ahead, wood → don't dawdle"), "{status}");
+        assert!(
+            taught.iter().take(3).any(|&i| i != 0),
+            "taught on level A: no dawdling on level B: {taught:?}"
+        );
+        assert!(
+            status.contains("learned: rail, rail-end ahead, wood → don't dawdle"),
+            "{status}"
+        );
         // a level's own zone comes first: a careful zone there and no flow from the table
         let mut sim = Sim::new(&crate::sim::tests::flat_level(), BallKind::Wood);
         let mut p = Pilot::new(b(), Vec::new());
@@ -3485,7 +3688,9 @@ mod tests {
         p.learned = table;
         p.zones = std::sync::Arc::new(crate::zones::parse("careful sector 1 r 10 : 0 2 0").0);
         let (own, _) = drive(&mut p, &mut sim, 30, 0);
-        assert!(own.iter().all(|&i| i == 0), "the level's zone first: {own:?}");
+        assert!(
+            own.iter().all(|&i| i == 0),
+            "the level's zone first: {own:?}"
+        );
     }
 }
-

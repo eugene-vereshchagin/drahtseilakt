@@ -64,7 +64,14 @@ pub struct Target {
 
 impl Target {
     pub fn new(name: &'static str, test: String, kind: Kind) -> Target {
-        Target { name, test, kind, max_len: 1 << 20, rss_mb: 512, dict: &[] }
+        Target {
+            name,
+            test,
+            kind,
+            max_len: 1 << 20,
+            rss_mb: 512,
+            dict: &[],
+        }
     }
 }
 
@@ -101,7 +108,10 @@ pub fn scratch() -> PathBuf {
     SCRATCH.with(|s| {
         s.borrow_mut()
             .get_or_insert_with(|| {
-                let id: String = format!("{:?}", std::thread::current().id()).chars().filter(char::is_ascii_digit).collect();
+                let id: String = format!("{:?}", std::thread::current().id())
+                    .chars()
+                    .filter(char::is_ascii_digit)
+                    .collect();
                 let d = artifacts("work").join(format!("p{}-t{id}", std::process::id()));
                 let _ = std::fs::create_dir_all(&d);
                 d
@@ -117,11 +127,16 @@ fn drop_scratch() {
 }
 
 pub fn fnv(bytes: &[u8]) -> u64 {
-    bytes.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &b| (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3))
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
 }
 
 fn env_u64(key: &str, default: u64) -> u64 {
-    std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -149,7 +164,12 @@ pub fn real_roots() -> Vec<PathBuf> {
 
 /// Files under `roots` whose extension is one of `exts` (any case), at most `max_bytes` each; when there are more than
 /// `max_files`, an even spread of them. Sorted, so a run is the same each time.
-pub fn files_under(roots: &[PathBuf], exts: &[&str], max_files: usize, max_bytes: u64) -> Vec<PathBuf> {
+pub fn files_under(
+    roots: &[PathBuf],
+    exts: &[&str],
+    max_files: usize,
+    max_bytes: u64,
+) -> Vec<PathBuf> {
     fn walk(d: &Path, depth: usize, exts: &[&str], max_bytes: u64, out: &mut Vec<PathBuf>) {
         if depth > 8 || out.len() > 100_000 {
             return;
@@ -163,9 +183,17 @@ pub fn files_under(roots: &[PathBuf], exts: &[&str], max_files: usize, max_bytes
             if t.is_dir() {
                 walk(&p, depth + 1, exts, max_bytes, out);
             } else if t.is_file() {
-                let ext = p.extension().map(|x| x.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
-                let name = p.file_name().map(|x| x.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
-                let wanted = exts.iter().any(|x| x.eq_ignore_ascii_case(&ext) || x.eq_ignore_ascii_case(&name));
+                let ext = p
+                    .extension()
+                    .map(|x| x.to_string_lossy().to_ascii_lowercase())
+                    .unwrap_or_default();
+                let name = p
+                    .file_name()
+                    .map(|x| x.to_string_lossy().to_ascii_lowercase())
+                    .unwrap_or_default();
+                let wanted = exts
+                    .iter()
+                    .any(|x| x.eq_ignore_ascii_case(&ext) || x.eq_ignore_ascii_case(&name));
                 if wanted && e.metadata().is_ok_and(|m| m.len() <= max_bytes) {
                     out.push(p);
                 }
@@ -178,7 +206,9 @@ pub fn files_under(roots: &[PathBuf], exts: &[&str], max_files: usize, max_bytes
     }
     if all.len() > max_files && max_files > 0 {
         let step = all.len() as f64 / max_files as f64;
-        all = (0..max_files).filter_map(|i| all.get((i as f64 * step) as usize).cloned()).collect();
+        all = (0..max_files)
+            .filter_map(|i| all.get((i as f64 * step) as usize).cloned())
+            .collect();
     }
     all
 }
@@ -195,7 +225,10 @@ static LAST_PANIC: Mutex<Option<(String, String)>> = Mutex::new(None);
 
 fn quiet_panics() {
     std::panic::set_hook(Box::new(|info| {
-        let place = info.location().map(|l| format!("{}:{}", l.file(), l.line())).unwrap_or_default();
+        let place = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_default();
         let msg = info
             .payload()
             .downcast_ref::<&str>()
@@ -215,7 +248,13 @@ fn run_one(run: &dyn Fn(&[u8]), input: &[u8]) -> Option<(String, String)> {
     }
     match catch_unwind(AssertUnwindSafe(|| run(input))) {
         Ok(()) => None,
-        Err(_) => Some(LAST_PANIC.lock().ok().and_then(|mut l| l.take()).unwrap_or_default()),
+        Err(_) => Some(
+            LAST_PANIC
+                .lock()
+                .ok()
+                .and_then(|mut l| l.take())
+                .unwrap_or_default(),
+        ),
     }
 }
 
@@ -230,7 +269,11 @@ struct Current {
 fn rss_mb() -> u64 {
     std::fs::read_to_string("/proc/self/statm")
         .ok()
-        .and_then(|s| s.split_whitespace().nth(1).and_then(|v| v.parse::<u64>().ok()))
+        .and_then(|s| {
+            s.split_whitespace()
+                .nth(1)
+                .and_then(|v| v.parse::<u64>().ok())
+        })
         .map_or(0, |pages| pages * 4096 / (1024 * 1024))
 }
 
@@ -259,7 +302,12 @@ fn write_finding(name: &str, prefix: &str, input: &[u8], note: &str) -> PathBuf 
     path
 }
 
-fn watchdog(name: Option<&'static str>, current: Arc<Mutex<Current>>, timeout: Duration, rss_cap: u64) {
+fn watchdog(
+    name: Option<&'static str>,
+    current: Arc<Mutex<Current>>,
+    timeout: Duration,
+    rss_cap: u64,
+) {
     std::thread::spawn(move || {
         // an input past its deadline is a hang when the process kept the processor busy since (a parser's hang is a
         // loop), or when it is six deadlines late whatever it did: a machine swapping for other jobs stalls any
@@ -277,7 +325,8 @@ fn watchdog(name: Option<&'static str>, current: Arc<Mutex<Current>>, timeout: D
                 (Some(_), Some((iter, cpu, at))) if iter == c.iter => {
                     let waited = at.elapsed();
                     let busy = Duration::from_millis(cpu_ticks().saturating_sub(cpu) * 10);
-                    (waited > timeout / 2 && busy * 2 > waited) || c.since.is_some_and(|s| s.elapsed() > timeout * 6)
+                    (waited > timeout / 2 && busy * 2 > waited)
+                        || c.since.is_some_and(|s| s.elapsed() > timeout * 6)
                 }
                 (Some(_), _) => {
                     suspect = Some((c.iter, cpu_ticks(), Instant::now()));
@@ -290,9 +339,14 @@ fn watchdog(name: Option<&'static str>, current: Arc<Mutex<Current>>, timeout: D
             }
             let (kind, code) = if over_time { ("hang", 3) } else { ("oom", 4) };
             let input = c.input.clone().unwrap_or_default();
-            let note = format!("{kind} at input {} (rss {rss} MiB, cap {rss_cap}, deadline {timeout:?})\n", c.iter);
+            let note = format!(
+                "{kind} at input {} (rss {rss} MiB, cap {rss_cap}, deadline {timeout:?})\n",
+                c.iter
+            );
             // a repro run (name None) only says what happened; the fuzzing run keeps the input
-            let path = name.map(|n| write_finding(n, kind, &input, &note)).unwrap_or_default();
+            let path = name
+                .map(|n| write_finding(n, kind, &input, &note))
+                .unwrap_or_default();
             println!("FUZZ!{kind} {} {}", c.iter, path.display());
             let _ = std::io::stdout().flush();
             std::process::exit(code);
@@ -301,7 +355,12 @@ fn watchdog(name: Option<&'static str>, current: Arc<Mutex<Current>>, timeout: D
 }
 
 /// Smaller inputs that keep `still(input)` true: chunks deleted, halving their size, within `budget` tries and `time`.
-pub fn minimize(input: &[u8], mut still: impl FnMut(&[u8]) -> bool, budget: usize, time: Duration) -> Vec<u8> {
+pub fn minimize(
+    input: &[u8],
+    mut still: impl FnMut(&[u8]) -> bool,
+    budget: usize,
+    time: Duration,
+) -> Vec<u8> {
     let start = Instant::now();
     let mut cur = input.to_vec();
     let mut tries = 0usize;
@@ -377,15 +436,25 @@ pub fn fuzz(target: Target, seeds: impl FnOnce() -> Vec<Vec<u8>>, run: impl Fn(&
         return;
     }
     let found = supervise(&target, rss_cap);
-    assert!(found.is_empty(), "{}: new findings: {found:#?}", target.name);
+    assert!(
+        found.is_empty(),
+        "{}: new findings: {found:#?}",
+        target.name
+    );
 }
 
 /// Replays the committed repros in fuzz/regressions/<name>/ (synthetic inputs only, never game data): none may
 /// panic or take more than a few seconds.
 pub fn regressions(name: &str, run: impl Fn(&[u8])) {
     let dir = root().join("regressions").join(name);
-    let Ok(rd) = std::fs::read_dir(&dir) else { return };
-    let mut files: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| p.is_file()).collect();
+    let Ok(rd) = std::fs::read_dir(&dir) else {
+        return;
+    };
+    let mut files: Vec<PathBuf> = rd
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_file())
+        .collect();
     files.sort();
     let mut bad = Vec::new();
     for f in &files {
@@ -424,7 +493,13 @@ fn repro(_target: &Target, file: &Path, run: &dyn Fn(&[u8]), timeout: Duration, 
     }
 }
 
-fn child(target: &Target, seeds: impl FnOnce() -> Vec<Vec<u8>>, run: &dyn Fn(&[u8]), timeout: Duration, rss_cap: u64) {
+fn child(
+    target: &Target,
+    seeds: impl FnOnce() -> Vec<Vec<u8>>,
+    run: &dyn Fn(&[u8]),
+    timeout: Duration,
+    rss_cap: u64,
+) {
     let seed = env_u64("FUZZ_SEED", 1);
     let from = env_u64("FUZZ_FROM", 0);
     let to = env_u64("FUZZ_TO", u64::MAX);
@@ -459,7 +534,14 @@ fn child(target: &Target, seeds: impl FnOnce() -> Vec<Vec<u8>>, run: &dyn Fn(&[u
     let mut execs = 0u64;
     let start = Instant::now();
     while iter < to && Instant::now() < until {
-        let input = Arc::new(mutate::input(&corpus, &dict, target.kind, seed, iter, target.max_len));
+        let input = Arc::new(mutate::input(
+            &corpus,
+            &dict,
+            target.kind,
+            seed,
+            iter,
+            target.max_len,
+        ));
         if let Some(t) = &trace {
             let _ = std::fs::write(t, input.as_slice());
             println!("FUZZ@ {iter}");
@@ -539,20 +621,39 @@ fn spawn(target: &Target, env: &[(&str, String)], rss_cap: u64) -> Outcome {
     } else {
         Command::new(&exe)
     };
-    cmd.args([target.test.as_str(), "--exact", "--ignored", "--nocapture", "--test-threads=1"])
-        .env("FUZZ_CHILD", "1")
-        .env("RUST_BACKTRACE", "0")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+    cmd.args([
+        target.test.as_str(),
+        "--exact",
+        "--ignored",
+        "--nocapture",
+        "--test-threads=1",
+    ])
+    .env("FUZZ_CHILD", "1")
+    .env("RUST_BACKTRACE", "0")
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null());
     for (k, v) in env {
         cmd.env(k, v);
     }
-    let mut out = Outcome { status: None, last: None, findings: Vec::new(), done: None, started: false };
-    let Ok(mut child) = cmd.spawn() else { return out };
+    let mut out = Outcome {
+        status: None,
+        last: None,
+        findings: Vec::new(),
+        done: None,
+        started: false,
+    };
+    let Ok(mut child) = cmd.spawn() else {
+        return out;
+    };
     if let Some(stdout) = child.stdout.take() {
-        for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+        for line in std::io::BufReader::new(stdout)
+            .lines()
+            .map_while(Result::ok)
+        {
             // libtest's "test name ... " may lead the first line
-            let Some(line) = line.find("FUZZ").and_then(|i| line.get(i..)) else { continue };
+            let Some(line) = line.find("FUZZ").and_then(|i| line.get(i..)) else {
+                continue;
+            };
             if let Some(n) = line.strip_prefix("FUZZ@ ") {
                 out.last = n.trim().parse().ok();
             } else if let Some(f) = line.strip_prefix("FUZZ!") {
@@ -579,7 +680,11 @@ fn reproduces(target: &Target, input: &[u8], want: &str, rss_cap: u64) -> bool {
     if std::fs::write(&file, input).is_err() {
         return false;
     }
-    let o = spawn(target, &[("FUZZ_REPRO", file.display().to_string())], rss_cap);
+    let o = spawn(
+        target,
+        &[("FUZZ_REPRO", file.display().to_string())],
+        rss_cap,
+    );
     let _ = std::fs::remove_file(&file);
     o.status.is_some_and(|s| describe(s) == want)
 }
@@ -604,9 +709,19 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
     let mut to_minimize: Vec<(PathBuf, String)> = Vec::new();
     let start = Instant::now();
     while Instant::now() < deadline {
-        let ms = deadline.saturating_duration_since(Instant::now()).as_millis().to_string();
-        let o = spawn(target, &[("FUZZ_FROM", iter.to_string()), ("FUZZ_MS", ms)], rss_cap);
-        let status = o.status.map(describe).unwrap_or_else(|| "not started".into());
+        let ms = deadline
+            .saturating_duration_since(Instant::now())
+            .as_millis()
+            .to_string();
+        let o = spawn(
+            target,
+            &[("FUZZ_FROM", iter.to_string()), ("FUZZ_MS", ms)],
+            rss_cap,
+        );
+        let status = o
+            .status
+            .map(describe)
+            .unwrap_or_else(|| "not started".into());
         for f in &o.findings {
             // a hang or an oom must come again in a fresh process: a machine busy elsewhere (swapping) stalls any
             // input, and memory a long run kept is not the input's
@@ -615,7 +730,10 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
                 let path = PathBuf::from(path);
                 let input = std::fs::read(&path).unwrap_or_default();
                 if !reproduces(target, &input, &status, rss_cap) {
-                    eprintln!("{}: {f}: not again in a fresh process; dropped", target.name);
+                    eprintln!(
+                        "{}: {f}: not again in a fresh process; dropped",
+                        target.name
+                    );
                     let _ = std::fs::remove_file(&path);
                     let _ = std::fs::remove_file(path.with_extension("txt"));
                     continue;
@@ -633,7 +751,9 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
         }
         if !o.started && status != "exit 0" {
             // the seeds or the target's setup failed: every child would, so the run ends here
-            let f = format!("setup {status}: the target failed before its first input (run the test with FUZZ_CHILD=1)");
+            let f = format!(
+                "setup {status}: the target failed before its first input (run the test with FUZZ_CHILD=1)"
+            );
             eprintln!("{}: FOUND {f}", target.name);
             findings.push(f);
             break;
@@ -686,7 +806,10 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
                     to_minimize.push((path, tstatus));
                     iter = at + 1;
                 } else {
-                    eprintln!("{}: {other} near input {reached} did not come again; going on", target.name);
+                    eprintln!(
+                        "{}: {other} near input {reached} did not come again; going on",
+                        target.name
+                    );
                     iter = reached + 65;
                 }
                 let _ = std::fs::remove_file(&trace);
@@ -701,8 +824,15 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
         if *n > 3 {
             continue;
         }
-        let Ok(input) = std::fs::read(&path) else { continue };
-        let min = minimize(&input, |c| reproduces(target, c, &want, rss_cap), 150, Duration::from_secs(300));
+        let Ok(input) = std::fs::read(&path) else {
+            continue;
+        };
+        let min = minimize(
+            &input,
+            |c| reproduces(target, c, &want, rss_cap),
+            150,
+            Duration::from_secs(300),
+        );
         let _ = std::fs::write(path.with_extension("min.bin"), min);
     }
     let secs = start.elapsed().as_secs_f64().max(1e-9);
@@ -715,7 +845,11 @@ fn supervise(target: &Target, rss_cap: u64) -> Vec<String> {
     eprint!("{summary}");
     let dir = artifacts(target.name);
     let _ = std::fs::create_dir_all(&dir);
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("stats.txt")) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("stats.txt"))
+    {
         let _ = f.write_all(summary.as_bytes());
     }
     findings
@@ -743,7 +877,10 @@ pub fn split_parts(input: &[u8], n: usize) -> Vec<&[u8]> {
     let mut out = Vec::new();
     let mut rest = input;
     while out.len() + 1 < n {
-        match rest.windows(PART_SEPARATOR.len()).position(|w| w == PART_SEPARATOR) {
+        match rest
+            .windows(PART_SEPARATOR.len())
+            .position(|w| w == PART_SEPARATOR)
+        {
             Some(at) => {
                 out.push(&rest[..at]);
                 rest = &rest[at + PART_SEPARATOR.len()..];

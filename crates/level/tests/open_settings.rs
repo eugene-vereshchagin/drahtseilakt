@@ -28,9 +28,27 @@ fn settings_survive_the_round_trip() {
             last_level: true,
             source_hash: Some(0x0123_4567_89ab_cdef),
             own_parts: true,
-            fog: Some(level::Fog { color: [0.5, 0.75, 1.0], color_down: [0.2, 0.3, 0.1], density: 0.0015, below: -40.0, depth: 150.0 }),
+            fog: Some(level::Fog {
+                color: [0.5, 0.75, 1.0],
+                color_down: [0.2, 0.3, 0.1],
+                density: 0.0015,
+                below: -40.0,
+                depth: 150.0,
+            }),
             sector_balls: vec![None, Some("stone".into()), None, Some("wood".into())],
-            clouds: Some(level::Clouds { top: -60.0, thickness: 70.0, cover: 0.9, scale: 50.0, sun: [0.0, 0.6, 0.8], sun_color: [4.0, 3.0, 2.0], sky: [0.5, 0.6, 0.8], shadow: [0.4, 0.35, 0.5], haze: 0.001, under: 0.5, wind: [1.0, -2.0] }),
+            clouds: Some(level::Clouds {
+                top: -60.0,
+                thickness: 70.0,
+                cover: 0.9,
+                scale: 50.0,
+                sun: [0.0, 0.6, 0.8],
+                sun_color: [4.0, 3.0, 2.0],
+                sky: [0.5, 0.6, 0.8],
+                shadow: [0.4, 0.35, 0.5],
+                haze: 0.001,
+                under: 0.5,
+                wind: [1.0, -2.0],
+            }),
         },
         ..Level::default()
     };
@@ -100,8 +118,7 @@ fn a_fog_reads_with_its_defaults_and_ranges() {
     let path = d.join("level.gltf");
     let mut doc: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    doc["scenes"][0]["extras"]["drahtseilakt"]["settings"] =
-        serde_json::json!({"fog": {"color": [0.5, 0.6, 2.0], "density": 5, "below": -20, "depth": 0}});
+    doc["scenes"][0]["extras"]["drahtseilakt"]["settings"] = serde_json::json!({"fog": {"color": [0.5, 0.6, 2.0], "density": 5, "below": -20, "depth": 0}});
     std::fs::write(&path, serde_json::to_string(&doc).unwrap()).unwrap();
     let fog = level::open::import(&d).unwrap().settings.fog.unwrap();
     assert_eq!(fog.color, [0.5, 0.6, 1.0]);
@@ -121,8 +138,7 @@ fn clouds_read_with_their_defaults_and_ranges() {
     let path = d.join("level.gltf");
     let mut doc: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    doc["scenes"][0]["extras"]["drahtseilakt"]["settings"] =
-        serde_json::json!({"clouds": {"top": -80, "cover": 3, "thickness": 0, "sun": [0, 0, 0], "sun_color": [100, 1, 1]}});
+    doc["scenes"][0]["extras"]["drahtseilakt"]["settings"] = serde_json::json!({"clouds": {"top": -80, "cover": 3, "thickness": 0, "sun": [0, 0, 0], "sun_color": [100, 1, 1]}});
     std::fs::write(&path, serde_json::to_string(&doc).unwrap()).unwrap();
     let c = level::open::import(&d).unwrap().settings.clouds.unwrap();
     assert_eq!(c.top, -80.0);

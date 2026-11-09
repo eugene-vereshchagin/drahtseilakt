@@ -164,7 +164,7 @@ Music_Final fanfare_a.ogg fanfare_b.ogg
 
 1. 把文件夹放进数据文件夹的 `sounds/` 中，然后启动游戏。
 2. 切换到扩展模式，在扩展选项页的 **Sounds** 一行选择该主题（即 `settings.txt` 中的设置 `sound-theme 名称`）。
-   经典模式总是播放默认主题。
+   经典模式在其 Sound 页有同样的选择（**Sound theme** 一行）。
 3. 玩一个关卡，留意终端中关于表格的提示。缺少的角色由后备主题补上，所以 `fallback none` 的主题应检查是否有遗漏：
    上面表格中的所有角色。
 4. 想不玩就试听，可以运行回放并把混音写入文件：
