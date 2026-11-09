@@ -42,7 +42,7 @@ Options、Credits、Exit；在关卡中按 Esc 打开暂停菜单，失败的一
 每一局通关都会保存为回放（在 Linux 上位于 `~/.local/share/drahtseilakt/replays/<level>/`，
 最快的一局保存为 `best.replay`）；`--replay FILE` 播放回放，`--headless` 在无窗口的情况下检验它，`--screenshot
 FILE.png` 渲染一帧。要测试某个位置，`--sector N` 从某个检查点开始，`--at X,Y,Z`（或关卡
-对象的名称）可从任意位置开始，配合 `--ball wood|stone|paper`；这样的一局会把起点保存在回放中，并且永远不会
+对象的名称）可从任意位置开始，使用该分段开始时的球（`--ball wood|stone|paper` 可覆盖）；这样的一局会把起点保存在回放中，并且永远不会
 算作最佳成绩。在开启扩展模式之前（Options、Extended，或用 `--debug` 开启一次），游戏会尽可能
 贴近原版。*扩展模式*会显示最佳时间，并在 Start 下按类别列出关卡
 （`levels/` 中的原版、重制、自制地图和开放格式关卡，每个关卡标有难度；如何制作和分享关卡：

@@ -29,6 +29,7 @@ fn settings_survive_the_round_trip() {
             source_hash: Some(0x0123_4567_89ab_cdef),
             own_parts: true,
             fog: Some(level::Fog { color: [0.5, 0.75, 1.0], color_down: [0.2, 0.3, 0.1], density: 0.0015, below: -40.0, depth: 150.0 }),
+            sector_balls: vec![None, Some("stone".into()), None, Some("wood".into())],
             clouds: Some(level::Clouds { top: -60.0, thickness: 70.0, cover: 0.9, scale: 50.0, sun: [0.0, 0.6, 0.8], sun_color: [4.0, 3.0, 2.0], sky: [0.5, 0.6, 0.8], shadow: [0.4, 0.35, 0.5], haze: 0.001, under: 0.5, wind: [1.0, -2.0] }),
         },
         ..Level::default()

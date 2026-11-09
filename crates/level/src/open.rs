@@ -265,6 +265,9 @@ fn settings_json(s: &crate::Settings) -> Value {
     if s.own_parts {
         v["parts"] = json!("own");
     }
+    if s.sector_balls.iter().any(Option::is_some) {
+        v["sector_balls"] = json!(s.sector_balls);
+    }
     if let Some(f) = s.fog {
         v["fog"] = json!({"color": f.color, "color_down": f.color_down, "density": f.density, "below": f.below,
             "depth": f.depth});
@@ -442,7 +445,20 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
         Value::Null => None,
         c => Some(clouds_from(c)?),
     };
+    let sector_balls = match &v["sector_balls"] {
+        Value::Null => Vec::new(),
+        Value::Array(a) if a.len() <= 256 => a
+            .iter()
+            .map(|b| match b {
+                Value::Null => Ok(None),
+                Value::String(s) if ["wood", "stone", "paper"].contains(&s.as_str()) => Ok(Some(s.clone())),
+                _ => Err("settings: sector_balls holds wood, stone, paper or null"),
+            })
+            .collect::<Result<_, _>>()?,
+        _ => return Err("settings: sector_balls is not a list".into()),
+    };
     Ok(crate::Settings {
+        sector_balls,
         clouds,
         fog,
         own_parts,

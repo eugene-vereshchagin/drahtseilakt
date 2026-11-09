@@ -378,6 +378,7 @@ fn synthetic_level() -> Level {
         own_parts: true,
         fog: None,
         clouds: None,
+        sector_balls: vec![None, Some("paper".into())],
     };
     l
 }

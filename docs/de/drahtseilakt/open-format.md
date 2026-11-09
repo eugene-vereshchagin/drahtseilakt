@@ -63,7 +63,7 @@ Ein Ordner mit:
 - **Szenen-Extras** `extras.drahtseilakt`: `format` (1), `groups` (Name und Indizes der Mitgliedsknoten — die
   Spielregeln lesen sie, siehe [nmo-format.md](nmo-format.md)), `sky` (Buchstabe des Himmels), `start_ball` und
   `settings`: was das Original aus seiner Leveltabelle und seinen Regeln nach Levelnummer nimmt, damit das Level ohne
-  die Dateien des Spiels gleich spielt — `music` (Thema 1 bis 1000), `light` (drei Zahlen 0..1), `level_bonus`
+  die Dateien des Spiels gleich spielt — `music` (Thema 1 bis 1000), `light` (drei Zahlen 0..1), `sector_balls` (eine Liste, Sektor 1 zuerst, aus `wood`, `stone`, `paper` oder null: die Kugel eines mit `--sector` an diesem Sektor begonnenen Laufs; ohne Eintrag gilt die Startkugel des Levels), `level_bonus`
   (Punkte), `tutorial` und `last_level` (true oder false: erstes und letztes Level des Originals) und `source_hash`
   (16 Hexziffern: FNV-1a der `.nmo`, aus der es umgewandelt wurde) sowie `parts` (`"own"`: das Level ist für die
   eigenen Teile des Spiels gemacht und nimmt sie vor denen der Kopie; `"copy"` oder nichts: zuerst die der Kopie; unser

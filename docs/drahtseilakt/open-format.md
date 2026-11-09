@@ -64,7 +64,7 @@ A folder holding:
 - **Scene extras** `extras.drahtseilakt`: `format` (1), `groups` (name and member node indices — the game
   rules read these, see [nmo-format.md](nmo-format.md)), `sky` (sky letter), `start_ball` and `settings`: what the
   original takes from its level table and its rules by level number, so the level plays the same without the game's
-  files — `music` (theme 1 to 1000), `light` (three numbers 0..1), `level_bonus` (points), `tutorial` and
+  files — `music` (theme 1 to 1000), `light` (three numbers 0..1), `level_bonus` (points), `sector_balls` (a list, sector 1 first, of `wood`, `stone`, `paper` or null: the ball a run begun at that sector with `--sector` has; none takes the level's start ball), `tutorial` and
   `last_level` (true or false: the original's first and last level), and `source_hash` (16 hex digits: the FNV-1a of
   the `.nmo` it was converted from), and `parts` (`"own"`: the level is made for the game's own parts and takes them
   before the copy's; `"copy"` or none: the copy's first; our level kit writes `"own"`). A replay recorded on that file plays on the converted level (the same level, so
