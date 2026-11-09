@@ -12,6 +12,7 @@
 //   mod <key> <fnv-1a 64 of its mod.txt, hex> [<option>=<value>]...   (optional, at most MAX_MODS: a mod that
 //                                 changes the run, so the run is modded and plays back only with that very mod;
 //                                 docs/drahtseilakt/mods.md. A replay without them is a classic run, as before)
+//   turn <tick> <degrees>         (optional, 0-359: the view's turn a `view.turn` mod hands the run, from this tick on)
 //   <tick> <input bits, hex>      (from this tick on; tick 1 is the first)
 //   end <last tick>
 
