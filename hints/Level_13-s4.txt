@@ -1,14 +1,2 @@
-# Level 13 sector 4 (CP3 -> CP4), 2026-11-09 (seventh session): the arms puzzle at the bar platform is SOLVED as the
-# video plays it (see hints/Level_13.txt, "seventh session"); the end (x ~60 -> stone transformer -> CP4) is still open.
-# Ride raft 1 on top (ball 4 above the stones) from the U to x -400; step onto raft 2 (Stone_16, z -1133.95) before
-# board B1 (x -382.8, lane 1); back onto raft 1 (Wood_05, z -1125.38) before B2 (x -364.6, lane 2); off north onto the
-# bar platform's narrow part at x -349 (z -1119), round the notch (x -338 z -1117), along the north edge (z -1105.5) to
-# arm 1's north paddle and push it east round its hub (pass points 10 from the hub, behind the turning bar) to ~150 deg;
-# the same for arm 2 (north paddle at z -1107, clear of the stopper hoop at z >= -1109.3); wait at (-287 -1120.8) for
-# raft 1, which now passes both arms; climb onto Stone_12 (y -298.9, 4 above the stones) at x -290; ride col 1 past
-# B3 (x -277.4, inner columns), move to col 2 (Wood_06) and pass B4 (x -188.8, lane 2) on raft 1. Lane 1 ends at x -172:
-# in the video the rafts are level here and the ball rolls across onto raft 2's woods; in our simulation raft 2 is a
-# whole raft (~10 units) ahead by then, the ball dips into the gap, so it drops onto lane 2's rails behind raft 2 and
-# rolls on to x ~58 (y -336), the old open spot (dies at x ~62 on A04_Floor_03's ramp).
-# Run: --level 13 --sector 4 --autopilot --plan hints/Level_13.plan --hints hints/Level_13-s4.txt --ticks 7300 --give-up 600 --headless
-at -595.2 -285 -1124.9 r 4 sector 4 kind paper : pass -565 -285 -1124.9 8 ; pass -556 -285 -1120.5 8 ; pass -546 -285 -1120.3 8 ; ride -542 -289 -1125.4 -399 -296.7 -1125.38 1 3000 ; ride -396 -296.9 -1133.95 -376 -297.9 -1133.95 1 900 ; ride -374 -298 -1125.38 -356 -298.9 -1125.38 1 900 ; pass -348 -296.6 -1118.5 12 ; pass -337 -297.2 -1112 12 ; pass -331 -297.5 -1105.5 10 ; pass -322.5 -297.9 -1106.1 8 ; pass -318.2 -298.1 -1109.1 8 ; pass -316.1 -298.2 -1113.8 8 ; pass -316.5 -298.2 -1118.9 8 ; pass -308 -298.6 -1107 10 ; pass -302 -298.9 -1107 8 ; pass -297.6 -299.2 -1111.1 8 ; pass -293.3 -299.4 -1114.1 8 ; pass -291.2 -299.5 -1118.8 8 ; pass -287 -299.7 -1120.8 4 ; await -324 -300.5 -1125.38 -289 -302.3 -1125.38 1.5 900 ; ride -293 -302.1 -1125.38 -270 -303.5 -1125.38 1.5 2400 ; ride -266 -303.7 -1129.65 -184.3 -310.75 -1129.65 1 2400 ; pass -176 -311 -1135 6 ; pass -150 -320 -1136.2 8 ; pass -100 -322 -1136.2 8 ; pass 30 -333 -1134 8 ; pass 60 -334 -1133.8 5 ; pass 89.4 -335 -1133.6 4
+# Level 13 sector 4 (CP3 -> CP4): the test player's arms solution (hints/Level_13-s4-arms.txt) to tick 4920, then the owner's end (lane switch at the end of lane 1, on to CP4 at 2:04.18) — together hints/Level_13-s4.replay (copy of hints/runs/owner/Level_13-s4-finish-8218.replay).
+at -595.2 -285 -1124.9 r 4 sector 4 kind paper : replay Level_13-s4.replay 0 7500
