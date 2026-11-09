@@ -65,6 +65,15 @@ kind original | Original | Оригинальные | Original | 原版 | Origin
 kind remastered | Remastered | Ремастер | Remastered | 重制版 | Remasterisés | Remasterizados | Rimasterizzati
 kind community | Your community maps | Ваши карты сообщества | Eigene Community-Karten | 你的社区地图 | Vos cartes de la communauté | Tus mapas de la comunidad | Le tue mappe della comunità
 kind open | Open format | Открытый формат | Offenes Format | 开放格式 | Format ouvert | Formato abierto | Formato aperto
+kind modified | Modified originals | Модифицированные оригиналы | Modifizierte Originale | 修改版原版 | Originaux modifiés | Originales modificados | Originali modificati
+modified set rotated | 45-Degree Rotated | Поворот на 45 градусов | 45 Grad gedreht | 旋转45度 | Rotation 45 degrés | Rotado 45 grados | Ruotato di 45 gradi
+modified set reverse | Reverse | Обратные | Rückwärts | 反向 | Inversé | Inverso | Inverso
+modified set invisible | Invisible | Невидимые | Unsichtbar | 隐形 | Invisible | Invisible | Invisibile
+modified level | Level | Уровень | Level | 关卡 | Niveau | Nivel | Livello
+modified new | New | Новая | Neu | 新 | Nouveau | Nuevo | Nuovo
+modified hard | Hard | Сложная | Schwer | 困难 | Difficile | Difícil | Difficile
+modified easy | Easy | Легкая | Leicht | 简单 | Facile | Fácil | Facile
+modified normal | Normal | Обычная | Normal | 普通 | Normal | Normal | Normale
 custom levels | Custom levels | Свои уровни | Eigene Level | 自定义关卡 | Niveaux perso | Niveles propios | Livelli personali
 import | Import | Импорт | Importieren | 导入 | Importer | Importar | Importa
 own levels | Our levels | Наши уровни | Unsere Level | 我们的关卡 | Nos niveaux | Nuestros niveles | I nostri livelli

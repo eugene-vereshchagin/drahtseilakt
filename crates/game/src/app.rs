@@ -1044,6 +1044,8 @@ fn custom_roots() -> Vec<PathBuf> {
         .into_iter()
         .filter(|&k| k != crate::levels::Kind::Original)
         .map(crate::levels::dir)
+        // the modified originals lie one folder deeper, in a folder per set (modified.rs)
+        .chain(crate::modified::set_folders(&crate::levels::dir(crate::levels::Kind::Modified)))
         .chain(gamedata::resources::shipped_levels_root())
         .collect()
 }

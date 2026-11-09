@@ -108,6 +108,14 @@ fn about(language: &str, kind: Kind) -> String {
             "Оригинальные уровни в открытом формате, с современными текстурами (4K–8K).\n\nДелает их на вашей \
              машине из папки original программа drahtseilakt-toolbox (remaster); никуда не распространяются.\n"
         }
+        ("ru", Kind::Modified) => {
+            "Модифицированные оригиналы: любительские переделки 13 уровней оригинала (повёрнутые на 45 градусов, \
+             обратные, невидимые). В них геометрия оригинала, поэтому игра их не поставляет; они играются только из \
+             ваших файлов и только при наличии вашей копии оригинала.\n\nПапка на каждый набор: \
+             modified/<Набор>/<папка уровня>/ с одним .nmo. Из имени файла вроде 反向Level_11(普通-fiype).NMO игра \
+             читает номер уровня, вариант (新 новая, 困难 сложная, 简单 лёгкая, 普通 обычная) и автора. Раскладывает так: \
+             drahtseilakt-toolbox import-maps <папка>.\n"
+        }
         ("ru", Kind::Open) => {
             "Уровни в открытом формате: созданные в нём или сконвертированные любительские карты; каждый уровень — \
              папка с level.gltf.\n\nЧасть поставляется с игрой, с разрешения и под свободной лицензией авторов \
@@ -135,6 +143,14 @@ fn about(language: &str, kind: Kind) -> String {
             "Die Original-Level im offenen Format, mit modernen Texturen (4K–8K).\n\nAuf Ihrem Rechner aus dem Ordner \
              original vom Programm drahtseilakt-toolbox (remaster) erzeugt und nie weitergegeben.\n"
         }
+        ("de", Kind::Modified) => {
+            "Modifizierte Originale: Community-Umbauten der 13 Original-Level (um 45 Grad gedreht, rückwärts, \
+             unsichtbar). Sie enthalten die Geometrie des Originals, darum liefert das Spiel sie nie mit; sie laufen \
+             nur aus Ihren eigenen Dateien und nur mit Ihrer Kopie des Originals.\n\nEin Ordner je Satz: \
+             modified/<Satz>/<Levelordner>/ mit einer .nmo. Aus dem Dateinamen wie 反向Level_11(普通-fiype).NMO liest \
+             das Spiel Levelnummer, Variante (新 neu, 困难 schwer, 简单 leicht, 普通 normal) und Autor. Einsortiert \
+             wird mit drahtseilakt-toolbox import-maps <Ordner>.\n"
+        }
         ("de", Kind::Open) => {
             "Level im offenen Format: darin gebaut oder umgewandelte Community-Karten; jedes Level ist ein Ordner mit \
              level.gltf.\n\nEinige kommen mit dem Spiel, mit Erlaubnis und unter freier Lizenz ihrer Autoren (LICENSE \
@@ -158,6 +174,12 @@ fn about(language: &str, kind: Kind) -> String {
         ("zh", Kind::Remastered) => {
             "开放格式的原版关卡，配有现代纹理（4K–8K）。\n\n由 drahtseilakt-toolbox（remaster）在你的电脑上从 original \
              文件夹生成，不会对外分发。\n"
+        }
+        ("zh", Kind::Modified) => {
+            "修改版原版关卡：社区对 13 个原版关卡的改版（旋转 45 度、反向、隐形）。它们含有原版的几何数据，所以游戏从不\
+             随附；只能从你自己的文件中游玩，并且需要你有原版游戏的副本。\n\n每个合集一个文件夹：\
+             modified/<合集>/<关卡文件夹>/，内含一个 .nmo。游戏从 反向Level_11(普通-fiype).NMO 这样的文件名中读出关卡\
+             编号、版本（新、困难、简单、普通）和作者。用 drahtseilakt-toolbox import-maps <文件夹> 整理。\n"
         }
         ("zh", Kind::Open) => {
             "开放格式的关卡：直接以该格式制作的关卡或转换后的自制地图；每个关卡是一个含有 level.gltf 的文件夹。\n\n\
@@ -183,6 +205,14 @@ fn about(language: &str, kind: Kind) -> String {
         (_, Kind::Remastered) => {
             "The original levels in the open format, with modern textures (4K-8K).\n\nMade on your machine from the \
              original folder by the program drahtseilakt-toolbox (remaster) and never distributed.\n"
+        }
+        (_, Kind::Modified) => {
+            "Modified originals: community remakes of the 13 original levels (rotated 45 degrees, reversed, \
+             invisible). They hold the original's geometry, so the game never ships them; they play only from your \
+             own files and only when you have a copy of the original.\n\nOne folder per set: \
+             modified/<Set>/<level folder>/ holding one .nmo. From a file name such as 反向Level_11(普通-fiype).NMO the \
+             game reads the level number, the variant (新 new, 困难 hard, 简单 easy, 普通 normal) and the author. \
+             drahtseilakt-toolbox import-maps <folder> sorts a collection into this shape.\n"
         }
         (_, Kind::Open) => {
             "Levels in the open format: made in it, or converted community maps; each level is a folder with \
