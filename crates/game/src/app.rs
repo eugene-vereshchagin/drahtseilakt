@@ -67,6 +67,8 @@ struct Game {
     sim: Sim,
     replay_in: Option<Replay>,
     replay_out: Replay,
+    /// The view's turn the window hands to the next tick (a `view.turn` mod), whole degrees; a replay brings its own.
+    pub view_turn: u16,
     /// Where the run begins when not at the level start (--sector, --at, --ball, or the replay's).
     start: Option<crate::replay::Start>,
     record: Option<PathBuf>,
@@ -264,6 +266,7 @@ impl Game {
             sim,
             start_ball,
             replay_out,
+            view_turn: 0,
             start,
             record: o.record.clone(),
             ball_lost_at: None,
@@ -528,6 +531,12 @@ impl Game {
             return;
         }
         let events_before = self.sim.events.len();
+        let turn = match &self.replay_in {
+            Some(r) if next <= r.end => r.turn_at(next),
+            Some(_) => 0,
+            None => self.view_turn,
+        };
+        self.sim.turn = turn;
         self.sim.step(input);
         self.effects.tick(&self.sim);
         if self.sim.drawn_ball() == Some(self.sim.ball.kind) && !self.sim.game_over {
@@ -547,6 +556,7 @@ impl Game {
             self.sound_out.clear();
         }
         self.replay_out.record(self.sim.tick, input);
+        self.replay_out.record_turn(self.sim.tick, turn);
         self.log_tick(input);
         self.dump_spin_loss();
         let ball = &self.sim.ball;
@@ -988,6 +998,11 @@ fn move_runs(old: &Path, new: &Path, stem: &str) -> Result<bool, String> {
     Ok(true)
 }
 
+/// The kept statistics of the time played (a mod's `playtime`).
+fn playtime_file() -> PathBuf {
+    gamedata::profile::data_dir().join("playtime.txt")
+}
+
 pub fn replay_dir() -> PathBuf {
     crate::levels::data_dir().join("replays")
 }
@@ -1243,6 +1258,9 @@ fn window(mut game: Game, data: Data, o: &Options, pilot: Option<Box<PilotRun>>)
         mods,
         view_mods,
         mod_began: Instant::now(),
+        playtimes: crate::playtime::PlayTimes::load(&playtime_file()),
+        playtime_saved: Instant::now(),
+        eased: None,
         mouse: (0.0, 0.0),
         fps: 60.0,
         ghost: None,
@@ -2834,6 +2852,11 @@ struct App {
     mods: crate::modrt::Mods,
     view_mods: crate::modrt::ViewMods,
     mod_began: Instant,
+    /// The time played per level (a mod's `playtime`), when it was last written, and the camera as eased (a mod's
+    /// `camera.smooth`): yaw, distance, field of view, and the free camera's eye and target.
+    playtimes: crate::playtime::PlayTimes,
+    playtime_saved: Instant,
+    eased: Option<([f32; 3], Option<(glam::Vec3, glam::Vec3)>)>,
     mouse: (f32, f32),
     fps: f32,
     /// The best run as a ghost (a mod's `ghost`), and whether it was looked for in this run.
@@ -3266,6 +3289,8 @@ impl App {
             V::ClockHour => ((now() / 3600) % 24) as f32,
             V::ClockMinute => ((now() / 60) % 60) as f32,
             V::ClockSecond => (now() % 60) as f32,
+            V::PlaytimeLevel => self.playtimes.level(&self.game.level.name),
+            V::PlaytimeAll => self.playtimes.total(),
             V::PracticeSpeed => self.time_scale,
             V::PracticeSaved => f32::from(u8::from(self.saved.is_some())),
             V::MouseDx => self.mouse.0,
@@ -3307,6 +3332,14 @@ impl App {
         );
         self.view_mods = view;
         self.mouse = (0.0, 0.0);
+        self.game.view_turn = self.view_mods.out.turn.unwrap_or(0);
+        if std::mem::take(&mut self.view_mods.out.playtime) && self.fly.is_none() && !self.game.sim.game_over && !self.game.sim.finished {
+            self.playtimes.add(&self.game.level.name, step);
+        }
+        if self.playtimes.dirty && self.playtime_saved.elapsed().as_secs() >= 10 {
+            self.playtime_saved = Instant::now();
+            self.playtimes.save(&playtime_file());
+        }
         if std::mem::take(&mut self.view_mods.out.restart) {
             self.restart();
             self.saved = None;
@@ -3682,6 +3715,7 @@ impl App {
 
     /// Opens the menu with `base` as its first screen: the main menu, or the pause, dead or end menu over the level.
     fn open_menu(&mut self, base: crate::menu::Screen) {
+        self.playtimes.save(&playtime_file());
         let mut menu = Menu::new(&self.data, &self.strings, base, self.number, self.features);
         menu.volumes = self.volumes;
         menu.graphics = self.graphics;
@@ -4127,6 +4161,16 @@ impl App {
                         self.game.assisted = true;
                     }
                 }
+                Practice::Sector(n) => {
+                    // the run begun again at that sector, as --sector does; the next ordinary restart is the level's
+                    let was = self.game.start.take();
+                    let top = self.game.sim.sector_count();
+                    self.game.start = Some(crate::replay::Start { sector: (n as usize).clamp(1, top.max(1)), ball: None, at: None });
+                    self.restart();
+                    self.game.start = was;
+                    self.saved = None;
+                    self.history.clear();
+                }
                 Practice::FreeCam => {
                     self.fly = match self.fly {
                         Some(_) => None,
@@ -4473,8 +4517,24 @@ impl App {
             }
         }
         let point = crate::lights::point(&sim.events, sim.tick, snap.ball);
+        // a mod's `camera.smooth`: how fast the camera follows what it is asked (a time constant of up to ~0.65 s)
+        let ease = {
+            let m = self.view_mods.out.smooth;
+            if m > 0.0 && self.menu.is_none() { 1.0 - (-step / (0.05 + m * 0.6)).exp() } else { 1.0 }
+        };
         if let Some(c) = &self.fly {
             (snap.eye, snap.target) = c.view();
+            if ease < 1.0 {
+                if let Some((e, t)) = self.eased.as_mut().and_then(|x| x.1.as_mut()) {
+                    *e += (snap.eye - *e) * ease;
+                    *t += (snap.target - *t) * ease;
+                    (snap.eye, snap.target) = (*e, *t);
+                } else {
+                    self.eased.get_or_insert(([0.0, 1.0, 0.0], None)).1 = Some((snap.eye, snap.target));
+                }
+            }
+        } else if let Some(x) = self.eased.as_mut() {
+            x.1 = None;
         }
         self.last_view = (snap.eye, snap.target);
         let tools = self.practice();
@@ -4533,14 +4593,31 @@ impl App {
                 w.zone_instances(&self.game, &mut inst);
             }
             inst.extend(ghost);
+            // a mod's view-only looks: the wooden ball deformed, decoy balls around it (never touch the run)
+            let (deform, decoys) = (self.view_mods.out.deform, self.view_mods.out.decoys);
+            if deform > 0.0 || decoys > 0 {
+                let t = self.mod_began.elapsed().as_secs_f32();
+                crate::scene::ball_looks(&mut inst, &snap, &self.game.ball_meshes, t, deform, decoys);
+            }
             let particles = self.game.effects.batches(snap.eye, snap.target);
             let mut view = scene::view(&snap);
             // the mods' camera (modrt.rs): turned about the ball, nearer or farther, a wider or narrower view
             let out = &self.view_mods.out;
             if self.fly.is_none() && !self.view_mods.is_empty() {
-                let back = glam::Quat::from_rotation_y(out.yaw.to_radians()) * (view.eye - view.target);
-                view.eye = view.target + back * out.distance;
-                let across = 2.0 * ((view.fov_y / 2.0).tan() / 0.75).atan() + out.fov.to_radians();
+                let goal = [out.yaw, out.distance, out.fov];
+                let e = self.eased.get_or_insert((goal, None));
+                if ease < 1.0 {
+                    let turn = (goal[0] - e.0[0] + 540.0).rem_euclid(360.0) - 180.0;
+                    e.0[0] = (e.0[0] + turn * ease).rem_euclid(360.0);
+                    e.0[1] += (goal[1] - e.0[1]) * ease;
+                    e.0[2] += (goal[2] - e.0[2]) * ease;
+                } else {
+                    e.0 = goal;
+                }
+                let [yaw, distance, fov] = e.0;
+                let back = glam::Quat::from_rotation_y(yaw.to_radians()) * (view.eye - view.target);
+                view.eye = view.target + back * distance;
+                let across = 2.0 * ((view.fov_y / 2.0).tan() / 0.75).atan() + fov.to_radians();
                 view.fov_y = 2.0 * ((across.clamp(0.2, 3.0) / 2.0).tan() * 0.75).atan();
             }
             (inst, particles, view)

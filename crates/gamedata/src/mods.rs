@@ -120,6 +120,8 @@ pub enum Value {
     InputRight,
     InputRotation,
     InputOverview,
+    /// The view's turn handed to the run (`view.turn`), whole degrees 0 to 359; recorded in the replay.
+    InputTurn,
     // view-only values
     /// Real seconds since the run began (pauses and menus included).
     RealTime,
@@ -142,9 +144,12 @@ pub enum Value {
     /// The practice blocks' state: the game's speed (1 as it is, down to 1/8) and whether a moment is saved (1 or 0).
     PracticeSpeed,
     PracticeSaved,
+    /// Time played of this level and of all levels, seconds, from the kept statistics (`playtime`).
+    PlaytimeLevel,
+    PlaytimeAll,
 }
 
-const VALUES: [(&str, Value); 37] = [
+const VALUES: [(&str, Value); 40] = [
     ("ball.x", Value::BallX),
     ("ball.y", Value::BallY),
     ("ball.z", Value::BallZ),
@@ -164,6 +169,7 @@ const VALUES: [(&str, Value); 37] = [
     ("input.right", Value::InputRight),
     ("input.rotation", Value::InputRotation),
     ("input.overview", Value::InputOverview),
+    ("input.turn", Value::InputTurn),
     ("real.time", Value::RealTime),
     ("frame.dt", Value::FrameDt),
     ("frame.fps", Value::Fps),
@@ -179,6 +185,8 @@ const VALUES: [(&str, Value); 37] = [
     ("best.time", Value::BestTime),
     ("practice.speed", Value::PracticeSpeed),
     ("practice.saved", Value::PracticeSaved),
+    ("playtime.level", Value::PlaytimeLevel),
+    ("playtime.all", Value::PlaytimeAll),
     // aliases kept short for HUD lines
     ("run.ticks", Value::RunTick),
     ("ball.v", Value::BallSpeed),
@@ -209,6 +217,7 @@ impl Value {
                 | Value::InputRight
                 | Value::InputRotation
                 | Value::InputOverview
+                | Value::InputTurn
         )
     }
 }
@@ -420,7 +429,19 @@ pub enum Action {
     Gravity(Expr),
     /// The physics' time factor, 0.5 to 4 (the original's 2).
     TimeFactor(Expr),
+    /// The steering turned about the vertical by so many degrees (the arrows push along the turned view).
+    SteerYaw(Expr),
     // the view's actions
+    /// The view's turn, in degrees, handed to the run as `input.turn` (recorded in the replay, whole degrees).
+    ViewTurn(Expr),
+    /// The camera eased (0 none to 1 slow): its turn, distance, field of view and the free camera follow smoothly.
+    CameraSmooth(Expr),
+    /// So many translucent decoy balls wandering around the ball (0 to 8; view only).
+    Decoys(Expr),
+    /// The wooden ball's look deformed at random, 0 (round) to 1 (view only; the physics keeps its round ball).
+    BallDeform(Expr),
+    /// This frame counts as time played: the level's and the total play time, kept in the data folder.
+    PlayTime,
     /// The field of view widened by so many degrees (-30 to 60).
     CameraFov(Expr),
     /// The camera's distance from the ball, as a factor (0.5 to 2).
@@ -455,18 +476,25 @@ pub enum Action {
     Faster,
     /// The free camera taken up or put down (the run waits while it flies).
     FreeCam,
+    /// The run begun again at a sector (1 first), as `--sector` does.
+    SetSector(Expr),
 }
 
 impl Action {
     pub fn sim(&self) -> bool {
         matches!(
             self,
-            Action::Stick(_) | Action::Gravity(_) | Action::TimeFactor(_) | Action::EndlessLives(_)
+            Action::Stick(_) | Action::Gravity(_) | Action::TimeFactor(_) | Action::EndlessLives(_) | Action::SteerYaw(_)
         )
     }
 
     /// One of the practice's deeds (rewind, save, load, speed, free camera): only on a key, and it makes the mod
     /// modded.
+    /// A single deed on a key that reaches into the run from outside (practice, or a jump to a sector).
+    pub fn deed(&self) -> bool {
+        self.practice() || matches!(self, Action::SetSector(_))
+    }
+
     pub fn practice(&self) -> bool {
         matches!(
             self,
@@ -485,6 +513,12 @@ impl Action {
             | Action::Stick(e)
             | Action::Gravity(e)
             | Action::TimeFactor(e)
+            | Action::SteerYaw(e)
+            | Action::ViewTurn(e)
+            | Action::CameraSmooth(e)
+            | Action::Decoys(e)
+            | Action::BallDeform(e)
+            | Action::SetSector(e)
             | Action::CameraFov(e)
             | Action::CameraDistance(e)
             | Action::CameraYaw(e)
@@ -502,6 +536,7 @@ impl Action {
             | Action::LoadMoment
             | Action::Slower
             | Action::Faster
+            | Action::PlayTime
             | Action::FreeCam => Vec::new(),
         }
     }
@@ -641,7 +676,7 @@ impl ModTxt {
 
     /// It changes the run (any sim action, or a practice deed that reaches into it): its runs are modded.
     pub fn modded(&self) -> bool {
-        self.rules.iter().any(|r| r.actions.iter().any(|a| a.sim() || a.practice()))
+        self.rules.iter().any(|r| r.actions.iter().any(|a| a.sim() || a.deed()))
     }
 
     /// It has a practice deed: while it is on, the game keeps the run's moments for going back.
@@ -1127,6 +1162,13 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "camera.fov" => Action::CameraFov(e(args)?),
         "camera.distance" => Action::CameraDistance(e(args)?),
         "camera.yaw" => Action::CameraYaw(e(args)?),
+        "camera.smooth" => Action::CameraSmooth(e(args)?),
+        "steer.yaw" => Action::SteerYaw(e(args)?),
+        "view.turn" => Action::ViewTurn(e(args)?),
+        "decoys" => Action::Decoys(e(args)?),
+        "ball.deform" => Action::BallDeform(e(args)?),
+        "playtime" if args.is_empty() => Action::PlayTime,
+        "sector.set" => Action::SetSector(e(args)?),
         "light" => Action::Light(e(args)?),
         "lantern" => Action::Lantern(e(args)?),
         "ghost" => Action::Ghost(e(args)?),
@@ -1203,7 +1245,7 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         ));
     }
     // a screenshot, a restart or a practice deed is a single deed: only on a key, never every frame
-    if (matches!(a, Action::Screenshot | Action::Restart) || a.practice()) && !key {
+    if (matches!(a, Action::Screenshot | Action::Restart) || a.deed()) && !key {
         return Err(format!("{verb} only on a key (on key <option>)"));
     }
     if !a.sim() && sim && !matches!(a, Action::Set(..)) {
@@ -1677,6 +1719,29 @@ mod tests {
         };
         assert_eq!(e.eval(&S), 0.6);
         assert_eq!(m.label("strength", "de"), "Strength");
+    }
+
+    #[test]
+    fn the_new_blocks_keep_the_run_and_the_view_apart() {
+        let head = "name.en T\noption k key KeyJ\n";
+        // looks, statistics and the view's turn are the view's: the mod stays classic
+        let view = parse_mod_txt(&format!(
+            "{head}on frame\ndo decoys 3\ndo ball.deform 0.5\ndo camera.smooth 0.4\ndo playtime\ndo view.turn 90\n"
+        ))
+        .unwrap();
+        assert!(!view.modded());
+        // steering turned with the view changes the run, and reads the view's turn the run keeps (input.turn)
+        let steer = parse_mod_txt(&format!("{head}on tick\ndo steer.yaw input.turn\n")).unwrap();
+        assert!(steer.modded() && !steer.practice());
+        assert!(parse_mod_txt(&format!("{head}on frame\ndo steer.yaw 5\n")).is_err(), "a run action on the view's event");
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo view.turn 5\n")).is_err(), "a view action on the run's event");
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo steer.yaw mouse.dx\n")).is_err(), "the run reads no view value");
+        assert!(parse_mod_txt(&format!("{head}on tick\ndo steer.yaw playtime.all\n")).is_err());
+        // a jump to a sector is a deed on a key: modded, but not the practice's keeping of moments
+        let jump = parse_mod_txt(&format!("{head}on key k\ndo sector.set run.sector + 1\n")).unwrap();
+        assert!(jump.modded() && !jump.practice());
+        assert!(parse_mod_txt(&format!("{head}on frame\ndo sector.set 2\n")).is_err(), "only on a key");
+        assert!(parse_mod_txt(&format!("{head}on frame\ndo playtime 5\n")).is_err());
     }
 
     #[test]

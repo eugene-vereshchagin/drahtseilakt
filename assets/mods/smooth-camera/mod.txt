@@ -1,0 +1,30 @@
+# Smooth camera (after AdvancedTravelCam's cinematic smoothing): the camera follows the view's turn, distance, field of view and the free camera with ease. Only the look changes.
+name.en Smooth camera
+name.ru Плавная камера
+name.de Sanfte Kamera
+name.zh 平滑镜头
+name.fr Caméra fluide
+name.es Cámara suave
+name.it Camera fluida
+description.en The camera eases into its turns and the free camera glides, as in a film.
+description.ru Камера плавно доводит повороты, свободная камера скользит, как в кино.
+description.de Die Kamera gleitet in Drehungen, die freie Kamera schwebt wie im Film.
+description.zh 镜头转动平滑过渡，自由视角如电影般滑行。
+description.fr La caméra adoucit ses virages et la caméra libre glisse comme au cinéma.
+description.es La cámara suaviza sus giros y la libre se desliza como en una película.
+description.it La camera ammorbidisce le rotazioni e quella libera scivola come in un film.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option strength number 1 10 1 4
+label strength en Smoothness
+label strength ru Плавность
+label strength de Sanftheit
+label strength zh 平滑度
+label strength fr Douceur
+label strength es Suavidad
+label strength it Morbidezza
+
+on frame
+do camera.smooth opt.strength / 10

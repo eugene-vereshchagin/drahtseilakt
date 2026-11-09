@@ -1,0 +1,30 @@
+# Interference (after Interference): translucent decoy balls wander around the ball. Only the look changes.
+name.en Interference
+name.ru Помехи
+name.de Störung
+name.zh 干扰
+name.fr Interférence
+name.es Interferencia
+name.it Interferenza
+description.en Translucent decoy balls drift around your ball.
+description.ru Полупрозрачные шары-обманки кружат вокруг шара.
+description.de Durchsichtige Lockbälle kreisen um den Ball.
+description.zh 半透明的诱饵球绕着你的球转。
+description.fr Des balles leurres translucides tournent autour de la balle.
+description.es Bolas señuelo translúcidas giran alrededor de la bola.
+description.it Palle esca traslucide girano attorno alla palla.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option count number 1 8 1 3
+label count en Decoys
+label count ru Шаров-обманок
+label count de Lockbälle
+label count zh 诱饵球数
+label count fr Leurres
+label count es Señuelos
+label count it Esche
+
+on frame
+do decoys opt.count

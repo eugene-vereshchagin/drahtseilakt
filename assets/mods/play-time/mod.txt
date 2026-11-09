@@ -1,0 +1,49 @@
+# Play time (after WatchYourTime): the time played per level, kept in the data folder's playtime.txt. Does not touch the run.
+name.en Play time
+name.ru Время игры
+name.de Spielzeit
+name.zh 游戏时长
+name.fr Temps de jeu
+name.es Tiempo de juego
+name.it Tempo di gioco
+description.en Counts the time you play each level and in all; kept between sessions.
+description.ru Считает время, проведённое в каждом уровне и во всех; хранится между сессиями.
+description.de Zählt die Spielzeit je Level und insgesamt; bleibt zwischen Sitzungen erhalten.
+description.zh 统计每关及总的游戏时长，跨次保存。
+description.fr Compte le temps joué par niveau et au total ; conservé entre les sessions.
+description.es Cuenta el tiempo jugado por nivel y en total; se guarda entre sesiones.
+description.it Conta il tempo giocato per livello e in totale; resta tra le sessioni.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option shown switch on
+label shown en Show on screen?
+label shown ru Показывать на экране?
+label shown de Auf dem Bildschirm zeigen?
+label shown zh 屏幕显示？
+label shown fr Afficher à l'écran ?
+label shown es ¿Mostrar en pantalla?
+label shown it Mostrare a schermo?
+label level en Played, level
+label level ru Сыграно, уровень
+label level de Gespielt, Level
+label level zh 本关已玩
+label level fr Joué, niveau
+label level es Jugado, nivel
+label level it Giocato, livello
+label all en Played, all
+label all ru Сыграно, всего
+label all de Gespielt, gesamt
+label all zh 总计已玩
+label all fr Joué, total
+label all es Jugado, total
+label all it Giocato, totale
+
+on frame
+do playtime
+
+on frame
+if opt.shown
+do show bottom-left level time playtime.level
+do show bottom-left all time playtime.all

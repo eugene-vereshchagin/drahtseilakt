@@ -561,6 +561,46 @@ pub fn instances(
     out
 }
 
+/// The ball's view-only looks (mods `ball.deform`, `decoys`; Interference, DeformedWB): the wooden ball's drawn matrix
+/// squeezed and stretched at random about its centre (the wood only, never the physics' round ball), and `decoys`
+/// translucent copies wandering around it. `t` is the real time in seconds; nothing here touches the run.
+pub fn ball_looks(inst: &mut Vec<Instance>, snap: &Snapshot, balls: &BallMeshes, t: f32, deform: f32, decoys: u8) {
+    let mesh = match snap.kind {
+        Some(BallKind::Wood) => balls.wood,
+        Some(BallKind::Stone) => balls.stone,
+        Some(BallKind::Paper) => balls.paper,
+        None => None,
+    };
+    let Some(mesh) = mesh else { return };
+    if deform > 0.0 && snap.kind == Some(BallKind::Wood) {
+        if let Some(i) = inst
+            .iter_mut()
+            .rev()
+            .find(|i| i.mesh == mesh && i.model == BALLS_MODEL && (i.matrix.w_axis.truncate() - snap.ball).length() < 1e-3)
+        {
+            let w = |k: f32| (t * (1.3 + k) + k * 5.1).sin() * (t * (0.7 + 0.4 * k) + k * 2.3).cos();
+            let s = Vec3::new(1.0 + 0.25 * deform * w(0.0), 1.0 + 0.25 * deform * w(1.0), 1.0 + 0.25 * deform * w(2.0));
+            i.matrix = Mat4::from_translation(snap.ball) * Mat4::from_scale(s) * Mat4::from_quat(snap.rotation);
+        }
+    }
+    for n in 0..decoys.min(8) {
+        let k = f32::from(n);
+        let a = t * (0.35 + 0.11 * k) + k * 2.4;
+        let r = 4.0 + 0.5 * k;
+        let at = snap.ball + Vec3::new(a.cos() * r, (a * 1.7 + k).sin() * 1.5, a.sin() * r);
+        inst.push(Instance {
+            model: BALLS_MODEL,
+            mesh,
+            matrix: Mat4::from_rotation_translation(snap.rotation * Quat::from_rotation_y(a), at),
+            marker: None,
+            uv_offset: [0.0; 2],
+            diffuse: Some([1.0, 1.0, 1.0, 0.3]),
+            unlit: false,
+            shadow: None,
+        });
+    }
+}
+
 /// The in-game camera's field of view: InGameCam's (Camera.nmo), 1.0123 radians across its 4:3 view, so
 /// vertically 2·atan(tan(1.0123 / 2) · 3/4) ≈ 45°; a wider window sees more at the sides.
 pub fn original_fov_y() -> f32 {

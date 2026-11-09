@@ -693,6 +693,8 @@ pub struct Sim {
     object_sectors: Vec<Option<usize>>,
     pub events: Vec<(u64, Event)>,
     prev_input: u8,
+    /// The view's turn in whole degrees, handed in by the window each tick (a `view.turn` mod; recorded in the replay).
+    pub turn: u16,
     /// The ball inside a transformer, if it is in one.
     hold: Option<TrafoHold>,
     /// The transformer animation playing, if one is.
@@ -1137,6 +1139,7 @@ impl Sim {
             object_sectors,
             events: Vec::new(),
             prev_input: 0,
+            turn: 0,
             hold: None,
             trafo_anim: None,
             dying: None,
@@ -1306,6 +1309,7 @@ impl Sim {
             V::InputRight => bit(input::RIGHT),
             V::InputRotation => bit(input::SHIFT),
             V::InputOverview => bit(input::LIFT),
+            V::InputTurn => f32::from(self.turn),
             _ => 0.0,
         }
     }
@@ -1446,6 +1450,12 @@ impl Sim {
         // transformer) puts a new body in, as the original does.
         // A ball that has fallen off is no longer steered.
         let push = if self.dying.is_some() { Vec3::ZERO } else { push };
+        // a mod's `steer.yaw`: the push turned with the view (the camera turns by the same rotation about the ball)
+        let push = if self.mods.out.steer_yaw != 0.0 {
+            Quat::from_rotation_y(self.mods.out.steer_yaw.to_radians()) * push
+        } else {
+            push
+        };
         // Every change of the arrows (a press or a release) wakes the ball, as the original's navigation runs
         // "Physics WakeUp" (measured in the C game): a ball left alone falls asleep, and a force does nothing to a
         // sleeping body; a ball resting against a slope while pushed rolls back once the push is let go.
@@ -2536,6 +2546,31 @@ pub(crate) mod tests {
             sticky > BALL_RADIUS + 5.0,
             "the sticky ball climbs: {sticky}"
         );
+    }
+
+    #[test]
+    fn steering_turns_with_the_views_turn_only_under_a_mod() {
+        let level = flat_level();
+        let roll = |mods: crate::modrt::SimMods, turn: u16| {
+            let mut sim = Sim::new(&level, BallKind::Wood);
+            sim.mods = mods;
+            let start = sim.ball.position;
+            let forward = sim.camera.forward();
+            for _ in 0..120 {
+                sim.turn = turn;
+                sim.step(input::UP);
+            }
+            ((sim.ball.position - start) * Vec3::new(1.0, 0.0, 1.0), forward)
+        };
+        let steer = "name.en S\non tick\ndo steer.yaw input.turn\n";
+        let (plain, forward) = roll(crate::modrt::SimMods::default(), 90);
+        let (same, _) = roll(mods_of(steer), 0);
+        let (turned, _) = roll(mods_of(steer), 90);
+        assert!(plain.dot(forward) > 5.0, "no mod: the turn is ignored");
+        assert!((same - roll(crate::modrt::SimMods::default(), 0).0).length() < 1e-3, "turn 0 is the classic run");
+        // the same rotation as the camera's: a quarter turn sends the push a quarter round the vertical axis
+        let expect = glam::Quat::from_rotation_y(std::f32::consts::FRAC_PI_2) * forward;
+        assert!(turned.normalize().dot(expect) > 0.9, "turned {turned:?} expected along {expect:?}");
     }
 
     #[test]

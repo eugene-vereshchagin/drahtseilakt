@@ -1,0 +1,30 @@
+# Deformed ball (after DeformedWB): the wooden ball's look is squeezed and stretched at random. Only the look changes; the physics keeps its round ball.
+name.en Deformed ball
+name.ru Кривой шар
+name.de Verformte Kugel
+name.zh 变形球
+name.fr Balle déformée
+name.es Bola deformada
+name.it Palla deformata
+description.en The wooden ball wobbles out of shape at random; only its look, not its rolling.
+description.ru Деревянный шар случайно меняет форму; только вид, не качение.
+description.de Die Holzkugel verformt sich zufällig; nur ihr Aussehen, nicht ihr Rollen.
+description.zh 木球外形随机变形，只改变外观，不影响滚动。
+description.fr La balle en bois se déforme au hasard ; seul son aspect change, pas son roulement.
+description.es La bola de madera se deforma al azar; solo su aspecto, no su rodar.
+description.it La palla di legno si deforma a caso; solo l'aspetto, non il rotolamento.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option amount number 10 100 10 60
+label amount en Deformation %
+label amount ru Искажение %
+label amount de Verformung %
+label amount zh 变形程度 %
+label amount fr Déformation %
+label amount es Deformación %
+label amount it Deformazione %
+
+on frame
+do ball.deform opt.amount / 100
