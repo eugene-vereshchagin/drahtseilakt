@@ -75,3 +75,5 @@ Drahtseilakt is licensed under the GPL-3.0, like OpenBallance it began from. It 
 game and never ships Ballance's data. (While this repository is private, `levels/` keeps a backup of the
 original levels for development; the public repository will not contain it.) Ballance is © 2004 Cyparade /
 Atari. This project is not affiliated with them.
+
+Where the game keeps its files (portable folder with `portable.txt`, or installed with per-user data): [files.md](docs/drahtseilakt/files.md).

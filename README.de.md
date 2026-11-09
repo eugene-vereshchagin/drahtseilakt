@@ -82,3 +82,5 @@ Drahtseilakt steht unter der GPL-3.0, wie OpenBallance, mit dem es begann. Es br
 Spiels und liefert nie Daten von Ballance aus. (Solange dieses Repository privat ist, hält `levels/` eine
 Sicherung der Originallevel für die Entwicklung; das öffentliche Repository enthält sie nicht.) Ballance ist
 © 2004 Cyparade / Atari. Dieses Projekt steht in keiner Verbindung zu ihnen.
+
+Wo das Spiel seine Dateien ablegt (portabler Ordner mit `portable.txt` oder Installation mit Daten im Benutzerordner): [files.md](docs/de/drahtseilakt/files.md).

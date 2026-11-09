@@ -30,9 +30,26 @@ impl Kind {
     }
 }
 
-/// The game's data folder: XDG_DATA_HOME or ~/.local/share on Linux, %APPDATA% on Windows,
+/// The folder of the running program, when it is a portable copy: a file `portable.txt` lies beside it. The player's
+/// data is then in `data/` there, and nothing outside the folder is touched.
+pub fn portable_root() -> Option<PathBuf> {
+    static ROOT: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    ROOT.get_or_init(|| {
+        let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+        std::fs::symlink_metadata(dir.join("portable.txt"))
+            .is_ok_and(|m| m.is_file())
+            .then_some(dir)
+    })
+    .clone()
+}
+
+/// The game's data folder: `data/` beside the program when it is portable (`portable.txt` beside it), else
+/// XDG_DATA_HOME or ~/.local/share on Linux, %APPDATA% on Windows,
 /// ~/Library/Application Support on macOS; the current folder when none is known.
 pub fn data_dir() -> PathBuf {
+    if let Some(root) = portable_root() {
+        return root.join("data");
+    }
     let var = |k: &str| {
         std::env::var_os(k)
             .filter(|v| !v.is_empty())

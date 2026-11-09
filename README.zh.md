@@ -65,3 +65,5 @@ Drahtseilakt 以 GPL-3.0 许可证发布，与它起步时所基于的 OpenBalla
 游戏拷贝，并且从不分发 Ballance 的数据。（在本仓库保持私有期间，`levels/` 中保存着原版关卡的
 备份，供开发使用；公开仓库中不会包含它。）Ballance 版权所有 © 2004 Cyparade /
 Atari。本项目与它们没有任何关联。
+
+游戏文件的位置（带 `portable.txt` 的便携文件夹，或数据在用户文件夹的安装版）：[files.md](docs/zh/drahtseilakt/files.md)。

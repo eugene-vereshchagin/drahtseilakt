@@ -412,8 +412,20 @@ fn restart() -> ! {
     }
 }
 
+/// Where the game found its shipped assets and keeps the player's data (and whether the copy is portable).
+fn paths_line() -> String {
+    let shown = |p: Option<std::path::PathBuf>| p.map_or("(none)".into(), |p| p.display().to_string());
+    format!(
+        "paths: assets {} | data {} ({})",
+        shown(gamedata::resources::assets_root()),
+        gamedata::profile::data_dir().display(),
+        if gamedata::profile::portable_root().is_some() { "portable" } else { "per-user" }
+    )
+}
+
 fn main() -> ExitCode {
     let result = parse_args().and_then(|o| {
+        println!("{}", paths_line());
         if let Some(from) = &o.import {
             let copied = levels::import(from)?;
             levels::prepare(&lang::docs_language(app::setting("language").as_deref()));
