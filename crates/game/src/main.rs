@@ -95,6 +95,7 @@ usage: drahtseilakt [options]
   --ticks N           with --screenshot: how many ticks to simulate first (default: the replay's end, or 1)
   --trace N           with --headless: print the ball's position every N ticks
   --from N            with --replay: play the replay up to tick N without a window, then hand over the keys
+                      (with --autopilot: to the test player)
   --sector N          begin at sector N's reset point with the ball that sector begins with (testing a place;
                       1 is the level start; --ball overrides the ball)
   --at X,Y,Z|OBJECT   begin with the ball at rest at a point, or 4 above a level object (e.g. P_Modul_34_01);

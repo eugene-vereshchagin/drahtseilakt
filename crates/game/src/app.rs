@@ -1205,6 +1205,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         return screenshot(&mut game, &data, &o, path);
     }
     if o.autopilot {
+        // (--replay with --from: the run's keys up to that tick, then the test player from where they left it)
+        let mut game = game;
+        if let Some(tick) = o.from {
+            game.fast_forward(tick);
+        }
         return autopilot(game, &data, &o);
     }
     if o.headless {
@@ -1245,6 +1250,15 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
                     b.velocity.length(),
                     if b.on_ground { "ground" } else { "air" }
                 );
+                // one body's contact points (its game index, as the loose trace's #), with DRAHTSEILAKT_TRACE_CONTACTS set
+                if let Some(i) = std::env::var("DRAHTSEILAKT_TRACE_CONTACTS").ok().and_then(|v| v.parse::<usize>().ok()) {
+                    for c in game.sim.world().body_contacts(i) {
+                        println!(
+                            "    contact {:?} types {:?} gap {:.4} normal ({:.3} {:.3} {:.3}) point ({:.2} {:.2} {:.2})",
+                            c.entities, c.types, c.gap, c.normal[0], c.normal[1], c.normal[2], c.point[0], c.point[1], c.point[2]
+                        );
+                    }
+                }
                 // the loose things near the ball (boxes, balls, modules' parts), with DRAHTSEILAKT_TRACE_LOOSE set
                 if std::env::var_os("DRAHTSEILAKT_TRACE_LOOSE").is_some() {
                     let trace_r: f32 = std::env::var("DRAHTSEILAKT_TRACE_R").ok().and_then(|v| v.parse().ok()).unwrap_or(40.0);

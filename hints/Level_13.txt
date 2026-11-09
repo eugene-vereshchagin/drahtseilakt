@@ -320,3 +320,21 @@ at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 
 # (-728), and they come loose again later. Next: find why the chain's sacks start differently from --sector 3's
 # (what touches them at 3:38, or how a sector's modules are reset when it is entered from the checkpoint); with
 # the same start the owner's trace should work as it does from --sector 3.
+# 2026-11-10 (sector 3 in the chain, continued). WHY the sacks differ: not a touch or a script; the physics' absolute time.
+# From the level start sector 3 begins at physics time ~443.7 s (from --sector 3 at ~15.9 s); at exactly 450.000 s
+# the ball joint of sack 34's rope (to FixCube) gives it a sideways kick (constraint controller, no contact, no
+# impact; reproduced from --sector 3 by running 200 s of empty physics first). After it the sacks swing with beats
+# (energy moving between the along and the across swing), so a fixed delay cannot meet them.
+# WHAT WORKS for the sacks (from the chain's own state, `--replay hints/runs/chain-s3-problem.replay --from 12780
+# --autopilot`, 3 min a try): per sack (z -821.95/-832.39/-841.9/-852.34, ball y -250.7/-251.4/-252.0/-252.7, the
+# sack's swing-end height -248.41/-248.85/-249.55/-250.25): goto/hold at (-718, y, z+3), `swing -724 PY Z -730.3 PY Z
+# 1.5 400` (its west turn), hold 61..71 ticks, `push 0 -1 30`, hold at (-717.5, y, z-3.5) 40: the push sends it
+# south past the railing post (z ~ z-2.8), where it stays (all four at z ~ -826/-836/-846/-856). Needs the ball there
+# by ~5:12 (sector time ~1:38): later the sacks swing across with a small along-swing and the west turn is missed.
+# WHAT BREAKS the timing: crate 42 (third, z -308.3). The owner's push passes 0.3 north of its centre and it slides
+# south-west to (-735.6 -316.5); the chain's passes 0.4 south and it wedges at (-733.4 -307.8) on the lane west of
+# the channel (lane x -728.7..-736, the channel's wall at -728.7), blocking the paper ball's way north. Fixes tried:
+# slow shove/press (crate stays in the channel), detour east (the wall), two rams (works, 8 s late: the stones get
+# ahead, the paper ball follows them at 6 u/s and reaches the sacks too late), one ram at speed 7 along z -307.5
+# (crate to (-731.1 -325.8), 6 s late, then a fall at the stone transformer). Next: a faster crate-42 ram inside the
+# owner's timing (or the trace's pull at that push to the owner's line, z -307.96), then the sack steps above.
