@@ -153,3 +153,17 @@ at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -73
 # Open spot (where the owner could record): the first board at x ~ -386 (z -1125, y ~ -293, block on a hoop across the raft's rails)
 # pushes the ball off the raft's back (both columns, z -1125.4 and -1129.65); beyond it the video's boards, the rotating-bar platform
 # (x ~ -326, P_Modul_17 at -326 -297.8 -1115.5) and the raft's way on to the finish platform are not driven.
+#
+# 2026-11-09 (sector 4, lane switching, NOT driven; notes for the next session). The coordinator's reading of the video (contact
+# sheets ref/video/frames/dense/level13/s4/sheet01..03): two rafts side by side on parallel rails for the whole stretch; a board
+# (block on a hoop) hangs over ONE raft's lane at a time, alternating left/right; before each board the ball rolls sideways onto the
+# NEIGHBOUR raft, then back; at the end it rolls off onto the long platform with the rotating bar P_Modul_17 (= the finish platform).
+# Findings in the simulation: raft 1 (Stone_10..13, Wood_05/06; z -1125.4 / -1129.65) and raft 2 (Stone_16/17, Wood_09/10; z -1134.0 /
+# -1138.2, start x -493, 0.8 units higher) start 50 apart in x; raft 1 is the faster one (stone 10 at x -454 when stone 16 is at -467,
+# t = 25 s) so they are level only around x -460 and raft 2 then lags further behind: in the simulation the lane switch needs the
+# ball to move onto raft 2 near x -460 and ride raft 2 (`ride` on Stone_16/17 near -467 -285 -1134), and to come back to raft 1 only
+# where they touch again - they do not, as simulated. So either raft 2 is held back differently in the original (check rail slope /
+# friction of A04_Rail_01 vs 02 and the loose balls' masses) or the lane switch must come before x -460 for good. The boards are
+# inside the rail meshes (A04_Rail_01 at -513.5 -286.1 -1133.9 (glTF z is the game's z negated), A04_Rail_02 at -382.8 -293.8 -1127.5):
+# `--export DIR --level 13` writes level.gltf (node `matrix` translation = position), the boards' x must be read from those meshes'
+# vertices (not done); the first board known: x ~ -386 over raft 1.
