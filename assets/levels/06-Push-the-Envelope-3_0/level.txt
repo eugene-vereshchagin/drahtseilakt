@@ -7,3 +7,4 @@ difficulty = 6
 order = 6
 catalogue-difficulty = 3
 type = Technical
+video = https://www.youtube.com/watch?v=MwOy6QMdy8E
