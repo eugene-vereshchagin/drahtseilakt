@@ -513,7 +513,20 @@ impl Data {
         t: &level::Texture,
         chain: &[crate::packs::Pack],
     ) -> Option<(u32, u32, Vec<u8>)> {
-        let (w, h, mut rgba, keyed) = self.texture_pixels(t, chain)?;
+        let Some((w, h, mut rgba, keyed)) = self.texture_pixels(t, chain) else {
+            // a texture nobody has (a map made for the copy's textures, played without it) is drawn plain: said once
+            if !matches!(t.source, level::TextureSource::None) {
+                static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+                if let Ok(mut said) = SAID.lock()
+                    && said.len() < 256
+                    && !said.contains(&t.name)
+                {
+                    said.push(t.name.clone());
+                    eprintln!("missing texture: {} (drawn plain)", t.name);
+                }
+            }
+            return None;
+        };
         // the texture's transparent colour: those texels get alpha 0 (SetAlphaForTransparentColor); a player's pack's
         // picture has real alpha instead
         if let Some(key) = t.color_key.filter(|_| keyed) {

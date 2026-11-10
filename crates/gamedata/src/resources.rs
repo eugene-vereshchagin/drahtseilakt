@@ -10,7 +10,7 @@
 // copy the copy's first (assets.rs, Data::own_parts). A role no provider fills is missing: logged once, never a crash.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 /// Who fills the interface's roles first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,6 +86,26 @@ pub fn set_chosen(p: Provider) {
 
 pub fn chosen() -> Provider {
     of(CHOSEN.load(Ordering::Relaxed))
+}
+
+static HAVE_COPY: AtomicBool = AtomicBool::new(true);
+
+/// Tells the interface choice whether the player's copy exists (before the choice is read).
+pub fn set_copy(have: bool) {
+    HAVE_COPY.store(have, Ordering::Relaxed);
+}
+
+/// Whether an interface can be chosen here: the copy's needs the copy, the toolbox's remaster of it needs the remaster.
+/// A saved choice that cannot be used plays as ours (and is not offered by the menu).
+pub fn usable(p: Provider) -> bool {
+    match p {
+        Provider::Own => true,
+        Provider::Original => HAVE_COPY.load(Ordering::Relaxed),
+        Provider::Remastered => {
+            HAVE_COPY.load(Ordering::Relaxed)
+                && std::fs::symlink_metadata(remastered_root()).is_ok_and(|m| m.is_dir())
+        }
+    }
 }
 
 /// The settings' choice (`interface ...`), if the player made one.
@@ -237,7 +257,16 @@ pub fn own_texture(name: &str) -> Option<PathBuf> {
         }
         index
     });
-    index.get(&texture_key(name)).cloned()
+    index
+        .get(&texture_key(name))
+        // a map's duplicates keep the picture's name with an editor's suffix (`Laterne_Verlauf.tga.003`,
+        // `Stick_Bottom.001`): the picture is the part before the first dot
+        .or_else(|| {
+            let file = name.rsplit(['/', '\\']).next().unwrap_or(name);
+            let (base, _) = file.split_once('.').filter(|(b, _)| !b.is_empty())?;
+            index.get(&texture_key(base))
+        })
+        .cloned()
 }
 
 /// The roles the interface's files play, by the original's path (a texture by its file name in Textures/, a sound

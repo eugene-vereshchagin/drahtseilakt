@@ -8,11 +8,10 @@ rings and shading lie, as fractions of its side). Each keeps the original's prop
 levels' texture coordinates: a texture that tiles tiles, a ball's wraps its sphere the same way. They are made at
 twice the original's resolution.
 
-  python3 -I assets/own/make/make_textures.py [STEP...]   # all, or only floors, stone, wood, marks, env, balls
+  python3 -I assets/own/make/make_textures.py [STEP...]   # all, or only floors, stone, wood, marks, env, balls, extras
 
 Needs Python 3 with numpy, scipy and Pillow, and the sources (python3 -I free_textures.py fetch). The output is
-deterministic. What the original has that is not here (skies, particles, glows, shadows, the lightning, a few
-pictures) still comes from the player's copy.
+deterministic. What the original has that is not here (skies, particles, the lightning) still comes from the player's copy.
 """
 
 import math
@@ -884,8 +883,64 @@ def make_track():
             dst.write(src.read())
 
 
+def radial(n, power=2.0):
+    """1 at the centre, 0 at the edge of the square (a soft round blob)."""
+    y, x = (np.arange(n) + 0.5) / n * 2 - 1, (np.arange(n) + 0.5) / n * 2 - 1
+    r = np.sqrt(y[:, None] ** 2 + x[None, :] ** 2)
+    return np.clip(1 - r, 0, 1) ** power
+
+
+def make_extras():
+    """What the copy supplies that needs no photograph: glows, shadows, light cones, the cloud layer, a few plain
+    surfaces. Drawn from the measured mean colour and the shape of the original's texture of the name (analysed, never
+    copied), at twice its size, so a level made for the copy's textures looks right without the copy. The additive and
+    shadow ones are dark or transparent where they should vanish, as the original's are."""
+    S2 = SCALE
+    # dark layers drawn additively: nearly black, a little cloud in them
+    n = 128 * S2
+    save(np.clip(rgb(19, 19, 19)[None, None, :] * (0.55 + 0.9 * noise(n, 4, 71, 5))[..., None], 0, 1), "SkyLayer")
+    save(np.clip(rgb(27, 27, 27)[None, None, :] * (0.4 + 1.2 * noise(n, 3, 72, 5))[..., None], 0, 1), "Sky_Vortex")
+    # the lanterns' cone: warm light fading along its length
+    n = 16 * S2
+    fade = np.linspace(1.05, 0.1, n)[:, None] * np.ones((1, n))
+    save(fade[..., None] * rgb(125, 106, 2)[None, None, :], "Laterne_Verlauf")
+    # shadows: black with a soft alpha
+    n = 16 * S2
+    save(np.zeros((n, n, 3)), "Laterne_Schatten", alpha=0.05 + 0.2 * radial(n, 0.6))
+    n = 64 * S2
+    save(np.zeros((n, n, 3)), "Trafo_Shadow_Big", alpha=0.3 + 0.2 * radial(n, 0.5))
+    save(np.zeros((n, n, 3)), "DomeShadow", alpha=0.25 + 0.4 * radial(n, 0.6))
+    # the stick's foot: bluish metal reflection fading out downwards
+    save(np.ones((n, n, 3)) * rgb(121, 122, 143)[None, None, :] * (0.95 + 0.1 * noise(n, 3, 73))[..., None],
+         "Stick_Bottom", alpha=np.linspace(1.0, 0.1, n)[:, None] * np.ones((1, n)))
+    # glows and flashes (additive): a bright centre fading to black
+    save(radial(n, 1.6)[..., None] * rgb(170, 62, 62)[None, None, :], "FloorGlow")
+    save(radial(n, 1.2)[..., None] * rgb(60, 60, 60)[None, None, :], "P_Extra_Life_Shadow")
+    n = 128 * S2
+    save(radial(n, 1.4)[..., None] * rgb(95, 75, 75)[None, None, :], "Misc_UFO_Flash")
+    # the extra life's oil drop: dark violet, swirled
+    save(np.clip(rgb(27, 15, 28)[None, None, :] * (0.5 + 1.0 * noise(n, 3, 74, 4))[..., None], 0, 1), "P_Extra_Life_Oil")
+    # reflections of the balloon and the dome
+    save(env(n, (201, 201, 201), 0.08, 75, 0.3), "PE_Ufo_env")
+    save(env(n, (165, 163, 202), 0.07, 76, 0.3), "DomeEnvironment")
+    # plain surfaces: the balloon's cloth and platform, a module's wall and floor, brown stone
+    def surface(mean, rel, seed, cells, size, planks=0):
+        v = noise(size, cells, seed, 4)
+        v = (v - v.mean()) / v.std()
+        img = np.clip(rgb(*mean)[None, None, :] * (1 + rel * v)[..., None], 0, 1)
+        if planks:
+            gap = (np.arange(size) % (size // planks)) < max(1, size // 128)
+            img[gap, :, :] *= 0.55
+        return img
+    save(surface((183, 174, 149), 0.10, 77, 6, 128 * S2, planks=8), "PE_Bal_balloons")
+    save(surface((104, 98, 88), 0.14, 78, 5, 256 * S2, planks=6), "PE_Bal_platform")
+    save(surface((151, 141, 125), 0.09, 79, 8, 256 * S2), "Modul03_Wall")
+    save(surface((179, 152, 118), 0.07, 80, 4, 128 * S2, planks=8), "Modul03_Floor")
+    save(surface((135, 112, 92), 0.12, 81, 6, 128 * S2), "Stone_Brown")
+
+
 STEPS = {"floors": make_floors, "track": make_track, "stone": make_stone, "wood": make_wood, "marks": make_marks, "env": make_env,
-         "balls": make_balls}
+         "balls": make_balls, "extras": make_extras}
 
 
 def main(argv):

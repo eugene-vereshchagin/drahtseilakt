@@ -27,7 +27,7 @@ matched (boards and grain fall elsewhere than the original's).
 | `Trafo_Environment` | the transformers' reflection | 64x64 | 13 | 12768 | ours | 43.3 |
 | `BallPaper.bmp` | the paper ball (Balls) | 128x128 | 13 | 12480 | ours | 43.1 |
 | `Wood_Metal` | boards with riveted iron bands (boxes, modules) | 128x128 | 13 | 12136 | ours | 51.3 |
-| `PE_Bal_balloons` | the balloon's ropes and cloth | 128x128 | 13 | 10816 | copy | |
+| `PE_Bal_balloons` | the balloon's ropes and cloth | 128x128 | 13 | 10816 | ours (extras) | |
 | `floor_top_Checkpoint` | the checkpoint's floor | 128x128 | 13 | 10190 | ours | 79.3 |
 | `Floor_Top_Profil` | the profiled (hollow) floors' tops | 128x128 | 13 | 10085 | ours | 89.7 |
 | `Metal_stained` | stained metal (modules, balloon) | 64x64 | 13 | 9860 | ours | 80.8 |
@@ -35,12 +35,12 @@ matched (boards and grain fall elsewhere than the original's).
 | `Wood_Plain2` | light boards | 128x128 | 7 | 8968 | ours | 52.9 |
 | `Modul18` | a module's steel plate and warning stripes | 64x64 | 12 | 8754 | ours | 55.7 |
 | `Trafo_Anim_Environment` | the transformer animation's reflection | 64x64 (in AnimTrafo.nmo) | 13 | 6032 | ours |  |
-| `Laterne_Verlauf` | the lanterns' light cone | 16x16 | 13 | 5920 | copy | |
+| `Laterne_Verlauf` | the lanterns' light cone | 16x16 | 13 | 5920 | ours (extras) | |
 | `Floor_Top_Borderless` | the floors' tops without strips | 128x128 | 13 | 4650 | ours | 91.0 |
 | `Column_beige_fade` | the columns fading downwards | 128x128 | 13 | 4576 | ours | 87.5 |
 | `Wood_Panel` | dark boards in a frame | 128x128 | 10 | 4322 | ours | 49.5 |
 | `Dome` | the dome's reflection | 128x128 | 7 | 3360 | ours | 47.2 |
-| `PE_Bal_platform` | the balloon's platform | 256x256 | 13 | 3042 | copy | |
+| `PE_Bal_platform` | the balloon's platform | 256x256 | 13 | 3042 | ours (extras) | |
 | `E_Holzbeschlag` | a crate's side in a riveted iron frame | 128x128 | 13 | 2699 | ours | 54.4 |
 | `Modul18_Gitter` | a module's grate (transparent) | 64x64 | 12 | 2542 | ours | 54.8 |
 | `Ball_Stone` | stone pieces (stone ball pickup, modules) | 128x128 | 13 | 2510 | ours | 57.4 |
@@ -49,10 +49,10 @@ matched (boards and grain fall elsewhere than the original's).
 | `Ball_Paper` | paper pieces (paper ball pickup) | 128x128 | 13 | 2082 | ours | 43.1 |
 | `P_Ball_Wood` | the wooden ball pickup | 128x128 (in P_Ball_Wood.nmo) | 7 | 1960 | ours | 51.7 |
 | `Ball_Wood` | wooden pieces (modules) | 128x128 | 13 | 1764 | ours | 51.7 |
-| `P_Extra_Life_Oil` | the extra life's oil drop | 128x128 | 13 | 1664 | copy | |
+| `P_Extra_Life_Oil` | the extra life's oil drop | 128x128 | 13 | 1664 | ours (extras) | |
 | `Modul11_13_Wood` | light boards with a strap | 128x128 | 8 | 1596 | ours | 45.8 |
 | `Tower_Roof` | the towers' roofs (shingles) | 64x64 | 13 | 1550 | ours | 57.5 |
-| `Modul03_Wall` | a module's wall with a sign | 256x256 | 4 | 1536 | copy | |
+| `Modul03_Wall` | a module's wall with a sign | 256x256 | 4 | 1536 | ours (extras) | |
 | `Floor_Top_Border` | the floors' tops, a brick strip one side | 128x128 | 13 | 1490 | ours | 90.3 |
 | `Laterne_Glas` | the lanterns' glass | 32x32 | 13 | 1480 | ours | 90.5 |
 | `Floor_Top_ProfilFlat` | the profiled floors' flat ends | 128x128 | 13 | 1272 | ours | 83.6 |
@@ -62,21 +62,21 @@ matched (boards and grain fall elsewhere than the original's).
 | `Brick` | light bricks | 128x128 | 8 | 988 | ours | 64.7 |
 | `sandsack` | the sandbags | 128x128 | 6 | 930 | ours | 49.0 |
 | `Modul16` | concrete with light stones | 128x128 | 3 | 810 | ours | 77.9 |
-| `Sky_Vortex` | the last level's vortex | 128x128 | 1 | 720 | copy | |
+| `Sky_Vortex` | the last level's vortex | 128x128 | 1 | 720 | ours (extras) | |
 | `Target` | the target | 64x64 | 11 | 576 | ours | 82.8 |
-| `Stick_Bottom` | the sticks' foot (reflection) | 64x64 | 12 | 560 | copy | |
+| `Stick_Bottom` | the sticks' foot (reflection) | 64x64 | 12 | 560 | ours (extras) | |
 | `Wood_Nailed` | boards with nailed planks | 128x128 | 4 | 492 | ours | 42.5 |
 | `Wood_Raft` | the raft's boards | 128x128 | 12 | 360 | ours | 63.2 |
-| `Laterne_Schatten` | the lanterns' shadow | 16x16 | 13 | 296 | copy | |
-| `Modul03_Floor` | a module's round wooden floor | 128x128 | 4 | 240 | copy | |
+| `Laterne_Schatten` | the lanterns' shadow | 16x16 | 13 | 296 | ours (extras) | |
+| `Modul03_Floor` | a module's round wooden floor | 128x128 | 4 | 240 | ours (extras) | |
 | `ExtraBall` | the extra points' balls | 64x64 | 13 | 208 | copy | |
 | `Trafo_FlashField` | the transformer's flash | 64x64 | 13 | 182 | copy | |
 | `Wood_MetalStripes` | boards with iron straps | 128x128 | 3 | 171 | ours | 56.3 |
 | `Modul30_d_Seiten.bmp` |  | 128x128 | 8 | 128 | ours | 58.2 |
 | `Modul15` | concrete with thin brick strips | 128x128 | 2 | 120 | ours | 85.5 |
-| `Trafo_Shadow_Big` | the transformers' shadow | 64x64 | 13 | 76 | copy | |
-| `P_Extra_Life_Shadow` | the extra life's shadow | 64x64 | 13 | 26 | copy | |
-| `Misc_UFO_Flash` | the balloon's flash | 128x128 | 13 | 26 | copy | |
-| `FloorGlow` | the extra point's glow | 64x64 | 13 | 26 | copy | |
-| `SkyLayer` | the cloud layer | 256x256 | 12 | 24 | copy | |
-| `DomeShadow` | the dome's shadow | 64x64 | 7 | 14 | copy | |
+| `Trafo_Shadow_Big` | the transformers' shadow | 64x64 | 13 | 76 | ours (extras) | |
+| `P_Extra_Life_Shadow` | the extra life's shadow | 64x64 | 13 | 26 | ours (extras) | |
+| `Misc_UFO_Flash` | the balloon's flash | 128x128 | 13 | 26 | ours (extras) | |
+| `FloorGlow` | the extra point's glow | 64x64 | 13 | 26 | ours (extras) | |
+| `SkyLayer` | the cloud layer | 256x256 | 12 | 24 | ours (extras) | |
+| `DomeShadow` | the dome's shadow | 64x64 | 7 | 14 | ours (extras) | |

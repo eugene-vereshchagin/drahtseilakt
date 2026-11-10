@@ -25,6 +25,8 @@ Changed with the packs (2026-11-03): `original` in a remastered level now draws 
 transparent colours); the look a remastered level had with `original` before, its own upscaled pictures, is now the
 `remastered` choice.
 
+**Without a copy or a remaster (2026-11-10).** The menu offers only the packs that can work: `original` (textures and models) needs the player's copy, `remastered` textures need a remaster in `levels/remastered`; the interface line likewise. A saved choice that is not available plays as `own` (the interface: the default) and the game logs it; the setting itself stays, so it applies again when the copy or the remaster is back. A texture nobody has is logged once (`missing texture: NAME (drawn plain)`); the glows, shadows, light cones, cloud layer and a few plain surfaces the original's levels use are made as our own textures (`make_textures.py extras`), and a map's copied names such as `Laterne_Verlauf.tga.003` find the picture of the name before the first dot.
+
 ## Where packs live
 
 In the data folder, beside `sounds/`: `textures/<pack>/` and `models/<pack>/` (`~/.local/share/drahtseilakt/` on Linux,

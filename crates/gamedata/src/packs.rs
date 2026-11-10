@@ -81,6 +81,36 @@ impl Kind {
     }
 }
 
+/// Whether the player's copy is there. The `original` packs are its files, so without it they are not offered (the
+/// default is that there is one: a program that only uses this library, the toolbox, works on a copy).
+static HAVE_COPY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+/// Tells the packs whether the player's copy exists (before `start`).
+pub fn set_copy(have: bool) {
+    HAVE_COPY.store(have, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the remastered export holds a level (levels/remastered/<Level>/level.gltf): the `remastered` textures are
+/// its files, so there is nothing to choose without one.
+pub fn remaster_exists() -> bool {
+    let Ok(read) = std::fs::read_dir(crate::profile::dir(crate::profile::Kind::Remastered)) else {
+        return false;
+    };
+    read.flatten()
+        .take(64)
+        .any(|e| e.path().join("level.gltf").is_file())
+}
+
+/// Whether a built-in pack can be used here: the copy's needs the copy, the remaster's needs a remaster (a pack with
+/// neither would draw every part untextured).
+fn builtin_usable(kind: Kind, key: &str) -> bool {
+    match key {
+        ORIGINAL => HAVE_COPY.load(std::sync::atomic::Ordering::Relaxed),
+        REMASTERED if kind == Kind::Textures => remaster_exists(),
+        _ => true,
+    }
+}
+
 /// A pack found.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pack {
@@ -195,6 +225,7 @@ pub fn scan(kind: Kind) -> Vec<Pack> {
     let mut all: Vec<Pack> = kind
         .builtin()
         .iter()
+        .filter(|k| builtin_usable(kind, k))
         .map(|k| Pack::builtin(kind, k))
         .collect();
     for p in packs_in(kind, &user_root(kind)) {
@@ -218,6 +249,15 @@ static STATE: Mutex<[Option<State>; 2]> = Mutex::new([None, None]);
 pub fn start(kind: Kind, wanted: Option<&str>, default: &str) {
     let packs = scan(kind);
     let found = |k: &str| packs.iter().any(|p| p.key == k);
+    if let Some(w) = wanted
+        && !found(w)
+        && kind.builtin().contains(&w)
+    {
+        eprintln!(
+            "{} pack {w}: not available here (it needs the player's copy or a remaster), using {default}",
+            kind.key()
+        );
+    }
     let chosen = match wanted {
         Some(w) if found(w) => w.to_owned(),
         _ if found(default) => default.to_owned(),
@@ -242,6 +282,7 @@ pub fn packs(kind: Kind) -> Vec<Pack> {
         .unwrap_or_else(|| {
             kind.builtin()
                 .iter()
+                .filter(|k| builtin_usable(kind, k))
                 .map(|k| Pack::builtin(kind, k))
                 .collect()
         })
