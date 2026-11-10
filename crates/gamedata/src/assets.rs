@@ -29,7 +29,7 @@ const SHARE: u64 = 8;
 const DECODED_SIDE_MAX: u32 = 1024;
 /// The compressed textures of the level already counted, by their data's hash: one picture many of its parts carry
 /// is uploaded once (render.rs) and counted once.
-static OVERLAY_HASHES: std::sync::Mutex<Vec<(u64, usize)>> = std::sync::Mutex::new(Vec::new());
+static OVERLAY_HASHES: std::sync::Mutex<Vec<(CompressedKey, usize)>> = std::sync::Mutex::new(Vec::new());
 static OVERLAY_BYTES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// The level's textures already counted (a texture decoded again, as a sky face is, counts once).
 static OVERLAY_COUNTED: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
@@ -569,13 +569,10 @@ impl Data {
             } => Some((*width, *height, rgba.clone(), true)),
             // an open-format level's texture: a plain file of its folder, its size checked before it is decoded
             level::TextureSource::LevelFile(path) => {
-                // its folder a real one too (a link there would lead out of the level's folder)
-                let folder = path
-                    .parent()
-                    .is_some_and(|d| std::fs::symlink_metadata(d).is_ok_and(|m| m.is_dir()));
-                let plain = folder
-                    && std::fs::symlink_metadata(path)
-                        .is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX);
+                // a plain file that stays inside the level's folder (no link on the way leads out of it)
+                let plain = std::fs::symlink_metadata(path)
+                    .is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX)
+                    && within_level(path);
                 if !plain || !self.overlay_pixels(path, false) {
                     return None;
                 }
@@ -1262,68 +1259,143 @@ fn fair_share() -> u64 {
     OVERLAY_BYTES_MAX.saturating_sub(OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed)) / SHARE
 }
 
+/// A level's own file stays inside the level: `path` as the system resolves it (every link on the way followed)
+/// lies under its level's folder resolved the same way (the folder above the `textures/` it is named in). A link
+/// anywhere below that folder which leads out of it is refused; the level's folder itself may be reached by one.
+fn within_level(path: &Path) -> bool {
+    let Some(level) = path.parent().and_then(Path::parent) else {
+        return false;
+    };
+    match (std::fs::canonicalize(level), std::fs::canonicalize(path)) {
+        (Ok(level), Ok(file)) => file.starts_with(&level) && file != level,
+        _ => false,
+    }
+}
+
+/// A picture file's size from its header.
+fn picture_size(path: &Path) -> Option<(u32, u32)> {
+    image::ImageReader::open(path)
+        .ok()
+        .and_then(|r| r.with_guessed_format().ok())
+        .and_then(|r| r.into_dimensions().ok())
+}
+
+/// What a picture takes halved `shrink` times, as RGBA.
+fn shrunk_bytes(w: u32, h: u32, shrink: u32) -> u64 {
+    let side = |s: u32| u64::from(s.checked_shr(shrink).unwrap_or(0).max(1));
+    side(w).saturating_mul(side(h)).saturating_mul(RGBA)
+}
+
+/// A level's own picture file planned: decoded when loaded, its transparent colour made alpha 0, then halved
+/// `shrink` times.
+pub struct PicturePlan {
+    path: PathBuf,
+    key: Option<[u8; 3]>,
+    shrink: u32,
+}
+
 /// A texture chosen and counted, not yet read: `texture_plan` makes the plans one after another (the budget is
 /// taken in the level's order, so a level looks the same each time), `load` reads them, on any thread.
 pub enum TexturePlan {
     /// Pixels already there (a small picture of the copy, of ours or of a pack).
     Pixels(u32, u32, Vec<u8>),
-    /// A level's own picture file, decoded when loaded, its transparent colour made alpha 0, then halved `shrink`
-    /// times.
-    Picture {
-        path: PathBuf,
-        key: Option<[u8; 3]>,
-        shrink: u32,
-    },
+    Picture(PicturePlan),
     /// A level's compressed texture, read without its `skip` largest levels; `decode`: as RGBA (no BC on the card).
+    /// The file read must be the one planned (`seen`: the plain file looked at; `header`: what it said). When it
+    /// turns out damaged, the picture beside it is drawn instead (`fallback`: no larger than what was counted).
     Compressed {
         path: PathBuf,
+        seen: std::fs::Metadata,
+        header: crate::gputex::Header,
         skip: usize,
         decode: bool,
+        fallback: Option<PicturePlan>,
     },
+}
+
+impl PicturePlan {
+    fn load(self) -> Option<crate::gputex::TextureData> {
+        let (mut w, mut h, mut rgba) = decode_capped(&self.path)?;
+        if let Some(key) = self.key {
+            for [r, g, b, a] in rgba.as_chunks_mut::<4>().0 {
+                if [*r, *g, *b] == key {
+                    *a = 0;
+                }
+            }
+        }
+        for _ in 0..self.shrink {
+            if w <= 1 && h <= 1 {
+                break;
+            }
+            rgba = crate::gputex::halve(w, h, &rgba)?;
+            (w, h) = ((w / 2).max(1), (h / 2).max(1));
+        }
+        crate::gputex::TextureData::from_rgba(w, h, rgba)
+    }
+}
+
+/// The compressed texture planned, read: the very file looked at (never through a link put there since), its header
+/// still what the plan was made from, the whole of it checked.
+fn load_compressed(
+    path: &Path,
+    seen: &std::fs::Metadata,
+    header: &crate::gputex::Header,
+    skip: usize,
+    decode: bool,
+) -> Result<crate::gputex::TextureData, String> {
+    use std::io::Read;
+    let cap = crate::gputex::FILE_MAX;
+    let mut bytes = Vec::new();
+    crate::package::open_plain(path, seen)
+        .and_then(|f| f.take(cap.saturating_add(1)).read_to_end(&mut bytes))
+        .map_err(|e| e.to_string())?;
+    if u64::try_from(bytes.len()).map_or(true, |n| n > cap) {
+        return Err("too big".into());
+    }
+    if crate::gputex::header(&bytes)? != *header {
+        return Err("changed since it was looked at".into());
+    }
+    let t = crate::gputex::texture(bytes, skip)?;
+    if decode {
+        crate::gputex::decoded(&t).ok_or_else(|| "does not decode".to_owned())
+    } else {
+        Ok(t)
+    }
 }
 
 impl TexturePlan {
     /// The texture with its mip levels, as the renderer uploads it.
     pub fn load(self) -> Option<crate::gputex::TextureData> {
-        use crate::gputex::TextureData;
         match self {
-            TexturePlan::Pixels(w, h, rgba) => TextureData::from_rgba(w, h, rgba),
-            TexturePlan::Picture { path, key, shrink } => {
-                let (mut w, mut h, mut rgba) = decode_capped(&path)?;
-                if let Some(key) = key {
-                    for [r, g, b, a] in rgba.as_chunks_mut::<4>().0 {
-                        if [*r, *g, *b] == key {
-                            *a = 0;
-                        }
-                    }
+            TexturePlan::Pixels(w, h, rgba) => crate::gputex::TextureData::from_rgba(w, h, rgba),
+            TexturePlan::Picture(p) => p.load(),
+            TexturePlan::Compressed {
+                path,
+                seen,
+                header,
+                skip,
+                decode,
+                fallback,
+            } => match load_compressed(&path, &seen, &header, skip, decode) {
+                Ok(t) => Some(t),
+                Err(e) => {
+                    let instead = if fallback.is_some() {
+                        "its picture is drawn instead, smaller"
+                    } else {
+                        "drawn plain"
+                    };
+                    eprintln!("{}: {e} ({instead}; remaster the level again)", path.display());
+                    fallback.and_then(PicturePlan::load)
                 }
-                for _ in 0..shrink {
-                    if w <= 1 && h <= 1 {
-                        break;
-                    }
-                    rgba = crate::gputex::halve(w, h, &rgba)?;
-                    (w, h) = ((w / 2).max(1), (h / 2).max(1));
-                }
-                TextureData::from_rgba(w, h, rgba)
-            }
-            TexturePlan::Compressed { path, skip, decode } => {
-                let bytes = read_capped(&path, crate::gputex::FILE_MAX)?;
-                let t = match crate::gputex::texture(bytes, skip) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        eprintln!("{}: {e} (drawn plain)", path.display());
-                        return None;
-                    }
-                };
-                if decode {
-                    crate::gputex::decoded(&t)
-                } else {
-                    Some(t)
-                }
-            }
+            },
         }
     }
 }
+
+/// What tells one compressed texture from another when the level's budget counts them: the data's hash as the header
+/// gives it (not yet checked, and a hash anyone can forge), the format, the size and the file's length. Files alike
+/// in all of it are counted once: the renderer keeps one texture for them, whatever each really holds.
+type CompressedKey = (u64, crate::gputex::Format, u32, u32, u64);
 
 impl Data {
     /// The plan for a texture the renderer is about to load; `bc`: the card draws BC-compressed textures. A level's
@@ -1341,65 +1413,56 @@ impl Data {
     }
 
     fn level_file_plan(&self, path: &Path, key: Option<[u8; 3]>, bc: bool) -> Option<TexturePlan> {
-        // its folder a real one (a link there would lead out of the level's folder), the files plain ones
-        let plain = |p: &Path, cap: u64| {
-            std::fs::symlink_metadata(p)
-                .ok()
-                .filter(|m| m.is_file() && m.len() <= cap)
-                .map(|m| m.len())
+        // a plain file that stays inside the level's folder (no link on the way leads out of it)
+        let picture = std::fs::symlink_metadata(path)
+            .ok()
+            .filter(|m| m.is_file() && m.len() <= IMAGE_MAX && within_level(path))
+            .map(|m| m.len());
+        let size = picture.and_then(|_| picture_size(path));
+        let picture_plan = |shrink: u32| PicturePlan {
+            path: path.to_path_buf(),
+            key,
+            shrink,
         };
-        if !path
-            .parent()
-            .is_some_and(|d| std::fs::symlink_metadata(d).is_ok_and(|m| m.is_dir()))
-        {
-            return None;
-        }
-        let picture = plain(path, IMAGE_MAX);
-        if let Some(plan) = self.compressed_plan(&path.with_extension("dtx"), picture, bc) {
+        if let Some(plan) = self.compressed_plan(&path.with_extension("dtx"), picture, size, bc, &picture_plan) {
             return Some(plan);
         }
         picture?;
         // a picture of the level's game files over its share of the budget is drawn smaller
         let mut shrink = 0u32;
         if self.budgeted(path, false) {
-            let (w, h) = image::ImageReader::open(path)
-                .ok()
-                .and_then(|r| r.with_guessed_format().ok())
-                .and_then(|r| r.into_dimensions().ok())?;
-            let size = |s: u32| {
-                u64::from((w >> s).max(1))
-                    .saturating_mul(u64::from((h >> s).max(1)))
-                    .saturating_mul(RGBA)
-            };
+            let (w, h) = size?;
             let share = fair_share();
-            while size(shrink) > share && shrink < 16 && (w >> shrink).max(h >> shrink) > 1 {
+            while shrunk_bytes(w, h, shrink) > share && shrink < 16 && shrunk_bytes(w, h, shrink) > RGBA {
                 shrink = shrink.saturating_add(1);
             }
-            if !charge(size(shrink)) {
+            if !charge(shrunk_bytes(w, h, shrink)) {
                 return None;
             }
         }
-        Some(TexturePlan::Picture {
-            path: path.to_path_buf(),
-            key,
-            shrink,
-        })
+        Some(TexturePlan::Picture(picture_plan(shrink)))
     }
 
     /// The compressed texture at `path`, if it is one made from the picture beside it (`picture`: that file's
-    /// length; none: the level carries only the compressed one): its header read and checked, the levels chosen
-    /// that fit its share of the budget (a level's own game files) or the adapter (no BC: decoded, at most
-    /// DECODED_SIDE_MAX a side).
-    fn compressed_plan(&self, path: &Path, picture: Option<u64>, bc: bool) -> Option<TexturePlan> {
+    /// length, `size`: its sides; none: the level carries only the compressed one): its header read and checked, the
+    /// levels chosen that fit its share of the budget (a level's own game files) or the adapter (no BC: decoded, at
+    /// most DECODED_SIDE_MAX a side; a texture that cannot be made that small is left to its picture).
+    fn compressed_plan(
+        &self,
+        path: &Path,
+        picture: Option<u64>,
+        size: Option<(u32, u32)>,
+        bc: bool,
+        picture_plan: &dyn Fn(u32) -> PicturePlan,
+    ) -> Option<TexturePlan> {
         use std::io::Read;
-        let len = std::fs::symlink_metadata(path)
+        let seen = std::fs::symlink_metadata(path)
             .ok()
-            .filter(|m| m.is_file() && m.len() <= crate::gputex::FILE_MAX)?
-            .len();
+            .filter(|m| m.is_file() && m.len() <= crate::gputex::FILE_MAX && within_level(path))?;
         let mut head = [0u8; crate::gputex::HEADER_LEN];
-        std::fs::File::open(path).ok()?.read_exact(&mut head).ok()?;
+        crate::package::open_plain(path, &seen).ok()?.read_exact(&mut head).ok()?;
         let h = crate::gputex::header(&head).ok()?;
-        if h.file_len() != len || picture.is_some_and(|p| p != h.source_len) {
+        if h.file_len() != seen.len() || picture.is_some_and(|p| p != h.source_len) {
             return None;
         }
         let droppable = h.droppable();
@@ -1418,13 +1481,26 @@ impl Data {
         while !bc && skip < droppable && side(skip) > DECODED_SIDE_MAX {
             skip = skip.saturating_add(1);
         }
+        if !bc && side(skip) > DECODED_SIDE_MAX {
+            return None;
+        }
+        // the picture drawn should the data turn out damaged: halved until it takes no more than what is counted
+        // here for the compressed texture
+        let fallback = |skip: usize| {
+            let (w, h) = size?;
+            let shrink = (0..16u32).find(|s| shrunk_bytes(w, h, *s) <= bytes(skip).max(RGBA))?;
+            Some(picture_plan(shrink))
+        };
+        let mut instead = None;
         if self.budgeted(path, false) {
+            let key: CompressedKey = (h.data_hash, h.format, h.width, h.height, seen.len());
             let known = OVERLAY_HASHES
                 .lock()
                 .ok()
-                .and_then(|k| k.iter().find(|(hash, _)| *hash == h.data_hash).map(|(_, s)| *s));
+                .and_then(|k| k.iter().find(|(k, _)| *k == key).map(|(_, s)| *s));
             match known {
-                // the same picture again: drawn as the first of it is
+                // the same texture again: drawn as the first of it is, and the renderer keeps one for both (no
+                // picture instead: nothing was counted for this one)
                 Some(first) => skip = first,
                 None => {
                     let share = fair_share();
@@ -1435,15 +1511,21 @@ impl Data {
                         return None;
                     }
                     if let Ok(mut k) = OVERLAY_HASHES.lock() {
-                        k.push((h.data_hash, skip));
+                        k.push((key, skip));
                     }
+                    instead = fallback(skip);
                 }
             }
+        } else {
+            instead = fallback(skip);
         }
         Some(TexturePlan::Compressed {
             path: path.to_path_buf(),
+            seen,
+            header: h,
             skip,
             decode: !bc,
+            fallback: instead,
         })
     }
 }
@@ -2286,10 +2368,65 @@ mod tests {
         std::fs::write(&dtx, write(Format::Bc7, 64, 64, (len + 1, 0), &levels).unwrap()).unwrap();
         let c = data.texture_plan(&t, true).unwrap().load().unwrap();
         assert_eq!(c.format, Format::Rgba);
+        // damaged data: found when it is read, and the picture drawn instead, no larger than what was counted
+        // (4 x 4 blocks of 16 bytes: a byte a pixel, so the 64 x 64 picture at 32 x 32)
         let mut bad = write(Format::Bc7, 64, 64, (len, 0), &levels).unwrap();
         *bad.last_mut().unwrap() ^= 1;
-        std::fs::write(&dtx, bad).unwrap();
+        std::fs::write(&dtx, &bad).unwrap();
+        let _ = data.for_level(Some(&root));
+        let c = data.texture_plan(&t, true).unwrap().load().unwrap();
+        assert_eq!((c.format, c.size()), (Format::Rgba, (32, 32)));
+        // a second file that says the same of itself is counted once but has no picture instead
         assert!(data.texture_plan(&t, true).unwrap().load().is_none());
+        // found by review: files forged to one hash were counted once whatever their size. Another size or length
+        // is another texture, counted again
+        let _ = data.for_level(Some(&root));
+        let good = write(Format::Bc7, 64, 64, (len, 0), &levels).unwrap();
+        std::fs::write(&dtx, &good).unwrap();
+        assert!(data.texture_plan(&t, true).is_some());
+        let taken = OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed);
+        let mut small = write(Format::Bc7, 32, 32, (len, 0), &levels[1..]).unwrap();
+        small[32..40].copy_from_slice(&good[32..40]);
+        std::fs::write(&dtx, &small).unwrap();
+        assert!(data.texture_plan(&t, true).is_some());
+        assert!(OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed) > taken);
+        // found by review: the file is read as it was planned. Changed since (another header), it is not taken
+        std::fs::write(&dtx, &good).unwrap();
+        let _ = data.for_level(Some(&root));
+        let plan = data.texture_plan(&t, true).unwrap();
+        let other = write(Format::Bc7, 64, 64, (len, 1), &levels).unwrap();
+        std::fs::write(&dtx, &other).unwrap();
+        assert_eq!(plan.load().map(|c| c.format), Some(Format::Rgba));
+        // found by review: without BC a texture that cannot be made small (its halves are not whole blocks) is left
+        // to its picture, never decoded whole
+        let block1 = [0xffu8, 0xff, 0, 0, 0, 0, 0, 0];
+        let (mut w, mut chain) = (2044u32, Vec::new());
+        loop {
+            chain.push(block1.repeat((w.div_ceil(4) * w.div_ceil(4)) as usize));
+            if w == 1 {
+                break;
+            }
+            w = (w / 2).max(1);
+        }
+        std::fs::write(&dtx, write(Format::Bc1, 2044, 2044, (len, 0), &chain).unwrap()).unwrap();
+        let _ = data.for_level(Some(&root));
+        assert!(matches!(data.texture_plan(&t, true), Some(TexturePlan::Compressed { .. })));
+        assert!(matches!(data.texture_plan(&t, false), Some(TexturePlan::Picture(_))));
+        // found by review: a textures folder that is a link out of the level is refused (the picture and the
+        // compressed texture alike)
+        #[cfg(unix)]
+        {
+            std::fs::write(&dtx, &good).unwrap();
+            let away = root.join("away");
+            std::fs::rename(&textures, &away).unwrap();
+            let outside = std::env::temp_dir().join(format!("drahtseilakt-plan-out-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&outside);
+            std::fs::rename(&away, &outside).unwrap();
+            std::os::unix::fs::symlink(&outside, &textures).unwrap();
+            assert!(data.texture_plan(&t, true).is_none());
+            assert!(data.texture(&t).is_none());
+            let _ = std::fs::remove_dir_all(&outside);
+        }
         let _ = Data::new(None).for_level(None);
         let _ = std::fs::remove_dir_all(&root);
     }

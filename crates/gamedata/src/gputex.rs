@@ -445,11 +445,12 @@ pub fn decoded(t: &TextureData) -> Option<TextureData> {
         });
         data.extend_from_slice(&rgba);
     }
+    // the hash stays: decoded, two textures of one hash and size are still one picture for the renderer
     Some(TextureData {
         format: Format::Rgba,
         data,
         mips,
-        hash: None,
+        hash: t.hash,
     })
 }
 

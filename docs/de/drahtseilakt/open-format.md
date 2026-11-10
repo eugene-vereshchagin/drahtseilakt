@@ -68,8 +68,7 @@ nicht sRGB (das Spiel beleuchtet im Gamma-Raum, wie das Original).
 Die Datei ist fremd wie der Rest eines Levels: Der Kopf wird gegen die Grenzen geprüft, bevor etwas gelesen wird, die
 Länge muss genau die sein, die der Kopf ergibt, die Daten müssen zu ihrem Hash passen und nur die genannten Blöcke
 enthalten, und einem Link wird nie gefolgt. Eine Datei, die eine andere Bildlänge nennt als das PNG daneben, oder
-deren Kopf nicht besteht, wird übergangen und das PNG genommen; eine mit beschädigten Daten wird ohne Textur
-gezeichnet und gemeldet (das Level neu remastern). Ein Level darf die `.dtx` auch ohne das PNG tragen.
+deren Kopf nicht besteht, wird übergangen und das PNG genommen; eine mit beschädigten Daten, oder zwischen Ansehen und Lesen geändert, wird gemeldet und stattdessen ihr PNG gezeichnet, kleiner (das Level neu remastern). Eine Datei, zu der ein Link aus dem Levelordner hinaus führt, wird abgelehnt. Ein Level darf die `.dtx` auch ohne das PNG tragen.
 
 - **Adapter.** BC gibt es auf jeder Desktop-Karte unter Vulkan und Direct3D 12 und auf jedem Mac unter Metal. Wo es
   fehlt (Chips mancher Telefone, manche Software-Adapter), dekodiert das Spiel die Blöcke selbst, ab der Mip-Stufe mit

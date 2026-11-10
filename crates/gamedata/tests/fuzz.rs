@@ -3,6 +3,8 @@
 //   image        a texture or picture (.bmp/.tga/.png/.jpg) as the game decodes it, and its header as the pixel
 //                budget reads it;
 //   gputex       a level's compressed texture (.dtx, gputex.rs): its header, the whole file, its decoding;
+//   gputex_data  the same with the data's hash set right first (the reader then goes on to the blocks and the
+//                decoders), and the decoders on blocks of any bytes;
 //   level_txt    a level folder's level.txt;
 //   theme_txt    a sound theme's theme.txt;
 //   pack_txt     a texture or model pack's pack.txt (the same shape, read through packs.rs);
@@ -140,6 +142,39 @@ pub fn run_gputex(input: &[u8]) {
     }
 }
 
+/// A file's hash is set to what its data hashes to, so the fuzzer's changes to the data get past the hash to the
+/// block checks and the decoders; then the bytes after the first three are decoded as blocks of a size the first
+/// three name (any bytes at all: what a card without the reader's checks would be given).
+pub fn run_gputex_data(input: &[u8]) {
+    use gamedata::gputex;
+    let mut file = input.to_vec();
+    if let Some(data) = file.get(1 + gputex::HEADER_LEN..) {
+        let hash = gputex::data_hash(data).to_le_bytes();
+        file[1 + 32..1 + 40].copy_from_slice(&hash);
+    }
+    run_gputex(&file);
+    let [pick, w, h, blocks @ ..] = input else {
+        return;
+    };
+    let format = if pick & 1 == 0 { gputex::Format::Bc1 } else { gputex::Format::Bc7 };
+    let (w, h) = (u32::from(*w % 33) + 1, u32::from(*h % 33) + 1);
+    let need = format.level_bytes(w, h).unwrap();
+    let mut data = blocks.to_vec();
+    data.resize(need, 0x40);
+    let rgba = gputex::decode_level(format, w, h, &data).expect("blocks of the right length decode");
+    assert_eq!(rgba.len() as u64, u64::from(w) * u64::from(h) * 4);
+    // a cut or grown level is refused
+    assert!(gputex::decode_level(format, w, h, &data[..need - 1]).is_none());
+}
+
+#[test]
+#[ignore]
+fn fuzz_gputex_data() {
+    let mut t = Target::new("gputex_data", test_name!("fuzz_gputex_data"), Kind::Binary);
+    t.max_len = 1 << 20;
+    fuzzkit::fuzz(t, gputex_seeds, run_gputex_data);
+}
+
 fn gputex_seeds() -> Vec<Vec<u8>> {
     use gamedata::gputex::{Format, write};
     let mut out = Vec::new();
@@ -184,6 +219,7 @@ fn fuzz_gputex() {
 fn gputex_seeds_read() {
     for s in gputex_seeds() {
         run_gputex(&s);
+        run_gputex_data(&s);
         assert!(gamedata::gputex::read(&s[1..]).is_ok());
     }
     // and cut anywhere, or with any one byte changed, a seed is refused or still sound
@@ -196,6 +232,7 @@ fn gputex_seeds_read() {
             let mut t = s.clone();
             t[at] ^= bit;
             run_gputex(&t);
+            run_gputex_data(&t);
         }
     }
 }
@@ -385,6 +422,7 @@ fn fuzz_sound_table() {
 fn fuzz_regressions() {
     fuzzkit::regressions("image", run_image);
     fuzzkit::regressions("gputex", run_gputex);
+    fuzzkit::regressions("gputex_data", run_gputex_data);
     fuzzkit::regressions("level_txt", run_level_txt);
     fuzzkit::regressions("theme_txt", run_theme_txt);
     fuzzkit::regressions("pack_txt", run_pack_txt);

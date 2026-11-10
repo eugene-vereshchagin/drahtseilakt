@@ -3172,7 +3172,10 @@ fn upload_menu_scene(
 ) {
     if let Some(ms) = scene {
         let loader = |t: &level::Texture, bc: bool| data.texture_plan(t, bc);
+        // the scene is another folder's: it shares no texture with the level uploaded before it
+        renderer.end_sharing();
         ms.model = Some(renderer.add_model(&ms.level, &loader));
+        renderer.end_sharing();
     }
 }
 
@@ -3207,6 +3210,8 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     if let Some((file, _)) = &game.trafo {
         renderer.add_model(&file.level, &loader);
     }
+    // the level and its parts are up: nothing uploaded later shares with them
+    renderer.end_sharing();
     let t = renderer.texture_stats;
     eprintln!(
         "textures: {} uploaded ({} compressed, {} shared with them), {} MB of video memory, in {:.2} s (reading {:.2} s, \

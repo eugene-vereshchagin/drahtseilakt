@@ -66,7 +66,7 @@ sRGB (the game lights in gamma space, as the original).
 The file is a stranger's like the rest of a level: the header is checked against the caps before anything is read, the
 length must be exactly what the header implies, the data must match its hash and hold only the blocks named above, and
 a link is never followed. A file that names another picture's length than the PNG beside it, or fails its header, is
-passed over and the PNG is used; one whose data is damaged is drawn plain and said (remaster the level again). A
+passed over and the PNG is used; one whose data is damaged, or changed between being looked at and read, is said and its PNG drawn instead, smaller (remaster the level again). A file reached through a link that leads out of the level's folder is refused. A
 level may carry the `.dtx` without the PNG.
 
 - **Adapters.** BC is on every desktop card under Vulkan and Direct3D 12 and on every Mac under Metal. Where the

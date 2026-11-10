@@ -1656,6 +1656,12 @@ impl Renderer {
         Some(view)
     }
 
+    /// The textures kept for sharing are let go: what is uploaded next (another level's folder, the menu's scene)
+    /// never takes a picture from what came before, and a model dropped later frees its textures.
+    pub fn end_sharing(&mut self) {
+        self.shared_textures.clear();
+    }
+
     /// A new level begins: the textures kept for sharing go with the old one's models, and the count starts again.
     pub fn begin_level(&mut self) {
         self.shared_textures.clear();
