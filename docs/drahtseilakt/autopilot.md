@@ -153,7 +153,7 @@ One file a level: `hints/<level>.txt` in the game's data folder (`hints/Level_01
 use; they hold no game data. A hint a line, `#` begins a comment:
 
 ```
-at X Y Z r R [sector N] [kind wood|stone|paper] : STEP ; STEP ; ...
+at X Y Z r R [sector N] [kind wood|stone|paper|sticky] : STEP ; STEP ; ...
 ```
 
 When the ball comes within R of the point (in that sector, as that ball), the steps run in order, once a life;

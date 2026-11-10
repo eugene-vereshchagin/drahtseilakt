@@ -169,7 +169,7 @@ Datei, die `--hints FILE` nennt. Die bisher geschriebenen Hinweise liegen im Rep
 Replays, die sie benutzen; sie enthalten keine Spieldaten. Ein Hinweis je Zeile, `#` beginnt einen Kommentar:
 
 ```
-at X Y Z r R [sector N] [kind wood|stone|paper] : SCHRITT ; SCHRITT ; ...
+at X Y Z r R [sector N] [kind wood|stone|paper|sticky] : SCHRITT ; SCHRITT ; ...
 ```
 
 Kommt die Kugel dem Punkt näher als R (in diesem Sektor, als diese Kugel), laufen die Schritte der Reihe nach,

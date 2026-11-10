@@ -103,7 +103,7 @@ pub enum Value {
     BallSpeed,
     /// The ball's vertical speed.
     BallVy,
-    /// 0 wood, 1 stone, 2 paper.
+    /// 0 wood, 1 stone, 2 paper, 3 sticky (ours).
     BallKind,
     /// 1 while the ball touches something.
     BallTouching,

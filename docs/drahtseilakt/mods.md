@@ -26,7 +26,7 @@ the level.
 
 | Mod | After the BML mod | What it does | Changes the run |
 |---|---|---|---|
-| `sticky-ball` | BallSticky, StickyAccess | what the ball touches holds it; pushing into a wall climbs it; options: stickiness, wooden ball only | yes (modded) |
+| `sticky-ball` | BallSticky, StickyAccess | what the ball touches holds it; pushing into a wall climbs it; options: stickiness, wooden ball only (the `sticky` ball kind holds of itself, without it) | yes (modded) |
 | `physics-lab` | PhysicsEditor | gravity as a vector: down (0–60, original 20) and sideways along the world's x and z (−20–20 each, original 0) — and the physics' time factor (0.5–4, original 2) | yes (modded) |
 | `dynamic-fov` | DynamicFov | the view widens with the ball's speed; option: strength | no |
 | `free-view` | FreeViewRotation, AdvancedTravelCam | the mouse turns the view about the ball, a key turns it back; camera distance | no |
@@ -44,6 +44,24 @@ the level.
 | `sector-jump` | SpeedrunShortcuts (set sector) | keys (F7 / PageUp, F6 / PageDown) start the level again at the next or the previous sector | yes (modded) |
 | `spawn-point` | NewSpawn, SpeedrunShortcuts (set spawn) | a key (F8, H or J) sets a spawn point where the ball is, another (G, F4 or C) puts the ball back there at rest, as the ball it was; the sector and its objects stay as they are | yes (modded) |
 | `free-steering` | FreeViewRotation (the steering too) | like `free-view`, but the arrows push along the turned view; the view's turn is recorded in the replay | yes (modded) |
+
+## The sticky ball kind
+
+*2026-11-10, the owner's decision.* After BallSticky, a fourth ball of our own, `sticky`, besides wood, stone and
+paper: not a mod but a ball kind any level may use. Its transformer is `P_Trafo_Sticky` (a crimson ring; a map that
+has one, BallSticky's own maps among them, takes it as any transformer), its loose ball `P_Ball_Sticky`, its name
+`sticky` wherever a kind is named (`--ball`, a replay's `start`, `sector_balls`, hints' `kind` and `become`, the level
+DSL's `ball`, `trafo` and `loose`). Its look is ours (`assets/own/make/make_parts.py`: crimson rubber in a honeycomb of
+cells, fourteen rubber chunks for its burst); on the copy's Balls.nmo, which has no such ball, it is drawn on the
+wooden ball's mesh, tinted crimson. Its sounds are the wooden ball's until it has its own.
+
+Its numbers (chosen, not measured: the original has no such ball, and BallSticky's are in its own files, not read):
+mass 4 (wood 1.9, stone 10), push 0.6 (0.15 a unit of mass, between stone's 0.09 and wood's 0.23), friction 1.0 (the
+most of the four), elasticity 0.05 (the least), damping 0.9 (as wood); the loose ball the same. It holds to what it
+touches as the `sticky-ball` mod's `ball.stick 0.9` does, without a mod: at the mod's default 0.6 so heavy a ball only
+clings to a wall (lift 1.09 against its weight of 1.21), at 0.9 it climbs (1.63). With the mod on as well, the stronger
+hold counts. On a slope pushed from rest it climbs up to 43° and, steeper, clings without rolling back (the test
+player's table).
 
 ## God mode
 
@@ -135,7 +153,7 @@ The view's events: `frame` (every frame drawn), `key <option>` (the key of one o
 |---|---|---|---|
 | `ball.x` `ball.y` `ball.z` | where the ball is | `real.time` | real seconds since the run began * |
 | `ball.speed` `ball.vy` | its speed, its vertical speed | `frame.dt` `frame.fps` | the frame's length, frames a second * |
-| `ball.kind` | 0 wood, 1 stone, 2 paper | `clock.hour` `clock.minute` `clock.second` | the clock, UTC * |
+| `ball.kind` | 0 wood, 1 stone, 2 paper, 3 sticky | `clock.hour` `clock.minute` `clock.second` | the clock, UTC * |
 | `ball.touching` `ball.wall` | it touches something; something steep | `mouse.dx` `mouse.dy` | the mouse's motion this frame * |
 | `run.tick` `run.time` | the run's ticks, seconds | `extras.points` `extras.points_all` | extra points left in the sector, and all * |
 | `practice.speed` | the game's speed (1, or down to 1/8) * | `practice.saved` | a moment is saved (1 or 0) * |
@@ -275,14 +293,6 @@ A mod comes from a stranger, so the game reads it as hostile and fails closed:
   second camera rig or one rig that springs to the other ball, and the switch as an input bit the replay keeps (as
   the spawn point's). None of the community maps at hand is known to have a dual start (their files are compressed, so
   a plain search proves nothing); without one to play, the change is left for when such a map turns up.
-- **A sticky ball kind** of its own with its transformer (BallSticky ships `Ball_Sticky.nmo`, `PH/P_Ball_Sticky.nmo`
-  and `PH/P_Trafo_Sticky.nmo`). The behaviour is there (`ball.stick` with `ball.kind`); a fourth `BallKind` is the
-  work: its physics numbers (in their `P_Ball_Sticky`, not in the DLL's strings; to be measured or chosen), its name
-  in `BallKind::from_name` (the transformer groups `P_Trafo_<kind>` and the sector balls follow it), and an arm in each
-  per-kind match: the ball mesh (scene.rs `Ball_*_Mesh`, the ghost in app.rs), the burst pieces (pieces.rs), the
-  rolling and hit sounds (ballsound.rs, audio.rs), the loose balls of that kind, the autopilot, hints and part checks;
-  and our own drawings — a ball, its pieces and a transformer module — since nothing of theirs is shipped. Left for a
-  change with those parts.
 - A fuzz target for mod.txt (the parser is strict, capped and unit-tested; fuzzing comes with the release work).
 
 ## The BML mods surveyed
@@ -320,7 +330,7 @@ What each does, whether we have it, and how it maps to our engine:
 | SysInfoDisplay | system time and battery on screen | factory `info-overlay` (clock, UTC); no battery |
 | TASSupport | record and play input, skip rendering, exit at the end | the engine: replays are deterministic input recordings (`--record`, `--replay`, `--headless`), god-mode's slow motion |
 | WatchYourTime | time played per level | factory `play-time` (`playtime.txt`; also `segment-timer`) |
-| BallSticky | a sticky ball type that climbs walls | factory `sticky-ball` (modded; any ball, or the wooden only); a kind of its own with its transformer is queued |
+| BallSticky | a sticky ball type that climbs walls | our own ball kind `sticky` with its transformer `P_Trafo_Sticky` (above); factory `sticky-ball` (modded) makes any ball sticky |
 | BMLModuls | new modules (wooden drop and rotating boards) | level parts, not mods: the open format's parts ([open-format.md](open-format.md)) |
 
 The original's limits these mods work around (frame rate cap, 4:3, low resolutions, eight sectors, a bitmap font,

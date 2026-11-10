@@ -109,7 +109,7 @@ our own). At each mark it reads the place along the marked stretch, every tenth 
 | slope | the way's rise over them: `flat`, `up`, `down` (more than 0.15) |
 | ahead | the first within them: `gap`, `drop`, `rail-end`, `rail-start`, `sill`, `transformer`, or `none` |
 | module | the nearest module within 8 (`P_Modul_25`, `P_Box`, ...), or `none` |
-| kind | `wood`, `stone`, `paper` |
+| kind | `wood`, `stone`, `paper`, `sticky` |
 
 What was the same over most (60%) of the stretch becomes a rule: the surface, the ball, and the values special to
 the place (not a plain medium or wide floor, straight, flat, nothing ahead, no module); the plain ones are left out,

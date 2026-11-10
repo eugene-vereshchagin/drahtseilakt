@@ -10,7 +10,7 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     title NAME...            the level's name (also title.ru, title.de, title.zh: its name in another language)
     order N                  its place in the list of our levels
     difficulty N             how hard it is, 1 (easy) to 10 (level.txt's difficulty; the menu sorts by it)
-    author NAME... / sky NAME / music 1..5 / bonus N / ball wood|stone|paper / light R G B
+    author NAME... / sky NAME / music 1..5 / bonus N / ball wood|stone|paper|sticky / light R G B
                              (sky: A, B, C (above the clouds), Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
                              Mist, Clouds; any Sky_<NAME>_* in the textures)
     clouds off | clouds [cover C] [below B] [thickness T] [size S]   the sea of cloud under the level (the game
@@ -69,7 +69,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LEVELS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "levels")
 STYLES = ("safe", "speed", "collector")
 LANGS = ("ru", "de", "zh")
-BALLS = {"wood": "Wood", "stone": "Stone", "paper": "Paper"}
+BALLS = {"wood": "Wood", "stone": "Stone", "paper": "Paper", "sticky": "Sticky"}
 # The test player's automatic steps: a point every this many units along the way, by style.
 SPACING = {"safe": 9.0, "speed": 14.0, "collector": 9.0}
 # scripts/own-levels.sh tries the speed style with other spacings and keeps the fastest run (LEVELDSL_SPEED_SPACING).
@@ -487,14 +487,14 @@ class Track:
         elif cmd == "trafo":
             kind = BALLS.get(word(args, 0, line))
             if kind is None:
-                raise LevelError(f"line {line}: trafo wood|stone|paper")
+                raise LevelError(f"line {line}: trafo wood|stone|paper|sticky")
             self.b.trafo(kind, self.n("trafo" + kind), tuple(p), s)
             if "nopilot" not in opts:
                 self.pilot.step(STYLES, f"become {kind.lower()}", p)
         elif cmd == "loose":
             kind = BALLS.get(word(args, 0, line))
             if kind is None:
-                raise LevelError(f"line {line}: loose wood|stone|paper")
+                raise LevelError(f"line {line}: loose wood|stone|paper|sticky")
             self.b.loose_ball(kind, self.n("loose" + kind), tuple(p), s)
         elif cmd == "column":
             self.b.column(f"Column_{self.n('column'):03d}", tuple(p), float(opts.get("depth", 40)))

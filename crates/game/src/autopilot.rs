@@ -1352,11 +1352,12 @@ const MOMENTUM_AHEAD: usize = 20;
 /// How each ball climbs by its own push (measured on the engine, `a_ball_climbs_by_its_push_as_the_table_says`):
 /// the steepest slope it climbs at all (degrees), and how much speed it keeps per degree under that (its pace up a
 /// slope, pushed on, is about `(steepest - slope) * per_degree`). Stone 17° (at 4.5: 12.6°), wood 36.7° (26°),
-/// paper 45.9° (31°).
-const CLIMB: [(crate::sim::BallKind, f32, f32); 3] = [
+/// paper 45.9° (31°), our sticky ball 43° (22.5°; steeper it does not roll back: it clings, creeping up).
+const CLIMB: [(crate::sim::BallKind, f32, f32); 4] = [
     (crate::sim::BallKind::Stone, 17.0, 1.05),
     (crate::sim::BallKind::Wood, 36.7, 0.42),
     (crate::sim::BallKind::Paper, 45.9, 0.30),
+    (crate::sim::BallKind::Sticky, 43.0, 0.2195),
 ];
 
 /// The steepest slope (degrees) ball `kind` climbs by its own push keeping `speed`: steeper needs a run-up.
@@ -3580,17 +3581,19 @@ mod tests {
             }
             sim.ball.velocity.x
         };
-        for kind in [BallKind::Stone, BallKind::Wood, BallKind::Paper] {
+        for kind in [BallKind::Stone, BallKind::Wood, BallKind::Paper, BallKind::Sticky] {
             let at = steepest_climb(kind, 4.5);
             let (gentler, steeper) = (pace(kind, at - 1.5), pace(kind, at + 1.5));
             assert!(
                 gentler > 4.5 && steeper < 4.5,
                 "{kind:?} at {at}: {gentler} {steeper}"
             );
-            assert!(
-                pace(kind, steepest_climb(kind, 0.0) + 1.5) < 0.0,
-                "{kind:?} rolls back"
-            );
+            let back = pace(kind, steepest_climb(kind, 0.0) + 1.5);
+            if kind == BallKind::Sticky {
+                assert!(back > -0.1 && back < 0.5, "the sticky ball clings: {back}");
+            } else {
+                assert!(back < 0.0, "{kind:?} rolls back");
+            }
         }
     }
 

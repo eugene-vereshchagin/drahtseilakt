@@ -37,7 +37,19 @@ pub enum BallKind {
     Wood,
     Stone,
     Paper,
+    /// Our own fourth ball (after BallSticky's `Ball_Sticky`, not the original's): tacky rubber that holds to what it
+    /// touches, so a wall pushed into can be climbed (`STICKY_HOLD`); its transformer is `P_Trafo_Sticky`.
+    Sticky,
 }
+
+/// The ball kinds, in their order (`kind as usize` indexes per-kind tables).
+pub const BALL_KINDS: [BallKind; 4] = [BallKind::Wood, BallKind::Stone, BallKind::Paper, BallKind::Sticky];
+
+/// How strongly the sticky ball holds to what it touches, as the sticky-ball mod's `ball.stick` does: the kind is that
+/// mod made a ball of its own. 0.9, not the mod's 0.6: the hold lifts the ball up a wall by `k` of its weight plus `k` of
+/// its push, and the sticky ball is twice the wooden one's weight for less push per mass, so at 0.6 it only clings
+/// (lift 1.09 against a weight of 1.21) and at 0.9 it climbs (1.63).
+pub const STICKY_HOLD: f32 = 0.9;
 
 impl BallKind {
     /// The original game's balls (its `Physicalize_GameBall` table, see docs/physics.md, section 3): the control
@@ -65,6 +77,16 @@ impl BallKind {
                 elasticity: 0.4,
                 lin_damp: 1.5,
             },
+            // ours (the original has no such ball; BallSticky's numbers are in its own files, not read): rubber,
+            // between wood and stone in weight, the push per mass between theirs (0.15 against 0.23 and 0.09), the
+            // most friction and the least bounce of the four, damped as wood
+            BallKind::Sticky => Params {
+                force: 0.6,
+                mass: 4.0,
+                friction: 1.0,
+                elasticity: 0.05,
+                lin_damp: 0.9,
+            },
         }
     }
 
@@ -76,6 +98,8 @@ impl BallKind {
             Some(BallKind::Stone)
         } else if n.contains("paper") {
             Some(BallKind::Paper)
+        } else if n.contains("sticky") {
+            Some(BallKind::Sticky)
         } else {
             None
         }
@@ -820,7 +844,7 @@ pub struct Sim {
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
-    ball_boxes: [(Vec3, Vec3); 3],
+    ball_boxes: [(Vec3, Vec3); BALL_KINDS.len()],
     /// The balls' pieces (pieces.rs), those lying about now (their kind, piece and body), and for each kind (wood,
     /// stone, paper) the tick they burst and the tick their fade began (20 s on, or the ball was lost).
     pieces: crate::pieces::Pieces,
@@ -1094,6 +1118,7 @@ impl Sim {
                     BallKind::Wood => (2.0, 0.6, 0.2, 0.6),
                     BallKind::Stone => (10.0, 0.7, 0.1, 0.2),
                     BallKind::Paper => (0.2, 0.5, 0.4, 1.5),
+                    BallKind::Sticky => (4.0, 1.0, 0.05, 0.9),
                 };
                 let material = Material {
                     friction,
@@ -1341,7 +1366,7 @@ impl Sim {
             breaks,
             module_sectors,
             module_bodies,
-            ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
+            ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); BALL_KINDS.len()],
             pieces: crate::pieces::Pieces::default(),
             flying: Vec::new(),
             pieces_burst: [None; 3],
@@ -1542,6 +1567,7 @@ impl Sim {
                 BallKind::Wood => 0.0,
                 BallKind::Stone => 1.0,
                 BallKind::Paper => 2.0,
+                BallKind::Sticky => 3.0,
             },
             V::BallTouching => {
                 if self.touching.0 {
@@ -1600,10 +1626,17 @@ impl Sim {
         (!n.is_empty(), n.iter().any(|n| n.y < 0.5))
     }
 
-    /// The sticky ball (a mod's `ball.stick`): what it touches holds it, against gravity, and a push into a wall
-    /// turns up along it, so a wall can be climbed. `push` is the arrows' direction, `force` the ball's push.
+    /// How strongly the ball holds to what it touches: the sticky kind's own hold, or a mod's `ball.stick` if more.
+    fn stickiness(&self) -> f32 {
+        let own = if self.ball.kind == BallKind::Sticky { STICKY_HOLD } else { 0.0 };
+        self.mods.out.stick.max(own)
+    }
+
+    /// The sticky ball (the sticky kind, or a mod's `ball.stick`): what it touches holds it, against gravity, and a
+    /// push into a wall turns up along it, so a wall can be climbed. `push` is the arrows' direction, `force` the
+    /// ball's push.
     fn sticky_force(&self, push: Vec3, force: f32) -> Vec3 {
-        let k = self.mods.out.stick;
+        let k = self.stickiness();
         if k <= 0.0 || self.dying.is_some() || self.hold.is_some() {
             return push * force;
         }
@@ -1728,7 +1761,7 @@ impl Sim {
         }
         self.push_keys = push_keys;
         let p = self.ball.kind.params();
-        let force = if self.mods.out.stick > 0.0 {
+        let force = if self.stickiness() > 0.0 {
             self.sticky_force(push, p.force)
         } else {
             push * p.force
@@ -2009,7 +2042,7 @@ impl Sim {
 
     /// The boxes of the ball meshes (wood, stone, paper) from the game's Balls.nmo; the depth-test cubes are tested
     /// against the box of the ball's mesh, as the original does.
-    pub fn set_ball_boxes(&mut self, boxes: [(Vec3, Vec3); 3]) {
+    pub fn set_ball_boxes(&mut self, boxes: [(Vec3, Vec3); BALL_KINDS.len()]) {
         self.ball_boxes = boxes;
     }
 
@@ -3171,8 +3204,8 @@ pub(crate) mod tests {
             sprite: None,
         });
         level.groups[0].members.push(3);
-        let climb = |mods: crate::modrt::SimMods| {
-            let mut sim = Sim::new(&level, BallKind::Wood);
+        let climb_as = |kind: BallKind, mods: crate::modrt::SimMods| {
+            let mut sim = Sim::new(&level, kind);
             sim.mods = mods;
             let mut top = 0.0f32;
             for _ in 0..600 {
@@ -3181,8 +3214,14 @@ pub(crate) mod tests {
             }
             top
         };
+        let climb = |mods: crate::modrt::SimMods| climb_as(BallKind::Wood, mods);
         let plain = climb(crate::modrt::SimMods::default());
         let sticky = climb(mods_of("name.en Sticky\non tick\ndo ball.stick 1\n"));
+        let kind = climb_as(BallKind::Sticky, crate::modrt::SimMods::default());
+        assert!(
+            kind > BALL_RADIUS + 5.0,
+            "the sticky kind climbs by itself, no mod on: {kind}"
+        );
         assert!(
             plain < BALL_RADIUS + 1.0,
             "the plain ball stays down: {plain}"
@@ -3467,6 +3506,40 @@ pub(crate) mod tests {
         }
         let (vs, vw) = (sim.ball.velocity.length(), wood.ball.velocity.length());
         assert!(vs > 1.0 && vs < 0.6 * vw, "stone {vs}, wood {vw}");
+    }
+
+    #[test]
+    fn a_sticky_transformer_makes_our_sticky_ball() {
+        // P_Trafo_Sticky (ours, after BallSticky's) as any transformer: the ball comes back as the sticky kind, which
+        // holds to the floor without any mod on.
+        let mut level = flat_level();
+        let trafo = level.objects.len();
+        level.objects.push(Object {
+            name: "P_Trafo_Sticky_01".into(),
+            matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            mesh: None,
+            visible: true,
+            sprite: None,
+        });
+        level.groups.push(Group {
+            name: "P_Trafo_Sticky".into(),
+            members: vec![trafo],
+        });
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        sim.step(0);
+        assert!(sim.events.contains(&(1, Event::Transform(BallKind::Sticky))));
+        for _ in 0..TRAFO_TICKS + 30 {
+            sim.step(0);
+        }
+        assert_eq!(sim.ball.kind, BallKind::Sticky);
+        assert_eq!(sim.drawn_ball(), Some(BallKind::Sticky));
+        assert!(sim.stickiness() > 0.0 && sim.mods.is_empty(), "sticky of itself");
+        assert_eq!(BallKind::from_name("sticky"), Some(BallKind::Sticky));
     }
 
     #[test]

@@ -4205,12 +4205,7 @@ impl App {
         let g = self.ghost.as_ref()?;
         let at = usize::try_from(self.game.sim.tick).ok()?;
         let &(pos, rot, kind) = g.path.get(at).or(g.path.last())?;
-        let b = &self.game.ball_meshes;
-        let mesh = match kind? {
-            crate::sim::BallKind::Wood => b.wood,
-            crate::sim::BallKind::Stone => b.stone,
-            crate::sim::BallKind::Paper => b.paper,
-        }?;
+        let (mesh, _) = self.game.ball_meshes.of(kind?)?;
         let a = self.view_mods.out.ghost;
         Some(crate::render::Instance {
             model: scene::BALLS_MODEL,

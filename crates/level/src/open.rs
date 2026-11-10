@@ -502,10 +502,10 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
             .iter()
             .map(|b| match b {
                 Value::Null => Ok(None),
-                Value::String(s) if ["wood", "stone", "paper"].contains(&s.as_str()) => {
+                Value::String(s) if ["wood", "stone", "paper", "sticky"].contains(&s.as_str()) => {
                     Ok(Some(s.clone()))
                 }
-                _ => Err("settings: sector_balls holds wood, stone, paper or null"),
+                _ => Err("settings: sector_balls holds wood, stone, paper, sticky or null"),
             })
             .collect::<Result<_, _>>()?,
         _ => return Err("settings: sector_balls is not a list".into()),

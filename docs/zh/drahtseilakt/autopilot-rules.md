@@ -76,7 +76,7 @@
 | slope | 其上的坡度:`flat`、`up`、`down`(超过 0.15) |
 | ahead | 其中遇到的第一个:`gap`、`drop`、`rail-end`、`rail-start`、`sill`、`transformer` 或 `none` |
 | module | 8 以内最近的模块(`P_Modul_25`、`P_Box` 等)或 `none` |
-| kind | `wood`、`stone`、`paper` |
+| kind | `wood`、`stone`、`paper`、`sticky` |
 
 在该段大部分(60%)相同的东西成为一条规则:表面、球,以及该地点特有的值(不是普通的中等或宽地面、直、平、前方无物、无模块);
 普通的值被省略,它们只会让规则适用的地方更少。没有特别之处的段落不会学到任何东西(其区域仍只属于本关)。规则追加到提示旁的

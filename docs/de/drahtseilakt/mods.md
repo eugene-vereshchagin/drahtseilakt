@@ -47,6 +47,25 @@ Start des Levels.
 | `spawn-point` | NewSpawn, SpeedrunShortcuts (Startpunkt setzen) | eine Taste (F8, H oder J) setzt einen Startpunkt, wo die Kugel ist, eine andere (G, F4 oder C) bringt die Kugel ruhend dorthin zurück, als die Kugel, die sie war; der Sektor und seine Objekte bleiben, wie sie sind | ja (gemoddet) |
 | `free-steering` | FreeViewRotation (auch die Steuerung) | wie `free-view`, aber die Pfeile schieben entlang der gedrehten Sicht; die Drehung der Sicht steht im Replay | ja (gemoddet) |
 
+## Die klebrige Kugelart
+
+*2026-11-10, Entscheidung des Besitzers.* Nach BallSticky eine vierte, eigene Kugel, `sticky`, neben Holz, Stein und
+Papier: kein Mod, sondern eine Kugelart, die jedes Level nutzen kann. Ihr Transformer ist `P_Trafo_Sticky` (ein
+karminroter Ring; eine Karte, die einen hat, darunter BallStickys eigene Karten, nimmt ihn wie jeden Transformer), ihre
+lose Kugel `P_Ball_Sticky`, ihr Name `sticky`, wo immer eine Art genannt wird (`--ball`, `start` eines Replays,
+`sector_balls`, `kind` und `become` der Hinweise, `ball`, `trafo` und `loose` der Level-Sprache). Ihr Aussehen ist
+unseres (`assets/own/make/make_parts.py`: karminroter Gummi in einer Wabe aus Zellen, vierzehn Gummibrocken für ihr
+Zerspringen); mit der Balls.nmo der Kopie, die keine solche Kugel hat, wird sie mit dem Mesh der Holzkugel gezeichnet,
+karminrot getönt. Ihre Geräusche sind die der Holzkugel, bis sie eigene hat.
+
+Ihre Werte (gewählt, nicht gemessen: das Original hat keine solche Kugel, und BallStickys stehen in dessen eigenen
+Dateien, die nicht gelesen werden): Masse 4 (Holz 1,9, Stein 10), Schub 0,6 (0,15 je Masseneinheit, zwischen 0,09 des
+Steins und 0,23 des Holzes), Reibung 1,0 (die höchste der vier), Elastizität 0,05 (die niedrigste), Dämpfung 0,9 (wie
+Holz); die lose Kugel ebenso. Sie haftet an dem, was sie berührt, wie `ball.stick 0.9` des Mods `sticky-ball`, ohne Mod:
+bei dessen Standard 0,6 klammert sich eine so schwere Kugel nur an eine Wand (Auftrieb 1,09 gegen ihr Gewicht von 1,21),
+bei 0,9 klettert sie (1,63). Ist der Mod auch an, zählt das stärkere Haften. An einem Hang, aus dem Stand geschoben,
+steigt sie bis 43° und klammert sich steiler fest, ohne zurückzurollen (die Tabelle des Testspielers).
+
 ## Gottmodus
 
 *2026-11-03, Entscheidung des Eigentümers* (decisions.md, „Der Gottmodus ist ein Entwicklungs-Mod“). Was die
@@ -143,7 +162,7 @@ Mods gedrückt).
 |---|---|---|---|
 | `ball.x` `ball.y` `ball.z` | wo die Kugel ist | `real.time` | echte Sekunden seit Beginn des Laufs * |
 | `ball.speed` `ball.vy` | ihre Geschwindigkeit, ihre senkrechte Geschwindigkeit | `frame.dt` `frame.fps` | die Länge des Bildes, Bilder je Sekunde * |
-| `ball.kind` | 0 Holz, 1 Stein, 2 Papier | `clock.hour` `clock.minute` `clock.second` | die Uhr, UTC * |
+| `ball.kind` | 0 Holz, 1 Stein, 2 Papier, 3 klebrig | `clock.hour` `clock.minute` `clock.second` | die Uhr, UTC * |
 | `ball.touching` `ball.wall` | sie berührt etwas; etwas Steiles | `mouse.dx` `mouse.dy` | die Bewegung der Maus in diesem Bild * |
 | `run.tick` `run.time` | die Ticks des Laufs, Sekunden | `extras.points` `extras.points_all` | im Sektor verbleibende Extrapunkte, und alle * |
 | `practice.speed` | das Tempo des Spiels (1, oder bis 1/8) * | `practice.saved` | ein Moment ist gespeichert (1 oder 0) * |
@@ -279,14 +298,6 @@ Ein Mod kommt von einem Fremden, also liest das Spiel ihn als feindselig und leh
   und den Wechsel als Eingabebit, das das Replay behält (wie beim Startpunkt). Von den vorhandenen Community-Karten ist
   keine mit Doppelstart bekannt (ihre Dateien sind komprimiert, eine einfache Suche beweist nichts); ohne eine zum
   Spielen wartet die Änderung auf eine solche Karte.
-- **Eine eigene klebrige Kugelart** mit ihrem Transformer (BallSticky liefert `Ball_Sticky.nmo`,
-  `PH/P_Ball_Sticky.nmo` und `PH/P_Trafo_Sticky.nmo`). Das Verhalten gibt es (`ball.stick` mit `ball.kind`); die Arbeit
-  ist eine vierte `BallKind`: ihre Physikwerte (in deren `P_Ball_Sticky`, nicht in den Strings der DLL; zu messen oder zu
-  wählen), ihr Name in `BallKind::from_name` (die Transformer-Gruppen `P_Trafo_<Art>` und die Sektorkugeln folgen ihm)
-  und ein Zweig in jeder Fallunterscheidung nach Art: das Kugel-Mesh (scene.rs `Ball_*_Mesh`, der Geist in app.rs), die
-  Splitter (pieces.rs), die Roll- und Aufprallgeräusche (ballsound.rs, audio.rs), lose Kugeln dieser Art, der Autopilot,
-  die Hinweise und Teileprüfungen; und unsere eigenen Zeichnungen — eine Kugel, ihre Splitter und ein Transformer-Modul —,
-  denn nichts von ihnen wird mitgeliefert. Zurückgestellt bis zu einer Änderung mit diesen Teilen.
 - Ein Fuzz-Ziel für mod.txt (der Parser ist streng, begrenzt und per Unit-Test abgedeckt; Fuzzing kommt mit der
   Release-Arbeit).
 
@@ -325,7 +336,7 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 | SysInfoDisplay | Systemzeit und Akku auf dem Bildschirm | Werks-Mod `info-overlay` (Uhr, UTC); kein Akku |
 | TASSupport | Eingaben aufnehmen und abspielen, Zeichnen überspringen, am Ende beenden | die Engine: Replays sind deterministische Aufnahmen der Eingaben (`--record`, `--replay`, `--headless`), die Zeitlupe von god-mode |
 | WatchYourTime | Spielzeit je Level | Werks-Mod `play-time` (`playtime.txt`; auch `segment-timer`) |
-| BallSticky | ein klebender Kugeltyp, der Wände hinaufklettert | Werks-Mod `sticky-ball` (gemoddet; jede Kugel oder nur die Holzkugel); eine eigene Art mit Transformer ist vorgemerkt |
+| BallSticky | ein klebender Kugeltyp, der Wände hinaufklettert | unsere eigene Kugelart `sticky` mit ihrem Transformer `P_Trafo_Sticky` (oben); Werks-Mod `sticky-ball` (gemoddet) macht jede Kugel klebrig |
 | BMLModuls | neue Module (hölzerner Fall und drehende Bretter) | Levelteile, keine Mods: die Teile des offenen Formats ([open-format.md](open-format.md)) |
 
 Die Grenzen des Originals, die diese Mods umgehen (Bildratengrenze, 4:3, niedrige Auflösungen, acht Sektoren, eine

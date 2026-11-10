@@ -113,7 +113,8 @@ const VOLUME_PER_SPEED: f32 = 0.05;
 pub(crate) fn table(kind: BallKind) -> ([&'static str; 3], [&'static str; MATERIALS]) {
     match kind {
         BallKind::Paper => (["Roll_Paper"; 3], ["Hit_Paper"; MATERIALS]),
-        BallKind::Wood => (
+        // our sticky ball has no sounds of its own yet: rubber of the wooden ball's weight class sounds nearest the wood
+        BallKind::Wood | BallKind::Sticky => (
             ["Roll_Wood_Stone", "Roll_Wood_Wood", "Roll_Wood_Metal"],
             [
                 "Hit_Wood_Stone",

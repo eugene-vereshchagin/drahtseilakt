@@ -41,6 +41,20 @@
 | `spawn-point` | NewSpawn、SpeedrunShortcuts（设置出生点） | 一个键（F8、H 或 J）在球所在处设出生点，另一个键（G、F4 或 C）把球静止地送回那里，恢复当时的球种；小节及其物体保持原样 | 是（modded） |
 | `free-steering` | FreeViewRotation（含操控） | 类似 `free-view`，但方向键沿转动后的视角推动；视角的转动记录在回放中 | 是（modded） |
 
+## 粘性球种类
+
+*2026-11-10，所有者的决定。* 仿照 BallSticky，在木球、石球、纸球之外加入我们自己的第四种球 `sticky`：不是 mod，而是任何关卡都可使用的球种。
+它的变球器是 `P_Trafo_Sticky`（深红色圆环；带有它的地图，包括 BallSticky 自己的地图，都像其他变球器一样使用它），散球是
+`P_Ball_Sticky`，凡是写球种的地方名字都是 `sticky`（`--ball`、回放的 `start`、`sector_balls`、提示的 `kind` 和 `become`、
+关卡语言的 `ball`、`trafo` 和 `loose`）。外观是我们自己的（`assets/own/make/make_parts.py`：蜂窝格的深红色橡胶，爆裂时为十四块橡胶碎片）；
+使用副本的 Balls.nmo 时（其中没有这种球），它用木球的网格绘制并染成深红色。在有自己的声音之前，使用木球的声音。
+
+它的参数（选定而非测量：原版没有这种球，BallSticky 的参数在其自身文件中，不读取）：质量 4（木 1.9，石 10），推力 0.6
+（每单位质量 0.15，介于石的 0.09 和木的 0.23 之间），摩擦 1.0（四者中最大），弹性 0.05（最小），阻尼 0.9（同木）；散球相同。
+它不需要 mod，就像 `sticky-ball` mod 的 `ball.stick 0.9` 那样粘住所碰之物：在该 mod 的默认 0.6 下，这么重的球只能贴在墙上
+（升力 1.09，自重 1.21），0.9 时能爬上去（1.63）。若同时开启该 mod，以更强的粘力为准。在斜坡上从静止推动，它能爬到 43°，
+更陡时则贴住不滑落（测试玩家的表）。
+
 ## 上帝模式
 
 *2026-11-03，所有者的决定*（decisions.md，“上帝模式是一个开发用模组”）。原来扩展模式的练习工具和无限生命合成一个模组
@@ -118,7 +132,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 |---|---|---|---|
 | `ball.x` `ball.y` `ball.z` | 球的位置 | `real.time` | 游玩开始以来的真实秒数 * |
 | `ball.speed` `ball.vy` | 它的速度、它的竖直速度 | `frame.dt` `frame.fps` | 帧的时长、每秒帧数 * |
-| `ball.kind` | 0 木球、1 石球、2 纸球 | `clock.hour` `clock.minute` `clock.second` | 时钟，UTC * |
+| `ball.kind` | 0 木球、1 石球、2 纸球、3 粘性球 | `clock.hour` `clock.minute` `clock.second` | 时钟，UTC * |
 | `ball.touching` `ball.wall` | 它碰到了某物；碰到了陡峭的东西 | `mouse.dx` `mouse.dy` | 本帧鼠标的移动 * |
 | `run.tick` `run.time` | 游玩的 tick 数、秒数 | `extras.points` `extras.points_all` | 本小节剩余的额外分，以及全部 * |
 | `practice.speed` | 游戏的速度（1，最低到 1/8） * | `practice.saved` | 已保存一个时刻（1 或 0） * |
@@ -235,12 +249,6 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
   实体 0：`replace_ball(0, ..)`、实体 1 的接触、推力、粘力），未激活的球作为被动动态刚体，小节的检查点、重置点、死亡、
   变球器和额外生命作用于哪个球，第二套相机或一套跳到另一个球的相机，以及作为回放保存的输入位的切换（同出生点）。
   手头的社区地图中尚不知有双起点的（文件是压缩的，简单搜索说明不了什么）；没有可玩的地图，此改动等到出现这样的地图再做。
-- **独立的粘性球类型**及其变球器（BallSticky 附带 `Ball_Sticky.nmo`、`PH/P_Ball_Sticky.nmo` 和
-  `PH/P_Trafo_Sticky.nmo`）。行为已经有了（`ball.stick` 配合 `ball.kind`）；工作在于第四种 `BallKind`：它的物理参数
-  （在他们的 `P_Ball_Sticky` 里，不在 DLL 字符串中；需测量或选定），它在 `BallKind::from_name` 中的名字（变球器组
-  `P_Trafo_<种类>` 和小节球随之而来），以及每个按种类分支处的一支：球的网格（scene.rs `Ball_*_Mesh`、app.rs 中的幽灵）、
-  碎片（pieces.rs）、滚动与撞击声（ballsound.rs、audio.rs）、该种类的散球、自动驾驶、提示和部件检查；还有我们自己的
-  美术——一个球、它的碎片和一个变球器模块——因为不附带他们的任何东西。留待带有这些部件的改动。
 - mod.txt 的 fuzz 目标（解析器严格、有上限并有单元测试；fuzz 随发布工作一起做）。
 
 ## 调查过的 BML mod
@@ -278,7 +286,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | SysInfoDisplay | 屏幕上显示系统时间和电量 | 内置 `info-overlay`（时钟，UTC）；无电量 |
 | TASSupport | 录制和播放输入、跳过渲染、结束时退出 | 引擎：回放是确定性的输入录制（`--record`、`--replay`、`--headless`），以及上帝模式的慢动作 |
 | WatchYourTime | 每关游戏时长 | 内置 `play-time`（`playtime.txt`；另有 `segment-timer`） |
-| BallSticky | 能爬墙的粘性球类型 | 内置 `sticky-ball`（modded；任意球或仅木球）；带变球器的独立种类排队中 |
+| BallSticky | 能爬墙的粘性球类型 | 我们自己的球种 `sticky` 及其变球器 `P_Trafo_Sticky`（见上文）；内置 `sticky-ball`（modded）可让任何球变粘 |
 | BMLModuls | 新模块（木制落板和旋转板） | 关卡部件，不是模组：开放格式的部件（[open-format.md](open-format.md)） |
 
 这些 mod 所绕开的原版限制（帧率上限、4:3、低分辨率、八个小节、位图字体、脆弱的变球时机）不是我们要照搬的。

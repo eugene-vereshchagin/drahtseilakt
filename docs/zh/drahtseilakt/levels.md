@@ -94,7 +94,7 @@ checkpoint                   # 检查点（朝向为 90 的倍数）：下一小
 finish                       # 气球，在前方 22 处
 ```
 
-此外：`rails L`、`rails-left A R`、`rails-right A R`（轨道，也可向上或向下）；`box`、`dome`、`loose wood|stone|paper`；`seesaw`（架在与其板长相同的缺口上）、`platebridge`（14.8 的缺口）、`swingbridge`（5 的缺口中的秋千）、`sack`、`arms`、`flaps`；`module P_Modul_NN` 配合 `ahead`、`side`、`up`、`turn`、`tilt` 放置其他任何部件；`move`、`turn`、`mark NAME` 和 `back NAME` 只移动光标而不建造。完整列表在 leveldsl.py 的开头。
+此外：`rails L`、`rails-left A R`、`rails-right A R`（轨道，也可向上或向下）；`box`、`dome`、`loose wood|stone|paper|sticky`；`seesaw`（架在与其板长相同的缺口上）、`platebridge`（14.8 的缺口）、`swingbridge`（5 的缺口中的秋千）、`sack`、`arms`、`flaps`；`module P_Modul_NN` 配合 `ahead`、`side`、`up`、`turn`、`tilt` 放置其他任何部件；`move`、`turn`、`mark NAME` 和 `back NAME` 只移动光标而不建造。完整列表在 leveldsl.py 的开头。
 
 **天空。** `sky` 选择关卡周围的天空盒：`A`、`B`、`C`（我们自己的，在云海之上，与原版的字母对应），或按名字选择一种摄影天空：`Mountains`（雾霭群山上的晚霞，峰顶有雪）、`Forest`（森林树冠上的夏日云朵，有林间空地和湖泊）、`Sea`（日落时平静的大海，倒映着云）、`Storm`（暗海上的厚重乌云和白浪）、`Sunset`（云海上的金色日落）、`Clouds`（云海上的夏日）、`Night`（群山环绕的暗湖上的银河）、`Desert`（傍晚的红色峡谷）、`Mist`（山谷里有雾的丘陵上的暮光）。它们的天空是 Poly Haven 的 CC0 照片；地平线以下的一切由 `assets/own/make/make_skies.py` 绘制，像从高空俯瞰，因此赛道高悬其上（`assets/own/CREDITS.md`）。其他任何名字都是关卡文件夹或纹理中的一组文件 `Textures/Sky/Sky_<名字>_<面>`（Front、Right、Back、Left、Down，如有还有 Top）；名字由字母、数字、`_` 和 `-` 组成。命令行的 `--sky 名字` 可让任何关卡换一种天空来玩。
 
