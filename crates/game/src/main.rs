@@ -74,7 +74,10 @@ usage: drahtseilakt [options]
   --map FILE.nmo      play a level file: a community map or any .nmo
   --open DIR          play a level in the open format (a folder with level.gltf)
   --export DIR        convert the chosen level to the open format in DIR (textures as PNG) and exit
-  --textures PACK     the texture pack the levels are drawn, or exported, with: own (our free textures; the default
+  --export-parts WHAT with --export: keep (the copy's modules, balls, sky, particles and sounds in DIR/game, so the
+                      level plays without the copy; the default) or none (nothing of the copy: the level uses the
+                      game's own parts and sounds; the default with --textures own)
+  --textures PACK    the texture pack the levels are drawn, or exported, with: own (our free textures; the default
                       for playing), original (the copy's; the default for --export), remastered, or a pack of the
                       data folder's textures/ (docs/drahtseilakt/packs.md)
   --models PACK       the model pack the parts and balls are drawn with: level (as the level takes them; the
@@ -138,6 +141,8 @@ pub struct Options {
     pub chosen: bool,
     pub record: Option<PathBuf>,
     pub export: Option<PathBuf>,
+    /// With `--export`: whether the copy's game files go into the export (`--export-parts`); None: by the pack.
+    pub export_parts: Option<bool>,
     /// The texture pack the levels are drawn (and exported) with, instead of the settings' (packs.rs).
     pub textures: Option<String>,
     /// The model pack the parts are drawn with, instead of the settings'.
@@ -204,6 +209,7 @@ fn parse_args() -> Result<Options, String> {
         chosen: false,
         record: None,
         export: None,
+        export_parts: None,
         textures: None,
         models: None,
         replay: None,
@@ -268,6 +274,13 @@ fn parse_args() -> Result<Options, String> {
                 o.chosen = true;
             }
             "--export" => o.export = Some(value()?.into()),
+            "--export-parts" => {
+                o.export_parts = match value()?.as_str() {
+                    "keep" => Some(true),
+                    "none" => Some(false),
+                    v => return Err(format!("--export-parts {v}: keep or none")),
+                }
+            }
             // a pack's key: checked against the packs found when the game starts (an unknown one is refused there)
             "--textures" | "--models" => {
                 let v = value()?;

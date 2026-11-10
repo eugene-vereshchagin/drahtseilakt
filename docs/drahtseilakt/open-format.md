@@ -5,7 +5,10 @@ The engine's own level format: open, documented, editable with ordinary tools. E
 (`drahtseilakt --level N --export DIR`, `--map FILE --export DIR`), and the game plays it
 (`drahtseilakt --open DIR`). Converted levels are made from the player's own data and are not distributed. With
 `--textures own` an export carries our own free textures (resources.md, "Own textures") instead of the copy's
-wherever we have one, the way to share a level's look with free assets only.
+wherever we have one, the way to share a level's look with free assets only. Textures with the same picture are
+written once and shared by the materials; textures not found are listed by name in the summary. `--textures own`
+also writes no `game/` folder (nothing of the copy: the level uses the game's own parts and sounds);
+`--export-parts keep|none` chooses it explicitly.
 
 ## Files
 

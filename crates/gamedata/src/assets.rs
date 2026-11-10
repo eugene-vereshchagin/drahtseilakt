@@ -1010,6 +1010,10 @@ impl Data {
                 },
                 level::TextureSource::Pixels { .. } => vec![t.name.clone()],
                 level::TextureSource::LevelFile(_) if maker == Maker::Copy => vec![t.name.clone()],
+                // a stranger's texture that names no file and carries no pixels: the pack's picture of its name, if any
+                level::TextureSource::None if maker == Maker::Stranger && !t.name.is_empty() => {
+                    vec![t.name.clone()]
+                }
                 level::TextureSource::LevelFile(_)
                 | level::TextureSource::Game(_)
                 | level::TextureSource::None => Vec::new(),
@@ -1390,70 +1394,173 @@ pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {
 /// Exports a level into `dir` in the open format with its textures, and with the game files it uses (its modules,
 /// the balls, the transformer, its sky, particles, shadow and sounds) in `dir/game`, so that it plays without the
 /// copy's level files.
-pub fn export(data: &Data, loaded: &LoadedLevel, dir: &Path) -> Result<(), String> {
+pub fn export(
+    data: &Data,
+    loaded: &LoadedLevel,
+    dir: &Path,
+    with_game_files: bool,
+) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let missing = export_level(data, &loaded.level, dir)?;
-    let game = dir.join(GAME_FILES);
-    let mut parts = 0usize;
-    for rel in parts_used(data, &loaded.level) {
-        let Some(part) = data.part(&rel) else {
-            continue;
-        };
-        let stem = rel
-            .strip_suffix(".nmo")
-            .or_else(|| rel.strip_suffix(".NMO"))
-            .unwrap_or(&rel);
-        real_folders(dir, &game.join(stem))?;
-        export_level(data, &part.level, &game.join(stem))?;
-        parts = parts.saturating_add(1);
+    if with_game_files {
+        let game = dir.join(GAME_FILES);
+        let mut parts = 0usize;
+        for rel in parts_used(data, &loaded.level) {
+            let Some(part) = data.part(&rel) else {
+                continue;
+            };
+            let stem = rel
+                .strip_suffix(".nmo")
+                .or_else(|| rel.strip_suffix(".NMO"))
+                .unwrap_or(&rel);
+            real_folders(dir, &game.join(stem))?;
+            export_level(data, &part.level, &game.join(stem))?;
+            parts = parts.saturating_add(1);
+        }
+        let mut files = 0usize;
+        real_folders(dir, &game)?;
+        for rel in files_used(data, &loaded.level) {
+            let Some(src) = data.file(&rel) else { continue };
+            copy_into(&src, &game, &rel)?;
+            files = files.saturating_add(1);
+        }
+        println!(
+            "{}: {parts} modules and parts, {files} game files (sky, particles, shadow, sounds)",
+            game.display()
+        );
     }
-    let mut files = 0usize;
-    real_folders(dir, &game)?;
-    for rel in files_used(data, &loaded.level) {
-        let Some(src) = data.file(&rel) else { continue };
-        copy_into(&src, &game, &rel)?;
-        files = files.saturating_add(1);
-    }
+    let unique = std::fs::read_dir(dir.join("textures"))
+        .map(|d| d.flatten().count())
+        .unwrap_or(0);
     println!(
-        "{}: {parts} modules and parts, {files} game files (sky, particles, shadow, sounds)",
-        game.display()
-    );
-    println!(
-        "{} written: {} objects, {} meshes, {} materials, {} textures ({missing} not found), {} groups",
+        "{} written: {} objects, {} meshes, {} materials, {} textures ({unique} pictures written, {} not found), {} groups",
         dir.display(),
         loaded.level.objects.len(),
         loaded.level.meshes.len(),
         loaded.level.materials.len(),
         loaded.level.textures.len(),
+        missing.len(),
         loaded.level.groups.len()
     );
+    if !missing.is_empty() {
+        println!("not found: {}", missing.join(", "));
+    }
     Ok(())
 }
 
-/// Writes one level (or part) in the open format with its textures; returns how many textures were not found.
-fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<usize, String> {
+/// Writes one level (or part) in the open format with its textures; returns the names of the textures not found.
+/// Textures with the same picture (and the same transparent colour) are written once and shared by the materials
+/// that use them: a map may carry thousands of texture objects of a few dozen pictures.
+fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<Vec<String>, String> {
     // the level's files are made anew: one there is removed first (a link or a hard link would be written through)
     for name in ["level.gltf", "level.bin"] {
         fresh(&dir.join(name))?;
     }
-    level::open::export(level, dir)?;
     real_folders(dir, &dir.join("textures"))?;
-    let mut missing = 0usize;
-    for (i, t) in level.textures.iter().enumerate() {
+    // read first: the texture may be this very file (a level exported into its own folder); a texture not found
+    // leaves what is there
+    type Key = (u32, u32, u64, Option<[u8; 3]>);
+    type Picture = (u32, u32, Vec<u8>);
+    let mut keep: Vec<level::Texture> = Vec::new();
+    let mut pictures: Vec<Option<Picture>> = Vec::new();
+    let mut to: Vec<usize> = Vec::with_capacity(level.textures.len());
+    let mut seen: std::collections::HashMap<Key, Vec<usize>> = std::collections::HashMap::new();
+    let mut by_name: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut missing: Vec<String> = Vec::new();
+    for t in &level.textures {
         // the game's texture by name stays a name (level.gltf says `game:<name>`): no file of the level's
-        if matches!(t.source, level::TextureSource::Game(_)) {
-            continue;
-        }
-        let path = dir.join(level::open::texture_file(i, &t.name));
-        // read first: the texture may be this very file (a level exported into its own folder); a texture not found
-        // leaves what is there
-        match data.texture(t) {
-            Some((w, h, rgba)) => {
-                fresh(&path)?;
-                image::save_buffer(&path, &rgba, w, h, image::ExtendedColorType::Rgba8)
-                    .map_err(|e| e.to_string())?
+        let named = match &t.source {
+            level::TextureSource::Game(n) => Some(format!("game:{n}")),
+            _ => None,
+        };
+        let found = if named.is_some() {
+            None
+        } else {
+            data.texture(t)
+        };
+        let add = |keep: &mut Vec<level::Texture>,
+                   pictures: &mut Vec<Option<Picture>>,
+                       pic: Option<Picture>| {
+            keep.push(level::Texture {
+                name: t.name.clone(),
+                source: match &t.source {
+                    level::TextureSource::Game(_) => t.source.clone(),
+                    _ => level::TextureSource::None,
+                },
+                color_key: t.color_key,
+            });
+            pictures.push(pic);
+            keep.len() - 1
+        };
+        let idx = match (named, found) {
+            (Some(n), _) => match by_name.get(&n) {
+                Some(&k) => k,
+                None => {
+                    let k = add(&mut keep, &mut pictures, None);
+                    by_name.insert(n, k);
+                    k
+                }
+            },
+            (None, Some((w, h, rgba))) => {
+                let key: Key = (w, h, crate::fnv1a(&rgba), t.color_key);
+                let same = seen.get(&key).and_then(|c| {
+                    c.iter().copied().find(|&k| {
+                        pictures
+                            .get(k)
+                            .and_then(Option::as_ref)
+                            .is_some_and(|p| p.2 == rgba)
+                    })
+                });
+                match same {
+                    Some(k) => k,
+                    None => {
+                        let k = add(&mut keep, &mut pictures, Some((w, h, rgba)));
+                        seen.entry(key).or_default().push(k);
+                        k
+                    }
+                }
             }
-            None => missing = missing.saturating_add(1),
+            (None, None) => {
+                let n = format!("missing:{}", t.name);
+                match by_name.get(&n) {
+                    Some(&k) => k,
+                    None => {
+                        missing.push(t.name.clone());
+                        let k = add(&mut keep, &mut pictures, None);
+                        by_name.insert(n, k);
+                        k
+                    }
+                }
+            }
+        };
+        to.push(idx);
+    }
+    level::open::export_textures(level, dir, &keep, &to)?;
+    // pictures of an earlier export into this folder (numbered as ours are) would stay as stale files: all are read
+    // by now, so they go
+    let old: Vec<PathBuf> = std::fs::read_dir(dir.join("textures"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| {
+            let n = e.file_name().to_string_lossy().into_owned();
+            n.ends_with(".png")
+                && n.get(..5).is_some_and(|h| {
+                    h.ends_with('_') && h.bytes().take(4).all(|b| b.is_ascii_digit())
+                })
+        })
+        .map(|e| e.path())
+        .take(65536)
+        .collect();
+    for p in old {
+        fresh(&p)?;
+    }
+    for (i, (t, pic)) in keep.iter().zip(&pictures).enumerate() {
+        if let Some((w, h, rgba)) = pic {
+            let path = dir.join(level::open::texture_file(i, &t.name));
+            fresh(&path)?;
+            image::save_buffer(&path, rgba, *w, *h, image::ExtendedColorType::Rgba8)
+                .map_err(|e| e.to_string())?;
         }
     }
     Ok(missing)

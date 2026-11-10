@@ -101,6 +101,20 @@ pub fn texture_file(index: usize, name: &str) -> String {
 /// Writes `level.gltf` and `level.bin` into `dir`. Texture images are referenced as `texture_file(i, name)`;
 /// writing those PNG files is the caller's job (it has the pixels).
 pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
+    let same: Vec<usize> = (0..level.textures.len()).collect();
+    export_textures(level, dir, &level.textures, &same)
+}
+
+/// `export` with the textures given instead of the level's: `textures` are the images written (named by
+/// `texture_file(i, name)`), and `remap[i]` is the image the level's texture `i` is, so that textures with the same
+/// picture are one image. A texture without an entry in `remap` is dropped from the materials.
+pub fn export_textures(
+    level: &Level,
+    dir: &Path,
+    textures: &[Texture],
+    remap: &[usize],
+) -> Result<(), String> {
+    let tex = |t: Option<usize>| t.and_then(|i| remap.get(i).copied());
     let mut bin: Vec<u8> = Vec::new();
     let mut views = Vec::new();
     let mut accessors = Vec::new();
@@ -145,7 +159,7 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
         .iter()
         .map(|m| {
             let mut pbr = json!({"baseColorFactor": m.diffuse, "metallicFactor": 0.0, "roughnessFactor": 1.0});
-            if let Some(t) = m.texture {
+            if let Some(t) = tex(m.texture) {
                 pbr["baseColorTexture"] = json!({"index": t});
             }
             let mut v = json!({
@@ -174,7 +188,7 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
             if m.unlit {
                 v["extensions"] = json!({"KHR_materials_unlit": {}});
             }
-            if let Some(t) = m.normal {
+            if let Some(t) = tex(m.normal) {
                 v["normalTexture"] = json!({"index": t});
                 if m.parallax > 0.0 {
                     v["extras"]["drahtseilakt"]["parallax"] = json!(m.parallax);
@@ -190,8 +204,7 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
         })
         .collect();
 
-    let images: Vec<Value> = level
-        .textures
+    let images: Vec<Value> = textures
         .iter()
         .enumerate()
         .map(|(i, t)| {
@@ -207,7 +220,7 @@ pub fn export(level: &Level, dir: &Path) -> Result<(), String> {
             v
         })
         .collect();
-    let textures: Vec<Value> = (0..level.textures.len())
+    let textures: Vec<Value> = (0..textures.len())
         .map(|i| json!({"source": i, "sampler": 0}))
         .collect();
 
