@@ -337,7 +337,8 @@ class Part:
     def mat(self, name, tex=None, **kw):
         """A material by name, made once; its texture is written into the part's folder."""
         if name not in self.mat_ids:
-            if tex:
+            # (a `game:` texture is the game's own by name, as the levels' scenery has them: no file here)
+            if tex and not tex.startswith(k.GAME):
                 # named after the role's texture in the pack; two roles of one name in a part share the first's file
                 file = PACK_NAMES[name] + ".png" if name in PACK_NAMES else tex
                 if file not in self.files:
@@ -1250,7 +1251,65 @@ def make_modul_26():
     p.node("P_Modul_26_MF")
     p.group("All_P_Modul_26", ["P_Modul_26_MF", "P_Modul_26_Balljoint_unten", "P_Modul_26_Balljoint_oben",
                                "P_Modul_26_Rope", "P_Modul_26_Sack", "P_Modul_26_Halter"])
+    sack_supports(p)
     p.write()
+
+
+# How far down a support's post reaches: as the levels' columns do, out of sight in the haze (levelkit.COLUMN_DEPTH).
+SUPPORT_DEPTH = 240.0
+
+
+def sack_supports(p):
+    """What the sack's holder hangs on (the original's hangs in the air): pieces the game puts together for each
+    sack where nothing of them comes near the ball's way (crates/game/src/supports.rs, the `sack-supports` mod).
+    Drawn only, never in the `All_` group. Every piece is in the holder's frame, +x away from the sack: the beam is
+    one unit long from the holder and is drawn stretched to its length; the others stand at the beam's far end."""
+    g = k.GAME
+    wood = p.mat("P_Modul_26_Balken", "wood_dark.png", diffuse=0.75, emissive=0.38)
+    iron = p.mat("P_Modul_26_Halter", "iron.png", diffuse=0.62, emissive=0.4, specular=0.5, power=20)
+    beige = p.mat("P_Modul_26_Saeule", g + "Column_beige", diffuse=1.0, emissive=0.32)
+    brick = p.mat("P_Modul_26_Sims", g + "Brick", diffuse=1.0, emissive=0.3)
+    stripes = p.mat("P_Modul_26_Mast", g + "Stick_Stripes", diffuse=1.0, emissive=0.35, specular=0.2, power=40)
+    d = SUPPORT_DEPTH
+    # the beam: over the holder's plate, a hand's width
+    beam = k.Mesh("P_Modul_26_Support_Beam_Mesh")
+    k.box(beam, wood, (0.0, -0.06, -0.2), (1.0, 0.36, 0.2))
+    # a stone column as the track's own, a brick cornice and a flat cap; the beam rests in its side on a corbel
+    col = k.Mesh("P_Modul_26_Support_Column_Mesh")
+    k.box(col, beige, (-0.1, -d, -1.0), (1.9, 1.0, 1.0))
+    k.box(col, brick, (-0.3, 0.1, -1.2), (2.1, 1.0, 1.2))
+    k.box(col, beige, (-0.2, 1.0, -1.1), (2.0, 1.3, 1.1))
+    k.box(col, beige, (-0.8, -0.8, -0.32), (-0.1, -0.06, 0.32))
+    # a striped mast with a ball on its top; a tie rod from the top holds the beam
+    mast = k.Mesh("P_Modul_26_Support_Mast_Mesh")
+    k.cylinder(mast, stripes, (0.45, -d, 0.0), (0, 1, 0), 0.42, d + 4.6, seg=10, vscale=5.0)
+    k.cylinder(mast, iron, (0.45, -0.3, 0.0), (0, 1, 0), 0.56, 0.9, seg=10)
+    k.cylinder(mast, iron, (0.45, 3.9, 0.0), (0, 1, 0), 0.54, 0.5, seg=10)
+    k.sphere(mast, iron, (0.45, 5.0, 0.0), 0.55, seg=10)
+    k.tube(mast, iron, [(0.45, 4.15, 0.0), (-3.6, 0.36, 0.0)], 0.07, seg=6, caps=True)
+    # a timber post with a strut under the beam (a gallows; two of them make a gate)
+    post = k.Mesh("P_Modul_26_Support_Post_Mesh")
+    k.box(post, wood, (0.0, -d, -0.34), (0.68, 0.9, 0.34))
+    k.box(post, iron, (-0.06, 0.9, -0.4), (0.74, 1.02, 0.4))
+    s = 1 / math.sqrt(2)
+    k.obox(post, wood, (-1.45, -1.5, 0.0), ((-s, s, 0), (s, s, 0), (0, 0, 1)), (2.05, 0.17, 0.17))
+    # an iron plate against a wall, a short strut from its foot to the beam
+    plate = k.Mesh("P_Modul_26_Support_Bracket_Mesh")
+    k.box(plate, iron, (-0.14, -1.5, -0.6), (0.0, 0.9, 0.6))
+    k.obox(plate, iron, (-0.75, -0.72, 0.0), ((-s, s, 0), (s, s, 0), (0, 0, 1)), (0.95, 0.09, 0.12))
+    # each post's plain shaft, which the game puts under it as often as a level is deep
+    col_shaft = k.Mesh("P_Modul_26_Support_Column_Shaft_Mesh")
+    k.box(col_shaft, beige, (-0.1, -d, -1.0), (1.9, 0.0, 1.0))
+    mast_shaft = k.Mesh("P_Modul_26_Support_Mast_Shaft_Mesh")
+    k.cylinder(mast_shaft, stripes, (0.45, -d, 0.0), (0, 1, 0), 0.42, d, seg=10, vscale=5.0)
+    post_shaft = k.Mesh("P_Modul_26_Support_Post_Shaft_Mesh")
+    k.box(post_shaft, wood, (0.0, -d, -0.34), (0.68, 0.0, 0.34))
+    names = []
+    for name, mesh in (("Beam", beam), ("Column", col), ("Mast", mast), ("Post", post), ("Bracket", plate),
+                       ("Column_Shaft", col_shaft), ("Mast_Shaft", mast_shaft), ("Post_Shaft", post_shaft)):
+        names.append("P_Modul_26_Support_" + name)
+        p.node(names[-1], p.mesh(mesh), pos=(0, 14.964, 0))
+    p.group("Supports_P_Modul_26", names)
 
 
 # The planks of the plate bridges (P_Modul_29 and the balloon's), by measured dimensions, rounded to 0.05: each a

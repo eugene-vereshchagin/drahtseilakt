@@ -287,6 +287,8 @@ impl Game {
         let effects = crate::particles::Effects::new(&level.level, &module_file);
         let mut placements =
             scene::placements(&level.level, &modules, sim.loose(), sim.module_bodies());
+        // what the sacks hang on (drawn when the `sack-supports` mod asks for them)
+        placements.extend(crate::supports::plan(&level.level, &modules).placements());
         if effects.has_flames() {
             // the flames are drawn, so their stand-ins need no markers
             placements.retain(|p| {
@@ -1222,6 +1224,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             start_packs(o.textures.as_deref(), o.models.as_deref());
         };
         return crate::audit::run(&o.audit, &data, o.audit_csv.as_deref(), &prepare);
+    }
+    if let Some(runs) = o.supports_check {
+        return crate::supports::run(&o, &data, runs.then_some(Path::new("hints")));
     }
     if let Some(dir) = &o.level_stats {
         return crate::levelstats::run(&o, &data, dir, Path::new("hints"));
@@ -3362,6 +3367,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         _ => crate::render::RenderLook::default(),
     };
     r.look = look;
+    scene::set_supports(look.supports);
     let ((fw, fh), (w, h)) = ((w, h), look.size(w, h));
     let view = if look.post() {
         let format = r.format;
@@ -5654,6 +5660,7 @@ impl App {
         let ghost = self.ghost_instance();
         // a mod's `render.*`: the picture's look; drawn at its own (low) size, then scaled onto the window
         let look = self.view_mods.out.look;
+        scene::set_supports(look.supports);
         let (rw, rh) = self.gpu.as_ref().map_or((1, 1), |g| look.size(g.config.width, g.config.height));
         let mod_quads = match (&self.gpu, self.game.font.as_ref()) {
             (Some(g), Some(f))

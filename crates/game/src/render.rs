@@ -204,6 +204,8 @@ pub struct RenderLook {
     pub fps_cap: u32,
     /// 16: the colour cut to 5-6-5 bits, no dither.
     pub colour_bits: u8,
+    /// The sacks' supports drawn: 0 none, `supports::PLAIN` or `supports::VARIED`.
+    pub supports: u8,
 }
 
 impl Default for RenderLook {
@@ -214,6 +216,7 @@ impl Default for RenderLook {
             filter: 0,
             fps_cap: 0,
             colour_bits: 0,
+            supports: 0,
         }
     }
 }

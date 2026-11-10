@@ -848,7 +848,51 @@ pub fn attach_looks(base: &mut level::Level, look: level::Level) -> usize {
             n = n.saturating_add(1);
         }
     }
+    attach_dressing(base, &look, m0);
     n
+}
+
+/// The groups of a part whose members are drawn only, put together by the game where they fit (the sacks' supports:
+/// `Supports_P_Modul_26`, crates/game/src/supports.rs).
+pub const DRESSING: &str = "Supports_";
+
+/// Brings the look's dressing (its `Supports_` groups: objects no rule and no physics knows, with their meshes) into
+/// `base`, whose materials already hold the look's from `m0` on. The look's part is made on the base's frames, so
+/// the objects keep their places. A group `base` has itself stays as it is.
+fn attach_dressing(base: &mut level::Level, look: &level::Level, m0: usize) {
+    for g in &look.groups {
+        let is_dressing = g
+            .name
+            .get(..DRESSING.len())
+            .is_some_and(|p| p.eq_ignore_ascii_case(DRESSING));
+        if !is_dressing || base.group(&g.name).is_some() {
+            continue;
+        }
+        let mut members = Vec::new();
+        for o in g.members.iter().filter_map(|&i| look.objects.get(i)) {
+            let Some(src) = o.mesh.and_then(|m| look.meshes.get(m)) else {
+                continue;
+            };
+            let mut mesh = src.look.as_deref().unwrap_or(src).clone();
+            mesh.look = None;
+            for p in &mut mesh.parts {
+                p.material = p.material.and_then(|i| i.checked_add(m0));
+            }
+            for c in &mut mesh.channels {
+                c.material = c.material.saturating_add(m0);
+            }
+            let mut object = o.clone();
+            object.mesh = Some(base.meshes.len());
+            object.visible = false;
+            base.meshes.push(mesh);
+            members.push(base.objects.len());
+            base.objects.push(object);
+        }
+        base.groups.push(level::Group {
+            name: g.name.clone(),
+            members,
+        });
+    }
 }
 
 /// A matrix of the level model (column-major) as glam's.

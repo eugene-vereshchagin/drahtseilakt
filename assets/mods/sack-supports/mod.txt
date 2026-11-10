@@ -1,0 +1,36 @@
+# Sack supports: the swinging sacks' holders, which float in the air in the original, hang on something: a stone
+# column, a striped mast, a timber post, a gate of two posts beside the track, or a beam to a wall that stands near.
+# The game chooses for each sack, as the level loads, what stands clear of the ball's way, of every moving part and
+# of the camera's sight (crates/game/src/supports.rs); where nothing does, the sack hangs as it always did.
+# Only the look changes (the game's own parts have the pieces; the original's models stay as they are): nothing is
+# added to the physics, so the run stays classic and replays play the same.
+name.en Sack supports
+name.ru Опоры мешков
+name.de Sackstützen
+name.zh 沙袋支架
+name.fr Supports des sacs
+name.es Soportes de sacos
+name.it Supporti dei sacchi
+description.en The swinging sacks hang on a column, a mast, a post or a wall bracket instead of thin air. Only the look changes.
+description.ru Качающиеся мешки висят на колонне, мачте, столбе или кронштейне, а не в воздухе. Меняется только вид.
+description.de Die schwingenden Säcke hängen an Säule, Mast, Pfosten oder Wandhalter statt in der Luft. Nur das Aussehen ändert sich.
+description.zh 摆动的沙袋挂在立柱、桅杆、木桩或墙架上，不再悬在空中。只改变外观。
+description.fr Les sacs se balancent à une colonne, un mât, un poteau ou une console, plus dans le vide. Seul l'aspect change.
+description.es Los sacos cuelgan de una columna, un mástil, un poste o una ménsula, ya no del aire. Solo cambia el aspecto.
+description.it I sacchi pendono da una colonna, un palo, un montante o una mensola, non più dal nulla. Cambia solo l'aspetto.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+default on
+option variety switch on
+label variety en Varied designs?
+label variety ru Разные опоры?
+label variety de Verschiedene Bauarten?
+label variety zh 多种样式?
+label variety fr Modèles variés ?
+label variety es ¿Diseños variados?
+label variety it Modelli vari?
+
+on frame
+do render.supports 1 + opt.variety

@@ -347,7 +347,7 @@ pub fn map_issues(path: &Path, data: &Data) -> Vec<Issue> {
 }
 
 /// The `.nmo` files of `root` (a file or a folder walked a few levels deep, links not followed), sorted.
-fn maps(root: &Path) -> Vec<PathBuf> {
+pub(crate) fn maps(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut todo = vec![(root.to_path_buf(), 0usize)];
     while let Some((path, depth)) = todo.pop() {

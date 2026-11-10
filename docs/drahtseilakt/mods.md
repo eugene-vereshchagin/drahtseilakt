@@ -41,6 +41,7 @@ the level.
 | `deformed-ball` | DeformedWB | the wooden ball's look is squeezed and stretched at random (the physics keeps its round ball); option: amount | no |
 | `back-to-2004` | (a joke; undoes our rendering fixes) | the game as on a PC of 2004: a low resolution (640x480, 800x600 or 1024x768) scaled up with hard pixels in a 4:3 frame with black bars, textures without mipmaps or anisotropy (bilinear or nearest: the distant shimmer), a frame cap (off, 60, 30), optional 16-bit colour banding; glasses for tears of blood included | no |
 | `play-time` | WatchYourTime | the time played, per level and in all, on screen and kept in the data folder's `playtime.txt`; option: show it | no |
+| `sack-supports` | (ours; the original's sacks hang in the air) | the swinging sacks' holders hang on something: a stone column, a striped mast, a timber post or a gate of two beside the track, or a beam to a wall near by. Chosen for each sack as the level loads, only where it stands clear of the ball's space, of every moving part, of the scenery and of the camera's sight of the ball; where nothing is clear the sack hangs as it always did. Drawn only, with the game's own models (the original's are left as they are). **On until switched off** (it mends the look and changes no rule; the classic mode still runs no mod). Option: varied designs | no |
 | `sector-jump` | SpeedrunShortcuts (set sector) | keys (F7 / PageUp, F6 / PageDown) start the level again at the next or the previous sector | yes (modded) |
 | `spawn-point` | NewSpawn, SpeedrunShortcuts (set spawn) | a key (F8, H or J) sets a spawn point where the ball is, another (G, F4 or C) puts the ball back there at rest, as the ball it was; the sector and its objects stay as they are | yes (modded) |
 | `free-steering` | FreeViewRotation (the steering too) | like `free-view`, but the arrows push along the turned view; the view's turn is recorded in the replay | yes (modded) |
@@ -119,7 +120,8 @@ The smallest mod:
 UTF-8 text, one statement a line, `#` begins a comment line. In this order:
 
 - **Header** — `name.<lang>` (at least one; languages `en ru de zh fr es it`), `description.<lang>`, `author`,
-  `version`, `licence`, `requires <game version>` (e.g. `0.1`; a newer one than the game refuses the mod).
+  `version`, `licence`, `requires <game version>` (e.g. `0.1`; a newer one than the game refuses the mod). A mod that only mends the look may say `default on`:
+  it is then switched on until the player switches it off (the factory `sack-supports`).
 - **Options** the player sets on the mod's page:
   - `option <name> switch on|off`
   - `option <name> number <min> <max> <step> <default>` (within ±1,000,000, a step of 0.001 or more, the default on
@@ -225,6 +227,7 @@ View actions (only on `frame` or `key`):
 - `do render.scale <width> <height>` — the picture drawn at this size (160x120 to 4096x4096, never above the window's) and scaled up to the window with the nearest pixel. `do render.aspect <w>:<h>` — the picture keeps this shape, black bars where the window is wider or taller.
 - `do render.filter default|bilinear|nearest` — the textures' filtering: ours (mipmaps, anisotropic), bilinear from the largest level only (no mipmaps: distant textures shimmer), or the nearest texel.
 - `do render.fps_cap <n>` — at most n frames a second (0: no cap; the run's ticks keep their clock). `do render.colour_bits 16` — the colour cut to 5-6-5 bits without dithering (any other value: full colour).
+- `do render.supports <0|1|2>` — the supports under the swinging sacks' holders: none, one design for all (the first that stands clear: column, post, mast, gate, wall bracket), or the designs varied. The pieces come with the game's own sack (its `Supports_P_Modul_26` group); the game puts them together for each sack where nothing of them comes within 4.5 of the ball's space (the floors and rails and 9 over them), into another module's reach (a sack's swing, a fan's draught, 8 around any other part), through scenery or, for a column, into the usual camera's sight of the ball. `--supports-check geometry|runs` measures every placed support of the original levels and the shipped maps again, and against the recorded runs.
   These render actions are the view's only: the run stays classic and replays play the same. The game has no edge antialiasing to undo.
 - `do light <0..1>` — the level's light; `do lantern <0..1>` — a light over the ball.
 - `do show <corner> <label|-> <format> <value>[, <value>[, <value>]]` — a HUD line this frame; corners `top-left

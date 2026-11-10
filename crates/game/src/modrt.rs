@@ -138,6 +138,7 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::CameraSmooth(e)
         | Action::RenderFpsCap(e)
         | Action::RenderColourBits(e)
+        | Action::RenderSupports(e)
         | Action::Decoys(e)
         | Action::BallDeform(e)
         | Action::SetSector(e)
@@ -433,6 +434,13 @@ impl ViewMods {
                     }
                     Action::RenderFpsCap(_) => out.look.fps_cap = x.clamp(0.0, 1000.0).round() as u32,
                     Action::RenderColourBits(_) => out.look.colour_bits = if x.round() == 16.0 { 16 } else { 0 },
+                    Action::RenderSupports(_) => {
+                        out.look.supports = match x.round() as i32 {
+                            1 => crate::supports::PLAIN,
+                            2 => crate::supports::VARIED,
+                            _ => 0,
+                        }
+                    }
                     Action::Decoys(_) => out.decoys = x.clamp(0.0, 8.0).round() as u8,
                     Action::BallDeform(_) => out.deform = x.clamp(0.0, 1.0),
                     Action::ViewTurn(_) => out.turn = Some(x.rem_euclid(360.0).floor() as u16),
@@ -573,7 +581,11 @@ impl Mods {
         let on = found
             .iter()
             .map(|m| {
-                let want = setting(&format!("mod.{}", m.key)).as_deref() == Some("on");
+                // (a mod that is on by default stays on until the settings say off)
+                let want = match setting(&format!("mod.{}", m.key)).as_deref() {
+                    Some(v) => v == "on",
+                    None => m.parsed.as_ref().is_ok_and(|t| t.default_on),
+                };
                 match (&m.parsed, want) {
                     (Ok(t), true)
                         if spent.saturating_add(t.cost) <= gamedata::mods::MAX_TOTAL_COST =>
@@ -953,6 +965,7 @@ mod tests {
             "blackout"
         );
         assert!((out.ghost - 0.4).abs() < 1e-4, "spirit trail");
+        assert_eq!(look.supports, crate::supports::VARIED, "sack supports: varied by default");
         assert_eq!(out.splits, vec![Corner::TopRight], "segment timer");
         assert!(
             out.lines.iter().any(|l| l.1.starts_with("Speed 30.0")),
@@ -978,6 +991,34 @@ mod tests {
         view.out.lines.clear();
         view.fire(Event::Frame, &|_| 0.0, &sim, "en");
         assert_eq!(view.out.yaw, 0.0, "free view turned back");
+    }
+
+    #[test]
+    fn a_mod_on_by_default_is_on_until_switched_off() {
+        let txt = "name.en S\ndefault on\non frame\ndo render.supports 1\n";
+        let found = || {
+            vec![Mod {
+                key: "s".into(),
+                factory: true,
+                parsed: gamedata::mods::parse_mod_txt(txt),
+            }]
+        };
+        // nothing in the settings: on, and only the look (the run is not a modded one)
+        let fresh = Mods::load(found(), |_| None);
+        assert_eq!(fresh.on, vec![true]);
+        let (sim, mut view) = fresh.running(true);
+        assert!(!sim.modded() && sim.replay_lines().is_empty());
+        view.fire(Event::Frame, &|_| 0.0, &sim, "en");
+        assert_eq!(view.out.look.supports, crate::supports::PLAIN);
+        // the classic mode runs no mod, this one neither
+        assert!(fresh.running(false).1.is_empty());
+        // switched off it stays off: the settings say so from then on
+        let mut m = fresh;
+        m.toggle(0);
+        let lines = m.lines();
+        assert!(lines.contains(&("mod.s".into(), "off".into())));
+        let back = Mods::load(found(), |k| lines.iter().find(|l| l.0 == k).map(|l| l.1.clone()));
+        assert_eq!(back.on, vec![false]);
     }
 
     #[test]

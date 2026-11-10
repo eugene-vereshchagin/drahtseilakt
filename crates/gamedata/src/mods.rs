@@ -454,6 +454,9 @@ pub enum Action {
     RenderFpsCap(Expr),
     /// The colour depth of the picture: 16 shows the 5-6-5 bands, anything else full colour (view only).
     RenderColourBits(Expr),
+    /// The supports drawn under the swinging sacks' holders: 0 none, 1 one design for all, 2 the designs varied
+    /// (view only; the game's own parts have them, crates/game/src/supports.rs).
+    RenderSupports(Expr),
     /// So many translucent decoy balls wandering around the ball (0 to 8; view only).
     Decoys(Expr),
     /// The wooden ball's look deformed at random, 0 (round) to 1 (view only; the physics keeps its round ball).
@@ -551,6 +554,7 @@ impl Action {
             | Action::CameraSmooth(e)
             | Action::RenderFpsCap(e)
             | Action::RenderColourBits(e)
+            | Action::RenderSupports(e)
             | Action::Decoys(e)
             | Action::BallDeform(e)
             | Action::SetSector(e)
@@ -681,6 +685,8 @@ pub struct ModTxt {
     pub version: String,
     pub licence: String,
     pub requires: (u32, u32, u32),
+    /// Switched on until the player switches it off (`default on`): for a mod that only mends the look.
+    pub default_on: bool,
     pub options: Vec<OptSpec>,
     /// Labels: (name, language, text); an option's label is named like the option.
     pub labels: Vec<(String, String, String)>,
@@ -1282,6 +1288,7 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         }),
         "render.fps_cap" => Action::RenderFpsCap(e(args)?),
         "render.colour_bits" => Action::RenderColourBits(e(args)?),
+        "render.supports" => Action::RenderSupports(e(args)?),
         "steer.yaw" => Action::SteerYaw(e(args)?),
         "view.turn" => Action::ViewTurn(e(args)?),
         "decoys" => Action::Decoys(e(args)?),
@@ -1498,6 +1505,14 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
                             .ok_or_else(|| at(format!("not a version: \"{}\"", clip(&v))))?
                     }
                 }
+            }
+            "default" if !in_rule => {
+                once(key)?;
+                m.default_on = match rest {
+                    "on" => true,
+                    "off" => false,
+                    _ => return Err(at("expected: default on|off".into())),
+                };
             }
             "option" if !in_rule => {
                 if m.options.len() >= MAX_OPTIONS {
@@ -1945,6 +1960,12 @@ mod tests {
         ))
         .unwrap();
         assert!(!m.modded(), "looks only: the run stays classic");
+        // the sacks' supports are a look too, and a mod may be on by default
+        let supports = parse_mod_txt("name.en S\ndefault on\noption v switch on\non frame\ndo render.supports 1 + opt.v\n").unwrap();
+        assert!(supports.default_on && !supports.modded() && !m.default_on);
+        assert!(matches!(supports.rules[0].actions[0], Action::RenderSupports(_)));
+        assert!(parse_mod_txt("name.en S\ndefault maybe\n").is_err());
+        assert!(parse_mod_txt("name.en S\non tick\ndo render.supports 1\n").is_err(), "a view action on the run's event");
         let acts = &m.rules[0].actions;
         assert!(matches!(acts[0], Action::RenderScale(..)));
         assert_eq!(acts[1], Action::RenderFilter(2));
@@ -1958,6 +1979,7 @@ mod tests {
             "render.aspect 43",
             "render.fps_cap",
             "render.colour_bits 1 2",
+            "render.supports",
         ] {
             assert!(parse_mod_txt(&format!("{head}on frame\ndo {bad}\n")).is_err(), "{bad}");
         }
