@@ -93,6 +93,10 @@ Ein Level enthält Geometrie und **Gruppen**; die Spiellogik liegt in `base.cmo`
 Gruppennamen: `PS_Levelstart` (Start; seine Z-Achse zeigt zurück zur Kamera), `PR_Resetpoints`
 (Kugelmittelpunkte je Sektor), `PC_Checkpoints`, `PE_Levelende`, `Sector_NN`, `Phys_Floors` /
 `Phys_FloorRails` / `Phys_FloorStopper` (Kollision), `P_*` (Module und Gegenstände, deren Modelle aus
-`3D Entities/PH/*.nmo` kommen), Klanggruppen. Objekte dieser Gruppen, deren Mesh kein Material hat, sind
-Platzhalter des Editors und werden nie gezeichnet. Himmel und Startkugel jedes Levels stehen im Datenarray
+`3D Entities/PH/*.nmo` kommen), Klanggruppen. Ein Mitglied einer `P_*`-Gruppe ist ein Platzhalter: Das Spiel baut an
+seiner Stelle das Modul mit dem Namen der Gruppe, gleich wie das Mitglied heißt, aussieht oder ob es versteckt ist
+(eine Karte aus Blender nennt es `P_Modul_26_01_.001` und gibt ihm Mesh und Materialien des Teils selbst); der
+Platzhalter selbst wird nicht gezeichnet. In den Levels des Originals ist ein Platzhalter ein sichtbares Mesh ohne
+Material, nach seinem Modul benannt. Ein Boden, eine Schiene oder ein Stopper ohne Material ist Levelgeometrie und
+wird einfarbig gezeichnet. Himmel und Startkugel jedes Levels stehen im Datenarray
 `AllLevel` von `3D Entities/Levelinit.nmo`.

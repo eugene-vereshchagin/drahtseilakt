@@ -1669,10 +1669,7 @@ pub fn parts_used(data: &Data, level: &level::Level) -> Vec<String> {
         .filter(|n| n.to_ascii_lowercase().ends_with(".nmo"))
         .filter(|n| {
             let stem = n.get(..n.len().saturating_sub(4)).unwrap_or_default();
-            level
-                .objects
-                .iter()
-                .any(|o| level::module_name(&o.name).eq_ignore_ascii_case(stem))
+            (0..level.objects.len()).any(|i| level.module_of(i).eq_ignore_ascii_case(stem))
         })
         .take(1024)
         .collect();

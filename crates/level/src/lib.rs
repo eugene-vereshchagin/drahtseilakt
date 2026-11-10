@@ -311,6 +311,24 @@ impl Level {
             .find(|(_, o)| o.name.eq_ignore_ascii_case(name))
     }
 
+    /// The module a level object stands in for. The original's level init goes through the groups named after the
+    /// modules (`P_Modul_26`, `P_Box`, `P_Trafo_Stone`...) and makes the module at each member, whatever the member
+    /// is called; a map made in Blender names its stand-ins `P_Modul_26_01_.001`, which no name rule reads. So the
+    /// object's `P_` group says what it is, and only an object in no such group is read by its name.
+    pub fn module_of(&self, object: usize) -> &str {
+        self.module_group(object).unwrap_or_else(|| {
+            self.objects
+                .get(object)
+                .map_or("", |o| module_name(&o.name))
+        })
+    }
+
+    /// The module group an object is in (`P_Box`, `P_Modul_26`...), if any.
+    pub fn module_group(&self, object: usize) -> Option<&str> {
+        self.groups_of(object)
+            .find(|g| g.get(..2).is_some_and(|p| p.eq_ignore_ascii_case("P_")))
+    }
+
     /// Names of the groups an object belongs to.
     pub fn groups_of(&self, object: usize) -> impl Iterator<Item = &str> {
         self.groups
@@ -322,6 +340,44 @@ impl Level {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_stand_in_is_what_its_group_says_whatever_its_name() {
+        use super::{Group, Level, Object};
+        let object = |name: &str| Object {
+            name: name.into(),
+            matrix: [[0.0; 4]; 4],
+            mesh: None,
+            visible: true,
+            sprite: None,
+        };
+        let level = Level {
+            objects: vec![
+                object("P_Modul_26_01_.001"),
+                object("P_Box_03"),
+                object("Anything"),
+            ],
+            groups: vec![
+                Group {
+                    name: "Sector_01".into(),
+                    members: vec![0, 1, 2],
+                },
+                Group {
+                    name: "P_Modul_26".into(),
+                    members: vec![0],
+                },
+                Group {
+                    name: "p_ball_stone".into(),
+                    members: vec![2],
+                },
+            ],
+            ..Level::default()
+        };
+        assert_eq!(level.module_of(0), "P_Modul_26");
+        assert_eq!(level.module_of(1), "P_Box", "no module group: by its name");
+        assert_eq!(level.module_of(2), "p_ball_stone");
+        assert_eq!(level.module_of(9), "");
+    }
+
     #[test]
     fn a_placeholder_names_its_module_with_or_without_a_letter() {
         assert_eq!(super::module_name("P_Box_03"), "P_Box");

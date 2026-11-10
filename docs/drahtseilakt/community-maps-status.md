@@ -35,3 +35,28 @@ lights, textures and sounds).
 **What this means.** The native rules play every map; the interpreter for the template's nine blocks and the next
 twenty would cover what the scripted maps add (moving and hidden objects, physics changes, copies, messages, text,
 sounds). Maps are never run half-way: a map that needs a block not implemented is reported with its name.
+
+## The audit: what a map asks for and what it gets (2026-11-10)
+
+`drahtseilakt --audit FILE|DIR [--audit-csv FILE]` goes through a map or a folder of maps without a window, with
+the player's copy and without it, and lists for each map: every body the physics makes of a level object that is
+not drawn (an invisible blocker, with its name, place and the reason), the stand-ins no module is made for, the
+modules and textures nobody has, the objects of classes the loader leaves out, the alpha tests the renderer does
+not follow and the script blocks not known. The CSV has one row per map, copy and kind of issue with the names; the
+summary ranks the kinds by the number of maps they hit. `--show-colliders` draws the floors and rails a map hides
+(red) and its hidden stoppers (yellow) as translucent shapes in the game and in screenshots.
+
+The first run over 605 maps (the 26 shipped and the 579 of the collection) found the causes of "invisible
+objects", and three rules were changed for every map:
+
+| cause | maps | now |
+|---|---|---|
+| a stand-in was known by its name (`P_Modul_26_01`) and only when it was a visible mesh without a material; maps made in Blender name it `P_Modul_26_01_.001`, give it materials or hide it, so no module was made and the stand-in stayed as an unseen or plain white solid | 71 + 29 + 22 | a member of a module's group is a stand-in, as the original's level init takes it |
+| a floor, rail or stopper without a material collided but was not drawn | 42 | drawn plain |
+| a group that is no module of the game (a mod's `P_Modul_Portal`) made its members solid | 13 | never a body; drawn as the object it is |
+
+What is left, by the maps it hits (with the copy): floors and rails hidden in the file that collide, 204 maps, and
+hidden stoppers, 160 (the maps' own invisible colliders, as in the original; `--show-colliders` shows them);
+objects of classes not read, 136 (animations 83, 2D entities 32, curves, sounds, patch meshes); textures that name
+no file and carry no pixels, 35; meshes with faces without a material, 30 (drawn grey); modules of mods, 17; script
+blocks not known, 11; fully transparent floors, 6.
