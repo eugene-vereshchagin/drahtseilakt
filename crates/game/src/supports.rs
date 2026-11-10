@@ -1035,6 +1035,19 @@ const CHECK_FLOOR: f32 = 2.0 * BALL_RADIUS;
 const CHECK_SCENERY: f32 = 0.3;
 const CHECK_RUN: f32 = BALL_RADIUS + 1.0;
 
+/// A level loaded as the game loads it, its modules, and the supports planned for its sacks: what the game does
+/// when a mod first asks for supports (`Game::show_supports`), and what the check measures.
+type Planned = (crate::assets::LoadedLevel, crate::assets::Data, Modules, Plan);
+
+fn planned(data: &crate::assets::Data, source: &crate::assets::Source) -> Result<Planned, String> {
+    let data = data.for_source(source);
+    let loaded = data.load(source)?;
+    let data = data.with_parts(&loaded.level);
+    let modules = crate::scene::load_modules(&loaded.level, &data);
+    let plan = plan(&loaded.level, &modules);
+    Ok((loaded, data, modules, plan))
+}
+
 /// `--supports-check geometry|runs`: plans the supports of the original levels 1 to 13 (with the copy) and of every shipped map,
 /// measures each placed one again (`check`), with `runs` for the original levels also against the ball's way in
 /// the runs of `hints`, and prints what stands where, what does not and why, by level and by design. An error when a placed
@@ -1058,19 +1071,15 @@ pub fn run(o: &crate::Options, data: &crate::assets::Data, hints: Option<&std::p
     let mut by_design = [(0usize, 0usize, f32::MAX, f32::MAX, f32::MAX); 5];
     let (mut sacks, mut bare, mut failed) = (0usize, [0usize; 2], 0usize);
     for (name, source, replays) in sources {
-        let data = data.for_source(&source);
-        let loaded = match data.load(&source) {
-            Ok(l) => l,
+        let began = std::time::Instant::now();
+        let (loaded, data, modules, plan) = match planned(data, &source) {
+            Ok(p) => p,
             Err(e) => {
                 println!("{name}: {e}");
                 continue;
             }
         };
         let level = &loaded.level;
-        let data = data.with_parts(level);
-        let modules = crate::scene::load_modules(level, &data);
-        let began = std::time::Instant::now();
-        let plan = plan(level, &modules);
         let took = began.elapsed().as_secs_f32();
         if plan.sacks.is_empty() {
             continue;
@@ -1163,6 +1172,15 @@ pub fn run(o: &crate::Options, data: &crate::assets::Data, hints: Option<&std::p
     }
     if failed > 0 {
         return Err(format!("{failed} placed supports are too near the ball's space"));
+    }
+    if sacks == 0 {
+        // (every set of levels has sacks: none found means the models in use bring no supports, or no level loaded)
+        return Err(format!(
+            "no sack with a support to plan was found: the models in use are \"{}\" (the supports come with the game's \
+             own, --models own), the copy {}",
+            gamedata::packs::chosen(gamedata::packs::Kind::Models),
+            if data.has_copy() { "is there" } else { "is missing" }
+        ));
     }
     Ok(())
 }
@@ -1340,6 +1358,30 @@ mod tests {
             let out = (v.x / SWING_ACROSS).hypot(v.z / SWING_ALONG);
             assert!(v.length() >= SWING_REACH || v.y >= 0.0 || out >= -v.y, "{p} is in the other sack's swing");
         }
+    }
+
+    /// The check's path on the shipped maps with the game's own parts (no copy), up to the first map with a support:
+    /// it finds the sacks, plans supports, and those placed pass the second measure.
+    #[test]
+    fn the_check_finds_the_shipped_maps_sacks() {
+        let root = gamedata::resources::shipped_levels_root().expect("the shipped levels");
+        let data = crate::assets::Data::new(None);
+        let (mut sacks, mut placed) = (0, 0);
+        for file in crate::audit::maps(&root) {
+            // (one map with a support placed is enough: a debug build plans slowly)
+            if placed > 0 {
+                break;
+            }
+            let source = crate::assets::Source::Nmo(file.clone());
+            let (loaded, _, modules, plan) = planned(&data, &source).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
+            sacks += plan.sacks.len();
+            for s in plan.sacks.iter().filter_map(|s| s.varied.as_ref()).take(2) {
+                placed += 1;
+                let c = check(&loaded.level, &modules, s, &[]);
+                assert!(c.floor >= CHECK_FLOOR && c.scenery >= CHECK_SCENERY, "{}: {c:?}", file.display());
+            }
+        }
+        assert!(sacks > 0 && placed > 0, "{sacks} sacks, {placed} supports checked");
     }
 
     #[test]

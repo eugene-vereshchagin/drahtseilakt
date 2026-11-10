@@ -1227,6 +1227,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         return crate::audit::run(&o.audit, &data, o.audit_csv.as_deref(), &prepare);
     }
     if let Some(runs) = o.supports_check {
+        // the supports come with our own models (the original's have none), whatever the player's settings choose:
+        // the check measures them, unless --models asks for another pack
+        start_packs(o.textures.as_deref(), Some(o.models.as_deref().unwrap_or(gamedata::packs::OWN)));
         return crate::supports::run(&o, &data, runs.then_some(Path::new("hints")));
     }
     if let Some(dir) = &o.level_stats {
