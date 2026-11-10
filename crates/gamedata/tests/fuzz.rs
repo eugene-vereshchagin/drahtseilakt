@@ -2,6 +2,7 @@
 // crates/fuzzkit:
 //   image        a texture or picture (.bmp/.tga/.png/.jpg) as the game decodes it, and its header as the pixel
 //                budget reads it;
+//   gputex       a level's compressed texture (.dtx, gputex.rs): its header, the whole file, its decoding;
 //   level_txt    a level folder's level.txt;
 //   theme_txt    a sound theme's theme.txt;
 //   pack_txt     a texture or model pack's pack.txt (the same shape, read through packs.rs);
@@ -104,6 +105,99 @@ fn fuzz_image() {
     // a 4096 x 4096 picture is within the caps: 256 MiB decoded, and again as RGBA
     t.rss_mb = 1100;
     fuzzkit::fuzz(t, image_seeds, run_image);
+}
+
+// --- compressed textures -----------------------------------------------------------------------------------------
+
+/// The first byte picks how many of the largest levels are dropped, the rest is the file.
+pub fn run_gputex(input: &[u8]) {
+    use gamedata::gputex;
+    let Some((&skip, bytes)) = input.split_first() else {
+        return;
+    };
+    // the header alone, as the budget reads it: every size it gives is within the caps
+    if let Ok(h) = gputex::header(bytes) {
+        assert!(h.width <= gputex::SIDE_MAX && h.height <= gputex::SIDE_MAX);
+        assert!(h.width % 4 == 0 && h.height % 4 == 0 && h.width >= 4 && h.height >= 4);
+        assert!(h.file_len() <= gputex::FILE_MAX, "a file of {} bytes", h.file_len());
+        assert!(h.droppable() < h.mips.len());
+    }
+    let Ok(t) = gputex::texture(bytes.to_vec(), usize::from(skip)) else {
+        return;
+    };
+    // what the renderer uploads as it is: every level inside the data, of exactly its size, whole blocks first
+    let (w, h) = t.size();
+    assert!(w % 4 == 0 && h % 4 == 0 && w >= 4 && h >= 4);
+    for m in &t.mips {
+        let level = t.level(m).expect("a level outside the data");
+        assert_eq!(Some(level.len()), t.format.level_bytes(m.width, m.height));
+    }
+    // (a file can be 4096 x 4096 only by being that long: the fuzzer's are small, so decoding them is quick)
+    let rgba = gputex::decoded(&t).expect("a read texture decodes");
+    assert_eq!(rgba.mips.len(), t.mips.len());
+    for m in &rgba.mips {
+        assert_eq!(m.len as u64, u64::from(m.width) * u64::from(m.height) * 4);
+    }
+}
+
+fn gputex_seeds() -> Vec<Vec<u8>> {
+    use gamedata::gputex::{Format, write};
+    let mut out = Vec::new();
+    for (format, block) in [
+        (Format::Bc1, vec![0xff, 0xff, 0, 0, 0xe4, 0x1b, 0xe4, 0x1b]),
+        (Format::Bc7, {
+            let mut b = vec![0x40u8; 1];
+            b.extend([0x5a; 15]);
+            b
+        }),
+    ] {
+        for (w, h) in [(4u32, 4u32), (8, 4), (16, 16), (32, 8)] {
+            let (mut lw, mut lh, mut levels) = (w, h, Vec::new());
+            loop {
+                levels.push(block.repeat((lw.div_ceil(4) * lh.div_ceil(4)) as usize));
+                if lw == 1 && lh == 1 {
+                    break;
+                }
+                (lw, lh) = ((lw / 2).max(1), (lh / 2).max(1));
+            }
+            let file = write(format, w, h, (77, 99), &levels).expect("a seed is a valid file");
+            for skip in [0u8, 1] {
+                let mut s = vec![skip];
+                s.extend(&file);
+                out.push(s);
+            }
+        }
+    }
+    out
+}
+
+#[test]
+#[ignore]
+fn fuzz_gputex() {
+    let mut t = Target::new("gputex", test_name!("fuzz_gputex"), Kind::Binary);
+    t.max_len = 1 << 20;
+    fuzzkit::fuzz(t, gputex_seeds, run_gputex);
+}
+
+/// The seeds themselves pass (the fuzzer's entry point, run on every test run).
+#[test]
+fn gputex_seeds_read() {
+    for s in gputex_seeds() {
+        run_gputex(&s);
+        assert!(gamedata::gputex::read(&s[1..]).is_ok());
+    }
+    // and cut anywhere, or with any one byte changed, a seed is refused or still sound
+    let s = gputex_seeds().pop().unwrap();
+    for cut in 0..s.len() {
+        run_gputex(&s[..cut]);
+    }
+    for at in 1..s.len().min(200) {
+        for bit in [1u8, 0x80] {
+            let mut t = s.clone();
+            t[at] ^= bit;
+            run_gputex(&t);
+        }
+    }
 }
 
 // --- small text files ------------------------------------------------------------------------------------------
@@ -290,6 +384,7 @@ fn fuzz_sound_table() {
 #[test]
 fn fuzz_regressions() {
     fuzzkit::regressions("image", run_image);
+    fuzzkit::regressions("gputex", run_gputex);
     fuzzkit::regressions("level_txt", run_level_txt);
     fuzzkit::regressions("theme_txt", run_theme_txt);
     fuzzkit::regressions("pack_txt", run_pack_txt);

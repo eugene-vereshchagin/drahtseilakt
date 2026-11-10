@@ -16,9 +16,21 @@ pub const GAME_FILES: &str = "game";
 const GAME_FILE_MAX: u64 = 64 * 1024 * 1024;
 /// The largest Virtools file read (the original's are a few MB, the community's largest maps tens).
 const NMO_MAX: u64 = 256 * 1024 * 1024;
-/// The most texture pixels a level's own game files may bring in all (1 GB of RGBA), counted from their headers.
-const OVERLAY_PIXELS_MAX: u64 = 256 * 1024 * 1024;
-static OVERLAY_PIXELS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// The most texture memory a level's own game files may bring in all: 1 GiB, counted from their headers (a decoded
+/// picture is 4 bytes a pixel; a compressed texture, gputex.rs, is its file's data).
+const OVERLAY_BYTES_MAX: u64 = 1024 * 1024 * 1024;
+/// A decoded picture's bytes a pixel.
+const RGBA: u64 = 4;
+/// The share of what is left of the budget one of a level's own textures may take: a larger one is drawn smaller
+/// (without its largest mip levels) instead of taking the place of those that come after it.
+const SHARE: u64 = 8;
+/// The largest side a compressed texture is decoded at for an adapter that cannot draw it as it is (a 4K picture
+/// would be 85 MB of RGBA there).
+const DECODED_SIDE_MAX: u32 = 1024;
+/// The compressed textures of the level already counted, by their data's hash: one picture many of its parts carry
+/// is uploaded once (render.rs) and counted once.
+static OVERLAY_HASHES: std::sync::Mutex<Vec<(u64, usize)>> = std::sync::Mutex::new(Vec::new());
+static OVERLAY_BYTES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// The level's textures already counted (a texture decoded again, as a sky face is, counts once).
 static OVERLAY_COUNTED: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
 /// The budgeted pictures already kept as a texture's pixels in the level or one of its parts: each further texture
@@ -187,7 +199,10 @@ impl Data {
 
     pub fn for_level(&self, level_dir: Option<&Path>) -> Data {
         // each level brings its own textures, within the budget again
-        OVERLAY_PIXELS.store(0, std::sync::atomic::Ordering::Relaxed);
+        OVERLAY_BYTES.store(0, std::sync::atomic::Ordering::Relaxed);
+        if let Ok(mut hashes) = OVERLAY_HASHES.lock() {
+            hashes.clear();
+        }
         if let Ok(mut counted) = OVERLAY_COUNTED.lock() {
             counted.clear();
         }
@@ -1186,7 +1201,7 @@ impl Data {
         else {
             return false;
         };
-        if !charge(u64::from(w).saturating_mul(u64::from(h))) {
+        if !charge(u64::from(w).saturating_mul(u64::from(h)).saturating_mul(RGBA)) {
             return false;
         }
         if let Ok(mut counted) = OVERLAY_COUNTED.lock() {
@@ -1218,19 +1233,19 @@ impl Data {
             stored.push(path.to_path_buf());
             return true;
         }
-        charge(u64::from(width).saturating_mul(u64::from(height)))
+        charge(u64::from(width).saturating_mul(u64::from(height)).saturating_mul(RGBA))
     }
 }
 
-/// Takes `n` pixels from the level's budget, if they fit.
+/// Takes `n` bytes from the level's budget, if they fit.
 fn charge(n: u64) -> bool {
     use std::sync::atomic::Ordering;
-    let mut taken = OVERLAY_PIXELS.load(Ordering::Relaxed);
+    let mut taken = OVERLAY_BYTES.load(Ordering::Relaxed);
     loop {
-        let Some(next) = taken.checked_add(n).filter(|&t| t <= OVERLAY_PIXELS_MAX) else {
+        let Some(next) = taken.checked_add(n).filter(|&t| t <= OVERLAY_BYTES_MAX) else {
             return false;
         };
-        match OVERLAY_PIXELS.compare_exchange_weak(
+        match OVERLAY_BYTES.compare_exchange_weak(
             taken,
             next,
             Ordering::Relaxed,
@@ -1239,6 +1254,197 @@ fn charge(n: u64) -> bool {
             Ok(_) => return true,
             Err(now) => taken = now,
         }
+    }
+}
+
+/// What one more texture may take of the level's budget: a share of what is left.
+fn fair_share() -> u64 {
+    OVERLAY_BYTES_MAX.saturating_sub(OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed)) / SHARE
+}
+
+/// A texture chosen and counted, not yet read: `texture_plan` makes the plans one after another (the budget is
+/// taken in the level's order, so a level looks the same each time), `load` reads them, on any thread.
+pub enum TexturePlan {
+    /// Pixels already there (a small picture of the copy, of ours or of a pack).
+    Pixels(u32, u32, Vec<u8>),
+    /// A level's own picture file, decoded when loaded, its transparent colour made alpha 0, then halved `shrink`
+    /// times.
+    Picture {
+        path: PathBuf,
+        key: Option<[u8; 3]>,
+        shrink: u32,
+    },
+    /// A level's compressed texture, read without its `skip` largest levels; `decode`: as RGBA (no BC on the card).
+    Compressed {
+        path: PathBuf,
+        skip: usize,
+        decode: bool,
+    },
+}
+
+impl TexturePlan {
+    /// The texture with its mip levels, as the renderer uploads it.
+    pub fn load(self) -> Option<crate::gputex::TextureData> {
+        use crate::gputex::TextureData;
+        match self {
+            TexturePlan::Pixels(w, h, rgba) => TextureData::from_rgba(w, h, rgba),
+            TexturePlan::Picture { path, key, shrink } => {
+                let (mut w, mut h, mut rgba) = decode_capped(&path)?;
+                if let Some(key) = key {
+                    for [r, g, b, a] in rgba.as_chunks_mut::<4>().0 {
+                        if [*r, *g, *b] == key {
+                            *a = 0;
+                        }
+                    }
+                }
+                for _ in 0..shrink {
+                    if w <= 1 && h <= 1 {
+                        break;
+                    }
+                    rgba = crate::gputex::halve(w, h, &rgba)?;
+                    (w, h) = ((w / 2).max(1), (h / 2).max(1));
+                }
+                TextureData::from_rgba(w, h, rgba)
+            }
+            TexturePlan::Compressed { path, skip, decode } => {
+                let bytes = read_capped(&path, crate::gputex::FILE_MAX)?;
+                let t = match crate::gputex::texture(bytes, skip) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("{}: {e} (drawn plain)", path.display());
+                        return None;
+                    }
+                };
+                if decode {
+                    crate::gputex::decoded(&t)
+                } else {
+                    Some(t)
+                }
+            }
+        }
+    }
+}
+
+impl Data {
+    /// The plan for a texture the renderer is about to load; `bc`: the card draws BC-compressed textures. A level's
+    /// own picture (an open-format level's file) with a compressed texture beside it (`name.dtx` by `name.png`, the
+    /// toolbox's) is planned as that; any other texture is its pixels as `texture` gives them.
+    pub fn texture_plan(&self, t: &level::Texture, bc: bool) -> Option<TexturePlan> {
+        let level::TextureSource::LevelFile(path) = &t.source else {
+            return self.texture(t).map(|(w, h, rgba)| TexturePlan::Pixels(w, h, rgba));
+        };
+        let plan = self.level_file_plan(path, t.color_key, bc);
+        if plan.is_none() {
+            eprintln!("missing texture: {} (drawn plain)", t.name);
+        }
+        plan
+    }
+
+    fn level_file_plan(&self, path: &Path, key: Option<[u8; 3]>, bc: bool) -> Option<TexturePlan> {
+        // its folder a real one (a link there would lead out of the level's folder), the files plain ones
+        let plain = |p: &Path, cap: u64| {
+            std::fs::symlink_metadata(p)
+                .ok()
+                .filter(|m| m.is_file() && m.len() <= cap)
+                .map(|m| m.len())
+        };
+        if !path
+            .parent()
+            .is_some_and(|d| std::fs::symlink_metadata(d).is_ok_and(|m| m.is_dir()))
+        {
+            return None;
+        }
+        let picture = plain(path, IMAGE_MAX);
+        if let Some(plan) = self.compressed_plan(&path.with_extension("dtx"), picture, bc) {
+            return Some(plan);
+        }
+        picture?;
+        // a picture of the level's game files over its share of the budget is drawn smaller
+        let mut shrink = 0u32;
+        if self.budgeted(path, false) {
+            let (w, h) = image::ImageReader::open(path)
+                .ok()
+                .and_then(|r| r.with_guessed_format().ok())
+                .and_then(|r| r.into_dimensions().ok())?;
+            let size = |s: u32| {
+                u64::from((w >> s).max(1))
+                    .saturating_mul(u64::from((h >> s).max(1)))
+                    .saturating_mul(RGBA)
+            };
+            let share = fair_share();
+            while size(shrink) > share && shrink < 16 && (w >> shrink).max(h >> shrink) > 1 {
+                shrink = shrink.saturating_add(1);
+            }
+            if !charge(size(shrink)) {
+                return None;
+            }
+        }
+        Some(TexturePlan::Picture {
+            path: path.to_path_buf(),
+            key,
+            shrink,
+        })
+    }
+
+    /// The compressed texture at `path`, if it is one made from the picture beside it (`picture`: that file's
+    /// length; none: the level carries only the compressed one): its header read and checked, the levels chosen
+    /// that fit its share of the budget (a level's own game files) or the adapter (no BC: decoded, at most
+    /// DECODED_SIDE_MAX a side).
+    fn compressed_plan(&self, path: &Path, picture: Option<u64>, bc: bool) -> Option<TexturePlan> {
+        use std::io::Read;
+        let len = std::fs::symlink_metadata(path)
+            .ok()
+            .filter(|m| m.is_file() && m.len() <= crate::gputex::FILE_MAX)?
+            .len();
+        let mut head = [0u8; crate::gputex::HEADER_LEN];
+        std::fs::File::open(path).ok()?.read_exact(&mut head).ok()?;
+        let h = crate::gputex::header(&head).ok()?;
+        if h.file_len() != len || picture.is_some_and(|p| p != h.source_len) {
+            return None;
+        }
+        let droppable = h.droppable();
+        let mut skip = 0usize;
+        let side = |skip: usize| h.mips.get(skip).map_or(0, |m| m.width.max(m.height));
+        // what the levels from `skip` on take: their blocks, or their pixels when decoded
+        let bytes = |skip: usize| -> u64 {
+            if bc {
+                u64::try_from(h.bytes_from(skip)).unwrap_or(u64::MAX)
+            } else {
+                h.mips.iter().skip(skip).fold(0u64, |n, m| {
+                    n.saturating_add(u64::from(m.width).saturating_mul(u64::from(m.height)).saturating_mul(RGBA))
+                })
+            }
+        };
+        while !bc && skip < droppable && side(skip) > DECODED_SIDE_MAX {
+            skip = skip.saturating_add(1);
+        }
+        if self.budgeted(path, false) {
+            let known = OVERLAY_HASHES
+                .lock()
+                .ok()
+                .and_then(|k| k.iter().find(|(hash, _)| *hash == h.data_hash).map(|(_, s)| *s));
+            match known {
+                // the same picture again: drawn as the first of it is
+                Some(first) => skip = first,
+                None => {
+                    let share = fair_share();
+                    while skip < droppable && bytes(skip) > share {
+                        skip = skip.saturating_add(1);
+                    }
+                    if !charge(bytes(skip)) {
+                        return None;
+                    }
+                    if let Ok(mut k) = OVERLAY_HASHES.lock() {
+                        k.push((h.data_hash, skip));
+                    }
+                }
+            }
+        }
+        Some(TexturePlan::Compressed {
+            path: path.to_path_buf(),
+            skip,
+            decode: !bc,
+        })
     }
 }
 
@@ -2004,8 +2210,8 @@ mod tests {
             .unwrap();
         let data = Data::new(None).for_level(None);
         // room for three copies of the 2 × 2 picture: the first counted when decoded, two more as copies
-        OVERLAY_PIXELS.store(
-            OVERLAY_PIXELS_MAX - 12,
+        OVERLAY_BYTES.store(
+            OVERLAY_BYTES_MAX - 12 * RGBA,
             std::sync::atomic::Ordering::Relaxed,
         );
         let mut level = level::Level {
@@ -2023,6 +2229,67 @@ mod tests {
             .filter(|t| first_pixel(t) == Some([10, 20, 30, 255]))
             .count();
         assert_eq!(replaced, 3);
+        let _ = Data::new(None).for_level(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner's remastered level drew its boxes plain white: the parts' 4K pictures were past the budget. A
+    /// texture over its share is drawn smaller instead, and a compressed one beside a picture is taken first, counted
+    /// once however many parts carry it, and refused when it is not that picture's.
+    #[test]
+    fn a_level_texture_over_its_share_is_drawn_smaller_never_plain() {
+        use crate::gputex::{Format, write};
+        let _lock = budget_lock();
+        let root = std::env::temp_dir().join(format!("drahtseilakt-plan-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let textures = root.join(GAME_FILES).join("textures");
+        std::fs::create_dir_all(&textures).unwrap();
+        let png = textures.join("0000_a.png");
+        image::RgbaImage::from_pixel(64, 64, image::Rgba([255, 0, 255, 255])).save(&png).unwrap();
+        let data = Data::new(None).for_level(Some(&root));
+        let t = level::Texture {
+            name: "a".into(),
+            source: level::TextureSource::LevelFile(png.clone()),
+            color_key: Some([255, 0, 255]),
+        };
+        let left = |bytes: u64| OVERLAY_BYTES.store(OVERLAY_BYTES_MAX - bytes, std::sync::atomic::Ordering::Relaxed);
+        // room for it eight times over: whole; for a 16th of that: halved twice, keyed
+        left(64 * 64 * 4 * SHARE);
+        let whole = data.texture_plan(&t, true).unwrap().load().unwrap();
+        assert_eq!(whole.size(), (64, 64));
+        left(64 * 64 * 4 * SHARE / 16);
+        let small = data.texture_plan(&t, true).unwrap().load().unwrap();
+        assert_eq!(small.size(), (16, 16));
+        assert_eq!(small.data.get(..4), Some(&[255, 0, 255, 0][..]));
+        // a compressed texture of that picture beside it: taken, whole while it fits, without its top level else
+        let block = { let mut b = [0u8; 16]; b[0] = 0x40; b };
+        let levels: Vec<Vec<u8>> = [256usize, 64, 16, 4, 1, 1, 1].iter().map(|n| block.repeat(*n)).collect();
+        let len = std::fs::metadata(&png).unwrap().len();
+        let dtx = textures.join("0000_a.dtx");
+        std::fs::write(&dtx, write(Format::Bc7, 64, 64, (len, 0), &levels).unwrap()).unwrap();
+        let _ = data.for_level(Some(&root));
+        let c = data.texture_plan(&t, true).unwrap().load().unwrap();
+        assert_eq!((c.format, c.size(), c.mips.len()), (Format::Bc7, (64, 64), 7));
+        // the same file again is not counted again
+        let taken = OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(data.texture_plan(&t, true).is_some());
+        assert_eq!(OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed), taken);
+        let _ = data.for_level(Some(&root));
+        left(256 * 16 * SHARE / 2);
+        let c = data.texture_plan(&t, true).unwrap().load().unwrap();
+        assert_eq!((c.size(), c.mips.len()), ((32, 32), 6));
+        // no BC on the card: decoded
+        let _ = data.for_level(Some(&root));
+        let c = data.texture_plan(&t, false).unwrap().load().unwrap();
+        assert_eq!((c.format, c.size()), (Format::Rgba, (64, 64)));
+        // made from another picture (its length differs), or damaged: the picture itself
+        std::fs::write(&dtx, write(Format::Bc7, 64, 64, (len + 1, 0), &levels).unwrap()).unwrap();
+        let c = data.texture_plan(&t, true).unwrap().load().unwrap();
+        assert_eq!(c.format, Format::Rgba);
+        let mut bad = write(Format::Bc7, 64, 64, (len, 0), &levels).unwrap();
+        *bad.last_mut().unwrap() ^= 1;
+        std::fs::write(&dtx, bad).unwrap();
+        assert!(data.texture_plan(&t, true).unwrap().load().is_none());
         let _ = Data::new(None).for_level(None);
         let _ = std::fs::remove_dir_all(&root);
     }

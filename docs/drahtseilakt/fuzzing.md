@@ -19,7 +19,7 @@ scripts/fuzz.sh 3600 2 nmo_file    # one target, an hour
 FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -- --ignored --nocapture
 ```
 
-Targets: `nmo_file`, `nmo_chunk`, `open_level` (crate `level`); `image`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
+Targets: `nmo_file`, `nmo_chunk`, `open_level` (crate `level`); `image`, `gputex`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
 (`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `zones`, `learned`, `wav`, `ogg`, `highscore`,
 `settings`, `level_sim` — a level loaded and played for a second, which takes a stranger's map past its reader
 into the physics and the rules — and `module_sim` — a module file in place of one an original level uses (a level

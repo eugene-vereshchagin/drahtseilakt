@@ -3144,9 +3144,19 @@ async fn adapter_device(
         })
         .await
         .map_err(|e| format!("no graphics adapter: {e}"))?;
+    // block-compressed textures (a remastered level's, gputex.rs) where the adapter has them: every desktop card
+    // under Vulkan and Direct3D 12 and every Mac's under Metal; without them (some phones' chips, software
+    // adapters) the game decodes them itself. DRAHTSEILAKT_NO_BC=1 plays as such an adapter does (for testing).
+    let bc = wgpu::Features::TEXTURE_COMPRESSION_BC;
+    let wanted = if std::env::var_os("DRAHTSEILAKT_NO_BC").is_some() {
+        wgpu::Features::empty()
+    } else {
+        adapter.features() & bc
+    };
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor {
             label: Some("drahtseilakt"),
+            required_features: wanted,
             ..Default::default()
         })
         .await
@@ -3161,7 +3171,7 @@ fn upload_menu_scene(
     data: &Data,
 ) {
     if let Some(ms) = scene {
-        let loader = |t: &level::Texture| data.texture(t);
+        let loader = |t: &level::Texture, bc: bool| data.texture_plan(t, bc);
         ms.model = Some(renderer.add_model(&ms.level, &loader));
     }
 }
@@ -3172,7 +3182,9 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     // the level's light colour (the level table's Light; white for a level without a row)
     renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
     renderer.fog = game.level.level.settings.fog;
-    let loader = |t: &level::Texture| data.texture(t);
+    let loader = |t: &level::Texture, bc: bool| data.texture_plan(t, bc);
+    let started = std::time::Instant::now();
+    renderer.begin_level();
     renderer.add_model(&game.level.level, &loader);
     renderer.add_model(&game.balls.level, &loader);
     // the level's sky by its name (a name that could not name a file is taken as none); closed when it has a top
@@ -3195,6 +3207,19 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     if let Some((file, _)) = &game.trafo {
         renderer.add_model(&file.level, &loader);
     }
+    let t = renderer.texture_stats;
+    eprintln!(
+        "textures: {} uploaded ({} compressed, {} shared with them), {} MB of video memory, in {:.2} s (reading {:.2} s, \
+         upload {:.2} s){}",
+        t.uploaded,
+        t.compressed,
+        t.shared,
+        t.bytes / (1024 * 1024),
+        started.elapsed().as_secs_f64(),
+        t.read.as_secs_f64(),
+        t.upload.as_secs_f64(),
+        if renderer.bc { "" } else { "; no BC on this adapter: compressed textures are decoded, smaller" }
+    );
     let shadow = level::Texture {
         name: "HardShadow".into(),
         source: level::TextureSource::File("HardShadow.bmp".into()),

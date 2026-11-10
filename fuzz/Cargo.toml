@@ -61,6 +61,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "gputex"
+path = "fuzz_targets/gputex.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "level_txt"
 path = "fuzz_targets/level_txt.rs"
 test = false

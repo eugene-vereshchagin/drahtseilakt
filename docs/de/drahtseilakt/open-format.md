@@ -40,6 +40,46 @@ Ein Ordner mit:
   gleich; für jedes andere Level in der Kopie und danach in unseren. Ein Pfad in `game/`, auf dem etwas ein Link ist, findet nichts. `--export` und die
   Toolbox schreiben ihn.
 
+## Komprimierte Texturen
+
+Neben einem großen Bild `textures/NNNN_name.png` kann ein Level `textures/NNNN_name.dtx` tragen: dasselbe Bild fertig
+für die Grafikkarte — blockkomprimiert, mit der ganzen Mip-Kette im Voraus. Beim Laden dekodiert das Spiel dann weder
+das PNG noch filtert es Mips, und die Textur belegt ein Achtel (BC1) oder ein Viertel (BC7) des Videospeichers. Das
+`remaster` der Toolbox schreibt sie (Bilder ab 512 x 512, deren Seiten Vielfache von vier sind); die Leveldatei nennt
+sie nicht. Die Teile eines Levels in `game/` tragen ihre ebenso.
+
+Die Datei (Little-Endian), `crates/gamedata/src/gputex.rs`:
+
+| Bytes | was |
+|---|---|
+| 0–3 | `DSTX` |
+| 4–5 | Version, 1 |
+| 6 | Format: 1 = BC1 (deckende Farbe, 4 Bit je Pixel), 2 = BC7 (mit Alpha oder eine Normal Map mit Höhe; 8 Bit je Pixel) |
+| 7 | Mip-Stufen: immer die ganze Kette bis 1 x 1 |
+| 8–11, 12–15 | Breite, Höhe: Vielfache von 4, höchstens 4096 |
+| 16–23, 24–31 | die Bilddatei, aus der sie gemacht wurde: Länge und Hash |
+| 32–39 | der Hash der folgenden Daten |
+| 40– | die Blöcke der Mip-Stufen, die größte zuerst, danach nichts |
+
+Der Hash ist FNV-1a über 8-Byte-Wörter in Little-Endian (das Ende mit Nullen aufgefüllt), dann die Länge. BC1-Blöcke
+sind im Vier-Farben-Modus (die erste Farbe die größere) oder einfarbig; BC7-Blöcke sind vom Modus 6. Die Texturen sind
+nicht sRGB (das Spiel beleuchtet im Gamma-Raum, wie das Original).
+
+Die Datei ist fremd wie der Rest eines Levels: Der Kopf wird gegen die Grenzen geprüft, bevor etwas gelesen wird, die
+Länge muss genau die sein, die der Kopf ergibt, die Daten müssen zu ihrem Hash passen und nur die genannten Blöcke
+enthalten, und einem Link wird nie gefolgt. Eine Datei, die eine andere Bildlänge nennt als das PNG daneben, oder
+deren Kopf nicht besteht, wird übergangen und das PNG genommen; eine mit beschädigten Daten wird ohne Textur
+gezeichnet und gemeldet (das Level neu remastern). Ein Level darf die `.dtx` auch ohne das PNG tragen.
+
+- **Adapter.** BC gibt es auf jeder Desktop-Karte unter Vulkan und Direct3D 12 und auf jedem Mac unter Metal. Wo es
+  fehlt (Chips mancher Telefone, manche Software-Adapter), dekodiert das Spiel die Blöcke selbst, ab der Mip-Stufe mit
+  höchstens 1024 je Seite. Geprüft unter Linux (Vulkan, NVIDIA) auf beide Arten; Windows und macOS nicht gelaufen.
+- **Speicher.** Die eigenen Spieldateien eines Levels (`game/`) teilen ein Budget von 1 GiB Texturspeicher; eine
+  Textur nimmt höchstens ein Achtel des Rests — eine größere wird ohne ihre größten Mip-Stufen gezeichnet (ein PNG
+  halbiert), nie blank. Ein Bild, das mehrere Teile tragen (dieselben Daten), wird einmal geladen und gezählt.
+- **Laden.** Texturen werden zu acht gelesen, jede in ihrem eigenen Thread, und hochgeladen, wie sie kommen. Das Spiel
+  gibt aus, wie viele es geladen hat, ihren Videospeicher und die Zeit.
+
 ## Inhalt
 
 - **Knoten**: einer je Objekt des Levels, der Reihe nach, mit Name, Weltmatrix `matrix` und, wenn es gezeichnet
