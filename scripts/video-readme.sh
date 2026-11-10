@@ -6,7 +6,7 @@
 #
 #   scripts/video-readme.sh LEVEL REPLAY OUT.mp4 [WxH]
 #
-# VIDEO_MODE names the run's style: test (the default: test runs and early tries), calm, speedrun or collector.
+# VIDEO_MODE names the run's style: test (the default: test runs and early tries), calm, speedrun or collector, or remaster (a remastered original level).
 set -eu
 level=$1; replay=$2; out=$3; size=${4:-1920x1080}
 here=$(dirname "$0")
@@ -16,7 +16,8 @@ case $mode in
     calm) mode_line="calm: steady and safe, every checkpoint" ;;
     speedrun) mode_line="speedrun: the fastest way found, risky tricks allowed" ;;
     collector) mode_line="collector: every extra point and life" ;;
-    *) echo "VIDEO_MODE: test, calm, speedrun or collector" >&2; exit 1 ;;
+    remaster) mode_line="remaster: the full beauty pass of the original level — every texture enlarged by the toolbox (up to 4096 px), rounded shapes, relief, the parts redrawn in the same way; not an early try" ;;
+    *) echo "VIDEO_MODE: test, calm, speedrun, collector or remaster" >&2; exit 1 ;;
 esac
 # The video's README: what it shows and what it was made with (the same choices the game made from its settings).
 settings=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/settings.txt
