@@ -1262,51 +1262,110 @@ SUPPORT_DEPTH = 240.0
 def sack_supports(p):
     """What the sack's holder hangs on (the original's hangs in the air): pieces the game puts together for each
     sack where nothing of them comes near the ball's way (crates/game/src/supports.rs, the `sack-supports` mod).
-    Drawn only, never in the `All_` group. Every piece is in the holder's frame, +x away from the sack: the beam is
-    one unit long from the holder and is drawn stretched to its length; the others stand at the beam's far end."""
+    Drawn only, never in the `All_` group. Every piece is in the holder's frame, +x away from the sack. Of each of
+    the three materials (timber, iron, rail tube) there is a beam, one unit long from the holder and drawn stretched
+    to its length, and a mount that holds the holder's plate to it; the posts stand at the beam's far end, each with
+    the joint that takes its beam (a band round a column or a mast, a bolted shoe on a timber post, a bend of the
+    tube itself). Every member is level or upright: nothing leans but the rail tube's quarter bend."""
     g = k.GAME
     wood = p.mat("P_Modul_26_Balken", "wood_dark.png", diffuse=0.75, emissive=0.38)
     iron = p.mat("P_Modul_26_Halter", "iron.png", diffuse=0.62, emissive=0.4, specular=0.5, power=20)
     beige = p.mat("P_Modul_26_Saeule", g + "Column_beige", diffuse=1.0, emissive=0.32)
     brick = p.mat("P_Modul_26_Sims", g + "Brick", diffuse=1.0, emissive=0.3)
     stripes = p.mat("P_Modul_26_Mast", g + "Stick_Stripes", diffuse=1.0, emissive=0.35, specular=0.2, power=40)
+    # the track's own rail tube (levelkit's "rail")
+    rail = p.mat("P_Modul_26_Rohr", g + "Track_Rail", diffuse=1.0, emissive=0.22, specular=0.85, power=40,
+                 normal=g + "Track_Rail_n")
     d = SUPPORT_DEPTH
-    # the beam: over the holder's plate, a hand's width
-    beam = k.Mesh("P_Modul_26_Support_Beam_Mesh")
-    k.box(beam, wood, (0.0, -0.06, -0.2), (1.0, 0.36, 0.2))
-    # a stone column as the track's own, a brick cornice and a flat cap; the beam rests in its side on a corbel
+    X, Y = (1, 0, 0), (0, 1, 0)
+    # the heights of the beams' middles over the holder's plate (its top is at 0.255), and the rail tube's radius
+    # (levelkit.RAIL_TUBE) and bend
+    arm, tube_y, tube_r, bend = 0.5, 0.6, 0.3, 0.9
+
+    def bolts(m, pts, axis, r=0.07, out=0.06):
+        for q in pts:
+            k.cylinder(m, iron, q, axis, r, out, seg=6)
+
+    # the beams: a timber, an iron pipe, a rail tube
+    beam_wood = k.Mesh("P_Modul_26_Support_Beam_Wood_Mesh")
+    k.box(beam_wood, wood, (0.0, 0.27, -0.2), (1.0, 0.73, 0.2))
+    beam_iron = k.Mesh("P_Modul_26_Support_Beam_Iron_Mesh")
+    k.cylinder(beam_iron, iron, (0.0, arm, 0.0), X, 0.16, 1.0, seg=10, caps=False)
+    beam_rail = k.Mesh("P_Modul_26_Support_Beam_Rail_Mesh")
+    k.cylinder(beam_rail, rail, (0.0, tube_y, 0.0), X, tube_r, 1.0, seg=12, caps=False)
+    # the mounts. Timber: a head block over the plate, two iron straps round both, bolted through
+    mount_wood = k.Mesh("P_Modul_26_Support_Mount_Wood_Mesh")
+    k.box(mount_wood, wood, (-0.85, 0.255, -1.55), (0.85, 0.82, 1.55))
+    for z in (-1.0, 1.0):
+        k.box(mount_wood, iron, (-0.9, -0.05, z - 0.13), (0.9, 0.87, z + 0.13))
+        bolts(mount_wood, [(-0.5, 0.87, z), (0.5, 0.87, z)], Y)
+    # iron: a flange bolted on the plate and a hub the pipe is screwed into from any side
+    mount_iron = k.Mesh("P_Modul_26_Support_Mount_Iron_Mesh")
+    k.cylinder(mount_iron, iron, (0.0, 0.255, 0.0), Y, 0.66, 0.09, seg=12)
+    k.cylinder(mount_iron, iron, (0.0, 0.34, 0.0), Y, 0.3, 0.46, seg=10)
+    k.sphere(mount_iron, iron, (0.0, 0.8, 0.0), 0.3, seg=10)
+    bolts(mount_iron, [(0.5 * math.cos(a), 0.345, 0.5 * math.sin(a)) for a in (0.8, 2.4, 3.9, 5.5)], Y)
+    # rail tube: it runs on over the plate in two clamps on a foot plate, as the track's rails in theirs
+    mount_rail = k.Mesh("P_Modul_26_Support_Mount_Rail_Mesh")
+    k.cylinder(mount_rail, rail, (-0.62, tube_y, 0.0), X, tube_r, 0.62, seg=12)
+    k.box(mount_rail, iron, (-0.66, 0.255, -0.55), (0.66, 0.32, 0.55))
+    for x in (-0.4, 0.26):
+        k.cylinder(mount_rail, iron, (x, tube_y, 0.0), X, tube_r + 0.07, 0.14, seg=12)
+        k.box(mount_rail, iron, (x, 0.32, -0.45), (x + 0.14, 0.44, 0.45))
+        bolts(mount_rail, [(x + 0.07, 0.44, -0.36), (x + 0.07, 0.44, 0.36)], Y, r=0.05)
+    # a stone column as the track's own, a brick cornice and a flat cap; an iron band round it takes the pipe
     col = k.Mesh("P_Modul_26_Support_Column_Mesh")
-    k.box(col, beige, (-0.1, -d, -1.0), (1.9, 1.0, 1.0))
-    k.box(col, brick, (-0.3, 0.1, -1.2), (2.1, 1.0, 1.2))
-    k.box(col, beige, (-0.2, 1.0, -1.1), (2.0, 1.3, 1.1))
-    k.box(col, beige, (-0.8, -0.8, -0.32), (-0.1, -0.06, 0.32))
-    # a striped mast with a ball on its top; a tie rod from the top holds the beam
+    k.box(col, beige, (-0.1, -d, -1.0), (1.9, 2.1, 1.0))
+    k.box(col, brick, (-0.3, 1.3, -1.2), (2.1, 2.1, 1.2))
+    k.box(col, beige, (-0.2, 2.1, -1.1), (2.0, 2.4, 1.1))
+    k.box(col, iron, (-0.17, arm - 0.3, -1.07), (1.97, arm + 0.3, 1.07))
+    k.cylinder(col, iron, (-0.5, arm, 0.0), X, 0.24, 0.34, seg=10)
+    bolts(col, [(-0.17, arm, z) for z in (-0.75, 0.75)], (-1, 0, 0))
+    bolts(col, [(x, arm, s * 1.07) for x in (0.3, 1.5) for s in (-1, 1)], (0, 0, 1))
+    # a striped mast with a ball on its top; a collar round it takes the pipe
     mast = k.Mesh("P_Modul_26_Support_Mast_Mesh")
-    k.cylinder(mast, stripes, (0.45, -d, 0.0), (0, 1, 0), 0.42, d + 4.6, seg=10, vscale=5.0)
-    k.cylinder(mast, iron, (0.45, -0.3, 0.0), (0, 1, 0), 0.56, 0.9, seg=10)
-    k.cylinder(mast, iron, (0.45, 3.9, 0.0), (0, 1, 0), 0.54, 0.5, seg=10)
-    k.sphere(mast, iron, (0.45, 5.0, 0.0), 0.55, seg=10)
-    k.tube(mast, iron, [(0.45, 4.15, 0.0), (-3.6, 0.36, 0.0)], 0.07, seg=6, caps=True)
-    # a timber post with a strut under the beam (a gallows; two of them make a gate)
+    k.cylinder(mast, stripes, (0.45, -d, 0.0), Y, 0.42, d + 2.0, seg=10, vscale=5.0)
+    k.cylinder(mast, iron, (0.45, arm - 0.32, 0.0), Y, 0.55, 0.64, seg=10)
+    k.cylinder(mast, iron, (-0.38, arm, 0.0), X, 0.24, 0.4, seg=10)
+    k.cylinder(mast, iron, (0.45, 1.8, 0.0), Y, 0.52, 0.3, seg=10)
+    k.sphere(mast, iron, (0.45, 2.5, 0.0), 0.5, seg=10)
+    # a timber post (two of them make a gate): the beam sits in an iron shoe bolted to its head,
+    # under an iron cap
     post = k.Mesh("P_Modul_26_Support_Post_Mesh")
-    k.box(post, wood, (0.0, -d, -0.34), (0.68, 0.9, 0.34))
-    k.box(post, iron, (-0.06, 0.9, -0.4), (0.74, 1.02, 0.4))
-    s = 1 / math.sqrt(2)
-    k.obox(post, wood, (-1.45, -1.5, 0.0), ((-s, s, 0), (s, s, 0), (0, 0, 1)), (2.05, 0.17, 0.17))
-    # an iron plate against a wall, a short strut from its foot to the beam
-    plate = k.Mesh("P_Modul_26_Support_Bracket_Mesh")
-    k.box(plate, iron, (-0.14, -1.5, -0.6), (0.0, 0.9, 0.6))
-    k.obox(plate, iron, (-0.75, -0.72, 0.0), ((-s, s, 0), (s, s, 0), (0, 0, 1)), (0.95, 0.09, 0.12))
+    k.box(post, wood, (0.0, -d, -0.34), (0.68, 1.15, 0.34))
+    k.box(post, iron, (-0.06, 1.15, -0.4), (0.74, 1.27, 0.4))
+    k.box(post, iron, (-0.06, 0.05, -0.4), (0.0, 0.95, 0.4))
+    k.box(post, iron, (-0.55, 0.2, -0.26), (-0.06, 0.8, 0.26))
+    bolts(post, [(-0.06, y, z) for y in (0.17, 0.83) for z in (-0.32, 0.32)], (-1, 0, 0))
+    bolts(post, [(-0.3, 0.5, s * 0.26) for s in (-1, 1)], (0, 0, 1), out=0.05)
+    # a tube of the track's rails coming up beside the track and bending over into the beam, a sleeve at the joint
+    rail_post = k.Mesh("P_Modul_26_Support_Rail_Mesh")
+    k.cylinder(rail_post, rail, (bend, -d, 0.0), Y, tube_r, d + tube_y - bend, seg=12, caps=False)
+    arc = [(bend * math.sin(a), tube_y - bend + bend * math.cos(a), 0.0)
+           for a in (math.pi / 2 * i / 8 for i in range(9))]
+    k.tube(rail_post, rail, arc, tube_r, seg=12)
+    k.cylinder(rail_post, iron, (-0.12, tube_y, 0.0), X, tube_r + 0.07, 0.24, seg=12)
+    k.cylinder(rail_post, iron, (bend, tube_y - bend - 0.24, 0.0), Y, tube_r + 0.07, 0.24, seg=12)
+    # an iron plate bolted on a wall or a pillar of the level, a socket on it for the pipe
+    plate = k.Mesh("P_Modul_26_Support_Wall_Mesh")
+    k.box(plate, iron, (-0.12, arm - 0.75, -0.6), (0.0, arm + 0.75, 0.6))
+    k.cylinder(plate, iron, (-0.5, arm, 0.0), X, 0.24, 0.38, seg=10)
+    bolts(plate, [(-0.12, arm + y, z) for y in (-0.55, 0.55) for z in (-0.42, 0.42)], (-1, 0, 0))
     # each post's plain shaft, which the game puts under it as often as a level is deep
     col_shaft = k.Mesh("P_Modul_26_Support_Column_Shaft_Mesh")
     k.box(col_shaft, beige, (-0.1, -d, -1.0), (1.9, 0.0, 1.0))
     mast_shaft = k.Mesh("P_Modul_26_Support_Mast_Shaft_Mesh")
-    k.cylinder(mast_shaft, stripes, (0.45, -d, 0.0), (0, 1, 0), 0.42, d, seg=10, vscale=5.0)
+    k.cylinder(mast_shaft, stripes, (0.45, -d, 0.0), Y, 0.42, d, seg=10, vscale=5.0)
     post_shaft = k.Mesh("P_Modul_26_Support_Post_Shaft_Mesh")
     k.box(post_shaft, wood, (0.0, -d, -0.34), (0.68, 0.0, 0.34))
+    rail_shaft = k.Mesh("P_Modul_26_Support_Rail_Shaft_Mesh")
+    k.cylinder(rail_shaft, rail, (bend, -d, 0.0), Y, tube_r, d, seg=12, caps=False)
     names = []
-    for name, mesh in (("Beam", beam), ("Column", col), ("Mast", mast), ("Post", post), ("Bracket", plate),
-                       ("Column_Shaft", col_shaft), ("Mast_Shaft", mast_shaft), ("Post_Shaft", post_shaft)):
+    for name, mesh in (("Beam_Wood", beam_wood), ("Beam_Iron", beam_iron), ("Beam_Rail", beam_rail),
+                       ("Mount_Wood", mount_wood), ("Mount_Iron", mount_iron), ("Mount_Rail", mount_rail),
+                       ("Column", col), ("Mast", mast), ("Post", post), ("Rail", rail_post), ("Wall", plate),
+                       ("Column_Shaft", col_shaft), ("Mast_Shaft", mast_shaft), ("Post_Shaft", post_shaft),
+                       ("Rail_Shaft", rail_shaft)):
         names.append("P_Modul_26_Support_" + name)
         p.node(names[-1], p.mesh(mesh), pos=(0, 14.964, 0))
     p.group("Supports_P_Modul_26", names)

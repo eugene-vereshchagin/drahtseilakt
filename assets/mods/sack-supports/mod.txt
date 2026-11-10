@@ -1,5 +1,6 @@
 # Sack supports: the swinging sacks' holders, which float in the air in the original, hang on something: a stone
-# column, a striped mast, a timber post, a gate of two posts beside the track, or a beam to a wall that stands near.
+# column, a striped mast, a timber post, a gate of two posts or a post of rail tube beside the track, a beam to a wall
+# or pillar that stands near, or a cross-beam to a neighbour's holder (a group of sacks on one or two supports).
 # The game chooses for each sack, as the level loads, what stands clear of the ball's way, of every moving part and
 # of the camera's sight (crates/game/src/supports.rs); where nothing does, the sack hangs as it always did.
 # Only the look changes (the game's own parts have the pieces; the original's models stay as they are): nothing is
