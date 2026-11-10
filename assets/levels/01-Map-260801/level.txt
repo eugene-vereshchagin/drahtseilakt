@@ -9,3 +9,4 @@ order = 1
 catalogue-difficulty = 1
 type = Casual
 source = https://forum.ballance.top/d/117
+video = https://www.youtube.com/watch?v=bhBiSnmG2ao&t=276s

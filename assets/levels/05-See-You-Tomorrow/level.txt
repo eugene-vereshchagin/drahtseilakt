@@ -9,3 +9,4 @@ order = 5
 catalogue-difficulty = 2
 type = Comprehensive
 source = https://forum.ballance.top/d/119
+video = https://www.youtube.com/watch?v=4cKGyTmIMuY

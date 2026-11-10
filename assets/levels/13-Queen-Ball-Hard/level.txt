@@ -1,10 +1,10 @@
 # Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
 # author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
-title = Level++ 9
-author = 不药而愈的匿名安慰
-posted = 2026-07-07
-difficulty = 8
-order = 9
-catalogue-difficulty = 4
-type = Comprehensive
-source = https://forum.ballance.top/d/108
+title = Queen Ball (Hard Ver.)
+author = pseudoacetyl
+posted = 2025-01-10
+difficulty = 10
+order = 13
+catalogue-difficulty = 5
+type = Technical
+video = https://www.youtube.com/watch?v=Sq10sBrBQ8g

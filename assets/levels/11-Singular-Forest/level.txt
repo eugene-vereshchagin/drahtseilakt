@@ -1,12 +1,12 @@
 # Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
 # author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
-title = Evolution of Logic
-title.zh = 逻辑时代
-author = dahkjdas
-posted = 2020-05-23
+title = Singular Forest
+title.zh = 单轨森林
+author = ZYL
+posted = 2023-02-16
 difficulty = 8
-order = 10
+order = 11
 catalogue-difficulty = 4
-type = Logical
-source = https://tieba.baidu.com/p/6700441841
-video = https://www.youtube.com/watch?v=0L338KaAEfI
+type = Technical
+source = https://tieba.baidu.com/p/8267347663
+video = https://www.youtube.com/watch?v=BEN-3nJShIU

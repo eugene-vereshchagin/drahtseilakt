@@ -5,6 +5,6 @@ title.zh = 东方夜谭
 author = perfectthought
 posted = 2019-02-08
 difficulty = 10
-order = 13
+order = 12
 catalogue-difficulty = 5
 video = https://www.youtube.com/watch?v=nM1oyg-Rhxg
