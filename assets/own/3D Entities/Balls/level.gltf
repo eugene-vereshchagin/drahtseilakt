@@ -4686,6 +4686,9 @@
    ],
    "doubleSided": false,
    "alphaMode": "OPAQUE",
+   "normalTexture": {
+    "index": 5
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -4694,11 +4697,11 @@
       0.1
      ],
      "specular": [
-      0.3,
-      0.3,
-      0.3
+      0.25,
+      0.25,
+      0.25
      ],
-     "power": 20,
+     "power": 24,
      "z_write": true
     }
    }
@@ -4725,6 +4728,9 @@
    ],
    "doubleSided": false,
    "alphaMode": "OPAQUE",
+   "normalTexture": {
+    "index": 6
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -4733,11 +4739,11 @@
       0.1
      ],
      "specular": [
-      0.2,
-      0.2,
-      0.2
+      0.22,
+      0.22,
+      0.22
      ],
-     "power": 10,
+     "power": 14,
      "z_write": true
     }
    }
@@ -4764,6 +4770,9 @@
    ],
    "doubleSided": false,
    "alphaMode": "OPAQUE",
+   "normalTexture": {
+    "index": 7
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -4803,6 +4812,9 @@
    ],
    "doubleSided": false,
    "alphaMode": "BLEND",
+   "normalTexture": {
+    "index": 5
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -4846,6 +4858,9 @@
    ],
    "doubleSided": false,
    "alphaMode": "BLEND",
+   "normalTexture": {
+    "index": 6
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -4889,6 +4904,9 @@
    ],
    "doubleSided": true,
    "alphaMode": "BLEND",
+   "normalTexture": {
+    "index": 7
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -5056,6 +5074,18 @@
   {
    "source": 4,
    "sampler": 0
+  },
+  {
+   "source": 5,
+   "sampler": 0
+  },
+  {
+   "source": 6,
+   "sampler": 0
+  },
+  {
+   "source": 7,
+   "sampler": 0
   }
  ],
  "images": [
@@ -5078,6 +5108,18 @@
   {
    "uri": "textures/glow.png",
    "name": "glow"
+  },
+  {
+   "uri": "textures/ball_wood_n.png",
+   "name": "ball_wood_n"
+  },
+  {
+   "uri": "textures/ball_stone_n.png",
+   "name": "ball_stone_n"
+  },
+  {
+   "uri": "textures/ball_paper_n.png",
+   "name": "ball_paper_n"
   }
  ],
  "samplers": [
@@ -5091,7 +5133,7 @@
  "buffers": [
   {
    "uri": "level.bin",
-   "byteLength": 2334288
+   "byteLength": 2385232
   }
  ],
  "bufferViews": [
@@ -8386,48 +8428,48 @@
   {
    "buffer": 0,
    "byteOffset": 2200592,
-   "byteLength": 14700,
+   "byteLength": 25740,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 2215292,
-   "byteLength": 14700,
+   "byteOffset": 2226332,
+   "byteLength": 25740,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 2229992,
-   "byteLength": 9800,
+   "byteOffset": 2252072,
+   "byteLength": 17160,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 2239792,
-   "byteLength": 27648,
+   "byteOffset": 2269232,
+   "byteLength": 49152,
    "target": 34963
   },
   {
    "buffer": 0,
-   "byteOffset": 2267440,
+   "byteOffset": 2318384,
    "byteLength": 14700,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 2282140,
+   "byteOffset": 2333084,
    "byteLength": 14700,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 2296840,
+   "byteOffset": 2347784,
    "byteLength": 9800,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 2306640,
+   "byteOffset": 2357584,
    "byteLength": 27648,
    "target": 34963
   }
@@ -13093,35 +13135,35 @@
   },
   {
    "componentType": 5126,
-   "count": 1225,
+   "count": 2145,
    "type": "VEC3",
    "min": [
-    -1.9679270940540492,
-    -1.9949087465333426,
-    -1.9652280612617232
+    -1.9188691046904145,
+    -1.8612055058624069,
+    -1.965968810968
    ],
    "max": [
-    1.9679270940540496,
-    1.9949087465333426,
-    1.9652280612617243
+    2.008869493265097,
+    1.9836734775853675,
+    1.921159508551011
    ],
    "bufferView": 548
   },
   {
    "componentType": 5126,
-   "count": 1225,
+   "count": 2145,
    "type": "VEC3",
    "bufferView": 549
   },
   {
    "componentType": 5126,
-   "count": 1225,
+   "count": 2145,
    "type": "VEC2",
    "bufferView": 550
   },
   {
    "componentType": 5125,
-   "count": 6912,
+   "count": 12288,
    "type": "SCALAR",
    "bufferView": 551
   },

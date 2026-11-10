@@ -533,162 +533,20 @@ def make_env():
 
 
 # --- the balls -----------------------------------------------------------------------------------------------------
-# Wrapped round the sphere as the original's are (the texture's width once round, its height pole to pole): the stone
-# grey green and pitted (125, 131, 115; 0.21), the wood upright boards (159, 126, 80; 0.34), the paper a printed sheet
-# (189 grey; 0.22).
+# Wrapped round the sphere (the texture's width once round, its height pole to pole), drawn in space by ballskins.py,
+# so nothing pinches at the poles: the wooden ball a blank glued up of blocks, the stone ball grey-white marble, the
+# paper ball a crumpled newspaper (the owner's wish, 2026-11-11: each must read as its material at a glance; they are
+# our own designs, not matched to the original's palette). The parts carry the same pictures with their reliefs
+# (make_parts.py); these are the pack's, for a level or a part that asks for the texture by its name.
 
 
 def make_balls():
-    n = 128 * SCALE
-    save(pits(stone_ball(n, 61), 61, count=150, sizes=(0.6, 1.6), depth=0.16), "Ball_Stone")
-    woodball = wood(n, (159, 126, 80), 0.34, 9, seed=18)
-    save(woodball, "Ball_Wood")
-    save(woodball, "P_Ball_Wood")
-    save(collage(n), "Ball_Paper")
+    import ballskins
 
-
-def wood_ball(n, seed):
-    """The wooden ball's skin, after the owner's concept (a reference, not copied): turned from one log, so the year
-    rings stand round each pole (on the sphere's mapping, rows of the same latitude), light wood with darker late
-    wood, fine radial cracks running out from the poles, a fine grain. Its mean the original's (159, 126, 80)."""
-    rng = np.random.default_rng(seed)
-    v = (np.arange(n) + 0.5) / n
-    d = np.minimum(v, 1 - v)[:, None]  # 0 at a pole, 0.5 at the equator (by row)
-    jitter = noise(n, 6, seed, 4)
-    # rings: denser outwards, each a little uneven round its circle
-    phase = (d * 2.0) ** 0.8 * 26.0 + 1.2 * (jitter - 0.5)
-    ring = 0.5 + 0.5 * np.cos(phase * 2 * np.pi)
-    late = np.clip(ring - 0.55, 0, 1) / 0.45
-    early, dark = np.array([214, 172, 118]) / 255.0, np.array([150, 104, 58]) / 255.0
-    img = early[None, None] + (dark - early)[None, None] * (0.95 * late ** 1.2)[..., None]
-    grain = noise(n, n // 6, seed + 1, 2) - 0.5
-    img = img * (1 + 0.10 * grain)[..., None] * (1 + 0.08 * (noise(n, 4, seed + 2, 4) - 0.5))[..., None]
-    # cracks: thin dark lines along a meridian from a pole out to some latitude, wandering a little
-    yy = np.arange(n)
-    for _ in range(26):
-        u0 = rng.uniform(0, n)
-        top = rng.random() < 0.5
-        length = rng.uniform(0.12, 0.38) * n
-        wobble = rng.uniform(1.5, 4.0)
-        for y in range(int(length)):
-            row = y if top else n - 1 - y
-            x = int(u0 + wobble * math.sin(y / (n * 0.04))) % n
-            fade = 1 - y / length
-            width = 1 + int(2 * fade)
-            for dx in range(-width, width + 1):
-                img[row, (x + dx) % n] *= 1 - 0.45 * fade * (1 - abs(dx) / (width + 1))
-    mean = img.reshape(-1, 3).mean(0)
-    return np.clip(img * (np.array([159, 126, 80]) / 255.0 / mean)[None, None], 0, 1)
-
-
-def stone_ball(n, seed):
-    """The stone ball's skin: one solid, worn stone (measured on the original's: mean colour (126, 132, 115), a fine
-    speckled grain, lightness std 27 of 255, most of it from texel to texel), soft clouding and a few faint veins, no
-    cracks (a photographed rock's cracks read as a ball fallen to pieces). Tiles both ways, so the sphere's seam does
-    not show."""
-    base = np.array([126, 132, 115]) / 255.0
-    fine = noise(n, n // 2, seed, 2) - 0.5
-    grain = noise(n, n // 8, seed + 1, 3) - 0.5
-    cloud = noise(n, 4, seed + 2, 5) - 0.5
-    # veins: thin soft lines where a warped field crosses a level
-    warp = noise(n, 3, seed + 3, 5)
-    vein = np.exp(-((np.sin(warp * 18.0) * 3.0) ** 2)) * (noise(n, 6, seed + 4, 3) > 0.55)
-    light = 1 + 0.42 * fine + 0.22 * grain + 0.16 * cloud - 0.10 * vein
-    tint = 1 + 0.04 * (noise(n, 5, seed + 5, 4)[..., None] - 0.5) * np.array([1.0, -0.6, 0.4])
-    return np.clip(base[None, None] * light[..., None] * tint, 0, 1)
-
-
-def pits(img, seed, count=260, sizes=(1.0, 3.0), depth=0.28):
-    """Small hollows in a stone: dark on the side the light comes from, a light rim on the other (as the original's
-    pitted stone ball, measured: about 260 pits, 1 to 3 texels of 128 across)."""
-    n = img.shape[0]
-    rng = np.random.default_rng(seed)
-    yy, xx = np.mgrid[0:n, 0:n]
-    out = img.copy()
-    for _ in range(count):
-        cx, cy = rng.uniform(0, n, 2)
-        r = rng.uniform(*sizes) * SCALE
-        dx = (xx - cx + n / 2) % n - n / 2
-        dy = (yy - cy + n / 2) % n - n / 2
-        d = np.hypot(dx / 1.3, dy) / r
-        m = d < 1.4
-        if not m.any():
-            continue
-        shade = np.where(d < 1, 1 - depth + 0.25 * (dx + dy) / (2 * r), 1 + 0.12 * np.clip(1.4 - d, 0, 0.4) / 0.4)
-        out[m] = out[m] * shade[m][:, None]
-    return np.clip(out, 0, 1)
-
-
-def newspaper(n):
-    """A crumpled printed sheet: columns of grey lines of "text", a few headlines and pictures, on paper (our own
-    drawing; the paper's crumples from the photo)."""
-    paper = photo("Paper003", n, (222, 222, 218), 0.06, 0.1, 0.0)
-    rng = np.random.default_rng(51)
-    img = paper.copy()
-    ink = np.zeros((n, n))
-    cols = 4
-    cw = n // cols
-    for c in range(cols):
-        x0 = c * cw + 3 * SCALE
-        y = int(rng.integers(0, 6)) * SCALE
-        while y < n:
-            kind = rng.random()
-            if kind < 0.12:  # a headline: a thick dark bar of words
-                h = 4 * SCALE
-                x = x0
-                while x < x0 + cw - 8 * SCALE:
-                    w = int(rng.integers(5, 14)) * SCALE
-                    ink[y:y + h, x:min(x + w, x0 + cw - 6 * SCALE)] = 0.85
-                    x += w + 2 * SCALE
-                y += h + 3 * SCALE
-            elif kind < 0.2:  # a picture
-                h = int(rng.integers(12, 24)) * SCALE
-                pic = noise(n, 3, int(rng.integers(0, 1000)), 3)[:h, :cw - 8 * SCALE]
-                ink[y:y + h, x0:x0 + cw - 8 * SCALE] = 0.25 + 0.5 * pic[:min(h, n - y)]
-                y += h + 3 * SCALE
-            else:  # a paragraph of lines of words
-                for _ in range(int(rng.integers(3, 9))):
-                    x = x0
-                    end = x0 + cw - 6 * SCALE - int(rng.integers(0, 3)) * 4 * SCALE
-                    while x < end:
-                        w = int(rng.integers(2, 7)) * SCALE
-                        ink[y:y + SCALE, x:min(x + w, end)] = 0.55
-                        x += w + SCALE
-                    y += 2 * SCALE
-                y += 2 * SCALE
-    from scipy import ndimage
-    ink = ndimage.gaussian_filter(np.clip(ink, 0, 1), 0.6, mode="wrap")
-    img = img * (1 - 0.85 * ink)[..., None]
-    return np.clip(img, 0, 1)
-
-
-def collage(n):
-    """Sheets of newspaper lying over each other at angles, each with a soft shadow, wrapping round (the original's
-    paper ball is such a heap of sheets: about a dozen visible, a quarter of the side each)."""
-    from scipy import ndimage
-
-    sheet = newspaper(n)
-    rng = np.random.default_rng(52)
-    out = photo("Paper003", n, (200, 200, 196), 0.06, 0.1, 0.0)
-    for _ in range(16):
-        w, h = int(rng.uniform(0.3, 0.45) * n), int(rng.uniform(0.35, 0.55) * n)
-        sx, sy = rng.integers(0, n - w), rng.integers(0, n - h)
-        piece = sheet[sy:sy + h, sx:sx + w]
-        ang = rng.uniform(-40, 40)
-        im = Image.fromarray((piece * 255).astype(np.uint8)).rotate(ang, Image.BILINEAR, expand=True)
-        mk = Image.new("L", (w, h), 255).rotate(ang, Image.BILINEAR, expand=True)
-        p = np.asarray(im, np.float64) / 255
-        a = np.asarray(mk, np.float64) / 255
-        ph, pw = a.shape
-        cx, cy = rng.integers(0, n), rng.integers(0, n)
-        ys = (np.arange(ph) + cy) % n
-        xs = (np.arange(pw) + cx) % n
-        shadow = ndimage.gaussian_filter(a, 2.5 * SCALE)
-        region = out[np.ix_(ys, xs)]
-        region = region * (1 - 0.35 * shadow[..., None])
-        region = region * (1 - a[..., None]) + p * a[..., None]
-        out[np.ix_(ys, xs)] = region
-    return np.clip(out, 0, 1)
+    save(ballskins.skin("stone")[0], "Ball_Stone")
+    save(ballskins.skin("wood")[0], "Ball_Wood")
+    save(ballskins.skin("wood")[0], "P_Ball_Wood")
+    save(ballskins.skin("paper")[0], "Ball_Paper")
 
 
 # --- our levels' track ----------------------------------------------------------------------------------------------

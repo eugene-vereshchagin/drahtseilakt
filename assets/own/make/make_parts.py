@@ -70,6 +70,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ballskins  # noqa: E402
 import ownkit as k  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -124,31 +125,6 @@ def _balloon():
     return np.clip(img * (0.92 + 0.1 * k.value_noise(TEX, TEX, (3, 3), 93))[..., None], 0, 1)
 
 
-def _ball_wood():
-    """The wooden ball: staves running round it with their grain."""
-    y, x = np.mgrid[0:TEX, 0:TEX]
-    stave = (x // (TEX // 12)) % 2
-    grain = k.value_noise(TEX, TEX, (2, 30), 101, octaves=3)
-    base = np.where(stave[..., None] == 1, k.rgb(176, 112, 58), k.rgb(150, 92, 46))
-    img = base * (0.8 + 0.35 * np.sin(grain * 30)[..., None] * 0.5 + 0.1)
-    gap = np.minimum(x % (TEX // 12), TEX // 12 - 1 - x % (TEX // 12)) < 1
-    return np.clip(np.where(gap[..., None], img * 0.5, img), 0, 1)
-
-
-def _ball_stone():
-    n = k.value_noise(TEX, TEX, (6, 6), 111)
-    vein = np.abs(k.value_noise(TEX, TEX, (3, 5), 112) - 0.5) < 0.02
-    img = k.rgb(128, 126, 122)[None, None] * (0.75 + 0.45 * n)[..., None]
-    return np.clip(np.where(vein[..., None], img * 0.7, img), 0, 1)
-
-
-def _ball_paper():
-    n = k.value_noise(TEX, TEX, (8, 8), 121)
-    folds = np.abs(np.sin(k.value_noise(TEX, TEX, (4, 4), 122) * 40)) < 0.15
-    img = k.rgb(236, 232, 218)[None, None] * (0.86 + 0.16 * n)[..., None]
-    return np.clip(np.where(folds[..., None], img * 0.82, img), 0, 1)
-
-
 def _ball_sticky():
     """Our sticky ball (no original's to stand in for): tacky crimson rubber in a honeycomb of shallow cells, each cell
     a little darker at its rim, a soft sheen in the middle."""
@@ -177,11 +153,18 @@ def _ball_sticky():
 
 
 def _dome():
-    """The dome bumper: deep blue tiles with lighter joints."""
-    y, x = np.mgrid[0:TEX, 0:TEX]
-    joint = (np.minimum(x % 32, 31 - x % 32) < 2) | (np.minimum(y % 32, 31 - y % 32) < 2)
-    img = k.rgb(40, 70, 150)[None, None] * (0.85 + 0.3 * k.value_noise(TEX, TEX, (8, 8), 131))[..., None]
-    return np.clip(np.where(joint[..., None], k.rgb(150, 170, 210), img), 0, 1)
+    """The dome's enamel, one panel a picture: deep blue glass fused on metal, clouded as fired enamel is, a little
+    lighter in the panel's middle, darker where it runs under the ribs, with a fine crackle."""
+    y, x = np.mgrid[0:TEX, 0:TEX] / float(TEX)
+    cloud = k.value_noise(TEX, TEX, (3, 3), 131, octaves=4) - 0.5
+    fine = k.value_noise(TEX, TEX, (40, 40), 132, octaves=2) - 0.5
+    edge = np.minimum(np.minimum(x, 1 - x), np.minimum(y, 1 - y))
+    middle = np.clip(edge / 0.35, 0, 1) ** 0.6
+    crack = np.abs(k.value_noise(TEX, TEX, (9, 9), 133, octaves=3) - 0.5) < 0.006
+    deep, light = k.rgb(16, 52, 128), k.rgb(52, 112, 190)
+    img = deep[None, None] + (light - deep)[None, None] * np.clip(0.15 + 0.55 * middle + 0.9 * cloud, 0, 1)[..., None]
+    img = img * (1 + 0.06 * fine)[..., None] * (0.55 + 0.45 * np.clip(edge / 0.05, 0, 1))[..., None]
+    return np.clip(np.where(crack[..., None], img * 0.8, img), 0, 1)
 
 
 def _radial(power=1.5, inner=0.0):
@@ -265,11 +248,12 @@ TEXTURE_MAKERS = {
     "rope.png": _rope,
     "burlap.png": _burlap,
     "balloon.png": _balloon,
-    "ball_wood.png": _ball_wood,
-    "ball_stone.png": _ball_stone,
-    "ball_paper.png": _ball_paper,
+    # the balls' skins and their reliefs (ballskins.py; the pack's Ball_Wood, Ball_Stone and Ball_Paper are the same)
+    "ball_wood.png": lambda: ballskins.skin("wood")[0], "ball_wood_n.png": lambda: ballskins.skin("wood")[1],
+    "ball_stone.png": lambda: ballskins.skin("stone")[0], "ball_stone_n.png": lambda: ballskins.skin("stone")[1],
+    "ball_paper.png": lambda: ballskins.skin("paper")[0], "ball_paper_n.png": lambda: ballskins.skin("paper")[1],
     "ball_sticky.png": _ball_sticky,
-    "dome.png": _dome,
+    "dome_enamel.png": _dome,
     "flash.png": _flash,
     "chrome_env.png": lambda: k.env_map(TEX, k.rgb(150, 170, 220), k.rgb(250, 250, 255), k.rgb(70, 60, 60), 19),
     "oil.png": _oil,
@@ -345,6 +329,10 @@ class Part:
                     texture(self.folder, tex, file)
                     self.files.append(file)
                 tex = file
+            # its relief, a normal map on the same coordinates, beside it
+            if kw.get("normal") and not kw["normal"].startswith(k.GAME) and kw["normal"] not in self.files:
+                texture(self.folder, kw["normal"])
+                self.files.append(kw["normal"])
             self.mats.append(k.material(name, tex, **kw))
             self.mat_ids[name] = len(self.mats) - 1
         return self.mat_ids[name]
@@ -479,26 +467,17 @@ def round_look(name, mat, kind):
 
 
 def paper_look(name, mat):
-    """The paper ball as drawn: a sheet crumpled into a ball, round as a whole, its folds soft creases (many faces,
-    smooth normals), the newspaper print over it."""
+    """The paper ball as drawn: a sheet crumpled into a ball, pressed into the flat faces and dents its skin is printed
+    for (ballskins.paper_shape: each face shows its own part of the page), many faces, smooth normals; the sharp
+    creases are in the skin's relief."""
     m = k.Mesh(name)
-    k.sphere(m, mat, (0, 0, 0), 2.0, seg=48)
-    rng = np.random.default_rng(152)
-    folds = [(v / np.linalg.norm(v), rng.uniform(0.02, 0.05), rng.uniform(3.0, 7.0))
-             for v in rng.normal(size=(36, 3))]
-    pts = []
-    for p in m.p:
-        d = np.array(p) / 2.0
-        r = 2.0
-        for v, amp, freq in folds:
-            # a crease: a ridge where the direction crosses a plane through the middle, sharp at its line
-            r += amp * (1 - min(1.0, abs(float(np.dot(d, v))) * freq)) ** 2
-        pts.append(tuple(d * r))
-    # as big as the physics' sphere (radius 2 round the middle): most of it on that sphere, only the creases' ridges
+    k.sphere(m, mat, (0, 0, 0), 2.0, seg=64)
+    d = np.asarray(m.p) / 2.0
+    radius, _, _ = ballskins.paper_shape(d)
+    # as big as the physics' sphere (radius 2 round the middle): most of it on that sphere, only the folds' ridges
     # a little out of it (no gap under it where it rests, and it does not sink in)
-    radii = sorted(float(np.linalg.norm(q)) for q in pts)
-    top = radii[int(0.9 * (len(radii) - 1))]
-    m.p = [tuple(np.array(q) * (2.0 / top)) for q in pts]
+    top = np.sort(radius)[int(0.9 * (len(radius) - 1))]
+    m.p = [tuple(q) for q in d * (radius / top * 2.0)[:, None]]
     smooth_normals(m)
     return m
 
@@ -626,12 +605,14 @@ def pieces(part, kind, mat, n, thick, seed, stretch=1.0):
 def make_balls():
     p = Part("Balls")
     piece_mat = dict(alpha="BLEND", blend=("src_alpha", "inv_src_alpha"), z_write=True)
-    wood = p.mat("Ball_Wood", "ball_wood.png", emissive=0.24, specular=0.3, power=20)
-    stone = p.mat("Ball_Stone", "ball_stone.png", emissive=0.27, specular=0.2, power=10)
-    paper = p.mat("Ball_Paper", "ball_paper.png", emissive=0.2)
-    wp = p.mat("Ball_Wood_Pieces", "ball_wood.png", emissive=0.24, **piece_mat)
-    sp = p.mat("Ball_Stone_Pieces", "ball_stone.png", emissive=0.27, **piece_mat)
-    pp = p.mat("Ball_Paper_Pieces", "ball_paper.png", emissive=0.2, double_sided=True, **piece_mat)
+    # (the pieces are the balls' own skin, so they carry the same picture and relief)
+    wood = p.mat("Ball_Wood", "ball_wood.png", emissive=0.24, specular=0.25, power=24, normal="ball_wood_n.png")
+    stone = p.mat("Ball_Stone", "ball_stone.png", emissive=0.27, specular=0.22, power=14, normal="ball_stone_n.png")
+    paper = p.mat("Ball_Paper", "ball_paper.png", emissive=0.2, normal="ball_paper_n.png")
+    wp = p.mat("Ball_Wood_Pieces", "ball_wood.png", emissive=0.24, normal="ball_wood_n.png", **piece_mat)
+    sp = p.mat("Ball_Stone_Pieces", "ball_stone.png", emissive=0.27, normal="ball_stone_n.png", **piece_mat)
+    pp = p.mat("Ball_Paper_Pieces", "ball_paper.png", emissive=0.2, double_sided=True, normal="ball_paper_n.png",
+               **piece_mat)
     sticky = p.mat("Ball_Sticky", "ball_sticky.png", emissive=0.24, specular=0.45, power=30)
     tp = p.mat("Ball_Sticky_Pieces", "ball_sticky.png", emissive=0.24, **piece_mat)
     light = p.mat("Ball_LightningSphere", "glow.png", diffuse=[0, 0, 0, 1], emissive=1.0, alpha="BLEND",
@@ -678,7 +659,8 @@ def make_loose_balls():
     for kind, tex, em in (("Wood", "ball_wood.png", 0.31), ("Stone", "ball_stone.png", 0.31),
                           ("Paper", "ball_paper.png", 0.31), ("Sticky", "ball_sticky.png", 0.31)):
         p = Part(f"PH/P_Ball_{kind}")
-        mat = p.mat(f"P_Ball_{kind}", tex, emissive=em, specular=0.2, power=15)
+        mat = p.mat(f"P_Ball_{kind}", tex, emissive=em, specular=0.0 if kind == "Paper" else 0.2, power=15,
+                    normal=None if kind == "Sticky" else tex.replace(".png", "_n.png"))
         bm = ball_mesh(f"P_Ball_{kind}_Mesh", mat, kind.lower())
         bm.look = (paper_look(f"P_Ball_{kind}_Look", mat) if kind == "Paper"
                    else round_look(f"P_Ball_{kind}_Look", mat, kind.lower()))
@@ -712,9 +694,12 @@ def shadow(p, name, mat_name, half=6.05):
 
 
 def make_dome():
+    """The dome bumper. What the ball meets is the plain cap (its points are the body's hull); what is drawn, its look,
+    lies just inside that cap: twelve brass ribs riveted from a base ring up to a hub, a hoop round the middle, and
+    between them panels of blue enamel set a little deeper."""
     p = Part("PH/P_Dome")
     sh = shadow(p, "P_DomeShadow", "P_DomeShadow")
-    mat = p.mat("P_Dome", "dome.png", emissive=0.6, specular=0.6, power=30)
+    mat = p.mat("P_Dome", "dome_enamel.png", emissive=0.6, specular=0.6, power=30)
     m = k.Mesh("P_Dome_MF_Mesh")
     # a low cap 13.3 across rising to 3.7, on a thin rim
     r = 6.644
@@ -723,10 +708,109 @@ def make_dome():
         a = t * math.pi / 2
         prof.append((0.45 + (3.676 - 0.45) * math.sin(a), r * 0.99 * math.cos(a)))
     lathe(m, mat, prof, 24)
+    m.look = dome_look(p, r * 0.985, 0.123, 0.45, 3.676 - 0.45)
     p.node("P_Dome_Shadow", sh, pos=(0.248, 0.11, 0.248), s=1.3)
     p.node("P_Dome_MF", p.mesh(m))
     p.group("All_P_Dome", ["P_Dome_Shadow", "P_Dome_MF"])
     p.write()
+
+
+def dome_look(p, r0, foot, y0, rise, ribs=12):
+    """The dome as drawn: the cap of radius r0 rising `rise` from y0 (a quarter ellipse), its rim down to `foot`."""
+    enamel = p.mat("P_Dome_Enamel", "dome_enamel.png", emissive=0.34, specular=0.85, power=48)
+    brass = p.mat("P_Dome_Ribs", "brass.png", emissive=0.3, specular=0.7, power=28)
+    m = k.Mesh("P_Dome_MF_Look")
+    deep, top = -0.11, -0.012  # the panels and the metal's face, measured out of the cap along its normal
+
+    def at(a, ph, off=0.0):
+        nr, ny = rise * math.cos(a), r0 * math.sin(a)
+        ln = math.hypot(nr, ny)
+        nr, ny = nr / ln, ny / ln
+        rad, y = r0 * math.cos(a) + nr * off, y0 + rise * math.sin(a) + ny * off
+        return (np.array([rad * math.cos(ph), y, rad * math.sin(ph)]),
+                np.array([nr * math.cos(ph), ny, nr * math.sin(ph)]))
+
+    def grid(mt, rows):
+        """Rows of (point, normal, uv) from the bottom up, each round with the angle: the faces between them."""
+        ids = [[m.vertex(q, n, uv) for q, n, uv in row] for row in rows]
+        for i in range(len(ids) - 1):
+            for j in range(len(ids[i]) - 1):
+                a, b, c, d = ids[i][j], ids[i][j + 1], ids[i + 1][j + 1], ids[i + 1][j]
+                m.tri(mt, a, c, b)
+                m.tri(mt, a, d, c)
+
+    def patch(mt, a0, a1, ph0, ph1, off, na, nph, v0=0.0, v1=1.0, u1=1.0):
+        grid(mt, [[at(a, ph, off) + ((u1 * s, v1 + (v0 - v1) * t),) for s, ph in zip(np.linspace(0, 1, nph + 1),
+                                                                                    np.linspace(ph0, ph1, nph + 1))]
+                  for t, a in zip(np.linspace(0, 1, na + 1), np.linspace(a0, a1, na + 1))])
+
+    def step(mt, a, ph0, ph1, nph, up):
+        """The metal's edge at angle a: a wall from its face down to the panels, facing up the dome or down it."""
+        rows = []
+        for off in ((deep, top) if up else (top, deep)):
+            row = []
+            for s, ph in zip(np.linspace(0, 1, nph + 1), np.linspace(ph0, ph1, nph + 1)):
+                q, n = at(a, ph, off)
+                t = at(a + 0.01, ph)[0] - at(a - 0.01, ph)[0]
+                t /= np.linalg.norm(t)
+                row.append((q, t if up else -t, (s * 8, 0.5 + off)))
+            rows.append(row)
+        grid(mt, rows)
+
+    def rivet(a, ph, side=0.0, size=0.085):
+        q, n = at(a, ph, top - size * 0.45)
+        e = np.array([-math.sin(ph), 0.0, math.cos(ph)])
+        k.sphere(m, brass, tuple(q + e * side), size, seg=6)
+
+    full = 2 * math.pi
+    a_ring, a_hoop, a_hub = 0.13, 0.66, math.acos(1.35 / r0)
+    hoop = 0.032  # the hoop's half width, as an angle up the dome
+    # the enamel: a panel a picture, two rows of them between the ribs
+    for i in range(ribs):
+        ph0, ph1 = full * i / ribs, full * (i + 1) / ribs
+        patch(enamel, a_ring, a_hoop, ph0, ph1, deep, 6, 4)
+        patch(enamel, a_hoop, a_hub, ph0, ph1, deep, 7, 4)
+    # the base ring: the rim's wall, the ring's face up to its edge, riveted
+    grid(brass, [[(np.array([r0 * math.cos(ph), y, r0 * math.sin(ph)]), np.array([math.cos(ph), 0, math.sin(ph)]),
+                   (ph * 6, y)) for ph in np.linspace(0, full, 49)] for y in (foot, y0)])
+    patch(brass, 0.0, a_ring, 0, full, top, 2, 48, u1=40.0, v1=0.4)
+    step(brass, a_ring, 0, full, 48, True)
+    for i in range(ribs * 3):
+        rivet(a_ring * 0.5, full * (i + 0.5) / (ribs * 3))
+    # the hoop and the hub
+    patch(brass, a_hoop - hoop, a_hoop + hoop, 0, full, top, 1, 48, u1=40.0, v1=0.3)
+    step(brass, a_hoop - hoop, 0, full, 48, False)
+    step(brass, a_hoop + hoop, 0, full, 48, True)
+    patch(brass, a_hub, math.pi / 2, 0, full, top, 4, 24, u1=6.0)
+    step(brass, a_hub, 0, full, 24, False)
+    for i in range(8):
+        rivet(a_hub + 0.07, full * i / 8)
+    k.sphere(m, brass, tuple(at(math.pi / 2, 0, top - 0.16)[0]), 0.3, seg=10)
+    # the ribs: a strip 0.44 wide up the dome on each meridian, its two sides down to the enamel, rivets along it
+    half = 0.22
+    for i in range(ribs):
+        ph = full * i / ribs
+        e = np.array([-math.sin(ph), 0.0, math.cos(ph)])
+        steps = np.linspace(a_ring, a_hub, 15)
+        face, left, right = [], [], []
+        length = 0.0
+        for j, a in enumerate(steps):
+            (q, n), (low, _) = at(a, ph, top), at(a, ph, deep)
+            if j:
+                length += float(np.linalg.norm(q - at(steps[j - 1], ph, top)[0]))
+            v = length / 2.0
+            face.append([(q - e * half, n, (0.0, v)), (q + e * half, n, (0.25, v))])
+            left.append([(low - e * half, -e, (0.3, v)), (q - e * half, -e, (0.35, v))])
+            right.append([(q + e * half, e, (0.3, v)), (low + e * half, e, (0.35, v))])
+        for rows in (face, left, right):
+            grid(brass, rows)
+        for a in np.linspace(a_ring + 0.09, a_hub - 0.09, 9):
+            if abs(a - a_hoop) > 0.05:
+                rivet(a, ph)
+        # and one on the hoop each side of the rib
+        for side in (-1, 1):
+            rivet(a_hoop, ph + side * full / ribs / 4)
+    return m
 
 
 def make_trafos():

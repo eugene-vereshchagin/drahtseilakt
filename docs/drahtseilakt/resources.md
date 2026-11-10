@@ -124,6 +124,11 @@ PACK` chooses for one run; `--export` keeps the copy's unless given `--textures 
 exported level. Our files ship with the game and are
 read through the same size caps as any texture; a level's name only picks among them, never makes a path.
 
+The balls and the dome are the exception (2026-11-11): they are our own designs, not matched to the original's
+textures. `assets/own/make/ballskins.py` draws the wooden ball as a blank glued up of blocks, the stone ball as
+grey-white veined marble and the paper ball as a crumpled newspaper, each with a normal map, and the dome is riveted
+brass ribs over blue enamel panels; the bodies the physics uses are unchanged (`assets/own/TEXTURES.md`).
+
 Which textures ours (or any texture pack's) replace, when a level is loaded (so drawing and export agree): in the copy's levels and parts, and
 in their remasters (`levels/remastered/`), every texture we have one of, by name; in a stranger's map (a community
 `.nmo`) a texture it names by file when that file is the copy's (a file its own folder brings stays its own), and

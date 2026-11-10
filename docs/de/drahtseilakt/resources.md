@@ -135,6 +135,12 @@ Texturen, die es als die des Spiels nennt (`game:`-Bilder, open-format.md), folg
 unsere in das exportierte Level schreibt. Unsere Dateien werden mit dem Spiel geliefert und mit denselben
 Größengrenzen gelesen wie jede Textur; ein Name aus einem Level wählt nur unter ihnen, er wird nie zu einem Pfad.
 
+Die Kugeln und die Kuppel sind die Ausnahme (2026-11-11): eigene Entwürfe, nicht an die Texturen des Originals
+angeglichen. `assets/own/make/ballskins.py` zeichnet die Holzkugel als aus Klötzen verleimten Rohling, die Steinkugel
+als grauweißen geäderten Marmor und die Papierkugel als zerknüllte Zeitung, jede mit Normal-Map; die Kuppel besteht
+aus genieteten Messingrippen über blauen Emailfeldern. Die Körper der Physik bleiben unverändert
+(`assets/own/TEXTURES.md`).
+
 Welche Texturen unsere ersetzen, beim Laden eines Levels (so stimmen Zeichnen und Export überein): in den Leveln und
 Teilen der Kopie und in ihren Remastern (`levels/remastered/`) jede, für die wir eine haben, nach Namen; in einer
 fremden Karte (einer Community-`.nmo`) eine Textur, die sie per Datei nennt, wenn die Datei die der Kopie ist (eine

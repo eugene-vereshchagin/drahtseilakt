@@ -45,10 +45,6 @@ SOURCES = {
                  5620613, "2026-03-30"),
     "Metal009": ("Metal009_1K-JPG.zip", "1b1970219b40fe707e7194b28702f1a65b0d227bbea56da69dfbc8d8b5cfcb5e",
                  4767000, "2018-08-16"),
-    "Rock030": ("Rock030_1K-JPG.zip", "2fd0bc2d214e2487c19062ed0798a85dd135b41cfc12bbaed42d5acae238f989",
-                  9677446, "2020-03-29"),
-    "Paper003": ("Paper003_1K-JPG.zip", "90b44da4c960ba044b37c26713c50ef1986687a522f1bbe847aeb9b471409040",
-                   2545301, "2018-08-30"),
     "Marble012": ("Marble012_1K-JPG.zip", "b04384c6d49ce73baeb70db7ea4abfe9948fc9b74b9fd92c3766970662bf2c43",
                     4672904, "2020-01-26"),
     "RoofingTiles015A": ("RoofingTiles015A_1K-JPG.zip", "5bb040c4c08592b607bba47cbf7384c2769bea1b49d088c463fa296708c0f743",
@@ -91,6 +87,13 @@ PALETTE = {
     "Lava004": ("Lava004_1K-JPG.zip", "fee9256befd26b59a7ff452ab6379dab4cdace5d7bee7f78cd9ad8176dd67c28",
                 8986332, "2019-12-12"),
 }
+# (Rock030 and Paper003 made the stone and the paper ball until 2026-11-11; the balls are now drawn, ballskins.py)
+PALETTE.update({
+    "Rock030": ("Rock030_1K-JPG.zip", "2fd0bc2d214e2487c19062ed0798a85dd135b41cfc12bbaed42d5acae238f989",
+                  9677446, "2020-03-29"),
+    "Paper003": ("Paper003_1K-JPG.zip", "90b44da4c960ba044b37c26713c50ef1986687a522f1bbe847aeb9b471409040",
+                   2545301, "2018-08-30"),
+})
 ALL = {**SOURCES, **PALETTE}
 MAX_ARCHIVE = 64 << 20
 

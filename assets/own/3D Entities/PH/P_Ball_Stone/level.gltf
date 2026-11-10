@@ -118,6 +118,9 @@
    ],
    "doubleSided": false,
    "alphaMode": "OPAQUE",
+   "normalTexture": {
+    "index": 1
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -140,12 +143,20 @@
   {
    "source": 0,
    "sampler": 0
+  },
+  {
+   "source": 1,
+   "sampler": 0
   }
  ],
  "images": [
   {
    "uri": "textures/Ball_Stone.png",
    "name": "Ball_Stone"
+  },
+  {
+   "uri": "textures/ball_stone_n.png",
+   "name": "ball_stone_n"
   }
  ],
  "samplers": [

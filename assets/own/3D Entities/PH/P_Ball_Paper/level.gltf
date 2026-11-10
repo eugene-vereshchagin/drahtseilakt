@@ -118,6 +118,9 @@
    ],
    "doubleSided": false,
    "alphaMode": "OPAQUE",
+   "normalTexture": {
+    "index": 1
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -126,9 +129,9 @@
       0.1
      ],
      "specular": [
-      0.2,
-      0.2,
-      0.2
+      0.0,
+      0.0,
+      0.0
      ],
      "power": 15,
      "z_write": true
@@ -140,12 +143,20 @@
   {
    "source": 0,
    "sampler": 0
+  },
+  {
+   "source": 1,
+   "sampler": 0
   }
  ],
  "images": [
   {
    "uri": "textures/Ball_Paper.png",
    "name": "Ball_Paper"
+  },
+  {
+   "uri": "textures/ball_paper_n.png",
+   "name": "ball_paper_n"
   }
  ],
  "samplers": [
@@ -159,7 +170,7 @@
  "buffers": [
   {
    "uri": "level.bin",
-   "byteLength": 110048
+   "byteLength": 160992
   }
  ],
  "bufferViews": [
@@ -190,25 +201,25 @@
   {
    "buffer": 0,
    "byteOffset": 43200,
-   "byteLength": 14700,
+   "byteLength": 25740,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 57900,
-   "byteLength": 14700,
+   "byteOffset": 68940,
+   "byteLength": 25740,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 72600,
-   "byteLength": 9800,
+   "byteOffset": 94680,
+   "byteLength": 17160,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteOffset": 82400,
-   "byteLength": 27648,
+   "byteOffset": 111840,
+   "byteLength": 49152,
    "target": 34963
   }
  ],
@@ -249,35 +260,35 @@
   },
   {
    "componentType": 5126,
-   "count": 1225,
+   "count": 2145,
    "type": "VEC3",
    "min": [
-    -1.9679270940540492,
-    -1.9949087465333426,
-    -1.9652280612617232
+    -1.9188691046904145,
+    -1.8612055058624069,
+    -1.965968810968
    ],
    "max": [
-    1.9679270940540496,
-    1.9949087465333426,
-    1.9652280612617243
+    2.008869493265097,
+    1.9836734775853675,
+    1.921159508551011
    ],
    "bufferView": 4
   },
   {
    "componentType": 5126,
-   "count": 1225,
+   "count": 2145,
    "type": "VEC3",
    "bufferView": 5
   },
   {
    "componentType": 5126,
-   "count": 1225,
+   "count": 2145,
    "type": "VEC2",
    "bufferView": 6
   },
   {
    "componentType": 5125,
-   "count": 6912,
+   "count": 12288,
    "type": "SCALAR",
    "bufferView": 7
   }

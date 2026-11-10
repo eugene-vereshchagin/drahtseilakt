@@ -15,17 +15,29 @@ few pictures and transparent parts, a later stage). The sky boxes (`Textures/Sky
 scored): high where the layout is measured exactly (floors, stripes, target), lower where only the kind of thing is
 matched (boards and grain fall elsewhere than the original's).
 
+The three balls and the dome are our own designs rather than matches of the original's (the owner's wish,
+2026-11-11: each must read as its material at a glance), so they carry no score. `make/ballskins.py` draws the balls'
+skins in space and reads them off along the sphere's directions (1024x512, nothing pinches at the poles), each with a
+normal map that the parts name beside it (`ball_<kind>_n.png` in the part's `textures/`): the wooden ball a blank
+glued up of blocks (each block its own grain, year rings and tone, thin glue joints, lathe marks, dents), the stone
+ball grey-white marble (veins as wandering fractures, faint streaked clouding, chips, a matte polish), the paper ball
+a crumpled newspaper (a page of masthead, headlines, columns and halftone photographs in letter shapes of no language,
+each flat face of the crumpled ball showing its own part of it, creases and wrinkles; the drawn mesh is pressed into
+the same faces). The pieces a ball sheds at a transformer are cut from the same skin. The dome (`P_Dome`) is drawn as
+twelve riveted brass ribs from a base ring to a hub with a hoop round the middle and panels of blue enamel between
+them (`dome_enamel.png`, drawn by `make_parts.py`), just inside the plain cap that stays its body.
+
 | Texture | What it is | Size | Levels | Triangles | Ours | Score |
 |---|---|---|---:|---:|---|---:|
 | `Rail_Environment` | the rails' reflection (chrome mapping) | 32x32 | 13 | 222963 | ours | 65.2 |
 | `Floor_Side` | the floors' sides | 128x128 | 13 | 36621 | ours | 86.8 |
 | `Misc_Ufo` | the balloon's envelope (reflection) | 128x128 | 13 | 20384 | ours | 60.4 |
-| `BallStone.bmp` | the stone ball (Balls) | 128x128 | 13 | 20280 | ours | 57.4 |
+| `BallStone.bmp` | the stone ball (Balls) | 128x128 | 13 | 20280 | ours (own design) | |
 | `Column_blue` | the blue columns | 128x128 | 13 | 16978 | ours | 71.5 |
-| `BallWood.bmp` | the wooden ball (Balls) | 128x128 | 13 | 14950 | ours | 51.7 |
+| `BallWood.bmp` | the wooden ball (Balls) | 128x128 | 13 | 14950 | ours (own design) | |
 | `Floor_Top_Flat` | the floors' tops, brick strips both sides | 128x128 | 13 | 14904 | ours | 89.5 |
 | `Trafo_Environment` | the transformers' reflection | 64x64 | 13 | 12768 | ours | 43.3 |
-| `BallPaper.bmp` | the paper ball (Balls) | 128x128 | 13 | 12480 | ours | 43.1 |
+| `BallPaper.bmp` | the paper ball (Balls) | 128x128 | 13 | 12480 | ours (own design) | |
 | `Wood_Metal` | boards with riveted iron bands (boxes, modules) | 128x128 | 13 | 12136 | ours | 51.3 |
 | `PE_Bal_balloons` | the balloon's ropes and cloth | 128x128 | 13 | 10816 | ours (extras) | |
 | `floor_top_Checkpoint` | the checkpoint's floor | 128x128 | 13 | 10190 | ours | 79.3 |
@@ -43,12 +55,12 @@ matched (boards and grain fall elsewhere than the original's).
 | `PE_Bal_platform` | the balloon's platform | 256x256 | 13 | 3042 | ours (extras) | |
 | `E_Holzbeschlag` | a crate's side in a riveted iron frame | 128x128 | 13 | 2699 | ours | 54.4 |
 | `Modul18_Gitter` | a module's grate (transparent) | 64x64 | 12 | 2542 | ours | 54.8 |
-| `Ball_Stone` | stone pieces (stone ball pickup, modules) | 128x128 | 13 | 2510 | ours | 57.4 |
+| `Ball_Stone` | stone pieces (stone ball pickup, modules) | 128x128 | 13 | 2510 | ours (own design) | |
 | `Ball_LightningSphere3` | the new ball's lightning | 64x64 | 13 | 2288 | copy | |
 | `Wood_Old` | old weathered boards | 128x128 | 13 | 2142 | ours | 51.9 |
-| `Ball_Paper` | paper pieces (paper ball pickup) | 128x128 | 13 | 2082 | ours | 43.1 |
-| `P_Ball_Wood` | the wooden ball pickup | 128x128 (in P_Ball_Wood.nmo) | 7 | 1960 | ours | 51.7 |
-| `Ball_Wood` | wooden pieces (modules) | 128x128 | 13 | 1764 | ours | 51.7 |
+| `Ball_Paper` | paper pieces (paper ball pickup) | 128x128 | 13 | 2082 | ours (own design) | |
+| `P_Ball_Wood` | the wooden ball pickup | 128x128 (in P_Ball_Wood.nmo) | 7 | 1960 | ours (own design) | |
+| `Ball_Wood` | wooden pieces (modules) | 128x128 | 13 | 1764 | ours (own design) | |
 | `P_Extra_Life_Oil` | the extra life's oil drop | 128x128 | 13 | 1664 | ours (extras) | |
 | `Modul11_13_Wood` | light boards with a strap | 128x128 | 8 | 1596 | ours | 45.8 |
 | `Tower_Roof` | the towers' roofs (shingles) | 64x64 | 13 | 1550 | ours | 57.5 |

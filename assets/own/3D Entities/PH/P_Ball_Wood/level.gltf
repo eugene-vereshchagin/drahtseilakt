@@ -118,6 +118,9 @@
    ],
    "doubleSided": false,
    "alphaMode": "OPAQUE",
+   "normalTexture": {
+    "index": 1
+   },
    "extras": {
     "drahtseilakt": {
      "ambient": [
@@ -140,12 +143,20 @@
   {
    "source": 0,
    "sampler": 0
+  },
+  {
+   "source": 1,
+   "sampler": 0
   }
  ],
  "images": [
   {
    "uri": "textures/P_Ball_Wood.png",
    "name": "P_Ball_Wood"
+  },
+  {
+   "uri": "textures/ball_wood_n.png",
+   "name": "ball_wood_n"
   }
  ],
  "samplers": [

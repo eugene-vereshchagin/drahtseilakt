@@ -116,6 +116,34 @@
      "indices": 7,
      "material": 1
     }
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "look": 2
+    }
+   }
+  },
+  {
+   "name": "P_Dome_MF_Look",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 8,
+      "NORMAL": 9,
+      "TEXCOORD_0": 10
+     },
+     "indices": 11,
+     "material": 2
+    },
+    {
+     "attributes": {
+      "POSITION": 8,
+      "NORMAL": 9,
+      "TEXCOORD_0": 10
+     },
+     "indices": 12,
+     "material": 3
+    }
    ]
   }
  ],
@@ -201,6 +229,84 @@
      "z_write": true
     }
    }
+  },
+  {
+   "name": "P_Dome_Enamel",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 2
+    }
+   },
+   "emissiveFactor": [
+    0.34,
+    0.34,
+    0.34
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.85,
+      0.85,
+      0.85
+     ],
+     "power": 48,
+     "z_write": true
+    }
+   }
+  },
+  {
+   "name": "P_Dome_Ribs",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 1.0,
+    "baseColorTexture": {
+     "index": 3
+    }
+   },
+   "emissiveFactor": [
+    0.3,
+    0.3,
+    0.3
+   ],
+   "doubleSided": false,
+   "alphaMode": "OPAQUE",
+   "extras": {
+    "drahtseilakt": {
+     "ambient": [
+      0.1,
+      0.1,
+      0.1
+     ],
+     "specular": [
+      0.7,
+      0.7,
+      0.7
+     ],
+     "power": 28,
+     "z_write": true
+    }
+   }
   }
  ],
  "textures": [
@@ -210,6 +316,14 @@
   },
   {
    "source": 1,
+   "sampler": 0
+  },
+  {
+   "source": 2,
+   "sampler": 0
+  },
+  {
+   "source": 3,
    "sampler": 0
   }
  ],
@@ -221,6 +335,14 @@
   {
    "uri": "textures/Dome.png",
    "name": "Dome"
+  },
+  {
+   "uri": "textures/dome_enamel.png",
+   "name": "dome_enamel"
+  },
+  {
+   "uri": "textures/brass.png",
+   "name": "brass"
   }
  ],
  "samplers": [
@@ -234,7 +356,7 @@
  "buffers": [
   {
    "uri": "level.bin",
-   "byteLength": 14712
+   "byteLength": 363176
   }
  ],
  "bufferViews": [
@@ -284,6 +406,36 @@
    "buffer": 0,
    "byteOffset": 8952,
    "byteLength": 5760,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 14712,
+   "byteLength": 89400,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 104112,
+   "byteLength": 89400,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 193512,
+   "byteLength": 59600,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 253112,
+   "byteLength": 14976,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 268088,
+   "byteLength": 95088,
    "target": 34963
   }
  ],
@@ -355,6 +507,46 @@
    "count": 1440,
    "type": "SCALAR",
    "bufferView": 7
+  },
+  {
+   "componentType": 5126,
+   "count": 7450,
+   "type": "VEC3",
+   "min": [
+    -6.54434,
+    0.123,
+    -6.54434
+   ],
+   "max": [
+    6.54434,
+    3.804,
+    6.54434
+   ],
+   "bufferView": 8
+  },
+  {
+   "componentType": 5126,
+   "count": 7450,
+   "type": "VEC3",
+   "bufferView": 9
+  },
+  {
+   "componentType": 5126,
+   "count": 7450,
+   "type": "VEC2",
+   "bufferView": 10
+  },
+  {
+   "componentType": 5125,
+   "count": 3744,
+   "type": "SCALAR",
+   "bufferView": 11
+  },
+  {
+   "componentType": 5125,
+   "count": 23772,
+   "type": "SCALAR",
+   "bufferView": 12
   }
  ]
 }
