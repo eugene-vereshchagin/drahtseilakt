@@ -426,3 +426,15 @@ Format; `levels/community/` und `levels/open/` werden weiter gelesen und nie ver
 dem Ordner des Levels, bestehende Läufe bleiben also. *Remastered* verlässt Start: es wird die Options-Zeile *Aussehen:
 original / remastered* (nur mit Export), eine Einstellung statt einer Level-Art; Phase 2 macht daraus Textur- und
 Modellpakete.
+
+## Eine „Ansicht“, und die Schönheit kommt über die Toolbox
+
+*Entscheidung des Eigentümers, 2026-11-11.* Die Ansicht eines Levels ist eine Wahl, ohne getrennte Schalter für
+Texturen und Form: *Original* (die Texturen der Kopie des Spielers, die Formen von 2004), *Remaster* (die von der
+Toolbox vergrößerten Originaltexturen), *Drahtseilakt* (unsere Texturen) und *Paket des Spielers*. Jede Ansicht außer
+*Original* ist die schöne: gerundete Formen, Relief, große Texturen. Die Rundung macht die Toolbox einmal je Level aus
+dessen eigenem Mesh und hält sie als Cache; die Texturen wechseln dann mit der Ansicht. Ein Level, das der Spieler nur
+in einen Ordner legt (eine Karte aus dem Internet), spielt daher, wie es ist – „hallo 2004“; die schönen Ansichten
+erscheinen dafür, nachdem es über die Toolbox importiert wurde, und das Spiel sagt das dort, wo die Ansicht gewählt
+wird, und bietet den Import an. Das Remaster ist eine Ansicht jedes Levels, kein eigener Satz von Levels. Mitgelieferte
+Sätze bleiben zwei: die Auswahl des Eigentümers in unserem offenen Format und die Community-Auswahl als ihre `.nmo`.

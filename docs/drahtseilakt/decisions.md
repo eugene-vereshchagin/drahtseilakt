@@ -401,3 +401,14 @@ folder). The player's folder is `levels/downloaded/` and takes both community `.
 kept follow the folder a level is in, so existing runs stay. *Remastered* leaves Start: it becomes the Options line
 *Look: original / remastered* (shown only when an export exists), a setting rather than a kind of level; phase 2 turns
 the remaster into texture and model packs. Every item says on the notes panel what it is and where it comes from.
+
+## One Look, and beauty comes through the toolbox
+
+*Owner's decision, 2026-11-11.* A level's look is one choice, not separate texture and shape switches: *Original*
+(the player's copy's textures, the 2004 shapes), *Remaster* (the toolbox's enlarged original textures), *Drahtseilakt*
+(our textures) and *Player's pack*. Every look but *Original* is the beautiful one: rounded shapes, relief, large
+textures. The rounding is made once per level by the toolbox from the level's own mesh and kept as a cache; the
+textures are then swapped by the look. So a level the player only drops into a folder (a map from the internet) plays
+as it is, "hello 2004"; the beautiful looks appear for it after it is brought in through the toolbox, and the game
+says so where the look is chosen and offers that import. The remaster is a look of any level, not a separate set of
+levels. Shipped sets stay two: the owner's picks in our open format and the community picks as their `.nmo`.
