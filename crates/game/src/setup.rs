@@ -11,7 +11,8 @@ use crate::app::{Gpu, window_gpu};
 use crate::hud::{Rect, text, width};
 use crate::levels::{self, Found};
 use crate::ui::{
-    ALIGN_LEFT, ALIGN_TOP, Anchor, CONTEXT_H, CONTEXT_W, Quad, Screen, Style, TEXT_SCREEN, place,
+    ALIGN_LEFT, ALIGN_TOP, Anchor, CONTEXT_H, CONTEXT_W, Quad, Screen, Style, TEXT_SCREEN,
+    TEXT_WORDWRAP, place,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -51,6 +52,7 @@ pub fn run(size: (u32, u32)) -> Result<Outcome, String> {
         typed: String::new(),
         message: None,
         imported: false,
+        lang: crate::lang::chosen(crate::app::setting("language").as_deref()),
         outcome: Outcome::Back,
         cursor: (0.0, 0.0),
         hover: None,
@@ -68,12 +70,48 @@ pub fn run(size: (u32, u32)) -> Result<Outcome, String> {
 const TYPED_MAX: usize = 1024;
 /// Found places shown at once.
 const SHOWN: usize = 8;
+/// One text of the window: its rectangle in the frame, the height of its line, colour, and whether it is centred.
+struct Item {
+    text: String,
+    rect: [f32; 4],
+    line: f32,
+    color: [f32; 4],
+    centre: bool,
+}
+
+impl Item {
+    fn style(&self) -> Style {
+        Style {
+            scale: [
+                self.line / CONTEXT_H * 16.0 * 0.9,
+                self.line / CONTEXT_H * 16.0,
+            ],
+            spacing: [1.0, 1.0],
+            align: if self.centre { 0 } else { ALIGN_LEFT } | ALIGN_TOP,
+            flags: TEXT_SCREEN | TEXT_WORDWRAP,
+            margins: [0.0; 4],
+            color: self.color,
+            v2: true,
+            shadow: Some(([1.0, 1.0], [0.0, 0.0, 0.0, 0.8])),
+        }
+    }
+}
+
+/// Where the parts sit in the 640x480 frame (rectangles: left, top, right, bottom).
+struct Geo {
+    panel: [f32; 4],
+    title: [f32; 4],
+    intro: [f32; 4],
+    list_top: f32,
+    field: [f32; 4],
+    message: [f32; 4],
+    import: [f32; 4],
+    cancel: [f32; 4],
+    hint: [f32; 4],
+}
+
 /// A row of the found places, in the 640x480 frame.
 const ROW: f32 = 22.0;
-/// The path field and the two buttons, in the 640x480 frame (left, top, right, bottom).
-const FIELD: [f32; 4] = [40.0, 340.0, 600.0, 366.0];
-const IMPORT_BUTTON: [f32; 4] = [150.0, 396.0, 300.0, 428.0];
-const CANCEL_BUTTON: [f32; 4] = [340.0, 396.0, 490.0, 428.0];
 
 /// The end of `t` when it is longer than `n` characters (a path's end tells the most), marked with a dot.
 fn tail(t: &str, n: usize) -> String {
@@ -99,6 +137,8 @@ struct Setup {
     /// The last import's outcome, shown under the list.
     message: Option<(String, bool)>,
     imported: bool,
+    /// The menus' language (its code in lang::LANGUAGES).
+    lang: String,
     outcome: Outcome,
     /// The pointer in window pixels, and the button it is over.
     cursor: (f32, f32),
@@ -113,11 +153,11 @@ impl Setup {
             return;
         }
         if levels::what(&from).is_none() {
-            let m = format!("No Ballance there: {}", from.display());
+            let m = self.no_ballance(&from);
             self.message = Some((m, false));
             return;
         }
-        self.message = Some(("Copying...".into(), true));
+        self.message = Some((self.tr("copying"), true));
         self.pending = Some(from);
     }
 
@@ -135,7 +175,7 @@ impl Setup {
                 self.imported = true;
                 event_loop.exit();
             }
-            Err(e) => self.message = Some((e, false)),
+            Err(e) => self.message = Some((tail(&e, 44), false)),
         }
     }
 
@@ -173,9 +213,154 @@ impl Setup {
         }
     }
 
-    /// The window's picture in the game's menu style: a dark panel over a plain backdrop, the interface's own font,
-    /// the found places as rows, a path field and two buttons (Import, Cancel). Rectangles are in pixels of the
-    /// window, text quads too; both are laid out in the interface's 640x480 frame, centred in the window.
+    /// The message for a place with no Ballance in it (the end of a long path only: it tells the most).
+    fn no_ballance(&self, from: &std::path::Path) -> String {
+        self.tr("no ballance")
+            .replace("{path}", &tail(&from.display().to_string(), 24))
+    }
+
+    /// A text of the window in the menus' language.
+    fn tr(&self, key: &str) -> String {
+        crate::lang::Strings::ours_for(&format!("setup {key}"), &self.lang)
+    }
+
+    /// Where everything sits in the 640x480 frame. The panel is as high as its content needs (the list has a row
+    /// for each place found, one when there is none) and is centred.
+    fn geo(&self) -> Geo {
+        let rows = self.found.len().clamp(1, SHOWN) as f32;
+        let list_top = 138.0;
+        let field_top = list_top + rows * ROW + 12.0;
+        let button_top = field_top + 58.0;
+        let hint_top = button_top + 40.0;
+        let bottom = hint_top + 34.0;
+        let off = (CONTEXT_H - (bottom - 20.0)) / 2.0 - 20.0;
+        let at = |r: [f32; 4]| [r[0], r[1] + off, r[2], r[3] + off];
+        Geo {
+            panel: at([24.0, 20.0, 616.0, bottom]),
+            title: at([40.0, 32.0, 600.0, 62.0]),
+            intro: at([44.0, 68.0, 596.0, 136.0]),
+            list_top: list_top + off,
+            field: at([40.0, field_top, 600.0, field_top + 26.0]),
+            message: at([44.0, field_top + 30.0, 596.0, field_top + 50.0]),
+            import: at([150.0, button_top, 300.0, button_top + 32.0]),
+            cancel: at([340.0, button_top, 490.0, button_top + 32.0]),
+            hint: at([40.0, hint_top, 600.0, hint_top + 28.0]),
+        }
+    }
+
+    /// The window's content in the game's menu style, in the 640x480 frame: filled rectangles (rectangle, colour)
+    /// and texts, in the menus' language.
+    fn scene(&self) -> (Vec<([f32; 4], [f32; 4])>, Vec<Item>) {
+        let g = self.geo();
+        let mut fills = Vec::new();
+        let mut items = Vec::new();
+        let rim = [0.55, 0.57, 0.62, 1.0];
+        let inset = |r: [f32; 4], d: f32| [r[0] + d, r[1] + d, r[2] - d, r[3] - d];
+        let mut say = |text: String, rect: [f32; 4], line: f32, color: [f32; 4], centre: bool| {
+            items.push(Item {
+                text,
+                rect,
+                line,
+                color,
+                centre,
+            });
+        };
+        fills.push((g.panel, rim));
+        fills.push((inset(g.panel, 3.0), [0.07, 0.07, 0.1, 1.0]));
+        say(self.tr("title"), g.title, 28.0, GOLD, true);
+        say(self.tr("intro"), g.intro, 15.0, WHITE, false);
+        let status = if self.searching.is_some() {
+            Some("searching")
+        } else if self.found.is_empty() {
+            Some("nothing")
+        } else {
+            None
+        };
+        if let Some(k) = status {
+            let y = g.list_top;
+            say(self.tr(k), [44.0, y, 596.0, y + ROW], 15.0, GREY, false);
+        }
+        for (row, (i, (p, kind))) in self
+            .found
+            .iter()
+            .enumerate()
+            .skip(self.first())
+            .take(SHOWN)
+            .enumerate()
+        {
+            let y = g.list_top + row as f32 * ROW;
+            let on = i == self.chosen && self.typed.is_empty();
+            if on {
+                fills.push(([40.0, y, 600.0, y + ROW - 2.0], [0.45, 0.3, 0.18, 0.75]));
+            }
+            let what = match kind {
+                Found::Installed => "game",
+                Found::Disc => "cd",
+                Found::Image => "image",
+            };
+            say(
+                self.tr(what),
+                [48.0, y + 1.0, 130.0, y + ROW],
+                14.0,
+                if on { GOLD } else { GREY },
+                false,
+            );
+            say(
+                tail(&p.display().to_string(), 38),
+                [134.0, y + 1.0, 596.0, y + ROW],
+                14.0,
+                if on { GOLD } else { WHITE },
+                false,
+            );
+        }
+        fills.push((g.field, rim));
+        fills.push((inset(g.field, 2.0), [0.02, 0.02, 0.03, 1.0]));
+        let label = self.tr("path");
+        let shown = if self.typed.is_empty() {
+            format!("{label} ")
+        } else {
+            format!("{label} {}_", tail(&self.typed, 36))
+        };
+        let f = g.field;
+        say(
+            shown,
+            [f[0] + 8.0, f[1] + 3.0, f[2] - 4.0, f[3]],
+            15.0,
+            if self.typed.is_empty() { GREY } else { GOLD },
+            false,
+        );
+        if let Some((m, ok)) = &self.message {
+            say(
+                m.clone(),
+                g.message,
+                14.0,
+                if *ok { WHITE } else { RED },
+                false,
+            );
+        }
+        for (r, label, main) in [(g.import, "import", true), (g.cancel, "cancel", false)] {
+            let hot = self.hover == Some(r);
+            let body = match (main, hot) {
+                (true, true) => [0.6, 0.38, 0.2, 1.0],
+                (true, false) => [0.45, 0.3, 0.18, 1.0],
+                (false, true) => [0.3, 0.3, 0.36, 1.0],
+                (false, false) => [0.16, 0.16, 0.2, 1.0],
+            };
+            fills.push((r, [0.7, 0.72, 0.78, 1.0]));
+            fills.push((inset(r, 2.0), body));
+            let key = if main { "import" } else { "cancel" };
+            let text = if main {
+                crate::lang::Strings::ours_for(key, &self.lang)
+            } else {
+                self.tr(label)
+            };
+            say(text, [r[0], r[1] + 5.0, r[2], r[3]], 20.0, WHITE, true);
+        }
+        say(self.tr("keys"), g.hint, 13.0, GREY, true);
+        (fills, items)
+    }
+
+    /// The window's picture: the scene in window pixels.
     fn frame(&self, w: f32, h: f32) -> (Vec<Rect>, Vec<Quad>) {
         let screen = Screen { w, h };
         let mut rects = vec![Rect {
@@ -185,10 +370,8 @@ impl Setup {
             h,
             color: [0.06, 0.06, 0.09, 1.0],
         }];
-        let mut quads = Vec::new();
-        let own = crate::fallback::available();
-        // a rectangle of the frame (context pixels)
-        let fill = |r: [f32; 4], color: [f32; 4], rects: &mut Vec<Rect>| {
+        let (fills, items) = self.scene();
+        for (r, color) in fills {
             let [x0, y0, x1, y1] = screen.rect(r, Anchor::Center);
             rects.push(Rect {
                 x: x0,
@@ -197,206 +380,29 @@ impl Setup {
                 h: y1 - y0,
                 color,
             });
-        };
-        let mut say = |t: &str,
-                       r: [f32; 4],
-                       line: f32,
-                       color: [f32; 4],
-                       centre: bool,
-                       rects: &mut Vec<Rect>| {
+        }
+        let mut quads = Vec::new();
+        let own = crate::fallback::available();
+        for it in items {
             if own {
-                let st = Style {
-                    scale: [line / CONTEXT_H * 16.0 * 0.9, line / CONTEXT_H * 16.0],
-                    spacing: [1.0, 1.0],
-                    align: if centre { 0 } else { ALIGN_LEFT } | ALIGN_TOP,
-                    flags: TEXT_SCREEN,
-                    margins: [0.0; 4],
-                    color,
-                    v2: true,
-                    shadow: Some(([1.0, 1.0], [0.0, 0.0, 0.0, 0.8])),
-                };
                 quads.extend(place(
-                    crate::fallback::styled(t, r, &st),
+                    crate::fallback::styled(&it.text, it.rect, &it.style()),
                     screen,
                     Anchor::Center,
                 ));
             } else {
                 // no shipped fonts: the built-in pixel font, upper case
-                let k = screen.rect(r, Anchor::Center);
-                let sc = ((k[3] - k[1]).min(line * 2.0) / 9.0).floor().max(1.0);
-                let t = t.to_uppercase();
-                let x = if centre {
+                let k = screen.rect(it.rect, Anchor::Center);
+                let sc = ((k[3] - k[1]).min(it.line * 2.0) / 9.0).floor().max(1.0);
+                let t = it.text.to_uppercase();
+                let x = if it.centre {
                     (k[0] + k[2] - width(&t, sc)) / 2.0
                 } else {
                     k[0]
                 };
-                text(rects, &t, x, k[1], sc, color);
+                text(&mut rects, &t, x, k[1], sc, it.color);
             }
-        };
-        // the panel with the interface's rim
-        fill(
-            [24.0, 20.0, 616.0, 460.0],
-            [0.55, 0.57, 0.62, 1.0],
-            &mut rects,
-        );
-        fill(
-            [27.0, 23.0, 613.0, 457.0],
-            [0.07, 0.07, 0.1, 1.0],
-            &mut rects,
-        );
-        say(
-            "Bring in your Ballance",
-            [40.0, 32.0, 600.0, 62.0],
-            28.0,
-            GOLD,
-            true,
-            &mut rects,
-        );
-        for (i, l) in [
-            "The game plays your own copy of Ballance. Bring it in once:",
-            "drop its folder or CD image (.cue, .iso) on this window,",
-            "choose one found on this computer, or type its path.",
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let y = 72.0 + i as f32 * 17.0;
-            say(
-                l,
-                [44.0, y, 596.0, y + 17.0],
-                15.0,
-                WHITE,
-                false,
-                &mut rects,
-            );
         }
-        let status = if self.searching.is_some() {
-            Some("Looking on this computer...")
-        } else if self.found.is_empty() {
-            Some("Nothing found on this computer.")
-        } else {
-            None
-        };
-        if let Some(t) = status {
-            say(
-                t,
-                [44.0, 134.0, 596.0, 152.0],
-                15.0,
-                GREY,
-                false,
-                &mut rects,
-            );
-        }
-        let first = self.first();
-        for (row, (i, (p, kind))) in self
-            .found
-            .iter()
-            .enumerate()
-            .skip(first)
-            .take(SHOWN)
-            .enumerate()
-            .map(|(r, x)| (r, x))
-        {
-            let y = 134.0 + row as f32 * ROW;
-            let on = i == self.chosen && self.typed.is_empty();
-            if on {
-                fill(
-                    [40.0, y, 600.0, y + ROW - 2.0],
-                    [0.45, 0.3, 0.18, 0.75],
-                    &mut rects,
-                );
-            }
-            let what = match kind {
-                Found::Installed => "Game",
-                Found::Disc => "CD",
-                Found::Image => "Image",
-            };
-            say(
-                what,
-                [48.0, y + 1.0, 110.0, y + ROW],
-                14.0,
-                if on { GOLD } else { GREY },
-                false,
-                &mut rects,
-            );
-            say(
-                &tail(&p.display().to_string(), 62),
-                [112.0, y + 1.0, 596.0, y + ROW],
-                14.0,
-                if on { GOLD } else { WHITE },
-                false,
-                &mut rects,
-            );
-        }
-        // the path field
-        fill(FIELD, [0.55, 0.57, 0.62, 1.0], &mut rects);
-        fill(
-            [
-                FIELD[0] + 2.0,
-                FIELD[1] + 2.0,
-                FIELD[2] - 2.0,
-                FIELD[3] - 2.0,
-            ],
-            [0.02, 0.02, 0.03, 1.0],
-            &mut rects,
-        );
-        let shown = if self.typed.is_empty() {
-            "Path: ".to_owned()
-        } else {
-            format!("Path: {}_", tail(&self.typed, 56))
-        };
-        say(
-            &shown,
-            [FIELD[0] + 8.0, FIELD[1] + 3.0, FIELD[2] - 4.0, FIELD[3]],
-            15.0,
-            if self.typed.is_empty() { GREY } else { GOLD },
-            false,
-            &mut rects,
-        );
-        if let Some((m, ok)) = &self.message {
-            say(
-                &tail(m, 70),
-                [44.0, 372.0, 596.0, 392.0],
-                14.0,
-                if *ok { WHITE } else { RED },
-                false,
-                &mut rects,
-            );
-        }
-        for (r, label, main) in [
-            (IMPORT_BUTTON, "Import", true),
-            (CANCEL_BUTTON, "Cancel", false),
-        ] {
-            let hot = self.hover == Some(r);
-            let body = match (main, hot) {
-                (true, true) => [0.6, 0.38, 0.2, 1.0],
-                (true, false) => [0.45, 0.3, 0.18, 1.0],
-                (false, true) => [0.3, 0.3, 0.36, 1.0],
-                (false, false) => [0.16, 0.16, 0.2, 1.0],
-            };
-            fill(r, [0.7, 0.72, 0.78, 1.0], &mut rects);
-            fill(
-                [r[0] + 2.0, r[1] + 2.0, r[2] - 2.0, r[3] - 2.0],
-                body,
-                &mut rects,
-            );
-            say(
-                label,
-                [r[0], r[1] + 5.0, r[2], r[3]],
-                20.0,
-                WHITE,
-                true,
-                &mut rects,
-            );
-        }
-        say(
-            "Up/Down choose   Enter import   Esc back",
-            [40.0, 434.0, 600.0, 454.0],
-            13.0,
-            GREY,
-            true,
-            &mut rects,
-        );
         (rects, quads)
     }
 
@@ -421,7 +427,8 @@ impl Setup {
         let size = self.window.as_ref()?.inner_size();
         let (w, h) = (size.width, size.height);
         let (x, y) = self.context(w as f32, h as f32);
-        [IMPORT_BUTTON, CANCEL_BUTTON]
+        let g = self.geo();
+        [g.import, g.cancel]
             .into_iter()
             .find(|r| x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3])
     }
@@ -432,7 +439,7 @@ impl Setup {
             return;
         }
         match self.over() {
-            Some(r) if r == CANCEL_BUTTON => self.finish(Outcome::Back, event_loop),
+            Some(r) if r == self.geo().cancel => self.finish(Outcome::Back, event_loop),
             Some(_) => self.key(KeyCode::Enter, None, event_loop),
             None => {
                 let Some((w, h)) = self
@@ -444,7 +451,7 @@ impl Setup {
                     return;
                 };
                 let (x, y) = self.context(w as f32, h as f32);
-                let row = ((y - 134.0) / ROW).floor();
+                let row = ((y - self.geo().list_top) / ROW).floor();
                 if (40.0..=600.0).contains(&x) && row >= 0.0 && (row as usize) < SHOWN {
                     let i = self.first() + row as usize;
                     if i < self.found.len() {
@@ -605,5 +612,104 @@ impl Setup {
         if let Some(w) = &self.window {
             w.request_redraw();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn blank(lang: &str) -> Setup {
+        Setup {
+            size: (640, 480),
+            window: None,
+            gpu: None,
+            searching: None,
+            pending: None,
+            found: Vec::new(),
+            chosen: 0,
+            typed: String::new(),
+            message: None,
+            imported: false,
+            lang: lang.to_owned(),
+            outcome: Outcome::Back,
+            cursor: (0.0, 0.0),
+            hover: None,
+            error: None,
+        }
+    }
+
+    /// Every text of the window fits its rectangle in every language and in every state of the window (searching,
+    /// nothing found, a full list, a long typed path, a long message), and the panel fits the frame.
+    #[test]
+    fn every_text_of_the_window_fits_in_every_language() {
+        if !crate::fallback::available() {
+            eprintln!("skipped: the shipped fonts (assets/fonts) are not there");
+            return;
+        }
+        let long =
+            "/home/a-player/Games/Ballance/with/a/very/long/path/to/the/original/copy".to_owned();
+        let mut checked = 0;
+        for &(lang, _) in &crate::lang::LANGUAGES {
+            for state in 0..5 {
+                let mut s = blank(lang);
+                match state {
+                    0 => {}
+                    1 => s.found = vec![(PathBuf::from(&long), Found::Image)],
+                    2 => {
+                        s.found = (0..12)
+                            .map(|i| {
+                                (
+                                    PathBuf::from(format!("{long}{i}")),
+                                    [Found::Installed, Found::Disc, Found::Image][i % 3],
+                                )
+                            })
+                            .collect();
+                        s.chosen = 5;
+                    }
+                    3 => {
+                        s.typed = long.repeat(3);
+                        s.message = Some((s.no_ballance(std::path::Path::new(&long)), false));
+                    }
+                    _ => s.message = Some((s.tr("copying"), true)),
+                }
+                let g = s.geo();
+                assert!(
+                    g.panel[1] >= 0.0 && g.panel[3] <= CONTEXT_H,
+                    "{lang} {state}: the panel fits the frame"
+                );
+                let (_, items) = s.scene();
+                for it in items {
+                    let quads = crate::fallback::styled(&it.text, it.rect, &it.style());
+                    for q in quads {
+                        let [x0, y0, x1, y1] = q.rect;
+                        let tol = 1.5;
+                        assert!(
+                            x0 >= it.rect[0] - tol
+                                && x1 <= it.rect[2] + tol
+                                && y0 >= it.rect[1] - tol
+                                && y1 <= it.rect[3] + tol,
+                            "{lang} state {state}: {:?} leaves its rectangle {:?}: glyph {:?}",
+                            it.text,
+                            it.rect,
+                            q.rect
+                        );
+                        checked += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked > 1000);
+    }
+
+    #[test]
+    fn the_window_is_smaller_without_places() {
+        let mut s = blank("en");
+        let empty = s.geo().panel;
+        s.found = (0..8)
+            .map(|i| (PathBuf::from(format!("/p{i}")), Found::Disc))
+            .collect();
+        let full = s.geo().panel;
+        assert!(full[3] - full[1] > empty[3] - empty[1]);
     }
 }
