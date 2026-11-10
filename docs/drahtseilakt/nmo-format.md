@@ -93,5 +93,9 @@ A level holds geometry and **groups**; the game's logic lives in `base.cmo` and 
 `PS_Levelstart` (start; its Z axis points back at the camera), `PR_Resetpoints` (ball centres per sector),
 `PC_Checkpoints`, `PE_Levelende`, `Sector_NN`, `Phys_Floors` / `Phys_FloorRails` / `Phys_FloorStopper`
 (collision), `P_*` (modules and items, whose models come from `3D Entities/PH/*.nmo`), sound groups.
-Objects in those groups whose mesh has no material are editor placeholders and are never drawn. The sky and
+A member of a `P_*` group is a stand-in: the game makes the module of the group's name at it, whatever the
+member is called, looks like or whether it is hidden (a map made in Blender names it `P_Modul_26_01_.001` and
+gives it the part's own mesh and materials); the stand-in itself is not drawn. In the original's levels a stand-in
+is a visible mesh without a material, named after its module. A floor, rail or stopper without a material is level
+geometry and is drawn plain. The sky and
 starting ball of each level are in the data array `AllLevel` of `3D Entities/Levelinit.nmo`.

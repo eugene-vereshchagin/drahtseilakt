@@ -1,0 +1,753 @@
+// The map audit (`--audit FILE|DIR`): what a map asks of the game and what the game does not give it. For every
+// map, with the player's copy and without it: each body the physics makes of a level object that is not drawn
+// (an "invisible blocker" gets a name, its groups and the reason), the stand-ins no module is made for, the
+// textures nobody has, the objects of kinds the loader leaves out, the materials' modes the renderer does not
+// follow, the script blocks not known. One CSV row per map, kind of issue and copy; a summary ranked by the
+// number of maps hit. Maps are strangers' files: read through the same loaders as the game, nothing else.
+
+use crate::assets::{Data, Source};
+use crate::scene::{self, Modules, Placement};
+use crate::sim::Sim;
+use level::Level;
+use std::path::{Path, PathBuf};
+
+/// How deep a folder of maps is walked, and how many maps one run takes.
+const MAX_DEPTH: usize = 6;
+const MAX_MAPS: usize = 5000;
+/// How many names a row lists (the count is always whole).
+const MAX_NAMES: usize = 40;
+
+/// One kind of issue in one map: how many, and the names (objects, textures, modules, blocks).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Issue {
+    pub kind: &'static str,
+    pub count: usize,
+    pub names: Vec<String>,
+}
+
+/// The kinds, with what each means (the CSV's legend and the summary's).
+pub const KINDS: [(&str, &str); 17] = [
+    ("load-failed", "the map does not load"),
+    (
+        "load-warning",
+        "objects of the file that could not be decoded",
+    ),
+    (
+        "body-no-material",
+        "a floor, rail or stopper collides but is not drawn",
+    ),
+    (
+        "body-plain",
+        "a floor, rail or stopper whose mesh has no material at all: drawn plain grey",
+    ),
+    (
+        "body-transparent",
+        "a floor or rail collides but every material of it is fully transparent",
+    ),
+    (
+        "body-hidden",
+        "a floor or rail hidden in the file collides with the ball (the map's own invisible collider)",
+    ),
+    (
+        "stopper-hidden",
+        "a stopper hidden in the file (stops boxes and loose balls, never the player's ball)",
+    ),
+    (
+        "standin-solid",
+        "a module's stand-in left as a solid of its own mesh: no module of its group is there",
+    ),
+    (
+        "standin-hidden",
+        "a module's stand-in hidden in the file: no module is made at it",
+    ),
+    (
+        "module-missing",
+        "a module the map names that neither the game nor the copy has",
+    ),
+    (
+        "loose-not-drawn",
+        "a box, ball or dome has a body but nothing is drawn for it",
+    ),
+    (
+        "texture-missing",
+        "a texture a material draws with that nobody has (drawn plain)",
+    ),
+    (
+        "texture-found",
+        "textures drawn: the map's own pixels, ours or the copy's by name (count only)",
+    ),
+    (
+        "part-no-material",
+        "a drawn mesh has faces without a material (drawn plain grey; the original draws them white)",
+    ),
+    (
+        "class-skipped",
+        "objects of classes the loader does not read (curves, characters, 2D, sounds, ...)",
+    ),
+    (
+        "material-mode",
+        "materials whose alpha test is not 'greater' (the renderer tests 'greater' only)",
+    ),
+    (
+        "script-block-unknown",
+        "script blocks this engine does not know: the map's scripts do not run",
+    ),
+];
+
+fn push(out: &mut Vec<Issue>, kind: &'static str, name: String) {
+    let i = match out.iter().position(|i| i.kind == kind) {
+        Some(i) => i,
+        None => {
+            out.push(Issue {
+                kind,
+                count: 0,
+                names: Vec::new(),
+            });
+            out.len().saturating_sub(1)
+        }
+    };
+    if let Some(issue) = out.get_mut(i) {
+        issue.count = issue.count.saturating_add(1);
+        if issue.names.len() < MAX_NAMES && !issue.names.contains(&name) {
+            issue.names.push(name);
+        }
+    }
+}
+
+/// A level object as a row names it: its name and where it is.
+fn named(level: &Level, i: usize) -> String {
+    level.objects.get(i).map_or_else(String::new, |o| {
+        let [x, y, z] = o.position();
+        format!("{} @{x:.0},{y:.0},{z:.0}", o.name)
+    })
+}
+
+/// The issues of a loaded level: its bodies against what is drawn, its stand-ins, its textures.
+pub fn level_issues(
+    level: &Level,
+    modules: &Modules,
+    sim: &Sim,
+    placements: &[Placement],
+    data: &Data,
+) -> Vec<Issue> {
+    let mut out = Vec::new();
+    let mut drawn = vec![false; level.objects.len()];
+    for p in placements {
+        if let Some(d) = drawn.get_mut(p.object) {
+            *d = true;
+        }
+    }
+    let is_drawn = |i: usize| drawn.get(i).copied().unwrap_or(false);
+    let loaded = |i: usize| scene::module_of(level, i).filter(|n| modules.get(n).is_some());
+    let not_solid: Vec<usize> = (0..level.objects.len())
+        .filter(|&i| loaded(i).is_some())
+        .collect();
+    for (i, body) in crate::sim::static_objects(level, &not_solid) {
+        let Some(o) = level.objects.get(i) else {
+            continue;
+        };
+        let Some(mesh) = o.mesh.and_then(|m| level.meshes.get(m)) else {
+            continue;
+        };
+        let stand_in = level.module_group(i).is_some();
+        let for_ball = body.group != crate::physics::GROUP_BALL;
+        let clear = |p: &level::Part| {
+            p.material
+                .and_then(|m| level.materials.get(m))
+                .is_some_and(|m| m.blend.is_some() && m.diffuse[3] <= 0.02)
+        };
+        let kind = if stand_in {
+            "standin-solid"
+        } else if !o.visible {
+            if for_ball {
+                "body-hidden"
+            } else {
+                "stopper-hidden"
+            }
+        } else if !is_drawn(i) {
+            "body-no-material"
+        } else if !mesh.parts.is_empty() && mesh.parts.iter().all(clear) {
+            "body-transparent"
+        } else if mesh.parts.iter().all(|p| p.material.is_none()) {
+            "body-plain"
+        } else {
+            continue;
+        };
+        push(&mut out, kind, named(level, i));
+    }
+    for &(i, _) in sim.loose() {
+        if !is_drawn(i) {
+            push(&mut out, "loose-not-drawn", named(level, i));
+        }
+    }
+    // the stand-ins: a member of a module's group at which no module is made
+    for (i, o) in level.objects.iter().enumerate() {
+        let Some(group) = level.module_group(i) else {
+            continue;
+        };
+        if scene::is_marker_group(group) || o.mesh.is_none() {
+            continue;
+        }
+        match scene::module_of(level, i) {
+            None if !o.visible => push(&mut out, "standin-hidden", named(level, i)),
+            None => {}
+            Some(name) if modules.get(name).is_none() => {
+                push(&mut out, "module-missing", name.to_owned());
+            }
+            Some(_) => {}
+        }
+    }
+    // the textures the materials of drawn meshes use
+    let mut used = vec![false; level.textures.len()];
+    for (i, o) in level.objects.iter().enumerate() {
+        if !is_drawn(i) {
+            continue;
+        }
+        let Some(mesh) = o.mesh.and_then(|m| level.meshes.get(m)) else {
+            continue;
+        };
+        if mesh.parts.iter().any(|p| p.material.is_none())
+            && mesh.parts.iter().any(|p| p.material.is_some())
+        {
+            push(&mut out, "part-no-material", named(level, i));
+        }
+        let materials = mesh
+            .parts
+            .iter()
+            .filter_map(|p| p.material)
+            .chain(mesh.channels.iter().map(|c| c.material));
+        for t in materials.filter_map(|m| level.materials.get(m).and_then(|m| m.texture)) {
+            if let Some(u) = used.get_mut(t) {
+                *u = true;
+            }
+        }
+    }
+    for (t, _) in level.textures.iter().zip(&used).filter(|(_, u)| **u) {
+        // (a pack's picture put in place of a texture at load is pixels by now)
+        let found = match &t.source {
+            level::TextureSource::Pixels { .. } => true,
+            level::TextureSource::None => false,
+            _ => data.texture(t).is_some(),
+        };
+        if found {
+            push(&mut out, "texture-found", t.name.clone());
+        } else {
+            let file = match &t.source {
+                level::TextureSource::File(f) => f.as_str(),
+                _ => "no file named",
+            };
+            push(&mut out, "texture-missing", format!("{} <{file}>", t.name));
+        }
+    }
+    if let Some(graph) = &level.scripts {
+        for (guid, name, n) in graph.prototypes() {
+            if !script::blocks::known(guid) {
+                for _ in 0..n {
+                    push(&mut out, "script-block-unknown", name.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// What the file itself holds that the level model leaves out: classes not read, alpha tests not followed.
+fn file_issues(path: &Path, out: &mut Vec<Issue>) {
+    use nmo::class;
+    let Some(bytes) = crate::assets::read_game_file(path) else {
+        return;
+    };
+    let Ok(doc) = nmo::read(&bytes).and_then(|f| nmo::Document::parse(&f)) else {
+        return;
+    };
+    // what the loader reads, and what carries nothing to draw (the level, groups, arrays, behaviours and their
+    // parameters, scenes, attributes' and messages' managers)
+    let read = [
+        class::LEVEL,
+        class::DATA_ARRAY,
+        class::GROUP,
+        class::MATERIAL,
+        class::TEXTURE,
+        class::MESH,
+        class::ENTITY_3D,
+        class::CAMERA,
+        class::TARGET_CAMERA,
+        class::LIGHT,
+        class::TARGET_LIGHT,
+        class::OBJECT_3D,
+        class::SPRITE_3D,
+        nmo::behavior::class::BEHAVIOR,
+    ];
+    let logic = [
+        2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 20, 22, 45, 46, 48, 55,
+    ];
+    for o in &doc.objects {
+        if read.contains(&o.class_id) || logic.contains(&o.class_id) {
+            continue;
+        }
+        let what = match o.class_id {
+            15 | 16 | 18 => "animation",
+            24..=26 => "sound",
+            27..=29 => "2D entity",
+            36 | 43 => "curve",
+            40 | 42 => "character",
+            50 | 51 => "grid",
+            53 => "patch mesh",
+            _ => "other",
+        };
+        push(
+            out,
+            "class-skipped",
+            format!("{what} (class {}) {}", o.class_id, o.name_lossy()),
+        );
+    }
+    for (_, o) in doc.of_class(class::MATERIAL) {
+        let Some(m) = o.chunk.as_ref().and_then(|c| nmo::scene::material(c).ok()) else {
+            continue;
+        };
+        // VXCMP_GREATER is 5, GREATEREQUAL 7: what the renderer's cutoff does
+        if m.alpha_test && !matches!(m.alpha_func, 5 | 7) {
+            push(
+                out,
+                "material-mode",
+                format!("{} alpha func {}", o.name_lossy(), m.alpha_func),
+            );
+        }
+    }
+}
+
+/// The issues of the map at `path` with the game's files `data`.
+pub fn map_issues(path: &Path, data: &Data) -> Vec<Issue> {
+    let mut out = Vec::new();
+    let source = Source::Nmo(path.to_path_buf());
+    let data = data.for_source(&source);
+    let loaded = match data.load(&source) {
+        Ok(l) => l,
+        Err(e) => {
+            push(&mut out, "load-failed", e);
+            return out;
+        }
+    };
+    for w in &loaded.warnings {
+        push(&mut out, "load-warning", w.clone());
+    }
+    let level = &loaded.level;
+    let data = data.with_parts(level);
+    let modules = scene::load_modules(level, &data);
+    let start = level
+        .start_ball
+        .as_deref()
+        .and_then(crate::sim::BallKind::from_name)
+        .unwrap_or(crate::sim::BallKind::Wood);
+    let sim = Sim::with_rules(level, start, &modules, false, crate::replay::VERSION);
+    let placements = scene::placements(level, &modules, sim.loose(), sim.module_bodies());
+    out.extend(level_issues(level, &modules, &sim, &placements, &data));
+    file_issues(path, &mut out);
+    out
+}
+
+/// The `.nmo` files of `root` (a file or a folder walked a few levels deep, links not followed), sorted.
+fn maps(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut todo = vec![(root.to_path_buf(), 0usize)];
+    while let Some((path, depth)) = todo.pop() {
+        let Ok(meta) = std::fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if meta.is_file() {
+            let nmo = path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("nmo"));
+            if nmo && out.len() < MAX_MAPS {
+                out.push(path);
+            }
+        } else if meta.is_dir() && depth < MAX_DEPTH {
+            let Ok(entries) = std::fs::read_dir(&path) else {
+                continue;
+            };
+            for e in entries.flatten().take(MAX_MAPS) {
+                todo.push((e.path(), depth.saturating_add(1)));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+fn csv_field(s: &str) -> String {
+    // a name may hold anything; nothing a spreadsheet would take for a formula starts a field
+    let s: String = s.chars().filter(|c| !c.is_control()).collect();
+    let s = if s.starts_with(['=', '+', '-', '@']) {
+        format!("'{s}")
+    } else {
+        s
+    };
+    format!("\"{}\"", s.replace('"', "\"\""))
+}
+
+/// Audits every map under each of `roots`, with the copy (when `data` has one) and without it; writes the CSV when
+/// asked, and prints the summary: the kinds of issue by the number of maps they hit.
+pub fn run(
+    roots: &[PathBuf],
+    data: &Data,
+    csv: Option<&Path>,
+    prepare: &dyn Fn(bool),
+) -> Result<(), String> {
+    let files: Vec<PathBuf> = roots.iter().flat_map(|r| maps(r)).collect();
+    if files.is_empty() {
+        return Err("--audit: no .nmo file there".into());
+    }
+    let passes: Vec<(&str, Data)> = if data.has_copy() {
+        vec![("with", data.clone()), ("without", Data::new(None))]
+    } else {
+        vec![("without", data.clone())]
+    };
+    let mut rows = String::from("map,copy,kind,count,names\n");
+    // per pass and kind: the maps hit and the items in all
+    let mut totals: Vec<(&str, &str, usize, usize)> = Vec::new();
+    for (copy, data) in &passes {
+        // the texture packs and the interface as the game has them with this copy, or with none
+        prepare(data.has_copy());
+        for file in &files {
+            let shown = file.display().to_string();
+            let issues = map_issues(file, data);
+            for i in &issues {
+                rows.push_str(&format!(
+                    "{},{copy},{},{},{}\n",
+                    csv_field(&shown),
+                    i.kind,
+                    i.count,
+                    csv_field(&i.names.join("; "))
+                ));
+                match totals.iter_mut().find(|t| t.0 == *copy && t.1 == i.kind) {
+                    Some(t) => {
+                        t.2 = t.2.saturating_add(1);
+                        t.3 = t.3.saturating_add(i.count);
+                    }
+                    None => totals.push((copy, i.kind, 1, i.count)),
+                }
+                if csv.is_none() {
+                    println!(
+                        "{shown} [{copy} the copy] {} x{}: {}",
+                        i.kind,
+                        i.count,
+                        i.names.join("; ")
+                    );
+                }
+            }
+        }
+    }
+    if let Some(path) = csv {
+        crate::hints::write_plain(path, &rows)?;
+    }
+    println!("audit: {} maps", files.len());
+    for (copy, _) in &passes {
+        println!("{copy} the copy, kinds of issue by the maps they hit:");
+        let mut t: Vec<_> = totals.iter().filter(|t| t.0 == *copy).collect();
+        t.sort_by(|a, b| b.2.cmp(&a.2).then(a.1.cmp(b.1)));
+        for (_, kind, maps, items) in t {
+            let what = KINDS.iter().find(|k| k.0 == *kind).map_or("", |k| k.1);
+            println!("  {maps:4} maps {items:6} items  {kind}: {what}");
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use level::{Group, Material, Mesh, Object, Part};
+
+    fn material() -> Material {
+        Material {
+            name: "m".into(),
+            diffuse: [1.0; 4],
+            ambient: [1.0; 3],
+            emissive: [0.0; 3],
+            specular: [0.0; 3],
+            power: 0.0,
+            texture: None,
+            normal: None,
+            parallax: 0.0,
+            blend: None,
+            alpha_cutoff: None,
+            z_write: true,
+            two_sided: false,
+            unlit: false,
+            texgen: None,
+        }
+    }
+
+    /// A square of two triangles at `at`, with the level's material 0 or without any, in the given groups.
+    fn add(
+        level: &mut Level,
+        name: &str,
+        at: [f32; 3],
+        with_material: bool,
+        visible: bool,
+        groups: &[&str],
+    ) -> usize {
+        let mesh = level.meshes.len();
+        level.meshes.push(Mesh {
+            name: format!("{name}_Mesh"),
+            positions: vec![
+                [-5.0, 0.0, -5.0],
+                [5.0, 0.0, -5.0],
+                [5.0, 0.0, 5.0],
+                [-5.0, 0.0, 5.0],
+            ],
+            normals: vec![[0.0, 1.0, 0.0]; 4],
+            uvs: vec![[0.0; 2]; 4],
+            parts: vec![Part {
+                material: with_material.then_some(0),
+                indices: vec![0, 2, 1, 0, 3, 2],
+            }],
+            channels: Vec::new(),
+            look: None,
+        });
+        let object = level.objects.len();
+        level.objects.push(Object {
+            name: name.into(),
+            matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [at[0], at[1], at[2], 1.0],
+            ],
+            mesh: Some(mesh),
+            visible,
+            sprite: None,
+        });
+        for g in groups {
+            match level.groups.iter_mut().find(|x| x.name == *g) {
+                Some(x) => x.members.push(object),
+                None => level.groups.push(Group {
+                    name: (*g).into(),
+                    members: vec![object],
+                }),
+            }
+        }
+        object
+    }
+
+    fn level() -> Level {
+        let mut level = Level::default();
+        level.materials.push(material());
+        add(
+            &mut level,
+            "Floor",
+            [0.0, 0.0, 0.0],
+            true,
+            true,
+            &["Phys_Floors"],
+        );
+        level
+    }
+
+    fn issues(level: &Level) -> Vec<Issue> {
+        let modules = Modules::default();
+        let sim = Sim::new(level, crate::sim::BallKind::Wood);
+        let placements = scene::placements(level, &modules, sim.loose(), sim.module_bodies());
+        level_issues(level, &modules, &sim, &placements, &Data::new(None))
+    }
+
+    fn count(found: &[Issue], kind: &str) -> usize {
+        found.iter().find(|i| i.kind == kind).map_or(0, |i| i.count)
+    }
+
+    #[test]
+    fn a_hidden_floor_is_reported_and_a_hidden_stopper_apart() {
+        let mut level = level();
+        add(
+            &mut level,
+            "Wall",
+            [20.0, 0.0, 0.0],
+            true,
+            false,
+            &["Phys_Floors"],
+        );
+        add(
+            &mut level,
+            "Stop",
+            [40.0, 0.0, 0.0],
+            true,
+            false,
+            &["Phys_FloorStopper"],
+        );
+        let found = issues(&level);
+        assert_eq!(count(&found, "body-hidden"), 1);
+        assert_eq!(count(&found, "stopper-hidden"), 1);
+        assert_eq!(count(&found, "body-no-material"), 0);
+        let hidden = found
+            .iter()
+            .find(|i| i.kind == "body-hidden")
+            .expect("reported");
+        assert_eq!(hidden.names, vec!["Wall @20,0,0".to_owned()]);
+    }
+
+    /// The original draws any visible object, with or without a material: a floor the ball runs on is seen.
+    #[test]
+    fn a_floor_without_a_material_is_drawn_plain() {
+        let mut level = level();
+        let plain = add(
+            &mut level,
+            "Loft01",
+            [20.0, 0.0, 0.0],
+            false,
+            true,
+            &["Phys_Floors"],
+        );
+        let sim = Sim::new(&level, crate::sim::BallKind::Wood);
+        let placements = scene::placements(
+            &level,
+            &Modules::default(),
+            sim.loose(),
+            sim.module_bodies(),
+        );
+        assert!(
+            placements
+                .iter()
+                .any(|p| p.object == plain && p.marker.is_none())
+        );
+        let found = issues(&level);
+        assert_eq!(count(&found, "body-no-material"), 0);
+        assert_eq!(count(&found, "body-plain"), 1);
+    }
+
+    /// The original makes a module at every member of the module's group, whatever the member is called, looks like
+    /// or whether it is hidden; the stand-in itself is never seen.
+    #[test]
+    fn a_member_of_a_modules_group_is_a_stand_in_whatever_it_looks_like() {
+        let mut level = level();
+        let blender = add(
+            &mut level,
+            "P_Modul_26_01_.001",
+            [20.0, 0.0, 0.0],
+            true,
+            true,
+            &["P_Modul_26", "Sector_01"],
+        );
+        let hidden = add(
+            &mut level,
+            "Anything",
+            [40.0, 0.0, 0.0],
+            false,
+            false,
+            &["P_Box", "Sector_01"],
+        );
+        let own = add(
+            &mut level,
+            "P_Box_03",
+            [60.0, 0.0, 0.0],
+            false,
+            true,
+            &["Sector_01"],
+        );
+        let floor = add(
+            &mut level,
+            "P_Box_04",
+            [80.0, 0.0, 0.0],
+            true,
+            true,
+            &["Phys_Floors"],
+        );
+        assert_eq!(scene::module_of(&level, blender), Some("P_Modul_26"));
+        assert_eq!(scene::module_of(&level, hidden), Some("P_Box"));
+        assert_eq!(
+            scene::module_of(&level, own),
+            Some("P_Box"),
+            "the original's levels: by the name"
+        );
+        assert_eq!(
+            scene::module_of(&level, floor),
+            None,
+            "a textured object in no module's group"
+        );
+        let sim = Sim::new(&level, crate::sim::BallKind::Wood);
+        let placements = scene::placements(
+            &level,
+            &Modules::default(),
+            sim.loose(),
+            sim.module_bodies(),
+        );
+        assert!(
+            placements.iter().any(|p| p.object == blender),
+            "no module there: the stand-in is what is seen"
+        );
+        let modules = Modules {
+            models: vec![Level::default()],
+            names: vec!["P_Modul_26".into()],
+        };
+        let placements = scene::placements(&level, &modules, sim.loose(), sim.module_bodies());
+        assert!(
+            !placements.iter().any(|p| p.object == blender),
+            "its module is there: the stand-in is not drawn"
+        );
+        assert!(placements.iter().any(|p| p.object == floor));
+    }
+
+    /// Only the game's own modules are made: a group a mod reads (`P_Modul_Portal`) is nothing to the level init,
+    /// so its members are never bodies; a module whose file is missing stays solid as its stand-in.
+    #[test]
+    fn a_group_of_no_module_of_the_game_makes_no_body() {
+        let mut level = level();
+        let portal = add(
+            &mut level,
+            "Portal_In",
+            [20.0, 0.0, 0.0],
+            false,
+            true,
+            &["P_Modul_Portal"],
+        );
+        let module = add(
+            &mut level,
+            "P_Modul_03_01",
+            [40.0, 0.0, 0.0],
+            false,
+            true,
+            &["P_Modul_03"],
+        );
+        let bodies: Vec<usize> = crate::sim::static_objects(&level, &[])
+            .into_iter()
+            .map(|s| s.0)
+            .collect();
+        assert!(!bodies.contains(&portal));
+        assert!(bodies.contains(&module));
+        let sim = Sim::new(&level, crate::sim::BallKind::Wood);
+        let placements = scene::placements(
+            &level,
+            &Modules::default(),
+            sim.loose(),
+            sim.module_bodies(),
+        );
+        assert!(
+            placements.iter().any(|p| p.object == module),
+            "a solid is seen, plain when it has no material"
+        );
+        let found = issues(&level);
+        assert_eq!(count(&found, "standin-solid"), 1);
+        assert_eq!(count(&found, "module-missing"), 2);
+    }
+
+    #[test]
+    fn a_csv_field_is_quoted_and_starts_no_formula() {
+        assert_eq!(csv_field("a \"b\", c"), "\"a \"\"b\"\", c\"");
+        assert_eq!(csv_field("=1+1"), "\"'=1+1\"");
+        assert_eq!(csv_field("a\nb\r"), "\"ab\"");
+    }
+
+    #[test]
+    fn a_folder_of_maps_is_walked_without_following_links() {
+        let dir = std::env::temp_dir().join(format!("drahtseilakt-audit-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("a/b")).expect("made");
+        std::fs::write(dir.join("a/b/One.NMO"), b"x").expect("written");
+        std::fs::write(dir.join("a/two.nmo"), b"x").expect("written");
+        std::fs::write(dir.join("a/notes.txt"), b"x").expect("written");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(dir.join("a"), dir.join("link")).expect("linked");
+        let found = maps(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(found.len(), 2, "{found:?}");
+    }
+}

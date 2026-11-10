@@ -36,3 +36,29 @@ Maus, Timer und Zähler, Licht, Texturen und Klänge).
 die nächsten zwanzig deckte ab, was die Karten mit Skripten hinzufügen (bewegte und versteckte Objekte,
 Physikänderungen, Kopien, Nachrichten, Text, Klänge). Karten laufen nie halb: eine Karte, die einen nicht umgesetzten
 Baustein braucht, wird mit dessen Namen gemeldet.
+
+## Die Prüfung: was eine Karte verlangt und was sie bekommt (2026-11-10)
+
+`drahtseilakt --audit FILE|DIR [--audit-csv FILE]` geht ohne Fenster durch eine Karte oder einen Ordner von Karten,
+mit der Kopie des Spielers und ohne sie, und listet für jede Karte: jeden Körper, den die Physik aus einem
+Levelobjekt macht und der nicht gezeichnet wird (ein unsichtbares Hindernis, mit Namen, Ort und Grund), die
+Platzhalter, für die kein Modul gebaut wird, die Module und Texturen, die niemand hat, die Objekte von Klassen, die
+der Lader auslässt, die Alphatests, denen der Renderer nicht folgt, und die unbekannten Skriptblöcke. Die CSV hat
+eine Zeile je Karte, Kopie und Art des Problems mit den Namen; die Übersicht ordnet die Arten nach der Zahl der
+betroffenen Karten. `--show-colliders` zeichnet die von einer Karte versteckten Böden und Schienen (rot) und ihre
+versteckten Stopper (gelb) durchscheinend, im Spiel und in Bildschirmfotos.
+
+Der erste Lauf über 605 Karten (die 26 mitgelieferten und die 579 der Sammlung) fand die Ursachen der
+„unsichtbaren Objekte“, und drei Regeln wurden für alle Karten geändert:
+
+| Ursache | Karten | jetzt |
+|---|---|---|
+| ein Platzhalter wurde an seinem Namen erkannt (`P_Modul_26_01`) und nur als sichtbares Mesh ohne Material; Karten aus Blender nennen ihn `P_Modul_26_01_.001`, geben ihm Materialien oder verstecken ihn, also wurde kein Modul gebaut und der Platzhalter blieb als unsichtbarer oder weißer fester Körper | 71 + 29 + 22 | ein Mitglied der Gruppe eines Moduls ist ein Platzhalter, wie ihn die Levelinitialisierung des Originals nimmt |
+| ein Boden, eine Schiene oder ein Stopper ohne Material kollidierte, wurde aber nicht gezeichnet | 42 | einfarbig gezeichnet |
+| eine Gruppe, die kein Modul des Spiels ist (`P_Modul_Portal` eines Mods), machte ihre Mitglieder fest | 13 | nie ein Körper; gezeichnet als das Objekt, das es ist |
+
+Was bleibt, nach betroffenen Karten (mit der Kopie): in der Datei versteckte Böden und Schienen, die kollidieren,
+204 Karten, und versteckte Stopper, 160 (die eigenen unsichtbaren Kollisionskörper der Karten, wie im Original;
+`--show-colliders` zeigt sie); Objekte nicht gelesener Klassen, 136 (Animationen 83, 2D-Objekte 32, Kurven, Klänge,
+Patch-Meshes); Texturen ohne Dateinamen und ohne Pixel, 35; Meshes mit Flächen ohne Material, 30 (grau gezeichnet);
+Module von Mods, 17; unbekannte Skriptblöcke, 11; völlig durchsichtige Böden, 6.

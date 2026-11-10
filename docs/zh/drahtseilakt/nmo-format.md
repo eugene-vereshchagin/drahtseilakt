@@ -73,4 +73,4 @@
 
 关卡包含几何体和**组**；游戏逻辑位于 `base.cmo` 中，按组名工作：
 `PS_Levelstart`（起点；其 Z 轴指回摄像机）、`PR_Resetpoints`（每个小节的球心位置）、`PC_Checkpoints`、`PE_Levelende`、`Sector_NN`、`Phys_Floors` / `Phys_FloorRails` / `Phys_FloorStopper`（碰撞）、`P_*`（机关和道具，其模型来自 `3D Entities/PH/*.nmo`）、声音组。
-这些组中网格没有材质的对象是编辑器占位物，从不绘制。各关卡的天空和初始球位于 `3D Entities/Levelinit.nmo` 的数据数组 `AllLevel` 中。
+`P_*` 组的成员是占位物：游戏在它的位置生成与组同名的机关，不论该成员叫什么名字、长什么样、是否隐藏（Blender 制作的地图把它命名为 `P_Modul_26_01_.001`，并给它零件本身的网格和材质）；占位物本身不绘制。在原版关卡中，占位物是没有材质的可见网格，以其机关命名。没有材质的地板、轨道或挡板属于关卡几何体，以纯色绘制。各关卡的天空和初始球位于 `3D Entities/Levelinit.nmo` 的数据数组 `AllLevel` 中。

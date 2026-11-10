@@ -1212,6 +1212,17 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     // (the interface no longer implies the original's sounds: the copy's interface is now the default)
     let theme = setting("sound-theme");
     gamedata::sound_themes::start(theme.as_deref());
+    scene::set_show_colliders(o.show_colliders);
+    if !o.audit.is_empty() {
+        let prepare = |copy: bool| {
+            gamedata::resources::set_copy(copy);
+            gamedata::packs::set_copy(copy);
+            // the packs a new player has (ours, the level's own parts), not this player's settings: the audit says
+            // what the game gives, the same on every machine; --textures and --models ask for another
+            start_packs(o.textures.as_deref(), o.models.as_deref());
+        };
+        return crate::audit::run(&o.audit, &data, o.audit_csv.as_deref(), &prepare);
+    }
     if let Some(dir) = &o.level_stats {
         return crate::levelstats::run(&o, &data, dir, Path::new("hints"));
     }

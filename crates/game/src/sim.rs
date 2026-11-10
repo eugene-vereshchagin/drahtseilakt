@@ -1077,7 +1077,8 @@ impl Sim {
             let Some(mesh) = o.mesh.and_then(|m| level.meshes.get(m)) else {
                 continue;
             };
-            let name = o.name.to_ascii_lowercase();
+            // what it is comes from its module's group, as the original takes it (its name only without one)
+            let name = level.module_of(i).to_ascii_lowercase();
             // As the original physicalizes them: the pose without the scale, the mesh's points scaled.
             let Some((pos, rot, scale)) = pose_and_scale(&o.matrix) else {
                 continue;
@@ -2673,7 +2674,7 @@ fn rest_out_of(triangles: &[Triangle], points: &[Vec3], sphere: Option<f32>, pos
 /// The mesh of the module file's object (`<module>_MF`) that the original makes in place of a loose object's
 /// stand-in (a crate, a paper ball, a dome), if the module file is loaded and has it.
 fn module_mesh<'a>(level: &Level, i: usize, modules: &'a Modules) -> Option<&'a level::Mesh> {
-    let name = level::module_name(&level.objects.get(i)?.name);
+    let name = level.module_of(i);
     let (_, file) = modules.get(name)?;
     let root = format!("{name}_MF");
     let o = file
@@ -2867,6 +2868,11 @@ fn sound_ids(level: &Level, i: usize) -> crate::physics::SoundIds {
 }
 
 fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
+    static_objects(level, made).into_iter().map(|s| s.1).collect()
+}
+
+/// The level's fixed bodies with the level object each is made of (the audit names them).
+pub(crate) fn static_objects(level: &Level, made: &[usize]) -> Vec<(usize, StaticMesh)> {
     let mut out = Vec::new();
     let mut seen = Vec::new();
     for g in &level.groups {
@@ -2875,8 +2881,9 @@ fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
         let group = match g.name.to_ascii_lowercase().as_str() {
             "phys_floors" | "phys_floorrails" => GROUP_FLOOR,
             "phys_floorstopper" => GROUP_BALL,
-            // Modules are solid for now; their own behaviour comes with phase 4. Boxes are bodies (see `Sim::new`).
-            n if n.starts_with("p_modul") => "",
+            // A module whose file is not there is solid as its stand-in: the game's own modules only
+            // (`scene::is_game_module`).
+            _ if crate::scene::is_game_module(&g.name) => "",
             _ => continue,
         };
         for &m in &g.members {
@@ -2927,13 +2934,16 @@ fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
                 }
             }
             if !triangles.is_empty() {
-                out.push(StaticMesh {
-                    triangles,
-                    pos,
-                    rot,
-                    group,
-                    sound: sound_ids(level, m),
-                });
+                out.push((
+                    m,
+                    StaticMesh {
+                        triangles,
+                        pos,
+                        rot,
+                        group,
+                        sound: sound_ids(level, m),
+                    },
+                ));
             }
         }
     }

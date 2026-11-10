@@ -9,6 +9,7 @@
 #![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 mod app;
+mod audit;
 use gamedata::assets;
 mod audio;
 mod autopilot;
@@ -116,6 +117,12 @@ usage: drahtseilakt [options]
   --sky NAME          play under another sky (A, B, C, Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
                       Mist, Clouds, or any Sky_<NAME>_* the textures have) instead of the level's own
   --size WxH          window or screenshot size (default 1600x900)
+  --audit FILE|DIR    no window: audit a map or a folder of maps, with the copy and without it: bodies that collide
+                      without being drawn (invisible blockers), stand-ins without a module, missing textures,
+                      objects and modes not read; prints a summary by the number of maps hit (may be repeated)
+  --show-colliders    draw the floors and rails a map hides (red) and its hidden stoppers (yellow) as translucent
+                      shapes: what stops the ball without being seen
+  --audit-csv FILE    with --audit: write one row per map, copy and kind of issue (with the names) to FILE
   --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in ./hints
                       for designing our own: DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py);
                       with --open LEVEL --replay RUN one of our levels along that run: DIR/level-stats-own.csv
@@ -193,6 +200,11 @@ pub struct Options {
     pub look: Option<[f32; 6]>,
     /// Measure the original levels into this folder (levelstats.rs) and stop.
     pub level_stats: Option<PathBuf>,
+    /// No window: audit these maps (files or folders of them) for what is not drawn or not there (audit.rs).
+    pub audit: Vec<PathBuf>,
+    pub audit_csv: Option<PathBuf>,
+    /// Draw the floors, rails and stoppers a map hides as translucent markers.
+    pub show_colliders: bool,
 }
 
 /// Until the release, a played game is a debug run unless `--no-debug` says otherwise (the owner's decision,
@@ -238,6 +250,9 @@ fn parse_args() -> Result<Options, String> {
         debug: false,
         look: None,
         level_stats: None,
+        audit: Vec::new(),
+        audit_csv: None,
+        show_colliders: false,
     };
     // `--name=value` is the same as `--name value` (handy for values that start with a minus).
     let mut args = std::env::args()
@@ -334,6 +349,9 @@ fn parse_args() -> Result<Options, String> {
             }
             "--debug" => debug = Some(true),
             "--no-debug" => debug = Some(false),
+            "--show-colliders" => o.show_colliders = true,
+            "--audit" => o.audit.push(value()?.into()),
+            "--audit-csv" => o.audit_csv = Some(value()?.into()),
             "--level-stats" => o.level_stats = Some(value()?.into()),
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--sky" => {
@@ -415,6 +433,7 @@ fn parse_args() -> Result<Options, String> {
         || o.video.is_some()
         || o.frames.is_some()
         || o.screenshot.is_some()
+        || !o.audit.is_empty()
         || o.export.is_some();
     o.debug = debug.unwrap_or(DEBUG_BY_DEFAULT && !unattended);
     Ok(o)

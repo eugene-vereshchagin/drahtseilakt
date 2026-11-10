@@ -128,6 +128,11 @@ const MARKERS: [(&str, [f32; 4]); 3] = [
     ("P_Extra_Point", [0.9, 0.9, 1.0, 0.7]),
 ];
 
+/// Whether a group is one the original shows with particles, not with a module's meshes.
+pub fn is_marker_group(group: &str) -> bool {
+    MARKERS.iter().any(|m| m.0.eq_ignore_ascii_case(group))
+}
+
 /// Modules whose own systems draw what they show (the extra points' balls, the finish's balloon or UFO), so their
 /// `All_` group is not shown as a whole.
 const OWN_DRAWING: [&str; 2] = ["P_Extra_Point", "PE_Balloon"];
@@ -304,19 +309,55 @@ fn has_material(level: &Level, mesh: usize) -> bool {
         .is_some_and(|m| m.parts.iter().any(|p| p.material.is_some()))
 }
 
-/// The module a level object stands in for: a visible mesh without any material and without a marker group is an
-/// editor stand-in, which the original replaces with its module (named by the object without its `_NN`).
+/// The module a level object stands in for, which the original makes in its place. The original's level init goes
+/// through the groups named after its modules and makes the module at every member, whatever the member is called,
+/// looks like or whether it is hidden (a map made in Blender gives its stand-ins the part's own mesh and materials,
+/// or hides them); so a member of a module's group is a stand-in. An object in no such group is one only as the
+/// original's levels have them: a visible mesh without any material, named after its module (`P_Box_03`).
 pub fn module_of(level: &Level, i: usize) -> Option<&str> {
     let o = level.objects.get(i)?;
     let mesh = o.mesh?;
+    if let Some(group) = level.module_group(i) {
+        return (!is_marker_group(group)).then_some(group);
+    }
     if !o.visible || has_material(level, mesh) {
         return None;
     }
-    let marker = level
-        .groups_of(i)
-        .any(|g| MARKERS.iter().any(|m| m.0.eq_ignore_ascii_case(g)));
+    let marker = level.groups_of(i).any(is_marker_group);
     (!marker).then(|| level::module_name(&o.name))
 }
+
+/// Whether a group is one of the game's own moving modules (`P_Modul_` and a number), the ones left solid as their
+/// stand-ins when their file is missing. A group of any other name (a mod's `P_Modul_Portal`) is nothing to the
+/// original's level init: its members are never made physical.
+pub fn is_game_module(group: &str) -> bool {
+    group
+        .get(..8)
+        .filter(|p| p.eq_ignore_ascii_case("P_Modul_"))
+        .and_then(|_| group.get(8..))
+        .is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Whether a level object is level geometry the physics makes a fixed body of (a floor, a rail, a stopper).
+fn is_solid_geometry(level: &Level, i: usize) -> bool {
+    level.groups_of(i).any(|g| {
+        ["Phys_Floors", "Phys_FloorRails", "Phys_FloorStopper"]
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(g))
+    })
+}
+
+/// The colliders' overlay (`--show-colliders`): the floors, rails and stoppers a map hides are drawn as translucent
+/// markers, so that what stops the ball unseen can be looked at.
+static SHOW_COLLIDERS: AtomicBool = AtomicBool::new(false);
+
+pub fn set_show_colliders(on: bool) {
+    SHOW_COLLIDERS.store(on, Ordering::Relaxed);
+}
+
+/// The overlay's colours: what the ball runs into, and what only stops boxes and loose balls.
+const HIDDEN_FLOOR: [f32; 4] = [1.0, 0.15, 0.1, 0.45];
+const HIDDEN_STOPPER: [f32; 4] = [1.0, 0.8, 0.1, 0.3];
 
 /// Loads every module the level's stand-ins name, once each (a missing or unreadable file is left out).
 pub fn load_modules(level: &Level, data: &crate::assets::Data) -> Modules {
@@ -356,11 +397,41 @@ pub fn placements(
         let Some(mesh) = o.mesh else { continue };
         // the cloud layer is hidden in the file: Gameplay.nmo shows it when the options have clouds (instances())
         let cloud = o.name == "SkyLayer";
-        if !o.visible && !cloud {
+        let matrix = Mat4::from_cols_array_2d(&o.matrix);
+        // a stand-in is never drawn itself, hidden or not: its module is (below)
+        // (only when its module is there: a stand-in whose module nobody has, a mod's or a missing file's, is all
+        // there is to see at its place, and is drawn as the object it is)
+        let stand_in = module_of(level, i).is_some_and(|n| modules.get(n).is_some());
+        if !o.visible && !cloud && !stand_in {
+            // (the colliders' overlay shows a hidden floor, rail or stopper)
+            if SHOW_COLLIDERS.load(Ordering::Relaxed) && is_solid_geometry(level, i) {
+                let stopper = level
+                    .groups_of(i)
+                    .all(|g| !g.eq_ignore_ascii_case("Phys_Floors") && !g.eq_ignore_ascii_case("Phys_FloorRails"));
+                out.push(Placement {
+                    model: LEVEL_MODEL,
+                    mesh,
+                    matrix,
+                    marker: Some(if stopper { HIDDEN_STOPPER } else { HIDDEN_FLOOR }),
+                    object: i,
+                    body: None,
+                    spin: None,
+                    trafo_shadow: None,
+                    sprite: None,
+                    cloud: false,
+                });
+            }
             continue;
         }
-        let matrix = Mat4::from_cols_array_2d(&o.matrix);
-        if has_material(level, mesh) {
+        // A floor, rail or stopper is drawn even without a material, as the original draws any visible object
+        // (plain, with the default material): the ball runs on it, so it must be seen.
+        // The same for a module's stand-in left solid because its file is missing (sim.rs, `static_objects`).
+        let plain_geometry = !stand_in
+            && !has_material(level, mesh)
+            && (is_solid_geometry(level, i) || level.module_group(i).is_some_and(is_game_module));
+        // (a start's, a checkpoint's or an extra point's stand-in is replaced too, whatever it looks like: below)
+        let marked = level.groups_of(i).any(is_marker_group);
+        if !stand_in && !marked && (has_material(level, mesh) || plain_geometry) {
             out.push(Placement {
                 model: LEVEL_MODEL,
                 mesh,
