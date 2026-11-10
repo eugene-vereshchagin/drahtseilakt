@@ -3,9 +3,9 @@
 
 use std::path::{Path, PathBuf};
 
-/// The largest texture file of an open-format level read, and its largest side (the toolbox makes them up to 8K).
+/// The largest texture file of an open-format level read, and its largest side (the toolbox makes them up to 4K).
 const IMAGE_MAX: u64 = 64 * 1024 * 1024;
-const SIDE_MAX: u32 = 8192;
+const SIDE_MAX: u32 = 4096;
 
 /// The folder of a level that keeps the game's files it uses (its modules, the balls, the transformer, its sky,
 /// particles, shadow and sounds), by their paths in the player's copy; a level that has it plays without the copy's

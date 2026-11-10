@@ -138,7 +138,7 @@ fn about(language: &str, kind: Kind) -> String {
              данные; моды и DLL игра никогда не выполняет.\n"
         }
         ("ru", Kind::Remastered) => {
-            "Оригинальные уровни в открытом формате, с современными текстурами (4K–8K).\n\nДелает их на вашей \
+            "Оригинальные уровни в открытом формате, с современными текстурами (4K).\n\nДелает их на вашей \
              машине из папки original программа drahtseilakt-toolbox (remaster); никуда не распространяются.\n"
         }
         ("ru", Kind::Modified) => {
@@ -173,7 +173,7 @@ fn about(language: &str, kind: Kind) -> String {
              führt das Spiel nie aus.\n"
         }
         ("de", Kind::Remastered) => {
-            "Die Original-Level im offenen Format, mit modernen Texturen (4K–8K).\n\nAuf Ihrem Rechner aus dem Ordner \
+            "Die Original-Level im offenen Format, mit modernen Texturen (4K).\n\nAuf Ihrem Rechner aus dem Ordner \
              original vom Programm drahtseilakt-toolbox (remaster) erzeugt und nie weitergegeben.\n"
         }
         ("de", Kind::Modified) => {
@@ -205,7 +205,7 @@ fn about(language: &str, kind: Kind) -> String {
              模组或 DLL。\n"
         }
         ("zh", Kind::Remastered) => {
-            "开放格式的原版关卡，配有现代纹理（4K–8K）。\n\n由 drahtseilakt-toolbox（remaster）在你的电脑上从 original \
+            "开放格式的原版关卡，配有现代纹理（4K）。\n\n由 drahtseilakt-toolbox（remaster）在你的电脑上从 original \
              文件夹生成，不会对外分发。\n"
         }
         ("zh", Kind::Modified) => {
@@ -236,7 +236,7 @@ fn about(language: &str, kind: Kind) -> String {
              mods or DLLs.\n"
         }
         (_, Kind::Remastered) => {
-            "The original levels in the open format, with modern textures (4K-8K).\n\nMade on your machine from the \
+            "The original levels in the open format, with modern textures (4K).\n\nMade on your machine from the \
              original folder by the program drahtseilakt-toolbox (remaster) and never distributed.\n"
         }
         (_, Kind::Modified) => {
@@ -259,7 +259,7 @@ fn about(language: &str, kind: Kind) -> String {
 
 /// The READMEs earlier versions of the game wrote (community and remastered, every language): one of these, untouched,
 /// is replaced by the current text; any other README is the player's and stays.
-const SUPERSEDED: [&str; 8] = [
+const SUPERSEDED: [&str; 12] = [
     "Любительские карты (.nmo), играются в расширенном режиме (Options, Extended).\n\nГде брать: каталог \
              github.com/pseudoacetyl/BallanceCustomMaps (список карт и ссылки на файлы), Ballance International \
              Discord (#new), Baidu Tieba (平衡球吧), Bilibili.\nКарты запускаются как данные; моды и DLL игра никогда \
@@ -283,6 +283,14 @@ const SUPERSEDED: [&str; 8] = [
              never runs mods or DLLs.\n",
     "The original levels in the open format, with modern textures (4K-8K).\n\nMade on your machine from the \
              original folder by the game's scripts (roadmap, phases 6 and 7) and never distributed.\n",
+    "Оригинальные уровни в открытом формате, с современными текстурами (4K–8K).\n\nДелает их на вашей \
+             машине из папки original программа drahtseilakt-toolbox (remaster); никуда не распространяются.\n",
+    "Die Original-Level im offenen Format, mit modernen Texturen (4K–8K).\n\nAuf Ihrem Rechner aus dem Ordner \
+             original vom Programm drahtseilakt-toolbox (remaster) erzeugt und nie weitergegeben.\n",
+    "开放格式的原版关卡，配有现代纹理（4K–8K）。\n\n由 drahtseilakt-toolbox（remaster）在你的电脑上从 original \
+             文件夹生成，不会对外分发。\n",
+    "The original levels in the open format, with modern textures (4K-8K).\n\nMade on your machine from the \
+             original folder by the program drahtseilakt-toolbox (remaster) and never distributed.\n",
 ];
 
 /// What a folder or file found on the machine is, if it is a Ballance to import.

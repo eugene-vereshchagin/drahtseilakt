@@ -8,7 +8,7 @@ Schiene über dem Abgrund. Der Name ist unsere Verbeugung vor dem Spiel und den 
 
 Drahtseilakt ist eine neue Engine für **Ballance** (Cyparade / Atari, 2004), von Grund auf in Rust geschrieben.
 Sie spielt die Daten deiner eigenen Kopie des Spiels — die Originallevel genau so, wie sie sind, und
-Community-Karten — unter Linux, Windows und macOS, in jeder Auflösung und jedem Seitenverhältnis bis 8K, mit
+Community-Karten — unter Linux, Windows und macOS, in jeder Auflösung und jedem Seitenverhältnis bis 4K, mit
 Level 13 und einem Menü für Community-Karten, später mit einem offenen, dokumentierten Levelformat und einem
 Konverter dafür.
 

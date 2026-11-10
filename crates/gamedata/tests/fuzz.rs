@@ -101,7 +101,7 @@ fn image_seeds() -> Vec<Vec<u8>> {
 fn fuzz_image() {
     let mut t = Target::new("image", test_name!("fuzz_image"), Kind::Binary);
     t.max_len = 4 << 20;
-    // an 8192 x 8192 picture is within the caps: 256 MiB decoded, and again as RGBA
+    // a 4096 x 4096 picture is within the caps: 256 MiB decoded, and again as RGBA
     t.rss_mb = 1100;
     fuzzkit::fuzz(t, image_seeds, run_image);
 }

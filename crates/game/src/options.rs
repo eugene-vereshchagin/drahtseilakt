@@ -17,7 +17,7 @@ pub const WINDOWED: [(u32, u32); 8] = [
     (2560, 1440),
 ];
 
-/// The sizes the settings take: from the original's smallest mode to 8K, the largest surface the renderer asks
+/// The sizes the settings take: from the original's smallest mode up to the largest surface the renderer asks
 /// the graphics device for (its default limit, 8192 a side; a larger one would fail on every start).
 pub const SURFACE_MAX: u32 = 8192;
 const WIDTH: std::ops::RangeInclusive<u32> = 320..=SURFACE_MAX;

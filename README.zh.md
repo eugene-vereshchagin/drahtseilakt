@@ -7,7 +7,7 @@
 以及制作它的人们致敬。
 
 Drahtseilakt 是 **Ballance**（Cyparade / Atari，2004）的一个新引擎，用 Rust 从零写成。它运行你自己的游戏拷贝
-中的数据 — 原样的原版关卡以及自制地图 — 支持 Linux、Windows 和 macOS，任意分辨率和宽高比，最高 8K，
+中的数据 — 原样的原版关卡以及自制地图 — 支持 Linux、Windows 和 macOS，任意分辨率和宽高比，最高 4K，
 带有第 13 关和自制地图菜单，之后还会有一种开放、有文档的关卡格式及其转换器。
 
 本项目最初是 emdzej 的 [OpenBallance](https://github.com/emdzej/openballance) 的一个分支，OpenBallance 在自己的

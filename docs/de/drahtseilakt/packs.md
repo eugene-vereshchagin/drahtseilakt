@@ -71,7 +71,7 @@ textures/
   alle auf, mit denen die Level zeichnen, was sie sind und ihre Größe), die der Strecke (`Track_Side`,
   `Track_floor_border`, ...) und jede andere Textur, die ein Level nennt. Namen werden ohne Rücksicht auf Groß- und
   Kleinschreibung, `_`, `-` und Leerzeichen und ohne Endung verglichen: `ball_wood.png` ist `Ball_Wood.bmp`.
-- PNG, JPEG, BMP oder TGA; höchstens 32 MB je Datei und 8192 Pixel je Seite; höchstens 4096 Bilder je Paket. Alpha zählt
+- PNG, JPEG, BMP oder TGA; höchstens 32 MB je Datei und 4096 Pixel je Seite; höchstens 4096 Bilder je Paket. Alpha zählt
   (die „transparente Farbe“ des Originals wird auf das Bild eines Pakets nicht angewandt).
 - Gelesen werden nur gewöhnliche Dateien direkt im Ordner des Pakets, in `Sky/` und in `Particles/`; Verknüpfungen werden
   nie verfolgt. Ein Bild, das sich nicht lesen oder dekodieren lässt, wird zugunsten des nächsten Pakets übergangen. Die

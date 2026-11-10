@@ -10,7 +10,7 @@
 |---|---|---|---|
 | `levels/original/` | 原版游戏：`base.cmo`、`3D Entities/`、`Textures/`、`Sounds/` 等，并已安装第 13 关的扩展包 | 由游戏从玩家已安装的游戏或 CD 中复制 | 经典模式和扩展模式 |
 | `levels/community/` | 自制地图：每个关卡一个文件夹，里面是一个 `.nmo` 或一个开放格式关卡（见下文） | 由玩家下载，`drahtseilakt-toolbox import-maps` 把下载内容整理成文件夹；文件夹中的 README 说明去哪里获取 | 扩展模式 |
-| `levels/remastered/` | 转换为开放格式的原版关卡，纹理放大到 4K–8K，并加上现代画面所需的其他内容 | 由 `drahtseilakt-toolbox remaster` 在玩家机器上根据 `original/` 生成；从不分发 | 扩展模式 |
+| `levels/remastered/` | 转换为开放格式的原版关卡，纹理放大到 4K，并加上现代画面所需的其他内容 | 由 `drahtseilakt-toolbox remaster` 在玩家机器上根据 `original/` 生成；从不分发 | 扩展模式 |
 | `levels/open/` | 开放格式的关卡：直接用它制作的，或转换后的自制地图 | 由玩家制作；部分随游戏附带 | 扩展模式 |
 | `levels/downloaded/` | 玩家下载的关卡：社区 `.nmo` 地图和开放格式关卡，每个关卡一个文件夹（见下文）；旧的 `levels/community/` 和 `levels/open/` 仍会一并读取，不会被移动 | 由玩家下载，`drahtseilakt-toolbox import-maps` 把下载内容整理成文件夹；文件夹的 README 说明获取途径 | 经典和扩展模式 |
 | `levels/modified/` | 修改版原版关卡：社区对 13 个原版关卡的改版，每个合集一个文件夹 | 玩家自己的文件；`drahtseilakt-toolbox import-maps` 整理下载内容；从不随游戏发行 | 经典与扩展模式，需有原版副本 |

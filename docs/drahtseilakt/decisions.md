@@ -129,7 +129,7 @@ the build may download them, pinned and checked against a checksum, and must als
 
 Replaces "A public release has its own content". We make no substitute content: the game plays the data of
 the player's own copy of Ballance, original levels and community maps alike. Improvements to that data —
-textures upscaled up to 8K, for instance — come from scripts the player runs locally on their own copy; the
+textures upscaled up to 4K, for instance — come from scripts the player runs locally on their own copy; the
 results stay on their machine and are never distributed by us.
 
 ## Native levels and original `.nmo`, both playable

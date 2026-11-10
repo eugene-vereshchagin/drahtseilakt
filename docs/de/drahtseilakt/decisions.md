@@ -136,7 +136,7 @@ mit Prüfsummenabgleich, muss aber auch offline aus lokalen Kopien funktionieren
 
 Ersetzt „Eine öffentliche Veröffentlichung hat eigene Inhalte“. Wir erstellen keine Ersatzinhalte: Das Spiel
 spielt die Daten der eigenen Ballance-Kopie des Spielers, Originallevel wie Community-Karten. Verbesserungen
-dieser Daten — etwa auf bis zu 8K hochskalierte Texturen — entstehen durch Skripte, die der Spieler lokal auf
+dieser Daten — etwa auf bis zu 4K hochskalierte Texturen — entstehen durch Skripte, die der Spieler lokal auf
 seiner Kopie ausführt; das Ergebnis bleibt auf seinem Rechner und wird von uns nie verbreitet.
 
 ## Eigene Level und originale `.nmo` — beides spielbar

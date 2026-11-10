@@ -25,7 +25,7 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   Kartenordner. Die Steinkugel rollt in der Menüszene ihren
   aufgezeichneten Weg. Die Spielkamera folgt wie im Original (zwei Federn, eine Drehung in
   250 ms, das Anheben; am C-Spiel gemessen). Die kurzen Lichter sind die der Skripte: die Blitze des letzten
-  Levels mit ihrem Donner und das blaue Licht der neuen Kugel. Die 8K-Prüfung folgt nach der Veröffentlichung.
+  Levels mit ihrem Donner und das blaue Licht der neuen Kugel.
 - **Phase 3**: Die Kugelphysik ist IVP, aus dem C-Code des Upstreams portiert (crates/ivp) und gegen das C-Spiel
   geprüft: ein gerader Stoß der Holz- und der Steinkugel und eine 17-Sekunden-Route in Level 1 stimmen auf 0,1
   bzw. 0,8 Einheiten überein. Alle Böden, Schienen und Stopper haben das eine Material, das das Original ihnen
@@ -168,7 +168,7 @@ klaren Fehler abbrechen; das Fuzzing lief ausreichend lange ohne Befund; die Bes
 - Level 1 aus seiner `.nmo` mit den Texturen des Spielers: Meshes, Materialien, Transparenz, Himmel, Licht.
 - Jede Auflösung und jedes Seitenverhältnis ab dem ersten Bild, kein 4:3: Die 3D-Ansicht nutzt das echte
   Seitenverhältnis; das 2D-Layout hält 640×480 in 4:3 in der Mitte und verankert Randelemente an den Rändern;
-  HiDPI; 8K wird nach der Veröffentlichung geprüft (bis dahin 4K).
+  HiDPI; bis 4K.
 - Der feste Simulationstakt von 60 Hz mit interpoliertem Rendern von Anfang an.
 - Eine freie Kamera, um durch jedes Level zu fliegen.
 
@@ -243,8 +243,8 @@ Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen 
   Ziegel an der Farbe, nicht an der Helligkeit, hebt sie an und senkt die Fugen, und der Renderer zeichnet diese Höhe
   mit Parallax Occlusion; immer an, Holz, Stein und Metall bleiben unberührt.
 - **Lokale Texturverbesserung**: Skripte, die der Spieler auf seiner Kopie ausführt, um Texturen
-  hochzuskalieren (bis 8K); das Repository enthält die Pipeline und ihre Parameter, nie die Ergebnisse.
-- **Replays als Video**: offline, Bild für Bild, in jeder Auflösung bis 8K, mit Ton. Hochgeladen wird nichts
+  hochzuskalieren (bis 4K); das Repository enthält die Pipeline und ihre Parameter, nie die Ergebnisse.
+- **Replays als Video**: offline, Bild für Bild, in jeder Auflösung bis 4K, mit Ton. Hochgeladen wird nichts
   ohne Anweisung des Inhabers.
 
 ## Kriterien für die Veröffentlichung

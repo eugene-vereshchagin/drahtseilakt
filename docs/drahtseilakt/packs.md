@@ -68,7 +68,7 @@ textures/
   the levels draw with, what it is and its size), the track's (`Track_Side`, `Track_floor_border`, ...) and any other
   texture a level names. Names are compared without case, `_`, `-` and spaces, and without the extension:
   `ball_wood.png` is `Ball_Wood.bmp`.
-- PNG, JPEG, BMP or TGA; at most 32 MB a file and 8192 pixels a side; at most 4096 pictures a pack. Alpha counts
+- PNG, JPEG, BMP or TGA; at most 32 MB a file and 4096 pixels a side; at most 4096 pictures a pack. Alpha counts
   (the original's "transparent colour" is not applied to a pack's picture).
 - Only plain files directly in the pack's folder, `Sky/` and `Particles/` are read; links are never followed. A picture
   that cannot be read or decoded is passed over for the next pack. A level's pictures from a level folder and from

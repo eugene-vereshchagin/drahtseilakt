@@ -8,7 +8,7 @@ over an abyss. The name is our nod to the game and to the people who made it.
 
 Drahtseilakt is a new engine for **Ballance** (Cyparade / Atari, 2004), written from scratch in Rust. It plays
 the data of your own copy of the game — the original levels exactly as they are, and community maps — on Linux,
-Windows and macOS, at any resolution and aspect ratio up to 8K, with level 13 and a menu for community maps,
+Windows and macOS, at any resolution and aspect ratio up to 4K, with level 13 and a menu for community maps,
 and later an open, documented level format and a converter to it.
 
 The project started as a fork of [OpenBallance](https://github.com/emdzej/openballance) by emdzej, which runs the
