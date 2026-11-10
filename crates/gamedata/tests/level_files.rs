@@ -282,7 +282,7 @@ fn a_maps_texture_name_never_reads_a_path() {
         warnings: Vec::new(),
     };
     let out = r.join("export");
-    gamedata::assets::export(&data, &loaded, &out).unwrap();
+    gamedata::assets::export(&data, &loaded, &out, true).unwrap();
     let written: Vec<_> = std::fs::read_dir(out.join("textures"))
         .unwrap()
         .flatten()

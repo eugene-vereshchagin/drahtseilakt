@@ -5,7 +5,10 @@ das das Spiel laden kann — die Originallevel aus der Kopie des Spielers, Commu
 Rechner des Spielers darin umgewandelt (`drahtseilakt --level N --export DIR`, `--map FILE --export DIR`), und
 das Spiel spielt es (`drahtseilakt --open DIR`). Umgewandelte Level entstehen aus den eigenen Daten des
 Spielers und werden nicht verbreitet. Mit `--textures own` trägt ein Export unsere freien Texturen (resources.md, „Eigene Texturen“) statt
-deren der Kopie, wo wir eine haben: so lässt sich das Aussehen eines Levels nur mit freien Ressourcen teilen.
+deren der Kopie, wo wir eine haben: so lässt sich das Aussehen eines Levels nur mit freien Ressourcen teilen. Texturen mit demselben Bild werden einmal geschrieben
+und von den Materialien geteilt; nicht gefundene Texturen stehen mit Namen in der Zusammenfassung. Mit `--textures
+own` entsteht auch kein Ordner `game/` (nichts aus der Kopie: das Level nutzt die eigenen Teile und Klänge des
+Spiels); `--export-parts keep|none` wählt es ausdrücklich.
 
 ## Dateien
 

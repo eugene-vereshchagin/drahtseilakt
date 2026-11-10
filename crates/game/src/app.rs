@@ -1207,7 +1207,10 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     let data = data.for_source(&o.source);
     if let Some(dir) = &o.export {
         let loaded = data.load(&o.source)?;
-        return crate::assets::export(&data, &loaded, dir);
+        // the own look ships no data of the copy: the level relies on the game's own parts and sounds
+        let own = o.textures.as_deref() == Some(gamedata::packs::OWN);
+        let with_game_files = o.export_parts.unwrap_or(!own);
+        return crate::assets::export(&data, &loaded, dir, with_game_files);
     }
     // the video tracking draws the levels as it was tuned on: without the cloud layer
     if o.locate.is_some() || o.follow.is_some() || o.frames.is_some() {
