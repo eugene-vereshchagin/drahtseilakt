@@ -13,10 +13,342 @@ at -1313.3 14 944 r 4 sector 1 kind stone : pass -1300 14 944.5 5 ; goto -1290.6
 # that one follows the paper ball down the chute x -908.6 and pushes it through the fans 18_08, 18_07, 18_09 to CP1.
 at -1205 -6.8 935.7 r 4 sector 1 kind paper : lead -1210 -6.8 935.7 6 700 ; pass -1076 -24 935.8 8 900 ; goto -1034.3 -30.2 936.3 400 ; await -1050 -25 935.8 -1031 -27 935.8 1.5 900 ; pass -1033.4 -30.2 937.7 4 ; pass -1027 -31 937.8 10 ; pass -1017 -32 931 12 ; pass -1007 -34.7 931 9 ; pass -1005.3 -32.7 935.15 5 ; hold -1005.3 -32.7 935.15 20 ; await -1020 -28 935.8 -998 -29.6 935.8 2.5 900 ; pass -1002 -33.3 931.7 6 ; pass -991 -34 937.4 9 ; pass -978 -35.4 940.3 8 ; goto -976.6 -35.2 936.3 300 ; await -990 -31 935.8 -969 -32.4 935.8 2.5 900 ; pass -975.6 -35.4 937.9 5 ; pass -968 -36.6 940 9 ; pass -955 -39 939.7 9 ; pass -940.4 -41.8 937.6 8 ; goto -929.4 -38.8 936.2 300 ; hold -929.3 -38.8 935.8 20 ; await -950 -40 935.76 -933 -38.5 935.76 2.5 900 ; wait 15 ; pass -922 -44.4 940.4 12 ; pass -911.5 -44 940.8 10 ; wait 40 ; pass -908.6 -41 928 6 ; pass -908.6 -42 905 6
 #
-# Sector 3 (not yet driven through; what was tried, 2026-11-08): ten loose stone balls lie in the long channel x -724.2
-# below CP2. Let go, they roll down it ahead of the paper ball and pile up against the three crates P_Modul_34 in the
-# channel's end (z -286..-316); the paper ball following them stops behind the pile (z -234, y -210.2) or, overtaking
-# some, wedged in among them, low in the channel. Its walls stand too high to hop out of from there, and pressing on
-# does not ride up onto the pile. The way on is the east half-pipe beside the channel (from z -255; north of that is
-# sky) into P_Trafo_Stone_01 (-716.1, -219.1, -261.8); the storyboard's ball gets there, how is not seen (frames
-# 2540-2536 of ref/video/frames/fast/level13: it sits in that socket). A hint needs the owner's run of this sector.
+# Sector 2 from sector 1: the ball comes to CP1 as paper (the owner's run of sector 2 began there as stone). Down the
+# stepped floor the way the owner went and into P_Trafo_Stone_03 on the upper platform (stone), then at once down the
+# wood strip to the planks (the crate by the block is left alone till they are down).
+at -908.5 -47.5 848.5 r 8 sector 2 kind paper : pass -908.6 -58.4 832.8 6 ; pass -908.6 -60.1 816.8 5 ; pass -908.2 -60.9 807.3 5 ; pass -901.7 -61.5 801.5 5 ; pass -892.9 -63.2 801.3 5 ; pass -877.5 -64 799.7 6 ; pass -872.1 -64.4 798.3 5 ; pass -871.7 -65.9 794.8 4 ; pass -869.8 -72.4 785.8 5 ; pass -870.9 -78.6 774.6 6 ; pass -877.3 -83 768.9 6 ; become stone
+# 2026-11-09: from the stone transformer on, the owner's whole sector 2 (planks, beam, fans, chute) as a closed-loop trace;
+# the hand-written steps below (lines from "at -866 -101 692" on) only run if the trace gives the ball back. Old line kept:
+# at -879.8 -92.6 761.5 r 3 sector 2 kind stone : pass -878.5 -92.2 750 5 ; pass -876.5 -92.5 741 5 ; pass -874.3 -92.9 734 5 ; pass -873.6 -97 714 6 ; pass -872.5 -100.5 695 5 ; pass -866 -101 692 4
+at -879.8 -92.6 761.5 r 3 sector 2 kind stone : trace Level_13-s2.replay 930 8700 2
+#
+# Sector 2, as the owner showed it (his run of the sector, hints/runs/owner/Level_13-s2-s3.replay; its copy without
+# the god-mode line, which it never used, is Level_13-s2.replay beside this file, followed by the test player and
+# replayed here). The loose stone ball P_Ball_Stone_18 rolls by itself from CP1 down to the rails x -864.7 on the upper
+# platform, where the block on its crate (P_Modul_34_02) holds it. As stone (P_Trafo_Stone_03): first the six planks
+# P_Modul_25 over the gap above the helix are rammed into a bridge, all but the southernmost 04, whose place stays
+# open as the helix's mouth; the platform tilts south, so each ram brakes at once. West row (02 z 691.2, 05 z 680.8)
+# from the lower platform; across fallen 02 to the narrow east strip, the east row (03, 01, 06) rammed west from it;
+# back over fallen 01.
+at -866 -101 692 r 4 sector 2 kind stone : goto -864 -101 691.2 ; hold -864 -101 691.2 30 ; press -853.5 -101 691.2 0 0 6 90 ; push -1 0 45 ; hold -860 -101 690 60 ; goto -864 -102 680.8 ; hold -864 -102 680.8 40 ; press -853.5 -102 680.8 0 0 6 90 ; push -1 0 45 ; hold -860 -102 681 60 ; goto -860 -101 692 ; hold -860 -101 692 30 ; press -842.5 -101 692 0 0 4 200 ; hold -842.5 -101 692 60 ; goto -841.5 -101 696.4 ; hold -841.5 -101 696.4 40 ; press -846.5 -101 696.4 0 0 5 60 ; push 1 0 30 ; hold -842 -101 694 40 ; goto -841.5 -101.5 686 ; hold -841.5 -101.5 686 40 ; press -846.5 -101.5 686 0 0 5 60 ; push 1 0 30 ; hold -842 -101.5 686 40 ; goto -841.5 -102.5 675.6 ; hold -841.5 -102.5 675.6 40 ; press -846.5 -102.5 675.6 0 0 5 60 ; push 1 0 30 ; hold -842 -102.5 677 40 ; goto -843 -101.5 686.5 ; hold -843 -101.5 686.5 30 ; press -862 -101.5 686.5 0 0 4 200 ; hold -862 -101.5 687 120
+# Then up the wood strip to the crate: one ram from the east knocks it from under the block (it slides out to the
+# west), a push from the north-west sets it east of the block, and a push from the north-east takes it onto the strip's
+# line (x -873.6): the block sinks, stone 18 rolls on along the serpentine. Where the serpentine crosses the strip
+# (z 729, 721, 713, 705) one of its rails is missing; the crate is the stone's support there, pushed down the strip
+# to just under each crossing before the stone comes (z 733.2, 719.3, 712.6, 707: slowly, at 2.8, or it slides on),
+# each push waiting until the stone has left the strip on the crossing before, the ball backing off after it so as
+# not to touch the stone. Then into P_Trafo_Paper_02 (paper), and after stone 18 into the helix's mouth, by the line
+# the owner took (straight in, the ball wedges between the rails), down the short helix to the beam's first fan slot.
+at -862 -101.5 687 r 1.5 sector 2 kind stone : pass -868 -101 691 5 ; pass -873.4 -97.7 710.6 6 ; press -873.3 -93.4 731.4 0 0 6 400 ; pass -868 -92.3 740 4 ; pass -860 -92 745 4 ; goto -856 -92 754.5 ; hold -856 -92 754.5 90 ; press -868 -91.6 748.5 0 0 9 150 ; push 0.9 0.45 30 ; goto -860 -91.5 744 ; goto -876 -92 746 ; goto -876 -91 757.5 ; goto -870.2 -91 757.5 ; hold -870.2 -91 757.5 20 ; press -870.2 -91.7 750.5 0 0 3 200 ; push 0 1 10 ; goto -870 -91 757 ; goto -860.2 -91.2 756 ; hold -860.2 -91.2 755.5 20 ; shove -866.8 -91.6 749.5 -873.6 -92.4 741.8 400 5.5 3 ; push 0.66 0.75 10 ; shove -873.6 -92.4 741.8 -873.8 -93.1 732.4 400 5.5 2 ; push 0 1 15 ; await -868 -89 733 -881 -90 728 3 900 ; press -874.3 -94.5 724.8 0 0 3.5 200 ; push 0 1 40 ; await -880 -91 722 -869 -91.4 721 2 600 ; press -873.2 -96.1 718.5 0 0 2.8 200 ; push 0 1 25 ; await -866 -92 717 -878.5 -93 713 2 600 ; press -873.2 -97.2 713.1 0 0 2.8 200 ; push 0 1 25 ; await -881 -94 710 -869 -94.8 705 2.5 600 ; pass -871.8 -100.4 696 7 ; pass -866 -102 683 7 ; become paper ; pass -854.9 -102.8 675.7 5 ; pass -852.2 -102.6 677.6 3 ; await -849.6 -104 676 -841 -118.6 670.3 3 300 ; pass -851.6 -103.2 672.6 4 ; pass -850.9 -106.6 670.9 2 ; pass -850.6 -110.7 670.1 3 ; pass -847.4 -116.9 669.7 6 ; pass -841.5 -118.6 670.2 7 ; pass -834.6 -118.7 675.8 9 ; pass -824.3 -124.5 679.6 12 ; pass -812.8 -138.3 673.2 8 ; pass -803.9 -143.1 669.8 3
+# The beam: the paper ball sits in the slot of the fan 18_10 until stone 18 comes; the owner's keys from there launch
+# it as the stone hits (2:00 to 2:02 of his run), and it rolls on into the slot of 18_11; again as the stone comes,
+# over the fan 18_12, where it floats until the stone has gone into the chute below, then onto the stone, riding it
+# down the chute: the stone and the loose paper ball P_Ball_Paper_01 ahead fall into the hole at z 584 and the paper
+# ball rolls over them to CP2.
+at -803.84 -143.18 669.73 r 2 sector 2 kind paper : hold -803.84 -143.18 669.73 30 ; await -835 -128 678 -819.2 -139.2 669.7 2 1200 ; replay Level_13-s2.replay 7200 7325 ; pass -785 -139 670.5 13 ; pass -763.85 -147.16 669.79 6 ; hold -763.85 -147.16 669.79 20 ; await -790 -139.7 669.7 -768.9 -143.4 669.7 2 900 ; replay Level_13-s2.replay 7500 7565 ; pass -752 -139.5 676 12 ; pass -726 -146 675.6 6 ; hold -724.7 -142 675.8 30 ; await -735 -147 669.7 -723.98 -151 666.3 2 600 ; press -724.7 -146.5 661.5 0 0 4 120 ; ride -724 -151.4 662 -724 -157.5 590 2 900 ; pass -723.9 -154.8 570 8 ; pass -724.1 -155.2 533 5
+#
+# Sector 3 (not yet driven through; 2026-11-08). The ten loose stone balls start rolling down the channel x -724.2
+# as the sector begins, about 11 units a second, ahead of the paper ball; followed in the channel they pile up
+# against the crates at its end and the paper ball is stuck behind them, too low to leave the channel there. The
+# owner: overtake them by the side troughs. The troughs lie beside the channel at its floor's height (found by
+# dropping a ball beside it): west z 335..405, east 240..300, west 180..200, east 80..140; a trough's floor tilts
+# toward the channel. At 12 (24 units a second) in a trough the paper ball passes two stones in the first (it got
+# into it at z 419 at a push west, back into the channel at its end between two stones, without falling); falling
+# back into the channel where a stone is, it is knocked off. Passing all ten needs the ball fast already at each
+# trough's start; not yet done. Then, ahead of them, out of the channel's end into the east half-pipe (from z -255;
+# north of that is sky) and into P_Trafo_Stone_01 (-716.1, -219.1, -261.8).
+#
+# Sector 3, the crates: as stone (P_Trafo_Stone_01, in the east half-pipe) each of the three crates P_Modul_34 under
+# the blocks standing in the channel (z -278.3, -293.3, -308.3) is rammed west from the half-pipe, braking at once:
+# its block sinks into the channel's gap. Then to the west half-pipe (a run found its way across on a sunk block,
+# after the press across at z -256 fell short: not yet reliable), as paper (P_Trafo_Paper_03)
+# over the fan 18_13, which lifts it above the channel's wall, and east into the channel, on down it.
+at -716.1 -219.1 -261.8 r 3 sector 3 kind stone : pass -713.5 -218.4 -272 4 ; goto -713.5 -218.7 -278.3 ; hold -713.5 -218.7 -278.3 20 ; press -726 -218.7 -278.3 0 0 7 90 ; push 1 0 25 ; goto -713.5 -219.6 -293.3 ; hold -713.5 -219.6 -293.3 20 ; press -726 -219.6 -293.3 0 0 7 90 ; push 1 0 25 ; goto -713.5 -220.6 -308.3 ; hold -713.5 -220.6 -308.3 20 ; press -726 -220.6 -308.3 0 0 7 90 ; push 1 0 25 ; pass -713 -219.5 -280 5 ; pass -712 -218.6 -257 5 ; hold -712 -218.6 -256 30 ; press -737 -219.4 -256 0 0 7 200 ; pass -733.5 -221 -290 5 ; become paper
+at -732 -223.4 -323.6 r 3 sector 3 kind paper : pass -733 -221 -300 5 ; pass -732.5 -219.5 -270 5 ; goto -732 -218 -263.2 ; hold -732 -210 -263.2 150 ; press -724.6 -211 -263.2 0 0 4 120 ; pass -724.2 -213.5 -285 5 ; pass -724.2 -215 -320 6
+#
+# Sector 3's end (worked out, not yet driven through): the channel ends in a pit before CP3 (its east wall at x -645.6
+# stands above the paper ball, which is stopped there). The storyboard's paper ball comes up out of it on top of the
+# loose stone balls that follow it down the channel; this needs all three blocks sunk at the crates (with one of
+# them still standing, the stones stop against it) and a wait at the pit's end.
+#
+# 2026-11-09 (second session, sector 3's end; stopped by the two-approaches rule, nothing new driven):
+# Run: --level 13 --sector 3 --autopilot --follow hints/Level_13-s2.replay --plan hints/Level_13.plan --hints
+# hints/Level_13.txt --ticks 20000 --give-up 40 (the copy without the mod line; the owner's own file needs --debug;
+# without --follow the way's search alone stops at (-724.2 -210.4 -238), just before the channel's end, which it
+# cannot leave). With --follow: sector 2, the beam, the chute and the side troughs go through in ~4 min of wall time,
+# the three crates are rammed (steps 6..14, ball -725 -220.5 -308), the stone transformer and the press west at
+# z -256 (step 17) FALL SHORT as before: the ball lands in the channel at (-720.3 -219.3 -292) and stays at
+# (-721.6 -219.4 -293.9) (speed 0, "stuck" every 2 s, rewinds to 00:59 of the sector do not change it). So the
+# crossing to the west half-pipe (the paper transformer P_Trafo_Paper_03) is the open spot, not the pit.
+# Approach 1: the previous press (-737 -219.4 -256 at 7). Approach 2: the way's search from the channel (cannot leave:
+# too low). Not tried: a run-up from further north of z -256 on the east half-pipe at 9..10, or crossing over a sunk block.
+# The video (dense frames 8-12 fps, 960x540, ref/video/frames/dense/level13/s3cross t=296..331 and s3end t=330..358):
+# CP2 at t~310; the ball waits on the wide platform at the channel's head until t~330 while the stones roll down the
+# channel (the platform's two corner transformers: one at t~313, the one at t~330 turns it to paper); the channel's
+# stretch to the flames/CP3 seen at t~337 and the stones queued on rails from t~340 (sector 4 starts there) pass in
+# 7 s of the video's timer, so the video is cut there (870 units of channel in 7 s is not physical) and gives no
+# line for the channel itself or the pit; --locate was not run (RATE is 4 a second in locate.rs, not configurable,
+# and the earlier real tracks of level 2 were lost after 35 s). Dense frames kept for sector 4's start (t 340..358).
+
+# Owner, 2026-11-09 (sector 3): the puzzle's goal is to lead the row of ten stone balls down to the pit before CP3,
+# where they fill it, and the paper ball crosses over them. He reached the pit without the stones and couldn't go on.
+# Sector 3 starts as PAPER (start sectors with the right ball!). When he knocked out the first crate, its upper block
+# did not drop though it should have: either a physics bug or part of the puzzle (open the stones' way BEFORE they
+# arrive). To check against the C reference on his next replay.
+
+# 2026-11-09 (third session, sector 3 as PAPER, the owner's best try hints/runs/owner/attempt-1794184731-28217.replay;
+# NOT solved, stopped by the two-approaches rule). Read off with `--debug --level 13 --replay F --headless --trace 30`
+# and DRAHTSEILAKT_TRACE_LOOSE=1 DRAHTSEILAKT_TRACE_R=3000 (new: the radius of the loose things listed; 40 before).
+# The replay holds the run's final line (his F3/F9 rewinds are cut out), so it replays exactly: 28217 ticks, ends at
+# (-675 -286 -1124.8) with 7 of the 10 stones (19,21,22,24,25,27,28) in the pit, stuck. Timeline of his line:
+#  0:00-0:36  the start (-724.2 -162 453), down the chute at ~14.7, the ten stones P_Ball_Stone_19..28 (x -724.2, z 311..446,
+#             15 apart, ahead of the ball at the start) are overtaken; ball at (-716.1 -216 -261.8) at 0:36 = into
+#             P_Trafo_Stone_01 (idle ~2.5 s = the transform), the stones' leader is then at z -46.
+#  0:38.5-1:04 as STONE in the channel's head: blocks (Schiebestein) of the crates z -278.3 / -293.3 / -308.3 sink at ~0:47,
+#             ~0:55, ~1:03 (y -212..-214 -> -217..-219) by bumping the crates from x -716..-733 back and forth; the leading
+#             stones are at z -278 at ~0:58, so it is a race of ~10 s that he won by 1-2 s (stone 23 rode the third block
+#             while it sank (1:02-1:04, z -292..-295), went east to x -713 and fell off the channel at z -327..-340 at ~1:10).
+#  1:04.5     paper again in the channel at (-732 -220.4 -323.6) (= the hint's "at -732 -223.4 -323.6 kind paper": the
+#             paper transformer is on the channel's west side below the crates; he got there over the sunk blocks, no
+#             crossing at z -256); waits ~3 s, respawn-like jump to (-739 -215.9 -275.7) at 1:10, launch at tick 4455
+#             (-723.7 -213.6 -297.4) and rides the channel at ~14.7 to z -806 by 1:36 (ahead of the stones).
+#  1:40-4:32  the sacks: P_Modul_26 Sack/Rope pairs hang at z -821.95, -831.95(-832.4), -841.9, -852.3 (x -724.2, rope top
+#             y -243, sack y -250/-252, they swing across the channel); the stones queue behind the first sack from
+#             z -806 (the first two stopped there at 1:52), the ball sits among them (speed 0) pushing slowly for ~3 min;
+#             four stones got through the sacks by 4:16-4:28 (z -869..-857), then stones 20 and 26 fell off the channel's west
+#             side at x -743 (z -836 / -868) at 4:46; three stones stayed at z -851..-843 until 6:10.
+#  4:32-5:44  ball runs on to the pit (z -1124.8); stones arrive at the pit's north wall z -1124.83 one by one and lie in a
+#             row along x: -647.7, -651.7 ... -671.7 (4 apart = touching), the pit's east wall is at x -645.6; the row of
+#             ten would reach x ~-687. The ball ended at (-675 -286 -1124.8) at the row's end (y -286 = on the pit floor,
+#             not above the stones): 7 stones are too few, the owner counted on the missing ones.
+# The owner's two other attempts (attempt-1794183905-13573: 3303 bytes, attempt-1794183348-1966: 369 bytes) are copied beside.
+# Autopilot, sector 3 from its start (`--level 13 --sector 3 --autopilot --plan hints/Level_13.plan --hints hints/Level_13.txt`):
+# the paper ball arrives at z -250 only at 1:00 (the owner at 0:36), the stones have overtaken it, and it wedges between
+# two of them at (-724.1 -211.2 -250.0) ("stuck", 3 rewinds to 00:59 do not help). So the first thing missing is the
+# owner's fast, clean run to P_Trafo_Stone_01 (his keys of ticks 0..2150 as a `replay` hint at the sector's start).
+# Approach 1: his keys from tick 2324 on shifted 120 ticks earlier (to win time at the crates): the ball fell at 0:42,
+# because the idle 0:36.5-0:38.5 IS the stone transform (it takes ~150 ticks) - cannot be cut.
+# Approach 2: the autopilot alone (above). Next: `replay hints/runs/owner/<his copy without the mod line> 0 2150` at the sector
+# start, then the crates as stone with the existing hint (go sooner: 3rd block by ~0:59), the paper transformer over the sunk
+# blocks, the channel at speed, and for the sacks `lead`/`shove` on the first stones so that they pass one by one.
+#
+# 2026-11-09 (third session, continued): the owner's line as a hint. hints/Level_13-s3.txt (one hint, `at -724.1 -154.2 537.2 r 6
+# sector 3 kind paper : replay Level_13-s3.replay 0 5500`; the replay is his best try without the mod line) fires at tick 0 of
+# `--level 13 --sector 3 --autopilot --plan hints/Level_13.plan --hints hints/Level_13-s3.txt` and reproduces his run exactly
+# (stones, crates, the paper transformer, the channel) to ~1:36; the sector's real start is (-724.1 -154.2 537.2), the ball
+# lands at z 532 and is let go at tick ~46 (his first key). Stone 23 is still lost at 1:10 (z -330) as in his run.
+# After the hint (tick 5500) the test player drives the ball on alone: it rides the channel through the sacks at once,
+# stops in the pit's east end (-647.6 -288.3 -1125.3, y -288 = on the floor) and the stones, with no ball among them to brake
+# them, tumble through the sacks (z -806..-860) and are lost one after the other (8 of 9 gone by 2:30, the rest roll past the
+# pit's north wall to z -1142 and fall): 0 stones in the pit. Wall time: the stuck state makes the run ~20 ticks/s.
+# So the sacks need the ball among the stones as in his 1:40-4:32 stretch (it sits in front of the first sack at z ~-810 and
+# lets the stones through one at a time); the remaining work is a closed loop for that (`lead`/`shove` on the nearest stone
+# at z -806..-852, ball held at x -724.2 in the channel, never letting a stone reach x -743 on the west side), then a
+# `become`-free wait west of the pit's entrance (x ~-690, z -1124) until all stones lie in the row, and the crossing over them.
+#
+# 2026-11-09 (fourth session, sector 4): hints/Level_13-s4.txt, PARTLY solved (see its comment). Run:
+# `--level 13 --sector 4 --autopilot --plan hints/Level_13.plan --hints hints/Level_13-s4.txt --ticks 2700 --give-up 600 --headless`
+# (--give-up 600: the ride is slow, 4 units a second, and the default 30 s ends the run as "dead"; the plain autopilot without a
+# hint never gets onto the raft: it falls off the U's base behind it and follows it at its pace). With the hint the ball is on the
+# raft's top from tick ~250 to ~2600 (x -545 -> -386, ride quality: standing 0%, speed 2.4 +- 1.6, slow 0.7%).
+# Chain: `--sector 3 ... --hints hints/Level_13-s3.txt` reaches sector 4 (CP3) at the start place of the hint (chain run to 11500 ticks
+# in the sector 4 at the raft's rear like the plain autopilot); the s3 and s4 hints are not yet in one file for one run.
+# Open spot (where the owner could record): the first board at x ~ -386 (z -1125, y ~ -293, block on a hoop across the raft's rails)
+# pushes the ball off the raft's back (both columns, z -1125.4 and -1129.65); beyond it the video's boards, the rotating-bar platform
+# (x ~ -326, P_Modul_17 at -326 -297.8 -1115.5) and the raft's way on to the finish platform are not driven.
+#
+# 2026-11-09 (sector 4, lane switching, NOT driven; notes for the next session). The coordinator's reading of the video (contact
+# sheets ref/video/frames/dense/level13/s4/sheet01..03): two rafts side by side on parallel rails for the whole stretch; a board
+# (block on a hoop) hangs over ONE raft's lane at a time, alternating left/right; before each board the ball rolls sideways onto the
+# NEIGHBOUR raft, then back; at the end it rolls off onto the long platform with the rotating bar P_Modul_17 (= the finish platform).
+# Findings in the simulation: raft 1 (Stone_10..13, Wood_05/06; z -1125.4 / -1129.65) and raft 2 (Stone_16/17, Wood_09/10; z -1134.0 /
+# -1138.2, start x -493, 0.8 units higher) start 50 apart in x; raft 1 is the faster one (stone 10 at x -454 when stone 16 is at -467,
+# t = 25 s) so they are level only around x -460 and raft 2 then lags further behind: in the simulation the lane switch needs the
+# ball to move onto raft 2 near x -460 and ride raft 2 (`ride` on Stone_16/17 near -467 -285 -1134), and to come back to raft 1 only
+# where they touch again - they do not, as simulated. So either raft 2 is held back differently in the original (check rail slope /
+# friction of A04_Rail_01 vs 02 and the loose balls' masses) or the lane switch must come before x -460 for good. The boards are
+# inside the rail meshes (A04_Rail_01 at -513.5 -286.1 -1133.9 (glTF z is the game's z negated), A04_Rail_02 at -382.8 -293.8 -1127.5):
+# `--export DIR --level 13` writes level.gltf (node `matrix` translation = position), the boards' x must be read from those meshes'
+# vertices (not done); the first board known: x ~ -386 over raft 1.
+#
+# 2026-11-09 (fifth session, sector 4 measured; supersedes the lane-switch notes above). Rails (glTF z negated): A04_Rail_01
+# (x -551..-172) holds BOTH lanes: lane 1 (z -1123..-1132, raft 1) from x -551; lane 2 (z -1132..-1140, raft 2) starts at x -500 on a
+# shallower ledge (y -288.2, 1.7 %) and ramps down 4 units at x -445..-420 into the 3 % slope of lane 1; lane 1 ENDS at x -172 (dead
+# end, ball falls); A04_Rail_03 (x -172..67, 6 deg, z -1140.5..-1131.7, lane 2 only) is the way on to the stone transformer
+# (89 -336 -1133.6). Boards (A04_Rail_02 mesh, 2.6 thick in x, 8.4 wide in z, hoop top y ~ ball-top level): B1 x -382.8 z -1131.7..-1123.3
+# (lane 1), B2 x -364.6 z -1140.9..-1132.4 (lane 2), B3 x -277.4 z -1135.3..-1128.5 (the inner columns of both), B4 x -188.8 z -1140.3
+# ..-1131.8 (lane 2). Raft columns z: raft 1 -1125.38 / -1129.65, raft 2 -1133.95 / -1138.22. Bar platform A04_Floor_01 (x -447, z
+# -1112), P_Modul_17_01 (-325.8 -294.8 -1115.5), _02 (-300.8 -296.1 -1120.5), A04_RailBumber (-322 -297.5 -1111.5).
+# Simulated rafts (idle ball, 1 s samples of Stone_10 / Stone_16 x): t=1 s -543/-493, 15 s -493/-479, 25 s -455/-467, 35 s -416/-454,
+# 41 s -392.5/-391.7 (LEVEL), 45 s -377/-372, 49 s -362/-356. Raft 1 runs 3.9 u/s from ~5 s; raft 2 creeps at ~1 u/s on its ledge to
+# x -454 (t 36 s), drops down the ramp and catches up: the rafts are level at x -392..-372 (t 41-45 s), i.e. exactly at boards 1/2.
+# Raft 1 then jams at x -305 (stones) / -326 (woods) on the bar platform's bumper; raft 2 runs on to the rail's end (x -164 at 90 s).
+# The video agrees: sheet01 raft 2 trails the ball's raft, sheet02 (3768..3757) it draws level, sheet03 the ball is level with raft 2
+# at board 2. Verdict: no fidelity bug found (geometry explains the stagger); the C reference was not run.
+# 2026-11-09 (sector 4 end, NOT solved): CP4 PR_Resetpoint_05 at (121.8 -334.7 -1133.6); stone transformer P_Trafo_Stone_06/07 at
+# (89.4 -336.1 -1133.6) on A04_Tower1 (x 86..92.5, z -1151..-1115). A04_Floor_03 (x 46..127, y -341..-333): a ramp 20 wide (z -1146..
+# -1126) from x 46 to 72 narrowing to a 5-wide path (z -1136..-1131, x 80..112) to the CP, then A05_Rail_01 from x 126. With the
+# current s4 hint the ball rides raft 2 to x 54 (y -335.5, speed 3.9, slope -0.4/3.9) and falls at x 62 (y -337 -> -342, dies at
+# 1:59) although it keeps z -1133.9: it sinks below the ramp's surface line - next: read A04_Floor_03's surface at x 55..75 (is it a
+# trough, where is the top at z -1133.9?) and step off the raft sideways (video: rolls into the transformer cage at ~408 s).
+# 2026-11-09 (sixth session, raft 1's jam traced; NOT fixed). What stops raft 1 is the rotating arm P_Modul_17
+# (Modul17_Dreharme, a bar along z through a vertical hinge, paddles at both ends; module group Floor), not the rail.
+# Arm _01 (hub -325.9 -297.8 -1115.5, beam z -1123.3..-1107.8, paddle z -1127.1..-1124.1 over raft 1's column
+# z -1125.38): Wood_05 pushes it, it turns 6 deg about y and stops dead (spin 0), the column jams at x -326.6. The arm's
+# beam hits Floor_Stopper (group Phys_FloorStopper = Ball, so it collides with the Floor arm): that object has a copy of
+# A04_RailBumber here = two thin upright horseshoe hoops (x -327.5..-326.8 and -302.9..-302.3, z -1117.1..-1109.3,
+# y -301..-296.8), 0.3 beside the beam at rest, below the beam's height. The Floor A04_RailBumber itself does not
+# collide with the arm. Without the stopper (debug run only) arm _01 swings ~47 deg and raft 1's column 1 passes, but
+# arm _02 (hub -301.0 -299.1 -1120.5, paddle z -1132.1..-1129.1 y -300.5..-297.7) turns 45 deg and wedges on Wood_06's
+# top (paddle bottom 0.6 into the ball; contact normal through the axis): column 2 jams at x -298.3 instead.
+# Video (sheet05, 3732..3721): both arms spin through wide angles (near 90 deg, parallel to the rails) as the 2-row x
+# 4-column block passes; the ball crosses the bar platform itself and gets onto the block after it. So in the original
+# the arms do not catch on the hoops (open question why: the arm's real group in P_Modul_17.nmo's Physicalize, which
+# docs/physics.md gives as Floor, was not re-read - the file is compressed; or the C build, which runs the scripts, could
+# show it) and the block pushes them aside together. Raft speeds: ours go as the slope (raft 1 230 u over 12.0 drop
+# = 5.2 %, 3.9 u/s; raft 2's ledge 1.6 %, 1.2 u/s; ratio 0.31 both), as damping-limited rolling (stone lin damp 0.2,
+# wood 0.6, gravity 20, time factor 2) predicts; not measured against the video yet. Riding raft 2's top past the
+# boards does not work (knocked off at B2 x -365 onto the rails, then wedged behind raft 1's jam at x -303.7): an
+# on-top ride to the cage needs raft 1 past the arms (boards alternate lanes; B4 at -188.8 covers all of raft 2).
+# 2026-11-09 (seventh session, the arms puzzle; engine NOT changed). Truth from the files (nmo-dump --params / --arrays):
+# P_Modul_17.nmo physicalizes Modul17_Dreharme with group "Floor", friction .7, elasticity .4, mass 3, lin damp 3, rot damp
+# .005, 3 convex (Col01..03), not frozen; hinge to FixCube about P_Modul_17_HingeFrame, "Limitations" 0 (limits -45/45 set
+# but off); spring (0,4,0)@HingeFrame to (0,0,-4)@arm, 0 / .32 / .1 / .1. Levelinit (both copies) Physicalize_Floors:
+# Phys_FloorStopper group "Ball". IVP's group filter (equal non-empty strings do not collide) => the arm (Floor) DOES hit
+# Floor_Stopper's hoops (Ball) in the original too: no fidelity bug. The hoops stand 1.2 (arm 1) / 1.6 (arm 2) west of the
+# hubs on the north side, so an arm turns freely only one way (north paddle east, ~0..169 deg); pushed by the raft (south
+# paddle east) it jams at once. That is the puzzle (owner): the player turns both arms first.
+# Video, 12 fps sheets ref/video/frames/dense/level13/s4-arms (384-400 s; counter 3756..3725): 384-386.2 the ball rides the
+# block's left (north, raft 1) lane on top; 386.3-386.5 it steps left (north) onto the bar platform's narrow part, ahead
+# of the block; 387.0 rolls east along the platform's north edge past the notch; 387.4-388 meets arm 1's NORTH paddle
+# from the west and pushes it east: arm 1 turns clockwise seen from behind (north end east, south paddle swings west over
+# the platform), 389.7 parallel to the rails, ball following the bar beside the hub (the stopper hoop stays west of the
+# ball); 390-392 arm 1 on to ~135 deg (north paddle over the rails ahead, south paddle on the platform behind), the
+# block's woods come into view behind; 393-394 the ball rolls on east along the north edge to arm 2, 394.5-395 pushes its
+# north paddle east the same way (arm 2 to ~90..135 deg); 396-398 the block passes arm 1 and arm 2 (the arms swing on
+# where the block touches them); 399.7-400 the ball rolls south off the platform onto the block beside arm 2's hub (third
+# column, raft 2's inner one), rides it past B3 on the outer column (400-404), takes extra points by fan/updraft cages
+# P_Modul_18 (404-420, optional), rides raft 1's inner column past B4 (424-426) and at 426.4 rolls right onto raft 2's
+# woods, level with raft 1's, while raft 1 falls off lane 1's dead end (427). Simulation with hints/Level_13-s4.txt: the
+# ball leaves raft 1 at x -349 (49.6 s), arm 1 to 152 deg at 54 s (springs back to ~0 by 60 s, after the block passed),
+# arm 2 to ~120 deg; raft 1 passes both arms (Wood_05 -326 at 57 s, -275 at 69.5 s); the ball climbs on at x -290 (66 s,
+# y -298.9 = 4 above the stones) and rides to B4. Open: in the video the rafts stay level up to B4; in ours raft 2 draws
+# ahead after x -390 (Wood_09 vs Wood_05: 0 at 41 s, +5.3 at 66 s, +10 at 88 s), so the cross at x -185 dips into the gap
+# (ball falls between the lanes). Raft speed vs video: board B1 (x -382.8, ~379 s) to the platform's start (x -353,
+# 386.4 s) = 30 units in 7.4 s = 4.0 u/s; ours 3.9 u/s (ticks 2580 -> 3040) - raft 1 matches. Raft 2's relative drift
+# (ours ~0.2 u/s faster after the ramp) is the suspect; not measured in the video yet (mixed raft: 2 stones + 2 woods
+# should be the slower one by damping; check rail-3 slope/friction of lane 2 vs lane 1 between x -390 and -185).
+#
+# 2026-11-09 (SECTOR 5, ORIGINAL level 13: video read, NOT driven through; the owner's "simple descent down vertical rails" is wrong:
+# the stretch is three helices of rails, a long beam, a transformer and a vertical coil). Dense sheets (ref/video/frames/dense/level13/
+# s5-coarse 0.5 fps 400-624 s, s5-cp 6 fps 440-474 s, s5-helix 4 fps 462-498 s, s5-helix8 8 fps 481.5-484.5 s; counter shows time).
+# Video, ball kind per stretch:
+#  400-417 s  sector 4's block of woods/stones, ball (paper) on top; 417-440 extra-point cages (fans), counter 4099 at 424 s.
+#  440-456    ball (paper) rides the raft block down the end of the rails; steps onto a U-shaped ledge, rolls north along a narrow path.
+#  458-459    cube transformer on the path (P_Trafo_Stone_06/07): paper -> STONE (ball grey from 4269).
+#  460-476    the CP4 pod (round, two pink flames) at the path's east end: the ball rolls into it (4260, CP4), goes back west along the
+#             path (extra points 4353 at ~470 s), then east again over the pod (474 s) onto TWO white rails running east (x 126 ff).
+#  477-482    stone ball east along the two rails (straight, ~5 u/s), enters a helix of rails.
+#  482-496    helix 1 (a coil of ~5 turns, r 10, centre (185.6, -1143.6), top y -337, the ball rides on the inner side of one tube),
+#             then helix 2, 3 (a long coiled chain, ~3900 units of rail, x 126..346, y -337..-562), 462-520 s in all.
+#  520-545    wooden beam (A05_Wood_01/02, x 343.7, z -1098 -> -652, y -560 -> -675), seen end-on: a long slope straight down.
+#  548-552    the ball rolls into a box transformer (P_Trafo_Wood, (343.7 -673.8 -632.4)) and turns WOOD (4755).
+#  552-584    wood ball down the vertical coil A05_Rail_04 (r ~10, y -614 -> -676, z -629..-609) onto the balloon platform; 584 s the
+#             balloon (ufo) lifts it away, score screen at ~602 s (time 5104, level bonus 1300).
+# Engine (plain autopilot, --level 13 --sector 5 --autopilot --plan hints/Level_13.plan --give-up 600): the sector starts at CP4
+# (121.8 -334.7 -1133.6) as stone, rolls east along the pair of rails (130 -> 183 at y -336.4, z -1133.64), laps helix 1 twice
+# (fast, 9-13 u/s, mostly in the air from turn to turn), stalls at (173.0 -359.6 -1138.8) and (166 -376.2 -1133.7) and falls off
+# near (168 -380 -1151) at ~36 s (dies, speed 45 in air); the route has only 939 points, helices are not in it.
+# Rail geometry (python from the exported level.gltf, glTF z negated, vertex rings of 8 along the tube, two tubes interleaved):
+# A05_Rail_01 (126..270, -336..-442, z -1154..-1067), A05_Rail_02 (252..336, -439..-513), A05_Rail_03 (315..347, -508..-562): one
+# chain, start (182.8 -337.8 -1133.6), ends (269 -439 -1084), (329 -513 -1100), (344 -558 -1103). The tubes alternate every ring:
+# at the helix's start the pair is split radially (r 8.8 / 11.1, dy 1.6) and goes over into r 10 / 10 with dy 3.8 (one above the
+# other); ball centre on the straight is 1.4 above the pair's mean, i.e. the ball is ~1.1 radius.
+# Attempt 1 (centre line of the tube pairs as `pass` points every 3-10 units, speed 2-6, radial/vertical offsets -1..+2.5 / -0.5..+1):
+# the ball always leaves the helix at (193 -340 -1144) .. (192.6 -345.6 -1147), i.e. 100-150 degrees into turn 1 (y falls 4 units
+# in the air, 'ground' -> 'air' at speed 5-10): the same spot whatever the speed; the plain run passes it at 9-10 u/s. Next: read the
+# tube geometry at (190..196, -337..-346, -1135..-1148) (is the pair a groove whose lower tube is the track? where does the inner tube
+# end?), try faster (9-10) on the first turn, or record the owner's ride there (--record from CP4, 477-484 s of the video).
+# Not done: hints/Level_13-s5.txt, the chain s3+s4+s5 in one file, hints/runs/pilot-L13-full.replay.
+# 2026-11-09 SECTOR 5 SOLVED (hints/Level_13-s5.txt, run hints/runs/pilot-L13-s5.replay, finished 01:50.48 from CP4): the coil A05_Rail_04 goes UP
+# (video 551-590 s, export): one thin tube, axis (340.0, -614.5), centre line r 5.6, 3.6 a turn, ~16 turns, ccw from above; ball wedged at r ~4;
+# `round 340 -614.5 4 25 2400 -614` climbs it in ~20 s (speed 10 stalls and falls at y -666) and the top throws it to the balloon (z -586.7).
+# Chain from --sector 3 with s3+s4+s5 hint files concatenated does NOT work yet: stuck in sector 4 (the s4 replay hint needs the exact CP3 state).
+#
+# 2026-11-09 (chain attempt, s3 -> s4 -> s5): the new `sync X Y Z [T]` step (hints.rs, sim.sector_entering) keeps the ball on the
+# reset point until the sector's loose objects and modules entered (checkpoint + 48 / 49 ticks); s4 and s5 hints start with it
+# (no effect from `--sector N`, where everything is in at once). With it a chain `--sector 3 --hints s3+s4+s5` runs s4's object
+# timing as `--sector 4` does, but the ball still differs at the start: `--sector` drops it 1.3 from the reset point (y -284.6,
+# falls at v -5.3), the chain's rests on the floor (y -285.9). The owner's/s4 keys are time-based, so the early difference grows:
+# at replay tick ~260 the chain ball takes the lower column (z -1129.7, y -289) instead of z -1125.2, and sticks at tick 7440
+# (x -313, the rotating bar). Shifting the sync target (x -596.4: 0.04 apart at t 106, z +-0.4) or waiting 2-4 ticks only moves
+# the divergence (3..7 units at t 300). Conclusion: a time-based replay hint is valid only from a dropped ball; for chains the
+# s4 replay must be re-recorded from the sync state (arms hint reactive, owner's end re-anchored), not tuned.
+#
+# 2026-11-09 (CHAIN SOLVED with the closed-loop `trace` step): sectors 3-5 follow the owner's recordings (from `--sector N`)
+# closed-loop, so they hold when the ball comes in from the sector before. Each starts with `sync` (wait on the reset point
+# until the sector's objects are in, so the run's moving objects are where they were in the recording), then `trace`:
+# recorded keys as feed-forward plus a pull to the recorded ball (relative to the raft it rides, when it rides one),
+# matched near one tick a tick; lost (> 4 off) it steers to the run ahead and finds it again (s5: the ball comes into CP4
+# at 10 u/s, sync cannot stop it on the point, the trace finds the owner's ball further on). s4 needs GAIN 2 (the wait
+# at (-288 -1120) beside the arms is on an edge) and ends at CP4 (its tick 7466), so s5's hint fires there.
+# --sector 3 with these three lines: finished 06:34.95 (23697 ticks); see hints/runs/pilot-L13-full.replay for --level 13.
+at -724.1 -154.2 537.2 r 6 sector 3 kind paper : sync -724.1 -154.2 537.2 200 ; trace Level_13-s3.replay 0 9900
+at -595.2 -285 -1124.9 r 4 sector 4 kind paper : sync -595.2 -285 -1124.9 200 ; trace Level_13-s4.replay 0 7466 2
+at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 ; trace Level_13-s5.replay 0 5300 ; push 0 1 40 ; round 340 -614.5 4 25 2400 -614
+#
+# 2026-11-09 (main session, chain from the level start): s1-s2 fine with the s2 line at r 16 (sync fires; CP2 at 3:33, no loss).
+# Sector 3 in the chain: the trace gets lost (4.0-4.3 off) at run ticks ~2937-3273 near the paper transformer (-717 -220 -307),
+# the weak lost-mode push wanders ~25 s and the stones are gone; GAIN 4 does not help. Tried TRACE_LOST 8 + full push when lost:
+# breaks sector 2 (lost at s2 run tick 32, the ball pushed off; game over) — reverted. Next: handle the transformer hold
+# (ball held in the air at the trafo) in `trace`'s matching (match by trafo events/progress, not position), keep the gentle lost mode.
+# 2026-11-09 (main session): tried matching the trace at transformers by "held, then new kind" (jump run.k to the run's first tick
+# with the ball's new kind): it misfires in sector 2 (jumped to run tick 5053, 90 off, deaths at 1:30) — reverted. Such a jump
+# must be bounded (only to a held stretch within a few seconds of the matched tick, same transformer place). Not retried.
+# 2026-11-10 (sector 3's sacks, chain from the level start): the chain's sector 3 fails at the four swinging sacks
+# P_Modul_26 (z -822, -832, -842, -852): only 5-6 of the ten stone balls reach the pit before CP3 (the swinging sacks
+# knock the rest off the channel at z -817..-822), so the pile stays low and the paper ball sticks at x -671..-690.
+# The owner's way (his run, 1:17-1:24): as stone, out of P_Trafo_Stone (-709.2 -248.5 -807) at once, then along the
+# channel's east side (x -718) at 2-4 u/s, reaching each sack's z 0.4-0.5 s after it turned at its east end (-717.8):
+# swinging back, it settles against the ball and stays at x -720.8 (all four by 1:24); then the stones pass. Their
+# phase is all that matters (the owner: stalling desyncs them). From --sector 3 the owner's trace does this; in the
+# chain the sacks swing differently from the start (sack 34 gets a sideways z wobble from 3:38, 5 s after CP2, and
+# a smaller swing, west end -729.8 instead of -730.4), so the replayed keys meet them out of phase.
+# Tried (reverted): (1) a wait before the stone transformer for sack 34's west turn (new step `swing`) then N ticks:
+# from --sector 3 N 138-144 settles all four, in the chain no N does (best 129: three). (2) per sack: hold 2.5-4.5
+# north of it at x -718, `swing` for its east turn, pass on at 3-6 u/s: 2-3 of four settle, some on the west side
+# (-728), and they come loose again later. Next: find why the chain's sacks start differently from --sector 3's
+# (what touches them at 3:38, or how a sector's modules are reset when it is entered from the checkpoint); with
+# the same start the owner's trace should work as it does from --sector 3.
+# 2026-11-10 (sector 3 in the chain, continued). WHY the sacks differ: not a touch or a script; the physics' absolute time.
+# From the level start sector 3 begins at physics time ~443.7 s (from --sector 3 at ~15.9 s); at exactly 450.000 s
+# the ball joint of sack 34's rope (to FixCube) gives it a sideways kick (constraint controller, no contact, no
+# impact; reproduced from --sector 3 by running 200 s of empty physics first). After it the sacks swing with beats
+# (energy moving between the along and the across swing), so a fixed delay cannot meet them.
+# WHAT WORKS for the sacks (from the chain's own state, `--replay hints/runs/chain-s3-problem.replay --from 12780
+# --autopilot`, 3 min a try): per sack (z -821.95/-832.39/-841.9/-852.34, ball y -250.7/-251.4/-252.0/-252.7, the
+# sack's swing-end height -248.41/-248.85/-249.55/-250.25): goto/hold at (-718, y, z+3), `swing -724 PY Z -730.3 PY Z
+# 1.5 400` (its west turn), hold 61..71 ticks, `push 0 -1 30`, hold at (-717.5, y, z-3.5) 40: the push sends it
+# south past the railing post (z ~ z-2.8), where it stays (all four at z ~ -826/-836/-846/-856). Needs the ball there
+# by ~5:12 (sector time ~1:38): later the sacks swing across with a small along-swing and the west turn is missed.
+# WHAT BREAKS the timing: crate 42 (third, z -308.3). The owner's push passes 0.3 north of its centre and it slides
+# south-west to (-735.6 -316.5); the chain's passes 0.4 south and it wedges at (-733.4 -307.8) on the lane west of
+# the channel (lane x -728.7..-736, the channel's wall at -728.7), blocking the paper ball's way north. Fixes tried:
+# slow shove/press (crate stays in the channel), detour east (the wall), two rams (works, 8 s late: the stones get
+# ahead, the paper ball follows them at 6 u/s and reaches the sacks too late), one ram at speed 7 along z -307.5
+# (crate to (-731.1 -325.8), 6 s late, then a fall at the stone transformer). Next: a faster crate-42 ram inside the
+# owner's timing (or the trace's pull at that push to the owner's line, z -307.96), then the sack steps above.
+# 2026-11-10 (sector 3 SOLVED in the chain; the whole level from the start: hints/Level_13-full.txt, finished 10:43.83,
+# no loss, no rewind; run hints/runs/Level_13.replay). `--level 13 --headless --autopilot --plan hints/Level_13.plan
+# --hints hints/Level_13-full.txt`. Sector 3's line: the owner's trace to his stone transformer (0..2745), then
+# crate 42 rammed along z -308.0 -> -309.3 (press 7, so it goes on south-west into the pocket at (-734 -311)): passed in
+# 6 of 6 starts perturbed by --from 12775..12820 (the old slanted ram from (-716.6 -306.8) wedged it in all 6). The ramp
+# north of the paper transformer ends in a fan's updraft at (-731.5 -214.5 -260.3): `push 0 1 18 ; hold` there 30
+# ticks and the updraft carries the paper ball onto the upper lane (x -724, y -214); a 30-tick push overshoots the
+# column at some speeds (z -258) and the ball rolls back to the lower lane (5 of 5 with the hold, 2-3 of 5 before).
+# Then full-speed descents (`pass ... 30 1500`), the four sacks (per-sack swing, W 61), the stone balls met at the pit
+# as stone, and the paper flight over the chute (stone transformer at the pit, owner's trace 6085..8900, paper
+# transformer, trace 9215..9900).
+# Still fragile (not hit in the run from the start): (1) from the chain's CP2 state with this file the chute is one
+# stone short and the paper ball sinks at (-675.7 -286.5 -1124.8); (2) sector 4's raft crossing at x ~ -185: with a
+# different entry the two rafts are a few units apart and the ball falls between them (see the raft notes above).

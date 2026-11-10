@@ -679,6 +679,11 @@ impl World {
         self.physics.contacts_of(1)
     }
 
+    /// The contact points one body (game index) takes part in, for tracing (entities are game indices + 1).
+    pub fn body_contacts(&self, i: usize) -> Vec<ivp::glue::ContactReadout> {
+        self.physics.contacts_of(i as u32 + 1)
+    }
+
     pub fn state(&self, i: usize) -> Option<State> {
         let id = (*self.handles.get(i)?)?;
         let s: BodyState = self.physics.body_state(id);

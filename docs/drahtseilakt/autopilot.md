@@ -170,7 +170,7 @@ transformers the hint rolled the ball into, in their order, count as gone throug
 | `turn N` | turn the view N quarters (negative: left) |
 | `become KIND` | roll into the nearest transformer of that kind (1200 ticks at most) |
 | `lead X Y Z D T` | keep D units ahead of the loose body nearest the point as it rolls (behind it, when D is negative), for T ticks: a stone ball pushing the paper one through fans, a ball to wait for |
-| `shove X Y Z TX TY TZ T` | push the loose body (or a module's moving part) nearest X Y Z to TX TY TZ: round it to behind it, then on into it slowly (T ticks at most) — a board shoved into place, a ball rolled where it is wanted |
+| `shove X Y Z TX TY TZ T [R [V]]` | push the loose body (or a module's moving part) nearest X Y Z to TX TY TZ: round it to behind it, R from its middle (3.5, a ball's size; more for a crate, 10 at most), then on into it slowly (T ticks at most), and with V only while it is slower than V (a crate on a slope slides on by itself) — a board shoved into place, a ball rolled where it is wanted, a crate set under a rail |
 | `press X Y Z SX SZ V T` | roll along the straight line from where the step begins to the point, kept to it sideways (SX SZ: an offset across it, in units, 3 at most: the side of a rail pair the ball keeps to), on while slower than V; done there, past it, or after T ticks — rails ridden leaning on their upper rail, a steady climb |
 | `pass X Y Z V [T]` | roll through the point without stopping, no faster than V (a corner, a rail's end, a transformer on the way), kept to the line from the point the hint's last `pass` went through (a chain of them follows rails and tracks) |
 | `cross DX DZ X Y Z R` | cross a moving part (a swing) toward the point: the moment and the length of the push along DX DZ are found on copies of the run from here (wait, push, let it carry, push off), the first that ends within R of the point on a floor, then played |
@@ -178,8 +178,11 @@ transformers the hint rolled the ball into, in their order, count as gone throug
 | `along V T` | push along the way the ball is rolling, not faster than V, for T ticks: rails that lead it (a helix) taken at speed |
 | `round X Z R V T [Y]` | go round the upright axis through (X, Z) at radius R and speed V (one way round, or the other when V is negative) for T ticks, or until the ball is above Y: up a helix of rails |
 | `await X Y Z QX QY QZ D T` | hold the ball where it is until the loose body or module part nearest X Y Z is within D of QX QY QZ (T ticks at most): a swing or a lift met at the right moment |
+| `swing X Y Z QX QY QZ D T` | hold the ball where it is until the loose body or module part nearest X Y Z has turned back at the end of its swing near QX QY QZ (within D, no longer moving toward it; T ticks at most): a pendulum's phase met however wide it swings |
 | `ride X Y Z QX QY QZ D T` | keep the ball over the loose body or module part nearest X Y Z until it is within D of QX QY QZ (T ticks at most) |
 | `replay FILE FROM TO` | a player's inputs of ticks FROM..TO of the replay FILE (beside the hint file), turned to the test player's view; begun with the ball held in a transformer, it starts as the ball is let go (FROM: the player's transform tick + 149), in step with the player |
+| `sync X Y Z [T]` | keep the ball on the point until the sector's loose objects and modules have entered (a checkpoint's sector begins 48 ticks after it; T at most, 600): the state a `--sector N` run starts from |
+| `trace FILE FROM TO [GAIN]` | the same stretch of a recorded run followed closed-loop: the replay is run once as the hints load, for the ball's place and speed at each tick; then each tick the player's arrows are the feed-forward plus a pull (times GAIN, 1 by default, 0 for none) toward the recorded place and speed at the matching point (matched by progress along the run, kept near one tick a tick so the run's waits stay waits), turned into the arrow set nearest it in the view now (the part missed carried to the next tick). Over 4 units off the run, it steers to the run's way 30 ticks ahead until it is on it again, and after 10 s lost gives the ball back to the autopilot. Unlike `replay`, it holds when the ball arrives a little different (a chain of sectors: `sync` first, then `trace`) |
 
 Directions are world directions (X east, Z north as the level is built), so a hint does not depend on where the
 view is turned; the arrows are chosen for the view at each tick. A hint file is untrusted: its size (64 KiB),
@@ -318,10 +321,12 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
   the thin rail's serpentine, the target that drops the bridge of sector 3, the crease of tilted cubes and its gap, the
   four lifts with cages, the stairs of fans, the stone balls shoved into the helices, the boxes on the hump, the log
   half-pipes. Standing 5.7% of the ticks (1.4% outside transformers), within 1 of an edge 14.1%, speed 5.3 ± 3.8.
-- Level 13: sector 1 by the hints; in sector 2 the paper ball gets down the helix and along the beam past the fans
-  18_10 and 18_11 by itself, and stops before 18_12, whose chute it goes down only pushed by the stone ball
-  P_Ball_Stone_18 (released by the crate under the block, not yet done). Sector 3 from its checkpoint: stuck behind
-  the pile of loose stone balls in the channel (`hints/Level_13.txt`, `.route`).
+- Level 13: sector 1 by the hints; sector 2, from its start, by the hints made from the owner's run of it with his
+  line followed (`hints/Level_13.txt`, `hints/Level_13-s2.replay`), with no going back: the planks, the crate set
+  under each rail crossing as stone 18 comes, the paper ball's dive, the beam and the chute. Sector 3: past the stones
+  along the side troughs as the owner went, the crates, the stone, paper and fan by hints, on by itself to the pit
+  before CP3, where the paper ball waits for the stones to lift it (not yet done). From the level's start, sector 2
+  is not yet reliable (the crate's pushes are sensitive to where the ball comes from); sectors 4 and 5 are open.
 - Videos of the finished runs: `scripts/video.sh`, kept outside the repository.
 - Our ten levels (levels.md, "Our levels and how to edit them"), 2026-11-03: each finished from the start in three
   styles, with the hint files their descriptions write (`assets/levels/<level>/pilot/`).

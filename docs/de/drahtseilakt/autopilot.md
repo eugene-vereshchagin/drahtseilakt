@@ -186,7 +186,7 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `turn N` | die Ansicht um N Viertel drehen (negativ: links) |
 | `become KIND` | in den nächsten Transformator dieser Art rollen (höchstens 1200 Takte) |
 | `lead X Y Z D T` | D Einheiten vor dem losen Körper nächst dem Punkt bleiben, während er rollt (hinter ihm bei negativem D), T Takte lang: eine Steinkugel schiebt die Papierkugel durch Ventilatoren, eine Kugel, auf die man wartet |
-| `shove X Y Z TX TY TZ T` | den losen Körper (oder das bewegliche Teil eines Moduls) nächst X Y Z nach TX TY TZ schieben: um ihn herum hinter ihn, dann langsam hinein (höchstens T Takte) — ein Brett an seinen Platz geschoben, eine Kugel dorthin gerollt, wo man sie braucht |
+| `shove X Y Z TX TY TZ T [R [V]]` | den losen Körper (oder das bewegliche Teil eines Moduls) nächst X Y Z nach TX TY TZ schieben: um ihn herum hinter ihn, R von seiner Mitte (3,5, die Größe einer Kugel; mehr für eine Kiste, höchstens 10), dann langsam hinein (höchstens T Takte), mit V nur, solange er langsamer als V ist (eine Kiste auf einem Gefälle rutscht von selbst weiter) — ein Brett an seinen Platz geschoben, eine Kugel dorthin gerollt, wo man sie braucht, eine Kiste unter eine Schiene gesetzt |
 | `press X Y Z SX SZ V T` | entlang der Geraden vom Ort, an dem der Schritt beginnt, zum Punkt rollen, seitlich an ihr gehalten (SX SZ: ein Versatz quer dazu, höchstens 3: auf welcher Seite eines Schienenpaars), solange langsamer als V; fertig am Punkt, dahinter oder nach T Takten — Schienen, auf der oberen lehnend gefahren, ein gleichmäßiger Anstieg |
 | `pass X Y Z V [T]` | durch den Punkt rollen, ohne anzuhalten, nicht schneller als V (eine Kurve, ein Schienenende, ein Transformator unterwegs); an der Linie vom Punkt gehalten, durch den das letzte `pass` des Hinweises ging (eine Kette davon folgt Schienen und Bahnen) |
 | `cross DX DZ X Y Z R` | über ein bewegliches Teil (eine Schaukel) zum Punkt: der Moment und die Länge des Stoßes entlang DX DZ werden auf Kopien des Laufs von hier gefunden (warten, stoßen, tragen lassen, abstoßen), der erste, nach dem die Kugel innerhalb R vom Punkt auf einem Boden ist, und dann gespielt |
@@ -196,6 +196,8 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `await X Y Z QX QY QZ D T` | die Kugel an Ort und Stelle halten, bis der lose Körper oder das bewegliche Modulteil nächst X Y Z innerhalb D von QX QY QZ ist (höchstens T Takte) — eine Schaukel oder ein Aufzug im richtigen Moment |
 | `ride X Y Z QX QY QZ D T` | die Kugel über dem Körper oder Modulteil nächst X Y Z halten, bis es innerhalb D von QX QY QZ ist (höchstens T Takte) |
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
+| `sync X Y Z [T]` | die Kugel auf dem Punkt halten, bis die losen Objekte und Module des Sektors eingesetzt sind (der Sektor eines Checkpoints beginnt 48 Takte danach; höchstens T, 600): der Zustand, mit dem ein Lauf `--sector N` beginnt |
+| `trace FILE FROM TO [GAIN]` | dieselbe Strecke eines aufgezeichneten Laufs, aber geregelt: das Replay wird beim Laden der Hinweise einmal abgespielt, für Ort und Geschwindigkeit der Kugel in jedem Takt; danach sind in jedem Takt die Pfeile des Spielers die Vorsteuerung plus ein Zug (mal GAIN, 1 ohne Angabe, 0 keiner) zu Ort und Geschwindigkeit an der passenden Stelle (nach Fortschritt entlang des Laufs, nahe einem Takt pro Takt, so dass Wartezeiten Wartezeiten bleiben), in den Pfeilsatz umgesetzt, der dem in der aktuellen Ansicht am nächsten liegt (der Rest geht in den nächsten Takt). Mehr als 4 Einheiten neben dem Lauf lenkt es zum Weg des Laufs 30 Takte voraus, bis die Kugel wieder darauf ist, und gibt sie nach 10 s an den Autopiloten zurück. Anders als `replay` hält es, wenn die Kugel etwas anders ankommt (eine Kette von Sektoren: erst `sync`, dann `trace`) |
 
 Richtungen sind Weltrichtungen (X nach Osten, Z nach Norden, wie das Level gebaut ist), ein Hinweis hängt also nicht
 von der Drehung der Ansicht ab; die Pfeile werden in jedem Takt zur Ansicht gewählt. Eine Hinweisdatei ist nicht
@@ -344,10 +346,13 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
   die vier Aufzüge mit Käfig, die Ventilatortreppen, die in die Spiralen geschobenen Steinkugeln, die Kisten auf dem
   Buckel, die Halbröhren aus Stämmen. Stillstand 5,7 % der Ticks (1,4 % außerhalb von Transformatoren), näher als 1 am
   Rand 14,1 %, Geschwindigkeit 5,3 ± 3,8.
-- Level 13: Sektor 1 nach den Hinweisen; in Sektor 2 kommt die Papierkugel allein die Spirale hinab und den Balken
-  entlang an den Ventilatoren 18_10 und 18_11 vorbei und hält vor 18_12, dessen Schacht sie nur hinabgeht, wenn die
-  Steinkugel P_Ball_Stone_18 sie schiebt (freigegeben von der Kiste unter dem Block, noch nicht gelöst). Sektor 3 von
-  seinem Checkpoint an: steckt hinter dem Haufen loser Steinkugeln in der Rinne fest (`hints/Level_13.txt`, `.route`).
+- Level 13: Sektor 1 nach den Hinweisen; Sektor 2 von seinem Anfang an nach den Hinweisen aus dem Lauf des Besitzers,
+  seiner Linie folgend (`hints/Level_13.txt`, `hints/Level_13-s2.replay`), ohne Zurückgehen: die Bretter, die Kiste
+  unter jeder Schienenkreuzung, wenn Steinkugel 18 kommt, der Tauchgang der Papierkugel, der Balken und der Schacht.
+  Sektor 3: an den Steinen vorbei über die seitlichen Rinnen wie der Besitzer, die Kisten, Stein, Papier und Ventilator
+  nach Hinweisen, allein weiter bis zur Grube vor CP3, wo die Papierkugel wartet, bis die Steine sie heben (noch nicht
+  gelöst). Vom Levelstart an ist Sektor 2 noch nicht zuverlässig (die Stöße der Kiste hängen davon ab, woher die Kugel
+  kommt); Sektoren 4 und 5 sind offen.
 - Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
 - Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
   Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).

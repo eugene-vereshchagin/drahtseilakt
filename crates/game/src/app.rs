@@ -1226,6 +1226,11 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         return screenshot(&mut game, &data, &o, path);
     }
     if o.autopilot {
+        // (--replay with --from: the run's keys up to that tick, then the test player from where they left it)
+        let mut game = game;
+        if let Some(tick) = o.from {
+            game.fast_forward(tick);
+        }
         return autopilot(game, &data, &o);
     }
     if o.headless {
@@ -1266,33 +1271,35 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
                     b.velocity.length(),
                     if b.on_ground { "ground" } else { "air" }
                 );
+                // one body's contact points (its game index, as the loose trace's #), with DRAHTSEILAKT_TRACE_CONTACTS set
+                if let Some(i) = std::env::var("DRAHTSEILAKT_TRACE_CONTACTS").ok().and_then(|v| v.parse::<usize>().ok()) {
+                    for c in game.sim.world().body_contacts(i) {
+                        println!(
+                            "    contact {:?} types {:?} gap {:.4} normal ({:.3} {:.3} {:.3}) point ({:.2} {:.2} {:.2})",
+                            c.entities, c.types, c.gap, c.normal[0], c.normal[1], c.normal[2], c.point[0], c.point[1], c.point[2]
+                        );
+                    }
+                }
                 // the loose things near the ball (boxes, balls, modules' parts), with DRAHTSEILAKT_TRACE_LOOSE set
                 if std::env::var_os("DRAHTSEILAKT_TRACE_LOOSE").is_some() {
+                    let trace_r: f32 = std::env::var("DRAHTSEILAKT_TRACE_R").ok().and_then(|v| v.parse().ok()).unwrap_or(40.0);
                     for &(o, body) in game.sim.loose() {
-                        let Some(st) = game.sim.world().state(body) else {
-                            continue;
-                        };
-                        if st.pos.distance(b.position) < 40.0 {
-                            let name = game
-                                .level
-                                .level
-                                .objects
-                                .get(o)
-                                .map_or("?", |ob| ob.name.as_str());
-                            println!(
-                                "    {name} ({:8.2} {:8.2} {:8.2})",
-                                st.pos.x, st.pos.y, st.pos.z
-                            );
+                        let Some(st) = game.sim.world().state(body) else { continue };
+                        if st.pos.distance(b.position) < trace_r {
+                            let name = game.level.level.objects.get(o).map_or("?", |ob| ob.name.as_str());
+                            println!("    {name} ({:8.2} {:8.2} {:8.2})", st.pos.x, st.pos.y, st.pos.z);
                         }
                     }
                     // and the modules' moving parts
                     for m in game.sim.module_bodies() {
-                        let Some(st) = game.sim.world().state(m.body) else {
-                            continue;
-                        };
-                        if st.pos.distance(b.position) < 40.0 {
+                        let Some(st) = game.sim.world().state(m.body) else { continue };
+                        if st.pos.distance(b.position) < trace_r {
                             let (o, p) = (&m.object, st.pos);
-                            println!("    {o} #{} ({:8.2} {:8.2} {:8.2})", m.body, p.x, p.y, p.z);
+                            let (r, w) = (st.rot, st.spin);
+                            println!(
+                                "    {o} #{} ({:8.2} {:8.2} {:8.2}) rot ({:.3} {:.3} {:.3} {:.3}) spin ({:.2} {:.2} {:.2})",
+                                m.body, p.x, p.y, p.z, r.x, r.y, r.z, r.w, w.x, w.y, w.z
+                            );
                         }
                     }
                 }
@@ -2424,6 +2431,11 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
     let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
     for h in &mut hints {
         for step in &mut h.steps {
+            if let crate::hints::Step::Trace(file, from, to, gain) = step {
+                let track = load_track(&dir.join(&*file), *from, *to, *gain, data, o)?;
+                *step = crate::hints::Step::Track(Box::new(track));
+                continue;
+            }
             let crate::hints::Step::Replay(file, from, to) = step else {
                 continue;
             };
@@ -2460,6 +2472,87 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
         println!("{} hints from {}", hints.len(), path.display());
     }
     Ok(hints)
+}
+
+/// A trace step's run: the replay `file` played (headless, from its own start) to tick `from`, then the ball's place
+/// and speed and the push of the player's arrows at each tick to `to`.
+fn load_track(
+    file: &Path,
+    from: u64,
+    to: u64,
+    gain: f32,
+    data: &Data,
+    o: &Options,
+) -> Result<crate::hints::Track, String> {
+    let bytes = crate::hints::read_plain(file, crate::hints::MAX_REPLAY_FILE)?;
+    let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
+    let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
+    let mut watch = o.clone();
+    watch.replay = Some(file.to_path_buf());
+    watch.follow = None;
+    watch.autopilot = false;
+    let mut seen = Game::new(&watch, data)?;
+    while seen.sim.tick < from && !seen.sim.game_over {
+        seen.tick(0);
+    }
+    let mut track = crate::hints::Track {
+        gain,
+        ..Default::default()
+    };
+    let mut changes = run.changes.iter().peekable();
+    let mut input = 0u8;
+    let mut bodies = Vec::new();
+    for t in 0..to {
+        // the input of tick t + 1 is the one the replay plays from the state at tick t (as for a replay step)
+        while let Some(&&(_, i)) = changes.peek().filter(|c| c.0 <= t + 1) {
+            input = i;
+            changes.next();
+        }
+        if t < from {
+            continue;
+        }
+        if seen.sim.game_over || seen.sim.finished {
+            break;
+        }
+        let cam = &seen.sim.camera;
+        track.pos.push(seen.sim.ball.position);
+        track.vel.push(seen.sim.ball.velocity);
+        track.push.push(crate::hints::push_of(input, cam.push_forward(), cam.push_right()));
+        track.lift.push(input & crate::sim::input::LIFT != 0);
+        track.on.push(crate::hints::carrier(&seen.sim));
+        let world = seen.sim.world();
+        bodies.push(
+            seen.sim
+                .loose()
+                .iter()
+                .filter_map(|&(o, b)| world.state(b).map(|st| (o, st.pos)))
+                .collect::<Vec<_>>(),
+        );
+        seen.tick(0);
+    }
+    crate::hints::fill_meet(&mut track, &bodies);
+    if std::env::var_os("TRACE_LOG").is_some() {
+        let mut near = std::collections::BTreeMap::new();
+        for (i, b) in bodies.iter().enumerate() {
+            for &(o, p) in b {
+                let d = track.pos.get(i).map_or(f32::INFINITY, |q| q.distance(p));
+                let e = near.entry(o).or_insert((f32::INFINITY, 0usize));
+                if d < e.0 {
+                    *e = (d, i);
+                }
+            }
+        }
+        eprintln!("trace bodies nearest the ball (object: distance, tick): {near:?}");
+    }
+    println!(
+        "trace {} {from}..{to}: {} ticks, {} on a body, {} before a body touches the ball ({} loose bodies)",
+        file.display(),
+        track.pos.len(),
+        track.on.iter().filter(|o| o.is_some()).count(),
+        track.meet.iter().filter(|o| o.is_some()).count(),
+        bodies.first().map_or(0, Vec::len)
+    );
+    Ok(track)
 }
 
 /// A report of where the test player is stuck, for whoever writes its hints: what it knows of the place, and two
@@ -2764,7 +2857,12 @@ impl PilotRun {
         };
         if let Some(at) = failed_at
             && let Some((state, attempt)) =
-                self.rewinds.back(at, (game.sim.sector, pilot.reached()))
+                self.rewinds.back(
+                    at,
+                    (game.sim.sector, pilot.reached()),
+                    game.sim.ball.position,
+                    fell,
+                )
         {
             let (sim, replay, p, b, sn, h, ne) = state;
             let line = format!(

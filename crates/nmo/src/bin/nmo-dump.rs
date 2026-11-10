@@ -1,5 +1,6 @@
 // nmo-dump: prints what a Virtools file holds. Default: the container; --objects: every object with its class;
 // --check: decode every scene object and print only what fails (for runs over whole map collections);
+// --arrays: every data array with its rows; --params: every parameter with its value or source;
 // --scripts: the behaviour graphs' building blocks by prototype, with counts (the survey of community maps).
 
 use nmo::{Document, class, scene};
@@ -39,11 +40,14 @@ fn decode(doc: &Document) -> Vec<String> {
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mode = match args.first().map(String::as_str) {
-        Some("--objects") | Some("--check") | Some("--scripts") => args.remove(0),
+        Some("--objects") | Some("--check") | Some("--scripts") | Some("--arrays")
+        | Some("--params") => args.remove(0),
         _ => String::new(),
     };
     if args.is_empty() {
-        eprintln!("usage: nmo-dump [--objects | --check | --scripts] FILE...");
+        eprintln!(
+            "usage: nmo-dump [--objects | --check | --scripts | --arrays | --params] FILE..."
+        );
         return ExitCode::from(2);
     }
     let mut failed = false;
@@ -94,6 +98,65 @@ fn main() -> ExitCode {
                 println!("{path}: {scripts} scripts, {} block kinds", protos.len());
                 for (guid, name, n) in protos {
                     println!("  {n:5} {guid} {name}");
+                }
+            }
+            "--arrays" => {
+                println!("{path}");
+                for (_, o) in doc.of_class(nmo::class::DATA_ARRAY) {
+                    let Some(Ok(a)) = o.chunk.as_ref().map(nmo::scene::data_array) else {
+                        continue;
+                    };
+                    let cols: Vec<String> = a
+                        .columns
+                        .iter()
+                        .map(|c| String::from_utf8_lossy(c).into_owned())
+                        .collect();
+                    println!("  array {}: {}", o.name_lossy(), cols.join(" | "));
+                    for row in &a.rows {
+                        println!("    {row:?}");
+                    }
+                }
+            }
+            "--params" => {
+                println!("{path}");
+                for (i, o) in doc.objects.iter().enumerate() {
+                    let Some(chunk) = &o.chunk else { continue };
+                    match o.class_id {
+                        2 => {
+                            if let Ok(p) = nmo::behavior::parameter_in(chunk) {
+                                println!(
+                                    "  {i:5} in    {:24} <- {:?}{}",
+                                    o.name_lossy(),
+                                    p.source,
+                                    if p.shared { " (shared)" } else { "" }
+                                );
+                            }
+                        }
+                        3 | 45 => {
+                            if let Ok(p) = nmo::behavior::parameter(chunk) {
+                                let v = match &p.value {
+                                    nmo::behavior::Saved::Bytes(b) => {
+                                        let txt = String::from_utf8_lossy(b);
+                                        let floats: Vec<f32> = b
+                                            .chunks_exact(4)
+                                            .filter_map(|c| {
+                                                c.try_into().ok().map(f32::from_le_bytes)
+                                            })
+                                            .collect();
+                                        format!("{b:02x?} {txt:?} {floats:?}")
+                                    }
+                                    other => format!("{other:?}"),
+                                };
+                                println!(
+                                    "  {i:5} {} {:24} = {v} -> {:?}",
+                                    if o.class_id == 3 { "out  " } else { "local" },
+                                    o.name_lossy(),
+                                    p.destinations
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
             "--objects" => {

@@ -14,8 +14,17 @@
 //   wait T                  no arrows for T ticks
 //   turn N                  turn the view N quarters (negative: to the left)
 //   become wood|stone|paper roll into the nearest transformer of that kind (1200 ticks at most)
+//   sync X Y Z [T]         keep the ball on the point until the sector's loose objects have been put in their places
+//                           (a checkpoint's sector begins 48 ticks after it): the state a run begun at that sector
+//                           (`--sector N`) starts a recorded replay hint from, so those hints hold in a chain
 //   replay FILE FROM TO     a player's inputs of ticks FROM..TO of the replay FILE (a plain name beside the hint file),
 //                           turned to the test player's view
+//   trace FILE FROM TO [GAIN] the same stretch closed-loop: the replay is run once as the hints load, for the ball's
+//                           place and speed at each of its ticks; each tick the recorded arrows are the feed-forward,
+//                           plus a correction (times GAIN, 1 if not given; 0 is none) toward the recorded place and
+//                           speed at the matching point of the run (by progress along it, kept near one tick a tick),
+//                           turned into the arrows nearest it in the view now. Lost (over 4 units off): it steers to
+//                           the run's way ahead until it is on it again (or gives the ball back to the autopilot)
 //
 // The file is untrusted (hints may be shared): its size, the number of hints and steps and every number are capped,
 // and a malformed line refuses the whole file with its line number.
@@ -59,13 +68,23 @@ pub enum Step {
     Replay(PathBuf, u64, u64),
     /// A replay stretch read: the view's quarter at its first tick and the inputs of its ticks.
     Inputs(i32, Vec<u8>),
+    /// As written: a replay stretch to follow closed-loop, its file, ticks and correction gain.
+    Trace(PathBuf, u64, u64, f32),
+    /// A trace read: the recorded run's ball and pushes, a tick each.
+    Track(Box<Track>),
     /// Keep this far ahead of (behind, when negative) the loose body nearest the point as it rolls, for so many ticks.
     Lead(Vec3, f32, u64),
-    /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most.
-    Shove(Vec3, Vec3, u64),
+    /// Push the loose body (or module part) nearest the first point to the second, for so many ticks at most; going
+    /// round it this far from its middle (a ball's size by default; a crate is bigger), and pushing only while it
+    /// is slower than the speed, when one is given (a crate on a slope slides on by itself).
+    Shove(Vec3, Vec3, u64, f32, Option<f32>),
     /// Hold the ball where it is until the loose body (or module part) nearest the first point is within the
     /// distance of the second, for so many ticks at most: a swing or a lift to get on or off at the right moment.
     Await(Vec3, Vec3, f32, u64),
+    /// Hold the ball where it is until the loose body (or module part) nearest the first point has turned back at
+    /// the end of its swing near the second (within the distance, no longer moving toward it), for so many ticks at
+    /// most: a pendulum's phase met however wide it swings.
+    Swing(Vec3, Vec3, f32, u64),
     /// Keep the ball over the loose body (or module part) nearest the first point until it is within the distance
     /// of the second, for so many ticks at most: riding a swing across.
     Ride(Vec3, Vec3, f32, u64),
@@ -78,6 +97,8 @@ pub enum Step {
     Along(f32, u64),
     /// Keep the ball on the point for so many ticks: still where it must wait (a slope would roll it away).
     Hold(Vec3, u64),
+    /// Keep the ball on the point until the current sector's objects have entered the physics (at most so many ticks).
+    Sync(Vec3, u64),
     /// Roll through the point without stopping, no faster than the speed (a corner, a rail's end, a transformer
     /// rolled into on the way), for so many ticks at most.
     Pass(Vec3, f32, u64),
@@ -88,6 +109,212 @@ pub enum Step {
     /// Go round the upright axis through the point (x, z) at the radius, at the speed (one way round or, negative,
     /// the other), for so many ticks or until the ball is above the point's height: up a helix of rails.
     Round(Vec3, f32, f32, u64),
+}
+
+/// A recorded run as a `trace` step follows it: for each tick of the stretch, the ball's place and speed before it,
+/// the world push the player's arrows gave in it, and whether the view was lifted.
+#[derive(Clone, PartialEq, Default)]
+pub struct Track {
+    pub pos: Vec<Vec3>,
+    pub vel: Vec<Vec3>,
+    pub push: Vec<Vec3>,
+    pub lift: Vec<bool>,
+    /// The loose body the ball rode at each tick, if any (its object, and the ball's place and speed relative to it):
+    /// on a raft the run is followed relative to the raft, wherever the raft is now.
+    pub on: Vec<Option<(usize, Vec3, Vec3)>>,
+    /// Before a loose body touches the ball (within `TRACE_MEET` ticks): that body's object and its place at the tick,
+    /// so the trace waits where the run is when the body comes later than it did in the run.
+    pub meet: Vec<Option<(usize, Vec3)>>,
+    pub gain: f32,
+}
+
+/// A loose body carries the ball when its middle is below the ball's and this near across.
+const CARRY_ACROSS: f32 = 3.5;
+const CARRY_BELOW: f32 = 0.5;
+/// A carrier this far from its place in the run is not followed.
+const CARRY_TRUST: f32 = 8.0;
+
+/// The loose body carrying the ball now, if any: its object and the ball's place and speed relative to it.
+pub fn carrier(sim: &Sim) -> Option<(usize, Vec3, Vec3)> {
+    let world = sim.world();
+    let b = sim.ball.position;
+    sim.loose()
+        .iter()
+        .filter_map(|&(object, body)| {
+            let st = world.state(body)?;
+            let d = b - st.pos;
+            let across = Vec3::new(d.x, 0.0, d.z).length();
+            (d.y > CARRY_BELOW && across < CARRY_ACROSS).then_some((object, d, sim.ball.velocity - st.vel, across))
+        })
+        .min_by(|a, c| a.3.total_cmp(&c.3))
+        .map(|(o, d, v, _)| (o, d, v))
+}
+
+/// The loose body touching the ball at tick `i` of the run (its middle within `TOUCH` of the ball's), if any.
+fn touch(track: &Track, bodies: &[Vec<(usize, Vec3)>], i: usize) -> Option<usize> {
+    let ball = *track.pos.get(i)?;
+    bodies
+        .get(i)?
+        .iter()
+        .map(|&(o, p)| (o, p.distance(ball)))
+        .filter(|b| b.1 < TOUCH)
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|b| b.0)
+}
+
+/// Fills `track.meet` from the loose bodies' places at each tick of the run (`bodies`, object and place).
+pub fn fill_meet(track: &mut Track, bodies: &[Vec<(usize, Vec3)>]) {
+    let n = track.on.len();
+    track.meet = vec![None; n];
+    for j in 0..n {
+        if touch(track, bodies, j).is_some() {
+            continue;
+        }
+        let next = (j + 1..(j + TRACE_MEET).min(n)).find_map(|i| touch(track, bodies, i));
+        if let Some(object) = next
+            && let Some(&(_, p)) = bodies.get(j).and_then(|b| b.iter().find(|b| b.0 == object))
+        {
+            track.meet[j] = Some((object, p));
+        }
+    }
+}
+
+/// How many ticks late the body about to touch the ball is, against the run (negative: early; 0 if none).
+fn meet_late(track: &Track, k: usize, sim: &Sim) -> i64 {
+    let Some(Some((object, _))) = track.meet.get(k) else {
+        return 0;
+    };
+    let Some(body) = sim.loose().iter().find(|l| l.0 == *object).map(|l| l.1) else {
+        return 0;
+    };
+    let Some(now) = sim.world().state(body).map(|s| s.pos) else {
+        return 0;
+    };
+    // the run's tick whose place of the body is nearest where it is now (ties to the nearest tick)
+    let mut best = (k, f32::INFINITY);
+    for j in k.saturating_sub(TRACE_MEET)..(k + TRACE_MEET).min(track.meet.len()) {
+        if let Some(Some((o, p))) = track.meet.get(j)
+            && o == object
+        {
+            let cost = p.distance(now) + 0.002 * (j as f32 - k as f32).abs();
+            if cost < best.1 {
+                best = (j, cost);
+            }
+        }
+    }
+    k as i64 - best.0 as i64
+}
+
+/// Where the run had the ball at tick `k`, and its speed, as they are now: relative to the body it rode, when that
+/// body is in the world, otherwise as recorded.
+fn reference(track: &Track, k: usize, sim: &Sim) -> Option<(Vec3, Vec3)> {
+    let (at, v) = (*track.pos.get(k)?, *track.vel.get(k)?);
+    let Some(Some((object, d, dv))) = track.on.get(k) else {
+        return Some((at, v));
+    };
+    let body = sim.loose().iter().find(|l| l.0 == *object).map(|l| l.1);
+    // (a body far from where it was in the run, one put away or gone another way, is no guide)
+    match body.and_then(|b| sim.world().state(b)) {
+        Some(st) if (st.pos + *d).distance(at) < CARRY_TRUST => Some((st.pos + *d, st.vel + *dv)),
+        _ => Some((at, v)),
+    }
+}
+
+impl std::fmt::Debug for Track {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Track({} ticks, gain {})", self.pos.len(), self.gain)
+    }
+}
+
+/// How a trace keeps to its run: the correction's pull per unit off the recorded place and per unit/s off its speed.
+const TRACE_KP: f32 = 0.35;
+const TRACE_KD: f32 = 0.25;
+/// The matching point is looked for this many ticks ahead of the last; skipping ahead costs this many units a
+/// second skipped (so a wait in the run, the ball still, is kept as time, not jumped over).
+const TRACE_WINDOW: usize = 90;
+const TRACE_SKIP_COST: f32 = 30.0;
+/// Further off the run than this the ball is lost: steered to the run's way this far ahead, looked for wider.
+const TRACE_LOST: f32 = 4.0;
+/// A lost ball is on the run again this near it.
+const TRACE_FOUND: f32 = 2.5;
+/// How far ahead of getting on a body the trace looks for it, and how late it may be (ticks) before the trace waits.
+pub const TRACE_MEET: usize = 150;
+/// A loose body this near the ball (middle to middle; balls touch at 4) touches it: a ball knocked on, a raft got on.
+const TOUCH: f32 = 4.5;
+const MEET_LATE: i64 = 3;
+const TRACE_AHEAD: usize = 30;
+const TRACE_SEARCH: usize = 600;
+/// Lost this long, the trace ends (the autopilot takes over).
+const TRACE_GIVE_UP: u64 = 600;
+
+/// The nine arrow sets a trace chooses from (no Shift: the view is not turned).
+const ARROW_SETS: [u8; 9] = [
+    0,
+    input::UP,
+    input::DOWN,
+    input::LEFT,
+    input::RIGHT,
+    input::UP | input::LEFT,
+    input::UP | input::RIGHT,
+    input::DOWN | input::LEFT,
+    input::DOWN | input::RIGHT,
+];
+
+/// The world push of arrows with the view's axes (forward, right), as the sim gives it.
+pub fn push_of(bits: u8, forward: Vec3, right: Vec3) -> Vec3 {
+    let mut v = Vec3::ZERO;
+    if bits & input::UP != 0 {
+        v += forward;
+    }
+    if bits & input::DOWN != 0 {
+        v -= forward;
+    }
+    if bits & input::SHIFT == 0 {
+        if bits & input::RIGHT != 0 {
+            v += right;
+        }
+        if bits & input::LEFT != 0 {
+            v -= right;
+        }
+    }
+    v
+}
+
+/// The arrow set whose push is nearest `want` (flat) with the view's axes, and what is left of `want`.
+pub fn nearest_arrows(want: Vec3, forward: Vec3, right: Vec3) -> (u8, Vec3) {
+    let want = Vec3::new(want.x, 0.0, want.z);
+    let mut best = (0u8, want, f32::INFINITY);
+    for bits in ARROW_SETS {
+        let left = want - push_of(bits, forward, right);
+        let d = left.length_squared();
+        if d < best.2 - 1e-6 {
+            best = (bits, left, d);
+        }
+    }
+    (best.0, best.1)
+}
+
+/// The tick of `track` the ball matches, `next` being the tick due now (one on from the last matched): the nearest
+/// recorded place from the last matched on, within the window, a tick off the due one costing `TRACE_SKIP_COST`
+/// units a second (so a wait in the run stays a wait); `wide` looks further and without the cost (a lost ball found
+/// again).
+pub fn match_tick(track: &Track, next: usize, ball: Vec3, wide: bool) -> usize {
+    let n = track.pos.len();
+    if n == 0 {
+        return 0;
+    }
+    let first = next.saturating_sub(1).min(n - 1);
+    let end = (next + if wide { TRACE_SEARCH } else { TRACE_WINDOW }).min(n - 1);
+    let mut best = (next.min(n - 1), f32::INFINITY);
+    for j in first..=end {
+        let Some(p) = track.pos.get(j) else { break };
+        let skip = (j as f32 - next as f32).abs() / 60.0;
+        let cost = p.distance(ball) + if wide { 0.0 } else { TRACE_SKIP_COST * skip };
+        if cost < best.1 {
+            best = (j, cost);
+        }
+    }
+    best.0
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -213,9 +440,27 @@ fn step(words: &[&str]) -> Result<Step, String> {
         "shove" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let to = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
-            Step::Shove(p, to, ticks(w.next())?)
+            let n = ticks(w.next())?;
+            let round = match w.next() {
+                Some(r) => num(Some(r))?,
+                None => SHOVE_BEHIND,
+            };
+            if !(SHOVE_BEHIND..=MAX_SHOVE_ROUND).contains(&round) {
+                return Err(format!("shove goes round at {SHOVE_BEHIND} to {MAX_SHOVE_ROUND}"));
+            }
+            let cap = match w.next() {
+                Some(v) => {
+                    let v = num(Some(v))?;
+                    if !(0.5..=MAX_PRESS_SPEED).contains(&v) {
+                        return Err(format!("shove is 0.5 to {MAX_PRESS_SPEED} fast"));
+                    }
+                    Some(v)
+                }
+                None => None,
+            };
+            Step::Shove(p, to, n, round, cap)
         }
-        "await" | "ride" => {
+        "await" | "ride" | "swing" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let q = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let d = num(w.next())?;
@@ -225,6 +470,8 @@ fn step(words: &[&str]) -> Result<Step, String> {
             let t = ticks(w.next())?;
             if name == "await" {
                 Step::Await(p, q, d, t)
+            } else if name == "swing" {
+                Step::Swing(p, q, d, t)
             } else {
                 Step::Ride(p, q, d, t)
             }
@@ -272,6 +519,14 @@ fn step(words: &[&str]) -> Result<Step, String> {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             Step::Hold(p, ticks(w.next())?)
         }
+        "sync" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let n = match w.next() {
+                Some(t) => ticks(Some(t))?,
+                None => GOTO_TICKS,
+            };
+            Step::Sync(p, n)
+        }
         "along" => {
             let speed = num(w.next())?;
             if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
@@ -304,6 +559,21 @@ fn step(words: &[&str]) -> Result<Step, String> {
                 return Err("replay's ticks must grow".into());
             }
             Step::Replay(PathBuf::from(file), from, to)
+        }
+        "trace" => {
+            let file = plain_name(w.next().ok_or("trace needs a file")?)?;
+            let (from, to) = (ticks(w.next())?, ticks(w.next())?);
+            if to <= from {
+                return Err("trace's ticks must grow".into());
+            }
+            let gain = match w.next() {
+                Some(g) => num(Some(g))?,
+                None => 1.0,
+            };
+            if !(0.0..=4.0).contains(&gain) {
+                return Err("trace's gain is 0 to 4".into());
+            }
+            Step::Trace(PathBuf::from(file), from, to, gain)
         }
         other => return Err(format!("unknown step \"{other}\"")),
     };
@@ -386,7 +656,7 @@ pub fn parse(text: &str) -> Result<Vec<Hint>, String> {
     let replays = out
         .iter()
         .flat_map(|h| &h.steps)
-        .filter(|s| matches!(s, Step::Replay(..)))
+        .filter(|s| matches!(s, Step::Replay(..) | Step::Trace(..)))
         .count();
     if replays > MAX_REPLAY_STEPS {
         return Err(format!("more than {MAX_REPLAY_STEPS} replay steps"));
@@ -586,6 +856,10 @@ struct Running {
     /// In a flow zone (zones.rs) the step is run without its stop: a goto rolled through, a wait or hold left out,
     /// a slow pass or press taken at `FLOW_SPEED`, when a copy of the run shows the ball is kept so.
     flowed: bool,
+    /// A trace's tick of its run due next, what its arrows left of the push wanted, and since when it is lost.
+    k: usize,
+    residual: Vec3,
+    lost_since: Option<u64>,
 }
 
 /// A step ending with the ball this far below its point has lost it to a floor beneath (`Runner::off_course`).
@@ -598,7 +872,8 @@ fn step_point(step: &Step) -> Option<Vec3> {
         | Step::Via(p, _)
         | Step::Pass(p, _, _)
         | Step::Press(p, _, _, _)
-        | Step::Hold(p, _) => Some(p),
+        | Step::Hold(p, _)
+        | Step::Sync(p, _) => Some(p),
         _ => None,
     }
 }
@@ -709,7 +984,10 @@ impl Runner {
     pub fn replaying(&self) -> bool {
         self.running.as_ref().is_some_and(|r| {
             let step = self.hints.get(r.hint).and_then(|h| h.steps.get(r.step));
-            matches!(step, Some(Step::Replay(..) | Step::Inputs(..)))
+            matches!(
+                step,
+                Some(Step::Replay(..) | Step::Inputs(..) | Step::Trace(..) | Step::Track(..))
+            )
         })
     }
 }
@@ -789,6 +1067,9 @@ impl Runner {
                 pushes: Vec::new(),
                 passed: None,
                 flowed: false,
+                k: 0,
+                residual: Vec3::ZERO,
+                lost_since: None,
             });
             self.begin(sim);
         }
@@ -856,6 +1137,9 @@ impl Runner {
         run.from = Vec3::ZERO;
         run.pushes.clear();
         run.flowed = false;
+        run.k = 0;
+        run.residual = Vec3::ZERO;
+        run.lost_since = None;
         let step = self.hints.get(run.hint).and_then(|h| h.steps.get(run.step));
         if let Some(Step::Inputs(q, _)) = step {
             run.quarter = *q;
@@ -1021,6 +1305,8 @@ fn cross_plan(sim: &Sim, dir: Vec3, to: Vec3, r: f32) -> Vec<Vec3> {
 /// A shove is done with the body this near its place; the ball pushes it from this far behind its middle.
 const SHOVE_NEAR: f32 = 1.0;
 const SHOVE_BEHIND: f32 = 3.5;
+/// The farthest a shove goes round its body (a large crate).
+const MAX_SHOVE_ROUND: f32 = 10.0;
 
 /// The input of `step` for this tick, or None when it is done.
 fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
@@ -1097,7 +1383,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             })?;
             Some(towards(near.0))
         }
-        Step::Shove(at, to, n) => {
+        Step::Shove(at, to, n, round, cap) => {
             if t >= *n {
                 return None;
             }
@@ -1111,23 +1397,32 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let dir = left.normalize();
             // behind the body as seen from where it must go, then on into it
             let rel = flat(ball.position - st.pos);
-            let behind = st.pos - dir * SHOVE_BEHIND;
+            let behind = st.pos - dir * *round;
             let off = flat(behind - ball.position);
             let v = flat(ball.velocity);
-            let ahead = rel.dot(dir) > -0.5 * SHOVE_BEHIND;
+            let ahead = rel.dot(dir) > -0.5 * *round;
             if ahead || (off.length() > 2.0 && rel.normalize_or_zero().dot(-dir) < 0.9) {
                 // round it on the side the ball is: to beside it, then behind
                 let perp = Vec3::new(-dir.z, 0.0, dir.x);
                 let side = perp * rel.dot(perp).signum();
-                let round = if ahead {
-                    st.pos + side * SHOVE_BEHIND
-                } else {
+                // (beside it, then on round by its corner: going straight from beside to behind would cut across a
+                // large body's corner)
+                let beside = st.pos + side * *round;
+                let to = if !ahead {
                     behind
+                } else if flat(beside - ball.position).length() > 1.5 {
+                    beside
+                } else {
+                    st.pos + (side - dir).normalize_or_zero() * *round
                 };
-                let d = flat(round - ball.position);
+                let d = flat(to - ball.position);
                 return Some(arrows(d.clamp_length_max(6.0) - 0.8 * v, quarter));
             }
-            // pushing: slowly, so the body is not knocked past the place or off the floor
+            // pushing: slowly, so the body is not knocked past the place or off the floor; with a speed, not while the
+            // body goes faster (the ball holds back)
+            if cap.is_some_and(|c| flat(st.vel).length() > c) {
+                return Some(arrows(-0.8 * v, quarter));
+            }
             let along = dir * 3.0 + (off - dir * off.dot(dir));
             Some(arrows(along - 0.8 * (v - flat(st.vel)), quarter))
         }
@@ -1165,6 +1460,18 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let st = sim.world().state(body)?;
             // the ball held where it was as the step began (an edge may slope)
             (st.pos.distance(*q) > *d).then(|| towards(run.from))
+        }
+        Step::Swing(at, q, d, n) => {
+            if t >= *n {
+                return None;
+            }
+            if t == 0 {
+                run.from = ball.position;
+            }
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
+            let st = sim.world().state(body)?;
+            let turned = st.pos.distance(*q) <= *d && st.vel.dot(*q - st.pos) <= 0.0;
+            (!turned).then(|| towards(run.from))
         }
         Step::Ride(at, q, d, n) => {
             if t >= *n {
@@ -1228,6 +1535,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             Some(arrows(around * f + u * a.clamp(-1.0, 1.0), quarter))
         }
         Step::Hold(p, n) => (t < *n).then(|| towards(*p)),
+        Step::Sync(p, n) => (t < *n && sim.sector_entering()).then(|| towards(*p)),
         Step::Cross(d, p, r) => {
             if t == 0 {
                 run.pushes = cross_plan(sim, *d, *p, *r);
@@ -1268,7 +1576,14 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 0
             })
         }
-        Step::Replay(..) => None,
+        Step::Replay(..) | Step::Trace(..) => None,
+        Step::Track(track) => {
+            if t == 0 && sim.is_held() {
+                run.start = run.start.saturating_add(1);
+                return Some(0);
+            }
+            trace(track, run, sim, t)
+        }
         Step::Inputs(_, inputs) => {
             // a transformer holding the ball as the step begins holds its recorded run too: it starts as the ball
             // is let go, in step with the player's whatever way the ball came in (later holds are the player's own)
@@ -1293,9 +1608,125 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     }
 }
 
+/// A trace's input this tick: the recorded push where the ball is along the run, plus the pull back onto it, as the
+/// arrows nearest (the part they miss carried to the next tick); lost, toward the run's way ahead.
+fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
+    let n = track.pos.len();
+    let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+    let ball = &sim.ball;
+    if n == 0 || run.k >= n || t > n as u64 + TRACE_GIVE_UP * 2 {
+        return None;
+    }
+    let lost = run.lost_since.is_some();
+    let k = match_tick(track, run.k, ball.position, lost);
+    // the body that touches the ball next (knocks it on, carries it) comes later than in the run: wait at this tick
+    let lag = if lost { 0 } else { meet_late(track, k, sim) };
+    let late = lag > MEET_LATE;
+    run.k = if late { k } else { k + 1 };
+    let (at, v_at) = reference(track, k, sim)?;
+    let off = at.distance(ball.position);
+    if std::env::var_os("TRACE_LOG").is_some() && t.is_multiple_of(30) {
+        let (p, v) = (ball.position, ball.velocity);
+        let w = v_at;
+        eprintln!(
+            "    trace t {t} k {k}{}{} off {off:.2} ball ({:.1} {:.1} {:.1}) run ({:.1} {:.1} {:.1}) v ({:.1} {:.1}) run v ({:.1} {:.1})",
+            if track.on.get(k).is_some_and(Option::is_some) { " on" } else { "" },
+            if late { " waits".to_string() } else if lag != 0 { format!(" lag {lag}") } else { String::new() },
+            p.x, p.y, p.z, at.x, at.y, at.z, v.x, v.z, w.x, w.z
+        );
+    }
+    let (fwd, right) = (sim.camera.push_forward(), sim.camera.push_right());
+    let lift = if track.lift.get(k).copied().unwrap_or(false) {
+        input::LIFT
+    } else {
+        0
+    };
+    if off > TRACE_LOST || (lost && off > TRACE_FOUND) {
+        if run.lost_since.is_none() {
+            eprintln!("  trace lost at tick {} (run tick {k}, {off:.1} off)", sim.tick);
+        }
+        let since = *run.lost_since.get_or_insert(sim.tick);
+        if sim.tick > since + TRACE_GIVE_UP {
+            return None;
+        }
+        run.residual = Vec3::ZERO;
+        let q = *track.pos.get((k + TRACE_AHEAD).min(n - 1))?;
+        let want = flat(q - ball.position).clamp_length_max(6.0) / 6.0 - 0.15 * flat(ball.velocity);
+        return Some(nearest_arrows(want, fwd, right).0 | lift);
+    }
+    if run.lost_since.take().is_some() {
+        eprintln!("  trace on its run again at tick {} (run tick {k})", sim.tick);
+    }
+    let ff = if late {
+        Vec3::ZERO
+    } else {
+        track.push.get(k).copied().unwrap_or(Vec3::ZERO)
+    };
+    let pull = (TRACE_KP * flat(at - ball.position) + TRACE_KD * flat(v_at - ball.velocity))
+        .clamp_length_max(1.5)
+        * track.gain;
+    let (bits, left) = nearest_arrows(ff + pull + run.residual, fwd, right);
+    run.residual = left.clamp_length_max(1.0);
+    Some(bits | lift)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn a_trace_step_parses_with_its_gain() {
+        let h = parse("at 0 0 0 r 5 : trace run.replay 10 90 ; trace run.replay 0 5 0.5").unwrap();
+        assert_eq!(h[0].steps[0], Step::Trace(PathBuf::from("run.replay"), 10, 90, 1.0));
+        assert_eq!(h[0].steps[1], Step::Trace(PathBuf::from("run.replay"), 0, 5, 0.5));
+        assert!(parse("at 0 0 0 r 5 : trace run.replay 9 9").is_err());
+        assert!(parse("at 0 0 0 r 5 : trace run.replay 0 9 5").is_err());
+        assert!(parse("at 0 0 0 r 5 : trace ../run.replay 0 9").is_err());
+        let line = "at 0 0 0 r 5 : trace run.replay 1 2";
+        assert!(parse(&vec![line; 17].join("\n")).is_err(), "traces count as replays");
+    }
+
+    #[test]
+    fn a_trace_picks_the_arrows_nearest_its_push() {
+        let (f, r) = (Vec3::Z, Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(nearest_arrows(Vec3::Z, f, r).0, input::UP);
+        assert_eq!(nearest_arrows(Vec3::new(0.9, 0.0, 0.9), f, r).0, input::UP | input::RIGHT);
+        assert_eq!(nearest_arrows(Vec3::new(-1.0, 0.0, -0.1), f, r).0, input::LEFT);
+        assert_eq!(nearest_arrows(Vec3::new(0.1, 0.0, 0.0), f, r).0, 0);
+        // a view turned: forward is world -X
+        let (f, r) = (Vec3::NEG_X, Vec3::new(0.0, 0.0, 1.0));
+        assert_eq!(nearest_arrows(Vec3::NEG_X, f, r).0, input::UP);
+        assert_eq!(nearest_arrows(Vec3::Z, f, r).0, input::RIGHT);
+        // a half push left over: carried, so two ticks give one arrow press
+        let (bits, left) = nearest_arrows(Vec3::new(0.0, 0.0, 0.4), Vec3::Z, Vec3::X);
+        assert_eq!(bits, 0);
+        assert_eq!(nearest_arrows(Vec3::new(0.0, 0.0, 0.4) + left, Vec3::Z, Vec3::X).0, input::UP);
+    }
+
+    #[test]
+    fn a_trace_matches_by_progress_but_keeps_a_wait() {
+        let mut track = Track::default();
+        // ten ticks still at the origin, then one unit a tick along x
+        for i in 0..40 {
+            track.pos.push(Vec3::new((i.max(10) - 10) as f32, 0.0, 0.0));
+        }
+        // still in the wait: the tick due, not the wait's end
+        assert_eq!(match_tick(&track, 0, Vec3::ZERO, false), 0);
+        assert_eq!(match_tick(&track, 5, Vec3::ZERO, false), 5);
+        // the ball ahead of the run: matched ahead
+        assert_eq!(match_tick(&track, 13, Vec3::new(8.0, 0.0, 0.0), false), 18);
+        // never further back than the last matched
+        assert_eq!(match_tick(&track, 31, Vec3::ZERO, false), 30);
+        // lost: found again further
+        assert_eq!(match_tick(&track, 0, Vec3::new(25.0, 0.0, 0.0), true), 35);
+    }
+
+    #[test]
+    fn a_sync_step_parses_with_its_default_ticks() {
+        let h = parse("at 0 0 0 r 5 : sync 1 2 3 ; sync 1 2 3 40").unwrap();
+        assert_eq!(h[0].steps[0], Step::Sync(Vec3::new(1.0, 2.0, 3.0), GOTO_TICKS));
+        assert_eq!(h[0].steps[1], Step::Sync(Vec3::new(1.0, 2.0, 3.0), 40));
+    }
+
     #[test]
     fn replay_names_are_plain_and_their_steps_few() {
         for good in ["run.replay", "Level_02-owner.replay", "a.b.replay"] {
@@ -1353,16 +1784,15 @@ mod tests {
         assert_eq!(h[1].steps[2], Step::Become(BallKind::Paper));
         assert_eq!(h[1].line, 3);
         let moving = parse("at 0 0 0 r 1 : lead 1 2 3 -4 300 ; shove 1 2 3 7 8 9 500").unwrap();
-        assert_eq!(
-            moving[0].steps[0],
-            Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300)
-        );
-        assert_eq!(
-            moving[0].steps[1],
-            Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500)
-        );
+        assert_eq!(moving[0].steps[0], Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300));
+        assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500, SHOVE_BEHIND, None));
+        let crate_ = parse("at 0 0 0 r 1 : shove 1 2 3 7 8 9 500 5.5 2").unwrap();
+        assert_eq!(crate_[0].steps[0], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500, 5.5, Some(2.0)));
+        assert!(parse("at 0 0 0 r 1 : shove 1 2 3 7 8 9 500 99").is_err());
         let swing =
             parse("at 0 0 0 r 1 : await 1 2 3 4 5 6 0.5 200 ; ride 1 2 3 4 5 6 0.5 90 ; press 1 2 3 0 1 6 200").unwrap();
+        let swing_end = parse("at 0 0 0 r 1 : swing 1 2 3 4 5 6 1.5 300").unwrap();
+        assert_eq!(swing_end[0].steps[0], Step::Swing(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 1.5, 300));
         assert_eq!(
             swing[0].steps[0],
             Step::Await(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 200)

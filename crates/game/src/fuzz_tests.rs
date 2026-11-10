@@ -189,7 +189,7 @@ fn fuzz_hints() {
     let mut t = Target::new("hints", test_name!("fuzz_hints"), Kind::Text);
     t.dict = &[
         "at", "r", "sector", "kind", "wood", "stone", "paper", ":", ";", "goto", "via", "push",
-        "air", "wait", "turn", "become", "replay", "#",
+        "air", "wait", "turn", "swing", "become", "replay", "#",
     ];
     fuzzkit::fuzz(t, hint_seeds, run_hints);
 }
