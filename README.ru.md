@@ -28,6 +28,12 @@ cargo build --release
 target/release/drahtseilakt --data /путь/к/Ballance --level 1
 ```
 
+На Windows релизная сборка не открывает окно консоли: запущенная из Проводника, игра пишет свои сообщения в
+`drahtseilakt.log` в своей папке данных (`%APPDATA%\drahtseilakt\`; лог прошлого запуска — `drahtseilakt.old.log`), так же и из консоли без
+перенаправления; с перенаправленным выводом (`2> log.txt`) —
+туда. Workflow *Drahtseilakt* в Actions (запускается по требованию) собирает и тестирует её на Windows, Linux и macOS
+и выкладывает каждую сборку в виде установленной: программа рядом с `assets/`.
+
 `drahtseilakt --import DIR` копирует оригинальную игру из установленной Ballance в DIR (или с образа вашего CD:
 `--import Ballance.cue`, `.bin` или `.iso`; запущенная без игры, она предлагает то же в окне: найденное на
 компьютере, перетащенную папку или образ, вписанный путь) в `levels/original/`

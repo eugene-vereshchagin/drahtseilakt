@@ -701,7 +701,13 @@ mod tests {
     #[test]
     fn settings_paths_never_depend_on_where_the_game_started() {
         assert!(resolve("relative/maps").starts_with(data_dir()));
-        assert!(resolve("/abs/maps") == Path::new("/abs/maps"));
+        // absolute as each system writes it ("/abs" has no drive on Windows: not absolute there)
+        let abs = if cfg!(windows) {
+            "C:\\abs\\maps"
+        } else {
+            "/abs/maps"
+        };
+        assert!(resolve(abs) == Path::new(abs));
         if let Some(h) = std::env::var_os("HOME") {
             assert_eq!(resolve("~/maps"), PathBuf::from(h).join("maps"));
         }

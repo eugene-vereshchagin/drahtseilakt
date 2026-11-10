@@ -1,0 +1,167 @@
+# Drahtseilakt: builds and tests the Rust game (crates/, binary `drahtseilakt`) on Windows, Linux and macOS and
+# uploads each as a download laid out as installed: the program, assets/ (fonts, own, sounds), LICENSE, READMEs.
+# With `toolbox` checked it also builds the separate drahtseilakt-toolbox (a private repository: it needs the secret
+# TOOLBOX_TOKEN, a fine-grained token with read-only Contents on eugene-vereshchagin/drahtseilakt-toolbox).
+#
+# On demand only (Actions -> Drahtseilakt -> Run workflow), never on push (CLAUDE.md, "CI runs on demand").
+# Actions are pinned by full commit SHA; the Rust toolchain by its exact version; crates by Cargo.lock (fetched
+# once with --locked, then built --offline, as the game builds on the owner's machine). The tests that need the
+# game's data skip without it (OPENBALLANCE_DATA is not set here).
+
+name: Drahtseilakt
+
+on:
+  workflow_dispatch:
+    inputs:
+      toolbox:
+        description: 'Also build drahtseilakt-toolbox (needs the TOOLBOX_TOKEN secret)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: drahtseilakt-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: '1.99.1'
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  game:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x86_64
+            exe: drahtseilakt.exe
+          - os: ubuntu-latest
+            name: linux-x86_64
+            exe: drahtseilakt
+          - os: macos-latest
+            name: macos-arm64
+            exe: drahtseilakt
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # the files exactly as committed (Windows runners convert line ends by default; tests compare texts)
+      - name: no line-end conversion
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: toolchain
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup override set "$RUST_TOOLCHAIN"
+          rustc --version && cargo --version
+      - name: system libraries (Linux; gamepads need udev, sound ALSA)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libasound2-dev
+      - name: fetch crates (pinned by Cargo.lock)
+        run: cargo fetch --locked
+      - name: build
+        run: cargo build --release --locked --offline -p drahtseilakt
+      - name: package (laid out as installed)
+        run: |
+          d=dist/drahtseilakt
+          mkdir -p "$d"
+          cp "target/release/${{ matrix.exe }}" "$d/"
+          cp -r assets "$d/"
+          rm -f "$d/assets/sounds/system/prepare.py"
+          rm -rf "$d/assets/own/make"
+          cp LICENSE README*.md "$d/"
+          if [ "$RUNNER_OS" != Windows ]; then
+            # a tarball keeps the program executable (an artifact's zip does not)
+            tar -czf "dist/drahtseilakt-${{ matrix.name }}.tar.gz" -C dist drahtseilakt
+            rm -rf "$d"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drahtseilakt-${{ matrix.name }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+      # after the upload: a failing test still leaves the build to try
+      - name: test
+        run: cargo test --release --locked --offline --workspace
+
+  toolbox:
+    if: inputs.toolbox
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x86_64
+            exe: drahtseilakt-toolbox.exe
+          - os: ubuntu-latest
+            name: linux-x86_64
+            exe: drahtseilakt-toolbox
+          - os: macos-latest
+            name: macos-arm64
+            exe: drahtseilakt-toolbox
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # the files exactly as committed (Windows runners convert line ends by default; tests compare texts)
+      - name: no line-end conversion
+        run: git config --global core.autocrlf false
+      # the toolbox takes the game's crates by path ../ballance/drahtseilakt: both checked out in that layout
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ballance/drahtseilakt
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: eugene-vereshchagin/drahtseilakt-toolbox
+          token: ${{ secrets.TOOLBOX_TOKEN }}
+          path: drahtseilakt-toolbox
+          persist-credentials: false
+      - name: toolchain
+        working-directory: drahtseilakt-toolbox
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup override set "$RUST_TOOLCHAIN"
+          rustc --version && cargo --version
+      - name: system libraries (Linux; window, gamepads)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libudev-dev libasound2-dev libxkbcommon-dev libwayland-dev
+      - name: fetch crates (pinned by Cargo.lock)
+        working-directory: drahtseilakt-toolbox
+        run: cargo fetch --locked
+      - name: build
+        working-directory: drahtseilakt-toolbox
+        run: cargo build --release --locked --offline
+      - name: package
+        working-directory: drahtseilakt-toolbox
+        run: |
+          d=dist/drahtseilakt-toolbox
+          mkdir -p "$d"
+          cp "target/release/${{ matrix.exe }}" "$d/"
+          cp LICENSE README*.md third-party.txt "$d/"
+          if [ "$RUNNER_OS" != Windows ]; then
+            tar -czf "dist/drahtseilakt-toolbox-${{ matrix.name }}.tar.gz" -C dist drahtseilakt-toolbox
+            rm -rf "$d"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drahtseilakt-toolbox-${{ matrix.name }}
+          path: drahtseilakt-toolbox/dist/
+          if-no-files-found: error
+          retention-days: 14
+      - name: test
+        working-directory: drahtseilakt-toolbox
+        run: cargo test --release --locked --offline

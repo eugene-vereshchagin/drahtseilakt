@@ -30,6 +30,12 @@ cargo build --release
 target/release/drahtseilakt --data /pfad/zu/Ballance --level 1
 ```
 
+Unter Windows öffnet der Release-Build kein Konsolenfenster: aus dem Explorer gestartet schreibt das Spiel seine
+Meldungen nach `drahtseilakt.log` in seinem Datenordner (`%APPDATA%\drahtseilakt\`; der des vorigen Starts ist `drahtseilakt.old.log`), ebenso aus einer Konsole
+ohne Umleitung; mit umgeleiteter Ausgabe
+(`2> log.txt`) dorthin. Der Actions-Workflow *Drahtseilakt* (auf Abruf) baut und testet es unter Windows, Linux und
+macOS und lädt jeden Build so hoch, wie er installiert aussieht: das Programm neben `assets/`.
+
 `drahtseilakt --import DIR` kopiert das Originalspiel aus Ihrem installierten Ballance in DIR (oder vom Abbild Ihrer
 Spiel-CD: `--import Ballance.cue`, `.bin` oder `.iso`; ohne das Spiel gestartet bietet das Fenster dasselbe an:
 was es auf dem Rechner findet, einen daraufgezogenen Ordner oder ein Abbild, einen eingetippten Pfad) nach `levels/original/`
