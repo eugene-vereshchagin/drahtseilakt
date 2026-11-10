@@ -1167,8 +1167,20 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
     // extended mode may choose another
     let explicit = gamedata::resources::from_settings();
     let default = gamedata::resources::default_for(data.copy_has("3D Entities/Menu.nmo"));
-    let chosen = explicit.unwrap_or(default);
+    gamedata::resources::set_copy(data.has_copy());
+    let chosen = match explicit {
+        Some(p) if !gamedata::resources::usable(p) => {
+            eprintln!(
+                "interface {}: not available here (it needs the player's copy or its remaster), using {}",
+                p.key(),
+                default.key()
+            );
+            default
+        }
+        other => other.unwrap_or(default),
+    };
     gamedata::resources::set_chosen(chosen);
+    gamedata::packs::set_copy(data.has_copy());
     let extended = load_features(o.debug).mode;
     gamedata::resources::set_in_use(if extended { chosen } else { default });
     // the levels' texture and model packs (packs.rs): the extended mode's choice, the command line's for one run; ours

@@ -27,6 +27,8 @@ Mit den Paketen geändert (2026-11-03): `original` zeichnet in einem remasterten
 ihren transparenten Farben); das Aussehen, das ein remastertes Level vorher mit `original` hatte, seine eigenen
 hochskalierten Bilder, ist nun die Wahl `remastered`.
 
+**Ohne Kopie oder Remaster (2026-11-10).** Das Menü bietet nur Pakete an, die funktionieren: `original` (Texturen und Modelle) braucht die Kopie des Spielers, `remastered`-Texturen brauchen ein Remaster in `levels/remastered`; die Oberflächen-Zeile ebenso. Eine gespeicherte, nicht verfügbare Wahl spielt als `own` (die Oberfläche: der Standard), das Spiel protokolliert es; die Einstellung selbst bleibt und gilt wieder, wenn Kopie oder Remaster zurück sind. Eine Textur, die niemand hat, wird einmal protokolliert (`missing texture: NAME (drawn plain)`); die Glühen, Schatten, Lichtkegel, die Wolkenschicht und einige schlichte Flächen der Original-Levels sind als eigene Texturen gemacht (`make_textures.py extras`), und in Karten kopierte Namen wie `Laterne_Verlauf.tga.003` finden das Bild des Namens vor dem ersten Punkt.
+
 ## Wo Pakete liegen
 
 Im Datenordner, neben `sounds/`: `textures/<paket>/` und `models/<paket>/` (`~/.local/share/drahtseilakt/` unter Linux,

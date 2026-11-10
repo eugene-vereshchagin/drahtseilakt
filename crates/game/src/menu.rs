@@ -3588,11 +3588,13 @@ fn switches(features: Features) -> impl Iterator<Item = Line> {
 fn next_provider(by: i32) -> gamedata::resources::Provider {
     use gamedata::resources::{Provider, chosen};
     let all = Provider::ALL;
-    let at = all.iter().position(|&p| p == chosen()).unwrap_or(1) as i32;
-    let n = all.len() as i32;
-    all.get((at + by).rem_euclid(n) as usize)
+    // only the ones usable here: without the copy (or its remaster) they are not offered
+    let ok: Vec<Provider> = all.into_iter().filter(|&p| gamedata::resources::usable(p)).collect();
+    let at = ok.iter().position(|&p| p == chosen()).unwrap_or(0) as i32;
+    let n = ok.len().max(1) as i32;
+    ok.get((at + by).rem_euclid(n) as usize)
         .copied()
-        .unwrap_or(Provider::Original)
+        .unwrap_or(Provider::Own)
 }
 
 /// The pack of a kind `by` steps after the chosen one (the arrows go round the packs found).
