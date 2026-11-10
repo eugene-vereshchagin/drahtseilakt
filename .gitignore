@@ -54,7 +54,6 @@ __pycache__/
 /fuzz/coverage/
 
 # Community maps shipped with the game (CREDITS.md): the authors' files, not the original's data.
-!/assets/levels/**/*.nmo
 
 # Levels and textures stay on disk only until the release (owner, 2026-11-10): git holds the code and the rest.
 # Level folders keep their text sources (level.txt, level.lvl, pilot/*.txt, READMEs) in git.
