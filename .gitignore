@@ -43,10 +43,6 @@ __pycache__/
 .vscode/
 .idea/
 
-# Original levels kept as a private backup (decisions.md, "The private repository is a backup").
-# Never carried into the public repository.
-!/levels/**/*.nmo
-!/levels/**/*.NMO
 
 # Cargo build output
 /target/
@@ -59,3 +55,23 @@ __pycache__/
 
 # Community maps shipped with the game (CREDITS.md): the authors' files, not the original's data.
 !/assets/levels/**/*.nmo
+
+# Levels and textures stay on disk only until the release (owner, 2026-11-10): git holds the code and the rest.
+# Level folders keep their text sources (level.txt, level.lvl, pilot/*.txt, READMEs) in git.
+/levels/**/*.*
+!/levels/**/*.txt
+!/levels/**/*.md
+/assets/levels/**/level.bin
+/assets/levels/**/level.gltf
+/levels-legacy_delme/**/level.bin
+/levels-legacy_delme/**/level.gltf
+/assets/own/3D Entities/MenuLevel/level.bin
+/assets/own/3D Entities/MenuLevel/level.gltf
+/assets/**/*.png
+/assets/**/*.jpg
+/assets/**/*.jpeg
+/assets/**/*.bmp
+/assets/**/*.tga
+/assets/**/*.dds
+/levels-legacy_delme/**/*.png
+/levels-legacy_delme/**/*.jpg
