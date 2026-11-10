@@ -38,6 +38,7 @@
 | `back-to-2004` | （玩笑；撤销我们的画面改进） | 像2004年的电脑：低分辨率（640x480、800x600或1024x768）的硬像素，4:3画面带黑边，纹理无mipmap和各向异性（双线性或最近邻：远处闪烁），帧率上限（关、60、30），可选16位色彩条纹；附赠一副用于流血泪的眼镜 | 否 |
 | `play-time` | WatchYourTime | 每关和总计的游戏时长，显示在屏幕上，并保存在数据文件夹的 `playtime.txt`；选项：是否显示 | 否 |
 | `sector-jump` | SpeedrunShortcuts（设置小节） | 按键（F7 / PageUp、F6 / PageDown）从下一个或上一个小节重新开始关卡 | 是（modded） |
+| `spawn-point` | NewSpawn、SpeedrunShortcuts（设置出生点） | 一个键（F8、H 或 J）在球所在处设出生点，另一个键（G、F4 或 C）把球静止地送回那里，恢复当时的球种；小节及其物体保持原样 | 是（modded） |
 | `free-steering` | FreeViewRotation（含操控） | 类似 `free-view`，但方向键沿转动后的视角推动；视角的转动记录在回放中 | 是（modded） |
 
 ## 上帝模式
@@ -158,6 +159,13 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 - `do sector.set <n>` — 游玩从小节 n（1 为第一个）重新开始，使用该小节的球，如同 `--sector`；回放记录起点。
   下一次普通重开又是关卡的起点。
 
+出生点（仅在 `key` 上；使 mod 成为 modded，并归入游玩一侧，回放会记录它）：
+
+- `do spawn.set` — 在球所在处设出生点（位置、朝向、球种）；
+- `do spawn.go` — 球静止地回到出生点，恢复当时的球种；小节及其物体保持原样（NewSpawn 的简单传送）。球丢失、在变球器中或正在变球时两者都不起作用。
+
+  两者都由游玩本身完成：按键在一个 tick 内按下一个输入位（64 设点，128 传送），回放与方向键一起保存它，因此回放结果相同。没有这样的 mod 时游玩忽略这些位。
+
 视图动作（只能用于 `frame` 或 `key`）：
 
 - `do camera.fov <degrees>` — 视野加宽这么多度（-30 到 60）。
@@ -225,7 +233,6 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
   一个球）——一个独立的构件，切换要记录在回放中。原版 mod 通过第二个起点对象（`PS_FourFlames_01_Dual`）识别双球地图；
   手头的社区地图中尚不知有这样的（文件是压缩的，简单搜索说明不了什么）。留作单独的工作。
 - **独立的粘性球类型**及其变形器（BallSticky 的 `P_Trafo_Sticky`）：目前任何球都可以变粘。
-- **传送到出生点**（NewSpawn）：上帝模式的保存与读取和 `--sector` 已覆盖练习。
 - mod.txt 的 fuzz 目标（解析器严格、有上限并有单元测试；fuzz 随发布工作一起做）。
 
 ## 调查过的 BML mod
@@ -251,13 +258,13 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | Interference | 球周围的半透明诱饵球 | 内置 `interference` |
 | LanternFader | 对灯笼材质做 alpha 测试以防掉帧 | 不需要（我们的渲染器） |
 | MapScripts | 运行地图的回调脚本 | 计划中：地图脚本解释器（scripts.md）；不是模组 |
-| NewSpawn | 设置出生点、传送到那里、录制灵魂球 | 上帝模式（F5/F9）、`--sector`、`--at`；`spirit-trail` |
+| NewSpawn | 设置出生点、传送到那里、录制灵魂球 | 内置 `spawn-point`（modded）；上帝模式（F5/F9）、`--sector`、`--at`；`spirit-trail` |
 | PhysicsEditor | 重力（向量）、物理时间因子、游戏速度 | 内置 `physics-lab`（modded；向下与侧向重力）；游戏速度是上帝模式的 `[` `]` |
 | PositionViewer | 球的坐标 | 内置 `info-overlay` |
 | RealTimeMeter | 跨关卡的真实游戏时间 | 内置 `segment-timer`（真实时间） |
 | ScreenCapturer | 一个键保存截图（PNG/JPEG、剪贴板） | 内置 `screenshot`（PNG；无剪贴板） |
 | Segment | 每个小节相对纪录的时间 | 内置 `segment-timer` |
-| SpeedrunShortcuts | 作弊模式、设置出生点、重开、设置小节 | 内置 `quick-restart`；上帝模式；`sector-jump`（设置小节；modded） |
+| SpeedrunShortcuts | 作弊模式、设置出生点、重开、设置小节 | 内置 `quick-restart`；上帝模式；`spawn-point`（设置出生点；modded）；`sector-jump`（设置小节；modded） |
 | SpiritTrail | 以半透明球显示纪录游玩 | 内置 `spirit-trail` |
 | StickyAccess | 在作弊模式下切换到粘性球 | 内置 `sticky-ball` |
 | SysInfoDisplay | 屏幕上显示系统时间和电量 | 内置 `info-overlay`（时钟，UTC）；无电量 |

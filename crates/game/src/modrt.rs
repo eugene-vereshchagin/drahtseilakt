@@ -164,7 +164,9 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Slower
         | Action::Faster
         | Action::PlayTime
-        | Action::FreeCam => Vec::new(),
+        | Action::FreeCam
+        | Action::SpawnSet
+        | Action::SpawnGo => Vec::new(),
     }
 }
 
@@ -242,6 +244,16 @@ impl SimMods {
             .collect()
     }
 
+    /// One of them has the spawn point's keys: the run heeds their input bits.
+    pub fn spawn(&self) -> bool {
+        self.runs.iter().any(|r| {
+            r.txt
+                .rules
+                .iter()
+                .any(|x| x.actions.iter().any(Action::run_deed))
+        })
+    }
+
     /// Any of them changes the run: it is modded.
     pub fn modded(&self) -> bool {
         self.runs.iter().any(|r| r.txt.modded())
@@ -300,6 +312,9 @@ pub enum Practice {
     FreeCam,
     /// The run begun again at this sector (1 first).
     Sector(u32),
+    /// A spawn point set where the ball is; the ball put back there at rest (the next tick's input bits).
+    SpawnSet,
+    SpawnGo,
 }
 
 impl Default for ViewOut {
@@ -473,6 +488,8 @@ impl ViewMods {
                     | Action::Slower
                     | Action::Faster
                     | Action::FreeCam
+                    | Action::SpawnSet
+                    | Action::SpawnGo
                         if out.practice.len() < 16 =>
                     {
                         out.practice.push(match a {
@@ -480,6 +497,8 @@ impl ViewMods {
                             Action::LoadMoment => Practice::Load,
                             Action::Slower => Practice::Slower,
                             Action::Faster => Practice::Faster,
+                            Action::SpawnSet => Practice::SpawnSet,
+                            Action::SpawnGo => Practice::SpawnGo,
                             _ => Practice::FreeCam,
                         });
                     }
@@ -671,7 +690,7 @@ impl Mods {
             };
             let txt = Arc::new(t.clone());
             let run = ModRun::new(&m.key, txt, self.opts.get(i).cloned().unwrap_or_default());
-            if t.rules.iter().any(|r| r.event.sim()) {
+            if t.run_side() {
                 sim.runs.push(run.clone());
             }
             if t.rules.iter().any(|r| !r.event.sim()) {
@@ -899,7 +918,7 @@ mod tests {
             .collect();
         assert_eq!(
             modded,
-            vec!["free-steering", "physics-lab", "sector-jump", "sticky-ball"],
+            vec!["free-steering", "physics-lab", "sector-jump", "spawn-point", "sticky-ball"],
             "only the rule variants change the run"
         );
         // each does its part: switched on, fired, its output set

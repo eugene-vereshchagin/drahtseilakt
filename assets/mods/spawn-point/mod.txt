@@ -1,0 +1,43 @@
+# Spawn point (after NewSpawn): a key sets a spawn point where the ball is, another puts the ball back there at rest,
+# as the ball it was. The run does it itself at a tick, from an input bit the replay keeps: the run is marked modded
+# and its replay names this mod, so it plays back the same.
+name.en Spawn point
+name.ru Точка возрождения
+name.de Startpunkt
+name.zh 自设出生点
+name.fr Point de départ
+name.es Punto de aparición
+name.it Punto di partenza
+description.en A key sets a spawn point where the ball is, another puts the ball back there. Such runs are modded.
+description.ru Клавиша ставит точку там, где шар, другая возвращает шар туда. Такие прохождения помечаются как с модами.
+description.de Eine Taste setzt einen Startpunkt beim Ball, eine andere bringt ihn dorthin zurück. Solche Läufe sind modifiziert.
+description.zh 一键在球所在处设出生点，另一键把球送回那里。此类通关记为改动。
+description.fr Une touche fixe un point de départ sous la balle, une autre l'y ramène. Ces parties sont modifiées.
+description.es Una tecla fija un punto donde está la bola y otra la devuelve allí. Esas partidas se marcan como modificadas.
+description.it Un tasto fissa un punto dove sta la palla, un altro la riporta lì. Tali partite sono modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option set key F8,KeyH,KeyJ
+option go key KeyG,F4,KeyC
+label set en Set spawn key
+label set ru Поставить точку
+label set de Taste: Punkt setzen
+label set zh 设出生点键
+label set fr Touche : fixer le point
+label set es Tecla: fijar punto
+label set it Tasto: fissa punto
+label go en Teleport key
+label go ru Вернуться к точке
+label go de Taste: zurück zum Punkt
+label go zh 传送键
+label go fr Touche : y retourner
+label go es Tecla: volver al punto
+label go it Tasto: torna al punto
+
+on key set
+do spawn.set
+
+on key go
+do spawn.go

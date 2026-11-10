@@ -26,6 +26,10 @@ pub mod input {
     pub const SHIFT: u8 = 16;
     /// Lift the camera for an overview.
     pub const LIFT: u8 = 32;
+    /// A spawn point set where the ball is, and the ball put back there at rest: pressed for one tick by a mod's key
+    /// (`spawn.set`, `spawn.go`), and only heeded while such a mod is on the run's side (its replay names it).
+    pub const SPAWN_SET: u8 = 64;
+    pub const SPAWN_GO: u8 = 128;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -785,6 +789,8 @@ pub struct Sim {
     object_sectors: Vec<Option<usize>>,
     pub events: Vec<(u64, Event)>,
     prev_input: u8,
+    /// The spawn point a mod's key set (`input::SPAWN_SET`): where the ball was, how it was turned, its kind.
+    spawn_point: Option<(Vec3, Quat, BallKind)>,
     /// The view's turn in whole degrees, handed in by the window each tick (a `view.turn` mod; recorded in the replay).
     pub turn: u16,
     /// The ball inside a transformer, if it is in one.
@@ -1320,6 +1326,7 @@ impl Sim {
             object_sectors,
             events: Vec::new(),
             prev_input: 0,
+            spawn_point: None,
             turn: 0,
             hold: None,
             trafo_anim: None,
@@ -1658,6 +1665,9 @@ impl Sim {
         self.run_scripts();
         let pressed = input & !self.prev_input;
         self.prev_input = input;
+        if pressed & (input::SPAWN_SET | input::SPAWN_GO) != 0 && self.mods.spawn() {
+            self.spawn_deeds(pressed);
+        }
 
         // Camera turns: Shift + Left / Right, a quarter per press.
         if input & input::SHIFT != 0 {
@@ -2447,6 +2457,29 @@ impl Sim {
         }
     }
 
+    /// The spawn point's keys (NewSpawn): set it where the ball is; put the ball back there, at rest, as it was turned,
+    /// as the ball it was, the camera's look-at point with it (the sector and its objects stay as they are, as NewSpawn's
+    /// plain teleport). Not while the ball is lost, held by a transformer or being changed.
+    fn spawn_deeds(&mut self, pressed: u8) {
+        if self.dying.is_some() || self.hold.is_some() || self.trafo_anim.is_some() {
+            return;
+        }
+        if pressed & input::SPAWN_SET != 0 {
+            self.spawn_point = Some((self.ball.position, self.ball.rotation, self.ball.kind));
+        }
+        if let (true, Some((p, r, kind))) = (pressed & input::SPAWN_GO != 0, self.spawn_point) {
+            self.ball.kind = kind;
+            self.ball.position = p;
+            self.ball.rotation = r;
+            self.ball.velocity = Vec3::ZERO;
+            self.ball.spin = Vec3::ZERO;
+            self.make_ball();
+            self.camera.position = camera_goal(&self.camera, p);
+            self.camera.target = p;
+            self.camera.step = Vec3::ZERO;
+        }
+    }
+
     /// A new ball at the current reset point, at rest, and the camera in its start view.
     fn respawn(&mut self) {
         self.place_ball();
@@ -3039,6 +3072,41 @@ pub(crate) mod tests {
             slow > classic + 3.0,
             "a slower physics falls less in as many ticks: {slow} against {classic}"
         );
+    }
+
+    #[test]
+    fn the_spawn_points_keys_put_the_ball_back_at_rest_only_with_its_mod() {
+        let spawn = "name.en S\noption a key F8\noption b key KeyG\non key a\ndo spawn.set\non key b\ndo spawn.go\n";
+        let run = |mods: crate::modrt::SimMods| {
+            let mut sim = Sim::new(&flat_level(), BallKind::Wood);
+            sim.mods = mods;
+            for _ in 0..30 {
+                sim.step(0);
+            }
+            sim.step(input::SPAWN_SET);
+            let at = sim.ball.position;
+            for _ in 0..90 {
+                sim.step(input::UP);
+            }
+            let rolled = sim.ball.position;
+            sim.step(input::SPAWN_GO);
+            (at, rolled, sim)
+        };
+        let (at, rolled, sim) = run(mods_of(spawn));
+        assert!(at.distance(rolled) > 2.0, "the ball rolled away: {at} to {rolled}");
+        assert!(
+            sim.ball.position.distance(at) < 0.1 && sim.ball.velocity.length() < 0.5,
+            "back at {at} at rest: {} moving {}",
+            sim.ball.position,
+            sim.ball.velocity
+        );
+        let (_, rolled, plain) = run(crate::modrt::SimMods::default());
+        assert!(
+            plain.ball.position.distance(rolled) < 1.0,
+            "without the mod the bits do nothing"
+        );
+        let mods = mods_of(spawn);
+        assert_eq!(mods.replay_lines().len(), 1, "the replay names the mod");
     }
 
     #[test]

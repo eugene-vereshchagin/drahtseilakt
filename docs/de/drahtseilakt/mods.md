@@ -44,6 +44,7 @@ Start des Levels.
 | `back-to-2004` | (ein Scherz; macht unsere Bildverbesserungen rückgängig) | das Spiel wie auf einem PC von 2004: niedrige Auflösung (640x480, 800x600 oder 1024x768) in harten Pixeln in einem 4:3-Bild mit schwarzen Balken, Texturen ohne Mipmaps und Anisotropie (bilinear oder nächster Nachbar: das Flimmern in der Ferne), Bildratenbegrenzung (aus, 60, 30), wahlweise 16-Bit-Farbbänder; Brille für Blutstränen inklusive | nein |
 | `play-time` | WatchYourTime | die Spielzeit je Level und gesamt, auf dem Bildschirm und in der `playtime.txt` des Datenordners; Option: anzeigen | nein |
 | `sector-jump` | SpeedrunShortcuts (Sektor setzen) | Tasten (F7 / PageUp, F6 / PageDown) starten das Level im nächsten oder vorigen Sektor neu | ja (gemoddet) |
+| `spawn-point` | NewSpawn, SpeedrunShortcuts (Startpunkt setzen) | eine Taste (F8, H oder J) setzt einen Startpunkt, wo die Kugel ist, eine andere (G, F4 oder C) bringt die Kugel ruhend dorthin zurück, als die Kugel, die sie war; der Sektor und seine Objekte bleiben, wie sie sind | ja (gemoddet) |
 | `free-steering` | FreeViewRotation (auch die Steuerung) | wie `free-view`, aber die Pfeile schieben entlang der gedrehten Sicht; die Drehung der Sicht steht im Replay | ja (gemoddet) |
 
 ## Gottmodus
@@ -187,6 +188,16 @@ Ein Sprung (nur bei `key`; macht den Mod gemoddet, ohne die Momente des Übens):
 - `do sector.set <n>` — der Lauf beginnt erneut in Sektor n (1 ist der erste), mit der Kugel dieses Sektors, wie `--sector`;
   das Replay nennt den Start. Der nächste gewöhnliche Neustart ist wieder der Levelstart.
 
+Der Startpunkt (nur auf `key`; der Mod wird gemoddet und gehört zur Seite des Laufs, sein Replay nennt ihn):
+
+- `do spawn.set` — ein Startpunkt, wo die Kugel ist (ihr Ort, ihre Drehung, ihre Art);
+- `do spawn.go` — die Kugel ruhend zum Startpunkt zurück, als die Kugel, die sie war; der Sektor und seine Objekte
+  bleiben, wie sie sind (der schlichte Teleport von NewSpawn). Beides nicht, während die Kugel verloren, in einem
+  Transformator oder im Wechsel ist.
+
+  Beides tut der Lauf selbst: die Taste drückt für einen Tick ein Eingabebit (64 setzen, 128 zurück), das das Replay mit
+  den Pfeilen behält, so spielt das Replay gleich ab. Ohne einen solchen Mod beachtet der Lauf die Bits nicht.
+
 Ansichtsaktionen (nur auf `frame` oder `key`):
 
 - `do camera.fov <degrees>` — die Ansicht um so viele Grad verbreitert (-30 bis 60).
@@ -265,7 +276,6 @@ Ein Mod kommt von einem Fremden, also liest das Spiel ihn als feindselig und leh
   komprimiert, eine einfache Suche beweist nichts). Eine eigene Aufgabe.
 - **Eine eigene klebrige Kugelart** mit ihrem Transformer (`P_Trafo_Sticky` aus BallSticky): heute lässt sich jede Kugel
   klebrig machen.
-- **Teleport zu einem Startpunkt** (NewSpawn): das Üben decken Speichern und Laden von god-mode und `--sector` ab.
 - Ein Fuzz-Ziel für mod.txt (der Parser ist streng, begrenzt und per Unit-Test abgedeckt; Fuzzing kommt mit der
   Release-Arbeit).
 
@@ -292,13 +302,13 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 | Interference | durchscheinende Täuschkugeln um die Kugel | Werks-Mod `interference` |
 | LanternFader | Alpha-Test auf dem Material der Laternen gegen Bildeinbrüche | nicht nötig (unser Renderer) |
 | MapScripts | führt die Callback-Skripte von Karten aus | geplant: der Interpreter für Kartenskripte (scripts.md); kein Mod |
-| NewSpawn | einen Startpunkt setzen, dorthin springen, eine Geisterkugel aufzeichnen | god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
+| NewSpawn | einen Startpunkt setzen, dorthin springen, eine Geisterkugel aufzeichnen | Werks-Mod `spawn-point` (gemoddet); god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
 | PhysicsEditor | Schwerkraft (ein Vektor), Zeitfaktor der Physik, Spieltempo | Werks-Mod `physics-lab` (gemoddet; Schwerkraft nach unten und seitlich); das Spieltempo ist `[` `]` von god-mode |
 | PositionViewer | die Koordinaten der Kugel | Werks-Mod `info-overlay` |
 | RealTimeMeter | echte Spielzeit, über Level hinweg | Werks-Mod `segment-timer` (Echtzeit) |
 | ScreenCapturer | eine Taste speichert ein Bildschirmfoto (PNG/JPEG, Zwischenablage) | Werks-Mod `screenshot` (PNG; keine Zwischenablage) |
 | Segment | die Zeit jedes Sektors gegen den Rekord | Werks-Mod `segment-timer` |
-| SpeedrunShortcuts | Cheat-Modus, Startpunkt setzen, Neustart, Sektor setzen | Werks-Mod `quick-restart`; god-mode; `sector-jump` (Sektor setzen; gemoddet) |
+| SpeedrunShortcuts | Cheat-Modus, Startpunkt setzen, Neustart, Sektor setzen | Werks-Mod `quick-restart`; god-mode; `spawn-point` (Startpunkt; gemoddet); `sector-jump` (Sektor setzen; gemoddet) |
 | SpiritTrail | der Rekordlauf als durchscheinende Kugel | Werks-Mod `spirit-trail` |
 | StickyAccess | im Cheat-Modus zur klebenden Kugel wechseln | Werks-Mod `sticky-ball` |
 | SysInfoDisplay | Systemzeit und Akku auf dem Bildschirm | Werks-Mod `info-overlay` (Uhr, UTC); kein Akku |

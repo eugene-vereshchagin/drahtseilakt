@@ -42,6 +42,7 @@ the level.
 | `back-to-2004` | (a joke; undoes our rendering fixes) | the game as on a PC of 2004: a low resolution (640x480, 800x600 or 1024x768) scaled up with hard pixels in a 4:3 frame with black bars, textures without mipmaps or anisotropy (bilinear or nearest: the distant shimmer), a frame cap (off, 60, 30), optional 16-bit colour banding; glasses for tears of blood included | no |
 | `play-time` | WatchYourTime | the time played, per level and in all, on screen and kept in the data folder's `playtime.txt`; option: show it | no |
 | `sector-jump` | SpeedrunShortcuts (set sector) | keys (F7 / PageUp, F6 / PageDown) start the level again at the next or the previous sector | yes (modded) |
+| `spawn-point` | NewSpawn, SpeedrunShortcuts (set spawn) | a key (F8, H or J) sets a spawn point where the ball is, another (G, F4 or C) puts the ball back there at rest, as the ball it was; the sector and its objects stay as they are | yes (modded) |
 | `free-steering` | FreeViewRotation (the steering too) | like `free-view`, but the arrows push along the turned view; the view's turn is recorded in the replay | yes (modded) |
 
 ## God mode
@@ -178,6 +179,15 @@ A jump (only on `key`; it makes the mod modded, without the practice's moments):
 - `do sector.set <n>` — the run begins again at sector n (1 is the first), with that sector's ball, as `--sector` does;
   the replay names the start. The next ordinary restart is the level's start again.
 
+The spawn point (only on `key`; it makes the mod modded, and puts it on the run's side so its replay names it):
+
+- `do spawn.set` — a spawn point where the ball is (its place, its turn, its kind);
+- `do spawn.go` — the ball put back at the spawn point, at rest, as the ball it was; the sector and its objects stay as
+  they are (NewSpawn's plain teleport). Neither while the ball is lost, in a transformer or being changed.
+
+  The run does both itself: the key presses an input bit for one tick (64 set, 128 go), which the replay keeps with
+  the arrows, so the replay plays back the same. Without such a mod the run ignores the bits.
+
 View actions (only on `frame` or `key`):
 
 - `do camera.fov <degrees>` — the view widened by so many degrees (-30 to 60).
@@ -263,7 +273,6 @@ A mod comes from a stranger, so the game reads it as hostile and fails closed:
   a plain search proves nothing). Left for its own change.
 - **A sticky ball kind** of its own with its transformer (BallSticky's `P_Trafo_Sticky`): today any ball can be made
   sticky.
-- **Teleport to a spawn point** (NewSpawn): god-mode's save and load and `--sector` cover the practice.
 - A fuzz target for mod.txt (the parser is strict, capped and unit-tested; fuzzing comes with the release work).
 
 ## The BML mods surveyed
@@ -289,13 +298,13 @@ What each does, whether we have it, and how it maps to our engine:
 | Interference | translucent decoy balls around the ball | factory `interference` |
 | LanternFader | alpha test on the lanterns' material against frame drops | not needed (our renderer) |
 | MapScripts | runs maps' callback scripts | planned: the map-script interpreter (scripts.md); not a mod |
-| NewSpawn | set a spawn point, teleport to it, record a spirit ball | god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
+| NewSpawn | set a spawn point, teleport to it, record a spirit ball | factory `spawn-point` (modded); god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
 | PhysicsEditor | gravity (a vector), physics time factor, game speed | factory `physics-lab` (modded; gravity down and sideways); the game speed is god-mode's `[` `]` |
 | PositionViewer | the ball's coordinates | factory `info-overlay` |
 | RealTimeMeter | real time of play, across levels | factory `segment-timer` (real time) |
 | ScreenCapturer | a key saves a screenshot (PNG/JPEG, clipboard) | factory `screenshot` (PNG; no clipboard) |
 | Segment | each sector's time against the record | factory `segment-timer` |
-| SpeedrunShortcuts | cheat mode, set spawn, restart, set sector | factory `quick-restart`; god-mode; `sector-jump` (set sector; modded) |
+| SpeedrunShortcuts | cheat mode, set spawn, restart, set sector | factory `quick-restart`; god-mode; `spawn-point` (set spawn; modded); `sector-jump` (set sector; modded) |
 | SpiritTrail | the record run as a translucent ball | factory `spirit-trail` |
 | StickyAccess | switch to the sticky ball under cheat mode | factory `sticky-ball` |
 | SysInfoDisplay | system time and battery on screen | factory `info-overlay` (clock, UTC); no battery |
