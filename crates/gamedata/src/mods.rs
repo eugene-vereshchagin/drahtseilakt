@@ -432,6 +432,9 @@ pub enum Action {
     Stick(Expr),
     /// Gravity's pull, 0 to 60 (the original's 20).
     Gravity(Expr),
+    /// Gravity's sideways components along the world's x and z, -60 to 60 each (the original's 0, 0): with
+    /// `world.gravity` a vector, as PhysicsEditor sets it.
+    GravitySide(Expr, Expr),
     /// The physics' time factor, 0.5 to 4 (the original's 2).
     TimeFactor(Expr),
     /// The steering turned about the vertical by so many degrees (the arrows push along the turned view).
@@ -499,7 +502,12 @@ impl Action {
     pub fn sim(&self) -> bool {
         matches!(
             self,
-            Action::Stick(_) | Action::Gravity(_) | Action::TimeFactor(_) | Action::EndlessLives(_) | Action::SteerYaw(_)
+            Action::Stick(_)
+                | Action::Gravity(_)
+                | Action::GravitySide(..)
+                | Action::TimeFactor(_)
+                | Action::EndlessLives(_)
+                | Action::SteerYaw(_)
         )
     }
 
@@ -545,7 +553,7 @@ impl Action {
             | Action::EndlessLives(e)
             | Action::Rewind(e) => vec![e],
             Action::Show(_, _, _, v) => v.iter().collect(),
-            Action::RenderScale(a, b) | Action::RenderAspect(a, b) => vec![a, b],
+            Action::RenderScale(a, b) | Action::RenderAspect(a, b) | Action::GravitySide(a, b) => vec![a, b],
             Action::RenderFilter(_) => Vec::new(),
             Action::Splits(_)
             | Action::Keys(_)
@@ -1221,6 +1229,13 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "ball.stick" => Action::Stick(e(args)?),
         "world.gravity" => Action::Gravity(e(args)?),
         "world.time" => Action::TimeFactor(e(args)?),
+        "world.gravity_xz" => {
+            let p = split_args_ws(args);
+            let [x, z] = p.as_slice() else {
+                return Err("expected: world.gravity_xz <x> <z>".into());
+            };
+            Action::GravitySide(e(x)?, e(z)?)
+        }
         "camera.fov" => Action::CameraFov(e(args)?),
         "camera.distance" => Action::CameraDistance(e(args)?),
         "camera.yaw" => Action::CameraYaw(e(args)?),

@@ -29,7 +29,7 @@ Start des Levels.
 | Mod | Nach dem BML-Mod | Was er tut | Ändert den Lauf |
 |---|---|---|---|
 | `sticky-ball` | BallSticky, StickyAccess | was die Kugel berührt, hält sie fest; drückt sie gegen eine Wand, klettert sie hinauf; Optionen: Haftstärke, nur die Holzkugel | ja (gemoddet) |
-| `physics-lab` | PhysicsEditor | Schwerkraft (0–60, im Original 20) und der Zeitfaktor der Physik (0,5–4, im Original 2) | ja (gemoddet) |
+| `physics-lab` | PhysicsEditor | Schwerkraft als Vektor: nach unten (0–60, im Original 20) und seitlich entlang x und z der Welt (je −20–20, im Original 0) — und der Zeitfaktor der Physik (0,5–4, im Original 2) | ja (gemoddet) |
 | `dynamic-fov` | DynamicFov | die Ansicht wird mit der Geschwindigkeit der Kugel breiter; Option: Stärke | nein |
 | `free-view` | FreeViewRotation, AdvancedTravelCam | die Maus dreht die Ansicht um die Kugel, eine Taste dreht sie zurück; Abstand der Kamera | nein |
 | `segment-timer` | Segment, RealTimeMeter, WatchYourTime | die Zeit des Laufs, die Echtzeit, die Zwischenzeit jedes Sektors gegen den besten Lauf (grün voraus, rot zurück) | nein |
@@ -168,6 +168,8 @@ Laufaktionen (nur auf einem Ereignis des Laufs; sie machen den Mod *gemoddet*):
 - `do ball.stick <0..1>` — die Kugel haftet mit dieser Stärke an dem, was sie berührt, gegen die Schwerkraft, und ein
   Druck gegen eine Wand lenkt sie an ihr hinauf.
 - `do world.gravity <0..60>` — die Zugkraft der Schwerkraft (im Original 20).
+- `do world.gravity_xz <x> <z>` — der seitliche Zug der Schwerkraft entlang x und z der Welt, je −60 bis 60 (im Original
+  0, 0; zwei Ausdrücke ohne Leerzeichen). Mit `world.gravity` wird die Schwerkraft ein Vektor, wie PhysicsEditor sie setzt.
 - `do world.time <0.5..4>` — der Zeitfaktor der Physik (im Original 2).
 - `do lives.endless <0|1>` — die letzte Kugel geht nie verloren (god-mode).
 - `do steer.yaw <Grad>` — der Schub der Pfeile um die Senkrechte um so viele Grad gedreht (die Kamera dreht sich um
@@ -291,7 +293,7 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 | LanternFader | Alpha-Test auf dem Material der Laternen gegen Bildeinbrüche | nicht nötig (unser Renderer) |
 | MapScripts | führt die Callback-Skripte von Karten aus | geplant: der Interpreter für Kartenskripte (scripts.md); kein Mod |
 | NewSpawn | einen Startpunkt setzen, dorthin springen, eine Geisterkugel aufzeichnen | god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
-| PhysicsEditor | Schwerkraft, Zeitfaktor der Physik, Spieltempo | Werks-Mod `physics-lab` (gemoddet); das Spieltempo ist `[` `]` von god-mode |
+| PhysicsEditor | Schwerkraft (ein Vektor), Zeitfaktor der Physik, Spieltempo | Werks-Mod `physics-lab` (gemoddet; Schwerkraft nach unten und seitlich); das Spieltempo ist `[` `]` von god-mode |
 | PositionViewer | die Koordinaten der Kugel | Werks-Mod `info-overlay` |
 | RealTimeMeter | echte Spielzeit, über Level hinweg | Werks-Mod `segment-timer` (Echtzeit) |
 | ScreenCapturer | eine Taste speichert ein Bildschirmfoto (PNG/JPEG, Zwischenablage) | Werks-Mod `screenshot` (PNG; keine Zwischenablage) |

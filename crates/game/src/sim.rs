@@ -1502,7 +1502,7 @@ impl Sim {
         self.touching = self.touch();
         self.fire_mods(gamedata::mods::Event::Tick, input);
         let out = self.mods.out;
-        self.world.set_rules(out.gravity, out.time_factor);
+        self.world.set_rules(out.gravity, out.gravity_xz, out.time_factor);
         self.step_run(input);
         let events: Vec<Event> = self.events.iter().skip(before).map(|e| e.1).collect();
         for e in events {
@@ -3039,6 +3039,28 @@ pub(crate) mod tests {
             slow > classic + 3.0,
             "a slower physics falls less in as many ticks: {slow} against {classic}"
         );
+    }
+
+    #[test]
+    fn a_mods_sideways_gravity_pulls_the_ball_along_the_worlds_x_and_z() {
+        let mut level = flat_level();
+        level.objects[2].matrix[3][1] = 30.0;
+        let fall = |text: &str| {
+            let mut sim = Sim::new(&level, BallKind::Wood);
+            let start = sim.ball.position;
+            sim.mods = mods_of(text);
+            for _ in 0..30 {
+                sim.step(0);
+            }
+            sim.ball.position - start
+        };
+        let straight = fall("name.en Down\non start\ndo world.gravity 20\n");
+        assert!(straight.x.abs() < 0.01 && straight.z.abs() < 0.01, "0, 0 falls straight: {straight}");
+        let text = "name.en Side\non start\ndo world.gravity_xz 10 -10\n";
+        let side = fall(text);
+        assert!(side.x > 1.0 && side.z < -1.0, "pulled along +x and -z: {side}");
+        assert!((side.y - straight.y).abs() < 0.01, "the pull down is as it was");
+        assert_eq!(fall(text), side, "the same mod plays the same run");
     }
 
     #[test]

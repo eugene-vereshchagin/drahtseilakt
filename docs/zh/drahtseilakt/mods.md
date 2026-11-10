@@ -23,7 +23,7 @@
 | 模组 | 仿照的 BML mod | 作用 | 改变游玩 |
 |---|---|---|---|
 | `sticky-ball` | BallSticky、StickyAccess | 球碰到的东西会粘住它；推向墙壁时会爬上去；选项：粘性、仅限木球 | 是（modded） |
-| `physics-lab` | PhysicsEditor | 重力（0–60，原版 20）和物理的时间因子（0.5–4，原版 2） | 是（modded） |
+| `physics-lab` | PhysicsEditor | 重力向量：向下（0–60，原版 20）以及沿世界 x、z 轴的侧向分量（各 −20–20，原版 0）——以及物理的时间因子（0.5–4，原版 2） | 是（modded） |
 | `dynamic-fov` | DynamicFov | 视野随球的速度变宽；选项：强度 | 否 |
 | `free-view` | FreeViewRotation、AdvancedTravelCam | 鼠标让视角绕球转动，一个键把它转回；相机距离 | 否 |
 | `segment-timer` | Segment、RealTimeMeter、WatchYourTime | 游玩时间、真实时间、每个小节相对最佳成绩的分段（领先为绿，落后为红） | 否 |
@@ -140,6 +140,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 - `do ball.stick <0..1>` — 球以此强度粘住它碰到的东西，抵抗重力，推向墙壁时会沿墙向上转。
 - `do world.gravity <0..60>` — 重力的拉力（原版为 20）。
+- `do world.gravity_xz <x> <z>` — 沿世界 x、z 轴的侧向重力，各 −60 到 60（原版为 0、0；两个不含空格的表达式）。与 `world.gravity` 一起，重力成为向量，如 PhysicsEditor 所设。
 - `do world.time <0.5..4>` — 物理的时间因子（原版为 2）。
 - `do lives.endless <0|1>` — 最后一个球永远不会丢失（god-mode）。
 - `do steer.yaw <度>` — 方向键的推力绕竖直轴转过这么多度（相机以同样的旋转转动，所以方向键沿转动后的视角推动）。
@@ -251,7 +252,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | LanternFader | 对灯笼材质做 alpha 测试以防掉帧 | 不需要（我们的渲染器） |
 | MapScripts | 运行地图的回调脚本 | 计划中：地图脚本解释器（scripts.md）；不是模组 |
 | NewSpawn | 设置出生点、传送到那里、录制灵魂球 | 上帝模式（F5/F9）、`--sector`、`--at`；`spirit-trail` |
-| PhysicsEditor | 重力、物理时间因子、游戏速度 | 内置 `physics-lab`（modded）；游戏速度是上帝模式的 `[` `]` |
+| PhysicsEditor | 重力（向量）、物理时间因子、游戏速度 | 内置 `physics-lab`（modded；向下与侧向重力）；游戏速度是上帝模式的 `[` `]` |
 | PositionViewer | 球的坐标 | 内置 `info-overlay` |
 | RealTimeMeter | 跨关卡的真实游戏时间 | 内置 `segment-timer`（真实时间） |
 | ScreenCapturer | 一个键保存截图（PNG/JPEG、剪贴板） | 内置 `screenshot`（PNG；无剪贴板） |

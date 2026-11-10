@@ -153,7 +153,7 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Rewind(e)
         | Action::Set(_, e) => vec![e],
         Action::Show(_, _, _, v) => v.iter().collect(),
-        Action::RenderScale(a, b) | Action::RenderAspect(a, b) => vec![a, b],
+        Action::RenderScale(a, b) | Action::RenderAspect(a, b) | Action::GravitySide(a, b) => vec![a, b],
         Action::RenderFilter(_) => Vec::new(),
         Action::Splits(_)
         | Action::Keys(_)
@@ -176,6 +176,8 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
 pub struct SimOut {
     pub stick: f32,
     pub gravity: f32,
+    /// Gravity's sideways components along the world's x and z (`world.gravity_xz`; the original's 0, 0).
+    pub gravity_xz: [f32; 2],
     pub time_factor: f32,
     /// The last ball is never lost (god-mode's `lives.endless`).
     pub endless: bool,
@@ -188,6 +190,7 @@ impl Default for SimOut {
         SimOut {
             stick: 0.0,
             gravity: crate::physics::GRAVITY,
+            gravity_xz: [0.0, 0.0],
             time_factor: crate::physics::TIME_FACTOR as f32,
             endless: false,
             steer_yaw: 0.0,
@@ -216,6 +219,10 @@ impl SimMods {
                 match a {
                     Action::Stick(_) => out.stick = x.clamp(0.0, 1.0),
                     Action::Gravity(_) => out.gravity = x.clamp(0.0, 60.0),
+                    Action::GravitySide(..) => {
+                        let side = |i: usize| v.get(i).copied().filter(|x| x.is_finite()).unwrap_or(0.0).clamp(-60.0, 60.0);
+                        out.gravity_xz = [side(0), side(1)];
+                    }
                     Action::TimeFactor(_) => out.time_factor = x.clamp(0.5, 4.0),
                     Action::EndlessLives(_) => out.endless = x != 0.0,
                     Action::SteerYaw(_) => out.steer_yaw = x.rem_euclid(360.0),

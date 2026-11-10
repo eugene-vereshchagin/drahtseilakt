@@ -27,7 +27,7 @@ the level.
 | Mod | After the BML mod | What it does | Changes the run |
 |---|---|---|---|
 | `sticky-ball` | BallSticky, StickyAccess | what the ball touches holds it; pushing into a wall climbs it; options: stickiness, wooden ball only | yes (modded) |
-| `physics-lab` | PhysicsEditor | gravity (0–60, original 20) and the physics' time factor (0.5–4, original 2) | yes (modded) |
+| `physics-lab` | PhysicsEditor | gravity as a vector: down (0–60, original 20) and sideways along the world's x and z (−20–20 each, original 0) — and the physics' time factor (0.5–4, original 2) | yes (modded) |
 | `dynamic-fov` | DynamicFov | the view widens with the ball's speed; option: strength | no |
 | `free-view` | FreeViewRotation, AdvancedTravelCam | the mouse turns the view about the ball, a key turns it back; camera distance | no |
 | `segment-timer` | Segment, RealTimeMeter, WatchYourTime | the run's time, the real time, each sector's split against the best run (green ahead, red behind) | no |
@@ -159,6 +159,8 @@ Run actions (only on a run's event; they make the mod *modded*):
 - `do ball.stick <0..1>` — the ball holds to what it touches with this strength, against gravity, and a push into a
   wall turns up along it.
 - `do world.gravity <0..60>` — gravity's pull (the original's 20).
+- `do world.gravity_xz <x> <z>` — gravity's sideways pull along the world's x and z, −60 to 60 each (the original's 0, 0;
+  two expressions without spaces). With `world.gravity` it makes gravity a vector, as PhysicsEditor sets it.
 - `do world.time <0.5..4>` — the physics' time factor (the original's 2).
 - `do lives.endless <0|1>` — the last ball is never lost (god-mode).
 - `do steer.yaw <degrees>` — the arrows' push turned about the vertical by so many degrees (the camera turns by the same
@@ -288,7 +290,7 @@ What each does, whether we have it, and how it maps to our engine:
 | LanternFader | alpha test on the lanterns' material against frame drops | not needed (our renderer) |
 | MapScripts | runs maps' callback scripts | planned: the map-script interpreter (scripts.md); not a mod |
 | NewSpawn | set a spawn point, teleport to it, record a spirit ball | god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
-| PhysicsEditor | gravity, physics time factor, game speed | factory `physics-lab` (modded); the game speed is god-mode's `[` `]` |
+| PhysicsEditor | gravity (a vector), physics time factor, game speed | factory `physics-lab` (modded; gravity down and sideways); the game speed is god-mode's `[` `]` |
 | PositionViewer | the ball's coordinates | factory `info-overlay` |
 | RealTimeMeter | real time of play, across levels | factory `segment-timer` (real time) |
 | ScreenCapturer | a key saves a screenshot (PNG/JPEG, clipboard) | factory `screenshot` (PNG; no clipboard) |
