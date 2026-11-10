@@ -1,0 +1,12 @@
+# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+title = The Long Night of Ages v1.1
+title.zh = 岁月长夜V1.1
+author = 四叶草 (dyethx)
+posted = 2026-07-19
+difficulty = 6
+order = 7
+catalogue-difficulty = 3
+type = Comprehensive
+source = https://forum.ballance.top/d/113
+video = https://www.youtube.com/watch?v=UAvmmVzN4Dc

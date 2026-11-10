@@ -1,0 +1,10 @@
+# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+title = Eastern Nights
+title.zh = 东方夜谭
+author = perfectthought
+posted = 2019-02-08
+difficulty = 10
+order = 13
+catalogue-difficulty = 5
+video = https://www.youtube.com/watch?v=nM1oyg-Rhxg

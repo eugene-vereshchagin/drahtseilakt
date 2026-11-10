@@ -1,0 +1,11 @@
+# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+title = Dreaming Back to 2025
+title.zh = 梦回2025
+author = 其乐融融
+posted = 2025-02-28
+difficulty = 6
+order = 8
+catalogue-difficulty = 3
+type = Comprehensive
+video = https://www.youtube.com/watch?v=MBJzOvgkLVk

@@ -1,0 +1,11 @@
+# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+title = Beginners Happiness 5
+title.zh = 萌新快乐图5
+author = dahkjdas
+posted = 2025-01-14
+difficulty = 4
+order = 3
+catalogue-difficulty = 2
+type = Comprehensive
+video = https://www.youtube.com/watch?v=jQi5n__Yg9M

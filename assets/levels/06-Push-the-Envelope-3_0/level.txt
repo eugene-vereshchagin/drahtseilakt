@@ -1,0 +1,9 @@
+# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+title = Push the Envelope 3.0
+title.zh = 挑战极限3.0
+author = lydjjlyd
+difficulty = 6
+order = 6
+catalogue-difficulty = 3
+type = Technical

@@ -15,16 +15,16 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/levels")
     }
 
-    /// Our levels: the shipped folders made from a level description.
+    /// Our levels: the folders made from a level description, shipped or set aside in `levels-legacy_delme/` while
+    /// the owner's picks of community maps stand in their place (CREDITS.md).
     fn levels() -> Vec<PathBuf> {
-        let mut v: Vec<PathBuf> = std::fs::read_dir(shipped())
-            .map(|r| {
-                r.flatten()
-                    .map(|e| e.path())
-                    .filter(|p| p.join("level.lvl").is_file())
-                    .collect()
-            })
-            .unwrap_or_default();
+        let legacy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels-legacy_delme");
+        let mut v: Vec<PathBuf> = [shipped(), legacy]
+            .iter()
+            .flat_map(|d| std::fs::read_dir(d).into_iter().flatten().flatten())
+            .map(|e| e.path())
+            .filter(|p| p.join("level.lvl").is_file())
+            .collect();
         v.sort();
         v
     }
@@ -182,7 +182,7 @@ mod tests {
         }
         assert!(
             count >= 10,
-            "at least ten of our own levels ship with the game: {count}"
+            "at least ten of our own levels are kept: {count}"
         );
     }
 }

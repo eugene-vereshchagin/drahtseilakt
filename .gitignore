@@ -56,3 +56,6 @@ __pycache__/
 /fuzz/corpus/
 /fuzz/target/
 /fuzz/coverage/
+
+# Community maps shipped with the game (CREDITS.md): the authors' files, not the original's data.
+!/assets/levels/**/*.nmo

@@ -1,0 +1,11 @@
+# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+title = Map 260801
+title.zh = 260801图
+author = 小锂电池
+posted = 2026-08-01
+difficulty = 2
+order = 1
+catalogue-difficulty = 1
+type = Casual
+source = https://forum.ballance.top/d/117

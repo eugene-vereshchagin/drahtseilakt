@@ -1,0 +1,12 @@
+# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+title = Singular Forest
+title.zh = 单轨森林
+author = ZYL
+posted = 2023-02-16
+difficulty = 8
+order = 12
+catalogue-difficulty = 4
+type = Technical
+source = https://tieba.baidu.com/p/8267347663
+video = https://www.youtube.com/watch?v=BEN-3nJShIU

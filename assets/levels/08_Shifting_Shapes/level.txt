@@ -1,9 +1,0 @@
-title = Shifting Shapes
-author = Drahtseilakt
-version = 1
-licence = GPL-3.0-only
-title.ru = Смена обличий
-title.de = Wechselnde Gestalten
-title.zh = 形态变换
-order = 8
-difficulty = 8
