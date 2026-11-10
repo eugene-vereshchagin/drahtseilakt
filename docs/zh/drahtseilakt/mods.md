@@ -229,10 +229,18 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 ## 尚未实现（排队中）
 
-- **同伴 / 双球**（DualBallControl）：按键切换到的第二个球需要游玩中有第二个玩家刚体（物理、操控、相机、检查点和死亡都只认
-  一个球）——一个独立的构件，切换要记录在回放中。原版 mod 通过第二个起点对象（`PS_FourFlames_01_Dual`）识别双球地图；
-  手头的社区地图中尚不知有这样的（文件是压缩的，简单搜索说明不了什么）。留作单独的工作。
-- **独立的粘性球类型**及其变形器（BallSticky 的 `P_Trafo_Sticky`）：目前任何球都可以变粘。
+- **同伴 / 双球**（DualBallControl）。从其字符串可见它的做法：在带第二个起点（`PS_FourFlames_01_Dual`，并有自己的
+  `PC_TwoFlames_0*` / `PR_Resetpoint_0*`）的地图上，它再次加载 `Balls.nmo`，物理化第二个游戏球和第二个 `Cam_MF`，
+  切换键关闭一个球的操控并把另一个设为 BallManager 的球。我们需要（全部在 Sim 中）：第二个球的状态和刚体（如今球是世界的
+  实体 0：`replace_ball(0, ..)`、实体 1 的接触、推力、粘力），未激活的球作为被动动态刚体，小节的检查点、重置点、死亡、
+  变球器和额外生命作用于哪个球，第二套相机或一套跳到另一个球的相机，以及作为回放保存的输入位的切换（同出生点）。
+  手头的社区地图中尚不知有双起点的（文件是压缩的，简单搜索说明不了什么）；没有可玩的地图，此改动等到出现这样的地图再做。
+- **独立的粘性球类型**及其变球器（BallSticky 附带 `Ball_Sticky.nmo`、`PH/P_Ball_Sticky.nmo` 和
+  `PH/P_Trafo_Sticky.nmo`）。行为已经有了（`ball.stick` 配合 `ball.kind`）；工作在于第四种 `BallKind`：它的物理参数
+  （在他们的 `P_Ball_Sticky` 里，不在 DLL 字符串中；需测量或选定），它在 `BallKind::from_name` 中的名字（变球器组
+  `P_Trafo_<种类>` 和小节球随之而来），以及每个按种类分支处的一支：球的网格（scene.rs `Ball_*_Mesh`、app.rs 中的幽灵）、
+  碎片（pieces.rs）、滚动与撞击声（ballsound.rs、audio.rs）、该种类的散球、自动驾驶、提示和部件检查；还有我们自己的
+  美术——一个球、它的碎片和一个变球器模块——因为不附带他们的任何东西。留待带有这些部件的改动。
 - mod.txt 的 fuzz 目标（解析器严格、有上限并有单元测试；fuzz 随发布工作一起做）。
 
 ## 调查过的 BML mod
@@ -249,7 +257,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | Coredump | 把运行中的 Virtools 上下文转储为 .nmo | 不需要（我们的运行时是自己的；`--export` 写出关卡） |
 | CursorClipper | 把光标限制在窗口内 | 不需要：游玩不从光标获取任何东西，`mouse.dx` 读取原始移动 |
 | DeformedWB | 随机使木球的外观变形 | 内置 `deformed-ball` |
-| DualBallControl | 双球地图，用一个键切换球 | 排队中（需要第二个玩家刚体） |
+| DualBallControl | 双球地图，用一个键切换球 | 排队中（需要第二个玩家刚体；具体见上文） |
 | DynamicFov | 视野随球的速度变化 | 内置 `dynamic-fov`；固定视野在 Graphics 中 |
 | EnergyItemCounter | 本小节剩余的额外分和生命 | 内置 `info-overlay` |
 | ExtraSector | 加载超过八个小节的地图 | 引擎：最多 64 个小节，无需加载器 |
@@ -270,7 +278,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | SysInfoDisplay | 屏幕上显示系统时间和电量 | 内置 `info-overlay`（时钟，UTC）；无电量 |
 | TASSupport | 录制和播放输入、跳过渲染、结束时退出 | 引擎：回放是确定性的输入录制（`--record`、`--replay`、`--headless`），以及上帝模式的慢动作 |
 | WatchYourTime | 每关游戏时长 | 内置 `play-time`（`playtime.txt`；另有 `segment-timer`） |
-| BallSticky | 能爬墙的粘性球类型 | 内置 `sticky-ball`（modded） |
+| BallSticky | 能爬墙的粘性球类型 | 内置 `sticky-ball`（modded；任意球或仅木球）；带变球器的独立种类排队中 |
 | BMLModuls | 新模块（木制落板和旋转板） | 关卡部件，不是模组：开放格式的部件（[open-format.md](open-format.md)） |
 
 这些 mod 所绕开的原版限制（帧率上限、4:3、低分辨率、八个小节、位图字体、脆弱的变球时机）不是我们要照搬的。

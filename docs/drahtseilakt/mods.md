@@ -266,13 +266,23 @@ A mod comes from a stranger, so the game reads it as hostile and fails closed:
 
 ## Not yet (queued)
 
-- **Companion / two balls** (DualBallControl): a second ball the keys switch to needs a second player body in the
-  run (the physics, the steering, the camera, the checkpoints and the death all know one ball), a building block of its
-  own, with the switch recorded in the replay. The original's mod finds a dual map by a second start object
-  (`PS_FourFlames_01_Dual`); none of the community maps at hand is known to have one (their files are compressed, so
-  a plain search proves nothing). Left for its own change.
-- **A sticky ball kind** of its own with its transformer (BallSticky's `P_Trafo_Sticky`): today any ball can be made
-  sticky.
+- **Companion / two balls** (DualBallControl). Its strings show what it does: on a map with a second start
+  (`PS_FourFlames_01_Dual`, with its own `PC_TwoFlames_0*` / `PR_Resetpoint_0*`) it loads `Balls.nmo` again,
+  physicalizes a second game ball and a second `Cam_MF`, and the switch key deactivates one ball's navigation and sets
+  the other as the BallManager's ball. Ours needs, all in the Sim: a second ball state and body (the world's entity 0
+  is the ball today: `replace_ball(0, ..)`, the contacts of entity 1, the push, the sticky force), the inactive ball as
+  a passive dynamic body, which ball a sector's checkpoint, reset point, death, transformer and extra life act on, a
+  second camera rig or one rig that springs to the other ball, and the switch as an input bit the replay keeps (as
+  the spawn point's). None of the community maps at hand is known to have a dual start (their files are compressed, so
+  a plain search proves nothing); without one to play, the change is left for when such a map turns up.
+- **A sticky ball kind** of its own with its transformer (BallSticky ships `Ball_Sticky.nmo`, `PH/P_Ball_Sticky.nmo`
+  and `PH/P_Trafo_Sticky.nmo`). The behaviour is there (`ball.stick` with `ball.kind`); a fourth `BallKind` is the
+  work: its physics numbers (in their `P_Ball_Sticky`, not in the DLL's strings; to be measured or chosen), its name
+  in `BallKind::from_name` (the transformer groups `P_Trafo_<kind>` and the sector balls follow it), and an arm in each
+  per-kind match: the ball mesh (scene.rs `Ball_*_Mesh`, the ghost in app.rs), the burst pieces (pieces.rs), the
+  rolling and hit sounds (ballsound.rs, audio.rs), the loose balls of that kind, the autopilot, hints and part checks;
+  and our own drawings — a ball, its pieces and a transformer module — since nothing of theirs is shipped. Left for a
+  change with those parts.
 - A fuzz target for mod.txt (the parser is strict, capped and unit-tested; fuzzing comes with the release work).
 
 ## The BML mods surveyed
@@ -289,7 +299,7 @@ What each does, whether we have it, and how it maps to our engine:
 | Coredump | dumps the running Virtools context into an .nmo | not needed (our runtime is ours; `--export` writes levels) |
 | CursorClipper | keeps the cursor inside the window | not needed: a run takes nothing from the cursor, `mouse.dx` reads raw motion |
 | DeformedWB | deforms the wooden ball's look at random | factory `deformed-ball` |
-| DualBallControl | dual-ball maps, a key switches the ball | queued (needs a second player body) |
+| DualBallControl | dual-ball maps, a key switches the ball | queued (needs a second player body; what exactly, above) |
 | DynamicFov | the field of view follows the ball's speed | factory `dynamic-fov`; the fixed field of view is in Graphics |
 | EnergyItemCounter | extra points and lives left in the sector | factory `info-overlay` |
 | ExtraSector | loads maps with more than eight sectors | the engine: up to 64 sectors, no loader needed |
@@ -310,7 +320,7 @@ What each does, whether we have it, and how it maps to our engine:
 | SysInfoDisplay | system time and battery on screen | factory `info-overlay` (clock, UTC); no battery |
 | TASSupport | record and play input, skip rendering, exit at the end | the engine: replays are deterministic input recordings (`--record`, `--replay`, `--headless`), god-mode's slow motion |
 | WatchYourTime | time played per level | factory `play-time` (`playtime.txt`; also `segment-timer`) |
-| BallSticky | a sticky ball type that climbs walls | factory `sticky-ball` (modded) |
+| BallSticky | a sticky ball type that climbs walls | factory `sticky-ball` (modded; any ball, or the wooden only); a kind of its own with its transformer is queued |
 | BMLModuls | new modules (wooden drop and rotating boards) | level parts, not mods: the open format's parts ([open-format.md](open-format.md)) |
 
 The original's limits these mods work around (frame rate cap, 4:3, low resolutions, eight sectors, a bitmap font,

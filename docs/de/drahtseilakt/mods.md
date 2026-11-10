@@ -269,13 +269,24 @@ Ein Mod kommt von einem Fremden, also liest das Spiel ihn als feindselig und leh
 
 ## Noch nicht (vorgemerkt)
 
-- **Begleiter / zwei Kugeln** (DualBallControl): eine zweite Kugel, auf die die Tasten umschalten, braucht einen zweiten
-  Spielerkörper im Lauf (Physik, Steuerung, Kamera, Checkpoints und Tod kennen eine Kugel) — ein eigener Baustein, mit dem
-  Wechsel im Replay. Der Mod des Originals erkennt eine Zwei-Kugel-Karte an einem zweiten Startobjekt
-  (`PS_FourFlames_01_Dual`); von den vorhandenen Community-Karten ist keine als solche bekannt (ihre Dateien sind
-  komprimiert, eine einfache Suche beweist nichts). Eine eigene Aufgabe.
-- **Eine eigene klebrige Kugelart** mit ihrem Transformer (`P_Trafo_Sticky` aus BallSticky): heute lässt sich jede Kugel
-  klebrig machen.
+- **Begleiter / zwei Kugeln** (DualBallControl). Seine Strings zeigen, was er tut: auf einer Karte mit einem zweiten
+  Start (`PS_FourFlames_01_Dual`, mit eigenen `PC_TwoFlames_0*` / `PR_Resetpoint_0*`) lädt er `Balls.nmo` erneut,
+  physikalisiert eine zweite Spielkugel und ein zweites `Cam_MF`, und die Wechseltaste schaltet die Steuerung der einen
+  Kugel ab und macht die andere zur Kugel des BallManagers. Wir brauchen, alles im Sim: einen zweiten Kugelzustand und
+  -körper (heute ist die Kugel die Entität 0 der Welt: `replace_ball(0, ..)`, die Kontakte der Entität 1, der Schub, die
+  Klebekraft), die inaktive Kugel als passiven dynamischen Körper, auf welche Kugel Checkpoint, Rücksetzpunkt, Tod,
+  Transformer und Extraleben eines Sektors wirken, ein zweites Kamera-Rig oder eines, das zur anderen Kugel springt,
+  und den Wechsel als Eingabebit, das das Replay behält (wie beim Startpunkt). Von den vorhandenen Community-Karten ist
+  keine mit Doppelstart bekannt (ihre Dateien sind komprimiert, eine einfache Suche beweist nichts); ohne eine zum
+  Spielen wartet die Änderung auf eine solche Karte.
+- **Eine eigene klebrige Kugelart** mit ihrem Transformer (BallSticky liefert `Ball_Sticky.nmo`,
+  `PH/P_Ball_Sticky.nmo` und `PH/P_Trafo_Sticky.nmo`). Das Verhalten gibt es (`ball.stick` mit `ball.kind`); die Arbeit
+  ist eine vierte `BallKind`: ihre Physikwerte (in deren `P_Ball_Sticky`, nicht in den Strings der DLL; zu messen oder zu
+  wählen), ihr Name in `BallKind::from_name` (die Transformer-Gruppen `P_Trafo_<Art>` und die Sektorkugeln folgen ihm)
+  und ein Zweig in jeder Fallunterscheidung nach Art: das Kugel-Mesh (scene.rs `Ball_*_Mesh`, der Geist in app.rs), die
+  Splitter (pieces.rs), die Roll- und Aufprallgeräusche (ballsound.rs, audio.rs), lose Kugeln dieser Art, der Autopilot,
+  die Hinweise und Teileprüfungen; und unsere eigenen Zeichnungen — eine Kugel, ihre Splitter und ein Transformer-Modul —,
+  denn nichts von ihnen wird mitgeliefert. Zurückgestellt bis zu einer Änderung mit diesen Teilen.
 - Ein Fuzz-Ziel für mod.txt (der Parser ist streng, begrenzt und per Unit-Test abgedeckt; Fuzzing kommt mit der
   Release-Arbeit).
 
@@ -293,7 +304,7 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 | Coredump | schreibt den laufenden Virtools-Kontext in eine .nmo | nicht nötig (unsere Laufzeit ist unsere; `--export` schreibt Level) |
 | CursorClipper | hält den Zeiger im Fenster | nicht nötig: Ein Lauf nimmt nichts vom Zeiger, `mouse.dx` liest die rohe Bewegung |
 | DeformedWB | verformt das Aussehen der Holzkugel zufällig | Werks-Mod `deformed-ball` |
-| DualBallControl | Karten mit zwei Kugeln, eine Taste wechselt die Kugel | vorgemerkt (braucht einen zweiten Spielerkörper) |
+| DualBallControl | Karten mit zwei Kugeln, eine Taste wechselt die Kugel | vorgemerkt (braucht einen zweiten Spielerkörper; was genau, oben) |
 | DynamicFov | das Sichtfeld folgt der Geschwindigkeit der Kugel | Werks-Mod `dynamic-fov`; das feste Sichtfeld ist in Graphics |
 | EnergyItemCounter | im Sektor verbleibende Extrapunkte und -leben | Werks-Mod `info-overlay` |
 | ExtraSector | lädt Karten mit mehr als acht Sektoren | die Engine: bis zu 64 Sektoren, kein Lader nötig |
@@ -314,7 +325,7 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 | SysInfoDisplay | Systemzeit und Akku auf dem Bildschirm | Werks-Mod `info-overlay` (Uhr, UTC); kein Akku |
 | TASSupport | Eingaben aufnehmen und abspielen, Zeichnen überspringen, am Ende beenden | die Engine: Replays sind deterministische Aufnahmen der Eingaben (`--record`, `--replay`, `--headless`), die Zeitlupe von god-mode |
 | WatchYourTime | Spielzeit je Level | Werks-Mod `play-time` (`playtime.txt`; auch `segment-timer`) |
-| BallSticky | ein klebender Kugeltyp, der Wände hinaufklettert | Werks-Mod `sticky-ball` (gemoddet) |
+| BallSticky | ein klebender Kugeltyp, der Wände hinaufklettert | Werks-Mod `sticky-ball` (gemoddet; jede Kugel oder nur die Holzkugel); eine eigene Art mit Transformer ist vorgemerkt |
 | BMLModuls | neue Module (hölzerner Fall und drehende Bretter) | Levelteile, keine Mods: die Teile des offenen Formats ([open-format.md](open-format.md)) |
 
 Die Grenzen des Originals, die diese Mods umgehen (Bildratengrenze, 4:3, niedrige Auflösungen, acht Sektoren, eine
