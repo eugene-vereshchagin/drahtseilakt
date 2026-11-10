@@ -338,3 +338,17 @@ at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 
 # ahead, the paper ball follows them at 6 u/s and reaches the sacks too late), one ram at speed 7 along z -307.5
 # (crate to (-731.1 -325.8), 6 s late, then a fall at the stone transformer). Next: a faster crate-42 ram inside the
 # owner's timing (or the trace's pull at that push to the owner's line, z -307.96), then the sack steps above.
+# 2026-11-10 (sector 3 SOLVED in the chain; the whole level from the start: hints/Level_13-full.txt, finished 10:43.83,
+# no loss, no rewind; run hints/runs/Level_13.replay). `--level 13 --headless --autopilot --plan hints/Level_13.plan
+# --hints hints/Level_13-full.txt`. Sector 3's line: the owner's trace to his stone transformer (0..2745), then
+# crate 42 rammed along z -308.0 -> -309.3 (press 7, so it goes on south-west into the pocket at (-734 -311)): passed in
+# 6 of 6 starts perturbed by --from 12775..12820 (the old slanted ram from (-716.6 -306.8) wedged it in all 6). The ramp
+# north of the paper transformer ends in a fan's updraft at (-731.5 -214.5 -260.3): `push 0 1 18 ; hold` there 30
+# ticks and the updraft carries the paper ball onto the upper lane (x -724, y -214); a 30-tick push overshoots the
+# column at some speeds (z -258) and the ball rolls back to the lower lane (5 of 5 with the hold, 2-3 of 5 before).
+# Then full-speed descents (`pass ... 30 1500`), the four sacks (per-sack swing, W 61), the stone balls met at the pit
+# as stone, and the paper flight over the chute (stone transformer at the pit, owner's trace 6085..8900, paper
+# transformer, trace 9215..9900).
+# Still fragile (not hit in the run from the start): (1) from the chain's CP2 state with this file the chute is one
+# stone short and the paper ball sinks at (-675.7 -286.5 -1124.8); (2) sector 4's raft crossing at x ~ -185: with a
+# different entry the two rafts are a few units apart and the ball falls between them (see the raft notes above).

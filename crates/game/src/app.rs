@@ -2834,7 +2834,12 @@ impl PilotRun {
         };
         if let Some(at) = failed_at
             && let Some((state, attempt)) =
-                self.rewinds.back(at, (game.sim.sector, pilot.reached()))
+                self.rewinds.back(
+                    at,
+                    (game.sim.sector, pilot.reached()),
+                    game.sim.ball.position,
+                    fell,
+                )
         {
             let (sim, replay, p, b, sn, h, ne) = state;
             let line = format!(
