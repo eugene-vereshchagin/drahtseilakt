@@ -376,7 +376,7 @@ Das Spiel kopiert einmal, was es braucht, aus der eigenen Kopie des Spielers nac
 installierten Spiel (`drahtseilakt --import <Ballance-Ordner>`) oder direkt von der CD des Spiels oder ihrem
 Abbild (`drahtseilakt --import Ballance.cue`, auch `.bin`, `.iso`: das InstallShield-6-Archiv in `SETUP/`, gelesen
 von `crates/cdimage`). Die Kopie ist freiwillig (decisions.md, „Das Spiel läuft ohne
-Weiteres“): ohne sie startet das Spiel mit seinen eigenen Leveln, und **Import** im Hauptmenü öffnet ein Fenster, das
+Weiteres“): ohne sie startet das Spiel mit seinen eigenen Leveln, und die Zeile **Import** in Options öffnet ein Fenster (im Stil der Spielmenüs; Esc oder Cancel führen zurück ins Spiel, der Schließen-Knopf beendet das Programm), das
 dasselbe tut: es zeigt, was es auf dem Rechner findet (installierte Spiele in den üblichen Ordnern von Windows, Wine, GOG, Heroic und Lutris; Discs in
 ihren Laufwerken; CD-Abbilder im Home-, Desktop- und Download-Ordner), nimmt einen daraufgezogenen Ordner, ein
 Abbild oder einen eingetippten Pfad und startet das Spiel mit der Kopie. Die Kopie sind die eigenen Daten des Spielers auf seinem Rechner; nichts wird

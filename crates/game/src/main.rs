@@ -511,8 +511,11 @@ fn main() -> ExitCode {
         // the menu's Import: the window that brings in the player's copy, in a process of its own (winit runs one
         // event loop a process), then the game again, with the copy or without it
         if std::env::var_os(IMPORT).is_some() {
-            if let Err(w) = setup::run(o.size) {
-                eprintln!("drahtseilakt: the window to bring in the game did not open: {w}");
+            match setup::run(o.size) {
+                // the close button ends the program: no game window follows
+                Ok(setup::Outcome::Quit) => return Ok(()),
+                Ok(_) => {}
+                Err(w) => eprintln!("drahtseilakt: the window to bring in the game did not open: {w}"),
             }
             restart();
         }

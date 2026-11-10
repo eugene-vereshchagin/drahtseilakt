@@ -876,16 +876,6 @@ impl Menu {
     /// The lines of `screen`, in the order the arrows go through them.
     fn lines(&self, screen: Screen) -> Vec<Line> {
         match screen {
-            Screen::Main if !self.copy => {
-                vec![
-                    Line::Start,
-                    Line::Import,
-                    Line::Highscore,
-                    Line::Options,
-                    Line::Credits,
-                    Line::Exit,
-                ]
-            }
             Screen::Main => vec![
                 Line::Start,
                 Line::Highscore,
@@ -927,6 +917,8 @@ impl Menu {
                 Some(Line::Sound),
                 Some(Line::Language),
                 self.look_offered.then_some(Line::Look),
+                // bringing in the player's own Ballance: a setting, offered while there is no copy
+                (!self.copy).then_some(Line::Import),
                 Some(Line::Extended),
                 Some(Line::Back),
             ]
@@ -5027,13 +5019,13 @@ mod tests {
             m.lines(Screen::Main),
             [
                 Line::Start,
-                Line::Import,
                 Line::Highscore,
                 Line::Options,
                 Line::Credits,
                 Line::Exit
             ]
         );
+        assert!(m.lines(Screen::Options).contains(&Line::Import));
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
             m.screen(),
@@ -5050,6 +5042,14 @@ mod tests {
         m.back();
         m.back();
         m.step(1);
+        m.step(1);
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Options, "the import is among the options");
+        let at = m.lines(Screen::Options).iter().position(|&l| l == Line::Import);
+        // a page opens on its last line (Back): the arrows wrap to the first
+        for _ in 0..=at.unwrap_or(0) {
+            m.step(1);
+        }
         assert_eq!(m.enter(), Action::Import);
     }
 

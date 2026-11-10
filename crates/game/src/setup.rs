@@ -3,11 +3,16 @@
 // is listed to choose with the arrows; a folder or image dropped on the window, or a path typed, is taken too. When
 // the copy is made the game starts again with it (winit runs one event loop a process). The machine is searched on
 // a thread of its own, so a slow drive never keeps the window from opening; the window is drawn only when something
-// changed, and the copying starts after a frame that says so.
+// changed, and the copying starts after a frame that says so. It looks like the game's menus (the interface's own
+// font, a panel, buttons) and can be left three ways: Esc or the Cancel button go back to the game's menu, the
+// window's close button ends the program, an import starts the game with the copy.
 
 use crate::app::{Gpu, window_gpu};
 use crate::hud::{Rect, text, width};
 use crate::levels::{self, Found};
+use crate::ui::{
+    ALIGN_LEFT, ALIGN_TOP, Anchor, CONTEXT_H, CONTEXT_W, Quad, Screen, Style, TEXT_SCREEN, place,
+};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -18,8 +23,19 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
-/// Opens the import window; true when the original was imported (the caller starts the game again).
-pub fn run(size: (u32, u32)) -> Result<bool, String> {
+/// How the window was left.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Outcome {
+    /// The original was imported: the game starts again with it.
+    Imported,
+    /// Esc or Cancel: back to the game's menu (the game starts again as it was).
+    Back,
+    /// The window's close button: the program ends, no game window follows.
+    Quit,
+}
+
+/// Opens the import window and says how it was left.
+pub fn run(size: (u32, u32)) -> Result<Outcome, String> {
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Wait);
     let (tx, rx) = std::sync::mpsc::channel();
@@ -35,12 +51,16 @@ pub fn run(size: (u32, u32)) -> Result<bool, String> {
         typed: String::new(),
         message: None,
         imported: false,
+        outcome: Outcome::Back,
+        cursor: (0.0, 0.0),
+        hover: None,
         error: None,
     };
     event_loop.run_app(&mut s).map_err(|e| e.to_string())?;
     match s.error {
         Some(e) => Err(e),
-        None => Ok(s.imported),
+        None if s.imported => Ok(Outcome::Imported),
+        None => Ok(s.outcome),
     }
 }
 
@@ -48,6 +68,23 @@ pub fn run(size: (u32, u32)) -> Result<bool, String> {
 const TYPED_MAX: usize = 1024;
 /// Found places shown at once.
 const SHOWN: usize = 8;
+/// A row of the found places, in the 640x480 frame.
+const ROW: f32 = 22.0;
+/// The path field and the two buttons, in the 640x480 frame (left, top, right, bottom).
+const FIELD: [f32; 4] = [40.0, 340.0, 600.0, 366.0];
+const IMPORT_BUTTON: [f32; 4] = [150.0, 396.0, 300.0, 428.0];
+const CANCEL_BUTTON: [f32; 4] = [340.0, 396.0, 490.0, 428.0];
+
+/// The end of `t` when it is longer than `n` characters (a path's end tells the most), marked with a dot.
+fn tail(t: &str, n: usize) -> String {
+    let chars: Vec<char> = t.chars().collect();
+    if chars.len() <= n {
+        return t.to_owned();
+    }
+    std::iter::once('.')
+        .chain(chars[chars.len() - (n - 1)..].iter().copied())
+        .collect()
+}
 
 struct Setup {
     size: (u32, u32),
@@ -62,6 +99,10 @@ struct Setup {
     /// The last import's outcome, shown under the list.
     message: Option<(String, bool)>,
     imported: bool,
+    outcome: Outcome,
+    /// The pointer in window pixels, and the button it is over.
+    cursor: (f32, f32),
+    hover: Option<[f32; 4]>,
     error: Option<String>,
 }
 
@@ -72,11 +113,11 @@ impl Setup {
             return;
         }
         if levels::what(&from).is_none() {
-            let m = format!("NO BALLANCE THERE: {}", from.display());
+            let m = format!("No Ballance there: {}", from.display());
             self.message = Some((m, false));
             return;
         }
-        self.message = Some(("COPYING...".into(), true));
+        self.message = Some(("Copying...".into(), true));
         self.pending = Some(from);
     }
 
@@ -104,7 +145,7 @@ impl Setup {
         }
         let n = self.found.len();
         match code {
-            KeyCode::Escape => event_loop.exit(),
+            KeyCode::Escape => self.finish(Outcome::Back, event_loop),
             KeyCode::ArrowUp if n > 0 => self.chosen = (self.chosen + n - 1) % n,
             KeyCode::ArrowDown if n > 0 => self.chosen = (self.chosen + 1) % n,
             KeyCode::Backspace => drop(self.typed.pop()),
@@ -132,109 +173,293 @@ impl Setup {
         }
     }
 
-    /// The window's lines: what is needed, what was found, the typed path, the last outcome and the keys.
-    fn overlay(&self, w: f32, h: f32) -> Vec<Rect> {
-        let mut out = vec![Rect {
+    /// The window's picture in the game's menu style: a dark panel over a plain backdrop, the interface's own font,
+    /// the found places as rows, a path field and two buttons (Import, Cancel). Rectangles are in pixels of the
+    /// window, text quads too; both are laid out in the interface's 640x480 frame, centred in the window.
+    fn frame(&self, w: f32, h: f32) -> (Vec<Rect>, Vec<Quad>) {
+        let screen = Screen { w, h };
+        let mut rects = vec![Rect {
             x: 0.0,
             y: 0.0,
             w,
             h,
-            color: [0.05, 0.05, 0.07, 1.0],
+            color: [0.06, 0.06, 0.09, 1.0],
         }];
-        let s = (h / 300.0).floor().max(1.0);
-        let line = 11.0 * s;
-        let x = 6.0 * s;
-        let mut y = 4.0 * line / 2.0;
-        // a line that does not fit loses the start of its last part (a path's end tells the most); the part before
-        // a tab stays whole
-        let say = |out: &mut Vec<Rect>, t: &str, scale: f32, color: [f32; 4], y: &mut f32| {
-            let room = ((w - 2.0 * x) / (6.0 * scale)).max(16.0) as usize;
-            let (head, tail) = t.split_once('\t').unwrap_or(("", t));
-            let room = room.saturating_sub(head.chars().count()).max(8);
-            let chars: Vec<char> = tail.chars().collect();
-            let tail: String = if chars.len() > room {
-                std::iter::once('.')
-                    .chain(chars.iter().skip(chars.len() - room + 1).copied())
-                    .collect()
-            } else {
-                tail.to_owned()
-            };
-            text(out, &format!("{head}{tail}"), x, *y, scale, color);
-            *y += line * scale / s;
-        };
-        say(&mut out, "DRAHTSEILAKT", s * 2.0, GOLD, &mut y);
-        y += line;
-        for l in [
-            "THE GAME PLAYS YOUR OWN COPY OF BALLANCE. BRING IT IN ONCE:",
-            "DROP ITS FOLDER OR CD IMAGE (.CUE, .ISO) ON THIS WINDOW,",
-            "CHOOSE ONE FOUND ON THIS COMPUTER, OR TYPE ITS PATH.",
-        ] {
-            say(&mut out, l, s, WHITE, &mut y);
-        }
-        y += line;
-        if self.searching.is_some() {
-            say(&mut out, "LOOKING ON THIS COMPUTER...", s, GREY, &mut y);
-        } else if self.found.is_empty() {
-            say(&mut out, "NOTHING FOUND ON THIS COMPUTER.", s, GREY, &mut y);
-        }
-        let first = self
-            .chosen
-            .saturating_sub(SHOWN / 2)
-            .min(self.found.len().saturating_sub(SHOWN));
-        for (i, (p, kind)) in self.found.iter().enumerate().skip(first).take(SHOWN) {
-            let what = match kind {
-                Found::Installed => "GAME ",
-                Found::Disc => "CD   ",
-                Found::Image => "IMAGE",
-            };
-            let mark = if i == self.chosen && self.typed.is_empty() {
-                ">"
-            } else {
-                " "
-            };
-            let color = if i == self.chosen && self.typed.is_empty() {
-                GOLD
-            } else {
-                WHITE
-            };
-            say(
-                &mut out,
-                &format!("{mark} {what} \t{}", p.display()),
-                s,
+        let mut quads = Vec::new();
+        let own = crate::fallback::available();
+        // a rectangle of the frame (context pixels)
+        let fill = |r: [f32; 4], color: [f32; 4], rects: &mut Vec<Rect>| {
+            let [x0, y0, x1, y1] = screen.rect(r, Anchor::Center);
+            rects.push(Rect {
+                x: x0,
+                y: y0,
+                w: x1 - x0,
+                h: y1 - y0,
                 color,
-                &mut y,
+            });
+        };
+        let mut say = |t: &str,
+                       r: [f32; 4],
+                       line: f32,
+                       color: [f32; 4],
+                       centre: bool,
+                       rects: &mut Vec<Rect>| {
+            if own {
+                let st = Style {
+                    scale: [line / CONTEXT_H * 16.0 * 0.9, line / CONTEXT_H * 16.0],
+                    spacing: [1.0, 1.0],
+                    align: if centre { 0 } else { ALIGN_LEFT } | ALIGN_TOP,
+                    flags: TEXT_SCREEN,
+                    margins: [0.0; 4],
+                    color,
+                    v2: true,
+                    shadow: Some(([1.0, 1.0], [0.0, 0.0, 0.0, 0.8])),
+                };
+                quads.extend(place(
+                    crate::fallback::styled(t, r, &st),
+                    screen,
+                    Anchor::Center,
+                ));
+            } else {
+                // no shipped fonts: the built-in pixel font, upper case
+                let k = screen.rect(r, Anchor::Center);
+                let sc = ((k[3] - k[1]).min(line * 2.0) / 9.0).floor().max(1.0);
+                let t = t.to_uppercase();
+                let x = if centre {
+                    (k[0] + k[2] - width(&t, sc)) / 2.0
+                } else {
+                    k[0]
+                };
+                text(rects, &t, x, k[1], sc, color);
+            }
+        };
+        // the panel with the interface's rim
+        fill(
+            [24.0, 20.0, 616.0, 460.0],
+            [0.55, 0.57, 0.62, 1.0],
+            &mut rects,
+        );
+        fill(
+            [27.0, 23.0, 613.0, 457.0],
+            [0.07, 0.07, 0.1, 1.0],
+            &mut rects,
+        );
+        say(
+            "Bring in your Ballance",
+            [40.0, 32.0, 600.0, 62.0],
+            28.0,
+            GOLD,
+            true,
+            &mut rects,
+        );
+        for (i, l) in [
+            "The game plays your own copy of Ballance. Bring it in once:",
+            "drop its folder or CD image (.cue, .iso) on this window,",
+            "choose one found on this computer, or type its path.",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let y = 72.0 + i as f32 * 17.0;
+            say(
+                l,
+                [44.0, y, 596.0, y + 17.0],
+                15.0,
+                WHITE,
+                false,
+                &mut rects,
             );
         }
-        y += line;
-        say(
-            &mut out,
-            &format!("PATH: \t{}_", self.typed),
-            s,
-            if self.typed.is_empty() { GREY } else { GOLD },
-            &mut y,
-        );
-        y += line;
-        if let Some((m, ok)) = &self.message {
-            for part in m.split(": ") {
-                say(
-                    &mut out,
-                    &part.to_uppercase(),
-                    s,
-                    if *ok { WHITE } else { RED },
-                    &mut y,
+        let status = if self.searching.is_some() {
+            Some("Looking on this computer...")
+        } else if self.found.is_empty() {
+            Some("Nothing found on this computer.")
+        } else {
+            None
+        };
+        if let Some(t) = status {
+            say(
+                t,
+                [44.0, 134.0, 596.0, 152.0],
+                15.0,
+                GREY,
+                false,
+                &mut rects,
+            );
+        }
+        let first = self.first();
+        for (row, (i, (p, kind))) in self
+            .found
+            .iter()
+            .enumerate()
+            .skip(first)
+            .take(SHOWN)
+            .enumerate()
+            .map(|(r, x)| (r, x))
+        {
+            let y = 134.0 + row as f32 * ROW;
+            let on = i == self.chosen && self.typed.is_empty();
+            if on {
+                fill(
+                    [40.0, y, 600.0, y + ROW - 2.0],
+                    [0.45, 0.3, 0.18, 0.75],
+                    &mut rects,
                 );
             }
+            let what = match kind {
+                Found::Installed => "Game",
+                Found::Disc => "CD",
+                Found::Image => "Image",
+            };
+            say(
+                what,
+                [48.0, y + 1.0, 110.0, y + ROW],
+                14.0,
+                if on { GOLD } else { GREY },
+                false,
+                &mut rects,
+            );
+            say(
+                &tail(&p.display().to_string(), 62),
+                [112.0, y + 1.0, 596.0, y + ROW],
+                14.0,
+                if on { GOLD } else { WHITE },
+                false,
+                &mut rects,
+            );
         }
-        let keys = "UP/DOWN CHOOSE   ENTER COPY   ESC QUIT";
-        text(
-            &mut out,
-            keys,
-            (w - width(keys, s)) / 2.0,
-            h - 2.0 * line,
-            s,
-            GREY,
+        // the path field
+        fill(FIELD, [0.55, 0.57, 0.62, 1.0], &mut rects);
+        fill(
+            [
+                FIELD[0] + 2.0,
+                FIELD[1] + 2.0,
+                FIELD[2] - 2.0,
+                FIELD[3] - 2.0,
+            ],
+            [0.02, 0.02, 0.03, 1.0],
+            &mut rects,
         );
-        out
+        let shown = if self.typed.is_empty() {
+            "Path: ".to_owned()
+        } else {
+            format!("Path: {}_", tail(&self.typed, 56))
+        };
+        say(
+            &shown,
+            [FIELD[0] + 8.0, FIELD[1] + 3.0, FIELD[2] - 4.0, FIELD[3]],
+            15.0,
+            if self.typed.is_empty() { GREY } else { GOLD },
+            false,
+            &mut rects,
+        );
+        if let Some((m, ok)) = &self.message {
+            say(
+                &tail(m, 70),
+                [44.0, 372.0, 596.0, 392.0],
+                14.0,
+                if *ok { WHITE } else { RED },
+                false,
+                &mut rects,
+            );
+        }
+        for (r, label, main) in [
+            (IMPORT_BUTTON, "Import", true),
+            (CANCEL_BUTTON, "Cancel", false),
+        ] {
+            let hot = self.hover == Some(r);
+            let body = match (main, hot) {
+                (true, true) => [0.6, 0.38, 0.2, 1.0],
+                (true, false) => [0.45, 0.3, 0.18, 1.0],
+                (false, true) => [0.3, 0.3, 0.36, 1.0],
+                (false, false) => [0.16, 0.16, 0.2, 1.0],
+            };
+            fill(r, [0.7, 0.72, 0.78, 1.0], &mut rects);
+            fill(
+                [r[0] + 2.0, r[1] + 2.0, r[2] - 2.0, r[3] - 2.0],
+                body,
+                &mut rects,
+            );
+            say(
+                label,
+                [r[0], r[1] + 5.0, r[2], r[3]],
+                20.0,
+                WHITE,
+                true,
+                &mut rects,
+            );
+        }
+        say(
+            "Up/Down choose   Enter import   Esc back",
+            [40.0, 434.0, 600.0, 454.0],
+            13.0,
+            GREY,
+            true,
+            &mut rects,
+        );
+        (rects, quads)
+    }
+
+    /// The first found place shown, so the chosen one stays in view.
+    fn first(&self) -> usize {
+        self.chosen
+            .saturating_sub(SHOWN / 2)
+            .min(self.found.len().saturating_sub(SHOWN))
+    }
+
+    /// The pointer's place in the 640x480 frame.
+    fn context(&self, w: f32, h: f32) -> (f32, f32) {
+        let k = (h / CONTEXT_H).min(w / CONTEXT_W).max(0.001);
+        (
+            (self.cursor.0 - (w - CONTEXT_W * k) / 2.0) / k,
+            (self.cursor.1 - (h - CONTEXT_H * k) / 2.0) / k,
+        )
+    }
+
+    /// What the pointer is over: a button's rectangle.
+    fn over(&self) -> Option<[f32; 4]> {
+        let size = self.window.as_ref()?.inner_size();
+        let (w, h) = (size.width, size.height);
+        let (x, y) = self.context(w as f32, h as f32);
+        [IMPORT_BUTTON, CANCEL_BUTTON]
+            .into_iter()
+            .find(|r| x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3])
+    }
+
+    /// A left click: a button, or a row of the found places.
+    fn click(&mut self, event_loop: &ActiveEventLoop) {
+        if self.imported || self.pending.is_some() {
+            return;
+        }
+        match self.over() {
+            Some(r) if r == CANCEL_BUTTON => self.finish(Outcome::Back, event_loop),
+            Some(_) => self.key(KeyCode::Enter, None, event_loop),
+            None => {
+                let Some((w, h)) = self
+                    .window
+                    .as_ref()
+                    .map(|w| w.inner_size())
+                    .map(|s| (s.width, s.height))
+                else {
+                    return;
+                };
+                let (x, y) = self.context(w as f32, h as f32);
+                let row = ((y - 134.0) / ROW).floor();
+                if (40.0..=600.0).contains(&x) && row >= 0.0 && (row as usize) < SHOWN {
+                    let i = self.first() + row as usize;
+                    if i < self.found.len() {
+                        self.chosen = i;
+                        self.typed.clear();
+                    }
+                }
+            }
+        }
+    }
+
+    /// Ends the window with `how`.
+    fn finish(&mut self, how: Outcome, event_loop: &ActiveEventLoop) {
+        self.outcome = how;
+        event_loop.exit();
     }
 
     fn draw(&mut self) {
@@ -249,9 +474,14 @@ impl Setup {
         };
         let view = frame.texture.create_view(&Default::default());
         let (w, h) = (gpu.config.width, gpu.config.height);
-        let rects = self.overlay(w as f32, h as f32);
-        if let Some(gpu) = &self.gpu {
+        let (rects, quads) = self.frame(w as f32, h as f32);
+        if let Some(gpu) = &mut self.gpu {
+            if let Some((aw, ah, rgba)) = crate::fallback::take_changed() {
+                gpu.renderer
+                    .add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
+            }
             gpu.renderer.draw_overlay(&view, w, h, &rects);
+            gpu.renderer.draw_ui(&view, w, h, &quads);
             gpu.renderer.queue.present(frame);
         }
     }
@@ -270,7 +500,7 @@ fn typed_path(t: &str) -> PathBuf {
 }
 
 const WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
-const GREY: [f32; 4] = [0.6, 0.6, 0.6, 1.0];
+const GREY: [f32; 4] = [0.68, 0.68, 0.72, 1.0];
 const GOLD: [f32; 4] = [1.0, 0.85, 0.3, 1.0];
 const RED: [f32; 4] = [1.0, 0.5, 0.45, 1.0];
 
@@ -300,7 +530,20 @@ impl ApplicationHandler for Setup {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => self.finish(Outcome::Quit, event_loop),
+            WindowEvent::CursorMoved { position, .. } => {
+                self.cursor = (position.x as f32, position.y as f32);
+                let over = self.over();
+                if over == self.hover {
+                    return;
+                }
+                self.hover = over;
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: winit::event::MouseButton::Left,
+                ..
+            } => self.click(event_loop),
             WindowEvent::Resized(size) => {
                 if let Some(gpu) = &mut self.gpu {
                     gpu.config.width = size.width.max(1);

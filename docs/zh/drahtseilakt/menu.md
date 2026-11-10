@@ -11,7 +11,7 @@
 | 界面 | 各行，从上到下 | 说明 |
 |---|---|---|
 | 主菜单（`Menu_Main`） | Start, Highscore, Options, Credits, Exit | Exit 会询问 "Do you want to quit the game?"（Yes / No） |
-| 没有副本时的主菜单（我们的） | Start, Import, Highscore, Options, Credits, Exit | Start 列出 "Our levels"（随附的关卡和 `levels/open/`）；Import 打开引入玩家副本的窗口，然后游戏用该副本重新启动（decisions.md，“游戏开箱即玩”） |
+| 没有副本时的主菜单（我们的） | Start, Highscore, Options, Credits, Exit | Start 列出 "Our levels"（随附的关卡和 `levels/open/`）；Options 多出一行 Import（在 Extended 之前），打开引入玩家副本的窗口：Esc 或 Cancel 回到游戏，窗口的关闭按钮结束程序，导入后游戏用该副本重新启动（decisions.md，“游戏开箱即玩”） |
 | Start（`Menu_Start`） | Level 1 … Level 12, Back | 前一关完成后，这一关才能玩（`DB_Levelfreischaltung`）；其余的显示为灰色。第 13 关附加包会替换 Menu.nmo 并加上它的那一行 |
 | Highscore（`Menu_Highscore`） | "Highscore Level N"、十个名字及分数、Back；左右键切换关卡 | 副本的默认值是 base.cmo 中的数组 `DB_Highscore_LvNN`（"Mr. Default"） |
 | Options（`Menu_Options`） | Graphics, Controls, Sound, Back | 我们在 Back 前另有 Language 和 Extended |
