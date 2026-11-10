@@ -37,16 +37,121 @@ fn decode(doc: &Document) -> Vec<String> {
     errors
 }
 
+/// The object animations of a file (class 15), each with the entity it moves, its length in frames, its
+/// controllers (kind and key count) and how far its linear position, rotation and scale keys go from the first; then the keyed
+/// animations (class 18) and every parameter of the object-animation type, which is what a block that plays one
+/// reads. The survey behind docs/drahtseilakt/community-maps.md, "Object animations".
+fn anims(doc: &Document) {
+    for (i, o) in doc.of_class(class::OBJECT_ANIMATION) {
+        let Some(chunk) = &o.chunk else { continue };
+        let name = o.name_lossy();
+        let Some(mut w) = chunk.section(0x0400_0000) else {
+            println!("  {i:5} anim {name}: no key section");
+            continue;
+        };
+        let mut kinds = Vec::new();
+        let head = (|| {
+            w.take(7)?;
+            let flags = w.u32()?;
+            let entity = w.u32()?;
+            let length = w.f32()?;
+            if flags & 0x80 != 0 {
+                w.take(3)?;
+            }
+            for _ in 0..64 {
+                let kind = w.u32()?;
+                if kind == 0 {
+                    break;
+                }
+                let size = w.u32()? as usize;
+                let block = w.take(size)?;
+                kinds.push((kind, block.first().copied().unwrap_or(0)));
+            }
+            nmo::Result::Ok((flags, entity, length))
+        })();
+        let Ok((flags, entity, length)) = head else {
+            println!("  {i:5} anim {name}: malformed");
+            continue;
+        };
+        // a reference is an index into the file's objects only in a chunk saved for a file
+        let target = chunk
+            .references_are_indices()
+            .then(|| doc.get(entity as usize))
+            .flatten()
+            .map_or_else(|| "?".to_string(), |e| e.name_lossy());
+        // how far the keys go from the first one: position, rotation (either sign of the quaternion), scale
+        let spread = |keys: &[Vec<f32>], signed: bool| -> f32 {
+            let Some(first) = keys.first() else {
+                return 0.0;
+            };
+            let dist = |k: &[f32], sign: f32| -> f32 {
+                k.iter()
+                    .zip(first)
+                    .map(|(a, b)| (a * sign - b).powi(2))
+                    .sum::<f32>()
+                    .sqrt()
+            };
+            keys.iter()
+                .map(|k| {
+                    if signed {
+                        dist(k, 1.0).min(dist(k, -1.0))
+                    } else {
+                        dist(k, 1.0)
+                    }
+                })
+                .fold(0.0, f32::max)
+        };
+        let (travel, turn, stretch) =
+            scene::object_animation(chunk)
+                .ok()
+                .flatten()
+                .map_or((0.0, 0.0, 0.0), |a| {
+                    let p: Vec<Vec<f32>> = a.position.iter().map(|k| k.1.to_vec()).collect();
+                    let r: Vec<Vec<f32>> = a.rotation.iter().map(|k| k.1.to_vec()).collect();
+                    let s: Vec<Vec<f32>> = a.scale.iter().map(|k| k.1.to_vec()).collect();
+                    (spread(&p, false), spread(&r, true), spread(&s, false))
+                });
+        let kinds: Vec<String> = kinds.iter().map(|(k, n)| format!("{k:#x}x{n}")).collect();
+        println!(
+            "  {i:5} anim {name} -> {target}: flags {flags:#x} length {length} travel {travel:.3} turn {turn:.3} stretch {stretch:.3} [{}]",
+            kinds.join(" ")
+        );
+    }
+    for (i, o) in doc.objects.iter().enumerate() {
+        if o.class_id == 18 || o.class_id == 16 {
+            println!(
+                "  {i:5} keyed animation (class {}) {}",
+                o.class_id,
+                o.name_lossy()
+            );
+        }
+        if o.class_id == 40 {
+            println!("  {i:5} character {}", o.name_lossy());
+        }
+        let Some(chunk) = &o.chunk else { continue };
+        if matches!(o.class_id, 2 | 3 | 45) {
+            let guid = if o.class_id == 2 {
+                nmo::behavior::parameter_in(chunk).ok().map(|p| p.guid)
+            } else {
+                nmo::behavior::parameter(chunk).ok().map(|p| p.guid)
+            };
+            if guid == Some(nmo::behavior::Guid(0x4347_6550, 0x11e5_2c0e)) {
+                println!("  {i:5} animation parameter {}", o.name_lossy());
+            }
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mode = match args.first().map(String::as_str) {
         Some("--objects") | Some("--check") | Some("--scripts") | Some("--arrays")
-        | Some("--params") => args.remove(0),
+        | Some("--params") | Some("--anims") => args.remove(0),
         _ => String::new(),
     };
     if args.is_empty() {
         eprintln!(
-            "usage: nmo-dump [--objects | --check | --scripts | --arrays | --params] FILE..."
+            "usage: nmo-dump [--objects | --check | --scripts | --arrays | --params | --anims] FILE..."
         );
         return ExitCode::from(2);
     }
@@ -100,6 +205,10 @@ fn main() -> ExitCode {
                     println!("  {n:5} {guid} {name}");
                 }
             }
+            "--anims" => {
+                println!("{path}");
+                anims(&doc);
+            }
             "--arrays" => {
                 println!("{path}");
                 for (_, o) in doc.of_class(nmo::class::DATA_ARRAY) {
@@ -138,10 +247,10 @@ fn main() -> ExitCode {
                                     nmo::behavior::Saved::Bytes(b) => {
                                         let txt = String::from_utf8_lossy(b);
                                         let floats: Vec<f32> = b
-                                            .chunks_exact(4)
-                                            .filter_map(|c| {
-                                                c.try_into().ok().map(f32::from_le_bytes)
-                                            })
+                                            .as_chunks::<4>()
+                                            .0
+                                            .iter()
+                                            .map(|c| f32::from_le_bytes(*c))
                                             .collect();
                                         format!("{b:02x?} {txt:?} {floats:?}")
                                     }

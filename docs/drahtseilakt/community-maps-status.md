@@ -57,6 +57,26 @@ objects", and three rules were changed for every map:
 
 What is left, by the maps it hits (with the copy): floors and rails hidden in the file that collide, 204 maps, and
 hidden stoppers, 160 (the maps' own invisible colliders, as in the original; `--show-colliders` shows them);
-objects of classes not read, 136 (animations 83, 2D entities 32, curves, sounds, patch meshes); textures that name
+objects of classes not read, 58 (2D entities 34, curves 16, sounds 9, patch meshes 2); textures that name
 no file and carry no pixels, 35; meshes with faces without a material, 30 (drawn grey); modules of mods, 17; script
 blocks not known, 11; fully transparent floors, 6.
+
+### Checked against the original: hidden colliders and object animations (2026-11-10)
+
+**Hidden floors and rails stay solid.** The original's level init physicalizes every member of `Phys_Floors` and
+`Phys_FloorRails`, and Physicalize does not look at whether the object is shown (the reference's port of the
+block, `src/bb/bb_physics.c`). The original's own levels rely on it: 7 of its 12 level files keep 19 hidden
+members there (`A02_inv_Coll_00`..`04` in level 6, `A07_Floor_Invisible_Col` in level 11, `A7_invisibleCollCube` in
+level 12). No rule changed. In Go Ahead the hidden walls stand in pairs along the track on both sides of a
+transformer (`Box04` / `Box05`): a corridor that keeps the ball from going round it, not a wall across the way; the
+map has no scripts, so nothing takes them away.
+
+**Object animations: nothing plays them.** 88 maps hold 9871 animation objects (classes 15 and 18). None of the 605
+maps has a block that plays one (Play Animation 3D Entity, Play Global Animation) or a parameter that holds one,
+and Virtools plays no animation by itself. 9287 of them are an exporter's bake: 35 keys each of position, rotation,
+scale and scale axis, every key equal to the first. 356 carry no keys of their own, 8 are the arms of the game's
+balloon. Nothing moves in the original, so the game moves nothing either. The audit counts them apart
+(`animation-unplayed`), names one whose keys would move, and reports `animation-played` for a map that has
+something to play one with. `nmo-dump --anims FILE...` prints each animation with its object, its controllers and
+how far its keys go. What does move in community maps is moved by their scripts (Set Position, Rotate, Physicalize,
+Set Physics Slider; about twenty maps), which is the script runtime's next phase ([scripts.md](scripts.md)).

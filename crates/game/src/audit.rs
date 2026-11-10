@@ -26,7 +26,7 @@ pub struct Issue {
 }
 
 /// The kinds, with what each means (the CSV's legend and the summary's).
-pub const KINDS: [(&str, &str); 17] = [
+pub const KINDS: [(&str, &str); 19] = [
     ("load-failed", "the map does not load"),
     (
         "load-warning",
@@ -46,7 +46,7 @@ pub const KINDS: [(&str, &str); 17] = [
     ),
     (
         "body-hidden",
-        "a floor or rail hidden in the file collides with the ball (the map's own invisible collider)",
+        "a floor or rail hidden in the file collides with the ball: an invisible collider, solid in the original too",
     ),
     (
         "stopper-hidden",
@@ -83,6 +83,14 @@ pub const KINDS: [(&str, &str); 17] = [
     (
         "class-skipped",
         "objects of classes the loader does not read (curves, characters, 2D, sounds, ...)",
+    ),
+    (
+        "animation-played",
+        "object animations in a map whose blocks play one: not played here, the objects stand still",
+    ),
+    (
+        "animation-unplayed",
+        "object animations no block of the map plays (an exporter's bake): still in the original too (count only)",
     ),
     (
         "material-mode",
@@ -253,13 +261,68 @@ pub fn level_issues(
 
 /// What the file itself holds that the level model leaves out: classes not read, alpha tests not followed.
 fn file_issues(path: &Path, out: &mut Vec<Issue>) {
-    use nmo::class;
     let Some(bytes) = crate::assets::read_game_file(path) else {
         return;
     };
     let Ok(doc) = nmo::read(&bytes).and_then(|f| nmo::Document::parse(&f)) else {
         return;
     };
+    doc_issues(&doc, out);
+}
+
+/// The building blocks that play an animation: Play Animation 3D Entity and Play Global Animation (3DTransfo;
+/// docs/animation.md 5.5 and 5.6).
+const ANIMATION_PLAYERS: [nmo::behavior::Guid; 2] = [
+    nmo::behavior::Guid(0x6422_1225, 0x769a_143f),
+    nmo::behavior::Guid(0x1c92_36e1, 0x42f4_0996),
+];
+
+fn is_animation(class_id: u32) -> bool {
+    matches!(class_id, 15 | 16 | 18)
+}
+
+/// Whether anything in the file can play an animation: one of the blocks that do, or a parameter whose value is
+/// an animation of the file. Nothing else moves an object by its animation: Virtools plays none by itself.
+fn plays_animations(doc: &nmo::Document) -> bool {
+    doc.objects.iter().any(|o| {
+        let Some(chunk) = &o.chunk else { return false };
+        match o.class_id {
+            nmo::behavior::class::BEHAVIOR => nmo::behavior::behavior(chunk)
+                .ok()
+                .and_then(|b| b.proto)
+                .is_some_and(|(guid, _)| ANIMATION_PLAYERS.contains(&guid)),
+            3 | 45 => matches!(
+                nmo::behavior::parameter(chunk).map(|p| p.value),
+                Ok(nmo::behavior::Saved::Object(Some(i)))
+                    if doc.get(i).is_some_and(|a| is_animation(a.class_id))
+            ),
+            _ => false,
+        }
+    })
+}
+
+/// Whether an object animation's keys move its object at all: some linear position, rotation or scale key differs
+/// from the first (a quaternion and its negative are one rotation).
+fn animation_moves(chunk: &nmo::chunk::Chunk) -> bool {
+    const EPS: f32 = 1e-4;
+    let Ok(Some(a)) = nmo::scene::object_animation(chunk) else {
+        return false;
+    };
+    fn differ<const N: usize>(keys: &[(f32, [f32; N])], signed: bool) -> bool {
+        let Some((_, first)) = keys.first() else {
+            return false;
+        };
+        let off =
+            |k: &[f32; N], sign: f32| k.iter().zip(first).any(|(x, y)| (x * sign - y).abs() > EPS);
+        keys.iter()
+            .any(|(_, k)| off(k, 1.0) && (!signed || off(k, -1.0)))
+    }
+    differ(&a.position, false) || differ(&a.rotation, true) || differ(&a.scale, false)
+}
+
+/// The issues of a file's objects: the classes the loader leaves out, the animations, the materials' modes.
+fn doc_issues(doc: &nmo::Document, out: &mut Vec<Issue>) {
+    use nmo::class;
     // what the loader reads, and what carries nothing to draw (the level, groups, arrays, behaviours and their
     // parameters, scenes, attributes' and messages' managers)
     let read = [
@@ -281,12 +344,25 @@ fn file_issues(path: &Path, out: &mut Vec<Issue>) {
     let logic = [
         2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 20, 22, 45, 46, 48, 55,
     ];
+    let played = plays_animations(doc);
     for o in &doc.objects {
         if read.contains(&o.class_id) || logic.contains(&o.class_id) {
             continue;
         }
+        if is_animation(o.class_id) {
+            // An animation is a loss only where a block plays it. The exporters bake one for every object, with
+            // keys that never leave the object's place; one that would move is named so.
+            let moves = o.chunk.as_ref().is_some_and(animation_moves);
+            let kind = if played {
+                "animation-played"
+            } else {
+                "animation-unplayed"
+            };
+            let note = if moves { " (its keys move)" } else { "" };
+            push(out, kind, format!("{}{note}", o.name_lossy()));
+            continue;
+        }
         let what = match o.class_id {
-            15 | 16 | 18 => "animation",
             24..=26 => "sound",
             27..=29 => "2D entity",
             36 | 43 => "curve",
@@ -583,6 +659,87 @@ mod tests {
             .find(|i| i.kind == "body-hidden")
             .expect("reported");
         assert_eq!(hidden.names, vec!["Wall @20,0,0".to_owned()]);
+    }
+
+    /// The original physicalizes every member of `Phys_Floors`, seen or not: its own levels keep invisible
+    /// colliders there (`A02_inv_Coll_00`, `A07_Floor_Invisible_Col`...), so a hidden floor is a body.
+    #[test]
+    fn a_hidden_floor_is_solid_as_the_originals_invisible_colliders() {
+        let mut level = level();
+        let wall = add(
+            &mut level,
+            "A02_inv_Coll_00",
+            [20.0, 0.0, 0.0],
+            true,
+            false,
+            &["Phys_Floors"],
+        );
+        let bodies = crate::sim::static_objects(&level, &[]);
+        assert!(bodies.iter().any(|(object, _)| *object == wall));
+    }
+
+    /// A file object saved for a file (references are indices), with one section of words.
+    fn file_object(class_id: u32, name: &str, section: u32, fields: &[u32]) -> nmo::Object {
+        let mut words = vec![section, 0];
+        words.extend_from_slice(fields);
+        nmo::Object {
+            id: 0,
+            class_id,
+            name: name.as_bytes().to_vec(),
+            chunk: Some(nmo::chunk::Chunk {
+                data_version: 10,
+                class_id: class_id as u8,
+                chunk_version: 7,
+                options: nmo::chunk::OPTION_FILE,
+                words,
+            }),
+        }
+    }
+
+    /// An object animation of `entity` with linear position keys at the given x.
+    fn animation(name: &str, entity: u32, xs: &[f32]) -> nmo::Object {
+        let mut fields = vec![0; 7];
+        fields.extend([0, entity, 100.0f32.to_bits()]);
+        fields.extend([0x637c_4301, 1 + 4 * xs.len() as u32, xs.len() as u32]);
+        for (k, x) in xs.iter().enumerate() {
+            fields.extend([(k as f32).to_bits(), x.to_bits(), 0, 0]);
+        }
+        fields.push(0);
+        file_object(15, name, 0x0400_0000, &fields)
+    }
+
+    fn doc_found(objects: Vec<nmo::Object>) -> Vec<Issue> {
+        let mut out = Vec::new();
+        doc_issues(&nmo::Document { objects }, &mut out);
+        out
+    }
+
+    /// Virtools plays no animation by itself: the bake an exporter leaves on every object moves nothing in the
+    /// original, so it is counted, not reported as a loss; one whose keys would move is named so.
+    #[test]
+    fn an_animation_nothing_plays_is_only_counted() {
+        let found = doc_found(vec![
+            animation("Still", 0, &[5.0, 5.0, 5.0]),
+            animation("Lift", 0, &[5.0, 9.0]),
+        ]);
+        assert_eq!(count(&found, "animation-unplayed"), 2);
+        assert_eq!(count(&found, "animation-played"), 0);
+        assert_eq!(count(&found, "class-skipped"), 0);
+        let names = &found.first().expect("one kind").names;
+        assert_eq!(
+            names,
+            &["Still".to_owned(), "Lift (its keys move)".to_owned()]
+        );
+    }
+
+    /// A block that reads an animation (a parameter holding one) plays it in the original: here it stands still.
+    #[test]
+    fn an_animation_a_block_reads_is_a_loss() {
+        // a local parameter of the object-animation type whose value is object 0
+        let holder = file_object(45, "Animation", 0x40, &[0x4347_6550, 0x11e5_2c0e, 2, 0]);
+        let found = doc_found(vec![animation("Lift", 0, &[5.0, 9.0]), holder]);
+        assert_eq!(count(&found, "animation-played"), 1);
+        assert_eq!(count(&found, "animation-unplayed"), 0);
     }
 
     /// The original draws any visible object, with or without a material: a floor the ball runs on is seen.

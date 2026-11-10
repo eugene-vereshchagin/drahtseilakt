@@ -59,6 +59,29 @@ Der erste Lauf über 605 Karten (die 26 mitgelieferten und die 579 der Sammlung)
 
 Was bleibt, nach betroffenen Karten (mit der Kopie): in der Datei versteckte Böden und Schienen, die kollidieren,
 204 Karten, und versteckte Stopper, 160 (die eigenen unsichtbaren Kollisionskörper der Karten, wie im Original;
-`--show-colliders` zeigt sie); Objekte nicht gelesener Klassen, 136 (Animationen 83, 2D-Objekte 32, Kurven, Klänge,
-Patch-Meshes); Texturen ohne Dateinamen und ohne Pixel, 35; Meshes mit Flächen ohne Material, 30 (grau gezeichnet);
+`--show-colliders` zeigt sie); Objekte nicht gelesener Klassen, 58 (2D-Objekte 34, Kurven 16, Klänge 9,
+Patch-Meshes 2); Texturen ohne Dateinamen und ohne Pixel, 35; Meshes mit Flächen ohne Material, 30 (grau gezeichnet);
 Module von Mods, 17; unbekannte Skriptblöcke, 11; völlig durchsichtige Böden, 6.
+
+### Mit dem Original abgeglichen: versteckte Kollisionskörper und Objektanimationen (2026-11-10)
+
+**Versteckte Böden und Schienen bleiben fest.** Die Levelinitialisierung des Originals physikalisiert jedes Mitglied
+von `Phys_Floors` und `Phys_FloorRails`, und Physicalize sieht nicht nach, ob das Objekt gezeigt wird (die
+Portierung des Bausteins in der Referenz, `src/bb/bb_physics.c`). Die eigenen Level des Originals bauen darauf: 7
+seiner 12 Leveldateien halten dort 19 versteckte Mitglieder (`A02_inv_Coll_00`..`04` in Level 6,
+`A07_Floor_Invisible_Col` in Level 11, `A7_invisibleCollCube` in Level 12). Keine Regel wurde geändert. In Go Ahead
+stehen die versteckten Wände paarweise längs der Strecke zu beiden Seiten eines Transformers (`Box04` / `Box05`):
+ein Gang, der verhindert, dass die Kugel ihn umfährt, keine Wand quer über den Weg; die Karte hat keine Skripte,
+also nimmt nichts sie weg.
+
+**Objektanimationen: nichts spielt sie ab.** 88 Karten enthalten 9871 Animationsobjekte (Klassen 15 und 18). Keine
+der 605 Karten hat einen Baustein, der eine abspielt (Play Animation 3D Entity, Play Global Animation), oder einen
+Parameter, der eine hält, und Virtools spielt von sich aus keine Animation ab. 9287 davon sind das Einbacken eines
+Exporters: je 35 Schlüssel für Position, Drehung, Skalierung und Skalierungsachse, jeder gleich dem ersten. 356
+haben keine eigenen Schlüssel, 8 sind die Arme des Ballons des Spiels. Im Original bewegt sich nichts, also bewegt
+auch das Spiel nichts. Die Prüfung zählt sie getrennt (`animation-unplayed`), nennt eine, deren Schlüssel das
+Objekt bewegen würden, und meldet `animation-played` für eine Karte, die etwas hat, womit eine abgespielt wird.
+`nmo-dump --anims FILE...` gibt jede Animation mit ihrem Objekt, ihren Controllern und der Reichweite ihrer
+Schlüssel aus. Was sich in Community-Karten wirklich bewegt, bewegen ihre Skripte (Set Position, Rotate,
+Physicalize, Set Physics Slider; etwa zwanzig Karten): die nächste Phase der Skriptlaufzeit
+([scripts.md](scripts.md)).
