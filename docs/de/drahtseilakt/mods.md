@@ -43,6 +43,7 @@ Start des Levels.
 | `deformed-ball` | DeformedWB | das Aussehen der Holzkugel wird zufällig gestaucht und gedehnt (die Physik behält die runde Kugel); Option: Stärke | nein |
 | `back-to-2004` | (ein Scherz; macht unsere Bildverbesserungen rückgängig) | das Spiel wie auf einem PC von 2004: niedrige Auflösung (640x480, 800x600 oder 1024x768) in harten Pixeln in einem 4:3-Bild mit schwarzen Balken, Texturen ohne Mipmaps und Anisotropie (bilinear oder nächster Nachbar: das Flimmern in der Ferne), Bildratenbegrenzung (aus, 60, 30), wahlweise 16-Bit-Farbbänder; Brille für Blutstränen inklusive | nein |
 | `play-time` | WatchYourTime | die Spielzeit je Level und gesamt, auf dem Bildschirm und in der `playtime.txt` des Datenordners; Option: anzeigen | nein |
+| `sack-supports` | (unserer; im Original hängen die Säcke in der Luft) | die Halter der schwingenden Säcke hängen an etwas: einer Steinsäule, einem gestreiften Mast, einem Holzpfosten oder einem Tor aus zweien neben der Bahn, oder an einem Balken zur nahen Wand. Für jeden Sack beim Laden des Levels gewählt, nur wo die Stütze den Raum des Balls, alle beweglichen Teile, die Kulisse und den Blick der Kamera auf den Ball frei lässt; wo nichts frei ist, hängt der Sack wie eh und je. Nur gezeichnet, mit den eigenen Modellen des Spiels (die des Originals bleiben, wie sie sind). **An, bis man ihn ausschaltet** (er bessert das Aussehen und ändert keine Regel; der klassische Modus führt weiterhin keinen Mod aus). Option: verschiedene Bauarten | nein |
 | `sector-jump` | SpeedrunShortcuts (Sektor setzen) | Tasten (F7 / PageUp, F6 / PageDown) starten das Level im nächsten oder vorigen Sektor neu | ja (gemoddet) |
 | `spawn-point` | NewSpawn, SpeedrunShortcuts (Startpunkt setzen) | eine Taste (F8, H oder J) setzt einen Startpunkt, wo die Kugel ist, eine andere (G, F4 oder C) bringt die Kugel ruhend dorthin zurück, als die Kugel, die sie war; der Sektor und seine Objekte bleiben, wie sie sind | ja (gemoddet) |
 | `free-steering` | FreeViewRotation (auch die Steuerung) | wie `free-view`, aber die Pfeile schieben entlang der gedrehten Sicht; die Drehung der Sicht steht im Replay | ja (gemoddet) |
@@ -123,7 +124,8 @@ Der kleinste Mod:
 Text in UTF-8, eine Anweisung je Zeile, `#` beginnt eine Kommentarzeile. In dieser Reihenfolge:
 
 - **Kopf** — `name.<lang>` (mindestens einer; Sprachen `en ru de zh fr es it`), `description.<lang>`, `author`,
-  `version`, `licence`, `requires <game version>` (z. B. `0.1`; eine neuere als die des Spiels lehnt den Mod ab).
+  `version`, `licence`, `requires <game version>` (z. B. `0.1`; eine neuere als die des Spiels lehnt den Mod ab). Ein Mod, der nur das Aussehen bessert, darf
+  `default on` sagen: er ist an, bis der Spieler ihn ausschaltet (der Werks-Mod `sack-supports`).
 - **Optionen**, die der Spieler auf der Seite des Mods setzt:
   - `option <name> switch on|off`
   - `option <name> number <min> <max> <step> <default>` (innerhalb von ±1 000 000, ein Schritt von mindestens 0,001, der
@@ -226,6 +228,7 @@ Ansichtsaktionen (nur auf `frame` oder `key`):
 - `do render.scale <Breite> <Höhe>` — das Bild in dieser Größe gezeichnet (160x120 bis 4096x4096, nie über dem Fenster) und mit dem nächsten Pixel aufs Fenster gezogen. `do render.aspect <b>:<h>` — das Bild behält diese Form, schwarze Balken, wo das Fenster breiter oder höher ist.
 - `do render.filter default|bilinear|nearest` — die Texturfilterung: unsere (Mipmaps, anisotrop), bilinear nur aus der größten Stufe (ohne Mipmaps flimmert die Ferne) oder der nächste Texel.
 - `do render.fps_cap <n>` — höchstens n Bilder pro Sekunde (0: keine Grenze; die Takte des Laufs behalten ihre Uhr). `do render.colour_bits 16` — die Farbe auf 5-6-5 Bit ohne Dithering gekappt (jeder andere Wert: volle Farbe).
+- `do render.supports <0|1|2>` — die Stützen unter den Haltern der schwingenden Säcke: keine, eine Bauart für alle (die erste freie: Säule, Pfosten, Mast, Tor, Wandhalter) oder verschiedene. Die Teile bringt der eigene Sack des Spiels mit (seine Gruppe `Supports_P_Modul_26`); das Spiel setzt sie für jeden Sack dort zusammen, wo nichts davon näher als 4,5 an den Raum des Balls kommt (die Böden und Schienen und 9 darüber), in die Reichweite eines anderen Moduls (der Schwung eines Sacks, der Luftstrom eines Ventilators, 8 um jedes andere Teil), durch die Kulisse oder, bei einer Säule, in den üblichen Blick der Kamera auf den Ball. `--supports-check geometry|runs` misst jede gesetzte Stütze der Originallevel und der mitgelieferten Karten noch einmal, auch gegen die aufgezeichneten Läufe.
   Diese Aktionen betreffen nur die Ansicht: der Lauf bleibt klassisch, Wiedergaben laufen gleich. Eine Kantenglättung zum Rückgängigmachen gibt es im Spiel nicht.
 - `do light <0..1>` — das Licht des Levels; `do lantern <0..1>` — ein Licht über der Kugel.
 - `do show <corner> <label|-> <format> <value>[, <value>[, <value>]]` — eine Einblendungszeile in diesem Bild; Ecken

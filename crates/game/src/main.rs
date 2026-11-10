@@ -55,6 +55,7 @@ mod scripting;
 mod setup;
 mod sim;
 mod sky;
+mod supports;
 mod trafo;
 mod ui;
 mod volume;
@@ -123,6 +124,10 @@ usage: drahtseilakt [options]
   --show-colliders    draw the floors and rails a map hides (red) and its hidden stoppers (yellow) as translucent
                       shapes: what stops the ball without being seen
   --audit-csv FILE    with --audit: write one row per map, copy and kind of issue (with the names) to FILE
+  --supports-check geometry|runs
+                      where the swinging sacks get a support (the sack-supports mod) in the original levels and the
+                      shipped maps, each placed one measured again; with runs also against the ball's way in the
+                      recorded runs of ./hints. Fails when one is too near the ball's space
   --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in ./hints
                       for designing our own: DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py);
                       with --open LEVEL --replay RUN one of our levels along that run: DIR/level-stats-own.csv
@@ -200,6 +205,8 @@ pub struct Options {
     pub look: Option<[f32; 6]>,
     /// Measure the original levels into this folder (levelstats.rs) and stop.
     pub level_stats: Option<PathBuf>,
+    /// Measure the sacks' supports of every original level and shipped map, then stop.
+    pub supports_check: Option<bool>,
     /// No window: audit these maps (files or folders of them) for what is not drawn or not there (audit.rs).
     pub audit: Vec<PathBuf>,
     pub audit_csv: Option<PathBuf>,
@@ -250,6 +257,7 @@ fn parse_args() -> Result<Options, String> {
         debug: false,
         look: None,
         level_stats: None,
+        supports_check: None,
         audit: Vec::new(),
         audit_csv: None,
         show_colliders: false,
@@ -353,6 +361,13 @@ fn parse_args() -> Result<Options, String> {
             "--audit" => o.audit.push(value()?.into()),
             "--audit-csv" => o.audit_csv = Some(value()?.into()),
             "--level-stats" => o.level_stats = Some(value()?.into()),
+            "--supports-check" => {
+                o.supports_check = Some(match value()?.as_str() {
+                    "geometry" => false,
+                    "runs" => true,
+                    _ => return Err("--supports-check geometry|runs".into()),
+                })
+            }
             "--screenshot" => o.screenshot = Some(value()?.into()),
             "--sky" => {
                 let name = value()?;

@@ -155,6 +155,16 @@ pub struct Placement {
     pub sprite: Option<level::Sprite>,
     /// The level's cloud layer (its `SkyLayer`), which the Graphics page's Clouds switch hides.
     pub cloud: bool,
+    /// A piece of a sack's support (supports.rs): the sets it is drawn in (`supports::PLAIN`, `VARIED`), 0 for
+    /// everything else.
+    pub support: u8,
+}
+
+/// Which supports are drawn (the `render.supports` action of a view mod): none, `supports::PLAIN` or `VARIED`.
+static SUPPORTS: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+pub fn set_supports(set: u8) {
+    SUPPORTS.store(set, Ordering::Relaxed);
 }
 
 /// The Clouds switch (the Graphics page): the original's `Skylayer ein?`.
@@ -419,6 +429,7 @@ pub fn placements(
                     trafo_shadow: None,
                     sprite: None,
                     cloud: false,
+                    support: 0,
                 });
             }
             continue;
@@ -443,6 +454,7 @@ pub fn placements(
                 trafo_shadow: None,
                 sprite: None,
                 cloud,
+                support: 0,
             });
             continue;
         }
@@ -464,6 +476,7 @@ pub fn placements(
                 trafo_shadow: None,
                 sprite: None,
                 cloud: false,
+                support: 0,
             });
             continue;
         }
@@ -515,6 +528,7 @@ pub fn placements(
                     .and_then(BallKind::from_name),
                 sprite: mo.sprite,
                 cloud: false,
+                support: 0,
             });
         }
     }
@@ -627,9 +641,11 @@ pub fn instances(
     }
     let hidden = |object: usize| extra_model.is_some() && views.iter().any(|v| v.object == object);
     let clouds = CLOUDS.load(Ordering::Relaxed) && !VOLUME_CLOUDS.load(Ordering::Relaxed);
+    let supports = SUPPORTS.load(Ordering::Relaxed);
     out.extend(
         placements
             .iter()
+            .filter(|p| p.support == 0 || p.support & supports != 0)
             .filter(|p| {
                 !taken.contains(&p.object) && !unseen.get(p.object).copied().unwrap_or(false)
             })

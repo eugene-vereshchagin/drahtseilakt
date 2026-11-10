@@ -640,7 +640,7 @@ const MORE_THINGS: [(&str, &str); 2] = [
 ];
 
 /// The sector (from 1) of a level object: its `Sector_NN` group, else the sector of the nearest object in one.
-fn sector_of(level: &level::Level, i: usize) -> usize {
+pub(crate) fn sector_of(level: &level::Level, i: usize) -> usize {
     for g in level.groups_of(i) {
         if let Some(n) = g
             .strip_prefix("Sector_")
@@ -866,7 +866,7 @@ fn measure(run: &Run, sectors: usize) -> (Vec<Tally>, Vec<Sample>) {
 }
 
 /// The replays of a level found in `hints`: the clean runs first (hints/runs), then the owner's.
-fn replays(hints: &Path, n: u32) -> Vec<PathBuf> {
+pub(crate) fn replays(hints: &Path, n: u32) -> Vec<PathBuf> {
     let stem = format!("Level_{n:02}");
     let mut out: Vec<PathBuf> = std::fs::read_dir(hints.join("runs"))
         .into_iter()

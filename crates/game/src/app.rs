@@ -70,6 +70,8 @@ struct Game {
     /// The balls' pieces, for each new run's bursts.
     pieces: crate::pieces::Pieces,
     placements: Vec<scene::Placement>,
+    /// Whether the sacks' supports were looked for (`show_supports`): only once a mod asks for them.
+    supports_planned: bool,
     modules: scene::Modules,
     /// The transformer animation's file (`AnimTrafo.nmo`), drawn after the modules, if the copy has it.
     trafo: Option<(LoadedLevel, crate::trafo::TrafoModel)>,
@@ -305,6 +307,7 @@ impl Game {
             data: data.clone(),
             trafo,
             placements,
+            supports_planned: false,
             modules,
             ball_meshes,
             pieces,
@@ -1222,6 +1225,9 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
             start_packs(o.textures.as_deref(), o.models.as_deref());
         };
         return crate::audit::run(&o.audit, &data, o.audit_csv.as_deref(), &prepare);
+    }
+    if let Some(runs) = o.supports_check {
+        return crate::supports::run(&o, &data, runs.then_some(Path::new("hints")));
     }
     if let Some(dir) = &o.level_stats {
         return crate::levelstats::run(&o, &data, dir, Path::new("hints"));
@@ -3312,6 +3318,20 @@ fn read_back(r: &Renderer, target: &wgpu::Texture, w: u32, h: u32) -> Result<Vec
     Ok(pixels)
 }
 
+impl Game {
+    /// Which of the sacks' supports are drawn (a view mod's `render.supports`: none, one design, varied). They are
+    /// looked for the first time one is asked for, so a game without the mod (the classic mode, or the mod switched
+    /// off) never spends a moment on them.
+    fn show_supports(&mut self, set: u8) {
+        if set != 0 && !self.supports_planned {
+            self.supports_planned = true;
+            let plan = crate::supports::plan(&self.level.level, &self.modules);
+            self.placements.extend(plan.placements());
+        }
+        scene::set_supports(set);
+    }
+}
+
 fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<(), String> {
     if let Ok(l) = std::env::var("DRAHTSEILAKT_SHOT_LANG") {
         let _ = SHOT_LANG.set(l);
@@ -3362,6 +3382,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         _ => crate::render::RenderLook::default(),
     };
     r.look = look;
+    game.show_supports(look.supports);
     let ((fw, fh), (w, h)) = ((w, h), look.size(w, h));
     let view = if look.post() {
         let format = r.format;
@@ -5654,6 +5675,7 @@ impl App {
         let ghost = self.ghost_instance();
         // a mod's `render.*`: the picture's look; drawn at its own (low) size, then scaled onto the window
         let look = self.view_mods.out.look;
+        self.game.show_supports(look.supports);
         let (rw, rh) = self.gpu.as_ref().map_or((1, 1), |g| look.size(g.config.width, g.config.height));
         let mod_quads = match (&self.gpu, self.game.font.as_ref()) {
             (Some(g), Some(f))

@@ -37,6 +37,7 @@
 | `deformed-ball` | DeformedWB | 木球的外观随机被压扁、拉长（物理仍是圆球）；选项：程度 | 否 |
 | `back-to-2004` | （玩笑；撤销我们的画面改进） | 像2004年的电脑：低分辨率（640x480、800x600或1024x768）的硬像素，4:3画面带黑边，纹理无mipmap和各向异性（双线性或最近邻：远处闪烁），帧率上限（关、60、30），可选16位色彩条纹；附赠一副用于流血泪的眼镜 | 否 |
 | `play-time` | WatchYourTime | 每关和总计的游戏时长，显示在屏幕上，并保存在数据文件夹的 `playtime.txt`；选项：是否显示 | 否 |
+| `sack-supports` | （我们自己的；原版的沙袋悬在空中） | 摆动沙袋的横梁有了支撑：轨道旁的石柱、条纹桅杆、木桩或两根木桩组成的门架，或连到近处墙面的横梁。关卡加载时为每个沙袋单独选择，只放在不碰球的活动空间、任何活动机关、场景物体和相机看球视线的地方；找不到空位时沙袋照旧悬挂。只是绘制，使用游戏自己的模型（原版模型保持不变）。**默认开启，直到玩家关闭**（它只修正外观，不改任何规则；经典模式仍不运行模组）。选项：多种样式 | 否 |
 | `sector-jump` | SpeedrunShortcuts（设置小节） | 按键（F7 / PageUp、F6 / PageDown）从下一个或上一个小节重新开始关卡 | 是（modded） |
 | `spawn-point` | NewSpawn、SpeedrunShortcuts（设置出生点） | 一个键（F8、H 或 J）在球所在处设出生点，另一个键（G、F4 或 C）把球静止地送回那里，恢复当时的球种；小节及其物体保持原样 | 是（modded） |
 | `free-steering` | FreeViewRotation（含操控） | 类似 `free-view`，但方向键沿转动后的视角推动；视角的转动记录在回放中 | 是（modded） |
@@ -103,7 +104,8 @@
 UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 - **文件头** — `name.<lang>`（至少一个；语言 `en ru de zh fr es it`）、`description.<lang>`、`author`、`version`、
-  `licence`、`requires <game version>`（如 `0.1`；比游戏更新的版本会导致游戏拒绝该模组）。
+  `licence`、`requires <game version>`（如 `0.1`；比游戏更新的版本会导致游戏拒绝该模组）。 只修正外观的模组可以写 `default on`：
+  在玩家关闭之前它一直开启（内置的 `sack-supports`）。
 - **选项**，玩家在模组页面上设置：
   - `option <name> switch on|off`
   - `option <name> number <min> <max> <step> <default>`（在 ±1,000,000 以内，步长不小于 0.001，默认值须落在从 `min`
@@ -188,6 +190,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 - `do render.scale <宽> <高>` — 以此大小绘制画面（160x120 至 4096x4096，不超过窗口），再用最近邻像素放大到窗口。`do render.aspect <宽>:<高>` — 画面保持此比例，窗口更宽或更高处为黑边。
 - `do render.filter default|bilinear|nearest` — 纹理过滤：我们的（mipmap、各向异性）、仅取最大级的双线性（无mipmap，远处闪烁）或最近邻纹素。
 - `do render.fps_cap <n>` — 每秒最多 n 帧（0：不限；对局的 tick 仍按自己的时钟）。`do render.colour_bits 16` — 颜色截为 5-6-5 位且不抖动（其他值：全彩）。
+- `do render.supports <0|1|2>` — 摆动沙袋横梁下的支架：无、全部同一种样式（第一个不挡路的：石柱、木桩、桅杆、门架、墙架）或多种样式。部件随游戏自己的沙袋提供（其 `Supports_P_Modul_26` 组）；游戏为每个沙袋拼装，条件是任何部分都不进入球的活动空间 4.5 以内（地板、轨道及其上方 9）、不进入其他机关的活动范围（沙袋的摆幅、风扇的气流、其他部件周围 8）、不穿过场景物体，石柱还不能挡住常规相机看球的视线。`--supports-check geometry|runs` 会重新测量原版关卡和随附地图中每个已放置的支架，并对照录制的对局。
   这些动作只影响画面：对局保持经典，回放不变。游戏中没有可撤销的边缘抗锯齿。
 - `do light <0..1>` — 关卡的光；`do lantern <0..1>` — 球上方的灯光。
 - `do show <corner> <label|-> <format> <value>[, <value>[, <value>]]` — 本帧的一行 HUD；角落 `top-left top-right
