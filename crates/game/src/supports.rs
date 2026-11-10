@@ -57,7 +57,8 @@ const SPACING: f32 = 1.2;
 const SLACK: f32 = 0.9;
 /// The grid the triangles are looked up by (x, z), and how far a test reaches.
 const CELL: f32 = 8.0;
-const REACH: f32 = BALL_RADIUS + AIR + SLACK + 0.2;
+/// (with the half width of the widest plain shaft, which is tested along its axis only)
+const REACH: f32 = BALL_RADIUS + AIR + SLACK + 1.7;
 /// A triangle over more cells than this is tested for every point.
 const MAX_CELLS: i64 = 1024;
 
@@ -111,6 +112,9 @@ struct Tri {
     p: [Vec3; 3],
     /// A floor or rail: the ball's space lies over it. Otherwise scenery.
     ball: bool,
+    /// The box no point outside of can be too near it (the triangle's, with the ball's space over it and the reach).
+    lo: Vec3,
+    hi: Vec3,
 }
 
 /// A place another module needs.
@@ -291,7 +295,13 @@ impl Space {
                 }
             }
         }
-        self.tris.push(Tri { p, ball });
+        let up = if ball { LIFTS.iter().copied().fold(0.0, f32::max) } else { 0.0 };
+        self.tris.push(Tri {
+            p,
+            ball,
+            lo: lo - Vec3::splat(REACH),
+            hi: hi + Vec3::new(REACH, REACH + up, REACH),
+        });
     }
 
     /// What a stand-in's module needs free about it.
@@ -342,6 +352,18 @@ impl Space {
                     None => false,
                 })
                 .collect(),
+            wide: self
+                .wide
+                .iter()
+                .copied()
+                .filter(|&i| {
+                    self.tris.get(i as usize).is_some_and(|t| {
+                        let (lo, hi) = (t.p[0].min(t.p[1]).min(t.p[2]), t.p[0].max(t.p[1]).max(t.p[2]));
+                        let r = reach + REACH;
+                        lo.x - r < joint.x && joint.x < hi.x + r && lo.z - r < joint.z && joint.z < hi.z + r
+                    })
+                })
+                .collect(),
             rolls: self
                 .rolls
                 .iter()
@@ -352,46 +374,49 @@ impl Space {
     }
 
     /// The triangles that may be within reach of `p`.
-    fn near(&self, p: Vec3) -> impl Iterator<Item = &Tri> + '_ {
+    fn near<'a>(&'a self, p: Vec3, about: &'a About) -> impl Iterator<Item = &'a Tri> + 'a {
         self.grid
             .get(&(cell(p.x), cell(p.z)))
             .into_iter()
             .flatten()
-            .chain(self.wide.iter())
+            .chain(about.wide.iter())
             .filter_map(|&i| self.tris.get(i as usize))
     }
 
     /// The distance from `p` to the ball's space (over the floors and rails near it; `REACH` and more when none is
-    /// near), or what `p` is too near to. Scenery within `open` of the point `at` is the wall a bracket is on.
-    fn point(&self, p: Vec3, own: usize, wall: Option<Vec3>, about: &About) -> Result<f32, Fault> {
+    /// near), or what `p` is too near to. `wide`: `p` stands for everything this near it (a shaft's axis for its skin). Scenery within `open` of the point `at` is the wall a bracket is on.
+    fn point(&self, p: Vec3, own: usize, wall: Option<Vec3>, about: &About, wide: f32) -> Result<f32, Fault> {
         let mut least = f32::MAX;
-        for t in self.near(p) {
+        for t in self.near(p, about) {
+            if p.cmplt(t.lo).any() || p.cmpgt(t.hi).any() {
+                continue;
+            }
             if t.ball {
                 for lift in LIFTS {
                     let q = p - Vec3::Y * lift;
                     let d = (closest_point(&t.p, q) - q).length() - BALL_RADIUS;
                     least = least.min(d);
-                    if d < AIR + SLACK {
+                    if d < AIR + SLACK + wide {
                         return Err(Fault::Ball);
                     }
                 }
             } else if wall.is_none_or(|w| (w - p).length() > 2.0)
-                && (closest_point(&t.p, p) - p).length() < SOLID_AIR + SLACK * 0.5
+                && (closest_point(&t.p, p) - p).length() < SOLID_AIR + SLACK * 0.5 + wide
             {
                 return Err(Fault::Scenery);
             }
         }
         for k in about.keeps.iter().filter_map(|&i| self.keeps.get(i)) {
             let inside = match *k {
-                Keep::Sphere(c, r) => (p - c).length() < r,
+                Keep::Sphere(c, r) => (p - c).length() < r + wide,
                 Keep::Column(foot, r, up) => {
                     let v = p - foot;
-                    v.y > 0.0 && v.y < up && Vec3::new(v.x, 0.0, v.z).length() < r
+                    v.y > 0.0 && v.y < up && Vec3::new(v.x, 0.0, v.z).length() < r + wide
                 }
                 Keep::Swing(joint, [across, up, along], object) => {
                     let v = p - joint;
                     let down = -v.dot(up);
-                    let air = if object == own { OWN_SWING_AIR } else { SWING_AIR };
+                    let air = wide + if object == own { OWN_SWING_AIR } else { SWING_AIR };
                     let out = (v.dot(across) / SWING_ACROSS).hypot(v.dot(along) / SWING_ALONG);
                     // (its own support begins at the joint)
                     let begins = object == own && v.length() < 1.5;
@@ -427,6 +452,8 @@ impl Space {
 /// What matters about one sack (`Space::about`).
 struct About {
     keeps: Vec<usize>,
+    /// The wide triangles (those the grid does not hold) that reach near the sack.
+    wide: Vec<u32>,
     rolls: Vec<Vec3>,
 }
 
@@ -654,23 +681,30 @@ fn candidate(
             }
         }
     }
-    // then each shaft's axis: where that is too near, its skin is nearer still
+    // then each shaft's axis: where that is too near, its skin is nearer still. A plain shaft (deep under the track,
+    // and long) is tested along its axis alone, as wide as it is
+    let mut points = Vec::new();
+    let mut clearance = REACH;
     for p in &parts {
-        if let Some((axis, _)) = kit.shafts.get(p.piece).copied().flatten() {
+        if let Some((axis, half)) = kit.shafts.get(p.piece).copied().flatten() {
+            let plain = p.piece > SHAFT;
+            let wide = if plain { half * std::f32::consts::SQRT_2 } else { 0.0 };
             let top = p.matrix.transform_point3(axis);
             let foot = p.matrix.transform_point3(Vec3::new(axis.x, kit.foot(p.piece), axis.z));
             let steps = ((top - foot).length() / SPACING).ceil().clamp(1.0, 4000.0);
             for k in 0..=steps as usize {
                 let q = top.lerp(foot, k as f32 / steps);
                 if q.y >= space.lowest - DEEP {
-                    space.point(q, object, wall, about)?;
+                    let d = space.point(q, object, wall, about, wide)?;
+                    if plain {
+                        clearance = clearance.min(d - wide);
+                        points.push(q);
+                    }
                 }
             }
         }
     }
-    let mut points = Vec::new();
-    let mut clearance = REACH;
-    for p in &parts {
+    for p in parts.iter().filter(|p| p.piece <= SHAFT) {
         let from = points.len();
         for t in kit.tris.get(p.piece).into_iter().flatten() {
             let w = [
@@ -681,7 +715,7 @@ fn candidate(
             sample(w, SPACING, space.lowest - DEEP, &mut points);
         }
         for &q in points.get(from..).into_iter().flatten() {
-            clearance = clearance.min(space.point(q, object, wall, about)?);
+            clearance = clearance.min(space.point(q, object, wall, about, 0.0)?);
         }
     }
     Ok(Support {
@@ -701,7 +735,13 @@ fn wall(space: &Space, place: &Mat4, kit: &Kit, yaw: f32) -> Option<(f32, Vec3)>
         .transform_vector3(Vec3::X)
         .normalize_or_zero();
     let mut best: Option<(f32, &Tri)> = None;
-    for t in &space.tris {
+    // (only what reaches within the farthest wall's distance of the holder)
+    let r = Vec3::splat(WALL_FAR);
+    for t in space
+        .tris
+        .iter()
+        .filter(|t| !(from + r).cmplt(t.lo).any() && !(from - r).cmpgt(t.hi).any())
+    {
         if let Some(at) = ray_hit(&t.p, from, dir)
             && best.is_none_or(|b| at < b.0)
         {
@@ -769,7 +809,9 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
         meshes: kit.meshes,
         nodes: kit.nodes,
     };
-    for (ordinal, &object) in stand_ins.iter().enumerate().take(MAX_SACKS) {
+    // each sack's candidates are looked through on their own: all the sacks at once, on the machine's cores
+    type Found = ([Option<Support>; 5], [Option<Fault>; 5]);
+    let search = |object: usize| -> Found {
         let mut found: [Option<Support>; 5] = Default::default();
         let mut faults = [None; 5];
         if let Some(place) = place_of(object) {
@@ -829,6 +871,25 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
                 }
             }
         }
+        (found, faults)
+    };
+    let sacks: Vec<usize> = stand_ins.iter().copied().take(MAX_SACKS).collect();
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).clamp(1, 8);
+    let share = sacks.len().div_ceil(threads).max(1);
+    let searched: Vec<Found> = std::thread::scope(|scope| {
+        let search = &search;
+        let workers: Vec<_> = sacks
+            .chunks(share)
+            .map(|part| scope.spawn(move || part.iter().map(|&o| search(o)).collect::<Vec<Found>>()))
+            .collect();
+        workers
+            .into_iter()
+            .zip(sacks.chunks(share))
+            // (a search that failed leaves its sacks as they are)
+            .flat_map(|(w, part)| w.join().unwrap_or_else(|_| part.iter().map(|_| Default::default()).collect()))
+            .collect()
+    });
+    for (ordinal, (&object, (found, mut faults))) in sacks.iter().zip(searched).enumerate() {
         for (f, s) in faults.iter_mut().zip(&found) {
             if s.is_some() {
                 *f = None;
