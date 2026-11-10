@@ -516,7 +516,12 @@ fn main() -> ExitCode {
                 "no copy of Ballance and no levels of the game's own (assets/levels): import your Ballance with \
                  --import DIR, or pass --data DIR",
             )?;
-            o.source = Source::Open(first.level);
+            // the shipped levels are open-format folders or community maps' .nmo files (the owner's picks)
+            o.source = if first.level.is_dir() {
+                Source::Open(first.level)
+            } else {
+                Source::Nmo(first.level)
+            };
         }
         app::run(o, data)
     });
