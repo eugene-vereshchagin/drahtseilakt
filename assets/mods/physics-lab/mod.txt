@@ -1,4 +1,5 @@
-# Physics lab (after PhysicsEditor): gravity and the physics' time factor as options. A rule variant: the run is
+# Physics lab (after PhysicsEditor): gravity as a vector (down, and sideways along the world's x and z) and the
+# physics' time factor as options. A rule variant: the run is
 # marked modded and its replay names this mod with the values, so it plays back the same.
 name.en Physics lab
 name.ru Физическая лаборатория
@@ -7,18 +8,20 @@ name.zh 物理实验室
 name.fr Labo de physique
 name.es Laboratorio de física
 name.it Laboratorio di fisica
-description.en Gravity and the physics' time factor to try (originals: 20 and 2.0).
-description.ru Гравитация и множитель времени физики (в оригинале 20 и 2,0).
-description.de Schwerkraft und Zeitfaktor der Physik (Original: 20 und 2,0).
-description.zh 可调重力与物理时间倍率（原版为 20 与 2.0）。
-description.fr Gravité et facteur de temps physique (originaux : 20 et 2,0).
-description.es Gravedad y factor de tiempo físico (originales: 20 y 2,0).
-description.it Gravità e fattore di tempo fisico (originali: 20 e 2,0).
+description.en Gravity, down and sideways, and the physics' time factor (originals: 20, 0 and 2.0).
+description.ru Гравитация вниз и вбок и множитель времени физики (в оригинале 20, 0 и 2,0).
+description.de Schwerkraft nach unten und seitlich, Zeitfaktor der Physik (Original: 20, 0 und 2,0).
+description.zh 可调向下与侧向重力及物理时间倍率（原版为 20、0 与 2.0）。
+description.fr Gravité vers le bas et latérale, facteur de temps physique (originaux : 20, 0 et 2,0).
+description.es Gravedad hacia abajo y lateral, factor de tiempo físico (originales: 20, 0 y 2,0).
+description.it Gravità verso il basso e laterale, fattore di tempo fisico (originali: 20, 0 e 2,0).
 author Drahtseilakt
 version 1.0
 licence GPL-3.0-only
 requires 0.1
 option gravity number 0 60 2 20
+option gravity_x number -20 20 1 0
+option gravity_z number -20 20 1 0
 option time number 5 40 1 20
 label gravity en Gravity
 label gravity ru Гравитация
@@ -27,6 +30,20 @@ label gravity zh 重力
 label gravity fr Gravité
 label gravity es Gravedad
 label gravity it Gravità
+label gravity_x en Gravity sideways X
+label gravity_x ru Гравитация вбок X
+label gravity_x de Schwerkraft seitlich X
+label gravity_x zh 侧向重力 X
+label gravity_x fr Gravité latérale X
+label gravity_x es Gravedad lateral X
+label gravity_x it Gravità laterale X
+label gravity_z en Gravity sideways Z
+label gravity_z ru Гравитация вбок Z
+label gravity_z de Schwerkraft seitlich Z
+label gravity_z zh 侧向重力 Z
+label gravity_z fr Gravité latérale Z
+label gravity_z es Gravedad lateral Z
+label gravity_z it Gravità laterale Z
 label time en Time factor x10
 label time ru Время физики x10
 label time de Zeitfaktor x10
@@ -37,4 +54,5 @@ label time it Fattore tempo x10
 
 on start
 do world.gravity opt.gravity
+do world.gravity_xz opt.gravity_x opt.gravity_z
 do world.time opt.time / 10

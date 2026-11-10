@@ -779,11 +779,7 @@ mod tests {
         ]
         .map(str::to_owned)
         .to_vec();
-        for kind in [
-            crate::sim::BallKind::Wood,
-            crate::sim::BallKind::Stone,
-            crate::sim::BallKind::Paper,
-        ] {
+        for kind in crate::sim::BALL_KINDS {
             let (rolls, hits) = crate::ballsound::table(kind);
             v.extend(rolls.iter().chain(hits.iter()).map(|s| (*s).to_owned()));
         }

@@ -119,7 +119,7 @@ acht Merkmalen:
 | slope | sein Anstieg darüber: `flat`, `up`, `down` (mehr als 0,15) |
 | ahead | das Erste darin: `gap`, `drop`, `rail-end`, `rail-start`, `sill`, `transformer` oder `none` |
 | module | das nächste Modul innerhalb 8 (`P_Modul_25`, `P_Box`, ...) oder `none` |
-| kind | `wood`, `stone`, `paper` |
+| kind | `wood`, `stone`, `paper`, `sticky` |
 
 Was über den größten Teil (60 %) der Strecke gleich war, wird eine Regel: die Oberfläche, die Kugel und die Werte,
 die die Stelle besonders machen (kein gewöhnlicher mittlerer oder breiter Boden, gerade, eben, nichts voraus, kein

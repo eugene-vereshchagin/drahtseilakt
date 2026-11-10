@@ -334,6 +334,7 @@ fn kind_of(s: &str) -> Option<BallKind> {
         "wood" => Some(BallKind::Wood),
         "stone" => Some(BallKind::Stone),
         "paper" => Some(BallKind::Paper),
+        "sticky" => Some(BallKind::Sticky),
         _ => None,
     }
 }
@@ -1783,6 +1784,9 @@ mod tests {
         );
         assert_eq!(h[1].steps[2], Step::Become(BallKind::Paper));
         assert_eq!(h[1].line, 3);
+        let sticky = parse("at 0 0 0 r 1 kind sticky : become sticky").unwrap();
+        assert_eq!(sticky[0].kind, Some(BallKind::Sticky), "our own ball's name");
+        assert_eq!(sticky[0].steps[0], Step::Become(BallKind::Sticky));
         let moving = parse("at 0 0 0 r 1 : lead 1 2 3 -4 300 ; shove 1 2 3 7 8 9 500").unwrap();
         assert_eq!(moving[0].steps[0], Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300));
         assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500, SHOVE_BEHIND, None));

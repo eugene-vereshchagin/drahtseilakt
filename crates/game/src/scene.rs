@@ -59,9 +59,15 @@ pub struct BallMeshes {
     pub wood: Option<usize>,
     pub stone: Option<usize>,
     pub paper: Option<usize>,
-    /// The boxes of the three meshes (wood, stone, paper), a sphere's ±2 where a mesh is missing.
-    pub boxes: [(Vec3, Vec3); 3],
+    /// Our own sticky ball (`Ball_Sticky_Mesh`): only our Balls part has it, not the original's Balls.nmo.
+    pub sticky: Option<usize>,
+    /// The boxes of the meshes (wood, stone, paper, sticky), a sphere's ±2 where a mesh is missing.
+    pub boxes: [(Vec3, Vec3); crate::sim::BALL_KINDS.len()],
 }
+
+/// The tint the sticky ball is drawn with on the wooden ball's mesh when the balls in use (the copy's Balls.nmo) have no
+/// sticky one: a tacky red, so it never passes for the wooden ball.
+const STICKY_TINT: [f32; 4] = [1.0, 0.35, 0.5, 1.0];
 
 impl BallMeshes {
     pub fn find(balls: &Level) -> BallMeshes {
@@ -71,10 +77,11 @@ impl BallMeshes {
                 .iter()
                 .position(|m| m.name.eq_ignore_ascii_case(name))
         };
-        let (wood, stone, paper) = (
+        let (wood, stone, paper, sticky) = (
             mesh("Ball_Wood_Mesh"),
             mesh("Ball_Stone_HighRes_Mesh").or_else(|| mesh("Ball_Stone_Mesh")),
             mesh("Ball_Paper_Mesh"),
+            mesh("Ball_Sticky_Mesh"),
         );
         let bounds = |m: Option<usize>| {
             let sphere = (Vec3::splat(-2.0), Vec3::splat(2.0));
@@ -93,7 +100,22 @@ impl BallMeshes {
             wood,
             stone,
             paper,
-            boxes: [bounds(wood), bounds(stone), bounds(paper)],
+            sticky,
+            boxes: [bounds(wood), bounds(stone), bounds(paper), bounds(sticky.or(wood))],
+        }
+    }
+
+    /// The mesh a ball of `kind` is drawn with, and its tint if any (the sticky ball on the wooden ball's mesh when the
+    /// balls in use have no sticky one).
+    pub fn of(&self, kind: BallKind) -> Option<(usize, Option<[f32; 4]>)> {
+        match kind {
+            BallKind::Wood => self.wood.map(|m| (m, None)),
+            BallKind::Stone => self.stone.map(|m| (m, None)),
+            BallKind::Paper => self.paper.map(|m| (m, None)),
+            BallKind::Sticky => self
+                .sticky
+                .map(|m| (m, None))
+                .or_else(|| self.wood.map(|m| (m, Some(STICKY_TINT)))),
         }
     }
 }
@@ -600,20 +622,14 @@ pub fn instances(
             shadow: None,
         });
     }
-    let mesh = match s.kind {
-        Some(BallKind::Wood) => balls.wood,
-        Some(BallKind::Stone) => balls.stone,
-        Some(BallKind::Paper) => balls.paper,
-        None => None,
-    };
-    if let Some(mesh) = mesh {
+    if let Some((mesh, tint)) = s.kind.and_then(|k| balls.of(k)) {
         out.push(Instance {
             model: BALLS_MODEL,
             mesh,
             matrix: Mat4::from_rotation_translation(s.rotation, s.ball),
             marker: None,
             uv_offset: [0.0; 2],
-            diffuse: None,
+            diffuse: tint,
             unlit: false,
             shadow: None,
         });
@@ -625,13 +641,9 @@ pub fn instances(
 /// squeezed and stretched at random about its centre (the wood only, never the physics' round ball), and `decoys`
 /// translucent copies wandering around it. `t` is the real time in seconds; nothing here touches the run.
 pub fn ball_looks(inst: &mut Vec<Instance>, snap: &Snapshot, balls: &BallMeshes, t: f32, deform: f32, decoys: u8) {
-    let mesh = match snap.kind {
-        Some(BallKind::Wood) => balls.wood,
-        Some(BallKind::Stone) => balls.stone,
-        Some(BallKind::Paper) => balls.paper,
-        None => None,
+    let Some((mesh, _)) = snap.kind.and_then(|k| balls.of(k)) else {
+        return;
     };
-    let Some(mesh) = mesh else { return };
     if deform > 0.0 && snap.kind == Some(BallKind::Wood) {
         if let Some(i) = inst
             .iter_mut()

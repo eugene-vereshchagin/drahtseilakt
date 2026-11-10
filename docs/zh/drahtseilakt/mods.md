@@ -23,7 +23,7 @@
 | 模组 | 仿照的 BML mod | 作用 | 改变游玩 |
 |---|---|---|---|
 | `sticky-ball` | BallSticky、StickyAccess | 球碰到的东西会粘住它；推向墙壁时会爬上去；选项：粘性、仅限木球 | 是（modded） |
-| `physics-lab` | PhysicsEditor | 重力（0–60，原版 20）和物理的时间因子（0.5–4，原版 2） | 是（modded） |
+| `physics-lab` | PhysicsEditor | 重力向量：向下（0–60，原版 20）以及沿世界 x、z 轴的侧向分量（各 −20–20，原版 0）——以及物理的时间因子（0.5–4，原版 2） | 是（modded） |
 | `dynamic-fov` | DynamicFov | 视野随球的速度变宽；选项：强度 | 否 |
 | `free-view` | FreeViewRotation、AdvancedTravelCam | 鼠标让视角绕球转动，一个键把它转回；相机距离 | 否 |
 | `segment-timer` | Segment、RealTimeMeter、WatchYourTime | 游玩时间、真实时间、每个小节相对最佳成绩的分段（领先为绿，落后为红） | 否 |
@@ -38,7 +38,22 @@
 | `back-to-2004` | （玩笑；撤销我们的画面改进） | 像2004年的电脑：低分辨率（640x480、800x600或1024x768）的硬像素，4:3画面带黑边，纹理无mipmap和各向异性（双线性或最近邻：远处闪烁），帧率上限（关、60、30），可选16位色彩条纹；附赠一副用于流血泪的眼镜 | 否 |
 | `play-time` | WatchYourTime | 每关和总计的游戏时长，显示在屏幕上，并保存在数据文件夹的 `playtime.txt`；选项：是否显示 | 否 |
 | `sector-jump` | SpeedrunShortcuts（设置小节） | 按键（F7 / PageUp、F6 / PageDown）从下一个或上一个小节重新开始关卡 | 是（modded） |
+| `spawn-point` | NewSpawn、SpeedrunShortcuts（设置出生点） | 一个键（F8、H 或 J）在球所在处设出生点，另一个键（G、F4 或 C）把球静止地送回那里，恢复当时的球种；小节及其物体保持原样 | 是（modded） |
 | `free-steering` | FreeViewRotation（含操控） | 类似 `free-view`，但方向键沿转动后的视角推动；视角的转动记录在回放中 | 是（modded） |
+
+## 粘性球种类
+
+*2026-11-10，所有者的决定。* 仿照 BallSticky，在木球、石球、纸球之外加入我们自己的第四种球 `sticky`：不是 mod，而是任何关卡都可使用的球种。
+它的变球器是 `P_Trafo_Sticky`（深红色圆环；带有它的地图，包括 BallSticky 自己的地图，都像其他变球器一样使用它），散球是
+`P_Ball_Sticky`，凡是写球种的地方名字都是 `sticky`（`--ball`、回放的 `start`、`sector_balls`、提示的 `kind` 和 `become`、
+关卡语言的 `ball`、`trafo` 和 `loose`）。外观是我们自己的（`assets/own/make/make_parts.py`：蜂窝格的深红色橡胶，爆裂时为十四块橡胶碎片）；
+使用副本的 Balls.nmo 时（其中没有这种球），它用木球的网格绘制并染成深红色。在有自己的声音之前，使用木球的声音。
+
+它的参数（选定而非测量：原版没有这种球，BallSticky 的参数在其自身文件中，不读取）：质量 4（木 1.9，石 10），推力 0.6
+（每单位质量 0.15，介于石的 0.09 和木的 0.23 之间），摩擦 1.0（四者中最大），弹性 0.05（最小），阻尼 0.9（同木）；散球相同。
+它不需要 mod，就像 `sticky-ball` mod 的 `ball.stick 0.9` 那样粘住所碰之物：在该 mod 的默认 0.6 下，这么重的球只能贴在墙上
+（升力 1.09，自重 1.21），0.9 时能爬上去（1.63）。若同时开启该 mod，以更强的粘力为准。在斜坡上从静止推动，它能爬到 43°，
+更陡时则贴住不滑落（测试玩家的表）。
 
 ## 上帝模式
 
@@ -117,7 +132,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 |---|---|---|---|
 | `ball.x` `ball.y` `ball.z` | 球的位置 | `real.time` | 游玩开始以来的真实秒数 * |
 | `ball.speed` `ball.vy` | 它的速度、它的竖直速度 | `frame.dt` `frame.fps` | 帧的时长、每秒帧数 * |
-| `ball.kind` | 0 木球、1 石球、2 纸球 | `clock.hour` `clock.minute` `clock.second` | 时钟，UTC * |
+| `ball.kind` | 0 木球、1 石球、2 纸球、3 粘性球 | `clock.hour` `clock.minute` `clock.second` | 时钟，UTC * |
 | `ball.touching` `ball.wall` | 它碰到了某物；碰到了陡峭的东西 | `mouse.dx` `mouse.dy` | 本帧鼠标的移动 * |
 | `run.tick` `run.time` | 游玩的 tick 数、秒数 | `extras.points` `extras.points_all` | 本小节剩余的额外分，以及全部 * |
 | `practice.speed` | 游戏的速度（1，最低到 1/8） * | `practice.saved` | 已保存一个时刻（1 或 0） * |
@@ -140,6 +155,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 - `do ball.stick <0..1>` — 球以此强度粘住它碰到的东西，抵抗重力，推向墙壁时会沿墙向上转。
 - `do world.gravity <0..60>` — 重力的拉力（原版为 20）。
+- `do world.gravity_xz <x> <z>` — 沿世界 x、z 轴的侧向重力，各 −60 到 60（原版为 0、0；两个不含空格的表达式）。与 `world.gravity` 一起，重力成为向量，如 PhysicsEditor 所设。
 - `do world.time <0.5..4>` — 物理的时间因子（原版为 2）。
 - `do lives.endless <0|1>` — 最后一个球永远不会丢失（god-mode）。
 - `do steer.yaw <度>` — 方向键的推力绕竖直轴转过这么多度（相机以同样的旋转转动，所以方向键沿转动后的视角推动）。
@@ -156,6 +172,13 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 - `do sector.set <n>` — 游玩从小节 n（1 为第一个）重新开始，使用该小节的球，如同 `--sector`；回放记录起点。
   下一次普通重开又是关卡的起点。
+
+出生点（仅在 `key` 上；使 mod 成为 modded，并归入游玩一侧，回放会记录它）：
+
+- `do spawn.set` — 在球所在处设出生点（位置、朝向、球种）；
+- `do spawn.go` — 球静止地回到出生点，恢复当时的球种；小节及其物体保持原样（NewSpawn 的简单传送）。球丢失、在变球器中或正在变球时两者都不起作用。
+
+  两者都由游玩本身完成：按键在一个 tick 内按下一个输入位（64 设点，128 传送），回放与方向键一起保存它，因此回放结果相同。没有这样的 mod 时游玩忽略这些位。
 
 视图动作（只能用于 `frame` 或 `key`）：
 
@@ -220,11 +243,12 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 
 ## 尚未实现（排队中）
 
-- **同伴 / 双球**（DualBallControl）：按键切换到的第二个球需要游玩中有第二个玩家刚体（物理、操控、相机、检查点和死亡都只认
-  一个球）——一个独立的构件，切换要记录在回放中。原版 mod 通过第二个起点对象（`PS_FourFlames_01_Dual`）识别双球地图；
-  手头的社区地图中尚不知有这样的（文件是压缩的，简单搜索说明不了什么）。留作单独的工作。
-- **独立的粘性球类型**及其变形器（BallSticky 的 `P_Trafo_Sticky`）：目前任何球都可以变粘。
-- **传送到出生点**（NewSpawn）：上帝模式的保存与读取和 `--sector` 已覆盖练习。
+- **同伴 / 双球**（DualBallControl）。从其字符串可见它的做法：在带第二个起点（`PS_FourFlames_01_Dual`，并有自己的
+  `PC_TwoFlames_0*` / `PR_Resetpoint_0*`）的地图上，它再次加载 `Balls.nmo`，物理化第二个游戏球和第二个 `Cam_MF`，
+  切换键关闭一个球的操控并把另一个设为 BallManager 的球。我们需要（全部在 Sim 中）：第二个球的状态和刚体（如今球是世界的
+  实体 0：`replace_ball(0, ..)`、实体 1 的接触、推力、粘力），未激活的球作为被动动态刚体，小节的检查点、重置点、死亡、
+  变球器和额外生命作用于哪个球，第二套相机或一套跳到另一个球的相机，以及作为回放保存的输入位的切换（同出生点）。
+  手头的社区地图中尚不知有双起点的（文件是压缩的，简单搜索说明不了什么）；没有可玩的地图，此改动等到出现这样的地图再做。
 - mod.txt 的 fuzz 目标（解析器严格、有上限并有单元测试；fuzz 随发布工作一起做）。
 
 ## 调查过的 BML mod
@@ -241,7 +265,7 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | Coredump | 把运行中的 Virtools 上下文转储为 .nmo | 不需要（我们的运行时是自己的；`--export` 写出关卡） |
 | CursorClipper | 把光标限制在窗口内 | 不需要：游玩不从光标获取任何东西，`mouse.dx` 读取原始移动 |
 | DeformedWB | 随机使木球的外观变形 | 内置 `deformed-ball` |
-| DualBallControl | 双球地图，用一个键切换球 | 排队中（需要第二个玩家刚体） |
+| DualBallControl | 双球地图，用一个键切换球 | 排队中（需要第二个玩家刚体；具体见上文） |
 | DynamicFov | 视野随球的速度变化 | 内置 `dynamic-fov`；固定视野在 Graphics 中 |
 | EnergyItemCounter | 本小节剩余的额外分和生命 | 内置 `info-overlay` |
 | ExtraSector | 加载超过八个小节的地图 | 引擎：最多 64 个小节，无需加载器 |
@@ -250,19 +274,19 @@ UTF-8 文本，每行一条语句，`#` 开始注释行。按以下顺序：
 | Interference | 球周围的半透明诱饵球 | 内置 `interference` |
 | LanternFader | 对灯笼材质做 alpha 测试以防掉帧 | 不需要（我们的渲染器） |
 | MapScripts | 运行地图的回调脚本 | 计划中：地图脚本解释器（scripts.md）；不是模组 |
-| NewSpawn | 设置出生点、传送到那里、录制灵魂球 | 上帝模式（F5/F9）、`--sector`、`--at`；`spirit-trail` |
-| PhysicsEditor | 重力、物理时间因子、游戏速度 | 内置 `physics-lab`（modded）；游戏速度是上帝模式的 `[` `]` |
+| NewSpawn | 设置出生点、传送到那里、录制灵魂球 | 内置 `spawn-point`（modded）；上帝模式（F5/F9）、`--sector`、`--at`；`spirit-trail` |
+| PhysicsEditor | 重力（向量）、物理时间因子、游戏速度 | 内置 `physics-lab`（modded；向下与侧向重力）；游戏速度是上帝模式的 `[` `]` |
 | PositionViewer | 球的坐标 | 内置 `info-overlay` |
 | RealTimeMeter | 跨关卡的真实游戏时间 | 内置 `segment-timer`（真实时间） |
 | ScreenCapturer | 一个键保存截图（PNG/JPEG、剪贴板） | 内置 `screenshot`（PNG；无剪贴板） |
 | Segment | 每个小节相对纪录的时间 | 内置 `segment-timer` |
-| SpeedrunShortcuts | 作弊模式、设置出生点、重开、设置小节 | 内置 `quick-restart`；上帝模式；`sector-jump`（设置小节；modded） |
+| SpeedrunShortcuts | 作弊模式、设置出生点、重开、设置小节 | 内置 `quick-restart`；上帝模式；`spawn-point`（设置出生点；modded）；`sector-jump`（设置小节；modded） |
 | SpiritTrail | 以半透明球显示纪录游玩 | 内置 `spirit-trail` |
 | StickyAccess | 在作弊模式下切换到粘性球 | 内置 `sticky-ball` |
 | SysInfoDisplay | 屏幕上显示系统时间和电量 | 内置 `info-overlay`（时钟，UTC）；无电量 |
 | TASSupport | 录制和播放输入、跳过渲染、结束时退出 | 引擎：回放是确定性的输入录制（`--record`、`--replay`、`--headless`），以及上帝模式的慢动作 |
 | WatchYourTime | 每关游戏时长 | 内置 `play-time`（`playtime.txt`；另有 `segment-timer`） |
-| BallSticky | 能爬墙的粘性球类型 | 内置 `sticky-ball`（modded） |
+| BallSticky | 能爬墙的粘性球类型 | 我们自己的球种 `sticky` 及其变球器 `P_Trafo_Sticky`（见上文）；内置 `sticky-ball`（modded）可让任何球变粘 |
 | BMLModuls | 新模块（木制落板和旋转板） | 关卡部件，不是模组：开放格式的部件（[open-format.md](open-format.md)） |
 
 这些 mod 所绕开的原版限制（帧率上限、4:3、低分辨率、八个小节、位图字体、脆弱的变球时机）不是我们要照搬的。

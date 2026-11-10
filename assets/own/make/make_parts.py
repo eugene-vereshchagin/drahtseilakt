@@ -149,6 +149,33 @@ def _ball_paper():
     return np.clip(np.where(folds[..., None], img * 0.82, img), 0, 1)
 
 
+def _ball_sticky():
+    """Our sticky ball (no original's to stand in for): tacky crimson rubber in a honeycomb of shallow cells, each cell
+    a little darker at its rim, a soft sheen in the middle."""
+    y, x = np.mgrid[0:TEX, 0:TEX].astype(np.float64)
+    # a hexagonal grid that tiles across u (12 cells round) and v (8 rows down)
+    w = TEX / 12.0
+    h = w * math.sqrt(3) / 2
+    row = np.floor(y / h)
+    xs = x / w - 0.5 * (row % 2)
+    cx = (np.floor(xs) + 0.5 + 0.5 * (row % 2)) * w
+    cy = (row + 0.5) * h
+    best = np.full(x.shape, np.inf)
+    for dr in (-1, 0, 1):
+        r2 = row + dr
+        xs2 = x / w - 0.5 * (r2 % 2)
+        for dc in (-1, 0, 1):
+            ccx = (np.floor(xs2) + dc + 0.5 + 0.5 * (r2 % 2)) * w
+            ccy = (r2 + 0.5) * h
+            d = np.hypot(x - ccx, y - ccy)
+            best = np.minimum(best, d)
+    rim = np.clip(best / (w * 0.55), 0, 1) ** 3
+    n = k.value_noise(TEX, TEX, (8, 8), 125)
+    base = k.rgb(178, 28, 64)[None, None] * (0.9 + 0.15 * n)[..., None]
+    img = base * (1.05 - 0.55 * rim)[..., None] + (0.18 * (1 - rim) ** 4)[..., None] * k.rgb(255, 170, 190)[None, None]
+    return np.clip(img, 0, 1)
+
+
 def _dome():
     """The dome bumper: deep blue tiles with lighter joints."""
     y, x = np.mgrid[0:TEX, 0:TEX]
@@ -213,6 +240,7 @@ TEXTURE_MAKERS = {
     "ball_wood.png": _ball_wood,
     "ball_stone.png": _ball_stone,
     "ball_paper.png": _ball_paper,
+    "ball_sticky.png": _ball_sticky,
     "dome.png": _dome,
     "flash.png": _flash,
     "chrome_env.png": lambda: k.env_map(TEX, k.rgb(150, 170, 220), k.rgb(250, 250, 255), k.rgb(70, 60, 60), 19),
@@ -261,6 +289,7 @@ PACK_NAMES = {
     "P_Trafo_Wood": "Trafo_Environment", "P_Trafo_Wood_Color": "Trafo_Environment",
     "P_Trafo_Stone": "Trafo_Environment", "P_Trafo_Stone_Color": "Trafo_Environment",
     "P_Trafo_Paper": "Trafo_Environment", "P_Trafo_Paper_Color": "Trafo_Environment",
+    "P_Trafo_Sticky": "Trafo_Environment", "P_Trafo_Sticky_Color": "Trafo_Environment",
 }
 
 
@@ -438,6 +467,9 @@ def ball_mesh(name, mat, kind):
     elif kind == "stone":
         k.sphere(m, mat, (0, 0, 0), 2.0, seg=24)
         fit_box(m, STONE_BOX)
+    elif kind == "sticky":
+        # ours: a true sphere of the physics' radius 2, smooth (the cells are in its texture)
+        k.sphere(m, mat, (0, 0, 0), 2.0, seg=24)
     else:
         k.sphere(m, mat, (0, 0, 0), 2.0, seg=20)
         fit_box(m, WOOD_BOX)
@@ -492,14 +524,19 @@ def make_balls():
     wp = p.mat("Ball_Wood_Pieces", "ball_wood.png", emissive=0.24, **piece_mat)
     sp = p.mat("Ball_Stone_Pieces", "ball_stone.png", emissive=0.27, **piece_mat)
     pp = p.mat("Ball_Paper_Pieces", "ball_paper.png", emissive=0.2, double_sided=True, **piece_mat)
+    sticky = p.mat("Ball_Sticky", "ball_sticky.png", emissive=0.24, specular=0.45, power=30)
+    tp = p.mat("Ball_Sticky_Pieces", "ball_sticky.png", emissive=0.24, **piece_mat)
     light = p.mat("Ball_LightningSphere", "glow.png", diffuse=[0, 0, 0, 1], emissive=1.0, alpha="BLEND",
                   blend=("one", "one"), double_sided=True)
     # sixteen staves of wood, seventeen chunks of stone, eighteen thin crumples of paper, as many as the original's
     wood_names = pieces(p, "Wood", wp, 16, 1.3, 1.25, 161, stretch=2.2)
     stone_names = pieces(p, "Stone", sp, 17, 1.5, 0.8, 162)
     paper_names = pieces(p, "Paper", pp, 18, 1.5, 1.75, 163)
+    # ours: fourteen thick rubber chunks
+    sticky_names = pieces(p, "Sticky", tp, 14, 1.6, 1.1, 164)
     balls = []
-    for name, mat, kind in (("Ball_Wood", wood, "wood"), ("Ball_Stone", stone, "stone"), ("Ball_Paper", paper, "paper")):
+    for name, mat, kind in (("Ball_Wood", wood, "wood"), ("Ball_Stone", stone, "stone"), ("Ball_Paper", paper, "paper"),
+                            ("Ball_Sticky", sticky, "sticky")):
         mesh_name = "Ball_Stone_HighRes_Mesh" if kind == "stone" else f"{name}_Mesh"
         p.node(name, p.mesh(ball_mesh(mesh_name, mat, kind)))
         balls.append(name)
@@ -512,11 +549,12 @@ def make_balls():
     p.node("Ball_Particle_Frame", s=1.5, visible=True)
     p.node("Ball_LightningSphere", p.mesh(m))
     for f in ("Ball_Pos_Frame", "Ball_WoodPieces_Frame", "Ball_StonePieces_Frame", "Ball_PaperPieces_Frame",
-              "Balls_MF"):
+              "Ball_StickyPieces_Frame", "Balls_MF"):
         p.node(f)
-    p.group("All_Balls", wood_names + stone_names + paper_names + balls +
+    p.group("All_Balls", wood_names + stone_names + paper_names + sticky_names + balls +
             ["Ball_Lightning_PointLight", "Ball_Particle_Frame", "Ball_LightningSphere", "Ball_Pos_Frame",
-             "Ball_WoodPieces_Frame", "Ball_StonePieces_Frame", "Ball_PaperPieces_Frame", "Balls_MF"])
+             "Ball_WoodPieces_Frame", "Ball_StonePieces_Frame", "Ball_PaperPieces_Frame", "Ball_StickyPieces_Frame",
+             "Balls_MF"])
     p.write()
 
 
@@ -527,7 +565,7 @@ def lathe_mesh(m, mat, profile, seg=16, **kw):
 def make_loose_balls():
     """The loose balls a level places (P_Ball_*): their physics comes from the level's stand-in; this is their look."""
     for kind, tex, em in (("Wood", "ball_wood.png", 0.31), ("Stone", "ball_stone.png", 0.31),
-                          ("Paper", "ball_paper.png", 0.31)):
+                          ("Paper", "ball_paper.png", 0.31), ("Sticky", "ball_sticky.png", 0.31)):
         p = Part(f"PH/P_Ball_{kind}")
         mat = p.mat(f"P_Ball_{kind}", tex, emissive=em, specular=0.2, power=15)
         p.node(f"P_Ball_{kind}_MF", p.mesh(ball_mesh(f"P_Ball_{kind}_Mesh", mat, kind.lower())))
@@ -579,8 +617,9 @@ def make_dome():
 
 def make_trafos():
     """The transformer pads: a steel ring 4.93 across and 0.48 high with the ball kind's colour inside (wood amber,
-    stone green, paper blue), and its shadow."""
-    colours = {"Wood": (0.92, 0.58, 0.09), "Stone": (0.09, 0.92, 0.58), "Paper": (0.09, 0.46, 0.92)}
+    stone green, paper blue, and our sticky ball's crimson for P_Trafo_Sticky), and its shadow."""
+    colours = {"Wood": (0.92, 0.58, 0.09), "Stone": (0.09, 0.92, 0.58), "Paper": (0.09, 0.46, 0.92),
+               "Sticky": (0.92, 0.09, 0.32)}
     for kind, c in colours.items():
         p = Part(f"PH/P_Trafo_{kind}")
         sh = shadow(p, f"P_Trafo_{kind}_Shadow", f"P_Trafo_{kind}_Shadow")

@@ -26,6 +26,10 @@ pub mod input {
     pub const SHIFT: u8 = 16;
     /// Lift the camera for an overview.
     pub const LIFT: u8 = 32;
+    /// A spawn point set where the ball is, and the ball put back there at rest: pressed for one tick by a mod's key
+    /// (`spawn.set`, `spawn.go`), and only heeded while such a mod is on the run's side (its replay names it).
+    pub const SPAWN_SET: u8 = 64;
+    pub const SPAWN_GO: u8 = 128;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,7 +37,19 @@ pub enum BallKind {
     Wood,
     Stone,
     Paper,
+    /// Our own fourth ball (after BallSticky's `Ball_Sticky`, not the original's): tacky rubber that holds to what it
+    /// touches, so a wall pushed into can be climbed (`STICKY_HOLD`); its transformer is `P_Trafo_Sticky`.
+    Sticky,
 }
+
+/// The ball kinds, in their order (`kind as usize` indexes per-kind tables).
+pub const BALL_KINDS: [BallKind; 4] = [BallKind::Wood, BallKind::Stone, BallKind::Paper, BallKind::Sticky];
+
+/// How strongly the sticky ball holds to what it touches, as the sticky-ball mod's `ball.stick` does: the kind is that
+/// mod made a ball of its own. 0.9, not the mod's 0.6: the hold lifts the ball up a wall by `k` of its weight plus `k` of
+/// its push, and the sticky ball is twice the wooden one's weight for less push per mass, so at 0.6 it only clings
+/// (lift 1.09 against a weight of 1.21) and at 0.9 it climbs (1.63).
+pub const STICKY_HOLD: f32 = 0.9;
 
 impl BallKind {
     /// The original game's balls (its `Physicalize_GameBall` table, see docs/physics.md, section 3): the control
@@ -61,6 +77,16 @@ impl BallKind {
                 elasticity: 0.4,
                 lin_damp: 1.5,
             },
+            // ours (the original has no such ball; BallSticky's numbers are in its own files, not read): rubber,
+            // between wood and stone in weight, the push per mass between theirs (0.15 against 0.23 and 0.09), the
+            // most friction and the least bounce of the four, damped as wood
+            BallKind::Sticky => Params {
+                force: 0.6,
+                mass: 4.0,
+                friction: 1.0,
+                elasticity: 0.05,
+                lin_damp: 0.9,
+            },
         }
     }
 
@@ -72,6 +98,8 @@ impl BallKind {
             Some(BallKind::Stone)
         } else if n.contains("paper") {
             Some(BallKind::Paper)
+        } else if n.contains("sticky") {
+            Some(BallKind::Sticky)
         } else {
             None
         }
@@ -785,6 +813,8 @@ pub struct Sim {
     object_sectors: Vec<Option<usize>>,
     pub events: Vec<(u64, Event)>,
     prev_input: u8,
+    /// The spawn point a mod's key set (`input::SPAWN_SET`): where the ball was, how it was turned, its kind.
+    spawn_point: Option<(Vec3, Quat, BallKind)>,
     /// The view's turn in whole degrees, handed in by the window each tick (a `view.turn` mod; recorded in the replay).
     pub turn: u16,
     /// The ball inside a transformer, if it is in one.
@@ -814,7 +844,7 @@ pub struct Sim {
     /// The modules' parts that are bodies, for drawing.
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
-    ball_boxes: [(Vec3, Vec3); 3],
+    ball_boxes: [(Vec3, Vec3); BALL_KINDS.len()],
     /// The balls' pieces (pieces.rs), those lying about now (their kind, piece and body), and for each kind (wood,
     /// stone, paper) the tick they burst and the tick their fade began (20 s on, or the ball was lost).
     pieces: crate::pieces::Pieces,
@@ -1088,6 +1118,7 @@ impl Sim {
                     BallKind::Wood => (2.0, 0.6, 0.2, 0.6),
                     BallKind::Stone => (10.0, 0.7, 0.1, 0.2),
                     BallKind::Paper => (0.2, 0.5, 0.4, 1.5),
+                    BallKind::Sticky => (4.0, 1.0, 0.05, 0.9),
                 };
                 let material = Material {
                     friction,
@@ -1320,6 +1351,7 @@ impl Sim {
             object_sectors,
             events: Vec::new(),
             prev_input: 0,
+            spawn_point: None,
             turn: 0,
             hold: None,
             trafo_anim: None,
@@ -1334,7 +1366,7 @@ impl Sim {
             breaks,
             module_sectors,
             module_bodies,
-            ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); 3],
+            ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); BALL_KINDS.len()],
             pieces: crate::pieces::Pieces::default(),
             flying: Vec::new(),
             pieces_burst: [None; 3],
@@ -1509,7 +1541,7 @@ impl Sim {
         self.touching = self.touch();
         self.fire_mods(gamedata::mods::Event::Tick, input);
         let out = self.mods.out;
-        self.world.set_rules(out.gravity, out.time_factor);
+        self.world.set_rules(out.gravity, out.gravity_xz, out.time_factor);
         self.step_run(input);
         let events: Vec<Event> = self.events.iter().skip(before).map(|e| e.1).collect();
         for e in events {
@@ -1542,6 +1574,7 @@ impl Sim {
                 BallKind::Wood => 0.0,
                 BallKind::Stone => 1.0,
                 BallKind::Paper => 2.0,
+                BallKind::Sticky => 3.0,
             },
             V::BallTouching => {
                 if self.touching.0 {
@@ -1600,10 +1633,17 @@ impl Sim {
         (!n.is_empty(), n.iter().any(|n| n.y < 0.5))
     }
 
-    /// The sticky ball (a mod's `ball.stick`): what it touches holds it, against gravity, and a push into a wall
-    /// turns up along it, so a wall can be climbed. `push` is the arrows' direction, `force` the ball's push.
+    /// How strongly the ball holds to what it touches: the sticky kind's own hold, or a mod's `ball.stick` if more.
+    fn stickiness(&self) -> f32 {
+        let own = if self.ball.kind == BallKind::Sticky { STICKY_HOLD } else { 0.0 };
+        self.mods.out.stick.max(own)
+    }
+
+    /// The sticky ball (the sticky kind, or a mod's `ball.stick`): what it touches holds it, against gravity, and a
+    /// push into a wall turns up along it, so a wall can be climbed. `push` is the arrows' direction, `force` the
+    /// ball's push.
     fn sticky_force(&self, push: Vec3, force: f32) -> Vec3 {
-        let k = self.mods.out.stick;
+        let k = self.stickiness();
         if k <= 0.0 || self.dying.is_some() || self.hold.is_some() {
             return push * force;
         }
@@ -1665,6 +1705,9 @@ impl Sim {
         self.run_scripts();
         let pressed = input & !self.prev_input;
         self.prev_input = input;
+        if pressed & (input::SPAWN_SET | input::SPAWN_GO) != 0 && self.mods.spawn() {
+            self.spawn_deeds(pressed);
+        }
 
         // Camera turns: Shift + Left / Right, a quarter per press.
         if input & input::SHIFT != 0 {
@@ -1725,7 +1768,7 @@ impl Sim {
         }
         self.push_keys = push_keys;
         let p = self.ball.kind.params();
-        let force = if self.mods.out.stick > 0.0 {
+        let force = if self.stickiness() > 0.0 {
             self.sticky_force(push, p.force)
         } else {
             push * p.force
@@ -2006,7 +2049,7 @@ impl Sim {
 
     /// The boxes of the ball meshes (wood, stone, paper) from the game's Balls.nmo; the depth-test cubes are tested
     /// against the box of the ball's mesh, as the original does.
-    pub fn set_ball_boxes(&mut self, boxes: [(Vec3, Vec3); 3]) {
+    pub fn set_ball_boxes(&mut self, boxes: [(Vec3, Vec3); BALL_KINDS.len()]) {
         self.ball_boxes = boxes;
     }
 
@@ -2451,6 +2494,29 @@ impl Sim {
     fn drop_ball_forces(&mut self) {
         for u in &mut self.updrafts {
             u.force = None;
+        }
+    }
+
+    /// The spawn point's keys (NewSpawn): set it where the ball is; put the ball back there, at rest, as it was turned,
+    /// as the ball it was, the camera's look-at point with it (the sector and its objects stay as they are, as NewSpawn's
+    /// plain teleport). Not while the ball is lost, held by a transformer or being changed.
+    fn spawn_deeds(&mut self, pressed: u8) {
+        if self.dying.is_some() || self.hold.is_some() || self.trafo_anim.is_some() {
+            return;
+        }
+        if pressed & input::SPAWN_SET != 0 {
+            self.spawn_point = Some((self.ball.position, self.ball.rotation, self.ball.kind));
+        }
+        if let (true, Some((p, r, kind))) = (pressed & input::SPAWN_GO != 0, self.spawn_point) {
+            self.ball.kind = kind;
+            self.ball.position = p;
+            self.ball.rotation = r;
+            self.ball.velocity = Vec3::ZERO;
+            self.ball.spin = Vec3::ZERO;
+            self.make_ball();
+            self.camera.position = camera_goal(&self.camera, p);
+            self.camera.target = p;
+            self.camera.step = Vec3::ZERO;
         }
     }
 
@@ -3049,6 +3115,63 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn the_spawn_points_keys_put_the_ball_back_at_rest_only_with_its_mod() {
+        let spawn = "name.en S\noption a key F8\noption b key KeyG\non key a\ndo spawn.set\non key b\ndo spawn.go\n";
+        let run = |mods: crate::modrt::SimMods| {
+            let mut sim = Sim::new(&flat_level(), BallKind::Wood);
+            sim.mods = mods;
+            for _ in 0..30 {
+                sim.step(0);
+            }
+            sim.step(input::SPAWN_SET);
+            let at = sim.ball.position;
+            for _ in 0..90 {
+                sim.step(input::UP);
+            }
+            let rolled = sim.ball.position;
+            sim.step(input::SPAWN_GO);
+            (at, rolled, sim)
+        };
+        let (at, rolled, sim) = run(mods_of(spawn));
+        assert!(at.distance(rolled) > 2.0, "the ball rolled away: {at} to {rolled}");
+        assert!(
+            sim.ball.position.distance(at) < 0.1 && sim.ball.velocity.length() < 0.5,
+            "back at {at} at rest: {} moving {}",
+            sim.ball.position,
+            sim.ball.velocity
+        );
+        let (_, rolled, plain) = run(crate::modrt::SimMods::default());
+        assert!(
+            plain.ball.position.distance(rolled) < 1.0,
+            "without the mod the bits do nothing"
+        );
+        let mods = mods_of(spawn);
+        assert_eq!(mods.replay_lines().len(), 1, "the replay names the mod");
+    }
+
+    #[test]
+    fn a_mods_sideways_gravity_pulls_the_ball_along_the_worlds_x_and_z() {
+        let mut level = flat_level();
+        level.objects[2].matrix[3][1] = 30.0;
+        let fall = |text: &str| {
+            let mut sim = Sim::new(&level, BallKind::Wood);
+            let start = sim.ball.position;
+            sim.mods = mods_of(text);
+            for _ in 0..30 {
+                sim.step(0);
+            }
+            sim.ball.position - start
+        };
+        let straight = fall("name.en Down\non start\ndo world.gravity 20\n");
+        assert!(straight.x.abs() < 0.01 && straight.z.abs() < 0.01, "0, 0 falls straight: {straight}");
+        let text = "name.en Side\non start\ndo world.gravity_xz 10 -10\n";
+        let side = fall(text);
+        assert!(side.x > 1.0 && side.z < -1.0, "pulled along +x and -z: {side}");
+        assert!((side.y - straight.y).abs() < 0.01, "the pull down is as it was");
+        assert_eq!(fall(text), side, "the same mod plays the same run");
+    }
+
+    #[test]
     fn the_sticky_ball_climbs_a_wall_it_is_pushed_into() {
         let forward = Sim::new(&flat_level(), BallKind::Wood)
             .camera
@@ -3088,8 +3211,8 @@ pub(crate) mod tests {
             sprite: None,
         });
         level.groups[0].members.push(3);
-        let climb = |mods: crate::modrt::SimMods| {
-            let mut sim = Sim::new(&level, BallKind::Wood);
+        let climb_as = |kind: BallKind, mods: crate::modrt::SimMods| {
+            let mut sim = Sim::new(&level, kind);
             sim.mods = mods;
             let mut top = 0.0f32;
             for _ in 0..600 {
@@ -3098,8 +3221,14 @@ pub(crate) mod tests {
             }
             top
         };
+        let climb = |mods: crate::modrt::SimMods| climb_as(BallKind::Wood, mods);
         let plain = climb(crate::modrt::SimMods::default());
         let sticky = climb(mods_of("name.en Sticky\non tick\ndo ball.stick 1\n"));
+        let kind = climb_as(BallKind::Sticky, crate::modrt::SimMods::default());
+        assert!(
+            kind > BALL_RADIUS + 5.0,
+            "the sticky kind climbs by itself, no mod on: {kind}"
+        );
         assert!(
             plain < BALL_RADIUS + 1.0,
             "the plain ball stays down: {plain}"
@@ -3384,6 +3513,40 @@ pub(crate) mod tests {
         }
         let (vs, vw) = (sim.ball.velocity.length(), wood.ball.velocity.length());
         assert!(vs > 1.0 && vs < 0.6 * vw, "stone {vs}, wood {vw}");
+    }
+
+    #[test]
+    fn a_sticky_transformer_makes_our_sticky_ball() {
+        // P_Trafo_Sticky (ours, after BallSticky's) as any transformer: the ball comes back as the sticky kind, which
+        // holds to the floor without any mod on.
+        let mut level = flat_level();
+        let trafo = level.objects.len();
+        level.objects.push(Object {
+            name: "P_Trafo_Sticky_01".into(),
+            matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            mesh: None,
+            visible: true,
+            sprite: None,
+        });
+        level.groups.push(Group {
+            name: "P_Trafo_Sticky".into(),
+            members: vec![trafo],
+        });
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        sim.step(0);
+        assert!(sim.events.contains(&(1, Event::Transform(BallKind::Sticky))));
+        for _ in 0..TRAFO_TICKS + 30 {
+            sim.step(0);
+        }
+        assert_eq!(sim.ball.kind, BallKind::Sticky);
+        assert_eq!(sim.drawn_ball(), Some(BallKind::Sticky));
+        assert!(sim.stickiness() > 0.0 && sim.mods.is_empty(), "sticky of itself");
+        assert_eq!(BallKind::from_name("sticky"), Some(BallKind::Sticky));
     }
 
     #[test]

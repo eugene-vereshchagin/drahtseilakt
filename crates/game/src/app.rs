@@ -78,6 +78,8 @@ struct Game {
     replay_out: Replay,
     /// The view's turn the window hands to the next tick (a `view.turn` mod), whole degrees; a replay brings its own.
     pub view_turn: u16,
+    /// Input bits a mod's key asked for, pressed at the next tick only (the spawn point's, `input::SPAWN_*`).
+    pulse: u8,
     /// Where the run begins when not at the level start (--sector, --at, --ball, or the replay's).
     start: Option<crate::replay::Start>,
     record: Option<PathBuf>,
@@ -310,6 +312,7 @@ impl Game {
             start_ball,
             replay_out,
             view_turn: 0,
+            pulse: 0,
             start,
             record: o.record.clone(),
             ball_lost_at: None,
@@ -602,10 +605,11 @@ impl Game {
     /// One tick: the replay's input if there is one, else the keyboard's.
     fn tick(&mut self, keys: u8) {
         let next = self.sim.tick + 1;
+        let pulse = std::mem::take(&mut self.pulse);
         let input = match &self.replay_in {
             Some(r) if next <= r.end => r.input_at(next),
             Some(_) => 0,
-            None => keys,
+            None => keys | pulse,
         };
         if self.sim.finished {
             // After the finish the world goes on for the eye (the balloon leaves); the run is over and recorded.
@@ -4299,12 +4303,7 @@ impl App {
         let g = self.ghost.as_ref()?;
         let at = usize::try_from(self.game.sim.tick).ok()?;
         let &(pos, rot, kind) = g.path.get(at).or(g.path.last())?;
-        let b = &self.game.ball_meshes;
-        let mesh = match kind? {
-            crate::sim::BallKind::Wood => b.wood,
-            crate::sim::BallKind::Stone => b.stone,
-            crate::sim::BallKind::Paper => b.paper,
-        }?;
+        let (mesh, _) = self.game.ball_meshes.of(kind?)?;
         let a = self.view_mods.out.ghost;
         Some(crate::render::Instance {
             model: scene::BALLS_MODEL,
@@ -5195,6 +5194,8 @@ impl App {
                     self.saved = None;
                     self.history.clear();
                 }
+                Practice::SpawnSet => self.game.pulse |= crate::sim::input::SPAWN_SET,
+                Practice::SpawnGo => self.game.pulse |= crate::sim::input::SPAWN_GO,
                 Practice::FreeCam => {
                     self.fly = match self.fly {
                         Some(_) => None,

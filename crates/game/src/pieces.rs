@@ -65,16 +65,26 @@ pub fn burst(kind: BallKind) -> Burst {
             lin_damp: 6.0,
             rot_damp: 0.5,
         },
+        // ours: rubber chunks, between the wood's and the stone's, bouncing less and lying where they fall
+        BallKind::Sticky => Burst {
+            point: Vec3::new(0.0, 1.0, 0.0),
+            impulse: (2.0, 4.5),
+            mass: (0.4, 0.4),
+            friction: (3.0, 3.0),
+            elasticity: 0.5,
+            lin_damp: 0.6,
+            rot_damp: 0.4,
+        },
     }
 }
 
 /// Every kind's pieces and the frame they are placed about.
 #[derive(Clone, Debug, Default)]
 pub struct Pieces {
-    /// Wood, stone, paper.
-    sets: [Vec<Piece>; 3],
+    /// Wood, stone, paper, sticky.
+    sets: [Vec<Piece>; crate::sim::BALL_KINDS.len()],
     /// Each frame's turn (its pieces are placed turned as in the file, at the ball).
-    turns: [Quat; 3],
+    turns: [Quat; crate::sim::BALL_KINDS.len()],
 }
 
 pub fn index(kind: BallKind) -> usize {
@@ -82,6 +92,7 @@ pub fn index(kind: BallKind) -> usize {
         BallKind::Wood => 0,
         BallKind::Stone => 1,
         BallKind::Paper => 2,
+        BallKind::Sticky => 3,
     }
 }
 
@@ -89,10 +100,10 @@ impl Pieces {
     /// The pieces of Balls.nmo; a kind the file lacks has none.
     pub fn find(balls: &Level) -> Pieces {
         let mut p = Pieces {
-            turns: [Quat::IDENTITY; 3],
+            turns: [Quat::IDENTITY; crate::sim::BALL_KINDS.len()],
             ..Pieces::default()
         };
-        for (k, name) in ["Wood", "Stone", "Paper"].into_iter().enumerate() {
+        for (k, name) in ["Wood", "Stone", "Paper", "Sticky"].into_iter().enumerate() {
             let Some((_, frame)) = balls.object(&format!("Ball_{name}Pieces_Frame")) else {
                 continue;
             };

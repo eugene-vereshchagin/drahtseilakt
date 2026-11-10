@@ -103,7 +103,7 @@ pub enum Value {
     BallSpeed,
     /// The ball's vertical speed.
     BallVy,
-    /// 0 wood, 1 stone, 2 paper.
+    /// 0 wood, 1 stone, 2 paper, 3 sticky (ours).
     BallKind,
     /// 1 while the ball touches something.
     BallTouching,
@@ -432,6 +432,9 @@ pub enum Action {
     Stick(Expr),
     /// Gravity's pull, 0 to 60 (the original's 20).
     Gravity(Expr),
+    /// Gravity's sideways components along the world's x and z, -60 to 60 each (the original's 0, 0): with
+    /// `world.gravity` a vector, as PhysicsEditor sets it.
+    GravitySide(Expr, Expr),
     /// The physics' time factor, 0.5 to 4 (the original's 2).
     TimeFactor(Expr),
     /// The steering turned about the vertical by so many degrees (the arrows push along the turned view).
@@ -493,13 +496,23 @@ pub enum Action {
     FreeCam,
     /// The run begun again at a sector (1 first), as `--sector` does.
     SetSector(Expr),
+    /// A spawn point set where the ball is; the ball put back there, at rest (NewSpawn). The run does them itself at a
+    /// tick, from an input bit the replay keeps (`input::SPAWN_SET`, `input::SPAWN_GO`), so the mod is on the run's
+    /// side and its replay names it.
+    SpawnSet,
+    SpawnGo,
 }
 
 impl Action {
     pub fn sim(&self) -> bool {
         matches!(
             self,
-            Action::Stick(_) | Action::Gravity(_) | Action::TimeFactor(_) | Action::EndlessLives(_) | Action::SteerYaw(_)
+            Action::Stick(_)
+                | Action::Gravity(_)
+                | Action::GravitySide(..)
+                | Action::TimeFactor(_)
+                | Action::EndlessLives(_)
+                | Action::SteerYaw(_)
         )
     }
 
@@ -507,7 +520,12 @@ impl Action {
     /// modded.
     /// A single deed on a key that reaches into the run from outside (practice, or a jump to a sector).
     pub fn deed(&self) -> bool {
-        self.practice() || matches!(self, Action::SetSector(_))
+        self.practice() || self.run_deed() || matches!(self, Action::SetSector(_))
+    }
+
+    /// A deed the run itself does at a tick, from an input bit the replay keeps (the spawn point's).
+    pub fn run_deed(&self) -> bool {
+        matches!(self, Action::SpawnSet | Action::SpawnGo)
     }
 
     pub fn practice(&self) -> bool {
@@ -545,7 +563,7 @@ impl Action {
             | Action::EndlessLives(e)
             | Action::Rewind(e) => vec![e],
             Action::Show(_, _, _, v) => v.iter().collect(),
-            Action::RenderScale(a, b) | Action::RenderAspect(a, b) => vec![a, b],
+            Action::RenderScale(a, b) | Action::RenderAspect(a, b) | Action::GravitySide(a, b) => vec![a, b],
             Action::RenderFilter(_) => Vec::new(),
             Action::Splits(_)
             | Action::Keys(_)
@@ -556,7 +574,9 @@ impl Action {
             | Action::Slower
             | Action::Faster
             | Action::PlayTime
-            | Action::FreeCam => Vec::new(),
+            | Action::FreeCam
+            | Action::SpawnSet
+            | Action::SpawnGo => Vec::new(),
         }
     }
 }
@@ -711,6 +731,13 @@ impl ModTxt {
         self.rules
             .iter()
             .any(|r| r.actions.iter().any(Action::practice))
+    }
+
+    /// It is on the run's side: it has rules on the run's events, or a deed the run does itself (the spawn point's).
+    pub fn run_side(&self) -> bool {
+        self.rules
+            .iter()
+            .any(|r| r.event.sim() || r.actions.iter().any(Action::run_deed))
     }
 
     /// The label names in their order (`Show` refers to them by place).
@@ -1221,6 +1248,13 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "ball.stick" => Action::Stick(e(args)?),
         "world.gravity" => Action::Gravity(e(args)?),
         "world.time" => Action::TimeFactor(e(args)?),
+        "world.gravity_xz" => {
+            let p = split_args_ws(args);
+            let [x, z] = p.as_slice() else {
+                return Err("expected: world.gravity_xz <x> <z>".into());
+            };
+            Action::GravitySide(e(x)?, e(z)?)
+        }
         "camera.fov" => Action::CameraFov(e(args)?),
         "camera.distance" => Action::CameraDistance(e(args)?),
         "camera.yaw" => Action::CameraYaw(e(args)?),
@@ -1266,6 +1300,8 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "slower" if args.is_empty() => Action::Slower,
         "faster" if args.is_empty() => Action::Faster,
         "freecam" if args.is_empty() => Action::FreeCam,
+        "spawn.set" if args.is_empty() => Action::SpawnSet,
+        "spawn.go" if args.is_empty() => Action::SpawnGo,
         "keys" => {
             let c = CORNERS
                 .iter()
@@ -2099,6 +2135,21 @@ mod tests {
         );
         // the practice's keys are the god-mode's now, no longer the game's
         assert!(parse_mod_txt("name.en K\noption k key F3,F5,F9,KeyR,F2,BracketLeft\n").is_ok());
+    }
+
+    #[test]
+    fn the_spawn_points_deeds_are_keys_only_and_on_the_runs_side() {
+        let ok = parse_mod_txt("name.en S\noption k key F8\non key k\ndo spawn.set\ndo spawn.go\n").unwrap();
+        assert!(ok.modded() && ok.run_side() && !ok.practice());
+        for bad in [
+            "name.en S\non frame\ndo spawn.set\n",
+            "name.en S\non tick\ndo spawn.go\n",
+            "name.en S\noption k key F8\non key k\ndo spawn.go now\n",
+        ] {
+            assert!(parse_mod_txt(bad).is_err(), "{bad:?}");
+        }
+        let view = parse_mod_txt("name.en V\noption k key F8\non key k\ndo screenshot\n").unwrap();
+        assert!(!view.run_side(), "a view mod stays off the run's side");
     }
 
     #[test]

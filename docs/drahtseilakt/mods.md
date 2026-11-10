@@ -26,8 +26,8 @@ the level.
 
 | Mod | After the BML mod | What it does | Changes the run |
 |---|---|---|---|
-| `sticky-ball` | BallSticky, StickyAccess | what the ball touches holds it; pushing into a wall climbs it; options: stickiness, wooden ball only | yes (modded) |
-| `physics-lab` | PhysicsEditor | gravity (0–60, original 20) and the physics' time factor (0.5–4, original 2) | yes (modded) |
+| `sticky-ball` | BallSticky, StickyAccess | what the ball touches holds it; pushing into a wall climbs it; options: stickiness, wooden ball only (the `sticky` ball kind holds of itself, without it) | yes (modded) |
+| `physics-lab` | PhysicsEditor | gravity as a vector: down (0–60, original 20) and sideways along the world's x and z (−20–20 each, original 0) — and the physics' time factor (0.5–4, original 2) | yes (modded) |
 | `dynamic-fov` | DynamicFov | the view widens with the ball's speed; option: strength | no |
 | `free-view` | FreeViewRotation, AdvancedTravelCam | the mouse turns the view about the ball, a key turns it back; camera distance | no |
 | `segment-timer` | Segment, RealTimeMeter, WatchYourTime | the run's time, the real time, each sector's split against the best run (green ahead, red behind) | no |
@@ -42,7 +42,26 @@ the level.
 | `back-to-2004` | (a joke; undoes our rendering fixes) | the game as on a PC of 2004: a low resolution (640x480, 800x600 or 1024x768) scaled up with hard pixels in a 4:3 frame with black bars, textures without mipmaps or anisotropy (bilinear or nearest: the distant shimmer), a frame cap (off, 60, 30), optional 16-bit colour banding; glasses for tears of blood included | no |
 | `play-time` | WatchYourTime | the time played, per level and in all, on screen and kept in the data folder's `playtime.txt`; option: show it | no |
 | `sector-jump` | SpeedrunShortcuts (set sector) | keys (F7 / PageUp, F6 / PageDown) start the level again at the next or the previous sector | yes (modded) |
+| `spawn-point` | NewSpawn, SpeedrunShortcuts (set spawn) | a key (F8, H or J) sets a spawn point where the ball is, another (G, F4 or C) puts the ball back there at rest, as the ball it was; the sector and its objects stay as they are | yes (modded) |
 | `free-steering` | FreeViewRotation (the steering too) | like `free-view`, but the arrows push along the turned view; the view's turn is recorded in the replay | yes (modded) |
+
+## The sticky ball kind
+
+*2026-11-10, the owner's decision.* After BallSticky, a fourth ball of our own, `sticky`, besides wood, stone and
+paper: not a mod but a ball kind any level may use. Its transformer is `P_Trafo_Sticky` (a crimson ring; a map that
+has one, BallSticky's own maps among them, takes it as any transformer), its loose ball `P_Ball_Sticky`, its name
+`sticky` wherever a kind is named (`--ball`, a replay's `start`, `sector_balls`, hints' `kind` and `become`, the level
+DSL's `ball`, `trafo` and `loose`). Its look is ours (`assets/own/make/make_parts.py`: crimson rubber in a honeycomb of
+cells, fourteen rubber chunks for its burst); on the copy's Balls.nmo, which has no such ball, it is drawn on the
+wooden ball's mesh, tinted crimson. Its sounds are the wooden ball's until it has its own.
+
+Its numbers (chosen, not measured: the original has no such ball, and BallSticky's are in its own files, not read):
+mass 4 (wood 1.9, stone 10), push 0.6 (0.15 a unit of mass, between stone's 0.09 and wood's 0.23), friction 1.0 (the
+most of the four), elasticity 0.05 (the least), damping 0.9 (as wood); the loose ball the same. It holds to what it
+touches as the `sticky-ball` mod's `ball.stick 0.9` does, without a mod: at the mod's default 0.6 so heavy a ball only
+clings to a wall (lift 1.09 against its weight of 1.21), at 0.9 it climbs (1.63). With the mod on as well, the stronger
+hold counts. On a slope pushed from rest it climbs up to 43° and, steeper, clings without rolling back (the test
+player's table).
 
 ## God mode
 
@@ -134,7 +153,7 @@ The view's events: `frame` (every frame drawn), `key <option>` (the key of one o
 |---|---|---|---|
 | `ball.x` `ball.y` `ball.z` | where the ball is | `real.time` | real seconds since the run began * |
 | `ball.speed` `ball.vy` | its speed, its vertical speed | `frame.dt` `frame.fps` | the frame's length, frames a second * |
-| `ball.kind` | 0 wood, 1 stone, 2 paper | `clock.hour` `clock.minute` `clock.second` | the clock, UTC * |
+| `ball.kind` | 0 wood, 1 stone, 2 paper, 3 sticky | `clock.hour` `clock.minute` `clock.second` | the clock, UTC * |
 | `ball.touching` `ball.wall` | it touches something; something steep | `mouse.dx` `mouse.dy` | the mouse's motion this frame * |
 | `run.tick` `run.time` | the run's ticks, seconds | `extras.points` `extras.points_all` | extra points left in the sector, and all * |
 | `practice.speed` | the game's speed (1, or down to 1/8) * | `practice.saved` | a moment is saved (1 or 0) * |
@@ -159,6 +178,8 @@ Run actions (only on a run's event; they make the mod *modded*):
 - `do ball.stick <0..1>` — the ball holds to what it touches with this strength, against gravity, and a push into a
   wall turns up along it.
 - `do world.gravity <0..60>` — gravity's pull (the original's 20).
+- `do world.gravity_xz <x> <z>` — gravity's sideways pull along the world's x and z, −60 to 60 each (the original's 0, 0;
+  two expressions without spaces). With `world.gravity` it makes gravity a vector, as PhysicsEditor sets it.
 - `do world.time <0.5..4>` — the physics' time factor (the original's 2).
 - `do lives.endless <0|1>` — the last ball is never lost (god-mode).
 - `do steer.yaw <degrees>` — the arrows' push turned about the vertical by so many degrees (the camera turns by the same
@@ -175,6 +196,15 @@ A jump (only on `key`; it makes the mod modded, without the practice's moments):
 
 - `do sector.set <n>` — the run begins again at sector n (1 is the first), with that sector's ball, as `--sector` does;
   the replay names the start. The next ordinary restart is the level's start again.
+
+The spawn point (only on `key`; it makes the mod modded, and puts it on the run's side so its replay names it):
+
+- `do spawn.set` — a spawn point where the ball is (its place, its turn, its kind);
+- `do spawn.go` — the ball put back at the spawn point, at rest, as the ball it was; the sector and its objects stay as
+  they are (NewSpawn's plain teleport). Neither while the ball is lost, in a transformer or being changed.
+
+  The run does both itself: the key presses an input bit for one tick (64 set, 128 go), which the replay keeps with
+  the arrows, so the replay plays back the same. Without such a mod the run ignores the bits.
 
 View actions (only on `frame` or `key`):
 
@@ -254,14 +284,15 @@ A mod comes from a stranger, so the game reads it as hostile and fails closed:
 
 ## Not yet (queued)
 
-- **Companion / two balls** (DualBallControl): a second ball the keys switch to needs a second player body in the
-  run (the physics, the steering, the camera, the checkpoints and the death all know one ball), a building block of its
-  own, with the switch recorded in the replay. The original's mod finds a dual map by a second start object
-  (`PS_FourFlames_01_Dual`); none of the community maps at hand is known to have one (their files are compressed, so
-  a plain search proves nothing). Left for its own change.
-- **A sticky ball kind** of its own with its transformer (BallSticky's `P_Trafo_Sticky`): today any ball can be made
-  sticky.
-- **Teleport to a spawn point** (NewSpawn): god-mode's save and load and `--sector` cover the practice.
+- **Companion / two balls** (DualBallControl). Its strings show what it does: on a map with a second start
+  (`PS_FourFlames_01_Dual`, with its own `PC_TwoFlames_0*` / `PR_Resetpoint_0*`) it loads `Balls.nmo` again,
+  physicalizes a second game ball and a second `Cam_MF`, and the switch key deactivates one ball's navigation and sets
+  the other as the BallManager's ball. Ours needs, all in the Sim: a second ball state and body (the world's entity 0
+  is the ball today: `replace_ball(0, ..)`, the contacts of entity 1, the push, the sticky force), the inactive ball as
+  a passive dynamic body, which ball a sector's checkpoint, reset point, death, transformer and extra life act on, a
+  second camera rig or one rig that springs to the other ball, and the switch as an input bit the replay keeps (as
+  the spawn point's). None of the community maps at hand is known to have a dual start (their files are compressed, so
+  a plain search proves nothing); without one to play, the change is left for when such a map turns up.
 - A fuzz target for mod.txt (the parser is strict, capped and unit-tested; fuzzing comes with the release work).
 
 ## The BML mods surveyed
@@ -278,7 +309,7 @@ What each does, whether we have it, and how it maps to our engine:
 | Coredump | dumps the running Virtools context into an .nmo | not needed (our runtime is ours; `--export` writes levels) |
 | CursorClipper | keeps the cursor inside the window | not needed: a run takes nothing from the cursor, `mouse.dx` reads raw motion |
 | DeformedWB | deforms the wooden ball's look at random | factory `deformed-ball` |
-| DualBallControl | dual-ball maps, a key switches the ball | queued (needs a second player body) |
+| DualBallControl | dual-ball maps, a key switches the ball | queued (needs a second player body; what exactly, above) |
 | DynamicFov | the field of view follows the ball's speed | factory `dynamic-fov`; the fixed field of view is in Graphics |
 | EnergyItemCounter | extra points and lives left in the sector | factory `info-overlay` |
 | ExtraSector | loads maps with more than eight sectors | the engine: up to 64 sectors, no loader needed |
@@ -287,19 +318,19 @@ What each does, whether we have it, and how it maps to our engine:
 | Interference | translucent decoy balls around the ball | factory `interference` |
 | LanternFader | alpha test on the lanterns' material against frame drops | not needed (our renderer) |
 | MapScripts | runs maps' callback scripts | planned: the map-script interpreter (scripts.md); not a mod |
-| NewSpawn | set a spawn point, teleport to it, record a spirit ball | god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
-| PhysicsEditor | gravity, physics time factor, game speed | factory `physics-lab` (modded); the game speed is god-mode's `[` `]` |
+| NewSpawn | set a spawn point, teleport to it, record a spirit ball | factory `spawn-point` (modded); god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
+| PhysicsEditor | gravity (a vector), physics time factor, game speed | factory `physics-lab` (modded; gravity down and sideways); the game speed is god-mode's `[` `]` |
 | PositionViewer | the ball's coordinates | factory `info-overlay` |
 | RealTimeMeter | real time of play, across levels | factory `segment-timer` (real time) |
 | ScreenCapturer | a key saves a screenshot (PNG/JPEG, clipboard) | factory `screenshot` (PNG; no clipboard) |
 | Segment | each sector's time against the record | factory `segment-timer` |
-| SpeedrunShortcuts | cheat mode, set spawn, restart, set sector | factory `quick-restart`; god-mode; `sector-jump` (set sector; modded) |
+| SpeedrunShortcuts | cheat mode, set spawn, restart, set sector | factory `quick-restart`; god-mode; `spawn-point` (set spawn; modded); `sector-jump` (set sector; modded) |
 | SpiritTrail | the record run as a translucent ball | factory `spirit-trail` |
 | StickyAccess | switch to the sticky ball under cheat mode | factory `sticky-ball` |
 | SysInfoDisplay | system time and battery on screen | factory `info-overlay` (clock, UTC); no battery |
 | TASSupport | record and play input, skip rendering, exit at the end | the engine: replays are deterministic input recordings (`--record`, `--replay`, `--headless`), god-mode's slow motion |
 | WatchYourTime | time played per level | factory `play-time` (`playtime.txt`; also `segment-timer`) |
-| BallSticky | a sticky ball type that climbs walls | factory `sticky-ball` (modded) |
+| BallSticky | a sticky ball type that climbs walls | our own ball kind `sticky` with its transformer `P_Trafo_Sticky` (above); factory `sticky-ball` (modded) makes any ball sticky |
 | BMLModuls | new modules (wooden drop and rotating boards) | level parts, not mods: the open format's parts ([open-format.md](open-format.md)) |
 
 The original's limits these mods work around (frame rate cap, 4:3, low resolutions, eight sectors, a bitmap font,

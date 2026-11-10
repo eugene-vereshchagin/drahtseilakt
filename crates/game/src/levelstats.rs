@@ -609,16 +609,18 @@ impl Tally {
 }
 
 /// The modules and things counted, with the CSV names.
-const THINGS: [(&str, &str); 21] = [
+const THINGS: [(&str, &str); 23] = [
     ("P_Extra_Point", "extra_points"),
     ("P_Extra_Life", "extra_lives"),
     ("P_Trafo_Wood", "trafo_wood"),
     ("P_Trafo_Stone", "trafo_stone"),
     ("P_Trafo_Paper", "trafo_paper"),
+    ("P_Trafo_Sticky", "trafo_sticky"),
     ("P_Box", "boxes"),
     ("P_Ball_Wood", "loose_wood_balls"),
     ("P_Ball_Stone", "loose_stone_balls"),
     ("P_Ball_Paper", "loose_paper_balls"),
+    ("P_Ball_Sticky", "loose_sticky_balls"),
     ("P_Dome", "domes"),
     ("P_Modul_01", "m01_pushers"),
     ("P_Modul_03", "m03_lifts"),

@@ -145,7 +145,7 @@ checkpoint                   # a checkpoint (the heading a multiple of 90): the 
 finish                       # the balloon, 22 ahead
 ```
 
-Besides: `rails L`, `rails-left A R`, `rails-right A R` (rails, also up or down); `box`, `dome`, `loose wood|stone|paper`;
+Besides: `rails L`, `rails-left A R`, `rails-right A R` (rails, also up or down); `box`, `dome`, `loose wood|stone|paper|sticky`;
 `seesaw` (over a gap of its board's length), `platebridge` (a gap of 14.8), `swingbridge` (a swing in a gap of 5),
 `sack`, `arms`, `flaps`; `module P_Modul_NN` with `ahead`, `side`, `up`, `turn`, `tilt` for any other part; `move`,
 `turn`, `mark NAME` and `back NAME` to move the cursor without building. The whole list is at the top of

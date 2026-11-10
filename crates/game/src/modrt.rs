@@ -153,7 +153,7 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Rewind(e)
         | Action::Set(_, e) => vec![e],
         Action::Show(_, _, _, v) => v.iter().collect(),
-        Action::RenderScale(a, b) | Action::RenderAspect(a, b) => vec![a, b],
+        Action::RenderScale(a, b) | Action::RenderAspect(a, b) | Action::GravitySide(a, b) => vec![a, b],
         Action::RenderFilter(_) => Vec::new(),
         Action::Splits(_)
         | Action::Keys(_)
@@ -164,7 +164,9 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Slower
         | Action::Faster
         | Action::PlayTime
-        | Action::FreeCam => Vec::new(),
+        | Action::FreeCam
+        | Action::SpawnSet
+        | Action::SpawnGo => Vec::new(),
     }
 }
 
@@ -176,6 +178,8 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
 pub struct SimOut {
     pub stick: f32,
     pub gravity: f32,
+    /// Gravity's sideways components along the world's x and z (`world.gravity_xz`; the original's 0, 0).
+    pub gravity_xz: [f32; 2],
     pub time_factor: f32,
     /// The last ball is never lost (god-mode's `lives.endless`).
     pub endless: bool,
@@ -188,6 +192,7 @@ impl Default for SimOut {
         SimOut {
             stick: 0.0,
             gravity: crate::physics::GRAVITY,
+            gravity_xz: [0.0, 0.0],
             time_factor: crate::physics::TIME_FACTOR as f32,
             endless: false,
             steer_yaw: 0.0,
@@ -216,6 +221,10 @@ impl SimMods {
                 match a {
                     Action::Stick(_) => out.stick = x.clamp(0.0, 1.0),
                     Action::Gravity(_) => out.gravity = x.clamp(0.0, 60.0),
+                    Action::GravitySide(..) => {
+                        let side = |i: usize| v.get(i).copied().filter(|x| x.is_finite()).unwrap_or(0.0).clamp(-60.0, 60.0);
+                        out.gravity_xz = [side(0), side(1)];
+                    }
                     Action::TimeFactor(_) => out.time_factor = x.clamp(0.5, 4.0),
                     Action::EndlessLives(_) => out.endless = x != 0.0,
                     Action::SteerYaw(_) => out.steer_yaw = x.rem_euclid(360.0),
@@ -233,6 +242,16 @@ impl SimMods {
             .filter(|r| r.txt.modded())
             .map(ModRun::replay_line)
             .collect()
+    }
+
+    /// One of them has the spawn point's keys: the run heeds their input bits.
+    pub fn spawn(&self) -> bool {
+        self.runs.iter().any(|r| {
+            r.txt
+                .rules
+                .iter()
+                .any(|x| x.actions.iter().any(Action::run_deed))
+        })
     }
 
     /// Any of them changes the run: it is modded.
@@ -293,6 +312,9 @@ pub enum Practice {
     FreeCam,
     /// The run begun again at this sector (1 first).
     Sector(u32),
+    /// A spawn point set where the ball is; the ball put back there at rest (the next tick's input bits).
+    SpawnSet,
+    SpawnGo,
 }
 
 impl Default for ViewOut {
@@ -466,6 +488,8 @@ impl ViewMods {
                     | Action::Slower
                     | Action::Faster
                     | Action::FreeCam
+                    | Action::SpawnSet
+                    | Action::SpawnGo
                         if out.practice.len() < 16 =>
                     {
                         out.practice.push(match a {
@@ -473,6 +497,8 @@ impl ViewMods {
                             Action::LoadMoment => Practice::Load,
                             Action::Slower => Practice::Slower,
                             Action::Faster => Practice::Faster,
+                            Action::SpawnSet => Practice::SpawnSet,
+                            Action::SpawnGo => Practice::SpawnGo,
                             _ => Practice::FreeCam,
                         });
                     }
@@ -664,7 +690,7 @@ impl Mods {
             };
             let txt = Arc::new(t.clone());
             let run = ModRun::new(&m.key, txt, self.opts.get(i).cloned().unwrap_or_default());
-            if t.rules.iter().any(|r| r.event.sim()) {
+            if t.run_side() {
                 sim.runs.push(run.clone());
             }
             if t.rules.iter().any(|r| !r.event.sim()) {
@@ -892,7 +918,7 @@ mod tests {
             .collect();
         assert_eq!(
             modded,
-            vec!["free-steering", "physics-lab", "sector-jump", "sticky-ball"],
+            vec!["free-steering", "physics-lab", "sector-jump", "spawn-point", "sticky-ball"],
             "only the rule variants change the run"
         );
         // each does its part: switched on, fired, its output set

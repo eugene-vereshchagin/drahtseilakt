@@ -97,6 +97,7 @@ pub struct World {
     pushers: Vec<Option<usize>>,
     /// The gravity and time factor in use: the original's unless a mod's rule changes them (modrt.rs).
     gravity: f32,
+    gravity_xz: [f32; 2],
     time_factor: f64,
     /// The IVP bodies of the level's physical objects, with whether the player's ball collides with them.
     statics: Vec<(usize, bool, SoundIds)>,
@@ -200,6 +201,7 @@ impl World {
             grounded: false,
             pushers: Vec::new(),
             gravity: GRAVITY,
+            gravity_xz: [0.0, 0.0],
             time_factor: TIME_FACTOR,
             statics: Vec::new(),
             spawns: Vec::new(),
@@ -662,11 +664,13 @@ impl World {
             .map(|c| i32::from(c.movement_state))
     }
 
-    /// A mod's gravity and time factor (modrt.rs SimOut): set only when they change.
-    pub fn set_rules(&mut self, gravity: f32, time_factor: f32) {
-        if gravity != self.gravity {
+    /// A mod's gravity (down, then sideways along the world's x and z) and time factor (modrt.rs SimOut): set only
+    /// when they change.
+    pub fn set_rules(&mut self, gravity: f32, side: [f32; 2], time_factor: f32) {
+        if gravity != self.gravity || side != self.gravity_xz {
             self.gravity = gravity;
-            self.physics.set_gravity([0.0, -gravity, 0.0]);
+            self.gravity_xz = side;
+            self.physics.set_gravity([side[0], -gravity, side[1]]);
         }
         let t = f64::from(time_factor);
         if t != self.time_factor {

@@ -100,7 +100,7 @@ usage: drahtseilakt [options]
                       1 is the level start; --ball overrides the ball)
   --at X,Y,Z|OBJECT   begin with the ball at rest at a point, or 4 above a level object (e.g. P_Modul_34_01);
                       the sector is the nearest object's unless --sector is given
-  --ball KIND         begin with a wood, stone or paper ball
+  --ball KIND         begin with a wood, stone, paper or sticky ball
                       (a run begun elsewhere is recorded with its start and is never a level's best run)
   --no-debug          a plain run (until the release a played game is a debug run by default)
   --debug             debug run: the extended mode, all levels open, and the development mod god-mode
@@ -361,8 +361,8 @@ fn parse_args() -> Result<Options, String> {
             "--at" => o.at = Some(value()?),
             "--ball" => {
                 let v = value()?.to_ascii_lowercase();
-                if !["wood", "stone", "paper"].contains(&v.as_str()) {
-                    return Err("--ball is wood, stone or paper".into());
+                if !["wood", "stone", "paper", "sticky"].contains(&v.as_str()) {
+                    return Err("--ball is wood, stone, paper or sticky".into());
                 }
                 o.ball = Some(v);
             }

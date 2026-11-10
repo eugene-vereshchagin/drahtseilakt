@@ -55,7 +55,7 @@ Jeder beendete Lauf wird als Replay gespeichert (unter Linux in
 `~/.local/share/drahtseilakt/replays/<Level>/`, der schnellste als `best.replay`); `--replay FILE` spielt eines
 ab, `--headless` prüft es ohne Fenster, `--screenshot FILE.png` rendert ein Bild. Um eine Stelle zu testen,
 beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines Level-Objekts) an beliebiger
-Stelle, mit der Kugel, mit der der Sektor beginnt (`--ball wood|stone|paper` überschreibt sie); ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
+Stelle, mit der Kugel, mit der der Sektor beginnt (`--ball wood|stone|paper|sticky` überschreibt sie); ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
 Bis der erweiterte Modus eingeschaltet ist (Options, Extended, oder `--debug` für einen Start), ist das Spiel so
 genau wie möglich das Original. Der *erweiterte Modus* zeigt Bestzeiten. Start listet die Level in beiden Modi nach Bedeutung (Klassisches Ballance aus Ihrer Kopie, Drahtseilakt,
 Ballance-Prüfungen, Community-Karten: die mitgelieferten besten und Ihr `levels/downloaded/`, jedes mit seiner Schwierigkeit; wie man eines

@@ -146,7 +146,7 @@ finish                       # воздушный шар, в 22 впереди
 ```
 
 Кроме того: `rails L`, `rails-left A R`, `rails-right A R` (рельсы, тоже вверх или вниз); `box`, `dome`,
-`loose wood|stone|paper`; `seesaw` (над пропастью длиной в её доску), `platebridge` (пропасть 14,8), `swingbridge`
+`loose wood|stone|paper|sticky`; `seesaw` (над пропастью длиной в её доску), `platebridge` (пропасть 14,8), `swingbridge`
 (качели в пропасти 5), `sack`, `arms`, `flaps`; `module P_Modul_NN` с `ahead`, `side`, `up`, `turn`, `tilt` для любой
 другой части; `move`, `turn`, `mark NAME` и `back NAME`, чтобы двигать курсор, ничего не строя. Полный список — в
 начале leveldsl.py.

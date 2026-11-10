@@ -29,7 +29,7 @@ Start des Levels.
 | Mod | Nach dem BML-Mod | Was er tut | Ändert den Lauf |
 |---|---|---|---|
 | `sticky-ball` | BallSticky, StickyAccess | was die Kugel berührt, hält sie fest; drückt sie gegen eine Wand, klettert sie hinauf; Optionen: Haftstärke, nur die Holzkugel | ja (gemoddet) |
-| `physics-lab` | PhysicsEditor | Schwerkraft (0–60, im Original 20) und der Zeitfaktor der Physik (0,5–4, im Original 2) | ja (gemoddet) |
+| `physics-lab` | PhysicsEditor | Schwerkraft als Vektor: nach unten (0–60, im Original 20) und seitlich entlang x und z der Welt (je −20–20, im Original 0) — und der Zeitfaktor der Physik (0,5–4, im Original 2) | ja (gemoddet) |
 | `dynamic-fov` | DynamicFov | die Ansicht wird mit der Geschwindigkeit der Kugel breiter; Option: Stärke | nein |
 | `free-view` | FreeViewRotation, AdvancedTravelCam | die Maus dreht die Ansicht um die Kugel, eine Taste dreht sie zurück; Abstand der Kamera | nein |
 | `segment-timer` | Segment, RealTimeMeter, WatchYourTime | die Zeit des Laufs, die Echtzeit, die Zwischenzeit jedes Sektors gegen den besten Lauf (grün voraus, rot zurück) | nein |
@@ -44,7 +44,27 @@ Start des Levels.
 | `back-to-2004` | (ein Scherz; macht unsere Bildverbesserungen rückgängig) | das Spiel wie auf einem PC von 2004: niedrige Auflösung (640x480, 800x600 oder 1024x768) in harten Pixeln in einem 4:3-Bild mit schwarzen Balken, Texturen ohne Mipmaps und Anisotropie (bilinear oder nächster Nachbar: das Flimmern in der Ferne), Bildratenbegrenzung (aus, 60, 30), wahlweise 16-Bit-Farbbänder; Brille für Blutstränen inklusive | nein |
 | `play-time` | WatchYourTime | die Spielzeit je Level und gesamt, auf dem Bildschirm und in der `playtime.txt` des Datenordners; Option: anzeigen | nein |
 | `sector-jump` | SpeedrunShortcuts (Sektor setzen) | Tasten (F7 / PageUp, F6 / PageDown) starten das Level im nächsten oder vorigen Sektor neu | ja (gemoddet) |
+| `spawn-point` | NewSpawn, SpeedrunShortcuts (Startpunkt setzen) | eine Taste (F8, H oder J) setzt einen Startpunkt, wo die Kugel ist, eine andere (G, F4 oder C) bringt die Kugel ruhend dorthin zurück, als die Kugel, die sie war; der Sektor und seine Objekte bleiben, wie sie sind | ja (gemoddet) |
 | `free-steering` | FreeViewRotation (auch die Steuerung) | wie `free-view`, aber die Pfeile schieben entlang der gedrehten Sicht; die Drehung der Sicht steht im Replay | ja (gemoddet) |
+
+## Die klebrige Kugelart
+
+*2026-11-10, Entscheidung des Besitzers.* Nach BallSticky eine vierte, eigene Kugel, `sticky`, neben Holz, Stein und
+Papier: kein Mod, sondern eine Kugelart, die jedes Level nutzen kann. Ihr Transformer ist `P_Trafo_Sticky` (ein
+karminroter Ring; eine Karte, die einen hat, darunter BallStickys eigene Karten, nimmt ihn wie jeden Transformer), ihre
+lose Kugel `P_Ball_Sticky`, ihr Name `sticky`, wo immer eine Art genannt wird (`--ball`, `start` eines Replays,
+`sector_balls`, `kind` und `become` der Hinweise, `ball`, `trafo` und `loose` der Level-Sprache). Ihr Aussehen ist
+unseres (`assets/own/make/make_parts.py`: karminroter Gummi in einer Wabe aus Zellen, vierzehn Gummibrocken für ihr
+Zerspringen); mit der Balls.nmo der Kopie, die keine solche Kugel hat, wird sie mit dem Mesh der Holzkugel gezeichnet,
+karminrot getönt. Ihre Geräusche sind die der Holzkugel, bis sie eigene hat.
+
+Ihre Werte (gewählt, nicht gemessen: das Original hat keine solche Kugel, und BallStickys stehen in dessen eigenen
+Dateien, die nicht gelesen werden): Masse 4 (Holz 1,9, Stein 10), Schub 0,6 (0,15 je Masseneinheit, zwischen 0,09 des
+Steins und 0,23 des Holzes), Reibung 1,0 (die höchste der vier), Elastizität 0,05 (die niedrigste), Dämpfung 0,9 (wie
+Holz); die lose Kugel ebenso. Sie haftet an dem, was sie berührt, wie `ball.stick 0.9` des Mods `sticky-ball`, ohne Mod:
+bei dessen Standard 0,6 klammert sich eine so schwere Kugel nur an eine Wand (Auftrieb 1,09 gegen ihr Gewicht von 1,21),
+bei 0,9 klettert sie (1,63). Ist der Mod auch an, zählt das stärkere Haften. An einem Hang, aus dem Stand geschoben,
+steigt sie bis 43° und klammert sich steiler fest, ohne zurückzurollen (die Tabelle des Testspielers).
 
 ## Gottmodus
 
@@ -142,7 +162,7 @@ Mods gedrückt).
 |---|---|---|---|
 | `ball.x` `ball.y` `ball.z` | wo die Kugel ist | `real.time` | echte Sekunden seit Beginn des Laufs * |
 | `ball.speed` `ball.vy` | ihre Geschwindigkeit, ihre senkrechte Geschwindigkeit | `frame.dt` `frame.fps` | die Länge des Bildes, Bilder je Sekunde * |
-| `ball.kind` | 0 Holz, 1 Stein, 2 Papier | `clock.hour` `clock.minute` `clock.second` | die Uhr, UTC * |
+| `ball.kind` | 0 Holz, 1 Stein, 2 Papier, 3 klebrig | `clock.hour` `clock.minute` `clock.second` | die Uhr, UTC * |
 | `ball.touching` `ball.wall` | sie berührt etwas; etwas Steiles | `mouse.dx` `mouse.dy` | die Bewegung der Maus in diesem Bild * |
 | `run.tick` `run.time` | die Ticks des Laufs, Sekunden | `extras.points` `extras.points_all` | im Sektor verbleibende Extrapunkte, und alle * |
 | `practice.speed` | das Tempo des Spiels (1, oder bis 1/8) * | `practice.saved` | ein Moment ist gespeichert (1 oder 0) * |
@@ -168,6 +188,8 @@ Laufaktionen (nur auf einem Ereignis des Laufs; sie machen den Mod *gemoddet*):
 - `do ball.stick <0..1>` — die Kugel haftet mit dieser Stärke an dem, was sie berührt, gegen die Schwerkraft, und ein
   Druck gegen eine Wand lenkt sie an ihr hinauf.
 - `do world.gravity <0..60>` — die Zugkraft der Schwerkraft (im Original 20).
+- `do world.gravity_xz <x> <z>` — der seitliche Zug der Schwerkraft entlang x und z der Welt, je −60 bis 60 (im Original
+  0, 0; zwei Ausdrücke ohne Leerzeichen). Mit `world.gravity` wird die Schwerkraft ein Vektor, wie PhysicsEditor sie setzt.
 - `do world.time <0.5..4>` — der Zeitfaktor der Physik (im Original 2).
 - `do lives.endless <0|1>` — die letzte Kugel geht nie verloren (god-mode).
 - `do steer.yaw <Grad>` — der Schub der Pfeile um die Senkrechte um so viele Grad gedreht (die Kamera dreht sich um
@@ -184,6 +206,16 @@ Ein Sprung (nur bei `key`; macht den Mod gemoddet, ohne die Momente des Übens):
 
 - `do sector.set <n>` — der Lauf beginnt erneut in Sektor n (1 ist der erste), mit der Kugel dieses Sektors, wie `--sector`;
   das Replay nennt den Start. Der nächste gewöhnliche Neustart ist wieder der Levelstart.
+
+Der Startpunkt (nur auf `key`; der Mod wird gemoddet und gehört zur Seite des Laufs, sein Replay nennt ihn):
+
+- `do spawn.set` — ein Startpunkt, wo die Kugel ist (ihr Ort, ihre Drehung, ihre Art);
+- `do spawn.go` — die Kugel ruhend zum Startpunkt zurück, als die Kugel, die sie war; der Sektor und seine Objekte
+  bleiben, wie sie sind (der schlichte Teleport von NewSpawn). Beides nicht, während die Kugel verloren, in einem
+  Transformator oder im Wechsel ist.
+
+  Beides tut der Lauf selbst: die Taste drückt für einen Tick ein Eingabebit (64 setzen, 128 zurück), das das Replay mit
+  den Pfeilen behält, so spielt das Replay gleich ab. Ohne einen solchen Mod beachtet der Lauf die Bits nicht.
 
 Ansichtsaktionen (nur auf `frame` oder `key`):
 
@@ -256,14 +288,16 @@ Ein Mod kommt von einem Fremden, also liest das Spiel ihn als feindselig und leh
 
 ## Noch nicht (vorgemerkt)
 
-- **Begleiter / zwei Kugeln** (DualBallControl): eine zweite Kugel, auf die die Tasten umschalten, braucht einen zweiten
-  Spielerkörper im Lauf (Physik, Steuerung, Kamera, Checkpoints und Tod kennen eine Kugel) — ein eigener Baustein, mit dem
-  Wechsel im Replay. Der Mod des Originals erkennt eine Zwei-Kugel-Karte an einem zweiten Startobjekt
-  (`PS_FourFlames_01_Dual`); von den vorhandenen Community-Karten ist keine als solche bekannt (ihre Dateien sind
-  komprimiert, eine einfache Suche beweist nichts). Eine eigene Aufgabe.
-- **Eine eigene klebrige Kugelart** mit ihrem Transformer (`P_Trafo_Sticky` aus BallSticky): heute lässt sich jede Kugel
-  klebrig machen.
-- **Teleport zu einem Startpunkt** (NewSpawn): das Üben decken Speichern und Laden von god-mode und `--sector` ab.
+- **Begleiter / zwei Kugeln** (DualBallControl). Seine Strings zeigen, was er tut: auf einer Karte mit einem zweiten
+  Start (`PS_FourFlames_01_Dual`, mit eigenen `PC_TwoFlames_0*` / `PR_Resetpoint_0*`) lädt er `Balls.nmo` erneut,
+  physikalisiert eine zweite Spielkugel und ein zweites `Cam_MF`, und die Wechseltaste schaltet die Steuerung der einen
+  Kugel ab und macht die andere zur Kugel des BallManagers. Wir brauchen, alles im Sim: einen zweiten Kugelzustand und
+  -körper (heute ist die Kugel die Entität 0 der Welt: `replace_ball(0, ..)`, die Kontakte der Entität 1, der Schub, die
+  Klebekraft), die inaktive Kugel als passiven dynamischen Körper, auf welche Kugel Checkpoint, Rücksetzpunkt, Tod,
+  Transformer und Extraleben eines Sektors wirken, ein zweites Kamera-Rig oder eines, das zur anderen Kugel springt,
+  und den Wechsel als Eingabebit, das das Replay behält (wie beim Startpunkt). Von den vorhandenen Community-Karten ist
+  keine mit Doppelstart bekannt (ihre Dateien sind komprimiert, eine einfache Suche beweist nichts); ohne eine zum
+  Spielen wartet die Änderung auf eine solche Karte.
 - Ein Fuzz-Ziel für mod.txt (der Parser ist streng, begrenzt und per Unit-Test abgedeckt; Fuzzing kommt mit der
   Release-Arbeit).
 
@@ -281,7 +315,7 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 | Coredump | schreibt den laufenden Virtools-Kontext in eine .nmo | nicht nötig (unsere Laufzeit ist unsere; `--export` schreibt Level) |
 | CursorClipper | hält den Zeiger im Fenster | nicht nötig: Ein Lauf nimmt nichts vom Zeiger, `mouse.dx` liest die rohe Bewegung |
 | DeformedWB | verformt das Aussehen der Holzkugel zufällig | Werks-Mod `deformed-ball` |
-| DualBallControl | Karten mit zwei Kugeln, eine Taste wechselt die Kugel | vorgemerkt (braucht einen zweiten Spielerkörper) |
+| DualBallControl | Karten mit zwei Kugeln, eine Taste wechselt die Kugel | vorgemerkt (braucht einen zweiten Spielerkörper; was genau, oben) |
 | DynamicFov | das Sichtfeld folgt der Geschwindigkeit der Kugel | Werks-Mod `dynamic-fov`; das feste Sichtfeld ist in Graphics |
 | EnergyItemCounter | im Sektor verbleibende Extrapunkte und -leben | Werks-Mod `info-overlay` |
 | ExtraSector | lädt Karten mit mehr als acht Sektoren | die Engine: bis zu 64 Sektoren, kein Lader nötig |
@@ -290,19 +324,19 @@ wurde ausgeführt. Was jeder tut, ob wir es haben und wie es auf unsere Engine a
 | Interference | durchscheinende Täuschkugeln um die Kugel | Werks-Mod `interference` |
 | LanternFader | Alpha-Test auf dem Material der Laternen gegen Bildeinbrüche | nicht nötig (unser Renderer) |
 | MapScripts | führt die Callback-Skripte von Karten aus | geplant: der Interpreter für Kartenskripte (scripts.md); kein Mod |
-| NewSpawn | einen Startpunkt setzen, dorthin springen, eine Geisterkugel aufzeichnen | god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
-| PhysicsEditor | Schwerkraft, Zeitfaktor der Physik, Spieltempo | Werks-Mod `physics-lab` (gemoddet); das Spieltempo ist `[` `]` von god-mode |
+| NewSpawn | einen Startpunkt setzen, dorthin springen, eine Geisterkugel aufzeichnen | Werks-Mod `spawn-point` (gemoddet); god-mode (F5/F9), `--sector`, `--at`; `spirit-trail` |
+| PhysicsEditor | Schwerkraft (ein Vektor), Zeitfaktor der Physik, Spieltempo | Werks-Mod `physics-lab` (gemoddet; Schwerkraft nach unten und seitlich); das Spieltempo ist `[` `]` von god-mode |
 | PositionViewer | die Koordinaten der Kugel | Werks-Mod `info-overlay` |
 | RealTimeMeter | echte Spielzeit, über Level hinweg | Werks-Mod `segment-timer` (Echtzeit) |
 | ScreenCapturer | eine Taste speichert ein Bildschirmfoto (PNG/JPEG, Zwischenablage) | Werks-Mod `screenshot` (PNG; keine Zwischenablage) |
 | Segment | die Zeit jedes Sektors gegen den Rekord | Werks-Mod `segment-timer` |
-| SpeedrunShortcuts | Cheat-Modus, Startpunkt setzen, Neustart, Sektor setzen | Werks-Mod `quick-restart`; god-mode; `sector-jump` (Sektor setzen; gemoddet) |
+| SpeedrunShortcuts | Cheat-Modus, Startpunkt setzen, Neustart, Sektor setzen | Werks-Mod `quick-restart`; god-mode; `spawn-point` (Startpunkt; gemoddet); `sector-jump` (Sektor setzen; gemoddet) |
 | SpiritTrail | der Rekordlauf als durchscheinende Kugel | Werks-Mod `spirit-trail` |
 | StickyAccess | im Cheat-Modus zur klebenden Kugel wechseln | Werks-Mod `sticky-ball` |
 | SysInfoDisplay | Systemzeit und Akku auf dem Bildschirm | Werks-Mod `info-overlay` (Uhr, UTC); kein Akku |
 | TASSupport | Eingaben aufnehmen und abspielen, Zeichnen überspringen, am Ende beenden | die Engine: Replays sind deterministische Aufnahmen der Eingaben (`--record`, `--replay`, `--headless`), die Zeitlupe von god-mode |
 | WatchYourTime | Spielzeit je Level | Werks-Mod `play-time` (`playtime.txt`; auch `segment-timer`) |
-| BallSticky | ein klebender Kugeltyp, der Wände hinaufklettert | Werks-Mod `sticky-ball` (gemoddet) |
+| BallSticky | ein klebender Kugeltyp, der Wände hinaufklettert | unsere eigene Kugelart `sticky` mit ihrem Transformer `P_Trafo_Sticky` (oben); Werks-Mod `sticky-ball` (gemoddet) macht jede Kugel klebrig |
 | BMLModuls | neue Module (hölzerner Fall und drehende Bretter) | Levelteile, keine Mods: die Teile des offenen Formats ([open-format.md](open-format.md)) |
 
 Die Grenzen des Originals, die diese Mods umgehen (Bildratengrenze, 4:3, niedrige Auflösungen, acht Sektoren, eine

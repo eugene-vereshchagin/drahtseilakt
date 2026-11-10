@@ -50,7 +50,7 @@ the name entry for a new highscore and the end menu.
 Every finished run is saved as a replay (on Linux in `~/.local/share/drahtseilakt/replays/<level>/`, the
 fastest as `best.replay`); `--replay FILE` plays one, `--headless` checks it without a window, `--screenshot
 FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint and `--at X,Y,Z` (or a level
-object's name) anywhere, with the ball that sector begins with (`--ball wood|stone|paper` overrides it); such a run keeps its start in its replay and is never a
+object's name) anywhere, with the ball that sector begins with (`--ball wood|stone|paper|sticky` overrides it); such a run keeps its start in its replay and is never a
 best run. Until the extended mode is turned on (Options, Extended, or `--debug` for one run) the game is the
 original as closely as it can be. The *extended mode* shows best times. Start lists levels by meaning in both modes (Classic Ballance from your copy, Drahtseilakt, Ballance
 Challenges, Community maps: the best shipped ones and your `levels/downloaded/`, each with its difficulty; how to make and share

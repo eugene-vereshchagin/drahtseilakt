@@ -47,7 +47,7 @@ const VALUES: [&[&str]; 8] = [
         "transformer",
     ],
     &[],
-    &["wood", "stone", "paper"],
+    &["wood", "stone", "paper", "sticky"],
 ];
 const MODULE: usize = 6;
 
