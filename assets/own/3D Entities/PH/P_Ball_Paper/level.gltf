@@ -73,6 +73,25 @@
      "indices": 3,
      "material": 0
     }
+   ],
+   "extras": {
+    "drahtseilakt": {
+     "look": 1
+    }
+   }
+  },
+  {
+   "name": "P_Ball_Paper_Look",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 4,
+      "NORMAL": 5,
+      "TEXCOORD_0": 6
+     },
+     "indices": 7,
+     "material": 0
+    }
    ]
   }
  ],
@@ -140,7 +159,7 @@
  "buffers": [
   {
    "uri": "level.bin",
-   "byteLength": 43200
+   "byteLength": 110048
   }
  ],
  "bufferViews": [
@@ -166,6 +185,30 @@
    "buffer": 0,
    "byteOffset": 38400,
    "byteLength": 4800,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 43200,
+   "byteLength": 14700,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 57900,
+   "byteLength": 14700,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 72600,
+   "byteLength": 9800,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 82400,
+   "byteLength": 27648,
    "target": 34963
   }
  ],
@@ -203,6 +246,40 @@
    "count": 1200,
    "type": "SCALAR",
    "bufferView": 3
+  },
+  {
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC3",
+   "min": [
+    -1.9679270940540492,
+    -1.9949087465333426,
+    -1.9652280612617232
+   ],
+   "max": [
+    1.9679270940540496,
+    1.9949087465333426,
+    1.9652280612617243
+   ],
+   "bufferView": 4
+  },
+  {
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC3",
+   "bufferView": 5
+  },
+  {
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC2",
+   "bufferView": 6
+  },
+  {
+   "componentType": 5125,
+   "count": 6912,
+   "type": "SCALAR",
+   "bufferView": 7
   }
  ]
 }

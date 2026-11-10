@@ -541,15 +541,65 @@ def make_env():
 
 def make_balls():
     n = 128 * SCALE
-    stone = photo("Rock030", n, (125, 131, 115), 0.17, 0.3, 0.2)
-    save(pits(stone, 61), "Ball_Stone")
+    save(pits(stone_ball(n, 61), 61, count=150, sizes=(0.6, 1.6), depth=0.16), "Ball_Stone")
     woodball = wood(n, (159, 126, 80), 0.34, 9, seed=18)
     save(woodball, "Ball_Wood")
     save(woodball, "P_Ball_Wood")
     save(collage(n), "Ball_Paper")
 
 
-def pits(img, seed, count=260):
+def wood_ball(n, seed):
+    """The wooden ball's skin, after the owner's concept (a reference, not copied): turned from one log, so the year
+    rings stand round each pole (on the sphere's mapping, rows of the same latitude), light wood with darker late
+    wood, fine radial cracks running out from the poles, a fine grain. Its mean the original's (159, 126, 80)."""
+    rng = np.random.default_rng(seed)
+    v = (np.arange(n) + 0.5) / n
+    d = np.minimum(v, 1 - v)[:, None]  # 0 at a pole, 0.5 at the equator (by row)
+    jitter = noise(n, 6, seed, 4)
+    # rings: denser outwards, each a little uneven round its circle
+    phase = (d * 2.0) ** 0.8 * 26.0 + 1.2 * (jitter - 0.5)
+    ring = 0.5 + 0.5 * np.cos(phase * 2 * np.pi)
+    late = np.clip(ring - 0.55, 0, 1) / 0.45
+    early, dark = np.array([214, 172, 118]) / 255.0, np.array([150, 104, 58]) / 255.0
+    img = early[None, None] + (dark - early)[None, None] * (0.95 * late ** 1.2)[..., None]
+    grain = noise(n, n // 6, seed + 1, 2) - 0.5
+    img = img * (1 + 0.10 * grain)[..., None] * (1 + 0.08 * (noise(n, 4, seed + 2, 4) - 0.5))[..., None]
+    # cracks: thin dark lines along a meridian from a pole out to some latitude, wandering a little
+    yy = np.arange(n)
+    for _ in range(26):
+        u0 = rng.uniform(0, n)
+        top = rng.random() < 0.5
+        length = rng.uniform(0.12, 0.38) * n
+        wobble = rng.uniform(1.5, 4.0)
+        for y in range(int(length)):
+            row = y if top else n - 1 - y
+            x = int(u0 + wobble * math.sin(y / (n * 0.04))) % n
+            fade = 1 - y / length
+            width = 1 + int(2 * fade)
+            for dx in range(-width, width + 1):
+                img[row, (x + dx) % n] *= 1 - 0.45 * fade * (1 - abs(dx) / (width + 1))
+    mean = img.reshape(-1, 3).mean(0)
+    return np.clip(img * (np.array([159, 126, 80]) / 255.0 / mean)[None, None], 0, 1)
+
+
+def stone_ball(n, seed):
+    """The stone ball's skin: one solid, worn stone (measured on the original's: mean colour (126, 132, 115), a fine
+    speckled grain, lightness std 27 of 255, most of it from texel to texel), soft clouding and a few faint veins, no
+    cracks (a photographed rock's cracks read as a ball fallen to pieces). Tiles both ways, so the sphere's seam does
+    not show."""
+    base = np.array([126, 132, 115]) / 255.0
+    fine = noise(n, n // 2, seed, 2) - 0.5
+    grain = noise(n, n // 8, seed + 1, 3) - 0.5
+    cloud = noise(n, 4, seed + 2, 5) - 0.5
+    # veins: thin soft lines where a warped field crosses a level
+    warp = noise(n, 3, seed + 3, 5)
+    vein = np.exp(-((np.sin(warp * 18.0) * 3.0) ** 2)) * (noise(n, 6, seed + 4, 3) > 0.55)
+    light = 1 + 0.42 * fine + 0.22 * grain + 0.16 * cloud - 0.10 * vein
+    tint = 1 + 0.04 * (noise(n, 5, seed + 5, 4)[..., None] - 0.5) * np.array([1.0, -0.6, 0.4])
+    return np.clip(base[None, None] * light[..., None] * tint, 0, 1)
+
+
+def pits(img, seed, count=260, sizes=(1.0, 3.0), depth=0.28):
     """Small hollows in a stone: dark on the side the light comes from, a light rim on the other (as the original's
     pitted stone ball, measured: about 260 pits, 1 to 3 texels of 128 across)."""
     n = img.shape[0]
@@ -558,14 +608,14 @@ def pits(img, seed, count=260):
     out = img.copy()
     for _ in range(count):
         cx, cy = rng.uniform(0, n, 2)
-        r = rng.uniform(1.0, 3.0) * SCALE
+        r = rng.uniform(*sizes) * SCALE
         dx = (xx - cx + n / 2) % n - n / 2
         dy = (yy - cy + n / 2) % n - n / 2
         d = np.hypot(dx / 1.3, dy) / r
         m = d < 1.4
         if not m.any():
             continue
-        shade = np.where(d < 1, 0.72 + 0.25 * (dx + dy) / (2 * r), 1 + 0.12 * np.clip(1.4 - d, 0, 0.4) / 0.4)
+        shade = np.where(d < 1, 1 - depth + 0.25 * (dx + dy) / (2 * r), 1 + 0.12 * np.clip(1.4 - d, 0, 0.4) / 0.4)
         out[m] = out[m] * shade[m][:, None]
     return np.clip(out, 0, 1)
 
@@ -660,7 +710,11 @@ def collage(n):
 TRACK_OUT = os.path.join(os.path.dirname(HERE), "Track")
 PX = 256 / 5.0  # texels a unit (a slab of 5 units is 256 texels)
 SLABS = 4  # slabs along a texture: 20 units a repeat
-TRACK_FLOOR = (195, 176, 146)
+# The owner's wish (2026-11-03, after playing level 1): darker and greyer than the original's sandy (195, 176, 146),
+# more like concrete, and the slabs' grid less marked.
+TRACK_FLOOR = (152, 147, 139)
+TRACK_SIDE = (118, 112, 104)
+JOINT_DEPTH = 0.26
 
 
 def save_track(img, name):
@@ -681,11 +735,11 @@ def joint(img, axis, at_start=True, at_end=True, width=2, depth=0.5):
     return img * f.reshape(shape)
 
 
-def slab_variety(h, w, seed, tone=0.05, dirt=0.10, wear=0.06):
+def slab_variety(h, w, seed, tone=0.035, dirt=0.10, wear=0.06):
     """A slab's own look as a factor: its tone, blotches of dirt and lighter worn patches (tiling noise)."""
     rng = np.random.default_rng(seed)
     t = 1 + rng.uniform(-tone, tone)
-    warm = np.array([1.0, rng.uniform(0.985, 1.01), rng.uniform(0.96, 1.01)])
+    warm = np.array([1.0, rng.uniform(0.99, 1.01), rng.uniform(0.98, 1.01)])
     d = noise(max(h, w), 3, seed + 1, 5)[:h, :w]
     e = noise(max(h, w), 6, seed + 2, 3)[:h, :w]
     f = t * (1 - dirt * np.clip((d - 0.45) * 2.2, 0, 1)) * (1 + wear * np.clip((e - 0.55) * 3, 0, 1))
@@ -703,7 +757,7 @@ def track_concrete(seed, h, w, mean=TRACK_FLOOR, rel=0.045):
         y0, x0 = rng.integers(0, 1024 - n), rng.integers(0, 1024 - w)
         sl = src[y0:y0 + n, x0:x0 + w].copy()
         sl = sl * slab_variety(n, w, seed * 31 + k)
-        out[k * n:(k + 1) * n] = joint(sl, 0)
+        out[k * n:(k + 1) * n] = joint(sl, 0, depth=JOINT_DEPTH)
     return out
 
 
@@ -737,7 +791,7 @@ def track_side(seed):
     concrete lighter downwards."""
     h = int(PX * 5) * SLABS
     w = int(PX * 5)
-    src = photo("Concrete012", 1024, (141, 121, 95), 0.10, 0.3, 0.4, fix=False)
+    src = photo("Concrete012", 1024, TRACK_SIDE, 0.10, 0.3, 0.4, fix=False)
     rng = np.random.default_rng(seed)
     n = h // SLABS
     img = np.zeros((h, w, 3))
@@ -746,20 +800,81 @@ def track_side(seed):
         img[k * n:(k + 1) * n] = joint(src[y0:y0 + n, x0:x0 + w] * slab_variety(n, w, seed * 17 + k, dirt=0.15), 0,
                                        width=2, depth=0.3)
     img *= np.linspace(0.84, 1.12, w)[None, :, None]
+    img = weather(img, seed + 3, along_rows=True)
     s, g = int(round(0.4 * PX)), 3
     img[:, :s] = brick_strip(h, s, seed + 9)
-    img[:, s:s + g] = rgb(90, 84, 78)
+    img[:, s:s + g] = rgb(70, 66, 62)
+    # the edge under the strip worn lighter in places
+    wear = np.clip((noise(h, 12, seed + 11)[:, :1] - 0.55) * 3, 0, 1)
+    img[:, s + g:s + g + 6] *= (1 + 0.12 * wear)[:, :, None]
     return img
+
+
+def weather(img, seed, along_rows):
+    """Rain streaks run down a concrete face from its top edge: darker stains, narrow and uneven, fading as they run
+    down, and a little grime all over. `along_rows`: the face's top edge is the texture's first column and down runs
+    along its rows' x (the track's sides); else its top is the first row and down runs along y (a column)."""
+    h, w = img.shape[:2]
+    n = max(h, w)
+    if along_rows:
+        streak = np.clip((noise(n, 48, seed, 3)[:h, :w].mean(1, keepdims=True) - 0.5) * 4, 0, 1)
+        fade = np.exp(-np.arange(w) / (w * 0.45))[None, :]
+        dark = 0.22 * streak * fade
+    else:
+        streak = np.clip((noise(n, 48, seed, 3)[:h, :w].mean(0, keepdims=True) - 0.5) * 4, 0, 1)
+        fade = np.exp(-np.arange(h) / (h * 0.6))[:, None]
+        dark = 0.22 * streak * fade
+    grime = 0.08 * noise(n, 6, seed + 1, 4)[:h, :w]
+    return img * (1 - dark - grime + 0.04)[..., None]
+
+
+def track_rail(seed):
+    """The rails' steel (u round a tube, v along it, 4 units a repeat): worn galvanised steel, brushed along the tube,
+    a light rust tint in patches and along streaks, and its relief (a normal map: the brushing) for the highlight to
+    run along; after the owner's concept of the rails (a reference)."""
+    h, w = 512, 128
+    brush = np.repeat(noise(w, 96, seed, 2)[:1], h, 0)  # lines along v
+    brush = brush + 0.5 * np.repeat(noise(w, 32, seed + 1, 3)[:1], h, 0)
+    along = noise(h, 6, seed + 2, 4)[:, :1]
+    base = np.array([0.60, 0.62, 0.64])
+    img = base[None, None] * (0.82 + 0.25 * (brush - 0.6) + 0.10 * (along - 0.5))[..., None]
+    rust = np.clip((noise(h, 5, seed + 3, 5)[:, :w] - 0.58) * 3.0, 0, 1)
+    rust = np.maximum(rust, 0.6 * np.clip((noise(h, 40, seed + 4, 3)[:, :w] - 0.7) * 4.0, 0, 1))
+    tint = np.array([0.55, 0.36, 0.22])
+    img = img * (1 - 0.45 * rust[..., None]) + tint[None, None] * (0.45 * rust[..., None])
+    height = brush * 0.6 + rust * 0.4
+    gx = np.roll(height, -1, 1) - np.roll(height, 1, 1)
+    gy = np.roll(height, -1, 0) - np.roll(height, 1, 0)
+    nrm = np.stack([-gx * 2.0, -gy * 2.0, np.ones_like(gx)], -1)
+    nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
+    return np.clip(img, 0, 1), nrm * 0.5 + 0.5
+
+
+def track_column(seed):
+    """The columns under the floors (u round, v down from the top, 5 units a repeat): the side's concrete, streaked
+    from the top, a joint where one cast ring meets the next."""
+    n = int(PX * 5)
+    src = photo("Concrete012", 1024, TRACK_SIDE, 0.12, 0.3, 0.4, fix=False)
+    rng = np.random.default_rng(seed)
+    y0, x0 = rng.integers(0, 1024 - n), rng.integers(0, 1024 - n)
+    img = src[y0:y0 + n, x0:x0 + n] * slab_variety(n, n, seed, dirt=0.18)
+    img = weather(img, seed + 1, along_rows=False)
+    return joint(img, 0, width=3, depth=0.35)
 
 
 def make_track():
     h = int(PX * 5) * SLABS
     for k, name in enumerate("ABC"):
-        save_track(joint(track_concrete(200 + 10 * k, h, int(PX * 5)), 1, width=2, depth=0.4), f"Track_Top_{name}")
+        save_track(joint(track_concrete(200 + 10 * k, h, int(PX * 5)), 1, width=2, depth=JOINT_DEPTH),
+                   f"Track_Top_{name}")
         save_track(kerb(300 + 10 * k, int(PX * 1.25)), f"Track_Kerb_{name}")
         save_track(kerb(400 + 10 * k, int(PX * 1.25), bricks=False, shade=0.38), f"Track_Shade_{name}")
         save_track(track_slope(500 + 10 * k, int(PX * 2.5)), f"Track_Slope_{name}")
     save_track(track_side(600), "Track_Side")
+    save_track(track_column(700), "Track_Column")
+    rail, rail_n = track_rail(800)
+    save_track(rail, "Track_Rail")
+    save_track(rail_n, "Track_Rail_n")
     # the borders' bricks are the menu scene's (make_menu_scene.py), kept here by the track's names too, so that every
     # texture our levels name as the game's (`game:<name>`, levelkit.py) is one of the game's own
     menu = os.path.join(os.path.dirname(HERE), "3D Entities", "MenuLevel", "textures")

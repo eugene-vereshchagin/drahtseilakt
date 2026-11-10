@@ -889,14 +889,18 @@ fn replays(hints: &Path, n: u32) -> Vec<PathBuf> {
 
 /// `--level-stats DIR`: measures the original levels 1 to 13 (or `--level N` alone) and writes
 /// `DIR/level-stats-auto.csv` (one row a sector and one for the whole level, for each source: a finished run, a
-/// plan's way) and the samples of each way (`DIR/samples/`) to check the classes against.
+/// plan's way) and the samples of each way (`DIR/samples/`) to check the classes against. With `--open LEVEL` and
+/// `--replay RUN` it measures that level (one of ours) along that run instead, into `DIR/level-stats-own.csv`.
 pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), String> {
     std::fs::create_dir_all(out.join("samples")).map_err(|e| format!("{}: {e}", out.display()))?;
+    if let Source::Open(dir) = &o.source {
+        return run_open(o, data, dir, out);
+    }
     let levels: Vec<u32> = match o.source {
         Source::Original(n) if o.chosen => vec![n],
         _ => (1..=13).collect(),
     };
-    let mut rows: Vec<(u32, String, String, usize, Tally)> = Vec::new();
+    let mut rows: Vec<(String, String, String, usize, Tally)> = Vec::new();
     for n in levels {
         let mut lo = o.clone();
         lo.source = Source::Original(n);
@@ -946,49 +950,112 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
             }
         }
         for (source, run) in &sources {
-            let sectors = run.checkpoints.len().max(1);
-            let (mut tallies, samples) = measure(run, sectors);
-            for t in tallies.iter_mut() {
-                t.set("finished", run.finished as u8 as f64);
-                t.set(
-                    "level_bonus",
-                    run.level.settings.level_bonus.unwrap_or(0) as f64,
-                );
-            }
-            let kind = if source.starts_with("run") {
-                "run"
-            } else {
-                "plan"
-            };
-            let mut text = String::from("x,y,z,sector,class,width,left,right,ball\n");
-            for x in &samples {
-                let side = |s: Option<Side>| {
-                    s.map_or_else(String::new, |s| format!("{s:?}").replace(',', ";"))
-                };
-                let _ = writeln!(
-                    text,
-                    "{:.2},{:.2},{:.2},{},{},{:.2},{},{},{:?}",
-                    x.pos.x,
-                    x.pos.y,
-                    x.pos.z,
-                    x.sector,
-                    CLASSES[x.class],
-                    x.width,
-                    side(x.sides[0]),
-                    side(x.sides[1]),
-                    x.kind
-                );
-            }
+            let kind = if source.starts_with("run") { "run" } else { "plan" };
             let file = out.join("samples").join(format!("Level_{n:02}-{kind}.csv"));
-            std::fs::write(&file, text).map_err(|e| format!("{}: {e}", file.display()))?;
-            for (k, t) in tallies.into_iter().enumerate() {
-                rows.push((n, source.clone(), times.join(" "), k, t));
+            for (k, t) in measure_into(run, &file)?.into_iter().enumerate() {
+                rows.push((n.to_string(), source.clone(), times.join(" "), k, t));
             }
         }
     }
+    write_rows(&rows, &out.join("level-stats-auto.csv"))
+}
+
+/// One of our levels (an open-format folder) measured along the run `o.replay`.
+fn run_open(o: &Options, data: &Data, dir: &Path, out: &Path) -> Result<(), String> {
+    let replay = o.replay.clone().ok_or("--level-stats with --open needs --replay RUN")?;
+    let data = data.for_source(&o.source);
+    let run = crate::app::stats_run(o, &data, None)?;
+    let name = dir.file_name().map_or_else(String::new, |f| f.to_string_lossy().into_owned());
+    let run_name = replay.file_name().map_or_else(String::new, |f| f.to_string_lossy().into_owned());
+    println!(
+        "{name}: {run_name}: {} after {:.1} s",
+        if run.finished { "finished" } else { "not finished" },
+        run.ticks.len() as f64 / 60.0
+    );
+    let file = out.join("samples").join(format!("{name}-run.csv"));
+    let mut tallies = measure_into(&run, &file)?;
+    // how the ride went (the whole level's row): the share of the time the ball stood (not counting a transformer's
+    // hold), and its speed while it rolled
+    let ride = ride(&run.ticks);
+    println!(
+        "{name}: standing {:.1}% of the time, speed p10 {:.1} p50 {:.1} p90 {:.1} units/s",
+        ride[0] * 100.0,
+        ride[1],
+        ride[2],
+        ride[3]
+    );
+    if let Some(t) = tallies.first_mut() {
+        for (k, v) in ["standing_share", "speed_p10", "speed_p50", "speed_p90"].into_iter().zip(ride) {
+            t.set(k, v);
+        }
+    }
+    let rows: Vec<_> = tallies
+        .into_iter()
+        .enumerate()
+        .map(|(k, t)| (name.clone(), format!("run:{run_name}"), format!("{:.1}", run.ticks.len() as f64 / 60.0), k, t))
+        .collect();
+    write_rows(&rows, &out.join("level-stats-own.csv"))
+}
+
+/// Standing below this speed (units a second).
+const STANDING: f32 = 0.5;
+
+/// The share of the ticks the ball stood (held by a transformer or dying not counted), and the 10th, 50th and 90th
+/// percentiles of its speed while it rolled.
+fn ride(ticks: &[TickRec]) -> [f64; 4] {
+    let mut speeds: Vec<f32> = Vec::new();
+    let (mut standing, mut counted) = (0usize, 0usize);
+    for w in ticks.windows(2) {
+        if w[1].held || w[1].dying || w[0].dying {
+            continue;
+        }
+        let v = w[1].pos.distance(w[0].pos) * 60.0;
+        counted += 1;
+        if v < STANDING {
+            standing += 1;
+        } else {
+            speeds.push(v);
+        }
+    }
+    speeds.sort_by(f32::total_cmp);
+    let pct = |q: f64| speeds.get(((speeds.len() as f64 - 1.0) * q).round().max(0.0) as usize).copied().unwrap_or(0.0) as f64;
+    [standing as f64 / counted.max(1) as f64, pct(0.1), pct(0.5), pct(0.9)]
+}
+
+/// Measures a way and writes its samples to `file`: the tallies, the whole level's first, then each sector's.
+fn measure_into(run: &Run, file: &Path) -> Result<Vec<Tally>, String> {
+    let sectors = run.checkpoints.len().max(1);
+    let (mut tallies, samples) = measure(run, sectors);
+    for t in tallies.iter_mut() {
+        t.set("finished", run.finished as u8 as f64);
+        t.set("level_bonus", run.level.settings.level_bonus.unwrap_or(0) as f64);
+    }
+    let mut text = String::from("x,y,z,sector,class,width,left,right,ball\n");
+    for x in &samples {
+        let side = |s: Option<Side>| s.map_or_else(String::new, |s| format!("{s:?}").replace(',', ";"));
+        let _ = writeln!(
+            text,
+            "{:.2},{:.2},{:.2},{},{},{:.2},{},{},{:?}",
+            x.pos.x,
+            x.pos.y,
+            x.pos.z,
+            x.sector,
+            CLASSES[x.class],
+            x.width,
+            side(x.sides[0]),
+            side(x.sides[1]),
+            x.kind
+        );
+    }
+    std::fs::write(file, text).map_err(|e| format!("{}: {e}", file.display()))?;
+    Ok(tallies)
+}
+
+/// The rows (level, source, finished runs, sector, tally) as CSV, under one header over every key any row has.
+fn write_rows(rows: &[(String, String, String, usize, Tally)], file: &Path) -> Result<(), String> {
     // one header over every key any row has, in the order they first came
     let mut keys: Vec<String> = Vec::new();
-    for r in &rows {
+    for r in rows {
         for (k, _) in &r.4.values {
             if !keys.contains(k) {
                 keys.push(k.clone());
@@ -996,7 +1063,7 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
         }
     }
     let mut text = format!("level,source,finished_runs,sector,{}\n", keys.join(","));
-    for (n, source, times, sector, t) in &rows {
+    for (n, source, times, sector, t) in rows {
         let _ = write!(text, "{n},{source},{times},{sector}");
         for k in &keys {
             let v = t.values.iter().find(|x| &x.0 == k).map_or(0.0, |x| x.1);
@@ -1004,8 +1071,7 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
         }
         text.push('\n');
     }
-    let file = out.join("level-stats-auto.csv");
-    std::fs::write(&file, text).map_err(|e| format!("{}: {e}", file.display()))?;
+    std::fs::write(file, text).map_err(|e| format!("{}: {e}", file.display()))?;
     println!("written {}", file.display());
     Ok(())
 }

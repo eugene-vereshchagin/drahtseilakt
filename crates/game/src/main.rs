@@ -111,7 +111,8 @@ usage: drahtseilakt [options]
                       Mist, Clouds, or any Sky_<NAME>_* the textures have) instead of the level's own
   --size WxH          window or screenshot size (default 1600x900)
   --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in ./hints
-                      for designing our own: DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py)
+                      for designing our own: DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py);
+                      with --open LEVEL --replay RUN one of our levels along that run: DIR/level-stats-own.csv
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
 Without --level, --map or --open the window opens with the level menu.

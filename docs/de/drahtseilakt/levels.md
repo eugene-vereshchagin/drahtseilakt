@@ -103,7 +103,7 @@ Das Menü listet sie in dieser Reihenfolge (`order` in level.txt; ihre Schwierig
 
 | # | Level | Sektoren | Idee | Himmel, Musik, Bonus |
 |---|---|---|---|---|
-| 1 | First Roll (Erster Lauf) | 3 | breite Böden mit Geländern, sanfte Kurven und Hänge, ein erstes Stück Schienen, ein kleiner Sprung | A, 1, 100 |
+| 1 | First Roll (Erster Lauf) | 4 | das erste Level des Originals im Geist, doppelt so lang: eine Holzbrücke, Schienen gerade, in Kurven und Schleifen, Kisten, die von kahlen Strecken geschoben werden, der Stein-Transformator und zurück, lose Kugeln, die Papierkugel über drei Ventilatoren und eine Plattenbrücke, eine Kuppel, Wippen, zwei Steine auf ihren Kisten, vier Schieber, kahle Terrassen mit scharfen Kurven, Holzrampen hinauf zwischen Absätzen mit Geländer, Schienen in einer Spirale hinab; Rinnen auf den meisten Böden, Geländer, wo man fallen kann | Sunset, 1, 100 |
 | 2 | Wood and Stone (Holz und Stein) | 4 | die Holzkugel erklimmt die Rampen, die die Steinkugel nicht schafft; die Steinkugel schiebt Kisten und lose Kugeln über Kanten ohne Rand | B, 2, 200 |
 | 3 | Paper Winds (Papierwinde) | 4 | die Papierkugel fährt auf Ventilatoren zu den Böden darüber; Plattenbrücken tragen sie | C, 3, 300 |
 | 4 | Swing Time (Schaukelzeit) | 4 | was sich bewegt: schwingende Säcke, drehende Arme, ein Klappenrad, Schaukeln, die eine Lücke überbrücken, während sie vorbeischwingen | A, 4, 400 |
@@ -154,6 +154,27 @@ Außerdem: `rails L`, `rails-left A R`, `rails-right A R` (Schienen, auch hinauf
 `up`, `turn`, `tilt` für jedes andere Teil; `move`, `turn`, `mark NAME` und `back NAME`, um den Cursor zu bewegen,
 ohne zu bauen. Die ganze Liste steht oben in leveldsl.py.
 
+`railing left|right|both|off` setzt Stahlgeländer an die Ränder der Böden von dort an, auf jedem Profil (Level 1:
+Rinnen, und Geländer, wo man fallen kann). Zwei Rätsel des Originals sind eigene Befehle: `crateblock` (der Stein auf
+der Kiste, P_Modul_34: ein Schlitz von 6 quer über den Weg, darin der Stein auf seiner Kiste, die auf einem 5 tieferen
+Boden steht, den die Beschreibung unter den Schlitz legt; eine Kugel auf diesem Boden schiebt die Kiste unter dem
+Stein hervor, und der Stein rutscht bündig mit dem Weg herab) und `pusher left|right` (P_Modul_01: ein Schlitz von 1,6
+quer über einen höchstens 6 breiten Weg, der Block des Schiebers füllt den Weg, seine Zielscheibe steht auf dieser
+Seite 5 über den Rand hinaus über einem 2,5 tieferen Boden, von dem aus eine Kugel den Block aus dem Weg schiebt). Die
+Böden darunter werden mit `mark`, `move`, `turn` und `back` gelegt.
+
+**Ecken, Plätze und Kulissen** (2026-11, Neubau von Level 1; `assets/own/make/levelparts.py`). `corner left|right [rail]
+[gap G]` ist eine harte rechtwinklige Ecke: das Ende des letzten Bodens ist ein Gehrungsring (der Querschnitt steht auf
+der Winkelhalbierenden, 1/cos 45 breiter), gemeinsam mit dem folgenden Boden; die Außenecke ist gefüllt, das Profil läuft
+ohne Bruch weiter; `rail` setzt außen ein Geländer 8 beiderseits, `gap` lässt es G lang geradeaus offen. `plaza W L
+[brick|kerb] [stone|wood] [gap SIDE C W]... [fence SIDE...]` ist eine ebene Fläche ab der Mitte ihrer Hinterkante mit
+Ziegelrand oder niedriger Kante außer an den Lücken und Geländern an den Seiten in `fence`; `disc R [rim] [ring [gap W]]`
+eine runde Fläche; `pit L [depth D] [wall LEN] [side S]` eine Grube im Weg mit Prellwand; `mark`/`back` beginnen und
+beenden einen Seitenast. Freistehende Kulissen (nur gezeichnet): `lamptower`, `mast`, `plinth`, `garland`, `wallblock`,
+`wlamp`, `lighthouse`; `scatter D` verteilt Türme, Masten und Sockel entlang des Wegs abseits der Böden. `loose KIND lead`
+und `plug` sind vom Platzcheck ausgenommen. Plätze, Scheiben und Gruben liegen 0,03 unter den anschließenden Böden
+(zwei ebene Teile auf gleicher Höhe wären ein Riss für den Nahttest).
+
 **Himmel.** `sky` wählt die Himmelsbox um das Level: `A`, `B`, `C` (unsere, über einem Wolkenmeer, wie die Buchstaben
 des Originals) oder einen der fotografischen Himmel mit Namen: `Mountains` (ein Abendhimmel über dunstigen Bergen mit
 Schnee auf den Gipfeln), `Forest` (Sommerwolken über einem Blätterdach mit Lichtungen und Seen), `Sea` (ein ruhiges
@@ -190,7 +211,9 @@ die einen abdriftenden Ball zur Mitte zurückrollt; ein Drittel ist blank), ab L
 (der Rest blank); erhöhte Wände sind selten (nur die hölzernen Halfpipes von Level 4 und einige Stücke in 12 und 13);
 Stahlgeländer (ein Rohr etwa 2,6 über dem Boden, auf Pfosten) laufen an etwa 490 und 420 Einheiten der Bodenkanten in
 den Leveln 1 und 2, 130 bis 540 in 3 bis 8, unter 90 in 9 bis 11 und keine in 12. Unsere Level
-gehen denselben Weg, eine Stufe deutlicher: Level 1 und 2 haben Geländer, 3 und 4 Ziegelränder (3 einen Sektor mit
+gehen denselben Weg, eine Stufe deutlicher: Level 1 hat Rinnen und Geländer, wo man fallen kann (um den Start, an der
+Außenseite der Kurven, auf den Absätzen, neben Böden mit einem Abgrund), wie das erste Level des Originals, Level 2
+Geländer, 3 und 4 Ziegelränder (3 einen Sektor mit
 Geländer), 5 bis 8 Rinnen (5 einen Sektor mit Rändern, 8 den letzten blank), 9 und 10 blanke Böden (9 den ersten
 Sektor als Rinne). `safety ART` setzt sie von dort an (die erste in einer Datei ist die des Levels); `borders off`
 macht die Böden von dort an blank, `borders on` gibt ihnen die Art des Levels zurück. Was jede ist:
@@ -218,6 +241,105 @@ Seiten dunklerer Beton mit eigenem Ziegelstreifen. Die Texturen liegen in `asset
 Schritt `track`); die Ränder nehmen die Ziegel der Menüszene. Sie werden nach der Strecke entlang der ganzen Bahn
 aufgetragen, und nacheinander gelegte Stücke (gerade, gebogen, ein Stück mit wechselnder Breite) sind ein Netz, so
 laufen die Texturen ohne Naht von Stück zu Stück.
+
+**Keine Nähte** (2026-11-03): ein Stück Boden ist ein Netz vom Start oder einem Checkpoint bis zum nächsten, sein
+Querschnitt wird aufrecht quer zur eigenen Richtung des Cursors (in einer Kurve genau) mitgeführt, so haben eine
+Gerade, die in eine Kurve übergeht, oder eine Rampe, die in eine Ebene übergeht, dort, wo sie sich treffen, denselben
+Querschnitt: kein Keil aus Nichts dazwischen; jeder Ring von Punkten gehört den Vierecken davor und danach (kein Riss,
+kein T-Stoß), und die Texturen liegen nach der Strecke entlang des Wegs. Die Stücke des Starts und der Checkpoints
+sind ebenso angeschlossen: an ihren Kanten, wo ein Boden weiterläuft, liegen ihre Ecken auf den Querschnittspunkten
+des Bodens selbst, und ihre Oberseite ist wie die Bahn texturiert. Der Test `our_floors_have_no_seams` (ownlevels.rs)
+prüft die Böden jedes Levels, das der Baukasten gemacht hat (ab Version 2, in `asset.generator` von level.gltf): wo
+die Oberseite eines Bodens endet, liegt daneben in ihrer Höhe keine andere (`the_seam_finder_sees_a_crack` prüft die
+Suche selbst). Ein Checkpoint auf einem schmalen Weg bekommt eine kleinere Schale und mit ihr weniger Tiefe, so
+bleiben ihre Hänge die gemessenen (eine Steinkugel, die in einer steileren Schale lag, rollte nicht heraus).
+
+**Platz, Schienen und Wolken** (2026-11-03, nachdem der Besitzer Level 1 gespielt hat): ein Weg muss der Kugel (Radius
+2) auf der Höhe ihrer Mitte mindestens 5,5 Breite lassen, zwischen seinen Rändern oder den Holmen seiner Geländer
+(levelkit.MIN_FREE); der Baukasten schreibt kein Level mit einer engeren Stelle und nennt jede (ein 6 breiter Weg mit
+Ziegelrändern ließ 4, und die Kugel klemmte). Eine Kiste oder eine lose Kugel muss so viel Platz neben sich lassen,
+mit dem, was nahe bei ihr quer über dem Weg liegt, außer sie ist mit `shove` markiert und die Kugel, die der Weg dort
+hat (die des Starts, dann die jedes Transformators), ist nicht leichter (Holz 1,9, Stein 10, Papier 0,2, eine Kiste
+1); keine lose Kugel liegt näher als 14 am Ende von Schienen (sie rollt in ihren Trichter). Schienen haben die Breite
+des Originals, gemessen: Rohre 0,6 dick, ihre Mitten 3,9 auseinander, so sitzt die Kugel tief zwischen ihnen; unsere
+liegen auf dem Boden, den sie verlassen (die Kugel sinkt 0,48 auf sie), und wo von einem Ende ein Boden weiterläuft,
+biegt sich jedes Rohr flach über die ebene Fläche des Bodens nach außen, von oben ein Trichter (keiner auf einer
+Rinne, die die Kugel selbst zur Mitte führt); Pfosten unter den Rohren halten sie, Schwellen quer zwischen ihnen nur
+mit `rails ... ties`, für spätere Level. Ein Transformator steht gleich vor dem, wofür seine Kugel da ist. Die flache
+Oberseite jedes Profils ist an denselben Stellen quer geschnitten (1, 1,25 und 2,5 von den Rändern, die letzte
+mindestens 1,5 von der Mitte, wo der Fuß einer schmalen Rinne liegt), so teilen Stücke verschiedener Profile, die Ende
+an Ende aufeinandertreffen, ihre Ecken; jede Fläche zeigt dahin, wohin ihre Normale zeigt (die Flächen der Bahn waren
+vorher verkehrt gewickelt, ihre Normalen zeigten nach innen). Der Beton der Bahn ist dunkler und grauer als der
+sandige Ton des Originals, die Fugen der Platten schwächer (Wunsch des Besitzers). Unter jedem Level liegt eine
+Wolkenschicht wie die des Originals (`SkyLayer`, in der Datei verborgen, vom Spiel gezeigt, wenn die Optionen Wolken
+haben, additiv über den Himmel gezeichnet): eine Ebene 165 unter dem tiefsten Boden, 500 über das Level hinaus nach
+allen Seiten, unsere eigenen grauen Wolken auf Schwarz, alle 675 wiederholt.
+
+**Stützen, Kurven und Aussehen** (2026-11-03, dritter Blick des Besitzers): Schienen halten ein paar Sättel unter
+beiden Rohren (unter der Kugel, die zwischen ihnen rollt) auf Säulen hinab in den Dunst, etwa einer alle 40 entlang,
+keiner nahe ihren Enden (dort halten sie die Böden) und keiner über einem anderen Boden; `railing turns` setzt von
+dort an ein Geländer an die Außenseite jeder Kurve (Level 1 hat es), und ein Geländer nur an der Innenseite einer
+Kurve wird abgelehnt. Die Wolkenschicht liegt nur unter den Himmeln, die ein Wolkenmeer sind (A, B, C, Sunset); Level
+1 liegt unter `Mountains`. Die Seiten der Bahn und die Säulen haben Regenspuren von ihrer Oberkante, die Säulen sind
+in Ringen gegossen (`Track_Column`). Das Netz eines Teils kann ein feineres Aussehen tragen (ownkit.py, `Mesh.look`:
+was das Spiel zeichnet, das Netz selbst bleibt der Physik): die Transformatoren sind wie die Platte des Originals
+gezeichnet (ein Chromrahmen um eine Scheibe aus dem Material der Kugel, farbige Knöpfe auf einer genieteten Platte),
+die Papierkugel als zerknülltes Blatt, die Seile der Ballons am Korb festgebunden.
+
+**Tore für die Kugeln** (2026-11-03, in der Simulation auf Rampen von 20 Länge gemessen): die Holz- und die
+Papierkugel steigen aus dem Stand eine Rampe von 33 Grad hinauf; die Steinkugel bleibt aus dem Stand bei 19 Grad
+stehen und mit 30 Anlauf bei 24, so ist eine Rampe, die auf 20 um 10 steigt (27 Grad), ein Tor, das nur Holz (oder
+Papier) passiert. Level 1 setzt eines gleich nach jeden Holz-Transformator und einen Stein-Transformator gleich vor
+das, wofür die Steinkugel gebraucht wird (eine lose Steinkugel, die Kiste, eine Kiste auf einem kahlen Stück, die
+Schieber); seine langen leeren Geraden sind gekürzt und zu Bögen geworden. Eine Kuppel muss auf beiden Seiten den
+Platz eines Wegs lassen (die DSL lehnt ein Level ab, wo sie es nicht tut, bei der Breite, die der Boden dort hat);
+Kisten und lose Kugeln werden bei derselben Breite geprüft. Säulen unter den Böden und unter Schienen halten Abstand
+zu jedem Boden unter ihnen, nach dessen eigener Breite.
+
+**Luft und Tore zum Herausfinden** (2026-11-03): ein Level im offenen Format kann in seinen Einstellungen Nebel tragen
+(`fog`: `color` zum Horizont, `color_down` gerade hinab, `density` je Einheit Entfernung, und `below`/`depth`: unter
+dieser Höhe vergeht alles innerhalb dieser Tiefe ganz in ihm). Der Renderer zeichnet ihn auf allem Beleuchteten (der
+Himmel, Sprites und die Wolkenschicht behalten ihre Farbe); die Physik sieht ihn nie, so bleiben Wiederholungen
+gleich, und die Level des Originals haben keinen. Unser Baukasten nimmt ihn aus den Farben des Himmels selbst (der
+Dunst gleich unter seinem Horizont, die Welt darunter) und lässt die Säulen und die Stützen der Schienen 240 tief in
+ihn reichen, so verblassen sie, statt abzubrechen; jeder Himmel außer Night bekommt die Wolkenschicht, als zwei Decks
+verstreuter Wolkenbänke über einer eigenen Welt. Nicht jeder Wechsel der Kugel liegt auf dem Weg: in Level 1 kommt die
+Steinkugel an einen Anstieg, den sie nicht schafft, der Holz-Transformator steht seitlich auf dem Platz davor; die
+Holzkugel kommt an eine Kiste, die sie nicht verschiebt, der Stein-Transformator steht seitlich auf dem Boden darunter
+(eine schnelle Holzkugel verschiebt sie manchmal doch); jeder Sektor, der eine Kugel braucht, gibt sie weiterhin.
+
+**Nach den Konzeptbildern des Besitzers** (2026-11-03, seine Bilder nur als Vorbild): Schienen aus abgenutztem,
+gebürstetem verzinktem Stahl mit leichtem Rostton und Relief (`Track_Rail`, eine Normal-Map), eine Schelle um jedes
+Rohr alle 9 entlang, ihr Bügel unter dem Weg der Kugel zum anderen Rohr hinab gebogen, und an den Stützen ein dünner
+Stahlstab vom Bügel hinab in den Dunst (die Beschläge nur gezeichnet); die Kugeln glatt gezeichnet (ihre groben Netze
+bleiben der Physik); der Start auf einem Steinturm hinab in den Dunst; Laternen auf Holzpfosten am Start und neben
+jedem Checkpoint.
+
+**Teile stehen auf ebenem Boden** (2026-11-03): der Baukasten lehnt ein Level ab, in dem die Platte eines
+Transformators, eine Kiste oder eine Kuppel nicht auf einem ebenen, waagerechten Stück an ihrem Fuß steht (ihre
+Grundfläche wird abgetastet: jede Bodenoberseite darunter innerhalb von 0,05 ihres Fußes, nichts fehlt), und nennt
+jede; wo eine steht, wird die Rinne verbreitert oder das Teil versetzt. Eine Kugel, die wechselt, wirft ihre Haut ab:
+ihre Stücke sind gebogene Bruchstücke ihrer eigenen Schale, außen ihre Textur, innen eine dünne Seite.
+
+**Lose Körper liegen auf dem Boden, nicht darin** (2026-11-09): der Platz eines Teils (`ahead`, `side`) ist ein
+Punkt auf der Geraden des Cursors in seiner Höhe, hinter einem Gefälle, neben einer Kurve oder an der Schräge einer
+Rinne also nicht auf dem Boden: Level 1 hatte lose Kugeln bis 2,4 tief darin, und die Physik stieß jede zu Beginn
+ihres Sektors heraus und schleuderte den Ball des Spielers, der sie berührte, mit Hunderten Einheiten pro Sekunde
+davon. Der Baukasten legt jetzt jede lose Kugel auf das, was unter ihr ist (aus einem Boden gehoben, auf einen
+gesenkt; die Papierkugel als Kugel von 2,04, der Reichweite ihrer Hülle), und lehnt ein Level ab, in dem eine lose
+Kugel oder eine Kiste mehr als 0,05 in Böden, Schienen oder Stoppern beginnt oder eine lose Kugel auf nichts liegt,
+und nennt jede (`levelkit.py --check ORDNER` prüft ein fertiges Level). Eine auf ein Gefälle gelegte Kugel wird
+gemeldet (sie rollt zu Beginn ihres Sektors davon). Das Spiel selbst hebt einen losen Körper, der mehr als 0,1 in der
+statischen Geometrie beginnt, vor dem Erzeugen auf sie hinauf; die Level des Originals haben keinen tiefer als 0,031
+(die Papierkugeln von Level 10), es bewegt also keinen der ihren.
+
+**Raum über der Kugel** (2026-11-03): über einem Transformator (sein Käfig hebt und hält die Kugel), einem Ventilator
+und dem Ballon darf nichts von Böden oder Schienen innerhalb von 12 hängen; und ein Weg darf unter einem anderen Boden
+oder Schienen nur verlaufen, wenn deren Unterseite höchstens 3,6 über ihm liegt (eine Wand, auf die die Kugel trifft)
+oder 6 und mehr (Platz zum Durchrollen), nie dazwischen, wo eine Kugel klemmt. Der Baukasten lehnt ein Level ab, das
+eines davon verletzt, und nennt die Stellen. Eine Kiste kann auf einer anderen stehen (`box ... up 5`).
+
+**Geometrieprüfungen** (2026-11-09, nach dem Spiel des Eigentümers in Level 1): das Kit schreibt kein Level, das eine von drei Prüfungen (`levelcheck.py`) nicht besteht, und nennt, was und wo. *Nähte:* kein Riss und keine Stufe von 0,005 bis 0,05, wo zwei Bodenstücke zusammentreffen (Plätze, Scheiben, Abzweige, Ecken liegen genau auf der Höhe des Bodens; ein flaches Stück trifft ein Profil nur an dessen flacher Mitte). *Kulissen:* kein Lampenturm, Mast, Sockel, keine Girlande, kein Wandblock und keine Säule innerhalb von 5 über der Oberseite eines Bodens (4 der Kugel und 1 Rand; seitlich 0,3, bei Schienen 2), außer die Beschreibung markiert es mit `obstacle`. *Abkürzungen:* kein Boden, der auf der Strecke 30 oder mehr weiter liegt, darf von einem früheren durch Fall oder Flug von einer Kante erreichbar sein (Kugel mit 20 Einheiten/s, Schwerkraft 20; gemessene Höchstgeschwindigkeiten: Papier 13,9, Holz 15,9, Stein 17,9; ein geneigtes Stück gibt Anstieg; eine Kante mit Geländer oder Rand ist keine Absprungkante) oder von der Spitze eines Gebläses (17 über seinem Boden), außer die Landung ist in der Beschreibung mit `drop [R]` markiert. Lose Körper im Boden (`check_clear`) bleiben verboten.
 
 **Start und Checkpoints** sind Schalen wie die des Originals (gemessen, nur Zahlen): der Start eine runde Plattform mit
 Radius 10 und einer Schale von Radius 7,5 und 1,25 Tiefe in der Mitte (der Ball kommt darin zur Ruhe), vier

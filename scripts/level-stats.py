@@ -4,6 +4,7 @@
 # per level and the targets for our own levels, and writes level-stats.md, level-stats.csv and level-stats.png.
 #
 #   scripts/level-stats.py AUTO_CSV MANUAL_CSV HINTS_DIR OUT_DIR
+#   scripts/level-stats.py --own OWN_CSV OWN_MANUAL_CSV LEVEL_STATS_CSV   (one of our levels against its target)
 #
 # A level without a finished run (12, 13) is measured along the test player's way through its plan: that way is
 # shorter than a real run (no detours, no going back), so its length is estimated from the walkthrough's time at the
@@ -11,7 +12,7 @@
 # from the plan's way; what only a run shows (turns, flights, times) is estimated too; such numbers are marked.
 import csv, math, os, statistics, sys
 
-AUTO, MANUAL, HINTS, OUT = sys.argv[1:5]
+AUTO, MANUAL, HINTS, OUT = (sys.argv[1:5] + [""] * 4)[:4]
 
 CLASSES = ["corridor", "wide", "trough", "posts", "curbs", "open", "narrow", "rails", "monorail", "siderail",
            "module", "air"]
@@ -26,7 +27,7 @@ WEIGHT = {"corridor": 0.3, "wide": 0.4, "trough": 0.6, "curbs": 0.8, "posts": 1.
           "air": 1.5, "narrow": 2.0, "rails": 2.0, "siderail": 3.0, "monorail": 3.0}
 # The track's share of the index: the owner's decision (2026-11-09) is that the track is about 20% of the index
 # (it was about 47% of the originals' sum, 100 of 215 a level on average); the weights above are scaled by this, so
-# the originals' average is 28 of the track against 110 of the rest. The other parts are as they were.
+# the originals' average is 29 of the track against 115 of the rest. The other parts are as they were.
 TRACK_SCALE = 0.29
 GROUPS = [("лёгкая (коридор, широкий, жёлоб)", ["corridor", "wide", "trough"]),
           ("с бортиками/столбиками", ["curbs", "posts"]),
@@ -41,6 +42,58 @@ def num(v):
     except (TypeError, ValueError):
         return 0.0
 
+
+# the difficulty index: five parts, added up (d: a level's measured row, m: its hand annotations)
+def index_of(d, m):
+    track = TRACK_SCALE * sum(d.get(f"len_{c}", 0.0) * w for c, w in WEIGHT.items()) / 100.0
+    puzzles = (1.0 * d.get("loose_moved", 0) + 2.0 * (d.get("m01_pushers", 0) + d.get("m34_boxstone", 0)
+               + d.get("m25_drawbridges", 0) + d.get("m37_targets", 0) + d.get("m03_lifts", 0))
+               + 1.0 * (d.get("m30_seesaws", 0) + d.get("m29_plates", 0) + d.get("m41_tipplates", 0)
+               + d.get("m19_flaps", 0)))
+    if d.get("estimated"):
+        # (no run: the loose things moved are not known; as many as the boxes and loose balls the plan names)
+        puzzles += 0.5 * (d.get("boxes", 0) + d.get("loose_stone_balls", 0) + d.get("loose_wood_balls", 0))
+    tricks = (1.0 * d.get("transforms", 0) + 1.0 * d.get("fan_flights", 0) + 3.0 * num(m["centrifugal"])
+              + 3.0 * num(m["balls_as_keys"]) + 2.0 * num(m["balls_ahead"]) + 2.0 * num(m["timing"]))
+    navigation = 3.0 * num(m["hidden_routes"]) + 2.0 * num(m["backtracks"]) + 4.0 * num(m["maze"])
+    hazards = (1.0 * (d.get("m26_sacks", 0) + d.get("m08_swings", 0) + d.get("m17_poles", 0))
+               + 0.5 * d.get("sharp_turns_at_edge", 0) + 0.3 * d.get("humps", 0))
+    return {"track": track, "puzzles": puzzles, "tricks": tricks, "navigation": navigation, "hazards": hazards,
+            "total": track + puzzles + tricks + navigation + hazards}
+
+
+def own_report(own_csv, manual_csv, stats_csv):
+    """One of our levels against its target: `--level-stats DIR --open LEVEL --replay RUN` (DIR/level-stats-own.csv),
+    its hand annotations (one line, the columns of hints/level-stats-manual.csv, `level` its order) and the report's
+    level-stats.csv (the target for that order: the index split as the original's of the same number)."""
+    rows = list(csv.DictReader(open(own_csv)))
+    whole = {k: num(v) for k, v in rows[0].items() if k not in ("level", "source", "finished_runs")}
+    m = next(csv.DictReader(l for l in open(manual_csv) if not l.startswith("#")))
+    n = int(m["level"])
+    orig = next(r for r in csv.DictReader(open(stats_csv)) if int(r["level"]) == n and int(r["sector"]) == 0)
+    i = index_of(whole, m)
+    target = num(orig["target_index"])
+    print(f"{rows[0]['level']} against our level {n}'s target (2x the original {n}'s trend)")
+    t = whole["time_s"]
+    print(f"  path {whole['path_len']:.0f} (target {num(orig['target_length']):.0f}), time {int(t // 60)}:{t % 60:04.1f}, "
+          f"sectors {len(rows) - 1}")
+    for k in ("track", "puzzles", "tricks", "navigation", "hazards", "total"):
+        share = num(orig[f"index_{k}"]) / max(num(orig["index_total"]), 1e-9)
+        print(f"  {k:10s} {i[k]:6.1f}   target {target * share:6.1f}")
+    print("  track by class: " + ", ".join(f"{c} {whole.get(f'len_{c}', 0):.0f}" for c in CLASSES))
+    for k in ("extra_points", "extra_lives", "taken_extra_points", "taken_extra_lives", "transforms", "fan_flights", "loose_moved",
+              "m01_pushers", "m34_boxstone", "m30_seesaws", "m29_plates", "sharp_turns", "sharp_turns_at_edge", "ramps_up",
+              "ramps_down", "humps",
+              "standing_share", "speed_p10", "speed_p50", "speed_p90"):
+        if k in whole:
+            print(f"  {k} {whole[k]:g}")
+    for r in rows[1:]:
+        print(f"  sector {r['sector']}: path {num(r['path_len']):.0f}, time {num(r['time_s']):.0f} s")
+
+
+if len(sys.argv) > 1 and sys.argv[1] == "--own":
+    own_report(*sys.argv[2:5])
+    sys.exit(0)
 
 auto = list(csv.DictReader(open(AUTO)))
 manual = {int(r["level"]): r for r in csv.DictReader(l for l in open(MANUAL) if not l.startswith("#"))}
@@ -119,24 +172,8 @@ def L(d, c):
     return d.get(f"len_{c}", 0.0)
 
 
-# the difficulty index: five parts, added up
 def index(n):
-    d, m = data[(n, 0)], manual[n]
-    track = TRACK_SCALE * sum(L(d, c) * w for c, w in WEIGHT.items()) / 100.0
-    puzzles = (1.0 * d.get("loose_moved", 0) + 2.0 * (d.get("m01_pushers", 0) + d.get("m34_boxstone", 0)
-               + d.get("m25_drawbridges", 0) + d.get("m37_targets", 0) + d.get("m03_lifts", 0))
-               + 1.0 * (d.get("m30_seesaws", 0) + d.get("m29_plates", 0) + d.get("m41_tipplates", 0)
-               + d.get("m19_flaps", 0)))
-    if d["estimated"]:
-        # (no run: the loose things moved are not known; as many as the boxes and loose balls the plan names)
-        puzzles += 0.5 * (d.get("boxes", 0) + d.get("loose_stone_balls", 0) + d.get("loose_wood_balls", 0))
-    tricks = (1.0 * d.get("transforms", 0) + 1.0 * d.get("fan_flights", 0) + 3.0 * num(m["centrifugal"])
-              + 3.0 * num(m["balls_as_keys"]) + 2.0 * num(m["balls_ahead"]) + 2.0 * num(m["timing"]))
-    navigation = 3.0 * num(m["hidden_routes"]) + 2.0 * num(m["backtracks"]) + 4.0 * num(m["maze"])
-    hazards = (1.0 * (d.get("m26_sacks", 0) + d.get("m08_swings", 0) + d.get("m17_poles", 0))
-               + 0.5 * d.get("sharp_turns_at_edge", 0) + 0.3 * d.get("humps", 0))
-    return {"track": track, "puzzles": puzzles, "tricks": tricks, "navigation": navigation, "hazards": hazards,
-            "total": track + puzzles + tricks + navigation + hazards}
+    return index_of(data[(n, 0)], manual[n])
 
 
 idx = {n: index(n) for n in levels}
@@ -238,6 +275,13 @@ def mmss(s):
 
 p("# Статистика 13 оригинальных уровней Ballance")
 p("")
+p("**Изменение от 2026-11-09 (решение владельца).** Трасса теперь даёт около 20% индекса, а не около 47%: веса типов "
+  "трассы умножены на 0,29 (`TRACK_SCALE` в `scripts/level-stats.py`); остальные части индекса не менялись. У "
+  "оригиналов в среднем трасса 28 очков из 138 (было 100 из 215). Индексы и цели для наших уровней ниже пересчитаны "
+  "(цель = в 2 раза больше тренда оригинала, как раньше). Замечание: за время с прошлого отчёта у уровня 12 появился "
+  "законченный прогон (`Level_12.replay`), поэтому он теперь измерен по прогону, а не оценён по плану, и его "
+  "остальные части индекса тоже другие (в т.ч. тренд и цели).")
+p("")
 p("Замеры для проектирования наших 13 уровней (каждый примерно в 2 раза длиннее своего оригинала, сложность растёт "
   "так же, число секторов то же). Ничего ещё не спроектировано - только измерено.")
 p("")
@@ -330,11 +374,11 @@ p("")
 p("## Индекс сложности")
 p("")
 p("Индекс - сумма пяти частей в «очках». Веса подобраны так, чтобы трасса (управление шаром) давала около "
-  "20% (с 2026-11-09; раньше половину; веса ниже умножены на 0,29), остальное - головоломки, техники, поиск пути и опасности:")
+  "20% (с 2026-11-09; раньше половину), остальное - головоломки, техники, поиск пути и опасности:")
 p("")
-p("- **Трасса** = сумма по типам (длина / 100 × вес). Вес: коридор 0,3, широкий пол 0,4, жёлоб 0,6, бортики 0,8, "
-  "столбики 1,0, открытый край 1,2, механизмы и воздух 1,5, узкая без перил 2, два рельса 2, монорельс и рельсы "
-  "вбок 3. То есть 100 ед. обычной трассы = 0,8 очка, 100 ед. монорельса = 3 очка.")
+p("- **Трасса** = сумма по типам (длина / 100 × вес). Вес (до умножения на 0,29): коридор 0,3, широкий пол "
+  "0,4, жёлоб 0,6, бортики 0,8, столбики 1,0, открытый край 1,2, механизмы и воздух 1,5, узкая без перил 2, два "
+  "рельса 2, монорельс и рельсы вбок 3. То есть 100 ед. обычной трассы = 0,23 очка, 100 ед. монорельса = 0,87 очка.")
 p("- **Головоломки** = 1 за каждый сдвинутый ящик/шар + 2 за толкатель, ящик под камнем, разводной мост, мишень, "
   "подъёмник + 1 за качели-доску, висячие и откидные плиты.")
 p("- **Техники** = 1 за превращение + 1 за полёт на вентиляторе + 3 за центробежный участок (р) + 3 за шар-ключ (р) "

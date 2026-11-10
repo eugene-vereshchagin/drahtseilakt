@@ -146,6 +146,9 @@ class Mesh:
         self.name = name
         self.p, self.n, self.uv = [], [], []
         self.parts = {}
+        # what is drawn instead of this mesh (another Mesh), when its shape is the physics' (open-format.md, a mesh's
+        # finer look): the game draws the look and gives the physics and the rules this one
+        self.look = None
 
     def vertex(self, p, n, uv):
         self.p.append(tuple(float(c) for c in p))
@@ -504,7 +507,8 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
 
     flat = lambda vs: struct.pack(f"<{len(vs) * len(vs[0])}f", *[c for v in vs for c in v])
     gl_meshes = []
-    for m in meshes:
+
+    def mesh_json(m):
         if not m.p or not any(m.parts.values()):
             raise ValueError(f"mesh {m.name} is empty")
         pos = [(x, y, -z) for x, y, z in m.p]
@@ -527,7 +531,15 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
             if mat is not None:
                 prim["material"] = mat
             prims.append(prim)
-        gl_meshes.append({"name": m.name, "primitives": prims})
+        return {"name": m.name, "primitives": prims}
+
+    for m in meshes:
+        gl_meshes.append(mesh_json(m))
+    # each finer look is one more mesh after all the level's own, named in its mesh's extras
+    for i, m in enumerate(meshes):
+        if m.look is not None:
+            gl_meshes.append(mesh_json(m.look))
+            gl_meshes[i]["extras"] = {"drahtseilakt": {"look": len(gl_meshes) - 1}}
 
     images = list(dict.fromkeys([mt["texture"] for mt in materials if mt["texture"]]
                                 + [mt["normal"] for mt in materials if mt.get("normal")]))

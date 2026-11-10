@@ -72,8 +72,12 @@ MAX_FILE = 48 << 20
 #   lift: (gain, degrees, amount) a dusty band over the horizon cleared: towards the sky's colour above it (9 to 15
 #         degrees up, smoothed round the circle) times gain, `amount` of it at the horizon, none `degrees` up
 #   haze: the aerial haze's thickness (per altitude of the camera over the world below; 0.1 is clear air)
+#   zoom: how much nearer the land seems (its features drawn that much larger); relief: its slopes that much steeper
+#   (more light and shade); vivid: its colours that much more saturated
 SKIES = {
-    "Mountains": dict(src="table_mountain_1_puresky", ev=0.0, below="land", kind="mountains", haze=0.10, seed=101),
+    # (the owner, 2026-11-03: the land under level 1 too dull and too far: brighter, greener, more relief, nearer)
+    "Mountains": dict(src="table_mountain_1_puresky", ev=0.15, below="land", kind="mountains", haze=0.065, seed=101,
+                      zoom=1.5, relief=1.6, vivid=1.35),
     "Forest": dict(src="kloofendal_48d_partly_cloudy_puresky", ev=-0.2, below="land", kind="forest", haze=0.13,
                    seed=202),
     "Sea": dict(src="kloppenheim_06_puresky", ev=0.0, below="sea", waves=0.10, water=(0.012, 0.030, 0.040),
@@ -465,7 +469,7 @@ def cloud_maps(light, seed):
 
 # Fine detail laid over the land at a much smaller scale than its map (tree crowns, rock grain, billows): a map of its
 # own over one camera altitude, multiplying the land's radiance.
-DETAIL = {"forest": (0.016, 0.55), "mist": (0.016, 0.4), "mountains": (0.03, 0.25), "canyon": (0.02, 0.2),
+DETAIL = {"forest": (0.016, 0.55), "mist": (0.016, 0.4), "mountains": (0.03, 0.3), "canyon": (0.02, 0.2),
           "clouds": (0.05, 0.12)}
 
 
@@ -500,6 +504,9 @@ class Below:
         seed = cfg["seed"]
         if cfg["below"] == "land":
             hgt, alb, water = land_maps(cfg["kind"], seed)
+            hgt = hgt * cfg.get("relief", 1.0)
+            grey = alb.mean(-1, keepdims=True)
+            alb = np.clip(grey + (alb - grey) * cfg.get("vivid", 1.0), 0, 1)
             self.ground = Pyramid(shade(hgt, alb, water, light, cfg["kind"], seed))
         elif cfg["below"] == "clouds":
             self.ground = Pyramid(cloud_maps(light, seed))
@@ -524,7 +531,8 @@ class Below:
         cfg, light = self.cfg, self.light
         down = np.maximum(-d[..., 1], 1e-4)
         dist = 1.0 / down  # slant distance in camera altitudes
-        px, pz = d[..., 0] * dist, d[..., 2] * dist
+        zoom = cfg.get("zoom", 1.0)
+        px, pz = d[..., 0] * dist / zoom, d[..., 2] * dist / zoom
         u = azimuth_u(d)
         # the haze's colour: the horizon's by azimuth when looking out, its average when looking straight down (where
         # every azimuth meets; by azimuth there it would draw a wedge pointing at the sun)

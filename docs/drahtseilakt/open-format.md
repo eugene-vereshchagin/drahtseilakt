@@ -67,7 +67,7 @@ A folder holding:
   files — `music` (theme 1 to 1000), `light` (three numbers 0..1), `level_bonus` (points), `sector_balls` (a list, sector 1 first, of `wood`, `stone`, `paper`, `sticky` or null: the ball a run begun at that sector with `--sector` has; none takes the level's start ball), `tutorial` and
   `last_level` (true or false: the original's first and last level), and `source_hash` (16 hex digits: the FNV-1a of
   the `.nmo` it was converted from), and `parts` (`"own"`: the level is made for the game's own parts and takes them
-  before the copy's; `"copy"` or none: the copy's first; our level kit writes `"own"`). A replay recorded on that file plays on the converted level (the same level, so
+  before the copy's; `"copy"` or none: the copy's first; our level kit writes `"own"`), and `fog` (only drawn: `color` and `color_down` three numbers 0..1 each, `density` 0..1 a unit of distance, `below` a height, `depth` a depth over 0: our levels have it, the original's none; levels.md). A replay recorded on that file plays on the converted level (the same level, so
   the same run); malformed settings refuse the level. Any level can name any hash, so a replay that plays on it is
   no proof of a run on the original. A level without settings (made before they were kept) plays with the defaults
   and says so; a remastered `Level_NN` takes them from the copy's table instead. The game files of `game/` stand in

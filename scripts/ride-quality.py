@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # Driving quality of a replay: run headless with --trace 1, report standing share, edge share, speed spread,
-# and stretches standing longer than 1 s (where, how long). usage: ride-quality.py LEVEL REPLAY
+# and stretches standing longer than 1 s (where, how long). usage: ride-quality.py LEVEL|LEVEL_DIR REPLAY
 # (the game from this checkout's target/release, or $DRAHTSEILAKT)
 import re, subprocess, sys, statistics, os
 lvl, rep = sys.argv[1], sys.argv[2]
 exe = os.environ.get('DRAHTSEILAKT', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'target', 'release', 'drahtseilakt'))
-out = subprocess.run(['nice', '-n', '19', exe, '--level', lvl, '--replay', rep, '--headless', '--trace', '1'],
+# a level's number (the original's), or a level folder (one of ours: --open)
+which = ['--open', lvl] if os.path.isdir(lvl) else ['--level', lvl]
+out = subprocess.run(['nice', '-n', '19', exe] + which + ['--replay', rep, '--headless', '--trace', '1'],
                      capture_output=True, text=True).stdout.splitlines()
 pat = re.compile(r'^(\d+):(\d+\.\d+) ball \(\s*(\S+)\s+(\S+)\s+(\S+)\) speed\s+(\S+)')
 ticks = []; trans = []; result = edges = ''

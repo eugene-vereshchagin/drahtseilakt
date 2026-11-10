@@ -223,7 +223,35 @@ def _shadow_soft():
     return np.zeros((TEX, TEX, 3)), _radial(1.2) * 0.85
 
 
+def track_slab(name, rows=256):
+    """One slab (5 units) of our track's texture (assets/own/Track, make_textures.py), for a part that becomes part
+    of the track (the crate puzzle's stone, which drops level with the way)."""
+    from PIL import Image
+    img = np.asarray(Image.open(os.path.join(OWN, "Track", name)).convert("RGB"), np.float64) / 255.0
+    return img[:rows]
+
+
+def _wicker():
+    """A woven basket: willow rods under and over the stakes, each rod round in shade, the gaps dark."""
+    n = TEX
+    y, x = np.mgrid[0:n, 0:n] / n
+    rows, cols = 16, 8
+    ry = (y * rows) % 1.0
+    cx = (x * cols) % 1.0
+    over = ((np.floor(y * rows) + np.floor(x * cols)) % 2) == 0
+    # a rod is lit along its middle, dark at its edges; where it passes under a stake the stake's side shades it
+    rod = np.sin(ry * np.pi) ** 0.6
+    under = np.where(over, 1.0, 0.72 + 0.28 * np.abs(np.cos(cx * np.pi)))
+    tone = 0.85 + 0.15 * k.value_noise(n, n, (24, 6), 71, octaves=3)
+    base = np.array([0.62, 0.47, 0.28])
+    img = base[None, None] * (rod * under * tone)[..., None]
+    return np.clip(img + 0.04, 0, 1)
+
+
 TEXTURE_MAKERS = {
+    "wicker.png": _wicker,
+    "track_top.png": lambda: track_slab("Track_Top_A.png"),
+    "track_side.png": lambda: track_slab("Track_Side.png")[:224, 32:],  # below its brick strip
     "wood.png": lambda: k.planks(TEX, k.rgb(176, 128, 78), 11),
     "wood_dark.png": lambda: k.planks(TEX, k.rgb(120, 82, 50), 12, boards=3),
     "stone.png": lambda: k.stone(TEX, k.rgb(150, 144, 132), 13, slabs=1),
@@ -265,7 +293,7 @@ def texture(folder, name, as_name=None):
 # not listed keep their placeholder's name (the pack has nothing for their role).
 PACK_NAMES = {
     "AnimTrafo_Bars": "Trafo_Anim_Environment", "AnimTrafo_RingParts": "Trafo_Anim_Environment",
-    "AnimTrafo_RingParts_Color": "Trafo_Anim_Environment",
+    "AnimTrafo_RingParts_Color": "Trafo_Anim_Environment", "P_Trafo_Base": "Metal_stained",
     "Ball_Wood": "Ball_Wood", "Ball_Wood_Pieces": "Ball_Wood", "Ball_Stone": "Ball_Stone",
     "Ball_Stone_Pieces": "Ball_Stone", "Ball_Paper": "Ball_Paper", "Ball_Paper_Pieces": "Ball_Paper",
     "P_Ball_Wood": "P_Ball_Wood", "P_Ball_Stone": "Ball_Stone", "P_Ball_Paper": "Ball_Paper",
@@ -280,7 +308,6 @@ PACK_NAMES = {
     "P_Modul_25_Wood": "Wood_Raft", "P_Modul_25_HingeSide": "Wood_Misc", "P_Modul_25_Hinge": "Wood_Metal",
     "P_Modul_26_Sandsack": "sandsack", "P_Modul_26_Halter": "E_Holzbeschlag", "P_Modul_26_Seil": "sandsack",
     "P_Modul_29": "Wood_Old", "P_Modul_30_Board": "Modul30_d_Seiten",
-    "P_Modul_34_Floor_Side": "Floor_Side", "P_Modul34_Floor_Top_Flat": "Floor_Top_Flat",
     "P_Modul_34_Box": "E_Holzbeschlag",
     "P_Modul_37_WoodMisc": "Wood_Misc", "P_Modul_37_WoodAxis": "Wood_Metal", "P_Modul_37_Wood01": "Ball_Wood",
     "P_Modul_37_Target": "Target", "P_Modul_37_Metall_1": "Metal_stained",
@@ -441,6 +468,40 @@ def fit_box(m, box):
     m.transformed(mat)
 
 
+def round_look(name, mat, kind):
+    """The wooden or stone ball as drawn: its sphere with many more faces and smooth normals (the mesh above, as
+    coarse as the original's, stays the physics')."""
+    m = k.Mesh(name)
+    k.sphere(m, mat, (0, 0, 0), 2.0, seg=48)
+    fit_box(m, STONE_BOX if kind == "stone" else WOOD_BOX)
+    return m
+
+
+def paper_look(name, mat):
+    """The paper ball as drawn: a sheet crumpled into a ball, round as a whole, its folds soft creases (many faces,
+    smooth normals), the newspaper print over it."""
+    m = k.Mesh(name)
+    k.sphere(m, mat, (0, 0, 0), 2.0, seg=48)
+    rng = np.random.default_rng(152)
+    folds = [(v / np.linalg.norm(v), rng.uniform(0.02, 0.05), rng.uniform(3.0, 7.0))
+             for v in rng.normal(size=(36, 3))]
+    pts = []
+    for p in m.p:
+        d = np.array(p) / 2.0
+        r = 2.0
+        for v, amp, freq in folds:
+            # a crease: a ridge where the direction crosses a plane through the middle, sharp at its line
+            r += amp * (1 - min(1.0, abs(float(np.dot(d, v))) * freq)) ** 2
+        pts.append(tuple(d * r))
+    # as big as the physics' sphere (radius 2 round the middle): most of it on that sphere, only the creases' ridges
+    # a little out of it (no gap under it where it rests, and it does not sink in)
+    radii = sorted(float(np.linalg.norm(q)) for q in pts)
+    top = radii[int(0.9 * (len(radii) - 1))]
+    m.p = [tuple(np.array(q) * (2.0 / top)) for q in pts]
+    smooth_normals(m)
+    return m
+
+
 def ball_mesh(name, mat, kind):
     m = k.Mesh(name)
     if kind == "paper":
@@ -488,26 +549,72 @@ def fibonacci(n, seed):
     return out
 
 
-def pieces(part, kind, mat, n, size, inner, seed, stretch=1.0):
-    """A ball's pieces: curved shards of the shell round n directions, each its own node with its y along its
-    direction (the burst pushes along the piece's own up, pieces.rs), in the group Ball_<Kind>_Pieces."""
+def pieces(part, kind, mat, n, thick, seed, stretch=1.0):
+    """A ball's pieces: the ball's own skin peeled into n curved shell fragments that together cover the sphere (each
+    the part of the sphere nearest one of n directions; `stretch` draws the cells out along the poles, as staves),
+    `thick` deep, the ball's texture on the outside as the ball has it, a thin inner side and edges. Each is its own
+    node, at its centre with its y along its direction (the burst pushes along the piece's own up, pieces.rs), in
+    the group Ball_<Kind>_Pieces. Its mesh, whose points the physics takes as its hull, is cut from a coarse sphere
+    (a few dozen points); what is drawn, its look, from a fine one."""
     names = []
-    rng = np.random.default_rng(seed)
-    for i, d in enumerate(fibonacci(n, seed)):
+    dirs = fibonacci(n, seed)
+    squash = np.array([1.0, 1.0 / stretch, 1.0])
+    keys = [d * squash / np.linalg.norm(d * squash) for d in dirs]
+
+    def owner(q):
+        v = q / np.linalg.norm(q) * squash
+        v /= np.linalg.norm(v)
+        return int(np.argmax([np.dot(v, kk) for kk in keys]))
+
+    def shell(seg):
+        sph = k.Mesh("tmp")
+        k.sphere(sph, mat, (0, 0, 0), 2.0, seg=seg)
+        P = np.asarray(sph.p)
+        tris = [tuple(t) for idx in sph.parts.values() for t in np.reshape(idx, (-1, 3))]
+        own = [owner(P[list(t)].mean(0)) for t in tris]
+        return P, sph.uv, tris, own
+
+    coarse, fine = shell(10), shell(40)
+    inner = (2.0 - thick) / 2.0
+
+    def build(name, shell_, i, centre, rot):
+        P, UV, tris, own = shell_
+        m = k.Mesh(name)
+        local = lambda q: rot.T @ (q - centre)
+        edges = {}
+        for t, o in zip(tris, own):
+            if o != i:
+                continue
+            for x, y in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+                key = (min(x, y), max(x, y))
+                edges[key] = None if key in edges else (x, y)
+            m.tri(mat, *[m.vertex(local(P[j]), rot.T @ (P[j] / 2.0), UV[j]) for j in t])
+            inn = [m.vertex(local(P[j] * inner), -(rot.T @ (P[j] / 2.0)), UV[j]) for j in t]
+            m.tri(mat, inn[0], inn[2], inn[1])
+        # the edges: where the piece's skin ends (an edge only one of its triangles has), a strip down to its inside
+        for e in edges.values():
+            if e is None:
+                continue
+            x, y = e
+            q = [P[x], P[y], P[y] * inner, P[x] * inner]
+            m.face(mat, [local(v) for v in q], [UV[x], UV[y], UV[y], UV[x]], normal=rot.T @ np.cross(P[y] - P[x], P[x]))
+        return m
+
+    for i, d in enumerate(dirs):
+        P, _, tris, own = coarse
+        mine = [t for t, o in zip(tris, own) if o == i]
+        if not mine:
+            continue
+        pts = np.array([P[j] for t in mine for j in t])
+        centre = pts.mean(0) * (1 + inner) / 2
         ref = np.array([0.0, 1.0, 0.0]) if abs(d[1]) < 0.9 else np.array([1.0, 0.0, 0.0])
         t1 = np.cross(ref, d)
         t1 /= np.linalg.norm(t1)
-        t2 = np.cross(d, t1)
-        a, b = size * rng.uniform(0.75, 1.2), size * stretch * rng.uniform(0.75, 1.2)
-        outer = [d + t1 * sa * a / 2 + t2 * sb * b / 2 for sa, sb in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
-        outer = [2.0 * q / np.linalg.norm(q) for q in outer]
-        inn = [q * inner / 2.0 for q in outer]
-        centre = (sum(outer) + sum(inn)) / 8
-        # the piece's frame: at its centre, y outward, x along t1
         rot = np.stack([t1, d, np.cross(t1, d)], 1)
-        local = lambda q: rot.T @ (q - centre)
-        m = k.Mesh(f"Ball_{kind}_piece{i + 1:02d}_Mesh")
-        k.hexahedron(m, mat, [local(q) for q in inn] + [local(q) for q in outer], scale=2.0)
+        m = build(f"Ball_{kind}_piece{i + 1:02d}_Mesh", coarse, i, centre, rot)
+        look = build(f"Ball_{kind}_piece{i + 1:02d}_Look", fine, i, centre, rot)
+        if look.p:
+            m.look = look
         name = f"Ball_{kind}_piece{i + 1:02d}"
         part.node(name, part.mesh(m), centre, t1, d)
         names.append(name)
@@ -528,17 +635,20 @@ def make_balls():
     tp = p.mat("Ball_Sticky_Pieces", "ball_sticky.png", emissive=0.24, **piece_mat)
     light = p.mat("Ball_LightningSphere", "glow.png", diffuse=[0, 0, 0, 1], emissive=1.0, alpha="BLEND",
                   blend=("one", "one"), double_sided=True)
-    # sixteen staves of wood, seventeen chunks of stone, eighteen thin crumples of paper, as many as the original's
-    wood_names = pieces(p, "Wood", wp, 16, 1.3, 1.25, 161, stretch=2.2)
-    stone_names = pieces(p, "Stone", sp, 17, 1.5, 0.8, 162)
-    paper_names = pieces(p, "Paper", pp, 18, 1.5, 1.75, 163)
+    # the skin peeled: sixteen staves of wood, seventeen shards of stone, eighteen scraps of paper, as many as the
+    # original's
+    wood_names = pieces(p, "Wood", wp, 16, 0.28, 161, stretch=2.2)
+    stone_names = pieces(p, "Stone", sp, 17, 0.4, 162)
+    paper_names = pieces(p, "Paper", pp, 18, 0.07, 163)
     # ours: fourteen thick rubber chunks
-    sticky_names = pieces(p, "Sticky", tp, 14, 1.6, 1.1, 164)
+    sticky_names = pieces(p, "Sticky", tp, 14, 0.3, 164)
     balls = []
     for name, mat, kind in (("Ball_Wood", wood, "wood"), ("Ball_Stone", stone, "stone"), ("Ball_Paper", paper, "paper"),
                             ("Ball_Sticky", sticky, "sticky")):
         mesh_name = "Ball_Stone_HighRes_Mesh" if kind == "stone" else f"{name}_Mesh"
-        p.node(name, p.mesh(ball_mesh(mesh_name, mat, kind)))
+        bm = ball_mesh(mesh_name, mat, kind)
+        bm.look = paper_look(f"{name}_Look", mat) if kind == "paper" else round_look(f"{name}_Look", mat, kind)
+        p.node(name, p.mesh(bm))
         balls.append(name)
     # the new ball's flash: a glowing sphere, cut flat a little below the ball's middle where it meets the floor
     m = k.Mesh("Ball_LightningSphere_Mesh")
@@ -568,7 +678,10 @@ def make_loose_balls():
                           ("Paper", "ball_paper.png", 0.31), ("Sticky", "ball_sticky.png", 0.31)):
         p = Part(f"PH/P_Ball_{kind}")
         mat = p.mat(f"P_Ball_{kind}", tex, emissive=em, specular=0.2, power=15)
-        p.node(f"P_Ball_{kind}_MF", p.mesh(ball_mesh(f"P_Ball_{kind}_Mesh", mat, kind.lower())))
+        bm = ball_mesh(f"P_Ball_{kind}_Mesh", mat, kind.lower())
+        bm.look = (paper_look(f"P_Ball_{kind}_Look", mat) if kind == "Paper"
+                   else round_look(f"P_Ball_{kind}_Look", mat, kind.lower()))
+        p.node(f"P_Ball_{kind}_MF", p.mesh(bm))
         p.group(f"All_P_Ball_{kind}", [f"P_Ball_{kind}_MF"])
         p.write()
 
@@ -629,10 +742,62 @@ def make_trafos():
                        texgen="reflect")
         m = k.Mesh(f"P_Trafo_{kind}_Mesh")
         trafo_ring(m, steel, colour)
+        # what is drawn: the original's kind of pad (measured: 4.94 across, 0.48 high), a rounded square frame of
+        # chrome tube round a disc of the ball's own material, a coloured stud on each corner, on a riveted plate
+        core = p.mat(f"Ball_{kind}", f"ball_{kind.lower()}.png", emissive=0.35, specular=0.3, power=20)
+        base = p.mat("P_Trafo_Base", "steel.png", diffuse=0.75, emissive=0.3, specular=0.4, power=25)
+        m.look = trafo_look(f"P_Trafo_{kind}_Look", steel, colour, core, base)
         p.node(f"P_Trafo_{kind}_Shadow", sh, pos=(0.08, -0.029, 0.219), s=0.453)
         p.node(f"P_Trafo_{kind}_MF", p.mesh(m))
         p.group(f"All_P_Trafo_{kind}", [f"P_Trafo_{kind}_Shadow", f"P_Trafo_{kind}_MF"])
         p.write()
+
+
+def smooth_normals(m):
+    """Gives every vertex the mean normal of the faces round its place (a smooth surface; the mesh's own seams, where
+    a texture wraps, stay invisible)."""
+    P = np.asarray(m.p)
+    acc = {}
+    for idx in m.parts.values():
+        for t in range(0, len(idx), 3):
+            a, b, c = idx[t:t + 3]
+            n = np.cross(P[b] - P[a], P[c] - P[a])
+            for i in (a, b, c):
+                key = tuple(np.round(P[i], 4))
+                acc[key] = acc.get(key, 0) + n
+    m.n = [tuple(v / (np.linalg.norm(v) + 1e-12)) for v in (acc.get(tuple(np.round(q, 4)), np.array([0, 1.0, 0]))
+                                                          for q in P)]
+
+
+def rounded_square(half, corner, n=8):
+    """A rounded square's outline (x, z), counter-clockwise from above."""
+    out = []
+    for cx, cz, a0 in ((half - corner, half - corner, 0), (-(half - corner), half - corner, 90),
+                       (-(half - corner), -(half - corner), 180), (half - corner, -(half - corner), 270)):
+        for i in range(n + 1):
+            a = math.radians(a0 + 90 * i / n)
+            out.append((cx + corner * math.cos(a), cz + corner * math.sin(a)))
+    return out
+
+
+def trafo_look(name, steel, colour, core, base):
+    m = k.Mesh(name)
+    # the plate: 4.9 square, 0.1 thick, its corners cut round, riveted along the edges
+    plate = rounded_square(2.45, 0.5, 4)
+    k.hull(m, base, [(x, y, z) for x, z in plate for y in (0.0, 0.1)])
+    for x, z in plate[::3]:
+        k.cylinder(m, steel, (x * 0.9, 0.1, z * 0.9), (0, 1, 0), 0.07, 0.04, seg=6)
+    # the frame: a chrome tube round a rounded square, standing on the plate
+    path = rounded_square(1.95, 0.7, 6)
+    k.tube(m, steel, [(x, 0.3, z) for x, z in path + path[:1]], 0.2, seg=10)
+    # the disc of the ball's material inside it, a little below the frame's top
+    k.cylinder(m, core, (0, 0.1, 0), (0, 1, 0), 1.62, 0.12, seg=32, cap_mat=core)
+    # a coloured stud on each corner, domed
+    for x, z in ((1.6, 1.6), (-1.6, 1.6), (-1.6, -1.6), (1.6, -1.6)):
+        k.cylinder(m, steel, (x, 0.1, z), (0, 1, 0), 0.34, 0.16, seg=16)
+        k.ellipsoid(m, colour, (x, 0.26, z), (0.3, 0.18, 0.3), seg=16)
+    smooth_normals(m)
+    return m
 
 
 def trafo_ring(m, steel, colour, a0=0.0, a1=360.0, seg=32):
@@ -656,18 +821,31 @@ def make_animtrafo():
     ringc = p.mat("AnimTrafo_RingParts_Color", "chrome_env.png", diffuse=[0.09, 0.92, 0.58, 1], texgen="reflect")
     flash = p.mat("AnimTrafo_Flashfield", "flash.png", diffuse=[1, 1, 1, 0.65], emissive=1.0, alpha="BLEND",
                   blend=("one", "one"), double_sided=True)
-    # the cage of bars that rises out of the floor: eight bars round the pad with two rings, 5.5 tall
+    # the cage that rises out of the floor (5.5 tall), in the pad's style: a chrome post on each rounded corner, a
+    # thinner bar in the middle of each side, a chrome frame at its foot and head as the pad's, and a band of the
+    # kind's colour round its middle
     mb = k.Mesh("AnimTrafo_Bars_Mesh")
-    for a in range(8):
-        t = 2 * math.pi * a / 8 + math.pi / 8
-        k.cylinder(mb, bars, (2.15 * math.cos(t), -5.5, 2.15 * math.sin(t)), (0, 1, 0), 0.12, 5.49, seg=6)
-    for y in (-5.2, -0.4):
-        k.torus(mb, bars, (0, y, 0), (0, 1, 0), 2.15, 0.1, seg=24, tube_seg=6)
+    frame = rounded_square(2.1, 0.75, 6)
+    for x, z in ((1.8, 1.8), (-1.8, 1.8), (-1.8, -1.8), (1.8, -1.8)):
+        k.cylinder(mb, ring, (x, -5.5, z), (0, 1, 0), 0.17, 5.49, seg=12)
+        k.ellipsoid(mb, ring, (x, -0.02, z), (0.22, 0.12, 0.22), seg=12)
+    for x, z in ((2.25, 0), (-2.25, 0), (0, 2.25), (0, -2.25)):
+        k.cylinder(mb, bars, (x, -5.3, z), (0, 1, 0), 0.08, 5.1, seg=8)
+    for y, r, mat in ((-5.25, 0.14, ring), (-0.3, 0.14, ring), (-2.8, 0.09, ringc)):
+        k.tube(mb, mat, [(x, y, z) for x, z in frame + frame[:1]], r, seg=10)
+    smooth_normals(mb)
     mf = k.Mesh("AnimTrafo_Flashfield_Mesh")
     quad_xz(mf, flash, 2.46, y=-0.024)
-    # four quarters of the ring, each in its frame's own turn (they open outwards along their frame's (-1, 0, -1))
+    # four quarters of the pad's frame, each in its frame's own turn (they open outwards along their frame's
+    # (-1, 0, -1)): a quarter of the chrome tube round its rounded corner and that corner's coloured stud
     ring_mesh = k.Mesh("AnimTrafo_Ringpart1_Mesh")
-    trafo_ring(ring_mesh, ring, ringc, 180.0, 270.0, seg=32)
+    quarter = [(x, z) for x, z in rounded_square(1.95, 0.7, 12) if x <= 1e-6 and z <= 1e-6]
+    quarter.sort(key=lambda q: math.atan2(q[1], q[0]))
+    k.tube(ring_mesh, ring, [(x, 0.3, z) for x, z in [(-1.95, 0.0)] + quarter + [(0.0, -1.95)]], 0.2, seg=10,
+           caps=True)
+    k.cylinder(ring_mesh, ring, (-1.6, 0.1, -1.6), (0, 1, 0), 0.34, 0.16, seg=16)
+    k.ellipsoid(ring_mesh, ringc, (-1.6, 0.26, -1.6), (0.3, 0.18, 0.3), seg=16)
+    smooth_normals(ring_mesh)
     axes = [((1, 0, 0), 1), ((0, 0, 1), 2), ((-1, 0, 0), 3), ((0, 0, -1), 4)]
     for x, i in reversed(axes):
         m = k.Mesh(f"AnimTrafo_Ringpart{i}_Mesh")
@@ -1169,8 +1347,9 @@ def make_modul_34():
     """The stone-ball puzzle's block and crate: a stone cube that slides down onto a crate; both are bodies of
     their own meshes."""
     p = Part("PH/P_Modul_34")
-    side = p.mat("P_Modul_34_Floor_Side", "stone_side.png", diffuse=0.48, emissive=0.41)
-    top = p.mat("P_Modul34_Floor_Top_Flat", "stone_light.png", emissive=0.08, specular=0.3, power=50)
+    # the stone drops level with the way and becomes part of it: the track's own concrete on top, its side below
+    side = p.mat("P_Modul_34_Floor_Side", "track_side.png", diffuse=0.6, emissive=0.42)
+    top = p.mat("P_Modul34_Floor_Top_Flat", "track_top.png", diffuse=1.0, emissive=0.12, specular=0.3, power=100)
     box = p.mat("P_Modul_34_Box", "crate.png", diffuse=0.88, emissive=0.37)
     p.node("P_Modul_34_Slider_Frame01", pos=(-7.7, 5.0, 0), x=(-1, 0, 0))
     p.node("P_Modul_34_Slider_Frame02", pos=(-7.7, -10.0, 0), x=(-1, 0, 0))
@@ -1276,6 +1455,24 @@ def balloon_ropes(m, mat, top, rim):
         k.tube(m, mat, [top, end], ROPE_R, seg=6)
 
 
+def rope_look(name, mat, knot, post, frame):
+    """A balloon's ropes as drawn: from the knot under it to the top of its post and to the basket's ring (radius 8,
+    1.9 up) a little either side of the post, each rope sagging a little; in the rope object's frame (`frame`)."""
+    m = k.Mesh(name)
+    a = math.atan2(post[2], post[0])
+    ends = [np.array([post[0], 2.15, post[2]])]
+    for d in (-0.12, 0.12):
+        ends.append(np.array([8.0 * math.cos(a + d), 1.9, 8.0 * math.sin(a + d)]))
+    for e in ends:
+        pts = []
+        for t in np.linspace(0.0, 1.0, 9):
+            q = knot + (e - knot) * t
+            q[1] -= 0.35 * math.sin(math.pi * t)
+            pts.append(q - frame)
+        k.tube(m, mat, pts, 0.07, seg=6, caps=True)
+    return m
+
+
 def make_balloon():
     """The finish: a platform hung under four balloons, reached by a plank bridge; when the ball is in, the
     bridge's hinges break and the balloons carry it off (the sim's PE_Balloon entry)."""
@@ -1309,6 +1506,38 @@ def make_balloon():
     k.torus(mp, metal, (0, 1.9, 0), (0, 1, 0), 8.0, 0.18, seg=32, tube_seg=6)
     for x, z in ((2.13, -7.99), (-5.84, -5.85), (-5.84, 5.85), (2.16, 7.98)):
         k.cylinder(mp, holder, (x, -1.8, z), (0, 1, 0), 0.3, 3.99, seg=8)
+    # what is drawn: a round woven basket (open where the bridge comes in), its rim, a planked deck inside, and the
+    # rails and the ramp the ball touches as wooden benches (the mesh above stays the physics')
+    wicker = p.mat("PE_Balloon_Wicker", "wicker.png", diffuse=1.0, emissive=0.3)
+    deckm = p.mat("PE_Balloon_Deck", "wood.png", diffuse=0.9, emissive=0.3)
+    look = k.Mesh("PE_Balloon_Look")
+    gap = math.radians(24)
+    for r_out, r_in in ((8.3, 7.95),):
+        rows = [(-2.6, 7.6), (-2.2, 8.1), (0.0, 8.3), (1.75, r_out)]
+        for i in range(len(rows) - 1):
+            (y0, a0), (y1, a1) = rows[i], rows[i + 1]
+            n = 40
+            for j in range(n):
+                t0 = gap + (2 * math.pi - 2 * gap) * j / n
+                t1 = gap + (2 * math.pi - 2 * gap) * (j + 1) / n
+                for rr0, rr1, inward in ((a0, a1, False), (a0 - 0.35, a1 - 0.35, True)):
+                    q = [(rr0 * math.cos(t0), y0, rr0 * math.sin(t0)), (rr0 * math.cos(t1), y0, rr0 * math.sin(t1)),
+                         (rr1 * math.cos(t1), y1, rr1 * math.sin(t1)), (rr1 * math.cos(t0), y1, rr1 * math.sin(t0))]
+                    uv = [(t0 * 2, y0 / 4), (t1 * 2, y0 / 4), (t1 * 2, y1 / 4), (t0 * 2, y1 / 4)]
+                    tm = (t0 + t1) / 2
+                    nrm = (math.cos(tm), 0, math.sin(tm)) if not inward else (-math.cos(tm), 0, -math.sin(tm))
+                    look.face(wicker, q if not inward else q[::-1], uv if not inward else uv[::-1], normal=nrm)
+    k.cylinder(look, deckm, (0, -2.6, 0), (0, 1, 0), 7.6, 0.26, seg=40)
+    k.torus(look, metal, (0, 1.9, 0), (0, 1, 0), 8.15, 0.2, seg=48, tube_seg=8)
+    for f in (rail1, rail3, back):
+        f(look, deckm)
+    floor(look, deckm)
+    entry(look, bridge)
+    ramp(look, deckm)
+    for x, z in ((2.13, -7.99), (-5.84, -5.85), (-5.84, 5.85), (2.16, 7.98)):
+        k.cylinder(look, holder, (x, -1.8, z), (0, 1, 0), 0.3, 3.99, seg=12)
+        k.ellipsoid(look, metal, (x, 2.2, z), (0.36, 0.22, 0.36), seg=12)
+    mp.look = look
     pi = p.mesh(mp)
     p.node("PE_Balloon_Platform", pi)
     hinge_a = [((2.132, 0.252, -7.989), (0.267, 0, -0.964)), ((-5.842, 0.252, -5.849), (-0.707, 0, -0.707)),
@@ -1329,6 +1558,15 @@ def make_balloon():
     for i, pos in enumerate(balloons, 1):
         mb = k.Mesh(f"PE_Balloon_Ballon0{i}_Mesh")
         lathe(mb, gores, BALLOON, 12)
+        # drawn smooth: the same envelope with many more gores and rows
+        fine = [(BALLOON[0][0], 0.0)]
+        for (y0, r0), (y1, r1) in zip(BALLOON, BALLOON[1:]):
+            for t in np.linspace(0, 1, 5)[1:]:
+                fine.append((y0 + (y1 - y0) * t, r0 + (r1 - r0) * t))
+        mbl = k.Mesh(f"PE_Balloon_Ballon0{i}_Look")
+        lathe(mbl, gores, fine, 36)
+        smooth_normals(mbl)
+        mb.look = mbl
         p.node(f"PE_Balloon_Ballon0{i}", p.mesh(mb), pos=pos)
     # each balloon's ropes: from the balloon's hinge under it down to the platform's rim (the joints' frames), in
     # the rope object's own frame half way between; three strands from one knot fanning out to the rim
@@ -1336,6 +1574,10 @@ def make_balloon():
     for i in range(4):
         ms = k.Mesh(f"PE_Balloon_Ballon_Seil0{i + 1}_Mesh")
         balloon_ropes(ms, rope, np.array(hinge_b[i][0]) - np.array(seil[i]), np.array(hinge_a[i][0]) - np.array(seil[i]))
+        # what is drawn: the ropes tied where the balloon pulls, from its knot down to the top of its post and to the
+        # basket's ring on either side of it (the hull above, measured as a whole, stays the physics')
+        ms.look = rope_look(f"PE_Balloon_Ballon_Seil0{i + 1}_Look", rope, np.array(hinge_b[i][0]),
+                            np.array(hinge_a[i][0]), np.array(seil[i]))
         p.node(f"PE_Balloon_Ballon_Seil0{i + 1}", p.mesh(ms), pos=seil[i])
     for i in range(1, 9):
         m = k.Mesh(f"PE_Balloon_Platte0{i}_Mesh")

@@ -101,7 +101,7 @@ order (`order` in level.txt; their difficulty, `difficulty`, runs 1 to 10 with i
 
 | # | Level | Sectors | Idea | Sky, music, bonus |
 |---|---|---|---|---|
-| 1 | First Roll | 3 | wide floors with railings, gentle turns and slopes, a first stretch of rails, one small hop | A, 1, 100 |
+| 1 | First Roll | 4 | the original's first level in spirit, twice its length: a wooden bridge, rails straight, curving and in loops, boxes and crates shoved off bare stretches, the stone transformer and back, loose balls, the paper ball up three fans and over a plate bridge, a dome, seesaws, two stones on their crates, four pushers, bare terraces of sharp turns, wooden ramps up between railed landings, rails spiralling down; gutters on most floors, railings where a fall is possible | Sunset, 1, 100 |
 | 2 | Wood and Stone | 4 | the wooden ball climbs the ramps the stone one cannot; the stone ball shoves crates and loose balls off ledges without borders | B, 2, 200 |
 | 3 | Paper Winds | 4 | the paper ball rides fans up to the floors above; plate bridges hold it | C, 3, 300 |
 | 4 | Swing Time | 4 | things that move: swinging sacks, turning arms, a flap wheel, swings that bridge a gap while they swing by | A, 4, 400 |
@@ -151,6 +151,33 @@ Besides: `rails L`, `rails-left A R`, `rails-right A R` (rails, also up or down)
 `turn`, `mark NAME` and `back NAME` to move the cursor without building. The whole list is at the top of
 leveldsl.py.
 
+`railing left|right|both|off` puts steel railings along the floors' edges from there on, on any profile (level 1:
+gutters, and railings where a fall is possible). Two of the original's puzzles are commands of their own: `crateblock`
+(the stone on the crate, P_Modul_34: a slot of 6 across the way, the stone standing in it on its crate, which stands
+on a floor 5 lower that the description lays under the slot; a ball on that floor pushes the crate out from under the
+stone, and the stone slides down level with the way) and `pusher left|right` (P_Modul_01: a slot of 1.6 across a way
+at most 6 wide, the pusher's block filling the way, its target plate standing 5 out past the edge on that side over a
+floor 2.5 lower, from where a ball pushes the block out of the way). The floors under them are laid with `mark`,
+`move`, `turn` and `back`.
+
+**Corners, plazas and scenery** (2026-11, level 1's rebuild; `assets/own/make/levelparts.py`). `corner left|right [rail]
+[gap G]` is a hard square corner: the last floor ends in a mitred ring (its cross-section standing on the bisector,
+1/cos 45 wider across), shared with the floor that follows, so the outer corner is filled and the profile (a groove
+with its kerbs, boards) runs on without a break; `rail` puts a railing on the outer side 8 either side of it, `gap`
+leaves that railing open for G along the way straight on (a train of stones flies out there). `plaza W L [brick|kerb]
+[stone|wood] [gap SIDE C W]... [fence SIDE...]` is a flat square from the middle of its back edge (moved by `side`,
+`ahead`, `up`), with a brick rim or a low kerb round it except at its gaps (back and front: the centre across, to the
+left; left and right: along from the back edge) and a railing along the sides in `fence`; `disc R [rim] [ring [gap W]]`
+a round floor (with a railing ring open at both ends); `pit L [depth D] [wall LEN] [side S]` a pit in the way
+(its bottom 4.3 under it, its walls, a stop wall 2 high on the far kerb); `mark` and `back` begin and end a side branch
+(nothing runs on from what was laid before). Free standing scenery, only drawn: `lamptower`, `mast` (striped),
+`plinth`, `garland` (a wire with lamps, from `ahead side up` to `ahead2 side2 up2`, `sag`), `wallblock` and `wlamp`
+(a lantern on a wall), `lighthouse` (a square tower, its shaft solid); `scatter D` puts a lamp tower, a mast or a
+plinth about every D units of way, clear of the floors, on the way's far sides. `loose KIND lead` (a ball the way's ball
+leads, rolling on ahead) and `plug` (a body put there to block the way until the right ball comes) are not held to the
+room check. Plazas, discs and pits lie 0.03 under the floors that run on from them (two flat pieces meeting at one
+height are a crack to the seam test).
+
 **Skies.** `sky` names the sky box round the level: `A`, `B`, `C` (ours, drawn above a sea of cloud, as the
 original's letters) or one of the photographic skies by name: `Mountains` (a sunset sky over hazy mountains with
 snow on the peaks), `Forest` (summer clouds over a forest canopy with glades and lakes), `Sea` (a calm sea at
@@ -185,7 +212,9 @@ ball back to the middle; a third bare), from level 6 on only a quarter to a thir
 are rare (only the wooden half pipes of level 4 and a few pieces of 12 and 13); steel railings (a pipe about 2.6 over
 the floor, on posts) run along about 490 and 420 units of the floors' edges in levels 1 and 2, 130 to 540 in levels 3
 to 8, under 90 in 9 to 11 and none in 12. Our levels go the same way, a step clearer:
-level 1 and 2 have railings, 3 and 4 brick borders (3 a sector of railings), 5 to 8 gutters (5 a sector of
+level 1 has gutters with railings where a fall is possible (round the start, along the outer side of turns, on the
+landings, beside floors with a drop), as the original's first level, level 2 railings, 3 and 4 brick borders (3 a
+sector of railings), 5 to 8 gutters (5 a sector of
 borders, 8 its last bare), 9 and 10 bare floors (9 its first sector a gutter). `safety KIND` sets it from there on
 (the first one in a file is the level's); `borders off` makes the floors bare from there on, `borders on` gives them
 back the level's safety. What each is:
@@ -211,6 +240,95 @@ towards their crease; the shade a border casts beside it; the sides darker concr
 textures are `assets/own/Track/` (make_textures.py, step `track`); the borders take the menu scene's brick. They are
 mapped by the distance along the whole track, and pieces laid one after another (straight, curved, a width changing
 over a piece) are one mesh, so the textures run on from piece to piece without a seam.
+
+**No seams** (2026-11-03): a stretch of floor is one mesh from the start or a checkpoint to the next, its
+cross-section carried upright across the cursor's own heading (exact on a turn), so a straight running into a turn or
+a ramp into a flat has the very same cross-section where they meet: no wedge of nothing between them; each ring of
+points is shared by the quads before and after it (no crack, no T-junction), and the textures are mapped by the
+distance along the way. The start's and the checkpoints' pieces are joined the same way: their edges where a floor
+runs on have their corners at the floor's own cross-section points, and their tops are mapped as the track's. The test
+`our_floors_have_no_seams` (ownlevels.rs) checks the floors of every level the kit made (version 2 on, in level.gltf's
+`asset.generator`): wherever a floor's top ends, there is no other top beside it at its height
+(`the_seam_finder_sees_a_crack` checks the finder itself). A checkpoint on a narrow way has a smaller bowl, and its
+depth with it, so its slopes stay the measured ones (a stone ball resting in a steeper bowl did not roll out of it).
+
+**Room, rails and clouds** (2026-11-03, after the owner played level 1): a way must leave the ball (radius 2) at least
+5.5 across at the height of its middle, between its borders or its railings' rails (levelkit.MIN_FREE); the kit
+refuses to write a level that has a narrower place and lists every one (a way 6 wide with brick borders left 4, and
+the ball wedged). A box or a loose ball must leave that much room beside it, with what lies across the way near it,
+unless it is marked `shove` and the ball the way has there (the start's, then each transformer's) is no lighter (wood
+1.9, stone 10, paper 0.2, a box 1); no loose ball lies within 14 of the end of rails (it rolls into their mouth).
+Rails are the original's width, measured: tubes 0.6 thick, their middles 3.9 apart, so the ball sits deep between
+them; ours lie on the floor they leave (the ball drops 0.48 onto them), and where a floor runs on from an end each
+tube bends out flat over the floor's flat, a mouth seen from above (none on a gutter, which leads the ball to the
+middle itself); posts under the tubes hold them, and ties across between them only with `rails ... ties`, for later
+levels. A transformer stands just before what its ball is for. Every profile's flat top is cut at the same places
+across (1, 1.25 and 2.5 in from the edges, the last at least 1.5 out from the middle, where a narrow gutter's foot
+is), so stretches of another profile meeting end to end share their vertices; every face turns the way its normal says
+(the tracks' faces were wound and their normals turned inwards before). The track's concrete is darker and greyer than
+the original's sandy tone and its slabs' joints fainter (the owner's wish). Under every level lies a cloud layer as
+the original's (`SkyLayer`, hidden in the file, shown by the game when the options have clouds, drawn added over the
+sky): a plane 165 under the lowest floor, 500 past the level on every side, our own grey clouds on black repeating
+every 675.
+
+**Supports, turns and looks** (2026-11-03, the owner's third look): rails are held by a few saddles under both tubes
+(below the ball riding between them) on columns down into the haze, about one every 40 along them, none near their
+ends (the floors hold them there) nor over another floor; `railing turns` puts a railing on the outer side of every
+turn from there on (level 1 has it), and a railing on a turn's inner side alone is refused. The cloud layer is laid
+only under the skies that are a sea of cloud (A, B, C, Sunset); level 1 is under `Mountains`. The track's sides and
+the columns are streaked by rain from their top edge, the columns cast in rings (`Track_Column`). A part's mesh can
+carry a finer look (ownkit.py, `Mesh.look`: what the game draws, the mesh itself staying the physics'): the
+transformers are drawn as the original's kind of pad (a chrome frame round a disc of the ball's material, coloured
+studs on a riveted plate), the paper ball as a crumpled sheet, the balloons' ropes tied to the basket.
+
+**Gates for the balls** (2026-11-03, measured in the sim on ramps 20 long): the wooden ball and the paper one climb a
+ramp of 33 degrees from rest; the stone ball stops on 19 degrees from rest and on 24 with a run-up of 30, so a ramp
+rising 10 over 20 (27 degrees) is a gate only wood (or paper) passes. Level 1 puts one right after each wood
+transformer, and a stone transformer right before what needs the stone ball (a loose stone ball, the crate, a crate on
+a bare stretch, the pushers); its long empty straights are cut and turned into bends. A dome must leave the room of a
+way on both sides of it (the DSL refuses a level where it does not, at the width the floor has there), and a box or a
+loose ball is checked at that width too. Columns under the floors and under rails keep clear of every floor below them
+by its own width.
+
+**Air and gates to find** (2026-11-03): a level in the open format may carry a fog in its settings (`fog`: `color`
+towards the horizon, `color_down` straight down, `density` a unit of distance, and `below`/`depth`: under that height
+things fade wholly into it within that depth). The renderer draws it on everything lit (the sky, sprites and the cloud
+layer keep their colour); the physics never sees it, so replays are unchanged, and the original's levels have none.
+Our kit sets it from the sky's own colours (the haze just under its horizon, the world below) and lets the columns and
+the rails' supports reach 240 down into it, so they fade out instead of ending; every sky but Night gets the cloud
+layer, as two decks of scattered banks over a world of its own. Not every switch of ball stands on the line: in level
+1 the stone ball comes to a climb it cannot make, with the wood transformer to the side of the square before it, and
+the wooden ball comes to a crate it cannot shift, with the stone transformer on the side of the floor below (a fast
+wooden ball can shift it now and then); each sector that needs a ball still gives one.
+
+**After the owner's concept art** (2026-11-03, his pictures as a reference only): rails of worn, brushed galvanised
+steel with a light rust tint and its relief (`Track_Rail`, a normal map), a clamp round each tube every 9 along them
+with its strap bent down under the ball's path to the other tube, and at the supports a thin steel rod from the strap
+down into the haze (the fittings only drawn); the balls drawn smooth (their coarse meshes stay the physics'); the
+start on a stone tower down into the haze; lanterns on wooden posts at the start and beside every checkpoint.
+
+**Parts stand on flat floor** (2026-11-03): the kit refuses a level where a transformer's pad, a box or a dome does
+not stand on a flat, level patch at its own foot (its footprint sampled: every floor top under it within 0.05 of its
+foot, none missing) and names each; a gutter is widened, or the part moved, where one stands. A ball that changes
+sheds its skin: its pieces are curved fragments of its own shell, its texture outside, a thin inside.
+
+**Loose bodies lie on the floor, not in it** (2026-11-09): a part's place (`ahead`, `side`) is a point on the
+cursor's straight line at the cursor's height, so behind a slope, beside a bend or on a gutter's side it was not on the
+floor: level 1 had loose balls up to 2.4 deep in it, and the physics shoved each out as its sector began, throwing the
+player's ball that touched it away at hundreds of units a second. The kit now rests every loose ball on what is under
+it (lifted out of a floor, let down onto one; the paper ball as a sphere of 2.04, its hull's reach) and refuses a level
+where a loose ball or a box starts more than 0.05 inside the floors, rails or stoppers, or a loose ball lies on nothing,
+naming each (`levelkit.py --check FOLDER` checks a level already made). A ball rested on a slope is said (it rolls away
+as its sector begins). The game itself lifts a loose body that starts more than 0.1 inside the static geometry out
+onto it before making it; the original's levels have none deeper than 0.031 (level 10's paper balls), so it never moves
+one of theirs.
+
+**Room over the ball** (2026-11-03): over a transformer (its cage lifts and holds the ball), a fan and the balloon
+nothing of the floors or rails may hang within 12; and a way may run under another floor or rails only with its
+underside at most 3.6 over it (a wall the ball meets) or 6 and more (room to pass), never between, where a ball
+wedges. The kit refuses a level that breaks either and names the places. A box may stand on another (`box ... up 5`).
+
+**Geometry checks** (2026-11-09, after the owner's play of level 1): the kit refuses a level that fails one of three checks (`levelcheck.py`), naming what and where. *Seams:* no crack and no step of 0.005 to 0.05 where two pieces of floor meet (plazas, discs, branches, corners lie exactly at the floor's height; a flat piece meets a profile only along the profile's flat middle). *Scenery:* no lamp tower, mast, plinth, garland, wall block or column within 5 over the top of a floor (the ball's 4 and a margin of 1; 0.3 beside it, 2 round rails), unless the description marks it `obstacle`. *Shortcuts:* no floor 30 or more further on the route can be reached from an earlier one by a fall or a flight off an edge (a ball at 20 units a second, gravity 20; the measured top speeds are 13.9 paper, 15.9 wood, 17.9 stone; a tilted piece adds a rise; an edge with railings or a border is not a launch) or from a fan's top (17 over its floor), unless the landing is marked `drop [R]` in the description. Loose bodies in the floors (`check_clear`) are still refused.
 
 **The start and the checkpoints** are bowls, as the original's (measured, numbers only): the start a round platform
 of radius 10 with a bowl of radius 7.5 and 1.25 deep in its middle (the ball comes to rest in it), four flame cups on
