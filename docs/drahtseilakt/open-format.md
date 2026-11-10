@@ -38,6 +38,46 @@ A folder holding:
   then the copy, so it plays the same with or without a copy; for any other level in the copy and then in ours. Any part of a path in `game/` that is a link finds nothing.
   `--export` and the toolbox write it.
 
+## Compressed textures
+
+Beside a large picture `textures/NNNN_name.png` a level may carry `textures/NNNN_name.dtx`: the same picture ready for
+the graphics card — block-compressed, with its whole mip chain made beforehand. The game then neither decodes the PNG
+nor filters mips when the level loads, and the texture takes an eighth (BC1) or a quarter (BC7) of the video memory.
+The toolbox's `remaster` writes them (pictures of 512 x 512 and more whose sides are multiples of four); the level
+file does not name them. A level's parts in `game/` carry theirs the same way.
+
+The file (little-endian), `crates/gamedata/src/gputex.rs`:
+
+| bytes | what |
+|---|---|
+| 0–3 | `DSTX` |
+| 4–5 | version, 1 |
+| 6 | format: 1 = BC1 (opaque colour, 4 bits a pixel), 2 = BC7 (with alpha, or a normal map with its height; 8 bits a pixel) |
+| 7 | mip levels: always the whole chain down to 1 x 1 |
+| 8–11, 12–15 | width, height: multiples of 4, at most 4096 |
+| 16–23, 24–31 | the picture file it was made from: its length and its hash |
+| 32–39 | the hash of the data that follows |
+| 40– | the mip levels' blocks, the largest first, nothing after them |
+
+The hash is FNV-1a over 8-byte little-endian words (the tail padded with zeros), then the length. BC1 blocks are in
+the four-colour mode (the first colour the larger) or of one colour; BC7 blocks are of mode 6. The textures are not
+sRGB (the game lights in gamma space, as the original).
+
+The file is a stranger's like the rest of a level: the header is checked against the caps before anything is read, the
+length must be exactly what the header implies, the data must match its hash and hold only the blocks named above, and
+a link is never followed. A file that names another picture's length than the PNG beside it, or fails its header, is
+passed over and the PNG is used; one whose data is damaged, or changed between being looked at and read, is said and its PNG drawn instead, smaller (remaster the level again). A file reached through a link that leads out of the level's folder is refused. A
+level may carry the `.dtx` without the PNG.
+
+- **Adapters.** BC is on every desktop card under Vulkan and Direct3D 12 and on every Mac under Metal. Where the
+  adapter lacks it (some phones' chips, some software adapters) the game decodes the blocks itself, from the mip level
+  of at most 1024 a side. Checked on Linux (Vulkan, NVIDIA) both ways; Windows and macOS not run.
+- **Memory.** A level's own game files (`game/`) share a budget of 1 GiB of texture memory; one texture takes at most
+  an eighth of what is left of it — a larger one is drawn without its largest mip levels (a PNG is halved), never plain.
+  One picture carried by several parts (the same data) is uploaded and counted once.
+- **Loading.** Textures are read eight at a time, each on its own thread, and uploaded as they come. The game prints
+  how many it uploaded, their video memory and the time.
+
 ## Contents
 
 - **Nodes**: one per object of the level, in order, with its name, its world `matrix` and, if it is drawn,

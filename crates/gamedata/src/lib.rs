@@ -3,6 +3,7 @@
 // loading and exporting levels.
 
 pub mod assets;
+pub mod gputex;
 pub mod mods;
 pub mod package;
 pub mod packs;

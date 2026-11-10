@@ -289,6 +289,11 @@ pub struct Renderer {
     white: wgpu::TextureView,
     /// The normal map of a material without one: the surface's own normal.
     flat_normal: wgpu::TextureView,
+    /// The card draws BC-compressed textures (every desktop card; not every phone's or old Mac's).
+    pub bc: bool,
+    /// The compressed textures of this level already on the card, by their data's hash, format, size and mip count.
+    shared_textures: HashMap<(u64, gamedata::gputex::Format, (u32, u32), usize), wgpu::TextureView>,
+    pub texture_stats: TextureStats,
     pub models: Vec<Model>,
     overlay_pipeline: wgpu::RenderPipeline,
     markers: HashMap<[u32; 4], GpuMaterial>,
@@ -313,8 +318,23 @@ pub struct Renderer {
     pub retro: Option<crate::retro::Retro>,
 }
 
-/// Loads a texture's pixels: a file is looked up by the caller-supplied function.
-pub type TextureLoader<'a> = dyn Fn(&level::Texture) -> Option<(u32, u32, Vec<u8>)> + 'a;
+/// Plans a texture's loading (the caller looks its file up and counts it; `bool`: the card draws BC-compressed
+/// textures); the renderer then reads the plans, several at a time.
+pub type TextureLoader<'a> = dyn Fn(&level::Texture, bool) -> Option<gamedata::assets::TexturePlan> + 'a;
+
+/// How many textures are read at a time, each on its own thread (a 4K picture decoded is 85 MB while it waits).
+const LOADS_AT_ONCE: usize = 8;
+
+/// What the textures of a level cost to load so far: said after each level's upload.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct TextureStats {
+    pub uploaded: usize,
+    pub shared: usize,
+    pub compressed: usize,
+    pub bytes: usize,
+    pub read: std::time::Duration,
+    pub upload: std::time::Duration,
+}
 
 impl Renderer {
     pub fn new(device: wgpu::Device, queue: wgpu::Queue, format: wgpu::TextureFormat) -> Renderer {
@@ -452,6 +472,7 @@ impl Renderer {
             ..Default::default()
         });
         let ui_pipeline = ui_pipeline(&device, &particle_tex_layout, format);
+        let bc = device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_BC);
         Renderer {
             device,
             queue,
@@ -477,6 +498,9 @@ impl Renderer {
             sampler,
             white,
             flat_normal,
+            bc,
+            shared_textures: HashMap::new(),
+            texture_stats: TextureStats::default(),
             models: Vec::new(),
             overlay_pipeline,
             markers: HashMap::new(),
@@ -503,6 +527,7 @@ impl Renderer {
 
     /// Uploads a model; returns its index for `Instance::model`.
     pub fn add_model(&mut self, level: &Level, load: &TextureLoader<'_>) -> usize {
+        let bc = self.bc;
         // only the textures a material draws with are loaded (a level may list textures it never uses: the loader
         // points a texture named twice at one of them)
         let used: std::collections::HashSet<usize> = level
@@ -510,17 +535,40 @@ impl Renderer {
             .iter()
             .flat_map(|m| m.texture.into_iter().chain(m.normal))
             .collect();
-        let textures: Vec<Option<wgpu::TextureView>> = level
+        // planned one after another (the level's budget is taken in its own order), then read several at a time, each
+        // on its own thread, and uploaded; the queue is flushed between, so the pictures never all wait in memory
+        let plans: Vec<(usize, gamedata::assets::TexturePlan)> = level
             .textures
             .iter()
             .enumerate()
-            .map(|(i, t)| {
-                if !used.contains(&i) {
-                    return None;
-                }
-                load(t).map(|(w, h, rgba)| upload_texture(&self.device, &self.queue, w, h, rgba))
-            })
+            .filter(|(i, _)| used.contains(i))
+            .filter_map(|(i, t)| load(t, bc).map(|p| (i, p)))
             .collect();
+        let mut textures: Vec<Option<wgpu::TextureView>> = vec![None; level.textures.len()];
+        let mut plans = plans.into_iter().peekable();
+        while plans.peek().is_some() {
+            let started = std::time::Instant::now();
+            let batch: Vec<_> = plans.by_ref().take(LOADS_AT_ONCE).collect();
+            let loaded: Vec<(usize, Option<gamedata::gputex::TextureData>)> = std::thread::scope(|s| {
+                let threads: Vec<_> = batch
+                    .into_iter()
+                    .map(|(i, plan)| (i, s.spawn(move || plan.load())))
+                    .collect();
+                threads
+                    .into_iter()
+                    .map(|(i, t)| (i, t.join().ok().flatten()))
+                    .collect()
+            });
+            self.texture_stats.read += started.elapsed();
+            let started = std::time::Instant::now();
+            for (i, data) in loaded {
+                if let (Some(data), Some(slot)) = (data, textures.get_mut(i)) {
+                    *slot = self.texture_view(&data);
+                }
+            }
+            self.queue.submit([]);
+            self.texture_stats.upload += started.elapsed();
+        }
         let materials = level
             .materials
             .iter()
@@ -1587,6 +1635,41 @@ fn tangents(m: &level::Mesh) -> Vec<[f32; 4]> {
         .collect()
 }
 
+impl Renderer {
+    /// A loaded texture on the card: one of the same data (a compressed texture's hash, format and size) is uploaded
+    /// once for all the models that carry it.
+    fn texture_view(&mut self, data: &gamedata::gputex::TextureData) -> Option<wgpu::TextureView> {
+        let key = data.hash.map(|h| (h, data.format, data.size(), data.mips.len()));
+        if let Some(view) = key.and_then(|k| self.shared_textures.get(&k)) {
+            self.texture_stats.shared += 1;
+            return Some(view.clone());
+        }
+        let view = upload_texture_data(&self.device, &self.queue, data)?;
+        self.texture_stats.uploaded += 1;
+        self.texture_stats.bytes += data.bytes();
+        if data.format != gamedata::gputex::Format::Rgba {
+            self.texture_stats.compressed += 1;
+        }
+        if let Some(k) = key {
+            self.shared_textures.insert(k, view.clone());
+        }
+        Some(view)
+    }
+
+    /// The textures kept for sharing are let go: what is uploaded next (another level's folder, the menu's scene)
+    /// never takes a picture from what came before, and a model dropped later frees its textures.
+    pub fn end_sharing(&mut self) {
+        self.shared_textures.clear();
+    }
+
+    /// A new level begins: the textures kept for sharing go with the old one's models, and the count starts again.
+    pub fn begin_level(&mut self) {
+        self.shared_textures.clear();
+        self.texture_stats = TextureStats::default();
+    }
+}
+
+/// Uploads RGBA pixels with a full mip chain (box-filtered on the CPU).
 fn upload_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -1594,7 +1677,64 @@ fn upload_texture(
     height: u32,
     rgba: Vec<u8>,
 ) -> wgpu::TextureView {
-    let levels = 32 - width.max(height).max(1).leading_zeros();
+    gamedata::gputex::TextureData::from_rgba(width, height, rgba)
+        .and_then(|data| upload_texture_data(device, queue, &data))
+        .unwrap_or_else(|| {
+            // a picture with no pixels: one white texel
+            let one = gamedata::gputex::TextureData::from_rgba(1, 1, vec![255; 4]);
+            one.and_then(|data| upload_texture_data(device, queue, &data))
+                .unwrap_or_else(|| unreachable_texture(device))
+        })
+}
+
+/// An empty 1 x 1 texture (never written): what stands in when even one texel cannot be made.
+fn unreachable_texture(device: &wgpu::Device) -> wgpu::TextureView {
+    device
+        .create_texture(&wgpu::TextureDescriptor {
+            label: Some("texture"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        })
+        .create_view(&Default::default())
+}
+
+/// Uploads a texture's mip levels as they are: RGBA, or BC blocks (the caller planned those only for a device that
+/// has them; the data's layout was checked by its reader, and is checked against the sizes again here).
+fn upload_texture_data(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    data: &gamedata::gputex::TextureData,
+) -> Option<wgpu::TextureView> {
+    use gamedata::gputex::Format;
+    let (width, height) = data.size();
+    // Not sRGB: the original's fixed-function pipeline lights and blends in gamma space, and so do we.
+    let (format, block) = match data.format {
+        Format::Rgba => (wgpu::TextureFormat::Rgba8Unorm, 1),
+        Format::Bc1 => (wgpu::TextureFormat::Bc1RgbaUnorm, 4),
+        Format::Bc7 => (wgpu::TextureFormat::Bc7RgbaUnorm, 4),
+    };
+    let compressed = block > 1;
+    if width == 0
+        || height == 0
+        || (compressed
+            && (!device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_BC)
+                || width % block != 0
+                || height % block != 0))
+        || data.mips.iter().any(|m| {
+            data.level(m).is_none() || data.format.level_bytes(m.width, m.height) != Some(m.len)
+        })
+    {
+        return None;
+    }
     let tex = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("texture"),
         size: wgpu::Extent3d {
@@ -1602,28 +1742,28 @@ fn upload_texture(
             height,
             depth_or_array_layers: 1,
         },
-        mip_level_count: levels,
+        mip_level_count: u32::try_from(data.mips.len()).ok()?,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        // Not sRGB: the original's fixed-function pipeline lights and blends in gamma space, and so do we.
-        format: wgpu::TextureFormat::Rgba8Unorm,
+        format,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    let (mut w, mut h, mut data) = (width, height, rgba);
-    for level in 0..levels {
+    for (level, m) in data.mips.iter().enumerate() {
+        // a compressed level is written in whole blocks, the small levels' too
+        let (w, h) = (m.width.div_ceil(block) * block, m.height.div_ceil(block) * block);
         queue.write_texture(
             wgpu::TexelCopyTextureInfo {
                 texture: &tex,
-                mip_level: level,
+                mip_level: u32::try_from(level).ok()?,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &data,
+            data.level(m)?,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * w),
-                rows_per_image: Some(h),
+                bytes_per_row: Some(w / block * u32::try_from(data.format.block_bytes()).ok()?),
+                rows_per_image: Some(h / block),
             },
             wgpu::Extent3d {
                 width: w,
@@ -1631,33 +1771,6 @@ fn upload_texture(
                 depth_or_array_layers: 1,
             },
         );
-        if w == 1 && h == 1 {
-            break;
-        }
-        let (nw, nh) = ((w / 2).max(1), (h / 2).max(1));
-        let mut next = vec![0u8; (nw * nh * 4) as usize];
-        for y in 0..nh {
-            for x in 0..nw {
-                for c in 0..4usize {
-                    let px = |xx: u32, yy: u32| {
-                        let (xx, yy) = (xx.min(w - 1), yy.min(h - 1));
-                        u32::from(
-                            data.get(((yy * w + xx) * 4) as usize + c)
-                                .copied()
-                                .unwrap_or(0),
-                        )
-                    };
-                    let s = px(2 * x, 2 * y)
-                        + px(2 * x + 1, 2 * y)
-                        + px(2 * x, 2 * y + 1)
-                        + px(2 * x + 1, 2 * y + 1);
-                    if let Some(d) = next.get_mut(((y * nw + x) * 4) as usize + c) {
-                        *d = (s / 4) as u8;
-                    }
-                }
-            }
-        }
-        (w, h, data) = (nw, nh, next);
     }
-    tex.create_view(&Default::default())
+    Some(tex.create_view(&Default::default()))
 }
