@@ -1432,6 +1432,13 @@ Execute:
 The off-by-one matters: for class 24 (CKSound) without Derived, it also collects 25 (CKWaveSound). For 30
 (Material) and 31 (Texture), c+1 is not a child class, so nothing extra is added.
 
+Port: a group's members are graph object ids of any kind (entities, meshes, materials, textures, behaviours), seeded
+from the file's group chunk (else from the level's entity members), kept in the run's state and changed by Add To
+Group (a behavioural object, not the group itself, not twice), Remove From Group, Group Clear and this block. Objects
+with no class (the engine's pseudo-objects) are not collected; the order is by class, then creation. "Only In
+Current Scene" is taken as always true (a map's objects all are in its scene). Group Iterator, Is In Group, Get
+Nearest In Group (entities only), Send Message To Group and the group count operation read the same state.
+
 Game (`Levelinit.nmo`): `set MipMap` with classes 30 and 31, `Preload Sound` with class 24. All have
 Derived = 0 and current scene = 1.
 

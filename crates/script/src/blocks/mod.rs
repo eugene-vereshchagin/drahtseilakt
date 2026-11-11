@@ -97,6 +97,7 @@ pub mod proto {
     pub const REMOVE_ROW: Guid = Guid(0x1fa5_7136, 0x1431_0857);
     pub const ROW_SEARCH: Guid = Guid(0x7886_3443, 0x45af_59b6);
     pub const GET_NEAREST_IN_GROUP: Guid = Guid(0x0852_07eb, 0x5849_50d8);
+    pub const FILL_GROUP_BY_CLASS: Guid = Guid(0x4445_257b, 0x7001_6c57);
     pub const SET_ROW: Guid = Guid(0x62e8_7901, 0x2df0_07dd);
     pub const INSERT_COLUMN: Guid = Guid(0x05cb_7802, 0x04a6_4a58);
     pub const REMOVE_COLUMN: Guid = Guid(0x3f37_7888, 0x128a_7767);

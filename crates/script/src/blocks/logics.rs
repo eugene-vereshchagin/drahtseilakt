@@ -476,14 +476,12 @@ pub(crate) fn send_message_to_group(
         let to_group = dest.and_then(|d| rt.graph.objects.get(d)).map(|o| o.kind);
         match to_group {
             Some(ObjKind::Group(g)) => {
-                for m in host.group_members(g) {
-                    let gid = rt
-                        .graph
-                        .objects
-                        .iter()
-                        .position(|o| o.kind == ObjKind::Entity(m));
-                    rt.post(msg(gid));
-                    host.message(&name, Some(Ent::Object(m)));
+                for m in rt.group_ids(g, host) {
+                    rt.post(msg(Some(m)));
+                    // the engine hears of the members it has as entities
+                    if let Some(e) = rt.ent(Some(m)) {
+                        host.message(&name, Some(e));
+                    }
                 }
             }
             Some(ObjKind::Entity(_)) | Some(ObjKind::Ball) => {
@@ -851,16 +849,7 @@ pub(crate) fn group_iterator(
         input(rt, b, 1);
     }
     let members: Vec<Id> = match group {
-        Some(ObjKind::Group(gi)) => host
-            .group_members(gi)
-            .into_iter()
-            .filter_map(|m| {
-                rt.graph
-                    .objects
-                    .iter()
-                    .position(|o| o.kind == ObjKind::Entity(m))
-            })
-            .collect(),
+        Some(ObjKind::Group(gi)) => rt.group_ids(gi, host),
         _ => Vec::new(),
     };
     // The index lives where the original keeps it: in output parameter 1 (Index) when the block has one, else in
@@ -905,9 +894,8 @@ pub(crate) fn is_in_group(
     if input(rt, b, 0) {
         let o = pin(rt, b, "Object", 0, host).as_obj();
         let g = pin(rt, b, "Group", 1, host).as_obj();
-        let e = rt.ent(o);
-        let hit = match (e, g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind)) {
-            (Some(Ent::Object(i)), Some(ObjKind::Group(gi))) => host.group_members(gi).contains(&i),
+        let hit = match (o, g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind)) {
+            (Some(o), Some(ObjKind::Group(gi))) => rt.group_ids(gi, host).contains(&o),
             _ => false,
         };
         out(rt, b, usize::from(!hit));
@@ -925,18 +913,67 @@ pub(crate) fn add_to_group(
     if input(rt, b, 0) {
         let g = pin(rt, b, "Group", 0, host).as_obj();
         let t = rt.target(b, host);
-        if let (Some(ObjKind::Group(gi)), Some(Ent::Object(i))) = (
-            g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind),
-            rt.ent(t),
-        ) {
+        if let (Some(ObjKind::Group(gi)), Some(o)) =
+            (g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind), t)
+        {
+            let ent = rt.ent(t);
             if proto == proto::ADD_TO_GROUP {
-                host.group_add(gi, i);
+                rt.group_add(gi, o, host);
+                if let Some(Ent::Object(i)) = ent {
+                    host.group_add(gi, i);
+                }
             } else {
-                host.group_remove(gi, i);
+                rt.group_remove(gi, o, host);
+                if let Some(Ent::Object(i)) = ent {
+                    host.group_remove(gi, i);
+                }
             }
         }
         out(rt, b, 0);
     }
+    Flow::Done
+}
+
+pub(crate) fn fill_group_by_class(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    // docs/gameplay_bbs.md, "Fill Group By Class": In is answered and Out fires before the target is looked at
+    if !input(rt, b, 0) {
+        return Flow::Done;
+    }
+    out(rt, b, 0);
+    let t = rt.target(b, host);
+    let Some(ObjKind::Group(gi)) = t.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind) else {
+        return Flow::Done;
+    };
+    let class = u32::try_from(pin(rt, b, "Class", 0, host).as_int()).unwrap_or(u32::MAX);
+    let derived = pin(rt, b, "Derived Classes", 1, host).as_bool();
+    // classes of the range that derive from the one asked for: all up to 0x37 with derived classes, else the class
+    // and the next number (which is a child of it only for a few, as the original's range is)
+    let hi = if derived {
+        0x37
+    } else {
+        class.saturating_add(1)
+    };
+    let lo = if derived { 0 } else { class };
+    let mut hits: Vec<(u32, Id)> = rt
+        .graph
+        .objects
+        .iter()
+        .enumerate()
+        .filter(|(_, o)| {
+            o.class != 0 && (lo..=hi).contains(&o.class) && types::class_derives(o.class, class)
+        })
+        .map(|(i, o)| (o.class, i))
+        .collect();
+    // the context lists objects by class, in creation order within it
+    hits.sort_by_key(|&(c, i)| (c, i));
+    let ids: Vec<Id> = hits.into_iter().map(|(_, i)| i).collect();
+    rt.group_add_many(gi, &ids, host);
     Flow::Done
 }
 
@@ -950,6 +987,7 @@ pub(crate) fn group_clear(
     if input(rt, b, 0) {
         let t = rt.target(b, host);
         if let Some(ObjKind::Group(gi)) = t.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind) {
+            rt.group_clear(gi, host);
             host.group_clear(gi);
         }
         out(rt, b, 0);
@@ -1200,10 +1238,12 @@ pub(crate) fn get_nearest_in_group(
             Some(rm) => transform_point(&rm, p),
             None => p,
         };
-        let mut best: Option<(usize, f32)> = None;
+        let mut best: Option<(Id, f32)> = None;
         if let Some(ObjKind::Group(gi)) = g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind) {
-            for m in host.group_members(gi) {
-                if let Some(mm) = host.matrix(Ent::Object(m)) {
+            for m in rt.group_ids(gi, host) {
+                if let Some(Ent::Object(e)) = rt.ent(Some(m))
+                    && let Some(mm) = host.matrix(Ent::Object(e))
+                {
                     let d = distance_sq([mm[3][0], mm[3][1], mm[3][2]], at);
                     if best.is_none_or(|(_, bd)| d < bd) {
                         best = Some((m, d));
@@ -1211,12 +1251,7 @@ pub(crate) fn get_nearest_in_group(
                 }
             }
         }
-        let nearest = best.and_then(|(m, _)| {
-            rt.graph
-                .objects
-                .iter()
-                .position(|o| o.kind == ObjKind::Entity(m))
-        });
+        let nearest = best.map(|(m, _)| m);
         set_pout(rt, b, "Nearest Object", 0, Value::Obj(nearest));
         if let Some((_, d)) = best {
             set_pout(rt, b, "Distance", 1, Value::Float(d.sqrt()));
@@ -1669,6 +1704,18 @@ pub(super) const PROTOS: &[Proto] = &[
         standing: Standing::Full,
         layouts: &[],
         run: add_to_group,
+        event: None,
+    },
+    Proto {
+        guid: proto::FILL_GROUP_BY_CLASS,
+        name: "Fill Group By Class",
+        library: Library::Logics,
+        pins: &["Class", "Derived Classes", "Only In Current Scene"],
+        pouts: &[],
+        flags: flags::TARGET,
+        standing: Standing::Full,
+        layouts: &[],
+        run: fill_group_by_class,
         event: None,
     },
     Proto {

@@ -144,5 +144,8 @@ daher werden Schleifen an der Grenze nicht verglichen. Stufe 3 (ganze Karten) fo
   Column, Move Row, Sort Rows, Test Cell, Get Highest, Value Count, Remove Key Row, Remove Row If, Change Value If,
   Row Search; der Lauf führt Spalten und Schlüsselspalte jedes Arrays selbst. Alles gegen das C-Orakel über alle
   Spaltenarten geprüft, außer Move Row, das dem C fehlt ([gameplay_bbs.md](../../gameplay_bbs.md), „Arrays").
-- Noch nicht: Attribute (Kennung `0x11` eines Objekts und der Chunk des Attributmanagers), Gruppen aus beliebigen
-  Objekten.
+- **Gruppen** halten beliebige Objekte des Graphen (Entitäten, Meshes, Materialien, Texturen, Verhalten): die Mitglieder
+  kommen aus der Datei, der Lauf führt sie selbst (mit Zurückspulen), und Fill Group By Class sammelt nach Klasse
+  ([gameplay_bbs.md](../../gameplay_bbs.md), „Fill Group By Class“). Für Gruppen aus Entitäten antworten Group
+  Iterator und Is In Group wie bisher.
+- Noch nicht: Attribute (Kennung `0x11` eines Objekts und der Chunk des Attributmanagers).

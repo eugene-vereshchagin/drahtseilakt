@@ -54,4 +54,6 @@
   Sort Rows、Test Cell、Get Highest、Value Count、Remove Key Row、Remove Row If、Change Value If、Row Search；每次运行自带
   每个数组的列和键列。除 C 中没有的 Move Row 外，所有列类型都已对照 C 预言机检验
   （[gameplay_bbs.md](../../gameplay_bbs.md)，“Arrays”）。
-- 尚未完成：属性（对象的标识符 `0x11` 和属性管理器的数据块）、可含任意对象的组。
+- **组**可含图中的任意对象（实体、网格、材质、纹理、行为）：成员取自文件，运行自行保存（随回滚），Fill Group By Class 按类收集
+  （[gameplay_bbs.md](../../gameplay_bbs.md)，“Fill Group By Class”）。对由实体组成的组，Group Iterator 和 Is In Group 的结果与以前相同。
+- 尚未完成：属性（对象的标识符 `0x11` 和属性管理器的数据块）。

@@ -219,7 +219,7 @@ pub fn to_json(
             json!([s, owner])
         })
         .collect();
-    json!({"objects": objects, "nodes": nodes, "arrays": arrays, "scripts": scripts})
+    json!({"objects": objects, "nodes": nodes, "arrays": arrays, "scripts": scripts, "groups": g.groups})
 }
 
 /// The most objects and arrays a level's scripts may have (a map's own are a few thousand).
@@ -403,7 +403,23 @@ pub fn from_json(j: &J, counts: [usize; 5]) -> Result<Graph, String> {
             opt_index(p.get(1).unwrap_or(&J::Null))?,
         ));
     }
-    Graph::assemble(objects, nodes, arrays, scripts)
+    // the members the file gave each group, of any kind (absent in files written before: the level's own are used)
+    let mut groups = Vec::new();
+    if let Some(list) = j.get("groups").and_then(J::as_array) {
+        if list.len() > MAX_OBJECTS {
+            return Err(too_many());
+        }
+        for m in list {
+            let ids = indices(m)?;
+            if ids.len() > MAX_OBJECTS || ids.iter().any(|&i| i >= objs.len()) {
+                return Err("a script group names an object that does not exist".into());
+            }
+            groups.push(ids);
+        }
+    }
+    let mut g = Graph::assemble(objects, nodes, arrays, scripts)?;
+    g.groups = groups;
+    Ok(g)
 }
 
 #[cfg(test)]
@@ -459,10 +475,15 @@ mod tests {
 
     #[test]
     fn a_graph_survives_the_open_format() {
-        let g = graph();
+        let mut g = graph();
+        g.groups = vec![vec![0, 1], vec![]];
         let j = to_json(&g, &Some, &Some);
         let back = from_json(&j, [1, 0, 0, 0, 0]).expect("read");
         assert_eq!(back, g);
+        // a group naming an object that is not there refuses the graph
+        let mut bad = j.clone();
+        bad["groups"] = serde_json::json!([[4000000000u64]]);
+        assert!(from_json(&bad, [1, 0, 0, 0, 0]).is_err());
     }
 
     #[test]

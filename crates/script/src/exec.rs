@@ -160,6 +160,9 @@ pub struct Runtime {
     pub values: Vec<Value>,
     /// The maps' arrays as the run has changed them (rows, columns, key column; the graph's are the file's).
     arrays: Vec<crate::Array>,
+    /// Each group's members as the run has them, by group index: seeded the first time a group is used (from the
+    /// file's members, else the host's level members) and changed by the group blocks.
+    groups: Vec<Option<Vec<Id>>>,
     /// Messages sent this tick, delivered at the next.
     outbox: Vec<Message>,
     inbox: Vec<Message>,
@@ -194,6 +197,9 @@ pub struct Runtime {
     op_cache: std::collections::HashMap<crate::census::Signature, Option<(usize, bool)>>,
 }
 
+/// The most groups a run keeps members for.
+const MAX_GROUPS: usize = 1 << 16;
+
 /// The most objects a run's scripts may copy.
 pub const MAX_COPIES: usize = 256;
 
@@ -223,6 +229,7 @@ impl Runtime {
             io: vec![false; n],
             values,
             arrays: graph.arrays.clone(),
+            groups: Vec::new(),
             graph,
             outbox: Vec::new(),
             inbox: Vec::new(),
@@ -1071,6 +1078,111 @@ impl Runtime {
         stack.insert(at.min(stack.len()), block);
         if let Some(st) = self.blocks.get_mut(block) {
             st.stacked = true;
+        }
+    }
+
+    // ---- groups -----------------------------------------------------------------------------------------------
+
+    fn seed_group(&mut self, group: usize, host: &dyn Host) {
+        if group >= MAX_GROUPS {
+            return;
+        }
+        if self.groups.len() <= group {
+            self.groups.resize(group.saturating_add(1), None);
+        }
+        if self.groups.get(group).is_some_and(Option::is_some) {
+            return;
+        }
+        let mut members: Vec<Id> = self.graph.groups.get(group).cloned().unwrap_or_default();
+        if members.is_empty() {
+            // a level that brought no members of its own (the open format): the engine's entity members
+            let level = host.group_members(group);
+            if !level.is_empty() {
+                let by_entity: std::collections::HashMap<usize, Id> = self
+                    .graph
+                    .objects
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, o)| match o.kind {
+                        ObjKind::Entity(e) => Some((e, i)),
+                        _ => None,
+                    })
+                    .collect();
+                members = level
+                    .into_iter()
+                    .filter_map(|e| by_entity.get(&e).copied())
+                    .collect();
+            }
+        }
+        if let Some(slot) = self.groups.get_mut(group) {
+            *slot = Some(members);
+        }
+    }
+
+    /// A group's members now, in the order they joined, of any kind.
+    pub fn group_ids(&mut self, group: usize, host: &dyn Host) -> Vec<Id> {
+        self.seed_group(group, host);
+        self.groups
+            .get(group)
+            .cloned()
+            .flatten()
+            .unwrap_or_default()
+    }
+
+    /// Adds an object to a group (any object of the graph that is a behavioural object, not the group itself, not
+    /// twice, within the cap).
+    pub(crate) fn group_add(&mut self, group: usize, object: Id, host: &dyn Host) {
+        self.seed_group(group, host);
+        let ok = self.graph.objects.get(object).is_some_and(|o| {
+            !matches!(o.kind, ObjKind::Group(g) if g == group)
+                && crate::types::class_derives(o.class, 19)
+        });
+        if let Some(Some(m)) = self.groups.get_mut(group)
+            && ok
+            && !m.contains(&object)
+            && m.len() < crate::MAX_OBJECTS
+        {
+            m.push(object);
+        }
+    }
+
+    /// Adds many objects at once (Fill Group By Class), each as `group_add` would.
+    pub(crate) fn group_add_many(&mut self, group: usize, objects: &[Id], host: &dyn Host) {
+        self.seed_group(group, host);
+        let ok: Vec<Id> = objects
+            .iter()
+            .copied()
+            .filter(|&i| {
+                self.graph.objects.get(i).is_some_and(|o| {
+                    !matches!(o.kind, ObjKind::Group(g) if g == group)
+                        && crate::types::class_derives(o.class, 19)
+                })
+            })
+            .collect();
+        if let Some(Some(m)) = self.groups.get_mut(group) {
+            let mut seen: std::collections::HashSet<Id> = m.iter().copied().collect();
+            for i in ok {
+                if m.len() >= crate::MAX_OBJECTS {
+                    break;
+                }
+                if seen.insert(i) {
+                    m.push(i);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn group_remove(&mut self, group: usize, object: Id, host: &dyn Host) {
+        self.seed_group(group, host);
+        if let Some(Some(m)) = self.groups.get_mut(group) {
+            m.retain(|&x| x != object);
+        }
+    }
+
+    pub(crate) fn group_clear(&mut self, group: usize, host: &dyn Host) {
+        self.seed_group(group, host);
+        if let Some(Some(m)) = self.groups.get_mut(group) {
+            m.clear();
         }
     }
 

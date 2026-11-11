@@ -235,7 +235,11 @@ output, one log line. The Object Rename written in phase 2 stays in the code beh
   Sort Rows, Test Cell, Get Highest, Value Count, Remove Key Row, Remove Row If, Change Value If, Row Search; the run
   keeps its own columns and key column per array. All checked against the C oracle on every column kind except Move
   Row, which the C lacks ([gameplay_bbs.md](../gameplay_bbs.md), "Arrays").
-- Not yet: attributes (identifier `0x11` of an object and the attribute manager's chunk), groups of any object.
+- **Groups** hold any object of the graph (entities, meshes, materials, textures, behaviours): the file's members seed
+  them, the run keeps them (rewound with it), and Fill Group By Class collects by class
+  ([gameplay_bbs.md](../gameplay_bbs.md), "Fill Group By Class"). Group Iterator and Is In Group give the same
+  results as before for groups of entities.
+- Not yet: attributes (identifier `0x11` of an object and the attribute manager's chunk).
 
 ## Hostile input
 

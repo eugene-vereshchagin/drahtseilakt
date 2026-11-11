@@ -329,6 +329,9 @@ pub struct Graph {
     /// Scripts and objects the scene starts deactivated (their saved activity says so, docs/ck-runtime.md); every
     /// other one starts active (a map's file mostly saves no activity at all). Not in the open format yet.
     pub start_off: Vec<Id>,
+    /// The members the file gives each group (by group index, as `ObjKind::Group` counts them), of any kind: entities,
+    /// meshes, materials, behaviours. A group missing here (or empty) starts with the host's level members.
+    pub groups: Vec<Vec<Id>>,
 }
 
 impl Graph {
@@ -343,6 +346,7 @@ impl Graph {
             links_from: vec![Vec::new(); n],
             priorities: Vec::new(),
             start_off: Vec::new(),
+            groups: Vec::new(),
         };
         for (i, o) in doc.objects.iter().enumerate().take(n) {
             let mut k = kind(i);
@@ -367,6 +371,22 @@ impl Graph {
                         .collect(),
                     key: a.key_column,
                 });
+            }
+            if let (ObjKind::Group(gi), Some(chunk)) = (k, &o.chunk)
+                && o.class_id == class::GROUP
+                && gi < MAX_OBJECTS
+                && let Ok(members) = nmo::scene::group(chunk)
+            {
+                if g.groups.len() <= gi {
+                    g.groups.resize(gi.saturating_add(1), Vec::new());
+                }
+                if let Some(slot) = g.groups.get_mut(gi) {
+                    *slot = members
+                        .into_iter()
+                        .filter(|&m| m < n)
+                        .take(MAX_OBJECTS)
+                        .collect();
+                }
             }
             if o.class_id == behavior::class::BEHAVIOR {
                 k = ObjKind::Behavior;
@@ -678,6 +698,7 @@ impl Graph {
             links_from: vec![Vec::new(); n],
             priorities: Vec::new(),
             start_off: Vec::new(),
+            groups: Vec::new(),
         };
         for (i, node) in nodes {
             match &node {
