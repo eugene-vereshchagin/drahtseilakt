@@ -3,7 +3,8 @@
 // mast, a timber post, a post of rail tube, a wall plate: the part's `Supports_<module>` group,
 // assets/own/make/make_parts.py) and this file decides, for every sack of a level as it is loaded, what is put
 // together of them and where: a free post beside the track, a gate of two posts, a beam to a wall or a pillar of the
-// level that stands near, or, for a sack with no room of its own, a cross-beam to a neighbour that has a support. The
+// level that stands near, or, for a sack with no room of its own, a cross-beam to a neighbour that has a support. A
+// sack still bare after that is looked at once more with longer beams, and beams along its swing. The
 // holder's mount, the beam and the post are of one material, and every member is level or upright. It is drawn only:
 // the physics never hears of it, so a run and its replay are the same with or without it (the `sack-supports` mod
 // switches it, docs/drahtseilakt/mods.md).
@@ -116,6 +117,10 @@ const LENGTHS: [f32; 8] = [5.0, 6.5, 8.0, 9.5, 11.0, 13.0, 15.0, 17.0];
 const YAWS: [f32; 10] = [
     0.0, 180.0, 25.0, -25.0, 155.0, -155.0, 50.0, -50.0, 130.0, -130.0,
 ];
+/// A sack that found nothing, and no neighbour to hang on, is looked at once more with longer beams and with beams
+/// along its swing as well (the nearest to across first): the post then stands further along the track's side.
+const MORE_LENGTHS: [f32; 4] = [20.0, 23.0, 26.0, 30.0];
+const MORE_YAWS: [f32; 6] = [75.0, -75.0, 105.0, -105.0, 90.0, -90.0];
 /// A wall is looked for every so many degrees, this near and this far, and must face the beam this squarely.
 const WALL_STEP: usize = 5;
 /// (at the height of the beams' middles over the joint)
@@ -1106,8 +1111,13 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
     };
     // each sack's candidates are looked through on their own: all the sacks at once, on the machine's cores
     type Found = ([Option<Support>; ND], [Option<Fault>; ND]);
-    let reach = LENGTHS.iter().copied().fold(WALL_FAR, f32::max) + 4.0;
-    let search = |object: usize| -> Found {
+    let reach = LENGTHS
+        .iter()
+        .chain(&MORE_LENGTHS)
+        .copied()
+        .fold(WALL_FAR, f32::max)
+        + 4.0;
+    let search = |object: usize, lengths: &[f32], yaws: &[f32], to_walls: bool| -> Found {
         let mut found: [Option<Support>; ND] = Default::default();
         let mut faults = [None; ND];
         if let Some(place) =
@@ -1115,14 +1125,18 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
         {
             let about = space.about(place.transform_point3(kit.joint), reach);
             // a beam that is not clear is not clear longer either: the least length each direction failed at
-            let mut beam_bad = [(f32::MAX, Fault::Ball); YAWS.len()];
+            let mut beam_bad = vec![(f32::MAX, Fault::Ball); yaws.len()];
             for (design, material) in MATERIAL.iter().copied().enumerate().take(POST_PIECE.len()) {
-                'design: for length in LENGTHS {
+                'design: for &length in lengths {
                     // (a gate is the same turned half round)
-                    for (y, yaw) in YAWS
+                    for (y, yaw) in yaws
                         .iter()
                         .enumerate()
                         .filter(|(_, y)| design != GATE || y.abs() <= 90.0)
+                        // (the second look does not repeat the first)
+                        .filter(|(_, y)| {
+                            to_walls || !(LENGTHS.contains(&length) && YAWS.contains(y))
+                        })
                     {
                         if let Some((_, f)) = beam_bad.get(y).filter(|b| length >= b.0) {
                             if let Some(x) = faults.get_mut(design) {
@@ -1162,9 +1176,14 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
                 }
             }
             // the nearest wall that a clear beam reaches
-            let near = walls(&space, &place, &kit);
+            let near = if to_walls {
+                walls(&space, &place, &kit)
+            } else {
+                Vec::new()
+            };
             let mut walls: Vec<(f32, f32, Vec3, Vec3)> = (0..360)
                 .step_by(WALL_STEP)
+                .filter(|_| to_walls)
                 .filter_map(|yaw| {
                     let yaw = yaw as f32 - 180.0;
                     wall(&near, &place, &kit, yaw).map(|(at, p, dir)| (at, yaw, p, dir))
@@ -1204,7 +1223,11 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
         let workers: Vec<_> = sacks
             .chunks(share)
             .map(|part| {
-                scope.spawn(move || part.iter().map(|&o| search(o)).collect::<Vec<Found>>())
+                scope.spawn(move || {
+                    part.iter()
+                        .map(|&o| search(o, &LENGTHS, &YAWS, true))
+                        .collect::<Vec<Found>>()
+                })
             })
             .collect();
         workers
@@ -1258,8 +1281,79 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
             faults,
         });
     }
-    // a sack left bare hangs on a cross-beam to its nearest neighbour that has a support (or hangs on one itself):
-    // a group of sacks on one or two supports. In each set by itself.
+    link_bare(&mut plan, &space, &kit, &place_of);
+    // What is still bare is looked at once more, with longer beams and more directions: each such sack by itself, all
+    // at once. What stands already stays as it stands, and a new support keeps its distance from it.
+    let bare: Vec<usize> = (0..plan.sacks.len())
+        .filter(|&i| {
+            plan.sacks
+                .get(i)
+                .is_some_and(|s| !s.held && (s.plain.is_none() || s.varied.is_none()))
+        })
+        .collect();
+    let lengths: Vec<f32> = LENGTHS.iter().chain(&MORE_LENGTHS).copied().collect();
+    let yaws: Vec<f32> = YAWS.iter().chain(&MORE_YAWS).copied().collect();
+    let more: Vec<Option<Found>> = std::thread::scope(|scope| {
+        let (search, lengths, yaws, sacks) = (&search, &lengths, &yaws, &plan.sacks);
+        let workers: Vec<_> = bare
+            .iter()
+            .map(|&i| {
+                scope.spawn(move || sacks.get(i).map(|s| search(s.object, lengths, yaws, false)))
+            })
+            .collect();
+        workers
+            .into_iter()
+            .map(|w| w.join().ok().flatten())
+            .collect()
+    });
+    let free = POST_PIECE.len();
+    for (&i, found) in bare.iter().zip(more) {
+        let Some((found, _)) = found else {
+            continue;
+        };
+        for set in [PLAIN, VARIED] {
+            if plan.sacks.get(i).is_none_or(|s| in_set(s, set).is_some()) {
+                continue;
+            }
+            let order: Vec<usize> = if set == PLAIN {
+                vec![0, 2, 1, 4, 3]
+            } else {
+                (0..free).map(|k| (k + i) % free).collect()
+            };
+            // the shortest beam that keeps its distance from what stands (of equals, the design whose turn it is)
+            let mut clear: Vec<&Support> = order
+                .iter()
+                .filter_map(|&d| found.get(d).and_then(|s| s.as_ref()))
+                .filter(|s| {
+                    plan.sacks
+                        .iter()
+                        .filter_map(|o| in_set(o, set))
+                        .all(|o| apart(s, o))
+                })
+                .collect();
+            clear.sort_by(|a, b| a.length.total_cmp(&b.length));
+            let pick = clear.first().map(|s| (*s).clone());
+            if let (Some(s), Some(sack)) = (pick, plan.sacks.get_mut(i)) {
+                if let Some(f) = sack.faults.get_mut(s.design) {
+                    *f = None;
+                }
+                *(if set == PLAIN {
+                    &mut sack.plain
+                } else {
+                    &mut sack.varied
+                }) = Some(s);
+            }
+        }
+    }
+    // (and its bare neighbours may now hang on it)
+    link_bare(&mut plan, &space, &kit, &place_of);
+    plan.took = began.elapsed().as_secs_f32();
+    plan
+}
+
+/// Hangs each sack left bare on a cross-beam to its nearest neighbour that has a support (or hangs on one itself): a
+/// group of sacks on one or two supports. In each set by itself.
+fn link_bare(plan: &mut Plan, space: &Space, kit: &Kit, place_of: &dyn Fn(usize) -> Option<Mat4>) {
     let upright = |m: &Mat4| m.y_axis.truncate().normalize_or_zero().y >= LINK_UPRIGHT;
     for set in [PLAIN, VARIED] {
         let mut tried: Vec<(usize, usize)> = Vec::new();
@@ -1296,15 +1390,7 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
                         continue;
                     };
                     tried.push((i, j));
-                    match link(
-                        &space,
-                        &kit,
-                        &place,
-                        sack.object,
-                        other.object,
-                        end,
-                        material,
-                    ) {
+                    match link(space, kit, &place, sack.object, other.object, end, material) {
                         Ok(s) => {
                             // (it comes to its neighbour's holder, as the neighbour's own support and other links do)
                             let free = plan.sacks.iter().all(|k| {
@@ -1341,8 +1427,6 @@ pub fn plan(level: &Level, modules: &Modules) -> Plan {
             }
         }
     }
-    plan.took = began.elapsed().as_secs_f32();
-    plan
 }
 
 /// A sack's support in a set.
@@ -2045,10 +2129,27 @@ mod tests {
                 .all(|p| p.y > 18.0 && p.y < 19.0 && p.x.abs() < 2.0)
         );
         assert_clear(&level, &modules, second);
-        // a neighbour hanging lower takes no level beam
+        // a neighbour hanging lower takes no level beam: the sack is looked at once more, and stands on a support of
+        // its own with a longer beam or one along its swing, clear as any; its neighbour's stays as it stood
+        let (design, length, yaw) = (first.design, first.length, first.yaw);
         level.objects[3].matrix[3][1] = 1.0;
         let plan = super::plan(&level, &modules);
-        assert!(plan.sacks[1].varied.is_none());
+        let (first, second) = (
+            plan.sacks[0].varied.as_ref().expect("first"),
+            plan.sacks[1].varied.as_ref().expect("second"),
+        );
+        assert_eq!(
+            (first.design, first.length, first.yaw),
+            (design, length, yaw)
+        );
+        assert_ne!(DESIGNS[second.design], "link");
+        assert!(second.length > 17.0 || MORE_YAWS.contains(&second.yaw));
+        assert!(second.pieces.iter().all(|p| {
+            let x = p.matrix.x_axis.truncate().normalize();
+            x.y.abs() < 1e-4
+        }));
+        assert_clear(&level, &modules, second);
+        assert!(apart(first, second));
     }
 
     #[test]
