@@ -217,6 +217,23 @@ nothing there. They are declared as **named no-ops** (owner's decision 2026-11-1
 output, one log line. The Object Rename written in phase 2 stays in the code behind the cargo feature
 `absent-as-authored` (off), for a later optional mod that plays such maps as their authors meant.
 
+## Stage 0b (2026-11-11): types, operations, messages
+
+- **Parameter types** (`crates/script/src/types.rs`): a registry GUID → name, kind, parent, size, default
+  ([ck-runtime.md](../ck-runtime.md), "Parameter types"); values gain quaternion, rectangle, box and object array
+  (the open format writes `["q", ...]`, `["rect", ...]`, `["box", ...]`, `["oa", [...]]`).
+- **Operations as data** (`crates/script/src/ops.rs`): rows keyed by (operation, output, input 1, input 2), looked
+  up with the types' parents and swapped inputs as the original's parameter manager does
+  ([ck-runtime.md](../ck-runtime.md), "Operations"). 114 of the 142 signatures in the community maps and the game
+  have a function; the other 28 (16 GUIDs without a name or C function, in four maps) are logged once and a
+  graph's operation passes input 1 on, an Op block writes nothing. A String converted to an object finds an object
+  of the output type's class. `script-dump --census` lists every signature with the row that answers it and, per
+  map, the blocks and signatures missing. The C oracle checks the value rows (`op_table`).
+- **Messages** carry their sender, receiver (or a broadcast's class) and data: Broadcast Message, Switch On
+  Message and Get Message Data are new ([gameplay_bbs.md](../gameplay_bbs.md), "Messages").
+- Not yet: attributes (identifier `0x11` of an object and the attribute manager's chunk), groups of any object,
+  the remaining array blocks.
+
 ## Hostile input
 
 A map comes from a stranger. Every list is capped (objects 2^20, array rows 2^16, 4096 messages a tick, 2000
@@ -359,7 +376,7 @@ by the engine's.
 | Sequencer | `42530844:257b6053` | 1 | 1 | done |
 | Calculator | `4bc209b8:5b3679b0` | 1 | 8 | planned |
 | TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | never (the engine's own interface) |
-| Get Message Data | `45875fee:45875fdd` | 1 | 1 | planned |
+| Get Message Data | `45875fee:45875fdd` | 1 | 1 | done |
 | Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | never (the engine's own interface) |
 | Set Clipping Planes | `652316a2:01aa09a9` | 1 | 2 | never (the engine's own interface) |
 | Set Fog | `151aaaaa:ffd5bdbc` | 1 | 3 | never (the engine's own interface) |
