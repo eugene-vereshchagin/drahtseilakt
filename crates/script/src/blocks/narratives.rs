@@ -326,7 +326,7 @@ pub(super) const PROTOS: &[Proto] = &[
         pins: &["", "Original"],
         pouts: &["Copy"],
         flags: 0,
-        standing: Standing::Partial,
+        standing: Standing::Full,
         layouts: &[],
         run: object_copy,
         event: None,

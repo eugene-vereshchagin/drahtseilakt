@@ -92,7 +92,7 @@ pub(super) const PROTOS: &[Proto] = &[
         pins: &[],
         pouts: &["Current Camera", "Position"],
         flags: 0,
-        standing: Standing::Partial,
+        standing: Standing::Full,
         layouts: &[],
         run: get_current_camera,
         event: None,
