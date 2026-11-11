@@ -31,6 +31,7 @@ mod lang;
 mod learned;
 mod levels;
 mod levelstats;
+mod look;
 mod lights;
 mod locate;
 mod menu;
