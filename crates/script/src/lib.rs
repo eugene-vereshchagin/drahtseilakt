@@ -13,6 +13,7 @@ pub use nmo::behavior::Guid;
 
 use nmo::behavior::{self, Saved};
 use nmo::{Document, class};
+use std::collections::{HashMap, HashSet};
 
 /// An index into `Graph::nodes` and `Graph::objects`: the object's index in the file.
 pub type Id = usize;
@@ -766,16 +767,17 @@ impl Graph {
     /// operations (with the operations' own parameters), and the script's "This" parameters. None when the
     /// script is larger than a copy may be.
     pub fn script_nodes(&self, root: Id) -> Option<Vec<Id>> {
-        let mut seen = vec![false; self.nodes.len()];
+        // membership only (the order is `out`'s): sized to the script, not to the whole graph, so walking
+        // every script of a map is linear in the map
+        let mut seen: HashSet<Id> = HashSet::new();
         let mut out: Vec<Id> = Vec::new();
+        let n = self.nodes.len();
         let mut add = |i: Id, out: &mut Vec<Id>| -> bool {
-            match seen.get_mut(i) {
-                Some(x) if !*x => {
-                    *x = true;
-                    out.push(i);
-                    true
-                }
-                _ => false,
+            if i < n && seen.insert(i) {
+                out.push(i);
+                true
+            } else {
+                false
             }
         };
         let mut todo = vec![root];
@@ -829,7 +831,8 @@ impl Graph {
     /// references among them kept, those to anything else shared. Returns the copy's root and, for each node
     /// copied, (the original, its copy).
     pub fn clone_script(&mut self, root: Id, owner: Id) -> Option<(Id, Vec<(Id, Id)>)> {
-        if !self.scripts.contains(&root) || owner >= self.objects.len() {
+        let is_root = matches!(self.block(root), Some(b) if b.parent.is_none());
+        if !is_root || owner >= self.objects.len() {
             return None;
         }
         let ids = self.script_nodes(root)?;
@@ -837,14 +840,14 @@ impl Graph {
         if base.checked_add(ids.len())? > MAX_OBJECTS {
             return None;
         }
-        let mut map: Vec<Option<Id>> = vec![None; base];
+        let mut map: HashMap<Id, Id> = HashMap::with_capacity(ids.len());
         let mut pairs = Vec::with_capacity(ids.len());
         for (k, &old) in ids.iter().enumerate() {
             let new = base.checked_add(k)?;
-            *map.get_mut(old)? = Some(new);
+            map.insert(old, new);
             pairs.push((old, new));
         }
-        let r = |i: Id| map.get(i).copied().flatten().unwrap_or(i);
+        let r = |i: Id| map.get(&i).copied().unwrap_or(i);
         let ro = |i: Option<Id>| i.map(r);
         let rv = |v: &[Id]| v.iter().map(|&i| r(i)).collect::<Vec<Id>>();
         for &(old, _) in &pairs {

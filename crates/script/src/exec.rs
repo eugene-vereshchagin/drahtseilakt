@@ -200,13 +200,15 @@ impl Runtime {
         let Some(Ent::Object(index)) = self.ent(Some(original)) else {
             return None;
         };
+        // every try counts, made or refused: each walks the scripts once, and a map may ask every tick
         if self.copies >= MAX_COPIES {
-            host.note("script copies stopped: too many objects copied");
+            if self.copies == MAX_COPIES {
+                self.copies = MAX_COPIES.saturating_add(1);
+                host.note("script copies stopped: too many objects copied");
+            }
             return None;
         }
         let number = self.copies.saturating_add(1);
-        let name = format!("{}{number:03}", self.graph.name(original));
-        let new_index = host.copy(Ent::Object(index), &name)?;
         self.copies = number;
         let scripts: Vec<Id> = self
             .graph
@@ -219,6 +221,34 @@ impl Runtime {
                     .is_some_and(|b| b.owner == Some(original))
             })
             .collect();
+        // The copy's work is the nodes it copies. Walking them is paid from the tick's budget as it goes,
+        // whether the copy is made or not: a copy that does not fit in what is left is refused whole (and
+        // the tick's work is spent), and the run's graph stays under its cap.
+        let mut work = 0u64;
+        for &s in &scripts {
+            let Some(nodes) = self.graph.script_nodes(s) else {
+                host.note("script copy refused: a script of the object is too large");
+                return None;
+            };
+            let cost = (nodes.len() as u64).saturating_add(1);
+            if cost > self.budget {
+                self.budget = 0;
+                self.starved = true;
+                host.note(
+                    "script copy refused: the object's scripts are more than a tick may copy",
+                );
+                return None;
+            }
+            self.budget = self.budget.saturating_sub(cost);
+            work = work.saturating_add(cost);
+        }
+        let room = crate::MAX_OBJECTS.saturating_sub(self.graph.nodes.len()) as u64;
+        if work.saturating_add(1) > room {
+            host.note("script copy refused: the run's scripts would be more than a map may hold");
+            return None;
+        }
+        let name = format!("{}{number:03}", self.graph.name(original));
+        let new_index = host.copy(Ent::Object(index), &name)?;
         let g = Arc::make_mut(&mut self.graph);
         let new_id = g.add_object(&name, ObjKind::Entity(new_index));
         let mut made = Vec::new();

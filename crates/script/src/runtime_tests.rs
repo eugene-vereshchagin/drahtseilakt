@@ -952,6 +952,11 @@ fn copies_are_capped() {
         rt.tick(&mut host);
     }
     assert_eq!(host.matrices.len(), 2 + crate::exec::MAX_COPIES);
+    assert_eq!(
+        host.notes.iter().filter(|n| n.contains("too many")).count(),
+        1,
+        "said once"
+    );
 }
 
 /// Linear Progression goes from A to B over its time, a Loop In a tick; Interpolator and Set Component follow it.
@@ -1087,4 +1092,70 @@ fn random_repeats_and_groups_change() {
         "and they differ from draw to draw"
     );
     assert!(notes.contains(&"group 0 + 1".to_string()), "{notes:?}");
+}
+
+/// A hostile map: an object with tens of thousands of scripts. Loading is linear in the map, and copying the
+/// object is paid from the tick's budget: a copy larger than a tick may make is refused, whole, so neither
+/// the load nor a tick takes the game's time (the bounds are generous: the work is milliseconds).
+#[test]
+fn an_object_with_very_many_scripts_neither_stalls_the_load_nor_a_copy() {
+    let build = |n: usize, maker: bool| {
+        let mut b = Build::new();
+        if maker {
+            let dep = b.local("Dependency Options", types::NONE, Value::None);
+            let orig = b.local("Original", types::ENTITY, Value::Obj(Some(0)));
+            let orig_pin = b.pin("Original", types::ENTITY, orig);
+            let copy_out = b.pout("Copy", types::ENTITY);
+            let copy = b.bb(
+                "Object Copy",
+                proto::OBJECT_COPY,
+                &["In"],
+                &["Out"],
+                vec![dep, orig_pin],
+                vec![copy_out],
+                vec![],
+                None,
+            );
+            let start = b.io("Start");
+            let l1 = b.link(start, in_of(&b.g, copy, 0), 0);
+            let l2 = b.link(out_of(&b.g, copy, 0), in_of(&b.g, copy, 0), 1);
+            b.script("Maker", None, start, vec![copy], vec![l1, l2]);
+        }
+        for _ in 0..n {
+            let s = b.io("Start");
+            b.script("S", Some(0), s, vec![], vec![]);
+        }
+        b.done()
+    };
+    let limit = std::time::Duration::from_secs(10);
+    // the load: 300 000 scripts on one object
+    let g = build(300_000, false);
+    let t = std::time::Instant::now();
+    let _rt = Runtime::new(g);
+    assert!(t.elapsed() < limit, "load took {:?}", t.elapsed());
+    // a copy every tick of an object with 20 000 scripts: the graph stays under its cap, the ticks are short
+    let g = build(20_000, true);
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    let t = std::time::Instant::now();
+    for _ in 0..300 {
+        rt.tick(&mut host);
+    }
+    assert!(t.elapsed() < limit, "300 ticks took {:?}", t.elapsed());
+    assert!(rt.graph.nodes.len() <= crate::MAX_OBJECTS);
+    assert!(host.matrices.len() > 2, "copies that fit are made");
+    assert!(
+        host.notes.iter().any(|n| n.contains("copy refused")),
+        "and one that does not fit is refused"
+    );
+    // straight calls, as the reviewer's: 256 tries on 60 000 scripts
+    let g = build(60_000, false);
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    let t = std::time::Instant::now();
+    for _ in 0..256 {
+        rt.copy_object(0, &mut host);
+    }
+    assert!(t.elapsed() < limit, "256 copies took {:?}", t.elapsed());
+    assert!(rt.graph.nodes.len() <= crate::MAX_OBJECTS);
 }

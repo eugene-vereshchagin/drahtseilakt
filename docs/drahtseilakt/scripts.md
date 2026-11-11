@@ -90,8 +90,9 @@ input is the game's keys only), the original's 2D interface blocks (never: the g
   (the original's and a three-digit number, `Base_Portal_In002`: templates tell their copies apart by name —
   the name's exact form in the original is not known), and a copy of every script attached to the original, bound
   to the copy ("This" is the copy) and in the state the original's is in. The run's graph is its own from the first
-  copy on (the level's is not touched; a rewound run copies again and gets the same). At most 256 copies a run,
-  16384 nodes a copied script. The copies are **not drawn and have no body** yet.
+  copy on (the level's is not touched; a rewound run copies again and gets the same). At most 256 copies a run (tries
+  count, made or refused), 16384 nodes a copied script; the nodes a copy makes are paid from the tick's work
+  budget, and a copy that does not fit in it, or in the graph's cap, is refused whole. The copies are **not drawn and have no body** yet.
 - **Box Box Intersection** with an object without a mesh tests its place as an empty box (the original's box of
   such an object). With these three the **Portal** maps' teleports work: the template copies a mesh-less frame
   with the script that tests the ball against "This" to each portal.
