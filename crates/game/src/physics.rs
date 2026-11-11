@@ -103,6 +103,26 @@ pub struct World {
     statics: Vec<(usize, bool, SoundIds)>,
     /// How each game body is made, for the ones that come and go (a sector's objects); none for the ball.
     spawns: Vec<Option<Spawn>>,
+    /// For each mesh given to `new`, the IVP body made of it (none: no usable triangles).
+    baked_of_mesh: Vec<Option<usize>>,
+    /// The level objects (rows of the entity table) whose body is one of the baked statics, by row (`tag_baked`).
+    baked_rows: std::collections::BTreeMap<usize, usize>,
+    /// The fixed bodies scripts made at run time, by handle (slots are never reused): see `add_static_*`.
+    script_statics: Vec<Option<ScriptStatic>>,
+}
+
+/// A fixed body made by a script: kept whole so that it can be put somewhere else (the body is made again, at the
+/// same place in `statics`).
+#[derive(Clone)]
+struct ScriptStatic {
+    id: usize,
+    surface: Surface,
+    pos: Vec3,
+    rot: Quat,
+    friction: f32,
+    elasticity: f32,
+    group: [u8; 8],
+    ball_collides: bool,
 }
 
 /// What the physics needs to make a game body again at its start: the original physicalizes a sector's objects when
@@ -205,6 +225,9 @@ impl World {
             time_factor: TIME_FACTOR,
             statics: Vec::new(),
             spawns: Vec::new(),
+            baked_of_mesh: Vec::new(),
+            baked_rows: std::collections::BTreeMap::new(),
+            script_statics: Vec::new(),
         };
         for mesh in statics {
             let ledges: Vec<ledge::Ledge> = mesh
@@ -213,6 +236,7 @@ impl World {
                 .filter_map(|t| ledge::triangle(vec3_f64(t.a), vec3_f64(t.b), vec3_f64(t.c)))
                 .collect();
             let Some(surface) = Surface::compile(ledges) else {
+                world.baked_of_mesh.push(None);
                 continue;
             };
             let desc = BodyDesc {
@@ -228,11 +252,153 @@ impl World {
                 vec3_f64(mesh.pos),
                 mesh.rot.ivp(),
             );
+            world.baked_of_mesh.push(Some(id));
             world
                 .statics
                 .push((id, mesh.group != GROUP_BALL, mesh.sound));
         }
         world
+    }
+
+    /// Says which level object each mesh given to `new` was made of (`rows[k]` for mesh `k`), so that a script's
+    /// Physicalize / Unphysicalize of that object finds its baked body.
+    pub fn tag_baked(&mut self, rows: &[usize]) {
+        self.baked_rows.clear();
+        for (&row, id) in rows.iter().zip(&self.baked_of_mesh) {
+            if let Some(id) = *id {
+                self.baked_rows.insert(row, id);
+            }
+        }
+    }
+
+    /// Whether the level's object `row` still has its baked fixed body.
+    pub fn has_baked(&self, row: usize) -> bool {
+        self.baked_rows.contains_key(&row)
+    }
+
+    /// Takes the baked body of object `row` out of the physics (a script's Unphysicalize of a level object). The
+    /// ball's floor lookup stops seeing it. False when there was none.
+    pub fn remove_baked(&mut self, row: usize) -> bool {
+        let Some(id) = self.baked_rows.remove(&row) else {
+            return false;
+        };
+        self.statics.retain(|s| s.0 != id);
+        self.physics.body_destroy(id);
+        true
+    }
+
+    /// A fixed body made at run time from triangles in the object's own frame (scale baked in), at `pos`/`rot`
+    /// (a script's concave Physicalize). Returns its handle; none when no triangle is usable.
+    pub fn add_static_triangles(
+        &mut self,
+        triangles: &[[Vec3; 3]],
+        pos: Vec3,
+        rot: Quat,
+        friction: f32,
+        elasticity: f32,
+        group_name: &str,
+    ) -> Option<usize> {
+        let ledges: Vec<ledge::Ledge> = triangles
+            .iter()
+            .filter_map(|t| ledge::triangle(vec3_f64(t[0]), vec3_f64(t[1]), vec3_f64(t[2])))
+            .collect();
+        let surface = Surface::compile(ledges)?;
+        Some(self.place_static(surface, pos, rot, friction, elasticity, group_name))
+    }
+
+    /// A fixed body made at run time from the hull of `points` (a script's convex Physicalize with Fixed).
+    pub fn add_static_hull(
+        &mut self,
+        points: &[Vec3],
+        pos: Vec3,
+        rot: Quat,
+        friction: f32,
+        elasticity: f32,
+        group_name: &str,
+    ) -> Option<usize> {
+        let pts: Vec<[f64; 3]> = points.iter().map(|&p| vec3_f64(p)).collect();
+        let surface = Surface::compile(vec![ivp::convex::hull(&pts)?])?;
+        Some(self.place_static(surface, pos, rot, friction, elasticity, group_name))
+    }
+
+    fn make_static_body(&mut self, s: &ScriptStatic) -> usize {
+        let desc = BodyDesc {
+            fixed: true,
+            friction: s.friction,
+            elasticity: s.elasticity,
+            group: s.group,
+            ..BodyDesc::default()
+        };
+        self.physics.add_body(
+            desc,
+            Shape::Surface(s.surface.clone()),
+            vec3_f64(s.pos),
+            ivp_quat(s.rot),
+        )
+    }
+
+    fn place_static(
+        &mut self,
+        surface: Surface,
+        pos: Vec3,
+        rot: Quat,
+        friction: f32,
+        elasticity: f32,
+        group_name: &str,
+    ) -> usize {
+        let mut s = ScriptStatic {
+            id: 0,
+            surface,
+            pos,
+            rot,
+            friction,
+            elasticity,
+            group: group(group_name),
+            ball_collides: group_name != GROUP_BALL,
+        };
+        s.id = self.make_static_body(&s);
+        self.statics
+            .push((s.id, s.ball_collides, SoundIds::default()));
+        self.script_statics.push(Some(s));
+        self.script_statics.len() - 1
+    }
+
+    /// Takes a script's fixed body out of the physics; the ball's floor lookup stops seeing it.
+    pub fn remove_static(&mut self, h: usize) {
+        if let Some(s) = self.script_statics.get_mut(h).and_then(Option::take) {
+            self.statics.retain(|x| x.0 != s.id);
+            self.physics.body_destroy(s.id);
+        }
+    }
+
+    /// Puts a script's fixed body at another place (its object was moved): made again in the same slot of the
+    /// level's statics, so the order of everything stays.
+    pub fn move_static(&mut self, h: usize, pos: Vec3, rot: Quat) {
+        let Some(mut s) = self.script_statics.get_mut(h).and_then(Option::take) else {
+            return;
+        };
+        self.physics.body_destroy(s.id);
+        s.pos = pos;
+        s.rot = rot;
+        let old = s.id;
+        s.id = self.make_static_body(&s);
+        if let Some(e) = self.statics.iter_mut().find(|x| x.0 == old) {
+            e.0 = s.id;
+        }
+        self.script_statics[h] = Some(s);
+    }
+
+    /// Where a script's fixed body is (none once removed).
+    #[cfg(test)]
+    pub fn static_pose(&self, h: usize) -> Option<(Vec3, Quat)> {
+        let s = self.script_statics.get(h)?.as_ref()?;
+        Some((s.pos, s.rot))
+    }
+
+    /// How many fixed bodies there are: the level's baked ones and the scripts'.
+    #[cfg(test)]
+    pub fn static_count(&self) -> usize {
+        self.statics.len()
     }
 
     /// A new game body from its spawn, made in the physics now when `active`, else only placed (a sector's object

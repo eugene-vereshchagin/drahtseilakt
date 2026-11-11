@@ -613,9 +613,9 @@ fn spec_of(e: &script::EmitterSpec) -> Spec {
         .texture
         .as_deref()
         .and_then(|n| {
-            textures()
-                .into_iter()
-                .find(|t| t.eq_ignore_ascii_case(n.trim_end_matches(".bmp").trim_end_matches(".tga")))
+            textures().into_iter().find(|t| {
+                t.eq_ignore_ascii_case(n.trim_end_matches(".bmp").trim_end_matches(".tga"))
+            })
         })
         .or((e.render != 2).then_some("Particle_Smoke"));
     Spec {
