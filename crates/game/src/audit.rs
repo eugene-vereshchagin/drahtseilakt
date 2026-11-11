@@ -86,7 +86,7 @@ pub const KINDS: [(&str, &str); 24] = [
     ),
     (
         "frame-not-drawn",
-        "2D frames not drawn: hidden or without a texture (a script's), or with a picture saved in the map (its bitmap is not read right yet)",
+        "2D frames hidden in the file or without a texture: what a script of the map shows or fills (not drawn)",
     ),
     (
         "sound-unplayed",
@@ -423,9 +423,7 @@ fn doc_issues(doc: &nmo::Document, out: &mut Vec<Issue>) {
                     .and_then(|e| doc.get(e.material?)?.chunk.as_ref())
                     .and_then(|c| nmo::scene::material(c).ok())
                     .and_then(|m| doc.get(m.texture?)?.chunk.as_ref())
-                    .and_then(|c| nmo::scene::texture(c).ok())
-                    // (a picture saved inside the map is not drawn yet: hud::level_frames)
-                    .is_some_and(|t| t.embedded.is_none());
+                    .is_some_and(|c| nmo::scene::texture(c).is_ok());
                 let kind = if shown && textured {
                     "frame-drawn"
                 } else {

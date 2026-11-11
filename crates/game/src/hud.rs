@@ -396,14 +396,8 @@ pub fn level_frames(level: &level::Level) -> Vec<LevelFrame> {
                     rect: f.rect,
                     uv: f.uv,
                     color: m.diffuse,
-                    texture: m.texture.filter(|t| {
-                        // a picture saved inside the map is not drawn yet: the reader takes such a frame's
-                        // bitmap for packed pixels where the file has it in planes (it comes out tiled and
-                        // upside down), and a wrong picture over the screen is worse than none
-                        level.textures.get(*t).is_some_and(|t| {
-                            !matches!(t.source, level::TextureSource::Pixels { .. })
-                        })
-                    })?,
+                    // a texture the level has (a material may name one it does not)
+                    texture: m.texture.filter(|t| level.textures.get(*t).is_some())?,
                 },
             ))
         })

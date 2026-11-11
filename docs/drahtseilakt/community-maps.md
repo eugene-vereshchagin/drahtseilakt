@@ -89,9 +89,9 @@ Found by the audit (`drahtseilakt --audit DIR`) over 606 maps; `nmo-dump --extra
 - **2D frames** (34 maps): an author's signature or logo in a corner of the screen. A frame the file shows, whose
   material has a texture, is drawn over the picture under the game's interface, where the file puts it in the
   original's 640 x 480 context, by Z order (at most 16 a map). A hidden frame or one without a texture is what a
-  script of the map shows or fills: not drawn. **Not drawn yet either:** a frame whose picture is saved inside the
-  map (nearly all of them): the reader takes that bitmap for packed pixels where the file has it in planes, so it
-  would come out tiled and upside down. An open-format level does not carry frames yet.
+  script of the map shows or fills: not drawn. Nearly all of these pictures are saved inside the map, as are many
+  textures of the maps' own floors and parts: a raw bitmap whose channels are whole planes one after another (blue,
+  green, red, alpha, each width x height bytes, rows bottom up). An open-format level does not carry frames yet.
 - **Textures without a picture** (31 maps): a texture with no pixels and no file name, named after the game's
   texture, often cut to a DOS name by an exporter (`METAL_ST`, `RAIL_ENV`, `WOOD_MET.Copy`), or with no name under
   a material named after one (`_aaaSkyLayer`). It is taken for that game's texture (ours, a pack's or the copy's).
