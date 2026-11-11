@@ -3193,6 +3193,9 @@ fn upload_menu_scene(
     }
 }
 
+/// The most pixels a map's 2D frame's texture may have (1024 x 1024: a signature or a logo is far smaller).
+const FRAME_PIXELS_MAX: u64 = 1 << 20;
+
 fn upload(renderer: &mut Renderer, game: &Game) {
     // the level's own parts' files (its sky, particles, shadow) as the level chose them
     let data = &game.data;
@@ -3241,14 +3244,26 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     );
     // the map's own 2D frames: each one's texture under its slot's name, the slots of the level before emptied
     let frames = crate::hud::level_frames(&game.level.level);
+    // one upload for each of the level's textures, whatever number of frames show it; a frame is a small picture,
+    // and a larger one is not taken (a stranger's map does not get video memory outside the level's budget)
+    let mut uploaded: Vec<(usize, &'static str)> = Vec::new();
     for (k, name) in crate::ui::FRAME_TEXTURES.into_iter().enumerate() {
-        let pixels = frames
-            .get(k)
-            .and_then(|f| game.level.level.textures.get(f.texture))
-            .and_then(|t| data.texture(t));
-        match pixels {
-            Some((w, h, rgba)) => renderer.add_named_texture(name, w, h, rgba),
-            None => renderer.remove_named_texture(name),
+        renderer.remove_named_texture(name);
+        let Some(f) = frames.get(k) else { continue };
+        if let Some((_, first)) = uploaded.iter().find(|(t, _)| *t == f.texture) {
+            renderer.share_named_texture(name, first);
+            continue;
+        }
+        let pixels = game
+            .level
+            .level
+            .textures
+            .get(f.texture)
+            .and_then(|t| data.texture(t))
+            .filter(|(w, h, _)| u64::from(*w) * u64::from(*h) <= FRAME_PIXELS_MAX);
+        if let Some((w, h, rgba)) = pixels {
+            renderer.add_named_texture(name, w, h, rgba);
+            uploaded.push((f.texture, name));
         }
     }
     let shadow = level::Texture {

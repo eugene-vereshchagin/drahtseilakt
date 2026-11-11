@@ -101,6 +101,36 @@ fn extras(doc: &Document) {
             sections.join(" ")
         );
     }
+    // who refers to each object, gathered in one pass over the file
+    let mut referrers: Vec<Vec<String>> = vec![Vec::new(); doc.objects.len()];
+    for (k, u) in doc.objects.iter().enumerate() {
+        let Some(c) = &u.chunk else { continue };
+        let mut refer = |to: usize, what: String| {
+            if let Some(r) = referrers.get_mut(to).filter(|r| r.len() < 16) {
+                r.push(what);
+            }
+        };
+        match u.class_id {
+            behavior::class::BEHAVIOR => {
+                if let Some(t) = behavior::behavior(c).ok().and_then(|b| b.target) {
+                    refer(t, format!("target of {k} {}", u.name_lossy()));
+                }
+            }
+            3 | 45 => {
+                if let Ok(behavior::Saved::Object(Some(x))) =
+                    behavior::parameter(c).map(|p| p.value)
+                {
+                    refer(x, format!("parameter {k} {}", u.name_lossy()));
+                }
+            }
+            class::GROUP => {
+                for m in scene::group(c).unwrap_or_default() {
+                    refer(m, format!("group {}", u.name_lossy()));
+                }
+            }
+            _ => {}
+        }
+    }
     for (i, o) in doc.objects.iter().enumerate() {
         if !matches!(o.class_id, 24..=29 | 43 | 53) {
             continue;
@@ -153,29 +183,7 @@ fn extras(doc: &Document) {
             },
             _ => String::new(),
         };
-        let mut users = Vec::new();
-        for (k, u) in doc.objects.iter().enumerate() {
-            let Some(c) = &u.chunk else { continue };
-            match u.class_id {
-                behavior::class::BEHAVIOR => {
-                    if behavior::behavior(c).is_ok_and(|b| b.target == Some(i)) {
-                        users.push(format!("target of {k} {}", u.name_lossy()));
-                    }
-                }
-                3 | 45 => {
-                    if matches!(behavior::parameter(c).map(|p| p.value), Ok(behavior::Saved::Object(Some(x))) if x == i)
-                    {
-                        users.push(format!("parameter {k} {}", u.name_lossy()));
-                    }
-                }
-                class::GROUP => {
-                    if scene::group(c).is_ok_and(|g| g.contains(&i)) {
-                        users.push(format!("group {}", u.name_lossy()));
-                    }
-                }
-                _ => {}
-            }
-        }
+        let mut users = referrers.get(i).cloned().unwrap_or_default();
         let own = behavior::scripts(chunk);
         if !own.is_empty() {
             users.push(format!("has {} scripts", own.len()));

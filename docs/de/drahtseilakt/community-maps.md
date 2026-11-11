@@ -93,7 +93,9 @@ Gefunden vom Audit (`drahtseilakt --audit ORDNER`) über 606 Karten; `nmo-dump -
   und dessen Material eine Textur hat, wird über dem Bild unter der Oberfläche des Spiels gezeichnet, dort, wo die
   Datei ihn im 640 x 480-Kontext des Originals hinsetzt, nach Z-Ordnung (höchstens 16 je Karte). Einen versteckten
   Rahmen oder einen ohne Textur zeigt oder füllt ein Skript der Karte: nicht gezeichnet. Ein Level im offenen Format
-  trägt noch keine Rahmen.
+  trägt noch keine Rahmen. **Noch nicht gezeichnet** wird auch ein Rahmen, dessen Bild in der Karte gespeichert ist
+  (fast alle): Der Leser hält diese Bitmap für gepackte Pixel, die Datei hat sie in Ebenen, das Bild käme gekachelt
+  und kopfüber heraus.
 - **Texturen ohne Bild** (31 Karten): eine Textur ohne Pixel und ohne Dateinamen, benannt nach einer Textur des
   Spiels, oft vom Exporter auf einen DOS-Namen gekürzt (`METAL_ST`, `RAIL_ENV`, `WOOD_MET.Copy`), oder ohne Namen
   unter einem Material, das nach einer benannt ist (`_aaaSkyLayer`). Sie gilt als diese Textur des Spiels (unsere,

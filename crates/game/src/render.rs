@@ -944,6 +944,13 @@ impl Renderer {
         self.named_textures.insert(name, bind);
     }
 
+    /// Keeps under `name` the very texture kept under `from` (no second upload).
+    pub fn share_named_texture(&mut self, name: &'static str, from: &'static str) {
+        if let Some(bind) = self.named_textures.get(from).cloned() {
+            self.named_textures.insert(name, bind);
+        }
+    }
+
     /// Forgets the texture kept under `name` (a level's frame the next level does not have).
     pub fn remove_named_texture(&mut self, name: &'static str) {
         self.named_textures.remove(name);
