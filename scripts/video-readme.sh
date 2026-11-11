@@ -16,7 +16,7 @@ case $mode in
     calm) mode_line="calm: steady and safe, every checkpoint" ;;
     speedrun) mode_line="speedrun: the fastest way found, risky tricks allowed" ;;
     collector) mode_line="collector: every extra point and life" ;;
-    remaster) mode_line="remaster: the full beauty pass of the original level — every texture enlarged by the toolbox (up to 4096 px), rounded shapes, relief, the parts redrawn in the same way; not an early try" ;;
+    remaster) mode_line="remaster: the full beauty pass of the original level (see below), not an early try" ;;
     *) echo "VIDEO_MODE: test, calm, speedrun, collector or remaster" >&2; exit 1 ;;
 esac
 # The video's README: what it shows and what it was made with (the same choices the game made from its settings).
@@ -55,6 +55,24 @@ case $ui in
     remastered) interface="the toolbox's remaster of the player's copy" ;;
     *) interface="Ballance's original, from the player's own copy (Drahtseilakt's own where the copy has none)" ;;
 esac
+mo=$(setting models); [ "$extended" = yes ] || mo=""
+case $mo in
+    own) models="Drahtseilakt's own (balls, transformers and every part drawn by us)" ;;
+    original) models="Ballance's original, from the player's own copy" ;;
+    ""|level) models="as the level takes them" ;;
+    *) models="the player's model pack \"$mo\"" ;;
+esac
+about=""
+if [ "$is_remaster" = yes ]; then
+    about="
+What the remaster is: the same level, the same physics and the same run, drawn anew. drahtseilakt-toolbox takes the
+level from the player's own copy of Ballance and rebuilds its look on the player's machine: every texture is enlarged
+by Real-ESRGAN up to 4096 pixels a side and stored compressed for the graphics card, the level's shapes are rounded
+where the 2004 meshes were faceted, and the lit surfaces get relief (normal maps, raised bricks and sunk mortar). The
+balls and parts are the game's own models. Nothing of Ballance is shipped: whoever owns the game makes the remaster
+from their own copy in a couple of clicks.
+"
+fi
 engine="Drahtseilakt $(git -C "$here/.." describe --always --dirty 2>/dev/null || echo unknown), a new engine for Ballance written in Rust"
 cat > "${out%.*}.README.txt" <<EOF2
 Level: $level_line
@@ -62,10 +80,11 @@ Engine: $engine
 Textures: $textures
 Sounds: $sounds
 Interface: $interface
+Models: $models
 Mode: $mode_line
 Played by: the Drahtseilakt test player (autopilot), replay $(basename "$replay")
 Video: $size, 60 fps, H.264 with AAC sound, made $(date -u +%Y-%m-%d)
-
+$about
 Drahtseilakt needs the player's own copy of Ballance for the original levels and never ships Ballance's data.
 Ballance is (c) 2004 Cyparade / Atari; this project is not affiliated with them.
 EOF2
