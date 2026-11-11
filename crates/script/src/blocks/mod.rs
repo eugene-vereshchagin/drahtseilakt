@@ -1,0 +1,595 @@
+// The building blocks the runtime knows, by prototype GUID, and the parameter operations. Each block reads its
+// active inputs (clearing them), its pins by name, acts through the host and activates its outputs. The list and
+// each block's standing: docs/drahtseilakt/scripts.md. A block met that is not here is reported by the runtime.
+
+use crate::exec::{Ent, Host, Runtime, Scratch};
+use crate::{Block, Guid, Id, ObjKind, Value, types};
+
+/// The longest string an operation builds.
+const MAX_STRING: usize = 1 << 16;
+
+/// What a block returns: done this tick, stays active for the next, or not known to the runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Flow {
+    Done,
+    Continue,
+    Unknown,
+}
+
+pub mod proto {
+    use super::Guid;
+    pub const OP: Guid = Guid(0x2d5d_6d01, 0x6a35_3eb0);
+    pub const OBJECT_DELETE: Guid = Guid(0x7412_0ded, 0x7652_4673);
+    pub const CHANGE_TEXTURE_VIDEO_FORMAT: Guid = Guid(0xf56d_92ef, 0x41eb_20c1);
+    pub const ACTIVATE_SCRIPT: Guid = Guid(0x4c7e_7bc3, 0x0b69_3155);
+    pub const DEACTIVATE_SCRIPT: Guid = Guid(0x1436_7c05, 0x635b_24f9);
+    pub const EXECUTE_SCRIPT: Guid = Guid(0x706c_5a40, 0x5bb3_1a0b);
+    pub const POINT_PARTICLE_SYSTEM: Guid = Guid(0x506b_40f7, 0x3085_2e46);
+    pub const PLANAR_PARTICLE_SYSTEM: Guid = Guid(0x4995_7bfe, 0x0ff2_7ffc);
+    pub const TT_SCALEABLE_PROXIMITY: Guid = Guid(0x2a2a_63ca, 0x0082_6175);
+    pub const PROXIMITY: Guid = Guid(0x5321_cacb, 0xdcdc_5213);
+    pub const GET_CELL: Guid = Guid(0x33b9_9f51, 0x07d9_5c45);
+    pub const SET_CELL: Guid = Guid(0x30ed_1c6d, 0x4a3b_7067);
+    pub const ADD_ROW: Guid = Guid(0x1c7e_5dc6, 0x3f64_23c2);
+    pub const GET_KEY_ROW: Guid = Guid(0x4906_4205, 0x10e7_2f7a);
+    pub const GET_ROW: Guid = Guid(0x33b7_7f41, 0x07b9_5c45);
+    pub const CLEAR_ARRAY: Guid = Guid(0x35c9_352f, 0x7b1a_193b);
+    pub const BINARY_SWITCH: Guid = Guid(0xeb50_6901, 0x984a_fccc);
+    pub const WAIT_MESSAGE: Guid = Guid(0x4587_ffee, 0x4587_ffdd);
+    pub const SEND_MESSAGE_TO_GROUP: Guid = Guid(0x5f90_6952, 0x6df1_1649);
+    pub const SEND_MESSAGE: Guid = Guid(0xa20e_8d5b, 0xdf00_2150);
+    pub const GROUP_ITERATOR: Guid = Guid(0x6050_252f, 0x3aa8_2d40);
+    pub const COLLECTION_ITERATOR: Guid = Guid(0x4196_02ec, 0x7822_779e);
+    pub const ITERATOR: Guid = Guid(0x198f_0af9, 0x0268_249f);
+    pub const PHYSICALIZE: Guid = Guid(0x7522_370e, 0x37ec_15ec);
+    pub const BOX_BOX_INTERSECTION: Guid = Guid(0x6415_4401, 0x76cf_37af);
+    pub const SET_POSITION: Guid = Guid(0xe456_e78a, 0x4567_89aa);
+    pub const SET_ORIENTATION: Guid = Guid(0x6258_74aa, 0xaa69_4132);
+    pub const SET_WORLD_MATRIX: Guid = Guid(0xaa4a_a6f0, 0xddef_def4);
+    pub const ROTATE: Guid = Guid(0xffff_ffee, 0xeeff_ffff);
+    pub const RESTORE_IC: Guid = Guid(0x766e_4e44, 0x4fac_6d52);
+    pub const TT_RESTORE_IC: Guid = Guid(0x7e0f_2f58, 0x232d_3109);
+    pub const SET_IC: Guid = Guid(0x7267_1a24, 0x161a_2347);
+    pub const KEEP_ACTIVE: Guid = Guid(0x7160_133a, 0x1f25_32fe);
+    pub const HIDE: Guid = Guid(0x31d9_7d82, 0x78d5_4d98);
+    pub const SHOW: Guid = Guid(0xa85a_213a, 0xef78_d52a);
+    pub const SWITCH_ON_PARAMETER: Guid = Guid(0x4c42_aace, 0x1da4_5635);
+    pub const DELAYER: Guid = Guid(0x15d4_72a5, 0x3bea_409f);
+    pub const TIMER: Guid = Guid(0xa2a5_a63a, 0xe4e7_e8e5);
+    pub const ACTIVATE_OBJECT: Guid = Guid(0x5f00_3fba, 0x5e57_4f60);
+    pub const DEACTIVATE_OBJECT: Guid = Guid(0x160f_4b7d, 0x67de_224e);
+    pub const OBJECT_COPY: Guid = Guid(0x3f6b_0ac7, 0x47d2_0f78);
+    pub const TEST: Guid = Guid(0x17d6_6d26, 0x726b_7dec);
+    pub const GET_CURRENT_CAMERA: Guid = Guid(0x368f_22b1, 0x2229_57e4);
+    pub const TEXT_DISPLAY: Guid = Guid(0xf22d_010a, 0xf2cd_010a);
+    pub const NOP: Guid = Guid(0x3025_61c4, 0x0d28_2980);
+    pub const WAVE_PLAYER: Guid = Guid(0x5bde_0e45, 0x2e21_07d5);
+    pub const IDENTITY: Guid = Guid(0x1515_1652, 0xaeef_ffd5);
+    pub const PARAMETER_SELECTOR: Guid = Guid(0x63eb_2b0c, 0x27e2_767e);
+    pub const KEY_EVENT: Guid = Guid(0x1af2_274b, 0x6b8c_1524);
+    pub const PER_SECOND: Guid = Guid(0x448e_54ce, 0x75a6_55c5);
+    pub const SET_PHYSICS_FORCE: Guid = Guid(0x56e2_0c57, 0x0b92_6068);
+    pub const CHANGE_TEXTURE_SIZE: Guid = Guid(0x7a7c_4d7b, 0x468d_0f33);
+    pub const SET_TEXTURE: Guid = Guid(0xeb12_3eb5, 0x5be3_21be);
+    pub const SET_DIFFUSE: Guid = Guid(0xe1e1_e1e1, 0x1e1e_1e1e);
+    pub const SET_EMISSIVE: Guid = Guid(0xd1d1_d1d1, 0x3030_3030);
+    pub const IS_IN_GROUP: Guid = Guid(0x58a1_210b, 0x14e5_715c);
+    pub const COUNTER: Guid = Guid(0x998f_000f, 0xf000_f899);
+    pub const BINARY_MEMORY: Guid = Guid(0xd02d_67dd, 0x1021_1fdd);
+    pub const GET_DELTA_TIME: Guid = Guid(0x47dc_3232, 0x64bf_203a);
+    pub const CHRONO: Guid = Guid(0x5e2f_1788, 0x4f96_5a44);
+    pub const WAIT_FOR_ALL: Guid = Guid(0xc044_a999, 0xfdfe_faf7);
+    pub const STREAMING_EVENT: Guid = Guid(0x1f0b_52bf, 0x4c33_42dd);
+    pub const SEQUENCER: Guid = Guid(0x4253_0844, 0x257b_6053);
+    pub const ADD_TO_GROUP: Guid = Guid(0x0002_4125, 0x7854_20ab);
+    pub const REMOVE_FROM_GROUP: Guid = Guid(0xd014_7412, 0x0258_520d);
+    pub const GROUP_CLEAR: Guid = Guid(0x1d12_662e, 0x4268_7a3c);
+    pub const BEZIER_PROGRESSION: Guid = Guid(0x6bb8_699a, 0x29fb_6a4b);
+    pub const LINEAR_PROGRESSION: Guid = Guid(0xfff4_5680, 0xaa51_2a39);
+    pub const INTERPOLATOR: Guid = Guid(0x3550_3950, 0x2dde_7a65);
+    pub const GET_COMPONENT: Guid = Guid(0x2689_057b, 0x1a1a_446a);
+    pub const SET_COMPONENT: Guid = Guid(0x6e80_0755, 0x57b6_4acb);
+    pub const RANDOM: Guid = Guid(0x0c62_2386, 0x1c30_54f7);
+    pub const RANDOM_SWITCH: Guid = Guid(0x79d7_2fde, 0x2e9d_0912);
+    pub const SET_EULER_ORIENTATION: Guid = Guid(0x0c49_66d8, 0x6c0c_6d14);
+    pub const SCALE: Guid = Guid(0x4123_6987, 0xa54a_87a6);
+    pub const TT_TIMER: Guid = Guid(0x6ac6_7901, 0x7d2a_6059);
+    pub const REMOVE_ROW: Guid = Guid(0x1fa5_7136, 0x1431_0857);
+    pub const ROW_SEARCH: Guid = Guid(0x7886_3443, 0x45af_59b6);
+    pub const GET_NEAREST_IN_GROUP: Guid = Guid(0x0852_07eb, 0x5849_50d8);
+    pub const OBJECT_RENAME: Guid = Guid(0x6f07_4ca7, 0x4542_7431);
+}
+
+mod absent;
+mod cameras;
+mod collisions;
+mod controllers;
+mod interface;
+mod logics;
+mod materials;
+mod narratives;
+mod physics;
+mod sounds;
+mod transfo3d;
+mod tt_particles;
+mod tt_toolbox;
+mod visuals;
+
+/// The player's building-block libraries (the DLLs in its `BuildingBlocks/`), which the registry's modules
+/// mirror, and the blocks found in maps but in none of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Library {
+    Logics,
+    Narratives,
+    Materials,
+    Transfo3d,
+    Visuals,
+    Collisions,
+    Cameras,
+    Controllers,
+    Interface,
+    Sounds,
+    Lights,
+    WorldEnvironments,
+    Addons1,
+    Physics,
+    TtToolbox,
+    TtGravity,
+    TtParticleSystems,
+    TtInterfaceManager,
+    TtDatabaseManager,
+    /// In none of the player's libraries: the original does nothing with such a block.
+    NotInPlayer,
+}
+
+impl Library {
+    /// The file the original loads the library from.
+    pub fn dll(self) -> &'static str {
+        match self {
+            Library::Logics => "Logics.dll",
+            Library::Narratives => "Narratives.dll",
+            Library::Materials => "Materials.dll",
+            Library::Transfo3d => "3DTransfo.dll",
+            Library::Visuals => "Visuals.dll",
+            Library::Collisions => "Collisions.dll",
+            Library::Cameras => "Cameras.dll",
+            Library::Controllers => "Controllers.dll",
+            Library::Interface => "Interface.dll",
+            Library::Sounds => "Sounds.dll",
+            Library::Lights => "Lights.dll",
+            Library::WorldEnvironments => "WorldEnvironments.dll",
+            Library::Addons1 => "BuildingBlocksAddons1.dll",
+            Library::Physics => "physics_RT.dll",
+            Library::TtToolbox => "TT_Toolbox_RT.dll",
+            Library::TtGravity => "TT_Gravity_RT.dll",
+            Library::TtParticleSystems => "TT_ParticleSystems_RT.dll",
+            Library::TtInterfaceManager => "TT_InterfaceManager_RT.dll",
+            Library::TtDatabaseManager => "TT_DatabaseManager_RT.dll",
+            Library::NotInPlayer => "-",
+        }
+    }
+}
+
+/// How far a declared block does what the original's does (docs/drahtseilakt/scripts.md, "Standing").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Standing {
+    Full,
+    /// Runs, with a limited effect (the engine service it needs is not there yet).
+    Partial,
+    /// Known and does nothing, as in the original (a block absent from the player's libraries).
+    NoOp,
+}
+
+/// Flags of a prototype's declaration: what its interface allows.
+pub mod flags {
+    /// The block may act on a target parameter of its own instead of the script's owner.
+    pub const TARGET: u32 = 1;
+    /// Inputs, input parameters or output parameters may be added by the map's author.
+    pub const VAR_INPUTS: u32 = 2;
+    pub const VAR_PINS: u32 = 4;
+    pub const VAR_POUTS: u32 = 8;
+}
+
+/// What happens to a block besides its run (the original's behaviour callback messages, CKM_BEHAVIOR*).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockEvent {
+    /// The block is put back to its start (its script is reset).
+    Reset,
+    /// The script holding the block becomes active, or inactive.
+    ActivateScript,
+    DeactivateScript,
+    /// The block's script is deleted.
+    Delete,
+    /// The block is a fresh copy (Object Copy of its script's owner).
+    Copy,
+}
+
+/// A block's run: reads its inputs and pins, acts, activates outputs. `proto` is the prototype it runs for
+/// (one function may serve several prototypes).
+pub type Run = fn(&mut Runtime, Id, &Block, Guid, &mut dyn Host) -> Flow;
+pub type OnEvent = fn(&mut Runtime, Id, &Block, BlockEvent, &mut dyn Host);
+
+/// A pin layout a prototype was saved with besides its current one (an older version of the block): chosen when
+/// the block's first input parameter is not of `first_pin`'s type.
+#[derive(Debug, Clone, Copy)]
+pub struct Layout {
+    pub first_pin_not: Guid,
+    pub pins: &'static [&'static str],
+}
+
+/// One building-block prototype: what it is, its interface and its functions.
+#[derive(Debug, Clone, Copy)]
+pub struct Proto {
+    pub guid: Guid,
+    pub name: &'static str,
+    pub library: Library,
+    /// Input and output parameters by index, as the prototype declares them (a block in a file may have more,
+    /// for a block with variable parameters, or carry its own names).
+    pub pins: &'static [&'static str],
+    pub pouts: &'static [&'static str],
+    pub flags: u32,
+    pub standing: Standing,
+    /// Older pin layouts of the same prototype.
+    pub layouts: &'static [Layout],
+    pub run: Run,
+    pub event: Option<OnEvent>,
+}
+
+impl Proto {
+    /// The pin layout this block was saved with: an older one when its first pin's type says so.
+    pub fn layout(&self, rt: &Runtime, b: &Block) -> &'static [&'static str] {
+        let first = b
+            .pins
+            .first()
+            .and_then(|&p| rt.graph.param(p))
+            .map(|p| p.guid);
+        for l in self.layouts {
+            if first.is_some_and(|g| g != l.first_pin_not) {
+                return l.pins;
+            }
+        }
+        self.pins
+    }
+}
+
+/// Every declared prototype, sorted by GUID for lookup.
+pub fn registry() -> &'static [Proto] {
+    static ALL: std::sync::OnceLock<Vec<Proto>> = std::sync::OnceLock::new();
+    ALL.get_or_init(|| {
+        let mut all: Vec<Proto> = [
+            absent::PROTOS,
+            cameras::PROTOS,
+            collisions::PROTOS,
+            controllers::PROTOS,
+            interface::PROTOS,
+            logics::PROTOS,
+            materials::PROTOS,
+            narratives::PROTOS,
+            physics::PROTOS,
+            sounds::PROTOS,
+            transfo3d::PROTOS,
+            tt_particles::PROTOS,
+            tt_toolbox::PROTOS,
+            visuals::PROTOS,
+        ]
+        .concat();
+        all.sort_by_key(|p| (p.guid.0, p.guid.1));
+        all
+    })
+}
+
+/// The declaration of a prototype, if the runtime knows it.
+pub fn find(guid: Guid) -> Option<&'static Proto> {
+    let all = registry();
+    all.binary_search_by_key(&(guid.0, guid.1), |p| (p.guid.0, p.guid.1))
+        .ok()
+        .and_then(|i| all.get(i))
+}
+
+/// Whether the runtime knows this prototype.
+pub fn known(guid: Guid) -> bool {
+    find(guid).is_some()
+}
+
+/// Runs one building block by its declaration; `Unknown` for a prototype not declared.
+pub fn run(rt: &mut Runtime, id: Id, b: &Block, proto: Guid, host: &mut dyn Host) -> Flow {
+    match find(proto) {
+        Some(p) => (p.run)(rt, id, b, proto, host),
+        None => Flow::Unknown,
+    }
+}
+
+/// Tells a block of an event, if its prototype handles it.
+pub fn event(rt: &mut Runtime, id: Id, b: &Block, e: BlockEvent, host: &mut dyn Host) {
+    if let Some(f) = b.proto.and_then(find).and_then(|p| p.event) {
+        f(rt, id, b, e, host);
+    }
+}
+
+/// Reads and clears input `i`.
+pub(crate) fn input(rt: &mut Runtime, b: &Block, i: usize) -> bool {
+    let Some(&io) = b.inputs.get(i) else {
+        return false;
+    };
+    let on = rt.io_active(io);
+    if on {
+        rt.set_io(io, false);
+    }
+    on
+}
+
+fn out(rt: &mut Runtime, b: &Block, i: usize) {
+    if let Some(&io) = b.outputs.get(i) {
+        rt.set_io(io, true);
+    }
+}
+
+fn pin(rt: &mut Runtime, b: &Block, name: &str, index: usize, host: &mut dyn Host) -> Value {
+    match rt.pin(b, name, index) {
+        Some(p) => rt.read(p, host),
+        None => Value::None,
+    }
+}
+
+fn set_pout(rt: &mut Runtime, b: &Block, name: &str, index: usize, v: Value) {
+    if let Some(p) = rt.pout(b, name, index) {
+        rt.write(p, v);
+    }
+}
+
+fn local(rt: &Runtime, b: &Block, index: usize) -> Value {
+    b.locals
+        .get(index)
+        .and_then(|&l| rt.values.get(l))
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// The target as an engine entity.
+fn target_ent(rt: &mut Runtime, b: &Block, host: &mut dyn Host) -> Option<Ent> {
+    let t = rt.target(b, host);
+    rt.ent(t)
+}
+
+/// A map array by object id: an index into the graph's arrays.
+fn array_of(rt: &Runtime, id: Option<Id>) -> Option<usize> {
+    match rt.graph.objects.get(id?)?.kind {
+        ObjKind::Array(i) => Some(i),
+        _ => None,
+    }
+}
+
+type Mat = [[f32; 4]; 4];
+
+fn mat_mul(a: &Mat, b: &Mat) -> Mat {
+    b.map(|bc| {
+        let mut out = [0.0f32; 4];
+        for (ak, &bk) in a.iter().zip(bc.iter()) {
+            for (o, &av) in out.iter_mut().zip(ak.iter()) {
+                *o += av * bk;
+            }
+        }
+        out
+    })
+}
+
+fn transform_dir(m: &Mat, p: [f32; 3]) -> [f32; 3] {
+    let mut out = [0.0f32; 3];
+    for (col, &pk) in m.iter().take(3).zip(p.iter()) {
+        for (o, &c) in out.iter_mut().zip(col.iter()) {
+            *o += c * pk;
+        }
+    }
+    out
+}
+
+fn transform_point(m: &Mat, p: [f32; 3]) -> [f32; 3] {
+    let d = transform_dir(m, p);
+    [d[0] + m[3][0], d[1] + m[3][1], d[2] + m[3][2]]
+}
+
+fn normalize(v: [f32; 3]) -> [f32; 3] {
+    let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if l > 1e-12 {
+        [v[0] / l, v[1] / l, v[2] / l]
+    } else {
+        v
+    }
+}
+
+fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+fn scale_of(m: &Mat) -> [f32; 4] {
+    m.map(|c| (c[0] * c[0] + c[1] * c[1] + c[2] * c[2]).sqrt())
+}
+
+/// Rotation by `angle` about `axis` (a unit vector), as a matrix.
+fn rotation(axis: [f32; 3], angle: f32) -> Mat {
+    let (s, c) = angle.sin_cos();
+    let t = 1.0 - c;
+    let [x, y, z] = axis;
+    [
+        [t * x * x + c, t * x * y + s * z, t * x * z - s * y, 0.0],
+        [t * x * y - s * z, t * y * y + c, t * y * z + s * x, 0.0],
+        [t * x * z + s * y, t * y * z - s * x, t * z * z + c, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+}
+
+/// The referential's matrix, or the world's.
+fn referential(
+    rt: &mut Runtime,
+    b: &Block,
+    name: &str,
+    index: usize,
+    host: &mut dyn Host,
+) -> Option<Mat> {
+    let r = pin(rt, b, name, index, host).as_obj();
+    let e = rt.ent(r)?;
+    host.matrix(e)
+}
+
+fn distance_sq(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let d = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    d[0] * d[0] + d[1] * d[1] + d[2] * d[2]
+}
+
+/// Compares as the original's comparison operator: 1 ==, 2 !=, 3 <, 4 <=, 5 >, 6 >=.
+fn compare(op: i32, a: &Value, b: &Value) -> bool {
+    match op {
+        1 => a.same(b),
+        2 => !a.same(b),
+        3 => a.as_float() < b.as_float(),
+        4 => a.as_float() <= b.as_float(),
+        5 => a.as_float() > b.as_float(),
+        6 => a.as_float() >= b.as_float(),
+        _ => false,
+    }
+}
+
+fn ent_name(rt: &Runtime, e: Option<Id>) -> String {
+    e.map(|i| rt.graph.name(i).to_string()).unwrap_or_default()
+}
+
+pub mod ops {
+    use super::Guid;
+    pub const ADD: Guid = Guid(0x33cc_6b49, 0x3589_282b);
+    pub const SUB: Guid = Guid(0x6764_1171, 0x6499_077a);
+    pub const MUL: Guid = Guid(0x3899_6b85, 0x334e_35c2);
+    pub const DIV: Guid = Guid(0x748c_3502, 0x0fea_0cf1);
+    pub const MOD: Guid = Guid(0x2a3f_4ab6, 0x753a_4a20);
+    pub const CONVERT: Guid = Guid(0x4280_09b4, 0x1caa_5c78);
+    pub const BY_NAME: Guid = Guid(0x5992_03f6, 0x23b0_6096);
+    pub const NAME: Guid = Guid(0x5939_156e, 0x62ab_3472);
+    pub const POSITION: Guid = Guid(0x4bc8_7aea, 0x6b5b_643e);
+    pub const CURRENT_MESH: Guid = Guid(0x6a5c_5061, 0x5efe_7428);
+    pub const WORLD_MATRIX: Guid = Guid(0x4728_51ba, 0x5ccc_2831);
+    pub const GET_Y: Guid = Guid(0x389f_72bd, 0x7aef_3482);
+    pub const LENGTH: Guid = Guid(0x556a_69af, 0x076e_3f09);
+    pub const ROW_COUNT: Guid = Guid(0xfb55_6b23, 0x69b2_2a75);
+    pub const GROUP_COUNT: Guid = Guid(0x44df_6f61, 0x5f8f_55c8);
+}
+
+fn is_float(g: Option<Guid>, v: &Value) -> bool {
+    matches!(g, Some(types::FLOAT) | Some(types::TIME)) || matches!(v, Value::Float(_))
+}
+
+pub(crate) fn arith(
+    f: fn(f32, f32) -> f32,
+    i: fn(i32, i32) -> i32,
+    a: &Value,
+    b: &Value,
+    floaty: bool,
+) -> Value {
+    match (a, b) {
+        (Value::Vec3(x), Value::Vec3(y)) => {
+            Value::Vec3([f(x[0], y[0]), f(x[1], y[1]), f(x[2], y[2])])
+        }
+        (Value::Vec3(x), s) | (s, Value::Vec3(x)) => {
+            let k = s.as_float();
+            Value::Vec3([f(x[0], k), f(x[1], k), f(x[2], k)])
+        }
+        // a string that doubles each time it is read would eat the memory: past the cap it stops growing
+        (Value::Str(x), _) if x.len() >= MAX_STRING => Value::Str(x.clone()),
+        (Value::Str(x), y) => Value::Str(format!("{x}{}", y.as_string())),
+        _ if floaty => Value::Float(f(a.as_float(), b.as_float())),
+        _ => Value::Int(i(a.as_int(), b.as_int())),
+    }
+}
+
+/// A parameter operation: the Op block's and the graphs' own. `out` and `a` are the output's and first input's
+/// types when known; a conversion goes by the output's type.
+pub fn operation(
+    rt: &mut Runtime,
+    host: &mut dyn Host,
+    guid: Guid,
+    out: Option<Guid>,
+    a_guid: Option<Guid>,
+    a: &Value,
+    b: &Value,
+) -> Value {
+    let floaty = is_float(out, a) || is_float(a_guid, a) || matches!(b, Value::Float(_));
+    match guid {
+        ops::ADD => arith(|x, y| x + y, i32::wrapping_add, a, b, floaty),
+        ops::SUB => arith(|x, y| x - y, i32::wrapping_sub, a, b, floaty),
+        ops::MUL => arith(|x, y| x * y, i32::wrapping_mul, a, b, floaty),
+        ops::DIV => {
+            // the original makes a zero divisor one and says so
+            let safe_f = |x: f32, y: f32| if y == 0.0 { x } else { x / y };
+            let safe_i = |x: i32, y: i32| x.checked_div(y).unwrap_or(x);
+            arith(safe_f, safe_i, a, b, floaty)
+        }
+        ops::MOD => {
+            let d = b.as_int();
+            Value::Int(a.as_int().checked_rem_euclid(d).unwrap_or(0))
+        }
+        ops::CONVERT | ops::BY_NAME => match out {
+            Some(types::FLOAT) | Some(types::TIME) => Value::Float(a.as_float()),
+            Some(types::INT) => Value::Int(a.as_int()),
+            Some(types::BOOL) => Value::Bool(a.as_bool()),
+            Some(types::STRING) => Value::Str(a.as_string()),
+            _ => match a {
+                Value::Str(name) => Value::Obj(rt.graph.find(name)),
+                v => v.clone(),
+            },
+        },
+        ops::NAME => Value::Str(ent_name(rt, a.as_obj())),
+        ops::POSITION => {
+            let e = rt.ent(a.as_obj());
+            match e.and_then(|e| host.matrix(e)) {
+                Some(m) => Value::Vec3([m[3][0], m[3][1], m[3][2]]),
+                None => Value::Vec3([0.0; 3]),
+            }
+        }
+        ops::WORLD_MATRIX => {
+            let e = rt.ent(a.as_obj());
+            e.and_then(|e| host.matrix(e))
+                .map_or(Value::None, Value::Matrix)
+        }
+        ops::CURRENT_MESH => {
+            let e = rt.ent(a.as_obj());
+            let mesh = e.and_then(|e| host.mesh_of(e));
+            Value::Obj(mesh.and_then(|m| {
+                rt.graph
+                    .objects
+                    .iter()
+                    .position(|o| o.kind == ObjKind::Mesh(m))
+            }))
+        }
+        ops::GET_Y => match a {
+            Value::Vec3(v) => Value::Float(v[1]),
+            Value::Obj(o) => {
+                let e = rt.ent(*o);
+                Value::Float(e.and_then(|e| host.matrix(e)).map_or(0.0, |m| m[3][1]))
+            }
+            v => Value::Float(v.as_float()),
+        },
+        ops::LENGTH => Value::Int(a.as_string().len() as i32),
+        ops::ROW_COUNT => {
+            Value::Int(array_of(rt, a.as_obj()).map_or(0, |i| rt.rows(i).len()) as i32)
+        }
+        ops::GROUP_COUNT => {
+            let n = match a
+                .as_obj()
+                .and_then(|x| rt.graph.objects.get(x))
+                .map(|o| o.kind)
+            {
+                Some(ObjKind::Group(g)) => host.group_members(g).len(),
+                _ => 0,
+            };
+            Value::Int(n as i32)
+        }
+        _ => {
+            host.note(&format!(
+                "script operation not known: {guid}; its first input is passed on"
+            ));
+            a.clone()
+        }
+    }
+}

@@ -23,3 +23,9 @@
 ## 地图现状
 
 184 张带脚本的地图（连同 `community-unsorted/` 共 584 张）：148 张只有模板，36 张有自己的脚本。173 张的所有构建块均为运行时所知；36 张自带脚本的地图中 8 张的每个构建块完整生效（AAAAAA Class Islands Scenery、Be Besieged on All Sides 2.0、Painstaking Journey、Queen Ball (Easy Ver.)、Take the leap、Traveling on Rubber Walls、Trial of the Ballance King、反向Level_11），17 张带有受限构建块（九张传送门地图：对象复制尚未实现，球的传送本身可用；脚本物理；纹理；按键）。11 张地图含未知构建块；工作顺序（组与渐变、脚本物理、复制、经引擎的声音与文字、外观、其余逻辑，“永不”：鼠标、字体、2D）见英文页。
+
+## 第 0 阶段（2026-11-11）：核心一致性
+
+**原型注册表**（`crates/script/src/blocks/`）：每个原型一条声明——GUID、名称、播放器的库、引脚模式、标志、完成程度、作为数据的旧引脚布局、运行函数和可选的事件函数。模块与播放器的库一一对应（`logics.rs` = Logics.dll、`narratives.rs` 等）。
+
+**播放器中没有的。** 地图中出现的八种构建块（Explode、Midi Player、Run VSL、Add/Remove/Select Mesh、Get Nearest Object、Object Rename `6f074ca7:45427431`）不在播放器的任何库中：原版里它们什么也不做。它们被声明为**具名空操作**（所有者 2026-11-11 的决定）：已知、清除输入、无输出、记一行日志。第二阶段写的 Object Rename 代码保留在 cargo 特性 `absent-as-authored`（关闭）之后，留给以后一个可选的“按作者本意”模组。

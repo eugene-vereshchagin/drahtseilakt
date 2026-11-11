@@ -110,6 +110,24 @@ the copies (the portals' particle frames); Attach Script, Object Create; sounds 
 player (`--autopilot`) does not know the portals: its way stops at one. A replay of a scripted map recorded
 before this change may play differently (the scripts now do more).
 
+## Stage 0 (2026-11-11): core conformance
+
+The first stage of porting the script system as a whole (not map by map): the core, so that every later block stands on the original's execution model.
+
+**The registry of prototypes** (`crates/script/src/blocks/`). One declaration per prototype: GUID, name, the
+player's library it lives in, the pin schema (input and output parameters by index, as the prototype names
+them), flags (targetable, variable inputs / pins / outputs), standing (full, partial, no-op), older pin layouts
+as data, the run function and an optional event function. The modules mirror the player's libraries
+(`logics.rs` = Logics.dll, `narratives.rs`, `transfo3d.rs`, `tt_toolbox.rs`, ...); a prototype not declared is
+reported once as before.
+
+**Not in the player.** Eight kinds found in maps have a GUID in none of the player's libraries: Explode, Midi
+Player, Run VSL, Add Mesh, Remove Mesh, Select Mesh, Get Nearest Object and Object Rename `6f074ca7:45427431`
+(Narratives.dll has a block of that name with another GUID). The original has no function for them, so they do
+nothing there. They are declared as **named no-ops** (owner's decision 2026-11-11): known, inputs cleared, no
+output, one log line. The Object Rename written in phase 2 stays in the code behind the cargo feature
+`absent-as-authored` (off), for a later optional mod that plays such maps as their authors meant.
+
 ## Hostile input
 
 A map comes from a stranger. Every list is capped (objects 2^20, array rows 2^16, 4096 messages a tick, 2000
@@ -124,7 +142,7 @@ file reader covers these classes too).
 `nmo-dump --scripts FILE` prints a map's blocks by prototype with counts. The table is over the owner's 584
 maps (`levels/community/` and `community-unsorted/`, 2026-11-09): 184 maps carry scripts, 148 of them only the
 template (the nine blocks plus Wait Message), 36 scripts of their own. *maps* = maps using the block, *blocks* =
-blocks in all maps. Status: **done** — runs with its effect; **partial** — runs, effect limited as said;
+blocks in all maps. Status: **no-op** — in none of the player's libraries, so the original does nothing with it; known and does nothing (section "Stage 0"); **done** — runs with its effect; **partial** — runs, effect limited as said;
 **planned** — not yet; **never** — the original's own interface (mouse, fonts, 2D text, camera, fog), replaced
 by the engine's.
 
@@ -190,8 +208,8 @@ by the engine's.
 | Set Light Color | `32115590:78951230` | 3 | 3 | planned |
 | Timer | `a2a5a63a:e4e7e8e5` | 3 | 4 | done |
 | Physics Impulse | `0c7e39bb:16db20d5` | 3 | 6 | planned |
-| Midi Player | `843cb43a:a12dac48` | 2 | 2 | planned |
-| Object Rename | `6f074ca7:45427431` | 2 | 4 | done |
+| Midi Player | `843cb43a:a12dac48` | 2 | 2 | no-op |
+| Object Rename | `6f074ca7:45427431` | 2 | 4 | no-op |
 | Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | never (the engine's own interface) |
 | 2D Text | `055b29fe:662d5ca0` | 2 | 2 | never (the engine's own interface) |
 | Fill Group By Class | `4445257b:70016c57` | 2 | 8 | planned |
@@ -226,7 +244,7 @@ by the engine's.
 | Set Specular | `20202020:30303030` | 1 | 1 | planned |
 | Write In Texture | `1d57024d:7c064238` | 1 | 1 | never (the engine's own interface) |
 | Show Mouse Cursor | `16f6368f:506b60fc` | 1 | 1 | never (the engine's own interface) |
-| Get Nearest Object | `4321abcd:0eeaabdd` | 1 | 1 | planned |
+| Get Nearest Object | `4321abcd:0eeaabdd` | 1 | 1 | no-op |
 | Input String | `693e7e4b:100104c4` | 1 | 1 | never (the engine's own interface) |
 | Mouse Cursor System | `2483576d:57c66324` | 1 | 1 | never (the engine's own interface) |
 | Mouse Cursor | `140c3eac:6e502a81` | 1 | 1 | never (the engine's own interface) |
@@ -264,7 +282,7 @@ by the engine's.
 | Scan String | `4afa2f11:034872e2` | 1 | 1 | planned |
 | Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |
 | Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | partial: accepted, no effect |
-| Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | planned |
+| Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | no-op |
 | Sort Rows | `6f623e68:62bb5a98` | 1 | 5 | planned |
 | Get Texture Info | `250c4d8d:288960d9` | 1 | 2 | planned |
 | Replace Texture | `?` | 1 | 1 | planned |
@@ -273,16 +291,16 @@ by the engine's.
 | Insert Column | `05cb7802:04a64a58` | 1 | 3 | planned |
 | Replace Material | `?` | 1 | 1 | planned |
 | Is Same Material | `?` | 1 | 1 | planned |
-| Add Mesh | `7a1d593e:12c5648d` | 1 | 1 | planned |
-| Remove Mesh | `0002145e:6e1b2592` | 1 | 4 | planned |
-| Select Mesh | `43890176:58b2244e` | 1 | 1 | planned |
+| Add Mesh | `7a1d593e:12c5648d` | 1 | 1 | no-op |
+| Remove Mesh | `0002145e:6e1b2592` | 1 | 4 | no-op |
+| Select Mesh | `43890176:58b2244e` | 1 | 1 | no-op |
 | Is Same Mesh | `?` | 1 | 1 | planned |
 | Switch On Key | `1f49612e:6cd63de0` | 1 | 2 | never (the engine's own interface) |
 | Wait For All | `c044a999:fdfefaf7` | 1 | 1 | done |
 | Key Waiter | `016d010b:017d010b` | 1 | 1 | never (the engine's own interface) |
 | Delete Dynamic Objects | `0cba3195:53440e4c` | 1 | 1 | planned |
 | Random Switch | `79d72fde:2e9d0912` | 1 | 1 | done (the same generator) |
-| Explode | `002d010a:003d010a` | 1 | 1 | planned |
+| Explode | `002d010a:003d010a` | 1 | 1 | no-op |
 
 ## Where the maps stand
 

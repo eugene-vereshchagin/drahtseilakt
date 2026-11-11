@@ -1159,3 +1159,21 @@ fn an_object_with_very_many_scripts_neither_stalls_the_load_nor_a_copy() {
     assert!(t.elapsed() < limit, "256 copies took {:?}", t.elapsed());
     assert!(rt.graph.nodes.len() <= crate::MAX_OBJECTS);
 }
+
+#[test]
+fn the_registry_declares_each_prototype_once_in_its_library() {
+    use crate::blocks::{Library, Standing, find, registry};
+    let all = registry();
+    for w in all.windows(2) {
+        assert_ne!(w[0].guid, w[1].guid, "{} declared twice", w[0].name);
+    }
+    // the 80 kinds known before the registry, plus the 7 absent ones besides Object Rename
+    assert_eq!(all.len(), 87);
+    for p in all {
+        assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
+        assert_eq!(p.library == Library::NotInPlayer, p.standing == Standing::NoOp, "{}", p.name);
+    }
+    assert_eq!(find(proto::OBJECT_RENAME).map(|p| p.standing), Some(Standing::NoOp));
+    assert_eq!(find(proto::DELAYER).map(|p| p.library.dll()), Some("Logics.dll"));
+    assert!(find(Guid(1, 2)).is_none());
+}

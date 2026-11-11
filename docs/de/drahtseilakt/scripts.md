@@ -59,3 +59,15 @@ neun Portal-Karten: die Objektkopie fehlt noch, das Versetzen der Kugel läuft; 
 Tasten). 11 Karten haben unbekannte Bausteine; die Reihenfolge der Arbeit (Gruppen und Progressionen, Physik per
 Skript, Kopien, Klang und Text durch die Engine, Aussehen, übrige Logik, „nie": Maus, Schriften, 2D) steht auf der
 englischen Seite.
+
+## Stufe 0 (2026-11-11): Konformität des Kerns
+
+**Das Register der Prototypen** (`crates/script/src/blocks/`): eine Deklaration je Prototyp — GUID, Name,
+Bibliothek des Players, Pin-Schema, Flags, Stand, ältere Pin-Layouts als Daten, Laufzeitfunktion und optionale
+Ereignisfunktion. Die Module spiegeln die Bibliotheken des Players (`logics.rs` = Logics.dll, `narratives.rs`, ...).
+
+**Nicht im Player.** Acht Bausteinarten aus Karten (Explode, Midi Player, Run VSL, Add/Remove/Select Mesh, Get
+Nearest Object, Object Rename `6f074ca7:45427431`) stehen in keiner Bibliothek des Players: im Original tun sie
+nichts. Sie sind als **benannte No-ops** deklariert (Entscheidung des Eigentümers 2026-11-11): bekannt, Eingänge
+gelöscht, keine Ausgabe, eine Logzeile. Der Object-Rename-Code aus Phase 2 bleibt hinter dem Cargo-Feature
+`absent-as-authored` (aus), für einen späteren optionalen Mod „wie der Autor es meinte".

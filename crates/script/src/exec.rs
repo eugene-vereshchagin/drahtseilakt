@@ -279,6 +279,14 @@ impl Runtime {
         Some(new_id)
     }
 
+    /// A line for the log, said once per key (a prototype) in a run.
+    pub(crate) fn report_once(&mut self, key: crate::Guid, host: &mut dyn Host, text: &str) {
+        if !self.unknown.contains(&key) {
+            self.unknown.push(key);
+            host.note(text);
+        }
+    }
+
     /// Spends one unit of the tick's work; false when none is left.
     fn spend(&mut self) -> bool {
         match self.budget.checked_sub(1) {
@@ -620,8 +628,10 @@ impl Runtime {
         }
     }
 
-    /// Object Rename: the object answers to the new name from now on (a name is kept to 256 bytes).
-    pub fn rename(&mut self, object: Id, name: &str) {
+    /// Object Rename as its author meant it (only behind the `absent-as-authored` feature: the player has no such
+    /// block, docs/drahtseilakt/scripts.md): the object answers to the new name from now on (a name is kept to 256 bytes).
+    #[cfg_attr(not(feature = "absent-as-authored"), allow(dead_code))]
+    pub(crate) fn rename(&mut self, object: Id, name: &str) {
         if object >= self.graph.objects.len() {
             return;
         }
