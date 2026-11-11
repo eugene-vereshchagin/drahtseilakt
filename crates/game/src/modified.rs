@@ -299,6 +299,7 @@ pub fn sample_packages() -> Vec<Package> {
                     author: name.author.clone(),
                     version: None,
                     posted: None,
+                    report: None,
                     titles,
                     order: None,
                     hidden: false,

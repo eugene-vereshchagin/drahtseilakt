@@ -3,6 +3,10 @@
 How the game keeps its levels, agreed with the owner on 2026-11-02 (decisions.md, "Levels live in one folder,
 four kinds"). The menus that show them are in [menu.md](menu.md).
 
+## The map check
+
+After `drahtseilakt-toolbox import-maps` the game checks every map it made (`drahtseilakt --audit-report DIR|FILE`, the audit of `--audit`) and writes `report.txt` beside it: the audit's kinds of issue with their counts. The list of downloaded maps words it in the player's language under the chosen map: a verdict (plays fully, plays with differences, may not be passable, does not load) and up to three lines, for example scripts the game does not know, script-driven parts that stand still, missing textures drawn in plain colour, sounds of the scripts not played. The lines are a table over the audit's kinds (crates/game/src/report.rs), never over maps; a kind the audit gains is counted as "other", and a script block that becomes known disappears from the report at the next check.
+
 ## The folders
 
 All levels sit in one folder, `levels/`, in the game's data folder (`~/.local/share/drahtseilakt/` on Linux,

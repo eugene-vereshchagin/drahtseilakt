@@ -50,6 +50,7 @@ mod playtime;
 mod proximity;
 mod render;
 mod replay;
+mod report;
 mod retro;
 mod scene;
 mod scripting;
@@ -124,6 +125,9 @@ usage: drahtseilakt [options]
                       objects and modes not read; prints a summary by the number of maps hit (may be repeated)
   --show-colliders    draw the floors and rails a map hides (red) and its hidden stoppers (yellow) as translucent
                       shapes: what stops the ball without being seen
+  --audit-report FILE|DIR
+                      no window: check a map or a folder of them and write report.txt beside each level (what the
+                      game does not support yet in it, read by the menu); prints a verdict per map (may be repeated)
   --audit-csv FILE    with --audit: write one row per map, copy and kind of issue (with the names) to FILE
   --supports-check geometry|runs
                       where the swinging sacks get a support (the sack-supports mod) in the original levels and the
@@ -211,6 +215,8 @@ pub struct Options {
     /// No window: audit these maps (files or folders of them) for what is not drawn or not there (audit.rs).
     pub audit: Vec<PathBuf>,
     pub audit_csv: Option<PathBuf>,
+    /// No window: check these maps and write report.txt beside each (report.rs).
+    pub audit_report: Vec<PathBuf>,
     /// Draw the floors, rails and stoppers a map hides as translucent markers.
     pub show_colliders: bool,
 }
@@ -261,6 +267,7 @@ fn parse_args() -> Result<Options, String> {
         supports_check: None,
         audit: Vec::new(),
         audit_csv: None,
+        audit_report: Vec::new(),
         show_colliders: false,
     };
     // `--name=value` is the same as `--name value` (handy for values that start with a minus).
@@ -360,6 +367,7 @@ fn parse_args() -> Result<Options, String> {
             "--no-debug" => debug = Some(false),
             "--show-colliders" => o.show_colliders = true,
             "--audit" => o.audit.push(value()?.into()),
+            "--audit-report" => o.audit_report.push(value()?.into()),
             "--audit-csv" => o.audit_csv = Some(value()?.into()),
             "--level-stats" => o.level_stats = Some(value()?.into()),
             "--supports-check" => {
@@ -450,6 +458,7 @@ fn parse_args() -> Result<Options, String> {
         || o.frames.is_some()
         || o.screenshot.is_some()
         || !o.audit.is_empty()
+        || !o.audit_report.is_empty()
         || o.export.is_some();
     o.debug = debug.unwrap_or(DEBUG_BY_DEFAULT && !unattended);
     Ok(o)

@@ -14,6 +14,15 @@ pub const TITLE_MAX: usize = 40;
 pub const FIELD_MAX: usize = 40;
 /// A level's own description of itself: `key = value` lines (title, author, version).
 pub const INFO_FILE: &str = "level.txt";
+/// The map check's result beside a level (written by `drahtseilakt --audit-report`): `kind = count` lines, the audit's
+/// kinds of issue; the game words them in the player's language (crates/game/src/report.rs).
+pub const REPORT_FILE: &str = "report.txt";
+/// The largest report.txt read, the most lines taken and the longest kind.
+pub const REPORT_MAX: u64 = 4096;
+const REPORT_LINES: usize = 64;
+const KIND_MAX: usize = 40;
+/// The largest count kept (a count beyond it is a hostile file's).
+const COUNT_MAX: usize = 1_000_000_000;
 /// The largest level.txt read; a larger one is ignored as not ours.
 pub const INFO_MAX: u64 = 4096;
 /// Entries of a levels folder looked at, and of each level's folder.
@@ -49,6 +58,8 @@ pub struct Package {
     pub difficulty: Option<u8>,
     /// level.txt gives its title (else it is named by its folder or file, and listed after the titled ones).
     pub titled: bool,
+    /// The map check beside it (report.txt): (kind of issue, how many); none when it was never checked.
+    pub report: Option<Vec<(String, usize)>>,
 }
 
 impl Package {
@@ -158,6 +169,7 @@ pub fn examine(folder: &Path) -> Result<Package, Skipped> {
         author: info.author,
         version: info.version,
         posted: info.posted,
+        report: read_report(&folder.join(REPORT_FILE)),
         titles: info.titles,
         order: info.order,
         hidden: info.hidden,
@@ -177,6 +189,7 @@ fn loose(file: &Path) -> Package {
         author: None,
         version: None,
         posted: None,
+        report: None,
         titles: Vec::new(),
         order: None,
         hidden: false,
@@ -263,6 +276,40 @@ pub fn info_of(level: &Path) -> Info {
         Some((f, Ok(p))) if p.level == level => read_info(&f.join(INFO_FILE)),
         _ => Info::default(),
     }
+}
+
+/// What a report.txt's bytes say: `kind = count` lines (a kind is lowercase letters and dashes); nothing for a file
+/// that is not one. A stranger's folder may hold anything, so lines, kinds and counts are capped.
+pub fn parse_report(bytes: &[u8]) -> Option<Vec<(String, usize)>> {
+    let text = String::from_utf8_lossy(bytes);
+    let mut out: Vec<(String, usize)> = Vec::new();
+    let mut seen = false;
+    for line in text.lines().take(REPORT_LINES) {
+        let line = line.trim();
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
+        seen = true;
+        let Some((kind, count)) = line.split_once('=') else {
+            continue;
+        };
+        let kind = kind.trim();
+        let ok = !kind.is_empty()
+            && kind.len() <= KIND_MAX
+            && kind.bytes().all(|b| b.is_ascii_lowercase() || b == b'-');
+        if let (true, Ok(n)) = (ok, count.trim().parse::<usize>())
+            && n <= COUNT_MAX
+            && !out.iter().any(|(k, _)| k == kind)
+        {
+            out.push((kind.to_owned(), n));
+        }
+    }
+    // a file with lines but no kind is not a report; an empty one (only the comment) is a clean map
+    (out.is_empty() == !seen).then_some(out)
+}
+
+fn read_report(path: &Path) -> Option<Vec<(String, usize)>> {
+    parse_report(&read_small(path, REPORT_MAX)?)
 }
 
 /// The easiest and hardest a level.txt's `difficulty` says.
@@ -827,5 +874,15 @@ mod tests {
         // outside the levels folders a level is named by its file
         assert_eq!(title_of(&d.join("Level_07.NMO"), &[], "en"), "Level_07");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_report_is_kinds_and_counts_and_hostile_lines_are_dropped() {
+        let r = parse_report(b"# note\ntexture-missing = 5\nBad Kind = 2\ntexture-missing = 9\nx = -1\nsound-unplayed = 2000000000000\n");
+        assert_eq!(r, Some(vec![("texture-missing".to_owned(), 5)]));
+        // only the comment: a map with nothing to report
+        assert_eq!(parse_report(b"# clean\n"), Some(vec![]));
+        // lines but no kind: not a report
+        assert_eq!(parse_report(b"hello\n"), None);
     }
 }
