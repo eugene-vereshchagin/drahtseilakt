@@ -373,6 +373,8 @@ impl MenuScene {
                 eye,
                 target,
                 fov_y: self.fov_y,
+                near: 0.5,
+                far: 3000.0,
             };
             return (inst, particles, view);
         }
@@ -391,6 +393,8 @@ impl MenuScene {
                 eye,
                 target,
                 fov_y: self.fov_y,
+                near: 0.5,
+                far: 3000.0,
             },
         )
     }

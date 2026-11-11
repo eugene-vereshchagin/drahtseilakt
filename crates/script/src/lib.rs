@@ -12,7 +12,7 @@ pub mod ops;
 mod runtime_tests;
 pub mod types;
 
-pub use exec::{Ent, Host, Quiet, Runtime, SoundCmd};
+pub use exec::{CameraChange, CameraState, Ent, Host, Quiet, Runtime, SoundCmd};
 pub use input::InputFrame;
 pub use nmo::behavior::Guid;
 

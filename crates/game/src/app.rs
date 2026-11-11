@@ -4713,7 +4713,8 @@ impl App {
             }
             return;
         };
-        self.script_voices.frame(audio, &self.data, &mut self.game.sim);
+        self.script_voices
+            .frame(audio, &self.data, &mut self.game.sim);
         for cmd in self.game.sound_out.drain(..) {
             match cmd {
                 SoundCmd::Play(name, volume) => drop(audio.play(&self.data, name, volume, 0.0)),

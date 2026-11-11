@@ -1850,3 +1850,13 @@ cursor by Show. The cursor is the window's only: no gameplay effect.
 
 Not in the C reference. By policy the engine draws its own interface: these only fire Out on In, and when their
 first input parameter is a Boolean it shows or hides the system cursor as Show Mouse Cursor does. Nothing else.
+
+## Cameras
+
+Cameras.dll blocks (`crates/script/src/blocks/cameras.rs`). They change the view only, never the simulation.
+
+- **Get Current Camera**: on its input, writes the camera object (none: the game's own camera) and its position.
+- **Set As Active Camera**: attaches the view to the target object; the view sits at its place and looks along its z axis.
+- **Set Clipping Planes**: sets near and far (defaults 0.1 and 200); applied only when near > 0 and far > near.
+- **Set FOV** (`aaaacccc:aaaacccc`): pin Angle in radians across the 4:3 view (InGameCam's is 1.0123); the host clamps it to 1..179 degrees. Applied to the active view whatever the target.
+- A run starts with the original camera; a new run (restart, or a rewind that rebuilds the run) starts without these changes.

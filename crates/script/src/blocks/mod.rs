@@ -61,6 +61,9 @@ pub mod proto {
     pub const OBJECT_COPY: Guid = Guid(0x3f6b_0ac7, 0x47d2_0f78);
     pub const TEST: Guid = Guid(0x17d6_6d26, 0x726b_7dec);
     pub const GET_CURRENT_CAMERA: Guid = Guid(0x368f_22b1, 0x2229_57e4);
+    pub const SET_AS_ACTIVE_CAMERA: Guid = Guid(0x368f_0ab1, 0x2d89_57e4);
+    pub const SET_CLIPPING_PLANES: Guid = Guid(0x6523_16a2, 0x01aa_09a9);
+    pub const SET_FOV: Guid = Guid(0xaaaa_cccc, 0xaaaa_cccc);
     pub const TEXT_DISPLAY: Guid = Guid(0xf22d_010a, 0xf2cd_010a);
     pub const NOP: Guid = Guid(0x3025_61c4, 0x0d28_2980);
     pub const WAVE_PLAYER: Guid = Guid(0x5bde_0e45, 0x2e21_07d5);

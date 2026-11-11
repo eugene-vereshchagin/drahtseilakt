@@ -1456,7 +1456,10 @@ impl Sim {
 
     /// The lengths of the sounds a map's scripts play, in ticks by lower-case file stem (the sound set's own: scripts
     /// wait on them, so they are part of the run's rules). A file not in it is silent.
-    pub fn set_sound_ticks(&mut self, ticks: std::sync::Arc<std::collections::HashMap<String, u64>>) {
+    pub fn set_sound_ticks(
+        &mut self,
+        ticks: std::sync::Arc<std::collections::HashMap<String, u64>>,
+    ) {
         if let Some(s) = &mut self.scripts {
             s.sound.ticks = ticks;
         }
@@ -1478,6 +1481,18 @@ impl Sim {
         self.input_now = frame;
     }
 
+    /// The camera the scripts changed for this run (the default without scripts).
+    pub fn script_camera(&self) -> crate::scripting::CameraOverride {
+        self.scripts
+            .as_ref()
+            .map_or_else(Default::default, |s| s.camera)
+    }
+
+    /// The world matrix of a level object as the scripts have it (none without scripts).
+    pub fn script_object_matrix(&self, i: usize) -> Option<Mat4> {
+        self.scripts.as_ref()?.object_matrix(i)
+    }
+
     /// One tick of the map's scripts, before the physics (the original runs its behaviours first in a frame); a
     /// script that sets the ball's position puts a new ball there at rest, as the original re-physicalizes it.
     fn run_scripts(&mut self) {
@@ -1494,6 +1509,8 @@ impl Sim {
             input: self.input_now,
             input_before: self.input_before,
             cursor: None,
+            eye: self.camera.position,
+            target: self.camera.target,
         };
         scripts.tick(&mut view);
         if view.cursor.is_some() {

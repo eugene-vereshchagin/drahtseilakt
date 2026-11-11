@@ -146,6 +146,8 @@ pub struct View {
     pub eye: Vec3,
     pub target: Vec3,
     pub fov_y: f32,
+    pub near: f32,
+    pub far: f32,
 }
 
 #[repr(C)]
@@ -1207,7 +1209,7 @@ impl Renderer {
         particles: &[crate::particles::Batch],
     ) {
         let aspect = width.max(1) as f32 / height.max(1) as f32;
-        let proj = perspective_lh(view.fov_y, aspect, 0.5, 3000.0);
+        let proj = perspective_lh(view.fov_y, aspect, view.near, view.far);
         let look = look_at_lh(view.eye, view.target, Vec3::Y);
         let fog = self.fog.filter(|_| !self.menu_frame);
         let globals = Globals {
