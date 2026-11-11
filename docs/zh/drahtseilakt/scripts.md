@@ -59,3 +59,5 @@
 - **属性**（`crates/script/src/blocks/attributes.rs`）：Has、Set、Remove Attribute 和 Objects With Attribute Iterator 作用于运行中每个对象的属性表
   （先是文件自带的，从标识符 `0x11` 谨慎读取，见 [ck-runtime.md](../../ck-runtime.md)；有上限；随运行回滚）。属性的名称和类型需要属性管理器的
   数据块，目前仍被跳过：属性即其文件索引。
+
+**输入**（格式 11）：整个键盘（DirectInput 扫描码）和鼠标（原版 640x480 画面内的位置、按键）属于一次运行的输入流；游戏把它们的变化记入回放（`keys` 与 `mouse` 行），回放时脚本得到记录的输入，而不是实机输入。格式 10 及更早的回放给脚本空键盘和静止的鼠标。模块：Key Event、Key Waiter、Switch On Key、Mouse Waiter、Input String（最多 256 个字符）、Show Mouse Cursor、Mouse Cursor、Mouse Cursor System（仅窗口光标）。

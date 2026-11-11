@@ -157,6 +157,11 @@ pub struct RunView {
     pub in_play: bool,
     /// Where a script put the ball this tick, to be applied by the run.
     pub teleport: Option<Vec3>,
+    /// The keyboard and the mouse of this tick and of the tick before (the run's input stream).
+    pub input: script::InputFrame,
+    pub input_before: script::InputFrame,
+    /// What the scripts asked of the system's mouse cursor this tick: shown or hidden.
+    pub cursor: Option<bool>,
 }
 
 /// The level's materials as the operations read them.
@@ -206,6 +211,18 @@ fn to_mat(m: &[[f32; 4]; 4]) -> Mat4 {
 impl Host for SimHost<'_> {
     fn delta_ms(&self) -> f32 {
         crate::sim::TICK * 1000.0
+    }
+
+    fn input(&self) -> script::InputFrame {
+        self.run.input
+    }
+
+    fn input_before(&self) -> script::InputFrame {
+        self.run.input_before
+    }
+
+    fn show_cursor(&mut self, on: bool) {
+        self.run.cursor = Some(on);
     }
 
     fn matrix(&self, e: Ent) -> Option<[[f32; 4]; 4]> {

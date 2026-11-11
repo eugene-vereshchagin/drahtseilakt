@@ -152,3 +152,5 @@ daher werden Schleifen an der Grenze nicht verglichen. Stufe 3 (ganze Karten) fo
   Iterator auf einer Attribut-Karte je Objekt im Lauf (zuerst die der Datei, defensiv aus Kennung `0x11` gelesen,
   [ck-runtime.md](../../ck-runtime.md); begrenzt; mit dem Lauf zurückgespult). Namen und Typen der Attribute brauchen den
   Chunk des Attributmanagers, der noch übersprungen wird: ein Attribut ist sein Dateiindex.
+
+**Eingabe** (Format 11): die ganze Tastatur (DirectInput-Scancodes) und die Maus (Position im 640x480-Bild des Originals, Tasten) gehören zum Eingabestrom eines Laufs; das Spiel zeichnet ihre Änderungen im Replay auf (Zeilen `keys` und `mouse`), und beim Abspielen sehen die Skripte die aufgezeichnete Eingabe, nie die Maschine. Replays ab Format 10 abwärts geben den Skripten eine leere Tastatur und eine ruhende Maus. Blöcke: Key Event, Key Waiter, Switch On Key, Mouse Waiter, Input String (höchstens 256 Zeichen), Show Mouse Cursor, Mouse Cursor, Mouse Cursor System (nur der Fenstercursor).

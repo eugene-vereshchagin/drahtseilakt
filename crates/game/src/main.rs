@@ -10,6 +10,7 @@
 
 mod app;
 mod audit;
+mod dik;
 use gamedata::assets;
 mod audio;
 mod autopilot;

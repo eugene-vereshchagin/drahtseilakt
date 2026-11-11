@@ -82,6 +82,8 @@ struct Game {
     pub view_turn: u16,
     /// Input bits a mod's key asked for, pressed at the next tick only (the spawn point's, `input::SPAWN_*`).
     pulse: u8,
+    /// The live keyboard and mouse for the scripts, set by the window each frame; a replay brings its own.
+    pub live_input: script::InputFrame,
     /// Where the run begins when not at the level start (--sector, --at, --ball, or the replay's).
     start: Option<crate::replay::Start>,
     record: Option<PathBuf>,
@@ -325,6 +327,7 @@ impl Game {
             replay_out,
             view_turn: 0,
             pulse: 0,
+            live_input: script::InputFrame::default(),
             start,
             record: o.record.clone(),
             ball_lost_at: None,
@@ -637,6 +640,13 @@ impl Game {
             None => self.view_turn,
         };
         self.sim.turn = turn;
+        // the scripts' keyboard and mouse: the replay's, else the window's; recorded with the run
+        let frame = match &self.replay_in {
+            Some(r) if next <= r.end => r.frame_at(next),
+            Some(_) => script::InputFrame::default(),
+            None => self.live_input.clamped(),
+        };
+        self.sim.set_input(frame);
         self.sim.step(input);
         self.effects.tick(&self.sim);
         if self.sim.drawn_ball() == Some(self.sim.ball.kind) && !self.sim.game_over {
@@ -667,6 +677,7 @@ impl Game {
         }
         self.replay_out.record(self.sim.tick, input);
         self.replay_out.record_turn(self.sim.tick, turn);
+        self.replay_out.record_frame(self.sim.tick, frame);
         self.log_tick(input);
         self.dump_spin_loss();
         let ball = &self.sim.ball;
@@ -1504,6 +1515,7 @@ fn window(
         pad_keys: 0,
         pad_held: false,
         cursor: None,
+        mouse_down: 0,
         wheel: 0.0,
         cursor_shown: None,
         resolutions: crate::options::WINDOWED.to_vec(),
@@ -3800,6 +3812,8 @@ struct App {
     pad_held: bool,
     /// The mouse's cursor in the window (pixels), while it is over it.
     cursor: Option<(f64, f64)>,
+    /// The mouse buttons down (`script::input::LEFT` and the others), for the scripts.
+    mouse_down: u8,
     /// The wheel's turn not yet a whole notch (a touchpad's pixels come in small steps).
     wheel: f64,
     /// The cursor is shown (menus) or hidden (the run); None until first set.
@@ -5784,6 +5798,13 @@ impl App {
                 continue;
             }
             self.prev = Some(Snapshot::of(&self.game.sim));
+            // the scripts' keyboard and mouse, as they are at this tick
+            let size = self
+                .gpu
+                .as_ref()
+                .map_or((0, 0), |g| (g.config.width, g.config.height));
+            self.game.live_input =
+                crate::dik::frame_of(&self.held, self.cursor, size, self.mouse_down);
             // the gamepads press the same keys; the camera's turn inverted as chosen
             self.game
                 .tick(self.bindings.turn(self.keys | self.pad_keys));
@@ -6273,7 +6294,9 @@ impl App {
 
     /// The cursor shown over the menus and hidden in the run (and while a level loads); never confined.
     fn show_cursor(&mut self) {
-        let shown = self.menu.is_some() && self.loading.is_none();
+        // a map's script may ask for the cursor in the run (Show Mouse Cursor): the window's cursor only
+        let shown = (self.menu.is_some() && self.loading.is_none())
+            || (self.menu.is_none() && self.game.sim.script_cursor == Some(true));
         if self.cursor_shown != Some(shown)
             && let Some(w) = &self.window
         {
@@ -6369,7 +6392,15 @@ impl ApplicationHandler for App {
                 state: ElementState::Pressed,
                 button,
                 ..
-            } => self.mouse_button(button, event_loop),
+            } => {
+                self.mouse_down |= crate::dik::button_bit(button);
+                self.mouse_button(button, event_loop)
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Released,
+                button,
+                ..
+            } => self.mouse_down &= !crate::dik::button_bit(button),
             WindowEvent::MouseWheel { delta, .. } => self.mouse_wheel(delta, event_loop),
             // a key let go while the window was not ours may never be reported released
             WindowEvent::Focused(false) => self.held.clear(),

@@ -1781,3 +1781,72 @@ The oracle (`switch_on_message`, Send Message and Broadcast Message as drivers, 
 The C reference files an activation request (the script starts in the next frame, like Activate Script). Our notes
 (docs/drahtseilakt/scripts.md, stage 0; scripts-port-plan.md item 18) have it run the script at once inside the
 caller's frame, as `CKBehavior::Execute` does; the notes win, so the oracle does not compare this block.
+
+## Input blocks (Controllers.dll and friends): keys, mouse, text
+
+Source: the C reference `src/bb/bb_controllers.c`, `bb_tt_misc.c` (Input String) and `bb_environment.c` (Show Mouse
+Cursor), read, not copied. All of them read the keyboard and the mouse of **the current tick from the run's input
+stream** (replay format 11, `docs/drahtseilakt/scripts.md` "Input"), never from the live machine. Keys are
+DirectInput scan codes (0 to 255). "Just pressed" means down in this tick and up in the tick before. The mouse is in
+the original's 640x480 frame; buttons are left, right, middle.
+
+### Key Event `1af2274b:6b8c1524`
+
+Inputs On, Off; outputs Pressed, Released; input parameters: one per key waited (any number, a key code each);
+output parameter Key State. Off (checked first) clears itself and ends the block. On clears itself and sets Key State
+to FALSE. Then, each tick while active: if all the keys of the input parameters are down and the state is FALSE, the
+state becomes TRUE and Pressed fires; if one is up and the state is TRUE, it becomes FALSE and Released fires. Key
+State is written each tick. The block stays active. With no key pins the "all keys down" test holds from the start
+(Pressed fires once after On).
+
+### Key Waiter `016d010b:017d010b`
+
+Input In; output Out; input parameter Key; output parameter Key; local 0 "Wait For Any Key". While the input is
+active: with Wait For Any Key, the first key (lowest scan code, 1 to 255) just pressed clears the input, fires Out and
+gives its code to the output parameter Key; otherwise, if the key of the input parameter is down, the input clears
+and Out fires. If nothing matches the block stays active and looks again next tick.
+
+### Switch On Key `1f49612e:6cd63de0`
+
+Not in the C reference. Modelled on Switch On Message: inputs On, Off; one input parameter per output, each a key
+code; output i fires in the tick its key is just pressed. Off ends the block, On is cleared; the block stays active.
+(No instance of it was checked against a real file's pin layout; any extra pins are keys by position.)
+
+### Mouse Waiter `014d010b:015d010b`
+
+Inputs On, Off; locals 0 "Off input exists" (default 1), 1 the mask of outputs that exist (default 0xffff; bit 0 Move,
+then pairs of bits Pressed/Released for left (bits 1, 2), right (3, 4), middle (5, 6); bit 7 wheel, not fired here);
+outputs exist in that order, only those whose bit is set. Output parameters: Mouse Position (Vector 2D), Wheel
+Direction (0 here: the stream has no wheel), Left Button, Middle Button, Right Button. On clears itself; Off (when it
+exists) clears itself and ends. Each tick while active: the previous position and button values are those the output
+parameters held; the position and the three buttons are written; Move fires when the position changed, a Pressed
+output when the button went from up to down, Released when from down to up. The block stays active.
+
+### Input String `693e7e4b:100104c4`
+
+Inputs On, Off; outputs On, Off, Updated String (called the 3 outputs 0, 1, 2); input parameters Reset String and End
+Key (used when Multiline); output parameters String, Key. Locals: 0 Max Size (default 32; this port clamps it to
+1..256, a bounded string), 1 Keyboard Repetition (no source: ignored), 2 Multiline, 3 Disable Keyboard Section (bit 0
+the numeric keypad, bit 1 the cursor block), 4 Use Caret, 5 the caret, 6 the buffer, 7 "on". Behaviour:
+
+- On: "on" is set; the text becomes Reset String (cut to Max Size), the caret goes to its end; String is the text
+  (with a backspace character `\b` at the caret when Use Caret); output On fires. Off: when "on", String is the text
+  without the caret mark, "on" clears; output Off fires; the block ends.
+- Each tick otherwise, the keys just pressed are walked in scan code order; each is given to the output parameter
+  Key. A single-line block ends on Return or keypad Enter (String = the text, output Off fires, the block ends); a
+  multiline one ends on the End Key pin's key. Else: Backspace deletes before the caret, Delete after it; Left and
+  Right move the caret (unless section bit 1); the keypad keys insert their characters (unless section bit 0); Return
+  in a multiline block inserts a newline; other keys insert the character of a US layout (Shift or right Shift held:
+  the shifted one), nothing for keys without a character and for Escape. Home, End, Page Up and Page Down do nothing.
+- A character inserted at the caret moves the tail right; the text is cut at Max Size. A full text takes no character
+  at its end. After any edit String is updated and Updated String fires.
+
+### Show Mouse Cursor `16f6368f:506b60fc`
+
+Input In; output Out; input parameter Show (Boolean). In clears itself, fires Out, and shows or hides the system's
+cursor by Show. The cursor is the window's only: no gameplay effect.
+
+### Mouse Cursor `140c3eac:6e502a81`, Mouse Cursor System `2483576d:57c66324`
+
+Not in the C reference. By policy the engine draws its own interface: these only fire Out on In, and when their
+first input parameter is a Boolean it shows or hides the system cursor as Show Mouse Cursor does. Nothing else.

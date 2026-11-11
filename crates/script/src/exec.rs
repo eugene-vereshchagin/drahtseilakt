@@ -67,6 +67,16 @@ pub trait Host {
     fn material_color(&self, _material: usize, _emissive: bool) -> Option<[f32; 4]> {
         None
     }
+    /// The keyboard and the mouse of the current tick, from the run's input stream (never the live machine); the
+    /// keys of the tick before it, to tell a key just pressed.
+    fn input(&self) -> crate::InputFrame {
+        crate::InputFrame::default()
+    }
+    fn input_before(&self) -> crate::InputFrame {
+        crate::InputFrame::default()
+    }
+    /// A script shows or hides the system's mouse cursor (no effect on the run).
+    fn show_cursor(&mut self, _on: bool) {}
 }
 
 /// What a script asks of a wave sound.
@@ -109,6 +119,12 @@ pub enum Scratch {
     Clock {
         elapsed: f32,
         running: bool,
+    },
+    /// Input String: the text typed so far, the caret (a character index) and whether it is on.
+    Typing {
+        text: String,
+        caret: usize,
+        on: bool,
     },
 }
 
