@@ -82,7 +82,7 @@ static bool type_guid(const char *t, CkGuid *g)
         {"group", {0x5c0f151bu, 0x6f0547fdu}},  {"none", {0x5a5716fdu, 0x44e276d7u}},
         {"array", {0x024d52f1u, 0x678223b2u}},  {"vector", {0x48824eaeu, 0x2fe47960u}},
         {"vec2", {0x4efcb34au, 0x6079e42fu}},   {"box", {0x668649c8u, 0x283e2ee1u}},
-        {"percentage", {0xf3c84b4eu, 0x0ffacc34u}},
+        {"percentage", {0xf3c84b4eu, 0x0ffacc34u}}, {"classid", {0x19644e43u, 0x4d6f6123u}},
     };
     for (size_t i = 0; i < sizeof k / sizeof *k; i++)
         if (!strcmp(t, k[i].name)) {
@@ -357,6 +357,11 @@ int main(int argc, char **argv)
         } else if (!strcmp(kind, "frames")) {
             sscanf(line, "%*s %d", &frames);
         }
+    }
+    /* the loader tells every block it was loaded (CKM_BEHAVIORLOAD), as the game's does */
+    for (unsigned k = 0; k < nblocks; k++) {
+        CkBehavior *x = ck_behavior(&ctx, blocks[k]);
+        if (x && x->bb && x->bb->callback) x->bb->callback(&ctx, x, CKM_BEHAVIORLOAD);
     }
     for (int i = 1; i <= frames; i++) {
         printf("frame %d\n", i);

@@ -35,6 +35,9 @@ pub mod proto {
     pub const WAIT_MESSAGE: Guid = Guid(0x4587_ffee, 0x4587_ffdd);
     pub const SEND_MESSAGE_TO_GROUP: Guid = Guid(0x5f90_6952, 0x6df1_1649);
     pub const SEND_MESSAGE: Guid = Guid(0xa20e_8d5b, 0xdf00_2150);
+    pub const BROADCAST_MESSAGE: Guid = Guid(0x3d6c_4ae1, 0x72ae_2cd6);
+    pub const SWITCH_ON_MESSAGE: Guid = Guid(0x1bb2_3f1d, 0x17ff_14b9);
+    pub const GET_MESSAGE_DATA: Guid = Guid(0x4587_5fee, 0x4587_5fdd);
     pub const GROUP_ITERATOR: Guid = Guid(0x6050_252f, 0x3aa8_2d40);
     pub const COLLECTION_ITERATOR: Guid = Guid(0x4196_02ec, 0x7822_779e);
     pub const ITERATOR: Guid = Guid(0x198f_0af9, 0x0268_249f);

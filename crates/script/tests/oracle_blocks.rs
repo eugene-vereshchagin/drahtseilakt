@@ -157,11 +157,15 @@ impl Spec {
         let mut objects: Vec<ObjInfo> = Vec::new();
         let mut nodes: Vec<(Id, Node)> = Vec::new();
         let add = |objects: &mut Vec<ObjInfo>, name: String, kind: ObjKind| -> Id {
-            objects.push(ObjInfo {
-                name,
-                class: 0,
-                kind,
-            });
+            // the classes the oracle creates its objects with (behavioural objects, behaviours, groups, arrays)
+            let class = match kind {
+                ObjKind::Entity(_) => 19,
+                ObjKind::Behavior => 8,
+                ObjKind::Group(_) => 23,
+                ObjKind::Array(_) => 52,
+                _ => 0,
+            };
+            objects.push(ObjInfo { name, class, kind });
             objects.len() - 1
         };
         let obj_ids: Vec<Id> = (0..self.objects)
@@ -208,6 +212,7 @@ impl Spec {
                 "group" => (types::GROUP, Value::Obj(idx(&group_ids))),
                 "array" => (types::ARRAY, Value::Obj(idx(&array_ids))),
                 "percentage" => (types::PERCENTAGE, Value::Float(v.parse().unwrap())),
+                "classid" => (types::CLASS_ID, Value::Int(v.parse().unwrap())),
                 "vector" | "vec2" | "box" => {
                     let f: Vec<f32> = v.split(',').map(|x| x.parse().unwrap()).collect();
                     let at = |k: usize| f.get(k).copied().unwrap_or(0.0);
@@ -1061,6 +1066,44 @@ fn op_table() {
             .local("int", g0 as i32)
             .local("int", g1 as i32);
         frame(r, b, &[])
+    });
+}
+
+/// Switch On Message on S0 (pins: message types, one output each), fed by the driver script S1 sending at
+/// random frames: Send Message to O0 or O1, or Broadcast Message to a class (Behavioral Object 19, 3D Entity 33).
+#[test]
+fn switch_on_message() {
+    sweep("Switch On Message", |r| {
+        let names = ["m", "n", "m"];
+        let k = 1 + r.below(3);
+        let mut b = B::new(0, proto::SWITCH_ON_MESSAGE, 2, k);
+        for n in names.iter().take(k) {
+            b = b.pin("msg", n);
+        }
+        let mut s = frame(r, b, &[]);
+        for _ in 0..1 + r.below(4) {
+            let n = s.add(B::new(1, proto::NOP, 1, 1));
+            s.link(None, (n, 0), r.below(20) as u16);
+            let m = r.pick(&["m", "n", "x"]);
+            let send = if r.below(2) == 0 {
+                B::new(1, proto::SEND_MESSAGE, 1, 1)
+                    .pin("msg", m)
+                    .pin("obj", r.below(2))
+            } else {
+                B::new(1, proto::BROADCAST_MESSAGE, 1, 1)
+                    .pin("msg", m)
+                    .pin("classid", r.pick(&[19, 33]))
+            };
+            let x = s.add(send);
+            s.link(Some((n, 0)), (x, 0), 0);
+        }
+        // Off now and then
+        if r.below(3) == 0 {
+            let x = s.blocks.len();
+            let _ = x;
+            s.link(None, (0, 1), 5 + r.below(20) as u16);
+        }
+        s
     });
 }
 

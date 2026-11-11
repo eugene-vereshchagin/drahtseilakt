@@ -1647,6 +1647,31 @@ absent: none), not the first column. An array without a key column logs "No colu
 happens (In stays active). Otherwise In is cleared, the first row whose key cell equals the key is copied to the
 pOuts and Found fires, else Not Found.
 
+## Messages
+
+A message is a record: its type (by name), the sender (the sending block's target, its script's object unless the
+block has a target of its own), the receiver and the parameters attached (pins of the sending block, referenced:
+whoever reads them later reads their value then). The message manager delivers a frame's messages at the start of
+the next (docs/ck-runtime.md); an object keeps the messages that reached it for that frame only. In the C reference
+an object keeps them only when it waits: a matching Wait Message, or a Switch On Message on it (its callback marks
+the object on load and attach). Ours keeps them for every object: blocks that read them are on waiting objects.
+
+- **Send Message** `a20e8d5b:df002150`: pIns Message, Dest, then the data. In cleared, Out fired; to the object, or
+  to each member of a group.
+- **Send Message To Group** `5f906952:6df11649`: pIns Message, Group, then the data (from pIn 1 before version 2).
+- **Broadcast Message** `3d6c4ae1:72ae2cd6` (C, version 2): pIn Message, pIn Class (a Class ID; default Behavioral
+  Object 19), then the data; to every object whose class is that class or derives from it. Without a sender (no
+  target and no owner) nothing happens and In stays active. In cleared, Out fired.
+- **Switch On Message** `1bb23f1d:17ff14b9` (C): ins On, Off; pIns Message 0..n; outs one per pIn. Off active:
+  cleared, done, nothing fired. Otherwise On cleared if active, and out *i* fires for every message of pIn *i*'s
+  type the owner received this frame; the block stays active (it polls every frame).
+- **Get Message Data** `45875fee:45875fdd` (no notes and no C: from its saved interface, pIn Message, pOut 0
+  Sender, pOuts 1.. the data, local "Can get several Message per Frame"): In cleared; the first message of that type
+  that reached the target this frame writes its sender to pOut 0 and its parameters, in order, to pOuts 1..; Out
+  fires whether one came or not. The local's second message per frame is not modelled.
+
+The oracle (`switch_on_message`, Send Message and Broadcast Message as drivers, classes 19 and 33) agrees with the C.
+
 ## Execute Script: ours differs from the C on purpose
 
 The C reference files an activation request (the script starts in the next frame, like Activate Script). Our notes
