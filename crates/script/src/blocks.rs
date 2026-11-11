@@ -5,6 +5,9 @@
 use crate::exec::{Ent, Host, Runtime, Scratch};
 use crate::{Block, Guid, Id, ObjKind, Value, types};
 
+/// The longest string an operation builds.
+const MAX_STRING: usize = 1 << 16;
+
 /// What a block returns: done this tick, stays active for the next, or not known to the runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flow {
@@ -1290,7 +1293,7 @@ fn is_float(g: Option<Guid>, v: &Value) -> bool {
     matches!(g, Some(types::FLOAT) | Some(types::TIME)) || matches!(v, Value::Float(_))
 }
 
-fn arith(
+pub(crate) fn arith(
     f: fn(f32, f32) -> f32,
     i: fn(i32, i32) -> i32,
     a: &Value,
@@ -1305,6 +1308,8 @@ fn arith(
             let k = s.as_float();
             Value::Vec3([f(x[0], k), f(x[1], k), f(x[2], k)])
         }
+        // a string that doubles each time it is read would eat the memory: past the cap it stops growing
+        (Value::Str(x), _) if x.len() >= MAX_STRING => Value::Str(x.clone()),
         (Value::Str(x), y) => Value::Str(format!("{x}{}", y.as_string())),
         _ if floaty => Value::Float(f(a.as_float(), b.as_float())),
         _ => Value::Int(i(a.as_int(), b.as_int())),

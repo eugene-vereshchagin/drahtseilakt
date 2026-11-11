@@ -205,16 +205,26 @@ pub fn to_json(
     json!({"objects": objects, "nodes": nodes, "arrays": arrays, "scripts": scripts})
 }
 
+/// The most objects and arrays a level's scripts may have (a map's own are a few thousand).
+const MAX_OBJECTS: usize = 1 << 18;
+const MAX_ARRAYS: usize = 1 << 12;
+
 /// The graphs from JSON. `counts` are how many entities, groups, meshes, materials and textures the level has: an
 /// object naming one beyond them is nothing the engine knows.
 pub fn from_json(j: &J, counts: [usize; 5]) -> Result<Graph, String> {
+    let too_many = || "the scripts hold more than a level's can".to_owned();
     let list = |k: &str| -> Result<&Vec<J>, String> {
         j.get(k)
             .and_then(J::as_array)
             .ok_or_else(|| format!("scripts: `{k}` expected"))
     };
+    // the counts are checked before anything is built from the lists (a stranger's file may claim any)
+    let (objs, node_list, array_list) = (list("objects")?, list("nodes")?, list("arrays")?);
+    if objs.len() > MAX_OBJECTS || node_list.len() > objs.len() || array_list.len() > MAX_ARRAYS {
+        return Err(too_many());
+    }
     let mut objects = Vec::new();
-    for o in list("objects")? {
+    for o in objs {
         let a = o
             .as_array()
             .filter(|a| a.len() == 3)
@@ -246,12 +256,17 @@ pub fn from_json(j: &J, counts: [usize; 5]) -> Result<Graph, String> {
         });
     }
     let mut nodes = Vec::new();
-    for n in list("nodes")? {
+    let mut taken = vec![false; objects.len()];
+    for n in node_list {
         let a = n
             .as_array()
             .filter(|a| a.len() == 2)
             .ok_or("script node is malformed")?;
         let id = index(a.first().ok_or("script node is malformed")?)?;
+        match taken.get_mut(id) {
+            Some(t) if !*t => *t = true,
+            _ => return Err("a script object has two nodes, or none".into()),
+        }
         let b = a.get(1).ok_or("script node is malformed")?;
         let f = |k: &str| b.get(k).unwrap_or(&J::Null);
         let node = match f("t").as_str().unwrap_or_default() {
@@ -314,7 +329,7 @@ pub fn from_json(j: &J, counts: [usize; 5]) -> Result<Graph, String> {
         nodes.push((id, node));
     }
     let mut arrays = Vec::new();
-    for a in list("arrays")? {
+    for a in array_list {
         let columns = a
             .get("columns")
             .and_then(J::as_array)
@@ -428,5 +443,63 @@ mod tests {
         let mut j = to_json(&graph(), &Some, &Some);
         j["nodes"][0][1]["inputs"] = serde_json::json!([4000000000u64]);
         assert!(from_json(&j, [1, 0, 0, 0, 0]).is_err());
+    }
+
+    // ---- hostile shapes: each is refused quickly, none builds a graph that stalls the runtime ----
+
+    fn refused(edit: impl FnOnce(&mut serde_json::Value)) {
+        let mut j = to_json(&graph(), &Some, &Some);
+        edit(&mut j);
+        assert!(from_json(&j, [1, 0, 0, 0, 0]).is_err());
+    }
+
+    #[test]
+    fn a_block_that_is_its_own_sub_behaviour_is_refused() {
+        refused(|j| j["nodes"][0][1]["sub"] = serde_json::json!([0, 0]));
+    }
+
+    #[test]
+    fn a_block_in_two_sub_lists_is_refused() {
+        refused(|j| {
+            j["nodes"][0][1]["sub"] = serde_json::json!([1, 1]);
+        });
+    }
+
+    #[test]
+    fn a_parameter_copying_round_a_loop_or_twice_is_refused() {
+        refused(|j| j["nodes"][2][1]["dest"] = serde_json::json!([3]));
+        refused(|j| j["nodes"][2][1]["dest"] = serde_json::json!([0, 0]));
+    }
+
+    #[test]
+    fn a_parameter_reading_itself_is_refused() {
+        refused(|j| j["nodes"][2][1]["source"] = serde_json::json!(3));
+    }
+
+    #[test]
+    fn more_nodes_than_objects_or_a_node_twice_is_refused() {
+        refused(|j| {
+            let n = j["nodes"][1].clone();
+            j["nodes"] =
+                serde_json::json!([j["nodes"][0].clone(), n.clone(), n.clone(), n.clone(), n]);
+        });
+        refused(|j| {
+            let n = j["nodes"][0].clone();
+            j["nodes"] = serde_json::json!([n.clone(), n]);
+        });
+    }
+
+    #[test]
+    fn a_script_twice_or_inside_another_graph_is_refused() {
+        refused(|j| j["scripts"] = serde_json::json!([[0, 1], [0, 1]]));
+        refused(|j| {
+            j["nodes"][0][1]["sub"] = serde_json::json!([2]);
+            j["nodes"].as_array_mut().expect("array").push(serde_json::json!([
+                2,
+                {"t": "block", "name": "inner", "proto": null, "flags": 0, "priority": 0, "target": null,
+                 "inputs": [], "outputs": [], "pins": [], "pouts": [], "locals": [], "sub": [], "links": [], "ops": []}
+            ]));
+            j["scripts"] = serde_json::json!([[0, 1], [2, 1]]);
+        });
     }
 }

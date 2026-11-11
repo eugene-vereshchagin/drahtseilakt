@@ -92,11 +92,19 @@ pub struct Runtime {
     pub tick: u64,
     /// Prototypes met that the runtime does not know, reported once each.
     unknown: Vec<crate::Guid>,
+    /// Work left this tick: every activation, execution, parameter read and write spends one, so a graph that
+    /// fans out (a sub-behaviour listed a thousand times, an operation reading one parameter twice, round and
+    /// round) cannot take the game's time, whatever file it came from.
+    budget: u64,
+    /// Whether the budget ran out (said once).
+    starved: bool,
 }
 
 /// The most pops of the execution stack in one graph in one tick (the original's BehaviorMaxIteration).
 const MAX_ITERATIONS: usize = 8_000;
 const MAX_DEPTH: usize = 48;
+/// The work one tick of all the scripts may do (a map's own take a few thousand).
+const TICK_BUDGET: u64 = 300_000;
 
 impl Runtime {
     /// A runtime with every script active and reset, as scripts of a loaded level start.
@@ -121,12 +129,28 @@ impl Runtime {
             inbox: Vec::new(),
             tick: 0,
             unknown: Vec::new(),
+            budget: TICK_BUDGET,
+            starved: false,
         };
         let scripts = rt.graph.scripts.clone();
         for s in scripts {
             rt.activate(s, true, true, 0);
         }
         rt
+    }
+
+    /// Spends one unit of the tick's work; false when none is left.
+    fn spend(&mut self) -> bool {
+        match self.budget.checked_sub(1) {
+            Some(b) => {
+                self.budget = b;
+                true
+            }
+            None => {
+                self.starved = true;
+                false
+            }
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -161,7 +185,7 @@ impl Runtime {
     /// `CKBehavior::Activate`: `reset` puts the behaviour back to its start (links, IOs, sub-behaviours), and a
     /// script's first input is activated.
     pub fn activate(&mut self, block: Id, active: bool, reset: bool, depth: usize) {
-        if depth > MAX_DEPTH {
+        if depth > MAX_DEPTH || !self.spend() {
             return;
         }
         let Some(b) = self.graph.block(block).cloned() else {
@@ -227,6 +251,7 @@ impl Runtime {
     pub fn tick(&mut self, host: &mut dyn Host) {
         self.tick = self.tick.saturating_add(1);
         self.inbox = std::mem::take(&mut self.outbox);
+        self.budget = TICK_BUDGET;
         let scripts = self.graph.scripts.clone();
         for s in scripts {
             if self.is_active(s) {
@@ -236,12 +261,16 @@ impl Runtime {
                 }
             }
         }
+        if self.starved {
+            self.starved = false;
+            host.note("script work stopped: a tick took more than the budget");
+        }
     }
 
     /// `CKBehavior::Execute`: a building block runs its prototype; a graph fires links and runs its stack.
     /// Returns whether the behaviour stays active.
     fn execute(&mut self, block: Id, host: &mut dyn Host, depth: usize) -> bool {
-        if depth > MAX_DEPTH {
+        if depth > MAX_DEPTH || !self.spend() {
             return false;
         }
         let Some(b) = self.graph.block(block).cloned() else {
@@ -303,7 +332,7 @@ impl Runtime {
         let mut iterations = 0usize;
         while let Some(top) = stack.pop() {
             iterations = iterations.saturating_add(1);
-            if iterations > MAX_ITERATIONS {
+            if iterations > MAX_ITERATIONS || self.budget == 0 {
                 host.note(&format!("script loop stopped in {}", b.name));
                 break;
             }
@@ -454,7 +483,7 @@ impl Runtime {
     }
 
     fn read_depth(&mut self, param: Id, host: &mut dyn Host, depth: usize) -> Value {
-        if depth > MAX_DEPTH {
+        if depth > MAX_DEPTH || !self.spend() {
             return Value::None;
         }
         let Some(p) = self.graph.param(param).cloned() else {
@@ -475,7 +504,7 @@ impl Runtime {
     }
 
     fn write_depth(&mut self, param: Id, v: Value, depth: usize) {
-        if depth > 8 {
+        if depth > 8 || !self.spend() {
             return;
         }
         let Some(slot) = self.values.get_mut(param) else {

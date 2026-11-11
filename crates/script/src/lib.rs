@@ -577,7 +577,6 @@ impl Graph {
         out
     }
 
-    /// Adds a pseudo-object of the engine's (the ball frame, the game's arrays) and returns its id.
     /// A graph from its primary data, as the open format carries it (the back references are derived again, as
     /// `from_document` derives them): `nodes` are `(object index, node)` pairs, `scripts` the top-level graphs with
     /// the object each is attached to. Every index is checked against the objects, the arrays and the caps, so a
@@ -658,18 +657,99 @@ impl Graph {
             }
             *g.nodes.get_mut(id(i)?).ok_or("script node out of range")? = node;
         }
+        g.check_shape()?;
         g.wire();
         for (s, owner) in scripts {
             opt(owner)?;
-            if !matches!(g.nodes.get(id(s)?), Some(Node::Block(_))) {
+            let Some(Node::Block(b)) = g.nodes.get(id(s)?) else {
                 return Err("a script is not a block".into());
+            };
+            if b.parent.is_some() {
+                return Err("a script is inside another graph".into());
+            }
+            if g.scripts.contains(&s) {
+                return Err("a script is listed twice".into());
             }
             g.scripts.push(s);
+            // graphs are trees (checked above), so this visits each block once
             g.set_owner(s, owner, 0);
         }
         Ok(g)
     }
 
+    /// The wiring a stranger's graph may have: a block is the sub-behaviour of at most one block, once and not of
+    /// itself (graphs are trees, so walking them is linear); no parameter copies to itself, twice, or round a loop,
+    /// and none reads its own value through its source or operation. (A graph from a `.nmo` is not held to this; the
+    /// runtime's work budget bounds what it does.)
+    fn check_shape(&self) -> Result<(), String> {
+        let n = self.nodes.len();
+        let mut parent = vec![false; n];
+        for (i, node) in self.nodes.iter().enumerate() {
+            let Node::Block(b) = node else { continue };
+            for &s in &b.sub {
+                if s == i || parent.get(s).copied().unwrap_or(true) {
+                    return Err("a block is a sub-behaviour twice, or of itself".into());
+                }
+                if let Some(x) = parent.get_mut(s) {
+                    *x = true;
+                }
+            }
+            for &l in &b.links {
+                if !matches!(self.nodes.get(l), Some(Node::Link(_))) {
+                    return Err("a block lists a link that is not one".into());
+                }
+            }
+        }
+        for node in &self.nodes {
+            if let Node::Param(p) = node {
+                let mut seen: Vec<Id> = p.destinations.clone();
+                seen.sort_unstable();
+                seen.dedup();
+                if seen.len() != p.destinations.len() {
+                    return Err("a parameter copies to another twice".into());
+                }
+            }
+        }
+        // no cycle through destinations, nor through what a parameter reads (its source, else its operation's inputs)
+        let dests = |i: Id| -> Vec<Id> {
+            match self.nodes.get(i) {
+                Some(Node::Param(p)) => p.destinations.clone(),
+                _ => Vec::new(),
+            }
+        };
+        let mut op_of = vec![None; n];
+        for (i, node) in self.nodes.iter().enumerate() {
+            if let Node::Op(o) = node
+                && let Some(out) = o.output
+                && let Some(slot) = op_of.get_mut(out)
+            {
+                *slot = Some(i);
+            }
+        }
+        let reads = |i: Id| -> Vec<Id> {
+            let Some(Node::Param(p)) = self.nodes.get(i) else {
+                return Vec::new();
+            };
+            if let Some(s) = p.source {
+                return vec![s];
+            }
+            match op_of
+                .get(i)
+                .copied()
+                .flatten()
+                .and_then(|o| self.nodes.get(o))
+            {
+                Some(Node::Op(o)) => o.inputs.iter().flatten().copied().collect(),
+                _ => Vec::new(),
+            }
+        };
+        if has_cycle(n, &dests) || has_cycle(n, &reads) {
+            return Err("parameters copy or read round a loop".into());
+        }
+        Ok(())
+    }
+
+    /// Adds a pseudo-object of the engine's (the ball frame, the game's arrays) and returns its id.
     pub fn add_object(&mut self, name: &str, kind: ObjKind) -> Id {
         let id = self.objects.len();
         self.objects.push(ObjInfo {
@@ -744,4 +824,41 @@ mod tests {
                 && !Value::Str("a".into()).same(&Value::Str("b".into()))
         );
     }
+}
+
+/// Whether the directed graph on `0..n` has a cycle (iterative, three colours: linear in nodes and edges).
+fn has_cycle(n: usize, edges: &dyn Fn(Id) -> Vec<Id>) -> bool {
+    // 0 unseen, 1 on the path, 2 done
+    let mut state = vec![0u8; n];
+    for start in 0..n {
+        if state.get(start).copied() != Some(0) {
+            continue;
+        }
+        let mut path: Vec<(Id, Vec<Id>)> = vec![(start, edges(start))];
+        if let Some(x) = state.get_mut(start) {
+            *x = 1;
+        }
+        while let Some((node, todo)) = path.last_mut() {
+            let node = *node;
+            match todo.pop() {
+                Some(next) => match state.get(next).copied() {
+                    Some(1) => return true,
+                    Some(0) => {
+                        if let Some(x) = state.get_mut(next) {
+                            *x = 1;
+                        }
+                        path.push((next, edges(next)));
+                    }
+                    _ => {}
+                },
+                None => {
+                    if let Some(x) = state.get_mut(node) {
+                        *x = 2;
+                    }
+                    path.pop();
+                }
+            }
+        }
+    }
+    false
 }

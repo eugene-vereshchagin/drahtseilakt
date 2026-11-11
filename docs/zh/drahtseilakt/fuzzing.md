@@ -17,7 +17,7 @@ scripts/fuzz.sh 3600 2 nmo_file    # 单个目标，一小时
 FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -- --ignored --nocapture
 ```
 
-目标：`nmo_file`、`nmo_chunk`、`open_level`（crate `level`）；`image`、`gputex`、`gputex_data`、`level_txt`、`theme_txt`、`pack_txt`、`sound_table`
+目标：`nmo_file`、`nmo_chunk`、`open_level`、`script_json`（crate `level`）；`image`、`gputex`、`gputex_data`、`level_txt`、`theme_txt`、`pack_txt`、`sound_table`
 （`gamedata`）；`disc_image`、`cue_sheet`、`iscab`（`cdimage`）；`replay`、`hints`、`zones`、`learned`、`wav`、`ogg`、`highscore`、
 `settings`、`level_sim`——加载关卡并运行一秒，让陌生人的地图越过读取器进入物理与规则——以及
 `module_sim`——用一个模块文件替换原版关卡所用的模块（关卡文件夹可自带模块），需要玩家的游戏副本（游戏本身，

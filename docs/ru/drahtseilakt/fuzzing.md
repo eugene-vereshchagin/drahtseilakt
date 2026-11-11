@@ -19,7 +19,7 @@ scripts/fuzz.sh 3600 2 nmo_file    # одна цель, час
 FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -- --ignored --nocapture
 ```
 
-Цели: `nmo_file`, `nmo_chunk`, `open_level` (крейт `level`); `image`, `gputex`, `gputex_data`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
+Цели: `nmo_file`, `nmo_chunk`, `open_level`, `script_json` (крейт `level`); `image`, `gputex`, `gputex_data`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
 (`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `zones`, `learned`, `wav`, `ogg`, `highscore`,
 `settings`, `level_sim` — уровень, загруженный и сыгранный секунду: так чужая карта проходит дальше читателя, в
 физику и правила — и `module_sim` — файл модуля вместо того, что использует оригинальный уровень (папка уровня может

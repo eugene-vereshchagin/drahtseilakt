@@ -731,3 +731,78 @@ fn the_proximity_test_enters_and_leaves_and_box_intersection_tests_overlap() {
         "no new event while it stays out"
     );
 }
+
+// ---- a stranger's graph may fan out: the tick's work budget ends it ----------------------------------------------
+
+fn bare(nodes: Vec<Node>) -> Graph {
+    let n = nodes.len();
+    Graph {
+        objects: (0..n)
+            .map(|i| crate::ObjInfo {
+                name: format!("o{i}"),
+                class: 0,
+                kind: ObjKind::Other,
+            })
+            .collect(),
+        nodes,
+        arrays: Vec::new(),
+        scripts: vec![0],
+        links_from: vec![Vec::new(); n],
+    }
+}
+
+#[test]
+fn a_block_listing_itself_a_thousand_times_does_not_stall_the_runtime() {
+    let block = Block {
+        name: "loop".into(),
+        sub: vec![0; 1000],
+        ..Block::default()
+    };
+    // activation recurses through the sub-behaviours: without a budget this is 1000^48 steps
+    let mut rt = Runtime::new(Arc::new(bare(vec![Node::Block(block)])));
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert!(
+        host.notes.iter().any(|n| n.contains("budget")),
+        "{:?}",
+        host.notes
+    );
+}
+
+#[test]
+fn an_operation_reading_its_own_output_twice_does_not_stall_the_runtime() {
+    let p = Param {
+        name: "p".into(),
+        guid: types::INT,
+        op: Some(1),
+        ..Param::default()
+    };
+    let op = crate::Op {
+        guid: Guid(1, 2),
+        inputs: [Some(0), Some(0)],
+        output: Some(0),
+    };
+    let mut rt = Runtime::new(Arc::new(bare(vec![Node::Param(p), Node::Op(op)])));
+    let mut host = Rec::new();
+    // 2^48 reads without a budget
+    let _ = rt.read(0, &mut host);
+}
+
+#[test]
+fn a_parameter_copying_to_itself_a_thousand_times_does_not_stall_the_runtime() {
+    let p = Param {
+        name: "p".into(),
+        guid: types::INT,
+        destinations: vec![0; 1000],
+        ..Param::default()
+    };
+    let mut rt = Runtime::new(Arc::new(bare(vec![Node::Param(p)])));
+    rt.write(0, Value::Int(1));
+}
+
+#[test]
+fn a_string_that_doubles_each_time_stops_growing() {
+    let big = Value::Str("x".repeat(1 << 16));
+    let r = crate::blocks::arith(|x, y| x + y, i32::wrapping_add, &big, &big, false);
+    assert!(r.as_string().len() <= (1 << 16) + 8);
+}

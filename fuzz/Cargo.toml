@@ -54,6 +54,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "script_json"
+path = "fuzz_targets/script_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "image"
 path = "fuzz_targets/image.rs"
 test = false

@@ -1,7 +1,8 @@
 // Fuzz targets of the level readers (docs/drahtseilakt/fuzzing.md), on the stable fuzzer in crates/fuzzkit:
 //   nmo_file    a whole .nmo/.cmo: container, object table, every scene decoder on every object, the level model;
 //   nmo_chunk   one state chunk through every scene decoder;
-//   open_level  the open format: level.gltf and level.bin.
+//   open_level  the open format: level.gltf and level.bin;
+//   script_json a converted map's behaviour graphs (the scene's `scripts` extras), read and run a few ticks.
 // They are #[ignore]: `FUZZ_SECS=600 cargo test --release --offline -p level --test fuzz -- --ignored`. Seeds are
 // synthetic files made here, plus the player's own files when present (read at run time, never committed). The
 // committed repros in fuzz/regressions/ are replayed by the ordinary (not ignored) tests at the end.
@@ -556,6 +557,213 @@ fn fuzz_open_level() {
     fuzzkit::fuzz(t, open_seeds, run_open_level);
 }
 
+// --- script_json -------------------------------------------------------------------------------------------------
+
+/// A host with nothing in it: the scripts run against it and ask for what they like.
+struct Nothing;
+
+impl script::Host for Nothing {
+    fn delta_ms(&self) -> f32 {
+        16.0
+    }
+    fn matrix(&self, _: script::Ent) -> Option<[[f32; 4]; 4]> {
+        Some([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
+    }
+    fn initial_matrix(&self, e: script::Ent) -> Option<[[f32; 4]; 4]> {
+        self.matrix(e)
+    }
+    fn set_matrix(&mut self, _: script::Ent, _: [[f32; 4]; 4]) {}
+    fn set_visible(&mut self, _: script::Ent, _: bool) {}
+    fn bounds(&self, _: script::Ent) -> Option<([f32; 3], [f32; 3])> {
+        Some(([-1.0; 3], [1.0; 3]))
+    }
+    fn delete(&mut self, _: script::Ent) {}
+    fn physicalize(&mut self, _: script::Ent, _: bool) {}
+    fn particles(&mut self, _: script::Ent, _: bool) {}
+    fn mesh_of(&self, _: script::Ent) -> Option<usize> {
+        None
+    }
+    fn group_members(&self, _: usize) -> Vec<usize> {
+        vec![0, 1, 2]
+    }
+    fn game_cell(&self, _: &str, _: usize, _: usize) -> Option<script::Value> {
+        None
+    }
+    fn message(&mut self, _: &str, _: Option<script::Ent>) {}
+    fn sound(&mut self, _: &str, _: bool) {}
+    fn text(&mut self, _: &str, _: &str, _: bool) {}
+    fn note(&mut self, _: &str) {}
+}
+
+/// The graphs from JSON text, then run: a graph that is accepted must not stall, nor grow without bound.
+pub fn run_script_json(input: &[u8]) {
+    let Ok(j) = serde_json::from_slice::<serde_json::Value>(input) else {
+        return;
+    };
+    let Ok(g) = level::script_json::from_json(&j, [8, 4, 4, 4, 4]) else {
+        return;
+    };
+    let mut rt = script::Runtime::new(std::sync::Arc::new(g));
+    let mut host = Nothing;
+    for _ in 0..4 {
+        rt.tick(&mut host);
+    }
+    let ids: Vec<usize> = rt.graph.scripts.iter().copied().take(8).collect();
+    for id in ids {
+        let _ = rt.read(id, &mut host);
+        rt.write(id, script::Value::Int(1));
+    }
+}
+
+fn script_seeds() -> Vec<Vec<u8>> {
+    use script::{Array, Block, Graph, Guid, Link, Node, ObjInfo, ObjKind, Op, Param, Value};
+    let obj = |n: &str, kind| ObjInfo {
+        name: n.into(),
+        class: 0,
+        kind,
+    };
+    let objects = vec![
+        obj("Script", ObjKind::Behavior),
+        obj("Sub", ObjKind::Behavior),
+        obj("In", ObjKind::Other),
+        obj("Out", ObjKind::Other),
+        obj("Link", ObjKind::Other),
+        obj("A", ObjKind::Other),
+        obj("B", ObjKind::Other),
+        obj("Op", ObjKind::Other),
+        obj("Thing", ObjKind::Entity(0)),
+    ];
+    let root = Block {
+        name: "Script".into(),
+        flags: 2,
+        sub: vec![1],
+        links: vec![4],
+        inputs: vec![2],
+        outputs: vec![3],
+        ..Block::default()
+    };
+    let sub = Block {
+        name: "Sub".into(),
+        proto: Some(Guid(7, 8)),
+        pins: vec![5],
+        pouts: vec![6],
+        ops: vec![7],
+        ..Block::default()
+    };
+    let param = |n: &str, v: Value, dest: Vec<usize>| Param {
+        name: n.into(),
+        guid: script::types::INT,
+        value: v,
+        destinations: dest,
+        ..Param::default()
+    };
+    let g = Graph::assemble(
+        objects,
+        vec![
+            (0, Node::Block(root)),
+            (1, Node::Block(sub)),
+            (
+                4,
+                Node::Link(Link {
+                    delay: 2,
+                    src: 2,
+                    dst: 3,
+                }),
+            ),
+            (5, Node::Param(param("A", Value::Int(2), vec![6]))),
+            (6, Node::Param(param("B", Value::Str("x".into()), vec![]))),
+            (
+                7,
+                Node::Op(Op {
+                    guid: script::blocks::ops::ADD,
+                    inputs: [Some(5), Some(5)],
+                    output: Some(6),
+                }),
+            ),
+        ],
+        vec![Array {
+            name: "T".into(),
+            columns: vec![("c".into(), 1)],
+            rows: vec![vec![Value::Int(1)], vec![Value::Vec3([1.0, 2.0, 3.0])]],
+        }],
+        vec![(0, Some(8))],
+    );
+    let mut out = Vec::new();
+    if let Ok(g) = g {
+        let j = level::script_json::to_json(&g, &Some, &Some);
+        out.push(serde_json::to_vec(&j).unwrap_or_default());
+    }
+    // the player's converted levels' scripts, when present
+    if std::env::var_os("FUZZ_NO_REAL").is_none()
+        && let Some(home) = std::env::var_os("HOME")
+    {
+        let levels = PathBuf::from(home).join(".local/share/drahtseilakt/levels");
+        for gltf in fuzzkit::files_under(
+            &[levels.join("open"), levels.join("remastered")],
+            &["gltf"],
+            12,
+            4 << 20,
+        ) {
+            if let Ok(bytes) = std::fs::read(gltf)
+                && let Ok(doc) = serde_json::from_slice::<serde_json::Value>(&bytes)
+                && let s = &doc["scenes"][0]["extras"]["drahtseilakt"]["scripts"]
+                && !s.is_null()
+            {
+                out.push(serde_json::to_vec(s).unwrap_or_default());
+            }
+        }
+    }
+    out
+}
+
+#[test]
+#[ignore]
+fn fuzz_script_json() {
+    let mut t = Target::new("script_json", test_name!("fuzz_script_json"), Kind::Text);
+    t.max_len = 1 << 20;
+    t.dict = &[
+        "\"objects\"",
+        "\"nodes\"",
+        "\"arrays\"",
+        "\"scripts\"",
+        "\"block\"",
+        "\"link\"",
+        "\"io\"",
+        "\"param\"",
+        "\"op\"",
+        "\"sub\"",
+        "\"dest\"",
+        "\"source\"",
+        "\"links\"",
+        "\"inputs\"",
+        "\"outputs\"",
+        "\"pins\"",
+        "\"pouts\"",
+        "\"locals\"",
+        "\"ops\"",
+        "\"target\"",
+        "\"proto\"",
+        "\"entity\"",
+        "\"group\"",
+        "\"array\"",
+        "[\"s\",",
+        "[\"o\",",
+        "[\"i\",",
+        "[\"m\",",
+        "null",
+        "[]",
+        "0",
+        "1",
+        "99999999",
+    ];
+    fuzzkit::fuzz(t, script_seeds, run_script_json);
+}
+
 // --- committed repros --------------------------------------------------------------------------------------------
 
 #[test]
@@ -563,6 +771,7 @@ fn fuzz_regressions() {
     fuzzkit::regressions("nmo_file", run_nmo_file);
     fuzzkit::regressions("nmo_chunk", run_nmo_chunk);
     fuzzkit::regressions("open_level", run_open_level);
+    fuzzkit::regressions("script_json", run_script_json);
 }
 
 /// The synthetic seeds are what they mean to be (a seed the reader refuses would fuzz only its first checks).
@@ -579,4 +788,8 @@ fn fuzz_seeds_are_read() {
     let l = level::open::import_bytes(&fuzzkit::scratch(), p[0], p[1]).unwrap();
     assert_eq!(l.meshes.len(), 1);
     assert!(l.meshes[0].look.is_some());
+    // the script seed is read by the reader (else the target fuzzes only its first checks)
+    let seeds = script_seeds();
+    let j: serde_json::Value = serde_json::from_slice(&seeds[0]).unwrap();
+    assert!(level::script_json::from_json(&j, [8, 4, 4, 4, 4]).is_ok());
 }
