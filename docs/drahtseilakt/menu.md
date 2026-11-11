@@ -137,14 +137,14 @@ and each submenu item says on the notes panel what it is and where it comes from
 
 | Item | Opens | Needs |
 |---|---|---|
-| *Drahtseilakt* | our own 13 levels, shipped with the game | |
+| *Featured maps* (ru «Избранные карты») | the owner's 13 picks of players' maps, brought into our open format, credited to their authors | |
 | *Classic Ballance* (ru «Классический Ballance») | the 13 original levels of the player's copy, unlocking as in the original | a copy |
 | *Ballance Challenges* (ru «Испытания Ballance») | the original levels remade by the community: the camera turned 45 degrees, the way backwards, the road invisible (`levels/modified/`) | a copy and levels in the folder |
 | *Community maps* (ru «Карты сообщества») | a submenu | |
 | &nbsp;&nbsp;*Best* (ru «Лучшие») | the 13 community maps shipped with the game, with their authors and the thanks notice | |
 | &nbsp;&nbsp;*Downloaded* (ru «Скачанные») | the player's folder `levels/downloaded/` (its path is shown): community `.nmo` maps and open-format levels in one list, with those of the earlier folders `levels/community/` and `levels/open/`, which are still read | |
 
-The strings are in all seven languages. Start's order since 2026-11-11: our own levels first, *Classic Ballance* second.
+The strings are in all seven languages. Start's order since 2026-11-11: the featured maps first, *Classic Ballance* second.
 
 **The Look** (owner's decision 2026-11-11, decisions.md "One Look, and beauty comes through the toolbox") is one line,
 *Look*, on the Graphics page (setting `look original|remaster|drahtseilakt|player`, with `textures` kept as the pack it

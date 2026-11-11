@@ -149,14 +149,14 @@ und Unterpunkt sagt im Hinweisfeld, was er ist und woher er kommt.
 
 | Punkt | Öffnet | Braucht |
 |---|---|---|
-| *Drahtseilakt* | unsere eigenen 13 Level, mit dem Spiel geliefert | |
+| *Ausgewählte Karten* (en *Featured maps*) | die 13 vom Eigentümer gewählten Spielerkarten, in unser offenes Format übertragen, mit ihren Autoren | |
 | *Klassisches Ballance* (en *Classic Ballance*) | die 13 Original-Level der Kopie des Spielers, freigeschaltet wie im Original | eine Kopie |
 | *Ballance-Prüfungen* (en *Ballance Challenges*) | die Original-Level, von der Community umgebaut: Kamera um 45° gedreht, der Weg zurück, die Bahn unsichtbar (`levels/modified/`) | eine Kopie und Level im Ordner |
 | *Community-Karten* (en *Community maps*) | ein Untermenü | |
 | &nbsp;&nbsp;*Beste* (en *Best*) | die 13 mit dem Spiel gelieferten Community-Karten, mit Autoren und Dank | |
 | &nbsp;&nbsp;*Heruntergeladen* (en *Downloaded*) | der Ordner des Spielers `levels/downloaded/` (sein Pfad wird gezeigt): Community-`.nmo`-Karten und Level im offenen Format in einer Liste, samt den früheren `levels/community/` und `levels/open/`, die weiter gelesen werden | |
 
-Die Texte gibt es in allen sieben Sprachen. Reihenfolge von Start seit 2026-11-11: zuerst unsere eigenen Level, an zweiter Stelle *Klassisches Ballance*.
+Die Texte gibt es in allen sieben Sprachen. Reihenfolge von Start seit 2026-11-11: zuerst die ausgewählten Karten, an zweiter Stelle *Klassisches Ballance*.
 
 **Das Aussehen (Look)** (Entscheidung des Eigentümers 2026-11-11, decisions.md, „One Look, and beauty comes through the
 toolbox") ist eine Zeile, *Aussehen*, auf der Graphics-Seite (Einstellung `look original|remaster|drahtseilakt|player`,

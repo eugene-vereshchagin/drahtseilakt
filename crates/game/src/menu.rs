@@ -4848,7 +4848,7 @@ mod tests {
             .collect();
         assert_eq!(
             kinds,
-            ["Drahtseilakt", "Classic Ballance", "Community maps", "Back"]
+            ["Featured maps", "Classic Ballance", "Community maps", "Back"]
         );
         m.step(1);
         assert_eq!(m.enter(), Action::None);
@@ -4991,7 +4991,7 @@ mod tests {
         );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom, "our own levels");
-        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Drahtseilakt"));
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Featured maps"));
         m.back();
         m.back();
         m.step(1);

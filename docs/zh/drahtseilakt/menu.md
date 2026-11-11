@@ -85,14 +85,14 @@ Start 在经典模式和扩展模式下相同；为空或不可用的项目不�
 
 | 项目 | 打开 | 需要 |
 |---|---|---|
-| *Drahtseilakt* | 我们自己的 13 个关卡，随游戏附带 | |
+| *精选地图*（en *Featured maps*） | 所有者挑选的 13 张玩家地图，已转换为我们的开放格式，注明作者 | |
 | *经典 Ballance*（en *Classic Ballance*） | 玩家副本中的 13 个原版关卡，按原版方式解锁 | 副本 |
 | *Ballance 挑战*（en *Ballance Challenges*） | 社区改造的原版关卡：视角旋转 45°、反向通关、隐形道路（`levels/modified/`） | 副本和该文件夹中的关卡 |
 | *社区地图*（en *Community maps*） | 子菜单 | |
 | &nbsp;&nbsp;*精选*（en *Best*） | 随游戏附带的 13 张社区地图，附作者和致谢 | |
 | &nbsp;&nbsp;*已下载*（en *Downloaded*） | 玩家的文件夹 `levels/downloaded/`（显示其路径）：社区 `.nmo` 地图和开放格式关卡合为一个列表，并包含仍会读取的旧文件夹 `levels/community/` 和 `levels/open/` | |
 
-文字提供全部七种语言。自 2026-11-11 起 Start 的顺序：先是我们自己的关卡，*经典 Ballance* 排第二。
+文字提供全部七种语言。自 2026-11-11 起 Start 的顺序：先是精选地图，*经典 Ballance* 排第二。
 
 **外观（Look）**（所有者 2026-11-11 的决定，decisions.md “One Look, and beauty comes through the toolbox”）是 Graphics 页上的一行
 *外观*（设置 `look original|remaster|drahtseilakt|player`，`textures` 保存其所用的纹理包），取代了单独的 Textures 行和 2026-11-09
