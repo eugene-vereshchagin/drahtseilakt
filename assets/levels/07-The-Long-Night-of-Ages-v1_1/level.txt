@@ -1,4 +1,4 @@
-# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# Converted to Drahtseilakt's open format from The-Long-Night-of-Ages-v1_1.nmo by 四叶草 (dyethx), with thanks to its author. The map belongs to its
 # author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
 title = The Long Night of Ages v1.1
 title.zh = 岁月长夜V1.1

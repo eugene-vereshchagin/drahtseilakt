@@ -1,4 +1,4 @@
-# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# Converted to Drahtseilakt's open format from Beginners-Happiness-5.nmo by dahkjdas, with thanks to its author. The map belongs to its
 # author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
 title = Beginners Happiness 5
 title.zh = 萌新快乐图5

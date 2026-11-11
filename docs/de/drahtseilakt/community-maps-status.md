@@ -39,7 +39,7 @@ Baustein braucht, wird mit dessen Namen gemeldet.
 
 ## Die Prüfung: was eine Karte verlangt und was sie bekommt (2026-11-10)
 
-`drahtseilakt --audit FILE|DIR [--audit-csv FILE]` geht ohne Fenster durch eine Karte oder einen Ordner von Karten,
+`drahtseilakt --audit FILE|DIR [--audit-csv FILE]` geht ohne Fenster durch eine Karte, einen Level-Ordner des offenen Formats (mit `level.gltf`) oder einen Ordner davon,
 mit der Kopie des Spielers und ohne sie, und listet für jede Karte: jeden Körper, den die Physik aus einem
 Levelobjekt macht und der nicht gezeichnet wird (ein unsichtbares Hindernis, mit Namen, Ort und Grund), die
 Platzhalter, für die kein Modul gebaut wird, die Module und Texturen, die niemand hat, die Objekte von Klassen, die

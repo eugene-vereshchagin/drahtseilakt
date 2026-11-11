@@ -246,7 +246,12 @@ pub fn export_textures(
         .map(|g| json!({"name": g.name, "members": g.members}))
         .collect();
 
-    let doc = json!({
+    let scripts = level.scripts.as_ref().map(|g| {
+        crate::script_json::to_json(g, &|i| mesh_index.get(i).copied().flatten(), &|i| {
+            remap.get(i).copied()
+        })
+    });
+    let mut doc = json!({
         "asset": {"version": "2.0", "generator": "drahtseilakt"},
         "extensionsUsed": if level.materials.iter().any(|m| m.unlit) { json!(["KHR_materials_unlit"]) } else { json!([]) },
         "scene": 0,
@@ -261,6 +266,9 @@ pub fn export_textures(
         "bufferViews": views,
         "accessors": accessors,
     });
+    if let Some(s) = scripts {
+        doc["scenes"][0]["extras"]["drahtseilakt"]["scripts"] = s;
+    }
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let text = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
     std::fs::write(dir.join("level.gltf"), text).map_err(|e| e.to_string())?;
@@ -1158,6 +1166,19 @@ fn import_from(
     level.sky = x["sky"].as_str().map(str::to_owned);
     level.start_ball = x["start_ball"].as_str().map(str::to_owned);
     level.settings = settings_from(&x["settings"])?;
+    if !x["scripts"].is_null() {
+        let counts = [
+            level.objects.len(),
+            level.groups.len(),
+            level.meshes.len(),
+            level.materials.len(),
+            level.textures.len(),
+        ];
+        level.scripts = Some(std::sync::Arc::new(crate::script_json::from_json(
+            &x["scripts"],
+            counts,
+        )?));
+    }
     let mut bytes = text;
     bytes.extend_from_slice(&bin);
     Ok((level, bytes))

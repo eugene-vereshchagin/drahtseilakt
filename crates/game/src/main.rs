@@ -118,7 +118,7 @@ usage: drahtseilakt [options]
   --sky NAME          play under another sky (A, B, C, Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
                       Mist, Clouds, or any Sky_<NAME>_* the textures have) instead of the level's own
   --size WxH          window or screenshot size (default 1600x900)
-  --audit FILE|DIR    no window: audit a map or a folder of maps, with the copy and without it: bodies that collide
+  --audit FILE|DIR    no window: audit a map, an open-format level or a folder of them, with the copy and without it: bodies that collide
                       without being drawn (invisible blockers), stand-ins without a module, missing textures,
                       objects and modes not read; prints a summary by the number of maps hit (may be repeated)
   --show-colliders    draw the floors and rails a map hides (red) and its hidden stoppers (yellow) as translucent

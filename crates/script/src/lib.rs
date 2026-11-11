@@ -578,6 +578,98 @@ impl Graph {
     }
 
     /// Adds a pseudo-object of the engine's (the ball frame, the game's arrays) and returns its id.
+    /// A graph from its primary data, as the open format carries it (the back references are derived again, as
+    /// `from_document` derives them): `nodes` are `(object index, node)` pairs, `scripts` the top-level graphs with
+    /// the object each is attached to. Every index is checked against the objects, the arrays and the caps, so a
+    /// stranger's level can name anything and gets an error, not a panic or a stall.
+    pub fn assemble(
+        objects: Vec<ObjInfo>,
+        nodes: Vec<(Id, Node)>,
+        arrays: Vec<Array>,
+        scripts: Vec<(Id, Option<Id>)>,
+    ) -> Result<Graph, String> {
+        let n = objects.len();
+        if n > MAX_OBJECTS || arrays.len() > MAX_OBJECTS {
+            return Err("too many objects in the scripts".into());
+        }
+        let id = |i: Id| -> Result<Id, String> {
+            if i < n {
+                Ok(i)
+            } else {
+                Err(format!("script object {i} does not exist"))
+            }
+        };
+        let opt = |i: Option<Id>| i.map_or(Ok(()), |i| id(i).map(|_| ()));
+        let all = |v: &[Id]| v.iter().try_for_each(|&i| id(i).map(|_| ()));
+        for o in &objects {
+            if let ObjKind::Array(a) = o.kind
+                && a >= arrays.len()
+            {
+                return Err("script object names an array that does not exist".into());
+            }
+        }
+        for a in &arrays {
+            if a.rows.len() > MAX_ARRAY_ROWS {
+                return Err("script array has too many rows".into());
+            }
+            for r in &a.rows {
+                r.iter().try_for_each(|v| match v {
+                    Value::Obj(o) => opt(*o),
+                    _ => Ok(()),
+                })?;
+            }
+        }
+        let mut g = Graph {
+            objects,
+            nodes: vec![Node::None; n],
+            arrays,
+            scripts: Vec::new(),
+            links_from: vec![Vec::new(); n],
+        };
+        for (i, node) in nodes {
+            match &node {
+                Node::None => {}
+                Node::Block(b) => {
+                    opt(b.target)?;
+                    for v in [
+                        &b.inputs, &b.outputs, &b.pins, &b.pouts, &b.locals, &b.sub, &b.links,
+                        &b.ops,
+                    ] {
+                        all(v)?;
+                    }
+                }
+                Node::Link(l) => {
+                    id(l.src)?;
+                    id(l.dst)?;
+                }
+                Node::Io(_) => {}
+                Node::Param(p) => {
+                    opt(p.source)?;
+                    all(&p.destinations)?;
+                    if let Value::Obj(o) = &p.value {
+                        opt(*o)?;
+                    }
+                }
+                Node::Op(o) => {
+                    opt(o.inputs[0])?;
+                    opt(o.inputs[1])?;
+                    opt(o.output)?;
+                }
+            }
+            *g.nodes.get_mut(id(i)?).ok_or("script node out of range")? = node;
+        }
+        g.wire();
+        for (s, owner) in scripts {
+            opt(owner)?;
+            if !matches!(g.nodes.get(id(s)?), Some(Node::Block(_))) {
+                return Err("a script is not a block".into());
+            }
+            g.scripts.push(s);
+            g.set_owner(s, owner, 0);
+        }
+        Ok(g)
+    }
+
     pub fn add_object(&mut self, name: &str, kind: ObjKind) -> Id {
         let id = self.objects.len();
         self.objects.push(ObjInfo {

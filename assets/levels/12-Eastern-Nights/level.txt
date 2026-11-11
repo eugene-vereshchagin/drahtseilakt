@@ -1,4 +1,4 @@
-# Community map, shipped with Drahtseilakt unmodified, with thanks to its author. The map belongs to its
+# Converted to Drahtseilakt's open format from Eastern-Nights.nmo by perfectthought, with thanks to its author. The map belongs to its
 # author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
 title = Eastern Nights
 title.zh = 东方夜谭

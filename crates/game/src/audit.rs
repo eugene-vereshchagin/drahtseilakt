@@ -395,7 +395,13 @@ fn doc_issues(doc: &nmo::Document, out: &mut Vec<Issue>) {
 /// The issues of the map at `path` with the game's files `data`.
 pub fn map_issues(path: &Path, data: &Data) -> Vec<Issue> {
     let mut out = Vec::new();
-    let source = Source::Nmo(path.to_path_buf());
+    // a folder is a level in the open format (maps() lists it when it holds level.gltf)
+    let open = path.is_dir();
+    let source = if open {
+        Source::Open(path.to_path_buf())
+    } else {
+        Source::Nmo(path.to_path_buf())
+    };
     let data = data.for_source(&source);
     let loaded = match data.load(&source) {
         Ok(l) => l,
@@ -418,11 +424,14 @@ pub fn map_issues(path: &Path, data: &Data) -> Vec<Issue> {
     let sim = Sim::with_rules(level, start, &modules, false, crate::replay::VERSION);
     let placements = scene::placements(level, &modules, sim.loose(), sim.module_bodies());
     out.extend(level_issues(level, &modules, &sim, &placements, &data));
-    file_issues(path, &mut out);
+    if !open {
+        file_issues(path, &mut out);
+    }
     out
 }
 
-/// The `.nmo` files of `root` (a file or a folder walked a few levels deep, links not followed), sorted.
+/// The `.nmo` files and the open-format level folders (those holding a `level.gltf`) of `root` (a file or a folder
+/// walked a few levels deep, links not followed), sorted.
 pub(crate) fn maps(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut todo = vec![(root.to_path_buf(), 0usize)];
@@ -435,6 +444,12 @@ pub(crate) fn maps(root: &Path) -> Vec<PathBuf> {
                 .extension()
                 .is_some_and(|e| e.eq_ignore_ascii_case("nmo"));
             if nmo && out.len() < MAX_MAPS {
+                out.push(path);
+            }
+        } else if meta.is_dir()
+            && std::fs::symlink_metadata(path.join("level.gltf")).is_ok_and(|m| m.is_file())
+        {
+            if out.len() < MAX_MAPS {
                 out.push(path);
             }
         } else if meta.is_dir() && depth < MAX_DEPTH {
@@ -471,7 +486,7 @@ pub fn run(
 ) -> Result<(), String> {
     let files: Vec<PathBuf> = roots.iter().flat_map(|r| maps(r)).collect();
     if files.is_empty() {
-        return Err("--audit: no .nmo file there".into());
+        return Err("--audit: no .nmo file or open-format level there".into());
     }
     let passes: Vec<(&str, Data)> = if data.has_copy() {
         vec![("with", data.clone()), ("without", Data::new(None))]
@@ -901,10 +916,14 @@ mod tests {
         std::fs::write(dir.join("a/b/One.NMO"), b"x").expect("written");
         std::fs::write(dir.join("a/two.nmo"), b"x").expect("written");
         std::fs::write(dir.join("a/notes.txt"), b"x").expect("written");
+        // an open-format level is one entry, its files are not looked into
+        std::fs::create_dir_all(dir.join("a/open")).expect("made");
+        std::fs::write(dir.join("a/open/level.gltf"), b"{}").expect("written");
+        std::fs::write(dir.join("a/open/Inner.nmo"), b"x").expect("written");
         #[cfg(unix)]
         std::os::unix::fs::symlink(dir.join("a"), dir.join("link")).expect("linked");
         let found = maps(&dir);
         let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(found.len(), 2, "{found:?}");
+        assert_eq!(found.len(), 3, "{found:?}");
     }
 }

@@ -38,7 +38,7 @@ sounds). Maps are never run half-way: a map that needs a block not implemented i
 
 ## The audit: what a map asks for and what it gets (2026-11-10)
 
-`drahtseilakt --audit FILE|DIR [--audit-csv FILE]` goes through a map or a folder of maps without a window, with
+`drahtseilakt --audit FILE|DIR [--audit-csv FILE]` goes through a map, a level folder of the open format (one holding `level.gltf`) or a folder of them without a window, with
 the player's copy and without it, and lists for each map: every body the physics makes of a level object that is
 not drawn (an invisible blocker, with its name, place and the reason), the stand-ins no module is made for, the
 modules and textures nobody has, the objects of classes the loader leaves out, the alpha tests the renderer does

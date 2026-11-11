@@ -6,6 +6,7 @@
 
 pub mod from_nmo;
 pub mod open;
+pub mod script_json;
 pub mod sectorballs;
 
 /// The module a level object is named after: its name without the trailing `_NN` (digits, then any letters:
@@ -52,8 +53,8 @@ pub struct Level {
     /// What the original game gives a level from its level table and its rules by level number; an open-format
     /// level carries it itself, so it plays the same without the game's files.
     pub settings: Settings,
-    /// The Virtools behaviour graphs a community map carries (scripts of its own), for the script runtime; a level
-    /// in the open format has none.
+    /// The Virtools behaviour graphs a community map carries (scripts of its own), for the script runtime; the open
+    /// format carries them in the scene's extras (`script_json.rs`).
     pub scripts: Option<std::sync::Arc<script::Graph>>,
 }
 

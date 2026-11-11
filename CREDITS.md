@@ -4,7 +4,7 @@ Other credit files: `assets/own/CREDITS.md` (photo textures), `assets/sounds/sys
 
 ## The owner's picks (in place of our own levels, for now)
 
-Thirteen more community maps, picked by the project's owner, stand in place of our own levels (Start > Drahtseilakt) until their remasters are made. **They belong to their authors and are shipped unmodified, with thanks; if an author objects, we will remove the map.** Each folder's `level.txt` names the author and where the map was posted; where no post is known, the author is credited by name and the video the map was found in is given. Our own earlier levels are kept in `levels-legacy_delme/`. Checksums: `assets/levels/SHA256SUMS`.
+Thirteen more community maps, picked by the project's owner, stand in place of our own levels (Start > Drahtseilakt) until their remasters are made. **They belong to their authors and are shipped converted to Drahtseilakt's open format (from each author's `.nmo`, with our own textures where the map's own are not embedded; nothing of the original game is included), with thanks; if an author objects, we will remove the map.** Each folder's `level.txt` names the author and where the map was posted; where no post is known, the author is credited by name and the video the map was found in is given. Our own earlier levels are kept in `levels-legacy_delme/`. Checksums: `assets/levels/SHA256SUMS`.
 
 | # | Map | Original name | Author | Posted | Difficulty | Source | Video | Folder |
 |---|---|---|---|---|---|---|---|---|
