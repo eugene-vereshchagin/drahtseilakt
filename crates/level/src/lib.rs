@@ -282,6 +282,8 @@ pub struct Object {
     pub visible: bool,
     /// A sprite (CKSprite3D): its mesh is a unit quad (0..1 in x and y) that is turned and sized each frame.
     pub sprite: Option<Sprite>,
+    /// The object it is a child of (Set Parent in the file): it follows when that one moves. `matrix` stays world.
+    pub parent: Option<usize>,
 }
 
 /// How a sprite is placed each frame (the original's CKSprite3D): `mode` 0 faces the view, 1 turns about the world x,
@@ -365,6 +367,7 @@ mod tests {
     fn a_stand_in_is_what_its_group_says_whatever_its_name() {
         use super::{Group, Level, Object};
         let object = |name: &str| Object {
+            parent: None,
             name: name.into(),
             matrix: [[0.0; 4]; 4],
             mesh: None,

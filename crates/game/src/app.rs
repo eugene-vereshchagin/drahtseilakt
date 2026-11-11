@@ -1647,7 +1647,7 @@ fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
             (&game.sim.extra_views(), game.extra_model.as_ref()),
             &snap,
             &game.sim.pieces_view(),
-            (game.sim.script_hidden(), game.sim.script_moved()),
+            game.sim.script_entities(),
         );
         if snap.kind.is_some() {
             scene::shadows(&game.shadow_receivers, snap.ball, &mut inst);
@@ -1730,7 +1730,7 @@ fn locate_run(game: &mut Game, o: &Options, dir: &Path) -> Result<(), String> {
             (&[], None),
             &snap,
             &game.sim.pieces_view(),
-            (game.sim.script_hidden(), game.sim.script_moved()),
+            game.sim.script_entities(),
         );
         off.edges(&mut r, view, &inst)
     };
@@ -3605,7 +3605,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         (&game.sim.extra_views(), game.extra_model.as_ref()),
         &snap,
         &game.sim.pieces_view(),
-        (game.sim.script_hidden(), game.sim.script_moved()),
+        game.sim.script_entities(),
     );
     let mut inst = inst;
     if snap.kind.is_some() {
@@ -4983,7 +4983,7 @@ impl App {
                 (&sim.extra_views(), g.extra_model.as_ref()),
                 &snap,
                 &sim.pieces_view(),
-                (sim.script_hidden(), sim.script_moved()),
+                sim.script_entities(),
             );
             if snap.kind.is_some() {
                 scene::shadows(&g.shadow_receivers, snap.ball, &mut inst);
@@ -5937,7 +5937,7 @@ impl App {
                 (&self.game.sim.extra_views(), self.game.extra_model.as_ref()),
                 &snap,
                 &self.game.sim.pieces_view(),
-                (self.game.sim.script_hidden(), self.game.sim.script_moved()),
+                self.game.sim.script_entities(),
             );
             if snap.kind.is_some() {
                 scene::shadows(&self.game.shadow_receivers, snap.ball, &mut inst);

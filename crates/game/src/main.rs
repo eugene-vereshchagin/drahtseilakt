@@ -11,6 +11,7 @@
 mod app;
 mod audit;
 mod dik;
+mod entities;
 use gamedata::assets;
 mod audio;
 mod autopilot;

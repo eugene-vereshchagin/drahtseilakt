@@ -301,6 +301,7 @@ mod tests {
         level::Level {
             meshes: vec![mesh],
             objects: vec![level::Object {
+                parent: None,
                 name: "Floor_001".into(),
                 matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
                 mesh: Some(0),

@@ -53,6 +53,7 @@ fn level() -> Level {
         }],
     });
     l.objects.push(Object {
+        parent: None,
         name: "dome".into(),
         matrix: [
             [1.0, 0.0, 0.0, 0.0],

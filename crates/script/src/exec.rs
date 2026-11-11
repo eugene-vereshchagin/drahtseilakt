@@ -74,6 +74,16 @@ pub trait Host {
     fn copy(&mut self, _e: Ent, _name: &str) -> Option<usize> {
         None
     }
+    /// Makes `parent` the parent of an object (Set Parent; none: no parent), keeping its world place. Whether it
+    /// was done (a loop or an unknown object is refused). The blocks that call it come with stage 4.
+    fn set_parent(&mut self, _e: Ent, _parent: Option<Ent>) -> bool {
+        false
+    }
+    /// A new object out of nothing (Object Create) at a matrix, with the mesh of a level object to draw as, or
+    /// none: the new object, or none when the engine makes none.
+    fn create(&mut self, _name: &str, _like: Option<Ent>, _m: [[f32; 4]; 4]) -> Option<usize> {
+        None
+    }
     /// A level group gains or loses a member, or all of them (Add To Group, Remove From Group, Group Clear).
     fn group_add(&mut self, _group: usize, _object: usize) {}
     fn group_remove(&mut self, _group: usize, _object: usize) {}

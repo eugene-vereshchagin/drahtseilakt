@@ -26,6 +26,28 @@ Parameterobjekte, also lesen Bausteine ihre Pins nach Namen. Was die Datei nicht
 aktiv startet (alle starten aktiv und zurückgesetzt) und die Objekte des Spiels selbst (`Ball_Pos_Frame`, die
 Tabelle `CurrentLevel`), die die Engine beantwortet.
 
+## Stage 3.1 (2026-11-12): the run's entity table
+
+(Englisch; Übersetzung folgt.)
+
+One table, `crates/game/src/entities.rs`, owned by the run (`Scripts.ents`), read by the renderer and the scripts. Rows
+0..N are the level's objects in the level's order; later rows are copies (Object Copy) and created objects (Object
+Create). A row: name, class (level, copy of a row, created), parent, world transform, hidden, mesh, materials, alive.
+It clones and rewinds with the run. Caps: `MAX_ENTITIES` rows in all (the same limit as the objects of the scripts) and
+`MAX_DRAWN_EXTRA` (4096) copies and created objects drawn per frame; rows past it stay in the table, undrawn.
+
+- **Hierarchy.** The level file's parent of each entity is read (`level::Object::parent`, from the entity chunk's
+  parent reference); a loop or a parent that is no object is dropped. A child stores its transform relative to its
+  parent and follows when the parent is moved or turned; moving the child itself sets its world place. Set Parent goes
+  through `Host::set_parent` (a loop is refused); the block comes with stage 4.
+- **Drawing.** Hidden or deleted rows are not drawn; a moved object is drawn at its transform (a child of a moved
+  parent at its placement carried along); a copy is drawn with its source's mesh and materials at its own transform,
+  only if the source is a plain mesh with a material (not a sprite, not the cloud layer; a copy of a collider is not
+  seen). Object Create (`Host::create`, the block comes with stage 4) draws if it has a mesh, else it only exists.
+- **Not here.** The collision and the ball read the level as before. The physics of moved and copied objects (static
+  bodies added and removed live, followers of a moving parent) is the next task, 3.2. A level without scripts has no
+  table and takes the old path unchanged.
+
 ## Das Modell des Interpreters
 
 `script::Graph` sind die Graphen der Datei als Daten; `script::Runtime` ist der Zustand (aktive Verhalten und
