@@ -26,7 +26,7 @@ pub struct Issue {
 }
 
 /// The kinds, with what each means (the CSV's legend and the summary's).
-pub const KINDS: [(&str, &str); 19] = [
+pub const KINDS: [(&str, &str); 24] = [
     ("load-failed", "the map does not load"),
     (
         "load-warning",
@@ -70,11 +70,31 @@ pub const KINDS: [(&str, &str); 19] = [
     ),
     (
         "texture-missing",
-        "a texture a material draws with that nobody has (drawn plain)",
+        "a texture a material draws with that nobody has (drawn in the material's colour, toned down)",
     ),
     (
         "texture-found",
         "textures drawn: the map's own pixels, ours or the copy's by name (count only)",
+    ),
+    (
+        "texture-by-name",
+        "textures without a picture or a file, taken for the game's texture their name means (count only)",
+    ),
+    (
+        "frame-drawn",
+        "2D frames of the map drawn over the picture, as the original draws them (count only)",
+    ),
+    (
+        "frame-not-drawn",
+        "2D frames hidden in the file or without a texture: what a script of the map shows or fills (not drawn)",
+    ),
+    (
+        "sound-unplayed",
+        "sounds of the map (read; its scripts play them, and the files are not in the map): not played",
+    ),
+    (
+        "curve-unused",
+        "curves and their points nothing in the map reads (an exporter's shapes): not drawn (count only)",
     ),
     (
         "part-no-material",
@@ -82,7 +102,7 @@ pub const KINDS: [(&str, &str); 19] = [
     ),
     (
         "class-skipped",
-        "objects of classes the loader does not read (curves, characters, 2D, sounds, ...)",
+        "objects of classes the loader does not read (curves a script reads, patch meshes, MIDI, 2D sprites, ...)",
     ),
     (
         "animation-played",
@@ -137,6 +157,7 @@ pub fn level_issues(
     sim: &Sim,
     placements: &[Placement],
     data: &Data,
+    open: bool,
 ) -> Vec<Issue> {
     let mut out = Vec::new();
     let mut drawn = vec![false; level.objects.len()];
@@ -237,6 +258,11 @@ pub fn level_issues(
             level::TextureSource::None => false,
             _ => data.texture(t).is_some(),
         };
+        // a `.nmo` map names the game's textures by file; one named outright is a texture that had neither a file
+        // nor pixels and was taken by its name (assets::name_meant_textures)
+        if let (true, false, level::TextureSource::Game(meant)) = (found, open, &t.source) {
+            push(&mut out, "texture-by-name", format!("{} = {meant}", t.name));
+        }
         if found {
             push(&mut out, "texture-found", t.name.clone());
         } else {
@@ -345,9 +371,86 @@ fn doc_issues(doc: &nmo::Document, out: &mut Vec<Issue>) {
         2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 20, 22, 45, 46, 48, 55,
     ];
     let played = plays_animations(doc);
+    // what a script of the file can reach: a parameter's value, a behaviour's target
+    let mut reached = vec![false; doc.objects.len()];
     for o in &doc.objects {
+        let Some(chunk) = &o.chunk else { continue };
+        let i = match o.class_id {
+            nmo::behavior::class::BEHAVIOR => {
+                nmo::behavior::behavior(chunk).ok().and_then(|b| b.target)
+            }
+            3 | 45 => match nmo::behavior::parameter(chunk).map(|p| p.value) {
+                Ok(nmo::behavior::Saved::Object(i)) => i,
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(r) = i.and_then(|i| reached.get_mut(i)) {
+            *r = true;
+        }
+    }
+    // a curve is read when it or a point of it is reached; its points are then read with it
+    let mut curve_read = reached.clone();
+    for (i, o) in doc.of_class(class::CURVE) {
+        let points = o
+            .chunk
+            .as_ref()
+            .and_then(|c| nmo::scene::curve(c).ok().flatten())
+            .map(|c| c.points)
+            .unwrap_or_default();
+        let read = reached.get(i).copied().unwrap_or(false)
+            || points
+                .iter()
+                .any(|p| reached.get(*p).copied().unwrap_or(false));
+        for p in points.into_iter().chain([i]) {
+            if let Some(r) = curve_read.get_mut(p) {
+                *r = read;
+            }
+        }
+    }
+    for (i, o) in doc.objects.iter().enumerate() {
         if read.contains(&o.class_id) || logic.contains(&o.class_id) {
             continue;
+        }
+        match o.class_id {
+            class::ENTITY_2D => {
+                // drawn as hud::level_frames draws: shown in the file, with a material that has a texture
+                let chunk = o.chunk.as_ref();
+                let shown =
+                    chunk.is_some_and(|c| c.section(0x4).is_none() && c.section(0x18).is_none());
+                let textured = chunk
+                    .and_then(|c| nmo::scene::entity_2d(c).ok())
+                    .and_then(|e| doc.get(e.material?)?.chunk.as_ref())
+                    .and_then(|c| nmo::scene::material(c).ok())
+                    .is_some_and(|m| m.texture.is_some());
+                let kind = if shown && textured {
+                    "frame-drawn"
+                } else {
+                    "frame-not-drawn"
+                };
+                push(out, kind, o.name_lossy());
+                continue;
+            }
+            class::WAVE_SOUND => {
+                let file = o
+                    .chunk
+                    .as_ref()
+                    .and_then(|c| nmo::scene::wave_sound(c).ok())
+                    .and_then(|s| s.file_name)
+                    .map(|f| String::from_utf8_lossy(&f).into_owned())
+                    .unwrap_or_default();
+                push(
+                    out,
+                    "sound-unplayed",
+                    format!("{} <{file}>", o.name_lossy()),
+                );
+                continue;
+            }
+            class::CURVE | class::CURVE_POINT if !curve_read.get(i).copied().unwrap_or(false) => {
+                push(out, "curve-unused", o.name_lossy());
+                continue;
+            }
+            _ => {}
         }
         if is_animation(o.class_id) {
             // An animation is a loss only where a block plays it. The exporters bake one for every object, with
@@ -423,7 +526,14 @@ pub fn map_issues(path: &Path, data: &Data) -> Vec<Issue> {
         .unwrap_or(crate::sim::BallKind::Wood);
     let sim = Sim::with_rules(level, start, &modules, false, crate::replay::VERSION);
     let placements = scene::placements(level, &modules, sim.loose(), sim.module_bodies());
-    out.extend(level_issues(level, &modules, &sim, &placements, &data));
+    out.extend(level_issues(
+        level,
+        &modules,
+        &sim,
+        &placements,
+        &data,
+        open,
+    ));
     if !open {
         file_issues(path, &mut out);
     }
@@ -639,7 +749,7 @@ mod tests {
         let modules = Modules::default();
         let sim = Sim::new(level, crate::sim::BallKind::Wood);
         let placements = scene::placements(level, &modules, sim.loose(), sim.module_bodies());
-        level_issues(level, &modules, &sim, &placements, &Data::new(None))
+        level_issues(level, &modules, &sim, &placements, &Data::new(None), false)
     }
 
     fn count(found: &[Issue], kind: &str) -> usize {
@@ -731,6 +841,58 @@ mod tests {
 
     /// Virtools plays no animation by itself: the bake an exporter leaves on every object moves nothing in the
     /// original, so it is counted, not reported as a loss; one whose keys would move is named so.
+    /// A frame is drawn as the game draws it (shown, a material with a texture); a hidden one or one without a
+    /// texture waits for a script. A sound is read but not played. A curve nothing reaches is an exporter's shape;
+    /// one a parameter names stays among the classes not read.
+    #[test]
+    fn frames_sounds_and_curves_are_told_apart() {
+        let f = f32::to_bits;
+        let material =
+            |texture: u32| file_object(30, "m", 0x1000, &[!0, !0, 0, 0, 0, texture, 0, 0, 0]);
+        let frame = |name: &str, material: u32| {
+            let rect = [f(0.0), f(0.0), f(80.0), f(60.0)];
+            let mut fields = vec![0x4_0000];
+            fields.extend(rect);
+            fields.push(material);
+            file_object(27, name, 0x0010_f000, &fields)
+        };
+        let mut hidden = frame("hidden", 1);
+        if let Some(c) = &mut hidden.chunk {
+            // the hidden mark before the frame's part
+            let mut words = vec![0x4, 2];
+            words.extend(c.words.iter().copied());
+            c.words = words;
+        }
+        let found = doc_found(vec![
+            file_object(31, "t", 0x1, &[]),
+            material(0),
+            material(u32::MAX),
+            frame("signature", 1),
+            frame("plain", 2),
+            hidden,
+            file_object(
+                25,
+                "bgm",
+                0x1000,
+                &[0, 5, u32::from_le_bytes(*b"a.wa"), u32::from(b'v')],
+            ),
+            file_object(43, "Line01", 0xffc0_0000, &[1, 8, f(0.0), 0, 1]),
+            file_object(36, "", 0x1, &[]),
+            file_object(43, "Path", 0xffc0_0000, &[0, f(0.0), 0, 1]),
+            file_object(45, "curve", 0x40, &[0, 0, 2, 9]),
+        ]);
+        assert_eq!(count(&found, "frame-drawn"), 1);
+        assert_eq!(count(&found, "frame-not-drawn"), 2);
+        assert_eq!(count(&found, "sound-unplayed"), 1);
+        assert!(
+            found
+                .iter()
+                .any(|i| i.names.contains(&"bgm <a.wav>".to_string()))
+        );
+        assert_eq!(count(&found, "curve-unused"), 2);
+        assert_eq!(count(&found, "class-skipped"), 1);
+    }
+
     #[test]
     fn an_animation_nothing_plays_is_only_counted() {
         let found = doc_found(vec![
