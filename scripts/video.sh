@@ -18,8 +18,9 @@ level=$1; replay=$2; out=$3; size=${4:-1920x1080}
 # VIDEO_CRF sets the encoder's quality (lower is better; 20 by default)
 ss=${VIDEO_SS:-1}; crf=${VIDEO_CRF:-20}
 # VIDEO_MODELS picks the model pack for the run (own, original or a pack's key), whatever the settings file says; a
-# remaster video takes the game's original models by default, so the ball and the parts are Ballance's own
-models=${VIDEO_MODELS:-}; [ -z "$models" ] && [ "${VIDEO_MODE:-}" = remaster ] && models=original
+# remaster video takes the level's own parts by default: Ballance's balls and parts as the toolbox remade them with the
+# level (rounder, larger textures, relief), not the copy's 2004 meshes (original) and not ours (own)
+models=${VIDEO_MODELS:-}; [ -z "$models" ] && [ "${VIDEO_MODE:-}" = remaster ] && models=level
 w=${size%x*}; h=${size#*x}
 draw="$((w * ss))x$((h * ss))"
 here=$(dirname "$0")

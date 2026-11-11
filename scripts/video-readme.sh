@@ -60,7 +60,8 @@ mo=$(setting models); [ "$extended" = yes ] || mo=""
 case $mo in
     own) models="Drahtseilakt's own (balls, transformers and every part drawn by us)" ;;
     original) models="Ballance's original, from the player's own copy" ;;
-    ""|level) models="as the level takes them" ;;
+    ""|level) models="as the level takes them"
+        [ "$is_remaster" = yes ] && models="Ballance's original balls and parts, remade by the toolbox with the level (rounder shapes, larger textures, relief)" ;;
     *) models="the player's model pack \"$mo\"" ;;
 esac
 about=""
@@ -70,7 +71,7 @@ What the remaster is: the same level, the same physics and the same run, drawn a
 level from the player's own copy of Ballance and rebuilds its look on the player's machine: every texture is enlarged
 by Real-ESRGAN up to 4096 pixels a side and stored compressed for the graphics card, the level's shapes are rounded
 where the 2004 meshes were faceted, and the lit surfaces get relief (normal maps, raised bricks and sunk mortar). The
-balls and parts are the game's own models. Nothing of Ballance is shipped: whoever owns the game makes the remaster
+balls and parts are the game's own models, remade the same way. Nothing of Ballance is shipped: whoever owns the game makes the remaster
 from their own copy in a couple of clicks.
 "
 fi
