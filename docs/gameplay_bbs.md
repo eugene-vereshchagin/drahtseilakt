@@ -1897,3 +1897,41 @@ the engine's own pixel font, so only what decides *where, how big, what colour* 
 - **3D Text, Movie Player:** known, do nothing (inputs taken, one log note). 3D Text would need the camera's
   projection of the object; left for later.
 - Text never affects the simulation: the boxes are only read by the renderer.
+
+## The game's facade
+
+What a map's scripts read or wait for that the map does not hold: the game's own objects, arrays and messages
+(plan items 1.4 and 3.9). Layouts are those saved in `Gameplay.nmo` and `Balls.nmo`; the engine fills the cells
+from the run (`crates/game/src/facade.rs`). Everything is read-only for the rules: a script's Set Cell on a game
+array is kept in the run's scripts only (at most 256 cells) and never reaches the simulation, so replays and the
+original levels (which carry no scripts) stay exact. A name the map holds itself is never replaced.
+
+Objects the graph gets when the map lacks them: `Ball`, `Ball_Stone`, `Ball_Paper`, `Ball_Wood` (the live ball),
+`Ball_Pos_Frame`, and as plain named objects `Particle_Flames`, `All_Gameplay`, `All_Sound`, `All_Balls`, `PH`,
+`Floor`, `Light_Ingame`, `InGameCam`; tables `CurrentLevel`, `IngameParameter`, `Energy`, `Physicalize_GameBall`.
+
+| Array | Columns (kind) | Cells |
+|---|---|---|
+| `CurrentLevel` (1 row) | Level ID (int), ActiveBall (object), Ball_Pos_Frame (object), CurrentResetpoint, Activation Phase? (bool), Points (int) | 0 (a map has no table number); the object of the ball's kind; the ball's frame; none; the ball is in play; the run's points |
+| `IngameParameter` (1 row) | Activetrafo (object), Activate Sector, Deactivate Sector (int), Tutorial activ?, RollSound activate? (bool) | none; the sector now; the sector left last (0 before a change); false; true |
+| `Energy` (1 row) | Points, Lifes, StartPoints, StartLifes (int), Timefactor (float), LifeBonus (int) | points; lives; 1000; 3; 500 (ms between two points counted off); 200 |
+| `Physicalize_GameBall` (3 rows) | Ballname, Friction, Elasticity, Mass, CollGroup, Linear Damp, Rot Damp, Force | Balls.nmo's rows: Ball_Paper, Ball_Stone, Ball_Wood |
+
+Messages are read from the file's message manager (a Message parameter saved as an index is resolved to its name).
+The engine broadcasts them (to every object, no sender) before the tick's scripts run, from what changed in the run
+since the tick before, so a Wait Message hears them in that tick.
+
+| Game event | Message name(s), in order | Original sender (Gameplay.nmo) |
+|---|---|---|
+| level start (first tick) | `Start Music` | Init Ingame |
+| checkpoint reached (sector rises) | `Checkpoint reached` | the sector scripts |
+| ball lost (lives drop) | `Ball Off`, `Sub Life`; with the last life also `Game Over` | BallManager; `Sub Life` is waited by Energy |
+| extra life (lives rise) | `Life_Up` | the points/lives script |
+| extra point (points rise, no life lost) | `Extrapoint` | waited by the points display |
+| level finished | `Level_Finish`, `End Level` | the finish script |
+| ball changed (transformer) | `Trafo` | Trafo Manager |
+
+Not emitted: `last Checkpoint reached`, `Pause Level` / `Unpause Level`, `Refresh`, `Dead`, the `BallNav` /
+`CamNav` activate messages and `Part_Loaded` (they belong to the game's own scripts, not run here).
+Open points: `CurrentLevel`'s Level ID is 0 because a map carries no level number; `Timefactor` is the counter's
+period in milliseconds (the original's parameter was not read).

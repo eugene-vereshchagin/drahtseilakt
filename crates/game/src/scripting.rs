@@ -42,6 +42,12 @@ pub struct Scripts {
     /// The text boxes the map's scripts show now, by the block that shows each (drawn by hud.rs under the interface;
     /// they rewind and restart with the run).
     pub text: Vec<(script::Id, script::TextSpec)>,
+    /// The game's facade: the objects of the ball by kind, the run's numbers last seen (for the game's messages),
+    /// the sector left last, and what scripts wrote into the game's arrays (kept in the run, never in its rules).
+    ball_objs: [Option<script::Id>; 3],
+    seen: Option<crate::facade::Seen>,
+    left_sector: usize,
+    written: BTreeMap<(String, usize, usize), Value>,
 }
 
 /// The most sound events kept for the audio between two drains (a run with no audio never drains them).
@@ -115,6 +121,11 @@ impl Scripts {
     pub fn new(level: &Level) -> Option<Scripts> {
         let graph = level.scripts.clone()?;
         let ball_id = graph.find("Ball_Pos_Frame");
+        let ball_objs = [
+            graph.find("Ball_Wood"),
+            graph.find("Ball_Stone"),
+            graph.find("Ball_Paper"),
+        ];
         let local_bounds = level
             .objects
             .iter()
@@ -159,6 +170,10 @@ impl Scripts {
             sound: SoundState::default(),
             camera: CameraOverride::default(),
             text: Vec::new(),
+            ball_objs,
+            seen: None,
+            left_sector: 0,
+            written: BTreeMap::new(),
         })
     }
 }
@@ -176,6 +191,11 @@ pub struct RunView {
     /// The keyboard and the mouse of this tick and of the tick before (the run's input stream).
     pub input: script::InputFrame,
     pub input_before: script::InputFrame,
+    /// The run's lives, sector and ball kind, and whether the level is finished (the game's messages follow them).
+    pub lives: u32,
+    pub sector: usize,
+    pub kind: crate::sim::BallKind,
+    pub finished: bool,
     /// What the scripts asked of the system's mouse cursor this tick: shown or hidden.
     pub cursor: Option<bool>,
     /// The sim camera's place and aim this tick (where the view looks without a camera object).
@@ -211,6 +231,9 @@ struct ScriptsParts {
     sound: SoundState,
     camera: CameraOverride,
     text: Vec<(script::Id, script::TextSpec)>,
+    ball_objs: [Option<script::Id>; 3],
+    left_sector: usize,
+    written: BTreeMap<(String, usize, usize), Value>,
 }
 
 impl ScriptsParts {
@@ -386,18 +409,46 @@ impl Host for SimHost<'_> {
     }
 
     fn game_cell(&self, array: &str, row: usize, column: usize) -> Option<Value> {
-        if !array.eq_ignore_ascii_case("CurrentLevel") || row != 0 {
-            return None;
+        let cols = crate::facade::columns(array)?;
+        cols.get(column)?;
+        if let Some(v) = self
+            .s
+            .written
+            .get(&(array.to_ascii_lowercase(), row, column))
+        {
+            return Some(v.clone());
         }
-        // Level ID, ActiveBall, Ball_Pos_Frame, CurrentResetpoint, Activation Phase?, Points (Gameplay.nmo).
-        Some(match column {
-            0 => Value::Int(0),
-            1 | 2 => Value::Obj(self.s.ball_id),
-            3 => Value::None,
-            4 => Value::Bool(self.run.in_play),
-            5 => Value::Int(i32::try_from(self.run.points).unwrap_or(i32::MAX)),
-            _ => return None,
-        })
+        let kind_object = match self.run.kind {
+            crate::sim::BallKind::Wood => self.s.ball_objs[0],
+            crate::sim::BallKind::Stone => self.s.ball_objs[1],
+            crate::sim::BallKind::Paper => self.s.ball_objs[2],
+            crate::sim::BallKind::Sticky => None,
+        };
+        crate::facade::cell(
+            array,
+            row,
+            column,
+            &crate::facade::Fill {
+                in_play: self.run.in_play,
+                points: self.run.points,
+                lives: self.run.lives,
+                sector: self.run.sector,
+                left_sector: self.s.left_sector,
+                frame: self.s.ball_id,
+                kind_object,
+            },
+        )
+    }
+
+    fn game_set_cell(&mut self, array: &str, row: usize, column: usize, v: Value) -> bool {
+        // only a cell the array has, and the run's own copy of it: the game's rules never read it back
+        if self.game_cell(array, row, column).is_none() || self.s.written.len() >= 256 {
+            return false;
+        }
+        self.s
+            .written
+            .insert((array.to_ascii_lowercase(), row, column), v);
+        true
     }
 
     fn message(&mut self, name: &str, to: Option<Ent>) {
@@ -596,6 +647,30 @@ impl Host for SimHost<'_> {
 }
 
 impl Scripts {
+    /// The game's messages for what the run did since the last tick (facade::events): broadcast, heard by the
+    /// scripts' Wait Message at the next tick. Nothing here changes the run.
+    fn emit_events(&mut self, run: &RunView) {
+        let now = crate::facade::Seen {
+            sector: run.sector,
+            lives: run.lives,
+            points: run.points,
+            kind: run.kind,
+            finished: run.finished,
+        };
+        if let Some(p) = &self.seen
+            && now.sector != p.sector
+        {
+            self.left_sector = p.sector;
+        }
+        for name in crate::facade::events(self.seen.as_ref(), &now) {
+            self.rt.send(name, None);
+            if self.log.len() < LOG_CAP {
+                self.log.push((run.tick, format!("game message {name}")));
+            }
+        }
+        self.seen = Some(now);
+    }
+
     /// One tick of the scripts over the run's view; the view carries back what the run must apply.
     /// The world matrix of a level object as the scripts have it: moved, else as loaded.
     pub fn object_matrix(&self, i: usize) -> Option<Mat4> {
@@ -606,6 +681,7 @@ impl Scripts {
     }
 
     pub fn tick(&mut self, run: &mut RunView) {
+        self.emit_events(run);
         let mut parts = ScriptsParts {
             hidden: std::mem::take(&mut self.hidden),
             moved: std::mem::take(&mut self.moved),
@@ -621,6 +697,9 @@ impl Scripts {
             sound: std::mem::take(&mut self.sound),
             camera: self.camera,
             text: std::mem::take(&mut self.text),
+            ball_objs: self.ball_objs,
+            left_sector: self.left_sector,
+            written: std::mem::take(&mut self.written),
         };
         {
             let mut host = SimHost { s: &mut parts, run };
@@ -637,8 +716,104 @@ impl Scripts {
         self.sound = parts.sound;
         self.camera = parts.camera;
         self.text = parts.text;
+        self.written = parts.written;
         if run.teleport.is_some() {
             self.teleports = self.teleports.saturating_add(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod facade_tests {
+    use super::*;
+    use crate::sim::BallKind;
+
+    fn view(tick: u64, sector: usize, lives: u32) -> RunView {
+        RunView {
+            tick,
+            ball: Vec3::ZERO,
+            ball_radius: 1.0,
+            points: 1000,
+            in_play: true,
+            teleport: None,
+            input: script::InputFrame::default(),
+            input_before: script::InputFrame::default(),
+            lives,
+            sector,
+            kind: BallKind::Wood,
+            finished: false,
+            cursor: None,
+            eye: Vec3::ZERO,
+            target: Vec3::Z,
+        }
+    }
+
+    fn scripts() -> Scripts {
+        let mut g = script::Graph::default();
+        for n in ["Ball_Pos_Frame", "Ball_Wood"] {
+            g.add_object(n, script::ObjKind::Ball);
+        }
+        let level = Level {
+            scripts: Some(std::sync::Arc::new(g)),
+            ..Level::default()
+        };
+        Scripts::new(&level).expect("a level with a graph has scripts")
+    }
+
+    #[test]
+    fn the_engine_sends_the_games_messages_to_every_object() {
+        // sent before the tick's scripts run, so a Wait Message hears it in that same tick
+        let mut s = scripts();
+        s.tick(&mut view(0, 1, 3));
+        assert_eq!(s.rt.messages_to("Start Music", None).len(), 1);
+        s.tick(&mut view(1, 1, 3));
+        assert!(s.rt.messages_to("Start Music", None).is_empty(), "once");
+        s.tick(&mut view(2, 2, 3));
+        assert_eq!(s.rt.messages_to("Checkpoint reached", None).len(), 1);
+        s.tick(&mut view(3, 2, 2));
+        assert_eq!(s.rt.messages_to("Sub Life", None).len(), 1);
+        assert_eq!(s.rt.messages_to("Ball Off", None).len(), 1);
+        assert!(s.log.iter().any(|(_, l)| l == "game message Checkpoint reached"));
+    }
+
+    #[test]
+    fn a_script_write_stays_in_the_run() {
+        let mut s = scripts();
+        let level_parts = |s: &mut Scripts, f: &mut dyn FnMut(&mut SimHost)| {
+            let mut run = view(0, 1, 3);
+            let mut parts = ScriptsParts {
+                hidden: vec![],
+                moved: vec![],
+                local_bounds: vec![],
+                names: vec![],
+                initial: vec![],
+                meshes: vec![],
+                groups: vec![],
+                materials: s.materials.clone(),
+                log: vec![],
+                ball_id: s.ball_id,
+                tick: 0,
+                sound: SoundState::default(),
+                camera: CameraOverride::default(),
+                text: vec![],
+                ball_objs: s.ball_objs,
+                left_sector: 0,
+                written: std::mem::take(&mut s.written),
+            };
+            f(&mut SimHost {
+                s: &mut parts,
+                run: &mut run,
+            });
+            s.written = parts.written;
+        };
+        level_parts(&mut s, &mut |h| {
+            assert_eq!(h.game_cell("Energy", 0, 1), Some(Value::Int(3)));
+            assert!(h.game_set_cell("Energy", 0, 1, Value::Int(99)));
+            assert_eq!(h.game_cell("Energy", 0, 1), Some(Value::Int(99)));
+            assert!(!h.game_set_cell("Energy", 0, 9, Value::Int(1)), "no such column");
+            assert!(!h.game_set_cell("Nope", 0, 0, Value::Int(1)));
+        });
+        // the run's own number is untouched
+        assert_eq!(s.ball_objs[0], s.rt.graph.find("Ball_Wood"));
     }
 }

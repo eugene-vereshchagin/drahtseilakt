@@ -53,6 +53,8 @@ impl Object {
 #[derive(Debug, Clone)]
 pub struct Document {
     pub objects: Vec<Object>,
+    /// The message manager's names in file index order (a Message parameter saved as an index reads one).
+    pub messages: Vec<Vec<u8>>,
 }
 
 impl Document {
@@ -81,10 +83,17 @@ impl Document {
         }
 
         let mut data = Reader::new(&file.data, Part::Data);
+        let mut messages = Vec::new();
         for _ in 0..file.header.manager_count {
-            data.bytes(8)?; // manager GUID
+            let guid = data.bytes(8)?; // manager GUID
             let size = data.u32()? as usize;
-            data.bytes(size)?;
+            let raw = data.bytes(size)?;
+            if guid.get(..4) == Some(&MESSAGE_MANAGER.to_le_bytes()[..]) && size > 0 {
+                // a manager chunk that does not parse leaves the table empty: indices then stay unnamed
+                if let Ok(chunk) = Chunk::parse(raw, Part::Data) {
+                    messages = message_names(&chunk).unwrap_or_default();
+                }
+            }
         }
         let mut objects = Vec::with_capacity(entries.len());
         for (id, class_id, name) in entries {
@@ -108,7 +117,7 @@ impl Document {
                 what: "object data (bytes left over)",
             });
         }
-        Ok(Document { objects })
+        Ok(Document { objects, messages })
     }
 
     pub fn get(&self, index: usize) -> Option<&Object> {
@@ -121,6 +130,21 @@ impl Document {
             .enumerate()
             .filter(move |(_, o)| o.class_id == class_id)
     }
+}
+
+/// The message manager's GUID (first word); its chunk's section 0x53 is a count and the names.
+const MESSAGE_MANAGER: u32 = 0x466a_0fac;
+/// The most message types a file names.
+const MAX_MESSAGE_TYPES: usize = 4_096;
+
+fn message_names(chunk: &Chunk) -> Option<Vec<Vec<u8>>> {
+    let mut w = chunk.section(0x53)?;
+    let n = (w.u32().ok()? as usize).min(MAX_MESSAGE_TYPES);
+    let mut out = Vec::new();
+    for _ in 0..n {
+        out.push(w.string().ok()?);
+    }
+    Some(out)
 }
 
 /// A reference to another object in the same file, resolved to its index; `None` for a null reference.

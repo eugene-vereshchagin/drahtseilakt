@@ -836,7 +836,7 @@ mod tests {
 
     fn doc_found(objects: Vec<nmo::Object>) -> Vec<Issue> {
         let mut out = Vec::new();
-        doc_issues(&nmo::Document { objects }, &mut out);
+        doc_issues(&nmo::Document { objects, messages: Vec::new() }, &mut out);
         out
     }
 

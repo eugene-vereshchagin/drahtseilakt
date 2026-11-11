@@ -133,6 +133,21 @@ fn le_i32(b: &[u8], at: usize) -> Option<i32> {
     le_f32(b, at).map(|f| f.to_bits() as i32)
 }
 
+/// The names of the game's ball objects (one live ball answers to each), and of the game's other objects, groups and
+/// tables that maps name and the map does not hold (plan 1.4); the host gives the tables' cells.
+pub const FACADE_BALLS: [&str; 4] = ["Ball", "Ball_Stone", "Ball_Paper", "Ball_Wood"];
+pub const FACADE_OTHER: [&str; 9] = [
+    "Particle_Flames",
+    "All_Gameplay",
+    "Physicalize_GameBall",
+    "Floor",
+    "All_Sound",
+    "PH",
+    "Light_Ingame",
+    "InGameCam",
+    "All_Balls",
+];
+
 impl Value {
     /// A saved value by its type; unknown types are kept raw, decoded by their size when a block needs a number.
     pub fn decode(guid: Guid, saved: &Saved) -> Value {
@@ -543,10 +558,20 @@ impl Graph {
                 }
                 behavior::class::PARAMETER_OUT | behavior::class::PARAMETER_LOCAL => {
                     behavior::parameter(chunk).ok().map(|p| {
+                        let value = match (&p.value, p.guid == types::MESSAGE) {
+                            // a message saved as an index into the file's message manager
+                            (behavior::Saved::Bytes(b), true) if b.len() == 4 => {
+                                let i = u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize;
+                                doc.messages.get(i).map_or(Value::Str(String::new()), |n| {
+                                    Value::Str(String::from_utf8_lossy(n).into_owned())
+                                })
+                            }
+                            _ => Value::decode(p.guid, &p.value),
+                        };
                         Node::Param(Param {
                             name: o.name_lossy(),
                             guid: p.guid,
-                            value: Value::decode(p.guid, &p.value),
+                            value,
                             destinations: p.destinations.into_iter().filter(|&d| d < n).collect(),
                             ..Param::default()
                         })
@@ -610,6 +635,19 @@ impl Graph {
         // game's tables, which the host answers (`Host::game_cell`).
         if g.find("Ball_Pos_Frame").is_none() {
             g.add_object("Ball_Pos_Frame", ObjKind::Ball);
+        }
+        // The game's facade (docs/gameplay_bbs.md, "The game's facade"): the live ball under its kinds' names, and the
+        // other objects, groups and tables every map's scripts name. The host answers the tables' cells; a name a
+        // map holds itself is left as it is.
+        for name in FACADE_BALLS {
+            if g.find(name).is_none() {
+                g.add_object(name, ObjKind::Ball);
+            }
+        }
+        for name in FACADE_OTHER {
+            if g.find(name).is_none() {
+                g.add_object(name, ObjKind::Other);
+            }
         }
         for table in ["CurrentLevel", "IngameParameter", "Energy"] {
             if g.find(table).is_none() {
