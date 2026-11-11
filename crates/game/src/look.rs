@@ -22,7 +22,12 @@ pub enum Look {
 }
 
 /// In the menu's order.
-pub const ALL: [Look; 4] = [Look::Original, Look::Remaster, Look::Drahtseilakt, Look::Player];
+pub const ALL: [Look; 4] = [
+    Look::Original,
+    Look::Remaster,
+    Look::Drahtseilakt,
+    Look::Player,
+];
 
 static CHOSEN: Mutex<Look> = Mutex::new(Look::Drahtseilakt);
 
@@ -45,8 +50,12 @@ impl Look {
     /// Whether the look can be shown here.
     pub fn available(self) -> bool {
         match self {
-            Look::Original => packs::packs(Kind::Textures).iter().any(|p| p.key == ORIGINAL),
-            Look::Remaster => packs::packs(Kind::Textures).iter().any(|p| p.key == REMASTERED),
+            Look::Original => packs::packs(Kind::Textures)
+                .iter()
+                .any(|p| p.key == ORIGINAL),
+            Look::Remaster => packs::packs(Kind::Textures)
+                .iter()
+                .any(|p| p.key == REMASTERED),
             Look::Drahtseilakt => true,
             Look::Player => player_pack(None).is_some(),
         }
@@ -92,7 +101,11 @@ pub fn from_settings(look: Option<&str>, textures: Option<&str>) -> Look {
         Some("original") if textures == Some(ORIGINAL) => Look::Original,
         _ => by_textures(),
     };
-    if wanted.available() { wanted } else { Look::Drahtseilakt }
+    if wanted.available() {
+        wanted
+    } else {
+        Look::Drahtseilakt
+    }
 }
 
 /// The look in force.
@@ -146,8 +159,14 @@ mod tests {
     fn old_settings_keep_their_meaning() {
         // nothing set: ours; the old textures keys say what they said; an old `look remastered` is the Remaster
         assert_eq!(from_settings(None, None), Look::Drahtseilakt);
-        assert_eq!(from_settings(Some("original"), Some("own")), Look::Drahtseilakt);
-        assert_eq!(from_settings(Some("drahtseilakt"), None), Look::Drahtseilakt);
+        assert_eq!(
+            from_settings(Some("original"), Some("own")),
+            Look::Drahtseilakt
+        );
+        assert_eq!(
+            from_settings(Some("drahtseilakt"), None),
+            Look::Drahtseilakt
+        );
         // looks that cannot be shown here fall back to ours (the test has no remaster export, no player's pack)
         assert_eq!(from_settings(Some("player"), None), Look::Drahtseilakt);
         assert!(Look::Drahtseilakt.rounded() && !Look::Original.rounded());

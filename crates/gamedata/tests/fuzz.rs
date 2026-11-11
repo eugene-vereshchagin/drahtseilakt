@@ -121,7 +121,11 @@ pub fn run_gputex(input: &[u8]) {
     if let Ok(h) = gputex::header(bytes) {
         assert!(h.width <= gputex::SIDE_MAX && h.height <= gputex::SIDE_MAX);
         assert!(h.width % 4 == 0 && h.height % 4 == 0 && h.width >= 4 && h.height >= 4);
-        assert!(h.file_len() <= gputex::FILE_MAX, "a file of {} bytes", h.file_len());
+        assert!(
+            h.file_len() <= gputex::FILE_MAX,
+            "a file of {} bytes",
+            h.file_len()
+        );
         assert!(h.droppable() < h.mips.len());
     }
     let Ok(t) = gputex::texture(bytes.to_vec(), usize::from(skip)) else {
@@ -156,12 +160,17 @@ pub fn run_gputex_data(input: &[u8]) {
     let [pick, w, h, blocks @ ..] = input else {
         return;
     };
-    let format = if pick & 1 == 0 { gputex::Format::Bc1 } else { gputex::Format::Bc7 };
+    let format = if pick & 1 == 0 {
+        gputex::Format::Bc1
+    } else {
+        gputex::Format::Bc7
+    };
     let (w, h) = (u32::from(*w % 33) + 1, u32::from(*h % 33) + 1);
     let need = format.level_bytes(w, h).unwrap();
     let mut data = blocks.to_vec();
     data.resize(need, 0x40);
-    let rgba = gputex::decode_level(format, w, h, &data).expect("blocks of the right length decode");
+    let rgba =
+        gputex::decode_level(format, w, h, &data).expect("blocks of the right length decode");
     assert_eq!(rgba.len() as u64, u64::from(w) * u64::from(h) * 4);
     // a cut or grown level is refused
     assert!(gputex::decode_level(format, w, h, &data[..need - 1]).is_none());

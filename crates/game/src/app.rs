@@ -1243,7 +1243,10 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
     if let Some(runs) = o.supports_check {
         // the supports come with our own models (the original's have none), whatever the player's settings choose:
         // the check measures them, unless --models asks for another pack
-        start_packs(o.textures.as_deref(), Some(o.models.as_deref().unwrap_or(gamedata::packs::OWN)));
+        start_packs(
+            o.textures.as_deref(),
+            Some(o.models.as_deref().unwrap_or(gamedata::packs::OWN)),
+        );
         return crate::supports::run(&o, &data, runs.then_some(Path::new("hints")));
     }
     if let Some(dir) = &o.level_stats {
@@ -1325,27 +1328,53 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
                     if b.on_ground { "ground" } else { "air" }
                 );
                 // one body's contact points (its game index, as the loose trace's #), with DRAHTSEILAKT_TRACE_CONTACTS set
-                if let Some(i) = std::env::var("DRAHTSEILAKT_TRACE_CONTACTS").ok().and_then(|v| v.parse::<usize>().ok()) {
+                if let Some(i) = std::env::var("DRAHTSEILAKT_TRACE_CONTACTS")
+                    .ok()
+                    .and_then(|v| v.parse::<usize>().ok())
+                {
                     for c in game.sim.world().body_contacts(i) {
                         println!(
                             "    contact {:?} types {:?} gap {:.4} normal ({:.3} {:.3} {:.3}) point ({:.2} {:.2} {:.2})",
-                            c.entities, c.types, c.gap, c.normal[0], c.normal[1], c.normal[2], c.point[0], c.point[1], c.point[2]
+                            c.entities,
+                            c.types,
+                            c.gap,
+                            c.normal[0],
+                            c.normal[1],
+                            c.normal[2],
+                            c.point[0],
+                            c.point[1],
+                            c.point[2]
                         );
                     }
                 }
                 // the loose things near the ball (boxes, balls, modules' parts), with DRAHTSEILAKT_TRACE_LOOSE set
                 if std::env::var_os("DRAHTSEILAKT_TRACE_LOOSE").is_some() {
-                    let trace_r: f32 = std::env::var("DRAHTSEILAKT_TRACE_R").ok().and_then(|v| v.parse().ok()).unwrap_or(40.0);
+                    let trace_r: f32 = std::env::var("DRAHTSEILAKT_TRACE_R")
+                        .ok()
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(40.0);
                     for &(o, body) in game.sim.loose() {
-                        let Some(st) = game.sim.world().state(body) else { continue };
+                        let Some(st) = game.sim.world().state(body) else {
+                            continue;
+                        };
                         if st.pos.distance(b.position) < trace_r {
-                            let name = game.level.level.objects.get(o).map_or("?", |ob| ob.name.as_str());
-                            println!("    {name} ({:8.2} {:8.2} {:8.2})", st.pos.x, st.pos.y, st.pos.z);
+                            let name = game
+                                .level
+                                .level
+                                .objects
+                                .get(o)
+                                .map_or("?", |ob| ob.name.as_str());
+                            println!(
+                                "    {name} ({:8.2} {:8.2} {:8.2})",
+                                st.pos.x, st.pos.y, st.pos.z
+                            );
                         }
                     }
                     // and the modules' moving parts
                     for m in game.sim.module_bodies() {
-                        let Some(st) = game.sim.world().state(m.body) else { continue };
+                        let Some(st) = game.sim.world().state(m.body) else {
+                            continue;
+                        };
                         if st.pos.distance(b.position) < trace_r {
                             let (o, p) = (&m.object, st.pos);
                             let (r, w) = (st.rot, st.spin);
@@ -2570,7 +2599,11 @@ fn load_track(
         let cam = &seen.sim.camera;
         track.pos.push(seen.sim.ball.position);
         track.vel.push(seen.sim.ball.velocity);
-        track.push.push(crate::hints::push_of(input, cam.push_forward(), cam.push_right()));
+        track.push.push(crate::hints::push_of(
+            input,
+            cam.push_forward(),
+            cam.push_right(),
+        ));
         track.lift.push(input & crate::sim::input::LIFT != 0);
         track.on.push(crate::hints::carrier(&seen.sim));
         let world = seen.sim.world();
@@ -2909,13 +2942,12 @@ impl PilotRun {
             still.then_some(self.since + 60)
         };
         if let Some(at) = failed_at
-            && let Some((state, attempt)) =
-                self.rewinds.back(
-                    at,
-                    (game.sim.sector, pilot.reached()),
-                    game.sim.ball.position,
-                    fell,
-                )
+            && let Some((state, attempt)) = self.rewinds.back(
+                at,
+                (game.sim.sector, pilot.reached()),
+                game.sim.ball.position,
+                fell,
+            )
         {
             let (sim, replay, p, b, sn, h, ne) = state;
             let line = format!(
@@ -3237,7 +3269,11 @@ fn upload(renderer: &mut Renderer, game: &Game) {
         started.elapsed().as_secs_f64(),
         t.read.as_secs_f64(),
         t.upload.as_secs_f64(),
-        if renderer.bc { "" } else { "; no BC on this adapter: compressed textures are decoded, smaller" }
+        if renderer.bc {
+            ""
+        } else {
+            "; no BC on this adapter: compressed textures are decoded, smaller"
+        }
     );
     let shadow = level::Texture {
         name: "HardShadow".into(),
@@ -3424,7 +3460,10 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     });
     let full_view = target.create_view(&Default::default());
     // DRAHTSEILAKT_SHOT_MOD=key: the view mods' look of that mod switched on (e.g. back-to-2004), not for menu shots
-    let look = match (std::env::var("DRAHTSEILAKT_SHOT_MOD"), std::env::var("DRAHTSEILAKT_SHOT_MENU")) {
+    let look = match (
+        std::env::var("DRAHTSEILAKT_SHOT_MOD"),
+        std::env::var("DRAHTSEILAKT_SHOT_MENU"),
+    ) {
         (Ok(key), Err(_)) => shot_look(&key, o.debug),
         _ => crate::render::RenderLook::default(),
     };
@@ -3554,7 +3593,13 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     r.draw_ui(&view, w, h, &quads);
     if let (true, Some(retro)) = (look.post(), &r.retro) {
         let place = look.placed(fw, fh);
-        retro.present(&r.device, &r.queue, &full_view, place, look.colour_bits == 16);
+        retro.present(
+            &r.device,
+            &r.queue,
+            &full_view,
+            place,
+            look.colour_bits == 16,
+        );
     }
     save_target(&r, &target, (fw, fh), path, game.sim.tick)
 }
@@ -3562,7 +3607,9 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
 /// The look a view mod asks of the picture, with its options as they come (a screenshot's `DRAHTSEILAKT_SHOT_MOD`).
 fn shot_look(key: &str, debug: bool) -> crate::render::RenderLook {
     let want = format!("mod.{key}");
-    let mods = crate::modrt::Mods::load(gamedata::mods::scan(debug), |k| (k == want).then(|| "on".to_owned()));
+    let mods = crate::modrt::Mods::load(gamedata::mods::scan(debug), |k| {
+        (k == want).then(|| "on".to_owned())
+    });
     let (sim, mut view) = mods.running(true);
     view.fire(gamedata::mods::Event::Frame, &|_| 0.0, &sim, "en");
     view.out.look
@@ -5724,7 +5771,10 @@ impl App {
         // a mod's `render.*`: the picture's look; drawn at its own (low) size, then scaled onto the window
         let look = self.view_mods.out.look;
         self.game.show_supports(look.supports);
-        let (rw, rh) = self.gpu.as_ref().map_or((1, 1), |g| look.size(g.config.width, g.config.height));
+        let (rw, rh) = self
+            .gpu
+            .as_ref()
+            .map_or((1, 1), |g| look.size(g.config.width, g.config.height));
         let mod_quads = match (&self.gpu, self.game.font.as_ref()) {
             (Some(g), Some(f))
                 if self.menu.is_none() && self.loading.is_none() && !self.view_mods.is_empty() =>
@@ -5755,7 +5805,10 @@ impl App {
         let view = if look.post() {
             let format = gpu.renderer.format;
             let device = gpu.renderer.device.clone();
-            let retro = gpu.renderer.retro.get_or_insert_with(|| crate::retro::Retro::new(&device, format));
+            let retro = gpu
+                .renderer
+                .retro
+                .get_or_insert_with(|| crate::retro::Retro::new(&device, format));
             retro.target(&device, format, rw, rh)
         } else {
             window_view.clone()
@@ -5846,14 +5899,8 @@ impl App {
         if !menu_up && lantern > 0.0 && gpu.renderer.point.is_none() {
             gpu.renderer.point = Some((snap.ball + glam::Vec3::Y * 4.0, [lantern; 3]));
         }
-        gpu.renderer.draw(
-            &view,
-            rw,
-            rh,
-            &frame_view,
-            &inst,
-            &particles,
-        );
+        gpu.renderer
+            .draw(&view, rw, rh, &frame_view, &inst, &particles);
         let drawn = draw_started.elapsed();
         let overlay_started = Instant::now();
         gpu.renderer.draw_overlay(
@@ -5863,11 +5910,7 @@ impl App {
             &match (&self.menu, &self.loading) {
                 // with the game's font the menus are the original's (drawn below), else the prototype's
                 (_, Some(_)) | (Some(_), None) if self.game.font.is_some() => Vec::new(),
-                (_, Some((source, _))) => Menu::loading_overlay(
-                    rw,
-                    rh,
-                    &loading_name(source),
-                ),
+                (_, Some((source, _))) => Menu::loading_overlay(rw, rh, &loading_name(source)),
                 (Some(m), None) => m.overlay(rw, rh),
                 (None, None) => {
                     let mut o = crate::hud::overlay(
@@ -5969,12 +6012,17 @@ impl App {
             gpu.renderer
                 .add_named_texture(crate::fallback::TEXTURE, w, h, rgba);
         }
-        gpu.renderer
-            .draw_ui(&view, rw, rh, &quads);
+        gpu.renderer.draw_ui(&view, rw, rh, &quads);
         if look.post() {
             if let Some(retro) = &gpu.renderer.retro {
                 let place = look.placed(gpu.config.width, gpu.config.height);
-                retro.present(&gpu.renderer.device, &gpu.renderer.queue, &window_view, place, look.colour_bits == 16);
+                retro.present(
+                    &gpu.renderer.device,
+                    &gpu.renderer.queue,
+                    &window_view,
+                    place,
+                    look.colour_bits == 16,
+                );
             }
         }
         let overlaid = overlay_started.elapsed();

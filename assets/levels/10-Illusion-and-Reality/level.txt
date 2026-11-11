@@ -10,3 +10,4 @@ catalogue-difficulty = 4
 type = Comprehensive
 source = https://tieba.baidu.com/p/9145563541
 video = https://www.youtube.com/watch?v=JAz1IGQi_Ig
+sky = Desert

@@ -8,3 +8,4 @@ order = 13
 catalogue-difficulty = 5
 type = Technical
 video = https://www.youtube.com/watch?v=Sq10sBrBQ8g
+sky = Storm

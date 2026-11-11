@@ -8,3 +8,4 @@ difficulty = 10
 order = 12
 catalogue-difficulty = 5
 video = https://www.youtube.com/watch?v=nM1oyg-Rhxg
+sky = Night

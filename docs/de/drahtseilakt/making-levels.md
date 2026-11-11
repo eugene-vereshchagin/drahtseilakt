@@ -52,6 +52,9 @@ keine.
 | `version` | seine Version | höchstens 40 Zeichen |
 | `difficulty` | wie schwer es ist | eine ganze Zahl, **1** (leicht) bis **10** (am schwersten); alles andere (0, 11, 3.5, „hard“) gilt als unbekannt |
 | `order` | sein Platz in einer Liste der Level eines Autors | eine ganze Zahl; Level gleicher Schwierigkeit mit einer kommen zuerst, in ihrer Reihenfolge |
+| `sky` | der Himmel, unter dem die Karte spielt | ein Name der Himmelsboxen des Spiels: `A`, `B`, `C` oder einer unserer (`Mountains`, `Forest`, `Sea`, `Storm`, `Sunset`, `Night`, `Desert`, `Mist`, `Clouds`); er geht dem Himmel der Leveldatei und der Tabelle des Originals vor, die nur mit Kopie und bei schweigender Karte gelesen wird |
+| `music` | das Musikthema | eine ganze Zahl von 1 bis 5 |
+| `light` | die Farbe des Lichts | drei Zahlen von 0 bis 1, `1 0.9 0.8` |
 | `hidden` | `yes`: aus der Liste genommen (ein Level für Tests) | öffnet weiter mit `--open` |
 | `source` | wo die Toolbox es gefunden hat | von `import-maps` geschrieben; nicht gezeigt |
 

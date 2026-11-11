@@ -10,3 +10,4 @@ catalogue-difficulty = 5
 type = Comprehensive
 catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
 video = https://www.youtube.com/watch?v=LPpHXL5DEAI (桜埜叶毣)
+sky = Night

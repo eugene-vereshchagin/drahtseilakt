@@ -83,7 +83,13 @@ impl Shape<'_> {
             Shape::Sphere(c, r) => (*c, *r),
             Shape::Hull(points) if !points.is_empty() => {
                 let middle = points.iter().copied().sum::<Vec3>() / points.len() as f32;
-                (middle, points.iter().map(|p| p.distance(middle)).fold(0.0, f32::max))
+                (
+                    middle,
+                    points
+                        .iter()
+                        .map(|p| p.distance(middle))
+                        .fold(0.0, f32::max),
+                )
             }
             Shape::Hull(_) => (Vec3::ZERO, 0.0),
         }
@@ -136,15 +142,21 @@ fn hull_triangle_overlap(points: &[Vec3], tri: &[Vec3; 3], toward: Vec3) -> f32 
     axes.extend([Vec3::X, Vec3::Y, Vec3::Z]);
     let mut least = f32::INFINITY;
     for axis in axes {
-        let Some(axis) = axis.try_normalize() else { continue };
-        let (lo, hi) = points.iter().fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), p| {
-            let d = p.dot(axis);
-            (lo.min(d), hi.max(d))
-        });
-        let (tlo, thi) = tri.iter().fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), p| {
-            let d = p.dot(axis);
-            (lo.min(d), hi.max(d))
-        });
+        let Some(axis) = axis.try_normalize() else {
+            continue;
+        };
+        let (lo, hi) = points
+            .iter()
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), p| {
+                let d = p.dot(axis);
+                (lo.min(d), hi.max(d))
+            });
+        let (tlo, thi) = tri
+            .iter()
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), p| {
+                let d = p.dot(axis);
+                (lo.min(d), hi.max(d))
+            });
         least = least.min((hi - tlo).min(thi - lo));
         if least <= 0.0 {
             return 0.0;
@@ -182,8 +194,16 @@ mod tests {
     #[test]
     fn a_body_s_depth_in_the_floor() {
         let floor = [
-            Triangle { a: Vec3::new(-9.0, 0.0, -9.0), b: Vec3::new(-9.0, 0.0, 9.0), c: Vec3::new(9.0, 0.0, 9.0) },
-            Triangle { a: Vec3::new(-9.0, 0.0, -9.0), b: Vec3::new(9.0, 0.0, 9.0), c: Vec3::new(9.0, 0.0, -9.0) },
+            Triangle {
+                a: Vec3::new(-9.0, 0.0, -9.0),
+                b: Vec3::new(-9.0, 0.0, 9.0),
+                c: Vec3::new(9.0, 0.0, 9.0),
+            },
+            Triangle {
+                a: Vec3::new(-9.0, 0.0, -9.0),
+                b: Vec3::new(9.0, 0.0, 9.0),
+                c: Vec3::new(9.0, 0.0, -9.0),
+            },
         ];
         let sphere = |y: f32| start_depth(&Shape::Sphere(Vec3::new(1.0, y, 1.0), 2.0), &floor);
         assert_eq!(sphere(2.0), 0.0, "resting on it");
@@ -193,7 +213,13 @@ mod tests {
         assert!((sphere(-0.5) - 2.5).abs() < 1e-5);
         let cube = |y: f32| {
             let corners: Vec<Vec3> = (0..8)
-                .map(|k| Vec3::new([-2.5, 2.5][k & 1], y + [-2.5, 2.5][(k >> 1) & 1], [-2.5, 2.5][k >> 2]))
+                .map(|k| {
+                    Vec3::new(
+                        [-2.5, 2.5][k & 1],
+                        y + [-2.5, 2.5][(k >> 1) & 1],
+                        [-2.5, 2.5][k >> 2],
+                    )
+                })
                 .collect();
             start_depth(&Shape::Hull(&corners), &floor)
         };

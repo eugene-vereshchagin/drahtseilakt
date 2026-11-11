@@ -50,6 +50,9 @@ are read; a larger file or a link is ignored as if there were none.
 | `version` | its version | at most 40 characters |
 | `difficulty` | how hard it is | a whole number, **1** (easy) to **10** (hardest); anything else (0, 11, 3.5, "hard") is read as unknown |
 | `order` | its place in a list of one author's levels | a whole number; levels of the same difficulty with one come first, in its order |
+| `sky` | the sky the map plays under | a name of the game's sky boxes: `A`, `B`, `C` or one of ours (`Mountains`, `Forest`, `Sea`, `Storm`, `Sunset`, `Night`, `Desert`, `Mist`, `Clouds`); it wins over the level file's own and the original's table, which is only read when a copy is there and the map says nothing |
+| `music` | the music theme | a whole number 1 to 5 |
+| `light` | the colour of the light | three numbers 0 to 1, `1 0.9 0.8` |
 | `hidden` | `yes`: kept out of the list (a level for tests) | still opens with `--open` |
 | `source` | where the toolbox found it | written by `import-maps`; not shown |
 

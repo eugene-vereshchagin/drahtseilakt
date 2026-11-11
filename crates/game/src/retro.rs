@@ -35,7 +35,10 @@ impl Retro {
                         multisampled: false,
                     },
                 ),
-                entry(1, wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering)),
+                entry(
+                    1,
+                    wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                ),
                 entry(
                     2,
                     wgpu::BindingType::Buffer {

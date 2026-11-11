@@ -144,7 +144,12 @@ pub fn carrier(sim: &Sim) -> Option<(usize, Vec3, Vec3)> {
             let st = world.state(body)?;
             let d = b - st.pos;
             let across = Vec3::new(d.x, 0.0, d.z).length();
-            (d.y > CARRY_BELOW && across < CARRY_ACROSS).then_some((object, d, sim.ball.velocity - st.vel, across))
+            (d.y > CARRY_BELOW && across < CARRY_ACROSS).then_some((
+                object,
+                d,
+                sim.ball.velocity - st.vel,
+                across,
+            ))
         })
         .min_by(|a, c| a.3.total_cmp(&c.3))
         .map(|(o, d, v, _)| (o, d, v))
@@ -447,7 +452,9 @@ fn step(words: &[&str]) -> Result<Step, String> {
                 None => SHOVE_BEHIND,
             };
             if !(SHOVE_BEHIND..=MAX_SHOVE_ROUND).contains(&round) {
-                return Err(format!("shove goes round at {SHOVE_BEHIND} to {MAX_SHOVE_ROUND}"));
+                return Err(format!(
+                    "shove goes round at {SHOVE_BEHIND} to {MAX_SHOVE_ROUND}"
+                ));
             }
             let cap = match w.next() {
                 Some(v) => {
@@ -1631,9 +1638,28 @@ fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
         let w = v_at;
         eprintln!(
             "    trace t {t} k {k}{}{} off {off:.2} ball ({:.1} {:.1} {:.1}) run ({:.1} {:.1} {:.1}) v ({:.1} {:.1}) run v ({:.1} {:.1})",
-            if track.on.get(k).is_some_and(Option::is_some) { " on" } else { "" },
-            if late { " waits".to_string() } else if lag != 0 { format!(" lag {lag}") } else { String::new() },
-            p.x, p.y, p.z, at.x, at.y, at.z, v.x, v.z, w.x, w.z
+            if track.on.get(k).is_some_and(Option::is_some) {
+                " on"
+            } else {
+                ""
+            },
+            if late {
+                " waits".to_string()
+            } else if lag != 0 {
+                format!(" lag {lag}")
+            } else {
+                String::new()
+            },
+            p.x,
+            p.y,
+            p.z,
+            at.x,
+            at.y,
+            at.z,
+            v.x,
+            v.z,
+            w.x,
+            w.z
         );
     }
     let (fwd, right) = (sim.camera.push_forward(), sim.camera.push_right());
@@ -1644,7 +1670,10 @@ fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
     };
     if off > TRACE_LOST || (lost && off > TRACE_FOUND) {
         if run.lost_since.is_none() {
-            eprintln!("  trace lost at tick {} (run tick {k}, {off:.1} off)", sim.tick);
+            eprintln!(
+                "  trace lost at tick {} (run tick {k}, {off:.1} off)",
+                sim.tick
+            );
         }
         let since = *run.lost_since.get_or_insert(sim.tick);
         if sim.tick > since + TRACE_GIVE_UP {
@@ -1656,7 +1685,10 @@ fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
         return Some(nearest_arrows(want, fwd, right).0 | lift);
     }
     if run.lost_since.take().is_some() {
-        eprintln!("  trace on its run again at tick {} (run tick {k})", sim.tick);
+        eprintln!(
+            "  trace on its run again at tick {} (run tick {k})",
+            sim.tick
+        );
     }
     let ff = if late {
         Vec3::ZERO
@@ -1677,21 +1709,36 @@ mod tests {
     #[test]
     fn a_trace_step_parses_with_its_gain() {
         let h = parse("at 0 0 0 r 5 : trace run.replay 10 90 ; trace run.replay 0 5 0.5").unwrap();
-        assert_eq!(h[0].steps[0], Step::Trace(PathBuf::from("run.replay"), 10, 90, 1.0));
-        assert_eq!(h[0].steps[1], Step::Trace(PathBuf::from("run.replay"), 0, 5, 0.5));
+        assert_eq!(
+            h[0].steps[0],
+            Step::Trace(PathBuf::from("run.replay"), 10, 90, 1.0)
+        );
+        assert_eq!(
+            h[0].steps[1],
+            Step::Trace(PathBuf::from("run.replay"), 0, 5, 0.5)
+        );
         assert!(parse("at 0 0 0 r 5 : trace run.replay 9 9").is_err());
         assert!(parse("at 0 0 0 r 5 : trace run.replay 0 9 5").is_err());
         assert!(parse("at 0 0 0 r 5 : trace ../run.replay 0 9").is_err());
         let line = "at 0 0 0 r 5 : trace run.replay 1 2";
-        assert!(parse(&vec![line; 17].join("\n")).is_err(), "traces count as replays");
+        assert!(
+            parse(&vec![line; 17].join("\n")).is_err(),
+            "traces count as replays"
+        );
     }
 
     #[test]
     fn a_trace_picks_the_arrows_nearest_its_push() {
         let (f, r) = (Vec3::Z, Vec3::new(1.0, 0.0, 0.0));
         assert_eq!(nearest_arrows(Vec3::Z, f, r).0, input::UP);
-        assert_eq!(nearest_arrows(Vec3::new(0.9, 0.0, 0.9), f, r).0, input::UP | input::RIGHT);
-        assert_eq!(nearest_arrows(Vec3::new(-1.0, 0.0, -0.1), f, r).0, input::LEFT);
+        assert_eq!(
+            nearest_arrows(Vec3::new(0.9, 0.0, 0.9), f, r).0,
+            input::UP | input::RIGHT
+        );
+        assert_eq!(
+            nearest_arrows(Vec3::new(-1.0, 0.0, -0.1), f, r).0,
+            input::LEFT
+        );
         assert_eq!(nearest_arrows(Vec3::new(0.1, 0.0, 0.0), f, r).0, 0);
         // a view turned: forward is world -X
         let (f, r) = (Vec3::NEG_X, Vec3::new(0.0, 0.0, 1.0));
@@ -1700,7 +1747,10 @@ mod tests {
         // a half push left over: carried, so two ticks give one arrow press
         let (bits, left) = nearest_arrows(Vec3::new(0.0, 0.0, 0.4), Vec3::Z, Vec3::X);
         assert_eq!(bits, 0);
-        assert_eq!(nearest_arrows(Vec3::new(0.0, 0.0, 0.4) + left, Vec3::Z, Vec3::X).0, input::UP);
+        assert_eq!(
+            nearest_arrows(Vec3::new(0.0, 0.0, 0.4) + left, Vec3::Z, Vec3::X).0,
+            input::UP
+        );
     }
 
     #[test]
@@ -1724,7 +1774,10 @@ mod tests {
     #[test]
     fn a_sync_step_parses_with_its_default_ticks() {
         let h = parse("at 0 0 0 r 5 : sync 1 2 3 ; sync 1 2 3 40").unwrap();
-        assert_eq!(h[0].steps[0], Step::Sync(Vec3::new(1.0, 2.0, 3.0), GOTO_TICKS));
+        assert_eq!(
+            h[0].steps[0],
+            Step::Sync(Vec3::new(1.0, 2.0, 3.0), GOTO_TICKS)
+        );
         assert_eq!(h[0].steps[1], Step::Sync(Vec3::new(1.0, 2.0, 3.0), 40));
     }
 
@@ -1785,18 +1838,46 @@ mod tests {
         assert_eq!(h[1].steps[2], Step::Become(BallKind::Paper));
         assert_eq!(h[1].line, 3);
         let sticky = parse("at 0 0 0 r 1 kind sticky : become sticky").unwrap();
-        assert_eq!(sticky[0].kind, Some(BallKind::Sticky), "our own ball's name");
+        assert_eq!(
+            sticky[0].kind,
+            Some(BallKind::Sticky),
+            "our own ball's name"
+        );
         assert_eq!(sticky[0].steps[0], Step::Become(BallKind::Sticky));
         let moving = parse("at 0 0 0 r 1 : lead 1 2 3 -4 300 ; shove 1 2 3 7 8 9 500").unwrap();
-        assert_eq!(moving[0].steps[0], Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300));
-        assert_eq!(moving[0].steps[1], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500, SHOVE_BEHIND, None));
+        assert_eq!(
+            moving[0].steps[0],
+            Step::Lead(Vec3::new(1.0, 2.0, 3.0), -4.0, 300)
+        );
+        assert_eq!(
+            moving[0].steps[1],
+            Step::Shove(
+                Vec3::new(1.0, 2.0, 3.0),
+                Vec3::new(7.0, 8.0, 9.0),
+                500,
+                SHOVE_BEHIND,
+                None
+            )
+        );
         let crate_ = parse("at 0 0 0 r 1 : shove 1 2 3 7 8 9 500 5.5 2").unwrap();
-        assert_eq!(crate_[0].steps[0], Step::Shove(Vec3::new(1.0, 2.0, 3.0), Vec3::new(7.0, 8.0, 9.0), 500, 5.5, Some(2.0)));
+        assert_eq!(
+            crate_[0].steps[0],
+            Step::Shove(
+                Vec3::new(1.0, 2.0, 3.0),
+                Vec3::new(7.0, 8.0, 9.0),
+                500,
+                5.5,
+                Some(2.0)
+            )
+        );
         assert!(parse("at 0 0 0 r 1 : shove 1 2 3 7 8 9 500 99").is_err());
         let swing =
             parse("at 0 0 0 r 1 : await 1 2 3 4 5 6 0.5 200 ; ride 1 2 3 4 5 6 0.5 90 ; press 1 2 3 0 1 6 200").unwrap();
         let swing_end = parse("at 0 0 0 r 1 : swing 1 2 3 4 5 6 1.5 300").unwrap();
-        assert_eq!(swing_end[0].steps[0], Step::Swing(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 1.5, 300));
+        assert_eq!(
+            swing_end[0].steps[0],
+            Step::Swing(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 1.5, 300)
+        );
         assert_eq!(
             swing[0].steps[0],
             Step::Await(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 200)

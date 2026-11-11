@@ -101,7 +101,12 @@ impl BallMeshes {
             stone,
             paper,
             sticky,
-            boxes: [bounds(wood), bounds(stone), bounds(paper), bounds(sticky.or(wood))],
+            boxes: [
+                bounds(wood),
+                bounds(stone),
+                bounds(paper),
+                bounds(sticky.or(wood)),
+            ],
         }
     }
 
@@ -415,14 +420,19 @@ pub fn placements(
         if !o.visible && !cloud && !stand_in {
             // (the colliders' overlay shows a hidden floor, rail or stopper)
             if SHOW_COLLIDERS.load(Ordering::Relaxed) && is_solid_geometry(level, i) {
-                let stopper = level
-                    .groups_of(i)
-                    .all(|g| !g.eq_ignore_ascii_case("Phys_Floors") && !g.eq_ignore_ascii_case("Phys_FloorRails"));
+                let stopper = level.groups_of(i).all(|g| {
+                    !g.eq_ignore_ascii_case("Phys_Floors")
+                        && !g.eq_ignore_ascii_case("Phys_FloorRails")
+                });
                 out.push(Placement {
                     model: LEVEL_MODEL,
                     mesh,
                     matrix,
-                    marker: Some(if stopper { HIDDEN_STOPPER } else { HIDDEN_FLOOR }),
+                    marker: Some(if stopper {
+                        HIDDEN_STOPPER
+                    } else {
+                        HIDDEN_FLOOR
+                    }),
                     object: i,
                     body: None,
                     spin: None,
@@ -727,19 +737,33 @@ pub fn instances(
 /// The ball's view-only looks (mods `ball.deform`, `decoys`; Interference, DeformedWB): the wooden ball's drawn matrix
 /// squeezed and stretched at random about its centre (the wood only, never the physics' round ball), and `decoys`
 /// translucent copies wandering around it. `t` is the real time in seconds; nothing here touches the run.
-pub fn ball_looks(inst: &mut Vec<Instance>, snap: &Snapshot, balls: &BallMeshes, t: f32, deform: f32, decoys: u8) {
+pub fn ball_looks(
+    inst: &mut Vec<Instance>,
+    snap: &Snapshot,
+    balls: &BallMeshes,
+    t: f32,
+    deform: f32,
+    decoys: u8,
+) {
     let Some((mesh, _)) = snap.kind.and_then(|k| balls.of(k)) else {
         return;
     };
     if deform > 0.0 && snap.kind == Some(BallKind::Wood) {
-        if let Some(i) = inst
-            .iter_mut()
-            .rev()
-            .find(|i| i.mesh == mesh && i.model == BALLS_MODEL && (i.matrix.w_axis.truncate() - snap.ball).length() < 1e-3)
-        {
-            let w = |k: f32| (t * (1.3 + k) + k * 5.1).sin() * (t * (0.7 + 0.4 * k) + k * 2.3).cos();
-            let s = Vec3::new(1.0 + 0.25 * deform * w(0.0), 1.0 + 0.25 * deform * w(1.0), 1.0 + 0.25 * deform * w(2.0));
-            i.matrix = Mat4::from_translation(snap.ball) * Mat4::from_scale(s) * Mat4::from_quat(snap.rotation);
+        if let Some(i) = inst.iter_mut().rev().find(|i| {
+            i.mesh == mesh
+                && i.model == BALLS_MODEL
+                && (i.matrix.w_axis.truncate() - snap.ball).length() < 1e-3
+        }) {
+            let w =
+                |k: f32| (t * (1.3 + k) + k * 5.1).sin() * (t * (0.7 + 0.4 * k) + k * 2.3).cos();
+            let s = Vec3::new(
+                1.0 + 0.25 * deform * w(0.0),
+                1.0 + 0.25 * deform * w(1.0),
+                1.0 + 0.25 * deform * w(2.0),
+            );
+            i.matrix = Mat4::from_translation(snap.ball)
+                * Mat4::from_scale(s)
+                * Mat4::from_quat(snap.rotation);
         }
     }
     for n in 0..decoys.min(8) {
