@@ -632,6 +632,38 @@ Game: `Sound.nmo` `HitSound Woodenflaps` (input = `PhysicsCollDetection` `Speed 
 Play Sound Instance), `Sound.nmo` `Fade In Music` (input = a `MusicVolume` array cell), and
 `Menu.nmo` `Volume`.
 
+## Sounds (Sounds.dll and TT ProximityVolumeControl)
+
+Read from the old C reference (`src/bb/bb_sounds.c`, `bb_tt_misc.c`; it follows the DLL functions listed there).
+These blocks act on a *wave sound* object (class 25): the target, or in the old layout a first pin of type Wave Sound
+(then every pin index shifts by one). Anything else as target: the block does nothing.
+
+- **Wave Player** `5bde0e45:2e2107d5`. Inputs Play, Stop, Pause/Resume; outputs Start Playing, End Playing,
+  Paused/Resumed; pins Fade In, Fade Out, Loop. Play: set the loop flag from the pin, play with the fade-in, fire
+  Start Playing; a non-looping Play keeps the block active (next frame), a looping one returns at once. Pause/Resume:
+  fires Paused/Resumed; a playing sound is paused and the block stays active, a paused one resumes. Stop: stop with
+  the fade-out; with a fade of 0 fire End Playing and return. With no input active: End Playing once the sound is no
+  longer playing, else stay active. (Our fade is not modelled: Stop ends the sound at once.)
+- **Volume Control** `33613f21:776b185b` (pin Gain, default 1), **Pitch Control** `7b7c731e:175b27a3` (pin Pitch,
+  default 1), **Panning Control** `6a5f17af:63480864` (pin Pan, default 0): clear In, fire Out, set the one value on
+  the sound. Not limited to 1 (volume above 1 is allowed).
+- **Play Sound Instance** `00283a35:38ef6b48`. Pins 2D, Object, Position, Direction, Min Delay, Volume (index 5, default
+  1, also in the old layout). Clears In, fires Out, plays a one-shot copy of the sound at Volume. The C reference
+  plays it 2D always; ours places it when 2D is off (object's position plus Position in its frame, else the world
+  Position): our choice, the audio attenuates it linearly to nothing at 100 units from the ball.
+- **TT ProximityVolumeControl** `38571b61:64cd2174`. Inputs On, Off; outputs On, Off; pins Object 1, Object 2, Near,
+  Far, Sound; local Status. On: Status on, fire On. Off: Status off. Every execution: d2 = squared distance of object 2
+  in object 1's frame, near2/far2 the squared pins; g = 0 if d2 is not below far2, 1 if d2 <= near2, else
+  1 - (d2 - near2) / (far2 - near2). The sound's gain is 1 for g > 1, 0 for g < 0, else 0.02 * 50^g (so out of range
+  it is 0.02, not silence). Then, with Status off: fire Off and return; else stay active. A missing object or sound:
+  nothing happens (the original returns an error code).
+- **TT_LinearVolume** is described below (same curve, but cut to 0 at or below 0.01).
+- **Midi Player** is in none of the player's libraries: a named no-op.
+
+Determinism: what a script can ask of a sound (is it playing) is answered from the run's tick clock and the sound's
+length in ticks, taken from the game's sound set without an audio device; a file the set does not have is silent
+and ends at once. The audio only receives commands.
+
 ## TT_Timer
 
 GUID `6ac67901:7d2a6059`. Prototype `0x10022710`, execute `0x10022800` (thunk `0x10001302`).

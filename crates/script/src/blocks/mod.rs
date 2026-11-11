@@ -64,6 +64,12 @@ pub mod proto {
     pub const TEXT_DISPLAY: Guid = Guid(0xf22d_010a, 0xf2cd_010a);
     pub const NOP: Guid = Guid(0x3025_61c4, 0x0d28_2980);
     pub const WAVE_PLAYER: Guid = Guid(0x5bde_0e45, 0x2e21_07d5);
+    pub const VOLUME_CONTROL: Guid = Guid(0x3361_3f21, 0x776b_185b);
+    pub const PITCH_CONTROL: Guid = Guid(0x7b7c_731e, 0x175b_27a3);
+    pub const PANNING_CONTROL: Guid = Guid(0x6a5f_17af, 0x6348_0864);
+    pub const PLAY_SOUND_INSTANCE: Guid = Guid(0x0028_3a35, 0x38ef_6b48);
+    pub const TT_LINEAR_VOLUME: Guid = Guid(0x09b3_35b3, 0x12d1_7cdc);
+    pub const TT_PROXIMITY_VOLUME_CONTROL: Guid = Guid(0x3857_1b61, 0x64cd_2174);
     pub const IDENTITY: Guid = Guid(0x1515_1652, 0xaeef_ffd5);
     pub const PARAMETER_SELECTOR: Guid = Guid(0x63eb_2b0c, 0x27e2_767e);
     pub const KEY_EVENT: Guid = Guid(0x1af2_274b, 0x6b8c_1524);

@@ -310,7 +310,7 @@ by the engine's.
 | Get Component | `2689057b:1a1a446a` | 4 | 8 | done |
 | Set World Matrix | `aa4aa6f0:ddefdef4` | 4 | 9 | done |
 | Set Diffuse | `e1e1e1e1:1e1e1e1e` | 4 | 11 | partial: accepted, no effect |
-| Volume Control | `33613f21:776b185b` | 4 | 8 | planned |
+| Volume Control | `33613f21:776b185b` | 4 | 8 | done |
 | Collection Iterator | `419602ec:7822779e` | 4 | 20 | done |
 | Set Texture | `eb123eb5:5be321be` | 3 | 3 | partial: accepted, no effect |
 | Set Component | `6e800755:57b64acb` | 3 | 12 | done |
@@ -342,7 +342,7 @@ by the engine's.
 | Attach Script | `1dba5f4a:14481212` | 2 | 3 | planned |
 | Clear Array | `35c9352f:7b1a193b` | 2 | 7 | done |
 | Get Delta Time | `47dc3232:64bf203a` | 2 | 3 | done |
-| Play Sound Instance | `00283a35:38ef6b48` | 2 | 7 | planned |
+| Play Sound Instance | `00283a35:38ef6b48` | 2 | 7 | done |
 | Group Clear | `1d12662e:42687a3c` | 2 | 9 | done |
 | Scale | `41236987:a54a87a6` | 2 | 7 | done |
 | Remove From Group | `d0147412:0258520d` | 2 | 2 | done |
@@ -351,11 +351,11 @@ by the engine's.
 | Set Material Z Buffer | `1144022f:68fd055c` | 2 | 5 | planned |
 | Create System Font | `936334fc:f243684f` | 1 | 1 | never (the engine's own interface) |
 | Movie Player | `778d16d4:1dd60060` | 1 | 1 | never (the engine's own interface) |
-| TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | planned |
+| TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
 | Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | planned |
 | Get SubString | `10b16051:26173b39` | 1 | 1 | planned |
 | Iterator If | `6bec4be6:12d64c7c` | 1 | 2 | planned |
-| TT_LinearVolume | `09b335b3:12d17cdc` | 1 | 1 | planned |
+| TT_LinearVolume | `09b335b3:12d17cdc` | 1 | 1 | done |
 | Set Ambient | `aaaaaaaa:aeae1287` | 1 | 1 | never (the engine's own interface) |
 | Set Specular | `20202020:30303030` | 1 | 1 | planned |
 | Write In Texture | `1d57024d:7c064238` | 1 | 1 | never (the engine's own interface) |
@@ -373,7 +373,7 @@ by the engine's.
 | Set FOV | `aaaacccc:aaaacccc` | 1 | 3 | never (the engine's own interface) |
 | TT Restore IC | `7e0f2f58:232d3109` | 1 | 4 | done |
 | Streaming Event | `1f0b52bf:4c3342dd` | 1 | 1 | done |
-| Pitch Control | `7b7c731e:175b27a3` | 1 | 3 | planned |
+| Pitch Control | `7b7c731e:175b27a3` | 1 | 3 | done |
 | Deactivate Object | `160f4b7d:67de224e` | 1 | 1 | done |
 | Random | `0c622386:1c3054f7` | 1 | 35 | done (a fixed seed: every run draws the same numbers) |
 | Set Euler Orientation | `0c4966d8:6c0c6d14` | 1 | 7 | done (X, then Y, then Z) |
@@ -451,9 +451,12 @@ blocks, the blocks beyond the template, the blocks not covered, and whether phas
    WakeUp; objects moved by script move their body.
 3. **Copies and created objects**: Object Copy (an entity with the original's mesh, drawn and physicalizable),
    Object Create, Object Rename, Attach Script (a copy of a script bound to a new owner).
-4. **Sound and text through the engine**: Wave Player on the map's own sounds (class 24/25 are not read yet:
-   the sound data lives in the map), Volume Control, Pitch Control, Play Sound Instance, Midi Player (never:
-   no MIDI; a note), Text Display / 2D Text in the HUD's own font.
+4. **Sound and text through the engine**: *sound done (3.4)*: Wave Player, Volume / Pitch / Panning Control, Play
+   Sound Instance, TT_LinearVolume, TT ProximityVolumeControl through the game's audio (`script_sound.rs`); the
+   wave objects (class 25) are read with their file, loop, gain, pan and pitch; the sound data is not in the maps,
+   so a file is resolved against the game's sound set (own theme, the player's copy) and a missing one is silent
+   with one log note. Midi Player stays a named no-op (no MIDI). Text Display / 2D Text in the HUD's own font:
+   still to do.
 5. **Looks**: Set Texture, Set Diffuse / Emissive / Ambient / Specular, Blend Textures, Set Blend Modes, Set
    Material Z Buffer, Set Alpha Test, Set Current Slot, Change Texture Size, Replace Texture / Material, Add /
    Remove / Select Mesh, Scale, Set Euler Orientation, Set 3DSprite Mode, Set Light Color, Set Fog, Set FOV

@@ -408,6 +408,13 @@ impl Variants {
     }
 }
 
+/// The length of a game sound in seconds, by its name, or None when the sound set has no such sound. No audio device
+/// is needed: scripts see a sound's length in their own clock (scripting.rs), so it must not depend on one.
+pub fn sound_seconds(data: &Data, name: &str) -> Option<f64> {
+    let s = load(data, name)?;
+    Some(s.frames.len() as f64 / f64::from(s.rate.max(1)))
+}
+
 impl Audio {
     /// The default output device, or None (no device, or it refused a stream): the game is then silent. With
     /// DRAHTSEILAKT_SOUND_FILE set, the mix is written to that WAV file instead (44100 Hz stereo, 16 bit).

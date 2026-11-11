@@ -53,6 +53,7 @@ mod replay;
 mod report;
 mod retro;
 mod scene;
+mod script_sound;
 mod scripting;
 mod setup;
 mod sim;

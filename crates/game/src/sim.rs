@@ -1445,6 +1445,14 @@ impl Sim {
         &self.frames
     }
 
+    /// The lengths of the sounds a map's scripts play, in ticks by lower-case file stem (the sound set's own: scripts
+    /// wait on them, so they are part of the run's rules). A file not in it is silent.
+    pub fn set_sound_ticks(&mut self, ticks: std::sync::Arc<std::collections::HashMap<String, u64>>) {
+        if let Some(s) = &mut self.scripts {
+            s.sound.ticks = ticks;
+        }
+    }
+
     /// Objects a map's scripts hid or deleted, by level object index (empty without scripts).
     pub fn script_hidden(&self) -> &[bool] {
         self.scripts.as_ref().map_or(&[], |s| s.hidden.as_slice())

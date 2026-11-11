@@ -39,7 +39,14 @@ pub trait Host {
     fn game_cell(&self, array: &str, row: usize, column: usize) -> Option<Value>;
     /// A message a script sends (to an entity, or to all): the engine may act on the game's own messages.
     fn message(&mut self, name: &str, to: Option<Ent>);
-    fn sound(&mut self, name: &str, on: bool);
+    /// A sound command for the wave sound object `key` (its graph id) whose file is `file`. Sound only goes out:
+    /// nothing the engine's audio does may reach the simulation.
+    fn sound(&mut self, _key: usize, _file: &str, _cmd: SoundCmd) {}
+    /// Whether the wave sound `key` is playing now. The engine answers from the run's own clock (the sound's
+    /// length in ticks), never from the audio device, so that replays are the same with sound on or off.
+    fn sound_playing(&self, _key: usize) -> bool {
+        false
+    }
     fn text(&mut self, name: &str, text: &str, on: bool);
     /// A line for the log: what a script did, or what the runtime could not do.
     fn note(&mut self, text: &str);
@@ -60,6 +67,20 @@ pub trait Host {
     fn material_color(&self, _material: usize, _emissive: bool) -> Option<[f32; 4]> {
         None
     }
+}
+
+/// What a script asks of a wave sound.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SoundCmd {
+    Play { looping: bool, fade_in: f32 },
+    Stop { fade_out: f32 },
+    Pause,
+    Resume,
+    Gain(f32),
+    Pitch(f32),
+    Pan(f32),
+    /// A one-shot copy of the sound (Play Sound Instance): its volume and, for a 3D one, its world position.
+    Instance { volume: f32, at: Option<[f32; 3]> },
 }
 
 /// Per-block state a block keeps between ticks.
@@ -1503,7 +1524,6 @@ impl Host for Quiet {
         None
     }
     fn message(&mut self, _: &str, _: Option<Ent>) {}
-    fn sound(&mut self, _: &str, _: bool) {}
     fn text(&mut self, _: &str, _: &str, _: bool) {}
     fn note(&mut self, _: &str) {}
 }
