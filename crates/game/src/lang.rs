@@ -1,5 +1,7 @@
 // The menus' words. The own interface speaks ours (assets/own/Texts/<code>.txt, one `key = text` file a language, built in
-// and overridden at start by files in the assets or the player's Texts folder; a new file adds a language): English, Russian, German,
+// and overridden at start by files in the assets or the player's Texts folder; a new file adds a language): English,
+// Russian, German, Simplified Chinese, French, Spanish and Italian. The original's interface speaks its copy's,
+// Language.nmo's table
 // `language` (a key, then German, English, Spanish, Italian and French) in the chosen language, and ours for what the
 // copy lacks (our additions, and the languages it has not). From the copy always: the key names of its table
 // `all_keys` (the original's interface), and from base.cmo the default keys (DB_Options) and each level's default
