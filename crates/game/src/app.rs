@@ -3239,6 +3239,18 @@ fn upload(renderer: &mut Renderer, game: &Game) {
         t.upload.as_secs_f64(),
         if renderer.bc { "" } else { "; no BC on this adapter: compressed textures are decoded, smaller" }
     );
+    // the map's own 2D frames: each one's texture under its slot's name, the slots of the level before emptied
+    let frames = crate::hud::level_frames(&game.level.level);
+    for (k, name) in crate::ui::FRAME_TEXTURES.into_iter().enumerate() {
+        let pixels = frames
+            .get(k)
+            .and_then(|f| game.level.level.textures.get(f.texture))
+            .and_then(|t| data.texture(t));
+        match pixels {
+            Some((w, h, rgba)) => renderer.add_named_texture(name, w, h, rgba),
+            None => renderer.remove_named_texture(name),
+        }
+    }
     let shadow = level::Texture {
         name: "HardShadow".into(),
         source: level::TextureSource::File("HardShadow.bmp".into()),

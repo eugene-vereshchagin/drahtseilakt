@@ -425,6 +425,9 @@ impl Data {
             Source::Open(_) if source.remastered() => Maker::Copy,
             Source::Nmo(_) | Source::Open(_) => Maker::Stranger,
         };
+        if matches!(source, Source::Nmo(_)) {
+            name_meant_textures(&mut loaded.level);
+        }
         self.put_pack_textures(&mut loaded.level, maker);
         Ok(loaded)
     }
@@ -1527,6 +1530,33 @@ impl Data {
             decode: !bc,
             fallback: instead,
         })
+    }
+}
+
+/// A stranger's `.nmo` map's textures that carry no picture and name no file, where the name says which of the
+/// game's textures is meant (resources::meant_texture): made the game's texture of that name, found like any other
+/// (the texture packs, ours, the copy's). The others stay without a picture.
+fn name_meant_textures(level: &mut level::Level) {
+    for i in 0..level.textures.len() {
+        let Some(t) = level.textures.get(i) else {
+            continue;
+        };
+        if !matches!(t.source, level::TextureSource::None) {
+            continue;
+        }
+        let materials: Vec<&str> = level
+            .materials
+            .iter()
+            .filter(|m| m.texture == Some(i))
+            .map(|m| m.name.as_str())
+            .collect();
+        if materials.is_empty() {
+            continue;
+        }
+        let meant = crate::resources::meant_texture(&t.name, &materials);
+        if let (Some(name), Some(t)) = (meant, level.textures.get_mut(i)) {
+            t.source = level::TextureSource::Game(name.to_owned());
+        }
     }
 }
 

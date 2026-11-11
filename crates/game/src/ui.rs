@@ -20,6 +20,27 @@ pub struct Quad {
     pub texture: &'static str,
 }
 
+/// The names a map's own 2D frames' textures are kept under (hud::level_frames gives each drawn frame a slot): as
+/// many frames of a map are drawn.
+pub const FRAME_TEXTURES: [&str; 16] = [
+    "level-frame-0",
+    "level-frame-1",
+    "level-frame-2",
+    "level-frame-3",
+    "level-frame-4",
+    "level-frame-5",
+    "level-frame-6",
+    "level-frame-7",
+    "level-frame-8",
+    "level-frame-9",
+    "level-frame-10",
+    "level-frame-11",
+    "level-frame-12",
+    "level-frame-13",
+    "level-frame-14",
+    "level-frame-15",
+];
+
 /// Which edge of the window an element keeps its distance to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(dead_code)] // Center: the menus' elements

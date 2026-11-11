@@ -214,6 +214,107 @@ pub fn texture_key(name: &str) -> String {
         .collect()
 }
 
+/// The textures of the original's levels and parts, by name (its `Textures` folder; the names only, which every
+/// community map uses): what a map's texture that carries no picture and names no file can be meant to be.
+const LEVEL_TEXTURES: [&str; 53] = [
+    "Ball_LightningSphere1",
+    "Ball_LightningSphere2",
+    "Ball_LightningSphere3",
+    "Ball_Paper",
+    "Ball_Stone",
+    "Ball_Wood",
+    "Brick",
+    "Column_beige",
+    "Column_beige_fade",
+    "Column_blue",
+    "Dome",
+    "DomeEnvironment",
+    "DomeShadow",
+    "E_Holzbeschlag",
+    "ExtraBall",
+    "ExtraParticle",
+    "FloorGlow",
+    "Floor_Side",
+    "Floor_Top_Border",
+    "Floor_Top_Borderless",
+    "Floor_Top_Checkpoint",
+    "Floor_Top_Flat",
+    "Floor_Top_Profil",
+    "Floor_Top_ProfilFlat",
+    "HardShadow",
+    "Laterne_Glas",
+    "Laterne_Schatten",
+    "Laterne_Verlauf",
+    "Metal_stained",
+    "Modul03_Floor",
+    "Modul03_Wall",
+    "Modul11_13_Wood",
+    "Modul11_Wood",
+    "Modul15",
+    "Modul16",
+    "Modul18",
+    "Modul18_Gitter",
+    "Modul30_d_Seiten",
+    "Rail_Environment",
+    "SkyLayer",
+    "Stick_Bottom",
+    "Stick_Stripes",
+    "Tower_Roof",
+    "Trafo_Environment",
+    "Trafo_FlashField",
+    "Trafo_Shadow_Big",
+    "Wood_Metal",
+    "Wood_MetalStripes",
+    "Wood_Misc",
+    "Wood_Nailed",
+    "Wood_Old",
+    "Wood_Panel",
+    "Wood_Plain",
+];
+
+/// The game's texture a map's texture means when it carries no pixels and names no file, if its name says so
+/// (`materials`: the names of the materials that draw with it, for a texture without a name):
+/// - the texture's name is the game's texture's (`Floor_Top_Profil`, also with an editor's copy suffix after a dot);
+/// - it is that name cut to the eight letters of a DOS file name, as an exporter left it (`METAL_ST`, `RAIL_ENV`,
+///   with copy marks after it: `METAL_STCC`, `RAIL_ENV000`): the game's texture beginning so, the shortest of them
+///   when several do (`WOOD_MET` is `Wood_Metal`, not `Wood_MetalStripes`; `FLOOR_TO` the plain `Floor_Top_Flat`);
+/// - it has no name, and a material drawing with it is named after a game's texture (`_aaaSkyLayer`): that one,
+///   the longest name found in the material's.
+///
+/// A guess where the cut name fits several; the map has nothing better, and the original draws such a texture as
+/// none at all. The answer is one of the game's own names, never the map's text.
+pub fn meant_texture(name: &str, materials: &[&str]) -> Option<&'static str> {
+    let stem = name.split('.').next().unwrap_or(name).trim();
+    if stem.is_empty() {
+        return materials
+            .iter()
+            .filter_map(|m| {
+                let m = texture_key(m);
+                LEVEL_TEXTURES
+                    .iter()
+                    .filter(|t| m.contains(&texture_key(t)))
+                    .max_by_key(|t| t.len())
+            })
+            .max_by_key(|t| t.len())
+            .copied();
+    }
+    let key = texture_key(stem);
+    if let Some(t) = LEVEL_TEXTURES.iter().find(|t| texture_key(t) == key) {
+        return Some(t);
+    }
+    // a DOS name: eight characters, then nothing but an editor's copy marks
+    let lower = stem.to_ascii_lowercase();
+    let (short, marks) = (lower.get(..8)?, lower.get(8..)?);
+    if !marks.bytes().all(|b| b.is_ascii_digit() || b == b'c') {
+        return None;
+    }
+    LEVEL_TEXTURES
+        .iter()
+        .filter(|t| t.to_ascii_lowercase().starts_with(short))
+        .min_by_key(|t| t.len())
+        .copied()
+}
+
 /// The most own textures looked at (the folder ships about sixty).
 const OWN_TEXTURES_MAX: usize = 4096;
 
@@ -361,6 +462,46 @@ pub fn missing(relative: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The names the community's maps carry (the 605-map audit): whole, cut to a DOS name, copied, or none.
+    #[test]
+    fn a_texture_without_a_picture_is_meant_by_its_name() {
+        let none: [&str; 0] = [];
+        assert_eq!(
+            meant_texture("Floor_Top_Profil", &none),
+            Some("Floor_Top_Profil")
+        );
+        assert_eq!(
+            meant_texture("Floor_Top_ProfilFlat.Copy", &none),
+            Some("Floor_Top_ProfilFlat")
+        );
+        assert_eq!(meant_texture("METAL_ST", &none), Some("Metal_stained"));
+        assert_eq!(meant_texture("METAL_STCC", &none), Some("Metal_stained"));
+        assert_eq!(
+            meant_texture("METAL_ST.Copy.Copy", &none),
+            Some("Metal_stained")
+        );
+        assert_eq!(
+            meant_texture("RAIL_ENV000", &none),
+            Some("Rail_Environment")
+        );
+        assert_eq!(meant_texture("Wood_Met", &none), Some("Wood_Metal"));
+        assert_eq!(meant_texture("WOOD_PAN", &none), Some("Wood_Panel"));
+        assert_eq!(meant_texture("FLOOR_SI", &none), Some("Floor_Side"));
+        assert_eq!(meant_texture("FLOOR_TO", &none), Some("Floor_Top_Flat"));
+        assert_eq!(
+            meant_texture("", &["Core", "_aaaSkyLayer001"]),
+            Some("SkyLayer")
+        );
+        // a name of its own, a short one, a cut name with more than copy marks after it, no name and no hint
+        assert_eq!(meant_texture("Venti", &none), None);
+        assert_eq!(meant_texture("Wood", &none), None);
+        assert_eq!(meant_texture("METAL_STUFF", &none), None);
+        assert_eq!(meant_texture("", &["03 - Default"]), None);
+        assert_eq!(meant_texture("", &none), None);
+        // names that are no ASCII do not cut inside a letter
+        assert_eq!(meant_texture("水面水面水面", &none), None);
+    }
 
     #[test]
     fn the_choice_reads_and_orders() {
