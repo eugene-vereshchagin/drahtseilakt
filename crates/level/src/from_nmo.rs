@@ -182,6 +182,39 @@ fn build(doc: &Document) -> Loaded {
         }
     }
 
+    // The 2D frames (class 27; a 2D sprite carries a picture of its own and is left out): the rectangle in pixels of
+    // the 640 x 480 render context, whichever way the file has it.
+    for (_, o) in doc.of_class(class::ENTITY_2D) {
+        if level.frames.len() >= crate::MAX_FRAMES {
+            break;
+        }
+        let Some(chunk) = &o.chunk else { continue };
+        match scene::entity_2d(chunk) {
+            Ok(e) => {
+                let [l, t, r, b] = e.rect;
+                let rect = if e.homogeneous() {
+                    [l * 640.0, t * 480.0, r * 640.0, b * 480.0]
+                } else {
+                    e.rect
+                };
+                let uv = if e.use_source() {
+                    e.source
+                } else {
+                    [0.0, 0.0, 1.0, 1.0]
+                };
+                level.frames.push(crate::Frame {
+                    name: name(o),
+                    rect,
+                    uv,
+                    z_order: e.z_order,
+                    material: e.material.and_then(|m| materials.get(&m).copied()),
+                    visible: chunk.section(0x4).is_none() && chunk.section(0x18).is_none(),
+                });
+            }
+            Err(e) => warn(o, e),
+        }
+    }
+
     let mut group_indices = HashMap::new();
     for (i, o) in doc.of_class(class::GROUP) {
         let Some(chunk) = &o.chunk else { continue };

@@ -56,6 +56,26 @@ pub struct Level {
     /// The Virtools behaviour graphs a community map carries (scripts of its own), for the script runtime; the open
     /// format carries them in the scene's extras (`script_json.rs`).
     pub scripts: Option<std::sync::Arc<script::Graph>>,
+    /// The 2D frames a map lays over the picture (an author's signature in a corner, a logo): at most MAX_FRAMES.
+    /// Only a `.nmo` map carries them; only drawn.
+    pub frames: Vec<Frame>,
+}
+
+/// Frames a level keeps (a map has one, rarely four).
+pub const MAX_FRAMES: usize = 64;
+
+/// A 2D frame (Virtools' CK2dEntity): a rectangle of the screen drawn with a material over the scene. The rectangle
+/// is left, top, right, bottom in pixels of the original's 640 x 480 render context; `uv` the part of the
+/// material's texture it shows (u0, v0, u1, v1). Frames are drawn by `z_order`, lower first.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Frame {
+    pub name: String,
+    pub rect: [f32; 4],
+    pub uv: [f32; 4],
+    pub z_order: i32,
+    pub material: Option<usize>,
+    /// Shown as the file has it (a hidden frame is one a script of the map shows).
+    pub visible: bool,
 }
 
 /// A level's settings beyond its scene (the original's `AllLevel` table in Levelinit.nmo, and its first and last

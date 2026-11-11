@@ -1,7 +1,8 @@
 // nmo-dump: prints what a Virtools file holds. Default: the container; --objects: every object with its class;
 // --check: decode every scene object and print only what fails (for runs over whole map collections);
 // --arrays: every data array with its rows; --params: every parameter with its value or source;
-// --scripts: the behaviour graphs' building blocks by prototype, with counts (the survey of community maps).
+// --scripts: the behaviour graphs' building blocks by prototype, with counts (the survey of community maps);
+// --extras: the 2D entities, sounds, curves and patch meshes of a file, each with what it holds and who names it.
 
 use nmo::{Document, class, scene};
 use std::process::ExitCode;
@@ -35,6 +36,166 @@ fn decode(doc: &Document) -> Vec<String> {
         }
     }
     errors
+}
+
+/// The objects around the scene (2D entities, sounds, curves, patch meshes), each with what it holds, whether the
+/// file hides it, and who refers to it: the parameters whose value it is, the behaviours it is the target of, the
+/// groups it is in. The survey behind docs/drahtseilakt/community-maps.md, "2D frames, curves and sounds".
+fn extras(doc: &Document) {
+    use nmo::behavior;
+    let name = |i: usize| doc.get(i).map_or_else(String::new, |o| o.name_lossy());
+    // the textures with no pixels in the file: the name they ask for and the sections they do hold
+    for (i, o) in doc.of_class(class::TEXTURE) {
+        let Some(chunk) = &o.chunk else { continue };
+        let Ok(t) = scene::texture(chunk) else {
+            println!("  {i:5} texture {}: unreadable", o.name_lossy());
+            continue;
+        };
+        if t.embedded.is_some() {
+            continue;
+        }
+        let mut sections = Vec::new();
+        let mut at = 0usize;
+        while let (Some(&id), Some(&next)) =
+            (chunk.words.get(at), chunk.words.get(at.saturating_add(1)))
+        {
+            let end = if next == 0 {
+                chunk.words.len()
+            } else {
+                next as usize
+            };
+            let head: Vec<String> = chunk
+                .words
+                .get(at.saturating_add(2)..end.min(at.saturating_add(14)))
+                .unwrap_or_default()
+                .iter()
+                .map(|w| format!("{w:x}"))
+                .collect();
+            sections.push(format!(
+                "{id:#x}[{}: {}]",
+                end.saturating_sub(at).saturating_sub(2),
+                head.join(" ")
+            ));
+            if next == 0 || end <= at {
+                break;
+            }
+            at = end;
+        }
+        for (_, m) in doc.of_class(class::MATERIAL) {
+            if let Some(mat) = m.chunk.as_ref().and_then(|c| scene::material(c).ok())
+                && mat.texture == Some(i)
+            {
+                sections.push(format!(
+                    "USED BY {} diffuse {:?}",
+                    m.name_lossy(),
+                    mat.diffuse
+                ));
+            }
+        }
+        println!(
+            "  {i:5} texture {:24} file {:?} dv {} | {}",
+            o.name_lossy(),
+            t.file_name
+                .map(|f| String::from_utf8_lossy(&f).into_owned()),
+            chunk.data_version,
+            sections.join(" ")
+        );
+    }
+    // who refers to each object, gathered in one pass over the file
+    let mut referrers: Vec<Vec<String>> = vec![Vec::new(); doc.objects.len()];
+    for (k, u) in doc.objects.iter().enumerate() {
+        let Some(c) = &u.chunk else { continue };
+        let mut refer = |to: usize, what: String| {
+            if let Some(r) = referrers.get_mut(to).filter(|r| r.len() < 16) {
+                r.push(what);
+            }
+        };
+        match u.class_id {
+            behavior::class::BEHAVIOR => {
+                if let Some(t) = behavior::behavior(c).ok().and_then(|b| b.target) {
+                    refer(t, format!("target of {k} {}", u.name_lossy()));
+                }
+            }
+            3 | 45 => {
+                if let Ok(behavior::Saved::Object(Some(x))) =
+                    behavior::parameter(c).map(|p| p.value)
+                {
+                    refer(x, format!("parameter {k} {}", u.name_lossy()));
+                }
+            }
+            class::GROUP => {
+                for m in scene::group(c).unwrap_or_default() {
+                    refer(m, format!("group {}", u.name_lossy()));
+                }
+            }
+            _ => {}
+        }
+    }
+    for (i, o) in doc.objects.iter().enumerate() {
+        if !matches!(o.class_id, 24..=29 | 43 | 53) {
+            continue;
+        }
+        let Some(chunk) = &o.chunk else {
+            println!(
+                "  {i:5} class {:2} {}: no chunk",
+                o.class_id,
+                o.name_lossy()
+            );
+            continue;
+        };
+        let hidden = chunk.section(0x4).is_some() || chunk.section(0x18).is_some();
+        let what = match o.class_id {
+            27..=29 => match scene::entity_2d(chunk) {
+                Ok(e) => {
+                    let mat = e.material.map(|m| {
+                        let tex = doc
+                            .get(m)
+                            .and_then(|o| o.chunk.as_ref())
+                            .and_then(|c| scene::material(c).ok())
+                            .and_then(|m| m.texture)
+                            .map(name);
+                        format!("{} (texture {tex:?})", name(m))
+                    });
+                    format!(
+                        "rect {:?} homogeneous {} flags {:#x} z {} material {mat:?}",
+                        e.rect,
+                        e.homogeneous(),
+                        e.flags,
+                        e.z_order
+                    )
+                }
+                Err(e) => format!("unreadable: {e}"),
+            },
+            25 => match scene::wave_sound(chunk) {
+                Ok(s) => format!(
+                    "file {:?} loop {} gain {}",
+                    s.file_name
+                        .map(|f| String::from_utf8_lossy(&f).into_owned()),
+                    s.looped,
+                    s.gain
+                ),
+                Err(e) => format!("unreadable: {e}"),
+            },
+            43 => match scene::curve(chunk) {
+                Ok(Some(c)) => format!("{} points, open {}", c.points.len(), c.open),
+                Ok(None) => "no curve part".into(),
+                Err(e) => format!("unreadable: {e}"),
+            },
+            _ => String::new(),
+        };
+        let mut users = referrers.get(i).cloned().unwrap_or_default();
+        let own = behavior::scripts(chunk);
+        if !own.is_empty() {
+            users.push(format!("has {} scripts", own.len()));
+        }
+        println!(
+            "  {i:5} class {:2} {:28} {}{what} | {}",
+            o.class_id,
+            o.name_lossy(),
+            if hidden { "HIDDEN " } else { "" },
+            users.join(", ")
+        );
+    }
 }
 
 /// The object animations of a file (class 15), each with the entity it moves, its length in frames, its
@@ -146,7 +307,7 @@ fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mode = match args.first().map(String::as_str) {
         Some("--objects") | Some("--check") | Some("--scripts") | Some("--arrays")
-        | Some("--params") | Some("--anims") => args.remove(0),
+        | Some("--params") | Some("--anims") | Some("--extras") => args.remove(0),
         _ => String::new(),
     };
     if args.is_empty() {
@@ -267,6 +428,10 @@ fn main() -> ExitCode {
                         _ => {}
                     }
                 }
+            }
+            "--extras" => {
+                println!("{path}");
+                extras(&doc);
             }
             "--objects" => {
                 println!("{path}");

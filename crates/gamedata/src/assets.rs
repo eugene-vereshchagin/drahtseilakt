@@ -426,6 +426,9 @@ impl Data {
             Source::Open(_) if source.remastered() => Maker::Copy,
             Source::Nmo(_) | Source::Open(_) => Maker::Stranger,
         };
+        if matches!(source, Source::Nmo(_)) {
+            name_meant_textures(&mut loaded.level);
+        }
         self.put_pack_textures(&mut loaded.level, maker);
         Ok(loaded)
     }
@@ -1566,6 +1569,38 @@ impl Data {
             decode: !bc,
             fallback: instead,
         })
+    }
+}
+
+/// A stranger's `.nmo` map's textures that carry no picture and name no file, where the name says which of the
+/// game's textures is meant (resources::meant_texture): made the game's texture of that name, found like any other
+/// (the texture packs, ours, the copy's). The others stay without a picture.
+fn name_meant_textures(level: &mut level::Level) {
+    // the materials drawing with each texture, gathered in one pass (a hostile map may hold very many of both);
+    // a few names say all there is to say
+    const NAMES: usize = 8;
+    let mut users: Vec<Vec<&str>> = vec![Vec::new(); level.textures.len()];
+    for m in &level.materials {
+        if let Some(u) = m.texture.and_then(|t| users.get_mut(t))
+            && u.len() < NAMES
+        {
+            u.push(m.name.as_str());
+        }
+    }
+    let meant: Vec<Option<&'static str>> = level
+        .textures
+        .iter()
+        .zip(&users)
+        .map(|(t, users)| {
+            let bare = matches!(t.source, level::TextureSource::None) && !users.is_empty();
+            bare.then(|| crate::resources::meant_texture(&t.name, users))
+                .flatten()
+        })
+        .collect();
+    for (t, name) in level.textures.iter_mut().zip(meant) {
+        if let Some(name) = name {
+            t.source = level::TextureSource::Game(name.to_owned());
+        }
     }
 }
 

@@ -896,6 +896,8 @@ pub struct Sim {
     /// The map's own scripts (scripting.rs), run each tick before the physics; none for a level without them, or
     /// for a replay recorded before format 9, when scripts did not run.
     pub scripts: Option<crate::scripting::Scripts>,
+    /// The map's own 2D frames that are drawn (only drawn).
+    frames: Vec<crate::hud::LevelFrame>,
 }
 
 /// A change of a sector's bodies due at a tick: its objects or its modules, entering or leaving the physics.
@@ -1429,12 +1431,18 @@ impl Sim {
             sector_changes: Vec::new(),
             mods: crate::modrt::SimMods::default(),
             touching: (false, false),
+            frames: crate::hud::level_frames(level),
             scripts: if format >= 9 {
                 crate::scripting::Scripts::new(level)
             } else {
                 None
             },
         }
+    }
+
+    /// The map's own 2D frames that are drawn (hud::level_frames): only drawn, no part of the run.
+    pub fn frames(&self) -> &[crate::hud::LevelFrame] {
+        &self.frames
     }
 
     /// Objects a map's scripts hid or deleted, by level object index (empty without scripts).
@@ -3185,6 +3193,7 @@ pub(crate) mod tests {
             start_ball: None,
             settings: level::Settings::default(),
             scripts: None,
+            frames: Vec::new(),
         }
     }
 

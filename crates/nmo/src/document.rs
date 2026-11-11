@@ -26,6 +26,13 @@ pub mod class {
     pub const SPRITE_3D: u32 = 37;
     pub const CURVE: u32 = 43;
     pub const OBJECT_ANIMATION: u32 = 15;
+    pub const CURVE_POINT: u32 = 36;
+    pub const WAVE_SOUND: u32 = 25;
+    pub const MIDI_SOUND: u32 = 26;
+    /// A 2D frame; 28 is a 2D sprite, 29 a sprite's text (both 2D entities with a picture of their own).
+    pub const ENTITY_2D: u32 = 27;
+    pub const SPRITE_2D: u32 = 28;
+    pub const SPRITE_TEXT: u32 = 29;
 }
 
 #[derive(Debug, Clone)]

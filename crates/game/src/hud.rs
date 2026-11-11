@@ -366,6 +366,83 @@ pub fn ball_lost(
     )
 }
 
+/// A map's 2D frame as it is drawn: its rectangle in the 640 x 480 context, the texture's part, the material's
+/// colour, and the level's texture it shows (kept by the renderer under `ui::FRAME_TEXTURES[slot]`, the frame's
+/// place in the list).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LevelFrame {
+    pub rect: [f32; 4],
+    pub uv: [f32; 4],
+    pub color: [f32; 4],
+    pub texture: usize,
+}
+
+/// The frames of a level that are drawn, in drawing order (by Z order, then as the file lists them): those the file
+/// shows, with a material that has a texture and a rectangle with an area, as the original's render context draws
+/// its 2D entities (C reference render.c). A frame without a texture is left out: a plain rectangle is what a
+/// script of the map fills or fades, and would only cover the picture.
+pub fn level_frames(level: &level::Level) -> Vec<LevelFrame> {
+    let mut frames: Vec<(i32, LevelFrame)> = level
+        .frames
+        .iter()
+        .filter(|f| f.visible)
+        .filter_map(|f| {
+            let m = level.materials.get(f.material?)?;
+            let [l, t, r, b] = f.rect;
+            let sane = f.rect.iter().chain(&f.uv).all(|v| v.is_finite()) && r > l && b > t;
+            sane.then_some((
+                f.z_order,
+                LevelFrame {
+                    rect: f.rect,
+                    uv: f.uv,
+                    color: m.diffuse,
+                    texture: m.texture.filter(|t| {
+                        // a picture saved inside the map is not drawn yet: the reader takes such a frame's
+                        // bitmap for packed pixels where the file has it in planes (it comes out tiled and
+                        // upside down), and a wrong picture over the screen is worse than none
+                        level.textures.get(*t).is_some_and(|t| {
+                            !matches!(t.source, level::TextureSource::Pixels { .. })
+                        })
+                    })?,
+                },
+            ))
+        })
+        .collect();
+    frames.sort_by_key(|f| f.0);
+    frames
+        .into_iter()
+        .map(|f| f.1)
+        .take(crate::ui::FRAME_TEXTURES.len())
+        .collect()
+}
+
+/// The quads of a level's frames: a frame keeps its distance to the edge of the window it is nearest to, as the
+/// interface's own parts do.
+fn frame_quads(frames: &[LevelFrame], screen: crate::ui::Screen) -> Vec<crate::ui::Quad> {
+    use crate::ui::{Anchor, CONTEXT_W, FRAME_TEXTURES};
+    frames
+        .iter()
+        .zip(FRAME_TEXTURES)
+        .map(|(f, texture)| {
+            let middle = (f.rect[0] + f.rect[2]) / 2.0;
+            let anchor = if middle < CONTEXT_W / 3.0 {
+                Anchor::Left
+            } else if middle > CONTEXT_W * 2.0 / 3.0 {
+                Anchor::Right
+            } else {
+                Anchor::Center
+            };
+            crate::ui::Quad {
+                rect: screen.rect(f.rect, anchor),
+                uv: f.uv,
+                top: f.color,
+                bottom: f.color,
+                texture,
+            }
+        })
+        .collect()
+}
+
 /// The points box and the life balls as the original draws them (rectangles and texture parts of its 2D frames, as
 /// the C game places them; the points in Font_Punktezähler's style). One ball per life; each further one 0.0387 of
 /// the context to the left, the end piece after the last.
@@ -383,7 +460,8 @@ pub fn interface(
         bottom: WHITE,
         texture: SPECIAL,
     };
-    let mut out = Vec::new();
+    // the map's own frames first: the game's interface is drawn over them
+    let mut out = frame_quads(sim.frames(), screen);
     // on the end screen the counter's points and the lives move over to the tally
     let tally = crate::endscreen::of(sim);
     let lives = tally.map_or(sim.lives, |t| t.lives).min(40) as usize;
@@ -438,6 +516,78 @@ pub fn interface(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A map's frames as the original's render context draws them: shown ones with a material, by Z order; here
+    /// only those with a texture, each anchored to the edge of the window it is nearest to.
+    #[test]
+    fn a_maps_frames_are_drawn_by_z_order_where_the_file_put_them() {
+        let material = |texture: Option<usize>| level::Material {
+            name: "m".into(),
+            diffuse: [1.0, 0.5, 0.25, 1.0],
+            ambient: [1.0; 3],
+            emissive: [0.0; 3],
+            specular: [0.0; 3],
+            power: 0.0,
+            texture,
+            normal: None,
+            parallax: 0.0,
+            blend: None,
+            alpha_cutoff: None,
+            z_write: true,
+            two_sided: false,
+            unlit: false,
+            texgen: None,
+        };
+        let frame =
+            |rect: [f32; 4], z_order: i32, material: Option<usize>, visible: bool| level::Frame {
+                name: "f".into(),
+                rect,
+                uv: [0.0, 0.0, 1.0, 1.0],
+                z_order,
+                material,
+                visible,
+            };
+        let texture = level::Texture {
+            name: "t".into(),
+            source: level::TextureSource::None,
+            color_key: None,
+        };
+        let level = level::Level {
+            textures: vec![texture],
+            materials: vec![material(Some(0)), material(None), material(Some(7))],
+            frames: vec![
+                frame([560.0, 0.0, 640.0, 60.0], 2, Some(0), true),
+                frame([0.0, 0.0, 80.0, 60.0], 1, Some(0), true),
+                frame([0.0, 0.0, 80.0, 60.0], 0, Some(0), false),
+                frame([0.0, 0.0, 80.0, 60.0], 0, Some(1), true),
+                frame([0.0, 0.0, 80.0, 60.0], 0, Some(2), true),
+                frame([0.0, 0.0, 80.0, 60.0], 0, Some(9), true),
+                frame([0.0, 0.0, 80.0, 60.0], 0, None, true),
+                frame([80.0, 0.0, 0.0, 60.0], 0, Some(0), true),
+                frame([0.0, f32::NAN, 80.0, 60.0], 0, Some(0), true),
+            ],
+            ..Default::default()
+        };
+        let frames = level_frames(&level);
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0].rect, [0.0, 0.0, 80.0, 60.0]);
+        assert_eq!(frames[1].color, [1.0, 0.5, 0.25, 1.0]);
+        // a window twice as wide as 4:3 needs: the left frame at the left edge, the right one at the right edge
+        let screen = crate::ui::Screen {
+            w: 2560.0,
+            h: 960.0,
+        };
+        let quads = frame_quads(&frames, screen);
+        assert_eq!(quads[0].rect, [0.0, 0.0, 160.0, 120.0]);
+        assert_eq!(quads[1].rect, [2400.0, 0.0, 2560.0, 120.0]);
+        assert_eq!(quads[0].texture, crate::ui::FRAME_TEXTURES[0]);
+        // never more frames than there are slots
+        let many = level::Level {
+            frames: vec![frame([0.0, 0.0, 8.0, 8.0], 0, Some(0), true); 40],
+            ..level.clone()
+        };
+        assert_eq!(level_frames(&many).len(), crate::ui::FRAME_TEXTURES.len());
+    }
 
     #[test]
     fn the_ball_lost_message_fades_in_stays_and_fades_out() {

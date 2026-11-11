@@ -82,6 +82,28 @@ are useful only as a source of requirements: what the community added to the gam
 camera options, fixes) tells us which features players want. Such a feature is reimplemented in our engine from
 its observable behaviour, the same way as any other; nothing is loaded from a mod.
 
+## What a map carries beyond its scene
+
+Found by the audit (`drahtseilakt --audit DIR`) over 606 maps; `nmo-dump --extras FILE` lists them for one map.
+
+- **2D frames** (34 maps): an author's signature or logo in a corner of the screen. A frame the file shows, whose
+  material has a texture, is drawn over the picture under the game's interface, where the file puts it in the
+  original's 640 x 480 context, by Z order (at most 16 a map). A hidden frame or one without a texture is what a
+  script of the map shows or fills: not drawn. **Not drawn yet either:** a frame whose picture is saved inside the
+  map (nearly all of them): the reader takes that bitmap for packed pixels where the file has it in planes, so it
+  would come out tiled and upside down. An open-format level does not carry frames yet.
+- **Textures without a picture** (31 maps): a texture with no pixels and no file name, named after the game's
+  texture, often cut to a DOS name by an exporter (`METAL_ST`, `RAIL_ENV`, `WOOD_MET.Copy`), or with no name under
+  a material named after one (`_aaaSkyLayer`). It is taken for that game's texture (ours, a pack's or the copy's).
+  Where a cut name fits several, the shortest is taken (`FLOOR_TO` is `Floor_Top_Flat`): a guess, listed by the
+  audit as `texture-by-name`. The original draws these without a texture.
+- **Textures nobody has** (9 maps): a file the author did not put into the map. Drawn in the material's colour,
+  toned down, never blank white.
+- **Sounds** (8 maps): read (file, loop, gain), but the files are not in the maps and only the maps' scripts play
+  them: not played.
+- **Curves** (16 maps): shapes an exporter left; no block and no parameter of any map reads one. Not drawn.
+- Not read: patch meshes (2 maps), MIDI sounds (3 maps).
+
 ## Rules for this project
 
 - **Maps are untrusted input**: files from strangers' drives. They go through the hardened, fuzzed parsers only

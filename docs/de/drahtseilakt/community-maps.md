@@ -85,6 +85,30 @@ hinzugefügt hat (Tachometer, Kartenmenüs, Kameraoptionen, Korrekturen), zeigt,
 Eine solche Funktion wird in unserer Engine nach ihrem beobachtbaren Verhalten neu umgesetzt, wie jede andere;
 aus einem Mod wird nichts geladen.
 
+## Was eine Karte außer ihrer Szene mitbringt
+
+Gefunden vom Audit (`drahtseilakt --audit ORDNER`) über 606 Karten; `nmo-dump --extras DATEI` zeigt es für eine Karte.
+
+- **2D-Rahmen** (34 Karten): Signatur oder Logo des Autors in einer Bildschirmecke. Ein Rahmen, den die Datei zeigt
+  und dessen Material eine Textur hat, wird über dem Bild unter der Oberfläche des Spiels gezeichnet, dort, wo die
+  Datei ihn im 640 x 480-Kontext des Originals hinsetzt, nach Z-Ordnung (höchstens 16 je Karte). Einen versteckten
+  Rahmen oder einen ohne Textur zeigt oder füllt ein Skript der Karte: nicht gezeichnet. Ein Level im offenen Format
+  trägt noch keine Rahmen. **Noch nicht gezeichnet** wird auch ein Rahmen, dessen Bild in der Karte gespeichert ist
+  (fast alle): Der Leser hält diese Bitmap für gepackte Pixel, die Datei hat sie in Ebenen, das Bild käme gekachelt
+  und kopfüber heraus.
+- **Texturen ohne Bild** (31 Karten): eine Textur ohne Pixel und ohne Dateinamen, benannt nach einer Textur des
+  Spiels, oft vom Exporter auf einen DOS-Namen gekürzt (`METAL_ST`, `RAIL_ENV`, `WOOD_MET.Copy`), oder ohne Namen
+  unter einem Material, das nach einer benannt ist (`_aaaSkyLayer`). Sie gilt als diese Textur des Spiels (unsere,
+  die eines Pakets oder die der Kopie). Passt ein gekürzter Name auf mehrere, gilt der kürzeste (`FLOOR_TO` ist
+  `Floor_Top_Flat`): eine Vermutung, im Audit als `texture-by-name` aufgeführt. Das Original zeichnet sie ohne Textur.
+- **Texturen, die niemand hat** (9 Karten): eine Datei, die der Autor nicht in die Karte gelegt hat. Gezeichnet in
+  der Farbe des Materials, abgedunkelt, nie reinweiß.
+- **Klänge** (8 Karten): gelesen (Datei, Schleife, Lautstärke), aber die Dateien liegen nicht in den Karten und nur
+  die Skripte der Karten spielen sie: nicht zu hören.
+- **Kurven** (16 Karten): Formen, die ein Exporter hinterlassen hat; kein Block und kein Parameter liest eine. Nicht
+  gezeichnet.
+- Nicht gelesen: Patch-Meshes (2 Karten), MIDI-Klänge (3 Karten).
+
 ## Regeln für dieses Projekt
 
 - **Karten sind nicht vertrauenswürdige Eingaben**: Dateien von fremden Laufwerken. Sie gehen nur durch die

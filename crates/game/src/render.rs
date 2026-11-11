@@ -155,6 +155,9 @@ struct OverlayVertex {
     color: [f32; 4],
 }
 
+/// How bright a material is drawn whose texture nobody has: a mid grey of its colour, as an unlit board would be.
+const ABSENT_TEXTURE_TONE: f32 = 0.55;
+
 fn overlay_pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("overlay"),
@@ -585,8 +588,13 @@ impl Renderer {
                     .normal
                     .and_then(|t| textures.get(t))
                     .and_then(Option::as_ref);
+                // a texture the material draws with that nobody has (a stranger's map naming a picture it does not
+                // carry): the material's own colour, toned down, so that a white material is no blank white box
+                let absent = m.texture.is_some() && view.is_none();
+                let tone = if absent { ABSENT_TEXTURE_TONE } else { 1.0 };
+                let [dr, dg, db, da] = m.diffuse;
                 let uniform = MaterialUniform {
-                    diffuse: m.diffuse,
+                    diffuse: [dr * tone, dg * tone, db * tone, da],
                     emissive: [
                         m.emissive[0],
                         m.emissive[1],
@@ -940,6 +948,18 @@ impl Renderer {
         self.named_textures.insert(name, bind);
     }
 
+    /// Keeps under `name` the very texture kept under `from` (no second upload).
+    pub fn share_named_texture(&mut self, name: &'static str, from: &'static str) {
+        if let Some(bind) = self.named_textures.get(from).cloned() {
+            self.named_textures.insert(name, bind);
+        }
+    }
+
+    /// Forgets the texture kept under `name` (a level's frame the next level does not have).
+    pub fn remove_named_texture(&mut self, name: &'static str) {
+        self.named_textures.remove(name);
+    }
+
     /// Draws the original's 2D interface over `target`, which keeps its content: quads in window pixels, each
     /// with a named texture (white when the copy lacks it).
     pub fn draw_ui(
@@ -1011,13 +1031,12 @@ impl Renderer {
             pass.set_pipeline(&self.ui_pipeline);
             pass.set_vertex_buffer(0, buf.slice(..));
             for (texture, first, count) in runs {
-                pass.set_bind_group(
-                    0,
-                    self.named_textures
-                        .get(texture)
-                        .unwrap_or(&self.particle_white),
-                    &[],
-                );
+                let bind = self.named_textures.get(texture);
+                // a map's frame whose texture nobody has is not drawn: never a white rectangle over the picture
+                if bind.is_none() && crate::ui::FRAME_TEXTURES.contains(&texture) {
+                    continue;
+                }
+                pass.set_bind_group(0, bind.unwrap_or(&self.particle_white), &[]);
                 pass.draw(first..first + count, 0..1);
             }
         }
