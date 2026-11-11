@@ -4,7 +4,9 @@
 // a test-only reference built with cmake). The traces must be equal frame by frame: the blocks run, in order, the
 // scripts and blocks active after the frame and every output parameter of the block under test. The C code is itself
 // a reimplementation: a disagreement is settled by the notes (docs/), and only where they are silent by the C, with
-// the finding written down. Skipped unless OPENBALLANCE_ORACLE names the built ck_oracle.
+// the finding written down. A case whose loop spins into the iteration cap is not compared: docs/ck-runtime.md says
+// at most BehaviorMaxIteration pops a frame, the C makes one more. Skipped unless OPENBALLANCE_ORACLE names the built
+// ck_oracle.
 
 #![allow(
     clippy::unwrap_used,
@@ -18,7 +20,7 @@
 use script::blocks::proto;
 use script::exec::{Ent, Host};
 use script::{
-    Block, Graph, Guid, Id, Io, Link, Node, ObjInfo, ObjKind, Param, Runtime, Value, types,
+    Array, Block, Graph, Guid, Id, Io, Link, Node, ObjInfo, ObjKind, Param, Runtime, Value, types,
 };
 use std::fmt::Write as _;
 use std::sync::Arc;
@@ -40,6 +42,8 @@ struct B {
     nout: usize,
     /// (kind, type as the oracle names it, value)
     params: Vec<(Kind, &'static str, String)>,
+    /// the target parameter (type, value)
+    target: Option<(&'static str, String)>,
 }
 
 impl B {
@@ -51,6 +55,7 @@ impl B {
             nin,
             nout,
             params: Vec::new(),
+            target: None,
         }
     }
     fn pin(mut self, t: &'static str, v: impl ToString) -> B {
@@ -59,6 +64,10 @@ impl B {
     }
     fn pout(mut self, t: &'static str, v: impl ToString) -> B {
         self.params.push((Kind::Pout, t, v.to_string()));
+        self
+    }
+    fn target(mut self, t: &'static str, v: impl ToString) -> B {
+        self.target = Some((t, v.to_string()));
         self
     }
     fn local(mut self, t: &'static str, v: impl ToString) -> B {
@@ -75,6 +84,8 @@ struct Spec {
     scripts: Vec<(usize, bool)>,
     /// members by object index
     groups: Vec<Vec<usize>>,
+    /// arrays of Integer columns: (columns, rows, key column or -1), cell (r, c) = 10 r + c
+    arrays: Vec<(usize, usize, i32)>,
     blocks: Vec<B>,
     /// (script, from: None = the start, Some((block, output)), (to block, input), delay)
     links: Vec<(usize, Option<(usize, usize)>, (usize, usize), u16)>,
@@ -104,6 +115,9 @@ impl Spec {
             let m: Vec<String> = m.iter().map(|x| x.to_string()).collect();
             writeln!(t, "group G{i} {}", m.join(" ")).unwrap();
         }
+        for (i, (c, r, k)) in self.arrays.iter().enumerate() {
+            writeln!(t, "array A{i} {c} {r} {k}").unwrap();
+        }
         for (i, b) in self.blocks.iter().enumerate() {
             writeln!(
                 t,
@@ -118,6 +132,9 @@ impl Spec {
                     Kind::Local => "local",
                 };
                 writeln!(t, "{k} {i} {ty} {v}").unwrap();
+            }
+            if let Some((ty, v)) = &b.target {
+                writeln!(t, "target {i} {ty} {v}").unwrap();
             }
         }
         for (s, from, (to, inp), d) in &self.links {
@@ -156,6 +173,9 @@ impl Spec {
         let group_ids: Vec<Id> = (0..self.groups.len())
             .map(|i| add(&mut objects, format!("G{i}"), ObjKind::Group(i)))
             .collect();
+        let array_ids: Vec<Id> = (0..self.arrays.len())
+            .map(|i| add(&mut objects, format!("A{i}"), ObjKind::Array(i)))
+            .collect();
         let script_in: Vec<Id> = script_ids
             .iter()
             .map(|_| {
@@ -186,6 +206,7 @@ impl Spec {
                 "obj" => (types::BEOBJECT, Value::Obj(idx(&obj_ids))),
                 "script" => (types::SCRIPT, Value::Obj(idx(&script_ids))),
                 "group" => (types::GROUP, Value::Obj(idx(&group_ids))),
+                "array" => (types::ARRAY, Value::Obj(idx(&array_ids))),
                 _ => panic!("type {ty}"),
             }
         };
@@ -264,10 +285,35 @@ impl Spec {
                     }
                 }
             }
+            let target = b.target.as_ref().map(|(ty, v)| {
+                let (g, val) = value(ty, v);
+                let src = add(&mut objects, "value".into(), ObjKind::Other);
+                nodes.push((
+                    src,
+                    Node::Param(Param {
+                        name: "value".into(),
+                        guid: g,
+                        value: val,
+                        ..Param::default()
+                    }),
+                ));
+                let p = add(&mut objects, "target".into(), ObjKind::Other);
+                nodes.push((
+                    p,
+                    Node::Param(Param {
+                        name: "target".into(),
+                        guid: g,
+                        source: Some(src),
+                        ..Param::default()
+                    }),
+                ));
+                p
+            });
             nodes.push((
                 id,
                 Node::Block(Block {
                     name: format!("B{i}"),
+                    target,
                     proto: Some(b.guid),
                     priority: b.prio,
                     inputs: ins.clone(),
@@ -316,7 +362,24 @@ impl Spec {
             .zip(&self.scripts)
             .map(|(&id, &(o, _))| (id, Some(obj_ids[o])))
             .collect();
-        let mut g = Graph::assemble(objects, nodes, Vec::new(), scripts).expect("assembles");
+        let arrays = self
+            .arrays
+            .iter()
+            .enumerate()
+            .map(|(i, &(c, r, k))| Array {
+                name: format!("A{i}"),
+                columns: (0..c).map(|_| ("c".to_string(), 1)).collect(),
+                rows: (0..r)
+                    .map(|row| {
+                        (0..c)
+                            .map(|col| Value::Int((10 * row + col) as i32))
+                            .collect()
+                    })
+                    .collect(),
+                key: usize::try_from(k).ok(),
+            })
+            .collect();
+        let mut g = Graph::assemble(objects, nodes, arrays, scripts).expect("assembles");
         g.start_off = script_ids
             .iter()
             .zip(&self.scripts)
@@ -356,7 +419,7 @@ impl Spec {
                 let shown = match ty {
                     "float" | "time" => format!("{:08x}", v.as_float().to_bits()),
                     "string" => v.as_string(),
-                    "obj" | "script" | "group" => v
+                    "obj" | "script" | "group" | "array" => v
                         .as_obj()
                         .map_or("-".to_string(), |o| rt.graph.name(o).to_string()),
                     _ => v.as_int().to_string(),
@@ -491,6 +554,13 @@ fn oracle(bin: &std::path::Path, file: &std::path::Path, spec: &Spec) -> String 
     String::from_utf8(out.stdout).unwrap()
 }
 
+/// Whether a frame of a trace ran the iteration cap (a loop with no way out within the frame).
+fn hits_the_cap(trace: &str) -> bool {
+    trace
+        .split("frame ")
+        .any(|f| f.matches("\nrun ").count() >= 7_000)
+}
+
 /// Every case of one kind: ours against the C, frame by frame.
 fn sweep(kind: &str, make: impl Fn(&mut Rng) -> Spec) {
     let Some(bin) = std::env::var_os("OPENBALLANCE_ORACLE") else {
@@ -517,6 +587,10 @@ fn sweep(kind: &str, make: impl Fn(&mut Rng) -> Spec) {
         let spec = make(&mut Rng::new(seed));
         let ours = spec.run();
         let theirs = oracle(&bin, &file, &spec);
+        if hits_the_cap(&theirs) {
+            // a loop spinning into BehaviorMaxIteration: the C pops once more than the notes say (see the top)
+            continue;
+        }
         if ours != theirs {
             let at = ours
                 .lines()
@@ -574,8 +648,7 @@ fn counter() {
             .pin("int", r.pick(COUNTS))
             .pin("int", r.pick(&[-3, 0, 1, 5]))
             .pin("int", r.pick(&[-2, -1, 0, 1, 3]));
-        // without pOut 0 a loop never ends: only through a delayed link then (the iteration cap is not compared:
-        // docs/ck-runtime.md says at most BehaviorMaxIteration pops, the C makes one more)
+        // without pOut 0 a loop never ends: only through a delayed link then
         let kept = r.below(4) != 0;
         if kept {
             b = b.pout("int", r.pick(&[0, 9]));
@@ -767,4 +840,148 @@ fn execute_script_runs_the_script_inside_the_callers_frame() {
         s.run(),
         "frame 1\nrun B0\nrun B2\nend S0 B0\nframe 2\nrun B0\nrun B1\nend\nframe 3\nend\n"
     );
+}
+
+#[test]
+fn a_script_cannot_execute_itself_while_it_runs() {
+    // docs/drahtseilakt/scripts.md, stage 0: "A script cannot run inside itself". Execute Script of its own script
+    // is refused, so Out fires at once and the script is neither reset nor run again inside the frame.
+    let mut s = Spec {
+        objects: 1,
+        scripts: vec![(0, true)],
+        frames: 2,
+        ..Spec::default()
+    };
+    let x = s.add(
+        B::new(0, proto::EXECUTE_SCRIPT, 1, 1)
+            .pin("bool", 1)
+            .pin("script", 0)
+            .local("bool", 1),
+    );
+    let p = s.add(B::new(0, proto::NOP, 1, 1));
+    s.link(Some((x, 0)), (p, 0), 0);
+    s.link(None, (x, 0), 0);
+    assert_eq!(s.run(), "frame 1\nrun B0\nrun B1\nend\nframe 2\nend\n");
+}
+
+#[test]
+fn a_group_iterator_without_an_index_output_or_local_walks_the_members() {
+    // docs/gameplay_bbs.md, "Group Iterator": with neither pOut 1 nor local 0 our runtime keeps the index itself
+    // (stage 0), so a loop still visits every member once and then fires Out.
+    let mut s = Spec {
+        objects: 3,
+        scripts: vec![(0, true)],
+        groups: vec![vec![0, 1, 2]],
+        frames: 5,
+        ..Spec::default()
+    };
+    let x = s.add(
+        B::new(0, proto::GROUP_ITERATOR, 2, 2)
+            .pin("group", 0)
+            .pout("obj", -1),
+    );
+    let done = s.add(B::new(0, proto::NOP, 1, 1));
+    s.link(Some((x, 0)), (done, 0), 0);
+    s.link(None, (x, 0), 0);
+    s.link(Some((x, 1)), (x, 1), 1);
+    let t = s.run();
+    let frames: Vec<&str> = t.split("frame ").skip(1).collect();
+    for (f, m) in ["O0", "O1", "O2"].iter().enumerate() {
+        assert!(
+            frames[f].contains(&format!("pout B0 0 {m}")),
+            "frame {}: {}",
+            f + 1,
+            frames[f]
+        );
+        assert!(
+            !frames[f].contains("run B1"),
+            "no Out yet in frame {}",
+            f + 1
+        );
+    }
+    assert!(
+        frames[3].contains("run B1"),
+        "Out after the last member: {}",
+        frames[3]
+    );
+    assert!(
+        frames[4].ends_with("end\npout B0 0 O2\n"),
+        "nothing after: {}",
+        frames[4]
+    );
+}
+
+#[test]
+fn op() {
+    // the arithmetic on Integers and Floats (the operation table as a whole is stage 0b)
+    sweep("Op", |r| {
+        let ops = [
+            (0x33cc_6b49u32, 0x3589_282bu32),
+            (0x6764_1171, 0x6499_077a),
+            (0x3899_6b85, 0x334e_35c2),
+            (0x748c_3502, 0x0fea_0cf1),
+        ];
+        let (g0, g1) = r.pick(&ops);
+        let t = r.pick(&["int", "float"]);
+        let b = B::new(0, proto::OP, 1, 1)
+            .pin(t, r.pick(&["-7", "0", "2", "5"]))
+            .pin(t, r.pick(&["-2", "0", "1", "3"]))
+            .pout(t, "0")
+            .local("int", 0)
+            .local("int", g0 as i32)
+            .local("int", g1 as i32);
+        frame(r, b, &[(0, 0, &[1])])
+    });
+}
+
+/// The arrays of every array case: A0 3 columns x 4 rows keyed by a random column (or none), A1 2 x 0 (empty),
+/// A2 1 x 1 without a key.
+fn with_arrays_of(r: &mut Rng, b: B, loops: &[(usize, usize, &[u16])]) -> Spec {
+    let s = frame(r, b, loops);
+    with_arrays(r, s)
+}
+
+fn with_arrays(r: &mut Rng, mut s: Spec) -> Spec {
+    s.arrays = vec![(3, 4, r.pick(&[-1, 0, 1, 2])), (2, 0, 0), (1, 1, -1)];
+    s
+}
+
+#[test]
+fn iterator() {
+    sweep("Iterator", |r| {
+        let b = B::new(0, proto::ITERATOR, 2, 2)
+            .target("array", r.pick(&[0, 0, 1, 2]))
+            .pin("int", r.pick(&[-1, 0, 1, 3, 4, 9]))
+            .pin("int", r.pick(&[-1, -1, 0, 2, 3, 7]))
+            .pin("bool", r.below(2))
+            .pout("int", r.pick(&[0, 2]))
+            .pout("int", 0)
+            .pout("int", 0);
+        with_arrays_of(r, b, &[(1, 1, &[0, 1, 2]), (0, 0, &[3])])
+    });
+}
+
+#[test]
+fn get_cell() {
+    sweep("Get Cell", |r| {
+        let b = B::new(0, proto::GET_CELL, 1, 2)
+            .target("array", r.pick(&[0, 0, 1, 2]))
+            .pin("int", r.pick(&[-1, 0, 1, 3, 4]))
+            .pin("int", r.pick(&[-1, 0, 2, 3]))
+            .pout("int", 5);
+        with_arrays_of(r, b, &[(0, 0, &[1]), (1, 0, &[2])])
+    });
+}
+
+#[test]
+fn get_key_row() {
+    sweep("Get Key Row", |r| {
+        let b = B::new(0, proto::GET_KEY_ROW, 1, 2)
+            .target("array", r.pick(&[0, 0, 1, 2]))
+            .pin("int", r.pick(&[-1, 0, 10, 20, 30, 40, 12]))
+            .pout("int", 5)
+            .pout("int", 5)
+            .pout("int", 5);
+        with_arrays_of(r, b, &[(0, 0, &[1]), (1, 0, &[2])])
+    });
 }

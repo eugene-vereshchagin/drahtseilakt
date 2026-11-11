@@ -111,13 +111,16 @@ Frame), und ein zweites Skript setzt das erste in zufälligen Frames zurück, de
 Pins laufen über Randwerte (negative, null und gebrochene Zeiten, Zähler und Schritte von -2 bis 7, Operatoren 0-7,
 leere Gruppen). Abgedeckt: Delayer, Timer, Counter, Sequencer, Binary Switch, Wait For All, Identity, Parameter
 Selector, Binary Memory, Test, Switch On Parameter, Per Second, Group Iterator, Wait Message mit Send Message,
-Activate Script und Deactivate Script (als Treiber); je 2000 Fälle stimmen überein. Die abweichenden Bausteine sind
+Op (Integer- und Float-Arithmetik, auch Division durch 0), Get Cell, Iterator, Get Key Row (Arrays mit
+Integer-Spalten, auch leere), Activate Script und Deactivate Script (als Treiber); je 2000 Fälle stimmen überein. Die abweichenden Bausteine sind
 jetzt in [gameplay_bbs.md](../../gameplay_bbs.md), Teil 5, beschrieben, und unsere folgen dem: der Delayer zählt den
 Frame, in dem In kommt, und hält seine Zeit in Elapsed Time; Timer bleibt nie aktiv (die Schleife ist die des
 Graphen); Counter und Sequencer halten ihren Wert in Ausgabeparameter 0 (der Sequencer lief vorher als Streaming
 Event, Wait For All als Nop); ein Baustein lässt die Eingänge, die er nicht behandelt, aktiv; Identity tut bei
 ungleich vielen Pins und Ausgaben nichts; Wait Message meldet ein Warten an und ist fertig, das Warten hält den Graphen
-aktiv, und die Zustellung der Nachricht löst Out aus, wie im Nachrichtenmanager des Originals. Execute Script wird
+aktiv, und die Zustellung der Nachricht löst Out aus, wie im Nachrichtenmanager des Originals; Iterator hält seine Zeile in Row Index und läuft rund um das
+Array; Get Key Row sucht in der eigenen Schlüsselspalte des Arrays (jetzt aus der Datei gelesen, Kennung `0x4000`),
+nicht in der ersten Spalte, und tut ohne sie nichts. Execute Script wird
 nicht verglichen: das C stellt eine Anforderung, nach unseren Notizen läuft das Skript sofort. Das C nimmt einen
 Stapeleintrag mehr als BehaviorMaxIteration, bevor es eine Schleife stoppt; die Notizen sagen höchstens so viele,
 daher werden Schleifen an der Grenze nicht verglichen. Stufe 3 (ganze Karten) folgt.

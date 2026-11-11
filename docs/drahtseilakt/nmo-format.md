@@ -77,6 +77,7 @@ words; writers may leave garbage after the terminating NUL.
 | Curve point | 36 | `0x10000000` | (data version 5 and later) the curve, user tangents (instead of TCB), linear, tension, continuity, bias, in and out tangents (curve-local) |
 | Data array | 52 | `0x1000` | columns: count, then name (string) and type (1 int, 2 float, 3 string, 4 object, 5 parameter + type GUID) |
 | | | `0x2000` | rows: count, then one value per column |
+| | | `0x4000` | sort order, sort column, key column (-1: none; Get Key Row searches the key column) |
 
 **Vertex save flags**: `0x1` one colour for all, `0x2` one specular for all, `0x4` no normals (the reader
 computes smooth ones), `0x8` one UV for all, `0x10` no positions.

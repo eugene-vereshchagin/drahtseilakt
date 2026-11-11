@@ -197,13 +197,16 @@ delay 0: re-entry in the same frame) and lets a second script reset, deactivate 
 frames; pins are swept over edge values (negative, zero and fractional times, counts and steps from -2 to 7,
 operators 0-7, empty groups). Covered: Delayer, Timer, Counter, Sequencer, Binary Switch, Wait For All, Identity,
 Parameter Selector, Binary Memory, Test, Switch On Parameter, Per Second, Group Iterator, Wait Message with Send
-Message, Activate Script and Deactivate Script (as the drivers); 2000 cases each agree. The blocks that disagreed are
+Message, Op (Integer and Float arithmetic, a divisor of 0 too), Get Cell, Iterator, Get Key Row (arrays of Integer
+columns, empty ones too), Activate Script and Deactivate Script (as the drivers); 2000 cases each agree. The blocks that disagreed are
 now written down in [gameplay_bbs.md](../gameplay_bbs.md), part 5, and ours follow that: the Delayer counts the
 frame In fires in and keeps its time in Elapsed Time; Timer never stays active (its loop is the graph's); Counter
 and Sequencer keep their value in output parameter 0 (the Sequencer was run as a Streaming Event before, Wait For
 All as a Nop); a block leaves the inputs it does not handle active; Identity does nothing with unequal pins and
 outputs; Wait Message registers a wait and is done, the waiting keeps its graph active, and the message's delivery
-fires Out, as in the original's message manager. Execute Script is not compared: the C files a request, our notes
+fires Out, as in the original's message manager; Iterator keeps its row in Row Index and walks round the array;
+Get Key Row searches the array's own key column (now read from the file, identifier `0x4000`), not the first
+column, and does nothing without one. Execute Script is not compared: the C files a request, our notes
 run the script at once. The C makes one stack pop more than BehaviorMaxIteration before it stops a loop; the notes
 say at most that many, so loops that hit the cap are not compared. Level 3 (whole maps) is next.
 
@@ -438,5 +441,6 @@ blocks, the blocks beyond the template, the blocks not covered, and whether phas
    their place; a map that needs them for play is reported by name.
 
 Semantics not knowable from the files, to be checked against the original by playing: the exact frame a
-delayed link fires relative to the physics step; Keep Active's "one at a time" local; the key column of Get
-Key Row (taken as the first column); TT Scaleable Proximity's first test after On (taken as at once).
+delayed link fires relative to the physics step; Keep Active's "one at a time" local; TT Scaleable Proximity's
+first test after On (taken as at once). (The key column of Get Key Row is the array's own, saved with it: settled by
+the C oracle, [gameplay_bbs.md](../gameplay_bbs.md), part 5.)

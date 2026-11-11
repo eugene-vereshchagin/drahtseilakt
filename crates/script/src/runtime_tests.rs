@@ -455,6 +455,7 @@ fn an_iterator_loops_over_a_map_array_and_set_position_moves_the_rows_objects() 
             vec![Value::Obj(Some(0)), Value::Vec3([1.0, 2.0, 3.0])],
             vec![Value::Obj(Some(1)), Value::Vec3([4.0, 5.0, 6.0])],
         ],
+        key: None,
     });
     let arr = b.g.add_object("Moves", ObjKind::Array(0));
     let arr_param = b.local("Target (Array)", types::ARRAY, Value::Obj(Some(arr)));
@@ -515,7 +516,8 @@ fn an_iterator_loops_over_a_map_array_and_set_position_moves_the_rows_objects() 
     rt.tick(&mut host);
     assert_eq!(host.matrices[0][3], [1.0, 2.0, 3.0, 1.0]);
     assert_eq!(host.matrices[1][3], [4.0, 5.0, 6.0, 1.0]);
-    assert_eq!(rt.values[row_out], Value::Int(1));
+    // docs/gameplay_bbs.md, "Iterator": the step past the last row wraps Row Index to 0, the stop row
+    assert_eq!(rt.values[row_out], Value::Int(0));
     assert!(!rt.is_active(script), "both rows done within one tick");
 }
 

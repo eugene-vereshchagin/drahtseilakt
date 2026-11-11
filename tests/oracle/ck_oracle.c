@@ -14,6 +14,9 @@
                                       string, msg (a message type by name), obj / script / group (an index of
                                       that kind, -1 none), none (a pin with no source: the block's default)
      group NAME OBJECT...             a group of objects
+     array NAME COLS ROWS KEY         an array of Integer columns, cell (row, col) = 10 * row + col, key column
+                                      KEY (-1 none)
+     target BLOCK TYPE VALUE          the block's target parameter (TYPE as for pin; array: an array index)
      link SCRIPT FROM TO DELAY        FROM: s (the script's start) or BLOCK.OUT; TO: BLOCK (its input 0) or
                                       BLOCK.IN
      frames N
@@ -30,8 +33,8 @@
 #define MAXN 4096
 
 static CkContext ctx;
-static CkId objects[MAXN], scripts[MAXN], blocks[MAXN], groups[MAXN];
-static unsigned nobjects, nscripts, nblocks, ngroups;
+static CkId objects[MAXN], scripts[MAXN], blocks[MAXN], groups[MAXN], arrays[MAXN];
+static unsigned nobjects, nscripts, nblocks, ngroups, narrays;
 /* the level-2 blocks' output parameters, with the type they are printed by */
 static struct { unsigned block, index; CkId param; char type[16]; } pouts[MAXN];
 static unsigned npouts;
@@ -76,6 +79,7 @@ static bool type_guid(const char *t, CkGuid *g)
         {"string", {0x6bd010e2u, 0x115617eau}}, {"msg", {0x03881e12u, 0x5ba34e2bu}},
         {"obj", {0x71d80779u, 0x402f42f3u}},    {"script", {0x7ea4176du, 0x1b405d30u}},
         {"group", {0x5c0f151bu, 0x6f0547fdu}},  {"none", {0x5a5716fdu, 0x44e276d7u}},
+        {"array", {0x024d52f1u, 0x678223b2u}},
     };
     for (size_t i = 0; i < sizeof k / sizeof *k; i++)
         if (!strcmp(t, k[i].name)) {
@@ -102,10 +106,10 @@ static void set_value(CkParameter *p, const char *t, const char *v)
     } else if (!strcmp(t, "msg")) {
         int32_t m = ck_message_type(&ctx, v);
         memcpy(&w, &m, 4);
-    } else if (!strcmp(t, "obj") || !strcmp(t, "script") || !strcmp(t, "group")) {
+    } else if (!strcmp(t, "obj") || !strcmp(t, "script") || !strcmp(t, "group") || !strcmp(t, "array")) {
         long i = strtol(v, NULL, 10);
-        CkId *of = !strcmp(t, "obj") ? objects : !strcmp(t, "script") ? scripts : groups;
-        unsigned n = !strcmp(t, "obj") ? nobjects : !strcmp(t, "script") ? nscripts : ngroups;
+        CkId *of = !strcmp(t, "obj") ? objects : !strcmp(t, "script") ? scripts : !strcmp(t, "group") ? groups : arrays;
+        unsigned n = !strcmp(t, "obj") ? nobjects : !strcmp(t, "script") ? nscripts : !strcmp(t, "group") ? ngroups : narrays;
         w = i >= 0 && (unsigned long)i < n ? of[i] : 0;
     } else {
         int32_t i = (int32_t)strtol(v, NULL, 10);
@@ -124,7 +128,7 @@ static void print_value(const CkParameter *p, const char *t)
         printf("%s", p->value && p->size ? (const char *)p->value : "");
     } else if (!strcmp(t, "float") || !strcmp(t, "time")) {
         printf("%08x", w);
-    } else if (!strcmp(t, "obj") || !strcmp(t, "script") || !strcmp(t, "group")) {
+    } else if (!strcmp(t, "obj") || !strcmp(t, "script") || !strcmp(t, "group") || !strcmp(t, "array")) {
         CkObj *o = w ? ck_obj(&ctx, w) : NULL;
         printf("%s", o ? o->name : "-");
     } else {
@@ -234,6 +238,35 @@ int main(int argc, char **argv)
                 q += used;
             }
             groups[ngroups++] = g->be.h.id;
+        } else if (!strcmp(kind, "array") && narrays < MAXN) {
+            unsigned cols = 0, rows = 0;
+            int key = -1;
+            if (sscanf(line, "%*s %127s %u %u %d", name, &cols, &rows, &key) != 4 || cols > 16 || rows > 64) return 2;
+            CkDataArray *arr = (CkDataArray *)ck_create(&ctx, CKCID_DATAARRAY, name);
+            for (unsigned k = 0; k < cols; k++) ck_array_insert_column(&ctx, arr, -1, CKARRAYTYPE_INT, "c", CKPGUID_NONE);
+            for (unsigned r = 0; r < rows; r++) {
+                uint32_t row = ck_array_add_row(&ctx, arr);
+                for (unsigned k = 0; k < cols; k++) {
+                    CkCell *c = ck_array_cell(arr, row, k);
+                    if (c) c->i = (int32_t)(10 * r + k);
+                }
+            }
+            arr->key_column = key;
+            arrays[narrays++] = arr->be.h.id;
+        } else if (!strcmp(kind, "target") && sscanf(line, "%*s %u %31s %127s", &a, k2, name) == 3 && a < nblocks) {
+            CkBehavior *x = ck_behavior(&ctx, blocks[a]);
+            CkGuid g;
+            if (!type_guid(k2, &g)) return 2;
+            CkParameter *src = (CkParameter *)ck_create(&ctx, CKCID_PARAMETERLOCAL, "value");
+            src->kind = CKP_LOCAL;
+            src->type = g;
+            set_value(src, k2, name);
+            CkParameter *pin = (CkParameter *)ck_create(&ctx, CKCID_PARAMETERIN, "target");
+            pin->kind = CKP_IN;
+            pin->type = g;
+            pin->owner = x->h.id;
+            pin->source = src->h.id;
+            x->target = pin->h.id;
         } else if (!strcmp(kind, "bb") && nblocks < MAXN) {
             unsigned ga = 0, gb = 0, nin = 0, nout = 0;
             if (sscanf(line, "%*s %127s %u %x:%x %d %u %u", name, &a, &ga, &gb, &prio, &nin, &nout) != 7 ||

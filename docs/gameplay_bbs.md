@@ -1626,6 +1626,27 @@ stops waiting and loses the wait; the graph then fires Out's links at the start 
 message sent in frame N), without running the block. A reset of the script ends the waiting (the flag is cleared);
 a wait that remains then catches its message without effect.
 
+## Iterator
+
+`198f0af9:0268249f`. Target: an array. Ins `In`, `Loop In`; outs `Out`, `Loop Out`; pIns `Starting Row`, `Ending Row`
+(-1 = the last), `Backward`; pOut 0 `Row Index`, then one pOut per column from pOut 1. Without an array nothing
+happens. With *n* rows and `Starting Row >= n` (so always for an empty array) Out fires at once and no input is
+cleared. Otherwise: on In (cleared) the row is Ending Row when backward, else Starting Row, and this is the first
+step; on Loop In (cleared) it is Row Index ∓ 1, wrapping round the array (below 0 to *n*-1, past *n*-1 to 0). The
+row is written to Row Index. The stop row is one past the end (Ending Row + 1, or 0 past the last row) forward,
+Starting Row - 1 (or *n*-1 below 0) backward; reaching it, except on the first step, fires Out (done). Else the row's
+cells go to pOut 1.. (a cell only into an output of its type; a row outside the array writes nothing) and Loop Out
+fires. So Starting Row above Ending Row walks round the end of the array, and a range covering the whole array
+starts again at its first row only by a new In.
+
+## Get Key Row
+
+`49064205:10e72f7a`. Target: an array; pIn 0 the key; outs `Found`, `Not Found`; one pOut per column. The key column
+is the **array's own** (saved under identifier `0x4000` of the array: sort order, sort column, key column; -1 or
+absent: none), not the first column. An array without a key column logs "No column criterion defined" and nothing
+happens (In stays active). Otherwise In is cleared, the first row whose key cell equals the key is copied to the
+pOuts and Found fires, else Not Found.
+
 ## Execute Script: ours differs from the C on purpose
 
 The C reference files an activation request (the script starts in the next frame, like Activate Script). Our notes

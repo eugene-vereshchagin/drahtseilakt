@@ -552,10 +552,19 @@ pub(crate) fn get_key_row(
     proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
+    let t = rt.target(b, host);
+    if proto == proto::GET_KEY_ROW {
+        // docs/gameplay_bbs.md, "Get Key Row": without an array or its key column nothing happens (In stays)
+        let key = array_of(rt, t)
+            .and_then(|a| rt.graph.arrays.get(a))
+            .and_then(|x| x.key);
+        if key.is_none() {
+            return Flow::Done;
+        }
+    }
     if !input(rt, b, 0) {
         return Flow::Done;
     }
-    let t = rt.target(b, host);
     let Some(a) = array_of(rt, t) else {
         out(rt, b, 1);
         return Flow::Done;
@@ -563,10 +572,13 @@ pub(crate) fn get_key_row(
     let row = if proto == proto::GET_ROW {
         usize::try_from(pin(rt, b, "Row Index", 0, host).as_int()).ok()
     } else {
+        let Some(k) = rt.graph.arrays.get(a).and_then(|x| x.key) else {
+            return Flow::Done;
+        };
         let key = pin(rt, b, "Key Value", 0, host);
         rt.rows(a)
             .iter()
-            .position(|r| r.first().is_some_and(|c| c.same(&key)))
+            .position(|r| r.get(k).is_some_and(|c| c.same(&key)))
     };
     match row.and_then(|r| rt.rows(a).get(r).cloned()) {
         Some(cells) => {
@@ -640,57 +652,71 @@ pub(crate) fn clear_array(
 
 pub(crate) fn iterator(
     rt: &mut Runtime,
-    id: Id,
+    _id: Id,
     b: &Block,
     _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    let start = input(rt, b, 0);
-    let looped = input(rt, b, 1);
-    if !start && !looped {
-        return Flow::Done;
-    }
+    // docs/gameplay_bbs.md, "Iterator": the row lives in Row Index and walks round the array
     let t = rt.target(b, host);
-    let rows = array_of(rt, t).map(|a| rt.rows(a).len()).unwrap_or(0) as i64;
-    let first = i64::from(pin(rt, b, "Starting Row", 0, host).as_int());
-    let last = i64::from(pin(rt, b, "Ending Row", 1, host).as_int());
-    let last = if last < 0 {
-        rows.saturating_sub(1)
-    } else {
-        last.min(rows.saturating_sub(1))
+    let Some(a) = array_of(rt, t) else {
+        return Flow::Done;
     };
-    let backward = pin(rt, b, "Backward", 2, host).as_bool();
-    let i = if start {
-        if backward { last } else { first }
-    } else {
-        match rt.scratch(id) {
-            Scratch::Index(i) => *i,
-            _ => first,
-        }
-    };
-    let done = if backward { i < first } else { i > last };
-    if done || i < 0 {
-        rt.set_scratch(id, Scratch::None);
+    let n = i32::try_from(rt.rows(a).len()).unwrap_or(i32::MAX);
+    let start = pin(rt, b, "Starting Row", 0, host).as_int();
+    if start >= n {
         out(rt, b, 0);
         return Flow::Done;
     }
-    set_pout(rt, b, "Row Index", 0, Value::Int(i as i32));
-    let cells = array_of(rt, t)
-        .and_then(|a| rt.rows(a).get(i as usize).cloned())
+    let end = match pin(rt, b, "Ending Row", 1, host).as_int() {
+        -1 => n.saturating_sub(1),
+        e => e,
+    };
+    let backward = pin(rt, b, "Backward", 2, host).as_bool();
+    let first = input(rt, b, 0);
+    let cur = if first {
+        if backward { end } else { start }
+    } else {
+        input(rt, b, 1);
+        let last = pout_value(rt, b, 0).map_or(0, |v| v.as_int());
+        let c = if backward {
+            last.saturating_sub(1)
+        } else {
+            last.saturating_add(1)
+        };
+        if c < 0 {
+            n.saturating_sub(1)
+        } else if c >= n {
+            0
+        } else {
+            c
+        }
+    };
+    set_pout(rt, b, "Row Index", 0, Value::Int(cur));
+    let stop = if backward {
+        match start.saturating_sub(1) {
+            -1 => n.saturating_sub(1),
+            s => s,
+        }
+    } else {
+        match end.saturating_add(1) {
+            s if s >= n => 0,
+            s => s,
+        }
+    };
+    if (!first || n == 0) && cur == stop {
+        out(rt, b, 0);
+        return Flow::Done;
+    }
+    let cells = usize::try_from(cur)
+        .ok()
+        .and_then(|r| rt.rows(a).get(r).cloned())
         .unwrap_or_default();
     for (k, c) in cells.into_iter().enumerate() {
         if let Some(p) = b.pouts.get(k.saturating_add(1)).copied() {
             rt.write(p, c);
         }
     }
-    rt.set_scratch(
-        id,
-        Scratch::Index(if backward {
-            i.saturating_sub(1)
-        } else {
-            i.saturating_add(1)
-        }),
-    );
     out(rt, b, 1);
     Flow::Done
 }

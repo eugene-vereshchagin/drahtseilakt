@@ -692,6 +692,7 @@ fn script_seeds() -> Vec<Vec<u8>> {
             name: "T".into(),
             columns: vec![("c".into(), 1)],
             rows: vec![vec![Value::Int(1)], vec![Value::Vec3([1.0, 2.0, 3.0])]],
+            key: Some(0),
         }],
         vec![(0, Some(8))],
     );
