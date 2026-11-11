@@ -4,6 +4,8 @@
 
 第一阶段（2026-11-09）：解释器核心、模板的构建块以及其余最常用的构建块；在真实地图上无窗口验证。代码：`crates/nmo/src/behavior.rs`（文件侧）、`crates/script`（图模型、运行时、构建块）、`crates/game/src/scripting.rs`（引擎侧）。格式参考：[ck-runtime.md](../../ck-runtime.md)。
 
+第二阶段（2026-11-11）：“This”——脚本自身的对象（没有值的局部参数，只有空的 `0x200` 段）读作 `Owner`（开放格式写作 `["this", 0]`），运行时启动时绑定到脚本的对象；此前这样的参数会丢失。**Object Copy** 会生成副本：本次运行中的一个对象，带有原对象的位置、网格和包围盒、自己的名字（原名加三位编号；原版中名字的确切形式未知），以及原对象每个脚本的副本，绑定到该副本；每次运行最多 256 个副本（被拒绝的尝试也计数），被复制的脚本最多 16384 个节点；副本的节点从该 tick 的工作预算中支付，放不进预算或图的上限的副本整体被拒绝；从第一个副本起运行拥有自己的图，关卡的图不变。副本目前**不绘制，也没有物理体**。**Box Box Intersection** 对没有网格的对象，把它的位置当作空包围盒来检测。这样**传送门**地图的传送可以工作。组在运行中可变（Add To Group、Remove From Group、Group Clear）。渐变：Linear Progression、Bezier Progression（其 2D 曲线未解码：按直线）、Interpolator、Get / Set Component、TT_Timer。Random 与 Random Switch：运行状态里一个固定种子的生成器，因此运行与其回放一致。另有：Set Euler Orientation、Scale、Get Nearest In Group、Row Search、Remove Row、Object Rename。尚未完成：脚本对关卡对象的物理（被脚本移动的平台在新位置绘制，却在旧位置碰撞）、副本的绘制、Attach Script、Object Create、经声音引擎的声音；测试玩家（`--autopilot`）不认识传送门。在此改动之前录制的带脚本地图的回放可能播放不同。
+
 ## 文件里有什么
 
 一张行为图是几类对象的集合，各有自己的状态块：8 Behavior（脚本、图或带原型 GUID 的构建块；标志、优先级、目标参数，以及子行为、连线、运算、输入/输出/局部参数、输入口和输出口的列表）、6 BehaviorLink（以帧计的延迟、源 IO 和目标 IO）、9 BehaviorIO、2 ParameterIn（类型和来源）、3 ParameterOut 与 45 ParameterLocal（类型、保存的值，输出还有复制目标）、4 ParameterOperation（运算 GUID、两个输入、一个输出）、52 DataArray（表格），以及任何 CKBeObject 的脚本列表（标识符 `0x800`）。引脚名就是参数对象名，所以构建块按名称读取引脚。文件说不出的：场景启动时哪些脚本处于激活状态（全部按激活并重置启动），以及游戏自身的对象（`Ball_Pos_Frame`、`CurrentLevel` 表），由引擎作答。

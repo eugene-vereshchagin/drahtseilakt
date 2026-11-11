@@ -267,6 +267,12 @@ pub fn parameter(chunk: &Chunk) -> Result<Parameter> {
     })
 }
 
+/// Whether a local parameter (class 45) is its script's "This": the object the script is attached to. Such a
+/// parameter is saved without a value (no section 0x40), with the empty section 0x200 alone.
+pub fn parameter_is_owner(chunk: &Chunk) -> bool {
+    chunk.section(0x40).is_none() && chunk.section(0x200).is_some()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Operation {
     pub guid: Guid,
