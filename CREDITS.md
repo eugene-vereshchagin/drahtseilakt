@@ -32,7 +32,7 @@ Source of the list: the community catalogue [BallanceCustomMaps](https://github.
 |---|---|---|---|---|---|---|---|---|
 | 1 | Scarborough Fair | 斯卡布罗集市 | yyc12345 | 2020-07-16 | - | 1 | [1](https://www.youtube.com/watch?v=k-GHCgitasM), [2](https://www.youtube.com/watch?v=YiMWDjlkOiQ) | `assets/levels/community/01-Scarborough-Fair/` |
 | 2 | Ballance Windows v1.1 | 平衡视窗V1.1 | hhmmdd123 | 2014-08-27 | 1.1 | 1 | [1](https://www.youtube.com/watch?v=aEHcbcRdSog), [2](https://www.youtube.com/watch?v=sOgcf8fSmoA) | `assets/levels/community/02-Ballance-Windows/` |
-| 3 | Cross Lift | 十字升降 | 失衡技师 | 2009-08-26 | - | 1 | [1](https://www.youtube.com/watch?v=a9G-BC3krCc), [2](https://www.youtube.com/watch?v=TIDXMaaKnQ8) | `assets/levels/community/03-Cross-Lift/` |
+| 3 | Ballance Bewildering City v1.3 | 平衡迷城V1.3 | 平衡总统 | 2015-02-23 | - | 1 | [1](https://www.youtube.com/watch?v=blWBlCh-6OE), [2](https://www.youtube.com/watch?v=lPJrcM8X500) | `assets/levels/community/03-Bewildering-City/` |
 | 4 | Moli Thinking | 茉莉思考 | ZYL | 2013-02-23 | - | 2 | [1](https://www.youtube.com/watch?v=PHLZ7g5aGFs), [2](https://www.youtube.com/watch?v=qsTTOyHRzM0) | `assets/levels/community/04-Moli-Thinking/` |
 | 5 | Totole Chicken (Bouillon) | 太太乐鸡(精) | 傲骨银狼ヶ璇 | 2010-08-27 | - | 2 | [1](https://www.youtube.com/watch?v=xSRaipnKJYE), [2](https://www.youtube.com/watch?v=wrAAQPa5ezs) | `assets/levels/community/05-Totole-Chicken-Bouillon/` |
 | 6 | Family Portrait | 全家福 | vipeazone | 2012-03-01 | - | 2 | [1](https://www.youtube.com/watch?v=qdq8hBLqN_0), [2](https://www.youtube.com/watch?v=53tTdt3YMwE) | `assets/levels/community/06-Family-Portrait/` |
