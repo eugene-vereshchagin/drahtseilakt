@@ -329,7 +329,19 @@ pub struct Graph {
     /// Scripts and objects the scene starts deactivated (their saved activity says so, docs/ck-runtime.md); every
     /// other one starts active (a map's file mostly saves no activity at all). Not in the open format yet.
     pub start_off: Vec<Id>,
+    /// The members the file gives each group (by group index, as `ObjKind::Group` counts them), of any kind: entities,
+    /// meshes, materials, behaviours. A group missing here (or empty) starts with the host's level members.
+    pub groups: Vec<Vec<Id>>,
+    /// The attributes the file's objects carry, in the order the attribute manager lists them: (object, the file's
+    /// attribute index, the parameter holding the value). Attribute indices are the file's own; a block names an
+    /// attribute by the same index (docs/ck-runtime.md, "Attributes").
+    pub attributes: Vec<(Id, i32, Option<Id>)>,
 }
+
+/// The most attributes one object carries in a run, attribute types (indices 0 to this) and attributes in all.
+pub const MAX_ATTRIBUTES_PER_OBJECT: usize = 64;
+pub const MAX_ATTRIBUTE_TYPES: i32 = 1 << 16;
+pub const MAX_ATTRIBUTES: usize = 1 << 16;
 
 impl Graph {
     /// The graphs of a file. `kind` says what each object of the file is to the engine (by its index).
@@ -343,6 +355,8 @@ impl Graph {
             links_from: vec![Vec::new(); n],
             priorities: Vec::new(),
             start_off: Vec::new(),
+            groups: Vec::new(),
+            attributes: Vec::new(),
         };
         for (i, o) in doc.objects.iter().enumerate().take(n) {
             let mut k = kind(i);
@@ -357,14 +371,7 @@ impl Graph {
                         .columns
                         .iter()
                         .map(|c| String::from_utf8_lossy(c).into_owned())
-                        .collect::<Vec<_>>()
-                        .into_iter()
-                        .zip(
-                            // the kinds are not kept by the decoder: infer each from the cells, else object
-                            (0..a.columns.len()).map(|c| {
-                                a.rows.first().and_then(|r| r.get(c)).map_or(4, cell_kind)
-                            }),
-                        )
+                        .zip(a.kinds.iter().copied())
                         .collect(),
                     rows: a
                         .rows
@@ -375,6 +382,22 @@ impl Graph {
                     key: a.key_column,
                 });
             }
+            if let (ObjKind::Group(gi), Some(chunk)) = (k, &o.chunk)
+                && o.class_id == class::GROUP
+                && gi < MAX_OBJECTS
+                && let Ok(members) = nmo::scene::group(chunk)
+            {
+                if g.groups.len() <= gi {
+                    g.groups.resize(gi.saturating_add(1), Vec::new());
+                }
+                if let Some(slot) = g.groups.get_mut(gi) {
+                    *slot = members
+                        .into_iter()
+                        .filter(|&m| m < n)
+                        .take(MAX_OBJECTS)
+                        .collect();
+                }
+            }
             if o.class_id == behavior::class::BEHAVIOR {
                 k = ObjKind::Behavior;
             }
@@ -384,6 +407,17 @@ impl Graph {
                 kind: k,
             });
             let Some(chunk) = &o.chunk else { continue };
+            for (attr, param) in nmo::scene::attributes(chunk)
+                .into_iter()
+                .take(MAX_ATTRIBUTES_PER_OBJECT)
+            {
+                if g.attributes.len() < MAX_ATTRIBUTES
+                    && let Ok(attr) = i32::try_from(attr)
+                    && attr < MAX_ATTRIBUTE_TYPES
+                {
+                    g.attributes.push((i, attr, param.filter(|&p| p < n)));
+                }
+            }
             let node = match o.class_id {
                 behavior::class::BEHAVIOR => behavior::behavior(chunk).ok().map(|b| {
                     Node::Block(Block {
@@ -685,6 +719,8 @@ impl Graph {
             links_from: vec![Vec::new(); n],
             priorities: Vec::new(),
             start_off: Vec::new(),
+            groups: Vec::new(),
+            attributes: Vec::new(),
         };
         for (i, node) in nodes {
             match &node {
@@ -978,15 +1014,6 @@ impl Graph {
         self.nodes.push(Node::None);
         self.links_from.push(Vec::new());
         id
-    }
-}
-
-fn cell_kind(c: &nmo::scene::Cell) -> u32 {
-    match c {
-        nmo::scene::Cell::Int(_) => 1,
-        nmo::scene::Cell::Float(_) => 2,
-        nmo::scene::Cell::String(_) => 3,
-        nmo::scene::Cell::Object(_) => 4,
     }
 }
 

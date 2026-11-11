@@ -158,8 +158,13 @@ pub struct Runtime {
     links: Vec<LinkState>,
     io: Vec<bool>,
     pub values: Vec<Value>,
-    /// The maps' arrays' rows, which Set Cell and Add Row change (the graph's are the file's).
-    arrays: Vec<Vec<Vec<Value>>>,
+    /// The maps' arrays as the run has changed them (rows, columns, key column; the graph's are the file's).
+    arrays: Vec<crate::Array>,
+    /// Each group's members as the run has them, by group index: seeded the first time a group is used (from the
+    /// file's members, else the host's level members) and changed by the group blocks.
+    groups: Vec<Option<Vec<Id>>>,
+    /// The attributes objects carry now, in the order the attribute manager lists them: (attribute, object, value).
+    attrs: Vec<(i32, Id, Value)>,
     /// Messages sent this tick, delivered at the next.
     outbox: Vec<Message>,
     inbox: Vec<Message>,
@@ -194,6 +199,9 @@ pub struct Runtime {
     op_cache: std::collections::HashMap<crate::census::Signature, Option<(usize, bool)>>,
 }
 
+/// The most groups a run keeps members for.
+const MAX_GROUPS: usize = 1 << 16;
+
 /// The most objects a run's scripts may copy.
 pub const MAX_COPIES: usize = 256;
 
@@ -217,12 +225,25 @@ impl Runtime {
                 _ => Value::None,
             })
             .collect();
+        let attrs = graph
+            .attributes
+            .iter()
+            .map(|&(o, a, p)| {
+                let v = match p.and_then(|p| graph.nodes.get(p)) {
+                    Some(Node::Param(q)) => q.value.clone(),
+                    _ => Value::None,
+                };
+                (a, o, v)
+            })
+            .collect();
         let mut rt = Runtime {
             blocks: vec![BlockState::default(); n],
             links: vec![LinkState::default(); n],
             io: vec![false; n],
             values,
-            arrays: graph.arrays.iter().map(|a| a.rows.clone()).collect(),
+            arrays: graph.arrays.clone(),
+            groups: Vec::new(),
+            attrs,
             graph,
             outbox: Vec::new(),
             inbox: Vec::new(),
@@ -693,6 +714,8 @@ impl Runtime {
         if let Some(o) = self.objects.get_mut(object) {
             o.gone = true;
         }
+        // a deleted object leaves the attribute manager's lists
+        self.attrs.retain(|(_, o, _)| *o != object);
     }
 
     /// Execute Script: the script is activated (reset if asked) and run at once, inside the caller's frame; the
@@ -1074,21 +1097,193 @@ impl Runtime {
         }
     }
 
+    // ---- groups -----------------------------------------------------------------------------------------------
+
+    fn seed_group(&mut self, group: usize, host: &dyn Host) {
+        if group >= MAX_GROUPS {
+            return;
+        }
+        if self.groups.len() <= group {
+            self.groups.resize(group.saturating_add(1), None);
+        }
+        if self.groups.get(group).is_some_and(Option::is_some) {
+            return;
+        }
+        let mut members: Vec<Id> = self.graph.groups.get(group).cloned().unwrap_or_default();
+        if members.is_empty() {
+            // a level that brought no members of its own (the open format): the engine's entity members
+            let level = host.group_members(group);
+            if !level.is_empty() {
+                let by_entity: std::collections::HashMap<usize, Id> = self
+                    .graph
+                    .objects
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, o)| match o.kind {
+                        ObjKind::Entity(e) => Some((e, i)),
+                        _ => None,
+                    })
+                    .collect();
+                members = level
+                    .into_iter()
+                    .filter_map(|e| by_entity.get(&e).copied())
+                    .collect();
+            }
+        }
+        if let Some(slot) = self.groups.get_mut(group) {
+            *slot = Some(members);
+        }
+    }
+
+    /// A group's members now, in the order they joined, of any kind.
+    pub fn group_ids(&mut self, group: usize, host: &dyn Host) -> Vec<Id> {
+        self.seed_group(group, host);
+        self.groups
+            .get(group)
+            .cloned()
+            .flatten()
+            .unwrap_or_default()
+    }
+
+    /// Adds an object to a group (any object of the graph that is a behavioural object, not the group itself, not
+    /// twice, within the cap).
+    pub(crate) fn group_add(&mut self, group: usize, object: Id, host: &dyn Host) {
+        self.seed_group(group, host);
+        let ok = self.graph.objects.get(object).is_some_and(|o| {
+            !matches!(o.kind, ObjKind::Group(g) if g == group)
+                && crate::types::class_derives(o.class, 19)
+        });
+        if let Some(Some(m)) = self.groups.get_mut(group)
+            && ok
+            && !m.contains(&object)
+            && m.len() < crate::MAX_OBJECTS
+        {
+            m.push(object);
+        }
+    }
+
+    /// Adds many objects at once (Fill Group By Class), each as `group_add` would.
+    pub(crate) fn group_add_many(&mut self, group: usize, objects: &[Id], host: &dyn Host) {
+        self.seed_group(group, host);
+        let ok: Vec<Id> = objects
+            .iter()
+            .copied()
+            .filter(|&i| {
+                self.graph.objects.get(i).is_some_and(|o| {
+                    !matches!(o.kind, ObjKind::Group(g) if g == group)
+                        && crate::types::class_derives(o.class, 19)
+                })
+            })
+            .collect();
+        if let Some(Some(m)) = self.groups.get_mut(group) {
+            let mut seen: std::collections::HashSet<Id> = m.iter().copied().collect();
+            for i in ok {
+                if m.len() >= crate::MAX_OBJECTS {
+                    break;
+                }
+                if seen.insert(i) {
+                    m.push(i);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn group_remove(&mut self, group: usize, object: Id, host: &dyn Host) {
+        self.seed_group(group, host);
+        if let Some(Some(m)) = self.groups.get_mut(group) {
+            m.retain(|&x| x != object);
+        }
+    }
+
+    pub(crate) fn group_clear(&mut self, group: usize, host: &dyn Host) {
+        self.seed_group(group, host);
+        if let Some(Some(m)) = self.groups.get_mut(group) {
+            m.clear();
+        }
+    }
+
+    // ---- attributes -------------------------------------------------------------------------------------------
+
+    /// The value of an attribute an object carries, if it carries it.
+    pub fn attribute(&self, object: Id, attr: i32) -> Option<&Value> {
+        self.attrs
+            .iter()
+            .find(|(a, o, _)| *a == attr && *o == object)
+            .map(|(_, _, v)| v)
+    }
+
+    /// Gives an object an attribute (kept if it has it) and sets its value; false when refused (an attribute type or
+    /// an object that does not exist, or a cap).
+    pub(crate) fn set_attribute(&mut self, object: Id, attr: i32, value: Option<Value>) -> bool {
+        if !(0..crate::MAX_ATTRIBUTE_TYPES).contains(&attr) || object >= self.graph.objects.len() {
+            return false;
+        }
+        if let Some(slot) = self
+            .attrs
+            .iter_mut()
+            .find(|(a, o, _)| *a == attr && *o == object)
+        {
+            if let Some(v) = value {
+                slot.2 = v;
+            }
+            return true;
+        }
+        let mine = self.attrs.iter().filter(|(_, o, _)| *o == object).count();
+        if mine >= crate::MAX_ATTRIBUTES_PER_OBJECT || self.attrs.len() >= crate::MAX_ATTRIBUTES {
+            return false;
+        }
+        self.attrs.push((attr, object, value.unwrap_or_default()));
+        true
+    }
+
+    /// How many attributes an object carries.
+    pub fn attrs_of(&self, object: Id) -> usize {
+        self.attrs.iter().filter(|(_, o, _)| *o == object).count()
+    }
+
+    pub(crate) fn remove_attribute(&mut self, object: Id, attr: i32) {
+        self.attrs.retain(|(a, o, _)| !(*a == attr && *o == object));
+    }
+
+    /// The objects having an attribute, in the order they got it, with its value (Objects With Attribute Iterator).
+    pub fn with_attribute(&self, attr: i32, index: usize) -> Option<(Id, &Value)> {
+        self.attrs
+            .iter()
+            .filter(|(a, _, _)| *a == attr)
+            .nth(index)
+            .map(|(_, o, v)| (*o, v))
+    }
+
     // ---- arrays -----------------------------------------------------------------------------------------------
 
     pub fn rows(&self, array: usize) -> &[Vec<Value>] {
-        self.arrays.get(array).map_or(&[], Vec::as_slice)
+        self.arrays.get(array).map_or(&[], |a| a.rows.as_slice())
+    }
+
+    /// Every array as the run has it now.
+    pub fn arrays(&self) -> &[crate::Array] {
+        &self.arrays
+    }
+
+    /// An array as the run has it now.
+    pub fn array(&self, array: usize) -> Option<&crate::Array> {
+        self.arrays.get(array)
+    }
+
+    /// The same, to change: the array blocks edit rows, columns and the key column through this.
+    pub(crate) fn array_mut(&mut self, array: usize) -> Option<&mut crate::Array> {
+        self.arrays.get_mut(array)
     }
 
     pub fn cell(&self, array: usize, row: usize, column: usize) -> Option<Value> {
-        self.arrays.get(array)?.get(row)?.get(column).cloned()
+        self.arrays.get(array)?.rows.get(row)?.get(column).cloned()
     }
 
     pub fn set_cell(&mut self, array: usize, row: usize, column: usize, v: Value) {
         if let Some(c) = self
             .arrays
             .get_mut(array)
-            .and_then(|a| a.get_mut(row))
+            .and_then(|a| a.rows.get_mut(row))
             .and_then(|r| r.get_mut(column))
         {
             *c = v;
@@ -1097,17 +1292,17 @@ impl Runtime {
 
     pub fn add_row(&mut self, array: usize, row: Vec<Value>) {
         if let Some(a) = self.arrays.get_mut(array)
-            && a.len() < crate::MAX_ARRAY_ROWS
+            && a.rows.len() < crate::MAX_ARRAY_ROWS
         {
-            a.push(row);
+            a.rows.push(row);
         }
     }
 
     /// Removes a row; false when there is none at the index.
     pub fn remove_row(&mut self, array: usize, row: usize) -> bool {
         match self.arrays.get_mut(array) {
-            Some(a) if row < a.len() => {
-                a.remove(row);
+            Some(a) if row < a.rows.len() => {
+                a.rows.remove(row);
                 true
             }
             _ => false,
@@ -1132,7 +1327,7 @@ impl Runtime {
 
     pub fn clear_rows(&mut self, array: usize) {
         if let Some(a) = self.arrays.get_mut(array) {
-            a.clear();
+            a.rows.clear();
         }
     }
 

@@ -764,6 +764,8 @@ fn bare(nodes: Vec<Node>) -> Graph {
         links_from: vec![Vec::new(); n],
         priorities: Vec::new(),
         start_off: Vec::new(),
+        groups: Vec::new(),
+        attributes: Vec::new(),
     }
 }
 
@@ -1184,8 +1186,9 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     for w in all.windows(2) {
         assert_ne!(w[0].guid, w[1].guid, "{} declared twice", w[0].name);
     }
-    // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's
-    assert_eq!(all.len(), 90);
+    // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
+    // blocks and Set Row among them)
+    assert_eq!(all.len(), 106);
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -1491,5 +1494,143 @@ fn the_census_counts_kinds_links_and_delays_with_the_registrys_standing() {
     assert!(
         csv.contains("block,Mystery,00000007:00000007,?,unknown,1,1"),
         "{csv}"
+    );
+}
+
+/// Groups hold any object of the graph, not only the level's entities (docs/gameplay_bbs.md, "Fill Group By Class"):
+/// the file's own members of every kind seed a group, Fill Group By Class collects by class (the class itself and
+/// the number after it when Derived Classes is off, every derived class when on), and Is In Group sees them.
+#[test]
+fn groups_hold_any_object_and_fill_by_class() {
+    let mut b = Build::new();
+    // ids 5.. : a mesh (class 32), two materials (30), a texture (31)
+    let mesh = b.g.add_object("Mesh", ObjKind::Mesh(0));
+    let m1 = b.g.add_object("Mat1", ObjKind::Material(0));
+    let m2 = b.g.add_object("Mat2", ObjKind::Material(1));
+    let tex = b.g.add_object("Tex", ObjKind::Texture(0));
+    for (i, c) in [(mesh, 32), (m1, 30), (m2, 30), (tex, 31)] {
+        b.g.objects[i].class = c;
+    }
+    b.g.groups = vec![vec![mesh, 0]];
+    let class = b.local("Class", types::INT, Value::Int(30));
+    let derived = b.local("Derived Classes", types::BOOL, Value::Bool(false));
+    let pins = vec![
+        b.pin("Class", types::INT, class),
+        b.pin("Derived Classes", types::BOOL, derived),
+    ];
+    let t = b.local("Target", types::GROUP, Value::Obj(Some(2)));
+    let fill = b.bb(
+        "Fill Group By Class",
+        proto::FILL_GROUP_BY_CLASS,
+        &["In"],
+        &["Out"],
+        pins,
+        vec![],
+        vec![],
+        Some(t),
+    );
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, fill, 0), 0);
+    b.script("S", None, start, vec![fill], vec![l]);
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    assert_eq!(
+        rt.group_ids(0, &host),
+        vec![mesh, 0],
+        "the file's members, of any kind"
+    );
+    rt.tick(&mut host);
+    assert_eq!(
+        rt.group_ids(0, &host),
+        vec![mesh, 0, m1, m2],
+        "the materials are added, the texture (class 31) is not"
+    );
+    // a copy of the run keeps its own members
+    let mut other = rt.clone();
+    other.group_clear(0, &host);
+    assert!(other.group_ids(0, &host).is_empty());
+    assert_eq!(rt.group_ids(0, &host).len(), 4);
+}
+
+/// Attributes (docs/gameplay_bbs.md, "Attributes"): the file's seed the lists in order, Set Attribute adds an object
+/// and its value, Has Attribute finds it and gives the value, Remove Attribute drops it; a copy of the run keeps its
+/// own, and a bad index is refused.
+#[test]
+fn attributes_are_set_found_and_listed_in_order() {
+    let mut b = Build::new();
+    b.g.attributes = vec![(0, 5, None), (1, 6, None)];
+    let target = b.local("Target", types::BEOBJECT, Value::Obj(Some(1)));
+    let attr = b.local("Attribute", types::INT, Value::Int(5));
+    let val = b.local("Attribute Value", types::INT, Value::Int(7));
+    let pins = vec![
+        b.pin("Attribute", types::INT, attr),
+        b.pin("Attribute Value", types::INT, val),
+    ];
+    let set = b.bb(
+        "Set Attribute",
+        proto::SET_ATTRIBUTE,
+        &["In"],
+        &["Out"],
+        pins,
+        vec![],
+        vec![],
+        Some(target),
+    );
+    let shown = b.pout("Attribute Value", types::INT);
+    let pin_has = b.pin("Attribute", types::INT, attr);
+    let has = b.bb(
+        "Has Attribute",
+        proto::HAS_ATTRIBUTE,
+        &["In"],
+        &["True", "False"],
+        vec![pin_has],
+        vec![shown],
+        vec![],
+        Some(target),
+    );
+    let start = b.io("Start");
+    let l1 = b.link(start, in_of(&b.g, set, 0), 0);
+    let l2 = b.link(out_of(&b.g, set, 0), in_of(&b.g, has, 0), 0);
+    b.script("S", None, start, vec![set, has], vec![l1, l2]);
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    assert_eq!(
+        rt.with_attribute(5, 0).map(|x| x.0),
+        Some(0),
+        "the file's first"
+    );
+    assert!(rt.attribute(1, 5).is_none());
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(rt.attribute(1, 5), Some(&Value::Int(7)));
+    assert_eq!(
+        rt.values[shown],
+        Value::Int(7),
+        "Has Attribute gives the value"
+    );
+    assert_eq!(
+        rt.with_attribute(5, 1).map(|x| x.0),
+        Some(1),
+        "in the order they were set"
+    );
+    assert!(rt.with_attribute(5, 2).is_none());
+    let mut other = rt.clone();
+    other.remove_attribute(1, 5);
+    assert!(other.attribute(1, 5).is_none() && rt.attribute(1, 5).is_some());
+    assert!(
+        !rt.set_attribute(1, -1, None),
+        "a negative index is no attribute"
+    );
+    assert!(
+        !rt.set_attribute(999_999, 5, None),
+        "nor an object that is not there"
+    );
+    for a in 0..80 {
+        rt.set_attribute(0, a + 10, None);
+    }
+    assert!(
+        rt.attrs_of(0) <= crate::MAX_ATTRIBUTES_PER_OBJECT,
+        "an object carries a bounded number"
     );
 }

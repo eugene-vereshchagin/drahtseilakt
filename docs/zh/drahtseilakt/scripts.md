@@ -50,4 +50,12 @@
   行，并按地图列出缺少的块和签名。C 预言机检查值运算的行（`op_table`）。
 - **消息**带有发送者、接收者（或广播的类）和数据：新增 Broadcast Message、Switch On Message 和 Get Message Data
   （[gameplay_bbs.md](../../gameplay_bbs.md)，“Messages”）。
-- 尚未完成：属性（对象的标识符 `0x11` 和属性管理器的数据块）、可含任意对象的组、其余的数组块。
+- **数组**（`crates/script/src/blocks/arrays.rs`）：带类型的键和单元格，以及 Set Row、Insert/Remove Column、Move Row、
+  Sort Rows、Test Cell、Get Highest、Value Count、Remove Key Row、Remove Row If、Change Value If、Row Search；每次运行自带
+  每个数组的列和键列。除 C 中没有的 Move Row 外，所有列类型都已对照 C 预言机检验
+  （[gameplay_bbs.md](../../gameplay_bbs.md)，“Arrays”）。
+- **组**可含图中的任意对象（实体、网格、材质、纹理、行为）：成员取自文件，运行自行保存（随回滚），Fill Group By Class 按类收集
+  （[gameplay_bbs.md](../../gameplay_bbs.md)，“Fill Group By Class”）。对由实体组成的组，Group Iterator 和 Is In Group 的结果与以前相同。
+- **属性**（`crates/script/src/blocks/attributes.rs`）：Has、Set、Remove Attribute 和 Objects With Attribute Iterator 作用于运行中每个对象的属性表
+  （先是文件自带的，从标识符 `0x11` 谨慎读取，见 [ck-runtime.md](../../ck-runtime.md)；有上限；随运行回滚）。属性的名称和类型需要属性管理器的
+  数据块，目前仍被跳过：属性即其文件索引。

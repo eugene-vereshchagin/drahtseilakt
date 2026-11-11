@@ -15,15 +15,17 @@
                                       that kind, -1 none), none (a pin with no source: the block's default),
                                       vector / vec2 / box (comma-separated floats), percentage (a float)
      group NAME OBJECT...             a group of objects
-     array NAME COLS ROWS KEY         an array of Integer columns, cell (row, col) = 10 * row + col, key column
-                                      KEY (-1 none)
+     array NAME COLS ROWS KEY [KINDS [MOD]]  an array, cell (row, col) = 10 * row + col (or (7 row + 3 col) % MOD),
+                                      key column KEY (-1 none); KINDS one letter a column: i Integer (default), f Float
+                                      (value / 2), s String ("s" and the value), o Object (object value % objects)
      target BLOCK TYPE VALUE          the block's target parameter (TYPE as for pin; array: an array index)
      link SCRIPT FROM TO DELAY        FROM: s (the script's start) or BLOCK.OUT; TO: BLOCK (its input 0) or
                                       BLOCK.IN
      frames N
    Output: "frame N", then "run NAME" for each block run, then "end" and the names of the active blocks and
    scripts, then "pout BLOCK K VALUE" for each output parameter of a level-2 block (floats as their bits in hex,
-   integers in decimal, objects by name, "-" none). */
+   integers in decimal, objects by name, "-" none), then each array: "array NAME key K" and a line a row, the cells
+   as for outputs (a string between quotes). */
 #include "ck/ck.h"
 #include "ck/ck_types.h"
 #include "bb/bb.h"
@@ -268,16 +270,35 @@ int main(int argc, char **argv)
             }
             groups[ngroups++] = g->be.h.id;
         } else if (!strcmp(kind, "array") && narrays < MAXN) {
-            unsigned cols = 0, rows = 0;
+            unsigned cols = 0, rows = 0, mod = 0;
             int key = -1;
-            if (sscanf(line, "%*s %127s %u %u %d", name, &cols, &rows, &key) != 4 || cols > 16 || rows > 64) return 2;
+            char kinds[64] = "";
+            int got = sscanf(line, "%*s %127s %u %u %d %63s %u", name, &cols, &rows, &key, kinds, &mod);
+            if (got < 4 || cols > 16 || rows > 64) return 2;
             CkDataArray *arr = (CkDataArray *)ck_create(&ctx, CKCID_DATAARRAY, name);
-            for (unsigned k = 0; k < cols; k++) ck_array_insert_column(&ctx, arr, -1, CKARRAYTYPE_INT, "c", CKPGUID_NONE);
+            for (unsigned k = 0; k < cols; k++) {
+                char kc = k < strlen(kinds) ? kinds[k] : 'i';
+                uint32_t type = kc == 'f' ? CKARRAYTYPE_FLOAT : kc == 's' ? CKARRAYTYPE_STRING : kc == 'o' ? CKARRAYTYPE_OBJECT : CKARRAYTYPE_INT;
+                ck_array_insert_column(&ctx, arr, -1, type, "c", CKPGUID_NONE);
+            }
             for (unsigned r = 0; r < rows; r++) {
                 uint32_t row = ck_array_add_row(&ctx, arr);
                 for (unsigned k = 0; k < cols; k++) {
                     CkCell *c = ck_array_cell(arr, row, k);
-                    if (c) c->i = (int32_t)(10 * r + k);
+                    int v = mod ? (int)((7 * r + 3 * k) % mod) : (int)(10 * r + k);
+                    if (!c) continue;
+                    switch (arr->cols[k].type) {
+                    case CKARRAYTYPE_FLOAT: c->f = (float)v / 2.0f; break;
+                    case CKARRAYTYPE_STRING: {
+                        char buf[32];
+                        snprintf(buf, sizeof buf, "s%d", v);
+                        free(c->s);
+                        c->s = strdup(buf);
+                        break;
+                    }
+                    case CKARRAYTYPE_OBJECT: c->obj = nobjects ? objects[(unsigned)v % nobjects] : 0; break;
+                    default: c->i = v;
+                    }
                 }
             }
             arr->key_column = key;
@@ -380,6 +401,26 @@ int main(int argc, char **argv)
             printf("pout %s %u ", ck_behavior(&ctx, blocks[pouts[k].block])->h.name, pouts[k].index);
             print_value(ck_param(&ctx, pouts[k].param), pouts[k].type);
             printf("\n");
+        }
+        for (unsigned k = 0; k < narrays; k++) {
+            CkDataArray *arr = ck_array(&ctx, arrays[k]);
+            printf("array %s key %d cols", arr->be.h.name, arr->key_column);
+            for (unsigned c = 0; c < arr->ncols; c++) printf(" %u", arr->cols[c].type);
+            printf("\n");
+            for (unsigned r = 0; r < arr->nrows; r++) {
+                printf("row");
+                for (unsigned c = 0; c < arr->ncols; c++) {
+                    CkCell *cell = ck_array_cell(arr, r, c);
+                    switch (arr->cols[c].type) {
+                    case CKARRAYTYPE_FLOAT: { uint32_t w; memcpy(&w, &cell->f, 4); printf(" %08x", w); break; }
+                    case CKARRAYTYPE_STRING: printf(" \"%s\"", cell->s ? cell->s : ""); break;
+                    case CKARRAYTYPE_OBJECT: { CkObj *o = cell->obj ? ck_obj(&ctx, cell->obj) : NULL; printf(" %s", o ? o->name : "-"); break; }
+                    case CKARRAYTYPE_PARAMETER: printf(" ?"); break;
+                    default: printf(" %d", cell->i);
+                    }
+                }
+                printf("\n");
+            }
         }
     }
     return 0;

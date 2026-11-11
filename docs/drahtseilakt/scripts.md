@@ -231,8 +231,18 @@ output, one log line. The Object Rename written in phase 2 stays in the code beh
   map, the blocks and signatures missing. The C oracle checks the value rows (`op_table`).
 - **Messages** carry their sender, receiver (or a broadcast's class) and data: Broadcast Message, Switch On
   Message and Get Message Data are new ([gameplay_bbs.md](../gameplay_bbs.md), "Messages").
-- Not yet: attributes (identifier `0x11` of an object and the attribute manager's chunk), groups of any object,
-  the remaining array blocks.
+- **Arrays** (`crates/script/src/blocks/arrays.rs`): typed keys and cells, and Set Row, Insert/Remove Column, Move Row,
+  Sort Rows, Test Cell, Get Highest, Value Count, Remove Key Row, Remove Row If, Change Value If, Row Search; the run
+  keeps its own columns and key column per array. All checked against the C oracle on every column kind except Move
+  Row, which the C lacks ([gameplay_bbs.md](../gameplay_bbs.md), "Arrays").
+- **Groups** hold any object of the graph (entities, meshes, materials, textures, behaviours): the file's members seed
+  them, the run keeps them (rewound with it), and Fill Group By Class collects by class
+  ([gameplay_bbs.md](../gameplay_bbs.md), "Fill Group By Class"). Group Iterator and Is In Group give the same
+  results as before for groups of entities.
+- **Attributes** (`crates/script/src/blocks/attributes.rs`): Has, Set and Remove Attribute and Objects With Attribute
+  Iterator on a per-object map of the run (the file's attributes first, read defensively from identifier `0x11`,
+  [ck-runtime.md](../ck-runtime.md); bounded; rewound with the run). Attribute names and types need the attribute manager's
+  chunk, which is still skipped: an attribute is its file index.
 
 ## Hostile input
 
@@ -324,7 +334,7 @@ by the engine's.
 | Create String | `4bcd2f9d:382652e2` | 2 | 2 | planned |
 | Proximity | `5321cacb:dcdc5213` | 2 | 2 | done |
 | Bezier Transform | `6d433e1b:191954b4` | 2 | 3 | planned |
-| Set Attribute | `373040f2:05e01b34` | 2 | 13 | planned |
+| Set Attribute | `373040f2:05e01b34` | 2 | 13 | done |
 | Set Emissive | `d1d1d1d1:30303030` | 2 | 2 | partial: accepted, no effect |
 | Chrono | `5e2f1788:4f965a44` | 2 | 3 | done |
 | Execute Script | `706c5a40:5bb31a0b` | 2 | 9 | done |
@@ -359,7 +369,7 @@ by the engine's.
 | Set IC | `72671a24:161a2347` | 1 | 1 | partial: accepted (initial conditions stay as loaded) |
 | Remove Row | `1fa57136:14310857` | 1 | 1 | done |
 | Shuffle Order | `270f177a:4ca20023` | 1 | 2 | planned |
-| Move Row | `101a62f4:6e2d25f6` | 1 | 2 | planned |
+| Move Row | `101a62f4:6e2d25f6` | 1 | 2 | done (from the notes: the C lacks it) |
 | Set FOV | `aaaacccc:aaaacccc` | 1 | 3 | never (the engine's own interface) |
 | TT Restore IC | `7e0f2f58:232d3109` | 1 | 4 | done |
 | Streaming Event | `1f0b52bf:4c3342dd` | 1 | 1 | done |
@@ -367,9 +377,9 @@ by the engine's.
 | Deactivate Object | `160f4b7d:67de224e` | 1 | 1 | done |
 | Random | `0c622386:1c3054f7` | 1 | 35 | done (a fixed seed: every run draws the same numbers) |
 | Set Euler Orientation | `0c4966d8:6c0c6d14` | 1 | 7 | done (X, then Y, then Z) |
-| Has Attribute | `25b54079:6ff90545` | 1 | 4 | planned |
+| Has Attribute | `25b54079:6ff90545` | 1 | 4 | done |
 | Set Material | `37865d50:2e285fab` | 1 | 3 | planned |
-| Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | planned |
+| Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | done |
 | SphericalParticleSystem | `67c88f47:8880721e` | 1 | 1 | planned |
 | Set 3DSprite Mode | `0c5d0457:c64c7000` | 1 | 1 | planned |
 | Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | planned |
@@ -389,12 +399,12 @@ by the engine's.
 | Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |
 | Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | partial: accepted, no effect |
 | Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | no-op |
-| Sort Rows | `6f623e68:62bb5a98` | 1 | 5 | planned |
+| Sort Rows | `6f623e68:62bb5a98` | 1 | 5 | done |
 | Get Texture Info | `250c4d8d:288960d9` | 1 | 2 | planned |
 | Replace Texture | `?` | 1 | 1 | planned |
 | Renamer | `?` | 1 | 4 | planned |
 | To Lower Keys | `?` | 1 | 1 | planned |
-| Insert Column | `05cb7802:04a64a58` | 1 | 3 | planned |
+| Insert Column | `05cb7802:04a64a58` | 1 | 3 | done |
 | Replace Material | `?` | 1 | 1 | planned |
 | Is Same Material | `?` | 1 | 1 | planned |
 | Add Mesh | `7a1d593e:12c5648d` | 1 | 1 | no-op |

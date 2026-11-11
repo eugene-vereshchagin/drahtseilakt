@@ -476,14 +476,12 @@ pub(crate) fn send_message_to_group(
         let to_group = dest.and_then(|d| rt.graph.objects.get(d)).map(|o| o.kind);
         match to_group {
             Some(ObjKind::Group(g)) => {
-                for m in host.group_members(g) {
-                    let gid = rt
-                        .graph
-                        .objects
-                        .iter()
-                        .position(|o| o.kind == ObjKind::Entity(m));
-                    rt.post(msg(gid));
-                    host.message(&name, Some(Ent::Object(m)));
+                for m in rt.group_ids(g, host) {
+                    rt.post(msg(Some(m)));
+                    // the engine hears of the members it has as entities
+                    if let Some(e) = rt.ent(Some(m)) {
+                        host.message(&name, Some(e));
+                    }
                 }
             }
             Some(ObjKind::Entity(_)) | Some(ObjKind::Ball) => {
@@ -600,53 +598,60 @@ pub(crate) fn get_cell(
     proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    if !input(rt, b, 0) {
+    if !active(rt, b, 0) {
         return Flow::Done;
     }
+    // no target: the original's execute fails and nothing happens (In stays)
+    let t = rt.target(b, host);
+    if t.is_none() {
+        return Flow::Done;
+    }
+    input(rt, b, 0);
     let row = pin(rt, b, "Row Index", 0, host).as_int();
     let col = pin(rt, b, "Column Index", 1, host).as_int();
     let (Ok(row), Ok(col)) = (usize::try_from(row), usize::try_from(col)) else {
         out(rt, b, 1);
         return Flow::Done;
     };
-    let t = rt.target(b, host);
-    let cell = match array_of(rt, t) {
-        Some(a) => {
-            if proto == proto::SET_CELL {
-                let v = pin(rt, b, "Value", 2, host);
-                let slot = rt
-                    .graph
-                    .arrays
-                    .get(a)
-                    .and_then(|arr| arr.rows.get(row))
-                    .and_then(|r| r.get(col))
-                    .is_some();
-                if slot {
-                    // the arrays live in the shared graph; a map's own table is edited in the runtime's copy
-                    rt.set_cell(a, row, col, v);
-                }
-                slot.then_some(Value::None)
-            } else {
-                rt.cell(a, row, col)
-            }
-        }
-        None => {
-            let name = ent_name(rt, t);
-            if proto == proto::SET_CELL {
-                None
-            } else {
-                host.game_cell(&name, row, col)
-            }
-        }
-    };
-    match cell {
-        Some(v) => {
-            if proto == proto::GET_CELL {
+    let Some(a) = array_of(rt, t) else {
+        // a game array (CurrentLevel...) lives in the engine: readable, not writable
+        let name = ent_name(rt, t);
+        let cell = if proto == proto::SET_CELL {
+            None
+        } else {
+            host.game_cell(&name, row, col)
+        };
+        match cell {
+            Some(v) => {
                 set_pout(rt, b, "Cell Value", 0, v);
+                out(rt, b, 0);
             }
-            out(rt, b, 0);
+            None => out(rt, b, 1),
         }
-        None => out(rt, b, 1),
+        return Flow::Done;
+    };
+    let kind = rt.array(a).and_then(|x| x.columns.get(col)).map(|c| c.1);
+    let exists = kind.is_some() && rt.array(a).and_then(|x| x.rows.get(row)).is_some();
+    if proto == proto::SET_CELL {
+        // docs/gameplay_bbs.md, "Arrays": the cell takes the parameter as its column's type
+        let g = rt
+            .pin(b, "Value", 2)
+            .and_then(|p| rt.graph.param(p))
+            .map(|p| p.guid);
+        let v = pin(rt, b, "Value", 2, host);
+        let cell = kind
+            .zip(g)
+            .and_then(|(k, g)| arrays::cell_from(rt, k, g, &v));
+        let done = exists && g.is_some();
+        if let (true, Some(c)) = (done, cell) {
+            rt.set_cell(a, row, col, c);
+        }
+        out(rt, b, usize::from(!done));
+    } else if exists {
+        arrays::cell_to_out(rt, b, a, row, col, 0);
+        out(rt, b, 0);
+    } else {
+        out(rt, b, 1);
     }
     Flow::Done
 }
@@ -659,40 +664,33 @@ pub(crate) fn get_key_row(
     host: &mut dyn Host,
 ) -> Flow {
     let t = rt.target(b, host);
-    if proto == proto::GET_KEY_ROW {
-        // docs/gameplay_bbs.md, "Get Key Row": without an array or its key column nothing happens (In stays)
-        let key = array_of(rt, t)
-            .and_then(|a| rt.graph.arrays.get(a))
-            .and_then(|x| x.key);
-        if key.is_none() {
-            return Flow::Done;
-        }
-    }
-    if !input(rt, b, 0) {
-        return Flow::Done;
-    }
+    // without an array nothing happens (In stays); so for Get Key Row without a key column of its own
     let Some(a) = array_of(rt, t) else {
-        out(rt, b, 1);
         return Flow::Done;
     };
+    let key_col = rt.array(a).and_then(|x| x.key);
+    if proto == proto::GET_KEY_ROW && key_col.is_none() {
+        return Flow::Done;
+    }
     let row = if proto == proto::GET_ROW {
-        usize::try_from(pin(rt, b, "Row Index", 0, host).as_int()).ok()
+        let r = pin(rt, b, "Row Index", 0, host).as_int();
+        input(rt, b, 0);
+        usize::try_from(r).ok()
     } else {
-        let Some(k) = rt.graph.arrays.get(a).and_then(|x| x.key) else {
+        let Some(k) = key_col else {
             return Flow::Done;
         };
-        let key = pin(rt, b, "Key Value", 0, host);
-        rt.rows(a)
-            .iter()
-            .position(|r| r.get(k).is_some_and(|c| c.same(&key)))
+        let kind = rt
+            .array(a)
+            .and_then(|x| x.columns.get(k))
+            .map_or(1, |c| c.1);
+        let key = arrays::key_from(rt, b, 0, kind, host);
+        input(rt, b, 0);
+        rt.array(a).and_then(|x| arrays::find_row(x, k, 1, &key, 0))
     };
-    match row.and_then(|r| rt.rows(a).get(r).cloned()) {
-        Some(cells) => {
-            for (i, c) in cells.into_iter().enumerate() {
-                if let Some(p) = b.pouts.get(i).copied() {
-                    rt.write(p, c);
-                }
-            }
+    match row.filter(|&r| r < rt.rows(a).len()) {
+        Some(r) => {
+            arrays::row_to_outs(rt, b, a, r, 0);
             out(rt, b, 0);
         }
         None => out(rt, b, 1),
@@ -814,14 +812,8 @@ pub(crate) fn iterator(
         out(rt, b, 0);
         return Flow::Done;
     }
-    let cells = usize::try_from(cur)
-        .ok()
-        .and_then(|r| rt.rows(a).get(r).cloned())
-        .unwrap_or_default();
-    for (k, c) in cells.into_iter().enumerate() {
-        if let Some(p) = b.pouts.get(k.saturating_add(1)).copied() {
-            rt.write(p, c);
-        }
+    if let Ok(r) = usize::try_from(cur) {
+        arrays::row_to_outs(rt, b, a, r, 1);
     }
     out(rt, b, 1);
     Flow::Done
@@ -857,16 +849,7 @@ pub(crate) fn group_iterator(
         input(rt, b, 1);
     }
     let members: Vec<Id> = match group {
-        Some(ObjKind::Group(gi)) => host
-            .group_members(gi)
-            .into_iter()
-            .filter_map(|m| {
-                rt.graph
-                    .objects
-                    .iter()
-                    .position(|o| o.kind == ObjKind::Entity(m))
-            })
-            .collect(),
+        Some(ObjKind::Group(gi)) => rt.group_ids(gi, host),
         _ => Vec::new(),
     };
     // The index lives where the original keeps it: in output parameter 1 (Index) when the block has one, else in
@@ -911,9 +894,8 @@ pub(crate) fn is_in_group(
     if input(rt, b, 0) {
         let o = pin(rt, b, "Object", 0, host).as_obj();
         let g = pin(rt, b, "Group", 1, host).as_obj();
-        let e = rt.ent(o);
-        let hit = match (e, g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind)) {
-            (Some(Ent::Object(i)), Some(ObjKind::Group(gi))) => host.group_members(gi).contains(&i),
+        let hit = match (o, g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind)) {
+            (Some(o), Some(ObjKind::Group(gi))) => rt.group_ids(gi, host).contains(&o),
             _ => false,
         };
         out(rt, b, usize::from(!hit));
@@ -931,18 +913,67 @@ pub(crate) fn add_to_group(
     if input(rt, b, 0) {
         let g = pin(rt, b, "Group", 0, host).as_obj();
         let t = rt.target(b, host);
-        if let (Some(ObjKind::Group(gi)), Some(Ent::Object(i))) = (
-            g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind),
-            rt.ent(t),
-        ) {
+        if let (Some(ObjKind::Group(gi)), Some(o)) =
+            (g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind), t)
+        {
+            let ent = rt.ent(t);
             if proto == proto::ADD_TO_GROUP {
-                host.group_add(gi, i);
+                rt.group_add(gi, o, host);
+                if let Some(Ent::Object(i)) = ent {
+                    host.group_add(gi, i);
+                }
             } else {
-                host.group_remove(gi, i);
+                rt.group_remove(gi, o, host);
+                if let Some(Ent::Object(i)) = ent {
+                    host.group_remove(gi, i);
+                }
             }
         }
         out(rt, b, 0);
     }
+    Flow::Done
+}
+
+pub(crate) fn fill_group_by_class(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    // docs/gameplay_bbs.md, "Fill Group By Class": In is answered and Out fires before the target is looked at
+    if !input(rt, b, 0) {
+        return Flow::Done;
+    }
+    out(rt, b, 0);
+    let t = rt.target(b, host);
+    let Some(ObjKind::Group(gi)) = t.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind) else {
+        return Flow::Done;
+    };
+    let class = u32::try_from(pin(rt, b, "Class", 0, host).as_int()).unwrap_or(u32::MAX);
+    let derived = pin(rt, b, "Derived Classes", 1, host).as_bool();
+    // classes of the range that derive from the one asked for: all up to 0x37 with derived classes, else the class
+    // and the next number (which is a child of it only for a few, as the original's range is)
+    let hi = if derived {
+        0x37
+    } else {
+        class.saturating_add(1)
+    };
+    let lo = if derived { 0 } else { class };
+    let mut hits: Vec<(u32, Id)> = rt
+        .graph
+        .objects
+        .iter()
+        .enumerate()
+        .filter(|(_, o)| {
+            o.class != 0 && (lo..=hi).contains(&o.class) && types::class_derives(o.class, class)
+        })
+        .map(|(i, o)| (o.class, i))
+        .collect();
+    // the context lists objects by class, in creation order within it
+    hits.sort_by_key(|&(c, i)| (c, i));
+    let ids: Vec<Id> = hits.into_iter().map(|(_, i)| i).collect();
+    rt.group_add_many(gi, &ids, host);
     Flow::Done
 }
 
@@ -956,6 +987,7 @@ pub(crate) fn group_clear(
     if input(rt, b, 0) {
         let t = rt.target(b, host);
         if let Some(ObjKind::Group(gi)) = t.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind) {
+            rt.group_clear(gi, host);
             host.group_clear(gi);
         }
         out(rt, b, 0);
@@ -1192,40 +1224,6 @@ pub(crate) fn remove_row(
     Flow::Done
 }
 
-pub(crate) fn row_search(
-    rt: &mut Runtime,
-    _id: Id,
-    b: &Block,
-    _proto: Guid,
-    host: &mut dyn Host,
-) -> Flow {
-    if input(rt, b, 0) {
-        let t = rt.target(b, host);
-        let col = usize::try_from(pin(rt, b, "Column", 0, host).as_int()).ok();
-        let first = usize::try_from(pin(rt, b, "First Search Row", 1, host).as_int()).unwrap_or(0);
-        let op = pin(rt, b, "Operation", 2, host).as_int();
-        let reference = pin(rt, b, "Reference Value", 3, host);
-        let found = match (array_of(rt, t), col) {
-            (Some(a), Some(col)) => rt
-                .rows(a)
-                .iter()
-                .enumerate()
-                .skip(first)
-                .find(|(_, r)| r.get(col).is_some_and(|c| compare(op, c, &reference)))
-                .map(|(i, _)| i),
-            _ => None,
-        };
-        match found {
-            Some(i) => {
-                set_pout(rt, b, "First Row Found", 0, Value::Int(i as i32));
-                out(rt, b, 0);
-            }
-            None => out(rt, b, 1),
-        }
-    }
-    Flow::Done
-}
-
 pub(crate) fn get_nearest_in_group(
     rt: &mut Runtime,
     _id: Id,
@@ -1240,10 +1238,12 @@ pub(crate) fn get_nearest_in_group(
             Some(rm) => transform_point(&rm, p),
             None => p,
         };
-        let mut best: Option<(usize, f32)> = None;
+        let mut best: Option<(Id, f32)> = None;
         if let Some(ObjKind::Group(gi)) = g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind) {
-            for m in host.group_members(gi) {
-                if let Some(mm) = host.matrix(Ent::Object(m)) {
+            for m in rt.group_ids(gi, host) {
+                if let Some(Ent::Object(e)) = rt.ent(Some(m))
+                    && let Some(mm) = host.matrix(Ent::Object(e))
+                {
                     let d = distance_sq([mm[3][0], mm[3][1], mm[3][2]], at);
                     if best.is_none_or(|(_, bd)| d < bd) {
                         best = Some((m, d));
@@ -1251,12 +1251,7 @@ pub(crate) fn get_nearest_in_group(
                 }
             }
         }
-        let nearest = best.and_then(|(m, _)| {
-            rt.graph
-                .objects
-                .iter()
-                .position(|o| o.kind == ObjKind::Entity(m))
-        });
+        let nearest = best.map(|(m, _)| m);
         set_pout(rt, b, "Nearest Object", 0, Value::Obj(nearest));
         if let Some((_, d)) = best {
             set_pout(rt, b, "Distance", 1, Value::Float(d.sqrt()));
@@ -1712,6 +1707,18 @@ pub(super) const PROTOS: &[Proto] = &[
         event: None,
     },
     Proto {
+        guid: proto::FILL_GROUP_BY_CLASS,
+        name: "Fill Group By Class",
+        library: Library::Logics,
+        pins: &["Class", "Derived Classes", "Only In Current Scene"],
+        pouts: &[],
+        flags: flags::TARGET,
+        standing: Standing::Full,
+        layouts: &[],
+        run: fill_group_by_class,
+        event: None,
+    },
+    Proto {
         guid: proto::GROUP_CLEAR,
         name: "Group Clear",
         library: Library::Logics,
@@ -1828,7 +1835,7 @@ pub(super) const PROTOS: &[Proto] = &[
         flags: flags::TARGET,
         standing: Standing::Full,
         layouts: &[],
-        run: row_search,
+        run: super::arrays::row_search,
         event: None,
     },
     Proto {

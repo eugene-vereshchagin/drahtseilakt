@@ -882,7 +882,7 @@ fn group_count(
         .and_then(|o| rt.graph.objects.get(o))
         .map(|o| o.kind)
     {
-        Some(ObjKind::Group(g)) => host.group_members(g).len(),
+        Some(ObjKind::Group(g)) => rt.group_ids(g, host).len(),
         _ => 0,
     };
     Some(Value::Int(n.min(i32::MAX as usize) as i32))

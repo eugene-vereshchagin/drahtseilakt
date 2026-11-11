@@ -1432,6 +1432,13 @@ Execute:
 The off-by-one matters: for class 24 (CKSound) without Derived, it also collects 25 (CKWaveSound). For 30
 (Material) and 31 (Texture), c+1 is not a child class, so nothing extra is added.
 
+Port: a group's members are graph object ids of any kind (entities, meshes, materials, textures, behaviours), seeded
+from the file's group chunk (else from the level's entity members), kept in the run's state and changed by Add To
+Group (a behavioural object, not the group itself, not twice), Remove From Group, Group Clear and this block. Objects
+with no class (the engine's pseudo-objects) are not collected; the order is by class, then creation. "Only In
+Current Scene" is taken as always true (a map's objects all are in its scene). Group Iterator, Is In Group, Get
+Nearest In Group (entities only), Send Message To Group and the group count operation read the same state.
+
 Game (`Levelinit.nmo`): `set MipMap` with classes 30 and 31, `Preload Sound` with class 24. All have
 Derived = 0 and current scene = 1.
 
@@ -1646,6 +1653,71 @@ is the **array's own** (saved under identifier `0x4000` of the array: sort order
 absent: none), not the first column. An array without a key column logs "No column criterion defined" and nothing
 happens (In stays active). Otherwise In is cleared, the first row whose key cell equals the key is copied to the
 pOuts and Found fires, else Not Found.
+
+## Arrays: typed cells and the row and column blocks
+
+Settled by the C oracle (`oracle_blocks.rs`: every block below against the upstream runtime on random arrays of all
+column kinds, thousands of cases each). A column has a kind: 1 Integer, 2 Float, 3 String, 4 Object, 5 Parameter (the
+last holds a value of any type: it goes out as it is and Set Cell stores the parameter; tests and sorting on it find
+nothing to compare). Rows and columns are
+changed in the run's copy of the array (rewound with the run); the key column belongs to the array and moves with its
+columns.
+
+- **Typed key.** A block that searches or tests builds its key from a pin of the column's own type (Integer pin for an
+  Integer column, Float for Float, String for String, the Object type itself for Object). A pin of another type gives
+  a key of 0 (for strings "", for objects none): the search still runs. Comparisons: 1 equal, 2 not equal, 3 less, 4
+  less or equal, 5 greater, 6 greater or equal; any other operation is false. Strings compare byte by byte, objects by
+  their ids as 32-bit numbers (none is 0). A start row outside the array, or a column outside it, finds nothing.
+- **Typed output.** A cell goes into an output parameter only if the types agree (Integer cell into Integer pout,
+  Float into Float, String into String; an Object cell into a pout of an object type, and then only when the object's
+  class derives from it, else "none"); otherwise the pout is left as it is. This holds for Get Cell, Get Row, Get Key
+  Row, Iterator and Get Highest. Without a target array none of these blocks does anything and In stays active.
+- **Set Cell, Change Value If**: a String column takes the parameter's text (a Boolean as TRUE/FALSE, an object by
+  name, none as NULL); the other kinds take the parameter's four bytes as they are, whatever its type (an Integer into
+  a Float column is the float with those bits; another type's bytes into an Object column are an object id).
+- **Set Row**: pin 0 the row, pins 1.. the cells by column, each taken only if its pin is of the column's type. Setting
+  `Unique Key Column` (on when absent): if the array has a key column and another row than the one being set already has
+  the key (taken from the pin of that column), nothing is written, In is cleared and `Already Present` (output 1)
+  fires; otherwise the row (if it exists) is written and Out fires.
+- **Insert Column** (Index -1 or past the end: append; Name; Column Type 1..5): In is cleared and Out fires first,
+  then, with an array, the column is inserted with default cells (0, 0.0, "", none); a key column at or after the new
+  place moves up by one. A column type outside 1..5, or an array of 256 columns, refuses the insert (ours; the C takes
+  any number). **Remove Column** (Index): the same order; a key column removed means no key column, a later one moves
+  down by one.
+- **Sort Rows** (Sorting Column, Ascending): sorts by the column with the quicksort of the C library the original
+  was built with (the middle row swapped to the front, partitioned by it, runs of up to eight rows by selection of
+  the maximum), so rows with equal keys end in the order the original gives them. The column's order: integers and
+  objects by a wrapped 32-bit difference, floats by the sign of the difference, strings byte by byte. In is cleared,
+  Out fires.
+- **Test Cell** (Row, Column, Operation, reference): True or False; the input is *not* cleared. **Get Highest**
+  (Column): the row with the highest cell (the first of equal ones), `Row Number` -1 for none, the row's cells to the
+  outputs 1.., `Found` or `Not Found`. **Value Count** (Column default 1, Operator, reference): the number of rows
+  that satisfy it. **Remove Key Row** (reference): removes the first row whose key cell equals it; `Removed` or `Not
+  Found`; without a key column nothing happens. **Remove Row If** (Column, Operation, reference): removes every row
+  that satisfies it, `Number Removed`; `Found` if any. **Change Value If** (Column, Operation, reference, new value):
+  sets the cell of every row that satisfies it, `Number Changed`; `Found` if any. **Row Search** is typed like the
+  others and a negative first row finds nothing.
+- **Move Row** (Src Row, Dest Row): *no C reference exists* (the upstream runtime lacks the block); from its pins and
+  the array operation of that name: the row at Src is taken out and put at Dest (both inside the array, else nothing
+  changes); Out fires. Not checked against the original.
+
+## Attributes
+
+Settled on real files and by the C oracle's notes (the oracle's own graphs cannot name an attribute: its attribute
+types come from a file's manager chunk). An object carries attributes: a number (the file's attribute index, see
+[ck-runtime.md](ck-runtime.md), identifier `0x11`) and a value. The runtime lists them in the order they were given
+(the file's first, then those blocks set), and deletes an object's with it; every run has its own lists (rewound
+with it). Caps: 64 attributes per object, indices 0 to 65535, 65536 in all.
+
+- **Has Attribute** (pin Attribute, default -1): In is cleared; if the target (a behavioural object) has the attribute
+  `True` fires and pout 0 gets its value, else `False`. A pin that is not a number (a name) names no attribute.
+- **Set Attribute** (Attribute, Attribute Value): In is cleared and Out fires first; with a target the attribute is
+  added if the object lacks it, and takes the value of pin 1. (The C refuses an index the attribute manager does not
+  know; without the manager's chunk any index in range is accepted here.)
+- **Remove Attribute**: In cleared, Out fires; the attribute is dropped if the target has it.
+- **Objects With Attribute Iterator** (Attribute): over every object that has it, in the order they got it, not
+  filtered by scene; pout 0 the object, pout 1 the value; the index is kept in local 0. In starts at 0, Loop In goes
+  on by one; past the last, `Out` fires and the index is left.
 
 ## Messages
 
