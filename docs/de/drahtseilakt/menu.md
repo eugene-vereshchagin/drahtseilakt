@@ -111,8 +111,7 @@ Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Men�
   - Bestzeiten neben den Leveln;
   - (Start ist seit 2026-11-09 in beiden Modi gleich; den Schalter gibt es nicht mehr);
   - Interface: Drahtseilakt / Ballance / Remaster, woher die Dateien der Oberfläche kommen ([resources.md](resources.md));
-  - Textures: das Texturpaket, womit die Level, ihre Teile und die Kugeln gezeichnet werden — Drahtseilakt (Vorgabe), Ballance, Remaster oder ein Paket des Spielers, mit seinem Namen; das nächste Level lädt
-    mit der Wahl ([packs.md](packs.md));
+  - Aussehen: eine Wahl, die Zeile *Aussehen* der Graphics-Seite (Original / Remaster / Drahtseilakt / Eigenes Paket; siehe „Das Aussehen" unten) statt der Texturpaket-Zeile; das nächste Level lädt damit ([packs.md](packs.md));
   - Models: das Modellpaket, womit die Teile und Kugeln gezeichnet werden (nur ihr Aussehen, nie ihre Physik) — wie im
     Level (jedes Level mit den Teilen, die es nimmt: Vorgabe), Drahtseilakt, Ballance oder ein Paket
     des Spielers ([packs.md](packs.md));
@@ -150,17 +149,26 @@ und Unterpunkt sagt im Hinweisfeld, was er ist und woher er kommt.
 
 | Punkt | Öffnet | Braucht |
 |---|---|---|
+| *Ausgewählte Karten* (en *Featured maps*) | die 13 vom Eigentümer gewählten Spielerkarten, in unser offenes Format übertragen, mit ihren Autoren | |
 | *Klassisches Ballance* (en *Classic Ballance*) | die 13 Original-Level der Kopie des Spielers, freigeschaltet wie im Original | eine Kopie |
-| *Drahtseilakt* | unsere eigenen 13 Level, mit dem Spiel geliefert | |
 | *Ballance-Prüfungen* (en *Ballance Challenges*) | die Original-Level, von der Community umgebaut: Kamera um 45° gedreht, der Weg zurück, die Bahn unsichtbar (`levels/modified/`) | eine Kopie und Level im Ordner |
 | *Community-Karten* (en *Community maps*) | ein Untermenü | |
 | &nbsp;&nbsp;*Beste* (en *Best*) | die 13 mit dem Spiel gelieferten Community-Karten, mit Autoren und Dank | |
 | &nbsp;&nbsp;*Heruntergeladen* (en *Downloaded*) | der Ordner des Spielers `levels/downloaded/` (sein Pfad wird gezeigt): Community-`.nmo`-Karten und Level im offenen Format in einer Liste, samt den früheren `levels/community/` und `levels/open/`, die weiter gelesen werden | |
 
-Die Texte gibt es in allen sieben Sprachen. *Remastered* ist keine Level-Art mehr: Options hat die Zeile *Aussehen:
-Ballance / Remaster* (en *Look: Ballance / Remaster*), nur sichtbar, wenn `levels/remastered/` einen Export enthält.
-Mit *remastered* spielt Klassisches Ballance jedes Original-Level aus seinem Export (die Einstellung `look
-remastered`); das Aussehen ist eine Einstellung, keine Liste, damit später Textur- und Modellpakete es ersetzen können.
+Die Texte gibt es in allen sieben Sprachen. Reihenfolge von Start seit 2026-11-11: zuerst die ausgewählten Karten, an zweiter Stelle *Klassisches Ballance*.
+
+**Das Aussehen (Look)** (Entscheidung des Eigentümers 2026-11-11, decisions.md, „One Look, and beauty comes through the
+toolbox") ist eine Zeile, *Aussehen*, auf der Graphics-Seite (Einstellung `look original|remaster|drahtseilakt|player`,
+`textures` hält das Paket, mit dem gezeichnet wird); sie ersetzt die getrennte Textures-Zeile und die Options-Zeile vom
+2026-11-09. *Original*: die Texturen der Kopie auf den Formen von 2004. *Remaster*: die von der Toolbox vergrößerten Texturen
+auf runden Formen. *Drahtseilakt* (Voreinstellung): unsere Texturen auf runden Formen. *Eigenes Paket*: ein Texturpaket des
+Spielers auf runden Formen. Ein Look, der hier nicht gezeigt werden kann, wird nicht angeboten (keine Kopie: kein Original
+und kein Remaster; kein Export: kein Remaster; kein eigenes Paket: kein „Eigenes Paket"); eine alte Einstellungsdatei behält
+ihre Bedeutung (`look remastered` ist Remaster, sonst entscheidet `textures`). Die runden Formen eines Originallevels sind
+sein Export `levels/remastered/Level_NN` (der Rundungs-Cache), den jeder Look außer Original nutzt; ein Level ohne ihn läuft
+wie es ist. Die Hilfe der Zeile und die Notiz einer heruntergeladenen Karte sagen, dass die schönen Looks nach dem Import des
+Levels mit `drahtseilakt-toolbox` kommen (das Spiel geht nie online und startet es nicht selbst).
 
 ## Wörter, die passen, Listen, die sagen, dass sie scrollen
 

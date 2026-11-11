@@ -67,7 +67,7 @@
   - 关卡旁显示最佳时间；
   - （自 2026-11-09 起 Start 在两种模式下相同；不再有此开关）；
   - Interface：Drahtseilakt / Ballance / Remaster，界面文件的来源（[resources.md](resources.md)）；
-  - Textures：绘制关卡、关卡部件和球所用的纹理包——Drahtseilakt（默认）、Ballance、Remaster 或玩家的纹理包，按其名称显示；下一个关卡按所选纹理包加载（[packs.md](packs.md)）；
+  - 外观：Graphics 页上的一个选择 *外观*（原版 / 重制版 / Drahtseilakt / 自选包；见下文“外观”），取代纹理包一行；下一关加载时生效（[packs.md](packs.md)）；
   - Models：绘制部件和球所用的模型包（只改变外观，绝不改变物理）——关卡自带（每个关卡使用它自己采用的部件：默认）、Drahtseilakt、Ballance 或玩家的模型包（[packs.md](packs.md)）；
   - Sounds：音效主题——系统、生成、Ballance（由 toolbox 制作）或玩家自己的主题（[resources.md](resources.md)）；在玩家选择其他主题之前播放生成主题；
   - Mods：找到的每个模组所在的界面（内置模组和玩家的模组；调试运行中还有上帝模式，它包含原来的练习工具和无限生命），每项用左右键切换，Enter 打开其页面及选项和按键（[mods.md](mods.md)）；经典模式下关闭。没有需要取消的时间限制：分数只会递减并停在零，与原版相同。
@@ -85,16 +85,22 @@ Start 在经典模式和扩展模式下相同；为空或不可用的项目不�
 
 | 项目 | 打开 | 需要 |
 |---|---|---|
+| *精选地图*（en *Featured maps*） | 所有者挑选的 13 张玩家地图，已转换为我们的开放格式，注明作者 | |
 | *经典 Ballance*（en *Classic Ballance*） | 玩家副本中的 13 个原版关卡，按原版方式解锁 | 副本 |
-| *Drahtseilakt* | 我们自己的 13 个关卡，随游戏附带 | |
 | *Ballance 挑战*（en *Ballance Challenges*） | 社区改造的原版关卡：视角旋转 45°、反向通关、隐形道路（`levels/modified/`） | 副本和该文件夹中的关卡 |
 | *社区地图*（en *Community maps*） | 子菜单 | |
 | &nbsp;&nbsp;*精选*（en *Best*） | 随游戏附带的 13 张社区地图，附作者和致谢 | |
 | &nbsp;&nbsp;*已下载*（en *Downloaded*） | 玩家的文件夹 `levels/downloaded/`（显示其路径）：社区 `.nmo` 地图和开放格式关卡合为一个列表，并包含仍会读取的旧文件夹 `levels/community/` 和 `levels/open/` | |
 
-文字提供全部七种语言。*Remastered* 不再是一种关卡类别：Options 有一行 *外观：Ballance / Remaster*（en *Look: Ballance /
-Remaster*），仅在 `levels/remastered/` 中有导出时显示。选 *重制版* 时，经典 Ballance 从其导出游玩每个原版关卡
-（设置 `look remastered`）；外观是一项设置而非列表，以便日后由纹理包和模型包取代。
+文字提供全部七种语言。自 2026-11-11 起 Start 的顺序：先是精选地图，*经典 Ballance* 排第二。
+
+**外观（Look）**（所有者 2026-11-11 的决定，decisions.md “One Look, and beauty comes through the toolbox”）是 Graphics 页上的一行
+*外观*（设置 `look original|remaster|drahtseilakt|player`，`textures` 保存其所用的纹理包），取代了单独的 Textures 行和 2026-11-09
+的 Options 行。*原版*：副本的纹理配 2004 年的造型。*重制版*：工具箱放大的纹理配圆润造型。*Drahtseilakt*（默认）：我们的纹理配圆润造型。
+*自选包*：玩家自己的纹理包配圆润造型。此处无法显示的外观不提供（没有副本：没有原版和重制版；没有导出：没有重制版；没有自己的包：没有自选包）；
+旧设置文件保持原意（`look remastered` 即重制版，否则由 `textures` 决定）。原版关卡的圆润造型是它的导出 `levels/remastered/Level_NN`（圆角缓存），
+除原版外的所有外观都使用它；没有导出的关卡保持原样。该行的帮助和已下载地图的备注都会说明：漂亮的外观需先用 `drahtseilakt-toolbox` 导入关卡
+（游戏从不联网，也不会自己运行它）。
 
 ## 放得下的文字，会说明自己可滚动的列表
 

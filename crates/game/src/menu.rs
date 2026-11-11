@@ -136,7 +136,7 @@ enum Line {
     /// The player's downloaded levels: community maps and open-format levels (levels/downloaded and the folders it
     /// replaces).
     Downloaded,
-    /// Options: the look of the original levels, original or remastered (shown when a remastered export exists).
+    /// Graphics: the Look, one choice of how levels are drawn (look.rs); only the looks available here go round.
     Look,
     Map(usize),
     Music,
@@ -150,7 +150,6 @@ enum Line {
     /// Where the interface's files come from: own, the original, its remaster (resources.rs).
     Interface,
     /// The texture pack the levels are drawn with (packs.rs): the arrows go round the packs found.
-    Textures,
     /// The model pack the parts and balls are drawn with (packs.rs).
     Models,
     /// The sound theme (sound_themes.rs): the arrows go round the themes found.
@@ -193,8 +192,8 @@ pub enum Action {
     ToggleDebug,
     /// One of the extended mode's additions on or off.
     Switch(Feature),
-    /// The look of the original levels chosen: true plays them from their remastered export.
-    Look(bool),
+    /// The look chosen: the next level loads with it.
+    Look(crate::look::Look),
     /// The volumes changed: sound and music, 0 to 1.
     Volumes([f32; 2]),
     /// The interface's provider chosen (it takes effect on the next start).
@@ -260,7 +259,6 @@ fn valued(line: Line) -> bool {
             | Line::Mode
             | Line::Look
             | Line::Interface
-            | Line::Textures
             | Line::Models
             | Line::SoundTheme
             | Line::Switch(_)
@@ -287,10 +285,6 @@ pub struct Menu {
     /// Our own levels and the best community maps are shipped (the Start items are left out when not).
     has_ours: bool,
     has_best: bool,
-    /// The remastered export is there, so the Options page offers the look of the original levels.
-    look_offered: bool,
-    /// The original levels are played from their remastered export (the setting `look remastered`).
-    pub look_remastered: bool,
     /// The player's copy of the original is there: without it the levels are our own and the menu offers the import.
     copy: bool,
     /// There are modified originals (levels/modified) to offer; they are listed only with a copy too.
@@ -361,8 +355,6 @@ impl Menu {
             list: List::None,
             has_ours: !crate::levels::shipped().is_empty(),
             has_best: !crate::levels::community().is_empty(),
-            look_offered: remastered_offered(),
-            look_remastered: crate::app::setting("look").as_deref() == Some("remastered"),
             copy: data.has_copy(),
             modified: crate::modified::offered(data.has_copy()),
             features,
@@ -454,7 +446,11 @@ impl Menu {
             }
             List::Downloaded => {
                 let about = self.describe(Some(Line::Downloaded));
-                if matches!(chosen, Some(Line::Map(_))) { format!("{about}\n{}", map()) } else { about }
+                if matches!(chosen, Some(Line::Map(_))) {
+                    format!("{about}\n{}\n{}", map(), self.strings.ours("note beautiful"))
+                } else {
+                    about
+                }
             }
             List::Ours => {
                 let about = self.describe(Some(Line::Ours));
@@ -544,12 +540,11 @@ impl Menu {
             Line::Language => (k("language"), NONE),
             Line::Extended => (k("extended"), NONE),
             Line::Lang(_) => (k("lang"), NONE),
-            Line::Look => (k("look"), &["original", "remastered"]),
+            Line::Look => (k("look"), &["original", "remaster", "drahtseilakt", "player"]),
             Line::Resolution => (k("resolution"), NONE),
             Line::Synch => (k("synch"), YN),
             Line::Clouds => (k("clouds"), YN),
             Line::Fullscreen => (k("fullscreen"), &["off", "borderless", "exclusive"]),
-            Line::Textures => (k("textures"), &["own", "original", "remastered", "player"]),
             Line::Models => (k("models"), &["level", "own", "original", "player"]),
             Line::Fov => (k("fov"), &["original", "wider", "narrower"]),
             Line::Key(i) => (k(&format!("key {}", crate::options::ACTIONS.get(i)?.0)), NONE),
@@ -578,22 +573,16 @@ impl Menu {
 
     /// Which of the line's values is the current one (an index into its `help_spec` values).
     fn help_value(&self, line: Line) -> usize {
-        use gamedata::packs::{Kind as PackKind, LEVEL, ORIGINAL, OWN, REMASTERED};
+        use gamedata::packs::{Kind as PackKind, LEVEL, ORIGINAL, OWN};
         let yn = |on: bool| usize::from(!on);
         match line {
-            Line::Look => usize::from(self.look_remastered),
+            Line::Look => ALL_LOOKS.iter().position(|&l| l == crate::look::chosen()).unwrap_or(2),
             Line::Synch => yn(self.graphics.vsync),
             Line::Clouds => yn(self.graphics.clouds),
             Line::Fullscreen => match self.graphics.fullscreen {
                 Fullscreen::Off => 0,
                 Fullscreen::Borderless => 1,
                 Fullscreen::Exclusive => 2,
-            },
-            Line::Textures => match gamedata::packs::chosen(PackKind::Textures).as_str() {
-                OWN => 0,
-                ORIGINAL => 1,
-                REMASTERED => 2,
-                _ => 3,
             },
             Line::Models => match gamedata::packs::chosen(PackKind::Models).as_str() {
                 LEVEL => 0,
@@ -660,7 +649,7 @@ impl Menu {
                 .collect::<Vec<_>>()
         };
         match line {
-            Line::Textures => pack(PackKind::Textures),
+            Line::Look => pack(PackKind::Textures),
             Line::Models => pack(PackKind::Models),
             Line::SoundTheme => {
                 let c = gamedata::sound_themes::chosen();
@@ -697,7 +686,11 @@ impl Menu {
             .get()
             .unwrap_or_else(|| self.help_value(line))
             .min(values.len() - 1);
-        let text = self.help_of(&format!("{key} {}", values[now]));
+        let mut text = self.help_of(&format!("{key} {}", values[now]));
+        // beauty comes through the toolbox: said where the look is chosen
+        if line == Line::Look {
+            text = format!("{text}\n{}", self.help_of("help look beautiful"));
+        }
         // a player's own pack or theme: its description when it gives one
         if values[now] == "player" && self.help_force.get().is_none() {
             if let Some(d) = self.player_descriptions(line, true).into_iter().next() {
@@ -730,7 +723,10 @@ impl Menu {
                 out.push(self.help_of(&key));
             }
             for v in values {
-                let text = self.help_of(&format!("{key} {v}"));
+                let mut text = self.help_of(&format!("{key} {v}"));
+                if line == Line::Look {
+                    text = format!("{text}\n{}", self.help_of("help look beautiful"));
+                }
                 if *v == "player" {
                     for d in self.player_descriptions(line, false) {
                         out.push(format!("{text}\n{d}"));
@@ -886,8 +882,8 @@ impl Menu {
             // by meaning, the same in both modes (owner's decision 2026-11-09); what is empty or unavailable is
             // left out: the original needs the copy, the challenges the copy and their folder
             Screen::Kinds => [
-                self.copy.then_some(Line::Classic),
                 self.has_ours.then_some(Line::Ours),
+                self.copy.then_some(Line::Classic),
                 (self.copy && self.modified).then_some(Line::Challenges),
                 Some(Line::Community),
                 Some(Line::Back),
@@ -916,7 +912,6 @@ impl Menu {
                 Some(Line::Controls),
                 Some(Line::Sound),
                 Some(Line::Language),
-                self.look_offered.then_some(Line::Look),
                 // bringing in the player's own Ballance: a setting, offered while there is no copy
                 (!self.copy).then_some(Line::Import),
                 Some(Line::Extended),
@@ -937,7 +932,6 @@ impl Menu {
                 .chain(switches(self.features))
                 .chain([
                     Line::Interface,
-                    Line::Textures,
                     Line::Models,
                     Line::SoundTheme,
                     Line::ModsMenu,
@@ -963,8 +957,7 @@ impl Menu {
                     Line::Synch,
                     Line::Clouds,
                     Line::Fullscreen,
-                    Line::Textures,
-                    Line::Models,
+                    Line::Look,
                 ];
                 if self.features.mode {
                     l.push(Line::Fov);
@@ -1154,8 +1147,7 @@ impl Menu {
                 self.step(by as isize);
                 Action::None
             }
-            (_, Some(Line::Look)) => self.toggle_look(),
-            (_, Some(Line::Textures)) => next_pack(gamedata::packs::Kind::Textures, by),
+            (_, Some(Line::Look)) => Action::Look(crate::look::next(by)),
             (_, Some(Line::Models)) => next_pack(gamedata::packs::Kind::Models, by),
             (_, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (Screen::Graphics, Some(l)) => self.change_graphics(l, by),
@@ -1254,9 +1246,8 @@ impl Menu {
                 .get(i)
                 .map_or(Action::None, |p| Action::Map(p.level.clone())),
             Line::Mode => Action::ToggleDebug,
-            Line::Look => self.toggle_look(),
+            Line::Look => Action::Look(crate::look::next(1)),
             Line::Interface => Action::Interface(next_provider(1)),
-            Line::Textures => next_pack(gamedata::packs::Kind::Textures, 1),
             Line::Models => next_pack(gamedata::packs::Kind::Models, 1),
             Line::SoundTheme => Action::SoundTheme(next_theme(1)),
             Line::Switch(i) => FEATURES.get(i).map_or(Action::None, |&f| Action::Switch(f)),
@@ -1290,12 +1281,6 @@ impl Menu {
     fn show(&mut self, list: List, folder: Option<PathBuf>) {
         self.list = list;
         self.folder = folder;
-    }
-
-    /// The Look line: the original levels played as they are, or from their remastered export.
-    fn toggle_look(&mut self) -> Action {
-        self.look_remastered = !self.look_remastered;
-        Action::Look(self.look_remastered)
     }
 
     /// Esc: back a screen; the pause menu back to the run. A key being awaited is left as it was.
@@ -1625,11 +1610,7 @@ impl Menu {
             Line::Community => s.ours("community maps"),
             Line::Best => s.ours("best maps"),
             Line::Downloaded => s.ours("downloaded maps"),
-            Line::Look => format!(
-                "{}: {}",
-                s.ours("look"),
-                s.ours(if self.look_remastered { "look remastered" } else { "look original" })
-            ),
+            Line::Look => s.ours("look"),
             Line::Highscore => s.get("Menu_Main Button Highscore", "Highscore"),
             Line::Options => s.get("Menu_Main Button Options", "Options"),
             Line::Credits => s.get("Menu_Main Button Credits", "Credits"),
@@ -1680,7 +1661,6 @@ impl Menu {
                     .map_or(key.clone(), |t| t.label(&key, s.language()))
             }
             Line::Interface => s.ours("interface"),
-            Line::Textures => s.ours("textures"),
             Line::Models => s.ours("models"),
             Line::SoundTheme => s.ours("sounds"),
             Line::Switch(i) => FEATURES
@@ -1812,14 +1792,7 @@ impl Menu {
                     (self.label(Line::Synch), yes_no(g.vsync)),
                     (self.label(Line::Clouds), yes_no(g.clouds)),
                     (self.label(Line::Fullscreen), full),
-                    (
-                        self.label(Line::Textures),
-                        self.pack_value(gamedata::packs::Kind::Textures),
-                    ),
-                    (
-                        self.label(Line::Models),
-                        self.pack_value(gamedata::packs::Kind::Models),
-                    ),
+                    (self.label(Line::Look), self.look_value()),
                 ];
                 if self.features.mode {
                     f.push((self.label(Line::Fov), format!("{}", g.fov)));
@@ -1861,10 +1834,6 @@ impl Menu {
                 if self.features.mode {
                     f.extend(switches(self.features).map(|l| self.switch_field(l)));
                     f.push((self.label(Line::Interface), self.interface_value()));
-                    f.push((
-                        self.label(Line::Textures),
-                        self.pack_value(gamedata::packs::Kind::Textures),
-                    ));
                     f.push((
                         self.label(Line::Models),
                         self.pack_value(gamedata::packs::Kind::Models),
@@ -3615,7 +3584,14 @@ fn theme_value(s: &Strings) -> String {
     if key == gamedata::sound_themes::ORIGINAL { s.ours("interface original") } else { key }
 }
 
+const ALL_LOOKS: [crate::look::Look; 4] = crate::look::ALL;
+
 impl Menu {
+    /// The Look line's value: the look chosen, in the menus' language.
+    fn look_value(&self) -> String {
+        self.strings.ours(&format!("look {}", crate::look::chosen().key()))
+    }
+
     /// The Textures or Models line's value: the chosen pack's name in the menus' language (a built-in pack's in ours).
     fn pack_value(&self, kind: gamedata::packs::Kind) -> String {
         use gamedata::packs::{LEVEL, ORIGINAL, OWN, REMASTERED, chosen, packs};
@@ -3664,17 +3640,6 @@ enum List {
     Downloaded,
     /// Ballance Challenges.
     Challenges,
-}
-
-/// Whether the remastered export is there (levels/remastered holds a level), so that the original levels can be played
-/// with that look.
-fn remastered_offered() -> bool {
-    let Ok(read) = std::fs::read_dir(crate::levels::dir(Kind::Remastered)) else {
-        return false;
-    };
-    read.flatten()
-        .take(64)
-        .any(|e| e.path().join("level.gltf").is_file())
 }
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
@@ -3766,8 +3731,6 @@ mod tests {
             list: List::None,
             has_ours: true,
             has_best: true,
-            look_offered: false,
-            look_remastered: false,
             copy: true,
             modified: false,
             features: Features::new(extended),
@@ -4249,7 +4212,6 @@ mod tests {
                     m.maps = maps.clone();
                     m.list = *kind;
                     m.modified = true;
-                    m.look_offered = true;
                     m.name = b"WWWWWWWWWWWWWWWW".to_vec();
                     m.points = 99_999_999;
                     for level in 1..=13 {
@@ -4616,7 +4578,6 @@ mod tests {
                 let mut m = menu(&[true; 13], mode);
                 m.copy = copy;
                 m.features.debug = true;
-                m.look_offered = true;
                 m.modified = true;
                 let mut screens = HELP_SCREENS.to_vec();
                 screens.extend([Screen::Ask(Ask::Restart), Screen::Ask(Ask::Exit)]);
@@ -4644,7 +4605,7 @@ mod tests {
             }
         }
         // the list screens: Map and Back
-        for k in ["help map", "help back"] {
+        for k in ["help map", "help back", "help look beautiful"] {
             assert!(helps.contains_key(k));
             used.insert(k.to_owned());
         }
@@ -4666,7 +4627,6 @@ mod tests {
             for mode in [true, false] {
                 let mut m = menu(&[true; 13], mode);
                 m.features.debug = true;
-                m.look_offered = true;
                 m.modified = true;
                 m.strings = Strings::ours_in(lang);
                 let mut screens = HELP_SCREENS.to_vec();
@@ -4744,8 +4704,7 @@ mod tests {
                 Line::Synch,
                 Line::Clouds,
                 Line::Fullscreen,
-                Line::Textures,
-                Line::Models,
+                Line::Look,
                 Line::Back
             ]
         );
@@ -4754,11 +4713,11 @@ mod tests {
             [Line::Music, Line::Effects, Line::SoundTheme, Line::Back]
         );
         // a line's value is shown for each, and the arrows ask for the pack or theme (the same keys as extended)
-        assert_eq!(m.fields(Screen::Graphics).len(), 6);
+        assert_eq!(m.fields(Screen::Graphics).len(), 5);
         assert_eq!(m.fields(Screen::Sound).len(), 3);
         let e = menu(&[true], true);
         assert!(e.lines(Screen::Graphics).contains(&Line::Fov));
-        assert_eq!(e.fields(Screen::Graphics).len(), 7);
+        assert_eq!(e.fields(Screen::Graphics).len(), 6);
         assert!(!m.lines(Screen::Controls).contains(&Line::Defaults));
         assert!(e.lines(Screen::Controls).contains(&Line::Defaults));
     }
@@ -4792,17 +4751,9 @@ mod tests {
                 ..Graphics::default()
             })
         );
-        // ours: the models and the textures (the packs, not the graphics), then the full screen
+        // ours: the look (not a graphics setting), then the full screen
         m.step(-1);
-        assert!(matches!(
-            m.adjust(1),
-            Action::Pack(gamedata::packs::Kind::Models, _)
-        ));
-        m.step(-1);
-        assert!(matches!(
-            m.adjust(1),
-            Action::Pack(gamedata::packs::Kind::Textures, _)
-        ));
+        assert!(matches!(m.adjust(1), Action::Look(_)));
         m.step(-1);
         let g = graphics(m.adjust(1)).unwrap();
         assert_eq!(g.fullscreen, Fullscreen::Borderless);
@@ -4897,8 +4848,9 @@ mod tests {
             .collect();
         assert_eq!(
             kinds,
-            ["Classic Ballance", "Drahtseilakt", "Community maps", "Back"]
+            ["Featured maps", "Classic Ballance", "Community maps", "Back"]
         );
+        m.step(1);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
             m.screen(),
@@ -4932,6 +4884,7 @@ mod tests {
             Screen::Kinds,
             "the classic mode: the original levels and the community maps"
         );
+        m.step(1);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Start);
         m.step(1);
@@ -5038,7 +4991,7 @@ mod tests {
         );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom, "our own levels");
-        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Drahtseilakt"));
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Featured maps"));
         m.back();
         m.back();
         m.step(1);
@@ -5060,7 +5013,7 @@ mod tests {
         assert!(!kinds(&menu(&[true], true)).contains(&Line::Challenges));
         assert_eq!(
             kinds(&menu(&[true], false)),
-            [Line::Classic, Line::Ours, Line::Community, Line::Back],
+            [Line::Ours, Line::Classic, Line::Community, Line::Back],
             "the same in both modes"
         );
         assert_eq!(kinds(&menu(&[true], false)), kinds(&menu(&[true], true)));
@@ -5070,8 +5023,8 @@ mod tests {
         assert_eq!(
             kinds(&m),
             [
-                Line::Classic,
                 Line::Ours,
+                Line::Classic,
                 Line::Challenges,
                 Line::Community,
                 Line::Back
@@ -5115,7 +5068,10 @@ mod tests {
                 "downloaded maps",
                 "look",
                 "look original",
-                "look remastered",
+                "look remaster",
+                "look drahtseilakt",
+                "look player",
+                "note beautiful",
                 "note classic",
                 "note ours",
                 "note challenges",
@@ -5138,8 +5094,7 @@ mod tests {
             ("interface own", "Drahtseilakt"),
             ("interface original", "Ballance"),
             ("interface remaster", "Remaster"),
-            ("look original", "Ballance"),
-            ("look remastered", "Remaster"),
+            ("look drahtseilakt", "Drahtseilakt"),
         ];
         for lang in ["en", "ru", "de", "zh", "fr", "es", "it"] {
             let s = crate::lang::Strings::ours_in(lang);
@@ -5190,15 +5145,16 @@ mod tests {
     }
 
     #[test]
-    fn the_look_line_is_offered_only_with_a_remastered_export_and_toggles() {
+    fn the_look_line_is_on_the_graphics_page_and_goes_round_the_available_looks() {
         let mut m = menu(&[true], false);
+        assert!(m.lines(Screen::Graphics).contains(&Line::Look));
         assert!(!m.lines(Screen::Options).contains(&Line::Look));
-        m.look_offered = true;
-        assert!(m.lines(Screen::Options).contains(&Line::Look));
-        assert_eq!(m.label(Line::Look), "Look: Ballance");
-        assert_eq!(m.toggle_look(), Action::Look(true));
-        assert_eq!(m.label(Line::Look), "Look: Remaster");
-        assert_eq!(m.toggle_look(), Action::Look(false));
+        assert_eq!(m.label(Line::Look), "Look");
+        assert_eq!(m.look_value(), "Drahtseilakt");
+        // every look offered is available, and the arrows only reach those
+        let next = crate::look::next(1);
+        assert!(next.available());
+        m.strings = crate::lang::Strings::ours_in("en");
     }
 
     #[test]
@@ -5207,7 +5163,7 @@ mod tests {
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
             m.lines(Screen::Kinds),
-            [Line::Classic, Line::Ours, Line::Community, Line::Back],
+            [Line::Ours, Line::Classic, Line::Community, Line::Back],
             "the classic mode too"
         );
         m.step(1);

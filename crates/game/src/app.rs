@@ -1050,10 +1050,11 @@ fn loading_name(source: &crate::assets::Source) -> String {
     }
 }
 
-/// Original level `n` from its remastered export, when the look is set to remastered (Options, Look) and the export
-/// has the level: the look is a setting, not a kind of level (phase 2 turns it into texture and model packs).
+/// Original level `n` from its remastered export (the rounding cache), when the look is a rounded one (Remaster,
+/// Drahtseilakt, Player's pack) and the export has the level; else the level as it is. The look is a setting, not a
+/// kind of level.
 fn look_source(n: u32) -> Option<crate::assets::Source> {
-    if setting("look").as_deref() != Some("remastered") {
+    if !crate::look::chosen().rounded() {
         return None;
     }
     let dir = crate::levels::dir(crate::levels::Kind::Remastered).join(format!("Level_{n:02}"));
@@ -1165,7 +1166,7 @@ fn start_packs(textures: Option<&str>, models: Option<&str>) {
     start(Kind::Models, models, LEVEL);
 }
 
-pub fn run(o: Options, data: Data) -> Result<(), String> {
+pub fn run(mut o: Options, data: Data) -> Result<(), String> {
     // where the interface's files come from: the copy's own when it has its menu, else ours (resources.rs); the
     // extended mode may choose another
     let explicit = gamedata::resources::from_settings();
@@ -1198,6 +1199,19 @@ pub fn run(o: Options, data: Data) -> Result<(), String> {
         o.textures.clone().or(textures).as_deref(),
         o.models.clone().or(models).as_deref(),
     );
+    // the one Look picks the textures (a `--textures` pack of this run wins); the shapes follow it per level
+    if o.textures.is_none() && o.export.is_none() {
+        crate::look::start(setting("look").as_deref(), setting("textures").as_deref());
+    }
+    // an original level named on the command line is drawn in the look too (the window, screenshots, videos); a run
+    // only checked without a picture stays on the copy's level, as replays were made on it
+    if let crate::assets::Source::Original(n) = o.source
+        && o.export.is_none()
+        && (!o.headless || o.screenshot.is_some())
+        && let Some(src) = look_source(n)
+    {
+        o.source = src;
+    }
     for (asked, kind) in [
         (&o.textures, gamedata::packs::Kind::Textures),
         (&o.models, gamedata::packs::Kind::Models),
@@ -5422,10 +5436,11 @@ impl App {
                 gamedata::packs::choose(kind, &key);
                 put_settings(&[(kind.key().to_owned(), key)]);
             }
-            Action::Look(remastered) => {
-                // the next original level plays with it
-                let look = if remastered { "remastered" } else { "original" };
-                put_settings(&[("look".to_owned(), look.to_owned())]);
+            Action::Look(look) => {
+                // the next level loads with it
+                let kept = setting("textures");
+                crate::look::choose(look, kept.as_deref());
+                put_settings(&crate::look::settings(look));
             }
             Action::Language(code) => {
                 // spoken at once: the menus' words again, in the new language

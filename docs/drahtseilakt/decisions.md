@@ -412,3 +412,13 @@ textures are then swapped by the look. So a level the player only drops into a f
 as it is, "hello 2004"; the beautiful looks appear for it after it is brought in through the toolbox, and the game
 says so where the look is chosen and offers that import. The remaster is a look of any level, not a separate set of
 levels. Shipped sets stay two: the owner's picks in our open format and the community picks as their `.nmo`.
+
+*Done 2026-11-11 (branch one-look):* the Look is one line on the Graphics page (`look original|remaster|drahtseilakt|player`),
+the rounded shapes of an original level are its toolbox export (`levels/remastered/Level_NN`, no longer a list), Start's
+order is Drahtseilakt, Classic Ballance, Ballance Challenges, Community maps, and the game explains the toolbox import
+where the Look is chosen and on a downloaded map's note rather than launching it. See [menu.md](menu.md).
+
+*Done 2026-11-11 (branch one-look):* the Look is one line on the Graphics page (`look original|remaster|drahtseilakt|player`),
+the rounded shapes of an original level are its toolbox export (`levels/remastered/Level_NN`, no longer a list), Start's
+order is Drahtseilakt, Classic Ballance, Ballance Challenges, Community maps, and the game explains the toolbox import
+where the Look is chosen and on a downloaded map's note rather than launching it. See [menu.md](menu.md).

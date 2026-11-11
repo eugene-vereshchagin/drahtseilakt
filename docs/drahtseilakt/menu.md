@@ -102,8 +102,7 @@ development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the or
   - best times beside the levels;
   - (Start is the same in both modes since 2026-11-09; the switch no longer exists);
   - Interface: Drahtseilakt / Ballance / Remaster, where the interface's files come from ([resources.md](resources.md));
-  - Textures: the texture pack the levels, their parts and the balls are drawn with — Drahtseilakt (the default), Ballance, Remaster or a player's pack, by its name; the next level loads with the choice
-    ([packs.md](packs.md));
+  - Look: one choice, the Graphics page's *Look* line (Original / Remaster / Drahtseilakt / Player's pack; see "The Look" below), in place of the texture pack line; the next level loads with it ([packs.md](packs.md));
   - Models: the model pack the parts and balls are drawn with (their look only, never their physics) — the level's
     (each level with the parts it takes: the default), Drahtseilakt, Ballance or a player's
     pack ([packs.md](packs.md));
@@ -138,17 +137,25 @@ and each submenu item says on the notes panel what it is and where it comes from
 
 | Item | Opens | Needs |
 |---|---|---|
+| *Featured maps* (ru «Избранные карты») | the owner's 13 picks of players' maps, brought into our open format, credited to their authors | |
 | *Classic Ballance* (ru «Классический Ballance») | the 13 original levels of the player's copy, unlocking as in the original | a copy |
-| *Drahtseilakt* | our own 13 levels, shipped with the game | |
 | *Ballance Challenges* (ru «Испытания Ballance») | the original levels remade by the community: the camera turned 45 degrees, the way backwards, the road invisible (`levels/modified/`) | a copy and levels in the folder |
 | *Community maps* (ru «Карты сообщества») | a submenu | |
 | &nbsp;&nbsp;*Best* (ru «Лучшие») | the 13 community maps shipped with the game, with their authors and the thanks notice | |
 | &nbsp;&nbsp;*Downloaded* (ru «Скачанные») | the player's folder `levels/downloaded/` (its path is shown): community `.nmo` maps and open-format levels in one list, with those of the earlier folders `levels/community/` and `levels/open/`, which are still read | |
 
-The strings are in all seven languages. *Remastered* is no longer a kind of level: Options has the line *Look:
-Ballance / Remaster* (ru «Вид: Ballance / Remaster»), shown only when `levels/remastered/` holds an export. With
-*remastered*, Classic Ballance plays each original level from its export (the setting `look remastered`); the look is
-a setting, not a list, so that texture and model packs can take its place later.
+The strings are in all seven languages. Start's order since 2026-11-11: the featured maps first, *Classic Ballance* second.
+
+**The Look** (owner's decision 2026-11-11, decisions.md "One Look, and beauty comes through the toolbox") is one line,
+*Look*, on the Graphics page (setting `look original|remaster|drahtseilakt|player`, with `textures` kept as the pack it
+draws with), replacing the separate Textures line and the Options line of 2026-11-09. *Original*: the copy's textures on
+the 2004 shapes. *Remaster*: the toolbox's enlarged textures on rounded shapes. *Drahtseilakt* (the default): our
+textures on rounded shapes. *Player's pack*: a texture pack of the player's on rounded shapes. A look that cannot be shown
+here is not offered (no copy: no Original or Remaster; no export: no Remaster; no pack of his: no Player's pack), and an
+old settings file keeps its meaning (`look remastered` is Remaster; `textures` decide otherwise). The rounded shapes of an
+original level are its export `levels/remastered/Level_NN` (the rounding cache), used by every look but Original; a level
+without one plays as it is. The Look's help and the notes panel of a downloaded map say that the beautiful looks come after
+the level is imported with `drahtseilakt-toolbox` (the game never goes online and does not run it itself).
 
 ## Words that fit, lists that say they scroll
 
