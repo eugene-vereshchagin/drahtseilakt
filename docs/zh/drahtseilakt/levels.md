@@ -2,6 +2,10 @@
 
 游戏如何保存其关卡，已于 2026-11-02 与项目所有者商定（decisions.md，“关卡存放在一个文件夹中，分四类”）。显示关卡的菜单见 [menu.md](menu.md)。
 
+## 地图检查
+
+运行 `drahtseilakt-toolbox import-maps` 之后,游戏会检查生成的每张地图(`drahtseilakt --audit-report DIR|FILE`,即 `--audit` 的审计),并在旁边写入 `report.txt`:审计的问题种类及数量。已下载地图列表会在所选地图下用玩家的语言说明:结论(完全支持、可玩但有差异、可能无法通关、无法加载)以及最多三行,例如游戏未知的脚本、由脚本驱动而静止的部件、缺失贴图以纯色代替、脚本的声音不播放。这些行是按审计种类建立的表(crates/game/src/report.rs),而不是按地图;审计新增的种类计为"其他",变为已知的脚本块在下次检查时从报告中消失。
+
 ## 文件夹
 
 所有关卡都位于游戏数据文件夹（Linux 上为 `~/.local/share/drahtseilakt/`，Windows 上为 `%APPDATA%\drahtseilakt\`，macOS 上为 `~/Library/Application Support/drahtseilakt/`）中的同一个文件夹 `levels/` 里，按来源和格式划分：

@@ -1240,6 +1240,14 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
         };
         return crate::audit::run(&o.audit, &data, o.audit_csv.as_deref(), &prepare);
     }
+    if !o.audit_report.is_empty() {
+        // as a new player has it, like --audit: the report says what the game gives, the same on every machine
+        gamedata::resources::set_copy(data.has_copy());
+        gamedata::packs::set_copy(data.has_copy());
+        start_packs(o.textures.as_deref(), o.models.as_deref());
+        let language = crate::lang::chosen(setting("language").as_deref());
+        return crate::report::run(&o.audit_report, &data, &language);
+    }
     if let Some(runs) = o.supports_check {
         // the supports come with our own models (the original's have none), whatever the player's settings choose:
         // the check measures them, unless --models asks for another pack

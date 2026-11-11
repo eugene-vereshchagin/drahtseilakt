@@ -24,6 +24,8 @@ const LIST_LINES: usize = 13;
 const MODS_LINES: usize = 9;
 /// Rows of the community maps' list (the author and the thanks are under them).
 const COMMUNITY_LINES: usize = 9;
+/// The most lines of a map's check the note shows after its verdict.
+const CHECK_LINES: usize = 3;
 
 /// The Controls page's rows: the copy's names for them (Language.nmo), in options::ACTIONS' order.
 const KEY_NAMES: [(&str, &str); 6] = [
@@ -454,12 +456,16 @@ impl Menu {
             }
             List::Downloaded => {
                 let about = self.describe(Some(Line::Downloaded));
-                if matches!(chosen, Some(Line::Map(_))) {
-                    format!(
-                        "{about}\n{}\n{}",
-                        map(),
-                        self.strings.ours("note beautiful")
-                    )
+                if let Some(Line::Map(m)) = chosen {
+                    // the map check from the import, when there is one: what the game does not support yet in it
+                    let check = self.check_note(m);
+                    // the folder's description gives way to the check: the rows matter more than the path
+                    let head = if check.is_empty() {
+                        format!("{about}\n{}", map())
+                    } else {
+                        map()
+                    };
+                    format!("{head}\n{}{check}", self.strings.ours("note beautiful"))
                 } else {
                     about
                 }
@@ -484,11 +490,33 @@ impl Menu {
         }
     }
 
+    /// The map check of map `i` as note lines (a newline first): its verdict and the lines that matter most; nothing
+    /// when the map was never checked.
+    fn check_note(&self, i: usize) -> String {
+        let Some(r) = self.maps.get(i).and_then(|p| p.report.as_ref()) else {
+            return String::new();
+        };
+        let s = crate::report::summarize(r);
+        let text = |k: &str| self.strings.ours(k);
+        format!(
+            "\n{}",
+            crate::report::words(&s, self.strings.language(), &text, CHECK_LINES)
+        )
+    }
+
     /// How many rows the list can show so that its note stays whole for every chosen map (the text shrinks to
     /// MIN_TEXT first; rows are given up only after that), so that the rows do not change as the choice moves.
     fn fit_rows(&self, f: &crate::ui::Face) -> usize {
         let texts: Vec<String> = if self.list == List::Best {
             (0..self.maps.len())
+                .map(|m| self.list_note(Some(Line::Map(m))))
+                .chain([self.list_note(None), self.list_note(Some(Line::Back))])
+                .collect()
+        } else if self.list == List::Downloaded {
+            // the notes differ by the maps' checks: every map with one counts (a few hundred at most), so that
+            // the rows do not change as the choice moves
+            (0..self.maps.len().min(512))
+                .filter(|&m| m == 0 || self.maps.get(m).is_some_and(|p| p.report.is_some()))
                 .map(|m| self.list_note(Some(Line::Map(m))))
                 .chain([self.list_note(None), self.list_note(Some(Line::Back))])
                 .collect()
@@ -4112,6 +4140,7 @@ mod tests {
                 author: None,
                 version: None,
                 posted: None,
+                report: None,
                 titles: Vec::new(),
                 order: None,
                 hidden: false,
@@ -4151,6 +4180,7 @@ mod tests {
                 author: None,
                 version: None,
                 posted: None,
+                report: None,
                 titles: Vec::new(),
                 order: None,
                 hidden: false,
@@ -4191,6 +4221,7 @@ mod tests {
                 author: None,
                 version: None,
                 posted: None,
+                report: None,
                 titles: Vec::new(),
                 order: None,
                 hidden: false,
@@ -4268,6 +4299,16 @@ mod tests {
             author: Some("An Author With A Very Long Name Indeed".to_owned()),
             version: Some("12.3.4-beta".to_owned()),
             posted: Some("2012-03-01".to_owned()),
+            report: Some(
+                [
+                    "script-block-unknown",
+                    "animation-played",
+                    "texture-missing",
+                    "sound-unplayed",
+                ]
+                .map(|k| (k.to_owned(), 12345))
+                .to_vec(),
+            ),
             titles: Vec::new(),
             order: None,
             hidden: false,

@@ -3,6 +3,10 @@
 Wie das Spiel seine Level aufbewahrt, mit dem Eigentümer am 2026-11-02 abgestimmt (decisions.md, „Level liegen in
 einem Ordner, vier Arten“). Die Menüs, die sie zeigen, stehen in [menu.md](menu.md).
 
+## Die Kartenprüfung
+
+Nach `drahtseilakt-toolbox import-maps` prüft das Spiel jede erzeugte Karte (`drahtseilakt --audit-report DIR|FILE`, das Audit von `--audit`) und legt daneben `report.txt` ab: die Arten von Auffälligkeiten des Audits mit ihrer Anzahl. Die Liste der heruntergeladenen Karten formuliert sie in der Sprache des Spielers unter der gewählten Karte: ein Urteil (läuft vollständig, mit Abweichungen, evtl. nicht schaffbar, lässt sich nicht laden) und bis zu drei Zeilen, etwa unbekannte Skripte, still stehende skriptgesteuerte Teile, fehlende Texturen in Einheitsfarbe, nicht gespielte Skript-Sounds. Die Zeilen sind eine Tabelle über die Audit-Arten (crates/game/src/report.rs), nie über Karten; eine neue Art zählt als "weitere", ein bekannt gewordener Skript-Block verschwindet bei der nächsten Prüfung.
+
 ## Die Ordner
 
 Alle Level liegen in einem Ordner, `levels/`, im Datenordner des Spiels (`~/.local/share/drahtseilakt/` unter
