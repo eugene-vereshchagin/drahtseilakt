@@ -148,4 +148,7 @@ daher werden Schleifen an der Grenze nicht verglichen. Stufe 3 (ganze Karten) fo
   kommen aus der Datei, der Lauf führt sie selbst (mit Zurückspulen), und Fill Group By Class sammelt nach Klasse
   ([gameplay_bbs.md](../../gameplay_bbs.md), „Fill Group By Class“). Für Gruppen aus Entitäten antworten Group
   Iterator und Is In Group wie bisher.
-- Noch nicht: Attribute (Kennung `0x11` eines Objekts und der Chunk des Attributmanagers).
+- **Attribute** (`crates/script/src/blocks/attributes.rs`): Has, Set und Remove Attribute sowie Objects With Attribute
+  Iterator auf einer Attribut-Karte je Objekt im Lauf (zuerst die der Datei, defensiv aus Kennung `0x11` gelesen,
+  [ck-runtime.md](../../ck-runtime.md); begrenzt; mit dem Lauf zurückgespult). Namen und Typen der Attribute brauchen den
+  Chunk des Attributmanagers, der noch übersprungen wird: ein Attribut ist sein Dateiindex.

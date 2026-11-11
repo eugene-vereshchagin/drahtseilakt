@@ -56,4 +56,6 @@
   （[gameplay_bbs.md](../../gameplay_bbs.md)，“Arrays”）。
 - **组**可含图中的任意对象（实体、网格、材质、纹理、行为）：成员取自文件，运行自行保存（随回滚），Fill Group By Class 按类收集
   （[gameplay_bbs.md](../../gameplay_bbs.md)，“Fill Group By Class”）。对由实体组成的组，Group Iterator 和 Is In Group 的结果与以前相同。
-- 尚未完成：属性（对象的标识符 `0x11` 和属性管理器的数据块）。
+- **属性**（`crates/script/src/blocks/attributes.rs`）：Has、Set、Remove Attribute 和 Objects With Attribute Iterator 作用于运行中每个对象的属性表
+  （先是文件自带的，从标识符 `0x11` 谨慎读取，见 [ck-runtime.md](../../ck-runtime.md)；有上限；随运行回滚）。属性的名称和类型需要属性管理器的
+  数据块，目前仍被跳过：属性即其文件索引。

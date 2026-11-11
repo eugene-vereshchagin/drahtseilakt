@@ -66,6 +66,7 @@ fn decode_chunk(c: &Chunk) {
     let _ = scene::parameter_word(c);
     let _ = scene::group(c);
     let _ = scene::data_array(c);
+    let _ = scene::attributes(c);
     let _ = scene::object_animation(c);
     let _ = scene::parameter_floats(c);
 }

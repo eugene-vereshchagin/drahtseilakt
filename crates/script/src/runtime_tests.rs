@@ -765,6 +765,7 @@ fn bare(nodes: Vec<Node>) -> Graph {
         priorities: Vec::new(),
         start_off: Vec::new(),
         groups: Vec::new(),
+        attributes: Vec::new(),
     }
 }
 
@@ -1187,7 +1188,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     }
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them)
-    assert_eq!(all.len(), 102);
+    assert_eq!(all.len(), 106);
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -1550,4 +1551,86 @@ fn groups_hold_any_object_and_fill_by_class() {
     other.group_clear(0, &host);
     assert!(other.group_ids(0, &host).is_empty());
     assert_eq!(rt.group_ids(0, &host).len(), 4);
+}
+
+/// Attributes (docs/gameplay_bbs.md, "Attributes"): the file's seed the lists in order, Set Attribute adds an object
+/// and its value, Has Attribute finds it and gives the value, Remove Attribute drops it; a copy of the run keeps its
+/// own, and a bad index is refused.
+#[test]
+fn attributes_are_set_found_and_listed_in_order() {
+    let mut b = Build::new();
+    b.g.attributes = vec![(0, 5, None), (1, 6, None)];
+    let target = b.local("Target", types::BEOBJECT, Value::Obj(Some(1)));
+    let attr = b.local("Attribute", types::INT, Value::Int(5));
+    let val = b.local("Attribute Value", types::INT, Value::Int(7));
+    let pins = vec![
+        b.pin("Attribute", types::INT, attr),
+        b.pin("Attribute Value", types::INT, val),
+    ];
+    let set = b.bb(
+        "Set Attribute",
+        proto::SET_ATTRIBUTE,
+        &["In"],
+        &["Out"],
+        pins,
+        vec![],
+        vec![],
+        Some(target),
+    );
+    let shown = b.pout("Attribute Value", types::INT);
+    let pin_has = b.pin("Attribute", types::INT, attr);
+    let has = b.bb(
+        "Has Attribute",
+        proto::HAS_ATTRIBUTE,
+        &["In"],
+        &["True", "False"],
+        vec![pin_has],
+        vec![shown],
+        vec![],
+        Some(target),
+    );
+    let start = b.io("Start");
+    let l1 = b.link(start, in_of(&b.g, set, 0), 0);
+    let l2 = b.link(out_of(&b.g, set, 0), in_of(&b.g, has, 0), 0);
+    b.script("S", None, start, vec![set, has], vec![l1, l2]);
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    assert_eq!(
+        rt.with_attribute(5, 0).map(|x| x.0),
+        Some(0),
+        "the file's first"
+    );
+    assert!(rt.attribute(1, 5).is_none());
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(rt.attribute(1, 5), Some(&Value::Int(7)));
+    assert_eq!(
+        rt.values[shown],
+        Value::Int(7),
+        "Has Attribute gives the value"
+    );
+    assert_eq!(
+        rt.with_attribute(5, 1).map(|x| x.0),
+        Some(1),
+        "in the order they were set"
+    );
+    assert!(rt.with_attribute(5, 2).is_none());
+    let mut other = rt.clone();
+    other.remove_attribute(1, 5);
+    assert!(other.attribute(1, 5).is_none() && rt.attribute(1, 5).is_some());
+    assert!(
+        !rt.set_attribute(1, -1, None),
+        "a negative index is no attribute"
+    );
+    assert!(
+        !rt.set_attribute(999_999, 5, None),
+        "nor an object that is not there"
+    );
+    for a in 0..80 {
+        rt.set_attribute(0, a + 10, None);
+    }
+    assert!(
+        rt.attrs_of(0) <= crate::MAX_ATTRIBUTES_PER_OBJECT,
+        "an object carries a bounded number"
+    );
 }

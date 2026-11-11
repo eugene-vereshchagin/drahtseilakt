@@ -219,7 +219,7 @@ pub fn to_json(
             json!([s, owner])
         })
         .collect();
-    json!({"objects": objects, "nodes": nodes, "arrays": arrays, "scripts": scripts, "groups": g.groups})
+    json!({"objects": objects, "nodes": nodes, "arrays": arrays, "scripts": scripts, "groups": g.groups, "attributes": g.attributes})
 }
 
 /// The most objects and arrays a level's scripts may have (a map's own are a few thousand).
@@ -417,8 +417,33 @@ pub fn from_json(j: &J, counts: [usize; 5]) -> Result<Graph, String> {
             groups.push(ids);
         }
     }
+    // the attributes the file's objects carry: (object, attribute index, parameter), absent in older files
+    let mut attributes = Vec::new();
+    if let Some(list) = j.get("attributes").and_then(J::as_array) {
+        if list.len() > script::MAX_ATTRIBUTES {
+            return Err(too_many());
+        }
+        for a in list {
+            let t = a
+                .as_array()
+                .filter(|t| t.len() == 3)
+                .ok_or("script attribute is malformed")?;
+            let o = index(t.first().ok_or("script attribute is malformed")?)?;
+            let n = i32::try_from(index(t.get(1).ok_or("script attribute is malformed")?)?)
+                .map_err(|e| e.to_string())?;
+            let p = opt_index(t.get(2).unwrap_or(&J::Null))?;
+            if o >= objs.len()
+                || n >= script::MAX_ATTRIBUTE_TYPES
+                || p.is_some_and(|p| p >= objs.len())
+            {
+                return Err("a script attribute names an object that does not exist".into());
+            }
+            attributes.push((o, n, p));
+        }
+    }
     let mut g = Graph::assemble(objects, nodes, arrays, scripts)?;
     g.groups = groups;
+    g.attributes = attributes;
     Ok(g)
 }
 
@@ -477,6 +502,7 @@ mod tests {
     fn a_graph_survives_the_open_format() {
         let mut g = graph();
         g.groups = vec![vec![0, 1], vec![]];
+        g.attributes = vec![(0, 5, None), (1, 6, Some(0))];
         let j = to_json(&g, &Some, &Some);
         let back = from_json(&j, [1, 0, 0, 0, 0]).expect("read");
         assert_eq!(back, g);

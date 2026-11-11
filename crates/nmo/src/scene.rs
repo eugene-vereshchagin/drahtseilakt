@@ -850,6 +850,38 @@ impl DataArray {
     }
 }
 
+/// The most attributes one object is read with (the run caps them lower).
+pub const MAX_ATTRIBUTES: usize = 256;
+
+/// The attributes a behavioural object carries (identifier `0x11`, docs/ck-runtime.md, "Attributes"): the file's
+/// attribute index and the parameter object holding its value, in the order saved. The layout is the count *n*,
+/// *n* parameter references, the count again, the attribute manager's GUID (two words), then *n* attribute indices.
+/// Nothing here can fail the object or the file: a short, inconsistent or oversized section gives no attributes.
+pub fn attributes(chunk: &Chunk) -> Vec<(u32, Option<usize>)> {
+    let read = || -> Option<Vec<(u32, Option<usize>)>> {
+        let mut w = chunk.section(0x11)?;
+        let n = w.u32().ok()? as usize;
+        // n references, the count, two GUID words and n indices must all be there
+        if n == 0 || n > MAX_ATTRIBUTES || n.checked_mul(2)?.checked_add(3)? > w.remaining() {
+            return None;
+        }
+        let refs: Vec<u32> = (0..n).map(|_| w.u32().ok()).collect::<Option<_>>()?;
+        if w.u32().ok()? as usize != n {
+            return None;
+        }
+        w.u32().ok()?;
+        w.u32().ok()?;
+        let idx: Vec<u32> = (0..n).map(|_| w.u32().ok()).collect::<Option<_>>()?;
+        Some(
+            idx.into_iter()
+                .zip(refs)
+                .map(|(i, r)| (i, reference(chunk, r)))
+                .collect(),
+        )
+    };
+    read().unwrap_or_default()
+}
+
 const MAX_COLUMNS: usize = 1_024;
 
 pub fn data_array(chunk: &Chunk) -> Result<DataArray> {
@@ -953,6 +985,27 @@ mod tests {
         assert_eq!(with(Some(vec![0, 0, u32::MAX])).ok(), Some((1, None)));
         assert_eq!(with(Some(vec![0, 0])).ok(), Some((1, None)));
         assert_eq!(with(None).ok(), Some((1, None)));
+    }
+
+    /// Attributes (identifier 0x11): count, references, count, manager GUID, indices; anything off gives none.
+    #[test]
+    fn attributes_are_read_defensively() {
+        let good = vec![2, 0x385, 0x386, 2, 0x3d24_2466, 0, 0x29, 0x41];
+        let read = |w: Vec<u32>| attributes(&chunk(&[(0x11, w)]));
+        assert_eq!(
+            read(good.clone()),
+            vec![(0x29, Some(0x385)), (0x41, Some(0x386))]
+        );
+        assert_eq!(read(vec![1, u32::MAX, 1, 7, 0, 5]), vec![(5, None)]);
+        // short, a count that disagrees, no attributes, a count beyond what is there or beyond the cap
+        assert!(read(good[..7].to_vec()).is_empty());
+        let mut bad = good.clone();
+        bad[3] = 3;
+        assert!(read(bad).is_empty());
+        assert!(read(vec![0]).is_empty());
+        assert!(read(vec![u32::MAX, 1, 2, 3]).is_empty());
+        assert!(read(vec![1_000_000, 1, 1, 0, 0, 5]).is_empty());
+        assert!(attributes(&chunk(&[(0x10, good)])).is_empty());
     }
 
     /// Record Anim's layout (docs/animation.md 5.2): linear position, rotation and scale, then the end of the list;

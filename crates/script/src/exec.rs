@@ -163,6 +163,8 @@ pub struct Runtime {
     /// Each group's members as the run has them, by group index: seeded the first time a group is used (from the
     /// file's members, else the host's level members) and changed by the group blocks.
     groups: Vec<Option<Vec<Id>>>,
+    /// The attributes objects carry now, in the order the attribute manager lists them: (attribute, object, value).
+    attrs: Vec<(i32, Id, Value)>,
     /// Messages sent this tick, delivered at the next.
     outbox: Vec<Message>,
     inbox: Vec<Message>,
@@ -223,6 +225,17 @@ impl Runtime {
                 _ => Value::None,
             })
             .collect();
+        let attrs = graph
+            .attributes
+            .iter()
+            .map(|&(o, a, p)| {
+                let v = match p.and_then(|p| graph.nodes.get(p)) {
+                    Some(Node::Param(q)) => q.value.clone(),
+                    _ => Value::None,
+                };
+                (a, o, v)
+            })
+            .collect();
         let mut rt = Runtime {
             blocks: vec![BlockState::default(); n],
             links: vec![LinkState::default(); n],
@@ -230,6 +243,7 @@ impl Runtime {
             values,
             arrays: graph.arrays.clone(),
             groups: Vec::new(),
+            attrs,
             graph,
             outbox: Vec::new(),
             inbox: Vec::new(),
@@ -700,6 +714,8 @@ impl Runtime {
         if let Some(o) = self.objects.get_mut(object) {
             o.gone = true;
         }
+        // a deleted object leaves the attribute manager's lists
+        self.attrs.retain(|(_, o, _)| *o != object);
     }
 
     /// Execute Script: the script is activated (reset if asked) and run at once, inside the caller's frame; the
@@ -1184,6 +1200,58 @@ impl Runtime {
         if let Some(Some(m)) = self.groups.get_mut(group) {
             m.clear();
         }
+    }
+
+    // ---- attributes -------------------------------------------------------------------------------------------
+
+    /// The value of an attribute an object carries, if it carries it.
+    pub fn attribute(&self, object: Id, attr: i32) -> Option<&Value> {
+        self.attrs
+            .iter()
+            .find(|(a, o, _)| *a == attr && *o == object)
+            .map(|(_, _, v)| v)
+    }
+
+    /// Gives an object an attribute (kept if it has it) and sets its value; false when refused (an attribute type or
+    /// an object that does not exist, or a cap).
+    pub(crate) fn set_attribute(&mut self, object: Id, attr: i32, value: Option<Value>) -> bool {
+        if !(0..crate::MAX_ATTRIBUTE_TYPES).contains(&attr) || object >= self.graph.objects.len() {
+            return false;
+        }
+        if let Some(slot) = self
+            .attrs
+            .iter_mut()
+            .find(|(a, o, _)| *a == attr && *o == object)
+        {
+            if let Some(v) = value {
+                slot.2 = v;
+            }
+            return true;
+        }
+        let mine = self.attrs.iter().filter(|(_, o, _)| *o == object).count();
+        if mine >= crate::MAX_ATTRIBUTES_PER_OBJECT || self.attrs.len() >= crate::MAX_ATTRIBUTES {
+            return false;
+        }
+        self.attrs.push((attr, object, value.unwrap_or_default()));
+        true
+    }
+
+    /// How many attributes an object carries.
+    pub fn attrs_of(&self, object: Id) -> usize {
+        self.attrs.iter().filter(|(_, o, _)| *o == object).count()
+    }
+
+    pub(crate) fn remove_attribute(&mut self, object: Id, attr: i32) {
+        self.attrs.retain(|(a, o, _)| !(*a == attr && *o == object));
+    }
+
+    /// The objects having an attribute, in the order they got it, with its value (Objects With Attribute Iterator).
+    pub fn with_attribute(&self, attr: i32, index: usize) -> Option<(Id, &Value)> {
+        self.attrs
+            .iter()
+            .filter(|(a, _, _)| *a == attr)
+            .nth(index)
+            .map(|(_, o, v)| (*o, v))
     }
 
     // ---- arrays -----------------------------------------------------------------------------------------------

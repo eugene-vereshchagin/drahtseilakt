@@ -332,7 +332,16 @@ pub struct Graph {
     /// The members the file gives each group (by group index, as `ObjKind::Group` counts them), of any kind: entities,
     /// meshes, materials, behaviours. A group missing here (or empty) starts with the host's level members.
     pub groups: Vec<Vec<Id>>,
+    /// The attributes the file's objects carry, in the order the attribute manager lists them: (object, the file's
+    /// attribute index, the parameter holding the value). Attribute indices are the file's own; a block names an
+    /// attribute by the same index (docs/ck-runtime.md, "Attributes").
+    pub attributes: Vec<(Id, i32, Option<Id>)>,
 }
+
+/// The most attributes one object carries in a run, attribute types (indices 0 to this) and attributes in all.
+pub const MAX_ATTRIBUTES_PER_OBJECT: usize = 64;
+pub const MAX_ATTRIBUTE_TYPES: i32 = 1 << 16;
+pub const MAX_ATTRIBUTES: usize = 1 << 16;
 
 impl Graph {
     /// The graphs of a file. `kind` says what each object of the file is to the engine (by its index).
@@ -347,6 +356,7 @@ impl Graph {
             priorities: Vec::new(),
             start_off: Vec::new(),
             groups: Vec::new(),
+            attributes: Vec::new(),
         };
         for (i, o) in doc.objects.iter().enumerate().take(n) {
             let mut k = kind(i);
@@ -397,6 +407,17 @@ impl Graph {
                 kind: k,
             });
             let Some(chunk) = &o.chunk else { continue };
+            for (attr, param) in nmo::scene::attributes(chunk)
+                .into_iter()
+                .take(MAX_ATTRIBUTES_PER_OBJECT)
+            {
+                if g.attributes.len() < MAX_ATTRIBUTES
+                    && let Ok(attr) = i32::try_from(attr)
+                    && attr < MAX_ATTRIBUTE_TYPES
+                {
+                    g.attributes.push((i, attr, param.filter(|&p| p < n)));
+                }
+            }
             let node = match o.class_id {
                 behavior::class::BEHAVIOR => behavior::behavior(chunk).ok().map(|b| {
                     Node::Block(Block {
@@ -699,6 +720,7 @@ impl Graph {
             priorities: Vec::new(),
             start_off: Vec::new(),
             groups: Vec::new(),
+            attributes: Vec::new(),
         };
         for (i, node) in nodes {
             match &node {

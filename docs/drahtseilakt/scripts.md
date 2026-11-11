@@ -239,7 +239,10 @@ output, one log line. The Object Rename written in phase 2 stays in the code beh
   them, the run keeps them (rewound with it), and Fill Group By Class collects by class
   ([gameplay_bbs.md](../gameplay_bbs.md), "Fill Group By Class"). Group Iterator and Is In Group give the same
   results as before for groups of entities.
-- Not yet: attributes (identifier `0x11` of an object and the attribute manager's chunk).
+- **Attributes** (`crates/script/src/blocks/attributes.rs`): Has, Set and Remove Attribute and Objects With Attribute
+  Iterator on a per-object map of the run (the file's attributes first, read defensively from identifier `0x11`,
+  [ck-runtime.md](../ck-runtime.md); bounded; rewound with the run). Attribute names and types need the attribute manager's
+  chunk, which is still skipped: an attribute is its file index.
 
 ## Hostile input
 
@@ -331,7 +334,7 @@ by the engine's.
 | Create String | `4bcd2f9d:382652e2` | 2 | 2 | planned |
 | Proximity | `5321cacb:dcdc5213` | 2 | 2 | done |
 | Bezier Transform | `6d433e1b:191954b4` | 2 | 3 | planned |
-| Set Attribute | `373040f2:05e01b34` | 2 | 13 | planned |
+| Set Attribute | `373040f2:05e01b34` | 2 | 13 | done |
 | Set Emissive | `d1d1d1d1:30303030` | 2 | 2 | partial: accepted, no effect |
 | Chrono | `5e2f1788:4f965a44` | 2 | 3 | done |
 | Execute Script | `706c5a40:5bb31a0b` | 2 | 9 | done |
@@ -374,9 +377,9 @@ by the engine's.
 | Deactivate Object | `160f4b7d:67de224e` | 1 | 1 | done |
 | Random | `0c622386:1c3054f7` | 1 | 35 | done (a fixed seed: every run draws the same numbers) |
 | Set Euler Orientation | `0c4966d8:6c0c6d14` | 1 | 7 | done (X, then Y, then Z) |
-| Has Attribute | `25b54079:6ff90545` | 1 | 4 | planned |
+| Has Attribute | `25b54079:6ff90545` | 1 | 4 | done |
 | Set Material | `37865d50:2e285fab` | 1 | 3 | planned |
-| Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | planned |
+| Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | done |
 | SphericalParticleSystem | `67c88f47:8880721e` | 1 | 1 | planned |
 | Set 3DSprite Mode | `0c5d0457:c64c7000` | 1 | 1 | planned |
 | Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | planned |

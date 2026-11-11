@@ -1701,6 +1701,24 @@ columns.
   the array operation of that name: the row at Src is taken out and put at Dest (both inside the array, else nothing
   changes); Out fires. Not checked against the original.
 
+## Attributes
+
+Settled on real files and by the C oracle's notes (the oracle's own graphs cannot name an attribute: its attribute
+types come from a file's manager chunk). An object carries attributes: a number (the file's attribute index, see
+[ck-runtime.md](ck-runtime.md), identifier `0x11`) and a value. The runtime lists them in the order they were given
+(the file's first, then those blocks set), and deletes an object's with it; every run has its own lists (rewound
+with it). Caps: 64 attributes per object, indices 0 to 65535, 65536 in all.
+
+- **Has Attribute** (pin Attribute, default -1): In is cleared; if the target (a behavioural object) has the attribute
+  `True` fires and pout 0 gets its value, else `False`. A pin that is not a number (a name) names no attribute.
+- **Set Attribute** (Attribute, Attribute Value): In is cleared and Out fires first; with a target the attribute is
+  added if the object lacks it, and takes the value of pin 1. (The C refuses an index the attribute manager does not
+  know; without the manager's chunk any index in range is accepted here.)
+- **Remove Attribute**: In cleared, Out fires; the attribute is dropped if the target has it.
+- **Objects With Attribute Iterator** (Attribute): over every object that has it, in the order they got it, not
+  filtered by scene; pout 0 the object, pout 1 the value; the index is kept in local 0. In starts at 0, Loop In goes
+  on by one; past the last, `Out` fires and the index is left.
+
 ## Messages
 
 A message is a record: its type (by name), the sender (the sending block's target, its script's object unless the

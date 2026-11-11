@@ -97,6 +97,10 @@ pub mod proto {
     pub const REMOVE_ROW: Guid = Guid(0x1fa5_7136, 0x1431_0857);
     pub const ROW_SEARCH: Guid = Guid(0x7886_3443, 0x45af_59b6);
     pub const GET_NEAREST_IN_GROUP: Guid = Guid(0x0852_07eb, 0x5849_50d8);
+    pub const HAS_ATTRIBUTE: Guid = Guid(0x25b5_4079, 0x6ff9_0545);
+    pub const SET_ATTRIBUTE: Guid = Guid(0x3730_40f2, 0x05e0_1b34);
+    pub const REMOVE_ATTRIBUTE: Guid = Guid(0x6b63_40c4, 0x61e9_4a41);
+    pub const OBJECTS_WITH_ATTRIBUTE_ITERATOR: Guid = Guid(0x6bc1_494c, 0x0c81_6ad3);
     pub const FILL_GROUP_BY_CLASS: Guid = Guid(0x4445_257b, 0x7001_6c57);
     pub const SET_ROW: Guid = Guid(0x62e8_7901, 0x2df0_07dd);
     pub const INSERT_COLUMN: Guid = Guid(0x05cb_7802, 0x04a6_4a58);
@@ -114,6 +118,7 @@ pub mod proto {
 
 mod absent;
 mod arrays;
+mod attributes;
 mod cameras;
 mod collisions;
 mod controllers;
@@ -273,6 +278,7 @@ pub fn registry() -> &'static [Proto] {
         let mut all: Vec<Proto> = [
             absent::PROTOS,
             arrays::PROTOS,
+            attributes::PROTOS,
             cameras::PROTOS,
             collisions::PROTOS,
             controllers::PROTOS,
