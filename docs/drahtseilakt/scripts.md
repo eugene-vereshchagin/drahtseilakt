@@ -161,6 +161,14 @@ reported once as before.
   block, `graph <id> <name>`), IO fired (`io <owner> <name> in<k>|out<k>`), script activation applied and
   parameter written (`param <id> = <value>`), capped at 2^20 lines; `script-dump --run N FILE` prints it.
 
+**Census** (`crates/script/src/census.rs`): `script-dump --census FILE|DIR...` counts every `.nmo`/`.cmo`
+(folders walked 8 deep, links not followed) and prints CSV: a summary (files, files with graphs, scripts, graphs,
+blocks, links, links by delay, behaviour and object priorities, scripts started deactivated), then each block kind
+(name, GUID, the registry's library and standing, or `?,unknown`; files, instances) and each operation (known or
+not). Over the owner's 579 maps: 1540 scripts, 10 536 blocks of 147 kinds, 11 833 links (delay 0: 11 545, 1: 233,
+2: 36, more: 19), 12 behaviour priorities, 5 object priorities, 24 scripts started deactivated. A unit test runs it
+on a graph built by hand; `crates/script/tests/census.rs` runs it over `OPENBALLANCE_MAPS` when that is set.
+
 **Not in the player.** Eight kinds found in maps have a GUID in none of the player's libraries: Explode, Midi
 Player, Run VSL, Add Mesh, Remove Mesh, Select Mesh, Get Nearest Object and Object Rename `6f074ca7:45427431`
 (Narratives.dll has a block of that name with another GUID). The original has no function for them, so they do

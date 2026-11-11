@@ -1102,8 +1102,9 @@ fn run_order(g: &Graph) -> Vec<Id> {
         .collect()
 }
 
-/// A host that is told nothing: the runtime's start, before the engine runs.
-struct Quiet;
+/// A host that is told nothing and has no objects: the runtime's start, before the engine runs, and tools that run
+/// a graph alone (script-dump --run).
+pub struct Quiet;
 
 impl Host for Quiet {
     fn delta_ms(&self) -> f32 {

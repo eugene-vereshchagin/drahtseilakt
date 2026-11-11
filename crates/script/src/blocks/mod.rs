@@ -474,6 +474,29 @@ pub mod ops {
     pub const LENGTH: Guid = Guid(0x556a_69af, 0x076e_3f09);
     pub const ROW_COUNT: Guid = Guid(0xfb55_6b23, 0x69b2_2a75);
     pub const GROUP_COUNT: Guid = Guid(0x44df_6f61, 0x5f8f_55c8);
+
+    /// The operations the runtime computes (any other copies its first input on, the original's rule).
+    pub const KNOWN: &[Guid] = &[
+        ADD,
+        SUB,
+        MUL,
+        DIV,
+        MOD,
+        CONVERT,
+        BY_NAME,
+        NAME,
+        POSITION,
+        CURRENT_MESH,
+        WORLD_MATRIX,
+        GET_Y,
+        LENGTH,
+        ROW_COUNT,
+        GROUP_COUNT,
+    ];
+
+    pub fn known(g: Guid) -> bool {
+        KNOWN.contains(&g)
+    }
 }
 
 fn is_float(g: Option<Guid>, v: &Value) -> bool {

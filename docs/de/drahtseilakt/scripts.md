@@ -83,3 +83,10 @@ Skripte laufen nicht, ihr Zustand bleibt), Object Delete eines Objekts löscht s
 sofort weg; Group/Collection Iterator halten den Index im Ausgang Index oder in Local 0; Execute Script führt das
 Skript sofort im Frame des Aufrufers aus; eine Spur (Frame, Verhalten, IO, Parameter) per Schalter. Ein Replay im
 Format 9 einer Karte mit Skripten wird als veraltet abgelehnt (Format 10); Level ohne Skripte sind unberührt.
+
+**Zählung** (`crates/script/src/census.rs`): `script-dump --census DATEI|ORDNER...` zählt alle `.nmo`/`.cmo` und
+gibt CSV aus: eine Übersicht (Dateien, Skripte, Graphen, Bausteine, Verbindungen nach Verzögerung, Prioritäten,
+deaktiviert gestartete Skripte) und je Bausteinart eine Zeile (Name, GUID, Bibliothek und Stand laut Register oder
+`?,unknown`, Dateien, Vorkommen) sowie je Operation. `script-dump --run N DATEI` führt die Skripte einer Datei N
+Ticks ohne Level aus und gibt die Spur aus. Geprüft von einem Unit-Test und von `crates/script/tests/census.rs`
+über `OPENBALLANCE_MAPS`, wenn gesetzt.

@@ -1442,3 +1442,40 @@ fn the_trace_shows_frames_runs_ios_and_parameters() {
     );
     assert!(rt.take_trace().is_empty(), "taken");
 }
+
+#[test]
+fn the_census_counts_kinds_links_and_delays_with_the_registrys_standing() {
+    let mut b = Build::new();
+    hider(&mut b, "Hides", 0, 0);
+    let unknown = b.bb(
+        "Mystery",
+        Guid(7, 7),
+        &["In"],
+        &[],
+        vec![],
+        vec![],
+        vec![],
+        None,
+    );
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, unknown, 0), 2);
+    b.script("Odd", Some(1), start, vec![unknown], vec![l]);
+    let g = b.done();
+    let mut c = crate::census::Census::default();
+    c.add(&g);
+    c.add(&Graph::default());
+    assert_eq!(
+        (c.files, c.with_graphs, c.scripts, c.blocks, c.links),
+        (2, 1, 2, 2, 2)
+    );
+    assert_eq!(c.delays, [1, 0, 1, 0]);
+    let csv = c.csv();
+    assert!(
+        csv.contains("block,Hide,31d97d82:78d54d98,Visuals.dll,full,1,1"),
+        "{csv}"
+    );
+    assert!(
+        csv.contains("block,Mystery,00000007:00000007,?,unknown,1,1"),
+        "{csv}"
+    );
+}

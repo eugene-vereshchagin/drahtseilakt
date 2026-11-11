@@ -4,11 +4,12 @@
 // prototype GUID our runtime either knows (blocks.rs) or reports. Every count is capped; indices are checked.
 
 pub mod blocks;
+pub mod census;
 pub mod exec;
 #[cfg(test)]
 mod runtime_tests;
 
-pub use exec::{Ent, Host, Runtime};
+pub use exec::{Ent, Host, Quiet, Runtime};
 pub use nmo::behavior::Guid;
 
 use nmo::behavior::{self, Saved};
@@ -451,15 +452,20 @@ impl Graph {
             if o.class_id == behavior::class::BEHAVIOR_LINK {
                 continue;
             }
-            let off = |a: Option<u32>| a.is_some_and(|f| f & 1 == 0 && f & 0x10 != 0);
-            if off(behavior::activity(chunk, false)) {
-                g.start_off.push(i);
+            let scripts = behavior::scripts(chunk);
+            // only an object with scripts is read as a behavioural one: in other classes these identifiers hold
+            // other things (a parameter's value is 0x40)
+            if !scripts.is_empty() {
+                let off = |a: Option<u32>| a.is_some_and(|f| f & 1 == 0 && f & 0x10 != 0);
+                if off(behavior::activity(chunk, false)) {
+                    g.start_off.push(i);
+                }
+                let prio = behavior::object_priority(chunk);
+                if prio != 0 {
+                    g.priorities.push((i, prio));
+                }
             }
-            let prio = behavior::object_priority(chunk);
-            if prio != 0 {
-                g.priorities.push((i, prio));
-            }
-            for s in behavior::scripts(chunk) {
+            for s in scripts {
                 if let Some(slot) = owners.get_mut(s) {
                     *slot = Some(i);
                 }
