@@ -57,6 +57,32 @@ pub struct Scripts {
     made: usize,
     /// Rows whose fixed or concave Physicalize was already reported.
     noted_static: Vec<usize>,
+    /// The fixed bodies scripts made (docs/physics.md 2.1): entity row -> the world's handle (none while the body's
+    /// command is queued) and the object's matrix the body was last placed by. In row order.
+    pub statics: BTreeMap<usize, StaticSlot>,
+    /// Fixed bodies made by scripts so far (bounds the handles in the world).
+    made_static: usize,
+}
+
+/// A script's fixed body and the object matrix it stands for.
+#[derive(Clone, Debug)]
+pub struct StaticSlot {
+    pub handle: Option<usize>,
+    pub last: Mat4,
+}
+
+/// The most fixed bodies the scripts of one run make.
+pub const MAX_SCRIPT_STATICS: usize = 1_024;
+/// The most triangles one fixed body of a script has (a larger mesh makes no body).
+pub const MAX_STATIC_TRIANGLES: usize = 65_536;
+
+/// How a fixed body is made.
+#[derive(Clone, Debug)]
+pub enum StaticShape {
+    /// The mesh's triangles in the object's frame (concave).
+    Triangles(Vec<[Vec3; 3]>),
+    /// The hull of points in the object's frame (a convex list).
+    Hull(Vec<Vec3>),
 }
 
 /// The most movable bodies the scripts of one run make.
@@ -85,8 +111,21 @@ pub enum PhysCmd {
         collide: bool,
         shift: Option<[f32; 3]>,
     },
+    Static {
+        ent: usize,
+        shape: StaticShape,
+        friction: f32,
+        elasticity: f32,
+        group: String,
+        pos: Vec3,
+        rot: glam::Quat,
+        /// The object's matrix at the request, which the body stands for.
+        at: Mat4,
+    },
     Remove {
         ent: usize,
+        /// The world's fixed body of the object, taken from the table by the host.
+        fixed: Option<usize>,
     },
     Force {
         ent: usize,
@@ -198,6 +237,16 @@ impl Scripts {
             groups: level.groups.iter().map(|g| g.members.clone()).collect(),
             materials: std::sync::Arc::new(Materials {
                 points: level.meshes.iter().map(|m| m.positions.clone()).collect(),
+                triangles: level
+                    .meshes
+                    .iter()
+                    .map(|m| {
+                        m.parts
+                            .iter()
+                            .flat_map(|p| p.indices.as_chunks::<3>().0.iter().copied())
+                            .collect()
+                    })
+                    .collect(),
                 of_mesh: level
                     .meshes
                     .iter()
@@ -228,6 +277,8 @@ impl Scripts {
             queue: Vec::new(),
             made: 0,
             noted_static: Vec::new(),
+            statics: BTreeMap::new(),
+            made_static: 0,
         })
     }
 }
@@ -262,6 +313,8 @@ pub struct RunView {
 struct Materials {
     /// Each mesh's vertices, for the hulls of script bodies.
     points: Vec<Vec<[f32; 3]>>,
+    /// Each mesh's triangles as vertex indices, for the fixed bodies of scripts.
+    triangles: Vec<Vec<[u32; 3]>>,
     of_mesh: Vec<Vec<usize>>,
     colours: Vec<([f32; 4], [f32; 4])>,
 }
@@ -290,6 +343,8 @@ struct ScriptsParts {
     queue: Vec<PhysCmd>,
     made: usize,
     noted_static: Vec<usize>,
+    statics: BTreeMap<usize, StaticSlot>,
+    made_static: usize,
 }
 
 impl ScriptsParts {
@@ -306,6 +361,110 @@ impl ScriptsParts {
 
 fn to_mat(m: &[[f32; 4]; 4]) -> Mat4 {
     Mat4::from_cols_array_2d(m)
+}
+
+impl SimHost<'_> {
+    /// A fixed Physicalize (Fixed = TRUE, or a concave list only): the object's mesh becomes a fixed body of the
+    /// world, in the object's frame with its scale, as the level's own floors are (docs/physics.md 2.1).
+    fn physicalize_static(&mut self, i: usize, name: &str, world: Mat4, spec: &script::PhysSpec) {
+        if spec.ball_count > 0 {
+            if !self.s.noted_static.contains(&i) && self.s.noted_static.len() < MAX_SCRIPT_STATICS {
+                self.s.noted_static.push(i);
+                self.s
+                    .note(format!("physicalizes {name} as a fixed ball (not made)"));
+            }
+            return;
+        }
+        if self.s.made_static >= MAX_SCRIPT_STATICS {
+            self.s
+                .note(format!("physicalizes {name}: too many fixed bodies"));
+            return;
+        }
+        let Some((pos, rot, scale)) = pose_of(&world) else {
+            return;
+        };
+        let Some(mesh) = self.s.ents.mesh(i) else {
+            self.s
+                .note(format!("physicalizes {name}: no mesh for a fixed body"));
+            return;
+        };
+        let points = self.s.materials.points.get(mesh);
+        let shape = if spec.convex_count > 0 {
+            let mut seen = std::collections::BTreeSet::new();
+            let mut pts: Vec<Vec3> = points
+                .map(|v| v.iter().map(|&p| Vec3::from(p) * scale).collect::<Vec<_>>())
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|p| p.is_finite() && seen.insert(p.to_array().map(f32::to_bits)))
+                .collect();
+            if pts.len() > MAX_HULL_POINTS {
+                let step = pts.len().div_ceil(MAX_HULL_POINTS);
+                pts = pts.into_iter().step_by(step).collect();
+            }
+            if pts.len() < 4 {
+                self.s
+                    .note(format!("physicalizes {name}: no mesh for a fixed body"));
+                return;
+            }
+            StaticShape::Hull(pts)
+        } else {
+            let (Some(points), Some(tris)) = (points, self.s.materials.triangles.get(mesh)) else {
+                return;
+            };
+            if tris.len() > MAX_STATIC_TRIANGLES {
+                self.s.note(format!(
+                    "physicalizes {name}: too many triangles for a fixed body"
+                ));
+                return;
+            }
+            let at = |k: u32| {
+                points
+                    .get(k as usize)
+                    .map_or(Vec3::ZERO, |&p| Vec3::from(p) * scale)
+            };
+            StaticShape::Triangles(
+                tris.iter()
+                    .map(|t| [at(t[0]), at(t[1]), at(t[2])])
+                    .collect(),
+            )
+        };
+        self.s.made_static += 1;
+        self.s.statics.insert(
+            i,
+            StaticSlot {
+                handle: None,
+                last: world,
+            },
+        );
+        self.s.queue.push(PhysCmd::Static {
+            ent: i,
+            shape,
+            friction: spec.friction,
+            elasticity: spec.elasticity,
+            group: spec.group.clone(),
+            pos,
+            rot,
+            at: world,
+        });
+    }
+}
+
+/// An object's pose as the physics takes it: the position, the rotation without the scale, and the scale.
+fn pose_of(world: &Mat4) -> Option<(Vec3, glam::Quat, Vec3)> {
+    let (x, y, z) = (
+        world.x_axis.truncate(),
+        world.y_axis.truncate(),
+        world.z_axis.truncate(),
+    );
+    let scale = Vec3::new(x.length(), y.length(), z.length());
+    let basis = glam::Mat3::from_cols(
+        x.normalize_or_zero(),
+        y.normalize_or_zero(),
+        z.normalize_or_zero(),
+    );
+    let rot = glam::Quat::from_mat3(&basis).normalize();
+    let pos = world.w_axis.truncate();
+    (pos.is_finite() && rot.is_finite() && scale.is_finite()).then_some((pos, rot, scale))
 }
 
 impl Host for SimHost<'_> {
@@ -434,8 +593,16 @@ impl Host for SimHost<'_> {
             return;
         };
         let name = self.s.name(i).to_string();
-        if !on && self.s.bodies.remove(&i).is_some() {
-            self.s.queue.push(PhysCmd::Remove { ent: i });
+        // the object's body goes: a movable or fixed one of a script, or the level's own (found when applied)
+        let slot = self.s.statics.remove(&i);
+        if !on {
+            self.s.queue.push(PhysCmd::Remove {
+                ent: i,
+                fixed: slot.as_ref().and_then(|s| s.handle),
+            });
+        }
+        let had = self.s.bodies.remove(&i).is_some() | slot.is_some();
+        if !on && had {
             self.s.note(format!("unphysicalizes {name}"));
         } else {
             self.s.note(format!(
@@ -450,7 +617,10 @@ impl Host for SimHost<'_> {
             return;
         };
         // an object already physicalized keeps its body: the original does not update it (docs/physics.md 2.1)
-        if self.s.bodies.contains_key(&i) || i >= self.s.ents.len() {
+        if self.s.bodies.contains_key(&i)
+            || self.s.statics.contains_key(&i)
+            || i >= self.s.ents.len()
+        {
             return;
         }
         let name = self.s.name(i).to_string();
@@ -460,13 +630,7 @@ impl Host for SimHost<'_> {
         if spec.fixed
             || (spec.convex_count == 0 && spec.ball_count == 0 && !spec.surface.is_empty())
         {
-            if !self.s.noted_static.contains(&i) && self.s.noted_static.len() < MAX_SCRIPT_BODIES {
-                self.s.noted_static.push(i);
-                self.s.note(format!(
-                    "physicalizes {name} as a {} body (static bodies by script not yet)",
-                    if spec.fixed { "fixed" } else { "concave" }
-                ));
-            }
+            self.physicalize_static(i, &name, world, spec);
             return;
         }
         if self.s.made >= MAX_SCRIPT_BODIES {
@@ -481,22 +645,9 @@ impl Host for SimHost<'_> {
             lin_damp: spec.lin_damp,
             rot_damp: spec.rot_damp,
         };
-        let (x, y, z) = (
-            world.x_axis.truncate(),
-            world.y_axis.truncate(),
-            world.z_axis.truncate(),
-        );
-        let scale = Vec3::new(x.length(), y.length(), z.length());
-        let basis = glam::Mat3::from_cols(
-            x.normalize_or_zero(),
-            y.normalize_or_zero(),
-            z.normalize_or_zero(),
-        );
-        let rot = glam::Quat::from_mat3(&basis).normalize();
-        let pos = world.w_axis.truncate();
-        if !(pos.is_finite() && rot.is_finite() && scale.is_finite()) {
+        let Some((pos, rot, scale)) = pose_of(&world) else {
             return;
-        }
+        };
         let pts: Vec<Vec3> = self
             .s
             .ents
@@ -940,6 +1091,14 @@ impl Scripts {
                     rot,
                     frozen,
                 } => {
+                    if world.has_baked(ent) {
+                        self.bodies.remove(&ent);
+                        note(
+                            &mut self.log,
+                            format!("{} already has the level's body", self.ents.name(ent)),
+                        );
+                        continue;
+                    }
                     let i = world.add_sphere(radius, m, pos, rot, !frozen);
                     self.bodies.insert(ent, Some(i));
                     note(
@@ -960,6 +1119,14 @@ impl Scripts {
                     collide,
                     shift,
                 } => {
+                    if world.has_baked(ent) {
+                        self.bodies.remove(&ent);
+                        note(
+                            &mut self.log,
+                            format!("{} already has the level's body", self.ents.name(ent)),
+                        );
+                        continue;
+                    }
                     match world.add_scripted_convex(&points, m, pos, rot, frozen, collide, shift) {
                         Some(i) => {
                             self.bodies.insert(ent, Some(i));
@@ -981,7 +1148,62 @@ impl Scripts {
                         }
                     }
                 }
-                PhysCmd::Remove { ent } => {
+                PhysCmd::Static {
+                    ent,
+                    shape,
+                    friction,
+                    elasticity,
+                    group,
+                    pos,
+                    rot,
+                    at,
+                } => {
+                    // the object is already a body of the level: the original does not physicalize it again
+                    if world.has_baked(ent) {
+                        self.statics.remove(&ent);
+                        note(
+                            &mut self.log,
+                            format!("{} already has the level's body", self.ents.name(ent)),
+                        );
+                        continue;
+                    }
+                    let (h, what) = match &shape {
+                        StaticShape::Triangles(t) => (
+                            world.add_static_triangles(t, pos, rot, friction, elasticity, &group),
+                            format!("{} triangles", t.len()),
+                        ),
+                        StaticShape::Hull(p) => (
+                            world.add_static_hull(p, pos, rot, friction, elasticity, &group),
+                            format!("a hull of {} points", p.len()),
+                        ),
+                    };
+                    match h {
+                        Some(h) => {
+                            self.statics.insert(
+                                ent,
+                                StaticSlot {
+                                    handle: Some(h),
+                                    last: at,
+                                },
+                            );
+                            note(
+                                &mut self.log,
+                                format!("{} is a fixed body of {what}", self.ents.name(ent)),
+                            );
+                        }
+                        None => {
+                            self.statics.remove(&ent);
+                            note(
+                                &mut self.log,
+                                format!(
+                                    "{} has no usable mesh for a fixed body",
+                                    self.ents.name(ent)
+                                ),
+                            );
+                        }
+                    }
+                }
+                PhysCmd::Remove { ent, fixed } => {
                     // a body made and removed in one tick was never in the world
                     if let Some(Some(i)) = self.bodies.get(&ent).copied() {
                         world.remove(i);
@@ -992,6 +1214,20 @@ impl Scripts {
                         self.forces.remove(&k);
                     }
                     self.bodies.remove(&ent);
+                    if let Some(h) = fixed {
+                        world.remove_static(h);
+                    }
+                    if let Some(slot) = self.statics.remove(&ent)
+                        && let Some(h) = slot.handle
+                    {
+                        world.remove_static(h);
+                    }
+                    if world.remove_baked(ent) {
+                        note(
+                            &mut self.log,
+                            format!("{} loses the level's body", self.ents.name(ent)),
+                        );
+                    }
                 }
                 PhysCmd::Force {
                     ent,
@@ -1023,6 +1259,23 @@ impl Scripts {
                         world.wake(i);
                     }
                 }
+            }
+        }
+        self.follow_statics(world);
+    }
+
+    /// Fixed bodies follow their objects: one whose object a script moved is put at the new place.
+    fn follow_statics(&mut self, world: &mut crate::physics::World) {
+        for (&ent, slot) in self.statics.iter_mut() {
+            let (Some(h), Some(cur)) = (slot.handle, self.ents.world(ent)) else {
+                continue;
+            };
+            let bits = |m: &Mat4| m.to_cols_array().map(f32::to_bits);
+            if bits(&cur) != bits(&slot.last) {
+                if let Some((pos, rot, _)) = pose_of(&cur) {
+                    world.move_static(h, pos, rot);
+                }
+                slot.last = cur;
             }
         }
     }
@@ -1065,6 +1318,8 @@ impl Scripts {
             queue: std::mem::take(&mut self.queue),
             made: self.made,
             noted_static: std::mem::take(&mut self.noted_static),
+            statics: std::mem::take(&mut self.statics),
+            made_static: self.made_static,
         };
         {
             let mut host = SimHost { s: &mut parts, run };
@@ -1082,6 +1337,8 @@ impl Scripts {
         self.queue = parts.queue;
         self.made = parts.made;
         self.noted_static = parts.noted_static;
+        self.statics = parts.statics;
+        self.made_static = parts.made_static;
         if run.teleport.is_some() {
             self.teleports = self.teleports.saturating_add(1);
         }
@@ -1168,6 +1425,8 @@ mod facade_tests {
                 queue: Vec::new(),
                 made: 0,
                 noted_static: Vec::new(),
+                statics: BTreeMap::new(),
+                made_static: 0,
             };
             f(&mut SimHost {
                 s: &mut parts,
@@ -1254,6 +1513,46 @@ mod body_tests {
                 }
             }
         }
+        // twelve triangles, outward facing (a vertex's index is its bits x, y, z: 1 for +1)
+        let mut idx = Vec::new();
+        let v = |k: u32| {
+            Vec3::new(
+                if k & 4 != 0 { 1.0 } else { -1.0 },
+                if k & 2 != 0 { 1.0 } else { -1.0 },
+                if k & 1 != 0 { 1.0 } else { -1.0 },
+            )
+        };
+        for axis in 0..3u32 {
+            for side in [0u32, 1] {
+                let bit = 4 >> axis;
+                let face: Vec<u32> = (0..8u32)
+                    .filter(|k| (k & bit != 0) == (side == 1))
+                    .collect();
+                // the face's corners in a ring: sorted by angle around its centre is overkill; the 4 corners'
+                // two diagonals are (0,3) and (1,2) of the sorted list
+                for tri in [[face[0], face[1], face[3]], [face[0], face[3], face[2]]] {
+                    let (a, b, c) = (v(tri[0]), v(tri[1]), v(tri[2]));
+                    let n = (b - a).cross(c - a);
+                    let want = if side == 1 { 1.0 } else { -1.0 };
+                    let dir = if axis == 0 {
+                        n.x
+                    } else if axis == 1 {
+                        n.y
+                    } else {
+                        n.z
+                    };
+                    if dir * want > 0.0 {
+                        idx.extend_from_slice(&tri);
+                    } else {
+                        idx.extend_from_slice(&[tri[0], tri[2], tri[1]]);
+                    }
+                }
+            }
+        }
+        mesh.parts.push(level::Part {
+            material: None,
+            indices: idx,
+        });
         let mut g = script::Graph::default();
         let mut level = Level::default();
         level.meshes.push(mesh);
@@ -1393,15 +1692,174 @@ mod body_tests {
         }
         assert_eq!(s.made, MAX_SCRIPT_BODIES);
         assert_eq!(s.bodies.len(), MAX_SCRIPT_BODIES);
-        // a fixed body is only reported, once
-        let mut s = scripts(1);
-        let sp = script::PhysSpec {
+    }
+
+    fn fixed_spec() -> script::PhysSpec {
+        script::PhysSpec {
             fixed: true,
+            convex_count: 0,
+            concave_count: 1,
             ..spec()
-        };
-        physicalize(&mut s, 0, &sp);
-        physicalize(&mut s, 0, &sp);
-        assert!(s.bodies.is_empty() && s.queue.is_empty());
-        assert_eq!(s.log.iter().filter(|l| l.1.contains("fixed")).count(), 1);
+        }
+    }
+
+    fn unphysicalize(s: &mut Scripts, k: usize) {
+        s.with_host(&mut view(), |_, h| h.physicalize(Ent::Object(k), false));
+    }
+
+    /// A ball above the cube at x = 0 (the cube's top is at y = 6).
+    fn ball_above(w: &mut World) -> usize {
+        w.add_sphere(
+            1.0,
+            crate::physics::Material {
+                friction: 0.7,
+                elasticity: 0.3,
+                mass: 1.0,
+                lin_damp: 0.1,
+                rot_damp: 0.1,
+            },
+            Vec3::new(0.0, 12.0, 0.0),
+            glam::Quat::IDENTITY,
+            true,
+        )
+    }
+
+    fn ball_y(w: &World, b: usize) -> f32 {
+        w.state(b).expect("ball").pos.y
+    }
+
+    #[test]
+    fn a_fixed_box_by_script_stops_the_ball_and_unphysicalize_lets_it_fall() {
+        let mut s = scripts(1);
+        let mut w = World::new(&[]);
+        let b = ball_above(&mut w);
+        physicalize(&mut s, 0, &fixed_spec());
+        run(&mut s, &mut w, 180);
+        let y = ball_y(&w, b);
+        assert!((y - 7.0).abs() < 0.3, "rests on the box at y = {y}");
+        assert!(
+            !w.floor_near(Vec3::new(0.0, 6.0, 0.0), 3.0).is_empty(),
+            "the ball's floor lookup sees it"
+        );
+        unphysicalize(&mut s, 0);
+        // a body at rest sleeps on (the physics forgets the contacts of the body that goes but wakes nobody; the
+        // original is the same, and its scripts wake bodies themselves)
+        w.wake(b);
+        run(&mut s, &mut w, 120);
+        assert!(
+            ball_y(&w, b) < -10.0,
+            "falls through, y = {}",
+            ball_y(&w, b)
+        );
+        assert!(w.floor_near(Vec3::new(0.0, 6.0, 0.0), 3.0).is_empty());
+        assert!(s.statics.is_empty());
+    }
+
+    #[test]
+    fn a_fixed_hull_by_script_stops_the_ball_too() {
+        let mut s = scripts(1);
+        let mut w = World::new(&[]);
+        let b = ball_above(&mut w);
+        physicalize(
+            &mut s,
+            0,
+            &script::PhysSpec {
+                fixed: true,
+                ..spec()
+            },
+        );
+        run(&mut s, &mut w, 180);
+        assert!((ball_y(&w, b) - 7.0).abs() < 0.3);
+    }
+
+    #[test]
+    fn a_fixed_body_follows_its_moved_object() {
+        let mut s = scripts(1);
+        let mut w = World::new(&[]);
+        let b = ball_above(&mut w);
+        physicalize(&mut s, 0, &fixed_spec());
+        run(&mut s, &mut w, 1);
+        let h = s.statics[&0].handle.expect("made");
+        assert_eq!(w.static_pose(h).expect("pose").0, Vec3::new(0.0, 5.0, 0.0));
+        s.ents
+            .set_world(0, Mat4::from_translation(Vec3::new(50.0, 5.0, 0.0)));
+        run(&mut s, &mut w, 1);
+        let h = s.statics[&0].handle.expect("still there");
+        assert_eq!(w.static_pose(h).expect("pose").0, Vec3::new(50.0, 5.0, 0.0));
+        // the ball no longer has it below: it falls through
+        run(&mut s, &mut w, 120);
+        assert!(ball_y(&w, b) < -10.0);
+        assert!(!w.floor_near(Vec3::new(50.0, 6.0, 0.0), 3.0).is_empty());
+        assert!(w.floor_near(Vec3::new(0.0, 6.0, 0.0), 3.0).is_empty());
+    }
+
+    #[test]
+    fn a_cloned_run_gives_the_same_world_and_rewind_restores_it() {
+        let mut s = scripts(2);
+        let mut w = World::new(&[]);
+        let b = ball_above(&mut w);
+        physicalize(&mut s, 0, &fixed_spec());
+        run(&mut s, &mut w, 30);
+        let (s0, w0) = (s.clone(), w.clone());
+        unphysicalize(&mut s, 0);
+        physicalize(&mut s, 1, &fixed_spec());
+        run(&mut s, &mut w, 100);
+        // the copy taken earlier, run the same way, ends the same
+        let (mut s1, mut w1) = (s0.clone(), w0.clone());
+        unphysicalize(&mut s1, 0);
+        physicalize(&mut s1, 1, &fixed_spec());
+        run(&mut s1, &mut w1, 100);
+        assert_eq!(ball_y(&w, b).to_bits(), ball_y(&w1, b).to_bits());
+        assert_eq!(w.static_count(), w1.static_count());
+        // and the saved copy still has the box
+        let (mut s2, mut w2) = (s0, w0);
+        run(&mut s2, &mut w2, 100);
+        assert!(
+            (ball_y(&w2, b) - 7.0).abs() < 0.3,
+            "the rewound run still stands on it"
+        );
+    }
+
+    #[test]
+    fn an_object_with_the_levels_body_gets_no_second_one_and_unphysicalize_removes_it() {
+        let mut s = scripts(2);
+        let level_floor = floor();
+        let mut w = World::new(&level_floor);
+        w.tag_baked(&[0]);
+        let n = w.static_count();
+        physicalize(&mut s, 0, &fixed_spec());
+        physicalize(&mut s, 1, &spec());
+        s.apply_physics(&mut w, 0);
+        // the movable one of object 1 is made; object 0 keeps the level's body, nothing is added for it
+        assert_eq!(w.static_count(), n);
+        assert!(s.statics.is_empty());
+        physicalize(&mut s, 0, &spec());
+        s.apply_physics(&mut w, 0);
+        assert!(!s.bodies.contains_key(&0));
+        unphysicalize(&mut s, 0);
+        s.apply_physics(&mut w, 0);
+        assert_eq!(w.static_count(), n - 1);
+        assert!(!w.has_baked(0));
+    }
+
+    #[test]
+    fn a_world_without_script_statics_is_the_baked_world() {
+        let a = World::new(&floor());
+        let mut b = World::new(&floor());
+        b.tag_baked(&[0]);
+        assert_eq!(a.static_count(), b.static_count());
+        let na = a.floor_near(Vec3::new(0.0, 0.0, 0.0), 50.0);
+        let nb = b.floor_near(Vec3::new(0.0, 0.0, 0.0), 50.0);
+        assert_eq!(na, nb);
+    }
+
+    #[test]
+    fn fixed_bodies_are_capped() {
+        let mut s = scripts(MAX_SCRIPT_STATICS + 5);
+        for k in 0..MAX_SCRIPT_STATICS + 5 {
+            physicalize(&mut s, k, &fixed_spec());
+        }
+        assert_eq!(s.statics.len(), MAX_SCRIPT_STATICS);
+        assert_eq!(s.made, 0);
     }
 }

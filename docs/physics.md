@@ -344,12 +344,37 @@ Features the content never uses:
 - The collision group string is read but not applied to script bodies yet (the world's groups are static strings).
 - Each tick after the physics step the object's matrix is the body's pose, orthonormal (the scale lives in the
   geometry), as the write-back of 3.1. Unphysicalize removes the body and leaves the object where it was.
-- A second Physicalize on a physicalized object changes nothing (as above). Fixed bodies and concave-only bodies
-  are not made yet: reported once in the log.
+- A second Physicalize on a physicalized object changes nothing (as above).
 - SetPhysicsForce and Physics Impulse take their vectors to world through the referentials (a direction of squared
   length <= 1e-4 is +X for the force), the force being a world vector at a world point; a force does nothing to a
   sleeping body, so scripts wake it (Physics WakeUp) first. A force or impulse on an object without a script body
   is ignored. Limits per run: 256 script bodies, 1024 hull points (a larger mesh is sampled evenly).
+
+**Fixed bodies by script (our runtime, 2026-11-12).**
+
+- Physicalize with Fixed = TRUE, or with a concave list only (no convex, no ball), makes a fixed body: a concave one
+  from the object's mesh triangles in its own frame, the scale baked in, at the object's pose without the scale; with
+  a convex list and Fixed = TRUE, the hull of the mesh's points. Friction, elasticity and the group name are the
+  block's. A fixed ball is not made (reported once). The body is in the world and in the ball's floor lookup from the
+  same tick (the run applies the scripts' requests after they ran and before the step).
+- Unphysicalize removes the object's body of any kind and the ball's floor lookup stops seeing it. A body at rest
+  does not wake when a body it rests on is removed (IVP forgets the contacts and wakes nobody; the original is the
+  same), so a script wakes it (Physics WakeUp). Our wrapper has no separate "Delete Collision Surfaces" block; it is
+  this Unphysicalize.
+- A script that moves an object with a fixed body (Set Position, Translate, any block that sets its matrix) moves the
+  body: each tick the run compares the object's matrix with the one the body was placed by and, if it differs, makes
+  the body again at the new pose (same slot in the order of the statics). The scale is the one at the Physicalize.
+  Bodies are not moved by the physics, so the object is never written back for them. A body that is moved by a
+  script does not push anything: contacts are recomputed, nothing is swept.
+- **Double bodies.** A level object that is already one of the level's baked fixed bodies (floors, rails, stoppers,
+  game modules: `World::new`, tagged by object row with `tag_baked`) gets no second body from a Physicalize, fixed or
+  movable: the script's request is skipped and logged ("already has the level's body"). Reason: in the original a
+  level object is in the physics only because something physicalized it (the base scripts' `Physicalize_Floors`
+  etc.), and a second Physicalize on a physicalized object changes nothing (above); the baked body is that first
+  one. Its Unphysicalize removes the baked body.
+- Limits per run: 1024 fixed bodies by script, 65536 triangles per body (a bigger mesh makes none), 1024 hull points.
+  Bodies made by script are part of the run's state: the world and the script state clone and rewind together, the
+  slots are never reused, and every walk is in object-row order.
 
 ### 2.2 SetPhysicsForce
 

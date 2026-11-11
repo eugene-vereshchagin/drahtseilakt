@@ -979,7 +979,8 @@ impl Sim {
         let not_solid: Vec<usize> = (0..level.objects.len())
             .filter(|&i| loaded(i).is_some())
             .collect();
-        let statics = static_meshes(level, &not_solid);
+        let (static_rows, statics): (Vec<usize>, Vec<StaticMesh>) =
+            static_objects(level, &not_solid).into_iter().unzip();
         let pos = |name: &str| -> Vec<(usize, Vec3)> {
             level
                 .members(name)
@@ -1069,6 +1070,7 @@ impl Sim {
             on_ground: false,
         };
         let mut world = World::new(&statics);
+        world.tag_baked(&static_rows);
         // Body 0 is the ball; it is made after the first sector's objects (below).
         let ball_body = world.reserve_ball(ball.position, ball.rotation);
         debug_assert_eq!(ball_body, 0);
@@ -2961,13 +2963,6 @@ fn sound_ids(level: &Level, i: usize) -> crate::physics::SoundIds {
         hit: id("Sound_HitID_"),
         roll: id("Sound_RollID_"),
     }
-}
-
-fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
-    static_objects(level, made)
-        .into_iter()
-        .map(|s| s.1)
-        .collect()
 }
 
 /// The level's fixed bodies with the level object each is made of (the audit names them).
