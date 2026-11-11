@@ -708,7 +708,10 @@ impl Runtime {
                 .get(s)
                 .is_some_and(|b| b.active && !b.gone && b.ran_inline != tick);
             if runs && self.awake(owner) {
+                // the running script counts as running inside this frame: an Execute Script of itself is refused
+                self.inline.push(s);
                 let keep = self.execute(s, host, 0);
+                self.inline.pop();
                 if let Some(st) = self.blocks.get_mut(s) {
                     st.active = keep;
                 }

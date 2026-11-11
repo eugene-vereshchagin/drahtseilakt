@@ -636,7 +636,7 @@ pub(crate) fn iterator(
 
 pub(crate) fn group_iterator(
     rt: &mut Runtime,
-    _id: Id,
+    id: Id,
     b: &Block,
     proto: Guid,
     host: &mut dyn Host,
@@ -674,11 +674,17 @@ pub(crate) fn group_iterator(
     // The index lives where the original keeps it: in output parameter 1 (Index) when the block has one, else in
     // local 0, so it survives as theirs does and other readers see it.
     let slot = b.pouts.get(1).or_else(|| b.locals.first()).copied();
+    // a block with neither keeps its index in its scratch, so a loop still walks the members
     let i = if start {
         0
     } else {
-        slot.and_then(|p| rt.values.get(p))
-            .map_or(0, |v| v.as_int().saturating_add(1))
+        match slot {
+            Some(p) => rt.values.get(p).map_or(0, |v| v.as_int().saturating_add(1)),
+            None => match rt.scratch(id) {
+                Scratch::Index(k) => i32::try_from(*k).unwrap_or(i32::MAX - 1).saturating_add(1),
+                _ => 0,
+            },
+        }
     };
     match usize::try_from(i)
         .ok()
@@ -686,8 +692,9 @@ pub(crate) fn group_iterator(
     {
         Some(m) => {
             set_pout(rt, b, "Element", 0, Value::Obj(Some(m)));
-            if let Some(p) = slot {
-                rt.write(p, Value::Int(i));
+            match slot {
+                Some(p) => rt.write(p, Value::Int(i)),
+                None => rt.set_scratch(id, Scratch::Index(i64::from(i))),
             }
             out(rt, b, 1);
         }
