@@ -46,6 +46,63 @@ pub struct Scripts {
     /// The planar/spherical particle emitters the map's blocks run now, by block (particles.rs draws them; they
     /// rewind and restart with the run, and never reach it).
     pub emitters: BTreeMap<usize, EmitterView>,
+    /// The movable bodies scripts made (docs/physics.md 2.1): entity row -> the world's body (none while the body's
+    /// command is queued). A BTreeMap, so every walk over it is in row order, never in hash order.
+    pub bodies: BTreeMap<usize, Option<usize>>,
+    /// The forces scripts made: (entity row, block) -> the world's force.
+    forces: BTreeMap<(usize, usize), usize>,
+    /// What the scripts asked of the physics this tick, in graph order; the run applies it (`apply_physics`).
+    queue: Vec<PhysCmd>,
+    /// Bodies made by scripts so far (slots in the world are never reused, so this bounds them).
+    made: usize,
+    /// Rows whose fixed or concave Physicalize was already reported.
+    noted_static: Vec<usize>,
+}
+
+/// The most movable bodies the scripts of one run make.
+pub const MAX_SCRIPT_BODIES: usize = 256;
+/// The most distinct vertices a script body's hull is made from (a larger mesh is sampled evenly).
+pub const MAX_HULL_POINTS: usize = 1_024;
+
+/// A request of the scripts to the physics world.
+#[derive(Clone, Debug)]
+pub enum PhysCmd {
+    Ball {
+        ent: usize,
+        radius: f32,
+        m: crate::physics::Material,
+        pos: Vec3,
+        rot: glam::Quat,
+        frozen: bool,
+    },
+    Convex {
+        ent: usize,
+        points: Vec<Vec3>,
+        m: crate::physics::Material,
+        pos: Vec3,
+        rot: glam::Quat,
+        frozen: bool,
+        collide: bool,
+        shift: Option<[f32; 3]>,
+    },
+    Remove {
+        ent: usize,
+    },
+    Force {
+        ent: usize,
+        key: usize,
+        create: bool,
+        at: Vec3,
+        force: Vec3,
+    },
+    Impulse {
+        ent: usize,
+        at: Vec3,
+        impulse: Vec3,
+    },
+    Wake {
+        ent: usize,
+    },
 }
 
 /// One script emitter: where it is and what its block says.
@@ -140,6 +197,7 @@ impl Scripts {
             ents: Entities::new(level),
             groups: level.groups.iter().map(|g| g.members.clone()).collect(),
             materials: std::sync::Arc::new(Materials {
+                points: level.meshes.iter().map(|m| m.positions.clone()).collect(),
                 of_mesh: level
                     .meshes
                     .iter()
@@ -165,6 +223,11 @@ impl Scripts {
             left_sector: 0,
             written: BTreeMap::new(),
             emitters: BTreeMap::new(),
+            bodies: BTreeMap::new(),
+            forces: BTreeMap::new(),
+            queue: Vec::new(),
+            made: 0,
+            noted_static: Vec::new(),
         })
     }
 }
@@ -197,6 +260,8 @@ pub struct RunView {
 /// The level's materials as the operations read them.
 #[derive(Debug, Default)]
 struct Materials {
+    /// Each mesh's vertices, for the hulls of script bodies.
+    points: Vec<Vec<[f32; 3]>>,
     of_mesh: Vec<Vec<usize>>,
     colours: Vec<([f32; 4], [f32; 4])>,
 }
@@ -221,6 +286,10 @@ struct ScriptsParts {
     left_sector: usize,
     written: BTreeMap<(String, usize, usize), Value>,
     emitters: BTreeMap<usize, EmitterView>,
+    bodies: BTreeMap<usize, Option<usize>>,
+    queue: Vec<PhysCmd>,
+    made: usize,
+    noted_static: Vec<usize>,
 }
 
 impl ScriptsParts {
@@ -360,13 +429,166 @@ impl Host for SimHost<'_> {
     }
 
     fn physicalize(&mut self, e: Ent, on: bool) {
-        // The ball is always in the physics here; other objects' physics by script come with phase 2.
-        if let Ent::Object(i) = e {
-            let name = self.s.name(i).to_string();
+        // Unphysicalize: a body a script made goes out of the world (the ball is always in it).
+        let Ent::Object(i) = e else {
+            return;
+        };
+        let name = self.s.name(i).to_string();
+        if !on && self.s.bodies.remove(&i).is_some() {
+            self.s.queue.push(PhysCmd::Remove { ent: i });
+            self.s.note(format!("unphysicalizes {name}"));
+        } else {
             self.s.note(format!(
-                "{} {name} (physics by script not yet)",
+                "{} {name} (no body of a script)",
                 if on { "physicalizes" } else { "unphysicalizes" }
             ));
+        }
+    }
+
+    fn physicalize_body(&mut self, e: Ent, _key: usize, spec: &script::PhysSpec) {
+        let Ent::Object(i) = e else {
+            return;
+        };
+        // an object already physicalized keeps its body: the original does not update it (docs/physics.md 2.1)
+        if self.s.bodies.contains_key(&i) || i >= self.s.ents.len() {
+            return;
+        }
+        let name = self.s.name(i).to_string();
+        let Some(world) = self.s.ents.world(i) else {
+            return;
+        };
+        if spec.fixed
+            || (spec.convex_count == 0 && spec.ball_count == 0 && !spec.surface.is_empty())
+        {
+            if !self.s.noted_static.contains(&i) && self.s.noted_static.len() < MAX_SCRIPT_BODIES {
+                self.s.noted_static.push(i);
+                self.s.note(format!(
+                    "physicalizes {name} as a {} body (static bodies by script not yet)",
+                    if spec.fixed { "fixed" } else { "concave" }
+                ));
+            }
+            return;
+        }
+        if self.s.made >= MAX_SCRIPT_BODIES {
+            self.s
+                .note(format!("physicalizes {name}: too many script bodies"));
+            return;
+        }
+        let m = crate::physics::Material {
+            friction: spec.friction,
+            elasticity: spec.elasticity,
+            mass: if spec.mass < 1e-8 { 1.0 } else { spec.mass },
+            lin_damp: spec.lin_damp,
+            rot_damp: spec.rot_damp,
+        };
+        let (x, y, z) = (
+            world.x_axis.truncate(),
+            world.y_axis.truncate(),
+            world.z_axis.truncate(),
+        );
+        let scale = Vec3::new(x.length(), y.length(), z.length());
+        let basis = glam::Mat3::from_cols(
+            x.normalize_or_zero(),
+            y.normalize_or_zero(),
+            z.normalize_or_zero(),
+        );
+        let rot = glam::Quat::from_mat3(&basis).normalize();
+        let pos = world.w_axis.truncate();
+        if !(pos.is_finite() && rot.is_finite() && scale.is_finite()) {
+            return;
+        }
+        let pts: Vec<Vec3> = self
+            .s
+            .ents
+            .mesh(i)
+            .and_then(|k| self.s.materials.points.get(k))
+            .map(|v| v.iter().map(|&p| Vec3::from(p) * scale).collect())
+            .unwrap_or_default();
+        let cmd = if spec.ball_count > 0 || spec.surface.is_empty() {
+            // the radius pin; a block that has none gets the mesh's half extent
+            let radius = spec.radius.unwrap_or_else(|| {
+                let (lo, hi) = pts.iter().fold(
+                    (Vec3::splat(f32::INFINITY), Vec3::splat(f32::NEG_INFINITY)),
+                    |(lo, hi), &p| (lo.min(p), hi.max(p)),
+                );
+                (hi - lo).max_element() * 0.5
+            });
+            if !(radius.is_finite() && radius > 0.0) {
+                self.s
+                    .note(format!("physicalizes {name}: no usable radius"));
+                return;
+            }
+            PhysCmd::Ball {
+                ent: i,
+                radius,
+                m,
+                pos,
+                rot,
+                frozen: spec.start_frozen,
+            }
+        } else {
+            // exact duplicates out, in a fixed order; a very large mesh is sampled evenly
+            let mut seen = std::collections::BTreeSet::new();
+            let mut points: Vec<Vec3> = pts
+                .into_iter()
+                .filter(|p| p.is_finite() && seen.insert(p.to_array().map(f32::to_bits)))
+                .collect();
+            if points.len() > MAX_HULL_POINTS {
+                let step = points.len().div_ceil(MAX_HULL_POINTS);
+                points = points.into_iter().step_by(step).collect();
+            }
+            if points.len() < 4 {
+                self.s
+                    .note(format!("physicalizes {name}: no mesh for a body"));
+                return;
+            }
+            PhysCmd::Convex {
+                ent: i,
+                points,
+                m,
+                pos,
+                rot,
+                frozen: spec.start_frozen,
+                collide: spec.collide,
+                shift: (!spec.auto_centre).then_some(spec.shift),
+            }
+        };
+        self.s.made += 1;
+        self.s.bodies.insert(i, None);
+        self.s.queue.push(cmd);
+    }
+
+    fn physics_force(&mut self, e: Ent, key: usize, create: bool, at: [f32; 3], force: [f32; 3]) {
+        if let Ent::Object(ent) = e
+            && self.s.bodies.contains_key(&ent)
+        {
+            self.s.queue.push(PhysCmd::Force {
+                ent,
+                key,
+                create,
+                at: Vec3::from(at),
+                force: Vec3::from(force),
+            });
+        }
+    }
+
+    fn physics_impulse(&mut self, e: Ent, at: [f32; 3], impulse: [f32; 3]) {
+        if let Ent::Object(ent) = e
+            && self.s.bodies.contains_key(&ent)
+        {
+            self.s.queue.push(PhysCmd::Impulse {
+                ent,
+                at: Vec3::from(at),
+                impulse: Vec3::from(impulse),
+            });
+        }
+    }
+
+    fn physics_wake(&mut self, e: Ent) {
+        if let Ent::Object(ent) = e
+            && self.s.bodies.contains_key(&ent)
+        {
+            self.s.queue.push(PhysCmd::Wake { ent });
         }
     }
 
@@ -700,8 +922,131 @@ impl Scripts {
         self.ents.world(i)
     }
 
+    /// Applies what the scripts asked of the physics this tick, in the order they asked (the run calls it after
+    /// `tick`, before the physics step).
+    pub fn apply_physics(&mut self, world: &mut crate::physics::World, tick: u64) {
+        let note = |log: &mut Vec<(u64, String)>, t: String| {
+            if log.len() < LOG_CAP {
+                log.push((tick, t));
+            }
+        };
+        for cmd in std::mem::take(&mut self.queue) {
+            match cmd {
+                PhysCmd::Ball {
+                    ent,
+                    radius,
+                    m,
+                    pos,
+                    rot,
+                    frozen,
+                } => {
+                    let i = world.add_sphere(radius, m, pos, rot, !frozen);
+                    self.bodies.insert(ent, Some(i));
+                    note(
+                        &mut self.log,
+                        format!(
+                            "{} is a ball body of radius {radius:.2}",
+                            self.ents.name(ent)
+                        ),
+                    );
+                }
+                PhysCmd::Convex {
+                    ent,
+                    points,
+                    m,
+                    pos,
+                    rot,
+                    frozen,
+                    collide,
+                    shift,
+                } => {
+                    match world.add_scripted_convex(&points, m, pos, rot, frozen, collide, shift) {
+                        Some(i) => {
+                            self.bodies.insert(ent, Some(i));
+                            note(
+                                &mut self.log,
+                                format!(
+                                    "{} is a convex body of {} points",
+                                    self.ents.name(ent),
+                                    points.len()
+                                ),
+                            );
+                        }
+                        None => {
+                            self.bodies.remove(&ent);
+                            note(
+                                &mut self.log,
+                                format!("{} has no hull for a body", self.ents.name(ent)),
+                            );
+                        }
+                    }
+                }
+                PhysCmd::Remove { ent } => {
+                    // a body made and removed in one tick was never in the world
+                    if let Some(Some(i)) = self.bodies.get(&ent).copied() {
+                        world.remove(i);
+                    }
+                    let gone: Vec<(usize, usize)> =
+                        self.forces.keys().filter(|k| k.0 == ent).copied().collect();
+                    for k in gone {
+                        self.forces.remove(&k);
+                    }
+                    self.bodies.remove(&ent);
+                }
+                PhysCmd::Force {
+                    ent,
+                    key,
+                    create,
+                    at,
+                    force,
+                } => {
+                    let Some(Some(i)) = self.bodies.get(&ent).copied() else {
+                        continue;
+                    };
+                    if create {
+                        if !self.forces.contains_key(&(ent, key))
+                            && let Some(c) = world.add_force(i, force, at)
+                        {
+                            self.forces.insert((ent, key), c);
+                        }
+                    } else if let Some(c) = self.forces.remove(&(ent, key)) {
+                        world.remove_force(c);
+                    }
+                }
+                PhysCmd::Impulse { ent, at, impulse } => {
+                    if let Some(Some(i)) = self.bodies.get(&ent).copied() {
+                        world.impulse_at(i, at, impulse);
+                    }
+                }
+                PhysCmd::Wake { ent } => {
+                    if let Some(Some(i)) = self.bodies.get(&ent).copied() {
+                        world.wake(i);
+                    }
+                }
+            }
+        }
+    }
+
+    /// After the physics step: each script body's object takes the body's pose (the original writes the poses back
+    /// every frame and never reads them; its matrix is orthonormal, the scale lives in the geometry only).
+    pub fn sync_physics(&mut self, world: &crate::physics::World) {
+        for (&ent, &body) in &self.bodies {
+            if let Some(i) = body
+                && let Some(s) = world.state(i)
+            {
+                self.ents
+                    .set_world(ent, Mat4::from_rotation_translation(s.rot, s.pos));
+            }
+        }
+    }
+
     pub fn tick(&mut self, run: &mut RunView) {
         self.emit_events(run);
+        self.with_host(run, |rt, host| rt.tick(host));
+    }
+
+    /// Runs `f` with the runtime and the engine's side of it (the parts of `self` are lent to the host meanwhile).
+    fn with_host(&mut self, run: &mut RunView, f: impl FnOnce(&mut Runtime, &mut SimHost<'_>)) {
         let mut parts = ScriptsParts {
             ents: std::mem::take(&mut self.ents),
             groups: std::mem::take(&mut self.groups),
@@ -716,10 +1061,14 @@ impl Scripts {
             left_sector: self.left_sector,
             written: std::mem::take(&mut self.written),
             emitters: std::mem::take(&mut self.emitters),
+            bodies: std::mem::take(&mut self.bodies),
+            queue: std::mem::take(&mut self.queue),
+            made: self.made,
+            noted_static: std::mem::take(&mut self.noted_static),
         };
         {
             let mut host = SimHost { s: &mut parts, run };
-            self.rt.tick(&mut host);
+            f(&mut self.rt, &mut host);
         }
         self.ents = parts.ents;
         self.groups = parts.groups;
@@ -729,6 +1078,10 @@ impl Scripts {
         self.text = parts.text;
         self.written = parts.written;
         self.emitters = parts.emitters;
+        self.bodies = parts.bodies;
+        self.queue = parts.queue;
+        self.made = parts.made;
+        self.noted_static = parts.noted_static;
         if run.teleport.is_some() {
             self.teleports = self.teleports.saturating_add(1);
         }
@@ -811,6 +1164,10 @@ mod facade_tests {
                 left_sector: 0,
                 written: std::mem::take(&mut s.written),
                 emitters: Default::default(),
+                bodies: Default::default(),
+                queue: Vec::new(),
+                made: 0,
+                noted_static: Vec::new(),
             };
             f(&mut SimHost {
                 s: &mut parts,
@@ -830,5 +1187,221 @@ mod facade_tests {
         });
         // the run's own number is untouched
         assert_eq!(s.ball_objs[0], s.rt.graph.find("Ball_Wood"));
+    }
+}
+
+#[cfg(test)]
+mod body_tests {
+    // Physicalize by script (docs/physics.md 2.1, 2.2, 2.5, 2.8): movable bodies made through the host and the world.
+    use super::*;
+    use crate::collide::{StaticMesh, Triangle};
+    use crate::physics::{GROUP_FLOOR, SoundIds, World};
+
+    fn spec() -> script::PhysSpec {
+        script::PhysSpec {
+            fixed: false,
+            friction: 0.7,
+            elasticity: 0.3,
+            mass: 1.0,
+            group: String::new(),
+            start_frozen: false,
+            collide: true,
+            auto_centre: true,
+            shift: [0.0; 3],
+            lin_damp: 0.1,
+            rot_damp: 0.1,
+            surface: "box".into(),
+            convex_count: 1,
+            ball_count: 0,
+            concave_count: 0,
+            radius: None,
+        }
+    }
+
+    fn floor() -> Vec<StaticMesh> {
+        let s = 100.0;
+        let p = [
+            Vec3::new(-s, 0.0, -s),
+            Vec3::new(s, 0.0, -s),
+            Vec3::new(s, 0.0, s),
+            Vec3::new(-s, 0.0, s),
+        ];
+        let tri = |a, b, c| Triangle { a, b, c };
+        vec![StaticMesh {
+            triangles: vec![tri(p[0], p[2], p[1]), tri(p[0], p[3], p[2])],
+            pos: Vec3::ZERO,
+            rot: glam::Quat::IDENTITY.into(),
+            group: GROUP_FLOOR,
+            sound: SoundIds::default(),
+        }]
+    }
+
+    /// A level with `n` objects, each a 2-unit cube at height 5 (object k at x = 10 k).
+    fn scripts(n: usize) -> Scripts {
+        let mut mesh = level::Mesh {
+            name: "cube".into(),
+            positions: Vec::new(),
+            normals: Vec::new(),
+            uvs: Vec::new(),
+            parts: Vec::new(),
+            channels: Vec::new(),
+            look: None,
+        };
+        for x in [-1.0, 1.0] {
+            for y in [-1.0, 1.0] {
+                for z in [-1.0, 1.0] {
+                    mesh.positions.push([x, y, z]);
+                }
+            }
+        }
+        let mut g = script::Graph::default();
+        let mut level = Level::default();
+        level.meshes.push(mesh);
+        for k in 0..n {
+            let name = format!("Box{k}");
+            g.add_object(&name, script::ObjKind::Entity(k));
+            level.objects.push(level::Object {
+                name,
+                matrix: Mat4::from_translation(Vec3::new(10.0 * k as f32, 5.0, 0.0))
+                    .to_cols_array_2d(),
+                mesh: Some(0),
+                visible: true,
+                sprite: None,
+                parent: None,
+            });
+        }
+        level.scripts = Some(std::sync::Arc::new(g));
+        Scripts::new(&level).expect("a graph")
+    }
+
+    fn view() -> RunView {
+        RunView {
+            tick: 0,
+            ball: Vec3::ZERO,
+            ball_radius: 1.0,
+            points: 0,
+            in_play: true,
+            teleport: None,
+            input: script::InputFrame::default(),
+            input_before: script::InputFrame::default(),
+            lives: 3,
+            sector: 1,
+            kind: crate::sim::BallKind::Wood,
+            finished: false,
+            cursor: None,
+            eye: Vec3::ZERO,
+            target: Vec3::Z,
+        }
+    }
+
+    fn physicalize(s: &mut Scripts, k: usize, sp: &script::PhysSpec) {
+        s.with_host(&mut view(), |_, h| {
+            h.physicalize_body(Ent::Object(k), 0, sp)
+        });
+    }
+
+    fn run(s: &mut Scripts, w: &mut World, ticks: u32) {
+        for _ in 0..ticks {
+            s.apply_physics(w, 0);
+            w.step(None);
+            s.sync_physics(w);
+        }
+    }
+
+    fn y_of(s: &Scripts, k: usize) -> f32 {
+        s.ents.world(k).expect("row").w_axis.y
+    }
+
+    #[test]
+    fn a_box_made_by_a_script_falls_and_rests_on_the_floor() {
+        let mut s = scripts(1);
+        let mut w = World::new(&floor());
+        physicalize(&mut s, 0, &spec());
+        run(&mut s, &mut w, 240);
+        // the cube's half height is 1: it rests with its centre about 1 above the floor
+        let y = y_of(&s, 0);
+        assert!((y - 1.0).abs() < 0.15, "rests at y = {y}");
+        assert!(s.ents.is_moved(0), "the row follows the body");
+    }
+
+    #[test]
+    fn an_impulse_moves_it_and_a_second_physicalize_changes_nothing() {
+        let mut s = scripts(1);
+        let mut w = World::new(&floor());
+        physicalize(&mut s, 0, &spec());
+        run(&mut s, &mut w, 240);
+        let x0 = s.ents.world(0).unwrap().w_axis.x;
+        let at = s.ents.world(0).unwrap().w_axis.truncate();
+        s.with_host(&mut view(), |_, h| {
+            h.physics_impulse(Ent::Object(0), at.to_array(), [8.0, 0.0, 0.0]);
+            h.physicalize_body(Ent::Object(0), 0, &spec());
+        });
+        run(&mut s, &mut w, 60);
+        assert!(
+            s.ents.world(0).unwrap().w_axis.x > x0 + 0.5,
+            "pushed along +x"
+        );
+        assert_eq!(
+            s.made, 1,
+            "the second Physicalize did not make another body"
+        );
+    }
+
+    #[test]
+    fn a_force_pushes_until_destroyed_and_unphysicalize_removes_the_body() {
+        let mut s = scripts(1);
+        let mut w = World::new(&floor());
+        physicalize(&mut s, 0, &spec());
+        run(&mut s, &mut w, 120);
+        // a force does nothing to a sleeping body (docs/physics.md 2.8): the script wakes it first
+        s.with_host(&mut view(), |_, h| {
+            h.physics_wake(Ent::Object(0));
+            h.physics_force(Ent::Object(0), 7, true, [0.0; 3], [0.5, 0.0, 0.0])
+        });
+        run(&mut s, &mut w, 30);
+        assert!(
+            s.ents.world(0).unwrap().w_axis.x > 0.2,
+            "the force moves it"
+        );
+        s.with_host(&mut view(), |_, h| h.physicalize(Ent::Object(0), false));
+        run(&mut s, &mut w, 2);
+        assert!(s.bodies.is_empty());
+        let y = y_of(&s, 0);
+        run(&mut s, &mut w, 60);
+        assert_eq!(y, y_of(&s, 0), "the row is left where the body was");
+    }
+
+    #[test]
+    fn a_rewound_run_gives_the_same_bodies() {
+        let mut s = scripts(1);
+        let mut w = World::new(&floor());
+        physicalize(&mut s, 0, &spec());
+        run(&mut s, &mut w, 30);
+        let (s2, w2) = (s.clone(), w.clone());
+        run(&mut s, &mut w, 90);
+        let (mut s2, mut w2) = (s2, w2);
+        run(&mut s2, &mut w2, 90);
+        assert_eq!(s.ents.world(0), s2.ents.world(0));
+    }
+
+    #[test]
+    fn caps_hold() {
+        let n = MAX_SCRIPT_BODIES + 10;
+        let mut s = scripts(n);
+        for k in 0..n {
+            physicalize(&mut s, k, &spec());
+        }
+        assert_eq!(s.made, MAX_SCRIPT_BODIES);
+        assert_eq!(s.bodies.len(), MAX_SCRIPT_BODIES);
+        // a fixed body is only reported, once
+        let mut s = scripts(1);
+        let sp = script::PhysSpec {
+            fixed: true,
+            ..spec()
+        };
+        physicalize(&mut s, 0, &sp);
+        physicalize(&mut s, 0, &sp);
+        assert!(s.bodies.is_empty() && s.queue.is_empty());
+        assert_eq!(s.log.iter().filter(|l| l.1.contains("fixed")).count(), 1);
     }
 }

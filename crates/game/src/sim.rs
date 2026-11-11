@@ -1533,6 +1533,7 @@ impl Sim {
             self.camera.target = p;
             self.camera.position = camera_goal(&self.camera, p);
         }
+        scripts.apply_physics(&mut self.world, self.tick);
         self.scripts = Some(scripts);
     }
 
@@ -1885,6 +1886,9 @@ impl Sim {
         self.world.set_push(0, force);
         self.prev_pose = (self.ball.position, self.ball.rotation);
         self.world.step(None);
+        if let Some(s) = &mut self.scripts {
+            s.sync_physics(&self.world);
+        }
         // a kind's pieces start to fade 20 s after their burst, and go when their fade is over (in the order they were
         // made, so kinds going on the same tick leave the physics as they always did)
         let mut gone = [false; 3];

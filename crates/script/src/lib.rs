@@ -65,6 +65,31 @@ pub enum EmitState {
     Gone,
 }
 
+/// A Physicalize block's pins as they were read when its Physicalize input fired (docs/physics.md 2.1).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhysSpec {
+    pub fixed: bool,
+    pub friction: f32,
+    pub elasticity: f32,
+    pub mass: f32,
+    /// The collision group, 8 characters significant.
+    pub group: String,
+    pub start_frozen: bool,
+    pub collide: bool,
+    /// Auto Mass Center; when false `shift` is the mass centre in the object's frame.
+    pub auto_centre: bool,
+    pub shift: [f32; 3],
+    pub lin_damp: f32,
+    pub rot_damp: f32,
+    /// The Collision Surface name (empty: a ball).
+    pub surface: String,
+    pub convex_count: usize,
+    pub ball_count: usize,
+    pub concave_count: usize,
+    /// The last `ball radius` pin (the original keeps only the last), if any.
+    pub radius: Option<f32>,
+}
+
 /// A planar/spherical particle block's values as its pins and settings give them (docs/particles.md section 2).
 /// Times in milliseconds, angles in radians, speed in units a millisecond.
 #[derive(Debug, Clone, PartialEq, Default)]

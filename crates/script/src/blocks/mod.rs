@@ -43,6 +43,8 @@ pub mod proto {
     pub const COLLECTION_ITERATOR: Guid = Guid(0x4196_02ec, 0x7822_779e);
     pub const ITERATOR: Guid = Guid(0x198f_0af9, 0x0268_249f);
     pub const PHYSICALIZE: Guid = Guid(0x7522_370e, 0x37ec_15ec);
+    pub const PHYSICS_IMPULSE: Guid = Guid(0x0c7e_39bb, 0x16db_20d5);
+    pub const PHYSICS_WAKEUP: Guid = Guid(0x38b8_51b5, 0x72ca_74ac);
     pub const BOX_BOX_INTERSECTION: Guid = Guid(0x6415_4401, 0x76cf_37af);
     pub const SET_POSITION: Guid = Guid(0xe456_e78a, 0x4567_89aa);
     pub const SET_ORIENTATION: Guid = Guid(0x6258_74aa, 0xaa69_4132);

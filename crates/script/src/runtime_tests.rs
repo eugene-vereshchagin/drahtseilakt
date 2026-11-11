@@ -1241,7 +1241,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them), the sounds, the input blocks and the cameras (Set As Active Camera,
     // Set Clipping Planes, Set FOV)
-    assert_eq!(all.len(), 129); // and the text blocks (six), the spherical emitter
+    assert_eq!(all.len(), 131); // and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
