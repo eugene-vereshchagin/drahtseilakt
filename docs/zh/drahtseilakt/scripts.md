@@ -10,6 +10,28 @@
 
 一张行为图是几类对象的集合，各有自己的状态块：8 Behavior（脚本、图或带原型 GUID 的构建块；标志、优先级、目标参数，以及子行为、连线、运算、输入/输出/局部参数、输入口和输出口的列表）、6 BehaviorLink（以帧计的延迟、源 IO 和目标 IO）、9 BehaviorIO、2 ParameterIn（类型和来源）、3 ParameterOut 与 45 ParameterLocal（类型、保存的值，输出还有复制目标）、4 ParameterOperation（运算 GUID、两个输入、一个输出）、52 DataArray（表格），以及任何 CKBeObject 的脚本列表（标识符 `0x800`）。引脚名就是参数对象名，所以构建块按名称读取引脚。文件说不出的：场景启动时哪些脚本处于激活状态（全部按激活并重置启动），以及游戏自身的对象（`Ball_Pos_Frame`、`CurrentLevel` 表），由引擎作答。
 
+## Stage 3.1 (2026-11-12): the run's entity table
+
+（英文；翻译待补。）
+
+One table, `crates/game/src/entities.rs`, owned by the run (`Scripts.ents`), read by the renderer and the scripts. Rows
+0..N are the level's objects in the level's order; later rows are copies (Object Copy) and created objects (Object
+Create). A row: name, class (level, copy of a row, created), parent, world transform, hidden, mesh, materials, alive.
+It clones and rewinds with the run. Caps: `MAX_ENTITIES` rows in all (the same limit as the objects of the scripts) and
+`MAX_DRAWN_EXTRA` (4096) copies and created objects drawn per frame; rows past it stay in the table, undrawn.
+
+- **Hierarchy.** The level file's parent of each entity is read (`level::Object::parent`, from the entity chunk's
+  parent reference); a loop or a parent that is no object is dropped. A child stores its transform relative to its
+  parent and follows when the parent is moved or turned; moving the child itself sets its world place. Set Parent goes
+  through `Host::set_parent` (a loop is refused); the block comes with stage 4.
+- **Drawing.** Hidden or deleted rows are not drawn; a moved object is drawn at its transform (a child of a moved
+  parent at its placement carried along); a copy is drawn with its source's mesh and materials at its own transform,
+  only if the source is a plain mesh with a material (not a sprite, not the cloud layer; a copy of a collider is not
+  seen). Object Create (`Host::create`, the block comes with stage 4) draws if it has a mesh, else it only exists.
+- **Not here.** The collision and the ball read the level as before. The physics of moved and copied objects (static
+  bodies added and removed live, followers of a moving parent) is the next task, 3.2. A level without scripts has no
+  table and takes the old path unchanged.
+
 ## 解释器模型
 
 `script::Graph` 是作为数据的文件行为图；`script::Runtime` 是状态（行为与 IO 的激活、连线的倒计时、参数值、表格行、消息）和一个 tick，如同原版行为管理器的一帧：每个激活的脚本执行；构建块读取并清除激活的输入、拉取引脚（运算值先算）、通过 `Host` 作用、写输出并激活输出口；图触发激活 IO 上的连线（无延迟立即、有延迟入队），按优先级处理激活子行为的栈，最后让延迟连线倒数。消息在下一 tick 到达等待者。脚本每 tick 在物理之前运行一次，确定性；格式 8 之前录制的回放不运行脚本，如录制时一样。无脚本的关卡不受影响。

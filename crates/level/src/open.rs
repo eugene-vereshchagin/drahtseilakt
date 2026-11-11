@@ -1129,6 +1129,7 @@ fn import_from(
             }
         }
         level.objects.push(Object {
+            parent: None,
             name: n["name"].as_str().unwrap_or_default().to_owned(),
             matrix: flip_matrix(&m),
             mesh: n["mesh"]

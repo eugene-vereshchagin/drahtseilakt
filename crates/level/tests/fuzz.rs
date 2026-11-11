@@ -448,6 +448,7 @@ fn synthetic_level() -> Level {
         [1.0, 2.0, 3.0, 1.0],
     ];
     l.objects.push(Object {
+        parent: None,
         name: "P_Box_01".into(),
         matrix: id,
         mesh: Some(0),
@@ -455,6 +456,7 @@ fn synthetic_level() -> Level {
         sprite: None,
     });
     l.objects.push(Object {
+        parent: None,
         name: "Sprite".into(),
         matrix: id,
         mesh: None,

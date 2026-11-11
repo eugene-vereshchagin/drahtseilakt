@@ -1820,6 +1820,7 @@ mod tests {
         });
         let object = level.objects.len();
         level.objects.push(Object {
+            parent: None,
             name: name.into(),
             matrix: [
                 [1.0, 0.0, 0.0, 0.0],

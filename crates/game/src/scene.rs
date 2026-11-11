@@ -631,9 +631,8 @@ pub fn instances(
     extras: (&[crate::extra::ExtraView], Option<&ExtraModel>),
     s: &Snapshot,
     pieces: &[(usize, usize, f32)],
-    scripted: (&[bool], &[Option<Mat4>]),
+    scripted: Option<&crate::entities::Entities>,
 ) -> Vec<Instance> {
-    let (script_hidden, script_moved) = scripted;
     let (views, extra_model) = extras;
     let mut out: Vec<Instance> = Vec::new();
     // The extra points with their module: the centre sprite and the floor glow until one fires, its small balls
@@ -675,7 +674,7 @@ pub fn instances(
             .filter(|p| {
                 !taken.contains(&p.object) && !unseen.get(p.object).copied().unwrap_or(false)
             })
-            .filter(|p| !script_hidden.get(p.object).copied().unwrap_or(false))
+            .filter(|p| !scripted.is_some_and(|e| e.is_hidden(p.object)))
             .filter(|p| !(p.marker.is_some() && hidden(p.object)))
             .filter(|p| clouds || !p.cloud)
             .map(|p| Instance {
@@ -687,11 +686,9 @@ pub fn instances(
                         p.matrix * Mat4::from_axis_angle(axis, rate * s.time)
                     }
                     (None, None, Some(sp)) => sprite_matrix(&p.matrix, sp, s.eye, s.target),
-                    (None, None, None) => script_moved
-                        .get(p.object)
-                        .copied()
-                        .flatten()
-                        .unwrap_or(p.matrix),
+                    (None, None, None) => {
+                        scripted.map_or(p.matrix, |e| e.draw_matrix(p.object, p.matrix))
+                    }
                 },
                 marker: p.marker,
                 uv_offset: [0.0; 2],
@@ -706,6 +703,14 @@ pub fn instances(
                 },
             }),
     );
+    // what scripts copied or made: drawn from the entity table, capped per frame (entities.rs)
+    if let Some(e) = scripted {
+        for (_, row, world) in e.drawn_extra() {
+            if let Some(mesh) = row.mesh {
+                out.push(Instance::plain(LEVEL_MODEL, mesh, world));
+            }
+        }
+    }
     for mesh in 0..crate::sky::faces() {
         out.push(Instance {
             model: SKY_MODEL,

@@ -2732,6 +2732,7 @@ mod tests {
         let mut matrix = IDENTITY;
         matrix[3] = [at[0], at[1], at[2], 1.0];
         level::Object {
+            parent: None,
             name: name.into(),
             matrix,
             mesh: Some(mesh),

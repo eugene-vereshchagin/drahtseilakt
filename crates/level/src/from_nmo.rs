@@ -121,6 +121,7 @@ fn build(doc: &Document) -> Loaded {
         class::SPRITE_3D,
     ];
     let mut objects = HashMap::new();
+    let mut parents: Vec<(usize, usize)> = Vec::new();
     for (i, o) in doc.objects.iter().enumerate() {
         if !entity_classes.contains(&o.class_id) {
             continue;
@@ -165,7 +166,11 @@ fn build(doc: &Document) -> Loaded {
                     }
                 }
                 objects.insert(i, level.objects.len());
+                if let Some(p) = e.parent {
+                    parents.push((level.objects.len(), p));
+                }
                 level.objects.push(Object {
+                    parent: None,
                     name: name(o),
                     matrix: [
                         [x[0], x[1], x[2], 0.0],
@@ -179,6 +184,27 @@ fn build(doc: &Document) -> Loaded {
                 });
             }
             Err(e) => warn(o, e),
+        }
+    }
+
+    // Parents, now that every object has its index; a parent that is no object here (or a loop) is dropped, the
+    // matrices being world ones already.
+    for (child, p) in parents {
+        if let Some(&par) = objects.get(&p)
+            && par != child
+        {
+            level.objects[child].parent = Some(par);
+        }
+    }
+    for i in 0..level.objects.len() {
+        let (mut at, mut steps) = (level.objects[i].parent, 0);
+        while let Some(a) = at {
+            steps += 1;
+            if a == i || steps > level.objects.len() {
+                level.objects[i].parent = None;
+                break;
+            }
+            at = level.objects[a].parent;
         }
     }
 

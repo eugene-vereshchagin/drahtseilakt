@@ -90,6 +90,7 @@ fn a_part_comes_from_the_level_folder_in_the_open_format() {
     std::fs::create_dir_all(&copy).unwrap();
     let mut part = level::Level::default();
     part.objects.push(level::Object {
+        parent: None,
         name: "Ball_Wood".into(),
         matrix: [
             [1.0, 0.0, 0.0, 0.0],

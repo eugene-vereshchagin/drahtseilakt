@@ -199,15 +199,35 @@ mod tests {
         let names = |a: &str| -> Vec<&str> { columns(a).unwrap().iter().map(|c| c.0).collect() };
         assert_eq!(
             names("CurrentLevel"),
-            ["Level ID", "ActiveBall", "Ball_Pos_Frame", "CurrentResetpoint", "Activation Phase?", "Points"]
+            [
+                "Level ID",
+                "ActiveBall",
+                "Ball_Pos_Frame",
+                "CurrentResetpoint",
+                "Activation Phase?",
+                "Points"
+            ]
         );
         assert_eq!(
             names("IngameParameter"),
-            ["Activetrafo", "Activate Sector", "Deactivate Sector", "Tutorial activ?", "RollSound activate?"]
+            [
+                "Activetrafo",
+                "Activate Sector",
+                "Deactivate Sector",
+                "Tutorial activ?",
+                "RollSound activate?"
+            ]
         );
         assert_eq!(
             names("Energy"),
-            ["Points", "Lifes", "StartPoints", "StartLifes", "Timefactor", "LifeBonus"]
+            [
+                "Points",
+                "Lifes",
+                "StartPoints",
+                "StartLifes",
+                "Timefactor",
+                "LifeBonus"
+            ]
         );
         assert_eq!(columns("physicalize_gameball").unwrap().len(), 8);
         assert!(columns("Checkpoints").is_none());
@@ -226,11 +246,21 @@ mod tests {
         assert_eq!(cell("IngameParameter", 0, 2, &f), Some(Value::Int(2)));
         assert_eq!(cell("Energy", 0, 0, &f), Some(Value::Int(970)));
         assert_eq!(cell("Energy", 0, 1, &f), Some(Value::Int(2)));
-        assert_eq!(cell("Energy", 0, 2, &f), Some(Value::Int(1000)), "StartPoints");
+        assert_eq!(
+            cell("Energy", 0, 2, &f),
+            Some(Value::Int(1000)),
+            "StartPoints"
+        );
         assert_eq!(cell("Energy", 0, 3, &f), Some(Value::Int(3)), "StartLifes");
         assert_eq!(cell("Energy", 0, 5, &f), Some(Value::Int(200)), "LifeBonus");
-        assert_eq!(cell("Physicalize_GameBall", 2, 0, &f), Some(Value::Str("Ball_Wood".into())));
-        assert_eq!(cell("Physicalize_GameBall", 1, 3, &f), Some(Value::Float(10.0)));
+        assert_eq!(
+            cell("Physicalize_GameBall", 2, 0, &f),
+            Some(Value::Str("Ball_Wood".into()))
+        );
+        assert_eq!(
+            cell("Physicalize_GameBall", 1, 3, &f),
+            Some(Value::Float(10.0))
+        );
         assert_eq!(cell("Physicalize_GameBall", 3, 0, &f), None);
     }
 
@@ -252,8 +282,16 @@ mod tests {
         );
         assert_eq!(t(&|n| n.lives = 4), ["Life_Up"]);
         assert_eq!(t(&|n| n.points = 1100), ["Extrapoint"]);
-        assert_eq!(t(&|n| n.points = 999), Vec::<&str>::new(), "the counter ticking down is no event");
-        assert_eq!(t(&|n| n.lives = 2), ["Ball Off", "Sub Life"], "the points a respawn resets are no extra point");
+        assert_eq!(
+            t(&|n| n.points = 999),
+            Vec::<&str>::new(),
+            "the counter ticking down is no event"
+        );
+        assert_eq!(
+            t(&|n| n.lives = 2),
+            ["Ball Off", "Sub Life"],
+            "the points a respawn resets are no extra point"
+        );
         assert_eq!(
             t(&|n| {
                 n.finished = true;

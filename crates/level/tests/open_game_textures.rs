@@ -48,6 +48,7 @@ fn level() -> Level {
         look: None,
     });
     l.objects.push(Object {
+        parent: None,
         name: "side".into(),
         matrix: [
             [1.0, 0.0, 0.0, 0.0],

@@ -36,6 +36,7 @@ fn level() -> Level {
     l.meshes.push(triangle("flat", 2.0));
     for (k, name) in ["round", "flat"].into_iter().enumerate() {
         l.objects.push(Object {
+            parent: None,
             name: name.into(),
             matrix: [
                 [1.0, 0.0, 0.0, 0.0],

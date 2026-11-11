@@ -389,19 +389,32 @@ pub struct Entity {
     /// The mesh drawn for this entity (3D objects only).
     pub mesh: Option<usize>,
     pub flags: u32,
+    /// The entity it is a child of (an index into the document's objects), when the file names one.
+    pub parent: Option<usize>,
 }
 
 pub fn entity(chunk: &Chunk) -> Result<Entity> {
     let mut w = chunk.section(0x0010_0000).ok_or(missing("entity matrix"))?;
-    let _ = w.u32()?;
+    let first = w.u32()?;
     let flags = w.u32()?;
     let m: Vec<[f32; 3]> = w.take(12)?.chunks_exact(3).map(xyz).collect();
     let row = |i: usize| m.get(i).copied().unwrap_or_default();
+    // after the matrix: 0x10000 an object to skip, 0x20000 the parent (CKRenderObject's save order)
+    // (a short chunk simply has none: a missing word is no parent, never a lost object)
+    if first & 0x10000 != 0 {
+        let _ = w.u32();
+    }
+    let parent = if first & 0x20000 != 0 {
+        w.u32().ok().and_then(|r| reference(chunk, r))
+    } else {
+        None
+    };
     let mesh = match chunk.section(0x4000) {
         Some(mut w) => reference(chunk, w.u32()?),
         None => None,
     };
     Ok(Entity {
+        parent,
         matrix: [row(0), row(1), row(2), row(3)],
         mesh,
         flags,

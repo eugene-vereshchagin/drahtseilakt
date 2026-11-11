@@ -1467,14 +1467,10 @@ impl Sim {
         }
     }
 
-    /// Objects a map's scripts hid or deleted, by level object index (empty without scripts).
-    pub fn script_hidden(&self) -> &[bool] {
-        self.scripts.as_ref().map_or(&[], |s| s.hidden.as_slice())
-    }
-
-    /// Objects a map's scripts moved: their matrices now (empty without scripts).
-    pub fn script_moved(&self) -> &[Option<Mat4>] {
-        self.scripts.as_ref().map_or(&[], |s| s.moved.as_slice())
+    /// The run's entity table (level objects, then the scripts' copies and created ones), for the renderer: none
+    /// without scripts, and then the level is drawn as it always was.
+    pub fn script_entities(&self) -> Option<&crate::entities::Entities> {
+        self.scripts.as_ref().map(|s| &s.ents)
     }
 
     /// The keyboard and the mouse of the next tick, for the scripts (call once per tick, before `step`).
@@ -3116,7 +3112,7 @@ pub(crate) mod tests {
         assert!(
             sim.scripts
                 .as_ref()
-                .is_some_and(|s| s.hidden.iter().all(|h| !h)),
+                .is_some_and(|s| s.ents.hidden_count() == 0),
             "the template hides nothing"
         );
     }
@@ -3143,14 +3139,8 @@ pub(crate) mod tests {
                 continue;
             };
             let (sim, log) = script_log(&level, ticks);
-            let hidden = sim
-                .scripts
-                .as_ref()
-                .map_or(0, |s| s.hidden.iter().filter(|h| **h).count());
-            let moved = sim
-                .scripts
-                .as_ref()
-                .map_or(0, |s| s.moved.iter().filter(|m| m.is_some()).count());
+            let hidden = sim.scripts.as_ref().map_or(0, |s| s.ents.hidden_count());
+            let moved = sim.scripts.as_ref().map_or(0, |s| s.ents.moved_count());
             eprintln!(
                 "== {folder}: {} log lines, {hidden} hidden, {moved} moved, ball at {:.1}",
                 log.len(),
@@ -3186,6 +3176,7 @@ pub(crate) mod tests {
             ]
         };
         let object = |name: &str, mesh: Option<usize>, m| Object {
+            parent: None,
             name: name.into(),
             matrix: m,
             mesh,
@@ -3412,6 +3403,7 @@ pub(crate) mod tests {
             }],
         });
         level.objects.push(Object {
+            parent: None,
             name: "wall".into(),
             matrix: [
                 [1.0, 0.0, 0.0, 0.0],
@@ -3706,6 +3698,7 @@ pub(crate) mod tests {
         let mut level = flat_level();
         let trafo = level.objects.len();
         level.objects.push(Object {
+            parent: None,
             name: "P_Trafo_Stone_01".into(),
             matrix: [
                 [1.0, 0.0, 0.0, 0.0],
@@ -3767,6 +3760,7 @@ pub(crate) mod tests {
         let mut level = flat_level();
         let trafo = level.objects.len();
         level.objects.push(Object {
+            parent: None,
             name: "P_Trafo_Sticky_01".into(),
             matrix: [
                 [1.0, 0.0, 0.0, 0.0],
@@ -3824,6 +3818,7 @@ pub(crate) mod tests {
         });
         let cube = level.objects.len();
         level.objects.push(Object {
+            parent: None,
             name: "Quader01".into(),
             // 400 wide, 100 deep, top at y = -10
             matrix: [
@@ -3960,6 +3955,7 @@ pub(crate) mod tests {
         });
         let obj = level.objects.len();
         level.objects.push(Object {
+            parent: None,
             name: name.into(),
             matrix: [
                 [1.0, 0.0, 0.0, 0.0],
@@ -4029,6 +4025,7 @@ pub(crate) mod tests {
             Vec3::new(6.6, 8.0, 6.6),
         ));
         file.objects.push(Object {
+            parent: None,
             name: "P_Dome_MF".into(),
             matrix: Mat4::IDENTITY.to_cols_array_2d(),
             mesh: Some(0),
