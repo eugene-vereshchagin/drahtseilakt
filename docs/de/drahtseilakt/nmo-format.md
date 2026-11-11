@@ -63,7 +63,7 @@ auf ganze Wörter aufgefüllten Bytes; nach dem abschließenden NUL kann Datenm�
 | | | `0x10000` | Effekt: Parameterverweis, Effekt (1 TexGen, 2 TexGen mit Bezugssystem); der Wert des Parameters ist der TexGen-Typ (CK2_3D.dll: None 0, Transform 1, Reflect 2, Chrome 3, Planar 4, Cube-Maps 31..34) |
 | Parameter | 46 | `0x40` | Typ-GUID (2 Wörter), ein Wort, Größe in Bytes, der Wert |
 | Textur | 31 | `0x10000` | Anzahl der Slots, Dateiname je Slot |
-| | | `0x20000` | eingebettete Pixel: Anzahl der Slots, dann Bits pro Pixel, Breite, Höhe, Masken A R G B, ein Wort, Pixelanzahl, Pixel; `[1, 0]`, wenn die Pixel in einer Datei liegen |
+| | | `0x20000` | eingebettete Pixel: Anzahl der Slots, dann Bits pro Pixel, Breite, Höhe, Masken A R G B, ein Kompressionswort (0), dann vier Ebenen, Blau, Grün, Rot, Alpha: je die Größe in Bytes (Breite x Höhe) und die Bytes, auf ein Wort aufgefüllt, Zeilen von unten nach oben; `[1, 0]`, wenn die Pixel in einer Datei liegen |
 | | | `0x2FF000` | Ladeoptionen: ein Wort (`0x100` eine transparente Farbe, `0x200` ein Videoformat folgt), dann je nach Abschnittsgröße die transparente Farbe (0xRRGGBB), der aktuelle Slot, das Videoformat; Texel dieser Farbe verwirft ein Alphatest |
 | Mesh | 32 | `0x100000` | Materialslots: Anzahl, dann (Verweis, Wort) je Slot |
 | | | `0x20000` | Vertexanzahl, Speicherflags, Größe (Datenwörter + 1), dann Positionen, Farben, Speculars, Normalen, UVs je nach Flags |

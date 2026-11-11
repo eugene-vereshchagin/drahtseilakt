@@ -298,21 +298,25 @@ pub fn texture(chunk: &Chunk) -> Result<Texture> {
             }
         }
     }
+    // The raw bitmaps (section 0x20000): a slot count, then the first slot's bits per pixel, width, height, the
+    // channel masks (A, R, G, B), a compression word (0: none) and the channels one after another, each a whole
+    // plane of width x height bytes behind its size in bytes, padded to a word: blue, green, red, alpha, rows bottom
+    // up. (Found in the bytes of 8058 textures of 606 community maps: every one has four planes of exactly
+    // width x height bytes and compression 0, and the copies of the game's own textures that maps carry are pixel
+    // for pixel the game's pictures when read so.)
     if let Some(mut w) = chunk.section(0x0002_0000) {
         let slots = w.u32()?;
         if slots > 0 && w.remaining() >= 9 {
             let bpp = w.u32()?;
             let (width, height) = (w.u32()?, w.u32()?);
-            let masks = [w.u32()?, w.u32()?, w.u32()?, w.u32()?];
-            let _ = w.u32()?;
-            let count = w.u32()? as usize;
+            let _masks = w.take(4)?;
+            let compression = w.u32()?;
             // at least one pixel a side: a zero-sized picture is no picture (the renderer could not make a texture of it)
             let side = 1..=MAX_TEXTURE_SIDE;
-            if bpp == 32 && side.contains(&width) && side.contains(&height) {
+            if bpp == 32 && compression == 0 && side.contains(&width) && side.contains(&height) {
                 let pixels = (width as usize).saturating_mul(height as usize);
-                if count == pixels {
-                    let data = w.take(count)?;
-                    tex.embedded = Some((width, height, unpack_pixels(data, masks)));
+                if let Some(rgba) = unpack_planes(&mut w, width as usize, pixels) {
+                    tex.embedded = Some((width, height, rgba));
                 }
             }
         }
@@ -335,17 +339,47 @@ pub fn texture(chunk: &Chunk) -> Result<Texture> {
     Ok(tex)
 }
 
-/// 32-bit pixels with channel masks (A, R, G, B) to RGBA bytes.
-fn unpack_pixels(data: &[u32], [a, r, g, b]: [u32; 4]) -> Vec<u8> {
-    let channel = |p: u32, mask: u32| -> u8 {
-        if mask == 0 {
-            return 0xFF;
+/// The channel planes of a raw bitmap (blue, green, red, alpha; each its size in bytes, then its bytes padded to a
+/// word) to RGBA bytes. Every plane has exactly `pixels` bytes, or the picture is refused (`None`); a bitmap that
+/// ends after its red plane, or whose alpha plane is empty, is opaque. Nothing is allocated before the three
+/// colour planes are known to be in the file, so a picture is never larger than four times the words that hold it.
+fn unpack_planes(w: &mut Words<'_>, width: usize, pixels: usize) -> Option<Vec<u8>> {
+    let mut plane = |optional: bool| -> Option<Option<&[u32]>> {
+        if optional && w.remaining() == 0 {
+            return Some(None);
         }
-        ((p & mask) >> mask.trailing_zeros()) as u8
+        let size = w.u32().ok()? as usize;
+        if optional && size == 0 {
+            return Some(None);
+        }
+        if size != pixels {
+            return None;
+        }
+        w.take(size.div_ceil(4)).ok().map(Some)
     };
-    data.iter()
-        .flat_map(|&p| [channel(p, r), channel(p, g), channel(p, b), channel(p, a)])
-        .collect()
+    let blue = plane(false)??;
+    let green = plane(false)??;
+    let red = plane(false)??;
+    let alpha = plane(true)?;
+    // the byte of pixel `i` in a plane: the file is little-endian, so the first byte of a word is its lowest
+    let byte = |plane: &[u32], i: usize| -> u8 {
+        let word = plane.get(i / 4).copied().unwrap_or(0).to_le_bytes();
+        word.get(i % 4).copied().unwrap_or(0)
+    };
+    // the file's first row is the picture's bottom one: the rows are turned over, so that the first is the top
+    let mut rgba = Vec::with_capacity(pixels.checked_mul(4)?);
+    for row in (0..pixels.checked_div(width)?).rev() {
+        let start = row.checked_mul(width)?;
+        for i in start..start.checked_add(width)? {
+            rgba.extend([
+                byte(red, i),
+                byte(green, i),
+                byte(blue, i),
+                alpha.map_or(0xFF, |a| byte(a, i)),
+            ]);
+        }
+    }
+    Some(rgba)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1149,24 +1183,103 @@ mod tests {
         assert_eq!(texture(&none).expect("texture").transparent, None);
     }
 
+    /// A raw bitmap as a file holds it: masks, no compression, then a plane a channel, each behind its size in bytes.
+    fn raw_bitmap(w: u32, h: u32, planes: &[&[u8]]) -> Vec<u32> {
+        let mut data = vec![1, 32, w, h];
+        data.extend([0xFF00_0000, 0x00FF_0000, 0x0000_FF00, 0x0000_00FF, 0]);
+        for plane in planes {
+            data.push(plane.len() as u32);
+            data.extend(plane.chunks(4).map(|c| {
+                let mut word = [0u8; 4];
+                word[..c.len()].copy_from_slice(c);
+                u32::from_le_bytes(word)
+            }));
+        }
+        data
+    }
+
+    fn embedded(data: Vec<u32>) -> Option<(u32, u32, Vec<u8>)> {
+        texture(&chunk(&[(0x0002_0000, data)]))
+            .expect("texture")
+            .embedded
+    }
+
     /// Fuzzing found it (nmo_chunk): an embedded picture 8192 wide and 0 high (no pixels, so the count matched) was
     /// kept, and the renderer cannot make a texture of no size. A side of 0 is no embedded picture.
     #[test]
     fn an_embedded_picture_without_pixels_is_none() {
-        let masks = [0xFF00_0000, 0x00FF_0000, 0x0000_FF00, 0x0000_00FF];
         let pictured = |w: u32, h: u32| {
-            let mut data = vec![1, 32, w, h];
-            data.extend(masks);
-            data.extend([0, w * h]);
-            data.extend(std::iter::repeat_n(0x8040_2010u32, (w * h) as usize));
-            texture(&chunk(&[(0x0002_0000, data)]))
-                .expect("texture")
-                .embedded
+            let plane = vec![0x10u8; (w * h) as usize];
+            embedded(raw_bitmap(w, h, &[&plane, &[0x20], &[0x40], &[0x80]]))
         };
         assert_eq!(pictured(8192, 0), None);
         assert_eq!(pictured(0, 5), None);
         assert_eq!(pictured(0, 0), None);
         assert_eq!(pictured(1, 1), Some((1, 1, vec![0x40, 0x20, 0x10, 0x80])));
+    }
+
+    /// The layout of the community maps' own pictures (606 maps, 8058 textures): the channels are whole planes one
+    /// after another, blue, green, red, alpha, each of width x height bytes with rows bottom up and padded to a
+    /// word; not packed pixels (read as those, a frame came out four times across in three bands and a blank one).
+    #[test]
+    fn an_embedded_picture_is_read_from_its_channel_planes() {
+        // 3 x 2, so a plane of 6 bytes ends inside a word: the padding is skipped, not read as the next plane
+        let blue = [1, 2, 3, 4, 5, 6];
+        let green = [11, 12, 13, 14, 15, 16];
+        let red = [21, 22, 23, 24, 25, 26];
+        let alpha = [31, 32, 33, 34, 35, 36];
+        let (w, h, rgba) =
+            embedded(raw_bitmap(3, 2, &[&blue, &green, &red, &alpha])).expect("a picture");
+        assert_eq!((w, h), (3, 2));
+        // the file's first row is the bottom one: the second row's pixels (3, 4, 5) come first, each left to right
+        let order = [3u8, 4, 5, 0, 1, 2];
+        let expected: Vec<u8> = order
+            .iter()
+            .flat_map(|i| [21 + i, 11 + i, 1 + i, 31 + i])
+            .collect();
+        assert_eq!(rgba, expected);
+        assert_eq!(rgba.get(..4), Some(&[24, 14, 4, 34][..]));
+
+        // no alpha plane (the bitmap ends, or the plane is empty): opaque
+        let opaque: Vec<u8> = order
+            .iter()
+            .flat_map(|i| [21 + i, 11 + i, 1 + i, 0xFF])
+            .collect();
+        let ended = embedded(raw_bitmap(3, 2, &[&blue, &green, &red])).expect("a picture");
+        assert_eq!(ended.2, opaque);
+        let empty = embedded(raw_bitmap(3, 2, &[&blue, &green, &red, &[]])).expect("a picture");
+        assert_eq!(empty.2, opaque);
+    }
+
+    /// A hostile bitmap is no picture, and never a panic or a buffer of the size it claims: a plane of another size
+    /// than width x height, planes cut short, a compressed bitmap, another depth, a size no file could hold.
+    #[test]
+    fn a_broken_embedded_picture_is_none() {
+        let p = [7u8; 6];
+        assert_eq!(embedded(raw_bitmap(3, 2, &[&p, &p[..5], &p, &p])), None);
+        assert_eq!(embedded(raw_bitmap(3, 2, &[&p, &p, &[7u8; 7], &p])), None);
+        assert_eq!(embedded(raw_bitmap(3, 2, &[&p, &p, &p, &p[..3]])), None);
+        assert_eq!(embedded(raw_bitmap(3, 2, &[&p, &p])), None);
+        assert_eq!(embedded(raw_bitmap(3, 2, &[])), None);
+        // a plane that says its size and has no bytes behind it
+        let mut cut = raw_bitmap(3, 2, &[&p, &p]);
+        cut.push(6);
+        cut.push(0x0707_0707);
+        assert_eq!(embedded(cut), None);
+        let mut compressed = raw_bitmap(3, 2, &[&p, &p, &p, &p]);
+        compressed[8] = 1;
+        assert_eq!(embedded(compressed), None);
+        let mut deep = raw_bitmap(3, 2, &[&p, &p, &p, &p]);
+        deep[1] = 24;
+        assert_eq!(embedded(deep), None);
+        // 8192 x 8192 claimed over a handful of words: refused before anything is allocated
+        let mut huge = raw_bitmap(8192, 8192, &[]);
+        huge.push(8192 * 8192);
+        huge.extend([0; 16]);
+        assert_eq!(embedded(huge), None);
+        assert_eq!(embedded(raw_bitmap(8193, 1, &[&p, &p, &p, &p])), None);
+        // only a header
+        assert_eq!(embedded(vec![1, 32, 3]), None);
     }
 
     /// Found by review while fuzzing: a mesh whose vertices carry no data of their own (no positions, no normals, one

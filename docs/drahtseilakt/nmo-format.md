@@ -62,7 +62,7 @@ words; writers may leave garbage after the terminating NUL.
 | | | `0x10000` | effect: parameter reference, effect (1 TexGen, 2 TexGen with a referential); the parameter's value is the TexGen type (CK2_3D.dll: None 0, Transform 1, Reflect 2, Chrome 3, Planar 4, cube maps 31..34) |
 | Parameter | 46 | `0x40` | type GUID (2 words), a word, size in bytes, the value |
 | Texture | 31 | `0x10000` | slot count, file name of each slot |
-| | | `0x20000` | embedded pixels: slot count, then bits per pixel, width, height, masks A R G B, a word, pixel count, pixels; `[1, 0]` when the pixels live in a file |
+| | | `0x20000` | embedded pixels: slot count, then bits per pixel, width, height, masks A R G B, a compression word (0), then four planes, blue, green, red, alpha: each its size in bytes (width x height) and its bytes padded to a word, rows bottom up; `[1, 0]` when the pixels live in a file |
 | | | `0x2FF000` | load options: a word (`0x100` a transparent colour, `0x200` a video format follows), then by the section's size the transparent colour (0xRRGGBB), the current slot, the video format; texels of that colour are dropped by an alpha test |
 | Mesh | 32 | `0x100000` | material slots: count, then (reference, word) per slot |
 | | | `0x20000` | vertex count, save flags, size (data words + 1), then positions, colours, speculars, normals, UVs as the flags say |
