@@ -14,16 +14,21 @@
 # calm, speedrun or collector; test by default), as every published video carries.
 set -eu
 level=$1; replay=$2; out=$3; size=${4:-1920x1080}
+# VIDEO_SS=N draws every frame N times larger and scales it down (supersampling: smooth edges, crisp far textures);
+# VIDEO_CRF sets the encoder's quality (lower is better; 20 by default)
+ss=${VIDEO_SS:-1}; crf=${VIDEO_CRF:-20}
+w=${size%x*}; h=${size#*x}
+draw="$((w * ss))x$((h * ss))"
 here=$(dirname "$0")
 game=${DRAHTSEILAKT_BIN:-$here/../target/release/drahtseilakt}
 work=$(mktemp -d "$(dirname "$out")/.video.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 mkfifo "$work/frames"
-ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgb24 -s "$size" -r 60 -i "$work/frames" \
-    -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p "$work/picture.mp4" &
+ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgb24 -s "$draw" -r 60 -i "$work/frames" \
+    -vf "scale=$size:flags=lanczos" -c:v libx264 -preset medium -crf "$crf" -pix_fmt yuv420p "$work/picture.mp4" &
 encoder=$!
 if [ -d "$level" ]; then which=--open; else which=--level; fi
-DRAHTSEILAKT_SOUND_FILE="$work/sound.wav" "$game" "$which" "$level" --replay "$replay" --size "$size" \
+DRAHTSEILAKT_SOUND_FILE="$work/sound.wav" "$game" "$which" "$level" --replay "$replay" --size "$draw" \
     --video "$work/frames"
 wait "$encoder"
 ffmpeg -loglevel error -y -i "$work/picture.mp4" -i "$work/sound.wav" -c:v copy -c:a aac -b:a 192k -shortest "$out"

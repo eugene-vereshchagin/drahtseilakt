@@ -83,7 +83,7 @@ Interface: $interface
 Models: $models
 Mode: $mode_line
 Played by: the Drahtseilakt test player (autopilot), replay $(basename "$replay")
-Video: $size, 60 fps, H.264 with AAC sound, made $(date -u +%Y-%m-%d)
+Video: $size, 60 fps, H.264 with AAC sound$( [ "${VIDEO_SS:-1}" -gt 1 ] && echo ", every frame drawn at ${VIDEO_SS}x the size and scaled down (supersampling)"), made $(date -u +%Y-%m-%d)
 $about
 Drahtseilakt needs the player's own copy of Ballance for the original levels and never ships Ballance's data.
 Ballance is (c) 2004 Cyparade / Atari; this project is not affiliated with them.
