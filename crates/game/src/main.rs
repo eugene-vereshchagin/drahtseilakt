@@ -55,6 +55,7 @@ mod report;
 mod retro;
 mod scene;
 mod script_sound;
+mod script_text;
 mod scripting;
 mod setup;
 mod sim;

@@ -45,6 +45,44 @@ pub enum ObjKind {
     Other,
 }
 
+/// A script's text box in the original's 640x480 frame (docs/gameplay_bbs.md, "Text").
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextSpec {
+    pub text: String,
+    /// The box: left, top, width, height in frame pixels.
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    /// The wanted height of a line in frame pixels (the engine shrinks it to fit).
+    pub size: f32,
+    pub bold: bool,
+    pub color: [f32; 4],
+    /// `text_align` bits; none of a pair means centred.
+    pub align: u8,
+}
+
+/// Bits of `TextSpec::align`.
+pub mod text_align {
+    pub const LEFT: u8 = 1;
+    pub const RIGHT: u8 = 2;
+    pub const TOP: u8 = 4;
+    pub const BOTTOM: u8 = 8;
+}
+
+/// The most text boxes a run shows at once, and the most characters one holds.
+pub const MAX_TEXT_BOXES: usize = 64;
+pub const MAX_TEXT_CHARS: usize = 1024;
+
+/// A font a script made: what the engine keeps of it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Font {
+    pub name: String,
+    pub scale: [f32; 2],
+    pub color: [f32; 4],
+    pub bold: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjInfo {
     pub name: String,

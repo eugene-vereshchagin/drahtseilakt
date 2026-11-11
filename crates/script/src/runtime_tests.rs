@@ -30,6 +30,8 @@ struct Rec {
     frame: crate::InputFrame,
     before: crate::InputFrame,
     cursor: Option<bool>,
+    /// Every text box call: the block and its spec (none: taken away).
+    boxes: Vec<(usize, Option<crate::TextSpec>)>,
 }
 
 fn ident(x: f32, y: f32, z: f32) -> [[f32; 4]; 4] {
@@ -112,8 +114,18 @@ impl Host for Rec {
     fn sound_playing(&self, _: usize) -> bool {
         self.playing
     }
-    fn text(&mut self, _: &str, text: &str, _: bool) {
-        self.notes.push(format!("text {text}"));
+    fn text_box(&mut self, key: usize, spec: Option<crate::TextSpec>) {
+        if let Some(s) = &spec {
+            if self
+                .boxes
+                .last()
+                .and_then(|(k, p)| (*k == key).then_some(p))
+                != Some(&spec)
+            {
+                self.notes.push(format!("text {}", s.text.trim_end()));
+            }
+        }
+        self.boxes.push((key, spec));
     }
     fn note(&mut self, text: &str) {
         self.notes.push(text.to_string());
@@ -1209,7 +1221,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     }
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them)
-    assert_eq!(all.len(), 119);
+    assert_eq!(all.len(), 125); // and stage 3.5 text: six blocks
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -1656,7 +1668,6 @@ fn attributes_are_set_found_and_listed_in_order() {
     );
 }
 
-
 // ---- sounds (docs/gameplay_bbs.md, "Sounds"): the commands go to the host; expected values from those notes ----
 
 /// A graph with a wave sound object (class 25, id 5, file "Wind.wav") and one sound block of `proto` that has
@@ -1710,7 +1721,16 @@ fn sound_script_watch(
     let hier = b.local("Hierarchy", types::BOOL, Value::Bool(false));
     for (n, &o) in watch.iter().enumerate() {
         let t = b.local("Target", types::ENTITY, Value::Obj(Some(n)));
-        let hide = b.bb("Hide", proto::HIDE, &["In"], &["Out"], vec![hier], vec![], vec![], Some(t));
+        let hide = b.bb(
+            "Hide",
+            proto::HIDE,
+            &["In"],
+            &["Out"],
+            vec![hier],
+            vec![],
+            vec![],
+            Some(t),
+        );
         links.push(b.link(out_of(&b.g, blk, o), in_of(&b.g, hide, 0), 0));
         sub.push(hide);
     }
@@ -1734,8 +1754,15 @@ fn a_looping_wave_player_plays_and_finishes_its_run() {
     );
     let mut host = Rec::new();
     rt.tick(&mut host);
-    assert_eq!(host.sounds, vec!["5 Sounds\\Wind.wav Play { looping: true, fade_in: 0.0 }"]);
-    assert_eq!(host.visible, vec![false, true], "Start Playing fired, End Playing did not");
+    assert_eq!(
+        host.sounds,
+        vec!["5 Sounds\\Wind.wav Play { looping: true, fade_in: 0.0 }"]
+    );
+    assert_eq!(
+        host.visible,
+        vec![false, true],
+        "Start Playing fired, End Playing did not"
+    );
     assert!(!rt.is_active(blk), "a looping Play returns at once");
     let _ = script;
 }
@@ -1757,10 +1784,13 @@ fn a_one_shot_wave_player_waits_for_the_sound_and_then_reports_the_end() {
     let mut host = Rec::new();
     host.playing = true;
     rt.tick(&mut host);
-    assert_eq!(host.sounds, vec!["5 Sounds\\Wind.wav Play { looping: false, fade_in: 0.5 }"]);
+    assert_eq!(
+        host.sounds,
+        vec!["5 Sounds\\Wind.wav Play { looping: false, fade_in: 0.5 }"]
+    );
     rt.tick(&mut host);
     assert!(rt.is_active(blk), "stays active while the sound plays");
-    assert_eq!(host.visible, vec![true, true], "no End Playing yet");  // (the one watched output hides A)
+    assert_eq!(host.visible, vec![true, true], "no End Playing yet"); // (the one watched output hides A)
     host.playing = false;
     rt.tick(&mut host);
     assert_eq!(host.visible, vec![false, true], "End Playing fired");
@@ -1803,9 +1833,18 @@ fn control(proto: Guid, name: &str, v: f32) -> Vec<String> {
 
 #[test]
 fn volume_pitch_and_panning_controls_set_their_value() {
-    assert_eq!(control(proto::VOLUME_CONTROL, "Gain", 0.25), ["5 Sounds\\Wind.wav Gain(0.25)"]);
-    assert_eq!(control(proto::PITCH_CONTROL, "Pitch", 1.5), ["5 Sounds\\Wind.wav Pitch(1.5)"]);
-    assert_eq!(control(proto::PANNING_CONTROL, "Pan", -1.0), ["5 Sounds\\Wind.wav Pan(-1.0)"]);
+    assert_eq!(
+        control(proto::VOLUME_CONTROL, "Gain", 0.25),
+        ["5 Sounds\\Wind.wav Gain(0.25)"]
+    );
+    assert_eq!(
+        control(proto::PITCH_CONTROL, "Pitch", 1.5),
+        ["5 Sounds\\Wind.wav Pitch(1.5)"]
+    );
+    assert_eq!(
+        control(proto::PANNING_CONTROL, "Pan", -1.0),
+        ["5 Sounds\\Wind.wav Pan(-1.0)"]
+    );
 }
 
 fn instance(flat: bool) -> Vec<String> {
@@ -1845,7 +1884,14 @@ fn a_sound_instance_is_flat_or_placed_at_the_object() {
 
 #[test]
 fn the_linear_volume_curve_follows_the_notes() {
-    for (v, want) in [(2.0, 1.0), (1.0, 1.0), (0.5, 0.141_421), (0.01, 0.0), (0.0, 0.0), (0.02, 0.02 * 50f32.powf(0.02))] {
+    for (v, want) in [
+        (2.0, 1.0),
+        (1.0, 1.0),
+        (0.5, 0.141_421),
+        (0.01, 0.0),
+        (0.0, 0.0),
+        (0.02, 0.02 * 50f32.powf(0.02)),
+    ] {
         let (mut rt, _, _, pout) = sound_script_watch(
             proto::TT_LINEAR_VOLUME,
             &["In"],
@@ -1889,7 +1935,11 @@ fn a_proximity_volume_follows_the_distance_and_ends_on_off() {
     assert_eq!(gain(1.0, 5.0), ["5 Sounds\\Wind.wav Gain(0.02)"]);
     let want = 0.02 * 50f32.powf(0.8);
     let got = gain(5.0, 20.0);
-    let got: f32 = got[0].trim_start_matches("5 Sounds\\Wind.wav Gain(").trim_end_matches(')').parse().unwrap();
+    let got: f32 = got[0]
+        .trim_start_matches("5 Sounds\\Wind.wav Gain(")
+        .trim_end_matches(')')
+        .parse()
+        .unwrap();
     assert!((got - want).abs() < 1e-5, "{got} vs {want}");
 }
 
@@ -2174,5 +2224,285 @@ fn the_cursor_blocks_only_show_or_hide_the_system_cursor() {
         r.tick(&[], [0, 0], 0);
         assert!(r.fired(0));
         assert_eq!(r.host.cursor, Some(true));
+    }
+}
+
+// ---- text: Text Display, 2D Text and the font blocks ------------------------------------------------------------
+
+/// One block of `proto` with the given pins (name, type, value), its inputs and outputs, run from a start input
+/// that is linked to input `first_in`; returns the runtime, the block's id and the graph builder's output.
+fn text_rig(
+    proto: Guid,
+    ins: &[&str],
+    outs: &[&str],
+    pins: &[(&str, Guid, Value)],
+    pouts: &[(&str, Guid)],
+    target_class: u32,
+) -> (Runtime, Id) {
+    let mut b = Build::new();
+    let pin_ids: Vec<Id> = pins
+        .iter()
+        .map(|(n, g, v)| {
+            let l = b.local(n, *g, v.clone());
+            b.pin(n, *g, l)
+        })
+        .collect();
+    let pout_ids: Vec<Id> = pouts.iter().map(|(n, g)| b.pout(n, *g)).collect();
+    let frame = b.g.add_object("Frame", ObjKind::Other);
+    b.g.objects[frame].class = target_class;
+    let target = b.local("Target", types::ENTITY, Value::Obj(Some(frame)));
+    let blk = b.bb(
+        "B",
+        proto,
+        ins,
+        outs,
+        pin_ids,
+        pout_ids,
+        vec![],
+        Some(target),
+    );
+    let start = b.io("Start");
+    let links = vec![b.link(start, in_of(&b.g, blk, 0), 0)];
+    b.script("S", Some(frame), start, vec![blk], links);
+    (Runtime::new(b.done()), blk)
+}
+
+fn last_box(host: &Rec) -> Option<crate::TextSpec> {
+    host.boxes.last().and_then(|(_, s)| s.clone())
+}
+
+#[test]
+fn text_display_sends_its_box_and_joins_its_text_pins() {
+    let pins = [
+        ("Offset", types::VECTOR2, Value::Vec2([10.0, 20.0])),
+        ("Color", types::COLOR, Value::Color([1.0, 0.5, 0.0, 1.0])),
+        ("Alignment", types::INT, Value::Int(2 | 16)),
+        ("Size", types::INT, Value::Int(15)),
+        ("Text", types::STRING, Value::Str("Score".into())),
+        ("Value", types::STRING, Value::Str("42".into())),
+    ];
+    let (mut rt, _) = text_rig(
+        proto::TEXT_DISPLAY,
+        &["On", "Off"],
+        &["Exit On", "Exit Off"],
+        &pins,
+        &[],
+        27,
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    let s = last_box(&host).expect("a box");
+    assert_eq!(
+        s.text, "Score 42 ",
+        "every text pin's string followed by a space"
+    );
+    assert_eq!(
+        (s.x, s.y, s.w, s.h),
+        (10.0, 20.0, 320.0, 32.0),
+        "offset and the default sprite size"
+    );
+    assert_eq!(s.size, 20.0, "15 points are 20 pixels");
+    assert_eq!(s.color, [1.0, 0.5, 0.0, 1.0]);
+    assert_eq!(
+        s.align,
+        text_align_bits(true, false, false, true),
+        "Left and Bottom"
+    );
+}
+
+fn text_align_bits(left: bool, right: bool, top: bool, bottom: bool) -> u8 {
+    use crate::text_align::*;
+    [(left, LEFT), (right, RIGHT), (top, TOP), (bottom, BOTTOM)]
+        .iter()
+        .filter(|(on, _)| *on)
+        .fold(0, |a, (_, b)| a | b)
+}
+
+#[test]
+fn text_display_off_takes_the_box_away_and_a_deactivated_script_too() {
+    let pins = [
+        ("Offset", types::VECTOR2, Value::Vec2([0.0, 0.0])),
+        ("Color", types::COLOR, Value::Color([1.0; 4])),
+        ("Alignment", types::INT, Value::Int(2)),
+        ("Size", types::INT, Value::Int(10)),
+        ("Text", types::STRING, Value::Str("x".into())),
+    ];
+    let (mut rt, blk) = text_rig(
+        proto::TEXT_DISPLAY,
+        &["On", "Off"],
+        &["Exit On", "Exit Off"],
+        &pins,
+        &[],
+        27,
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert!(last_box(&host).is_some());
+    let b = rt.graph.block(blk).unwrap().clone();
+    crate::blocks::event(
+        &mut rt,
+        blk,
+        &b,
+        crate::blocks::BlockEvent::DeactivateScript,
+        &mut host,
+    );
+    assert_eq!(
+        host.boxes.last(),
+        Some(&(blk, None)),
+        "deactivating the script removes the box"
+    );
+    // Off input
+    let off = in_of(&rt.graph, blk, 1);
+    rt.set_io(off, true);
+    host.boxes.clear();
+    rt.tick(&mut host);
+    assert_eq!(
+        host.boxes.first(),
+        Some(&(blk, None)),
+        "Off removes the box"
+    );
+}
+
+#[test]
+fn text_2d_uses_the_font_margins_and_alignment_and_counts_lines() {
+    let pins = [
+        ("Font", types::INT, Value::Int(1)),
+        ("Text", types::STRING, Value::Str("one\ntwo".into())),
+        ("Alignment", types::INT, Value::Int(1 | 4)),
+        ("Margins", types::RECT, Value::Rect([2.0, 3.0, 4.0, 5.0])),
+        ("Offset", types::VECTOR2, Value::Vec2([1.0, 1.0])),
+    ];
+    let (mut rt, blk) = text_rig(
+        proto::TEXT_2D,
+        &["On", "Off"],
+        &["Exit On", "Exit Off"],
+        &pins,
+        &[("Text Extents", types::RECT), ("Line Count", types::INT)],
+        27,
+    );
+    rt.fonts.push(crate::Font {
+        name: "f".into(),
+        scale: [0.5, 0.25],
+        color: [0.0, 1.0, 0.0, 1.0],
+        bold: true,
+    });
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    let s = last_box(&host).expect("a box");
+    assert_eq!(
+        (s.x, s.y, s.w, s.h),
+        (3.0, 4.0, 634.0, 472.0),
+        "margins inside the frame plus the offset"
+    );
+    assert_eq!(s.size, 8.0, "the font's scale 0.25 of a 32 pixel cell");
+    assert_eq!(s.color, [0.0, 1.0, 0.0, 1.0]);
+    assert!(s.bold);
+    assert_eq!(s.align, text_align_bits(true, false, true, false));
+    let lc = rt.graph.block(blk).unwrap().pouts[1];
+    assert_eq!(rt.values[lc], Value::Int(2));
+}
+
+#[test]
+fn text_2d_on_something_that_is_not_a_2d_entity_draws_nothing() {
+    let pins = [("Text", types::STRING, Value::Str("x".into()))];
+    let (mut rt, _) = text_rig(
+        proto::TEXT_2D,
+        &["On", "Off"],
+        &["Exit On", "Exit Off"],
+        &pins,
+        &[],
+        33,
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert!(host.boxes.is_empty());
+}
+
+#[test]
+fn font_blocks_make_fonts_and_set_their_properties() {
+    // TT CreateFontEx without a texture makes no font
+    let (mut rt, _) = text_rig(
+        proto::TT_CREATE_FONT_EX,
+        &["In"],
+        &["Out"],
+        &[
+            ("Font Name", types::STRING, Value::Str("F".into())),
+            ("Font Texture", types::TEXTURE, Value::Obj(None)),
+        ],
+        &[("Font", types::INT)],
+        27,
+    );
+    rt.tick(&mut Rec::new());
+    assert!(rt.fonts.is_empty());
+    // with a texture it does, and a second font of the name replaces it
+    let (mut rt, blk) = text_rig(
+        proto::TT_CREATE_FONT_EX,
+        &["In"],
+        &["Out"],
+        &[
+            ("Font Name", types::STRING, Value::Str("F".into())),
+            ("Font Texture", types::TEXTURE, Value::Obj(Some(0))),
+        ],
+        &[("Font", types::INT)],
+        27,
+    );
+    rt.tick(&mut Rec::new());
+    assert_eq!(rt.fonts.len(), 1);
+    let f = rt.graph.block(blk).unwrap().pouts[0];
+    assert_eq!(rt.values[f], Value::Int(1));
+    // Create System Font: bold from weight 700
+    let (mut rt, blk) = text_rig(
+        proto::CREATE_SYSTEM_FONT,
+        &["In"],
+        &["Success", "Error"],
+        &[
+            ("Font Name", types::STRING, Value::Str("S".into())),
+            ("System Font Name", types::INT, Value::Int(0)),
+            ("Font Weight", types::INT, Value::Int(700)),
+        ],
+        &[("Font Created", types::INT)],
+        27,
+    );
+    rt.tick(&mut Rec::new());
+    assert!(rt.fonts[0].bold);
+    let f = rt.graph.block(blk).unwrap().pouts[0];
+    assert_eq!(rt.values[f], Value::Int(1));
+    // Set Font Properties
+    let (mut rt, _) = text_rig(
+        proto::SET_FONT_PROPERTIES,
+        &["In"],
+        &["Out"],
+        &[
+            ("Font", types::INT, Value::Int(1)),
+            ("Space", types::VECTOR2, Value::Vec2([0.0; 2])),
+            ("Scale", types::VECTOR2, Value::Vec2([0.4, 0.5])),
+            ("Italic Offset", types::FLOAT, Value::Float(0.0)),
+            ("Color", types::COLOR, Value::Color([0.1, 0.2, 0.3, 1.0])),
+        ],
+        &[],
+        27,
+    );
+    rt.fonts.push(crate::Font {
+        name: "f".into(),
+        scale: [1.0; 2],
+        color: [1.0; 4],
+        bold: false,
+    });
+    rt.tick(&mut Rec::new());
+    assert_eq!(rt.fonts[0].scale, [0.4, 0.5]);
+    assert_eq!(rt.fonts[0].color, [0.1, 0.2, 0.3, 1.0]);
+}
+
+#[test]
+fn three_d_text_and_movie_player_are_named_no_ops() {
+    for p in [proto::TEXT_3D, proto::MOVIE_PLAYER] {
+        let (mut rt, _) = text_rig(p, &["In"], &["Out"], &[], &[], 27);
+        let mut host = Rec::new();
+        rt.tick(&mut host);
+        assert!(host.boxes.is_empty());
+        assert!(
+            host.notes.iter().any(|n| n.contains("does nothing")),
+            "said once"
+        );
     }
 }

@@ -37,6 +37,9 @@ pub struct Scripts {
     pub teleports: u32,
     /// The map's sounds: what plays in the run's own clock, and what the audio is to do about it.
     pub sound: SoundState,
+    /// The text boxes the map's scripts show now, by the block that shows each (drawn by hud.rs under the interface;
+    /// they rewind and restart with the run).
+    pub text: Vec<(script::Id, script::TextSpec)>,
 }
 
 /// The most sound events kept for the audio between two drains (a run with no audio never drains them).
@@ -143,6 +146,7 @@ impl Scripts {
             ball_id,
             teleports: 0,
             sound: SoundState::default(),
+            text: Vec::new(),
         })
     }
 }
@@ -190,6 +194,7 @@ struct ScriptsParts {
     ball_id: Option<script::Id>,
     tick: u64,
     sound: SoundState,
+    text: Vec<(script::Id, script::TextSpec)>,
 }
 
 impl ScriptsParts {
@@ -394,13 +399,20 @@ impl Host for SimHost<'_> {
         let ticks = self.s.sound.ticks.get(&stem.to_ascii_lowercase()).copied();
         if ticks.is_none() && !self.s.sound.noted.contains(&stem) {
             self.s.sound.noted.push(stem.clone());
-            self.s.note(format!("sound file {file:?} is not available: silent"));
+            self.s
+                .note(format!("sound file {file:?} is not available: silent"));
         }
         let st = &mut self.s.sound;
         match cmd {
             SoundCmd::Play { looping, .. } => {
                 let until = (!looping).then(|| tick.saturating_add(ticks.unwrap_or(0)));
-                st.playing.insert(key, Playing { until, paused: None });
+                st.playing.insert(
+                    key,
+                    Playing {
+                        until,
+                        paused: None,
+                    },
+                );
             }
             SoundCmd::Stop { .. } => {
                 st.playing.remove(&key);
@@ -430,17 +442,31 @@ impl Host for SimHost<'_> {
     }
 
     fn sound_playing(&self, key: usize) -> bool {
-        self.s.sound.playing.get(&key).is_some_and(|p| {
-            p.paused.is_some() || p.until.is_none_or(|u| self.s.tick < u)
-        })
+        self.s
+            .sound
+            .playing
+            .get(&key)
+            .is_some_and(|p| p.paused.is_some() || p.until.is_none_or(|u| self.s.tick < u))
     }
 
-    fn text(&mut self, name: &str, text: &str, on: bool) {
-        self.s.note(if on {
-            format!("text {name}: {text:?}")
-        } else {
-            format!("text {name} off")
-        });
+    fn text_box(&mut self, key: usize, spec: Option<script::TextSpec>) {
+        let at = self.s.text.iter().position(|(k, _)| *k == key);
+        match (at, spec) {
+            (Some(i), None) => {
+                self.s.text.remove(i);
+            }
+            (Some(i), Some(mut spec)) => {
+                spec.text = spec.text.chars().take(script::MAX_TEXT_CHARS).collect();
+                if let Some(slot) = self.s.text.get_mut(i) {
+                    slot.1 = spec;
+                }
+            }
+            (None, Some(mut spec)) if self.s.text.len() < script::MAX_TEXT_BOXES => {
+                spec.text = spec.text.chars().take(script::MAX_TEXT_CHARS).collect();
+                self.s.text.push((key, spec));
+            }
+            (None, _) => {}
+        }
     }
 
     fn note(&mut self, text: &str) {
@@ -522,6 +548,7 @@ impl Scripts {
             ball_id: self.ball_id,
             tick: run.tick,
             sound: std::mem::take(&mut self.sound),
+            text: std::mem::take(&mut self.text),
         };
         {
             let mut host = SimHost { s: &mut parts, run };
@@ -536,6 +563,7 @@ impl Scripts {
         self.groups = parts.groups;
         self.log = parts.log;
         self.sound = parts.sound;
+        self.text = parts.text;
         if run.teleport.is_some() {
             self.teleports = self.teleports.saturating_add(1);
         }
