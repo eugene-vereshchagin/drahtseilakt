@@ -107,6 +107,19 @@ impl Host for Rec {
     fn note(&mut self, text: &str) {
         self.notes.push(text.to_string());
     }
+    fn copy(&mut self, e: Ent, name: &str) -> Option<usize> {
+        let m = self.matrix(e)?;
+        self.matrices.push(m);
+        self.visible.push(true);
+        self.notes.push(format!("copy {name}"));
+        Some(self.matrices.len() - 1)
+    }
+    fn group_add(&mut self, group: usize, object: usize) {
+        self.notes.push(format!("group {group} + {object}"));
+    }
+    fn group_remove(&mut self, group: usize, object: usize) {
+        self.notes.push(format!("group {group} - {object}"));
+    }
 }
 
 /// Builds graphs node by node; ids are handed out in order.
@@ -805,4 +818,344 @@ fn a_string_that_doubles_each_time_stops_growing() {
     let big = Value::Str("x".repeat(1 << 16));
     let r = crate::blocks::arith(|x, y| x + y, i32::wrapping_add, &big, &big, false);
     assert!(r.as_string().len() <= (1 << 16) + 8);
+}
+
+/// A template object A with a script that hides "This"; another script copies A and moves the copy. The copy
+/// gets its own name and its own copy of the script, bound to the copy: the copy's script hides the copy.
+#[test]
+fn object_copy_copies_the_scripts_and_binds_this_to_the_copy() {
+    let mut b = Build::new();
+    // the maker: Start -> Object Copy(A) -> Set Position(Copy, 5 0 0)
+    let dep = b.local("Dependency Options", types::NONE, Value::None);
+    let orig = b.local("Original", types::ENTITY, Value::Obj(Some(0)));
+    let orig_pin = b.pin("Original", types::ENTITY, orig);
+    let copy_out = b.pout("Copy", types::ENTITY);
+    let copy = b.bb(
+        "Object Copy",
+        proto::OBJECT_COPY,
+        &["In"],
+        &["Out"],
+        vec![dep, orig_pin],
+        vec![copy_out],
+        vec![],
+        None,
+    );
+    let pos = b.local("Position", types::VECTOR, Value::Vec3([5.0, 0.0, 0.0]));
+    let pos_pin = b.pin("Position", types::VECTOR, pos);
+    let set = b.bb(
+        "Set Position",
+        proto::SET_POSITION,
+        &["In"],
+        &["Out"],
+        vec![pos_pin],
+        vec![],
+        vec![],
+        Some(copy_out),
+    );
+    let start2 = b.io("Start");
+    let l1 = b.link(start2, in_of(&b.g, copy, 0), 0);
+    let l2 = b.link(out_of(&b.g, copy, 0), in_of(&b.g, set, 0), 0);
+    b.script("Maker", None, start2, vec![copy, set], vec![l1, l2]);
+    // the template's script on A (object 0): Start -> Hide(This)
+    let this = b.local("This", types::BEOBJECT, Value::Owner);
+    let target = b.pin("Target", types::ENTITY, this);
+    let hide = b.bb(
+        "Hide",
+        proto::HIDE,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(target),
+    );
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, hide, 0), 0);
+    let template = b.script("Template", Some(0), start, vec![hide], vec![l]);
+    let g = b.done();
+    let nodes_before = g.nodes.len();
+    let mut rt = Runtime::new(g.clone());
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(
+        host.visible,
+        vec![false, true, true],
+        "the template hides itself; the copy is made"
+    );
+    assert_eq!(
+        host.matrices[2][3],
+        [5.0, 0.0, 0.0, 1.0],
+        "the copy is moved, not the original"
+    );
+    assert_eq!(host.matrices[0][3], [0.0, 0.0, 0.0, 1.0]);
+    assert!(
+        host.notes.contains(&"copy A001".to_string()),
+        "{:?}",
+        host.notes
+    );
+    assert_eq!(
+        g.nodes.len(),
+        nodes_before,
+        "the level's graph is not touched: the run has its own"
+    );
+    assert_eq!(
+        rt.graph.scripts.len(),
+        3,
+        "the copy has the template's script"
+    );
+    let copied = *rt.graph.scripts.last().unwrap();
+    assert_ne!(copied, template);
+    assert_eq!(
+        rt.graph
+            .name(rt.graph.block(copied).unwrap().owner.unwrap()),
+        "A001"
+    );
+    rt.tick(&mut host);
+    assert_eq!(
+        host.visible,
+        vec![false, true, false],
+        "the copy's script hides the copy"
+    );
+    // a rewound run copies again and gets the same
+    let mut again = Runtime::new(g);
+    let mut host2 = Rec::new();
+    again.tick(&mut host2);
+    again.tick(&mut host2);
+    assert_eq!(host2.visible, host.visible);
+}
+
+/// Object Copy in a loop stops at the cap: the run does not grow without end.
+#[test]
+fn copies_are_capped() {
+    let mut b = Build::new();
+    let dep = b.local("Dependency Options", types::NONE, Value::None);
+    let orig = b.local("Original", types::ENTITY, Value::Obj(Some(0)));
+    let orig_pin = b.pin("Original", types::ENTITY, orig);
+    let copy_out = b.pout("Copy", types::ENTITY);
+    let copy = b.bb(
+        "Object Copy",
+        proto::OBJECT_COPY,
+        &["In"],
+        &["Out"],
+        vec![dep, orig_pin],
+        vec![copy_out],
+        vec![],
+        None,
+    );
+    let start = b.io("Start");
+    let l1 = b.link(start, in_of(&b.g, copy, 0), 0);
+    let l2 = b.link(out_of(&b.g, copy, 0), in_of(&b.g, copy, 0), 0);
+    b.script("Maker", None, start, vec![copy], vec![l1, l2]);
+    let mut rt = Runtime::new(b.done());
+    let mut host = Rec::new();
+    for _ in 0..3 {
+        rt.tick(&mut host);
+    }
+    assert_eq!(host.matrices.len(), 2 + crate::exec::MAX_COPIES);
+    assert_eq!(
+        host.notes.iter().filter(|n| n.contains("too many")).count(),
+        1,
+        "said once"
+    );
+}
+
+/// Linear Progression goes from A to B over its time, a Loop In a tick; Interpolator and Set Component follow it.
+#[test]
+fn a_progression_runs_from_a_to_b_and_ends() {
+    let mut b = Build::new();
+    let f = |b: &mut Build, name: &str, v: f32| {
+        let l = b.local(name, types::FLOAT, Value::Float(v));
+        b.pin(name, types::FLOAT, l)
+    };
+    let (time, a, c) = (
+        f(&mut b, "Time", 100.0),
+        f(&mut b, "A", 2.0),
+        f(&mut b, "B", 12.0),
+    );
+    let outs: Vec<Id> = ["Elapsed Time", "Value", "Delta", "Progression"]
+        .iter()
+        .map(|n| b.pout(n, types::FLOAT))
+        .collect();
+    let (value, progression) = (outs[1], outs[3]);
+    let time_based = b.local("Time Based", types::BOOL, Value::Bool(true));
+    let prog = b.bb(
+        "Linear Progression",
+        proto::LINEAR_PROGRESSION,
+        &["In", "Loop In"],
+        &["Out", "Loop Out"],
+        vec![time, a, c],
+        outs,
+        vec![time_based],
+        None,
+    );
+    // Interpolator: (0 0 0)..(10 20 30) at the progression
+    let va = b.local("A", types::VECTOR, Value::Vec3([0.0; 3]));
+    let vb = b.local("B", types::VECTOR, Value::Vec3([10.0, 20.0, 30.0]));
+    let (pa, pb) = (b.pin("A", types::VECTOR, va), b.pin("B", types::VECTOR, vb));
+    let pv = b.pin("Value", types::FLOAT, progression);
+    let mixed = b.pout("C", types::VECTOR);
+    let mix = b.bb(
+        "Interpolator",
+        proto::INTERPOLATOR,
+        &["In"],
+        &["Out"],
+        vec![pa, pb, pv],
+        vec![mixed],
+        vec![],
+        None,
+    );
+    let start = b.io("Start");
+    let l1 = b.link(start, in_of(&b.g, prog, 0), 0);
+    let l2 = b.link(out_of(&b.g, prog, 1), in_of(&b.g, prog, 1), 1);
+    let l3 = b.link(out_of(&b.g, prog, 1), in_of(&b.g, mix, 0), 0);
+    let script = b.script("S", None, start, vec![prog, mix], vec![l1, l2, l3]);
+    let mut rt = Runtime::new(b.done());
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(rt.values[value], Value::Float(2.0), "it starts at A");
+    let mut last = 2.0;
+    for _ in 0..3 {
+        rt.tick(&mut host);
+        let v = rt.values[value].as_float();
+        assert!(v > last && v < 12.0, "{v}");
+        last = v;
+    }
+    // 3 ticks of 16.67 ms of 100: half way
+    assert!((last - 7.0).abs() < 0.01, "{last}");
+    assert!((rt.values[mixed].as_vec3()[1] - 10.0).abs() < 0.01);
+    for _ in 0..4 {
+        rt.tick(&mut host);
+    }
+    assert_eq!(rt.values[value], Value::Float(12.0), "it ends at B");
+    assert!(!rt.is_active(script), "and stops");
+}
+
+/// Random gives the same numbers in every run, within its bounds; the group blocks reach the engine.
+#[test]
+fn random_repeats_and_groups_change() {
+    let build = || {
+        let mut b = Build::new();
+        let lo = b.local("Min", types::FLOAT, Value::Float(3.0));
+        let hi = b.local("Max", types::FLOAT, Value::Float(4.0));
+        let (plo, phi) = (
+            b.pin("Min", types::FLOAT, lo),
+            b.pin("Max", types::FLOAT, hi),
+        );
+        let rand = b.pout("Rand", types::FLOAT);
+        let random = b.bb(
+            "Random",
+            proto::RANDOM,
+            &["In"],
+            &["Out"],
+            vec![plo, phi],
+            vec![rand],
+            vec![],
+            None,
+        );
+        let group = b.local("Group", types::GROUP, Value::Obj(Some(2)));
+        let pg = b.pin("Group", types::GROUP, group);
+        let t = b.local("Target", types::BEOBJECT, Value::Obj(Some(1)));
+        let add = b.bb(
+            "Add To Group",
+            proto::ADD_TO_GROUP,
+            &["In"],
+            &["Out"],
+            vec![pg],
+            vec![],
+            vec![],
+            Some(t),
+        );
+        let start = b.io("Start");
+        let l1 = b.link(start, in_of(&b.g, random, 0), 0);
+        let l2 = b.link(out_of(&b.g, random, 0), in_of(&b.g, random, 0), 1);
+        let l3 = b.link(start, in_of(&b.g, add, 0), 0);
+        b.script("S", None, start, vec![random, add], vec![l1, l2, l3]);
+        (b.done(), rand)
+    };
+    let run = || {
+        let (g, rand) = build();
+        let mut rt = Runtime::new(g);
+        let mut host = Rec::new();
+        let mut seen = Vec::new();
+        for _ in 0..20 {
+            rt.tick(&mut host);
+            seen.push(rt.values[rand].as_float());
+        }
+        (seen, host.notes)
+    };
+    let (a, notes) = run();
+    let (b2, _) = run();
+    assert_eq!(a, b2, "the same numbers in every run");
+    assert!(a.iter().all(|x| (3.0..4.0).contains(x)), "{a:?}");
+    assert!(
+        a.windows(2).any(|w| w[0] != w[1]),
+        "and they differ from draw to draw"
+    );
+    assert!(notes.contains(&"group 0 + 1".to_string()), "{notes:?}");
+}
+
+/// A hostile map: an object with tens of thousands of scripts. Loading is linear in the map, and copying the
+/// object is paid from the tick's budget: a copy larger than a tick may make is refused, whole, so neither
+/// the load nor a tick takes the game's time (the bounds are generous: the work is milliseconds).
+#[test]
+fn an_object_with_very_many_scripts_neither_stalls_the_load_nor_a_copy() {
+    let build = |n: usize, maker: bool| {
+        let mut b = Build::new();
+        if maker {
+            let dep = b.local("Dependency Options", types::NONE, Value::None);
+            let orig = b.local("Original", types::ENTITY, Value::Obj(Some(0)));
+            let orig_pin = b.pin("Original", types::ENTITY, orig);
+            let copy_out = b.pout("Copy", types::ENTITY);
+            let copy = b.bb(
+                "Object Copy",
+                proto::OBJECT_COPY,
+                &["In"],
+                &["Out"],
+                vec![dep, orig_pin],
+                vec![copy_out],
+                vec![],
+                None,
+            );
+            let start = b.io("Start");
+            let l1 = b.link(start, in_of(&b.g, copy, 0), 0);
+            let l2 = b.link(out_of(&b.g, copy, 0), in_of(&b.g, copy, 0), 1);
+            b.script("Maker", None, start, vec![copy], vec![l1, l2]);
+        }
+        for _ in 0..n {
+            let s = b.io("Start");
+            b.script("S", Some(0), s, vec![], vec![]);
+        }
+        b.done()
+    };
+    let limit = std::time::Duration::from_secs(10);
+    // the load: 300 000 scripts on one object
+    let g = build(300_000, false);
+    let t = std::time::Instant::now();
+    let _rt = Runtime::new(g);
+    assert!(t.elapsed() < limit, "load took {:?}", t.elapsed());
+    // a copy every tick of an object with 20 000 scripts: the graph stays under its cap, the ticks are short
+    let g = build(20_000, true);
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    let t = std::time::Instant::now();
+    for _ in 0..300 {
+        rt.tick(&mut host);
+    }
+    assert!(t.elapsed() < limit, "300 ticks took {:?}", t.elapsed());
+    assert!(rt.graph.nodes.len() <= crate::MAX_OBJECTS);
+    assert!(host.matrices.len() > 2, "copies that fit are made");
+    assert!(
+        host.notes.iter().any(|n| n.contains("copy refused")),
+        "and one that does not fit is refused"
+    );
+    // straight calls, as the reviewer's: 256 tries on 60 000 scripts
+    let g = build(60_000, false);
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    let t = std::time::Instant::now();
+    for _ in 0..256 {
+        rt.copy_object(0, &mut host);
+    }
+    assert!(t.elapsed() < limit, "256 copies took {:?}", t.elapsed());
+    assert!(rt.graph.nodes.len() <= crate::MAX_OBJECTS);
 }

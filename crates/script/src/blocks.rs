@@ -81,6 +81,23 @@ pub mod proto {
     pub const WAIT_FOR_ALL: Guid = Guid(0xc044_a999, 0xfdfe_faf7);
     pub const STREAMING_EVENT: Guid = Guid(0x1f0b_52bf, 0x4c33_42dd);
     pub const SEQUENCER: Guid = Guid(0x4253_0844, 0x257b_6053);
+    pub const ADD_TO_GROUP: Guid = Guid(0x0002_4125, 0x7854_20ab);
+    pub const REMOVE_FROM_GROUP: Guid = Guid(0xd014_7412, 0x0258_520d);
+    pub const GROUP_CLEAR: Guid = Guid(0x1d12_662e, 0x4268_7a3c);
+    pub const BEZIER_PROGRESSION: Guid = Guid(0x6bb8_699a, 0x29fb_6a4b);
+    pub const LINEAR_PROGRESSION: Guid = Guid(0xfff4_5680, 0xaa51_2a39);
+    pub const INTERPOLATOR: Guid = Guid(0x3550_3950, 0x2dde_7a65);
+    pub const GET_COMPONENT: Guid = Guid(0x2689_057b, 0x1a1a_446a);
+    pub const SET_COMPONENT: Guid = Guid(0x6e80_0755, 0x57b6_4acb);
+    pub const RANDOM: Guid = Guid(0x0c62_2386, 0x1c30_54f7);
+    pub const RANDOM_SWITCH: Guid = Guid(0x79d7_2fde, 0x2e9d_0912);
+    pub const SET_EULER_ORIENTATION: Guid = Guid(0x0c49_66d8, 0x6c0c_6d14);
+    pub const SCALE: Guid = Guid(0x4123_6987, 0xa54a_87a6);
+    pub const TT_TIMER: Guid = Guid(0x6ac6_7901, 0x7d2a_6059);
+    pub const REMOVE_ROW: Guid = Guid(0x1fa5_7136, 0x1431_0857);
+    pub const ROW_SEARCH: Guid = Guid(0x7886_3443, 0x45af_59b6);
+    pub const GET_NEAREST_IN_GROUP: Guid = Guid(0x0852_07eb, 0x5849_50d8);
+    pub const OBJECT_RENAME: Guid = Guid(0x6f07_4ca7, 0x4542_7431);
 }
 
 /// Whether the runtime knows this prototype.
@@ -152,6 +169,23 @@ const KNOWN: &[Guid] = &[
     proto::WAIT_FOR_ALL,
     proto::STREAMING_EVENT,
     proto::SEQUENCER,
+    proto::ADD_TO_GROUP,
+    proto::REMOVE_FROM_GROUP,
+    proto::GROUP_CLEAR,
+    proto::BEZIER_PROGRESSION,
+    proto::LINEAR_PROGRESSION,
+    proto::INTERPOLATOR,
+    proto::GET_COMPONENT,
+    proto::SET_COMPONENT,
+    proto::RANDOM,
+    proto::RANDOM_SWITCH,
+    proto::SET_EULER_ORIENTATION,
+    proto::SCALE,
+    proto::TT_TIMER,
+    proto::REMOVE_ROW,
+    proto::ROW_SEARCH,
+    proto::GET_NEAREST_IN_GROUP,
+    proto::OBJECT_RENAME,
 ];
 
 /// Reads and clears input `i`.
@@ -1239,11 +1273,390 @@ pub fn run(rt: &mut Runtime, id: Id, b: &Block, proto: Guid, host: &mut dyn Host
         proto::OBJECT_COPY => {
             if input(rt, b, 0) {
                 let o = pin(rt, b, "Original", 1, host).as_obj();
-                host.note(&format!(
-                    "script copies {} (copies are not made yet; the copy is nothing)",
-                    ent_name(rt, o)
-                ));
-                set_pout(rt, b, "Copy", 0, Value::Obj(None));
+                let copy = o.and_then(|o| rt.copy_object(o, host));
+                if copy.is_none() {
+                    host.note(&format!(
+                        "script copies {} (no copy made; the copy is nothing)",
+                        ent_name(rt, o)
+                    ));
+                }
+                set_pout(rt, b, "Copy", 0, Value::Obj(copy));
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::ADD_TO_GROUP | proto::REMOVE_FROM_GROUP => {
+            if input(rt, b, 0) {
+                let g = pin(rt, b, "Group", 0, host).as_obj();
+                let t = rt.target(b, host);
+                if let (Some(ObjKind::Group(gi)), Some(Ent::Object(i))) = (
+                    g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind),
+                    rt.ent(t),
+                ) {
+                    if proto == proto::ADD_TO_GROUP {
+                        host.group_add(gi, i);
+                    } else {
+                        host.group_remove(gi, i);
+                    }
+                }
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::GROUP_CLEAR => {
+            if input(rt, b, 0) {
+                let t = rt.target(b, host);
+                if let Some(ObjKind::Group(gi)) =
+                    t.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind)
+                {
+                    host.group_clear(gi);
+                }
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::LINEAR_PROGRESSION | proto::BEZIER_PROGRESSION => {
+            // In starts at A; each Loop In moves on by the tick (or by one frame when not time based) and
+            // gives the value between A and B; at the end B and Out. The Bezier one's curve is a 2D curve the
+            // runtime does not decode: it is taken as the straight line a new block has.
+            let start = input(rt, b, 0);
+            let looped = input(rt, b, 1);
+            if !start && !looped {
+                return Flow::Done;
+            }
+            let duration = pin(rt, b, "Duration", 0, host).as_float();
+            let a = pin(rt, b, "A", 1, host).as_float();
+            let c = pin(rt, b, "B", 2, host).as_float();
+            let time_based = !matches!(local(rt, b, 0), Value::Bool(false));
+            let (elapsed, last) = match rt.scratch(id) {
+                Scratch::Progress { elapsed, last } if !start => (
+                    *elapsed + if time_based { host.delta_ms() } else { 1.0 },
+                    *last,
+                ),
+                _ => (0.0, a),
+            };
+            let progress = if duration > 0.0 {
+                (elapsed / duration).clamp(0.0, 1.0)
+            } else {
+                1.0
+            };
+            let value = a + (c - a) * progress;
+            set_pout(rt, b, "Elapsed Time", 0, Value::Float(elapsed));
+            set_pout(rt, b, "Value", 1, Value::Float(value));
+            set_pout(rt, b, "Delta", 2, Value::Float(value - last));
+            set_pout(rt, b, "Progression", 3, Value::Float(progress));
+            if progress >= 1.0 {
+                rt.set_scratch(id, Scratch::None);
+                out(rt, b, 0);
+            } else {
+                rt.set_scratch(
+                    id,
+                    Scratch::Progress {
+                        elapsed,
+                        last: value,
+                    },
+                );
+                out(rt, b, 1);
+            }
+            Flow::Done
+        }
+        proto::INTERPOLATOR => {
+            if input(rt, b, 0) {
+                let a = pin(rt, b, "A", 0, host);
+                let c = pin(rt, b, "B", 1, host);
+                let t = pin(rt, b, "Value", 2, host).as_float();
+                let mix = |x: f32, y: f32| x + (y - x) * t;
+                let v = match (&a, &c) {
+                    (Value::Vec3(x), Value::Vec3(y)) => {
+                        Value::Vec3([mix(x[0], y[0]), mix(x[1], y[1]), mix(x[2], y[2])])
+                    }
+                    (Value::Vec2(x), Value::Vec2(y)) => {
+                        Value::Vec2([mix(x[0], y[0]), mix(x[1], y[1])])
+                    }
+                    (Value::Color(x), Value::Color(y)) => Value::Color([
+                        mix(x[0], y[0]),
+                        mix(x[1], y[1]),
+                        mix(x[2], y[2]),
+                        mix(x[3], y[3]),
+                    ]),
+                    (Value::Int(x), Value::Int(y)) => Value::Int(mix(*x as f32, *y as f32) as i32),
+                    _ => Value::Float(mix(a.as_float(), c.as_float())),
+                };
+                set_pout(rt, b, "C", 0, v);
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::GET_COMPONENT => {
+            if input(rt, b, 0) {
+                let parts: Vec<f32> = match pin(rt, b, "Variable", 0, host) {
+                    Value::Vec3(v) => v.to_vec(),
+                    Value::Vec2(v) => v.to_vec(),
+                    Value::Color(v) => v.to_vec(),
+                    v @ Value::Raw(_) => v.as_vec3().to_vec(),
+                    v => vec![v.as_float()],
+                };
+                for (i, x) in parts.into_iter().enumerate() {
+                    if let Some(p) = b.pouts.get(i).copied() {
+                        rt.write(p, Value::Float(x));
+                    }
+                }
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::SET_COMPONENT => {
+            if input(rt, b, 0) {
+                let mut c = [0.0f32; 4];
+                for (i, slot) in c.iter_mut().enumerate() {
+                    if let Some(p) = b.pins.get(i).copied() {
+                        *slot = rt.read(p, host).as_float();
+                    }
+                }
+                let kind = rt
+                    .pout(b, "Variable", 0)
+                    .and_then(|p| rt.graph.param(p))
+                    .map(|p| p.guid);
+                let v = match kind {
+                    Some(types::VECTOR2) => Value::Vec2([c[0], c[1]]),
+                    Some(types::COLOR) => Value::Color(c),
+                    _ if b.pins.len() == 2 => Value::Vec2([c[0], c[1]]),
+                    _ if b.pins.len() >= 4 => Value::Color(c),
+                    _ => Value::Vec3([c[0], c[1], c[2]]),
+                };
+                set_pout(rt, b, "Variable", 0, v);
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::RANDOM => {
+            if input(rt, b, 0) {
+                let lo = pin(rt, b, "Min", 0, host);
+                let hi = pin(rt, b, "Max", 1, host);
+                let v = match (&lo, &hi) {
+                    (Value::Vec3(x), Value::Vec3(y)) => {
+                        let mut r = [0.0f32; 3];
+                        for (k, slot) in r.iter_mut().enumerate() {
+                            let (x, y) = (
+                                x.get(k).copied().unwrap_or(0.0),
+                                y.get(k).copied().unwrap_or(0.0),
+                            );
+                            *slot = x + (y - x) * rt.random();
+                        }
+                        Value::Vec3(r)
+                    }
+                    (Value::Int(x), Value::Int(y)) => {
+                        let (x, y) = (*x as f32, *y as f32);
+                        Value::Int((x + (y - x) * rt.random()) as i32)
+                    }
+                    _ => {
+                        let (x, y) = (lo.as_float(), hi.as_float());
+                        Value::Float(x + (y - x) * rt.random())
+                    }
+                };
+                set_pout(rt, b, "Rand", 0, v);
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::RANDOM_SWITCH => {
+            if input(rt, b, 0) {
+                // one output by its coefficient's share of the sum
+                let mut coefs = Vec::new();
+                for i in 0..b.outputs.len().min(64) {
+                    let c = b
+                        .pins
+                        .get(i)
+                        .copied()
+                        .map_or(1.0, |p| rt.read(p, host).as_float());
+                    coefs.push(if c.is_finite() { c.max(0.0) } else { 0.0 });
+                }
+                let sum: f32 = coefs.iter().sum();
+                let mut left = rt.random() * sum;
+                let mut hit = 0usize;
+                for (i, c) in coefs.iter().enumerate() {
+                    hit = i;
+                    if left < *c {
+                        break;
+                    }
+                    left -= *c;
+                }
+                out(rt, b, hit);
+            }
+            Flow::Done
+        }
+        proto::SET_EULER_ORIENTATION => {
+            if input(rt, b, 0) {
+                let x = pin(rt, b, "X", 0, host).as_float();
+                let y = pin(rt, b, "Y", 1, host).as_float();
+                let z = pin(rt, b, "Z", 2, host).as_float();
+                let r = referential(rt, b, "Referential", 4, host);
+                if let Some(e) = target_ent(rt, b, host)
+                    && let Some(m) = host.matrix(e)
+                {
+                    // the turn about X first, then Y, then Z, in the referential's axes (the world's without one)
+                    let mut rot = mat_mul(
+                        &rotation([0.0, 0.0, 1.0], z),
+                        &mat_mul(&rotation([0.0, 1.0, 0.0], y), &rotation([1.0, 0.0, 0.0], x)),
+                    );
+                    if let Some(rm) = r {
+                        let mut frame = rm;
+                        for (col, len) in frame.iter_mut().zip(scale_of(&rm)).take(3) {
+                            if len > 1e-12 {
+                                *col = col.map(|v| v / len);
+                            }
+                        }
+                        frame[3] = [0.0, 0.0, 0.0, 1.0];
+                        rot = mat_mul(&frame, &rot);
+                    }
+                    let s = scale_of(&m);
+                    let mut next = m;
+                    for ((dst, src), len) in next.iter_mut().zip(rot.iter()).zip(s).take(3) {
+                        *dst = [src[0] * len, src[1] * len, src[2] * len, 0.0];
+                    }
+                    host.set_matrix(e, next);
+                }
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::SCALE => {
+            if input(rt, b, 0) {
+                let v = pin(rt, b, "Scaling Vector", 0, host).as_vec3();
+                let absolute = pin(rt, b, "Absolute", 2, host).as_bool();
+                if let Some(e) = target_ent(rt, b, host)
+                    && let Some(mut m) = host.matrix(e)
+                {
+                    let s = scale_of(&m);
+                    for ((col, want), len) in m.iter_mut().zip(v).zip(s).take(3) {
+                        let k = if absolute {
+                            if len > 1e-12 { want / len } else { 1.0 }
+                        } else {
+                            want
+                        };
+                        *col = [col[0] * k, col[1] * k, col[2] * k, 0.0];
+                    }
+                    host.set_matrix(e, m);
+                }
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::TT_TIMER => {
+            // On/Reset, Pause, Play, Off: a clock that counts the ticks' time while it plays.
+            let (mut elapsed, mut running, mut on) = match rt.scratch(id) {
+                Scratch::Clock { elapsed, running } => (*elapsed, *running, true),
+                _ => (0.0, false, false),
+            };
+            if input(rt, b, 0) {
+                (elapsed, running, on) = (0.0, true, true);
+                out(rt, b, 0);
+            } else if on && running {
+                elapsed += host.delta_ms();
+            }
+            if input(rt, b, 1) {
+                running = false;
+                out(rt, b, 1);
+            }
+            if input(rt, b, 2) {
+                running = on;
+                out(rt, b, 2);
+            }
+            if input(rt, b, 3) {
+                on = false;
+                out(rt, b, 3);
+            }
+            if on {
+                set_pout(rt, b, "Elapsed Time", 0, Value::Float(elapsed));
+                rt.set_scratch(id, Scratch::Clock { elapsed, running });
+                Flow::Continue
+            } else {
+                rt.set_scratch(id, Scratch::None);
+                Flow::Done
+            }
+        }
+        proto::REMOVE_ROW => {
+            if input(rt, b, 0) {
+                let t = rt.target(b, host);
+                let row = usize::try_from(pin(rt, b, "Row Index", 0, host).as_int()).ok();
+                let removed = match (array_of(rt, t), row) {
+                    (Some(a), Some(r)) => rt.remove_row(a, r),
+                    _ => false,
+                };
+                out(rt, b, usize::from(!removed));
+            }
+            Flow::Done
+        }
+        proto::ROW_SEARCH => {
+            if input(rt, b, 0) {
+                let t = rt.target(b, host);
+                let col = usize::try_from(pin(rt, b, "Column", 0, host).as_int()).ok();
+                let first =
+                    usize::try_from(pin(rt, b, "First Search Row", 1, host).as_int()).unwrap_or(0);
+                let op = pin(rt, b, "Operation", 2, host).as_int();
+                let reference = pin(rt, b, "Reference Value", 3, host);
+                let found = match (array_of(rt, t), col) {
+                    (Some(a), Some(col)) => rt
+                        .rows(a)
+                        .iter()
+                        .enumerate()
+                        .skip(first)
+                        .find(|(_, r)| r.get(col).is_some_and(|c| compare(op, c, &reference)))
+                        .map(|(i, _)| i),
+                    _ => None,
+                };
+                match found {
+                    Some(i) => {
+                        set_pout(rt, b, "First Row Found", 0, Value::Int(i as i32));
+                        out(rt, b, 0);
+                    }
+                    None => out(rt, b, 1),
+                }
+            }
+            Flow::Done
+        }
+        proto::GET_NEAREST_IN_GROUP => {
+            if input(rt, b, 0) {
+                let g = pin(rt, b, "Group", 0, host).as_obj();
+                let p = pin(rt, b, "Position", 1, host).as_vec3();
+                let at = match referential(rt, b, "Referential", 2, host) {
+                    Some(rm) => transform_point(&rm, p),
+                    None => p,
+                };
+                let mut best: Option<(usize, f32)> = None;
+                if let Some(ObjKind::Group(gi)) =
+                    g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind)
+                {
+                    for m in host.group_members(gi) {
+                        if let Some(mm) = host.matrix(Ent::Object(m)) {
+                            let d = distance_sq([mm[3][0], mm[3][1], mm[3][2]], at);
+                            if best.is_none_or(|(_, bd)| d < bd) {
+                                best = Some((m, d));
+                            }
+                        }
+                    }
+                }
+                let nearest = best.and_then(|(m, _)| {
+                    rt.graph
+                        .objects
+                        .iter()
+                        .position(|o| o.kind == ObjKind::Entity(m))
+                });
+                set_pout(rt, b, "Nearest Object", 0, Value::Obj(nearest));
+                if let Some((_, d)) = best {
+                    set_pout(rt, b, "Distance", 1, Value::Float(d.sqrt()));
+                }
+                out(rt, b, 0);
+            }
+            Flow::Done
+        }
+        proto::OBJECT_RENAME => {
+            if input(rt, b, 0) {
+                let o = pin(rt, b, "Object", 0, host).as_obj();
+                let name = pin(rt, b, "Name", 1, host).as_string();
+                if let Some(o) = o {
+                    rt.rename(o, &name);
+                }
                 out(rt, b, 0);
             }
             Flow::Done

@@ -57,6 +57,7 @@ fn value(v: &Value) -> J {
         Value::Color(a) => json!(["c", a.map(num)]),
         Value::Matrix(m) => json!(["m", m.iter().flatten().map(|x| num(*x)).collect::<Vec<_>>()]),
         Value::Raw(b) => json!(["r", hex(b)]),
+        Value::Owner => json!(["this", 0]),
     }
 }
 
@@ -125,6 +126,7 @@ fn value_of(j: &J) -> Result<Value, String> {
                 })
             }))
         }
+        "this" => Value::Owner,
         "r" => Value::Raw(unhex(x.as_str().ok_or("script bytes expected")?)?),
         _ => return Err("unknown script value".into()),
     })
