@@ -304,7 +304,7 @@ by the engine's.
 | Wait Message | `4587ffee:4587ffdd` | 35 | 76 | done |
 | Group Iterator | `6050252f:3aa82d40` | 22 | 64 | done |
 | Hide | `31d97d82:78d54d98` | 20 | 76 | done |
-| Physicalize | `7522370e:37ec15ec` | 19 | 98 | partial: runs; the ball only (other objects: phase 2) |
+| Physicalize | `7522370e:37ec15ec` | 19 | 98 | partial: movable bodies (ball, convex hull of the mesh) made live and followed by their objects; fixed and concave bodies logged only |
 | Box Box Intersection | `64154401:76cf37af` | 19 | 44 | done |
 | Set Position | `e456e78a:456789aa` | 18 | 84 | done |
 | Iterator | `198f0af9:0268249f` | 17 | 41 | done |
@@ -334,7 +334,7 @@ by the engine's.
 | Object Create | `271538e6:2fae49ac` | 4 | 9 | planned |
 | Bezier Progression | `6bb8699a:29fb6a4b` | 4 | 22 | partial: runs as a straight line (the block's 2D curve is not decoded) |
 | Interpolator | `35503950:2dde7a65` | 4 | 11 | done (colours mixed in RGB) |
-| SetPhysicsForce | `56e20c57:0b926068` | 4 | 5 | partial: accepted, no force yet |
+| SetPhysicsForce | `56e20c57:0b926068` | 4 | 5 | partial: a world force on a script body; Pos/Direction referentials to world |
 | Get Component | `2689057b:1a1a446a` | 4 | 8 | done |
 | Set World Matrix | `aa4aa6f0:ddefdef4` | 4 | 9 | done |
 | Set Diffuse | `e1e1e1e1:1e1e1e1e` | 4 | 11 | partial: accepted, no effect |
@@ -351,7 +351,7 @@ by the engine's.
 | Mouse Waiter | `014d010b:015d010b` | 3 | 3 | done (mouse of the run's input stream; no wheel) |
 | Set Light Color | `32115590:78951230` | 3 | 3 | planned |
 | Timer | `a2a5a63a:e4e7e8e5` | 3 | 4 | done |
-| Physics Impulse | `0c7e39bb:16db20d5` | 3 | 6 | planned |
+| Physics Impulse | `0c7e39bb:16db20d5` | 3 | 6 | partial: on script bodies |
 | Midi Player | `843cb43a:a12dac48` | 2 | 2 | no-op |
 | Object Rename | `6f074ca7:45427431` | 2 | 4 | no-op |
 | Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | partial: scale and colour kept; the engine draws its own face |
@@ -421,7 +421,7 @@ by the engine's.
 | TT Sky | `36691920:3b261630` | 1 | 1 | never (the engine's own interface) |
 | Get Row | `33b77f41:07b95c45` | 1 | 1 | done |
 | Set As Active Camera | `368f0ab1:2d8957e4` | 1 | 2 | never (the engine's own interface) |
-| Physics WakeUp | `38b851b5:72ca74ac` | 1 | 1 | planned |
+| Physics WakeUp | `38b851b5:72ca74ac` | 1 | 1 | partial: on script bodies |
 | Set Parent | `9d9d9d98:7e7a7f75` | 1 | 1 | planned |
 | Scan String | `4afa2f11:034872e2` | 1 | 1 | planned |
 | Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |

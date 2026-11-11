@@ -30,6 +30,26 @@ pub trait Host {
     fn bounds(&self, e: Ent) -> Option<([f32; 3], [f32; 3])>;
     fn delete(&mut self, e: Ent);
     fn physicalize(&mut self, e: Ent, on: bool);
+    /// A Physicalize input with the block's pins read (docs/physics.md 2.1): the engine makes the body if it can
+    /// (movable bodies only for now). Without an override it is the plain on switch.
+    fn physicalize_body(&mut self, e: Ent, _key: usize, _spec: &crate::PhysSpec) {
+        self.physicalize(e, true);
+    }
+    /// SetPhysicsForce (docs/physics.md 2.2): `create` makes the force of block `key` on `e` (a world vector `force`
+    /// already multiplied by Force Value, applied at the world point `at`); not `create` destroys that block's force.
+    fn physics_force(
+        &mut self,
+        _e: Ent,
+        _key: usize,
+        _create: bool,
+        _at: [f32; 3],
+        _force: [f32; 3],
+    ) {
+    }
+    /// Physics Impulse (docs/physics.md 2.5): a world impulse vector at a world point, the body woken.
+    fn physics_impulse(&mut self, _e: Ent, _at: [f32; 3], _impulse: [f32; 3]) {}
+    /// Physics WakeUp (docs/physics.md 2.8).
+    fn physics_wake(&mut self, _e: Ent) {}
     fn particles(&mut self, e: Ent, on: bool);
     /// A planar or spherical emitter block (`key` = its graph id) sets its state and values at `e` (docs/particles.md
     /// section 11). Particles are for the eye only; the engine must never let them reach the run. Called every tick

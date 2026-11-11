@@ -463,6 +463,36 @@ impl World {
         Some(self.add_spawn(spawn, active))
     }
 
+    /// A script's movable convex body (Physicalize): the hull of `points` in the object's own frame, made in the
+    /// physics now. `shift` is the mass centre in that frame, none for the hull's own ("Auto Mass Center").
+    /// None when the points span no volume.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_scripted_convex(
+        &mut self,
+        points: &[Vec3],
+        m: Material,
+        pos: Vec3,
+        rot: Quat,
+        frozen: bool,
+        collide: bool,
+        shift: Option<[f32; 3]>,
+    ) -> Option<usize> {
+        let pts: Vec<[f64; 3]> = points.iter().map(|&p| vec3_f64(p)).collect();
+        let surface = Surface::compile(vec![ivp::convex::hull(&pts)?])?;
+        let spawn = Spawn {
+            shape: Shape::Surface(surface),
+            m,
+            pos,
+            rot: rot.into(),
+            shift,
+            group: "",
+            fixed: false,
+            frozen,
+            collide,
+        };
+        Some(self.add_spawn(spawn, true))
+    }
+
     /// A module's part (or FixCube): one convex piece per point set, in its own frame, its mass centre at its origin,
     /// with the module's values. None when no piece spans a volume.
     #[allow(clippy::too_many_arguments)]

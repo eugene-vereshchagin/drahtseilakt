@@ -332,6 +332,25 @@ Features the content never uses:
 - Balls mixed with meshes.
 - Concave meshes on dynamic bodies.
 
+**Port rules for scripted movable bodies (our runtime, 2026-11-12).** Where the notes above are silent:
+
+- A Physicalize with Fixed = FALSE makes a ball (Ball Count > 0 or an empty Collision Surface name) or a convex body
+  (the hull of the object's current mesh, exact duplicate vertices removed, the object's scale baked in; only
+  `convex 1` is used, taken from the owner's mesh as the attach callback sets it). Position and orientation come
+  from the object's world matrix at the moment of the input; mass below 1e-8 becomes 1.
+- A ball's radius is the last `ball radius` pin. A ball block with no radius pin takes half the mesh's largest extent
+  (the original is silent; no map of the game does this).
+- Auto Mass Center = TRUE takes the hull's own centre; FALSE takes Shift as the centre in the object's frame.
+- The collision group string is read but not applied to script bodies yet (the world's groups are static strings).
+- Each tick after the physics step the object's matrix is the body's pose, orthonormal (the scale lives in the
+  geometry), as the write-back of 3.1. Unphysicalize removes the body and leaves the object where it was.
+- A second Physicalize on a physicalized object changes nothing (as above). Fixed bodies and concave-only bodies
+  are not made yet: reported once in the log.
+- SetPhysicsForce and Physics Impulse take their vectors to world through the referentials (a direction of squared
+  length <= 1e-4 is +X for the force), the force being a world vector at a world point; a force does nothing to a
+  sleeping body, so scripts wake it (Physics WakeUp) first. A force or impulse on an object without a script body
+  is ignored. Limits per run: 256 script bodies, 1024 hull points (a larger mesh is sampled evenly).
+
 ### 2.2 SetPhysicsForce
 
 Inputs are Create and Destroy. The command's `Execute` is `FUN_10004930` (vtable `0x10063278`).
