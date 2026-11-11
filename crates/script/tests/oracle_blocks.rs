@@ -84,8 +84,10 @@ struct Spec {
     scripts: Vec<(usize, bool)>,
     /// members by object index
     groups: Vec<Vec<usize>>,
-    /// arrays of Integer columns: (columns, rows, key column or -1), cell (r, c) = 10 r + c
-    arrays: Vec<(usize, usize, i32)>,
+    /// arrays: (columns, rows, key column or -1, the kind of each column as a letter: i f s o, the missing ones
+    /// i, modulus). The cell (r, c) is 10 r + c, or (7 r + 3 c) % modulus when that is not 0; a float is half of
+    /// it, a string "s" and it, an object the one it names (modulo the objects).
+    arrays: Vec<(usize, usize, i32, &'static str, usize)>,
     blocks: Vec<B>,
     /// (script, from: None = the start, Some((block, output)), (to block, input), delay)
     links: Vec<(usize, Option<(usize, usize)>, (usize, usize), u16)>,
@@ -115,8 +117,9 @@ impl Spec {
             let m: Vec<String> = m.iter().map(|x| x.to_string()).collect();
             writeln!(t, "group G{i} {}", m.join(" ")).unwrap();
         }
-        for (i, (c, r, k)) in self.arrays.iter().enumerate() {
-            writeln!(t, "array A{i} {c} {r} {k}").unwrap();
+        for (i, (c, r, k, kinds, m)) in self.arrays.iter().enumerate() {
+            let kinds = if kinds.is_empty() { "-" } else { kinds };
+            writeln!(t, "array A{i} {c} {r} {k} {kinds} {m}").unwrap();
         }
         for (i, b) in self.blocks.iter().enumerate() {
             writeln!(
@@ -381,17 +384,39 @@ impl Spec {
             .arrays
             .iter()
             .enumerate()
-            .map(|(i, &(c, r, k))| Array {
-                name: format!("A{i}"),
-                columns: (0..c).map(|_| ("c".to_string(), 1)).collect(),
-                rows: (0..r)
-                    .map(|row| {
-                        (0..c)
-                            .map(|col| Value::Int((10 * row + col) as i32))
-                            .collect()
-                    })
-                    .collect(),
-                key: usize::try_from(k).ok(),
+            .map(|(i, &(c, r, k, kinds, m))| {
+                let kind_of = |col: usize| match kinds.chars().nth(col) {
+                    Some('f') => 2,
+                    Some('s') => 3,
+                    Some('o') => 4,
+                    _ => 1,
+                };
+                Array {
+                    name: format!("A{i}"),
+                    columns: (0..c).map(|col| ("c".to_string(), kind_of(col))).collect(),
+                    rows: (0..r)
+                        .map(|row| {
+                            (0..c)
+                                .map(|col| {
+                                    let v = if m > 0 {
+                                        (7 * row + 3 * col) % m
+                                    } else {
+                                        10 * row + col
+                                    };
+                                    match kind_of(col) {
+                                        2 => Value::Float(v as f32 / 2.0),
+                                        3 => Value::Str(format!("s{v}")),
+                                        4 => Value::Obj(
+                                            obj_ids.get(v % self.objects.max(1)).copied(),
+                                        ),
+                                        _ => Value::Int(v as i32),
+                                    }
+                                })
+                                .collect()
+                        })
+                        .collect(),
+                    key: usize::try_from(k).ok(),
+                }
             })
             .collect();
         let mut g = Graph::assemble(objects, nodes, arrays, scripts).expect("assembles");
@@ -457,6 +482,36 @@ impl Spec {
                     _ => v.as_int().to_string(),
                 };
                 writeln!(out, "pout B{b} {k} {shown}").unwrap();
+            }
+            for (i, a) in rt.arrays().iter().enumerate() {
+                let kinds: Vec<String> = a.columns.iter().map(|c| c.1.to_string()).collect();
+                let kinds: String = kinds.iter().map(|k| format!(" {k}")).collect();
+                writeln!(
+                    out,
+                    "array A{i} key {} cols{kinds}",
+                    a.key.map_or(-1, |k| k as i32)
+                )
+                .unwrap();
+                for row in &a.rows {
+                    out.push_str("row");
+                    for (c, v) in a.columns.iter().zip(row) {
+                        match c.1 {
+                            2 => write!(out, " {:08x}", v.as_float().to_bits()),
+                            3 => write!(out, " \"{}\"", v.as_string()),
+                            4 => write!(
+                                out,
+                                " {}",
+                                v.as_obj()
+                                    .map(|o| rt.graph.name(o).to_string())
+                                    .filter(|n| !n.is_empty())
+                                    .unwrap_or("-".to_string())
+                            ),
+                            _ => write!(out, " {}", v.as_int()),
+                        }
+                        .unwrap();
+                    }
+                    out.push('\n');
+                }
             }
         }
         out
@@ -1115,7 +1170,11 @@ fn with_arrays_of(r: &mut Rng, b: B, loops: &[(usize, usize, &[u16])]) -> Spec {
 }
 
 fn with_arrays(r: &mut Rng, mut s: Spec) -> Spec {
-    s.arrays = vec![(3, 4, r.pick(&[-1, 0, 1, 2])), (2, 0, 0), (1, 1, -1)];
+    s.arrays = vec![
+        (3, 4, r.pick(&[-1, 0, 1, 2]), "", 0),
+        (2, 0, 0, "", 0),
+        (1, 1, -1, "", 0),
+    ];
     s
 }
 
@@ -1157,4 +1216,256 @@ fn get_key_row() {
             .pout("int", 5);
         with_arrays_of(r, b, &[(0, 0, &[1]), (1, 0, &[2])])
     });
+}
+
+// ---- arrays of every column kind (docs/gameplay_bbs.md, "Arrays") ----------------------------------------------------
+
+/// The arrays of the typed cases: A0 4 columns (Integer, Float, String, Object) x 12 rows with repeated values, keyed
+/// by a random column (or none), A1 an empty one, A2 1 x 1, A3 3 columns x 30 rows (enough to sort by partitions).
+fn with_mixed_arrays(r: &mut Rng, mut s: Spec) -> Spec {
+    s.arrays = vec![
+        (4, 12, r.pick(&[-1, 0, 1, 2, 3]), "ifso", 5),
+        (2, 0, 0, "fs", 0),
+        (1, 1, -1, "", 0),
+        (3, 30, r.pick(&[-1, 0, 1]), "sif", 6),
+    ];
+    s
+}
+
+fn typed_loops(r: &mut Rng, b: B, loops: &[(usize, usize, &[u16])]) -> Spec {
+    let s = frame(r, b, loops);
+    with_mixed_arrays(r, s)
+}
+
+fn array_target(r: &mut Rng) -> i32 {
+    r.pick(&[0, 0, 0, 3, 3, 1, 2, -1])
+}
+
+/// A pin of a random type with a value the sample arrays hold (or just misses).
+fn typed_pin(r: &mut Rng, b: B) -> B {
+    match r.below(4) {
+        0 => b.pin("int", r.pick(&[0, 1, 2, 3, -1])),
+        1 => b.pin(
+            "float",
+            r.pick(&["0", "0.5", "1", "1.5", "2", "3.5", "2.5"]),
+        ),
+        2 => b.pin(
+            "string",
+            r.pick(&["s0", "s1", "s2", "s3", "s4", "s5", "", "x"]),
+        ),
+        _ => b.pin("obj", r.pick(&[0, 1, 2, -1])),
+    }
+}
+
+fn typed_pout(r: &mut Rng, b: B) -> B {
+    match r.below(4) {
+        0 => b.pout("int", 9),
+        1 => b.pout("float", 9),
+        2 => b.pout("string", "z"),
+        _ => b.pout("obj", -1),
+    }
+}
+
+#[test]
+fn set_row() {
+    sweep("Set Row", |r| {
+        let mut b = B::new(0, proto::SET_ROW, 1, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 3, 11, 12, 20]));
+        for _ in 0..4 {
+            b = typed_pin(r, b);
+        }
+        b = b.local("bool", r.below(2));
+        typed_loops(r, b, &[(0, 0, &[1, 2]), (1, 0, &[3])])
+    });
+}
+
+#[test]
+fn insert_column() {
+    sweep("Insert Column", |r| {
+        let b = B::new(0, proto::INSERT_COLUMN, 1, 1)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 4, 5, 9]))
+            .pin("string", "n")
+            .pin("int", r.pick(&[1, 2, 3, 4]))
+            .pin("int", 0);
+        typed_loops(r, b, &[(0, 0, &[1, 2])])
+    });
+}
+
+#[test]
+fn remove_column() {
+    sweep("Remove Column", |r| {
+        let b = B::new(0, proto::REMOVE_COLUMN, 1, 1)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4, 9]));
+        typed_loops(r, b, &[(0, 0, &[1, 2])])
+    });
+}
+
+#[test]
+fn sort_rows() {
+    sweep("Sort Rows", |r| {
+        let b = B::new(0, proto::SORT_ROWS, 1, 1)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]))
+            .pin("bool", r.below(2));
+        typed_loops(r, b, &[(0, 0, &[1, 2])])
+    });
+}
+
+#[test]
+fn test_cell() {
+    sweep("Test Cell", |r| {
+        let b = B::new(0, proto::TEST_CELL, 1, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 5, 11, 12]))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]))
+            .pin("int", r.pick(&[0, 1, 2, 3, 4, 5, 6, 7]));
+        let b = typed_pin(r, b);
+        typed_loops(r, b, &[(0, 0, &[1]), (1, 0, &[2])])
+    });
+}
+
+#[test]
+fn get_highest() {
+    sweep("Get Highest", |r| {
+        let mut b = B::new(0, proto::GET_HIGHEST, 1, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]))
+            .pout("int", 7);
+        for _ in 0..4 {
+            b = typed_pout(r, b);
+        }
+        typed_loops(r, b, &[(0, 0, &[1, 2]), (1, 0, &[3])])
+    });
+}
+
+#[test]
+fn value_count() {
+    sweep("Value Count", |r| {
+        let b = B::new(0, proto::VALUE_COUNT, 1, 1)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]))
+            .pin("int", r.pick(&[0, 1, 2, 3, 4, 5, 6, 7]));
+        let b = typed_pin(r, b).pout("int", 9);
+        typed_loops(r, b, &[(0, 0, &[1, 2])])
+    });
+}
+
+#[test]
+fn remove_key_row() {
+    sweep("Remove Key Row", |r| {
+        let b = B::new(0, proto::REMOVE_KEY_ROW, 1, 2).target("array", array_target(r));
+        let b = typed_pin(r, b);
+        typed_loops(r, b, &[(0, 0, &[1, 2]), (1, 0, &[3])])
+    });
+}
+
+#[test]
+fn remove_row_if() {
+    sweep("Remove Row If", |r| {
+        let b = B::new(0, proto::REMOVE_ROW_IF, 1, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]))
+            .pin("int", r.pick(&[0, 1, 2, 3, 4, 5, 6, 7]));
+        let b = typed_pin(r, b).pout("int", 9);
+        typed_loops(r, b, &[(0, 0, &[1, 2]), (1, 0, &[3])])
+    });
+}
+
+#[test]
+fn change_value_if() {
+    sweep("Change Value If", |r| {
+        let b = B::new(0, proto::CHANGE_VALUE_IF, 1, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]))
+            .pin("int", r.pick(&[0, 1, 2, 3, 4, 5, 6, 7]));
+        let b = typed_pin(r, b);
+        let b = typed_pin(r, b).pout("int", 9);
+        typed_loops(r, b, &[(0, 0, &[1, 2]), (1, 0, &[3])])
+    });
+}
+
+#[test]
+fn row_search() {
+    sweep("Row Search", |r| {
+        let b = B::new(0, proto::ROW_SEARCH, 1, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]))
+            .pin("int", r.pick(&[-1, 0, 1, 5, 12]))
+            .pin("int", r.pick(&[0, 1, 2, 3, 4, 5, 6, 7]));
+        let b = typed_pin(r, b).pout("int", 9);
+        typed_loops(r, b, &[(0, 0, &[1, 2]), (1, 0, &[3])])
+    });
+}
+
+#[test]
+fn typed_get_key_row_and_get_cell() {
+    sweep("Get Key Row (typed)", |r| {
+        let b = B::new(0, proto::GET_KEY_ROW, 1, 2).target("array", array_target(r));
+        let mut b = typed_pin(r, b);
+        for _ in 0..4 {
+            b = typed_pout(r, b);
+        }
+        typed_loops(r, b, &[(0, 0, &[1]), (1, 0, &[2])])
+    });
+    sweep("Get Cell (typed)", |r| {
+        let b = B::new(0, proto::GET_CELL, 1, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 11, 12]))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]));
+        let b = typed_pout(r, b);
+        typed_loops(r, b, &[(0, 0, &[1]), (1, 0, &[2])])
+    });
+    sweep("Set Cell (typed)", |r| {
+        let b = B::new(0, proto::SET_CELL, 1, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 11, 12]))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]));
+        let b = typed_pin(r, b);
+        typed_loops(r, b, &[(0, 0, &[1]), (1, 0, &[2])])
+    });
+    sweep("Iterator (typed)", |r| {
+        let mut b = B::new(0, proto::ITERATOR, 2, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[0, 1, 3]))
+            .pin("int", r.pick(&[-1, 2, 5]))
+            .pin("bool", r.below(2))
+            .pout("int", 0);
+        for _ in 0..4 {
+            b = typed_pout(r, b);
+        }
+        typed_loops(r, b, &[(1, 1, &[0, 1])])
+    });
+}
+
+/// Move Row has no C reference (the upstream runtime lacks it): the expectation is from the docs alone (the row at
+/// Src Row is taken out and put at Dest Row; an index outside the array changes nothing; Out fires either way).
+#[test]
+fn move_row_follows_the_notes() {
+    let run = |src: i32, dest: i32| {
+        let b = B::new(0, proto::MOVE_ROW, 1, 1)
+            .target("array", 0)
+            .pin("int", src)
+            .pin("int", dest);
+        let mut s = frame(&mut Rng::new(1), b, &[]);
+        s.arrays = vec![(1, 4, -1, "", 0)];
+        s.links.clear();
+        s.link(None, (0, 0), 0);
+        s.frames = 3;
+        let t = s.run();
+        let last = t.rsplit("frame 3").next().unwrap().to_string();
+        let rows: Vec<&str> = last.lines().filter(|l| l.starts_with("row")).collect();
+        (
+            rows.join("|"),
+            last.contains("run B0") || t.contains("run B0"),
+        )
+    };
+    assert_eq!(run(3, 0).0, "row 30|row 0|row 10|row 20");
+    assert_eq!(run(0, 2).0, "row 10|row 20|row 0|row 30");
+    assert_eq!(run(1, 1).0, "row 0|row 10|row 20|row 30");
+    assert_eq!(run(4, 0).0, "row 0|row 10|row 20|row 30");
+    assert_eq!(run(-1, 0).0, "row 0|row 10|row 20|row 30");
+    assert_eq!(run(0, 9).0, "row 0|row 10|row 20|row 30");
 }

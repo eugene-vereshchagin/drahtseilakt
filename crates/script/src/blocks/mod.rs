@@ -97,10 +97,22 @@ pub mod proto {
     pub const REMOVE_ROW: Guid = Guid(0x1fa5_7136, 0x1431_0857);
     pub const ROW_SEARCH: Guid = Guid(0x7886_3443, 0x45af_59b6);
     pub const GET_NEAREST_IN_GROUP: Guid = Guid(0x0852_07eb, 0x5849_50d8);
+    pub const SET_ROW: Guid = Guid(0x62e8_7901, 0x2df0_07dd);
+    pub const INSERT_COLUMN: Guid = Guid(0x05cb_7802, 0x04a6_4a58);
+    pub const REMOVE_COLUMN: Guid = Guid(0x3f37_7888, 0x128a_7767);
+    pub const MOVE_ROW: Guid = Guid(0x101a_62f4, 0x6e2d_25f6);
+    pub const SORT_ROWS: Guid = Guid(0x6f62_3e68, 0x62bb_5a98);
+    pub const TEST_CELL: Guid = Guid(0x4e6c_6da8, 0x6369_04fc);
+    pub const GET_HIGHEST: Guid = Guid(0x46f7_1e13, 0x13d2_6f61);
+    pub const VALUE_COUNT: Guid = Guid(0x5343_77de, 0x75fd_478a);
+    pub const REMOVE_KEY_ROW: Guid = Guid(0x0f83_34ea, 0x279a_40cd);
+    pub const REMOVE_ROW_IF: Guid = Guid(0x5786_5622, 0x662d_2fee);
+    pub const CHANGE_VALUE_IF: Guid = Guid(0x0725_3edb, 0x4d12_37ed);
     pub const OBJECT_RENAME: Guid = Guid(0x6f07_4ca7, 0x4542_7431);
 }
 
 mod absent;
+mod arrays;
 mod cameras;
 mod collisions;
 mod controllers;
@@ -259,6 +271,7 @@ pub fn registry() -> &'static [Proto] {
     ALL.get_or_init(|| {
         let mut all: Vec<Proto> = [
             absent::PROTOS,
+            arrays::PROTOS,
             cameras::PROTOS,
             collisions::PROTOS,
             controllers::PROTOS,
@@ -450,19 +463,6 @@ fn referential(
 fn distance_sq(a: [f32; 3], b: [f32; 3]) -> f32 {
     let d = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
     d[0] * d[0] + d[1] * d[1] + d[2] * d[2]
-}
-
-/// Compares as the original's comparison operator: 1 ==, 2 !=, 3 <, 4 <=, 5 >, 6 >=.
-fn compare(op: i32, a: &Value, b: &Value) -> bool {
-    match op {
-        1 => a.same(b),
-        2 => !a.same(b),
-        3 => a.as_float() < b.as_float(),
-        4 => a.as_float() <= b.as_float(),
-        5 => a.as_float() > b.as_float(),
-        6 => a.as_float() >= b.as_float(),
-        _ => false,
-    }
 }
 
 fn ent_name(rt: &Runtime, e: Option<Id>) -> String {

@@ -50,4 +50,8 @@
   行，并按地图列出缺少的块和签名。C 预言机检查值运算的行（`op_table`）。
 - **消息**带有发送者、接收者（或广播的类）和数据：新增 Broadcast Message、Switch On Message 和 Get Message Data
   （[gameplay_bbs.md](../../gameplay_bbs.md)，“Messages”）。
-- 尚未完成：属性（对象的标识符 `0x11` 和属性管理器的数据块）、可含任意对象的组、其余的数组块。
+- **数组**（`crates/script/src/blocks/arrays.rs`）：带类型的键和单元格，以及 Set Row、Insert/Remove Column、Move Row、
+  Sort Rows、Test Cell、Get Highest、Value Count、Remove Key Row、Remove Row If、Change Value If、Row Search；每次运行自带
+  每个数组的列和键列。除 C 中没有的 Move Row 外，所有列类型都已对照 C 预言机检验
+  （[gameplay_bbs.md](../../gameplay_bbs.md)，“Arrays”）。
+- 尚未完成：属性（对象的标识符 `0x11` 和属性管理器的数据块）、可含任意对象的组。

@@ -835,6 +835,8 @@ pub enum Cell {
 pub struct DataArray {
     /// Column names as stored.
     pub columns: Vec<Vec<u8>>,
+    /// Each column's kind as stored: 1 integer, 2 float, 3 string, 4 object, 5 parameter.
+    pub kinds: Vec<u32>,
     pub rows: Vec<Vec<Cell>>,
     /// The key column (identifier `0x4000`: sort order, sort column, key column), if the array has one.
     pub key_column: Option<usize>,
@@ -893,6 +895,7 @@ pub fn data_array(chunk: &Chunk) -> Result<DataArray> {
     });
     Ok(DataArray {
         columns,
+        kinds,
         rows,
         key_column,
     })

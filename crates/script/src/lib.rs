@@ -357,14 +357,7 @@ impl Graph {
                         .columns
                         .iter()
                         .map(|c| String::from_utf8_lossy(c).into_owned())
-                        .collect::<Vec<_>>()
-                        .into_iter()
-                        .zip(
-                            // the kinds are not kept by the decoder: infer each from the cells, else object
-                            (0..a.columns.len()).map(|c| {
-                                a.rows.first().and_then(|r| r.get(c)).map_or(4, cell_kind)
-                            }),
-                        )
+                        .zip(a.kinds.iter().copied())
                         .collect(),
                     rows: a
                         .rows
@@ -978,15 +971,6 @@ impl Graph {
         self.nodes.push(Node::None);
         self.links_from.push(Vec::new());
         id
-    }
-}
-
-fn cell_kind(c: &nmo::scene::Cell) -> u32 {
-    match c {
-        nmo::scene::Cell::Int(_) => 1,
-        nmo::scene::Cell::Float(_) => 2,
-        nmo::scene::Cell::String(_) => 3,
-        nmo::scene::Cell::Object(_) => 4,
     }
 }
 

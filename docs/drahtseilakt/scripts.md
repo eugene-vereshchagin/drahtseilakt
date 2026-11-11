@@ -231,8 +231,11 @@ output, one log line. The Object Rename written in phase 2 stays in the code beh
   map, the blocks and signatures missing. The C oracle checks the value rows (`op_table`).
 - **Messages** carry their sender, receiver (or a broadcast's class) and data: Broadcast Message, Switch On
   Message and Get Message Data are new ([gameplay_bbs.md](../gameplay_bbs.md), "Messages").
-- Not yet: attributes (identifier `0x11` of an object and the attribute manager's chunk), groups of any object,
-  the remaining array blocks.
+- **Arrays** (`crates/script/src/blocks/arrays.rs`): typed keys and cells, and Set Row, Insert/Remove Column, Move Row,
+  Sort Rows, Test Cell, Get Highest, Value Count, Remove Key Row, Remove Row If, Change Value If, Row Search; the run
+  keeps its own columns and key column per array. All checked against the C oracle on every column kind except Move
+  Row, which the C lacks ([gameplay_bbs.md](../gameplay_bbs.md), "Arrays").
+- Not yet: attributes (identifier `0x11` of an object and the attribute manager's chunk), groups of any object.
 
 ## Hostile input
 
@@ -359,7 +362,7 @@ by the engine's.
 | Set IC | `72671a24:161a2347` | 1 | 1 | partial: accepted (initial conditions stay as loaded) |
 | Remove Row | `1fa57136:14310857` | 1 | 1 | done |
 | Shuffle Order | `270f177a:4ca20023` | 1 | 2 | planned |
-| Move Row | `101a62f4:6e2d25f6` | 1 | 2 | planned |
+| Move Row | `101a62f4:6e2d25f6` | 1 | 2 | done (from the notes: the C lacks it) |
 | Set FOV | `aaaacccc:aaaacccc` | 1 | 3 | never (the engine's own interface) |
 | TT Restore IC | `7e0f2f58:232d3109` | 1 | 4 | done |
 | Streaming Event | `1f0b52bf:4c3342dd` | 1 | 1 | done |
@@ -389,12 +392,12 @@ by the engine's.
 | Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |
 | Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | partial: accepted, no effect |
 | Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | no-op |
-| Sort Rows | `6f623e68:62bb5a98` | 1 | 5 | planned |
+| Sort Rows | `6f623e68:62bb5a98` | 1 | 5 | done |
 | Get Texture Info | `250c4d8d:288960d9` | 1 | 2 | planned |
 | Replace Texture | `?` | 1 | 1 | planned |
 | Renamer | `?` | 1 | 4 | planned |
 | To Lower Keys | `?` | 1 | 1 | planned |
-| Insert Column | `05cb7802:04a64a58` | 1 | 3 | planned |
+| Insert Column | `05cb7802:04a64a58` | 1 | 3 | done |
 | Replace Material | `?` | 1 | 1 | planned |
 | Is Same Material | `?` | 1 | 1 | planned |
 | Add Mesh | `7a1d593e:12c5648d` | 1 | 1 | no-op |

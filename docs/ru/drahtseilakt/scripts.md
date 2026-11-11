@@ -132,5 +132,8 @@ Wait For All — как Nop); блок оставляет активными в�
   карте — каких блоков и сигнатур не хватает. Оракул на C проверяет строки над значениями (`op_table`).
 - **Сообщения** несут отправителя, получателя (или класс рассылки) и данные: новые блоки Broadcast Message, Switch
   On Message и Get Message Data ([gameplay_bbs.md](../../gameplay_bbs.md), «Messages»).
-- Ещё нет: атрибуты (идентификатор `0x11` объекта и чанк менеджера атрибутов), группы из любых объектов,
-  оставшиеся блоки массивов.
+- **Массивы** (`crates/script/src/blocks/arrays.rs`): типизированные ключи и ячейки, блоки Set Row, Insert/Remove
+  Column, Move Row, Sort Rows, Test Cell, Get Highest, Value Count, Remove Key Row, Remove Row If, Change Value If,
+  Row Search; у прогона свои столбцы и ключевой столбец каждого массива. Всё сверено с оракулом на C на всех видах
+  столбцов, кроме Move Row, которого в C нет ([gameplay_bbs.md](../../gameplay_bbs.md), «Arrays»).
+- Ещё нет: атрибуты (идентификатор `0x11` объекта и чанк менеджера атрибутов), группы из любых объектов.

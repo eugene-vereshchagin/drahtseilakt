@@ -1184,8 +1184,9 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     for w in all.windows(2) {
         assert_ne!(w[0].guid, w[1].guid, "{} declared twice", w[0].name);
     }
-    // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's
-    assert_eq!(all.len(), 90);
+    // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
+    // blocks and Set Row among them)
+    assert_eq!(all.len(), 101);
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(

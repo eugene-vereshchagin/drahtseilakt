@@ -158,8 +158,8 @@ pub struct Runtime {
     links: Vec<LinkState>,
     io: Vec<bool>,
     pub values: Vec<Value>,
-    /// The maps' arrays' rows, which Set Cell and Add Row change (the graph's are the file's).
-    arrays: Vec<Vec<Vec<Value>>>,
+    /// The maps' arrays as the run has changed them (rows, columns, key column; the graph's are the file's).
+    arrays: Vec<crate::Array>,
     /// Messages sent this tick, delivered at the next.
     outbox: Vec<Message>,
     inbox: Vec<Message>,
@@ -222,7 +222,7 @@ impl Runtime {
             links: vec![LinkState::default(); n],
             io: vec![false; n],
             values,
-            arrays: graph.arrays.iter().map(|a| a.rows.clone()).collect(),
+            arrays: graph.arrays.clone(),
             graph,
             outbox: Vec::new(),
             inbox: Vec::new(),
@@ -1077,18 +1077,33 @@ impl Runtime {
     // ---- arrays -----------------------------------------------------------------------------------------------
 
     pub fn rows(&self, array: usize) -> &[Vec<Value>] {
-        self.arrays.get(array).map_or(&[], Vec::as_slice)
+        self.arrays.get(array).map_or(&[], |a| a.rows.as_slice())
+    }
+
+    /// Every array as the run has it now.
+    pub fn arrays(&self) -> &[crate::Array] {
+        &self.arrays
+    }
+
+    /// An array as the run has it now.
+    pub fn array(&self, array: usize) -> Option<&crate::Array> {
+        self.arrays.get(array)
+    }
+
+    /// The same, to change: the array blocks edit rows, columns and the key column through this.
+    pub(crate) fn array_mut(&mut self, array: usize) -> Option<&mut crate::Array> {
+        self.arrays.get_mut(array)
     }
 
     pub fn cell(&self, array: usize, row: usize, column: usize) -> Option<Value> {
-        self.arrays.get(array)?.get(row)?.get(column).cloned()
+        self.arrays.get(array)?.rows.get(row)?.get(column).cloned()
     }
 
     pub fn set_cell(&mut self, array: usize, row: usize, column: usize, v: Value) {
         if let Some(c) = self
             .arrays
             .get_mut(array)
-            .and_then(|a| a.get_mut(row))
+            .and_then(|a| a.rows.get_mut(row))
             .and_then(|r| r.get_mut(column))
         {
             *c = v;
@@ -1097,17 +1112,17 @@ impl Runtime {
 
     pub fn add_row(&mut self, array: usize, row: Vec<Value>) {
         if let Some(a) = self.arrays.get_mut(array)
-            && a.len() < crate::MAX_ARRAY_ROWS
+            && a.rows.len() < crate::MAX_ARRAY_ROWS
         {
-            a.push(row);
+            a.rows.push(row);
         }
     }
 
     /// Removes a row; false when there is none at the index.
     pub fn remove_row(&mut self, array: usize, row: usize) -> bool {
         match self.arrays.get_mut(array) {
-            Some(a) if row < a.len() => {
-                a.remove(row);
+            Some(a) if row < a.rows.len() => {
+                a.rows.remove(row);
                 true
             }
             _ => false,
@@ -1132,7 +1147,7 @@ impl Runtime {
 
     pub fn clear_rows(&mut self, array: usize) {
         if let Some(a) = self.arrays.get_mut(array) {
-            a.clear();
+            a.rows.clear();
         }
     }
 
