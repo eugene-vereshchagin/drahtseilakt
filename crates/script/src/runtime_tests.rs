@@ -857,8 +857,9 @@ fn object_copy_copies_the_scripts_and_binds_this_to_the_copy() {
     let start2 = b.io("Start");
     let l1 = b.link(start2, in_of(&b.g, copy, 0), 0);
     let l2 = b.link(out_of(&b.g, copy, 0), in_of(&b.g, set, 0), 0);
-    // the maker on B: the manager runs it before the template (the order its object is first met in)
+    // the maker on B, which has the higher priority: the manager runs it before the template
     b.script("Maker", Some(1), start2, vec![copy, set], vec![l1, l2]);
+    b.g.priorities = vec![(1, 1)];
     // the template's script on A (object 0): Start -> Hide(This)
     let this = b.local("This", types::BEOBJECT, Value::Owner);
     let target = b.pin("Target", types::ENTITY, this);

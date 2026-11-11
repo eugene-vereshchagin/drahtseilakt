@@ -138,7 +138,8 @@ reported once as before.
   activated again without Reset? resumes where it was (its delayed links go on counting). Before stage 0 every
   activation of an inactive script reset it.
 - *Order.* Objects by their priority (identifier `0x40`; in the maps only the Level object has one, 32000),
-  stable; each object's scripts in its order.
+  then in file order (the order the original registers them in as the level loads); each object's scripts in
+  its order.
 - *Start state.* Each script starts reset and active, unless its saved activity (identifier `0x200000` of a
   behaviour, `0x400` of its object: bit 1 activate, `0x10` deactivate) starts it deactivated: 24 scripts of the
   community maps do. The saved behaviour flags say nothing of it (1357 of the 1539 scripts that run have no active
@@ -168,6 +169,25 @@ blocks, links, links by delay, behaviour and object priorities, scripts started 
 not). Over the owner's 579 maps: 1540 scripts, 10 536 blocks of 147 kinds, 11 833 links (delay 0: 11 545, 1: 233,
 2: 36, more: 19), 12 behaviour priorities, 5 object priorities, 24 scripts started deactivated. A unit test runs it
 on a graph built by hand; `crates/script/tests/census.rs` runs it over `OPENBALLANCE_MAPS` when that is set.
+
+**The C oracle.** The upstream C runtime in `src/ck` + `src/bb` stays as a test-only reference (owner's decision
+2026-11-11): nothing of it is copied, it only runs the same graphs so the traces can be diffed. Level 1 is in
+place: `tests/oracle/ck_oracle.c` builds a graph of trivial blocks (Nop, Binary Switch, Activate Script,
+Deactivate Script) from a small text description, and `crates/script/tests/oracle.rs` generates random ones
+(1-3 objects, 1-4 scripts, some started deactivated, block priorities -1..5, link delays 0-3) and checks that our
+trace equals the C one frame by frame: the blocks run in each frame, in order, and the scripts and blocks active
+after it. 5000 random graphs agree; the same test with activation applied at once fails at the first graph that
+activates a later script. To run it:
+
+```sh
+cmake -S . -B target/ck-oracle -DCMAKE_BUILD_TYPE=Release
+cmake --build target/ck-oracle --target ck_oracle
+OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle   # ORACLE_CASES=5000
+```
+
+Without `OPENBALLANCE_ORACLE` the test runs our side only. Not yet: level 2 (one graph per block kind, pins swept;
+the oracle already shows Delayer and Counter count differently: the C Delayer counts the frame it starts in) and
+level 3 (whole maps). A disagreement is settled by the notes, not by the oracle: it is a reimplementation too.
 
 **Not in the player.** Eight kinds found in maps have a GUID in none of the player's libraries: Explode, Midi
 Player, Run VSL, Add Mesh, Remove Mesh, Select Mesh, Get Nearest Object and Object Rename `6f074ca7:45427431`

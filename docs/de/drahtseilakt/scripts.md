@@ -90,3 +90,13 @@ deaktiviert gestartete Skripte) und je Bausteinart eine Zeile (Name, GUID, Bibli
 `?,unknown`, Dateien, Vorkommen) sowie je Operation. `script-dump --run N DATEI` führt die Skripte einer Datei N
 Ticks ohne Level aus und gibt die Spur aus. Geprüft von einem Unit-Test und von `crates/script/tests/census.rs`
 über `OPENBALLANCE_MAPS`, wenn gesetzt.
+
+**Das C-Orakel.** Die alte C-Laufzeit (`src/ck` + `src/bb`) bleibt nur als Testreferenz (Entscheidung des
+Eigentümers 2026-11-11): nichts davon wird kopiert, sie führt nur dieselben Graphen aus, damit die Spuren verglichen
+werden. Stufe 1 steht: `tests/oracle/ck_oracle.c` baut einen Graphen einfacher Bausteine (Nop, Binary Switch,
+Activate/Deactivate Script) aus einer Textbeschreibung, `crates/script/tests/oracle.rs` erzeugt Zufallsgraphen und
+vergleicht die Spuren Frame für Frame (welche Bausteine in welcher Reihenfolge liefen, was danach aktiv ist); 5000
+Graphen stimmen überein. Bauen und starten:
+`cmake -S . -B target/ck-oracle -DCMAKE_BUILD_TYPE=Release && cmake --build target/ck-oracle --target ck_oracle`,
+dann `OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle`. Stufen 2 (Bausteine)
+und 3 (Karten) folgen; einen Unterschied entscheiden die Notizen, nicht das Orakel.

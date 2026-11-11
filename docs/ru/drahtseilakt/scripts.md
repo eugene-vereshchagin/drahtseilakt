@@ -83,3 +83,12 @@ Script ставят заявку, которую следующий тик пр�
 строке на вид блока (имя, GUID, библиотека и готовность по реестру или `?,unknown`, файлы, экземпляры) и на
 операцию. `script-dump --run N ФАЙЛ` гоняет скрипты файла N тиков без уровня и печатает трассу. Перепись
 проверяется модульным тестом и тестом `crates/script/tests/census.rs` над `OPENBALLANCE_MAPS`, если задана.
+
+**C-оракул.** Старый C-рантайм (`src/ck` + `src/bb`) остаётся эталоном только для тестов (решение владельца
+2026-11-11): из него ничего не копируется, он лишь гоняет те же графы для сравнения трасс. Уровень 1 готов:
+`tests/oracle/ck_oracle.c` строит граф простых блоков (Nop, Binary Switch, Activate/Deactivate Script) по
+текстовому описанию, `crates/script/tests/oracle.rs` порождает случайные графы и сверяет трассы покадрово (какие
+блоки и в каком порядке шли, что активно после кадра); 5000 графов совпадают. Сборка и запуск:
+`cmake -S . -B target/ck-oracle -DCMAKE_BUILD_TYPE=Release && cmake --build target/ck-oracle --target ck_oracle`,
+затем `OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle`. Уровни 2 (блоки) и
+3 (карты) — позже; расхождение решают заметки, а не оракул.

@@ -146,8 +146,8 @@ pub struct Runtime {
     rng: u64,
     /// Objects copied so far (Object Copy), capped.
     copies: usize,
-    /// The scripts in the order the behaviour manager runs them: objects by priority (higher first, file order
-    /// among equals), each object's scripts in its list's order.
+    /// The scripts in the order the behaviour manager runs them: objects by priority (higher first, then file
+    /// order), each object's scripts in its list's order.
     order: Vec<Id>,
     /// Each graph object's state in the scene.
     objects: Vec<ObjState>,
@@ -1073,8 +1073,9 @@ impl Runtime {
     }
 }
 
-/// The behaviour manager's order: objects with scripts by priority, higher first (stable, so the file's order
-/// among equals), each object's scripts in the order the graph lists them; scripts without an owner last.
+/// The behaviour manager's order: objects with scripts by priority, higher first, then in the file's order (the
+/// order the original registers them in as the level loads), each object's scripts in the order the graph lists
+/// them; scripts without an owner last.
 fn run_order(g: &Graph) -> Vec<Id> {
     let mut owners: Vec<Option<Id>> = Vec::new();
     let mut by_owner: std::collections::HashMap<Option<Id>, Vec<Id>> =
@@ -1095,7 +1096,7 @@ fn run_order(g: &Graph) -> Vec<Id> {
             .map_or(0, |&(_, p)| p),
         None => i32::MIN,
     };
-    owners.sort_by_key(|o| std::cmp::Reverse(prio(o)));
+    owners.sort_by_key(|o| (std::cmp::Reverse(prio(o)), o.is_none(), *o));
     owners
         .into_iter()
         .flat_map(|o| by_owner.remove(&o).unwrap_or_default())
