@@ -2,11 +2,13 @@
 // is identified by a hash of its file, so a replay never runs against the wrong data. A replay holds only our
 // input, never game data, so it can live in the repository.
 //
-//   drahtseilakt-replay 9        (1: recorded before the ball burst into pieces in transformers, 2: before the
+//   drahtseilakt-replay 10       (1: recorded before the ball burst into pieces in transformers, 2: before the
 //                                 pieces went after 20 s, 3: before the checkpoints followed their names, 4: before
 //                                 the loose objects were made of their module file's mesh, 5: before the camera
 //                                 looked along the reset point after a lost ball, 6: before a run begun at a sector took the
-//                                 sector's own ball, 7: before the camera's start and respawn heading was the reset point's exact one, 8: before a map's own scripts ran; each played so)
+//                                 sector's own ball, 7: before the camera's start and respawn heading was the reset point's exact one, 8: before a map's own scripts ran; each played so; 9: before
+//                                 a script's activation waited for the next tick, as the original's: a run of a map
+//                                 with scripts in format 9 is stale and refused, one without scripts plays as before)
 //   level <file name> <fnv-1a 64 of the file, hex>
 //   start <sector> <ball kind or -> <x,y,z or ->   (optional: a run begun elsewhere than the level start)
 //   mod <key> <fnv-1a 64 of its mod.txt, hex> [<option>=<value>]...   (optional, at most MAX_MODS: a mod that
@@ -18,13 +20,14 @@
 
 use std::fmt::Write as _;
 
-pub const FORMAT: &str = "drahtseilakt-replay 9";
+pub const FORMAT: &str = "drahtseilakt-replay 10";
 /// The format written (the number in `FORMAT`).
-pub const VERSION: u32 = 9;
+pub const VERSION: u32 = 10;
 /// The formats read: 1 (no bursts), 2 (the pieces lie until the ball is lost), 3 (the checkpoints in their group's
 /// order), 4 (the loose objects of their stand-ins' meshes), 5 (the respawn at the start heading), 6, 7 (a run begun at a sector
-/// keeps the sector's ball), 8 (the camera's exact heading) and 9 (a map's own scripts run; before, they did not).
-const FORMATS: [&str; 9] = [
+/// keeps the sector's ball), 8 (the camera's exact heading), 9 (a map's own scripts run; before, they did not) and 10
+/// (the scripts run as the original's behaviour manager: an activation applies at the next tick).
+const FORMATS: [&str; 10] = [
     "drahtseilakt-replay 1",
     "drahtseilakt-replay 2",
     "drahtseilakt-replay 3",
@@ -33,6 +36,7 @@ const FORMATS: [&str; 9] = [
     "drahtseilakt-replay 6",
     "drahtseilakt-replay 7",
     "drahtseilakt-replay 8",
+    "drahtseilakt-replay 9",
     FORMAT,
 ];
 
@@ -56,6 +60,21 @@ pub struct ModRef {
 /// The most `mod` lines a replay has, and options per line.
 const MAX_MODS: usize = 64;
 const MAX_MOD_OPTS: usize = 16;
+
+/// The first format whose scripts run as they do now; a run of a map with scripts recorded in an older format
+/// that ran scripts (9) would play differently, so it is refused as stale, never played silently otherwise.
+pub const SCRIPTS_FROM: u32 = 10;
+
+/// Why a replay cannot play on a level with scripts, if it cannot: recorded in a format whose scripts ran
+/// otherwise. Formats before 9 ran no scripts and play as they were recorded.
+pub fn stale_for_scripts(version: u32, has_scripts: bool) -> Option<String> {
+    (has_scripts && (9..SCRIPTS_FROM).contains(&version)).then(|| {
+        format!(
+            "recorded in replay format {version}, whose map scripts ran otherwise (format {SCRIPTS_FROM}: an \
+             activation applies at the next tick, as in the original); the run is stale, record it again"
+        )
+    })
+}
 
 impl ModRef {
     /// A `mod` line read: plain words only.
@@ -335,11 +354,11 @@ mod tests {
     }
 
     #[test]
-    fn format_9_round_trips_and_older_formats_still_read() -> Result<(), String> {
+    fn format_10_round_trips_and_older_formats_still_read() -> Result<(), String> {
         let mut r = Replay::new("Level_01.NMO", 0xabc);
         r.record(1, 0);
-        assert_eq!(r.version, 9);
-        assert!(r.to_text().starts_with("drahtseilakt-replay 9\n"));
+        assert_eq!(r.version, 10);
+        assert!(r.to_text().starts_with("drahtseilakt-replay 10\n"));
         assert_eq!(Replay::parse(&r.to_text())?, r);
         let old = Replay::parse("drahtseilakt-replay 7\nlevel a 1\n1 00\nend 1")?;
         assert_eq!(old.version, 7);
@@ -415,12 +434,20 @@ mod tests {
         let eight = Replay::parse("drahtseilakt-replay 8\nlevel a 1\n1 01\nend 5")
             .expect("format 8 still reads");
         assert_eq!(eight.version, 8);
-        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 9");
-        assert_eq!(new.version, 9);
+        let nine = Replay::parse("drahtseilakt-replay 9\nlevel a 1\n1 01\nend 5")
+            .expect("format 9 still reads");
+        assert_eq!(nine.version, 9);
+        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 10");
+        assert_eq!(new.version, 10);
         assert!(
-            Replay::parse("drahtseilakt-replay 10\nlevel a 1\nend 1").is_err(),
+            Replay::parse("drahtseilakt-replay 11\nlevel a 1\nend 1").is_err(),
             "a later format is refused"
         );
+        // format 9's scripts ran otherwise: stale on a map with scripts, fine without; older ones ran none
+        assert!(stale_for_scripts(9, true).is_some());
+        assert!(stale_for_scripts(9, false).is_none());
+        assert!(stale_for_scripts(8, true).is_none());
+        assert!(stale_for_scripts(10, true).is_none());
         let mut kept = Replay::new("a", 1);
         kept.version = 2;
         assert_eq!(

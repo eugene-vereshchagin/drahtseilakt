@@ -49,8 +49,10 @@ parameter's value, the arrays' rows, a little scratch per block (an iterator's i
 proximity test's last answer), the messages in flight — and runs one tick as the original's behaviour manager
 runs a frame ([ck-runtime.md](../ck-runtime.md), "Execution"):
 
-1. Every active script, in file order, is executed.
-2. A **building block** runs its prototype's code in `blocks.rs`: it reads and clears its active inputs, reads its
+1. Every pending activation request (Activate Script, Deactivate Script, Activate Object) of a script whose object
+   is active in the scene is applied; then every active script of such an object is executed, in the manager's
+   order: objects by priority (higher first, file order among equals), each object's scripts in its list's order.
+2. A **building block** runs its prototype's code (`blocks/`, found in the registry): it reads and clears its active inputs, reads its
    pins (pulled: an input follows its source, and a value computed by an operation is computed first), acts
    through the `Host`, writes its outputs (copied on to their destinations) and activates its output IOs. It
    returns whether it stays active for the next tick.
@@ -64,7 +66,9 @@ runs a frame ([ck-runtime.md](../ck-runtime.md), "Execution"):
 
 Scripts run once a tick before the physics (the original's order in a frame), in run ticks, from the same input
 as everything else, so a run stays deterministic and a replay plays back the same. A replay recorded before
-**format 8** runs without scripts, as it was recorded ([replay.rs](../../crates/game/src/replay.rs)). Levels
+**format 8** runs without scripts, as it was recorded ([replay.rs](../../crates/game/src/replay.rs)). A replay of
+a map with scripts in **format 9** is refused as stale: its scripts activated at once, so it would play otherwise
+(format 10, stage 0). A format-9 run of a level without scripts plays as before. Levels
 without scripts are untouched: there is no runtime at all.
 
 **The engine's side** (`Host`, implemented in `scripting.rs`): matrices and visibility of level objects
@@ -120,6 +124,42 @@ them), flags (targetable, variable inputs / pins / outputs), standing (full, par
 as data, the run function and an optional event function. The modules mirror the player's libraries
 (`logics.rs` = Logics.dll, `narratives.rs`, `transfo3d.rs`, `tt_toolbox.rs`, ...); a prototype not declared is
 reported once as before.
+
+**The executor** (`crates/script/src/exec.rs`), as the original's behaviour manager
+([ck-runtime.md](../ck-runtime.md), "Execution"):
+
+- *Activation requests.* Activate Script and Deactivate Script file a request on the script; the next tick applies
+  every request before any script runs. A script activated by another one starts in the tick after, never in the
+  same one; one deactivated still finishes the tick it is in. Activation and deactivation asked in one tick: the
+  later wins. Activate Script: pin 0 Reset?, pins 1.. the scripts; an older layout (pin 0 the script, pin 1 Reset?,
+  default true) is data of its declaration, chosen when pin 0 is not a boolean; local 0 Awake Object (default
+  true) wakes a sleeping owner.
+- *Reset is separate from active.* A behaviour is reset when asked, or when activated for the first time; a script
+  activated again without Reset? resumes where it was (its delayed links go on counting). Before stage 0 every
+  activation of an inactive script reset it.
+- *Order.* Objects by their priority (identifier `0x40`; in the maps only the Level object has one, 32000),
+  stable; each object's scripts in its order.
+- *Start state.* Each script starts reset and active, unless its saved activity (identifier `0x200000` of a
+  behaviour, `0x400` of its object: bit 1 activate, `0x10` deactivate) starts it deactivated: 24 scripts of the
+  community maps do. The saved behaviour flags say nothing of it (1357 of the 1539 scripts that run have no active
+  bit there).
+- *Objects in the scene.* Deactivate Object puts an object to sleep: its scripts are not run (their state is kept)
+  until Activate Object wakes it, which also asks for its scripts' activation (reset if asked). Object Delete of an
+  object deletes its scripts with it (the manager never runs them again); of a behaviour, that behaviour.
+- *Block callbacks.* A declaration may carry an event function for Reset (at the play's start), Activate Script /
+  Deactivate Script (its script, or its script's object, changes state), Delete and Copy. The particle emitters use
+  it (docs/particles.md, section 8): deactivating the owning script takes the particles off at once, activating it
+  again brings back an emitter that was on.
+- *Block state where the original keeps it.* Group Iterator and Collection Iterator keep their index in output
+  parameter 1 (Index), else in local 0, as the original's (read by other blocks, and kept as theirs is); the rest
+  keep a scratch state, cleared when the script is reset (whether the original's blocks clear theirs then is not
+  established: it sends no reset message on a script's reset).
+- *Execute Script* activates the script (reset if pin 0 says so) and runs it at once inside the caller's frame;
+  the manager does not run it again that tick. The block waits (stays active) and fires Out in the first later tick
+  in which the script is no longer active. A script cannot run inside itself; nesting is capped at 8.
+- *Trace.* `Runtime::set_trace(true)` keeps a line per frame (`frame N`), behaviour run (`run <id> <name>` for a
+  block, `graph <id> <name>`), IO fired (`io <owner> <name> in<k>|out<k>`), script activation applied and
+  parameter written (`param <id> = <value>`), capped at 2^20 lines; `script-dump --run N FILE` prints it.
 
 **Not in the player.** Eight kinds found in maps have a GUID in none of the player's libraries: Explode, Midi
 Player, Run VSL, Add Mesh, Remove Mesh, Select Mesh, Get Nearest Object and Object Rename `6f074ca7:45427431`

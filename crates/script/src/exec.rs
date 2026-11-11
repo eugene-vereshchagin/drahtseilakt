@@ -5,7 +5,7 @@
 // through blocks.rs. Messages sent in a tick reach their waiters in the next. All order is by index, so a run is
 // deterministic. The state is small and cloned with the run (rewind, replays); the graph is shared.
 
-use crate::blocks::{self, Flow};
+use crate::blocks::{self, BlockEvent, Flow};
 use crate::{Graph, Id, Node, ObjKind, Value};
 use std::sync::Arc;
 
@@ -88,7 +88,32 @@ struct BlockState {
     active: bool,
     stacked: bool,
     scratch: Scratch,
+    /// Reset at least once (the original's flags are no longer all zero): activating it again without asking for
+    /// a reset keeps its state.
+    reset_done: bool,
+    /// Pending activation requests of a script (`REQ_*`), applied at the start of the next tick.
+    request: u8,
+    /// Deleted (Object Delete of the behaviour or of its owner): never runs again.
+    gone: bool,
+    /// The tick in which Execute Script last ran it inside its caller's frame (the manager skips it then).
+    ran_inline: u64,
 }
+
+const REQ_ACTIVATE: u8 = 1;
+const REQ_DEACTIVATE: u8 = 2;
+const REQ_RESET: u8 = 4;
+
+/// An object's state in the scene: asleep (deactivated in the scene: its scripts are not executed) or deleted.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct ObjState {
+    asleep: bool,
+    gone: bool,
+}
+
+/// The most trace lines a run keeps (the trace is a tool's, never the game's).
+const MAX_TRACE: usize = 1 << 20;
+/// How deep Execute Script may nest scripts run inside their caller's frame.
+const MAX_INLINE: usize = 8;
 
 #[derive(Debug, Clone, Default)]
 struct LinkState {
@@ -121,6 +146,17 @@ pub struct Runtime {
     rng: u64,
     /// Objects copied so far (Object Copy), capped.
     copies: usize,
+    /// The scripts in the order the behaviour manager runs them: objects by priority (higher first, file order
+    /// among equals), each object's scripts in its list's order.
+    order: Vec<Id>,
+    /// Each graph object's state in the scene.
+    objects: Vec<ObjState>,
+    /// Whether any activation request waits (most ticks none does: the requests pass is skipped).
+    requested: bool,
+    /// Scripts being run inside a caller's frame (Execute Script), innermost last.
+    inline: Vec<Id>,
+    /// The trace (frames, behaviours run, IOs fired, parameters written), when asked for.
+    trace: Option<Vec<String>>,
 }
 
 /// The most objects a run's scripts may copy.
@@ -133,7 +169,9 @@ const MAX_DEPTH: usize = 48;
 const TICK_BUDGET: u64 = 300_000;
 
 impl Runtime {
-    /// A runtime with every script active and reset, as scripts of a loaded level start.
+    /// A runtime as the scripts of a loaded level start: each script reset and active, unless its saved activity
+    /// (or its object's) starts it deactivated (the saved behaviour flags say nothing of it: most scripts that
+    /// run have no active bit there).
     pub fn new(graph: Arc<Graph>) -> Runtime {
         let n = graph.nodes.len();
         let values = graph
@@ -159,13 +197,58 @@ impl Runtime {
             starved: false,
             rng: 0x9e37_79b9_7f4a_7c15,
             copies: 0,
+            order: Vec::new(),
+            objects: Vec::new(),
+            requested: false,
+            inline: Vec::new(),
+            trace: None,
         };
+        rt.objects = vec![ObjState::default(); rt.graph.objects.len()];
+        for &o in &rt.graph.start_off {
+            if let Some(st) = rt.objects.get_mut(o)
+                && rt.graph.block(o).is_none()
+            {
+                st.asleep = true;
+            }
+        }
+        rt.order = run_order(&rt.graph);
         let scripts = rt.graph.scripts.clone();
+        // the original's launch resets every block (CKM_BEHAVIORRESET) before the engine runs: nothing to tell
+        let mut quiet = Quiet;
+        let off: std::collections::HashSet<Id> = rt.graph.start_off.iter().copied().collect();
         for s in scripts {
             rt.bind_owner(s);
-            rt.activate(s, true, true, 0);
+            let active = !off.contains(&s);
+            rt.activate(s, active, true, 0);
+            rt.tree_event(s, BlockEvent::Reset, &mut quiet, 0);
         }
+        rt.budget = TICK_BUDGET;
         rt
+    }
+
+    /// Turns the trace on (or off): from then on each tick's frame, behaviours run, IOs fired and parameters
+    /// written are kept for `take_trace`.
+    pub fn set_trace(&mut self, on: bool) {
+        self.trace = on.then(Vec::new);
+    }
+
+    /// The trace lines kept since the last call.
+    pub fn take_trace(&mut self) -> Vec<String> {
+        self.trace.as_mut().map(std::mem::take).unwrap_or_default()
+    }
+
+    fn trace_line(&mut self, line: impl FnOnce(&Runtime) -> String) {
+        if self.trace.as_ref().is_some_and(|t| t.len() < MAX_TRACE) {
+            let l = line(self);
+            if let Some(t) = self.trace.as_mut() {
+                t.push(l);
+            }
+        }
+    }
+
+    /// The scripts in the order a tick runs them.
+    pub fn order(&self) -> &[Id] {
+        &self.order
     }
 
     /// Puts the script's owner where its "This" parameters stand.
@@ -262,7 +345,10 @@ impl Runtime {
         self.links.resize(n, LinkState::default());
         self.io.resize(n, false);
         self.values.resize(n, Value::None);
+        self.objects
+            .resize(self.graph.objects.len(), ObjState::default());
         for (old_root, root, pairs) in made {
+            self.order.push(root);
             for (old, new) in pairs {
                 let v = if matches!(self.graph.param(new), Some(p) if p.value == Value::Owner) {
                     Value::Obj(Some(new_id))
@@ -275,6 +361,7 @@ impl Runtime {
             }
             let active = self.is_active(old_root);
             self.activate(root, active, true, 0);
+            self.tree_event(root, BlockEvent::Copy, host, 0);
         }
         Some(new_id)
     }
@@ -315,7 +402,33 @@ impl Runtime {
 
     pub fn set_io(&mut self, io: Id, on: bool) {
         if let Some(x) = self.io.get_mut(io) {
+            let rising = on && !*x;
             *x = on;
+            if rising {
+                self.trace_line(|rt| {
+                    let owner = rt.graph.io(io).and_then(|i| i.owner);
+                    let side = owner.and_then(|o| rt.graph.block(o)).and_then(|b| {
+                        b.inputs
+                            .iter()
+                            .position(|&x| x == io)
+                            .map(|k| format!("in{k}"))
+                            .or_else(|| {
+                                b.outputs
+                                    .iter()
+                                    .position(|&x| x == io)
+                                    .map(|k| format!("out{k}"))
+                            })
+                    });
+                    format!(
+                        "io {} {}",
+                        owner.map_or_else(
+                            || "?".to_string(),
+                            |o| format!("{o} {}", rt.graph.name(o))
+                        ),
+                        side.unwrap_or_default()
+                    )
+                });
+            }
         }
     }
 
@@ -330,56 +443,202 @@ impl Runtime {
         }
     }
 
-    /// `CKBehavior::Activate`: `reset` puts the behaviour back to its start (links, IOs, sub-behaviours), and a
-    /// script's first input is activated.
+    /// `CKBehavior::Activate`: `reset` (or a behaviour never reset) puts the behaviour back to its start (links,
+    /// IOs, sub-behaviours), and a script's first input is activated. Activating a behaviour that was reset before
+    /// without asking for a reset keeps its state (it resumes).
     pub fn activate(&mut self, block: Id, active: bool, reset: bool, depth: usize) {
         if depth > MAX_DEPTH || !self.spend() {
             return;
         }
-        let Some(b) = self.graph.block(block).cloned() else {
-            return;
-        };
-        let was_off = !self.is_active(block);
-        if reset || was_off {
-            for &l in &b.links {
-                if let (Some(link), Some(st)) = (self.graph.link(l), self.links.get_mut(l)) {
-                    st.current = link.delay;
-                    st.queued = false;
-                }
-            }
-            for &s in &b.sub {
-                self.activate(s, false, true, depth.saturating_add(1));
-            }
-            for &io in b.inputs.iter().chain(&b.outputs) {
-                self.set_io(io, false);
-            }
-            if let Some(st) = self.blocks.get_mut(block) {
-                st.scratch = Scratch::None;
-                st.stacked = false;
-            }
-            if b.parent.is_none()
-                && let Some(&first) = b.inputs.first()
-            {
-                self.set_io(first, true);
-            }
+        let done = self.blocks.get(block).is_some_and(|b| b.reset_done);
+        if reset || !done {
+            self.reset(block, depth);
         }
         if let Some(st) = self.blocks.get_mut(block) {
             st.active = active;
         }
     }
 
-    /// Every script's scripts of an object (its graphs attached): activated or deactivated.
-    pub fn activate_object(&mut self, object: Id, active: bool, reset: bool) {
-        let scripts: Vec<Id> = self
-            .graph
-            .scripts
+    /// FUN_24005dc8 (docs/ck-runtime.md): links back to their delays, sub-behaviours inactive and reset, IOs off,
+    /// requests cleared; a script's input 0 on. The blocks are not told (the original sends CKM_BEHAVIORRESET only
+    /// when the play starts); their scratch state is cleared.
+    fn reset(&mut self, block: Id, depth: usize) {
+        if depth > MAX_DEPTH || !self.spend() {
+            return;
+        }
+        let Some(b) = self.graph.block(block).cloned() else {
+            return;
+        };
+        for &l in &b.links {
+            if let (Some(link), Some(st)) = (self.graph.link(l), self.links.get_mut(l)) {
+                st.current = link.delay;
+                st.queued = false;
+            }
+        }
+        for &s in &b.sub {
+            if let Some(st) = self.blocks.get_mut(s) {
+                st.active = false;
+            }
+            self.reset(s, depth.saturating_add(1));
+        }
+        for &io in b.inputs.iter().chain(&b.outputs) {
+            self.set_io(io, false);
+        }
+        if let Some(st) = self.blocks.get_mut(block) {
+            st.scratch = Scratch::None;
+            st.stacked = false;
+            st.reset_done = true;
+            st.request = 0;
+        }
+        if b.parent.is_none()
+            && let Some(&first) = b.inputs.first()
+        {
+            self.set_io(first, true);
+        }
+    }
+
+    /// Activate Script / Deactivate Script: a request on the script, applied by the next tick before any script
+    /// runs (the original's behaviour manager). Activation wins over a deactivation asked in the same tick only if
+    /// asked after it.
+    pub fn request(&mut self, script: Id, active: bool, reset: bool) {
+        self.requested = true;
+        if let Some(st) = self.blocks.get_mut(script) {
+            st.request = if active {
+                (st.request & !REQ_DEACTIVATE) | REQ_ACTIVATE | if reset { REQ_RESET } else { 0 }
+            } else {
+                (st.request & !(REQ_ACTIVATE | REQ_RESET)) | REQ_DEACTIVATE
+            };
+        }
+    }
+
+    /// Tells every building block of a behaviour's tree of an event.
+    pub(crate) fn tree_event(
+        &mut self,
+        root: Id,
+        e: BlockEvent,
+        host: &mut dyn Host,
+        depth: usize,
+    ) {
+        if depth > MAX_DEPTH || !self.spend() {
+            return;
+        }
+        let Some(b) = self.graph.block(root).cloned() else {
+            return;
+        };
+        if b.proto.is_some() {
+            blocks::event(self, root, &b, e, host);
+        }
+        for &s in &b.sub {
+            self.tree_event(s, e, host, depth.saturating_add(1));
+        }
+    }
+
+    /// The scripts attached to an object.
+    fn scripts_of(&self, object: Id) -> Vec<Id> {
+        self.order
             .iter()
             .copied()
             .filter(|&s| self.graph.block(s).is_some_and(|b| b.owner == Some(object)))
-            .collect();
-        for s in scripts {
-            self.activate(s, active, reset, 0);
+            .collect()
+    }
+
+    /// Whether the object is active in the scene (its scripts run). The level and objects the graph does not
+    /// hold are.
+    pub fn awake(&self, object: Option<Id>) -> bool {
+        object
+            .and_then(|o| self.objects.get(o))
+            .is_none_or(|o| !o.asleep && !o.gone)
+    }
+
+    /// Activate Object / Deactivate Object (CKScene::Activate / DeActivate): the object wakes in the scene or
+    /// falls asleep; its scripts' blocks are told (ACTIVATESCRIPT / DEACTIVATESCRIPT). Waking also asks for its
+    /// scripts' activation (with reset if asked), applied at the next tick as any activation.
+    pub fn activate_object(&mut self, object: Id, active: bool, reset: bool, host: &mut dyn Host) {
+        let Some(st) = self.objects.get(object).copied() else {
+            return;
+        };
+        if st.gone {
+            return;
         }
+        let scripts = self.scripts_of(object);
+        if active {
+            if st.asleep {
+                if let Some(o) = self.objects.get_mut(object) {
+                    o.asleep = false;
+                }
+                for &s in &scripts {
+                    self.tree_event(s, BlockEvent::ActivateScript, host, 0);
+                }
+            }
+            for s in scripts {
+                self.request(s, true, reset);
+            }
+        } else if !st.asleep {
+            if let Some(o) = self.objects.get_mut(object) {
+                o.asleep = true;
+            }
+            for s in scripts {
+                self.tree_event(s, BlockEvent::DeactivateScript, host, 0);
+            }
+        }
+    }
+
+    /// Wakes the object a script is attached to if it sleeps (Activate Script's "Awake Object").
+    pub(crate) fn wake_owner(&mut self, script: Id, host: &mut dyn Host) {
+        let owner = self.graph.block(script).and_then(|b| b.owner);
+        if let Some(o) = owner
+            && !self.awake(Some(o))
+        {
+            self.activate_object(o, true, false, host);
+        }
+    }
+
+    /// Object Delete of a behaviour: its blocks are told, and it never runs again.
+    pub fn delete_behavior(&mut self, block: Id, host: &mut dyn Host) {
+        if self.blocks.get(block).is_none_or(|b| b.gone) {
+            return;
+        }
+        self.tree_event(block, BlockEvent::Delete, host, 0);
+        if let Some(st) = self.blocks.get_mut(block) {
+            st.gone = true;
+            st.active = false;
+            st.request = 0;
+        }
+    }
+
+    /// Object Delete of an object: its scripts are deleted with it (the manager no longer runs them).
+    pub fn delete_object(&mut self, object: Id, host: &mut dyn Host) {
+        if self.objects.get(object).is_none_or(|o| o.gone) {
+            return;
+        }
+        for s in self.scripts_of(object) {
+            self.delete_behavior(s, host);
+        }
+        if let Some(o) = self.objects.get_mut(object) {
+            o.gone = true;
+        }
+    }
+
+    /// Execute Script: the script is activated (reset if asked) and run at once, inside the caller's frame; the
+    /// manager does not run it again in this tick. False when it cannot be (deleted, already running inside
+    /// this frame, nested too deep).
+    pub(crate) fn execute_now(&mut self, script: Id, reset: bool, host: &mut dyn Host) -> bool {
+        if self.inline.len() >= MAX_INLINE
+            || self.inline.contains(&script)
+            || self.blocks.get(script).is_none_or(|b| b.gone)
+        {
+            return false;
+        }
+        self.activate(script, true, reset, 0);
+        self.inline.push(script);
+        let keep = self.execute(script, host, 0);
+        self.inline.pop();
+        let tick = self.tick;
+        if let Some(st) = self.blocks.get_mut(script) {
+            st.active = keep;
+            st.ran_inline = tick;
+        }
+        true
     }
 
     pub fn send(&mut self, name: &str, to: Option<Id>) {
@@ -395,14 +654,60 @@ impl Runtime {
             .any(|(n, to)| n.eq_ignore_ascii_case(name) && (to.is_none() || *to == owner))
     }
 
-    /// One tick of every active script, in file order.
+    /// One tick, as the original's behaviour manager runs a frame: first every pending activation request of a
+    /// script of an object active in the scene is applied, then every active script of such an object is run, in
+    /// the manager's order.
     pub fn tick(&mut self, host: &mut dyn Host) {
         self.tick = self.tick.saturating_add(1);
         self.inbox = std::mem::take(&mut self.outbox);
         self.budget = TICK_BUDGET;
-        let scripts = self.graph.scripts.clone();
-        for s in scripts {
-            if self.is_active(s) {
+        let tick = self.tick;
+        self.trace_line(|_| format!("frame {tick}"));
+        let order = self.order.clone();
+        // a request asked while the pass runs (a block's callback) waits for the next tick, as in the original
+        let pending = std::mem::take(&mut self.requested);
+        for &s in order.iter().filter(|_| pending) {
+            let Some(st) = self.blocks.get(s) else {
+                continue;
+            };
+            let (req, was, gone) = (st.request, st.active, st.gone);
+            if req & (REQ_ACTIVATE | REQ_DEACTIVATE) == 0 || gone {
+                continue;
+            }
+            let owner = self.graph.block(s).and_then(|b| b.owner);
+            if !self.awake(owner) {
+                // it waits for its object to wake
+                self.requested = true;
+                continue;
+            }
+            let on = req & REQ_ACTIVATE != 0;
+            self.activate(s, on, req & REQ_RESET != 0, 0);
+            if let Some(st) = self.blocks.get_mut(s) {
+                st.request = 0;
+            }
+            self.trace_line(|rt| {
+                format!(
+                    "script {s} {} {}",
+                    rt.graph.name(s),
+                    if on { "activated" } else { "deactivated" }
+                )
+            });
+            if was != on {
+                let e = if on {
+                    BlockEvent::ActivateScript
+                } else {
+                    BlockEvent::DeactivateScript
+                };
+                self.tree_event(s, e, host, 0);
+            }
+        }
+        for s in order {
+            let owner = self.graph.block(s).and_then(|b| b.owner);
+            let runs = self
+                .blocks
+                .get(s)
+                .is_some_and(|b| b.active && !b.gone && b.ran_inline != tick);
+            if runs && self.awake(owner) {
                 let keep = self.execute(s, host, 0);
                 if let Some(st) = self.blocks.get_mut(s) {
                     st.active = keep;
@@ -424,6 +729,16 @@ impl Runtime {
         let Some(b) = self.graph.block(block).cloned() else {
             return false;
         };
+        if self.blocks.get(block).is_some_and(|st| st.gone) {
+            return false;
+        }
+        self.trace_line(|rt| {
+            format!(
+                "{} {block} {}",
+                if b.proto.is_some() { "run" } else { "graph" },
+                rt.graph.name(block)
+            )
+        });
         if let Some(proto) = b.proto {
             return match blocks::run(self, block, &b, proto, host) {
                 Flow::Done => false,
@@ -686,6 +1001,7 @@ impl Runtime {
             return;
         };
         *slot = v.clone();
+        self.trace_line(|_| format!("param {param} = {v:?}"));
         let dests = self
             .graph
             .param(param)
@@ -755,4 +1071,69 @@ impl Runtime {
             _ => None,
         }
     }
+}
+
+/// The behaviour manager's order: objects with scripts by priority, higher first (stable, so the file's order
+/// among equals), each object's scripts in the order the graph lists them; scripts without an owner last.
+fn run_order(g: &Graph) -> Vec<Id> {
+    let mut owners: Vec<Option<Id>> = Vec::new();
+    let mut by_owner: std::collections::HashMap<Option<Id>, Vec<Id>> =
+        std::collections::HashMap::new();
+    for &s in &g.scripts {
+        let owner = g.block(s).and_then(|b| b.owner);
+        let list = by_owner.entry(owner).or_default();
+        if list.is_empty() {
+            owners.push(owner);
+        }
+        list.push(s);
+    }
+    let prio = |o: &Option<Id>| match o {
+        Some(o) => g
+            .priorities
+            .iter()
+            .find(|(id, _)| id == o)
+            .map_or(0, |&(_, p)| p),
+        None => i32::MIN,
+    };
+    owners.sort_by_key(|o| std::cmp::Reverse(prio(o)));
+    owners
+        .into_iter()
+        .flat_map(|o| by_owner.remove(&o).unwrap_or_default())
+        .collect()
+}
+
+/// A host that is told nothing: the runtime's start, before the engine runs.
+struct Quiet;
+
+impl Host for Quiet {
+    fn delta_ms(&self) -> f32 {
+        0.0
+    }
+    fn matrix(&self, _: Ent) -> Option<[[f32; 4]; 4]> {
+        None
+    }
+    fn initial_matrix(&self, _: Ent) -> Option<[[f32; 4]; 4]> {
+        None
+    }
+    fn set_matrix(&mut self, _: Ent, _: [[f32; 4]; 4]) {}
+    fn set_visible(&mut self, _: Ent, _: bool) {}
+    fn bounds(&self, _: Ent) -> Option<([f32; 3], [f32; 3])> {
+        None
+    }
+    fn delete(&mut self, _: Ent) {}
+    fn physicalize(&mut self, _: Ent, _: bool) {}
+    fn particles(&mut self, _: Ent, _: bool) {}
+    fn mesh_of(&self, _: Ent) -> Option<usize> {
+        None
+    }
+    fn group_members(&self, _: usize) -> Vec<usize> {
+        Vec::new()
+    }
+    fn game_cell(&self, _: &str, _: usize, _: usize) -> Option<Value> {
+        None
+    }
+    fn message(&mut self, _: &str, _: Option<Ent>) {}
+    fn sound(&mut self, _: &str, _: bool) {}
+    fn text(&mut self, _: &str, _: &str, _: bool) {}
+    fn note(&mut self, _: &str) {}
 }

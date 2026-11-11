@@ -306,6 +306,34 @@ pub fn scripts(chunk: &Chunk) -> Vec<usize> {
     }
 }
 
+/// What the scene does with an object when the play starts, as saved with it (CKObjectManager's single-object
+/// activity): identifier 0x200000 for a behaviour, 0x400 for any other behavioural object. Bits: 1 activate, 0x10
+/// deactivate, 0x20 leave as it is, 0x40 reset, 0x80 keep the state as loaded as its initial value. None when not
+/// saved (most map files: the object starts as the scene's default).
+pub fn activity(chunk: &Chunk, is_behavior: bool) -> Option<u32> {
+    chunk
+        .section(if is_behavior { 0x20_0000 } else { 0x400 })?
+        .u32()
+        .ok()
+}
+
+/// A behavioural object's priority (identifier 0x40, docs/ck-runtime.md): from data version 5 a flag word comes
+/// first and the priority follows only when it has bit 0x10000000; before, the word is the priority. 0 when absent.
+/// Objects of higher priority run their scripts first.
+pub fn object_priority(chunk: &Chunk) -> i32 {
+    let Some(mut w) = chunk.section(0x40) else {
+        return 0;
+    };
+    let Ok(first) = w.u32() else { return 0 };
+    if chunk.data_version < 5 {
+        return first as i32;
+    }
+    if first & 0x1000_0000 == 0 {
+        return 0;
+    }
+    w.u32().map_or(0, |p| p as i32)
+}
+
 #[cfg(test)]
 #[allow(
     clippy::expect_used,
@@ -434,6 +462,24 @@ mod tests {
         assert!(operation(&chunk(&[(0x400, vec![1, 2, 2, 5, 6])])).is_err());
 
         assert_eq!(scripts(&chunk(&[(0x800, vec![2, 30, 31])])), vec![30, 31]);
+        let mut c = chunk(&[(0x40, vec![0x1000_0000, 32_000])]);
+        c.data_version = 10;
+        assert_eq!(object_priority(&c), 32_000);
+        let mut c = chunk(&[(0x40, vec![0, 5])]);
+        c.data_version = 10;
+        assert_eq!(object_priority(&c), 0);
+        c.data_version = 4;
+        assert_eq!(object_priority(&c), 0);
+        let mut c = chunk(&[(0x40, vec![0x1000_0000])]);
+        c.data_version = 10;
+        assert_eq!(object_priority(&c), 0, "a cut section is no priority");
+        assert_eq!(object_priority(&chunk(&[])), 0);
+        assert_eq!(
+            activity(&chunk(&[(0x20_0000, vec![0x50])]), true),
+            Some(0x50)
+        );
+        assert_eq!(activity(&chunk(&[(0x20_0000, vec![0x50])]), false), None);
+        assert_eq!(activity(&chunk(&[(0x400, vec![0xc9])]), false), Some(0xc9));
         assert_eq!(io_flags(&chunk(&[(0x8, vec![2])])), 2);
     }
 }

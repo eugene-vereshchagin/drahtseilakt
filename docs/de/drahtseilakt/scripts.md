@@ -71,3 +71,15 @@ Nearest Object, Object Rename `6f074ca7:45427431`) stehen in keiner Bibliothek d
 nichts. Sie sind als **benannte No-ops** deklariert (Entscheidung des Eigentümers 2026-11-11): bekannt, Eingänge
 gelöscht, keine Ausgabe, eine Logzeile. Der Object-Rename-Code aus Phase 2 bleibt hinter dem Cargo-Feature
 `absent-as-authored` (aus), für einen späteren optionalen Mod „wie der Autor es meinte".
+
+**Der Ausführer** (`crates/script/src/exec.rs`), wie der Verhaltensmanager des Originals: Activate Script und
+Deactivate Script stellen eine Anforderung, die der nächste Tick vor allen Skripten anwendet (ein von einem anderen
+aktiviertes Skript startet einen Tick später); Zurücksetzen ist von Aktivität getrennt (ein ohne Reset? wieder
+aktiviertes Skript macht weiter); Reihenfolge: Objekte nach Priorität (`0x40`), die Skripte eines Objekts nach
+seiner Liste; der Startzustand kommt aus der gespeicherten Szenenaktivität (`0x200000` / `0x400`; 24 Skripte der
+Karten starten deaktiviert), nicht aus den Verhaltensflags; Deactivate Object legt ein Objekt schlafen (seine
+Skripte laufen nicht, ihr Zustand bleibt), Object Delete eines Objekts löscht seine Skripte mit; Baustein-Callbacks
+(Reset, Skript an/aus, Löschen, Kopie) nutzen die Partikelemitter: ein deaktiviertes Skript nimmt die Partikel
+sofort weg; Group/Collection Iterator halten den Index im Ausgang Index oder in Local 0; Execute Script führt das
+Skript sofort im Frame des Aufrufers aus; eine Spur (Frame, Verhalten, IO, Parameter) per Schalter. Ein Replay im
+Format 9 einer Karte mit Skripten wird als veraltet abgelehnt (Format 10); Level ohne Skripte sind unberührt.

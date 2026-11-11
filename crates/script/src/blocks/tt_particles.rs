@@ -35,6 +35,27 @@ pub(crate) fn point_particle_system(
     }
 }
 
+/// The emitter's callback (docs/particles.md, section 8): deactivating the owning script takes the particles off
+/// at once (the render callback is unregistered), activating it again brings back an emitter that was on; a
+/// reset kills the particles.
+pub(crate) fn particle_event(
+    rt: &mut Runtime,
+    id: Id,
+    b: &Block,
+    e: BlockEvent,
+    host: &mut dyn Host,
+) {
+    let on = matches!(rt.scratch(id), Scratch::Flag(true));
+    let Some(ent) = rt.ent(b.owner) else {
+        return;
+    };
+    match e {
+        BlockEvent::DeactivateScript | BlockEvent::Delete if on => host.particles(ent, false),
+        BlockEvent::ActivateScript if on => host.particles(ent, true),
+        _ => {}
+    }
+}
+
 pub(super) const PROTOS: &[Proto] = &[
     Proto {
         guid: proto::POINT_PARTICLE_SYSTEM,
@@ -46,7 +67,7 @@ pub(super) const PROTOS: &[Proto] = &[
         standing: Standing::Full,
         layouts: &[],
         run: point_particle_system,
-        event: None,
+        event: Some(particle_event),
     },
     Proto {
         guid: proto::PLANAR_PARTICLE_SYSTEM,
@@ -58,6 +79,6 @@ pub(super) const PROTOS: &[Proto] = &[
         standing: Standing::Partial,
         layouts: &[],
         run: point_particle_system,
-        event: None,
+        event: Some(particle_event),
     },
 ];

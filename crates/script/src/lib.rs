@@ -305,6 +305,12 @@ pub struct Graph {
     pub scripts: Vec<Id>,
     /// For each IO, the links leaving it.
     pub links_from: Vec<Vec<Id>>,
+    /// Objects with a priority other than 0 (identifier 0x40 of a behavioural object): higher runs its scripts
+    /// first. Not in the open format yet (every object 0 there).
+    pub priorities: Vec<(Id, i32)>,
+    /// Scripts and objects the scene starts deactivated (their saved activity says so, docs/ck-runtime.md); every
+    /// other one starts active (a map's file mostly saves no activity at all). Not in the open format yet.
+    pub start_off: Vec<Id>,
 }
 
 impl Graph {
@@ -317,6 +323,8 @@ impl Graph {
             arrays: Vec::new(),
             scripts: Vec::new(),
             links_from: vec![Vec::new(); n],
+            priorities: Vec::new(),
+            start_off: Vec::new(),
         };
         for (i, o) in doc.objects.iter().enumerate().take(n) {
             let mut k = kind(i);
@@ -434,10 +442,22 @@ impl Graph {
         let mut owners: Vec<Option<Id>> = vec![None; n];
         for (i, o) in doc.objects.iter().enumerate().take(n) {
             let Some(chunk) = &o.chunk else { continue };
-            if o.class_id == behavior::class::BEHAVIOR
-                || o.class_id == behavior::class::BEHAVIOR_LINK
-            {
+            if o.class_id == behavior::class::BEHAVIOR {
+                if behavior::activity(chunk, true).is_some_and(|f| f & 1 == 0 && f & 0x10 != 0) {
+                    g.start_off.push(i);
+                }
                 continue;
+            }
+            if o.class_id == behavior::class::BEHAVIOR_LINK {
+                continue;
+            }
+            let off = |a: Option<u32>| a.is_some_and(|f| f & 1 == 0 && f & 0x10 != 0);
+            if off(behavior::activity(chunk, false)) {
+                g.start_off.push(i);
+            }
+            let prio = behavior::object_priority(chunk);
+            if prio != 0 {
+                g.priorities.push((i, prio));
             }
             for s in behavior::scripts(chunk) {
                 if let Some(slot) = owners.get_mut(s) {
@@ -638,6 +658,8 @@ impl Graph {
             arrays,
             scripts: Vec::new(),
             links_from: vec![Vec::new(); n],
+            priorities: Vec::new(),
+            start_off: Vec::new(),
         };
         for (i, node) in nodes {
             match &node {

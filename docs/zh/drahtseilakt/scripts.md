@@ -29,3 +29,5 @@
 **原型注册表**（`crates/script/src/blocks/`）：每个原型一条声明——GUID、名称、播放器的库、引脚模式、标志、完成程度、作为数据的旧引脚布局、运行函数和可选的事件函数。模块与播放器的库一一对应（`logics.rs` = Logics.dll、`narratives.rs` 等）。
 
 **播放器中没有的。** 地图中出现的八种构建块（Explode、Midi Player、Run VSL、Add/Remove/Select Mesh、Get Nearest Object、Object Rename `6f074ca7:45427431`）不在播放器的任何库中：原版里它们什么也不做。它们被声明为**具名空操作**（所有者 2026-11-11 的决定）：已知、清除输入、无输出、记一行日志。第二阶段写的 Object Rename 代码保留在 cargo 特性 `absent-as-authored`（关闭）之后，留给以后一个可选的“按作者本意”模组。
+
+**执行器**（`crates/script/src/exec.rs`），与原版的行为管理器一致：Activate Script 与 Deactivate Script 提交请求，由下一个 tick 在任何脚本运行之前应用（被另一个脚本激活的脚本晚一个 tick 开始）；重置与激活分开（不带 Reset? 再次激活的脚本从原处继续）；顺序：对象按优先级（`0x40`），对象的脚本按其列表；初始状态取自保存的场景活动（`0x200000` / `0x400`；地图中有 24 个脚本以停用状态开始），而不是行为标志；Deactivate Object 让对象休眠（其脚本不运行，状态保留），对对象执行 Object Delete 会连同其脚本一起删除；构建块回调（重置、脚本激活/停用、删除、复制）用于粒子发射器：停用脚本会立即撤下粒子；Group/Collection Iterator 把索引保存在输出 Index 或局部参数 0 中；Execute Script 在调用者的帧内立即执行脚本；可按开关输出跟踪（帧、行为运行、IO、参数写入）。带脚本地图的格式 9 回放被视为过时而拒绝（格式 10）；无脚本的关卡不受影响。

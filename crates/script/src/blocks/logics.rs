@@ -636,7 +636,7 @@ pub(crate) fn iterator(
 
 pub(crate) fn group_iterator(
     rt: &mut Runtime,
-    id: Id,
+    _id: Id,
     b: &Block,
     proto: Guid,
     host: &mut dyn Host,
@@ -671,13 +671,14 @@ pub(crate) fn group_iterator(
             .collect(),
         _ => Vec::new(),
     };
+    // The index lives where the original keeps it: in output parameter 1 (Index) when the block has one, else in
+    // local 0, so it survives as theirs does and other readers see it.
+    let slot = b.pouts.get(1).or_else(|| b.locals.first()).copied();
     let i = if start {
         0
     } else {
-        match rt.scratch(id) {
-            Scratch::Index(i) => *i,
-            _ => 0,
-        }
+        slot.and_then(|p| rt.values.get(p))
+            .map_or(0, |v| v.as_int().saturating_add(1))
     };
     match usize::try_from(i)
         .ok()
@@ -685,14 +686,12 @@ pub(crate) fn group_iterator(
     {
         Some(m) => {
             set_pout(rt, b, "Element", 0, Value::Obj(Some(m)));
-            set_pout(rt, b, "Index", 1, Value::Int(i as i32));
-            rt.set_scratch(id, Scratch::Index(i.saturating_add(1)));
+            if let Some(p) = slot {
+                rt.write(p, Value::Int(i));
+            }
             out(rt, b, 1);
         }
-        None => {
-            rt.set_scratch(id, Scratch::None);
-            out(rt, b, 0);
-        }
+        None => out(rt, b, 0),
     }
     Flow::Done
 }

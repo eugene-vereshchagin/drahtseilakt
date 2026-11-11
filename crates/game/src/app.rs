@@ -218,6 +218,11 @@ impl Game {
                         level.name
                     ));
                 }
+                if let Some(why) =
+                    crate::replay::stale_for_scripts(r.version, level.level.scripts.is_some())
+                {
+                    return Err(format!("{}: {why}", p.display()));
+                }
                 Some(r)
             }
             None => None,
