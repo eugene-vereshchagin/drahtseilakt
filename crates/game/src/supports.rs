@@ -1511,7 +1511,7 @@ pub fn run(
         let name = file
             .file_stem()
             .map_or_else(String::new, |f| f.to_string_lossy().into_owned());
-        sources.push((name, Source::Nmo(file), Vec::new()));
+        sources.push((name, if file.is_dir() { Source::Open(file) } else { Source::Nmo(file) }, Vec::new()));
     }
     // per design: placed (varied set), placed (plain set), the least clearances
     let mut by_design = [(0usize, 0usize, f32::MAX, f32::MAX, f32::MAX); ND];
@@ -2130,7 +2130,11 @@ mod tests {
             if placed > 0 {
                 break;
             }
-            let source = crate::assets::Source::Nmo(file.clone());
+            let source = if file.is_dir() {
+                crate::assets::Source::Open(file.clone())
+            } else {
+                crate::assets::Source::Nmo(file.clone())
+            };
             let (loaded, _, modules, plan) =
                 planned(&data, &source).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
             sacks += plan.sacks.len();
