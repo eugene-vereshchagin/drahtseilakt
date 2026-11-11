@@ -388,12 +388,23 @@ impl Host for SimHost<'_> {
     }
 
     fn camera_get(&self) -> CameraState {
-        let (eye, forward) = match self.s.camera.active.and_then(|i| self.matrix(Ent::Object(i))) {
+        let (eye, forward) = match self
+            .s
+            .camera
+            .active
+            .and_then(|i| self.matrix(Ent::Object(i)))
+        {
             Some(m) => {
                 let m = to_mat(&m);
-                (m.w_axis.truncate(), m.z_axis.truncate().normalize_or(Vec3::Z))
+                (
+                    m.w_axis.truncate(),
+                    m.z_axis.truncate().normalize_or(Vec3::Z),
+                )
             }
-            None => (self.run.eye, (self.run.target - self.run.eye).normalize_or(Vec3::Z)),
+            None => (
+                self.run.eye,
+                (self.run.target - self.run.eye).normalize_or(Vec3::Z),
+            ),
         };
         let cam = &self.s.camera;
         let (near, far) = cam.clip.unwrap_or((0.5, 3000.0));
@@ -401,7 +412,9 @@ impl Host for SimHost<'_> {
             position: eye.to_array(),
             forward: forward.to_array(),
             up: [0.0, 1.0, 0.0],
-            fov: cam.fov.unwrap_or_else(|| crate::scene::fov_degrees(crate::scene::fov_y())),
+            fov: cam
+                .fov
+                .unwrap_or_else(|| crate::scene::fov_degrees(crate::scene::fov_y())),
             near,
             far,
             object: cam.active,
@@ -411,7 +424,9 @@ impl Host for SimHost<'_> {
     fn camera_set(&mut self, change: CameraChange) {
         match change {
             CameraChange::Fov(d) if d.is_finite() => self.s.camera.fov = Some(d.clamp(1.0, 179.0)),
-            CameraChange::Clip { near, far } if near.is_finite() && far.is_finite() && near > 0.0 && far > near => {
+            CameraChange::Clip { near, far }
+                if near.is_finite() && far.is_finite() && near > 0.0 && far > near =>
+            {
                 self.s.camera.clip = Some((near, far));
             }
             CameraChange::Active(i) => self.s.camera.active = Some(i),
@@ -425,13 +440,20 @@ impl Host for SimHost<'_> {
         let ticks = self.s.sound.ticks.get(&stem.to_ascii_lowercase()).copied();
         if ticks.is_none() && !self.s.sound.noted.contains(&stem) {
             self.s.sound.noted.push(stem.clone());
-            self.s.note(format!("sound file {file:?} is not available: silent"));
+            self.s
+                .note(format!("sound file {file:?} is not available: silent"));
         }
         let st = &mut self.s.sound;
         match cmd {
             SoundCmd::Play { looping, .. } => {
                 let until = (!looping).then(|| tick.saturating_add(ticks.unwrap_or(0)));
-                st.playing.insert(key, Playing { until, paused: None });
+                st.playing.insert(
+                    key,
+                    Playing {
+                        until,
+                        paused: None,
+                    },
+                );
             }
             SoundCmd::Stop { .. } => {
                 st.playing.remove(&key);
@@ -461,9 +483,11 @@ impl Host for SimHost<'_> {
     }
 
     fn sound_playing(&self, key: usize) -> bool {
-        self.s.sound.playing.get(&key).is_some_and(|p| {
-            p.paused.is_some() || p.until.is_none_or(|u| self.s.tick < u)
-        })
+        self.s
+            .sound
+            .playing
+            .get(&key)
+            .is_some_and(|p| p.paused.is_some() || p.until.is_none_or(|u| self.s.tick < u))
     }
 
     fn text(&mut self, name: &str, text: &str, on: bool) {

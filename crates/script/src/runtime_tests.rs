@@ -11,9 +11,9 @@
 )]
 
 use crate::blocks::proto;
-use crate::{CameraChange, CameraState};
 use crate::exec::{Ent, Host};
 use crate::{Block, Graph, Guid, Id, Io, Link, Node, ObjKind, Param, Runtime, Value, types};
+use crate::{CameraChange, CameraState};
 use std::sync::Arc;
 
 /// A host that records what the scripts asked of it; two level objects (0 and 1) and the ball.
@@ -1210,7 +1210,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     }
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them), and the cameras' Set As Active Camera and Set Clipping Planes
-    assert_eq!(all.len(), 114);
+    assert_eq!(all.len(), 115);
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -1657,7 +1657,6 @@ fn attributes_are_set_found_and_listed_in_order() {
     );
 }
 
-
 // ---- sounds (docs/gameplay_bbs.md, "Sounds"): the commands go to the host; expected values from those notes ----
 
 /// A graph with a wave sound object (class 25, id 5, file "Wind.wav") and one sound block of `proto` that has
@@ -1711,7 +1710,16 @@ fn sound_script_watch(
     let hier = b.local("Hierarchy", types::BOOL, Value::Bool(false));
     for (n, &o) in watch.iter().enumerate() {
         let t = b.local("Target", types::ENTITY, Value::Obj(Some(n)));
-        let hide = b.bb("Hide", proto::HIDE, &["In"], &["Out"], vec![hier], vec![], vec![], Some(t));
+        let hide = b.bb(
+            "Hide",
+            proto::HIDE,
+            &["In"],
+            &["Out"],
+            vec![hier],
+            vec![],
+            vec![],
+            Some(t),
+        );
         links.push(b.link(out_of(&b.g, blk, o), in_of(&b.g, hide, 0), 0));
         sub.push(hide);
     }
@@ -1735,8 +1743,15 @@ fn a_looping_wave_player_plays_and_finishes_its_run() {
     );
     let mut host = Rec::new();
     rt.tick(&mut host);
-    assert_eq!(host.sounds, vec!["5 Sounds\\Wind.wav Play { looping: true, fade_in: 0.0 }"]);
-    assert_eq!(host.visible, vec![false, true], "Start Playing fired, End Playing did not");
+    assert_eq!(
+        host.sounds,
+        vec!["5 Sounds\\Wind.wav Play { looping: true, fade_in: 0.0 }"]
+    );
+    assert_eq!(
+        host.visible,
+        vec![false, true],
+        "Start Playing fired, End Playing did not"
+    );
     assert!(!rt.is_active(blk), "a looping Play returns at once");
     let _ = script;
 }
@@ -1758,10 +1773,13 @@ fn a_one_shot_wave_player_waits_for_the_sound_and_then_reports_the_end() {
     let mut host = Rec::new();
     host.playing = true;
     rt.tick(&mut host);
-    assert_eq!(host.sounds, vec!["5 Sounds\\Wind.wav Play { looping: false, fade_in: 0.5 }"]);
+    assert_eq!(
+        host.sounds,
+        vec!["5 Sounds\\Wind.wav Play { looping: false, fade_in: 0.5 }"]
+    );
     rt.tick(&mut host);
     assert!(rt.is_active(blk), "stays active while the sound plays");
-    assert_eq!(host.visible, vec![true, true], "no End Playing yet");  // (the one watched output hides A)
+    assert_eq!(host.visible, vec![true, true], "no End Playing yet"); // (the one watched output hides A)
     host.playing = false;
     rt.tick(&mut host);
     assert_eq!(host.visible, vec![false, true], "End Playing fired");
@@ -1804,9 +1822,18 @@ fn control(proto: Guid, name: &str, v: f32) -> Vec<String> {
 
 #[test]
 fn volume_pitch_and_panning_controls_set_their_value() {
-    assert_eq!(control(proto::VOLUME_CONTROL, "Gain", 0.25), ["5 Sounds\\Wind.wav Gain(0.25)"]);
-    assert_eq!(control(proto::PITCH_CONTROL, "Pitch", 1.5), ["5 Sounds\\Wind.wav Pitch(1.5)"]);
-    assert_eq!(control(proto::PANNING_CONTROL, "Pan", -1.0), ["5 Sounds\\Wind.wav Pan(-1.0)"]);
+    assert_eq!(
+        control(proto::VOLUME_CONTROL, "Gain", 0.25),
+        ["5 Sounds\\Wind.wav Gain(0.25)"]
+    );
+    assert_eq!(
+        control(proto::PITCH_CONTROL, "Pitch", 1.5),
+        ["5 Sounds\\Wind.wav Pitch(1.5)"]
+    );
+    assert_eq!(
+        control(proto::PANNING_CONTROL, "Pan", -1.0),
+        ["5 Sounds\\Wind.wav Pan(-1.0)"]
+    );
 }
 
 fn instance(flat: bool) -> Vec<String> {
@@ -1846,7 +1873,14 @@ fn a_sound_instance_is_flat_or_placed_at_the_object() {
 
 #[test]
 fn the_linear_volume_curve_follows_the_notes() {
-    for (v, want) in [(2.0, 1.0), (1.0, 1.0), (0.5, 0.141_421), (0.01, 0.0), (0.0, 0.0), (0.02, 0.02 * 50f32.powf(0.02))] {
+    for (v, want) in [
+        (2.0, 1.0),
+        (1.0, 1.0),
+        (0.5, 0.141_421),
+        (0.01, 0.0),
+        (0.0, 0.0),
+        (0.02, 0.02 * 50f32.powf(0.02)),
+    ] {
         let (mut rt, _, _, pout) = sound_script_watch(
             proto::TT_LINEAR_VOLUME,
             &["In"],
@@ -1890,7 +1924,11 @@ fn a_proximity_volume_follows_the_distance_and_ends_on_off() {
     assert_eq!(gain(1.0, 5.0), ["5 Sounds\\Wind.wav Gain(0.02)"]);
     let want = 0.02 * 50f32.powf(0.8);
     let got = gain(5.0, 20.0);
-    let got: f32 = got[0].trim_start_matches("5 Sounds\\Wind.wav Gain(").trim_end_matches(')').parse().unwrap();
+    let got: f32 = got[0]
+        .trim_start_matches("5 Sounds\\Wind.wav Gain(")
+        .trim_end_matches(')')
+        .parse()
+        .unwrap();
     assert!((got - want).abs() < 1e-5, "{got} vs {want}");
 }
 
@@ -1920,7 +1958,16 @@ fn camera_script(
         })
         .collect();
     let pouts: Vec<Id> = pouts.iter().map(|(n, g)| b.pout(n, *g)).collect();
-    let blk = b.bb("Camera", proto, ins, outs, pins, pouts.clone(), vec![], target.then_some(t));
+    let blk = b.bb(
+        "Camera",
+        proto,
+        ins,
+        outs,
+        pins,
+        pouts.clone(),
+        vec![],
+        target.then_some(t),
+    );
     let start = b.io("Start");
     let links = vec![b.link(start, in_of(&b.g, blk, 0), 0)];
     b.script("S", Some(owner), start, vec![blk], links);
@@ -1934,7 +1981,10 @@ fn get_current_camera_writes_the_host_camera_to_its_outputs() {
         &["In"],
         &["Out"],
         &[],
-        &[("Current Camera", types::OBJECT), ("Position", types::VECTOR)],
+        &[
+            ("Current Camera", types::OBJECT),
+            ("Position", types::VECTOR),
+        ],
         false,
     );
     let mut host = Rec::new();
@@ -1946,7 +1996,14 @@ fn get_current_camera_writes_the_host_camera_to_its_outputs() {
 
 #[test]
 fn set_as_active_camera_attaches_the_view_to_the_target_object() {
-    let (mut rt, _, _) = camera_script(proto::SET_AS_ACTIVE_CAMERA, &["In"], &["Out"], &[], &[], true);
+    let (mut rt, _, _) = camera_script(
+        proto::SET_AS_ACTIVE_CAMERA,
+        &["In"],
+        &["Out"],
+        &[],
+        &[],
+        true,
+    );
     let mut host = Rec::new();
     rt.tick(&mut host);
     assert_eq!(host.cams, vec![CameraChange::Active(1)]);
@@ -1959,7 +2016,10 @@ fn set_clipping_planes_applies_a_near_below_a_far_and_ignores_the_rest() {
             proto::SET_CLIPPING_PLANES,
             &["In"],
             &["Out"],
-            &[("Near", types::FLOAT, Value::Float(near)), ("Far", types::FLOAT, Value::Float(far))],
+            &[
+                ("Near", types::FLOAT, Value::Float(near)),
+                ("Far", types::FLOAT, Value::Float(far)),
+            ],
             &[],
             false,
         )
@@ -1967,11 +2027,42 @@ fn set_clipping_planes_applies_a_near_below_a_far_and_ignores_the_rest() {
     let (mut rt, _, _) = planes(0.5, 100.0);
     let mut host = Rec::new();
     rt.tick(&mut host);
-    assert_eq!(host.cams, vec![CameraChange::Clip { near: 0.5, far: 100.0 }]);
+    assert_eq!(
+        host.cams,
+        vec![CameraChange::Clip {
+            near: 0.5,
+            far: 100.0
+        }]
+    );
     for (near, far) in [(0.0, 100.0), (-1.0, 100.0), (5.0, 5.0), (f32::NAN, 100.0)] {
         let (mut rt, _, _) = planes(near, far);
         let mut host = Rec::new();
         rt.tick(&mut host);
         assert!(host.cams.is_empty(), "{near} {far} is ignored");
     }
+}
+
+#[test]
+fn set_fov_gives_the_angle_in_degrees_and_ignores_a_non_finite_one() {
+    let fov = |a: f32| {
+        camera_script(
+            proto::SET_FOV,
+            &["In"],
+            &["Out"],
+            &[("Angle", types::FLOAT, Value::Float(a))],
+            &[],
+            false,
+        )
+    };
+    let (mut rt, _, _) = fov(1.012_291);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    match host.cams.as_slice() {
+        [CameraChange::Fov(d)] => assert!((d - 58.0).abs() < 0.01, "{d}"),
+        other => panic!("{other:?}"),
+    }
+    let (mut rt, _, _) = fov(f32::NAN);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert!(host.cams.is_empty());
 }

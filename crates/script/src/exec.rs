@@ -116,15 +116,23 @@ pub enum CameraChange {
 /// What a script asks of a wave sound.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SoundCmd {
-    Play { looping: bool, fade_in: f32 },
-    Stop { fade_out: f32 },
+    Play {
+        looping: bool,
+        fade_in: f32,
+    },
+    Stop {
+        fade_out: f32,
+    },
     Pause,
     Resume,
     Gain(f32),
     Pitch(f32),
     Pan(f32),
     /// A one-shot copy of the sound (Play Sound Instance): its volume and, for a 3D one, its world position.
-    Instance { volume: f32, at: Option<[f32; 3]> },
+    Instance {
+        volume: f32,
+        at: Option<[f32; 3]>,
+    },
 }
 
 /// Per-block state a block keeps between ticks.

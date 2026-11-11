@@ -34,7 +34,10 @@ impl Snapshot {
         let cam = sim.script_camera();
         // a camera object the scripts attached the view to: its place, looking along its own z
         let (eye, target) = match cam.active.and_then(|i| sim.script_object_matrix(i)) {
-            Some(m) => (m.w_axis.truncate(), m.w_axis.truncate() + m.z_axis.truncate()),
+            Some(m) => (
+                m.w_axis.truncate(),
+                m.w_axis.truncate() + m.z_axis.truncate(),
+            ),
             None => (sim.camera.position, sim.camera.target),
         };
         Snapshot {

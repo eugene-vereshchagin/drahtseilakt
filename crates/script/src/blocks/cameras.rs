@@ -65,6 +65,25 @@ pub(crate) fn set_clipping_planes(
     Flow::Done
 }
 
+/// Set FOV: the view's field of view, the Angle pin in radians across the 4:3 view (as InGameCam's 1.0123); it is
+/// applied to the active view whatever the target, and an angle that is not finite is ignored.
+pub(crate) fn set_fov(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    if input(rt, b, 0) {
+        let angle = float_or(pin(rt, b, "Angle", 0, host), f32::NAN);
+        if angle.is_finite() {
+            host.camera_set(CameraChange::Fov(angle.to_degrees()));
+        }
+        out(rt, b, 0);
+    }
+    Flow::Done
+}
+
 pub(super) const PROTOS: &[Proto] = &[
     Proto {
         guid: proto::GET_CURRENT_CAMERA,
@@ -100,6 +119,18 @@ pub(super) const PROTOS: &[Proto] = &[
         standing: Standing::Partial,
         layouts: &[],
         run: set_clipping_planes,
+        event: None,
+    },
+    Proto {
+        guid: proto::SET_FOV,
+        name: "Set FOV",
+        library: Library::Cameras,
+        pins: &["Angle"],
+        pouts: &[],
+        flags: flags::TARGET,
+        standing: Standing::Partial,
+        layouts: &[],
+        run: set_fov,
         event: None,
     },
 ];

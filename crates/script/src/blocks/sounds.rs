@@ -8,7 +8,11 @@ use crate::exec::SoundCmd;
 /// The wave sound a block acts on, and where its own pins start: the old layout of these blocks takes the sound
 /// as its first pin (a Wave Sound parameter), the game's use the target.
 fn sound_of(rt: &mut Runtime, b: &Block, host: &mut dyn Host) -> (Option<Id>, usize) {
-    let first = b.pins.first().and_then(|&p| rt.graph.param(p)).map(|p| p.guid);
+    let first = b
+        .pins
+        .first()
+        .and_then(|&p| rt.graph.param(p))
+        .map(|p| p.guid);
     let (obj, k) = if first == Some(types::WAVE_SOUND) {
         let p = pin(rt, b, "", 0, host).as_obj();
         (p, 1)
@@ -31,7 +35,14 @@ fn file_of(rt: &Runtime, obj: Id) -> String {
         .unwrap_or_else(|| rt.graph.name(obj).to_string())
 }
 
-fn float_pin(rt: &mut Runtime, b: &Block, name: &str, i: usize, default: f32, host: &mut dyn Host) -> f32 {
+fn float_pin(
+    rt: &mut Runtime,
+    b: &Block,
+    name: &str,
+    i: usize,
+    default: f32,
+    host: &mut dyn Host,
+) -> f32 {
     if rt.pin(b, name, i).is_none() {
         return default;
     }
@@ -41,7 +52,13 @@ fn float_pin(rt: &mut Runtime, b: &Block, name: &str, i: usize, default: f32, ho
 
 /// Wave Player: inputs Play, Stop, Pause/Resume; outputs Start Playing, End Playing, Paused/Resumed; pins Fade In,
 /// Fade Out, Loop. Stays active while the sound plays; a looping Play returns at once.
-pub(crate) fn wave_player(rt: &mut Runtime, _id: Id, b: &Block, _proto: Guid, host: &mut dyn Host) -> Flow {
+pub(crate) fn wave_player(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
     let (Some(obj), k) = sound_of(rt, b, host) else {
         return Flow::Done;
     };
@@ -92,7 +109,13 @@ pub(crate) fn wave_event(rt: &mut Runtime, _id: Id, b: &Block, e: BlockEvent, ho
 }
 
 /// Volume Control, Pitch Control and Panning Control: one value to the sound (default 1, 1 and 0).
-pub(crate) fn sound_control(rt: &mut Runtime, _id: Id, b: &Block, proto: Guid, host: &mut dyn Host) -> Flow {
+pub(crate) fn sound_control(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
     input(rt, b, 0);
     out(rt, b, 0);
     let (Some(obj), k) = sound_of(rt, b, host) else {
@@ -117,7 +140,13 @@ pub(crate) fn sound_control(rt: &mut Runtime, _id: Id, b: &Block, proto: Guid, h
 /// Play Sound Instance: pins 2D, Object, Position, Direction, Min Delay, Volume. A one-shot copy of the sound; in
 /// 3D (pin `2D` off) it sits at the object's position (plus the Position pin in the object's frame), else at the
 /// Position pin as a world point.
-pub(crate) fn play_sound_instance(rt: &mut Runtime, _id: Id, b: &Block, _proto: Guid, host: &mut dyn Host) -> Flow {
+pub(crate) fn play_sound_instance(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
     input(rt, b, 0);
     out(rt, b, 0);
     let (Some(obj), _) = sound_of(rt, b, host) else {
@@ -125,7 +154,9 @@ pub(crate) fn play_sound_instance(rt: &mut Runtime, _id: Id, b: &Block, _proto: 
     };
     let file = file_of(rt, obj);
     let volume = float_pin(rt, b, "Volume", 5, 1.0, host);
-    let flat = rt.pin(b, "2D", 0).is_none_or(|_| pin(rt, b, "2D", 0, host).as_bool());
+    let flat = rt
+        .pin(b, "2D", 0)
+        .is_none_or(|_| pin(rt, b, "2D", 0, host).as_bool());
     let at = if flat {
         None
     } else {
@@ -152,10 +183,22 @@ fn volume_curve(v: f32, cut: f32) -> f32 {
     }
 }
 
-pub(crate) fn linear_volume(rt: &mut Runtime, _id: Id, b: &Block, _proto: Guid, host: &mut dyn Host) -> Flow {
+pub(crate) fn linear_volume(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
     input(rt, b, 0);
     let v = float_pin(rt, b, "Vol. in Decibel", 0, 0.0, host);
-    set_pout(rt, b, "Linear Volume", 0, Value::Float(volume_curve(v, 0.01)));
+    set_pout(
+        rt,
+        b,
+        "Linear Volume",
+        0,
+        Value::Float(volume_curve(v, 0.01)),
+    );
     out(rt, b, 0);
     Flow::Done
 }
@@ -163,7 +206,13 @@ pub(crate) fn linear_volume(rt: &mut Runtime, _id: Id, b: &Block, _proto: Guid, 
 /// TT ProximityVolumeControl: pins Object 1, Object 2, Near, Far, Sound. Every tick the sound's gain follows how
 /// near object 2 is to object 1 (squared distances, linear between Near and Far, then the curve); On starts it,
 /// Off ends it after one more update.
-pub(crate) fn proximity_volume(rt: &mut Runtime, id: Id, b: &Block, _proto: Guid, host: &mut dyn Host) -> Flow {
+pub(crate) fn proximity_volume(
+    rt: &mut Runtime,
+    id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
     let mut on = matches!(rt.scratch(id), Scratch::Flag(true));
     if input(rt, b, 1) {
         on = false;
@@ -185,7 +234,11 @@ pub(crate) fn proximity_volume(rt: &mut Runtime, id: Id, b: &Block, _proto: Guid
         return Flow::Done;
     };
     // object 2's position in object 1's frame; only the distance matters: the frame's scale does, so invert it
-    let d = [m2[3][0] - m1[3][0], m2[3][1] - m1[3][1], m2[3][2] - m1[3][2]];
+    let d = [
+        m2[3][0] - m1[3][0],
+        m2[3][1] - m1[3][1],
+        m2[3][2] - m1[3][2],
+    ];
     let local = [0, 1, 2].map(|c| {
         let axis = [m1[0][c], m1[1][c], m1[2][c]];
         let s2 = axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2];
@@ -269,7 +322,14 @@ pub(super) const PROTOS: &[Proto] = &[
         guid: proto::PLAY_SOUND_INSTANCE,
         name: "Play Sound Instance",
         library: Library::Sounds,
-        pins: &["2D", "Object", "Position", "Direction", "Min Delay", "Volume"],
+        pins: &[
+            "2D",
+            "Object",
+            "Position",
+            "Direction",
+            "Min Delay",
+            "Volume",
+        ],
         pouts: &[],
         flags: flags::TARGET,
         standing: Standing::Full,

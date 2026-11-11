@@ -1447,7 +1447,10 @@ impl Sim {
 
     /// The lengths of the sounds a map's scripts play, in ticks by lower-case file stem (the sound set's own: scripts
     /// wait on them, so they are part of the run's rules). A file not in it is silent.
-    pub fn set_sound_ticks(&mut self, ticks: std::sync::Arc<std::collections::HashMap<String, u64>>) {
+    pub fn set_sound_ticks(
+        &mut self,
+        ticks: std::sync::Arc<std::collections::HashMap<String, u64>>,
+    ) {
         if let Some(s) = &mut self.scripts {
             s.sound.ticks = ticks;
         }
@@ -1465,7 +1468,9 @@ impl Sim {
 
     /// The camera the scripts changed for this run (the default without scripts).
     pub fn script_camera(&self) -> crate::scripting::CameraOverride {
-        self.scripts.as_ref().map_or_else(Default::default, |s| s.camera)
+        self.scripts
+            .as_ref()
+            .map_or_else(Default::default, |s| s.camera)
     }
 
     /// The world matrix of a level object as the scripts have it (none without scripts).
