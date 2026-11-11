@@ -11,6 +11,7 @@
 )]
 
 use crate::blocks::proto;
+use crate::{CameraChange, CameraState};
 use crate::exec::{Ent, Host};
 use crate::{Block, Graph, Guid, Id, Io, Link, Node, ObjKind, Param, Runtime, Value, types};
 use std::sync::Arc;
@@ -27,6 +28,8 @@ struct Rec {
     playing: bool,
     ball: [f32; 3],
     in_play: bool,
+    /// The camera changes the scripts asked for.
+    cams: Vec<CameraChange>,
 }
 
 fn ident(x: f32, y: f32, z: f32) -> [[f32; 4]; 4] {
@@ -102,6 +105,16 @@ impl Host for Rec {
     }
     fn message(&mut self, name: &str, _: Option<Ent>) {
         self.messages.push(name.to_string());
+    }
+    fn camera_get(&self) -> CameraState {
+        CameraState {
+            position: [1.0, 2.0, 3.0],
+            object: Some(7),
+            ..CameraState::default()
+        }
+    }
+    fn camera_set(&mut self, change: CameraChange) {
+        self.cams.push(change);
     }
     fn sound(&mut self, key: usize, file: &str, cmd: crate::SoundCmd) {
         self.sounds.push(format!("{key} {file} {cmd:?}"));
@@ -1196,8 +1209,8 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
         assert_ne!(w[0].guid, w[1].guid, "{} declared twice", w[0].name);
     }
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
-    // blocks and Set Row among them)
-    assert_eq!(all.len(), 112);
+    // blocks and Set Row among them), and the cameras' Set As Active Camera and Set Clipping Planes
+    assert_eq!(all.len(), 114);
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -1879,4 +1892,86 @@ fn a_proximity_volume_follows_the_distance_and_ends_on_off() {
     let got = gain(5.0, 20.0);
     let got: f32 = got[0].trim_start_matches("5 Sounds\\Wind.wav Gain(").trim_end_matches(')').parse().unwrap();
     assert!((got - want).abs() < 1e-5, "{got} vs {want}");
+}
+
+// ---- cameras (docs/gameplay_bbs.md, "Cameras"): the changes go to the host; the reading comes from it ----
+
+/// A graph with two objects (0 owns the script, 1 is a camera) and one camera block of `proto` with `pins` set and
+/// `pouts` declared, targeted at the camera when `target` is set. Returns the runtime, the block and its pouts.
+fn camera_script(
+    proto: Guid,
+    ins: &[&str],
+    outs: &[&str],
+    pins: &[(&str, Guid, Value)],
+    pouts: &[(&str, Guid)],
+    target: bool,
+) -> (Runtime, Id, Vec<Id>) {
+    let mut b = Build::new();
+    let owner = b.g.add_object("Owner", ObjKind::Other);
+    let cam = b.g.add_object("Cam", ObjKind::Other);
+    b.g.objects[cam].class = 34;
+    b.g.objects[cam].kind = ObjKind::Entity(1);
+    let t = b.local("Target", types::OBJECT, Value::Obj(Some(cam)));
+    let pins: Vec<Id> = pins
+        .iter()
+        .map(|(n, g, v)| {
+            let l = b.local(n, *g, v.clone());
+            b.pin(n, *g, l)
+        })
+        .collect();
+    let pouts: Vec<Id> = pouts.iter().map(|(n, g)| b.pout(n, *g)).collect();
+    let blk = b.bb("Camera", proto, ins, outs, pins, pouts.clone(), vec![], target.then_some(t));
+    let start = b.io("Start");
+    let links = vec![b.link(start, in_of(&b.g, blk, 0), 0)];
+    b.script("S", Some(owner), start, vec![blk], links);
+    (Runtime::new(b.done()), blk, pouts)
+}
+
+#[test]
+fn get_current_camera_writes_the_host_camera_to_its_outputs() {
+    let (mut rt, _, pouts) = camera_script(
+        proto::GET_CURRENT_CAMERA,
+        &["In"],
+        &["Out"],
+        &[],
+        &[("Current Camera", types::OBJECT), ("Position", types::VECTOR)],
+        false,
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(rt.values[pouts[0]], Value::Obj(Some(7)));
+    assert_eq!(rt.values[pouts[1]], Value::Vec3([1.0, 2.0, 3.0]));
+    assert!(host.cams.is_empty(), "reading the camera changes nothing");
+}
+
+#[test]
+fn set_as_active_camera_attaches_the_view_to_the_target_object() {
+    let (mut rt, _, _) = camera_script(proto::SET_AS_ACTIVE_CAMERA, &["In"], &["Out"], &[], &[], true);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.cams, vec![CameraChange::Active(1)]);
+}
+
+#[test]
+fn set_clipping_planes_applies_a_near_below_a_far_and_ignores_the_rest() {
+    let planes = |near: f32, far: f32| {
+        camera_script(
+            proto::SET_CLIPPING_PLANES,
+            &["In"],
+            &["Out"],
+            &[("Near", types::FLOAT, Value::Float(near)), ("Far", types::FLOAT, Value::Float(far))],
+            &[],
+            false,
+        )
+    };
+    let (mut rt, _, _) = planes(0.5, 100.0);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.cams, vec![CameraChange::Clip { near: 0.5, far: 100.0 }]);
+    for (near, far) in [(0.0, 100.0), (-1.0, 100.0), (5.0, 5.0), (f32::NAN, 100.0)] {
+        let (mut rt, _, _) = planes(near, far);
+        let mut host = Rec::new();
+        rt.tick(&mut host);
+        assert!(host.cams.is_empty(), "{near} {far} is ignored");
+    }
 }

@@ -6,7 +6,7 @@
 
 use glam::{Mat4, Vec3};
 use level::Level;
-use script::{Ent, Host, Runtime, SoundCmd, Value};
+use script::{CameraChange, CameraState, Ent, Host, Runtime, SoundCmd, Value};
 use std::collections::{BTreeMap, HashMap};
 
 /// How many log lines a run keeps.
@@ -37,12 +37,23 @@ pub struct Scripts {
     pub teleports: u32,
     /// The map's sounds: what plays in the run's own clock, and what the audio is to do about it.
     pub sound: SoundState,
+    /// The camera the scripts changed (Set As Active Camera, Set Clipping Planes, ...).
+    pub camera: CameraOverride,
 }
 
 /// The most sound events kept for the audio between two drains (a run with no audio never drains them).
 const SOUND_EVENT_CAP: usize = 1_024;
 /// The most voices a map's scripts hold at once in the audio (instances and wave players together).
 pub const MAX_SCRIPT_VOICES: usize = 16;
+
+/// What the scripts changed of the camera for this run: a field of view in degrees, clipping planes, and the camera
+/// object the view is attached to. None of it reaches the simulation; a new run starts without it.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CameraOverride {
+    pub fov: Option<f32>,
+    pub clip: Option<(f32, f32)>,
+    pub active: Option<usize>,
+}
 
 /// What the audio is to do for a script: the wave sound object, its file and the command.
 #[derive(Debug, Clone, PartialEq)]
@@ -143,6 +154,7 @@ impl Scripts {
             ball_id,
             teleports: 0,
             sound: SoundState::default(),
+            camera: CameraOverride::default(),
         })
     }
 }
@@ -157,6 +169,9 @@ pub struct RunView {
     pub in_play: bool,
     /// Where a script put the ball this tick, to be applied by the run.
     pub teleport: Option<Vec3>,
+    /// The sim camera's place and aim this tick (where the view looks without a camera object).
+    pub eye: Vec3,
+    pub target: Vec3,
 }
 
 /// The level's materials as the operations read them.
@@ -185,6 +200,7 @@ struct ScriptsParts {
     ball_id: Option<script::Id>,
     tick: u64,
     sound: SoundState,
+    camera: CameraOverride,
 }
 
 impl ScriptsParts {
@@ -371,6 +387,38 @@ impl Host for SimHost<'_> {
         self.s.note(format!("message {name}{to}"));
     }
 
+    fn camera_get(&self) -> CameraState {
+        let (eye, forward) = match self.s.camera.active.and_then(|i| self.matrix(Ent::Object(i))) {
+            Some(m) => {
+                let m = to_mat(&m);
+                (m.w_axis.truncate(), m.z_axis.truncate().normalize_or(Vec3::Z))
+            }
+            None => (self.run.eye, (self.run.target - self.run.eye).normalize_or(Vec3::Z)),
+        };
+        let cam = &self.s.camera;
+        let (near, far) = cam.clip.unwrap_or((0.5, 3000.0));
+        CameraState {
+            position: eye.to_array(),
+            forward: forward.to_array(),
+            up: [0.0, 1.0, 0.0],
+            fov: cam.fov.unwrap_or_else(|| crate::scene::fov_degrees(crate::scene::fov_y())),
+            near,
+            far,
+            object: cam.active,
+        }
+    }
+
+    fn camera_set(&mut self, change: CameraChange) {
+        match change {
+            CameraChange::Fov(d) if d.is_finite() => self.s.camera.fov = Some(d.clamp(1.0, 179.0)),
+            CameraChange::Clip { near, far } if near.is_finite() && far.is_finite() && near > 0.0 && far > near => {
+                self.s.camera.clip = Some((near, far));
+            }
+            CameraChange::Active(i) => self.s.camera.active = Some(i),
+            _ => {}
+        }
+    }
+
     fn sound(&mut self, key: usize, file: &str, cmd: SoundCmd) {
         let tick = self.s.tick;
         let stem = sound_stem(file);
@@ -491,6 +539,14 @@ impl Host for SimHost<'_> {
 
 impl Scripts {
     /// One tick of the scripts over the run's view; the view carries back what the run must apply.
+    /// The world matrix of a level object as the scripts have it: moved, else as loaded.
+    pub fn object_matrix(&self, i: usize) -> Option<Mat4> {
+        match self.moved.get(i) {
+            Some(Some(m)) => Some(*m),
+            _ => self.initial.get(i).map(to_mat),
+        }
+    }
+
     pub fn tick(&mut self, run: &mut RunView) {
         let mut parts = ScriptsParts {
             hidden: std::mem::take(&mut self.hidden),
@@ -505,6 +561,7 @@ impl Scripts {
             ball_id: self.ball_id,
             tick: run.tick,
             sound: std::mem::take(&mut self.sound),
+            camera: self.camera,
         };
         {
             let mut host = SimHost { s: &mut parts, run };
@@ -519,6 +576,7 @@ impl Scripts {
         self.groups = parts.groups;
         self.log = parts.log;
         self.sound = parts.sound;
+        self.camera = parts.camera;
         if run.teleport.is_some() {
             self.teleports = self.teleports.saturating_add(1);
         }

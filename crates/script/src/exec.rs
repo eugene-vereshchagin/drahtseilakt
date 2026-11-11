@@ -67,6 +67,50 @@ pub trait Host {
     fn material_color(&self, _material: usize, _emissive: bool) -> Option<[f32; 4]> {
         None
     }
+    /// The camera the scripts see: its place, view, lens and clipping planes, and the camera object it is attached to.
+    fn camera_get(&self) -> CameraState {
+        CameraState::default()
+    }
+    /// A change of the camera, for this run only (Set As Active Camera, Set Clipping Planes; Set FOV when it exists).
+    fn camera_set(&mut self, _change: CameraChange) {}
+}
+
+/// The camera as a script reads it. Angles are degrees; the planes are world units.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CameraState {
+    pub position: [f32; 3],
+    pub forward: [f32; 3],
+    pub up: [f32; 3],
+    pub fov: f32,
+    pub near: f32,
+    pub far: f32,
+    /// The camera object the view is attached to (none: the game's own camera).
+    pub object: Option<crate::Id>,
+}
+
+impl Default for CameraState {
+    fn default() -> Self {
+        CameraState {
+            position: [0.0; 3],
+            forward: [0.0, 0.0, 1.0],
+            up: [0.0, 1.0, 0.0],
+            fov: 45.0,
+            near: 0.5,
+            far: 3000.0,
+            object: None,
+        }
+    }
+}
+
+/// What a script asks of the camera.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CameraChange {
+    /// The field of view, degrees.
+    Fov(f32),
+    /// The near and far clipping planes.
+    Clip { near: f32, far: f32 },
+    /// The camera object the view is attached to.
+    Active(crate::Id),
 }
 
 /// What a script asks of a wave sound.

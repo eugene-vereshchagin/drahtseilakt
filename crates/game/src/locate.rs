@@ -192,6 +192,8 @@ pub fn track(
                     target: p - lag / 12.0,
                     // the videos are the original's: its field of view, whatever the player chose
                     fov_y: crate::scene::original_fov_y(),
+                    near: 0.5,
+                    far: 3000.0,
                 };
                 let Some(picture) = draw(&view, p) else {
                     failed.set(true);

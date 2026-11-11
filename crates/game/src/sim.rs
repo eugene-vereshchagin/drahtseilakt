@@ -1463,6 +1463,16 @@ impl Sim {
         self.scripts.as_ref().map_or(&[], |s| s.moved.as_slice())
     }
 
+    /// The camera the scripts changed for this run (the default without scripts).
+    pub fn script_camera(&self) -> crate::scripting::CameraOverride {
+        self.scripts.as_ref().map_or_else(Default::default, |s| s.camera)
+    }
+
+    /// The world matrix of a level object as the scripts have it (none without scripts).
+    pub fn script_object_matrix(&self, i: usize) -> Option<Mat4> {
+        self.scripts.as_ref()?.object_matrix(i)
+    }
+
     /// One tick of the map's scripts, before the physics (the original runs its behaviours first in a frame); a
     /// script that sets the ball's position puts a new ball there at rest, as the original re-physicalizes it.
     fn run_scripts(&mut self) {
@@ -1476,6 +1486,8 @@ impl Sim {
             points: self.points,
             in_play: self.dying.is_none() && self.hold.is_none() && !self.finished,
             teleport: None,
+            eye: self.camera.position,
+            target: self.camera.target,
         };
         scripts.tick(&mut view);
         if let Some(p) = view.teleport {

@@ -1781,3 +1781,13 @@ The oracle (`switch_on_message`, Send Message and Broadcast Message as drivers, 
 The C reference files an activation request (the script starts in the next frame, like Activate Script). Our notes
 (docs/drahtseilakt/scripts.md, stage 0; scripts-port-plan.md item 18) have it run the script at once inside the
 caller's frame, as `CKBehavior::Execute` does; the notes win, so the oracle does not compare this block.
+
+## Cameras
+
+Cameras.dll blocks (`crates/script/src/blocks/cameras.rs`). They change the view only, never the simulation.
+
+- **Get Current Camera**: on its input, writes the camera object (none: the game's own camera) and its position.
+- **Set As Active Camera**: attaches the view to the target object; the view sits at its place and looks along its z axis.
+- **Set Clipping Planes**: sets near and far (defaults 0.1 and 200); applied only when near > 0 and far > near.
+- Set FOV is not registered yet: its prototype id is not in the reference sources. The host side (`camera_set`, `Fov`) clamps to 1..179 degrees.
+- A run starts with the original camera; a new run (restart, or a rewind that rebuilds the run) starts without these changes.

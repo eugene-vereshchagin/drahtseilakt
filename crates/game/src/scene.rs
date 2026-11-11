@@ -24,18 +24,29 @@ pub struct Snapshot {
     pub target: Vec3,
     /// The run's time in seconds, for the scripts' turning objects.
     pub time: f32,
+    /// The lens the scripts set: a field of view in degrees and the clipping planes (none: the original's).
+    pub fov: Option<f32>,
+    pub clip: Option<(f32, f32)>,
 }
 
 impl Snapshot {
     pub fn of(sim: &Sim) -> Snapshot {
+        let cam = sim.script_camera();
+        // a camera object the scripts attached the view to: its place, looking along its own z
+        let (eye, target) = match cam.active.and_then(|i| sim.script_object_matrix(i)) {
+            Some(m) => (m.w_axis.truncate(), m.w_axis.truncate() + m.z_axis.truncate()),
+            None => (sim.camera.position, sim.camera.target),
+        };
         Snapshot {
             ball: sim.ball.position,
             rotation: sim.ball.rotation,
             kind: sim.drawn_ball(),
             trafo: sim.trafo_anim(),
-            eye: sim.camera.position,
-            target: sim.camera.target,
+            eye,
+            target,
             time: sim.tick as f32 * crate::sim::TICK,
+            fov: cam.fov,
+            clip: cam.clip,
         }
     }
 
@@ -51,6 +62,8 @@ impl Snapshot {
             eye: a.eye.lerp(b.eye, t),
             target: a.target.lerp(b.target, t),
             time: a.time + (b.time - a.time) * t,
+            fov: b.fov,
+            clip: b.clip,
         }
     }
 }
@@ -794,14 +807,26 @@ pub fn original_fov_y() -> f32 {
 pub fn fov_y() -> f32 {
     match FOV.load(Ordering::Relaxed) {
         0 => original_fov_y(),
-        d => 2.0 * (((d as f32).to_radians() / 2.0).tan() * 0.75).atan(),
+        d => fov_from_degrees(d as f32),
     }
+}
+
+/// The vertical field of view for `degrees` across the 4:3 view (the extended mode's convention).
+pub fn fov_from_degrees(degrees: f32) -> f32 {
+    2.0 * ((degrees.to_radians() / 2.0).tan() * 0.75).atan()
+}
+
+/// The inverse of `fov_from_degrees`.
+pub fn fov_degrees(fov_y: f32) -> f32 {
+    (2.0 * ((fov_y / 2.0).tan() / 0.75).atan()).to_degrees()
 }
 
 pub fn view(s: &Snapshot) -> View {
     View {
         eye: s.eye,
         target: s.target,
-        fov_y: fov_y(),
+        fov_y: s.fov.map_or_else(fov_y, fov_from_degrees),
+        near: s.clip.map_or(0.5, |c| c.0),
+        far: s.clip.map_or(3000.0, |c| c.1),
     }
 }
