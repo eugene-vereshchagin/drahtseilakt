@@ -606,7 +606,8 @@ Decision: `PlanarParticleSystem` and `SphericalParticleSystem` blocks of a map's
   maximum number, emission (+variance), initial/ending size, initial/ending colour. Settings (locals): render mode
   (2 line, 5 orientable, 7 fast, any other sprite), blends (2/3 = one/source colour, any other alpha-additive),
   Evolutions, Variances; the live cap is the smaller of the pin and the pool-size setting. Texture: used only when
-  the pin names one of the game's own particle textures, else untextured.
+  the pin names one of the game's own particle textures; else a sprite system draws the soft smoke puff
+  (`Particle_Smoke`, tinted by the colours) instead of a hard square (our look choice), a line system untextured.
 - States: On sets emitting, Off clears it (live particles finish, section 5), Freeze toggles (frozen: nothing
   moves, particles stay drawn). Deactivating or deleting the script, a reset, a level restart or a rewind take the
   particles away at once (the block's scratch and the runtime's emitter table are part of the run's state).

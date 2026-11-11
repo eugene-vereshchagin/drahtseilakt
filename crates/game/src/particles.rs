@@ -606,13 +606,18 @@ pub struct Batch {
 const SCRIPT_POOL_CAP: i32 = 256;
 
 /// A script emitter's values as a native system's spec. The texture is one of the game's particle textures if the
-/// pin names one, else the particles are untextured.
+/// pin names one; else a sprite gets the soft round smoke puff (tinted by its colours; both blends add, so its black
+/// edge adds nothing) instead of a hard square, and a line system stays untextured.
 fn spec_of(e: &script::EmitterSpec) -> Spec {
-    let texture = e.texture.as_deref().and_then(|n| {
-        textures()
-            .into_iter()
-            .find(|t| t.eq_ignore_ascii_case(n.trim_end_matches(".bmp").trim_end_matches(".tga")))
-    });
+    let texture = e
+        .texture
+        .as_deref()
+        .and_then(|n| {
+            textures()
+                .into_iter()
+                .find(|t| t.eq_ignore_ascii_case(n.trim_end_matches(".bmp").trim_end_matches(".tga")))
+        })
+        .or((e.render != 2).then_some("Particle_Smoke"));
     Spec {
         frame: "",
         kind: match e.shape {
