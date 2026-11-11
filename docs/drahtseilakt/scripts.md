@@ -185,9 +185,27 @@ cmake --build target/ck-oracle --target ck_oracle
 OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle   # ORACLE_CASES=5000
 ```
 
-Without `OPENBALLANCE_ORACLE` the test runs our side only. Not yet: level 2 (one graph per block kind, pins swept;
-the oracle already shows Delayer and Counter count differently: the C Delayer counts the frame it starts in) and
-level 3 (whole maps). A disagreement is settled by the notes, not by the oracle: it is a reimplementation too.
+Without `OPENBALLANCE_ORACLE` the test runs our side only. A disagreement is settled by the notes, not by the oracle:
+it is a reimplementation too.
+
+**C oracle, level 2** (`crates/script/tests/oracle_blocks.rs`, `--test oracle_blocks`): one synthetic graph per
+block kind. The oracle's description gained blocks of any prototype with their pins, outputs and locals (Boolean,
+Integer, Float, Time, String, message, object, script, group), groups, links into any input, and prints every output
+parameter of the blocks after each frame. Each case puts the block in a script with a Nop probe on each output, fires
+its inputs from the script's start at edge delays (0, 1, 2, ... 13 frames), loops outputs back into inputs (also with
+delay 0: re-entry in the same frame) and lets a second script reset, deactivate and reactivate the first at random
+frames; pins are swept over edge values (negative, zero and fractional times, counts and steps from -2 to 7,
+operators 0-7, empty groups). Covered: Delayer, Timer, Counter, Sequencer, Binary Switch, Wait For All, Identity,
+Parameter Selector, Binary Memory, Test, Switch On Parameter, Per Second, Group Iterator, Wait Message with Send
+Message, Activate Script and Deactivate Script (as the drivers); 2000 cases each agree. The blocks that disagreed are
+now written down in [gameplay_bbs.md](../gameplay_bbs.md), part 5, and ours follow that: the Delayer counts the
+frame In fires in and keeps its time in Elapsed Time; Timer never stays active (its loop is the graph's); Counter
+and Sequencer keep their value in output parameter 0 (the Sequencer was run as a Streaming Event before, Wait For
+All as a Nop); a block leaves the inputs it does not handle active; Identity does nothing with unequal pins and
+outputs; Wait Message registers a wait and is done, the waiting keeps its graph active, and the message's delivery
+fires Out, as in the original's message manager. Execute Script is not compared: the C files a request, our notes
+run the script at once. The C makes one stack pop more than BehaviorMaxIteration before it stops a loop; the notes
+say at most that many, so loops that hit the cap are not compared. Level 3 (whole maps) is next.
 
 **Not in the player.** Eight kinds found in maps have a GUID in none of the player's libraries: Explode, Midi
 Player, Run VSL, Add Mesh, Remove Mesh, Select Mesh, Get Nearest Object and Object Rename `6f074ca7:45427431`

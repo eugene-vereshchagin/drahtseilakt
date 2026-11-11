@@ -1534,3 +1534,100 @@ or Out. The module scripts' values:
 | P_Modul_29 wake-up; its stone-ball test | 80; 4 | 85 / 100; 8 / 20 | 10 / 60; 2 / 30 |
 | P_Modul_18 activation; its updraft test | 80; 7 | 85 / 100; 12 / 20 | 10 / 60; 1 / 10 |
 | PE_Balloon wake-up; finish | 70; 1 | 75 / 100; 5 / 10 | 10 / 60; 1 / 10 |
+
+# Part 5. Flow blocks, settled by the C oracle
+
+The blocks below had no notes of their own. Their behaviour is taken from the C reference (`src/bb`, itself written
+from the disassembly of `Logics.dll`) by the level-2 differential oracle (`crates/script/tests/oracle_blocks.rs`,
+docs/drahtseilakt/scripts.md): one synthetic graph per kind, pins swept over edge values, traced frame by frame
+against the C. Where a note above already says something (Timer, Per Second), the note is the rule and the C was
+found to agree with it. Common points:
+
+- A block reads and clears only the inputs it handles. An input that was active and is not handled **stays
+  active**: the next run of the block still sees it (Binary Memory with both inputs on, Parameter Selector with
+  several, Timer with In and Loop In, Group Iterator without a group).
+- The state that counts frames or steps lives in the block's **output parameter**, as in the original: it survives
+  a reset of the script (a reset does not touch parameters) and other blocks read it. A block without that output
+  starts from 0 every time.
+- "Done" means the block returns `CKBR_OK` (inactive after the run), "stays" means `CKBR_ACTIVATENEXTFRAME`.
+
+## Delayer
+
+`15d472a5:3bea409f`. In `In`; out `Out`; pIn 0 `Time to Wait` (Time, ms); pOut 0 `Elapsed Time` (Time). Each run:
+if In is active it is cleared and Elapsed Time set to 0; then `Elapsed Time += delta time` (single precision) is
+written; if `Time to Wait <= Elapsed Time` Out fires and the block is done, else it stays. So the frame In fires
+already counts: at 1000/60 ms a frame, 50 ms fires in the 3rd run, 500 ms in the 31st; a wait of 0 or less fires in
+the first run. Deactivating the script mid-wait and activating it again without a reset resumes the count; a reset
+stops the block (it is inactive and its In cleared) but leaves Elapsed Time as it was.
+
+## Counter
+
+`998f000f:f000f899`. Ins `In`, `Loop In`; outs `Out`, `Loop Out`; pIns `Count`, `Start Index`, `Step` (Integers;
+Step 0 counts as 1); pOut 0 `Value` (Integer; optional). Each run: if In is active it is cleared and the value
+becomes `Start Index`; otherwise Loop In is cleared and the value becomes pOut 0 + Step (0 + Step without the
+output). The value is written to pOut 0; then Out fires if `Count <= (value - Start) / Step` (integer division
+truncating to zero), else Loop Out. Done. So Count *n* > 0 gives *n* Loop Outs (values Start, Start+Step, ...) and
+then Out with pOut 0 = Start + n·Step; Count 0 or less gives Out at once (pOut 0 = Start). A negative Step counts
+down the same way. The arithmetic wraps on overflow.
+
+## Sequencer
+
+`42530844:257b6053`, version 2. Ins `Reset`, `In`; outs `Exit Reset`, `Out 1` .. `Out n`; pOut 0 (the current
+index, Integer). Each run, In first: if In is active it is cleared, the index = pOut 0 + 1, set to 0 if
+`n <= index` (that is, past the last Out), written, and `Out (index + 1)` fires. Then Reset: if active it is
+cleared, the index set to -1 and Exit Reset fires. Done. Both in one run: the Out fires and the index ends at -1.
+With no Out at all nothing but Exit Reset ever fires.
+
+## Wait For All
+
+`c044a999:fdfefaf7`. Ins `In 0` .. `In n`; out `Out`. Each run: if every input is active they are all cleared and
+Out fires (done); otherwise nothing is cleared and the block stays, so the inputs that came are kept until the
+others do.
+
+## Identity
+
+`15151652:aeefffd5`. Each pIn *i* is copied to pOut *i*, In cleared, Out fired — only when the block has as many
+pIns as pOuts. Otherwise the original throws "Wrong number of Input/Output parameters": nothing happens (In stays
+active, no Out).
+
+## Parameter Selector
+
+`63eb2b0c:27e2767e`. Ins `In 0` .. `In n`; pIns 0 .. n; pOut 0. The first active input (lowest index) is cleared
+and its pIn copied to pOut 0; the other active inputs stay active. Out fires on every run.
+
+## Binary Memory
+
+`d02d67dd:10211fdd`. Ins `True`, `False`; outs the same. If True is active it is cleared, out `True` fires and
+pOut 0 = TRUE; otherwise False is cleared, out `False` fires and pOut 0 = FALSE. A False that came with a True stays
+active.
+
+## Test
+
+`17d66d26:726b7dec`. pIn 0 the operator (1 ==, 2 !=, 3 <, 4 <=, 5 >, 6 >=), pIns 1 and 2 the operands. In is
+cleared. The operands compare as floats (Integers and Booleans converted), or as strings when either pin is a
+String. An operator of 0 or less fires nothing; one above 6 compares false (out `False`).
+
+## Group Iterator
+
+`6050252f:3aa82d40`. Ins `In`, `Loop In`; outs `Out`, `Loop Out`; pIn 0 `Group`; pOut 0 `Element`, pOut 1 `Index`
+(else local 0). Without a group (or not a group) Out fires and **no input is cleared**. Otherwise the index is
+pOut 1 (local 0) + 1 on Loop In, 0 on In (the input cleared); past the last member Out fires, else Element and Index
+are written and Loop Out fires. Done. A block with neither pOut 1 nor local 0 (only seen in made-up graphs) walks
+the members by a private index in our runtime (stage 0); the C reads 0 every time and so repeats member 1.
+
+## Wait Message
+
+`4587ffee:4587ffdd`. Ins `In`, `Stop`; out `Out`; pIn 0 `Message`. A run registers on In (cleared) a wait for that
+message on the block's target (its owner), and on Stop (cleared) removes the block's waits for it; without a message
+type nothing happens at all. The block is done after the run, but a block that waits keeps its graph active (the
+`0x40` behaviour flag, docs/ck-runtime.md). The message manager delivers the frame's messages at its end: a waiting
+block whose message reached its object (sent to it, to a group it is in, or broadcast) has its Out activated there,
+stops waiting and loses the wait; the graph then fires Out's links at the start of its next run (frame N+1 for a
+message sent in frame N), without running the block. A reset of the script ends the waiting (the flag is cleared);
+a wait that remains then catches its message without effect.
+
+## Execute Script: ours differs from the C on purpose
+
+The C reference files an activation request (the script starts in the next frame, like Activate Script). Our notes
+(docs/drahtseilakt/scripts.md, stage 0; scripts-port-plan.md item 18) have it run the script at once inside the
+caller's frame, as `CKBehavior::Execute` does; the notes win, so the oracle does not compare this block.

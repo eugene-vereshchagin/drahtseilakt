@@ -567,13 +567,15 @@ fn a_message_sent_in_one_tick_wakes_its_waiter_in_the_next() {
     let start2 = b.io("Start");
     let delayed = b.local("Time to Wait", types::TIME, Value::Float(40.0));
     let wait_pin = b.pin("Time to Wait", types::TIME, delayed);
+    // the delayer counts in its Elapsed Time output (docs/gameplay_bbs.md, "Delayer")
+    let elapsed = b.pout("Elapsed Time", types::TIME);
     let delayer = b.bb(
         "Delayer",
         proto::DELAYER,
         &["In"],
         &["Out"],
         vec![wait_pin],
-        vec![],
+        vec![elapsed],
         vec![],
         None,
     );
@@ -595,13 +597,10 @@ fn a_message_sent_in_one_tick_wakes_its_waiter_in_the_next() {
     let g = b.done();
     let mut rt = Runtime::new(g);
     let mut host = Rec::new();
-    for _ in 0..3 {
+    // docs/gameplay_bbs.md, "Delayer": the tick In fires in counts, so 40 ms is reached in the third run
+    for _ in 0..2 {
         rt.tick(&mut host);
-        assert_eq!(
-            host.visible,
-            vec![true, true],
-            "40 ms is three ticks at 60 Hz, the message comes after"
-        );
+        assert_eq!(host.visible, vec![true, true], "the delayer still waits");
     }
     rt.tick(&mut host);
     assert_eq!(

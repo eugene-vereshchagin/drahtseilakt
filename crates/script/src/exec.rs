@@ -97,6 +97,9 @@ struct BlockState {
     gone: bool,
     /// The tick in which Execute Script last ran it inside its caller's frame (the manager skips it then).
     ran_inline: u64,
+    /// Waiting for a message (the original's behaviour flag `0x40`): keeps its graph active though the block
+    /// itself is not; the message's delivery fires its first output.
+    waiting: bool,
 }
 
 const REQ_ACTIVATE: u8 = 1;
@@ -110,6 +113,8 @@ struct ObjState {
     gone: bool,
 }
 
+/// The most message waits a run keeps.
+const MAX_WAITS: usize = 4_096;
 /// The most trace lines a run keeps (the trace is a tool's, never the game's).
 const MAX_TRACE: usize = 1 << 20;
 /// How deep Execute Script may nest scripts run inside their caller's frame.
@@ -133,6 +138,8 @@ pub struct Runtime {
     /// Messages sent this tick, delivered at the next: (name, receiver or all).
     outbox: Vec<(String, Option<Id>)>,
     inbox: Vec<(String, Option<Id>)>,
+    /// Message waits (Wait Message): (message, waiting block, the object it waits on), in registration order.
+    waits: Vec<(String, Id, Option<Id>)>,
     pub tick: u64,
     /// Prototypes met that the runtime does not know, reported once each.
     unknown: Vec<crate::Guid>,
@@ -191,6 +198,7 @@ impl Runtime {
             graph,
             outbox: Vec::new(),
             inbox: Vec::new(),
+            waits: Vec::new(),
             tick: 0,
             unknown: Vec::new(),
             budget: TICK_BUDGET,
@@ -486,6 +494,7 @@ impl Runtime {
         }
         if let Some(st) = self.blocks.get_mut(block) {
             st.scratch = Scratch::None;
+            st.waiting = false;
             st.stacked = false;
             st.reset_done = true;
             st.request = 0;
@@ -647,6 +656,62 @@ impl Runtime {
         }
     }
 
+    /// Wait Message's In: the block waits for a message of this name to reach `object` (registered once).
+    pub fn wait_for(&mut self, name: &str, block: Id, object: Option<Id>) {
+        if let Some(st) = self.blocks.get_mut(block) {
+            st.waiting = true;
+        }
+        let known = self
+            .waits
+            .iter()
+            .any(|(n, b, _)| *b == block && n.eq_ignore_ascii_case(name));
+        if !known && self.waits.len() < MAX_WAITS {
+            self.waits.push((name.to_string(), block, object));
+        }
+    }
+
+    /// Wait Message's Stop: the block's waits for this message are removed.
+    pub fn unwait(&mut self, name: &str, block: Id) {
+        let before = self.waits.len();
+        self.waits
+            .retain(|(n, b, _)| !(*b == block && n.eq_ignore_ascii_case(name)));
+        if self.waits.len() != before
+            && let Some(st) = self.blocks.get_mut(block)
+        {
+            st.waiting = false;
+        }
+    }
+
+    /// The message manager's delivery (the end of the previous frame, before any request is applied): each wait a
+    /// message matches (sent to its object, or to everyone) is removed, and a block still waiting gets its first
+    /// output fired, which its graph carries on when it next runs.
+    fn deliver(&mut self) {
+        if self.waits.is_empty() {
+            return;
+        }
+        let inbox = std::mem::take(&mut self.inbox);
+        for (name, to) in &inbox {
+            let mut i = 0;
+            while let Some((n, block, obj)) = self.waits.get(i).cloned() {
+                if !(n.eq_ignore_ascii_case(name) && (to.is_none() || *to == obj)) {
+                    i = i.saturating_add(1);
+                    continue;
+                }
+                self.waits.remove(i);
+                let waiting = self.blocks.get(block).is_some_and(|b| b.waiting);
+                if let Some(st) = self.blocks.get_mut(block) {
+                    st.waiting = false;
+                }
+                if waiting
+                    && let Some(&out) = self.graph.block(block).and_then(|b| b.outputs.first())
+                {
+                    self.set_io(out, true);
+                }
+            }
+        }
+        self.inbox = inbox;
+    }
+
     /// Whether a message of this name reached the block's owner (or everyone) this tick.
     pub fn received(&self, name: &str, owner: Option<Id>) -> bool {
         self.inbox
@@ -660,6 +725,7 @@ impl Runtime {
     pub fn tick(&mut self, host: &mut dyn Host) {
         self.tick = self.tick.saturating_add(1);
         self.inbox = std::mem::take(&mut self.outbox);
+        self.deliver();
         self.budget = TICK_BUDGET;
         let tick = self.tick;
         self.trace_line(|_| format!("frame {tick}"));
@@ -860,7 +926,10 @@ impl Runtime {
                 keep = true;
             }
         }
-        keep || b.sub.iter().any(|&s| self.is_active(s))
+        keep || b
+            .sub
+            .iter()
+            .any(|&s| self.blocks.get(s).is_some_and(|st| st.active || st.waiting))
     }
 
     fn queue(&mut self, link: Id, delay: u16) {

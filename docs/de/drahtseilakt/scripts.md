@@ -98,5 +98,26 @@ Activate/Deactivate Script) aus einer Textbeschreibung, `crates/script/tests/ora
 vergleicht die Spuren Frame für Frame (welche Bausteine in welcher Reihenfolge liefen, was danach aktiv ist); 5000
 Graphen stimmen überein. Bauen und starten:
 `cmake -S . -B target/ck-oracle -DCMAKE_BUILD_TYPE=Release && cmake --build target/ck-oracle --target ck_oracle`,
-dann `OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle`. Stufen 2 (Bausteine)
-und 3 (Karten) folgen; einen Unterschied entscheiden die Notizen, nicht das Orakel.
+dann `OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle`. Einen Unterschied
+entscheiden die Notizen, nicht das Orakel.
+
+**C-Orakel, Stufe 2** (`crates/script/tests/oracle_blocks.rs`, `--test oracle_blocks`): ein synthetischer Graph je
+Bausteinart. Die Beschreibung des Orakels kennt nun Bausteine jedes Prototyps mit Eingabe-, Ausgabe- und lokalen
+Parametern (Boolean, Integer, Float, Time, String, Nachricht, Objekt, Skript, Gruppe), Gruppen, Verbindungen in jeden
+Eingang, und gibt nach jedem Frame alle Ausgabeparameter der Bausteine aus. In jedem Fall steht der Baustein in einem
+Skript mit einer Nop-Sonde an jedem Ausgang; seine Eingänge werden vom Skriptstart mit Randverzögerungen (0, 1, 2,
+... 13 Frames) ausgelöst, Ausgänge zurück in Eingänge geführt (auch mit Verzögerung 0: Wiedereintritt im selben
+Frame), und ein zweites Skript setzt das erste in zufälligen Frames zurück, deaktiviert und aktiviert es wieder; die
+Pins laufen über Randwerte (negative, null und gebrochene Zeiten, Zähler und Schritte von -2 bis 7, Operatoren 0-7,
+leere Gruppen). Abgedeckt: Delayer, Timer, Counter, Sequencer, Binary Switch, Wait For All, Identity, Parameter
+Selector, Binary Memory, Test, Switch On Parameter, Per Second, Group Iterator, Wait Message mit Send Message,
+Activate Script und Deactivate Script (als Treiber); je 2000 Fälle stimmen überein. Die abweichenden Bausteine sind
+jetzt in [gameplay_bbs.md](../../gameplay_bbs.md), Teil 5, beschrieben, und unsere folgen dem: der Delayer zählt den
+Frame, in dem In kommt, und hält seine Zeit in Elapsed Time; Timer bleibt nie aktiv (die Schleife ist die des
+Graphen); Counter und Sequencer halten ihren Wert in Ausgabeparameter 0 (der Sequencer lief vorher als Streaming
+Event, Wait For All als Nop); ein Baustein lässt die Eingänge, die er nicht behandelt, aktiv; Identity tut bei
+ungleich vielen Pins und Ausgaben nichts; Wait Message meldet ein Warten an und ist fertig, das Warten hält den Graphen
+aktiv, und die Zustellung der Nachricht löst Out aus, wie im Nachrichtenmanager des Originals. Execute Script wird
+nicht verglichen: das C stellt eine Anforderung, nach unseren Notizen läuft das Skript sofort. Das C nimmt einen
+Stapeleintrag mehr als BehaviorMaxIteration, bevor es eine Schleife stoppt; die Notizen sagen höchstens so viele,
+daher werden Schleifen an der Grenze nicht verglichen. Stufe 3 (ganze Karten) folgt.
