@@ -188,6 +188,7 @@ pub mod flags {
     pub const VAR_INPUTS: u32 = 2;
     pub const VAR_PINS: u32 = 4;
     pub const VAR_POUTS: u32 = 8;
+    pub const VAR_OUTPUTS: u32 = 16;
 }
 
 /// What happens to a block besides its run (the original's behaviour callback messages, CKM_BEHAVIOR*).
@@ -316,6 +317,17 @@ pub(crate) fn input(rt: &mut Runtime, b: &Block, i: usize) -> bool {
         rt.set_io(io, false);
     }
     on
+}
+
+/// Whether input `i` is active, leaving it as it is (a block handles only some of its inputs; the others stay
+/// active for its next run, as the original's).
+fn active(rt: &Runtime, b: &Block, i: usize) -> bool {
+    b.inputs.get(i).is_some_and(|&io| rt.io_active(io))
+}
+
+/// The value output parameter `i` holds now (a block keeping its count there), `None` without that output.
+fn pout_value(rt: &Runtime, b: &Block, i: usize) -> Option<Value> {
+    b.pouts.get(i).and_then(|&p| rt.values.get(p)).cloned()
 }
 
 fn out(rt: &mut Runtime, b: &Block, i: usize) {

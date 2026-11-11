@@ -51,16 +51,15 @@ pub(crate) fn identity(
     _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    input(rt, b, 0);
-    for i in 0..b.pins.len() {
-        let v = rt
-            .pin(b, "", i)
-            .map(|p| rt.read(p, host))
-            .unwrap_or_default();
-        if let Some(p) = b.pouts.get(i).copied() {
-            rt.write(p, v);
-        }
+    // docs/gameplay_bbs.md, "Identity": only with as many pIns as pOuts; else nothing happens at all
+    if b.pins.len() != b.pouts.len() {
+        return Flow::Done;
     }
+    for (&p, &o) in b.pins.iter().zip(&b.pouts) {
+        let v = rt.read(p, host);
+        rt.write(o, v);
+    }
+    input(rt, b, 0);
     out(rt, b, 0);
     Flow::Done
 }
@@ -72,18 +71,15 @@ pub(crate) fn parameter_selector(
     _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    for i in 0..b.inputs.len() {
-        if input(rt, b, i) {
-            let v = b
-                .pins
-                .get(i)
-                .copied()
-                .map(|p| rt.read(p, host))
-                .unwrap_or_default();
+    // docs/gameplay_bbs.md, "Parameter Selector": the first active input wins, the others stay active
+    if let Some(i) = (0..b.inputs.len()).find(|&i| active(rt, b, i)) {
+        input(rt, b, i);
+        if let Some(&p) = b.pins.get(i) {
+            let v = rt.read(p, host);
             set_pout(rt, b, "Selected", 0, v);
-            out(rt, b, 0);
         }
     }
+    out(rt, b, 0);
     Flow::Done
 }
 
@@ -108,12 +104,34 @@ pub(crate) fn test(
     _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    if input(rt, b, 0) {
-        let op = pin(rt, b, "Test", 0, host).as_int();
-        let a = pin(rt, b, "A", 1, host);
-        let c = pin(rt, b, "B", 2, host);
-        out(rt, b, usize::from(!compare(op, &a, &c)));
+    // docs/gameplay_bbs.md, "Test": floats (or strings when either operand is one); operator 0 or less: nothing
+    input(rt, b, 0);
+    let op = pin(rt, b, "Test", 0, host).as_int();
+    let a = pin(rt, b, "A", 1, host);
+    let c = pin(rt, b, "B", 2, host);
+    if op <= 0 {
+        return Flow::Done;
     }
+    let text = |v: &Value| match v {
+        Value::Str(s) => s.clone(),
+        _ => String::new(),
+    };
+    let ord = if matches!(a, Value::Str(_)) || matches!(c, Value::Str(_)) {
+        text(&a).partial_cmp(&text(&c))
+    } else {
+        a.as_float().partial_cmp(&c.as_float())
+    };
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    let r = matches!(
+        (op, ord),
+        (1, Some(Equal))
+            | (2, Some(Less | Greater) | None)
+            | (3, Some(Less))
+            | (4, Some(Less | Equal))
+            | (5, Some(Greater))
+            | (6, Some(Greater | Equal))
+    );
+    out(rt, b, usize::from(!r));
     Flow::Done
 }
 
@@ -170,48 +188,54 @@ pub(crate) fn keep_active(
 
 pub(crate) fn delayer(
     rt: &mut Runtime,
-    id: Id,
+    _id: Id,
     b: &Block,
-    proto: Guid,
+    _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    let restart = input(rt, b, 0);
-    let looped = input(rt, b, 1);
-    let wait = pin(
-        rt,
-        b,
-        if proto == proto::DELAYER {
-            "Time to Wait"
-        } else {
-            "Duration"
-        },
-        0,
-        host,
-    )
-    .as_float();
-    let mut elapsed = match rt.scratch(id) {
-        Scratch::Time(t) if !restart => *t,
-        _ => 0.0,
-    };
-    if !restart && !looped && !matches!(rt.scratch(id), Scratch::Time(_)) {
-        return Flow::Done;
-    }
-    if !restart {
-        elapsed += host.delta_ms();
-    }
+    // docs/gameplay_bbs.md, "Delayer": the count is Elapsed Time itself, and the frame In fires in counts
+    let elapsed = if input(rt, b, 0) {
+        set_pout(rt, b, "Elapsed Time", 0, Value::Float(0.0));
+        0.0
+    } else {
+        pout_value(rt, b, 0).map_or(0.0, |v| v.as_float())
+    } + host.delta_ms();
     set_pout(rt, b, "Elapsed Time", 0, Value::Float(elapsed));
-    set_pout(rt, b, "Delta Time", 1, Value::Float(host.delta_ms()));
-    if elapsed >= wait {
-        rt.set_scratch(id, Scratch::None);
+    let wait = pin(rt, b, "Time to Wait", 0, host).as_float();
+    if wait <= elapsed {
         out(rt, b, 0);
         Flow::Done
     } else {
-        rt.set_scratch(id, Scratch::Time(elapsed));
-        if proto == proto::TIMER {
-            out(rt, b, 1);
-        }
         Flow::Continue
     }
+}
+
+pub(crate) fn timer(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    // docs/gameplay_bbs.md, "Timer": In restarts, else Loop In goes on; the loop is the graph's, the block never
+    // stays active
+    let elapsed = if input(rt, b, 0) {
+        set_pout(rt, b, "Elapsed Time", 0, Value::Float(0.0));
+        0.0
+    } else {
+        input(rt, b, 1);
+        pout_value(rt, b, 0).map_or(0.0, |v| v.as_float())
+    } + host.delta_ms();
+    set_pout(rt, b, "Elapsed Time", 0, Value::Float(elapsed));
+    set_pout(rt, b, "Delta Time", 1, Value::Float(host.delta_ms()));
+    let duration = pin(rt, b, "Duration", 0, host).as_float();
+    // an unordered compare (NaN) takes the "less" branch: Loop Out
+    out(
+        rt,
+        b,
+        usize::from(elapsed.partial_cmp(&duration).is_none_or(|o| o.is_lt())),
+    );
+    Flow::Done
 }
 
 pub(crate) fn chrono(
@@ -267,71 +291,112 @@ pub(crate) fn per_second(
     _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    if input(rt, b, 0) {
-        let x = pin(rt, b, "X", 0, host).as_float();
-        set_pout(rt, b, "Y", 0, Value::Float(x * host.delta_ms() / 1000.0));
-        out(rt, b, 0);
+    // docs/gameplay_bbs.md, "Per Second": every pOut i = pIn i scaled by the frame in seconds
+    input(rt, b, 0);
+    out(rt, b, 0);
+    let s = host.delta_ms() * 0.001;
+    for (&p, &o) in b.pins.iter().zip(&b.pouts) {
+        let v = match rt.read(p, host) {
+            Value::None => continue,
+            Value::Vec2(v) => Value::Vec2(v.map(|x| x * s)),
+            Value::Vec3(v) => Value::Vec3(v.map(|x| x * s)),
+            Value::Color(v) => Value::Color(v.map(|x| x * s)),
+            v => Value::Float(v.as_float() * s),
+        };
+        rt.write(o, v);
     }
     Flow::Done
 }
 
 pub(crate) fn counter(
     rt: &mut Runtime,
-    id: Id,
+    _id: Id,
     b: &Block,
     _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    let start = input(rt, b, 0);
-    let looped = input(rt, b, 1);
-    if !start && !looped {
-        return Flow::Done;
-    }
+    // docs/gameplay_bbs.md, "Counter": the value lives in pOut 0; Out once Count steps are done
     let count = pin(rt, b, "Count", 0, host).as_int();
-    let first = pin(rt, b, "Start Index", 1, host).as_int();
-    let step = pin(rt, b, "Step", 2, host).as_int().max(1);
-    let i = if start {
-        0
-    } else {
-        match rt.scratch(id) {
-            Scratch::Index(i) => *i,
-            _ => 0,
-        }
+    let start = pin(rt, b, "Start Index", 1, host).as_int();
+    let step = match pin(rt, b, "Step", 2, host).as_int() {
+        0 => 1,
+        s => s,
     };
-    if i >= i64::from(count) {
-        rt.set_scratch(id, Scratch::None);
-        out(rt, b, 0);
+    let v = if input(rt, b, 0) {
+        start
     } else {
-        set_pout(
-            rt,
-            b,
-            "Value",
-            0,
-            Value::Int(first.saturating_add((i as i32).saturating_mul(step))),
-        );
-        rt.set_scratch(id, Scratch::Index(i.saturating_add(1)));
-        out(rt, b, 1);
-    }
+        input(rt, b, 1);
+        pout_value(rt, b, 0)
+            .map_or(0, |v| v.as_int())
+            .wrapping_add(step)
+    };
+    set_pout(rt, b, "Value", 0, Value::Int(v));
+    // step is never 0 here; i32::MIN / -1 wraps to i32::MIN
+    let done = count <= v.wrapping_sub(start).checked_div(step).unwrap_or(i32::MIN);
+    out(rt, b, usize::from(!done));
     Flow::Done
 }
 
 pub(crate) fn binary_memory(
     rt: &mut Runtime,
-    id: Id,
+    _id: Id,
     b: &Block,
     _proto: Guid,
     _host: &mut dyn Host,
 ) -> Flow {
+    // docs/gameplay_bbs.md, "Binary Memory": True wins; a False that came with it stays active
+    let on = input(rt, b, 0);
+    if !on {
+        input(rt, b, 1);
+    }
+    out(rt, b, usize::from(!on));
+    set_pout(rt, b, "State", 0, Value::Bool(on));
+    Flow::Done
+}
+
+pub(crate) fn sequencer(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    _host: &mut dyn Host,
+) -> Flow {
+    // docs/gameplay_bbs.md, "Sequencer": In steps to the next Out (the index in pOut 0), then Reset back to -1
+    if input(rt, b, 1) {
+        let n = i64::try_from(b.outputs.len()).unwrap_or(i64::MAX);
+        let mut cur = pout_value(rt, b, 0)
+            .map_or(0, |v| v.as_int())
+            .wrapping_add(1);
+        if n.saturating_sub(1) <= i64::from(cur) {
+            cur = 0;
+        }
+        set_pout(rt, b, "Current", 0, Value::Int(cur));
+        if let Ok(o) = usize::try_from(i64::from(cur).saturating_add(1)) {
+            out(rt, b, o);
+        }
+    }
     if input(rt, b, 0) {
-        rt.set_scratch(id, Scratch::Flag(false));
-        set_pout(rt, b, "State", 0, Value::Bool(false));
+        set_pout(rt, b, "Current", 0, Value::Int(-1));
         out(rt, b, 0);
     }
-    if input(rt, b, 1) {
-        rt.set_scratch(id, Scratch::Flag(true));
-        set_pout(rt, b, "State", 0, Value::Bool(true));
-        out(rt, b, 1);
+    Flow::Done
+}
+
+pub(crate) fn wait_for_all(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    _host: &mut dyn Host,
+) -> Flow {
+    // docs/gameplay_bbs.md, "Wait For All": the inputs that came are kept until the others do
+    if !(0..b.inputs.len()).all(|i| active(rt, b, i)) {
+        return Flow::Continue;
     }
+    for i in 0..b.inputs.len() {
+        input(rt, b, i);
+    }
+    out(rt, b, 0);
     Flow::Done
 }
 
@@ -357,24 +422,20 @@ pub(crate) fn wait_message(
     _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    if input(rt, b, 1) {
-        rt.set_scratch(id, Scratch::None);
-        return Flow::Done;
-    }
-    let started = input(rt, b, 0);
-    if started {
-        rt.set_scratch(id, Scratch::Received(false));
-    }
-    if !matches!(rt.scratch(id), Scratch::Received(_)) {
-        return Flow::Done;
-    }
+    // docs/gameplay_bbs.md, "Wait Message": In registers a wait on the target, Stop removes it; the delivery
+    // (Runtime::deliver) fires Out
     let name = pin(rt, b, "Message", 0, host).as_string();
-    if !started && rt.received(&name, b.owner) {
-        rt.set_scratch(id, Scratch::None);
-        out(rt, b, 0);
+    if name.is_empty() {
         return Flow::Done;
     }
-    Flow::Continue
+    let t = rt.target(b, host);
+    if input(rt, b, 0) {
+        rt.wait_for(&name, id, t);
+    }
+    if input(rt, b, 1) {
+        rt.unwait(&name, id);
+    }
+    Flow::Done
 }
 
 pub(crate) fn send_message_to_group(
@@ -491,10 +552,19 @@ pub(crate) fn get_key_row(
     proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
+    let t = rt.target(b, host);
+    if proto == proto::GET_KEY_ROW {
+        // docs/gameplay_bbs.md, "Get Key Row": without an array or its key column nothing happens (In stays)
+        let key = array_of(rt, t)
+            .and_then(|a| rt.graph.arrays.get(a))
+            .and_then(|x| x.key);
+        if key.is_none() {
+            return Flow::Done;
+        }
+    }
     if !input(rt, b, 0) {
         return Flow::Done;
     }
-    let t = rt.target(b, host);
     let Some(a) = array_of(rt, t) else {
         out(rt, b, 1);
         return Flow::Done;
@@ -502,10 +572,13 @@ pub(crate) fn get_key_row(
     let row = if proto == proto::GET_ROW {
         usize::try_from(pin(rt, b, "Row Index", 0, host).as_int()).ok()
     } else {
+        let Some(k) = rt.graph.arrays.get(a).and_then(|x| x.key) else {
+            return Flow::Done;
+        };
         let key = pin(rt, b, "Key Value", 0, host);
         rt.rows(a)
             .iter()
-            .position(|r| r.first().is_some_and(|c| c.same(&key)))
+            .position(|r| r.get(k).is_some_and(|c| c.same(&key)))
     };
     match row.and_then(|r| rt.rows(a).get(r).cloned()) {
         Some(cells) => {
@@ -579,57 +652,71 @@ pub(crate) fn clear_array(
 
 pub(crate) fn iterator(
     rt: &mut Runtime,
-    id: Id,
+    _id: Id,
     b: &Block,
     _proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    let start = input(rt, b, 0);
-    let looped = input(rt, b, 1);
-    if !start && !looped {
-        return Flow::Done;
-    }
+    // docs/gameplay_bbs.md, "Iterator": the row lives in Row Index and walks round the array
     let t = rt.target(b, host);
-    let rows = array_of(rt, t).map(|a| rt.rows(a).len()).unwrap_or(0) as i64;
-    let first = i64::from(pin(rt, b, "Starting Row", 0, host).as_int());
-    let last = i64::from(pin(rt, b, "Ending Row", 1, host).as_int());
-    let last = if last < 0 {
-        rows.saturating_sub(1)
-    } else {
-        last.min(rows.saturating_sub(1))
+    let Some(a) = array_of(rt, t) else {
+        return Flow::Done;
     };
-    let backward = pin(rt, b, "Backward", 2, host).as_bool();
-    let i = if start {
-        if backward { last } else { first }
-    } else {
-        match rt.scratch(id) {
-            Scratch::Index(i) => *i,
-            _ => first,
-        }
-    };
-    let done = if backward { i < first } else { i > last };
-    if done || i < 0 {
-        rt.set_scratch(id, Scratch::None);
+    let n = i32::try_from(rt.rows(a).len()).unwrap_or(i32::MAX);
+    let start = pin(rt, b, "Starting Row", 0, host).as_int();
+    if start >= n {
         out(rt, b, 0);
         return Flow::Done;
     }
-    set_pout(rt, b, "Row Index", 0, Value::Int(i as i32));
-    let cells = array_of(rt, t)
-        .and_then(|a| rt.rows(a).get(i as usize).cloned())
+    let end = match pin(rt, b, "Ending Row", 1, host).as_int() {
+        -1 => n.saturating_sub(1),
+        e => e,
+    };
+    let backward = pin(rt, b, "Backward", 2, host).as_bool();
+    let first = input(rt, b, 0);
+    let cur = if first {
+        if backward { end } else { start }
+    } else {
+        input(rt, b, 1);
+        let last = pout_value(rt, b, 0).map_or(0, |v| v.as_int());
+        let c = if backward {
+            last.saturating_sub(1)
+        } else {
+            last.saturating_add(1)
+        };
+        if c < 0 {
+            n.saturating_sub(1)
+        } else if c >= n {
+            0
+        } else {
+            c
+        }
+    };
+    set_pout(rt, b, "Row Index", 0, Value::Int(cur));
+    let stop = if backward {
+        match start.saturating_sub(1) {
+            -1 => n.saturating_sub(1),
+            s => s,
+        }
+    } else {
+        match end.saturating_add(1) {
+            s if s >= n => 0,
+            s => s,
+        }
+    };
+    if (!first || n == 0) && cur == stop {
+        out(rt, b, 0);
+        return Flow::Done;
+    }
+    let cells = usize::try_from(cur)
+        .ok()
+        .and_then(|r| rt.rows(a).get(r).cloned())
         .unwrap_or_default();
     for (k, c) in cells.into_iter().enumerate() {
         if let Some(p) = b.pouts.get(k.saturating_add(1)).copied() {
             rt.write(p, c);
         }
     }
-    rt.set_scratch(
-        id,
-        Scratch::Index(if backward {
-            i.saturating_sub(1)
-        } else {
-            i.saturating_add(1)
-        }),
-    );
     out(rt, b, 1);
     Flow::Done
 }
@@ -641,11 +728,6 @@ pub(crate) fn group_iterator(
     proto: Guid,
     host: &mut dyn Host,
 ) -> Flow {
-    let start = input(rt, b, 0);
-    let looped = input(rt, b, 1);
-    if !start && !looped {
-        return Flow::Done;
-    }
     let g = pin(
         rt,
         b,
@@ -658,7 +740,17 @@ pub(crate) fn group_iterator(
         host,
     )
     .as_obj();
-    let members: Vec<Id> = match g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind) {
+    let group = g.and_then(|x| rt.graph.objects.get(x)).map(|o| o.kind);
+    if proto == proto::GROUP_ITERATOR && !matches!(group, Some(ObjKind::Group(_))) {
+        // docs/gameplay_bbs.md, "Group Iterator": no group, Out at once and the inputs left as they are
+        out(rt, b, 0);
+        return Flow::Done;
+    }
+    let start = input(rt, b, 0);
+    if !start {
+        input(rt, b, 1);
+    }
+    let members: Vec<Id> = match group {
         Some(ObjKind::Group(gi)) => host
             .group_members(gi)
             .into_iter()
@@ -1102,7 +1194,7 @@ pub(super) const PROTOS: &[Proto] = &[
         flags: flags::VAR_INPUTS,
         standing: Standing::Full,
         layouts: &[],
-        run: nop,
+        run: wait_for_all,
         event: None,
     },
     Proto {
@@ -1182,7 +1274,7 @@ pub(super) const PROTOS: &[Proto] = &[
         name: "Delayer",
         library: Library::Logics,
         pins: &["Time to Wait"],
-        pouts: &["Elapsed Time", "Delta Time"],
+        pouts: &["Elapsed Time"],
         flags: 0,
         standing: Standing::Full,
         layouts: &[],
@@ -1198,7 +1290,7 @@ pub(super) const PROTOS: &[Proto] = &[
         flags: 0,
         standing: Standing::Full,
         layouts: &[],
-        run: delayer,
+        run: timer,
         event: None,
     },
     Proto {
@@ -1242,7 +1334,7 @@ pub(super) const PROTOS: &[Proto] = &[
         name: "Counter",
         library: Library::Logics,
         pins: &["Count", "Start Index", "Step"],
-        pouts: &[],
+        pouts: &["Value"],
         flags: 0,
         standing: Standing::Full,
         layouts: &[],
@@ -1279,10 +1371,10 @@ pub(super) const PROTOS: &[Proto] = &[
         library: Library::Logics,
         pins: &[],
         pouts: &[],
-        flags: flags::VAR_INPUTS,
+        flags: flags::VAR_OUTPUTS,
         standing: Standing::Full,
         layouts: &[],
-        run: streaming_event,
+        run: sequencer,
         event: None,
     },
     Proto {

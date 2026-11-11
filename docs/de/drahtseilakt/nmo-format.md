@@ -78,6 +78,7 @@ auf ganze Wörter aufgefüllten Bytes; nach dem abschließenden NUL kann Datenm�
 | Kurvenpunkt | 36 | `0x10000000` | (Datenversion 5 und neuer) die Kurve, eigene Tangenten (statt TCB), linear, Tension, Continuity, Bias, Ein- und Ausgangstangente (kurvenlokal) |
 | Datenarray | 52 | `0x1000` | Spalten: Anzahl, dann Name (String) und Typ (1 Int, 2 Float, 3 String, 4 Objekt, 5 Parameter + Typ-GUID) |
 | | | `0x2000` | Zeilen: Anzahl, dann ein Wert je Spalte |
+| | | `0x4000` | Sortierreihenfolge, Sortierspalte, Schlüsselspalte (-1: keine; Get Key Row sucht in der Schlüsselspalte) |
 
 **Vertex-Speicherflags**: `0x1` eine Farbe für alle, `0x2` ein Specular für alle, `0x4` keine Normalen (der
 Leser berechnet glatte), `0x8` ein UV für alle, `0x10` keine Positionen.

@@ -284,6 +284,8 @@ pub struct Array {
     /// Column names and kinds (1 int, 2 float, 3 string, 4 object, 5 parameter).
     pub columns: Vec<(String, u32)>,
     pub rows: Vec<Vec<Value>>,
+    /// The key column Get Key Row searches (saved with the array), if any.
+    pub key: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -355,6 +357,7 @@ impl Graph {
                         .take(MAX_ARRAY_ROWS)
                         .map(|r| r.iter().map(cell_value).collect())
                         .collect(),
+                    key: a.key_column,
                 });
             }
             if o.class_id == behavior::class::BEHAVIOR {

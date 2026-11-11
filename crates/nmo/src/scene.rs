@@ -836,6 +836,8 @@ pub struct DataArray {
     /// Column names as stored.
     pub columns: Vec<Vec<u8>>,
     pub rows: Vec<Vec<Cell>>,
+    /// The key column (identifier `0x4000`: sort order, sort column, key column), if the array has one.
+    pub key_column: Option<usize>,
 }
 
 impl DataArray {
@@ -883,7 +885,17 @@ pub fn data_array(chunk: &Chunk) -> Result<DataArray> {
             rows.push(row);
         }
     }
-    Ok(DataArray { columns, rows })
+    // a missing or short 0x4000 means no key column; a negative one (-1) too
+    let key_column = chunk.section(0x4000).and_then(|mut w| {
+        w.u32().ok()?;
+        w.u32().ok()?;
+        usize::try_from(w.u32().ok()? as i32).ok()
+    });
+    Ok(DataArray {
+        columns,
+        rows,
+        key_column,
+    })
 }
 
 #[cfg(test)]
@@ -918,6 +930,26 @@ mod tests {
             options: OPTION_FILE,
             words,
         }
+    }
+
+    /// An array's key column comes from identifier 0x4000 (sort order, sort column, key column); -1, a short
+    /// section or none at all mean no key column, and never fail the array.
+    #[test]
+    fn a_data_array_keeps_its_key_column() {
+        let key = u32::from_le_bytes(*b"Key\0");
+        let columns = vec![2, 4, key, 1, 4, key, 1];
+        let rows = vec![1, 10, 11];
+        let with = |extra: Option<Vec<u32>>| {
+            let mut s = vec![(0x1000, columns.clone()), (0x2000, rows.clone())];
+            if let Some(e) = extra {
+                s.push((0x4000, e));
+            }
+            data_array(&chunk(&s)).map(|a| (a.rows.len(), a.key_column))
+        };
+        assert_eq!(with(Some(vec![0, 0, 1])).ok(), Some((1, Some(1))));
+        assert_eq!(with(Some(vec![0, 0, u32::MAX])).ok(), Some((1, None)));
+        assert_eq!(with(Some(vec![0, 0])).ok(), Some((1, None)));
+        assert_eq!(with(None).ok(), Some((1, None)));
     }
 
     /// Record Anim's layout (docs/animation.md 5.2): linear position, rotation and scale, then the end of the list;

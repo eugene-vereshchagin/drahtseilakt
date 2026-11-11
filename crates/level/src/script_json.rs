@@ -189,7 +189,7 @@ pub fn to_json(
         .arrays
         .iter()
         .map(|a| {
-            json!({"name": a.name, "columns": a.columns,
+            json!({"name": a.name, "columns": a.columns, "key": a.key,
                 "rows": a.rows.iter().map(|r| r.iter().map(value).collect::<Vec<_>>()).collect::<Vec<_>>()})
         })
         .collect();
@@ -368,6 +368,11 @@ pub fn from_json(j: &J, counts: [usize; 5]) -> Result<Graph, String> {
                 .and_then(J::as_str)
                 .unwrap_or_default()
                 .to_owned(),
+            // absent or null in files written before the key column was kept: none
+            key: match a.get("key") {
+                None | Some(J::Null) => None,
+                Some(k) => Some(index(k)?),
+            },
             columns,
             rows,
         });
@@ -423,6 +428,7 @@ mod tests {
                 name: "T".into(),
                 columns: vec![("c".into(), 1)],
                 rows: vec![vec![Value::Int(7)], vec![Value::Raw(vec![1, 255])]],
+                key: Some(0),
             }],
             vec![(0, Some(1))],
         )

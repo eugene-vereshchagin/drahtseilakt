@@ -455,6 +455,7 @@ fn an_iterator_loops_over_a_map_array_and_set_position_moves_the_rows_objects() 
             vec![Value::Obj(Some(0)), Value::Vec3([1.0, 2.0, 3.0])],
             vec![Value::Obj(Some(1)), Value::Vec3([4.0, 5.0, 6.0])],
         ],
+        key: None,
     });
     let arr = b.g.add_object("Moves", ObjKind::Array(0));
     let arr_param = b.local("Target (Array)", types::ARRAY, Value::Obj(Some(arr)));
@@ -515,7 +516,8 @@ fn an_iterator_loops_over_a_map_array_and_set_position_moves_the_rows_objects() 
     rt.tick(&mut host);
     assert_eq!(host.matrices[0][3], [1.0, 2.0, 3.0, 1.0]);
     assert_eq!(host.matrices[1][3], [4.0, 5.0, 6.0, 1.0]);
-    assert_eq!(rt.values[row_out], Value::Int(1));
+    // docs/gameplay_bbs.md, "Iterator": the step past the last row wraps Row Index to 0, the stop row
+    assert_eq!(rt.values[row_out], Value::Int(0));
     assert!(!rt.is_active(script), "both rows done within one tick");
 }
 
@@ -567,13 +569,15 @@ fn a_message_sent_in_one_tick_wakes_its_waiter_in_the_next() {
     let start2 = b.io("Start");
     let delayed = b.local("Time to Wait", types::TIME, Value::Float(40.0));
     let wait_pin = b.pin("Time to Wait", types::TIME, delayed);
+    // the delayer counts in its Elapsed Time output (docs/gameplay_bbs.md, "Delayer")
+    let elapsed = b.pout("Elapsed Time", types::TIME);
     let delayer = b.bb(
         "Delayer",
         proto::DELAYER,
         &["In"],
         &["Out"],
         vec![wait_pin],
-        vec![],
+        vec![elapsed],
         vec![],
         None,
     );
@@ -595,13 +599,10 @@ fn a_message_sent_in_one_tick_wakes_its_waiter_in_the_next() {
     let g = b.done();
     let mut rt = Runtime::new(g);
     let mut host = Rec::new();
-    for _ in 0..3 {
+    // docs/gameplay_bbs.md, "Delayer": the tick In fires in counts, so 40 ms is reached in the third run
+    for _ in 0..2 {
         rt.tick(&mut host);
-        assert_eq!(
-            host.visible,
-            vec![true, true],
-            "40 ms is three ticks at 60 Hz, the message comes after"
-        );
+        assert_eq!(host.visible, vec![true, true], "the delayer still waits");
     }
     rt.tick(&mut host);
     assert_eq!(
