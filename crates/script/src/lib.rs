@@ -45,6 +45,59 @@ pub enum ObjKind {
     Other,
 }
 
+/// The shape a particle block emits from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EmitShape {
+    /// The unit square in the frame's XY plane.
+    #[default]
+    Planar,
+    /// The unit sphere around the frame, moving outwards.
+    Spherical,
+}
+
+/// What an emitter block is doing: emitting, frozen (nothing moves, particles stay drawn), stopped (live particles
+/// finish) or gone (its script stopped: the particles go at once).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmitState {
+    On,
+    Frozen,
+    Off,
+    Gone,
+}
+
+/// A planar/spherical particle block's values as its pins and settings give them (docs/particles.md section 2).
+/// Times in milliseconds, angles in radians, speed in units a millisecond.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct EmitterSpec {
+    pub shape: EmitShape,
+    /// The `Particle Rendering` and the two blend settings, as the original's enum values.
+    pub render: i32,
+    pub src_blend: i32,
+    pub dst_blend: i32,
+    /// `Evolutions` (Size=1, Color=2, Texture=4) and `Variances` flag settings.
+    pub evolutions: u32,
+    pub variances: u32,
+    pub delay: f32,
+    pub yaw_var: f32,
+    pub pitch_var: f32,
+    pub speed: f32,
+    pub speed_var: f32,
+    pub life: f32,
+    pub life_var: f32,
+    /// The live-particle cap: the smaller of the pin and the pool-size setting.
+    pub max: i32,
+    pub emission: i32,
+    pub emission_var: i32,
+    pub size0: f32,
+    pub size0_var: f32,
+    pub size1: f32,
+    pub size1_var: f32,
+    pub color0: [f32; 4],
+    pub color1: [f32; 4],
+    /// The texture's name in the map, if the pin names one.
+    pub texture: Option<String>,
+}
+
 /// A script's text box in the original's 640x480 frame (docs/gameplay_bbs.md, "Text").
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextSpec {
