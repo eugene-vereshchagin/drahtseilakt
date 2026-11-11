@@ -47,7 +47,10 @@ pub trait Host {
     fn sound_playing(&self, _key: usize) -> bool {
         false
     }
-    fn text(&mut self, name: &str, text: &str, on: bool);
+    /// The script text box of block `key` (its graph id): shown or changed with a spec, taken away with none. The
+    /// engine draws it in a layer under its own interface, in the original's 640x480 frame, with its own font, and
+    /// fits it; text never reaches the simulation. A block sends its spec every tick while it is on.
+    fn text_box(&mut self, _key: usize, _spec: Option<crate::TextSpec>) {}
     /// A line for the log: what a script did, or what the runtime could not do.
     fn note(&mut self, text: &str);
     /// A copy of a level object under a new name (Object Copy): the new object's index, or none when the
@@ -272,6 +275,9 @@ pub struct Runtime {
     rng: u64,
     /// Objects copied so far (Object Copy), capped.
     copies: usize,
+    /// The fonts the scripts made (TT CreateFontEx, Create System Font): index + 1 is the Font value. Only size,
+    /// weight and colour are kept: the engine draws every font in its own face.
+    pub(crate) fonts: Vec<crate::Font>,
     /// The scripts in the order the behaviour manager runs them: objects by priority (higher first, then file
     /// order), each object's scripts in its list's order.
     order: Vec<Id>,
@@ -343,6 +349,7 @@ impl Runtime {
             starved: false,
             rng: 0x9e37_79b9_7f4a_7c15,
             copies: 0,
+            fonts: Vec::new(),
             order: Vec::new(),
             objects: Vec::new(),
             requested: false,
@@ -1592,6 +1599,5 @@ impl Host for Quiet {
         None
     }
     fn message(&mut self, _: &str, _: Option<Ent>) {}
-    fn text(&mut self, _: &str, _: &str, _: bool) {}
     fn note(&mut self, _: &str) {}
 }

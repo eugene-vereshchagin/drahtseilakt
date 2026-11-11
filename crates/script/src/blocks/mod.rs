@@ -65,6 +65,12 @@ pub mod proto {
     pub const SET_CLIPPING_PLANES: Guid = Guid(0x6523_16a2, 0x01aa_09a9);
     pub const SET_FOV: Guid = Guid(0xaaaa_cccc, 0xaaaa_cccc);
     pub const TEXT_DISPLAY: Guid = Guid(0xf22d_010a, 0xf2cd_010a);
+    pub const SET_FONT_PROPERTIES: Guid = Guid(0xdacf_bd61, 0x7a6e_65e7);
+    pub const TEXT_2D: Guid = Guid(0x055b_29fe, 0x662d_5ca0);
+    pub const TEXT_3D: Guid = Guid(0x1f5b_2fe7, 0x6d35_5175);
+    pub const CREATE_SYSTEM_FONT: Guid = Guid(0x9363_34fc, 0xf243_684f);
+    pub const MOVIE_PLAYER: Guid = Guid(0x778d_16d4, 0x1dd6_0060);
+    pub const TT_CREATE_FONT_EX: Guid = Guid(0x260e_4eb0, 0x0e25_6b90);
     pub const NOP: Guid = Guid(0x3025_61c4, 0x0d28_2980);
     pub const WAVE_PLAYER: Guid = Guid(0x5bde_0e45, 0x2e21_07d5);
     pub const VOLUME_CONTROL: Guid = Guid(0x3361_3f21, 0x776b_185b);

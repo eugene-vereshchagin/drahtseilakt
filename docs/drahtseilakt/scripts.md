@@ -298,7 +298,7 @@ by the engine's.
 | Get Key Row | `49064205:10e72f7a` | 13 | 38 | done |
 | Object Copy | `3f6b0ac7:47d20f78` | 13 | 42 | partial: the copy and its scripts are made and run (own name, `This` bound to it); not drawn, no body |
 | Send Message To Group | `5f906952:6df11649` | 12 | 31 | done |
-| Text Display | `f22d010a:f2cd010a` | 11 | 32 | done |
+| Text Display | `f22d010a:f2cd010a` | 11 | 32 | done (drawn in the game's own pixel font, fitted to its box) |
 | Test | `17d66d26:726b7dec` | 11 | 96 | done |
 | Get Current Camera | `368f22b1:222957e4` | 11 | 12 | partial: none |
 | Set Orientation | `625874aa:aa694132` | 10 | 10 | done |
@@ -334,10 +334,10 @@ by the engine's.
 | Physics Impulse | `0c7e39bb:16db20d5` | 3 | 6 | planned |
 | Midi Player | `843cb43a:a12dac48` | 2 | 2 | no-op |
 | Object Rename | `6f074ca7:45427431` | 2 | 4 | no-op |
-| Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | never (the engine's own interface) |
-| 2D Text | `055b29fe:662d5ca0` | 2 | 2 | never (the engine's own interface) |
+| Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | partial: scale and colour kept; the engine draws its own face |
+| 2D Text | `055b29fe:662d5ca0` | 2 | 2 | partial: drawn over the whole frame (the 2D entity's own frame is not known yet) |
 | Fill Group By Class | `4445257b:70016c57` | 2 | 8 | planned |
-| 3D Text | `1f5b2fe7:6d355175` | 2 | 3 | never (the engine's own interface) |
+| 3D Text | `1f5b2fe7:6d355175` | 2 | 3 | named no-op (said once) |
 | Row Search | `78863443:45af59b6` | 2 | 2 | done |
 | Create String | `4bcd2f9d:382652e2` | 2 | 2 | planned |
 | Proximity | `5321cacb:dcdc5213` | 2 | 2 | done |
@@ -357,8 +357,8 @@ by the engine's.
 | Linear Progression | `fff45680:aa512a39` | 2 | 3 | done |
 | Set Blend Modes | `2f572a66:6a9a0088` | 2 | 5 | planned |
 | Set Material Z Buffer | `1144022f:68fd055c` | 2 | 5 | planned |
-| Create System Font | `936334fc:f243684f` | 1 | 1 | never (the engine's own interface) |
-| Movie Player | `778d16d4:1dd60060` | 1 | 1 | never (the engine's own interface) |
+| Create System Font | `936334fc:f243684f` | 1 | 1 | partial: size and weight only |
+| Movie Player | `778d16d4:1dd60060` | 1 | 1 | named no-op (said once) |
 | TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
 | Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | planned |
 | Get SubString | `10b16051:26173b39` | 1 | 1 | planned |
@@ -393,7 +393,7 @@ by the engine's.
 | Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | planned |
 | Sequencer | `42530844:257b6053` | 1 | 1 | done |
 | Calculator | `4bc209b8:5b3679b0` | 1 | 8 | planned |
-| TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | never (the engine's own interface) |
+| TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | partial: the font is a name and a size; no texture, no font |
 | Get Message Data | `45875fee:45875fdd` | 1 | 1 | done |
 | Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | never (the engine's own interface) |
 | Set Clipping Planes | `652316a2:01aa09a9` | 1 | 2 | never (the engine's own interface) |
@@ -463,8 +463,8 @@ blocks, the blocks beyond the template, the blocks not covered, and whether phas
    Sound Instance, TT_LinearVolume, TT ProximityVolumeControl through the game's audio (`script_sound.rs`); the
    wave objects (class 25) are read with their file, loop, gain, pan and pitch; the sound data is not in the maps,
    so a file is resolved against the game's sound set (own theme, the player's copy) and a missing one is silent
-   with one log note. Midi Player stays a named no-op (no MIDI). Text Display / 2D Text in the HUD's own font:
-   still to do.
+   with one log note. Midi Player stays a named no-op (no MIDI). Text Display / 2D Text: *done (3.5 text part)* as boxes
+   in a layer under the HUD (`script_text.rs`, docs/gameplay_bbs.md "Text").
 5. **Looks**: Set Texture, Set Diffuse / Emissive / Ambient / Specular, Blend Textures, Set Blend Modes, Set
    Material Z Buffer, Set Alpha Test, Set Current Slot, Change Texture Size, Replace Texture / Material, Add /
    Remove / Select Mesh, Scale, Set Euler Orientation, Set 3DSprite Mode, Set Light Color, Set Fog, Set FOV
@@ -473,7 +473,7 @@ blocks, the blocks beyond the template, the blocks not covered, and whether phas
    (expressions), Row Search, Sort Rows, Move / Remove Row, Insert Column, Has / Set Attribute, Objects With
    Attribute Iterator, Iterator If, Get Message Data, Execute / Attach Script, Scan String, Create String, Get
    SubString, To Lower Keys, Renamer.
-7. **Never**: fonts (Create System Font, TT CreateFontEx, Set Font Properties), Movie Player, Write In Texture,
+7. **Never**: Movie Player and 3D Text (named no-ops), Write In Texture,
    Edit 2D Entity, Set As Active Camera, Set Clipping Planes, TT Sky: the game's own interface and camera take
    their place; a map that needs them for play is reported by name.
 

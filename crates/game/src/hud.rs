@@ -233,7 +233,11 @@ pub fn overlay(
 ) -> Vec<Rect> {
     let (w, h) = (width_px as f32, height_px as f32);
     let scale = (h / 240.0).round().max(2.0);
-    let mut out = Vec::new();
+    // The map's own text goes first: under everything the game itself shows.
+    let mut out = match &sim.scripts {
+        Some(sc) if !sc.text.is_empty() => crate::script_text::rects(&sc.text, w, h),
+        _ => Vec::new(),
+    };
 
     // The sector and the tick in the top left corner, in debug mode.
     let hud = format!("SECTOR {}   TICK {}", sim.sector + 1, sim.tick);

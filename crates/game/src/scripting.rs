@@ -39,6 +39,9 @@ pub struct Scripts {
     pub sound: SoundState,
     /// The camera the scripts changed (Set As Active Camera, Set Clipping Planes, ...).
     pub camera: CameraOverride,
+    /// The text boxes the map's scripts show now, by the block that shows each (drawn by hud.rs under the interface;
+    /// they rewind and restart with the run).
+    pub text: Vec<(script::Id, script::TextSpec)>,
 }
 
 /// The most sound events kept for the audio between two drains (a run with no audio never drains them).
@@ -155,6 +158,7 @@ impl Scripts {
             teleports: 0,
             sound: SoundState::default(),
             camera: CameraOverride::default(),
+            text: Vec::new(),
         })
     }
 }
@@ -206,6 +210,7 @@ struct ScriptsParts {
     tick: u64,
     sound: SoundState,
     camera: CameraOverride,
+    text: Vec<(script::Id, script::TextSpec)>,
 }
 
 impl ScriptsParts {
@@ -507,12 +512,24 @@ impl Host for SimHost<'_> {
             .is_some_and(|p| p.paused.is_some() || p.until.is_none_or(|u| self.s.tick < u))
     }
 
-    fn text(&mut self, name: &str, text: &str, on: bool) {
-        self.s.note(if on {
-            format!("text {name}: {text:?}")
-        } else {
-            format!("text {name} off")
-        });
+    fn text_box(&mut self, key: usize, spec: Option<script::TextSpec>) {
+        let at = self.s.text.iter().position(|(k, _)| *k == key);
+        match (at, spec) {
+            (Some(i), None) => {
+                self.s.text.remove(i);
+            }
+            (Some(i), Some(mut spec)) => {
+                spec.text = spec.text.chars().take(script::MAX_TEXT_CHARS).collect();
+                if let Some(slot) = self.s.text.get_mut(i) {
+                    slot.1 = spec;
+                }
+            }
+            (None, Some(mut spec)) if self.s.text.len() < script::MAX_TEXT_BOXES => {
+                spec.text = spec.text.chars().take(script::MAX_TEXT_CHARS).collect();
+                self.s.text.push((key, spec));
+            }
+            (None, _) => {}
+        }
     }
 
     fn note(&mut self, text: &str) {
@@ -603,6 +620,7 @@ impl Scripts {
             tick: run.tick,
             sound: std::mem::take(&mut self.sound),
             camera: self.camera,
+            text: std::mem::take(&mut self.text),
         };
         {
             let mut host = SimHost { s: &mut parts, run };
@@ -618,6 +636,7 @@ impl Scripts {
         self.log = parts.log;
         self.sound = parts.sound;
         self.camera = parts.camera;
+        self.text = parts.text;
         if run.teleport.is_some() {
             self.teleports = self.teleports.saturating_add(1);
         }

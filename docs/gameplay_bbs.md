@@ -1860,3 +1860,40 @@ Cameras.dll blocks (`crates/script/src/blocks/cameras.rs`). They change the view
 - **Set Clipping Planes**: sets near and far (defaults 0.1 and 200); applied only when near > 0 and far > near.
 - **Set FOV** (`aaaacccc:aaaacccc`): pin Angle in radians across the 4:3 view (InGameCam's is 1.0123); the host clamps it to 1..179 degrees. Applied to the active view whatever the target.
 - A run starts with the original camera; a new run (restart, or a rewind that rebuilds the run) starts without these changes.
+
+## Text (script text boxes: Text Display, 2D Text, font blocks)
+
+Source: `docs/fonts.md` sections 6.1-6.5, and the old C `src/bb/bb_interface.c` where the notes are silent. The
+original draws a map's text with its texture font (2D Text) or a GDI sprite (Text Display); we draw every box in
+the engine's own pixel font, so only what decides *where, how big, what colour* is kept.
+
+- **Box.** A block that shows text has a box: text, rectangle in the 640x480 frame, wanted line height, colour,
+  weight, alignment. It exists while the block is on. The block re-sends it every tick (a Text Display and a 2D Text
+  both stay active until Off); the engine replaces the box of that block, so a changed text shows at once.
+- **Gone when:** Off input (Exit Off fires, the box goes: fonts.md 6.4 "no callback is registered, so the text is
+  gone from the next frame"); the block's script is deactivated, reset or deleted; the run restarts or rewinds (the
+  boxes live in the run's state, not the renderer's).
+- **Text Display** (fonts.md 6.5): pins Offset (the sprite's top left, frame pixels), Color, Alignment (CK sprite
+  text enum Center 1, Left 2, Right 4, Top 8, Bottom 16, VCenter 32, HCenter 64), Size, Text and extra pins. Text =
+  each text pin's string followed by a space. The sprite is the local Sprite Size (default 320x32). The C
+  (`bb_text_display`) only handles On/Off and draws nothing; the notes' semantics are followed. *Not in the notes:*
+  the unit of Size: taken as points at 96 dpi (px = size * 4/3); an unset Size (0) is 13 px. A colour pin that
+  holds no colour is white.
+- **2D Text** (fonts.md 6.4): needs a 2D entity (class 27-29) as target, else nothing is drawn (the C pushes the
+  draw only `if (ck_2dentity(...))`). On -> Exit On, Off -> Exit Off. Pins: Font, Text, Alignment (Center 0, Left
+  1, Right 2, Top 4, Bottom 8), Margins (left, top, right, bottom; default 2), Offset. The 2D entity's own
+  position and size are not known to the engine yet (3.5, second part): the box is the whole frame inside the
+  margins plus the offset. Output Line Count = lines split at '\n'; Text Extents is not written. Text Properties
+  flags are not read: text always wraps at the box's width.
+- **Fonts.** TT CreateFontEx (name, texture): no name -> nothing; no texture -> no font (fonts.md 6.1 step 1); else
+  a font of that name, output = its 1-based index. Create System Font: a font by name, bold when Font Weight >= 600,
+  output Font Created and Success; with no room (64 fonts) nothing, and no Error output either (fonts.md 6.3).
+  Set Font Properties: Out first; a Font index that does not exist is left alone; Scale and Color are kept.
+  A second font of an existing name replaces it (a restarted level makes its fonts again). A font stands for a line
+  height of 32 px * scale.y (the glyph cell of the original's font texture); no font = scale 0.5, white. Names
+  map to one face of ours: the name only identifies the font.
+- **Fit.** Wrapped at spaces and '\n', then shrunk (to 0.6 frame pixels per font pixel), then cut at the box's
+  edge. Caps: 64 boxes, 1024 characters per box, 2048 glyphs drawn per frame.
+- **3D Text, Movie Player:** known, do nothing (inputs taken, one log note). 3D Text would need the camera's
+  projection of the object; left for later.
+- Text never affects the simulation: the boxes are only read by the renderer.
