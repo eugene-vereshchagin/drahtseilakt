@@ -1197,7 +1197,8 @@ fn an_object_with_very_many_scripts_neither_stalls_the_load_nor_a_copy() {
         }
         b.done()
     };
-    let limit = std::time::Duration::from_secs(10);
+    // generous for a debug build on a busy machine: what it catches is a blow-up (quadratic walks), not seconds
+    let limit = std::time::Duration::from_secs(30);
     // the load: 300 000 scripts on one object
     let g = build(300_000, false);
     let t = std::time::Instant::now();
