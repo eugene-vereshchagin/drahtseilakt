@@ -73,6 +73,8 @@ fn decode_all(doc: &Document) {
         let _ = scene::curve_point(c);
         let _ = scene::camera(c);
         let _ = scene::sprite(c);
+        let _ = scene::entity_2d(c);
+        let _ = scene::wave_sound(c);
         let _ = scene::material_effect(c);
         let _ = scene::parameter_word(c);
         let _ = scene::group(c);

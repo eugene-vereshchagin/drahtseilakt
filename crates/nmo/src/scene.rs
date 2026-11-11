@@ -2,7 +2,7 @@
 // were worked out from the files themselves (the original levels and the community maps) together with the
 // identifier constants of the Virtools SDK; see docs/drahtseilakt/nmo-format.md.
 
-use crate::chunk::Chunk;
+use crate::chunk::{Chunk, Words};
 use crate::document::reference;
 use crate::error::{Error, Part, Result};
 
@@ -617,6 +617,124 @@ pub fn sprite(chunk: &Chunk) -> Result<Sprite> {
     Ok(s)
 }
 
+/// A 2D entity (CK2dEntity, classes 27 to 29; section 0x10f000, C reference `load_2dentity`): a rectangle of the
+/// screen drawn over the scene with a material. The rectangle is left, top, right, bottom: fractions of the
+/// view when `homogeneous`, else pixels of the 640 x 480 render context. `source` is the part of the texture it
+/// shows (u0, v0, u1, v1), used when `use_source`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Entity2d {
+    pub flags: u32,
+    pub rect: [f32; 4],
+    pub source: [f32; 4],
+    pub z_order: i32,
+    pub material: Option<usize>,
+}
+
+impl Entity2d {
+    pub const USE_SOURCE: u32 = 0x20;
+    pub const HOMOGENEOUS: u32 = 0x200;
+
+    pub fn homogeneous(&self) -> bool {
+        self.flags & Self::HOMOGENEOUS != 0
+    }
+
+    pub fn use_source(&self) -> bool {
+        self.flags & Self::USE_SOURCE != 0
+    }
+}
+
+/// The 2D entity's part, or the constructor's values (no rectangle, the whole texture, no material) when the file
+/// has none. A plain frame (class 27) of an older file names its material in section 0x200000.
+pub fn entity_2d(chunk: &Chunk) -> Result<Entity2d> {
+    let mut e = Entity2d {
+        flags: 0,
+        rect: [0.0; 4],
+        source: [0.0, 0.0, 1.0, 1.0],
+        z_order: 0,
+        material: None,
+    };
+    let frame = u32::from(chunk.class_id) == crate::class::ENTITY_2D;
+    if let Some(mut w) = chunk.section(0x0010_f000) {
+        let saved = w.u32()?;
+        // the bits that say what follows are not the entity's flags
+        e.flags = saved & 0xfff8_f7ff;
+        let four = |w: &mut Words<'_>| -> Result<[f32; 4]> {
+            let mut v = [0.0f32; 4];
+            for x in &mut v {
+                *x = w.f32()?;
+                if !x.is_finite() {
+                    return Err(malformed("2D entity rectangle"));
+                }
+            }
+            Ok(v)
+        };
+        e.rect = four(&mut w)?;
+        if saved & 0x1_0000 != 0 {
+            e.source = four(&mut w)?;
+        }
+        if saved & 0x2_0000 != 0 {
+            e.z_order = w.u32()? as i32;
+        }
+        if saved & 0x4_0000 != 0 {
+            e.material = reference(chunk, w.u32()?);
+        }
+    }
+    if frame && let Some(mut w) = chunk.section(0x0020_0000) {
+        e.material = reference(chunk, w.u32()?);
+    }
+    Ok(e)
+}
+
+/// A wave sound (CKWaveSound, class 25; C reference `ck_sound_load_chunk`): the file it plays (CKSound's section
+/// 0x1000, or 0x100000 when present) and, from data version 3, its flags (0x8 loops), gain, pan and pitch.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WaveSound {
+    pub file_name: Option<Vec<u8>>,
+    pub looped: bool,
+    pub gain: f32,
+    pub pan: f32,
+    pub pitch: f32,
+}
+
+/// A sound's file name is a path; longer than this is no name.
+const MAX_SOUND_NAME: usize = 1_024;
+
+pub fn wave_sound(chunk: &Chunk) -> Result<WaveSound> {
+    let mut s = WaveSound {
+        file_name: None,
+        looped: false,
+        gain: 1.0,
+        pan: 0.0,
+        pitch: 1.0,
+    };
+    let named = |name: Vec<u8>| -> Result<Option<Vec<u8>>> {
+        if name.len() > MAX_SOUND_NAME {
+            return Err(malformed("sound file name"));
+        }
+        Ok((!name.is_empty()).then_some(name))
+    };
+    if let Some(mut w) = chunk.section(0x1000) {
+        w.u32()?;
+        s.file_name = named(w.string()?)?;
+    }
+    if let Some(mut w) = chunk.section(0x0010_0000) {
+        s.file_name = named(w.string()?)?;
+    }
+    if chunk.data_version >= 3
+        && let Some(mut w) = chunk.section(0x0040_0000)
+    {
+        let flags = w.u32()?;
+        w.u32()?; // priority
+        let (gain, pan, pitch) = (w.f32()?, w.f32()?, w.f32()?);
+        if ![gain, pan, pitch].iter().all(|v| v.is_finite()) {
+            return Err(malformed("sound value"));
+        }
+        s.looped = flags & 0x8 != 0;
+        (s.gain, s.pan, s.pitch) = (gain, pan, pitch);
+    }
+    Ok(s)
+}
+
 /// A material's effect (section 0x10000), apart from the material so that a bad one costs only the effect: its
 /// kind (1 texture coordinate generation, 2 the same with a referential) and the parameter object holding its
 /// setting.
@@ -1069,5 +1187,96 @@ mod tests {
         // positions in the file: as many vertices as they hold
         assert!(made(1000, all & !NO_POSITION, 3000).is_ok());
         assert!(made(1000, all & !NO_POSITION, 2000).is_err());
+    }
+
+    /// The 2D entity's part as the C reference's `load_2dentity` reads it: the saved flags say what follows the
+    /// rectangle (0x10000 a source rectangle, 0x20000 the Z order, 0x40000 the material).
+    #[test]
+    fn a_2d_frame_is_read_and_bad_ones_refused() {
+        let f = f32::to_bits;
+        let rect = [f(0.0), f(0.0), f(80.0), f(60.0)];
+        let mut data = vec![0x0007_0220];
+        data.extend(rect);
+        data.extend([f(0.25), f(0.5), f(0.75), f(1.0)]);
+        data.extend([(-3i32) as u32, 7]);
+        let e = entity_2d(&chunk(&[(0x0010_f000, data.clone())])).unwrap();
+        assert_eq!(e.rect, [0.0, 0.0, 80.0, 60.0]);
+        assert_eq!(e.source, [0.25, 0.5, 0.75, 1.0]);
+        assert_eq!((e.z_order, e.material), (-3, Some(7)));
+        assert!(e.homogeneous() && e.use_source());
+        // the bits that say what follows are not kept as flags
+        assert_eq!(e.flags & 0x0007_0800, 0);
+        // nothing optional: the whole texture, no material
+        let mut plain = vec![0x200];
+        plain.extend(rect);
+        let e = entity_2d(&chunk(&[(0x0010_f000, plain.clone())])).unwrap();
+        assert_eq!(
+            (e.source, e.z_order, e.material),
+            ([0.0, 0.0, 1.0, 1.0], 0, None)
+        );
+        // a plain frame's material of an older file; not read for a sprite
+        let mut old = chunk(&[(0x0010_f000, plain.clone()), (0x0020_0000, vec![9])]);
+        assert_eq!(entity_2d(&old).unwrap().material, None);
+        old.class_id = 27;
+        assert_eq!(entity_2d(&old).unwrap().material, Some(9));
+        // no part at all: the constructor's values
+        assert_eq!(entity_2d(&chunk(&[(0x1, vec![])])).unwrap().rect, [0.0; 4]);
+        // cut short anywhere, or a rectangle that is no number
+        for n in 0..data.len() {
+            assert!(entity_2d(&chunk(&[(0x0010_f000, data[..n].to_vec())])).is_err());
+        }
+        let mut nan = plain;
+        nan[2] = f(f32::NAN);
+        assert!(entity_2d(&chunk(&[(0x0010_f000, nan)])).is_err());
+    }
+
+    /// A wave sound as the C reference's `ck_sound_load_chunk` reads it: CKSound's file name, the later section's
+    /// over it, then flags (0x8 loops), priority, gain, pan and pitch.
+    #[test]
+    fn a_wave_sound_is_read_and_bad_ones_refused() {
+        let f = f32::to_bits;
+        let name = |s: &str| {
+            let mut v = vec![s.len() as u32];
+            let mut bytes = s.as_bytes().to_vec();
+            bytes.resize(s.len().div_ceil(4) * 4, 0);
+            v.extend(
+                bytes
+                    .chunks(4)
+                    .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])),
+            );
+            v
+        };
+        let mut base = vec![0];
+        base.extend(name("a.wav"));
+        let settings = vec![0x8, f(0.5), f(0.85), f(0.0), f(1.0)];
+        let s = wave_sound(&chunk(&[
+            (0x1000, base.clone()),
+            (0x0040_0000, settings.clone()),
+        ]))
+        .unwrap();
+        assert_eq!(s.file_name.as_deref(), Some(&b"a.wav"[..]));
+        assert!(s.looped);
+        assert_eq!((s.gain, s.pan, s.pitch), (0.85, 0.0, 1.0));
+        // the later section's name wins; no settings: the constructor's
+        let s = wave_sound(&chunk(&[
+            (0x1000, base.clone()),
+            (0x0010_0000, name("b.wav")),
+        ]))
+        .unwrap();
+        assert_eq!(s.file_name.as_deref(), Some(&b"b.wav"[..]));
+        assert!(!s.looped && s.gain == 1.0);
+        // settings of a data version before 3 are not read
+        let mut early = chunk(&[(0x0040_0000, settings.clone())]);
+        early.data_version = 2;
+        assert!(!wave_sound(&early).unwrap().looped);
+        // a name longer than its section, an endless one, settings cut short or no numbers
+        assert!(wave_sound(&chunk(&[(0x1000, vec![0, 400, 1])])).is_err());
+        let mut long = vec![0];
+        long.extend(name(&"x".repeat(2000)));
+        assert!(wave_sound(&chunk(&[(0x1000, long)])).is_err());
+        assert!(wave_sound(&chunk(&[(0x0040_0000, settings[..3].to_vec())])).is_err());
+        let mut inf = settings;
+        inf[2] = f(f32::INFINITY);
+        assert!(wave_sound(&chunk(&[(0x0040_0000, inf)])).is_err());
     }
 }
