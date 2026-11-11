@@ -1,8 +1,12 @@
 // script-dump: prints the behaviour graphs of a .nmo as a tree, for reading what a map's scripts do: each
 // script with its owner, each graph's blocks (prototype, target, pins with the values they read, outputs),
 // and the links between their inputs and outputs with their delays. A reading aid, not part of the game.
+// --census FILE|DIR...: the census of every .nmo/.cmo given or under the folders (CSV: block kinds and operations with
+// the registry's standing). --run N FILE: runs the file's scripts N ticks alone (no level, no engine) and prints the
+// runtime's trace.
 
 use script::{Graph, Id, Node, ObjKind, Value};
+use std::io::Write as _;
 use std::process::ExitCode;
 
 /// How deep a graph's boxes are printed (a hostile file may nest without end).
@@ -117,10 +121,69 @@ fn block(g: &Graph, id: Id, depth: usize) {
     }
 }
 
+fn load(path: &std::path::Path) -> Result<nmo::Document, String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let file = nmo::read(&bytes).map_err(|e| e.to_string())?;
+    nmo::Document::parse(&file).map_err(|e| e.to_string())
+}
+
+fn census(paths: &[String]) -> ExitCode {
+    let mut c = script::census::Census::default();
+    for p in paths {
+        for e in c.add_files(std::path::Path::new(p)) {
+            eprintln!("{e}");
+        }
+    }
+    print!("{}", c.csv());
+    ExitCode::SUCCESS
+}
+
+fn run(ticks: &str, path: &str) -> ExitCode {
+    let Ok(ticks) = ticks.parse::<u64>() else {
+        eprintln!("--run needs a tick count");
+        return ExitCode::from(2);
+    };
+    let doc = match load(std::path::Path::new(path)) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{path}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let g = std::sync::Arc::new(Graph::from_document(&doc, &|_| ObjKind::Other));
+    let mut rt = script::Runtime::new(g);
+    rt.set_trace(true);
+    let mut host = script::Quiet;
+    let mut out = std::io::stdout().lock();
+    for _ in 0..ticks.min(1_000_000) {
+        rt.tick(&mut host);
+        for l in rt.take_trace() {
+            // a closed pipe (| head) ends the run
+            if writeln!(out, "{l}").is_err() {
+                return ExitCode::SUCCESS;
+            }
+        }
+    }
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        Some("--census") => return census(args.get(1..).unwrap_or_default()),
+        Some("--run") => {
+            return match (args.get(1), args.get(2)) {
+                (Some(n), Some(f)) => run(n, f),
+                _ => {
+                    eprintln!("usage: script-dump --run TICKS FILE.nmo");
+                    ExitCode::from(2)
+                }
+            };
+        }
+        _ => {}
+    }
     if args.is_empty() {
-        eprintln!("usage: script-dump FILE.nmo...");
+        eprintln!("usage: script-dump FILE.nmo... | --census FILE|DIR... | --run TICKS FILE.nmo");
         return ExitCode::from(2);
     }
     let mut failed = false;

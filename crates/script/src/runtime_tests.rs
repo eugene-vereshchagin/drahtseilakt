@@ -761,6 +761,8 @@ fn bare(nodes: Vec<Node>) -> Graph {
         arrays: Vec::new(),
         scripts: vec![0],
         links_from: vec![Vec::new(); n],
+        priorities: Vec::new(),
+        start_off: Vec::new(),
     }
 }
 
@@ -855,7 +857,9 @@ fn object_copy_copies_the_scripts_and_binds_this_to_the_copy() {
     let start2 = b.io("Start");
     let l1 = b.link(start2, in_of(&b.g, copy, 0), 0);
     let l2 = b.link(out_of(&b.g, copy, 0), in_of(&b.g, set, 0), 0);
-    b.script("Maker", None, start2, vec![copy, set], vec![l1, l2]);
+    // the maker on B, which has the higher priority: the manager runs it before the template
+    b.script("Maker", Some(1), start2, vec![copy, set], vec![l1, l2]);
+    b.g.priorities = vec![(1, 1)];
     // the template's script on A (object 0): Start -> Hide(This)
     let this = b.local("This", types::BEOBJECT, Value::Owner);
     let target = b.pin("Target", types::ENTITY, this);
@@ -1158,4 +1162,321 @@ fn an_object_with_very_many_scripts_neither_stalls_the_load_nor_a_copy() {
     }
     assert!(t.elapsed() < limit, "256 copies took {:?}", t.elapsed());
     assert!(rt.graph.nodes.len() <= crate::MAX_OBJECTS);
+}
+
+#[test]
+fn the_registry_declares_each_prototype_once_in_its_library() {
+    use crate::blocks::{Library, Standing, find, registry};
+    let all = registry();
+    for w in all.windows(2) {
+        assert_ne!(w[0].guid, w[1].guid, "{} declared twice", w[0].name);
+    }
+    // the 80 kinds known before the registry, plus the 7 absent ones besides Object Rename
+    assert_eq!(all.len(), 87);
+    for p in all {
+        assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
+        assert_eq!(
+            p.library == Library::NotInPlayer,
+            p.standing == Standing::NoOp,
+            "{}",
+            p.name
+        );
+    }
+    assert_eq!(
+        find(proto::OBJECT_RENAME).map(|p| p.standing),
+        Some(Standing::NoOp)
+    );
+    assert_eq!(
+        find(proto::DELAYER).map(|p| p.library.dll()),
+        Some("Logics.dll")
+    );
+    assert!(find(Guid(1, 2)).is_none());
+}
+
+/// A script on `owner` whose start hides `target` (Start -> Hide).
+fn hider(b: &mut Build, name: &str, owner: Id, target: Id) -> Id {
+    let t = b.local("Target", types::ENTITY, Value::Obj(Some(target)));
+    let hide = b.bb(
+        "Hide",
+        proto::HIDE,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(t),
+    );
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, hide, 0), 0);
+    b.script(name, Some(owner), start, vec![hide], vec![l])
+}
+
+/// A script on object 0 whose start runs one block `proto` with pins `pins` (each a local of the given value).
+fn one_block(b: &mut Build, proto: Guid, pins: Vec<(Guid, Value)>) -> Id {
+    let mut ps = Vec::new();
+    for (g, v) in pins {
+        let l = b.local("p", g, v);
+        ps.push(b.pin("p", g, l));
+    }
+    let blk = b.bb("blk", proto, &["In"], &["Out"], ps, vec![], vec![], None);
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, blk, 0), 0);
+    b.script("Caller", Some(0), start, vec![blk], vec![l])
+}
+
+#[test]
+fn an_activation_asked_in_a_tick_is_applied_at_the_start_of_the_next() {
+    // B's script (saved inactive) hides B; A's script activates it. A's object has the higher priority, so the
+    // manager runs A first: with an activation applied at once, B would hide in the same tick.
+    let mut b = Build::new();
+    let target = hider(&mut b, "B hides", 1, 1);
+    b.g.start_off.push(target);
+    one_block(
+        &mut b,
+        proto::ACTIVATE_SCRIPT,
+        vec![
+            (types::BOOL, Value::Bool(true)),
+            (types::SCRIPT, Value::Obj(Some(target))),
+        ],
+    );
+    b.g.priorities = vec![(0, 100)];
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    assert_eq!(
+        rt.order().first().copied(),
+        Some(rt.graph.scripts[1]),
+        "A's object first"
+    );
+    assert!(
+        !rt.is_active(target),
+        "saved to start deactivated, starts inactive"
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(
+        host.visible,
+        vec![true, true],
+        "asked in tick 1, not yet run"
+    );
+    rt.tick(&mut host);
+    assert_eq!(host.visible, vec![true, false], "applied and run in tick 2");
+}
+
+#[test]
+fn a_script_resumed_without_reset_keeps_its_state() {
+    // Start -(delay 3)-> Hide A; deactivated in tick 1 and activated again without reset, the delayed link goes
+    // on counting where it was: the hide comes on tick 3 + the ticks it was off, never restarted.
+    let mut b = Build::new();
+    let t = b.local("Target", types::ENTITY, Value::Obj(Some(0)));
+    let hide = b.bb(
+        "Hide",
+        proto::HIDE,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(t),
+    );
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, hide, 0), 3);
+    let s = b.script("Late", Some(0), start, vec![hide], vec![l]);
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    rt.tick(&mut host); // the link is queued: 2 left
+    rt.request(s, false, false);
+    rt.tick(&mut host); // off
+    rt.request(s, true, false);
+    rt.tick(&mut host); // on again: 1 left
+    rt.tick(&mut host); // fires at the end of the tick: Hide runs in the next
+    assert_eq!(host.visible, vec![true, true]);
+    rt.tick(&mut host);
+    assert_eq!(
+        host.visible,
+        vec![false, true],
+        "resumed, not restarted (a reset would wait 3 more)"
+    );
+}
+
+#[test]
+fn a_sleeping_object_runs_no_scripts_and_resumes_when_woken() {
+    let mut b = Build::new();
+    let t = b.local("Target", types::ENTITY, Value::Obj(Some(1)));
+    let hide = b.bb(
+        "Hide",
+        proto::HIDE,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(t),
+    );
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, hide, 0), 2);
+    b.script("On B", Some(1), start, vec![hide], vec![l]);
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    rt.activate_object(1, false, false, &mut host);
+    for _ in 0..5 {
+        rt.tick(&mut host);
+    }
+    assert_eq!(host.visible, vec![true, true], "asleep: nothing runs");
+    rt.activate_object(1, true, false, &mut host);
+    for _ in 0..3 {
+        rt.tick(&mut host);
+    }
+    assert_eq!(host.visible, vec![true, false], "woken: the script goes on");
+}
+
+#[test]
+fn execute_script_runs_the_script_inside_the_callers_frame() {
+    let mut b = Build::new();
+    let target = hider(&mut b, "B hides", 1, 1);
+    b.g.start_off.push(target);
+    one_block(
+        &mut b,
+        proto::EXECUTE_SCRIPT,
+        vec![
+            (types::BOOL, Value::Bool(false)),
+            (types::SCRIPT, Value::Obj(Some(target))),
+        ],
+    );
+    b.g.priorities = vec![(0, 100)];
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.visible, vec![true, false], "in the same tick");
+}
+
+#[test]
+fn deleting_an_object_ends_its_scripts() {
+    let mut b = Build::new();
+    let t = b.local("Target", types::ENTITY, Value::Obj(Some(1)));
+    let hide = b.bb(
+        "Hide",
+        proto::HIDE,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(t),
+    );
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, hide, 0), 2);
+    let s = b.script("On A", Some(0), start, vec![hide], vec![l]);
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    rt.delete_object(0, &mut host);
+    rt.request(s, true, true);
+    for _ in 0..4 {
+        rt.tick(&mut host);
+    }
+    assert_eq!(host.visible, vec![true, true]);
+    assert!(!rt.is_active(s));
+}
+
+#[test]
+fn a_group_iterator_keeps_its_index_in_its_index_output() {
+    let mut b = Build::new();
+    let grp = b.local("Group", types::GROUP, Value::Obj(Some(2)));
+    let gpin = b.pin("Group", types::GROUP, grp);
+    let elem = b.pout("Element", types::ENTITY);
+    let index = b.pout("Index", types::INT);
+    let it = b.bb(
+        "Group Iterator",
+        proto::GROUP_ITERATOR,
+        &["In", "Loop In"],
+        &["Out", "Loop Out"],
+        vec![gpin],
+        vec![elem, index],
+        vec![],
+        None,
+    );
+    let start = b.io("Start");
+    let l1 = b.link(start, in_of(&b.g, it, 0), 0);
+    let l2 = b.link(out_of(&b.g, it, 1), in_of(&b.g, it, 1), 1);
+    b.script("Iter", Some(0), start, vec![it], vec![l1, l2]);
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(rt.values[index], Value::Int(0));
+    rt.tick(&mut host);
+    assert_eq!(
+        rt.values[index],
+        Value::Int(1),
+        "the second member, from the stored index"
+    );
+    assert_eq!(rt.values[elem], Value::Obj(Some(1)));
+}
+
+#[test]
+fn the_trace_shows_frames_runs_ios_and_parameters() {
+    let mut b = Build::new();
+    hider(&mut b, "Hides", 0, 0);
+    let g = b.done();
+    let mut rt = Runtime::new(g);
+    rt.set_trace(true);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    let t = rt.take_trace();
+    assert_eq!(t.first().map(String::as_str), Some("frame 1"));
+    assert!(
+        t.iter()
+            .any(|l| l.starts_with("graph ") && l.ends_with("Hides")),
+        "{t:?}"
+    );
+    assert!(
+        t.iter()
+            .any(|l| l.starts_with("run ") && l.ends_with("Hide")),
+        "{t:?}"
+    );
+    assert!(
+        t.iter().any(|l| l.starts_with("io ") && l.ends_with("in0")),
+        "{t:?}"
+    );
+    assert!(rt.take_trace().is_empty(), "taken");
+}
+
+#[test]
+fn the_census_counts_kinds_links_and_delays_with_the_registrys_standing() {
+    let mut b = Build::new();
+    hider(&mut b, "Hides", 0, 0);
+    let unknown = b.bb(
+        "Mystery",
+        Guid(7, 7),
+        &["In"],
+        &[],
+        vec![],
+        vec![],
+        vec![],
+        None,
+    );
+    let start = b.io("Start");
+    let l = b.link(start, in_of(&b.g, unknown, 0), 2);
+    b.script("Odd", Some(1), start, vec![unknown], vec![l]);
+    let g = b.done();
+    let mut c = crate::census::Census::default();
+    c.add(&g);
+    c.add(&Graph::default());
+    assert_eq!(
+        (c.files, c.with_graphs, c.scripts, c.blocks, c.links),
+        (2, 1, 2, 2, 2)
+    );
+    assert_eq!(c.delays, [1, 0, 1, 0]);
+    let csv = c.csv();
+    assert!(
+        csv.contains("block,Hide,31d97d82:78d54d98,Visuals.dll,full,1,1"),
+        "{csv}"
+    );
+    assert!(
+        csv.contains("block,Mystery,00000007:00000007,?,unknown,1,1"),
+        "{csv}"
+    );
 }

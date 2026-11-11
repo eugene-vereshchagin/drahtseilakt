@@ -22,7 +22,8 @@ chunks saved with option 8 are indices into the file's object table.
 |---|---|
 | `0x800` | scripts: count, behavior references |
 | `0x10` | attributes: count, then per attribute `[class id]`, type name (string), category (string), GUID, parameter reference |
-| `0x40` | priority word (data version >= 5: only if bit `0x10000000`) |
+| `0x40` | priority word (data version >= 5: a flag word first, the priority follows only if it has bit `0x10000000`; in the community maps only the Level object has one: `0x10000000, 32000`) |
+| `0x400` | the object's saved scene activity (CKObjectManager single-object activity): 1 activate, `0x10` deactivate, `0x20` leave, `0x40` reset, `0x80` the state as loaded is the initial value. A behaviour saves its own under `0x200000`. Most map files save none |
 
 In `base.cmo` the `Level` object owns the nine top-level scripts: `Delete_All_Loaded_NMO`,
 `Delete_Loaded_NMO`, `Loading_Manager`, `Default Level`, `Event_handler`, `Delete_LoadID`, `Level_Init`,

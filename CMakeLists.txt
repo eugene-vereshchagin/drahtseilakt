@@ -42,3 +42,9 @@ foreach(t ck_test run_test cab_test)
   target_compile_options(${t} PRIVATE ${OB_WARN})
   add_test(NAME ${t} COMMAND ${t} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endforeach()
+
+# The differential oracle of the Rust script runtime (test-only, tests/oracle/ck_oracle.c): built into a scratch
+# directory, e.g. cmake -S . -B target/ck-oracle && cmake --build target/ck-oracle --target ck_oracle
+add_executable(ck_oracle tests/oracle/ck_oracle.c)
+target_link_libraries(ck_oracle PRIVATE ob_core)
+target_compile_options(ck_oracle PRIVATE ${OB_WARN})

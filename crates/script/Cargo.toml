@@ -10,5 +10,10 @@ repository.workspace = true
 [dependencies]
 nmo = { path = "../nmo" }
 
+[features]
+# Blocks the player's libraries lack run as their authors meant (for a later optional mod); off: named no-ops, as
+# in the original.
+absent-as-authored = []
+
 [lints]
 workspace = true

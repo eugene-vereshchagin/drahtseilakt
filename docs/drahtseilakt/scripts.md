@@ -49,8 +49,10 @@ parameter's value, the arrays' rows, a little scratch per block (an iterator's i
 proximity test's last answer), the messages in flight — and runs one tick as the original's behaviour manager
 runs a frame ([ck-runtime.md](../ck-runtime.md), "Execution"):
 
-1. Every active script, in file order, is executed.
-2. A **building block** runs its prototype's code in `blocks.rs`: it reads and clears its active inputs, reads its
+1. Every pending activation request (Activate Script, Deactivate Script, Activate Object) of a script whose object
+   is active in the scene is applied; then every active script of such an object is executed, in the manager's
+   order: objects by priority (higher first, file order among equals), each object's scripts in its list's order.
+2. A **building block** runs its prototype's code (`blocks/`, found in the registry): it reads and clears its active inputs, reads its
    pins (pulled: an input follows its source, and a value computed by an operation is computed first), acts
    through the `Host`, writes its outputs (copied on to their destinations) and activates its output IOs. It
    returns whether it stays active for the next tick.
@@ -64,7 +66,9 @@ runs a frame ([ck-runtime.md](../ck-runtime.md), "Execution"):
 
 Scripts run once a tick before the physics (the original's order in a frame), in run ticks, from the same input
 as everything else, so a run stays deterministic and a replay plays back the same. A replay recorded before
-**format 8** runs without scripts, as it was recorded ([replay.rs](../../crates/game/src/replay.rs)). Levels
+**format 8** runs without scripts, as it was recorded ([replay.rs](../../crates/game/src/replay.rs)). A replay of
+a map with scripts in **format 9** is refused as stale: its scripts activated at once, so it would play otherwise
+(format 10, stage 0). A format-9 run of a level without scripts plays as before. Levels
 without scripts are untouched: there is no runtime at all.
 
 **The engine's side** (`Host`, implemented in `scripting.rs`): matrices and visibility of level objects
@@ -110,6 +114,88 @@ the copies (the portals' particle frames); Attach Script, Object Create; sounds 
 player (`--autopilot`) does not know the portals: its way stops at one. A replay of a scripted map recorded
 before this change may play differently (the scripts now do more).
 
+## Stage 0 (2026-11-11): core conformance
+
+The first stage of porting the script system as a whole (not map by map): the core, so that every later block stands on the original's execution model.
+
+**The registry of prototypes** (`crates/script/src/blocks/`). One declaration per prototype: GUID, name, the
+player's library it lives in, the pin schema (input and output parameters by index, as the prototype names
+them), flags (targetable, variable inputs / pins / outputs), standing (full, partial, no-op), older pin layouts
+as data, the run function and an optional event function. The modules mirror the player's libraries
+(`logics.rs` = Logics.dll, `narratives.rs`, `transfo3d.rs`, `tt_toolbox.rs`, ...); a prototype not declared is
+reported once as before.
+
+**The executor** (`crates/script/src/exec.rs`), as the original's behaviour manager
+([ck-runtime.md](../ck-runtime.md), "Execution"):
+
+- *Activation requests.* Activate Script and Deactivate Script file a request on the script; the next tick applies
+  every request before any script runs. A script activated by another one starts in the tick after, never in the
+  same one; one deactivated still finishes the tick it is in. Activation and deactivation asked in one tick: the
+  later wins. Activate Script: pin 0 Reset?, pins 1.. the scripts; an older layout (pin 0 the script, pin 1 Reset?,
+  default true) is data of its declaration, chosen when pin 0 is not a boolean; local 0 Awake Object (default
+  true) wakes a sleeping owner.
+- *Reset is separate from active.* A behaviour is reset when asked, or when activated for the first time; a script
+  activated again without Reset? resumes where it was (its delayed links go on counting). Before stage 0 every
+  activation of an inactive script reset it.
+- *Order.* Objects by their priority (identifier `0x40`; in the maps only the Level object has one, 32000),
+  then in file order (the order the original registers them in as the level loads); each object's scripts in
+  its order.
+- *Start state.* Each script starts reset and active, unless its saved activity (identifier `0x200000` of a
+  behaviour, `0x400` of its object: bit 1 activate, `0x10` deactivate) starts it deactivated: 24 scripts of the
+  community maps do. The saved behaviour flags say nothing of it (1357 of the 1539 scripts that run have no active
+  bit there).
+- *Objects in the scene.* Deactivate Object puts an object to sleep: its scripts are not run (their state is kept)
+  until Activate Object wakes it, which also asks for its scripts' activation (reset if asked). Object Delete of an
+  object deletes its scripts with it (the manager never runs them again); of a behaviour, that behaviour.
+- *Block callbacks.* A declaration may carry an event function for Reset (at the play's start), Activate Script /
+  Deactivate Script (its script, or its script's object, changes state), Delete and Copy. The particle emitters use
+  it (docs/particles.md, section 8): deactivating the owning script takes the particles off at once, activating it
+  again brings back an emitter that was on.
+- *Block state where the original keeps it.* Group Iterator and Collection Iterator keep their index in output
+  parameter 1 (Index), else in local 0, as the original's (read by other blocks, and kept as theirs is); the rest
+  keep a scratch state, cleared when the script is reset (whether the original's blocks clear theirs then is not
+  established: it sends no reset message on a script's reset).
+- *Execute Script* activates the script (reset if pin 0 says so) and runs it at once inside the caller's frame;
+  the manager does not run it again that tick. The block waits (stays active) and fires Out in the first later tick
+  in which the script is no longer active. A script cannot run inside itself; nesting is capped at 8.
+- *Trace.* `Runtime::set_trace(true)` keeps a line per frame (`frame N`), behaviour run (`run <id> <name>` for a
+  block, `graph <id> <name>`), IO fired (`io <owner> <name> in<k>|out<k>`), script activation applied and
+  parameter written (`param <id> = <value>`), capped at 2^20 lines; `script-dump --run N FILE` prints it.
+
+**Census** (`crates/script/src/census.rs`): `script-dump --census FILE|DIR...` counts every `.nmo`/`.cmo`
+(folders walked 8 deep, links not followed) and prints CSV: a summary (files, files with graphs, scripts, graphs,
+blocks, links, links by delay, behaviour and object priorities, scripts started deactivated), then each block kind
+(name, GUID, the registry's library and standing, or `?,unknown`; files, instances) and each operation (known or
+not). Over the owner's 579 maps: 1540 scripts, 10 536 blocks of 147 kinds, 11 833 links (delay 0: 11 545, 1: 233,
+2: 36, more: 19), 12 behaviour priorities, 5 object priorities, 24 scripts started deactivated. A unit test runs it
+on a graph built by hand; `crates/script/tests/census.rs` runs it over `OPENBALLANCE_MAPS` when that is set.
+
+**The C oracle.** The upstream C runtime in `src/ck` + `src/bb` stays as a test-only reference (owner's decision
+2026-11-11): nothing of it is copied, it only runs the same graphs so the traces can be diffed. Level 1 is in
+place: `tests/oracle/ck_oracle.c` builds a graph of trivial blocks (Nop, Binary Switch, Activate Script,
+Deactivate Script) from a small text description, and `crates/script/tests/oracle.rs` generates random ones
+(1-3 objects, 1-4 scripts, some started deactivated, block priorities -1..5, link delays 0-3) and checks that our
+trace equals the C one frame by frame: the blocks run in each frame, in order, and the scripts and blocks active
+after it. 5000 random graphs agree; the same test with activation applied at once fails at the first graph that
+activates a later script. To run it:
+
+```sh
+cmake -S . -B target/ck-oracle -DCMAKE_BUILD_TYPE=Release
+cmake --build target/ck-oracle --target ck_oracle
+OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle   # ORACLE_CASES=5000
+```
+
+Without `OPENBALLANCE_ORACLE` the test runs our side only. Not yet: level 2 (one graph per block kind, pins swept;
+the oracle already shows Delayer and Counter count differently: the C Delayer counts the frame it starts in) and
+level 3 (whole maps). A disagreement is settled by the notes, not by the oracle: it is a reimplementation too.
+
+**Not in the player.** Eight kinds found in maps have a GUID in none of the player's libraries: Explode, Midi
+Player, Run VSL, Add Mesh, Remove Mesh, Select Mesh, Get Nearest Object and Object Rename `6f074ca7:45427431`
+(Narratives.dll has a block of that name with another GUID). The original has no function for them, so they do
+nothing there. They are declared as **named no-ops** (owner's decision 2026-11-11): known, inputs cleared, no
+output, one log line. The Object Rename written in phase 2 stays in the code behind the cargo feature
+`absent-as-authored` (off), for a later optional mod that plays such maps as their authors meant.
+
 ## Hostile input
 
 A map comes from a stranger. Every list is capped (objects 2^20, array rows 2^16, 4096 messages a tick, 2000
@@ -124,7 +210,7 @@ file reader covers these classes too).
 `nmo-dump --scripts FILE` prints a map's blocks by prototype with counts. The table is over the owner's 584
 maps (`levels/community/` and `community-unsorted/`, 2026-11-09): 184 maps carry scripts, 148 of them only the
 template (the nine blocks plus Wait Message), 36 scripts of their own. *maps* = maps using the block, *blocks* =
-blocks in all maps. Status: **done** — runs with its effect; **partial** — runs, effect limited as said;
+blocks in all maps. Status: **no-op** — in none of the player's libraries, so the original does nothing with it; known and does nothing (section "Stage 0"); **done** — runs with its effect; **partial** — runs, effect limited as said;
 **planned** — not yet; **never** — the original's own interface (mouse, fonts, 2D text, camera, fog), replaced
 by the engine's.
 
@@ -190,8 +276,8 @@ by the engine's.
 | Set Light Color | `32115590:78951230` | 3 | 3 | planned |
 | Timer | `a2a5a63a:e4e7e8e5` | 3 | 4 | done |
 | Physics Impulse | `0c7e39bb:16db20d5` | 3 | 6 | planned |
-| Midi Player | `843cb43a:a12dac48` | 2 | 2 | planned |
-| Object Rename | `6f074ca7:45427431` | 2 | 4 | done |
+| Midi Player | `843cb43a:a12dac48` | 2 | 2 | no-op |
+| Object Rename | `6f074ca7:45427431` | 2 | 4 | no-op |
 | Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | never (the engine's own interface) |
 | 2D Text | `055b29fe:662d5ca0` | 2 | 2 | never (the engine's own interface) |
 | Fill Group By Class | `4445257b:70016c57` | 2 | 8 | planned |
@@ -226,7 +312,7 @@ by the engine's.
 | Set Specular | `20202020:30303030` | 1 | 1 | planned |
 | Write In Texture | `1d57024d:7c064238` | 1 | 1 | never (the engine's own interface) |
 | Show Mouse Cursor | `16f6368f:506b60fc` | 1 | 1 | never (the engine's own interface) |
-| Get Nearest Object | `4321abcd:0eeaabdd` | 1 | 1 | planned |
+| Get Nearest Object | `4321abcd:0eeaabdd` | 1 | 1 | no-op |
 | Input String | `693e7e4b:100104c4` | 1 | 1 | never (the engine's own interface) |
 | Mouse Cursor System | `2483576d:57c66324` | 1 | 1 | never (the engine's own interface) |
 | Mouse Cursor | `140c3eac:6e502a81` | 1 | 1 | never (the engine's own interface) |
@@ -264,7 +350,7 @@ by the engine's.
 | Scan String | `4afa2f11:034872e2` | 1 | 1 | planned |
 | Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |
 | Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | partial: accepted, no effect |
-| Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | planned |
+| Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | no-op |
 | Sort Rows | `6f623e68:62bb5a98` | 1 | 5 | planned |
 | Get Texture Info | `250c4d8d:288960d9` | 1 | 2 | planned |
 | Replace Texture | `?` | 1 | 1 | planned |
@@ -273,16 +359,16 @@ by the engine's.
 | Insert Column | `05cb7802:04a64a58` | 1 | 3 | planned |
 | Replace Material | `?` | 1 | 1 | planned |
 | Is Same Material | `?` | 1 | 1 | planned |
-| Add Mesh | `7a1d593e:12c5648d` | 1 | 1 | planned |
-| Remove Mesh | `0002145e:6e1b2592` | 1 | 4 | planned |
-| Select Mesh | `43890176:58b2244e` | 1 | 1 | planned |
+| Add Mesh | `7a1d593e:12c5648d` | 1 | 1 | no-op |
+| Remove Mesh | `0002145e:6e1b2592` | 1 | 4 | no-op |
+| Select Mesh | `43890176:58b2244e` | 1 | 1 | no-op |
 | Is Same Mesh | `?` | 1 | 1 | planned |
 | Switch On Key | `1f49612e:6cd63de0` | 1 | 2 | never (the engine's own interface) |
 | Wait For All | `c044a999:fdfefaf7` | 1 | 1 | done |
 | Key Waiter | `016d010b:017d010b` | 1 | 1 | never (the engine's own interface) |
 | Delete Dynamic Objects | `0cba3195:53440e4c` | 1 | 1 | planned |
 | Random Switch | `79d72fde:2e9d0912` | 1 | 1 | done (the same generator) |
-| Explode | `002d010a:003d010a` | 1 | 1 | planned |
+| Explode | `002d010a:003d010a` | 1 | 1 | no-op |
 
 ## Where the maps stand
 

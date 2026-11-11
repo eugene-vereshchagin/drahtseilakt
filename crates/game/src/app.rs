@@ -218,6 +218,11 @@ impl Game {
                         level.name
                     ));
                 }
+                if let Some(why) =
+                    crate::replay::stale_for_scripts(r.version, level.level.scripts.is_some())
+                {
+                    return Err(format!("{}: {why}", p.display()));
+                }
                 Some(r)
             }
             None => None,
@@ -727,6 +732,11 @@ impl Game {
         let best_ticks = std::fs::read_to_string(&best)
             .ok()
             .and_then(|t| Replay::parse(&t).ok())
+            // a stale run (recorded under the old script rules) is no longer this level's best
+            .filter(|r| {
+                crate::replay::stale_for_scripts(r.version, self.level.level.scripts.is_some())
+                    .is_none()
+            })
             .map(|r| r.end);
         // A run begun elsewhere than the level start is a test, never the level's best; nor is a modded run.
         if self.start.is_none()
@@ -820,6 +830,11 @@ impl Game {
                 .ok()?;
         let replay = Replay::parse(&text).ok()?;
         if replay.level_hash != self.level.hash || replay.start.is_some() || !replay.mods.is_empty()
+        {
+            return None;
+        }
+        if crate::replay::stale_for_scripts(replay.version, self.level.level.scripts.is_some())
+            .is_some()
         {
             return None;
         }

@@ -59,3 +59,44 @@ neun Portal-Karten: die Objektkopie fehlt noch, das Versetzen der Kugel läuft; 
 Tasten). 11 Karten haben unbekannte Bausteine; die Reihenfolge der Arbeit (Gruppen und Progressionen, Physik per
 Skript, Kopien, Klang und Text durch die Engine, Aussehen, übrige Logik, „nie": Maus, Schriften, 2D) steht auf der
 englischen Seite.
+
+## Stufe 0 (2026-11-11): Konformität des Kerns
+
+**Das Register der Prototypen** (`crates/script/src/blocks/`): eine Deklaration je Prototyp — GUID, Name,
+Bibliothek des Players, Pin-Schema, Flags, Stand, ältere Pin-Layouts als Daten, Laufzeitfunktion und optionale
+Ereignisfunktion. Die Module spiegeln die Bibliotheken des Players (`logics.rs` = Logics.dll, `narratives.rs`, ...).
+
+**Nicht im Player.** Acht Bausteinarten aus Karten (Explode, Midi Player, Run VSL, Add/Remove/Select Mesh, Get
+Nearest Object, Object Rename `6f074ca7:45427431`) stehen in keiner Bibliothek des Players: im Original tun sie
+nichts. Sie sind als **benannte No-ops** deklariert (Entscheidung des Eigentümers 2026-11-11): bekannt, Eingänge
+gelöscht, keine Ausgabe, eine Logzeile. Der Object-Rename-Code aus Phase 2 bleibt hinter dem Cargo-Feature
+`absent-as-authored` (aus), für einen späteren optionalen Mod „wie der Autor es meinte".
+
+**Der Ausführer** (`crates/script/src/exec.rs`), wie der Verhaltensmanager des Originals: Activate Script und
+Deactivate Script stellen eine Anforderung, die der nächste Tick vor allen Skripten anwendet (ein von einem anderen
+aktiviertes Skript startet einen Tick später); Zurücksetzen ist von Aktivität getrennt (ein ohne Reset? wieder
+aktiviertes Skript macht weiter); Reihenfolge: Objekte nach Priorität (`0x40`), die Skripte eines Objekts nach
+seiner Liste; der Startzustand kommt aus der gespeicherten Szenenaktivität (`0x200000` / `0x400`; 24 Skripte der
+Karten starten deaktiviert), nicht aus den Verhaltensflags; Deactivate Object legt ein Objekt schlafen (seine
+Skripte laufen nicht, ihr Zustand bleibt), Object Delete eines Objekts löscht seine Skripte mit; Baustein-Callbacks
+(Reset, Skript an/aus, Löschen, Kopie) nutzen die Partikelemitter: ein deaktiviertes Skript nimmt die Partikel
+sofort weg; Group/Collection Iterator halten den Index im Ausgang Index oder in Local 0; Execute Script führt das
+Skript sofort im Frame des Aufrufers aus; eine Spur (Frame, Verhalten, IO, Parameter) per Schalter. Ein Replay im
+Format 9 einer Karte mit Skripten wird als veraltet abgelehnt (Format 10); Level ohne Skripte sind unberührt.
+
+**Zählung** (`crates/script/src/census.rs`): `script-dump --census DATEI|ORDNER...` zählt alle `.nmo`/`.cmo` und
+gibt CSV aus: eine Übersicht (Dateien, Skripte, Graphen, Bausteine, Verbindungen nach Verzögerung, Prioritäten,
+deaktiviert gestartete Skripte) und je Bausteinart eine Zeile (Name, GUID, Bibliothek und Stand laut Register oder
+`?,unknown`, Dateien, Vorkommen) sowie je Operation. `script-dump --run N DATEI` führt die Skripte einer Datei N
+Ticks ohne Level aus und gibt die Spur aus. Geprüft von einem Unit-Test und von `crates/script/tests/census.rs`
+über `OPENBALLANCE_MAPS`, wenn gesetzt.
+
+**Das C-Orakel.** Die alte C-Laufzeit (`src/ck` + `src/bb`) bleibt nur als Testreferenz (Entscheidung des
+Eigentümers 2026-11-11): nichts davon wird kopiert, sie führt nur dieselben Graphen aus, damit die Spuren verglichen
+werden. Stufe 1 steht: `tests/oracle/ck_oracle.c` baut einen Graphen einfacher Bausteine (Nop, Binary Switch,
+Activate/Deactivate Script) aus einer Textbeschreibung, `crates/script/tests/oracle.rs` erzeugt Zufallsgraphen und
+vergleicht die Spuren Frame für Frame (welche Bausteine in welcher Reihenfolge liefen, was danach aktiv ist); 5000
+Graphen stimmen überein. Bauen und starten:
+`cmake -S . -B target/ck-oracle -DCMAKE_BUILD_TYPE=Release && cmake --build target/ck-oracle --target ck_oracle`,
+dann `OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle`. Stufen 2 (Bausteine)
+und 3 (Karten) folgen; einen Unterschied entscheiden die Notizen, nicht das Orakel.
