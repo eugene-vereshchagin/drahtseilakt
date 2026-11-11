@@ -551,7 +551,6 @@ impl Host for TestHost {
         None
     }
     fn message(&mut self, _: &str, _: Option<Ent>) {}
-    fn sound(&mut self, _: &str, _: bool) {}
     fn text(&mut self, _: &str, _: &str, _: bool) {}
     fn note(&mut self, _: &str) {}
 }

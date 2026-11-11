@@ -11,7 +11,7 @@ pub mod ops;
 mod runtime_tests;
 pub mod types;
 
-pub use exec::{Ent, Host, Quiet, Runtime};
+pub use exec::{Ent, Host, Quiet, Runtime, SoundCmd};
 pub use nmo::behavior::Guid;
 
 use nmo::behavior::{self, Saved};
@@ -336,7 +336,24 @@ pub struct Graph {
     /// attribute index, the parameter holding the value). Attribute indices are the file's own; a block names an
     /// attribute by the same index (docs/ck-runtime.md, "Attributes").
     pub attributes: Vec<(Id, i32, Option<Id>)>,
+    /// The file's wave sounds (class 25): what each plays and how, as the map saved them.
+    pub waves: Vec<Wave>,
 }
+
+/// A wave sound object as the map saved it (the sound data itself is not in the map: the engine resolves `file`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Wave {
+    pub object: Id,
+    /// The file name as saved (a path; only its last part and no extension matter to the engine).
+    pub file: String,
+    pub looped: bool,
+    pub gain: f32,
+    pub pan: f32,
+    pub pitch: f32,
+}
+
+/// The most wave sounds one graph keeps.
+pub const MAX_WAVES: usize = 4_096;
 
 /// The most attributes one object carries in a run, attribute types (indices 0 to this) and attributes in all.
 pub const MAX_ATTRIBUTES_PER_OBJECT: usize = 64;
@@ -357,6 +374,7 @@ impl Graph {
             start_off: Vec::new(),
             groups: Vec::new(),
             attributes: Vec::new(),
+            waves: Vec::new(),
         };
         for (i, o) in doc.objects.iter().enumerate().take(n) {
             let mut k = kind(i);
@@ -400,6 +418,23 @@ impl Graph {
             }
             if o.class_id == behavior::class::BEHAVIOR {
                 k = ObjKind::Behavior;
+            }
+            if o.class_id == nmo::document::class::WAVE_SOUND
+                && g.waves.len() < MAX_WAVES
+                && let Some(chunk) = &o.chunk
+                && let Ok(w) = nmo::scene::wave_sound(chunk)
+            {
+                g.waves.push(Wave {
+                    object: g.objects.len(),
+                    file: w
+                        .file_name
+                        .map(|f| String::from_utf8_lossy(&f).into_owned())
+                        .unwrap_or_default(),
+                    looped: w.looped,
+                    gain: w.gain,
+                    pan: w.pan,
+                    pitch: w.pitch,
+                });
             }
             g.objects.push(ObjInfo {
                 name: o.name_lossy(),
@@ -721,6 +756,7 @@ impl Graph {
             start_off: Vec::new(),
             groups: Vec::new(),
             attributes: Vec::new(),
+            waves: Vec::new(),
         };
         for (i, node) in nodes {
             match &node {

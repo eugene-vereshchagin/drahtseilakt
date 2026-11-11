@@ -6,7 +6,8 @@
 
 use glam::{Mat4, Vec3};
 use level::Level;
-use script::{Ent, Host, Runtime, Value};
+use script::{Ent, Host, Runtime, SoundCmd, Value};
+use std::collections::{BTreeMap, HashMap};
 
 /// How many log lines a run keeps.
 const LOG_CAP: usize = 2_000;
@@ -34,6 +35,66 @@ pub struct Scripts {
     /// The ball's pseudo-object in the graph (`Ball_Pos_Frame`), if a script can name it.
     ball_id: Option<script::Id>,
     pub teleports: u32,
+    /// The map's sounds: what plays in the run's own clock, and what the audio is to do about it.
+    pub sound: SoundState,
+}
+
+/// The most sound events kept for the audio between two drains (a run with no audio never drains them).
+const SOUND_EVENT_CAP: usize = 1_024;
+/// The most voices a map's scripts hold at once in the audio (instances and wave players together).
+pub const MAX_SCRIPT_VOICES: usize = 16;
+
+/// What the audio is to do for a script: the wave sound object, its file and the command.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SoundEvent {
+    pub key: usize,
+    pub file: String,
+    pub cmd: SoundCmd,
+}
+
+/// A wave sound that plays in the run's clock: until a tick (None: looping), or paused with this many ticks left.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Playing {
+    until: Option<u64>,
+    paused: Option<u64>,
+}
+
+/// The sounds of a run. `playing` is what a script can see (the Wave Player's End Playing); it follows the sound's
+/// length in ticks, never the audio device, so a replay is the same with sound on or off, with a file or without.
+#[derive(Debug, Clone, Default)]
+pub struct SoundState {
+    /// Each sound file's length in ticks (by lower-case file stem), set by the app from the sound set; a file not in
+    /// it is silent and ends at once.
+    pub ticks: std::sync::Arc<HashMap<String, u64>>,
+    playing: BTreeMap<usize, Playing>,
+    /// Files already noted as silent.
+    noted: Vec<String>,
+    /// For the audio, drained by the app each frame.
+    pub events: Vec<SoundEvent>,
+}
+
+/// A sound file's name as the sound set knows it: the last part of the path, no extension (the length table is
+/// keyed by it in lower case).
+pub fn sound_stem(file: &str) -> String {
+    let base = file.rsplit(['/', '\\']).next().unwrap_or(file);
+    base.rsplit_once('.').map_or(base, |(s, _)| s).to_string()
+}
+
+impl Scripts {
+    /// Each sound file the map's wave objects name (by stem), for the app to measure.
+    pub fn sound_files(&self) -> Vec<String> {
+        let mut v: Vec<String> = self
+            .rt
+            .graph
+            .waves
+            .iter()
+            .map(|w| sound_stem(&w.file))
+            .filter(|s| !s.is_empty())
+            .collect();
+        v.sort();
+        v.dedup();
+        v
+    }
 }
 
 impl Scripts {
@@ -81,6 +142,7 @@ impl Scripts {
             log: Vec::new(),
             ball_id,
             teleports: 0,
+            sound: SoundState::default(),
         })
     }
 }
@@ -122,6 +184,7 @@ struct ScriptsParts {
     log: Vec<(u64, String)>,
     ball_id: Option<script::Id>,
     tick: u64,
+    sound: SoundState,
 }
 
 impl ScriptsParts {
@@ -308,11 +371,51 @@ impl Host for SimHost<'_> {
         self.s.note(format!("message {name}{to}"));
     }
 
-    fn sound(&mut self, name: &str, on: bool) {
-        self.s.note(format!(
-            "sound {name} {}",
-            if on { "plays" } else { "stops" }
-        ));
+    fn sound(&mut self, key: usize, file: &str, cmd: SoundCmd) {
+        let tick = self.s.tick;
+        let stem = sound_stem(file);
+        let ticks = self.s.sound.ticks.get(&stem.to_ascii_lowercase()).copied();
+        if ticks.is_none() && !self.s.sound.noted.contains(&stem) {
+            self.s.sound.noted.push(stem.clone());
+            self.s.note(format!("sound file {file:?} is not available: silent"));
+        }
+        let st = &mut self.s.sound;
+        match cmd {
+            SoundCmd::Play { looping, .. } => {
+                let until = (!looping).then(|| tick.saturating_add(ticks.unwrap_or(0)));
+                st.playing.insert(key, Playing { until, paused: None });
+            }
+            SoundCmd::Stop { .. } => {
+                st.playing.remove(&key);
+            }
+            SoundCmd::Pause => {
+                if let Some(p) = st.playing.get_mut(&key) {
+                    p.paused = Some(p.until.map_or(0, |u| u.saturating_sub(tick)));
+                }
+            }
+            SoundCmd::Resume => {
+                if let Some(p) = st.playing.get_mut(&key)
+                    && let Some(left) = p.paused.take()
+                    && p.until.is_some()
+                {
+                    p.until = Some(tick.saturating_add(left));
+                }
+            }
+            _ => {}
+        }
+        if st.events.len() < SOUND_EVENT_CAP {
+            st.events.push(SoundEvent {
+                key,
+                file: stem,
+                cmd,
+            });
+        }
+    }
+
+    fn sound_playing(&self, key: usize) -> bool {
+        self.s.sound.playing.get(&key).is_some_and(|p| {
+            p.paused.is_some() || p.until.is_none_or(|u| self.s.tick < u)
+        })
     }
 
     fn text(&mut self, name: &str, text: &str, on: bool) {
@@ -401,6 +504,7 @@ impl Scripts {
             log: std::mem::take(&mut self.log),
             ball_id: self.ball_id,
             tick: run.tick,
+            sound: std::mem::take(&mut self.sound),
         };
         {
             let mut host = SimHost { s: &mut parts, run };
@@ -414,6 +518,7 @@ impl Scripts {
         self.meshes = parts.meshes;
         self.groups = parts.groups;
         self.log = parts.log;
+        self.sound = parts.sound;
         if run.teleport.is_some() {
             self.teleports = self.teleports.saturating_add(1);
         }

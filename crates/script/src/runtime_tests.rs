@@ -22,6 +22,9 @@ struct Rec {
     visible: Vec<bool>,
     notes: Vec<String>,
     messages: Vec<String>,
+    /// The sound commands: "key file Command".
+    sounds: Vec<String>,
+    playing: bool,
     ball: [f32; 3],
     in_play: bool,
 }
@@ -100,7 +103,12 @@ impl Host for Rec {
     fn message(&mut self, name: &str, _: Option<Ent>) {
         self.messages.push(name.to_string());
     }
-    fn sound(&mut self, _: &str, _: bool) {}
+    fn sound(&mut self, key: usize, file: &str, cmd: crate::SoundCmd) {
+        self.sounds.push(format!("{key} {file} {cmd:?}"));
+    }
+    fn sound_playing(&self, _: usize) -> bool {
+        self.playing
+    }
     fn text(&mut self, _: &str, text: &str, _: bool) {
         self.notes.push(format!("text {text}"));
     }
@@ -766,6 +774,7 @@ fn bare(nodes: Vec<Node>) -> Graph {
         start_off: Vec::new(),
         groups: Vec::new(),
         attributes: Vec::new(),
+        waves: Vec::new(),
     }
 }
 
@@ -1188,7 +1197,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     }
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them)
-    assert_eq!(all.len(), 106);
+    assert_eq!(all.len(), 112);
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -1633,4 +1642,241 @@ fn attributes_are_set_found_and_listed_in_order() {
         rt.attrs_of(0) <= crate::MAX_ATTRIBUTES_PER_OBJECT,
         "an object carries a bounded number"
     );
+}
+
+
+// ---- sounds (docs/gameplay_bbs.md, "Sounds"): the commands go to the host; expected values from those notes ----
+
+/// A graph with a wave sound object (class 25, id 5, file "Wind.wav") and one sound block of `proto` that has
+/// `ins` inputs, `outs` outputs and pins `(name, type, value)` set, targeted at the wave sound and owned by object
+/// 0. Returns the runtime, the script and block ids and the block's pout (if `pout` is named).
+fn sound_script(
+    proto: Guid,
+    ins: &[&str],
+    outs: &[&str],
+    pins: &[(&str, Guid, Value)],
+    pout: Option<&str>,
+) -> (Runtime, Id, Id, Option<Id>) {
+    sound_script_watch(proto, ins, outs, pins, pout, &[])
+}
+
+/// As `sound_script`, with a Hide behind each output in `watch` (the first hides A, the second B): an output that
+/// fired shows as a hidden object in the host.
+fn sound_script_watch(
+    proto: Guid,
+    ins: &[&str],
+    outs: &[&str],
+    pins: &[(&str, Guid, Value)],
+    pout: Option<&str>,
+    watch: &[usize],
+) -> (Runtime, Id, Id, Option<Id>) {
+    let mut b = Build::new();
+    let wave = b.g.add_object("Wind", ObjKind::Other);
+    b.g.objects[wave].class = 25;
+    b.g.waves.push(crate::Wave {
+        object: wave,
+        file: "Sounds\\Wind.wav".into(),
+        looped: false,
+        gain: 1.0,
+        pan: 0.0,
+        pitch: 1.0,
+    });
+    let target = b.local("Target", types::OBJECT, Value::Obj(Some(wave)));
+    let pins: Vec<Id> = pins
+        .iter()
+        .map(|(n, g, v)| {
+            let l = b.local(n, *g, v.clone());
+            b.pin(n, *g, l)
+        })
+        .collect();
+    let pouts: Vec<Id> = pout.map(|n| b.pout(n, types::FLOAT)).into_iter().collect();
+    let first_out = pouts.first().copied();
+    let blk = b.bb("Sound", proto, ins, outs, pins, pouts, vec![], Some(target));
+    let start = b.io("Start");
+    let mut sub = vec![blk];
+    let mut links = vec![b.link(start, in_of(&b.g, blk, 0), 0)];
+    let hier = b.local("Hierarchy", types::BOOL, Value::Bool(false));
+    for (n, &o) in watch.iter().enumerate() {
+        let t = b.local("Target", types::ENTITY, Value::Obj(Some(n)));
+        let hide = b.bb("Hide", proto::HIDE, &["In"], &["Out"], vec![hier], vec![], vec![], Some(t));
+        links.push(b.link(out_of(&b.g, blk, o), in_of(&b.g, hide, 0), 0));
+        sub.push(hide);
+    }
+    let script = b.script("S", Some(0), start, sub, links);
+    (Runtime::new(b.done()), script, blk, first_out)
+}
+
+#[test]
+fn a_looping_wave_player_plays_and_finishes_its_run() {
+    let (mut rt, script, blk, _) = sound_script_watch(
+        proto::WAVE_PLAYER,
+        &["Play", "Stop", "Pause/Resume"],
+        &["Start Playing", "End Playing", "Paused/Resumed"],
+        &[
+            ("Fade In", types::FLOAT, Value::Float(0.0)),
+            ("Fade Out", types::FLOAT, Value::Float(0.0)),
+            ("Loop", types::BOOL, Value::Bool(true)),
+        ],
+        None,
+        &[0, 1],
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.sounds, vec!["5 Sounds\\Wind.wav Play { looping: true, fade_in: 0.0 }"]);
+    assert_eq!(host.visible, vec![false, true], "Start Playing fired, End Playing did not");
+    assert!(!rt.is_active(blk), "a looping Play returns at once");
+    let _ = script;
+}
+
+#[test]
+fn a_one_shot_wave_player_waits_for_the_sound_and_then_reports_the_end() {
+    let (mut rt, _, blk, _) = sound_script_watch(
+        proto::WAVE_PLAYER,
+        &["Play", "Stop", "Pause/Resume"],
+        &["Start Playing", "End Playing", "Paused/Resumed"],
+        &[
+            ("Fade In", types::FLOAT, Value::Float(0.5)),
+            ("Fade Out", types::FLOAT, Value::Float(0.0)),
+            ("Loop", types::BOOL, Value::Bool(false)),
+        ],
+        None,
+        &[1],
+    );
+    let mut host = Rec::new();
+    host.playing = true;
+    rt.tick(&mut host);
+    assert_eq!(host.sounds, vec!["5 Sounds\\Wind.wav Play { looping: false, fade_in: 0.5 }"]);
+    rt.tick(&mut host);
+    assert!(rt.is_active(blk), "stays active while the sound plays");
+    assert_eq!(host.visible, vec![true, true], "no End Playing yet");  // (the one watched output hides A)
+    host.playing = false;
+    rt.tick(&mut host);
+    assert_eq!(host.visible, vec![false, true], "End Playing fired");
+    assert!(!rt.is_active(blk));
+    assert_eq!(host.sounds.len(), 1, "no more commands");
+}
+
+#[test]
+fn a_script_going_inactive_silences_its_wave_player() {
+    let (mut rt, _, _, _) = sound_script(
+        proto::WAVE_PLAYER,
+        &["Play", "Stop", "Pause/Resume"],
+        &["Start Playing", "End Playing", "Paused/Resumed"],
+        &[("Loop", types::BOOL, Value::Bool(true))],
+        None,
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    rt.activate_object(0, false, false, &mut host);
+    assert_eq!(
+        host.sounds.last().map(String::as_str),
+        Some("5 Sounds\\Wind.wav Stop { fade_out: 0.0 }")
+    );
+}
+
+fn control(proto: Guid, name: &str, v: f32) -> Vec<String> {
+    let (mut rt, _, _, _) = sound_script_watch(
+        proto,
+        &["In"],
+        &["Out"],
+        &[(name, types::FLOAT, Value::Float(v))],
+        None,
+        &[0],
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert!(!host.visible[0], "Out fired");
+    host.sounds
+}
+
+#[test]
+fn volume_pitch_and_panning_controls_set_their_value() {
+    assert_eq!(control(proto::VOLUME_CONTROL, "Gain", 0.25), ["5 Sounds\\Wind.wav Gain(0.25)"]);
+    assert_eq!(control(proto::PITCH_CONTROL, "Pitch", 1.5), ["5 Sounds\\Wind.wav Pitch(1.5)"]);
+    assert_eq!(control(proto::PANNING_CONTROL, "Pan", -1.0), ["5 Sounds\\Wind.wav Pan(-1.0)"]);
+}
+
+fn instance(flat: bool) -> Vec<String> {
+    let (mut rt, _, _, _) = sound_script_watch(
+        proto::PLAY_SOUND_INSTANCE,
+        &["In"],
+        &["Out"],
+        &[
+            ("2D", types::BOOL, Value::Bool(flat)),
+            ("Object", types::ENTITY, Value::Obj(Some(1))),
+            ("Position", types::VECTOR, Value::Vec3([0.0, 2.0, 0.0])),
+            ("Direction", types::VECTOR, Value::Vec3([0.0; 3])),
+            ("Min Delay", types::FLOAT, Value::Float(0.0)),
+            ("Volume", types::FLOAT, Value::Float(0.5)),
+        ],
+        None,
+        &[0],
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert!(!host.visible[0], "Out fired");
+    host.sounds
+}
+
+#[test]
+fn a_sound_instance_is_flat_or_placed_at_the_object() {
+    assert_eq!(
+        instance(true),
+        ["5 Sounds\\Wind.wav Instance { volume: 0.5, at: None }"]
+    );
+    // object B (1) sits at x = 10; the position pin is in its frame
+    assert_eq!(
+        instance(false),
+        ["5 Sounds\\Wind.wav Instance { volume: 0.5, at: Some([10.0, 2.0, 0.0]) }"]
+    );
+}
+
+#[test]
+fn the_linear_volume_curve_follows_the_notes() {
+    for (v, want) in [(2.0, 1.0), (1.0, 1.0), (0.5, 0.141_421), (0.01, 0.0), (0.0, 0.0), (0.02, 0.02 * 50f32.powf(0.02))] {
+        let (mut rt, _, _, pout) = sound_script_watch(
+            proto::TT_LINEAR_VOLUME,
+            &["In"],
+            &["Out"],
+            &[("Vol. in Decibel", types::FLOAT, Value::Float(v))],
+            Some("Linear Volume"),
+            &[0],
+        );
+        let mut host = Rec::new();
+        rt.tick(&mut host);
+        assert!(!host.visible[0], "Out fired");
+        let got = rt.values[pout.unwrap()].as_float();
+        assert!((got - want).abs() < 1e-4, "v {v}: {got} vs {want}");
+    }
+}
+
+#[test]
+fn a_proximity_volume_follows_the_distance_and_ends_on_off() {
+    let gain = |near: f32, far: f32| {
+        let (mut rt, script, blk, _) = sound_script(
+            proto::TT_PROXIMITY_VOLUME_CONTROL,
+            &["On", "Off"],
+            &["On", "Off"],
+            &[
+                ("Object 1", types::ENTITY, Value::Obj(Some(0))),
+                ("Object 2", types::ENTITY, Value::Obj(Some(1))),
+                ("Near", types::FLOAT, Value::Float(near)),
+                ("Far", types::FLOAT, Value::Float(far)),
+                ("Sound", types::SOUND, Value::Obj(Some(5))),
+            ],
+            None,
+        );
+        let mut host = Rec::new();
+        rt.tick(&mut host);
+        assert!(rt.is_active(blk) && rt.is_active(script), "stays on");
+        host.sounds.clone()
+    };
+    // B is 10 units from A: inside Near the sound is at full volume, past Far at 0.02 (not silent), between the
+    // squared distances linear: 1 - (100 - 25) / (400 - 25) = 0.8
+    assert_eq!(gain(12.0, 20.0), ["5 Sounds\\Wind.wav Gain(1.0)"]);
+    assert_eq!(gain(1.0, 5.0), ["5 Sounds\\Wind.wav Gain(0.02)"]);
+    let want = 0.02 * 50f32.powf(0.8);
+    let got = gain(5.0, 20.0);
+    let got: f32 = got[0].trim_start_matches("5 Sounds\\Wind.wav Gain(").trim_end_matches(')').parse().unwrap();
+    assert!((got - want).abs() < 1e-5, "{got} vs {want}");
 }

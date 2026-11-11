@@ -106,6 +106,8 @@ struct Game {
     music_theme: Option<u32>,
     /// The level table's LevelBonus.
     level_bonus: i64,
+    /// The lengths of the sounds the map's scripts play, in ticks (scripting.rs `SoundState`).
+    sound_ticks: std::sync::Arc<std::collections::HashMap<String, u64>>,
     /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
     assisted: bool,
     /// The mods that run on the run's side (modrt.rs), as each new run starts with them: a replay's own (its `mod`
@@ -253,6 +255,8 @@ impl Game {
         sim.respawn_faces_on = replay_in.as_ref().is_none_or(|r| r.version >= 6);
         let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
+        let sound_ticks = std::sync::Arc::new(script_sound_ticks(&sim, data));
+        sim.set_sound_ticks(sound_ticks.clone());
         // a replay played with mods that changed the run plays with the very same mods, or not at all
         let mods = match &replay_in {
             Some(r) if !r.mods.is_empty() => {
@@ -332,6 +336,7 @@ impl Game {
             shadow_receivers: scene::shadow_receivers(&level.level),
             music_theme: level.level.settings.music,
             level_bonus,
+            sound_ticks,
             assisted: false,
             mods,
             last_level: level.level.settings.last_level,
@@ -818,6 +823,7 @@ impl Game {
         sim.checkpoints_by_name = version >= 4;
         sim.respawn_faces_on = version >= 6;
         sim.level_bonus = self.level_bonus;
+        sim.set_sound_ticks(self.sound_ticks.clone());
         sim
     }
 
@@ -1516,6 +1522,7 @@ fn window(
         heard: 0,
         started: false,
         rolling: [None; 3 + crate::ballsound::FAN_SLOTS],
+        script_voices: crate::script_sound::Voices::default(),
         music: None,
         blitz: crate::lights::Blitz::new(
             std::time::SystemTime::now()
@@ -2479,6 +2486,22 @@ fn read_plan(
 }
 
 /// The level file's name without its extension (Level_01 for Level_01.NMO).
+/// The lengths in ticks of the sounds a map's scripts name, from the game's sound set (no audio device needed: scripts
+/// wait on them). A name the set does not have is left out, and so is silent.
+fn script_sound_ticks(sim: &Sim, data: &Data) -> std::collections::HashMap<String, u64> {
+    let mut out = std::collections::HashMap::new();
+    let Some(scripts) = &sim.scripts else {
+        return out;
+    };
+    for stem in scripts.sound_files() {
+        if let Some(sec) = crate::audio::sound_seconds(data, &stem) {
+            let ticks = (sec / f64::from(crate::sim::TICK)).ceil();
+            out.insert(stem.to_ascii_lowercase(), ticks as u64);
+        }
+    }
+    out
+}
+
 fn level_stem(game: &Game) -> String {
     Path::new(&game.level.name)
         .file_stem()
@@ -3733,6 +3756,8 @@ struct App {
     started: bool,
     /// The loops playing, by slot: rolling (stone, wood, metal), then the fans'.
     rolling: [Option<u64>; 3 + crate::ballsound::FAN_SLOTS],
+    /// The voices of the map's scripts in the audio (script_sound.rs).
+    script_voices: crate::script_sound::Voices,
     /// The level's music.
     music: Option<Music>,
     /// The last level's lightning (lights.rs).
@@ -4669,8 +4694,12 @@ impl App {
     fn sound_events(&mut self) {
         let Some(audio) = &mut self.audio else {
             self.game.sound_out.clear();
+            if let Some(s) = &mut self.game.sim.scripts {
+                s.sound.events.clear();
+            }
             return;
         };
+        self.script_voices.frame(audio, &self.data, &mut self.game.sim);
         for cmd in self.game.sound_out.drain(..) {
             match cmd {
                 SoundCmd::Play(name, volume) => drop(audio.play(&self.data, name, volume, 0.0)),

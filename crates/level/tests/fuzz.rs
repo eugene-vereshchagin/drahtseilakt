@@ -598,7 +598,6 @@ impl script::Host for Nothing {
         None
     }
     fn message(&mut self, _: &str, _: Option<script::Ent>) {}
-    fn sound(&mut self, _: &str, _: bool) {}
     fn text(&mut self, _: &str, _: &str, _: bool) {}
     fn note(&mut self, _: &str) {}
 }
