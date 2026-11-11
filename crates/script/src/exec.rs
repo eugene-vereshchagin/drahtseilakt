@@ -31,6 +31,17 @@ pub trait Host {
     fn delete(&mut self, e: Ent);
     fn physicalize(&mut self, e: Ent, on: bool);
     fn particles(&mut self, e: Ent, on: bool);
+    /// A planar or spherical emitter block (`key` = its graph id) sets its state and values at `e` (docs/particles.md
+    /// section 11). Particles are for the eye only; the engine must never let them reach the run. Called every tick
+    /// the block is on (the pins are read every frame), and with `EmitState::Gone` when the block's script stops.
+    fn emitter(
+        &mut self,
+        _key: usize,
+        _e: Ent,
+        _spec: &crate::EmitterSpec,
+        _state: crate::EmitState,
+    ) {
+    }
     /// The level mesh of an entity, by index.
     fn mesh_of(&self, e: Ent) -> Option<usize>;
     /// The members of a level group, by index.

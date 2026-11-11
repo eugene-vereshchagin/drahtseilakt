@@ -602,6 +602,62 @@ pub struct Batch {
     pub vertices: Vec<Vertex>,
 }
 
+/// The most particles all script emitters of a map hold together is `MAX_EMITTERS` times this.
+const SCRIPT_POOL_CAP: i32 = 256;
+
+/// A script emitter's values as a native system's spec. The texture is one of the game's particle textures if the
+/// pin names one; else a sprite gets the soft round smoke puff (tinted by its colours; both blends add, so its black
+/// edge adds nothing) instead of a hard square, and a line system stays untextured.
+fn spec_of(e: &script::EmitterSpec) -> Spec {
+    let texture = e
+        .texture
+        .as_deref()
+        .and_then(|n| {
+            textures()
+                .into_iter()
+                .find(|t| t.eq_ignore_ascii_case(n.trim_end_matches(".bmp").trim_end_matches(".tga")))
+        })
+        .or((e.render != 2).then_some("Particle_Smoke"));
+    Spec {
+        frame: "",
+        kind: match e.shape {
+            script::EmitShape::Planar => Kind::Planar,
+            script::EmitShape::Spherical => Kind::Spherical,
+        },
+        render: match e.render {
+            2 => Render::Line,
+            5 => Render::Orientable,
+            7 => Render::Fast,
+            _ => Render::Sprite,
+        },
+        blend: if (e.src_blend, e.dst_blend) == (2, 3) {
+            Blend::OneSrcColor
+        } else {
+            Blend::AlphaAdd
+        },
+        evolutions: e.evolutions,
+        variances: e.variances,
+        delay: e.delay.max(1.0),
+        emission: e.emission.clamp(0, 64),
+        emission_var: e.emission_var.clamp(0, 64),
+        max: e.max.clamp(0, SCRIPT_POOL_CAP) as usize,
+        speed: e.speed,
+        speed_var: e.speed_var,
+        yaw_var: e.yaw_var,
+        pitch_var: e.pitch_var,
+        life: e.life.clamp(1.0, 20_000.0),
+        life_var: e.life_var,
+        size0: e.size0,
+        size0_var: e.size0_var,
+        size1: e.size1,
+        size1_var: e.size1_var,
+        color0: e.color0,
+        color1: e.color1,
+        texture,
+        trail_rate: 0.0,
+    }
+}
+
 /// When a level emitter burns, as its module's script switches it.
 #[derive(Clone, Copy, Debug)]
 enum When {
@@ -642,6 +698,8 @@ struct ExtraFx {
 /// Every particle system of a level, switched as the original's scripts switch them.
 pub struct Effects {
     emitters: Vec<(System, When)>,
+    /// The planar/spherical emitters the map's scripts run, by block (scripting.rs `EmitterView`).
+    scripted: std::collections::BTreeMap<usize, System>,
     extras: Vec<ExtraFx>,
     seed: u32,
 }
@@ -652,6 +710,7 @@ impl Effects {
     pub fn new(level: &level::Level, module: &dyn Fn(&str) -> Option<level::Level>) -> Effects {
         let mut fx = Effects {
             emitters: Vec::new(),
+            scripted: std::collections::BTreeMap::new(),
             extras: Vec::new(),
             seed: 1,
         };
@@ -714,6 +773,7 @@ impl Effects {
     pub fn menu(level: &level::Level) -> Effects {
         let mut fx = Effects {
             emitters: Vec::new(),
+            scripted: std::collections::BTreeMap::new(),
             extras: Vec::new(),
             seed: 7,
         };
@@ -797,6 +857,7 @@ impl Effects {
             s.set_active(on);
             s.tick(dt);
         }
+        self.tick_scripted(sim, dt);
         for v in sim.extra_views() {
             if !self.extras.iter().any(|e| e.object == v.object) {
                 let at = Mat4::from_translation(v.center);
@@ -855,17 +916,57 @@ impl Effects {
         }
     }
 
+    /// The script emitters follow the run's scripts: new ones start, values and frames follow the blocks, the ones
+    /// the scripts no longer run (stopped script, restart, rewind) vanish at once; an Off one lets its particles
+    /// finish and a frozen one holds them. Their random numbers are their own (never the simulation's).
+    fn tick_scripted(&mut self, sim: &crate::sim::Sim, dt: f32) {
+        let views = sim.scripts.as_ref().map(|s| &s.emitters);
+        self.scripted
+            .retain(|k, _| views.is_some_and(|v| v.contains_key(k)));
+        let Some(views) = views else {
+            return;
+        };
+        for (&k, v) in views {
+            if !self.scripted.contains_key(&k) {
+                let seed = self.next_seed().wrapping_add(k as u32);
+                self.scripted
+                    .insert(k, System::new(spec_of(&v.spec), v.frame, seed));
+            }
+            let Some(s) = self.scripted.get_mut(&k) else {
+                continue;
+            };
+            s.spec = spec_of(&v.spec);
+            s.frame = v.frame;
+            match v.state {
+                script::EmitState::Frozen => continue,
+                script::EmitState::On => {
+                    if !s.emitting {
+                        s.emitting = true;
+                        s.elapsed = s.spec.delay;
+                    }
+                }
+                _ => s.emitting = false,
+            }
+            s.tick(dt);
+        }
+    }
+
     /// The particles seen from `eye` towards `target`, batched by texture, blend and kind.
     pub fn batches(&self, eye: Vec3, target: Vec3) -> Vec<Batch> {
         let forward = (target - eye).normalize_or(Vec3::Z);
         let right = Vec3::Y.cross(forward).normalize_or(Vec3::X);
         let up = forward.cross(right).normalize_or(Vec3::Y);
         let mut out: Vec<Batch> = Vec::new();
-        let systems = self.emitters.iter().map(|e| &e.0).chain(
-            self.extras
-                .iter()
-                .flat_map(|e| std::iter::once(&e.burst).chain(&e.trails).chain(&e.hits)),
-        );
+        let systems = self
+            .emitters
+            .iter()
+            .map(|e| &e.0)
+            .chain(self.scripted.values())
+            .chain(
+                self.extras
+                    .iter()
+                    .flat_map(|e| std::iter::once(&e.burst).chain(&e.trails).chain(&e.hits)),
+            );
         for s in systems.filter(|s| !s.is_empty()) {
             let lines = s.spec.render == Render::Line;
             let at = match out.iter().position(|b| {
@@ -907,5 +1008,31 @@ mod tests {
             s.tick(1000.0 / 60.0);
         }
         assert!(s.is_empty(), "every particle lives at most 1250 ms");
+    }
+
+    #[test]
+    fn a_script_emitter_is_capped_and_its_particles_outlive_off_but_not_the_block() {
+        let e = script::EmitterSpec {
+            max: 1_000_000,
+            emission: 1_000,
+            delay: 20.0,
+            life: 100.0,
+            ..script::EmitterSpec::default()
+        };
+        let spec = spec_of(&e);
+        assert!(spec.max <= SCRIPT_POOL_CAP as usize && spec.emission <= 64);
+        let mut s = System::new(spec, Mat4::IDENTITY, 3);
+        s.emitting = true;
+        for _ in 0..30 {
+            s.tick(1000.0 / 60.0);
+        }
+        assert!(!s.is_empty() && s.particles.len() <= spec.max);
+        s.emitting = false;
+        s.tick(1000.0 / 60.0);
+        assert!(!s.is_empty(), "off lets the live ones finish");
+        for _ in 0..30 {
+            s.tick(1000.0 / 60.0);
+        }
+        assert!(s.is_empty());
     }
 }

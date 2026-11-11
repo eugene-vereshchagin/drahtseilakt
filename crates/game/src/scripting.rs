@@ -48,7 +48,21 @@ pub struct Scripts {
     seen: Option<crate::facade::Seen>,
     left_sector: usize,
     written: BTreeMap<(String, usize, usize), Value>,
+    /// The planar/spherical particle emitters the map's blocks run now, by block (particles.rs draws them; they
+    /// rewind and restart with the run, and never reach it).
+    pub emitters: BTreeMap<usize, EmitterView>,
 }
+
+/// One script emitter: where it is and what its block says.
+#[derive(Clone, Debug)]
+pub struct EmitterView {
+    pub frame: Mat4,
+    pub spec: script::EmitterSpec,
+    pub state: script::EmitState,
+}
+
+/// The most emitters a map's scripts run at once.
+pub const MAX_EMITTERS: usize = 64;
 
 /// The most sound events kept for the audio between two drains (a run with no audio never drains them).
 const SOUND_EVENT_CAP: usize = 1_024;
@@ -174,6 +188,7 @@ impl Scripts {
             seen: None,
             left_sector: 0,
             written: BTreeMap::new(),
+            emitters: BTreeMap::new(),
         })
     }
 }
@@ -234,6 +249,7 @@ struct ScriptsParts {
     ball_objs: [Option<script::Id>; 3],
     left_sector: usize,
     written: BTreeMap<(String, usize, usize), Value>,
+    emitters: BTreeMap<usize, EmitterView>,
 }
 
 impl ScriptsParts {
@@ -395,6 +411,33 @@ impl Host for SimHost<'_> {
                 if on { "on" } else { "off" }
             ));
         }
+    }
+
+    fn emitter(
+        &mut self,
+        key: usize,
+        e: Ent,
+        spec: &script::EmitterSpec,
+        state: script::EmitState,
+    ) {
+        if state == script::EmitState::Gone {
+            self.s.emitters.remove(&key);
+            return;
+        }
+        if !self.s.emitters.contains_key(&key) && self.s.emitters.len() >= MAX_EMITTERS {
+            return;
+        }
+        let Some(m) = self.matrix(e) else {
+            return;
+        };
+        self.s.emitters.insert(
+            key,
+            EmitterView {
+                frame: to_mat(&m),
+                spec: spec.clone(),
+                state,
+            },
+        );
     }
 
     fn mesh_of(&self, e: Ent) -> Option<usize> {
@@ -700,6 +743,7 @@ impl Scripts {
             ball_objs: self.ball_objs,
             left_sector: self.left_sector,
             written: std::mem::take(&mut self.written),
+            emitters: std::mem::take(&mut self.emitters),
         };
         {
             let mut host = SimHost { s: &mut parts, run };
@@ -717,6 +761,7 @@ impl Scripts {
         self.camera = parts.camera;
         self.text = parts.text;
         self.written = parts.written;
+        self.emitters = parts.emitters;
         if run.teleport.is_some() {
             self.teleports = self.teleports.saturating_add(1);
         }
@@ -773,7 +818,11 @@ mod facade_tests {
         s.tick(&mut view(3, 2, 2));
         assert_eq!(s.rt.messages_to("Sub Life", None).len(), 1);
         assert_eq!(s.rt.messages_to("Ball Off", None).len(), 1);
-        assert!(s.log.iter().any(|(_, l)| l == "game message Checkpoint reached"));
+        assert!(
+            s.log
+                .iter()
+                .any(|(_, l)| l == "game message Checkpoint reached")
+        );
     }
 
     #[test]
@@ -799,6 +848,7 @@ mod facade_tests {
                 ball_objs: s.ball_objs,
                 left_sector: 0,
                 written: std::mem::take(&mut s.written),
+                emitters: Default::default(),
             };
             f(&mut SimHost {
                 s: &mut parts,
@@ -810,7 +860,10 @@ mod facade_tests {
             assert_eq!(h.game_cell("Energy", 0, 1), Some(Value::Int(3)));
             assert!(h.game_set_cell("Energy", 0, 1, Value::Int(99)));
             assert_eq!(h.game_cell("Energy", 0, 1), Some(Value::Int(99)));
-            assert!(!h.game_set_cell("Energy", 0, 9, Value::Int(1)), "no such column");
+            assert!(
+                !h.game_set_cell("Energy", 0, 9, Value::Int(1)),
+                "no such column"
+            );
             assert!(!h.game_set_cell("Nope", 0, 0, Value::Int(1)));
         });
         // the run's own number is untouched

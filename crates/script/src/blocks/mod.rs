@@ -23,6 +23,7 @@ pub mod proto {
     pub const EXECUTE_SCRIPT: Guid = Guid(0x706c_5a40, 0x5bb3_1a0b);
     pub const POINT_PARTICLE_SYSTEM: Guid = Guid(0x506b_40f7, 0x3085_2e46);
     pub const PLANAR_PARTICLE_SYSTEM: Guid = Guid(0x4995_7bfe, 0x0ff2_7ffc);
+    pub const SPHERICAL_PARTICLE_SYSTEM: Guid = Guid(0x67c8_8f47, 0x8880_721e);
     pub const TT_SCALEABLE_PROXIMITY: Guid = Guid(0x2a2a_63ca, 0x0082_6175);
     pub const PROXIMITY: Guid = Guid(0x5321_cacb, 0xdcdc_5213);
     pub const GET_CELL: Guid = Guid(0x33b9_9f51, 0x07d9_5c45);

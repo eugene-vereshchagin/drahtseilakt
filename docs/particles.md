@@ -593,3 +593,27 @@ UVs/stride. Imports: `rand` and `_CIacos` (MSVCRT); `Vx3DRotateVector`, `Vx3DMul
   particle would be drawn once like that. A zero velocity with the Orientable renderer normalises a zero
   vector.
 - Unused renderers (1, 4, 6, 8, 9), deflectors and interactors are only summarised.
+
+## 11. Script-driven emitters in Drahtseilakt (planar and spherical)
+
+Decision: `PlanarParticleSystem` and `SphericalParticleSystem` blocks of a map's scripts run as native emitters
+(crates/script `tt_particles.rs` -> `Host::emitter`, crates/game `particles.rs`). Everything below is from sections
+2, 4 and 5 above; nothing here is new reverse engineering except the engine's choices.
+
+- The block's owner is the emitter frame; its world matrix is read at every call, so an emitter on a moved or
+  copied object follows it.
+- Pins read every call while the block runs: delay, yaw/pitch variance, speed (+variance), lifespan (+variance),
+  maximum number, emission (+variance), initial/ending size, initial/ending colour. Settings (locals): render mode
+  (2 line, 5 orientable, 7 fast, any other sprite), blends (2/3 = one/source colour, any other alpha-additive),
+  Evolutions, Variances; the live cap is the smaller of the pin and the pool-size setting. Texture: used only when
+  the pin names one of the game's own particle textures; else a sprite system draws the soft smoke puff
+  (`Particle_Smoke`, tinted by the colours) instead of a hard square (our look choice), a line system untextured.
+- States: On sets emitting, Off clears it (live particles finish, section 5), Freeze toggles (frozen: nothing
+  moves, particles stay drawn). Deactivating or deleting the script, a reset, a level restart or a rewind take the
+  particles away at once (the block's scratch and the runtime's emitter table are part of the run's state).
+- The block stays active while frozen (the original goes inactive until the next input); the observable state is
+  the same.
+- Particles are for the eye only: own pseudo-random numbers (never the simulation's), no feedback into the run.
+  Caps: 64 emitters per map, 256 live particles per emitter, 64 per emission event, lifespan at most 20 s.
+- Not done: delay variance, texture animation, angular speed/spreading, deflectors/interactors (none are used
+  by the maps seen).

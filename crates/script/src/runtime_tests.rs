@@ -35,6 +35,8 @@ struct Rec {
     cams: Vec<CameraChange>,
     /// Every text box call: the block and its spec (none: taken away).
     boxes: Vec<(usize, Option<crate::TextSpec>)>,
+    /// Every emitter call: block, entity, values, state.
+    emitters: Vec<(usize, Ent, crate::EmitterSpec, crate::EmitState)>,
 }
 
 fn ident(x: f32, y: f32, z: f32) -> [[f32; 4]; 4] {
@@ -98,6 +100,9 @@ impl Host for Rec {
     fn physicalize(&mut self, _: Ent, _: bool) {}
     fn particles(&mut self, _: Ent, on: bool) {
         self.notes.push(format!("particles {on}"));
+    }
+    fn emitter(&mut self, key: usize, e: Ent, spec: &crate::EmitterSpec, state: crate::EmitState) {
+        self.emitters.push((key, e, spec.clone(), state));
     }
     fn mesh_of(&self, _: Ent) -> Option<usize> {
         None
@@ -1235,7 +1240,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them), the sounds, the input blocks and the cameras (Set As Active Camera,
     // Set Clipping Planes, Set FOV)
-    assert_eq!(all.len(), 128); // and the text blocks (six)
+    assert_eq!(all.len(), 129); // and the text blocks (six), the spherical emitter
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -2653,4 +2658,110 @@ fn three_d_text_and_movie_player_are_named_no_ops() {
             "said once"
         );
     }
+}
+
+/// A planar emitter block on object 0 with the given pin values, its three inputs and a script that starts it.
+fn emitter_script(shape_proto: Guid) -> (Arc<Graph>, Id, [Id; 3]) {
+    let mut b = Build::new();
+    let mut pins = Vec::new();
+    for (name, v) in [
+        ("Emission Delay", Value::Float(20.0)),
+        ("Emission Delay Variance", Value::Float(0.0)),
+        ("Yaw Variance", Value::Float(0.1)),
+        ("Pitch Variance", Value::Float(0.2)),
+        ("Speed", Value::Float(0.0055)),
+        ("Speed Variance", Value::Float(0.001)),
+        ("Angular Speed/Spreading", Value::Float(0.0)),
+        (
+            "Angular Speed Variance/Spreading Variation",
+            Value::Float(0.0),
+        ),
+        ("Lifespan", Value::Float(800.0)),
+        ("Lifespan Variance", Value::Float(25.0)),
+        ("Maximum Number", Value::Int(80)),
+        ("Emission", Value::Int(3)),
+        ("Emission Variance", Value::Int(1)),
+        ("Initial Size", Value::Float(0.7)),
+        ("Initial Size Variance", Value::Float(0.0)),
+        ("Ending Size", Value::Float(0.2)),
+    ] {
+        let l = b.local(name, types::NONE, v);
+        pins.push(b.pin(name, types::NONE, l));
+    }
+    let mut locals = Vec::new();
+    for v in [
+        Value::Raw(vec![0; 4]),
+        Value::Int(1),
+        Value::Float(0.0),
+        Value::Int(40),
+        Value::Int(3),
+        Value::Int(5),
+        Value::Int(2),
+        Value::Obj(None),
+        Value::Int(3),
+        Value::Int(12),
+    ] {
+        locals.push(b.local("setting", types::NONE, v));
+    }
+    let block = b.bb(
+        "PlanarParticleSystem",
+        shape_proto,
+        &["On", "Off", "Freeze"],
+        &["Exit On", "Exit Off", "Exit Freeze"],
+        pins,
+        vec![],
+        locals,
+        None,
+    );
+    let ins = [0, 1, 2].map(|i| in_of(&b.g, block, i));
+    let start = b.io("Start");
+    let l = b.link(start, ins[0], 0);
+    let script = b.script("S", Some(0), start, vec![block], vec![l]);
+    let _ = script;
+    (b.done(), block, ins)
+}
+
+#[test]
+fn a_planar_emitter_reads_its_pins_and_follows_on_freeze_off() {
+    use crate::EmitState::{Frozen, Off, On};
+    let (g, block, ins) = emitter_script(proto::PLANAR_PARTICLE_SYSTEM);
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    let (key, ent, spec, state) = host.emitters.last().cloned().expect("On reaches the host");
+    assert_eq!((key, ent, state), (block, Ent::Object(0), On));
+    assert_eq!(spec.shape, crate::EmitShape::Planar);
+    assert_eq!((spec.delay, spec.speed, spec.life), (20.0, 0.0055, 800.0));
+    assert_eq!((spec.emission, spec.emission_var), (3, 1));
+    assert_eq!(spec.max, 40, "the pool-size setting caps the pin's 80");
+    assert_eq!((spec.src_blend, spec.dst_blend, spec.render), (5, 2, 3));
+    assert_eq!(spec.variances, 12);
+    // freeze toggles: frozen, then back on
+    rt.set_io(ins[2], true);
+    rt.tick(&mut host);
+    assert_eq!(host.emitters.last().map(|e| e.3), Some(Frozen));
+    rt.tick(&mut host);
+    assert_eq!(
+        host.emitters.last().map(|e| e.3),
+        Some(Frozen),
+        "stays frozen"
+    );
+    rt.set_io(ins[2], true);
+    rt.tick(&mut host);
+    assert_eq!(host.emitters.last().map(|e| e.3), Some(On));
+    rt.set_io(ins[1], true);
+    rt.tick(&mut host);
+    assert_eq!(host.emitters.last().map(|e| e.3), Some(Off));
+}
+
+#[test]
+fn a_spherical_emitter_has_its_own_shape() {
+    let (g, _, _) = emitter_script(proto::SPHERICAL_PARTICLE_SYSTEM);
+    let mut rt = Runtime::new(g);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(
+        host.emitters.last().map(|e| e.2.shape),
+        Some(crate::EmitShape::Spherical)
+    );
 }
