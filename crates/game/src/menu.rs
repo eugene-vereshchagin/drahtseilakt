@@ -498,7 +498,10 @@ impl Menu {
         };
         let s = crate::report::summarize(r);
         let text = |k: &str| self.strings.ours(k);
-        format!("\n{}", crate::report::words(&s, &text, CHECK_LINES))
+        format!(
+            "\n{}",
+            crate::report::words(&s, self.strings.language(), &text, CHECK_LINES)
+        )
     }
 
     /// How many rows the list can show so that its note stays whole for every chosen map (the text shrinks to

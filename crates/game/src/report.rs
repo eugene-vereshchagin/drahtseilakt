@@ -152,13 +152,38 @@ pub fn summarize(issues: &[(String, usize)]) -> Summary {
 
 /// The verdict and the lines as text in the language `text` speaks (a key to its words, `{n}` the count): the verdict
 /// first, then at most `max` lines.
-pub fn words(s: &Summary, text: &dyn Fn(&str) -> String, max: usize) -> String {
+pub fn words(s: &Summary, language: &str, text: &dyn Fn(&str) -> String, max: usize) -> String {
     let mut out = text(s.verdict.key());
     for (key, n) in s.lines.iter().take(max) {
         out.push('\n');
-        out.push_str(&text(key).replace("{n}", &n.to_string()));
+        out.push_str(&plural(&text(key), language, *n).replace("{n}", &n.to_string()));
     }
     out
+}
+
+/// The form of a count's text for `n` in `language`: forms are separated by `||` (one, other; Russian: one, few,
+/// many; Chinese has one); a text with fewer forms than the language wants uses its last.
+pub fn plural(forms: &str, language: &str, n: usize) -> String {
+    let at = match language {
+        "ru" => {
+            if n % 10 == 1 && n % 100 != 11 {
+                0
+            } else if (2..=4).contains(&(n % 10)) && !(12..=14).contains(&(n % 100)) {
+                1
+            } else {
+                2
+            }
+        }
+        // French counts 0 and 1 as the singular
+        "fr" => usize::from(n >= 2),
+        "zh" => 0,
+        _ => usize::from(n != 1),
+    };
+    let parts: Vec<&str> = forms.split("||").collect();
+    parts
+        .get(at)
+        .or(parts.last())
+        .map_or_else(String::new, |p| (*p).to_owned())
 }
 
 /// A report.txt for the audit's issues.
@@ -207,7 +232,7 @@ pub fn run(
         })
         .map_or_else(|| map.display().to_string(), |p| p.title);
         // one line a map, as a log line reads: its title, the verdict, then the lines in brackets
-        let all = words(&summary, &text, usize::MAX);
+        let all = words(&summary, language, &text, usize::MAX);
         let mut parts = all.lines();
         let verdict = parts.next().unwrap_or_default();
         let rest: Vec<&str> = parts.collect();
@@ -297,6 +322,42 @@ mod tests {
                 || kind == "load-failed";
             assert!(known, "{kind} has no place in the map check");
         }
+    }
+
+    #[test]
+    fn counts_take_the_plural_form_of_their_language() {
+        let ru = "a||b||c";
+        let at = |n| plural(ru, "ru", n);
+        assert_eq!([1, 21, 101].map(at), ["a", "a", "a"]);
+        assert_eq!([2, 3, 4, 22, 24].map(at), ["b"; 5]);
+        assert_eq!([0, 5, 11, 12, 14, 20, 25, 111].map(at), ["c"; 8]);
+        assert_eq!(
+            (plural("x||y", "en", 1), plural("x||y", "en", 2)),
+            ("x".into(), "y".into())
+        );
+        assert_eq!(
+            (plural("x||y", "fr", 0), plural("x||y", "fr", 2)),
+            ("x".into(), "y".into())
+        );
+        assert_eq!(plural("x", "zh", 7), "x");
+        // every worded line has the forms its language needs
+        for lang in ["en", "ru", "de", "zh", "fr", "es", "it"] {
+            let need = match lang {
+                "ru" => 3,
+                "zh" => 1,
+                _ => 2,
+            };
+            for g in GROUPS.iter().map(|g| g.key).chain([OTHER]) {
+                let t = crate::lang::Strings::ours_for(g, lang);
+                assert_eq!(t.split("||").count(), need, "{g} in {lang}");
+            }
+        }
+        assert_eq!(
+            crate::lang::Strings::ours_for("report plain", "en")
+                .split("||")
+                .next(),
+            Some("{n} surface drawn plain")
+        );
     }
 
     #[test]
