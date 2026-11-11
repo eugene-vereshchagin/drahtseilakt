@@ -144,6 +144,13 @@ pub fn rects(boxes: &[(script::Id, TextSpec)], width: f32, height: f32) -> Vec<R
                 return out;
             }
             let (x, y, px) = (ox + line.x * s, oy + line.y * s, laid.pixel * s);
+            // a dark shadow one font pixel down and right, so the text reads on a bright sky too
+            let shadow = [0.0, 0.0, 0.0, spec.color[3] * 0.7];
+            let d = px.max(1.0);
+            text(&mut out, &line.text, x + d, y + d, px, shadow);
+            if spec.bold {
+                text(&mut out, &line.text, x + px * 0.6 + d, y + d, px, shadow);
+            }
             text(&mut out, &line.text, x, y, px, spec.color);
             if spec.bold {
                 text(&mut out, &line.text, x + px * 0.6, y, px, spec.color);
