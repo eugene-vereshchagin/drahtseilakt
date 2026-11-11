@@ -617,7 +617,15 @@ pub(crate) fn get_cell(
         // a game array (CurrentLevel...) lives in the engine: readable, not writable
         let name = ent_name(rt, t);
         let cell = if proto == proto::SET_CELL {
-            None
+            // a write stays in the script run (the host keeps it apart from the game's rules)
+            let v = pin(rt, b, "Value", 2, host);
+            let taken = host.game_set_cell(&name, row, col, v);
+            if taken {
+                out(rt, b, 0);
+            } else {
+                out(rt, b, 1);
+            }
+            return Flow::Done;
         } else {
             host.game_cell(&name, row, col)
         };

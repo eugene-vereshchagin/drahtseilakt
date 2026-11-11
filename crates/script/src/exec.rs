@@ -37,6 +37,11 @@ pub trait Host {
     fn group_members(&self, group: usize) -> Vec<usize>;
     /// A cell of one of the game's own arrays (`CurrentLevel`...), which live in the engine, not in the map.
     fn game_cell(&self, array: &str, row: usize, column: usize) -> Option<Value>;
+    /// A script writes a cell of a game array: kept for the run's scripts only, never in the game's rules. Whether it
+    /// was taken.
+    fn game_set_cell(&mut self, _array: &str, _row: usize, _column: usize, _v: Value) -> bool {
+        false
+    }
     /// A message a script sends (to an entity, or to all): the engine may act on the game's own messages.
     fn message(&mut self, name: &str, to: Option<Ent>);
     /// A sound command for the wave sound object `key` (its graph id) whose file is `file`. Sound only goes out:

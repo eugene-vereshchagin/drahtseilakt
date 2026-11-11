@@ -928,11 +928,13 @@ const START_OBJECTS_SECONDS_TUTORIAL: f64 = 4.0 / 60.0;
 const GATE_RADIUS: f32 = 7.0;
 /// The points a level starts with (the Energy array's StartPoints), and the counter that takes one every half
 /// second (its Timefactor, 500 ms): measured in the C game on level 2, the points go down at ticks 32, 62, 92...
-const START_POINTS: i64 = 1000;
+pub(crate) const START_POINTS: i64 = 1000;
 /// The points each life left adds to a finished level's score (the Energy array's LifeBonus).
-const LIFE_BONUS: i64 = 200;
+/// The lives a level starts with (the Energy array's StartLifes).
+pub(crate) const START_LIVES: u32 = 3;
+pub(crate) const LIFE_BONUS: i64 = 200;
 const POINTS_FROM: u64 = 32;
-const POINTS_EVERY: u64 = 30;
+pub(crate) const POINTS_EVERY: u64 = 30;
 
 /// Ticks from a new ball to the depth-test cubes' first test: fitted to the C game, where a ball leaving level 2 on
 /// the same route is lost at tick 331 (the iterator's round is 4 ticks there, so this is known modulo 4).
@@ -1380,7 +1382,7 @@ impl Sim {
             ball,
             camera,
             tick: 0,
-            lives: 3,
+            lives: START_LIVES,
             lives_spared: false,
             // the points counter takes its first point as the level starts (C game, level 2: 999 when the ball comes)
             points: START_POINTS - 1,
@@ -1504,6 +1506,10 @@ impl Sim {
             ball: self.ball.position,
             ball_radius: BALL_RADIUS,
             points: self.points,
+            lives: self.lives,
+            sector: self.sector,
+            kind: self.ball.kind,
+            finished: self.finished,
             in_play: self.dying.is_none() && self.hold.is_none() && !self.finished,
             teleport: None,
             input: self.input_now,
