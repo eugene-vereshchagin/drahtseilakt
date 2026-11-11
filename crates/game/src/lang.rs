@@ -1,5 +1,5 @@
-// The menus' words. The own interface speaks ours (assets/own/Texts/menu.txt, built in): English, Russian, German,
-// Simplified Chinese, French, Spanish and Italian. The original's interface speaks its copy's, Language.nmo's table
+// The menus' words. The own interface speaks ours (assets/own/Texts/<code>.txt, one `key = text` file a language, built in
+// and overridden at start by files in the assets or the player's Texts folder; a new file adds a language): English, Russian, German,
 // `language` (a key, then German, English, Spanish, Italian and French) in the chosen language, and ours for what the
 // copy lacks (our additions, and the languages it has not). From the copy always: the key names of its table
 // `all_keys` (the original's interface), and from base.cmo the default keys (DB_Options) and each level's default
@@ -7,23 +7,149 @@
 
 use crate::assets::Data;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::OnceLock;
 
 /// The languages of Language.nmo's columns, after the key column.
 pub const COPY_LANGUAGES: [&str; 5] = ["de", "en", "es", "it", "fr"];
 
-/// The menus' languages, in the Language page's order, each by its own name; the columns of our texts.
-pub const LANGUAGES: [(&str, &str); 7] = [
-    ("en", "English"),
-    ("ru", "Русский"),
-    ("de", "Deutsch"),
-    ("zh", "简体中文"),
-    ("fr", "Français"),
-    ("es", "Español"),
-    ("it", "Italiano"),
+/// The built-in languages' files, in the Language page's order (assets/own/Texts/<code>.txt).
+const BUILT_IN: [(&str, &str); 7] = [
+    ("en", include_str!("../../../assets/own/Texts/en.txt")),
+    ("ru", include_str!("../../../assets/own/Texts/ru.txt")),
+    ("de", include_str!("../../../assets/own/Texts/de.txt")),
+    ("zh", include_str!("../../../assets/own/Texts/zh.txt")),
+    ("fr", include_str!("../../../assets/own/Texts/fr.txt")),
+    ("es", include_str!("../../../assets/own/Texts/es.txt")),
+    ("it", include_str!("../../../assets/own/Texts/it.txt")),
 ];
 
-/// Our texts (built in): a key, then a column for each of LANGUAGES.
-const OURS: &str = include_str!("../../../assets/own/Texts/menu.txt");
+/// The most a language file may weigh; a larger one is ignored.
+const FILE_MAX: u64 = 1 << 20;
+
+/// One language's texts by key.
+type Table = HashMap<String, String>;
+
+/// Every language: its code, its own name (the file's `language name`) and its texts. English is first.
+struct Tables {
+    langs: Vec<(&'static str, &'static str)>,
+    tables: Vec<Table>,
+}
+
+/// The texts of a `key = text` file; comments (`#`) and lines without `=` are skipped.
+pub fn parse_table(text: &str) -> Table {
+    text.lines()
+        .map(str::trim)
+        .filter(|l| !l.starts_with('#'))
+        .filter_map(|l| l.split_once('='))
+        .map(|(k, t)| (k.trim().to_owned(), t.trim().to_owned()))
+        .filter(|(k, t)| !k.is_empty() && !t.is_empty())
+        .collect()
+}
+
+/// A language code a file may carry: short, lowercase ASCII letters, digits and `-`.
+fn valid_code(code: &str) -> bool {
+    (1..=8).contains(&code.len())
+        && code
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
+/// The built-in languages with the files of `dirs` laid over them, later folders winning: a file of a known code
+/// replaces its texts key by key, a file of a new code adds a language (after the built-in ones, by code).
+fn build(dirs: &[PathBuf]) -> Tables {
+    let mut codes: Vec<String> = BUILT_IN.iter().map(|l| l.0.to_owned()).collect();
+    let mut tables: Vec<Table> = BUILT_IN.iter().map(|l| parse_table(l.1)).collect();
+    for dir in dirs {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            continue;
+        };
+        let mut files: Vec<(String, PathBuf)> = entries
+            .flatten()
+            .filter_map(|e| {
+                let path = e.path();
+                let code = path.file_name()?.to_str()?.strip_suffix(".txt")?.to_owned();
+                valid_code(&code).then_some((code, path))
+            })
+            .collect();
+        // by name, so a run is the same everywhere
+        files.sort();
+        for (code, path) in files {
+            let ok =
+                std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= FILE_MAX);
+            let Some(bytes) = ok.then(|| std::fs::read(&path).ok()).flatten() else {
+                eprintln!("texts: {} not read", path.display());
+                continue;
+            };
+            let table = parse_table(&String::from_utf8_lossy(&bytes));
+            let i = match codes.iter().position(|c| *c == code) {
+                Some(i) => i,
+                None => {
+                    codes.push(code);
+                    tables.push(Table::new());
+                    codes.len() - 1
+                }
+            };
+            if let Some(t) = tables.get_mut(i) {
+                t.extend(table);
+            }
+        }
+    }
+    let langs = codes
+        .iter()
+        .zip(&tables)
+        .map(|(c, t)| {
+            let name = t.get("language name").cloned().unwrap_or_else(|| c.clone());
+            // one leak per language for the whole run: the list is built once
+            let code: &'static str = Box::leak(c.clone().into_boxed_str());
+            let name: &'static str = Box::leak(name.into_boxed_str());
+            (code, name)
+        })
+        .collect();
+    Tables { langs, tables }
+}
+
+/// The folders whose language files override the built-in ones: the game's assets, then the player's data folder.
+fn override_dirs() -> Vec<PathBuf> {
+    if cfg!(test) {
+        // tests run on the built-in texts, whatever the machine holds
+        return Vec::new();
+    }
+    [
+        gamedata::resources::assets_root().map(|r| r.join("own").join("Texts")),
+        Some(gamedata::profile::data_dir().join("Texts")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+fn tables() -> &'static Tables {
+    static T: OnceLock<Tables> = OnceLock::new();
+    T.get_or_init(|| build(&override_dirs()))
+}
+
+/// The menus' languages, in the Language page's order: code and own name. The built-in ones, then any the player's
+/// files add.
+pub fn languages() -> &'static [(&'static str, &'static str)] {
+    &tables().langs
+}
+
+/// The keys of the language `code` (built-in text plus overrides), for the tests.
+#[cfg(test)]
+pub fn table_keys(code: &str) -> Vec<String> {
+    keys_of(tables(), code)
+}
+
+#[cfg(test)]
+fn keys_of(t: &Tables, code: &str) -> Vec<String> {
+    t.langs
+        .iter()
+        .position(|l| l.0 == code)
+        .and_then(|i| t.tables.get(i))
+        .map(|t| t.keys().cloned().collect())
+        .unwrap_or_default()
+}
 
 /// Highscore places a level keeps.
 pub const PLACES: usize = 10;
@@ -39,35 +165,30 @@ pub struct Strings {
     pub invert: bool,
     /// Each level's default highscore list (index 0 is level 1), best first.
     pub highscores: Vec<crate::highscore::List>,
-    /// The language's column in LANGUAGES (0, English, when none).
+    /// The language's place in languages() (0, English, when none).
     lang: usize,
 }
 
-/// Our text of `key` in the language of column `lang`, English when that column is empty.
+/// Our text of `key` in the language at place `lang` of `languages()`, English when that language lacks it.
 fn ours(key: &str, lang: usize) -> Option<&'static str> {
-    OURS.lines()
-        .filter(|l| !l.starts_with('#'))
-        .map(|l| l.split(" | ").map(str::trim))
-        .find_map(|mut cols| {
-            (cols.next()? == key).then(|| {
-                let texts: Vec<&str> = cols.collect();
-                texts
-                    .get(lang)
-                    .filter(|t| !t.is_empty())
-                    .or(texts.first())
-                    .copied()
-            })
-        })
-        .flatten()
+    let t = tables();
+    t.tables
+        .get(lang)
+        .and_then(|m| m.get(key))
+        .or_else(|| t.tables.first().and_then(|m| m.get(key)))
+        .map(String::as_str)
 }
 
 impl Strings {
-    /// The menus' words in `language` (one of LANGUAGES; English when not): the copy's (`copy`, the original's
+    /// The menus' words in `language` (one of languages(); English when not): the copy's (`copy`, the original's
     /// interface) where it has that language, else ours; the copy's default keys and highscores either way.
     pub fn load(data: &Data, language: &str, copy: bool) -> Strings {
         let mut s = Strings {
             controls: [68, 69, 70, 71, 39, 53],
-            lang: LANGUAGES.iter().position(|l| l.0 == language).unwrap_or(0),
+            lang: languages()
+                .iter()
+                .position(|l| l.0 == language)
+                .unwrap_or(0),
             ..Strings::default()
         };
         let column = COPY_LANGUAGES
@@ -175,7 +296,10 @@ impl Strings {
 
     /// Our text of `key` in `language` (the key itself when there is none), for text made outside the menus' language.
     pub fn ours_for(key: &str, language: &str) -> String {
-        let lang = LANGUAGES.iter().position(|l| l.0 == language).unwrap_or(0);
+        let lang = languages()
+            .iter()
+            .position(|l| l.0 == language)
+            .unwrap_or(0);
         ours(key, lang).unwrap_or(key).to_owned()
     }
 
@@ -184,7 +308,10 @@ impl Strings {
     pub fn ours_in(language: &str) -> Strings {
         let mut s = Strings {
             controls: [68, 69, 70, 71, 39, 53],
-            lang: LANGUAGES.iter().position(|l| l.0 == language).unwrap_or(0),
+            lang: languages()
+                .iter()
+                .position(|l| l.0 == language)
+                .unwrap_or(0),
             ..Strings::default()
         };
         s.own_highscores();
@@ -237,9 +364,9 @@ impl Strings {
             .or_else(|| ours(&format!("key {name}"), self.lang).map(str::to_owned))
     }
 
-    /// The menus' language (its code in LANGUAGES).
+    /// The menus' language (its code in languages()).
     pub fn language(&self) -> &'static str {
-        LANGUAGES.get(self.lang).map_or("en", |l| l.0)
+        languages().get(self.lang).map_or("en", |l| l.0)
     }
 }
 
@@ -258,7 +385,7 @@ pub fn chosen(setting: Option<&str>) -> String {
     [setting.map(str::to_owned), system_language()]
         .into_iter()
         .flatten()
-        .find(|l| LANGUAGES.iter().any(|k| k.0 == l))
+        .find(|l| languages().iter().any(|k| k.0 == l))
         .unwrap_or_else(|| "en".to_owned())
 }
 
@@ -313,15 +440,61 @@ mod tests {
             "第 2 关最高分"
         );
         assert_eq!(zh.language(), "zh");
-        // every line has a key and seven texts, none empty in English
-        for l in OURS
-            .lines()
-            .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
-        {
-            let cols: Vec<&str> = l.split(" | ").collect();
-            assert_eq!(cols.len(), 1 + LANGUAGES.len(), "{l}");
-            assert!(cols.iter().all(|c| !c.trim().is_empty()), "{l}");
+    }
+
+    #[test]
+    fn every_language_file_has_the_keys_of_english() {
+        let t = build(&[]);
+        let en = keys_of(&t, "en");
+        assert!(en.len() > 200);
+        let mut missing = Vec::new();
+        for (code, _) in &t.langs {
+            let has = keys_of(&t, code);
+            for k in &en {
+                if !has.contains(k) {
+                    missing.push(format!("{code}: {k}"));
+                }
+            }
+            for k in &has {
+                if !en.contains(k) {
+                    missing.push(format!("{code}: {k} (not in English)"));
+                }
+            }
         }
+        assert!(missing.is_empty(), "keys missing:\n{}", missing.join("\n"));
+        // English holds a text for every key, and each file names its language
+        for (code, name) in &t.langs {
+            assert!(
+                !name.is_empty() && *name != *code,
+                "{code} has no language name"
+            );
+        }
+    }
+
+    #[test]
+    fn a_file_overrides_a_language_and_adds_one() {
+        let dir = std::env::temp_dir().join(format!("drahtseilakt-texts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("de.txt"),
+            "# fix\nMenu_Main Button Start = Los = geht's\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("pt.txt"),
+            "language name = Português\nlevel = Nível {n}\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("Bad Name.txt"), "language name = x\n").unwrap();
+        let t = build(std::slice::from_ref(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+        let de = t.langs.iter().position(|l| l.0 == "de").unwrap();
+        assert_eq!(t.tables[de]["Menu_Main Button Start"], "Los = geht's");
+        assert_eq!(t.tables[de]["Menu_Main Button Options"], "Optionen");
+        assert_eq!(t.langs.len(), 8);
+        assert_eq!(t.langs[7], ("pt", "Português"));
+        assert_eq!(t.tables[7]["level"], "Nível {n}");
     }
 
     #[test]
