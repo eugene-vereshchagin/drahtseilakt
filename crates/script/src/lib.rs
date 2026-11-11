@@ -6,12 +6,14 @@
 pub mod blocks;
 pub mod census;
 pub mod exec;
+pub mod input;
 pub mod ops;
 #[cfg(test)]
 mod runtime_tests;
 pub mod types;
 
 pub use exec::{Ent, Host, Quiet, Runtime};
+pub use input::InputFrame;
 pub use nmo::behavior::Guid;
 
 use nmo::behavior::{self, Saved};

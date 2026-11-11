@@ -2,13 +2,15 @@
 // is identified by a hash of its file, so a replay never runs against the wrong data. A replay holds only our
 // input, never game data, so it can live in the repository.
 //
-//   drahtseilakt-replay 10       (1: recorded before the ball burst into pieces in transformers, 2: before the
+//   drahtseilakt-replay 11       (1: recorded before the ball burst into pieces in transformers, 2: before the
 //                                 pieces went after 20 s, 3: before the checkpoints followed their names, 4: before
 //                                 the loose objects were made of their module file's mesh, 5: before the camera
 //                                 looked along the reset point after a lost ball, 6: before a run begun at a sector took the
 //                                 sector's own ball, 7: before the camera's start and respawn heading was the reset point's exact one, 8: before a map's own scripts ran; each played so; 9: before
 //                                 a script's activation waited for the next tick, as the original's: a run of a map
-//                                 with scripts in format 9 is stale and refused, one without scripts plays as before)
+//                                 with scripts in format 9 is stale and refused, one without scripts plays as before; 10: before the keyboard and
+//                                 the mouse were part of the input: a map's scripts saw none of them, so a replay of
+//                                 format <= 10 gives the scripts an empty keyboard and a still mouse)
 //   level <file name> <fnv-1a 64 of the file, hex>
 //   start <sector> <ball kind or -> <x,y,z or ->   (optional: a run begun elsewhere than the level start)
 //   mod <key> <fnv-1a 64 of its mod.txt, hex> [<option>=<value>]...   (optional, at most MAX_MODS: a mod that
@@ -16,18 +18,24 @@
 //                                 docs/drahtseilakt/mods.md. A replay without them is a classic run, as before)
 //   turn <tick> <degrees>         (optional, 0-359: the view's turn a `view.turn` mod hands the run, from this tick on)
 //   <tick> <input bits, hex>      (from this tick on; tick 1 is the first)
+//   keys <tick> <+|-><hex scan code>...   (format 11, optional: keys that went down (+) or up (-) from this tick on, the
+//                                 DirectInput scan codes a map's scripts read; keys are up at the start)
+//   mouse <tick> <x> <y> <buttons>   (format 11, optional: the mouse's position in the original's 640x480 frame and its
+//                                 buttons, bit 0 left, 1 right, 2 middle, from this tick on; at the start 0 0 0)
 //   end <last tick>
 
+use script::InputFrame;
 use std::fmt::Write as _;
 
-pub const FORMAT: &str = "drahtseilakt-replay 10";
+pub const FORMAT: &str = "drahtseilakt-replay 11";
 /// The format written (the number in `FORMAT`).
-pub const VERSION: u32 = 10;
+pub const VERSION: u32 = 11;
 /// The formats read: 1 (no bursts), 2 (the pieces lie until the ball is lost), 3 (the checkpoints in their group's
 /// order), 4 (the loose objects of their stand-ins' meshes), 5 (the respawn at the start heading), 6, 7 (a run begun at a sector
 /// keeps the sector's ball), 8 (the camera's exact heading), 9 (a map's own scripts run; before, they did not) and 10
-/// (the scripts run as the original's behaviour manager: an activation applies at the next tick).
-const FORMATS: [&str; 10] = [
+/// (the scripts run as the original's behaviour manager: an activation applies at the next tick) and 11 (the keyboard
+/// and the mouse are in the input stream, for a map's scripts).
+const FORMATS: [&str; 11] = [
     "drahtseilakt-replay 1",
     "drahtseilakt-replay 2",
     "drahtseilakt-replay 3",
@@ -37,6 +45,7 @@ const FORMATS: [&str; 10] = [
     "drahtseilakt-replay 7",
     "drahtseilakt-replay 8",
     "drahtseilakt-replay 9",
+    "drahtseilakt-replay 10",
     FORMAT,
 ];
 
@@ -117,6 +126,8 @@ pub struct Replay {
     /// (first tick, the view's turn in whole degrees) where it changes: a second input channel, only for a run whose
     /// mod hands its view's turn to the run (`view.turn`); empty otherwise.
     pub turns: Vec<(u64, u16)>,
+    /// (first tick, keyboard and mouse) where they change: what a map's scripts see (format 11; empty before).
+    pub frames: Vec<(u64, InputFrame)>,
     pub end: u64,
 }
 
@@ -130,6 +141,7 @@ impl Replay {
             mods: Vec::new(),
             changes: Vec::new(),
             turns: Vec::new(),
+            frames: Vec::new(),
             end: 0,
         }
     }
@@ -151,6 +163,26 @@ impl Replay {
     pub fn record_turn(&mut self, tick: u64, turn: u16) {
         if self.turns.last().map_or(0, |c| c.1) != turn {
             self.turns.push((tick, turn));
+        }
+    }
+
+    /// Records the keyboard and the mouse of `tick` (only where they change; nothing before format 11).
+    pub fn record_frame(&mut self, tick: u64, frame: InputFrame) {
+        let frame = frame.clamped();
+        if self.version >= 11 && self.frames.last().map_or(InputFrame::default(), |c| c.1) != frame
+        {
+            self.frames.push((tick, frame));
+        }
+    }
+
+    /// The keyboard and the mouse at a tick (an empty keyboard and a still mouse before format 11).
+    pub fn frame_at(&self, tick: u64) -> InputFrame {
+        match self.frames.partition_point(|c| c.0 <= tick) {
+            0 => InputFrame::default(),
+            n => self
+                .frames
+                .get(n.saturating_sub(1))
+                .map_or(InputFrame::default(), |c| c.1),
         }
     }
 
@@ -210,6 +242,20 @@ impl Replay {
         for (tt, d) in turns {
             let _ = writeln!(s, "turn {tt} {d}");
         }
+        let mut before = InputFrame::default();
+        for (t, f) in &self.frames {
+            let keys: Vec<String> = (0..=255u8)
+                .filter(|&k| f.down(k) != before.down(k))
+                .map(|k| format!("{}{k:02x}", if f.down(k) { '+' } else { '-' }))
+                .collect();
+            if !keys.is_empty() {
+                let _ = writeln!(s, "keys {t} {}", keys.join(" "));
+            }
+            if (f.mouse, f.buttons) != (before.mouse, before.buttons) {
+                let _ = writeln!(s, "mouse {t} {} {} {}", f.mouse[0], f.mouse[1], f.buttons);
+            }
+            before = *f;
+        }
         let _ = writeln!(s, "end {}", self.end);
         s
     }
@@ -240,6 +286,7 @@ impl Replay {
             mods: Vec::new(),
             changes: Vec::new(),
             turns: Vec::new(),
+            frames: Vec::new(),
             end: 0,
         };
         for line in lines {
@@ -255,6 +302,13 @@ impl Replay {
                 }
                 r.mods
                     .push(line.split_whitespace().collect::<Vec<_>>().join(" "));
+                continue;
+            }
+            if a == "keys" || a == "mouse" {
+                if version < 11 {
+                    return Err(format!("{a} lines need replay format 11: {line}"));
+                }
+                parse_frame_line(&mut r.frames, a, f).ok_or_else(|| format!("bad {a}: {line}"))?;
                 continue;
             }
             if a == "turn" {
@@ -288,6 +342,53 @@ impl Replay {
         Ok(r)
     }
 }
+
+/// A `keys` or `mouse` line applied to the frames: the last frame (or an empty one) changed at that tick.
+fn parse_frame_line<'a>(
+    frames: &mut Vec<(u64, InputFrame)>,
+    kind: &str,
+    mut f: impl Iterator<Item = &'a str>,
+) -> Option<()> {
+    let tick: u64 = f.next()?.parse().ok()?;
+    let last = frames.last().copied();
+    if last.is_some_and(|c| c.0 > tick) {
+        return None;
+    }
+    let mut cur = last.map_or(InputFrame::default(), |c| c.1);
+    if kind == "keys" {
+        let mut n = 0;
+        for tok in f {
+            let (on, hex) = match (tok.strip_prefix('+'), tok.strip_prefix('-')) {
+                (Some(h), _) => (true, h),
+                (_, Some(h)) => (false, h),
+                _ => return None,
+            };
+            cur.set(u8::from_str_radix(hex, 16).ok()?, on);
+            n += 1;
+        }
+        if n == 0 {
+            return None;
+        }
+    } else {
+        let x: i16 = f.next()?.parse().ok()?;
+        let y: i16 = f.next()?.parse().ok()?;
+        let b: u8 = f.next()?.parse().ok()?;
+        if !(0..=MOUSE_W).contains(&x) || !(0..=MOUSE_H).contains(&y) || b > 7 || f.next().is_some()
+        {
+            return None;
+        }
+        cur.mouse = [x, y];
+        cur.buttons = b;
+    }
+    match frames.last_mut() {
+        Some(l) if l.0 == tick => l.1 = cur,
+        _ => frames.push((tick, cur)),
+    }
+    Some(())
+}
+
+const MOUSE_W: i16 = script::input::MOUSE_FRAME.0;
+const MOUSE_H: i16 = script::input::MOUSE_FRAME.1;
 
 fn parse_start<'a>(mut f: impl Iterator<Item = &'a str>) -> Option<Start> {
     let sector = f.next()?.parse().ok().filter(|&n| n >= 1)?;
@@ -354,11 +455,11 @@ mod tests {
     }
 
     #[test]
-    fn format_10_round_trips_and_older_formats_still_read() -> Result<(), String> {
+    fn format_11_round_trips_and_older_formats_still_read() -> Result<(), String> {
         let mut r = Replay::new("Level_01.NMO", 0xabc);
         r.record(1, 0);
-        assert_eq!(r.version, 10);
-        assert!(r.to_text().starts_with("drahtseilakt-replay 10\n"));
+        assert_eq!(r.version, 11);
+        assert!(r.to_text().starts_with("drahtseilakt-replay 11\n"));
         assert_eq!(Replay::parse(&r.to_text())?, r);
         let old = Replay::parse("drahtseilakt-replay 7\nlevel a 1\n1 00\nend 1")?;
         assert_eq!(old.version, 7);
@@ -437,10 +538,13 @@ mod tests {
         let nine = Replay::parse("drahtseilakt-replay 9\nlevel a 1\n1 01\nend 5")
             .expect("format 9 still reads");
         assert_eq!(nine.version, 9);
-        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 10");
-        assert_eq!(new.version, 10);
+        let ten = Replay::parse("drahtseilakt-replay 10\nlevel a 1\n1 01\nend 5")
+            .expect("format 10 still reads");
+        assert_eq!(ten.version, 10);
+        let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 11");
+        assert_eq!(new.version, 11);
         assert!(
-            Replay::parse("drahtseilakt-replay 11\nlevel a 1\nend 1").is_err(),
+            Replay::parse("drahtseilakt-replay 12\nlevel a 1\nend 1").is_err(),
             "a later format is refused"
         );
         // format 9's scripts ran otherwise: stale on a map with scripts, fine without; older ones ran none
@@ -448,6 +552,7 @@ mod tests {
         assert!(stale_for_scripts(9, false).is_none());
         assert!(stale_for_scripts(8, true).is_none());
         assert!(stale_for_scripts(10, true).is_none());
+        assert!(stale_for_scripts(11, true).is_none());
         let mut kept = Replay::new("a", 1);
         kept.version = 2;
         assert_eq!(
@@ -456,6 +561,63 @@ mod tests {
             "an older format is written as it is"
         );
         assert!(Replay::parse("drahtseilakt-replay 1\nlevel a 1\nstart 1 - 1,2\nend 1").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn the_keyboard_and_the_mouse_round_trip_as_changes() -> Result<(), String> {
+        let mut r = Replay::new("Level_01.NMO", 0xabc);
+        let mut f = InputFrame::default();
+        for t in 1..=8u64 {
+            f.set(0x1c, (3..6).contains(&t));
+            f.set(0xc8, t >= 5);
+            f.mouse = [if t >= 7 { 320 } else { 0 }, if t >= 7 { 240 } else { 0 }];
+            f.buttons = if t == 8 { script::input::LEFT } else { 0 };
+            r.record(t, 0);
+            r.record_frame(t, f);
+        }
+        // only the ticks where something changed are stored
+        assert_eq!(
+            r.frames.iter().map(|c| c.0).collect::<Vec<_>>(),
+            vec![3, 5, 6, 7, 8]
+        );
+        let text = r.to_text();
+        assert!(text.contains("keys 3 +1c\n"), "{text}");
+        assert!(text.contains("keys 5 +c8\n") || text.contains("keys 5 -1c +c8"));
+        assert!(text.contains("mouse 7 320 240 0\n"), "{text}");
+        let back = Replay::parse(&text)?;
+        assert_eq!(back, r);
+        assert!(!back.frame_at(2).down(0x1c));
+        assert!(back.frame_at(4).down(0x1c));
+        assert!(!back.frame_at(6).down(0x1c) && back.frame_at(6).down(0xc8));
+        assert_eq!(back.frame_at(8).mouse, [320, 240]);
+        assert_eq!(back.frame_at(8).buttons, 1);
+        // a run without input is as before: no input lines
+        let mut plain = Replay::new("Level_01.NMO", 0xabc);
+        plain.record(1, 0);
+        plain.record_frame(1, InputFrame::default());
+        assert!(!plain.to_text().contains("keys") && !plain.to_text().contains("mouse"));
+        // an older format records and reads no input lines
+        let mut old = Replay::new("Level_01.NMO", 0xabc);
+        old.version = 10;
+        old.record_frame(1, f);
+        assert!(old.frames.is_empty());
+        assert!(Replay::parse("drahtseilakt-replay 10\nlevel a 1\nkeys 1 +1c\nend 1").is_err());
+        // hostile lines
+        for bad in [
+            "keys 1",
+            "keys 1 1c",
+            "keys 1 +zz",
+            "mouse 1 700 0 0",
+            "mouse 1 0 0 9",
+            "mouse 1 0 0",
+            "keys 2 +1c\nkeys 1 -1c",
+        ] {
+            assert!(
+                Replay::parse(&format!("drahtseilakt-replay 11\nlevel a 1\n{bad}\nend 2")).is_err(),
+                "{bad}"
+            );
+        }
         Ok(())
     }
 }

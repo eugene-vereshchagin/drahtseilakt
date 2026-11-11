@@ -827,6 +827,12 @@ pub struct Sim {
     spawn_point: Option<(Vec3, Quat, BallKind)>,
     /// The view's turn in whole degrees, handed in by the window each tick (a `view.turn` mod; recorded in the replay).
     pub turn: u16,
+    /// The keyboard and the mouse of this tick and of the tick before, as the map's scripts see them: from the run's
+    /// input stream (the replay's in a replay), never the live machine. Set by `set_input` once per tick.
+    input_now: script::InputFrame,
+    input_before: script::InputFrame,
+    /// What the scripts last asked of the system's mouse cursor (shown or hidden); none if they never did.
+    pub script_cursor: Option<bool>,
     /// The ball inside a transformer, if it is in one.
     hold: Option<TrafoHold>,
     /// The transformer animation playing, if one is.
@@ -1394,6 +1400,9 @@ impl Sim {
             prev_input: 0,
             spawn_point: None,
             turn: 0,
+            input_now: script::InputFrame::default(),
+            input_before: script::InputFrame::default(),
+            script_cursor: None,
             hold: None,
             trafo_anim: None,
             dying: None,
@@ -1455,6 +1464,12 @@ impl Sim {
         self.scripts.as_ref().map_or(&[], |s| s.moved.as_slice())
     }
 
+    /// The keyboard and the mouse of the next tick, for the scripts (call once per tick, before `step`).
+    pub fn set_input(&mut self, frame: script::InputFrame) {
+        self.input_before = self.input_now;
+        self.input_now = frame;
+    }
+
     /// One tick of the map's scripts, before the physics (the original runs its behaviours first in a frame); a
     /// script that sets the ball's position puts a new ball there at rest, as the original re-physicalizes it.
     fn run_scripts(&mut self) {
@@ -1468,8 +1483,14 @@ impl Sim {
             points: self.points,
             in_play: self.dying.is_none() && self.hold.is_none() && !self.finished,
             teleport: None,
+            input: self.input_now,
+            input_before: self.input_before,
+            cursor: None,
         };
         scripts.tick(&mut view);
+        if view.cursor.is_some() {
+            self.script_cursor = view.cursor;
+        }
         if let Some(p) = view.teleport {
             self.ball.position = p;
             self.ball.velocity = Vec3::ZERO;

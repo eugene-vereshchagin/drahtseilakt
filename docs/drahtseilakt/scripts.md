@@ -71,6 +71,15 @@ a map with scripts in **format 9** is refused as stale: its scripts activated at
 (format 10, stage 0). A format-9 run of a level without scripts plays as before. Levels
 without scripts are untouched: there is no runtime at all.
 
+**Input** (format 11): the whole keyboard (DirectInput scan codes, the original's key codes) and the mouse (position
+in the original's 640x480 frame, buttons) are part of a run's input stream. The game reads them from the window once
+per tick, hands them to the scripts and records the changes in the replay (`keys` and `mouse` lines,
+[replay.rs](../../crates/game/src/replay.rs)); playing a replay gives the scripts the recorded input, never the live
+machine, so replays stay exact. A replay of format 10 or older gives the scripts an empty keyboard and a still mouse
+(as before, when these blocks did nothing); it needs no `keys` or `mouse` line. Blocks: Key Event, Key Waiter, Switch
+On Key, Mouse Waiter, Input String (bounded at 256 characters), and Show Mouse Cursor, Mouse Cursor, Mouse Cursor
+System (the window's cursor only, no effect on the run). Their semantics: `docs/gameplay_bbs.md`, "Input blocks".
+
 **The engine's side** (`Host`, implemented in `scripting.rs`): matrices and visibility of level objects
 (kept as overlays the renderer reads: `script_hidden`, `script_moved`), the ball's position (Set Position on
 the ball puts a new ball there at rest, as the original re-physicalizes it), bounding boxes (the mesh's box
@@ -82,8 +91,7 @@ natively from their frames ([modules](modules/)), so Point Particle System only 
 
 What phase 1 does **not** do: physics for scripted objects other than the ball (Physicalize, SetPhysicsForce,
 Physics Impulse are accepted and logged), copies of objects (Object Copy returns nothing), texts and sounds
-(logged; the HUD and the sound engine come next), keys other than the game's (Key Event never fires: a run's
-input is the game's keys only), the original's 2D interface blocks (never: the game has its own).
+(logged; the HUD and the sound engine come next), the original's 2D interface blocks (never: the game has its own).
 
 ## Phase 2 (2026-11-11): copies, "This", groups, progressions
 
@@ -299,7 +307,7 @@ by the engine's.
 | Nop | `302561c4:0d282980` | 8 | 50 | done |
 | Restore IC | `766e4e44:4fac6d52` | 8 | 23 | done |
 | Identity | `15151652:aeefffd5` | 6 | 38 | done |
-| Key Event | `1af2274b:6b8c1524` | 6 | 22 | partial: never fires (keys are not in a run) |
+| Key Event | `1af2274b:6b8c1524` | 6 | 22 | done (keys of the run's input stream) |
 | Parameter Selector | `63eb2b0c:27e2767e` | 6 | 20 | done |
 | Add To Group | `00024125:785420ab` | 5 | 11 | done |
 | Rotate | `ffffffee:eeffffff` | 5 | 14 | done |
@@ -320,7 +328,7 @@ by the engine's.
 | Binary Memory | `d02d67dd:10211fdd` | 3 | 7 | done |
 | Get Nearest In Group | `085207eb:584950d8` | 3 | 4 | done |
 | Is In Group | `58a1210b:14e5715c` | 3 | 18 | done |
-| Mouse Waiter | `014d010b:015d010b` | 3 | 3 | never (the engine's own interface) |
+| Mouse Waiter | `014d010b:015d010b` | 3 | 3 | done (mouse of the run's input stream; no wheel) |
 | Set Light Color | `32115590:78951230` | 3 | 3 | planned |
 | Timer | `a2a5a63a:e4e7e8e5` | 3 | 4 | done |
 | Physics Impulse | `0c7e39bb:16db20d5` | 3 | 6 | planned |
@@ -359,11 +367,11 @@ by the engine's.
 | Set Ambient | `aaaaaaaa:aeae1287` | 1 | 1 | never (the engine's own interface) |
 | Set Specular | `20202020:30303030` | 1 | 1 | planned |
 | Write In Texture | `1d57024d:7c064238` | 1 | 1 | never (the engine's own interface) |
-| Show Mouse Cursor | `16f6368f:506b60fc` | 1 | 1 | never (the engine's own interface) |
+| Show Mouse Cursor | `16f6368f:506b60fc` | 1 | 1 | done (the system cursor only) |
 | Get Nearest Object | `4321abcd:0eeaabdd` | 1 | 1 | no-op |
-| Input String | `693e7e4b:100104c4` | 1 | 1 | never (the engine's own interface) |
-| Mouse Cursor System | `2483576d:57c66324` | 1 | 1 | never (the engine's own interface) |
-| Mouse Cursor | `140c3eac:6e502a81` | 1 | 1 | never (the engine's own interface) |
+| Input String | `693e7e4b:100104c4` | 1 | 1 | done (at most 256 characters; US layout) |
+| Mouse Cursor System | `2483576d:57c66324` | 1 | 1 | partial: passes the flow, shows or hides the system cursor |
+| Mouse Cursor | `140c3eac:6e502a81` | 1 | 1 | partial: passes the flow, shows or hides the system cursor |
 | Set Pickable | `f1499052:ebe9bbf1` | 1 | 1 | never (the engine's own interface) |
 | TT_Timer | `6ac67901:7d2a6059` | 1 | 1 | done |
 | Set IC | `72671a24:161a2347` | 1 | 1 | partial: accepted (initial conditions stay as loaded) |
@@ -411,9 +419,9 @@ by the engine's.
 | Remove Mesh | `0002145e:6e1b2592` | 1 | 4 | no-op |
 | Select Mesh | `43890176:58b2244e` | 1 | 1 | no-op |
 | Is Same Mesh | `?` | 1 | 1 | planned |
-| Switch On Key | `1f49612e:6cd63de0` | 1 | 2 | never (the engine's own interface) |
+| Switch On Key | `1f49612e:6cd63de0` | 1 | 2 | done (semantics modelled, not in the C reference) |
 | Wait For All | `c044a999:fdfefaf7` | 1 | 1 | done |
-| Key Waiter | `016d010b:017d010b` | 1 | 1 | never (the engine's own interface) |
+| Key Waiter | `016d010b:017d010b` | 1 | 1 | done |
 | Delete Dynamic Objects | `0cba3195:53440e4c` | 1 | 1 | planned |
 | Random Switch | `79d72fde:2e9d0912` | 1 | 1 | done (the same generator) |
 | Explode | `002d010a:003d010a` | 1 | 1 | no-op |
@@ -462,8 +470,7 @@ blocks, the blocks beyond the template, the blocks not covered, and whether phas
    (expressions), Row Search, Sort Rows, Move / Remove Row, Insert Column, Has / Set Attribute, Objects With
    Attribute Iterator, Iterator If, Get Message Data, Execute / Attach Script, Scan String, Create String, Get
    SubString, To Lower Keys, Renamer.
-7. **Never**: the mouse (Mouse Cursor, Mouse Waiter, Show Mouse Cursor, Input String, Key Waiter, Switch On
-   Key), fonts (Create System Font, TT CreateFontEx, Set Font Properties), Movie Player, Write In Texture,
+7. **Never**: fonts (Create System Font, TT CreateFontEx, Set Font Properties), Movie Player, Write In Texture,
    Edit 2D Entity, Set As Active Camera, Set Clipping Planes, TT Sky: the game's own interface and camera take
    their place; a map that needs them for play is reported by name.
 

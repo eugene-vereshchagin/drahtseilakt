@@ -67,6 +67,13 @@ pub mod proto {
     pub const IDENTITY: Guid = Guid(0x1515_1652, 0xaeef_ffd5);
     pub const PARAMETER_SELECTOR: Guid = Guid(0x63eb_2b0c, 0x27e2_767e);
     pub const KEY_EVENT: Guid = Guid(0x1af2_274b, 0x6b8c_1524);
+    pub const KEY_WAITER: Guid = Guid(0x016d_010b, 0x017d_010b);
+    pub const SWITCH_ON_KEY: Guid = Guid(0x1f49_612e, 0x6cd6_3de0);
+    pub const MOUSE_WAITER: Guid = Guid(0x014d_010b, 0x015d_010b);
+    pub const INPUT_STRING: Guid = Guid(0x693e_7e4b, 0x1001_04c4);
+    pub const SHOW_MOUSE_CURSOR: Guid = Guid(0x16f6_368f, 0x506b_60fc);
+    pub const MOUSE_CURSOR_SYSTEM: Guid = Guid(0x2483_576d, 0x57c6_6324);
+    pub const MOUSE_CURSOR: Guid = Guid(0x140c_3eac, 0x6e50_2a81);
     pub const PER_SECOND: Guid = Guid(0x448e_54ce, 0x75a6_55c5);
     pub const SET_PHYSICS_FORCE: Guid = Guid(0x56e2_0c57, 0x0b92_6068);
     pub const CHANGE_TEXTURE_SIZE: Guid = Guid(0x7a7c_4d7b, 0x468d_0f33);

@@ -24,6 +24,9 @@ struct Rec {
     messages: Vec<String>,
     ball: [f32; 3],
     in_play: bool,
+    frame: crate::InputFrame,
+    before: crate::InputFrame,
+    cursor: Option<bool>,
 }
 
 fn ident(x: f32, y: f32, z: f32) -> [[f32; 4]; 4] {
@@ -113,6 +116,15 @@ impl Host for Rec {
         self.visible.push(true);
         self.notes.push(format!("copy {name}"));
         Some(self.matrices.len() - 1)
+    }
+    fn input(&self) -> crate::InputFrame {
+        self.frame
+    }
+    fn input_before(&self) -> crate::InputFrame {
+        self.before
+    }
+    fn show_cursor(&mut self, on: bool) {
+        self.cursor = Some(on);
     }
     fn group_add(&mut self, group: usize, object: usize) {
         self.notes.push(format!("group {group} + {object}"));
@@ -1188,7 +1200,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     }
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them)
-    assert_eq!(all.len(), 106);
+    assert_eq!(all.len(), 113);
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -1633,4 +1645,288 @@ fn attributes_are_set_found_and_listed_in_order() {
         rt.attrs_of(0) <= crate::MAX_ATTRIBUTES_PER_OBJECT,
         "an object carries a bounded number"
     );
+}
+
+// ---- input blocks (docs/gameplay_bbs.md, "Input blocks"): keys and mouse come from the host's tick input ----
+
+/// A script on object 0 starting one input block through its input 0; returns the block and the runtime.
+struct InputRig {
+    rt: Runtime,
+    host: Rec,
+    blk: Id,
+    g: Arc<Graph>,
+}
+
+impl InputRig {
+    fn new(
+        proto: Guid,
+        ins: &[&str],
+        outs: &[&str],
+        pins: Vec<(Guid, Value)>,
+        pouts: &[(&str, Guid)],
+        locals: Vec<(Guid, Value)>,
+    ) -> (InputRig, Vec<Id>) {
+        let mut b = Build::new();
+        let mut ps = Vec::new();
+        for (g, v) in pins {
+            let l = b.local("p", g, v);
+            ps.push(b.pin("p", g, l));
+        }
+        let po: Vec<Id> = pouts.iter().map(|(n, g)| b.pout(n, *g)).collect();
+        let ls: Vec<Id> = locals
+            .into_iter()
+            .map(|(g, v)| b.local("l", g, v))
+            .collect();
+        let blk = b.bb("blk", proto, ins, outs, ps, po.clone(), ls, None);
+        let start = b.io("Start");
+        let mut subs = vec![blk];
+        let mut links = vec![b.link(start, in_of(&b.g, blk, 0), 0)];
+        // each output sends the message "o<i>" to object 0, which the host records
+        for i in 0..outs.len() {
+            let m = b.local("m", types::MESSAGE, Value::Str(format!("o{i}")));
+            let mp = b.pin("Message", types::MESSAGE, m);
+            let d = b.local("d", types::ENTITY, Value::Obj(Some(0)));
+            let dp = b.pin("Dest", types::ENTITY, d);
+            let send = b.bb(
+                "send",
+                proto::SEND_MESSAGE,
+                &["In"],
+                &["Out"],
+                vec![mp, dp],
+                vec![],
+                vec![],
+                None,
+            );
+            links.push(b.link(out_of(&b.g, blk, i), in_of(&b.g, send, 0), 0));
+            subs.push(send);
+        }
+        b.script("S", Some(0), start, subs, links);
+        let g = b.done();
+        let rig = InputRig {
+            rt: Runtime::new(g.clone()),
+            host: Rec::new(),
+            blk,
+            g,
+        };
+        (rig, po)
+    }
+
+    /// One tick with `keys` down (the previous tick's keys are the last call's).
+    fn tick(&mut self, keys: &[u8], mouse: [i16; 2], buttons: u8) {
+        self.host.before = self.host.frame;
+        self.host.messages.clear();
+        let mut f = crate::InputFrame::default();
+        for &k in keys {
+            f.set(k, true);
+        }
+        f.mouse = mouse;
+        f.buttons = buttons;
+        self.host.frame = f;
+        self.rt.tick(&mut self.host);
+    }
+
+    /// Whether output `out` fired in the last tick.
+    fn fired(&self, out: usize) -> bool {
+        self.host.messages.contains(&format!("o{out}"))
+    }
+}
+
+#[test]
+fn key_event_fires_pressed_and_released_on_the_keys_of_the_tick() {
+    let (mut r, po) = InputRig::new(
+        proto::KEY_EVENT,
+        &["On", "Off"],
+        &["Pressed", "Released"],
+        vec![
+            (types::INT, Value::Int(0x1d)),
+            (types::INT, Value::Int(0x39)),
+        ],
+        &[("Key State", types::BOOL)],
+        vec![],
+    );
+    r.tick(&[0x1d], [0, 0], 0);
+    assert!(!r.fired(0), "only one of the two keys is down");
+    r.tick(&[0x1d, 0x39], [0, 0], 0);
+    assert!(r.fired(0), "both down: Pressed");
+    assert_eq!(r.rt.values[po[0]], Value::Bool(true));
+    r.tick(&[0x1d, 0x39], [0, 0], 0);
+    assert!(!r.fired(0), "Pressed fires once");
+    r.tick(&[0x39], [0, 0], 0);
+    assert!(r.fired(1), "a key let go: Released");
+    assert_eq!(r.rt.values[po[0]], Value::Bool(false));
+}
+
+#[test]
+fn key_waiter_waits_for_its_key_or_for_any_key_just_pressed() {
+    let (mut r, _) = InputRig::new(
+        proto::KEY_WAITER,
+        &["In"],
+        &["Out"],
+        vec![(types::INT, Value::Int(0x1c))],
+        &[("Key", types::INT)],
+        vec![(types::BOOL, Value::Bool(false))],
+    );
+    r.tick(&[0x39], [0, 0], 0);
+    assert!(!r.fired(0));
+    r.tick(&[0x1c], [0, 0], 0);
+    assert!(r.fired(0), "its key is down");
+    let (mut r, po) = InputRig::new(
+        proto::KEY_WAITER,
+        &["In"],
+        &["Out"],
+        vec![(types::INT, Value::Int(0))],
+        &[("Key", types::INT)],
+        vec![(types::BOOL, Value::Bool(true))],
+    );
+    r.tick(&[0x39], [0, 0], 0);
+    assert!(r.fired(0), "any key");
+    assert_eq!(r.rt.values[po[0]], Value::Int(0x39));
+    let (mut r, _) = InputRig::new(
+        proto::KEY_WAITER,
+        &["In"],
+        &["Out"],
+        vec![(types::INT, Value::Int(0))],
+        &[("Key", types::INT)],
+        vec![(types::BOOL, Value::Bool(true))],
+    );
+    r.host.frame.set(0x10, true);
+    r.tick(&[0x10], [0, 0], 0);
+    assert!(!r.fired(0), "a key already held is not a press");
+}
+
+#[test]
+fn switch_on_key_fires_the_output_of_the_key_just_pressed() {
+    let (mut r, _) = InputRig::new(
+        proto::SWITCH_ON_KEY,
+        &["On", "Off"],
+        &["A", "B"],
+        vec![
+            (types::INT, Value::Int(0x1e)),
+            (types::INT, Value::Int(0x30)),
+        ],
+        &[],
+        vec![],
+    );
+    r.tick(&[], [0, 0], 0);
+    r.tick(&[0x30], [0, 0], 0);
+    assert!(!r.fired(0) && r.fired(1));
+    r.tick(&[0x30], [0, 0], 0);
+    assert!(!r.fired(1), "held, not pressed again");
+}
+
+#[test]
+fn mouse_waiter_fires_move_and_button_edges_in_its_output_order() {
+    // mask: Move, left pressed (bit 1), left released (bit 2) -> outputs 0, 1, 2
+    let (mut r, po) = InputRig::new(
+        proto::MOUSE_WAITER,
+        &["On", "Off"],
+        &["Move", "Left Pressed", "Left Released"],
+        vec![],
+        &[
+            ("Mouse Position", types::VECTOR2),
+            ("Wheel Direction", types::FLOAT),
+            ("Left Button", types::BOOL),
+            ("Middle Button", types::BOOL),
+            ("Right Button", types::BOOL),
+        ],
+        vec![
+            (types::BOOL, Value::Bool(true)),
+            (types::INT, Value::Int(0b111)),
+        ],
+    );
+    r.tick(&[], [0, 0], 0);
+    assert!(!r.fired(0), "no move from the origin");
+    r.tick(&[], [320, 240], 0);
+    assert!(r.fired(0));
+    assert_eq!(r.rt.values[po[0]], Value::Vec2([320.0, 240.0]));
+    r.tick(&[], [320, 240], crate::input::LEFT);
+    assert!(r.fired(1) && !r.fired(0));
+    assert_eq!(r.rt.values[po[2]], Value::Bool(true));
+    r.tick(&[], [320, 240], 0);
+    assert!(r.fired(2));
+}
+
+fn typed(r: &mut InputRig, key: u8) {
+    r.tick(&[], [0, 0], 0);
+    r.tick(&[key], [0, 0], 0);
+}
+
+#[test]
+fn input_string_types_edits_and_ends_on_return() {
+    let (mut r, po) = InputRig::new(
+        proto::INPUT_STRING,
+        &["On", "Off"],
+        &["On", "Off", "Updated String"],
+        vec![
+            (types::STRING, Value::Str("ab".into())),
+            (types::INT, Value::Int(0)),
+        ],
+        &[("String", types::STRING), ("Key", types::INT)],
+        vec![
+            (types::INT, Value::Int(4)),
+            (types::BOOL, Value::Bool(false)),
+            (types::BOOL, Value::Bool(false)),
+            (types::INT, Value::Int(0)),
+            (types::BOOL, Value::Bool(false)),
+        ],
+    );
+    r.tick(&[], [0, 0], 0);
+    assert!(r.fired(0), "On");
+    assert_eq!(r.rt.values[po[0]], Value::Str("ab".into()));
+    typed(&mut r, 0x2e); // c
+    assert_eq!(r.rt.values[po[0]], Value::Str("abc".into()));
+    assert!(r.fired(2), "Updated String");
+    assert_eq!(r.rt.values[po[1]], Value::Int(0x2e));
+    typed(&mut r, 0x0e); // backspace
+    assert_eq!(r.rt.values[po[0]], Value::Str("ab".into()));
+    // Shift gives the capital
+    r.tick(&[], [0, 0], 0);
+    r.tick(&[0x2a, 0x20], [0, 0], 0);
+    assert_eq!(r.rt.values[po[0]], Value::Str("abD".into()));
+    // full at 4: the fifth character at the end is refused
+    typed(&mut r, 0x21);
+    typed(&mut r, 0x22);
+    assert_eq!(r.rt.values[po[0]], Value::Str("abDf".into()));
+    typed(&mut r, 0x1c); // Return
+    assert!(r.fired(1), "Off on Return");
+    assert_eq!(r.rt.values[po[0]], Value::Str("abDf".into()));
+}
+
+#[test]
+fn input_string_is_bounded_at_256_characters() {
+    let long = "x".repeat(1000);
+    let (mut r, po) = InputRig::new(
+        proto::INPUT_STRING,
+        &["On", "Off"],
+        &["On", "Off", "Updated String"],
+        vec![
+            (types::STRING, Value::Str(long)),
+            (types::INT, Value::Int(0)),
+        ],
+        &[("String", types::STRING), ("Key", types::INT)],
+        vec![(types::INT, Value::Int(100000))],
+    );
+    r.tick(&[], [0, 0], 0);
+    assert_eq!(r.rt.values[po[0]], Value::Str("x".repeat(256)));
+}
+
+#[test]
+fn the_cursor_blocks_only_show_or_hide_the_system_cursor() {
+    for p in [
+        proto::SHOW_MOUSE_CURSOR,
+        proto::MOUSE_CURSOR,
+        proto::MOUSE_CURSOR_SYSTEM,
+    ] {
+        let (mut r, _) = InputRig::new(
+            p,
+            &["In"],
+            &["Out"],
+            vec![(types::BOOL, Value::Bool(true))],
+            &[],
+            vec![],
+        );
+        r.tick(&[], [0, 0], 0);
+        assert!(r.fired(0));
+        assert_eq!(r.host.cursor, Some(true));
+    }
 }
