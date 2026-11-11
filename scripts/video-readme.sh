@@ -56,6 +56,7 @@ case $ui in
     *) interface="Ballance's original, from the player's own copy (Drahtseilakt's own where the copy has none)" ;;
 esac
 mo=$(setting models); [ "$extended" = yes ] || mo=""
+[ -n "${VIDEO_MODELS:-}" ] && mo=$VIDEO_MODELS
 case $mo in
     own) models="Drahtseilakt's own (balls, transformers and every part drawn by us)" ;;
     original) models="Ballance's original, from the player's own copy" ;;

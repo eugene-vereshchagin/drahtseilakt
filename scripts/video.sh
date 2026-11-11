@@ -17,6 +17,9 @@ level=$1; replay=$2; out=$3; size=${4:-1920x1080}
 # VIDEO_SS=N draws every frame N times larger and scales it down (supersampling: smooth edges, crisp far textures);
 # VIDEO_CRF sets the encoder's quality (lower is better; 20 by default)
 ss=${VIDEO_SS:-1}; crf=${VIDEO_CRF:-20}
+# VIDEO_MODELS picks the model pack for the run (own, original or a pack's key), whatever the settings file says; a
+# remaster video takes the game's original models by default, so the ball and the parts are Ballance's own
+models=${VIDEO_MODELS:-}; [ -z "$models" ] && [ "${VIDEO_MODE:-}" = remaster ] && models=original
 w=${size%x*}; h=${size#*x}
 draw="$((w * ss))x$((h * ss))"
 here=$(dirname "$0")
@@ -29,9 +32,9 @@ ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgb24 -s "$draw" -r 60 -i "$work/
 encoder=$!
 if [ -d "$level" ]; then which=--open; else which=--level; fi
 DRAHTSEILAKT_SOUND_FILE="$work/sound.wav" "$game" "$which" "$level" --replay "$replay" --size "$draw" \
-    --video "$work/frames"
+    ${models:+--models "$models"} --video "$work/frames"
 wait "$encoder"
 ffmpeg -loglevel error -y -i "$work/picture.mp4" -i "$work/sound.wav" -c:v copy -c:a aac -b:a 192k -shortest "$out"
 
-sh "$here/video-readme.sh" "$level" "$replay" "$out" "$size"
+VIDEO_MODELS=$models sh "$here/video-readme.sh" "$level" "$replay" "$out" "$size"
 echo "$out"
