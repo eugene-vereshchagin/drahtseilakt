@@ -819,7 +819,19 @@ fn a_parameter_copying_to_itself_a_thousand_times_does_not_stall_the_runtime() {
 #[test]
 fn a_string_that_doubles_each_time_stops_growing() {
     let big = Value::Str("x".repeat(1 << 16));
-    let r = crate::blocks::arith(|x, y| x + y, i32::wrapping_add, &big, &big, false);
+    let mut rt = Runtime::new(Arc::new(bare(vec![])));
+    let r = crate::ops::run(
+        &mut rt,
+        &mut Rec::new(),
+        crate::ops::op::ADD,
+        types::STRING,
+        types::STRING,
+        types::STRING,
+        &big,
+        &big,
+        true,
+    )
+    .unwrap();
     assert!(r.as_string().len() <= (1 << 16) + 8);
 }
 

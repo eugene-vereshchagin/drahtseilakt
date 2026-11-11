@@ -19,7 +19,7 @@ pub mod class {
 }
 
 /// A Virtools GUID (two 32-bit words), naming a building block prototype, a parameter type or an operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Guid(pub u32, pub u32);
 
 impl std::fmt::Display for Guid {

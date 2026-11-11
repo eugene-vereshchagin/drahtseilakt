@@ -13,16 +13,19 @@ pub(crate) fn op(rt: &mut Runtime, _id: Id, b: &Block, _proto: Guid, host: &mut 
     );
     let a = pin(rt, b, "p1", 0, host);
     let c = pin(rt, b, "p2", 1, host);
-    let out_guid = rt
-        .pout(b, "res", 0)
-        .and_then(|p| rt.graph.param(p))
-        .map(|p| p.guid);
-    let a_guid = rt
-        .pin(b, "p1", 0)
-        .and_then(|p| rt.graph.param(p))
-        .map(|p| p.guid);
-    let r = operation(rt, host, guid, out_guid, a_guid, &a, &c);
-    set_pout(rt, b, "res", 0, r);
+    let ty = |p: Option<Id>| {
+        p.and_then(|p| rt.graph.param(p))
+            .map_or(types::NONE, |p| p.guid)
+    };
+    let (res, t1, t2) = (
+        ty(rt.pout(b, "res", 0)),
+        ty(rt.pin(b, "p1", 0)),
+        ty(rt.pin(b, "p2", 1)),
+    );
+    // an Op block whose signature has no function writes nothing (the C reference; the notes are silent)
+    if let Some(r) = crate::ops::run(rt, host, guid, res, t1, t2, &a, &c, false) {
+        set_pout(rt, b, "res", 0, r);
+    }
     out(rt, b, 0);
     Flow::Done
 }

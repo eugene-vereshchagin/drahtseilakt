@@ -682,7 +682,7 @@ fn script_seeds() -> Vec<Vec<u8>> {
             (
                 7,
                 Node::Op(Op {
-                    guid: script::blocks::ops::ADD,
+                    guid: script::ops::op::ADD,
                     inputs: [Some(5), Some(5)],
                     output: Some(6),
                 }),

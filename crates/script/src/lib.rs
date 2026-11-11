@@ -6,8 +6,10 @@
 pub mod blocks;
 pub mod census;
 pub mod exec;
+pub mod ops;
 #[cfg(test)]
 mod runtime_tests;
+pub mod types;
 
 pub use exec::{Ent, Host, Quiet, Runtime};
 pub use nmo::behavior::Guid;
@@ -62,34 +64,19 @@ pub enum Value {
     Vec2([f32; 2]),
     Color([f32; 4]),
     Matrix([[f32; 4]; 4]),
+    /// x, y, z, w.
+    Quat([f32; 4]),
+    /// left, top, right, bottom.
+    Rect([f32; 4]),
+    /// min x, y, z, max x, y, z.
+    Box([f32; 6]),
+    /// An Object Array: object references (none for an object that is gone).
+    Objects(Vec<Option<Id>>),
     /// Bytes of a type the runtime does not decode; read as a number when a block wants one.
     Raw(Vec<u8>),
     /// A script's "This": the object the script is attached to, which the runtime puts in its place when the
     /// script starts (a copy of the script gets the copy of the object).
     Owner,
-}
-
-pub mod types {
-    use super::Guid;
-    pub const NONE: Guid = Guid(0x1cb1_0760, 0x419f_50c5);
-    pub const INT: Guid = Guid(0x5a57_16fd, 0x44e2_76d7);
-    pub const FLOAT: Guid = Guid(0x4788_4c3f, 0x432c_2c20);
-    pub const BOOL: Guid = Guid(0x1ad5_2a8e, 0x5e74_1920);
-    pub const STRING: Guid = Guid(0x6bd0_10e2, 0x1156_17ea);
-    pub const VECTOR: Guid = Guid(0x4882_4eae, 0x2fe4_7960);
-    pub const VECTOR2: Guid = Guid(0x4efc_b34a, 0x6079_e42f);
-    pub const MATRIX: Guid = Guid(0x643f_046e, 0x6521_1b71);
-    pub const COLOR: Guid = Guid(0x57d4_2fee, 0x7cbb_3b91);
-    pub const TIME: Guid = Guid(0x54b4_422b, 0x730f_0f4f);
-    pub const MESSAGE: Guid = Guid(0x0388_1e12, 0x5ba3_4e2b);
-    pub const OBJECT: Guid = Guid(0x30ec_20ab, 0x6df6_517d);
-    pub const BEOBJECT: Guid = Guid(0x71d8_0779, 0x402f_42f3);
-    pub const ENTITY: Guid = Guid(0x5b8a_05d5, 0x31ea_28d4);
-    pub const GROUP: Guid = Guid(0x5c0f_151b, 0x6f05_47fd);
-    pub const SCRIPT: Guid = Guid(0x7ea4_176d, 0x1b40_5d30);
-    pub const ARRAY: Guid = Guid(0x024d_52f1, 0x6782_23b2);
-    pub const MESH: Guid = Guid(0x2453_5345, 0x65d1_5229);
-    pub const MATERIAL: Guid = Guid(0x55ab_12cd, 0x22ae_6a8b);
 }
 
 fn le_f32(b: &[u8], at: usize) -> Option<f32> {
@@ -115,22 +102,32 @@ impl Value {
             Saved::Name(n) => Value::Str(String::from_utf8_lossy(n).into_owned()),
             Saved::Bytes(b) => {
                 let f = |i: usize| le_f32(b, i.saturating_mul(4)).unwrap_or(0.0);
-                match guid {
-                    types::INT => Value::Int(le_i32(b, 0).unwrap_or(0)),
-                    types::FLOAT | types::TIME => Value::Float(f(0)),
-                    types::BOOL => Value::Bool(le_i32(b, 0).unwrap_or(0) != 0),
-                    types::STRING => {
+                let n = b.len();
+                match types::kind(guid) {
+                    Some(types::Kind::Int | types::Kind::Enum) => {
+                        Value::Int(le_i32(b, 0).unwrap_or(0))
+                    }
+                    Some(types::Kind::Float) => Value::Float(f(0)),
+                    Some(types::Kind::Bool) => Value::Bool(le_i32(b, 0).unwrap_or(0) != 0),
+                    Some(types::Kind::Str) => {
                         let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
                         Value::Str(
                             String::from_utf8_lossy(b.get(..end).unwrap_or_default()).into_owned(),
                         )
                     }
-                    types::VECTOR if b.len() >= 12 => Value::Vec3([f(0), f(1), f(2)]),
-                    types::VECTOR2 if b.len() >= 8 => Value::Vec2([f(0), f(1)]),
-                    types::COLOR if b.len() >= 16 => Value::Color([f(0), f(1), f(2), f(3)]),
-                    types::MATRIX if b.len() >= 64 => Value::Matrix(std::array::from_fn(|r| {
-                        std::array::from_fn(|c| f(r.saturating_mul(4).saturating_add(c)))
-                    })),
+                    Some(types::Kind::Vector) if n >= 12 => Value::Vec3([f(0), f(1), f(2)]),
+                    Some(types::Kind::Vector2) if n >= 8 => Value::Vec2([f(0), f(1)]),
+                    Some(types::Kind::Color) if n >= 16 => Value::Color([f(0), f(1), f(2), f(3)]),
+                    Some(types::Kind::Quat) if n >= 16 => Value::Quat([f(0), f(1), f(2), f(3)]),
+                    Some(types::Kind::Rect) if n >= 16 => Value::Rect([f(0), f(1), f(2), f(3)]),
+                    Some(types::Kind::Box) if n >= 24 => {
+                        Value::Box([f(0), f(1), f(2), f(3), f(4), f(5)])
+                    }
+                    Some(types::Kind::Matrix) if n >= 64 => {
+                        Value::Matrix(std::array::from_fn(|r| {
+                            std::array::from_fn(|c| f(r.saturating_mul(4).saturating_add(c)))
+                        }))
+                    }
                     _ => Value::Raw(b.clone()),
                 }
             }
@@ -174,6 +171,24 @@ impl Value {
         match self {
             Value::Obj(o) => *o,
             _ => None,
+        }
+    }
+
+    /// Four components: a quaternion, a colour, a rectangle, or four saved floats.
+    pub fn as_vec4(&self) -> [f32; 4] {
+        match self {
+            Value::Quat(v) | Value::Color(v) | Value::Rect(v) => *v,
+            Value::Raw(b) if b.len() >= 16 => [0, 4, 8, 12].map(|i| le_f32(b, i).unwrap_or(0.0)),
+            _ => [0.0; 4],
+        }
+    }
+
+    pub fn as_vec2(&self) -> [f32; 2] {
+        match self {
+            Value::Vec2(v) => *v,
+            Value::Vec3(v) => [v[0], v[1]],
+            Value::Raw(b) if b.len() >= 8 => [0, 4].map(|i| le_f32(b, i).unwrap_or(0.0)),
+            _ => [0.0; 2],
         }
     }
 
@@ -657,6 +672,7 @@ impl Graph {
             for r in &a.rows {
                 r.iter().try_for_each(|v| match v {
                     Value::Obj(o) => opt(*o),
+                    Value::Objects(v) => v.iter().try_for_each(|o| opt(*o)),
                     _ => Ok(()),
                 })?;
             }
@@ -690,8 +706,10 @@ impl Graph {
                 Node::Param(p) => {
                     opt(p.source)?;
                     all(&p.destinations)?;
-                    if let Value::Obj(o) = &p.value {
-                        opt(*o)?;
+                    match &p.value {
+                        Value::Obj(o) => opt(*o)?,
+                        Value::Objects(v) => v.iter().try_for_each(|o| opt(*o))?,
+                        _ => {}
                     }
                 }
                 Node::Op(o) => {

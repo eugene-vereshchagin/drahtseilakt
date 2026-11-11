@@ -56,6 +56,10 @@ fn value(v: &Value) -> J {
         Value::Vec2(a) => json!(["v2", a.map(num)]),
         Value::Color(a) => json!(["c", a.map(num)]),
         Value::Matrix(m) => json!(["m", m.iter().flatten().map(|x| num(*x)).collect::<Vec<_>>()]),
+        Value::Quat(a) => json!(["q", a.map(num)]),
+        Value::Rect(a) => json!(["rect", a.map(num)]),
+        Value::Box(a) => json!(["box", a.map(num)]),
+        Value::Objects(v) => json!(["oa", v]),
         Value::Raw(b) => json!(["r", hex(b)]),
         Value::Owner => json!(["this", 0]),
     }
@@ -126,6 +130,17 @@ fn value_of(j: &J) -> Result<Value, String> {
                 })
             }))
         }
+        "q" => Value::Quat(floats(x)?),
+        "rect" => Value::Rect(floats(x)?),
+        "box" => Value::Box(floats(x)?),
+        "oa" => Value::Objects(
+            x.as_array()
+                .ok_or("script object array expected")?
+                .iter()
+                .take(script::MAX_ARRAY_ROWS)
+                .map(opt_index)
+                .collect::<Result<_, _>>()?,
+        ),
         "this" => Value::Owner,
         "r" => Value::Raw(unhex(x.as_str().ok_or("script bytes expected")?)?),
         _ => return Err("unknown script value".into()),
@@ -427,7 +442,14 @@ mod tests {
             vec![Array {
                 name: "T".into(),
                 columns: vec![("c".into(), 1)],
-                rows: vec![vec![Value::Int(7)], vec![Value::Raw(vec![1, 255])]],
+                rows: vec![
+                    vec![Value::Int(7)],
+                    vec![Value::Raw(vec![1, 255])],
+                    vec![Value::Quat([0.0, 0.5, -1.0, 1.0])],
+                    vec![Value::Rect([1.0, 2.0, 3.0, 4.0])],
+                    vec![Value::Box([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])],
+                    vec![Value::Objects(vec![Some(0), None])],
+                ],
                 key: Some(0),
             }],
             vec![(0, Some(1))],

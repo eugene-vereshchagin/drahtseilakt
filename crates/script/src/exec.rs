@@ -52,6 +52,14 @@ pub trait Host {
     fn group_add(&mut self, _group: usize, _object: usize) {}
     fn group_remove(&mut self, _group: usize, _object: usize) {}
     fn group_clear(&mut self, _group: usize) {}
+    /// The level materials of a level mesh, in its order (Get Material, Get Material List).
+    fn mesh_materials(&self, _mesh: usize) -> Vec<usize> {
+        Vec::new()
+    }
+    /// A level material's diffuse (or emissive) colour, RGBA.
+    fn material_color(&self, _material: usize, _emissive: bool) -> Option<[f32; 4]> {
+        None
+    }
 }
 
 /// Per-block state a block keeps between ticks.
@@ -164,6 +172,9 @@ pub struct Runtime {
     inline: Vec<Id>,
     /// The trace (frames, behaviours run, IOs fired, parameters written), when asked for.
     trace: Option<Vec<String>>,
+    /// Operation signatures looked up so far, with the row found (an index into `ops::TABLE`) and whether the
+    /// inputs are swapped; a signature without one is reported when first met.
+    op_cache: std::collections::HashMap<crate::census::Signature, Option<(usize, bool)>>,
 }
 
 /// The most objects a run's scripts may copy.
@@ -210,6 +221,7 @@ impl Runtime {
             requested: false,
             inline: Vec::new(),
             trace: None,
+            op_cache: std::collections::HashMap::new(),
         };
         rt.objects = vec![ObjState::default(); rt.graph.objects.len()];
         for &o in &rt.graph.start_off {
@@ -372,6 +384,44 @@ impl Runtime {
             self.tree_event(root, BlockEvent::Copy, host, 0);
         }
         Some(new_id)
+    }
+
+    /// The function of an operation signature (ops::find), looked up once per run; a signature without one is
+    /// reported then.
+    pub(crate) fn op_function(
+        &mut self,
+        op: crate::Guid,
+        res: crate::Guid,
+        p1: crate::Guid,
+        p2: crate::Guid,
+        host: &mut dyn Host,
+    ) -> Option<(&'static crate::ops::Row, bool)> {
+        const MAX_SIGNATURES: usize = 4_096;
+        let key = (op, p1, p2, res);
+        let found = match self.op_cache.get(&key) {
+            Some(f) => *f,
+            None => {
+                let f = crate::ops::find(op, res, p1, p2).and_then(|(row, swap)| {
+                    crate::ops::TABLE
+                        .iter()
+                        .position(|r| std::ptr::eq(r, row))
+                        .map(|i| (i, swap))
+                });
+                if f.is_none() {
+                    host.note(&format!(
+                        "script operation not known: {op} for {} ({}, {}); input 1 is passed on",
+                        crate::types::name(res),
+                        crate::types::name(p1),
+                        crate::types::name(p2)
+                    ));
+                }
+                if self.op_cache.len() < MAX_SIGNATURES {
+                    self.op_cache.insert(key, f);
+                }
+                f
+            }
+        };
+        found.and_then(|(i, swap)| crate::ops::TABLE.get(i).map(|r| (r, swap)))
     }
 
     /// A line for the log, said once per key (a prototype) in a run.
@@ -543,7 +593,7 @@ impl Runtime {
     }
 
     /// The scripts attached to an object.
-    fn scripts_of(&self, object: Id) -> Vec<Id> {
+    pub(crate) fn scripts_of(&self, object: Id) -> Vec<Id> {
         self.order
             .iter()
             .copied()
@@ -1090,12 +1140,14 @@ impl Runtime {
         };
         let a = o.inputs[0].map_or(Value::None, |i| self.read_depth(i, host, depth));
         let b = o.inputs[1].map_or(Value::None, |i| self.read_depth(i, host, depth));
-        let out_guid = o.output.and_then(|x| self.graph.param(x)).map(|p| p.guid);
-        let a_guid = o.inputs[0]
-            .and_then(|x| self.graph.param(x))
-            .map(|p| p.guid);
-        let r = blocks::operation(self, host, o.guid, out_guid, a_guid, &a, &b);
-        if let Some(out) = o.output {
+        let ty = |x: Option<Id>| {
+            x.and_then(|x| self.graph.param(x))
+                .map_or(crate::types::NONE, |p| p.guid)
+        };
+        let (res, t1, t2) = (ty(o.output), ty(o.inputs[0]), ty(o.inputs[1]));
+        if let Some(out) = o.output
+            && let Some(r) = crate::ops::run(self, host, o.guid, res, t1, t2, &a, &b, true)
+        {
             self.write(out, r);
         }
     }
