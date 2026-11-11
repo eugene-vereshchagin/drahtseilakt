@@ -43,6 +43,15 @@ pub trait Host {
     fn text(&mut self, name: &str, text: &str, on: bool);
     /// A line for the log: what a script did, or what the runtime could not do.
     fn note(&mut self, text: &str);
+    /// A copy of a level object under a new name (Object Copy): the new object's index, or none when the
+    /// engine makes no copy.
+    fn copy(&mut self, _e: Ent, _name: &str) -> Option<usize> {
+        None
+    }
+    /// A level group gains or loses a member, or all of them (Add To Group, Remove From Group, Group Clear).
+    fn group_add(&mut self, _group: usize, _object: usize) {}
+    fn group_remove(&mut self, _group: usize, _object: usize) {}
+    fn group_clear(&mut self, _group: usize) {}
 }
 
 /// Per-block state a block keeps between ticks.
@@ -62,6 +71,16 @@ pub enum Scratch {
     /// A message waiter: received.
     Received(bool),
     Flag(bool),
+    /// A progression's time so far (ms, or frames) and the value it gave last.
+    Progress {
+        elapsed: f32,
+        last: f32,
+    },
+    /// A timer that may be paused: its time, and whether it runs.
+    Clock {
+        elapsed: f32,
+        running: bool,
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -98,7 +117,14 @@ pub struct Runtime {
     budget: u64,
     /// Whether the budget ran out (said once).
     starved: bool,
+    /// The random blocks' generator: a fixed seed stepped by each draw, so a run repeats exactly.
+    rng: u64,
+    /// Objects copied so far (Object Copy), capped.
+    copies: usize,
 }
+
+/// The most objects a run's scripts may copy.
+pub const MAX_COPIES: usize = 256;
 
 /// The most pops of the execution stack in one graph in one tick (the original's BehaviorMaxIteration).
 const MAX_ITERATIONS: usize = 8_000;
@@ -131,12 +157,96 @@ impl Runtime {
             unknown: Vec::new(),
             budget: TICK_BUDGET,
             starved: false,
+            rng: 0x9e37_79b9_7f4a_7c15,
+            copies: 0,
         };
         let scripts = rt.graph.scripts.clone();
         for s in scripts {
+            rt.bind_owner(s);
             rt.activate(s, true, true, 0);
         }
         rt
+    }
+
+    /// Puts the script's owner where its "This" parameters stand.
+    fn bind_owner(&mut self, script: Id) {
+        let Some(owner) = self.graph.block(script).and_then(|b| b.owner) else {
+            return;
+        };
+        for id in self.graph.script_nodes(script).unwrap_or_default() {
+            if matches!(self.graph.param(id), Some(p) if p.value == Value::Owner)
+                && let Some(v) = self.values.get_mut(id)
+            {
+                *v = Value::Obj(Some(owner));
+            }
+        }
+    }
+
+    /// The next random number in [0, 1): the same sequence in every run (xorshift), so replays repeat.
+    pub fn random(&mut self) -> f32 {
+        let mut x = self.rng;
+        x ^= x.wrapping_shl(13);
+        x ^= x.wrapping_shr(7);
+        x ^= x.wrapping_shl(17);
+        self.rng = x;
+        (x.wrapping_shr(40) as f32) / 16_777_216.0
+    }
+
+    /// Object Copy: a copy of a level object with copies of the scripts attached to it, bound to the copy and
+    /// in the state the originals are in. The copy gets a name of its own (the original's and a number), as
+    /// the scripts that copy a template tell their copies apart by name. None when the object is no level
+    /// object, the engine makes no copy, or the run has copied its fill.
+    pub fn copy_object(&mut self, original: Id, host: &mut dyn Host) -> Option<Id> {
+        let Some(Ent::Object(index)) = self.ent(Some(original)) else {
+            return None;
+        };
+        if self.copies >= MAX_COPIES {
+            host.note("script copies stopped: too many objects copied");
+            return None;
+        }
+        let number = self.copies.saturating_add(1);
+        let name = format!("{}{number:03}", self.graph.name(original));
+        let new_index = host.copy(Ent::Object(index), &name)?;
+        self.copies = number;
+        let scripts: Vec<Id> = self
+            .graph
+            .scripts
+            .iter()
+            .copied()
+            .filter(|&s| {
+                self.graph
+                    .block(s)
+                    .is_some_and(|b| b.owner == Some(original))
+            })
+            .collect();
+        let g = Arc::make_mut(&mut self.graph);
+        let new_id = g.add_object(&name, ObjKind::Entity(new_index));
+        let mut made = Vec::new();
+        for s in scripts {
+            if let Some((root, pairs)) = g.clone_script(s, new_id) {
+                made.push((s, root, pairs));
+            }
+        }
+        let n = self.graph.nodes.len();
+        self.blocks.resize(n, BlockState::default());
+        self.links.resize(n, LinkState::default());
+        self.io.resize(n, false);
+        self.values.resize(n, Value::None);
+        for (old_root, root, pairs) in made {
+            for (old, new) in pairs {
+                let v = if matches!(self.graph.param(new), Some(p) if p.value == Value::Owner) {
+                    Value::Obj(Some(new_id))
+                } else {
+                    self.values.get(old).cloned().unwrap_or_default()
+                };
+                if let Some(slot) = self.values.get_mut(new) {
+                    *slot = v;
+                }
+            }
+            let active = self.is_active(old_root);
+            self.activate(root, active, true, 0);
+        }
+        Some(new_id)
     }
 
     /// Spends one unit of the tick's work; false when none is left.
@@ -466,6 +576,31 @@ impl Runtime {
             && a.len() < crate::MAX_ARRAY_ROWS
         {
             a.push(row);
+        }
+    }
+
+    /// Removes a row; false when there is none at the index.
+    pub fn remove_row(&mut self, array: usize, row: usize) -> bool {
+        match self.arrays.get_mut(array) {
+            Some(a) if row < a.len() => {
+                a.remove(row);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Object Rename: the object answers to the new name from now on (a name is kept to 256 bytes).
+    pub fn rename(&mut self, object: Id, name: &str) {
+        if object >= self.graph.objects.len() {
+            return;
+        }
+        let mut end = name.len().min(256);
+        while !name.is_char_boundary(end) {
+            end = end.saturating_sub(1);
+        }
+        if let Some(o) = Arc::make_mut(&mut self.graph).objects.get_mut(object) {
+            o.name = name.get(..end).unwrap_or_default().to_string();
         }
     }
 

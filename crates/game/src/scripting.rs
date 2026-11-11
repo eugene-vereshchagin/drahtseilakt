@@ -10,6 +10,8 @@ use script::{Ent, Host, Runtime, Value};
 
 /// How many log lines a run keeps.
 const LOG_CAP: usize = 2_000;
+/// The most objects a run holds with the scripts' copies (the runtime caps the copies well below).
+const MAX_OBJECTS: usize = 1 << 20;
 
 #[derive(Clone)]
 pub struct Scripts {
@@ -193,7 +195,9 @@ impl Host for SimHost<'_> {
                 ))
             }
             Ent::Object(i) => {
-                let (lo, hi) = (*self.s.local_bounds.get(i)?)?;
+                // an object without a mesh has an empty box at its place, as the original's: a ball's box
+                // meets it when the place is inside (the portals' template tests the ball against such a frame)
+                let (lo, hi) = (*self.s.local_bounds.get(i)?).unwrap_or((Vec3::ZERO, Vec3::ZERO));
                 let m = to_mat(&self.matrix(e)?);
                 let mut wlo = Vec3::splat(f32::INFINITY);
                 let mut whi = Vec3::splat(f32::NEG_INFINITY);
@@ -296,6 +300,50 @@ impl Host for SimHost<'_> {
 
     fn note(&mut self, text: &str) {
         self.s.note(text.to_string());
+    }
+
+    fn copy(&mut self, e: Ent, name: &str) -> Option<usize> {
+        // The copy is an object of the run alone: it has the original's place, mesh and box, and its own
+        // overlays (hidden, moved), past the level's objects. It is not drawn yet and has no body.
+        let Ent::Object(i) = e else { return None };
+        if self.s.names.len() >= MAX_OBJECTS {
+            return None;
+        }
+        let matrix = self.matrix(e)?;
+        let new = self.s.names.len();
+        self.s.names.push(name.to_string());
+        self.s.initial.push(matrix);
+        self.s.meshes.push(self.s.meshes.get(i).copied().flatten());
+        self.s
+            .local_bounds
+            .push(self.s.local_bounds.get(i).copied().flatten());
+        self.s
+            .hidden
+            .push(self.s.hidden.get(i).copied().unwrap_or(false));
+        self.s.moved.push(None);
+        self.s.note(format!("copies {} as {name}", self.s.name(i)));
+        Some(new)
+    }
+
+    fn group_add(&mut self, group: usize, object: usize) {
+        if let Some(g) = self.s.groups.get_mut(group)
+            && !g.contains(&object)
+            && g.len() < MAX_OBJECTS
+        {
+            g.push(object);
+        }
+    }
+
+    fn group_remove(&mut self, group: usize, object: usize) {
+        if let Some(g) = self.s.groups.get_mut(group) {
+            g.retain(|&m| m != object);
+        }
+    }
+
+    fn group_clear(&mut self, group: usize) {
+        if let Some(g) = self.s.groups.get_mut(group) {
+            g.clear();
+        }
     }
 }
 

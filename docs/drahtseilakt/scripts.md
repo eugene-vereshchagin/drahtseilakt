@@ -81,6 +81,34 @@ Physics Impulse are accepted and logged), copies of objects (Object Copy returns
 (logged; the HUD and the sound engine come next), keys other than the game's (Key Event never fires: a run's
 input is the game's keys only), the original's 2D interface blocks (never: the game has its own).
 
+## Phase 2 (2026-11-11): copies, "This", groups, progressions
+
+- **"This"**: a script's own object is a local parameter saved without a value (class 45 with the empty section
+  `0x200` alone). It is read as `Owner` (the open format writes `["this", 0]`) and bound to the script's object
+  when the runtime starts; before, such a parameter was lost and every block reading it got nothing.
+- **Object Copy** makes a copy: an object of the run with the original's place, mesh and box, a name of its own
+  (the original's and a three-digit number, `Base_Portal_In002`: templates tell their copies apart by name —
+  the name's exact form in the original is not known), and a copy of every script attached to the original, bound
+  to the copy ("This" is the copy) and in the state the original's is in. The run's graph is its own from the first
+  copy on (the level's is not touched; a rewound run copies again and gets the same). At most 256 copies a run,
+  16384 nodes a copied script. The copies are **not drawn and have no body** yet.
+- **Box Box Intersection** with an object without a mesh tests its place as an empty box (the original's box of
+  such an object). With these three the **Portal** maps' teleports work: the template copies a mesh-less frame
+  with the script that tests the ball against "This" to each portal.
+- **Groups** change in the run: Add To Group, Remove From Group, Group Clear (level objects only).
+- **Progressions**: Linear Progression, Bezier Progression (its 2D curve is not decoded: a straight line),
+  Interpolator, Get / Set Component, TT_Timer.
+- **Random**, **Random Switch**: one generator with a fixed seed in the run's state, stepped by each draw, so
+  a run and its replay draw the same numbers. (The original's are not reproducible at all.)
+- Set Euler Orientation, Scale, Get Nearest In Group, Row Search, Remove Row, Object Rename.
+
+Still not done, most wanted first: **physics by script** for level objects (Physicalize of a floor or a box,
+Physics Impulse, SetPhysicsForce, Set Physics Slider): an object a script moves, shows or hides keeps the body it
+was loaded with, so a platform moved by a script is drawn at its new place and collides at its old one; drawing
+the copies (the portals' particle frames); Attach Script, Object Create; sounds through the sound engine. The test
+player (`--autopilot`) does not know the portals: its way stops at one. A replay of a scripted map recorded
+before this change may play differently (the scripts now do more).
+
 ## Hostile input
 
 A map comes from a stranger. Every list is capped (objects 2^20, array rows 2^16, 4096 messages a tick, 2000
@@ -125,7 +153,7 @@ by the engine's.
 | PlanarParticleSystem | `49957bfe:0ff27ffc` | 14 | 37 | done |
 | Activate Object | `5f003fba:5e574f60` | 14 | 49 | done |
 | Get Key Row | `49064205:10e72f7a` | 13 | 38 | done |
-| Object Copy | `3f6b0ac7:47d20f78` | 13 | 42 | partial: runs; the copy is nothing yet |
+| Object Copy | `3f6b0ac7:47d20f78` | 13 | 42 | partial: the copy and its scripts are made and run (own name, `This` bound to it); not drawn, no body |
 | Send Message To Group | `5f906952:6df11649` | 12 | 31 | done |
 | Text Display | `f22d010a:f2cd010a` | 11 | 32 | done |
 | Test | `17d66d26:726b7dec` | 11 | 96 | done |
@@ -138,36 +166,36 @@ by the engine's.
 | Identity | `15151652:aeefffd5` | 6 | 38 | done |
 | Key Event | `1af2274b:6b8c1524` | 6 | 22 | partial: never fires (keys are not in a run) |
 | Parameter Selector | `63eb2b0c:27e2767e` | 6 | 20 | done |
-| Add To Group | `00024125:785420ab` | 5 | 11 | planned |
+| Add To Group | `00024125:785420ab` | 5 | 11 | done |
 | Rotate | `ffffffee:eeffffff` | 5 | 14 | done |
 | Object Create | `271538e6:2fae49ac` | 4 | 9 | planned |
-| Bezier Progression | `6bb8699a:29fb6a4b` | 4 | 22 | planned |
-| Interpolator | `35503950:2dde7a65` | 4 | 11 | planned |
+| Bezier Progression | `6bb8699a:29fb6a4b` | 4 | 22 | partial: runs as a straight line (the block's 2D curve is not decoded) |
+| Interpolator | `35503950:2dde7a65` | 4 | 11 | done (colours mixed in RGB) |
 | SetPhysicsForce | `56e20c57:0b926068` | 4 | 5 | partial: accepted, no force yet |
-| Get Component | `2689057b:1a1a446a` | 4 | 8 | planned |
+| Get Component | `2689057b:1a1a446a` | 4 | 8 | done |
 | Set World Matrix | `aa4aa6f0:ddefdef4` | 4 | 9 | done |
 | Set Diffuse | `e1e1e1e1:1e1e1e1e` | 4 | 11 | partial: accepted, no effect |
 | Volume Control | `33613f21:776b185b` | 4 | 8 | planned |
 | Collection Iterator | `419602ec:7822779e` | 4 | 20 | done |
 | Set Texture | `eb123eb5:5be321be` | 3 | 3 | partial: accepted, no effect |
-| Set Component | `6e800755:57b64acb` | 3 | 12 | planned |
+| Set Component | `6e800755:57b64acb` | 3 | 12 | done |
 | Set Physics Slider | `2973360e:23d31aa7` | 3 | 3 | planned |
 | Per Second | `448e54ce:75a655c5` | 3 | 7 | done |
 | Counter | `998f000f:f000f899` | 3 | 9 | done |
 | Binary Memory | `d02d67dd:10211fdd` | 3 | 7 | done |
-| Get Nearest In Group | `085207eb:584950d8` | 3 | 4 | planned |
+| Get Nearest In Group | `085207eb:584950d8` | 3 | 4 | done |
 | Is In Group | `58a1210b:14e5715c` | 3 | 18 | done |
 | Mouse Waiter | `014d010b:015d010b` | 3 | 3 | never (the engine's own interface) |
 | Set Light Color | `32115590:78951230` | 3 | 3 | planned |
 | Timer | `a2a5a63a:e4e7e8e5` | 3 | 4 | done |
 | Physics Impulse | `0c7e39bb:16db20d5` | 3 | 6 | planned |
 | Midi Player | `843cb43a:a12dac48` | 2 | 2 | planned |
-| Object Rename | `6f074ca7:45427431` | 2 | 4 | planned |
+| Object Rename | `6f074ca7:45427431` | 2 | 4 | done |
 | Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | never (the engine's own interface) |
 | 2D Text | `055b29fe:662d5ca0` | 2 | 2 | never (the engine's own interface) |
 | Fill Group By Class | `4445257b:70016c57` | 2 | 8 | planned |
 | 3D Text | `1f5b2fe7:6d355175` | 2 | 3 | never (the engine's own interface) |
-| Row Search | `78863443:45af59b6` | 2 | 2 | planned |
+| Row Search | `78863443:45af59b6` | 2 | 2 | done |
 | Create String | `4bcd2f9d:382652e2` | 2 | 2 | planned |
 | Proximity | `5321cacb:dcdc5213` | 2 | 2 | done |
 | Bezier Transform | `6d433e1b:191954b4` | 2 | 3 | planned |
@@ -180,10 +208,10 @@ by the engine's.
 | Clear Array | `35c9352f:7b1a193b` | 2 | 7 | done |
 | Get Delta Time | `47dc3232:64bf203a` | 2 | 3 | done |
 | Play Sound Instance | `00283a35:38ef6b48` | 2 | 7 | planned |
-| Group Clear | `1d12662e:42687a3c` | 2 | 9 | planned |
-| Scale | `41236987:a54a87a6` | 2 | 7 | planned |
-| Remove From Group | `d0147412:0258520d` | 2 | 2 | planned |
-| Linear Progression | `fff45680:aa512a39` | 2 | 3 | planned |
+| Group Clear | `1d12662e:42687a3c` | 2 | 9 | done |
+| Scale | `41236987:a54a87a6` | 2 | 7 | done |
+| Remove From Group | `d0147412:0258520d` | 2 | 2 | done |
+| Linear Progression | `fff45680:aa512a39` | 2 | 3 | done |
 | Set Blend Modes | `2f572a66:6a9a0088` | 2 | 5 | planned |
 | Set Material Z Buffer | `1144022f:68fd055c` | 2 | 5 | planned |
 | Create System Font | `936334fc:f243684f` | 1 | 1 | never (the engine's own interface) |
@@ -202,9 +230,9 @@ by the engine's.
 | Mouse Cursor System | `2483576d:57c66324` | 1 | 1 | never (the engine's own interface) |
 | Mouse Cursor | `140c3eac:6e502a81` | 1 | 1 | never (the engine's own interface) |
 | Set Pickable | `f1499052:ebe9bbf1` | 1 | 1 | never (the engine's own interface) |
-| TT_Timer | `6ac67901:7d2a6059` | 1 | 1 | planned |
+| TT_Timer | `6ac67901:7d2a6059` | 1 | 1 | done |
 | Set IC | `72671a24:161a2347` | 1 | 1 | partial: accepted (initial conditions stay as loaded) |
-| Remove Row | `1fa57136:14310857` | 1 | 1 | planned |
+| Remove Row | `1fa57136:14310857` | 1 | 1 | done |
 | Shuffle Order | `270f177a:4ca20023` | 1 | 2 | planned |
 | Move Row | `101a62f4:6e2d25f6` | 1 | 2 | planned |
 | Set FOV | `aaaacccc:aaaacccc` | 1 | 3 | never (the engine's own interface) |
@@ -212,8 +240,8 @@ by the engine's.
 | Streaming Event | `1f0b52bf:4c3342dd` | 1 | 1 | done |
 | Pitch Control | `7b7c731e:175b27a3` | 1 | 3 | planned |
 | Deactivate Object | `160f4b7d:67de224e` | 1 | 1 | done |
-| Random | `0c622386:1c3054f7` | 1 | 35 | planned |
-| Set Euler Orientation | `0c4966d8:6c0c6d14` | 1 | 7 | planned |
+| Random | `0c622386:1c3054f7` | 1 | 35 | done (a fixed seed: every run draws the same numbers) |
+| Set Euler Orientation | `0c4966d8:6c0c6d14` | 1 | 7 | done (X, then Y, then Z) |
 | Has Attribute | `25b54079:6ff90545` | 1 | 4 | planned |
 | Set Material | `37865d50:2e285fab` | 1 | 3 | planned |
 | Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | planned |
@@ -252,7 +280,7 @@ by the engine's.
 | Wait For All | `c044a999:fdfefaf7` | 1 | 1 | done |
 | Key Waiter | `016d010b:017d010b` | 1 | 1 | never (the engine's own interface) |
 | Delete Dynamic Objects | `0cba3195:53440e4c` | 1 | 1 | planned |
-| Random Switch | `79d72fde:2e9d0912` | 1 | 1 | planned |
+| Random Switch | `79d72fde:2e9d0912` | 1 | 1 | done (the same generator) |
 | Explode | `002d010a:003d010a` | 1 | 1 | planned |
 
 ## Where the maps stand
@@ -263,8 +291,7 @@ effect (AAAAAA Class Islands Scenery, Be Besieged on All Sides 2.0, Painstaking 
 Ver.), Take the leap, Traveling on Rubber Walls, Trial of the Ballance King, 反向Level_11); the other 17 run
 with a limited block: the nine **Portal** maps (Dueling With the Ice Cube ×3, Find Your Place, In the Field 2.0,
 Periodic Travel, Rectangular Elements, See You Tomorrow, Traveling Through the Void 2.0) share one portal script
-whose Object Copy (the portals' particle frames) is not made yet — the teleport itself (Box Box Intersection →
-Set Position on the ball) runs; 2010s, A Little Journey, All-We-Know physicalize objects by script; Board-Na
+whose Object Copy (the portals' particle frames) was not made in phase 1, so the portals did nothing (phase 2 makes them work, see above); 2010s, A Little Journey, All-We-Know physicalize objects by script; Board-Na
 Leona sets a texture; Family Portrait 2 and 反向Level_08 wait for keys; Omit Superfluous Things resizes a
 texture; Queen Ball (Hard Ver.) sets a physics force.
 

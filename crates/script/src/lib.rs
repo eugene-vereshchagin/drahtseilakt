@@ -20,6 +20,8 @@ pub type Id = usize;
 /// Caps on a map's graphs (a hostile file may claim any count).
 pub const MAX_OBJECTS: usize = 1 << 20;
 pub const MAX_ARRAY_ROWS: usize = 1 << 16;
+/// The most nodes one script may have to be copied (Object Copy copies an object's scripts with it).
+pub const MAX_SCRIPT_NODES: usize = 1 << 14;
 
 /// What an object of the file is to the engine: the level's entity, group, mesh, material or texture by index,
 /// one of the graphs' own arrays, or something the engine has no handle on.
@@ -60,6 +62,9 @@ pub enum Value {
     Matrix([[f32; 4]; 4]),
     /// Bytes of a type the runtime does not decode; read as a number when a block wants one.
     Raw(Vec<u8>),
+    /// A script's "This": the object the script is attached to, which the runtime puts in its place when the
+    /// script starts (a copy of the script gets the copy of the object).
+    Owner,
 }
 
 pub mod types {
@@ -391,6 +396,14 @@ impl Graph {
                         ..Param::default()
                     })
                 }),
+                behavior::class::PARAMETER_LOCAL if behavior::parameter_is_owner(chunk) => {
+                    Some(Node::Param(Param {
+                        name: o.name_lossy(),
+                        guid: types::BEOBJECT,
+                        value: Value::Owner,
+                        ..Param::default()
+                    }))
+                }
                 behavior::class::PARAMETER_OUT | behavior::class::PARAMETER_LOCAL => {
                     behavior::parameter(chunk).ok().map(|p| {
                         Node::Param(Param {
@@ -747,6 +760,159 @@ impl Graph {
             return Err("parameters copy or read round a loop".into());
         }
         Ok(())
+    }
+
+    /// Every node of a script: its blocks down the tree, their inputs, outputs, parameters, links and
+    /// operations (with the operations' own parameters), and the script's "This" parameters. None when the
+    /// script is larger than a copy may be.
+    pub fn script_nodes(&self, root: Id) -> Option<Vec<Id>> {
+        let mut seen = vec![false; self.nodes.len()];
+        let mut out: Vec<Id> = Vec::new();
+        let mut add = |i: Id, out: &mut Vec<Id>| -> bool {
+            match seen.get_mut(i) {
+                Some(x) if !*x => {
+                    *x = true;
+                    out.push(i);
+                    true
+                }
+                _ => false,
+            }
+        };
+        let mut todo = vec![root];
+        while let Some(id) = todo.pop() {
+            if out.len() > MAX_SCRIPT_NODES {
+                return None;
+            }
+            let Some(b) = self.block(id) else { continue };
+            if !add(id, &mut out) {
+                continue;
+            }
+            for &i in b
+                .inputs
+                .iter()
+                .chain(&b.outputs)
+                .chain(&b.pins)
+                .chain(&b.pouts)
+                .chain(&b.locals)
+                .chain(&b.links)
+                .chain(&b.target)
+            {
+                add(i, &mut out);
+            }
+            for &o in &b.ops {
+                if let Some(Node::Op(op)) = self.nodes.get(o) {
+                    add(o, &mut out);
+                    for &i in op.inputs.iter().flatten().chain(&op.output) {
+                        add(i, &mut out);
+                    }
+                }
+            }
+            todo.extend(b.sub.iter().rev());
+        }
+        // "This" may be listed by no block: it is found from the inputs that read it
+        let mut k = 0usize;
+        while let Some(&id) = out.get(k) {
+            k = k.saturating_add(1);
+            if out.len() > MAX_SCRIPT_NODES {
+                return None;
+            }
+            if let Some(src) = self.param(id).and_then(|p| p.source)
+                && matches!(self.param(src), Some(p) if p.value == Value::Owner)
+            {
+                add(src, &mut out);
+            }
+        }
+        Some(out)
+    }
+
+    /// Copies a script for another owner (the copy of the object it is attached to): every node of it anew, the
+    /// references among them kept, those to anything else shared. Returns the copy's root and, for each node
+    /// copied, (the original, its copy).
+    pub fn clone_script(&mut self, root: Id, owner: Id) -> Option<(Id, Vec<(Id, Id)>)> {
+        if !self.scripts.contains(&root) || owner >= self.objects.len() {
+            return None;
+        }
+        let ids = self.script_nodes(root)?;
+        let base = self.nodes.len();
+        if base.checked_add(ids.len())? > MAX_OBJECTS {
+            return None;
+        }
+        let mut map: Vec<Option<Id>> = vec![None; base];
+        let mut pairs = Vec::with_capacity(ids.len());
+        for (k, &old) in ids.iter().enumerate() {
+            let new = base.checked_add(k)?;
+            *map.get_mut(old)? = Some(new);
+            pairs.push((old, new));
+        }
+        let r = |i: Id| map.get(i).copied().flatten().unwrap_or(i);
+        let ro = |i: Option<Id>| i.map(r);
+        let rv = |v: &[Id]| v.iter().map(|&i| r(i)).collect::<Vec<Id>>();
+        for &(old, _) in &pairs {
+            let node = match self.nodes.get(old)? {
+                Node::None => Node::None,
+                Node::Block(b) => Node::Block(Block {
+                    name: b.name.clone(),
+                    proto: b.proto,
+                    flags: b.flags,
+                    priority: b.priority,
+                    target: ro(b.target),
+                    inputs: rv(&b.inputs),
+                    outputs: rv(&b.outputs),
+                    pins: rv(&b.pins),
+                    pouts: rv(&b.pouts),
+                    locals: rv(&b.locals),
+                    sub: rv(&b.sub),
+                    links: rv(&b.links),
+                    ops: rv(&b.ops),
+                    parent: if old == root { None } else { ro(b.parent) },
+                    owner: Some(owner),
+                }),
+                Node::Link(l) => Node::Link(Link {
+                    delay: l.delay,
+                    src: r(l.src),
+                    dst: r(l.dst),
+                }),
+                Node::Io(io) => Node::Io(Io {
+                    owner: ro(io.owner),
+                    is_input: io.is_input,
+                }),
+                Node::Param(p) => Node::Param(Param {
+                    name: p.name.clone(),
+                    guid: p.guid,
+                    value: p.value.clone(),
+                    source: ro(p.source),
+                    shared: p.shared,
+                    destinations: rv(&p.destinations),
+                    op: ro(p.op),
+                    block: ro(p.block),
+                }),
+                Node::Op(o) => Node::Op(Op {
+                    guid: o.guid,
+                    inputs: [ro(o.inputs[0]), ro(o.inputs[1])],
+                    output: ro(o.output),
+                }),
+            };
+            let info = self.objects.get(old)?.clone();
+            self.objects.push(info);
+            self.nodes.push(node);
+            self.links_from.push(Vec::new());
+        }
+        for &(_, new) in &pairs {
+            let links = match self.nodes.get(new) {
+                Some(Node::Block(b)) => b.links.clone(),
+                _ => continue,
+            };
+            for l in links {
+                if let Some(link) = self.link(l)
+                    && let Some(from) = self.links_from.get_mut(link.src)
+                {
+                    from.push(l);
+                }
+            }
+        }
+        let new_root = r(root);
+        self.scripts.push(new_root);
+        Some((new_root, pairs))
     }
 
     /// Adds a pseudo-object of the engine's (the ball frame, the game's arrays) and returns its id.
