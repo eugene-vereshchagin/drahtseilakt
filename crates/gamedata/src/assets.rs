@@ -29,7 +29,8 @@ const SHARE: u64 = 8;
 const DECODED_SIDE_MAX: u32 = 1024;
 /// The compressed textures of the level already counted, by their data's hash: one picture many of its parts carry
 /// is uploaded once (render.rs) and counted once.
-static OVERLAY_HASHES: std::sync::Mutex<Vec<(CompressedKey, usize)>> = std::sync::Mutex::new(Vec::new());
+static OVERLAY_HASHES: std::sync::Mutex<Vec<(CompressedKey, usize)>> =
+    std::sync::Mutex::new(Vec::new());
 static OVERLAY_BYTES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// The level's textures already counted (a texture decoded again, as a sky face is, counts once).
 static OVERLAY_COUNTED: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
@@ -447,14 +448,16 @@ impl Data {
             Source::Open(dir) => return self.load_open_level(dir),
         };
         let mut loaded = load_nmo(&path)?;
+        let info = crate::package::info_of(&path);
         // Levels of the game name their sky, ball, music, light and bonus in the game's own table, not in the level
         // file; the level takes them, so an export carries them (the open format plays without the table).
         let s = self.settings(&loaded.name);
-        loaded.level.sky = loaded.level.sky.take().or(s.sky);
+        // what the map's own level.txt says wins; the table (only there with a copy) fills what it leaves open
+        loaded.level.sky = info.sky.or(loaded.level.sky.take()).or(s.sky);
         loaded.level.start_ball = loaded.level.start_ball.take().or(s.start_ball);
         loaded.level.settings = level::Settings {
-            music: s.music,
-            light: s.light,
+            music: info.music.or(s.music),
+            light: info.light.or(s.light),
             level_bonus: s.level_bonus,
             // the original's first level begins with its tutorial; its last one has the lightning and last music
             tutorial: loaded.name.eq_ignore_ascii_case("Level_01.NMO"),
@@ -478,6 +481,16 @@ impl Data {
     /// (levels/remastered/Level_NN) takes them from the copy's table as before, any other plays with the defaults
     /// and says so.
     fn load_open_level(&self, dir: &Path) -> Result<LoadedLevel, String> {
+        let mut loaded = self.load_open_table(dir)?;
+        // the level.txt beside the level names its sky, music and light (it wins over the level file's own)
+        let info = crate::package::info_of(dir);
+        loaded.level.sky = info.sky.or(loaded.level.sky.take());
+        loaded.level.settings.music = info.music.or(loaded.level.settings.music);
+        loaded.level.settings.light = info.light.or(loaded.level.settings.light);
+        Ok(loaded)
+    }
+
+    fn load_open_table(&self, dir: &Path) -> Result<LoadedLevel, String> {
         let mut loaded = load_open(dir)?;
         if loaded.level.settings != level::Settings::default() {
             return Ok(loaded);
@@ -1198,7 +1211,11 @@ impl Data {
         else {
             return false;
         };
-        if !charge(u64::from(w).saturating_mul(u64::from(h)).saturating_mul(RGBA)) {
+        if !charge(
+            u64::from(w)
+                .saturating_mul(u64::from(h))
+                .saturating_mul(RGBA),
+        ) {
             return false;
         }
         if let Ok(mut counted) = OVERLAY_COUNTED.lock() {
@@ -1230,7 +1247,11 @@ impl Data {
             stored.push(path.to_path_buf());
             return true;
         }
-        charge(u64::from(width).saturating_mul(u64::from(height)).saturating_mul(RGBA))
+        charge(
+            u64::from(width)
+                .saturating_mul(u64::from(height))
+                .saturating_mul(RGBA),
+        )
     }
 }
 
@@ -1242,12 +1263,8 @@ fn charge(n: u64) -> bool {
         let Some(next) = taken.checked_add(n).filter(|&t| t <= OVERLAY_BYTES_MAX) else {
             return false;
         };
-        match OVERLAY_BYTES.compare_exchange_weak(
-            taken,
-            next,
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-        ) {
+        match OVERLAY_BYTES.compare_exchange_weak(taken, next, Ordering::Relaxed, Ordering::Relaxed)
+        {
             Ok(_) => return true,
             Err(now) => taken = now,
         }
@@ -1256,7 +1273,8 @@ fn charge(n: u64) -> bool {
 
 /// What one more texture may take of the level's budget: a share of what is left.
 fn fair_share() -> u64 {
-    OVERLAY_BYTES_MAX.saturating_sub(OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed)) / SHARE
+    OVERLAY_BYTES_MAX.saturating_sub(OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed))
+        / SHARE
 }
 
 /// A level's own file stays inside the level: `path` as the system resolves it (every link on the way followed)
@@ -1384,7 +1402,10 @@ impl TexturePlan {
                     } else {
                         "drawn plain"
                     };
-                    eprintln!("{}: {e} ({instead}; remaster the level again)", path.display());
+                    eprintln!(
+                        "{}: {e} ({instead}; remaster the level again)",
+                        path.display()
+                    );
                     fallback.and_then(PicturePlan::load)
                 }
             },
@@ -1403,7 +1424,9 @@ impl Data {
     /// toolbox's) is planned as that; any other texture is its pixels as `texture` gives them.
     pub fn texture_plan(&self, t: &level::Texture, bc: bool) -> Option<TexturePlan> {
         let level::TextureSource::LevelFile(path) = &t.source else {
-            return self.texture(t).map(|(w, h, rgba)| TexturePlan::Pixels(w, h, rgba));
+            return self
+                .texture(t)
+                .map(|(w, h, rgba)| TexturePlan::Pixels(w, h, rgba));
         };
         let plan = self.level_file_plan(path, t.color_key, bc);
         if plan.is_none() {
@@ -1424,7 +1447,13 @@ impl Data {
             key,
             shrink,
         };
-        if let Some(plan) = self.compressed_plan(&path.with_extension("dtx"), picture, size, bc, &picture_plan) {
+        if let Some(plan) = self.compressed_plan(
+            &path.with_extension("dtx"),
+            picture,
+            size,
+            bc,
+            &picture_plan,
+        ) {
             return Some(plan);
         }
         picture?;
@@ -1433,7 +1462,10 @@ impl Data {
         if self.budgeted(path, false) {
             let (w, h) = size?;
             let share = fair_share();
-            while shrunk_bytes(w, h, shrink) > share && shrink < 16 && shrunk_bytes(w, h, shrink) > RGBA {
+            while shrunk_bytes(w, h, shrink) > share
+                && shrink < 16
+                && shrunk_bytes(w, h, shrink) > RGBA
+            {
                 shrink = shrink.saturating_add(1);
             }
             if !charge(shrunk_bytes(w, h, shrink)) {
@@ -1460,7 +1492,10 @@ impl Data {
             .ok()
             .filter(|m| m.is_file() && m.len() <= crate::gputex::FILE_MAX && within_level(path))?;
         let mut head = [0u8; crate::gputex::HEADER_LEN];
-        crate::package::open_plain(path, &seen).ok()?.read_exact(&mut head).ok()?;
+        crate::package::open_plain(path, &seen)
+            .ok()?
+            .read_exact(&mut head)
+            .ok()?;
         let h = crate::gputex::header(&head).ok()?;
         if h.file_len() != seen.len() || picture.is_some_and(|p| p != h.source_len) {
             return None;
@@ -1474,7 +1509,11 @@ impl Data {
                 u64::try_from(h.bytes_from(skip)).unwrap_or(u64::MAX)
             } else {
                 h.mips.iter().skip(skip).fold(0u64, |n, m| {
-                    n.saturating_add(u64::from(m.width).saturating_mul(u64::from(m.height)).saturating_mul(RGBA))
+                    n.saturating_add(
+                        u64::from(m.width)
+                            .saturating_mul(u64::from(m.height))
+                            .saturating_mul(RGBA),
+                    )
                 })
             }
         };
@@ -1825,7 +1864,7 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<Vec<Str
         };
         let add = |keep: &mut Vec<level::Texture>,
                    pictures: &mut Vec<Option<Picture>>,
-                       pic: Option<Picture>| {
+                   pic: Option<Picture>| {
             keep.push(level::Texture {
                 name: t.name.clone(),
                 source: match &t.source {
@@ -2327,14 +2366,21 @@ mod tests {
         let textures = root.join(GAME_FILES).join("textures");
         std::fs::create_dir_all(&textures).unwrap();
         let png = textures.join("0000_a.png");
-        image::RgbaImage::from_pixel(64, 64, image::Rgba([255, 0, 255, 255])).save(&png).unwrap();
+        image::RgbaImage::from_pixel(64, 64, image::Rgba([255, 0, 255, 255]))
+            .save(&png)
+            .unwrap();
         let data = Data::new(None).for_level(Some(&root));
         let t = level::Texture {
             name: "a".into(),
             source: level::TextureSource::LevelFile(png.clone()),
             color_key: Some([255, 0, 255]),
         };
-        let left = |bytes: u64| OVERLAY_BYTES.store(OVERLAY_BYTES_MAX - bytes, std::sync::atomic::Ordering::Relaxed);
+        let left = |bytes: u64| {
+            OVERLAY_BYTES.store(
+                OVERLAY_BYTES_MAX - bytes,
+                std::sync::atomic::Ordering::Relaxed,
+            )
+        };
         // room for it eight times over: whole; for a 16th of that: halved twice, keyed
         left(64 * 64 * 4 * SHARE);
         let whole = data.texture_plan(&t, true).unwrap().load().unwrap();
@@ -2344,18 +2390,31 @@ mod tests {
         assert_eq!(small.size(), (16, 16));
         assert_eq!(small.data.get(..4), Some(&[255, 0, 255, 0][..]));
         // a compressed texture of that picture beside it: taken, whole while it fits, without its top level else
-        let block = { let mut b = [0u8; 16]; b[0] = 0x40; b };
-        let levels: Vec<Vec<u8>> = [256usize, 64, 16, 4, 1, 1, 1].iter().map(|n| block.repeat(*n)).collect();
+        let block = {
+            let mut b = [0u8; 16];
+            b[0] = 0x40;
+            b
+        };
+        let levels: Vec<Vec<u8>> = [256usize, 64, 16, 4, 1, 1, 1]
+            .iter()
+            .map(|n| block.repeat(*n))
+            .collect();
         let len = std::fs::metadata(&png).unwrap().len();
         let dtx = textures.join("0000_a.dtx");
         std::fs::write(&dtx, write(Format::Bc7, 64, 64, (len, 0), &levels).unwrap()).unwrap();
         let _ = data.for_level(Some(&root));
         let c = data.texture_plan(&t, true).unwrap().load().unwrap();
-        assert_eq!((c.format, c.size(), c.mips.len()), (Format::Bc7, (64, 64), 7));
+        assert_eq!(
+            (c.format, c.size(), c.mips.len()),
+            (Format::Bc7, (64, 64), 7)
+        );
         // the same file again is not counted again
         let taken = OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed);
         assert!(data.texture_plan(&t, true).is_some());
-        assert_eq!(OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed), taken);
+        assert_eq!(
+            OVERLAY_BYTES.load(std::sync::atomic::Ordering::Relaxed),
+            taken
+        );
         let _ = data.for_level(Some(&root));
         left(256 * 16 * SHARE / 2);
         let c = data.texture_plan(&t, true).unwrap().load().unwrap();
@@ -2365,7 +2424,11 @@ mod tests {
         let c = data.texture_plan(&t, false).unwrap().load().unwrap();
         assert_eq!((c.format, c.size()), (Format::Rgba, (64, 64)));
         // made from another picture (its length differs), or damaged: the picture itself
-        std::fs::write(&dtx, write(Format::Bc7, 64, 64, (len + 1, 0), &levels).unwrap()).unwrap();
+        std::fs::write(
+            &dtx,
+            write(Format::Bc7, 64, 64, (len + 1, 0), &levels).unwrap(),
+        )
+        .unwrap();
         let c = data.texture_plan(&t, true).unwrap().load().unwrap();
         assert_eq!(c.format, Format::Rgba);
         // damaged data: found when it is read, and the picture drawn instead, no larger than what was counted
@@ -2408,10 +2471,20 @@ mod tests {
             }
             w = (w / 2).max(1);
         }
-        std::fs::write(&dtx, write(Format::Bc1, 2044, 2044, (len, 0), &chain).unwrap()).unwrap();
+        std::fs::write(
+            &dtx,
+            write(Format::Bc1, 2044, 2044, (len, 0), &chain).unwrap(),
+        )
+        .unwrap();
         let _ = data.for_level(Some(&root));
-        assert!(matches!(data.texture_plan(&t, true), Some(TexturePlan::Compressed { .. })));
-        assert!(matches!(data.texture_plan(&t, false), Some(TexturePlan::Picture(_))));
+        assert!(matches!(
+            data.texture_plan(&t, true),
+            Some(TexturePlan::Compressed { .. })
+        ));
+        assert!(matches!(
+            data.texture_plan(&t, false),
+            Some(TexturePlan::Picture(_))
+        ));
         // found by review: a textures folder that is a link out of the level is refused (the picture and the
         // compressed texture alike)
         #[cfg(unix)]
@@ -2419,7 +2492,8 @@ mod tests {
             std::fs::write(&dtx, &good).unwrap();
             let away = root.join("away");
             std::fs::rename(&textures, &away).unwrap();
-            let outside = std::env::temp_dir().join(format!("drahtseilakt-plan-out-{}", std::process::id()));
+            let outside =
+                std::env::temp_dir().join(format!("drahtseilakt-plan-out-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&outside);
             std::fs::rename(&away, &outside).unwrap();
             std::os::unix::fs::symlink(&outside, &textures).unwrap();

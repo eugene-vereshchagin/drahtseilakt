@@ -154,7 +154,9 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Rewind(e)
         | Action::Set(_, e) => vec![e],
         Action::Show(_, _, _, v) => v.iter().collect(),
-        Action::RenderScale(a, b) | Action::RenderAspect(a, b) | Action::GravitySide(a, b) => vec![a, b],
+        Action::RenderScale(a, b) | Action::RenderAspect(a, b) | Action::GravitySide(a, b) => {
+            vec![a, b]
+        }
         Action::RenderFilter(_) => Vec::new(),
         Action::Splits(_)
         | Action::Keys(_)
@@ -223,7 +225,13 @@ impl SimMods {
                     Action::Stick(_) => out.stick = x.clamp(0.0, 1.0),
                     Action::Gravity(_) => out.gravity = x.clamp(0.0, 60.0),
                     Action::GravitySide(..) => {
-                        let side = |i: usize| v.get(i).copied().filter(|x| x.is_finite()).unwrap_or(0.0).clamp(-60.0, 60.0);
+                        let side = |i: usize| {
+                            v.get(i)
+                                .copied()
+                                .filter(|x| x.is_finite())
+                                .unwrap_or(0.0)
+                                .clamp(-60.0, 60.0)
+                        };
                         out.gravity_xz = [side(0), side(1)];
                     }
                     Action::TimeFactor(_) => out.time_factor = x.clamp(0.5, 4.0),
@@ -421,19 +429,37 @@ impl ViewMods {
                     Action::Ghost(_) => out.ghost = x.clamp(0.0, 1.0),
                     Action::CameraSmooth(_) => out.smooth = x.clamp(0.0, 1.0),
                     Action::RenderScale(..) => {
-                        let (w, h) = (v.first().copied().unwrap_or(0.0), v.get(1).copied().unwrap_or(0.0));
+                        let (w, h) = (
+                            v.first().copied().unwrap_or(0.0),
+                            v.get(1).copied().unwrap_or(0.0),
+                        );
                         // from 160x120 up to 4096x4096; anything else is no scaling
-                        out.look.scale = (w.is_finite() && h.is_finite() && (160.0..=4096.0).contains(&w) && (120.0..=4096.0).contains(&h))
-                            .then(|| (w.round() as u32, h.round() as u32));
+                        out.look.scale = (w.is_finite()
+                            && h.is_finite()
+                            && (160.0..=4096.0).contains(&w)
+                            && (120.0..=4096.0).contains(&h))
+                        .then(|| (w.round() as u32, h.round() as u32));
                     }
                     Action::RenderFilter(f) => out.look.filter = *f,
                     Action::RenderAspect(..) => {
-                        let (w, h) = (v.first().copied().unwrap_or(0.0), v.get(1).copied().unwrap_or(0.0));
-                        out.look.aspect = (w.is_finite() && h.is_finite() && w >= 1.0 && h >= 1.0 && w / h < 8.0 && h / w < 8.0)
+                        let (w, h) = (
+                            v.first().copied().unwrap_or(0.0),
+                            v.get(1).copied().unwrap_or(0.0),
+                        );
+                        out.look.aspect = (w.is_finite()
+                            && h.is_finite()
+                            && w >= 1.0
+                            && h >= 1.0
+                            && w / h < 8.0
+                            && h / w < 8.0)
                             .then_some((w, h));
                     }
-                    Action::RenderFpsCap(_) => out.look.fps_cap = x.clamp(0.0, 1000.0).round() as u32,
-                    Action::RenderColourBits(_) => out.look.colour_bits = if x.round() == 16.0 { 16 } else { 0 },
+                    Action::RenderFpsCap(_) => {
+                        out.look.fps_cap = x.clamp(0.0, 1000.0).round() as u32
+                    }
+                    Action::RenderColourBits(_) => {
+                        out.look.colour_bits = if x.round() == 16.0 { 16 } else { 0 }
+                    }
                     Action::RenderSupports(_) => {
                         out.look.supports = match x.round() as i32 {
                             1 => crate::supports::PLAIN,
@@ -446,7 +472,8 @@ impl ViewMods {
                     Action::ViewTurn(_) => out.turn = Some(x.rem_euclid(360.0).floor() as u16),
                     Action::PlayTime => out.playtime = true,
                     Action::SetSector(_) if out.practice.len() < 16 => {
-                        out.practice.push(Practice::Sector(x.clamp(1.0, 64.0).round() as u32));
+                        out.practice
+                            .push(Practice::Sector(x.clamp(1.0, 64.0).round() as u32));
                     }
                     Action::Show(c, label, f, _) => {
                         // a corner holds at most a few lines
@@ -930,7 +957,13 @@ mod tests {
             .collect();
         assert_eq!(
             modded,
-            vec!["free-steering", "physics-lab", "sector-jump", "spawn-point", "sticky-ball"],
+            vec![
+                "free-steering",
+                "physics-lab",
+                "sector-jump",
+                "spawn-point",
+                "sticky-ball"
+            ],
             "only the rule variants change the run"
         );
         // each does its part: switched on, fired, its output set
@@ -956,16 +989,28 @@ mod tests {
         assert!(out.fov > 0.0, "dynamic fov");
         let look = out.look;
         assert_eq!(look.scale, Some((640, 480)), "back to 2004: the resolution");
-        assert_eq!((look.filter, look.fps_cap, look.colour_bits), (1, 60, 0), "its defaults");
+        assert_eq!(
+            (look.filter, look.fps_cap, look.colour_bits),
+            (1, 60, 0),
+            "its defaults"
+        );
         assert_eq!(look.aspect, Some((4.0, 3.0)));
-        assert!(look.post() && look.size(1920, 1080) == (640, 480) && look.placed(1920, 1080) == (240, 0, 1440, 1080));
+        assert!(
+            look.post()
+                && look.size(1920, 1080) == (640, 480)
+                && look.placed(1920, 1080) == (240, 0, 1440, 1080)
+        );
         assert!((out.yaw - 20.0).abs() < 1e-4, "free view: {}", out.yaw);
         assert!(
             (out.light - 0.1).abs() < 1e-4 && out.lantern > 0.0,
             "blackout"
         );
         assert!((out.ghost - 0.4).abs() < 1e-4, "spirit trail");
-        assert_eq!(look.supports, crate::supports::VARIED, "sack supports: varied by default");
+        assert_eq!(
+            look.supports,
+            crate::supports::VARIED,
+            "sack supports: varied by default"
+        );
         assert_eq!(out.splits, vec![Corner::TopRight], "segment timer");
         assert!(
             out.lines.iter().any(|l| l.1.starts_with("Speed 30.0")),
@@ -977,9 +1022,19 @@ mod tests {
             "{:?}",
             out.lines
         );
-        assert!((out.smooth - 0.4).abs() < 1e-4 && out.decoys == 3 && (out.deform - 0.6).abs() < 1e-4, "looks");
-        assert!(out.playtime && out.turn == Some(20), "play time, the view's turn");
-        assert!(out.lines.iter().any(|l| l.1.starts_with("Played, level")), "{:?}", out.lines);
+        assert!(
+            (out.smooth - 0.4).abs() < 1e-4 && out.decoys == 3 && (out.deform - 0.6).abs() < 1e-4,
+            "looks"
+        );
+        assert!(
+            out.playtime && out.turn == Some(20),
+            "play time, the view's turn"
+        );
+        assert!(
+            out.lines.iter().any(|l| l.1.starts_with("Played, level")),
+            "{:?}",
+            out.lines
+        );
         view.press("F7", &values, &sim, "en");
         assert_eq!(view.out.practice, vec![Practice::Sector(1)], "sector jump");
         view.out.practice.clear();
@@ -1017,7 +1072,9 @@ mod tests {
         m.toggle(0);
         let lines = m.lines();
         assert!(lines.contains(&("mod.s".into(), "off".into())));
-        let back = Mods::load(found(), |k| lines.iter().find(|l| l.0 == k).map(|l| l.1.clone()));
+        let back = Mods::load(found(), |k| {
+            lines.iter().find(|l| l.0 == k).map(|l| l.1.clone())
+        });
         assert_eq!(back.on, vec![false]);
     }
 

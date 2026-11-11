@@ -43,7 +43,12 @@ pub enum BallKind {
 }
 
 /// The ball kinds, in their order (`kind as usize` indexes per-kind tables).
-pub const BALL_KINDS: [BallKind; 4] = [BallKind::Wood, BallKind::Stone, BallKind::Paper, BallKind::Sticky];
+pub const BALL_KINDS: [BallKind; 4] = [
+    BallKind::Wood,
+    BallKind::Stone,
+    BallKind::Paper,
+    BallKind::Sticky,
+];
 
 /// How strongly the sticky ball holds to what it touches, as the sticky-ball mod's `ball.stick` does: the kind is that
 /// mod made a ball of its own. 0.9, not the mod's 0.6: the hold lifts the ball up a wall by `k` of its weight plus `k` of
@@ -1070,7 +1075,10 @@ impl Sim {
         // docs/physics.md, section 3).
         let mut loose = Vec::new();
         let mut start_depths = Vec::new();
-        let static_triangles: Vec<Triangle> = statics.iter().flat_map(StaticMesh::world_triangles).collect();
+        let static_triangles: Vec<Triangle> = statics
+            .iter()
+            .flat_map(StaticMesh::world_triangles)
+            .collect();
         let mut sectors: Vec<Vec<usize>> = Vec::new();
         let mut unsectored = Vec::new();
         for (i, o) in level.objects.iter().enumerate() {
@@ -1091,7 +1099,7 @@ impl Sim {
                 Some(m) if format >= 5 => m,
                 _ => mesh,
             };
-                        let points: Vec<Vec3> = mesh
+            let points: Vec<Vec3> = mesh
                 .positions
                 .iter()
                 .map(|p| Vec3::from(*p) * scale)
@@ -1107,9 +1115,13 @@ impl Sim {
                 .map(|_| BALL_RADIUS * scale.x);
             let mut pos = pos;
             if is_box || name.starts_with("p_ball_") {
-                let (depth, lift) = rest_out_of(&static_triangles, &points, sphere, pos, rot.quat());
+                let (depth, lift) =
+                    rest_out_of(&static_triangles, &points, sphere, pos, rot.quat());
                 if lift > 0.0 {
-                    eprintln!("{}: made {depth:.2} inside the floors, lifted {lift:.2} onto them", o.name);
+                    eprintln!(
+                        "{}: made {depth:.2} inside the floors, lifted {lift:.2} onto them",
+                        o.name
+                    );
                 }
                 pos.y += lift;
                 start_depths.push((i, depth, lift));
@@ -1403,7 +1415,12 @@ impl Sim {
             checkpoints_by_name: true,
             respawn_faces_on: true,
             heading_exact_on: format >= 8,
-            sector_balls: level.settings.sector_balls.iter().map(|b| b.as_deref().and_then(BallKind::from_name)).collect(),
+            sector_balls: level
+                .settings
+                .sector_balls
+                .iter()
+                .map(|b| b.as_deref().and_then(BallKind::from_name))
+                .collect(),
             sector_ball_rule: format >= 7,
             depth_from: DEPTH_PHASE,
             points_clock: 0,
@@ -1568,7 +1585,8 @@ impl Sim {
         self.touching = self.touch();
         self.fire_mods(gamedata::mods::Event::Tick, input);
         let out = self.mods.out;
-        self.world.set_rules(out.gravity, out.gravity_xz, out.time_factor);
+        self.world
+            .set_rules(out.gravity, out.gravity_xz, out.time_factor);
         self.step_run(input);
         let events: Vec<Event> = self.events.iter().skip(before).map(|e| e.1).collect();
         for e in events {
@@ -1662,7 +1680,11 @@ impl Sim {
 
     /// How strongly the ball holds to what it touches: the sticky kind's own hold, or a mod's `ball.stick` if more.
     fn stickiness(&self) -> f32 {
-        let own = if self.ball.kind == BallKind::Sticky { STICKY_HOLD } else { 0.0 };
+        let own = if self.ball.kind == BallKind::Sticky {
+            STICKY_HOLD
+        } else {
+            0.0
+        };
         self.mods.out.stick.max(own)
     }
 
@@ -1780,7 +1802,11 @@ impl Sim {
         // The physics owns the ball's state; the game only reads it back. Only a new ball (a respawn, the end of a
         // transformer) puts a new body in, as the original does.
         // A ball that has fallen off is no longer steered.
-        let push = if self.dying.is_some() { Vec3::ZERO } else { push };
+        let push = if self.dying.is_some() {
+            Vec3::ZERO
+        } else {
+            push
+        };
         // a mod's `steer.yaw`: the push turned with the view (the camera turns by the same rotation about the ball)
         let push = if self.mods.out.steer_yaw != 0.0 {
             Quat::from_rotation_y(self.mods.out.steer_yaw.to_radians()) * push
@@ -2614,7 +2640,13 @@ pub const SUNK_DEPTH: f32 = 0.1;
 /// How deep a loose object (its points about `pos`, or a sphere of `sphere`'s radius) starts in the static
 /// `triangles`, and how far up it is moved so that it rests on them instead (0 when it is not deeper than
 /// SUNK_DEPTH, or no lift up to four times its reach frees it).
-fn rest_out_of(triangles: &[Triangle], points: &[Vec3], sphere: Option<f32>, pos: Vec3, rot: Quat) -> (f32, f32) {
+fn rest_out_of(
+    triangles: &[Triangle],
+    points: &[Vec3],
+    sphere: Option<f32>,
+    pos: Vec3,
+    rot: Quat,
+) -> (f32, f32) {
     let world: Vec<Vec3> = points.iter().map(|p| pos + rot * *p).collect();
     let (middle, reach) = match sphere {
         Some(r) => (pos, r),
@@ -2626,8 +2658,12 @@ fn rest_out_of(triangles: &[Triangle], points: &[Vec3], sphere: Option<f32>, pos
         .filter(|t| {
             let lo = t.a.min(t.b).min(t.c);
             let hi = t.a.max(t.b).max(t.c);
-            lo.x < middle.x + reach && hi.x > middle.x - reach && lo.z < middle.z + reach && hi.z > middle.z - reach
-                && lo.y < middle.y + reach + top && hi.y > middle.y - reach
+            lo.x < middle.x + reach
+                && hi.x > middle.x - reach
+                && lo.z < middle.z + reach
+                && hi.z > middle.z - reach
+                && lo.y < middle.y + reach + top
+                && hi.y > middle.y - reach
         })
         .copied()
         .collect();
@@ -2868,7 +2904,10 @@ fn sound_ids(level: &Level, i: usize) -> crate::physics::SoundIds {
 }
 
 fn static_meshes(level: &Level, made: &[usize]) -> Vec<StaticMesh> {
-    static_objects(level, made).into_iter().map(|s| s.1).collect()
+    static_objects(level, made)
+        .into_iter()
+        .map(|s| s.1)
+        .collect()
 }
 
 /// The level's fixed bodies with the level object each is made of (the audit names them).
@@ -3234,7 +3273,10 @@ pub(crate) mod tests {
             (at, rolled, sim)
         };
         let (at, rolled, sim) = run(mods_of(spawn));
-        assert!(at.distance(rolled) > 2.0, "the ball rolled away: {at} to {rolled}");
+        assert!(
+            at.distance(rolled) > 2.0,
+            "the ball rolled away: {at} to {rolled}"
+        );
         assert!(
             sim.ball.position.distance(at) < 0.1 && sim.ball.velocity.length() < 0.5,
             "back at {at} at rest: {} moving {}",
@@ -3264,11 +3306,20 @@ pub(crate) mod tests {
             sim.ball.position - start
         };
         let straight = fall("name.en Down\non start\ndo world.gravity 20\n");
-        assert!(straight.x.abs() < 0.01 && straight.z.abs() < 0.01, "0, 0 falls straight: {straight}");
+        assert!(
+            straight.x.abs() < 0.01 && straight.z.abs() < 0.01,
+            "0, 0 falls straight: {straight}"
+        );
         let text = "name.en Side\non start\ndo world.gravity_xz 10 -10\n";
         let side = fall(text);
-        assert!(side.x > 1.0 && side.z < -1.0, "pulled along +x and -z: {side}");
-        assert!((side.y - straight.y).abs() < 0.01, "the pull down is as it was");
+        assert!(
+            side.x > 1.0 && side.z < -1.0,
+            "pulled along +x and -z: {side}"
+        );
+        assert!(
+            (side.y - straight.y).abs() < 0.01,
+            "the pull down is as it was"
+        );
         assert_eq!(fall(text), side, "the same mod plays the same run");
     }
 
@@ -3352,17 +3403,26 @@ pub(crate) mod tests {
                 sim.turn = turn;
                 sim.step(input::UP);
             }
-            ((sim.ball.position - start) * Vec3::new(1.0, 0.0, 1.0), forward)
+            (
+                (sim.ball.position - start) * Vec3::new(1.0, 0.0, 1.0),
+                forward,
+            )
         };
         let steer = "name.en S\non tick\ndo steer.yaw input.turn\n";
         let (plain, forward) = roll(crate::modrt::SimMods::default(), 90);
         let (same, _) = roll(mods_of(steer), 0);
         let (turned, _) = roll(mods_of(steer), 90);
         assert!(plain.dot(forward) > 5.0, "no mod: the turn is ignored");
-        assert!((same - roll(crate::modrt::SimMods::default(), 0).0).length() < 1e-3, "turn 0 is the classic run");
+        assert!(
+            (same - roll(crate::modrt::SimMods::default(), 0).0).length() < 1e-3,
+            "turn 0 is the classic run"
+        );
         // the same rotation as the camera's: a quarter turn sends the push a quarter round the vertical axis
         let expect = glam::Quat::from_rotation_y(std::f32::consts::FRAC_PI_2) * forward;
-        assert!(turned.normalize().dot(expect) > 0.9, "turned {turned:?} expected along {expect:?}");
+        assert!(
+            turned.normalize().dot(expect) > 0.9,
+            "turned {turned:?} expected along {expect:?}"
+        );
     }
 
     #[test]
@@ -3440,8 +3500,15 @@ pub(crate) mod tests {
     /// dt), InGameCam v·(1 − 0.5)/5 more: about 0.183·v in all at 60 Hz (the C game's rig, measured).
     #[test]
     fn the_camera_lags_behind_a_rolling_ball_as_the_original() {
-        let mut c =
-            Camera { quarter: 0, yaw: 0.0, base: 0.0, lift: 0.0, position: Vec3::ZERO, step: Vec3::ZERO, target: Vec3::ZERO };
+        let mut c = Camera {
+            quarter: 0,
+            yaw: 0.0,
+            base: 0.0,
+            lift: 0.0,
+            position: Vec3::ZERO,
+            step: Vec3::ZERO,
+            target: Vec3::ZERO,
+        };
         c.position = camera_goal(&c, Vec3::ZERO);
         let v = 10.0;
         let mut ball = Vec3::ZERO;
@@ -3517,7 +3584,11 @@ pub(crate) mod tests {
     #[test]
     fn a_reset_point_turned_45_degrees_gives_the_exact_heading() {
         let mut level = flat_level();
-        let r = level.objects.iter().position(|o| o.name == "PR_Resetpoint_01").unwrap();
+        let r = level
+            .objects
+            .iter()
+            .position(|o| o.name == "PR_Resetpoint_01")
+            .unwrap();
         // local -x along (1, 0, 1) / sqrt 2: heading 45 degrees from +z towards +x
         let c = std::f32::consts::FRAC_1_SQRT_2;
         level.objects[r].matrix = [
@@ -3528,7 +3599,11 @@ pub(crate) mod tests {
         ];
         let quarter_45 = std::f32::consts::FRAC_PI_4;
         let mut sim = Sim::new(&level, BallKind::Paper);
-        assert!((sim.camera.yaw - quarter_45).abs() < 1e-5, "start yaw {}", sim.camera.yaw);
+        assert!(
+            (sim.camera.yaw - quarter_45).abs() < 1e-5,
+            "start yaw {}",
+            sim.camera.yaw
+        );
         assert!((sim.camera.push_forward() - Vec3::new(c, 0.0, c)).length() < 1e-5);
         // an older format keeps the start heading (+x)
         let old = Sim::with_rules(&level, BallKind::Paper, &Modules::default(), false, 7);
@@ -3539,7 +3614,11 @@ pub(crate) mod tests {
             sim.step(input::SHIFT | input::RIGHT);
         }
         let turned = quarter_45 + std::f32::consts::FRAC_PI_2;
-        assert!((sim.camera.yaw - turned).abs() < 1e-4, "turned yaw {}", sim.camera.yaw);
+        assert!(
+            (sim.camera.yaw - turned).abs() < 1e-4,
+            "turned yaw {}",
+            sim.camera.yaw
+        );
         // a respawn comes back to the reset point's heading
         sim.put_ball(Vec3::new(500.0, 10.0, 0.0));
         for _ in 0..600 {
@@ -3551,7 +3630,11 @@ pub(crate) mod tests {
         for _ in 0..DEATH_RESPAWN_TICKS {
             sim.step(0);
         }
-        assert!((sim.camera.yaw - quarter_45).abs() < 1e-4, "respawn yaw {}", sim.camera.yaw);
+        assert!(
+            (sim.camera.yaw - quarter_45).abs() < 1e-4,
+            "respawn yaw {}",
+            sim.camera.yaw
+        );
         assert!((sim.camera.push_forward() - Vec3::new(c, 0.0, c)).length() < 1e-4);
     }
 
@@ -3640,13 +3723,19 @@ pub(crate) mod tests {
         });
         let mut sim = Sim::new(&level, BallKind::Wood);
         sim.step(0);
-        assert!(sim.events.contains(&(1, Event::Transform(BallKind::Sticky))));
+        assert!(
+            sim.events
+                .contains(&(1, Event::Transform(BallKind::Sticky)))
+        );
         for _ in 0..TRAFO_TICKS + 30 {
             sim.step(0);
         }
         assert_eq!(sim.ball.kind, BallKind::Sticky);
         assert_eq!(sim.drawn_ball(), Some(BallKind::Sticky));
-        assert!(sim.stickiness() > 0.0 && sim.mods.is_empty(), "sticky of itself");
+        assert!(
+            sim.stickiness() > 0.0 && sim.mods.is_empty(),
+            "sticky of itself"
+        );
         assert_eq!(BallKind::from_name("sticky"), Some(BallKind::Sticky));
     }
 
@@ -3917,19 +4006,34 @@ pub(crate) mod tests {
         let probe = Sim::new(&level, BallKind::Wood);
         let forward = probe.camera.forward().with_y(0.0).normalize();
         let at = probe.ball.position.with_y(0.5) + forward * 12.0;
-        let stone = add_cube(&mut level, "P_Ball_Stone_01", at, &["P_Ball_Stone", "Sector_01"]);
+        let stone = add_cube(
+            &mut level,
+            "P_Ball_Stone_01",
+            at,
+            &["P_Ball_Stone", "Sector_01"],
+        );
         let mut sim = Sim::new(&level, BallKind::Wood);
         let &(i, depth, lift) = sim.start_depths.first().expect("the loose ball measured");
         assert_eq!(i, stone);
-        assert!((depth - 1.5).abs() < 0.01 && (lift - 1.5).abs() < 0.02, "{depth} deep, lifted {lift}");
+        assert!(
+            (depth - 1.5).abs() < 0.01 && (lift - 1.5).abs() < 0.02,
+            "{depth} deep, lifted {lift}"
+        );
         let body = sim.loose[0].1;
         let mut fastest = (0.0f32, 0.0f32);
         for _ in 0..240 {
             sim.step(input::UP);
             fastest.0 = fastest.0.max(sim.ball.velocity.length());
-            fastest.1 = fastest.1.max(sim.world.state(body).map_or(0.0, |s| s.vel.length()));
+            fastest.1 = fastest
+                .1
+                .max(sim.world.state(body).map_or(0.0, |s| s.vel.length()));
         }
-        assert!(fastest.0 < 15.0 && fastest.1 < 15.0, "thrown: ball {}, loose ball {}", fastest.0, fastest.1);
+        assert!(
+            fastest.0 < 15.0 && fastest.1 < 15.0,
+            "thrown: ball {}, loose ball {}",
+            fastest.0,
+            fastest.1
+        );
         let moved = sim.world.state(body).map_or(Vec3::ZERO, |s| s.pos) - at;
         assert!(moved.dot(forward) > 1.0, "the ball pushed it on: {moved}");
     }

@@ -1511,7 +1511,15 @@ pub fn run(
         let name = file
             .file_stem()
             .map_or_else(String::new, |f| f.to_string_lossy().into_owned());
-        sources.push((name, if file.is_dir() { Source::Open(file) } else { Source::Nmo(file) }, Vec::new()));
+        sources.push((
+            name,
+            if file.is_dir() {
+                Source::Open(file)
+            } else {
+                Source::Nmo(file)
+            },
+            Vec::new(),
+        ));
     }
     // per design: placed (varied set), placed (plain set), the least clearances
     let mut by_design = [(0usize, 0usize, f32::MAX, f32::MAX, f32::MAX); ND];

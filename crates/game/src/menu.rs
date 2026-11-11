@@ -404,7 +404,11 @@ impl Menu {
 
     /// The most rows the open list shows: the community maps leave room for a longer note.
     fn max_rows(&self) -> usize {
-        if self.note_below() { COMMUNITY_LINES } else { LIST_LINES }
+        if self.note_below() {
+            COMMUNITY_LINES
+        } else {
+            LIST_LINES
+        }
     }
 
     /// Whether the open list has a note on a panel under its rows: the shipped community picks (author and thanks)
@@ -416,7 +420,11 @@ impl Menu {
     /// A note's text with the Esc hint as its last line (the hint alone when there is no note).
     fn with_hint(&self, note: String) -> String {
         let hint = self.strings.ours("esc back");
-        if note.trim().is_empty() { hint } else { format!("{note}\n{hint}") }
+        if note.trim().is_empty() {
+            hint
+        } else {
+            format!("{note}\n{hint}")
+        }
     }
 
     /// The note under an open list with one: the picks' (what they are, the chosen map's author, the authors' notice)
@@ -447,18 +455,30 @@ impl Menu {
             List::Downloaded => {
                 let about = self.describe(Some(Line::Downloaded));
                 if matches!(chosen, Some(Line::Map(_))) {
-                    format!("{about}\n{}\n{}", map(), self.strings.ours("note beautiful"))
+                    format!(
+                        "{about}\n{}\n{}",
+                        map(),
+                        self.strings.ours("note beautiful")
+                    )
                 } else {
                     about
                 }
             }
             List::Ours => {
                 let about = self.describe(Some(Line::Ours));
-                if matches!(chosen, Some(Line::Map(_))) { format!("{about}\n{}", map()) } else { about }
+                if matches!(chosen, Some(Line::Map(_))) {
+                    format!("{about}\n{}", map())
+                } else {
+                    about
+                }
             }
             List::Challenges => {
                 let about = self.describe(Some(Line::Challenges));
-                if matches!(chosen, Some(Line::Map(_))) { format!("{about}\n{}", map()) } else { about }
+                if matches!(chosen, Some(Line::Map(_))) {
+                    format!("{about}\n{}", map())
+                } else {
+                    about
+                }
             }
             List::None => String::new(),
         }
@@ -540,14 +560,20 @@ impl Menu {
             Line::Language => (k("language"), NONE),
             Line::Extended => (k("extended"), NONE),
             Line::Lang(_) => (k("lang"), NONE),
-            Line::Look => (k("look"), &["original", "remaster", "drahtseilakt", "player"]),
+            Line::Look => (
+                k("look"),
+                &["original", "remaster", "drahtseilakt", "player"],
+            ),
             Line::Resolution => (k("resolution"), NONE),
             Line::Synch => (k("synch"), YN),
             Line::Clouds => (k("clouds"), YN),
             Line::Fullscreen => (k("fullscreen"), &["off", "borderless", "exclusive"]),
             Line::Models => (k("models"), &["level", "own", "original", "player"]),
             Line::Fov => (k("fov"), &["original", "wider", "narrower"]),
-            Line::Key(i) => (k(&format!("key {}", crate::options::ACTIONS.get(i)?.0)), NONE),
+            Line::Key(i) => (
+                k(&format!("key {}", crate::options::ACTIONS.get(i)?.0)),
+                NONE,
+            ),
             Line::Defaults => (k("defaults"), NONE),
             Line::Invert => (k("invert"), YN),
             Line::Music => (k("music"), NONE),
@@ -576,7 +602,10 @@ impl Menu {
         use gamedata::packs::{Kind as PackKind, LEVEL, ORIGINAL, OWN};
         let yn = |on: bool| usize::from(!on);
         match line {
-            Line::Look => ALL_LOOKS.iter().position(|&l| l == crate::look::chosen()).unwrap_or(2),
+            Line::Look => ALL_LOOKS
+                .iter()
+                .position(|&l| l == crate::look::chosen())
+                .unwrap_or(2),
             Line::Synch => yn(self.graphics.vsync),
             Line::Clouds => yn(self.graphics.clouds),
             Line::Fullscreen => match self.graphics.fullscreen {
@@ -603,7 +632,9 @@ impl Menu {
                 _ => 3,
             },
             Line::Mode => yn(self.features.mode),
-            Line::Switch(i) => yn(FEATURES.get(i).is_some_and(|&f| self.features.switched_on(f))),
+            Line::Switch(i) => yn(FEATURES
+                .get(i)
+                .is_some_and(|&f| self.features.switched_on(f))),
             Line::Interface => match gamedata::resources::chosen() {
                 gamedata::resources::Provider::Own => 0,
                 gamedata::resources::Provider::Original => 1,
@@ -627,7 +658,12 @@ impl Menu {
             text.lines()
                 .filter(|l| !l.starts_with('#'))
                 .find_map(|l| l.strip_prefix(key).and_then(|v| v.strip_prefix(' ')))
-                .map(|v| v.chars().filter(|c| !c.is_control()).take(220).collect::<String>())
+                .map(|v| {
+                    v.chars()
+                        .filter(|c| !c.is_control())
+                        .take(220)
+                        .collect::<String>()
+                })
                 .map(|v| v.trim().to_owned())
                 .filter(|v| !v.is_empty())
         };
@@ -703,7 +739,8 @@ impl Menu {
     /// How many values the line's help has (1 for a line without).
     #[cfg(test)]
     fn help_values(&self, screen: Screen, line: Line) -> usize {
-        self.help_spec(screen, line).map_or(1, |(_, v)| v.len().max(1))
+        self.help_spec(screen, line)
+            .map_or(1, |(_, v)| v.len().max(1))
     }
 
     /// Every help the screen's lines can show, one for each value of each line, and the descriptions of the
@@ -762,7 +799,8 @@ impl Menu {
         for t in self.helps_all(screen) {
             let t = if has_back { self.with_hint(t) } else { t };
             let (lines, k, _) = fit_whole(f, &t, max_w, 1.0e4, &FONT_HELP);
-            let h = lines.len() as f32 * row_pitch(&scaled_style(&FONT_HELP, k)) + 2.0 * NOTE_PAD[1];
+            let h =
+                lines.len() as f32 * row_pitch(&scaled_style(&FONT_HELP, k)) + 2.0 * NOTE_PAD[1];
             worst = worst.max(h);
         }
         NOTE_BOTTOM - worst / crate::ui::CONTEXT_H - 0.012
@@ -1077,11 +1115,19 @@ impl Menu {
         } else {
             self.lines(sc).len()
         };
-        let order: Vec<usize> = if by < 0 { (0..n).collect() } else { (0..n).rev().collect() };
+        let order: Vec<usize> = if by < 0 {
+            (0..n).collect()
+        } else {
+            (0..n).rev().collect()
+        };
         if let Some(i) = order.into_iter().find(|&i| self.selectable(sc, i)) {
             self.set_chosen(i);
             if scrolls(sc) {
-                self.top = if by < 0 { 0 } else { n.saturating_sub(self.page_len()) };
+                self.top = if by < 0 {
+                    0
+                } else {
+                    n.saturating_sub(self.page_len())
+                };
             }
         }
     }
@@ -2147,7 +2193,11 @@ impl Menu {
                 let mut cands = Vec::new();
                 for (t, r, st, b) in items {
                     label_ball(&mut scratch, t, *r, st, *b);
-                    cands.push((CAND.with(|c| c.get()), floor_k(st).max(FIT_SHRINK), floor_k(st)));
+                    cands.push((
+                        CAND.with(|c| c.get()),
+                        floor_k(st).max(FIT_SHRINK),
+                        floor_k(st),
+                    ));
                 }
                 dry.set(false);
                 let one = cands.iter().map(|c| c.0.0).fold(1.0f32, f32::min);
@@ -2157,7 +2207,10 @@ impl Menu {
                 let force = if one >= fit_min {
                     (one * 0.999, false)
                 } else {
-                    let two = cands.iter().map(|c| c.0.1.unwrap_or(c.0.0)).fold(1.0f32, f32::min);
+                    let two = cands
+                        .iter()
+                        .map(|c| c.0.1.unwrap_or(c.0.0))
+                        .fold(1.0f32, f32::min);
                     ((two * 0.999).max(kmin), true)
                 };
                 groups.set(groups.get() + 1);
@@ -2301,7 +2354,13 @@ impl Menu {
             let st = FONT_HELP;
             let max_w = (NOTE_X[1] - NOTE_X[0]) * crate::ui::CONTEXT_W - 2.0 * pad_x;
             // a note is never cut: smaller down to MIN_TEXT, then taller than `max_h` (the layouts leave room)
-            let (lines, k, _) = fit_whole(f, text, max_w, max_h * crate::ui::CONTEXT_H - 2.0 * pad_y, &st);
+            let (lines, k, _) = fit_whole(
+                f,
+                text,
+                max_w,
+                max_h * crate::ui::CONTEXT_H - 2.0 * pad_y,
+                &st,
+            );
             let st = scaled_style(&st, k);
             let pitch = row_pitch(&st);
             let wide = lines
@@ -2605,7 +2664,13 @@ impl Menu {
                     String::new()
                 };
                 let top = LIST_TOP + self.page_len() as f32 * ROW_STEP + HINT_H + 0.008;
-                note(&mut out, &self.with_hint(text), NOTE_BOTTOM, true, NOTE_BOTTOM - top);
+                note(
+                    &mut out,
+                    &self.with_hint(text),
+                    NOTE_BOTTOM,
+                    true,
+                    NOTE_BOTTOM - top,
+                );
                 back_only(&mut out);
             }
             Screen::Highscore => {
@@ -2709,7 +2774,13 @@ impl Menu {
                     .filter(|l| !l.is_empty())
                     .collect();
                 let top = MODS_TOP + shown_n as f32 * ROW_STEP + HINT_H + 0.008;
-                note(&mut out, &self.with_hint(help.join("\n")), NOTE_BOTTOM, true, NOTE_BOTTOM - top);
+                note(
+                    &mut out,
+                    &self.with_hint(help.join("\n")),
+                    NOTE_BOTTOM,
+                    true,
+                    NOTE_BOTTOM - top,
+                );
                 back_only(&mut out);
             }
             Screen::Graphics | Screen::Controls | Screen::Sound | Screen::Extended => {
@@ -2759,10 +2830,14 @@ impl Menu {
                         let x1 = 0.32 + 0.36 * text_right(KEY_UV);
                         if let Some(f) = font {
                             let nat = |t: &str| {
-                                quads_wide(&f.layout(t, crate::ui::homogeneous([0.0, y, 1.0, y + 0.0396]), &left))
+                                quads_wide(&f.layout(
+                                    t,
+                                    crate::ui::homogeneous([0.0, y, 1.0, y + 0.0396]),
+                                    &left,
+                                ))
                             };
                             let (nw, vw) = (nat(name), nat(value));
-                                                        let room = (x1 - x0) * crate::ui::CONTEXT_W;
+                            let room = (x1 - x0) * crate::ui::CONTEXT_W;
                             if vw > (x1 - 0.56) * crate::ui::CONTEXT_W - 4.0 && nw + vw > 0.0 {
                                 let want = if nw + vw + 6.0 <= room {
                                     x1 - (vw + 6.0) / crate::ui::CONTEXT_W
@@ -2810,7 +2885,12 @@ impl Menu {
                         let y = CREDITS_TOP + k as f32 * pitch;
                         if let Some(t) = all.get(i) {
                             let m = 2.0 / crate::ui::CONTEXT_H;
-                            label(&mut out, t, [CREDITS_X[0], y - m, CREDITS_X[1], y + pitch + m], &st);
+                            label(
+                                &mut out,
+                                t,
+                                [CREDITS_X[0], y - m, CREDITS_X[1], y + pitch + m],
+                                &st,
+                            );
                         }
                     }
                     scroll(
@@ -2984,7 +3064,8 @@ fn quads_wide(q: &[crate::ui::Quad]) -> f32 {
     if q.is_empty() {
         return 0.0;
     }
-    q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max) - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
+    q.iter().map(|q| q.rect[2]).fold(f32::MIN, f32::max)
+        - q.iter().map(|q| q.rect[0]).fold(f32::MAX, f32::min)
 }
 
 /// How wide `t` is drawn in `style` on one line (context pixels).
@@ -3201,7 +3282,10 @@ fn paragraph(
     style: &crate::ui::Style,
 ) -> (Vec<crate::ui::Quad>, f32) {
     let m = style.margins;
-    let (w, h) = (frame[2] - frame[0] - m[0] - m[2], frame[3] - frame[1] - m[1] - m[3]);
+    let (w, h) = (
+        frame[2] - frame[0] - m[0] - m[2],
+        frame[3] - frame[1] - m[1] - m[3],
+    );
     if w <= 0.0 || h <= 0.0 || t.trim().is_empty() {
         return (Vec::new(), 1.0);
     }
@@ -3271,7 +3355,10 @@ fn fit_label(
             s
         };
         return match split {
-            Some((a, b, _)) if two => (f.layout(&format!("{}\n{}", fitted(&a), fitted(&b)), frame, &st), k),
+            Some((a, b, _)) if two => (
+                f.layout(&format!("{}\n{}", fitted(&a), fitted(&b)), frame, &st),
+                k,
+            ),
             _ => (f.layout(&fitted(t), frame, &st), k),
         };
     }
@@ -3516,7 +3603,11 @@ impl KeyRepeat {
         *t += dt;
         let slow = (t.min(REPEAT_FASTER_AT) - REPEAT_DELAY).max(0.0) * REPEAT_SLOW;
         let fast = (*t - REPEAT_FASTER_AT).max(0.0) * REPEAT_FAST;
-        let total = if *t < REPEAT_DELAY { 0 } else { 1 + (slow + fast) as u32 };
+        let total = if *t < REPEAT_DELAY {
+            0
+        } else {
+            1 + (slow + fast) as u32
+        };
         let due = total.saturating_sub(*done);
         *done = total;
         (due > 0).then_some((*code, due))
@@ -3550,7 +3641,10 @@ fn next_provider(by: i32) -> gamedata::resources::Provider {
     use gamedata::resources::{Provider, chosen};
     let all = Provider::ALL;
     // only the ones usable here: without the copy (or its remaster) they are not offered
-    let ok: Vec<Provider> = all.into_iter().filter(|&p| gamedata::resources::usable(p)).collect();
+    let ok: Vec<Provider> = all
+        .into_iter()
+        .filter(|&p| gamedata::resources::usable(p))
+        .collect();
     let at = ok.iter().position(|&p| p == chosen()).unwrap_or(0) as i32;
     let n = ok.len().max(1) as i32;
     ok.get((at + by).rem_euclid(n) as usize)
@@ -3581,7 +3675,11 @@ fn theme_value(s: &Strings) -> String {
     if let Some(n) = TEST_NAME.with(|n| n.borrow().clone()) {
         return n;
     }
-    if key == gamedata::sound_themes::ORIGINAL { s.ours("interface original") } else { key }
+    if key == gamedata::sound_themes::ORIGINAL {
+        s.ours("interface original")
+    } else {
+        key
+    }
 }
 
 const ALL_LOOKS: [crate::look::Look; 4] = crate::look::ALL;
@@ -3589,7 +3687,8 @@ const ALL_LOOKS: [crate::look::Look; 4] = crate::look::ALL;
 impl Menu {
     /// The Look line's value: the look chosen, in the menus' language.
     fn look_value(&self) -> String {
-        self.strings.ours(&format!("look {}", crate::look::chosen().key()))
+        self.strings
+            .ours(&format!("look {}", crate::look::chosen().key()))
     }
 
     /// The Textures or Models line's value: the chosen pack's name in the menus' language (a built-in pack's in ours).
@@ -3976,7 +4075,11 @@ mod tests {
         let mut r = KeyRepeat::default();
         r.press(K::ArrowDown);
         assert_eq!(r.advance(0.30), None, "nothing before the delay");
-        assert_eq!(r.advance(0.06), Some((K::ArrowDown, 1)), "the first repeat at 0.35 s");
+        assert_eq!(
+            r.advance(0.06),
+            Some((K::ArrowDown, 1)),
+            "the first repeat at 0.35 s"
+        );
         let mut n = 1;
         for _ in 0..60 {
             n += r.advance(1.0 / 60.0).map_or(0, |h| h.1);
@@ -4001,7 +4104,11 @@ mod tests {
             .map(|i| Package {
                 level: PathBuf::from(format!("{i}.nmo")),
                 folder: PathBuf::from(format!("{i}.nmo")),
-                title: if i == 60 { "Zebra".to_owned() } else { format!("Level {i}") },
+                title: if i == 60 {
+                    "Zebra".to_owned()
+                } else {
+                    format!("Level {i}")
+                },
                 author: None,
                 version: None,
                 posted: None,
@@ -4052,13 +4159,22 @@ mod tests {
             })
             .collect();
         m.push(Screen::Custom);
-        let screen = crate::ui::Screen { w: 1920.0, h: 1080.0 };
+        let screen = crate::ui::Screen {
+            w: 1920.0,
+            h: 1080.0,
+        };
         for _ in 0..3 {
             m.page_by(1);
             let rows: Vec<usize> = m
                 .hits(true, screen)
                 .iter()
-                .filter_map(|h| if let Target::Line(i) = h.target { Some(i) } else { None })
+                .filter_map(|h| {
+                    if let Target::Line(i) = h.target {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
                 .collect();
             assert_eq!(rows.last(), Some(&100), "Back is drawn after every scroll");
         }
@@ -4164,11 +4280,18 @@ mod tests {
             (
                 "own",
                 List::Ours,
-                crate::levels::shipped().into_iter().chain((0..20).map(long)).collect(),
+                crate::levels::shipped()
+                    .into_iter()
+                    .chain((0..20).map(long))
+                    .collect(),
             ),
             ("best", List::Best, community),
             ("downloaded", List::Downloaded, (0..20).map(long).collect()),
-            ("challenges", List::Challenges, crate::modified::sample_packages()),
+            (
+                "challenges",
+                List::Challenges,
+                crate::modified::sample_packages(),
+            ),
             ("none", List::Downloaded, Vec::new()),
         ];
         let mods = gamedata::mods::scan(true);
@@ -4190,7 +4313,8 @@ mod tests {
         // the folder note's path: long, so that it must wrap (at its separators only)
         TEST_PATH.with(|p| {
             *p.borrow_mut() = Some(
-                "~/.local/share/drahtseilakt-with-a-long-profile/community-maps/levels/community".to_owned(),
+                "~/.local/share/drahtseilakt-with-a-long-profile/community-maps/levels/community"
+                    .to_owned(),
             );
         });
         // mod texts shortened in their middle (the mod page's labels and values, the mods' names)
@@ -4260,9 +4384,12 @@ mod tests {
                             states.push((Screen::Mods, i, 0));
                         }
                         for page in 0..m.mods.found.len() {
-                            for i in 0..=m.mods.found.get(page).map_or(0, |f| {
-                                f.parsed.as_ref().map_or(0, |t| t.options.len())
-                            }) {
+                            for i in 0..=m
+                                .mods
+                                .found
+                                .get(page)
+                                .map_or(0, |f| f.parsed.as_ref().map_or(0, |t| t.options.len()))
+                            {
                                 states.push((Screen::ModPage, i, page));
                             }
                         }
@@ -4294,7 +4421,8 @@ mod tests {
                                     && b[1] >= r[1] - tol
                                     && b[3] <= r[3] + tol
                             };
-                            let id = format!("{lang} mode={mode} {list} {sc:?}/{i}/{extra} {w}x{h}");
+                            let id =
+                                format!("{lang} mode={mode} {list} {sc:?}/{i}/{extra} {w}x{h}");
                             // the buttons: on the window, none on another (the scroll bar lies beside its rows)
                             for (a, ha) in hits.iter().enumerate() {
                                 assert!(
@@ -4325,7 +4453,10 @@ mod tests {
                             // the labels of one column of buttons share one size
                             let mut sizes_of: std::collections::BTreeMap<u32, (f32, String)> =
                                 std::collections::BTreeMap::new();
-                            for p in probes.iter().filter(|p| p.group != 0 && !p.quads.is_empty()) {
+                            for p in probes
+                                .iter()
+                                .filter(|p| p.group != 0 && !p.quads.is_empty())
+                            {
                                 let (s0, t0) = sizes_of
                                     .entry(p.group)
                                     .or_insert_with(|| (p.size, p.text.clone()));
@@ -4353,8 +4484,10 @@ mod tests {
                                 if p.panel.is_some() {
                                     let t = p.text.as_str();
                                     let like = !t.contains(' ')
-                                        && (t.starts_with(['~', '/', '%']) || t.contains(['/', '\\']));
-                                    if !t.contains(' ') && t != esc && (like || path_end.is_some()) {
+                                        && (t.starts_with(['~', '/', '%'])
+                                            || t.contains(['/', '\\']));
+                                    if !t.contains(' ') && t != esc && (like || path_end.is_some())
+                                    {
                                         if let Some(ends) = path_end {
                                             assert!(
                                                 ends,
@@ -4371,7 +4504,11 @@ mod tests {
                                 }
                                 // a hint is on a note panel, not over the plain background
                                 if p.text == esc {
-                                    assert!(p.panel.is_some(), "the Esc hint is not on a panel: {id} {:?}", p.text);
+                                    assert!(
+                                        p.panel.is_some(),
+                                        "the Esc hint is not on a panel: {id} {:?}",
+                                        p.text
+                                    );
                                     seen_hints += 1;
                                 }
                                 let b = p.quads.iter().fold(
@@ -4398,7 +4535,10 @@ mod tests {
                                     p.size
                                 );
                                 if let Some(panel) = p.panel {
-                                    assert!(inside(b, panel), "a note out of its panel {panel:?}: {at}");
+                                    assert!(
+                                        inside(b, panel),
+                                        "a note out of its panel {panel:?}: {at}"
+                                    );
                                     assert!(
                                         inside(panel, strip),
                                         "a panel out of the centre strip {strip:?}: {at} {panel:?}"
@@ -4415,9 +4555,15 @@ mod tests {
                                     }
                                     // the fill lies inside the rim: within the panel, clear of its edges by the rim
                                     let fill = p.fill.expect("a note has its fill");
-                                    assert!(inside(fill, panel), "a note's fill out of its rim: {at} {fill:?} {panel:?}");
                                     assert!(
-                                        fill[0] > panel[0] && fill[1] > panel[1] && fill[2] < panel[2] && fill[3] < panel[3],
+                                        inside(fill, panel),
+                                        "a note's fill out of its rim: {at} {fill:?} {panel:?}"
+                                    );
+                                    assert!(
+                                        fill[0] > panel[0]
+                                            && fill[1] > panel[1]
+                                            && fill[2] < panel[2]
+                                            && fill[3] < panel[3],
                                         "a note's fill touches the rim's outer edge: {at} {fill:?} {panel:?}"
                                     );
                                     // a note is never cut or ellipsized
@@ -4463,7 +4609,10 @@ mod tests {
                                 }
                                 // no note and no hint lies below Back
                                 if let (Some(panel), Some(bk)) = (p.panel, back) {
-                                    assert!(panel[3] <= bk[1] + tol, "a note below Back {bk:?}: {at} {panel:?}");
+                                    assert!(
+                                        panel[3] <= bk[1] + tol,
+                                        "a note below Back {bk:?}: {at} {panel:?}"
+                                    );
                                 }
                                 // a button's label (ball at its left end): every line centred on the one axis of
                                 // the text area (right of the ball, left of the art's limit), the block centred
@@ -4473,7 +4622,10 @@ mod tests {
                                     p.panel,
                                     p.wrap,
                                     buttons.iter().rev().find(|(r, _)| {
-                                        centre[0] >= r[0] && centre[0] <= r[2] && centre[1] >= r[1] && centre[1] <= r[3]
+                                        centre[0] >= r[0]
+                                            && centre[0] <= r[2]
+                                            && centre[1] >= r[1]
+                                            && centre[1] <= r[3]
                                     }),
                                 ) {
                                     let axis = (c + right.min(r[2])) / 2.0;
@@ -4503,7 +4655,9 @@ mod tests {
                                             "a label line off the button's text axis {axis} (at {mid}): {at}"
                                         );
                                     }
-                                    if (p.frame[1] - r[1]).abs() <= tol && (p.frame[3] - r[3]).abs() <= tol {
+                                    if (p.frame[1] - r[1]).abs() <= tol
+                                        && (p.frame[3] - r[3]).abs() <= tol
+                                    {
                                         let mid = (b[1] + b[3]) / 2.0;
                                         let want = (r[1] + r[3]) / 2.0;
                                         // the glyph cells carry the font's own asymmetry (about a fifth of a line)
@@ -4518,8 +4672,12 @@ mod tests {
                                 }
                                 // no label or value of the game's own texts is ever shortened (only list rows of
                                 // levels and the highscores' names, which come from outside, may be)
-                                if !matches!(sc, Screen::Custom | Screen::Highscore | Screen::Entry) && !p.wrap && p.panel.is_none() {
-                                    let letters = p.text.chars().filter(|c| !c.is_whitespace()).count();
+                                if !matches!(sc, Screen::Custom | Screen::Highscore | Screen::Entry)
+                                    && !p.wrap
+                                    && p.panel.is_none()
+                                {
+                                    let letters =
+                                        p.text.chars().filter(|c| !c.is_whitespace()).count();
                                     if p.cut || p.quads.len() < letters {
                                         cut.insert(format!("{lang} {id} {:?} ({w}x{h})", p.text));
                                     }
@@ -4567,7 +4725,10 @@ mod tests {
         for l in file.lines().filter(|l| l.starts_with("help ")) {
             let cols: Vec<&str> = l.split(" | ").map(str::trim).collect();
             assert_eq!(cols.len(), 8, "a help without all seven languages: {l}");
-            assert!(cols.iter().all(|c| !c.is_empty()), "an empty help text: {l}");
+            assert!(
+                cols.iter().all(|c| !c.is_empty()),
+                "an empty help text: {l}"
+            );
             helps.insert(cols[0].to_owned(), cols[1].to_owned());
         }
         // every line of every screen, and every value of it, names a help that is there
@@ -4596,7 +4757,10 @@ mod tests {
                         };
                         assert_eq!(keys.len(), m.help_values(sc, line).max(1).max(keys.len()));
                         for k in keys {
-                            assert!(helps.contains_key(&k), "missing help text {k:?} ({sc:?} {line:?})");
+                            assert!(
+                                helps.contains_key(&k),
+                                "missing help text {k:?} ({sc:?} {line:?})"
+                            );
                             used.insert(k);
                             checked += 1;
                         }
@@ -4654,7 +4818,11 @@ mod tests {
                                 for p in probe.into_inner().iter().filter(|p| p.panel.is_some()) {
                                     let panel = p.panel.unwrap();
                                     on_panel += 1;
-                                    assert!(!p.cut && !p.text.ends_with(".."), "a help cut: {id} {:?}", p.text);
+                                    assert!(
+                                        !p.cut && !p.text.ends_with(".."),
+                                        "a help cut: {id} {:?}",
+                                        p.text
+                                    );
                                     assert!(p.size >= MIN_TEXT - 1e-3, "a help too small: {id}");
                                     assert!(
                                         panel[0] >= strip[0] - tol && panel[2] <= strip[2] + tol,
@@ -4848,7 +5016,12 @@ mod tests {
             .collect();
         assert_eq!(
             kinds,
-            ["Featured maps", "Classic Ballance", "Community maps", "Back"]
+            [
+                "Featured maps",
+                "Classic Ballance",
+                "Community maps",
+                "Back"
+            ]
         );
         m.step(1);
         assert_eq!(m.enter(), Action::None);
@@ -4997,8 +5170,15 @@ mod tests {
         m.step(1);
         m.step(1);
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.screen(), Screen::Options, "the import is among the options");
-        let at = m.lines(Screen::Options).iter().position(|&l| l == Line::Import);
+        assert_eq!(
+            m.screen(),
+            Screen::Options,
+            "the import is among the options"
+        );
+        let at = m
+            .lines(Screen::Options)
+            .iter()
+            .position(|&l| l == Line::Import);
         // a page opens on its last line (Back): the arrows wrap to the first
         for _ in 0..=at.unwrap_or(0) {
             m.step(1);
@@ -5045,7 +5225,10 @@ mod tests {
                 m.copy = false;
                 m.modified = modified;
                 let l = kinds(&m);
-                assert!(!l.contains(&Line::Classic) && !l.contains(&Line::Challenges), "{l:?}");
+                assert!(
+                    !l.contains(&Line::Classic) && !l.contains(&Line::Challenges),
+                    "{l:?}"
+                );
                 m.copy = true;
                 assert!(kinds(&m).contains(&Line::Classic));
                 assert_eq!(kinds(&m).contains(&Line::Challenges), modified);
@@ -5118,10 +5301,7 @@ mod tests {
             assert!(m.describe(Some(l)).len() > 20, "{l:?}");
         }
         // the downloaded folder's place is shown
-        assert!(
-            m.describe(Some(Line::Downloaded))
-                .ends_with("downloaded")
-        );
+        assert!(m.describe(Some(Line::Downloaded)).ends_with("downloaded"));
     }
 
     #[test]

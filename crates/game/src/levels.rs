@@ -111,7 +111,9 @@ fn downloaded(language: &str) -> String {
         }
     };
     let body = about(language, Kind::Community);
-    let body = body.split_once("\n\n").map_or(body.as_str(), |(_, rest)| rest);
+    let body = body
+        .split_once("\n\n")
+        .map_or(body.as_str(), |(_, rest)| rest);
     format!("{head}{body}")
 }
 
@@ -831,7 +833,9 @@ pub fn shipped() -> Vec<gamedata::package::Package> {
 /// credited in CREDITS.md; the folder is not one of the open-format levels (`shipped` does not list it).
 pub fn community() -> Vec<gamedata::package::Package> {
     gamedata::resources::shipped_levels_root()
-        .map_or_else(Vec::new, |r| gamedata::package::scan(&r.join("community")).0)
+        .map_or_else(Vec::new, |r| {
+            gamedata::package::scan(&r.join("community")).0
+        })
         .into_iter()
         .filter(|p| !p.hidden)
         .collect()

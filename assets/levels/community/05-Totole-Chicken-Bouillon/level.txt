@@ -11,3 +11,4 @@ type = Comprehensive
 catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomMapList.md
 video = https://www.youtube.com/watch?v=xSRaipnKJYE (桜埜叶毣)
 video = https://www.youtube.com/watch?v=wrAAQPa5ezs (LacuS: Custom Level 7)
+sky = Sea

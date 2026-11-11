@@ -10,3 +10,4 @@ catalogue-difficulty = 3
 type = Comprehensive
 source = https://forum.ballance.top/d/113
 video = https://www.youtube.com/watch?v=UAvmmVzN4Dc
+sky = Night

@@ -8,3 +8,4 @@ order = 4
 catalogue-difficulty = 2
 type = Logical
 video = https://www.youtube.com/watch?v=WJPVbtzQbEg
+sky = Mist

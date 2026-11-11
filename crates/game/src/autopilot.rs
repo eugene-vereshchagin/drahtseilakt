@@ -3340,9 +3340,23 @@ impl<T: Clone> Rewinds<T> {
     /// The saves after the one gone back to are dropped (they were on the failed course).
     /// `spot`: where the ball stood still, or was lost (`lost`); the third standing still at one spot, or the sixth
     /// loss, is taken as it comes.
-    pub fn back(&mut self, at: u64, place: (usize, usize), spot: Vec3, lost: bool) -> Option<(T, u32)> {
-        let (near, most) = if lost { (LOST_SPOT, LOSTS_AT_SPOT) } else { (STUCK_SPOT, STUCKS_AT_SPOT) };
-        let n = match self.spots.iter_mut().find(|s| s.1 == lost && s.0.distance(spot) <= near) {
+    pub fn back(
+        &mut self,
+        at: u64,
+        place: (usize, usize),
+        spot: Vec3,
+        lost: bool,
+    ) -> Option<(T, u32)> {
+        let (near, most) = if lost {
+            (LOST_SPOT, LOSTS_AT_SPOT)
+        } else {
+            (STUCK_SPOT, STUCKS_AT_SPOT)
+        };
+        let n = match self
+            .spots
+            .iter_mut()
+            .find(|s| s.1 == lost && s.0.distance(spot) <= near)
+        {
             Some(s) => {
                 s.2 += 1;
                 s.2
@@ -3403,7 +3417,10 @@ mod tests {
         // (the third time there: taken as it comes)
         assert!(r.back(1500, (1, 10), spot, false).is_none());
         // (elsewhere, and a lost ball, still go back)
-        assert!(r.back(1500, (1, 10), spot + Vec3::Z * 10.0, false).is_some());
+        assert!(
+            r.back(1500, (1, 10), spot + Vec3::Z * 10.0, false)
+                .is_some()
+        );
         assert!(r.back(1500, (1, 10), spot, true).is_some());
         // (lost there five times more, the last of them taken)
         for _ in 0..4 {
@@ -3629,7 +3646,12 @@ mod tests {
             }
             sim.ball.velocity.x
         };
-        for kind in [BallKind::Stone, BallKind::Wood, BallKind::Paper, BallKind::Sticky] {
+        for kind in [
+            BallKind::Stone,
+            BallKind::Wood,
+            BallKind::Paper,
+            BallKind::Sticky,
+        ] {
             let at = steepest_climb(kind, 4.5);
             let (gentler, steeper) = (pace(kind, at - 1.5), pace(kind, at + 1.5));
             assert!(

@@ -567,7 +567,9 @@ impl Action {
             | Action::EndlessLives(e)
             | Action::Rewind(e) => vec![e],
             Action::Show(_, _, _, v) => v.iter().collect(),
-            Action::RenderScale(a, b) | Action::RenderAspect(a, b) | Action::GravitySide(a, b) => vec![a, b],
+            Action::RenderScale(a, b) | Action::RenderAspect(a, b) | Action::GravitySide(a, b) => {
+                vec![a, b]
+            }
             Action::RenderFilter(_) => Vec::new(),
             Action::Splits(_)
             | Action::Keys(_)
@@ -631,7 +633,9 @@ impl OptSpec {
                     v
                 }
             }
-            OptKind::Key(list) | OptKind::Choice(list) => v.round().clamp(0.0, list.len().saturating_sub(1) as f32),
+            OptKind::Key(list) | OptKind::Choice(list) => {
+                v.round().clamp(0.0, list.len().saturating_sub(1) as f32)
+            }
         }
     }
 
@@ -659,7 +663,9 @@ impl OptSpec {
                 let v: f32 = s.parse().ok().filter(|v: &f32| v.is_finite())?;
                 (*min..=*max).contains(&v).then(|| self.clamp(v))
             }
-            OptKind::Key(list) | OptKind::Choice(list) => list.iter().position(|k| k == s).map(|i| i as f32),
+            OptKind::Key(list) | OptKind::Choice(list) => {
+                list.iter().position(|k| k == s).map(|i| i as f32)
+            }
         }
     }
 
@@ -729,7 +735,9 @@ impl ModTxt {
 
     /// It changes the run (any sim action, or a practice deed that reaches into it): its runs are modded.
     pub fn modded(&self) -> bool {
-        self.rules.iter().any(|r| r.actions.iter().any(|a| a.sim() || a.deed()))
+        self.rules
+            .iter()
+            .any(|r| r.actions.iter().any(|a| a.sim() || a.deed()))
     }
 
     /// It has a practice deed: while it is on, the game keeps the run's moments for going back.
@@ -1481,7 +1489,10 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
             let name = text_value(rest).map_err(at)?;
             let (shown, cut) = crate::package::clean_noted(&name, crate::package::TITLE_MAX);
             if cut {
-                eprintln!("mod name.{lang} shortened to {} characters: {shown}", crate::package::TITLE_MAX);
+                eprintln!(
+                    "mod name.{lang} shortened to {} characters: {shown}",
+                    crate::package::TITLE_MAX
+                );
             }
             m.names.push((lang, shown));
             continue;
@@ -1671,7 +1682,9 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
             for c in list {
                 let n = format!("{}.{c}", o.key);
                 if !m.labels.iter().any(|(l, lang, _)| *l == n && lang == "en") {
-                    return Err(format!("choice \"{n}\" has no English label (label {n} en ...)"));
+                    return Err(format!(
+                        "choice \"{n}\" has no English label (label {n} en ...)"
+                    ));
                 }
             }
         }
@@ -1917,7 +1930,8 @@ mod tests {
             "option q choice a a b c d e f g h i j k l m\n",
         ] {
             assert!(
-                parse_mod_txt(&format!("name.en T\n{bad}label q.a en A\nlabel q.b en B\n")).is_err(),
+                parse_mod_txt(&format!("name.en T\n{bad}label q.a en A\nlabel q.b en B\n"))
+                    .is_err(),
                 "{bad}"
             );
         }
@@ -1925,7 +1939,10 @@ mod tests {
         assert!(parse_mod_txt("name.en T\noption q choice a a b\nlabel q.a en A\n").is_err());
         assert!(parse_mod_txt("name.en T\nlabel q..a en A\n").is_err());
         assert!(parse_mod_txt("name.en T\nlabel q.a.b en A\n").is_err());
-        let long = format!("name.en T\noption q choice a a {}\nlabel q.a en A\n", "b".repeat(60));
+        let long = format!(
+            "name.en T\noption q choice a a {}\nlabel q.a en A\n",
+            "b".repeat(60)
+        );
         assert!(parse_mod_txt(&long).is_err());
     }
 
@@ -1941,14 +1958,27 @@ mod tests {
         // steering turned with the view changes the run, and reads the view's turn the run keeps (input.turn)
         let steer = parse_mod_txt(&format!("{head}on tick\ndo steer.yaw input.turn\n")).unwrap();
         assert!(steer.modded() && !steer.practice());
-        assert!(parse_mod_txt(&format!("{head}on frame\ndo steer.yaw 5\n")).is_err(), "a run action on the view's event");
-        assert!(parse_mod_txt(&format!("{head}on tick\ndo view.turn 5\n")).is_err(), "a view action on the run's event");
-        assert!(parse_mod_txt(&format!("{head}on tick\ndo steer.yaw mouse.dx\n")).is_err(), "the run reads no view value");
+        assert!(
+            parse_mod_txt(&format!("{head}on frame\ndo steer.yaw 5\n")).is_err(),
+            "a run action on the view's event"
+        );
+        assert!(
+            parse_mod_txt(&format!("{head}on tick\ndo view.turn 5\n")).is_err(),
+            "a view action on the run's event"
+        );
+        assert!(
+            parse_mod_txt(&format!("{head}on tick\ndo steer.yaw mouse.dx\n")).is_err(),
+            "the run reads no view value"
+        );
         assert!(parse_mod_txt(&format!("{head}on tick\ndo steer.yaw playtime.all\n")).is_err());
         // a jump to a sector is a deed on a key: modded, but not the practice's keeping of moments
-        let jump = parse_mod_txt(&format!("{head}on key k\ndo sector.set run.sector + 1\n")).unwrap();
+        let jump =
+            parse_mod_txt(&format!("{head}on key k\ndo sector.set run.sector + 1\n")).unwrap();
         assert!(jump.modded() && !jump.practice());
-        assert!(parse_mod_txt(&format!("{head}on frame\ndo sector.set 2\n")).is_err(), "only on a key");
+        assert!(
+            parse_mod_txt(&format!("{head}on frame\ndo sector.set 2\n")).is_err(),
+            "only on a key"
+        );
         assert!(parse_mod_txt(&format!("{head}on frame\ndo playtime 5\n")).is_err());
     }
 
@@ -1961,15 +1991,26 @@ mod tests {
         .unwrap();
         assert!(!m.modded(), "looks only: the run stays classic");
         // the sacks' supports are a look too, and a mod may be on by default
-        let supports = parse_mod_txt("name.en S\ndefault on\noption v switch on\non frame\ndo render.supports 1 + opt.v\n").unwrap();
+        let supports = parse_mod_txt(
+            "name.en S\ndefault on\noption v switch on\non frame\ndo render.supports 1 + opt.v\n",
+        )
+        .unwrap();
         assert!(supports.default_on && !supports.modded() && !m.default_on);
-        assert!(matches!(supports.rules[0].actions[0], Action::RenderSupports(_)));
+        assert!(matches!(
+            supports.rules[0].actions[0],
+            Action::RenderSupports(_)
+        ));
         assert!(parse_mod_txt("name.en S\ndefault maybe\n").is_err());
-        assert!(parse_mod_txt("name.en S\non tick\ndo render.supports 1\n").is_err(), "a view action on the run's event");
+        assert!(
+            parse_mod_txt("name.en S\non tick\ndo render.supports 1\n").is_err(),
+            "a view action on the run's event"
+        );
         let acts = &m.rules[0].actions;
         assert!(matches!(acts[0], Action::RenderScale(..)));
         assert_eq!(acts[1], Action::RenderFilter(2));
-        let Action::RenderAspect(w, h) = &acts[2] else { panic!() };
+        let Action::RenderAspect(w, h) = &acts[2] else {
+            panic!()
+        };
         assert_eq!((w.eval(&S), h.eval(&S)), (4.0, 3.0));
         for bad in [
             "render.scale 640",
@@ -1981,10 +2022,16 @@ mod tests {
             "render.colour_bits 1 2",
             "render.supports",
         ] {
-            assert!(parse_mod_txt(&format!("{head}on frame\ndo {bad}\n")).is_err(), "{bad}");
+            assert!(
+                parse_mod_txt(&format!("{head}on frame\ndo {bad}\n")).is_err(),
+                "{bad}"
+            );
         }
         for ok in ["render.scale opt.k 480", "render.fps_cap opt.k"] {
-            assert!(parse_mod_txt(&format!("{head}on frame\ndo {ok}\n")).is_ok(), "{ok}");
+            assert!(
+                parse_mod_txt(&format!("{head}on frame\ndo {ok}\n")).is_ok(),
+                "{ok}"
+            );
         }
         // a run's rule may not do them
         assert!(parse_mod_txt(&format!("{head}on tick\ndo render.filter nearest\n")).is_err());
@@ -2161,7 +2208,8 @@ mod tests {
 
     #[test]
     fn the_spawn_points_deeds_are_keys_only_and_on_the_runs_side() {
-        let ok = parse_mod_txt("name.en S\noption k key F8\non key k\ndo spawn.set\ndo spawn.go\n").unwrap();
+        let ok = parse_mod_txt("name.en S\noption k key F8\non key k\ndo spawn.set\ndo spawn.go\n")
+            .unwrap();
         assert!(ok.modded() && ok.run_side() && !ok.practice());
         for bad in [
             "name.en S\non frame\ndo spawn.set\n",

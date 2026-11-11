@@ -31,9 +31,9 @@ mod lang;
 mod learned;
 mod levels;
 mod levelstats;
-mod look;
 mod lights;
 mod locate;
+mod look;
 mod menu;
 mod menuscene;
 mod modified;
@@ -49,8 +49,8 @@ mod pieces;
 mod playtime;
 mod proximity;
 mod render;
-mod retro;
 mod replay;
+mod retro;
 mod scene;
 mod scripting;
 mod setup;
@@ -513,8 +513,7 @@ fn log_without_console() {
     // the last start's log is kept beside (a crash's log survives the next start)
     let log = dir.join("drahtseilakt.log");
     let _ = std::fs::rename(&log, dir.join("drahtseilakt.old.log"));
-    let Ok(out) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::File::create(&log))
-    else {
+    let Ok(out) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::File::create(&log)) else {
         return;
     };
     let (Ok(err), Ok(exe)) = (out.try_clone(), std::env::current_exe()) else {

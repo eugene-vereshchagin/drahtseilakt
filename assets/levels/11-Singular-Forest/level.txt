@@ -10,3 +10,4 @@ catalogue-difficulty = 4
 type = Technical
 source = https://tieba.baidu.com/p/8267347663
 video = https://www.youtube.com/watch?v=BEN-3nJShIU
+sky = Forest

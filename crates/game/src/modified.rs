@@ -105,12 +105,16 @@ pub fn parse_name(stem: &str) -> Name {
     let stem = stem.strip_prefix("反向").unwrap_or(stem);
     // the bracket at the end
     let (head, inner) = match (stem.rfind('('), stem.rfind(')')) {
-        (Some(a), Some(b)) if a < b && stem[b + 1..].trim().is_empty() => (&stem[..a], Some(&stem[a + 1..b])),
+        (Some(a), Some(b)) if a < b && stem[b + 1..].trim().is_empty() => {
+            (&stem[..a], Some(&stem[a + 1..b]))
+        }
         _ => (stem, None),
     };
     let (mut variant, mut author) = (None, None);
     if let Some(inner) = inner {
-        let (first, tail) = inner.split_once('-').map_or((inner, None), |(a, b)| (a, Some(b)));
+        let (first, tail) = inner
+            .split_once('-')
+            .map_or((inner, None), |(a, b)| (a, Some(b)));
         match Variant::of_word(first) {
             Some(v) => {
                 variant = Some(v);
@@ -119,7 +123,9 @@ pub fn parse_name(stem: &str) -> Name {
             None => author = Some(inner.to_owned()),
         }
     }
-    let author = author.map(|a| clean(&a, TITLE_MAX)).filter(|a| !a.is_empty());
+    let author = author
+        .map(|a| clean(&a, TITLE_MAX))
+        .filter(|a| !a.is_empty());
     // "Level" (any case), an optional "_" or space, and digits
     let lower = head.to_ascii_lowercase();
     let level = lower.find("level").and_then(|at| {
@@ -132,7 +138,12 @@ pub fn parse_name(stem: &str) -> Name {
             .collect();
         digits.parse::<u32>().ok()
     });
-    Name { level, variant, author, rest: head.trim().to_owned() }
+    Name {
+        level,
+        variant,
+        author,
+        rest: head.trim().to_owned(),
+    }
 }
 
 /// The set folders inside the modified folder, by name.
@@ -170,14 +181,26 @@ fn title_in(lang: &str, set: &Set, name: &Name) -> String {
     if let Some(v) = name.variant {
         what = format!("{what} {}", word(lang, v.key()));
     }
-    let text = if set_text.is_empty() { what } else { format!("{set_text} - {what}") };
+    let text = if set_text.is_empty() {
+        what
+    } else {
+        format!("{set_text} - {what}")
+    };
     clean(&text, TITLE_MAX)
 }
 
 /// One scanned level of a set, with the title the names give in every language, its author, and the order.
 fn describe(set: &Set, mut p: Package) -> (Package, Name) {
-    let named = if p.level.is_file() { p.level.file_stem() } else { p.folder.file_name() };
-    let name = parse_name(&named.map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+    let named = if p.level.is_file() {
+        p.level.file_stem()
+    } else {
+        p.folder.file_name()
+    };
+    let name = parse_name(
+        &named
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+    );
     // a level.txt of the player's own wins
     if !p.titled {
         p.title = title_in("en", set, &name);
@@ -199,7 +222,12 @@ fn describe(set: &Set, mut p: Package) -> (Package, Name) {
 pub fn levels(root: &Path) -> Vec<Package> {
     let mut all: Vec<(Set, Name, Package)> = Vec::new();
     for folder in set_folders(root) {
-        let set = Set::of_folder(&folder.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+        let set = Set::of_folder(
+            &folder
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        );
         let (found, skipped) = gamedata::package::scan(&folder);
         for s in skipped.iter().take(10) {
             eprintln!("  {s}");
@@ -211,16 +239,28 @@ pub fn levels(root: &Path) -> Vec<Package> {
     }
     all.sort_by(|(sa, na, pa), (sb, nb, pb)| {
         let key = |s: &Set, n: &Name, p: &Package| {
-            (s.rank(), format!("{s:?}"), n.level.is_none(), n.level, n.variant, n.author.clone(), p.title.to_lowercase())
+            (
+                s.rank(),
+                format!("{s:?}"),
+                n.level.is_none(),
+                n.level,
+                n.variant,
+                n.author.clone(),
+                p.title.to_lowercase(),
+            )
         };
-        key(sa, na, pa).cmp(&key(sb, nb, pb)).then_with(|| pa.level.cmp(&pb.level))
+        key(sa, na, pa)
+            .cmp(&key(sb, nb, pb))
+            .then_with(|| pa.level.cmp(&pb.level))
     });
     all.into_iter().map(|(_, _, p)| p).collect()
 }
 
 /// Whether the modified folder holds a level at all: the menu offers the kind only then (and only with a copy).
 pub fn any(root: &Path) -> bool {
-    set_folders(root).iter().any(|f| !gamedata::package::scan(f).0.is_empty())
+    set_folders(root)
+        .iter()
+        .any(|f| !gamedata::package::scan(f).0.is_empty())
 }
 
 /// Every set, level and variant a name can give, titled in every language and credited to a long author: what the
@@ -228,9 +268,20 @@ pub fn any(root: &Path) -> bool {
 #[cfg(test)]
 pub fn sample_packages() -> Vec<Package> {
     let mut v = Vec::new();
-    for set in [Set::Rotated, Set::Reverse, Set::Invisible, Set::Other("A long collection's name".to_owned())] {
+    for set in [
+        Set::Rotated,
+        Set::Reverse,
+        Set::Invisible,
+        Set::Other("A long collection's name".to_owned()),
+    ] {
         for level in [Some(1), Some(11), Some(13), None] {
-            for variant in [None, Some(Variant::Easy), Some(Variant::Normal), Some(Variant::Hard), Some(Variant::New)] {
+            for variant in [
+                None,
+                Some(Variant::Easy),
+                Some(Variant::Normal),
+                Some(Variant::Hard),
+                Some(Variant::New),
+            ] {
                 let name = Name {
                     level,
                     variant,
@@ -273,22 +324,46 @@ mod tests {
     #[test]
     fn names_give_the_level_the_variant_and_the_author() {
         let n = parse_name("反向Level_11(普通-fiype)");
-        assert_eq!((n.level, n.variant, n.author.as_deref()), (Some(11), Some(Variant::Normal), Some("fiype")));
+        assert_eq!(
+            (n.level, n.variant, n.author.as_deref()),
+            (Some(11), Some(Variant::Normal), Some("fiype"))
+        );
         let n = parse_name("反向Level_01(新-Burning红云)");
-        assert_eq!((n.level, n.variant, n.author.as_deref()), (Some(1), Some(Variant::New), Some("Burning红云")));
+        assert_eq!(
+            (n.level, n.variant, n.author.as_deref()),
+            (Some(1), Some(Variant::New), Some("Burning红云"))
+        );
         let n = parse_name("反向Level_09(困难)");
-        assert_eq!((n.level, n.variant, n.author), (Some(9), Some(Variant::Hard), None));
-        assert_eq!(parse_name("反向Level_09(简单)").variant, Some(Variant::Easy));
+        assert_eq!(
+            (n.level, n.variant, n.author),
+            (Some(9), Some(Variant::Hard), None)
+        );
+        assert_eq!(
+            parse_name("反向Level_09(简单)").variant,
+            Some(Variant::Easy)
+        );
         assert_eq!(parse_name("反向Level_04").variant, None);
         // an author alone
         let n = parse_name("Level 05(Someone)");
-        assert_eq!((n.level, n.variant, n.author.as_deref()), (Some(5), None, Some("Someone")));
+        assert_eq!(
+            (n.level, n.variant, n.author.as_deref()),
+            (Some(5), None, Some("Someone"))
+        );
         // a map with no number keeps its name
         let n = parse_name("反向双轨世界.Level");
         assert_eq!((n.level, n.rest.as_str()), (None, "双轨世界.Level"));
         assert_eq!(parse_name("45-Degree Rotated - Level 13").level, Some(13));
         // junk does not panic
-        for s in ["", "(", ")(", "Level_", "Level_(新-)", "(新-a)(b", "反向", "Level_99999999999"] {
+        for s in [
+            "",
+            "(",
+            ")(",
+            "Level_",
+            "Level_(新-)",
+            "(新-a)(b",
+            "反向",
+            "Level_99999999999",
+        ] {
             let _ = parse_name(s);
         }
         assert_eq!(parse_name("Level_(新-)").author, None);
@@ -310,13 +385,20 @@ mod tests {
         assert_eq!(title_in("ru", &set, &n), "Обратные - Уровень 11 Обычная");
         assert_eq!(title_in("de", &set, &n), "Rückwärts - Level 11 Normal");
         assert_eq!(title_in("zh", &set, &n), "反向 - 关卡 11 普通");
-        assert_eq!(title_in("en", &Set::Rotated, &parse_name("Level_03")), "45-Degree Rotated - Level 03");
-        assert_eq!(title_in("en", &Set::Reverse, &parse_name("反向蓝星序曲")), "Reverse - 蓝星序曲");
+        assert_eq!(
+            title_in("en", &Set::Rotated, &parse_name("Level_03")),
+            "45-Degree Rotated - Level 03"
+        );
+        assert_eq!(
+            title_in("en", &Set::Reverse, &parse_name("反向蓝星序曲")),
+            "Reverse - 蓝星序曲"
+        );
     }
 
     #[test]
     fn levels_are_grouped_by_set_and_ordered_by_number_and_variant() {
-        let root = std::env::temp_dir().join(format!("drahtseilakt-modified-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("drahtseilakt-modified-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let mk = |set: &str, folder: &str, file: &str| {
             let d = root.join(set).join(folder);
@@ -324,8 +406,16 @@ mod tests {
             std::fs::write(d.join(file), b"").unwrap();
         };
         mk("Invisible Maps", "Level_01", "Level_01.NMO");
-        mk("Reverse Maps", "反向Level_11(普通-fiype)", "反向Level_11(普通-fiype).NMO");
-        mk("Reverse Maps", "反向Level_11(困难)", "反向Level_11(困难).NMO");
+        mk(
+            "Reverse Maps",
+            "反向Level_11(普通-fiype)",
+            "反向Level_11(普通-fiype).NMO",
+        );
+        mk(
+            "Reverse Maps",
+            "反向Level_11(困难)",
+            "反向Level_11(困难).NMO",
+        );
         mk("Reverse Maps", "反向Level_02", "反向Level_02.NMO");
         mk("45-Degree Rotated Maps", "Level_13", "Level_13.NMO");
         mk("Mirror", "Odd", "Odd.nmo");
@@ -344,7 +434,10 @@ mod tests {
             ]
         );
         assert_eq!(v.get(2).and_then(|p| p.author.as_deref()), Some("fiype"));
-        assert_eq!(v.get(1).map(|p| p.title_in("ru")), Some("Обратные - Уровень 02"));
+        assert_eq!(
+            v.get(1).map(|p| p.title_in("ru")),
+            Some("Обратные - Уровень 02")
+        );
         let _ = std::fs::remove_dir_all(&root);
         assert!(!any(&root), "no folder, no kind");
     }

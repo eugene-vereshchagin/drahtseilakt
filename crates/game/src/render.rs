@@ -320,7 +320,8 @@ pub struct Renderer {
 
 /// Plans a texture's loading (the caller looks its file up and counts it; `bool`: the card draws BC-compressed
 /// textures); the renderer then reads the plans, several at a time.
-pub type TextureLoader<'a> = dyn Fn(&level::Texture, bool) -> Option<gamedata::assets::TexturePlan> + 'a;
+pub type TextureLoader<'a> =
+    dyn Fn(&level::Texture, bool) -> Option<gamedata::assets::TexturePlan> + 'a;
 
 /// How many textures are read at a time, each on its own thread (a 4K picture decoded is 85 MB while it waits).
 const LOADS_AT_ONCE: usize = 8;
@@ -472,7 +473,9 @@ impl Renderer {
             ..Default::default()
         });
         let ui_pipeline = ui_pipeline(&device, &particle_tex_layout, format);
-        let bc = device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_BC);
+        let bc = device
+            .features()
+            .contains(wgpu::Features::TEXTURE_COMPRESSION_BC);
         Renderer {
             device,
             queue,
@@ -549,16 +552,17 @@ impl Renderer {
         while plans.peek().is_some() {
             let started = std::time::Instant::now();
             let batch: Vec<_> = plans.by_ref().take(LOADS_AT_ONCE).collect();
-            let loaded: Vec<(usize, Option<gamedata::gputex::TextureData>)> = std::thread::scope(|s| {
-                let threads: Vec<_> = batch
-                    .into_iter()
-                    .map(|(i, plan)| (i, s.spawn(move || plan.load())))
-                    .collect();
-                threads
-                    .into_iter()
-                    .map(|(i, t)| (i, t.join().ok().flatten()))
-                    .collect()
-            });
+            let loaded: Vec<(usize, Option<gamedata::gputex::TextureData>)> =
+                std::thread::scope(|s| {
+                    let threads: Vec<_> = batch
+                        .into_iter()
+                        .map(|(i, plan)| (i, s.spawn(move || plan.load())))
+                        .collect();
+                    threads
+                        .into_iter()
+                        .map(|(i, t)| (i, t.join().ok().flatten()))
+                        .collect()
+                });
             self.texture_stats.read += started.elapsed();
             let started = std::time::Instant::now();
             for (i, data) in loaded {
@@ -1639,7 +1643,9 @@ impl Renderer {
     /// A loaded texture on the card: one of the same data (a compressed texture's hash, format and size) is uploaded
     /// once for all the models that carry it.
     fn texture_view(&mut self, data: &gamedata::gputex::TextureData) -> Option<wgpu::TextureView> {
-        let key = data.hash.map(|h| (h, data.format, data.size(), data.mips.len()));
+        let key = data
+            .hash
+            .map(|h| (h, data.format, data.size(), data.mips.len()));
         if let Some(view) = key.and_then(|k| self.shared_textures.get(&k)) {
             self.texture_stats.shared += 1;
             return Some(view.clone());
@@ -1726,7 +1732,9 @@ fn upload_texture_data(
     if width == 0
         || height == 0
         || (compressed
-            && (!device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_BC)
+            && (!device
+                .features()
+                .contains(wgpu::Features::TEXTURE_COMPRESSION_BC)
                 || width % block != 0
                 || height % block != 0))
         || data.mips.iter().any(|m| {
@@ -1751,7 +1759,10 @@ fn upload_texture_data(
     });
     for (level, m) in data.mips.iter().enumerate() {
         // a compressed level is written in whole blocks, the small levels' too
-        let (w, h) = (m.width.div_ceil(block) * block, m.height.div_ceil(block) * block);
+        let (w, h) = (
+            m.width.div_ceil(block) * block,
+            m.height.div_ceil(block) * block,
+        );
         queue.write_texture(
             wgpu::TexelCopyTextureInfo {
                 texture: &tex,

@@ -18,7 +18,11 @@ pub struct PlayTimes {
 }
 
 fn plain(name: &str) -> bool {
-    !name.is_empty() && name.len() <= MAX_NAME && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    !name.is_empty()
+        && name.len() <= MAX_NAME
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 impl PlayTimes {
@@ -26,7 +30,9 @@ impl PlayTimes {
         let mut t = PlayTimes::default();
         for line in text.lines().take(MAX_LEVELS) {
             let mut f = line.split_whitespace();
-            let (Some(name), Some(secs)) = (f.next(), f.next()) else { continue };
+            let (Some(name), Some(secs)) = (f.next(), f.next()) else {
+                continue;
+            };
             if let (true, Ok(s)) = (plain(name), secs.parse::<f64>())
                 && s.is_finite()
                 && s >= 0.0
@@ -41,13 +47,18 @@ impl PlayTimes {
 
     pub fn load(path: &Path) -> PlayTimes {
         match std::fs::metadata(path) {
-            Ok(m) if m.is_file() && m.len() <= MAX_FILE => std::fs::read_to_string(path).map(|s| PlayTimes::parse(&s)).unwrap_or_default(),
+            Ok(m) if m.is_file() && m.len() <= MAX_FILE => std::fs::read_to_string(path)
+                .map(|s| PlayTimes::parse(&s))
+                .unwrap_or_default(),
             _ => PlayTimes::default(),
         }
     }
 
     pub fn to_text(&self) -> String {
-        self.levels.iter().map(|(n, s)| format!("{n} {s:.2}\n")).collect()
+        self.levels
+            .iter()
+            .map(|(n, s)| format!("{n} {s:.2}\n"))
+            .collect()
     }
 
     pub fn save(&mut self, path: &Path) {
@@ -73,7 +84,10 @@ impl PlayTimes {
     }
 
     pub fn level(&self, level: &str) -> f32 {
-        self.levels.iter().find(|l| l.0 == level).map_or(0.0, |l| l.1 as f32)
+        self.levels
+            .iter()
+            .find(|l| l.0 == level)
+            .map_or(0.0, |l| l.1 as f32)
     }
 
     pub fn total(&self) -> f32 {
@@ -92,7 +106,10 @@ mod tests {
         t.add("Level_01.NMO", 0.5);
         t.add("Level_02.NMO", 5.0); // one call counts a second at most
         assert!(t.dirty);
-        assert_eq!((t.level("Level_01.NMO"), t.level("Level_09.NMO")), (1.0, 0.0));
+        assert_eq!(
+            (t.level("Level_01.NMO"), t.level("Level_09.NMO")),
+            (1.0, 0.0)
+        );
         assert!((t.total() - 2.0).abs() < 1e-6);
         let back = PlayTimes::parse(&t.to_text());
         assert_eq!(back.level("Level_02.NMO"), 1.0);
@@ -100,7 +117,9 @@ mod tests {
 
     #[test]
     fn hostile_lines_count_for_nothing() {
-        let t = PlayTimes::parse("../x 5\nok nan\nok -3\nok inf\nfine 7\nfine 9\n\u{0}bad 1\njustone\n");
+        let t = PlayTimes::parse(
+            "../x 5\nok nan\nok -3\nok inf\nfine 7\nfine 9\n\u{0}bad 1\njustone\n",
+        );
         assert_eq!((t.level("fine"), t.level("ok"), t.total()), (7.0, 0.0, 7.0));
         let mut u = PlayTimes::default();
         u.add("a b", 1.0);

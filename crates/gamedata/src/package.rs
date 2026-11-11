@@ -223,6 +223,46 @@ pub struct Info {
     pub order: Option<u32>,
     pub hidden: bool,
     pub difficulty: Option<u8>,
+    /// The sky the level wants (`sky = Mountains`): one of ours or the game's, by the name its textures carry.
+    pub sky: Option<String>,
+    /// The music theme (`music = 2`, the original's themes 1 to 5).
+    pub music: Option<u32>,
+    /// The light's colour (`light = 1 0.9 0.8`, three numbers 0..1).
+    pub light: Option<[f32; 3]>,
+}
+
+/// The longest sky name a level.txt may give (as the sky box's own limit).
+pub const SKY_NAME_MAX: usize = 32;
+
+/// A sky name that may name texture files: letters, digits, `_` and `-`.
+fn sky_name(v: &str) -> Option<String> {
+    let v = v.trim();
+    (!v.is_empty()
+        && v.len() <= SKY_NAME_MAX
+        && v.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'))
+    .then(|| v.to_owned())
+}
+
+/// Three numbers 0..1 separated by spaces.
+fn light_colour(v: &str) -> Option<[f32; 3]> {
+    let mut it = v.split_whitespace().map(|n| n.parse::<f32>().ok());
+    let c = [it.next()??, it.next()??, it.next()??];
+    (it.next().is_none() && c.iter().all(|x| (0.0..=1.0).contains(x))).then_some(c)
+}
+
+/// What the level.txt beside a level says about it: for an `.nmo`, the one in its folder when the folder holds
+/// only that level; for an open-format folder, its own. Nothing when there is none.
+pub fn info_of(level: &Path) -> Info {
+    let folder = if is_nmo(level) {
+        level.parent()
+    } else {
+        Some(level)
+    };
+    match folder.map(|f| (f, examine(f))) {
+        Some((f, Ok(p))) if p.level == level => read_info(&f.join(INFO_FILE)),
+        _ => Info::default(),
+    }
 }
 
 /// The easiest and hardest a level.txt's `difficulty` says.
@@ -267,6 +307,20 @@ pub fn parse_info(bytes: &[u8]) -> Info {
         }
         if key == "difficulty" {
             info.difficulty = info.difficulty.or_else(|| difficulty(value));
+            continue;
+        }
+        if key == "sky" {
+            info.sky = info.sky.take().or_else(|| sky_name(value));
+            continue;
+        }
+        if key == "music" {
+            info.music = info
+                .music
+                .or_else(|| value.trim().parse().ok().filter(|n| (1..=5).contains(n)));
+            continue;
+        }
+        if key == "light" {
+            info.light = info.light.or_else(|| light_colour(value));
             continue;
         }
         if key == "hidden" {
@@ -451,6 +505,16 @@ fn is_nmo(p: &Path) -> bool {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn level_txt_names_sky_music_and_light() {
+        let i = parse_info(b"sky = Mountains\nmusic = 3\nlight = 1 0.5 0\n");
+        assert_eq!(i.sky.as_deref(), Some("Mountains"));
+        assert_eq!(i.music, Some(3));
+        assert_eq!(i.light, Some([1.0, 0.5, 0.0]));
+        let bad = parse_info(b"sky = ../x\nmusic = 9\nlight = 2 0 0\n");
+        assert!(bad.sky.is_none() && bad.music.is_none() && bad.light.is_none());
+    }
+
     use super::*;
 
     fn temp(name: &str) -> PathBuf {

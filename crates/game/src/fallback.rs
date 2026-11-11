@@ -223,7 +223,10 @@ fn d_cover(gx: u32, gy: u32, w: f32, h: f32) -> f32 {
     let mut hits = 0;
     for sy in 0..n {
         for sx in 0..n {
-            if inside(gx as f32 + (sx as f32 + 0.5) / n as f32, gy as f32 + (sy as f32 + 0.5) / n as f32) {
+            if inside(
+                gx as f32 + (sx as f32 + 0.5) / n as f32,
+                gy as f32 + (sy as f32 + 0.5) / n as f32,
+            ) {
                 hits += 1;
             }
         }

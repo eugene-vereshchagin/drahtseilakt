@@ -950,7 +950,11 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
             }
         }
         for (source, run) in &sources {
-            let kind = if source.starts_with("run") { "run" } else { "plan" };
+            let kind = if source.starts_with("run") {
+                "run"
+            } else {
+                "plan"
+            };
             let file = out.join("samples").join(format!("Level_{n:02}-{kind}.csv"));
             for (k, t) in measure_into(run, &file)?.into_iter().enumerate() {
                 rows.push((n.to_string(), source.clone(), times.join(" "), k, t));
@@ -962,14 +966,25 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
 
 /// One of our levels (an open-format folder) measured along the run `o.replay`.
 fn run_open(o: &Options, data: &Data, dir: &Path, out: &Path) -> Result<(), String> {
-    let replay = o.replay.clone().ok_or("--level-stats with --open needs --replay RUN")?;
+    let replay = o
+        .replay
+        .clone()
+        .ok_or("--level-stats with --open needs --replay RUN")?;
     let data = data.for_source(&o.source);
     let run = crate::app::stats_run(o, &data, None)?;
-    let name = dir.file_name().map_or_else(String::new, |f| f.to_string_lossy().into_owned());
-    let run_name = replay.file_name().map_or_else(String::new, |f| f.to_string_lossy().into_owned());
+    let name = dir
+        .file_name()
+        .map_or_else(String::new, |f| f.to_string_lossy().into_owned());
+    let run_name = replay
+        .file_name()
+        .map_or_else(String::new, |f| f.to_string_lossy().into_owned());
     println!(
         "{name}: {run_name}: {} after {:.1} s",
-        if run.finished { "finished" } else { "not finished" },
+        if run.finished {
+            "finished"
+        } else {
+            "not finished"
+        },
         run.ticks.len() as f64 / 60.0
     );
     let file = out.join("samples").join(format!("{name}-run.csv"));
@@ -985,14 +1000,25 @@ fn run_open(o: &Options, data: &Data, dir: &Path, out: &Path) -> Result<(), Stri
         ride[3]
     );
     if let Some(t) = tallies.first_mut() {
-        for (k, v) in ["standing_share", "speed_p10", "speed_p50", "speed_p90"].into_iter().zip(ride) {
+        for (k, v) in ["standing_share", "speed_p10", "speed_p50", "speed_p90"]
+            .into_iter()
+            .zip(ride)
+        {
             t.set(k, v);
         }
     }
     let rows: Vec<_> = tallies
         .into_iter()
         .enumerate()
-        .map(|(k, t)| (name.clone(), format!("run:{run_name}"), format!("{:.1}", run.ticks.len() as f64 / 60.0), k, t))
+        .map(|(k, t)| {
+            (
+                name.clone(),
+                format!("run:{run_name}"),
+                format!("{:.1}", run.ticks.len() as f64 / 60.0),
+                k,
+                t,
+            )
+        })
         .collect();
     write_rows(&rows, &out.join("level-stats-own.csv"))
 }
@@ -1018,8 +1044,18 @@ fn ride(ticks: &[TickRec]) -> [f64; 4] {
         }
     }
     speeds.sort_by(f32::total_cmp);
-    let pct = |q: f64| speeds.get(((speeds.len() as f64 - 1.0) * q).round().max(0.0) as usize).copied().unwrap_or(0.0) as f64;
-    [standing as f64 / counted.max(1) as f64, pct(0.1), pct(0.5), pct(0.9)]
+    let pct = |q: f64| {
+        speeds
+            .get(((speeds.len() as f64 - 1.0) * q).round().max(0.0) as usize)
+            .copied()
+            .unwrap_or(0.0) as f64
+    };
+    [
+        standing as f64 / counted.max(1) as f64,
+        pct(0.1),
+        pct(0.5),
+        pct(0.9),
+    ]
 }
 
 /// Measures a way and writes its samples to `file`: the tallies, the whole level's first, then each sector's.
@@ -1028,11 +1064,15 @@ fn measure_into(run: &Run, file: &Path) -> Result<Vec<Tally>, String> {
     let (mut tallies, samples) = measure(run, sectors);
     for t in tallies.iter_mut() {
         t.set("finished", run.finished as u8 as f64);
-        t.set("level_bonus", run.level.settings.level_bonus.unwrap_or(0) as f64);
+        t.set(
+            "level_bonus",
+            run.level.settings.level_bonus.unwrap_or(0) as f64,
+        );
     }
     let mut text = String::from("x,y,z,sector,class,width,left,right,ball\n");
     for x in &samples {
-        let side = |s: Option<Side>| s.map_or_else(String::new, |s| format!("{s:?}").replace(',', ";"));
+        let side =
+            |s: Option<Side>| s.map_or_else(String::new, |s| format!("{s:?}").replace(',', ";"));
         let _ = writeln!(
             text,
             "{:.2},{:.2},{:.2},{},{},{:.2},{},{},{:?}",

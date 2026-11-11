@@ -144,9 +144,9 @@ impl Pack {
                 .find(|(k, _)| k == l)
                 .map(|(_, v)| v.clone())
         };
-        find(lang)
-            .or_else(|| find("en"))
-            .unwrap_or_else(|| crate::package::clean_noted(&self.key, crate::sound_themes::NAME_SHOWN).0)
+        find(lang).or_else(|| find("en")).unwrap_or_else(|| {
+            crate::package::clean_noted(&self.key, crate::sound_themes::NAME_SHOWN).0
+        })
     }
 
     /// One of the game's own packs (not a folder of the player's).

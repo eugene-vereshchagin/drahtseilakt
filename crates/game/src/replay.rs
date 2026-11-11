@@ -239,8 +239,15 @@ impl Replay {
                 continue;
             }
             if a == "turn" {
-                let tick: u64 = f.next().and_then(|v| v.parse().ok()).ok_or_else(|| format!("bad turn: {line}"))?;
-                let deg: u16 = f.next().and_then(|v| v.parse().ok()).filter(|d| *d < 360).ok_or_else(|| format!("bad turn: {line}"))?;
+                let tick: u64 = f
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .ok_or_else(|| format!("bad turn: {line}"))?;
+                let deg: u16 = f
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .filter(|d| *d < 360)
+                    .ok_or_else(|| format!("bad turn: {line}"))?;
                 if r.turns.last().is_some_and(|c| c.0 >= tick) {
                     return Err(format!("ticks out of order: {line}"));
                 }
@@ -306,7 +313,8 @@ mod tests {
     }
 
     #[test]
-    fn the_views_turn_is_a_second_channel_and_a_run_without_it_is_as_before() -> Result<(), String> {
+    fn the_views_turn_is_a_second_channel_and_a_run_without_it_is_as_before() -> Result<(), String>
+    {
         let mut r = Replay::new("Level_01.NMO", 0xabc);
         for t in 1..=6 {
             r.record(t, 0);
@@ -315,7 +323,10 @@ mod tests {
         assert_eq!(r.turns, vec![(4, 90)]);
         let back = Replay::parse(&r.to_text())?;
         assert_eq!(back, r);
-        assert_eq!((back.turn_at(3), back.turn_at(4), back.turn_at(6)), (0, 90, 90));
+        assert_eq!(
+            (back.turn_at(3), back.turn_at(4), back.turn_at(6)),
+            (0, 90, 90)
+        );
         let mut plain = Replay::new("Level_01.NMO", 0xabc);
         plain.record(1, 0);
         assert!(!plain.to_text().contains("turn"));
@@ -398,13 +409,18 @@ mod tests {
         let six = Replay::parse("drahtseilakt-replay 6\nlevel a 1\n1 01\nend 5")
             .expect("format 6 still reads");
         assert_eq!(six.version, 6);
-        let seven = Replay::parse("drahtseilakt-replay 7\nlevel a 1\n1 01\nend 5").expect("format 7 still reads");
+        let seven = Replay::parse("drahtseilakt-replay 7\nlevel a 1\n1 01\nend 5")
+            .expect("format 7 still reads");
         assert_eq!(seven.version, 7);
-        let eight = Replay::parse("drahtseilakt-replay 8\nlevel a 1\n1 01\nend 5").expect("format 8 still reads");
+        let eight = Replay::parse("drahtseilakt-replay 8\nlevel a 1\n1 01\nend 5")
+            .expect("format 8 still reads");
         assert_eq!(eight.version, 8);
         let new = Replay::parse(&Replay::new("a", 1).to_text()).expect("format 9");
         assert_eq!(new.version, 9);
-        assert!(Replay::parse("drahtseilakt-replay 10\nlevel a 1\nend 1").is_err(), "a later format is refused");
+        assert!(
+            Replay::parse("drahtseilakt-replay 10\nlevel a 1\nend 1").is_err(),
+            "a later format is refused"
+        );
         let mut kept = Replay::new("a", 1);
         kept.version = 2;
         assert_eq!(

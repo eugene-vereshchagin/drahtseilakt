@@ -9,3 +9,4 @@ order = 3
 catalogue-difficulty = 2
 type = Comprehensive
 video = https://www.youtube.com/watch?v=jQi5n__Yg9M
+sky = Clouds

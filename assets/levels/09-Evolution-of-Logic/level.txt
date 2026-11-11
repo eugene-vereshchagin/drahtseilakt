@@ -10,3 +10,4 @@ catalogue-difficulty = 4
 type = Logical
 source = https://tieba.baidu.com/p/6700441841
 video = https://www.youtube.com/watch?v=0L338KaAEfI
+sky = B

@@ -10,3 +10,4 @@ catalogue-difficulty = 2
 type = Logical
 source = https://tieba.baidu.com/p/8159356350
 video = https://www.youtube.com/watch?v=xqcHwkeaqDs
+sky = Night
