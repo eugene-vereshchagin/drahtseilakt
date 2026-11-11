@@ -277,10 +277,20 @@ impl Census {
         }
         line("signature,name,op,in1,in2,out,standing,files,instances".into());
         for (&(op, a, b, r), seen) in &self.signatures {
-            let standing = if crate::ops::find(op, r, a, b).is_some() {
-                "known"
-            } else {
-                "unknown"
+            // known: by which row (its source and signature) the table answers
+            let standing = match crate::ops::find(op, r, a, b) {
+                Some((row, swap)) => format!(
+                    "{} {}<-{}+{}{}",
+                    match row.source {
+                        crate::ops::Source::C => "C",
+                        crate::ops::Source::Name => "name",
+                    },
+                    crate::types::name(row.res),
+                    crate::types::name(row.p1),
+                    crate::types::name(row.p2),
+                    if swap { " swapped" } else { "" }
+                ),
+                None => "unknown".to_string(),
             };
             line(format!(
                 "signature,{},{op},{},{},{},{standing},{},{}",

@@ -207,6 +207,16 @@ impl Spec {
                 "script" => (types::SCRIPT, Value::Obj(idx(&script_ids))),
                 "group" => (types::GROUP, Value::Obj(idx(&group_ids))),
                 "array" => (types::ARRAY, Value::Obj(idx(&array_ids))),
+                "percentage" => (types::PERCENTAGE, Value::Float(v.parse().unwrap())),
+                "vector" | "vec2" | "box" => {
+                    let f: Vec<f32> = v.split(',').map(|x| x.parse().unwrap()).collect();
+                    let at = |k: usize| f.get(k).copied().unwrap_or(0.0);
+                    match ty {
+                        "vector" => (types::VECTOR, Value::Vec3([at(0), at(1), at(2)])),
+                        "vec2" => (types::VECTOR2, Value::Vec2([at(0), at(1)])),
+                        _ => (types::BOX, Value::Box(std::array::from_fn(at))),
+                    }
+                }
                 _ => panic!("type {ty}"),
             }
         };
@@ -417,7 +427,24 @@ impl Spec {
             for &(b, k, p, ty) in &printed {
                 let v = rt.values.get(p).cloned().unwrap_or_default();
                 let shown = match ty {
-                    "float" | "time" => format!("{:08x}", v.as_float().to_bits()),
+                    "float" | "time" | "percentage" => format!("{:08x}", v.as_float().to_bits()),
+                    "vector" | "vec2" | "box" => {
+                        let c: Vec<f32> = match &v {
+                            Value::Vec3(a) => a.to_vec(),
+                            Value::Vec2(a) => a.to_vec(),
+                            Value::Box(a) => a.to_vec(),
+                            _ => vec![0.0; 6],
+                        };
+                        let n = match ty {
+                            "vector" => 3,
+                            "vec2" => 2,
+                            _ => 6,
+                        };
+                        (0..n)
+                            .map(|k| format!("{:08x}", c.get(k).copied().unwrap_or(0.0).to_bits()))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    }
                     "string" => v.as_string(),
                     "obj" | "script" | "group" | "array" => v
                         .as_obj()
@@ -931,6 +958,109 @@ fn op() {
             .local("int", g0 as i32)
             .local("int", g1 as i32);
         frame(r, b, &[(0, 0, &[1])])
+    });
+}
+
+/// The operation table against the C over the value types it can build: (operation, output type, input 1
+/// type and values, input 2 type and values or none). Only signatures the C has a function for (directly or
+/// through the parents) and two it lacks (both sides then write nothing) are compared: a row the C lacks and we
+/// take from the operation's name would differ by design.
+#[test]
+fn op_table() {
+    const I: &[&str] = &["-7", "0", "2", "5", "2147483647", "-2147483648"];
+    const D: &[&str] = &["-2", "0", "1", "3", "-1"];
+    // i32::MIN / -1 faults in x86 code (the C reference dies of SIGFPE): ours gives i32::MIN, not compared
+    const N: &[&str] = &["-7", "0", "2", "5", "2147483647", "-2147483647"];
+    const F: &[&str] = &[
+        "-7.5",
+        "0",
+        "0.1",
+        "2",
+        "1e7",
+        "0.00001",
+        "16.666666",
+        "3.14159265",
+    ];
+    const S: &[&str] = &["12", "-3x", "abc", "4.5", "1e3", "+7", ""];
+    const V: &[&str] = &["1,2,3", "0,-0.5,7", "1e6,0,1"];
+    const BX: &[&str] = &["0,1,2,3,4,5", "-1,-1,-1,1,1,1"];
+    const NAMES: &[&str] = &["O0", "O2", "G0", "nope", ""];
+    let (by_name, name) = (
+        (0x5992_03f6u32, 0x23b0_6096u32),
+        (0x5939_156eu32, 0x62ab_3472u32),
+    );
+    type Case = (
+        (u32, u32),
+        &'static str,
+        (&'static str, &'static [&'static str]),
+        Option<(&'static str, &'static [&'static str])>,
+    );
+    let (add, sub, mul, div, md, conv, len, gety, max, abs) = (
+        (0x33cc_6b49, 0x3589_282b),
+        (0x6764_1171, 0x6499_077a),
+        (0x3899_6b85, 0x334e_35c2),
+        (0x748c_3502, 0x0fea_0cf1),
+        (0x2a3f_4ab6, 0x753a_4a20),
+        (0x4280_09b4, 0x1caa_5c78),
+        (0x556a_69af, 0x076e_3f09),
+        (0x389f_72bd, 0x7aef_3482),
+        (0x6ea2_14cb, 0x43be_6b56),
+        (0x1ada_7470, 0x6209_7629),
+    );
+    let cases: Vec<Case> = vec![
+        (add, "int", ("int", I), Some(("int", I))),
+        (sub, "int", ("int", I), Some(("int", I))),
+        (mul, "int", ("int", I), Some(("int", I))),
+        (div, "int", ("int", N), Some(("int", D))),
+        (md, "int", ("int", N), Some(("int", D))),
+        (add, "float", ("float", F), Some(("float", F))),
+        (sub, "float", ("float", F), Some(("float", F))),
+        (mul, "float", ("float", F), Some(("float", F))),
+        (sub, "time", ("time", F), Some(("time", F))),
+        (div, "float", ("time", F), Some(("time", F))),
+        (div, "float", ("float", F), Some(("float", F))),
+        (mul, "float", ("int", I), Some(("float", F))),
+        (mul, "float", ("float", F), Some(("int", I))),
+        (mul, "int", ("float", F), Some(("int", I))),
+        (add, "time", ("time", F), Some(("time", F))),
+        (add, "string", ("string", S), Some(("string", S))),
+        (conv, "float", ("int", I), None),
+        (conv, "int", ("float", F), None),
+        (conv, "float", ("bool", &["0", "1"]), None),
+        (conv, "vec2", ("float", F), Some(("float", F))),
+        (conv, "int", ("string", S), None),
+        (conv, "string", ("int", I), None),
+        (conv, "string", ("float", F), None),
+        (conv, "string", ("time", F), None),
+        (conv, "string", ("percentage", F), None),
+        (conv, "string", ("bool", &["0", "1"]), None),
+        (len, "int", ("string", S), None),
+        (gety, "float", ("vector", V), None),
+        (max, "vector", ("box", BX), None),
+        (abs, "float", ("float", F), None),
+        (sub, "vector", ("vector", V), Some(("int", I))),
+        // objects by name (exact names: the C compares exactly, the notes in any case) and names of objects
+        (by_name, "obj", ("string", NAMES), None),
+        (conv, "obj", ("string", NAMES), None),
+        (name, "string", ("obj", &["0", "2", "-1"]), None),
+    ];
+    sweep("Op table", |r| {
+        let ((g0, g1), out, (t1, v1), second) = r.pick(&cases);
+        let mut b = B::new(0, proto::OP, 1, 1).pin(t1, r.pick(v1));
+        if let Some((t2, v2)) = second {
+            b = b.pin(t2, r.pick(v2));
+        }
+        let start = match out {
+            "string" => "-",
+            "vector" | "vec2" | "box" => "9,9,9,9,9,9",
+            _ => "9",
+        };
+        let b = b
+            .pout(out, start)
+            .local("int", 0)
+            .local("int", g0 as i32)
+            .local("int", g1 as i32);
+        frame(r, b, &[])
     });
 }
 

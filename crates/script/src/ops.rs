@@ -163,7 +163,7 @@ pub static TABLE: &[Row] = &[
         INT,
         FLOAT,
         INT,
-        |_, _, _, a, b| Some(Value::Int((a.as_float() * b.as_int() as f32) as i32)),
+        |_, _, _, a, b| Some(Value::Int(ftol(a.as_float() * b.as_int() as f32))),
         C,
     ),
     r(op::DIV, INT, INT, INT, div_int, C),
@@ -363,7 +363,7 @@ pub static TABLE: &[Row] = &[
         INT,
         FLOAT,
         NO,
-        |_, _, _, a, _| Some(Value::Int(a.as_float() as i32)),
+        |_, _, _, a, _| Some(Value::Int(ftol(a.as_float()))),
         C,
     ),
     r(
@@ -576,6 +576,16 @@ pub fn run(
 
 // ---- the functions --------------------------------------------------------------------------------------------
 
+/// A float to an integer as the original's x86 code converts (truncation toward zero; out of range or NaN gives
+/// the "integer indefinite" `i32::MIN`).
+pub fn ftol(f: f32) -> i32 {
+    if f.is_nan() || f >= 2_147_483_648.0 || f < -2_147_483_648.0 {
+        i32::MIN
+    } else {
+        f as i32
+    }
+}
+
 fn nonzero(d: f32) -> f32 {
     if d == 0.0 { 1.0 } else { d }
 }
@@ -783,6 +793,28 @@ fn scan_int(s: &str) -> i32 {
     v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
 }
 
+/// The leading decimal number of a string as C's `sscanf("%f")` reads it (0 when there is none): sign, digits,
+/// a point, an exponent; the longest prefix that is a number (a long run of digits is cut at 64 characters).
+fn scan_float(s: &str) -> f32 {
+    let s = s.trim_start();
+    let end = s
+        .char_indices()
+        .take(64)
+        .take_while(|&(_, c)| c.is_ascii_digit() || matches!(c, '+' | '-' | '.' | 'e' | 'E'))
+        .last()
+        .map_or(0, |(i, c)| i.saturating_add(c.len_utf8()));
+    let mut prefix = s.get(..end).unwrap_or_default();
+    while !prefix.is_empty() {
+        if let Ok(f) = prefix.parse::<f32>() {
+            return f;
+        }
+        prefix = prefix
+            .get(..prefix.len().saturating_sub(1))
+            .unwrap_or_default();
+    }
+    0.0
+}
+
 /// String → the output's type through its string function: a number, `TRUE` (any case) for a Boolean, an object
 /// of the output type's class by name (as Get Object By Name: the first of that name, any case; a pseudo-object
 /// of the game is of every class).
@@ -796,7 +828,7 @@ fn from_string(
     let s = a.as_string();
     Some(match t::kind(res) {
         Some(t::Kind::Int | t::Kind::Enum) => Value::Int(scan_int(&s)),
-        Some(t::Kind::Float) => Value::Float(s.trim().parse().unwrap_or(0.0)),
+        Some(t::Kind::Float) => Value::Float(scan_float(&s)),
         Some(t::Kind::Bool) => Value::Bool(s.eq_ignore_ascii_case("true")),
         Some(t::Kind::Str | t::Kind::Message | t::Kind::Attribute) => Value::Str(s),
         Some(t::Kind::Object(class)) => Value::Obj(
@@ -1010,6 +1042,225 @@ fn colour(rt: &mut Runtime, host: &mut dyn Host, a: &Value, emissive: bool) -> O
 mod tests {
     use super::*;
 
+    /// Each signature against values worked out by hand (not by running the code): the C's rows and the rows
+    /// taken from the operations' names.
+    #[test]
+    fn hand_computed_values() {
+        use crate::exec::Quiet;
+        let mut rt = Runtime::new(std::sync::Arc::new(crate::Graph::default()));
+        let mut run = |o: Guid, res: Guid, p1: Guid, p2: Guid, a: Value, b: Value| {
+            super::run(&mut rt, &mut Quiet, o, res, p1, p2, &a, &b, false)
+        };
+        let (i, f, s, v) = (
+            Value::Int,
+            Value::Float,
+            |x: &str| Value::Str(x.into()),
+            Value::Vec3,
+        );
+        let n = Value::None;
+        let cases: Vec<(Option<Value>, Option<Value>)> = vec![
+            (
+                run(op::ADD, INT, INT, INT, i(i32::MAX), i(1)),
+                Some(i(i32::MIN)),
+            ),
+            (run(op::DIV, INT, INT, INT, i(7), i(0)), Some(i(7))),
+            (run(op::DIV, INT, INT, INT, i(-7), i(2)), Some(i(-3))),
+            (run(op::MOD, INT, INT, INT, i(-7), i(3)), Some(i(2))),
+            (run(op::MOD, INT, INT, INT, i(7), i(-3)), Some(i(1))),
+            (run(op::MOD, INT, INT, INT, i(5), i(0)), Some(i(0))),
+            (
+                run(op::DIV, FLOAT, FLOAT, FLOAT, f(3.0), f(0.0)),
+                Some(f(3.0)),
+            ),
+            (run(op::MUL, INT, FLOAT, INT, f(2.75), i(2)), Some(i(5))),
+            (run(op::MUL, FLOAT, FLOAT, INT, f(2.5), i(2)), Some(f(5.0))),
+            (
+                run(op::ADD, TIME, TIME, TIME, f(16.5), f(0.5)),
+                Some(f(17.0)),
+            ),
+            (
+                run(op::CONVERT, INT, FLOAT, NO, f(-2.9), n.clone()),
+                Some(i(-2)),
+            ),
+            (
+                run(op::CONVERT, INT, FLOAT, NO, f(3e9), n.clone()),
+                Some(i(i32::MIN)),
+            ),
+            (
+                run(op::CONVERT, FLOAT, BOOL, NO, Value::Bool(true), n.clone()),
+                Some(f(1.0)),
+            ),
+            (
+                run(op::CONVERT, INT, BOOL, NO, Value::Bool(true), n.clone()),
+                Some(i(1)),
+            ),
+            (
+                run(op::CONVERT, STRING, FLOAT, NO, f(0.5), n.clone()),
+                Some(s("0.5")),
+            ),
+            (
+                run(op::CONVERT, STRING, BOOL, NO, Value::Bool(false), n.clone()),
+                Some(s("FALSE")),
+            ),
+            (
+                run(op::CONVERT, STRING, INT, NO, i(-12), n.clone()),
+                Some(s("-12")),
+            ),
+            (
+                run(op::CONVERT, INT, STRING, NO, s(" 31 apples"), n.clone()),
+                Some(i(31)),
+            ),
+            (
+                run(op::CONVERT, BOOL, STRING, NO, s("True"), n.clone()),
+                Some(Value::Bool(true)),
+            ),
+            (
+                run(op::CONVERT, VECTOR2, FLOAT, FLOAT, f(1.0), f(2.0)),
+                Some(Value::Vec2([1.0, 2.0])),
+            ),
+            (
+                run(op::ADD, STRING, STRING, STRING, s("ab"), s("c")),
+                Some(s("abc")),
+            ),
+            (
+                run(op::LENGTH, INT, STRING, NO, s("four"), n.clone()),
+                Some(i(4)),
+            ),
+            (
+                run(
+                    op::ADD,
+                    VECTOR,
+                    VECTOR,
+                    VECTOR,
+                    v([1.0, 2.0, 3.0]),
+                    v([1.0, 1.0, 1.0]),
+                ),
+                Some(v([2.0, 3.0, 4.0])),
+            ),
+            (
+                run(op::MUL, VECTOR, VECTOR, FLOAT, v([1.0, -2.0, 0.5]), f(2.0)),
+                Some(v([2.0, -4.0, 1.0])),
+            ),
+            (
+                run(op::DIV, VECTOR, VECTOR, FLOAT, v([2.0, 4.0, 6.0]), f(0.0)),
+                Some(v([2.0, 4.0, 6.0])),
+            ),
+            (
+                run(
+                    op::CROSS,
+                    VECTOR,
+                    VECTOR,
+                    VECTOR,
+                    v([1.0, 0.0, 0.0]),
+                    v([0.0, 1.0, 0.0]),
+                ),
+                Some(v([0.0, 0.0, 1.0])),
+            ),
+            (
+                run(
+                    op::NORMALIZE,
+                    VECTOR,
+                    VECTOR,
+                    NO,
+                    v([3.0, 0.0, 4.0]),
+                    n.clone(),
+                ),
+                Some(v([0.6, 0.0, 0.8])),
+            ),
+            (
+                run(op::NORMALIZE, VECTOR, VECTOR, NO, v([0.0; 3]), n.clone()),
+                Some(v([0.0; 3])),
+            ),
+            (
+                run(
+                    op::MAGNITUDE,
+                    FLOAT,
+                    VECTOR,
+                    NO,
+                    v([3.0, 0.0, 4.0]),
+                    n.clone(),
+                ),
+                Some(f(5.0)),
+            ),
+            (
+                run(op::SET_Y, VECTOR, VECTOR, FLOAT, v([1.0, 2.0, 3.0]), f(9.0)),
+                Some(v([1.0, 9.0, 3.0])),
+            ),
+            (
+                run(op::OPPOSITE, INT, INT, NO, i(i32::MIN), n.clone()),
+                Some(i(i32::MIN)),
+            ),
+            (
+                run(
+                    op::OPPOSITE,
+                    VECTOR,
+                    VECTOR,
+                    NO,
+                    v([1.0, -2.0, 0.0]),
+                    n.clone(),
+                ),
+                Some(v([-1.0, 2.0, -0.0])),
+            ),
+            (
+                run(op::ARC_COSINE, FLOAT, FLOAT, NO, f(-1.0), n.clone()),
+                Some(f(std::f32::consts::PI)),
+            ),
+            (
+                run(
+                    op::GET_W,
+                    FLOAT,
+                    QUATERNION,
+                    NO,
+                    Value::Quat([0.1, 0.2, 0.3, 0.4]),
+                    n.clone(),
+                ),
+                Some(f(0.4)),
+            ),
+            (
+                run(
+                    op::MAX,
+                    VECTOR,
+                    BOX,
+                    NO,
+                    Value::Box([0.0, 1.0, 2.0, 3.0, 4.0, 5.0]),
+                    n.clone(),
+                ),
+                Some(v([3.0, 4.0, 5.0])),
+            ),
+            (
+                run(
+                    op::MUL,
+                    VECTOR,
+                    MATRIX,
+                    VECTOR,
+                    Value::Matrix([
+                        [0.0, 1.0, 0.0, 0.0],
+                        [-1.0, 0.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [10.0, 0.0, 0.0, 1.0],
+                    ]),
+                    v([1.0, 2.0, 3.0]),
+                ),
+                Some(v([8.0, 1.0, 3.0])),
+            ),
+            // no function: an Op block leaves its output
+            (
+                run(
+                    Guid(0x1ada_7470, 0x6209_7629),
+                    FLOAT,
+                    FLOAT,
+                    NO,
+                    f(-2.0),
+                    n.clone(),
+                ),
+                None,
+            ),
+        ];
+        for (k, (got, want)) in cases.into_iter().enumerate() {
+            assert_eq!(got, want, "case {k}");
+        }
+    }
+
     #[test]
     fn every_row_is_one_signature() {
         for (i, a) in TABLE.iter().enumerate() {
@@ -1070,6 +1321,10 @@ mod tests {
         assert_eq!(scan_int("-7"), -7);
         assert_eq!(scan_int("x1"), 0);
         assert_eq!(scan_int("99999999999"), i32::MAX);
+        assert_eq!(scan_float(" 2.5abc"), 2.5);
+        assert_eq!(scan_float("-1e2x"), -100.0);
+        assert_eq!(scan_float("1e"), 1.0);
+        assert_eq!(scan_float("x"), 0.0);
     }
 
     #[test]

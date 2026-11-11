@@ -149,8 +149,8 @@ function: the meaning is the operation's registered name, not yet checked agains
 | Operation | Signatures (output ← inputs) | Function |
 |---|---|---|
 | Addition, Subtraction, Multiplication | Integer ← Integer, Integer; Float ← Float, Float | wrapping integer arithmetic; single-precision float |
-| Multiplication | Float ← Integer, Float; Integer ← Float, Integer | `(float)i * f`; `(int)(f * (float)i)` (truncated) |
-| Division | Integer, Float | a divisor of 0 becomes 1 (and is logged in the original); `i32::MIN / -1` stays `i32::MIN` |
+| Multiplication | Float ← Integer, Float; Integer ← Float, Integer | `(float)i * f`; `(int)(f * (float)i)` (converted as Convert Float → Integer) |
+| Division | Integer, Float | a divisor of 0 becomes 1 (and is logged in the original); `i32::MIN / -1` faults in the original's x86 code (the game would stop); ours gives `i32::MIN` (and 0 for the remainder) |
 | Modulo `2a3f4ab6` | Integer ← Integer, Integer | `r = a % d`, `r + d` when `r < 0`; 0 for a divisor of 0 |
 | Addition | String ← String, String | concatenation (ours stops growing at 64 KiB) |
 | Addition, Subtraction *name* | Vector ← Vector, Vector | per component |
@@ -163,7 +163,7 @@ function: the meaning is the operation's registered name, not yet checked agains
 | Get X / Y / Z / W *name* | Float ← Quaternion | the component |
 | Get Y | Float ← Vector; Float ← 3D Entity | the component; the entity's world position's y (nothing written without an entity) |
 | Get Right / Up / Dir *name* | Vector ← 3D Entity | the world matrix's column 0 / 1 / 2, normalized |
-| Convert | Float ← Integer; Integer ← Float; 2D Vector ← Float, Float | `(float)`; truncation toward 0 (ours saturates); (x, y) |
+| Convert | Float ← Integer; Integer ← Float; 2D Vector ← Float, Float | `(float)`; truncation toward 0, out of range or NaN `i32::MIN` (x86's integer indefinite); (x, y) |
 | Convert | String ← Integer, Float, Boolean, Time, Percentage | the input type's string function: `%d`; `%g`; `TRUE` / `FALSE` |
 | Convert | Integer, Object ← String | the output type's string function: the leading integer (`%d`, else 0); the object by name and class (above) |
 | Convert *name* | Integer ← Boolean; Quaternion ← Matrix | 0 / 1; the rotation's quaternion |
@@ -184,7 +184,11 @@ function: the meaning is the operation's registered name, not yet checked agains
 1e6. Through the parents these cover more signatures: Time + Time is Float addition, Angle × Float Float
 multiplication, String → Array / Texture / Group / 3D Entity... the object string function, Boolean → Float the
 Integer conversion, Get Name of a Mesh or an Array Object → String. The census (`script-dump --census`) lists every
-signature met with its standing: of the 142 in the community maps and the game, 114 have a function.
+signature met with its standing (the row that answers it and where the row comes from): of the 142 in the
+community maps and the game, 114 have a function, 87 of them through C rows. The level-2 oracle
+(`crates/script/tests/oracle_blocks.rs`, `op_table`) runs the C rows over values it can build (Integer, Float, Time,
+Percentage, Boolean, String, Vector, 2D Vector, Box, objects by name) against the C: 66 of the 142 signatures are answered by rows
+checked so. The entity, mesh and material rows are checked by unit tests only; `ops.rs` has a table of hand-computed values.
 
 Not in the table (no name, no C function; the 16 such GUIDs are used only in four maps): `014405eb`
 (Boolean ← Boolean, Boolean), `0a547387` (Boolean ← 2D / 3D Entity), `0dd635d5` (Object Array ← 3D Entity),
