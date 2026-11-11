@@ -137,7 +137,7 @@ struct Setup {
     /// The last import's outcome, shown under the list.
     message: Option<(String, bool)>,
     imported: bool,
-    /// The menus' language (its code in lang::LANGUAGES).
+    /// The menus' language (its code in lang::languages()).
     lang: String,
     outcome: Outcome,
     /// The pointer in window pixels, and the button it is over.
@@ -650,7 +650,7 @@ mod tests {
         let long =
             "/home/a-player/Games/Ballance/with/a/very/long/path/to/the/original/copy".to_owned();
         let mut checked = 0;
-        for &(lang, _) in &crate::lang::LANGUAGES {
+        for &(lang, _) in crate::lang::languages() {
             for state in 0..5 {
                 let mut s = blank(lang);
                 match state {

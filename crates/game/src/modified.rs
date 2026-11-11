@@ -204,7 +204,7 @@ fn describe(set: &Set, mut p: Package) -> (Package, Name) {
     // a level.txt of the player's own wins
     if !p.titled {
         p.title = title_in("en", set, &name);
-        p.titles = crate::lang::LANGUAGES
+        p.titles = crate::lang::languages()
             .iter()
             .filter(|(code, _)| *code != "en")
             .map(|(code, _)| ((*code).to_owned(), title_in(code, set, &name)))
@@ -289,7 +289,7 @@ pub fn sample_packages() -> Vec<Package> {
                     rest: "Double Track World.Level".to_owned(),
                 };
                 let mut titles: Vec<(String, String)> = Vec::new();
-                for (code, _) in crate::lang::LANGUAGES.iter().filter(|l| l.0 != "en") {
+                for (code, _) in crate::lang::languages().iter().filter(|l| l.0 != "en") {
                     titles.push(((*code).to_owned(), title_in(code, &set, &name)));
                 }
                 v.push(Package {

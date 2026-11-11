@@ -10,7 +10,7 @@ use crate::assets::Data;
 use crate::features::{FEATURES, Feature, Features};
 use crate::highscore::{NAME_MAX, Table};
 use crate::hud::{Rect, text, width};
-use crate::lang::{LANGUAGES, Strings, latin1};
+use crate::lang::{Strings, languages, latin1};
 use crate::levels::Kind;
 use crate::options::{Bindings, Fullscreen, Graphics};
 use gamedata::package::Package;
@@ -156,7 +156,7 @@ enum Line {
     Models,
     /// The sound theme (sound_themes.rs): the arrows go round the themes found.
     SoundTheme,
-    /// The Language page, and a language on it (by its place in lang::LANGUAGES).
+    /// The Language page, and a language on it (by its place in lang::languages()).
     Language,
     Lang(usize),
     /// One of the extended mode's additions, by its place in FEATURES.
@@ -911,7 +911,7 @@ impl Menu {
                 .iter()
                 .position(|e| e.number == self.level && e.available && e.open)
                 .and_then(|i| at(Line::Level(i))),
-            Screen::Language => LANGUAGES
+            Screen::Language => languages()
                 .iter()
                 .position(|l| l.0 == self.strings.language())
                 .and_then(|i| at(Line::Lang(i))),
@@ -986,7 +986,7 @@ impl Menu {
             .into_iter()
             .flatten()
             .collect(),
-            Screen::Language => (0..LANGUAGES.len())
+            Screen::Language => (0..languages().len())
                 .map(Line::Lang)
                 .chain([Line::Back])
                 .collect(),
@@ -1292,7 +1292,7 @@ impl Menu {
             Line::ModOn => Action::ModSwitch(self.mod_page),
             Line::ModOpt(o) => Action::ModOption(self.mod_page, o, 1),
             Line::Language => open(self, Screen::Language),
-            Line::Lang(i) => match LANGUAGES.get(i) {
+            Line::Lang(i) => match languages().get(i) {
                 Some(&(code, _)) => {
                     self.pop();
                     Action::Language(code.to_owned())
@@ -1701,7 +1701,7 @@ impl Menu {
             Line::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Line::Sound => s.get("Menu_Options Button Sound", "Sound"),
             Line::Language => s.ours("language"),
-            Line::Lang(i) => LANGUAGES.get(i).map_or("", |l| l.1).to_owned(),
+            Line::Lang(i) => languages().get(i).map_or("", |l| l.1).to_owned(),
             Line::Extended => s.ours("extended"),
             Line::Level(i) => {
                 let n = self.entries.get(i).map_or(0, |e| e.number);
@@ -2596,7 +2596,7 @@ impl Menu {
                     let y = 0.17 + k as f32 * step;
                     let r = [0.4031, y, 0.5969, y + step - 0.013];
                     button(&mut out, r, LEVEL_UV, state(i), Some(Target::Line(i)));
-                    let spoken = LANGUAGES
+                    let spoken = languages()
                         .get(k)
                         .is_some_and(|c| c.0 == self.strings.language());
                     let style = if spoken { FONT_03_GOLD } else { FONT_03 };
@@ -4360,7 +4360,7 @@ mod tests {
         });
         // mod texts shortened in their middle (the mod page's labels and values, the mods' names)
         let mut cut = std::collections::BTreeSet::new();
-        for &(lang, _) in &LANGUAGES {
+        for &(lang, _) in languages() {
             // a player's pack or theme with a name of the longest allowed (16 letters), of wide ones
             let wide = match lang {
                 "ru" => "Щ".repeat(16),
@@ -4760,17 +4760,20 @@ mod tests {
 
     #[test]
     fn every_line_and_every_value_has_a_help_in_every_language() {
-        // menu.txt: every help text has all seven languages
-        let file = include_str!("../../../assets/own/Texts/menu.txt");
+        // the language files: every help text has every language
         let mut helps = std::collections::BTreeMap::new();
-        for l in file.lines().filter(|l| l.starts_with("help ")) {
-            let cols: Vec<&str> = l.split(" | ").map(str::trim).collect();
-            assert_eq!(cols.len(), 8, "a help without all seven languages: {l}");
-            assert!(
-                cols.iter().all(|c| !c.is_empty()),
-                "an empty help text: {l}"
-            );
-            helps.insert(cols[0].to_owned(), cols[1].to_owned());
+        for (code, _) in languages() {
+            for key in crate::lang::table_keys(code)
+                .into_iter()
+                .filter(|k| k.starts_with("help "))
+            {
+                let t = Strings::ours_for(&key, code);
+                assert!(
+                    !t.is_empty() && t != key,
+                    "an empty help text: {key} in {code}"
+                );
+                helps.insert(key, code.to_string());
+            }
         }
         // every line of every screen, and every value of it, names a help that is there
         let mut used = std::collections::BTreeSet::new();
@@ -4828,7 +4831,7 @@ mod tests {
         }
         let face = crate::ui::Face::Own;
         let (mut shown, mut values) = (0, 0);
-        for &(lang, _) in &LANGUAGES {
+        for &(lang, _) in languages() {
             for mode in [true, false] {
                 let mut m = menu(&[true; 13], mode);
                 m.features.debug = true;
