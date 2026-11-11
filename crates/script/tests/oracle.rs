@@ -407,6 +407,33 @@ fn a_spec_runs_in_our_runtime_without_the_oracle() {
         "frame 1\nrun B0\nend\nframe 2\nrun B1\nend\nframe 3\nend\n"
     );
     for seed in 0..50 {
-        random_spec(seed).run();
+        let spec = random_spec(seed);
+        assert_eq!(
+            spec.run(),
+            spec.run(),
+            "seed {seed}: the same graph runs the same"
+        );
+    }
+}
+
+#[test]
+fn a_cloned_runtime_goes_on_as_the_original() {
+    // rewind and replays clone the run's state: a clone taken mid-run must trace as the original from there
+    for seed in 0..50 {
+        let spec = random_spec(seed);
+        let (g, _, _) = spec.graph();
+        let mut a = Runtime::new(Arc::new(g));
+        let mut host = script::Quiet;
+        for _ in 0..7 {
+            a.tick(&mut host);
+        }
+        let mut b = a.clone();
+        a.set_trace(true);
+        b.set_trace(true);
+        for _ in 0..20 {
+            a.tick(&mut host);
+            b.tick(&mut host);
+            assert_eq!(a.take_trace(), b.take_trace(), "seed {seed}");
+        }
     }
 }
