@@ -819,7 +819,19 @@ fn a_parameter_copying_to_itself_a_thousand_times_does_not_stall_the_runtime() {
 #[test]
 fn a_string_that_doubles_each_time_stops_growing() {
     let big = Value::Str("x".repeat(1 << 16));
-    let r = crate::blocks::arith(|x, y| x + y, i32::wrapping_add, &big, &big, false);
+    let mut rt = Runtime::new(Arc::new(bare(vec![])));
+    let r = crate::ops::run(
+        &mut rt,
+        &mut Rec::new(),
+        crate::ops::op::ADD,
+        types::STRING,
+        types::STRING,
+        types::STRING,
+        &big,
+        &big,
+        true,
+    )
+    .unwrap();
     assert!(r.as_string().len() <= (1 << 16) + 8);
 }
 
@@ -1172,8 +1184,8 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     for w in all.windows(2) {
         assert_ne!(w[0].guid, w[1].guid, "{} declared twice", w[0].name);
     }
-    // the 80 kinds known before the registry, plus the 7 absent ones besides Object Rename
-    assert_eq!(all.len(), 87);
+    // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's
+    assert_eq!(all.len(), 90);
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(

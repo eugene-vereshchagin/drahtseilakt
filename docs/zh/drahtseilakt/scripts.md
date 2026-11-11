@@ -37,3 +37,17 @@
 **C 预言机。** 旧的 C 运行时（`src/ck` + `src/bb`）仅作为测试参照保留（所有者 2026-11-11 的决定）：不复制其中任何代码，它只运行相同的图以便比较跟踪。第 1 级已就绪：`tests/oracle/ck_oracle.c` 根据文本描述构建由简单构建块（Nop、Binary Switch、Activate/Deactivate Script）组成的图，`crates/script/tests/oracle.rs` 生成随机图并逐帧比较跟踪（每帧运行了哪些构建块、顺序如何、帧后哪些处于激活状态）；5000 个图一致。构建与运行：`cmake -S . -B target/ck-oracle -DCMAKE_BUILD_TYPE=Release && cmake --build target/ck-oracle --target ck_oracle`，然后 `OPENBALLANCE_ORACLE=$PWD/target/ck-oracle/ck_oracle cargo test -p script --test oracle`。分歧由笔记裁定，而不是由预言机。
 
 **C 预言机，第 2 级**（`crates/script/tests/oracle_blocks.rs`，`--test oracle_blocks`）：每种构建块一个合成图。预言机的描述现在支持任意原型的构建块及其输入、输出和局部参数（Boolean、Integer、Float、Time、String、消息、对象、脚本、组）、组、连到任意输入的链接，并在每帧后打印构建块的全部输出参数。每个用例把构建块放在一个脚本中，每个输出接一个 Nop 探针；其输入从脚本开始以边界延迟（0、1、2……13 帧）触发，输出回接到输入（包括延迟 0：同一帧内重入），第二个脚本在随机帧重置、停用并重新激活第一个脚本；引脚取边界值（负、零和小数时间，-2 到 7 的计数和步长，运算符 0-7，空组）。已覆盖：Delayer、Timer、Counter、Sequencer、Binary Switch、Wait For All、Identity、Parameter Selector、Binary Memory、Test、Switch On Parameter、Per Second、Group Iterator、Wait Message 与 Send Message、Op（Integer 与 Float 算术，包括除以 0）、Get Cell、Iterator、Get Key Row（Integer 列的数组，包括空数组）、Activate Script 和 Deactivate Script（作为驱动）；每种 2000 个用例一致。出现分歧的构建块现已写入 [gameplay_bbs.md](../../gameplay_bbs.md) 第 5 部分，我们的实现遵循该记录：Delayer 计入 In 到达的那一帧，并把时间保存在 Elapsed Time 中；Timer 从不保持激活（循环由图完成）；Counter 和 Sequencer 把值保存在输出参数 0 中（Sequencer 之前按 Streaming Event 运行，Wait For All 按 Nop）；构建块不处理的输入保持激活；Identity 在引脚与输出数量不等时什么也不做；Wait Message 登记等待后即结束，等待使其图保持激活，消息送达时触发 Out，与原版的消息管理器一致；Iterator 把行号保存在 Row Index 中并绕数组循环；Get Key Row 在数组自身的键列中查找（现从文件读取，标识 `0x4000`），而不是第一列，没有键列时什么也不做。Execute Script 不作比较：C 提交请求，而按我们的笔记脚本立即执行。C 在停止循环前比 BehaviorMaxIteration 多弹出一次栈；笔记说至多这么多次，因此触及上限的循环不作比较。下一步是第 3 级（整张地图）。
+
+## 第 0b 阶段（2026-11-11）：类型、运算、消息
+
+- **参数类型**（`crates/script/src/types.rs`）：GUID → 名称、种类、父类型、大小、默认值的注册表
+  （[ck-runtime.md](../../ck-runtime.md)，“Parameter types”）；值新增四元数、矩形、包围盒和对象数组（开放格式写作
+  `["q", ...]`、`["rect", ...]`、`["box", ...]`、`["oa", [...]]`）。
+- **运算即数据**（`crates/script/src/ops.rs`）：按（运算、输出、输入 1、输入 2）索引的行，查找时像原版参数管理器一样
+  依次尝试类型的父类型和交换输入（[ck-runtime.md](../../ck-runtime.md)，“Operations”）。社区地图和游戏中的 142 个
+  签名有 114 个有函数；其余 28 个（16 个既无名称也无 C 函数的 GUID，见于四张地图）只记录一次日志：图中的运算把输入 1
+  传下去，Op 块不写任何值。字符串转成对象时，只找输出类型所属类的对象。`script-dump --census` 列出每个签名及回答它的
+  行，并按地图列出缺少的块和签名。C 预言机检查值运算的行（`op_table`）。
+- **消息**带有发送者、接收者（或广播的类）和数据：新增 Broadcast Message、Switch On Message 和 Get Message Data
+  （[gameplay_bbs.md](../../gameplay_bbs.md)，“Messages”）。
+- 尚未完成：属性（对象的标识符 `0x11` 和属性管理器的数据块）、可含任意对象的组、其余的数组块。

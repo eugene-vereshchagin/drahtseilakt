@@ -12,7 +12,8 @@
      bb NAME SCRIPT GA:GB PRIO NIN NOUT  level 2: a block of any prototype GUID with NIN inputs, NOUT outputs
      pin|pout|local BLOCK TYPE VALUE  a parameter of that block, in order: TYPE bool, int, float, time (float ms),
                                       string, msg (a message type by name), obj / script / group (an index of
-                                      that kind, -1 none), none (a pin with no source: the block's default)
+                                      that kind, -1 none), none (a pin with no source: the block's default),
+                                      vector / vec2 / box (comma-separated floats), percentage (a float)
      group NAME OBJECT...             a group of objects
      array NAME COLS ROWS KEY         an array of Integer columns, cell (row, col) = 10 * row + col, key column
                                       KEY (-1 none)
@@ -79,7 +80,9 @@ static bool type_guid(const char *t, CkGuid *g)
         {"string", {0x6bd010e2u, 0x115617eau}}, {"msg", {0x03881e12u, 0x5ba34e2bu}},
         {"obj", {0x71d80779u, 0x402f42f3u}},    {"script", {0x7ea4176du, 0x1b405d30u}},
         {"group", {0x5c0f151bu, 0x6f0547fdu}},  {"none", {0x5a5716fdu, 0x44e276d7u}},
-        {"array", {0x024d52f1u, 0x678223b2u}},
+        {"array", {0x024d52f1u, 0x678223b2u}},  {"vector", {0x48824eaeu, 0x2fe47960u}},
+        {"vec2", {0x4efcb34au, 0x6079e42fu}},   {"box", {0x668649c8u, 0x283e2ee1u}},
+        {"percentage", {0xf3c84b4eu, 0x0ffacc34u}}, {"classid", {0x19644e43u, 0x4d6f6123u}},
     };
     for (size_t i = 0; i < sizeof k / sizeof *k; i++)
         if (!strcmp(t, k[i].name)) {
@@ -89,10 +92,29 @@ static bool type_guid(const char *t, CkGuid *g)
     return false;
 }
 
-/* a parameter's value from its description: 4 bytes, or a string with its terminator */
+/* the float components of a vector-like type (vector 3, vec2 2, box 6), 0 for a 4-byte type */
+static unsigned components(const char *t)
+{
+    return !strcmp(t, "vector") ? 3 : !strcmp(t, "vec2") ? 2 : !strcmp(t, "box") ? 6 : 0;
+}
+
+/* a parameter's value from its description: 4 bytes, a string with its terminator, or comma-separated floats */
 static void set_value(CkParameter *p, const char *t, const char *v)
 {
     uint32_t w = 0;
+    unsigned n = components(t);
+    if (n) {
+        float *f = calloc(n, sizeof *f);
+        const char *q = v;
+        for (unsigned k = 0; k < n && q && *q; k++) {
+            f[k] = strtof(q, NULL);
+            q = strchr(q, ',');
+            if (q) q++;
+        }
+        p->value = (uint8_t *)f;
+        p->size = n * (uint32_t)sizeof *f;
+        return;
+    }
     if (!strcmp(t, "string")) {
         size_t n = strlen(v) + 1;
         p->value = malloc(n);
@@ -100,7 +122,7 @@ static void set_value(CkParameter *p, const char *t, const char *v)
         p->size = (uint32_t)n;
         return;
     }
-    if (!strcmp(t, "float") || !strcmp(t, "time")) {
+    if (!strcmp(t, "float") || !strcmp(t, "time") || !strcmp(t, "percentage")) {
         float f = strtof(v, NULL);
         memcpy(&w, &f, 4);
     } else if (!strcmp(t, "msg")) {
@@ -124,9 +146,16 @@ static void print_value(const CkParameter *p, const char *t)
 {
     uint32_t w = 0;
     if (p->value) memcpy(&w, p->value, p->size < 4 ? p->size : 4);
-    if (!strcmp(t, "string")) {
+    unsigned n = components(t);
+    if (n) {
+        for (unsigned k = 0; k < n; k++) {
+            uint32_t c = 0;
+            if (p->value && (k + 1) * 4 <= p->size) memcpy(&c, (const uint8_t *)p->value + 4 * k, 4);
+            printf("%s%08x", k ? "," : "", c);
+        }
+    } else if (!strcmp(t, "string")) {
         printf("%s", p->value && p->size ? (const char *)p->value : "");
-    } else if (!strcmp(t, "float") || !strcmp(t, "time")) {
+    } else if (!strcmp(t, "float") || !strcmp(t, "time") || !strcmp(t, "percentage")) {
         printf("%08x", w);
     } else if (!strcmp(t, "obj") || !strcmp(t, "script") || !strcmp(t, "group") || !strcmp(t, "array")) {
         CkObj *o = w ? ck_obj(&ctx, w) : NULL;
@@ -328,6 +357,11 @@ int main(int argc, char **argv)
         } else if (!strcmp(kind, "frames")) {
             sscanf(line, "%*s %d", &frames);
         }
+    }
+    /* the loader tells every block it was loaded (CKM_BEHAVIORLOAD), as the game's does */
+    for (unsigned k = 0; k < nblocks; k++) {
+        CkBehavior *x = ck_behavior(&ctx, blocks[k]);
+        if (x && x->bb && x->bb->callback) x->bb->callback(&ctx, x, CKM_BEHAVIORLOAD);
     }
     for (int i = 1; i <= frames; i++) {
         printf("frame %d\n", i);

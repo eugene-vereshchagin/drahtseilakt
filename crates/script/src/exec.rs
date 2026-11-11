@@ -52,6 +52,14 @@ pub trait Host {
     fn group_add(&mut self, _group: usize, _object: usize) {}
     fn group_remove(&mut self, _group: usize, _object: usize) {}
     fn group_clear(&mut self, _group: usize) {}
+    /// The level materials of a level mesh, in its order (Get Material, Get Material List).
+    fn mesh_materials(&self, _mesh: usize) -> Vec<usize> {
+        Vec::new()
+    }
+    /// A level material's diffuse (or emissive) colour, RGBA.
+    fn material_color(&self, _material: usize, _emissive: bool) -> Option<[f32; 4]> {
+        None
+    }
 }
 
 /// Per-block state a block keeps between ticks.
@@ -113,6 +121,23 @@ struct ObjState {
     gone: bool,
 }
 
+/// A message in flight (docs/gameplay_bbs.md, "Messages"): its type (by name), the object that sent it, its
+/// receiver (an object; none: every object of `class`, a broadcast) and the parameters attached to it, read when
+/// a block asks for them.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Message {
+    pub name: String,
+    pub sender: Option<Id>,
+    pub to: Option<Id>,
+    /// A broadcast's class (CKCID); none: every object.
+    pub class: Option<u32>,
+    pub data: Vec<Id>,
+}
+
+/// The most messages a tick sends, and parameters a message carries.
+const MAX_MESSAGES: usize = 4_096;
+pub const MAX_MESSAGE_DATA: usize = 32;
+
 /// The most message waits a run keeps.
 const MAX_WAITS: usize = 4_096;
 /// The most trace lines a run keeps (the trace is a tool's, never the game's).
@@ -135,9 +160,9 @@ pub struct Runtime {
     pub values: Vec<Value>,
     /// The maps' arrays' rows, which Set Cell and Add Row change (the graph's are the file's).
     arrays: Vec<Vec<Vec<Value>>>,
-    /// Messages sent this tick, delivered at the next: (name, receiver or all).
-    outbox: Vec<(String, Option<Id>)>,
-    inbox: Vec<(String, Option<Id>)>,
+    /// Messages sent this tick, delivered at the next.
+    outbox: Vec<Message>,
+    inbox: Vec<Message>,
     /// Message waits (Wait Message): (message, waiting block, the object it waits on), in registration order.
     waits: Vec<(String, Id, Option<Id>)>,
     pub tick: u64,
@@ -164,6 +189,9 @@ pub struct Runtime {
     inline: Vec<Id>,
     /// The trace (frames, behaviours run, IOs fired, parameters written), when asked for.
     trace: Option<Vec<String>>,
+    /// Operation signatures looked up so far, with the row found (an index into `ops::TABLE`) and whether the
+    /// inputs are swapped; a signature without one is reported when first met.
+    op_cache: std::collections::HashMap<crate::census::Signature, Option<(usize, bool)>>,
 }
 
 /// The most objects a run's scripts may copy.
@@ -210,6 +238,7 @@ impl Runtime {
             requested: false,
             inline: Vec::new(),
             trace: None,
+            op_cache: std::collections::HashMap::new(),
         };
         rt.objects = vec![ObjState::default(); rt.graph.objects.len()];
         for &o in &rt.graph.start_off {
@@ -372,6 +401,44 @@ impl Runtime {
             self.tree_event(root, BlockEvent::Copy, host, 0);
         }
         Some(new_id)
+    }
+
+    /// The function of an operation signature (ops::find), looked up once per run; a signature without one is
+    /// reported then.
+    pub(crate) fn op_function(
+        &mut self,
+        op: crate::Guid,
+        res: crate::Guid,
+        p1: crate::Guid,
+        p2: crate::Guid,
+        host: &mut dyn Host,
+    ) -> Option<(&'static crate::ops::Row, bool)> {
+        const MAX_SIGNATURES: usize = 4_096;
+        let key = (op, p1, p2, res);
+        let found = match self.op_cache.get(&key) {
+            Some(f) => *f,
+            None => {
+                let f = crate::ops::find(op, res, p1, p2).and_then(|(row, swap)| {
+                    crate::ops::TABLE
+                        .iter()
+                        .position(|r| std::ptr::eq(r, row))
+                        .map(|i| (i, swap))
+                });
+                if f.is_none() {
+                    host.note(&format!(
+                        "script operation not known: {op} for {} ({}, {}); input 1 is passed on",
+                        crate::types::name(res),
+                        crate::types::name(p1),
+                        crate::types::name(p2)
+                    ));
+                }
+                if self.op_cache.len() < MAX_SIGNATURES {
+                    self.op_cache.insert(key, f);
+                }
+                f
+            }
+        };
+        found.and_then(|(i, swap)| crate::ops::TABLE.get(i).map(|r| (r, swap)))
     }
 
     /// A line for the log, said once per key (a prototype) in a run.
@@ -543,7 +610,7 @@ impl Runtime {
     }
 
     /// The scripts attached to an object.
-    fn scripts_of(&self, object: Id) -> Vec<Id> {
+    pub(crate) fn scripts_of(&self, object: Id) -> Vec<Id> {
         self.order
             .iter()
             .copied()
@@ -650,10 +717,42 @@ impl Runtime {
         true
     }
 
+    /// A message to an object, or to every object (none), from no sender and without data.
     pub fn send(&mut self, name: &str, to: Option<Id>) {
-        if self.outbox.len() < 4_096 {
-            self.outbox.push((name.to_string(), to));
+        self.post(Message {
+            name: name.to_string(),
+            to,
+            ..Message::default()
+        });
+    }
+
+    /// Sends a message, delivered at the next tick (capped a tick; data capped).
+    pub fn post(&mut self, mut m: Message) {
+        m.data.truncate(MAX_MESSAGE_DATA);
+        if self.outbox.len() < MAX_MESSAGES {
+            self.outbox.push(m);
         }
+    }
+
+    /// Whether a message reaches an object: sent to it, or broadcast to its class (the game's pseudo-objects,
+    /// without a class, are of every class).
+    pub fn reaches(&self, m: &Message, object: Option<Id>) -> bool {
+        match (m.to, m.class) {
+            (Some(to), _) => Some(to) == object,
+            (None, None) => true,
+            (None, Some(c)) => object
+                .and_then(|o| self.graph.objects.get(o))
+                .is_none_or(|o| crate::types::class_derives(o.class, c)),
+        }
+    }
+
+    /// The messages of this name that reached the object this tick (sent in the last one), in sending order.
+    pub fn messages_to(&self, name: &str, object: Option<Id>) -> Vec<Message> {
+        self.inbox
+            .iter()
+            .filter(|m| m.name.eq_ignore_ascii_case(name) && self.reaches(m, object))
+            .cloned()
+            .collect()
     }
 
     /// Wait Message's In: the block waits for a message of this name to reach `object` (registered once).
@@ -690,10 +789,10 @@ impl Runtime {
             return;
         }
         let inbox = std::mem::take(&mut self.inbox);
-        for (name, to) in &inbox {
+        for m in &inbox {
             let mut i = 0;
             while let Some((n, block, obj)) = self.waits.get(i).cloned() {
-                if !(n.eq_ignore_ascii_case(name) && (to.is_none() || *to == obj)) {
+                if !(n.eq_ignore_ascii_case(&m.name) && self.reaches(m, obj)) {
                     i = i.saturating_add(1);
                     continue;
                 }
@@ -716,7 +815,7 @@ impl Runtime {
     pub fn received(&self, name: &str, owner: Option<Id>) -> bool {
         self.inbox
             .iter()
-            .any(|(n, to)| n.eq_ignore_ascii_case(name) && (to.is_none() || *to == owner))
+            .any(|m| m.name.eq_ignore_ascii_case(name) && self.reaches(m, owner))
     }
 
     /// One tick, as the original's behaviour manager runs a frame: first every pending activation request of a
@@ -1090,12 +1189,14 @@ impl Runtime {
         };
         let a = o.inputs[0].map_or(Value::None, |i| self.read_depth(i, host, depth));
         let b = o.inputs[1].map_or(Value::None, |i| self.read_depth(i, host, depth));
-        let out_guid = o.output.and_then(|x| self.graph.param(x)).map(|p| p.guid);
-        let a_guid = o.inputs[0]
-            .and_then(|x| self.graph.param(x))
-            .map(|p| p.guid);
-        let r = blocks::operation(self, host, o.guid, out_guid, a_guid, &a, &b);
-        if let Some(out) = o.output {
+        let ty = |x: Option<Id>| {
+            x.and_then(|x| self.graph.param(x))
+                .map_or(crate::types::NONE, |p| p.guid)
+        };
+        let (res, t1, t2) = (ty(o.output), ty(o.inputs[0]), ty(o.inputs[1]));
+        if let Some(out) = o.output
+            && let Some(r) = crate::ops::run(self, host, o.guid, res, t1, t2, &a, &b, true)
+        {
             self.write(out, r);
         }
     }

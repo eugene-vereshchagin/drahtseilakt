@@ -124,3 +124,21 @@ nicht in der ersten Spalte, und tut ohne sie nichts. Execute Script wird
 nicht verglichen: das C stellt eine Anforderung, nach unseren Notizen läuft das Skript sofort. Das C nimmt einen
 Stapeleintrag mehr als BehaviorMaxIteration, bevor es eine Schleife stoppt; die Notizen sagen höchstens so viele,
 daher werden Schleifen an der Grenze nicht verglichen. Stufe 3 (ganze Karten) folgt.
+
+## Stufe 0b (2026-11-11): Typen, Operationen, Nachrichten
+
+- **Parametertypen** (`crates/script/src/types.rs`): ein Verzeichnis GUID → Name, Art, Elterntyp, Größe,
+  Vorgabewert ([ck-runtime.md](../../ck-runtime.md), „Parameter types"); Werte kennen nun Quaternion, Rechteck,
+  Box und Objekt-Array (das offene Format schreibt `["q", ...]`, `["rect", ...]`, `["box", ...]`, `["oa", [...]]`).
+- **Operationen als Daten** (`crates/script/src/ops.rs`): Zeilen nach (Operation, Ausgabe, Eingabe 1, Eingabe 2),
+  gesucht mit den Elterntypen und vertauschten Eingaben wie im Parametermanager des Originals
+  ([ck-runtime.md](../../ck-runtime.md), „Operations"). 114 der 142 Signaturen der Community-Karten und des Spiels
+  haben eine Funktion; die übrigen 28 (16 GUIDs ohne Namen und ohne C-Funktion, in vier Karten) werden einmal
+  protokolliert: eine Operation des Graphen gibt Eingabe 1 weiter, ein Op-Block schreibt nichts. Ein String, der zu
+  einem Objekt wird, findet ein Objekt der Klasse des Ausgabetyps. `script-dump --census` listet jede Signatur mit
+  der Zeile, die sie beantwortet, und je Karte die fehlenden Blöcke und Signaturen. Das C-Orakel prüft die
+  Zeilen über Werten (`op_table`).
+- **Nachrichten** tragen Absender, Empfänger (oder die Klasse eines Rundrufs) und Daten: neu sind Broadcast
+  Message, Switch On Message und Get Message Data ([gameplay_bbs.md](../../gameplay_bbs.md), „Messages").
+- Noch nicht: Attribute (Kennung `0x11` eines Objekts und der Chunk des Attributmanagers), Gruppen aus beliebigen
+  Objekten, die übrigen Array-Blöcke.

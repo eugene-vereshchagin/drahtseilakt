@@ -27,6 +27,8 @@ pub struct Scripts {
     initial: Vec<[[f32; 4]; 4]>,
     meshes: Vec<Option<usize>>,
     groups: Vec<Vec<usize>>,
+    /// Each level mesh's materials in its order, and each material's diffuse and emissive colour (read only).
+    materials: std::sync::Arc<Materials>,
     /// The log: (tick, what happened), capped.
     pub log: Vec<(u64, String)>,
     /// The ball's pseudo-object in the graph (`Ball_Pos_Frame`), if a script can name it.
@@ -61,6 +63,21 @@ impl Scripts {
             initial: level.objects.iter().map(|o| o.matrix).collect(),
             meshes: level.objects.iter().map(|o| o.mesh).collect(),
             groups: level.groups.iter().map(|g| g.members.clone()).collect(),
+            materials: std::sync::Arc::new(Materials {
+                of_mesh: level
+                    .meshes
+                    .iter()
+                    .map(|m| m.parts.iter().filter_map(|p| p.material).collect())
+                    .collect(),
+                colours: level
+                    .materials
+                    .iter()
+                    .map(|m| {
+                        let [r, g, b] = m.emissive;
+                        (m.diffuse, [r, g, b, 1.0])
+                    })
+                    .collect(),
+            }),
             log: Vec::new(),
             ball_id,
             teleports: 0,
@@ -80,6 +97,13 @@ pub struct RunView {
     pub teleport: Option<Vec3>,
 }
 
+/// The level's materials as the operations read them.
+#[derive(Debug, Default)]
+struct Materials {
+    of_mesh: Vec<Vec<usize>>,
+    colours: Vec<([f32; 4], [f32; 4])>,
+}
+
 struct SimHost<'a> {
     s: &'a mut ScriptsParts,
     run: &'a mut RunView,
@@ -94,6 +118,7 @@ struct ScriptsParts {
     initial: Vec<[[f32; 4]; 4]>,
     meshes: Vec<Option<usize>>,
     groups: Vec<Vec<usize>>,
+    materials: std::sync::Arc<Materials>,
     log: Vec<(u64, String)>,
     ball_id: Option<script::Id>,
     tick: u64,
@@ -345,6 +370,20 @@ impl Host for SimHost<'_> {
             g.clear();
         }
     }
+
+    fn mesh_materials(&self, mesh: usize) -> Vec<usize> {
+        self.s
+            .materials
+            .of_mesh
+            .get(mesh)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn material_color(&self, material: usize, emissive: bool) -> Option<[f32; 4]> {
+        let (d, e) = self.s.materials.colours.get(material)?;
+        Some(if emissive { *e } else { *d })
+    }
 }
 
 impl Scripts {
@@ -358,6 +397,7 @@ impl Scripts {
             initial: std::mem::take(&mut self.initial),
             meshes: std::mem::take(&mut self.meshes),
             groups: std::mem::take(&mut self.groups),
+            materials: self.materials.clone(),
             log: std::mem::take(&mut self.log),
             ball_id: self.ball_id,
             tick: run.tick,

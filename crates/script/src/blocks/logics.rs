@@ -13,16 +13,19 @@ pub(crate) fn op(rt: &mut Runtime, _id: Id, b: &Block, _proto: Guid, host: &mut 
     );
     let a = pin(rt, b, "p1", 0, host);
     let c = pin(rt, b, "p2", 1, host);
-    let out_guid = rt
-        .pout(b, "res", 0)
-        .and_then(|p| rt.graph.param(p))
-        .map(|p| p.guid);
-    let a_guid = rt
-        .pin(b, "p1", 0)
-        .and_then(|p| rt.graph.param(p))
-        .map(|p| p.guid);
-    let r = operation(rt, host, guid, out_guid, a_guid, &a, &c);
-    set_pout(rt, b, "res", 0, r);
+    let ty = |p: Option<Id>| {
+        p.and_then(|p| rt.graph.param(p))
+            .map_or(types::NONE, |p| p.guid)
+    };
+    let (res, t1, t2) = (
+        ty(rt.pout(b, "res", 0)),
+        ty(rt.pin(b, "p1", 0)),
+        ty(rt.pin(b, "p2", 1)),
+    );
+    // an Op block whose signature has no function writes nothing (the C reference; the notes are silent)
+    if let Some(r) = crate::ops::run(rt, host, guid, res, t1, t2, &a, &c, false) {
+        set_pout(rt, b, "res", 0, r);
+    }
     out(rt, b, 0);
     Flow::Done
 }
@@ -459,6 +462,17 @@ pub(crate) fn send_message_to_group(
             host,
         )
         .as_obj();
+        // the sender is the block's target; the pins from 2 on are the message's data (docs/gameplay_bbs.md,
+        // "Messages")
+        let sender = rt.target(b, host);
+        let data: Vec<Id> = b.pins.iter().skip(2).copied().collect();
+        let msg = |to: Option<Id>| crate::exec::Message {
+            name: name.clone(),
+            sender,
+            to,
+            class: None,
+            data: data.clone(),
+        };
         let to_group = dest.and_then(|d| rt.graph.objects.get(d)).map(|o| o.kind);
         match to_group {
             Some(ObjKind::Group(g)) => {
@@ -468,22 +482,114 @@ pub(crate) fn send_message_to_group(
                         .objects
                         .iter()
                         .position(|o| o.kind == ObjKind::Entity(m));
-                    rt.send(&name, gid);
+                    rt.post(msg(gid));
                     host.message(&name, Some(Ent::Object(m)));
                 }
             }
             Some(ObjKind::Entity(_)) | Some(ObjKind::Ball) => {
-                rt.send(&name, dest);
+                rt.post(msg(dest));
                 let e = rt.ent(dest);
                 host.message(&name, e);
             }
             _ => {
-                rt.send(&name, None);
+                rt.post(msg(None));
                 host.message(&name, None);
             }
         }
         out(rt, b, 0);
     }
+    Flow::Done
+}
+
+/// Broadcast Message (docs/gameplay_bbs.md, "Messages"): from the target to every object of the class (pin 1
+/// when it is a Class ID, else Behavioral Object), the pins after it as data. Without a sender nothing happens.
+pub(crate) fn broadcast_message(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    let Some(sender) = rt.target(b, host) else {
+        return Flow::Done;
+    };
+    if !input(rt, b, 0) {
+        return Flow::Done;
+    }
+    out(rt, b, 0);
+    let name = pin(rt, b, "Message", 0, host).as_string();
+    let has_class = b
+        .pins
+        .get(1)
+        .and_then(|&p| rt.graph.param(p))
+        .is_some_and(|p| p.guid == types::CLASS_ID);
+    let (class, first) = if has_class {
+        let c = pin(rt, b, "Class", 1, host).as_int();
+        (u32::try_from(c).unwrap_or(19), 2)
+    } else {
+        (19, 1)
+    };
+    rt.post(crate::exec::Message {
+        name: name.clone(),
+        sender: Some(sender),
+        to: None,
+        class: Some(class),
+        data: b.pins.iter().skip(first).copied().collect(),
+    });
+    host.message(&name, None);
+    Flow::Done
+}
+
+/// Switch On Message: Off (input 1) clears itself and ends the block; otherwise On is cleared and output i fires
+/// for each message of pin i's type the owner received (sent in the last tick). Stays active.
+pub(crate) fn switch_on_message(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    if input(rt, b, 1) {
+        return Flow::Done;
+    }
+    input(rt, b, 0);
+    for i in 0..b.pins.len().min(b.outputs.len()) {
+        let name = b
+            .pins
+            .get(i)
+            .map(|&p| rt.read(p, host).as_string())
+            .unwrap_or_default();
+        if !name.is_empty() && rt.received(&name, b.owner) {
+            out(rt, b, i);
+        }
+    }
+    Flow::Continue
+}
+
+/// Get Message Data: on In (cleared), the first message of pin 0's type that reached the target this tick gives
+/// its sender to pout 0 and its data, in order, to pouts 1..; Out fires whether or not one came.
+pub(crate) fn get_message_data(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    if !input(rt, b, 0) {
+        return Flow::Done;
+    }
+    let name = pin(rt, b, "Message", 0, host).as_string();
+    let t = rt.target(b, host);
+    if let Some(m) = rt.messages_to(&name, t).into_iter().next() {
+        if let Some(&p) = b.pouts.first() {
+            rt.write(p, Value::Obj(m.sender));
+        }
+        for (&p, &d) in b.pouts.iter().skip(1).zip(&m.data) {
+            let v = rt.read(d, host);
+            rt.write(p, v);
+        }
+    }
+    out(rt, b, 0);
     Flow::Done
 }
 
@@ -1411,6 +1517,42 @@ pub(super) const PROTOS: &[Proto] = &[
         standing: Standing::Full,
         layouts: &[],
         run: send_message_to_group,
+        event: None,
+    },
+    Proto {
+        guid: proto::BROADCAST_MESSAGE,
+        name: "Broadcast Message",
+        library: Library::Logics,
+        pins: &["Message", "Class"],
+        pouts: &[],
+        flags: flags::TARGET | flags::VAR_PINS,
+        standing: Standing::Full,
+        layouts: &[],
+        run: broadcast_message,
+        event: None,
+    },
+    Proto {
+        guid: proto::SWITCH_ON_MESSAGE,
+        name: "Switch On Message",
+        library: Library::Logics,
+        pins: &["Message"],
+        pouts: &[],
+        flags: flags::VAR_PINS | flags::VAR_OUTPUTS,
+        standing: Standing::Full,
+        layouts: &[],
+        run: switch_on_message,
+        event: None,
+    },
+    Proto {
+        guid: proto::GET_MESSAGE_DATA,
+        name: "Get Message Data",
+        library: Library::Logics,
+        pins: &["Message"],
+        pouts: &["Sender"],
+        flags: flags::TARGET | flags::VAR_POUTS,
+        standing: Standing::Full,
+        layouts: &[],
+        run: get_message_data,
         event: None,
     },
     Proto {

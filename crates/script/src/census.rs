@@ -33,6 +33,65 @@ pub struct Census {
     pub start_off: usize,
     pub kinds: BTreeMap<(u32, u32), Seen>,
     pub ops: BTreeMap<(u32, u32), Seen>,
+    /// Every operation signature met (operation, input 1, input 2, output types), in a graph's own operations
+    /// and in Op blocks.
+    pub signatures: BTreeMap<Signature, Seen>,
+    /// Per file with graphs: (file, block kinds the registry lacks, signatures the table lacks, kinds it runs
+    /// only in part).
+    pub maps: Vec<MapRow>,
+}
+
+/// An operation signature: the operation and its input and output types, as the table looks it up.
+pub type Signature = (Guid, Guid, Guid, Guid);
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MapRow {
+    pub file: String,
+    pub missing: Vec<String>,
+    pub ops_missing: Vec<String>,
+    pub partial: Vec<String>,
+}
+
+/// The signatures of a graph's operations: its own operations and its Op blocks (the operation's GUID in locals 1
+/// and 2, the types of pins 0 and 1 and of pout 0), with the name the file gives each.
+pub fn signatures(g: &Graph) -> Vec<(Signature, String)> {
+    let ty = |p: Option<&crate::Id>| -> Guid {
+        p.and_then(|&p| g.param(p))
+            .map_or(crate::types::NONE, |p| p.guid)
+    };
+    let mut out = Vec::new();
+    for (i, n) in g.nodes.iter().enumerate() {
+        match n {
+            Node::Op(o) => out.push((
+                (
+                    o.guid,
+                    ty(o.inputs[0].as_ref()),
+                    ty(o.inputs[1].as_ref()),
+                    ty(o.output.as_ref()),
+                ),
+                g.name(i).to_string(),
+            )),
+            Node::Block(b) if b.proto == Some(blocks::proto::OP) => {
+                let local = |k: usize| {
+                    b.locals
+                        .get(k)
+                        .and_then(|&l| g.param(l))
+                        .map_or(0, |p| p.value.as_int() as u32)
+                };
+                out.push((
+                    (
+                        Guid(local(1), local(2)),
+                        ty(b.pins.first()),
+                        ty(b.pins.get(1)),
+                        ty(b.pouts.first()),
+                    ),
+                    b.name.clone(),
+                ));
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 fn count(map: &mut BTreeMap<(u32, u32), Seen>, g: Guid, name: &str, file: &mut Vec<(u32, u32)>) {
@@ -94,7 +153,13 @@ impl Census {
                 .and_then(|b| nmo::read(&b).map_err(|e| e.to_string()))
                 .and_then(|file| nmo::Document::parse(&file).map_err(|e| e.to_string()));
             match doc {
-                Ok(d) => self.add(&Graph::from_document(&d, &|_| crate::ObjKind::Other)),
+                Ok(d) => {
+                    let g = Graph::from_document(&d, &|_| crate::ObjKind::Other);
+                    self.add(&g);
+                    if !g.scripts.is_empty() {
+                        self.maps.push(map_row(&f.to_string_lossy(), &g));
+                    }
+                }
                 Err(e) => errors.push(format!("{}: {e}", f.display())),
             }
         }
@@ -135,6 +200,19 @@ impl Census {
                 }
                 Node::Op(o) => count(&mut self.ops, o.guid, "", &mut ops),
                 _ => {}
+            }
+        }
+        let mut sigs = Vec::new();
+        for (sig, name) in signatures(g) {
+            let e = self.signatures.entry(sig).or_default();
+            // an Op block is named "Op" unless its author renamed it; a graph's own operation by the operation
+            if e.name.is_empty() || (e.name == "Op" && !name.is_empty()) {
+                e.name = name;
+            }
+            e.instances = e.instances.saturating_add(1);
+            if !sigs.contains(&sig) {
+                sigs.push(sig);
+                e.files = e.files.saturating_add(1);
             }
         }
     }
@@ -187,7 +265,7 @@ impl Census {
             ));
         }
         for (&(g0, g1), seen) in &self.ops {
-            let known = if blocks::ops::known(Guid(g0, g1)) {
+            let known = if crate::ops::known(Guid(g0, g1)) {
                 "known"
             } else {
                 "unknown"
@@ -197,6 +275,84 @@ impl Census {
                 seen.files, seen.instances
             ));
         }
+        line("signature,name,op,in1,in2,out,standing,files,instances".into());
+        for (&(op, a, b, r), seen) in &self.signatures {
+            // known: by which row (its source and signature) the table answers
+            let standing = match crate::ops::find(op, r, a, b) {
+                Some((row, swap)) => format!(
+                    "{} {}<-{}+{}{}",
+                    match row.source {
+                        crate::ops::Source::C => "C",
+                        crate::ops::Source::Name => "name",
+                    },
+                    crate::types::name(row.res),
+                    crate::types::name(row.p1),
+                    crate::types::name(row.p2),
+                    if swap { " swapped" } else { "" }
+                ),
+                None => "unknown".to_string(),
+            };
+            line(format!(
+                "signature,{},{op},{},{},{},{standing},{},{}",
+                seen.name.replace(',', ";"),
+                crate::types::name(a),
+                crate::types::name(b),
+                crate::types::name(r),
+                seen.files,
+                seen.instances
+            ));
+        }
+        let full = self
+            .maps
+            .iter()
+            .filter(|m| m.missing.is_empty() && m.ops_missing.is_empty() && m.partial.is_empty())
+            .count();
+        let known = self
+            .maps
+            .iter()
+            .filter(|m| m.missing.is_empty() && m.ops_missing.is_empty())
+            .count();
+        line(format!(
+            "maps,with graphs {},every block and operation known {known},full effect {full}",
+            self.maps.len()
+        ));
+        for m in &self.maps {
+            line(format!(
+                "map,{},{},{},{}",
+                m.file.replace(',', ";"),
+                m.missing.join("; ").replace(',', ";"),
+                m.ops_missing.join("; ").replace(',', ";"),
+                m.partial.join("; ").replace(',', ";")
+            ));
+        }
         out
     }
+}
+
+/// One file's standing: the block kinds the registry lacks or runs in part, and the operation signatures the
+/// table lacks.
+pub fn map_row(file: &str, g: &Graph) -> MapRow {
+    let mut row = MapRow {
+        file: file.to_string(),
+        ..MapRow::default()
+    };
+    for (guid, name, _) in g.prototypes() {
+        match blocks::find(guid) {
+            None => row.missing.push(name),
+            Some(p) if p.standing == Standing::Partial => row.partial.push(p.name.to_string()),
+            Some(_) => {}
+        }
+    }
+    for ((op, a, b, r), name) in signatures(g) {
+        if crate::ops::find(op, r, a, b).is_none() {
+            let s = format!("{name} {op}");
+            if !row.ops_missing.contains(&s) {
+                row.ops_missing.push(s);
+            }
+        }
+    }
+    row.missing.sort();
+    row.partial.sort();
+    row.ops_missing.sort();
+    row
 }
