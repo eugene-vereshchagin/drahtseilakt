@@ -117,17 +117,47 @@ impl Default for Light {
     }
 }
 
+/// A range of a shared buffer (a model's meshes live in a few large buffers: one buffer each took seconds to create).
+#[derive(Clone)]
+struct BufSlice {
+    buf: wgpu::Buffer,
+    off: u64,
+    len: u64,
+}
+
+impl BufSlice {
+    fn slice(&self) -> wgpu::BufferSlice<'_> {
+        self.buf.slice(self.off..self.off + self.len)
+    }
+}
+
+/// A mesh's bytes before they are on the card: vertices, and per part its indices (and its channel's vertices).
+struct MeshCpu {
+    vertex: Vec<u8>,
+    parts: Vec<PartCpu>,
+}
+
+struct PartCpu {
+    index: Vec<u8>,
+    count: u32,
+    material: usize,
+    channel: Option<(Vec<u8>, PipelineKey)>,
+}
+
+/// The most bytes one shared buffer takes (a model past it goes on in the next buffer).
+const POOL_BYTES: usize = 64 << 20;
+
 struct GpuPart {
-    index: wgpu::Buffer,
+    index: BufSlice,
     count: u32,
     material: usize,
     /// A material channel: its own vertices (the mesh's with the channel's coordinates) and blend, drawn over the
     /// mesh without writing depth.
-    channel: Option<(wgpu::Buffer, PipelineKey)>,
+    channel: Option<(BufSlice, PipelineKey)>,
 }
 
 struct GpuMesh {
-    vertex: wgpu::Buffer,
+    vertex: BufSlice,
     parts: Vec<GpuPart>,
 }
 
@@ -176,6 +206,7 @@ fn sky_scale(spec: &script::SkySpec, far: f32) -> f32 {
     }
 }
 
+#[derive(Clone)]
 struct GpuMaterial {
     bind: wgpu::BindGroup,
     key: PipelineKey,
@@ -908,7 +939,7 @@ impl Renderer {
 
     /// A mesh on the GPU: its vertices, a part per material and a pass per material channel. A part without a material
     /// uses `default_material`.
-    fn gpu_mesh(&self, m: &level::Mesh, default_material: usize) -> Option<GpuMesh> {
+    fn gpu_mesh_cpu(m: &level::Mesh, default_material: usize) -> Option<MeshCpu> {
         if m.positions.is_empty() {
             return None;
         }
@@ -921,25 +952,12 @@ impl Renderer {
                 tangent: tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]),
             })
             .collect();
-        let vertex = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&m.name),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-        let mut parts: Vec<GpuPart> = m
+        let mut parts: Vec<PartCpu> = m
             .parts
             .iter()
             .filter(|p| !p.indices.is_empty())
-            .map(|p| GpuPart {
-                index: self
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some(&m.name),
-                        contents: bytemuck::cast_slice(&p.indices),
-                        usage: wgpu::BufferUsages::INDEX,
-                    }),
+            .map(|p| PartCpu {
+                index: bytemuck::cast_slice(&p.indices).to_vec(),
                 count: p.indices.len() as u32,
                 material: p.material.unwrap_or(default_material),
                 channel: None,
@@ -963,25 +981,12 @@ impl Renderer {
                     ..*v
                 })
                 .collect();
-            let buf = self
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&m.name),
-                    contents: bytemuck::cast_slice(&vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-            parts.push(GpuPart {
-                index: self
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some(&m.name),
-                        contents: bytemuck::cast_slice(&all),
-                        usage: wgpu::BufferUsages::INDEX,
-                    }),
+            parts.push(PartCpu {
+                index: bytemuck::cast_slice(&all).to_vec(),
                 count: all.len() as u32,
                 material: c.material,
                 channel: Some((
-                    buf,
+                    bytemuck::cast_slice(&vertices).to_vec(),
                     PipelineKey {
                         blend: Some(c.blend),
                         z_write: false,
@@ -990,7 +995,95 @@ impl Renderer {
                 )),
             });
         }
-        Some(GpuMesh { vertex, parts })
+        Some(MeshCpu {
+            vertex: bytemuck::cast_slice(&vertices).to_vec(),
+            parts,
+        })
+    }
+
+    /// The meshes on the card, their bytes packed into a few shared buffers (a buffer for each vertex list and each
+    /// index list took 12 ms apiece on a software adapter: 25 s for a 2000-mesh map).
+    fn upload_meshes(&self, meshes: Vec<Option<MeshCpu>>) -> Vec<Option<GpuMesh>> {
+        struct Pending {
+            bytes: Vec<u8>,
+        }
+        let mut chunks: Vec<Pending> = vec![Pending { bytes: Vec::new() }];
+        // a range in chunk `c`, to be turned into a slice once the chunk is a buffer
+        let mut put = |data: &[u8]| -> (usize, u64, u64) {
+            if chunks
+                .last()
+                .is_some_and(|c| !c.bytes.is_empty() && c.bytes.len() + data.len() > POOL_BYTES)
+            {
+                chunks.push(Pending { bytes: Vec::new() });
+            }
+            let c = chunks.len() - 1;
+            let last = &mut chunks[c];
+            let off = last.bytes.len() as u64;
+            last.bytes.extend_from_slice(data);
+            while last.bytes.len() % 4 != 0 {
+                last.bytes.push(0);
+            }
+            (c, off, data.len() as u64)
+        };
+        type Range = (usize, u64, u64);
+        struct Plan {
+            vertex: Range,
+            parts: Vec<(Range, u32, usize, Option<(Range, PipelineKey)>)>,
+        }
+        let plans: Vec<Option<Plan>> = meshes
+            .iter()
+            .map(|m| {
+                m.as_ref().map(|m| Plan {
+                    vertex: put(&m.vertex),
+                    parts: m
+                        .parts
+                        .iter()
+                        .map(|p| {
+                            (
+                                put(&p.index),
+                                p.count,
+                                p.material,
+                                p.channel.as_ref().map(|c| (put(&c.0), c.1)),
+                            )
+                        })
+                        .collect(),
+                })
+            })
+            .collect();
+        let buffers: Vec<wgpu::Buffer> = chunks
+            .iter()
+            .map(|c| {
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("meshes"),
+                        contents: &c.bytes,
+                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX,
+                    })
+            })
+            .collect();
+        let slice = |(c, off, len): Range| BufSlice {
+            buf: buffers[c].clone(),
+            off,
+            len,
+        };
+        plans
+            .into_iter()
+            .map(|p| {
+                p.map(|p| GpuMesh {
+                    vertex: slice(p.vertex),
+                    parts: p
+                        .parts
+                        .into_iter()
+                        .map(|(index, count, material, channel)| GpuPart {
+                            index: slice(index),
+                            count,
+                            material,
+                            channel: channel.map(|(r, k)| (slice(r), k)),
+                        })
+                        .collect(),
+                })
+            })
+            .collect()
     }
 
     /// The sky a script built (scriptsky.rs), as a mesh of the level's model (its parts name the level's materials);
@@ -998,7 +1091,8 @@ impl Renderer {
     pub fn set_script_sky(&mut self, model: usize, sky: Option<&level::Mesh>) -> Option<usize> {
         let gpu = sky.and_then(|m| {
             let default = self.models.get(model)?.materials.len().saturating_sub(1);
-            self.gpu_mesh(m, default)
+            let cpu = Self::gpu_mesh_cpu(m, default)?;
+            self.upload_meshes(vec![Some(cpu)]).pop().flatten()
         });
         let m = self.models.get_mut(model)?;
         let at = match self.script_sky.filter(|s| s.0 == model) {
@@ -1098,23 +1192,37 @@ impl Renderer {
             .iter()
             .map(|t| t.color_key.is_some())
             .collect();
+        let mut same_materials = std::collections::HashMap::new();
         let materials = level
             .materials
             .iter()
-            .map(|m| self.gpu_material(m, &textures, &keyed, (Z_FUNC_DEFAULT, ALPHA_FUNC_DEFAULT)))
+            .map(|m| {
+                // materials alike in all they draw with share one buffer and bind group (a map may carry a
+                // thousand copies of one: each cost 4 ms on a software adapter)
+                let mut same = m.clone();
+                same.name.clear();
+                same_materials
+                    .entry(format!("{same:?}"))
+                    .or_insert_with(|| {
+                        self.gpu_material(m, &textures, &keyed, (Z_FUNC_DEFAULT, ALPHA_FUNC_DEFAULT))
+                    })
+                    .clone()
+            })
             .collect::<Vec<_>>();
         // A part without a material is drawn with a plain white one, kept at the end.
         let default_material = materials.len();
         let mut materials = materials;
         materials.push(self.flat_material([0.8, 0.8, 0.8, 1.0], false));
 
-        let meshes = level
-            .meshes
-            .iter()
-            // a mesh with a finer look (a remastered level's) is drawn as that look
-            .map(|m| m.look.as_deref().unwrap_or(m))
-            .map(|m| self.gpu_mesh(m, default_material))
-            .collect();
+        let meshes = self.upload_meshes(
+            level
+                .meshes
+                .iter()
+                // a mesh with a finer look (a remastered level's) is drawn as that look
+                .map(|m| m.look.as_deref().unwrap_or(m))
+                .map(|m| Self::gpu_mesh_cpu(m, default_material))
+                .collect(),
+        );
         self.models.push(Model {
             meshes,
             materials,
@@ -1928,9 +2036,9 @@ impl Renderer {
                     part.channel
                         .as_ref()
                         .map_or(&mesh.vertex, |c| &c.0)
-                        .slice(..),
+                        .slice(),
                 );
-                pass.set_index_buffer(part.index.slice(..), wgpu::IndexFormat::Uint32);
+                pass.set_index_buffer(part.index.slice(), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..part.count, 0, 0..1);
             }
             // Particles last, over everything, testing depth without writing it.
