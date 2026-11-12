@@ -248,7 +248,7 @@ pub(super) const PROTOS: &[Proto] = &[
         pins: &["Scaling Vector", "", "Absolute"],
         pouts: &[],
         flags: flags::TARGET,
-        standing: Standing::Partial,
+        standing: Standing::Full,
         layouts: &[],
         run: scale,
         event: None,

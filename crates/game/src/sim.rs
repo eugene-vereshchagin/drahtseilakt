@@ -1488,6 +1488,13 @@ impl Sim {
             .map_or_else(Default::default, |s| s.camera)
     }
 
+    /// The light, fog and sky the scripts changed for this run (none without scripts).
+    pub fn script_env(&self) -> crate::scripting::EnvOverride {
+        self.scripts
+            .as_ref()
+            .map_or_else(Default::default, |s| s.env.clone())
+    }
+
     /// The world matrix of a level object as the scripts have it (none without scripts).
     pub fn script_object_matrix(&self, i: usize) -> Option<Mat4> {
         self.scripts.as_ref()?.object_matrix(i)

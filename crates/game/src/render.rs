@@ -41,6 +41,9 @@ struct Globals {
     fog_height: [f32; 4],
     /// The fog's colour seen straight down (rgb).
     fog_down: [f32; 4],
+    /// A script's fog (Set Fog): x the mode (0 none, 1 exp, 2 exp2, 3 linear), y the start, z the end, w the density.
+    script_fog: [f32; 4],
+    script_fog_color: [f32; 4],
 }
 
 #[repr(C)]
@@ -276,6 +279,9 @@ pub struct Renderer {
     pub point: Option<(Vec3, [f32; 3])>,
     /// The level's fog (its settings); none for the original's levels.
     pub fog: Option<level::Fog>,
+    /// What a script's Set Fog set for this run: none when no script did, `Some(None)` when it switched fog off (the
+    /// level's own fog too).
+    pub script_fog: Option<Option<script::FogSpec>>,
     /// The level's sea of cloud (clouds.rs) and how finely it is drawn; none for the original's levels.
     pub clouds: Option<crate::clouds::Layer>,
     /// The frame shows another scene than the level (the menu's): neither the level's sea of cloud nor its fog.
@@ -492,6 +498,7 @@ impl Renderer {
             light: Light::default(),
             flash: 0.0,
             fog: None,
+            script_fog: None,
             clouds: None,
             menu_frame: false,
             cloud_pass: None,
@@ -1211,7 +1218,13 @@ impl Renderer {
         let aspect = width.max(1) as f32 / height.max(1) as f32;
         let proj = perspective_lh(view.fov_y, aspect, view.near, view.far);
         let look = look_at_lh(view.eye, view.target, Vec3::Y);
-        let fog = self.fog.filter(|_| !self.menu_frame);
+        let scripted = self.script_fog.filter(|_| !self.menu_frame);
+        let fog = if scripted.is_some() {
+            None
+        } else {
+            self.fog.filter(|_| !self.menu_frame)
+        };
+        let script_fog = scripted.flatten();
         let globals = Globals {
             view_proj: (proj * look).to_cols_array_2d(),
             light_dir: self
@@ -1251,6 +1264,10 @@ impl Renderer {
             fog_down: fog.map_or([0.0; 4], |f| {
                 [f.color_down[0], f.color_down[1], f.color_down[2], 0.0]
             }),
+            script_fog: script_fog
+                .map_or([0.0; 4], |f| [f32::from(f.mode), f.start, f.end, f.density]),
+            script_fog_color: script_fog
+                .map_or([0.0; 4], |f| [f.color[0], f.color[1], f.color[2], 0.0]),
         };
         self.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));

@@ -133,8 +133,8 @@ pub(crate) fn set_font_properties(
 }
 
 /// 2D Text: while on, the text of pin Text on the target 2D entity (class 27 to 29), in the font of pin Font,
-/// aligned by pin Alignment (Center 0, Left 1, Right 2, Top 4, Bottom 8), inside the margins; the entity's own
-/// frame is not known to the engine yet, so the whole frame stands for it. On -> Exit On; Off -> Exit Off and
+/// aligned by pin Alignment (Center 0, Left 1, Right 2, Top 4, Bottom 8), inside the margins; the entity's frame is
+/// what Edit 2D Entity set (the whole frame when none). On -> Exit On; Off -> Exit Off and
 /// the text is gone. Outputs: Line Count.
 pub(crate) fn text_2d(rt: &mut Runtime, id: Id, b: &Block, _p: Guid, host: &mut dyn Host) -> Flow {
     if input(rt, b, 1) {
@@ -160,6 +160,20 @@ pub(crate) fn text_2d(rt: &mut Runtime, id: Id, b: &Block, _p: Guid, host: &mut 
         _ => [2.0; 4],
     };
     let off = pin(rt, b, "Offset", 4, host).as_vec2();
+    // the entity's frame as Edit 2D Entity left it: values up to 2 are fractions of the 640x480 frame, larger
+    // ones frame pixels; what was not edited is the whole frame
+    let (fx, fy, fw, fh) = {
+        let e = t
+            .and_then(|t| rt.ents2d.iter().find(|(k, _)| *k == t))
+            .map(|(_, e)| *e)
+            .unwrap_or_default();
+        let px = |v: f32, whole: f32| if v.abs() <= 2.0 { v * whole } else { v };
+        let [x, y] = e.pos.unwrap_or([0.0; 2]);
+        let [w, h] = e.size.unwrap_or([FRAME.0, FRAME.1]);
+        let (x, y) = (px(x, FRAME.0), px(y, FRAME.1));
+        let (w, h) = (px(w, FRAME.0).max(0.0), px(h, FRAME.1).max(0.0));
+        (x, y, w, h)
+    };
     let (scale, color, bold) = rt
         .font(font)
         .map_or(([0.5; 2], [1.0; 4], false), |f| (f.scale, f.color, f.bold));
@@ -175,10 +189,10 @@ pub(crate) fn text_2d(rt: &mut Runtime, id: Id, b: &Block, _p: Guid, host: &mut 
         id,
         Some(TextSpec {
             text,
-            x: m[0] + off[0],
-            y: m[1] + off[1],
-            w: FRAME.0 - m[0] - m[2],
-            h: FRAME.1 - m[1] - m[3],
+            x: fx + m[0] + off[0],
+            y: fy + m[1] + off[1],
+            w: fw - m[0] - m[2],
+            h: fh - m[1] - m[3],
             size: FONT_CELL * scale[1],
             bold,
             color,
@@ -321,7 +335,7 @@ pub(super) const PROTOS: &[Proto] = &[
         "2D Text",
         Library::Interface,
         &["Font", "Text", "Alignment", "Margins", "Offset"],
-        Standing::Partial,
+        Standing::Full,
         text_2d,
         Some(text_event),
     ),
@@ -330,7 +344,7 @@ pub(super) const PROTOS: &[Proto] = &[
         "Set Font Properties",
         Library::Interface,
         &["Font", "Space", "Scale", "Italic Offset", "Color"],
-        Standing::Partial,
+        Standing::Full,
         set_font_properties,
         None,
     ),
@@ -339,7 +353,7 @@ pub(super) const PROTOS: &[Proto] = &[
         "Create System Font",
         Library::Interface,
         &["Font Name", "System Font Name", "Font Weight"],
-        Standing::Partial,
+        Standing::Full,
         create_system_font,
         None,
     ),
@@ -366,7 +380,7 @@ pub(super) const PROTOS: &[Proto] = &[
         "TT CreateFontEx",
         Library::TtToolbox,
         &["Font Name", "Font Texture"],
-        Standing::Partial,
+        Standing::Full,
         create_font_ex,
         None,
     ),

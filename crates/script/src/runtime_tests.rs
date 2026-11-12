@@ -33,6 +33,8 @@ struct Rec {
     cursor: Option<bool>,
     /// The camera changes the scripts asked for.
     cams: Vec<CameraChange>,
+    /// The light, fog and sky changes the scripts asked for.
+    env: Vec<crate::EnvChange>,
     /// Every text box call: the block and its spec (none: taken away).
     boxes: Vec<(usize, Option<crate::TextSpec>)>,
     /// Every emitter call: block, entity, values, state.
@@ -125,6 +127,9 @@ impl Host for Rec {
     }
     fn camera_set(&mut self, change: CameraChange) {
         self.cams.push(change);
+    }
+    fn env_set(&mut self, change: crate::EnvChange) {
+        self.env.push(change);
     }
     fn sound(&mut self, key: usize, file: &str, cmd: crate::SoundCmd) {
         self.sounds.push(format!("{key} {file} {cmd:?}"));
@@ -1241,7 +1246,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them), the sounds, the input blocks and the cameras (Set As Active Camera,
     // Set Clipping Planes, Set FOV)
-    assert_eq!(all.len(), 131); // and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp
+    assert_eq!(all.len(), 136); // and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -2765,4 +2770,163 @@ fn a_spherical_emitter_has_its_own_shape() {
         host.emitters.last().map(|e| e.2.shape),
         Some(crate::EmitShape::Spherical)
     );
+}
+
+// ---- the scene's look: Set Light Color, Set Fog, TT Sky, Edit 2D Entity, Set Pickable ---------------------------
+
+#[test]
+fn set_light_color_names_the_target_light_and_clamps_the_colour() {
+    let pins = [(
+        "Color",
+        types::COLOR,
+        Value::Color([0.25, 2.0, f32::NAN, 1.0]),
+    )];
+    let (mut rt, _) = text_rig(
+        crate::blocks::environment::SET_LIGHT_COLOR,
+        &["In"],
+        &["Out"],
+        &pins,
+        &[],
+        38,
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(
+        host.env,
+        vec![crate::EnvChange::LightColor {
+            light: "Frame".into(),
+            color: [0.25, 1.0, 0.0, 1.0]
+        }]
+    );
+}
+
+fn fog_pins(mode: i32, start: f32, end: f32) -> Vec<(&'static str, Guid, Value)> {
+    vec![
+        ("Fog Mode", types::INT, Value::Int(mode)),
+        ("Fog Start", types::FLOAT, Value::Float(start)),
+        ("Fog End", types::FLOAT, Value::Float(end)),
+        ("Fog Density", types::FLOAT, Value::Float(0.5)),
+        (
+            "Fog Color",
+            types::COLOR,
+            Value::Color([0.1, 0.2, 0.3, 1.0]),
+        ),
+    ]
+}
+
+#[test]
+fn set_fog_sets_a_linear_fog_and_mode_none_or_a_bad_range_switches_it_off() {
+    let run = |mode, start, end| {
+        let (mut rt, _) = text_rig(
+            crate::blocks::environment::SET_FOG,
+            &["In"],
+            &["Out"],
+            &fog_pins(mode, start, end),
+            &[],
+            0,
+        );
+        let mut host = Rec::new();
+        rt.tick(&mut host);
+        host.env
+    };
+    assert_eq!(
+        run(3, 35.0, 60.0),
+        vec![crate::EnvChange::Fog(Some(crate::FogSpec {
+            mode: 3,
+            start: 35.0,
+            end: 60.0,
+            density: 0.5,
+            color: [0.1, 0.2, 0.3, 1.0]
+        }))]
+    );
+    assert_eq!(run(0, 35.0, 60.0), vec![crate::EnvChange::Fog(None)]);
+    assert_eq!(
+        run(3, 60.0, 35.0),
+        vec![crate::EnvChange::Fog(None)],
+        "end before start"
+    );
+    assert!(matches!(run(2, 0.0, 0.0)[0], crate::EnvChange::Fog(Some(f)) if f.mode == 2));
+}
+
+#[test]
+fn tt_sky_stays_on_until_off_and_off_takes_it_away() {
+    let mut pins = vec![
+        ("Distortion", types::FLOAT, Value::Float(0.15)),
+        ("Vertex Color", types::COLOR, Value::Color([1.0; 4])),
+        ("Orientation Object", types::ENTITY, Value::Obj(None)),
+        ("Radius", types::FLOAT, Value::Float(100.0)),
+        ("Quadratic SideFaces?", types::BOOL, Value::Bool(true)),
+        ("or SideFace-Heigth", types::FLOAT, Value::Float(10.0)),
+        ("Y-Position of Sky", types::FLOAT, Value::Float(0.0)),
+    ];
+    for _ in 0..5 {
+        pins.push(("Side-Mat", types::MATERIAL, Value::Obj(Some(1))));
+    }
+    let (mut rt, blk) = text_rig(
+        crate::blocks::environment::TT_SKY,
+        &["On", "Off"],
+        &["Exit On", "Exit Off"],
+        &pins,
+        &[],
+        0,
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    rt.tick(&mut host);
+    assert!(host.env.len() >= 2, "every tick while on");
+    match &host.env[0] {
+        crate::EnvChange::Sky(Some(s)) => {
+            assert_eq!(
+                s.sides.len(),
+                4,
+                "four sides without a Side Materials local"
+            );
+            assert_eq!(s.radius, 100.0);
+            assert_eq!(s.distortion, 0.15);
+        }
+        other => panic!("{other:?}"),
+    }
+    let off = in_of(&rt.graph, blk, 1);
+    rt.set_io(off, true);
+    host.env.clear();
+    rt.tick(&mut host);
+    assert_eq!(host.env, vec![crate::EnvChange::Sky(None)]);
+}
+
+#[test]
+fn edit_2d_entity_keeps_what_it_edits_and_2d_text_lays_out_inside_it() {
+    let pins = [
+        ("Size X", types::FLOAT, Value::Float(0.5)),
+        ("Size Y", types::FLOAT, Value::Float(0.25)),
+    ];
+    let (mut rt, _) = text_rig(
+        crate::blocks::environment::EDIT_2D_ENTITY,
+        &["In"],
+        &["Out"],
+        &pins,
+        &[],
+        27,
+    );
+    rt.tick(&mut Rec::new());
+    assert_eq!(rt.ents2d.len(), 1);
+    assert_eq!(rt.ents2d[0].1.size, Some([0.5, 0.25]));
+    assert_eq!(rt.ents2d[0].1.pos, None, "position not edited");
+}
+
+#[test]
+fn set_pickable_only_passes_on() {
+    let pins = [("Pickable", types::BOOL, Value::Bool(false))];
+    let (mut rt, blk) = text_rig(
+        crate::blocks::environment::SET_PICKABLE,
+        &["In"],
+        &["Out"],
+        &pins,
+        &[],
+        0,
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert!(host.env.is_empty());
+    let inp = rt.graph.block(blk).unwrap().inputs[0];
+    assert!(!rt.io_active(inp), "the input was taken");
 }

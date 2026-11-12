@@ -132,7 +132,53 @@ pub trait Host {
     }
     /// A change of the camera, for this run only (Set As Active Camera, Set Clipping Planes; Set FOV when it exists).
     fn camera_set(&mut self, _change: CameraChange) {}
+    /// A script changes the scene's look for this run only (Set Light Color, Set Fog, TT Sky). The engine keeps it
+    /// in the run (it rewinds with it) and the renderer shows it; nothing of it reaches the simulation.
+    fn env_set(&mut self, _change: EnvChange) {}
 }
+
+/// What a script asks of the scene's light, fog and sky.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnvChange {
+    /// The colour of the named light (RGBA, 0..1).
+    LightColor { light: String, color: [f32; 4] },
+    /// The fog (none: switched off).
+    Fog(Option<FogSpec>),
+    /// The script sky (none: gone).
+    Sky(Option<SkySpec>),
+}
+
+/// A fog a script set: mode 1 exponential, 2 squared exponential, 3 linear (0 is no fog and comes as `Fog(None)`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FogSpec {
+    pub mode: u8,
+    pub start: f32,
+    pub end: f32,
+    pub density: f32,
+    pub color: [f32; 4],
+}
+
+/// The sky a TT Sky block builds: the vertex colour, the radius, the lens widening and the materials of its sides
+/// and bottom (graph objects).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SkySpec {
+    pub color: [f32; 4],
+    pub radius: f32,
+    pub distortion: f32,
+    pub sides: Vec<Option<crate::Id>>,
+    pub bottom: Option<crate::Id>,
+}
+
+/// What a script set of a 2D entity (Edit 2D Entity): each part only when the block edits it.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Ent2d {
+    pub pos: Option<[f32; 2]>,
+    pub size: Option<[f32; 2]>,
+    pub rotation: Option<f32>,
+}
+
+/// The most 2D entities a run keeps edits of.
+pub const MAX_ENTS_2D: usize = 64;
 
 /// The camera as a script reads it. Angles are degrees; the planes are world units.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -324,6 +370,8 @@ pub struct Runtime {
     /// The fonts the scripts made (TT CreateFontEx, Create System Font): index + 1 is the Font value. Only size,
     /// weight and colour are kept: the engine draws every font in its own face.
     pub(crate) fonts: Vec<crate::Font>,
+    /// What scripts set of 2D entities (Edit 2D Entity), by the entity's graph object, at most `MAX_ENTS_2D`.
+    pub ents2d: Vec<(Id, Ent2d)>,
     /// The scripts in the order the behaviour manager runs them: objects by priority (higher first, then file
     /// order), each object's scripts in its list's order.
     order: Vec<Id>,
@@ -396,6 +444,7 @@ impl Runtime {
             rng: 0x9e37_79b9_7f4a_7c15,
             copies: 0,
             fonts: Vec::new(),
+            ents2d: Vec::new(),
             order: Vec::new(),
             objects: Vec::new(),
             requested: false,
