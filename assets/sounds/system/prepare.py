@@ -30,6 +30,9 @@ SOUNDS = [
     ("Misc_Checkpoint", "checkpoint/169855_3126007-hq.mp3", "sound", 0.0, None, 0, 2),
     ("Misc_Fall", "ball_lost/159408_1656228-hq.mp3", "sound", 0.0, None, 0, 1),
     ("Misc_Lightning", "ball_appear/spark.wav", "sound", 0.0, None, 0, 1),
+    # Misc_Trafo was changed by hand afterwards (2026-11-12; the owner could not hear the 0.5 s original cut): slowed to
+    # 2.5 s (the original's runs 3.1 s, the animation 2.55 s) with ffmpeg atempo=0.5,0.5,0.8, +6 dB (-16 LUFS, as the
+    # checkpoint), limited at 0.84, faded out over the last 0.3 s
     ("Misc_Trafo", "transformer/qubodup-megaswosh1.wav", "sound", 0.0, None, 0, 1),
     ("Extra_Start", "extra_point/! glass_004.ogg", "sound", 0.0, None, 0, 1),
     ("Extra_Hit", "extra_point/glass_002.ogg", "sound", 0.0, None, 0, 1),

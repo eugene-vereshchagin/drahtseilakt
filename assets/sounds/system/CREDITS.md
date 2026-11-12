@@ -10,7 +10,7 @@ original's, matched to the original's atmospheres (about −32 LUFS); the shakuh
 pass at 2.6 kHz) and the tonal wind's rumble (high pass at 90 Hz). `Music/music.txt` says which track plays in which
 role; several in one role form a pool the game picks from. Freesound sources are the public 128 kbps HQ previews
 of the sounds named. The CC-BY works are used under their licences with the attribution below; the changes are
-those just listed. Licences:
+those just listed; `Misc_Trafo` is slowed to 2.5 s (time-stretch, pitch lowered), raised 6 dB and faded out. Licences:
 CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/, CC-BY 3.0 https://creativecommons.org/licenses/by/3.0/,
 CC-BY 4.0 https://creativecommons.org/licenses/by/4.0/.
 

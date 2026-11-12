@@ -83,7 +83,7 @@ for example by a crossfade). Every other sound is a **one-shot**, played once.
 | `Misc_Checkpoint` | A checkpoint is reached | one-shot | 3.5 s, −16 LUFS |
 | `Misc_Fall` | The ball is lost | one-shot | 5.6 s, −18 LUFS |
 | `Misc_Lightning` | A new ball appears | one-shot | 3.5 s, −25 LUFS |
-| `Misc_Trafo` | A transformer changes the ball | one-shot | 3.1 s, −22 LUFS |
+| `Misc_Trafo` | A transformer changes the ball | one-shot | 3.1 s, −22 LUFS (the system theme's: 2.5 s, −16 LUFS) |
 | `Extra_Life_Blob` | The extra life is touched | one-shot | 0.3 s, short |
 | `Misc_extraball` | The extra life is gained (0.3 s after `Extra_Life_Blob`) | one-shot | 0.9 s, short |
 | `Extra_Start` | Extra points are released | one-shot | 3.0 s, −28 LUFS |

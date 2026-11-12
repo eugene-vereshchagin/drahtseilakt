@@ -1557,6 +1557,10 @@ which a critically damped spring of 0.23 per frame matches. The new ball keeps t
 transformer's own `P_Trafo_*_MF` and `_Shadow`, hidden in their module file, are shown from the level start and
 stay shown throughout.
 
+Port note (visual only): the next sector's transformers are drawn from the checkpoint tick, not with the rest of the sector
+48 ticks later, and stay drawn when a lost ball restarts the sector (Beginners Happiness: the first transformer of sector 2
+lies 17 units past the checkpoint and popped up as the ball reached it). Physics timing is unchanged.
+
 ## TT Scaleable Proximity (as the port runs it)
 
 `TT_Toolbox_RT`, GUID `2a2a63ca:00826175`; the C reference's `bb_tt_scaleable_proximity` (src/bb/bb_interface.c) is
