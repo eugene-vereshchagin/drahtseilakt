@@ -98,6 +98,17 @@ pub mod proto {
     pub const SET_TEXTURE: Guid = Guid(0xeb12_3eb5, 0x5be3_21be);
     pub const SET_DIFFUSE: Guid = Guid(0xe1e1_e1e1, 0x1e1e_1e1e);
     pub const SET_EMISSIVE: Guid = Guid(0xd1d1_d1d1, 0x3030_3030);
+    pub const SET_SPECULAR: Guid = Guid(0x2020_2020, 0x3030_3030);
+    pub const SET_AMBIENT: Guid = Guid(0xaaaa_aaaa, 0xaeae_1287);
+    pub const SET_MATERIAL: Guid = Guid(0x3786_5d50, 0x2e28_5fab);
+    pub const SET_BLEND_MODES: Guid = Guid(0x2f57_2a66, 0x6a9a_0088);
+    pub const SET_MATERIAL_Z_BUFFER: Guid = Guid(0x1144_022f, 0x68fd_055c);
+    pub const SET_ALPHA_TEST: Guid = Guid(0x1cb5_661e, 0x5b5d_3fda);
+    pub const SET_CURRENT_SLOT: Guid = Guid(0xaaaa_213a, 0xeaa8_d52a);
+    pub const GET_TEXTURE_INFO: Guid = Guid(0x250c_4d8d, 0x2889_60d9);
+    pub const SET_3DSPRITE_MODE: Guid = Guid(0x0c5d_0457, 0xc64c_7000);
+    pub const BLEND_TEXTURES: Guid = Guid(0x53ee_4292, 0x7d93_2bb1);
+    pub const WRITE_IN_TEXTURE: Guid = Guid(0x1d57_024d, 0x7c06_4238);
     pub const IS_IN_GROUP: Guid = Guid(0x58a1_210b, 0x14e5_715c);
     pub const COUNTER: Guid = Guid(0x998f_000f, 0xf000_f899);
     pub const BINARY_MEMORY: Guid = Guid(0xd02d_67dd, 0x1021_1fdd);

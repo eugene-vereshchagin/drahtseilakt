@@ -12,6 +12,7 @@ mod app;
 mod audit;
 mod dik;
 mod entities;
+mod matstate;
 use gamedata::assets;
 mod audio;
 mod autopilot;

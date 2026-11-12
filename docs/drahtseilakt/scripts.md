@@ -113,6 +113,30 @@ It clones and rewinds with the run. Caps: `MAX_ENTITIES` rows in all (the same l
   bodies added and removed live, followers of a moving parent) is the next task, 3.2. A level without scripts has no
   table and takes the old path unchanged.
 
+## Stage 3.8 (2026-11-12): materials and textures change in a run
+
+`crates/game/src/matstate.rs` keeps what scripts changed of the level's materials and textures (`Scripts.mats`, part of
+the run: it clones and rewinds with it, a new run starts without it). The level's own materials stay as loaded; a
+`MatOverride` per touched material (diffuse, emissive, specular + power, ambient, texture, blend, z write / function,
+alpha test, two-sided) lies over them. Blocks reach it through `Host::material_set` / `texture_set` /
+`texture_info`; `MatState::effective(i)` is the material as drawn.
+
+- **Drawing.** `Renderer::sync_materials` (called before each frame with the run's state) rebuilds only the GPU
+  materials whose override differs from what is drawn, and puts back the level's own when an override is gone (a
+  rewind). With no override, before and now, it does nothing and allocates nothing. A map that uses Set Texture has
+  all its textures loaded (not only those a material draws with) so any of them can be set.
+- **Blocks.** Set Diffuse (keeps alpha on request), Set Emissive, Set Ambient, Set Specular, Set Texture, Set Blend
+  Modes, Set Material Z Buffer, Set Alpha Test, Set Material, Set Current Slot, Get Texture Info, Change Texture Size.
+  Full: Diffuse, Emissive, Ambient, Specular, Texture, Blend Modes, Get Texture Info, Change Texture Size.
+- **Partial.** Z Buffer (the write flag is drawn, the compare function is recorded only: the depth test stays "less or
+  equal"); Alpha Test (on with the reference, the function is not drawn); Set Material (the replaced material takes the
+  new one's whole state for every object that uses it, not for the target object alone); Set Current Slot (recorded);
+  Set 3DSprite Mode, Blend Textures, Write In Texture (accepted, they change pixels or sprite modes the engine does not
+  draw).
+- **Caps.** Only the level's own materials and textures can be named (anything else is ignored, so the table is at most
+  as large as the level's); colours are clamped to 0..1, specular power to 0..1000; a texture size to 2048 x 2048; a
+  slot to -1..255; a blend mode the engine has no name for is ignored.
+
 ## Phase 2 (2026-11-11): copies, "This", groups, progressions
 
 - **"This"**: a script's own object is a local parameter saved without a value (class 45 with the empty section
@@ -337,10 +361,10 @@ by the engine's.
 | SetPhysicsForce | `56e20c57:0b926068` | 4 | 5 | partial: a world force on a script body; Pos/Direction referentials to world |
 | Get Component | `2689057b:1a1a446a` | 4 | 8 | done |
 | Set World Matrix | `aa4aa6f0:ddefdef4` | 4 | 9 | done |
-| Set Diffuse | `e1e1e1e1:1e1e1e1e` | 4 | 11 | partial: accepted, no effect |
+| Set Diffuse | `e1e1e1e1:1e1e1e1e` | 4 | 11 | full: the material's colour in the run |
 | Volume Control | `33613f21:776b185b` | 4 | 8 | done |
 | Collection Iterator | `419602ec:7822779e` | 4 | 20 | done |
-| Set Texture | `eb123eb5:5be321be` | 3 | 3 | partial: accepted, no effect |
+| Set Texture | `eb123eb5:5be321be` | 3 | 3 | full: the material's texture in the run |
 | Set Component | `6e800755:57b64acb` | 3 | 12 | done |
 | Set Physics Slider | `2973360e:23d31aa7` | 3 | 3 | planned |
 | Per Second | `448e54ce:75a655c5` | 3 | 7 | done |
@@ -380,12 +404,12 @@ by the engine's.
 | Create System Font | `936334fc:f243684f` | 1 | 1 | done: maps to our own font (weight 600+ is bold); no system fonts |
 | Movie Player | `778d16d4:1dd60060` | 1 | 1 | named no-op (said once) |
 | TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
-| Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | planned |
+| Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | partial: accepted, pixels not written |
 | Get SubString | `10b16051:26173b39` | 1 | 1 | planned |
 | Iterator If | `6bec4be6:12d64c7c` | 1 | 2 | planned |
 | TT_LinearVolume | `09b335b3:12d17cdc` | 1 | 1 | done |
 | Set Ambient | `aaaaaaaa:aeae1287` | 1 | 1 | never (the engine's own interface) |
-| Set Specular | `20202020:30303030` | 1 | 1 | planned |
+| Set Specular | `20202020:30303030` | 1 | 1 | full |
 | Write In Texture | `1d57024d:7c064238` | 1 | 1 | never (the engine's own interface) |
 | Show Mouse Cursor | `16f6368f:506b60fc` | 1 | 1 | done (the system cursor only) |
 | Get Nearest Object | `4321abcd:0eeaabdd` | 1 | 1 | no-op |
@@ -425,7 +449,7 @@ by the engine's.
 | Set Parent | `9d9d9d98:7e7a7f75` | 1 | 1 | planned |
 | Scan String | `4afa2f11:034872e2` | 1 | 1 | planned |
 | Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |
-| Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | partial: accepted, no effect |
+| Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | full: recorded, capped at 2048 x 2048 (the picture is not resampled) |
 | Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | no-op |
 | Sort Rows | `6f623e68:62bb5a98` | 1 | 5 | done |
 | Get Texture Info | `250c4d8d:288960d9` | 1 | 2 | planned |
@@ -455,7 +479,7 @@ Ver.), Take the leap, Traveling on Rubber Walls, Trial of the Ballance King, 反
 with a limited block: the nine **Portal** maps (Dueling With the Ice Cube ×3, Find Your Place, In the Field 2.0,
 Periodic Travel, Rectangular Elements, See You Tomorrow, Traveling Through the Void 2.0) share one portal script
 whose Object Copy (the portals' particle frames) was not made in phase 1, so the portals did nothing (phase 2 makes them work, see above); 2010s, A Little Journey, All-We-Know physicalize objects by script; Board-Na
-Leona sets a texture; Family Portrait 2 and 反向Level_08 wait for keys; Omit Superfluous Things resizes a
+Leona sets a texture (full since stage 3.8); Family Portrait 2 and 反向Level_08 wait for keys; Omit Superfluous Things resizes a
 texture; Queen Ball (Hard Ver.) sets a physics force.
 
 The 11 maps with blocks not yet known, and what they need, most blocking first: Add To Group (5 maps), Bezier

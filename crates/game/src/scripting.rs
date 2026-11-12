@@ -36,6 +36,8 @@ pub struct Scripts {
     pub camera: CameraOverride,
     /// The light, fog and sky the scripts changed (Set Light Color, Set Fog, TT Sky).
     pub env: EnvOverride,
+    /// What the scripts changed of the level's materials and textures (matstate.rs); the renderer reads it.
+    pub mats: crate::matstate::MatState,
     /// The text boxes the map's scripts show now, by the block that shows each (drawn by hud.rs under the interface;
     /// they rewind and restart with the run).
     pub text: Vec<(script::Id, script::TextSpec)>,
@@ -291,6 +293,7 @@ impl Scripts {
             sound: SoundState::default(),
             camera: CameraOverride::default(),
             env: EnvOverride::default(),
+            mats: crate::matstate::MatState::new(level),
             text: Vec::new(),
             ball_objs,
             seen: None,
@@ -360,6 +363,7 @@ struct ScriptsParts {
     sound: SoundState,
     camera: CameraOverride,
     env: EnvOverride,
+    mats: crate::matstate::MatState,
     text: Vec<(script::Id, script::TextSpec)>,
     ball_objs: [Option<script::Id>; 3],
     left_sector: usize,
@@ -1086,8 +1090,26 @@ impl Host for SimHost<'_> {
     }
 
     fn material_color(&self, material: usize, emissive: bool) -> Option<[f32; 4]> {
+        if !self.s.mats.is_empty()
+            && let Some(m) = self.s.mats.effective(material)
+        {
+            let [r, g, b] = m.emissive;
+            return Some(if emissive { [r, g, b, 1.0] } else { m.diffuse });
+        }
         let (d, e) = self.s.materials.colours.get(material)?;
         Some(if emissive { *e } else { *d })
+    }
+
+    fn material_set(&mut self, material: usize, change: script::MatChange) {
+        self.s.mats.apply(material, change);
+    }
+
+    fn texture_info(&self, texture: usize) -> Option<script::TexInfo> {
+        self.s.mats.texture_info(texture)
+    }
+
+    fn texture_set(&mut self, texture: usize, change: script::TexChange) {
+        self.s.mats.apply_texture(texture, change);
     }
 }
 
@@ -1359,6 +1381,7 @@ impl Scripts {
             sound: std::mem::take(&mut self.sound),
             camera: self.camera,
             env: std::mem::take(&mut self.env),
+            mats: std::mem::take(&mut self.mats),
             text: std::mem::take(&mut self.text),
             ball_objs: self.ball_objs,
             left_sector: self.left_sector,
@@ -1381,6 +1404,7 @@ impl Scripts {
         self.sound = parts.sound;
         self.camera = parts.camera;
         self.env = parts.env;
+        self.mats = parts.mats;
         self.text = parts.text;
         self.written = parts.written;
         self.emitters = parts.emitters;
@@ -1468,6 +1492,7 @@ mod facade_tests {
                 sound: SoundState::default(),
                 camera: CameraOverride::default(),
                 env: EnvOverride::default(),
+                mats: Default::default(),
                 text: vec![],
                 ball_objs: s.ball_objs,
                 left_sector: 0,
@@ -1524,6 +1549,7 @@ mod facade_tests {
                 sound: SoundState::default(),
                 camera: CameraOverride::default(),
                 env: std::mem::take(&mut s.env),
+                mats: std::mem::take(&mut s.mats),
                 text: vec![],
                 ball_objs: s.ball_objs,
                 left_sector: 0,

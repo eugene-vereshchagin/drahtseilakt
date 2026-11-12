@@ -106,6 +106,11 @@ struct GpuMaterial {
 pub struct Model {
     meshes: Vec<Option<GpuMesh>>,
     materials: Vec<GpuMaterial>,
+    /// What the materials draw with, kept so a script's change of a material can rebuild it.
+    textures: Vec<Option<wgpu::TextureView>>,
+    keyed: Vec<bool>,
+    /// The scripts' changes now drawn, by material (the level's own look otherwise).
+    applied: std::collections::BTreeMap<usize, crate::matstate::MatOverride>,
 }
 
 /// One thing to draw this frame.
@@ -540,16 +545,168 @@ impl Renderer {
         }
     }
 
+    /// The GPU side of one material: its uniform and bind group, with the textures it draws with (by the level's
+    /// texture index; `keyed` marks textures with a transparent colour). Used for the level's own materials and
+    /// again for any a script changes.
+    fn gpu_material(
+        &self,
+        m: &level::Material,
+        textures: &[Option<wgpu::TextureView>],
+        keyed: &[bool],
+    ) -> GpuMaterial {
+        let view = m
+            .texture
+            .and_then(|t| textures.get(t))
+            .and_then(Option::as_ref);
+        let relief = m
+            .normal
+            .and_then(|t| textures.get(t))
+            .and_then(Option::as_ref);
+        // a texture the material draws with that nobody has (a stranger's map naming a picture it does not
+        // carry): the material's own colour, toned down, so that a white material is no blank white box
+        let absent = m.texture.is_some() && view.is_none();
+        let tone = if absent { ABSENT_TEXTURE_TONE } else { 1.0 };
+        let [dr, dg, db, da] = m.diffuse;
+        let uniform = MaterialUniform {
+            diffuse: [dr * tone, dg * tone, db * tone, da],
+            emissive: [
+                m.emissive[0],
+                m.emissive[1],
+                m.emissive[2],
+                if view.is_some() { 1.0 } else { 0.0 },
+            ],
+            params: [
+                // a texture with a transparent colour turns the alpha test on, dropping alpha 0
+                if m.texture
+                    .is_some_and(|t| keyed.get(t).copied().unwrap_or(false))
+                {
+                    0.0
+                } else {
+                    m.alpha_cutoff.unwrap_or(-1.0)
+                },
+                if m.unlit { 1.0 } else { 0.0 },
+                match m.texgen {
+                    Some(level::TexGen::Reflect) => 2.0,
+                    Some(level::TexGen::Chrome) => 3.0,
+                    None => 0.0,
+                },
+                if relief.is_some() { 1.0 } else { 0.0 },
+            ],
+            // w: the parallax depth (the normal map's alpha is then a height), only with a normal map
+            ambient: [
+                m.ambient[0],
+                m.ambient[1],
+                m.ambient[2],
+                if relief.is_some() && m.parallax.is_finite() {
+                    m.parallax.clamp(0.0, 0.25)
+                } else {
+                    0.0
+                },
+            ],
+            specular: [m.specular[0], m.specular[1], m.specular[2], m.power],
+        };
+        let buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("material"),
+                contents: bytemuck::bytes_of(&uniform),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("material"),
+            layout: &self.material_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(view.unwrap_or(&self.white)),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(
+                        relief.unwrap_or(&self.flat_normal),
+                    ),
+                },
+            ],
+        });
+        GpuMaterial {
+            bind,
+            key: PipelineKey {
+                blend: m.blend,
+                z_write: m.z_write || m.blend.is_none(),
+            },
+        }
+    }
+
+    /// Draws the materials a script changed as it changed them (matstate.rs): only a material whose change differs
+    /// from what is drawn is rebuilt, and one whose change is gone (a rewind) goes back to the level's own. With
+    /// nothing changed, before and now, this does nothing.
+    pub fn sync_materials(&mut self, model: usize, state: &crate::matstate::MatState) {
+        let Some(m) = self.models.get(model) else {
+            return;
+        };
+        if state.over.is_empty() && m.applied.is_empty() {
+            return;
+        }
+        let mut rebuilt: Vec<(usize, Option<crate::matstate::MatOverride>, GpuMaterial)> =
+            Vec::new();
+        for (&i, o) in &state.over {
+            if m.applied.get(&i) != Some(o)
+                && let Some(mat) = state.effective(i)
+            {
+                rebuilt.push((
+                    i,
+                    Some(o.clone()),
+                    self.gpu_material(&mat, &m.textures, &m.keyed),
+                ));
+            }
+        }
+        for &i in m.applied.keys() {
+            if !state.over.contains_key(&i)
+                && let Some(mat) = state.effective(i)
+            {
+                rebuilt.push((i, None, self.gpu_material(&mat, &m.textures, &m.keyed)));
+            }
+        }
+        let Some(m) = self.models.get_mut(model) else {
+            return;
+        };
+        for (i, o, g) in rebuilt {
+            if let Some(slot) = m.materials.get_mut(i) {
+                *slot = g;
+            }
+            match o {
+                Some(o) => m.applied.insert(i, o),
+                None => m.applied.remove(&i),
+            };
+        }
+    }
+
     /// Uploads a model; returns its index for `Instance::model`.
     pub fn add_model(&mut self, level: &Level, load: &TextureLoader<'_>) -> usize {
         let bc = self.bc;
         // only the textures a material draws with are loaded (a level may list textures it never uses: the loader
         // points a texture named twice at one of them)
-        let used: std::collections::HashSet<usize> = level
+        let mut used: std::collections::HashSet<usize> = level
             .materials
             .iter()
             .flat_map(|m| m.texture.into_iter().chain(m.normal))
             .collect();
+        // a map whose scripts set textures may set any of its own (the loader's budget still applies)
+        if level
+            .scripts
+            .as_ref()
+            .is_some_and(|g| g.uses_proto(script::SET_TEXTURE))
+        {
+            used.extend(0..level.textures.len());
+        }
         // planned one after another (the level's budget is taken in its own order), then read several at a time, each
         // on its own thread, and uploaded; the queue is flushed between, so the pictures never all wait in memory
         let plans: Vec<(usize, gamedata::assets::TexturePlan)> = level
@@ -585,103 +742,15 @@ impl Renderer {
             self.queue.submit([]);
             self.texture_stats.upload += started.elapsed();
         }
+        let keyed: Vec<bool> = level
+            .textures
+            .iter()
+            .map(|t| t.color_key.is_some())
+            .collect();
         let materials = level
             .materials
             .iter()
-            .map(|m| {
-                let view = m
-                    .texture
-                    .and_then(|t| textures.get(t))
-                    .and_then(Option::as_ref);
-                let relief = m
-                    .normal
-                    .and_then(|t| textures.get(t))
-                    .and_then(Option::as_ref);
-                // a texture the material draws with that nobody has (a stranger's map naming a picture it does not
-                // carry): the material's own colour, toned down, so that a white material is no blank white box
-                let absent = m.texture.is_some() && view.is_none();
-                let tone = if absent { ABSENT_TEXTURE_TONE } else { 1.0 };
-                let [dr, dg, db, da] = m.diffuse;
-                let uniform = MaterialUniform {
-                    diffuse: [dr * tone, dg * tone, db * tone, da],
-                    emissive: [
-                        m.emissive[0],
-                        m.emissive[1],
-                        m.emissive[2],
-                        if view.is_some() { 1.0 } else { 0.0 },
-                    ],
-                    params: [
-                        // a texture with a transparent colour turns the alpha test on, dropping alpha 0
-                        match m
-                            .texture
-                            .and_then(|t| level.textures.get(t))
-                            .and_then(|t| t.color_key)
-                        {
-                            Some(_) => 0.0,
-                            None => m.alpha_cutoff.unwrap_or(-1.0),
-                        },
-                        if m.unlit { 1.0 } else { 0.0 },
-                        match m.texgen {
-                            Some(level::TexGen::Reflect) => 2.0,
-                            Some(level::TexGen::Chrome) => 3.0,
-                            None => 0.0,
-                        },
-                        if relief.is_some() { 1.0 } else { 0.0 },
-                    ],
-                    // w: the parallax depth (the normal map's alpha is then a height), only with a normal map
-                    ambient: [
-                        m.ambient[0],
-                        m.ambient[1],
-                        m.ambient[2],
-                        if relief.is_some() && m.parallax.is_finite() {
-                            m.parallax.clamp(0.0, 0.25)
-                        } else {
-                            0.0
-                        },
-                    ],
-                    specular: [m.specular[0], m.specular[1], m.specular[2], m.power],
-                };
-                let buf = self
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("material"),
-                        contents: bytemuck::bytes_of(&uniform),
-                        usage: wgpu::BufferUsages::UNIFORM,
-                    });
-                let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("material"),
-                    layout: &self.material_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: buf.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::TextureView(
-                                view.unwrap_or(&self.white),
-                            ),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: wgpu::BindingResource::Sampler(&self.sampler),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 3,
-                            resource: wgpu::BindingResource::TextureView(
-                                relief.unwrap_or(&self.flat_normal),
-                            ),
-                        },
-                    ],
-                });
-                GpuMaterial {
-                    bind,
-                    key: PipelineKey {
-                        blend: m.blend,
-                        z_write: m.z_write || m.blend.is_none(),
-                    },
-                }
-            })
+            .map(|m| self.gpu_material(m, &textures, &keyed))
             .collect::<Vec<_>>();
         // A part without a material is drawn with a plain white one, kept at the end.
         let default_material = materials.len();
@@ -777,7 +846,13 @@ impl Renderer {
                 Some(GpuMesh { vertex, parts })
             })
             .collect();
-        self.models.push(Model { meshes, materials });
+        self.models.push(Model {
+            meshes,
+            materials,
+            textures,
+            keyed,
+            applied: Default::default(),
+        });
         self.models.len() - 1
     }
 

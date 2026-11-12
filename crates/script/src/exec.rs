@@ -135,6 +135,71 @@ pub trait Host {
     /// A script changes the scene's look for this run only (Set Light Color, Set Fog, TT Sky). The engine keeps it
     /// in the run (it rewinds with it) and the renderer shows it; nothing of it reaches the simulation.
     fn env_set(&mut self, _change: EnvChange) {}
+    /// A script changes a level material for this run (Set Diffuse, Set Texture, Set Blend Modes, ...).
+    fn material_set(&mut self, _material: usize, _change: MatChange) {}
+    /// What a level texture is now: its file, size and current slot (Get Texture Info); none for a texture the level
+    /// does not have.
+    fn texture_info(&self, _texture: usize) -> Option<TexInfo> {
+        None
+    }
+    /// A script changes a level texture for this run (Change Texture Size, Set Current Slot).
+    fn texture_set(&mut self, _texture: usize, _change: TexChange) {}
+}
+
+/// What a script asks of a level material. Colours are RGBA or RGB, 0..1; blend modes and compare functions are
+/// Virtools' own numbers (VXBLEND_MODE 1..11, VXCMPFUNC 1..8).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MatChange {
+    Diffuse {
+        color: [f32; 4],
+        keep_alpha: bool,
+    },
+    Emissive([f32; 3]),
+    Specular {
+        color: [f32; 3],
+        power: f32,
+    },
+    Ambient([f32; 3]),
+    /// The material's texture (none: the material has no texture).
+    Texture(Option<usize>),
+    /// The whole state of another level material (Set Material).
+    CopyFrom(usize),
+    Blend {
+        on: bool,
+        src: u8,
+        dst: u8,
+    },
+    ZBuffer {
+        write: bool,
+        func: u8,
+    },
+    AlphaTest {
+        on: bool,
+        func: u8,
+        reference: u8,
+    },
+}
+
+/// What a script asks of a level texture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TexChange {
+    /// Change Texture Size (the engine caps it).
+    Size {
+        width: u32,
+        height: u32,
+        clear: bool,
+    },
+    /// Set Current Slot.
+    Slot(i32),
+}
+
+/// A level texture as Get Texture Info reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TexInfo {
+    pub file: String,
+    pub width: u32,
+    pub height: u32,
+    pub slot: i32,
 }
 
 /// What a script asks of the scene's light, fog and sky.
