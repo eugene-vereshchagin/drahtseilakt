@@ -243,6 +243,50 @@ def _lift_rim():
     return np.clip(img * groove[..., None], 0, 1)
 
 
+def _paint_green():
+    """Bottle-green machine paint on iron (the spinner's arm, the pusher's beam): as the lift's red, brushed and
+    chipped to the dark metal in a few patches."""
+    img = k.metal(TEX, k.rgb(58, 98, 80), 44, brushed=0.05)
+    chips = k.value_noise(TEX, TEX, (10, 10), 45, octaves=3)
+    soot = k.value_noise(TEX, TEX, (5, 5), 46)
+    img = img * (0.84 + 0.24 * soot)[..., None]
+    bare = np.clip((chips - 0.72) * 9, 0, 0.7)[..., None]
+    return np.clip(img * (1 - bare) + k.rgb(84, 70, 64)[None, None] * bare, 0, 1)
+
+
+def _bullseye():
+    """A target to be put whole on a face: red rings round a red bull's eye on cream paint, a dark line round its
+    edge, a little worn."""
+    y, x = np.mgrid[0:TEX, 0:TEX]
+    c = (TEX - 1) / 2
+    r = np.hypot(x - c, y - c) / (TEX / 2)
+    red, white = k.rgb(178, 38, 34), k.rgb(232, 226, 214)
+    ring = (r < 0.2) | ((r > 0.42) & (r < 0.62)) | ((r > 0.82) & (r < 0.94))
+    img = np.where(ring[..., None], red, white)
+    edge = np.minimum(np.minimum(x, TEX - 1 - x), np.minimum(y, TEX - 1 - y)) < 5
+    img = np.where(edge[..., None], k.rgb(70, 62, 58), img)
+    wear = k.value_noise(TEX, TEX, (6, 6), 47)
+    chips = np.clip((k.value_noise(TEX, TEX, (14, 14), 48, octaves=3) - 0.76) * 8, 0, 0.5)[..., None]
+    img = img * (0.88 + 0.14 * wear)[..., None]
+    return np.clip(img * (1 - chips) + k.rgb(96, 88, 82)[None, None] * chips, 0, 1)
+
+
+def _sack_cloth():
+    """Canvas for the sack (u goes twice round it): a plain weave, mottled, and a grain sack's woven stripes, one
+    broad and two narrow, down the middle of each broad side."""
+    n = 2 * TEX
+    y, x = np.mgrid[0:n, 0:n]
+    warp, weft = 0.5 + 0.5 * np.sin(x * np.pi / 2), 0.5 + 0.5 * np.sin(y * np.pi / 2)
+    weave = np.where(((x // 4 + y // 4) % 2) == 0, warp, weft)
+    img = k.rgb(180, 154, 108)[None, None] * (0.76 + 0.16 * weave + 0.18 * k.value_noise(n, n, (6, 6), 95)
+                                               + 0.06 * k.value_noise(n, n, (48, 48), 96, octaves=2))[..., None]
+    fx = x / n
+    d = np.minimum(fx, 1 - fx)
+    stripe = (d < 0.02) | ((d > 0.036) & (d < 0.047))
+    blue = k.rgb(62, 80, 122)[None, None] * (0.8 + 0.3 * weave)[..., None]
+    return np.clip(np.where(stripe[..., None], 0.75 * blue + 0.25 * img, img), 0, 1)
+
+
 def _shadow_soft():
     return np.zeros((TEX, TEX, 3)), _radial(1.2) * 0.85
 
@@ -289,6 +333,9 @@ TEXTURE_MAKERS = {
     "lift_deck.png": _lift_deck,
     "lift_paint.png": _lift_paint,
     "lift_rim.png": _lift_rim,
+    "paint_green.png": _paint_green,
+    "bullseye.png": _bullseye,
+    "sack_cloth.png": _sack_cloth,
     "rope.png": _rope,
     "burlap.png": _burlap,
     "balloon.png": _balloon,
@@ -1081,9 +1128,319 @@ def make_extra_point():
 # --- the modules with physics ------------------------------------------------------------------------------------
 
 
+# --- the second round of redrawn parts (2026-11-12): looks only, the meshes the physics reads stay as they were ----
+
+
+def annulus(m, mat, base, axis, r0, r1, length, seg=32, turns=8.0, face_mat=None):
+    """A round ring with a hole, from `base` along `axis`: outer wall r1, inner wall r0, a flat face at each end
+    (of `face_mat` when given); shaded round."""
+    a, u, v = k._basis(axis)
+    b = np.asarray(base, np.float64)
+    fm = mat if face_mat is None else face_mat
+    top = a * length
+
+    def quad(mt, pts, nrms, uvs):
+        ids = [m.vertex(q, n, t) for q, n, t in zip(pts, nrms, uvs)]
+        if np.dot(np.cross(pts[1] - pts[0], pts[2] - pts[0]), nrms[0] + nrms[2]) < 0:
+            ids = ids[::-1]
+        m.tri(mt, ids[0], ids[1], ids[2])
+        m.tri(mt, ids[0], ids[2], ids[3])
+
+    for j in range(seg):
+        t0, t1 = 2 * math.pi * j / seg, 2 * math.pi * (j + 1) / seg
+        d0, d1 = u * math.cos(t0) + v * math.sin(t0), u * math.cos(t1) + v * math.sin(t1)
+        u0, u1 = j / seg * turns, (j + 1) / seg * turns
+        wall = [(u0, 0), (u1, 0), (u1, length / 4), (u0, length / 4)]
+        quad(mat, [b + d0 * r1, b + d1 * r1, b + d1 * r1 + top, b + d0 * r1 + top], [d0, d1, d1, d0], wall)
+        if r0 > 0:
+            quad(mat, [b + d0 * r0, b + d1 * r0, b + d1 * r0 + top, b + d0 * r0 + top], [-d0, -d1, -d1, -d0], wall)
+        for off, n in ((top * 0, -a), (top, a)):
+            quad(fm, [b + off + d0 * r0, b + off + d1 * r0, b + off + d1 * r1, b + off + d0 * r1], [n] * 4,
+                 [(u0, 0), (u1, 0), (u1, (r1 - r0) / 4), (u0, (r1 - r0) / 4)])
+
+
+def bolt_ring(m, mat, centre, axis, r, n, size=0.11, proud=0.05, phase=0.0):
+    """`n` hexagonal bolt heads on a circle of radius r about `axis`, standing `proud` of the face at `centre`."""
+    a, u, v = k._basis(axis)
+    c = np.asarray(centre, np.float64)
+    for i in range(n):
+        t = phase + 2 * math.pi * i / n
+        k.prism(m, mat, c + (u * math.cos(t) + v * math.sin(t)) * r, a, size, proud, 6)
+
+
+def target_face(m, mat, corner, du, dv):
+    """A flat face carrying the whole target picture once (never stretched over the faces round it): from `corner`
+    along `du` and `dv`, facing du x dv."""
+    c, du, dv = (np.asarray(q, np.float64) for q in (corner, du, dv))
+    m.face(mat, [c, c + du, c + du + dv, c + dv], [(0, 1), (1, 1), (1, 0), (0, 0)], normal=np.cross(du, dv))
+
+
+# The sack as drawn: rings (height, half width in x, half width in z, how deep its pleats are) from its sewn bottom
+# up to the gathered cloth above the tie. They keep within the physics' hull (sack_points) but for the pleats.
+SACK_RINGS = [(-2.93, 0.04, 1.9, 0.0), (-2.62, 0.4, 1.84, 0.0), (-2.3, 0.78, 1.74, 0.0), (-2.03, 1.05, 1.66, 0.0),
+              (-1.5, 1.27, 1.75, 0.0), (-1.03, 1.36, 1.79, 0.0), (-0.03, 1.36, 1.79, 0.0), (0.5, 1.29, 1.7, 0.015),
+              (0.97, 1.14, 1.55, 0.03), (1.3, 0.95, 1.27, 0.06), (1.58, 0.71, 0.95, 0.09), (1.78, 0.5, 0.58, 0.12),
+              (1.92, 0.36, 0.38, 0.1), (2.02, 0.4, 0.44, 0.14), (2.2, 0.5, 0.58, 0.2), (2.34, 0.56, 0.66, 0.24)]
+
+
+def sack_at(i, a, out=1.0):
+    """A point of the drawn sack: ring i at angle a (the bulges of the sand low down, the pleats towards the neck)."""
+    y, rx, rz, pleat = SACK_RINGS[i]
+    f = (1 + pleat * math.cos(10 * a) + 0.022 * math.sin(3 * a + 1.7 * y)) * out
+    return np.array([rx * f * math.cos(a), y, rz * f * math.sin(a)])
+
+
+def sack_look(name, cloth, cord):
+    """The sack as drawn, inside the physics' hull: a sewn canvas sack heavy with sand, wedge-bottomed along its
+    bottom seam, widest low down, its side seams running up to a pleated neck tied with three turns of cord, the
+    cloth gathered above the tie, the cord's ends hanging over to one side (where the hull's tie is)."""
+    m = k.Mesh(name)
+    seg = 40
+    rows = []
+    for i, (y, rx, rz, pleat) in enumerate(SACK_RINGS):
+        rows.append([m.vertex(sack_at(i, 2 * math.pi * j / seg), (0, 1, 0), (j / seg * 2, (y + 3.0) / 5.4))
+                     for j in range(seg + 1)])
+    P = lambda i: np.array(m.p[i])
+
+    def tri(a, b, c, ref):
+        if np.dot(np.cross(P(b) - P(a), P(c) - P(a)), ref) < 0:
+            b, c = c, b
+        m.tri(cloth, a, b, c)
+
+    for i in range(len(rows) - 1):
+        for j in range(seg):
+            a, b, c, d = rows[i][j], rows[i][j + 1], rows[i + 1][j + 1], rows[i + 1][j]
+            ref = (P(a) + P(c)) * np.array([1, 0, 1]) + np.array([0, -0.4 if i < 3 else 0.0, 0])
+            tri(a, c, b, ref)
+            tri(a, d, c, ref)
+    lo = m.vertex((0, -2.975, 0), (0, -1, 0), (0.5, 0))
+    hi = m.vertex((0, 2.16, 0), (0, 1, 0), (0.5, 1))
+    for j in range(seg):
+        tri(rows[0][j], rows[0][j + 1], lo, (0, -1, 0))
+        tri(rows[-1][j], rows[-1][j + 1], hi, (0, 1, 0))
+    smooth_normals(m)
+    # the seam: down one side, along the bottom, up the other, and an ear at each bottom corner
+    top = 11
+    path = [sack_at(i, math.pi / 2, 1.012) for i in range(top, -1, -1)]
+    path += [np.array([0, -2.99, 0.0])] + [sack_at(i, 3 * math.pi / 2, 1.012) for i in range(0, top + 1)]
+    k.tube(m, cord, path, 0.05, seg=6)
+    for s in (-1, 1):
+        k.cylinder(m, cloth, (0, -2.84, s * 1.8), (0, -0.25, s), 0.17, 0.2, seg=8, r_top=0.03)
+    # the tie: three turns, a knot, two ends leaning over to +z
+    for y, r in ((1.83, 0.5), (1.92, 0.44), (2.01, 0.47)):
+        k.torus(m, cord, (0, y, 0.0), (0, 1, 0), r, 0.055, seg=20, tube_seg=6)
+    k.ellipsoid(m, cord, (0.0, 1.93, 0.52), (0.15, 0.13, 0.11), seg=8)
+    k.tube(m, cord, [(0.06, 1.95, 0.55), (0.1, 2.2, 0.95), (0.1, 2.22, 1.3), (0.1, 2.02, 1.55)], 0.05, seg=6, caps=True)
+    k.tube(m, cord, [(-0.06, 1.95, 0.55), (-0.3, 2.3, 0.85), (-0.35, 2.3, 1.15), (-0.35, 2.05, 1.42)], 0.05, seg=6,
+           caps=True)
+    return m
+
+
+def sack_rope_look(name, rope, iron, brass):
+    """The sack's rope as drawn (the physics' is a plain rod): a twisted rope, a brass ferrule and an iron eye at
+    its head (the eye hangs in the holder's ring), a stopper knot where the sack's neck is tied round it."""
+    m = k.Mesh(name)
+    k.cylinder(m, rope, (0, -6.25, 0), (0, 1, 0), 0.13, 11.72, seg=10)
+    k.cylinder(m, brass, (0, 5.08, 0), (0, 1, 0), 0.175, 0.4, seg=10)
+    k.torus(m, iron, (0, 5.72, 0), (1, 0, 0), 0.26, 0.07, seg=16, tube_seg=6)
+    k.ellipsoid(m, rope, (0, -5.93, 0), (0.25, 0.2, 0.25), seg=10)
+    return m
+
+
+def sack_holder_look(name, plate, iron, brass):
+    """The sack's holder as drawn: its plate (the measured box), a boss under it with the ring the rope's eye hangs
+    in, and four bolts through the plate."""
+    m = k.Mesh(name)
+    k.box(m, plate, (-0.733, 0.0, -1.427), (0.733, 0.255, 1.426))
+    k.cylinder(m, iron, (0, -0.07, 0), (0, 1, 0), 0.4, 0.07, seg=16)
+    k.torus(m, iron, (0, -0.29, 0), (0, 0, 1), 0.26, 0.07, seg=16, tube_seg=6)
+    for x in (-0.47, 0.47):
+        for z in (-1.12, 1.12):
+            k.prism(m, brass, (x, 0.255, z), (0, 1, 0), 0.13, 0.06, 6)
+            k.prism(m, brass, (x, 0.0, z), (0, -1, 0), 0.13, 0.06, 6)
+    return m
+
+
+def flap_panel(paint, wood, bolts):
+    """One flap as drawn, the physics' board (6.39 x 0.50 x 5.00, the axle through its root): a painted iron frame,
+    its root rail round the axle, a rail across the middle, oak boards set back in it, a bolt at each corner."""
+    m = k.Mesh("flap")
+    x0, x1, y0, y1, z0, z1 = -0.308, 6.085, -0.254, 0.246, -10.0, -5.0
+    w = 0.42
+    k.box(m, paint, (x0, y0, z0), (x1, y1, z0 + w))
+    k.box(m, paint, (x0, y0, z1 - w), (x1, y1, z1))
+    k.box(m, paint, (x0, y0, z0 + w), (x0 + 0.62, y1, z1 - w))
+    k.box(m, paint, (x1 - w, y0, z0 + w), (x1, y1, z1 - w))
+    k.box(m, paint, (2.95, y0 + 0.04, z0 + w), (3.27, y1 - 0.04, z1 - w))
+    k.box(m, wood, (x0 + 0.62, y0 + 0.1, z0 + w), (x1 - w, y1 - 0.1, z1 - w), scale=2.0)
+    for x in (x0 + 0.31, 3.11, x1 - 0.21):
+        for z in (z0 + 0.21, z1 - 0.21):
+            k.prism(m, bolts, (x, y1, z), (0, 1, 0), 0.11, 0.05, 6)
+            k.prism(m, bolts, (x, y0, z), (0, -1, 0), 0.11, 0.05, 6)
+    return m
+
+
+def flaps_look(name, paint, wood, bolts):
+    """Both flaps as drawn: the second is the first turned a quarter about the axle at the other end."""
+    m = k.Mesh(name)
+    one = flap_panel(paint, wood, bolts)
+    k.add(m, one)
+    turn = np.array([[0.0, -1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 15.0], [0, 0, 0, 1]])
+    k.add(m, one, turn)
+    return m
+
+
+def flap_axis_look(name, shaft, iron, hub, paint, bolts):
+    """The flap wheel's axle as drawn: a steel shaft in a sleeve, a spoked wheel in the middle (inside the physics'
+    hexagon: painted rim, six iron spokes, a bolted boss), a bearing collar either side of the wheel and a bolted
+    bearing flange at each end."""
+    m = k.Mesh(name)
+    k.cylinder(m, shaft, (0, 0, -10.0), (0, 0, 1), 0.2, 20.0, seg=12)
+    k.cylinder(m, iron, (0, 0, -4.064), (0, 0, 1), 0.29, 7.826, seg=12)
+    annulus(m, paint, (0.001, 0, -0.273), (0, 0, 1), 2.2, 2.6, 0.567, seg=36)
+    for i in range(6):
+        a = math.radians(60 * i)
+        d, t = (math.cos(a), math.sin(a), 0), (-math.sin(a), math.cos(a), 0)
+        k.obox(m, iron, (1.4 * d[0], 1.4 * d[1], 0.01), [d, (0, 0, 1), t], (0.86, 0.2, 0.16))
+    k.cylinder(m, hub, (0, 0, -0.36), (0, 0, 1), 0.66, 0.74, seg=20)
+    for z, ax in ((-0.36, (0, 0, -1)), (0.38, (0, 0, 1))):
+        bolt_ring(m, bolts, (0, 0, z), ax, 0.46, 6, size=0.09, proud=0.04)
+        k.cylinder(m, bolts, (0, 0, z), ax, 0.27, 0.07, seg=12)
+    for z in (-4.75, 4.25):
+        k.cylinder(m, hub, (0, 0, z), (0, 0, 1), 0.44, 0.5, seg=14)
+        k.cylinder(m, bolts, (0, 0, z + 0.19), (0, 0, 1), 0.47, 0.12, seg=14)
+    for z, ax in ((-9.55, (0, 0, -1)), (9.55, (0, 0, 1))):
+        k.cylinder(m, hub, (0, 0, z), ax, 1.22, 0.49, seg=24)
+        bolt_ring(m, bolts, (0, 0, z + ax[2] * 0.49), ax, 0.88, 6, size=0.11, proud=0.05)
+        k.cylinder(m, iron, (0, 0, z + ax[2] * 0.49), ax, 0.4, 0.08, seg=12)
+    return m
+
+
+def spinner_look(name, arm, paddle, paint, iron, hub, steel, bolts, target):
+    """The turning arms as drawn: the physics' tapered arm painted, banded twice each side; a turned drum on a
+    spindle for the hub (the arm turns about the upright); each paddle a framed iron plate held by a fork and two
+    stays, with the whole target, rings round a bull's eye, once on each face."""
+    m = k.Mesh(name)
+    arm(m, paint)
+    section = lambda z: (1.068 - 0.708 * (abs(z) - 0.73) / 7.006, 1.069 - 0.569 * (abs(z) - 0.73) / 7.006)
+    for z in (-5.4, -2.9, 2.9, 5.4):
+        w, h = section(z)
+        k.box(m, iron, (-w / 2 - 0.035, -h / 2 - 0.035, z - 0.15), (w / 2 + 0.035, h / 2 + 0.035, z + 0.15))
+        for s in (-1, 1):
+            k.prism(m, bolts, (s * 0.0, h / 2 + 0.035, z), (0, 1, 0), 0.09, 0.04, 6)
+            k.prism(m, bolts, (s * (w / 2 + 0.035), 0, z), (s, 0, 0), 0.09, 0.04, 6)
+    k.cylinder(m, hub, (0, -0.62, 0), (0, 1, 0), 0.86, 1.24, seg=24)
+    bolt_ring(m, bolts, (0, 0.62, 0), (0, 1, 0), 0.62, 6, size=0.1, proud=0.05)
+    k.prism(m, iron, (0, 0.62, 0), (0, 1, 0), 0.3, 0.16, 6)
+    k.cylinder(m, steel, (0, -1.2, 0), (0, 1, 0), 0.3, 0.58, seg=12)
+    k.cylinder(m, iron, (0, -1.3, 0), (0, 1, 0), 0.6, 0.16, seg=16)
+    for s in (-1, 1):
+        z0, z1 = (8.573, 11.621) if s > 0 else (-11.621, -8.573)
+        w = 0.24
+        k.box(m, iron, (-0.155, -1.4, z0), (0.155, -1.4 + w, z1))
+        k.box(m, iron, (-0.155, 1.4 - w, z0), (0.155, 1.4, z1))
+        k.box(m, iron, (-0.155, -1.4 + w, z0), (0.155, 1.4 - w, z0 + w))
+        k.box(m, iron, (-0.155, -1.4 + w, z1 - w), (0.155, 1.4 - w, z1))
+        k.box(m, paddle, (-0.11, -1.4 + w, z0 + w), (0.11, 1.4 - w, z1 - w))
+        span_y, span_z = 2.8 - 2 * w, z1 - z0 - 2 * w
+        target_face(m, target, (0.112, -1.4 + w, z0 + w), (0, 0, span_z), (0, span_y, 0))
+        target_face(m, target, (-0.112, -1.4 + w, z1 - w), (0, 0, -span_z), (0, span_y, 0))
+        for x in (-0.155, 0.155):
+            for y in (-1.28, 1.28):
+                for z in (z0 + 0.12, z1 - 0.12):
+                    k.prism(m, bolts, (x, y, z), (math.copysign(1, x), 0, 0), 0.08, 0.04, 6)
+        # the fork from the arm's end to the paddle's inner edge, and a stay above and below
+        inner = z0 if s > 0 else z1
+        k.box(m, iron, (-0.12, -0.3, min(s * 7.5, inner)), (0.12, 0.3, max(s * 7.5, inner)))
+        for y in (-1, 1):
+            k.tube(m, steel, [(0, y * 0.33, s * 6.1), (0, y * 1.22, inner + s * 0.12)], 0.06, seg=6)
+    return m
+
+
+def fan_look(name, hub, blade, tip, steel, brass):
+    """The fan as drawn (everything turns with the rotor, so everything but the blades is round about the axle): a
+    hub with a brass nose, four broad twisted blades of painted sheet with brass tips, a turned shroud ring round
+    them with a brass lip, and a guard of two wire rings on four struts."""
+    m = k.Mesh(name)
+    k.cylinder(m, hub, (0, 0.08, 0), (0, 1, 0), 0.4, 0.8, seg=16)
+    k.cylinder(m, brass, (0, 0.88, 0), (0, 1, 0), 0.4, 0.2, seg=16, r_top=0.14)
+    stations = [(0.36, 0.2, 0.3), (0.8, 0.44, 0.3), (1.22, 0.54, 0.25), (1.52, 0.44, 0.2)]
+    up = lambda h: np.array([0, h, 0.0])
+    for b in range(4):
+        t = math.pi / 2 * b
+        d, s = np.array([math.cos(t), 0, math.sin(t)]), np.array([-math.sin(t), 0, math.cos(t)])
+        for (r0, c0, p0), (r1, c1, p1) in zip(stations, stations[1:]):
+            pts = [d * r0 + s * c0 + up(0.5 - p0), d * r1 + s * c1 + up(0.5 - p1),
+                   d * r1 - s * c1 + up(0.5 + p1), d * r0 - s * c0 + up(0.5 + p0)]
+            m.face(tip if r1 > 1.4 else blade, pts)
+    annulus(m, hub, (0, 0.02, 0), (0, 1, 0), 1.68, 1.8, 1.0, seg=36, turns=10.0)
+    annulus(m, brass, (0, 1.02, 0), (0, 1, 0), 1.66, 1.82, 0.08, seg=36, turns=10.0)
+    for r in (0.75, 1.2):
+        annulus(m, steel, (0, 1.02, 0), (0, 1, 0), r - 0.035, r + 0.035, 0.08, seg=28)
+    for b in range(4):
+        t = math.pi / 2 * b + math.pi / 4
+        d, s = (math.cos(t), 0, math.sin(t)), (-math.sin(t), 0, math.cos(t))
+        k.obox(m, steel, (1.03 * d[0], 1.05, 1.03 * d[2]), [d, (0, 1, 0), s], (0.65, 0.03, 0.035))
+    return m
+
+
+def pusher_look(name, paint, iron, wood, bolts, target):
+    """The pusher as drawn, on the physics' three shapes: the head a framed iron plate with the whole target on its
+    face and two gussets behind it; the beam a painted girder (two flanges, a web, stiffeners, rivets along the
+    top) with a cap at its end; the upright a framed panel, iron rails and slanted stiles round oak boards, a
+    strap up its middle, standing on two feet on the beam."""
+    m = k.Mesh(name)
+    # the head (-8.008..-7.508, 3.6 high, 3.96 wide)
+    k.box(m, iron, (-8.008, -0.71, -1.98), (-7.508, 2.89, 1.98))
+    target_face(m, target, (-8.02, -0.46, 1.5), (0, 0, -3.0), (0, 3.1, 0))
+    for y in (-0.52, 2.7):
+        for z in (-1.76, 1.76):
+            k.prism(m, bolts, (-8.008, y, z), (-1, 0, 0), 0.13, 0.06, 6)
+            k.prism(m, bolts, (-7.508, y, z), (1, 0, 0), 0.13, 0.06, 6)
+    for z in (-0.5, 0.5):
+        prism_xy(m, iron, [(-7.508, 1.099), (-6.2, 1.099), (-7.508, 2.5)], z - 0.07, z + 0.07)
+    # the beam (to 2.592, 2.01 high, 1.2 wide)
+    x0, x1 = -7.508, 2.592
+    k.box(m, paint, (x0, 0.87, -0.6), (x1, 1.099, 0.6))
+    k.box(m, paint, (x0, -0.91, -0.6), (x1, -0.68, 0.6))
+    k.box(m, paint, (x0, -0.68, -0.2), (x1, 0.87, 0.2))
+    for i in range(7):
+        x = -6.3 + 1.4 * i
+        k.box(m, iron, (x - 0.06, -0.68, -0.56), (x + 0.06, 0.87, 0.56))
+        for z in (-0.42, 0.42):
+            k.prism(m, bolts, (x, 1.099, z), (0, 1, 0), 0.08, 0.04, 6)
+    k.box(m, iron, (x1 - 0.12, -0.91, -0.6), (x1, 1.099, 0.6))
+    # the upright (bottom 1.59: -2.47..2.45; top 5.938: -3.578..3.457; 0.63 deep)
+    yb, yt, z = 1.59, 5.938, 0.313
+    xl = lambda y: -2.47 - 1.108 * (y - yb) / (yt - yb)
+    xr = lambda y: 2.45 + 1.007 * (y - yb) / (yt - yb)
+    w = 0.42
+    for lo, hi in ((yb, yb + w), (yt - w, yt)):
+        prism_xy(m, paint, [(xl(lo), lo), (xr(lo), lo), (xr(hi), hi), (xl(hi), hi)], -z, z)
+    lo, hi = yb + w, yt - w
+    for f, sgn in ((xl, 1), (xr, -1)):
+        a, b = sorted((f(lo), f(lo) + sgn * w)), sorted((f(hi), f(hi) + sgn * w))
+        k.hexahedron(m, paint, [(a[0], lo, -z), (a[1], lo, -z), (a[1], lo, z), (a[0], lo, z),
+                                (b[0], hi, -z), (b[1], hi, -z), (b[1], hi, z), (b[0], hi, z)])
+    k.hexahedron(m, wood, [(xl(lo) + w, lo, -0.17), (xr(lo) - w, lo, -0.17), (xr(lo) - w, lo, 0.17),
+                           (xl(lo) + w, lo, 0.17), (xl(hi) + w, hi, -0.17), (xr(hi) - w, hi, -0.17),
+                           (xr(hi) - w, hi, 0.17), (xl(hi) + w, hi, 0.17)], scale=2.0)
+    k.box(m, iron, (-0.2, lo, -0.25), (0.2, hi, 0.25))
+    for s in (-1, 1):
+        for y in (yb + 0.21, yt - 0.21):
+            for x in (xl(y) + 0.24, 0.0, xr(y) - 0.24):
+                k.prism(m, bolts, (x, y, s * z), (0, 0, s), 0.11, 0.05, 6)
+        k.prism(m, bolts, (0, (lo + hi) / 2, s * 0.25), (0, 0, s), 0.09, 0.04, 6)
+    for x in (-1.7, 1.7):
+        k.box(m, iron, (x - 0.28, 1.099, -0.26), (x + 0.28, yb, 0.26))
+        k.box(m, iron, (x - 0.45, 1.099, -0.5), (x + 0.45, 1.19, 0.5))
+    return m
+
+
 def make_modul_01():
-    """The pusher: a stone block on a long beam with an end plate, sliding in its channel (the channel's floor,
-    sides and filler are collision only: the level draws the channel)."""
+    """The pusher: a head plate on a long beam with an upright, sliding in its channel (the channel's floor, sides
+    and filler are collision only: the level draws the channel). Drawn (pusher_look) as a mechanical pusher: a
+    target on the framed head, a painted girder, the upright a framed panel of oak boards."""
     p = Part("PH/P_Modul_01")
     stone = p.mat("P_Modul_01_Stone", "stone.png", diffuse=0.59, emissive=0.38, specular=0.3, power=10)
     target = p.mat("P_Modul_01_Target", "target.png", emissive=0.27)
@@ -1100,6 +1457,13 @@ def make_modul_01():
     k.box(m, stone, (-2.6, -0.91, -0.6), (2.592, 1.099, 0.6))
     for x0, x1 in ((-2.2, -3.2), (0.0, 0.0), (2.1, 3.1)):
         k.tube(m, wood, [(x0, 1.0, 0), (x1, 5.75, 0)], 0.28, seg=8, caps=True)
+    # (that plain mesh stays the object's; what is drawn is its look, pusher_look)
+    l_green = p.mat("P_Modul_01_Green", "paint_green.png", diffuse=0.85, emissive=0.3, specular=0.2, power=16)
+    l_iron = p.mat("P_Modul_01_Iron", "iron.png", emissive=0.3, specular=0.4, power=20)
+    l_boards = p.mat("P_Modul_01_Boards", "lift_deck.png", diffuse=0.85, emissive=0.34, specular=0.1, power=10)
+    l_bolts = p.mat("P_Modul_01_Bolts", "brass.png", diffuse=0.85, emissive=0.32, specular=0.6, power=30)
+    l_bullseye = p.mat("P_Modul_01_Bullseye", "bullseye.png", diffuse=0.9, emissive=0.3)
+    m.look = pusher_look("P_Modul_01_Pusher_Look", l_green, l_iron, l_boards, l_bolts, l_bullseye)
     p.node("P_Modul_01_Pusher", p.mesh(m), pos=(2.508, -1.485, 0.65))
     rinne = p.mesh(col("P_Modul_01_Rinne_01_Mesh", lambda m: k.box(m, None, (-8.979, -1.582, -0.65),
                                                                        (4.752, -1.177, 0.65))))
@@ -1315,7 +1679,8 @@ def make_modul_08():
 
 
 def make_modul_17():
-    """The turning arms: a tapered steel arm on a hub, a paddle at each end."""
+    """The turning arms: a tapered arm on a hub, a paddle at each end (drawn by spinner_look: a painted, banded
+    arm on a turned drum, framed paddles with a whole target on each face)."""
     p = Part("PH/P_Modul_17")
     target = p.mat("P_Modul_17_Target", "target.png", emissive=0.27)
     metal = p.mat("P_Modul_17_Metal", "steel.png", diffuse=0.31, emissive=0.22, specular=0.6, power=30)
@@ -1335,6 +1700,14 @@ def make_modul_17():
     paddle(md, target, -11.621, -8.573)
     paddle(md, target, 8.573, 11.621)
     k.cylinder(md, cube, (-0.729, 0, 0), (1, 0, 0), 0.9, 1.458, seg=12)
+    l_green = p.mat("P_Modul_17_Green", "paint_green.png", diffuse=0.85, emissive=0.3, specular=0.2, power=16)
+    l_iron = p.mat("P_Modul_17_Iron", "iron.png", emissive=0.3, specular=0.4, power=20)
+    l_hub = p.mat("P_Modul_17_Hub", "lift_rim.png", diffuse=0.85, emissive=0.3, specular=0.45, power=24)
+    l_steel = p.mat("P_Modul_17_Steel", "steel.png", diffuse=0.8, emissive=0.3, specular=0.6, power=30)
+    l_bolts = p.mat("P_Modul_17_Bolts", "brass.png", diffuse=0.85, emissive=0.32, specular=0.6, power=30)
+    l_bullseye = p.mat("P_Modul_17_Bullseye", "bullseye.png", diffuse=0.9, emissive=0.3)
+    md.look = spinner_look("P_Modul_17_Dreharme_Look", arm, l_iron, l_green, l_iron, l_hub, l_steel, l_bolts,
+                           l_bullseye)
     p.node("P_Modul_17_HingeFrame", pos=(0, -3.749, 0), x=(0, 0, -1), y=(-1, 0, 0), s=2.0)
     p.node("Modul17_Dreharme", p.mesh(md), pos=(0, -3.0, 0), x=(0, 0, -1))
     p.node("P_Modul_17_MF")
@@ -1346,7 +1719,8 @@ def make_modul_17():
 
 
 def make_modul_18():
-    """The fan: a four-bladed rotor (its housing is the level's), and the updraft's box."""
+    """The fan: a four-bladed rotor (the frame round it is the level's), and the updraft's box. Drawn (fan_look)
+    with a shroud ring and a wire guard, which turn with it."""
     p = Part("PH/P_Modul_18")
     rotor = p.mat("P_Modul_18_Rotor", "steel.png", diffuse=0.62, emissive=0.18, specular=0.5, power=20,
                   double_sided=True)
@@ -1359,6 +1733,12 @@ def make_modul_18():
         pts = [d * 0.3 + s * 0.48 + np.array([0, 0.3, 0]), d * 1.767 + s * 0.48 + np.array([0, 0.25, 0]),
                d * 1.767 - s * 0.48 + np.array([0, 0.85, 0]), d * 0.3 - s * 0.48 + np.array([0, 0.95, 0])]
         m.face(rotor, pts)
+    l_hub = p.mat("P_Modul_18_Hub", "lift_rim.png", diffuse=0.85, emissive=0.3, specular=0.45, power=24)
+    l_blade = p.mat("P_Modul_18_Blade", "lift_paint.png", diffuse=0.85, emissive=0.3, specular=0.2, power=16, double_sided=True)
+    l_tip = p.mat("P_Modul_18_Tip", "brass.png", diffuse=0.85, emissive=0.32, specular=0.6, power=30, double_sided=True)
+    l_steel = p.mat("P_Modul_18_Steel", "steel.png", diffuse=0.8, emissive=0.3, specular=0.6, power=30)
+    l_bolts = p.mat("P_Modul_18_Bolts", "brass.png", diffuse=0.85, emissive=0.32, specular=0.6, power=30)
+    m.look = fan_look("Modul_18_Rotor_Look", l_hub, l_blade, l_tip, l_steel, l_bolts)
     p.node("P_Modul_18_Particle", y=(0, 0, -1))
     p.node("P_Modul_18_Rotor", p.mesh(m), pos=(0, -0.55, 0.002), x=(0.336, 0.007, 0.942), y=(0, 1, -0.004),
            s=(1, 0.5, 1))
@@ -1371,7 +1751,8 @@ def make_modul_18():
 
 
 def make_modul_19():
-    """The flap wheel: two boards at right angles on a hexagonal hub and an axle."""
+    """The flap wheel: two boards at right angles on a hexagonal hub and an axle (drawn by flaps_look and
+    flap_axis_look: framed panels of oak boards, a spoked wheel, bearing collars and flanges)."""
     p = Part("PH/P_Modul_19")
     axis = p.mat("P_Modul_19_Axis", "steel.png", diffuse=[0.72, 0.76, 0.84, 1], emissive=0.43, specular=0.5,
                  power=20)
@@ -1395,6 +1776,14 @@ def make_modul_19():
     k.cylinder(max_, axis, (0, 0, -10.0), (0, 0, 1), 0.3, 20.0, seg=10)
     for z in (-10.0, 9.6):
         k.cylinder(max_, axis, (0, 0, z), (0, 0, 1), 1.27, 0.4, seg=16)
+    l_paint = p.mat("P_Modul_19_Paint", "lift_paint.png", diffuse=0.85, emissive=0.3, specular=0.2, power=16)
+    l_boards = p.mat("P_Modul_19_Boards", "lift_deck.png", diffuse=0.85, emissive=0.34, specular=0.1, power=10)
+    l_iron = p.mat("P_Modul_19_Iron", "iron.png", emissive=0.3, specular=0.4, power=20)
+    l_hub = p.mat("P_Modul_19_Hub", "lift_rim.png", diffuse=0.85, emissive=0.3, specular=0.45, power=24)
+    l_steel = p.mat("P_Modul_19_Steel", "steel.png", diffuse=0.8, emissive=0.3, specular=0.6, power=30)
+    l_bolts = p.mat("P_Modul_19_Bolts", "brass.png", diffuse=0.85, emissive=0.32, specular=0.6, power=30)
+    mfl.look = flaps_look("P_Modul_19_Flaps_Look", l_paint, l_boards, l_bolts)
+    max_.look = flap_axis_look("P_Modul_19_Axis_Look", l_steel, l_iron, l_hub, l_paint, l_bolts)
     rot = dict(x=(0.996, 0.087, 0), y=(-0.087, 0.996, 0))
     p.node("P_Modul_19_Axis", p.mesh(max_), pos=(-2.929, -0.246, -2.5), **rot)
     p.node("P_Modul_19_Flaps", p.mesh(mfl), pos=(-2.929, -0.246, -2.5), **rot)
@@ -1454,7 +1843,9 @@ def sack_points():
 
 
 def make_modul_26():
-    """The sandbag on a rope from a holder; the sack and the rope are bodies of their own meshes."""
+    """The sandbag on a rope from a holder; the sack and the rope are bodies of their own meshes (the hull of
+    sack_points and a plain rod), which stay as they are. Drawn (sack_look, sack_rope_look, sack_holder_look) as a
+    sewn canvas sack tied at the neck, a twisted rope with an iron eye, and a bolted plate with a ring."""
     p = Part("PH/P_Modul_26")
     sack = p.mat("P_Modul_26_Sandsack", "burlap.png", diffuse=0.7, emissive=0.46)
     holder = p.mat("P_Modul_26_Halter", "iron.png", diffuse=0.62, emissive=0.4, specular=0.5, power=20)
@@ -1465,6 +1856,13 @@ def make_modul_26():
     k.box(mh, holder, (-0.733, 0.0, -1.427), (0.733, 0.255, 1.426))
     mr = k.Mesh("P_Modul_26_Rope_Mesh")
     k.prism(mr, rope, (0, -6.25, 0), (0, 1, 0), 0.15, 12.5, 10)
+    l_cloth = p.mat("P_Modul_26_Cloth", "sack_cloth.png", diffuse=0.8, emissive=0.42)
+    l_cord = p.mat("P_Modul_26_Cord", "rope.png", diffuse=0.73, emissive=0.41)
+    l_iron = p.mat("P_Modul_26_Iron", "iron.png", emissive=0.3, specular=0.4, power=20)
+    l_bolts = p.mat("P_Modul_26_Bolts", "brass.png", diffuse=0.85, emissive=0.32, specular=0.6, power=30)
+    ms.look = sack_look("P_Modul_26_Sack_Look", l_cloth, l_cord)
+    mh.look = sack_holder_look("P_Modul_26_Halter_Look", holder, l_iron, l_bolts)
+    mr.look = sack_rope_look("P_Modul_26_Rope_Look", rope, l_iron, l_bolts)
     p.node("P_Modul_26_Sack", p.mesh(ms), pos=(0, 0.517, 0))
     p.node("P_Modul_26_Halter", p.mesh(mh), pos=(-0.001, 14.964, 0))
     p.node("P_Modul_26_Rope", p.mesh(mr), pos=(0, 8.714, 0))

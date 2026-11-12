@@ -102,6 +102,15 @@ its look (open-format.md): the physics takes its hull from the mesh, and the tes
 floors and walls, so both see the same thing whatever is drawn. The lift (`P_Modul_03`, 2026-11-12) is drawn this
 way: a turned metal disc with a bolted rim and an oak deck, its loose panels red-painted frames with a boarded foot
 and bars above (the ball is seen through them); its slab, panels and gate are unchanged as meshes.
+Five more parts are drawn this way since (second round, 2026-11-12), every object, pivot and plain mesh as before: the
+sack (`P_Modul_26`: a sewn canvas sack tied at the neck, a twisted rope with an iron eye hanging in the ring of a
+bolted plate), the flap wheel (`P_Modul_19`: framed panels of oak boards, a spoked wheel, bearing collars and
+flanges), the turning arms (`P_Modul_17`: a painted, banded arm on a turned drum, framed paddles with a whole target on
+each face), the fan (`P_Modul_18`: hub, four twisted blades, a shroud ring and a wire guard, all of which turn with
+the rotor, so all but the blades are round about the axle) and the pusher (`P_Modul_01`: a target on a framed head
+plate, a painted girder, the upright a framed panel). Their new materials (`..._Green`, `..._Bullseye`, `..._Cloth`
+and the like) are not among the texture pack's roles, so they are always drawn with the part's own pictures
+(`paint_green`, `bullseye`, `sack_cloth` and the lift's).
 
 A level takes our parts first when it says it is made for them (its settings' `"parts": "own"`, which our level kit
 `assets/own/make/levelkit.py` writes), so it plays the same with or without a copy; any other level (the copy's, a
