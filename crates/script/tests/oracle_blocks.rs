@@ -1192,6 +1192,23 @@ fn iterator() {
     });
 }
 
+/// Iterator If (`bb_iterator_if`): the rows whose column compares with a reference, one per loop turn.
+#[test]
+fn iterator_if() {
+    sweep("Iterator If", |r| {
+        let b = B::new(0, proto::ITERATOR_IF, 2, 2)
+            .target("array", r.pick(&[0, 0, 1, 2]))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3]))
+            .pin("int", r.pick(&[0, 1, 2, 3, 4, 5, 6, 7]))
+            .pin("int", r.pick(&[-1, 0, 10, 11, 20, 21, 30, 5]))
+            .pout("int", r.pick(&[0, 2]))
+            .pout("int", 0)
+            .pout("int", 0)
+            .pout("int", 0);
+        with_arrays_of(r, b, &[(1, 1, &[0, 1, 2]), (0, 0, &[3])])
+    });
+}
+
 #[test]
 fn get_cell() {
     sweep("Get Cell", |r| {

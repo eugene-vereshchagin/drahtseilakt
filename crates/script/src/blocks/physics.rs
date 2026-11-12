@@ -232,7 +232,7 @@ pub(super) const PROTOS: &[Proto] = &[
         pins: &[],
         pouts: &[],
         flags: flags::TARGET,
-        standing: Standing::Partial,
+        standing: Standing::Full,
         layouts: &[],
         run: physics_wakeup,
         event: None,

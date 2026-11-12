@@ -48,6 +48,9 @@ pub struct Entity {
     /// Whether a copy of it is drawn as a plain mesh (not a billboard sprite, not a cloud layer).
     drawable: bool,
     bounds: Option<(Vec3, Vec3)>,
+    /// The state Set IC saved: the world matrix and whether the row was shown. Restore IC goes back to it; none:
+    /// the row's initial state is the level's own.
+    ic: Option<(Mat4, bool)>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -90,6 +93,7 @@ impl Entities {
                     alive: true,
                     drawable: o.sprite.is_none() && o.name != "SkyLayer",
                     bounds,
+                    ic: None,
                 }
             })
             .collect::<Vec<_>>();
@@ -127,6 +131,29 @@ impl Entities {
 
     pub fn initial(&self, i: usize) -> Option<Mat4> {
         self.rows.get(i).map(|r| r.initial)
+    }
+
+    /// The matrix Restore IC puts a row back to: the one Set IC saved, else the level's.
+    pub fn ic_matrix(&self, i: usize) -> Option<Mat4> {
+        let r = self.rows.get(i)?;
+        Some(r.ic.map_or(r.initial, |(m, _)| m))
+    }
+
+    /// Whether the row was shown when Set IC saved it (none: it never did).
+    pub fn ic_shown(&self, i: usize) -> Option<bool> {
+        self.rows.get(i)?.ic.map(|(_, hidden)| !hidden)
+    }
+
+    /// Set IC: the row's world matrix and visibility now are its initial condition.
+    pub fn save_ic(&mut self, i: usize) -> bool {
+        let Some(world) = self.world(i) else {
+            return false;
+        };
+        let Some(r) = self.rows.get_mut(i) else {
+            return false;
+        };
+        r.ic = Some((world, r.hidden));
+        true
     }
 
     pub fn is_hidden(&self, i: usize) -> bool {
@@ -262,6 +289,7 @@ impl Entities {
             alive: true,
             drawable: src.drawable,
             bounds: src.bounds,
+            ic: None,
         };
         self.rows.push(row);
         Some(self.rows.len() - 1)
@@ -292,6 +320,7 @@ impl Entities {
             alive: true,
             drawable: true,
             bounds,
+            ic: None,
         });
         Some(self.rows.len() - 1)
     }
@@ -364,6 +393,7 @@ mod tests {
                     alive: true,
                     drawable: true,
                     bounds: None,
+                    ic: None,
                 }
             })
             .collect::<Vec<_>>();
@@ -427,6 +457,35 @@ mod tests {
         let drawn: Vec<_> = t.drawn_extra().collect();
         assert_eq!(drawn.len(), 1);
         assert_eq!(drawn[0].0, shown);
+    }
+
+    #[test]
+    fn set_ic_saves_the_place_and_visibility_restore_uses() {
+        let mut t = table(2);
+        // without Set IC the initial state is the level's own
+        assert_eq!(t.ic_matrix(1), t.initial(1));
+        assert_eq!(t.ic_shown(1), None);
+        t.set_world(1, Mat4::from_translation(Vec3::new(3.0, 4.0, 5.0)));
+        t.set_hidden(1, true);
+        assert!(t.save_ic(1));
+        t.set_world(1, Mat4::from_translation(Vec3::new(9.0, 9.0, 9.0)));
+        t.set_hidden(1, false);
+        assert_eq!(
+            t.ic_matrix(1).unwrap().w_axis.truncate(),
+            Vec3::new(3.0, 4.0, 5.0)
+        );
+        assert_eq!(t.ic_shown(1), Some(false));
+        // the level's own initial matrix (what bodies follow) is unchanged
+        assert_eq!(t.initial(1).unwrap().w_axis.x, 10.0);
+        // a child saves its world place
+        t.set_world(0, Mat4::from_translation(Vec3::new(0.0, 5.0, 0.0)));
+        assert!(t.link(1, Some(0)));
+        assert!(t.save_ic(1));
+        assert_eq!(
+            t.ic_matrix(1).unwrap().w_axis.truncate(),
+            Vec3::new(9.0, 9.0, 9.0)
+        );
+        assert!(!t.save_ic(7));
     }
 
     #[test]

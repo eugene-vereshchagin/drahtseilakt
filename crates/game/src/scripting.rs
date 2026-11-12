@@ -71,7 +71,18 @@ pub struct Scripts {
     pub statics: BTreeMap<usize, StaticSlot>,
     /// Fixed bodies made by scripts so far (bounds the handles in the world).
     made_static: usize,
+    /// The sliders scripts made (Set Physics Slider): (row of the target, block) -> the world's joint and the row of
+    /// the other body.
+    joints: BTreeMap<(usize, usize), (usize, usize)>,
+    /// Sliders asked for whose bodies are not in the world yet (the original retries each frame): (target row, other
+    /// row, block, what), at most `MAX_PENDING_JOINTS`.
+    pending_joints: Vec<(usize, usize, usize, script::SliderSpec)>,
 }
+
+/// The most sliders waiting for their bodies.
+pub const MAX_PENDING_JOINTS: usize = 64;
+/// The most sliders one run's scripts make.
+pub const MAX_SCRIPT_JOINTS: usize = 256;
 
 /// A script's fixed body and the object matrix it stands for.
 #[derive(Clone, Debug)]
@@ -154,6 +165,13 @@ pub enum PhysCmd {
     },
     Wake {
         ent: usize,
+    },
+    /// Set Physics Slider of block `key` between the bodies of two rows (none: destroy it).
+    Slider {
+        ent: usize,
+        other: usize,
+        key: usize,
+        spec: Option<script::SliderSpec>,
     },
 }
 
@@ -311,6 +329,8 @@ impl Scripts {
             emitters: BTreeMap::new(),
             bodies: BTreeMap::new(),
             forces: BTreeMap::new(),
+            joints: BTreeMap::new(),
+            pending_joints: Vec::new(),
             body_last: BTreeMap::new(),
             baked_last: BTreeMap::new(),
             queue: Vec::new(),
@@ -550,7 +570,23 @@ impl Host for SimHost<'_> {
     fn initial_matrix(&self, e: Ent) -> Option<[[f32; 4]; 4]> {
         match e {
             Ent::Ball => None,
-            Ent::Object(i) => self.s.ents.initial(i).map(|m| m.to_cols_array_2d()),
+            Ent::Object(i) => self.s.ents.ic_matrix(i).map(|m| m.to_cols_array_2d()),
+        }
+    }
+
+    fn set_ic(&mut self, e: Ent) {
+        if let Ent::Object(i) = e
+            && self.s.ents.save_ic(i)
+        {
+            let name = self.s.name(i).to_string();
+            self.s.note(format!("saves the state of {name} as its initial state"));
+        }
+    }
+
+    fn ic_visible(&self, e: Ent) -> Option<bool> {
+        match e {
+            Ent::Ball => None,
+            Ent::Object(i) => self.s.ents.ic_shown(i),
         }
     }
 
@@ -791,6 +827,29 @@ impl Host for SimHost<'_> {
                 impulse: Vec3::from(impulse),
             });
         }
+    }
+
+    fn physics_slider(
+        &mut self,
+        e: Ent,
+        e2: Ent,
+        key: usize,
+        create: Option<script::SliderSpec>,
+    ) {
+        let (Ent::Object(ent), Ent::Object(other)) = (e, e2) else {
+            return;
+        };
+        if let Some(sp) = create
+            && !(sp.p0.iter().chain(sp.p1.iter()).all(|v| v.is_finite()))
+        {
+            return;
+        }
+        self.s.queue.push(PhysCmd::Slider {
+            ent,
+            other,
+            key,
+            spec: create,
+        });
     }
 
     fn physics_wake(&mut self, e: Ent) {
@@ -1326,6 +1385,19 @@ impl Scripts {
                     }
                 }
                 PhysCmd::Remove { ent, fixed } => {
+                    // a body taken out of the world takes its joints with it
+                    let gone: Vec<(usize, usize)> = self
+                        .joints
+                        .iter()
+                        .filter(|(k, v)| k.0 == ent || v.1 == ent)
+                        .map(|(k, _)| *k)
+                        .collect();
+                    for k in gone {
+                        if let Some((j, _)) = self.joints.remove(&k) {
+                            world.remove_joint(j);
+                        }
+                    }
+                    self.pending_joints.retain(|p| p.0 != ent && p.1 != ent);
                     // a body made and removed in one tick was never in the world
                     if let Some(Some(i)) = self.bodies.get(&ent).copied() {
                         world.remove(i);
@@ -1383,10 +1455,98 @@ impl Scripts {
                         world.wake(i);
                     }
                 }
+                PhysCmd::Slider {
+                    ent,
+                    other,
+                    key,
+                    spec,
+                } => match spec {
+                    Some(spec) => {
+                        // one slider to a block: a second Create does nothing, as the original's
+                        if !self.joints.contains_key(&(ent, key))
+                            && !self
+                                .pending_joints
+                                .iter()
+                                .any(|p| p.0 == ent && p.2 == key)
+                        {
+                            self.make_slider(world, ent, other, key, spec, tick);
+                        }
+                    }
+                    None => {
+                        self.pending_joints.retain(|p| !(p.0 == ent && p.2 == key));
+                        if let Some((j, _)) = self.joints.remove(&(ent, key)) {
+                            world.remove_joint(j);
+                        }
+                    }
+                },
             }
         }
+        self.retry_sliders(world, tick);
         self.follow_statics(world);
         self.follow_bodies(world);
+    }
+
+    fn log_line(&mut self, tick: u64, t: String) {
+        if self.log.len() < LOG_CAP {
+            self.log.push((tick, t));
+        }
+    }
+
+    /// The IVP body of a row a script knows: its movable body, its fixed one, or the level's own.
+    fn ivp_of(&self, world: &crate::physics::World, ent: usize) -> Option<usize> {
+        if let Some(Some(i)) = self.bodies.get(&ent) {
+            return world.body_ivp(*i);
+        }
+        if let Some(h) = self.statics.get(&ent).and_then(|s| s.handle) {
+            return world.static_ivp(h);
+        }
+        world.baked_ivp(ent)
+    }
+
+    /// Set Physics Slider: the joint between the two rows' bodies. When one of them is not in the world yet the
+    /// request waits and is tried again each tick (the original's pending commands), within `MAX_PENDING_JOINTS`.
+    fn make_slider(
+        &mut self,
+        world: &mut crate::physics::World,
+        ent: usize,
+        other: usize,
+        key: usize,
+        spec: script::SliderSpec,
+        tick: u64,
+    ) {
+        let (Some(a), Some(b)) = (self.ivp_of(world, ent), self.ivp_of(world, other)) else {
+            if self.pending_joints.len() < MAX_PENDING_JOINTS {
+                self.pending_joints.push((ent, other, key, spec));
+            }
+            return;
+        };
+        if self.joints.len() >= MAX_SCRIPT_JOINTS {
+            return;
+        }
+        match world.add_slider_ivp(a, b, Vec3::from(spec.p0), Vec3::from(spec.p1), spec.limits) {
+            Some(j) => {
+                self.joints.insert((ent, key), (j, other));
+                let line = format!(
+                    "{} slides on {}",
+                    self.ents.name(ent),
+                    self.ents.name(other)
+                );
+                self.log_line(tick, line);
+            }
+            None => {
+                let line = format!("{} has no slider (no axis)", self.ents.name(ent));
+                self.log_line(tick, line);
+            }
+        }
+    }
+
+    fn retry_sliders(&mut self, world: &mut crate::physics::World, tick: u64) {
+        if self.pending_joints.is_empty() {
+            return;
+        }
+        for (ent, other, key, spec) in std::mem::take(&mut self.pending_joints) {
+            self.make_slider(world, ent, other, key, spec, tick);
+        }
     }
 
     fn remember_body(&mut self, ent: usize) {
@@ -1951,6 +2111,75 @@ mod body_tests {
         let y = y_of(&s, 0);
         run(&mut s, &mut w, 60);
         assert_eq!(y, y_of(&s, 0), "the row is left where the body was");
+    }
+
+    fn slider_spec() -> script::SliderSpec {
+        script::SliderSpec {
+            p0: [0.0, 5.0, 0.0],
+            p1: [10.0, 5.0, 0.0],
+            limits: None,
+        }
+    }
+
+    #[test]
+    fn a_slider_holds_a_box_on_its_axis_and_destroy_lets_it_fall() {
+        let mut s = scripts(2);
+        let mut w = World::new(&floor());
+        // box 1 fixed in place, box 0 loose, joined along x at height 5
+        let fixed = script::PhysSpec {
+            fixed: true,
+            ..spec()
+        };
+        physicalize(&mut s, 1, &fixed);
+        physicalize(&mut s, 0, &spec());
+        s.with_host(&mut view(), |_, h| {
+            h.physics_slider(Ent::Object(0), Ent::Object(1), 9, Some(slider_spec()))
+        });
+        run(&mut s, &mut w, 120);
+        assert_eq!(s.joints.len(), 1, "the joint is made: {:?}", s.log);
+        assert!(
+            (y_of(&s, 0) - 5.0).abs() < 0.3,
+            "held at height 5, not falling: {}",
+            y_of(&s, 0)
+        );
+        // along the axis it moves
+        let at = s.ents.world(0).unwrap().w_axis.truncate();
+        s.with_host(&mut view(), |_, h| {
+            h.physics_wake(Ent::Object(0));
+            h.physics_impulse(Ent::Object(0), at.to_array(), [4.0, 0.0, 0.0])
+        });
+        run(&mut s, &mut w, 30);
+        assert!(s.ents.world(0).unwrap().w_axis.x > 0.5, "slides along x");
+        assert!((y_of(&s, 0) - 5.0).abs() < 0.3, "still on the axis");
+        // Destroy
+        s.with_host(&mut view(), |_, h| {
+            h.physics_slider(Ent::Object(0), Ent::Object(1), 9, None)
+        });
+        s.with_host(&mut view(), |_, h| h.physics_wake(Ent::Object(0)));
+        run(&mut s, &mut w, 240);
+        assert!(s.joints.is_empty());
+        assert!(y_of(&s, 0) < 2.0, "free again: {}", y_of(&s, 0));
+    }
+
+    #[test]
+    fn a_slider_waits_for_a_body_that_is_not_there_yet() {
+        let mut s = scripts(2);
+        let mut w = World::new(&floor());
+        physicalize(&mut s, 0, &spec());
+        s.with_host(&mut view(), |_, h| {
+            h.physics_slider(Ent::Object(0), Ent::Object(1), 9, Some(slider_spec()))
+        });
+        run(&mut s, &mut w, 2);
+        assert!(s.joints.is_empty() && s.pending_joints.len() == 1);
+        physicalize(&mut s, 1, &script::PhysSpec { fixed: true, ..spec() });
+        run(&mut s, &mut w, 2);
+        assert_eq!(s.joints.len(), 1, "made once the other body exists");
+        assert!(s.pending_joints.is_empty());
+        // a rewound run is the same
+        let (mut a, mut wa) = (s.clone(), w.clone());
+        run(&mut s, &mut w, 60);
+        run(&mut a, &mut wa, 60);
+        assert_eq!(s.ents.world(0), a.ents.world(0));
     }
 
     #[test]

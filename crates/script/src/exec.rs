@@ -104,6 +104,16 @@ pub trait Host {
     fn create(&mut self, _name: &str, _like: Option<Ent>, _m: [[f32; 4]; 4]) -> Option<usize> {
         None
     }
+    /// Set IC: the object's current state (place, shown or hidden) becomes its initial condition, which Restore IC
+    /// puts it back to.
+    fn set_ic(&mut self, _e: Ent) {}
+    /// Whether the object was shown in the initial condition Set IC saved (none: it saved none).
+    fn ic_visible(&self, _e: Ent) -> Option<bool> {
+        None
+    }
+    /// Set Physics Slider (docs/physics.md 2.3): `create` makes the slider of block `key` between the bodies of
+    /// `e` and `e2`; none destroys that block's slider.
+    fn physics_slider(&mut self, _e: Ent, _e2: Ent, _key: usize, _create: Option<SliderSpec>) {}
     /// A level group gains or loses a member, or all of them (Add To Group, Remove From Group, Group Clear).
     fn group_add(&mut self, _group: usize, _object: usize) {}
     fn group_remove(&mut self, _group: usize, _object: usize) {}
@@ -363,6 +373,14 @@ const REQ_ACTIVATE: u8 = 1;
 const REQ_DEACTIVATE: u8 = 2;
 const REQ_RESET: u8 = 4;
 
+/// What Set Physics Slider asks for: the axis from `p0` to `p1` (world points), and limits along it in metres.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SliderSpec {
+    pub p0: [f32; 3],
+    pub p1: [f32; 3],
+    pub limits: Option<(f32, f32)>,
+}
+
 /// An object's state in the scene: asleep (deactivated in the scene: its scripts are not executed) or deleted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 struct ObjState {
@@ -430,8 +448,13 @@ pub struct Runtime {
     starved: bool,
     /// The random blocks' generator: a fixed seed stepped by each draw, so a run repeats exactly.
     rng: u64,
-    /// Objects copied so far (Object Copy), capped.
+    /// Objects copied (Object Copy) and created (Object Create) so far, capped together.
     copies: usize,
+    /// What Object Create made and Attach Script attached: (the object, whether it is dynamic: Delete Dynamic
+    /// Objects deletes those).
+    made: Vec<(Id, bool)>,
+    /// Scripts attached so far (Attach Script), capped.
+    attached: usize,
     /// The fonts the scripts made (TT CreateFontEx, Create System Font): index + 1 is the Font value. Only size,
     /// weight and colour are kept: the engine draws every font in its own face.
     pub(crate) fonts: Vec<crate::Font>,
@@ -456,8 +479,11 @@ pub struct Runtime {
 /// The most groups a run keeps members for.
 const MAX_GROUPS: usize = 1 << 16;
 
-/// The most objects a run's scripts may copy.
+/// The most objects a run's scripts may copy or create.
 pub const MAX_COPIES: usize = 256;
+
+/// The most scripts a run's scripts may attach (Attach Script).
+pub const MAX_ATTACHED: usize = 256;
 
 /// The most pops of the execution stack in one graph in one tick (the original's BehaviorMaxIteration).
 const MAX_ITERATIONS: usize = 8_000;
@@ -508,6 +534,8 @@ impl Runtime {
             starved: false,
             rng: 0x9e37_79b9_7f4a_7c15,
             copies: 0,
+            made: Vec::new(),
+            attached: 0,
             fonts: Vec::new(),
             ents2d: Vec::new(),
             order: Vec::new(),
@@ -678,6 +706,224 @@ impl Runtime {
             self.tree_event(root, BlockEvent::Copy, host, 0);
         }
         Some(new_id)
+    }
+
+    /// Makes the run's state vectors as long as the graph, after objects and nodes were added to it.
+    fn grow(&mut self) {
+        let n = self.graph.nodes.len();
+        self.blocks.resize(n, BlockState::default());
+        self.links.resize(n, LinkState::default());
+        self.io.resize(n, false);
+        self.values.resize(n, Value::None);
+        self.objects
+            .resize(self.graph.objects.len(), ObjState::default());
+    }
+
+    /// Object Create: a new object of `class` named `name`, in the run's graph. A group or a data array is made
+    /// empty; a 3D entity is a row of the engine's entity table (no mesh: it only exists); anything else is an
+    /// object the scripts can hold and pass on. A level is never made. None when refused (the cap, a level, the
+    /// engine makes no row). Created together with copies under `MAX_COPIES`. `dynamic` ones go with Delete
+    /// Dynamic Objects.
+    pub fn create_object(
+        &mut self,
+        class: u32,
+        name: &str,
+        dynamic: bool,
+        host: &mut dyn Host,
+    ) -> Option<Id> {
+        if class == 0 || crate::types::class_derives(class, 21) {
+            host.note("script cannot create a level (or no class): nothing made");
+            return None;
+        }
+        if self.copies >= MAX_COPIES {
+            if self.copies == MAX_COPIES {
+                self.copies = MAX_COPIES.saturating_add(1);
+                host.note("script creates stopped: too many objects made");
+            }
+            return None;
+        }
+        let kind = if crate::types::class_derives(class, 23) {
+            let next = self
+                .graph
+                .objects
+                .iter()
+                .filter_map(|o| match o.kind {
+                    ObjKind::Group(g) => Some(g.saturating_add(1)),
+                    _ => None,
+                })
+                .max()
+                .unwrap_or(0)
+                .max(self.graph.groups.len());
+            if next >= MAX_GROUPS {
+                return None;
+            }
+            ObjKind::Group(next)
+        } else if crate::types::class_derives(class, 52) {
+            let at = self.arrays.len();
+            self.arrays.push(crate::Array {
+                name: name.to_string(),
+                columns: Vec::new(),
+                rows: Vec::new(),
+                key: None,
+            });
+            ObjKind::Array(at)
+        } else if crate::types::class_derives(class, 33) {
+            let identity = [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ];
+            ObjKind::Entity(host.create(name, None, identity)?)
+        } else {
+            ObjKind::Other
+        };
+        self.copies = self.copies.saturating_add(1);
+        let g = Arc::make_mut(&mut self.graph);
+        if let ObjKind::Group(gi) = kind {
+            while g.groups.len() <= gi {
+                g.groups.push(Vec::new());
+            }
+        }
+        let id = g.add_object(name, kind);
+        if let Some(o) = g.objects.get_mut(id) {
+            o.class = class;
+        }
+        self.grow();
+        self.made.push((id, dynamic));
+        host.note(&format!("script creates {name} (class {class})"));
+        Some(id)
+    }
+
+    /// Object Delete of something Object Create made (a group, an array, an object of another class; entities
+    /// go the way level objects do): true when it was one of those and is gone now.
+    pub fn delete_created(&mut self, object: Id, host: &mut dyn Host) -> bool {
+        let Some(at) = self.made.iter().position(|m| m.0 == object) else {
+            return false;
+        };
+        self.made.remove(at);
+        if self.graph.block(object).is_some() {
+            // an attached script
+            self.delete_behavior(object, host);
+            return true;
+        }
+        match self.graph.objects.get(object).map(|o| o.kind) {
+            Some(ObjKind::Entity(i)) => {
+                host.delete(Ent::Object(i));
+                self.delete_object(object, host);
+            }
+            Some(ObjKind::Behavior) => self.delete_behavior(object, host),
+            Some(ObjKind::Group(gi)) => {
+                self.seed_group(gi, host);
+                if let Some(Some(m)) = self.groups.get_mut(gi) {
+                    m.clear();
+                }
+                if let Some(o) = self.objects.get_mut(object) {
+                    o.gone = true;
+                }
+            }
+            Some(ObjKind::Array(ai)) => {
+                if let Some(a) = self.arrays.get_mut(ai) {
+                    a.rows.clear();
+                }
+                if let Some(o) = self.objects.get_mut(object) {
+                    o.gone = true;
+                }
+            }
+            _ => {
+                if let Some(o) = self.objects.get_mut(object) {
+                    o.gone = true;
+                }
+            }
+        }
+        true
+    }
+
+    /// Delete Dynamic Objects: everything Object Create made dynamic and Attach Script attached dynamic is gone.
+    pub fn delete_dynamic(&mut self, host: &mut dyn Host) {
+        let ids: Vec<Id> = self
+            .made
+            .iter()
+            .filter(|m| m.1)
+            .map(|m| m.0)
+            .rev()
+            .collect();
+        for id in ids {
+            self.delete_created(id, host);
+        }
+    }
+
+    /// Attach Script: a copy of `script` (a top-level behaviour) is attached to `target`, bound to it, started as
+    /// asked (`activate`, `reset`), and kept as a dynamic one when `dynamic`. The copy's nodes are paid from the
+    /// tick's work as Object Copy's are; at most `MAX_ATTACHED` in a run. The copy's root, or none when refused.
+    pub fn attach_script(
+        &mut self,
+        script: Id,
+        target: Id,
+        dynamic: bool,
+        activate: bool,
+        reset: bool,
+        host: &mut dyn Host,
+    ) -> Option<Id> {
+        let attachable = self
+            .graph
+            .objects
+            .get(target)
+            .is_some_and(|o| !matches!(o.kind, ObjKind::Behavior))
+            && self.objects.get(target).is_some_and(|o| !o.gone);
+        if !attachable || self.graph.block(script).is_none_or(|b| b.parent.is_some()) {
+            return None;
+        }
+        if self.attached >= MAX_ATTACHED {
+            if self.attached == MAX_ATTACHED {
+                self.attached = MAX_ATTACHED.saturating_add(1);
+                host.note("script attaches stopped: too many scripts attached");
+            }
+            return None;
+        }
+        let Some(nodes) = self.graph.script_nodes(script) else {
+            host.note("script attach refused: the script is too large");
+            return None;
+        };
+        let cost = (nodes.len() as u64).saturating_add(1);
+        if cost > self.budget {
+            self.budget = 0;
+            self.starved = true;
+            host.note("script attach refused: more than a tick may copy");
+            return None;
+        }
+        self.budget = self.budget.saturating_sub(cost);
+        let room = crate::MAX_OBJECTS.saturating_sub(self.graph.nodes.len()) as u64;
+        if cost > room {
+            host.note("script attach refused: the run's scripts would be more than a map may hold");
+            return None;
+        }
+        self.attached = self.attached.saturating_add(1);
+        let g = Arc::make_mut(&mut self.graph);
+        let (root, pairs) = g.clone_script(script, target)?;
+        self.grow();
+        self.order.push(root);
+        for (old, new) in pairs {
+            let v = if matches!(self.graph.param(new), Some(p) if p.value == Value::Owner) {
+                Value::Obj(Some(target))
+            } else {
+                self.values.get(old).cloned().unwrap_or_default()
+            };
+            if let Some(slot) = self.values.get_mut(new) {
+                *slot = v;
+            }
+        }
+        self.activate(root, activate, reset, 0);
+        self.tree_event(root, BlockEvent::Copy, host, 0);
+        if dynamic {
+            self.made.push((root, true));
+        }
+        host.note(&format!(
+            "script attaches {} to {}",
+            self.graph.name(script),
+            self.graph.name(target)
+        ));
+        Some(root)
     }
 
     /// The function of an operation signature (ops::find), looked up once per run; a signature without one is

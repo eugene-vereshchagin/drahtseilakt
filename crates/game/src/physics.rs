@@ -837,6 +837,36 @@ impl World {
         }
     }
 
+    /// The IVP body of a game body, when it is in the physics.
+    pub fn body_ivp(&self, i: usize) -> Option<usize> {
+        self.handles.get(i).copied().flatten()
+    }
+
+    /// The IVP body of a script's fixed body (its handle from `add_static_*`).
+    pub fn static_ivp(&self, h: usize) -> Option<usize> {
+        self.script_statics.get(h)?.as_ref().map(|s| s.id)
+    }
+
+    /// The IVP body of a level object's baked fixed body.
+    pub fn baked_ivp(&self, row: usize) -> Option<usize> {
+        self.baked_rows.get(&row).copied()
+    }
+
+    /// A slider between two IVP bodies (the ids `body_ivp`, `static_ivp` and `baked_ivp` give): the same joint
+    /// `add_slider` makes, for bodies that are not both game bodies (a fixed body and a movable one).
+    pub fn add_slider_ivp(
+        &mut self,
+        a: usize,
+        b: usize,
+        p0: Vec3,
+        p1: Vec3,
+        limits: Option<(f32, f32)>,
+    ) -> Option<usize> {
+        let (lim, lo, hi) = limits.map_or((false, -1.0, 1.0), |(lo, hi)| (true, lo, hi));
+        self.physics
+            .slider_create(Some(a), Some(b), p3(p0), p3(p1), lim, lo, hi)
+    }
+
     /// A slider of body `a` to body `b` along the world axis from `p0` to `p1`, limited to lo..hi along it when
     /// asked (Set Physics Slider). None when either body is not in the physics.
     pub fn add_slider(

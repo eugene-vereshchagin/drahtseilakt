@@ -803,7 +803,103 @@ pub(crate) fn row_search(
     Flow::Done
 }
 
+/// Iterator If (Logics, `FUN_25499770`, C: `bb_iterator_if`): the rows whose Column compares (Operator) with the
+/// Reference Value, one per loop; pOut 0 holds the row index the walk is at, the cells follow from pOut 1. Out
+/// when no row is left (also with an empty array).
+pub(crate) fn iterator_if(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    let Some(a) = target_array(rt, b, host) else {
+        return Flow::Done;
+    };
+    let start = if input(rt, b, 0) {
+        0
+    } else {
+        input(rt, b, 1);
+        pout_value(rt, b, 0)
+            .map_or(0, |v| v.as_int())
+            .saturating_add(1)
+    };
+    let n = i32::try_from(rt.rows(a).len()).unwrap_or(i32::MAX);
+    if start >= n {
+        out(rt, b, 0);
+        return Flow::Done;
+    }
+    let col = pin_int(rt, b, 0, 0, host);
+    let op = pin_int(rt, b, 1, 1, host);
+    let col = usize::try_from(col).ok();
+    let kind = col
+        .and_then(|c| column_kind_of(rt, a, c))
+        .unwrap_or(INT);
+    let key = key_from(rt, b, 2, kind, host);
+    let found = col.and_then(|c| rt.array(a).and_then(|x| find_row(x, c, op, &key, start)));
+    match found {
+        Some(r) => {
+            row_to_outs(rt, b, a, r, 1);
+            set_pout(
+                rt,
+                b,
+                "Index",
+                0,
+                Value::Int(i32::try_from(r).unwrap_or(i32::MAX)),
+            );
+            out(rt, b, 1);
+        }
+        None => out(rt, b, 0),
+    }
+    Flow::Done
+}
+
+/// Shuffle Order (Logics): the rows of the target array put in a random order, drawn from the run's own seeded
+/// generator (a Fisher-Yates pass, so a run and its replay shuffle alike).
+pub(crate) fn shuffle_order(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    if input(rt, b, 0) {
+        if let Some(a) = target_array(rt, b, host) {
+            let n = rt.rows(a).len();
+            for i in (1..n).rev() {
+                let r = rt.random();
+                let j = ((r * (i.saturating_add(1)) as f32) as usize).min(i);
+                if let Some(arr) = rt.array_mut(a) {
+                    arr.rows.swap(i, j);
+                }
+            }
+        }
+        out(rt, b, 0);
+    }
+    Flow::Done
+}
+
 pub(crate) const PROTOS: &[Proto] = &[
+    Proto {
+        guid: proto::ITERATOR_IF,
+        name: "Iterator If",
+        library: Library::Logics,
+        pins: &["Column", "Operator", "Reference Value"],
+        pouts: &["Index"],
+        flags: flags::TARGET | flags::VAR_POUTS,
+        standing: Standing::Full,
+        layouts: &[],
+        run: iterator_if,
+        event: None,
+    },
+    decl(
+        proto::SHUFFLE_ORDER,
+        "Shuffle Order",
+        &[],
+        &[],
+        flags::TARGET,
+        shuffle_order,
+    ),
     decl(
         proto::SET_ROW,
         "Set Row",
