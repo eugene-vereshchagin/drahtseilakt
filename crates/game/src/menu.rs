@@ -3394,7 +3394,7 @@ fn fit_label(
         };
         return match split {
             Some((a, b, _)) if two => (
-                f.layout(&format!("{}\n{}", fitted(&a), fitted(&b)), frame, &st),
+                tight_two(f, &fitted(&a), &fitted(&b), frame, &st),
                 k,
             ),
             _ => (f.layout(&fitted(t), frame, &st), k),
@@ -3409,7 +3409,7 @@ fn fit_label(
     // two lines, each at most the frame's width, both within its height
     if let Some((a, b, k2)) = split {
         if k2 >= fit_min && k2 > k1 {
-            return (f.layout(&format!("{a}\n{b}"), frame, &scaled(k2)), k2);
+            return (tight_two(f, &a, &b, frame, &scaled(k2)), k2);
         }
     }
     // one line, as small as allowed, and what still does not fit loses its middle
@@ -3424,6 +3424,36 @@ fn fit_label(
     }
     (q, k)
 }
+
+/// Two lines of a label with a tight line advance (the font's cell is far taller than its capitals), the block
+/// centred in the frame by what is drawn: the space above the first line equals the space below the second.
+fn tight_two(
+    f: &crate::ui::Face,
+    a: &str,
+    b: &str,
+    frame: [f32; 4],
+    st: &crate::ui::Style,
+) -> Vec<crate::ui::Quad> {
+    let mut st = *st;
+    st.spacing[1] -= TWO_LINE_TIGHT * line_height(&st);
+    let mut q = f.layout(&format!("{a}\n{b}"), frame, &st);
+    if q.is_empty() {
+        return q;
+    }
+    let top = q.iter().map(|q| q.rect[1]).fold(f32::MAX, f32::min);
+    let bottom = q.iter().map(|q| q.rect[3]).fold(f32::MIN, f32::max);
+    let m = st.margins;
+    let mid = (frame[1] + m[1] + frame[3] - m[3]) / 2.0;
+    let dy = mid - (top + bottom) / 2.0;
+    for g in &mut q {
+        g.rect[1] += dy;
+        g.rect[3] += dy;
+    }
+    q
+}
+
+/// How much of the cell height the line advance of a two-line label is cut by.
+const TWO_LINE_TIGHT: f32 = 0.22;
 
 /// A label in two lines, broken at the space nearest its middle, or for a text without spaces in a script that
 /// needs none (Chinese) at its middle character; None for one word.
@@ -5562,5 +5592,46 @@ mod tests {
             .collect();
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(names, ["a.nmo", "b.NMO", "open level"]);
+    }
+
+    #[test]
+    fn a_two_line_label_is_tight_and_centred_in_its_frame() {
+        if !crate::fallback::available() {
+            eprintln!("skipped: the shipped fonts (assets/fonts) are not there");
+            return;
+        }
+        let face = crate::ui::Face::Own;
+        let st = crate::ui::Style {
+            scale: [0.05, 0.05],
+            spacing: [0.0, 0.0],
+            align: 0,
+            flags: crate::ui::TEXT_SCREEN,
+            margins: [4.0; 4],
+            color: [1.0; 4],
+            v2: false,
+            shadow: None,
+        };
+        let frame = [100.0, 100.0, 300.0, 100.0 + 2.0 * line_height(&st) + 20.0];
+        for text in ["Zurueck zum Hauptmenue", "Neues Spiel starten", "Geschwindigkeit der Kugel"] {
+            let (q, _) = fit_label(&face, text, frame, &st);
+            let (a, b) = two_lines(text).unwrap();
+            let one = fit_label(&face, &a, frame, &st).0;
+            let _ = b;
+            assert!(!q.is_empty() && !one.is_empty());
+            let top = q.iter().map(|g| g.rect[1]).fold(f32::MAX, f32::min);
+            let bottom = q.iter().map(|g| g.rect[3]).fold(f32::MIN, f32::max);
+            let (above, below) = (top - frame[1], frame[3] - bottom);
+            assert!((above - below).abs() <= 1.0, "{text}: gap above {above} below {below}");
+            // the gap between the lines: the lowest top of a glyph below the middle line minus the highest bottom above
+            let mid = (top + bottom) / 2.0;
+            let up_bottom = q.iter().filter(|g| g.rect[3] <= mid + 1.0).map(|g| g.rect[3]).fold(f32::MIN, f32::max);
+            let low_top = q.iter().filter(|g| g.rect[1] >= mid - 1.0).map(|g| g.rect[1]).fold(f32::MAX, f32::min);
+            let glyph = (bottom - top) / 2.0;
+            assert!(
+                low_top - up_bottom <= above + glyph * 0.3 + 1.0,
+                "{text}: line gap {} above {above} glyph {glyph}",
+                low_top - up_bottom
+            );
+        }
     }
 }
