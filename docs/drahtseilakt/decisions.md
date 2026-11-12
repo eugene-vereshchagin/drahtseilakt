@@ -458,3 +458,15 @@ and from `textures.original/` (a map without its sidecar). Only looks change: re
   copy is missing it says that the toolbox imports the original levels.
 
 *Done 2026-11-12 (branch levels-layout):* `assets/levels/drahtseilakt/` (the 13 picks and the hidden `Parts_Test`) and `assets/levels/community/` (the 13 `.nmo` with `level.txt`; the `.remaster/` sidecars are taken away, the sidecar loader stays for the toolbox's own `remaster-nmo`); `SHA256SUMS` sit in each folder. In the player's data folder `gamedata::profile` renames once, at the first read of a level folder and with a log line each: `original` to `ballance-original`, `remastered` to `ballance-remaster`, `downloaded` to `user-levels`, and the entries of `community/` and `open/` into `user-levels/` one by one (a clashing name stays and is still read; nothing deleted or overwritten; a folder the settings place elsewhere is left; the settings keys `levels.original` etc. still work). Runs recorded under the old kind names move to the new key on first play. `package::scan_user` applies the rule to `user-levels/`: grouping folders are searched four levels deep; a level folder without `level.txt` and a loose `.nmo` are **not listed** (before, both were: a missing level.txt only meant the folder's name as title, a loose `.nmo` was a level of its own), but each is named in the console log with what to do, and the folder's README says it; the shipped sets and the leftover `community/`/`open/` keep the lenient `scan`. Menu: "Downloaded" became "User levels" in all seven languages (the Start structure is unchanged). The toolbox writes to `ballance-remaster/` and (`import-maps`) `user-levels/` through the same `profile` names.
+
+## One Classic Ballance entry; the look decides how it looks
+
+*Owner's decision, 2026-11-12.* There are no separate menu entries for Ballance original and Ballance remaster. The
+player who wants classic Ballance goes to Classic Ballance and plays the levels of `ballance-original/` (the copy's
+`.nmo` files), which are rounded at load like every map. The look (Graphics page) decides the rest: the classic look
+is rounding only with the original textures; the remaster look adds the remastered textures (`ballance-remaster/`, 4K,
+made by the toolbox). Whoever wants it as in 2004 turns on the Back to 2004 mod, which switches everything off:
+square shapes, plain textures. Why: one place to choose the look, no duplicate lists of the same thirteen levels.
+
+In `user-levels/`, entries that break the folder rule are not listed; the User levels page then says at the bottom that
+the levels folder is wrong and where the manual is (the game never opens a browser).
