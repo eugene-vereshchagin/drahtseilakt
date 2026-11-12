@@ -54,7 +54,12 @@ pub struct Scripts {
     /// command is queued). A BTreeMap, so every walk over it is in row order, never in hash order.
     pub bodies: BTreeMap<usize, Option<usize>>,
     /// The forces scripts made: (entity row, block) -> the world's force.
-    forces: BTreeMap<(usize, usize), usize>,
+    forces: BTreeMap<(usize, usize), (usize, Vec3, Vec3)>,
+    /// The matrix each script body's object had when the physics last wrote it (or the body was made): a different
+    /// matrix later means a script moved the object, and the body is put there.
+    body_last: BTreeMap<usize, Mat4>,
+    /// The matrix each moved level object's baked body was last put by (absent: as loaded).
+    baked_last: BTreeMap<usize, Mat4>,
     /// What the scripts asked of the physics this tick, in graph order; the run applies it (`apply_physics`).
     queue: Vec<PhysCmd>,
     /// Bodies made by scripts so far (slots in the world are never reused, so this bounds them).
@@ -87,6 +92,8 @@ pub enum StaticShape {
     Triangles(Vec<[Vec3; 3]>),
     /// The hull of points in the object's frame (a convex list).
     Hull(Vec<Vec3>),
+    /// A sphere of this radius (a ball shape with Fixed = TRUE).
+    Sphere(f32),
 }
 
 /// The most movable bodies the scripts of one run make.
@@ -104,6 +111,7 @@ pub enum PhysCmd {
         pos: Vec3,
         rot: glam::Quat,
         frozen: bool,
+        group: String,
     },
     Convex {
         ent: usize,
@@ -114,6 +122,7 @@ pub enum PhysCmd {
         frozen: bool,
         collide: bool,
         shift: Option<[f32; 3]>,
+        group: String,
     },
     Static {
         ent: usize,
@@ -302,6 +311,8 @@ impl Scripts {
             emitters: BTreeMap::new(),
             bodies: BTreeMap::new(),
             forces: BTreeMap::new(),
+            body_last: BTreeMap::new(),
+            baked_last: BTreeMap::new(),
             queue: Vec::new(),
             made: 0,
             noted_static: Vec::new(),
@@ -329,6 +340,9 @@ pub struct RunView {
     pub sector: usize,
     pub kind: crate::sim::BallKind,
     pub finished: bool,
+    /// The ball is dying, and the last checkpoint has been passed (for the game's messages).
+    pub dying: bool,
+    pub last_stage: bool,
     /// What the scripts asked of the system's mouse cursor this tick: shown or hidden.
     pub cursor: Option<bool>,
     /// The sim camera's place and aim this tick (where the view looks without a camera object).
@@ -397,14 +411,6 @@ impl SimHost<'_> {
     /// A fixed Physicalize (Fixed = TRUE, or a concave list only): the object's mesh becomes a fixed body of the
     /// world, in the object's frame with its scale, as the level's own floors are (docs/physics.md 2.1).
     fn physicalize_static(&mut self, i: usize, name: &str, world: Mat4, spec: &script::PhysSpec) {
-        if spec.ball_count > 0 {
-            if !self.s.noted_static.contains(&i) && self.s.noted_static.len() < MAX_SCRIPT_STATICS {
-                self.s.noted_static.push(i);
-                self.s
-                    .note(format!("physicalizes {name} as a fixed ball (not made)"));
-            }
-            return;
-        }
         if self.s.made_static >= MAX_SCRIPT_STATICS {
             self.s
                 .note(format!("physicalizes {name}: too many fixed bodies"));
@@ -419,7 +425,27 @@ impl SimHost<'_> {
             return;
         };
         let points = self.s.materials.points.get(mesh);
-        let shape = if spec.convex_count > 0 {
+        let shape = if spec.ball_count > 0 {
+            // the radius pin; a block that has none gets the mesh's half extent (as for a movable ball)
+            let radius = spec.radius.unwrap_or_else(|| {
+                let (lo, hi) = points.map_or((Vec3::ZERO, Vec3::ZERO), |v| {
+                    v.iter().fold(
+                        (Vec3::splat(f32::INFINITY), Vec3::splat(f32::NEG_INFINITY)),
+                        |(lo, hi), &p| {
+                            let p = Vec3::from(p) * scale;
+                            (lo.min(p), hi.max(p))
+                        },
+                    )
+                });
+                (hi - lo).max_element() * 0.5
+            });
+            if !(radius.is_finite() && radius > 0.0) {
+                self.s
+                    .note(format!("physicalizes {name}: no usable radius"));
+                return;
+            }
+            StaticShape::Sphere(radius)
+        } else if spec.convex_count > 0 {
             let mut seen = std::collections::BTreeSet::new();
             let mut pts: Vec<Vec3> = points
                 .map(|v| v.iter().map(|&p| Vec3::from(p) * scale).collect::<Vec<_>>())
@@ -706,6 +732,7 @@ impl Host for SimHost<'_> {
                 pos,
                 rot,
                 frozen: spec.start_frozen,
+                group: spec.group.clone(),
             }
         } else {
             // exact duplicates out, in a fixed order; a very large mesh is sampled evenly
@@ -732,6 +759,7 @@ impl Host for SimHost<'_> {
                 frozen: spec.start_frozen,
                 collide: spec.collide,
                 shift: (!spec.auto_centre).then_some(spec.shift),
+                group: spec.group.clone(),
             }
         };
         self.s.made += 1;
@@ -1114,6 +1142,17 @@ impl Host for SimHost<'_> {
 }
 
 impl Scripts {
+    /// The game's pause messages (the app's pause menu opened or closed over the run): broadcast like the others,
+    /// heard when the scripts next tick.
+    pub fn pause_event(&mut self, paused: bool, tick: u64) {
+        for name in crate::facade::pause_events(paused) {
+            self.rt.send(name, None);
+            if self.log.len() < LOG_CAP {
+                self.log.push((tick, format!("game message {name}")));
+            }
+        }
+    }
+
     /// The game's messages for what the run did since the last tick (facade::events): broadcast, heard by the
     /// scripts' Wait Message at the next tick. Nothing here changes the run.
     fn emit_events(&mut self, run: &RunView) {
@@ -1123,6 +1162,8 @@ impl Scripts {
             points: run.points,
             kind: run.kind,
             finished: run.finished,
+            dying: run.dying,
+            last_stage: run.last_stage,
         };
         if let Some(p) = &self.seen
             && now.sector != p.sector
@@ -1161,6 +1202,7 @@ impl Scripts {
                     pos,
                     rot,
                     frozen,
+                    group,
                 } => {
                     if world.has_baked(ent) {
                         self.bodies.remove(&ent);
@@ -1170,8 +1212,9 @@ impl Scripts {
                         );
                         continue;
                     }
-                    let i = world.add_sphere(radius, m, pos, rot, !frozen);
+                    let i = world.add_sphere_in(radius, m, pos, rot, !frozen, &group);
                     self.bodies.insert(ent, Some(i));
+                    self.remember_body(ent);
                     note(
                         &mut self.log,
                         format!(
@@ -1189,6 +1232,7 @@ impl Scripts {
                     frozen,
                     collide,
                     shift,
+                    group,
                 } => {
                     if world.has_baked(ent) {
                         self.bodies.remove(&ent);
@@ -1198,9 +1242,12 @@ impl Scripts {
                         );
                         continue;
                     }
-                    match world.add_scripted_convex(&points, m, pos, rot, frozen, collide, shift) {
+                    match world.add_scripted_convex(
+                        &points, m, pos, rot, frozen, collide, shift, &group,
+                    ) {
                         Some(i) => {
                             self.bodies.insert(ent, Some(i));
+                            self.remember_body(ent);
                             note(
                                 &mut self.log,
                                 format!(
@@ -1242,6 +1289,10 @@ impl Scripts {
                         StaticShape::Triangles(t) => (
                             world.add_static_triangles(t, pos, rot, friction, elasticity, &group),
                             format!("{} triangles", t.len()),
+                        ),
+                        StaticShape::Sphere(r) => (
+                            world.add_static_sphere(*r, pos, rot, friction, elasticity, &group),
+                            format!("a sphere of radius {r:.2}"),
                         ),
                         StaticShape::Hull(p) => (
                             world.add_static_hull(p, pos, rot, friction, elasticity, &group),
@@ -1285,6 +1336,8 @@ impl Scripts {
                         self.forces.remove(&k);
                     }
                     self.bodies.remove(&ent);
+                    self.body_last.remove(&ent);
+                    self.baked_last.remove(&ent);
                     if let Some(h) = fixed {
                         world.remove_static(h);
                     }
@@ -1314,9 +1367,9 @@ impl Scripts {
                         if !self.forces.contains_key(&(ent, key))
                             && let Some(c) = world.add_force(i, force, at)
                         {
-                            self.forces.insert((ent, key), c);
+                            self.forces.insert((ent, key), (c, at, force));
                         }
-                    } else if let Some(c) = self.forces.remove(&(ent, key)) {
+                    } else if let Some((c, _, _)) = self.forces.remove(&(ent, key)) {
                         world.remove_force(c);
                     }
                 }
@@ -1333,6 +1386,63 @@ impl Scripts {
             }
         }
         self.follow_statics(world);
+        self.follow_bodies(world);
+    }
+
+    fn remember_body(&mut self, ent: usize) {
+        if let Some(m) = self.ents.world(ent) {
+            self.body_last.insert(ent, m);
+        }
+    }
+
+    /// Bodies of the level and of scripts follow their objects when a script moved them: a baked fixed body is put
+    /// where the object went, a movable body is teleported (at rest, its forces carried over).
+    fn follow_bodies(&mut self, world: &mut crate::physics::World) {
+        let bits = |m: &Mat4| m.to_cols_array().map(f32::to_bits);
+        for row in world.baked_row_list() {
+            let (Some(cur), Some(init)) = (self.ents.world(row), self.ents.initial(row)) else {
+                continue;
+            };
+            let last = self.baked_last.get(&row).copied().unwrap_or(init);
+            if bits(&cur) == bits(&last) {
+                continue;
+            }
+            let delta = cur * last.inverse();
+            if delta.is_finite() {
+                world.move_baked(row, delta);
+            }
+            self.baked_last.insert(row, cur);
+        }
+        let moved: Vec<(usize, usize, Mat4)> = self
+            .bodies
+            .iter()
+            .filter_map(|(&ent, &b)| {
+                let cur = self.ents.world(ent)?;
+                let last = self.body_last.get(&ent)?;
+                (bits(&cur) != bits(last)).then_some((ent, b?, cur))
+            })
+            .collect();
+        for (ent, body, cur) in moved {
+            self.body_last.insert(ent, cur);
+            let Some((pos, rot, _)) = pose_of(&cur) else {
+                continue;
+            };
+            let keys: Vec<(usize, usize)> =
+                self.forces.keys().filter(|k| k.0 == ent).copied().collect();
+            for k in &keys {
+                if let Some((c, _, _)) = self.forces.get(k) {
+                    world.remove_force(*c);
+                }
+            }
+            world.teleport(body, pos, rot);
+            for k in keys {
+                if let Some((_, at, force)) = self.forces.get(&k).copied()
+                    && let Some(c) = world.add_force(body, force, at)
+                {
+                    self.forces.insert(k, (c, at, force));
+                }
+            }
+        }
     }
 
     /// Fixed bodies follow their objects: one whose object a script moved is put at the new place.
@@ -1358,8 +1468,12 @@ impl Scripts {
             if let Some(i) = body
                 && let Some(s) = world.state(i)
             {
-                self.ents
-                    .set_world(ent, Mat4::from_rotation_translation(s.rot, s.pos));
+                let m = Mat4::from_rotation_translation(s.rot, s.pos);
+                self.ents.set_world(ent, m);
+                // read back what the table holds now (a child's matrix goes through its parent)
+                if let Some(w) = self.ents.world(ent) {
+                    self.body_last.insert(ent, w);
+                }
             }
         }
     }
@@ -1439,6 +1553,8 @@ mod facade_tests {
             sector,
             kind: BallKind::Wood,
             finished: false,
+            dying: false,
+            last_stage: false,
             cursor: None,
             eye: Vec3::ZERO,
             target: Vec3::Z,
@@ -1752,6 +1868,8 @@ mod body_tests {
             sector: 1,
             kind: crate::sim::BallKind::Wood,
             finished: false,
+            dying: false,
+            last_stage: false,
             cursor: None,
             eye: Vec3::ZERO,
             target: Vec3::Z,
@@ -2016,6 +2134,133 @@ mod body_tests {
         let na = a.floor_near(Vec3::new(0.0, 0.0, 0.0), 50.0);
         let nb = b.floor_near(Vec3::new(0.0, 0.0, 0.0), 50.0);
         assert_eq!(na, nb);
+    }
+
+    #[test]
+    fn a_baked_body_follows_its_moved_object() {
+        let mut s = scripts(1);
+        let mut w = World::new(&floor());
+        w.tag_baked(&[0]);
+        let b = ball_above(&mut w);
+        // row 0's own body is the 200 x 200 floor at y = 0 here: move the object 500 along x and the floor goes too
+        run(&mut s, &mut w, 120);
+        assert!(ball_y(&w, b) > 0.0 && ball_y(&w, b) < 3.0, "rests on the floor");
+        s.ents.set_world(0, Mat4::from_translation(Vec3::new(500.0, 5.0, 0.0)));
+        w.wake(b);
+        run(&mut s, &mut w, 120);
+        assert!(ball_y(&w, b) < -10.0, "the floor went with its object");
+        assert!(w.has_baked(0));
+        // and a ball dropped over the new place lands on it
+        let c = ball_above(&mut w);
+        w.teleport(c, Vec3::new(500.0, 12.0, 0.0), glam::Quat::IDENTITY);
+        run(&mut s, &mut w, 180);
+        assert!(ball_y(&w, c) > 0.0 && ball_y(&w, c) < 3.0, "y = {}", ball_y(&w, c));
+        // a level without moved objects keeps its body where it was
+        let mut s2 = scripts(1);
+        let mut w2 = World::new(&floor());
+        w2.tag_baked(&[0]);
+        let b2 = ball_above(&mut w2);
+        run(&mut s2, &mut w2, 240);
+        assert!(ball_y(&w2, b2) > 0.0);
+    }
+
+    #[test]
+    fn a_script_body_moved_by_a_script_is_teleported() {
+        let mut s = scripts(1);
+        let mut w = World::new(&floor());
+        physicalize(&mut s, 0, &spec());
+        run(&mut s, &mut w, 240);
+        s.ents.set_world(0, Mat4::from_translation(Vec3::new(30.0, 20.0, 0.0)));
+        s.apply_physics(&mut w, 0);
+        let b = s.bodies[&0].expect("body");
+        let st = w.state(b).expect("state");
+        assert!((st.pos - Vec3::new(30.0, 20.0, 0.0)).length() < 1e-3, "{:?}", st.pos);
+        run(&mut s, &mut w, 240);
+        let m = s.ents.world(0).unwrap();
+        assert!((m.w_axis.x - 30.0).abs() < 2.0, "x = {}", m.w_axis.x);
+        assert!((m.w_axis.y - 1.0).abs() < 0.2, "it fell onto the floor again, y = {}", m.w_axis.y);
+    }
+
+    #[test]
+    fn a_fixed_ball_shape_makes_a_fixed_sphere() {
+        let mut s = scripts(1);
+        let mut w = World::new(&[]);
+        let b = ball_above(&mut w);
+        physicalize(
+            &mut s,
+            0,
+            &script::PhysSpec {
+                fixed: true,
+                convex_count: 0,
+                ball_count: 1,
+                radius: Some(3.0),
+                ..spec()
+            },
+        );
+        run(&mut s, &mut w, 240);
+        assert_eq!(s.statics.len(), 1);
+        assert_eq!(s.made, 0);
+        assert_eq!(w.static_count(), 1);
+        // the sphere (centre y = 5, radius 3) holds the ball (radius 1) on its top at y = 9, at the most
+        assert!(ball_y(&w, b) > 8.0, "y = {}", ball_y(&w, b));
+        unphysicalize(&mut s, 0);
+        s.apply_physics(&mut w, 0);
+        assert_eq!(w.static_count(), 0);
+    }
+
+    #[test]
+    fn script_bodies_of_one_named_group_do_not_collide_with_each_other() {
+        let stack = |group: &str| {
+            let mut s = scripts(2);
+            let mut w = World::new(&floor());
+            s.ents.set_world(0, Mat4::from_translation(Vec3::new(0.0, 5.0, 0.0)));
+            s.ents.set_world(1, Mat4::from_translation(Vec3::new(0.0, 9.0, 0.0)));
+            let sp = script::PhysSpec {
+                group: group.into(),
+                ..spec()
+            };
+            physicalize(&mut s, 0, &sp);
+            physicalize(&mut s, 1, &sp);
+            run(&mut s, &mut w, 300);
+            (y_of(&s, 0), y_of(&s, 1))
+        };
+        let (a, b) = stack("");
+        assert!(b > a + 1.5, "no group: stacked, {a} {b}");
+        let (a, b) = stack("Pile");
+        assert!((a - 1.0).abs() < 0.2 && (b - 1.0).abs() < 0.2, "same group: both on the floor, {a} {b}");
+    }
+
+    #[test]
+    fn the_pause_messages_are_sent_and_logged() {
+        let mut s = scripts(1);
+        s.pause_event(true, 5);
+        s.pause_event(false, 6);
+        let sent: Vec<&str> = s.log.iter().map(|l| l.1.as_str()).collect();
+        assert_eq!(
+            sent,
+            [
+                "game message Pause Level",
+                "game message Unpause Level",
+                "game message Refresh"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_live_pause_is_recorded_and_a_playback_ignores_live_ones() {
+        use crate::sim::Sim;
+        let level = level::Level::default();
+        let mut sim = Sim::new(&level, crate::sim::BallKind::Wood);
+        sim.notify_pause(true);
+        sim.notify_pause(false);
+        assert_eq!(sim.pauses, [(1, true), (1, false)]);
+        let mut play = Sim::new(&level, crate::sim::BallKind::Wood);
+        play.set_playback_pauses(Some(vec![(2, true)]));
+        play.notify_pause(true);
+        assert!(play.pauses.is_empty(), "live pauses are ignored in playback");
+        play.step(0);
+        play.step(0);
+        assert_eq!(play.pauses, [(2, true)], "delivered at its tick");
     }
 
     #[test]

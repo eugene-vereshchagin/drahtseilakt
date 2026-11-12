@@ -22,12 +22,16 @@
 //                                 DirectInput scan codes a map's scripts read; keys are up at the start)
 //   mouse <tick> <x> <y> <buttons>   (format 11, optional: the mouse's position in the original's 640x480 frame and its
 //                                 buttons, bit 0 left, 1 right, 2 middle, from this tick on; at the start 0 0 0)
+//   pause <tick> <1|0>   (format 11, optional: the pause menu opened (1) or closed (0); the game's pause messages reach the
+//                                 scripts at this tick)
 //   end <last tick>
 
 use script::InputFrame;
 use std::fmt::Write as _;
 
 pub const FORMAT: &str = "drahtseilakt-replay 11";
+/// The most pause events a replay holds.
+pub const MAX_PAUSES: usize = 4096;
 /// The format written (the number in `FORMAT`).
 pub const VERSION: u32 = 11;
 /// The formats read: 1 (no bursts), 2 (the pieces lie until the ball is lost), 3 (the checkpoints in their group's
@@ -128,6 +132,9 @@ pub struct Replay {
     pub turns: Vec<(u64, u16)>,
     /// (first tick, keyboard and mouse) where they change: what a map's scripts see (format 11; empty before).
     pub frames: Vec<(u64, InputFrame)>,
+    /// (tick, paused) where the pause menu opened (true) or closed (false) over the run: the tick whose scripts first
+    /// hear the game's pause messages (format 11; empty before).
+    pub pauses: Vec<(u64, bool)>,
     pub end: u64,
 }
 
@@ -142,6 +149,7 @@ impl Replay {
             changes: Vec::new(),
             turns: Vec::new(),
             frames: Vec::new(),
+            pauses: Vec::new(),
             end: 0,
         }
     }
@@ -172,6 +180,13 @@ impl Replay {
         if self.version >= 11 && self.frames.last().map_or(InputFrame::default(), |c| c.1) != frame
         {
             self.frames.push((tick, frame));
+        }
+    }
+
+    /// Takes the run's pause events (nothing before format 11).
+    pub fn record_pauses(&mut self, pauses: &[(u64, bool)]) {
+        if self.version >= 11 {
+            self.pauses = pauses.to_vec();
         }
     }
 
@@ -256,6 +271,9 @@ impl Replay {
             }
             before = *f;
         }
+        for (t, p) in &self.pauses {
+            let _ = writeln!(s, "pause {t} {}", u8::from(*p));
+        }
         let _ = writeln!(s, "end {}", self.end);
         s
     }
@@ -287,6 +305,7 @@ impl Replay {
             changes: Vec::new(),
             turns: Vec::new(),
             frames: Vec::new(),
+            pauses: Vec::new(),
             end: 0,
         };
         for line in lines {
@@ -309,6 +328,28 @@ impl Replay {
                     return Err(format!("{a} lines need replay format 11: {line}"));
                 }
                 parse_frame_line(&mut r.frames, a, f).ok_or_else(|| format!("bad {a}: {line}"))?;
+                continue;
+            }
+            if a == "pause" {
+                if version < 11 {
+                    return Err(format!("pause lines need replay format 11: {line}"));
+                }
+                let tick: Option<u64> = f.next().and_then(|v| v.parse().ok());
+                let on = match f.next() {
+                    Some("1") => Some(true),
+                    Some("0") => Some(false),
+                    _ => None,
+                };
+                let (Some(tick), Some(on)) = (tick, on) else {
+                    return Err(format!("bad pause: {line}"));
+                };
+                if f.next().is_some()
+                    || r.pauses.len() >= MAX_PAUSES
+                    || r.pauses.last().is_some_and(|p| p.0 > tick)
+                {
+                    return Err(format!("bad pause: {line}"));
+                }
+                r.pauses.push((tick, on));
                 continue;
             }
             if a == "turn" {
@@ -612,12 +653,32 @@ mod tests {
             "mouse 1 0 0 9",
             "mouse 1 0 0",
             "keys 2 +1c\nkeys 1 -1c",
+            "pause 1",
+            "pause 1 2",
+            "pause x 1",
+            "pause 1 1 1",
+            "pause 2 1\npause 1 0",
         ] {
             assert!(
                 Replay::parse(&format!("drahtseilakt-replay 11\nlevel a 1\n{bad}\nend 2")).is_err(),
                 "{bad}"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn pauses_round_trip() -> Result<(), String> {
+        let mut r = Replay::new("Level_01.NMO", 0xabc);
+        r.record_pauses(&[(5, true), (9, false)]);
+        let text = r.to_text();
+        assert!(text.contains("pause 5 1\npause 9 0\n"), "{text}");
+        assert_eq!(Replay::parse(&text)?, r);
+        let mut old = Replay::new("a", 1);
+        old.version = 10;
+        old.record_pauses(&[(5, true)]);
+        assert!(old.pauses.is_empty());
+        assert!(Replay::parse("drahtseilakt-replay 10\nlevel a 1\npause 1 1\nend 1").is_err());
         Ok(())
     }
 }

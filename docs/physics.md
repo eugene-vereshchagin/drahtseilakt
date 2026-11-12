@@ -341,7 +341,8 @@ Features the content never uses:
 - A ball's radius is the last `ball radius` pin. A ball block with no radius pin takes half the mesh's largest extent
   (the original is silent; no map of the game does this).
 - Auto Mass Center = TRUE takes the hull's own centre; FALSE takes Shift as the centre in the object's frame.
-- The collision group string is read but not applied to script bodies yet (the world's groups are static strings).
+- The collision group string (first 8 bytes) is the body's group, through IVP's group filter (3.4): script bodies of one
+  non-empty group do not collide with each other (nor with the level's bodies of that group, e.g. "Floor").
 - Each tick after the physics step the object's matrix is the body's pose, orthonormal (the scale lives in the
   geometry), as the write-back of 3.1. Unphysicalize removes the body and leaves the object where it was.
 - A second Physicalize on a physicalized object changes nothing (as above).
@@ -355,7 +356,7 @@ Features the content never uses:
 - Physicalize with Fixed = TRUE, or with a concave list only (no convex, no ball), makes a fixed body: a concave one
   from the object's mesh triangles in its own frame, the scale baked in, at the object's pose without the scale; with
   a convex list and Fixed = TRUE, the hull of the mesh's points. Friction, elasticity and the group name are the
-  block's. A fixed ball is not made (reported once). The body is in the world and in the ball's floor lookup from the
+  block's. A ball shape with Fixed = TRUE makes a fixed sphere (radius pin, else half the mesh's largest extent). The body is in the world and in the ball's floor lookup from the
   same tick (the run applies the scripts' requests after they ran and before the step).
 - Unphysicalize removes the object's body of any kind and the ball's floor lookup stops seeing it. A body at rest
   does not wake when a body it rests on is removed (IVP forgets the contacts and wakes nobody; the original is the
@@ -372,6 +373,12 @@ Features the content never uses:
   level object is in the physics only because something physicalized it (the base scripts' `Physicalize_Floors`
   etc.), and a second Physicalize on a physicalized object changes nothing (above); the baked body is that first
   one. Its Unphysicalize removes the baked body.
+- **Moved objects with bodies of their own** (2026-11-12). A level object with a baked body that a script moves
+  (also through a moved parent) carries the body along: the run takes the change of the object's matrix (new times
+  inverse of the last one the body was placed by, the loaded one at first) and makes the baked body again at the moved
+  pose, in the same slot of the statics (`World::move_baked`). A script body (movable) whose object a script moved is
+  teleported: made again at the new pose, at rest and awake, its SetPhysicsForce forces re-made (`World::teleport`).
+  Levels whose scripts move nothing are untouched.
 - Limits per run: 1024 fixed bodies by script, 65536 triangles per body (a bigger mesh makes none), 1024 hull points.
   Bodies made by script are part of the run's state: the world and the script state clone and rewind together, the
   slots are never reused, and every walk is in object-row order.

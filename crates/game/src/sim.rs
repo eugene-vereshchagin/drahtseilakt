@@ -831,6 +831,10 @@ pub struct Sim {
     /// input stream (the replay's in a replay), never the live machine. Set by `set_input` once per tick.
     input_now: script::InputFrame,
     input_before: script::InputFrame,
+    /// The pause events of the run: (the tick whose scripts first hear it, paused). Recorded in the replay.
+    pub pauses: Vec<(u64, bool)>,
+    /// The pause events of the replay being played (delivered at their ticks; a live pause is then ignored).
+    playback_pauses: Option<Vec<(u64, bool)>>,
     /// What the scripts last asked of the system's mouse cursor (shown or hidden); none if they never did.
     pub script_cursor: Option<bool>,
     /// The ball inside a transformer, if it is in one.
@@ -1406,6 +1410,8 @@ impl Sim {
             turn: 0,
             input_now: script::InputFrame::default(),
             input_before: script::InputFrame::default(),
+            pauses: Vec::new(),
+            playback_pauses: None,
             script_cursor: None,
             hold: None,
             trafo_anim: None,
@@ -1515,6 +1521,8 @@ impl Sim {
             sector: self.sector,
             kind: self.ball.kind,
             finished: self.finished,
+            dying: self.dying.is_some(),
+            last_stage: !self.checkpoints().is_empty() && self.last_stage().0,
             in_play: self.dying.is_none() && self.hold.is_none() && !self.finished,
             teleport: None,
             input: self.input_now,
@@ -1817,6 +1825,19 @@ impl Sim {
             return;
         }
         self.tick += 1;
+        if let Some(list) = &self.playback_pauses {
+            let now: Vec<bool> = list
+                .iter()
+                .filter(|p| p.0 == self.tick)
+                .map(|p| p.1)
+                .collect();
+            for paused in now {
+                self.pauses.push((self.tick, paused));
+                if let Some(s) = &mut self.scripts {
+                    s.pause_event(paused, self.tick);
+                }
+            }
+        }
         self.run_scripts();
         let pressed = input & !self.prev_input;
         self.prev_input = input;
@@ -2375,6 +2396,24 @@ impl Sim {
             .iter()
             .position(|c| c.0 == object)
             .is_some_and(|k| k < self.sector)
+    }
+
+    /// The pause menu opened (`true`) or closed over the run: the map's scripts hear the original's pause messages.
+    /// Recorded in the run's pauses at the tick whose scripts hear it; ignored while a replay plays (its own are
+    /// delivered by `step`).
+    pub fn notify_pause(&mut self, paused: bool) {
+        if self.playback_pauses.is_some() || self.pauses.len() >= crate::replay::MAX_PAUSES {
+            return;
+        }
+        self.pauses.push((self.tick + 1, paused));
+        if let Some(s) = &mut self.scripts {
+            s.pause_event(paused, self.tick);
+        }
+    }
+
+    /// A replay's pause events to be delivered at their ticks (none: no replay plays, live pauses count).
+    pub fn set_playback_pauses(&mut self, pauses: Option<Vec<(u64, bool)>>) {
+        self.playback_pauses = pauses;
     }
 
     /// Whether the last checkpoint has been passed (the level's last stage), and where the level ends.

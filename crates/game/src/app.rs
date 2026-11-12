@@ -255,6 +255,7 @@ impl Game {
         sim.pieces_expire = replay_in.as_ref().is_none_or(|r| r.version >= 3);
         sim.checkpoints_by_name = replay_in.as_ref().is_none_or(|r| r.version >= 4);
         sim.respawn_faces_on = replay_in.as_ref().is_none_or(|r| r.version >= 6);
+        sim.set_playback_pauses(replay_in.as_ref().map(|r| r.pauses.clone()));
         let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
         let sound_ticks = std::sync::Arc::new(script_sound_ticks(&sim, data));
@@ -584,6 +585,7 @@ impl Game {
         }
         if let Some(r) = self.replay_in.take() {
             self.replay_out.version = r.version;
+            self.sim.set_playback_pauses(None);
         }
     }
 
@@ -678,6 +680,9 @@ impl Game {
         self.replay_out.record(self.sim.tick, input);
         self.replay_out.record_turn(self.sim.tick, turn);
         self.replay_out.record_frame(self.sim.tick, frame);
+        if self.replay_out.pauses.len() != self.sim.pauses.len() {
+            self.replay_out.record_pauses(&self.sim.pauses);
+        }
         self.log_tick(input);
         self.dump_spin_loss();
         let ball = &self.sim.ball;
@@ -1506,6 +1511,7 @@ fn window(
         },
         opts: o.clone(),
         menu,
+        pause_told: false,
         loading: None,
         features,
         strings,
@@ -3760,6 +3766,8 @@ struct App {
     number: Option<u32>,
     /// The menu, while it is open; the run is paused under it.
     menu: Option<Menu>,
+    /// The pause menu was opened over the run and the scripts were told (they hear the end of it too).
+    pause_told: bool,
     /// A level to load: (the level, whether the loading screen has been drawn).
     loading: Option<(crate::assets::Source, bool)>,
     /// The extended mode and which of its additions are on (features.rs).
@@ -5552,7 +5560,12 @@ impl App {
     fn menu_action(&mut self, action: Action, event_loop: &ActiveEventLoop) {
         match action {
             Action::None => {}
-            Action::Continue => self.menu = None,
+            Action::Continue => {
+                self.menu = None;
+                if std::mem::take(&mut self.pause_told) {
+                    self.game.sim.notify_pause(false);
+                }
+            }
             Action::Play(n) => self.play(n),
             Action::Map(path) if path.is_dir() => self.load(crate::assets::Source::Open(path)),
             Action::Map(path) => self.load(crate::assets::Source::Nmo(path)),
@@ -5729,6 +5742,10 @@ impl App {
             // the run waits under the pause menu; a finished or lost run has its own menu
             KeyCode::Escape if down && !self.game.sim.finished => {
                 let lost = self.game.sim.game_over;
+                if !lost && self.menu.is_none() {
+                    self.game.sim.notify_pause(true);
+                    self.pause_told = true;
+                }
                 self.open_menu(if lost {
                     crate::menu::Screen::Dead
                 } else {
