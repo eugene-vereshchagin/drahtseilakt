@@ -3025,35 +3025,6 @@ impl Menu {
         }
         out
     }
-
-    /// The loading screen in the interface's face: with the own interface a band behind it (the menu scene is
-    /// drawn under it).
-    pub fn loading_interface(
-        face: &crate::ui::Face,
-        screen: crate::ui::Screen,
-        strings: &Strings,
-        what: &str,
-    ) -> Vec<crate::ui::Quad> {
-        use crate::ui::{Anchor, Quad, homogeneous};
-        let mut out = Vec::new();
-        if face.own() {
-            out.push(Quad {
-                angle: 0.0,
-                rect: screen.rect(homogeneous([0.0, 0.43, 1.0, 0.57]), Anchor::Center),
-                uv: [0.0, 0.99, 1.0, 1.0],
-                top: [1.0, 1.0, 1.0, 0.61],
-                bottom: [1.0, 1.0, 1.0, 0.61],
-                texture: SPECIAL,
-            });
-        }
-        let text = strings.ours("loading").replace("{name}", what);
-        out.extend(crate::ui::place(
-            face.layout(&text, homogeneous([0.2, 0.45, 0.8, 0.55]), &FONT_01),
-            screen,
-            Anchor::Center,
-        ));
-        out
-    }
 }
 
 /// A label as drawn, for the layout tests: its text, its frame and its glyphs' rectangles (window pixels), the size

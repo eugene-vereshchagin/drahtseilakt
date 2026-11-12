@@ -12,6 +12,7 @@ mod app;
 mod audit;
 mod dik;
 mod entities;
+mod loading;
 mod matstate;
 mod texpaint;
 use gamedata::assets;
