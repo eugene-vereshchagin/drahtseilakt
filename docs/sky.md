@@ -382,3 +382,9 @@ Strings:
 | `0x100129c0` | `%d.Side-Mat` |
 | `0x100129b8` | `Top Mat` |
 | `0x100129ac` | `Bottom Mat` |
+
+## A map's own sky block (TT Sky)
+
+A map's script can build a sky of its own with the TT Sky block (walls, bottom and top from the level's materials);
+the game draws it round the camera in place of the level's sky for as long as the block is on. See
+`docs/drahtseilakt/scripts.md`, "Stage 3 looks and environment".

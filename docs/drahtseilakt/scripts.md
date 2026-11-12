@@ -128,11 +128,18 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
 - **Blocks.** Set Diffuse (keeps alpha on request), Set Emissive, Set Ambient, Set Specular, Set Texture, Set Blend
   Modes, Set Material Z Buffer, Set Alpha Test, Set Material, Set Current Slot, Get Texture Info, Change Texture Size.
   Full: Diffuse, Emissive, Ambient, Specular, Texture, Blend Modes, Get Texture Info, Change Texture Size.
-- **Partial.** Z Buffer (the write flag is drawn, the compare function is recorded only: the depth test stays "less or
-  equal"); Alpha Test (on with the reference, the function is not drawn); Set Material (the replaced material takes the
-  new one's whole state for every object that uses it, not for the target object alone); Set Current Slot (recorded);
-  Set 3DSprite Mode, Blend Textures, Write In Texture (accepted, they change pixels or sprite modes the engine does not
-  draw).
+- **Full since stage 4.1.** Z Buffer and Alpha Test: the compare functions (1..8) reach the renderer. The depth test
+  is a pipeline variant per function (created when first drawn, kept; past 96 pipelines a new function falls back to
+  "less or equal"); the alpha test's function is a uniform of the material and a switch in `shader.wgsl` (5, greater,
+  is what level materials always had, so a level without scripts draws as before). Set 3DSprite Mode: the mode (0 faces
+  the view, 1 / 2 turn about the world x / y, 3 keeps its axes) is kept per entity row (`Entities::sprite_mode`) and
+  `scene::sprite_matrix` uses it for a 3D sprite.
+- **Partial.** Set Material (the replaced material takes the new one's whole state for every object that uses it, not
+  for the target object alone); Set Current Slot (recorded; the nmo reader keeps only a texture's first slot, in
+  `nmo::scene::texture`, so there is no second picture to show); Blend Textures and Write In Texture (accepted: they
+  change pixels, which needs the CPU pixels of a level texture, a per-run copy that rewinds, and a GPU texture handle
+  to upload to; the renderer keeps only views. Two maps use them: Back and Forth, Fierce Battles. Left for a later
+  stage).
 - **Caps.** Only the level's own materials and textures can be named (anything else is ignored, so the table is at most
   as large as the level's); colours are clamped to 0..1, specular power to 0..1000; a texture size to 2048 x 2048; a
   slot to -1..255; a blend mode the engine has no name for is ignored.
@@ -400,7 +407,7 @@ by the engine's.
 | Remove From Group | `d0147412:0258520d` | 2 | 2 | done |
 | Linear Progression | `fff45680:aa512a39` | 2 | 3 | done |
 | Set Blend Modes | `2f572a66:6a9a0088` | 2 | 5 | planned |
-| Set Material Z Buffer | `1144022f:68fd055c` | 2 | 5 | planned |
+| Set Material Z Buffer | `1144022f:68fd055c` | 2 | 5 | done (stage 4.1): the depth function is drawn |
 | Create System Font | `936334fc:f243684f` | 1 | 1 | done: maps to our own font (weight 600+ is bold); no system fonts |
 | Movie Player | `778d16d4:1dd60060` | 1 | 1 | named no-op (said once) |
 | TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
@@ -433,22 +440,22 @@ by the engine's.
 | Set Material | `37865d50:2e285fab` | 1 | 3 | planned |
 | Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | done |
 | SphericalParticleSystem | `67c88f47:8880721e` | 1 | 1 | planned |
-| Set 3DSprite Mode | `0c5d0457:c64c7000` | 1 | 1 | planned |
-| Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | planned |
+| Set 3DSprite Mode | `0c5d0457:c64c7000` | 1 | 1 | done (stage 4.1) |
+| Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | partial: recorded; only a texture's first slot is loaded |
 | Sequencer | `42530844:257b6053` | 1 | 1 | done |
 | Calculator | `4bc209b8:5b3679b0` | 1 | 8 | planned |
 | TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | done: a font of the name with a texture; drawn in our own font (no system fonts) |
 | Get Message Data | `45875fee:45875fdd` | 1 | 1 | done |
-| Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | partial: position, size and rotation are kept per 2D entity (64); 2D Text lays out inside them; the entity itself is not drawn |
+| Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | partial: position, size and rotation are kept per 2D entity (64); 2D Text lays out inside them; a frame the file shows with a textured material is drawn at the edited place and size (rotation is not; a frame the file hides stays hidden) |
 | Set Clipping Planes | `652316a2:01aa09a9` | 1 | 2 | done: the renderer takes near and far |
 | Set Fog | `151aaaaa:ffd5bdbc` | 1 | 3 | done: linear, exp and exp2 distance fog in the shader (replaces the level fog); mode 0 switches fog off |
-| TT Sky | `36691920:3b261630` | 1 | 1 | partial: the state (sides, colour, radius) is kept in the run and logged; the sky box is not drawn (needs a mesh built at run time) |
+| TT Sky | `36691920:3b261630` | 1 | 1 | partial: the state (sides, colour, radius) is kept in the run and logged; drawn (stage 4.1): a mesh built from the sides, bottom and top materials, see below |
 | Get Row | `33b77f41:07b95c45` | 1 | 1 | done |
 | Set As Active Camera | `368f0ab1:2d8957e4` | 1 | 2 | done: the view is placed by the camera object (position, looking along its z) |
 | Physics WakeUp | `38b851b5:72ca74ac` | 1 | 1 | partial: on script bodies |
 | Set Parent | `9d9d9d98:7e7a7f75` | 1 | 1 | planned |
 | Scan String | `4afa2f11:034872e2` | 1 | 1 | planned |
-| Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |
+| Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | done (stage 4.1): reference and function are drawn |
 | Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | full: recorded, capped at 2048 x 2048 (the picture is not resampled) |
 | Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | no-op |
 | Sort Rows | `6f623e68:62bb5a98` | 1 | 5 | done |
@@ -517,8 +524,8 @@ blocks, the blocks beyond the template, the blocks not covered, and whether phas
    (expressions), Row Search, Sort Rows, Move / Remove Row, Insert Column, Has / Set Attribute, Objects With
    Attribute Iterator, Iterator If, Get Message Data, Execute / Attach Script, Scan String, Create String, Get
    SubString, To Lower Keys, Renamer.
-7. **Never**: Movie Player and 3D Text (named no-ops), Write In Texture,
-   Edit 2D Entity, Set As Active Camera, Set Clipping Planes, TT Sky: the game's own interface and camera take
+7. **Never** (the plan's list as first written; Edit 2D Entity and TT Sky were drawn later, in stage 4.1): Movie Player and
+   3D Text (named no-ops), Write In Texture, Set As Active Camera, Set Clipping Planes: the game's own interface and camera take
    their place; a map that needs them for play is reported by name.
 
 Semantics not knowable from the files, to be checked against the original by playing: the exact frame a
@@ -535,7 +542,15 @@ Scripts change the scene's look for the current run only; the state lives in the
   renderer's one light; its colour is replaced (the view mods' dimming still multiplies it). At most 16 lights kept.
 - Set Fog: `EnvChange::Fog`. A script fog replaces the level's own fog; the shader fades lit surfaces to the fog
   colour by distance (mode 1 exp, 2 exp2, 3 linear between start and end). Mode 0 or a bad range switches fog off.
-- TT Sky: the block stays on while its input On is active and records its sides' materials; nothing is drawn yet.
+- TT Sky (drawn since stage 4.1): `scriptsky::build` makes one mesh centred on the eye from the block's pins: Side
+  Materials walls (4..16; local 0) at distance Radius, square or SideFace-Height high, centred Y-Position above the eye,
+  a fan for the bottom (and the top), a part per level material. `Renderer::apply_script_sky` uploads it (rebuilt
+  only when the block's state changes) as a mesh of the level's model, and draws it first, with no depth test or write,
+  unlit, in the Vertex Color; the level's own sky is left out while it is on. A sky larger than the camera's far plane is
+  scaled down about the eye (it only turns, so it looks the same). Distortion and Orientation Object are not used. Off
+  takes the mesh away. A wall without a material is not drawn. (Misty, the only map with the block, never gives it
+  materials: its Get Row outputs are not wired to the block's pins, so the sky stays empty there.)
+- Edit 2D Entity / Set 3DSprite Mode: see stage 3.8 and hud.rs `edited_frames`.
 - Camera: Set FOV, Set Clipping Planes and Set As Active Camera reach the frame through `Snapshot` (fov, clip, the
   camera object's matrix).
 - Fonts map to our own font; Set Font Properties keeps scale and colour, not spacing or italics.
