@@ -1384,63 +1384,9 @@ def fan_look(name, hub, blade, tip, steel, brass):
     return m
 
 
-def pusher_look(name, paint, iron, wood, bolts, target):
-    """The pusher as drawn, on the physics' three shapes: the head a framed iron plate with the whole target on its
-    face and two gussets behind it; the beam a painted girder (two flanges, a web, stiffeners, rivets along the
-    top) with a cap at its end; the upright a framed panel, iron rails and slanted stiles round oak boards, a
-    strap up its middle, standing on two feet on the beam."""
-    m = k.Mesh(name)
-    # the head (-8.008..-7.508, 3.6 high, 3.96 wide)
-    k.box(m, iron, (-8.008, -0.71, -1.98), (-7.508, 2.89, 1.98))
-    target_face(m, target, (-8.02, -0.46, 1.5), (0, 0, -3.0), (0, 3.1, 0))
-    for y in (-0.52, 2.7):
-        for z in (-1.76, 1.76):
-            k.prism(m, bolts, (-8.008, y, z), (-1, 0, 0), 0.13, 0.06, 6)
-            k.prism(m, bolts, (-7.508, y, z), (1, 0, 0), 0.13, 0.06, 6)
-    for z in (-0.5, 0.5):
-        prism_xy(m, iron, [(-7.508, 1.099), (-6.2, 1.099), (-7.508, 2.5)], z - 0.07, z + 0.07)
-    # the beam (to 2.592, 2.01 high, 1.2 wide)
-    x0, x1 = -7.508, 2.592
-    k.box(m, paint, (x0, 0.87, -0.6), (x1, 1.099, 0.6))
-    k.box(m, paint, (x0, -0.91, -0.6), (x1, -0.68, 0.6))
-    k.box(m, paint, (x0, -0.68, -0.2), (x1, 0.87, 0.2))
-    for i in range(7):
-        x = -6.3 + 1.4 * i
-        k.box(m, iron, (x - 0.06, -0.68, -0.56), (x + 0.06, 0.87, 0.56))
-        for z in (-0.42, 0.42):
-            k.prism(m, bolts, (x, 1.099, z), (0, 1, 0), 0.08, 0.04, 6)
-    k.box(m, iron, (x1 - 0.12, -0.91, -0.6), (x1, 1.099, 0.6))
-    # the upright (bottom 1.59: -2.47..2.45; top 5.938: -3.578..3.457; 0.63 deep)
-    yb, yt, z = 1.59, 5.938, 0.313
-    xl = lambda y: -2.47 - 1.108 * (y - yb) / (yt - yb)
-    xr = lambda y: 2.45 + 1.007 * (y - yb) / (yt - yb)
-    w = 0.42
-    for lo, hi in ((yb, yb + w), (yt - w, yt)):
-        prism_xy(m, paint, [(xl(lo), lo), (xr(lo), lo), (xr(hi), hi), (xl(hi), hi)], -z, z)
-    lo, hi = yb + w, yt - w
-    for f, sgn in ((xl, 1), (xr, -1)):
-        a, b = sorted((f(lo), f(lo) + sgn * w)), sorted((f(hi), f(hi) + sgn * w))
-        k.hexahedron(m, paint, [(a[0], lo, -z), (a[1], lo, -z), (a[1], lo, z), (a[0], lo, z),
-                                (b[0], hi, -z), (b[1], hi, -z), (b[1], hi, z), (b[0], hi, z)])
-    k.hexahedron(m, wood, [(xl(lo) + w, lo, -0.17), (xr(lo) - w, lo, -0.17), (xr(lo) - w, lo, 0.17),
-                           (xl(lo) + w, lo, 0.17), (xl(hi) + w, hi, -0.17), (xr(hi) - w, hi, -0.17),
-                           (xr(hi) - w, hi, 0.17), (xl(hi) + w, hi, 0.17)], scale=2.0)
-    k.box(m, iron, (-0.2, lo, -0.25), (0.2, hi, 0.25))
-    for s in (-1, 1):
-        for y in (yb + 0.21, yt - 0.21):
-            for x in (xl(y) + 0.24, 0.0, xr(y) - 0.24):
-                k.prism(m, bolts, (x, y, s * z), (0, 0, s), 0.11, 0.05, 6)
-        k.prism(m, bolts, (0, (lo + hi) / 2, s * 0.25), (0, 0, s), 0.09, 0.04, 6)
-    for x in (-1.7, 1.7):
-        k.box(m, iron, (x - 0.28, 1.099, -0.26), (x + 0.28, yb, 0.26))
-        k.box(m, iron, (x - 0.45, 1.099, -0.5), (x + 0.45, 1.19, 0.5))
-    return m
-
-
 def make_modul_01():
-    """The pusher: a head plate on a long beam with an upright, sliding in its channel (the channel's floor, sides
-    and filler are collision only: the level draws the channel). Drawn (pusher_look) as a mechanical pusher: a
-    target on the framed head, a painted girder, the upright a framed panel of oak boards."""
+    """The pusher: a stone block on a long beam with an end plate, sliding in its channel (the channel's floor,
+    sides and filler are collision only: the level draws the channel)."""
     p = Part("PH/P_Modul_01")
     stone = p.mat("P_Modul_01_Stone", "stone.png", diffuse=0.59, emissive=0.38, specular=0.3, power=10)
     target = p.mat("P_Modul_01_Target", "target.png", emissive=0.27)
@@ -1457,13 +1403,6 @@ def make_modul_01():
     k.box(m, stone, (-2.6, -0.91, -0.6), (2.592, 1.099, 0.6))
     for x0, x1 in ((-2.2, -3.2), (0.0, 0.0), (2.1, 3.1)):
         k.tube(m, wood, [(x0, 1.0, 0), (x1, 5.75, 0)], 0.28, seg=8, caps=True)
-    # (that plain mesh stays the object's; what is drawn is its look, pusher_look)
-    l_green = p.mat("P_Modul_01_Green", "paint_green.png", diffuse=0.85, emissive=0.3, specular=0.2, power=16)
-    l_iron = p.mat("P_Modul_01_Iron", "iron.png", emissive=0.3, specular=0.4, power=20)
-    l_boards = p.mat("P_Modul_01_Boards", "lift_deck.png", diffuse=0.85, emissive=0.34, specular=0.1, power=10)
-    l_bolts = p.mat("P_Modul_01_Bolts", "brass.png", diffuse=0.85, emissive=0.32, specular=0.6, power=30)
-    l_bullseye = p.mat("P_Modul_01_Bullseye", "bullseye.png", diffuse=0.9, emissive=0.3)
-    m.look = pusher_look("P_Modul_01_Pusher_Look", l_green, l_iron, l_boards, l_bolts, l_bullseye)
     p.node("P_Modul_01_Pusher", p.mesh(m), pos=(2.508, -1.485, 0.65))
     rinne = p.mesh(col("P_Modul_01_Rinne_01_Mesh", lambda m: k.box(m, None, (-8.979, -1.582, -0.65),
                                                                        (4.752, -1.177, 0.65))))
