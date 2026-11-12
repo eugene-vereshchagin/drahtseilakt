@@ -13,7 +13,7 @@ Englisch, Spanisch, Italienisch und Französisch; `GameSettings.Language` wählt
 | Bildschirm | Zeilen von oben nach unten | Hinweise |
 |---|---|---|
 | Hauptmenü (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit fragt „Do you want to quit the game?“ (Yes / No) |
-| Hauptmenü ohne Kopie (unseres) | Start, Highscore, Options, Credits, Exit | Start listet „Our levels“ (die mitgelieferten und `levels/open/`); Options hat eine zusätzliche Zeile Import (vor Extended), die das Fenster öffnet, das die Kopie des Spielers holt: Esc oder Cancel führen zurück ins Spiel, der Schließen-Knopf des Fensters beendet das Programm, ein Import startet das Spiel mit der Kopie neu (decisions.md, „Das Spiel läuft ohne Weiteres“) |
+| Hauptmenü ohne Kopie (unseres) | Start, Highscore, Options, Credits, Exit | Start listet „Our levels“ (die mitgelieferten und `levels/open/`); Options zeigt eine Notiz, dass die Originallevel mit `drahtseilakt-toolbox` importiert werden (ein eigenes Programm; das Spiel hat kein Importfenster und startet die Toolbox nie) (decisions.md, „Das Spiel läuft ohne Weiteres“) |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | ein Level ist spielbar, sobald das vorige geschafft ist (`DB_Levelfreischaltung`); die anderen sind grau. Das Add-on mit Level 13 ersetzt Menu.nmo und fügt seine Zeile hinzu |
 | Highscore (`Menu_Highscore`) | „Highscore Level N“, zehn Namen mit Punkten, Back; links und rechts wechseln das Level | die Vorgaben der Kopie sind die Arrays `DB_Highscore_LvNN` in base.cmo („Mr. Default“) |
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | bei uns vor Back noch Language und Extended |

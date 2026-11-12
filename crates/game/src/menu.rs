@@ -109,8 +109,6 @@ pub enum Ask {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Line {
     Start,
-    /// Bring in the player's copy of the original (shown while there is none).
-    Import,
     Highscore,
     Options,
     Credits,
@@ -184,8 +182,6 @@ pub enum Action {
     Continue,
     Play(u32),
     Map(PathBuf),
-    /// Open the window that brings in the player's copy of the original.
-    Import,
     Restart,
     /// Leave the level for the main menu.
     Home,
@@ -287,7 +283,7 @@ pub struct Menu {
     /// Our own levels and the best community maps are shipped (the Start items are left out when not).
     has_ours: bool,
     has_best: bool,
-    /// The player's copy of the original is there: without it the levels are our own and the menu offers the import.
+    /// The player's copy of the original is there: without it the levels are our own and the Options page says where the original comes from.
     copy: bool,
     /// There are modified originals (levels/modified) to offer; they are listed only with a copy too.
     modified: bool,
@@ -569,7 +565,6 @@ impl Menu {
         let k = |s: &str| format!("help {s}");
         Some(match line {
             Line::Start => (k("start"), NONE),
-            Line::Import => (k("import"), NONE),
             Line::Highscore => (k("highscore"), NONE),
             Line::Options => (k("options"), NONE),
             Line::Credits => (k("credits"), NONE),
@@ -800,7 +795,19 @@ impl Menu {
                 out.push(text);
             }
         }
-        out
+        out.into_iter()
+            .map(|t| self.with_copy_note(screen, t))
+            .collect()
+    }
+
+    /// Without a copy of the original the Options page says, above the help, where the original levels come from:
+    /// the toolbox (a separate program) brings them in; the game itself has no import.
+    fn with_copy_note(&self, screen: Screen, text: String) -> String {
+        if screen == Screen::Options && !self.copy {
+            format!("{}\n{text}", self.strings.ours("note toolbox"))
+        } else {
+            text
+        }
     }
 
     /// The text of the notes panel of a screen with helps: the line under the cursor, Esc's hint last where the
@@ -811,6 +818,7 @@ impl Menu {
             .get(self.chosen())
             .map(|&l| self.help_now(screen, l))
             .unwrap_or_default();
+        let text = self.with_copy_note(screen, text);
         if lines.contains(&Line::Back) {
             self.with_hint(text)
         } else {
@@ -978,8 +986,6 @@ impl Menu {
                 Some(Line::Controls),
                 Some(Line::Sound),
                 Some(Line::Language),
-                // bringing in the player's own Ballance: a setting, offered while there is no copy
-                (!self.copy).then_some(Line::Import),
                 Some(Line::Extended),
                 Some(Line::Back),
             ]
@@ -996,12 +1002,7 @@ impl Menu {
             Screen::Extended if self.features.mode => [Line::Mode]
                 .into_iter()
                 .chain(switches(self.features))
-                .chain([
-                    Line::Interface,
-                    Line::Models,
-                    Line::ModsMenu,
-                    Line::Back,
-                ])
+                .chain([Line::Interface, Line::Models, Line::ModsMenu, Line::Back])
                 .collect(),
             Screen::Mods => (0..self.mods.found.len())
                 .map(Line::Mod)
@@ -1280,7 +1281,6 @@ impl Menu {
                 self.show(List::Challenges, Some(root));
                 open(self, Screen::Custom)
             }
-            Line::Import => Action::Import,
             Line::Highscore => open(self, Screen::Highscore),
             Line::Options => open(self, Screen::Options),
             Line::Credits => open(self, Screen::Credits),
@@ -1681,7 +1681,6 @@ impl Menu {
         let s = &self.strings;
         match line {
             Line::Start => s.get("Menu_Main Button Start", "Start"),
-            Line::Import => s.ours("import"),
             Line::Classic => s.ours("classic ballance"),
             Line::Ours => s.ours("drahtseilakt"),
             Line::Challenges => s.ours("ballance challenges"),
@@ -4943,15 +4942,26 @@ mod tests {
         assert!(e.lines(Screen::Controls).contains(&Line::Defaults));
         // the sound theme is chosen in one place only: the sound page
         assert!(!e.lines(Screen::Extended).contains(&Line::SoundTheme));
-        assert_eq!(e.fields(Screen::Extended).len(), e.lines(Screen::Extended).len() - 1);
+        assert_eq!(
+            e.fields(Screen::Extended).len(),
+            e.lines(Screen::Extended).len() - 1
+        );
     }
 
     #[test]
     fn without_a_copy_the_original_sound_theme_is_not_offered() {
         gamedata::resources::set_copy(false);
-        assert!(!gamedata::sound_themes::choices().iter().any(|k| k == "original"));
+        assert!(
+            !gamedata::sound_themes::choices()
+                .iter()
+                .any(|k| k == "original")
+        );
         gamedata::resources::set_copy(true);
-        assert!(gamedata::sound_themes::choices().iter().any(|k| k == "original"));
+        assert!(
+            gamedata::sound_themes::choices()
+                .iter()
+                .any(|k| k == "original")
+        );
     }
 
     fn graphics(a: Action) -> Option<Graphics> {
@@ -5202,7 +5212,7 @@ mod tests {
     }
 
     #[test]
-    fn without_a_copy_the_menu_offers_our_levels_and_the_import() {
+    fn without_a_copy_the_menu_offers_our_levels_and_a_note_about_the_toolbox() {
         let mut m = menu(&[false; 13], false);
         m.copy = false;
         assert_eq!(
@@ -5215,7 +5225,10 @@ mod tests {
                 Line::Exit
             ]
         );
-        assert!(m.lines(Screen::Options).contains(&Line::Import));
+        assert!(
+            m.help_panel(Screen::Options)
+                .contains(&m.strings.ours("note toolbox"))
+        );
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
             m.screen(),
@@ -5229,25 +5242,6 @@ mod tests {
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom, "our own levels");
         assert_eq!(m.title(Screen::Custom).as_deref(), Some("Featured maps"));
-        m.back();
-        m.back();
-        m.step(1);
-        m.step(1);
-        assert_eq!(m.enter(), Action::None);
-        assert_eq!(
-            m.screen(),
-            Screen::Options,
-            "the import is among the options"
-        );
-        let at = m
-            .lines(Screen::Options)
-            .iter()
-            .position(|&l| l == Line::Import);
-        // a page opens on its last line (Back): the arrows wrap to the first
-        for _ in 0..=at.unwrap_or(0) {
-            m.step(1);
-        }
-        assert_eq!(m.enter(), Action::Import);
     }
 
     #[test]
@@ -5319,6 +5313,7 @@ mod tests {
                 "look drahtseilakt",
                 "look player",
                 "note beautiful",
+                "note toolbox",
                 "note classic",
                 "note ours",
                 "note challenges",

@@ -37,8 +37,7 @@ ohne Umleitung; mit umgeleiteter Ausgabe
 macOS und lädt jeden Build so hoch, wie er installiert aussieht: das Programm neben `assets/`.
 
 `drahtseilakt --import DIR` kopiert das Originalspiel aus Ihrem installierten Ballance in DIR (oder vom Abbild Ihrer
-Spiel-CD: `--import Ballance.cue`, `.bin` oder `.iso`; ohne das Spiel gestartet bietet das Fenster dasselbe an:
-was es auf dem Rechner findet, einen daraufgezogenen Ordner oder ein Abbild, einen eingetippten Pfad) nach `levels/original/`
+Spiel-CD: `--import Ballance.cue`, `.bin` oder `.iso`) nach `levels/original/`
 des Spiels; alle Level liegen in `levels/` in seinem Datenordner (`~/.local/share/drahtseilakt/` unter Linux),
 jeder Ordner mit einem README, was hineingehört ([wo die Level liegen](docs/de/drahtseilakt/levels.md)).
 `--data` (oder `OPENBALLANCE_DATA`) spielt stattdessen aus einem anderen Ballance-Ordner. Das eigene

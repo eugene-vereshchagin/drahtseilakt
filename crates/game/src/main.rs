@@ -63,7 +63,6 @@ mod script_text;
 mod script_text3d;
 mod scripting;
 mod scriptsky;
-mod setup;
 mod sim;
 mod sky;
 mod supports;
@@ -476,26 +475,6 @@ fn parse_args() -> Result<Options, String> {
 /// How many --then runs may follow on.
 const MAX_THEN: usize = 8;
 
-/// Set in the process that opens the import window for the menu's Import.
-pub const IMPORT: &str = "DRAHTSEILAKT_IMPORT";
-
-/// Starts this program again with the same arguments, waits for it and ends with its exit code.
-fn restart() -> ! {
-    let status = std::env::current_exe().and_then(|exe| {
-        std::process::Command::new(exe)
-            .args(std::env::args_os().skip(1))
-            .env_remove(IMPORT)
-            .status()
-    });
-    match status {
-        Ok(s) => std::process::exit(s.code().unwrap_or(1)),
-        Err(e) => {
-            eprintln!("drahtseilakt: could not start the game again: {e}");
-            std::process::exit(1)
-        }
-    }
-}
-
 /// Where the game found its shipped assets and keeps the player's data (and whether the copy is portable).
 fn paths_line() -> String {
     let shown =
@@ -559,17 +538,6 @@ fn main() -> ExitCode {
             levels::prepare(&lang::docs_language(app::setting("language").as_deref()));
             println!("{copied} files copied to {}", levels::dir(levels::Kind::Original).display());
             return Ok(());
-        }
-        // the menu's Import: the window that brings in the player's copy, in a process of its own (winit runs one
-        // event loop a process), then the game again, with the copy or without it
-        if std::env::var_os(IMPORT).is_some() {
-            match setup::run(o.size) {
-                // the close button ends the program: no game window follows
-                Ok(setup::Outcome::Quit) => return Ok(()),
-                Ok(_) => {}
-                Err(w) => eprintln!("drahtseilakt: the window to bring in the game did not open: {w}"),
-            }
-            restart();
         }
         // the copy of the original is optional: without it the game plays its own levels (decisions.md, "The game
         // plays out of the box"); a folder named with --data must itself be a copy (no other place is tried)
