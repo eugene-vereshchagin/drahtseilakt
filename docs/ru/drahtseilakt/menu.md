@@ -12,7 +12,7 @@
 | Экран | Строки сверху вниз | Примечания |
 |---|---|---|
 | Главное (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit спрашивает «Do you want to quit the game?» (Yes / No) |
-| Главное без копии (наше) | Start, Highscore, Options, Credits, Exit | Start показывает «Our levels» (поставляемые и `levels/open/`); в Options есть дополнительная строка Import (перед Extended), она открывает окно, которое приносит копию игрока: Esc или Cancel возвращают в игру, кнопка закрытия окна завершает программу, импорт запускает игру заново уже с копией (decisions.md, «Игра играет из коробки») |
+| Главное без копии (наше) | Start, Highscore, Options, Credits, Exit | Start показывает «Our levels» (поставляемые и `levels/open/`); в Options показана заметка, что оригинальные уровни импортируются через `drahtseilakt-toolbox` (отдельная программа; в игре нет окна импорта, и она никогда не запускает toolbox) (decisions.md, «Игра играет из коробки») |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | уровень открывается, когда пройден предыдущий (`DB_Levelfreischaltung`); остальные серые. Дополнение с 13-м уровнем заменяет Menu.nmo и добавляет свою строку |
 | Highscore (`Menu_Highscore`) | «Highscore Level N», десять имён с очками, Back; влево и вправо меняют уровень | начальные таблицы копии — массивы `DB_Highscore_LvNN` в base.cmo («Mr. Default») |
 | Options (`Menu_Options`) | Graphics, Controls, Sound, Back | у нас перед Back ещё Language и Extended |

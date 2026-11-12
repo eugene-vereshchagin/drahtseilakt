@@ -442,7 +442,7 @@ impl Data {
                     return Err(match &self.root {
                         Some(root) => format!("Level_{n:02}.NMO is not in {}", root.display()),
                         None => format!(
-                            "Level_{n:02}.NMO: no copy of the original (import it from the menu)"
+                            "Level_{n:02}.NMO: no copy of the original (import it with drahtseilakt-toolbox)"
                         ),
                     });
                 }

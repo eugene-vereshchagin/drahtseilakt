@@ -5611,19 +5611,6 @@ impl App {
             }
             Action::Home => self.open_menu(crate::menu::Screen::Main),
             Action::Quit => event_loop.exit(),
-            Action::Import => {
-                // the import window runs in a process of its own and starts the game again when it is done
-                let started = std::env::current_exe().and_then(|exe| {
-                    std::process::Command::new(exe)
-                        .args(std::env::args_os().skip(1))
-                        .env(crate::IMPORT, "1")
-                        .spawn()
-                });
-                match started {
-                    Ok(_) => event_loop.exit(),
-                    Err(e) => eprintln!("could not open the import window: {e}"),
-                }
-            }
             Action::Volumes(v) => {
                 self.volumes = v;
                 if let Some(a) = &mut self.audio {

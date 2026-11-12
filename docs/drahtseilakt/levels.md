@@ -371,10 +371,7 @@ The game copies what it needs from the player's own copy into `levels/original/`
 (`drahtseilakt --import <Ballance folder>`) or straight from the game's CD or its image
 (`drahtseilakt --import Ballance.cue`, or `.bin`, `.iso`: the InstallShield 6 archive in `SETUP/`, read by
 `crates/cdimage`). The copy is optional (decisions.md, "The game plays out of the box"): without one the game starts
-with its own levels, and the **Import** line of Options opens a window (in the game's menu style; Esc or Cancel go back to the game, the close button ends the program) that does the same: it lists what it finds on the
-computer (installed games in the usual folders of Windows, Wine, GOG, Heroic and Lutris; discs in their drives; CD
-images in the home, Desktop and Downloads folders), takes a folder or image dropped on it or a path typed, and starts
-the game with the copy. The
+with its own levels, and the Options page says to import the original levels with `drahtseilakt-toolbox` (a separate program; the game has no import window and never runs it). The
 copy is the player's own data on the player's machine; nothing is downloaded and nothing goes into the
 repository. `--data DIR` still plays from any folder without copying.
 
