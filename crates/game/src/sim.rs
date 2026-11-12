@@ -1508,6 +1508,8 @@ impl Sim {
             sector: self.sector,
             kind: self.ball.kind,
             finished: self.finished,
+            dying: self.dying.is_some(),
+            last_stage: !self.checkpoints().is_empty() && self.last_stage().0,
             in_play: self.dying.is_none() && self.hold.is_none() && !self.finished,
             teleport: None,
             input: self.input_now,
@@ -2368,6 +2370,13 @@ impl Sim {
             .iter()
             .position(|c| c.0 == object)
             .is_some_and(|k| k < self.sector)
+    }
+
+    /// The pause menu opened (`true`) or closed over the run: the map's scripts hear the original's pause messages.
+    pub fn notify_pause(&mut self, paused: bool) {
+        if let Some(s) = &mut self.scripts {
+            s.pause_event(paused, self.tick);
+        }
     }
 
     /// Whether the last checkpoint has been passed (the level's last stage), and where the level ends.

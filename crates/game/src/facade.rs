@@ -123,6 +123,16 @@ pub fn cell(array: &str, row: usize, column: usize, f: &Fill) -> Option<Value> {
     })
 }
 
+/// The messages the original's pause sends: `Pause Level` when the pause menu opens; `Unpause Level` and `Refresh`
+/// (the gameplay script's refresh of the time factor and the sky) when the run goes on.
+pub fn pause_events(paused: bool) -> &'static [&'static str] {
+    if paused {
+        &["Pause Level"]
+    } else {
+        &["Unpause Level", "Refresh"]
+    }
+}
+
 /// The run's numbers an event is seen from, one tick to the next.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Seen {
@@ -131,19 +141,32 @@ pub struct Seen {
     pub points: i64,
     pub kind: BallKind,
     pub finished: bool,
+    /// The ball is dying (falling out of the level), and the last checkpoint has been passed (a level with
+    /// checkpoints).
+    pub dying: bool,
+    pub last_stage: bool,
 }
 
 /// The game's messages for what changed between two ticks, in the order the original sends them. The table
 /// "game event -> message name" (docs/gameplay_bbs.md): level start `Start Music` (Init Ingame), sector reached
 /// `Checkpoint reached`, a life lost `Ball Off` then `Sub Life` (and `Game Over` with the last one), an extra life
-/// `Life_Up`, an extra point `Extrapoint`, the level finished `Level_Finish` then `End Level`, a new ball `Trafo`.
+/// `Life_Up`, an extra point `Extrapoint`, the level finished `Level_Finish` then `End Level`, a new ball `Trafo`;
+/// also the last checkpoint reached `last Checkpoint reached` (after `Checkpoint reached`), the ball starting to
+/// die `Dead`, and at the start `Part_Loaded` (the level's parts are in) before `Start Music`. The pause's own
+/// messages come from `pause_events`.
 pub fn events(prev: Option<&Seen>, now: &Seen) -> Vec<&'static str> {
     let Some(p) = prev else {
-        return vec!["Start Music"];
+        return vec!["Part_Loaded", "Start Music"];
     };
     let mut out = Vec::new();
     if now.sector > p.sector {
         out.push("Checkpoint reached");
+        if now.last_stage && !p.last_stage {
+            out.push("last Checkpoint reached");
+        }
+    }
+    if now.dying && !p.dying {
+        out.push("Dead");
     }
     if now.lives < p.lives {
         out.push("Ball Off");
@@ -190,6 +213,8 @@ mod tests {
             points: 1000,
             kind: BallKind::Wood,
             finished: false,
+            dying: false,
+            last_stage: false,
         }
     }
 
@@ -266,7 +291,7 @@ mod tests {
 
     #[test]
     fn each_event_has_its_message() {
-        assert_eq!(events(None, &seen()), ["Start Music"]);
+        assert_eq!(events(None, &seen()), ["Part_Loaded", "Start Music"]);
         let s = seen();
         assert!(events(Some(&s), &s).is_empty());
         let t = |f: &dyn Fn(&mut Seen)| {
@@ -276,6 +301,16 @@ mod tests {
         };
         assert_eq!(t(&|n| n.sector = 2), ["Checkpoint reached"]);
         assert_eq!(t(&|n| n.lives = 2), ["Ball Off", "Sub Life"]);
+        assert_eq!(
+            t(&|n| {
+                n.sector = 5;
+                n.last_stage = true;
+            }),
+            ["Checkpoint reached", "last Checkpoint reached"]
+        );
+        assert_eq!(t(&|n| n.dying = true), ["Dead"]);
+        assert_eq!(pause_events(true), ["Pause Level"]);
+        assert_eq!(pause_events(false), ["Unpause Level", "Refresh"]);
         assert_eq!(
             events(Some(&Seen { lives: 1, ..s }), &Seen { lives: 0, ..s }),
             ["Ball Off", "Sub Life", "Game Over"]

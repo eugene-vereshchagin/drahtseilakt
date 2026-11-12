@@ -312,6 +312,9 @@ pub struct RunView {
     pub sector: usize,
     pub kind: crate::sim::BallKind,
     pub finished: bool,
+    /// The ball is dying, and the last checkpoint has been passed (for the game's messages).
+    pub dying: bool,
+    pub last_stage: bool,
     /// What the scripts asked of the system's mouse cursor this tick: shown or hidden.
     pub cursor: Option<bool>,
     /// The sim camera's place and aim this tick (where the view looks without a camera object).
@@ -1068,6 +1071,17 @@ impl Host for SimHost<'_> {
 }
 
 impl Scripts {
+    /// The game's pause messages (the app's pause menu opened or closed over the run): broadcast like the others,
+    /// heard when the scripts next tick.
+    pub fn pause_event(&mut self, paused: bool, tick: u64) {
+        for name in crate::facade::pause_events(paused) {
+            self.rt.send(name, None);
+            if self.log.len() < LOG_CAP {
+                self.log.push((tick, format!("game message {name}")));
+            }
+        }
+    }
+
     /// The game's messages for what the run did since the last tick (facade::events): broadcast, heard by the
     /// scripts' Wait Message at the next tick. Nothing here changes the run.
     fn emit_events(&mut self, run: &RunView) {
@@ -1077,6 +1091,8 @@ impl Scripts {
             points: run.points,
             kind: run.kind,
             finished: run.finished,
+            dying: run.dying,
+            last_stage: run.last_stage,
         };
         if let Some(p) = &self.seen
             && now.sector != p.sector
@@ -1462,6 +1478,8 @@ mod facade_tests {
             sector,
             kind: BallKind::Wood,
             finished: false,
+            dying: false,
+            last_stage: false,
             cursor: None,
             eye: Vec3::ZERO,
             target: Vec3::Z,
@@ -1685,6 +1703,8 @@ mod body_tests {
             sector: 1,
             kind: crate::sim::BallKind::Wood,
             finished: false,
+            dying: false,
+            last_stage: false,
             cursor: None,
             eye: Vec3::ZERO,
             target: Vec3::Z,
@@ -2043,6 +2063,22 @@ mod body_tests {
         assert!(b > a + 1.5, "no group: stacked, {a} {b}");
         let (a, b) = stack("Pile");
         assert!((a - 1.0).abs() < 0.2 && (b - 1.0).abs() < 0.2, "same group: both on the floor, {a} {b}");
+    }
+
+    #[test]
+    fn the_pause_messages_are_sent_and_logged() {
+        let mut s = scripts(1);
+        s.pause_event(true, 5);
+        s.pause_event(false, 6);
+        let sent: Vec<&str> = s.log.iter().map(|l| l.1.as_str()).collect();
+        assert_eq!(
+            sent,
+            [
+                "game message Pause Level",
+                "game message Unpause Level",
+                "game message Refresh"
+            ]
+        );
     }
 
     #[test]

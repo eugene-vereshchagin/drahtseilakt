@@ -1931,7 +1931,12 @@ since the tick before, so a Wait Message hears them in that tick.
 | level finished | `Level_Finish`, `End Level` | the finish script |
 | ball changed (transformer) | `Trafo` | Trafo Manager |
 
-Not emitted: `last Checkpoint reached`, `Pause Level` / `Unpause Level`, `Refresh`, `Dead`, the `BallNav` /
-`CamNav` activate messages and `Part_Loaded` (they belong to the game's own scripts, not run here).
+Also emitted (2026-11-12; names read from Gameplay.nmo and Levelinit.nmo): `last Checkpoint reached` after `Checkpoint reached`
+when the last checkpoint of a level that has checkpoints is passed; `Dead` when the ball starts to die (before `Ball Off`);
+`Part_Loaded` once, before `Start Music` in the first tick (the original sends it for each part while loading);
+`Pause Level` when the pause menu opens over the run and `Unpause Level` then `Refresh` when it closes with Continue
+(sent by the app through `Sim::notify_pause`, heard by the scripts at their next tick; a pause is not in a replay's
+input, so a script that waits for these hears them only in a live run).
+Not emitted: the `BallNav` / `CamNav` activate messages (they belong to the game's own scripts, not run here).
 Open points: `CurrentLevel`'s Level ID is 0 because a map carries no level number; `Timefactor` is the counter's
 period in milliseconds (the original's parameter was not read).
