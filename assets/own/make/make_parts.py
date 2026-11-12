@@ -202,6 +202,47 @@ def _oil():
     return np.clip(img * 0.32, 0, 1)
 
 
+def _lift_deck():
+    """The lift's deck: oak boards along x, butt joints staggered from board to board with two nails either side,
+    worn lighter along the boards' middles."""
+    n = 2 * TEX
+    img = k.planks(n, k.rgb(142, 100, 60), 31, boards=4, gaps=0.75)
+    y, x = np.mgrid[0:n, 0:n]
+    rng = np.random.default_rng(32)
+    board = y // (n // 4)
+    wear = k.value_noise(n, n, (3, 6), 33)
+    img = img * (0.86 + 0.3 * wear * np.sin(np.pi * (y % (n // 4)) / (n // 4)) ** 2)[..., None]
+    for b in range(4):
+        jx = int(rng.integers(n // 8, n - n // 8))
+        on = board == b
+        img = np.where((on & (np.abs(x - jx) < 2))[..., None], img * 0.35, img)
+        for dx in (-14, 14):
+            for fy in (0.25, 0.75):
+                cy = (b + fy) * (n // 4)
+                d = np.hypot(x - (jx + dx), y - cy)
+                img = np.where((d < 4.5)[..., None], k.rgb(58, 54, 52)[None, None] * (1.5 - d / 6)[..., None], img)
+    return np.clip(img, 0, 1)
+
+
+def _lift_paint():
+    """Red-oxide paint on iron, as the lift's loose panels have it: brushed, worn to the dark metal in a few
+    patches, a little soot in the mottle."""
+    img = k.metal(TEX, k.rgb(150, 60, 45), 34, brushed=0.05)
+    chips = k.value_noise(TEX, TEX, (10, 10), 35, octaves=3)
+    soot = k.value_noise(TEX, TEX, (5, 5), 36)
+    img = img * (0.84 + 0.24 * soot)[..., None]
+    bare = np.clip((chips - 0.72) * 9, 0, 0.7)[..., None]
+    return np.clip(img * (1 - bare) + k.rgb(84, 70, 64)[None, None] * bare, 0, 1)
+
+
+def _lift_rim():
+    """Turned gunmetal for the lift's disc (u goes round it): fine rings and a few darker ones."""
+    img = k.metal(TEX, k.rgb(112, 118, 128), 37, brushed=0.1).transpose(1, 0, 2)
+    y = np.arange(TEX)[:, None]
+    groove = 1 - 0.3 * np.exp(-((y % 64) - 32.0) ** 2 / 6.0)
+    return np.clip(img * groove[..., None], 0, 1)
+
+
 def _shadow_soft():
     return np.zeros((TEX, TEX, 3)), _radial(1.2) * 0.85
 
@@ -245,6 +286,9 @@ TEXTURE_MAKERS = {
     "brass.png": lambda: k.metal(TEX, k.rgb(186, 150, 82), 18),
     "target.png": _target,
     "crate.png": _crate,
+    "lift_deck.png": _lift_deck,
+    "lift_paint.png": _lift_paint,
+    "lift_rim.png": _lift_rim,
     "rope.png": _rope,
     "burlap.png": _burlap,
     "balloon.png": _balloon,
@@ -1073,12 +1117,97 @@ def make_modul_01():
     p.write()
 
 
+def flat_xz(m, mat, pts, y, up=True, uv=None):
+    """A flat convex polygon at height y from (x, z) points, facing up or down; `uv` a function of (x, z)."""
+    q = [np.array((x, y, z), np.float64) for x, z in pts]
+    n = np.cross(q[1] - q[0], q[2] - q[0])
+    if (n[1] > 0) != up:
+        q = q[::-1]
+    uv = uv or (lambda x, z: (x / 4.0, z / 4.0))
+    m.face(mat, q, [uv(v[0], v[2]) for v in q], normal=(0, 1 if up else -1, 0))
+
+
+def ring_xz(m, mat, r0, r1, y, seg=40, turns=10.0, vspan=1.0):
+    """A flat ring facing up, from radius r0 to r1 at height y; the texture's u goes round it `turns` times."""
+    for j in range(seg):
+        a0, a1 = 2 * math.pi * j / seg, 2 * math.pi * (j + 1) / seg
+        pts = [(r0 * math.cos(a0), r0 * math.sin(a0)), (r1 * math.cos(a0), r1 * math.sin(a0)),
+               (r1 * math.cos(a1), r1 * math.sin(a1)), (r0 * math.cos(a1), r0 * math.sin(a1))]
+        uvs = [(j / seg * turns, 0), (j / seg * turns, vspan), ((j + 1) / seg * turns, vspan),
+               ((j + 1) / seg * turns, 0)]
+        q = [np.array((x, y, z), np.float64) for x, z in pts]
+        if np.cross(q[1] - q[0], q[2] - q[0])[1] < 0:
+            q, uvs = q[::-1], uvs[::-1]
+        m.face(mat, q, uvs, normal=(0, 1, 0))
+
+
+def lift_disc(name, metal, dark, deck, bolts):
+    """The lift's disc as drawn, inside the physics' slab (radius 10, twenty sides, 1.04 thick): a turned metal
+    body with chamfered edges, on top a wide rim the cage stands on, bolted between the panels' places, a brass
+    line, an oak deck within it and a bolted boss plate in the middle (the plate and the bolts' heads stand a few
+    hundredths proud of the slab)."""
+    m = k.Mesh(name)
+    top = 0.52
+    lathe(m, metal, [(-0.52, 9.5), (-0.36, 9.87), (0.38, 9.87), (top, 9.74)], seg=40)
+    flat_xz(m, dark, regular(40, 9.5), -0.52, up=False)
+    ring_xz(m, metal, 7.6, 9.74, top, turns=12.0, vspan=0.55)
+    ring_xz(m, bolts, 7.42, 7.6, top, turns=40.0, vspan=0.05)
+    flat_xz(m, deck, regular(40, 7.42), top)
+    # sixteen bolts round the rim: a pair outside each panel, none under the cage's corners
+    for i in range(16):
+        a = math.radians(11.25 + 22.5 * i)
+        k.prism(m, bolts, (9.42 * math.cos(a), top, 9.42 * math.sin(a)), (0, 1, 0), 0.17, 0.07, 6, phase=a)
+    k.cylinder(m, metal, (0, top, 0), (0, 1, 0), 1.45, 0.03, seg=24)
+    k.cylinder(m, dark, (0, top + 0.03, 0), (0, 1, 0), 0.5, 0.03, seg=16)
+    for i in range(6):
+        a = math.radians(60 * i)
+        k.prism(m, bolts, (1.08 * math.cos(a), top + 0.03, 1.08 * math.sin(a)), (0, 1, 0), 0.13, 0.05, 6, phase=a)
+    return m
+
+
+def lift_panel(m, paint, wood, bars, bolts):
+    """One of the lift's loose panels as drawn, inside the physics' trapezoid prism (7.24 wide outside, 6.51
+    inside, 0.88 deep, 7.28 high): two stiles with the prism's slanted sides, three rails set back between them,
+    boards filling the foot and six round bars the upper part (the ball is seen through them), brass bolts where
+    the rails meet the stiles."""
+    z0, z1, y0, y1 = -0.438, 0.438, -2.72, 4.565
+    xi = 2.705
+    for s in (-1, 1):
+        k.hexahedron(m, paint, [(s * 3.618, y0, z0), (s * xi, y0, z0), (s * xi, y0, z1), (s * 3.255, y0, z1),
+                                (s * 3.618, y1, z0), (s * xi, y1, z0), (s * xi, y1, z1), (s * 3.255, y1, z1)])
+    rails = ((y0, -2.22, 0.36), (-0.3, 0.14, 0.3), (4.02, y1, 0.36))
+    for lo, hi, d in rails:
+        k.box(m, paint, (-xi, lo, -d), (xi, hi, d))
+    k.box(m, wood, (-xi, -2.22, -0.17), (xi, -0.3, 0.17), scale=2.0)
+    for i in range(6):
+        k.cylinder(m, bars, ((i - 2.5) * 0.78, 0.14, 0.0), (0, 1, 0), 0.125, 3.88, seg=10, caps=False)
+    for z, axis, x in ((z0, (0, 0, -1), 3.16), (z1, (0, 0, 1), 2.98)):
+        for s in (-1, 1):
+            for y in (-2.47, -0.08, 4.29):
+                k.prism(m, bolts, (s * x, y, z), axis, 0.13, 0.05, 6)
+
+
+def lift_gate_trim(m, dark, bolts):
+    """What the lift's gate has besides its posts and lintel: a dark plate on the lintel's outer face with two
+    brass bolts, and a foot band on each post's inner side."""
+    k.box(m, dark, (-1.6, 4.47, -0.52), (1.6, 4.95, -0.491))
+    for x in (-1.25, 1.25):
+        k.prism(m, bolts, (x, 4.71, -0.52), (0, 0, -1), 0.13, 0.05, 6)
+
+
 def make_modul_03():
-    """The falling floor: a twenty-sided slab ringed by seven walls and a gate, which fall away."""
+    """The lift: a disc on a spring, held down by the seven loose panels and the gate of its cage; pushed off, they
+    fall away and it rises. The physics' shapes are the plain ones below (a twenty-sided slab, trapezoid panels, the
+    gate's posts and lintel), and they stay the objects' meshes; what is drawn, their looks, is built into them: a
+    turned metal disc with a bolted rim and an oak deck, and red-painted iron panels, each a frame with a boarded
+    foot and bars above it (lift_disc, lift_panel, lift_gate_trim)."""
     p = Part("PH/P_Modul_03")
-    floor = p.mat("P_Modul_03_Floor", "stone_light.png", diffuse=0.8, emissive=0.39)
-    walls = p.mat("P_Modul_03_Walls", "stone_side.png", diffuse=0.79, emissive=0.31)
+    floor = p.mat("P_Modul_03_Floor", "lift_rim.png", diffuse=0.85, emissive=0.3, specular=0.45, power=24)
+    walls = p.mat("P_Modul_03_Walls", "lift_paint.png", diffuse=0.85, emissive=0.3, specular=0.2, power=16)
     trim = p.mat("P_Modul_03_Trim", "iron.png", emissive=0.3, specular=0.4, power=20)
+    deck = p.mat("P_Modul_03_Deck", "lift_deck.png", diffuse=0.85, emissive=0.34, specular=0.1, power=10)
+    bars = p.mat("P_Modul_03_Bars", "steel.png", diffuse=0.8, emissive=0.3, specular=0.6, power=30)
+    bolts = p.mat("P_Modul_03_Bolts", "brass.png", diffuse=0.85, emissive=0.32, specular=0.6, power=30)
     slab = lambda m, mt: prism_xz(m, mt, regular(20, 10.0), -0.52, 0.52)
     # 7.24 wide in front, 6.51 behind, 0.88 deep, 7.28 high
     wall = lambda m, mt: k.hexahedron(
@@ -1096,15 +1225,24 @@ def make_modul_03():
     lintel = lambda m, mt: k.hexahedron(m, mt, [
         (-3.582, 4.287, -0.491), (3.601, 4.287, -0.491), (3.25, 4.287, 0.395), (-3.21, 4.287, 0.395),
         (-3.582, 5.438, -0.491), (3.601, 5.28, -0.491), (3.25, 5.09, 0.395), (-3.21, 5.09, 0.395)])
+    # The plain shapes stay the objects' meshes, as they were: the slab is the physics' shape, and the test player
+    # reads the modules' meshes as floors and walls (autopilot.rs, floor_triangles), so a panel must stay one closed
+    # wall to it, not rails and bars. What is drawn is each mesh's look.
     mf = k.Mesh("P_Modul_03_Floor_Mesh")
     slab(mf, floor)
+    mf.look = lift_disc("P_Modul_03_Floor_Look", floor, trim, deck, bolts)
     mw = k.Mesh("P_Modul_03_Wall01_Mesh")
     wall(mw, walls)
     k.box(mw, trim, (-3.5, 4.565, -0.35), (3.5, 4.75, 0.35))
+    mw.look = k.Mesh("P_Modul_03_Wall01_Look")
+    lift_panel(mw.look, walls, deck, bars, bolts)
     mg = k.Mesh("P_Modul_03_Gate_Mesh")
-    post(mg, walls, -3.612, -2.6)
-    post(mg, walls, 3.601, 2.6, -0.49)
-    lintel(mg, walls)
+    mg.look = k.Mesh("P_Modul_03_Gate_Look")
+    for m in (mg, mg.look):
+        post(m, walls, -3.612, -2.6)
+        post(m, walls, 3.601, 2.6, -0.49)
+        lintel(m, walls)
+    lift_gate_trim(mg.look, trim, bolts)
     p.node("P_Modul_03_frame_high", pos=(0, 17.079, 0), x=(0, 0, 1), s=0.313)
     p.node("P_Modul_03_frame_low", pos=(0, -6.117, 0), x=(0, 0, 1), s=0.313)
     p.node("P_Modul_03_Floor", p.mesh(mf), pos=(0, -9.118, 0), x=(-0.707, 0, 0.707))
