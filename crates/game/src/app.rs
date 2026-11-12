@@ -3280,6 +3280,7 @@ async fn adapter_device(
         })
         .await
         .map_err(|e| format!("no graphics device: {e}"))?;
+    crate::render::note_adapter(&adapter);
     Ok((adapter, device, queue))
 }
 

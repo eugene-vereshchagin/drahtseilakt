@@ -25,6 +25,10 @@ Changed with the packs (2026-11-03): `original` in a remastered level now draws 
 transparent colours); the look a remastered level had with `original` before, its own upscaled pictures, is now the
 `remastered` choice.
 
+**Parts and balls without a copy (2026-11-12).** No level of ours or of the community carries its own parts (no `game/` folder), so `models level` means the copy's parts with a copy and our own parts without one: with no copy `level` and `own` draw the same (the Models line's help says so).
+
+**Edge anti-aliasing (2026-11-12).** The scene is drawn with 4x MSAA (2x or none where the adapter cannot), resolved to the frame; the mod `back-to-2004` turns it off with the mipmaps. Every texture is uploaded with a full mip chain and sampled trilinear, anisotropic 16x.
+
 **Without a copy or a remaster (2026-11-10).** The menu offers only the packs that can work: `original` (textures and models) needs the player's copy, `remastered` textures need a remaster in `levels/remastered`; the interface line likewise. A saved choice that is not available plays as `own` (the interface: the default) and the game logs it; the setting itself stays, so it applies again when the copy or the remaster is back. A texture nobody has is logged once (`missing texture: NAME (drawn plain)`); the glows, shadows, light cones, cloud layer and a few plain surfaces the original's levels use are made as our own textures (`make_textures.py extras`), and a map's copied names such as `Laterne_Verlauf.tga.003` find the picture of the name before the first dot.
 
 ## Where packs live
