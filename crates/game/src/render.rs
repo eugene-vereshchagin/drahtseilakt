@@ -1223,6 +1223,18 @@ impl Renderer {
                 .map(|m| Self::gpu_mesh_cpu(m, default_material))
                 .collect(),
         );
+        // the pipelines the model's materials draw with are made now, not in the frame they first show (a hitch each)
+        let mut keys: Vec<PipelineKey> = materials.iter().map(|m| m.key).collect();
+        keys.sort_by_key(|k| (k.blend.map(|(a, b)| (a as u8, b as u8)), k.z_write, k.z_func));
+        keys.dedup();
+        for k in keys.into_iter().take(MAX_PIPELINES) {
+            self.pipeline(k);
+        }
+        for b in [PBlend::AlphaAdd, PBlend::OneSrcColor, PBlend::Alpha] {
+            for lines in [false, true] {
+                self.particle_pipeline((b, lines));
+            }
+        }
         self.models.push(Model {
             meshes,
             materials,
