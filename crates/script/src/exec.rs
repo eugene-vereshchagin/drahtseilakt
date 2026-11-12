@@ -157,6 +157,12 @@ pub trait Host {
     }
     /// A script changes a level texture for this run (Change Texture Size, Set Current Slot).
     fn texture_set(&mut self, _texture: usize, _change: TexChange) {}
+    /// A script writes pixels of a level texture (Blend Textures, Write In Texture). The host keeps a per-run copy
+    /// of the texture and returns how many pixels it wrote (the block pays that from the tick's work); 0 when it
+    /// wrote nothing.
+    fn texture_paint(&mut self, _texture: usize, _paint: TexPaint) -> u64 {
+        0
+    }
 }
 
 /// What a script asks of a level material. Colours are RGBA or RGB, 0..1; blend modes and compare functions are
@@ -204,6 +210,22 @@ pub enum TexChange {
     },
     /// Set Current Slot.
     Slot(i32),
+}
+
+/// What a script writes into a level texture's pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TexPaint {
+    /// Blend Textures: the target becomes `a` * (1 - factor) + `b` * factor (the sources are stretched to the target's
+    /// size).
+    Blend { a: usize, b: usize, factor: f32 },
+    /// Write In Texture: a square of `size` pixels (or the pen texture stretched to it) centred on the pixel `uv`.
+    Write {
+        uv: [f32; 2],
+        color: [f32; 4],
+        size: i32,
+        pen: Option<usize>,
+        mode: i32,
+    },
 }
 
 /// A level texture as Get Texture Info reads it.
@@ -977,6 +999,18 @@ impl Runtime {
         if !self.unknown.contains(&key) {
             self.unknown.push(key);
             host.note(text);
+        }
+    }
+
+    /// Pays `units` of the tick's work for something a block did in one go (pixels written); what is not there
+    /// ends the tick's work.
+    pub(crate) fn pay(&mut self, units: u64) {
+        match self.budget.checked_sub(units) {
+            Some(b) => self.budget = b,
+            None => {
+                self.budget = 0;
+                self.starved = true;
+            }
         }
     }
 

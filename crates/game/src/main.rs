@@ -13,6 +13,7 @@ mod audit;
 mod dik;
 mod entities;
 mod matstate;
+mod texpaint;
 use gamedata::assets;
 mod audio;
 mod autopilot;

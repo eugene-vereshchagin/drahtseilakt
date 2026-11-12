@@ -40,6 +40,7 @@ struct Rec {
     /// The material and texture changes the scripts asked for.
     mats: Vec<(usize, crate::MatChange)>,
     texs: Vec<(usize, crate::TexChange)>,
+    paints: Vec<(usize, crate::TexPaint)>,
     /// Every text box call: the block and its spec (none: taken away).
     boxes: Vec<(usize, Option<crate::TextSpec>)>,
     /// Every emitter call: block, entity, values, state.
@@ -168,6 +169,10 @@ impl Host for Rec {
     }
     fn texture_set(&mut self, texture: usize, change: crate::TexChange) {
         self.texs.push((texture, change));
+    }
+    fn texture_paint(&mut self, texture: usize, paint: crate::TexPaint) -> u64 {
+        self.paints.push((texture, paint));
+        64 * 1000
     }
     fn texture_info(&self, texture: usize) -> Option<crate::TexInfo> {
         (texture == 0).then(|| crate::TexInfo {
@@ -2815,6 +2820,50 @@ fn texture_blocks_record_size_and_slot_and_report_info() {
     );
     rt.tick(&mut host);
     assert_eq!(rt.values[pouts[0]], Value::None);
+}
+
+#[test]
+fn write_in_texture_hands_its_pixels_to_the_host() {
+    use crate::TexPaint as P;
+    let (mut rt, _, _) = material_script(
+        proto::WRITE_IN_TEXTURE,
+        vec![
+            ("UV", types::VECTOR2, Value::Vec2([3.0, 20.0])),
+            ("Color", types::COLOR, Value::Color([0.0, 0.5, 1.0, 1.0])),
+            ("Size", types::INT, Value::Int(2)),
+            ("Pen Texture", types::TEXTURE, Value::Obj(None)),
+            ("Write Mode", types::INT, Value::Int(1)),
+        ],
+        &[],
+        &["Out"],
+        Some(2),
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(
+        host.paints,
+        vec![(
+            0,
+            P::Write {
+                uv: [3.0, 20.0],
+                color: [0.0, 0.5, 1.0, 1.0],
+                size: 2,
+                pen: None,
+                mode: 1
+            }
+        )]
+    );
+    // a material is not a texture: nothing is written
+    let (mut rt, _, _) = material_script(
+        proto::WRITE_IN_TEXTURE,
+        vec![("UV", types::VECTOR2, Value::Vec2([0.0, 0.0]))],
+        &[],
+        &["Out"],
+        Some(0),
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert!(host.paints.is_empty());
 }
 
 // ---- text: Text Display, 2D Text and the font blocks ------------------------------------------------------------
