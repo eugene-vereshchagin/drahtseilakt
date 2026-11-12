@@ -15,7 +15,7 @@ pub mod types;
 pub use blocks::proto::SET_TEXTURE;
 pub use exec::{
     CameraChange, CameraState, Ent, Ent2d, EnvChange, FogSpec, Host, MAX_ENTS_2D, MatChange, Quiet, Runtime,
-    SkySpec, SoundCmd, TexChange, TexInfo,
+    SkySpec, SliderSpec, SoundCmd, TexChange, TexInfo,
 };
 pub use input::InputFrame;
 pub use nmo::behavior::Guid;

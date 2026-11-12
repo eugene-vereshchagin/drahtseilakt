@@ -104,11 +104,12 @@ It clones and rewinds with the run. Caps: `MAX_ENTITIES` rows in all (the same l
 - **Hierarchy.** The level file's parent of each entity is read (`level::Object::parent`, from the entity chunk's
   parent reference); a loop or a parent that is no object is dropped. A child stores its transform relative to its
   parent and follows when the parent is moved or turned; moving the child itself sets its world place. Set Parent goes
-  through `Host::set_parent` (a loop is refused); the block comes with stage 4.
+  through `Host::set_parent` (a loop is refused); the **Set Parent** block follows the C: no target entity, nothing; a parent that is
+  no entity unparents; itself is refused; Out otherwise.
 - **Drawing.** Hidden or deleted rows are not drawn; a moved object is drawn at its transform (a child of a moved
   parent at its placement carried along); a copy is drawn with its source's mesh and materials at its own transform,
   only if the source is a plain mesh with a material (not a sprite, not the cloud layer; a copy of a collider is not
-  seen). Object Create (`Host::create`, the block comes with stage 4) draws if it has a mesh, else it only exists.
+  seen). Object Create of a 3D entity class (`Host::create`) is a mesh-less row: it only exists.
 - **Not here.** The collision and the ball read the level as before. The physics of moved and copied objects (static
   bodies added and removed live, followers of a moving parent) is the next task, 3.2. A level without scripts has no
   table and takes the old path unchanged.
@@ -162,7 +163,7 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
 Still not done, most wanted first: **physics by script** for level objects (Physicalize of a floor or a box,
 Physics Impulse, SetPhysicsForce, Set Physics Slider): an object a script moves, shows or hides keeps the body it
 was loaded with, so a platform moved by a script is drawn at its new place and collides at its old one; drawing
-the copies (the portals' particle frames); Attach Script, Object Create; sounds through the sound engine. The test
+the copies (the portals' particle frames); sounds through the sound engine. The test
 player (`--autopilot`) does not know the portals: its way stops at one. A replay of a scripted map recorded
 before this change may play differently (the scripts now do more).
 
@@ -355,7 +356,7 @@ by the engine's.
 | Parameter Selector | `63eb2b0c:27e2767e` | 6 | 20 | done |
 | Add To Group | `00024125:785420ab` | 5 | 11 | done |
 | Rotate | `ffffffee:eeffffff` | 5 | 14 | done |
-| Object Create | `271538e6:2fae49ac` | 4 | 9 | planned |
+| Object Create | `271538e6:2fae49ac` | 4 | 9 | done: a group (empty), data array (no columns), 3D entity row (no mesh) or other object of the class, `Dynamic` kept; capped with copies at 256 |
 | Bezier Progression | `6bb8699a:29fb6a4b` | 4 | 22 | partial: runs as a straight line (the block's 2D curve is not decoded) |
 | Interpolator | `35503950:2dde7a65` | 4 | 11 | done (colours mixed in RGB) |
 | SetPhysicsForce | `56e20c57:0b926068` | 4 | 5 | partial: a world force on a script body; Pos/Direction referentials to world |
@@ -366,7 +367,7 @@ by the engine's.
 | Collection Iterator | `419602ec:7822779e` | 4 | 20 | done |
 | Set Texture | `eb123eb5:5be321be` | 3 | 3 | full: the material's texture in the run |
 | Set Component | `6e800755:57b64acb` | 3 | 12 | done |
-| Set Physics Slider | `2973360e:23d31aa7` | 3 | 3 | planned |
+| Set Physics Slider | `2973360e:23d31aa7` | 3 | 3 | done: the IVP slider between the two script (or level) bodies, retried until both exist |
 | Per Second | `448e54ce:75a655c5` | 3 | 7 | done |
 | Counter | `998f000f:f000f899` | 3 | 9 | done |
 | Binary Memory | `d02d67dd:10211fdd` | 3 | 7 | done |
@@ -391,7 +392,7 @@ by the engine's.
 | Chrono | `5e2f1788:4f965a44` | 2 | 3 | done |
 | Execute Script | `706c5a40:5bb31a0b` | 2 | 9 | done |
 | Send Message | `a20e8d5b:df002150` | 2 | 6 | done |
-| Attach Script | `1dba5f4a:14481212` | 2 | 3 | planned |
+| Attach Script | `1dba5f4a:14481212` | 2 | 3 | done: a copy of the script bound to the target, started as asked; capped at 256 |
 | Clear Array | `35c9352f:7b1a193b` | 2 | 7 | done |
 | Get Delta Time | `47dc3232:64bf203a` | 2 | 3 | done |
 | Play Sound Instance | `00283a35:38ef6b48` | 2 | 7 | done |
@@ -406,7 +407,7 @@ by the engine's.
 | TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
 | Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | partial: accepted, pixels not written |
 | Get SubString | `10b16051:26173b39` | 1 | 1 | planned |
-| Iterator If | `6bec4be6:12d64c7c` | 1 | 2 | planned |
+| Iterator If | `6bec4be6:12d64c7c` | 1 | 2 | done (the C's loop; the oracle has the block) |
 | TT_LinearVolume | `09b335b3:12d17cdc` | 1 | 1 | done |
 | Set Ambient | `aaaaaaaa:aeae1287` | 1 | 1 | never (the engine's own interface) |
 | Set Specular | `20202020:30303030` | 1 | 1 | full |
@@ -418,9 +419,9 @@ by the engine's.
 | Mouse Cursor | `140c3eac:6e502a81` | 1 | 1 | partial: passes the flow, shows or hides the system cursor |
 | Set Pickable | `f1499052:ebe9bbf1` | 1 | 1 | done: named no-op (the player has no picking) |
 | TT_Timer | `6ac67901:7d2a6059` | 1 | 1 | done |
-| Set IC | `72671a24:161a2347` | 1 | 1 | partial: accepted (initial conditions stay as loaded) |
+| Set IC | `72671a24:161a2347` | 1 | 1 | done: place and visibility are saved; Restore IC goes back to them |
 | Remove Row | `1fa57136:14310857` | 1 | 1 | done |
-| Shuffle Order | `270f177a:4ca20023` | 1 | 2 | planned |
+| Shuffle Order | `270f177a:4ca20023` | 1 | 2 | done: Fisher-Yates from the run's seeded generator |
 | Move Row | `101a62f4:6e2d25f6` | 1 | 2 | done (from the notes: the C lacks it) |
 | Set FOV | `aaaacccc:aaaacccc` | 1 | 3 | done: the renderer takes the lens (docs: camera.fov) |
 | TT Restore IC | `7e0f2f58:232d3109` | 1 | 4 | done |
@@ -445,8 +446,8 @@ by the engine's.
 | TT Sky | `36691920:3b261630` | 1 | 1 | partial: the state (sides, colour, radius) is kept in the run and logged; the sky box is not drawn (needs a mesh built at run time) |
 | Get Row | `33b77f41:07b95c45` | 1 | 1 | done |
 | Set As Active Camera | `368f0ab1:2d8957e4` | 1 | 2 | done: the view is placed by the camera object (position, looking along its z) |
-| Physics WakeUp | `38b851b5:72ca74ac` | 1 | 1 | partial: on script bodies |
-| Set Parent | `9d9d9d98:7e7a7f75` | 1 | 1 | planned |
+| Physics WakeUp | `38b851b5:72ca74ac` | 1 | 1 | done (it reaches every body a script can name: its own; the ball is the engine's) |
+| Set Parent | `9d9d9d98:7e7a7f75` | 1 | 1 | done: the entity table's hierarchy (children follow, loops refused) |
 | Scan String | `4afa2f11:034872e2` | 1 | 1 | planned |
 | Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |
 | Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | full: recorded, capped at 2048 x 2048 (the picture is not resampled) |
@@ -466,7 +467,7 @@ by the engine's.
 | Switch On Key | `1f49612e:6cd63de0` | 1 | 2 | done (semantics modelled, not in the C reference) |
 | Wait For All | `c044a999:fdfefaf7` | 1 | 1 | done |
 | Key Waiter | `016d010b:017d010b` | 1 | 1 | done |
-| Delete Dynamic Objects | `0cba3195:53440e4c` | 1 | 1 | planned |
+| Delete Dynamic Objects | `0cba3195:53440e4c` | 1 | 1 | done: deletes what Object Create and Attach Script made dynamic (the C oracle deletes none) |
 | Random Switch | `79d72fde:2e9d0912` | 1 | 1 | done (the same generator) |
 | Explode | `002d010a:003d010a` | 1 | 1 | no-op |
 
@@ -539,3 +540,28 @@ Scripts change the scene's look for the current run only; the state lives in the
 - Camera: Set FOV, Set Clipping Planes and Set As Active Camera reach the frame through `Snapshot` (fov, clip, the
   camera object's matrix).
 - Fonts map to our own font; Set Font Properties keeps scale and colour, not spacing or italics.
+
+## Scene changes (lib-scene)
+
+Object Create, Delete Dynamic Objects, Object Delete of made objects, Set Parent, Attach Script, Set IC, Set Physics
+Slider, Iterator If and Shuffle Order (`blocks/scene.rs`, `blocks/arrays.rs`, `Runtime::create_object`,
+`delete_dynamic`, `attach_script`).
+
+- **Object Create** makes the object in the run's own graph (the level's is untouched). A group (class 23) is a new
+  group index with no members; a data array (52) has no columns; a 3D entity class (33 and below: 3D Frame, Sprite3D,
+  3D Object) is a row of the entity table with no mesh (`Host::create`); any other class is an object the scripts can
+  hold. A level is refused. `Dynamic` (local 0) marks the object for Delete Dynamic Objects. Together with Object Copy
+  at most `MAX_COPIES` (256) objects are made in a run (the refused ones say so once).
+- **Object Delete** of a made group, array or script removes it whole (a group is emptied, an array's rows cleared);
+  of a level group still only notes. **Delete Dynamic Objects** deletes every dynamic one (the C's block is a no-op).
+- **Attach Script** copies a top-level script for the target (nodes paid from the tick's work like Object Copy's, at
+  most `MAX_ATTACHED` = 256 per run), binds `This` to the target, starts it as `Activate?` and `Reset?` say; pOut Created
+  Script. `Dynamic?` scripts go with Delete Dynamic Objects.
+- **Set IC** saves the row's world place and whether it is shown; **Restore IC** puts both back (a row that never had
+  Set IC goes back to its level matrix, as before).
+- **Set Physics Slider** queues `PhysCmd::Slider`; the game applies it with IVP's slider (`World::add_slider_ivp`)
+  between the target's and Object2's bodies (a script's movable or fixed body, or the level's baked one). A missing
+  body waits and is retried each tick (up to 64 waiting, 256 sliders); Destroy or Unphysicalize of either body removes
+  it. A fixed body that a script moves is made again by the physics and loses its slider (not handled).
+- **Iterator If** is the C's loop (`bb_iterator_if`); **Shuffle Order** draws from `Runtime::random`, so a run and
+  its replay shuffle alike.

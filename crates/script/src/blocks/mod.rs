@@ -150,6 +150,13 @@ pub mod proto {
     pub const REMOVE_ROW_IF: Guid = Guid(0x5786_5622, 0x662d_2fee);
     pub const CHANGE_VALUE_IF: Guid = Guid(0x0725_3edb, 0x4d12_37ed);
     pub const OBJECT_RENAME: Guid = Guid(0x6f07_4ca7, 0x4542_7431);
+    pub const OBJECT_CREATE: Guid = Guid(0x2715_38e6, 0x2fae_49ac);
+    pub const DELETE_DYNAMIC_OBJECTS: Guid = Guid(0x0cba_3195, 0x5344_0e4c);
+    pub const SET_PARENT: Guid = Guid(0x9d9d_9d98, 0x7e7a_7f75);
+    pub const ATTACH_SCRIPT: Guid = Guid(0x1dba_5f4a, 0x1448_1212);
+    pub const SET_PHYSICS_SLIDER: Guid = Guid(0x2973_360e, 0x23d3_1aa7);
+    pub const ITERATOR_IF: Guid = Guid(0x6bec_4be6, 0x12d6_4c7c);
+    pub const SHUFFLE_ORDER: Guid = Guid(0x270f_177a, 0x4ca2_0023);
 }
 
 mod absent;
@@ -164,6 +171,7 @@ mod logics;
 mod materials;
 mod narratives;
 mod physics;
+mod scene;
 mod sounds;
 mod transfo3d;
 mod tt_particles;
@@ -325,6 +333,7 @@ pub fn registry() -> &'static [Proto] {
             materials::PROTOS,
             narratives::PROTOS,
             physics::PROTOS,
+            scene::PROTOS,
             sounds::PROTOS,
             transfo3d::PROTOS,
             tt_particles::PROTOS,

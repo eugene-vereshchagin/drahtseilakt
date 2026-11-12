@@ -16,6 +16,8 @@ use crate::{Block, Graph, Guid, Id, Io, Link, Node, ObjKind, Param, Runtime, Val
 use crate::{CameraChange, CameraState};
 use std::sync::Arc;
 
+mod scene;
+
 /// A host that records what the scripts asked of it; two level objects (0 and 1) and the ball.
 #[derive(Default)]
 struct Rec {
@@ -42,6 +44,13 @@ struct Rec {
     boxes: Vec<(usize, Option<crate::TextSpec>)>,
     /// Every emitter call: block, entity, values, state.
     emitters: Vec<(usize, Ent, crate::EmitterSpec, crate::EmitState)>,
+    /// Scene changes: Set Parent calls, Set IC calls, the sliders asked for (key, spec; none: destroyed), the
+    /// objects deleted.
+    parents: Vec<(Ent, Option<Ent>)>,
+    ics: Vec<Ent>,
+    ic_shown: Option<bool>,
+    sliders: Vec<(Ent, Ent, usize, Option<crate::SliderSpec>)>,
+    deleted: Vec<Ent>,
 }
 
 fn ident(x: f32, y: f32, z: f32) -> [[f32; 4]; 4] {
@@ -100,7 +109,27 @@ impl Host for Rec {
         ))
     }
     fn delete(&mut self, e: Ent) {
+        self.deleted.push(e);
         self.set_visible(e, false);
+    }
+    fn set_parent(&mut self, e: Ent, parent: Option<Ent>) -> bool {
+        self.parents.push((e, parent));
+        true
+    }
+    fn create(&mut self, name: &str, _like: Option<Ent>, m: [[f32; 4]; 4]) -> Option<usize> {
+        self.matrices.push(m);
+        self.visible.push(true);
+        self.notes.push(format!("create {name}"));
+        Some(self.matrices.len() - 1)
+    }
+    fn set_ic(&mut self, e: Ent) {
+        self.ics.push(e);
+    }
+    fn ic_visible(&self, _: Ent) -> Option<bool> {
+        self.ic_shown
+    }
+    fn physics_slider(&mut self, e: Ent, e2: Ent, key: usize, create: Option<crate::SliderSpec>) {
+        self.sliders.push((e, e2, key, create));
     }
     fn physicalize(&mut self, _: Ent, _: bool) {}
     fn particles(&mut self, _: Ent, on: bool) {
@@ -112,8 +141,8 @@ impl Host for Rec {
     fn mesh_of(&self, _: Ent) -> Option<usize> {
         None
     }
-    fn group_members(&self, _: usize) -> Vec<usize> {
-        vec![0, 1]
+    fn group_members(&self, group: usize) -> Vec<usize> {
+        if group == 0 { vec![0, 1] } else { Vec::new() }
     }
     fn game_cell(&self, array: &str, row: usize, column: usize) -> Option<Value> {
         (array == "CurrentLevel" && row == 0 && column == 4).then_some(Value::Bool(self.in_play))
@@ -1263,7 +1292,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them), the sounds, the input blocks and the cameras (Set As Active Camera,
     // Set Clipping Planes, Set FOV)
-    assert_eq!(all.len(), 147); // and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp, the five environment and the 11 material blocks
+    assert_eq!(all.len(), 154); // the seven scene blocks (Object Create ... Shuffle Order) and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp, the five environment and the 11 material blocks
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(

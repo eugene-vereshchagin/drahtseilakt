@@ -139,6 +139,17 @@ pub(crate) fn object_delete(
 ) -> Flow {
     if input(rt, b, 0) {
         let o = pin(rt, b, "Object", 0, host).as_obj();
+        // what Object Create made (a group, an array) or Attach Script attached goes whole
+        if let Some(x) = o
+            && !matches!(
+                rt.graph.objects.get(x).map(|i| i.kind),
+                Some(ObjKind::Entity(_) | ObjKind::Ball)
+            )
+            && rt.delete_created(x, host)
+        {
+            out(rt, b, 0);
+            return Flow::Done;
+        }
         match o.and_then(|x| rt.graph.objects.get(x)).map(|i| i.kind) {
             Some(ObjKind::Entity(_)) | Some(ObjKind::Ball) => {
                 if let Some(e) = rt.ent(o) {
@@ -177,6 +188,9 @@ pub(crate) fn restore_ic(
             && let Some(m) = host.initial_matrix(e)
         {
             host.set_matrix(e, m);
+            if let Some(shown) = host.ic_visible(e) {
+                host.set_visible(e, shown);
+            }
         }
         out(rt, b, 0);
     }
@@ -188,10 +202,13 @@ pub(crate) fn set_ic(
     _id: Id,
     b: &Block,
     _proto: Guid,
-    _host: &mut dyn Host,
+    host: &mut dyn Host,
 ) -> Flow {
-    // Looks only, or initial conditions kept as loaded: accepted, nothing to do in this engine.
+    // the target's state now is its initial condition: Restore IC goes back to it
     if input(rt, b, 0) {
+        if let Some(e) = target_ent(rt, b, host) {
+            host.set_ic(e);
+        }
         out(rt, b, 0);
     }
     Flow::Done
@@ -314,7 +331,7 @@ pub(super) const PROTOS: &[Proto] = &[
         pins: &[],
         pouts: &[],
         flags: 0,
-        standing: Standing::Partial,
+        standing: Standing::Full,
         layouts: &[],
         run: set_ic,
         event: None,
