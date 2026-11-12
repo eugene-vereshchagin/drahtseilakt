@@ -1248,6 +1248,10 @@ impl Host for SimHost<'_> {
     fn texture_set(&mut self, texture: usize, change: script::TexChange) {
         self.s.mats.apply_texture(texture, change);
     }
+
+    fn texture_paint(&mut self, texture: usize, paint: script::TexPaint) -> u64 {
+        self.s.mats.paint(texture, paint)
+    }
 }
 
 impl Scripts {

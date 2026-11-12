@@ -3308,6 +3308,8 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
     renderer.fog = game.level.level.settings.fog;
     let loader = |t: &level::Texture, bc: bool| data.texture_plan(t, bc);
+    // where a script's first write into a level texture reads its picture from
+    crate::matstate::set_texture_reader(data.clone());
     let started = std::time::Instant::now();
     renderer.begin_level();
     renderer.add_model(&game.level.level, &loader);
@@ -3523,6 +3525,8 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         .ticks
         .or(game.replay_in.as_ref().map(|r| r.end))
         .unwrap_or(1);
+    // the scripts' texture writes read their pictures from the game's files from the first tick on
+    crate::matstate::set_texture_reader(data.clone());
     let mut prev = Snapshot::of(&game.sim);
     // after the finish the world goes on (the balloon, the end screen)
     while game.sim.tick < ticks && !game.sim.game_over {

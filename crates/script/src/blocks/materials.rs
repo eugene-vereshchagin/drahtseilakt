@@ -1,7 +1,7 @@
 // Materials.dll: materials and textures.
 
 use super::*;
-use crate::exec::{MatChange, TexChange};
+use crate::exec::{MatChange, TexChange, TexPaint};
 
 /// Set 3DSprite Mode: the target 3D sprite's orientation mode (pin Mode: 0 faces the view, 1 and 2 turn about the world
 /// x and y, 3 keeps the sprite's own axes; anything else is ignored).
@@ -313,9 +313,71 @@ pub(crate) fn get_texture_info(
     Flow::Done
 }
 
-/// Blocks accepted and passed through: they write pixels or sprite modes the engine has no draw for.
-pub(crate) fn pass(rt: &mut Runtime, _id: Id, b: &Block, _p: Guid, _host: &mut dyn Host) -> Flow {
+/// Pixels one unit of the tick's work pays for.
+const PIXELS_PER_UNIT: u64 = 64;
+
+fn pay_pixels(rt: &mut Runtime, pixels: u64) {
+    rt.pay(pixels / PIXELS_PER_UNIT + 1);
+}
+
+/// Blend Textures: the target texture takes Texture 1 * (1 - Blend Factor) + Texture 2 * Blend Factor (the factor is
+/// clamped to 0..1).
+pub(crate) fn blend_textures(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _p: Guid,
+    host: &mut dyn Host,
+) -> Flow {
     if input(rt, b, 0) {
+        let target = target_texture(rt, b, host);
+        let a = pin(rt, b, "Texture 1", 0, host).as_obj();
+        let c = pin(rt, b, "Texture 2", 1, host).as_obj();
+        let f = pin(rt, b, "Blend Factor", 2, host).as_float();
+        if let (Some(t), Some(a), Some(c)) = (target, texture_of(rt, a), texture_of(rt, c)) {
+            let factor = if f.is_finite() {
+                f.clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let n = host.texture_paint(t, TexPaint::Blend { a, b: c, factor });
+            pay_pixels(rt, n);
+        }
+        out(rt, b, 0);
+    }
+    Flow::Done
+}
+
+/// Write In Texture: pin UV is the pixel (x, y), Size the side of the square written (a pen texture, when given, is
+/// stretched to it), Color and Write Mode as `game::texpaint` defines them.
+pub(crate) fn write_in_texture(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _p: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    if input(rt, b, 0) {
+        let target = target_texture(rt, b, host);
+        let uv = pin(rt, b, "UV", 0, host).as_vec2();
+        let color = pin(rt, b, "Color", 1, host).as_vec4();
+        let size = pin(rt, b, "Size", 2, host).as_int();
+        let pen = pin(rt, b, "Pen Texture", 3, host).as_obj();
+        let mode = pin(rt, b, "Write Mode", 4, host).as_int();
+        if let Some(t) = target {
+            let pen = texture_of(rt, pen);
+            let n = host.texture_paint(
+                t,
+                TexPaint::Write {
+                    uv,
+                    color,
+                    size,
+                    pen,
+                    mode,
+                },
+            );
+            pay_pixels(rt, n);
+        }
         out(rt, b, 0);
     }
     Flow::Done
@@ -471,8 +533,8 @@ pub(super) const PROTOS: &[Proto] = &[
         &["Texture 1", "Texture 2", "Blend Factor"],
         &[],
         flags::TARGET,
-        Partial,
-        pass
+        Full,
+        blend_textures
     ),
     proto!(
         WRITE_IN_TEXTURE,
@@ -480,8 +542,8 @@ pub(super) const PROTOS: &[Proto] = &[
         &["UV", "Color", "Size", "Pen Texture", "Write Mode"],
         &[],
         flags::TARGET,
-        Partial,
-        pass
+        Full,
+        write_in_texture
     ),
     proto!(
         CHANGE_TEXTURE_VIDEO_FORMAT,

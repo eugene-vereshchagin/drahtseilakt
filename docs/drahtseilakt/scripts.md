@@ -137,13 +137,33 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
   `scene::sprite_matrix` uses it for a 3D sprite.
 - **Partial.** Set Material (the replaced material takes the new one's whole state for every object that uses it, not
   for the target object alone); Set Current Slot (recorded; the nmo reader keeps only a texture's first slot, in
-  `nmo::scene::texture`, so there is no second picture to show); Blend Textures and Write In Texture (accepted: they
-  change pixels, which needs the CPU pixels of a level texture, a per-run copy that rewinds, and a GPU texture handle
-  to upload to; the renderer keeps only views. Two maps use them: Back and Forth, Fierce Battles. Left for a later
-  stage).
+  `nmo::scene::texture`, so there is no second picture to show)).
+- **Full since stage 4.2: Blend Textures and Write In Texture** (below).
 - **Caps.** Only the level's own materials and textures can be named (anything else is ignored, so the table is at most
   as large as the level's); colours are clamped to 0..1, specular power to 0..1000; a texture size to 2048 x 2048; a
   slot to -1..255; a blend mode the engine has no name for is ignored.
+
+### Stage 4.2: pixel writes (Blend Textures, Write In Texture)
+
+- **Copies.** The first write into a level texture makes a per-run CPU copy (`MatState::written`, RGBA at the texture's
+  own size, at most 2048 x 2048, at most 16 MiB of copies together; a write that would not fit is ignored). The
+  picture it starts from is the level's own (embedded pixels, or read from the game's files by `matstate::set_texture_reader`,
+  set when a level is uploaded; a texture nobody has cannot be written into, except that Blend Textures takes the first
+  source's size). The copy shares its pixels (`Arc`) with every clone of the run; a write copies them first, so a
+  clone made before the write (a rewind point) keeps the old picture. Each changed copy has a fresh stamp.
+- **Drawing.** `Renderer::sync_materials` uploads a copy as its own GPU texture when its stamp is not the drawn one
+  (`texture_sync`), builds again the materials that use that texture, and puts the level's view back when the copy is
+  gone (a rewind). A blend that changes nothing keeps its stamp, so a map that blends every tick uploads once.
+- **Blend Textures** (pins Texture 1, Texture 2, Blend Factor): target = T1 * (1 - f) + T2 * f in all four channels, f
+  held to 0..1, the sources stretched (nearest) to the target's size. The factor's meaning (0 = Texture 1) is read from
+  the maps' use (Back and Forth morphs Paper, Stone, Wood in turn); there is no C for it in `src/bb`.
+- **Write In Texture** (UV, Color, Size, Pen Texture, Write Mode): UV is a pixel (x, y); a square of Size pixels
+  (1..256) centred on it, in Color, or the pen texture stretched to it. Write Mode 0 replaces all four channels, 1 (and
+  any other value) replaces the colour and keeps the texture's alpha, 2 mixes by the written alpha, 3 adds. These
+  modes are our reading (the one map uses mode 1 with Size 1); it draws no text.
+- **Work.** Every pixel written is paid from the tick's work budget: one unit per 64 pixels, plus one.
+- **Maps.** Back and Forth reaches full effect. Fierce Battles writes one pixel into a ball texture, which only a
+  level material that draws with that texture shows; it stays partial for its other blocks (3D Text, an Op).
 
 ## Phase 2 (2026-11-11): copies, "This", groups, progressions
 
@@ -412,13 +432,13 @@ by the engine's.
 | Create System Font | `936334fc:f243684f` | 1 | 1 | done: maps to our own font (weight 600+ is bold); no system fonts |
 | Movie Player | `778d16d4:1dd60060` | 1 | 1 | named no-op (said once) |
 | TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
-| Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | partial: accepted, pixels not written |
+| Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | full: writes the run's copy of the target texture (stage 4.2) |
 | Get SubString | `10b16051:26173b39` | 1 | 1 | full: the original's 32-bit index arithmetic, never panics (oracle-checked) |
 | Iterator If | `6bec4be6:12d64c7c` | 1 | 2 | done (the C's loop; the oracle has the block) |
 | TT_LinearVolume | `09b335b3:12d17cdc` | 1 | 1 | done |
 | Set Ambient | `aaaaaaaa:aeae1287` | 1 | 1 | never (the engine's own interface) |
 | Set Specular | `20202020:30303030` | 1 | 1 | full |
-| Write In Texture | `1d57024d:7c064238` | 1 | 1 | never (the engine's own interface) |
+| Write In Texture | `1d57024d:7c064238` | 1 | 1 | full: writes the run's copy of the target texture (stage 4.2) |
 | Show Mouse Cursor | `16f6368f:506b60fc` | 1 | 1 | done (the system cursor only) |
 | Get Nearest Object | `4321abcd:0eeaabdd` | 1 | 1 | no-op |
 | Input String | `693e7e4b:100104c4` | 1 | 1 | done (at most 256 characters; US layout) |

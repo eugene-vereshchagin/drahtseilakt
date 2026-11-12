@@ -152,6 +152,29 @@ pub struct Model {
     keyed: Vec<bool>,
     /// The scripts' changes now drawn, by material (the level's own look otherwise).
     applied: std::collections::BTreeMap<usize, crate::matstate::MatOverride>,
+    /// The textures a script wrote into that are drawn now: by texture, the copy's stamp and the level's own view
+    /// that stands back in when the copy is gone (a rewind).
+    written: std::collections::BTreeMap<usize, (u64, Option<wgpu::TextureView>)>,
+}
+
+/// Which of a run's texture copies the renderer must upload (new, or changed since: by stamp) and which of the
+/// textures it draws a copy of must go back to the level's own (the copy is gone). `copies`: the run's, by texture,
+/// with their stamps; `drawn`: what is drawn now, likewise.
+pub(crate) fn texture_sync(
+    copies: &std::collections::BTreeMap<usize, u64>,
+    drawn: &std::collections::BTreeMap<usize, u64>,
+) -> (Vec<usize>, Vec<usize>) {
+    let upload = copies
+        .iter()
+        .filter(|(t, s)| drawn.get(t) != Some(s))
+        .map(|(&t, _)| t)
+        .collect();
+    let restore = drawn
+        .keys()
+        .copied()
+        .filter(|t| !copies.contains_key(t))
+        .collect();
+    (upload, restore)
 }
 
 /// One thing to draw this frame.
@@ -702,9 +725,94 @@ impl Renderer {
         let Some(m) = self.models.get(model) else {
             return;
         };
-        if state.over.is_empty() && m.applied.is_empty() {
+        if state.over.is_empty()
+            && m.applied.is_empty()
+            && state.written.is_empty()
+            && m.written.is_empty()
+        {
             return;
         }
+        // the textures scripts wrote into: a changed copy is uploaded again, a gone one gives the level's back
+        let stamps = |it: &mut dyn Iterator<Item = (usize, u64)>| it.collect();
+        let copies: std::collections::BTreeMap<usize, u64> =
+            stamps(&mut state.written.iter().map(|(&t, c)| (t, c.stamp)));
+        let drawn: std::collections::BTreeMap<usize, u64> =
+            stamps(&mut m.written.iter().map(|(&t, (s, _))| (t, *s)));
+        let (upload, restore) = texture_sync(&copies, &drawn);
+        if !upload.is_empty() || !restore.is_empty() {
+            let views: Vec<(usize, u64, wgpu::TextureView)> = upload
+                .iter()
+                .filter_map(|t| {
+                    let c = state.written.get(t)?;
+                    let v = upload_texture(
+                        &self.device,
+                        &self.queue,
+                        c.pix.width,
+                        c.pix.height,
+                        c.pix.rgba.to_vec(),
+                    );
+                    Some((*t, c.stamp, v))
+                })
+                .collect();
+            let Some(m) = self.models.get_mut(model) else {
+                return;
+            };
+            for (t, stamp, v) in views {
+                let Some(slot) = m.textures.get_mut(t) else {
+                    continue;
+                };
+                let original = match m.written.remove(&t) {
+                    Some((_, o)) => o,
+                    None => slot.clone(),
+                };
+                *slot = Some(v);
+                m.written.insert(t, (stamp, original));
+            }
+            for t in restore {
+                if let Some((_, original)) = m.written.remove(&t)
+                    && let Some(slot) = m.textures.get_mut(t)
+                {
+                    *slot = original;
+                }
+            }
+            // every material that draws with one of those textures is built again
+            let touched: std::collections::BTreeSet<usize> = upload
+                .iter()
+                .copied()
+                .chain(drawn.keys().copied())
+                .collect();
+            let rebuild: Vec<usize> = (0..state.material_count())
+                .filter(|&i| {
+                    state.effective(i).is_some_and(|mat| {
+                        mat.texture.is_some_and(|t| touched.contains(&t))
+                            || mat.normal.is_some_and(|t| touched.contains(&t))
+                    })
+                })
+                .collect();
+            let Some(m) = self.models.get(model) else {
+                return;
+            };
+            let rebuilt: Vec<(usize, GpuMaterial)> = rebuild
+                .into_iter()
+                .filter_map(|i| {
+                    let mat = state.effective(i)?;
+                    Some((
+                        i,
+                        self.gpu_material(&mat, &m.textures, &m.keyed, state.funcs(i)),
+                    ))
+                })
+                .collect();
+            if let Some(m) = self.models.get_mut(model) {
+                for (i, g) in rebuilt {
+                    if let Some(slot) = m.materials.get_mut(i) {
+                        *slot = g;
+                    }
+                }
+            }
+        }
+        let Some(m) = self.models.get(model) else {
+            return;
+        };
         let mut rebuilt: Vec<(usize, Option<crate::matstate::MatOverride>, GpuMaterial)> =
             Vec::new();
         for (&i, o) in &state.over {
@@ -958,6 +1066,7 @@ impl Renderer {
             textures,
             keyed,
             applied: Default::default(),
+            written: Default::default(),
         });
         self.models.len() - 1
     }
@@ -2040,4 +2149,30 @@ fn upload_texture_data(
         );
     }
     Some(tex.create_view(&Default::default()))
+}
+
+#[cfg(test)]
+mod texture_copy_tests {
+    use super::texture_sync;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn a_copy_is_uploaded_once_and_again_only_when_its_stamp_changes() {
+        let none = BTreeMap::new();
+        let one: BTreeMap<usize, u64> = [(3, 7)].into();
+        // nothing written, nothing drawn: nothing to do
+        assert_eq!(texture_sync(&none, &none), (vec![], vec![]));
+        // a new copy is uploaded
+        assert_eq!(texture_sync(&one, &none), (vec![3], vec![]));
+        // the same stamp drawn: not again
+        assert_eq!(texture_sync(&one, &one), (vec![], vec![]));
+        // a changed copy (a new stamp) is uploaded again
+        let newer: BTreeMap<usize, u64> = [(3, 8)].into();
+        assert_eq!(texture_sync(&newer, &one), (vec![3], vec![]));
+        // a rewind to before any write: the level's own texture goes back
+        assert_eq!(texture_sync(&none, &newer), (vec![], vec![3]));
+        // a rewind to an older copy is uploaded too (its stamp differs from the one drawn)
+        let older: BTreeMap<usize, u64> = [(3, 5)].into();
+        assert_eq!(texture_sync(&older, &newer), (vec![3], vec![]));
+    }
 }
