@@ -1,5 +1,5 @@
 #!/usr/bin/env python3 -I
-"""Builds the player's manual: local HTML pages from the player-facing docs, in en, ru, de and zh.
+"""Builds the player's manual: local HTML pages from the player's manual sources (docs/manual/<lang>/*.md), in en, ru, de and zh.
 
     python3 -I tools/make_manual.py [OUTDIR]        (default: assets/manual)
 
@@ -22,26 +22,24 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 FONTS = ROOT / "assets" / "fonts"
 
-# (code, name in its own language, docs folder)
+# (code, name in its own language, source folder)
 LANGS = [
-    ("en", "English", DOCS / "drahtseilakt"),
-    ("ru", "Русский", DOCS / "ru" / "drahtseilakt"),
-    ("de", "Deutsch", DOCS / "de" / "drahtseilakt"),
-    ("zh", "简体中文", DOCS / "zh" / "drahtseilakt"),
+    ("en", "English", DOCS / "manual" / "en"),
+    ("ru", "Русский", DOCS / "manual" / "ru"),
+    ("de", "Deutsch", DOCS / "manual" / "de"),
+    ("zh", "简体中文", DOCS / "manual" / "zh"),
 ]
 
 # Sections and pages (slug = source file name without .md); the order is the sidebar's.
 SECTIONS = [
-    ("play", ["menu", "levels", "packs", "sound-themes", "mods"]),
-    ("make", ["making-levels", "open-format", "community-maps"]),
+    ("play", ["playing", "levels", "looks", "toolbox", "mods", "sound", "help"]),
 ]
 
 UI = {
     "en": {
         "title": "Drahtseilakt manual",
         "home": "Home",
-        "play": "Playing",
-        "make": "For level makers",
+        "play": "Contents",
         "lang": "Language",
         "untranslated": "This page is not translated into your language yet; it is shown in English.",
         "lead": "A new engine for Ballance, the 2004 game of a ball on a rail over an abyss. It plays the original "
@@ -63,8 +61,7 @@ UI = {
     "ru": {
         "title": "Руководство Drahtseilakt",
         "home": "Главная",
-        "play": "Игра",
-        "make": "Для авторов уровней",
+        "play": "Содержание",
         "lang": "Язык",
         "untranslated": "Эта страница ещё не переведена на ваш язык, она показана по-английски.",
         "lead": "Новый движок для Ballance, игры 2004 года о шаре на рельсе над пропастью. Играет в оригинальные "
@@ -87,8 +84,7 @@ UI = {
     "de": {
         "title": "Drahtseilakt-Anleitung",
         "home": "Start",
-        "play": "Spielen",
-        "make": "Für Levelbauer",
+        "play": "Inhalt",
         "lang": "Sprache",
         "untranslated": "Diese Seite ist noch nicht in Ihre Sprache übersetzt; sie wird auf Englisch gezeigt.",
         "lead": "Eine neue Engine für Ballance, das Spiel von 2004 über eine Kugel auf einer Schiene über dem Abgrund. "
@@ -111,8 +107,7 @@ UI = {
     "zh": {
         "title": "Drahtseilakt 手册",
         "home": "首页",
-        "play": "游玩",
-        "make": "给关卡作者",
+        "play": "目录",
         "lang": "语言",
         "untranslated": "此页尚未翻译成您的语言，以英文显示。",
         "lead": "Ballance（2004 年的游戏，一只球在深渊上的轨道上滚动）的新引擎。可玩您自己拷贝中的原版关卡、"
@@ -207,7 +202,8 @@ tr:last-child td { border-bottom: 0; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
 .untranslated { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: .6rem; padding: .55rem .9rem;
   font-size: .9rem; margin: 0 0 1.4rem; }
-.lead { font-size: 1.2rem; color: var(--muted); margin: 0 0 1.6rem; }
+.lead { font-size: 1.1rem; color: var(--muted); margin: 0 0 1.6rem; }
+.lead p { margin: 0; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; margin: 1rem 0 0; }
 .cards a { display: block; padding: .9rem 1.1rem; border: 1px solid var(--line); border-radius: .8rem; text-decoration: none;
   color: var(--text); background: var(--bg); font-weight: 700; font-family: "Tektur", "Noto Sans", "Noto Sans SC", sans-serif; }
@@ -319,7 +315,7 @@ def shell(lang: str, cur: str, title: str, content: str, titles: dict) -> str:
 """
 
 
-def home(lang: str, titles: dict) -> str:
+def home(lang: str, titles: dict, intro: str = "", rest: str = "") -> str:
     ui = UI[lang]
     rows = "".join(
         f"<tr><td>{html.escape(k)}</td><td>{html.escape(v)}</td></tr>" for k, v in ui["keys"]
@@ -329,9 +325,9 @@ def home(lang: str, titles: dict) -> str:
         for p in pages:
             cards.append(f'<a href="{p}.html">{html.escape(titles[lang][p])}</a>')
     return (
-        f'<h1>{html.escape(ui["title"])}</h1>\n<p class="lead">{html.escape(ui["lead"])}</p>\n'
+        f'<h1>{html.escape(ui["title"])}</h1>\n<div class="lead">{intro or html.escape(ui["lead"])}</div>\n'
         f'<h2>{html.escape(ui["keys_h"])}</h2>\n<div class="tablewrap"><table class="keys">{rows}</table></div>\n'
-        f'<p>{html.escape(ui["keys_n"])}</p>\n'
+        f'<p>{html.escape(ui["keys_n"])}</p>\n{rest}\n'
         f'<h2>{html.escape(ui["pages_h"])}</h2>\n<div class="cards">{"".join(cards)}</div>\n'
     )
 
@@ -404,13 +400,22 @@ def build(out: Path) -> list[str]:
             if code == "zh":
                 zh_text += text
             (out / code / f"{p}.html").write_text(shell(code, p, titles[code][p], body, titles), encoding="utf-8")
-        h = home(code, titles)
-        zh_text += home("zh", titles) if code == "zh" else ""
+        isrc = folder / "index.md"
+        if not isrc.exists():
+            isrc = LANGS[0][2] / "index.md"
+        itext = isrc.read_text(encoding="utf-8")
+        head, _, tail = itext.partition("\n## ")
+        ihead, n = convert(head, code, "index", titles)
+        irest, n2 = convert("## " + tail, code, "index", titles)
+        notes += n + n2
+        h = home(code, titles, ihead, irest)
+        if code == "zh":
+            zh_text += itext + home("zh", titles)
         (out / code / "index.html").write_text(shell(code, "index", UI[code]["home"], h, titles), encoding="utf-8")
     (out / "index.html").write_text(pick_page(), encoding="utf-8")
     css = CSS.replace('url("../fonts/', 'url("fonts/')
     (out / "style.css").write_text(css, encoding="utf-8")
-    zh_text += "".join(UI["zh"][k] for k in ("title", "home", "play", "make", "lang", "untranslated", "lead",
+    zh_text += "".join(UI["zh"][k] for k in ("title", "home", "play", "lang", "untranslated", "lead",
                                              "keys_h", "keys_n", "pages_h", "note_h"))
     zh_text += "".join(a + b for a, b in UI["zh"]["keys"])
     zh_text += "".join(n for _, n, _ in LANGS)

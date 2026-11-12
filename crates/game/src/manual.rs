@@ -92,8 +92,7 @@ mod tests {
             panic!("generator failed: {err}");
         }
         let pages = [
-            "index", "menu", "levels", "packs", "sound-themes", "mods", "making-levels", "open-format",
-            "community-maps",
+            "index", "playing", "levels", "looks", "toolbox", "mods", "sound", "help",
         ];
         for lang in LANGUAGES {
             for p in pages {
