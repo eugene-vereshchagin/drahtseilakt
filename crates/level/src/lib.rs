@@ -8,6 +8,7 @@ pub mod from_nmo;
 pub mod open;
 pub mod script_json;
 pub mod sectorballs;
+pub mod smooth;
 
 /// The module a level object is named after: its name without the trailing `_NN` (digits, then any letters:
 /// `P_Box_03` is `P_Box`, `P_Trafo_Stone_03a` is `P_Trafo_Stone`); a name without one is its own. A copy made in
