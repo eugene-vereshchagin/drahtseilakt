@@ -2082,6 +2082,23 @@ mod body_tests {
     }
 
     #[test]
+    fn a_live_pause_is_recorded_and_a_playback_ignores_live_ones() {
+        use crate::sim::Sim;
+        let level = level::Level::default();
+        let mut sim = Sim::new(&level, crate::sim::BallKind::Wood);
+        sim.notify_pause(true);
+        sim.notify_pause(false);
+        assert_eq!(sim.pauses, [(1, true), (1, false)]);
+        let mut play = Sim::new(&level, crate::sim::BallKind::Wood);
+        play.set_playback_pauses(Some(vec![(2, true)]));
+        play.notify_pause(true);
+        assert!(play.pauses.is_empty(), "live pauses are ignored in playback");
+        play.step(0);
+        play.step(0);
+        assert_eq!(play.pauses, [(2, true)], "delivered at its tick");
+    }
+
+    #[test]
     fn fixed_bodies_are_capped() {
         let mut s = scripts(MAX_SCRIPT_STATICS + 5);
         for k in 0..MAX_SCRIPT_STATICS + 5 {

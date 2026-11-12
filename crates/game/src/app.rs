@@ -255,6 +255,7 @@ impl Game {
         sim.pieces_expire = replay_in.as_ref().is_none_or(|r| r.version >= 3);
         sim.checkpoints_by_name = replay_in.as_ref().is_none_or(|r| r.version >= 4);
         sim.respawn_faces_on = replay_in.as_ref().is_none_or(|r| r.version >= 6);
+        sim.set_playback_pauses(replay_in.as_ref().map(|r| r.pauses.clone()));
         let level_bonus = level.level.settings.level_bonus.unwrap_or(0);
         sim.level_bonus = level_bonus;
         let sound_ticks = std::sync::Arc::new(script_sound_ticks(&sim, data));
@@ -584,6 +585,7 @@ impl Game {
         }
         if let Some(r) = self.replay_in.take() {
             self.replay_out.version = r.version;
+            self.sim.set_playback_pauses(None);
         }
     }
 
@@ -678,6 +680,9 @@ impl Game {
         self.replay_out.record(self.sim.tick, input);
         self.replay_out.record_turn(self.sim.tick, turn);
         self.replay_out.record_frame(self.sim.tick, frame);
+        if self.replay_out.pauses.len() != self.sim.pauses.len() {
+            self.replay_out.record_pauses(&self.sim.pauses);
+        }
         self.log_tick(input);
         self.dump_spin_loss();
         let ball = &self.sim.ball;
