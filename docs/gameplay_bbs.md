@@ -1894,8 +1894,15 @@ the engine's own pixel font, so only what decides *where, how big, what colour* 
   map to one face of ours: the name only identifies the font.
 - **Fit.** Wrapped at spaces and '\n', then shrunk (to 0.6 frame pixels per font pixel), then cut at the box's
   edge. Caps: 64 boxes, 1024 characters per box, 2048 glyphs drawn per frame.
-- **3D Text, Movie Player:** known, do nothing (inputs taken, one log note). 3D Text would need the camera's
-  projection of the object; left for later.
+- **3D Text:** pins as 2D Text's (Font, Text, Alignment, Margins, Offset; Paragraph Indentation, background and
+  caret pins are not read), target a 3D entity. While on, the text is drawn in the world on the entity's place: laid out
+  on its local XY plane (readable looking along +Z), moving with its world matrix, hidden with it. The box is the
+  entity's mesh bounds on X and Y, or, for a dummy, unbounded with the alignment relative to its origin. The font's
+  scale is the line's height: 0.5 world units at scale 1 (the two maps set 10: lines of 5 units; the original's size is
+  not known). Colour = font colour times the entity's first material's diffuse; the material's texture is not used.
+  Our font (Noto Sans / Tektur / Noto Sans SC atlas), depth-tested, alpha-blended, unlit. Caps: 32 texts, 4096
+  characters together, 4096 glyph quads a frame. State is per block in the run (rewinds with it).
+- **Movie Player:** known, does nothing (inputs taken, one log note).
 - Text never affects the simulation: the boxes are only read by the renderer.
 
 ## The game's facade

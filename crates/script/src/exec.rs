@@ -90,6 +90,9 @@ pub trait Host {
     /// engine draws it in a layer under its own interface, in the original's 640x480 frame, with its own font, and
     /// fits it; text never reaches the simulation. A block sends its spec every tick while it is on.
     fn text_box(&mut self, _key: usize, _spec: Option<crate::TextSpec>) {}
+    /// The 3D text of block `key` on entity `e`: shown or changed with a spec, taken away with none. The engine
+    /// draws it in the world on the entity's place (and keeps at most `MAX_TEXT3D` and `MAX_TEXT3D_CHARS`).
+    fn text_3d(&mut self, _key: usize, _on: Option<(Ent, crate::Text3dSpec)>) {}
     /// A line for the log: what a script did, or what the runtime could not do.
     fn note(&mut self, text: &str);
     /// A copy of a level object under a new name (Object Copy): the new object's index, or none when the

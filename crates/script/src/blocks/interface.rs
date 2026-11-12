@@ -1,10 +1,10 @@
 // Interface.dll: 2D text and fonts (docs/fonts.md; the findings the old C gave where it is silent are in
 // docs/gameplay_bbs.md, "Text"). A block's text is a box in the original's 640x480 frame sent to the host
 // (`Host::text_box`, keyed by the block); the engine draws and fits it. Fonts keep only size, weight and colour:
-// the engine draws every font in its own face. 3D Text and Movie Player are named no-ops.
+// the engine draws every font in its own face. Movie Player is a named no-op; 3D Text puts its text in the world (Host::text_3d).
 
 use super::*;
-use crate::{Font, MAX_TEXT_CHARS, TextSpec, text_align};
+use crate::{Font, MAX_TEXT_CHARS, Text3dSpec, TextSpec, text_align};
 
 /// The frame a script's 2D coordinates live in.
 const FRAME: (f32, f32) = (640.0, 480.0);
@@ -265,7 +265,7 @@ pub(crate) fn text_display(
     Flow::Continue
 }
 
-/// A block that is known and draws nothing here (3D Text, Movie Player): inputs taken, said once.
+/// A block that is known and draws nothing here (Movie Player): inputs taken, said once.
 pub(crate) fn named_no_op(
     rt: &mut Runtime,
     _id: Id,
@@ -285,6 +285,69 @@ pub(crate) fn named_no_op(
         );
     }
     Flow::Done
+}
+
+/// 3D Text: while on, the text of pin Text on the target 3D entity's place, in the font of pin Font (its scale is the
+/// line's height in world units), aligned by pin Alignment inside the margins. On -> Exit On; Off -> Exit Off and
+/// the text is gone. Pins Paragraph Indentation, the background and caret ones are not read. Outputs: Line Count.
+pub(crate) fn text_3d(rt: &mut Runtime, id: Id, b: &Block, _p: Guid, host: &mut dyn Host) -> Flow {
+    if input(rt, b, 1) {
+        host.text_3d(id, None);
+        out(rt, b, 1);
+        return Flow::Done;
+    }
+    if input(rt, b, 0) {
+        out(rt, b, 0);
+    }
+    let t = rt.target(b, host);
+    let Some(e) = rt.ent(t) else {
+        return Flow::Continue;
+    };
+    let text = clip(&pin(rt, b, "Text", 1, host).as_string());
+    let font = pin(rt, b, "Font", 0, host).as_int();
+    let align = pin(rt, b, "Alignment", 2, host).as_int();
+    let margins = match pin(rt, b, "Margins", 3, host) {
+        Value::Rect(r) => r,
+        _ => [2.0; 4],
+    };
+    let offset = pin(rt, b, "Offset", 4, host).as_vec2();
+    let (scale, color, bold) = rt
+        .font(font)
+        .map_or(([0.5; 2], [1.0; 4], false), |f| (f.scale, f.color, f.bold));
+    let lines = text.split('\n').count();
+    set_pout(
+        rt,
+        b,
+        "Line Count",
+        1,
+        Value::Int(i32::try_from(lines).unwrap_or(i32::MAX)),
+    );
+    host.text_3d(
+        id,
+        Some((
+            e,
+            Text3dSpec {
+                text,
+                align: u8::try_from(align & 15).unwrap_or(0),
+                scale,
+                margins,
+                offset,
+                bold,
+                color,
+            },
+        )),
+    );
+    Flow::Continue
+}
+
+/// The text goes when the block is reset or its script is deactivated or deleted.
+fn text_3d_event(_rt: &mut Runtime, id: Id, _b: &Block, e: BlockEvent, host: &mut dyn Host) {
+    if matches!(
+        e,
+        BlockEvent::Reset | BlockEvent::DeactivateScript | BlockEvent::Delete
+    ) {
+        host.text_3d(id, None);
+    }
 }
 
 /// The box goes when the block is reset or its script is deactivated or deleted.
@@ -361,10 +424,20 @@ pub(super) const PROTOS: &[Proto] = &[
         proto::TEXT_3D,
         "3D Text",
         Library::Interface,
-        &[],
-        Standing::Partial,
-        named_no_op,
-        None,
+        &[
+            "Font",
+            "Text",
+            "Alignment",
+            "Margins",
+            "Offset",
+            "Paragraph Indentation",
+            "Background Material",
+            "Caret Size",
+            "Caret Material",
+        ],
+        Standing::Full,
+        text_3d,
+        Some(text_3d_event),
     ),
     decl(
         proto::MOVIE_PLAYER,

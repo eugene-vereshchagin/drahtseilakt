@@ -3636,10 +3636,11 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     if snap.kind.is_some() {
         scene::shadows(&game.shadow_receivers, snap.ball, &mut inst);
     }
-    let particles = game.effects.batches(snap.eye, snap.target);
+    let mut particles = game.effects.batches(snap.eye, snap.target);
     if let Some(sc) = &game.sim.scripts {
         r.sync_materials(scene::LEVEL_MODEL, &sc.mats);
     }
+    crate::script_text3d::add(game.sim.scripts.as_ref(), &mut particles, &mut r);
     r.apply_script_sky(scene::LEVEL_MODEL, env.sky.as_ref(), snap.eye, &mut inst);
     r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
     // DRAHTSEILAKT_BENCH=N: draws the frame N times more, with each quality of the clouds, and prints the time a frame
@@ -5019,10 +5020,11 @@ impl App {
             if snap.kind.is_some() {
                 scene::shadows(&g.shadow_receivers, snap.ball, &mut inst);
             }
-            let particles = g.effects.batches(snap.eye, snap.target);
+            let mut particles = g.effects.batches(snap.eye, snap.target);
             if let Some(sc) = &sim.scripts {
                 r.sync_materials(scene::LEVEL_MODEL, &sc.mats);
             }
+            crate::script_text3d::add(sim.scripts.as_ref(), &mut particles, &mut r);
             r.apply_script_sky(
                 scene::LEVEL_MODEL,
                 sim.script_env().sky.as_ref(),
@@ -5971,7 +5973,7 @@ impl App {
             .as_mut()
             .filter(|m| m.model.is_some() && menu_up);
         gpu.renderer.menu_frame = menu_scene.is_some();
-        let (inst, particles, frame_view) = if let Some(ms) = menu_scene {
+        let (inst, mut particles, frame_view) = if let Some(ms) = menu_scene {
             self.menu_ms += f64::from(step) * 1000.0;
             ms.effects.tick_menu(step * 1000.0);
             ms.frame(self.menu_ms)
@@ -6062,6 +6064,11 @@ impl App {
         if let Some(sc) = &self.game.sim.scripts {
             gpu.renderer.sync_materials(scene::LEVEL_MODEL, &sc.mats);
         }
+        crate::script_text3d::add(
+            self.game.sim.scripts.as_ref(),
+            &mut particles,
+            &mut gpu.renderer,
+        );
         gpu.renderer
             .draw(&view, rw, rh, &frame_view, &inst, &particles);
         let drawn = draw_started.elapsed();

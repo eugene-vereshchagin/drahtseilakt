@@ -41,6 +41,9 @@ pub struct Scripts {
     /// The text boxes the map's scripts show now, by the block that shows each (drawn by hud.rs under the interface;
     /// they rewind and restart with the run).
     pub text: Vec<(script::Id, script::TextSpec)>,
+    /// The 3D texts the map's scripts show now, by block (script_text3d.rs draws them on their entities; capped by
+    /// `MAX_TEXT3D` and `MAX_TEXT3D_CHARS`, they rewind and restart with the run).
+    pub text3d: crate::script_text3d::Texts,
     /// The game's facade: the objects of the ball by kind, the run's numbers last seen (for the game's messages),
     /// the sector left last, and what scripts wrote into the game's arrays (kept in the run, never in its rules).
     ball_objs: [Option<script::Id>; 3],
@@ -331,6 +334,7 @@ impl Scripts {
             env: EnvOverride::default(),
             mats: crate::matstate::MatState::new(level),
             text: Vec::new(),
+            text3d: Default::default(),
             ball_objs,
             seen: None,
             left_sector: 0,
@@ -408,6 +412,7 @@ struct ScriptsParts {
     env: EnvOverride,
     mats: crate::matstate::MatState,
     text: Vec<(script::Id, script::TextSpec)>,
+    text3d: crate::script_text3d::Texts,
     ball_objs: [Option<script::Id>; 3],
     left_sector: usize,
     written: BTreeMap<(String, usize, usize), Value>,
@@ -588,7 +593,8 @@ impl Host for SimHost<'_> {
             && self.s.ents.save_ic(i)
         {
             let name = self.s.name(i).to_string();
-            self.s.note(format!("saves the state of {name} as its initial state"));
+            self.s
+                .note(format!("saves the state of {name} as its initial state"));
         }
     }
 
@@ -879,13 +885,7 @@ impl Host for SimHost<'_> {
         }
     }
 
-    fn physics_slider(
-        &mut self,
-        e: Ent,
-        e2: Ent,
-        key: usize,
-        create: Option<script::SliderSpec>,
-    ) {
+    fn physics_slider(&mut self, e: Ent, e2: Ent, key: usize, create: Option<script::SliderSpec>) {
         let (Ent::Object(ent), Ent::Object(other)) = (e, e2) else {
             return;
         };
@@ -1157,6 +1157,10 @@ impl Host for SimHost<'_> {
         }
     }
 
+    fn text_3d(&mut self, key: usize, on: Option<(script::Ent, script::Text3dSpec)>) {
+        self.s.text3d.set(key, on);
+    }
+
     fn note(&mut self, text: &str) {
         self.s.note(text.to_string());
     }
@@ -1355,9 +1359,9 @@ impl Scripts {
                         );
                         continue;
                     }
-                    match world.add_scripted_convex(
-                        &points, m, pos, rot, frozen, collide, shift, &group,
-                    ) {
+                    match world
+                        .add_scripted_convex(&points, m, pos, rot, frozen, collide, shift, &group)
+                    {
                         Some(i) => {
                             self.bodies.insert(ent, Some(i));
                             self.remember_body(ent);
@@ -1518,10 +1522,7 @@ impl Scripts {
                     Some(spec) => {
                         // one slider to a block: a second Create does nothing, as the original's
                         if !self.joints.contains_key(&(ent, key))
-                            && !self
-                                .pending_joints
-                                .iter()
-                                .any(|p| p.0 == ent && p.2 == key)
+                            && !self.pending_joints.iter().any(|p| p.0 == ent && p.2 == key)
                         {
                             self.make_slider(world, ent, other, key, spec, tick);
                         }
@@ -1711,6 +1712,7 @@ impl Scripts {
             env: std::mem::take(&mut self.env),
             mats: std::mem::take(&mut self.mats),
             text: std::mem::take(&mut self.text),
+            text3d: std::mem::take(&mut self.text3d),
             ball_objs: self.ball_objs,
             left_sector: self.left_sector,
             written: std::mem::take(&mut self.written),
@@ -1734,6 +1736,7 @@ impl Scripts {
         self.env = parts.env;
         self.mats = parts.mats;
         self.text = parts.text;
+        self.text3d = parts.text3d;
         self.written = parts.written;
         self.emitters = parts.emitters;
         self.bodies = parts.bodies;
@@ -1824,6 +1827,7 @@ mod facade_tests {
                 env: EnvOverride::default(),
                 mats: Default::default(),
                 text: vec![],
+                text3d: Default::default(),
                 ball_objs: s.ball_objs,
                 left_sector: 0,
                 written: std::mem::take(&mut s.written),
@@ -1881,6 +1885,7 @@ mod facade_tests {
                 env: std::mem::take(&mut s.env),
                 mats: std::mem::take(&mut s.mats),
                 text: vec![],
+                text3d: Default::default(),
                 ball_objs: s.ball_objs,
                 left_sector: 0,
                 written: BTreeMap::new(),
@@ -2229,7 +2234,14 @@ mod body_tests {
         });
         run(&mut s, &mut w, 2);
         assert!(s.joints.is_empty() && s.pending_joints.len() == 1);
-        physicalize(&mut s, 1, &script::PhysSpec { fixed: true, ..spec() });
+        physicalize(
+            &mut s,
+            1,
+            &script::PhysSpec {
+                fixed: true,
+                ..spec()
+            },
+        );
         run(&mut s, &mut w, 2);
         assert_eq!(s.joints.len(), 1, "made once the other body exists");
         assert!(s.pending_joints.is_empty());
@@ -2431,8 +2443,12 @@ mod body_tests {
         let b = ball_above(&mut w);
         // row 0's own body is the 200 x 200 floor at y = 0 here: move the object 500 along x and the floor goes too
         run(&mut s, &mut w, 120);
-        assert!(ball_y(&w, b) > 0.0 && ball_y(&w, b) < 3.0, "rests on the floor");
-        s.ents.set_world(0, Mat4::from_translation(Vec3::new(500.0, 5.0, 0.0)));
+        assert!(
+            ball_y(&w, b) > 0.0 && ball_y(&w, b) < 3.0,
+            "rests on the floor"
+        );
+        s.ents
+            .set_world(0, Mat4::from_translation(Vec3::new(500.0, 5.0, 0.0)));
         w.wake(b);
         run(&mut s, &mut w, 120);
         assert!(ball_y(&w, b) < -10.0, "the floor went with its object");
@@ -2441,7 +2457,11 @@ mod body_tests {
         let c = ball_above(&mut w);
         w.teleport(c, Vec3::new(500.0, 12.0, 0.0), glam::Quat::IDENTITY);
         run(&mut s, &mut w, 180);
-        assert!(ball_y(&w, c) > 0.0 && ball_y(&w, c) < 3.0, "y = {}", ball_y(&w, c));
+        assert!(
+            ball_y(&w, c) > 0.0 && ball_y(&w, c) < 3.0,
+            "y = {}",
+            ball_y(&w, c)
+        );
         // a level without moved objects keeps its body where it was
         let mut s2 = scripts(1);
         let mut w2 = World::new(&floor());
@@ -2457,15 +2477,24 @@ mod body_tests {
         let mut w = World::new(&floor());
         physicalize(&mut s, 0, &spec());
         run(&mut s, &mut w, 240);
-        s.ents.set_world(0, Mat4::from_translation(Vec3::new(30.0, 20.0, 0.0)));
+        s.ents
+            .set_world(0, Mat4::from_translation(Vec3::new(30.0, 20.0, 0.0)));
         s.apply_physics(&mut w, 0);
         let b = s.bodies[&0].expect("body");
         let st = w.state(b).expect("state");
-        assert!((st.pos - Vec3::new(30.0, 20.0, 0.0)).length() < 1e-3, "{:?}", st.pos);
+        assert!(
+            (st.pos - Vec3::new(30.0, 20.0, 0.0)).length() < 1e-3,
+            "{:?}",
+            st.pos
+        );
         run(&mut s, &mut w, 240);
         let m = s.ents.world(0).unwrap();
         assert!((m.w_axis.x - 30.0).abs() < 2.0, "x = {}", m.w_axis.x);
-        assert!((m.w_axis.y - 1.0).abs() < 0.2, "it fell onto the floor again, y = {}", m.w_axis.y);
+        assert!(
+            (m.w_axis.y - 1.0).abs() < 0.2,
+            "it fell onto the floor again, y = {}",
+            m.w_axis.y
+        );
     }
 
     #[test]
@@ -2500,8 +2529,10 @@ mod body_tests {
         let stack = |group: &str| {
             let mut s = scripts(2);
             let mut w = World::new(&floor());
-            s.ents.set_world(0, Mat4::from_translation(Vec3::new(0.0, 5.0, 0.0)));
-            s.ents.set_world(1, Mat4::from_translation(Vec3::new(0.0, 9.0, 0.0)));
+            s.ents
+                .set_world(0, Mat4::from_translation(Vec3::new(0.0, 5.0, 0.0)));
+            s.ents
+                .set_world(1, Mat4::from_translation(Vec3::new(0.0, 9.0, 0.0)));
             let sp = script::PhysSpec {
                 group: group.into(),
                 ..spec()
@@ -2514,7 +2545,10 @@ mod body_tests {
         let (a, b) = stack("");
         assert!(b > a + 1.5, "no group: stacked, {a} {b}");
         let (a, b) = stack("Pile");
-        assert!((a - 1.0).abs() < 0.2 && (b - 1.0).abs() < 0.2, "same group: both on the floor, {a} {b}");
+        assert!(
+            (a - 1.0).abs() < 0.2 && (b - 1.0).abs() < 0.2,
+            "same group: both on the floor, {a} {b}"
+        );
     }
 
     #[test]
@@ -2544,7 +2578,10 @@ mod body_tests {
         let mut play = Sim::new(&level, crate::sim::BallKind::Wood);
         play.set_playback_pauses(Some(vec![(2, true)]));
         play.notify_pause(true);
-        assert!(play.pauses.is_empty(), "live pauses are ignored in playback");
+        assert!(
+            play.pauses.is_empty(),
+            "live pauses are ignored in playback"
+        );
         play.step(0);
         play.step(0);
         assert_eq!(play.pauses, [(2, true)], "delivered at its tick");

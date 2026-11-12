@@ -1357,6 +1357,7 @@ impl Renderer {
             let (src, dst) = match key.0 {
                 PBlend::AlphaAdd => (wgpu::BlendFactor::SrcAlpha, wgpu::BlendFactor::One),
                 PBlend::OneSrcColor => (wgpu::BlendFactor::One, wgpu::BlendFactor::Src),
+                PBlend::Alpha => (wgpu::BlendFactor::SrcAlpha, wgpu::BlendFactor::OneMinusSrcAlpha),
             };
             let c = wgpu::BlendComponent { src_factor: src, dst_factor: dst, operation: wgpu::BlendOperation::Add };
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
