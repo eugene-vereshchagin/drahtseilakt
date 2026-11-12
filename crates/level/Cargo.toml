@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 nmo = { path = "../nmo" }
 script = { path = "../script" }
+glam = "=0.34.1"
 serde_json = "=1.0.154"
 
 [lints]
