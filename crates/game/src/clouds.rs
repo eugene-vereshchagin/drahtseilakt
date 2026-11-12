@@ -100,6 +100,41 @@ pub struct Pass {
     bind: Option<(wgpu::BindGroup, u32, u32)>,
 }
 
+/// The sea of cloud under a level that names a sky with a land below it (Mountains, Forest, Mist, Desert) and has no
+/// sea of its own: a stranger's map made without the toolkit would show that land (a green swamp from far above)
+/// instead of clouds. Lit like the toolkit's (`levelkit.py` CLOUD_SEA, `sky_light.json`): Mist takes Forest's light,
+/// Desert Mountains'. A closed sea (`under` 1: nothing below it shows through). None for any other sky.
+pub fn default_sea(sky: &str, lowest: f32) -> Option<level::Clouds> {
+    let (sun, sun_color, sky_c, shadow) = match sky {
+        "Mountains" | "Desert" => (
+            [0.742, 0.224, 0.632],
+            [2.6, 2.461, 2.051],
+            [0.1448, 0.1718, 0.26],
+            [0.1322, 0.1074, 0.1926],
+        ),
+        "Forest" | "Mist" => (
+            [0.3771, 0.7422, 0.554],
+            [2.5903, 2.6, 2.4851],
+            [0.1998, 0.2428, 0.4016],
+            [0.1824, 0.1517, 0.2975],
+        ),
+        _ => return None,
+    };
+    Some(level::Clouds {
+        top: lowest - 35.0,
+        thickness: 110.0,
+        cover: 0.8,
+        scale: 85.0,
+        sun,
+        sun_color,
+        sky: sky_c,
+        shadow,
+        haze: 0.0005,
+        under: 1.0,
+        wind: level::Clouds::DEFAULT.wind,
+    })
+}
+
 /// What the level's layer looks like this run: its settings, the haze round the horizon (the sky's colour just above
 /// it, RGBA8, gamma) and its average.
 pub struct Layer {

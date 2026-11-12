@@ -202,7 +202,9 @@ which the land shows far below. The level kit writes it into the level's setting
 `make_skies.py`) and its table (`levelkit.py`, `CLOUD_SEA`); a level changes it with
 `clouds cover C below B thickness T size S` (any of them: how much of it is cloud, 0..1; its tops B under the lowest
 floor, 35 if not given; T deep, 110; a cloud S across, 85) or has none with `clouds off`. The original's levels have
-none. The settings file's `cloud-quality` (`low`, `medium` (the default), `high`; `off` draws none) sets how finely
+none. A level that names one of those four land skies but carries no `clouds` of its own (a converted map) is drawn
+over a closed sea of cloud (`clouds::default_sea`), so the sky box's land (a green swamp from far above) never shows.
+The settings file's `cloud-quality` (`low`, `medium` (the default), `high`; `off` draws none) sets how finely
 it is drawn, and *Clouds?* off hides it as well ([menu.md](menu.md)). On an RTX 3060 at 2560×1440 it costs about
 3.5, 4.5 and 6 ms a frame (low, medium, high).
 `make_skies.py` makes `Sunset` and `Clouds` with only haze below the horizon: their sea of cloud is the game's,

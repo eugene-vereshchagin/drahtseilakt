@@ -3414,7 +3414,11 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     }
     // the sea of cloud, fading far off into the sky's own colour at the horizon; it takes the place of the level's
     // flat cloud layer (SkyLayer)
-    renderer.clouds = game.level.level.settings.clouds.and_then(|settings| {
+    let sea = game.level.level.settings.clouds.or_else(|| {
+        let sky = game.level.level.sky.as_deref()?;
+        crate::clouds::default_sea(sky, game.sim.lowest_floor())
+    });
+    renderer.clouds = sea.and_then(|settings| {
         let faces: Vec<_> = sky
             .textures
             .iter()
