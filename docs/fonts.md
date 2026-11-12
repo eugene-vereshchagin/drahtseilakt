@@ -542,3 +542,10 @@ Game: 67 uses, all All_Menu.
 - Whether the Level debug scripts (Create System Font, Text Display, "show Version", "Show Evaluation
   Copy") ever run in the retail game is not checked.
 - The texture-stage state `0x27` set to 4 in `FUN_25391a30` is not identified. It is irrelevant for us.
+
+## Two-line menu labels
+
+A menu label too long for one line is broken at the space nearest its middle. The two lines advance by the cell
+height less 22 % (the font's cell is much taller than its capitals, so the full advance left a wide gap between the
+lines and little above and below), and the block is centred in the button by the glyphs actually drawn, so the space
+above the first line equals the space below the second. Single-line labels are unchanged.
