@@ -189,7 +189,7 @@ static STATE: Mutex<Option<State>> = Mutex::new(None);
 fn playing(themes: &[Theme], wanted: Option<&str>) -> String {
     let found = |k: &str| themes.iter().any(|t| t.key == k);
     match wanted {
-        Some(w) if found(w) || w == ORIGINAL => w.to_owned(),
+        Some(w) if found(w) || (w == ORIGINAL && crate::resources::have_copy()) => w.to_owned(),
         _ if found(DEFAULT) => DEFAULT.to_owned(),
         _ => SYSTEM.to_owned(),
     }
@@ -241,7 +241,8 @@ pub fn chosen() -> String {
 pub fn choose(key: &str) {
     if let Ok(mut s) = STATE.lock()
         && let Some(s) = s.as_mut()
-        && (s.themes.iter().any(|t| t.key == key) || key == ORIGINAL)
+        && (s.themes.iter().any(|t| t.key == key)
+            || (key == ORIGINAL && crate::resources::have_copy()))
     {
         s.chosen = key.to_owned();
         s.wanted = Some(key.to_owned());
@@ -263,10 +264,11 @@ pub fn plays_copy() -> bool {
     c == ORIGINAL && !themes().iter().any(|t| t.key == ORIGINAL)
 }
 
-/// The keys that can be chosen, in order: the themes found, and "original" when it has no folder yet.
+/// The keys that can be chosen, in order: the themes found, and "original" when it has no folder yet and a copy exists.
 pub fn choices() -> Vec<String> {
     let mut keys: Vec<String> = themes().into_iter().map(|t| t.key).collect();
-    if !keys.iter().any(|k| k == ORIGINAL) {
+    // "original" plays the player's copy: without a copy it is not offered (as the look choice hides Original)
+    if !keys.iter().any(|k| k == ORIGINAL) && crate::resources::have_copy() {
         keys.push(ORIGINAL.to_owned());
     }
     keys
