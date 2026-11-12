@@ -25,9 +25,11 @@ pub struct MatOverride {
     pub texture: Option<Option<usize>>,
     pub blend: Option<Option<(Blend, Blend)>>,
     pub z_write: Option<bool>,
-    /// Virtools' compare function (1..8); recorded, the renderer's depth test stays "less or equal".
+    /// Virtools' compare function of the depth test (1..8); the renderer's pipelines use it.
     pub z_func: Option<u8>,
     pub alpha_cutoff: Option<Option<f32>>,
+    /// Virtools' compare function of the alpha test (1..8); 5, greater, is what the level's own use.
+    pub alpha_func: Option<u8>,
     pub two_sided: Option<bool>,
 }
 
@@ -135,6 +137,16 @@ impl MatState {
         Some(m)
     }
 
+    /// The depth test's and the alpha test's compare functions of the material as drawn now.
+    pub fn funcs(&self, index: usize) -> (u8, u8) {
+        let o = self.over.get(&index);
+        (
+            o.and_then(|o| o.z_func).unwrap_or(crate::render::Z_FUNC_DEFAULT),
+            o.and_then(|o| o.alpha_func)
+                .unwrap_or(crate::render::ALPHA_FUNC_DEFAULT),
+        )
+    }
+
     pub fn apply(&mut self, material: usize, change: MatChange) {
         if material >= self.base.len() {
             return;
@@ -176,6 +188,7 @@ impl MatState {
                     z_write: Some(m.z_write),
                     z_func: self.over.get(&from).and_then(|o| o.z_func),
                     alpha_cutoff: Some(m.alpha_cutoff),
+                    alpha_func: self.over.get(&from).and_then(|o| o.alpha_func),
                     two_sided: Some(m.two_sided),
                 };
             }
@@ -194,8 +207,15 @@ impl MatState {
                     cur.z_func = Some(func);
                 }
             }
-            MatChange::AlphaTest { on, reference, .. } => {
+            MatChange::AlphaTest {
+                on,
+                reference,
+                func,
+            } => {
                 cur.alpha_cutoff = Some(on.then(|| f32::from(reference) / 255.0));
+                if (1..=8).contains(&func) {
+                    cur.alpha_func = Some(func);
+                }
             }
         }
         if self.over.get(&material) != Some(&cur) {
@@ -329,6 +349,8 @@ mod tests {
         assert_eq!(m.blend, Some((Blend::SrcAlpha, Blend::InvSrcAlpha)));
         assert!(!m.z_write);
         assert_eq!(s.over[&0].z_func, Some(4));
+        assert_eq!(s.funcs(0), (4, 7));
+        assert_eq!(s.funcs(1), (4, 5), "an untouched material keeps the level's tests");
         assert!((m.alpha_cutoff.unwrap() - 0.2).abs() < 1e-6);
         s.apply(
             0,

@@ -403,7 +403,7 @@ pub(super) const PROTOS: &[Proto] = &[
         &["Z Buffer Write", "Z Compare Function"],
         &[],
         flags::TARGET,
-        Partial,
+        Full,
         set_z_buffer
     ),
     proto!(
@@ -416,7 +416,7 @@ pub(super) const PROTOS: &[Proto] = &[
         ],
         &[],
         flags::TARGET,
-        Partial,
+        Full,
         set_alpha_test
     ),
     proto!(

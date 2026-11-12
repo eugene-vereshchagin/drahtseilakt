@@ -55,6 +55,8 @@ struct MaterialUniform {
     ambient: [f32; 4],
     /// rgb: the highlight's colour; a: its power (0: none).
     specular: [f32; 4],
+    /// x: the alpha test's function (Virtools' 1..8).
+    funcs: [f32; 4],
 }
 
 /// The scene's light as the original sets it (Gameplay.nmo's Light_Ingame, a directional light, and the scene
@@ -95,6 +97,28 @@ struct GpuMesh {
 struct PipelineKey {
     blend: Option<(Blend, Blend)>,
     z_write: bool,
+    /// Virtools' compare function of the depth test (1..8); the level's own is 4, "less or equal".
+    z_func: u8,
+}
+
+/// The depth test the level's materials have, and the alpha test's function (greater): what drawing did before scripts.
+pub const Z_FUNC_DEFAULT: u8 = 4;
+pub const ALPHA_FUNC_DEFAULT: u8 = 5;
+/// At most this many pipelines are kept; past it a script's depth function falls back to the default one.
+const MAX_PIPELINES: usize = 96;
+
+/// The depth test of Virtools' compare function number (1 never .. 8 always); a number out of range: less or equal.
+fn compare(func: u8) -> wgpu::CompareFunction {
+    match func {
+        1 => wgpu::CompareFunction::Never,
+        2 => wgpu::CompareFunction::Less,
+        3 => wgpu::CompareFunction::Equal,
+        5 => wgpu::CompareFunction::Greater,
+        6 => wgpu::CompareFunction::NotEqual,
+        7 => wgpu::CompareFunction::GreaterEqual,
+        8 => wgpu::CompareFunction::Always,
+        _ => wgpu::CompareFunction::LessEqual,
+    }
 }
 
 struct GpuMaterial {
@@ -553,6 +577,7 @@ impl Renderer {
         m: &level::Material,
         textures: &[Option<wgpu::TextureView>],
         keyed: &[bool],
+        funcs: (u8, u8),
     ) -> GpuMaterial {
         let view = m
             .texture
@@ -604,6 +629,7 @@ impl Renderer {
                 },
             ],
             specular: [m.specular[0], m.specular[1], m.specular[2], m.power],
+            funcs: [f32::from(funcs.1), 0.0, 0.0, 0.0],
         };
         let buf = self
             .device
@@ -641,6 +667,7 @@ impl Renderer {
             key: PipelineKey {
                 blend: m.blend,
                 z_write: m.z_write || m.blend.is_none(),
+                z_func: funcs.0,
             },
         }
     }
@@ -664,7 +691,7 @@ impl Renderer {
                 rebuilt.push((
                     i,
                     Some(o.clone()),
-                    self.gpu_material(&mat, &m.textures, &m.keyed),
+                    self.gpu_material(&mat, &m.textures, &m.keyed, state.funcs(i)),
                 ));
             }
         }
@@ -672,7 +699,11 @@ impl Renderer {
             if !state.over.contains_key(&i)
                 && let Some(mat) = state.effective(i)
             {
-                rebuilt.push((i, None, self.gpu_material(&mat, &m.textures, &m.keyed)));
+                rebuilt.push((
+                    i,
+                    None,
+                    self.gpu_material(&mat, &m.textures, &m.keyed, state.funcs(i)),
+                ));
             }
         }
         let Some(m) = self.models.get_mut(model) else {
@@ -687,6 +718,93 @@ impl Renderer {
                 None => m.applied.remove(&i),
             };
         }
+    }
+
+    /// A mesh on the GPU: its vertices, a part per material and a pass per material channel. A part without a material
+    /// uses `default_material`.
+    fn gpu_mesh(&self, m: &level::Mesh, default_material: usize) -> Option<GpuMesh> {
+        if m.positions.is_empty() {
+            return None;
+        }
+        let tangents = tangents(m);
+        let vertices: Vec<Vertex> = (0..m.positions.len())
+            .map(|i| Vertex {
+                pos: m.positions.get(i).copied().unwrap_or_default(),
+                normal: m.normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]),
+                uv: m.uvs.get(i).copied().unwrap_or_default(),
+                tangent: tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]),
+            })
+            .collect();
+        let vertex = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&m.name),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let mut parts: Vec<GpuPart> = m
+            .parts
+            .iter()
+            .filter(|p| !p.indices.is_empty())
+            .map(|p| GpuPart {
+                index: self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some(&m.name),
+                        contents: bytemuck::cast_slice(&p.indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    }),
+                count: p.indices.len() as u32,
+                material: p.material.unwrap_or(default_material),
+                channel: None,
+            })
+            .collect();
+        // the material channels: every face again, with the channel's material, coordinates and blend
+        let all: Vec<u32> = m
+            .parts
+            .iter()
+            .flat_map(|p| p.indices.iter().copied())
+            .collect();
+        for c in &m.channels {
+            if all.is_empty() || c.material >= default_material {
+                continue;
+            }
+            let vertices: Vec<Vertex> = vertices
+                .iter()
+                .enumerate()
+                .map(|(i, v)| Vertex {
+                    uv: c.uvs.get(i).copied().unwrap_or_default(),
+                    ..*v
+                })
+                .collect();
+            let buf = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(&m.name),
+                    contents: bytemuck::cast_slice(&vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            parts.push(GpuPart {
+                index: self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some(&m.name),
+                        contents: bytemuck::cast_slice(&all),
+                        usage: wgpu::BufferUsages::INDEX,
+                    }),
+                count: all.len() as u32,
+                material: c.material,
+                channel: Some((
+                    buf,
+                    PipelineKey {
+                        blend: Some(c.blend),
+                        z_write: false,
+                        z_func: Z_FUNC_DEFAULT,
+                    },
+                )),
+            });
+        }
+        Some(GpuMesh { vertex, parts })
     }
 
     /// Uploads a model; returns its index for `Instance::model`.
@@ -750,7 +868,7 @@ impl Renderer {
         let materials = level
             .materials
             .iter()
-            .map(|m| self.gpu_material(m, &textures, &keyed))
+            .map(|m| self.gpu_material(m, &textures, &keyed, (Z_FUNC_DEFAULT, ALPHA_FUNC_DEFAULT)))
             .collect::<Vec<_>>();
         // A part without a material is drawn with a plain white one, kept at the end.
         let default_material = materials.len();
@@ -762,89 +880,7 @@ impl Renderer {
             .iter()
             // a mesh with a finer look (a remastered level's) is drawn as that look
             .map(|m| m.look.as_deref().unwrap_or(m))
-            .map(|m| {
-                if m.positions.is_empty() {
-                    return None;
-                }
-                let tangents = tangents(m);
-                let vertices: Vec<Vertex> = (0..m.positions.len())
-                    .map(|i| Vertex {
-                        pos: m.positions.get(i).copied().unwrap_or_default(),
-                        normal: m.normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]),
-                        uv: m.uvs.get(i).copied().unwrap_or_default(),
-                        tangent: tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]),
-                    })
-                    .collect();
-                let vertex = self
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some(&m.name),
-                        contents: bytemuck::cast_slice(&vertices),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
-                let mut parts: Vec<GpuPart> = m
-                    .parts
-                    .iter()
-                    .filter(|p| !p.indices.is_empty())
-                    .map(|p| GpuPart {
-                        index: self
-                            .device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some(&m.name),
-                                contents: bytemuck::cast_slice(&p.indices),
-                                usage: wgpu::BufferUsages::INDEX,
-                            }),
-                        count: p.indices.len() as u32,
-                        material: p.material.unwrap_or(default_material),
-                        channel: None,
-                    })
-                    .collect();
-                // the material channels: every face again, with the channel's material, coordinates and blend
-                let all: Vec<u32> = m
-                    .parts
-                    .iter()
-                    .flat_map(|p| p.indices.iter().copied())
-                    .collect();
-                for c in &m.channels {
-                    if all.is_empty() || c.material >= default_material {
-                        continue;
-                    }
-                    let vertices: Vec<Vertex> = vertices
-                        .iter()
-                        .enumerate()
-                        .map(|(i, v)| Vertex {
-                            uv: c.uvs.get(i).copied().unwrap_or_default(),
-                            ..*v
-                        })
-                        .collect();
-                    let buf = self
-                        .device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some(&m.name),
-                            contents: bytemuck::cast_slice(&vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
-                    parts.push(GpuPart {
-                        index: self
-                            .device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some(&m.name),
-                                contents: bytemuck::cast_slice(&all),
-                                usage: wgpu::BufferUsages::INDEX,
-                            }),
-                        count: all.len() as u32,
-                        material: c.material,
-                        channel: Some((
-                            buf,
-                            PipelineKey {
-                                blend: Some(c.blend),
-                                z_write: false,
-                            },
-                        )),
-                    });
-                }
-                Some(GpuMesh { vertex, parts })
-            })
+            .map(|m| self.gpu_mesh(m, default_material))
             .collect();
         self.models.push(Model {
             meshes,
@@ -867,6 +903,7 @@ impl Renderer {
             params: [-1.0, 1.0, 0.0, 0.0],
             ambient: [0.0; 4],
             specular: [0.0; 4],
+            funcs: [f32::from(ALPHA_FUNC_DEFAULT), 0.0, 0.0, 0.0],
         };
         let buf = self
             .device
@@ -902,6 +939,7 @@ impl Renderer {
             key: PipelineKey {
                 blend: Some((Blend::Zero, Blend::SrcColor)),
                 z_write: false,
+                z_func: Z_FUNC_DEFAULT,
             },
         });
     }
@@ -913,6 +951,7 @@ impl Renderer {
             params: [-1.0, if marker { 1.0 } else { 0.0 }, 0.0, 0.0],
             ambient: [0.0; 4],
             specular: [0.0; 4],
+            funcs: [f32::from(ALPHA_FUNC_DEFAULT), 0.0, 0.0, 0.0],
         };
         let buf = self
             .device
@@ -948,6 +987,7 @@ impl Renderer {
             key: PipelineKey {
                 blend: marker.then_some((Blend::SrcAlpha, Blend::InvSrcAlpha)),
                 z_write: !marker,
+                z_func: Z_FUNC_DEFAULT,
             },
         }
     }
@@ -998,7 +1038,7 @@ impl Renderer {
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: DEPTH_FORMAT,
                     depth_write_enabled: Some(key.z_write),
-                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    depth_compare: Some(compare(key.z_func)),
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
@@ -1414,6 +1454,15 @@ impl Renderer {
                     Some(k) => opaque.push((0.0, i, p, k)),
                     None => {}
                 }
+            }
+        }
+        // a script's depth function not seen before, with the pipelines at their cap, is drawn with the default one
+        for d in opaque.iter_mut().chain(blended.iter_mut()) {
+            if d.3.z_func != Z_FUNC_DEFAULT
+                && !self.pipelines.contains_key(&d.3)
+                && self.pipelines.len() >= MAX_PIPELINES
+            {
+                d.3.z_func = Z_FUNC_DEFAULT;
             }
         }
         blended.sort_by(|a, b| b.0.total_cmp(&a.0));

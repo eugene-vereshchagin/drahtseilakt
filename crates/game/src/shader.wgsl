@@ -42,6 +42,8 @@ struct Material {
     ambient: vec4<f32>,
     // rgb: the highlight's colour; a: its power (0: none).
     specular: vec4<f32>,
+    // x: the alpha test's function (Virtools' 1 never .. 8 always; 5, greater, is the usual one).
+    funcs: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> g: Globals;
@@ -127,6 +129,21 @@ fn sample_tex(t: texture_2d<f32>, uv: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>, m
     return select(textureSample(t, samp, uv), textureSampleGrad(t, samp, uv, dx, dy), moved);
 }
 
+// Whether the alpha test lets a pixel of alpha `a` through against the reference `r` (Virtools' compare functions).
+fn alpha_passes(a: f32, r: f32, f: f32) -> bool {
+    let k = i32(f + 0.5);
+    switch k {
+        case 1: { return false; }
+        case 2: { return a < r; }
+        case 3: { return abs(a - r) < 0.002; }
+        case 4: { return a <= r; }
+        case 6: { return abs(a - r) >= 0.002; }
+        case 7: { return a >= r; }
+        case 8: { return true; }
+        default: { return a > r; }
+    }
+}
+
 @fragment
 fn fs(in: VsOut) -> @location(0) vec4<f32> {
     let uv_dx = dpdx(in.uv);
@@ -180,7 +197,7 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         diffuse = inst.diffuse;
     }
     let color = base * diffuse;
-    if mat.params.x >= 0.0 && color.a <= mat.params.x {
+    if mat.params.x >= 0.0 && !alpha_passes(color.a, mat.params.x, mat.funcs.x) {
         discard;
     }
     if mat.params.y > 0.5 || inst.uv.z > 0.5 {
