@@ -139,6 +139,7 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::RenderFpsCap(e)
         | Action::RenderColourBits(e)
         | Action::RenderSupports(e)
+        | Action::RenderPlain(e)
         | Action::Decoys(e)
         | Action::BallDeform(e)
         | Action::SetSector(e)
@@ -460,6 +461,7 @@ impl ViewMods {
                     Action::RenderColourBits(_) => {
                         out.look.colour_bits = if x.round() == 16.0 { 16 } else { 0 }
                     }
+                    Action::RenderPlain(_) => out.look.plain = x >= 0.5,
                     Action::RenderSupports(_) => {
                         out.look.supports = match x.round() as i32 {
                             1 => crate::supports::PLAIN,

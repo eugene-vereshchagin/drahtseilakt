@@ -47,6 +47,12 @@ turned by 45 degrees. Pro Racing seasons are not of this kind: they are new geom
 
 ## A level is a folder
 
+**Remastered sets (2026-11-12).** The shipped levels come pre-remastered by the toolbox: an open-format folder carries
+its rounded `look` meshes, upscaled pictures (with `.dtx` and normal maps beside) and the plain originals in
+`textures.original/`; a `.nmo` map carries a sidecar `<map>.remaster/` (an open-format level made from it) whose looks
+the game puts on the map's meshes by name when it loads the map. The Back to 2004 look (`render.plain`) draws both
+as they were made. A sidecar is not a level of its own: deeper folders are not looked at.
+
 *Owner's decision of 2026-11-03* (decisions.md, "A level is a folder"). `community/` and `open/` (and `remastered/`) hold
 levels, not whatever an archive unpacked: the custom levels menu shows a flat list of levels, sorted by difficulty
 and title, and no folders to open. Everything a level's author and a player need to know is gathered on

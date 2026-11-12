@@ -457,6 +457,9 @@ pub enum Action {
     /// The supports drawn under the swinging sacks' holders: 0 none, 1 one design for all, 2 the designs varied
     /// (view only; the game's own parts have them, crates/game/src/supports.rs).
     RenderSupports(Expr),
+    /// The plain originals (0 or 1): the shapes and pictures of the level as its original has them, without the
+    /// rounding and upscaling it ships with (view only; the game draws the level again when it changes).
+    RenderPlain(Expr),
     /// So many translucent decoy balls wandering around the ball (0 to 8; view only).
     Decoys(Expr),
     /// The wooden ball's look deformed at random, 0 (round) to 1 (view only; the physics keeps its round ball).
@@ -555,6 +558,7 @@ impl Action {
             | Action::RenderFpsCap(e)
             | Action::RenderColourBits(e)
             | Action::RenderSupports(e)
+            | Action::RenderPlain(e)
             | Action::Decoys(e)
             | Action::BallDeform(e)
             | Action::SetSector(e)
@@ -1297,6 +1301,7 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "render.fps_cap" => Action::RenderFpsCap(e(args)?),
         "render.colour_bits" => Action::RenderColourBits(e(args)?),
         "render.supports" => Action::RenderSupports(e(args)?),
+        "render.plain" => Action::RenderPlain(e(args)?),
         "steer.yaw" => Action::SteerYaw(e(args)?),
         "view.turn" => Action::ViewTurn(e(args)?),
         "decoys" => Action::Decoys(e(args)?),
@@ -2000,6 +2005,8 @@ mod tests {
             supports.rules[0].actions[0],
             Action::RenderSupports(_)
         ));
+        let plain = parse_mod_txt("name.en P\non frame\ndo render.plain 1\n").unwrap();
+        assert!(matches!(plain.rules[0].actions[0], Action::RenderPlain(_)) && !plain.modded());
         assert!(parse_mod_txt("name.en S\ndefault maybe\n").is_err());
         assert!(
             parse_mod_txt("name.en S\non tick\ndo render.supports 1\n").is_err(),
