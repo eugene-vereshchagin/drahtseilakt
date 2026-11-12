@@ -436,7 +436,7 @@ by the engine's.
 | Set Blend Modes | `2f572a66:6a9a0088` | 2 | 5 | planned |
 | Set Material Z Buffer | `1144022f:68fd055c` | 2 | 5 | done (stage 4.1): the depth function is drawn |
 | Create System Font | `936334fc:f243684f` | 1 | 1 | done: maps to our own font (weight 600+ is bold); no system fonts |
-| Movie Player | `778d16d4:1dd60060` | 1 | 1 | named no-op (said once) |
+| Movie Player | `778d16d4:1dd60060` | 1 | 1 | full: animates the target texture's slots over Duration ms; Loop; One Loop Played at each pass end (`materials.rs`) |
 | TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
 | Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | full: writes the run's copy of the target texture (stage 4.2) |
 | Get SubString | `10b16051:26173b39` | 1 | 1 | full: the original's 32-bit index arithmetic, never panics (oracle-checked) |
@@ -551,8 +551,7 @@ blocks, the blocks beyond the template, the blocks not covered, and whether phas
    (expressions), Row Search, Sort Rows, Move / Remove Row, Insert Column, Has / Set Attribute, Objects With
    Attribute Iterator, Iterator If, Get Message Data, Execute / Attach Script, Scan String, Create String, Get
    SubString, To Lower Keys, Renamer.
-7. **Never** (the plan's list as first written; Edit 2D Entity and TT Sky were drawn later, in stage 4.1): Movie Player and
-   (3D Text now draws in the world), Write In Texture, Set As Active Camera, Set Clipping Planes: the game's own interface and camera take
+7. **Never** (the plan's list as first written; Edit 2D Entity and TT Sky were drawn later, in stage 4.1): Write In Texture, Set As Active Camera, Set Clipping Planes: the game's own interface and camera take
    their place; a map that needs them for play is reported by name.
 
 Semantics not knowable from the files, to be checked against the original by playing: the exact frame a

@@ -3186,18 +3186,103 @@ fn font_blocks_make_fonts_and_set_their_properties() {
     assert_eq!(rt.fonts[0].color, [0.1, 0.2, 0.3, 1.0]);
 }
 
+/// A Movie Player on texture 0 with the given pins, started by the script's start input; returns the runtime,
+/// the block, its script and its Current Slot output parameter. Its One Loop Played output is linked to a probe
+/// input (the last id returned), so a test can count the passes.
+fn movie_rig(duration: f32, looping: bool, start: i32, end: i32) -> (Runtime, Id, Id, Id, Id) {
+    let mut b = Build::new();
+    let owner = b.g.add_object("Owner", ObjKind::Other);
+    let t0 = b.g.add_object("T0", ObjKind::Texture(0));
+    let target = b.local("Target", types::OBJECT, Value::Obj(Some(t0)));
+    let pins: Vec<Id> = [
+        ("Duration", types::FLOAT, Value::Float(duration)),
+        ("Loop", types::BOOL, Value::Bool(looping)),
+        ("Starting Slot", types::INT, Value::Int(start)),
+        ("Ending Slot", types::INT, Value::Int(end)),
+    ]
+    .iter()
+    .map(|(n, g, v)| {
+        let l = b.local(n, *g, v.clone());
+        b.pin(n, *g, l)
+    })
+    .collect();
+    let pout = b.pout("Current Slot", types::INT);
+    let elapsed = b.local("Elapsed", types::FLOAT, Value::Float(0.0));
+    let blk = b.bb(
+        "Movie",
+        proto::MOVIE_PLAYER,
+        &["On", "Off"],
+        &["Synchro Out", "One Loop Played"],
+        pins,
+        vec![pout],
+        vec![elapsed],
+        Some(target),
+    );
+    let probe = b.io("Probe");
+    let start_io = b.io("Start");
+    let links = vec![
+        b.link(start_io, in_of(&b.g, blk, 0), 0),
+        b.link(out_of(&b.g, blk, 1), probe, 1),
+    ];
+    let script = b.script("S", Some(owner), start_io, vec![blk], links);
+    (Runtime::new(b.done()), blk, script, pout, probe)
+}
+
 #[test]
-fn movie_player_is_a_named_no_op() {
-    for p in [proto::MOVIE_PLAYER] {
-        let (mut rt, _) = text_rig(p, &["In"], &["Out"], &[], &[], 27);
-        let mut host = Rec::new();
+fn movie_player_steps_the_texture_through_its_slots() {
+    use crate::TexChange as T;
+    let (mut rt, _, script, pout, _) = movie_rig(1000.0, false, 0, 3);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.texs, vec![(0, T::Slot(0))], "On shows the Starting Slot");
+    for _ in 0..70 {
         rt.tick(&mut host);
-        assert!(host.boxes.is_empty());
-        assert!(
-            host.notes.iter().any(|n| n.contains("does nothing")),
-            "said once"
-        );
     }
+    let slots: Vec<i32> = host
+        .texs
+        .iter()
+        .map(|(_, c)| match c {
+            T::Slot(s) => *s,
+            other => panic!("unexpected change {other:?}"),
+        })
+        .collect();
+    assert_eq!(slots, vec![0, 1, 2, 3], "one change per slot, in order");
+    assert_eq!(rt.values[pout], Value::Int(3), "Current Slot ends on Ending Slot");
+    assert!(!rt.is_active(script), "one pass without Loop stops the block");
+}
+
+#[test]
+fn movie_player_fires_one_loop_played_and_loops() {
+    let (mut rt, _, script, _, probe) = movie_rig(100.0, true, 0, 1);
+    let mut host = Rec::new();
+    let mut passes = 0;
+    for _ in 0..40 {
+        rt.tick(&mut host);
+        if rt.io_active(probe) {
+            passes += 1;
+            rt.set_io(probe, false);
+        }
+    }
+    assert!(passes >= 5, "One Loop Played fires at the end of each pass, got {passes}");
+    assert!(rt.is_active(script), "Loop keeps the block running");
+}
+
+#[test]
+fn movie_player_off_stops_it() {
+    let (mut rt, blk, script, _, _) = movie_rig(1000.0, true, 0, 3);
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    for _ in 0..5 {
+        rt.tick(&mut host);
+    }
+    let before = host.texs.len();
+    rt.set_io(in_of(&rt.graph, blk, 1), true);
+    rt.tick(&mut host);
+    assert!(!rt.is_active(script), "Off stops the block");
+    for _ in 0..30 {
+        rt.tick(&mut host);
+    }
+    assert_eq!(host.texs.len(), before, "no slot changes after Off");
 }
 
 /// A planar emitter block on object 0 with the given pin values, its three inputs and a script that starts it.
