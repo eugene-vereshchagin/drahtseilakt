@@ -945,6 +945,11 @@ pub(crate) const POINTS_EVERY: u64 = 30;
 const DEPTH_PHASE: u64 = 3;
 
 impl Sim {
+    /// The top of the lowest floor of the level (only used to place a sea of cloud under it).
+    pub fn lowest_floor(&self) -> f32 {
+        self.rules.death_y + 60.0
+    }
+
     /// A run of a level without its modules' physics (their placeholders are solid).
     #[cfg(test)]
     pub fn new(level: &Level, start_ball: BallKind) -> Sim {
