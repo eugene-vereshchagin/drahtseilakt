@@ -372,6 +372,12 @@ Features the content never uses:
   level object is in the physics only because something physicalized it (the base scripts' `Physicalize_Floors`
   etc.), and a second Physicalize on a physicalized object changes nothing (above); the baked body is that first
   one. Its Unphysicalize removes the baked body.
+- **Moved objects with bodies of their own** (2026-11-12). A level object with a baked body that a script moves
+  (also through a moved parent) carries the body along: the run takes the change of the object's matrix (new times
+  inverse of the last one the body was placed by, the loaded one at first) and makes the baked body again at the moved
+  pose, in the same slot of the statics (`World::move_baked`). A script body (movable) whose object a script moved is
+  teleported: made again at the new pose, at rest and awake, its SetPhysicsForce forces re-made (`World::teleport`).
+  Levels whose scripts move nothing are untouched.
 - Limits per run: 1024 fixed bodies by script, 65536 triangles per body (a bigger mesh makes none), 1024 hull points.
   Bodies made by script are part of the run's state: the world and the script state clone and rewind together, the
   slots are never reused, and every walk is in object-row order.

@@ -109,6 +109,17 @@ pub struct World {
     baked_rows: std::collections::BTreeMap<usize, usize>,
     /// The fixed bodies scripts made at run time, by handle (slots are never reused): see `add_static_*`.
     script_statics: Vec<Option<ScriptStatic>>,
+    /// What is needed to make a baked body again somewhere else (a script moved its object), by IVP body.
+    baked_info: std::collections::BTreeMap<usize, BakedInfo>,
+}
+
+/// A level object's baked fixed body, kept so that it can follow its object.
+#[derive(Clone)]
+struct BakedInfo {
+    surface: std::sync::Arc<Surface>,
+    pos: Vec3,
+    rot: Quat,
+    group: [u8; 8],
 }
 
 /// A fixed body made by a script: kept whole so that it can be put somewhere else (the body is made again, at the
@@ -228,6 +239,7 @@ impl World {
             baked_of_mesh: Vec::new(),
             baked_rows: std::collections::BTreeMap::new(),
             script_statics: Vec::new(),
+            baked_info: std::collections::BTreeMap::new(),
         };
         for mesh in statics {
             let ledges: Vec<ledge::Ledge> = mesh
@@ -246,11 +258,21 @@ impl World {
                 group: group(mesh.group),
                 ..BodyDesc::default()
             };
+            let kept = std::sync::Arc::new(surface.clone());
             let id = world.physics.add_body(
                 desc,
                 Shape::Surface(surface),
                 vec3_f64(mesh.pos),
                 mesh.rot.ivp(),
+            );
+            world.baked_info.insert(
+                id,
+                BakedInfo {
+                    surface: kept,
+                    pos: mesh.pos,
+                    rot: mesh.rot.quat(),
+                    group: group(mesh.group),
+                },
             );
             world.baked_of_mesh.push(Some(id));
             world
@@ -283,8 +305,73 @@ impl World {
             return false;
         };
         self.statics.retain(|s| s.0 != id);
+        self.baked_info.remove(&id);
         self.physics.body_destroy(id);
         true
+    }
+
+    /// The rows that still have their baked body, in row order.
+    pub fn baked_row_list(&self) -> Vec<usize> {
+        self.baked_rows.keys().copied().collect()
+    }
+
+    /// Carries the baked body of object `row` along with its object, which a script moved by `delta` (the new world
+    /// matrix times the inverse of the old). The body is made again in the same slot of the statics.
+    pub fn move_baked(&mut self, row: usize, delta: glam::Mat4) {
+        let Some(&old) = self.baked_rows.get(&row) else {
+            return;
+        };
+        let Some(mut info) = self.baked_info.remove(&old) else {
+            return;
+        };
+        let basis = glam::Mat3::from_cols(
+            delta.x_axis.truncate().normalize_or_zero(),
+            delta.y_axis.truncate().normalize_or_zero(),
+            delta.z_axis.truncate().normalize_or_zero(),
+        );
+        let turn = Quat::from_mat3(&basis).normalize();
+        let pos = delta.transform_point3(info.pos);
+        if !(pos.is_finite() && turn.is_finite()) {
+            self.baked_info.insert(old, info);
+            return;
+        }
+        info.pos = pos;
+        info.rot = (turn * info.rot).normalize();
+        self.physics.body_destroy(old);
+        let desc = BodyDesc {
+            fixed: true,
+            friction: SURFACE_FRICTION,
+            elasticity: SURFACE_ELASTICITY,
+            group: info.group,
+            ..BodyDesc::default()
+        };
+        let id = self.physics.add_body(
+            desc,
+            Shape::Surface((*info.surface).clone()),
+            vec3_f64(info.pos),
+            ivp_quat(info.rot),
+        );
+        if let Some(e) = self.statics.iter_mut().find(|x| x.0 == old) {
+            e.0 = id;
+        }
+        self.baked_rows.insert(row, id);
+        self.baked_info.insert(id, info);
+    }
+
+    /// Puts game body `i` (a script's movable body) at another place at rest, as the original does when a script
+    /// sets the position of a physicalized object: the body is made again there, awake.
+    pub fn teleport(&mut self, i: usize, pos: Vec3, rot: Quat) {
+        if !matches!(self.handles.get(i), Some(Some(_))) {
+            return;
+        }
+        let Some(Some(s)) = self.spawns.get_mut(i) else {
+            return;
+        };
+        s.pos = pos;
+        s.rot = Rot::Quat(rot);
+        s.frozen = false;
+        self.remove(i);
+        self.activate(i);
     }
 
     /// A fixed body made at run time from triangles in the object's own frame (scale baked in), at `pos`/`rot`

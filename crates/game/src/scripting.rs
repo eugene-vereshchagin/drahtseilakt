@@ -50,7 +50,12 @@ pub struct Scripts {
     /// command is queued). A BTreeMap, so every walk over it is in row order, never in hash order.
     pub bodies: BTreeMap<usize, Option<usize>>,
     /// The forces scripts made: (entity row, block) -> the world's force.
-    forces: BTreeMap<(usize, usize), usize>,
+    forces: BTreeMap<(usize, usize), (usize, Vec3, Vec3)>,
+    /// The matrix each script body's object had when the physics last wrote it (or the body was made): a different
+    /// matrix later means a script moved the object, and the body is put there.
+    body_last: BTreeMap<usize, Mat4>,
+    /// The matrix each moved level object's baked body was last put by (absent: as loaded).
+    baked_last: BTreeMap<usize, Mat4>,
     /// What the scripts asked of the physics this tick, in graph order; the run applies it (`apply_physics`).
     queue: Vec<PhysCmd>,
     /// Bodies made by scripts so far (slots in the world are never reused, so this bounds them).
@@ -274,6 +279,8 @@ impl Scripts {
             emitters: BTreeMap::new(),
             bodies: BTreeMap::new(),
             forces: BTreeMap::new(),
+            body_last: BTreeMap::new(),
+            baked_last: BTreeMap::new(),
             queue: Vec::new(),
             made: 0,
             noted_static: Vec::new(),
@@ -1101,6 +1108,7 @@ impl Scripts {
                     }
                     let i = world.add_sphere(radius, m, pos, rot, !frozen);
                     self.bodies.insert(ent, Some(i));
+                    self.remember_body(ent);
                     note(
                         &mut self.log,
                         format!(
@@ -1130,6 +1138,7 @@ impl Scripts {
                     match world.add_scripted_convex(&points, m, pos, rot, frozen, collide, shift) {
                         Some(i) => {
                             self.bodies.insert(ent, Some(i));
+                            self.remember_body(ent);
                             note(
                                 &mut self.log,
                                 format!(
@@ -1214,6 +1223,8 @@ impl Scripts {
                         self.forces.remove(&k);
                     }
                     self.bodies.remove(&ent);
+                    self.body_last.remove(&ent);
+                    self.baked_last.remove(&ent);
                     if let Some(h) = fixed {
                         world.remove_static(h);
                     }
@@ -1243,9 +1254,9 @@ impl Scripts {
                         if !self.forces.contains_key(&(ent, key))
                             && let Some(c) = world.add_force(i, force, at)
                         {
-                            self.forces.insert((ent, key), c);
+                            self.forces.insert((ent, key), (c, at, force));
                         }
-                    } else if let Some(c) = self.forces.remove(&(ent, key)) {
+                    } else if let Some((c, _, _)) = self.forces.remove(&(ent, key)) {
                         world.remove_force(c);
                     }
                 }
@@ -1262,6 +1273,63 @@ impl Scripts {
             }
         }
         self.follow_statics(world);
+        self.follow_bodies(world);
+    }
+
+    fn remember_body(&mut self, ent: usize) {
+        if let Some(m) = self.ents.world(ent) {
+            self.body_last.insert(ent, m);
+        }
+    }
+
+    /// Bodies of the level and of scripts follow their objects when a script moved them: a baked fixed body is put
+    /// where the object went, a movable body is teleported (at rest, its forces carried over).
+    fn follow_bodies(&mut self, world: &mut crate::physics::World) {
+        let bits = |m: &Mat4| m.to_cols_array().map(f32::to_bits);
+        for row in world.baked_row_list() {
+            let (Some(cur), Some(init)) = (self.ents.world(row), self.ents.initial(row)) else {
+                continue;
+            };
+            let last = self.baked_last.get(&row).copied().unwrap_or(init);
+            if bits(&cur) == bits(&last) {
+                continue;
+            }
+            let delta = cur * last.inverse();
+            if delta.is_finite() {
+                world.move_baked(row, delta);
+            }
+            self.baked_last.insert(row, cur);
+        }
+        let moved: Vec<(usize, usize, Mat4)> = self
+            .bodies
+            .iter()
+            .filter_map(|(&ent, &b)| {
+                let cur = self.ents.world(ent)?;
+                let last = self.body_last.get(&ent)?;
+                (bits(&cur) != bits(last)).then_some((ent, b?, cur))
+            })
+            .collect();
+        for (ent, body, cur) in moved {
+            self.body_last.insert(ent, cur);
+            let Some((pos, rot, _)) = pose_of(&cur) else {
+                continue;
+            };
+            let keys: Vec<(usize, usize)> =
+                self.forces.keys().filter(|k| k.0 == ent).copied().collect();
+            for k in &keys {
+                if let Some((c, _, _)) = self.forces.get(k) {
+                    world.remove_force(*c);
+                }
+            }
+            world.teleport(body, pos, rot);
+            for k in keys {
+                if let Some((_, at, force)) = self.forces.get(&k).copied()
+                    && let Some(c) = world.add_force(body, force, at)
+                {
+                    self.forces.insert(k, (c, at, force));
+                }
+            }
+        }
     }
 
     /// Fixed bodies follow their objects: one whose object a script moved is put at the new place.
@@ -1287,8 +1355,12 @@ impl Scripts {
             if let Some(i) = body
                 && let Some(s) = world.state(i)
             {
-                self.ents
-                    .set_world(ent, Mat4::from_rotation_translation(s.rot, s.pos));
+                let m = Mat4::from_rotation_translation(s.rot, s.pos);
+                self.ents.set_world(ent, m);
+                // read back what the table holds now (a child's matrix goes through its parent)
+                if let Some(w) = self.ents.world(ent) {
+                    self.body_last.insert(ent, w);
+                }
             }
         }
     }
@@ -1851,6 +1923,51 @@ mod body_tests {
         let na = a.floor_near(Vec3::new(0.0, 0.0, 0.0), 50.0);
         let nb = b.floor_near(Vec3::new(0.0, 0.0, 0.0), 50.0);
         assert_eq!(na, nb);
+    }
+
+    #[test]
+    fn a_baked_body_follows_its_moved_object() {
+        let mut s = scripts(1);
+        let mut w = World::new(&floor());
+        w.tag_baked(&[0]);
+        let b = ball_above(&mut w);
+        // row 0's own body is the 200 x 200 floor at y = 0 here: move the object 500 along x and the floor goes too
+        run(&mut s, &mut w, 120);
+        assert!(ball_y(&w, b) > 0.0 && ball_y(&w, b) < 3.0, "rests on the floor");
+        s.ents.set_world(0, Mat4::from_translation(Vec3::new(500.0, 5.0, 0.0)));
+        w.wake(b);
+        run(&mut s, &mut w, 120);
+        assert!(ball_y(&w, b) < -10.0, "the floor went with its object");
+        assert!(w.has_baked(0));
+        // and a ball dropped over the new place lands on it
+        let c = ball_above(&mut w);
+        w.teleport(c, Vec3::new(500.0, 12.0, 0.0), glam::Quat::IDENTITY);
+        run(&mut s, &mut w, 180);
+        assert!(ball_y(&w, c) > 0.0 && ball_y(&w, c) < 3.0, "y = {}", ball_y(&w, c));
+        // a level without moved objects keeps its body where it was
+        let mut s2 = scripts(1);
+        let mut w2 = World::new(&floor());
+        w2.tag_baked(&[0]);
+        let b2 = ball_above(&mut w2);
+        run(&mut s2, &mut w2, 240);
+        assert!(ball_y(&w2, b2) > 0.0);
+    }
+
+    #[test]
+    fn a_script_body_moved_by_a_script_is_teleported() {
+        let mut s = scripts(1);
+        let mut w = World::new(&floor());
+        physicalize(&mut s, 0, &spec());
+        run(&mut s, &mut w, 240);
+        s.ents.set_world(0, Mat4::from_translation(Vec3::new(30.0, 20.0, 0.0)));
+        s.apply_physics(&mut w, 0);
+        let b = s.bodies[&0].expect("body");
+        let st = w.state(b).expect("state");
+        assert!((st.pos - Vec3::new(30.0, 20.0, 0.0)).length() < 1e-3, "{:?}", st.pos);
+        run(&mut s, &mut w, 240);
+        let m = s.ents.world(0).unwrap();
+        assert!((m.w_axis.x - 30.0).abs() < 2.0, "x = {}", m.w_axis.x);
+        assert!((m.w_axis.y - 1.0).abs() < 0.2, "it fell onto the floor again, y = {}", m.w_axis.y);
     }
 
     #[test]
