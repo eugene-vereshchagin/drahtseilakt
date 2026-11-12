@@ -11,6 +11,44 @@ use wgpu::util::DeviceExt;
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 const UNIFORM_ALIGN: u64 = 256;
 
+/// Anti-aliasing is always on (4 samples a pixel; fewer where the adapter cannot): the most the adapter does for the
+/// formats the game draws with (1, 2 or 4). The mod back-to-2004 turns it off with the mipmaps (`RenderLook::filter`).
+static MSAA_MAX: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
+const MSAA_WANTED: u32 = 4;
+
+/// Tells the renderer what the adapter can do (before the first frame).
+pub fn note_adapter(adapter: &wgpu::Adapter) {
+    let ok = |f: wgpu::TextureFormat, n: u32| {
+        adapter
+            .get_texture_format_features(f)
+            .flags
+            .sample_count_supported(n)
+    };
+    let both = |n: u32| {
+        [
+            wgpu::TextureFormat::Rgba8Unorm,
+            wgpu::TextureFormat::Bgra8Unorm,
+            DEPTH_FORMAT,
+        ]
+        .into_iter()
+        .all(|f| ok(f, n))
+    };
+    let max = [4, 2].into_iter().find(|&n| both(n)).unwrap_or(1);
+    MSAA_MAX.store(max, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The samples a pixel to draw with: 4 down to what the adapter does, none for the 2004 look.
+fn samples_now(look: &RenderLook) -> u32 {
+    if look.filter != 0 {
+        return 1;
+    }
+    let max = MSAA_MAX.load(std::sync::atomic::Ordering::Relaxed);
+    [4, 2, 1]
+        .into_iter()
+        .find(|&n| n <= MSAA_WANTED && n <= max)
+        .unwrap_or(1)
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
@@ -405,6 +443,9 @@ pub struct Renderer {
     /// The original's 2D interface: its pipeline over the frame (named textures, alpha blended, no depth).
     ui_pipeline: wgpu::RenderPipeline,
     clamp: wgpu::Sampler,
+    /// The samples a pixel the pipelines, the depth and the colour target were made for.
+    samples: u32,
+    msaa: Option<(wgpu::TextureView, u32, u32)>,
     /// How a view mod wants the picture to look (a 2004 PC's: low resolution, plain filtering, banded colour).
     pub look: RenderLook,
     /// The colour behind everything (the sky's zenith).
@@ -615,6 +656,8 @@ impl Renderer {
             particle_white,
             ui_pipeline,
             clamp,
+            samples: 1,
+            msaa: None,
             look: RenderLook::default(),
             clear: wgpu::Color {
                 r: 0.4,
@@ -1184,8 +1227,13 @@ impl Renderer {
     }
 
     fn pipeline(&mut self, key: PipelineKey) -> &wgpu::RenderPipeline {
-        let (device, shader, layout, format) =
-            (&self.device, &self.shader, &self.layout, self.format);
+        let (device, shader, layout, format, samples) = (
+            &self.device,
+            &self.shader,
+            &self.layout,
+            self.format,
+            self.samples,
+        );
         self.pipelines.entry(key).or_insert_with(|| {
             let factor = |b: Blend| match b {
                 Blend::Zero => wgpu::BlendFactor::Zero,
@@ -1233,7 +1281,10 @@ impl Renderer {
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
-                multisample: Default::default(),
+                multisample: wgpu::MultisampleState {
+                    count: samples,
+                    ..Default::default()
+                },
                 fragment: Some(wgpu::FragmentState {
                     module: shader,
                     entry_point: Some("fs"),
@@ -1369,11 +1420,12 @@ impl Renderer {
     }
 
     fn particle_pipeline(&mut self, key: (PBlend, bool)) {
-        let (device, shader, layout, format) = (
+        let (device, shader, layout, format, samples) = (
             &self.device,
             &self.particle_shader,
             &self.particle_layout,
             self.format,
+            self.samples,
         );
         self.particle_pipelines.entry(key).or_insert_with(|| {
             let (src, dst) = match key.0 {
@@ -1407,7 +1459,10 @@ impl Renderer {
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
-                multisample: Default::default(),
+                multisample: wgpu::MultisampleState {
+                    count: samples,
+                    ..Default::default()
+                },
                 fragment: Some(wgpu::FragmentState {
                     module: shader,
                     entry_point: Some("fs"),
@@ -1424,6 +1479,45 @@ impl Renderer {
         });
     }
 
+    /// Takes the anti-aliasing the look allows this frame: another sample count makes the pipelines, the
+    /// depth and the cloud pass again.
+    fn sync_quality(&mut self) {
+        let samples = samples_now(&self.look);
+        if samples != self.samples {
+            self.samples = samples;
+            self.pipelines.clear();
+            self.particle_pipelines.clear();
+            self.depth = None;
+            self.msaa = None;
+            self.cloud_pass = None;
+        }
+    }
+
+    /// The multisampled colour the frame is drawn into (resolved to the target), when anti-aliasing is on.
+    fn msaa_view(&mut self, width: u32, height: u32) -> Option<wgpu::TextureView> {
+        if self.samples <= 1 {
+            return None;
+        }
+        if !matches!(&self.msaa, Some((_, w, h)) if *w == width && *h == height) {
+            let tex = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("msaa"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: self.samples,
+                dimension: wgpu::TextureDimension::D2,
+                format: self.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+            self.msaa = Some((tex.create_view(&Default::default()), width, height));
+        }
+        self.msaa.as_ref().map(|m| m.0.clone())
+    }
+
     fn depth_view(&mut self, width: u32, height: u32) -> Option<wgpu::TextureView> {
         let fresh = match &self.depth {
             Some((_, _, w, h)) => *w != width || *h != height,
@@ -1438,7 +1532,7 @@ impl Renderer {
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,
-                sample_count: 1,
+                sample_count: self.samples,
                 dimension: wgpu::TextureDimension::D2,
                 format: DEPTH_FORMAT,
                 // the cloud pass reads it
@@ -1532,6 +1626,7 @@ impl Renderer {
         instances: &[Instance],
         particles: &[crate::particles::Batch],
     ) {
+        self.sync_quality();
         let aspect = width.max(1) as f32 / height.max(1) as f32;
         let proj = perspective_lh(view.fov_y, aspect, view.near, view.far);
         let look = look_at_lh(view.eye, view.target, Vec3::Y);
@@ -1718,6 +1813,10 @@ impl Renderer {
         let Some(depth) = self.depth_view(width, height) else {
             return;
         };
+        // with anti-aliasing on, the frame is drawn into a multisampled colour and resolved to the target at its end
+        let msaa = self.msaa_view(width, height);
+        let resolve_to = msaa.as_ref().map(|_| target);
+        let target = msaa.as_ref().unwrap_or(target);
         // the sea of cloud goes between the opaque scene (whose depth it reads) and the blended one
         let quality = crate::clouds::quality();
         let clouds =
@@ -1727,6 +1826,7 @@ impl Renderer {
                 &self.device,
                 &self.queue,
                 self.format,
+                self.samples,
             ));
             if let Some(ring) = self.clouds.as_ref().map(|l| l.ring.clone()) {
                 self.set_cloud_ring(&ring);
@@ -1765,14 +1865,18 @@ impl Renderer {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: target,
                     depth_slice: None,
-                    resolve_target: None,
+                    resolve_target: resolve_to.filter(|_| *last),
                     ops: wgpu::Operations {
                         load: if keep {
                             wgpu::LoadOp::Load
                         } else {
                             wgpu::LoadOp::Clear(self.clear)
                         },
-                        store: wgpu::StoreOp::Store,
+                        store: if resolve_to.is_some() && *last {
+                            wgpu::StoreOp::Discard
+                        } else {
+                            wgpu::StoreOp::Store
+                        },
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
