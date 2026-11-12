@@ -77,6 +77,7 @@ note ours = 13 张玩家制作的地图，为本游戏精选并转换为其开�
 note challenges = 社区改造的原版关卡：视角旋转 45°、反向通关、隐形道路。
 note community = 社区制作的地图：随游戏附带的精选地图，以及你下载的地图。
 note downloaded = 你自己的关卡和下载的地图：各放入自己的文件夹并附 level.txt（见文件夹中的 README）。
+user levels wrong = 关卡文件夹中有 {n} 项有误 — 见手册：{link}
 community credit 1 = 社区精选地图（开始，社区地图，精选）：
 modified set rotated = 旋转45度
 modified set reverse = 反向

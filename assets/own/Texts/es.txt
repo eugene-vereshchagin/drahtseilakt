@@ -77,6 +77,7 @@ note ours = 13 mapas de jugadores, elegidos para el juego y pasados a su formato
 note challenges = Los niveles originales rehechos por la comunidad: cámara girada 45°, el camino al revés, la ruta invisible.
 note community = Mapas de la comunidad: los mejores incluidos con el juego y los que has descargado.
 note downloaded = Tus niveles y mapas descargados: cada uno en su carpeta con un level.txt (ver el README de la carpeta).
+user levels wrong = Algunas entradas de la carpeta de niveles son incorrectas ({n}) — ver el manual: {link}
 community credit 1 = Mejores mapas de la comunidad (Jugar, Mapas de la comunidad, Las mejores):
 modified set rotated = Rotado 45 grados
 modified set reverse = Inverso

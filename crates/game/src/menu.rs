@@ -276,6 +276,8 @@ pub struct Menu {
     pub entries: Vec<Entry>,
     /// The custom levels shown: the levels of the kind's folder, by title (levels.md, "A level is a folder").
     pub maps: Vec<Package>,
+    /// Entries of the player's levels folder that do not follow the rule (shown as a hint on its page).
+    pub wrong_entries: usize,
     /// The kind's folder the custom levels come from.
     folder: Option<PathBuf>,
     /// Which list the custom levels shown are.
@@ -349,6 +351,7 @@ impl Menu {
             stack: Vec::new(),
             entries,
             maps: Vec::new(),
+            wrong_entries: 0,
             folder: None,
             list: List::None,
             has_ours: !crate::levels::shipped().is_empty(),
@@ -423,6 +426,22 @@ impl Menu {
         } else {
             format!("{note}\n{hint}")
         }
+    }
+
+    /// The whole note of the open list's page: its note with the Esc hint, and under it the hint on wrong entries in
+    /// the player's folder (the manual's page on levels) when there are some.
+    fn page_note(&self, chosen: Option<Line>) -> String {
+        let text = self.with_hint(self.list_note(chosen));
+        if self.list != List::Downloaded || self.wrong_entries == 0 {
+            return text;
+        }
+        let link = manual_link(self.strings.language());
+        let wrong = self
+            .strings
+            .ours("user levels wrong")
+            .replace("{n}", &self.wrong_entries.to_string())
+            .replace("{link}", link);
+        format!("{text}\n{wrong}")
     }
 
     /// The note under an open list with one: the picks' (what they are, the chosen map's author, the authors' notice)
@@ -1261,6 +1280,7 @@ impl Menu {
             Line::Community => open(self, Screen::Community),
             Line::Ours => {
                 self.maps = crate::levels::shipped();
+                self.wrong_entries = 0;
                 self.show(List::Ours, None);
                 open(self, Screen::Custom)
             }
@@ -1270,7 +1290,7 @@ impl Menu {
                 open(self, Screen::Custom)
             }
             Line::Downloaded => {
-                self.maps = downloaded_levels();
+                (self.maps, self.wrong_entries) = downloaded_levels();
                 self.show(List::Downloaded, Some(crate::levels::dir(Kind::Downloaded)));
                 open(self, Screen::Custom)
             }
@@ -2692,15 +2712,11 @@ impl Menu {
                 note(&mut out, &said.join("\n"), 0.30, false, 0.3);
                 // the list's note (what it is, the chosen map's author, where the folder is), Esc's hint its last
                 // line; without a note the hint alone takes the note's place
-                let text = if self.note_below() {
-                    self.list_note(lines.get(self.chosen()).copied())
-                } else {
-                    String::new()
-                };
+                let text = self.page_note(lines.get(self.chosen()).copied());
                 let top = LIST_TOP + self.page_len() as f32 * ROW_STEP + HINT_H + 0.008;
                 note(
                     &mut out,
-                    &self.with_hint(text),
+                    &text,
                     NOTE_BOTTOM,
                     true,
                     NOTE_BOTTOM - top,
@@ -3777,29 +3793,44 @@ enum List {
     Challenges,
 }
 
-/// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
-/// it; folders that hold no level or several are not shown, and said so on the console.
+/// The manual's page on levels in a language: its translation where the docs have one (ru, de, zh), else English.
+fn manual_link(lang: &str) -> &'static str {
+    match lang {
+        "ru" => "https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/ru/drahtseilakt/levels.md",
+        "de" => "https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/de/drahtseilakt/levels.md",
+        "zh" => "https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/zh/drahtseilakt/levels.md",
+        _ => "https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/drahtseilakt/levels.md",
+    }
+}
+
 /// The player's downloaded levels: the downloaded folder's and those of the folders it replaced (community, open),
 /// each read where it is, in one list.
-fn downloaded_levels() -> Vec<Package> {
+/// With the number of entries of the player's folder that do not follow the rule (the hint on its page).
+fn downloaded_levels() -> (Vec<Package>, usize) {
     let mut seen: Vec<PathBuf> = Vec::new();
     let mut v = Vec::new();
+    let mut wrong = 0;
     for kind in gamedata::profile::DOWNLOADED {
         let root = crate::levels::dir(kind);
         if !seen.contains(&root) {
             // user-levels follows the rule (a folder of its own with level.txt); the earlier folders, read where
             // they are still left over, are read as before
-            v.extend(maps_in(&root, kind == gamedata::profile::Kind::Downloaded));
+            let strict = kind == gamedata::profile::Kind::Downloaded;
+            let (levels, skipped) = scan_levels(&root, strict);
+            v.extend(levels);
+            if strict {
+                wrong = skipped;
+            }
             seen.push(root);
         }
     }
     gamedata::package::sort(&mut v);
-    v
+    (v, wrong)
 }
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
-/// it; folders that hold no level or several are not shown, and said so on the console.
-fn maps_in(dir: &Path, strict: bool) -> Vec<Package> {
+/// it; folders that hold no level or several are not shown, and said so on the console, with how many were skipped.
+fn scan_levels(dir: &Path, strict: bool) -> (Vec<Package>, usize) {
     let (levels, skipped) = if strict {
         gamedata::package::scan_user(dir)
     } else {
@@ -3815,7 +3846,7 @@ fn maps_in(dir: &Path, strict: bool) -> Vec<Package> {
             eprintln!("  {s}");
         }
     }
-    levels
+    (levels, skipped.len())
 }
 
 #[cfg(test)]
@@ -3837,7 +3868,7 @@ mod tests {
         std::fs::write(root.join("pack.tar.gz"), b"").unwrap();
         let mut m = menu(&[true], true);
         m.folder = Some(root.clone());
-        m.maps = maps_in(&root, false);
+        m.maps = scan_levels(&root, false).0;
         m.stack.push((Screen::Custom, 0));
         // by title, a level named by level.txt before one named by its file; no folders to open, nested levels and
         // junk not shown
@@ -3868,6 +3899,7 @@ mod tests {
                 })
                 .collect(),
             maps: Vec::new(),
+            wrong_entries: 0,
             folder: None,
             list: List::None,
             has_ours: true,
@@ -5326,6 +5358,7 @@ mod tests {
                 "note community",
                 "note downloaded",
                 "note picks",
+                "user levels wrong",
             ] {
                 assert_ne!(s.ours(key), key, "{lang} {key}");
             }
@@ -5497,6 +5530,34 @@ mod tests {
     }
 
     #[test]
+    fn the_page_hints_at_entries_of_the_folder_that_are_wrong() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-wrong-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let good = root.join("good");
+        std::fs::create_dir_all(good.join("Level A")).unwrap();
+        std::fs::write(good.join("Level A/a.nmo"), b"").unwrap();
+        std::fs::write(good.join("Level A/level.txt"), b"title = A\n").unwrap();
+        std::fs::create_dir_all(root.join("loose")).unwrap();
+        std::fs::write(root.join("loose/Loose.nmo"), b"").unwrap();
+        let page = |dir: &Path| {
+            let (maps, wrong) = scan_levels(dir, true);
+            let mut m = menu(&[true], false);
+            m.maps = maps;
+            m.wrong_entries = wrong;
+            m.list = List::Downloaded;
+            m.stack.push((Screen::Custom, 0));
+            m.page_note(None)
+        };
+        let bad = page(&root.join("loose"));
+        assert!(bad.contains("are wrong (1)"), "{bad}");
+        assert!(bad.contains("github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/"), "{bad}");
+        assert!(bad.ends_with("levels.md"), "{bad}");
+        let ok = page(&good);
+        assert!(!ok.contains("wrong"), "{ok}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn maps_are_the_level_files_and_folders_of_the_folder() {
         let dir = std::env::temp_dir().join(format!("drahtseilakt-maps-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -5506,7 +5567,7 @@ mod tests {
         std::fs::create_dir_all(dir.join("open level")).unwrap();
         std::fs::write(dir.join("open level/level.gltf"), b"").unwrap();
         std::fs::create_dir_all(dir.join("empty")).unwrap();
-        let names: Vec<_> = maps_in(&dir, false)
+        let names: Vec<_> = scan_levels(&dir, false).0
             .iter()
             .map(|p| p.level.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
