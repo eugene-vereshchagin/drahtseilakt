@@ -2097,6 +2097,9 @@ impl Sim {
             // modules one frame later.
             self.sector_change(SECTOR_END_TICKS, self.sector - 1, false);
             self.sector_change(SECTOR_BEGIN_TICKS, self.sector, true);
+            // the next sector's transformers are drawn from the checkpoint on (their pads stood in the way the ball
+            // takes at once; one popping up 0.8 s later, as the ball reaches it, looked like a glitch)
+            self.show_trafos_of(self.sector);
         }
         if let Some(end) = self.rules.end
             && self.finishes.is_empty()
@@ -2649,13 +2652,30 @@ impl Sim {
                     self.world.deactivate(b);
                 }
             }
-            for (u, _) in self
+            let (current, trafos) = (self.sector, &self.rules.trafos);
+            for (i, (u, _)) in self
                 .unseen
                 .iter_mut()
                 .zip(&self.object_sectors)
-                .filter(|(_, s)| **s == Some(c.sector))
+                .enumerate()
+                .filter(|(_, (_, s))| **s == Some(c.sector))
             {
+                // a transformer of the sector in play stays drawn when the sector starts again after a loss
+                if !c.enter && c.sector == current && trafos.iter().any(|t| t.0 == i) {
+                    continue;
+                }
                 *u = !c.enter;
+            }
+        }
+    }
+
+    /// Draws the transformers of `sector` now (their objects are seen before the sector's other objects enter).
+    fn show_trafos_of(&mut self, sector: usize) {
+        for &(i, ..) in &self.rules.trafos {
+            if self.object_sectors.get(i).copied().flatten() == Some(sector)
+                && let Some(u) = self.unseen.get_mut(i)
+            {
+                *u = false;
             }
         }
     }
@@ -4210,6 +4230,46 @@ pub(crate) mod tests {
         }
         assert!(sim.world.state(b2).is_some(), "the next sector's box came");
         assert!(!sim.unseen[o2] && !sim.unseen[cp]);
+    }
+
+    #[test]
+    fn the_next_sector_s_transformer_is_drawn_from_the_checkpoint_and_stays_through_a_loss() {
+        let mut level = flat_level();
+        let cp = add_cube(
+            &mut level,
+            "PC_TwoFlames_01",
+            Vec3::new(0.0, 0.0, 0.0),
+            &["PC_Checkpoints"],
+        );
+        let tr = add_cube(
+            &mut level,
+            "P_Trafo_Paper_02",
+            Vec3::new(40.0, 1.0, 0.0),
+            &["P_Trafo_Paper", "Sector_02"],
+        );
+        let other = add_cube(
+            &mut level,
+            "P_Box_02",
+            Vec3::new(-30.0, 1.0, 20.0),
+            &["P_Box", "Sector_02"],
+        );
+        let mut sim = Sim::new(&level, BallKind::Wood);
+        assert!(sim.unseen[tr] && sim.unseen[other] && !sim.unseen[cp]);
+        sim.step(0);
+        let t = sim.tick;
+        assert!(sim.events.contains(&(t, Event::Checkpoint(1))));
+        assert!(!sim.unseen[tr], "the transformer is drawn at once");
+        assert!(sim.unseen[other], "the sector's other objects wait for it");
+        while sim.tick < t + SECTOR_BEGIN_TICKS {
+            sim.step(0);
+        }
+        assert!(!sim.unseen[tr] && !sim.unseen[other]);
+        // the sector starts again after a loss: the objects blink, the transformer does not
+        sim.die();
+        for _ in 0..DEATH_SECTOR_BEGIN_TICKS + 2 {
+            sim.step(0);
+            assert!(!sim.unseen[tr], "tick {}", sim.tick);
+        }
     }
 
     #[test]
