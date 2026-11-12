@@ -4042,6 +4042,7 @@ impl PilotWatch {
         let top = KEYS_BOTTOM - KEYS_LINE * lines.len() as f32 - 0.01;
         let shade = [0.0, 0.0, 0.0, 0.55];
         let mut q = vec![crate::ui::Quad {
+            angle: 0.0,
             rect: crate::ui::homogeneous([0.01, top, KEYS_RIGHT, KEYS_BOTTOM]),
             uv: [0.0, 0.0, 1.0, 1.0],
             top: shade,

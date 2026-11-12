@@ -296,7 +296,10 @@ pub struct SkySpec {
 pub struct Ent2d {
     pub pos: Option<[f32; 2]>,
     pub size: Option<[f32; 2]>,
+    /// Radians, as the engine's 2D entity rotation.
     pub rotation: Option<f32>,
+    /// A script's Show or Hide of the entity (over the file's own visibility).
+    pub shown: Option<bool>,
 }
 
 /// The most 2D entities a run keeps edits of.

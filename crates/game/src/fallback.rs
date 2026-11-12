@@ -408,6 +408,7 @@ fn draw(text: &str, r: [f32; 4], height: f32, widen: f32, st: &Style) -> Vec<Qua
                     let (sx, sy) = (kx * p.size, k * p.size);
                     let y = baseline + off[1];
                     out.push(Quad {
+                        angle: 0.0,
                         rect: [
                             x + g.bounds[0] * sx,
                             y + g.bounds[1] * sy,

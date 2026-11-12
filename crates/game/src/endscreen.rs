@@ -143,6 +143,7 @@ pub fn interface(
     screen: Screen,
 ) -> Vec<Quad> {
     let quad = |r: [f32; 4], uv: [f32; 4], color: [f32; 4], texture: &'static str| Quad {
+        angle: 0.0,
         rect: screen.rect(homogeneous(r), Anchor::Center),
         uv,
         top: color,

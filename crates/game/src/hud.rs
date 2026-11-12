@@ -381,17 +381,20 @@ pub struct LevelFrame {
     pub uv: [f32; 4],
     pub color: [f32; 4],
     pub texture: usize,
+    /// Drawn as the file has it (false: the file hides it, and only a script's Show draws it).
+    pub shown: bool,
+    /// Turn about the rectangle's centre, in degrees (Edit 2D Entity's rotation).
+    pub angle: f32,
 }
 
-/// The frames of a level that are drawn, in drawing order (by Z order, then as the file lists them): those the file
-/// shows, with a material that has a texture and a rectangle with an area, as the original's render context draws
+/// The frames of a level that can be drawn, in drawing order (by Z order, then as the file lists them): those
+/// (shown or hidden by the file: a script may show one) with a material that has a texture and a rectangle with an area, as the original's render context draws
 /// its 2D entities (C reference render.c). A frame without a texture is left out: a plain rectangle is what a
 /// script of the map fills or fades, and would only cover the picture.
 pub fn level_frames(level: &level::Level) -> Vec<LevelFrame> {
     let mut frames: Vec<(i32, LevelFrame)> = level
         .frames
         .iter()
-        .filter(|f| f.visible)
         .filter_map(|f| {
             let m = level.materials.get(f.material?)?;
             let [l, t, r, b] = f.rect;
@@ -405,6 +408,8 @@ pub fn level_frames(level: &level::Level) -> Vec<LevelFrame> {
                     color: m.diffuse,
                     // a texture the level has (a material may name one it does not)
                     texture: m.texture.filter(|t| level.textures.get(*t).is_some())?,
+                    shown: f.visible,
+                    angle: 0.0,
                 },
             ))
         })
@@ -448,8 +453,15 @@ pub fn edited_frames(frames: &[LevelFrame], edits: &[(String, script::Ent2d)]) -
                 }
             }
             r = [x, y, x + w, y + h];
+            // the engine's rotation is in radians; one that is not a number is none
+            let angle = e
+                .rotation
+                .filter(|a| a.is_finite())
+                .map_or(f.angle, f32::to_degrees);
             (w > 0.0 && h > 0.0 && r.iter().all(|v| v.is_finite())).then(|| LevelFrame {
                 rect: r,
+                angle,
+                shown: e.shown.unwrap_or(f.shown),
                 ..f.clone()
             })
         })
@@ -463,6 +475,7 @@ fn frame_quads(frames: &[LevelFrame], screen: crate::ui::Screen) -> Vec<crate::u
     frames
         .iter()
         .zip(FRAME_TEXTURES)
+        .filter(|(f, _)| f.shown)
         .map(|(f, texture)| {
             let middle = (f.rect[0] + f.rect[2]) / 2.0;
             let anchor = if middle < CONTEXT_W / 3.0 {
@@ -478,6 +491,7 @@ fn frame_quads(frames: &[LevelFrame], screen: crate::ui::Screen) -> Vec<crate::u
                 top: f.color,
                 bottom: f.color,
                 texture,
+                angle: f.angle,
             }
         })
         .collect()
@@ -494,6 +508,7 @@ pub fn interface(
     use crate::ui::{Anchor, Quad, homogeneous};
     const SPECIAL: &str = "Button01_special";
     let quad = |r: [f32; 4], uv: [f32; 4], anchor: Anchor| Quad {
+        angle: 0.0,
         rect: screen.rect(homogeneous(r), anchor),
         uv,
         top: WHITE,
@@ -565,12 +580,14 @@ mod tests {
             uv: [0.0, 0.0, 1.0, 1.0],
             color: [1.0; 4],
             texture: 0,
+            shown: true,
+            angle: 0.0,
         };
         let frames = vec![f("a"), f("b")];
         let edit = script::Ent2d {
             pos: Some([0.5, 100.0]),
             size: Some([0.25, f32::NAN]),
-            rotation: None,
+            ..Default::default()
         };
         let out = edited_frames(&frames, &[("a".into(), edit)]);
         assert_eq!(
@@ -588,6 +605,42 @@ mod tests {
             1,
             "no size hides it"
         );
+    }
+
+    #[test]
+    fn edit_2d_entity_rotates_a_frame_and_show_draws_one_the_file_hides() {
+        let hidden = LevelFrame {
+            name: "h".into(),
+            rect: [100.0, 100.0, 200.0, 140.0],
+            uv: [0.0, 0.0, 1.0, 1.0],
+            color: [1.0; 4],
+            texture: 0,
+            shown: false,
+            angle: 0.0,
+        };
+        let screen = crate::ui::Screen { w: 640.0, h: 480.0 };
+        assert!(frame_quads(&[hidden.clone()], screen).is_empty());
+        let edit = script::Ent2d {
+            rotation: Some(std::f32::consts::FRAC_PI_2),
+            shown: Some(true),
+            ..Default::default()
+        };
+        let out = edited_frames(&[hidden.clone()], &[("h".into(), edit)]);
+        assert!(out[0].shown);
+        assert!((out[0].angle - 90.0).abs() < 1e-4, "radians become degrees");
+        let q = frame_quads(&out, screen);
+        assert_eq!(q.len(), 1);
+        assert!((q[0].angle - 90.0).abs() < 1e-4);
+        // a Hide over a shown frame, and a rotation that is not a number
+        let shown = LevelFrame { shown: true, ..hidden };
+        let edit = script::Ent2d {
+            rotation: Some(f32::NAN),
+            shown: Some(false),
+            ..Default::default()
+        };
+        let out = edited_frames(&[shown], &[("h".into(), edit)]);
+        assert!(frame_quads(&out, screen).is_empty());
+        assert_eq!(out[0].angle, 0.0);
     }
 
     /// A map's frames as the original's render context draws them: shown ones with a material, by Z order; here
@@ -642,9 +695,12 @@ mod tests {
             ..Default::default()
         };
         let frames = level_frames(&level);
-        assert_eq!(frames.len(), 2);
-        assert_eq!(frames[0].rect, [0.0, 0.0, 80.0, 60.0]);
-        assert_eq!(frames[1].color, [1.0, 0.5, 0.25, 1.0]);
+        // the frame the file hides is kept (a script may show it), but is not drawn until then
+        assert_eq!(frames.len(), 3);
+        assert!(!frames[0].shown && frames[1].shown);
+        assert_eq!(frames[1].rect, [0.0, 0.0, 80.0, 60.0]);
+        assert_eq!(frames[2].color, [1.0, 0.5, 0.25, 1.0]);
+        let frames: Vec<LevelFrame> = frames.into_iter().filter(|f| f.shown).collect();
         // a window twice as wide as 4:3 needs: the left frame at the left edge, the right one at the right edge
         let screen = crate::ui::Screen {
             w: 2560.0,

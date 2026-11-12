@@ -467,7 +467,7 @@ by the engine's.
 | Calculator | `4bc209b8:5b3679b0` | 1 | 8 | full: numbers, a..z, + - * / ^, unary signs, pi, abs sqrt sin cos tan asin acos atan sinh cosh tanh exp ln log floor ceil; caps 256 tokens, depth 32, 511 bytes (oracle-checked on the C's grammar, random expressions against a second evaluator on the rest) |
 | TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | done: a font of the name with a texture; drawn in our own font (no system fonts) |
 | Get Message Data | `45875fee:45875fdd` | 1 | 1 | done |
-| Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | partial: position, size and rotation are kept per 2D entity (64); 2D Text lays out inside them; a frame the file shows with a textured material is drawn at the edited place and size (rotation is not; a frame the file hides stays hidden) |
+| Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | full (stage 4.3): position, size and rotation (radians, drawn turned about the frame's centre) are kept per 2D entity (64); 2D Text lays out inside them; a frame the file hides is drawn once a script's Show reaches it (and Hide removes a shown one) |
 | Set Clipping Planes | `652316a2:01aa09a9` | 1 | 2 | done: the renderer takes near and far |
 | Set Fog | `151aaaaa:ffd5bdbc` | 1 | 3 | done: linear, exp and exp2 distance fog in the shader (replaces the level fog); mode 0 switches fog off |
 | TT Sky | `36691920:3b261630` | 1 | 1 | partial: the state (sides, colour, radius) is kept in the run and logged; drawn (stage 4.1): a mesh built from the sides, bottom and top materials, see below |

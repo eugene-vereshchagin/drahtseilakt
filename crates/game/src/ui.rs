@@ -13,6 +13,8 @@ pub const CONTEXT_H: f32 = 480.0;
 /// v1), the colours of its top and bottom edges, and the texture's name (loaded from the game's textures).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Quad {
+    /// Turn about the rectangle's centre, in degrees (a map's 2D frame a script rotated); 0 for the rest.
+    pub angle: f32,
     pub rect: [f32; 4],
     pub uv: [f32; 4],
     pub top: [f32; 4],
@@ -325,6 +327,7 @@ impl Font {
             let x0 = x + sx * g[3];
             let x1 = x0 + sx * g[2];
             out.push(Quad {
+                angle: 0.0,
                 rect: [(x0 + 0.5).floor(), y, (x1 + 0.5).floor(), y + gh],
                 uv: [g[0] + du, g[1] + dv, g[0] + g[2], g[1] + g[5]],
                 top: color,
@@ -382,6 +385,7 @@ pub fn place(quads: Vec<Quad>, screen: Screen, anchor: Anchor) -> Vec<Quad> {
     quads
         .into_iter()
         .map(|q| Quad {
+            angle: 0.0,
             rect: screen.rect(q.rect, anchor),
             ..q
         })

@@ -3394,6 +3394,20 @@ fn edit_2d_entity_keeps_what_it_edits_and_2d_text_lays_out_inside_it() {
 }
 
 #[test]
+fn show_and_hide_on_a_2d_entity_are_kept_for_the_interface() {
+    for (proto, want) in [
+        (crate::blocks::proto::SHOW, true),
+        (crate::blocks::proto::HIDE, false),
+    ] {
+        let (mut rt, _) = text_rig(proto, &["In"], &["Out"], &[], &[], 27);
+        rt.tick(&mut Rec::new());
+        assert_eq!(rt.ents2d.len(), 1);
+        assert_eq!(rt.ents2d[0].1.shown, Some(want));
+        assert_eq!(rt.ents2d[0].1.size, None, "nothing else is edited");
+    }
+}
+
+#[test]
 fn set_pickable_only_passes_on() {
     let pins = [("Pickable", types::BOOL, Value::Bool(false))];
     let (mut rt, blk) = text_rig(
