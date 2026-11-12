@@ -1054,7 +1054,7 @@ fn op_table() {
         (&'static str, &'static [&'static str]),
         Option<(&'static str, &'static [&'static str])>,
     );
-    let (add, sub, mul, div, md, conv, len, gety, max, abs) = (
+    let (add, sub, mul, div, md, conv, len, gety, max) = (
         (0x33cc_6b49, 0x3589_282b),
         (0x6764_1171, 0x6499_077a),
         (0x3899_6b85, 0x334e_35c2),
@@ -1064,7 +1064,6 @@ fn op_table() {
         (0x556a_69af, 0x076e_3f09),
         (0x389f_72bd, 0x7aef_3482),
         (0x6ea2_14cb, 0x43be_6b56),
-        (0x1ada_7470, 0x6209_7629),
     );
     let cases: Vec<Case> = vec![
         (add, "int", ("int", I), Some(("int", I))),
@@ -1096,7 +1095,6 @@ fn op_table() {
         (len, "int", ("string", S), None),
         (gety, "float", ("vector", V), None),
         (max, "vector", ("box", BX), None),
-        (abs, "float", ("float", F), None),
         (sub, "vector", ("vector", V), Some(("int", I))),
         // objects by name (exact names: the C compares exactly, the notes in any case) and names of objects
         (by_name, "obj", ("string", NAMES), None),
@@ -1186,23 +1184,6 @@ fn iterator() {
             .pin("int", r.pick(&[-1, -1, 0, 2, 3, 7]))
             .pin("bool", r.below(2))
             .pout("int", r.pick(&[0, 2]))
-            .pout("int", 0)
-            .pout("int", 0);
-        with_arrays_of(r, b, &[(1, 1, &[0, 1, 2]), (0, 0, &[3])])
-    });
-}
-
-/// Iterator If (`bb_iterator_if`): the rows whose column compares with a reference, one per loop turn.
-#[test]
-fn iterator_if() {
-    sweep("Iterator If", |r| {
-        let b = B::new(0, proto::ITERATOR_IF, 2, 2)
-            .target("array", r.pick(&[0, 0, 1, 2]))
-            .pin("int", r.pick(&[-1, 0, 1, 2, 3]))
-            .pin("int", r.pick(&[0, 1, 2, 3, 4, 5, 6, 7]))
-            .pin("int", r.pick(&[-1, 0, 10, 11, 20, 21, 30, 5]))
-            .pout("int", r.pick(&[0, 2]))
-            .pout("int", 0)
             .pout("int", 0)
             .pout("int", 0);
         with_arrays_of(r, b, &[(1, 1, &[0, 1, 2]), (0, 0, &[3])])
@@ -1484,4 +1465,421 @@ fn move_row_follows_the_notes() {
     assert_eq!(run(4, 0).0, "row 0|row 10|row 20|row 30");
     assert_eq!(run(-1, 0).0, "row 0|row 10|row 20|row 30");
     assert_eq!(run(0, 9).0, "row 0|row 10|row 20|row 30");
+}
+
+/// Our side alone on a block fired once at the start: the pout lines of the last frame.
+fn once(b: B) -> String {
+    let mut s = frame(&mut Rng::new(1), b, &[]);
+    s.links.clear();
+    s.link(None, (0, 0), 0);
+    s.frames = 3;
+    let t = s.run();
+    let last = t.rsplit("frame 3").next().unwrap().to_string();
+    last.lines()
+        .filter(|l| l.starts_with("pout"))
+        .collect::<Vec<_>>()
+        .join("|")
+}
+
+const INT_FORMATS: &[&str] = &[
+    "%d", "", "%5d", "%-5d|", "%05d", "%+d", "%x", "%X", "%o", "%3.2d", "%#x", "%u", "n=%d!", "%%%d",
+];
+const FLOAT_FORMATS: &[&str] = &[
+    "%f", "%g", "%.2f", "%8.3f", "%e", "%G", "%10.4e", "", "%5.1f", "%+g", "%-9.2f|", "%.0f", "%#g", "%08.3f",
+    "%.10g", "%E",
+];
+const STRING_FORMATS: &[&str] = &["%s", "", "%5s", "%-5s", "[%s]", ">%.3s"];
+
+#[test]
+fn create_string() {
+    sweep("Create String", |r| {
+        let mut b = B::new(0, proto::CREATE_STRING, 3, 3)
+            .pin("string", r.pick(&["", ",", "|", ";;", "-"]));
+        let mut formats = Vec::new();
+        for _ in 0..1 + r.below(4) {
+            match r.below(4) {
+                0 => {
+                    b = b.pin("int", r.pick(&["-7", "0", "42", "255", "-1", "65"]));
+                    formats.push(r.pick(INT_FORMATS));
+                }
+                1 => {
+                    b = b.pin(
+                        "float",
+                        r.pick(&["-7.5", "0", "0.1", "3.14159", "1e7", "123456.789", "0.00001234", "1e-7", "100"]),
+                    );
+                    formats.push(r.pick(FLOAT_FORMATS));
+                }
+                2 => {
+                    b = b.pin("string", r.pick(&["", "abc", "hello_world", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]));
+                    formats.push(r.pick(STRING_FORMATS));
+                }
+                _ => {
+                    b = b.pin("bool", r.below(2));
+                    formats.push(r.pick(&["", "%s", "x%s"]));
+                }
+            }
+        }
+        b = b.pout("string", r.pick(&["-", "", "old"]));
+        for f in formats {
+            b = b.local("string", f);
+        }
+        frame(r, b, &[(1, 1, &[1, 2]), (0, 2, &[2])])
+    });
+}
+
+#[test]
+fn create_string_formats_and_joins() {
+    fn run(delim: &str, parts: &[(&'static str, &str, &str)], inputs: usize) -> String {
+        let mut b = B::new(0, proto::CREATE_STRING, 3, 3).pin("string", delim);
+        for (t, v, _) in parts {
+            b = b.pin(t, v);
+        }
+        b = b.pout("string", if inputs == 1 { "" } else { "-" });
+        for (_, _, f) in parts {
+            b = b.local("string", f);
+        }
+        let mut s = frame(&mut Rng::new(1), b, &[]);
+        s.links.clear();
+        s.link(None, (0, inputs), 0);
+        s.frames = 3;
+        let t = s.run();
+        let last = t.rsplit("frame 3").next().unwrap().to_string();
+        last.lines().find(|l| l.starts_with("pout")).unwrap().to_string()
+    }
+    // Landfill's message: strings with "%s", the delimiter between every pair
+    assert_eq!(
+        run(", ", &[("string", "a", "%s"), ("int", "7", "%03d"), ("float", "2.5", "%.1f"), ("string", "z", "")], 0),
+        "pout B0 0 a, 007, 2.5, z"
+    );
+    assert_eq!(run("", &[("float", "0.5", ""), ("int", "-3", "")], 0), "pout B0 0 0.5-3");
+    // an Integer or Float with an empty format is its own text; a Boolean is TRUE / FALSE
+    assert_eq!(run("/", &[("bool", "1", ""), ("bool", "0", "%s")], 0), "pout B0 0 TRUE/FALSE");
+    // Add Line (input 1) to an empty text has no newline; Clear (input 2) empties it
+    assert_eq!(run("", &[("string", "line", "%s")], 1), "pout B0 0 line");
+    assert_eq!(run("", &[("string", "line", "%s")], 2), "pout B0 0 ");
+    // a hostile format: only the first conversion takes the value, a width is capped, and nothing panics
+    assert_eq!(run("", &[("int", "5", "%d%d|%")], 0), "pout B0 0 5|");
+    let long = run("", &[("int", "5", "%99999999d")], 0);
+    assert!(long.len() < 1100, "{}", long.len());
+    assert_eq!(run("", &[("int", "5", "%.*d %n%ll")], 0), "pout B0 0 5 ");
+    // huge parts and delimiters: the text stops at 64 KiB
+    let big = "y".repeat(60_000);
+    let big = big.as_str();
+    let t = run(big, &[("string", big, "%s"), ("string", big, ""), ("string", big, "")], 0);
+    assert_eq!(t.len(), "pout B0 0 ".len() + (1 << 16));
+    // a multi-byte character in a format or a text is kept whole
+    assert_eq!(run("", &[("string", "\u{e9}t\u{e9}", "\u{e9}>%s")], 0), "pout B0 0 \u{e9}>\u{e9}t\u{e9}");
+}
+
+#[test]
+fn scan_string() {
+    sweep("Scan String", |r| {
+        let mut b = B::new(0, proto::SCAN_STRING, 1, 1)
+            .pin(
+                "string",
+                r.pick(&["a,b,,c", "1,2,,3", "x_y_z", "", "_lead", "12_4.5_abc", "ab--cd--ef", "trail-", "a", ",,,", "1e2_-3_+4_x7"]),
+            )
+            .pin("string", r.pick(&[",", "_", "", "--", "ab", "zz", "-"]))
+            .pout("int", 7);
+        for _ in 0..r.below(5) {
+            b = match r.below(3) {
+                0 => b.pout("int", 9),
+                1 => b.pout("float", 9),
+                _ => b.pout("string", "z"),
+            };
+        }
+        frame(r, b, &[(0, 0, &[1])])
+    });
+}
+
+#[test]
+fn scan_string_splits_and_converts() {
+    let b = B::new(0, proto::SCAN_STRING, 1, 1)
+        .pin("string", "12 4.5  abc")
+        .pin("string", "")
+        .pout("int", 7)
+        .pout("int", 9)
+        .pout("float", 9)
+        .pout("string", "z");
+    assert_eq!(once(b), "pout B0 0 3|pout B0 1 12|pout B0 2 40900000|pout B0 3 abc");
+    // more pieces than outputs: the count is not written
+    let b = B::new(0, proto::SCAN_STRING, 1, 1)
+        .pin("string", "a,b,c")
+        .pin("string", ",")
+        .pout("int", 7)
+        .pout("string", "z");
+    assert_eq!(once(b), "pout B0 0 7|pout B0 1 a");
+    // a multi-byte delimiter, leading and trailing delimiters
+    let b = B::new(0, proto::SCAN_STRING, 1, 1)
+        .pin("string", "--a----b--")
+        .pin("string", "--")
+        .pout("int", 7)
+        .pout("string", "z")
+        .pout("string", "z");
+    assert_eq!(once(b), "pout B0 0 2|pout B0 1 a|pout B0 2 b");
+}
+
+#[test]
+fn get_substring() {
+    sweep("Get SubString", |r| {
+        let b = B::new(0, proto::GET_SUBSTRING, 1, 1)
+            .pin("string", r.pick(&["Hello_World", "", "a", "Ball_Wood_Sub1", "0123456789"]))
+            .pin("int", r.pick(&[-50, -5, -1, 0, 1, 3, 10, 11, 12, 100]))
+            .pin("int", r.pick(&[-30, -3, -1, 0, 1, 2, 5, 8, 11, 50, 1000]))
+            .pout("string", "-");
+        frame(r, b, &[(0, 0, &[1])])
+    });
+}
+
+#[test]
+fn get_substring_hand_values_and_hostile_input() {
+    let sub = |s: &str, start: i32, len: i32| {
+        once(
+            B::new(0, proto::GET_SUBSTRING, 1, 1)
+                .pin("string", s)
+                .pin("int", start)
+                .pin("int", len)
+                .pout("string", "-"),
+        )
+    };
+    assert_eq!(sub("Hello World", 6, 0), "pout B0 0 World");
+    assert_eq!(sub("Hello World", 0, 5), "pout B0 0 Hello");
+    assert_eq!(sub("Hello World", 6, 50), "pout B0 0 World");
+    assert_eq!(sub("Hello World", -2, 5), "pout B0 0 Hel");
+    assert_eq!(sub("Hello World", 11, 3), "pout B0 0 ");
+    assert_eq!(sub("Hello World", 99, 0), "pout B0 0 ");
+    assert_eq!(sub("", 0, 0), "pout B0 0 ");
+    // extreme numbers wrap as the original's 32-bit arithmetic does and never panic
+    for (a, b) in [(i32::MAX, i32::MAX), (i32::MIN, i32::MIN), (i32::MAX, 0), (i32::MIN, 5), (3, i32::MAX), (-1, i32::MIN)] {
+        let _ = sub("Hello World", a, b);
+    }
+    // not UTF-8 text reaches the runtime already made lossy: a slice never cuts a character in the middle
+    let part = script::blocks::strings::substring(&[0xe9, b'a', 0xff, b'b', 0xc3], 1, 3);
+    assert_eq!(part, vec![b'a', 0xff, b'b']);
+}
+
+/// A random expression over the C reference's grammar (numbers, a, b, PI, + - * /, parentheses, unary signs), with
+/// spaces; divisors are plain nonzero numbers or variables, so no NaN is made.
+fn expression(r: &mut Rng, depth: usize) -> String {
+    let atom = |r: &mut Rng| -> String {
+        r.pick(&["0", "1", "2", "2.5", "0.1", "10", ".5", "a", "b", "A", "pi", "PI", "3"]).to_string()
+    };
+    let nonzero = |r: &mut Rng| -> String { r.pick(&["1", "2", "2.5", "0.1", "10", "a", "b", "pi"]).to_string() };
+    if depth == 0 || r.below(4) == 0 {
+        return atom(r);
+    }
+    // (the harness reads a value up to the next blank: no spaces here; the spaces are in the independent test)
+    match r.below(6) {
+        0 => format!("({})", expression(r, depth - 1)),
+        1 => format!("-{}", atom(r)),
+        2 => format!("{}*{}", expression(r, depth - 1), atom(r)),
+        3 => format!("{}/{}", expression(r, depth - 1), nonzero(r)),
+        4 => format!("{}+{}", expression(r, depth - 1), expression(r, depth - 1)),
+        _ => format!("{}-{}", expression(r, depth - 1), expression(r, depth - 1)),
+    }
+}
+
+#[test]
+fn calculator() {
+    sweep("Calculator", |r| {
+        // sometimes a broken expression: both sides log it and leave x alone
+        let e = match r.below(8) {
+            0 => r.pick(&["", "1+", "(1", "1)", "c", "ab", "*2", "1..2", "2a", "a*"]).to_string(),
+            _ => expression(r, 3),
+        };
+        let t = r.pick(&["float", "int"]);
+        let b = B::new(0, proto::CALCULATOR, 1, 1)
+            .pin("string", e)
+            .pin(r.pick(&["float", "int"]), r.pick(&["-3", "1", "2", "7"]))
+            .pin(t, r.pick(&["1", "2", "5"]))
+            .pout("float", "9")
+            .local("string", "")
+            .local("int", 0);
+        frame(r, b, &[(0, 0, &[1])])
+    });
+}
+
+/// An expression as a tree, evaluated by a second implementation (the oracle of this test): every binary result is
+/// rounded to single precision, as the block does.
+#[derive(Clone, Debug)]
+enum Ex {
+    Num(f32),
+    Var(usize),
+    Neg(Box<Ex>),
+    Bin(char, Box<Ex>, Box<Ex>),
+    Fun(&'static str, Box<Ex>),
+}
+
+fn gen_ex(r: &mut Rng, depth: usize) -> Ex {
+    if depth == 0 || r.below(5) == 0 {
+        return if r.below(2) == 0 {
+            Ex::Num(r.pick(&[0.5f32, 1.0, 2.0, 3.0, 0.25, 10.0, 1.5]))
+        } else {
+            Ex::Var(r.below(3))
+        };
+    }
+    match r.below(7) {
+        0 => Ex::Neg(Box::new(gen_ex(r, depth - 1))),
+        1 => Ex::Fun(
+            r.pick(&["sin", "cos", "abs", "sqrt", "ln", "exp", "atan", "floor"]),
+            Box::new(gen_ex(r, depth - 1)),
+        ),
+        _ => Ex::Bin(
+            r.pick(&['+', '-', '*', '/', '^']),
+            Box::new(gen_ex(r, depth - 1)),
+            Box::new(gen_ex(r, depth - 1)),
+        ),
+    }
+}
+
+fn eval_ex(e: &Ex, v: &[f32; 3]) -> f64 {
+    let rd = |x: f64| f64::from(x as f32);
+    match e {
+        Ex::Num(n) => f64::from(*n),
+        Ex::Var(i) => f64::from(v[*i]),
+        Ex::Neg(a) => -eval_ex(a, v),
+        Ex::Fun(f, a) => {
+            let a = eval_ex(a, v);
+            rd(match *f {
+                "sin" => a.sin(),
+                "cos" => a.cos(),
+                "abs" => a.abs(),
+                "sqrt" => a.sqrt(),
+                "ln" => a.ln(),
+                "exp" => a.exp(),
+                "atan" => a.atan(),
+                _ => a.floor(),
+            })
+        }
+        Ex::Bin(o, a, b) => {
+            let (a, b) = (eval_ex(a, v), eval_ex(b, v));
+            rd(match o {
+                '+' => a + b,
+                '-' => a - b,
+                '*' => a * b,
+                '/' => a / b,
+                _ => a.powf(b),
+            })
+        }
+    }
+}
+
+/// Printed with parentheses everywhere a precedence could matter, with random extra ones and spaces.
+fn print_ex(e: &Ex, r: &mut Rng) -> String {
+    let sp = |r: &mut Rng| r.pick(&["", " "]);
+    match e {
+        Ex::Num(n) => format!("{n}"),
+        Ex::Var(i) => ["a", "b", "c"][*i].to_uppercase_if(r.below(2) == 0),
+        Ex::Neg(a) => format!("(-{})", print_ex(a, r)),
+        Ex::Fun(f, a) => format!("{}{}({})", f.to_uppercase_if(r.below(2) == 0), sp(r), print_ex(a, r)),
+        Ex::Bin(o, a, b) => format!("({}{}{o}{}{})", print_ex(a, r), sp(r), sp(r), print_ex(b, r)),
+    }
+}
+
+trait CaseIf {
+    fn to_uppercase_if(&self, up: bool) -> String;
+}
+impl CaseIf for str {
+    fn to_uppercase_if(&self, up: bool) -> String {
+        if up { self.to_uppercase() } else { self.to_string() }
+    }
+}
+
+/// The calculator against an independent evaluation of random expression trees over the whole grammar (the C
+/// reference knows only part of it): the result is the same single-precision number, or both are not numbers.
+#[test]
+fn calculator_matches_an_independent_evaluation_on_random_expressions() {
+    for seed in 0..400u64 {
+        let mut r = Rng::new(seed);
+        let tree = gen_ex(&mut r, 4);
+        let vals = [r.pick(&[0.5f32, 2.0, 3.0, 0.75]), r.pick(&[1.0f32, 4.0, 2.5]), r.pick(&[2.0f32, 0.125])];
+        let text = print_ex(&tree, &mut r);
+        let want = eval_ex(&tree, &vals) as f32;
+        let b = B::new(0, proto::CALCULATOR, 1, 1)
+            .pin("string", &text)
+            .pin("float", vals[0])
+            .pin("float", vals[1])
+            .pin("float", vals[2])
+            .pout("float", "9")
+            .local("string", "");
+        let got = once(b);
+        let shown = format!("pout B0 0 {:08x}", want.to_bits());
+        if want.is_nan() {
+            // NaN is whatever the hardware makes: only "a NaN" is checked
+            let bits = u32::from_str_radix(got.rsplit(' ').next().unwrap(), 16).unwrap();
+            assert!(f32::from_bits(bits).is_nan(), "{text}: {got}");
+        } else {
+            assert_eq!(got, shown, "seed {seed}: {text}");
+        }
+    }
+}
+
+#[test]
+fn calculator_hand_values_and_caps() {
+    let calc = |e: &str, a: f32, b: f32| {
+        once(
+            B::new(0, proto::CALCULATOR, 1, 1)
+                .pin("string", e)
+                .pin("float", a)
+                .pin("float", b)
+                .pout("float", "9")
+                .local("string", ""),
+        )
+    };
+    let bits = |x: f32| format!("pout B0 0 {:08x}", x.to_bits());
+    // the maps' expressions
+    assert_eq!(calc("(a^2+a)*2", 3.0, 0.0), bits(24.0));
+    assert_eq!(calc("sin(a*b)/2+0.5", 0.0, 5.0), bits(0.5));
+    let n = (-2.0f64 * 0.25f64.ln()).sqrt() * (2.0 * f64::from(3.141_592_7_f32) * 0.0).cos();
+    assert_eq!(calc("sqrt(-2*ln(a))*cos(2*pi*b)", 0.25, 0.0), bits(n as f32));
+    // a syntax error leaves x as it was (9, the pout's start in the harness: the bits of 9.0 are not written)
+    assert_eq!(calc("1+", 0.0, 0.0), format!("pout B0 0 {:08x}", 9.0f32.to_bits()));
+    // caps: 20 nested parentheses are fine, 40 are not; the expression is read to 511 bytes
+    let deep = |n: usize| format!("{}a{}", "(".repeat(n), ")".repeat(n));
+    assert_eq!(calc(&deep(20), 4.0, 0.0), bits(4.0));
+    assert_eq!(calc(&deep(40), 4.0, 0.0), format!("pout B0 0 {:08x}", 9.0f32.to_bits()));
+    let long = vec!["1"; 129].join("+");
+    assert_eq!(calc(&long, 0.0, 0.0), format!("pout B0 0 {:08x}", 9.0f32.to_bits()));
+    assert_eq!(calc(&"9".repeat(100_000), 0.0, 0.0), calc(&"9".repeat(511), 0.0, 0.0));
+}
+
+#[test]
+fn iterator_if_sweep() {
+    sweep("Iterator If", |r| {
+        let b = B::new(0, proto::ITERATOR_IF, 2, 2)
+            .target("array", array_target(r))
+            .pin("int", r.pick(&[-1, 0, 1, 2, 3, 4]))
+            .pin("int", r.pick(&[0, 1, 2, 3, 4, 5, 6, 7]));
+        let b = typed_pin(r, b).pout("int", 9);
+        let mut b = b;
+        for _ in 0..3 {
+            b = typed_pout(r, b);
+        }
+        typed_loops(r, b, &[(1, 1, &[0, 1, 2]), (0, 0, &[3])])
+    });
+}
+
+/// Shuffle Order has no C reference: it keeps every row, in some order, the same one for the same run.
+#[test]
+fn shuffle_order_keeps_the_rows() {
+    let build = || {
+        let b = B::new(0, proto::SHUFFLE_ORDER, 1, 1).target("array", 0);
+        let mut s = frame(&mut Rng::new(1), b, &[]);
+        s.arrays = vec![(1, 8, -1, "", 0)];
+        s.links.clear();
+        s.link(None, (0, 0), 0);
+        s.frames = 3;
+        s.run()
+    };
+    let t = build();
+    let rows = |t: &str| -> Vec<String> {
+        t.rsplit("frame 3").next().unwrap().lines().filter(|l| l.starts_with("row")).map(String::from).collect()
+    };
+    let mut got = rows(&t);
+    assert_eq!(t, build(), "the same run shuffles the same way");
+    assert_ne!(got, (0..8).map(|i| format!("row {}", 10 * i)).collect::<Vec<_>>(), "it moved rows");
+    got.sort();
+    let mut want: Vec<String> = (0..8).map(|i| format!("row {}", 10 * i)).collect();
+    want.sort();
+    assert_eq!(got, want);
 }

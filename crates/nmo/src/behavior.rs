@@ -185,6 +185,8 @@ pub fn parameter_in(chunk: &Chunk) -> Result<ParameterIn> {
 pub enum Saved {
     /// A type with its own sub-chunk (not decoded).
     SubChunk,
+    /// A 2D curve (the progression shape of Bezier Progression and Bezier Transform).
+    Curve(crate::curve2d::Curve2d),
     /// The raw bytes of a plain value (int, float, bool, string, vector, matrix, colour...).
     Bytes(Vec<u8>),
     /// A message or attribute type, stored by name.
@@ -226,7 +228,18 @@ pub fn parameter(chunk: &Chunk) -> Result<Parameter> {
     let guid = remap(stored);
     let mode = w.u32()?;
     let value = match mode {
-        0 => Saved::SubChunk,
+        0 => {
+            let curve = (stored == crate::curve2d::GUID)
+                .then(|| {
+                    let sub = w.sub_chunk(chunk.chunk_version).ok()?;
+                    crate::curve2d::Curve2d::from_parameter(&sub).ok().flatten()
+                })
+                .flatten();
+            match curve {
+                Some(c) => Saved::Curve(c),
+                None => Saved::SubChunk,
+            }
+        }
         1 => {
             if stored == PG_PARAMTYPE {
                 Saved::Type(Guid(w.u32()?, w.u32()?))

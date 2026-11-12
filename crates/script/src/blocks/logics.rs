@@ -1055,6 +1055,115 @@ pub(crate) fn linear_progression(
     Flow::Done
 }
 
+/// The progression curve a block's pin holds; none when the pin has no curve.
+fn curve_of(v: &Value) -> Option<std::sync::Arc<nmo::curve2d::Curve2d>> {
+    match v {
+        Value::Curve(c) => Some(c.clone()),
+        _ => None,
+    }
+}
+
+pub(crate) fn bezier_progression(
+    rt: &mut Runtime,
+    id: Id,
+    b: &Block,
+    proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    // The original (Bezier Progression, written from the player's code): Value = A + (B - A) * curve(elapsed /
+    // duration, at most 1). Always time based; Elapsed Time lives in its output, grows by the tick on every run
+    // (the first run of In included) and Out fires once it exceeds the duration. A block whose curve the file
+    // does not give runs as a straight line (a new block's curve).
+    let curve = curve_of(&pin(rt, b, "Progression Curve", 3, host));
+    let y = |x: f32| match &curve {
+        Some(c) => c.get_y(x),
+        None => x.clamp(0.0, 1.0),
+    };
+    let start = active(rt, b, 0);
+    if !start && !active(rt, b, 1) {
+        return Flow::Done;
+    }
+    let duration = pin(rt, b, "Duration", 0, host).as_float();
+    let a = pin(rt, b, "A", 1, host).as_float();
+    let c = pin(rt, b, "B", 2, host).as_float();
+    let _ = (id, proto);
+    let mut elapsed = 0.0f32;
+    let mut prev = 0.0f32;
+    if start {
+        input(rt, b, 0);
+        prev = (c - a) * y(0.0) + a;
+    } else {
+        input(rt, b, 1);
+        elapsed = pout_value(rt, b, 0).map_or(0.0, |v| v.as_float());
+        prev = pout_value(rt, b, 1).map_or(prev, |v| v.as_float());
+    }
+    elapsed += host.delta_ms();
+    let mut progress = elapsed / duration;
+    if progress > 1.0 || progress.is_nan() {
+        progress = 1.0;
+    }
+    let value = (c - a) * y(progress) + a;
+    set_pout(rt, b, "Elapsed Time", 0, Value::Float(elapsed));
+    set_pout(rt, b, "Value", 1, Value::Float(value));
+    set_pout(rt, b, "Delta", 2, Value::Float(value - prev));
+    set_pout(rt, b, "Progression", 3, Value::Float(progress));
+    out(rt, b, if duration < elapsed { 0 } else { 1 });
+    Flow::Done
+}
+
+pub(crate) fn bezier_transform(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _proto: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    // Y = bottom + curve((X - left) / (right - left)) * (top - bottom): the boundaries (left, top, right, bottom)
+    // map the X range onto the curve's 0..1 and the curve's 0..1 onto the Y range. With the local "Use 4 Floats
+    // As Boundaries" the rectangle comes as four floats (the pins after the curve) in the same order.
+    // No block of the player's libraries is the reference for this one: the reading is the block's documented
+    // interface and the boundaries of the maps that use it (a default rectangle of 0, 1, 1, 0 is the identity).
+    if !input(rt, b, 0) {
+        return Flow::Done;
+    }
+    let x = pin(rt, b, "X", 0, host).as_float();
+    let curve = curve_of(&pin(rt, b, "Progression Curve", 1, host));
+    let rect = if matches!(local(rt, b, 0), Value::Bool(true)) {
+        let f = |rt: &mut Runtime, host: &mut dyn Host, i: usize| {
+            b.pins
+                .get(i)
+                .copied()
+                .map_or(0.0, |p| rt.read(p, host).as_float())
+        };
+        [
+            f(rt, host, 2),
+            f(rt, host, 3),
+            f(rt, host, 4),
+            f(rt, host, 5),
+        ]
+    } else {
+        match pin(rt, b, "Boundaries", 2, host) {
+            Value::Rect(r) => r,
+            _ => [0.0, 1.0, 1.0, 0.0],
+        }
+    };
+    let [left, top, right, bottom] = rect;
+    let width = right - left;
+    let t = if width == 0.0 || !width.is_finite() {
+        0.0
+    } else {
+        (x - left) / width
+    };
+    let u = match &curve {
+        Some(c) => c.get_y(t),
+        None => t.clamp(0.0, 1.0),
+    };
+    let y = bottom + u * (top - bottom);
+    set_pout(rt, b, "Y", 0, Value::Float(if y.is_finite() { y } else { 0.0 }));
+    out(rt, b, 0);
+    Flow::Done
+}
+
 pub(crate) fn interpolator(
     rt: &mut Runtime,
     _id: Id,
@@ -1754,12 +1863,24 @@ pub(super) const PROTOS: &[Proto] = &[
         guid: proto::BEZIER_PROGRESSION,
         name: "Bezier Progression",
         library: Library::Logics,
-        pins: &["Duration", "A", "B"],
+        pins: &["Duration", "A", "B", "Progression Curve"],
         pouts: &["Elapsed Time", "Value", "Delta", "Progression"],
         flags: 0,
-        standing: Standing::Partial,
+        standing: Standing::Full,
         layouts: &[],
-        run: linear_progression,
+        run: bezier_progression,
+        event: None,
+    },
+    Proto {
+        guid: proto::BEZIER_TRANSFORM,
+        name: "Bezier Transform",
+        library: Library::Logics,
+        pins: &["X", "Progression Curve", "Boundaries"],
+        pouts: &["Y"],
+        flags: 0,
+        standing: Standing::Full,
+        layouts: &[],
+        run: bezier_transform,
         event: None,
     },
     Proto {

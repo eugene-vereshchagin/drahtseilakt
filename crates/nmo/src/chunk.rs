@@ -117,6 +117,53 @@ impl<'a> Words<'a> {
         Ok(s)
     }
 
+    /// A sub-chunk stored inline (CKStateChunk::ReadSubChunk, parent chunk version 4 and later): its size in
+    /// words, then class id, version, word count, file flag, id count, sub-chunk count, manager count (parent
+    /// version above 4), then the words. Only the words are kept (the lists behind them are skipped).
+    pub fn sub_chunk(&mut self, parent_chunk_version: u8) -> Result<Chunk> {
+        let bad = |what| Error::Malformed {
+            part: Part::Data,
+            what,
+        };
+        let size = self.u32()? as usize;
+        if size == 0 || size > self.remaining() || parent_chunk_version < 4 {
+            return Err(bad("sub-chunk size"));
+        }
+        let start = self.pos;
+        let class_id = self.u32()?;
+        let version = self.u32()?;
+        let count = self.u32()? as usize;
+        let file = self.u32()?;
+        let ids = self.u32()? as usize;
+        let subs = self.u32()? as usize;
+        let managers = if parent_chunk_version > 4 {
+            self.u32()? as usize
+        } else {
+            0
+        };
+        let need = count
+            .checked_add(ids)
+            .and_then(|n| n.checked_add(subs))
+            .and_then(|n| n.checked_add(managers))
+            .ok_or(bad("sub-chunk lists"))?;
+        if need > self.remaining() {
+            return Err(bad("sub-chunk length"));
+        }
+        let words = self.take(count)?.to_vec();
+        let options = (if file == 1 { 8 } else { 0 })
+            | (if ids != 0 { 1 } else { 0 })
+            | (if subs != 0 { 4 } else { 0 })
+            | (if managers != 0 { 2 } else { 0 });
+        self.pos = start.saturating_add(size).min(self.words.len());
+        Ok(Chunk {
+            data_version: version as u8,
+            class_id: class_id as u8,
+            chunk_version: (version >> 16) as u8,
+            options,
+            words,
+        })
+    }
+
     /// A string: its length in bytes, then the bytes padded to whole words. The trailing NUL and anything
     /// after it (some writers leave garbage in the padding) are dropped.
     pub fn string(&mut self) -> Result<Vec<u8>> {

@@ -1151,6 +1151,115 @@ fn a_progression_runs_from_a_to_b_and_ends() {
     assert!(!rt.is_active(script), "and stops");
 }
 
+fn line_curve(y0: f32, y1: f32) -> Value {
+    use nmo::curve2d::{Curve2d, Point};
+    let p = |x: f32, y: f32| Point {
+        pos: [x, y],
+        flags: 2,
+        ..Point::default()
+    };
+    Value::Curve(Arc::new(Curve2d::new(vec![p(0.0, y0), p(1.0, y1)])))
+}
+
+const CURVE2D: Guid = Guid(0x20ad_345d, 0x1afb_25b1);
+
+/// Bezier Progression follows the original: Elapsed Time grows by the tick on the first run too, Value is
+/// A + (B - A) * curve(elapsed / duration), Out comes once the elapsed time exceeds the duration.
+#[test]
+fn a_bezier_progression_follows_its_curve_and_ends() {
+    let mut b = Build::new();
+    let f = |b: &mut Build, name: &str, v: f32| {
+        let l = b.local(name, types::FLOAT, Value::Float(v));
+        b.pin(name, types::FLOAT, l)
+    };
+    let (time, a, c) = (
+        f(&mut b, "Duration", 100.0),
+        f(&mut b, "A", 2.0),
+        f(&mut b, "B", 12.0),
+    );
+    // the curve falls from 1 to 0: the value goes from B to A
+    let cl = b.local("Progression Curve", CURVE2D, line_curve(1.0, 0.0));
+    let cp = b.pin("Progression Curve", CURVE2D, cl);
+    let outs: Vec<Id> = ["Elapsed Time", "Value", "Delta", "Progression"]
+        .iter()
+        .map(|n| b.pout(n, types::FLOAT))
+        .collect();
+    let (elapsed, value, delta, progress) = (outs[0], outs[1], outs[2], outs[3]);
+    let prog = b.bb(
+        "Bezier Progression",
+        proto::BEZIER_PROGRESSION,
+        &["In", "Loop In"],
+        &["Out", "Loop Out"],
+        vec![time, a, c, cp],
+        outs,
+        vec![],
+        None,
+    );
+    let start = b.io("Start");
+    let l1 = b.link(start, in_of(&b.g, prog, 0), 0);
+    let l2 = b.link(out_of(&b.g, prog, 1), in_of(&b.g, prog, 1), 1);
+    let script = b.script("S", None, start, vec![prog], vec![l1, l2]);
+    let mut rt = Runtime::new(b.done());
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    let tick = 1000.0 / 60.0;
+    // the first run: elapsed = one tick, progress 1/6, value = 2 + 10 * (1 - 1/6)
+    assert!((rt.values[elapsed].as_float() - tick).abs() < 1e-3);
+    assert!((rt.values[progress].as_float() - 1.0 / 6.0).abs() < 1e-4);
+    assert!((rt.values[value].as_float() - (2.0 + 10.0 * (1.0 - 1.0 / 6.0))).abs() < 1e-3);
+    // delta: from the value at 0 (B = 12) to the first value
+    assert!((rt.values[delta].as_float() - (rt.values[value].as_float() - 12.0)).abs() < 1e-3);
+    for _ in 0..8 {
+        rt.tick(&mut host);
+    }
+    assert_eq!(rt.values[progress], Value::Float(1.0));
+    assert_eq!(rt.values[value], Value::Float(2.0), "it ends at A, the curve's 0");
+    assert!(!rt.is_active(script), "Out fired and nothing looped back");
+}
+
+/// Bezier Transform: Y = bottom + curve((X - left) / (right - left)) * (top - bottom).
+#[test]
+fn a_bezier_transform_maps_x_through_the_curve_and_the_boundaries() {
+    let run = |x: f32, curve: Value, rect: [f32; 4]| -> f32 {
+        let mut b = Build::new();
+        let xl = b.local("X", types::FLOAT, Value::Float(x));
+        let xp = b.pin("X", types::FLOAT, xl);
+        let cl = b.local("Progression Curve", CURVE2D, curve);
+        let cp = b.pin("Progression Curve", CURVE2D, cl);
+        let rl = b.local("Boundaries", types::RECT, Value::Rect(rect));
+        let rp = b.pin("Boundaries", types::RECT, rl);
+        let y = b.pout("Y", types::FLOAT);
+        let local = b.local("Use 4 Floats As Boundaries", types::BOOL, Value::Bool(false));
+        let t = b.bb(
+            "Bezier Transform",
+            proto::BEZIER_TRANSFORM,
+            &["In"],
+            &["Out"],
+            vec![xp, cp, rp],
+            vec![y],
+            vec![local],
+            None,
+        );
+        let start = b.io("Start");
+        let l1 = b.link(start, in_of(&b.g, t, 0), 0);
+        b.script("S", None, start, vec![t], vec![l1]);
+        let mut rt = Runtime::new(b.done());
+        rt.tick(&mut Rec::new());
+        rt.values[y].as_float()
+    };
+    // a straight curve: the boundaries alone
+    assert_eq!(run(60.0, line_curve(0.0, 1.0), [0.0, 120.0, 120.0, 0.0]), 60.0);
+    assert_eq!(run(0.8, line_curve(0.0, 1.0), [0.0, 1.25, 1.0, 0.0]), 1.0);
+    // a falling curve: Y = 120 * (1 - 0.25)
+    assert_eq!(run(30.0, line_curve(1.0, 0.0), [0.0, 120.0, 120.0, 0.0]), 90.0);
+    // X outside the range is the curve's end value; a rectangle of no width reads the curve at 0
+    assert_eq!(run(500.0, line_curve(0.0, 1.0), [0.0, 10.0, 100.0, 0.0]), 10.0);
+    assert_eq!(run(-9.0, line_curve(0.0, 1.0), [0.0, 10.0, 100.0, 2.0]), 2.0);
+    assert_eq!(run(5.0, line_curve(0.0, 1.0), [3.0, 10.0, 3.0, 0.0]), 0.0);
+    // no curve in the file: the identity shape
+    assert_eq!(run(25.0, Value::None, [0.0, 1.0, 100.0, 0.0]), 0.25);
+}
+
 /// Random gives the same numbers in every run, within its bounds; the group blocks reach the engine.
 #[test]
 fn random_repeats_and_groups_change() {
@@ -1292,7 +1401,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them), the sounds, the input blocks and the cameras (Set As Active Camera,
     // Set Clipping Planes, Set FOV)
-    assert_eq!(all.len(), 154); // the seven scene blocks (Object Create ... Shuffle Order) and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp, the five environment and the 11 material blocks
+    assert_eq!(all.len(), 159); // the strings, Calculator and Bezier Transform (five), the seven scene blocks (Object Create ... Shuffle Order) and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp, the five environment and the 11 material blocks
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(

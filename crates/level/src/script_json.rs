@@ -61,6 +61,24 @@ fn value(v: &Value) -> J {
         Value::Box(a) => json!(["box", a.map(num)]),
         Value::Objects(v) => json!(["oa", v]),
         Value::Raw(b) => json!(["r", hex(b)]),
+        Value::Curve(c) => json!([
+            "curve",
+            c.points
+                .iter()
+                .map(|p| json!([
+                    p.flags,
+                    num(p.pos[0]),
+                    num(p.pos[1]),
+                    num(p.tension),
+                    num(p.continuity),
+                    num(p.bias),
+                    num(p.tan_in[0]),
+                    num(p.tan_in[1]),
+                    num(p.tan_out[0]),
+                    num(p.tan_out[1]),
+                ]))
+                .collect::<Vec<_>>()
+        ]),
         Value::Owner => json!(["this", 0]),
     }
 }
@@ -142,6 +160,32 @@ fn value_of(j: &J) -> Result<Value, String> {
                 .collect::<Result<_, _>>()?,
         ),
         "this" => Value::Owner,
+        "curve" => {
+            let pts = x.as_array().ok_or("script curve expected")?;
+            if pts.len() > nmo::curve2d::MAX_POINTS {
+                return Err("script curve has too many points".into());
+            }
+            let mut points = Vec::new();
+            for p in pts {
+                let f = floats::<9>(&json!(p.as_array().and_then(|a| a.get(1..)).unwrap_or_default()))?;
+                let flags = p
+                    .as_array()
+                    .and_then(|a| a.first())
+                    .and_then(J::as_u64)
+                    .and_then(|x| u32::try_from(x).ok())
+                    .ok_or("script curve flags expected")?;
+                points.push(nmo::curve2d::Point {
+                    flags,
+                    pos: [f[0], f[1]],
+                    tension: f[2],
+                    continuity: f[3],
+                    bias: f[4],
+                    tan_in: [f[5], f[6]],
+                    tan_out: [f[7], f[8]],
+                });
+            }
+            Value::Curve(std::sync::Arc::new(nmo::curve2d::Curve2d::new(points)))
+        }
         "r" => Value::Raw(unhex(x.as_str().ok_or("script bytes expected")?)?),
         _ => return Err("unknown script value".into()),
     })
@@ -490,6 +534,19 @@ mod tests {
                     vec![Value::Rect([1.0, 2.0, 3.0, 4.0])],
                     vec![Value::Box([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])],
                     vec![Value::Objects(vec![Some(0), None])],
+                    vec![Value::Curve(std::sync::Arc::new(nmo::curve2d::Curve2d::new(vec![
+                        nmo::curve2d::Point {
+                            pos: [0.0, 0.0],
+                            flags: 3,
+                            tan_out: [1.0, 0.5],
+                            ..nmo::curve2d::Point::default()
+                        },
+                        nmo::curve2d::Point {
+                            pos: [1.0, 1.0],
+                            tension: 0.5,
+                            ..nmo::curve2d::Point::default()
+                        },
+                    ])))],
                 ],
                 key: Some(0),
             }],
