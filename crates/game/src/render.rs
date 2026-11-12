@@ -491,13 +491,451 @@ pub struct Renderer {
     pub retro: Option<crate::retro::Retro>,
 }
 
+/// A range in shared chunk `.0`: its offset and length.
+type Range = (usize, u64, u64);
+
+struct MeshPlan {
+    vertex: Range,
+    parts: Vec<(Range, u32, usize, Option<(Range, PipelineKey)>)>,
+}
+
+/// Meshes packed into chunks of bytes (each to become one buffer), with where each mesh's pieces lie. Made without
+/// the card, so a loading thread can do it.
+pub struct PackedMeshes {
+    chunks: Vec<Vec<u8>>,
+    plans: Vec<Option<MeshPlan>>,
+}
+
+impl PackedMeshes {
+    /// The meshes once the chunks are buffers (`buffers[i]` holds chunk `i`).
+    fn assemble(self, buffers: Vec<wgpu::Buffer>) -> Vec<Option<GpuMesh>> {
+        let slice = |(c, off, len): Range| BufSlice {
+            buf: buffers[c].clone(),
+            off,
+            len,
+        };
+        self.plans
+            .into_iter()
+            .map(|p| {
+                p.map(|p| GpuMesh {
+                    vertex: slice(p.vertex),
+                    parts: p
+                        .parts
+                        .into_iter()
+                        .map(|(index, count, material, channel)| GpuPart {
+                            index: slice(index),
+                            count,
+                            material,
+                            channel: channel.map(|(r, k)| (slice(r), k)),
+                        })
+                        .collect(),
+                })
+            })
+            .collect()
+    }
+}
+
+fn pack_meshes(meshes: Vec<Option<MeshCpu>>) -> PackedMeshes {
+    let mut chunks: Vec<Vec<u8>> = vec![Vec::new()];
+    // a range in chunk `c`, to be turned into a slice once the chunk is a buffer
+    let mut put = |data: &[u8]| -> Range {
+        if chunks
+            .last()
+            .is_some_and(|c| !c.is_empty() && c.len() + data.len() > POOL_BYTES)
+        {
+            chunks.push(Vec::new());
+        }
+        let c = chunks.len() - 1;
+        let last = &mut chunks[c];
+        let off = last.len() as u64;
+        last.extend_from_slice(data);
+        while last.len() % 4 != 0 {
+            last.push(0);
+        }
+        (c, off, data.len() as u64)
+    };
+    let plans: Vec<Option<MeshPlan>> = meshes
+        .iter()
+        .map(|m| {
+            m.as_ref().map(|m| MeshPlan {
+                vertex: put(&m.vertex),
+                parts: m
+                    .parts
+                    .iter()
+                    .map(|p| {
+                        (
+                            put(&p.index),
+                            p.count,
+                            p.material,
+                            p.channel.as_ref().map(|c| (put(&c.0), c.1)),
+                        )
+                    })
+                    .collect(),
+            })
+        })
+        .collect();
+    PackedMeshes { chunks, plans }
+}
+
+/// What a model's meshes are as bytes, ready to go to the card (the part of the upload that needs no card): made
+/// by a loading thread. `material_count` is the model's number of materials.
+pub fn prepare_meshes(level: &Level) -> PackedMeshes {
+    let default_material = level.materials.len();
+    pack_meshes(
+        level
+            .meshes
+            .iter()
+            .map(|m| m.look.as_deref().unwrap_or(m))
+            .map(|m| Renderer::gpu_mesh_cpu(m, default_material))
+            .collect(),
+    )
+}
+
+/// The textures a model draws with that are to be read: planned one after another (the level's budget is taken in
+/// its own order).
+pub fn texture_plans(
+    level: &Level,
+    load: &TextureLoader<'_>,
+    bc: bool,
+) -> Vec<(usize, gamedata::assets::TexturePlan)> {
+    // only the textures a material draws with are loaded (a level may list textures it never uses: the loader
+    // points a texture named twice at one of them)
+    let mut used: std::collections::HashSet<usize> = level
+        .materials
+        .iter()
+        .flat_map(|m| m.texture.into_iter().chain(m.normal))
+        .collect();
+    // a map whose scripts set textures may set any of its own (the loader's budget still applies)
+    if level
+        .scripts
+        .as_ref()
+        .is_some_and(|g| g.uses_proto(script::SET_TEXTURE))
+    {
+        used.extend(0..level.textures.len());
+    }
+    level
+        .textures
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| used.contains(i))
+        .filter_map(|(i, t)| load(t, bc).map(|p| (i, p)))
+        .collect()
+}
+
+/// How many bytes of a texture a loading thread writes at once: each write has its own cost, and its time holds up
+/// no frame.
+const BAND_BYTES: usize = 512 << 10;
+
+/// A texture on its way up, written band by band so a frame can take a few of them and go on.
+pub struct TexJob {
+    tex: wgpu::Texture,
+    data: gamedata::gputex::TextureData,
+    block: u32,
+    mip: usize,
+    /// The next row (in pixels, a whole number of blocks) of the level to write.
+    row: u32,
+    /// The bytes written at once.
+    band: usize,
+}
+
+impl TexJob {
+    /// Writes bands of the texture until `deadline` (at least one); true when all are written.
+    fn bands(&mut self, queue: &wgpu::Queue, deadline: std::time::Instant) -> bool {
+        loop {
+            let Some(m) = self.data.mips.get(self.mip) else {
+                break;
+            };
+            let block = self.block;
+            let (w, h) = (
+                m.width.div_ceil(block) * block,
+                m.height.div_ceil(block) * block,
+            );
+            let row_bytes = (w / block) as usize * self.data.format.block_bytes();
+            let rows_at_once = (self.band / row_bytes.max(1)).max(1) as u32;
+            let first = self.row / block;
+            let rows = rows_at_once.min(h / block - first);
+            if let Some(level) = self.data.level(m) {
+                let from = first as usize * row_bytes;
+                let to = (first + rows) as usize * row_bytes;
+                queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &self.tex,
+                        mip_level: self.mip as u32,
+                        origin: wgpu::Origin3d {
+                            x: 0,
+                            y: self.row,
+                            z: 0,
+                        },
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    level.get(from..to).unwrap_or_default(),
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some((row_bytes) as u32),
+                        rows_per_image: Some(rows),
+                    },
+                    wgpu::Extent3d {
+                        width: w,
+                        height: rows * block,
+                        depth_or_array_layers: 1,
+                    },
+                );
+            }
+            self.row += rows * block;
+            if self.row >= h {
+                self.row = 0;
+                self.mip += 1;
+            }
+            // the card does the copying at the submit: each band is sent, so the time is spent where it is counted
+            queue.submit([]);
+            if std::time::Instant::now() >= deadline {
+                break;
+            }
+        }
+        self.mip >= self.data.mips.len()
+    }
+}
+
+/// The steps of one model's upload after its textures are on the card: materials, the meshes' buffers, pipelines.
+/// `step` does what fits before `deadline` and says when the model is done (`None` deadline: all at once).
+pub struct ModelBuild {
+    src: Vec<level::Material>,
+    textures: Vec<Option<wgpu::TextureView>>,
+    keyed: Vec<bool>,
+    same: std::collections::HashMap<String, GpuMaterial>,
+    materials: Vec<GpuMaterial>,
+    packed: Option<PackedMeshes>,
+    buffers: Vec<wgpu::Buffer>,
+    meshes: Option<Vec<Option<GpuMesh>>>,
+    keys: Vec<PipelineKey>,
+    pipelines: usize,
+    particles: usize,
+    /// The longest single step so far.
+    worst: std::time::Duration,
+}
+
+impl ModelBuild {
+    /// `packed`: the meshes' bytes when a loading thread made them, else they are made here.
+    pub fn new(
+        level: &Level,
+        textures: Vec<Option<wgpu::TextureView>>,
+        packed: Option<PackedMeshes>,
+    ) -> ModelBuild {
+        ModelBuild {
+            src: level.materials.clone(),
+            keyed: level
+                .textures
+                .iter()
+                .map(|t| t.color_key.is_some())
+                .collect(),
+            textures,
+            same: Default::default(),
+            materials: Vec::new(),
+            packed: Some(packed.unwrap_or_else(|| prepare_meshes(level))),
+            buffers: Vec::new(),
+            meshes: None,
+            keys: Vec::new(),
+            pipelines: 0,
+            particles: 0,
+            worst: Default::default(),
+        }
+    }
+
+    pub fn step(
+        &mut self,
+        r: &mut Renderer,
+        deadline: Option<std::time::Instant>,
+    ) -> Option<Model> {
+        // a step is not begun when the longest step seen so far would not end before the deadline
+        let mut last = std::time::Instant::now();
+        let mut worst = self.worst;
+        // (the first step of a call always runs, or a step longer than the slice would never be taken)
+        let mut begun = false;
+        let mut late = |d: Option<std::time::Instant>| {
+            let now = std::time::Instant::now();
+            if begun {
+                worst = worst.max(now - last);
+            }
+            last = now;
+            let stop = begun && d.is_some_and(|d| now + worst >= d);
+            begun = true;
+            stop
+        };
+        // materials alike in all they draw with share one buffer and bind group (a map may carry a thousand copies
+        // of one: each cost 4 ms on a software adapter)
+        while self.materials.len() < self.src.len() {
+            if late(deadline) {
+                self.worst = worst;
+                return None;
+            }
+            let m = self.src[self.materials.len()].clone();
+            let mut same = m.clone();
+            same.name.clear();
+            let g = match self.same.get(&format!("{same:?}")) {
+                Some(g) => g.clone(),
+                None => {
+                    let g = r.gpu_material(
+                        &m,
+                        &self.textures,
+                        &self.keyed,
+                        (Z_FUNC_DEFAULT, ALPHA_FUNC_DEFAULT),
+                    );
+                    self.same.insert(format!("{same:?}"), g.clone());
+                    g
+                }
+            };
+            self.materials.push(g);
+        }
+        if self.materials.len() == self.src.len() {
+            // A part without a material is drawn with a plain white one, kept at the end.
+            self.materials
+                .push(r.flat_material([0.8, 0.8, 0.8, 1.0], false));
+        }
+        // the meshes' bytes go up one shared buffer at a time
+        while self.meshes.is_none() {
+            if late(deadline) {
+                self.worst = worst;
+                return None;
+            }
+            let Some(p) = &self.packed else { break };
+            if let Some(chunk) = p.chunks.get(self.buffers.len()) {
+                let b = r.mesh_buffer(chunk);
+                self.buffers.push(b);
+            } else if let Some(p) = self.packed.take() {
+                self.meshes = Some(p.assemble(std::mem::take(&mut self.buffers)));
+            }
+        }
+        if self.keys.is_empty() && self.pipelines == 0 {
+            let mut keys: Vec<PipelineKey> = self.materials.iter().map(|m| m.key).collect();
+            keys.sort_by_key(|k| {
+                (
+                    k.blend.map(|(a, b)| (a as u8, b as u8)),
+                    k.z_write,
+                    k.z_func,
+                )
+            });
+            keys.dedup();
+            keys.truncate(MAX_PIPELINES);
+            self.keys = keys;
+            self.pipelines = 1;
+        }
+        // the pipelines the model's materials draw with are made now, not in the frame they first show (a hitch
+        // each)
+        while self.pipelines - 1 < self.keys.len() {
+            if late(deadline) {
+                self.worst = worst;
+                return None;
+            }
+            r.model_pipeline(self.keys[self.pipelines - 1]);
+            self.pipelines += 1;
+        }
+        let kinds = [PBlend::AlphaAdd, PBlend::OneSrcColor, PBlend::Alpha];
+        while self.particles < kinds.len() * 2 {
+            if late(deadline) {
+                self.worst = worst;
+                return None;
+            }
+            let (b, lines) = (kinds[self.particles / 2], self.particles % 2 == 1);
+            r.particle_pipeline((b, lines));
+            self.particles += 1;
+        }
+        Some(Model {
+            meshes: self.meshes.take().unwrap_or_default(),
+            materials: std::mem::take(&mut self.materials),
+            textures: std::mem::take(&mut self.textures),
+            keyed: std::mem::take(&mut self.keyed),
+            applied: Default::default(),
+            written: Default::default(),
+        })
+    }
+}
+
+/// Puts textures on the card from any thread (the device and the queue may be used from several): a loading thread
+/// reads a texture and has it uploaded in the same breath, the frames of the window going on meanwhile.
+pub struct TextureUploader {
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    shared: std::collections::HashMap<
+        (u64, gamedata::gputex::Format, (u32, u32), usize),
+        wgpu::TextureView,
+    >,
+    pub stats: TextureStats,
+}
+
+impl TextureUploader {
+    pub fn new(r: &Renderer) -> TextureUploader {
+        TextureUploader {
+            device: r.device.clone(),
+            queue: r.queue.clone(),
+            shared: Default::default(),
+            stats: TextureStats::default(),
+        }
+    }
+
+    /// What comes next shares no texture with what went up before.
+    pub fn end_sharing(&mut self) {
+        self.shared.clear();
+    }
+
+    pub fn upload(&mut self, data: gamedata::gputex::TextureData) -> Option<wgpu::TextureView> {
+        let key = data
+            .hash
+            .map(|h| (h, data.format, data.size(), data.mips.len()));
+        if let Some(view) = key.and_then(|k| self.shared.get(&k)) {
+            self.stats.shared += 1;
+            return Some(view.clone());
+        }
+        let started = std::time::Instant::now();
+        let (tex, block) = create_texture_for(&self.device, &data)?;
+        let mut job = TexJob {
+            tex,
+            data,
+            block,
+            mip: 0,
+            row: 0,
+            band: BAND_BYTES,
+        };
+        let far = started + std::time::Duration::from_secs(3600);
+        job.bands(&self.queue, far);
+        let view = job.tex.create_view(&Default::default());
+        self.stats.upload += started.elapsed();
+        self.stats.uploaded += 1;
+        self.stats.bytes += job.data.bytes();
+        if job.data.format != gamedata::gputex::Format::Rgba {
+            self.stats.compressed += 1;
+        }
+        if let Some(k) = key {
+            self.shared.insert(k, view.clone());
+        }
+        Some(view)
+    }
+}
+
+impl Renderer {
+    /// The models a loading built take the place of the old ones, except the model at `keep` (the menu's scene),
+    /// which goes after them; its new place.
+    pub fn replace_models(&mut self, new: Vec<Model>, keep: Option<usize>) -> Option<usize> {
+        let old = std::mem::replace(&mut self.models, new);
+        let kept = keep.and_then(|k| old.into_iter().nth(k))?;
+        self.models.push(kept);
+        Some(self.models.len() - 1)
+    }
+
+    /// Models built in slices put at the end; the first one's index.
+    pub fn append_models(&mut self, new: Vec<Model>) -> usize {
+        let first = self.models.len();
+        self.models.extend(new);
+        first
+    }
+}
+
 /// Plans a texture's loading (the caller looks its file up and counts it; `bool`: the card draws BC-compressed
 /// textures); the renderer then reads the plans, several at a time.
 pub type TextureLoader<'a> =
     dyn Fn(&level::Texture, bool) -> Option<gamedata::assets::TexturePlan> + 'a;
 
 /// How many textures are read at a time, each on its own thread (a 4K picture decoded is 85 MB while it waits).
-const LOADS_AT_ONCE: usize = 8;
+pub const LOADS_AT_ONCE: usize = 8;
 
 /// What the textures of a level cost to load so far: said after each level's upload.
 #[derive(Clone, Copy, Default, Debug)]
@@ -1015,86 +1453,19 @@ impl Renderer {
     /// The meshes on the card, their bytes packed into a few shared buffers (a buffer for each vertex list and each
     /// index list took 12 ms apiece on a software adapter: 25 s for a 2000-mesh map).
     fn upload_meshes(&self, meshes: Vec<Option<MeshCpu>>) -> Vec<Option<GpuMesh>> {
-        struct Pending {
-            bytes: Vec<u8>,
-        }
-        let mut chunks: Vec<Pending> = vec![Pending { bytes: Vec::new() }];
-        // a range in chunk `c`, to be turned into a slice once the chunk is a buffer
-        let mut put = |data: &[u8]| -> (usize, u64, u64) {
-            if chunks
-                .last()
-                .is_some_and(|c| !c.bytes.is_empty() && c.bytes.len() + data.len() > POOL_BYTES)
-            {
-                chunks.push(Pending { bytes: Vec::new() });
-            }
-            let c = chunks.len() - 1;
-            let last = &mut chunks[c];
-            let off = last.bytes.len() as u64;
-            last.bytes.extend_from_slice(data);
-            while last.bytes.len() % 4 != 0 {
-                last.bytes.push(0);
-            }
-            (c, off, data.len() as u64)
-        };
-        type Range = (usize, u64, u64);
-        struct Plan {
-            vertex: Range,
-            parts: Vec<(Range, u32, usize, Option<(Range, PipelineKey)>)>,
-        }
-        let plans: Vec<Option<Plan>> = meshes
-            .iter()
-            .map(|m| {
-                m.as_ref().map(|m| Plan {
-                    vertex: put(&m.vertex),
-                    parts: m
-                        .parts
-                        .iter()
-                        .map(|p| {
-                            (
-                                put(&p.index),
-                                p.count,
-                                p.material,
-                                p.channel.as_ref().map(|c| (put(&c.0), c.1)),
-                            )
-                        })
-                        .collect(),
-                })
+        let packed = pack_meshes(meshes);
+        let buffers = packed.chunks.iter().map(|c| self.mesh_buffer(c)).collect();
+        packed.assemble(buffers)
+    }
+
+    /// One shared buffer of packed mesh bytes.
+    fn mesh_buffer(&self, bytes: &[u8]) -> wgpu::Buffer {
+        self.device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("meshes"),
+                contents: bytes,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX,
             })
-            .collect();
-        let buffers: Vec<wgpu::Buffer> = chunks
-            .iter()
-            .map(|c| {
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("meshes"),
-                        contents: &c.bytes,
-                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX,
-                    })
-            })
-            .collect();
-        let slice = |(c, off, len): Range| BufSlice {
-            buf: buffers[c].clone(),
-            off,
-            len,
-        };
-        plans
-            .into_iter()
-            .map(|p| {
-                p.map(|p| GpuMesh {
-                    vertex: slice(p.vertex),
-                    parts: p
-                        .parts
-                        .into_iter()
-                        .map(|(index, count, material, channel)| GpuPart {
-                            index: slice(index),
-                            count,
-                            material,
-                            channel: channel.map(|(r, k)| (slice(r), k)),
-                        })
-                        .collect(),
-                })
-            })
-            .collect()
     }
 
     /// The sky a script built (scriptsky.rs), as a mesh of the level's model (its parts name the level's materials);
@@ -1147,33 +1518,11 @@ impl Renderer {
 
     /// Uploads a model; returns its index for `Instance::model`.
     pub fn add_model(&mut self, level: &Level, load: &TextureLoader<'_>) -> usize {
-        let bc = self.bc;
-        // only the textures a material draws with are loaded (a level may list textures it never uses: the loader
-        // points a texture named twice at one of them)
-        let mut used: std::collections::HashSet<usize> = level
-            .materials
-            .iter()
-            .flat_map(|m| m.texture.into_iter().chain(m.normal))
-            .collect();
-        // a map whose scripts set textures may set any of its own (the loader's budget still applies)
-        if level
-            .scripts
-            .as_ref()
-            .is_some_and(|g| g.uses_proto(script::SET_TEXTURE))
-        {
-            used.extend(0..level.textures.len());
-        }
-        // planned one after another (the level's budget is taken in its own order), then read several at a time, each
-        // on its own thread, and uploaded; the queue is flushed between, so the pictures never all wait in memory
-        let plans: Vec<(usize, gamedata::assets::TexturePlan)> = level
-            .textures
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| used.contains(i))
-            .filter_map(|(i, t)| load(t, bc).map(|p| (i, p)))
-            .collect();
+        let plans = texture_plans(level, load, self.bc);
         let mut textures: Vec<Option<wgpu::TextureView>> = vec![None; level.textures.len()];
         let mut plans = plans.into_iter().peekable();
+        // read several at a time, each on its own thread, and uploaded; the queue is flushed between, so the
+        // pictures never all wait in memory
         while plans.peek().is_some() {
             let started = std::time::Instant::now();
             let batch: Vec<_> = plans.by_ref().take(LOADS_AT_ONCE).collect();
@@ -1198,63 +1547,18 @@ impl Renderer {
             self.queue.submit([]);
             self.texture_stats.upload += started.elapsed();
         }
-        let keyed: Vec<bool> = level
-            .textures
-            .iter()
-            .map(|t| t.color_key.is_some())
-            .collect();
-        let mut same_materials = std::collections::HashMap::new();
-        let materials = level
-            .materials
-            .iter()
-            .map(|m| {
-                // materials alike in all they draw with share one buffer and bind group (a map may carry a
-                // thousand copies of one: each cost 4 ms on a software adapter)
-                let mut same = m.clone();
-                same.name.clear();
-                same_materials
-                    .entry(format!("{same:?}"))
-                    .or_insert_with(|| {
-                        self.gpu_material(m, &textures, &keyed, (Z_FUNC_DEFAULT, ALPHA_FUNC_DEFAULT))
-                    })
-                    .clone()
-            })
-            .collect::<Vec<_>>();
-        // A part without a material is drawn with a plain white one, kept at the end.
-        let default_material = materials.len();
-        let mut materials = materials;
-        materials.push(self.flat_material([0.8, 0.8, 0.8, 1.0], false));
-
-        let meshes = self.upload_meshes(
-            level
-                .meshes
-                .iter()
-                // a mesh with a finer look (a remastered level's) is drawn as that look
-                .map(|m| m.look.as_deref().unwrap_or(m))
-                .map(|m| Self::gpu_mesh_cpu(m, default_material))
-                .collect(),
-        );
-        // the pipelines the model's materials draw with are made now, not in the frame they first show (a hitch each)
-        let mut keys: Vec<PipelineKey> = materials.iter().map(|m| m.key).collect();
-        keys.sort_by_key(|k| (k.blend.map(|(a, b)| (a as u8, b as u8)), k.z_write, k.z_func));
-        keys.dedup();
-        for k in keys.into_iter().take(MAX_PIPELINES) {
-            self.pipeline(k);
-        }
-        for b in [PBlend::AlphaAdd, PBlend::OneSrcColor, PBlend::Alpha] {
-            for lines in [false, true] {
-                self.particle_pipeline((b, lines));
+        let mut build = ModelBuild::new(level, textures, None);
+        loop {
+            if let Some(m) = build.step(self, None) {
+                self.models.push(m);
+                return self.models.len() - 1;
             }
         }
-        self.models.push(Model {
-            meshes,
-            materials,
-            textures,
-            keyed,
-            applied: Default::default(),
-            written: Default::default(),
-        });
-        self.models.len() - 1
+    }
+
+    /// The pipelines a model's materials draw with are made now, not in the frame they first show (a hitch each).
+    fn model_pipeline(&mut self, k: PipelineKey) {
+        self.pipeline(k);
     }
 
     /// A material of one colour: lit and opaque, or (for markers) unlit and blended.
@@ -2056,10 +2360,7 @@ impl Renderer {
                 pass.set_bind_group(2, &mat.bind, &[]);
                 pass.set_vertex_buffer(
                     0,
-                    part.channel
-                        .as_ref()
-                        .map_or(&mesh.vertex, |c| &c.0)
-                        .slice(),
+                    part.channel.as_ref().map_or(&mesh.vertex, |c| &c.0).slice(),
                 );
                 pass.set_index_buffer(part.index.slice(), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..part.count, 0, 0..1);
@@ -2338,11 +2639,10 @@ fn unreachable_texture(device: &wgpu::Device) -> wgpu::TextureView {
 
 /// Uploads a texture's mip levels as they are: RGBA, or BC blocks (the caller planned those only for a device that
 /// has them; the data's layout was checked by its reader, and is checked against the sizes again here).
-fn upload_texture_data(
+fn create_texture_for(
     device: &wgpu::Device,
-    queue: &wgpu::Queue,
     data: &gamedata::gputex::TextureData,
-) -> Option<wgpu::TextureView> {
+) -> Option<(wgpu::Texture, u32)> {
     use gamedata::gputex::Format;
     let (width, height) = data.size();
     // Not sRGB: the original's fixed-function pipeline lights and blends in gamma space, and so do we.
@@ -2380,6 +2680,15 @@ fn upload_texture_data(
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
+    Some((tex, block))
+}
+
+fn upload_texture_data(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    data: &gamedata::gputex::TextureData,
+) -> Option<wgpu::TextureView> {
+    let (tex, block) = create_texture_for(device, data)?;
     for (level, m) in data.mips.iter().enumerate() {
         // a compressed level is written in whole blocks, the small levels' too
         let (w, h) = (

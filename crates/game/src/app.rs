@@ -191,6 +191,7 @@ impl Game {
         } else {
             data.load(&o.source)?
         };
+        crate::loading::stage(crate::loading::Stage::Building);
         let data = &data.with_parts(&level.level);
         scene::cloud_material(&mut level.level);
         for w in &level.warnings {
@@ -222,11 +223,11 @@ impl Game {
             .then(|| data.part("3D Entities/Balls.nmo"))
             .flatten()
             .unwrap_or_else(|| crate::assets::LoadedLevel {
-                    level: level::Level::default(),
-                    name: "Balls".into(),
-                    hash: 0,
-                    warnings: Vec::new(),
-                });
+                level: level::Level::default(),
+                name: "Balls".into(),
+                hash: 0,
+                warnings: Vec::new(),
+            });
         let replay_in = match &o.replay {
             Some(p) => {
                 let text =
@@ -1612,6 +1613,14 @@ fn window(
         menu,
         pause_told: false,
         loading: None,
+        autoloaded: false,
+        splash: None,
+        startup: None,
+        load_frames: Default::default(),
+        load_busy: Default::default(),
+        load_slow: 0,
+        load_last_step: Default::default(),
+        load_stages: Default::default(),
         features,
         strings,
         graphics,
@@ -1704,7 +1713,10 @@ fn window(
     if let Some(path) = video {
         return app.video(&path);
     }
-    eprintln!("startup: event loop begins {:.0} ms after launch", since_launch());
+    eprintln!(
+        "startup: event loop begins {:.0} ms after launch",
+        since_launch()
+    );
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Poll);
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
@@ -3431,45 +3443,71 @@ fn plain_level(level: &level::Level) -> level::Level {
 }
 
 fn upload(renderer: &mut Renderer, game: &Game) {
-    // the level's own parts' files (its sky, particles, shadow) as the level chose them
+    upload_prepare(renderer, game);
     let data = &game.data;
-    // the level's light colour (the level table's Light; white for a level without a row)
-    renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
-    renderer.fog = game.level.level.settings.fog;
     let loader = |t: &level::Texture, bc: bool| data.texture_plan(t, bc);
-    // where a script's first write into a level texture reads its picture from
-    crate::matstate::set_texture_reader(data.clone());
     let started = std::time::Instant::now();
     renderer.begin_level();
     let plain = renderer.look.plain;
     renderer.plain_uploaded = plain;
-    if plain {
-        renderer.add_model(&plain_level(&game.level.level), &loader);
-    } else {
-        renderer.add_model(&game.level.level, &loader);
+    for l in level_models(game, plain) {
+        renderer.add_model(&l, &loader);
     }
-    renderer.add_model(&game.balls.level, &loader);
-    // the level's sky by its name (a name that could not name a file is taken as none); closed when it has a top
+    models_uploaded(renderer, game, started);
+    let mut step = 0;
+    while upload_extras(renderer, game, step) {
+        step += 1;
+    }
+}
+
+/// What a level's upload sets before its models go up: the light, the fog, where a script reads textures from.
+fn upload_prepare(renderer: &mut Renderer, game: &Game) {
+    // the level's light colour (the level table's Light; white for a level without a row)
+    renderer.light.color = game.level.level.settings.light.unwrap_or([1.0; 3]);
+    renderer.fog = game.level.level.settings.fog;
+    // where a script's first write into a level texture reads its picture from
+    crate::matstate::set_texture_reader(game.data.clone());
+}
+
+/// The level's sky by its name (a name that could not name a file is taken as none); closed when it has a top.
+fn sky_model(game: &Game) -> level::Level {
     let letter = crate::sky::override_name()
         .or_else(|| game.level.level.sky.clone())
         .filter(|n| crate::sky::valid_name(n))
         .unwrap_or_else(|| "A".into());
-    let top = data
+    let top = game
+        .data
         .file(&format!(
             "Textures/Sky/{}",
             crate::sky::face_file(&letter, "Top")
         ))
         .is_some();
-    let sky = crate::sky::model(&letter, top);
-    renderer.add_model(&sky, &loader);
-    crate::sky::set_faces(sky.meshes.len());
-    for m in &game.modules.models {
-        renderer.add_model(m, &loader);
-    }
+    crate::sky::model(&letter, top)
+}
+
+/// The models a game has on the card, in the order its instances name them: the level, the balls, the sky, the
+/// modules, the transformer's animation.
+fn level_models(game: &Game, plain: bool) -> Vec<std::borrow::Cow<'_, level::Level>> {
+    use std::borrow::Cow;
+    let mut v = vec![
+        if plain {
+            Cow::Owned(plain_level(&game.level.level))
+        } else {
+            Cow::Borrowed(&game.level.level)
+        },
+        Cow::Borrowed(&game.balls.level),
+        Cow::Owned(sky_model(game)),
+    ];
+    v.extend(game.modules.models.iter().map(Cow::Borrowed));
     if let Some((file, _)) = &game.trafo {
-        renderer.add_model(&file.level, &loader);
+        v.push(Cow::Borrowed(&file.level));
     }
-    // the level and its parts are up: nothing uploaded later shares with them
+    v
+}
+
+/// The level's models are up: nothing uploaded later shares with them; says what it cost.
+fn models_uploaded(renderer: &mut Renderer, game: &Game, started: std::time::Instant) {
+    crate::sky::set_faces(sky_model(game).meshes.len());
     renderer.end_sharing();
     let t = renderer.texture_stats;
     eprintln!(
@@ -3488,39 +3526,11 @@ fn upload(renderer: &mut Renderer, game: &Game) {
             "; no BC on this adapter: compressed textures are decoded, smaller"
         }
     );
-    // the map's own 2D frames: each one's texture under its slot's name, the slots of the level before emptied
-    let frames = crate::hud::level_frames(&game.level.level);
-    // one upload for each of the level's textures, whatever number of frames show it; a frame is a small picture,
-    // and a larger one is not taken (a stranger's map does not get video memory outside the level's budget)
-    let mut uploaded: Vec<(usize, &'static str)> = Vec::new();
-    for (k, name) in crate::ui::FRAME_TEXTURES.into_iter().enumerate() {
-        renderer.remove_named_texture(name);
-        let Some(f) = frames.get(k) else { continue };
-        if let Some((_, first)) = uploaded.iter().find(|(t, _)| *t == f.texture) {
-            renderer.share_named_texture(name, first);
-            continue;
-        }
-        let pixels = game
-            .level
-            .level
-            .textures
-            .get(f.texture)
-            .and_then(|t| data.texture(t))
-            .filter(|(w, h, _)| u64::from(*w) * u64::from(*h) <= FRAME_PIXELS_MAX);
-        if let Some((w, h, rgba)) = pixels {
-            renderer.add_named_texture(name, w, h, rgba);
-            uploaded.push((f.texture, name));
-        }
-    }
-    let shadow = level::Texture {
-        name: "HardShadow".into(),
-        source: level::TextureSource::File("HardShadow.bmp".into()),
-        color_key: None,
-    };
-    if let Some((w, h, rgba)) = data.texture(&shadow) {
-        renderer.set_shadow_texture(w, h, rgba);
-    }
-    // the interface's textures
+}
+
+/// The interface's and the particles' textures, by name.
+fn interface_textures() -> Vec<&'static str> {
+    // the own interface draws its texts in the shipped fonts: the copy's font is not read
     let own = gamedata::resources::in_use() == gamedata::resources::Provider::Own;
     let interface = [
         "Font_1",
@@ -3528,9 +3538,53 @@ fn upload(renderer: &mut Renderer, game: &Game) {
         "Button01_select",
         "Button01_deselect",
     ];
-    // the own interface draws its texts in the shipped fonts: the copy's font is not read
-    let fonts = interface.into_iter().filter(|n| !(own && *n == "Font_1"));
-    for name in crate::particles::textures().into_iter().chain(fonts) {
+    crate::particles::textures()
+        .into_iter()
+        .chain(interface.into_iter().filter(|n| !(own && *n == "Font_1")))
+        .collect()
+}
+
+/// One piece of what a level's upload does after its models (step `step`, from 0): the map's 2D frames and the
+/// shadow, one of the interface's textures, the sea of cloud, the sky's colour. False when there is no such step.
+fn upload_extras(renderer: &mut Renderer, game: &Game, step: usize) -> bool {
+    let data = &game.data;
+    let names = interface_textures();
+    if step == 0 {
+        // the map's own 2D frames: each one's texture under its slot's name, the slots of the level before emptied
+        let frames = crate::hud::level_frames(&game.level.level);
+        // one upload for each of the level's textures, whatever number of frames show it; a frame is a small picture,
+        // and a larger one is not taken (a stranger's map does not get video memory outside the level's budget)
+        let mut uploaded: Vec<(usize, &'static str)> = Vec::new();
+        for (k, name) in crate::ui::FRAME_TEXTURES.into_iter().enumerate() {
+            renderer.remove_named_texture(name);
+            let Some(f) = frames.get(k) else { continue };
+            if let Some((_, first)) = uploaded.iter().find(|(t, _)| *t == f.texture) {
+                renderer.share_named_texture(name, first);
+                continue;
+            }
+            let pixels = game
+                .level
+                .level
+                .textures
+                .get(f.texture)
+                .and_then(|t| data.texture(t))
+                .filter(|(w, h, _)| u64::from(*w) * u64::from(*h) <= FRAME_PIXELS_MAX);
+            if let Some((w, h, rgba)) = pixels {
+                renderer.add_named_texture(name, w, h, rgba);
+                uploaded.push((f.texture, name));
+            }
+        }
+        let shadow = level::Texture {
+            name: "HardShadow".into(),
+            source: level::TextureSource::File("HardShadow.bmp".into()),
+            color_key: None,
+        };
+        if let Some((w, h, rgba)) = data.texture(&shadow) {
+            renderer.set_shadow_texture(w, h, rgba);
+        }
+        return true;
+    }
+    if let Some(&name) = names.get(step - 1) {
         let t = level::Texture {
             name: name.to_owned(),
             source: level::TextureSource::File(
@@ -3545,31 +3599,36 @@ fn upload(renderer: &mut Renderer, game: &Game) {
         if let Some((w, h, rgba)) = data.texture(&t) {
             renderer.add_named_texture(name, w, h, rgba);
         }
+        return true;
     }
-    // the sea of cloud, fading far off into the sky's own colour at the horizon; it takes the place of the level's
-    // flat cloud layer (SkyLayer)
-    let sea = game.level.level.settings.clouds.or_else(|| {
-        let sky = game.level.level.sky.as_deref()?;
-        crate::clouds::default_sea(sky, game.sim.lowest_floor())
-    });
-    renderer.clouds = sea.and_then(|settings| {
-        let faces: Vec<_> = sky
-            .textures
-            .iter()
-            .take(4)
-            .map(|t| data.texture(t))
-            .collect();
-        let (ring, haze) = crate::clouds::horizon_ring(&faces)?;
-        Some(crate::clouds::Layer {
-            settings,
-            ring,
-            haze,
-        })
-    });
-    if let Some(ring) = renderer.clouds.as_ref().map(|l| l.ring.clone()) {
-        renderer.set_cloud_ring(&ring);
+    let sky = sky_model(game);
+    if step == names.len() + 1 {
+        // the sea of cloud, fading far off into the sky's own colour at the horizon; it takes the place of the
+        // level's flat cloud layer (SkyLayer)
+        let sea = game.level.level.settings.clouds.or_else(|| {
+            let sky = game.level.level.sky.as_deref()?;
+            crate::clouds::default_sea(sky, game.sim.lowest_floor())
+        });
+        renderer.clouds = sea.and_then(|settings| {
+            let faces: Vec<_> = sky
+                .textures
+                .iter()
+                .take(4)
+                .map(|t| data.texture(t))
+                .collect();
+            let (ring, haze) = crate::clouds::horizon_ring(&faces)?;
+            Some(crate::clouds::Layer {
+                settings,
+                ring,
+                haze,
+            })
+        });
+        if let Some(ring) = renderer.clouds.as_ref().map(|l| l.ring.clone()) {
+            renderer.set_cloud_ring(&ring);
+        }
+        scene::set_volume_clouds(renderer.clouds.is_some());
+        return true;
     }
-    scene::set_volume_clouds(renderer.clouds.is_some());
     // The zenith colour: the top row of the front texture, averaged.
     if let Some((w, _, rgba)) = sky.textures.first().and_then(|t| data.texture(t)) {
         let row = rgba.get(..(w as usize * 4)).unwrap_or_default();
@@ -3590,6 +3649,7 @@ fn upload(renderer: &mut Renderer, game: &Game) {
             a: 1.0,
         };
     }
+    false
 }
 
 /// The pixels of an offscreen frame (RGBA, rows top down).
@@ -3910,7 +3970,169 @@ pub(crate) struct Gpu {
     pub modes: Vec<wgpu::PresentMode>,
 }
 
+/// How long the card's share of a loading may take in one frame.
+const LOAD_SLICE: std::time::Duration = std::time::Duration::from_millis(26);
+/// A loading that takes longer than this shows its screen (a quicker one stays as it was).
+const LOAD_SCREEN_AFTER: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// A level on its way in (`App::load`).
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+
+struct Load {
+    source: crate::assets::Source,
+    data: Data,
+    number: Option<u32>,
+    plain: bool,
+    began: Instant,
+    /// Set to stop the thread (Esc).
+    cancel: Arc<std::sync::atomic::AtomicBool>,
+    up: crate::loading::Uploader,
+    game_rx: std::sync::mpsc::Receiver<Result<Box<Game>, String>>,
+    game: Option<Box<Game>>,
+    models_done: bool,
+    extra: usize,
+    /// The longest step of each kind so far (textures, making builds, models, extras).
+    worst: Arc<[AtomicU64; 4]>,
+}
+
+impl Load {
+    /// Whether the loading screen is up.
+    fn shown(&self) -> bool {
+        self.began.elapsed() >= LOAD_SCREEN_AFTER
+    }
+}
+
+/// The loading thread: reads and builds the level, then reads the textures its models draw with and packs their
+/// meshes, handing them over as they are ready (the channel holds a few, so the pictures never all wait in memory).
+fn load_worker(
+    o: Options,
+    data: Data,
+    bc: bool,
+    plain: bool,
+    uploader: crate::render::TextureUploader,
+    tx: std::sync::mpsc::SyncSender<crate::loading::Item>,
+    game_tx: std::sync::mpsc::Sender<Result<Box<Game>, String>>,
+    cancel: &std::sync::atomic::AtomicBool,
+) {
+    use crate::loading::{Item, Stage};
+    use std::sync::atomic::Ordering::Relaxed;
+    let game = match Game::new(&o, &data) {
+        Ok(g) => g,
+        Err(e) => {
+            let _ = game_tx.send(Err(e));
+            return;
+        }
+    };
+    let models = level_models(&game, plain);
+    let loader = |t: &level::Texture, bc: bool| game.data.texture_plan(t, bc);
+    let mut plans = std::collections::VecDeque::new();
+    for (mi, l) in models.iter().enumerate() {
+        for (i, p) in crate::render::texture_plans(l, &loader, bc) {
+            plans.push_back((mi, i, p));
+        }
+    }
+    crate::loading::textures_planned(plans.len());
+    crate::loading::stage(Stage::Textures);
+    let Some(uploader) = read_and_upload(plans, None, uploader, &tx, cancel) else {
+        return;
+    };
+    for (mi, l) in models.iter().enumerate() {
+        if cancel.load(Relaxed) {
+            return;
+        }
+        if tx
+            .send(Item::Packed(mi, crate::render::prepare_meshes(l)))
+            .is_err()
+        {
+            return;
+        }
+    }
+    drop(models);
+    if tx.send(Item::Finished(uploader.stats)).is_err() {
+        return;
+    }
+    let _ = game_tx.send(Ok(Box::new(game)));
+}
+
+/// How long the splash stands at least, and how long it takes to give way to the menu.
+const SPLASH_MIN: std::time::Duration = std::time::Duration::from_millis(1400);
+const SPLASH_FADE: std::time::Duration = std::time::Duration::from_millis(450);
+
+/// The title screen at the start of the game.
+struct Splash {
+    began: Instant,
+    /// A key or a click asked for the menu.
+    skipped: bool,
+    /// When the splash began to give way.
+    fading: Option<Instant>,
+}
+
+impl Splash {
+    /// 1 while it stands, down to 0 as it fades.
+    fn fade(&self) -> f32 {
+        self.fading.map_or(1.0, |t| {
+            1.0 - (t.elapsed().as_secs_f32() / SPLASH_FADE.as_secs_f32()).clamp(0.0, 1.0)
+        })
+    }
+}
+
+/// What the start still has to put on the card for the menu: the first models, the extras, the menu's scene.
+#[derive(Default)]
+struct Startup {
+    phase: u8,
+    up: Option<crate::loading::Uploader>,
+    extra: usize,
+    /// How many models the placeholder game has: the menu's scene is the next one.
+    models: usize,
+    cancel: Arc<std::sync::atomic::AtomicBool>,
+}
+
+/// Reads textures (several at a time, each on its own thread) and puts them on the card, sending each view as it is
+/// there. `boundary`: the model from which no texture is shared with those before. The uploader back, or None when
+/// the receiver is gone or the work was cancelled.
+fn read_and_upload(
+    mut plans: std::collections::VecDeque<(usize, usize, gamedata::assets::TexturePlan)>,
+    boundary: Option<usize>,
+    mut uploader: crate::render::TextureUploader,
+    tx: &std::sync::mpsc::SyncSender<crate::loading::Item>,
+    cancel: &std::sync::atomic::AtomicBool,
+) -> Option<crate::render::TextureUploader> {
+    use crate::loading::Item;
+    while !plans.is_empty() {
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            return None;
+        }
+        let batch: Vec<_> = plans
+            .drain(..plans.len().min(crate::render::LOADS_AT_ONCE))
+            .collect();
+        let loaded: Vec<_> = std::thread::scope(|s| {
+            let threads: Vec<_> = batch
+                .into_iter()
+                .map(|(mi, i, plan)| (mi, i, s.spawn(move || plan.load())))
+                .collect();
+            threads
+                .into_iter()
+                .map(|(mi, i, t)| (mi, i, t.join().ok().flatten()))
+                .collect()
+        });
+        for (mi, i, data) in loaded {
+            if Some(mi) == boundary {
+                uploader.end_sharing();
+            }
+            let view = data.and_then(|d| uploader.upload(d));
+            crate::loading::texture_done();
+            tx.send(Item::View(mi, i, view)).ok()?;
+        }
+    }
+    Some(uploader)
+}
+
 struct App {
+    /// The splash while it is up, and the start-up work behind it.
+    /// DRAHTSEILAKT_AUTOLOAD has been done.
+    autoloaded: bool,
+    splash: Option<Splash>,
+    startup: Option<Box<Startup>>,
     game: Game,
     /// The options the game was started with, for loading another level.
     opts: Options,
@@ -3920,8 +4142,16 @@ struct App {
     menu: Option<Menu>,
     /// The pause menu was opened over the run and the scripts were told (they hear the end of it too).
     pause_told: bool,
-    /// A level to load: (the level, whether the loading screen has been drawn).
-    loading: Option<(crate::assets::Source, bool)>,
+    /// A level being loaded: its CPU work on a thread, its upload to the card in slices (`App::loading_step`).
+    loading: Option<Box<Load>>,
+    /// The longest frame of the loading in progress, and how many there were.
+    load_frames: (std::time::Duration, u32),
+    /// The time the main thread spent in the loading's slices.
+    load_busy: std::time::Duration,
+    /// Frames of the loading that took over 50 ms.
+    load_slow: u32,
+    load_last_step: std::time::Duration,
+    load_stages: [std::time::Duration; 6],
     /// The extended mode and which of its additions are on (features.rs).
     features: crate::features::Features,
     /// The copy's words for the menus.
@@ -4482,15 +4712,22 @@ impl App {
         let Gpu {
             surface,
             config,
-            mut renderer,
+            renderer,
             modes,
         } = window_gpu(&window)?;
-        upload(&mut renderer, &self.game);
-        self.light_base = Some(renderer.light);
-        if self.menu_scene.is_none() {
-            self.menu_scene = load_menu_scene(&self.data);
+        eprintln!(
+            "startup: window and graphics card ready {:.0} ms after launch",
+            since_launch()
+        );
+        // what the menu needs goes up in slices while the splash is drawn (`App::startup_step`)
+        self.startup = Some(Box::new(Startup::default()));
+        if self.game.font.is_some() && std::env::var_os("DRAHTSEILAKT_NO_SPLASH").is_none() {
+            self.splash = Some(Splash {
+                began: Instant::now(),
+                skipped: false,
+                fading: None,
+            });
         }
-        upload_menu_scene(&mut renderer, self.menu_scene.as_mut(), &self.data);
         self.gpu = Some(Gpu {
             surface,
             config,
@@ -4501,46 +4738,6 @@ impl App {
         set_fullscreen(&window, self.graphics.fullscreen, self.graphics.resolution);
         self.window = Some(window);
         self.last = Instant::now();
-        Ok(())
-    }
-
-    /// Loads a level in place of the current one: a new run, its models uploaded anew.
-    fn switch(&mut self, source: crate::assets::Source) -> Result<(), String> {
-        self.game.save_attempt();
-        let mut o = self.opts.clone();
-        let number = match source {
-            crate::assets::Source::Original(n) => Some(n),
-            _ => None,
-        };
-        o.source = source;
-        (o.replay, o.from, o.sector, o.at, o.ball) = (None, None, None, None, None);
-        self.data = self.data.for_source(&o.source);
-        let mut game = Game::new(&o, &self.data)?;
-        game.start_session();
-        self.game = game;
-        if let Some(a) = &mut self.audio {
-            a.stop_all_fading_music(crate::audio::MUSIC_FADE_OUT);
-            a.forget_sounds();
-        }
-        self.rolling = [None; 3 + crate::ballsound::FAN_SLOTS];
-        self.heard = 0;
-        self.started = false;
-        self.music = None;
-        self.number = number;
-        self.prev = None;
-        self.keys = 0;
-        if let Some(gpu) = &mut self.gpu {
-            gpu.renderer.models.clear();
-            // the light as the level sets it (a mod's dimming never carried into the next level)
-            gpu.renderer.light.ambient = crate::render::Light::default().ambient;
-            upload(&mut gpu.renderer, &self.game);
-            self.light_base = Some(gpu.renderer.light);
-            upload_menu_scene(&mut gpu.renderer, self.menu_scene.as_mut(), &self.data);
-        }
-        if let Some(w) = &self.window {
-            w.set_title(&self.title());
-        }
-        self.apply_mods();
         Ok(())
     }
 
@@ -5040,13 +5237,367 @@ impl App {
         }
     }
 
-    /// Loads a level after the loading screen has been drawn.
+    /// Loads a level: the work of reading and building it goes to a thread, the frames go on (a loading bar shows
+    /// when it takes over half a second), the card's share is done in slices between them.
     fn load(&mut self, source: crate::assets::Source) {
         self.menu = None;
-        self.loading = Some((source, false));
         if let Some(a) = &mut self.audio {
             a.play(&self.data, "Menu_load", 1.0, 0.0);
         }
+        let Some(gpu) = &self.gpu else { return };
+        let (bc, plain) = (gpu.renderer.bc, gpu.renderer.look.plain);
+        let uploader = crate::render::TextureUploader::new(&gpu.renderer);
+        let number = match source {
+            crate::assets::Source::Original(n) => Some(n),
+            _ => None,
+        };
+        let mut o = self.opts.clone();
+        o.source = source.clone();
+        (o.replay, o.from, o.sector, o.at, o.ball) = (None, None, None, None, None);
+        let data = self.data.for_source(&o.source);
+        crate::loading::begin();
+        let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (tx, rx) = std::sync::mpsc::sync_channel(64);
+        let (game_tx, game_rx) = std::sync::mpsc::channel();
+        let worker = (o, data.clone(), cancel.clone());
+        let spawned = std::thread::Builder::new()
+            .name("loading".into())
+            .stack_size(64 << 20)
+            .spawn(move || {
+                load_worker(
+                    worker.0, worker.1, bc, plain, uploader, tx, game_tx, &worker.2,
+                )
+            });
+        if let Err(e) = spawned {
+            eprintln!("drahtseilakt: could not start the loading thread: {e}");
+            self.open_menu(crate::menu::Screen::Main);
+            return;
+        }
+        self.load_frames = Default::default();
+        self.load_busy = Default::default();
+        self.load_slow = 0;
+        self.loading = Some(Box::new(Load {
+            source,
+            data,
+            number,
+            plain,
+            began: Instant::now(),
+            cancel,
+            up: crate::loading::Uploader::threaded(rx, true),
+            game_rx,
+            game: None,
+            models_done: false,
+            extra: 0,
+            worst: Default::default(),
+        }));
+    }
+
+    /// Esc while a level loads: back to the menu, what the thread makes dropped.
+    fn cancel_loading(&mut self) {
+        if let Some(l) = self.loading.take() {
+            l.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+            eprintln!(
+                "loading: cancelled after {:.2} s",
+                l.began.elapsed().as_secs_f64()
+            );
+            drop(l);
+        }
+        if let Some(gpu) = &mut self.gpu {
+            gpu.renderer.end_sharing();
+        }
+        self.open_menu(crate::menu::Screen::Main);
+    }
+
+    /// A slice of the start-up's work on the card, a frame at a time: what the menu needs, so the splash goes on
+    /// moving meanwhile. The textures are read and put up by a thread; the clouds and the like are made here while
+    /// it works.
+    fn startup_step(&mut self) {
+        let Some(mut st) = self.startup.take() else {
+            return;
+        };
+        let deadline = Instant::now() + LOAD_SLICE;
+        let Some(gpu) = &mut self.gpu else { return };
+        let r = &mut gpu.renderer;
+        let mut last_phase = 99;
+        loop {
+            if last_phase != st.phase {
+                eprintln!("startup: phase {} at {:.0} ms", st.phase, since_launch());
+                last_phase = st.phase;
+            }
+            match st.phase {
+                // the menu's scene read, the textures of its models and the placeholder game's handed to a thread
+                0 => {
+                    upload_prepare(r, &self.game);
+                    r.plain_uploaded = r.look.plain;
+                    if self.menu_scene.is_none() {
+                        self.menu_scene = load_menu_scene(&self.data);
+                    }
+                    let models = level_models(&self.game, r.look.plain);
+                    st.models = models.len();
+                    let mut plans = std::collections::VecDeque::new();
+                    let own = &self.game.data;
+                    let own_loader = |t: &level::Texture, bc: bool| own.texture_plan(t, bc);
+                    for (mi, l) in models.iter().enumerate() {
+                        for (i, p) in crate::render::texture_plans(l, &own_loader, r.bc) {
+                            plans.push_back((mi, i, p));
+                        }
+                    }
+                    if let Some(ms) = &self.menu_scene {
+                        let data = &self.data;
+                        let loader = |t: &level::Texture, bc: bool| data.texture_plan(t, bc);
+                        for (i, p) in crate::render::texture_plans(&ms.level, &loader, r.bc) {
+                            plans.push_back((models.len(), i, p));
+                        }
+                    }
+                    let boundary = Some(models.len());
+                    let uploader = crate::render::TextureUploader::new(r);
+                    let (tx, rx) = std::sync::mpsc::sync_channel(64);
+                    let cancel = st.cancel.clone();
+                    crate::loading::begin();
+                    crate::loading::textures_planned(plans.len());
+                    let spawned =
+                        std::thread::Builder::new()
+                            .name("startup".into())
+                            .spawn(move || {
+                                if let Some(up) =
+                                    read_and_upload(plans, boundary, uploader, &tx, &cancel)
+                                {
+                                    let _ = tx.send(crate::loading::Item::Finished(up.stats));
+                                }
+                            });
+                    if spawned.is_err() {
+                        eprintln!("drahtseilakt: could not start the start-up thread");
+                        return;
+                    }
+                    st.up = Some(crate::loading::Uploader::threaded(rx, true));
+                    st.phase = 1;
+                }
+                // the interface's and the clouds' pieces, while the textures come
+                1 => {
+                    if upload_extras(r, &self.game, st.extra) {
+                        st.extra += 1;
+                    } else {
+                        self.light_base = Some(r.light);
+                        st.phase = 2;
+                    }
+                    if let Some(up) = st.up.as_mut() {
+                        up.pump_textures(r, deadline);
+                    }
+                }
+                // the models on the card
+                2 => {
+                    let Some(up) = st.up.as_mut() else { break };
+                    if !up.textures_done() {
+                        up.pump_textures(r, deadline);
+                        if up.lost {
+                            eprintln!("drahtseilakt: the start-up thread stopped");
+                            return;
+                        }
+                    } else if !up.builds_made() {
+                        let models = level_models(&self.game, r.look.plain);
+                        let mut refs: Vec<&level::Level> = models.iter().map(|m| &**m).collect();
+                        if let Some(ms) = &self.menu_scene {
+                            refs.push(&ms.level);
+                        }
+                        up.make_builds(&refs);
+                    } else if up.pump_models(r, deadline) {
+                        let mut staged = std::mem::take(&mut up.staged);
+                        let scene = (staged.len() > st.models).then(|| staged.pop()).flatten();
+                        r.append_models(staged);
+                        if let (Some(m), Some(ms)) = (scene, &mut self.menu_scene) {
+                            ms.model = Some(r.append_models(vec![m]));
+                        }
+                        if let Some(stats) = up.stats {
+                            r.texture_stats = stats;
+                        }
+                        models_uploaded(r, &self.game, up.started);
+                        st.up = None;
+                        st.phase = 3;
+                    }
+                }
+                _ => {
+                    eprintln!(
+                        "startup: the menu is ready {:.0} ms after launch",
+                        since_launch()
+                    );
+                    self.last = Instant::now();
+                    return;
+                }
+            }
+            if Instant::now() >= deadline {
+                break;
+            }
+        }
+        self.startup = Some(st);
+    }
+
+    /// The splash's course: it gives way once the start-up is done, it has stood long enough, or a key asked.
+    fn splash_step(&mut self) {
+        let ready = self.startup.is_none();
+        let Some(sp) = &mut self.splash else { return };
+        let stood = sp.began.elapsed() >= SPLASH_MIN;
+        match sp.fading {
+            None if ready && (stood || sp.skipped) => sp.fading = Some(Instant::now()),
+            Some(t) if t.elapsed() >= SPLASH_FADE => self.splash = None,
+            _ => {}
+        }
+    }
+
+    /// A slice of the loading's work on the main thread (the card's share), a few milliseconds; the level takes
+    /// its place when it is all there.
+    fn loading_step(&mut self) {
+        let began = Instant::now();
+        self.loading_slice();
+        self.load_busy += began.elapsed();
+        self.load_last_step = began.elapsed();
+    }
+
+    fn loading_slice(&mut self) {
+        let Some(mut l) = self.loading.take() else {
+            return;
+        };
+        let deadline = Instant::now() + LOAD_SLICE;
+        let fail = |app: &mut App, e: String| {
+            eprintln!("drahtseilakt: {e}");
+            if let Some(gpu) = &mut app.gpu {
+                gpu.renderer.end_sharing();
+            }
+            app.open_menu(crate::menu::Screen::Main);
+        };
+        let Some(gpu) = &mut self.gpu else {
+            return fail(self, "no window to load into".into());
+        };
+        let r = &mut gpu.renderer;
+        let mut first = true;
+        loop {
+            if l.cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                return;
+            }
+            let step_began = Instant::now();
+            let what = if !l.up.textures_done() {
+                "textures"
+            } else if !l.up.builds_made() {
+                "making builds"
+            } else if !l.models_done {
+                "models"
+            } else {
+                "extras"
+            };
+            let kind = ["textures", "making builds", "models", "extras"]
+                .iter()
+                .position(|k| *k == what)
+                .unwrap_or(0);
+            // a step that would run past the slice (judged by the longest of its kind so far) waits for the next
+            // frame; the first of a frame always runs
+            if !first
+                && step_began + std::time::Duration::from_micros(l.worst[kind].load(Relaxed))
+                    > deadline
+            {
+                break;
+            }
+            first = false;
+            let _slow = scopeguard_note(step_began, what, l.extra, l.worst.clone(), kind);
+            if !l.up.textures_done() {
+                l.up.pump_textures(r, deadline);
+                if l.up.lost {
+                    // the thread is gone: its error (if it sent one) is the reason
+                    let why = match l.game_rx.try_recv() {
+                        Ok(Err(e)) => e,
+                        _ => "the loading thread stopped".into(),
+                    };
+                    return fail(self, why);
+                }
+                if l.up.textures_done() {
+                    crate::loading::stage(crate::loading::Stage::Finishing);
+                }
+                break;
+            }
+            if l.game.is_none() {
+                match l.game_rx.try_recv() {
+                    Ok(Ok(g)) => l.game = Some(g),
+                    Ok(Err(e)) => return fail(self, e),
+                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                    Err(_) => return fail(self, "the loading thread stopped".into()),
+                }
+                continue;
+            }
+            let Some(game) = l.game.as_deref() else { break };
+            if !l.up.builds_made() {
+                let models = level_models(game, l.plain);
+                let refs: Vec<&level::Level> = models.iter().map(|m| &**m).collect();
+                l.up.make_builds(&refs);
+            } else if !l.models_done {
+                l.models_done = l.up.pump_models(r, deadline);
+                if l.models_done {
+                    if let Some(stats) = l.up.stats {
+                        r.texture_stats = stats;
+                    }
+                    models_uploaded(r, game, l.up.started);
+                }
+            } else if upload_extras(r, game, l.extra) {
+                l.extra += 1;
+                crate::loading::finishing(700 + 300 * l.extra / (interface_textures().len() + 3));
+            } else {
+                return self.finish_loading(l);
+            }
+            if Instant::now() >= deadline {
+                break;
+            }
+        }
+        self.loading = Some(l);
+    }
+
+    /// The level is loaded and on the card: it takes the old one's place.
+    fn finish_loading(&mut self, mut l: Box<Load>) {
+        let Some(game) = l.game.take() else { return };
+        self.game.save_attempt();
+        let mut game = *game;
+        game.start_session();
+        self.game = game;
+        self.data = l.data.clone();
+        if let Some(a) = &mut self.audio {
+            a.stop_all_fading_music(crate::audio::MUSIC_FADE_OUT);
+            a.forget_sounds();
+        }
+        self.rolling = [None; 3 + crate::ballsound::FAN_SLOTS];
+        self.heard = 0;
+        self.started = false;
+        self.music = None;
+        self.number = l.number;
+        self.prev = None;
+        self.keys = 0;
+        if let Some(gpu) = &mut self.gpu {
+            let r = &mut gpu.renderer;
+            // the light as the level sets it (a mod's dimming never carried into the next level)
+            r.light.ambient = crate::render::Light::default().ambient;
+            upload_prepare(r, &self.game);
+            r.plain_uploaded = l.plain;
+            let kept = self.menu_scene.as_ref().and_then(|m| m.model);
+            let at = r.replace_models(std::mem::take(&mut l.up.staged), kept);
+            if let Some(ms) = &mut self.menu_scene {
+                ms.model = at;
+            }
+            self.light_base = Some(r.light);
+        }
+        if let Some(w) = &self.window {
+            w.set_title(&self.title());
+        }
+        self.apply_mods();
+        self.acc = 0.0;
+        let took = l.began.elapsed();
+        self.stall.note("level load", took);
+        eprintln!(
+            "loading: {:.2} s in all ({:.2} s of it the card's work here), {} frames drawn meanwhile ({} over 50 ms), the longest {:.0} ms",
+            took.as_secs_f64(),
+            self.load_busy.as_secs_f64(),
+            self.load_frames.1,
+            self.load_slow,
+            self.load_frames.0.as_secs_f64() * 1000.0
+        );
+        eprintln!(
+            "loading: frame stages, ms in all: {:?}",
+            self.load_stages.map(|d| d.as_millis())
+        );
     }
 
     /// Opens the menu with `base` as its first screen: the main menu, or the pause, dead or end menu over the level.
@@ -5860,7 +6411,17 @@ impl App {
         typed: Option<&str>,
         event_loop: &ActiveEventLoop,
     ) {
+        if let Some(sp) = &mut self.splash {
+            // any key asks for the menu; the splash keeps the keys until it is gone
+            if down {
+                sp.skipped = true;
+            }
+            return;
+        }
         if self.loading.is_some() {
+            if down && code == KeyCode::Escape {
+                self.cancel_loading();
+            }
             return;
         }
         if self.menu.is_some() {
@@ -5967,10 +6528,14 @@ impl App {
             self.gpu.as_ref().map_or(0, |g| g.renderer.pipeline_count()),
             self.music.is_some(),
         );
+        let loading = self.loading.is_some();
         self.frame_inner();
         self.frames += 1;
         if self.frames == 1 {
-            eprintln!("startup: first frame drawn {:.0} ms after launch", since_launch());
+            eprintln!(
+                "startup: first frame drawn {:.0} ms after launch",
+                since_launch()
+            );
         }
         if self.frames.is_multiple_of(15)
             && let Some(w) = &self.window
@@ -5982,13 +6547,26 @@ impl App {
             }
         }
         let took = began.elapsed().saturating_sub(self.stall.slept);
+        if loading {
+            for (a, b) in self.load_stages.iter_mut().zip(self.stall.stages) {
+                *a += b;
+            }
+            if took.as_millis() > 50 {
+                self.load_slow += 1;
+            }
+            self.load_frames.0 = self.load_frames.0.max(took);
+            self.load_frames.1 += 1;
+        }
         if took < STALL {
             return;
         }
         let sim = &self.game.sim;
         let mut what = std::mem::take(&mut self.stall.notes);
         if sim.lives != before.0 || sim.game_over != before.2 {
-            what.push(format!("death or respawn (lives {} -> {})", before.0, sim.lives));
+            what.push(format!(
+                "death or respawn (lives {} -> {})",
+                before.0, sim.lives
+            ));
         }
         if sim.sector != before.1 {
             what.push(format!("sector {} -> {}", before.1 + 1, sim.sector + 1));
@@ -5998,7 +6576,10 @@ impl App {
         }
         let pipelines = self.gpu.as_ref().map_or(0, |g| g.renderer.pipeline_count());
         if pipelines != before.5 {
-            what.push(format!("{} pipelines created", pipelines.saturating_sub(before.5)));
+            what.push(format!(
+                "{} pipelines created",
+                pipelines.saturating_sub(before.5)
+            ));
         }
         if self.music.is_some() && !before.6 {
             what.push("music started".into());
@@ -6043,21 +6624,20 @@ impl App {
         };
         self.acc = (self.acc + (now - self.last).as_secs_f32() * scale).min(0.25);
         self.last = now;
-        // A level to load is loaded after a frame that says so; the run waits while the menu is open.
-        match self.loading.take() {
-            Some((source, true)) => {
-                let load_began = Instant::now();
-                let loaded = self.switch(source);
-                self.stall.note("level load", load_began.elapsed());
-                if let Err(e) = loaded {
-                    eprintln!("drahtseilakt: {e}");
-                    self.open_menu(crate::menu::Screen::Main);
-                }
-                self.acc = 0.0;
-            }
-            Some((source, false)) => self.loading = Some((source, true)),
-            None => {}
+        // a debugging hook: DRAHTSEILAKT_AUTOLOAD=<level folder> loads that level once the menu is up (loading-bar tests)
+        if !self.autoloaded
+            && self.startup.is_none()
+            && self.splash.is_none()
+            && let Some(p) = std::env::var_os("DRAHTSEILAKT_AUTOLOAD").filter(|p| !p.is_empty())
+        {
+            self.autoloaded = true;
+            self.menu = None;
+            self.load(crate::assets::Source::Open(PathBuf::from(p)));
         }
+        self.startup_step();
+        self.splash_step();
+        // a level being loaded gets a slice of the card's work each frame; the run waits
+        self.loading_step();
         if let Some(c) = &mut self.fly {
             // the run waits while the free camera is up
             c.fly(self.fly_keys, self.acc);
@@ -6319,8 +6899,15 @@ impl App {
             &mut particles,
             &mut gpu.renderer,
         );
-        gpu.renderer
-            .draw(&view, rw, rh, &frame_view, &inst, &particles);
+        // the loading screen's own picture covers the window once it has come up: the scene behind it is not drawn
+        // (it would cost a third of each frame while the card is busy taking the level's textures)
+        let covered = self.loading.as_ref().is_some_and(|l| {
+            l.began.elapsed() > LOAD_SCREEN_AFTER + std::time::Duration::from_millis(300)
+        });
+        if !covered {
+            gpu.renderer
+                .draw(&view, rw, rh, &frame_view, &inst, &particles);
+        }
         let drawn = draw_started.elapsed();
         let overlay_started = Instant::now();
         gpu.renderer.draw_overlay(
@@ -6330,7 +6917,13 @@ impl App {
             &match (&self.menu, &self.loading) {
                 // with the game's font the menus are the original's (drawn below), else the prototype's
                 (_, Some(_)) | (Some(_), None) if self.game.font.is_some() => Vec::new(),
-                (_, Some((source, _))) => Menu::loading_overlay(rw, rh, &loading_name(source)),
+                (_, Some(l)) => {
+                    if l.shown() {
+                        Menu::loading_overlay(rw, rh, &loading_name(&l.source))
+                    } else {
+                        Vec::new()
+                    }
+                }
                 (Some(m), None) => m.overlay(rw, rh),
                 (None, None) => {
                     let mut o = crate::hud::overlay(
@@ -6391,8 +6984,20 @@ impl App {
         };
         let font = self.game.font.as_ref();
         let quads = match (&self.menu, &self.loading, font) {
-            (_, Some((source, _)), Some(f)) => {
-                Menu::loading_interface(f, screen, &self.strings, &loading_name(source))
+            (_, Some(l), Some(f)) => {
+                if l.shown() {
+                    crate::loading::bar(
+                        f,
+                        screen,
+                        &self.strings,
+                        &loading_name(&l.source),
+                        crate::loading::fraction(),
+                        &crate::loading::text(&self.strings),
+                        l.began.elapsed().as_secs_f32() - LOAD_SCREEN_AFTER.as_secs_f32(),
+                    )
+                } else {
+                    Vec::new()
+                }
             }
             (Some(m), None, Some(_)) => {
                 // over a level its points and lives stay in view, as the original's pause shows them
@@ -6428,6 +7033,15 @@ impl App {
             }
             _ => Vec::new(),
         };
+        let mut quads = quads;
+        if let (Some(sp), Some(f)) = (&self.splash, font) {
+            quads.extend(crate::loading::splash(
+                f,
+                screen,
+                sp.began.elapsed().as_secs_f32(),
+                sp.fade(),
+            ));
+        }
         if let Some((w, h, rgba)) = crate::fallback::take_changed() {
             gpu.renderer
                 .add_named_texture(crate::fallback::TEXTURE, w, h, rgba);
@@ -6573,6 +7187,10 @@ impl App {
 
     /// Left presses the button under the cursor; right and the mouse's back button are Esc.
     fn mouse_button(&mut self, button: MouseButton, event_loop: &ActiveEventLoop) {
+        if let Some(sp) = &mut self.splash {
+            sp.skipped = true;
+            return;
+        }
         if self.menu.is_none() || self.loading.is_some() {
             return;
         }
@@ -6968,4 +7586,34 @@ mod placeholder_tests {
         s.note("slow", std::time::Duration::from_millis(250));
         assert_eq!(s.notes, vec!["slow 250 ms".to_owned()]);
     }
+}
+
+/// Notes (stderr) a step of the loading that held a frame for long: dropped when the step ends.
+struct SlowStep(Instant, &'static str, usize, Arc<[AtomicU64; 4]>, usize);
+
+impl Drop for SlowStep {
+    fn drop(&mut self) {
+        let took = self.0.elapsed();
+        if self.1 != "textures" {
+            self.3[self.4].fetch_max(took.as_micros() as u64, Relaxed);
+        }
+        if took.as_millis() >= 40 {
+            eprintln!(
+                "loading: slow step: {} {} took {:.0} ms",
+                self.1,
+                self.2,
+                took.as_secs_f64() * 1000.0
+            );
+        }
+    }
+}
+
+fn scopeguard_note(
+    began: Instant,
+    what: &'static str,
+    n: usize,
+    worst: Arc<[AtomicU64; 4]>,
+    kind: usize,
+) -> SlowStep {
+    SlowStep(began, what, n, worst, kind)
 }
