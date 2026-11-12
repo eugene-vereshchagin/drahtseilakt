@@ -26,6 +26,9 @@ pub trait Host {
     fn initial_matrix(&self, e: Ent) -> Option<[[f32; 4]; 4]>;
     fn set_matrix(&mut self, e: Ent, m: [[f32; 4]; 4]);
     fn set_visible(&mut self, e: Ent, on: bool);
+    /// Set 3DSprite Mode: how a 3D sprite is turned each frame (0 faces the view, 1 about the world x, 2 about y, 3 keeps
+    /// its own axes). A target that is no sprite is ignored by the host.
+    fn sprite_mode(&mut self, _e: Ent, _mode: u32) {}
     /// The world-axis bounding box of the entity.
     fn bounds(&self, e: Ent) -> Option<([f32; 3], [f32; 3])>;
     fn delete(&mut self, e: Ent);
@@ -233,15 +236,20 @@ pub struct FogSpec {
     pub color: [f32; 4],
 }
 
-/// The sky a TT Sky block builds: the vertex colour, the radius, the lens widening and the materials of its sides
-/// and bottom (graph objects).
+/// The sky a TT Sky block builds: the vertex colour, the radius (the distance to the walls), the lens widening, the
+/// walls' shape (square ones, or this height) and height of the sky's middle, and the level materials of its sides,
+/// bottom and top.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SkySpec {
     pub color: [f32; 4],
     pub radius: f32,
     pub distortion: f32,
-    pub sides: Vec<Option<crate::Id>>,
-    pub bottom: Option<crate::Id>,
+    pub quadratic: bool,
+    pub side_height: f32,
+    pub y: f32,
+    pub sides: Vec<Option<usize>>,
+    pub bottom: Option<usize>,
+    pub top: Option<usize>,
 }
 
 /// What a script set of a 2D entity (Edit 2D Entity): each part only when the block edits it.

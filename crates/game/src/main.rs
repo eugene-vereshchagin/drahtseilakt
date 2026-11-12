@@ -60,6 +60,7 @@ mod scene;
 mod script_sound;
 mod script_text;
 mod scripting;
+mod scriptsky;
 mod setup;
 mod sim;
 mod sky;

@@ -1663,6 +1663,12 @@ fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
         if let Some(sc) = &game.sim.scripts {
             r.sync_materials(scene::LEVEL_MODEL, &sc.mats);
         }
+        r.apply_script_sky(
+            scene::LEVEL_MODEL,
+            game.sim.script_env().sky.as_ref(),
+            snap.eye,
+            &mut inst,
+        );
         let px = off
             .pixels(&mut r, &scene::view(&snap), &inst, &quads)
             .ok_or("the frame could not be read back")?;
@@ -3630,6 +3636,7 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     if let Some(sc) = &game.sim.scripts {
         r.sync_materials(scene::LEVEL_MODEL, &sc.mats);
     }
+    r.apply_script_sky(scene::LEVEL_MODEL, env.sky.as_ref(), snap.eye, &mut inst);
     r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
     // DRAHTSEILAKT_BENCH=N: draws the frame N times more, with each quality of the clouds, and prints the time a frame
     // takes (the GPU waited for after each batch), to measure what the sea of cloud costs
@@ -5012,6 +5019,12 @@ impl App {
             if let Some(sc) = &sim.scripts {
                 r.sync_materials(scene::LEVEL_MODEL, &sc.mats);
             }
+            r.apply_script_sky(
+                scene::LEVEL_MODEL,
+                sim.script_env().sky.as_ref(),
+                snap.eye,
+                &mut inst,
+            );
             r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
             r.draw_overlay(
                 &view,
@@ -6026,6 +6039,9 @@ impl App {
             self.game.sim.script_env()
         };
         gpu.renderer.script_fog = env.fog;
+        let mut inst = inst;
+        gpu.renderer
+            .apply_script_sky(scene::LEVEL_MODEL, env.sky.as_ref(), snap.eye, &mut inst);
         if let Some(base) = self.light_base {
             let k = if menu_up {
                 1.0

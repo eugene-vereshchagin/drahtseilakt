@@ -1459,9 +1459,13 @@ impl Sim {
         }
     }
 
-    /// The map's own 2D frames that are drawn (hud::level_frames): only drawn, no part of the run.
-    pub fn frames(&self) -> &[crate::hud::LevelFrame] {
-        &self.frames
+    /// The map's own 2D frames that are drawn (hud::level_frames), as the map's Edit 2D Entity blocks left them: only
+    /// drawn, no part of the run.
+    pub fn frames(&self) -> Vec<crate::hud::LevelFrame> {
+        match self.scripts.as_ref().map(|s| s.frame_edits()) {
+            Some(edits) if !edits.is_empty() => crate::hud::edited_frames(&self.frames, &edits),
+            _ => self.frames.clone(),
+        }
     }
 
     /// The lengths of the sounds a map's scripts play, in ticks by lower-case file stem (the sound set's own: scripts

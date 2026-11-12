@@ -685,7 +685,14 @@ pub fn instances(
                     (None, Some((axis, rate)), _) => {
                         p.matrix * Mat4::from_axis_angle(axis, rate * s.time)
                     }
-                    (None, None, Some(sp)) => sprite_matrix(&p.matrix, sp, s.eye, s.target),
+                    (None, None, Some(sp)) => {
+                        let mode = scripted.and_then(|e| e.sprite_mode(p.object));
+                        let sp = level::Sprite {
+                            mode: mode.unwrap_or(sp.mode),
+                            ..*sp
+                        };
+                        sprite_matrix(&p.matrix, &sp, s.eye, s.target)
+                    }
                     (None, None, None) => {
                         scripted.map_or(p.matrix, |e| e.draw_matrix(p.object, p.matrix))
                     }

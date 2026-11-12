@@ -41,6 +41,8 @@ pub struct Entity {
     moved: bool,
     /// A script hid it (or deleted it); for a level row, as before: the file's own hidden mark is not here.
     pub hidden: bool,
+    /// A script's Set 3DSprite Mode (a sprite's own mode otherwise).
+    sprite_mode: Option<u32>,
     pub mesh: Option<usize>,
     /// The materials of its mesh, in order.
     pub materials: Vec<usize>,
@@ -84,6 +86,7 @@ impl Entities {
                     mat: m,
                     moved: false,
                     hidden: false,
+                    sprite_mode: None,
                     mesh: o.mesh,
                     materials: o
                         .mesh
@@ -250,6 +253,22 @@ impl Entities {
         true
     }
 
+    /// Set 3DSprite Mode for a row; whether it changed.
+    pub fn set_sprite_mode(&mut self, i: usize, mode: u32) -> bool {
+        match self.rows.get_mut(i) {
+            Some(r) if r.sprite_mode != Some(mode) => {
+                r.sprite_mode = Some(mode);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// The mode a script gave a row's sprite.
+    pub fn sprite_mode(&self, i: usize) -> Option<u32> {
+        self.rows.get(i)?.sprite_mode
+    }
+
     pub fn set_hidden(&mut self, i: usize, hidden: bool) -> bool {
         match self.rows.get_mut(i) {
             Some(r) if r.hidden != hidden => {
@@ -284,6 +303,7 @@ impl Entities {
             mat: world,
             moved: false,
             hidden: src.hidden || !src.alive,
+            sprite_mode: src.sprite_mode,
             mesh: src.mesh,
             materials: src.materials.clone(),
             alive: true,
@@ -315,6 +335,7 @@ impl Entities {
             mat: matrix,
             moved: false,
             hidden: false,
+            sprite_mode: None,
             mesh,
             materials,
             alive: true,
@@ -388,6 +409,7 @@ mod tests {
                     mat: m,
                     moved: false,
                     hidden: false,
+                    sprite_mode: None,
                     mesh: Some(k),
                     materials: vec![k + 100],
                     alive: true,
