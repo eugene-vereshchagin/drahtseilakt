@@ -30,6 +30,5 @@ In Ihrem Datenordner (siehe [Level und Ordner](levels.md)):
 
 ## Ein Problem melden
 
-Schreiben Sie uns auf der Projektseite github.com/eugene-vereshchagin/drahtseilakt (Issues). Nennen Sie das Level, was
-geschah und was Sie taten, nennen Sie Ihr System und hängen Sie das neueste `session-....log` und die `.replay` des
-Laufs aus dem Ordner `replays/<Level>/` an.
+Wohin Sie Probleme melden können, steht bald hier. Bis dahin heben Sie das neueste `session-....log` und `.replay`
+des Laufs aus dem Ordner `replays/<Level>/` auf: Sie zeigen genau, was geschah.

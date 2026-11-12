@@ -26,5 +26,5 @@
 
 ## 报告问题
 
-请到项目主页 github.com/eugene-vereshchagin/drahtseilakt（Issues）告诉我们。请写明关卡、发生了什么、您做了什么，
-说明您的系统，并附上 `replays/<关卡>/` 文件夹中最新的 `session-....log` 和该次游玩的 `.replay`。
+问题反馈的地址稍后会写在这里。在此之前，请保留 `replays/<关卡>/` 文件夹中最新的 `session-....log` 和 `.replay`：
+它们准确记录了发生的事情。

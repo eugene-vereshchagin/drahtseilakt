@@ -30,6 +30,5 @@ In your data folder (see [Levels and folders](levels.md)):
 
 ## Reporting a problem
 
-Tell us on the project's page, github.com/eugene-vereshchagin/drahtseilakt (the issues). Say which level, what happened
-and what you did, name your system, and attach the newest `session-....log` and the `.replay` of the run from the
-`replays/<level>/` folder.
+Where to send reports will be named here soon. Meanwhile keep the newest `session-....log` and `.replay` of the run
+from the `replays/<level>/` folder: they show exactly what happened.
