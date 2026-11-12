@@ -470,3 +470,11 @@ square shapes, plain textures. Why: one place to choose the look, no duplicate l
 
 In `user-levels/`, entries that break the folder rule are not listed; the User levels page then says at the bottom that
 the levels folder is wrong and where the manual is (the game never opens a browser).
+
+## The player's manual ships as local HTML and opens from the game
+
+*Owner's decision, 2026-11-13.* The game ships a manual for players as local HTML pages (`manual/`, made from the
+player-facing docs in every documentation language, styled like the game), and opens it in the system's browser when
+the player asks (Help in the menu, F1). This relaxes "the game never opens a browser" for exactly this: a local file,
+on request, never during a run, never a remote address. Why: a hint like "the levels folder is wrong, see the manual"
+is useless if the manual is a URL to type in by hand.
