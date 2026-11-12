@@ -193,11 +193,11 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
   a run and its replay draw the same numbers. (The original's are not reproducible at all.)
 - Set Euler Orientation, Scale, Get Nearest In Group, Row Search, Remove Row, Object Rename.
 
-Still not done, most wanted first: **physics by script** for level objects (Physicalize of a floor or a box,
-Physics Impulse, SetPhysicsForce, Set Physics Slider): an object a script moves, shows or hides keeps the body it
-was loaded with, so a platform moved by a script is drawn at its new place and collides at its old one; drawing
-the copies (the portals' particle frames); sounds through the sound engine. The test
-player (`--autopilot`) does not know the portals: its way stops at one. A replay of a scripted map recorded
+Later stages (2-4, merged) did the physics by script, the drawn copies (the portals' particle frames) and the
+sounds; the census counts every scripted map at full effect. The test player (`--autopilot`) does not know the
+portals: its way stops at one. A level in the open format keeps its arrays' key column and column kinds
+(`script_json.rs`); the picks exported before that kept neither, so their portals never made their copies, and they
+were exported again (2026-11-12). A replay of a scripted map recorded
 before this change may play differently (the scripts now do more).
 
 ## Stage 0 (2026-11-11): core conformance
