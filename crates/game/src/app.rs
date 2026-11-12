@@ -4781,6 +4781,10 @@ impl App {
                 fading: None,
             });
         }
+        let mut renderer = renderer;
+        if self.splash.is_some() {
+            renderer.prepare_title();
+        }
         self.gpu = Some(Gpu {
             surface,
             config,
@@ -7137,14 +7141,12 @@ impl App {
             gpu.renderer
                 .add_named_texture(crate::fallback::TEXTURE, w, h, rgba);
         }
-        gpu.renderer.draw_ui(&view, rw, rh, &quads);
-        if let Some(shot) = shot {
-            gpu.renderer.draw_title(&view, rw, rh, &shot);
-        }
         for (name, w, h, rgba) in self.art.uploads() {
             gpu.renderer.add_named_texture(name, w, h, rgba);
         }
-        gpu.renderer.draw_ui(&view, rw, rh, &art_quads);
+        // the words wait for their picture (its pipeline is made on a thread at the start)
+        gpu.renderer
+            .draw_screen(&view, (rw, rh), &quads, shot.as_ref(), &art_quads);
         if look.post() {
             if let Some(retro) = &gpu.renderer.retro {
                 let place = look.placed(gpu.config.width, gpu.config.height);

@@ -124,21 +124,28 @@ const NAME: Spec = Spec {
 };
 const CREDIT: Spec = Spec {
     name: "Art_Credit",
-    glow: Some(("Art_CreditGlow", 0.6)),
+    glow: None,
     weight: 500.0,
     widen: 1.2,
     tracking: 0.16,
 };
 const DOING: Spec = Spec {
     name: "Art_Stage",
-    glow: Some(("Art_StageGlow", 0.6)),
+    glow: None,
     weight: 500.0,
     widen: 1.2,
     tracking: 0.14,
 };
 
+/// The stage line's type case: the characters a stage's text may need, set well apart (`CASE_GAP` of an em) so that
+/// each can be cut out of the one texture. The count in the line then runs without a texture being made: each
+/// texture made costs a frame of the load a wait behind the loading thread's uploads.
+const CASE_DIGITS: &str = "0123456789";
+const CASE_GAP: f32 = 0.5;
+
 /// A line as it was last drawn.
 struct Made {
+    glyphs: Vec<crate::fallback::Set>,
     key: String,
     w: u32,
     h: u32,
@@ -161,9 +168,15 @@ struct Ink {
 #[derive(Default)]
 pub struct Art {
     made: std::collections::HashMap<&'static str, Made>,
+    /// The size each line was fitted to: (what was asked, the capitals' height it got).
+    fitted: std::collections::HashMap<&'static str, (String, f32)>,
     uploads: Vec<(&'static str, u32, u32, Vec<u8>)>,
     shown: f32,
     last: Option<std::time::Instant>,
+    /// How many lines may still be drawn anew this frame: one, so that a screen coming up spreads its lines over
+    /// its first frames (each texture made waits behind the loading thread's uploads; a line missing for a frame
+    /// of the fade-in is not seen, a frame half a second long is).
+    budget: u32,
 }
 
 fn white(cover: &[u8]) -> Vec<u8> {
@@ -203,6 +216,12 @@ impl Art {
     fn ensure(&mut self, spec: &Spec, text: &str, cap: f32) -> Option<&Made> {
         let key = format!("{cap:.0}|{text}");
         if self.made.get(spec.name).is_none_or(|m| m.key != key) {
+            if self.budget == 0 {
+                // next frame; what was there for another text or size is not shown meanwhile
+                self.made.remove(spec.name);
+                return None;
+            }
+            self.budget -= 1;
             let Some(line) =
                 crate::fallback::line(text, cap.round(), spec.weight, spec.widen, spec.tracking)
             else {
@@ -224,6 +243,7 @@ impl Art {
             self.made.insert(
                 spec.name,
                 Made {
+                    glyphs: line.glyphs,
                     key,
                     w: line.w,
                     h: line.h,
@@ -252,10 +272,18 @@ impl Art {
             return;
         }
         let mut cap = cap.round().max(6.0);
-        // a line too wide for the window is set smaller (its width goes with its size)
-        let wide = self.ensure(spec, text, cap).map_or(0.0, |m| m.w as f32);
-        if wide > fit && fit > 0.0 {
-            cap = (cap * fit / wide).floor().max(6.0);
+        // a line too wide for the window is set smaller (its width goes with its size): measured once
+        let asked = format!("{cap:.0}|{fit:.0}|{text}");
+        match self.fitted.get(spec.name) {
+            Some((key, c)) if *key == asked => cap = *c,
+            _ => {
+                let wide = crate::fallback::line(text, cap, spec.weight, spec.widen, spec.tracking)
+                    .map_or(0.0, |l| l.w as f32);
+                if wide > fit && fit > 0.0 {
+                    cap = (cap * fit / wide).floor().max(6.0);
+                }
+                self.fitted.insert(spec.name, (asked, cap));
+            }
         }
         let Some(m) = self.ensure(spec, text, cap) else {
             return;
@@ -282,12 +310,81 @@ impl Art {
             out.push(quad(lower, ink.shadow, ink.shadow, name));
             out.push(quad(rect, ink.glow, ink.glow, name));
         }
-        out.push(quad(
-            [x0, y0, x0 + m.w as f32, y0 + m.h as f32],
-            ink.top,
-            ink.bottom,
-            spec.name,
-        ));
+        let rect = [x0, y0, x0 + m.w as f32, y0 + m.h as f32];
+        if spec.glow.is_none() {
+            // a plain shadow: the line itself, dark, a little down and to the right
+            let d = (cap * 0.06).max(1.0).round();
+            let lower = [rect[0] + d, rect[1] + d, rect[2] + d, rect[3] + d];
+            out.push(quad(lower, ink.shadow, ink.shadow, spec.name));
+        }
+        out.push(quad(rect, ink.top, ink.bottom, spec.name));
+    }
+
+    /// Sets `text` centred on `at.0` with its baseline at `at.1` out of the stage line's type case: one texture for
+    /// all the characters of the text and the digits, made again only when the text brings a new character.
+    fn typeset(
+        &mut self,
+        out: &mut Vec<Quad>,
+        text: &str,
+        at: (f32, f32),
+        cap: f32,
+        color: [f32; 4],
+        shadow: [f32; 4],
+    ) {
+        if text.trim().is_empty() || color[3] <= 0.0 {
+            return;
+        }
+        let cap = cap.round().max(6.0);
+        let mut case: Vec<char> = text
+            .chars()
+            .chain(CASE_DIGITS.chars())
+            .filter(|c| !c.is_control())
+            .collect();
+        case.sort_unstable();
+        case.dedup();
+        let case: String = case.into_iter().collect();
+        let spec = Spec {
+            tracking: CASE_GAP,
+            ..DOING
+        };
+        let Some(m) = self.ensure(&spec, &case, cap) else {
+            return;
+        };
+        // the pen's steps: each character's advance and the line's own tracking (of an em, which is near enough
+        // 1.4 capitals high in the interface's face)
+        let gap = DOING.tracking * cap * 1.4;
+        let find = |c: char| m.glyphs.iter().find(|g| g.c == c);
+        let width: f32 = text
+            .chars()
+            .filter_map(find)
+            .map(|g| g.advance + gap)
+            .sum::<f32>()
+            - gap;
+        let (mut x, y0) = (at.0 - width / 2.0, (at.1 - m.base).round());
+        let d = (cap * 0.06).max(1.0).round();
+        let mut letters = Vec::new();
+        for g in text.chars().filter_map(find) {
+            if let Some((from, to, off)) = g.ink {
+                let left = (x + off).round();
+                let rect = [left, y0, left + (to - from) as f32, y0 + m.h as f32];
+                let uv = [from as f32 / m.w as f32, 0.0, to as f32 / m.w as f32, 1.0];
+                let quad = |rect: [f32; 4], c: [f32; 4]| Quad {
+                    angle: 0.0,
+                    rect,
+                    uv,
+                    top: c,
+                    bottom: c,
+                    texture: DOING.name,
+                };
+                out.push(quad(
+                    [rect[0] + d, rect[1] + d, rect[2] + d, rect[3] + d],
+                    shadow,
+                ));
+                letters.push(quad(rect, color));
+            }
+            x += g.advance + gap;
+        }
+        out.extend(letters);
     }
 
     /// The title screen's words over its picture (titlescene.rs): the game's name, coming up a little after the
@@ -295,6 +392,7 @@ impl Art {
     pub fn splash(&mut self, screen: Screen, t: f32, fade: f32) -> Vec<Quad> {
         let (w, h) = (screen.w, screen.h);
         let mut out = Vec::new();
+        self.budget = 1;
         let a = ((t - 0.15) / 0.6).clamp(0.0, 1.0);
         let a = a * a * (3.0 - 2.0 * a);
         let rise = (1.0 - a) * h * 0.012;
@@ -328,6 +426,7 @@ impl Art {
     ) -> Vec<Quad> {
         let (w, h) = (screen.w, screen.h);
         let mut out = Vec::new();
+        self.budget = 1;
         let a = (t / 0.25).clamp(0.0, 1.0);
         let shadow = [0.03, 0.02, 0.06, 0.6 * a];
         self.put(
@@ -364,20 +463,13 @@ impl Art {
             );
         }
         let quiet = [0.93, 0.92, 0.96, 0.88 * a];
-        self.put(
+        self.typeset(
             &mut out,
-            &DOING,
             stage,
-            w / 2.0,
-            h * 0.715,
+            (w / 2.0, h * 0.715),
             (h * 0.0185).max(8.0),
-            w * 0.8,
-            &Ink {
-                top: quiet,
-                bottom: quiet,
-                glow: [0.0; 4],
-                shadow: tint(shadow, 0.9),
-            },
+            quiet,
+            tint(shadow, 0.9),
         );
         out
     }

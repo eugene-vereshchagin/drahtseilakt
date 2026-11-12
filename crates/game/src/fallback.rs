@@ -436,6 +436,17 @@ pub struct Line {
     pub cover: Vec<u8>,
     /// The baseline's row in the picture.
     pub base: f32,
+    /// Its characters in order: what a caller needs to set other text with them (loading.rs' stage line).
+    pub glyphs: Vec<Set>,
+}
+
+/// A character of a drawn line: how far the pen moves over it (without the tracking), and the columns of the picture
+/// its ink is in with where they begin against the pen (None for a blank).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Set {
+    pub c: char,
+    pub advance: f32,
+    pub ink: Option<(u32, u32, f32)>,
 }
 
 /// The largest picture a line is drawn into (a title across an 8K window fits).
@@ -456,6 +467,7 @@ pub fn line(text: &str, cap: f32, weight: f32, widen: f32, tracking: f32) -> Opt
         f.set_variation(b"wght", weight.clamp(100.0, 900.0));
     }
     let mut outlines = Vec::new();
+    let mut glyphs = Vec::new();
     let mut x = 0.0f32;
     for c in text.chars().take(TEXT_MAX).filter(|c| !c.is_control()) {
         let (g, size) = shape(c);
@@ -467,9 +479,11 @@ pub fn line(text: &str, cap: f32, weight: f32, widen: f32, tracking: f32) -> Opt
         let scale = PxScale { x: s * widen, y: s };
         let id = font.glyph_id(g);
         let advance = font.as_scaled(scale).h_advance(id);
-        if let Some(o) =
-            font.outline_glyph(id.with_scale_and_position(scale, ab_glyph::point(x, 0.0)))
-        {
+        let outline =
+            font.outline_glyph(id.with_scale_and_position(scale, ab_glyph::point(x, 0.0)));
+        // the ink's columns are known once the picture's left edge is (below): its bounds for now
+        glyphs.push((c, advance, x, outline.as_ref().map(|o| o.px_bounds())));
+        if let Some(o) = outline {
             outlines.push(o);
         }
         x += advance + tracking * em * size * widen;
@@ -508,11 +522,24 @@ pub fn line(text: &str, cap: f32, weight: f32, widen: f32, tracking: f32) -> Opt
             }
         });
     }
+    let glyphs = glyphs
+        .into_iter()
+        .map(|(c, advance, pen, bounds)| Set {
+            c,
+            advance,
+            ink: bounds.map(|b| {
+                let from = (b.min.x - x0).floor().max(0.0);
+                let to = ((b.max.x - x0).ceil() + 1.0).min(w as f32);
+                (from as u32, to as u32, from + x0 - pen)
+            }),
+        })
+        .collect();
     Some(Line {
         w,
         h,
         cover,
         base: -y0,
+        glyphs,
     })
 }
 
@@ -614,6 +641,7 @@ mod tests {
             h: 4,
             cover: vec![255; 32],
             base: 3.0,
+            glyphs: Vec::new(),
         };
         let (w, h, soft) = soften(&line, 4.0, 2, 5);
         assert_eq!((w, h), (4 + 10, 2 + 10));
@@ -630,6 +658,7 @@ mod tests {
             h: 0,
             cover: Vec::new(),
             base: 0.0,
+            glyphs: Vec::new(),
         };
         let (w, h, soft) = soften(&empty, f32::NAN, 0, 1);
         assert_eq!(soft.len(), (w * h) as usize);

@@ -491,6 +491,9 @@ pub struct Renderer {
     pub retro: Option<crate::retro::Retro>,
     /// The title and loading screens' picture (titlescene.rs), made when first shown.
     title: Option<crate::titlescene::TitleScene>,
+    /// The picture's pipeline being made on a thread (`prepare_title`), and when the picture was first there.
+    title_coming: Option<std::sync::mpsc::Receiver<crate::titlescene::TitleScene>>,
+    title_since: Option<std::time::Instant>,
 }
 
 /// A range in shared chunk `.0`: its offset and length.
@@ -1145,6 +1148,8 @@ impl Renderer {
             depth: None,
             retro: None,
             title: None,
+            title_coming: None,
+            title_since: None,
         }
     }
 
@@ -1764,19 +1769,53 @@ impl Renderer {
         self.named_textures.remove(name);
     }
 
-    /// Draws the title or loading screen's picture over `target`.
-    pub fn draw_title(
-        &mut self,
-        target: &wgpu::TextureView,
-        width: u32,
-        height: u32,
-        shot: &crate::titlescene::Shot,
-    ) {
+    /// Starts making the title picture's pipeline on a thread: compiling its shader takes a tenth of a second or
+    /// two, which the start-up does not wait for (the picture fades in when it is there).
+    pub fn prepare_title(&mut self) {
+        if self.title.is_some() || self.title_coming.is_some() {
+            return;
+        }
+        let (device, format) = (self.device.clone(), self.format);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let spawned = std::thread::Builder::new()
+            .name("title picture".into())
+            .spawn(move || {
+                let began = std::time::Instant::now();
+                let made = crate::titlescene::TitleScene::new(&device, format);
+                eprintln!(
+                    "startup: the title picture's pipeline made in {:.0} ms (on its thread)",
+                    began.elapsed().as_secs_f64() * 1000.0
+                );
+                let _ = tx.send(made);
+            });
+        if spawned.is_ok() {
+            self.title_coming = Some(rx);
+        }
+    }
+
+    /// The picture's shot as it is drawn now, once its pipeline is there (None while it is still being made: the
+    /// frame stays as it is; the title screen's picture then comes up in a quarter of a second).
+    fn title_shot(&mut self, shot: &crate::titlescene::Shot) -> Option<crate::titlescene::Shot> {
+        if let Some(rx) = &self.title_coming {
+            match rx.try_recv() {
+                Ok(made) => {
+                    self.title = Some(made);
+                    self.title_coming = None;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => return None,
+                // the thread is gone without a pipeline: it is made here
+                Err(_) => self.title_coming = None,
+            }
+        }
         let (device, format) = (&self.device, self.format);
-        let title = self
-            .title
+        self.title
             .get_or_insert_with(|| crate::titlescene::TitleScene::new(device, format));
-        title.draw(&self.device, &self.queue, target, (width, height), shot);
+        let since = *self.title_since.get_or_insert_with(std::time::Instant::now);
+        let mut shot = *shot;
+        if !shot.loading {
+            shot.alpha *= (since.elapsed().as_secs_f32() / 0.25).clamp(0.0, 1.0);
+        }
+        Some(shot)
     }
 
     /// Draws the original's 2D interface over `target`, which keeps its content: quads in window pixels, each
@@ -1791,6 +1830,68 @@ impl Renderer {
         if quads.is_empty() {
             return;
         }
+        let (verts, runs) = Self::ui_vertices(width, height, quads);
+        let buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("ui"),
+                contents: bytemuck::cast_slice(&verts),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let mut enc = self.device.create_command_encoder(&Default::default());
+        self.ui_pass(&mut enc, target, (&buf, 0..buf.size()), runs);
+        self.queue.submit([enc.finish()]);
+    }
+
+    /// The interface, then the title or loading screen's picture over it, then that screen's words: one buffer and
+    /// one batch of commands for the card, as the interface alone takes (every object made and every batch sent
+    /// waits its turn behind the loading thread's uploads, and the frames of a load must not pay for that thrice).
+    pub fn draw_screen(
+        &mut self,
+        target: &wgpu::TextureView,
+        (width, height): (u32, u32),
+        under: &[crate::ui::Quad],
+        shot: Option<&crate::titlescene::Shot>,
+        over: &[crate::ui::Quad],
+    ) {
+        // the words wait for their picture
+        let waiting = shot.is_some();
+        let shot = shot.and_then(|s| self.title_shot(s));
+        let over = if waiting && shot.is_none() { &[] } else { over };
+        if under.is_empty() && shot.is_none() && over.is_empty() {
+            return;
+        }
+        let (under_verts, under_runs) = Self::ui_vertices(width, height, under);
+        let (over_verts, over_runs) = Self::ui_vertices(width, height, over);
+        let params = shot.map(|s| crate::titlescene::TitleScene::params((width, height), &s));
+        // the three passes' vertices one after the other in one buffer
+        let mut bytes: Vec<u8> = Vec::new();
+        bytes.extend_from_slice(bytemuck::cast_slice(&under_verts));
+        let over_at = bytes.len() as u64;
+        bytes.extend_from_slice(bytemuck::cast_slice(&over_verts));
+        let params_at = bytes.len() as u64;
+        if let Some(p) = &params {
+            bytes.extend_from_slice(bytemuck::cast_slice(p));
+        }
+        let buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("screen"),
+                contents: &bytes,
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let mut enc = self.device.create_command_encoder(&Default::default());
+        self.ui_pass(&mut enc, target, (&buf, 0..over_at), under_runs);
+        if let (Some(_), Some(title)) = (&params, &self.title) {
+            title.pass(&mut enc, target, buf.slice(params_at..));
+        }
+        self.ui_pass(&mut enc, target, (&buf, over_at..params_at), over_runs);
+        self.queue.submit([enc.finish()]);
+    }
+
+    /// The quads' vertices (in clip space on a target of `width` by `height`) and their runs by texture (name, first
+    /// vertex, count).
+    fn ui_vertices(width: u32, height: u32, quads: &[crate::ui::Quad]) -> (Vec<UiVertex>, UiRuns) {
         let (w, h) = (width.max(1) as f32, height.max(1) as f32);
         let mut verts: Vec<UiVertex> = Vec::with_capacity(quads.len() * 6);
         let mut runs: Vec<(&'static str, u32, u32)> = Vec::new();
@@ -1832,14 +1933,20 @@ impl Renderer {
                 _ => runs.push((q.texture, first, 6)),
             }
         }
-        let buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("ui"),
-                contents: bytemuck::cast_slice(&verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-        let mut enc = self.device.create_command_encoder(&Default::default());
+        (verts, runs)
+    }
+
+    /// A pass of the interface's quads added to `enc`: `verts` holds their vertices.
+    fn ui_pass(
+        &self,
+        enc: &mut wgpu::CommandEncoder,
+        target: &wgpu::TextureView,
+        (buf, range): (&wgpu::Buffer, std::ops::Range<u64>),
+        runs: UiRuns,
+    ) {
+        if runs.is_empty() {
+            return;
+        }
         {
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("ui"),
@@ -1858,7 +1965,7 @@ impl Renderer {
                 multiview_mask: None,
             });
             pass.set_pipeline(&self.ui_pipeline);
-            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.set_vertex_buffer(0, buf.slice(range));
             for (texture, first, count) in runs {
                 let bind = self.named_textures.get(texture);
                 // a map's frame whose texture nobody has is not drawn: never a white rectangle over the picture
@@ -1869,7 +1976,6 @@ impl Renderer {
                 pass.draw(first..first + count, 0..1);
             }
         }
-        self.queue.submit([enc.finish()]);
     }
 
     fn particle_pipeline(&mut self, key: (PBlend, bool)) {
@@ -2426,6 +2532,9 @@ fn look_at_lh(eye: Vec3, target: Vec3, up: Vec3) -> Mat4 {
         glam::Vec4::new(-s.dot(eye), -u.dot(eye), -f.dot(eye), 1.0),
     )
 }
+
+/// The interface's quads' runs by texture: (name, first vertex, count).
+type UiRuns = Vec<(&'static str, u32, u32)>;
 
 /// A vertex of the 2D interface: clip-space position, texture coordinates, colour.
 #[repr(C)]

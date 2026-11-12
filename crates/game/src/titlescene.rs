@@ -2,8 +2,6 @@
 // (titlescene.wgsl: the ball on a rope over a sea of clouds, under a sky in the mood of the level's). It needs no
 // model and no texture, so it is there on the first frame, before anything is loaded, and costs the load nothing.
 
-use wgpu::util::DeviceExt;
-
 /// A sky's colours (linear): the mood of the screen.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Mood {
@@ -118,9 +116,10 @@ pub struct Shot {
 
 pub struct TitleScene {
     pipeline: wgpu::RenderPipeline,
-    params: wgpu::Buffer,
-    bind: wgpu::BindGroup,
 }
+
+/// How many numbers a frame of the picture takes (seven vectors of four: titlescene.wgsl's `Params`).
+pub const PARAMS: usize = 28;
 
 impl TitleScene {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> TitleScene {
@@ -128,24 +127,15 @@ impl TitleScene {
             label: Some("title scene"),
             source: wgpu::ShaderSource::Wgsl(include_str!("titlescene.wgsl").into()),
         });
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("title scene"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
         let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("title scene"),
-            bind_group_layouts: &[Some(&layout)],
+            bind_group_layouts: &[],
             immediate_size: 0,
         });
+        let attributes = wgpu::vertex_attr_array![
+            0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4,
+            4 => Float32x4, 5 => Float32x4, 6 => Float32x4
+        ];
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("title scene"),
             layout: Some(&pl),
@@ -153,7 +143,12 @@ impl TitleScene {
                 module: &shader,
                 entry_point: Some("vs"),
                 compilation_options: Default::default(),
-                buffers: &[],
+                // the frame's parameters: one instance
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: (PARAMS * std::mem::size_of::<f32>()) as u64,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &attributes,
+                })],
             },
             primitive: Default::default(),
             depth_stencil: None,
@@ -171,41 +166,17 @@ impl TitleScene {
             multiview_mask: None,
             cache: None,
         });
-        let params = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("title scene"),
-            contents: bytemuck::bytes_of(&[0f32; 28]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("title scene"),
-            layout: &layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: params.as_entire_binding(),
-            }],
-        });
-        TitleScene {
-            pipeline,
-            params,
-            bind,
-        }
+        TitleScene { pipeline }
     }
 
-    /// Draws the picture over `target` (`w` by `h` pixels), which keeps what the picture does not cover yet.
-    pub fn draw(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        target: &wgpu::TextureView,
-        (w, h): (u32, u32),
-        shot: &Shot,
-    ) {
+    /// The numbers of a frame of the picture on a target of `w` by `h` pixels: the pass's one instance.
+    pub fn params((w, h): (u32, u32), shot: &Shot) -> [f32; PARAMS] {
         let m = &shot.mood;
         // the loading screen's backdrop is kept darker under a bright sky, so the words stand on it
         let bright = m.horizon.iter().sum::<f32>() / 3.0;
         let keep = (0.92 - 0.2 * bright).clamp(0.6, 0.92);
         let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
-        let data: [f32; 28] = [
+        [
             w.max(1) as f32,
             h.max(1) as f32,
             // the noise loses its grain far from zero: the clock goes round
@@ -235,31 +206,36 @@ impl TitleScene {
             m.shade[1],
             m.shade[2],
             0.0,
-        ];
-        queue.write_buffer(&self.params, 0, bytemuck::bytes_of(&data));
-        let mut enc = device.create_command_encoder(&Default::default());
-        {
-            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("title scene"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
-            pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &self.bind, &[]);
-            pass.draw(0..3, 0..1);
-        }
-        queue.submit([enc.finish()]);
+        ]
+    }
+
+    /// Draws the picture over `target`, which keeps what the picture does not cover yet: a pass added to `enc`,
+    /// its parameters (`params`) in `instance`.
+    pub fn pass(
+        &self,
+        enc: &mut wgpu::CommandEncoder,
+        target: &wgpu::TextureView,
+        instance: wgpu::BufferSlice<'_>,
+    ) {
+        let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("title scene"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(&self.pipeline);
+        pass.set_vertex_buffer(0, instance);
+        pass.draw(0..3, 0..1);
     }
 }
 
@@ -277,5 +253,19 @@ mod tests {
         assert_eq!(Mood::of(Some("A"), None), DAY);
         assert_eq!(Mood::of(None, Some(2)), DUSK);
         assert_eq!(Mood::of(Some("?"), None), Mood::of(Some("?"), Some(9)));
+    }
+
+    #[test]
+    fn a_frames_numbers_are_finite_and_in_range() {
+        let shot = Shot {
+            loading: true,
+            time: f32::NAN,
+            progress: 7.0,
+            alpha: f32::INFINITY,
+            mood: DUSK,
+        };
+        let p = TitleScene::params((0, 0), &shot);
+        assert!(p.iter().all(|v| v.is_finite()));
+        assert_eq!((p[0], p[1], p[2], p[3], p[5]), (1.0, 1.0, 0.0, 0.0, 1.0));
     }
 }

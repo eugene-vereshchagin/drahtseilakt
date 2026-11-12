@@ -19,12 +19,43 @@ struct Params {
     shade: vec4<f32>,
 };
 
-@group(0) @binding(0) var<uniform> P: Params;
+// The frame's parameters come as the one instance's attributes (no uniform buffer, no bind group: every object made
+// for a frame waits its turn behind the loading thread's uploads) and are kept here for the functions below.
+var<private> P: Params;
+
+struct VsOut {
+    @builtin(position) clip: vec4<f32>,
+    @location(0) @interpolate(flat) a: vec4<f32>,
+    @location(1) @interpolate(flat) b: vec4<f32>,
+    @location(2) @interpolate(flat) zenith: vec4<f32>,
+    @location(3) @interpolate(flat) horizon: vec4<f32>,
+    @location(4) @interpolate(flat) sun: vec4<f32>,
+    @location(5) @interpolate(flat) lit: vec4<f32>,
+    @location(6) @interpolate(flat) shade: vec4<f32>,
+};
 
 @vertex
-fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
+fn vs(
+    @builtin(vertex_index) i: u32,
+    @location(0) a: vec4<f32>,
+    @location(1) b: vec4<f32>,
+    @location(2) zenith: vec4<f32>,
+    @location(3) horizon: vec4<f32>,
+    @location(4) sun: vec4<f32>,
+    @location(5) lit: vec4<f32>,
+    @location(6) shade: vec4<f32>,
+) -> VsOut {
     let p = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
-    return vec4<f32>(p * 2.0 - vec2<f32>(1.0), 0.0, 1.0);
+    var out: VsOut;
+    out.clip = vec4<f32>(p * 2.0 - vec2<f32>(1.0), 0.0, 1.0);
+    out.a = a;
+    out.b = b;
+    out.zenith = zenith;
+    out.horizon = horizon;
+    out.sun = sun;
+    out.lit = lit;
+    out.shade = shade;
+    return out;
 }
 
 fn hash2(p: vec2<f32>) -> f32 {
@@ -154,7 +185,9 @@ fn wood(q: vec3<f32>) -> vec3<f32> {
 }
 
 @fragment
-fn fs(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
+fn fs(in: VsOut) -> @location(0) vec4<f32> {
+    P = Params(in.a, in.b, in.zenith, in.horizon, in.sun, in.lit, in.shade);
+    let frag = in.clip;
     let res = P.a.xy;
     let t = P.a.z;
     let loading = P.b.x > 0.5;
