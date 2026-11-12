@@ -40,6 +40,8 @@ struct Rec {
     /// The material and texture changes the scripts asked for.
     mats: Vec<(usize, crate::MatChange)>,
     texs: Vec<(usize, crate::TexChange)>,
+    /// Set Material calls: the entity, the material replaced (none: all), the one drawn instead.
+    replaced: Vec<(Ent, Option<usize>, usize)>,
     paints: Vec<(usize, crate::TexPaint)>,
     /// Every text box call: the block and its spec (none: taken away).
     boxes: Vec<(usize, Option<crate::TextSpec>)>,
@@ -166,6 +168,10 @@ impl Host for Rec {
     }
     fn material_set(&mut self, material: usize, change: crate::MatChange) {
         self.mats.push((material, change));
+    }
+    fn material_replace(&mut self, e: Ent, from: Option<usize>, to: usize) -> bool {
+        self.replaced.push((e, from, to));
+        true
     }
     fn texture_set(&mut self, texture: usize, change: crate::TexChange) {
         self.texs.push((texture, change));
@@ -2731,11 +2737,11 @@ fn set_texture_names_a_level_texture_or_clears_it() {
 }
 
 #[test]
-fn set_material_copies_the_new_material_over_the_replaced_one() {
-    use crate::MatChange as C;
-    // ids: the target material 0 is not what is replaced; "Material" is material 1, "to replace" material 0
+fn set_material_replaces_the_material_for_the_target_object_alone() {
+    // ids: "Material" is material 1, "to replace" material 0; the target is object 1
     let mut b = Build::new();
     let owner = b.g.add_object("Owner", ObjKind::Other);
+    let obj = b.g.add_object("Obj", ObjKind::Entity(1));
     let m0 = b.g.add_object("M0", ObjKind::Material(0));
     let m1 = b.g.add_object("M1", ObjKind::Material(1));
     let pins: Vec<Id> = [("Material", m1), ("Material to replace", m0)]
@@ -2745,6 +2751,7 @@ fn set_material_copies_the_new_material_over_the_replaced_one() {
             b.pin(n, types::OBJECT, l)
         })
         .collect();
+    let target = b.local("Target", types::ENTITY, Value::Obj(Some(obj)));
     let blk = b.bb(
         "SetMat",
         proto::SET_MATERIAL,
@@ -2753,7 +2760,7 @@ fn set_material_copies_the_new_material_over_the_replaced_one() {
         pins,
         vec![],
         vec![],
-        None,
+        Some(target),
     );
     let start = b.io("Start");
     let links = vec![b.link(start, in_of(&b.g, blk, 0), 0)];
@@ -2761,7 +2768,8 @@ fn set_material_copies_the_new_material_over_the_replaced_one() {
     let mut rt = Runtime::new(b.done());
     let mut host = Rec::new();
     rt.tick(&mut host);
-    assert_eq!(host.mats, vec![(0, C::CopyFrom(1))]);
+    assert_eq!(host.replaced, vec![(Ent::Object(1), Some(0), 1)]);
+    assert!(host.mats.is_empty(), "no level-wide material change");
 }
 
 #[test]

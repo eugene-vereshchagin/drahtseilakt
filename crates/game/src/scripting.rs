@@ -1241,6 +1241,16 @@ impl Host for SimHost<'_> {
         self.s.mats.apply(material, change);
     }
 
+    fn material_replace(&mut self, e: Ent, from: Option<usize>, to: usize) -> bool {
+        // only a material the level has; the ball has no row
+        match e {
+            Ent::Object(i) if to < self.s.mats.material_count() => {
+                self.s.ents.replace_material(i, from, to)
+            }
+            _ => false,
+        }
+    }
+
     fn texture_info(&self, texture: usize) -> Option<script::TexInfo> {
         self.s.mats.texture_info(texture)
     }

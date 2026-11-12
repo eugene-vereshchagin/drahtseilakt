@@ -192,9 +192,20 @@ pub struct Instance {
     pub unlit: bool,
     /// The ball's shadow pass over this floor mesh: its centre (world x, z) and side.
     pub shadow: Option<[f32; 3]>,
+    /// Materials this one thing draws in place of its mesh's own (a script's Set Material): (the level's, the
+    /// replacement). Empty for nearly everything.
+    pub swaps: Vec<(usize, usize)>,
 }
 
 impl Instance {
+    /// The material index a part of this instance is drawn with.
+    fn material_of(&self, part_material: usize) -> usize {
+        self.swaps
+            .iter()
+            .find(|(from, _)| *from == part_material)
+            .map_or(part_material, |(_, to)| *to)
+    }
+
     /// A mesh drawn with its own materials as they are.
     pub fn plain(model: usize, mesh: usize, matrix: Mat4) -> Instance {
         Instance {
@@ -206,6 +217,7 @@ impl Instance {
             diffuse: None,
             unlit: false,
             shadow: None,
+            swaps: Vec::new(),
         }
     }
 }
@@ -1641,7 +1653,7 @@ impl Renderer {
                     None => self
                         .models
                         .get(inst.model)
-                        .and_then(|m| m.materials.get(part.material))
+                        .and_then(|m| m.materials.get(inst.material_of(part.material)))
                         .map(|m| m.key),
                 };
                 match key {
@@ -1795,7 +1807,7 @@ impl Renderer {
                 let mat = match inst.marker {
                     _ if inst.shadow.is_some() => self.shadow_material.as_ref(),
                     Some(c) => self.markers.get(&c.map(f32::to_bits)),
-                    None => model.materials.get(part.material),
+                    None => model.materials.get(inst.material_of(part.material)),
                 };
                 let Some(mat) = mat else {
                     continue;

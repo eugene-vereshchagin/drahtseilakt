@@ -201,9 +201,9 @@ pub(crate) fn set_alpha_test(
     })
 }
 
-/// Set Material: the target object's material "Material to replace" (all of its mesh's materials when that pin is
-/// empty) takes the state of the other material. The engine's materials are shared by every object that uses them,
-/// so the change is level-wide, not for this object alone.
+/// Set Material: the target object draws "Material" in place of its mesh's material "Material to replace" (of all
+/// its mesh's materials when that pin is empty). Only the target object changes: the host keeps the replacement per
+/// entity, and other objects that use the same material keep it.
 pub(crate) fn set_material(
     rt: &mut Runtime,
     _id: Id,
@@ -215,25 +215,14 @@ pub(crate) fn set_material(
         let to_obj = pin(rt, b, "Material", 0, host).as_obj();
         let from_obj = pin(rt, b, "Material to replace", 1, host).as_obj();
         let (to, from) = (material_of(rt, to_obj), material_of(rt, from_obj));
-        if let Some(to) = to {
-            let replaced = match from {
-                Some(f) => vec![f],
-                None => target_ent(rt, b, host)
-                    .and_then(|e| host.mesh_of(e))
-                    .map(|m| host.mesh_materials(m))
-                    .unwrap_or_default(),
-            };
-            for f in replaced.into_iter().take(MAX_REPLACED) {
-                host.material_set(f, MatChange::CopyFrom(to));
-            }
+        if let (Some(to), Some(e)) = (to, target_ent(rt, b, host)) {
+            let _ = rt.pay(1);
+            host.material_replace(e, from, to);
         }
         out(rt, b, 0);
     }
     Flow::Done
 }
-
-/// The most materials one Set Material block replaces at once.
-const MAX_REPLACED: usize = 64;
 
 /// Change Texture Size: the engine records the size (capped at 2048 x 2048); the picture is not resampled.
 pub(crate) fn change_texture_size(
@@ -461,7 +450,7 @@ pub(super) const PROTOS: &[Proto] = &[
         &["Material", "Material to replace"],
         &[],
         flags::TARGET,
-        Partial,
+        Full,
         set_material
     ),
     proto!(

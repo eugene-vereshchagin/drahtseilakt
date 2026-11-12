@@ -701,6 +701,7 @@ pub fn instances(
                 uv_offset: [0.0; 2],
                 unlit: p.sprite.is_some(),
                 shadow: None,
+                swaps: scripted.map_or_else(Vec::new, |e| e.swaps(p.object).to_vec()),
                 // a transformer's shadow fades while its kind's animation plays (Set Diffuse on its material)
                 diffuse: match (p.trafo_shadow, s.trafo) {
                     (Some(k), Some((_, age, kind))) if k == kind => {
@@ -714,7 +715,10 @@ pub fn instances(
     if let Some(e) = scripted {
         for (_, row, world) in e.drawn_extra() {
             if let Some(mesh) = row.mesh {
-                out.push(Instance::plain(LEVEL_MODEL, mesh, world));
+                out.push(Instance {
+                    swaps: row.swaps.clone(),
+                    ..Instance::plain(LEVEL_MODEL, mesh, world)
+                });
             }
         }
     }
@@ -728,6 +732,7 @@ pub fn instances(
             diffuse: None,
             unlit: false,
             shadow: None,
+            swaps: Vec::new(),
         });
     }
     if let (Some(model), Some((at, age, _))) = (trafo, s.trafo) {
@@ -745,6 +750,7 @@ pub fn instances(
             diffuse: (alpha < 1.0).then_some([1.0, 1.0, 1.0, alpha]),
             unlit: false,
             shadow: None,
+            swaps: Vec::new(),
         });
     }
     if let Some((mesh, tint)) = s.kind.and_then(|k| balls.of(k)) {
@@ -757,6 +763,7 @@ pub fn instances(
             diffuse: tint,
             unlit: false,
             shadow: None,
+            swaps: Vec::new(),
         });
     }
     out
@@ -808,6 +815,7 @@ pub fn ball_looks(
             diffuse: Some([1.0, 1.0, 1.0, 0.3]),
             unlit: false,
             shadow: None,
+            swaps: Vec::new(),
         });
     }
 }

@@ -167,6 +167,11 @@ pub trait Host {
     fn env_set(&mut self, _change: EnvChange) {}
     /// A script changes a level material for this run (Set Diffuse, Set Texture, Set Blend Modes, ...).
     fn material_set(&mut self, _material: usize, _change: MatChange) {}
+    /// Set Material: the entity's mesh material `from` (none: all of its mesh's) is drawn as `to`, for this entity
+    /// alone. True when something was replaced.
+    fn material_replace(&mut self, _e: Ent, _from: Option<usize>, _to: usize) -> bool {
+        false
+    }
     /// What a level texture is now: its file, size and current slot (Get Texture Info); none for a texture the level
     /// does not have.
     fn texture_info(&self, _texture: usize) -> Option<TexInfo> {

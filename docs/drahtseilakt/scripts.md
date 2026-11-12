@@ -135,8 +135,11 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
   is what level materials always had, so a level without scripts draws as before). Set 3DSprite Mode: the mode (0 faces
   the view, 1 / 2 turn about the world x / y, 3 keeps its axes) is kept per entity row (`Entities::sprite_mode`) and
   `scene::sprite_matrix` uses it for a 3D sprite.
-- **Partial.** Set Material (the replaced material takes the new one's whole state for every object that uses it, not
-  for the target object alone)). **Full since stage 4.3: Set Current Slot.** `nmo::scene::texture` reads every
+- **Full since stage 4.3: Set Material and Set Current Slot.** Set Material replaces a material on the target object
+  alone: `Entities::replace_material` keeps (level material, material drawn now) pairs per row (at most 32; a copy
+  starts with its source's), `Instance::swaps` carries them to the renderer, which draws the part with the
+  replacement; other objects that use the same material are untouched, and no level-wide material changes.
+  Set Current Slot: `nmo::scene::texture` reads every
   slot (at most `MAX_SLOTS` = 64, names and saved pictures; 64 MiB of pixels per texture; a slot that cannot be read
   ends the list); `Level::texture_slots` carries those after the first, `MatState::show_slot` makes the chosen slot's
   picture the texture's run copy (the renderer uploads it as it does a written texture; slot 0 gives the level's own
@@ -461,7 +464,7 @@ by the engine's.
 | Random | `0c622386:1c3054f7` | 1 | 35 | done (a fixed seed: every run draws the same numbers) |
 | Set Euler Orientation | `0c4966d8:6c0c6d14` | 1 | 7 | done (X, then Y, then Z) |
 | Has Attribute | `25b54079:6ff90545` | 1 | 4 | done |
-| Set Material | `37865d50:2e285fab` | 1 | 3 | planned |
+| Set Material | `37865d50:2e285fab` | 1 | 3 | full (stage 4.3): per-object material replacement (the target's own parts draw the new material) |
 | Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | done |
 | SphericalParticleSystem | `67c88f47:8880721e` | 1 | 1 | planned |
 | Set 3DSprite Mode | `0c5d0457:c64c7000` | 1 | 1 | done (stage 4.1) |

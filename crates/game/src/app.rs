@@ -4576,6 +4576,7 @@ impl App {
             diffuse: Some([0.7, 0.85, 1.0, a]),
             unlit: false,
             shadow: None,
+            swaps: Vec::new(),
         })
     }
 

@@ -12,6 +12,8 @@ use level::Level;
 pub const MAX_ENTITIES: usize = crate::scripting::MAX_OBJECTS;
 /// The most copies and created objects drawn in one frame; the rows past it stay in the table, undrawn.
 pub const MAX_DRAWN_EXTRA: usize = 4_096;
+/// The most materials of one row a script may replace (Set Material).
+pub const MAX_SWAPS: usize = 32;
 /// How far up a parent chain is followed (a loop or a very deep chain stops here).
 const MAX_DEPTH: usize = 32;
 
@@ -46,6 +48,9 @@ pub struct Entity {
     pub mesh: Option<usize>,
     /// The materials of its mesh, in order.
     pub materials: Vec<usize>,
+    /// Set Material on this row alone: the mesh's material (as the level has it) and the one it is drawn with now.
+    /// At most `MAX_SWAPS`, kept in the order they were first made.
+    pub swaps: Vec<(usize, usize)>,
     pub alive: bool,
     /// Whether a copy of it is drawn as a plain mesh (not a billboard sprite, not a cloud layer).
     drawable: bool,
@@ -93,6 +98,7 @@ impl Entities {
                         .and_then(|k| level.meshes.get(k))
                         .map(|mesh| mesh.parts.iter().filter_map(|p| p.material).collect())
                         .unwrap_or_default(),
+                    swaps: Vec::new(),
                     alive: true,
                     drawable: o.sprite.is_none() && o.name != "SkyLayer",
                     bounds,
@@ -126,6 +132,42 @@ impl Entities {
 
     pub fn mesh(&self, i: usize) -> Option<usize> {
         self.rows.get(i)?.mesh
+    }
+
+    /// Set Material on row `i` alone: its mesh's material `from` (the level's, or the one a first replacement made)
+    /// is drawn as `to`; with no `from`, every material of its mesh. False for a row that is not there or at
+    /// `MAX_SWAPS`. Other rows that share the mesh and the material are not touched.
+    pub fn replace_material(&mut self, i: usize, from: Option<usize>, to: usize) -> bool {
+        let Some(r) = self.rows.get_mut(i) else {
+            return false;
+        };
+        let originals: Vec<usize> = r.materials.clone();
+        let mut done = false;
+        for o in originals {
+            let now = r
+                .swaps
+                .iter()
+                .find(|(k, _)| *k == o)
+                .map_or(o, |(_, cur)| *cur);
+            if from.is_some_and(|f| f != now) {
+                continue;
+            }
+            if let Some(e) = r.swaps.iter_mut().find(|(k, _)| *k == o) {
+                e.1 = to;
+            } else if r.swaps.len() < MAX_SWAPS {
+                r.swaps.push((o, to));
+            } else {
+                continue;
+            }
+            done = true;
+        }
+        done
+    }
+
+    /// What row `i` draws in place of its mesh's own materials (Set Material): pairs of the level's material and its
+    /// replacement; empty for a row nobody changed.
+    pub fn swaps(&self, i: usize) -> &[(usize, usize)] {
+        self.rows.get(i).map_or(&[], |r| &r.swaps)
     }
 
     pub fn local_bounds(&self, i: usize) -> Option<Option<(Vec3, Vec3)>> {
@@ -306,6 +348,7 @@ impl Entities {
             sprite_mode: src.sprite_mode,
             mesh: src.mesh,
             materials: src.materials.clone(),
+            swaps: src.swaps.clone(),
             alive: true,
             drawable: src.drawable,
             bounds: src.bounds,
@@ -338,6 +381,7 @@ impl Entities {
             sprite_mode: None,
             mesh,
             materials,
+            swaps: Vec::new(),
             alive: true,
             drawable: true,
             bounds,
@@ -412,6 +456,7 @@ mod tests {
                     sprite_mode: None,
                     mesh: Some(k),
                     materials: vec![k + 100],
+                    swaps: Vec::new(),
                     alive: true,
                     drawable: true,
                     bounds: None,
@@ -449,6 +494,27 @@ mod tests {
         let cc = t.copy(c, "again").unwrap();
         assert_eq!(t.get(cc).unwrap().class, Class::Copy { source: c });
         assert_eq!(at(&t, cc), Vec3::new(5.0, 6.0, 7.0));
+    }
+
+    #[test]
+    fn set_material_changes_one_row_and_not_the_others_that_share_the_material() {
+        let mut t = table(2);
+        // rows 0 and 1 have materials 100 and 101; make row 1 share 100
+        t.rows[1].materials = vec![100, 101];
+        assert!(t.replace_material(0, Some(100), 7));
+        assert_eq!(t.swaps(0), &[(100, 7)]);
+        assert!(t.swaps(1).is_empty(), "the other row keeps the material");
+        // replacing the replacement, and a `from` the row does not draw with
+        assert!(t.replace_material(0, Some(7), 8));
+        assert_eq!(t.swaps(0), &[(100, 8)]);
+        assert!(!t.replace_material(0, Some(55), 9));
+        // no `from`: every material of the mesh
+        assert!(t.replace_material(1, None, 3));
+        assert_eq!(t.swaps(1), &[(100, 3), (101, 3)]);
+        // a copy starts with its source's replacements
+        let c = t.copy(1, "c").unwrap();
+        assert_eq!(t.swaps(c), t.swaps(1));
+        assert!(!t.replace_material(9, None, 1));
     }
 
     #[test]
