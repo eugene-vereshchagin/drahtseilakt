@@ -3528,6 +3528,12 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         r.flash = crate::lights::Blitz::new(1).step(game.sim.tick).0;
     }
     r.point = crate::lights::point(&game.sim.events, game.sim.tick, snap.ball);
+    // what the map's scripts changed of the light and the fog by then
+    let env = game.sim.script_env();
+    if let Some(c) = env.ingame_light() {
+        r.light.color = c;
+    }
+    r.script_fog = env.fog;
     let (w, h) = o.size;
     let target = r.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("screenshot"),
@@ -5987,13 +5993,20 @@ impl App {
         (gpu.renderer.flash, gpu.renderer.point) =
             if menu_up { (0.0, None) } else { (flash, point) };
         // the mods' light: the level's dimmed, a light over the ball
+        // what the map's scripts changed of the look for this run: the game light's colour and the fog
+        let env = if menu_up {
+            crate::scripting::EnvOverride::default()
+        } else {
+            self.game.sim.script_env()
+        };
+        gpu.renderer.script_fog = env.fog;
         if let Some(base) = self.light_base {
             let k = if menu_up {
                 1.0
             } else {
                 self.view_mods.out.light
             };
-            gpu.renderer.light.color = base.color.map(|c| c * k);
+            gpu.renderer.light.color = env.ingame_light().unwrap_or(base.color).map(|c| c * k);
             gpu.renderer.light.ambient = base.ambient.map(|c| c * k);
         }
         let lantern = self.view_mods.out.lantern;

@@ -147,6 +147,7 @@ mod attributes;
 mod cameras;
 mod collisions;
 mod controllers;
+pub(crate) mod environment;
 mod interface;
 mod logics;
 mod materials;
@@ -307,6 +308,7 @@ pub fn registry() -> &'static [Proto] {
             cameras::PROTOS,
             collisions::PROTOS,
             controllers::PROTOS,
+            environment::PROTOS,
             interface::PROTOS,
             logics::PROTOS,
             materials::PROTOS,

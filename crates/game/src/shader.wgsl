@@ -25,6 +25,9 @@ struct Globals {
     fog_height: vec4<f32>,
     // rgb: the fog's colour seen straight down (the world far below), the colour above seen towards the horizon
     fog_down: vec4<f32>,
+    // A script's fog (Set Fog): x the mode (0 none, 1 exp, 2 exp2, 3 linear), y start, z end, w density; its colour.
+    script_fog: vec4<f32>,
+    script_fog_color: vec4<f32>,
 };
 
 struct Material {
@@ -244,6 +247,19 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
 // The air between the eye and a point: its distance thickens it, and so does its depth under the fog's height (the
 // world far below fades into the haze), each as the other were clear.
 fn fogged(c: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
+    if g.script_fog.x > 0.5 {
+        let d = length(world - g.eye.xyz);
+        var keep = 1.0;
+        if g.script_fog.x > 2.5 {
+            keep = clamp((g.script_fog.z - d) / max(g.script_fog.z - g.script_fog.y, 1e-4), 0.0, 1.0);
+        } else if g.script_fog.x > 1.5 {
+            let e = g.script_fog.w * d;
+            keep = exp(-e * e);
+        } else {
+            keep = exp(-g.script_fog.w * d);
+        }
+        return mix(g.script_fog_color.rgb, c, keep);
+    }
     if g.fog_height.z < 0.5 {
         return c;
     }

@@ -34,6 +34,8 @@ pub struct Scripts {
     pub sound: SoundState,
     /// The camera the scripts changed (Set As Active Camera, Set Clipping Planes, ...).
     pub camera: CameraOverride,
+    /// The light, fog and sky the scripts changed (Set Light Color, Set Fog, TT Sky).
+    pub env: EnvOverride,
     /// The text boxes the map's scripts show now, by the block that shows each (drawn by hud.rs under the interface;
     /// they rewind and restart with the run).
     pub text: Vec<(script::Id, script::TextSpec)>,
@@ -169,6 +171,28 @@ pub struct CameraOverride {
     pub active: Option<usize>,
 }
 
+/// The most lights whose colour a run's scripts change.
+pub const MAX_LIGHT_OVERRIDES: usize = 16;
+
+/// What the scripts changed of the scene's look for this run: light colours by the light's name, the fog (`Some(None)`:
+/// switched off) and the sky a TT Sky block builds. Per run: a new run starts without it, and it rewinds with the run.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct EnvOverride {
+    pub lights: Vec<(String, [f32; 4])>,
+    pub fog: Option<Option<script::FogSpec>>,
+    pub sky: Option<script::SkySpec>,
+}
+
+impl EnvOverride {
+    /// The colour the scripts gave the game's own light, `Light_Ingame` (the one the renderer lights the level with).
+    pub fn ingame_light(&self) -> Option<[f32; 3]> {
+        self.lights
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case("Light_Ingame"))
+            .map(|(_, c)| [c[0], c[1], c[2]])
+    }
+}
+
 /// What the audio is to do for a script: the wave sound object, its file and the command.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SoundEvent {
@@ -266,6 +290,7 @@ impl Scripts {
             teleports: 0,
             sound: SoundState::default(),
             camera: CameraOverride::default(),
+            env: EnvOverride::default(),
             text: Vec::new(),
             ball_objs,
             seen: None,
@@ -334,6 +359,7 @@ struct ScriptsParts {
     tick: u64,
     sound: SoundState,
     camera: CameraOverride,
+    env: EnvOverride,
     text: Vec<(script::Id, script::TextSpec)>,
     ball_objs: [Option<script::Id>; 3],
     left_sector: usize,
@@ -891,6 +917,29 @@ impl Host for SimHost<'_> {
         }
     }
 
+    fn env_set(&mut self, change: script::EnvChange) {
+        match change {
+            script::EnvChange::LightColor { light, color } => {
+                let env = &mut self.s.env;
+                if let Some(slot) = env.lights.iter_mut().find(|(n, _)| *n == light) {
+                    slot.1 = color;
+                } else if env.lights.len() < MAX_LIGHT_OVERRIDES {
+                    env.lights.push((light, color));
+                }
+            }
+            script::EnvChange::Fog(f) => self.s.env.fog = Some(f),
+            script::EnvChange::Sky(sky) => {
+                if self.s.env.sky != sky {
+                    self.s.note(match &sky {
+                        Some(k) => format!("sky of {} sides on", k.sides.len()),
+                        None => "sky off".to_string(),
+                    });
+                }
+                self.s.env.sky = sky;
+            }
+        }
+    }
+
     fn sound(&mut self, key: usize, file: &str, cmd: SoundCmd) {
         let tick = self.s.tick;
         let stem = sound_stem(file);
@@ -1309,6 +1358,7 @@ impl Scripts {
             tick: run.tick,
             sound: std::mem::take(&mut self.sound),
             camera: self.camera,
+            env: std::mem::take(&mut self.env),
             text: std::mem::take(&mut self.text),
             ball_objs: self.ball_objs,
             left_sector: self.left_sector,
@@ -1330,6 +1380,7 @@ impl Scripts {
         self.log = parts.log;
         self.sound = parts.sound;
         self.camera = parts.camera;
+        self.env = parts.env;
         self.text = parts.text;
         self.written = parts.written;
         self.emitters = parts.emitters;
@@ -1416,6 +1467,7 @@ mod facade_tests {
                 tick: 0,
                 sound: SoundState::default(),
                 camera: CameraOverride::default(),
+                env: EnvOverride::default(),
                 text: vec![],
                 ball_objs: s.ball_objs,
                 left_sector: 0,
@@ -1433,6 +1485,7 @@ mod facade_tests {
                 run: &mut run,
             });
             s.written = parts.written;
+            s.env = parts.env;
         };
         level_parts(&mut s, &mut |h| {
             assert_eq!(h.game_cell("Energy", 0, 1), Some(Value::Int(3)));
@@ -1446,6 +1499,92 @@ mod facade_tests {
         });
         // the run's own number is untouched
         assert_eq!(s.ball_objs[0], s.rt.graph.find("Ball_Wood"));
+    }
+
+    #[test]
+    fn scripts_change_the_light_fog_and_sky_for_the_run_and_a_rewound_run_has_none_of_it() {
+        let mut s = scripts();
+        let before = s.clone();
+        let fog = script::FogSpec {
+            mode: 3,
+            start: 35.0,
+            end: 60.0,
+            density: 1.0,
+            color: [0.0, 0.0, 0.0, 1.0],
+        };
+        let level_parts = |s: &mut Scripts, f: &mut dyn FnMut(&mut SimHost)| {
+            let mut run = view(0, 1, 3);
+            let mut parts = ScriptsParts {
+                ents: Entities::default(),
+                groups: vec![],
+                materials: s.materials.clone(),
+                log: vec![],
+                ball_id: s.ball_id,
+                tick: 0,
+                sound: SoundState::default(),
+                camera: CameraOverride::default(),
+                env: std::mem::take(&mut s.env),
+                text: vec![],
+                ball_objs: s.ball_objs,
+                left_sector: 0,
+                written: BTreeMap::new(),
+                emitters: Default::default(),
+                bodies: Default::default(),
+                queue: Vec::new(),
+                made: 0,
+                noted_static: Vec::new(),
+                statics: BTreeMap::new(),
+                made_static: 0,
+            };
+            f(&mut SimHost {
+                s: &mut parts,
+                run: &mut run,
+            });
+            s.env = parts.env;
+        };
+        level_parts(&mut s, &mut |h| {
+            h.env_set(script::EnvChange::LightColor {
+                light: "light_ingame".into(),
+                color: [0.33, 0.41, 0.73, 1.0],
+            });
+            h.env_set(script::EnvChange::Fog(Some(fog)));
+            h.env_set(script::EnvChange::Sky(Some(script::SkySpec {
+                color: [1.0; 4],
+                radius: 100.0,
+                distortion: 0.15,
+                sides: vec![None; 4],
+                bottom: None,
+            })));
+        });
+        assert_eq!(s.env.ingame_light(), Some([0.33, 0.41, 0.73]));
+        assert_eq!(s.env.fog, Some(Some(fog)));
+        assert!(s.env.sky.is_some());
+        // a second colour for the same light replaces the first; fog off is told apart from no fog change
+        level_parts(&mut s, &mut |h| {
+            h.env_set(script::EnvChange::LightColor {
+                light: "light_ingame".into(),
+                color: [1.0; 4],
+            });
+            h.env_set(script::EnvChange::Fog(None));
+            h.env_set(script::EnvChange::Sky(None));
+        });
+        assert_eq!(s.env.lights.len(), 1);
+        assert_eq!(s.env.ingame_light(), Some([1.0; 3]));
+        assert_eq!(s.env.fog, Some(None));
+        assert!(s.env.sky.is_none());
+        // the light's cap
+        level_parts(&mut s, &mut |h| {
+            for k in 0..MAX_LIGHT_OVERRIDES + 8 {
+                h.env_set(script::EnvChange::LightColor {
+                    light: format!("L{k}"),
+                    color: [0.5; 4],
+                });
+            }
+        });
+        assert_eq!(s.env.lights.len(), MAX_LIGHT_OVERRIDES);
+        // the rewound (earlier) run never had any of it
+        assert_eq!(before.env, EnvOverride::default());
+        assert_eq!(before.env.ingame_light(), None);
     }
 }
 

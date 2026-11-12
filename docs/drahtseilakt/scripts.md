@@ -349,13 +349,13 @@ by the engine's.
 | Get Nearest In Group | `085207eb:584950d8` | 3 | 4 | done |
 | Is In Group | `58a1210b:14e5715c` | 3 | 18 | done |
 | Mouse Waiter | `014d010b:015d010b` | 3 | 3 | done (mouse of the run's input stream; no wheel) |
-| Set Light Color | `32115590:78951230` | 3 | 3 | planned |
+| Set Light Color | `32115590:78951230` | 3 | 3 | done: the colour of `Light_Ingame` (the game light the renderer lights with); other lights are kept in the run but not drawn |
 | Timer | `a2a5a63a:e4e7e8e5` | 3 | 4 | done |
 | Physics Impulse | `0c7e39bb:16db20d5` | 3 | 6 | partial: on script bodies |
 | Midi Player | `843cb43a:a12dac48` | 2 | 2 | no-op |
 | Object Rename | `6f074ca7:45427431` | 2 | 4 | no-op |
-| Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | partial: scale and colour kept; the engine draws its own face |
-| 2D Text | `055b29fe:662d5ca0` | 2 | 2 | partial: drawn over the whole frame (the 2D entity's own frame is not known yet) |
+| Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | done: scale and colour; drawn in our own font |
+| 2D Text | `055b29fe:662d5ca0` | 2 | 2 | done: inside the frame Edit 2D Entity gave the entity (values up to 2 are fractions of 640x480); drawn in our own font |
 | Fill Group By Class | `4445257b:70016c57` | 2 | 8 | planned |
 | 3D Text | `1f5b2fe7:6d355175` | 2 | 3 | named no-op (said once) |
 | Row Search | `78863443:45af59b6` | 2 | 2 | done |
@@ -372,12 +372,12 @@ by the engine's.
 | Get Delta Time | `47dc3232:64bf203a` | 2 | 3 | done |
 | Play Sound Instance | `00283a35:38ef6b48` | 2 | 7 | done |
 | Group Clear | `1d12662e:42687a3c` | 2 | 9 | done |
-| Scale | `41236987:a54a87a6` | 2 | 7 | done |
+| Scale | `41236987:a54a87a6` | 2 | 7 | done: the object is drawn scaled; physics bodies are NOT rescaled; the Hierarchy pin is ignored |
 | Remove From Group | `d0147412:0258520d` | 2 | 2 | done |
 | Linear Progression | `fff45680:aa512a39` | 2 | 3 | done |
 | Set Blend Modes | `2f572a66:6a9a0088` | 2 | 5 | planned |
 | Set Material Z Buffer | `1144022f:68fd055c` | 2 | 5 | planned |
-| Create System Font | `936334fc:f243684f` | 1 | 1 | partial: size and weight only |
+| Create System Font | `936334fc:f243684f` | 1 | 1 | done: maps to our own font (weight 600+ is bold); no system fonts |
 | Movie Player | `778d16d4:1dd60060` | 1 | 1 | named no-op (said once) |
 | TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
 | Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | planned |
@@ -392,13 +392,13 @@ by the engine's.
 | Input String | `693e7e4b:100104c4` | 1 | 1 | done (at most 256 characters; US layout) |
 | Mouse Cursor System | `2483576d:57c66324` | 1 | 1 | partial: passes the flow, shows or hides the system cursor |
 | Mouse Cursor | `140c3eac:6e502a81` | 1 | 1 | partial: passes the flow, shows or hides the system cursor |
-| Set Pickable | `f1499052:ebe9bbf1` | 1 | 1 | never (the engine's own interface) |
+| Set Pickable | `f1499052:ebe9bbf1` | 1 | 1 | done: named no-op (the player has no picking) |
 | TT_Timer | `6ac67901:7d2a6059` | 1 | 1 | done |
 | Set IC | `72671a24:161a2347` | 1 | 1 | partial: accepted (initial conditions stay as loaded) |
 | Remove Row | `1fa57136:14310857` | 1 | 1 | done |
 | Shuffle Order | `270f177a:4ca20023` | 1 | 2 | planned |
 | Move Row | `101a62f4:6e2d25f6` | 1 | 2 | done (from the notes: the C lacks it) |
-| Set FOV | `aaaacccc:aaaacccc` | 1 | 3 | never (the engine's own interface) |
+| Set FOV | `aaaacccc:aaaacccc` | 1 | 3 | done: the renderer takes the lens (docs: camera.fov) |
 | TT Restore IC | `7e0f2f58:232d3109` | 1 | 4 | done |
 | Streaming Event | `1f0b52bf:4c3342dd` | 1 | 1 | done |
 | Pitch Control | `7b7c731e:175b27a3` | 1 | 3 | done |
@@ -413,14 +413,14 @@ by the engine's.
 | Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | planned |
 | Sequencer | `42530844:257b6053` | 1 | 1 | done |
 | Calculator | `4bc209b8:5b3679b0` | 1 | 8 | planned |
-| TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | partial: the font is a name and a size; no texture, no font |
+| TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | done: a font of the name with a texture; drawn in our own font (no system fonts) |
 | Get Message Data | `45875fee:45875fdd` | 1 | 1 | done |
-| Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | never (the engine's own interface) |
-| Set Clipping Planes | `652316a2:01aa09a9` | 1 | 2 | never (the engine's own interface) |
-| Set Fog | `151aaaaa:ffd5bdbc` | 1 | 3 | never (the engine's own interface) |
-| TT Sky | `36691920:3b261630` | 1 | 1 | never (the engine's own interface) |
+| Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | partial: position, size and rotation are kept per 2D entity (64); 2D Text lays out inside them; the entity itself is not drawn |
+| Set Clipping Planes | `652316a2:01aa09a9` | 1 | 2 | done: the renderer takes near and far |
+| Set Fog | `151aaaaa:ffd5bdbc` | 1 | 3 | done: linear, exp and exp2 distance fog in the shader (replaces the level fog); mode 0 switches fog off |
+| TT Sky | `36691920:3b261630` | 1 | 1 | partial: the state (sides, colour, radius) is kept in the run and logged; the sky box is not drawn (needs a mesh built at run time) |
 | Get Row | `33b77f41:07b95c45` | 1 | 1 | done |
-| Set As Active Camera | `368f0ab1:2d8957e4` | 1 | 2 | never (the engine's own interface) |
+| Set As Active Camera | `368f0ab1:2d8957e4` | 1 | 2 | done: the view is placed by the camera object (position, looking along its z) |
 | Physics WakeUp | `38b851b5:72ca74ac` | 1 | 1 | partial: on script bodies |
 | Set Parent | `9d9d9d98:7e7a7f75` | 1 | 1 | planned |
 | Scan String | `4afa2f11:034872e2` | 1 | 1 | planned |
@@ -501,3 +501,17 @@ Semantics not knowable from the files, to be checked against the original by pla
 delayed link fires relative to the physics step; Keep Active's "one at a time" local; TT Scaleable Proximity's
 first test after On (taken as at once). (The key column of Get Key Row is the array's own, saved with it: settled by
 the C oracle, [gameplay_bbs.md](../gameplay_bbs.md), part 5.)
+
+## Stage 3 looks and environment (2026-11-12)
+
+Scripts change the scene's look for the current run only; the state lives in the run's scripts (`EnvOverride`,
+`Ent2d` in the runtime), so a rewind or a new run starts without it, and the simulation never reads it.
+
+- Set Light Color: `Host::env_set(EnvChange::LightColor)`, the light found by its object name. `Light_Ingame` is the
+  renderer's one light; its colour is replaced (the view mods' dimming still multiplies it). At most 16 lights kept.
+- Set Fog: `EnvChange::Fog`. A script fog replaces the level's own fog; the shader fades lit surfaces to the fog
+  colour by distance (mode 1 exp, 2 exp2, 3 linear between start and end). Mode 0 or a bad range switches fog off.
+- TT Sky: the block stays on while its input On is active and records its sides' materials; nothing is drawn yet.
+- Camera: Set FOV, Set Clipping Planes and Set As Active Camera reach the frame through `Snapshot` (fov, clip, the
+  camera object's matrix).
+- Fonts map to our own font; Set Font Properties keeps scale and colour, not spacing or italics.
