@@ -4,23 +4,23 @@ Other credit files: `assets/own/CREDITS.md` (photo textures), `assets/sounds/sys
 
 ## The owner's picks (in place of our own levels, for now)
 
-Thirteen more community maps, picked by the project's owner, stand in place of our own levels (Start > Drahtseilakt) until their remasters are made. **They belong to their authors and are shipped converted to Drahtseilakt's open format (from each author's `.nmo`, with our own textures where the map's own are not embedded; nothing of the original game is included), with thanks; if an author objects, we will remove the map.** Each folder's `level.txt` names the author and where the map was posted; where no post is known, the author is credited by name and the video the map was found in is given. Our own earlier levels are kept in `levels-legacy_delme/`. Checksums: `assets/levels/SHA256SUMS`.
+Thirteen more community maps, picked by the project's owner, stand in place of our own levels (Start > Drahtseilakt) until their remasters are made. **They belong to their authors and are shipped converted to Drahtseilakt's open format (from each author's `.nmo`, with our own textures where the map's own are not embedded; nothing of the original game is included), with thanks; if an author objects, we will remove the map.** Each folder's `level.txt` names the author and where the map was posted; where no post is known, the author is credited by name and the video the map was found in is given. Our own earlier levels are kept in `levels-legacy_delme/`. Checksums: `assets/levels/drahtseilakt/SHA256SUMS`.
 
 | # | Map | Original name | Author | Posted | Difficulty | Source | Video | Folder |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Map 260801 | 260801图 | 小锂电池 | 2026-08-01 | 1 | [link](https://forum.ballance.top/d/117) | [1](https://www.youtube.com/watch?v=bhBiSnmG2ao&t=276s) | `assets/levels/01-Map-260801/` |
-| 2 | Bright Galaxy v1.2 | 璀璨星河 | 其乐融融 | 2022-11-25 | 2 | [link](https://tieba.baidu.com/p/8159356350) | [1](https://www.youtube.com/watch?v=xqcHwkeaqDs) | `assets/levels/02-Bright-Galaxy-v1_2/` |
-| 3 | Beginners Happiness 5 | 萌新快乐图5 | dahkjdas | 2025-01-14 | 2 | - | [1](https://www.youtube.com/watch?v=jQi5n__Yg9M) | `assets/levels/03-Beginners-Happiness-5/` |
-| 4 | Edge of the Shade | - | Kry | 2024-06-16 | 2 | - | [1](https://www.youtube.com/watch?v=WJPVbtzQbEg) | `assets/levels/04-Edge-of-the-Shade/` |
-| 5 | See You Tomorrow | 明天见 | 不药而愈的匿名安慰 | 2026-08-04 | 2 | [link](https://forum.ballance.top/d/119) | [1](https://www.youtube.com/watch?v=4cKGyTmIMuY) | `assets/levels/05-See-You-Tomorrow/` |
-| 6 | Push the Envelope 3.0 | 挑战极限3.0 | lydjjlyd | - | 3 | - | [1](https://www.youtube.com/watch?v=MwOy6QMdy8E) | `assets/levels/06-Push-the-Envelope-3_0/` |
-| 7 | The Long Night of Ages v1.1 | 岁月长夜V1.1 | 四叶草 (dyethx) | 2026-07-19 | 3 | [link](https://forum.ballance.top/d/113) | [1](https://www.youtube.com/watch?v=UAvmmVzN4Dc) | `assets/levels/07-The-Long-Night-of-Ages-v1_1/` |
-| 8 | Dreaming Back to 2025 | 梦回2025 | 其乐融融 | 2025-02-28 | 3 | - | [1](https://www.youtube.com/watch?v=MBJzOvgkLVk) | `assets/levels/08-Dreaming-Back-to-2025/` |
-| 9 | Evolution of Logic | 逻辑时代 | dahkjdas | 2020-05-23 | 4 | [link](https://tieba.baidu.com/p/6700441841) | [1](https://www.youtube.com/watch?v=0L338KaAEfI) | `assets/levels/09-Evolution-of-Logic/` |
-| 10 | Illusion and Reality | 幻实 | Entity_303 | 2024-10-23 | 4 | [link](https://tieba.baidu.com/p/9145563541) | [1](https://www.youtube.com/watch?v=JAz1IGQi_Ig) | `assets/levels/10-Illusion-and-Reality/` |
-| 11 | Singular Forest | 单轨森林 | ZYL | 2023-02-16 | 4 | [link](https://tieba.baidu.com/p/8267347663) | [1](https://www.youtube.com/watch?v=BEN-3nJShIU) | `assets/levels/11-Singular-Forest/` |
-| 12 | Eastern Nights | 东方夜谭 | perfectthought | 2019-02-08 | 5 | - | [1](https://www.youtube.com/watch?v=nM1oyg-Rhxg) | `assets/levels/12-Eastern-Nights/` |
-| 13 | Queen Ball (Hard Ver.) | - | pseudoacetyl | 2025-01-10 | 5 | - | [1](https://www.youtube.com/watch?v=Sq10sBrBQ8g) | `assets/levels/13-Queen-Ball-Hard/` |
+| 1 | Map 260801 | 260801图 | 小锂电池 | 2026-08-01 | 1 | [link](https://forum.ballance.top/d/117) | [1](https://www.youtube.com/watch?v=bhBiSnmG2ao&t=276s) | `assets/levels/drahtseilakt/01-Map-260801/` |
+| 2 | Bright Galaxy v1.2 | 璀璨星河 | 其乐融融 | 2022-11-25 | 2 | [link](https://tieba.baidu.com/p/8159356350) | [1](https://www.youtube.com/watch?v=xqcHwkeaqDs) | `assets/levels/drahtseilakt/02-Bright-Galaxy-v1_2/` |
+| 3 | Beginners Happiness 5 | 萌新快乐图5 | dahkjdas | 2025-01-14 | 2 | - | [1](https://www.youtube.com/watch?v=jQi5n__Yg9M) | `assets/levels/drahtseilakt/03-Beginners-Happiness-5/` |
+| 4 | Edge of the Shade | - | Kry | 2024-06-16 | 2 | - | [1](https://www.youtube.com/watch?v=WJPVbtzQbEg) | `assets/levels/drahtseilakt/04-Edge-of-the-Shade/` |
+| 5 | See You Tomorrow | 明天见 | 不药而愈的匿名安慰 | 2026-08-04 | 2 | [link](https://forum.ballance.top/d/119) | [1](https://www.youtube.com/watch?v=4cKGyTmIMuY) | `assets/levels/drahtseilakt/05-See-You-Tomorrow/` |
+| 6 | Push the Envelope 3.0 | 挑战极限3.0 | lydjjlyd | - | 3 | - | [1](https://www.youtube.com/watch?v=MwOy6QMdy8E) | `assets/levels/drahtseilakt/06-Push-the-Envelope-3_0/` |
+| 7 | The Long Night of Ages v1.1 | 岁月长夜V1.1 | 四叶草 (dyethx) | 2026-07-19 | 3 | [link](https://forum.ballance.top/d/113) | [1](https://www.youtube.com/watch?v=UAvmmVzN4Dc) | `assets/levels/drahtseilakt/07-The-Long-Night-of-Ages-v1_1/` |
+| 8 | Dreaming Back to 2025 | 梦回2025 | 其乐融融 | 2025-02-28 | 3 | - | [1](https://www.youtube.com/watch?v=MBJzOvgkLVk) | `assets/levels/drahtseilakt/08-Dreaming-Back-to-2025/` |
+| 9 | Evolution of Logic | 逻辑时代 | dahkjdas | 2020-05-23 | 4 | [link](https://tieba.baidu.com/p/6700441841) | [1](https://www.youtube.com/watch?v=0L338KaAEfI) | `assets/levels/drahtseilakt/09-Evolution-of-Logic/` |
+| 10 | Illusion and Reality | 幻实 | Entity_303 | 2024-10-23 | 4 | [link](https://tieba.baidu.com/p/9145563541) | [1](https://www.youtube.com/watch?v=JAz1IGQi_Ig) | `assets/levels/drahtseilakt/10-Illusion-and-Reality/` |
+| 11 | Singular Forest | 单轨森林 | ZYL | 2023-02-16 | 4 | [link](https://tieba.baidu.com/p/8267347663) | [1](https://www.youtube.com/watch?v=BEN-3nJShIU) | `assets/levels/drahtseilakt/11-Singular-Forest/` |
+| 12 | Eastern Nights | 东方夜谭 | perfectthought | 2019-02-08 | 5 | - | [1](https://www.youtube.com/watch?v=nM1oyg-Rhxg) | `assets/levels/drahtseilakt/12-Eastern-Nights/` |
+| 13 | Queen Ball (Hard Ver.) | - | pseudoacetyl | 2025-01-10 | 5 | - | [1](https://www.youtube.com/watch?v=Sq10sBrBQ8g) | `assets/levels/drahtseilakt/13-Queen-Ball-Hard/` |
 
 ## Community maps shipped with the game
 

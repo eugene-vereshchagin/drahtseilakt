@@ -14,7 +14,7 @@ mod tests {
 
     fn shipped(name: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../assets/levels")
+            .join("../../assets/levels/drahtseilakt")
             .join(name)
     }
 

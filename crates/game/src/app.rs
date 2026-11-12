@@ -1154,7 +1154,8 @@ fn custom_roots() -> Vec<PathBuf> {
         .chain(crate::modified::set_folders(&crate::levels::dir(
             crate::levels::Kind::Modified,
         )))
-        .chain(gamedata::resources::shipped_levels_root())
+        .chain(gamedata::resources::shipped_drahtseilakt_root())
+        .chain(gamedata::resources::shipped_community_root())
         .collect()
 }
 
@@ -1181,6 +1182,18 @@ fn runs_root(source: &crate::assets::Source) -> (PathBuf, Option<PathBuf>) {
                     let shared =
                         folder == "other" || kinds.filter_map(|d| name(&d)).any(|k| k == folder);
                     let old = (!shared).then(|| maps.join(&folder));
+                    // runs kept under the kind's earlier folder name (levels/downloaded/..., before user-levels/)
+                    let earlier: &[&str] = match kind.to_str() {
+                        Some("user-levels") => &["downloaded", "community", "open"],
+                        Some("ballance-original") => &["original"],
+                        Some("ballance-remaster") => &["remastered"],
+                        _ => &[],
+                    };
+                    let old = earlier
+                        .iter()
+                        .map(|e| replay_dir().join("levels").join(e).join(&folder))
+                        .find(|p| p.is_dir())
+                        .or(old);
                     (replay_dir().join("levels").join(kind).join(folder), old)
                 }
                 _ => (
@@ -1189,10 +1202,20 @@ fn runs_root(source: &crate::assets::Source) -> (PathBuf, Option<PathBuf>) {
                 ),
             }
         }
-        crate::assets::Source::Open(p) => (
-            maps.join(p.parent().and_then(name).unwrap_or_else(|| "other".into())),
-            None,
-        ),
+        crate::assets::Source::Open(p) => {
+            let kind = p.parent().and_then(name).unwrap_or_else(|| "other".into());
+            // runs kept under the kind's earlier folder name (maps/downloaded/..., maps/levels/... for the shipped set)
+            let old = match kind.to_str() {
+                Some("user-levels") => ["downloaded", "community", "open"].as_slice(),
+                Some("drahtseilakt") => ["levels"].as_slice(),
+                Some("ballance-remaster") => ["remastered"].as_slice(),
+                _ => [].as_slice(),
+            }
+            .iter()
+            .map(|e| maps.join(e))
+            .find(|d| d.is_dir());
+            (maps.join(kind), old)
+        }
     }
 }
 

@@ -15,14 +15,16 @@ they come from and what format they are in:
 
 | Folder | What | Where it comes from | Mode |
 |---|---|---|---|
-| `levels/original/` | the original game: `base.cmo`, `3D Entities/`, `Textures/`, `Sounds/` and the rest, level 13's add-on installed into it | copied by the game from the player's installed game or CD | classic and extended |
-| `levels/community/` | community maps: a folder per level, a `.nmo` or an open-format level in it (below) | the player downloads them, `drahtseilakt-toolbox import-maps` sorts a download into folders; the folder's README says where | extended |
-| `levels/remastered/` | the original levels converted to the open format, with textures upscaled to 4K and what else a modern look needs | made on the player's machine by `drahtseilakt-toolbox remaster` from `original/`; never distributed | extended |
-| `levels/open/` | levels in the open format: made in it, or converted community maps | made by players; some come with the game | extended |
-| `levels/downloaded/` | the player's downloaded levels: community `.nmo` maps and open-format levels, a folder per level (below); the earlier `levels/community/` and `levels/open/` are still read next to it, never moved | the player downloads them, `drahtseilakt-toolbox import-maps` sorts a download into folders; the folder's README says where | classic and extended |
+| `levels/ballance-original/` | the original game: `base.cmo`, `3D Entities/`, `Textures/`, `Sounds/` and the rest, level 13's add-on installed into it | copied by the game from the player's installed game or CD | classic and extended |
+| `levels/ballance-remaster/` | the original levels converted to the open format, with textures upscaled to 4K and what else a modern look needs | made on the player's machine by `drahtseilakt-toolbox remaster` from `ballance-original/`; never distributed | extended |
+| `levels/user-levels/` | the player's own levels: community `.nmo` maps and open-format levels, each in a named folder of its own with a `level.txt` (section "The rule" below); created empty on the first start, with a README.txt that says how to add a level | the player puts them there; `drahtseilakt-toolbox import-maps` sorts a download into it | classic and extended |
 | `levels/modified/` | modified originals: community remakes of the 13 original levels, in a folder per set | the player's own files; `drahtseilakt-toolbox import-maps` sorts a download; never shipped | classic and extended, with a copy of the original |
 
-Start lists them by meaning, in both modes (menu.md, "Start, by meaning"): `original/`, our own levels, `modified/`, and the community maps (the shipped best ones and `downloaded/`, with `community/` and `open/`, the folders it replaces). Since 2026-11-09 a player's folder is `levels/downloaded/`; the older two keep working where they exist, and runs of their levels keep their keys (below).
+Start lists them by meaning, in both modes (menu.md, "Start, by meaning"): the sets shipped with the game, **Drahtseilakt** (`assets/levels/drahtseilakt/`: the owner's 13 picks, open format, rounded, 4x textures) and **Community** (`assets/levels/community/`: 13 community maps as the authors' original `.nmo` files with `level.txt`, original textures), **Ballance** (`ballance-original/` and `ballance-remaster/`, when imported), `modified/`, and **User levels** (`levels/user-levels/`).
+
+**The rule (owner's decision 2026-11-12).** A level counts as a level only when it lies in its own named folder that holds either one `.nmo` file or an open-format level (`level.gltf` ...), plus the description file `level.txt`. In `user-levels/` subfolders are allowed for grouping (`user-levels/Pro Racing/Season 1/My Map/`): a folder that holds no level is a grouping folder and the game looks inside it. What the game does with the rest: a level folder without `level.txt` is not listed (earlier it was, named by its folder); a loose `.nmo` straight in the folder is not listed either (earlier it was a level of its own); neither is dropped silently: the console log names each one and says what to do (a folder of its own, a level.txt). A folder with several levels is skipped as before. The shipped folders and the earlier `community/` and `open/` folders (while they still exist) keep the lenient reading: level.txt optional.
+
+**Earlier folder names (migration, 2026-11-12).** At the first start the game moves the player's `original/` to `ballance-original/`, `remastered/` to `ballance-remaster/` and `downloaded/` to `user-levels/`, and moves the entries of `community/` and `open/` into `user-levels/` one by one (an entry whose name is taken stays where it is and is still read); each move is a log line, nothing is deleted or overwritten, and a folder the settings place elsewhere is left alone (the setting `levels.original` still works as `levels.ballance-original`). Runs recorded under the earlier folder names are found again.
 
 ## Modified originals
 
@@ -373,7 +375,7 @@ textures in its own folder).
 
 ## The original game: copied by default
 
-The game copies what it needs from the player's own copy into `levels/original/` once: from an installed game
+The game copies what it needs from the player's own copy into `levels/ballance-original/` once: from an installed game
 (`drahtseilakt --import <Ballance folder>`) or straight from the game's CD or its image
 (`drahtseilakt --import Ballance.cue`, or `.bin`, `.iso`: the InstallShield 6 archive in `SETUP/`, read by
 `crates/cdimage`). The copy is optional (decisions.md, "The game plays out of the box"): without one the game starts
@@ -397,7 +399,7 @@ want them shipped with the game. Each shipped level needs:
 
 - its author's permission and a free licence, recorded next to it (`LICENSE` in its folder);
 - nothing of the original game inside: no textures, sounds or meshes of Ballance. A converted map that uses the
-  original's textures names them, and the game takes them from `levels/original/` (the player's copy), as the
+  original's textures names them, and the game takes them from `levels/ballance-original/` (the player's copy), as the
   map did in the original;
 - a replay that finishes it, checked like the original levels' replays.
 
@@ -418,7 +420,7 @@ under `replays/levels/<kind>/<level folder>/<map>/`, so two folders' `Level_07.N
 loose `Foo.nmo` and a folder `Foo/` never share. Runs an earlier version kept in `replays/maps/<level folder>/` are
 moved there the first time the level is played (only through real folders, never over runs already there).
 
-*Since 2026-11-09:* a level in the old `community/` or `open/` folder keeps the key of that folder's name, so existing runs and best times stay; a level in `downloaded/` is kept under `downloaded`. Moving a level from an old folder into `downloaded/` starts it with new runs.
+*Since 2026-11-12:* the kind's name in the key follows the folder (`user-levels`, `ballance-original`, `ballance-remaster`); runs recorded under the earlier names (`downloaded`, `community`, `open`, `original`, `remastered`) are moved to the new key the first time the level is played.
 
 ## Languages
 

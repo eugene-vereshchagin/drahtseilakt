@@ -90,7 +90,7 @@ Start 在经典模式和扩展模式下相同；为空或不可用的项目不�
 | *Ballance 挑战*（en *Ballance Challenges*） | 社区改造的原版关卡：视角旋转 45°、反向通关、隐形道路（`levels/modified/`） | 副本和该文件夹中的关卡 |
 | *社区地图*（en *Community maps*） | 子菜单 | |
 | &nbsp;&nbsp;*精选*（en *Best*） | 随游戏附带的 13 张社区地图，附作者和致谢 | |
-| &nbsp;&nbsp;*已下载*（en *Downloaded*） | 玩家的文件夹 `levels/downloaded/`（显示其路径）：社区 `.nmo` 地图和开放格式关卡合为一个列表，并包含仍会读取的旧文件夹 `levels/community/` 和 `levels/open/` | |
+| &nbsp;&nbsp;*已下载*（en *Downloaded*） | 玩家的文件夹 `levels/user-levels/`（显示其路径）：社区 `.nmo` 地图和开放格式关卡合为一个列表，并包含仍会读取的旧文件夹 `levels/community/` 和 `levels/open/` | |
 
 文字提供全部七种语言。自 2026-11-11 起 Start 的顺序：先是精选地图，*经典 Ballance* 排第二。
 
@@ -98,7 +98,7 @@ Start 在经典模式和扩展模式下相同；为空或不可用的项目不�
 *外观*（设置 `look original|remaster|drahtseilakt|player`，`textures` 保存其所用的纹理包），取代了单独的 Textures 行和 2026-11-09
 的 Options 行。*原版*：副本的纹理配 2004 年的造型。*重制版*：工具箱放大的纹理配圆润造型。*Drahtseilakt*（默认）：我们的纹理配圆润造型。
 *自选包*：玩家自己的纹理包配圆润造型。此处无法显示的外观不提供（没有副本：没有原版和重制版；没有导出：没有重制版；没有自己的包：没有自选包）；
-旧设置文件保持原意（`look remastered` 即重制版，否则由 `textures` 决定）。原版关卡的圆润造型是它的导出 `levels/remastered/Level_NN`（圆角缓存），
+旧设置文件保持原意（`look remastered` 即重制版，否则由 `textures` 决定）。原版关卡的圆润造型是它的导出 `levels/ballance-remaster/Level_NN`（圆角缓存），
 除原版外的所有外观都使用它；没有导出的关卡保持原样。该行的帮助和已下载地图的备注都会说明：漂亮的外观需先用 `drahtseilakt-toolbox` 导入关卡
 （游戏从不联网，也不会自己运行它）。
 

@@ -1588,9 +1588,13 @@ pub fn run(
             ));
         }
     }
-    for file in gamedata::resources::shipped_levels_root()
-        .iter()
-        .flat_map(|r| crate::audit::maps(r))
+    for file in [
+        gamedata::resources::shipped_drahtseilakt_root(),
+        gamedata::resources::shipped_community_root(),
+    ]
+    .iter()
+    .flatten()
+    .flat_map(|r| crate::audit::maps(r))
     {
         let name = file
             .file_stem()
@@ -2232,7 +2236,7 @@ mod tests {
     /// it finds the sacks, plans supports, and those placed pass the second measure.
     #[test]
     fn the_check_finds_the_shipped_maps_sacks() {
-        let root = gamedata::resources::shipped_levels_root().expect("the shipped levels");
+        let root = gamedata::resources::shipped_drahtseilakt_root().expect("the shipped levels");
         let data = crate::assets::Data::new(None);
         let (mut sacks, mut placed) = (0, 0);
         for file in crate::audit::maps(&root) {

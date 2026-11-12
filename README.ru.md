@@ -35,11 +35,11 @@ target/release/drahtseilakt --data /путь/к/Ballance --level 1
 и выкладывает каждую сборку в виде установленной: программа рядом с `assets/`.
 
 `drahtseilakt --import DIR` копирует оригинальную игру из установленной Ballance в DIR (или с образа вашего CD:
-`--import Ballance.cue`, `.bin` или `.iso`) в `levels/original/`
+`--import Ballance.cue`, `.bin` или `.iso`) в `levels/ballance-original/`
 игры; все уровни лежат в `levels/` в её папке данных (`~/.local/share/drahtseilakt/` на Linux), в каждой папке
 README о том, что там должно лежать ([где лежат уровни](docs/ru/drahtseilakt/levels.md)).
 `--data` (или `OPENBALLANCE_DATA`) вместо этого играет из другой папки Ballance. Отдельная
-программа `drahtseilakt-toolbox remaster --scale 8` конвертирует оригинальные уровни в `levels/remastered/`
+программа `drahtseilakt-toolbox remaster --scale 8` конвертирует оригинальные уровни в `levels/ballance-remaster/`
 (открытый формат) с более круглыми формами и текстурами в восемь раз крупнее: через Real-ESRGAN (он дорисовывает детали), если он лежит
 в `realesrgan/` рядом с toolbox (закреплён в его репозитории drahtseilakt-toolbox) или есть в PATH, иначе Lanczos; играются из Start → Remastered. Самой игре не нужно
 ни то, ни другое. `--level N` играет оригинальный уровень N, `--map
@@ -60,7 +60,7 @@ FILE.nmo` — любой файл уровня или любительскую �
 wood|stone|paper|sticky` переопределяет его); такое прохождение хранит своё начало в реплее и никогда не считается лучшим.
 Пока не включён расширенный режим (Options, Extended, или `--debug` на один запуск), игра как можно точнее
 повторяет оригинал. *Расширенный режим* показывает лучшие времена. Start перечисляет уровни по смыслу в обоих режимах (Классический Ballance из вашей копии,
-Drahtseilakt, Испытания Ballance, Карты сообщества: лучшие из поставки и ваша `levels/downloaded/`, у каждого — его сложность; как сделать уровень и
+Drahtseilakt, Испытания Ballance, Карты сообщества: лучшие из поставки и ваша `levels/user-levels/`, у каждого — его сложность; как сделать уровень и
 поделиться им: [как делать и делиться уровнями](docs/ru/drahtseilakt/making-levels.md)) и моды
 ([моды](docs/ru/drahtseilakt/mods.md)). Отладочный запуск (`--debug`) к тому же открывает все уровни и предлагает мод
 для разработки — *режим бога*: бесконечные жизни, F5 сохраняет момент, а F9 возвращает к нему, F3 отматывает на

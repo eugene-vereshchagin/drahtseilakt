@@ -23,7 +23,7 @@ esac
 settings=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/settings.txt
 setting() { [ -f "$settings" ] && sed -n "s/^$1 //p" "$settings" | head -n 1; }
 extended=$( [ "$(setting profile)" = extended ] && echo yes || echo no )
-remastered=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/levels/remastered
+remastered=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/levels/ballance-remaster
 case $(cd "$level" 2>/dev/null && pwd -P) in
     "$(cd "$remastered" 2>/dev/null && pwd -P)"/Level_[0-9][0-9]) is_remaster=yes ;;
     *) is_remaster=no ;;

@@ -36,10 +36,10 @@ uploads each laid out as installed: the program beside `assets/`.
 
 `drahtseilakt --import DIR` copies the original game from your installed Ballance in DIR (or from your game CD's
 image: `--import Ballance.cue`, `.bin` or `.iso`) into the game's
-`levels/original/`; all levels live in `levels/` in its data folder (`~/.local/share/drahtseilakt/` on Linux),
+`levels/ballance-original/`; all levels live in `levels/` in its data folder (`~/.local/share/drahtseilakt/` on Linux),
 each folder with a README saying what belongs there ([where levels live](docs/drahtseilakt/levels.md)).
 `--data` (or `OPENBALLANCE_DATA`) plays from another Ballance folder instead. The separate
-`drahtseilakt-toolbox remaster --scale 8` converts the original levels into `levels/remastered/` (the open format)
+`drahtseilakt-toolbox remaster --scale 8` converts the original levels into `levels/ballance-remaster/` (the open format)
 with rounder shapes and textures eight times larger: by Real-ESRGAN (it adds detail) when it is in `realesrgan/` beside
 the toolbox (its own repository, drahtseilakt-toolbox, pins it) or on the PATH, else by Lanczos; they play with Options → Look: Remaster. The game itself needs neither. `--level N` plays original level N, `--map FILE.nmo`
 any level file or community map, `--open DIR` a level in the [open format](docs/drahtseilakt/open-format.md);
@@ -58,7 +58,7 @@ FILE.png` renders a frame. To test a place, `--sector N` begins at a checkpoint 
 object's name) anywhere, with the ball that sector begins with (`--ball wood|stone|paper|sticky` overrides it); such a run keeps its start in its replay and is never a
 best run. Until the extended mode is turned on (Options, Extended, or `--debug` for one run) the game is the
 original as closely as it can be. The *extended mode* shows best times. Start lists levels by meaning in both modes (Classic Ballance from your copy, Drahtseilakt, Ballance
-Challenges, Community maps: the best shipped ones and your `levels/downloaded/`, each with its difficulty; how to make and share
+Challenges, Community maps: the best shipped ones and your `levels/user-levels/`, each with its difficulty; how to make and share
 one: [making and sharing levels](docs/drahtseilakt/making-levels.md)) and the mods ([mods](docs/drahtseilakt/mods.md)).
 A debug run (`--debug`) also opens every level and offers the development mod *god mode*: endless lives, F5 saves the
 moment and F9 goes back to it, F3 goes seconds back, R restarts, `[` and `]` slow the run down and speed it up again,

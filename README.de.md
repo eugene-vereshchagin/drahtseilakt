@@ -37,11 +37,11 @@ ohne Umleitung; mit umgeleiteter Ausgabe
 macOS und lädt jeden Build so hoch, wie er installiert aussieht: das Programm neben `assets/`.
 
 `drahtseilakt --import DIR` kopiert das Originalspiel aus Ihrem installierten Ballance in DIR (oder vom Abbild Ihrer
-Spiel-CD: `--import Ballance.cue`, `.bin` oder `.iso`) nach `levels/original/`
+Spiel-CD: `--import Ballance.cue`, `.bin` oder `.iso`) nach `levels/ballance-original/`
 des Spiels; alle Level liegen in `levels/` in seinem Datenordner (`~/.local/share/drahtseilakt/` unter Linux),
 jeder Ordner mit einem README, was hineingehört ([wo die Level liegen](docs/de/drahtseilakt/levels.md)).
 `--data` (oder `OPENBALLANCE_DATA`) spielt stattdessen aus einem anderen Ballance-Ordner. Das eigene
-Programm `drahtseilakt-toolbox remaster --scale 8` wandelt die Original-Level nach `levels/remastered/` (offenes
+Programm `drahtseilakt-toolbox remaster --scale 8` wandelt die Original-Level nach `levels/ballance-remaster/` (offenes
 Format) mit runderen Formen und achtmal größeren Texturen um: mit Real-ESRGAN (es ergänzt Details), wenn es in
 `realesrgan/` neben der Toolbox liegt (festgelegt in seinem Repository drahtseilakt-toolbox) oder im PATH ist, sonst mit Lanczos; sie laufen unter Start → Remastered. Das Spiel selbst braucht
 beides nicht. `--level N` spielt Originallevel N, `--map
@@ -63,7 +63,7 @@ beginnt `--sector N` an einem Checkpoint und `--at X,Y,Z` (oder der Name eines L
 Stelle, mit der Kugel, mit der der Sektor beginnt (`--ball wood|stone|paper|sticky` überschreibt sie); ein solcher Lauf behält seinen Start im Replay und ist nie ein bester Lauf.
 Bis der erweiterte Modus eingeschaltet ist (Options, Extended, oder `--debug` für einen Start), ist das Spiel so
 genau wie möglich das Original. Der *erweiterte Modus* zeigt Bestzeiten. Start listet die Level in beiden Modi nach Bedeutung (Klassisches Ballance aus Ihrer Kopie, Drahtseilakt,
-Ballance-Prüfungen, Community-Karten: die mitgelieferten besten und Ihr `levels/downloaded/`, jedes mit seiner Schwierigkeit; wie man eines
+Ballance-Prüfungen, Community-Karten: die mitgelieferten besten und Ihr `levels/user-levels/`, jedes mit seiner Schwierigkeit; wie man eines
 baut und teilt: [Level bauen und teilen](docs/de/drahtseilakt/making-levels.md)) und die Mods
 ([Mods](docs/de/drahtseilakt/mods.md)). Ein Debug-Lauf (`--debug`) öffnet zudem alle Level und bietet den
 Entwicklungs-Mod *Gottmodus*: endlose Leben, F5 speichert den Moment und F9 kehrt dorthin zurück, F3 geht Sekunden
