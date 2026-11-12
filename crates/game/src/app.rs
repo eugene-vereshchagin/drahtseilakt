@@ -61,6 +61,8 @@ impl Default for Timing {
 }
 
 struct Game {
+    /// No level is loaded: the menu at the start (see `Game::placeholder`).
+    placeholder: bool,
     /// The game's files for this level: its parts ours or the copy's first, as the level says (Data::with_parts).
     data: Data,
     level: LoadedLevel,
@@ -169,7 +171,26 @@ fn begin_at(sim: &mut Sim, st: &crate::replay::Start) {
 
 impl Game {
     fn new(o: &Options, data: &Data) -> Result<Game, String> {
-        let mut level = data.load(&o.source)?;
+        Self::build(o, data, false)
+    }
+
+    /// A game with no level in it, for the menu at the start: nothing is read or built, the level comes when the
+    /// player picks one (`App::switch`). It costs next to nothing, and is never run.
+    fn placeholder(o: &Options, data: &Data) -> Result<Game, String> {
+        Self::build(o, data, true)
+    }
+
+    fn build(o: &Options, data: &Data, empty: bool) -> Result<Game, String> {
+        let mut level = if empty {
+            LoadedLevel {
+                level: level::Level::default(),
+                name: "Drahtseilakt".into(),
+                hash: 0,
+                warnings: Vec::new(),
+            }
+        } else {
+            data.load(&o.source)?
+        };
         let data = &data.with_parts(&level.level);
         scene::cloud_material(&mut level.level);
         for w in &level.warnings {
@@ -197,9 +218,10 @@ impl Game {
         }
         // the shared parts (balls, modules, transformer): the level folder's own when it has them, else ours or the
         // copy's (assets.rs); without any the ball is drawn plain and bursts into nothing (said once, never fatal)
-        let balls =
-            data.part("3D Entities/Balls.nmo")
-                .unwrap_or_else(|| crate::assets::LoadedLevel {
+        let balls = (!empty)
+            .then(|| data.part("3D Entities/Balls.nmo"))
+            .flatten()
+            .unwrap_or_else(|| crate::assets::LoadedLevel {
                     level: level::Level::default(),
                     name: "Balls".into(),
                     hash: 0,
@@ -312,8 +334,9 @@ impl Game {
             });
         }
         let trafo_model = scene::FIRST_MODULE_MODEL + modules.models.len();
-        let trafo = data
-            .part("3D Entities/AnimTrafo.nmo")
+        let trafo = (!empty)
+            .then(|| data.part("3D Entities/AnimTrafo.nmo"))
+            .flatten()
             .and_then(|f| crate::trafo::TrafoModel::new(&f.level, trafo_model).map(|m| (f, m)));
         Ok(Game {
             data: data.clone(),
@@ -344,8 +367,13 @@ impl Game {
             assisted: false,
             mods,
             last_level: level.level.settings.last_level,
+            placeholder: empty,
             runs_root: {
-                let (root, old) = runs_root(&o.source);
+                let (root, old) = if empty {
+                    (replay_dir(), None)
+                } else {
+                    runs_root(&o.source)
+                };
                 let stem = level.name.trim_end_matches(".NMO").trim_end_matches(".nmo");
                 match old.map(|old| move_runs(&old, &root, stem)) {
                     Some(Ok(true)) => {
@@ -359,6 +387,7 @@ impl Game {
                 root
             },
             shown_name: match &o.source {
+                _ if empty => "Drahtseilakt".into(),
                 crate::assets::Source::Original(_) => level.name.clone(),
                 crate::assets::Source::Nmo(_) | crate::assets::Source::Open(_) => {
                     loading_name(&o.source)
@@ -462,6 +491,9 @@ impl Game {
     /// Opens the session log of a windowed run in the level's folder: one line for the ball at every tick, and one
     /// for each of its contacts. A replay played back is logged too, so the same case can be compared with the run.
     fn start_session(&mut self) {
+        if self.placeholder {
+            return;
+        }
         let dir = self.run_dir();
         let _ = std::fs::create_dir_all(&dir);
         let stamp = std::time::SystemTime::now()
@@ -491,6 +523,15 @@ impl Game {
                 println!("session log: {}", path.display());
             }
             Err(e) => eprintln!("could not open the session log {}: {e}", path.display()),
+        }
+    }
+
+    /// One line in the session log (a stall), written out at once.
+    fn log_line(&mut self, line: &str) {
+        use std::io::Write as _;
+        if let Some(w) = &mut self.session {
+            let _ = writeln!(w, "# {line}");
+            let _ = w.flush();
         }
     }
 
@@ -877,6 +918,9 @@ impl Game {
     }
 
     fn title(&self) -> String {
+        if self.placeholder {
+            return "Drahtseilakt".into();
+        }
         let s = &self.sim;
         let state = if s.finished {
             "  FINISHED"
@@ -1203,7 +1247,44 @@ fn start_packs(textures: Option<&str>, models: Option<&str>) {
     start(Kind::Models, models, LEVEL);
 }
 
+/// When the game began running (for the start-up numbers).
+static LAUNCHED: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+
+fn since_launch() -> f64 {
+    LAUNCHED
+        .get()
+        .map_or(0.0, |t| t.elapsed().as_secs_f64() * 1000.0)
+}
+
+/// A frame whose own work (the run's ticks, the picture, presenting; not the pause that holds the frame rate) takes
+/// longer than this is logged with what happened in it.
+const STALL: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// What the window loop notes for the frame in progress, for the stall log (`App::frame`).
+#[derive(Default)]
+struct Stall {
+    /// What happened this frame that can take long: a level loaded, music begun, the surface set up again...
+    notes: Vec<String>,
+    /// The frame's stages: ticks, acquire, instances, draw, overlay, present.
+    stages: [std::time::Duration; 6],
+    /// The slowest tick of the frame, and its number.
+    slowest: (std::time::Duration, u64),
+    /// Time spent on the map's material sync, and sleeping to hold the frame rate (not work).
+    sync: std::time::Duration,
+    slept: std::time::Duration,
+}
+
+impl Stall {
+    fn note(&mut self, what: &str, took: std::time::Duration) {
+        if took >= std::time::Duration::from_millis(5) {
+            self.notes
+                .push(format!("{what} {:.0} ms", took.as_secs_f64() * 1000.0));
+        }
+    }
+}
+
 pub fn run(mut o: Options, data: Data) -> Result<(), String> {
+    LAUNCHED.get_or_init(Instant::now);
     // where the interface's files come from: the copy's own when it has its menu, else ours (resources.rs); the
     // extended mode may choose another
     let explicit = gamedata::resources::from_settings();
@@ -1317,7 +1398,23 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
     if let Some(follow) = &o.follow {
         return follow_run(&o, &data, follow);
     }
-    let mut game = Game::new(&o, &data)?;
+    // the menu at the start has no level behind it: nothing of any level is read or uploaded before it shows
+    let menu_start = !o.chosen
+        && o.replay.is_none()
+        && o.frames.is_none()
+        && o.screenshot.is_none()
+        && !o.autopilot
+        && !o.headless
+        && o.video.is_none()
+        && o.from.is_none()
+        && o.sector.is_none()
+        && o.at.is_none()
+        && o.ball.is_none();
+    let mut game = if menu_start {
+        Game::placeholder(&o, &data)?
+    } else {
+        Game::new(&o, &data)?
+    };
     if let Some(dir) = &o.frames {
         return frames_run(&mut game, dir);
     }
@@ -1506,6 +1603,8 @@ fn window(
     });
     let mut app = App {
         number: match o.source {
+            // no level is loaded at the menu's start: every pick loads one
+            _ if game.placeholder => None,
             crate::assets::Source::Original(n) => Some(n),
             _ => None,
         },
@@ -1574,6 +1673,9 @@ fn window(
         fps: 60.0,
         ghost: None,
         ghost_tried: false,
+        stall: Stall::default(),
+        frames: 0,
+        shown_title: String::new(),
         best_splits: None,
         light_base: None,
         shot_due: false,
@@ -1602,6 +1704,7 @@ fn window(
     if let Some(path) = video {
         return app.video(&path);
     }
+    eprintln!("startup: event loop begins {:.0} ms after launch", since_launch());
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.set_control_flow(ControlFlow::Poll);
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
@@ -3872,6 +3975,10 @@ struct App {
     /// The best run as a ghost (a mod's `ghost`), and whether it was looked for in this run.
     ghost: Option<Box<Ghost>>,
     ghost_tried: bool,
+    /// The stall log's notes for the frame in progress, the frames drawn, the title as shown.
+    stall: Stall,
+    frames: u64,
+    shown_title: String,
     /// The best run's sector times (a mod's `splits`), read once a run.
     best_splits: Option<Vec<u64>>,
     /// The level's light as uploaded (a mod's `light` dims it).
@@ -4327,9 +4434,17 @@ fn show_graphics(g: &crate::options::Graphics, features: crate::features::Featur
 }
 
 impl App {
+    /// The window's title: the game's name while the main menu is up (or no level is loaded), else the level's.
+    fn title(&self) -> String {
+        match &self.menu {
+            Some(m) if !m.over_level() => "Drahtseilakt".into(),
+            _ => self.game.title(),
+        }
+    }
+
     fn init(&mut self, event_loop: &ActiveEventLoop) -> Result<(), String> {
         let attrs = Window::default_attributes()
-            .with_title(self.game.title())
+            .with_title(self.title())
             .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
         let Gpu {
@@ -4391,7 +4506,7 @@ impl App {
             upload_menu_scene(&mut gpu.renderer, self.menu_scene.as_mut(), &self.data);
         }
         if let Some(w) = &self.window {
-            w.set_title(&self.game.title());
+            w.set_title(&self.title());
         }
         self.apply_mods();
         Ok(())
@@ -4542,7 +4657,7 @@ impl App {
 
     /// The ghost of the best run, played up to this run's tick (a few ticks a frame, so a long run catches up).
     fn keep_ghost(&mut self) {
-        if self.view_mods.out.ghost <= 0.0 || !self.game.counts_so_far() {
+        if self.view_mods.out.ghost <= 0.0 || self.game.placeholder || !self.game.counts_so_far() {
             self.ghost = None;
             return;
         }
@@ -4799,6 +4914,7 @@ impl App {
             let replay = self.game.replay_in.as_ref();
             let seed =
                 replay.map_or_else(|| now() as u64, |r| r.level_hash ^ r.end.rotate_left(32));
+            let began = Instant::now();
             self.music = Some(Music::new(
                 self.game.music_theme,
                 self.game.last_level,
@@ -4808,6 +4924,7 @@ impl App {
             // the sounds' picks from the same seed, their pools' other files decoded ahead
             audio.seed_sounds(seed.rotate_left(29) ^ 0x5851_f42d_4c95_7f2d);
             audio.preload_sound_pools(&self.data);
+            self.stall.note("music and sound pools", began.elapsed());
         }
         if let Some(m) = &mut self.music {
             // what may play next decoded ahead (our pieces are long), then the music's frame; the rest let go
@@ -5800,11 +5917,89 @@ impl App {
         }
     }
 
+    /// One frame, timed: one that takes over 100 ms of work is logged with what happened in it (the session log
+    /// and stderr), so a hang in play can be found afterwards.
     fn frame(&mut self) {
+        let began = Instant::now();
+        self.stall.notes.clear();
+        self.stall.slept = std::time::Duration::ZERO;
+        self.stall.slowest = (std::time::Duration::ZERO, 0);
+        self.stall.stages = Default::default();
+        self.stall.sync = std::time::Duration::ZERO;
+        let before = (
+            self.game.sim.lives,
+            self.game.sim.sector,
+            self.game.sim.game_over,
+            self.game.sim.finished,
+            self.game.sim.tick,
+            self.gpu.as_ref().map_or(0, |g| g.renderer.pipeline_count()),
+            self.music.is_some(),
+        );
+        self.frame_inner();
+        self.frames += 1;
+        if self.frames == 1 {
+            eprintln!("startup: first frame drawn {:.0} ms after launch", since_launch());
+        }
+        if self.frames.is_multiple_of(15)
+            && let Some(w) = &self.window
+        {
+            let t = self.title();
+            if t != self.shown_title {
+                w.set_title(&t);
+                self.shown_title = t;
+            }
+        }
+        let took = began.elapsed().saturating_sub(self.stall.slept);
+        if took < STALL {
+            return;
+        }
+        let sim = &self.game.sim;
+        let mut what = std::mem::take(&mut self.stall.notes);
+        if sim.lives != before.0 || sim.game_over != before.2 {
+            what.push(format!("death or respawn (lives {} -> {})", before.0, sim.lives));
+        }
+        if sim.sector != before.1 {
+            what.push(format!("sector {} -> {}", before.1 + 1, sim.sector + 1));
+        }
+        if sim.finished && !before.3 {
+            what.push("finish".into());
+        }
+        let pipelines = self.gpu.as_ref().map_or(0, |g| g.renderer.pipeline_count());
+        if pipelines != before.5 {
+            what.push(format!("{} pipelines created", pipelines.saturating_sub(before.5)));
+        }
+        if self.music.is_some() && !before.6 {
+            what.push("music started".into());
+        }
+        let st = &self.stall.stages;
+        let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0;
+        let line = format!(
+            "stall: frame {:.0} ms at tick {} (ticks {:.0} [slowest {:.0} at tick {}, scripts {}], acquire {:.0}, instances {:.0}, draw {:.0} [material sync {:.0}], overlay {:.0}, present {:.0}){}{}",
+            ms(took),
+            sim.tick,
+            ms(st[0]),
+            ms(self.stall.slowest.0),
+            self.stall.slowest.1,
+            if sim.scripts.is_some() { "on" } else { "off" },
+            ms(st[1]),
+            ms(st[2]),
+            ms(st[3]),
+            ms(self.stall.sync),
+            ms(st[4]),
+            ms(st[5]),
+            if what.is_empty() { "" } else { "; " },
+            what.join(", ")
+        );
+        eprintln!("{line}");
+        self.game.log_line(&line);
+    }
+
+    fn frame_inner(&mut self) {
         // Immediate presenting does not wait for the monitor, so the frames are capped here at about 60 a second.
         let since = self.last.elapsed();
         if since < FRAME {
             std::thread::sleep(FRAME - since);
+            self.stall.slept += FRAME - since;
         }
         let now = Instant::now();
         // this frame's real step (after the cap's sleep), held to a quarter second after a stall
@@ -5819,7 +6014,10 @@ impl App {
         // A level to load is loaded after a frame that says so; the run waits while the menu is open.
         match self.loading.take() {
             Some((source, true)) => {
-                if let Err(e) = self.switch(source) {
+                let load_began = Instant::now();
+                let loaded = self.switch(source);
+                self.stall.note("level load", load_began.elapsed());
+                if let Err(e) = loaded {
                     eprintln!("drahtseilakt: {e}");
                     self.open_menu(crate::menu::Screen::Main);
                 }
@@ -5863,8 +6061,13 @@ impl App {
             self.game.live_input =
                 crate::dik::frame_of(&self.held, self.cursor, size, self.mouse_down);
             // the gamepads press the same keys; the camera's turn inverted as chosen
+            let tick_began = Instant::now();
             self.game
                 .tick(self.bindings.turn(self.keys | self.pad_keys));
+            let tick_took = tick_began.elapsed();
+            if tick_took > self.stall.slowest.0 {
+                self.stall.slowest = (tick_took, self.game.sim.tick);
+            }
             if let Some(w) = self.pilot.as_mut().filter(|w| !w.done) {
                 w.run.near_edges.tick(&w.run.edges, &self.game.sim.ball);
                 self.watch_trail();
@@ -5952,7 +6155,9 @@ impl App {
             wgpu::CurrentSurfaceTexture::Success(f)
             | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
             _ => {
+                let began = Instant::now();
                 gpu.surface.configure(&gpu.renderer.device, &gpu.config);
+                self.stall.note("swapchain reconfigure", began.elapsed());
                 return;
             }
         };
@@ -6067,7 +6272,9 @@ impl App {
             gpu.renderer.point = Some((snap.ball + glam::Vec3::Y * 4.0, [lantern; 3]));
         }
         if let Some(sc) = &self.game.sim.scripts {
+            let began = Instant::now();
             gpu.renderer.sync_materials(scene::LEVEL_MODEL, &sc.mats);
+            self.stall.sync = began.elapsed();
         }
         crate::script_text3d::add(
             self.game.sim.scripts.as_ref(),
@@ -6211,6 +6418,7 @@ impl App {
         }
         gpu.renderer.queue.present(frame);
         let presented = present_started.elapsed();
+        self.stall.stages = [simulated, acquired, built, drawn, overlaid, presented];
         if let Some(t) = &mut self.timing {
             t.stages[0] += acquired;
             t.stages[1] += built;
@@ -6249,12 +6457,10 @@ impl App {
             let frame = std::time::Duration::from_secs_f64(1.0 / f64::from(look.fps_cap));
             if let Some(rest) = frame.checked_sub(started.elapsed()) {
                 std::thread::sleep(rest);
+                self.stall.slept += rest;
             }
         }
         if let Some(w) = &self.window {
-            if self.game.sim.tick.is_multiple_of(15) {
-                w.set_title(&self.game.title());
-            }
             w.request_redraw();
         }
     }
@@ -6692,4 +6898,36 @@ pub(crate) fn stats_run(
         .filter_map(|(o, d)| Some((game.level.level.objects.get(o)?.name.clone(), d)))
         .collect();
     Ok(run)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod placeholder_tests {
+    use super::*;
+
+    #[test]
+    fn the_menu_game_holds_no_level_and_is_named_for_the_game() {
+        let o = crate::default_options();
+        let started = Instant::now();
+        let g = Game::placeholder(&o, &Data::new(None)).unwrap();
+        assert!(g.placeholder);
+        assert_eq!(g.title(), "Drahtseilakt");
+        assert!(g.placements.is_empty(), "nothing of a level is built");
+        assert!(g.level.level.objects.is_empty());
+        assert!(started.elapsed().as_secs() < 5, "it costs next to nothing");
+        // no session log is opened for it
+        let mut g = g;
+        g.start_session();
+        assert!(g.session.is_none());
+        // a stall line has nowhere to go without a session, and does not fail
+        g.log_line("stall: test");
+    }
+
+    #[test]
+    fn a_stall_note_keeps_only_what_took_time() {
+        let mut s = Stall::default();
+        s.note("quick", std::time::Duration::from_millis(1));
+        s.note("slow", std::time::Duration::from_millis(250));
+        assert_eq!(s.notes, vec!["slow 250 ms".to_owned()]);
+    }
 }

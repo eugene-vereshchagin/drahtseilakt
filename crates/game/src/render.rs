@@ -804,6 +804,11 @@ impl Renderer {
         }
     }
 
+    /// How many pipelines are made so far (a new one is a hitch in the frame that needs it).
+    pub fn pipeline_count(&self) -> usize {
+        self.pipelines.len() + self.particle_pipelines.len()
+    }
+
     /// Draws the materials a script changed as it changed them (matstate.rs): only a material whose change differs
     /// from what is drawn is rebuilt, and one whose change is gone (a rewind) goes back to the level's own. With
     /// nothing changed, before and now, this does nothing.

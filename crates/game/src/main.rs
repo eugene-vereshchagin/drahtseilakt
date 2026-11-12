@@ -234,9 +234,9 @@ pub struct Options {
 /// plain unless `--debug` is given, so recorded runs and tests are unchanged. The release cleanup sets this false.
 const DEBUG_BY_DEFAULT: bool = true;
 
-fn parse_args() -> Result<Options, String> {
-    let mut debug: Option<bool> = None;
-    let mut o = Options {
+/// The options with nothing asked for.
+pub(crate) fn default_options() -> Options {
+    Options {
         data: None,
         import: None,
         source: Source::Original(1),
@@ -277,7 +277,12 @@ fn parse_args() -> Result<Options, String> {
         audit_csv: None,
         audit_report: Vec::new(),
         show_colliders: false,
-    };
+    }
+}
+
+fn parse_args() -> Result<Options, String> {
+    let mut debug: Option<bool> = None;
+    let mut o = default_options();
     // `--name=value` is the same as `--name value` (handy for values that start with a minus).
     let mut args = std::env::args()
         .skip(1)
