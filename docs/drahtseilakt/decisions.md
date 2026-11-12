@@ -470,3 +470,5 @@ square shapes, plain textures. Why: one place to choose the look, no duplicate l
 
 In `user-levels/`, entries that break the folder rule are not listed; the User levels page then says at the bottom that
 the levels folder is wrong and where the manual is (the game never opens a browser).
+
+*Done 2026-11-13:* the game now ships a local manual (`assets/manual/`, `tools/make_manual.py`) and the hint says to press F1; the owner's decision of the same day relaxes "never opens a browser" to: only the local manual, only on the player's request (see menu.md, "The manual").

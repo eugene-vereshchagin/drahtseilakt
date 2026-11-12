@@ -156,6 +156,8 @@ enum Line {
     SoundTheme,
     /// The Language page, and a language on it (by its place in lang::languages()).
     Language,
+    /// Opens the local manual (manual.rs).
+    Help,
     Lang(usize),
     /// One of the extended mode's additions, by its place in FEATURES.
     Switch(usize),
@@ -186,6 +188,8 @@ pub enum Action {
     /// Leave the level for the main menu.
     Home,
     Quit,
+    /// Open the local manual at this page (`index`, `levels`); the game says if it cannot.
+    Manual(&'static str),
     /// The extended mode on or off.
     ToggleDebug,
     /// One of the extended mode's additions on or off.
@@ -269,6 +273,8 @@ fn valued(line: Line) -> bool {
 pub struct Menu {
     /// Test hook: show the help of this value (an index into the line's values) instead of the current one.
     help_force: std::cell::Cell<Option<usize>>,
+    /// A message from the last action (the manual could not be opened), shown in the help panel until the next key.
+    pub notice: Option<String>,
     /// The rows the open list with a note under it shows: as many as leave the note whole (set by `draw`).
     note_rows: std::cell::Cell<usize>,
     /// The screens open, the first the menu's base, each with its chosen line.
@@ -347,6 +353,7 @@ impl Menu {
             .collect();
         let mut m = Menu {
             help_force: std::cell::Cell::new(None),
+            notice: None,
             note_rows: std::cell::Cell::new(LIST_LINES),
             stack: Vec::new(),
             entries,
@@ -431,16 +438,17 @@ impl Menu {
     /// The whole note of the open list's page: its note with the Esc hint, and under it the hint on wrong entries in
     /// the player's folder (the manual's page on levels) when there are some.
     fn page_note(&self, chosen: Option<Line>) -> String {
+        if let Some(n) = &self.notice {
+            return n.clone();
+        }
         let text = self.with_hint(self.list_note(chosen));
         if self.list != List::Downloaded || self.wrong_entries == 0 {
             return text;
         }
-        let link = manual_link(self.strings.language());
         let wrong = self
             .strings
             .ours("user levels wrong")
-            .replace("{n}", &self.wrong_entries.to_string())
-            .replace("{link}", link);
+            .replace("{n}", &self.wrong_entries.to_string());
         format!("{text}\n{wrong}")
     }
 
@@ -600,6 +608,7 @@ impl Menu {
             Line::Controls => (k("controls"), NONE),
             Line::Sound => (k("sound"), NONE),
             Line::Language => (k("language"), NONE),
+            Line::Help => (k("manual"), NONE),
             Line::Extended => (k("extended"), NONE),
             Line::Lang(_) => (k("lang"), NONE),
             Line::Look => (
@@ -832,6 +841,9 @@ impl Menu {
     /// The text of the notes panel of a screen with helps: the line under the cursor, Esc's hint last where the
     /// screen has a Back.
     fn help_panel(&self, screen: Screen) -> String {
+        if let Some(n) = &self.notice {
+            return n.clone();
+        }
         let lines = self.lines(screen);
         let text = lines
             .get(self.chosen())
@@ -1005,6 +1017,7 @@ impl Menu {
                 Some(Line::Controls),
                 Some(Line::Sound),
                 Some(Line::Language),
+                Some(Line::Help),
                 Some(Line::Extended),
                 Some(Line::Back),
             ]
@@ -1316,6 +1329,7 @@ impl Menu {
             Line::ModOn => Action::ModSwitch(self.mod_page),
             Line::ModOpt(o) => Action::ModOption(self.mod_page, o, 1),
             Line::Language => open(self, Screen::Language),
+            Line::Help => Action::Manual("index"),
             Line::Lang(i) => match languages().get(i) {
                 Some(&(code, _)) => {
                     self.pop();
@@ -1724,6 +1738,7 @@ impl Menu {
             Line::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Line::Sound => s.get("Menu_Options Button Sound", "Sound"),
             Line::Language => s.ours("language"),
+            Line::Help => s.ours("manual"),
             Line::Lang(i) => languages().get(i).map_or("", |l| l.1).to_owned(),
             Line::Extended => s.ours("extended"),
             Line::Level(i) => {
@@ -3793,13 +3808,14 @@ enum List {
     Challenges,
 }
 
-/// The manual's page on levels in a language: its translation where the docs have one (ru, de, zh), else English.
-fn manual_link(lang: &str) -> &'static str {
-    match lang {
-        "ru" => "https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/ru/drahtseilakt/levels.md",
-        "de" => "https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/de/drahtseilakt/levels.md",
-        "zh" => "https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/zh/drahtseilakt/levels.md",
-        _ => "https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/drahtseilakt/levels.md",
+impl Menu {
+    /// The manual's page F1 opens here: the levels page on the player's levels list, else the home page.
+    pub fn manual_page(&self) -> &'static str {
+        if self.screen() == Screen::Custom && self.list == List::Downloaded {
+            "levels"
+        } else {
+            "index"
+        }
     }
 }
 
@@ -3886,6 +3902,7 @@ mod tests {
     fn menu(open: &[bool], extended: bool) -> Menu {
         let mut m = Menu {
             help_force: std::cell::Cell::new(None),
+            notice: None,
             note_rows: std::cell::Cell::new(LIST_LINES),
             stack: Vec::new(),
             entries: open
@@ -5359,6 +5376,8 @@ mod tests {
                 "note downloaded",
                 "note picks",
                 "user levels wrong",
+                "manual",
+                "help manual",
             ] {
                 assert_ne!(s.ours(key), key, "{lang} {key}");
             }
@@ -5550,8 +5569,7 @@ mod tests {
         };
         let bad = page(&root.join("loose"));
         assert!(bad.contains("are wrong (1)"), "{bad}");
-        assert!(bad.contains("github.com/eugene-vereshchagin/drahtseilakt/blob/main/docs/"), "{bad}");
-        assert!(bad.ends_with("levels.md"), "{bad}");
+        assert!(bad.contains("F1"), "{bad}");
         let ok = page(&good);
         assert!(!ok.contains("wrong"), "{ok}");
         let _ = std::fs::remove_dir_all(&root);

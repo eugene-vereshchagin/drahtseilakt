@@ -39,6 +39,7 @@ mod levelstats;
 mod lights;
 mod locate;
 mod look;
+mod manual;
 mod menu;
 mod menuscene;
 mod modified;
