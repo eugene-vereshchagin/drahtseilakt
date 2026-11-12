@@ -107,6 +107,7 @@ pub enum PhysCmd {
         pos: Vec3,
         rot: glam::Quat,
         frozen: bool,
+        group: String,
     },
     Convex {
         ent: usize,
@@ -117,6 +118,7 @@ pub enum PhysCmd {
         frozen: bool,
         collide: bool,
         shift: Option<[f32; 3]>,
+        group: String,
     },
     Static {
         ent: usize,
@@ -697,6 +699,7 @@ impl Host for SimHost<'_> {
                 pos,
                 rot,
                 frozen: spec.start_frozen,
+                group: spec.group.clone(),
             }
         } else {
             // exact duplicates out, in a fixed order; a very large mesh is sampled evenly
@@ -723,6 +726,7 @@ impl Host for SimHost<'_> {
                 frozen: spec.start_frozen,
                 collide: spec.collide,
                 shift: (!spec.auto_centre).then_some(spec.shift),
+                group: spec.group.clone(),
             }
         };
         self.s.made += 1;
@@ -1111,6 +1115,7 @@ impl Scripts {
                     pos,
                     rot,
                     frozen,
+                    group,
                 } => {
                     if world.has_baked(ent) {
                         self.bodies.remove(&ent);
@@ -1120,7 +1125,7 @@ impl Scripts {
                         );
                         continue;
                     }
-                    let i = world.add_sphere(radius, m, pos, rot, !frozen);
+                    let i = world.add_sphere_in(radius, m, pos, rot, !frozen, &group);
                     self.bodies.insert(ent, Some(i));
                     self.remember_body(ent);
                     note(
@@ -1140,6 +1145,7 @@ impl Scripts {
                     frozen,
                     collide,
                     shift,
+                    group,
                 } => {
                     if world.has_baked(ent) {
                         self.bodies.remove(&ent);
@@ -1149,7 +1155,9 @@ impl Scripts {
                         );
                         continue;
                     }
-                    match world.add_scripted_convex(&points, m, pos, rot, frozen, collide, shift) {
+                    match world.add_scripted_convex(
+                        &points, m, pos, rot, frozen, collide, shift, &group,
+                    ) {
                         Some(i) => {
                             self.bodies.insert(ent, Some(i));
                             self.remember_body(ent);
@@ -2013,6 +2021,28 @@ mod body_tests {
         unphysicalize(&mut s, 0);
         s.apply_physics(&mut w, 0);
         assert_eq!(w.static_count(), 0);
+    }
+
+    #[test]
+    fn script_bodies_of_one_named_group_do_not_collide_with_each_other() {
+        let stack = |group: &str| {
+            let mut s = scripts(2);
+            let mut w = World::new(&floor());
+            s.ents.set_world(0, Mat4::from_translation(Vec3::new(0.0, 5.0, 0.0)));
+            s.ents.set_world(1, Mat4::from_translation(Vec3::new(0.0, 9.0, 0.0)));
+            let sp = script::PhysSpec {
+                group: group.into(),
+                ..spec()
+            };
+            physicalize(&mut s, 0, &sp);
+            physicalize(&mut s, 1, &sp);
+            run(&mut s, &mut w, 300);
+            (y_of(&s, 0), y_of(&s, 1))
+        };
+        let (a, b) = stack("");
+        assert!(b > a + 1.5, "no group: stacked, {a} {b}");
+        let (a, b) = stack("Pile");
+        assert!((a - 1.0).abs() < 0.2 && (b - 1.0).abs() < 0.2, "same group: both on the floor, {a} {b}");
     }
 
     #[test]

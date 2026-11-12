@@ -146,7 +146,7 @@ struct Spawn {
     rot: Rot,
     /// The mass centre in the body's frame (`None`: the shape's own, as "Auto Mass Center").
     shift: Option<[f32; 3]>,
-    group: &'static str,
+    group: [u8; 8],
     fixed: bool,
     /// Made asleep (a module's movable part waits to be touched).
     frozen: bool,
@@ -548,7 +548,7 @@ impl World {
             start_frozen: s.frozen,
             collide: s.collide,
             shift: s.shift,
-            group: group(s.group),
+            group: s.group,
             // the level's objects are entity 0; the game's bodies follow in creation order, so the ball is entity 1
             entity: i as u32 + 1,
             mass: s.m.mass,
@@ -704,13 +704,27 @@ impl World {
         rot: impl Into<Rot>,
         active: bool,
     ) -> usize {
+        self.add_sphere_in(radius, m, pos, rot, active, "")
+    }
+
+    /// A loose sphere in the collision group `group_name` (a script's ball body): bodies of one named group do not
+    /// collide with each other.
+    pub fn add_sphere_in(
+        &mut self,
+        radius: f32,
+        m: Material,
+        pos: Vec3,
+        rot: impl Into<Rot>,
+        active: bool,
+        group_name: &str,
+    ) -> usize {
         let spawn = Spawn {
             shape: Shape::Sphere(radius),
             m,
             pos,
             rot: rot.into(),
             shift: None,
-            group: "",
+            group: group(group_name),
             fixed: false,
             frozen: false,
             collide: true,
@@ -738,7 +752,7 @@ impl World {
             pos,
             rot: rot.into(),
             shift: Some([0.0; 3]),
-            group: "",
+            group: [0; 8],
             fixed,
             frozen: false,
             collide: true,
@@ -759,6 +773,7 @@ impl World {
         frozen: bool,
         collide: bool,
         shift: Option<[f32; 3]>,
+        group_name: &str,
     ) -> Option<usize> {
         let pts: Vec<[f64; 3]> = points.iter().map(|&p| vec3_f64(p)).collect();
         let surface = Surface::compile(vec![ivp::convex::hull(&pts)?])?;
@@ -768,7 +783,7 @@ impl World {
             pos,
             rot: rot.into(),
             shift,
-            group: "",
+            group: group(group_name),
             fixed: false,
             frozen,
             collide,
@@ -786,7 +801,7 @@ impl World {
         pos: Vec3,
         rot: impl Into<Rot>,
         fixed: bool,
-        group: &'static str,
+        group_name: &'static str,
         frozen: bool,
         collide: bool,
         shift: [f32; 3],
@@ -806,7 +821,7 @@ impl World {
             pos,
             rot: rot.into(),
             shift: Some(shift),
-            group,
+            group: group(group_name),
             fixed,
             frozen,
             collide,

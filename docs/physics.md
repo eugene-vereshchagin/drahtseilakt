@@ -341,7 +341,8 @@ Features the content never uses:
 - A ball's radius is the last `ball radius` pin. A ball block with no radius pin takes half the mesh's largest extent
   (the original is silent; no map of the game does this).
 - Auto Mass Center = TRUE takes the hull's own centre; FALSE takes Shift as the centre in the object's frame.
-- The collision group string is read but not applied to script bodies yet (the world's groups are static strings).
+- The collision group string (first 8 bytes) is the body's group, through IVP's group filter (3.4): script bodies of one
+  non-empty group do not collide with each other (nor with the level's bodies of that group, e.g. "Floor").
 - Each tick after the physics step the object's matrix is the body's pose, orthonormal (the scale lives in the
   geometry), as the write-back of 3.1. Unphysicalize removes the body and leaves the object where it was.
 - A second Physicalize on a physicalized object changes nothing (as above).
