@@ -355,7 +355,7 @@ Features the content never uses:
 - Physicalize with Fixed = TRUE, or with a concave list only (no convex, no ball), makes a fixed body: a concave one
   from the object's mesh triangles in its own frame, the scale baked in, at the object's pose without the scale; with
   a convex list and Fixed = TRUE, the hull of the mesh's points. Friction, elasticity and the group name are the
-  block's. A fixed ball is not made (reported once). The body is in the world and in the ball's floor lookup from the
+  block's. A ball shape with Fixed = TRUE makes a fixed sphere (radius pin, else half the mesh's largest extent). The body is in the world and in the ball's floor lookup from the
   same tick (the run applies the scripts' requests after they ran and before the step).
 - Unphysicalize removes the object's body of any kind and the ball's floor lookup stops seeing it. A body at rest
   does not wake when a body it rests on is removed (IVP forgets the contacts and wakes nobody; the original is the

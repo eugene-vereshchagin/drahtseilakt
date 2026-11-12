@@ -127,7 +127,7 @@ struct BakedInfo {
 #[derive(Clone)]
 struct ScriptStatic {
     id: usize,
-    surface: Surface,
+    shape: Shape,
     pos: Vec3,
     rot: Quat,
     friction: f32,
@@ -408,6 +408,36 @@ impl World {
         Some(self.place_static(surface, pos, rot, friction, elasticity, group_name))
     }
 
+    /// A fixed sphere made at run time (a script's Physicalize of a ball shape with Fixed = TRUE).
+    pub fn add_static_sphere(
+        &mut self,
+        radius: f32,
+        pos: Vec3,
+        rot: Quat,
+        friction: f32,
+        elasticity: f32,
+        group_name: &str,
+    ) -> Option<usize> {
+        if !(radius.is_finite() && radius > 0.0) {
+            return None;
+        }
+        let mut s = ScriptStatic {
+            id: 0,
+            shape: Shape::Sphere(radius),
+            pos,
+            rot,
+            friction,
+            elasticity,
+            group: group(group_name),
+            ball_collides: group_name != GROUP_BALL,
+        };
+        s.id = self.make_static_body(&s);
+        self.statics
+            .push((s.id, s.ball_collides, SoundIds::default()));
+        self.script_statics.push(Some(s));
+        Some(self.script_statics.len() - 1)
+    }
+
     fn make_static_body(&mut self, s: &ScriptStatic) -> usize {
         let desc = BodyDesc {
             fixed: true,
@@ -418,7 +448,7 @@ impl World {
         };
         self.physics.add_body(
             desc,
-            Shape::Surface(s.surface.clone()),
+            s.shape.clone(),
             vec3_f64(s.pos),
             ivp_quat(s.rot),
         )
@@ -435,7 +465,7 @@ impl World {
     ) -> usize {
         let mut s = ScriptStatic {
             id: 0,
-            surface,
+            shape: Shape::Surface(surface),
             pos,
             rot,
             friction,

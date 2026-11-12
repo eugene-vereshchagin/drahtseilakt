@@ -88,6 +88,8 @@ pub enum StaticShape {
     Triangles(Vec<[Vec3; 3]>),
     /// The hull of points in the object's frame (a convex list).
     Hull(Vec<Vec3>),
+    /// A sphere of this radius (a ball shape with Fixed = TRUE).
+    Sphere(f32),
 }
 
 /// The most movable bodies the scripts of one run make.
@@ -374,14 +376,6 @@ impl SimHost<'_> {
     /// A fixed Physicalize (Fixed = TRUE, or a concave list only): the object's mesh becomes a fixed body of the
     /// world, in the object's frame with its scale, as the level's own floors are (docs/physics.md 2.1).
     fn physicalize_static(&mut self, i: usize, name: &str, world: Mat4, spec: &script::PhysSpec) {
-        if spec.ball_count > 0 {
-            if !self.s.noted_static.contains(&i) && self.s.noted_static.len() < MAX_SCRIPT_STATICS {
-                self.s.noted_static.push(i);
-                self.s
-                    .note(format!("physicalizes {name} as a fixed ball (not made)"));
-            }
-            return;
-        }
         if self.s.made_static >= MAX_SCRIPT_STATICS {
             self.s
                 .note(format!("physicalizes {name}: too many fixed bodies"));
@@ -396,7 +390,27 @@ impl SimHost<'_> {
             return;
         };
         let points = self.s.materials.points.get(mesh);
-        let shape = if spec.convex_count > 0 {
+        let shape = if spec.ball_count > 0 {
+            // the radius pin; a block that has none gets the mesh's half extent (as for a movable ball)
+            let radius = spec.radius.unwrap_or_else(|| {
+                let (lo, hi) = points.map_or((Vec3::ZERO, Vec3::ZERO), |v| {
+                    v.iter().fold(
+                        (Vec3::splat(f32::INFINITY), Vec3::splat(f32::NEG_INFINITY)),
+                        |(lo, hi), &p| {
+                            let p = Vec3::from(p) * scale;
+                            (lo.min(p), hi.max(p))
+                        },
+                    )
+                });
+                (hi - lo).max_element() * 0.5
+            });
+            if !(radius.is_finite() && radius > 0.0) {
+                self.s
+                    .note(format!("physicalizes {name}: no usable radius"));
+                return;
+            }
+            StaticShape::Sphere(radius)
+        } else if spec.convex_count > 0 {
             let mut seen = std::collections::BTreeSet::new();
             let mut pts: Vec<Vec3> = points
                 .map(|v| v.iter().map(|&p| Vec3::from(p) * scale).collect::<Vec<_>>())
@@ -1180,6 +1194,10 @@ impl Scripts {
                         StaticShape::Triangles(t) => (
                             world.add_static_triangles(t, pos, rot, friction, elasticity, &group),
                             format!("{} triangles", t.len()),
+                        ),
+                        StaticShape::Sphere(r) => (
+                            world.add_static_sphere(*r, pos, rot, friction, elasticity, &group),
+                            format!("a sphere of radius {r:.2}"),
                         ),
                         StaticShape::Hull(p) => (
                             world.add_static_hull(p, pos, rot, friction, elasticity, &group),
@@ -1968,6 +1986,33 @@ mod body_tests {
         let m = s.ents.world(0).unwrap();
         assert!((m.w_axis.x - 30.0).abs() < 2.0, "x = {}", m.w_axis.x);
         assert!((m.w_axis.y - 1.0).abs() < 0.2, "it fell onto the floor again, y = {}", m.w_axis.y);
+    }
+
+    #[test]
+    fn a_fixed_ball_shape_makes_a_fixed_sphere() {
+        let mut s = scripts(1);
+        let mut w = World::new(&[]);
+        let b = ball_above(&mut w);
+        physicalize(
+            &mut s,
+            0,
+            &script::PhysSpec {
+                fixed: true,
+                convex_count: 0,
+                ball_count: 1,
+                radius: Some(3.0),
+                ..spec()
+            },
+        );
+        run(&mut s, &mut w, 240);
+        assert_eq!(s.statics.len(), 1);
+        assert_eq!(s.made, 0);
+        assert_eq!(w.static_count(), 1);
+        // the sphere (centre y = 5, radius 3) holds the ball (radius 1) on its top at y = 9, at the most
+        assert!(ball_y(&w, b) > 8.0, "y = {}", ball_y(&w, b));
+        unphysicalize(&mut s, 0);
+        s.apply_physics(&mut w, 0);
+        assert_eq!(w.static_count(), 0);
     }
 
     #[test]
