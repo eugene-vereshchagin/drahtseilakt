@@ -1019,18 +1019,6 @@ impl Runtime {
         }
     }
 
-    /// Pays `units` of the tick's work for something a block did in one go (pixels written); what is not there
-    /// ends the tick's work.
-    pub(crate) fn pay(&mut self, units: u64) {
-        match self.budget.checked_sub(units) {
-            Some(b) => self.budget = b,
-            None => {
-                self.budget = 0;
-                self.starved = true;
-            }
-        }
-    }
-
     /// Spends one unit of the tick's work; false when none is left.
     fn spend(&mut self) -> bool {
         match self.budget.checked_sub(1) {
@@ -1992,7 +1980,6 @@ impl Runtime {
         }
     }
 
-    /// An object of the graph as an engine entity, when it is one.
     /// Pays `cost` units of work from the tick's budget; false (and the budget gone) when it does not cover them.
     pub(crate) fn pay(&mut self, cost: u64) -> bool {
         if cost > self.budget {
@@ -2004,6 +1991,7 @@ impl Runtime {
         true
     }
 
+    /// An object of the graph as an engine entity, when it is one.
     pub fn ent(&self, id: Option<Id>) -> Option<Ent> {
         match self.graph.objects.get(id?)?.kind {
             ObjKind::Entity(i) => Some(Ent::Object(i)),

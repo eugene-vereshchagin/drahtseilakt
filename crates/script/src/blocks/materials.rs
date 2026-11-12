@@ -317,7 +317,7 @@ pub(crate) fn get_texture_info(
 const PIXELS_PER_UNIT: u64 = 64;
 
 fn pay_pixels(rt: &mut Runtime, pixels: u64) {
-    rt.pay(pixels / PIXELS_PER_UNIT + 1);
+    let _ = rt.pay(pixels / PIXELS_PER_UNIT + 1);
 }
 
 /// Blend Textures: the target texture takes Texture 1 * (1 - Blend Factor) + Texture 2 * Blend Factor (the factor is
