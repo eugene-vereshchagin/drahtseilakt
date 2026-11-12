@@ -12,7 +12,10 @@ pub mod ops;
 mod runtime_tests;
 pub mod types;
 
-pub use exec::{CameraChange, CameraState, Ent, Host, Quiet, Runtime, SoundCmd};
+pub use blocks::proto::SET_TEXTURE;
+pub use exec::{
+    CameraChange, CameraState, Ent, Host, MatChange, Quiet, Runtime, SoundCmd, TexChange, TexInfo,
+};
 pub use input::InputFrame;
 pub use nmo::behavior::Guid;
 
@@ -804,6 +807,13 @@ impl Graph {
         for s in subs {
             self.set_owner(s, owner, depth.saturating_add(1));
         }
+    }
+
+    /// Whether any block of the graph is of this prototype.
+    pub fn uses_proto(&self, guid: Guid) -> bool {
+        self.nodes
+            .iter()
+            .any(|n| matches!(n, Node::Block(b) if b.proto == Some(guid)))
     }
 
     pub fn block(&self, id: Id) -> Option<&Block> {

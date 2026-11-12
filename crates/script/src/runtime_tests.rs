@@ -33,6 +33,9 @@ struct Rec {
     cursor: Option<bool>,
     /// The camera changes the scripts asked for.
     cams: Vec<CameraChange>,
+    /// The material and texture changes the scripts asked for.
+    mats: Vec<(usize, crate::MatChange)>,
+    texs: Vec<(usize, crate::TexChange)>,
     /// Every text box call: the block and its spec (none: taken away).
     boxes: Vec<(usize, Option<crate::TextSpec>)>,
     /// Every emitter call: block, entity, values, state.
@@ -125,6 +128,20 @@ impl Host for Rec {
     }
     fn camera_set(&mut self, change: CameraChange) {
         self.cams.push(change);
+    }
+    fn material_set(&mut self, material: usize, change: crate::MatChange) {
+        self.mats.push((material, change));
+    }
+    fn texture_set(&mut self, texture: usize, change: crate::TexChange) {
+        self.texs.push((texture, change));
+    }
+    fn texture_info(&self, texture: usize) -> Option<crate::TexInfo> {
+        (texture == 0).then(|| crate::TexInfo {
+            file: "wall.bmp".into(),
+            width: 64,
+            height: 32,
+            slot: 3,
+        })
     }
     fn sound(&mut self, key: usize, file: &str, cmd: crate::SoundCmd) {
         self.sounds.push(format!("{key} {file} {cmd:?}"));
@@ -1241,7 +1258,7 @@ fn the_registry_declares_each_prototype_once_in_its_library() {
     // the 80 kinds known before the registry, the 7 absent ones besides Object Rename, and stage 0b's (the ten array
     // blocks and Set Row among them), the sounds, the input blocks and the cameras (Set As Active Camera,
     // Set Clipping Planes, Set FOV)
-    assert_eq!(all.len(), 131); // and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp
+    assert_eq!(all.len(), 142); // and the text blocks (six), the spherical emitter, Physics Impulse and WakeUp, the 11 material blocks
     for p in all {
         assert_eq!(find(p.guid).map(|q| q.name), Some(p.name));
         assert_eq!(
@@ -2379,6 +2396,282 @@ fn set_fov_gives_the_angle_in_degrees_and_ignores_a_non_finite_one() {
     let mut host = Rec::new();
     rt.tick(&mut host);
     assert!(host.cams.is_empty());
+}
+
+// ---- materials and textures (Materials.dll): the changes go to the host for this run ------------------------------
+
+/// A graph with material 0 (the target), material 1, and texture 0, and one block of `proto` with `pins`
+/// (object values name them by `Value::Obj(Some(..))`): returns the runtime and the ids of the three objects.
+fn material_script(
+    proto: Guid,
+    pins: Vec<(&str, Guid, Value)>,
+    pouts: &[(&str, Guid)],
+    outs: &[&str],
+    target: Option<usize>,
+) -> (Runtime, [Id; 3], Vec<Id>) {
+    let mut b = Build::new();
+    let owner = b.g.add_object("Owner", ObjKind::Other);
+    let m0 = b.g.add_object("M0", ObjKind::Material(0));
+    let m1 = b.g.add_object("M1", ObjKind::Material(1));
+    let t0 = b.g.add_object("T0", ObjKind::Texture(0));
+    let ids = [m0, m1, t0];
+    let t = target.map(|i| b.local("Target", types::OBJECT, Value::Obj(Some(ids[i]))));
+    let pins: Vec<Id> = pins
+        .iter()
+        .map(|(n, g, v)| {
+            let l = b.local(n, *g, v.clone());
+            b.pin(n, *g, l)
+        })
+        .collect();
+    let pouts: Vec<Id> = pouts.iter().map(|(n, g)| b.pout(n, *g)).collect();
+    let mut all = vec!["In"];
+    all.truncate(1);
+    let blk = b.bb("Mat", proto, &all, outs, pins, pouts.clone(), vec![], t);
+    let start = b.io("Start");
+    let links = vec![b.link(start, in_of(&b.g, blk, 0), 0)];
+    b.script("S", Some(owner), start, vec![blk], links);
+    (Runtime::new(b.done()), ids, pouts)
+}
+
+fn run_material(
+    proto: Guid,
+    pins: Vec<(&str, Guid, Value)>,
+    target: usize,
+) -> Vec<(usize, crate::MatChange)> {
+    let (mut rt, _, _) = material_script(proto, pins, &[], &["Out"], Some(target));
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    host.mats
+}
+
+#[test]
+fn the_material_blocks_hand_their_change_to_the_host() {
+    use crate::MatChange as C;
+    let color = Value::Color([0.1, 0.2, 0.3, 0.4]);
+    assert_eq!(
+        run_material(
+            proto::SET_DIFFUSE,
+            vec![
+                ("Diffuse Color", types::COLOR, color.clone()),
+                ("Keep Alpha Component", types::BOOL, Value::Bool(true)),
+            ],
+            1
+        ),
+        vec![(
+            1,
+            C::Diffuse {
+                color: [0.1, 0.2, 0.3, 0.4],
+                keep_alpha: true
+            }
+        )]
+    );
+    assert_eq!(
+        run_material(
+            proto::SET_EMISSIVE,
+            vec![("Emissive Color", types::COLOR, color.clone())],
+            0
+        ),
+        vec![(0, C::Emissive([0.1, 0.2, 0.3]))]
+    );
+    assert_eq!(
+        run_material(
+            proto::SET_AMBIENT,
+            vec![("Ambient Color", types::COLOR, color.clone())],
+            0
+        ),
+        vec![(0, C::Ambient([0.1, 0.2, 0.3]))]
+    );
+    assert_eq!(
+        run_material(
+            proto::SET_SPECULAR,
+            vec![
+                ("Specular Color", types::COLOR, color),
+                ("Specular Power", types::FLOAT, Value::Float(8.0)),
+            ],
+            0
+        ),
+        vec![(
+            0,
+            C::Specular {
+                color: [0.1, 0.2, 0.3],
+                power: 8.0
+            }
+        )]
+    );
+    assert_eq!(
+        run_material(
+            proto::SET_BLEND_MODES,
+            vec![
+                ("Blend", types::BOOL, Value::Bool(true)),
+                ("Source Blend", types::INT, Value::Int(5)),
+                ("Destination Blend", types::INT, Value::Int(6)),
+            ],
+            0
+        ),
+        vec![(
+            0,
+            C::Blend {
+                on: true,
+                src: 5,
+                dst: 6
+            }
+        )]
+    );
+    assert_eq!(
+        run_material(
+            proto::SET_MATERIAL_Z_BUFFER,
+            vec![
+                ("Z Buffer Write", types::BOOL, Value::Bool(false)),
+                ("Z Compare Function", types::INT, Value::Int(4)),
+            ],
+            0
+        ),
+        vec![(
+            0,
+            C::ZBuffer {
+                write: false,
+                func: 4
+            }
+        )]
+    );
+    assert_eq!(
+        run_material(
+            proto::SET_ALPHA_TEST,
+            vec![
+                ("Alpha Test Enable", types::BOOL, Value::Bool(true)),
+                ("Alpha Test Function", types::INT, Value::Int(7)),
+                ("Alpha Reference Value", types::INT, Value::Int(999)),
+            ],
+            0
+        ),
+        vec![(
+            0,
+            C::AlphaTest {
+                on: true,
+                func: 7,
+                reference: 255
+            }
+        )]
+    );
+}
+
+#[test]
+fn set_texture_names_a_level_texture_or_clears_it() {
+    use crate::MatChange as C;
+    let (mut rt, ids, _) = material_script(
+        proto::SET_TEXTURE,
+        vec![("Texture", types::OBJECT, Value::Obj(None))],
+        &[],
+        &["Out"],
+        Some(0),
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.mats, vec![(0, C::Texture(None))]);
+    // the texture object (index 0) is a Texture; a material object in that pin is not one
+    let tex = ids[2];
+    let (mut rt, _, _) = material_script(
+        proto::SET_TEXTURE,
+        vec![("Texture", types::OBJECT, Value::Obj(Some(tex)))],
+        &[],
+        &["Out"],
+        Some(1),
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.mats, vec![(1, C::Texture(Some(0)))]);
+}
+
+#[test]
+fn set_material_copies_the_new_material_over_the_replaced_one() {
+    use crate::MatChange as C;
+    // ids: the target material 0 is not what is replaced; "Material" is material 1, "to replace" material 0
+    let mut b = Build::new();
+    let owner = b.g.add_object("Owner", ObjKind::Other);
+    let m0 = b.g.add_object("M0", ObjKind::Material(0));
+    let m1 = b.g.add_object("M1", ObjKind::Material(1));
+    let pins: Vec<Id> = [("Material", m1), ("Material to replace", m0)]
+        .iter()
+        .map(|(n, o)| {
+            let l = b.local(n, types::OBJECT, Value::Obj(Some(*o)));
+            b.pin(n, types::OBJECT, l)
+        })
+        .collect();
+    let blk = b.bb(
+        "SetMat",
+        proto::SET_MATERIAL,
+        &["In"],
+        &["Out"],
+        pins,
+        vec![],
+        vec![],
+        None,
+    );
+    let start = b.io("Start");
+    let links = vec![b.link(start, in_of(&b.g, blk, 0), 0)];
+    b.script("S", Some(owner), start, vec![blk], links);
+    let mut rt = Runtime::new(b.done());
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.mats, vec![(0, C::CopyFrom(1))]);
+}
+
+#[test]
+fn texture_blocks_record_size_and_slot_and_report_info() {
+    use crate::TexChange as T;
+    let (mut rt, _, _) = material_script(
+        proto::CHANGE_TEXTURE_SIZE,
+        vec![
+            ("Size", types::VECTOR2, Value::Vec2([128.0, 64.0])),
+            ("Clear", types::BOOL, Value::Bool(true)),
+        ],
+        &[],
+        &["Out"],
+        Some(2),
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(
+        host.texs,
+        vec![(
+            0,
+            T::Size {
+                width: 128,
+                height: 64,
+                clear: true
+            }
+        )]
+    );
+    let (mut rt, _, _) = material_script(
+        proto::SET_CURRENT_SLOT,
+        vec![("Slot Index", types::INT, Value::Int(2))],
+        &[],
+        &["Out"],
+        Some(2),
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(host.texs, vec![(0, T::Slot(2))]);
+    let (mut rt, _, pouts) = material_script(
+        proto::GET_TEXTURE_INFO,
+        vec![],
+        &[("FileName", types::STRING), ("Priority", types::INT)],
+        &["Exist", "Empty"],
+        Some(2),
+    );
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    assert_eq!(rt.values[pouts[0]], Value::Str("wall.bmp".into()));
+    // a material is not a texture: "Empty" fires and nothing is written
+    let (mut rt, _, pouts) = material_script(
+        proto::GET_TEXTURE_INFO,
+        vec![],
+        &[("FileName", types::STRING), ("Priority", types::INT)],
+        &["Exist", "Empty"],
+        Some(0),
+    );
+    rt.tick(&mut host);
+    assert_eq!(rt.values[pouts[0]], Value::None);
 }
 
 // ---- text: Text Display, 2D Text and the font blocks ------------------------------------------------------------

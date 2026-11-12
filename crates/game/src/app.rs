@@ -1654,6 +1654,9 @@ fn frames_run(game: &mut Game, dir: &Path) -> Result<(), String> {
         }
         let screen = crate::ui::Screen { w: 640.0, h: 480.0 };
         let quads = crate::hud::interface(&game.sim, game.font.as_ref(), screen);
+        if let Some(sc) = &game.sim.scripts {
+            r.sync_materials(scene::LEVEL_MODEL, &sc.mats);
+        }
         let px = off
             .pixels(&mut r, &scene::view(&snap), &inst, &quads)
             .ok_or("the frame could not be read back")?;
@@ -3612,6 +3615,9 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         scene::shadows(&game.shadow_receivers, snap.ball, &mut inst);
     }
     let particles = game.effects.batches(snap.eye, snap.target);
+    if let Some(sc) = &game.sim.scripts {
+        r.sync_materials(scene::LEVEL_MODEL, &sc.mats);
+    }
     r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
     // DRAHTSEILAKT_BENCH=N: draws the frame N times more, with each quality of the clouds, and prints the time a frame
     // takes (the GPU waited for after each batch), to measure what the sea of cloud costs
@@ -4989,6 +4995,9 @@ impl App {
                 scene::shadows(&g.shadow_receivers, snap.ball, &mut inst);
             }
             let particles = g.effects.batches(snap.eye, snap.target);
+            if let Some(sc) = &sim.scripts {
+                r.sync_materials(scene::LEVEL_MODEL, &sc.mats);
+            }
             r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
             r.draw_overlay(
                 &view,
@@ -5999,6 +6008,9 @@ impl App {
         let lantern = self.view_mods.out.lantern;
         if !menu_up && lantern > 0.0 && gpu.renderer.point.is_none() {
             gpu.renderer.point = Some((snap.ball + glam::Vec3::Y * 4.0, [lantern; 3]));
+        }
+        if let Some(sc) = &self.game.sim.scripts {
+            gpu.renderer.sync_materials(scene::LEVEL_MODEL, &sc.mats);
         }
         gpu.renderer
             .draw(&view, rw, rh, &frame_view, &inst, &particles);
