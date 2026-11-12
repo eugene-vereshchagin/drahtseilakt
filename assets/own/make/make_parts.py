@@ -790,7 +790,9 @@ def make_dome():
     between them panels of blue enamel set a little deeper."""
     p = Part("PH/P_Dome")
     sh = shadow(p, "P_DomeShadow", "P_DomeShadow")
-    mat = p.mat("P_Dome", "dome_enamel.png", emissive=0.6, specular=0.6, power=30)
+    # polished steel that mirrors the sky (the reflection map: sky above, a bright band, a dark ground)
+    mat = p.mat("P_Dome", "chrome_env.png", diffuse=[0.74, 0.84, 1.0, 1], emissive=0.6, specular=0.9, power=60,
+                texgen="reflect")
     m = k.Mesh("P_Dome_MF_Mesh")
     # a low cap 13.3 across rising to 3.7, on a thin rim
     r = 6.644
@@ -799,7 +801,6 @@ def make_dome():
         a = t * math.pi / 2
         prof.append((0.45 + (3.676 - 0.45) * math.sin(a), r * 0.99 * math.cos(a)))
     lathe(m, mat, prof, 24)
-    m.look = dome_look(p, r * 0.985, 0.123, 0.45, 3.676 - 0.45)
     p.node("P_Dome_Shadow", sh, pos=(0.248, 0.11, 0.248), s=1.3)
     p.node("P_Dome_MF", p.mesh(m))
     p.group("All_P_Dome", ["P_Dome_Shadow", "P_Dome_MF"])
