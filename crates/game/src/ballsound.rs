@@ -90,8 +90,12 @@ impl FanSound {
     }
 }
 
-/// Materials, as the attributes number them: 1 stone, 2 wood, 3 metal, 4 dome (hits only).
-const MATERIALS: usize = 4;
+/// Materials, as the attributes number them: 1 stone, 2 wood, 3 metal, 4 dome (hits only), and ours: 5 sack (hits
+/// only; the original's sack makes no sound of its own, ours thuds softly).
+const MATERIALS: usize = 5;
+
+/// The hit material of a swinging sack's parts.
+pub const SACK_HIT: u8 = 5;
 
 /// The hit listeners (Hit Sounds): per material, the minimum and maximum speed and the sleep after a hit, in seconds
 /// of physics time.
@@ -100,6 +104,7 @@ const HITS: [(f32, f32, f64); MATERIALS] = [
     (2.0, 14.0, 1.0),
     (2.0, 14.0, 2.0),
     (1.0, 15.0, 1.0),
+    (1.5, 12.0, 0.5),
 ];
 
 /// The rolling contacts' delays (PhysicsContinuousContact): a loop starts after this long touching a material and
@@ -109,10 +114,21 @@ const ROLL_DELAY: f64 = 0.3;
 /// MultiRollSoundControl: volume = speed × 0.05 (SoundVolumeFactor), pitch = 0.5 + speed × 0.01.
 const VOLUME_PER_SPEED: f32 = 0.05;
 
+/// Under this speed the ball stands still for the rolling sounds: a ball resting on the floor (or on rails) jitters a
+/// little, and its loop must be silent then. Above it the volume starts from zero, so there is no jump when it moves off.
+const STILL_SPEED: f32 = 0.5;
+
+/// How much of the way to the target speed's volume and pitch the sound takes each tick (about 70 ms at 66 ticks a
+/// second): the loops swell and fall smoothly, without steps (clicks) when the speed changes between two ticks.
+const FOLLOW: f32 = 0.2;
+
 /// The BallSound table: (roll on stone, wood, metal), (hit on stone, wood, metal, dome).
 pub(crate) fn table(kind: BallKind) -> ([&'static str; 3], [&'static str; MATERIALS]) {
     match kind {
-        BallKind::Paper => (["Roll_Paper"; 3], ["Hit_Paper"; MATERIALS]),
+        BallKind::Paper => (
+            ["Roll_Paper"; 3],
+            ["Hit_Paper", "Hit_Paper", "Hit_Paper", "Hit_Paper", "Hit_Sack"],
+        ),
         // our sticky ball has no sounds of its own yet: rubber of the wooden ball's weight class sounds nearest the wood
         BallKind::Wood | BallKind::Sticky => (
             ["Roll_Wood_Stone", "Roll_Wood_Wood", "Roll_Wood_Metal"],
@@ -121,6 +137,7 @@ pub(crate) fn table(kind: BallKind) -> ([&'static str; 3], [&'static str; MATERI
                 "Hit_Wood_Wood",
                 "Hit_Wood_Metal",
                 "Hit_Wood_Dome",
+                "Hit_Sack",
             ],
         ),
         BallKind::Stone => (
@@ -130,6 +147,7 @@ pub(crate) fn table(kind: BallKind) -> ([&'static str; 3], [&'static str; MATERI
                 "Hit_Stone_Wood",
                 "Hit_Stone_Metal",
                 "Hit_Stone_Kuppel",
+                "Hit_Sack",
             ],
         ),
     }
@@ -142,6 +160,8 @@ pub struct BallSound {
     /// Per rolling material: since when it has been touched or untouched, and whether its loop plays.
     touch: [(Option<f64>, Option<f64>, bool); 3],
     kind: Option<BallKind>,
+    /// The volume and pitch the rolling loops are at now (they follow the speed's, `FOLLOW`).
+    roll: (f32, f32),
 }
 
 impl BallSound {
@@ -197,7 +217,18 @@ impl BallSound {
             }
         }
         if self.touch.iter().any(|t| t.2) {
-            out.push(SoundCmd::Roll(speed * VOLUME_PER_SPEED, 0.5 + speed * 0.01));
+            // a ball standing still is silent; the volume follows the speed above that, the pitch likewise
+            let moving = (speed - STILL_SPEED).max(0.0);
+            let target = (moving * VOLUME_PER_SPEED, 0.5 + moving * 0.01);
+            if self.roll.1 == 0.0 {
+                // the loop has just started: from silence, at the pitch of the speed
+                self.roll = (0.0, target.1);
+            }
+            self.roll.0 += (target.0 - self.roll.0) * FOLLOW;
+            self.roll.1 += (target.1 - self.roll.1) * FOLLOW;
+            out.push(SoundCmd::Roll(self.roll.0, self.roll.1));
+        } else {
+            self.roll = (0.0, 0.0);
         }
     }
 
@@ -209,6 +240,7 @@ impl BallSound {
             }
             *t = (None, None, false);
         }
+        self.roll = (0.0, 0.0);
     }
 }
 
@@ -243,6 +275,41 @@ mod tests {
     }
 
     #[test]
+    fn a_ball_standing_still_rolls_silently_and_a_moving_one_follows_its_speed() {
+        let mut b = BallSound::default();
+        let mut out = Vec::new();
+        let on = BallSounds {
+            impacts: vec![],
+            rolls: vec![3],
+        };
+        let roll = |out: &Vec<SoundCmd>| match out.last() {
+            Some(&SoundCmd::Roll(v, p)) => (v, p),
+            other => panic!("{other:?}"),
+        };
+        // touching the rails, resting (a jitter of 0.3): silent
+        for k in 0..30 {
+            b.tick(&on, BallKind::Wood, 0.3, f64::from(k) * 0.02, &mut out);
+        }
+        assert_eq!(roll(&out).0, 0.0);
+        // it sets off: louder and higher with the speed, in small steps
+        let mut last = roll(&out);
+        for k in 0..60 {
+            let speed = 0.3 + k as f32 * 0.2;
+            b.tick(&on, BallKind::Wood, speed, 0.6 + f64::from(k) * 0.015, &mut out);
+            let now = roll(&out);
+            assert!(now.0 >= last.0 && now.1 >= last.1);
+            assert!(now.0 - last.0 < 0.08, "a step of {}", now.0 - last.0);
+            last = now;
+        }
+        assert!(last.0 > 0.2);
+        // and stops again
+        for k in 0..60 {
+            b.tick(&on, BallKind::Wood, 0.0, 2.0 + f64::from(k) * 0.015, &mut out);
+        }
+        assert!(roll(&out).0 < 0.01);
+    }
+
+    #[test]
     fn a_fan_is_heard_near_it_and_stops_beyond_25() {
         assert_eq!(fan_volume(1.0), 1.0);
         assert!((fan_volume(24.99) - 0.02).abs() < 0.001);
@@ -269,16 +336,23 @@ mod tests {
         b.tick(&on, BallKind::Stone, 10.0, 0.2, &mut out);
         assert!(out.is_empty());
         b.tick(&on, BallKind::Stone, 10.0, 0.3, &mut out);
-        assert_eq!(
-            out,
-            vec![
-                SoundCmd::Loop(0, "Roll_Stone_Stone"),
-                SoundCmd::Roll(0.5, 0.6)
-            ]
-        );
+        assert_eq!(out[0], SoundCmd::Loop(0, "Roll_Stone_Stone"));
+        // it starts from silence and swells towards the speed's volume (9.5 × 0.05)
+        let SoundCmd::Roll(v, p) = out[1] else {
+            panic!("{out:?}")
+        };
+        assert!(v > 0.0 && v < 0.2 && (p - 0.595).abs() < 0.01, "{v} {p}");
         out.clear();
-        b.tick(&off, BallKind::Stone, 10.0, 0.4, &mut out);
-        b.tick(&off, BallKind::Stone, 10.0, 0.75, &mut out);
+        for k in 0..40 {
+            b.tick(&on, BallKind::Stone, 10.0, 0.31 + f64::from(k) * 0.015, &mut out);
+        }
+        let Some(&SoundCmd::Roll(v, _)) = out.last() else {
+            panic!()
+        };
+        assert!((v - 0.475).abs() < 0.01, "{v}");
+        out.clear();
+        b.tick(&off, BallKind::Stone, 10.0, 1.4, &mut out);
+        b.tick(&off, BallKind::Stone, 10.0, 1.75, &mut out);
         assert_eq!(out.last(), Some(&SoundCmd::Stop(0)));
     }
 }

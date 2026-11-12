@@ -410,6 +410,7 @@ pub const KNOWN_SOUNDS: &[&str] = &[
     "Hit_Wood_Metal",
     "Hit_Wood_Dome",
     "Hit_WoodenFlap",
+    "Hit_Sack",
     "Hit_Stone_Wood",
     "Hit_Stone_Stone",
     "Hit_Stone_Metal",

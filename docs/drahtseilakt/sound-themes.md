@@ -71,6 +71,7 @@ The original's figures below are measured on its files: length, and integrated l
 sound is long enough to measure; very short sounds are given as such. They are a guide, not a rule: a theme may be
 louder or softer as a whole, but its sounds should keep about these proportions to one another, as the game mixes
 them as the original did (the rolling sound's volume and speed follow the ball's speed, for instance).
+The rolling loops are silent while the ball stands still (speed under 0.5) and swell and fall smoothly with its speed. The system theme's `Hit_Wood_Metal` and `Hit_Stone_Metal` (the ball landing on rails) last 0.9 s with an iron ring.
 
 **Loop** means the game plays the file over and over: it must loop without a seam (its end running into its start,
 for example by a crossfade). Every other sound is a **one-shot**, played once.
@@ -81,7 +82,7 @@ for example by a crossfade). Every other sound is a **one-shot**, played once.
 |---|---|---|---|
 | `Misc_StartLevel` | A run begins | one-shot | 4.2 s, −18 LUFS |
 | `Misc_Checkpoint` | A checkpoint is reached | one-shot | 3.5 s, −16 LUFS |
-| `Misc_Fall` | The ball is lost | one-shot | 5.6 s, −18 LUFS |
+| `Misc_Fall` | The ball is lost | one-shot | 5.6 s, −18 LUFS (the system theme's: 1.9 s, −22 LUFS, soft and low) |
 | `Misc_Lightning` | A new ball appears | one-shot | 3.5 s, −25 LUFS |
 | `Misc_Trafo` | A transformer changes the ball | one-shot | 3.1 s, −22 LUFS (the system theme's: 2.5 s, −16 LUFS) |
 | `Extra_Life_Blob` | The extra life is touched | one-shot | 0.3 s, short |
@@ -95,13 +96,14 @@ for example by a crossfade). Every other sound is a **one-shot**, played once.
 | `Menu_load` | A level is loading | one-shot | 5.2 s, −19 LUFS |
 | `Roll_<ball>_<floor>` | The ball rolls (volume and speed follow the ball's speed) | loop | 1–2 s, −27 to −41 LUFS |
 | `Hit_<ball>_<floor>` | The ball hits the floor or a wall | one-shot | 0.1–0.3 s, short |
+| `Hit_Sack` | A swinging sack strikes the ball (ours: the original's sack is silent; a soft, low thud) | one-shot | none; the shipped themes' is 0.4 s |
 
 The balls: `Wood`, `Stone` and `Paper`; the floors: `Stone`, `Wood`, `Metal`. Rolling: `Roll_Wood_Stone`,
 `Roll_Wood_Wood`, `Roll_Wood_Metal`, `Roll_Stone_Stone`, `Roll_Stone_Wood`, `Roll_Stone_Metal`, and `Roll_Paper` for the
 paper ball on every floor. Hits: `Hit_Wood_Stone`, `Hit_Wood_Wood`, `Hit_Wood_Metal`, `Hit_Stone_Stone`,
 `Hit_Stone_Wood`, `Hit_Stone_Metal`, the domes `Hit_Wood_Dome` (2.0 s, −18 LUFS) and `Hit_Stone_Kuppel` (1.2 s,
 −21 LUFS), and `Hit_Paper` for the paper ball. The rolling loops of the original, from quiet to loud: paper and wood on
-stone about −41, wood on metal −37, stone on stone −36, stone on wood −29, wood on wood −27, stone on metal −28 LUFS.
+stone about −41, wood on metal −37 (the system theme's rail loops are synthesized: a ringing rail, no clatter), stone on stone −36, stone on wood −29, wood on wood −27, stone on metal −28 LUFS.
 
 A level may bring its own effects (a community level's `Sounds/` folder); they come before any theme's.
 

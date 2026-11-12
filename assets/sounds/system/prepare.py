@@ -6,10 +6,15 @@
 # looped without a seam where the game loops it, and encoded as Ogg Vorbis. Music/music.txt, the table of which track
 # plays in which role (several per role: a pool the game picks from), is written from POOLS below.
 #
-#   python3 -I prepare.py ORIGINAL_SOUNDS_DIR [--earlier CANDIDATES] [--round3 CANDIDATES_3]
+#   python3 -I prepare.py ORIGINAL_SOUNDS_DIR [--earlier CANDIDATES] [--round3 CANDIDATES_3] [--fixes BASE_SOUNDS --rails RAILS]
 #
 # --earlier: the first rounds' candidates (effects, the finish music and the first nine level tracks);
 # --round3: the third round's (2026-11-03: its music/ and music_atmo/ folders, the atmospheres and nine more tracks).
+# --fixes (2026-11-12, after the owner's listening notes): reworks four roles from BASE_SOUNDS, a folder holding the
+# first round's Hit_Wood_Metal.ogg and Hit_Stone_Metal.ogg (the commit before the fixes has them: git show
+# f662ce4:assets/sounds/system/Sounds/<file>), the rail hits being longer and more iron (a modal ring added), and writes
+# the fall sound, synthesized (no source: gentle falling glide and a soft thud); --rails: the folder of the synthesized
+# rail loops (audio-candidates/rails-2026-11-09: !Roll_Wood_Metal_C.ogg and !Roll_Stone_Metal_A.ogg).
 # A round not given is left as it is. Needs ffmpeg and numpy. Writes into the folders beside this file.
 
 import argparse
@@ -311,6 +316,85 @@ def round3(candidates, original, made):
         made[name] = {"source": src, "seconds": round(len(x) / RATE, 2), "lufs": round(lufs(x), 1)}
 
 
+# --- the fixes of 2026-11-12 -------------------------------------------------------------------------------------
+# Iron ring: the partials (Hz) of a struck iron bar, their decay times (s) and levels. Inharmonic on purpose: a bell-like
+# harmonic series sounds like a glass, these like a rail or a pipe. Kept below 2 kHz so the ring is not harsh.
+IRON = [(310.0, 0.95, 1.0), (548.0, 0.75, 0.7), (905.0, 0.6, 0.5), (1380.0, 0.45, 0.3), (1960.0, 0.3, 0.15)]
+RING_SECONDS = 0.9
+
+
+def iron_hit(x, semitones, seconds=RING_SECONDS):
+    """The hit `x` (mono) as if it struck iron: its own knock, a ring of IRON's partials excited by it (the
+    partials as damped sines), a soft low pass at 5 kHz, the whole `seconds` long, faded out, peak -3 dB."""
+    n = int(seconds * RATE)
+    t = np.arange(n) / RATE
+    k = 2 ** (semitones / 12)
+    # the ring: the partials struck at the moment of the hit (a sine each, the same phases every run), their sum a
+    # little under the knock's own peak, so that it rings audibly for most of the 0.9 s
+    ir = sum(a * np.exp(-6.9 * t / (1.4 * d)) * np.sin(2 * np.pi * f * k * t + 0.7 * i) for i, (f, d, a) in enumerate(IRON))
+    ir *= np.minimum(1.0, t / 0.002)
+    src = x[:, 0]
+    ring = ir * 0.5 * float(np.max(np.abs(src))) / float(np.max(np.abs(ir)))
+    body = np.zeros(n)
+    body[: min(len(src), n)] = src[:n] * 0.6
+    y = body + ring
+    y = np.convolve(y, np.hanning(9) / np.hanning(9).sum(), mode="same")  # about -3 dB at 5 kHz: no needle
+    y *= np.minimum(1.0, (n - np.arange(n)) / (0.2 * RATE))
+    y *= 10 ** (-3.0 / 20) / np.max(np.abs(y))
+    return y[:, None].astype("<f4")
+
+
+def fall_sound():
+    """The ball is lost: a gentle falling glide (490 down to 90 Hz, a sine with a soft octave) that grows quieter, then a
+    low soft thud at its end. 1.9 s, nothing above 1 kHz but the glide's own octaves, peak -3 dB, -22 LUFS."""
+    n = int(1.9 * RATE)
+    t = np.arange(n) / RATE
+    f = 90 + 400 * np.exp(-t / 0.5)
+    phase = 2 * np.pi * np.cumsum(f) / RATE
+    env = np.minimum(1.0, t / 0.04) * np.exp(-t / 0.8) * np.minimum(1.0, (1.9 - t) / 0.3)
+    glide = (np.sin(phase) + 0.6 * np.sin(2 * phase) + 0.2 * np.sin(3 * phase)) * env
+    td = t - 0.95
+    thud = np.where(td > 0, np.exp(-td / 0.16) * (np.sin(2 * np.pi * (60 + 30 * np.exp(-td / 0.05)) * td) + 0.3 * np.sin(2 * np.pi * 180 * td)), 0.0)
+    y = glide * 0.55 + thud * 0.7
+    y *= np.minimum(1.0, (1.9 - t) / 0.4)
+    return to_lufs(y[:, None].astype("<f4"), -22.0, peak_db=-3.0)
+
+
+def sack_sound():
+    """The swinging sack hits the ball: a soft, low thud of cloth and sand, as the sound of a body in a sack: an 85 Hz
+    knock falling from 130 to 85 Hz, a short low-passed (600 Hz) rustle, 0.4 s, nothing above 700 Hz to speak of, peak -3 dB."""
+    n = int(0.4 * RATE)
+    t = np.arange(n) / RATE
+    knock = np.sin(2 * np.pi * (85 + 45 * np.exp(-t / 0.04)) * t) * np.exp(-t / 0.09)
+    noise = np.random.default_rng(26).standard_normal(n)
+    kernel = np.hanning(int(RATE / 600 * 2))
+    rustle = np.convolve(noise, kernel / kernel.sum(), mode="same") * np.exp(-t / 0.05)
+    y = knock + 0.5 * rustle / np.max(np.abs(rustle))
+    y *= np.minimum(1.0, t / 0.003) * np.minimum(1.0, (0.4 - t) / 0.1)
+    y *= 10 ** (-3.0 / 20) / np.max(np.abs(y))
+    return y[:, None].astype("<f4")
+
+
+def fixes(base, rails, made):
+    y = sack_sound()
+    encode(y, HERE / "Sounds" / "Hit_Sack.ogg", 4)
+    made["Hit_Sack"] = {"source": "synthesized", "seconds": round(len(y) / RATE, 2)}
+    for role, semitones in (("Hit_Wood_Metal", 0), ("Hit_Stone_Metal", -3)):
+        x = decode(Path(base) / f"{role}.ogg", 0.0, None, 1, 0)
+        y = iron_hit(x, semitones)
+        encode(y, HERE / "Sounds" / f"{role}.ogg", 4)
+        made[role] = {"source": f"{role}.ogg (first round) + iron ring", "seconds": round(len(y) / RATE, 2)}
+    y = fall_sound()
+    encode(y, HERE / "Sounds" / "Misc_Fall.ogg", 4)
+    made["Misc_Fall"] = {"source": "synthesized", "seconds": round(len(y) / RATE, 2), "lufs": round(lufs(y), 1)}
+    if rails:
+        for role, src in (("Roll_Wood_Metal", "!Roll_Wood_Metal_C.ogg"), ("Roll_Stone_Metal", "!Roll_Stone_Metal_A.ogg")):
+            y = decode(Path(rails) / src, 0.0, None, 1, 0)
+            encode(y, HERE / "Sounds" / f"{role}.ogg", 4)
+            made[role] = {"source": f"rails-2026-11-09/{src} (synthesized)", "seconds": round(len(y) / RATE, 2),
+                          "lufs": round(lufs(y), 1)}
+
+
 def write_table():
     with open(HERE / "Music" / "music.txt", "w", encoding="utf-8") as f:
         f.write("# Which of our tracks plays in which role of the original's music: a pool per role, the game picks one\n")
@@ -324,12 +408,16 @@ def main():
     ap.add_argument("original")
     ap.add_argument("--earlier", type=Path)
     ap.add_argument("--round3", type=Path)
+    ap.add_argument("--fixes", type=Path)
+    ap.add_argument("--rails", type=Path)
     args = ap.parse_args()
     made = {}
     if args.earlier:
         earlier(args.earlier, args.original, made)
     if args.round3:
         round3(args.round3, args.original, made)
+    if args.fixes:
+        fixes(args.fixes, args.rails, made)
     write_table()
     print(json.dumps(made, indent=1, ensure_ascii=False))
 
