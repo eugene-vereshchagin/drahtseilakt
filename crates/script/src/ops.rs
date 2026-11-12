@@ -53,24 +53,41 @@ pub mod op {
     pub const MESH: Guid = Guid(0x1309_5053, 0x7f9b_44e2);
     pub const DIFFUSE: Guid = Guid(0x0f9e_20cc, 0x6ea1_0a47);
     pub const EMISSIVE: Guid = Guid(0x1368_4596, 0x0ab5_7f34);
+    /// The C reference's "box maximum" row; the same GUID as `MIN`, which the DLL registers as Min.
     pub const MAX: Guid = Guid(0x6ea2_14cb, 0x43be_6b56);
-    /// The same GUID as `MAX` above, which the C reference calls the box's maximum: used on two numbers it is the
-    /// smaller of them (the Clamp group of Landfill in the Clouds applies it to the upper bound), so it is the
-    /// operation Min, and the C's box row reads the box's second corner.
+    /// Min (ParameterOperations.dll, `re/ops.txt`): Integer, Float, Vector, 2D Vector pairs; the C's box row reads
+    /// the box's second corner (the DLL registers Min of a Box too).
     pub const MIN: Guid = Guid(0x6ea2_14cb, 0x43be_6b56);
-    /// Max of two numbers: the lower bound of the same Clamp group.
+    /// Max.
     pub const MAXIMUM: Guid = Guid(0x7c2e_01a8, 0x6e70_2206);
-    /// Absolute value (Float, Integer): `Abs XYZ` in Stairway to the Clouds applies it to three components.
+    /// Absolute Value (Integer, Float).
     pub const ABS: Guid = Guid(0x1ada_7470, 0x6209_7629);
-    /// Distance of two points (Vector, Vector or 3D Entity, 3D Entity → Float): Landfill's "Has Speed?" measures the
-    /// way an object went in a frame with it and compares the result with a threshold.
+    /// Get Distance (Float ← Vector, Vector / 3D Entity, 3D Entity; Vector ← 3D Entity, 3D Entity is the second
+    /// minus the first).
     pub const DISTANCE: Guid = Guid(0x265c_7d00, 0x5c8f_1702);
-    /// Equality of two strings or two objects (Boolean): the maps switch on it to find an object by its name.
-    pub const STRING_EQUAL: Guid = Guid(0x5e86_6012, 0x5860_306d);
-    /// Inverse of a matrix (Matrix ← Matrix): Stairway to the Clouds takes This's world matrix through it and
-    /// multiplies the result with another object's position (a point in This's own frame).
+    /// Contain String (Boolean ← String, String): whether input 1 contains input 2 (the DLL stores strstr's pointer).
+    pub const CONTAIN_STRING: Guid = Guid(0x5e86_6012, 0x5860_306d);
+    /// Inverse (Matrix, Vector, 2D Vector, Float, Color).
     pub const INVERSE: Guid = Guid(0x7c27_550b, 0x32a3_2e99);
-    pub const OBJECT_EQUAL: Guid = Guid(0x6ab9_4f5a, 0x1a63_76a9);
+    /// Is Derived From (Boolean ← Object, Object): CKIsChildClassOf(input 1, the class of input 2).
+    pub const IS_DERIVED_FROM: Guid = Guid(0x6ab9_4f5a, 0x1a63_76a9);
+    /// Equal.
+    pub const EQUAL: Guid = Guid(0x6c62_476b, 0x7a92_2973);
+    /// Xor (Integer, Boolean).
+    pub const XOR: Guid = Guid(0x0144_05eb, 0x2e08_7eec);
+    /// Is Visible (Boolean ← 3D / 2D Entity).
+    pub const IS_VISIBLE: Guid = Guid(0x0a54_7387, 0x4108_51af);
+    /// Get Children (Object Array ← 3D Entity).
+    pub const CHILDREN: Guid = Guid(0x0dd6_35d5, 0x47e6_2a28);
+    /// Get Parent (3D Entity, 2D Entity).
+    pub const PARENT: Guid = Guid(0x5bf9_718f, 0x030b_698c);
+    /// Get Width / Get Height (Integer ← nothing: the render area; ← Texture; ← 2D Entity).
+    pub const WIDTH: Guid = Guid(0x5a4e_13fe, 0x628b_7ca2);
+    pub const HEIGHT: Guid = Guid(0x37f9_040e, 0x52c0_5c4e);
+    /// Set Alpha (Color ← Color, Float).
+    pub const SET_ALPHA: Guid = Guid(0x48c1_0000, 0xfec1_00a0);
+    /// Degre To Radian (Float ← Float).
+    pub const DEG_TO_RAD: Guid = Guid(0x49c1_00e0, 0xfeb1_05a9);
     pub const BOUNDING_BOX: Guid = Guid(0x31a7_649f, 0x305e_5164);
 }
 
@@ -85,6 +102,8 @@ pub enum Source {
     C,
     /// The operation's registered name; the C has no function for it (it copies input 1).
     Name,
+    /// ParameterOperations.dll's own function for it (read from the disassembly, `re/ops.txt`); the C has none.
+    Dll,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -108,10 +127,11 @@ const fn r(op: Guid, res: Guid, p1: Guid, p2: Guid, f: OpFn, source: Source) -> 
     }
 }
 
-use Source::{C, Name as N};
+use Source::{C, Dll as D, Name as N};
 use t::{
-    BEOBJECT, BOOL, BOX, COLOR, ENTITY, ENTITY2D, FLOAT, GROUP, INT, MATERIAL, MATRIX, MESH,
-    NONE as NO, OBJECT, OBJECT_ARRAY, PERCENTAGE, QUATERNION, SCRIPT, STRING, TIME, VECTOR,
+    BEOBJECT, BOOL, BOX, COLOR, ENTITY, ENTITY2D, EULER, FLOAT, GROUP, INT, MATERIAL, MATRIX, MESH,
+    NONE as NO, OBJECT, OBJECT_ARRAY, PERCENTAGE, QUATERNION, RECT, SCRIPT, STRING, TEXTURE, TIME,
+    VECTOR,
     VECTOR2,
 };
 
@@ -262,45 +282,75 @@ pub static TABLE: &[Row] = &[
         N,
     ),
     // Min, Max, Abs, Distance and the equality tests: named by their use in the maps (the C has none of them)
-    r(op::MIN, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int().min(b.as_int()))), N),
-    r(op::MIN, FLOAT, FLOAT, FLOAT, |_, _, _, a, b| Some(Value::Float(fmin(a.as_float(), b.as_float()))), N),
-    r(op::MAXIMUM, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int().max(b.as_int()))), N),
-    r(op::MAXIMUM, FLOAT, FLOAT, FLOAT, |_, _, _, a, b| Some(Value::Float(fmax(a.as_float(), b.as_float()))), N),
-    r(op::ABS, INT, INT, NO, |_, _, _, a, _| Some(Value::Int(a.as_int().wrapping_abs())), N),
-    r(op::ABS, FLOAT, FLOAT, NO, |_, _, _, a, _| Some(Value::Float(a.as_float().abs())), N),
+    r(op::MIN, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int().min(b.as_int()))), D),
+    r(op::MIN, FLOAT, FLOAT, FLOAT, |_, _, _, a, b| Some(Value::Float(fmin(a.as_float(), b.as_float()))), D),
+    r(op::MAXIMUM, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int().max(b.as_int()))), D),
+    r(op::MAXIMUM, FLOAT, FLOAT, FLOAT, |_, _, _, a, b| Some(Value::Float(fmax(a.as_float(), b.as_float()))), D),
+    r(op::ABS, INT, INT, NO, |_, _, _, a, _| Some(Value::Int(a.as_int().wrapping_abs())), D),
+    r(op::ABS, FLOAT, FLOAT, NO, |_, _, _, a, _| Some(Value::Float(a.as_float().abs())), D),
     r(
         op::DISTANCE,
         FLOAT,
         VECTOR,
         VECTOR,
         |_, _, _, a, b| Some(Value::Float(length(zip3(a, b, |x, y| x - y)))),
-        N,
+        D,
     ),
-    r(op::DISTANCE, FLOAT, ENTITY, ENTITY, entity_distance, N),
+    r(op::DISTANCE, FLOAT, ENTITY, ENTITY, entity_distance, D),
     r(
         op::INVERSE,
         MATRIX,
         MATRIX,
         NO,
         |_, _, _, a, _| a.as_matrix().and_then(|m| invert(&m)).map(Value::Matrix),
-        N,
+        D,
+    ),
+    // the rest of ParameterOperations.dll's table (`re/ops.txt`); the C has none of these
+    r(op::CONTAIN_STRING, BOOL, STRING, STRING, contain_string, D),
+    r(op::IS_DERIVED_FROM, BOOL, OBJECT, OBJECT, is_derived_from, D),
+    r(op::EQUAL, BOOL, STRING, STRING, |_, _, _, a, b| Some(Value::Bool(equal_strings(a, b))), D),
+    r(op::EQUAL, BOOL, INT, INT, |_, _, _, a, b| Some(Value::Bool(a.as_int() == b.as_int())), D),
+    r(
+        op::EQUAL,
+        BOOL,
+        FLOAT,
+        FLOAT,
+        |_, _, _, a, b| Some(Value::Bool(a.as_float().to_bits() == b.as_float().to_bits())),
+        D,
     ),
     r(
-        op::STRING_EQUAL,
+        op::EQUAL,
         BOOL,
-        STRING,
-        STRING,
-        |_, _, _, a, b| Some(Value::Bool(a.as_string() == b.as_string())),
-        N,
+        INT,
+        FLOAT,
+        |_, _, _, a, b| Some(Value::Bool(f64::from(a.as_int()) == f64::from(b.as_float()))),
+        D,
     ),
-    r(
-        op::OBJECT_EQUAL,
-        BOOL,
-        OBJECT,
-        OBJECT,
-        |_, _, _, a, b| Some(Value::Bool(a.as_obj() == b.as_obj())),
-        N,
-    ),
+    r(op::EQUAL, BOOL, BOOL, BOOL, |_, _, _, a, b| Some(Value::Bool(a.as_bool() == b.as_bool())), D),
+    r(op::EQUAL, BOOL, OBJECT, OBJECT, |_, _, _, a, b| Some(Value::Bool(a.as_obj() == b.as_obj())), D),
+    r(op::EQUAL, BOOL, VECTOR2, VECTOR2, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
+    r(op::EQUAL, BOOL, VECTOR, VECTOR, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
+    r(op::EQUAL, BOOL, EULER, EULER, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
+    r(op::EQUAL, BOOL, QUATERNION, QUATERNION, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
+    r(op::EQUAL, BOOL, RECT, RECT, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
+    r(op::EQUAL, BOOL, COLOR, COLOR, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
+    r(op::EQUAL, BOOL, MATRIX, MATRIX, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
+    r(op::XOR, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int() ^ b.as_int())), D),
+    r(op::XOR, BOOL, BOOL, BOOL, |_, _, _, a, b| Some(Value::Bool(a.as_bool() != b.as_bool())), D),
+    r(op::IS_VISIBLE, BOOL, ENTITY, NO, is_visible, D),
+    r(op::IS_VISIBLE, BOOL, ENTITY2D, NO, is_visible, D),
+    r(op::CHILDREN, OBJECT_ARRAY, ENTITY, NO, children, D),
+    r(op::PARENT, ENTITY, ENTITY, NO, parent, D),
+    r(op::PARENT, ENTITY2D, ENTITY2D, NO, parent, D),
+    r(op::WIDTH, INT, NO, NO, |_, h, _, _, _| h.screen_size().map(|s| Value::Int(s.0)), D),
+    r(op::HEIGHT, INT, NO, NO, |_, h, _, _, _| h.screen_size().map(|s| Value::Int(s.1)), D),
+    r(op::WIDTH, INT, TEXTURE, NO, |rt, h, _, a, _| texture_size(rt, h, a, false), D),
+    r(op::HEIGHT, INT, TEXTURE, NO, |rt, h, _, a, _| texture_size(rt, h, a, true), D),
+    r(op::SET_ALPHA, COLOR, COLOR, FLOAT, set_alpha, D),
+    r(op::MATERIAL, MATERIAL, t::SPRITE3D, NO, sprite_material, D),
+    r(op::DEG_TO_RAD, FLOAT, FLOAT, NO, |_, _, _, a, _| Some(Value::Float(a.as_float() * 0.017_453_292)), D),
+    r(op::DISTANCE, VECTOR, ENTITY, ENTITY, entity_offset, D),
+    r(op::DIV, QUATERNION, QUATERNION, QUATERNION, quat_div, D),
     // vectors and quaternions (by name)
     r(
         op::NORMALIZE,
@@ -476,6 +526,7 @@ pub static TABLE: &[Row] = &[
     r(op::CLASS_ID, t::CLASS_ID, OBJECT, NO, class_id, C),
     r(op::ROW_COUNT, INT, t::ARRAY, NO, row_count, C),
     r(op::GROUP_COUNT, INT, GROUP, NO, group_count, C),
+    r(op::SCRIPT, SCRIPT, BEOBJECT, STRING, script_by_name, D),
     r(op::SCRIPT, SCRIPT, BEOBJECT, INT, script_of, C),
     r(
         op::SCRIPT_COUNT,
@@ -662,6 +713,158 @@ fn entity_distance(
     let (ma, mb) = (world(rt, host, a)?, world(rt, host, b)?);
     let d = [ma[3][0] - mb[3][0], ma[3][1] - mb[3][1], ma[3][2] - mb[3][2]];
     Some(Value::Float(length(d)))
+}
+
+/// Whether input 1 contains input 2 (strstr; a missing string gives false, an empty one is found at once).
+fn contain_string(_: &mut Runtime, _: &mut dyn Host, _: Guid, a: &Value, b: &Value) -> Option<Value> {
+    Some(Value::Bool(match (a, b) {
+        (Value::Str(x), Value::Str(y)) => x.contains(y.as_str()),
+        _ => false,
+    }))
+}
+
+/// Equal on two strings: strcmp, so case matters; a missing string is false.
+fn equal_strings(a: &Value, b: &Value) -> bool {
+    matches!((a, b), (Value::Str(x), Value::Str(y)) if x == y)
+}
+
+/// The words of a value as the original's `repz cmps` compares them (bit for bit, so 0.0 and -0.0 differ).
+fn words(v: &Value) -> Vec<u32> {
+    match v {
+        Value::Vec2(x) => x.iter().map(|f| f.to_bits()).collect(),
+        Value::Vec3(x) => x.iter().map(|f| f.to_bits()).collect(),
+        Value::Quat(x) | Value::Rect(x) | Value::Color(x) => x.iter().map(|f| f.to_bits()).collect(),
+        Value::Matrix(m) => m.iter().flatten().map(|f| f.to_bits()).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn bits_equal(a: &Value, b: &Value) -> bool {
+    words(a) == words(b)
+}
+
+/// The CK class tree of the classes a level holds: the class a class derives from.
+fn class_parent(c: u32) -> Option<u32> {
+    Some(match c {
+        // 2 / 3 / 4 / 6 / 8 / 9 (parameters, links, behaviours, ios), 10 scene, 16 render context, 20 ...: roots below Object
+        11 => 1,                         // scene object -> object
+        19 => 11,                        // be object -> scene object
+        10 | 21 | 23 | 24 | 30 | 31 | 32 | 47 | 52 | 51 => 19,
+        25 | 26 => 24,                   // wave, midi sound -> sound
+        33 | 27 => 47,                   // 3D entity, 2D entity -> render object
+        34 | 36 | 37 | 38 | 40 | 41 | 43 => 33,
+        35 => 34,                        // target camera -> camera
+        39 => 38,                        // target light -> light
+        42 => 41,                        // body part -> 3D object
+        28 => 27,                        // sprite -> 2D entity
+        29 => 28,                        // sprite text -> sprite
+        2..=9 | 12..=18 | 20 | 22 | 44..=46 | 48..=50 | 53.. => 1,
+        _ => return None,
+    })
+}
+
+/// Whether class `c` is `base` or derives from it (CKIsChildClassOf).
+fn class_derives(c: u32, base: u32) -> bool {
+    let mut at = Some(c);
+    for _ in 0..16 {
+        match at {
+            Some(x) if x == base => return true,
+            Some(x) => at = class_parent(x),
+            None => return false,
+        }
+    }
+    false
+}
+
+/// Is Derived From: the class of input 1 is, or derives from, the class of input 2 (nothing written when either object
+/// is gone).
+fn is_derived_from(
+    rt: &mut Runtime,
+    _: &mut dyn Host,
+    _: Guid,
+    a: &Value,
+    b: &Value,
+) -> Option<Value> {
+    let class = |v: &Value| v.as_obj().and_then(|o| rt.graph.objects.get(o)).map(|o| o.class);
+    let (c1, c2) = (class(a)?, class(b)?);
+    Some(Value::Bool(class_derives(c1, c2)))
+}
+
+fn is_visible(rt: &mut Runtime, host: &mut dyn Host, _: Guid, a: &Value, _: &Value) -> Option<Value> {
+    let e = rt.ent(a.as_obj())?;
+    host.is_visible(e).map(Value::Bool)
+}
+
+/// Get Parent: nothing written for an object without one.
+fn parent(rt: &mut Runtime, host: &mut dyn Host, _: Guid, a: &Value, _: &Value) -> Option<Value> {
+    let e = rt.ent(a.as_obj())?;
+    let p = host.parent_of(e)?;
+    let kind = match p {
+        crate::Ent::Object(i) => ObjKind::Entity(i),
+        crate::Ent::Ball => ObjKind::Ball,
+    };
+    object_of(rt, kind).map(|o| Value::Obj(Some(o)))
+}
+
+/// Get Children: the object's children as an Object Array (paid from the tick's work, one unit each).
+fn children(rt: &mut Runtime, host: &mut dyn Host, _: Guid, a: &Value, _: &Value) -> Option<Value> {
+    let e = rt.ent(a.as_obj())?;
+    let kids = host.children_of(e);
+    if !rt.pay(kids.len() as u64) {
+        return None;
+    }
+    let list = kids
+        .into_iter()
+        .take(crate::MAX_CHILDREN)
+        .map(|k| object_of(rt, ObjKind::Entity(k)))
+        .collect();
+    Some(Value::Objects(list))
+}
+
+fn texture_size(rt: &mut Runtime, host: &mut dyn Host, a: &Value, height: bool) -> Option<Value> {
+    let o = rt.graph.objects.get(a.as_obj()?)?;
+    let ObjKind::Texture(t) = o.kind else { return None };
+    let info = host.texture_info(t)?;
+    Some(Value::Int(i32::try_from(if height { info.height } else { info.width }).unwrap_or(i32::MAX)))
+}
+
+/// Set Alpha: the colour with its alpha set to the number, at most 1 (no lower bound).
+fn set_alpha(_: &mut Runtime, _: &mut dyn Host, _: Guid, a: &Value, b: &Value) -> Option<Value> {
+    let [r, g, bl, _] = a.as_vec4();
+    let f = b.as_float();
+    Some(Value::Color([r, g, bl, if f > 1.0 { 1.0 } else { f }]))
+}
+
+/// Get Distance of two entities as a Vector: the second's world position minus the first's.
+fn entity_offset(
+    rt: &mut Runtime,
+    host: &mut dyn Host,
+    _: Guid,
+    a: &Value,
+    b: &Value,
+) -> Option<Value> {
+    let (ma, mb) = (world(rt, host, a)?, world(rt, host, b)?);
+    Some(Value::Vec3([mb[3][0] - ma[3][0], mb[3][1] - ma[3][1], mb[3][2] - ma[3][2]]))
+}
+
+/// Get Script with a name: the first script of the object whose name contains the string (nothing written if none).
+fn script_by_name(rt: &mut Runtime, _: &mut dyn Host, _: Guid, a: &Value, b: &Value) -> Option<Value> {
+    let key = b.as_string();
+    let found = scripts(rt, a)
+        .into_iter()
+        .find(|&s| rt.graph.name(s).contains(key.as_str()))?;
+    Some(Value::Obj(Some(found)))
+}
+
+/// Quaternion division, VxMath's `Vx3DQuaternionDivide(P, Q)`: conj(Q) * P (x, y, z, w).
+fn quat_div(_: &mut Runtime, _: &mut dyn Host, _: Guid, a: &Value, b: &Value) -> Option<Value> {
+    let (p, q) = (a.as_vec4(), b.as_vec4());
+    Some(Value::Quat([
+        q[3] * p[0] - q[0] * p[3] - p[2] * q[1] + p[1] * q[2],
+        p[1] * q[3] - p[3] * q[1] - p[0] * q[2] + p[2] * q[0],
+        p[2] * q[3] - p[3] * q[2] - p[1] * q[0] + p[0] * q[1],
+        p[2] * q[2] + p[1] * q[1] + p[0] * q[0] + q[3] * p[3],
+    ]))
 }
 
 /// The inverse of a 4x4 matrix (rows as the world matrices keep them), `None` for a singular one.
@@ -1095,6 +1298,13 @@ fn material_of(
     })))
 }
 
+/// Get Material of a 3D sprite: its mesh's first material (nothing written without one).
+fn sprite_material(rt: &mut Runtime, host: &mut dyn Host, _: Guid, a: &Value, _: &Value) -> Option<Value> {
+    let e = rt.ent(a.as_obj())?;
+    let m = *host.mesh_materials(host.mesh_of(e)?).first()?;
+    object_of(rt, ObjKind::Material(m)).map(|o| Value::Obj(Some(o)))
+}
+
 /// Get Material List: nothing written for what is not a mesh.
 fn material_list(
     rt: &mut Runtime,
@@ -1380,17 +1590,10 @@ mod tests {
                 ),
                 Some(v([8.0, 1.0, 3.0])),
             ),
-            // no function: an Op block leaves its output
+            // Degre To Radian: x * 0.017453292
             (
-                run(
-                    Guid(0x49c1_00e0, 0xfeb1_05a9),
-                    FLOAT,
-                    FLOAT,
-                    NO,
-                    f(-2.0),
-                    n.clone(),
-                ),
-                None,
+                run(op::DEG_TO_RAD, FLOAT, FLOAT, NO, f(-2.0), n.clone()),
+                Some(f(-0.034_906_584)),
             ),
             (
                 run(
@@ -1430,25 +1633,86 @@ mod tests {
                 Some(f(5.0)),
             ),
             (
-                run(op::STRING_EQUAL, BOOL, STRING, STRING, s("PE_Balloon"), s("PE_Balloon")),
+                run(op::CONTAIN_STRING, BOOL, STRING, STRING, s("PE_Balloon_01"), s("Balloon")),
                 Some(Value::Bool(true)),
             ),
             (
-                run(op::STRING_EQUAL, BOOL, STRING, STRING, s("PE_Balloon"), s("pe_balloon")),
+                run(op::CONTAIN_STRING, BOOL, STRING, STRING, s("PE_Balloon"), s("balloon")),
                 Some(Value::Bool(false)),
             ),
             (
-                run(op::OBJECT_EQUAL, BOOL, OBJECT, OBJECT, Value::Obj(Some(3)), Value::Obj(Some(3))),
+                run(op::CONTAIN_STRING, BOOL, STRING, STRING, s("PE"), s("")),
                 Some(Value::Bool(true)),
             ),
             (
-                run(op::OBJECT_EQUAL, BOOL, OBJECT, OBJECT, Value::Obj(Some(3)), Value::Obj(None)),
+                run(op::EQUAL, BOOL, STRING, STRING, s("PE_Balloon"), s("PE_Balloon")),
+                Some(Value::Bool(true)),
+            ),
+            (
+                run(op::EQUAL, BOOL, STRING, STRING, s("PE_Balloon"), s("pe_balloon")),
                 Some(Value::Bool(false)),
             ),
+            (run(op::EQUAL, BOOL, FLOAT, FLOAT, f(0.0), f(-0.0)), Some(Value::Bool(false))),
+            (run(op::EQUAL, BOOL, INT, FLOAT, i(3), f(3.0)), Some(Value::Bool(true))),
+            (run(op::EQUAL, BOOL, INT, INT, i(3), i(4)), Some(Value::Bool(false))),
+            (
+                run(op::EQUAL, BOOL, VECTOR, VECTOR, v([1.0, 2.0, 3.0]), v([1.0, 2.0, 3.0])),
+                Some(Value::Bool(true)),
+            ),
+            (
+                run(op::EQUAL, BOOL, OBJECT, OBJECT, Value::Obj(Some(3)), Value::Obj(None)),
+                Some(Value::Bool(false)),
+            ),
+            (run(op::XOR, INT, INT, INT, i(6), i(3)), Some(i(5))),
+            (
+                run(op::XOR, BOOL, BOOL, BOOL, Value::Bool(true), Value::Bool(true)),
+                Some(Value::Bool(false)),
+            ),
+            (
+                run(op::SET_ALPHA, COLOR, COLOR, FLOAT, Value::Color([0.1, 0.2, 0.3, 0.4]), f(2.0)),
+                Some(Value::Color([0.1, 0.2, 0.3, 1.0])),
+            ),
+            (
+                run(op::SET_ALPHA, COLOR, COLOR, FLOAT, Value::Color([0.1, 0.2, 0.3, 0.4]), f(-0.5)),
+                Some(Value::Color([0.1, 0.2, 0.3, -0.5])),
+            ),
+            (
+                run(
+                    op::DIV,
+                    QUATERNION,
+                    QUATERNION,
+                    QUATERNION,
+                    Value::Quat([1.0, 0.0, 0.0, 0.0]),
+                    Value::Quat([0.0, 1.0, 0.0, 0.0]),
+                ),
+                Some(Value::Quat([0.0, 0.0, 1.0, 0.0])),
+            ),
+            (run(op::WIDTH, INT, NO, NO, n.clone(), n.clone()), None),
         ];
         for (k, (got, want)) in cases.into_iter().enumerate() {
             assert_eq!(got, want, "case {k}");
         }
+    }
+
+    #[test]
+    fn degrees_to_radians() {
+        use crate::exec::Quiet;
+        let mut rt = Runtime::new(std::sync::Arc::new(crate::Graph::default()));
+        let got = super::run(
+            &mut rt, &mut Quiet, op::DEG_TO_RAD, FLOAT, FLOAT, NO, &Value::Float(180.0), &Value::None, false,
+        );
+        assert!((got.unwrap().as_float() - std::f32::consts::PI).abs() < 1e-5);
+    }
+
+    #[test]
+    fn the_class_tree() {
+        // 3D object (41) -> 3D entity (33) -> render object (47) -> be object (19) -> scene object (11) -> object (1)
+        assert!(class_derives(41, 33) && class_derives(41, 1) && class_derives(41, 41));
+        assert!(class_derives(35, 34)); // target camera is a camera
+        assert!(!class_derives(33, 41)); // not the other way
+        assert!(!class_derives(27, 33)); // a 2D entity is no 3D entity
+        assert!(class_derives(29, 27)); // sprite text is a 2D entity
+        assert!(!class_derives(31, 32)); // texture and mesh are siblings
     }
 
     #[test]

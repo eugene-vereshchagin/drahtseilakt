@@ -110,6 +110,23 @@ pub trait Host {
     /// Set IC: the object's current state (place, shown or hidden) becomes its initial condition, which Restore IC
     /// puts it back to.
     fn set_ic(&mut self, _e: Ent) {}
+    /// Whether an object is shown now (the operation Is Visible); none: the engine does not know it.
+    fn is_visible(&self, _e: Ent) -> Option<bool> {
+        None
+    }
+    /// The parent of an object (the operation Get Parent); none: it has none.
+    fn parent_of(&self, _e: Ent) -> Option<Ent> {
+        None
+    }
+    /// The children of an object, in the engine's order (the operation Get Children), at most
+    /// `crate::MAX_CHILDREN` of them.
+    fn children_of(&self, _e: Ent) -> Vec<usize> {
+        Vec::new()
+    }
+    /// The render area's size in pixels (the operations Get Width and Get Height without an input); none: unknown.
+    fn screen_size(&self) -> Option<(i32, i32)> {
+        None
+    }
     /// Whether the object was shown in the initial condition Set IC saved (none: it saved none).
     fn ic_visible(&self, _e: Ent) -> Option<bool> {
         None
@@ -1942,6 +1959,17 @@ impl Runtime {
     }
 
     /// An object of the graph as an engine entity, when it is one.
+    /// Pays `cost` units of work from the tick's budget; false (and the budget gone) when it does not cover them.
+    pub(crate) fn pay(&mut self, cost: u64) -> bool {
+        if cost > self.budget {
+            self.budget = 0;
+            self.starved = true;
+            return false;
+        }
+        self.budget -= cost;
+        true
+    }
+
     pub fn ent(&self, id: Option<Id>) -> Option<Ent> {
         match self.graph.objects.get(id?)?.kind {
             ObjKind::Entity(i) => Some(Ent::Object(i)),
