@@ -3787,7 +3787,9 @@ fn downloaded_levels() -> Vec<Package> {
     for kind in gamedata::profile::DOWNLOADED {
         let root = crate::levels::dir(kind);
         if !seen.contains(&root) {
-            v.extend(maps_in(&root));
+            // user-levels follows the rule (a folder of its own with level.txt); the earlier folders, read where
+            // they are still left over, are read as before
+            v.extend(maps_in(&root, kind == gamedata::profile::Kind::Downloaded));
             seen.push(root);
         }
     }
@@ -3797,12 +3799,16 @@ fn downloaded_levels() -> Vec<Package> {
 
 /// The levels of a custom levels folder by title: the level folders in it and the `.nmo` files dropped loose into
 /// it; folders that hold no level or several are not shown, and said so on the console.
-fn maps_in(dir: &Path) -> Vec<Package> {
-    let (levels, skipped) = gamedata::package::scan(dir);
+fn maps_in(dir: &Path, strict: bool) -> Vec<Package> {
+    let (levels, skipped) = if strict {
+        gamedata::package::scan_user(dir)
+    } else {
+        gamedata::package::scan(dir)
+    };
     if !skipped.is_empty() {
         let shown = gamedata::package::printable(&dir.to_string_lossy());
         eprintln!(
-            "{shown}: {} folders are not levels (a level folder holds one level):",
+            "{shown}: {} entries are not levels (a level is a folder of its own with one level and a level.txt):",
             skipped.len()
         );
         for s in skipped.iter().take(10) {
@@ -3831,7 +3837,7 @@ mod tests {
         std::fs::write(root.join("pack.tar.gz"), b"").unwrap();
         let mut m = menu(&[true], true);
         m.folder = Some(root.clone());
-        m.maps = maps_in(&root);
+        m.maps = maps_in(&root, false);
         m.stack.push((Screen::Custom, 0));
         // by title, a level named by level.txt before one named by its file; no folders to open, nested levels and
         // junk not shown
@@ -5360,7 +5366,7 @@ mod tests {
             assert!(m.describe(Some(l)).len() > 20, "{l:?}");
         }
         // the downloaded folder's place is shown
-        assert!(m.describe(Some(Line::Downloaded)).ends_with("downloaded"));
+        assert!(m.describe(Some(Line::Downloaded)).ends_with("user-levels"));
     }
 
     #[test]
@@ -5380,7 +5386,7 @@ mod tests {
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom);
         assert_eq!(m.list, List::Downloaded);
-        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Downloaded"));
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("User levels"));
     }
 
     #[test]
@@ -5500,7 +5506,7 @@ mod tests {
         std::fs::create_dir_all(dir.join("open level")).unwrap();
         std::fs::write(dir.join("open level/level.gltf"), b"").unwrap();
         std::fs::create_dir_all(dir.join("empty")).unwrap();
-        let names: Vec<_> = maps_in(&dir)
+        let names: Vec<_> = maps_in(&dir, false)
             .iter()
             .map(|p| p.level.file_name().unwrap().to_string_lossy().into_owned())
             .collect();

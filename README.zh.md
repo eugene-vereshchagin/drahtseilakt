@@ -31,9 +31,9 @@ target/release/drahtseilakt --data /path/to/Ballance --level 1
 `drahtseilakt.log`（上一次启动的日志为 `drahtseilakt.old.log`；在控制台中未重定向时也是如此）；输出被重定向时（`2> log.txt`）则写到那里。Actions 工作流 *Drahtseilakt*（按需运行）在 Windows、Linux 和
 macOS 上构建并测试游戏，并按安装后的布局上传每个构建：程序旁边是 `assets/`。
 
-`drahtseilakt --import DIR` 会把 DIR 中你已安装的 Ballance 原版游戏（或你的游戏 CD 镜像：`--import Ballance.cue`、`.bin` 或 `.iso`；没有找到游戏时启动的窗口提供同样的功能：电脑上找到的内容、拖到窗口上的文件夹或镜像、输入的路径）复制到游戏的 `levels/original/`；所有关卡都放在
+`drahtseilakt --import DIR` 会把 DIR 中你已安装的 Ballance 原版游戏（或你的游戏 CD 镜像：`--import Ballance.cue`、`.bin` 或 `.iso`；没有找到游戏时启动的窗口提供同样的功能：电脑上找到的内容、拖到窗口上的文件夹或镜像、输入的路径）复制到游戏的 `levels/ballance-original/`；所有关卡都放在
 游戏数据文件夹（Linux 上为 `~/.local/share/drahtseilakt/`）的 `levels/` 中，每个文件夹里都有说明应放什么的 README
-（[关卡存放位置](docs/zh/drahtseilakt/levels.md)）。`--data`（或 `OPENBALLANCE_DATA`）则改为从另一个 Ballance 文件夹游玩。独立程序 `drahtseilakt-toolbox remaster --scale 8` 会把原版关卡转换到 `levels/remastered/`（开放格式），形状更圆，纹理放大八倍：Real-ESRGAN 位于 toolbox 旁的 `realesrgan/`（版本固定在其仓库 drahtseilakt-toolbox 中）或在 PATH 中时使用它（会补出细节），否则使用 Lanczos；它们在 Start → Remastered 中游玩。游戏本身两者都不需要。`--level N` 游玩原版第 N 关，`--map FILE.nmo`
+（[关卡存放位置](docs/zh/drahtseilakt/levels.md)）。`--data`（或 `OPENBALLANCE_DATA`）则改为从另一个 Ballance 文件夹游玩。独立程序 `drahtseilakt-toolbox remaster --scale 8` 会把原版关卡转换到 `levels/ballance-remaster/`（开放格式），形状更圆，纹理放大八倍：Real-ESRGAN 位于 toolbox 旁的 `realesrgan/`（版本固定在其仓库 drahtseilakt-toolbox 中）或在 PATH 中时使用它（会补出细节），否则使用 Lanczos；它们在 Start → Remastered 中游玩。游戏本身两者都不需要。`--level N` 游玩原版第 N 关，`--map FILE.nmo`
 游玩任意关卡文件或自制地图，`--open DIR` 游玩[开放格式](docs/zh/drahtseilakt/open-format.md)的关卡；
 `--export DIR` 把所选关卡转换为该格式。方向键相对于相机滚动球，Shift+左/右
 转动相机，空格键抬高相机，F11 切换全屏，Esc 暂停；其他按键可在 Options → Controls 中绑定。也可以用手柄：左摇杆或十字键滚动球，
@@ -49,7 +49,7 @@ FILE.png` 渲染一帧。要测试某个位置，`--sector N` 从某个检查点
 对象的名称）可从任意位置开始，使用该分段开始时的球（`--ball wood|stone|paper|sticky` 可覆盖）；这样的一局会把起点保存在回放中，并且永远不会
 算作最佳成绩。在开启扩展模式之前（Options、Extended，或用 `--debug` 开启一次），游戏会尽可能
 贴近原版。*扩展模式*会显示最佳时间。Start 在两种模式下都按含义列出关卡
-（你副本中的经典 Ballance、Drahtseilakt、Ballance 挑战、社区地图：随游戏附带的精选和你的 `levels/downloaded/`，每个关卡标有难度；如何制作和分享关卡：
+（你副本中的经典 Ballance、Drahtseilakt、Ballance 挑战、社区地图：随游戏附带的精选和你的 `levels/user-levels/`，每个关卡标有难度；如何制作和分享关卡：
 [制作与分享关卡](docs/zh/drahtseilakt/making-levels.md)），以及模组（[模组](docs/zh/drahtseilakt/mods.md)）。
 调试运行（`--debug`）还会解锁所有关卡，并提供开发用模组*上帝模式*：无限生命，F5 保存当前时刻，F9 回到该时刻，
 F3 后退数秒，R 重新开始，`[` 和 `]` 让游戏变慢和重新加快，F2 启用自由相机，并显示小节和 tick；这样的一局作为已修改

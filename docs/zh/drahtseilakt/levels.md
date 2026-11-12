@@ -12,14 +12,16 @@
 
 | 文件夹 | 内容 | 来源 | 模式 |
 |---|---|---|---|
-| `levels/original/` | 原版游戏：`base.cmo`、`3D Entities/`、`Textures/`、`Sounds/` 等，并已安装第 13 关的扩展包 | 由游戏从玩家已安装的游戏或 CD 中复制 | 经典模式和扩展模式 |
-| `levels/community/` | 自制地图：每个关卡一个文件夹，里面是一个 `.nmo` 或一个开放格式关卡（见下文） | 由玩家下载，`drahtseilakt-toolbox import-maps` 把下载内容整理成文件夹；文件夹中的 README 说明去哪里获取 | 扩展模式 |
-| `levels/remastered/` | 转换为开放格式的原版关卡，纹理放大到 4K，并加上现代画面所需的其他内容 | 由 `drahtseilakt-toolbox remaster` 在玩家机器上根据 `original/` 生成；从不分发 | 扩展模式 |
-| `levels/open/` | 开放格式的关卡：直接用它制作的，或转换后的自制地图 | 由玩家制作；部分随游戏附带 | 扩展模式 |
-| `levels/downloaded/` | 玩家下载的关卡：社区 `.nmo` 地图和开放格式关卡，每个关卡一个文件夹（见下文）；旧的 `levels/community/` 和 `levels/open/` 仍会一并读取，不会被移动 | 由玩家下载，`drahtseilakt-toolbox import-maps` 把下载内容整理成文件夹；文件夹的 README 说明获取途径 | 经典和扩展模式 |
+| `levels/ballance-original/` | 原版游戏：`base.cmo`、`3D Entities/`、`Textures/`、`Sounds/` 等，并已安装第 13 关的扩展包 | 由游戏从玩家已安装的游戏或 CD 中复制 | 经典模式和扩展模式 |
+| `levels/ballance-remaster/` | 转换为开放格式的原版关卡，纹理放大到 4K，并加上现代画面所需的其他内容 | 由 `drahtseilakt-toolbox remaster` 在玩家机器上根据 `ballance-original/` 生成；从不分发 | 扩展模式 |
+| `levels/user-levels/` | 玩家自己的关卡：社区 `.nmo` 地图和开放格式关卡，各放在自己的命名文件夹中并附 `level.txt`（见下文“规则”）；首次启动时创建为空，并带有说明如何添加关卡的 README.txt | 玩家自己放入；`drahtseilakt-toolbox import-maps` 把下载内容整理到这里 | 经典和扩展模式 |
 | `levels/modified/` | 修改版原版关卡：社区对 13 个原版关卡的改版，每个合集一个文件夹 | 玩家自己的文件；`drahtseilakt-toolbox import-maps` 整理下载内容；从不随游戏发行 | 经典与扩展模式，需有原版副本 |
 
-Start 在两种模式下都按含义列出它们（menu.md，“按含义划分的 Start”）：`original/`、我们自己的关卡、`modified/`，以及社区地图（随游戏附带的精选和 `downloaded/`，连同它所取代的 `community/` 和 `open/`）。自 2026-11-09 起玩家的文件夹是 `levels/downloaded/`；旧的两个文件夹若存在仍然有效，其关卡的成绩保留原有的键（见下文）。
+Start 在两种模式下都按含义列出它们（menu.md，“按含义划分的 Start”）：随游戏附带的合集 **Drahtseilakt**（`assets/levels/drahtseilakt/`：所有者精选的 13 张地图，开放格式，已圆润化，4 倍纹理）和 **Community**（`assets/levels/community/`：13 张社区地图，保留作者的原始 `.nmo` 文件并附 `level.txt`，使用原始纹理），**Ballance**（导入后的 `ballance-original/` 和 `ballance-remaster/`），`modified/`，以及 **User levels**（`levels/user-levels/`）。
+
+**规则（所有者 2026-11-12 的决定）。** 只有当一个关卡位于自己的命名文件夹中，且该文件夹里有一个 `.nmo` 文件或一个开放格式关卡（`level.gltf` ……），再加上描述文件 `level.txt`，它才算关卡。`user-levels/` 中允许用子文件夹分组（`user-levels/Pro Racing/Season 1/我的地图/`）：不含关卡的文件夹被视为分组文件夹，游戏会进去查找。其余情况：没有 `level.txt` 的关卡文件夹不再列出（以前按文件夹名列出）；直接放在文件夹里的单个 `.nmo` 也不再列出（以前自成一个关卡）；两者都不会被悄悄忽略：控制台日志会逐一指出并说明该怎么做（单独的文件夹、level.txt）。含有多个关卡的文件夹照旧被跳过。随游戏附带的文件夹以及旧的 `community/`、`open/`（只要还存在）照旧宽松读取：level.txt 可有可无。
+
+**旧文件夹名（迁移，2026-11-12）。** 首次启动时，游戏把玩家的 `original/` 移到 `ballance-original/`，`remastered/` 移到 `ballance-remaster/`，`downloaded/` 移到 `user-levels/`，并把 `community/` 和 `open/` 的条目逐个移入 `user-levels/`（名称已被占用的条目留在原处并继续读取）；每次移动都记一行日志，不删除也不覆盖任何文件，设置中指向别处的文件夹不动（设置 `levels.original` 仍等同于 `levels.ballance-original`）。以前的成绩照常找到。
 
 ## 修改版原版关卡
 
@@ -155,7 +157,7 @@ scripts/own-levels.sh assets/levels/03_Paper_Winds
 
 ## 原版游戏：默认复制
 
-游戏从玩家自己的副本中把所需内容一次性复制到 `levels/original/`：从已安装的游戏复制（`drahtseilakt --import <Ballance folder>`），或直接从游戏 CD 或其镜像复制（`drahtseilakt --import Ballance.cue`，也可以是 `.bin`、`.iso`：读取 `SETUP/` 中的 InstallShield 6 压缩包，由 `crates/cdimage` 实现）。副本是可选的（decisions.md，“游戏开箱即玩”）：没有副本时游戏以自己的关卡启动，Options 页面会提示：原版关卡请用 `drahtseilakt-toolbox` 导入（独立程序；游戏没有导入窗口，也从不运行它）。副本是玩家自己机器上的玩家自己的数据；不下载任何东西，也不往仓库里放任何东西。`--data DIR` 仍可不经复制直接从任意文件夹游玩。
+游戏从玩家自己的副本中把所需内容一次性复制到 `levels/ballance-original/`：从已安装的游戏复制（`drahtseilakt --import <Ballance folder>`），或直接从游戏 CD 或其镜像复制（`drahtseilakt --import Ballance.cue`，也可以是 `.bin`、`.iso`：读取 `SETUP/` 中的 InstallShield 6 压缩包，由 `crates/cdimage` 实现）。副本是可选的（decisions.md，“游戏开箱即玩”）：没有副本时游戏以自己的关卡启动，Options 页面会提示：原版关卡请用 `drahtseilakt-toolbox` 导入（独立程序；游戏没有导入窗口，也从不运行它）。副本是玩家自己机器上的玩家自己的数据；不下载任何东西，也不往仓库里放任何东西。`--data DIR` 仍可不经复制直接从任意文件夹游玩。
 
 该文件夹的 README 列出了需要手动复制的内容：已安装的 Ballance 中的 `base.cmo` 以及 `3D Entities`、`Textures` 和 `Sounds` 文件夹（游戏不读取其他内容）；对于第 13 关，还需按其说明文件将 SuDu 扩展包安装到该副本中。
 
@@ -168,7 +170,7 @@ scripts/own-levels.sh assets/levels/03_Paper_Winds
 游戏安装时会在 `levels/open/` 中附带一些关卡（我们自己的），以及作者希望随游戏发布的转换后的自制地图。每个随附的关卡需要：
 
 - 作者的许可和自由许可证，记录在关卡旁边（其文件夹中的 `LICENSE`）；
-- 不含原版游戏的任何内容：不含 Ballance 的纹理、声音或网格。使用原版纹理的转换地图只写明纹理名称，游戏从 `levels/original/`（玩家的副本）中取用，就像该地图在原版中那样；
+- 不含原版游戏的任何内容：不含 Ballance 的纹理、声音或网格。使用原版纹理的转换地图只写明纹理名称，游戏从 `levels/ballance-original/`（玩家的副本）中取用，就像该地图在原版中那样；
 - 一个能通关的回放，按与原版关卡回放相同的方式检查。
 
 只有在许可证允许后，仓库才会收录这类关卡；原版游戏的文件绝不会进入仓库。
@@ -181,7 +183,7 @@ scripts/own-levels.sh assets/levels/03_Paper_Winds
 
 回放、最佳时间和高分榜按类别分别保存，因此与原版关卡同名的自制地图绝不会被算作原版关卡：原版关卡为 `replays/<level>/`，其他为 `replays/maps/<kind>/<map>/`（`community`、`open`、`remastered`），关卡文件夹的为 `replays/levels/<kind>/<关卡文件夹>/<map>/`，这样两个文件夹中的 `Level_07.NMO` 不会共用成绩，单独的 `Foo.nmo` 和文件夹 `Foo/` 也不会。旧版本保存在 `replays/maps/<关卡文件夹>/` 中的成绩会在首次游玩该关卡时移到那里（只经过真实文件夹，绝不覆盖已有的成绩）。
 
-*自 2026-11-09 起：* 旧文件夹 `community/` 或 `open/` 中的关卡沿用以该文件夹名命名的键，因此已有成绩和最佳时间保留；`downloaded/` 中的关卡记在 `downloaded` 下。把关卡从旧文件夹移到 `downloaded/` 会让它的成绩重新开始。
+*自 2026-11-12 起：* 键中的类别名随文件夹而变（`user-levels`、`ballance-original`、`ballance-remaster`）；以旧名（`downloaded`、`community`、`open`、`original`、`remastered`）记录的成绩在首次游玩该关卡时迁移到新键。
 
 ## 语言
 

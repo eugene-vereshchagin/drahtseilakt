@@ -7,7 +7,7 @@
 ## 关卡放在哪里
 
 所有关卡都位于游戏数据文件夹中的 `levels/`（Linux 上为 `~/.local/share/drahtseilakt/`，Windows 上为
-`%APPDATA%\drahtseilakt\`，macOS 上为 `~/Library/Application Support/drahtseilakt/`）。你自己的或别人的关卡放进 `levels/downloaded/`，分两种：
+`%APPDATA%\drahtseilakt\`，macOS 上为 `~/Library/Application Support/drahtseilakt/`）。你自己的或别人的关卡放进 `levels/user-levels/`，分两种：
 
 
 - 社区地图（Virtools `.nmo` 文件，原版的格式）；
@@ -15,16 +15,16 @@
 
 **一个关卡，一个文件夹，直接放在该文件夹中：**
 
-*自 2026-11-09 起两者都放入 `levels/downloaded/`；旧的 `levels/community/` 和 `levels/open/` 仍会读取，不会移动任何文件。* 菜单中：*Start，社区地图，已下载*。
+*自 2026-11-12 起，`levels/user-levels/` 是唯一推荐的文件夹（旧的 `downloaded/`、`community/`、`open/` 已在首次启动时移入其中，未删除任何文件）。* 菜单中：*Start，社区地图，我的关卡*。
 
 ```
-levels/downloaded/
+levels/user-levels/
   Green Dam/                 关卡的文件夹：简单的名称，最多 40 个字符
     Green Dam.NMO            关卡：恰好一个 .nmo ……
     level.txt                它的名称、作者、难度（见下；可选，但没有标题的关卡排在最后）
     README.txt               可选：它是什么、怎么玩、它的许可证
     preview.png              可选：它的图片（也可以是 preview.jpg）
-levels/downloaded/
+levels/user-levels/
   Sky Road/
     level.gltf level.bin     …… 或一个开放格式的关卡
     textures/                它自己的纹理（PNG），直接放在 textures/ 中
@@ -32,7 +32,7 @@ levels/downloaded/
     level.txt  README.md  preview.jpg
 ```
 
-直接放进 `levels/downloaded/` 的单个 `.nmo` 也是一个关卡，以其文件名命名：试玩地图最快的方式。
+**规则：** 只有当一个关卡位于自己的命名文件夹中，且该文件夹里有一个 `.nmo` 文件或一个开放格式关卡（`level.gltf` ……），再加上描述文件 `level.txt`，它才算关卡。可以用子文件夹分组（`levels/user-levels/Pro Racing/Season 1/Green Dam/`）。没有 `level.txt` 的关卡文件夹和直接放在 `user-levels/` 里的单个 `.nmo` 不会列出；游戏日志会逐一指出并说明该怎么做。（以前单个 `.nmo` 自成一个关卡，level.txt 也是可选的。）
 
 ## level.txt
 
@@ -106,7 +106,7 @@ toolbox（`drahtseilakt-toolbox`，一个单独的程序；游戏本身从不运
 drahtseilakt-toolbox import-maps ~/Downloads/Maps --catalogue CustomMapList.md
 ```
 
-- 该文件夹下（任意深度的文件夹中）的每个 `.nmo` 都成为 `levels/downloaded/` 中的一个关卡文件夹（`--to 文件夹` 可指定
+- 该文件夹下（任意深度的文件夹中）的每个 `.nmo` 都成为 `levels/user-levels/` 中的一个关卡文件夹（`--to 文件夹` 可指定
   另一个），其中有地图、作为预览的图片，以及说明来源的 level.txt；
 - 使用 `--catalogue`（社区的地图列表 `CustomMapList.md`）时，在其中找到的地图会得到英文标题、原名（中文地图为
   `title.zh`）、作者和难度（目录以半级为单位评定 1–5；乘以二得到我们的 1–10）；

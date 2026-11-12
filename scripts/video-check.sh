@@ -17,7 +17,7 @@ out=$1; shift
 [ $# -gt 0 ] || set -- 01 02 03 04 05 06 07 08 09 10 11 12 13
 here=$(cd "$(dirname "$0")/.." && pwd)
 game=${DRAHTSEILAKT_BIN:-$here/target/release/drahtseilakt}
-remastered=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/levels/remastered
+remastered=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/levels/ballance-remaster
 models=level # what scripts/video.sh takes for VIDEO_MODE=remaster
 mkdir -p "$out"
 sum=$out/summary.txt

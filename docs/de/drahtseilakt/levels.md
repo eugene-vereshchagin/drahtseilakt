@@ -15,14 +15,16 @@ geteilt nach Herkunft und Format:
 
 | Ordner | Was | Woher | Modus |
 |---|---|---|---|
-| `levels/original/` | das Originalspiel: `base.cmo`, `3D Entities/`, `Textures/`, `Sounds/` und der Rest, mit dem darin installierten Add-on für Level 13 | vom Spiel aus dem installierten Spiel des Spielers oder von der CD kopiert | klassisch und erweitert |
-| `levels/community/` | Community-Karten: ein Ordner je Level, darin eine `.nmo` oder ein Level im offenen Format (unten) | der Spieler lädt sie selbst, `drahtseilakt-toolbox import-maps` sortiert einen Download in Ordner; das README des Ordners sagt, wo | erweitert |
-| `levels/remastered/` | die Original-Level im offenen Format, mit auf 4K vergrößerten Texturen und was ein modernes Aussehen sonst braucht | auf dem Rechner des Spielers von `drahtseilakt-toolbox remaster` aus `original/` erzeugt; nie weitergegeben | erweitert |
-| `levels/open/` | Level im offenen Format: darin gebaut oder umgewandelte Community-Karten | von Spielern gemacht; einige kommen mit dem Spiel | erweitert |
-| `levels/downloaded/` | die vom Spieler heruntergeladenen Level: Community-`.nmo`-Karten und Level im offenen Format, ein Ordner je Level (unten); die früheren `levels/community/` und `levels/open/` werden daneben weiter gelesen, nichts wird verschoben | der Spieler lädt sie selbst, `drahtseilakt-toolbox import-maps` sortiert einen Download in Ordner; das README des Ordners sagt, wo | klassisch und erweitert |
+| `levels/ballance-original/` | das Originalspiel: `base.cmo`, `3D Entities/`, `Textures/`, `Sounds/` und der Rest, mit dem darin installierten Add-on für Level 13 | vom Spiel aus dem installierten Spiel des Spielers oder von der CD kopiert | klassisch und erweitert |
+| `levels/ballance-remaster/` | die Original-Level im offenen Format, mit auf 4K vergrößerten Texturen und was ein modernes Aussehen sonst braucht | auf dem Rechner des Spielers von `drahtseilakt-toolbox remaster` aus `ballance-original/` erzeugt; nie weitergegeben | erweitert |
+| `levels/user-levels/` | die eigenen Level des Spielers: Community-`.nmo`-Karten und Level im offenen Format, jedes in einem eigenen benannten Ordner mit einer `level.txt` (Abschnitt „Die Regel“ unten); beim ersten Start leer angelegt, mit einer README.txt, die sagt, wie man ein Level hinzufügt | der Spieler legt sie dort ab; `drahtseilakt-toolbox import-maps` sortiert einen Download hinein | klassisch und erweitert |
 | `levels/modified/` | modifizierte Originale: Community-Umbauten der 13 Original-Level, ein Ordner je Satz | eigene Dateien des Spielers; `drahtseilakt-toolbox import-maps` sortiert einen Download ein; nie mitgeliefert | klassisch und erweitert, mit Kopie des Originals |
 
-Start listet sie nach Bedeutung, in beiden Modi (menu.md, „Start nach Bedeutung“): `original/`, unsere Level, `modified/` und die Community-Karten (die mitgelieferten besten und `downloaded/` samt `community/` und `open/`, die es ersetzt). Seit 2026-11-09 ist der Ordner des Spielers `levels/downloaded/`; die beiden älteren funktionieren weiter, wo sie existieren, und die Läufe ihrer Level behalten ihre Schlüssel (unten).
+Start listet sie nach Bedeutung, in beiden Modi (menu.md, „Start nach Bedeutung“): die mitgelieferten Sätze, **Drahtseilakt** (`assets/levels/drahtseilakt/`: die 13 Auswahl-Karten des Eigentümers, offenes Format, gerundet, 4x-Texturen) und **Community** (`assets/levels/community/`: 13 Community-Karten als Original-`.nmo`-Dateien der Autoren mit `level.txt`, Originaltexturen), **Ballance** (`ballance-original/` und `ballance-remaster/`, wenn importiert), `modified/` und **User levels** (`levels/user-levels/`).
+
+**Die Regel (Entscheidung des Eigentümers 2026-11-12).** Ein Level zählt nur dann als Level, wenn es in einem eigenen benannten Ordner liegt, der entweder eine `.nmo`-Datei oder ein Level im offenen Format (`level.gltf` ...) enthält, dazu die Beschreibungsdatei `level.txt`. In `user-levels/` sind Unterordner zum Gruppieren erlaubt (`user-levels/Pro Racing/Season 1/Meine Karte/`): ein Ordner ohne Level ist ein Gruppenordner, das Spiel schaut hinein. Was das Spiel mit dem Rest tut: ein Level-Ordner ohne `level.txt` wird nicht gelistet (früher schon, unter dem Ordnernamen); eine lose `.nmo` direkt im Ordner auch nicht (früher ein eigenes Level); nichts fällt stillschweigend weg: das Konsolen-Log nennt jeden Fall und sagt, was zu tun ist (eigener Ordner, level.txt). Ein Ordner mit mehreren Leveln wird wie bisher übergangen. Die mitgelieferten Ordner und die früheren `community/` und `open/` (solange sie existieren) werden wie bisher gelesen: level.txt ist optional.
+
+**Frühere Ordnernamen (Umzug, 2026-11-12).** Beim ersten Start verschiebt das Spiel `original/` des Spielers nach `ballance-original/`, `remastered/` nach `ballance-remaster/`, `downloaded/` nach `user-levels/` und die Einträge von `community/` und `open/` einzeln nach `user-levels/` (ein Eintrag, dessen Name dort belegt ist, bleibt liegen und wird weiter gelesen); jeder Umzug ist eine Log-Zeile, nichts wird gelöscht oder überschrieben, ein von den Einstellungen anderswohin gelegter Ordner bleibt unberührt (die Einstellung `levels.original` gilt weiter als `levels.ballance-original`). Frühere Läufe werden wiedergefunden.
 
 ## Modifizierte Originale
 
@@ -376,7 +378,7 @@ einem Lauf ein Video. Ein Level wiegt 3,3 bis 3,8 MB, 2,6 MB davon die Texturen,
 
 ## Das Originalspiel: standardmäßig kopiert
 
-Das Spiel kopiert einmal, was es braucht, aus der eigenen Kopie des Spielers nach `levels/original/`: aus einem
+Das Spiel kopiert einmal, was es braucht, aus der eigenen Kopie des Spielers nach `levels/ballance-original/`: aus einem
 installierten Spiel (`drahtseilakt --import <Ballance-Ordner>`) oder direkt von der CD des Spiels oder ihrem
 Abbild (`drahtseilakt --import Ballance.cue`, auch `.bin`, `.iso`: das InstallShield-6-Archiv in `SETUP/`, gelesen
 von `crates/cdimage`). Die Kopie ist freiwillig (decisions.md, „Das Spiel läuft ohne
@@ -400,7 +402,7 @@ Community-Karten, deren Autoren sie mit dem Spiel ausliefern möchten. Jedes sol
 
 - die Erlaubnis seines Autors und eine freie Lizenz, daneben festgehalten (`LICENSE` in seinem Ordner);
 - nichts vom Originalspiel darin: keine Texturen, Klänge oder Meshes von Ballance. Eine umgewandelte Karte, die
-  Texturen des Originals nutzt, nennt sie beim Namen, und das Spiel nimmt sie aus `levels/original/` (der Kopie
+  Texturen des Originals nutzt, nennt sie beim Namen, und das Spiel nimmt sie aus `levels/ballance-original/` (der Kopie
   des Spielers), wie es die Karte im Original tat;
 - ein Replay, das es schafft, geprüft wie die Replays der Original-Level.
 
@@ -422,7 +424,7 @@ damit `Level_07.NMO` aus zwei Ordnern ihre Läufe getrennt halten. Auch eine ein
 teilen keine Läufe. Läufe, die eine frühere Version in `replays/maps/<Level-Ordner>/` hielt, werden beim ersten Spielen
 des Levels dorthin verschoben (nur durch echte Ordner, nie über schon vorhandene).
 
-*Seit 2026-11-09:* ein Level im alten Ordner `community/` oder `open/` behält den Schlüssel nach dem Namen dieses Ordners, damit bestehende Läufe und Bestzeiten bleiben; ein Level in `downloaded/` wird unter `downloaded` geführt. Ein Level aus einem alten Ordner nach `downloaded/` zu verschieben beginnt seine Läufe neu.
+*Seit 2026-11-12:* der Kind-Name im Schlüssel folgt dem Ordner (`user-levels`, `ballance-original`, `ballance-remaster`); unter den früheren Namen (`downloaded`, `community`, `open`, `original`, `remastered`) gespeicherte Läufe werden beim ersten Spielen des Levels unter den neuen Schlüssel verschoben.
 
 ## Sprachen
 

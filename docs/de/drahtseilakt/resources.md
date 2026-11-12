@@ -6,7 +6,7 @@ des Menüs, der Klang des Falls, die Holzkugel...). Nach der Entscheidung „Eig
 
 - **eigen**: unsere mitgelieferten Dateien in `assets/own/`, angeordnet wie das Original (die Oberfläche seit Stufe 2: siehe „Die eigene Oberfläche“ unten);
 - **Original**: die Kopie des Spielers;
-- **Remaster**: das Remaster der Kopie aus der Toolbox, in `levels/remastered/.interface/`.
+- **Remaster**: das Remaster der Kopie aus der Toolbox, in `levels/ballance-remaster/.interface/`.
 
 Der Schalter **Interface** des erweiterten Modus (own / original / remaster, Einstellung `interface`) wählt, wer
 zuerst kommt; er wirkt ab dem nächsten Start. Vorgabe, und was der klassische Modus spielt, ist die Oberfläche der Kopie, wenn sie ihr Menü hat, sonst **Eigen**
@@ -142,7 +142,7 @@ aus genieteten Messingrippen über blauen Emailfeldern. Die Körper der Physik b
 (`assets/own/TEXTURES.md`).
 
 Welche Texturen unsere ersetzen, beim Laden eines Levels (so stimmen Zeichnen und Export überein): in den Leveln und
-Teilen der Kopie und in ihren Remastern (`levels/remastered/`) jede, für die wir eine haben, nach Namen; in einer
+Teilen der Kopie und in ihren Remastern (`levels/ballance-remaster/`) jede, für die wir eine haben, nach Namen; in einer
 fremden Karte (einer Community-`.nmo`) eine Textur, die sie per Datei nennt, wenn die Datei die der Kopie ist (eine
 Datei aus dem eigenen Ordner der Karte bleibt ihre), und mitgebrachte Pixel nur, wenn sie Pixel für Pixel die Textur
 der Kopie dieses Namens sind, sodass die eigenen Bilder einer Karte nie überdeckt werden; die eigenen Dateien eines

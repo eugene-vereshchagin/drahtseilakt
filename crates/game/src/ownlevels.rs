@@ -12,7 +12,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     fn shipped() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/levels")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/levels/drahtseilakt")
     }
 
     /// Our levels: the shipped folders made from a level description. The ones set aside in `levels-legacy_delme/`

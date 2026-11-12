@@ -7,7 +7,7 @@ providers can fill a role:
 - **own**: our files shipped with the game in `assets/own/`, laid out as the original (the interface since stage 2:
   see "The own interface" below);
 - **original**: the player's copy;
-- **remaster**: the toolbox's remaster of the copy, in `levels/remastered/.interface/`.
+- **remaster**: the toolbox's remaster of the copy, in `levels/ballance-remaster/.interface/`.
 
 The extended mode's **Interface** switch (own / original / remaster, setting `interface`) chooses which comes first;
 it takes effect on the next start. The default, and what the classic mode plays, is the copy's own interface when the copy has its menu, else
@@ -145,7 +145,7 @@ grey-white veined marble and the paper ball as a crumpled newspaper, each with a
 brass ribs over blue enamel panels; the bodies the physics uses are unchanged (`assets/own/TEXTURES.md`).
 
 Which textures ours (or any texture pack's) replace, when a level is loaded (so drawing and export agree): in the copy's levels and parts, and
-in their remasters (`levels/remastered/`), every texture we have one of, by name; in a stranger's map (a community
+in their remasters (`levels/ballance-remaster/`), every texture we have one of, by name; in a stranger's map (a community
 `.nmo`) a texture it names by file when that file is the copy's (a file its own folder brings stays its own), and
 pixels it carries only when they are the copy's texture of that name, pixel for pixel, so a map's own pictures are
 never covered; an open-format level's own files never. A texture's file name from a `.nmo` is only ever its last part,

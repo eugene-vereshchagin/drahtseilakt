@@ -1,9 +1,11 @@
-// What a level is in the custom levels' folders (docs/drahtseilakt/levels.md, "A level is a folder"): a folder directly
-// in `levels/community/` or `levels/open/` holding exactly one level — one `.nmo` file or one open-format level
-// (level.gltf) — with an optional `level.txt` naming it, or a single `.nmo` dropped loose into the folder. Anything
-// else in a level's folder and any deeper folder is not looked at, so a player's archive dump shows nothing but
-// levels. The folders come from strangers: links are never followed, counts are capped, level.txt is read up to a
-// few KiB and its text cleaned of control and direction characters, and a title is at most TITLE_MAX characters.
+// What a level is (docs/drahtseilakt/levels.md, "A level is a folder"): a folder of its own that holds either one `.nmo`
+// file or an open-format level (level.gltf), plus the description file `level.txt`. `scan_user` applies that rule to the
+// player's `user-levels/` (grouping folders allowed; loose `.nmo` files and folders without level.txt are reported, not
+// silently dropped); `scan` is the lenient reading of one folder level deep (shipped sets, the earlier community and
+// open folders): level.txt optional, a loose `.nmo` a level of its own. Anything else in a level's folder is not looked
+// at, so a player's archive dump shows nothing but levels. The folders come from strangers: links are never followed,
+// counts are capped, level.txt is read up to a few KiB and its text cleaned of control and direction characters, and a
+// title is at most TITLE_MAX characters.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -79,12 +81,26 @@ pub enum Skipped {
     Empty(PathBuf),
     /// More than one level file (several `.nmo`, or `.nmo` beside level.gltf).
     Several(PathBuf, usize),
+    /// A level folder without `level.txt` (the rule of `user-levels/`: a level has its description file).
+    NoInfo(PathBuf),
+    /// A `.nmo` lying loose, in no folder of its own (the rule of `user-levels/`: put it into a folder with a level.txt).
+    Loose(PathBuf),
 }
 
 impl std::fmt::Display for Skipped {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Skipped::Empty(p) => write!(f, "{}: no level in it", printable(&p.to_string_lossy())),
+            Skipped::NoInfo(p) => write!(
+                f,
+                "{}: a level folder needs a level.txt (title = ...) beside the level",
+                printable(&p.to_string_lossy())
+            ),
+            Skipped::Loose(p) => write!(
+                f,
+                "{}: a loose .nmo is not a level: put it in a folder of its own with a level.txt",
+                printable(&p.to_string_lossy())
+            ),
             Skipped::Several(p, n) => {
                 write!(
                     f,
@@ -110,6 +126,53 @@ pub fn scan(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
             }
         }
     }
+    sort(&mut found);
+    (found, skipped)
+}
+
+/// How deep `scan_user` looks for level folders under a grouping folder, and the most folders it opens.
+const GROUP_DEPTH: usize = 4;
+const GROUP_FOLDERS_MAX: usize = 2000;
+
+/// The levels of the player's `user-levels/` (docs, "A level is a folder"): a level is a folder of its own that holds
+/// either one `.nmo` or an open-format level (level.gltf) AND the description file level.txt. A folder that holds no
+/// level is a grouping folder: the folders in it are looked at too (a few levels deep). A level folder without
+/// level.txt, one with several levels, and a loose `.nmo` are no levels; each is reported in the second list so that
+/// the game can say so in its log, never silently dropped. Links are not followed.
+pub fn scan_user(root: &Path) -> (Vec<Package>, Vec<Skipped>) {
+    let (mut found, mut skipped) = (Vec::new(), Vec::new());
+    let mut todo = vec![(root.to_path_buf(), 0usize)];
+    let mut opened = 0usize;
+    while let Some((dir, depth)) = todo.pop() {
+        opened = opened.saturating_add(1);
+        if opened > GROUP_FOLDERS_MAX {
+            break;
+        }
+        for (path, kind) in entries(&dir, ENTRIES_MAX) {
+            if kind.is_file() && is_nmo(&path) {
+                skipped.push(Skipped::Loose(path));
+            } else if kind.is_dir() {
+                match examine(&path) {
+                    Ok(p) => {
+                        let has_info = std::fs::symlink_metadata(path.join(INFO_FILE))
+                            .is_ok_and(|m| m.is_file());
+                        if has_info {
+                            found.push(p);
+                        } else {
+                            skipped.push(Skipped::NoInfo(path));
+                        }
+                    }
+                    Err(Skipped::Empty(_)) if depth < GROUP_DEPTH => {
+                        todo.push((path, depth.saturating_add(1)));
+                    }
+                    // a grouping folder deeper than we look, or empty: nothing to say
+                    Err(Skipped::Empty(_)) => {}
+                    Err(s) => skipped.push(s),
+                }
+            }
+        }
+    }
+    skipped.sort_by(|a, b| format!("{a}").cmp(&format!("{b}")));
     sort(&mut found);
     (found, skipped)
 }
@@ -563,6 +626,33 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn user_levels_need_their_own_folder_and_a_level_txt() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-user-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let mk = |d: &str, files: &[&str]| {
+            std::fs::create_dir_all(root.join(d)).unwrap();
+            for f in files {
+                std::fs::write(root.join(d).join(f), b"").unwrap();
+            }
+        };
+        mk("Good", &["a.nmo", "level.txt"]);
+        mk("Group/Season 1/Deep", &["level.gltf", "level.txt"]);
+        mk("NoText", &["b.nmo"]);
+        mk("Two", &["a.nmo", "b.nmo", "level.txt"]);
+        mk("Group/Empty", &[]);
+        std::fs::write(root.join("Loose.nmo"), b"").unwrap();
+        let (found, skipped) = scan_user(&root);
+        let names: Vec<_> = found.iter().map(|p| p.title.clone()).collect();
+        assert_eq!(names.len(), 2, "{names:?}");
+        assert!(names.contains(&"Good".to_owned()) && names.contains(&"Deep".to_owned()));
+        assert!(skipped.contains(&Skipped::NoInfo(root.join("NoText"))));
+        assert!(skipped.contains(&Skipped::Loose(root.join("Loose.nmo"))));
+        assert!(skipped.contains(&Skipped::Several(root.join("Two"), 2)));
+        assert_eq!(skipped.len(), 3, "{skipped:?}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     fn temp(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!(

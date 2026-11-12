@@ -154,7 +154,7 @@ und Unterpunkt sagt im Hinweisfeld, was er ist und woher er kommt.
 | *Ballance-Prüfungen* (en *Ballance Challenges*) | die Original-Level, von der Community umgebaut: Kamera um 45° gedreht, der Weg zurück, die Bahn unsichtbar (`levels/modified/`) | eine Kopie und Level im Ordner |
 | *Community-Karten* (en *Community maps*) | ein Untermenü | |
 | &nbsp;&nbsp;*Beste* (en *Best*) | die 13 mit dem Spiel gelieferten Community-Karten, mit Autoren und Dank | |
-| &nbsp;&nbsp;*Heruntergeladen* (en *Downloaded*) | der Ordner des Spielers `levels/downloaded/` (sein Pfad wird gezeigt): Community-`.nmo`-Karten und Level im offenen Format in einer Liste, samt den früheren `levels/community/` und `levels/open/`, die weiter gelesen werden | |
+| &nbsp;&nbsp;*Heruntergeladen* (en *Downloaded*) | der Ordner des Spielers `levels/user-levels/` (sein Pfad wird gezeigt): Community-`.nmo`-Karten und Level im offenen Format in einer Liste, samt den früheren `levels/community/` und `levels/open/`, die weiter gelesen werden | |
 
 Die Texte gibt es in allen sieben Sprachen. Reihenfolge von Start seit 2026-11-11: zuerst die ausgewählten Karten, an zweiter Stelle *Klassisches Ballance*.
 
@@ -166,7 +166,7 @@ auf runden Formen. *Drahtseilakt* (Voreinstellung): unsere Texturen auf runden F
 Spielers auf runden Formen. Ein Look, der hier nicht gezeigt werden kann, wird nicht angeboten (keine Kopie: kein Original
 und kein Remaster; kein Export: kein Remaster; kein eigenes Paket: kein „Eigenes Paket"); eine alte Einstellungsdatei behält
 ihre Bedeutung (`look remastered` ist Remaster, sonst entscheidet `textures`). Die runden Formen eines Originallevels sind
-sein Export `levels/remastered/Level_NN` (der Rundungs-Cache), den jeder Look außer Original nutzt; ein Level ohne ihn läuft
+sein Export `levels/ballance-remaster/Level_NN` (der Rundungs-Cache), den jeder Look außer Original nutzt; ein Level ohne ihn läuft
 wie es ist. Die Hilfe der Zeile und die Notiz einer heruntergeladenen Karte sagen, dass die schönen Looks nach dem Import des
 Levels mit `drahtseilakt-toolbox` kommen (das Spiel geht nie online und startet es nicht selbst).
 

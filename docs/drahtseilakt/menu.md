@@ -142,7 +142,7 @@ and each submenu item says on the notes panel what it is and where it comes from
 | *Ballance Challenges* (ru «Испытания Ballance») | the original levels remade by the community: the camera turned 45 degrees, the way backwards, the road invisible (`levels/modified/`) | a copy and levels in the folder |
 | *Community maps* (ru «Карты сообщества») | a submenu | |
 | &nbsp;&nbsp;*Best* (ru «Лучшие») | the 13 community maps shipped with the game, with their authors and the thanks notice | |
-| &nbsp;&nbsp;*Downloaded* (ru «Скачанные») | the player's folder `levels/downloaded/` (its path is shown): community `.nmo` maps and open-format levels in one list, with those of the earlier folders `levels/community/` and `levels/open/`, which are still read | |
+| &nbsp;&nbsp;*Downloaded* (ru «Скачанные») | the player's folder `levels/user-levels/` (its path is shown): community `.nmo` maps and open-format levels in one list, with those of the earlier folders `levels/community/` and `levels/open/`, which are still read | |
 
 The strings are in all seven languages. Start's order since 2026-11-11: the featured maps first, *Classic Ballance* second.
 
@@ -153,7 +153,7 @@ the 2004 shapes. *Remaster*: the toolbox's enlarged textures on rounded shapes. 
 textures on rounded shapes. *Player's pack*: a texture pack of the player's on rounded shapes. A look that cannot be shown
 here is not offered (no copy: no Original or Remaster; no export: no Remaster; no pack of his: no Player's pack), and an
 old settings file keeps its meaning (`look remastered` is Remaster; `textures` decide otherwise). The rounded shapes of an
-original level are its export `levels/remastered/Level_NN` (the rounding cache), used by every look but Original; a level
+original level are its export `levels/ballance-remaster/Level_NN` (the rounding cache), used by every look but Original; a level
 without one plays as it is. The Look's help and the notes panel of a downloaded map say that the beautiful looks come after
 the level is imported with `drahtseilakt-toolbox` (the game never goes online and does not run it itself).
 

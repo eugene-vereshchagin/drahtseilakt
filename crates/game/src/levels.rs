@@ -36,7 +36,20 @@ pub fn prepare(language: &str) {
 
 /// A README of ours that a newer text replaces: one that pointed to a moved folder, or an earlier version's, untouched.
 fn outdated(text: &str) -> bool {
-    text.ends_with(MOVED_MARK) || SUPERSEDED.contains(&text)
+    // the Downloaded README before user-levels, and the Remastered ones that name the `original` folder
+    const EARLIER: [&str; 8] = [
+        "Downloaded levels: community .nmo maps",
+        "Скачанные уровни: любительские карты",
+        "Heruntergeladene Level: Community-Karten",
+        "已下载的关卡：社区 .nmo 地图",
+        "from the original folder by the program",
+        "из папки original программа",
+        "aus dem Ordner original vom Programm",
+        "从 original 文件夹生成",
+    ];
+    text.ends_with(MOVED_MARK)
+        || SUPERSEDED.contains(&text)
+        || EARLIER.iter().any(|e| text.contains(e))
 }
 
 /// Writes `text` as the folder's README, making the folder; an existing README is replaced only when `replace` and it
@@ -89,32 +102,57 @@ fn moved(language: &str, to: &Path) -> String {
     text + MOVED_MARK
 }
 
-/// The README of the downloaded levels' folder: what it is, and that the earlier folders still work, then what a
-/// level folder holds (as the earlier community folder's README said).
+/// The README of `user-levels/`: how to add a level (the rule of docs, "A level is a folder"), and that the earlier folders
+/// were moved here.
 fn downloaded(language: &str) -> String {
-    let head = match language {
-        "ru" => {
-            "Скачанные уровни: любительские карты .nmo и уровни в открытом формате (Старт, Карты сообщества, Скачанные).\n\n\
-             Прежние папки community/ и open/ работают по-прежнему: игра читает и их, ничего не переносится.\n\n"
-        }
-        "de" => {
-            "Heruntergeladene Level: Community-Karten (.nmo) und Level im offenen Format (Start, Community-Karten, Heruntergeladen).\n\n\
-             Die früheren Ordner community/ und open/ funktionieren weiter: das Spiel liest auch sie, nichts wird verschoben.\n\n"
-        }
-        "zh" => {
-            "已下载的关卡：社区 .nmo 地图和开放格式关卡（开始，社区地图，已下载）。\n\n\
-             旧的 community/ 和 open/ 文件夹仍然有效：游戏也会读取它们，不会移动任何文件。\n\n"
-        }
-        _ => {
-            "Downloaded levels: community .nmo maps and open-format levels (Start, Community maps, Downloaded).\n\n\
-             The earlier folders community/ and open/ still work: the game reads them too, nothing is moved.\n\n"
-        }
-    };
-    let body = about(language, Kind::Community);
-    let body = body
-        .split_once("\n\n")
-        .map_or(body.as_str(), |(_, rest)| rest);
-    format!("{head}{body}")
+    match language {
+        "ru" => "Ваши уровни: кладите их сюда.\n\n\
+                 Уровень считается уровнем, только если он лежит в собственной именованной папке, где есть либо один файл .nmo, \
+                 либо уровень в открытом формате (level.gltf, level.bin, textures/), и файл описания level.txt. Пример:\n  \
+                 user-levels/Моя карта/Моя карта.nmo\n  user-levels/Моя карта/level.txt  (строки: title = ..., author = ..., \
+                 version = ...)\n\
+                 Вложенные папки для группировки допустимы (user-levels/Сезон 1/Моя карта/). Одиночный .nmo прямо в этой папке \
+                 или папка уровня без level.txt в меню не показывается (игра пишет об этом в лог). Скачанную коллекцию \
+                 раскладывает так: drahtseilakt-toolbox import-maps <папка>.\n\n\
+                 Прежние папки downloaded/, community/ и open/ перенесены сюда; оставшиеся в них уровни игра читает по-прежнему.\n\n\
+                 Где брать карты: каталог github.com/pseudoacetyl/BallanceCustomMaps, Ballance International Discord (#new), \
+                 Baidu Tieba (平衡球吧), Bilibili. Карты запускаются как данные; моды и DLL игра никогда не выполняет.\n"
+            .to_owned(),
+        "de" => "Ihre Level: legen Sie sie hier ab.\n\n\
+                 Ein Level zählt nur dann als Level, wenn es in einem eigenen benannten Ordner liegt, der entweder eine .nmo-Datei \
+                 oder ein Level im offenen Format (level.gltf, level.bin, textures/) enthält, dazu die Beschreibungsdatei \
+                 level.txt. Beispiel:\n  user-levels/Meine Karte/Meine Karte.nmo\n  user-levels/Meine Karte/level.txt  (Zeilen: \
+                 title = ..., author = ..., version = ...)\n\
+                 Unterordner zum Gruppieren sind erlaubt (user-levels/Saison 1/Meine Karte/). Eine lose .nmo direkt in diesem \
+                 Ordner oder ein Level-Ordner ohne level.txt wird nicht angezeigt (das Spiel sagt es im Log). \
+                 drahtseilakt-toolbox import-maps <Ordner> sortiert einen Download in diese Form ein.\n\n\
+                 Die früheren Ordner downloaded/, community/ und open/ wurden hierher verschoben; Level, die noch darin liegen, \
+                 liest das Spiel weiter.\n\n\
+                 Wo es Karten gibt: der Katalog github.com/pseudoacetyl/BallanceCustomMaps, der Ballance International Discord \
+                 (#new), Baidu Tieba (平衡球吧), Bilibili. Karten laufen als Daten; Mods und DLLs führt das Spiel nie aus.\n"
+            .to_owned(),
+        "zh" => "你的关卡：放在这里。\n\n\
+                 只有放在自己的命名文件夹中的才算关卡：该文件夹里要有一个 .nmo 文件，或一个开放格式的关卡（level.gltf、\
+                 level.bin、textures/），再加上描述文件 level.txt。示例：\n  user-levels/我的地图/我的地图.nmo\n  \
+                 user-levels/我的地图/level.txt （内容：title = ...、author = ...、version = ...）\n\
+                 可以用子文件夹分组（user-levels/第一季/我的地图/）。直接放在本文件夹里的单个 .nmo，或没有 level.txt 的关卡\
+                 文件夹不会显示（游戏会在日志中说明）。drahtseilakt-toolbox import-maps <文件夹> 可把下载的合集整理成这种形式。\n\n\
+                 旧的 downloaded/、community/、open/ 文件夹已移到这里；仍留在其中的关卡游戏照常读取。\n\n\
+                 获取地图：目录 github.com/pseudoacetyl/BallanceCustomMaps、Ballance International Discord（#new）、\
+                 百度贴吧 平衡球吧、哔哩哔哩。地图只作为数据运行；游戏从不执行模组或 DLL。\n"
+            .to_owned(),
+        _ => "Your levels: put them here.\n\n\
+              A level counts as a level only when it lies in its own named folder that holds either one .nmo file or an \
+              open-format level (level.gltf, level.bin, textures/), plus the description file level.txt. Example:\n  \
+              user-levels/My Map/My Map.nmo\n  user-levels/My Map/level.txt  (lines: title = ..., author = ..., version = ...)\n\
+              Subfolders for grouping are fine (user-levels/Season 1/My Map/). A loose .nmo straight in this folder, or a \
+              level folder without level.txt, is not shown (the game says so in its log). drahtseilakt-toolbox import-maps \
+              <folder> sorts a downloaded collection into this shape.\n\n\
+              The earlier folders downloaded/, community/ and open/ were moved here; levels still left in them are read too.\n\n\
+              Where to get maps: the catalogue github.com/pseudoacetyl/BallanceCustomMaps, the Ballance International Discord \
+              (#new), Baidu Tieba (平衡球吧), Bilibili. Maps run as data; the game never runs mods or DLLs.\n"
+            .to_owned(),
+    }
 }
 
 /// A folder's README: what belongs there and where to get it.
@@ -141,7 +179,7 @@ fn about(language: &str, kind: Kind) -> String {
         }
         ("ru", Kind::Remastered) => {
             "Оригинальные уровни в открытом формате, с современными текстурами (4K).\n\nДелает их на вашей \
-             машине из папки original программа drahtseilakt-toolbox (remaster); никуда не распространяются.\n"
+             машине из папки ballance-original программа drahtseilakt-toolbox (remaster); никуда не распространяются.\n"
         }
         ("ru", Kind::Modified) => {
             "Модифицированные оригиналы: любительские переделки 13 уровней оригинала (повёрнутые на 45 градусов, \
@@ -176,7 +214,7 @@ fn about(language: &str, kind: Kind) -> String {
         }
         ("de", Kind::Remastered) => {
             "Die Original-Level im offenen Format, mit modernen Texturen (4K).\n\nAuf Ihrem Rechner aus dem Ordner \
-             original vom Programm drahtseilakt-toolbox (remaster) erzeugt und nie weitergegeben.\n"
+             ballance-original vom Programm drahtseilakt-toolbox (remaster) erzeugt und nie weitergegeben.\n"
         }
         ("de", Kind::Modified) => {
             "Modifizierte Originale: Community-Umbauten der 13 Original-Level (um 45 Grad gedreht, rückwärts, \
@@ -207,7 +245,7 @@ fn about(language: &str, kind: Kind) -> String {
              模组或 DLL。\n"
         }
         ("zh", Kind::Remastered) => {
-            "开放格式的原版关卡，配有现代纹理（4K）。\n\n由 drahtseilakt-toolbox（remaster）在你的电脑上从 original \
+            "开放格式的原版关卡，配有现代纹理（4K）。\n\n由 drahtseilakt-toolbox（remaster）在你的电脑上从 ballance-original \
              文件夹生成，不会对外分发。\n"
         }
         ("zh", Kind::Modified) => {
@@ -239,7 +277,7 @@ fn about(language: &str, kind: Kind) -> String {
         }
         (_, Kind::Remastered) => {
             "The original levels in the open format, with modern textures (4K).\n\nMade on your machine from the \
-             original folder by the program drahtseilakt-toolbox (remaster) and never distributed.\n"
+             ballance-original folder by the program drahtseilakt-toolbox (remaster) and never distributed.\n"
         }
         (_, Kind::Modified) => {
             "Modified originals: community remakes of the 13 original levels (rotated 45 degrees, reversed, \
@@ -678,25 +716,23 @@ mod tests {
     }
 }
 
-/// The levels shipped with the game (`assets/levels/`, the open format, our own content): what the game plays
+/// The levels shipped with the game (`assets/levels/drahtseilakt/`, the open format, our own content): what the game plays
 /// without any copy of the original (decisions.md, "The game plays out of the box"). The hidden ones (level.txt's
 /// `hidden = yes`: the test level `Parts_Test`) are left out; they still load by their path (`--open`).
 pub fn shipped() -> Vec<gamedata::package::Package> {
-    gamedata::resources::shipped_levels_root()
+    gamedata::resources::shipped_drahtseilakt_root()
         .map_or_else(Vec::new, |r| gamedata::package::scan(&r).0)
         .into_iter()
         .filter(|p| !p.hidden)
         .collect()
 }
 
-/// The community maps shipped with the game (`assets/levels/community/NN-name/`: one map's `.nmo` and its level.txt,
+/// The community maps shipped with the game (`assets/levels/community/NN-name/`, the original files and textures: one map's `.nmo` and its level.txt,
 /// naming the author), in the order their level.txt gives. They are the maps of strangers, shown with thanks and
 /// credited in CREDITS.md; the folder is not one of the open-format levels (`shipped` does not list it).
 pub fn community() -> Vec<gamedata::package::Package> {
-    gamedata::resources::shipped_levels_root()
-        .map_or_else(Vec::new, |r| {
-            gamedata::package::scan(&r.join("community")).0
-        })
+    gamedata::resources::shipped_community_root()
+        .map_or_else(Vec::new, |r| gamedata::package::scan(&r).0)
         .into_iter()
         .filter(|p| !p.hidden)
         .collect()

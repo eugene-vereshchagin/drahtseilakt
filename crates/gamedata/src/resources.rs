@@ -184,6 +184,16 @@ pub fn shipped_levels_root() -> Option<PathBuf> {
     assets_root().map(|a| a.join("levels"))
 }
 
+/// Our own shipped set, Drahtseilakt: `levels/drahtseilakt/` (the open format, rounded, with 4x textures).
+pub fn shipped_drahtseilakt_root() -> Option<PathBuf> {
+    shipped_levels_root().map(|r| r.join("drahtseilakt"))
+}
+
+/// The shipped community maps: `levels/community/` (each one's original `.nmo`, with its own textures).
+pub fn shipped_community_root() -> Option<PathBuf> {
+    shipped_levels_root().map(|r| r.join("community"))
+}
+
 /// Whether a file of the original's layout is one of a level's parts, which our own files fill too (the modules, the
 /// balls, the transformer, the skies, the particles and the ball's shadow): asked from ours first for a new level, from
 /// the copy first for the copy's (assets.rs).
