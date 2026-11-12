@@ -72,3 +72,7 @@ __pycache__/
 /assets/**/*.dds
 /levels-legacy_delme/**/*.png
 /levels-legacy_delme/**/*.jpg
+/assets/levels/**/*.dtx
+/assets/levels/**/level.source
+/assets/levels/**/*.remaster/
+/assets/levels/**/textures.original/
