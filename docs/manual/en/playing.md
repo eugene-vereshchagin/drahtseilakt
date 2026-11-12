@@ -46,7 +46,7 @@ Restart and Exit ask once whether you are sure. Every finished run is saved as a
 ## The menus
 
 - **Start** lists the sets of levels: *Featured maps*, *Classic Ballance* (needs your copy of the original),
-  *Ballance Challenges* (community remakes of the originals, also needs the copy) and *Community maps* with *Best* and
+  *Ballance Challenges* (community remakes of the originals, also needs the copy) and *Community maps* with *Included* and
   *User levels*. Next to each map you see its difficulty from 1 to 10.
 - **Options** has *Graphics* (window size, sync, clouds, full screen and the *Look*, see [Looks](looks.md)),
   *Controls*, *Sound* (volumes and the sound theme, see [Sound and music](sound.md)), *Language*, *Extended* and

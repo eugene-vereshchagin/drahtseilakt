@@ -47,7 +47,7 @@ verlassen. Neustart und Verlassen fragen einmal nach. Jeder beendete Lauf wird a
 
 - **Start** zeigt die Levelgruppen: *Ausgewählte Karten*, *Klassisches Ballance* (braucht Ihre Kopie des Originals),
   *Ballance-Prüfungen* (Umbauten der Originallevel durch die Community, ebenfalls mit Kopie) und *Community-Karten*
-  mit *Beste* und *Eigene Level*. Neben jeder Karte steht ihr Schwierigkeitsgrad von 1 bis 10.
+  mit *Mitgeliefert* und *Eigene Level*. Neben jeder Karte steht ihr Schwierigkeitsgrad von 1 bis 10.
 - **Optionen** enthält *Grafik* (Fenstergröße, Synchronisation, Wolken, Vollbild und das *Aussehen*, siehe
   [Aussehen](looks.md)), *Steuerung*, *Sound* (Lautstärke und Klangthema, siehe [Klang und Musik](sound.md)),
   *Sprache*, *Erweitert* und *Hilfe* (diese Anleitung).

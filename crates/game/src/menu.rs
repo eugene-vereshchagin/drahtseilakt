@@ -5440,7 +5440,7 @@ mod tests {
         assert_eq!(m.screen(), Screen::Community);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom);
-        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Best"));
+        assert_eq!(m.title(Screen::Custom).as_deref(), Some("Included"));
         assert_eq!(m.maps.len(), 13, "the thirteen shipped maps");
         let orders: Vec<_> = m.maps.iter().map(|p| p.order).collect();
         assert_eq!(

@@ -4,8 +4,8 @@
 
 Two sets of maps are inside the game, so you can play at once without anything else:
 
-- **Featured maps**: 13 maps picked by us, from community authors, with rounded shapes and large textures.
-- **Community maps, Best**: 13 more community maps in the files their authors made, with their credits.
+- **Featured maps**: 13 maps picked by us, from community authors, with rounded shapes and textures we improved: they are not the ones the author first used.
+- **Community maps, Included**: 13 more community maps in the files their authors made, with their credits.
 
 All of these belong to their authors and are shown with thanks. If an author asks us to remove a map, we do.
 
