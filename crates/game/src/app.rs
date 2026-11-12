@@ -5709,6 +5709,7 @@ impl App {
             a.play(&self.data, "Menu_click", 1.0, 0.0);
         }
         let Some(menu) = &mut self.menu else { return };
+        menu.notice = None;
         // a key awaited on the Controls page takes the key pressed
         if menu.waiting() {
             let action = menu.capture(code);
@@ -5739,6 +5740,7 @@ impl App {
             KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space => menu.enter(),
             // Esc and Backspace leave any screen from any row
             KeyCode::Escape | KeyCode::Backspace => menu.back(),
+            KeyCode::F1 => Action::Manual(menu.manual_page()),
             KeyCode::PageUp => {
                 menu.page_by(-1);
                 Action::None
@@ -5783,6 +5785,14 @@ impl App {
             }
             Action::Home => self.open_menu(crate::menu::Screen::Main),
             Action::Quit => event_loop.exit(),
+            Action::Manual(page) => {
+                // the local manual, only because the player asked (manual.rs); a failure is said in the menu
+                if let Err(e) = crate::manual::open(&self.strings, page)
+                    && let Some(m) = &mut self.menu
+                {
+                    m.notice = Some(e);
+                }
+            }
             Action::Volumes(v) => {
                 self.volumes = v;
                 if let Some(a) = &mut self.audio {

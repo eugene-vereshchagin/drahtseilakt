@@ -478,3 +478,5 @@ player-facing docs in every documentation language, styled like the game), and o
 the player asks (Help in the menu, F1). This relaxes "the game never opens a browser" for exactly this: a local file,
 on request, never during a run, never a remote address. Why: a hint like "the levels folder is wrong, see the manual"
 is useless if the manual is a URL to type in by hand.
+
+*Done 2026-11-13:* the game now ships a local manual (`assets/manual/`, `tools/make_manual.py`) and the hint says to press F1; the owner's decision of the same day relaxes "never opens a browser" to: only the local manual, only on the player's request (see menu.md, "The manual").
