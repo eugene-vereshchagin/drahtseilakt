@@ -277,7 +277,7 @@ struct Voice {
 }
 
 /// How long music takes to fade in when it starts, and the default fade-out when it is stopped, in seconds.
-pub const MUSIC_FADE_IN: f64 = 1.5;
+pub const MUSIC_FADE_IN: f64 = 5.0;
 pub const MUSIC_FADE_OUT: f64 = 1.0;
 
 /// The volume factor `t` seconds into a rise over `total` seconds: 0 at the start, 1 at the end, eased (smoothstep).
