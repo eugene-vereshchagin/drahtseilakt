@@ -375,6 +375,8 @@ pub fn ball_lost(
 /// place in the list).
 #[derive(Debug, Clone, PartialEq)]
 pub struct LevelFrame {
+    /// The 2D entity's name (a script finds it by it: Edit 2D Entity).
+    pub name: String,
     pub rect: [f32; 4],
     pub uv: [f32; 4],
     pub color: [f32; 4],
@@ -397,6 +399,7 @@ pub fn level_frames(level: &level::Level) -> Vec<LevelFrame> {
             sane.then_some((
                 f.z_order,
                 LevelFrame {
+                    name: f.name.clone(),
                     rect: f.rect,
                     uv: f.uv,
                     color: m.diffuse,
@@ -411,6 +414,45 @@ pub fn level_frames(level: &level::Level) -> Vec<LevelFrame> {
         .into_iter()
         .map(|f| f.1)
         .take(crate::ui::FRAME_TEXTURES.len())
+        .collect()
+}
+
+/// Edit 2D Entity's frames over the level's: a frame a script gave a position or a size (values up to 2 are fractions of
+/// the 640 x 480 frame, larger ones pixels) moves or resizes; what it did not edit stays as the file has it, and a
+/// size that is nothing hides the frame. At most `FRAME_TEXTURES` frames, so this is bounded by the caller's list.
+pub fn edited_frames(frames: &[LevelFrame], edits: &[(String, script::Ent2d)]) -> Vec<LevelFrame> {
+    let px = |v: f32, whole: f32| if v.abs() <= 2.0 { v * whole } else { v };
+    frames
+        .iter()
+        .filter_map(|f| {
+            let Some((_, e)) = edits.iter().find(|(n, _)| *n == f.name) else {
+                return Some(f.clone());
+            };
+            let mut r = f.rect;
+            let (w, h) = (r[2] - r[0], r[3] - r[1]);
+            let (mut x, mut y, mut w, mut h) = (r[0], r[1], w, h);
+            if let Some([px_, py_]) = e.pos {
+                if px_.is_finite() {
+                    x = px(px_, 640.0);
+                }
+                if py_.is_finite() {
+                    y = px(py_, 480.0);
+                }
+            }
+            if let Some([sw, sh]) = e.size {
+                if sw.is_finite() {
+                    w = px(sw, 640.0);
+                }
+                if sh.is_finite() {
+                    h = px(sh, 480.0);
+                }
+            }
+            r = [x, y, x + w, y + h];
+            (w > 0.0 && h > 0.0 && r.iter().all(|v| v.is_finite())).then(|| LevelFrame {
+                rect: r,
+                ..f.clone()
+            })
+        })
         .collect()
 }
 
@@ -459,7 +501,7 @@ pub fn interface(
         texture: SPECIAL,
     };
     // the map's own frames first: the game's interface is drawn over them
-    let mut out = frame_quads(sim.frames(), screen);
+    let mut out = frame_quads(&sim.frames(), screen);
     // on the end screen the counter's points and the lives move over to the tally
     let tally = crate::endscreen::of(sim);
     let lives = tally.map_or(sim.lives, |t| t.lives).min(40) as usize;
@@ -514,6 +556,39 @@ pub fn interface(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn edit_2d_entity_moves_and_resizes_a_frame_by_name() {
+        let f = |name: &str| LevelFrame {
+            name: name.into(),
+            rect: [0.0, 0.0, 64.0, 48.0],
+            uv: [0.0, 0.0, 1.0, 1.0],
+            color: [1.0; 4],
+            texture: 0,
+        };
+        let frames = vec![f("a"), f("b")];
+        let edit = script::Ent2d {
+            pos: Some([0.5, 100.0]),
+            size: Some([0.25, f32::NAN]),
+            rotation: None,
+        };
+        let out = edited_frames(&frames, &[("a".into(), edit)]);
+        assert_eq!(
+            out[0].rect,
+            [320.0, 100.0, 480.0, 148.0],
+            "fractions and pixels, a NaN part kept"
+        );
+        assert_eq!(out[1], frames[1], "an unnamed frame stays");
+        let none = script::Ent2d {
+            size: Some([0.0, 0.0]),
+            ..Default::default()
+        };
+        assert_eq!(
+            edited_frames(&frames, &[("b".into(), none)]).len(),
+            1,
+            "no size hides it"
+        );
+    }
 
     /// A map's frames as the original's render context draws them: shown ones with a material, by Z order; here
     /// only those with a texture, each anchored to the edge of the window it is nearest to.

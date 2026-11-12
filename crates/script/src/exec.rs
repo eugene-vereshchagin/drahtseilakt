@@ -26,6 +26,9 @@ pub trait Host {
     fn initial_matrix(&self, e: Ent) -> Option<[[f32; 4]; 4]>;
     fn set_matrix(&mut self, e: Ent, m: [[f32; 4]; 4]);
     fn set_visible(&mut self, e: Ent, on: bool);
+    /// Set 3DSprite Mode: how a 3D sprite is turned each frame (0 faces the view, 1 about the world x, 2 about y, 3 keeps
+    /// its own axes). A target that is no sprite is ignored by the host.
+    fn sprite_mode(&mut self, _e: Ent, _mode: u32) {}
     /// The world-axis bounding box of the entity.
     fn bounds(&self, e: Ent) -> Option<([f32; 3], [f32; 3])>;
     fn delete(&mut self, e: Ent);

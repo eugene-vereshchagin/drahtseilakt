@@ -3,6 +3,25 @@
 use super::*;
 use crate::exec::{MatChange, TexChange};
 
+/// Set 3DSprite Mode: the target 3D sprite's orientation mode (pin Mode: 0 faces the view, 1 and 2 turn about the world
+/// x and y, 3 keeps the sprite's own axes; anything else is ignored).
+pub(crate) fn set_3dsprite_mode(
+    rt: &mut Runtime,
+    _id: Id,
+    b: &Block,
+    _p: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    if input(rt, b, 0) {
+        let mode = pin(rt, b, "Mode", 0, host).as_int();
+        if let (Some(e), Ok(m @ 0..=3)) = (target_ent(rt, b, host), u32::try_from(mode)) {
+            host.sprite_mode(e, m);
+        }
+        out(rt, b, 0);
+    }
+    Flow::Done
+}
+
 pub(crate) fn change_texture_video_format(
     rt: &mut Runtime,
     _id: Id,
@@ -443,8 +462,8 @@ pub(super) const PROTOS: &[Proto] = &[
         &["Mode"],
         &[],
         flags::TARGET,
-        Partial,
-        pass
+        Full,
+        set_3dsprite_mode
     ),
     proto!(
         BLEND_TEXTURES,

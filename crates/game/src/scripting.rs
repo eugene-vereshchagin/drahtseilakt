@@ -241,6 +241,15 @@ pub fn sound_stem(file: &str) -> String {
 }
 
 impl Scripts {
+    /// What Edit 2D Entity set of the map's 2D entities, by the entity's name (at most `MAX_ENTS_2D`).
+    pub fn frame_edits(&self) -> Vec<(String, script::Ent2d)> {
+        self.rt
+            .ents2d
+            .iter()
+            .filter_map(|(id, e)| Some((self.rt.graph.objects.get(*id)?.name.clone(), *e)))
+            .collect()
+    }
+
     /// Each sound file the map's wave objects name (by stem), for the app to measure.
     pub fn sound_files(&self) -> Vec<String> {
         let mut v: Vec<String> = self
@@ -595,6 +604,15 @@ impl Host for SimHost<'_> {
             let name = self.s.name(i).to_string();
             self.s
                 .note(format!("{} {name}", if on { "shows" } else { "hides" }));
+        }
+    }
+
+    fn sprite_mode(&mut self, e: Ent, mode: u32) {
+        if let Ent::Object(i) = e
+            && self.s.ents.set_sprite_mode(i, mode)
+        {
+            let name = self.s.name(i).to_string();
+            self.s.note(format!("sprite {name} mode {mode}"));
         }
     }
 
