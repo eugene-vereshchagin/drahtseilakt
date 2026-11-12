@@ -764,6 +764,23 @@ fn column_kind_of(rt: &Runtime, a: usize, col: usize) -> Option<u32> {
     rt.array(a).and_then(|x| column_kind(x, col))
 }
 
+/// Iterator If's search: the first row from `start` whose cell in `col` satisfies `op` against the Reference
+/// Value pin (pin 2).
+pub(crate) fn iterator_if_row(
+    rt: &mut Runtime,
+    b: &Block,
+    a: usize,
+    col: i32,
+    op: i32,
+    start: i32,
+    host: &mut dyn Host,
+) -> Option<usize> {
+    let c = usize::try_from(col).ok()?;
+    let kind = column_kind_of(rt, a, c).unwrap_or(INT);
+    let key = key_from(rt, b, 2, kind, host);
+    rt.array(a).and_then(|x| find_row(x, c, op, &key, start))
+}
+
 /// Row Search: the first row from a start whose cell satisfies the operation against a typed reference.
 pub(crate) fn row_search(
     rt: &mut Runtime,

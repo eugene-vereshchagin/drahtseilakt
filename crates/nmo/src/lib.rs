@@ -6,6 +6,7 @@ pub mod behavior;
 mod bytes;
 mod checksum;
 pub mod chunk;
+pub mod curve2d;
 pub mod document;
 pub mod error;
 pub mod file;

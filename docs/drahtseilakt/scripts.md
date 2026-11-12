@@ -153,7 +153,7 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
   such an object). With these three the **Portal** maps' teleports work: the template copies a mesh-less frame
   with the script that tests the ball against "This" to each portal.
 - **Groups** change in the run: Add To Group, Remove From Group, Group Clear (level objects only).
-- **Progressions**: Linear Progression, Bezier Progression (its 2D curve is not decoded: a straight line),
+- **Progressions**: Linear Progression, Bezier Progression and Bezier Transform (the 2D curve parameter is decoded, `nmo::curve2d`),
   Interpolator, Get / Set Component, TT_Timer.
 - **Random**, **Random Switch**: one generator with a fixed seed in the run's state, stepped by each draw, so
   a run and its replay draw the same numbers. (The original's are not reproducible at all.)
@@ -356,7 +356,7 @@ by the engine's.
 | Add To Group | `00024125:785420ab` | 5 | 11 | done |
 | Rotate | `ffffffee:eeffffff` | 5 | 14 | done |
 | Object Create | `271538e6:2fae49ac` | 4 | 9 | planned |
-| Bezier Progression | `6bb8699a:29fb6a4b` | 4 | 22 | partial: runs as a straight line (the block's 2D curve is not decoded) |
+| Bezier Progression | `6bb8699a:29fb6a4b` | 4 | 22 | full: follows the map's 2D curve (Hermite segments, TCB tangents, bisection as the original); a block without a curve runs as a straight line |
 | Interpolator | `35503950:2dde7a65` | 4 | 11 | done (colours mixed in RGB) |
 | SetPhysicsForce | `56e20c57:0b926068` | 4 | 5 | partial: a world force on a script body; Pos/Direction referentials to world |
 | Get Component | `2689057b:1a1a446a` | 4 | 8 | done |
@@ -383,9 +383,9 @@ by the engine's.
 | Fill Group By Class | `4445257b:70016c57` | 2 | 8 | planned |
 | 3D Text | `1f5b2fe7:6d355175` | 2 | 3 | named no-op (said once) |
 | Row Search | `78863443:45af59b6` | 2 | 2 | done |
-| Create String | `4bcd2f9d:382652e2` | 2 | 2 | planned |
+| Create String | `4bcd2f9d:382652e2` | 2 | 2 | full: printf formats per part, Create / Add Line / Clear, 64 KiB cap (oracle-checked) |
 | Proximity | `5321cacb:dcdc5213` | 2 | 2 | done |
-| Bezier Transform | `6d433e1b:191954b4` | 2 | 3 | planned |
+| Bezier Transform | `6d433e1b:191954b4` | 2 | 3 | full: Y = bottom + curve((X - left) / (right - left)) * (top - bottom); no C reference, the boundary orientation is read from the maps |
 | Set Attribute | `373040f2:05e01b34` | 2 | 13 | done |
 | Set Emissive | `d1d1d1d1:30303030` | 2 | 2 | partial: accepted, no effect |
 | Chrono | `5e2f1788:4f965a44` | 2 | 3 | done |
@@ -405,8 +405,8 @@ by the engine's.
 | Movie Player | `778d16d4:1dd60060` | 1 | 1 | named no-op (said once) |
 | TT ProximityVolumeControl | `38571b61:64cd2174` | 1 | 1 | done |
 | Blend Textures | `53ee4292:7d932bb1` | 1 | 7 | partial: accepted, pixels not written |
-| Get SubString | `10b16051:26173b39` | 1 | 1 | planned |
-| Iterator If | `6bec4be6:12d64c7c` | 1 | 2 | planned |
+| Get SubString | `10b16051:26173b39` | 1 | 1 | full: the original's 32-bit index arithmetic, never panics (oracle-checked) |
+| Iterator If | `6bec4be6:12d64c7c` | 1 | 2 | full (oracle-checked) |
 | TT_LinearVolume | `09b335b3:12d17cdc` | 1 | 1 | done |
 | Set Ambient | `aaaaaaaa:aeae1287` | 1 | 1 | never (the engine's own interface) |
 | Set Specular | `20202020:30303030` | 1 | 1 | full |
@@ -420,7 +420,7 @@ by the engine's.
 | TT_Timer | `6ac67901:7d2a6059` | 1 | 1 | done |
 | Set IC | `72671a24:161a2347` | 1 | 1 | partial: accepted (initial conditions stay as loaded) |
 | Remove Row | `1fa57136:14310857` | 1 | 1 | done |
-| Shuffle Order | `270f177a:4ca20023` | 1 | 2 | planned |
+| Shuffle Order | `270f177a:4ca20023` | 1 | 2 | full by name: Fisher-Yates from the run's generator; no C reference |
 | Move Row | `101a62f4:6e2d25f6` | 1 | 2 | done (from the notes: the C lacks it) |
 | Set FOV | `aaaacccc:aaaacccc` | 1 | 3 | done: the renderer takes the lens (docs: camera.fov) |
 | TT Restore IC | `7e0f2f58:232d3109` | 1 | 4 | done |
@@ -436,7 +436,7 @@ by the engine's.
 | Set 3DSprite Mode | `0c5d0457:c64c7000` | 1 | 1 | planned |
 | Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | planned |
 | Sequencer | `42530844:257b6053` | 1 | 1 | done |
-| Calculator | `4bc209b8:5b3679b0` | 1 | 8 | planned |
+| Calculator | `4bc209b8:5b3679b0` | 1 | 8 | full: numbers, a..z, + - * / ^, unary signs, pi, abs sqrt sin cos tan asin acos atan sinh cosh tanh exp ln log floor ceil; caps 256 tokens, depth 32, 511 bytes (oracle-checked on the C's grammar, random expressions against a second evaluator on the rest) |
 | TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | done: a font of the name with a texture; drawn in our own font (no system fonts) |
 | Get Message Data | `45875fee:45875fdd` | 1 | 1 | done |
 | Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | partial: position, size and rotation are kept per 2D entity (64); 2D Text lays out inside them; the entity itself is not drawn |
@@ -447,7 +447,7 @@ by the engine's.
 | Set As Active Camera | `368f0ab1:2d8957e4` | 1 | 2 | done: the view is placed by the camera object (position, looking along its z) |
 | Physics WakeUp | `38b851b5:72ca74ac` | 1 | 1 | partial: on script bodies |
 | Set Parent | `9d9d9d98:7e7a7f75` | 1 | 1 | planned |
-| Scan String | `4afa2f11:034872e2` | 1 | 1 | planned |
+| Scan String | `4afa2f11:034872e2` | 1 | 1 | full (oracle-checked) |
 | Set Alpha Test | `1cb5661e:5b5d3fda` | 1 | 1 | planned |
 | Change Texture Size | `7a7c4d7b:468d0f33` | 1 | 1 | full: recorded, capped at 2048 x 2048 (the picture is not resampled) |
 | Is Same Texture | `021e6fa7:6fe74610` | 1 | 1 | no-op |

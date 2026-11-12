@@ -54,6 +54,23 @@ pub mod op {
     pub const DIFFUSE: Guid = Guid(0x0f9e_20cc, 0x6ea1_0a47);
     pub const EMISSIVE: Guid = Guid(0x1368_4596, 0x0ab5_7f34);
     pub const MAX: Guid = Guid(0x6ea2_14cb, 0x43be_6b56);
+    /// The same GUID as `MAX` above, which the C reference calls the box's maximum: used on two numbers it is the
+    /// smaller of them (the Clamp group of Landfill in the Clouds applies it to the upper bound), so it is the
+    /// operation Min, and the C's box row reads the box's second corner.
+    pub const MIN: Guid = Guid(0x6ea2_14cb, 0x43be_6b56);
+    /// Max of two numbers: the lower bound of the same Clamp group.
+    pub const MAXIMUM: Guid = Guid(0x7c2e_01a8, 0x6e70_2206);
+    /// Absolute value (Float, Integer): `Abs XYZ` in Stairway to the Clouds applies it to three components.
+    pub const ABS: Guid = Guid(0x1ada_7470, 0x6209_7629);
+    /// Distance of two points (Vector, Vector or 3D Entity, 3D Entity → Float): Landfill's "Has Speed?" measures the
+    /// way an object went in a frame with it and compares the result with a threshold.
+    pub const DISTANCE: Guid = Guid(0x265c_7d00, 0x5c8f_1702);
+    /// Equality of two strings or two objects (Boolean): the maps switch on it to find an object by its name.
+    pub const STRING_EQUAL: Guid = Guid(0x5e86_6012, 0x5860_306d);
+    /// Inverse of a matrix (Matrix ← Matrix): Stairway to the Clouds takes This's world matrix through it and
+    /// multiplies the result with another object's position (a point in This's own frame).
+    pub const INVERSE: Guid = Guid(0x7c27_550b, 0x32a3_2e99);
+    pub const OBJECT_EQUAL: Guid = Guid(0x6ab9_4f5a, 0x1a63_76a9);
     pub const BOUNDING_BOX: Guid = Guid(0x31a7_649f, 0x305e_5164);
 }
 
@@ -242,6 +259,46 @@ pub static TABLE: &[Row] = &[
         FLOAT,
         NO,
         |_, _, _, a, _| Some(Value::Float(a.as_float().acos())),
+        N,
+    ),
+    // Min, Max, Abs, Distance and the equality tests: named by their use in the maps (the C has none of them)
+    r(op::MIN, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int().min(b.as_int()))), N),
+    r(op::MIN, FLOAT, FLOAT, FLOAT, |_, _, _, a, b| Some(Value::Float(fmin(a.as_float(), b.as_float()))), N),
+    r(op::MAXIMUM, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int().max(b.as_int()))), N),
+    r(op::MAXIMUM, FLOAT, FLOAT, FLOAT, |_, _, _, a, b| Some(Value::Float(fmax(a.as_float(), b.as_float()))), N),
+    r(op::ABS, INT, INT, NO, |_, _, _, a, _| Some(Value::Int(a.as_int().wrapping_abs())), N),
+    r(op::ABS, FLOAT, FLOAT, NO, |_, _, _, a, _| Some(Value::Float(a.as_float().abs())), N),
+    r(
+        op::DISTANCE,
+        FLOAT,
+        VECTOR,
+        VECTOR,
+        |_, _, _, a, b| Some(Value::Float(length(zip3(a, b, |x, y| x - y)))),
+        N,
+    ),
+    r(op::DISTANCE, FLOAT, ENTITY, ENTITY, entity_distance, N),
+    r(
+        op::INVERSE,
+        MATRIX,
+        MATRIX,
+        NO,
+        |_, _, _, a, _| a.as_matrix().and_then(|m| invert(&m)).map(Value::Matrix),
+        N,
+    ),
+    r(
+        op::STRING_EQUAL,
+        BOOL,
+        STRING,
+        STRING,
+        |_, _, _, a, b| Some(Value::Bool(a.as_string() == b.as_string())),
+        N,
+    ),
+    r(
+        op::OBJECT_EQUAL,
+        BOOL,
+        OBJECT,
+        OBJECT,
+        |_, _, _, a, b| Some(Value::Bool(a.as_obj() == b.as_obj())),
         N,
     ),
     // vectors and quaternions (by name)
@@ -586,6 +643,66 @@ pub fn ftol(f: f32) -> i32 {
     }
 }
 
+fn fmin(a: f32, b: f32) -> f32 {
+    if b < a { b } else { a }
+}
+
+fn fmax(a: f32, b: f32) -> f32 {
+    if b > a { b } else { a }
+}
+
+/// The distance of two entities' world positions (nothing written without both).
+fn entity_distance(
+    rt: &mut Runtime,
+    host: &mut dyn Host,
+    _: Guid,
+    a: &Value,
+    b: &Value,
+) -> Option<Value> {
+    let (ma, mb) = (world(rt, host, a)?, world(rt, host, b)?);
+    let d = [ma[3][0] - mb[3][0], ma[3][1] - mb[3][1], ma[3][2] - mb[3][2]];
+    Some(Value::Float(length(d)))
+}
+
+/// The inverse of a 4x4 matrix (rows as the world matrices keep them), `None` for a singular one.
+pub(crate) fn invert(m: &[[f32; 4]; 4]) -> Option<[[f32; 4]; 4]> {
+    let a: Vec<f64> = m.iter().flatten().map(|&x| f64::from(x)).collect();
+    // Gauss-Jordan with partial pivoting on [a | 1]
+    let mut w = [[0.0f64; 8]; 4];
+    for r in 0..4 {
+        for c in 0..4 {
+            w[r][c] = a.get(r * 4 + c).copied().unwrap_or(0.0);
+        }
+        w[r][4 + r] = 1.0;
+    }
+    for col in 0..4 {
+        let piv = (col..4).max_by(|&x, &y| w[x][col].abs().total_cmp(&w[y][col].abs()))?;
+        if w[piv][col].abs() < 1e-12 || !w[piv][col].is_finite() {
+            return None;
+        }
+        w.swap(col, piv);
+        let d = w[col][col];
+        for c in 0..8 {
+            w[col][c] /= d;
+        }
+        for r in 0..4 {
+            if r != col {
+                let f = w[r][col];
+                for c in 0..8 {
+                    w[r][c] -= f * w[col][c];
+                }
+            }
+        }
+    }
+    let mut out = [[0.0f32; 4]; 4];
+    for r in 0..4 {
+        for c in 0..4 {
+            out[r][c] = w[r][4 + c] as f32;
+        }
+    }
+    Some(out)
+}
+
 fn nonzero(d: f32) -> f32 {
     if d == 0.0 { 1.0 } else { d }
 }
@@ -825,7 +942,11 @@ fn from_string(
     a: &Value,
     _: &Value,
 ) -> Option<Value> {
-    let s = a.as_string();
+    text_to_value(rt, res, a.as_string())
+}
+
+/// A text as a value of a type, through the type's string function (as Convert String → that type).
+pub(crate) fn text_to_value(rt: &Runtime, res: Guid, s: String) -> Option<Value> {
     Some(match t::kind(res) {
         Some(t::Kind::Int | t::Kind::Enum) => Value::Int(scan_int(&s)),
         Some(t::Kind::Float) => Value::Float(scan_float(&s)),
@@ -839,6 +960,22 @@ fn from_string(
         ),
         _ => return None,
     })
+}
+
+/// A value of a type as text, through the type's string function as the C reference has it (CK2.dll: Integer `%d`,
+/// Float `%g`, Boolean `TRUE` / `FALSE`, a string itself, an object its name or `NULL`, a message its name); the
+/// other types give an empty text, as there.
+pub(crate) fn value_text(rt: &Runtime, guid: Guid, v: &Value) -> String {
+    match t::kind(guid) {
+        Some(t::Kind::Int | t::Kind::Enum) => v.as_int().to_string(),
+        Some(t::Kind::Float) => fmt_g(v.as_float()),
+        Some(t::Kind::Bool) => if v.as_int() != 0 { "TRUE" } else { "FALSE" }.into(),
+        Some(t::Kind::Str | t::Kind::Message) => v.as_string(),
+        Some(t::Kind::Object(_)) => v
+            .as_obj()
+            .map_or_else(|| "NULL".into(), |o| rt.graph.name(o).to_string()),
+        _ => String::new(),
+    }
 }
 
 fn name(rt: &Runtime, o: Option<Id>) -> String {
@@ -1246,7 +1383,7 @@ mod tests {
             // no function: an Op block leaves its output
             (
                 run(
-                    Guid(0x1ada_7470, 0x6209_7629),
+                    Guid(0x49c1_00e0, 0xfeb1_05a9),
                     FLOAT,
                     FLOAT,
                     NO,
@@ -1254,6 +1391,59 @@ mod tests {
                     n.clone(),
                 ),
                 None,
+            ),
+            (
+                run(
+                    op::INVERSE,
+                    MATRIX,
+                    MATRIX,
+                    NO,
+                    Value::Matrix([
+                        [0.0, 2.0, 0.0, 0.0],
+                        [-2.0, 0.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [4.0, 6.0, 8.0, 1.0],
+                    ]),
+                    n.clone(),
+                ),
+                Some(Value::Matrix([
+                    [0.0, -0.5, 0.0, 0.0],
+                    [0.5, 0.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [-3.0, 2.0, -8.0, 1.0],
+                ])),
+            ),
+            (
+                run(op::INVERSE, MATRIX, MATRIX, NO, Value::Matrix([[0.0; 4]; 4]), n.clone()),
+                None,
+            ),
+            // Abs, Min, Max (the clamp of Landfill in the Clouds), Distance and the equality tests
+            (run(op::ABS, FLOAT, FLOAT, NO, f(-2.5), n.clone()), Some(f(2.5))),
+            (run(op::ABS, INT, INT, NO, i(-7), n.clone()), Some(i(7))),
+            (run(op::ABS, INT, INT, NO, i(i32::MIN), n.clone()), Some(i(i32::MIN))),
+            (run(op::MIN, FLOAT, FLOAT, FLOAT, f(3.0), f(-1.0)), Some(f(-1.0))),
+            (run(op::MIN, INT, INT, INT, i(3), i(9)), Some(i(3))),
+            (run(op::MAXIMUM, FLOAT, FLOAT, FLOAT, f(3.0), f(-1.0)), Some(f(3.0))),
+            (run(op::MAXIMUM, TIME, TIME, TIME, f(1.5), f(1000.0)), Some(f(1000.0))),
+            (
+                run(op::DISTANCE, FLOAT, VECTOR, VECTOR, v([1.0, 2.0, 3.0]), v([4.0, 6.0, 3.0])),
+                Some(f(5.0)),
+            ),
+            (
+                run(op::STRING_EQUAL, BOOL, STRING, STRING, s("PE_Balloon"), s("PE_Balloon")),
+                Some(Value::Bool(true)),
+            ),
+            (
+                run(op::STRING_EQUAL, BOOL, STRING, STRING, s("PE_Balloon"), s("pe_balloon")),
+                Some(Value::Bool(false)),
+            ),
+            (
+                run(op::OBJECT_EQUAL, BOOL, OBJECT, OBJECT, Value::Obj(Some(3)), Value::Obj(Some(3))),
+                Some(Value::Bool(true)),
+            ),
+            (
+                run(op::OBJECT_EQUAL, BOOL, OBJECT, OBJECT, Value::Obj(Some(3)), Value::Obj(None)),
+                Some(Value::Bool(false)),
             ),
         ];
         for (k, (got, want)) in cases.into_iter().enumerate() {

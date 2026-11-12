@@ -190,11 +190,25 @@ community maps and the game, 114 have a function, 87 of them through C rows. The
 Percentage, Boolean, String, Vector, 2D Vector, Box, objects by name) against the C: 66 of the 142 signatures are answered by rows
 checked so. The entity, mesh and material rows are checked by unit tests only; `ops.rs` has a table of hand-computed values.
 
-Not in the table (no name, no C function; the 16 such GUIDs are used only in four maps): `014405eb`
-(Boolean ← Boolean, Boolean), `0a547387` (Boolean ← 2D / 3D Entity), `0dd635d5` (Object Array ← 3D Entity),
-`1ada7470` (Float ← Float, Integer ← Integer), `265c7d00` (entity / vector pairs → Float or Vector), `37f9040e` and
-`5a4e13fe` (Integer ← nothing), `48c10000` (Color ← Color, Float), `49c100e0` (Angle / Float ← Float),
-`5bf9718f` (3D Entity ← 3D Entity), `5e866012` (Boolean ← String, String), `6ab94f5a` (Boolean ← Object, Object),
-`6c62476b` (Boolean ← Float, Float / Integer, Integer), `7c27550b` (Matrix ← Matrix), `7c2e01a8` and the
-Float / Integer forms of `6ea214cb` (number ← number, number); also Division of Quaternions, Material of
-`23c8061b` and Script ← Behavioral Object, String. Their names need ParameterOperations.dll's registration table.
+Named by their use in the maps (rows with source `name`; the C has none of them, and ParameterOperations.dll's own
+registration table is not at hand, so each reading rests on the maps and is listed with its evidence):
+
+| GUID | Signature | Reading | Evidence |
+|---|---|---|---|
+| `1ada7470` | Float, Integer ← itself | Abs | `Abs XYZ` group of Stairway to the Clouds: three Get Component results each through it |
+| `7c2e01a8` | number ← number, number | Max | the lower bound of Landfill's `Clamp` groups (it takes the `Min` pin) |
+| `6ea214cb` | number ← number, number | Min | the upper bound of the same groups (the `Max` pin); the Box row above is the same GUID |
+| `265c7d00` | Float ← Vector, Vector / 3D Entity, 3D Entity | Distance | Landfill's `Has Speed?`: positions of the object now and last frame, then compared with a threshold |
+| `5e866012` | Boolean ← String, String | Equal | `Is Platform Sub`: an object's name against each of the names the map lists, True is "Yes" |
+| `6ab94f5a` | Boolean ← Object, Object | Equal | an iterated element against `Pit_Template`, True hides it |
+| `7c27550b` | Matrix ← Matrix | Inverse | Stairway to the Clouds: This's world matrix through it, then multiplied with another object's position |
+
+Still without a function (an Op block leaves its output; the census lists them as `unknown`, 9 GUIDs in 5 maps):
+`014405eb` (Boolean ← Boolean, Boolean: probably Xor, "changed since last frame"), `0a547387` (Boolean ← 2D / 3D
+Entity, one input: a property test, maybe visibility, the sense unknown), `0dd635d5` (Object Array ← 3D Entity: probably
+the children), `265c7d00` as Vector ← 3D Entity, 3D Entity (a direction between two entities, the sign unknown),
+`37f9040e` and `5a4e13fe` (Integer ← nothing: Landfill's chain before Set 2D Size / Set 2D Pos, probably the screen's
+width and height), `48c10000` (Color ← Color, Float: probably Set Alpha, fed by a fade), `49c100e0` (Angle / Float ←
+Float: a unit conversion on Bezier output), `5bf9718f` (3D Entity ← 3D Entity: probably Get Parent), `6c62476b`
+(Boolean ← Float, Float / Integer, Integer: a comparison, which one unknown), Division of
+Quaternions, Material of `23c8061b` and Script ← Behavioral Object, String. No evidence in the maps settles these.

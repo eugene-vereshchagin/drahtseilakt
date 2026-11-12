@@ -4,6 +4,7 @@
 // prototype GUID our runtime either knows (blocks.rs) or reports. Every count is capped; indices are checked.
 
 pub mod blocks;
+pub mod calc;
 pub mod census;
 pub mod exec;
 pub mod input;
@@ -194,6 +195,8 @@ pub enum Value {
     Box([f32; 6]),
     /// An Object Array: object references (none for an object that is gone).
     Objects(Vec<Option<Id>>),
+    /// A 2D curve parameter (a progression shape).
+    Curve(std::sync::Arc<nmo::curve2d::Curve2d>),
     /// Bytes of a type the runtime does not decode; read as a number when a block wants one.
     Raw(Vec<u8>),
     /// A script's "This": the object the script is attached to, which the runtime puts in its place when the
@@ -235,6 +238,7 @@ impl Value {
     pub fn decode(guid: Guid, saved: &Saved) -> Value {
         match saved {
             Saved::None | Saved::SubChunk | Saved::Type(_) => Value::None,
+            Saved::Curve(c) => Value::Curve(std::sync::Arc::new(c.clone())),
             Saved::Object(o) => Value::Obj(*o),
             Saved::Name(n) => Value::Str(String::from_utf8_lossy(n).into_owned()),
             Saved::Bytes(b) => {

@@ -121,6 +121,7 @@ pub mod proto {
     pub const REMOVE_FROM_GROUP: Guid = Guid(0xd014_7412, 0x0258_520d);
     pub const GROUP_CLEAR: Guid = Guid(0x1d12_662e, 0x4268_7a3c);
     pub const BEZIER_PROGRESSION: Guid = Guid(0x6bb8_699a, 0x29fb_6a4b);
+    pub const BEZIER_TRANSFORM: Guid = Guid(0x6d43_3e1b, 0x1919_54b4);
     pub const LINEAR_PROGRESSION: Guid = Guid(0xfff4_5680, 0xaa51_2a39);
     pub const INTERPOLATOR: Guid = Guid(0x3550_3950, 0x2dde_7a65);
     pub const GET_COMPONENT: Guid = Guid(0x2689_057b, 0x1a1a_446a);
@@ -149,6 +150,12 @@ pub mod proto {
     pub const REMOVE_KEY_ROW: Guid = Guid(0x0f83_34ea, 0x279a_40cd);
     pub const REMOVE_ROW_IF: Guid = Guid(0x5786_5622, 0x662d_2fee);
     pub const CHANGE_VALUE_IF: Guid = Guid(0x0725_3edb, 0x4d12_37ed);
+    pub const CREATE_STRING: Guid = Guid(0x4bcd_2f9d, 0x3826_52e2);
+    pub const SCAN_STRING: Guid = Guid(0x4afa_2f11, 0x0348_72e2);
+    pub const GET_SUBSTRING: Guid = Guid(0x10b1_6051, 0x2617_3b39);
+    pub const CALCULATOR: Guid = Guid(0x4bc2_09b8, 0x5b36_79b0);
+    pub const ITERATOR_IF: Guid = Guid(0x6bec_4be6, 0x12d6_4c7c);
+    pub const SHUFFLE_ORDER: Guid = Guid(0x270f_177a, 0x4ca2_0023);
     pub const OBJECT_RENAME: Guid = Guid(0x6f07_4ca7, 0x4542_7431);
 }
 
@@ -165,6 +172,7 @@ mod materials;
 mod narratives;
 mod physics;
 mod sounds;
+pub mod strings;
 mod transfo3d;
 mod tt_particles;
 mod tt_toolbox;
@@ -326,6 +334,7 @@ pub fn registry() -> &'static [Proto] {
             narratives::PROTOS,
             physics::PROTOS,
             sounds::PROTOS,
+            strings::PROTOS,
             transfo3d::PROTOS,
             tt_particles::PROTOS,
             tt_toolbox::PROTOS,
