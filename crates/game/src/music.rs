@@ -384,7 +384,7 @@ impl Music {
         .into_iter()
         .flatten()
         {
-            audio.stop(id);
+            audio.fade_out(id, crate::audio::MUSIC_FADE_OUT);
         }
         self.finished = true;
     }

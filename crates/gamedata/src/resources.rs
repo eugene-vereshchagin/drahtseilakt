@@ -90,6 +90,11 @@ pub fn chosen() -> Provider {
 
 static HAVE_COPY: AtomicBool = AtomicBool::new(true);
 
+/// Whether the player's copy of the original exists (as last told by `set_copy`).
+pub fn have_copy() -> bool {
+    HAVE_COPY.load(Ordering::Relaxed)
+}
+
 /// Tells the interface choice whether the player's copy exists (before the choice is read).
 pub fn set_copy(have: bool) {
     HAVE_COPY.store(have, Ordering::Relaxed);

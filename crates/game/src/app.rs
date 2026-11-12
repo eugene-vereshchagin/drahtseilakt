@@ -4367,7 +4367,7 @@ impl App {
         game.start_session();
         self.game = game;
         if let Some(a) = &mut self.audio {
-            a.stop_all();
+            a.stop_all_fading_music(crate::audio::MUSIC_FADE_OUT);
             a.forget_sounds();
         }
         self.rolling = [None; 3 + crate::ballsound::FAN_SLOTS];
@@ -5518,8 +5518,17 @@ impl App {
                 | KeyCode::NumpadEnter
                 | KeyCode::Space
                 | KeyCode::Escape
-        ) && let Some(a) = &mut self.audio
+        ) && !(matches!(
+            code,
+            KeyCode::ArrowLeft
+                | KeyCode::ArrowRight
+                | KeyCode::Enter
+                | KeyCode::NumpadEnter
+                | KeyCode::Space
+        ) && self.menu.as_ref().is_some_and(|m| m.on_sound_theme()))
+            && let Some(a) = &mut self.audio
         {
+            // (a change of the sound theme clicks with the new theme, in menu_action)
             a.play(&self.data, "Menu_click", 1.0, 0.0);
         }
         let Some(menu) = &mut self.menu else { return };
@@ -5646,6 +5655,8 @@ impl App {
                 if let Some(a) = &mut self.audio {
                     a.forget_sounds();
                 }
+                // the preview: the click plays with the theme just chosen
+                self.menu_click();
                 save_settings(self.volumes, self.features, &self.player);
             }
             Action::ToggleDebug | Action::Switch(_) => {
@@ -6333,7 +6344,9 @@ impl App {
             MouseButton::Left => {
                 let Some(p) = self.pointer() else { return };
                 if let Some(action) = self.menu.as_mut().and_then(|m| m.click(p)) {
-                    self.menu_click();
+                    if !matches!(action, Action::SoundTheme(_)) {
+                        self.menu_click();
+                    }
                     self.menu_action(action, event_loop);
                 }
             }

@@ -269,6 +269,25 @@ struct Voice {
     wait: f64,
     /// Music (its own volume setting) rather than a sound.
     music: bool,
+    /// Seconds the volume rises over from the start (0: at once), and seconds played so far (the fade's clock).
+    fade_in: f64,
+    age: f64,
+    /// Fading out: seconds left and the whole fade's seconds; the voice goes when it is over.
+    fade_out: Option<(f64, f64)>,
+}
+
+/// How long music takes to fade in when it starts, and the default fade-out when it is stopped, in seconds.
+pub const MUSIC_FADE_IN: f64 = 1.5;
+pub const MUSIC_FADE_OUT: f64 = 1.0;
+
+/// The volume factor `t` seconds into a rise over `total` seconds: 0 at the start, 1 at the end, eased (smoothstep).
+/// No rise (`total` 0) is full volume at once.
+pub fn ramp(t: f64, total: f64) -> f32 {
+    if total <= 0.0 {
+        return 1.0;
+    }
+    let x = (t / total).clamp(0.0, 1.0);
+    (x * x * (3.0 - 2.0 * x)) as f32
 }
 
 #[derive(Default)]
@@ -286,12 +305,26 @@ impl Mixer {
         let dt = 1.0 / f64::from(self.rate.max(1));
         let volumes = self.volumes;
         for v in &mut self.voices {
-            let gain = v.volume * volumes[usize::from(v.music)];
+            let base = v.volume * volumes[usize::from(v.music)];
             let step = f64::from(v.sound.rate) * dt * f64::from(v.pitch.max(0.0));
             for frame in out.chunks_mut(channels.max(1)) {
                 if v.wait > 0.0 {
                     v.wait -= dt;
                     continue;
+                }
+                let mut gain = base;
+                if v.fade_in > 0.0 && v.age < v.fade_in {
+                    gain *= ramp(v.age, v.fade_in);
+                }
+                v.age += dt;
+                if let Some((left, total)) = &mut v.fade_out {
+                    *left -= dt;
+                    if *left <= 0.0 {
+                        v.looping = false;
+                        v.pos = v.sound.frames.len() as f64;
+                        continue;
+                    }
+                    gain *= ramp(*left, *total);
                 }
                 let n = v.sound.frames.len();
                 if n == 0 {
@@ -327,6 +360,7 @@ impl Mixer {
         }
         self.voices
             .retain(|v| v.looping || v.wait > 0.0 || (v.pos as usize) < v.sound.frames.len());
+        // (a voice whose fade-out is over has been set past its end above)
         for o in out.iter_mut() {
             *o = o.clamp(-1.0, 1.0);
         }
@@ -698,6 +732,9 @@ impl Audio {
             looping,
             wait,
             music,
+            fade_in: if music { MUSIC_FADE_IN } else { 0.0 },
+            age: 0.0,
+            fade_out: None,
         });
         Some(id)
     }
@@ -735,12 +772,28 @@ impl Audio {
         }
     }
 
-    /// Stops every sound.
-    pub fn stop_all(&mut self) {
-        if let Ok(mut m) = self.mixer.lock() {
-            m.voices.clear();
+    /// Fades a sound out over `secs` seconds, then stops it (`stop` is at once).
+    pub fn fade_out(&mut self, id: u64, secs: f64) {
+        if let Ok(mut m) = self.mixer.lock()
+            && let Some(v) = m.voices.iter_mut().find(|v| v.id == id)
+            && v.fade_out.is_none()
+        {
+            v.fade_out = Some((secs.max(0.01), secs.max(0.01)));
         }
     }
+
+    /// Stops every sound but lets the music fade out over `secs` seconds (the level changes).
+    pub fn stop_all_fading_music(&mut self, secs: f64) {
+        if let Ok(mut m) = self.mixer.lock() {
+            m.voices.retain(|v| v.music);
+            for v in &mut m.voices {
+                if v.fade_out.is_none() {
+                    v.fade_out = Some((secs.max(0.01), secs.max(0.01)));
+                }
+            }
+        }
+    }
+
 }
 
 #[cfg(test)]
@@ -978,6 +1031,9 @@ mod tests {
             looping: false,
             wait: 0.0,
             music: false,
+            fade_in: 0.0,
+            age: 0.0,
+            fade_out: None,
         });
         let mut out = [0.0f32; 8];
         m.fill(&mut out, 2);
@@ -993,8 +1049,59 @@ mod tests {
             looping: true,
             wait: 0.0,
             music: false,
+            fade_in: 0.0,
+            age: 0.0,
+            fade_out: None,
         });
         m.fill(&mut out, 2);
         assert_eq!(m.voices.len(), 1, "a loop goes on");
+    }
+
+    #[test]
+    fn music_fades_in_and_out_along_the_ramp() {
+        assert_eq!(ramp(0.0, 1.5), 0.0);
+        assert_eq!(ramp(1.5, 1.5), 1.0);
+        assert_eq!(ramp(9.0, 1.5), 1.0);
+        assert_eq!(ramp(0.7, 0.0), 1.0);
+        let mut last = 0.0;
+        for k in 0..=30 {
+            let r = ramp(f64::from(k) * 0.05, 1.5);
+            assert!(r >= last, "the rise never falls");
+            last = r;
+        }
+        assert!((ramp(0.75, 1.5) - 0.5).abs() < 1e-6);
+        // in the mixer: a looping piece of constant level rises over its fade-in, then fades out and goes
+        let sound = Arc::new(Sound {
+            frames: vec![[1.0, 1.0]; 4],
+            rate: 4,
+        });
+        let mut m = Mixer {
+            voices: vec![Voice {
+                id: 1,
+                sound,
+                pos: 0.0,
+                volume: 1.0,
+                pitch: 1.0,
+                looping: true,
+                wait: 0.0,
+                music: true,
+                fade_in: 1.0,
+                age: 0.0,
+                fade_out: None,
+            }],
+            rate: 4,
+            volumes: [1.0; 2],
+        };
+        let mut out = [0.0f32; 8];
+        m.fill(&mut out, 1);
+        assert_eq!(out[0], 0.0, "starts silent");
+        assert!(out[1] > 0.0 && out[1] < out[2] && out[2] < out[3] && out[3] < 1.0);
+        m.fill(&mut out, 1);
+        assert_eq!(out[7], 1.0, "full after the fade-in");
+        m.voices[0].fade_out = Some((1.0, 1.0));
+        m.fill(&mut out, 1);
+        assert!(out[0] < 1.0 && out[0] > out[3]);
+        m.fill(&mut out, 1);
+        assert!(m.voices.is_empty(), "gone after the fade-out");
     }
 }

@@ -999,7 +999,6 @@ impl Menu {
                 .chain([
                     Line::Interface,
                     Line::Models,
-                    Line::SoundTheme,
                     Line::ModsMenu,
                     Line::Back,
                 ])
@@ -1239,6 +1238,11 @@ impl Menu {
     }
 
     /// Enter on the current screen.
+    /// Whether the row under the cursor is the sound theme's (its click is played with the new theme).
+    pub fn on_sound_theme(&self) -> bool {
+        self.lines(self.screen()).get(self.chosen()) == Some(&Line::SoundTheme)
+    }
+
     pub fn enter(&mut self) -> Action {
         let screen = self.screen();
         let Some(line) = self.lines(screen).get(self.chosen()).copied() else {
@@ -1912,7 +1916,6 @@ impl Menu {
                         self.label(Line::Models),
                         self.pack_value(gamedata::packs::Kind::Models),
                     ));
-                    f.push((self.label(Line::SoundTheme), theme_value(&self.strings)));
                     f.push((self.label(Line::ModsMenu), ">".to_owned()));
                 }
                 f
@@ -4938,6 +4941,17 @@ mod tests {
         assert_eq!(e.fields(Screen::Graphics).len(), 6);
         assert!(!m.lines(Screen::Controls).contains(&Line::Defaults));
         assert!(e.lines(Screen::Controls).contains(&Line::Defaults));
+        // the sound theme is chosen in one place only: the sound page
+        assert!(!e.lines(Screen::Extended).contains(&Line::SoundTheme));
+        assert_eq!(e.fields(Screen::Extended).len(), e.lines(Screen::Extended).len() - 1);
+    }
+
+    #[test]
+    fn without_a_copy_the_original_sound_theme_is_not_offered() {
+        gamedata::resources::set_copy(false);
+        assert!(!gamedata::sound_themes::choices().iter().any(|k| k == "original"));
+        gamedata::resources::set_copy(true);
+        assert!(gamedata::sound_themes::choices().iter().any(|k| k == "original"));
     }
 
     fn graphics(a: Action) -> Option<Graphics> {
