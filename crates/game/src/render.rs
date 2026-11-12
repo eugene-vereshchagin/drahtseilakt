@@ -489,6 +489,8 @@ pub struct Renderer {
     depth: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
     /// The scaling pass of `look` (retro.rs), made when first needed.
     pub retro: Option<crate::retro::Retro>,
+    /// The title and loading screens' picture (titlescene.rs), made when first shown.
+    title: Option<crate::titlescene::TitleScene>,
 }
 
 /// A range in shared chunk `.0`: its offset and length.
@@ -1142,6 +1144,7 @@ impl Renderer {
             },
             depth: None,
             retro: None,
+            title: None,
         }
     }
 
@@ -1759,6 +1762,21 @@ impl Renderer {
     /// Forgets the texture kept under `name` (a level's frame the next level does not have).
     pub fn remove_named_texture(&mut self, name: &'static str) {
         self.named_textures.remove(name);
+    }
+
+    /// Draws the title or loading screen's picture over `target`.
+    pub fn draw_title(
+        &mut self,
+        target: &wgpu::TextureView,
+        width: u32,
+        height: u32,
+        shot: &crate::titlescene::Shot,
+    ) {
+        let (device, format) = (&self.device, self.format);
+        let title = self
+            .title
+            .get_or_insert_with(|| crate::titlescene::TitleScene::new(device, format));
+        title.draw(&self.device, &self.queue, target, (width, height), shot);
     }
 
     /// Draws the original's 2D interface over `target`, which keeps its content: quads in window pixels, each
