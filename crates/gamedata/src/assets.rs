@@ -1815,9 +1815,20 @@ pub fn load_open(dir: &Path) -> Result<LoadedLevel, String> {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default(),
-        hash: crate::fnv1a(&bytes),
+        hash: remastered_from(dir).unwrap_or_else(|| crate::fnv1a(&bytes)),
         warnings: Vec::new(),
     })
+}
+
+/// The file the toolbox leaves in a level folder it remastered (`remaster-open`): the hash the level was known by
+/// before, so that the runs recorded on it still play on the remastered one (its looks and pictures change what is
+/// drawn, never what is played). 16 hexadecimal digits, a plain file of the folder.
+pub const SOURCE_HASH_FILE: &str = "level.source";
+
+fn remastered_from(dir: &Path) -> Option<u64> {
+    let file = plain_path(dir, SOURCE_HASH_FILE)?;
+    let text = read_capped(&file, 64)?;
+    u64::from_str_radix(std::str::from_utf8(&text).ok()?.trim(), 16).ok()
 }
 
 /// Writes a level in the open format into `dir`, with its textures as PNG files (from the player's copy).
