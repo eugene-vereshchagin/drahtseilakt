@@ -77,6 +77,7 @@ note ours = 13 maps by players, chosen for the game and brought into its open fo
 note challenges = The original levels remade by the community: the camera turned 45°, the way backwards, the road invisible.
 note community = Maps made by the community: the best ones shipped with the game, and those you downloaded.
 note downloaded = Your own levels and downloaded maps: put each in a folder of its own with a level.txt (see the README in the folder).
+user levels wrong = Some entries in the levels folder are wrong ({n}) — see the manual: {link}
 community credit 1 = Best community maps (Start, Community maps, Best):
 modified set rotated = 45-Degree Rotated
 modified set reverse = Reverse
