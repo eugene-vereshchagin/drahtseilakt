@@ -34,6 +34,9 @@ pub const OBJECT3D: Guid = Guid(0x362e_4df8, 0x1744_3539);
 pub const CAMERA: Guid = Guid(0x3cf2_4d6f, 0x2162_04f9);
 pub const LIGHT: Guid = Guid(0x4b6d_412f, 0x5d1e_1416);
 pub const ENTITY2D: Guid = Guid(0x1816_71e3, 0x1bdc_1503);
+/// Only seen as the first input of Get Material in ParameterOperations.dll (`re/ops.txt`, between the Mesh and the 2D
+/// Entity variants), so read as the 3D Sprite.
+pub const SPRITE3D: Guid = Guid(0x23c8_061b, 0x7003_3a27);
 pub const MATERIAL: Guid = Guid(0x55ab_12cd, 0x22ae_6a8b);
 pub const TEXTURE: Guid = Guid(0x155b_2870, 0x1836_79f8);
 pub const MESH: Guid = Guid(0x2453_5345, 0x65d1_5229);
@@ -129,6 +132,7 @@ pub const TYPES: &[TypeInfo] = &[
     obj(OBJECT3D, "3D Object", ENTITY, 41),
     obj(CAMERA, "Camera", ENTITY, 34),
     obj(LIGHT, "Light", ENTITY, 38),
+    obj(SPRITE3D, "3D Sprite", ENTITY, 37),
     obj(ENTITY2D, "2D Entity", BEOBJECT, 27),
     obj(MATERIAL, "Material", BEOBJECT, 30),
     obj(TEXTURE, "Texture", BEOBJECT, 31),

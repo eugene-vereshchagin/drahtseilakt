@@ -592,6 +592,38 @@ impl Host for SimHost<'_> {
         }
     }
 
+    fn is_visible(&self, e: Ent) -> Option<bool> {
+        match e {
+            Ent::Ball => None,
+            Ent::Object(i) => Some(!self.s.ents.is_hidden(i)),
+        }
+    }
+
+    fn parent_of(&self, e: Ent) -> Option<Ent> {
+        match e {
+            Ent::Ball => None,
+            Ent::Object(i) => self.s.ents.get(i)?.parent.map(Ent::Object),
+        }
+    }
+
+    fn children_of(&self, e: Ent) -> Vec<usize> {
+        let Ent::Object(i) = e else { return Vec::new() };
+        (0..self.s.ents.len())
+            .filter(|&k| {
+                self.s
+                    .ents
+                    .get(k)
+                    .is_some_and(|r| r.alive && r.parent == Some(i))
+            })
+            .take(script::MAX_CHILDREN)
+            .collect()
+    }
+
+    fn screen_size(&self) -> Option<(i32, i32)> {
+        // the game's fixed 2D layout (the original runs at 640 x 480 unless the player chose another size)
+        Some((640, 480))
+    }
+
     fn ic_visible(&self, e: Ent) -> Option<bool> {
         match e {
             Ent::Ball => None,

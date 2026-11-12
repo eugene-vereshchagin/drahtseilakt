@@ -190,25 +190,32 @@ community maps and the game, 114 have a function, 87 of them through C rows. The
 Percentage, Boolean, String, Vector, 2D Vector, Box, objects by name) against the C: 66 of the 142 signatures are answered by rows
 checked so. The entity, mesh and material rows are checked by unit tests only; `ops.rs` has a table of hand-computed values.
 
-Named by their use in the maps (rows with source `name`; the C has none of them, and ParameterOperations.dll's own
-registration table is not at hand, so each reading rests on the maps and is listed with its evidence):
+Read from the original's own code (rows with source `dll`). `ParameterOperations.dll` registers every operation with
+`RegisterOperationType` (GUID + name) and `RegisterOperationFunction` (operation, output type, input types, function);
+`ballance/re/ops_extract.py` and `ops_table.py` (outside the repository) decode the registrations out of the disassembly into `ballance/re/ops.txt` (423 rows:
+GUID, name, output, input 1, input 2, function address), and each function below was read in the disassembly. The
+readings that came from the maps first were checked against it; two were wrong (`5e866012` is Contain String, not
+Equal; `6ab94f5a` is Is Derived From, not Equal).
 
-| GUID | Signature | Reading | Evidence |
-|---|---|---|---|
-| `1ada7470` | Float, Integer ← itself | Abs | `Abs XYZ` group of Stairway to the Clouds: three Get Component results each through it |
-| `7c2e01a8` | number ← number, number | Max | the lower bound of Landfill's `Clamp` groups (it takes the `Min` pin) |
-| `6ea214cb` | number ← number, number | Min | the upper bound of the same groups (the `Max` pin); the Box row above is the same GUID |
-| `265c7d00` | Float ← Vector, Vector / 3D Entity, 3D Entity | Distance | Landfill's `Has Speed?`: positions of the object now and last frame, then compared with a threshold |
-| `5e866012` | Boolean ← String, String | Equal | `Is Platform Sub`: an object's name against each of the names the map lists, True is "Yes" |
-| `6ab94f5a` | Boolean ← Object, Object | Equal | an iterated element against `Pit_Template`, True hides it |
-| `7c27550b` | Matrix ← Matrix | Inverse | Stairway to the Clouds: This's world matrix through it, then multiplied with another object's position |
+| GUID | Name | Signature and reading |
+|---|---|---|
+| `1ada7470` | Absolute Value | Integer (wrapping: the minimum stays), Float |
+| `6ea214cb` / `7c2e01a8` | Min / Max | `b < a ? b : a` / `b > a ? b : a` (a NaN keeps input 1); the Box row of `6ea214cb` is the C's |
+| `265c7d00` | Get Distance | Float ← Vector, Vector / 3D Entity, 3D Entity (world positions); Vector ← 3D Entity, 3D Entity is input 2's position minus input 1's |
+| `5e866012` | Contain String | Boolean: input 1 contains input 2 (strstr; the DLL stores the pointer, so any hit is true; a missing string is false) |
+| `6ab94f5a` | Is Derived From | Boolean: the class of object 1 is, or derives from, the class of object 2 (`CKIsChildClassOf`) |
+| `6c62476b` | Equal | strings (strcmp, case matters), Integer, Boolean, Object (the ids); Float and Vector, Euler, 2D Vector, Quaternion, Rectangle, Color, Matrix bit for bit (`repz cmps`: 0.0 and -0.0 differ); Integer with Float numerically |
+| `7c27550b` | Inverse | Matrix (and Vector, 2D Vector, Float, Color) |
+| `014405eb` | Xor | Integer `a ^ b`, Boolean on the truth values |
+| `0a547387` | Is Visible | Boolean ← 3D / 2D Entity (the object's own visible flag) |
+| `0dd635d5` | Get Children | Object Array ← 3D Entity (at most 4096, paid from the tick's work) |
+| `5bf9718f` | Get Parent | 3D / 2D Entity ← itself; nothing written for an object without a parent |
+| `5a4e13fe` / `37f9040e` | Get Width / Get Height | Integer ← nothing (the render area; the game says 640 x 480) or ← Texture |
+| `48c10000` | Set Alpha | Color ← Color, Float: alpha = the number, at most 1 (no lower bound) |
+| `49c100e0` | Degre To Radian | Float ← Float: `x * 0.017453292` |
+| `748c3502` | Division | Quaternion: VxMath's `Vx3DQuaternionDivide(P, Q)` = conj(Q) * P |
+| `250020d4` | Get Script | Script ← Behavioral Object, String: the first script whose name contains the string (strstr) |
+| `6b8c78bd` | Get Material | also of `23c8061b` (read as the 3D Sprite): the first material of its mesh |
 
-Still without a function (an Op block leaves its output; the census lists them as `unknown`, 9 GUIDs in 5 maps):
-`014405eb` (Boolean ← Boolean, Boolean: probably Xor, "changed since last frame"), `0a547387` (Boolean ← 2D / 3D
-Entity, one input: a property test, maybe visibility, the sense unknown), `0dd635d5` (Object Array ← 3D Entity: probably
-the children), `265c7d00` as Vector ← 3D Entity, 3D Entity (a direction between two entities, the sign unknown),
-`37f9040e` and `5a4e13fe` (Integer ← nothing: Landfill's chain before Set 2D Size / Set 2D Pos, probably the screen's
-width and height), `48c10000` (Color ← Color, Float: probably Set Alpha, fed by a fade), `49c100e0` (Angle / Float ←
-Float: a unit conversion on Bezier output), `5bf9718f` (3D Entity ← 3D Entity: probably Get Parent), `6c62476b`
-(Boolean ← Float, Float / Integer, Integer: a comparison, which one unknown), Division of
-Quaternions, Material of `23c8061b` and Script ← Behavioral Object, String. No evidence in the maps settles these.
+Not done: Get Width / Get Height of a 2D Entity (the host has no 2D entity size), the object-array Equal, and the mixed
+Integer / Float forms of Min, Max and Division. The census now lists no unknown operation in the maps.

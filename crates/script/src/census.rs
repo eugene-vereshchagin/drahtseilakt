@@ -284,6 +284,7 @@ impl Census {
                     match row.source {
                         crate::ops::Source::C => "C",
                         crate::ops::Source::Name => "name",
+                        crate::ops::Source::Dll => "dll",
                     },
                     crate::types::name(row.res),
                     crate::types::name(row.p1),

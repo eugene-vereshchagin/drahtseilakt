@@ -29,6 +29,8 @@ use std::collections::{HashMap, HashSet};
 pub type Id = usize;
 
 /// Caps on a map's graphs (a hostile file may claim any count).
+/// The most children one Get Children returns.
+pub const MAX_CHILDREN: usize = 4096;
 pub const MAX_OBJECTS: usize = 1 << 20;
 pub const MAX_ARRAY_ROWS: usize = 1 << 16;
 /// The most nodes one script may have to be copied (Object Copy copies an object's scripts with it).
