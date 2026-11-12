@@ -57,6 +57,7 @@ pub fn run(size: (u32, u32)) -> Result<Outcome, String> {
         cursor: (0.0, 0.0),
         hover: None,
         error: None,
+        retry: false,
     };
     event_loop.run_app(&mut s).map_err(|e| e.to_string())?;
     match s.error {
@@ -144,6 +145,8 @@ struct Setup {
     cursor: (f32, f32),
     hover: Option<[f32; 4]>,
     error: Option<String>,
+    /// The last draw got no frame: draw again.
+    retry: bool,
 }
 
 impl Setup {
@@ -474,8 +477,12 @@ impl Setup {
         let frame = match gpu.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(f)
             | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
-            _ => {
+            other => {
+                // no frame this time (outdated, timed out, occluded): configure again and ask for the next one, or
+                // the window would stay black until something else happens to redraw it
+                eprintln!("setup window: no frame to draw into ({other:?}), trying again");
                 gpu.surface.configure(&gpu.renderer.device, &gpu.config);
+                self.retry = true;
                 return;
             }
         };
@@ -516,9 +523,22 @@ impl ApplicationHandler for Setup {
         if self.window.is_some() {
             return;
         }
+        // never larger than the screen (the buttons sit in the middle: a window bigger than the screen hides them)
+        let (mut w, mut h) = self.size;
+        if let Some(m) = event_loop
+            .primary_monitor()
+            .or_else(|| event_loop.available_monitors().next())
+        {
+            let m = m.size();
+            if m.width > 0 && m.height > 0 {
+                w = w.min(m.width * 9 / 10).max(320);
+                h = h.min(m.height * 9 / 10).max(240);
+            }
+        }
+        eprintln!("setup window: opening {w}x{h}");
         let attrs = Window::default_attributes()
             .with_title("Drahtseilakt: bring in your Ballance")
-            .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
+            .with_inner_size(winit::dpi::PhysicalSize::new(w, h));
         let made = event_loop
             .create_window(attrs)
             .map_err(|e| e.to_string())
@@ -527,6 +547,8 @@ impl ApplicationHandler for Setup {
             Ok((w, g)) => {
                 self.window = Some(w);
                 self.gpu = Some(g);
+                // some systems send no first redraw by themselves: without this the window stays black
+                self.redraw();
             }
             Err(e) => {
                 self.error = Some(e);
@@ -558,6 +580,7 @@ impl ApplicationHandler for Setup {
                     gpu.surface.configure(&gpu.renderer.device, &gpu.config);
                 }
             }
+            WindowEvent::Focused(_) | WindowEvent::Occluded(false) | WindowEvent::ScaleFactorChanged { .. } => {}
             WindowEvent::DroppedFile(path) => self.ask(path),
             WindowEvent::KeyboardInput {
                 event:
@@ -570,7 +593,12 @@ impl ApplicationHandler for Setup {
                 ..
             } => self.key(code, text.as_deref(), event_loop),
             WindowEvent::RedrawRequested => {
+                self.retry = false;
                 self.draw();
+                if self.retry {
+                    self.redraw();
+                    return;
+                }
                 // the frame saying it copies is up: now the copying
                 if let Some(from) = self.pending.take() {
                     self.import(from, event_loop);
@@ -636,6 +664,7 @@ mod tests {
             cursor: (0.0, 0.0),
             hover: None,
             error: None,
+            retry: false,
         }
     }
 

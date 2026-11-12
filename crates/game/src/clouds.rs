@@ -154,10 +154,15 @@ pub struct Frame {
 }
 
 impl Pass {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Pass {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        format: wgpu::TextureFormat,
+        samples: u32,
+    ) -> Pass {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("clouds"),
-            source: wgpu::ShaderSource::Wgsl(shader_source().into()),
+            source: wgpu::ShaderSource::Wgsl(shader_source(samples > 1).into()),
         });
         let tex = |binding, dim, sample_type| wgpu::BindGroupLayoutEntry {
             binding,
@@ -165,7 +170,8 @@ impl Pass {
             ty: wgpu::BindingType::Texture {
                 sample_type,
                 view_dimension: dim,
-                multisampled: false,
+                // the scene's depth (binding 4) is multisampled with anti-aliasing: its first sample is read
+                multisampled: binding == 4 && samples > 1,
             },
             count: None,
         };
@@ -221,7 +227,10 @@ impl Pass {
             },
             primitive: Default::default(),
             depth_stencil: None,
-            multisample: Default::default(),
+            multisample: wgpu::MultisampleState {
+                count: samples,
+                ..Default::default()
+            },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: Some("fs"),
@@ -404,14 +413,14 @@ impl Pass {
 }
 
 /// The shader: the built-in one, or in a debug build, for tuning the look, the file DRAHTSEILAKT_CLOUD_SHADER names.
-fn shader_source() -> String {
+fn shader_source(multisampled: bool) -> String {
     #[cfg(debug_assertions)]
     if let Some(text) =
         std::env::var_os("DRAHTSEILAKT_CLOUD_SHADER").and_then(|p| std::fs::read_to_string(p).ok())
     {
-        return text;
+        return depth_binding(text, multisampled);
     }
-    include_str!("clouds.wgsl").to_owned()
+    depth_binding(include_str!("clouds.wgsl").to_owned(), multisampled)
 }
 
 /// Every texture of the layer repeats over this many clouds' sizes (clouds.wgsl: the map of banks every 30 and its
@@ -787,5 +796,14 @@ mod tests {
         let right = RING * 3 / 4 * 4;
         assert_eq!(&ring[right..right + 3], &[0, 255, 0]);
         assert!(horizon_ring(&faces[..2]).is_none());
+    }
+}
+
+/// The shader's depth binding as the scene's depth texture is: multisampled with anti-aliasing (its sample 0 is read).
+fn depth_binding(text: String, multisampled: bool) -> String {
+    if multisampled {
+        text.replace("texture_depth_2d", "texture_depth_multisampled_2d")
+    } else {
+        text
     }
 }
