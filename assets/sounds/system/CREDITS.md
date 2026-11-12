@@ -10,7 +10,7 @@ original's, matched to the original's atmospheres (about −32 LUFS); the shakuh
 pass at 2.6 kHz) and the tonal wind's rumble (high pass at 90 Hz). `Music/music.txt` says which track plays in which
 role; several in one role form a pool the game picks from. Freesound sources are the public 128 kbps HQ previews
 of the sounds named. The CC-BY works are used under their licences with the attribution below; the changes are
-those just listed; `Misc_Trafo` is slowed to 2.5 s (time-stretch, pitch lowered), raised 6 dB and faded out. Licences:
+those just listed; the fixes of 2026-11-12 are listed in their rows (`prepare.py --fixes`: rail loops, iron-ring rail hits, synthesized fall); `Misc_Trafo` is slowed to 2.5 s (time-stretch, pitch lowered), raised 6 dB and faded out. Licences:
 CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/, CC-BY 3.0 https://creativecommons.org/licenses/by/3.0/,
 CC-BY 4.0 https://creativecommons.org/licenses/by/4.0/.
 
@@ -18,7 +18,7 @@ CC-BY 4.0 https://creativecommons.org/licenses/by/4.0/.
 |---|---|---|---|---|---|
 | `Sounds/Misc_StartLevel.ogg` | Misc_StartLevel | 121800_1525789-hq.mp3 | BOSS MUSIC | CC0 1.0 | https://freesound.org/people/BOSS%20MUSIC/sounds/121800/ |
 | `Sounds/Misc_Checkpoint.ogg` | Misc_Checkpoint | 169855_3126007-hq.mp3 | GnoteSoundz | CC0 1.0 | https://freesound.org/people/GnoteSoundz/sounds/169855/ |
-| `Sounds/Misc_Fall.ogg` | Misc_Fall | 159408_1656228-hq.mp3 | noirenex | CC0 1.0 | https://freesound.org/people/noirenex/sounds/159408/ |
+| `Sounds/Misc_Fall.ogg` | Misc_Fall | synthesized (prepare.py `fall_sound`: falling glide 490 to 90 Hz and a soft thud, 1.9 s, -22 LUFS) | Drahtseilakt project | GPL-3.0-only | no source (replaces freesound 159408 by noirenex, CC0, whose steady 700 Hz tone was harsh) |
 | `Sounds/Misc_Lightning.ogg` | Misc_Lightning | spark.wav | BMacZero | CC0 | https://opengameart.org/content/electricity-sound-effects-0 |
 | `Sounds/Misc_Trafo.ogg` | Misc_Trafo | qubodup-megaswosh1.wav | qubodup | CC0 | https://opengameart.org/content/wind-hit-time-morph |
 | `Sounds/Extra_Start.ogg` | Extra_Start | glass_004.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/interface-sounds |
@@ -33,17 +33,17 @@ CC-BY 4.0 https://creativecommons.org/licenses/by/4.0/.
 | `Sounds/Roll_Paper.ogg` | Roll_Paper | 545532_6233742-hq.mp3 | rsellick | CC0 1.0 | https://freesound.org/people/rsellick/sounds/545532/ |
 | `Sounds/Roll_Wood_Wood.ogg` | Roll_Wood_Wood | 629001_13875907-hq.mp3 | KaleidacousticsAudio | CC0 1.0 | https://freesound.org/people/KaleidacousticsAudio/sounds/629001/ |
 | `Sounds/Roll_Wood_Stone.ogg` | Roll_Wood_Stone | 182345_1864955-hq.mp3 | Claire.H | CC-BY 3.0 | https://freesound.org/people/Claire.H/sounds/182345/ |
-| `Sounds/Roll_Wood_Metal.ogg` | Roll_Wood_Metal | 537939_11979494-hq.mp3 | belanhud | CC0 1.0 | https://freesound.org/people/belanhud/sounds/537939/ |
+| `Sounds/Roll_Wood_Metal.ogg` | Roll_Wood_Metal | !Roll_Wood_Metal_C.ogg ('hollow tube', modal synthesis) | Drahtseilakt project | GPL-3.0-only | audio-generated/rails.py (replaces freesound 537939 by belanhud, CC0, a clatter like maracas) |
 | `Sounds/Roll_Stone_Wood.ogg` | Roll_Stone_Wood | 629001_13875907-hq.mp3 | KaleidacousticsAudio | CC0 1.0 | https://freesound.org/people/KaleidacousticsAudio/sounds/629001/ |
 | `Sounds/Roll_Stone_Stone.ogg` | Roll_Stone_Stone | 182345_1864955-hq.mp3 | Claire.H | CC-BY 3.0 | https://freesound.org/people/Claire.H/sounds/182345/ |
-| `Sounds/Roll_Stone_Metal.ogg` | Roll_Stone_Metal | 537939_11979494-hq.mp3 | belanhud | CC0 1.0 | https://freesound.org/people/belanhud/sounds/537939/ |
+| `Sounds/Roll_Stone_Metal.ogg` | Roll_Stone_Metal | !Roll_Stone_Metal_A.ogg ('growl + ring', modal synthesis) | Drahtseilakt project | GPL-3.0-only | audio-generated/rails.py (replaces freesound 537939 by belanhud, CC0) |
 | `Sounds/Hit_Wood_Wood.ogg` | Hit_Wood_Wood | impactWood_medium_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
 | `Sounds/Hit_Wood_Stone.ogg` | Hit_Wood_Stone | impactGeneric_light_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
-| `Sounds/Hit_Wood_Metal.ogg` | Hit_Wood_Metal | impactMetal_light_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
+| `Sounds/Hit_Wood_Metal.ogg` | Hit_Wood_Metal | impactMetal_light_000.ogg + iron ring | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds ; changed: iron ring of five partials added, 0.9 s, low-passed at 5 kHz |
 | `Sounds/Hit_Wood_Dome.ogg` | Hit_Wood_Dome | impactPlate_light_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
 | `Sounds/Hit_Stone_Stone.ogg` | Hit_Stone_Stone | impactMining_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
 | `Sounds/Hit_Stone_Wood.ogg` | Hit_Stone_Wood | impactWood_heavy_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
-| `Sounds/Hit_Stone_Metal.ogg` | Hit_Stone_Metal | impactMetal_medium_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
+| `Sounds/Hit_Stone_Metal.ogg` | Hit_Stone_Metal | impactMetal_medium_000.ogg + iron ring | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds ; changed: iron ring (3 semitones lower) added, 0.9 s |
 | `Sounds/Hit_Stone_Kuppel.ogg` | Hit_Stone_Kuppel | impactPlate_light_002.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
 | `Sounds/Hit_Paper.ogg` | Hit_Paper | 334200_4290188-hq.mp3 | WasabiWielder | CC0 1.0 | https://freesound.org/people/WasabiWielder/sounds/334200/ |
 | `Music/Music_Final.ogg` | Music_Final | 108248_327532-hq.mp3 | Nick-Nac | CC0 1.0 | https://freesound.org/people/Nick-Nac/sounds/108248/ |
@@ -81,3 +81,4 @@ CUSTOMIZE YOUR LOOP 01 G 112 BPM" by CarlosCarty, "鹤舞白沙" by Amingliang, 
 juskiddink (all CC-BY 4.0, freesound.org), "Senbazuru" and "Finding Movement" by Kevin MacLeod (incompetech.com,
 CC-BY 4.0), "Asian Duet" by elerya (CC-BY 3.0, opengameart.org), "wind ambient synth" by botpl (CC-BY 3.0,
 freesound.org); each cut, faded and levelled as described above, the quartz bowl also shaped into a swell.
+| `Sounds/Hit_Sack.ogg` | Hit_Sack (the swinging sack hits the ball) | synthesized (prepare.py `sack_sound`: 85 Hz knock, low rustle, 0.4 s) | Drahtseilakt project | GPL-3.0-only | no source |

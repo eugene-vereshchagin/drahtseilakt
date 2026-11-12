@@ -609,6 +609,16 @@ fn module_parts(
             part.shift,
             false,
         )?;
+        if level.module_of(i) == "P_Modul_26" {
+            // the swinging sack thuds softly when it strikes the ball (our own role; the original's makes no sound)
+            world.set_sound(
+                body,
+                crate::physics::SoundIds {
+                    hit: crate::ballsound::SACK_HIT,
+                    roll: 0,
+                },
+            );
+        }
         inst.parts.push(body);
         named.push((part.object, body));
         bodies.push(ModuleBody {

@@ -51,3 +51,5 @@ synthesis), and the level swells softly and irregularly as the ball turns, never
 modes; the stone ball (`Roll_Stone_Metal`) is a rough growl of beating lines round
 120 Hz in blobs, a 450–900 Hz ring that small irregular scrapes strike, and a faint grind (variant A, the owner's choice; three
 variants were made of each).
+
+The swinging sack's hit (`Hit_Sack`, 2026-11-12) is the same synthesized thud as the system theme's (an 85 Hz knock and a low rustle, 0.4 s), GPL-3.0-only.
