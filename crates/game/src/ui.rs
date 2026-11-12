@@ -373,11 +373,6 @@ impl Face {
             _ => crate::fallback::styled(text, rect, st),
         }
     }
-
-    /// The own interface's face.
-    pub fn own(&self) -> bool {
-        matches!(self, Face::Own)
-    }
 }
 
 /// Quads in context pixels placed in the window with `anchor`.

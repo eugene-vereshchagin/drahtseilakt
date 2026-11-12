@@ -68,6 +68,7 @@ mod scriptsky;
 mod sim;
 mod sky;
 mod supports;
+mod titlescene;
 mod trafo;
 mod ui;
 mod volume;

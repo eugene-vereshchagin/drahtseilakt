@@ -429,6 +429,182 @@ fn draw(text: &str, r: [f32; 4], height: f32, widen: f32, st: &Style) -> Vec<Qua
     out
 }
 
+/// A line of text drawn for one place on the screen, at the very size it is shown: coverage, a byte a pixel.
+pub struct Line {
+    pub w: u32,
+    pub h: u32,
+    pub cover: Vec<u8>,
+    /// The baseline's row in the picture.
+    pub base: f32,
+    /// Its characters in order: what a caller needs to set other text with them (loading.rs' stage line).
+    pub glyphs: Vec<Set>,
+}
+
+/// A character of a drawn line: how far the pen moves over it (without the tracking), and the columns of the picture
+/// its ink is in with where they begin against the pen (None for a blank).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Set {
+    pub c: char,
+    pub advance: f32,
+    pub ink: Option<(u32, u32, f32)>,
+}
+
+/// The largest picture a line is drawn into (a title across an 8K window fits).
+const LINE_MAX: (f32, f32) = (8192.0, 1024.0);
+
+/// `text` on one line in the shipped fonts with capitals `cap` pixels high, drawn at that size (not scaled from the
+/// atlas, so it is sharp at any window size): lower case as small capitals as everywhere in the interface, Tektur at
+/// `weight`, the glyphs `widen` times as wide and `tracking` of an em apart. None when there is nothing to draw.
+pub fn line(text: &str, cap: f32, weight: f32, widen: f32, tracking: f32) -> Option<Line> {
+    let mut guard = ATLAS.lock().ok()?;
+    let atlas = guard.get_or_insert_with(Atlas::new);
+    if atlas.fonts.is_empty() || !(cap.is_finite() && (2.0..=LINE_MAX.1 / 2.0).contains(&cap)) {
+        return None;
+    }
+    let em = cap * EM / atlas.cap;
+    let widen = widen.clamp(0.5, 3.0);
+    if let Some(f) = atlas.fonts.first_mut() {
+        f.set_variation(b"wght", weight.clamp(100.0, 900.0));
+    }
+    let mut outlines = Vec::new();
+    let mut glyphs = Vec::new();
+    let mut x = 0.0f32;
+    for c in text.chars().take(TEXT_MAX).filter(|c| !c.is_control()) {
+        let (g, size) = shape(c);
+        let Some(font) = atlas.fonts.iter().find(|f| f.glyph_id(g) != GlyphId(0)) else {
+            continue;
+        };
+        let per_em = font.units_per_em().unwrap_or(1000.0).max(1.0);
+        let s = em * size * font.height_unscaled() / per_em;
+        let scale = PxScale { x: s * widen, y: s };
+        let id = font.glyph_id(g);
+        let advance = font.as_scaled(scale).h_advance(id);
+        let outline =
+            font.outline_glyph(id.with_scale_and_position(scale, ab_glyph::point(x, 0.0)));
+        // the ink's columns are known once the picture's left edge is (below): its bounds for now
+        glyphs.push((c, advance, x, outline.as_ref().map(|o| o.px_bounds())));
+        if let Some(o) = outline {
+            outlines.push(o);
+        }
+        x += advance + tracking * em * size * widen;
+        if x > LINE_MAX.0 {
+            break;
+        }
+    }
+    if let Some(f) = atlas.fonts.first_mut() {
+        f.set_variation(b"wght", WEIGHT);
+    }
+    let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+    for o in &outlines {
+        let b = o.px_bounds();
+        (x0, y0) = (x0.min(b.min.x), y0.min(b.min.y));
+        (x1, y1) = (x1.max(b.max.x), y1.max(b.max.y));
+    }
+    if !(x0 < x1 && y0 < y1) {
+        return None;
+    }
+    let (x0, y0) = (x0.floor() - 1.0, y0.floor() - 1.0);
+    let (w, h) = ((x1 - x0).ceil() + 2.0, (y1 - y0).ceil() + 2.0);
+    if w > LINE_MAX.0 || h > LINE_MAX.1 {
+        return None;
+    }
+    let (w, h) = (w as u32, h as u32);
+    let mut cover = vec![0u8; (w * h) as usize];
+    for o in &outlines {
+        let b = o.px_bounds();
+        let (ox, oy) = ((b.min.x - x0) as u32, (b.min.y - y0) as u32);
+        o.draw(|gx, gy, c| {
+            let i = ((oy + gy) * w + ox + gx) as usize;
+            if ox + gx < w
+                && let Some(p) = cover.get_mut(i)
+            {
+                *p = p.saturating_add((c.clamp(0.0, 1.0) * 255.0) as u8);
+            }
+        });
+    }
+    let glyphs = glyphs
+        .into_iter()
+        .map(|(c, advance, pen, bounds)| Set {
+            c,
+            advance,
+            ink: bounds.map(|b| {
+                let from = (b.min.x - x0).floor().max(0.0);
+                let to = ((b.max.x - x0).ceil() + 1.0).min(w as f32);
+                (from as u32, to as u32, from + x0 - pen)
+            }),
+        })
+        .collect();
+    Some(Line {
+        w,
+        h,
+        cover,
+        base: -y0,
+        glyphs,
+    })
+}
+
+/// A soft copy of a line's coverage for its glow and shadow: blurred about `radius` pixels, kept `step` times smaller
+/// (it has no detail), with a margin of `margin` small pixels around the line. (width, height, coverage).
+pub fn soften(line: &Line, radius: f32, step: u32, margin: u32) -> (u32, u32, Vec<u8>) {
+    let step = step.clamp(1, 16);
+    let (w, h) = (
+        line.w.div_ceil(step) + 2 * margin,
+        line.h.div_ceil(step) + 2 * margin,
+    );
+    let mut a = vec![0f32; (w * h) as usize];
+    for y in 0..line.h {
+        for x in 0..line.w {
+            let c = line
+                .cover
+                .get((y * line.w + x) as usize)
+                .copied()
+                .unwrap_or(0);
+            if c != 0
+                && let Some(p) = a.get_mut(((y / step + margin) * w + x / step + margin) as usize)
+            {
+                *p += f32::from(c) / (255.0 * (step * step) as f32);
+            }
+        }
+    }
+    // three box blurs make a bell
+    let r = ((radius / step as f32 / 1.7).round() as i64).clamp(1, i64::from(margin.max(1)));
+    let mut b = vec![0f32; a.len()];
+    for _ in 0..3 {
+        box_blur(&a, &mut b, (w, h), r, true);
+        box_blur(&b, &mut a, (w, h), r, false);
+    }
+    (
+        w,
+        h,
+        a.iter()
+            .map(|v| (v.clamp(0.0, 1.0) * 255.0) as u8)
+            .collect(),
+    )
+}
+
+/// One box blur of `src` (`w` by `h`) into `dst`, `r` pixels each way, along the rows (`across`) or the columns.
+fn box_blur(src: &[f32], dst: &mut [f32], (w, h): (u32, u32), r: i64, across: bool) {
+    let (wi, hi) = (i64::from(w), i64::from(h));
+    let (n, m) = if across { (hi, wi) } else { (wi, hi) };
+    for j in 0..n {
+        let index = |k: i64| if across { j * wi + k } else { k * wi + j };
+        let at = |k: i64| -> f32 {
+            if (0..m).contains(&k) {
+                src.get(index(k) as usize).copied().unwrap_or(0.0)
+            } else {
+                0.0
+            }
+        };
+        let mut sum: f32 = (-r..=r).map(at).sum();
+        for k in 0..m {
+            if let Some(p) = dst.get_mut(index(k) as usize) {
+                *p = sum / (2 * r + 1) as f32;
+            }
+            sum += at(k + r + 1) - at(k - r);
+        }
+    }
+}
+
 /// The shipped fonts were found: the own interface can draw its texts.
 pub fn available() -> bool {
     ATLAS
@@ -456,6 +632,41 @@ mod tests {
         assert!(!needed("Level_01 é"));
         assert!(needed("失衡空间站"));
         assert!(needed("Уровень"));
+    }
+
+    #[test]
+    fn a_soft_copy_spreads_the_line_and_keeps_inside_its_margin() {
+        let line = Line {
+            w: 8,
+            h: 4,
+            cover: vec![255; 32],
+            base: 3.0,
+            glyphs: Vec::new(),
+        };
+        let (w, h, soft) = soften(&line, 4.0, 2, 5);
+        assert_eq!((w, h), (4 + 10, 2 + 10));
+        assert_eq!(soft.len(), (w * h) as usize);
+        let at = |x: u32, y: u32| soft[(y * w + x) as usize];
+        assert!(
+            at(7, 6) > at(3, 6) && at(3, 6) > 0,
+            "brightest in the middle, fading out"
+        );
+        assert_eq!(at(0, 0), 0, "nothing reaches the corner");
+        // nothing to blur, absurd sizes: no panic
+        let empty = Line {
+            w: 0,
+            h: 0,
+            cover: Vec::new(),
+            base: 0.0,
+            glyphs: Vec::new(),
+        };
+        let (w, h, soft) = soften(&empty, f32::NAN, 0, 1);
+        assert_eq!(soft.len(), (w * h) as usize);
+        assert!(line_refused("x", f32::NAN) && line_refused("x", 1.0e9) && line_refused("x", 0.0));
+    }
+
+    fn line_refused(text: &str, cap: f32) -> bool {
+        line(text, cap, 700.0, 1.0, 0.1).is_none()
     }
 
     #[test]

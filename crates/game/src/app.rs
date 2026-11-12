@@ -1132,6 +1132,29 @@ fn loading_name(source: &crate::assets::Source) -> String {
     }
 }
 
+/// What the loading screen shows of a level: its name, who made it, and the mood of its sky (level.txt's `sky`; an
+/// original level's goes by its number).
+fn loading_card(
+    source: &crate::assets::Source,
+) -> (String, Option<String>, crate::titlescene::Mood) {
+    use crate::titlescene::Mood;
+    let name = loading_name(source);
+    match source {
+        crate::assets::Source::Original(n) => (name, None, Mood::of(None, Some(*n))),
+        crate::assets::Source::Nmo(p) | crate::assets::Source::Open(p) => {
+            let info = gamedata::package::info_of(p);
+            // an original level's rounded export (levels/remastered/Level_NN) names no sky: its number says it
+            let number = p
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|n| n.strip_prefix("Level_"))
+                .and_then(|n| n.parse().ok());
+            let mood = Mood::of(info.sky.as_deref(), number);
+            (name, info.author.filter(|a| !a.trim().is_empty()), mood)
+        }
+    }
+}
+
 /// Original level `n` from its remastered export (the rounding cache), when the look is a rounded one (Remaster,
 /// Drahtseilakt, Player's pack) and the export has the level; else the level as it is. The look is a setting, not a
 /// kind of level.
@@ -1638,6 +1661,7 @@ fn window(
         loading: None,
         autoloaded: false,
         splash: None,
+        art: Default::default(),
         startup: None,
         load_frames: Default::default(),
         load_busy: Default::default(),
@@ -4007,6 +4031,10 @@ struct Load {
     number: Option<u32>,
     plain: bool,
     began: Instant,
+    /// What the loading screen says and the mood of its picture: the level's name, who made it, its sky's.
+    title: String,
+    credit: Option<String>,
+    mood: crate::titlescene::Mood,
     /// Set to stop the thread (Esc).
     cancel: Arc<std::sync::atomic::AtomicBool>,
     up: crate::loading::Uploader,
@@ -4155,6 +4183,8 @@ struct App {
     /// DRAHTSEILAKT_AUTOLOAD has been done.
     autoloaded: bool,
     splash: Option<Splash>,
+    /// The title and loading screens' words and shown progress.
+    art: crate::loading::Art,
     startup: Option<Box<Startup>>,
     game: Game,
     /// The options the game was started with, for loading another level.
@@ -4751,6 +4781,10 @@ impl App {
                 fading: None,
             });
         }
+        let mut renderer = renderer;
+        if self.splash.is_some() {
+            renderer.prepare_title();
+        }
         self.gpu = Some(Gpu {
             surface,
             config,
@@ -5299,7 +5333,11 @@ impl App {
         self.load_frames = Default::default();
         self.load_busy = Default::default();
         self.load_slow = 0;
+        let (title, credit, mood) = loading_card(&source);
         self.loading = Some(Box::new(Load {
+            title,
+            credit,
+            mood,
             source,
             data,
             number,
@@ -5458,7 +5496,15 @@ impl App {
     fn splash_step(&mut self) {
         let ready = self.startup.is_none();
         let Some(sp) = &mut self.splash else { return };
-        let stood = sp.began.elapsed() >= SPLASH_MIN;
+        // DRAHTSEILAKT_SPLASH_HOLD=seconds keeps the title screen up that long (for taking its picture)
+        let hold = std::env::var("DRAHTSEILAKT_SPLASH_HOLD")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+            .filter(|v| v.is_finite())
+            .map_or(SPLASH_MIN, |v| {
+                std::time::Duration::from_secs_f32(v.clamp(0.0, 600.0))
+            });
+        let stood = sp.began.elapsed() >= hold;
         match sp.fading {
             None if ready && (stood || sp.skipped) => sp.fading = Some(Instant::now()),
             Some(t) if t.elapsed() >= SPLASH_FADE => self.splash = None,
@@ -7016,21 +7062,20 @@ impl App {
             h: rh as f32,
         };
         let font = self.game.font.as_ref();
+        // the words of the title and loading screens go over their picture, the rest of the interface under it
+        let mut art_quads = Vec::new();
         let quads = match (&self.menu, &self.loading, font) {
-            (_, Some(l), Some(f)) => {
+            (_, Some(l), Some(_)) => {
                 if l.shown() {
-                    crate::loading::bar(
-                        f,
+                    art_quads = self.art.loading(
                         screen,
-                        &self.strings,
-                        &loading_name(&l.source),
-                        crate::loading::fraction(),
+                        &l.title,
+                        l.credit.as_deref(),
                         &crate::loading::text(&self.strings),
                         l.began.elapsed().as_secs_f32() - LOAD_SCREEN_AFTER.as_secs_f32(),
-                    )
-                } else {
-                    Vec::new()
+                    );
                 }
+                Vec::new()
             }
             (Some(m), None, Some(_)) => {
                 // over a level its points and lives stay in view, as the original's pause shows them
@@ -7066,20 +7111,42 @@ impl App {
             }
             _ => Vec::new(),
         };
-        let mut quads = quads;
-        if let (Some(sp), Some(f)) = (&self.splash, font) {
-            quads.extend(crate::loading::splash(
-                f,
-                screen,
-                sp.began.elapsed().as_secs_f32(),
-                sp.fade(),
-            ));
-        }
+        // the title and loading screens: their picture over the frame, then their words
+        let shot = match (&self.splash, &self.loading, font) {
+            (Some(sp), _, Some(_)) => {
+                let t = sp.began.elapsed().as_secs_f32();
+                art_quads = self.art.splash(screen, t, sp.fade());
+                Some(crate::titlescene::Shot {
+                    loading: false,
+                    time: t,
+                    progress: 0.0,
+                    alpha: sp.fade(),
+                    mood: crate::titlescene::DUSK,
+                })
+            }
+            (None, Some(l), Some(_)) => {
+                let t = l.began.elapsed().as_secs_f32() - LOAD_SCREEN_AFTER.as_secs_f32();
+                let progress = self.art.progress(crate::loading::fraction(), t < 0.0);
+                l.shown().then_some(crate::titlescene::Shot {
+                    loading: true,
+                    time: t,
+                    progress,
+                    alpha: (t / 0.25).clamp(0.0, 1.0),
+                    mood: l.mood,
+                })
+            }
+            _ => None,
+        };
         if let Some((w, h, rgba)) = crate::fallback::take_changed() {
             gpu.renderer
                 .add_named_texture(crate::fallback::TEXTURE, w, h, rgba);
         }
-        gpu.renderer.draw_ui(&view, rw, rh, &quads);
+        for (name, w, h, rgba) in self.art.uploads() {
+            gpu.renderer.add_named_texture(name, w, h, rgba);
+        }
+        // the words wait for their picture (its pipeline is made on a thread at the start)
+        gpu.renderer
+            .draw_screen(&view, (rw, rh), &quads, shot.as_ref(), &art_quads);
         if look.post() {
             if let Some(retro) = &gpu.renderer.retro {
                 let place = look.placed(gpu.config.width, gpu.config.height);
