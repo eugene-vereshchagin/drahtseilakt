@@ -1,7 +1,7 @@
 // Interface.dll: 2D text and fonts (docs/fonts.md; the findings the old C gave where it is silent are in
 // docs/gameplay_bbs.md, "Text"). A block's text is a box in the original's 640x480 frame sent to the host
 // (`Host::text_box`, keyed by the block); the engine draws and fits it. Fonts keep only size, weight and colour:
-// the engine draws every font in its own face. Movie Player is a named no-op; 3D Text puts its text in the world (Host::text_3d).
+// the engine draws every font in its own face. Movie Player animates a texture's slots (materials.rs); 3D Text puts its text in the world (Host::text_3d).
 
 use super::*;
 use crate::{Font, MAX_TEXT_CHARS, Text3dSpec, TextSpec, text_align};
@@ -265,28 +265,6 @@ pub(crate) fn text_display(
     Flow::Continue
 }
 
-/// A block that is known and draws nothing here (Movie Player): inputs taken, said once.
-pub(crate) fn named_no_op(
-    rt: &mut Runtime,
-    _id: Id,
-    b: &Block,
-    proto: Guid,
-    host: &mut dyn Host,
-) -> Flow {
-    let mut any = false;
-    for i in 0..b.inputs.len() {
-        any |= input(rt, b, i);
-    }
-    if any {
-        rt.report_once(
-            proto,
-            host,
-            &format!("script block does nothing in the player: {}", b.name),
-        );
-    }
-    Flow::Done
-}
-
 /// 3D Text: while on, the text of pin Text on the target 3D entity's place, in the font of pin Font (its scale is the
 /// line's height in world units), aligned by pin Alignment inside the margins. On -> Exit On; Off -> Exit Off and
 /// the text is gone. Pins Paragraph Indentation, the background and caret ones are not read. Outputs: Line Count.
@@ -439,15 +417,18 @@ pub(super) const PROTOS: &[Proto] = &[
         text_3d,
         Some(text_3d_event),
     ),
-    decl(
-        proto::MOVIE_PLAYER,
-        "Movie Player",
-        Library::Interface,
-        &[],
-        Standing::Partial,
-        named_no_op,
-        None,
-    ),
+    Proto {
+        guid: proto::MOVIE_PLAYER,
+        name: "Movie Player",
+        library: Library::Interface,
+        pins: &["Duration", "Loop", "Starting Slot", "Ending Slot"],
+        pouts: &["Current Slot"],
+        flags: flags::TARGET,
+        standing: Standing::Full,
+        layouts: &[],
+        run: super::materials::movie_player,
+        event: None,
+    },
     decl(
         proto::TT_CREATE_FONT_EX,
         "TT CreateFontEx",

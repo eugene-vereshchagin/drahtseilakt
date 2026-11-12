@@ -1902,7 +1902,7 @@ the engine's own pixel font, so only what decides *where, how big, what colour* 
   not known). Colour = font colour times the entity's first material's diffuse; the material's texture is not used.
   Our font (Noto Sans / Tektur / Noto Sans SC atlas), depth-tested, alpha-blended, unlit. Caps: 32 texts, 4096
   characters together, 4096 glyph quads a frame. State is per block in the run (rewinds with it).
-- **Movie Player:** known, does nothing (inputs taken, one log note).
+- **Movie Player:** animates the target texture, no video. On shows Starting Slot and fires Synchro Out; each tick moves the texture to the slot the elapsed time reaches (Starting to Ending Slot, equal spans over Duration ms, counting down when the end is lower; Current Slot is its output). At the end of a pass One Loop Played fires; Loop starts it again, else it stops. Off stops it. No Duration or no texture: times only, changes no slot.
 - Text never affects the simulation: the boxes are only read by the renderer.
 
 ## The game's facade

@@ -274,6 +274,100 @@ pub(crate) fn set_current_slot(
     Flow::Done
 }
 
+/// The slot a Movie Player shows after `elapsed` ms of one pass of `duration` ms: the pass is cut into equal
+/// spans, one per slot from Starting Slot to Ending Slot (counting down when the end is below the start), and
+/// the last span ends on the end slot.
+fn movie_slot(start: i32, end: i32, elapsed: f32, duration: f32) -> i32 {
+    let (start, end) = (i64::from(start), i64::from(end));
+    let count = (end - start).abs() + 1;
+    let progress = if duration > 0.0 && !elapsed.is_nan() {
+        (elapsed / duration).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let step = ((count as f32 * progress).floor() as i64).min(count - 1);
+    let slot = if end >= start { start + step } else { start - step };
+    slot.clamp(start.min(end), start.max(end)) as i32
+}
+
+/// Movie Player (Interface.dll): animates the target texture through its slots, one pass per Duration (ms).
+/// On shows Starting Slot, fires Synchro Out and keeps running; each tick adds the tick's time to Elapsed (local 0)
+/// and moves the texture to the slot that time reaches (Current Slot is its output). At the end of a pass Out 1
+/// fires: with Loop the pass starts again, else the block stops. Off stops it. Without a Duration above zero or a
+/// target texture it times the passes and changes no slot.
+pub(crate) fn movie_player(
+    rt: &mut Runtime,
+    id: Id,
+    b: &Block,
+    _p: Guid,
+    host: &mut dyn Host,
+) -> Flow {
+    if input(rt, b, 0) {
+        let duration = pin(rt, b, "Duration", 0, host).as_float();
+        let start = pin(rt, b, "Starting Slot", 2, host).as_int();
+        let tex = if duration > 0.0 {
+            target_texture(rt, b, host)
+        } else {
+            None
+        };
+        if let Some(t) = tex {
+            host.texture_set(t, TexChange::Slot(start));
+        }
+        set_pout(rt, b, "Current Slot", 0, Value::Int(start));
+        if let Some(&l) = b.locals.first() {
+            rt.write(l, Value::Float(0.0));
+        }
+        rt.set_scratch(id, Scratch::Flag(true));
+        out(rt, b, 0);
+        return Flow::Continue;
+    }
+    if input(rt, b, 1) {
+        rt.set_scratch(id, Scratch::Flag(false));
+        return Flow::Done;
+    }
+    if !matches!(rt.scratch(id), Scratch::Flag(true)) {
+        return Flow::Done;
+    }
+    let duration = pin(rt, b, "Duration", 0, host).as_float();
+    let looping = pin(rt, b, "Loop", 1, host).as_bool();
+    let start = pin(rt, b, "Starting Slot", 2, host).as_int();
+    let end = pin(rt, b, "Ending Slot", 3, host).as_int();
+    let tex = if duration > 0.0 {
+        target_texture(rt, b, host)
+    } else {
+        None
+    };
+    let mut elapsed = local(rt, b, 0).as_float() + host.delta_ms();
+    let mut finished = false;
+    if elapsed >= duration {
+        finished = true;
+        if looping {
+            elapsed -= duration;
+        }
+    }
+    if let Some(&l) = b.locals.first() {
+        rt.write(l, Value::Float(elapsed));
+    }
+    if duration > 0.0 {
+        let slot = movie_slot(start, end, elapsed, duration);
+        let shown = pout_value(rt, b, 0).map_or(start, |v| v.as_int());
+        if slot != shown {
+            if let Some(t) = tex {
+                host.texture_set(t, TexChange::Slot(slot));
+            }
+        }
+        set_pout(rt, b, "Current Slot", 0, Value::Int(slot));
+    }
+    if finished {
+        out(rt, b, 1);
+        if !looping {
+            rt.set_scratch(id, Scratch::Flag(false));
+            return Flow::Done;
+        }
+    }
+    Flow::Continue
+}
+
 /// Get Texture Info: "Exist" when the target is a level texture (with its file name, and, past the declared two,
 /// width, height and slot where the block has outputs for them), else "Empty".
 pub(crate) fn get_texture_info(
