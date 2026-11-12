@@ -3286,6 +3286,7 @@ pub(crate) mod tests {
             settings: level::Settings::default(),
             scripts: None,
             frames: Vec::new(),
+            texture_slots: Vec::new(),
         }
     }
 

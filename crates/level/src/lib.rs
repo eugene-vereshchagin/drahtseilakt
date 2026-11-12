@@ -59,6 +59,9 @@ pub struct Level {
     /// The 2D frames a map lays over the picture (an author's signature in a corner, a logo): at most MAX_FRAMES.
     /// Only a `.nmo` map carries them; only drawn.
     pub frames: Vec<Frame>,
+    /// The slots after the first of the textures that have several (an animation's frames), by texture index; at most
+    /// `nmo::scene::MAX_SLOTS - 1` each. Only a `.nmo` map carries them; a script's Set Current Slot shows one.
+    pub texture_slots: Vec<(usize, Vec<TextureSource>)>,
 }
 
 /// Frames a level keeps (a map has one, rarely four).

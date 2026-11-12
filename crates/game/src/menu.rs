@@ -2140,6 +2140,7 @@ impl Menu {
         // behind the menus the game draws the interface's 3D scene (the original's or our own, menuscene.rs)
         let mut out = Vec::new();
         let quad = |r: [f32; 4], uv: [f32; 4], texture: &'static str| Quad {
+            angle: 0.0,
             rect: screen.rect(homogeneous(r), Anchor::Center),
             uv,
             top: WHITE,
@@ -2148,6 +2149,7 @@ impl Menu {
         };
         // M_BlackScreen: a strip of Button01_special's black at 0.61
         out.push(Quad {
+            angle: 0.0,
             top: [1.0, 1.0, 1.0, 0.61],
             bottom: [1.0, 1.0, 1.0, 0.61],
             ..quad([0.3, 0.0, 0.7, 1.0], [0.0, 0.99, 1.0, 1.0], SPECIAL)
@@ -2335,6 +2337,7 @@ impl Menu {
             }
             let plain = |out: &mut Vec<Quad>, r: [f32; 4], a: f32| {
                 out.push(Quad {
+                    angle: 0.0,
                     top: [1.0, 1.0, 1.0, a],
                     bottom: [1.0, 1.0, 1.0, a],
                     ..quad(r, [0.0, 0.0, 1.0, 1.0], PLAIN)
@@ -2419,6 +2422,7 @@ impl Menu {
             let dark = |out: &mut Vec<Quad>, a: f32, b: f32, c: f32, d: f32| {
                 if c > a && d > b {
                     out.push(Quad {
+                        angle: 0.0,
                         top: [0.0, 0.0, 0.0, 0.78],
                         bottom: [0.0, 0.0, 0.0, 0.78],
                         ..quad(fr(a, b, c, d), [0.0, 0.0, 1.0, 1.0], PLAIN)
@@ -2960,6 +2964,7 @@ impl Menu {
                     );
                 }
                 out.push(Quad {
+                    angle: 0.0,
                     top: [0.0, 0.0, 0.0, 0.43],
                     bottom: [0.0, 0.0, 0.0, 0.43],
                     ..quad(
@@ -3000,6 +3005,7 @@ impl Menu {
         let mut out = Vec::new();
         if face.own() {
             out.push(Quad {
+                angle: 0.0,
                 rect: screen.rect(homogeneous([0.0, 0.43, 1.0, 0.57]), Anchor::Center),
                 uv: [0.0, 0.99, 1.0, 1.0],
                 top: [1.0, 1.0, 1.0, 0.61],

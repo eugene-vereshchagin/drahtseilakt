@@ -192,9 +192,20 @@ pub struct Instance {
     pub unlit: bool,
     /// The ball's shadow pass over this floor mesh: its centre (world x, z) and side.
     pub shadow: Option<[f32; 3]>,
+    /// Materials this one thing draws in place of its mesh's own (a script's Set Material): (the level's, the
+    /// replacement). Empty for nearly everything.
+    pub swaps: Vec<(usize, usize)>,
 }
 
 impl Instance {
+    /// The material index a part of this instance is drawn with.
+    fn material_of(&self, part_material: usize) -> usize {
+        self.swaps
+            .iter()
+            .find(|(from, _)| *from == part_material)
+            .map_or(part_material, |(_, to)| *to)
+    }
+
     /// A mesh drawn with its own materials as they are.
     pub fn plain(model: usize, mesh: usize, matrix: Mat4) -> Instance {
         Instance {
@@ -206,6 +217,7 @@ impl Instance {
             diffuse: None,
             unlit: false,
             shadow: None,
+            swaps: Vec::new(),
         }
     }
 }
@@ -1279,27 +1291,37 @@ impl Renderer {
         let mut verts: Vec<UiVertex> = Vec::with_capacity(quads.len() * 6);
         let mut runs: Vec<(&'static str, u32, u32)> = Vec::new();
         for q in quads {
-            let [x0, y0, x1, y1] = q.rect;
-            let (cx0, cy0, cx1, cy1) = (
-                x0 / w * 2.0 - 1.0,
-                1.0 - y0 / h * 2.0,
-                x1 / w * 2.0 - 1.0,
-                1.0 - y1 / h * 2.0,
-            );
             let [u0, v0, u1, v1] = q.uv;
             let v = |x: f32, y: f32, u: f32, t: f32, color: [f32; 4]| UiVertex {
-                pos: [x, y],
+                pos: [x / w * 2.0 - 1.0, 1.0 - y / h * 2.0],
                 uv: [u, t],
                 color,
             };
+            // the corners in window pixels, turned about the centre by the quad's angle (0 leaves them as they are)
+            let [x0, y0, x1, y1] = q.rect;
+            let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+            let (sn, cs) = if q.angle.is_finite() {
+                q.angle.to_radians().sin_cos()
+            } else {
+                (0.0, 1.0)
+            };
+            let turn = |x: f32, y: f32| {
+                if sn == 0.0 {
+                    (x, y)
+                } else {
+                    let (dx, dy) = (x - cx, y - cy);
+                    (cx + dx * cs - dy * sn, cy + dx * sn + dy * cs)
+                }
+            };
+            let (a, b, c, d) = (turn(x0, y0), turn(x1, y0), turn(x1, y1), turn(x0, y1));
             let first = verts.len() as u32;
             verts.extend([
-                v(cx0, cy0, u0, v0, q.top),
-                v(cx1, cy0, u1, v0, q.top),
-                v(cx1, cy1, u1, v1, q.bottom),
-                v(cx0, cy0, u0, v0, q.top),
-                v(cx1, cy1, u1, v1, q.bottom),
-                v(cx0, cy1, u0, v1, q.bottom),
+                v(a.0, a.1, u0, v0, q.top),
+                v(b.0, b.1, u1, v0, q.top),
+                v(c.0, c.1, u1, v1, q.bottom),
+                v(a.0, a.1, u0, v0, q.top),
+                v(c.0, c.1, u1, v1, q.bottom),
+                v(d.0, d.1, u0, v1, q.bottom),
             ]);
             match runs.last_mut() {
                 Some(r) if r.0 == q.texture => r.2 += 6,
@@ -1631,7 +1653,7 @@ impl Renderer {
                     None => self
                         .models
                         .get(inst.model)
-                        .and_then(|m| m.materials.get(part.material))
+                        .and_then(|m| m.materials.get(inst.material_of(part.material)))
                         .map(|m| m.key),
                 };
                 match key {
@@ -1785,7 +1807,7 @@ impl Renderer {
                 let mat = match inst.marker {
                     _ if inst.shadow.is_some() => self.shadow_material.as_ref(),
                     Some(c) => self.markers.get(&c.map(f32::to_bits)),
-                    None => model.materials.get(part.material),
+                    None => model.materials.get(inst.material_of(part.material)),
                 };
                 let Some(mat) = mat else {
                     continue;

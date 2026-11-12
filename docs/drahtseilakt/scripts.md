@@ -135,9 +135,15 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
   is what level materials always had, so a level without scripts draws as before). Set 3DSprite Mode: the mode (0 faces
   the view, 1 / 2 turn about the world x / y, 3 keeps its axes) is kept per entity row (`Entities::sprite_mode`) and
   `scene::sprite_matrix` uses it for a 3D sprite.
-- **Partial.** Set Material (the replaced material takes the new one's whole state for every object that uses it, not
-  for the target object alone); Set Current Slot (recorded; the nmo reader keeps only a texture's first slot, in
-  `nmo::scene::texture`, so there is no second picture to show)).
+- **Full since stage 4.3: Set Material and Set Current Slot.** Set Material replaces a material on the target object
+  alone: `Entities::replace_material` keeps (level material, material drawn now) pairs per row (at most 32; a copy
+  starts with its source's), `Instance::swaps` carries them to the renderer, which draws the part with the
+  replacement; other objects that use the same material are untouched, and no level-wide material changes.
+  Set Current Slot: `nmo::scene::texture` reads every
+  slot (at most `MAX_SLOTS` = 64, names and saved pictures; 64 MiB of pixels per texture; a slot that cannot be read
+  ends the list); `Level::texture_slots` carries those after the first, `MatState::show_slot` makes the chosen slot's
+  picture the texture's run copy (the renderer uploads it as it does a written texture; slot 0 gives the level's own
+  back; a slot the texture lacks changes nothing; a later Write In Texture paints the shown picture).
 - **Full since stage 4.2: Blend Textures and Write In Texture** (below).
 - **Caps.** Only the level's own materials and textures can be named (anything else is ignored, so the table is at most
   as large as the level's); colours are clamped to 0..1, specular power to 0..1000; a texture size to 2048 x 2048; a
@@ -458,16 +464,16 @@ by the engine's.
 | Random | `0c622386:1c3054f7` | 1 | 35 | done (a fixed seed: every run draws the same numbers) |
 | Set Euler Orientation | `0c4966d8:6c0c6d14` | 1 | 7 | done (X, then Y, then Z) |
 | Has Attribute | `25b54079:6ff90545` | 1 | 4 | done |
-| Set Material | `37865d50:2e285fab` | 1 | 3 | planned |
+| Set Material | `37865d50:2e285fab` | 1 | 3 | full (stage 4.3): per-object material replacement (the target's own parts draw the new material) |
 | Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | done |
 | SphericalParticleSystem | `67c88f47:8880721e` | 1 | 1 | planned |
 | Set 3DSprite Mode | `0c5d0457:c64c7000` | 1 | 1 | done (stage 4.1) |
-| Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | partial: recorded; only a texture's first slot is loaded |
+| Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | full (stage 4.3): the chosen slot's picture is drawn (all slots of a texture are read) |
 | Sequencer | `42530844:257b6053` | 1 | 1 | done |
 | Calculator | `4bc209b8:5b3679b0` | 1 | 8 | full: numbers, a..z, + - * / ^, unary signs, pi, abs sqrt sin cos tan asin acos atan sinh cosh tanh exp ln log floor ceil; caps 256 tokens, depth 32, 511 bytes (oracle-checked on the C's grammar, random expressions against a second evaluator on the rest) |
 | TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | done: a font of the name with a texture; drawn in our own font (no system fonts) |
 | Get Message Data | `45875fee:45875fdd` | 1 | 1 | done |
-| Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | partial: position, size and rotation are kept per 2D entity (64); 2D Text lays out inside them; a frame the file shows with a textured material is drawn at the edited place and size (rotation is not; a frame the file hides stays hidden) |
+| Edit 2D Entity | `7fc54c91:3f486670` | 1 | 6 | full (stage 4.3): position, size and rotation (radians, drawn turned about the frame's centre) are kept per 2D entity (64); 2D Text lays out inside them; a frame the file hides is drawn once a script's Show reaches it (and Hide removes a shown one) |
 | Set Clipping Planes | `652316a2:01aa09a9` | 1 | 2 | done: the renderer takes near and far |
 | Set Fog | `151aaaaa:ffd5bdbc` | 1 | 3 | done: linear, exp and exp2 distance fog in the shader (replaces the level fog); mode 0 switches fog off |
 | TT Sky | `36691920:3b261630` | 1 | 1 | partial: the state (sides, colour, radius) is kept in the run and logged; drawn (stage 4.1): a mesh built from the sides, bottom and top materials, see below |

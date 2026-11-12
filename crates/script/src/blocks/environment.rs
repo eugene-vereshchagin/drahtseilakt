@@ -135,6 +135,19 @@ fn finite2(v: [f32; 2]) -> Option<[f32; 2]> {
     (v[0].is_finite() && v[1].is_finite()).then_some(v)
 }
 
+/// The run's record of a 2D entity (made when first needed; none past `MAX_ENTS_2D` entities).
+pub(crate) fn ent2d_slot(rt: &mut Runtime, t: Id) -> Option<&mut Ent2d> {
+    let at = match rt.ents2d.iter().position(|(k, _)| *k == t) {
+        Some(i) => i,
+        None if rt.ents2d.len() < MAX_ENTS_2D => {
+            rt.ents2d.push((t, Ent2d::default()));
+            rt.ents2d.len() - 1
+        }
+        None => return None,
+    };
+    rt.ents2d.get_mut(at).map(|(_, e)| e)
+}
+
 /// Edit 2D Entity: the ticked parts of the target 2D entity, by the names of the pins the block carries (Position
 /// X and Y, Size X and Y, Rotation). The run keeps them (at most `MAX_ENTS_2D` entities) and a 2D Text on the
 /// entity lays itself out inside them; the engine has no picture of the entity itself.
@@ -160,15 +173,7 @@ pub(crate) fn edit_2d_entity(
         let size = pair(rt, "Size X", "Size Y", host);
         let rotation = named(rt, b, "Rotation", host).map(|v| v.as_float());
         if let Some(t) = t {
-            let at = rt.ents2d.iter().position(|(k, _)| *k == t);
-            let slot = match at {
-                Some(i) => rt.ents2d.get_mut(i).map(|(_, e)| e),
-                None if rt.ents2d.len() < MAX_ENTS_2D => {
-                    rt.ents2d.push((t, Ent2d::default()));
-                    rt.ents2d.last_mut().map(|(_, e)| e)
-                }
-                None => None,
-            };
+            let slot = ent2d_slot(rt, t);
             if let Some(e) = slot {
                 // a half-given pair keeps the other half
                 let merge = |old: Option<[f32; 2]>, new: Option<[f32; 2]>| {
@@ -266,7 +271,7 @@ pub(super) const PROTOS: &[Proto] = &[
         pins: &[],
         pouts: &[],
         flags: flags::TARGET | flags::VAR_PINS,
-        standing: Standing::Partial,
+        standing: Standing::Full,
         layouts: &[],
         run: edit_2d_entity,
         event: None,

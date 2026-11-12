@@ -45,6 +45,39 @@ struct TexBase {
 }
 
 impl TexBase {
+    fn of(t: &level::Texture) -> TexBase {
+        match &t.source {
+            TextureSource::Pixels {
+                width,
+                height,
+                rgba,
+            } => TexBase {
+                embedded: (*width > 0
+                    && *height > 0
+                    && *width <= MAX_TEXTURE_SIDE
+                    && *height <= MAX_TEXTURE_SIDE
+                    && rgba.len() == *width as usize * *height as usize * 4)
+                    .then(|| Pix {
+                        width: *width,
+                        height: *height,
+                        rgba: Arc::new(rgba.clone()),
+                    }),
+                source: None,
+                loaded: OnceLock::new(),
+            },
+            TextureSource::None => TexBase {
+                embedded: None,
+                source: None,
+                loaded: OnceLock::new(),
+            },
+            _ => TexBase {
+                embedded: None,
+                source: Some(t.clone()),
+                loaded: OnceLock::new(),
+            },
+        }
+    }
+
     fn pix(&self) -> Option<Pix> {
         if let Some(p) = &self.embedded {
             return Some(p.clone());
@@ -114,6 +147,8 @@ pub struct MatState {
     textures: Arc<Vec<(String, u32, u32)>>,
     /// The pictures of the level's textures (read when a script first writes one).
     bases: Arc<Vec<TexBase>>,
+    /// The slots after the first of the level's textures that have several, by texture index (Set Current Slot).
+    slot_bases: Arc<BTreeMap<usize, Vec<TexBase>>>,
     /// The copies scripts wrote into, by level texture index. At most `MAX_COPY_BYTES` together; only textures the
     /// level has.
     pub written: BTreeMap<usize, TexCopy>,
@@ -149,39 +184,25 @@ impl MatState {
             over: BTreeMap::new(),
             tex: BTreeMap::new(),
             written: BTreeMap::new(),
-            bases: Arc::new(
+            bases: Arc::new(level.textures.iter().map(TexBase::of).collect()),
+            slot_bases: Arc::new(
                 level
-                    .textures
+                    .texture_slots
                     .iter()
-                    .map(|t| match &t.source {
-                        TextureSource::Pixels {
-                            width,
-                            height,
-                            rgba,
-                        } => TexBase {
-                            embedded: (*width > 0
-                                && *height > 0
-                                && *width <= MAX_TEXTURE_SIDE
-                                && *height <= MAX_TEXTURE_SIDE
-                                && rgba.len() == *width as usize * *height as usize * 4)
-                                .then(|| Pix {
-                                    width: *width,
-                                    height: *height,
-                                    rgba: Arc::new(rgba.clone()),
-                                }),
-                            source: None,
-                            loaded: OnceLock::new(),
-                        },
-                        TextureSource::None => TexBase {
-                            embedded: None,
-                            source: None,
-                            loaded: OnceLock::new(),
-                        },
-                        _ => TexBase {
-                            embedded: None,
-                            source: Some(t.clone()),
-                            loaded: OnceLock::new(),
-                        },
+                    .filter(|(t, _)| *t < level.textures.len())
+                    .filter_map(|(t, more)| {
+                        let own = level.textures.get(*t)?;
+                        let bases = more
+                            .iter()
+                            .take(nmo::scene::MAX_SLOTS - 1)
+                            .map(|source| {
+                                TexBase::of(&level::Texture {
+                                    source: source.clone(),
+                                    ..own.clone()
+                                })
+                            })
+                            .collect();
+                        Some((*t, bases))
                     })
                     .collect(),
             ),
@@ -340,9 +361,44 @@ impl MatState {
                     cur.size = Some((width.min(MAX_TEXTURE_SIDE), height.min(MAX_TEXTURE_SIDE)));
                 }
             }
-            TexChange::Slot(s) => cur.slot = s.clamp(-1, MAX_SLOT),
+            TexChange::Slot(s) => {
+                cur.slot = s.clamp(-1, MAX_SLOT);
+                self.show_slot(texture, cur.slot);
+            }
         }
         self.tex.insert(texture, cur);
+    }
+
+    /// Set Current Slot on a texture that has several slots: the slot's picture is what the texture draws (as the
+    /// copy a script wrote, so the renderer uploads it the same way; a write after it paints that picture); slot 0
+    /// gives the level's own back. A slot the texture does not have, or whose picture cannot be read, changes nothing.
+    fn show_slot(&mut self, texture: usize, slot: i32) {
+        let Some(more) = self.slot_bases.get(&texture) else {
+            return;
+        };
+        let Ok(k) = usize::try_from(slot) else {
+            return;
+        };
+        if k == 0 {
+            self.written.remove(&texture);
+            return;
+        }
+        let Some(pix) = more.get(k - 1).and_then(TexBase::pix) else {
+            return;
+        };
+        if self
+            .written
+            .get(&texture)
+            .is_some_and(|c| Arc::ptr_eq(&c.pix.rgba, &pix.rgba))
+        {
+            return;
+        }
+        let held = self.written.get(&texture).map_or(0, |c| c.pix.rgba.len());
+        if self.copy_bytes() - held + pix.rgba.len() > MAX_COPY_BYTES {
+            return;
+        }
+        let stamp = NEXT_GEN.fetch_add(1, Ordering::Relaxed);
+        self.written.insert(texture, TexCopy { pix, stamp });
     }
 
     /// How many materials the level has.
@@ -538,6 +594,45 @@ mod tests {
             pen: None,
             mode: 1,
         }
+    }
+
+    #[test]
+    fn set_current_slot_shows_the_slot_s_picture_of_a_texture_with_several() {
+        let embedded = |p: Pix| TexBase {
+            embedded: Some(p),
+            source: None,
+            loaded: OnceLock::new(),
+        };
+        let mut s = painted();
+        s.slot_bases = Arc::new(BTreeMap::from([(
+            0,
+            vec![
+                embedded(flat(2, 2, [9, 9, 9, 255])),
+                embedded(flat(2, 2, [7, 7, 7, 255])),
+            ],
+        )]));
+        s.apply_texture(0, TexChange::Slot(2));
+        assert_eq!(s.written[&0].pix.rgba[..4], [7, 7, 7, 255]);
+        assert_eq!(s.texture_info(0).unwrap().slot, 2);
+        let stamp = s.written[&0].stamp;
+        s.apply_texture(0, TexChange::Slot(2));
+        assert_eq!(s.written[&0].stamp, stamp, "the same picture is not made again");
+        s.apply_texture(0, TexChange::Slot(1));
+        assert_eq!(s.written[&0].pix.rgba[..4], [9, 9, 9, 255]);
+        // a slot the texture does not have, or none (-1), leaves the picture
+        s.apply_texture(0, TexChange::Slot(3));
+        s.apply_texture(0, TexChange::Slot(-1));
+        assert_eq!(s.written[&0].pix.rgba[..4], [9, 9, 9, 255]);
+        // slot 0 is the level's own picture again; a texture of one slot takes no copy
+        s.apply_texture(0, TexChange::Slot(0));
+        assert!(s.written.is_empty());
+        s.apply_texture(1, TexChange::Slot(1));
+        assert!(s.written.is_empty());
+        // a rewind (a clone before) keeps its own
+        let mut t = s.clone();
+        s.apply_texture(0, TexChange::Slot(1));
+        t.apply_texture(0, TexChange::Slot(0));
+        assert!(t.written.is_empty() && s.written.contains_key(&0));
     }
 
     #[test]

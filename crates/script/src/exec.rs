@@ -167,6 +167,11 @@ pub trait Host {
     fn env_set(&mut self, _change: EnvChange) {}
     /// A script changes a level material for this run (Set Diffuse, Set Texture, Set Blend Modes, ...).
     fn material_set(&mut self, _material: usize, _change: MatChange) {}
+    /// Set Material: the entity's mesh material `from` (none: all of its mesh's) is drawn as `to`, for this entity
+    /// alone. True when something was replaced.
+    fn material_replace(&mut self, _e: Ent, _from: Option<usize>, _to: usize) -> bool {
+        false
+    }
     /// What a level texture is now: its file, size and current slot (Get Texture Info); none for a texture the level
     /// does not have.
     fn texture_info(&self, _texture: usize) -> Option<TexInfo> {
@@ -296,7 +301,10 @@ pub struct SkySpec {
 pub struct Ent2d {
     pub pos: Option<[f32; 2]>,
     pub size: Option<[f32; 2]>,
+    /// Radians, as the engine's 2D entity rotation.
     pub rotation: Option<f32>,
+    /// A script's Show or Hide of the entity (over the file's own visibility).
+    pub shown: Option<bool>,
 }
 
 /// The most 2D entities a run keeps edits of.
