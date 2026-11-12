@@ -97,6 +97,12 @@ an ellipsoid), and the physics values (masses, frictions, joints, forces) are th
 (crates/game/src/modules.rs); only the looks are new. `crates/game/src/partcheck.rs` runs every module of levels 1
 to 12 with the copy's part and with ours from the same start and input and compares the ways.
 
+Where a part's drawn shape is richer than its plain one, the plain shape stays the object's mesh and the drawn one is
+its look (open-format.md): the physics takes its hull from the mesh, and the test player reads the modules' meshes as
+floors and walls, so both see the same thing whatever is drawn. The lift (`P_Modul_03`, 2026-11-12) is drawn this
+way: a turned metal disc with a bolted rim and an oak deck, its loose panels red-painted frames with a boarded foot
+and bars above (the ball is seen through them); its slab, panels and gate are unchanged as meshes.
+
 A level takes our parts first when it says it is made for them (its settings' `"parts": "own"`, which our level kit
 `assets/own/make/levelkit.py` writes), so it plays the same with or without a copy; any other level (the copy's, a
 community map, a converted, remastered or older open-format level) takes the copy's first, as it was made, and ours
