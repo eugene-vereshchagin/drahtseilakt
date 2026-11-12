@@ -60,6 +60,7 @@ mod retro;
 mod scene;
 mod script_sound;
 mod script_text;
+mod script_text3d;
 mod scripting;
 mod scriptsky;
 mod setup;

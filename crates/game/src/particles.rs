@@ -28,6 +28,8 @@ pub enum Render {
 pub enum Blend {
     AlphaAdd,
     OneSrcColor,
+    /// Plain alpha blending (script text).
+    Alpha,
 }
 
 const VAR_SPEED: u32 = 1;

@@ -15,8 +15,8 @@ pub mod types;
 
 pub use blocks::proto::SET_TEXTURE;
 pub use exec::{
-    CameraChange, CameraState, Ent, Ent2d, EnvChange, FogSpec, Host, MAX_ENTS_2D, MatChange, Quiet, Runtime,
-    SkySpec, SliderSpec, SoundCmd, TexChange, TexInfo, TexPaint,
+    CameraChange, CameraState, Ent, Ent2d, EnvChange, FogSpec, Host, MAX_ENTS_2D, MatChange, Quiet,
+    Runtime, SkySpec, SliderSpec, SoundCmd, TexChange, TexInfo, TexPaint,
 };
 pub use input::InputFrame;
 pub use nmo::behavior::Guid;
@@ -154,6 +154,27 @@ pub mod text_align {
     pub const TOP: u8 = 4;
     pub const BOTTOM: u8 = 8;
 }
+
+/// A 3D Text block's text in the world (docs/drahtseilakt/scripts.md, "3D Text"): on the place of a 3D entity,
+/// laid out on its local XY plane. The engine draws it in its own font, depth-tested and alpha-blended, with the
+/// entity's world matrix as it is each frame; it never reaches the simulation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Text3dSpec {
+    pub text: String,
+    /// `text_align` bits; none of a pair means centred.
+    pub align: u8,
+    /// The font's scale (Set Font Properties): the line is `scale[1]` world units high, widened by `scale[0] / scale[1]`.
+    pub scale: [f32; 2],
+    /// Margins (left, top, right, bottom) and offset, in the 2D Text's units (frame pixels, 32 to a line at scale 1).
+    pub margins: [f32; 4],
+    pub offset: [f32; 2],
+    pub bold: bool,
+    pub color: [f32; 4],
+}
+
+/// The most 3D texts a run shows at once, and the most characters all of them hold together.
+pub const MAX_TEXT3D: usize = 32;
+pub const MAX_TEXT3D_CHARS: usize = 4096;
 
 /// The most text boxes a run shows at once, and the most characters one holds.
 pub const MAX_TEXT_BOXES: usize = 64;

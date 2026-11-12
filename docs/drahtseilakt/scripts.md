@@ -169,7 +169,7 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
   modes are our reading (the one map uses mode 1 with Size 1); it draws no text.
 - **Work.** Every pixel written is paid from the tick's work budget: one unit per 64 pixels, plus one.
 - **Maps.** Back and Forth reaches full effect. Fierce Battles writes one pixel into a ball texture, which only a
-  level material that draws with that texture shows; it stays partial for its other blocks (3D Text, an Op).
+  level material that draws with that texture shows; it stays partial for its other blocks (an Op).
 
 ## Phase 2 (2026-11-11): copies, "This", groups, progressions
 
@@ -415,7 +415,7 @@ by the engine's.
 | Set Font Properties | `dacfbd61:7a6e65e7` | 2 | 6 | done: scale and colour; drawn in our own font |
 | 2D Text | `055b29fe:662d5ca0` | 2 | 2 | done: inside the frame Edit 2D Entity gave the entity (values up to 2 are fractions of 640x480); drawn in our own font |
 | Fill Group By Class | `4445257b:70016c57` | 2 | 8 | planned |
-| 3D Text | `1f5b2fe7:6d355175` | 2 | 3 | named no-op (said once) |
+| 3D Text | `1f5b2fe7:6d355175` | 2 | 3 | full: text in the world on the target entity (script_text3d.rs; see gameplay_bbs.md, "Text") |
 | Row Search | `78863443:45af59b6` | 2 | 2 | done |
 | Create String | `4bcd2f9d:382652e2` | 2 | 2 | full: printf formats per part, Create / Add Line / Clear, 64 KiB cap (oracle-checked) |
 | Proximity | `5321cacb:dcdc5213` | 2 | 2 | done |
@@ -552,7 +552,7 @@ blocks, the blocks beyond the template, the blocks not covered, and whether phas
    Attribute Iterator, Iterator If, Get Message Data, Execute / Attach Script, Scan String, Create String, Get
    SubString, To Lower Keys, Renamer.
 7. **Never** (the plan's list as first written; Edit 2D Entity and TT Sky were drawn later, in stage 4.1): Movie Player and
-   3D Text (named no-ops), Write In Texture, Set As Active Camera, Set Clipping Planes: the game's own interface and camera take
+   (3D Text now draws in the world), Write In Texture, Set As Active Camera, Set Clipping Planes: the game's own interface and camera take
    their place; a map that needs them for play is reported by name.
 
 Semantics not knowable from the files, to be checked against the original by playing: the exact frame a

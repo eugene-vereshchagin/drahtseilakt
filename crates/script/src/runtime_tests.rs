@@ -45,6 +45,8 @@ struct Rec {
     paints: Vec<(usize, crate::TexPaint)>,
     /// Every text box call: the block and its spec (none: taken away).
     boxes: Vec<(usize, Option<crate::TextSpec>)>,
+    /// Every 3D text call: the block, the entity and the spec (none: taken away).
+    texts3d: Vec<(usize, Option<(Ent, crate::Text3dSpec)>)>,
     /// Every emitter call: block, entity, values, state.
     emitters: Vec<(usize, Ent, crate::EmitterSpec, crate::EmitState)>,
     /// Scene changes: Set Parent calls, Set IC calls, the sliders asked for (key, spec; none: destroyed), the
@@ -193,6 +195,9 @@ impl Host for Rec {
     }
     fn sound_playing(&self, _: usize) -> bool {
         self.playing
+    }
+    fn text_3d(&mut self, key: usize, on: Option<(Ent, crate::Text3dSpec)>) {
+        self.texts3d.push((key, on));
     }
     fn text_box(&mut self, key: usize, spec: Option<crate::TextSpec>) {
         if let Some(s) = &spec {
@@ -2895,7 +2900,13 @@ fn text_rig(
         })
         .collect();
     let pout_ids: Vec<Id> = pouts.iter().map(|(n, g)| b.pout(n, *g)).collect();
-    let frame = b.g.add_object("Frame", ObjKind::Other);
+    // class 33 is a 3D entity (row 7 of the host's table)
+    let kind = if target_class == 33 {
+        ObjKind::Entity(7)
+    } else {
+        ObjKind::Other
+    };
+    let frame = b.g.add_object("Frame", kind);
     b.g.objects[frame].class = target_class;
     let target = b.local("Target", types::ENTITY, Value::Obj(Some(frame)));
     let blk = b.bb(
@@ -3050,6 +3061,41 @@ fn text_2d_uses_the_font_margins_and_alignment_and_counts_lines() {
 }
 
 #[test]
+fn text_3d_sends_its_text_on_the_entity_and_takes_it_away() {
+    let pins = [
+        ("Font", types::INT, Value::Int(1)),
+        ("Text", types::STRING, Value::Str("one\ntwo".into())),
+        ("Alignment", types::INT, Value::Int(1)),
+        ("Margins", types::RECT, Value::Rect([2.0, 3.0, 4.0, 5.0])),
+        ("Offset", types::VECTOR2, Value::Vec2([1.0, 1.0])),
+    ];
+    let (mut rt, blk) = text_rig(
+        proto::TEXT_3D,
+        &["On", "Off"],
+        &["Exit On", "Exit Off"],
+        &pins,
+        &[("Text Extents", types::RECT), ("Line Count", types::INT)],
+        33,
+    );
+    rt.fonts.push(crate::Font {
+        name: "f".into(),
+        scale: [10.0, 8.0],
+        color: [0.0, 1.0, 0.5, 1.0],
+        bold: false,
+    });
+    let mut host = Rec::new();
+    rt.tick(&mut host);
+    let (_, on) = host.texts3d.last().expect("a text");
+    let (e, s) = on.clone().expect("shown");
+    assert_eq!(e, Ent::Object(7));
+    assert_eq!(s.text, "one\ntwo");
+    assert_eq!((s.scale, s.color), ([10.0, 8.0], [0.0, 1.0, 0.5, 1.0]));
+    assert_eq!((s.margins, s.offset, s.align), ([2.0, 3.0, 4.0, 5.0], [1.0, 1.0], 1));
+    let lc = rt.graph.block(blk).unwrap().pouts[1];
+    assert_eq!(rt.values[lc], Value::Int(2));
+}
+
+#[test]
 fn text_2d_on_something_that_is_not_a_2d_entity_draws_nothing() {
     let pins = [("Text", types::STRING, Value::Str("x".into()))];
     let (mut rt, _) = text_rig(
@@ -3141,8 +3187,8 @@ fn font_blocks_make_fonts_and_set_their_properties() {
 }
 
 #[test]
-fn three_d_text_and_movie_player_are_named_no_ops() {
-    for p in [proto::TEXT_3D, proto::MOVIE_PLAYER] {
+fn movie_player_is_a_named_no_op() {
+    for p in [proto::MOVIE_PLAYER] {
         let (mut rt, _) = text_rig(p, &["In"], &["Out"], &[], &[], 27);
         let mut host = Rec::new();
         rt.tick(&mut host);
