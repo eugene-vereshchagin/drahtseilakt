@@ -196,16 +196,10 @@ fn build(doc: &Document) -> Loaded {
             level.objects[child].parent = Some(par);
         }
     }
-    for i in 0..level.objects.len() {
-        let (mut at, mut steps) = (level.objects[i].parent, 0);
-        while let Some(a) = at {
-            steps += 1;
-            if a == i || steps > level.objects.len() {
-                level.objects[i].parent = None;
-                break;
-            }
-            at = level.objects[a].parent;
-        }
+    let mut parent_of: Vec<Option<usize>> = level.objects.iter().map(|o| o.parent).collect();
+    break_parent_loops(&mut parent_of);
+    for (o, p) in level.objects.iter_mut().zip(parent_of) {
+        o.parent = p;
     }
 
     // The 2D frames (class 27; a 2D sprite carries a picture of its own and is left out): the rectangle in pixels of
@@ -435,4 +429,78 @@ fn smooth_normals(positions: &[[f32; 3]], faces: &[([u16; 3], u16)]) -> Vec<[f32
             }
         })
         .collect()
+}
+
+
+/// Breaks every loop in a parent table by dropping the parent of the loop's lowest-numbered object (a parent that is
+/// no object counts as none). One walk over each chain, each object visited once: linear in the table, whatever the
+/// chains' length (a hostile file may chain a hundred thousand objects).
+fn break_parent_loops(parent: &mut [Option<usize>]) {
+    let n = parent.len();
+    // 0 not seen, 1 on the chain being walked, 2 settled
+    let mut state = vec![0u8; n];
+    let mut path: Vec<usize> = Vec::new();
+    for start in 0..n {
+        if state[start] != 0 {
+            continue;
+        }
+        path.clear();
+        let mut at = start;
+        loop {
+            state[at] = 1;
+            path.push(at);
+            let Some(p) = parent[at].filter(|&p| p < n) else {
+                parent[at] = None;
+                break;
+            };
+            match state[p] {
+                2 => break,
+                1 => {
+                    let from = path.iter().position(|&x| x == p).unwrap_or(0);
+                    if let Some(&lowest) = path[from..].iter().min() {
+                        parent[lowest] = None;
+                    }
+                    break;
+                }
+                _ => at = p,
+            }
+        }
+        for &x in &path {
+            state[x] = 2;
+        }
+    }
+}
+
+#[cfg(test)]
+mod loop_tests {
+    use super::break_parent_loops;
+
+    #[test]
+    fn loops_are_broken_and_chains_kept() {
+        // 0 -> 1 -> 2 -> 0 (a loop), 3 -> 1 (a tail into it), 4 -> 5 (a chain), 6 -> itself
+        let mut p = vec![Some(1), Some(2), Some(0), Some(1), Some(5), None, Some(6)];
+        break_parent_loops(&mut p);
+        assert_eq!(p, [None, Some(2), Some(0), Some(1), Some(5), None, None]);
+    }
+
+    #[test]
+    fn a_hundred_thousand_long_chain_and_loop_are_fast() {
+        let n = 100_000;
+        let t = std::time::Instant::now();
+        // a chain: i -> i + 1, kept whole
+        let mut chain: Vec<Option<usize>> = (0..n).map(|i| (i + 1 < n).then_some(i + 1)).collect();
+        let before = chain.clone();
+        break_parent_loops(&mut chain);
+        assert_eq!(chain, before);
+        // the same chain closed into a loop: broken once, at object 0
+        let mut ring: Vec<Option<usize>> = (0..n).map(|i| Some((i + 1) % n)).collect();
+        break_parent_loops(&mut ring);
+        assert_eq!(ring[0], None);
+        assert!(ring[1..].iter().all(Option::is_some));
+        // and the loop reached from the far end of a long tail, the tail in reverse order
+        let mut tail: Vec<Option<usize>> = (0..n).map(|i| Some(i.saturating_sub(1))).collect();
+        break_parent_loops(&mut tail);
+        assert_eq!(tail[0], None);
+        assert!(t.elapsed().as_secs_f32() < 2.0, "took {:?}", t.elapsed());
+    }
 }
