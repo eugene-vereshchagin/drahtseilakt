@@ -430,6 +430,17 @@ impl Data {
             name_meant_textures(&mut loaded.level);
         }
         self.put_pack_textures(&mut loaded.level, maker);
+        // the toolbox's remaster of a map (`remaster-nmo`): `<name>.remaster/` beside the .nmo, an open-format level
+        // made from it; its rounded looks and larger pictures are put on the map's meshes (the map itself, its
+        // physics and scripts, stays what it is). The Back to 2004 look draws the meshes without them.
+        if let Source::Nmo(p) = source {
+            let sidecar = p.with_extension("remaster");
+            if sidecar.join("level.gltf").is_file()
+                && let Ok(look) = self.load_open_level(&sidecar)
+            {
+                attach_looks(&mut loaded.level, look.level);
+            }
+        }
         Ok(loaded)
     }
 

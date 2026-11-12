@@ -364,6 +364,8 @@ pub struct RenderLook {
     pub colour_bits: u8,
     /// The sacks' supports drawn: 0 none, `supports::PLAIN` or `supports::VARIED`.
     pub supports: u8,
+    /// The level drawn as its original has it: no rounded looks, the textures before the toolbox grew them.
+    pub plain: bool,
 }
 
 impl Default for RenderLook {
@@ -375,6 +377,7 @@ impl Default for RenderLook {
             fps_cap: 0,
             colour_bits: 0,
             supports: 0,
+            plain: false,
         }
     }
 }
@@ -479,6 +482,8 @@ pub struct Renderer {
     msaa: Option<(wgpu::TextureView, u32, u32)>,
     /// How a view mod wants the picture to look (a 2004 PC's: low resolution, plain filtering, banded colour).
     pub look: RenderLook,
+    /// Whether the level on the card was uploaded plain (`RenderLook::plain` at that time); a change draws it again.
+    pub plain_uploaded: bool,
     /// The colour behind everything (the sky's zenith).
     pub clear: wgpu::Color,
     depth: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
@@ -690,6 +695,7 @@ impl Renderer {
             samples: 1,
             msaa: None,
             look: RenderLook::default(),
+            plain_uploaded: false,
             clear: wgpu::Color {
                 r: 0.4,
                 g: 0.45,

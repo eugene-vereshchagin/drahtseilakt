@@ -422,3 +422,13 @@ where the Look is chosen and on a downloaded map's note rather than launching it
 the rounded shapes of an original level are its toolbox export (`levels/remastered/Level_NN`, no longer a list), Start's
 order is Drahtseilakt, Classic Ballance, Ballance Challenges, Community maps, and the game explains the toolbox import
 where the Look is chosen and on a downloaded map's note rather than launching it. See [menu.md](menu.md).
+
+## The shipped sets come remastered (replaces "rounding only through the toolbox" for what we ship)
+
+*Owner's decision, 2026-11-12.* By default we do every rounding and improvement we can: the levels we ship (the picks
+in `assets/levels/NN-*`, open format; the community maps in `assets/levels/community/`) come pre-remastered, with
+rounded shapes and textures upscaled for 4K, made by the toolbox (`remaster-open DIR` for an open-format folder,
+`remaster-nmo FILE.nmo` for a map: a `<map>.remaster/` sidecar beside the `.nmo` whose looks and pictures the game
+puts on the map's meshes; the map itself, its physics and scripts, stay as they were). Square, unsmoothed surfaces
+and the plain pictures are only for the `back-to-2004` mod (`render.plain`), which draws the level from its meshes
+and from `textures.original/` (a map without its sidecar). Only looks change: replays play the same.

@@ -3302,6 +3302,31 @@ fn upload_menu_scene(
 /// The most pixels a map's 2D frame's texture may have (1024 x 1024: a signature or a logo is far smaller).
 const FRAME_PIXELS_MAX: u64 = 1 << 20;
 
+/// The level as its original has it (the Back to 2004 look): the meshes without the looks the toolbox rounded them
+/// with, the textures from the folder's `textures.original/` where it has them, no normal maps. A level without any
+/// of it comes out the same.
+fn plain_level(level: &level::Level) -> level::Level {
+    let mut l = level.clone();
+    for m in &mut l.meshes {
+        m.look = None;
+    }
+    for m in &mut l.materials {
+        m.normal = None;
+        m.parallax = 0.0;
+    }
+    for t in &mut l.textures {
+        if let level::TextureSource::LevelFile(p) = &t.source
+            && let (Some(dir), Some(name)) = (p.parent().and_then(Path::parent), p.file_name())
+        {
+            let original = dir.join("textures.original").join(name);
+            if original.is_file() {
+                t.source = level::TextureSource::LevelFile(original);
+            }
+        }
+    }
+    l
+}
+
 fn upload(renderer: &mut Renderer, game: &Game) {
     // the level's own parts' files (its sky, particles, shadow) as the level chose them
     let data = &game.data;
@@ -3313,7 +3338,13 @@ fn upload(renderer: &mut Renderer, game: &Game) {
     crate::matstate::set_texture_reader(data.clone());
     let started = std::time::Instant::now();
     renderer.begin_level();
-    renderer.add_model(&game.level.level, &loader);
+    let plain = renderer.look.plain;
+    renderer.plain_uploaded = plain;
+    if plain {
+        renderer.add_model(&plain_level(&game.level.level), &loader);
+    } else {
+        renderer.add_model(&game.level.level, &loader);
+    }
     renderer.add_model(&game.balls.level, &loader);
     // the level's sky by its name (a name that could not name a file is taken as none); closed when it has a top
     let letter = crate::sky::override_name()
@@ -3546,6 +3577,15 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
     let (_, device, queue) = pollster::block_on(device(None))?;
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = Renderer::new(device, queue, format);
+    // DRAHTSEILAKT_SHOT_MOD=key: the view mods' look of that mod switched on (e.g. back-to-2004), not for menu shots
+    let look = match (
+        std::env::var("DRAHTSEILAKT_SHOT_MOD"),
+        std::env::var("DRAHTSEILAKT_SHOT_MENU"),
+    ) {
+        (Ok(key), Err(_)) => shot_look(&key, o.debug),
+        _ => crate::render::RenderLook::default(),
+    };
+    r.look = look;
     upload(&mut r, game);
     // the passing lights as the window would show them (the lightning on a fixed schedule)
     if game.last_level {
@@ -3574,14 +3614,6 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         view_formats: &[],
     });
     let full_view = target.create_view(&Default::default());
-    // DRAHTSEILAKT_SHOT_MOD=key: the view mods' look of that mod switched on (e.g. back-to-2004), not for menu shots
-    let look = match (
-        std::env::var("DRAHTSEILAKT_SHOT_MOD"),
-        std::env::var("DRAHTSEILAKT_SHOT_MENU"),
-    ) {
-        (Ok(key), Err(_)) => shot_look(&key, o.debug),
-        _ => crate::render::RenderLook::default(),
-    };
     r.look = look;
     game.show_supports(look.supports);
     let ((fw, fh), (w, h)) = ((w, h), look.size(w, h));
@@ -5958,6 +5990,12 @@ impl App {
         };
         let acquired = acquire_started.elapsed();
         gpu.renderer.look = look;
+        if look.plain != gpu.renderer.plain_uploaded {
+            // the Back to 2004 look went on or off: the level is drawn again from its other files
+            gpu.renderer.models.clear();
+            upload(&mut gpu.renderer, &self.game);
+            upload_menu_scene(&mut gpu.renderer, self.menu_scene.as_mut(), &self.data);
+        }
         let window_view = frame.texture.create_view(&Default::default());
         let view = if look.post() {
             let format = gpu.renderer.format;

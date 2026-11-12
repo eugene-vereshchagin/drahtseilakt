@@ -1,6 +1,6 @@
 # Back to 2004: undoes our rendering fixes, so the game looks as it did on a PC of the year of its release: a low
 # resolution scaled up with hard pixels in a 4:3 frame, textures without mipmaps or anisotropy (the distant shimmer),
-# a frame cap and, if you dare, 16-bit colour. Only the look changes; the run stays classic, replays play the same.
+# the plain shapes and pictures of the level as it was made (no rounding, no upscaling), a frame cap and, if you dare, 16-bit colour. Only the look changes; the run stays classic, replays play the same.
 name.en Back to 2004
 name.ru Назад в 2004
 name.de Zurück ins Jahr 2004
@@ -133,3 +133,6 @@ do render.fps_cap 30
 on frame
 if opt.banding
 do render.colour_bits 16
+
+on frame
+do render.plain 1
