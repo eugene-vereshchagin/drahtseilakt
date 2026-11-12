@@ -223,15 +223,20 @@ pub struct FogSpec {
     pub color: [f32; 4],
 }
 
-/// The sky a TT Sky block builds: the vertex colour, the radius, the lens widening and the materials of its sides
-/// and bottom (graph objects).
+/// The sky a TT Sky block builds: the vertex colour, the radius (the distance to the walls), the lens widening, the
+/// walls' shape (square ones, or this height) and height of the sky's middle, and the level materials of its sides,
+/// bottom and top.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SkySpec {
     pub color: [f32; 4],
     pub radius: f32,
     pub distortion: f32,
-    pub sides: Vec<Option<crate::Id>>,
-    pub bottom: Option<crate::Id>,
+    pub quadratic: bool,
+    pub side_height: f32,
+    pub y: f32,
+    pub sides: Vec<Option<usize>>,
+    pub bottom: Option<usize>,
+    pub top: Option<usize>,
 }
 
 /// What a script set of a 2D entity (Edit 2D Entity): each part only when the block edits it.

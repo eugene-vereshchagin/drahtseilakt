@@ -1694,8 +1694,12 @@ mod facade_tests {
                 color: [1.0; 4],
                 radius: 100.0,
                 distortion: 0.15,
+                quadratic: true,
+                side_height: 10.0,
+                y: 0.0,
                 sides: vec![None; 4],
                 bottom: None,
+                top: None,
             })));
         });
         assert_eq!(s.env.ingame_light(), Some([0.33, 0.41, 0.73]));

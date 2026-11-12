@@ -8,6 +8,8 @@ pub(crate) const SET_LIGHT_COLOR: Guid = Guid(0x3211_5590, 0x7895_1230);
 pub(crate) const SET_FOG: Guid = Guid(0x151a_aaaa, 0xffd5_bdbc);
 pub(crate) const TT_SKY: Guid = Guid(0x3669_1920, 0x3b26_1630);
 pub(crate) const EDIT_2D_ENTITY: Guid = Guid(0x7fc5_4c91, 0x3f48_6670);
+/// The farthest a script sky's walls may be.
+pub const MAX_SKY_RADIUS: f32 = 100_000.0;
 pub(crate) const SET_PICKABLE: Guid = Guid(0xf149_9052, 0xebe9_bbf1);
 
 fn finite4(c: [f32; 4]) -> [f32; 4] {
@@ -86,21 +88,33 @@ pub(crate) fn tt_sky(rt: &mut Runtime, _id: Id, b: &Block, _p: Guid, host: &mut 
     let bottom = local(rt, b, 2).as_bool();
     let mat = |rt: &mut Runtime, i: usize, host: &mut dyn Host| {
         let p = b.pins.get(i).copied()?;
-        rt.read(p, host).as_obj()
+        let o = rt.read(p, host).as_obj()?;
+        match rt.graph.objects.get(o)?.kind {
+            ObjKind::Material(m) => Some(m),
+            _ => None,
+        }
     };
     let walls = (0..sides).map(|k| mat(rt, 7 + k, host)).collect();
+    let top_mat = if top { mat(rt, 7 + sides, host) } else { None };
     let bottom_at = 7 + sides + usize::from(top);
     let bottom = if bottom {
         mat(rt, bottom_at, host)
     } else {
         None
     };
+    let num = |v: f32| if v.is_finite() { v } else { 0.0 };
     let spec = SkySpec {
         color: finite4(pin(rt, b, "Vertex Color", 1, host).as_vec4()),
-        radius: pin(rt, b, "Radius", 3, host).as_float(),
+        radius: num(pin(rt, b, "Radius", 3, host).as_float()).clamp(0.0, MAX_SKY_RADIUS),
         distortion: pin(rt, b, "Distortion", 0, host).as_float().clamp(0.0, 1.0),
+        quadratic: pin(rt, b, "Quadratic SideFaces?", 4, host).as_bool(),
+        side_height: num(pin(rt, b, "or SideFace-Heigth", 5, host).as_float())
+            .clamp(0.0, MAX_SKY_RADIUS),
+        y: num(pin(rt, b, "Y-Position of Sky", 6, host).as_float())
+            .clamp(-MAX_SKY_RADIUS, MAX_SKY_RADIUS),
         sides: walls,
         bottom,
+        top: top_mat,
     };
     host.env_set(EnvChange::Sky(Some(spec)));
     Flow::Continue
@@ -240,7 +254,7 @@ pub(super) const PROTOS: &[Proto] = &[
         ],
         pouts: &[],
         flags: flags::VAR_PINS,
-        standing: Standing::Partial,
+        standing: Standing::Full,
         layouts: &[],
         run: tt_sky,
         event: None,

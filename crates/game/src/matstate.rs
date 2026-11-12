@@ -141,7 +141,8 @@ impl MatState {
     pub fn funcs(&self, index: usize) -> (u8, u8) {
         let o = self.over.get(&index);
         (
-            o.and_then(|o| o.z_func).unwrap_or(crate::render::Z_FUNC_DEFAULT),
+            o.and_then(|o| o.z_func)
+                .unwrap_or(crate::render::Z_FUNC_DEFAULT),
             o.and_then(|o| o.alpha_func)
                 .unwrap_or(crate::render::ALPHA_FUNC_DEFAULT),
         )
@@ -350,7 +351,11 @@ mod tests {
         assert!(!m.z_write);
         assert_eq!(s.over[&0].z_func, Some(4));
         assert_eq!(s.funcs(0), (4, 7));
-        assert_eq!(s.funcs(1), (4, 5), "an untouched material keeps the level's tests");
+        assert_eq!(
+            s.funcs(1),
+            (4, 5),
+            "an untouched material keeps the level's tests"
+        );
         assert!((m.alpha_cutoff.unwrap() - 0.2).abs() < 1e-6);
         s.apply(
             0,

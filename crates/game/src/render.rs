@@ -121,6 +121,23 @@ fn compare(func: u8) -> wgpu::CompareFunction {
     }
 }
 
+/// How much a script sky must shrink for its farthest corner to be inside the far plane (1: not at all).
+fn sky_scale(spec: &script::SkySpec, far: f32) -> f32 {
+    let n = spec.sides.len().clamp(4, 16) as f32;
+    let corner = spec.radius / (std::f32::consts::PI / n).cos();
+    let half_h = if spec.quadratic {
+        spec.radius * (std::f32::consts::PI / n).tan()
+    } else {
+        spec.side_height / 2.0
+    };
+    let bound = corner.hypot(spec.y.abs() + half_h);
+    if bound.is_finite() && bound > 1e-3 && far.is_finite() {
+        (far * 0.9 / bound).min(1.0)
+    } else {
+        1.0
+    }
+}
+
 struct GpuMaterial {
     bind: wgpu::BindGroup,
     key: PipelineKey,
@@ -311,6 +328,10 @@ pub struct Renderer {
     /// What a script's Set Fog set for this run: none when no script did, `Some(None)` when it switched fog off (the
     /// level's own fog too).
     pub script_fog: Option<Option<script::FogSpec>>,
+    /// The sky a script built (its model and mesh), drawn first with no depth, behind everything.
+    script_sky: Option<(usize, usize)>,
+    /// The spec the script sky was built from, and whether any of it is drawn.
+    script_sky_spec: Option<(script::SkySpec, bool)>,
     /// The level's sea of cloud (clouds.rs) and how finely it is drawn; none for the original's levels.
     pub clouds: Option<crate::clouds::Layer>,
     /// The frame shows another scene than the level (the menu's): neither the level's sea of cloud nor its fog.
@@ -528,6 +549,8 @@ impl Renderer {
             flash: 0.0,
             fog: None,
             script_fog: None,
+            script_sky: None,
+            script_sky_spec: None,
             clouds: None,
             menu_frame: false,
             cloud_pass: None,
@@ -805,6 +828,53 @@ impl Renderer {
             });
         }
         Some(GpuMesh { vertex, parts })
+    }
+
+    /// The sky a script built (scriptsky.rs), as a mesh of the level's model (its parts name the level's materials);
+    /// none takes it away. Returns its mesh index for `Instance::mesh` while it is there.
+    pub fn set_script_sky(&mut self, model: usize, sky: Option<&level::Mesh>) -> Option<usize> {
+        let gpu = sky.and_then(|m| {
+            let default = self.models.get(model)?.materials.len().saturating_sub(1);
+            self.gpu_mesh(m, default)
+        });
+        let m = self.models.get_mut(model)?;
+        let at = match self.script_sky.filter(|s| s.0 == model) {
+            Some((_, i)) => i,
+            None => {
+                m.meshes.push(None);
+                m.meshes.len() - 1
+            }
+        };
+        let shown = gpu.is_some();
+        *m.meshes.get_mut(at)? = gpu;
+        self.script_sky = Some((model, at));
+        shown.then_some(at)
+    }
+
+    /// The sky a map's TT Sky block builds (`sky`), put into this frame's instances: its mesh is made when the block's
+    /// state changes, drawn at the eye in place of the level's own sky. Nothing happens with no script sky.
+    pub fn apply_script_sky(
+        &mut self,
+        model: usize,
+        sky: Option<&script::SkySpec>,
+        eye: Vec3,
+        inst: &mut Vec<Instance>,
+    ) {
+        if self.script_sky_spec.as_ref().map(|s| &s.0) != sky {
+            let mesh = sky.and_then(crate::scriptsky::build);
+            let at = self.set_script_sky(model, mesh.as_ref());
+            self.script_sky_spec = sky.map(|k| (k.clone(), at.is_some()));
+        }
+        let (Some((spec, true)), Some((_, at))) = (&self.script_sky_spec, self.script_sky) else {
+            return;
+        };
+        inst.retain(|i| i.model != crate::scene::SKY_MODEL);
+        let white = spec.color.iter().all(|&c| c >= 0.999);
+        inst.push(Instance {
+            unlit: true,
+            diffuse: (!white).then_some(spec.color),
+            ..Instance::plain(model, at, Mat4::from_translation(eye))
+        });
     }
 
     /// Uploads a model; returns its index for `Instance::model`.
@@ -1397,7 +1467,15 @@ impl Renderer {
         let mut matrices = vec![0u8; instances.len() * UNIFORM_ALIGN as usize];
         for (i, inst) in instances.iter().enumerate() {
             let mut data = [0f32; INSTANCE_BYTES / 4];
-            data[..16].copy_from_slice(&inst.matrix.to_cols_array());
+            // the script's sky is drawn at any distance the scene's far plane lets (it only turns about the eye, so
+            // a smaller one looks the same)
+            let matrix = match &self.script_sky_spec {
+                Some((spec, true)) if self.script_sky == Some((inst.model, inst.mesh)) => {
+                    inst.matrix * Mat4::from_scale(Vec3::splat(sky_scale(spec, view.far)))
+                }
+                _ => inst.matrix,
+            };
+            data[..16].copy_from_slice(&matrix.to_cols_array());
             data[16..18].copy_from_slice(&inst.uv_offset);
             data[18] = if inst.unlit { 1.0 } else { 0.0 };
             data[20..24].copy_from_slice(&inst.diffuse.unwrap_or([0.0, 0.0, 0.0, -1.0]));
@@ -1421,6 +1499,7 @@ impl Renderer {
                 }
             }
         }
+        let mut back = Vec::new();
         let mut opaque = Vec::new();
         let mut blended = Vec::new();
         for (i, inst) in instances.iter().enumerate() {
@@ -1447,6 +1526,17 @@ impl Renderer {
                         .map(|m| m.key),
                 };
                 match key {
+                    // the script's sky: first, over everything the frame has so far, writing no depth
+                    Some(k) if self.script_sky == Some((inst.model, inst.mesh)) => back.push((
+                        0.0,
+                        i,
+                        p,
+                        PipelineKey {
+                            z_write: false,
+                            z_func: 8,
+                            ..k
+                        },
+                    )),
                     Some(k) if k.blend.is_some() => {
                         let d = inst.matrix.w_axis.truncate().distance_squared(view.eye);
                         blended.push((d, i, p, k));
@@ -1457,7 +1547,11 @@ impl Renderer {
             }
         }
         // a script's depth function not seen before, with the pipelines at their cap, is drawn with the default one
-        for d in opaque.iter_mut().chain(blended.iter_mut()) {
+        for d in back
+            .iter_mut()
+            .chain(opaque.iter_mut())
+            .chain(blended.iter_mut())
+        {
             if d.3.z_func != Z_FUNC_DEFAULT
                 && !self.pipelines.contains_key(&d.3)
                 && self.pipelines.len() >= MAX_PIPELINES
@@ -1467,7 +1561,7 @@ impl Renderer {
         }
         blended.sort_by(|a, b| b.0.total_cmp(&a.0));
         let draws: Vec<(f32, usize, usize, PipelineKey)> =
-            opaque.into_iter().chain(blended).collect();
+            back.into_iter().chain(opaque).chain(blended).collect();
         for d in &draws {
             self.pipeline(d.3);
         }
