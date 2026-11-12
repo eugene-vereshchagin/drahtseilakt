@@ -55,6 +55,13 @@ its rounded `look` meshes, upscaled pictures (with `.dtx` and normal maps beside
 the game puts on the map's meshes by name when it loads the map. The Back to 2004 look (`render.plain`) draws both
 as they were made. A sidecar is not a level of its own: deeper folders are not looked at.
 
+**Rounding at load (2026-11-12).** A level that has no looks of its own (a map without a sidecar, a community or own
+map, an original without a remaster) is rounded when it loads: the game makes the same rounded looks the toolbox does
+(`crates/level/src/smooth.rs`, the same algorithm: round shapes only, box edges stay sharp, uv coordinates carried over
+so the level's own textures map as before; textures are not upscaled). Physics keeps the source meshes, so runs and
+replays are the same. It takes 0.1 to 0.5 s even on one core for the largest maps, so nothing is cached. Caps: a mesh
+over 400,000 triangles stays as it is, and a level's looks stop at 6 million vertices. Back to 2004 draws the meshes.
+
 *Owner's decision of 2026-11-03* (decisions.md, "A level is a folder"). `community/` and `open/` (and `remastered/`) hold
 levels, not whatever an archive unpacked: the custom levels menu shows a flat list of levels, sorted by difficulty
 and title, and no folders to open. Everything a level's author and a player need to know is gathered on

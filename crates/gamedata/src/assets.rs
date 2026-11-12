@@ -441,6 +441,16 @@ impl Data {
                 attach_looks(&mut loaded.level, look.level);
             }
         }
+        // a level with no looks of its own (a map nobody remastered) is rounded here; Back to 2004 draws it without
+        let t = std::time::Instant::now();
+        let n = level::smooth::add_looks(&mut loaded.level);
+        if n > 0 {
+            eprintln!(
+                "rounding: {n} of {} meshes rounded in {:.2} s",
+                loaded.level.meshes.len(),
+                t.elapsed().as_secs_f64()
+            );
+        }
         Ok(loaded)
     }
 

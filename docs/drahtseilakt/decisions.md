@@ -432,3 +432,27 @@ rounded shapes and textures upscaled for 4K, made by the toolbox (`remaster-open
 puts on the map's meshes; the map itself, its physics and scripts, stay as they were). Square, unsmoothed surfaces
 and the plain pictures are only for the `back-to-2004` mod (`render.plain`), which draws the level from its meshes
 and from `textures.original/` (a map without its sidecar). Only looks change: replays play the same.
+
+## Level folders, and what counts as a level (refines the entry above)
+
+*Owner's decision, 2026-11-12, after testing the portable build as a new player.* Why: the shipped levels lay loose in
+`assets/levels/NN-*` next to a `community/` subfolder, the player's folders had grown four names for one thing
+(`downloaded`, `community`, `open`, plus the copy's), and 4x textures on the community set made the portable build
+5.8 GB without making the maps look like their authors' own.
+
+- **Two shipped sets, two folders:** `assets/levels/drahtseilakt/` holds the owner's picks in our open format, rounded
+  and with textures upscaled 4x (the toolbox's `remaster-open`); `assets/levels/community/` holds the community maps as
+  their authors' `.nmo` files with their own textures (no 4x), each with its `level.txt`.
+- **Beauty for every map, always:** any level the game plays (Ballance's own without a remaster, a community `.nmo`, a
+  player's map) gets the rounded shapes and the rest of the beauty at load, from its own meshes and its own textures.
+  Square shapes and plain pictures only with the Back to 2004 mod. Textures are upscaled only by the toolbox (the
+  Drahtseilakt set ships so). Only looks change: physics and replays stay the same.
+- **The player's data folder:** an imported Ballance lands in `levels/ballance-original/` and
+  `levels/ballance-remaster/` (the toolbox); the player's own and downloaded levels go to `levels/user-levels/`, the
+  one folder we recommend (it replaces `downloaded/`, `community/` and `open/`; old folders are moved, never deleted).
+  `modified/` (the community's remakes of the original levels) stays.
+- **What counts as a level:** a level is a level only when it lies in its own named folder that holds either one
+  `.nmo` file or an open-format level (`level.gltf` …), plus its description file `level.txt`. Folders may group levels
+  (subfolders). A loose `.nmo` without its folder is not hidden silently: the game says what it found and how to fix it.
+- **The game and the toolbox are separate programs:** the game never launches the toolbox or an import window; where a
+  copy is missing it says that the toolbox imports the original levels.

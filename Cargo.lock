@@ -940,6 +940,7 @@ name = "level"
 version = "0.1.0"
 dependencies = [
  "fuzzkit",
+ "glam",
  "nmo",
  "script",
  "serde_json",
