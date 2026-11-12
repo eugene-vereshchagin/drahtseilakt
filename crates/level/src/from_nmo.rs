@@ -39,7 +39,7 @@ fn build(doc: &Document) -> Loaded {
         let Some(chunk) = &o.chunk else { continue };
         match scene::texture(chunk) {
             Ok(t) => {
-                let source = match (t.embedded, t.file_name) {
+                let source_of = |embedded: Option<(u32, u32, Vec<u8>)>, file_name: Option<Vec<u8>>| match (embedded, file_name) {
                     (Some((width, height, rgba)), _) => TextureSource::Pixels {
                         width,
                         height,
@@ -50,7 +50,16 @@ fn build(doc: &Document) -> Loaded {
                     }
                     (None, None) => TextureSource::None,
                 };
+                let source = source_of(t.embedded, t.file_name);
                 textures.insert(i, level.textures.len());
+                if !t.slots.is_empty() {
+                    let more = t
+                        .slots
+                        .into_iter()
+                        .map(|s| source_of(s.embedded, s.file_name))
+                        .collect();
+                    level.texture_slots.push((level.textures.len(), more));
+                }
                 level.textures.push(Texture {
                     name: name(o),
                     source,

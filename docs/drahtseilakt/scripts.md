@@ -136,8 +136,11 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
   the view, 1 / 2 turn about the world x / y, 3 keeps its axes) is kept per entity row (`Entities::sprite_mode`) and
   `scene::sprite_matrix` uses it for a 3D sprite.
 - **Partial.** Set Material (the replaced material takes the new one's whole state for every object that uses it, not
-  for the target object alone); Set Current Slot (recorded; the nmo reader keeps only a texture's first slot, in
-  `nmo::scene::texture`, so there is no second picture to show)).
+  for the target object alone)). **Full since stage 4.3: Set Current Slot.** `nmo::scene::texture` reads every
+  slot (at most `MAX_SLOTS` = 64, names and saved pictures; 64 MiB of pixels per texture; a slot that cannot be read
+  ends the list); `Level::texture_slots` carries those after the first, `MatState::show_slot` makes the chosen slot's
+  picture the texture's run copy (the renderer uploads it as it does a written texture; slot 0 gives the level's own
+  back; a slot the texture lacks changes nothing; a later Write In Texture paints the shown picture).
 - **Full since stage 4.2: Blend Textures and Write In Texture** (below).
 - **Caps.** Only the level's own materials and textures can be named (anything else is ignored, so the table is at most
   as large as the level's); colours are clamped to 0..1, specular power to 0..1000; a texture size to 2048 x 2048; a
@@ -462,7 +465,7 @@ by the engine's.
 | Objects With Attribute Iterator | `6bc1494c:0c816ad3` | 1 | 7 | done |
 | SphericalParticleSystem | `67c88f47:8880721e` | 1 | 1 | planned |
 | Set 3DSprite Mode | `0c5d0457:c64c7000` | 1 | 1 | done (stage 4.1) |
-| Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | partial: recorded; only a texture's first slot is loaded |
+| Set Current Slot | `aaaa213a:eaa8d52a` | 1 | 3 | full (stage 4.3): the chosen slot's picture is drawn (all slots of a texture are read) |
 | Sequencer | `42530844:257b6053` | 1 | 1 | done |
 | Calculator | `4bc209b8:5b3679b0` | 1 | 8 | full: numbers, a..z, + - * / ^, unary signs, pi, abs sqrt sin cos tan asin acos atan sinh cosh tanh exp ln log floor ceil; caps 256 tokens, depth 32, 511 bytes (oracle-checked on the C's grammar, random expressions against a second evaluator on the rest) |
 | TT CreateFontEx | `260e4eb0:0e256b90` | 1 | 1 | done: a font of the name with a texture; drawn in our own font (no system fonts) |

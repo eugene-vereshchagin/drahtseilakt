@@ -506,7 +506,7 @@ pub(super) const PROTOS: &[Proto] = &[
         &["Slot Index"],
         &[],
         flags::TARGET,
-        Partial,
+        Full,
         set_current_slot
     ),
     proto!(

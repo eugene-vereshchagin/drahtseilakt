@@ -279,47 +279,98 @@ pub struct Texture {
     pub embedded: Option<(u32, u32, Vec<u8>)>,
     /// The colour (0xRRGGBB) its texels are transparent in, when it has one (CKTexture's transparent colour).
     pub transparent: Option<u32>,
+    /// The slots after the first (a texture of several pictures: an animation's frames), at most `MAX_SLOTS - 1`.
+    pub slots: Vec<TextureSlot>,
 }
+
+/// One further slot of a texture: its file's name and/or its own saved pixels, as the first slot's.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TextureSlot {
+    pub file_name: Option<Vec<u8>>,
+    pub embedded: Option<(u32, u32, Vec<u8>)>,
+}
+
+/// The most slots of a texture that are read (the rest are ignored).
+pub const MAX_SLOTS: usize = 64;
+/// The most bytes of saved pixels read from one texture, all its slots together.
+const MAX_SLOT_BYTES: usize = 64 << 20;
 
 pub fn texture(chunk: &Chunk) -> Result<Texture> {
     let mut tex = Texture {
         file_name: None,
         embedded: None,
         transparent: None,
+        slots: Vec::new(),
     };
     let mut slot_count = 0u32;
+    // The file names (section 0x10000): the slot count, then each slot's name. A slot count the words cannot hold
+    // is cut where they end; at most MAX_SLOTS names are read.
+    let mut names: Vec<Option<Vec<u8>>> = Vec::new();
     if let Some(mut w) = chunk.section(0x0001_0000) {
         let slots = w.u32()?;
         slot_count = slots;
-        if slots > 0 {
-            let name = w.string()?;
-            if !name.is_empty() {
-                tex.file_name = Some(name);
-            }
+        for k in 0..(slots as usize).min(MAX_SLOTS) {
+            let name = match w.string() {
+                Ok(n) => n,
+                // the first slot's name must be readable, a later one that is not ends the list
+                Err(e) if k == 0 => return Err(e),
+                Err(_) => break,
+            };
+            names.push((!name.is_empty()).then_some(name));
         }
     }
-    // The raw bitmaps (section 0x20000): a slot count, then the first slot's bits per pixel, width, height, the
+    // The raw bitmaps (section 0x20000): a slot count, then for each slot its bits per pixel, width, height, the
     // channel masks (A, R, G, B), a compression word (0: none) and the channels one after another, each a whole
     // plane of width x height bytes behind its size in bytes, padded to a word: blue, green, red, alpha, rows bottom
     // up. (Found in the bytes of 8058 textures of 606 community maps: every one has four planes of exactly
     // width x height bytes and compression 0, and the copies of the game's own textures that maps carry are pixel
-    // for pixel the game's pictures when read so.)
+    // for pixel the game's pictures when read so.) The slots follow one another; one that cannot be read ends the
+    // list (the next one's place is not known).
+    let mut pictures: Vec<Option<(u32, u32, Vec<u8>)>> = Vec::new();
     if let Some(mut w) = chunk.section(0x0002_0000) {
         let slots = w.u32()?;
-        if slots > 0 && w.remaining() >= 9 {
+        let mut budget = MAX_SLOT_BYTES;
+        for _ in 0..(slots as usize).min(MAX_SLOTS) {
+            if w.remaining() < 9 {
+                break;
+            }
             let bpp = w.u32()?;
             let (width, height) = (w.u32()?, w.u32()?);
             let _masks = w.take(4)?;
             let compression = w.u32()?;
             // at least one pixel a side: a zero-sized picture is no picture (the renderer could not make a texture of it)
             let side = 1..=MAX_TEXTURE_SIDE;
-            if bpp == 32 && compression == 0 && side.contains(&width) && side.contains(&height) {
-                let pixels = (width as usize).saturating_mul(height as usize);
-                if let Some(rgba) = unpack_planes(&mut w, width as usize, pixels) {
-                    tex.embedded = Some((width, height, rgba));
-                }
+            if !(bpp == 32 && compression == 0 && side.contains(&width) && side.contains(&height)) {
+                break;
+            }
+            let pixels = (width as usize).saturating_mul(height as usize);
+            if pixels.saturating_mul(4) > budget {
+                break;
+            }
+            let Some(rgba) = unpack_planes(&mut w, width as usize, pixels) else {
+                break;
+            };
+            budget -= rgba.len();
+            pictures.push(Some((width, height, rgba)));
+        }
+    }
+    let mut names = names.into_iter();
+    let mut pictures = pictures.into_iter();
+    tex.file_name = names.next().flatten();
+    tex.embedded = pictures.next().flatten();
+    for _ in 1..MAX_SLOTS {
+        let (file_name, embedded) = (names.next().flatten(), pictures.next().flatten());
+        if file_name.is_none() && embedded.is_none() {
+            // a slot with neither is kept only when a later one has something (the slot numbers stay)
+            let later = names.len() + pictures.len();
+            if later == 0 {
+                break;
             }
         }
+        tex.slots.push(TextureSlot {
+            file_name,
+            embedded,
+        });
     }
     // The load options (section 0x2ff000): a packed word (0x100 transparent, 0x200 a video format follows), then,
     // by the section's size, the transparent colour, as CKTexture::Load reads it (C reference ck_3d.c).
@@ -1303,6 +1354,62 @@ mod tests {
         texture(&chunk(&[(0x0002_0000, data)]))
             .expect("texture")
             .embedded
+    }
+
+    /// A string as a chunk holds it: its length, then its bytes padded to a word.
+    fn string_words(s: &str) -> Vec<u32> {
+        let mut v = vec![s.len() as u32];
+        v.extend(s.as_bytes().chunks(4).map(|c| {
+            let mut word = [0u8; 4];
+            word[..c.len()].copy_from_slice(c);
+            u32::from_le_bytes(word)
+        }));
+        v
+    }
+
+    /// A texture of several slots keeps each one's name and picture, the first in `file_name` / `embedded`.
+    #[test]
+    fn a_texture_with_several_slots_keeps_every_slot() {
+        let mut names = vec![3];
+        for n in ["one.bmp", "two.bmp", "three.bmp"] {
+            names.extend(string_words(n));
+        }
+        // three 1 x 1 pictures, each one's own colour (blue plane 1, 2 or 3)
+        let mut raw = vec![3];
+        for b in [1u8, 2, 3] {
+            raw.extend(&raw_bitmap(1, 1, &[&[b], &[0], &[0], &[0xFF]])[1..]);
+        }
+        let t = texture(&chunk(&[(0x0001_0000, names), (0x0002_0000, raw)])).expect("texture");
+        assert_eq!(t.file_name.as_deref(), Some(&b"one.bmp"[..]));
+        assert_eq!(t.embedded, Some((1, 1, vec![0, 0, 1, 0xFF])));
+        assert_eq!(t.slots.len(), 2);
+        assert_eq!(t.slots[0].file_name.as_deref(), Some(&b"two.bmp"[..]));
+        assert_eq!(t.slots[1].embedded, Some((1, 1, vec![0, 0, 3, 0xFF])));
+        // a texture of one slot has no further ones
+        let one = chunk(&[(0x0001_0000, [vec![1], string_words("a.bmp")].concat())]);
+        assert!(texture(&one).expect("texture").slots.is_empty());
+    }
+
+    /// A hostile slot count is bounded by the words there are and by `MAX_SLOTS`; a truncated later slot ends the
+    /// list; nothing panics.
+    #[test]
+    fn hostile_slot_counts_are_bounded() {
+        let mut names = vec![u32::MAX];
+        for k in 0..200 {
+            names.extend(string_words(&format!("f{k}.bmp")));
+        }
+        let t = texture(&chunk(&[(0x0001_0000, names)])).expect("texture");
+        assert_eq!(t.slots.len(), MAX_SLOTS - 1);
+        // the second name claims more bytes than are left
+        let cut = chunk(&[(0x0001_0000, [vec![5], string_words("a"), vec![400, 1]].concat())]);
+        let t = texture(&cut).expect("texture");
+        assert!(t.slots.is_empty());
+        // pictures: a count of billions with one picture and a lying second one
+        let mut raw = vec![u32::MAX];
+        raw.extend(&raw_bitmap(1, 1, &[&[1], &[0], &[0], &[0xFF]])[1..]);
+        raw.extend([0, 32, 8192, 8192, 0, 0, 0, 0, 0, 7, 7]);
+        let t = texture(&chunk(&[(0x0002_0000, raw)])).expect("texture");
+        assert!(t.embedded.is_some() && t.slots.is_empty());
     }
 
     /// Fuzzing found it (nmo_chunk): an embedded picture 8192 wide and 0 high (no pixels, so the count matched) was
