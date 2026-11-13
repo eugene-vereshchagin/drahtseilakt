@@ -248,6 +248,10 @@ player has installed it; it is never downloaded and never a dependency of the ga
 nothing more than the game. Whether the toolbox's archive later carries Real-ESRGAN (its licence allows it,
 pinned and checksummed) is decided at the release.
 
+*2026-11-13.* The game's parts (balls, PH modules, the transformer) with no look of their own are rounded at load by the
+same `level::smooth` (once per run per distinct mesh, cached by a hash of its contents; about 0.1 s for the first
+level), also under `models original`. Physics keeps the source meshes. Back to 2004 draws them unrounded.
+
 
 ## Own content by default, the original's on the player's request
 
