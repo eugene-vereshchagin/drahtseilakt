@@ -271,7 +271,7 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
 
     // the shot: camera, rail, ball
     let radius = 1.0;
-    var tr = 0.17;          // the tubes' radius
+    var tr = 0.19;          // the tube's radius
     var ro: vec3<f32>;
     var fwd: vec3<f32>;
     var focal: f32;
@@ -292,8 +292,8 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         reach = min(0.30 * aspect, 0.42) * 2.0 * dist / focal;
         along = mix(-reach, reach, clamp(P.b.y, 0.0, 1.0));
         eye = 30.0;
-        tr = 0.12;
-        bank = 0.32;
+        tr = 0.14;
+        bank = 0.0;
         // a long lens: the sun low at the right, under the rail's height
         sd = normalize(vec3<f32>(0.235, 0.034, -1.0));
         tight = 4.0;
@@ -322,10 +322,9 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     // the rail's frame: along, across (banked on the loading screen), and out of the rail
     let side = turn(normalize(cross(ad, world_up)), ad, bank);
     let upr = cross(side, ad);
-    let gap = 0.70;                                   // half the distance between the tubes' axes
-    let lift = 0.25;
+        let lift = 0.25;
     let org = vec3<f32>(0.0, lift, 0.0);
-    let rest = sqrt((radius + tr) * (radius + tr) - gap * gap);
+    let rest = radius + tr;                           // the ball rests on the tube's top
     let centre = org + ad * along + upr * rest;
     let zen = P.zenith.rgb;
     let hor = P.horizon.rgb;
@@ -333,13 +332,12 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     let gold = vec3<f32>(1.0, 0.70, 0.30);
     let steel_body = vec3<f32>(0.42, 0.44, 0.50);
 
-    // the two tubes
-    var tubes: array<Tube, 2>;
-    var tube_col: array<vec3<f32>, 2>;
+    // the single tube
+    var tubes: array<Tube, 1>;
+    var tube_col: array<vec3<f32>, 1>;
     var glow = vec3<f32>(0.0);
-    for (var k = 0; k < 2; k++) {
-        let off = side * (gap * (f32(k) * 2.0 - 1.0));
-        let h = tube_hit(ro, rd, org + off, ad, reach, tr, focus, aperture, px);
+    for (var k = 0; k < 1; k++) {
+        let h = tube_hit(ro, rd, org, ad, reach, tr, focus, aperture, px);
         tubes[k] = h;
         var c = vec3<f32>(0.0);
         if h.cov > 0.0 {
@@ -382,11 +380,12 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     var tie_col = vec3<f32>(0.0);
     {
         let sp = 3.2;
-        let wide = gap + tr + 0.16;
+        let wide = tr + 0.10;
+        let post = select(1.9, 0.6, loading);
         let lo = vec3<f32>(dot(ro - org, ad), dot(ro - org, side), dot(ro - org, upr));
         let ld = vec3<f32>(dot(rd, ad), dot(rd, side), dot(rd, upr));
         // the stretch of the ray inside the rail's block, and so which ties it can meet
-        let region = box_hit(lo, ld, vec3<f32>(-1.0e5, -wide, -tr - 0.26), vec3<f32>(1.0e5, wide, tr + 0.08));
+        let region = box_hit(lo, ld, vec3<f32>(-1.0e5, -wide, -tr - post), vec3<f32>(1.0e5, wide, tr + 0.08));
         let t0 = max(region.tn, 0.0);
         if region.tf > t0 {
             let a0 = lo.x + ld.x * t0;
@@ -402,16 +401,17 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
                 if abs(ak) > reach + 0.1 {
                     continue;
                 }
-                for (var part = 0; part < 3; part++) {
+                for (var part = 0; part < 2; part++) {
                     var bmin: vec3<f32>;
                     var bmax: vec3<f32>;
                     if part == 0 {
-                        bmin = vec3<f32>(ak - 0.09, -wide, -tr - 0.14);
-                        bmax = vec3<f32>(ak + 0.11, wide, -tr + 0.005);
+                        // the post under the tube, its foot lost in the clouds
+                        bmin = vec3<f32>(ak - 0.07, -0.07, -tr - post);
+                        bmax = vec3<f32>(ak + 0.07, 0.07, -tr + 0.02);
                     } else {
-                        let sgn = f32(part) * 2.0 - 3.0;
-                        bmin = vec3<f32>(ak - 0.17, sgn * gap - tr - 0.05, -tr - 0.05);
-                        bmax = vec3<f32>(ak + 0.17, sgn * gap + tr + 0.05, tr + 0.05);
+                        // the cradle that holds the tube from below
+                        bmin = vec3<f32>(ak - 0.16, -tr - 0.05, -tr - 0.10);
+                        bmax = vec3<f32>(ak + 0.16, tr + 0.05, 0.02);
                     }
                     let bh = box_hit(lo, ld, bmin, bmax);
                     if bh.tf > max(bh.tn, 0.0) && bh.tn < tie_t {
@@ -419,7 +419,7 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
                         let n = ad * bh.n.x + side * bh.n.y + upr * bh.n.z;
                         var tc = vec3<f32>(0.0);
                         if part == 0 {
-                            tc = metal(n, rd, sd, eye, vec3<f32>(0.34, 0.35, 0.40), 0.2);
+                            tc = metal(n, rd, sd, eye, vec3<f32>(0.30, 0.31, 0.36), 0.2);
                         } else {
                             tc = metal(n, rd, sd, eye, steel_body * 1.3, 0.7);
                         }
@@ -508,15 +508,14 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         col += glow;
     }
     // the layers, the farthest first
-    var lt = array<f32, 4>(tubes[0].t, tubes[1].t, tie_t, ball_t);
-    var lc = array<vec4<f32>, 4>(
+    var lt = array<f32, 3>(tubes[0].t, tie_t, ball_t);
+    var lc = array<vec4<f32>, 3>(
         vec4<f32>(tube_col[0], tubes[0].cov),
-        vec4<f32>(tube_col[1], tubes[1].cov),
         vec4<f32>(tie_col, tie_cov),
         vec4<f32>(ball_col, ball_cov),
     );
-    for (var round = 0; round < 3; round++) {
-        for (var i = 0; i < 3; i++) {
+    for (var round = 0; round < 2; round++) {
+        for (var i = 0; i < 2; i++) {
             if lt[i] < lt[i + 1] {
                 let tt = lt[i];
                 lt[i] = lt[i + 1];
@@ -527,7 +526,7 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
             }
         }
     }
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 3; i++) {
         col = mix(col, lc[i].rgb, lc[i].a);
     }
     if loading {
