@@ -162,7 +162,7 @@ impl Pass {
     ) -> Pass {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("clouds"),
-            source: wgpu::ShaderSource::Wgsl(shader_source(samples > 1).into()),
+            source: wgpu::ShaderSource::Wgsl(shader_source(samples).into()),
         });
         let tex = |binding, dim, sample_type| wgpu::BindGroupLayoutEntry {
             binding,
@@ -170,7 +170,7 @@ impl Pass {
             ty: wgpu::BindingType::Texture {
                 sample_type,
                 view_dimension: dim,
-                // the scene's depth (binding 4) is multisampled with anti-aliasing: its first sample is read
+                // the scene's depth (binding 4) is multisampled with anti-aliasing: each sample is read
                 multisampled: binding == 4 && samples > 1,
             },
             count: None,
@@ -413,14 +413,14 @@ impl Pass {
 }
 
 /// The shader: the built-in one, or in a debug build, for tuning the look, the file DRAHTSEILAKT_CLOUD_SHADER names.
-fn shader_source(multisampled: bool) -> String {
+fn shader_source(samples: u32) -> String {
     #[cfg(debug_assertions)]
     if let Some(text) =
         std::env::var_os("DRAHTSEILAKT_CLOUD_SHADER").and_then(|p| std::fs::read_to_string(p).ok())
     {
-        return depth_binding(text, multisampled);
+        return depth_binding(text, samples);
     }
-    depth_binding(include_str!("clouds.wgsl").to_owned(), multisampled)
+    depth_binding(include_str!("clouds.wgsl").to_owned(), samples)
 }
 
 /// Every texture of the layer repeats over this many clouds' sizes (clouds.wgsl: the map of banks every 30 and its
@@ -800,8 +800,9 @@ mod tests {
 }
 
 /// The shader's depth binding as the scene's depth texture is: multisampled with anti-aliasing (its sample 0 is read).
-fn depth_binding(text: String, multisampled: bool) -> String {
-    if multisampled {
+fn depth_binding(text: String, samples: u32) -> String {
+    let text = format!("const NS: i32 = {};\n{text}", samples.max(1));
+    if samples > 1 {
         text.replace("texture_depth_2d", "texture_depth_multisampled_2d")
     } else {
         text
