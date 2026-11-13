@@ -48,6 +48,7 @@ verlassen. Neustart und Verlassen fragen einmal nach. Wiederholungen sind standa
 - **Start** zeigt die Levelgruppen: *Ausgewählte Karten*, *Klassisches Ballance* (braucht Ihre Kopie des Originals),
   *Ballance-Prüfungen* (Umbauten der Originallevel durch die Community, ebenfalls mit Kopie) und *Community-Karten*
   mit *Mitgeliefert* und *Eigene Level*. Neben jeder Karte steht ihr Schwierigkeitsgrad von 1 bis 10.
+- **Replays** listet Ihre gespeicherten Wiederholungen, neueste zuerst; Enter spielt eine ab. Leer, solange das Speichern aus ist.
 - **Optionen** enthält *Grafik* (Fenstergröße, Synchronisation, Wolken, Vollbild und das *Aussehen*, siehe
   [Aussehen](looks.md)), *Steuerung*, *Sound* (Lautstärke und Klangthema, siehe [Klang und Musik](sound.md)),
   *Replays*, *Sprache*, *Erweitert* und *Hilfe* (diese Anleitung).
@@ -71,9 +72,9 @@ Platz brauchen. Stellen Sie unter **Optionen > Replays** *Replays speichern* ein
 - **Immer**: jeder Lauf wird gespeichert.
 
 Die Wiederholungen liegen im Ordner `user-replays` Ihres Datenordners, eine Datei je Lauf, benannt nach Datum und Level:
-`2026-11-12-21-40-05-Level_03.replay`. Derselbe Bildschirm listet sie, neueste zuerst, mit Datum, Level, Länge und
+`2026-11-12-21-40-05-Level_03.replay`. Die Liste steht im Hauptmenü unter **Replays**: sie zeigt sie, neueste zuerst, mit Datum, Level, Länge und
 Ausgang. **Enter** spielt eine im Fenster ab, **Esc** stoppt sie und führt zur Liste zurück. Eine Wiederholung läuft nur
 auf genau der Leveldatei, auf der sie aufgenommen wurde: fehlt der Level oder stammt sie aus einer anderen Version des
-Spiels, sagt die Liste das. *Ordner öffnen...* öffnet einen Dialog für einen anderen Ordner (etwa mit zugesandten
+Spiels, sagt die Liste das. *Ordner öffnen...* (unter **Optionen > Replays**) öffnet einen Dialog für einen anderen Ordner (etwa mit zugesandten
 Wiederholungen); er wird gemerkt und seine Wiederholungen werden mitgelistet. Bei einem Fehler im Spiel ist die
 Wiederholung des betreffenden Laufs der beste Bericht: senden Sie die Datei.
