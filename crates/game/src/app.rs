@@ -219,7 +219,7 @@ impl Game {
         }
         // the shared parts (balls, modules, transformer): the level folder's own when it has them, else ours or the
         // copy's (assets.rs); without any the ball is drawn plain and bursts into nothing (said once, never fatal)
-        let balls = (!empty)
+        let mut balls = (!empty)
             .then(|| data.part("3D Entities/Balls.nmo"))
             .flatten()
             .unwrap_or_else(|| crate::assets::LoadedLevel {
@@ -260,7 +260,13 @@ impl Game {
             .as_deref()
             .and_then(crate::sim::BallKind::from_name)
             .unwrap_or(crate::sim::BallKind::Wood);
-        let modules = scene::load_modules(&level.level, data);
+        let mut modules = scene::load_modules(&level.level, data);
+        // the parts the game draws are rounded like a level's meshes (once per run; physics keeps the meshes)
+        let t_round = std::time::Instant::now();
+        let mut rounded = level::smooth::add_looks_cached(&mut balls.level);
+        for m in &mut modules.models {
+            rounded += level::smooth::add_looks_cached(m);
+        }
         let extra_model = scene::ExtraModel::new(&modules);
         // The original's level 1 begins with its tutorial, which stops the level before the ball comes (the level's
         // settings say so: an .nmo's from the game's table, an open-format level's its own).
@@ -338,7 +344,17 @@ impl Game {
         let trafo = (!empty)
             .then(|| data.part("3D Entities/AnimTrafo.nmo"))
             .flatten()
-            .and_then(|f| crate::trafo::TrafoModel::new(&f.level, trafo_model).map(|m| (f, m)));
+            .and_then(|mut f| {
+                let m = crate::trafo::TrafoModel::new(&f.level, trafo_model)?;
+                rounded += level::smooth::add_looks_cached(&mut f.level);
+                Some((f, m))
+            });
+        if rounded > 0 {
+            eprintln!(
+                "rounding: {rounded} part meshes rounded in {:.2} s",
+                t_round.elapsed().as_secs_f64()
+            );
+        }
         Ok(Game {
             data: data.clone(),
             trafo,
@@ -3548,6 +3564,18 @@ fn level_models(game: &Game, plain: bool) -> Vec<std::borrow::Cow<'_, level::Lev
     v.extend(game.modules.models.iter().map(Cow::Borrowed));
     if let Some((file, _)) = &game.trafo {
         v.push(Cow::Borrowed(&file.level));
+    }
+    if plain {
+        // Back to 2004: the parts are drawn as they are in the files, without the rounding
+        for (i, m) in v.iter_mut().enumerate() {
+            if i != 0 && i != 2 && m.meshes.iter().any(|x| x.look.is_some()) {
+                let mut l = m.as_ref().clone();
+                for x in &mut l.meshes {
+                    x.look = None;
+                }
+                *m = Cow::Owned(l);
+            }
+        }
     }
     v
 }

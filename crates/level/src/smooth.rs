@@ -66,6 +66,57 @@ pub fn add_looks(level: &mut Level) -> usize {
     n
 }
 
+/// `add_looks` for the shared parts (balls, modules, the transformer): the same shapes, made once per run for each
+/// distinct mesh (found by a hash of its contents, so the same part met again or by another level costs a lookup).
+pub fn add_looks_cached(level: &mut Level) -> usize {
+    use std::hash::{Hash, Hasher};
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<HashMap<u64, Option<Mesh>>>> = OnceLock::new();
+    if level.meshes.iter().any(|m| m.look.is_some()) {
+        return 0;
+    }
+    let sig = |m: &Mesh| -> u64 {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for p in &m.positions {
+            p.map(f32::to_bits).hash(&mut h);
+        }
+        for p in &m.normals {
+            p.map(f32::to_bits).hash(&mut h);
+        }
+        for p in &m.uvs {
+            p.map(f32::to_bits).hash(&mut h);
+        }
+        for part in &m.parts {
+            part.indices.hash(&mut h);
+        }
+        h.finish()
+    };
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let sigs: Vec<u64> = level.meshes.iter().map(sig).collect();
+    let missing: Vec<usize> = {
+        let Ok(c) = cache.lock() else { return 0 };
+        (0..sigs.len()).filter(|&i| !c.contains_key(&sigs[i])).collect()
+    };
+    if !missing.is_empty() {
+        let todo: Vec<Mesh> = missing.iter().map(|&i| level.meshes[i].clone()).collect();
+        let made = looks_of(&todo);
+        if let Ok(mut c) = cache.lock() {
+            for (&i, look) in missing.iter().zip(made) {
+                c.insert(sigs[i], look);
+            }
+        }
+    }
+    let Ok(c) = cache.lock() else { return 0 };
+    let mut n = 0;
+    for (m, s) in level.meshes.iter_mut().zip(&sigs) {
+        if let Some(Some(look)) = c.get(s) {
+            m.look = Some(Box::new(look.clone()));
+            n += 1;
+        }
+    }
+    n
+}
+
 /// The look of each mesh (None where it needs none or is over the caps), made on all the processor's threads.
 pub fn looks_of(meshes: &[Mesh]) -> Vec<Option<Mesh>> {
     let one = |m: &Mesh| -> Option<Mesh> {
