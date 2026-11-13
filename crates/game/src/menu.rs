@@ -238,9 +238,11 @@ pub struct Hit {
 
 /// The mouse's cursor over the menu: where it is in the window (pixels), the window's size, and whether the menu is
 /// drawn as the interface (a face to draw with) or as the prototype's lines.
-#[derive(Clone, Copy, Debug)]
-pub struct Pointer {
+#[derive(Clone, Copy)]
+pub struct Pointer<'a> {
     pub interface: bool,
+    /// The face the menu is drawn with: the layout of a screen with a help panel depends on it.
+    pub face: Option<&'a crate::ui::Face>,
     pub screen: crate::ui::Screen,
     pub x: f32,
     pub y: f32,
@@ -1443,10 +1445,15 @@ impl Menu {
 
     /// The buttons of the screen shown and where they are drawn, in a window of `screen`'s size: the interface's
     /// (the very rectangles it draws, any size and aspect) or the prototype's lines.
-    pub fn hits(&self, interface: bool, screen: crate::ui::Screen) -> Vec<Hit> {
+    pub fn hits(
+        &self,
+        interface: bool,
+        screen: crate::ui::Screen,
+        face: Option<&crate::ui::Face>,
+    ) -> Vec<Hit> {
         if interface {
             let hits = std::cell::RefCell::new(Vec::new());
-            self.draw(None, screen, &hits, None);
+            self.draw(face, screen, &hits, None);
             hits.into_inner()
         } else {
             let mut hits = Vec::new();
@@ -1456,15 +1463,17 @@ impl Menu {
     }
 
     /// The button under the cursor.
-    fn hit(&self, p: Pointer) -> Option<Hit> {
+    fn hit(&self, p: Pointer<'_>) -> Option<Hit> {
         let inside =
             |h: &Hit| p.x >= h.rect[0] && p.x < h.rect[2] && p.y >= h.rect[1] && p.y < h.rect[3];
-        self.hits(p.interface, p.screen).into_iter().find(inside)
+        self.hits(p.interface, p.screen, p.face)
+            .into_iter()
+            .find(inside)
     }
 
     /// The cursor moved: the line under it is chosen, as the arrows would choose it (a line that cannot be chosen,
     /// or a key being awaited, leaves the choice alone). True when the chosen line changed.
-    pub fn hover(&mut self, p: Pointer) -> bool {
+    pub fn hover(&mut self, p: Pointer<'_>) -> bool {
         if self.waiting() {
             return false;
         }
@@ -1485,7 +1494,7 @@ impl Menu {
     /// A left click: the button under the cursor chosen and pressed as Enter presses it; a line with a value goes
     /// down on its left half and up on its right half, as Left and Right change it; the highscores' arrows change
     /// the level. None when no button is there (or a key is awaited: a mouse button is not a key to bind).
-    pub fn click(&mut self, p: Pointer) -> Option<Action> {
+    pub fn click(&mut self, p: Pointer<'_>) -> Option<Action> {
         if self.waiting() {
             return None;
         }
@@ -4004,16 +4013,17 @@ mod tests {
         (320.0, 200.0),
     ];
 
-    fn at(m: &Menu, interface: bool, w: f32, h: f32, target: Target, fx: f32) -> Pointer {
+    fn at(m: &Menu, interface: bool, w: f32, h: f32, target: Target, fx: f32) -> Pointer<'static> {
         let screen = crate::ui::Screen { w, h };
         let hit = m
-            .hits(interface, screen)
+            .hits(interface, screen, None)
             .into_iter()
             .find(|h| h.target == target)
             .unwrap();
         let r = hit.rect;
         Pointer {
             interface,
+            face: None,
             screen,
             x: r[0] + (r[2] - r[0]) * fx,
             y: (r[1] + r[3]) / 2.0,
@@ -4029,7 +4039,7 @@ mod tests {
         let m = menu(&[true, true], true);
         for (w, h) in WINDOWS {
             let screen = crate::ui::Screen { w, h };
-            let hits = m.hits(true, screen);
+            let hits = m.hits(true, screen, None);
             // one per line, each exactly a button the interface draws
             assert_eq!(hits.len(), m.lines(Screen::Main).len());
             let quads = m.interface(None, screen);
@@ -4151,6 +4161,18 @@ mod tests {
     }
 
     #[test]
+    fn a_click_on_exit_asks_and_yes_quits() {
+        for (w, h) in WINDOWS {
+            let mut m = menu(&[true], false);
+            let exit = at(&m, true, w, h, line_of(&m, Line::Exit), 0.5);
+            assert_eq!(m.click(exit), Some(Action::None), "{w}x{h}");
+            assert_eq!(m.screen(), Screen::Ask(Ask::Quit));
+            let yes = at(&m, true, w, h, line_of(&m, Line::Yes), 0.5);
+            assert_eq!(m.click(yes), Some(Action::Quit), "{w}x{h}");
+        }
+    }
+
+    #[test]
     fn yes_and_no_are_clicked() {
         let mut m = menu(&[true], false);
         m.push(Screen::Ask(Ask::Quit));
@@ -4260,7 +4282,7 @@ mod tests {
         for _ in 0..3 {
             m.page_by(1);
             let rows: Vec<usize> = m
-                .hits(true, screen)
+                .hits(true, screen, None)
                 .iter()
                 .filter_map(|h| {
                     if let Target::Line(i) = h.target {
@@ -4304,7 +4326,7 @@ mod tests {
                     None
                 }
             };
-            m.hits(true, screen).iter().filter_map(line).collect()
+            m.hits(true, screen, None).iter().filter_map(line).collect()
         };
         // a page of maps and Back
         assert_eq!(rows(&m), (0..LIST_LINES).chain([30]).collect::<Vec<_>>());

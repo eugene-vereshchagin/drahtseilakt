@@ -7307,6 +7307,27 @@ impl App {
     }
 }
 
+/// Where the cursor is over the menu: the window's size and the face the menu is drawn with (its layout depends on it,
+/// so a click lands on what is drawn).
+fn pointer_at(
+    cursor: Option<(f64, f64)>,
+    size: Option<(u32, u32)>,
+    face: Option<&crate::ui::Face>,
+) -> Option<crate::menu::Pointer<'_>> {
+    let (x, y) = cursor?;
+    let (w, h) = size?;
+    Some(crate::menu::Pointer {
+        interface: face.is_some(),
+        face,
+        screen: crate::ui::Screen {
+            w: w as f32,
+            h: h as f32,
+        },
+        x: x as f32,
+        y: y as f32,
+    })
+}
+
 /// Pixels of a touchpad's scrolling that make one notch of the wheel.
 const WHEEL_PIXELS: f64 = 40.0;
 
@@ -7314,18 +7335,10 @@ const WHEEL_PIXELS: f64 = 40.0;
 /// closes a menu has nothing to leak into it.
 impl App {
     /// Where the cursor is over the menu, as the menu lays its buttons out in this window.
-    fn pointer(&self) -> Option<crate::menu::Pointer> {
-        let (x, y) = self.cursor?;
-        let gpu = self.gpu.as_ref()?;
-        Some(crate::menu::Pointer {
-            interface: self.game.font.is_some(),
-            screen: crate::ui::Screen {
-                w: gpu.config.width as f32,
-                h: gpu.config.height as f32,
-            },
-            x: x as f32,
-            y: y as f32,
-        })
+    fn window_size(&self) -> Option<(u32, u32)> {
+        self.gpu
+            .as_ref()
+            .map(|g| (g.config.width, g.config.height))
     }
 
     /// The menu's click sound, as its keys make it.
@@ -7336,7 +7349,9 @@ impl App {
     }
 
     fn mouse_moved(&mut self) {
-        let Some(p) = self.pointer() else { return };
+        let Some(p) = pointer_at(self.cursor, self.window_size(), self.game.font.as_ref()) else {
+            return;
+        };
         if self.loading.is_none() && self.menu.as_mut().is_some_and(|m| m.hover(p)) {
             self.menu_click();
         }
@@ -7353,7 +7368,10 @@ impl App {
         }
         match button {
             MouseButton::Left => {
-                let Some(p) = self.pointer() else { return };
+                let Some(p) = pointer_at(self.cursor, self.window_size(), self.game.font.as_ref())
+                else {
+                    return;
+                };
                 if let Some(action) = self.menu.as_mut().and_then(|m| m.click(p)) {
                     if !matches!(action, Action::SoundTheme(_)) {
                         self.menu_click();
@@ -7381,7 +7399,7 @@ impl App {
         while self.wheel.abs() >= 1.0 {
             let by = if self.wheel > 0.0 { -1 } else { 1 };
             self.wheel += f64::from(by);
-            let p = self.pointer();
+            let p = pointer_at(self.cursor, self.window_size(), self.game.font.as_ref());
             if let Some(action) = self.menu.as_mut().map(|m| m.wheel(by, p)) {
                 self.menu_action(action, event_loop);
             }
