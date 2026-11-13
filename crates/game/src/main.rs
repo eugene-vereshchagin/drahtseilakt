@@ -72,6 +72,7 @@ mod supports;
 mod titlescene;
 mod trafo;
 mod ui;
+mod userreplay;
 mod volume;
 mod watch;
 mod zones;
@@ -231,6 +232,10 @@ pub struct Options {
     pub audit_report: Vec<PathBuf>,
     /// Draw the floors, rails and stoppers a map hides as translucent markers.
     pub show_colliders: bool,
+    /// The development logs of `data/replays/<level>/` (session logs, watch log, spin-loss dumps, attempts and every
+    /// finished run's replay) are written: unattended runs, `--debug` given, DRAHTSEILAKT_DEV_LOGS set, or
+    /// `dev-logs on` in the settings. A player's game writes none (their replays are the Replays setting's).
+    pub dev_logs: bool,
 }
 
 /// Until the release, a played game is a debug run unless `--no-debug` says otherwise (the owner's decision,
@@ -281,6 +286,7 @@ pub(crate) fn default_options() -> Options {
         audit_csv: None,
         audit_report: Vec::new(),
         show_colliders: false,
+        dev_logs: false,
     }
 }
 
@@ -478,6 +484,10 @@ fn parse_args() -> Result<Options, String> {
         || !o.audit_report.is_empty()
         || o.export.is_some();
     o.debug = debug.unwrap_or(DEBUG_BY_DEFAULT && !unattended);
+    o.dev_logs = unattended
+        || debug == Some(true)
+        || std::env::var_os("DRAHTSEILAKT_DEV_LOGS").is_some_and(|v| !v.is_empty() && v != "0")
+        || gamedata::profile::setting("dev-logs").is_some_and(|v| matches!(v.trim(), "on" | "yes"));
     Ok(o)
 }
 
