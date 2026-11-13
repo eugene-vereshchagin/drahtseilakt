@@ -130,29 +130,6 @@ fn fs(in: VsOut) -> FsOut {
     // distance is SIZE over the ray's largest component. Anything nearer is the level.
     // Each sample of an anti-aliased pixel has its own depth: the cloud is shaded once, along the farthest, and
     // written only to the samples that see about as far, so an edge against the clouds keeps its coverage.
-    var dists: array<f32, NS>;
-    var scene = 0.0;
-    for (var s = 0; s < NS; s++) {
-        let z = textureLoad(depth, px, s);
-        var d = 1e9;
-        if z < 1.0 {
-            let wp = c.inv_view_proj * vec4<f32>(ndc, z, 1.0);
-            d = length(wp.xyz / wp.w - eye);
-            let a = abs(dir);
-            let box = SKY / max(max(a.x, a.y), a.z);
-            if d > box * 0.999 {
-                d = 1e9;
-            }
-        }
-        dists[s] = d;
-        scene = max(scene, d);
-    }
-    var mask = 0u;
-    for (var s = 0; s < NS; s++) {
-        if dists[s] >= scene * 0.98 {
-            mask |= 1u << u32(s);
-        }
-    }
     let bottom = c.slab.x;
     let top = c.slab.y;
     // the stretch of the ray inside the slab
@@ -165,6 +142,33 @@ fn fs(in: VsOut) -> FsOut {
         t1 = min(max(a, b), FAR);
     } else if eye.y > top || eye.y < bottom {
         discard;
+    }
+    // every depth beyond the layer's far side (or the sky box) counts as the same distance: only the nearer samples
+    // differ, so the depth buffer's noise at the horizon cannot split a pixel's samples into bands
+    let cap = t1 + 1.0;
+    var dists: array<f32, NS>;
+    var scene = 0.0;
+    for (var s = 0; s < NS; s++) {
+        let z = textureLoad(depth, px, s);
+        var d = 1e9;
+        if z < 1.0 {
+            let wp = c.inv_view_proj * vec4<f32>(ndc, z, 1.0);
+            d = length(wp.xyz / wp.w - eye);
+            let a = abs(dir);
+            let box = SKY / max(max(a.x, a.y), a.z);
+            if d > box * 0.98 {
+                d = 1e9;
+            }
+        }
+        d = min(d, cap);
+        dists[s] = d;
+        scene = max(scene, d);
+    }
+    var mask = 0u;
+    for (var s = 0; s < NS; s++) {
+        if dists[s] >= scene * 0.98 {
+            mask |= 1u << u32(s);
+        }
     }
     let end = min(t1, scene);
     // below the layer: the haze there hides the world under it, as much as the level says
