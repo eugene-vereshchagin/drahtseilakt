@@ -23,6 +23,10 @@ struct Params {
 // for a frame waits its turn behind the loading thread's uploads) and are kept here for the functions below.
 var<private> P: Params;
 
+// The ball's own wooden texture (the game's own picture, equirectangular), with its mips.
+@group(0) @binding(0) var ball_tex: texture_2d<f32>;
+@group(0) @binding(1) var ball_samp: sampler;
+
 struct VsOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) @interpolate(flat) a: vec4<f32>,
@@ -184,6 +188,76 @@ fn wood(q: vec3<f32>) -> vec3<f32> {
     return c;
 }
 
+
+struct Tube {
+    cov: f32,
+    s: f32,
+    t: f32,
+    d: f32,
+    e: vec3<f32>,
+}
+
+/// A tube (a line `org + ad * s`, |s| <= reach, of radius `rr`) as the ray sees it: the nearest points of the two,
+/// the coverage with the focus blur and the pixel's width.
+fn tube_hit(ro: vec3<f32>, rd: vec3<f32>, org: vec3<f32>, ad: vec3<f32>, reach: f32, rr: f32, focus: f32, aperture: f32, px: f32) -> Tube {
+    let b = dot(rd, ad);
+    let w0 = ro - org;
+    let denom = max(1.0 - b * b, 1e-5);
+    let s = clamp((dot(ad, w0) - b * dot(rd, w0)) / denom, -reach, reach);
+    let pa = org + ad * s;
+    let tc = max(dot(pa - ro, rd), 0.0);
+    let e = ro + rd * tc - pa;
+    let d = length(e);
+    let blur = aperture * abs(tc - focus) / focus + px * tc * 0.75;
+    let cov = clamp((rr + blur - d) / (2.0 * blur), 0.0, 1.0) * min(1.0, 2.0 * rr / (rr + blur));
+    return Tube(cov, s, tc, d, e);
+}
+
+/// Polished steel with normal `n`: the sky and the clouds mirrored (strong, a metal), the sun's glint, a little body.
+fn metal(n: vec3<f32>, rd: vec3<f32>, sd: vec3<f32>, eye: f32, body: vec3<f32>, mirror: f32) -> vec3<f32> {
+    let ndv = clamp(dot(n, -rd), 0.0, 1.0);
+    let r = reflect(rd, n);
+    let fres = mirror + (1.0 - mirror) * pow(1.0 - ndv, 5.0);
+    let refl = sky(r, sd, eye, 1.0, false) * vec3<f32>(1.0, 1.0, 1.05) * 1.35;
+    let hv = normalize(sd - rd);
+    let ndh = max(dot(n, hv), 0.0);
+    let spec = min(pow(ndh, 400.0) * 40.0, 6.0) + pow(ndh, 40.0) * 0.25;
+    let ndl = clamp(dot(n, sd) * 0.6 + 0.4, 0.0, 1.0);
+    let amb = mix(P.lit.rgb * 0.5 + P.horizon.rgb * 0.25, P.zenith.rgb * 1.4 + P.horizon.rgb * 0.2, n.y * 0.5 + 0.5);
+    // a studio strip high up so the polish reads even with the sun behind
+    let hk = normalize(normalize(vec3<f32>(0.45, 0.8, 0.5)) - rd);
+    let strip = pow(max(dot(n, hk), 0.0), 60.0) * 0.6;
+    return body * (P.sun.rgb * 1.2 * ndl + amb) * (1.0 - fres) + refl * fres
+        + P.sun.rgb * spec * step(0.0, dot(n, sd) + 0.2) + vec3<f32>(strip) * (P.zenith.rgb + P.horizon.rgb + vec3<f32>(0.3));
+}
+
+/// A box in the rail's frame under the ray: entry and exit distances, the entry face's normal (local).
+struct BoxHit {
+    tn: f32,
+    tf: f32,
+    n: vec3<f32>,
+}
+
+fn box_hit(lo: vec3<f32>, ld: vec3<f32>, bmin: vec3<f32>, bmax: vec3<f32>) -> BoxHit {
+    let sg = select(vec3<f32>(-1.0), vec3<f32>(1.0), ld >= vec3<f32>(0.0));
+    let inv = 1.0 / (ld + sg * 1e-6);
+    let t1 = (bmin - lo) * inv;
+    let t2 = (bmax - lo) * inv;
+    let tmin = min(t1, t2);
+    let tmax = max(t1, t2);
+    let tn = max(max(tmin.x, tmin.y), tmin.z);
+    let tf = min(min(tmax.x, tmax.y), tmax.z);
+    var n = vec3<f32>(0.0);
+    if tn == tmin.x {
+        n.x = -sg.x;
+    } else if tn == tmin.y {
+        n.y = -sg.y;
+    } else {
+        n.z = -sg.z;
+    }
+    return BoxHit(tn, tf, n);
+}
+
 @fragment
 fn fs(in: VsOut) -> @location(0) vec4<f32> {
     P = Params(in.a, in.b, in.zenith, in.horizon, in.sun, in.lit, in.shade);
@@ -195,38 +269,40 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     let ndc = vec2<f32>((frag.x / res.x * 2.0 - 1.0) * aspect, 1.0 - frag.y / res.y * 2.0);
     let world_up = vec3<f32>(0.0, 1.0, 0.0);
 
-    // the shot: camera, rope, ball
+    // the shot: camera, rail, ball
     let radius = 1.0;
-    var rope_r = 0.085;
+    var tr = 0.17;          // the tubes' radius
     var ro: vec3<f32>;
     var fwd: vec3<f32>;
     var focal: f32;
-    var ad: vec3<f32>;     // the rope's direction
-    var reach = 1.0e4;      // the rope's reach length
+    var ad: vec3<f32>;     // the rail's direction
+    var reach = 1.0e4;      // the rail's reach length
     var along: f32;        // where the ball is on it
     var eye: f32;          // the camera's height over the clouds
     var aperture = 0.0;
     var tight = 1.0;
+    var bank = 0.0;
     var sd: vec3<f32>;
     if loading {
         focal = 5.67;
         let dist = 58.0;
-        ro = vec3<f32>(0.0, -3.58, dist);
+        ro = vec3<f32>(0.0, -3.0, dist);
         fwd = normalize(vec3<f32>(0.0, 0.106, -1.0));
         ad = vec3<f32>(1.0, 0.0, 0.0);
         reach = min(0.30 * aspect, 0.42) * 2.0 * dist / focal;
         along = mix(-reach, reach, clamp(P.b.y, 0.0, 1.0));
         eye = 30.0;
-        rope_r = 0.075;
-        // a long lens: the sun low at the right, under the wire's height
+        tr = 0.12;
+        bank = 0.32;
+        // a long lens: the sun low at the right, under the rail's height
         sd = normalize(vec3<f32>(0.235, 0.034, -1.0));
         tight = 4.0;
     } else {
         focal = 3.73;
         ad = normalize(vec3<f32>(1.0, 0.0, 1.35));
         along = -0.9 + 0.20 * t;
-        ro = vec3<f32>(-3.0 + 0.16 * t, 0.62 + 0.03 * t, 10.9 - 0.14 * t);
-        fwd = normalize(vec3<f32>(1.75, 1.42, -12.5));
+        ro = vec3<f32>(-3.0 + 0.16 * t, 1.05 + 0.03 * t, 10.9 - 0.14 * t);
+        fwd = normalize(vec3<f32>(1.75, 1.15, -12.5));
         eye = 34.0;
         aperture = 0.10;
         sd = normalize(vec3<f32>(-0.16, P.b.z, -1.0));
@@ -243,79 +319,137 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         col = mix(vec3<f32>(g), col, 0.92) * P.horizon.a;
     }
 
-    let centre = ad * along + world_up * (radius + rope_r);
+    // the rail's frame: along, across (banked on the loading screen), and out of the rail
+    let side = turn(normalize(cross(ad, world_up)), ad, bank);
+    let upr = cross(side, ad);
+    let gap = 0.70;                                   // half the distance between the tubes' axes
+    let lift = 0.25;
+    let org = vec3<f32>(0.0, lift, 0.0);
+    let rest = sqrt((radius + tr) * (radius + tr) - gap * gap);
+    let centre = org + ad * along + upr * rest;
     let zen = P.zenith.rgb;
     let hor = P.horizon.rgb;
+    let focus = length(centre - ro);
+    let gold = vec3<f32>(1.0, 0.70, 0.30);
+    let steel_body = vec3<f32>(0.42, 0.44, 0.50);
 
-    // the rope: the nearest points of the ray and its axis
-    let b = dot(rd, ad);
-    let w0 = ro;
-    let denom = max(1.0 - b * b, 1e-5);
-    let s_axis = clamp((dot(ad, w0) - b * dot(rd, w0)) / denom * 1.0, -reach, reach);
-    let pa = ad * s_axis;
-    let tc = max(dot(pa - ro, rd), 0.0);
-    let pr = ro + rd * tc;
-    let e = pr - pa;
-    let dline = length(e);
-    var rope_cov = 0.0;
-    var rope_col = vec3<f32>(0.0);
+    // the two tubes
+    var tubes: array<Tube, 2>;
+    var tube_col: array<vec3<f32>, 2>;
     var glow = vec3<f32>(0.0);
-    {
-        let focus = length(centre - ro);
-        let blur = aperture * abs(tc - focus) / focus + px * tc * 0.75;
-        rope_cov = clamp((rope_r + blur - dline) / (2.0 * blur), 0.0, 1.0) * min(1.0, 2.0 * rope_r / (rope_r + blur));
-        if rope_cov > 0.0 {
+    for (var k = 0; k < 2; k++) {
+        let off = side * (gap * (f32(k) * 2.0 - 1.0));
+        let h = tube_hit(ro, rd, org + off, ad, reach, tr, focus, aperture, px);
+        tubes[k] = h;
+        var c = vec3<f32>(0.0);
+        if h.cov > 0.0 {
+            let b = dot(rd, ad);
             let inward = normalize(-(rd - ad * b));
-            let k = clamp(dline / rope_r, 0.0, 1.0);
-            let n0 = normalize(e / rope_r + inward * sqrt(1.0 - k * k));
-            // three strands laid in a twist
-            let side = normalize(cross(ad, world_up));
-            let phi = atan2(dot(n0, side), dot(n0, world_up));
-            let lay = phi * 3.0 + s_axis * 9.0;
-            // the strands show while they are in focus and wider than a few pixels
-            let soft = clamp(1.0 - blur / (rope_r * 0.8), 0.0, 1.0) * clamp(0.7 / (px * tc * 7.0), 0.0, 1.0);
-            let n = normalize(n0 + ad * cos(lay) * 0.55 * soft);
-            let fibre = noise2(vec2<f32>(s_axis * 30.0 + phi * 4.0, phi * 9.0 - s_axis * 14.0));
-            var base = vec3<f32>(0.50, 0.36, 0.20) * (0.62 + 0.38 * mix(0.6, abs(sin(lay * 0.5)), soft))
-                * (0.85 + 0.3 * mix(0.5, fibre, soft));
-            let ndl = clamp(dot(n, sd) * 0.6 + 0.4, 0.0, 1.0);
-            let amb = mix(P.lit.rgb * 0.5 + hor * 0.25, zen * 1.4 + hor * 0.2, n.y * 0.5 + 0.5);
+            let kk = clamp(h.d / tr, 0.0, 1.0);
+            let n = normalize(h.e / tr + inward * sqrt(1.0 - kk * kk));
             // the ball's shade where it rests
-            let near = abs(s_axis - along);
-            let contact = mix(0.25, 1.0, smoothstep(0.1, 1.6, near));
-            rope_col = base * (P.sun.rgb * 2.2 * ndl + amb * 1.3) * contact;
-            // the light along its edge against the sun
-            rope_col += P.sun.rgb * 0.5 * pow(1.0 - abs(dot(n, rd)), 3.0) * max(dot(-rd, -sd), 0.0);
-        }
-        if loading {
-            // what is done glows; a glint runs along it
-            let done = s_axis <= along;
-            let sg = clamp((dot(ad, w0) - b * dot(rd, w0)) / denom, -reach, along);
-            let pg = ad * sg;
-            let dg = length(ro + rd * max(dot(pg - ro, rd), 0.0) - pg);
-            let gold = vec3<f32>(1.0, 0.70, 0.30);
-            let run = -reach + fract(t * 0.33) * (along + reach + 4.0);
-            let glint = exp(-(sg - run) * (sg - run) / 3.0) * step(run, along + 0.5);
-            glow = gold * (0.55 * exp(-dg / 0.30) + 0.16 * exp(-dg / 1.5)) * (1.0 + 1.6 * glint);
-            if done {
-                rope_col = vec3<f32>(1.0, 0.86, 0.56) * (1.6 + 2.0 * glint);
-            } else {
-                rope_col = col * 0.45 + vec3<f32>(0.42, 0.42, 0.46);
-                rope_cov *= 0.85;
-            }
-            // the ends' ferrules
-            for (var k = 0; k < 2; k++) {
-                let end = ad * (reach + 0.2) * (f32(k) * 2.0 - 1.0);
-                let te = max(dot(end - ro, rd), 0.0);
-                let de = length(ro + rd * te - end);
-                let c = clamp((0.26 - de) / (px * te) + 0.5, 0.0, 1.0);
-                let lit = k == 0 || P.b.y >= 0.999;
-                var fc = col * 0.45 + vec3<f32>(0.42, 0.42, 0.46);
-                if lit {
-                    fc = vec3<f32>(1.0, 0.82, 0.50) * 1.5;
+            let contact = mix(0.35, 1.0, smoothstep(0.1, 1.8, abs(h.s - along)));
+            c = metal(n, rd, sd, eye, steel_body, 0.72) * contact;
+            if loading {
+                let glint_run = -reach + fract(t * 0.33) * (along + reach + 4.0);
+                let glint = exp(-(h.s - glint_run) * (h.s - glint_run) / 3.0) * step(glint_run, along + 0.5);
+                if h.s <= along {
+                    // what is done glows, a glint running along it
+                    c = c * 0.35 + gold * (1.5 + 2.0 * glint) * (0.55 + 0.45 * pow(1.0 - abs(dot(n, rd)), 0.5));
+                } else {
+                    c = c * 0.8 + col * 0.15;
                 }
-                rope_col = mix(rope_col, fc * (1.2 - de * 1.6), c);
-                rope_cov = max(rope_cov, c);
+            }
+        }
+        tube_col[k] = c;
+    }
+    if loading {
+        // a halo of light round what is done
+        let b = dot(rd, ad);
+        let w0 = ro - org;
+        let denom = max(1.0 - b * b, 1e-5);
+        let sg = clamp((dot(ad, w0) - b * dot(rd, w0)) / denom, -reach, along);
+        let pg = org + ad * sg;
+        let dg = length(ro + rd * max(dot(pg - ro, rd), 0.0) - pg);
+        let run = -reach + fract(t * 0.33) * (along + reach + 4.0);
+        let glint = exp(-(sg - run) * (sg - run) / 3.0) * step(run, along + 0.5);
+        glow = gold * (0.45 * exp(-dg / 0.45) + 0.14 * exp(-dg / 1.8)) * (1.0 + 1.6 * glint);
+    }
+
+    // the cross-ties under the tubes, with a clamp over each tube
+    var tie_cov = 0.0;
+    var tie_t = 1.0e9;
+    var tie_col = vec3<f32>(0.0);
+    {
+        let sp = 3.2;
+        let wide = gap + tr + 0.16;
+        let lo = vec3<f32>(dot(ro - org, ad), dot(ro - org, side), dot(ro - org, upr));
+        let ld = vec3<f32>(dot(rd, ad), dot(rd, side), dot(rd, upr));
+        // the stretch of the ray inside the rail's block, and so which ties it can meet
+        let region = box_hit(lo, ld, vec3<f32>(-1.0e5, -wide, -tr - 0.26), vec3<f32>(1.0e5, wide, tr + 0.08));
+        let t0 = max(region.tn, 0.0);
+        if region.tf > t0 {
+            let a0 = lo.x + ld.x * t0;
+            let a1 = lo.x + ld.x * region.tf;
+            let k0 = i32(floor((min(a0, a1) - 0.3) / sp - 0.5));
+            let k1 = i32(ceil((max(a0, a1) + 0.3) / sp - 0.5));
+            for (var kk = 0; kk <= 10; kk++) {
+                let k = k0 + kk;
+                if k > k1 {
+                    break;
+                }
+                let ak = (f32(k) + 0.5) * sp;
+                if abs(ak) > reach + 0.1 {
+                    continue;
+                }
+                for (var part = 0; part < 3; part++) {
+                    var bmin: vec3<f32>;
+                    var bmax: vec3<f32>;
+                    if part == 0 {
+                        bmin = vec3<f32>(ak - 0.09, -wide, -tr - 0.14);
+                        bmax = vec3<f32>(ak + 0.11, wide, -tr + 0.005);
+                    } else {
+                        let sgn = f32(part) * 2.0 - 3.0;
+                        bmin = vec3<f32>(ak - 0.17, sgn * gap - tr - 0.05, -tr - 0.05);
+                        bmax = vec3<f32>(ak + 0.17, sgn * gap + tr + 0.05, tr + 0.05);
+                    }
+                    let bh = box_hit(lo, ld, bmin, bmax);
+                    if bh.tf > max(bh.tn, 0.0) && bh.tn < tie_t {
+                        let c = clamp((bh.tf - bh.tn) / (px * max(bh.tn, 1.0) * 1.2), 0.0, 1.0);
+                        let n = ad * bh.n.x + side * bh.n.y + upr * bh.n.z;
+                        var tc = vec3<f32>(0.0);
+                        if part == 0 {
+                            tc = metal(n, rd, sd, eye, vec3<f32>(0.34, 0.35, 0.40), 0.2);
+                        } else {
+                            tc = metal(n, rd, sd, eye, steel_body * 1.3, 0.7);
+                        }
+                        if loading && ak <= along {
+                            tc = tc * 0.4 + gold * 1.3;
+                        }
+                        tie_cov = c;
+                        tie_t = bh.tn;
+                        tie_col = tc;
+                    }
+                }
+            }
+        }
+    }
+    if loading {
+        // the ends' knobs
+        for (var k = 0; k < 2; k++) {
+            let end = org + ad * (reach + 0.5) * (f32(k) * 2.0 - 1.0) + upr * (-0.05);
+            let te = max(dot(end - ro, rd), 0.0);
+            let de = length(ro + rd * te - end);
+            let c = clamp((0.34 - de) / (px * te) + 0.5, 0.0, 1.0);
+            let lit = k == 0 || P.b.y >= 0.999;
+            var fc = col * 0.45 + vec3<f32>(0.42, 0.42, 0.46);
+            if lit {
+                fc = vec3<f32>(1.0, 0.82, 0.50) * 1.5;
+            }
+            if c > tie_cov {
+                tie_col = fc * (1.2 - de * 1.2);
+                tie_cov = c;
+                tie_t = te;
             }
         }
     }
@@ -332,17 +466,26 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         let thc = sqrt(max(radius * radius - d2, 0.0));
         ball_t = tca - thc;
         let n = normalize(ro + rd * ball_t - centre);
-        let axis = normalize(cross(world_up, ad));
+        let axis = -side;
         let q = turn(turn(n, axis, -along / radius), vec3<f32>(0.6, 0.0, 0.8), 0.9);
-        let albedo = wood(q);
+        var albedo: vec3<f32>;
+        if P.sun.a > 0.5 {
+            // the texture's equirectangular picture; the mip by the pixel's footprint on the sphere
+            let uv = vec2<f32>(atan2(q.z, q.x) * 0.15915494 + 0.5, acos(clamp(q.y, -1.0, 1.0)) * 0.31830989);
+            let texels = px * tca / radius * f32(textureDimensions(ball_tex).x) * 0.15915494;
+            let tex = textureSampleLevel(ball_tex, ball_samp, uv, max(log2(max(texels, 1.0)), 0.0)).rgb;
+            albedo = pow(tex, vec3<f32>(2.2)) * 1.05;
+        } else {
+            albedo = wood(q);
+        }
         let ndv = clamp(dot(n, -rd), 0.0, 1.0);
         let ndl = dot(n, sd);
         let sunlit = clamp(ndl * 0.75 + 0.25, 0.0, 1.0);
         let amb = mix(P.lit.rgb * 0.6 + hor * 0.3, zen * 1.5 + hor * 0.25, n.y * 0.5 + 0.5);
         // a low warm fill from the camera's side, as the clouds throw back
         let fill = clamp(dot(n, normalize(vec3<f32>(0.5, 0.25, 1.0))), 0.0, 1.0);
-        let rest = mix(0.45, 1.0, smoothstep(-1.0, -0.55, n.y));
-        var c = albedo * (P.sun.rgb * 2.6 * sunlit * sunlit + amb * 1.5 + (hor * 0.5 + P.lit.rgb * 0.4) * fill) * rest;
+        let shade = mix(0.45, 1.0, smoothstep(-1.0, -0.55, n.y));
+        var c = albedo * (P.sun.rgb * 2.6 * sunlit * sunlit + amb * 1.5 + (hor * 0.5 + P.lit.rgb * 0.4) * fill) * shade;
         // the varnish: the sky mirrored, more at the rim; the sun's glint
         let r = reflect(rd, n);
         let fres = 0.075 + 0.925 * pow(1.0 - ndv, 5.0);
@@ -354,23 +497,38 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
         let hk = normalize(key - rd);
         c += (zen * 0.6 + hor * 0.7 + vec3<f32>(0.25)) * (pow(max(dot(n, hk), 0.0), 220.0) * 1.3 + pow(max(dot(n, hk), 0.0), 18.0) * 0.07);
         if loading {
-            // the ball is small here and the evening may be dark: a lamp of its own, and a calmer grain
-            c += mix(albedo, vec3<f32>(0.5, 0.26, 0.10), 0.5) * vec3<f32>(1.0, 0.9, 0.74) * 1.5
+            // the ball is small here and the evening may be dark: a lamp of its own
+            c += mix(albedo, vec3<f32>(0.5, 0.26, 0.10), 0.5) * vec3<f32>(1.0, 0.9, 0.74) * 1.2
                 * pow(clamp(dot(n, normalize(vec3<f32>(-0.45, 0.65, 0.6))) * 0.6 + 0.4, 0.0, 1.0), 2.0);
         }
         ball_col = c;
     }
 
-    // the nearer of the two over the farther
     if loading {
         col += glow;
     }
-    if tc > ball_t {
-        col = mix(col, rope_col, rope_cov);
-        col = mix(col, ball_col, ball_cov);
-    } else {
-        col = mix(col, ball_col, ball_cov);
-        col = mix(col, rope_col, rope_cov);
+    // the layers, the farthest first
+    var lt = array<f32, 4>(tubes[0].t, tubes[1].t, tie_t, ball_t);
+    var lc = array<vec4<f32>, 4>(
+        vec4<f32>(tube_col[0], tubes[0].cov),
+        vec4<f32>(tube_col[1], tubes[1].cov),
+        vec4<f32>(tie_col, tie_cov),
+        vec4<f32>(ball_col, ball_cov),
+    );
+    for (var round = 0; round < 3; round++) {
+        for (var i = 0; i < 3; i++) {
+            if lt[i] < lt[i + 1] {
+                let tt = lt[i];
+                lt[i] = lt[i + 1];
+                lt[i + 1] = tt;
+                let cc = lc[i];
+                lc[i] = lc[i + 1];
+                lc[i + 1] = cc;
+            }
+        }
+    }
+    for (var i = 0; i < 4; i++) {
+        col = mix(col, lc[i].rgb, lc[i].a);
     }
     if loading {
         // the ball's own warm halo

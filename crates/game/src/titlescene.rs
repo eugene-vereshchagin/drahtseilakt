@@ -1,6 +1,7 @@
 // The picture of the title and loading screens: one pass over the whole window that traces a small scene of its own
-// (titlescene.wgsl: the ball on a rope over a sea of clouds, under a sky in the mood of the level's). It needs no
-// model and no texture, so it is there on the first frame, before anything is loaded, and costs the load nothing.
+// (titlescene.wgsl: the ball on a steel rail over a sea of clouds, under a sky in the mood of the level's). It needs
+// no model, only the ball's own wooden texture (read and cut to mips when the pipeline is made, on its thread), and
+// costs the load nothing. The very first frames show a still of it instead (splashpic.rs).
 
 /// A sky's colours (linear): the mood of the screen.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -116,20 +117,146 @@ pub struct Shot {
 
 pub struct TitleScene {
     pipeline: wgpu::RenderPipeline,
+    bind: wgpu::BindGroup,
+    /// Whether the ball's texture was there (else the shader paints a grain of its own).
+    pub textured: bool,
+}
+
+/// The ball's texture in the game's own parts (assets/own), as RGBA with its mip chain, largest first.
+fn ball_texture() -> Option<Vec<(u32, u32, Vec<u8>)>> {
+    let path = gamedata::resources::own_root()?.join("3D Entities/Balls/textures/Ball_Wood.png");
+    // a texture of a sane size only: this is a file of the game's folder, but it is read on the first frame
+    if std::fs::metadata(&path).ok()?.len() > 8 << 20 {
+        return None;
+    }
+    let img = image::open(&path).ok()?.into_rgba8();
+    let (mut w, mut h) = img.dimensions();
+    if w == 0 || h == 0 || w > 4096 || h > 4096 {
+        return None;
+    }
+    let mut level = img.into_raw();
+    let mut chain = vec![(w, h, level.clone())];
+    while w > 1 || h > 1 {
+        let (nw, nh) = ((w / 2).max(1), (h / 2).max(1));
+        let mut next = Vec::with_capacity((nw * nh * 4) as usize);
+        for y in 0..nh {
+            for x in 0..nw {
+                for c in 0..4usize {
+                    let at = |dx: u32, dy: u32| {
+                        let (sx, sy) = ((x * 2 + dx).min(w - 1), (y * 2 + dy).min(h - 1));
+                        u32::from(level[((sy * w + sx) * 4) as usize + c])
+                    };
+                    next.push(((at(0, 0) + at(1, 0) + at(0, 1) + at(1, 1) + 2) / 4) as u8);
+                }
+            }
+        }
+        level = next;
+        (w, h) = (nw, nh);
+        chain.push((w, h, level.clone()));
+    }
+    Some(chain)
 }
 
 /// How many numbers a frame of the picture takes (seven vectors of four: titlescene.wgsl's `Params`).
 pub const PARAMS: usize = 28;
 
 impl TitleScene {
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> TitleScene {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        format: wgpu::TextureFormat,
+    ) -> TitleScene {
+        let chain = ball_texture();
+        let textured = chain.is_some();
+        let chain = chain.unwrap_or_else(|| vec![(1, 1, vec![140, 80, 40, 255])]);
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("title ball"),
+            size: wgpu::Extent3d {
+                width: chain[0].0,
+                height: chain[0].1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: chain.len() as u32,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        for (level, (w, h, data)) in chain.iter().enumerate() {
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &texture,
+                    mip_level: level as u32,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                data,
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(w * 4),
+                    rows_per_image: Some(*h),
+                },
+                wgpu::Extent3d {
+                    width: *w,
+                    height: *h,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
+        let view = texture.create_view(&Default::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            ..Default::default()
+        });
+        let entry = |binding, ty| wgpu::BindGroupLayoutEntry {
+            binding,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty,
+            count: None,
+        };
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("title scene"),
+            entries: &[
+                entry(
+                    0,
+                    wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                ),
+                entry(
+                    1,
+                    wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                ),
+            ],
+        });
+        let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("title scene"),
+            layout: &layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("title scene"),
             source: wgpu::ShaderSource::Wgsl(include_str!("titlescene.wgsl").into()),
         });
         let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("title scene"),
-            bind_group_layouts: &[],
+            bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
         let attributes = wgpu::vertex_attr_array![
@@ -166,7 +293,11 @@ impl TitleScene {
             multiview_mask: None,
             cache: None,
         });
-        TitleScene { pipeline }
+        TitleScene {
+            pipeline,
+            bind,
+            textured,
+        }
     }
 
     /// The numbers of a frame of the picture on a target of `w` by `h` pixels: the pass's one instance.
@@ -234,6 +365,7 @@ impl TitleScene {
             multiview_mask: None,
         });
         pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, &self.bind, &[]);
         pass.set_vertex_buffer(0, instance);
         pass.draw(0..3, 0..1);
     }
