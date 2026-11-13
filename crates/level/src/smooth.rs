@@ -66,15 +66,19 @@ pub fn add_looks(level: &mut Level) -> usize {
     n
 }
 
+/// The triangles of a mesh.
+fn triangles(m: &Mesh) -> usize {
+    m.parts.iter().map(|p| p.indices.len() / 3).sum()
+}
+
 /// `add_looks` for the shared parts (balls, modules, the transformer): the same shapes, made once per run for each
 /// distinct mesh (found by a hash of its contents, so the same part met again or by another level costs a lookup).
+/// A part's look from a model pack that is no finer than the mesh (the copy's own meshes put as looks by `models
+/// original`) is rounded too, from that look; a finer look (a pack's high-poly ball) is kept.
 pub fn add_looks_cached(level: &mut Level) -> usize {
     use std::hash::{Hash, Hasher};
     use std::sync::{Mutex, OnceLock};
     static CACHE: OnceLock<Mutex<HashMap<u64, Option<Mesh>>>> = OnceLock::new();
-    if level.meshes.iter().any(|m| m.look.is_some()) {
-        return 0;
-    }
     let sig = |m: &Mesh| -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         for p in &m.positions {
@@ -92,13 +96,23 @@ pub fn add_looks_cached(level: &mut Level) -> usize {
         h.finish()
     };
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    let sigs: Vec<u64> = level.meshes.iter().map(sig).collect();
+    // what each mesh is rounded from: itself, or its look when that is no finer than the mesh; None: keeps its look
+    let source = |m: &Mesh| -> Option<Mesh> {
+        match m.look.as_deref() {
+            None => Some(Mesh { look: None, ..m.clone() }),
+            Some(l) if triangles(l) <= triangles(m) => Some(Mesh { look: None, ..l.clone() }),
+            Some(_) => None,
+        }
+    };
+    let sources: Vec<Option<Mesh>> = level.meshes.iter().map(source).collect();
+    let sigs: Vec<u64> = sources.iter().map(|s| s.as_ref().map_or(0, sig)).collect();
+    let wanted = |i: usize| sources[i].is_some();
     let missing: Vec<usize> = {
         let Ok(c) = cache.lock() else { return 0 };
-        (0..sigs.len()).filter(|&i| !c.contains_key(&sigs[i])).collect()
+        (0..sigs.len()).filter(|&i| wanted(i) && !c.contains_key(&sigs[i])).collect()
     };
     if !missing.is_empty() {
-        let todo: Vec<Mesh> = missing.iter().map(|&i| level.meshes[i].clone()).collect();
+        let todo: Vec<Mesh> = missing.iter().filter_map(|&i| sources[i].clone()).collect();
         let made = looks_of(&todo);
         if let Ok(mut c) = cache.lock() {
             for (&i, look) in missing.iter().zip(made) {
@@ -108,10 +122,17 @@ pub fn add_looks_cached(level: &mut Level) -> usize {
     }
     let Ok(c) = cache.lock() else { return 0 };
     let mut n = 0;
-    for (m, s) in level.meshes.iter_mut().zip(&sigs) {
-        if let Some(Some(look)) = c.get(s) {
-            m.look = Some(Box::new(look.clone()));
-            n += 1;
+    for (i, m) in level.meshes.iter_mut().enumerate() {
+        if !wanted(i) {
+            continue;
+        }
+        match c.get(&sigs[i]) {
+            Some(Some(look)) => {
+                m.look = Some(Box::new(look.clone()));
+                n += 1;
+            }
+            // nothing to round: a look that is only the mesh again is dropped (it draws the same)
+            _ => {}
         }
     }
     n
@@ -676,4 +697,47 @@ mod tests {
         }];
         assert!(mesh(&box_face).is_none());
     }
+}
+
+/// The mesh the game draws for `m`: its look when it has one, else itself.
+pub fn drawn(m: &Mesh) -> &Mesh {
+    m.look.as_deref().unwrap_or(m)
+}
+
+/// How faceted a mesh is shaded: the widest angle, in degrees, between the normals at the two ends of one of its edges
+/// (a sphere of 8 segments is about 45, a well rounded one a few degrees; a flat-shaded mesh has its corners' normals
+/// agree within each face, so it is measured by the faces it meets across the shared corners instead).
+pub fn facets(m: &Mesh) -> f32 {
+    let mut widest = 0f32;
+    let normal = |i: usize| m.normals.get(i).map_or(Vec3::ZERO, |n| Vec3::from(*n));
+    let mut by_corner: HashMap<[i64; 3], Vec<Vec3>> = HashMap::new();
+    for part in &m.parts {
+        for t in part.indices.chunks_exact(3) {
+            for k in 0..3 {
+                let (a, b) = (t[k] as usize, t[(k + 1) % 3] as usize);
+                if a >= m.positions.len() || b >= m.positions.len() {
+                    continue;
+                }
+                widest = widest.max(normal(a).normalize_or_zero().dot(normal(b).normalize_or_zero()).clamp(-1.0, 1.0).acos());
+            }
+            for &i in t {
+                if let Some(p) = m.positions.get(i as usize) {
+                    let n = normal(i as usize).normalize_or_zero();
+                    let v = by_corner.entry(key(Vec3::from(*p))).or_default();
+                    if !v.iter().any(|o| o.dot(n) > 0.9999) {
+                        v.push(n);
+                    }
+                }
+            }
+        }
+    }
+    // a corner whose copies disagree is a crease: a ball has none
+    for v in by_corner.values() {
+        for a in v {
+            for b in v {
+                widest = widest.max(a.dot(*b).clamp(-1.0, 1.0).acos());
+            }
+        }
+    }
+    widest.to_degrees()
 }

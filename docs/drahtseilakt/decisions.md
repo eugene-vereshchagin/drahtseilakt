@@ -250,7 +250,9 @@ pinned and checksummed) is decided at the release.
 
 *2026-11-13.* The game's parts (balls, PH modules, the transformer) with no look of their own are rounded at load by the
 same `level::smooth` (once per run per distinct mesh, cached by a hash of its contents; about 0.1 s for the first
-level), also under `models original`. Physics keeps the source meshes. Back to 2004 draws them unrounded.
+level), also under `models original`. A part whose look is no finer than its mesh (`models original` puts the copy's
+meshes as looks, which made the first fix skip the ball) is rounded from that look; a finer pack look is kept. Physics
+keeps the source meshes. Back to 2004 draws them unrounded.
 
 
 ## Own content by default, the original's on the player's request
