@@ -3369,7 +3369,7 @@ const VIDEO_AFTER: u64 = 360;
 /// The time of one frame at 60 frames a second.
 const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
 
-/// How frames are shown. `Immediate` by default: on the test machine the vertical-sync modes (`Fifo`,
+/// How frames are shown. `Mailbox` by default where offered (no tearing, no waiting), else `Immediate`: on the test machine the vertical-sync modes (`Fifo`,
 /// `FifoRelaxed`) blocked the presenting for about a second per frame, while `Immediate` presents at once and may
 /// tear. Synch to Screen (`vsync`, the Graphics page) or DRAHTSEILAKT_PRESENT=fifo gives the synchronised mode,
 /// which never tears; the variable comes first.
@@ -3378,7 +3378,11 @@ pub(crate) fn present_mode(offered: &[wgpu::PresentMode], vsync: bool) -> wgpu::
         Ok("fifo") => wgpu::PresentMode::Fifo,
         Ok("relaxed") => wgpu::PresentMode::FifoRelaxed,
         Ok("immediate") => wgpu::PresentMode::Immediate,
+        Ok("mailbox") => wgpu::PresentMode::Mailbox,
         _ if vsync => wgpu::PresentMode::Fifo,
+        // without vsync: the newest finished frame replaces the queued one at the screen's refresh, so nothing
+        // waits and nothing tears; where the driver lacks it, frames go out at once (and may tear)
+        _ if offered.contains(&wgpu::PresentMode::Mailbox) => wgpu::PresentMode::Mailbox,
         _ => wgpu::PresentMode::Immediate,
     };
     if offered.contains(&wanted) {
