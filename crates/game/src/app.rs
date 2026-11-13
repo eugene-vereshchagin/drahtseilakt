@@ -18,6 +18,13 @@ use crate::watch::{Finding, Watch};
 /// The language `--screenshot` draws the menus in (DRAHTSEILAKT_SHOT_LANG), else the settings'.
 static SHOT_LANG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
+/// Whether the development logs are written (Options::dev_logs): set once at the start of `run`.
+static DEV_LOGS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn dev_logs() -> bool {
+    DEV_LOGS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// A value of the settings file; the language of a menu screenshot may be set apart from it.
 pub fn setting(key: &str) -> Option<String> {
     match (key, SHOT_LANG.get()) {
@@ -480,7 +487,7 @@ impl Game {
         for l in &lines {
             println!("{l}");
         }
-        if self.replay_in.is_some() {
+        if self.replay_in.is_some() || !dev_logs() {
             return;
         }
         let dir = self.run_dir();
@@ -508,7 +515,7 @@ impl Game {
     /// Opens the session log of a windowed run in the level's folder: one line for the ball at every tick, and one
     /// for each of its contacts. A replay played back is logged too, so the same case can be compared with the run.
     fn start_session(&mut self) {
-        if self.placeholder {
+        if self.placeholder || !dev_logs() {
             return;
         }
         let dir = self.run_dir();
@@ -605,7 +612,7 @@ impl Game {
             (b.position, b.velocity, b.spin, b.on_ground)
         };
         let spin = spin_v.length();
-        if on_ground && self.prev_spin - spin > 3.0 {
+        if dev_logs() && on_ground && self.prev_spin - spin > 3.0 {
             let floor = self.sim.world().floor_near(position, 6.0);
             let mut text = format!(
                 "# tick {} {} ball position {:?} velocity {:?} spin {:?} (spin {:.3} before, {:.3} now)\n",
@@ -656,7 +663,7 @@ impl Game {
     /// Saves a run that did not finish (restarted or closed before the end), so that the falls and the lifts of
     /// the level can be studied later. Named by the time it was saved; the folder is the level's.
     fn save_attempt(&self) {
-        if self.sim.finished || self.sim.tick == 0 || self.replay_in.is_some() {
+        if !dev_logs() || self.sim.finished || self.sim.tick == 0 || self.replay_in.is_some() {
             return;
         }
         let stem = self
@@ -803,7 +810,11 @@ impl Game {
         } else {
             ""
         };
-        let mut targets = vec![dir.join(format!("{}-{}{tag}.replay", stem, self.sim.tick))];
+        // the run's own file among the level's runs is a development log; the best run below is kept for the menu
+        let mut targets = Vec::new();
+        if dev_logs() {
+            targets.push(dir.join(format!("{}-{}{tag}.replay", stem, self.sim.tick)));
+        }
         if let Some(r) = &self.record {
             targets.push(r.clone());
         }
@@ -1120,6 +1131,8 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
     m.bindings = load_bindings(&strings);
     m.mods = crate::modrt::Mods::load(gamedata::mods::scan(o.debug), setting);
     m.resolutions = crate::options::WINDOWED.to_vec();
+    m.replays.mode = crate::userreplay::Mode::load(setting);
+    m.replays.dirs = crate::userreplay::dirs(setting);
     for k in keys.chars() {
         match k {
             'u' => m.step(-1),
@@ -1347,6 +1360,7 @@ impl Stall {
 }
 
 pub fn run(mut o: Options, data: Data) -> Result<(), String> {
+    DEV_LOGS.store(o.dev_logs, std::sync::atomic::Ordering::Relaxed);
     LAUNCHED.get_or_init(Instant::now);
     // where the interface's files come from: the copy's own when it has its menu, else ours (resources.rs); the
     // extended mode may choose another
@@ -1674,6 +1688,13 @@ fn window(
         opts: o.clone(),
         menu,
         pause_told: false,
+        save_replays: crate::userreplay::Mode::load(setting),
+        replay_prompt: None,
+        run_recorded: false,
+        lost_seen: None,
+        replay_loading: None,
+        user_replay: None,
+        folder_pick: None,
         loading: None,
         autoloaded: false,
         splash: None,
@@ -1787,6 +1808,8 @@ fn window(
     if let Some(w) = app.pilot.take().filter(|w| !w.done) {
         w.run.summary(&app.game, o)?;
     }
+    // the window closed in a run: kept when Save replays is Always (nothing can be asked now)
+    app.leave_run(true);
     app.game.save_attempt();
     match app.error {
         Some(e) => Err(e),
@@ -4004,6 +4027,25 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
         }
         quads.extend(m.interface(game.font.as_ref(), screen));
     }
+    // DRAHTSEILAKT_SHOT_PROMPT=<finished|game-over|left|ball-lost> draws the Save replay? prompt (a look at it)
+    if let (Some(f), Some(o)) = (
+        game.font.as_ref(),
+        std::env::var("DRAHTSEILAKT_SHOT_PROMPT")
+            .ok()
+            .and_then(|v| crate::userreplay::Outcome::from_key(&v)),
+    ) {
+        let key = match o {
+            crate::userreplay::Outcome::Finished => "replay ask finished",
+            crate::userreplay::Outcome::GameOver => "replay ask game over",
+            crate::userreplay::Outcome::Left => "replay ask left",
+            crate::userreplay::Outcome::BallLost => "replay ask ball lost",
+        };
+        let yes = strings.ours("replay yes");
+        let no = strings.ours("replay no");
+        quads.extend(
+            crate::menu::replay_prompt(f, screen, &strings.ours(key), Some((&yes, &no)), 1.0).0,
+        );
+    }
     if let Some((aw, ah, rgba)) = crate::fallback::take_changed() {
         r.add_named_texture(crate::fallback::TEXTURE, aw, ah, rgba);
     }
@@ -4079,6 +4121,25 @@ const LOAD_SCREEN_AFTER: std::time::Duration = std::time::Duration::from_millis(
 
 /// A level on its way in (`App::load`).
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+
+/// A run offered for saving: its replay text (taken when the run ended, so what comes after cannot change it), the
+/// level's name and the moment, how it ended; and the prompt's life (a saved message, or the question).
+struct ReplayPrompt {
+    pending: Option<PendingReplay>,
+    /// Said instead of the question once the replay is saved (or could not be).
+    message: Option<String>,
+    outcome: crate::userreplay::Outcome,
+    since: Instant,
+    life: f32,
+    /// The Yes and No buttons where they were drawn last (window pixels).
+    hits: std::cell::Cell<[[f32; 4]; 2]>,
+}
+
+struct PendingReplay {
+    text: String,
+    level: String,
+    stamp: crate::userreplay::Stamp,
+}
 
 struct Load {
     source: crate::assets::Source,
@@ -4250,6 +4311,17 @@ struct App {
     menu: Option<Menu>,
     /// The pause menu was opened over the run and the scripts were told (they hear the end of it too).
     pause_told: bool,
+    /// Save replays: Off, Ask or Always (userreplay.rs); the prompt up now, if any; a run's end already offered or saved.
+    save_replays: crate::userreplay::Mode,
+    replay_prompt: Option<ReplayPrompt>,
+    run_recorded: bool,
+    /// The tick of the ball lost that was last offered.
+    lost_seen: Option<u64>,
+    /// A replay from the Replays screen is loading, and the one playing (Esc or its end goes back to the list).
+    replay_loading: Option<PathBuf>,
+    user_replay: Option<PathBuf>,
+    /// The folder dialog open on its thread: its answer.
+    folder_pick: Option<std::sync::mpsc::Receiver<Option<PathBuf>>>,
     /// A level being loaded: its CPU work on a thread, its upload to the card in slices (`App::loading_step`).
     loading: Option<Box<Load>>,
     /// The longest frame of the loading in progress, and how many there were.
@@ -5329,6 +5401,9 @@ impl App {
 
     /// The run starts again: its music and its start sound too.
     fn restart(&mut self) {
+        self.leave_run(false);
+        self.run_recorded = false;
+        self.lost_seen = None;
         self.game.restart();
         self.reset_mod_run();
         self.started = false;
@@ -5337,6 +5412,268 @@ impl App {
             m.stop(a);
         }
         self.music = None;
+    }
+
+    /// The run as it stands, offered or saved by the Save replays setting: `Finished` and `GameOver` end it, `Left` is
+    /// a restart, the main menu or another level, `BallLost` a lost ball with the run going on. Nothing for a replay
+    /// being played, the watched test player's run, a run too short to matter (unless finished), or the setting Off.
+    fn run_ended(&mut self, outcome: crate::userreplay::Outcome, closing: bool) {
+        use crate::userreplay::{MIN_TICKS, Mode, Outcome};
+        let g = &self.game;
+        if self.save_replays == Mode::Off
+            || g.placeholder
+            || g.replay_in.is_some()
+            || self.pilot.is_some()
+            || g.sim.tick == 0
+            || (g.sim.tick < MIN_TICKS && outcome != Outcome::Finished)
+        {
+            return;
+        }
+        // always: every run's end, once (a lost ball with the run going on is part of the run, saved with it)
+        if self.save_replays == Mode::Always && outcome == Outcome::BallLost {
+            return;
+        }
+        if self.save_replays == Mode::Ask && closing {
+            return;
+        }
+        let stamp = crate::userreplay::local_now();
+        let pending = PendingReplay {
+            text: crate::userreplay::with_header(&g.replay_out.to_text(), &stamp, outcome),
+            level: g.level.name.clone(),
+            stamp,
+        };
+        if self.save_replays == Mode::Always {
+            self.write_replay(pending, outcome);
+        } else {
+            self.replay_prompt = Some(ReplayPrompt {
+                pending: Some(pending),
+                message: None,
+                outcome,
+                since: Instant::now(),
+                life: if outcome == Outcome::BallLost {
+                    crate::userreplay::PROMPT_SECS
+                } else {
+                    60.0
+                },
+                hits: Default::default(),
+            });
+        }
+    }
+
+    /// The run in progress is being left (restart, menu, another level, the window closing): offered once.
+    fn leave_run(&mut self, closing: bool) {
+        if !self.run_recorded && !self.game.sim.finished && !self.game.sim.game_over {
+            self.run_ended(crate::userreplay::Outcome::Left, closing);
+        }
+        self.run_recorded = true;
+    }
+
+    /// Writes an offered replay into the replays folder; says so on the prompt (Ask) or on the console.
+    fn write_replay(&mut self, p: PendingReplay, outcome: crate::userreplay::Outcome) {
+        let said = match crate::userreplay::save(
+            &crate::userreplay::default_dir(),
+            &p.stamp,
+            &p.level,
+            &p.text,
+        ) {
+            Ok(path) => {
+                println!("replay saved to {}", shown_path(&path));
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                self.strings.ours("replay saved").replace("{name}", &name)
+            }
+            Err(e) => {
+                eprintln!("could not save the replay: {e}");
+                self.strings.ours("replay not saved")
+            }
+        };
+        // under Always nothing is asked, so nothing is said but a line on the console; under Ask the prompt says it
+        if self.save_replays == crate::userreplay::Mode::Ask {
+            self.replay_prompt = Some(ReplayPrompt {
+                pending: None,
+                message: Some(said),
+                outcome,
+                since: Instant::now(),
+                life: 4.0,
+                hits: Default::default(),
+            });
+        }
+    }
+
+    /// Y or N (or a click) on the prompt.
+    fn answer_replay_prompt(&mut self, yes: bool) {
+        let Some(mut pr) = self.replay_prompt.take() else {
+            return;
+        };
+        if let (true, Some(p)) = (yes, pr.pending.take()) {
+            self.write_replay(p, pr.outcome);
+        }
+    }
+
+    /// The lost ball and the end of the run, noticed each frame.
+    fn replay_events(&mut self) {
+        if self.game.replay_in.is_some() {
+            return;
+        }
+        if let Some(t) = self.game.ball_lost_at
+            && self.lost_seen != Some(t)
+        {
+            self.lost_seen = Some(t);
+            if !self.game.sim.game_over && !self.game.sim.finished {
+                self.run_ended(crate::userreplay::Outcome::BallLost, false);
+            }
+        }
+        if !self.run_recorded {
+            if self.game.sim.game_over {
+                self.run_recorded = true;
+                self.run_ended(crate::userreplay::Outcome::GameOver, false);
+            } else if self.game.sim.finished {
+                self.run_recorded = true;
+                self.run_ended(crate::userreplay::Outcome::Finished, false);
+            }
+        }
+        if let Some(p) = &self.replay_prompt
+            && p.since.elapsed().as_secs_f32() > p.life
+        {
+            self.replay_prompt = None;
+        }
+    }
+
+    /// The Replays screen opened over the main menu (after a replay, or one that would not play), with a message.
+    fn open_replays(&mut self, notice: Option<String>) {
+        if let Some(m) = &mut self.menu {
+            m.open_replays();
+            m.notice = notice;
+        }
+    }
+
+    /// Plays a replay of the list: its level is found among the player's, and the run plays in the window.
+    fn play_user_replay(&mut self, path: PathBuf) {
+        let said = |app: &mut App, text: String| {
+            if let Some(m) = &mut app.menu {
+                m.notice = Some(text);
+            }
+        };
+        let text = match crate::hints::read_plain(&path, crate::hints::MAX_REPLAY_FILE)
+            .and_then(|b| String::from_utf8(b).map_err(|_| "not text".to_owned()))
+        {
+            Ok(t) => t,
+            Err(_) => return said(self, self.strings.ours("replays broken note")),
+        };
+        let Ok(r) = Replay::parse(&text) else {
+            return said(self, self.strings.ours("replays broken note"));
+        };
+        match self.replay_source(&r) {
+            Some(source) => self.load_with(source, Some(path)),
+            None => {
+                let name = r.level_name.replace('_', " ");
+                said(
+                    self,
+                    self.strings
+                        .ours("replay no level")
+                        .replace("{name}", &name),
+                )
+            }
+        }
+    }
+
+    /// The level a replay was recorded on, among the player's: an original level (its look when that is chosen), else
+    /// a level of that name in any of the levels' folders, a `.nmo` only when its file is the very one (its hash).
+    fn replay_source(&self, r: &Replay) -> Option<crate::assets::Source> {
+        let norm = |n: &str| {
+            n.trim()
+                .trim_end_matches(".NMO")
+                .trim_end_matches(".nmo")
+                .replace(' ', "_")
+                .to_lowercase()
+        };
+        let want = norm(&r.level_name);
+        if let Some(n) = want
+            .strip_prefix("level_")
+            .and_then(|k| k.parse::<u32>().ok())
+            .filter(|n| (1..=13).contains(n))
+        {
+            if let Some(src) = look_source(n) {
+                return Some(src);
+            }
+            if self.data.original(n).is_some() {
+                return Some(crate::assets::Source::Original(n));
+            }
+        }
+        let mut open = None;
+        for root in custom_roots() {
+            for pk in gamedata::package::scan(&root).0 {
+                let file = pk
+                    .level
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned());
+                if file.as_deref().map(norm).as_deref() != Some(want.as_str()) {
+                    continue;
+                }
+                if pk.level.is_dir() {
+                    open.get_or_insert(crate::assets::Source::Open(pk.level));
+                } else if crate::hints::read_plain(&pk.level, 256 << 20)
+                    .is_ok_and(|b| gamedata::fnv1a(&b) == r.level_hash)
+                {
+                    return Some(crate::assets::Source::Nmo(pk.level));
+                }
+            }
+        }
+        open
+    }
+
+    /// Back from a replay being played to the Replays list.
+    fn stop_replay(&mut self) {
+        self.user_replay = None;
+        self.number = None;
+        self.keys = 0;
+        self.open_menu(crate::menu::Screen::Main);
+        self.open_replays(None);
+    }
+
+    /// The folder dialog, on its own thread so that the window keeps drawing; one at a time.
+    fn pick_replay_folder(&mut self) {
+        if self.folder_pick.is_some() {
+            return;
+        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        let title = self.strings.ours("replays pick folder");
+        let spawned = std::thread::Builder::new()
+            .name("folder-dialog".into())
+            .spawn(move || {
+                let picked = rfd::FileDialog::new().set_title(title).pick_folder();
+                let _ = tx.send(picked);
+            });
+        match spawned {
+            Ok(_) => self.folder_pick = Some(rx),
+            Err(e) => eprintln!("drahtseilakt: could not open the folder dialog: {e}"),
+        }
+    }
+
+    /// The folder dialog's answer, when it came: the folder is kept in the settings and its replays listed.
+    fn folder_picked(&mut self) {
+        let Some(rx) = &self.folder_pick else { return };
+        let answer = match rx.try_recv() {
+            Ok(a) => a,
+            Err(std::sync::mpsc::TryRecvError::Empty) => return,
+            Err(_) => None,
+        };
+        self.folder_pick = None;
+        let Some(dir) =
+            answer.filter(|d| d.is_absolute() && !d.to_string_lossy().contains(['\n', '\r']))
+        else {
+            return;
+        };
+        put_settings(&[(
+            crate::userreplay::FOLDER_SETTING.to_owned(),
+            dir.display().to_string(),
+        )]);
+        if let Some(m) = &mut self.menu {
+            m.replays.dirs = crate::userreplay::dirs(setting);
+            m.reload_replays();
+        }
     }
 
     /// Plays original level `n`: the current run starts again if it is that level, otherwise it is loaded.
@@ -5352,6 +5689,13 @@ impl App {
     /// Loads a level: the work of reading and building it goes to a thread, the frames go on (a loading bar shows
     /// when it takes over half a second), the card's share is done in slices between them.
     fn load(&mut self, source: crate::assets::Source) {
+        self.load_with(source, None);
+    }
+
+    fn load_with(&mut self, source: crate::assets::Source, replay: Option<PathBuf>) {
+        self.leave_run(false);
+        self.replay_loading = replay.clone();
+        self.user_replay = None;
         self.menu = None;
         if let Some(a) = &mut self.audio {
             a.play(&self.data, "Menu_load", 1.0, 0.0);
@@ -5365,7 +5709,7 @@ impl App {
         };
         let mut o = self.opts.clone();
         o.source = source.clone();
-        (o.replay, o.from, o.sector, o.at, o.ball) = (None, None, None, None, None);
+        (o.replay, o.from, o.sector, o.at, o.ball) = (replay.clone(), None, None, None, None);
         let data = self.data.for_source(&o.source);
         crate::loading::begin();
         let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -5410,6 +5754,7 @@ impl App {
 
     /// Esc while a level loads: back to the menu, what the thread makes dropped.
     fn cancel_loading(&mut self) {
+        self.replay_loading = None;
         if let Some(l) = self.loading.take() {
             l.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
             eprintln!(
@@ -5586,7 +5931,17 @@ impl App {
             if let Some(gpu) = &mut app.gpu {
                 gpu.renderer.end_sharing();
             }
+            let replaying = app.replay_loading.take().is_some();
             app.open_menu(crate::menu::Screen::Main);
+            // a replay that would not play says why on its list
+            if replaying {
+                let why = if e.contains("another level file") {
+                    app.strings.ours("replay other level")
+                } else {
+                    e.chars().take(240).collect()
+                };
+                app.open_replays(Some(why));
+            }
         };
         let Some(gpu) = &mut self.gpu else {
             return fail(self, "no window to load into".into());
@@ -5687,7 +6042,14 @@ impl App {
         self.heard = 0;
         self.started = false;
         self.music = None;
-        self.number = l.number;
+        self.number = if self.replay_loading.is_some() {
+            None
+        } else {
+            l.number
+        };
+        self.user_replay = self.replay_loading.take();
+        self.run_recorded = false;
+        self.lost_seen = None;
         self.prev = None;
         self.keys = 0;
         if let Some(gpu) = &mut self.gpu {
@@ -5733,6 +6095,8 @@ impl App {
         menu.bindings = self.bindings;
         menu.resolutions = self.resolutions.clone();
         menu.mods = self.mods.clone();
+        menu.replays.mode = self.save_replays;
+        menu.replays.dirs = crate::userreplay::dirs(setting);
         if let Some(gpu) = &self.gpu {
             menu.resolution = (gpu.config.width, gpu.config.height);
         }
@@ -6317,7 +6681,11 @@ impl App {
     }
 
     fn run_over(&mut self) {
-        if self.menu.is_some() || self.loading.is_some() || self.fly.is_some() {
+        if self.menu.is_some()
+            || self.loading.is_some()
+            || self.fly.is_some()
+            || self.user_replay.is_some()
+        {
             return;
         }
         // with a saved moment (extended mode) a lost run waits for F9 or R; Esc opens the dead menu
@@ -6435,7 +6803,19 @@ impl App {
                 self.restart();
                 self.saved = None;
             }
-            Action::Home => self.open_menu(crate::menu::Screen::Main),
+            Action::Home => {
+                self.leave_run(false);
+                self.open_menu(crate::menu::Screen::Main)
+            }
+            Action::SaveReplays(mode) => {
+                self.save_replays = mode;
+                if mode == crate::userreplay::Mode::Off {
+                    self.replay_prompt = None;
+                }
+                put_settings(&[(crate::userreplay::SETTING.to_owned(), mode.key().to_owned())]);
+            }
+            Action::PlayReplay(path) => self.play_user_replay(path),
+            Action::PickReplayFolder => self.pick_replay_folder(),
             Action::Quit => event_loop.exit(),
             Action::Manual(page) => {
                 // the local manual, only because the player asked (manual.rs); a failure is said in the menu
@@ -6558,6 +6938,22 @@ impl App {
             }
             return;
         }
+        // the Save replay? prompt: Y and N, unless a menu takes the typed letters or the key is bound to an action
+        if down
+            && self
+                .replay_prompt
+                .as_ref()
+                .is_some_and(|p| p.pending.is_some())
+            && matches!(code, KeyCode::KeyY | KeyCode::KeyN)
+            && self.bindings.bits(code) == 0
+            && self
+                .menu
+                .as_ref()
+                .is_none_or(|m| m.screen() != crate::menu::Screen::Entry && !m.waiting())
+        {
+            self.answer_replay_prompt(code == KeyCode::KeyY);
+            return;
+        }
         if self.menu.is_some() {
             if down {
                 self.key_repeat.press(code);
@@ -6608,6 +7004,10 @@ impl App {
         let bit = match code {
             _ if bound != 0 => bound,
             // the run waits under the pause menu; a finished or lost run has its own menu
+            KeyCode::Escape if down && self.user_replay.is_some() => {
+                self.stop_replay();
+                return;
+            }
             KeyCode::Escape if down && !self.game.sim.finished => {
                 let lost = self.game.sim.game_over;
                 if !lost && self.menu.is_none() {
@@ -6824,6 +7224,20 @@ impl App {
         }
         let simulated = started.elapsed();
         self.run_over();
+        self.replay_events();
+        self.folder_picked();
+        // a replay of the list plays to its end (and a couple of seconds more), then the list is back
+        if self.user_replay.is_some()
+            && self.menu.is_none()
+            && self.loading.is_none()
+            && self
+                .game
+                .replay_in
+                .as_ref()
+                .is_some_and(|r| self.game.sim.tick >= r.end + 120)
+        {
+            self.stop_replay();
+        }
         self.mod_frame(step);
         if let Some(a) = &mut self.audio {
             a.pass(f64::from(ticks) * f64::from(TICK));
@@ -7117,6 +7531,40 @@ impl App {
             h: rh as f32,
         };
         let font = self.game.font.as_ref();
+        // the Save replay? prompt over the run or a menu (not over the loading screen)
+        let prompt_quads = match (&self.replay_prompt, font) {
+            (Some(p), Some(f)) if self.loading.is_none() => {
+                use crate::userreplay::Outcome;
+                let t = p.since.elapsed().as_secs_f32();
+                let alpha = ((p.life - t) / 0.8).clamp(0.0, 1.0);
+                let key = match p.outcome {
+                    Outcome::Finished => "replay ask finished",
+                    Outcome::GameOver => "replay ask game over",
+                    Outcome::Left => "replay ask left",
+                    Outcome::BallLost => "replay ask ball lost",
+                };
+                let (text, buttons) = match &p.message {
+                    Some(m) => (m.clone(), None),
+                    None => (
+                        self.strings.ours(key),
+                        Some((
+                            self.strings.ours("replay yes"),
+                            self.strings.ours("replay no"),
+                        )),
+                    ),
+                };
+                let (q, hits) = crate::menu::replay_prompt(
+                    f,
+                    screen,
+                    &text,
+                    buttons.as_ref().map(|b| (b.0.as_str(), b.1.as_str())),
+                    alpha,
+                );
+                p.hits.set(hits);
+                q
+            }
+            _ => Vec::new(),
+        };
         // the words of the title and loading screens go over their picture, the rest of the interface under it
         let mut art_quads = Vec::new();
         let quads = match (&self.menu, &self.loading, font) {
@@ -7139,6 +7587,7 @@ impl App {
                     q = crate::hud::interface(&self.game.sim, font, screen);
                 }
                 q.extend(m.interface(font, screen));
+                q.extend(prompt_quads);
                 q
             }
             (None, None, _) => {
@@ -7155,6 +7604,7 @@ impl App {
                     q.extend(crate::endscreen::interface(&t, f, &self.strings, screen));
                 }
                 q.extend(mod_quads);
+                q.extend(prompt_quads);
                 // the watched test player's status, small in the top left corner (--watch)
                 if let (Some(w), Some(f)) = (self.pilot.as_ref().filter(|w| !w.done), font) {
                     q.extend(watch_overlay(&w.status(&self.game), f, screen));
@@ -7328,6 +7778,28 @@ impl App {
         })
     }
 
+    /// A click on the prompt's Yes or No; true when it was one.
+    fn click_replay_prompt(&mut self) -> bool {
+        let Some((x, y)) = self.cursor else {
+            return false;
+        };
+        let Some(p) = self.replay_prompt.as_ref().filter(|p| p.pending.is_some()) else {
+            return false;
+        };
+        let (x, y) = (x as f32, y as f32);
+        let inside = |r: [f32; 4]| r[2] > r[0] && x >= r[0] && x < r[2] && y >= r[1] && y < r[3];
+        let [yes, no] = p.hits.get();
+        if inside(yes) {
+            self.answer_replay_prompt(true);
+            true
+        } else if inside(no) {
+            self.answer_replay_prompt(false);
+            true
+        } else {
+            false
+        }
+    }
+
     /// The menu's click sound, as its keys make it.
     fn menu_click(&mut self) {
         if let Some(a) = &mut self.audio {
@@ -7346,6 +7818,9 @@ impl App {
     fn mouse_button(&mut self, button: MouseButton, event_loop: &ActiveEventLoop) {
         if let Some(sp) = &mut self.splash {
             sp.skipped = true;
+            return;
+        }
+        if button == MouseButton::Left && self.click_replay_prompt() {
             return;
         }
         if self.menu.is_none() || self.loading.is_some() {
@@ -7392,6 +7867,10 @@ impl App {
     fn show_cursor(&mut self) {
         // a map's script may ask for the cursor in the run (Show Mouse Cursor): the window's cursor only
         let shown = (self.menu.is_some() && self.loading.is_none())
+            || self
+                .replay_prompt
+                .as_ref()
+                .is_some_and(|p| p.pending.is_some())
             || (self.menu.is_none() && self.game.sim.script_cursor == Some(true));
         if self.cursor_shown != Some(shown)
             && let Some(w) = &self.window

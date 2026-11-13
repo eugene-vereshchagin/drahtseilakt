@@ -25,10 +25,12 @@ kennt. Der Bericht der Toolbox in der Levelliste sagt, was sie gefunden hat. Ein
 In Ihrem Datenordner (siehe [Level und Ordner](levels.md)):
 
 - `settings.txt`: Ihre Einstellungen.
-- `replays/<Level>/`: Wiederholungen Ihrer Läufe (`.replay`) und die Protokolle Ihrer Sitzungen (`session-....log`).
+- `user-replays/`: die Wiederholungen, die Sie speichern lassen (Optionen, Replays), siehe [Spielen](playing.md#wiederholungen).
 - `screenshots/`: Bilder, die der Mod „Screenshot-Taste“ gespeichert hat.
 
 ## Ein Problem melden
 
-Wohin Sie Probleme melden können, steht bald hier. Bis dahin heben Sie das neueste `session-....log` und `.replay`
-des Laufs aus dem Ordner `replays/<Level>/` auf: Sie zeigen genau, was geschah.
+Wohin Sie Probleme melden können, steht bald hier. Bis dahin schalten Sie *Replays speichern* ein (Optionen, Replays)
+und heben die `.replay`-Datei des Laufs auf, der das Problem zeigt: sie zeigt genau, was geschah. Die Entwicklerprotokolle
+in `replays/<Level>/` entstehen nur, wenn das Spiel mit `--debug`, mit der Umgebungsvariable `DRAHTSEILAKT_DEV_LOGS=1`
+oder mit `dev-logs on` in `settings.txt` gestartet wird.

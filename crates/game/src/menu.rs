@@ -80,6 +80,8 @@ pub enum Screen {
     Graphics,
     Controls,
     Sound,
+    /// The players' replays: the Save replays setting, the folder to open, and the replays found (userreplay.rs).
+    Replays,
     Extended,
     /// The mods (docs/drahtseilakt/mods.md): the practice tools and endless lives, then each mod found, on or off.
     Mods,
@@ -122,6 +124,11 @@ enum Line {
     Controls,
     Sound,
     Extended,
+    /// Options: the Replays screen; on it: the Save replays setting, the folder dialog, a replay of the list.
+    Replays,
+    SaveReplays,
+    OpenFolder,
+    Replay(usize),
     Level(usize),
     /// Classic Ballance: the 13 original levels of the player's copy (the list of Start).
     Classic,
@@ -209,6 +216,12 @@ pub enum Action {
     Language(String),
     /// The new highscore's name was entered: the game saves it and shows the list.
     Score(Vec<u8>),
+    /// Save replays changed: the game keeps and saves it.
+    SaveReplays(crate::userreplay::Mode),
+    /// Play this replay (the game finds its level and says if it cannot).
+    PlayReplay(PathBuf),
+    /// The folder dialog for another replays folder.
+    PickReplayFolder,
     /// The Graphics page changed: the game applies and saves it.
     Graphics(Graphics),
     /// The keys changed: the game takes and saves them.
@@ -258,6 +271,7 @@ fn valued(line: Line) -> bool {
             | Line::Fullscreen
             | Line::Fov
             | Line::Invert
+            | Line::SaveReplays
             | Line::Mode
             | Line::Look
             | Line::Interface
@@ -328,6 +342,17 @@ pub struct Menu {
     /// The Credits' first line shown, and how far they scroll (set when they are drawn).
     credits_top: usize,
     credits_max: std::cell::Cell<usize>,
+    /// The Replays screen's state.
+    pub replays: ReplayState,
+}
+
+/// What the Replays screen shows: the setting, where the replays are looked for, and the list found when the screen
+/// was opened (newest first).
+#[derive(Default)]
+pub struct ReplayState {
+    pub mode: crate::userreplay::Mode,
+    pub dirs: Vec<PathBuf>,
+    pub items: Vec<crate::userreplay::Item>,
 }
 
 impl Menu {
@@ -385,6 +410,7 @@ impl Menu {
             top: 0,
             credits_top: 0,
             credits_max: std::cell::Cell::new(0),
+            replays: ReplayState::default(),
         };
         m.push(base);
         m
@@ -607,6 +633,7 @@ impl Menu {
             Line::Graphics => (k("graphics"), NONE),
             Line::Controls => (k("controls"), NONE),
             Line::Sound => (k("sound"), NONE),
+            Line::Replays => (k("replays"), NONE),
             Line::Language => (k("language"), NONE),
             Line::Help => (k("manual"), NONE),
             Line::Extended => (k("extended"), NONE),
@@ -1016,6 +1043,7 @@ impl Menu {
                 Some(Line::Graphics),
                 Some(Line::Controls),
                 Some(Line::Sound),
+                Some(Line::Replays),
                 Some(Line::Language),
                 Some(Line::Help),
                 Some(Line::Extended),
@@ -1024,6 +1052,11 @@ impl Menu {
             .into_iter()
             .flatten()
             .collect(),
+            Screen::Replays => [Line::SaveReplays, Line::OpenFolder]
+                .into_iter()
+                .chain((0..self.replays.items.len()).map(Line::Replay))
+                .chain([Line::Back])
+                .collect(),
             Screen::Language => (0..languages().len())
                 .map(Line::Lang)
                 .chain([Line::Back])
@@ -1258,6 +1291,7 @@ impl Menu {
             (_, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (Screen::Graphics, Some(l)) => self.change_graphics(l, by),
             (Screen::Controls, Some(Line::Invert)) => self.toggle_invert(),
+            (Screen::Replays, Some(Line::SaveReplays)) => self.change_save(by),
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
             (_, Some(Line::Mod(i))) => Action::ModSwitch(i),
@@ -1320,6 +1354,13 @@ impl Menu {
             Line::Graphics => open(self, Screen::Graphics),
             Line::Controls => open(self, Screen::Controls),
             Line::Sound => open(self, Screen::Sound),
+            Line::Replays => {
+                self.reload_replays();
+                open(self, Screen::Replays)
+            }
+            Line::SaveReplays => self.change_save(1),
+            Line::OpenFolder => Action::PickReplayFolder,
+            Line::Replay(i) => self.play_replay(i),
             Line::Extended => open(self, Screen::Extended),
             Line::ModsMenu => open(self, Screen::Mods),
             Line::Mod(i) => {
@@ -1411,6 +1452,73 @@ impl Menu {
                 }
                 self.pop();
                 Action::None
+            }
+        }
+    }
+
+    /// The Replays screen opened over the first screen (the list read again).
+    pub fn open_replays(&mut self) {
+        self.push(Screen::Options);
+        self.reload_replays();
+        self.push(Screen::Replays);
+    }
+
+    /// The Save replays setting a step on.
+    fn change_save(&mut self, by: i32) -> Action {
+        self.replays.mode = self.replays.mode.next(by);
+        Action::SaveReplays(self.replays.mode)
+    }
+
+    /// The list read again from the folders (when the screen opens, and when a folder is chosen); the chosen line keeps
+    /// its place as far as the list allows.
+    pub fn reload_replays(&mut self) {
+        self.replays.items = crate::userreplay::scan_all(&self.replays.dirs);
+        let n = self.lines(self.screen()).len();
+        if let Some(s) = self.stack.last_mut() {
+            s.1 = s.1.min(n.saturating_sub(1));
+        }
+    }
+
+    /// Enter on a replay: it plays when it can; a stale or broken file says why instead.
+    fn play_replay(&mut self, i: usize) -> Action {
+        let Some(item) = self.replays.items.get(i) else {
+            return Action::None;
+        };
+        match &item.state {
+            crate::userreplay::State::Ok => Action::PlayReplay(item.path.clone()),
+            _ => {
+                self.notice = Some(self.replay_note(i));
+                Action::None
+            }
+        }
+    }
+
+    /// What the note under the list says of replay `i`: its file, and why it cannot play when it cannot.
+    fn replay_note(&self, i: usize) -> String {
+        let s = &self.strings;
+        let Some(it) = self.replays.items.get(i) else {
+            return String::new();
+        };
+        let name = it
+            .path
+            .file_stem()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        match &it.state {
+            crate::userreplay::State::Ok => format!(
+                "{name}\n{}  {}  {}",
+                it.saved.clone().unwrap_or_default(),
+                self.replay_level(it),
+                clock(it.ticks)
+            ),
+            crate::userreplay::State::Stale(f) => {
+                format!(
+                    "{name}\n{}",
+                    s.ours("replays stale note").replace("{format}", f)
+                )
+            }
+            crate::userreplay::State::Broken(_) => {
+                format!("{name}\n{}", s.ours("replays broken note"))
             }
         }
     }
@@ -1737,6 +1845,10 @@ impl Menu {
             Line::Graphics => s.get("Menu_Options Button Graphics", "Graphics"),
             Line::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Line::Sound => s.get("Menu_Options Button Sound", "Sound"),
+            Line::Replays => s.ours("replays"),
+            Line::SaveReplays => s.ours("save replays"),
+            Line::OpenFolder => s.ours("open folder"),
+            Line::Replay(i) => self.replay_name(i),
             Line::Language => s.ours("language"),
             Line::Help => s.ours("manual"),
             Line::Lang(i) => languages().get(i).map_or("", |l| l.1).to_owned(),
@@ -1795,6 +1907,65 @@ impl Menu {
         }
     }
 
+    /// A replay's row name: month and day it was saved and the level (the file's name when it is not a replay);
+    /// the whole of it is in the note under the list.
+    fn replay_name(&self, i: usize) -> String {
+        let Some(it) = self.replays.items.get(i) else {
+            return String::new();
+        };
+        let level = self.replay_level(it);
+        let level = if level.chars().count() > 9 {
+            format!("{}..", level.chars().take(7).collect::<String>())
+        } else {
+            level
+        };
+        let when = it
+            .saved
+            .as_deref()
+            .map(|d| d.get(5..10).unwrap_or(d).to_owned());
+        match (when, level.is_empty()) {
+            (Some(d), false) => format!("{d} {level}"),
+            (Some(d), true) => d,
+            (None, false) => level,
+            (None, true) => it
+                .path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        }
+    }
+
+    /// The level a replay was made on, in words.
+    fn replay_level(&self, it: &crate::userreplay::Item) -> String {
+        it.level
+            .trim_end_matches(".NMO")
+            .trim_end_matches(".nmo")
+            .replace('_', " ")
+    }
+
+    /// A replay's row value: its length and how it ended, or what is wrong with the file.
+    fn replay_value(&self, it: &crate::userreplay::Item) -> String {
+        use crate::userreplay::{Outcome, State};
+        let s = &self.strings;
+        match &it.state {
+            State::Stale(_) => s.ours("replay stale"),
+            State::Broken(_) => s.ours("replay broken"),
+            State::Ok => {
+                let how = match it.outcome {
+                    Some(Outcome::Finished) => s.ours("replay finished"),
+                    Some(Outcome::GameOver) => s.ours("replay game over"),
+                    Some(Outcome::Left) => s.ours("replay left"),
+                    Some(Outcome::BallLost) => s.ours("replay ball lost"),
+                    None => String::new(),
+                };
+                let t = it.ticks / 60;
+                format!("{:02}:{:02} {how}", (t / 60).min(99), t % 60)
+                    .trim()
+                    .to_owned()
+            }
+        }
+    }
+
     /// A custom level's title as it is (any script), in the menus' language when it has one in it, a cut one's "…"
     /// as "..." (the game's font has no "…").
     fn map_text(&self, i: usize) -> Option<String> {
@@ -1848,6 +2019,7 @@ impl Menu {
             Screen::Sound => s.get("Menu_Options Button Sound", "Sound"),
             Screen::Extended => s.ours("extended"),
             Screen::Mods => s.ours("mods"),
+            Screen::Replays => s.ours("replays"),
             Screen::ModPage => self.label(Line::Mod(self.mod_page)),
             Screen::Language => s.ours("language"),
             Screen::Kinds => s.ours("levels"),
@@ -1967,6 +2139,36 @@ impl Menu {
                 for l in self.mods_help() {
                     f.push((l, String::new()));
                 }
+                f
+            }
+            Screen::Replays => {
+                let mode = self.replays.mode;
+                let mut f = vec![
+                    (self.label(Line::SaveReplays), s.ours(&format!("save {}", mode.key()))),
+                    (self.label(Line::OpenFolder), ">".to_owned()),
+                ];
+                for (i, it) in self.replays.items.iter().enumerate() {
+                    f.push((self.label(Line::Replay(i)), self.replay_value(it)));
+                }
+                // under the rows: a message, else what the chosen line is
+                let chosen = self.lines(Screen::Replays).get(self.chosen()).copied();
+                let mut help: Vec<String> = Vec::new();
+                match chosen {
+                    _ if self.notice.is_some() => help.extend(self.notice.clone()),
+                    Some(Line::SaveReplays) => help.push(s.ours("replays note save")),
+                    Some(Line::OpenFolder) => {
+                        help.push(s.ours("replays note folder"));
+                        for d in &self.replays.dirs {
+                            help.push(shown_path(&d.display().to_string()));
+                        }
+                    }
+                    Some(Line::Replay(i)) => help.push(self.replay_note(i)),
+                    _ => {}
+                }
+                if self.replays.items.is_empty() && self.notice.is_none() {
+                    help.push(s.ours("replays none"));
+                }
+                f.extend(help.into_iter().map(|l| (l, String::new())));
                 f
             }
             Screen::ModPage => {
@@ -2729,13 +2931,7 @@ impl Menu {
                 // line; without a note the hint alone takes the note's place
                 let text = self.page_note(lines.get(self.chosen()).copied());
                 let top = LIST_TOP + self.page_len() as f32 * ROW_STEP + HINT_H + 0.008;
-                note(
-                    &mut out,
-                    &text,
-                    NOTE_BOTTOM,
-                    true,
-                    NOTE_BOTTOM - top,
-                );
+                note(&mut out, &text, NOTE_BOTTOM, true, NOTE_BOTTOM - top);
                 back_only(&mut out);
             }
             Screen::Highscore => {
@@ -2783,7 +2979,7 @@ impl Menu {
                 }
                 back_only(&mut out);
             }
-            Screen::Mods | Screen::ModPage => {
+            Screen::Mods | Screen::ModPage | Screen::Replays => {
                 title(&mut out);
                 let fields = self.fields(sc);
                 // the rows (a long list scrolls), then the help under them as a paragraph
@@ -2812,7 +3008,8 @@ impl Menu {
                             .map(|(_, v)| text_wide(f, v, &FONT_ROW))
                             .fold(0.0f32, f32::max);
                         let value = (need + 14.0) / crate::ui::CONTEXT_W;
-                        (ROWS_X[1] - 0.03 - value.clamp(0.06, 0.12)).max(ROWS_X[0] + 0.15)
+                        let top = if sc == Screen::Replays { 0.14 } else { 0.12 };
+                        (ROWS_X[1] - 0.03 - value.clamp(0.06, top)).max(ROWS_X[0] + 0.15)
                     });
                     let mut left = FONT_ROW;
                     left.align = crate::ui::ALIGN_LEFT;
@@ -3025,6 +3222,62 @@ impl Menu {
         }
         out
     }
+}
+
+/// The Save replay? prompt over the run or a menu: a small panel at the top with Yes and No buttons, drawn as the
+/// menus' own (fitted to the window and the language). Returns its quads and the buttons' rectangles in window pixels
+/// (Yes, No) for the mouse. `alpha` fades it out at the end of its time.
+pub fn replay_prompt(
+    f: &crate::ui::Face,
+    screen: crate::ui::Screen,
+    text: &str,
+    buttons: Option<(&str, &str)>,
+    alpha: f32,
+) -> (Vec<crate::ui::Quad>, [[f32; 4]; 2]) {
+    use crate::ui::{Anchor, Quad, homogeneous};
+    let mut out = Vec::new();
+    let panel = [
+        0.27,
+        0.02,
+        0.73,
+        if buttons.is_some() { 0.135 } else { 0.08 },
+    ];
+    out.push(Quad {
+        angle: 0.0,
+        rect: screen.rect(homogeneous(panel), Anchor::Center),
+        uv: [0.0, 0.0, 1.0, 1.0],
+        top: [0.0, 0.0, 0.0, 0.78 * alpha],
+        bottom: [0.0, 0.0, 0.0, 0.78 * alpha],
+        texture: PLAIN,
+    });
+    let fade = |q: Vec<Quad>, out: &mut Vec<Quad>| {
+        out.extend(q.into_iter().map(|mut q| {
+            q.top[3] *= alpha;
+            q.bottom[3] *= alpha;
+            q
+        }));
+    };
+    let (quads, _) = fit_label(f, text, homogeneous([0.28, 0.025, 0.72, 0.075]), &FONT_03);
+    fade(crate::ui::place(quads, screen, Anchor::Center), &mut out);
+    let mut hits = [[0.0; 4]; 2];
+    if let Some((yes, no)) = buttons {
+        for (k, (label, x0)) in [(yes, 0.30), (no, 0.52)].into_iter().enumerate() {
+            let r = [x0, 0.083, x0 + 0.18, 0.13];
+            hits[k] = screen.rect(homogeneous(r), Anchor::Center);
+            let [u0, v0, u1, v1] = YES_NO_UV;
+            out.push(Quad {
+                angle: 0.0,
+                rect: hits[k],
+                uv: [u0, v0, u1, v1],
+                top: [1.0, 1.0, 1.0, alpha],
+                bottom: [1.0, 1.0, 1.0, alpha],
+                texture: DESELECT_TEX,
+            });
+            let (quads, _) = fit_label(f, label, homogeneous(r), &FONT_03);
+            fade(crate::ui::place(quads, screen, Anchor::Center), &mut out);
+        }
+    }
+    (out, hits)
 }
 
 /// A label as drawn, for the layout tests: its text, its frame and its glyphs' rectangles (window pixels), the size
@@ -3393,10 +3646,7 @@ fn fit_label(
             s
         };
         return match split {
-            Some((a, b, _)) if two => (
-                tight_two(f, &fitted(&a), &fitted(&b), frame, &st),
-                k,
-            ),
+            Some((a, b, _)) if two => (tight_two(f, &fitted(&a), &fitted(&b), frame, &st), k),
             _ => (f.layout(&fitted(t), frame, &st), k),
         };
     }
@@ -3684,13 +3934,16 @@ impl KeyRepeat {
 
 /// The screens whose lines scroll as a list above their Back.
 fn scrolls(screen: Screen) -> bool {
-    matches!(screen, Screen::Custom | Screen::Mods | Screen::ModPage)
+    matches!(
+        screen,
+        Screen::Custom | Screen::Mods | Screen::ModPage | Screen::Replays
+    )
 }
 
 /// The rows a screen's list shows at once.
 fn page(screen: Screen) -> usize {
     match screen {
-        Screen::Mods | Screen::ModPage => MODS_LINES,
+        Screen::Mods | Screen::ModPage | Screen::Replays => MODS_LINES,
         _ => LIST_LINES,
     }
 }
@@ -3944,6 +4197,7 @@ mod tests {
             top: 0,
             credits_top: 0,
             credits_max: std::cell::Cell::new(0),
+            replays: ReplayState::default(),
         };
         m.push(Screen::Main);
         m
@@ -4488,6 +4742,31 @@ mod tests {
                         for i in 0..m.lines(Screen::Mods).len() {
                             states.push((Screen::Mods, i, 0));
                         }
+                        // the replays: the longest of names and values, the three states of a file
+                        {
+                            use crate::userreplay::{Item, Outcome, State};
+                            m.replays.items = (0..12)
+                                .map(|k| Item {
+                                    path: PathBuf::from(format!("/home/someone/replays/2026-11-12-14-03-0{k}-Level_03.replay")),
+                                    level: "Very_Long_Community_Level_Name.nmo".into(),
+                                    saved: Some("2026-11-12 14:03".into()),
+                                    ticks: 359_999,
+                                    outcome: Some([Outcome::Finished, Outcome::GameOver, Outcome::Left, Outcome::BallLost][k % 4]),
+                                    state: match k % 3 {
+                                        0 => State::Ok,
+                                        1 => State::Stale("drahtseilakt-replay 99".into()),
+                                        _ => State::Broken("x".into()),
+                                    },
+                                })
+                                .collect();
+                            m.replays.dirs = vec![PathBuf::from(
+                                "/home/someone/.local/share/drahtseilakt/user-replays",
+                            )];
+                            for i in 0..m.lines(Screen::Replays).len() {
+                                states.push((Screen::Replays, i, 0));
+                            }
+                            m.notice = None;
+                        }
                         for page in 0..m.mods.found.len() {
                             for i in 0..=m
                                 .mods
@@ -4777,7 +5056,12 @@ mod tests {
                                 }
                                 // no label or value of the game's own texts is ever shortened (only list rows of
                                 // levels and the highscores' names, which come from outside, may be)
+                                // (a replay row's name holds a level's name and a date from outside: shortened like the maps')
+                                let outside = sc == Screen::Replays
+                                    && (0..m.replays.items.len())
+                                        .any(|i| m.replay_name(i) == p.text);
                                 if !matches!(sc, Screen::Custom | Screen::Highscore | Screen::Entry)
+                                    && !outside
                                     && !p.wrap
                                     && p.panel.is_none()
                                 {
@@ -5163,11 +5447,114 @@ mod tests {
     }
 
     #[test]
+    fn the_replays_screen_changes_the_setting_lists_files_and_plays_only_good_ones() {
+        use crate::userreplay::{Item, Mode, Outcome, State};
+        let mut m = menu(&[true], false);
+        m.push(Screen::Options);
+        let at = m
+            .lines(Screen::Options)
+            .iter()
+            .position(|&l| l == Line::Replays);
+        m.set_chosen(at.unwrap());
+        m.replays.dirs = vec![std::env::temp_dir().join("drahtseilakt-no-such-replays-folder")];
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Replays);
+        // off at first; Enter and the arrows go round Off, Ask, Always
+        assert_eq!(m.replays.mode, Mode::Off);
+        assert_eq!(m.enter(), Action::SaveReplays(Mode::Ask));
+        assert_eq!(m.adjust(1), Action::SaveReplays(Mode::Always));
+        assert_eq!(m.adjust(1), Action::SaveReplays(Mode::Off));
+        assert_eq!(m.adjust(-1), Action::SaveReplays(Mode::Always));
+        m.step(1);
+        assert_eq!(m.enter(), Action::PickReplayFolder);
+        let item = |name: &str, state| Item {
+            path: PathBuf::from(name),
+            level: "Level_03.NMO".into(),
+            saved: Some("2026-11-12 14:03".into()),
+            ticks: 5025,
+            outcome: Some(Outcome::Finished),
+            state,
+        };
+        m.replays.items = vec![
+            item("/r/a.replay", State::Ok),
+            item("/r/b.replay", State::Stale("drahtseilakt-replay 99".into())),
+            item("/r/c.replay", State::Broken("x".into())),
+        ];
+        assert_eq!(m.lines(Screen::Replays).len(), 6);
+        m.step(1);
+        assert_eq!(m.enter(), Action::PlayReplay(PathBuf::from("/r/a.replay")));
+        m.step(1);
+        assert_eq!(
+            m.enter(),
+            Action::None,
+            "a stale replay says why, never plays"
+        );
+        assert!(
+            m.notice
+                .as_deref()
+                .is_some_and(|n| n.contains("/b") || n.starts_with("b"))
+        );
+        assert_eq!(m.replay_name(0), "11-12 Level 03");
+        assert_eq!(m.replay_value(&m.replays.items[0]), "01:23 finished");
+        m.back();
+        assert_eq!(m.screen(), Screen::Options);
+    }
+
+    #[test]
+    fn the_save_replay_prompt_fits_the_window_in_every_language() {
+        if !crate::fallback::available() {
+            eprintln!("skipped: the shipped fonts (assets/fonts) are not there");
+            return;
+        }
+        let face = crate::ui::Face::Own;
+        for &(lang, _) in languages() {
+            let s = Strings::ours_in(lang);
+            for key in [
+                "replay ask finished",
+                "replay ask game over",
+                "replay ask left",
+                "replay ask ball lost",
+                "replay saved",
+            ] {
+                for (w, h) in [
+                    (640.0, 480.0),
+                    (1280.0, 720.0),
+                    (1080.0, 1920.0),
+                    (3440.0, 1440.0),
+                ] {
+                    let screen = crate::ui::Screen { w, h };
+                    let (yes, no) = (s.ours("replay yes"), s.ours("replay no"));
+                    let text = s
+                        .ours(key)
+                        .replace("{name}", "2026-11-12-21-40-05-Level_03");
+                    let (quads, hits) = replay_prompt(&face, screen, &text, Some((&yes, &no)), 1.0);
+                    assert!(!quads.is_empty());
+                    for q in &quads {
+                        assert!(
+                            q.rect[0] >= -1.0
+                                && q.rect[2] <= w + 1.0
+                                && q.rect[1] >= -1.0
+                                && q.rect[3] <= h + 1.0,
+                            "{lang} {key} {w}x{h}: {:?}",
+                            q.rect
+                        );
+                    }
+                    assert!(hits[0][2] <= hits[1][0], "the two buttons overlap");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn options_open_the_language_page_and_a_language_is_chosen() {
         let mut m = menu(&[true], false);
         m.push(Screen::Options);
         assert!(m.lines(Screen::Options).contains(&Line::Language));
-        m.set_chosen(3);
+        let at = m
+            .lines(Screen::Options)
+            .iter()
+            .position(|&l| l == Line::Language);
+        m.set_chosen(at.unwrap());
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Language);
         // the language spoken is chosen first (English), its name in its own words
@@ -5586,7 +5973,8 @@ mod tests {
         std::fs::create_dir_all(dir.join("open level")).unwrap();
         std::fs::write(dir.join("open level/level.gltf"), b"").unwrap();
         std::fs::create_dir_all(dir.join("empty")).unwrap();
-        let names: Vec<_> = scan_levels(&dir, false).0
+        let names: Vec<_> = scan_levels(&dir, false)
+            .0
             .iter()
             .map(|p| p.level.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
@@ -5612,7 +6000,11 @@ mod tests {
             shadow: None,
         };
         let frame = [100.0, 100.0, 300.0, 100.0 + 2.0 * line_height(&st) + 20.0];
-        for text in ["Zurueck zum Hauptmenue", "Neues Spiel starten", "Geschwindigkeit der Kugel"] {
+        for text in [
+            "Zurueck zum Hauptmenue",
+            "Neues Spiel starten",
+            "Geschwindigkeit der Kugel",
+        ] {
             let (q, _) = fit_label(&face, text, frame, &st);
             let (a, b) = two_lines(text).unwrap();
             let one = fit_label(&face, &a, frame, &st).0;
@@ -5621,11 +6013,22 @@ mod tests {
             let top = q.iter().map(|g| g.rect[1]).fold(f32::MAX, f32::min);
             let bottom = q.iter().map(|g| g.rect[3]).fold(f32::MIN, f32::max);
             let (above, below) = (top - frame[1], frame[3] - bottom);
-            assert!((above - below).abs() <= 1.0, "{text}: gap above {above} below {below}");
+            assert!(
+                (above - below).abs() <= 1.0,
+                "{text}: gap above {above} below {below}"
+            );
             // the gap between the lines: the lowest top of a glyph below the middle line minus the highest bottom above
             let mid = (top + bottom) / 2.0;
-            let up_bottom = q.iter().filter(|g| g.rect[3] <= mid + 1.0).map(|g| g.rect[3]).fold(f32::MIN, f32::max);
-            let low_top = q.iter().filter(|g| g.rect[1] >= mid - 1.0).map(|g| g.rect[1]).fold(f32::MAX, f32::min);
+            let up_bottom = q
+                .iter()
+                .filter(|g| g.rect[3] <= mid + 1.0)
+                .map(|g| g.rect[3])
+                .fold(f32::MIN, f32::max);
+            let low_top = q
+                .iter()
+                .filter(|g| g.rect[1] >= mid - 1.0)
+                .map(|g| g.rect[1])
+                .fold(f32::MAX, f32::min);
             let glyph = (bottom - top) / 2.0;
             assert!(
                 low_top - up_bottom <= above + glyph * 0.3 + 1.0,

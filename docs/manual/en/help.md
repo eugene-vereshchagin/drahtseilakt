@@ -25,10 +25,12 @@ report in the level list tells what it found. Such a map may still be playable.
 In your data folder (see [Levels and folders](levels.md)):
 
 - `settings.txt`: your settings.
-- `replays/<level>/`: replays of your runs (`.replay`) and the logs of your sessions (`session-....log`).
+- `user-replays/`: the replays you chose to save (Options, Replays), see [Playing](playing.md#replays).
 - `screenshots/`: pictures saved by the Screenshot key mod.
 
 ## Reporting a problem
 
-Where to send reports will be named here soon. Meanwhile keep the newest `session-....log` and `.replay` of the run
-from the `replays/<level>/` folder: they show exactly what happened.
+Where to send reports will be named here soon. Meanwhile turn on *Save replays* (Options, Replays) and keep the `.replay`
+file of the run that shows the problem: it shows exactly what happened. The development logs of `replays/<level>/` are
+written only when the game is started with `--debug`, with the environment variable `DRAHTSEILAKT_DEV_LOGS=1`, or with
+`dev-logs on` in `settings.txt`.

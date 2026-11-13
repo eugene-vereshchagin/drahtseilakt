@@ -21,10 +21,10 @@
 在您的数据文件夹中（见 [关卡与文件夹](levels.md)）：
 
 - `settings.txt`：您的设置。
-- `replays/<关卡>/`：您游玩的回放（`.replay`）和会话日志（`session-....log`）。
+- `user-replays/`：您选择保存的回放（设置，回放），见 [游玩](playing.md#回放)。
 - `screenshots/`：“截图键”模组保存的图片。
 
 ## 报告问题
 
-问题反馈的地址稍后会写在这里。在此之前，请保留 `replays/<关卡>/` 文件夹中最新的 `session-....log` 和 `.replay`：
-它们准确记录了发生的事情。
+问题反馈的地址稍后会写在这里。在此之前，请开启 *保存回放*（设置，回放），并保留显示问题那一局的 `.replay` 文件：它准确记录了发生的事情。
+`replays/<关卡>/` 中的开发日志只在以 `--debug`、环境变量 `DRAHTSEILAKT_DEV_LOGS=1` 或 `settings.txt` 中的 `dev-logs on` 启动时才会写入。

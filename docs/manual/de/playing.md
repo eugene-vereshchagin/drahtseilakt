@@ -41,7 +41,7 @@ Jede Art rollt anders, schauen Sie sich also die Bahn an, bevor Sie wählen.
 ## Pause und Neustart
 
 **Esc** pausiert das Spiel. Das Pausenmenü bietet: weiterspielen, Level neu starten, Bestenliste, Optionen und Level
-verlassen. Neustart und Verlassen fragen einmal nach. Jeder beendete Lauf wird als Wiederholung gespeichert.
+verlassen. Neustart und Verlassen fragen einmal nach. Wiederholungen sind standardmäßig aus, siehe [Wiederholungen](#wiederholungen).
 
 ## Die Menüs
 
@@ -50,10 +50,30 @@ verlassen. Neustart und Verlassen fragen einmal nach. Jeder beendete Lauf wird a
   mit *Mitgeliefert* und *Eigene Level*. Neben jeder Karte steht ihr Schwierigkeitsgrad von 1 bis 10.
 - **Optionen** enthält *Grafik* (Fenstergröße, Synchronisation, Wolken, Vollbild und das *Aussehen*, siehe
   [Aussehen](looks.md)), *Steuerung*, *Sound* (Lautstärke und Klangthema, siehe [Klang und Musik](sound.md)),
-  *Sprache*, *Erweitert* und *Hilfe* (diese Anleitung).
+  *Replays*, *Sprache*, *Erweitert* und *Hilfe* (diese Anleitung).
 - **Sprache** wechselt die Menüsprache sofort: Englisch, Russisch, Deutsch, vereinfachtes Chinesisch, Französisch,
   Spanisch und Italienisch.
 - **Erweitert** schaltet den erweiterten Modus ein: Bestzeiten neben den Leveln, mehr Auswahl bei Aussehen und Klang
   und die [Mods](mods.md). Ist er aus, spielt das Spiel wie das Original.
 
 Jede Menüzeile hat eine kurze Erklärung im Feld auf dem Bildschirm.
+
+## Wiederholungen
+
+Eine Wiederholung zeichnet Ihre Tastendrücke auf und spielt Ihren Lauf genau ab. Standardmäßig sind sie aus, weil sie
+Platz brauchen. Stellen Sie unter **Optionen > Replays** *Replays speichern* ein:
+
+- **Aus**: nichts wird gespeichert.
+- **Fragen**: Wenn ein Lauf endet (Level geschafft, Spiel vorbei, Neustart oder Verlassen) und wenn eine Kugel
+  verloren geht, erscheint oben die Frage „Wiederholung speichern?“. Drücken Sie **Y** oder **N** oder klicken Sie auf
+  Ja oder Nein. Das Spiel läuft währenddessen weiter; ohne Antwort verschwindet die Frage nach einigen Sekunden. Läufe
+  unter fünf Sekunden werden nicht angeboten, außer sie sind geschafft.
+- **Immer**: jeder Lauf wird gespeichert.
+
+Die Wiederholungen liegen im Ordner `user-replays` Ihres Datenordners, eine Datei je Lauf, benannt nach Datum und Level:
+`2026-11-12-21-40-05-Level_03.replay`. Derselbe Bildschirm listet sie, neueste zuerst, mit Datum, Level, Länge und
+Ausgang. **Enter** spielt eine im Fenster ab, **Esc** stoppt sie und führt zur Liste zurück. Eine Wiederholung läuft nur
+auf genau der Leveldatei, auf der sie aufgenommen wurde: fehlt der Level oder stammt sie aus einer anderen Version des
+Spiels, sagt die Liste das. *Ordner öffnen...* öffnet einen Dialog für einen anderen Ordner (etwa mit zugesandten
+Wiederholungen); er wird gemerkt und seine Wiederholungen werden mitgelistet. Bei einem Fehler im Spiel ist die
+Wiederholung des betreffenden Laufs der beste Bericht: senden Sie die Datei.
