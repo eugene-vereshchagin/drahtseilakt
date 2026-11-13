@@ -80,8 +80,10 @@ pub enum Screen {
     Graphics,
     Controls,
     Sound,
-    /// The players' replays: the Save replays setting, the folder to open, and the replays found (userreplay.rs).
+    /// The players' replays, from the main menu: one line for each replay found (userreplay.rs), then Back.
     Replays,
+    /// Options, Replays: the Save replays setting and the folder to open.
+    ReplaySettings,
     Extended,
     /// The mods (docs/drahtseilakt/mods.md): the practice tools and endless lives, then each mod found, on or off.
     Mods,
@@ -124,8 +126,10 @@ enum Line {
     Controls,
     Sound,
     Extended,
-    /// Options: the Replays screen; on it: the Save replays setting, the folder dialog, a replay of the list.
+    /// Options: the replay settings; on them: the Save replays setting and the folder dialog.
     Replays,
+    /// The main menu: the list of the players' replays; on it: a replay.
+    ReplayList,
     SaveReplays,
     OpenFolder,
     Replay(usize),
@@ -636,6 +640,7 @@ impl Menu {
             Line::Controls => (k("controls"), NONE),
             Line::Sound => (k("sound"), NONE),
             Line::Replays => (k("replays"), NONE),
+            Line::ReplayList => (k("replay list"), NONE),
             Line::Language => (k("language"), NONE),
             Line::Help => (k("manual"), NONE),
             Line::Extended => (k("extended"), NONE),
@@ -1009,6 +1014,7 @@ impl Menu {
             Screen::Main => vec![
                 Line::Start,
                 Line::Highscore,
+                Line::ReplayList,
                 Line::Options,
                 Line::Credits,
                 Line::Exit,
@@ -1054,9 +1060,9 @@ impl Menu {
             .into_iter()
             .flatten()
             .collect(),
-            Screen::Replays => [Line::SaveReplays, Line::OpenFolder]
-                .into_iter()
-                .chain((0..self.replays.items.len()).map(Line::Replay))
+            Screen::ReplaySettings => vec![Line::SaveReplays, Line::OpenFolder, Line::Back],
+            Screen::Replays => (0..self.replays.items.len())
+                .map(Line::Replay)
                 .chain([Line::Back])
                 .collect(),
             Screen::Language => (0..languages().len())
@@ -1293,7 +1299,7 @@ impl Menu {
             (_, Some(Line::SoundTheme)) => Action::SoundTheme(next_theme(by)),
             (Screen::Graphics, Some(l)) => self.change_graphics(l, by),
             (Screen::Controls, Some(Line::Invert)) => self.toggle_invert(),
-            (Screen::Replays, Some(Line::SaveReplays)) => self.change_save(by),
+            (Screen::ReplaySettings, Some(Line::SaveReplays)) => self.change_save(by),
             (Screen::Extended, Some(Line::Mode)) => Action::ToggleDebug,
             (Screen::Extended, Some(Line::Interface)) => Action::Interface(next_provider(by)),
             (_, Some(Line::Mod(i))) => Action::ModSwitch(i),
@@ -1356,8 +1362,10 @@ impl Menu {
             Line::Graphics => open(self, Screen::Graphics),
             Line::Controls => open(self, Screen::Controls),
             Line::Sound => open(self, Screen::Sound),
-            Line::Replays => {
-                self.reload_replays();
+            Line::Replays => open(self, Screen::ReplaySettings),
+            Line::ReplayList => {
+                // the list is read again each time it opens
+                self.replays.items = crate::userreplay::scan_all(&self.replays.dirs);
                 open(self, Screen::Replays)
             }
             Line::SaveReplays => self.change_save(1),
@@ -1458,10 +1466,9 @@ impl Menu {
         }
     }
 
-    /// The Replays screen opened over the first screen (the list read again).
+    /// The replay list opened over the first screen (read again).
     pub fn open_replays(&mut self) {
-        self.push(Screen::Options);
-        self.reload_replays();
+        self.replays.items = crate::userreplay::scan_all(&self.replays.dirs);
         self.push(Screen::Replays);
     }
 
@@ -1854,7 +1861,7 @@ impl Menu {
             Line::Graphics => s.get("Menu_Options Button Graphics", "Graphics"),
             Line::Controls => s.get("Menu_Options Button Controls", "Controls"),
             Line::Sound => s.get("Menu_Options Button Sound", "Sound"),
-            Line::Replays => s.ours("replays"),
+            Line::Replays | Line::ReplayList => s.ours("replays"),
             Line::SaveReplays => s.ours("save replays"),
             Line::OpenFolder => s.ours("open folder"),
             Line::Replay(i) => self.replay_name(i),
@@ -2028,7 +2035,7 @@ impl Menu {
             Screen::Sound => s.get("Menu_Options Button Sound", "Sound"),
             Screen::Extended => s.ours("extended"),
             Screen::Mods => s.ours("mods"),
-            Screen::Replays => s.ours("replays"),
+            Screen::Replays | Screen::ReplaySettings => s.ours("replays"),
             Screen::ModPage => self.label(Line::Mod(self.mod_page)),
             Screen::Language => s.ours("language"),
             Screen::Kinds => s.ours("levels"),
@@ -2150,17 +2157,14 @@ impl Menu {
                 }
                 f
             }
-            Screen::Replays => {
+            Screen::ReplaySettings => {
                 let mode = self.replays.mode;
                 let mut f = vec![
                     (self.label(Line::SaveReplays), s.ours(&format!("save {}", mode.key()))),
                     (self.label(Line::OpenFolder), ">".to_owned()),
                 ];
-                for (i, it) in self.replays.items.iter().enumerate() {
-                    f.push((self.label(Line::Replay(i)), self.replay_value(it)));
-                }
                 // under the rows: a message, else what the chosen line is
-                let chosen = self.lines(Screen::Replays).get(self.chosen()).copied();
+                let chosen = self.lines(Screen::ReplaySettings).get(self.chosen()).copied();
                 let mut help: Vec<String> = Vec::new();
                 match chosen {
                     _ if self.notice.is_some() => help.extend(self.notice.clone()),
@@ -2171,6 +2175,21 @@ impl Menu {
                             help.push(shown_path(&d.display().to_string()));
                         }
                     }
+                    _ => {}
+                }
+                f.extend(help.into_iter().map(|l| (l, String::new())));
+                f
+            }
+            Screen::Replays => {
+                let mut f = Vec::new();
+                for (i, it) in self.replays.items.iter().enumerate() {
+                    f.push((self.label(Line::Replay(i)), self.replay_value(it)));
+                }
+                // under the rows: a message, else what the chosen line is; an empty list says why
+                let chosen = self.lines(Screen::Replays).get(self.chosen()).copied();
+                let mut help: Vec<String> = Vec::new();
+                match chosen {
+                    _ if self.notice.is_some() => help.extend(self.notice.clone()),
                     Some(Line::Replay(i)) => help.push(self.replay_note(i)),
                     _ => {}
                 }
@@ -2988,7 +3007,7 @@ impl Menu {
                 }
                 back_only(&mut out);
             }
-            Screen::Mods | Screen::ModPage | Screen::Replays => {
+            Screen::Mods | Screen::ModPage | Screen::Replays | Screen::ReplaySettings => {
                 title(&mut out);
                 let fields = self.fields(sc);
                 // the rows (a long list scrolls), then the help under them as a paragraph
@@ -3945,14 +3964,14 @@ impl KeyRepeat {
 fn scrolls(screen: Screen) -> bool {
     matches!(
         screen,
-        Screen::Custom | Screen::Mods | Screen::ModPage | Screen::Replays
+        Screen::Custom | Screen::Mods | Screen::ModPage | Screen::Replays | Screen::ReplaySettings
     )
 }
 
 /// The rows a screen's list shows at once.
 fn page(screen: Screen) -> usize {
     match screen {
-        Screen::Mods | Screen::ModPage | Screen::Replays => MODS_LINES,
+        Screen::Mods | Screen::ModPage | Screen::Replays | Screen::ReplaySettings => MODS_LINES,
         _ => LIST_LINES,
     }
 }
@@ -4311,6 +4330,11 @@ mod tests {
             let p = at(&m, true, w, h, line_of(&m, Line::Options), 0.5);
             assert_eq!(m.click(p), Some(Action::None));
             assert_eq!(m.screen(), Screen::Options);
+            // and on Replays: the list of the replays
+            let mut m = menu(&[true, true], true);
+            let p = at(&m, true, w, h, line_of(&m, Line::ReplayList), 0.5);
+            assert_eq!(m.click(p), Some(Action::None));
+            assert_eq!(m.screen(), Screen::Replays);
             // the same with the prototype's lines
             let mut m = menu(&[true, true], true);
             let p = at(&m, false, w, h, line_of(&m, Line::Credits), 0.5);
@@ -4786,6 +4810,9 @@ mod tests {
                             )];
                             for i in 0..m.lines(Screen::Replays).len() {
                                 states.push((Screen::Replays, i, 0));
+                            }
+                            for i in 0..m.lines(Screen::ReplaySettings).len() {
+                                states.push((Screen::ReplaySettings, i, 0));
                             }
                             m.notice = None;
                         }
@@ -5437,7 +5464,7 @@ mod tests {
             .into_iter()
             .map(|l| m.label(l))
             .collect();
-        assert_eq!(labels, ["Start", "Highscore", "Options", "Credits", "Exit"]);
+        assert_eq!(labels, ["Start", "Highscore", "Replays", "Options", "Credits", "Exit"]);
         let mut m = menu(&[true], true);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
@@ -5480,7 +5507,8 @@ mod tests {
         m.set_chosen(at.unwrap());
         m.replays.dirs = vec![std::env::temp_dir().join("drahtseilakt-no-such-replays-folder")];
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.screen(), Screen::Replays);
+        assert_eq!(m.screen(), Screen::ReplaySettings);
+        assert_eq!(m.lines(Screen::ReplaySettings).len(), 3, "settings only, no list");
         // off at first; Enter and the arrows go round Off, Ask, Always
         assert_eq!(m.replays.mode, Mode::Off);
         assert_eq!(m.enter(), Action::SaveReplays(Mode::Ask));
@@ -5489,6 +5517,16 @@ mod tests {
         assert_eq!(m.adjust(-1), Action::SaveReplays(Mode::Always));
         m.step(1);
         assert_eq!(m.enter(), Action::PickReplayFolder);
+        // the list is opened from the main menu
+        m.back();
+        m.back();
+        assert_eq!(m.screen(), Screen::Main);
+        let at = m.lines(Screen::Main).iter().position(|&l| l == Line::ReplayList);
+        m.set_chosen(at.unwrap());
+        assert_eq!(m.enter(), Action::None);
+        assert_eq!(m.screen(), Screen::Replays);
+        assert_eq!(m.lines(Screen::Replays), [Line::Back], "no replays: Back alone");
+        assert!(m.fields(Screen::Replays).iter().any(|f| f.0 == m.strings.ours("replays none")));
         let item = |name: &str, state| Item {
             path: PathBuf::from(name),
             level: "Level_03.NMO".into(),
@@ -5502,8 +5540,8 @@ mod tests {
             item("/r/b.replay", State::Stale("drahtseilakt-replay 99".into())),
             item("/r/c.replay", State::Broken("x".into())),
         ];
-        assert_eq!(m.lines(Screen::Replays).len(), 6);
-        m.step(1);
+        assert_eq!(m.lines(Screen::Replays).len(), 4);
+        m.set_chosen(0);
         assert_eq!(m.enter(), Action::PlayReplay(PathBuf::from("/r/a.replay")));
         m.step(1);
         assert_eq!(
@@ -5519,7 +5557,7 @@ mod tests {
         assert_eq!(m.replay_name(0), "11-12 Level 03");
         assert_eq!(m.replay_value(&m.replays.items[0]), "01:23 finished");
         m.back();
-        assert_eq!(m.screen(), Screen::Options);
+        assert_eq!(m.screen(), Screen::Main);
     }
 
     #[test]
@@ -5685,6 +5723,7 @@ mod tests {
             [
                 Line::Start,
                 Line::Highscore,
+                Line::ReplayList,
                 Line::Options,
                 Line::Credits,
                 Line::Exit
@@ -5913,9 +5952,10 @@ mod tests {
         let mut m = menu(&[true], false);
         m.step(1);
         m.step(1);
+        m.step(1);
         assert_eq!(m.lines(Screen::Main)[m.chosen()], Line::Options);
         m.apply_mode(Features::new(true), Vec::new(), Vec::new());
-        assert_eq!(m.lines(Screen::Main).len(), 5);
+        assert_eq!(m.lines(Screen::Main).len(), 6);
         assert_eq!(m.lines(Screen::Main)[m.chosen()], Line::Options);
     }
 

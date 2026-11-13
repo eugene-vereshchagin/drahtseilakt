@@ -48,6 +48,7 @@ Restart and Exit ask once whether you are sure. Replays are off by default; see 
 - **Start** lists the sets of levels: *Featured maps*, *Classic Ballance* (needs your copy of the original),
   *Ballance Challenges* (community remakes of the originals, also needs the copy) and *Community maps* with *Included* and
   *User levels*. Next to each map you see its difficulty from 1 to 10.
+- **Replays** lists your saved replays, newest first; Enter plays one. It is empty until you turn on saving.
 - **Options** has *Graphics* (window size, sync, clouds, full screen and the *Look*, see [Looks](looks.md)),
   *Controls*, *Sound* (volumes and the sound theme, see [Sound and music](sound.md)), *Replays*, *Language*, *Extended* and
   *Help* (this manual).
@@ -61,7 +62,7 @@ Every line of the menus has a short explanation in the panel on the screen.
 ## Replays
 
 A replay is a recording of your key presses; it plays your run back exactly. They are off by default, as they take
-space. In **Options > Replays** set *Save replays*:
+space. In **Options > Replays** set *Save replays* (the list of saved replays is in the main menu, under **Replays**):
 
 - **Off**: nothing is saved.
 - **Ask**: when a run ends (the level is finished, the game is over, or you restart or leave it) and when a ball is
@@ -71,9 +72,9 @@ space. In **Options > Replays** set *Save replays*:
 - **Always**: every run is saved.
 
 Replays are kept in the `user-replays` folder of your data folder, one file each, named by date and level:
-`2026-11-12-21-40-05-Level_03.replay`. The same screen lists them, newest first, with the date, level, length and how
+`2026-11-12-21-40-05-Level_03.replay`. The list is in the main menu under **Replays**: it shows them, newest first, with the date, level, length and how
 the run ended. **Enter** plays one in the window, **Esc** stops it and takes you back to the list. A replay plays only
 on the very level file it was recorded on: if you do not have that level, or the replay comes from another version of
-the game, the list says so. *Open folder...* opens a dialog to choose another folder (for example one with replays
+the game, the list says so. *Open folder...* (in **Options > Replays**) opens a dialog to choose another folder (for example one with replays
 somebody sent you); it is remembered and its replays are listed too. If a game has a bug, a replay of the run that
 shows it is the best report: send the file.
