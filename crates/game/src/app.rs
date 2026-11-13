@@ -3413,6 +3413,11 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
     // read back for the screenshots where the surface allows it
     let usage =
         wgpu::TextureUsages::RENDER_ATTACHMENT | (caps.usages & wgpu::TextureUsages::COPY_SRC);
+    eprintln!(
+        "render: presenting {:?} (offered {:?})",
+        present_mode(&caps.present_modes, load_graphics().vsync),
+        caps.present_modes
+    );
     let config = wgpu::SurfaceConfiguration {
         usage,
         format,
@@ -7146,9 +7151,15 @@ impl App {
     }
 
     fn frame_inner(&mut self) {
-        // Immediate presenting does not wait for the monitor, so the frames are capped here at about 60 a second.
+        // Immediate presenting does not wait for the monitor, so the frames are capped here at about 60 a second;
+        // the synchronised modes (Fifo, Mailbox) pace themselves by the screen, and a second, sleeping cap on top of
+        // them beats against the refresh and makes the picture judder
+        let paced = self
+            .gpu
+            .as_ref()
+            .is_some_and(|g| g.config.present_mode != wgpu::PresentMode::Immediate);
         let since = self.last.elapsed();
-        if since < FRAME {
+        if !paced && since < FRAME {
             std::thread::sleep(FRAME - since);
             self.stall.slept += FRAME - since;
         }
