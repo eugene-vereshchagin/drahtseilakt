@@ -3395,7 +3395,34 @@ pub(crate) fn window_gpu(window: &Arc<Window>) -> Result<Gpu, String> {
         caps.present_modes
     );
     surface.configure(&device, &config);
-    let renderer = Renderer::new(device, queue, format);
+    // the still picture goes up before anything else is made (the renderer's pipelines, the fonts, the menu)
+    let pic = crate::splashpic::SplashPic::load(&device, &queue, format);
+    if let Some(pic) = &pic {
+        match surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(f)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(f) => {
+                let view = f.texture.create_view(&Default::default());
+                let mut enc = device.create_command_encoder(&Default::default());
+                pic.draw(
+                    &queue,
+                    &mut enc,
+                    &view,
+                    (config.width, config.height),
+                    1.0,
+                    true,
+                );
+                queue.submit([enc.finish()]);
+                queue.present(f);
+                eprintln!(
+                    "startup: first pixel (the still picture) {:.0} ms after launch",
+                    since_launch()
+                );
+            }
+            _ => {}
+        }
+    }
+    let mut renderer = Renderer::new(device, queue, format);
+    renderer.set_splash_pic(pic);
     Ok(Gpu {
         surface,
         config,
@@ -7115,7 +7142,9 @@ impl App {
         let shot = match (&self.splash, &self.loading, font) {
             (Some(sp), _, Some(_)) => {
                 let t = sp.began.elapsed().as_secs_f32();
-                art_quads = self.art.splash(screen, t, sp.fade());
+                if std::env::var_os("DRAHTSEILAKT_SPLASH_STILL").is_none() {
+                    art_quads = self.art.splash(screen, t, sp.fade());
+                }
                 Some(crate::titlescene::Shot {
                     loading: false,
                     time: t,

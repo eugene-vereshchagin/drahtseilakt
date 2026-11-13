@@ -124,8 +124,7 @@ pub struct TitleScene {
 
 /// The ball's texture in the game's own parts (assets/own), as RGBA with its mip chain, largest first.
 fn ball_texture() -> Option<Vec<(u32, u32, Vec<u8>)>> {
-    let path = gamedata::resources::own_root()?
-        .join("3D Entities/Balls/textures/Ball_Wood.png");
+    let path = gamedata::resources::own_root()?.join("3D Entities/Balls/textures/Ball_Wood.png");
     // a texture of a sane size only: this is a file of the game's folder, but it is read on the first frame
     if std::fs::metadata(&path).ok()?.len() > 8 << 20 {
         return None;
@@ -162,7 +161,11 @@ fn ball_texture() -> Option<Vec<(u32, u32, Vec<u8>)>> {
 pub const PARAMS: usize = 28;
 
 impl TitleScene {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> TitleScene {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        format: wgpu::TextureFormat,
+    ) -> TitleScene {
         let chain = ball_texture();
         let textured = chain.is_some();
         let chain = chain.unwrap_or_else(|| vec![(1, 1, vec![140, 80, 40, 255])]);
@@ -227,7 +230,10 @@ impl TitleScene {
                         multisampled: false,
                     },
                 ),
-                entry(1, wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering)),
+                entry(
+                    1,
+                    wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                ),
             ],
         });
         let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {

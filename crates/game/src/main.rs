@@ -67,6 +67,7 @@ mod scripting;
 mod scriptsky;
 mod sim;
 mod sky;
+mod splashpic;
 mod supports;
 mod titlescene;
 mod trafo;

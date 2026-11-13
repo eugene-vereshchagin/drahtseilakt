@@ -494,6 +494,8 @@ pub struct Renderer {
     /// The picture's pipeline being made on a thread (`prepare_title`), and when the picture was first there.
     title_coming: Option<std::sync::mpsc::Receiver<crate::titlescene::TitleScene>>,
     title_since: Option<std::time::Instant>,
+    /// The still picture of the first frames (splashpic.rs), under the title scene until that has faded in.
+    splash_pic: Option<crate::splashpic::SplashPic>,
 }
 
 /// A range in shared chunk `.0`: its offset and length.
@@ -1150,6 +1152,7 @@ impl Renderer {
             title: None,
             title_coming: None,
             title_since: None,
+            splash_pic: None,
         }
     }
 
@@ -1769,6 +1772,11 @@ impl Renderer {
         self.named_textures.remove(name);
     }
 
+    /// Keeps the still picture the window showed first, for the title scene to fade in over.
+    pub fn set_splash_pic(&mut self, pic: Option<crate::splashpic::SplashPic>) {
+        self.splash_pic = pic;
+    }
+
     /// Starts making the title picture's pipeline on a thread: compiling its shader takes a tenth of a second or
     /// two, which the start-up does not wait for (the picture fades in when it is there).
     pub fn prepare_title(&mut self) {
@@ -1794,8 +1802,12 @@ impl Renderer {
     }
 
     /// The picture's shot as it is drawn now, once its pipeline is there (None while it is still being made: the
-    /// frame stays as it is; the title screen's picture then comes up in a quarter of a second).
-    fn title_shot(&mut self, shot: &crate::titlescene::Shot) -> Option<crate::titlescene::Shot> {
+    /// still picture of the first frames stays), and how far the scene has faded in over that still (0 to 1). The
+    /// title scene's clock starts when it begins to fade in, as the still shows it at time zero.
+    fn title_shot(
+        &mut self,
+        shot: &crate::titlescene::Shot,
+    ) -> Option<(crate::titlescene::Shot, f32)> {
         if let Some(rx) = &self.title_coming {
             match rx.try_recv() {
                 Ok(made) => {
@@ -1812,10 +1824,20 @@ impl Renderer {
             .get_or_insert_with(|| crate::titlescene::TitleScene::new(device, queue, format));
         let since = *self.title_since.get_or_insert_with(std::time::Instant::now);
         let mut shot = *shot;
+        let mut ramp = 1.0;
         if !shot.loading {
-            shot.alpha *= (since.elapsed().as_secs_f32() / 0.25).clamp(0.0, 1.0);
+            // DRAHTSEILAKT_SPLASH_STILL=1: the scene at time zero, the still picture's frame (see docs/drahtseilakt/splash.md)
+            if std::env::var_os("DRAHTSEILAKT_SPLASH_STILL").is_some() {
+                shot.time = 0.0;
+            } else {
+                shot.time = since.elapsed().as_secs_f32();
+                // with no still under it the scene fades in over the frame as before
+                let over = if self.splash_pic.is_some() { 0.5 } else { 0.25 };
+                ramp = (shot.time / over).clamp(0.0, 1.0);
+                shot.alpha *= ramp;
+            }
         }
-        Some(shot)
+        Some((shot, ramp))
     }
 
     /// Draws the original's 2D interface over `target`, which keeps its content: quads in window pixels, each
@@ -1856,9 +1878,13 @@ impl Renderer {
     ) {
         // the words wait for their picture
         let waiting = shot.is_some();
+        // the still picture stands under the title scene (not the loading screen's) while the scene is not all there
+        let still = shot.filter(|s| !s.loading).map(|s| s.alpha);
         let shot = shot.and_then(|s| self.title_shot(s));
+        let still = still.filter(|_| shot.is_none_or(|(_, ramp)| ramp < 1.0));
+        let shot = shot.map(|(s, _)| s);
         let over = if waiting && shot.is_none() { &[] } else { over };
-        if under.is_empty() && shot.is_none() && over.is_empty() {
+        if under.is_empty() && shot.is_none() && over.is_empty() && still.is_none() {
             return;
         }
         let (under_verts, under_runs) = Self::ui_vertices(width, height, under);
@@ -1866,7 +1892,10 @@ impl Renderer {
         let params = shot.map(|s| {
             let mut p = crate::titlescene::TitleScene::params((width, height), &s);
             // the sun's fourth number: whether the ball's texture is there
-            p[19] = self.title.as_ref().map_or(0.0, |t| f32::from(u8::from(t.textured)));
+            p[19] = self
+                .title
+                .as_ref()
+                .map_or(0.0, |t| f32::from(u8::from(t.textured)));
             p
         });
         // the three passes' vertices one after the other in one buffer
@@ -1887,6 +1916,9 @@ impl Renderer {
             });
         let mut enc = self.device.create_command_encoder(&Default::default());
         self.ui_pass(&mut enc, target, (&buf, 0..over_at), under_runs);
+        if let (Some(alpha), Some(pic)) = (still, &self.splash_pic) {
+            pic.draw(&self.queue, &mut enc, target, (width, height), alpha, false);
+        }
         if let (Some(_), Some(title)) = (&params, &self.title) {
             title.pass(&mut enc, target, buf.slice(params_at..));
         }
