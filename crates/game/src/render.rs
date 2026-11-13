@@ -1775,13 +1775,13 @@ impl Renderer {
         if self.title.is_some() || self.title_coming.is_some() {
             return;
         }
-        let (device, format) = (self.device.clone(), self.format);
+        let (device, queue, format) = (self.device.clone(), self.queue.clone(), self.format);
         let (tx, rx) = std::sync::mpsc::channel();
         let spawned = std::thread::Builder::new()
             .name("title picture".into())
             .spawn(move || {
                 let began = std::time::Instant::now();
-                let made = crate::titlescene::TitleScene::new(&device, format);
+                let made = crate::titlescene::TitleScene::new(&device, &queue, format);
                 eprintln!(
                     "startup: the title picture's pipeline made in {:.0} ms (on its thread)",
                     began.elapsed().as_secs_f64() * 1000.0
@@ -1807,9 +1807,9 @@ impl Renderer {
                 Err(_) => self.title_coming = None,
             }
         }
-        let (device, format) = (&self.device, self.format);
+        let (device, queue, format) = (&self.device, &self.queue, self.format);
         self.title
-            .get_or_insert_with(|| crate::titlescene::TitleScene::new(device, format));
+            .get_or_insert_with(|| crate::titlescene::TitleScene::new(device, queue, format));
         let since = *self.title_since.get_or_insert_with(std::time::Instant::now);
         let mut shot = *shot;
         if !shot.loading {
@@ -1863,7 +1863,12 @@ impl Renderer {
         }
         let (under_verts, under_runs) = Self::ui_vertices(width, height, under);
         let (over_verts, over_runs) = Self::ui_vertices(width, height, over);
-        let params = shot.map(|s| crate::titlescene::TitleScene::params((width, height), &s));
+        let params = shot.map(|s| {
+            let mut p = crate::titlescene::TitleScene::params((width, height), &s);
+            // the sun's fourth number: whether the ball's texture is there
+            p[19] = self.title.as_ref().map_or(0.0, |t| f32::from(u8::from(t.textured)));
+            p
+        });
         // the three passes' vertices one after the other in one buffer
         let mut bytes: Vec<u8> = Vec::new();
         bytes.extend_from_slice(bytemuck::cast_slice(&under_verts));
