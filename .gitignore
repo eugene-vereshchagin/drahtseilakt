@@ -66,6 +66,7 @@ __pycache__/
 /assets/own/3D Entities/MenuLevel/level.gltf
 /assets/**/*.png
 /assets/**/*.jpg
+!/assets/own/Splash/splash.jpg
 /assets/**/*.jpeg
 /assets/**/*.bmp
 /assets/**/*.tga
