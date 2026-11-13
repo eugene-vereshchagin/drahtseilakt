@@ -15,8 +15,7 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/levels/drahtseilakt")
     }
 
-    /// Our levels: the shipped folders made from a level description. The ones set aside in `levels-legacy_delme/`
-    /// are not checked: they wait to be replaced, and their runs predate the balls remade with own-level-1.
+    /// Our levels: the shipped folders made from a level description.
     fn levels() -> Vec<PathBuf> {
         let mut v: Vec<PathBuf> = [shipped()]
             .iter()
