@@ -112,8 +112,13 @@ fn jitter(p: vec2<f32>) -> f32 {
     return f32(h & 0xffffu) / 65536.0;
 }
 
+struct FsOut {
+    @location(0) colour: vec4<f32>,
+    @builtin(sample_mask) mask: u32,
+}
+
 @fragment
-fn fs(in: VsOut) -> @location(0) vec4<f32> {
+fn fs(in: VsOut) -> FsOut {
     let size = vec2<f32>(c.wind.w, c.haze.a);
     let px = vec2<i32>(in.pos.xy);
     let ndc = vec2<f32>(in.pos.x / size.x * 2.0 - 1.0, 1.0 - in.pos.y / size.y * 2.0);
@@ -123,15 +128,29 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     // how far the scene is along this ray. The sky box (sky.rs: a cube SIZE round the eye) writes depth as an opaque
     // mesh does, so where the depth is the box's own along this ray, there is only sky, behind the clouds: the box's
     // distance is SIZE over the ray's largest component. Anything nearer is the level.
-    let z = textureLoad(depth, px, 0);
-    var scene = 1e9;
-    if z < 1.0 {
-        let wp = c.inv_view_proj * vec4<f32>(ndc, z, 1.0);
-        scene = length(wp.xyz / wp.w - eye);
-        let a = abs(dir);
-        let box = SKY / max(max(a.x, a.y), a.z);
-        if scene > box * 0.999 {
-            scene = 1e9;
+    // Each sample of an anti-aliased pixel has its own depth: the cloud is shaded once, along the farthest, and
+    // written only to the samples that see about as far, so an edge against the clouds keeps its coverage.
+    var dists: array<f32, NS>;
+    var scene = 0.0;
+    for (var s = 0; s < NS; s++) {
+        let z = textureLoad(depth, px, s);
+        var d = 1e9;
+        if z < 1.0 {
+            let wp = c.inv_view_proj * vec4<f32>(ndc, z, 1.0);
+            d = length(wp.xyz / wp.w - eye);
+            let a = abs(dir);
+            let box = SKY / max(max(a.x, a.y), a.z);
+            if d > box * 0.999 {
+                d = 1e9;
+            }
+        }
+        dists[s] = d;
+        scene = max(scene, d);
+    }
+    var mask = 0u;
+    for (var s = 0; s < NS; s++) {
+        if dists[s] >= scene * 0.98 {
+            mask |= 1u << u32(s);
         }
     }
     let bottom = c.slab.x;
@@ -252,5 +271,8 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {
     if alpha < 0.002 {
         discard;
     }
-    return vec4<f32>(to_gamma(col / alpha) * alpha, alpha);
+    var out: FsOut;
+    out.colour = vec4<f32>(to_gamma(col / alpha) * alpha, alpha);
+    out.mask = mask;
+    return out;
 }
