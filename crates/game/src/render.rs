@@ -35,6 +35,16 @@ pub fn note_adapter(adapter: &wgpu::Adapter) {
     };
     let max = [4, 2].into_iter().find(|&n| both(n)).unwrap_or(1);
     MSAA_MAX.store(max, std::sync::atomic::Ordering::Relaxed);
+    eprintln!(
+        "render: anti-aliasing up to {max}x (rgba8 {:?}, bgra8 {:?}, depth {:?} samples flags)",
+        adapter
+            .get_texture_format_features(wgpu::TextureFormat::Rgba8Unorm)
+            .flags,
+        adapter
+            .get_texture_format_features(wgpu::TextureFormat::Bgra8Unorm)
+            .flags,
+        adapter.get_texture_format_features(DEPTH_FORMAT).flags
+    );
 }
 
 /// The samples a pixel to draw with: 4 down to what the adapter does, none for the 2004 look.
@@ -42,7 +52,14 @@ fn samples_now(look: &RenderLook) -> u32 {
     if look.filter != 0 {
         return 1;
     }
-    let max = MSAA_MAX.load(std::sync::atomic::Ordering::Relaxed);
+    let mut max = MSAA_MAX.load(std::sync::atomic::Ordering::Relaxed);
+    // DRAHTSEILAKT_MSAA=1|2|4 caps the samples (for comparing pictures)
+    if let Some(n) = std::env::var("DRAHTSEILAKT_MSAA")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+    {
+        max = max.min(n.max(1));
+    }
     [4, 2, 1]
         .into_iter()
         .find(|&n| n <= MSAA_WANTED && n <= max)
@@ -2080,6 +2097,10 @@ impl Renderer {
     fn sync_quality(&mut self) {
         let samples = samples_now(&self.look);
         if samples != self.samples {
+            eprintln!(
+                "render: drawing with {samples} samples a pixel, surface format {:?}",
+                self.format
+            );
             self.samples = samples;
             self.pipelines.clear();
             self.particle_pipelines.clear();

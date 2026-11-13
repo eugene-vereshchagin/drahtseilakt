@@ -85,6 +85,7 @@ per-player thing is the name in the highscore list.
   goes through the lines elsewhere, through the levels on the highscores. A click on a key's line on the Controls
   page waits for a key as Enter does; mouse buttons cannot be bound. The cursor is shown over the menus and hidden
   in a run, never held in the window; the run takes nothing from the mouse, so a click that closes a menu does
+  The click is tested against the buttons as the menu is drawn, with the game's face (a screen with a help panel lays its buttons out by the panel's height, which the face measures; a click once used the face-less layout and missed every button below the first on such screens, Exit among them, 2026-11-13). `DRAHTSEILAKT_MSAA=1|2|4` caps the anti-aliasing for comparing pictures; the log's `render:` lines tell what the adapter offers and what the frame draws with.
   nothing in the level. The buttons are hit where they are drawn, in any window and either interface.
 - Every finished run is still kept as a replay (it costs nothing on screen); the fastest counts as the best time
   shown in the extended mode.
