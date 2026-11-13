@@ -1923,32 +1923,21 @@ impl Menu {
         }
     }
 
-    /// A replay's row name: month and day it was saved and the level (the file's name when it is not a replay);
-    /// the whole of it is in the note under the list.
+    /// A replay's row name: the level, whole (the list is newest first; when and how long are in the note under the
+    /// list); the day it was saved when the level is not known, else the file's name.
     fn replay_name(&self, i: usize) -> String {
         let Some(it) = self.replays.items.get(i) else {
             return String::new();
         };
         let level = self.replay_level(it);
-        let level = if level.chars().count() > 9 {
-            format!("{}..", level.chars().take(7).collect::<String>())
-        } else {
-            level
-        };
-        let when = it
-            .saved
-            .as_deref()
-            .map(|d| d.get(5..10).unwrap_or(d).to_owned());
-        match (when, level.is_empty()) {
-            (Some(d), false) => format!("{d} {level}"),
-            (Some(d), true) => d,
-            (None, false) => level,
-            (None, true) => it
-                .path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default(),
+        if !level.is_empty() {
+            return level;
         }
+        it.saved
+            .as_deref()
+            .map(|d| d.get(..10).unwrap_or(d).to_owned())
+            .or_else(|| it.path.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .unwrap_or_default()
     }
 
     /// The level a replay was made on, in words.
@@ -3508,6 +3497,18 @@ fn wrap_lines(f: &crate::ui::Face, text: &str, w: f32, style: &crate::ui::Style)
                     let mut tail = Vec::new();
                     while text_wide(f, &head, style) > w && head.chars().count() > 1 {
                         tail.push(head.pop().unwrap_or(' '));
+                    }
+                    // a name like 2026-11-14-01-04-47-01-Map-260801 breaks after a dash or underscore, not inside
+                    // a number or a word
+                    if let Some(at) = head
+                        .char_indices()
+                        .filter(|&(i, c)| i > 0 && matches!(c, '-' | '_'))
+                        .map(|(i, c)| i + c.len_utf8())
+                        .last()
+                        .filter(|&at| at < head.len())
+                    {
+                        tail.extend(head[at..].chars().rev());
+                        head.truncate(at);
                     }
                     lines.push(head);
                     cur = tail.into_iter().rev().collect();
@@ -5554,7 +5555,7 @@ mod tests {
                 .as_deref()
                 .is_some_and(|n| n.contains("/b") || n.starts_with("b"))
         );
-        assert_eq!(m.replay_name(0), "11-12 Level 03");
+        assert_eq!(m.replay_name(0), "Level 03");
         assert_eq!(m.replay_value(&m.replays.items[0]), "01:23 finished");
         m.back();
         assert_eq!(m.screen(), Screen::Main);
@@ -6042,6 +6043,34 @@ mod tests {
             .collect();
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(names, ["a.nmo", "b.NMO", "open level"]);
+    }
+
+    #[test]
+    fn a_long_replay_name_breaks_after_a_dash() {
+        if !crate::fallback::available() {
+            eprintln!("skipped: the shipped fonts (assets/fonts) are not there");
+            return;
+        }
+        let face = crate::ui::Face::Own;
+        let st = crate::ui::Style {
+            scale: [0.05, 0.05],
+            spacing: [0.0, 0.0],
+            align: 0,
+            flags: crate::ui::TEXT_SCREEN,
+            margins: [4.0; 4],
+            color: [1.0; 4],
+            v2: false,
+            shadow: None,
+        };
+        let name = "2026-11-14-01-04-47-01-Map-260801";
+        let w = text_wide(&face, name, &st) * 0.8;
+        let lines = wrap_lines(&face, name, w, &st);
+        assert!(lines.len() >= 2, "{lines:?}");
+        assert_eq!(lines.concat(), name);
+        for l in &lines[..lines.len() - 1] {
+            assert!(l.ends_with('-'), "{lines:?}");
+            assert!(text_wide(&face, l, &st) <= w, "{lines:?}");
+        }
     }
 
     #[test]
