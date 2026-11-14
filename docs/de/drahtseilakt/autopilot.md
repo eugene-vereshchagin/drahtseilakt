@@ -293,6 +293,24 @@ Eine Zonendatei ist nicht vertrauenswürdig wie eine Hinweisdatei: ihre Größe 
 (256 je Zone) und jede Zahl sind begrenzt; eine fehlerhafte Zeile wird mit einem Vermerk ausgelassen, die anderen
 Zonen gelten.
 
+## Modifizierte Originale
+
+Die Umbauten der Originallevels aus der Community (levels.md, „Modifizierte Originale“) haben die Geometrie des
+Originals: dieselben Objekte an denselben Stellen. Die **unsichtbaren Karten** verstecken jedes Objekt, auch den
+Platzhalter des Zielballons (das Spiel setzt den Ballon trotzdem dorthin, wie es die Initialisierung des Originals
+tut); ihre Physik ist die des Originals, Tick für Tick, sodass die Läufe des Originals unverändert auf ihnen laufen.
+Die **45-Grad-Karten** drehen die Wiedereinstiegspunkte um eine Achteldrehung: die Kamera blickt entlang einer
+Diagonale der Welt, und die Pfeile schieben entlang der Achsen der Kamera.
+
+Darum nimmt der Testspieler die Hinweise und Pläne des Originals, wie sie sind (ihre Orte und Richtungen sind die der
+Welt), und gibt eine Richtung der Welt als die Pfeile der Kamera, wie sie gerade steht, samt ihrem Versatz gegen ganze
+Vierteldrehungen: auf einer 45-Grad-Karte ist ein Schub entlang einer Weltachse zwei Pfeile. Ein Replay eines Spielers
+auf dem Originallevel (mit `--follow` und `--then` gefolgt oder als Abschnitt `replay` oder `trace` eines Hinweises)
+wird auf dem Originallevel angesehen, der Datei der Kopie selbst, wenn die Karte dessen Geometrie hat (dieselben
+Objekte an denselben Stellen, in beliebiger Reihenfolge); übernommen werden nur der Weg des Balls und seine Schübe in
+der Welt, und die Tasten des Spielers werden in die Pfeile der Kamera der Karte übersetzt. Ein Umbau mit anderen
+Objekten ist kein Umbau dieses Levels: ein solches Replay wird wie bisher abgelehnt.
+
 ## Videos seiner Läufe
 
 `--video FILE` mit `--replay` zeichnet den Lauf ohne Fenster, ein Bild je Takt (60 pro Sekunde) in `--size`, als

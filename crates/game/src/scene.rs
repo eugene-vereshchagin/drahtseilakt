@@ -351,6 +351,14 @@ pub fn module_of(level: &Level, i: usize) -> Option<&str> {
     if let Some(group) = level.module_group(i) {
         return (!is_marker_group(group)).then_some(group);
     }
+    // the finish: the original's init makes the balloon at the member of PE_Levelende, hidden or not (the invisible
+    // maps hide every object of the level, the balloon's stand-in too, and still end at the balloon)
+    if level
+        .groups_of(i)
+        .any(|g| g.eq_ignore_ascii_case("PE_Levelende"))
+    {
+        return Some("PE_Balloon");
+    }
     if !o.visible || has_material(level, mesh) {
         return None;
     }

@@ -272,6 +272,22 @@ nothing holds), and why a limit is let go.
 A zones file is untrusted like a hint file: its size (64 KiB), the zones (256) and points (256 a zone) and every
 number are capped; a malformed line is left out with a note naming it, the other zones still count.
 
+## Modified originals
+
+The community remakes of the original levels (levels.md, "Modified originals") hold the original's geometry: the
+same objects at the same places. The **invisible maps** hide every object, the balloon's stand-in too (the game
+makes the balloon there all the same, as the original's init does); their physics is the original's tick for tick,
+so the original's runs play on them unchanged. The **45-degree maps** turn the reset points by an eighth of a turn:
+the view looks along a diagonal of the world and the arrows push along the view's axes.
+
+So the test player takes the original's hints and plans as they are (their places and directions are the world's),
+and gives a world direction as the arrows of the view as it is, its offset from whole quarters too: on a 45-degree
+map a push along an axis of the world is two arrows. A player's replay recorded on the original level (followed with
+`--follow` and `--then`, or a hint's `replay` or `trace` stretch) is seen on the original level, the copy's own file,
+when the map holds its geometry (the same objects at the same places, in any order); only the ball's way and its
+pushes in the world are taken over, and the player's keys are turned into the arrows of the map's view. A remake
+whose objects differ is no remake of it: such a replay is refused as before.
+
 ## Videos of its runs
 
 `--video FILE` with `--replay` draws the run without a window, one frame a tick (60 a second) at `--size`, as raw
