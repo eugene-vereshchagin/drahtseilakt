@@ -292,6 +292,12 @@ A replay of the original level also plays with `--replay` on a remake whose obje
 too (an invisible map: the same physics and view, so the same run tick for tick; `--record` saves it as the map's).
 On a 45-degree map the keys would push another way, so there it is refused.
 
+Where it stands, 2026-11-15 (runs in `hints/runs/modified/`): the invisible maps, 12 of 13 finished from the start by
+the test player (levels 1, 11, 12, 13 by the plan and hints alone, 4 and 9 following the owner's runs, the others following
+the original's kept run; level 8 only as the original's kept run played on the map, `Level_08-original-run.replay`).
+The 45-degree maps, levels 1-7, 9 and 10 finished following the original's kept run with no hints (the hints' open
+steps were written for the original's view); 8, 11, 12 and 13 not yet.
+
 ## Videos of its runs
 
 `--video FILE` with `--replay` draws the run without a window, one frame a tick (60 a second) at `--size`, as raw

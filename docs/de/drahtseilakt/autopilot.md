@@ -315,6 +315,13 @@ Ein Replay des Originallevels läuft auch mit `--replay` auf einem Umbau, dessen
 (eine unsichtbare Karte: dieselbe Physik und Kamera, also derselbe Lauf Tick für Tick; `--record` speichert ihn als
 Replay der Karte). Auf einer 45-Grad-Karte würden die Tasten anders schieben, dort wird es abgelehnt.
 
+Stand 2026-11-15 (Läufe in `hints/runs/modified/`): die unsichtbaren Karten, 12 von 13 vom Testspieler vom Start an
+geschafft (Level 1, 11, 12, 13 allein nach Plan und Hinweisen, 4 und 9 den Läufen des Besitzers folgend, die übrigen dem
+gespeicherten Lauf des Originals folgend; Level 8 bisher nur als gespeicherter Lauf des Originals, auf der Karte
+abgespielt, `Level_08-original-run.replay`). Die 45-Grad-Karten: Level 1-7, 9 und 10 geschafft, dem gespeicherten
+Lauf des Originals ohne Hinweise folgend (die offenen Schritte der Hinweise sind für die Kamera des Originals
+geschrieben); 8, 11, 12 und 13 noch nicht.
+
 ## Videos seiner Läufe
 
 `--video FILE` mit `--replay` zeichnet den Lauf ohne Fenster, ein Bild je Takt (60 pro Sekunde) in `--size`, als
