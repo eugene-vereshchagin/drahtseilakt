@@ -243,8 +243,11 @@ impl Game {
                 let r = Replay::parse(&text).map_err(|e| format!("{}: {e}", p.display()))?;
                 // a replay plays on its level file, or on a level converted from that file (an open-format export
                 // records its source's hash): the same level, so the same run
+                // (or on the original level the map is a remake of, turned the same way and with the same objects:
+                // the invisible maps, whose physics is the original's, play the original's runs)
                 if r.level_hash != level.hash
                     && Some(r.level_hash) != level.level.settings.source_hash
+                    && remake_of(data, &level.level, &r, true).is_none()
                 {
                     return Err(format!(
                         "{}: recorded on another level file than {}",
@@ -2308,20 +2311,7 @@ fn watch_options(o: &Options, data: &Data, run: &Replay) -> Options {
     if run.level_hash == chosen.hash || Some(run.level_hash) == chosen.level.settings.source_hash {
         return watch;
     }
-    let Some(n) = level_number(&run.level_name) else {
-        return watch;
-    };
-    // (the copy's own file: the replays of the original levels are recorded on it)
-    let Some(original) = data
-        .original(n)
-        .filter(|s| matches!(s, crate::assets::Source::Nmo(_)))
-    else {
-        return watch;
-    };
-    let Ok(orig) = data.load(&original) else {
-        return watch;
-    };
-    if orig.hash == run.level_hash && same_geometry(&orig.level, &chosen.level) {
+    if let Some((n, original)) = remake_of(data, &chosen.level, run, false) {
         println!(
             "{}: the original's run, seen on the original level {n} (the map holds its geometry)",
             run.level_name
@@ -2329,6 +2319,25 @@ fn watch_options(o: &Options, data: &Data, run: &Replay) -> Options {
         watch.source = original;
     }
     watch
+}
+
+/// The original level (its number and the copy's own file) a replay `run` was recorded on, when `chosen` is a remake
+/// holding its geometry: the same objects at the same places, and with `turns` also turned the same way (then the
+/// physics and the view are the original's and the run plays on the remake tick for tick: the invisible maps).
+fn remake_of(
+    data: &Data,
+    chosen: &level::Level,
+    run: &Replay,
+    turns: bool,
+) -> Option<(u32, crate::assets::Source)> {
+    let n = level_number(&run.level_name)?;
+    // (the copy's own file: the replays of the original levels are recorded on it)
+    let original = data
+        .original(n)
+        .filter(|s| matches!(s, crate::assets::Source::Nmo(_)))?;
+    let orig = data.load(&original).ok()?;
+    (orig.hash == run.level_hash && same_geometry(&orig.level, chosen, turns))
+        .then_some((n, original))
 }
 
 /// The original level a file name names (`Level_04.NMO`: 4), 1 to 13.
@@ -2343,19 +2352,24 @@ fn level_number(name: &str) -> Option<u32> {
 }
 
 /// Whether two levels hold the same geometry: the same objects (in any order) at the same places, with meshes of as
-/// many points (how they look, whether they are shown and which way they face may differ).
-fn same_geometry(a: &level::Level, b: &level::Level) -> bool {
-    // each object as its name, its place on a grid of a hundredth and its mesh's points, sorted
+/// many points (how they look and whether they are shown may differ; which way they face too, unless `turns`).
+fn same_geometry(a: &level::Level, b: &level::Level, turns: bool) -> bool {
+    // each object as its name, its place (or its whole matrix) on a grid of a ten-thousandth and its mesh's points,
+    // sorted
     let key = |l: &level::Level| {
-        let mut k: Vec<(String, [i64; 3], Option<usize>)> = l
+        let mut k: Vec<(String, Vec<i64>, Option<usize>)> = l
             .objects
             .iter()
             .map(|o| {
-                let p = o.position();
-                let cell = |v: f32| (f64::from(v) * 100.0).round() as i64;
+                let cell = |v: f32| (f64::from(v) * 1e4).round() as i64;
+                let place: Vec<i64> = if turns {
+                    o.matrix.iter().flatten().map(|&v| cell(v)).collect()
+                } else {
+                    o.position().iter().map(|&v| cell(v)).collect()
+                };
                 (
                     o.name.clone(),
-                    [cell(p[0]), cell(p[1]), cell(p[2])],
+                    place,
                     o.mesh
                         .and_then(|m| l.meshes.get(m))
                         .map(|m| m.positions.len()),

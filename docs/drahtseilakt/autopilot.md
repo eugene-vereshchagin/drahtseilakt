@@ -288,6 +288,10 @@ when the map holds its geometry (the same objects at the same places, in any ord
 pushes in the world are taken over, and the player's keys are turned into the arrows of the map's view. A remake
 whose objects differ is no remake of it: such a replay is refused as before.
 
+A replay of the original level also plays with `--replay` on a remake whose objects are turned the same way
+too (an invisible map: the same physics and view, so the same run tick for tick; `--record` saves it as the map's).
+On a 45-degree map the keys would push another way, so there it is refused.
+
 ## Videos of its runs
 
 `--video FILE` with `--replay` draws the run without a window, one frame a tick (60 a second) at `--size`, as raw

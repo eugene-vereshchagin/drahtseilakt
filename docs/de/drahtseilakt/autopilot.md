@@ -311,6 +311,10 @@ Objekte an denselben Stellen, in beliebiger Reihenfolge); übernommen werden nur
 der Welt, und die Tasten des Spielers werden in die Pfeile der Kamera der Karte übersetzt. Ein Umbau mit anderen
 Objekten ist kein Umbau dieses Levels: ein solches Replay wird wie bisher abgelehnt.
 
+Ein Replay des Originallevels läuft auch mit `--replay` auf einem Umbau, dessen Objekte zudem gleich gedreht sind
+(eine unsichtbare Karte: dieselbe Physik und Kamera, also derselbe Lauf Tick für Tick; `--record` speichert ihn als
+Replay der Karte). Auf einer 45-Grad-Karte würden die Tasten anders schieben, dort wird es abgelehnt.
+
 ## Videos seiner Läufe
 
 `--video FILE` mit `--replay` zeichnet den Lauf ohne Fenster, ein Bild je Takt (60 pro Sekunde) in `--size`, als
