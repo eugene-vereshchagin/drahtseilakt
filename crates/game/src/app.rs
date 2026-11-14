@@ -3103,6 +3103,7 @@ impl PilotRun {
         mut pilot: crate::autopilot::Pilot,
     ) -> Result<PilotRun, String> {
         pilot.hints = crate::hints::Runner::new(load_hints(game, data, o)?);
+        pilot.style = o.style;
         let zones_path = zones_path(game, o);
         pilot.zones = Arc::new(load_zones(&zones_path));
         let learned_path = zones_path.with_file_name(LEARNED);

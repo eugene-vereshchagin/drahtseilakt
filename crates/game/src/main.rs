@@ -109,6 +109,7 @@ usage: drahtseilakt [options]
   --then FILE         with --follow: from the sector this replay begins at, its way instead (up to 8 times)
   --plan FILE         the test player's way goes through the level objects named in FILE, in order
   --hints FILE        the test player's hints (default: hints/<level>.txt in the data folder; autopilot.md)
+  --style STYLE       how the test player rides: calm (the default: a steady pace on the middle) or speedrun
   --rewinds N         the test player goes back to a saved state at most N times (lost or stuck; 0: never)
   --report DIR        where the test player writes a report each time it is stuck (default: the temp folder)
   --locate DIR        find the ball's way in a video's frames (DIR/s0001.jpg, four a second); track to --record
@@ -192,6 +193,8 @@ pub struct Options {
     pub plan: Option<PathBuf>,
     /// The test player's hint file, instead of the level's in the data folder.
     pub hints: Option<PathBuf>,
+    /// How the test player rides (calm or speedrun).
+    pub style: crate::autopilot::Style,
     /// Where the test player's stuck reports go.
     pub report: Option<PathBuf>,
     /// The test player gives up when its ball has not moved for this many seconds (or its way has not got on for
@@ -263,6 +266,7 @@ pub(crate) fn default_options() -> Options {
         then: Vec::new(),
         plan: None,
         hints: None,
+        style: crate::autopilot::Style::Calm,
         report: None,
         give_up: 30,
         rewinds: 600,
@@ -363,6 +367,11 @@ fn parse_args() -> Result<Options, String> {
                 o.autopilot = true;
             }
             "--hints" => o.hints = Some(value()?.into()),
+            "--style" => {
+                let v = value()?;
+                o.style = crate::autopilot::Style::parse(&v)
+                    .ok_or_else(|| format!("--style: calm or speedrun, not {v}"))?;
+            }
             "--report" => o.report = Some(value()?.into()),
             "--give-up" => {
                 let s: u64 = value()?
