@@ -101,4 +101,7 @@ at 1530 -200 -499.8 r 4 sector 6 kind stone : pass 1526 -200 -497.5 3 ; pass 152
 # z -583, south along x 1476, west along z -606, south along x 1448, east along z -631.5), each crossing under the end
 # of the one before. The wooden ball rides each on its lower rail leaning on the upper one, comes onto the next fast
 # enough to carry over its end (a slow ball drops between them), then the platform and the balloon.
-at 1460 -211 -547 r 4 sector 6 kind wood : press 1459.1 -211.3 -583.5 0.8 0 12 400 ; press 1474.9 -211.5 -581.4 0 -0.8 10 300 ; press 1474.9 -211.5 -606.3 0.8 0 12 300 ; press 1447.7 -211.5 -604.4 0 -0.8 10 300 ; press 1449.2 -211.5 -631.9 -0.8 0 12 300 ; press 1485 -211.5 -630.0 0 -0.8 10 300 ; pass 1485 -228 -642 5
+# (45-degree map: a lean and the push along a rail of the world's axes come out at 0.71 each in that view, so the
+# first pair leans harder, 1.2, and the ball comes to the end of the second slower and lands short on the crossing
+# of the third; a short push east (8 ticks) sets it onto the third's rails before it rolls back between them)
+at 1460 -211 -547 r 4 sector 6 kind wood : press 1459.1 -211.3 -583.5 1.2 0 12 400 ; press 1474.9 -211.5 -581.4 0 -0.8 10 300 ; push 1 0 8 ; press 1474.9 -211.5 -606.3 0.8 0 12 300 ; press 1447.7 -211.5 -604.4 0 -0.8 10 300 ; press 1449.2 -211.5 -631.9 -0.8 0 12 300 ; press 1485 -211.5 -630.0 0 -0.8 10 300 ; pass 1485 -228 -642 5

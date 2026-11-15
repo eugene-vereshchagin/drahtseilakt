@@ -313,14 +313,18 @@ steps were written for the original's view); level 8 the same way, 10:41.30. Wit
 push (above), 2026-11-15: level 12 finished, 13:30.93 (`--follow` its kept run, its plan and `hints/Level_12-45.txt`:
 two places taken more carefully, the turn back onto the upper row of sector 6 at z 694 and the corner onto the rail x 521.3 of sector 7
 slower and wider; braking and steering there are diagonal pushes, weaker in this view). Level 11
-(`hints/Level_11-45.txt`: two crate rams more in each of the first two channels of sector 3) gets to the last rail
-pairs of sector 6 and loses its balls there: the first pair holds with the lean offset 1.2 instead of 0.8, but at
-the end of the second the ball comes onto the crossing of the third too slowly (9.7 on the original, 7 to 8 here: a
-lean takes from the push along the rail) and sinks between them; more or less lean, other speeds, the lean first
-among the arrows and the original's run traced there did not get it over. Level 13 (`Level_13-full.txt`) past
-sector 1, lost in sector 2: following the owner's run of the sector, the stone ball gets stuck on the wood strip at
-(-872.5, -95.5, 721), the crate under the serpentine's crossings lying elsewhere than in his run. Levels 11
-and 13 are not finished yet.
+finished, 14:44.20 with 3 lives (the same way, `hints/Level_11-45.txt`: two crate rams more in each of the first
+two channels of sector 3; on the last rail pairs of sector 6 the first pair leans 1.2 instead of 0.8, and as the
+ball comes to the end of the second slower than on the original, 7 to 8 instead of 9.7, a lean taking from the push
+along the rail, and lands short on the crossing of the third, 8 ticks of push east set it onto the third's rails
+before it rolls back between them). Level 13
+(`hints/Level_13-45.txt`, 2026-11-16: `Level_13-full.txt` with sector 2 taken apart where the owner's run goes
+another way in this view: the plank at z 686 that his ball knocks over in passing rammed down, the ball stopping 2
+units short at the serpentine's crossing z 721 so the crate stays under it and stone 18 rolls over untouched, the
+crate pressed under the crossings z 713 and 705 closed-loop with each crossing awaited, and on the beam a press
+east after his launch keys so the paper ball is in the second fan's slot before the stone) passes sectors 1 and 2
+from the start and gets stuck in sector 3 at the crates of the channel (-724.5, -219.4, -293.9), following the
+owner's run there. Level 13 is not finished yet.
 
 ## The speedrun style
 
