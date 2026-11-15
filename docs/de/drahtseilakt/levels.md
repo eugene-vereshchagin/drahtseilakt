@@ -129,8 +129,18 @@ Community-Teil), nur aus eigenen Inhalten; das gebaute Level liegt nicht in git.
 
 Was das offene Format noch nicht trägt (beim Bauen gefunden): die Slots einer Textur (Movie Player, Set Current
 Slot), Wave-Klänge (Wave Player), eine eigene Textur des Levels für Skript-Partikel, ein zur Sicht gedrehtes
-3D-Sprite des Levels. `crates/game/src/showcase.rs` prüft, dass jedes unserer Teile darin steht und dass sein Lauf
-(`hints/runs/Level_00-synthetic.replay`, vom Testspieler mit `hints/Level_00-synthetic.txt`) es schafft.
+3D-Sprite des Levels. Seit den Anmerkungen 10 des Besitzers (2026-11-16) steht jedes klassische Element so, wie die Level des Originals es
+setzen, der Weg führt ohne Umweg hindurch, aus unseren eigenen Teilen: Ventilatoren in eigenen Blöcken mit Gitter auf
+Plattformen 15 x 15, 25 auseinander und 11 höher (Level 3), eine Reihe von sechs Mulden über der Leere für die
+Papierkugel (Level 7), das Klappenrad zwischen zwei Bahnen 15 auseinander (Level 9-11), die Brettbrücke über eine
+Lücke von 9,1 (Level 2, 3, 5, 8), die Zugbrücke am Ende eines Stichwegs, die in die Lücke 7,6 einer Querbahn fällt
+(Level 5), zwei Schieber, von einem 2,5 tieferen Boden geschoben (Level 1), die Kiste unter ihrem Stein mit einem 5
+tieferen Boden darunter (Level 1) und eine Schienenspirale mit zwei Windungen. `crates/game/src/showcase.rs` prüft,
+dass jedes unserer Teile darin steht und dass jedes Element in der Physik des Spiels seine Arbeit tut: die
+`checks.txt` des Levels (vom Generator aus seinen `check`-Zeilen geschrieben) rollt eine Kugel der richtigen und der
+falschen Art mit den Pfeiltasten durch jedes Element und prüft, wohin sie kommt und wie weit sich die Teile des Moduls
+drehen oder bewegen. Eine Prüfung namens `pending-...` läuft und wird gemeldet, ist aber noch nicht Pflicht. Der Lauf
+des Testspielers wird für das Level nicht mehr aufbewahrt.
 Ohne Kopie des Originals steht hinter dem Menü der erste mitgelieferte Level nach dem Schaulevel (order 0), damit das
 Menü nicht seine Schilder zeigt.
 

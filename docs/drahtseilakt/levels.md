@@ -138,8 +138,16 @@ not in git.
 
 What the open format cannot hold yet, found while making it: a texture's slots (Movie Player, Set Current Slot), wave
 sounds (Wave Player), a level's own texture for script particles, a level's 3D sprite turned to the view.
-`crates/game/src/showcase.rs` checks that every part of ours stands in it and that its run
-(`hints/runs/Level_00-synthetic.replay`, the test player's with `hints/Level_00-synthetic.txt`) finishes it.
+Since the owner's notes 10 (2026-11-16) every classic element stands as the original's levels set it, the way going
+through it with no way round, built of our own parts: fans in their own blocks with a grille on 15 x 15 platforms 25
+apart and 11 up (level 3), a row of six troughs over the void for the paper ball (level 7), the flap wheel between two
+lanes 15 apart (levels 9-11), the board bridge over a gap of 9.1 (levels 2, 3, 5, 8), the drawbridge at a spur's end
+falling into a lane's gap of 7.6 (level 5), two pushers pushed from a floor 2.5 lower (level 1), the crate under its
+stone crossed under by a floor 5 lower (level 1), and a rail spiral of two turns. `crates/game/src/showcase.rs`
+checks that every part of ours stands in it and that each element does its job in the game's physics: the level's
+`checks.txt` (written by the generator from its `check` lines) rolls a ball of the right kind and of the wrong one
+through each element with the arrows and checks where it gets to and how far the module's parts turned or moved. A
+check named `pending-...` is run and reported but not yet required. The test player's run is no longer kept for it.
 Without a copy of the original the level behind the menu is the first shipped level past the showcase (order 0),
 so the menu never shows its sign boards.
 
