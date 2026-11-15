@@ -52,7 +52,13 @@ def build():
     b.trafo("Paper", 1, (142, 0, 0), 2)
     b.module("P_Modul_18", 1, K.pose((165, 0.6, 12)), 2)
     b.module("P_Modul_17", 1, K.pose((185, 4.5, -18)), 2)
-    b.module("P_Modul_19", 1, K.pose((205, 0.5, 15)), 2)
+    # the flap wheel as the original's levels set it (leveldsl.py, flaps): a lane out from the floor's edge (z 30), a
+    # gap of a flap's length after it with the flat flap over it at the floors' top, the axle across the lane at the
+    # gap's near edge, the other flap standing up 15 to the side, an unseen stopper under the flat one, a bay beyond
+    b.slab("Bay_Flaps_Lane", (207.25, -L.DEPTH, 30), (212.75, 0, 36), sector=0)
+    b.module("P_Modul_19", 1, K.pose((200, 0, 39.24), (0, 0, 1)), 2)
+    b.stopper("Stopper_Flaps", (207.5, -1.03, 36), (212.5, -0.53, 42.4))
+    b.slab("Bay_Flaps", (205, -L.DEPTH, 42.4), (215, 0, 52), sector=0)
     b.module("P_Modul_26", 1, K.pose((222, 3.0, -15)), 2)
     b.module("P_Modul_08", 1, K.pose((242, 1.2, 15)), 2)
     b.extra_point(2, (200, 0, 0), 2)

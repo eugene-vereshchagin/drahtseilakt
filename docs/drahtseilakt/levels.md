@@ -197,7 +197,8 @@ finish                       # the balloon, 22 ahead
 
 Besides: `rails L`, `rails-left A R`, `rails-right A R` (rails, also up or down); `box`, `dome`, `loose wood|stone|paper|sticky`;
 `seesaw` (over a gap of its board's length), `platebridge` (a gap of 14.8), `swingbridge` (a swing in a gap of 5),
-`sack`, `arms`, `flaps`; `module P_Modul_NN` with `ahead`, `side`, `up`, `turn`, `tilt` for any other part; `move`,
+`sack`, `arms`, `flaps` (the flap wheel over a gap of 6.4 in a way about 6 wide, as the original's levels set it: one flap
+flat over the gap, the other standing beside the way); `module P_Modul_NN` with `ahead`, `side`, `up`, `turn`, `tilt` for any other part; `move`,
 `turn`, `mark NAME` and `back NAME` to move the cursor without building. The whole list is at the top of
 leveldsl.py.
 

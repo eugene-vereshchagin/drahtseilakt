@@ -189,7 +189,9 @@ finish                       # der Ballon, 22 voraus
 
 Außerdem: `rails L`, `rails-left A R`, `rails-right A R` (Schienen, auch hinauf oder hinab); `box`, `dome`,
 `loose wood|stone|paper|sticky`; `seesaw` (über einer Lücke von der Länge ihres Bretts), `platebridge` (eine Lücke von 14,8),
-`swingbridge` (eine Schaukel in einer Lücke von 5), `sack`, `arms`, `flaps`; `module P_Modul_NN` mit `ahead`, `side`,
+`swingbridge` (eine Schaukel in einer Lücke von 5), `sack`, `arms`, `flaps` (das Klappenrad über einer Lücke von 6,4 in
+einem etwa 6 breiten Weg, wie es die Level des Originals setzen: eine Klappe liegt über der Lücke, die andere steht neben
+dem Weg); `module P_Modul_NN` mit `ahead`, `side`,
 `up`, `turn`, `tilt` für jedes andere Teil; `move`, `turn`, `mark NAME` und `back NAME`, um den Cursor zu bewegen,
 ohne zu bauen. Die ganze Liste steht oben in leveldsl.py.
 

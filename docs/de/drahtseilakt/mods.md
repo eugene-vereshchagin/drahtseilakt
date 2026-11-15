@@ -65,7 +65,9 @@ Steins und 0,23 des Holzes), Reibung 1,0 (die höchste der vier), Elastizität 0
 Holz); die lose Kugel ebenso. Sie haftet an dem, was sie berührt, wie `ball.stick 0.9` des Mods `sticky-ball`, ohne Mod:
 bei dessen Standard 0,6 klammert sich eine so schwere Kugel nur an eine Wand (Auftrieb 1,09 gegen ihr Gewicht von 1,21),
 bei 0,9 klettert sie (1,63). Ist der Mod auch an, zählt das stärkere Haften. An einem Hang, aus dem Stand geschoben,
-steigt sie bis 43° und klammert sich steiler fest, ohne zurückzurollen (die Tabelle des Testspielers).
+steigt sie bis 43° und klammert sich steiler fest, ohne zurückzurollen (die Tabelle des Testspielers). Von einer Wand oder Kiste weggedrückt, die sie berührt,
+lässt sie los (*2026-11-15*: vorher war der Halt stärker als der Schub, und eine Klebekugel, die an eine Kiste auf dem
+Boden gerollt war, kam nie mehr von ihr weg).
 
 ## Gottmodus
 

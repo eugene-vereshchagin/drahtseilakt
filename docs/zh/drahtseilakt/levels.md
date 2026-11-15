@@ -124,7 +124,7 @@ checkpoint                   # 检查点（朝向为 90 的倍数）：下一小
 finish                       # 气球，在前方 22 处
 ```
 
-此外：`rails L`、`rails-left A R`、`rails-right A R`（轨道，也可向上或向下）；`box`、`dome`、`loose wood|stone|paper|sticky`；`seesaw`（架在与其板长相同的缺口上）、`platebridge`（14.8 的缺口）、`swingbridge`（5 的缺口中的秋千）、`sack`、`arms`、`flaps`；`module P_Modul_NN` 配合 `ahead`、`side`、`up`、`turn`、`tilt` 放置其他任何部件；`move`、`turn`、`mark NAME` 和 `back NAME` 只移动光标而不建造。完整列表在 leveldsl.py 的开头。
+此外：`rails L`、`rails-left A R`、`rails-right A R`（轨道，也可向上或向下）；`box`、`dome`、`loose wood|stone|paper|sticky`；`seesaw`（架在与其板长相同的缺口上）、`platebridge`（14.8 的缺口）、`swingbridge`（5 的缺口中的秋千）、`sack`、`arms`、`flaps`（翻板轮，像原版关卡那样架在约 6 宽的路上 6.4 长的缺口上：一块翻板平铺在缺口上，另一块立在路旁）；`module P_Modul_NN` 配合 `ahead`、`side`、`up`、`turn`、`tilt` 放置其他任何部件；`move`、`turn`、`mark NAME` 和 `back NAME` 只移动光标而不建造。完整列表在 leveldsl.py 的开头。
 
 `railing left|right|both|off` 从此处起沿地面边缘设置钢护栏，适用于任何截面（第 1 关：槽形地面，可能掉落处加护栏）。原版的两个谜题有各自的命令：`crateblock`（箱子上的石块，P_Modul_34：横跨道路的 6 宽的槽，石块立在槽中、压在自己的箱子上，箱子位于描述在槽下铺设的低 5 的地面上；该地面上的球把箱子从石块下推出，石块便下滑到与道路齐平）和 `pusher left|right`（P_Modul_01：横跨最宽 6 的道路的 1.6 宽的槽，推杆的石块堵住道路，其靶板在该侧伸出边缘 5，位于低 2.5 的地面上方，球从那里把石块推离道路）。其下的地面用 `mark`、`move`、`turn` 和 `back` 铺设。
 

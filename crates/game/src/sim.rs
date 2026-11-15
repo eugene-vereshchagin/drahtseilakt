@@ -55,6 +55,9 @@ pub const BALL_KINDS: [BallKind; 4] = [
 /// its push, and the sticky ball is twice the wooden one's weight for less push per mass, so at 0.6 it only clings
 /// (lift 1.09 against a weight of 1.21) and at 0.9 it climbs (1.63).
 pub const STICKY_HOLD: f32 = 0.9;
+/// The sticky ball lets go of a surface when the arrows push it away from it by more than this (the cosine between
+/// the push and the surface's normal, about 84°): pushing along a wall still holds to it.
+const STICKY_LET_GO: f32 = 0.1;
 
 impl BallKind {
     /// The original game's balls (its `Physicalize_GameBall` table, see docs/physics.md, section 3): the control
@@ -1783,13 +1786,18 @@ impl Sim {
 
     /// The sticky ball (the sticky kind, or a mod's `ball.stick`): what it touches holds it, against gravity, and a
     /// push into a wall turns up along it, so a wall can be climbed. `push` is the arrows' direction, `force` the
-    /// ball's push.
+    /// ball's push. A surface the arrows push the ball away from lets go of it: the hold toward a wall is stronger than
+    /// the push, so held to everything it touched, a ball that once rolled against a wall or a box could never leave.
     fn sticky_force(&self, push: Vec3, force: f32) -> Vec3 {
         let k = self.stickiness();
         if k <= 0.0 || self.dying.is_some() || self.hold.is_some() {
             return push * force;
         }
-        let normals = self.contact_normals();
+        let normals: Vec<Vec3> = self
+            .contact_normals()
+            .into_iter()
+            .filter(|n| push.dot(*n) <= STICKY_LET_GO)
+            .collect();
         if normals.is_empty() {
             return push * force;
         }
@@ -3526,6 +3534,25 @@ pub(crate) mod tests {
         assert!(
             sticky > BALL_RADIUS + 5.0,
             "the sticky ball climbs: {sticky}"
+        );
+        // pushed away from the wall it holds to, the sticky ball lets go: the hold never outweighs the player's push
+        // (else a ball that once touched a wall or a box on the floor could never leave it)
+        let mut sim = Sim::new(&level, BallKind::Sticky);
+        for _ in 0..90 {
+            sim.step(input::UP);
+        }
+        let at_wall = sim.ball.position.dot(forward);
+        assert!(
+            at_wall > 8.0 - BALL_RADIUS - 0.5,
+            "the ball reached the wall: {at_wall}"
+        );
+        for _ in 0..300 {
+            sim.step(input::DOWN);
+        }
+        let away = sim.ball.position.dot(forward);
+        assert!(
+            away < at_wall - 6.0,
+            "the sticky ball leaves the wall it is pushed away from: {at_wall} -> {away}"
         );
     }
 
