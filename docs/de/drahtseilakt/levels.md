@@ -113,10 +113,10 @@ Community-Teil), nur aus eigenen Inhalten; das gebaute Level liegt nicht in git.
 - **Klassisch**, fünf Sektoren: Böden und Oberflächen (Rinne, Ziegelrand, Geländer, blanker Boden, Holz, Breiten,
   Rampe, runde Kurven, harte Ecken); Schienen (gerade, in Kurven, steigend, fallend) und Kulisse (Holzdeck auf
   Säulen, Lampenturm, Mast, Sockel, Pfeiler, Mauerblock, Girlande, Leuchtturm); die Teile (Extrapunkt und -leben,
-  Kisten, Kuppel, die vier losen Bälle, Sack, Drehkreuz, Klappenrad); die Transformer und die Mechanik auf dem Weg
-  (Papier und der Ventilator, Wippe, Plattenbrücke, Schaukel, Stein schiebt Kisten, klebriger Ball, Holz); die
-  Rätselmodule in Buchten neben einem breiten Boden (Schieber, Kiste unter ihrem Stein, Kippplatten, Plattenbrücke
-  und Zugbrücke zu Buchten, Klappbrücke, fallender Raum).
+  Kisten, Kuppel, die vier losen Bälle, Sack, Drehkreuz); die Transformer und die Mechanik auf dem Weg
+  (Papier und der Ventilator, Wippe, Plattenbrücke, Schaukel, Stein schiebt Kisten, klebriger Ball, Holz); Stein
+  und die Rätselmodule auf dem Weg (Klappenrad, Brettbrücke, Zugbrücke, Schieber, Kiste unter ihrem Stein) und der
+  fallende Raum daneben.
 - **Das Tor** „COMMUNITY", hinter dem Himmel, Nebel und Licht wechseln (ein Skript).
 - **Community**, zwei Sektoren: die Materialien der Community-Karten (Alpha-Blending, Alpha-Test, additives
   Leuchten, Chrom- und Spiegel-Texturkoordinaten, ein doppelseitiges Blatt, unbeleuchtete Farbe, Normalmap mit
@@ -129,18 +129,24 @@ Community-Teil), nur aus eigenen Inhalten; das gebaute Level liegt nicht in git.
 
 Was das offene Format noch nicht trägt (beim Bauen gefunden): die Slots einer Textur (Movie Player, Set Current
 Slot), Wave-Klänge (Wave Player), eine eigene Textur des Levels für Skript-Partikel, ein zur Sicht gedrehtes
-3D-Sprite des Levels. Seit den Anmerkungen 10 des Besitzers (2026-11-16) steht jedes klassische Element so, wie die Level des Originals es
-setzen, der Weg führt ohne Umweg hindurch, aus unseren eigenen Teilen: Ventilatoren in eigenen Blöcken mit Gitter auf
-Plattformen 15 x 15, 25 auseinander und 11 höher (Level 3), eine Reihe von sechs Mulden über der Leere für die
-Papierkugel (Level 7), das Klappenrad zwischen zwei Bahnen 15 auseinander (Level 9-11), die Brettbrücke über eine
-Lücke von 9,1 (Level 2, 3, 5, 8), die Zugbrücke am Ende eines Stichwegs, die in die Lücke 7,6 einer Querbahn fällt
-(Level 5), zwei Schieber, von einem 2,5 tieferen Boden geschoben (Level 1), die Kiste unter ihrem Stein mit einem 5
-tieferen Boden darunter (Level 1) und eine Schienenspirale mit zwei Windungen. `crates/game/src/showcase.rs` prüft,
-dass jedes unserer Teile darin steht und dass jedes Element in der Physik des Spiels seine Arbeit tut: die
-`checks.txt` des Levels (vom Generator aus seinen `check`-Zeilen geschrieben) rollt eine Kugel der richtigen und der
-falschen Art mit den Pfeiltasten durch jedes Element und prüft, wohin sie kommt und wie weit sich die Teile des Moduls
-drehen oder bewegen. Eine Prüfung namens `pending-...` läuft und wird gemeldet, ist aber noch nicht Pflicht. Der Lauf
-des Testspielers wird für das Level nicht mehr aufbewahrt.
+3D-Sprite des Levels. Seit den Anmerkungen 10 des Besitzers (2026-11-16) stehen die klassischen Elemente so, wie die Level des Originals sie
+setzen (gemessen an den Leveln 1-13), der Weg führt durch jedes, aus unseren eigenen Teilen: zwei Ventilatorstufen
+(Level 3: ein Ventilator auf einer Plattform 15 x 15 hebt die Papierkugel auf Schienen 11 höher, die über eine Lücke
+von 10 zur nächsten Plattform führen, deren Ventilator sie auf einen Boden 14 höher an ihrem Rand hebt), sechs Mulden
+über der Leere (Level 7), die Wippe über einer Lücke von 12,9 (Level 2-9), die Plattenbrücke über 15,4 mit dem Rahmen
+6,9 vom nahen Rand (Level 2-10), die Schaukel über einer Lücke von 15 über einem 6,2 tiefen Graben (Level 8), das
+Klappenrad zwischen zwei Bahnen 15 auseinander, das eine Steinkugel kippt, die rollend auf seine stehende Klappe trifft
+(Level 9-11), die Brettbrücke über 9,1 (Level 2, 3, 5, 8), die Zugbrücke, die in die Lücke 7,6 einer Querbahn fällt
+(Level 5), zwei Schieber, von einem 2,5 tieferen Boden geschoben (Level 1), die Kiste unter ihrem Stein in einem 5,3
+langen Schlitz über einem breiten, 5 tieferen Boden, von einer unter dem Stein durchrollenden Steinkugel
+herausgestoßen, zurück nach oben über eine Rampe auf der fernen Seite (Level 1), und eine Schienenspirale mit zwei
+Windungen. Der fallende Raum (P_Modul_03), der Sack und das Drehkreuz stehen noch neben dem Weg, noch nicht vermessen.
+`crates/game/src/showcase.rs` prüft, dass jedes unserer Teile im Level steht und dass jedes Element in der Physik des
+Spiels seine Arbeit tut: die `checks.txt` des Levels (vom Generator aus seinen `check`-Zeilen geschrieben) rollt eine
+Kugel der richtigen und der falschen Art mit den Pfeiltasten durch jedes Element und prüft, wohin sie kommt und wie
+weit sich die Teile des Moduls drehen oder bewegen; jede Prüfung ist Pflicht. `SHOWCASE_COPY_PARTS=<Kopie>` führt
+dieselben Prüfungen mit den Teilen der Kopie statt unserer aus. Der Lauf des Testspielers wird für das Level nicht mehr
+aufbewahrt.
 Ohne Kopie des Originals steht hinter dem Menü der erste mitgelieferte Level nach dem Schaulevel (order 0), damit das
 Menü nicht seine Schilder zeigt.
 

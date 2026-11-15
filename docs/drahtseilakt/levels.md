@@ -124,9 +124,9 @@ not in git.
 - **Classic**, five sectors: floors and surfaces (gutter, brick border, railings, bare, wood, widths, a ramp, round
   turns, hard corners); rails (straight, turning, rising, falling) and scenery (wooden deck on columns, lamp tower,
   mast, plinth, pillar, wall block, garland, lighthouse); the parts (extra point and life, boxes, dome, the four loose
-  balls, sack, turning arms, flap wheel); the transformers and the mechanics on the way (paper and the fan, seesaw,
-  plate bridge, swing, stone shoving boxes, sticky, wood); the puzzle modules in bays beside a wide floor (pusher,
-  crate under its stone, tipping plates, plate bridge and drawbridge to bays, flap bridge, falling room).
+  balls, sack, turning arms); the transformers and the mechanics on the way (paper and the fan, seesaw,
+  plate bridge, swing, stone shoving boxes, sticky, wood); stone and the puzzle modules on the way (flap wheel, board
+  bridge, drawbridge, pushers, crate under its stone) and the falling room beside it.
 - **The gate** "COMMUNITY", past which the sky, the fog and the light change (a script).
 - **Community**, two sectors: the materials community maps use (alpha blend, alpha test, additive glow, chrome and
   reflect texture coordinates, a double-sided sheet, unlit colour, a normal map with parallax, a second pass over a
@@ -138,16 +138,21 @@ not in git.
 
 What the open format cannot hold yet, found while making it: a texture's slots (Movie Player, Set Current Slot), wave
 sounds (Wave Player), a level's own texture for script particles, a level's 3D sprite turned to the view.
-Since the owner's notes 10 (2026-11-16) every classic element stands as the original's levels set it, the way going
-through it with no way round, built of our own parts: fans in their own blocks with a grille on 15 x 15 platforms 25
-apart and 11 up (level 3), a row of six troughs over the void for the paper ball (level 7), the flap wheel between two
-lanes 15 apart (levels 9-11), the board bridge over a gap of 9.1 (levels 2, 3, 5, 8), the drawbridge at a spur's end
-falling into a lane's gap of 7.6 (level 5), two pushers pushed from a floor 2.5 lower (level 1), the crate under its
-stone crossed under by a floor 5 lower (level 1), and a rail spiral of two turns. `crates/game/src/showcase.rs`
-checks that every part of ours stands in it and that each element does its job in the game's physics: the level's
-`checks.txt` (written by the generator from its `check` lines) rolls a ball of the right kind and of the wrong one
-through each element with the arrows and checks where it gets to and how far the module's parts turned or moved. A
-check named `pending-...` is run and reported but not yet required. The test player's run is no longer kept for it.
+Since the owner's notes 10 (2026-11-16) the classic elements stand as the original's levels set them (measured on
+levels 1-13), the way going through each, built of our own parts: two fan steps (level 3: a fan on a 15 x 15 platform
+lifts the paper ball onto rails 11 up that cross a gap of 10 to the next platform, whose fan lifts it onto a floor 14
+up at its edge), six troughs over the void (level 7), the seesaw over a gap of 12.9 (levels 2-9), the plate bridge over
+15.4 with its frame 6.9 from the near edge (levels 2-10), the swing over a gap of 15 above a trench 6.2 deep (level 8),
+the flap wheel between two lanes 15 apart, tipped by a stone ball that comes at its standing flap rolling (levels
+9-11), the board bridge over 9.1 (levels 2, 3, 5, 8), the drawbridge falling into a lane's gap of 7.6 (level 5), two
+pushers pushed from a floor 2.5 lower (level 1), the crate under its stone in a slot 5.3 long over a broad floor 5
+lower, knocked out by a stone ball rolling through under the stone, the way back up a ramp on the far side (level 1),
+and a rail spiral of two turns. The falling room (P_Modul_03), the sack and the turning arms still stand beside the
+way, not yet measured. `crates/game/src/showcase.rs` checks that every part of ours stands in the level and that each
+element does its job in the game's physics: the level's `checks.txt` (written by the generator from its `check`
+lines) rolls a ball of the right kind and of the wrong one through each element with the arrows and checks where it
+gets to and how far the module's parts turned or moved; every check is required. `SHOWCASE_COPY_PARTS=<copy>` runs the
+same checks with the copy's parts in place of ours. The test player's run is no longer kept for the level.
 Without a copy of the original the level behind the menu is the first shipped level past the showcase (order 0),
 so the menu never shows its sign boards.
 
