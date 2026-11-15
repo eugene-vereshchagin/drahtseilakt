@@ -331,7 +331,11 @@ geschafft (Level 1, 11, 12, 13 allein nach Plan und Hinweisen, 4 und 9 den Läuf
 gespeicherten Lauf des Originals folgend; Level 8 bisher nur als gespeicherter Lauf des Originals, auf der Karte
 abgespielt, `Level_08-original-run.replay`). Die 45-Grad-Karten: Level 1-7, 9 und 10 geschafft, dem gespeicherten
 Lauf des Originals ohne Hinweise folgend (die offenen Schritte der Hinweise sind für die Kamera des Originals
-geschrieben); 8, 11, 12 und 13 noch nicht.
+geschrieben); Level 8 ebenso, 10:41.30. Mit den Hinweisen als Schub des Originals (oben), 2026-11-15: Level 11
+(`hints/Level_11-45.txt`: je zwei Rammstöße gegen die Kiste mehr in den ersten beiden Kanälen von Sektor 3) kommt bis
+zu den letzten Schienenpaaren von Sektor 6 und verliert dort seine Kugeln (ein diagonales Anlehnen ist in dieser
+Ansicht schwächer); Level 12 (seine Hinweise) bis zu den gestoßenen Steinkugeln von Sektor 6; Level 13
+(`Level_13-full.txt`) über Sektor 1 hinaus, verloren in Sektor 2. Noch nicht geschafft.
 
 ## Der Speedrun-Stil
 

@@ -305,7 +305,11 @@ Where it stands, 2026-11-15 (runs in `hints/runs/modified/`): the invisible maps
 the test player (levels 1, 11, 12, 13 by the plan and hints alone, 4 and 9 following the owner's runs, the others following
 the original's kept run; level 8 only as the original's kept run played on the map, `Level_08-original-run.replay`).
 The 45-degree maps, levels 1-7, 9 and 10 finished following the original's kept run with no hints (the hints' open
-steps were written for the original's view); 8, 11, 12 and 13 not yet.
+steps were written for the original's view); level 8 the same way, 10:41.30. With the hints given as the original's
+push (above), 2026-11-15: level 11 (`hints/Level_11-45.txt`: two crate rams more in each of the first two channels of
+sector 3) gets to the last rail pairs of sector 6 and loses its balls there (a diagonal lean is weaker in this view);
+level 12 (its hints) to the shoved stone balls of sector 6; level 13 (`Level_13-full.txt`) past sector 1, lost in
+sector 2. Not finished yet.
 
 ## The speedrun style
 
