@@ -82,9 +82,16 @@ deren Kopf nicht besteht, wird übergangen und das PNG genommen; eine mit besch�
 ## Inhalt
 
 - **Knoten**: einer je Objekt des Levels, der Reihe nach, mit Name, Weltmatrix `matrix` und, wenn es gezeichnet
-  wird, `mesh`. `extras.drahtseilakt.visible` sagt, ob das Objekt angezeigt wird.
-- **Meshes**: eines je Mesh mit Geometrie; ein Primitiv je Material, alle Primitive eines Meshes teilen sich
-  dieselben Accessoren `POSITION`, `NORMAL` und `TEXCOORD_0` (Floats), `indices` als 32-Bit-Ganzzahlen. Die
+  wird, `mesh`. `extras.drahtseilakt.visible` sagt, ob das Objekt angezeigt wird; `extras.drahtseilakt.parent` den
+  Index des Knotens, dem es folgt, wenn ein Skript jenen bewegt (Set Parent in einer Karte; die Matrix bleibt die der
+  Welt, es ist also kein glTF-Kind; ein Index, der auf keinen anderen Knoten zeigt, lehnt das Level ab, ein Kreis
+  wird aufgebrochen). Eine Matrix mit einem nicht endlichen Eintrag (Karten haben so etwas, und das Spiel spielt sie)
+  steht vollständig in `extras.drahtseilakt.matrix`, diese Einträge als `"nan"`, `"inf"` oder `"-inf"`; die
+  `matrix` von glTF hat dort 0.
+- **Meshes**: eines je Mesh mit Vertices; ein Primitiv je Material, alle Primitive eines Meshes teilen sich
+  dieselben Accessoren `POSITION`, `NORMAL` und `TEXCOORD_0` (Floats), `indices` als 32-Bit-Ganzzahlen. Ein Mesh
+  aus Vertices ohne Flächen (die Punkte, aus denen die Partikel einer Karte kommen) ist ein Primitiv mit `mode` 0
+  (Punkte), ohne `indices` und `material`. Die
   Materialkanäle eines Meshes (Durchgänge über das ganze Mesh mit einem anderen Material) stehen in
   `extras.drahtseilakt.channels`: je Kanal `material`, `blend` (Namen von Quell- und Zielfaktor, wie unten) und
   `texcoord` k, der Satz `TEXCOORD_k` mit seinen Koordinaten; höchstens 16. Ein Mesh kann eine feinere Gestalt
@@ -129,7 +136,11 @@ deren Kopf nicht besteht, wird übergangen und das PNG genommen; eine mit besch�
   (x, z je Sekunde). Nur `top` ist nötig; Werte außerhalb des Bereichs werden darauf begrenzt, ein fehlerhafter Wert
   weist das Level ab.
 
-- **Skripte** `extras.drahtseilakt.scripts` (die eigenen Verhaltensgraphen einer konvertierten Community-Karte; `script_json.rs`): `objects` (Name, Klasse und was jedes für die Engine ist: Entität, Gruppe, Mesh, Material, Textur oder Tabelle per Index), `nodes` (Blöcke, Links, IOs, Parameter und Operationen per Objektindex), `arrays` (die Tabellen der Karte), `scripts` (die Graphen der obersten Ebene mit dem Objekt, an dem jeder hängt). Nur Daten, von unserer Laufzeit gefahren ([scripts.md](scripts.md)); die Rückverweise werden beim Lesen neu abgeleitet, jeder Index wird geprüft, ein fehlerhafter Eintrag lehnt das Level ab. Ohne das Feld hat das Level keine Skripte (die Flammen der Vorlage werden in jedem Fall aus den Emitter-Frames gezeichnet).
+- **Rahmen** `extras.drahtseilakt.frames` (die 2D-Rahmen einer konvertierten Karte: die Signatur des Autors in einer
+  Ecke, ein Logo; nur gezeichnet): jeder mit `name`, `rect` (links, oben, rechts, unten in Pixeln eines Bildschirms von
+  640 x 480), `uv` (der gezeigte Teil der Textur), `z_order` (niedriger zuerst gezeichnet), `material` (ein Index oder
+  null) und `visible`. Höchstens 64; ein fehlerhafter lehnt das Level ab.
+- **Skripte** `extras.drahtseilakt.scripts` (die eigenen Verhaltensgraphen einer konvertierten Community-Karte; `script_json.rs`): `objects` (Name, Klasse und was jedes für die Engine ist: Entität, Gruppe, Mesh, Material, Textur oder Tabelle per Index), `nodes` (Blöcke, Links, IOs, Parameter und Operationen per Objektindex), `arrays` (die Tabellen der Karte), `scripts` (die Graphen der obersten Ebene mit dem Objekt, an dem jeder hängt) und, wenn die Karte sie hat, `groups` (die Mitglieder, die sie jeder Gruppe gibt), `attributes`, `priorities` (Objekt und Priorität: eine höhere führt ihre Skripte zuerst aus), `start_off` (die Skripte und Objekte, die die Szene deaktiviert beginnt) und `waves` (ihre Klänge: Objekt, Datei, Schleife, Lautstärke, Panorama, Tonhöhe). Ein Level, das geschrieben wurde, bevor die letzten drei bewahrt wurden, wird ohne sie gelesen. Nur Daten, von unserer Laufzeit gefahren ([scripts.md](scripts.md)); die Rückverweise werden beim Lesen neu abgeleitet, jeder Index wird geprüft, ein fehlerhafter Eintrag lehnt das Level ab. Ohne das Feld hat das Level keine Skripte (die Flammen der Vorlage werden in jedem Fall aus den Emitter-Frames gezeichnet).
 
 ## Koordinaten
 

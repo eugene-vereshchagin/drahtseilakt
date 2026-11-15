@@ -81,13 +81,19 @@ level may carry the `.dtx` without the PNG.
 ## Contents
 
 - **Nodes**: one per object of the level, in order, with its name, its world `matrix` and, if it is drawn,
-  its `mesh`. `extras.drahtseilakt.visible` tells whether the object is shown.
+  its `mesh`. `extras.drahtseilakt.visible` tells whether the object is shown; `extras.drahtseilakt.parent` the
+  index of the node it follows when a script moves that one (Set Parent in a map; the matrix stays the world's, so it
+  is no glTF child; one that is no other node refuses the level, a loop is broken). A matrix with an entry that is not
+  finite (a map may have one, and the game plays it) is kept whole in `extras.drahtseilakt.matrix`, those entries
+  written `"nan"`, `"inf"` or `"-inf"`; glTF's `matrix` then has 0 for them.
 - **Reset points** (group `PR_Resetpoints`, nodes `PR_Resetpoint_NN`, one per sector, the first at the start):
   where the ball comes back in sector NN. The node's rotation also says which way the track runs: the camera looks
   along the point's **-x axis** (as in the original levels), snapped to the nearest quarter turn on the ground, after
   a respawn, so the view hints at the way on. Our level builder writes each point with its -x axis along the track.
-- **Meshes**: one per mesh with geometry; one primitive per material, all primitives of a mesh sharing the
-  same `POSITION`, `NORMAL` and `TEXCOORD_0` accessors (floats), `indices` as 32-bit integers. A mesh's
+- **Meshes**: one per mesh with vertices; one primitive per material, all primitives of a mesh sharing the
+  same `POSITION`, `NORMAL` and `TEXCOORD_0` accessors (floats), `indices` as 32-bit integers. A mesh of vertices
+  without faces (the points a map's particles come from) is one primitive of `mode` 0 (points) without `indices` or
+  `material`. A mesh's
   material channels (passes over the whole mesh with another material) are `extras.drahtseilakt.channels`:
   each its `material`, `blend` (source and destination factor names, as below) and `texcoord` k, the
   `TEXCOORD_k` set holding its coordinates; at most 16. A mesh may carry a finer look drawn in its place
@@ -128,7 +134,11 @@ level may carry the `.dtx` without the PNG.
   horizon's haze a unit of distance), `under` (0..1: how much of the world under it the haze there hides) and `wind`
   (x, z a second). Only `top` is needed; values out of range are held to it, a malformed one refuses the level.
 
-- **Scripts** `extras.drahtseilakt.scripts` (a converted community map's own behaviour graphs; `script_json.rs`): `objects` (name, class and what each is to the engine: an entity, group, mesh, material, texture or array by index), `nodes` (the blocks, links, IOs, parameters and operations by object index), `arrays` (the maps' tables), `scripts` (the top-level graphs with the object each is attached to). Data only, driven by our runtime ([scripts.md](scripts.md)); the back references are derived on reading, every index is checked, and a malformed entry refuses the level. A level without it has no scripts (the template's flames are drawn from the emitters' frames either way).
+- **Frames** `extras.drahtseilakt.frames` (a converted map's 2D frames: an author's signature in a corner, a logo;
+  only drawn): each its `name`, `rect` (left, top, right, bottom in pixels of a 640 x 480 screen), `uv` (the part of
+  the texture shown), `z_order` (lower drawn first), `material` (an index or null) and `visible`. At most 64; a
+  malformed one refuses the level.
+- **Scripts** `extras.drahtseilakt.scripts` (a converted community map's own behaviour graphs; `script_json.rs`): `objects` (name, class and what each is to the engine: an entity, group, mesh, material, texture or array by index), `nodes` (the blocks, links, IOs, parameters and operations by object index), `arrays` (the maps' tables), `scripts` (the top-level graphs with the object each is attached to), and, when the map has them, `groups` (the members it gives each group), `attributes`, `priorities` (object and priority: a higher one runs its scripts first), `start_off` (the scripts and objects the scene starts deactivated) and `waves` (its wave sounds: object, file, looped, gain, pan, pitch). A level written before the last three were kept reads without them. Data only, driven by our runtime ([scripts.md](scripts.md)); the back references are derived on reading, every index is checked, and a malformed entry refuses the level. A level without it has no scripts (the template's flames are drawn from the emitters' frames either way).
 
 ## Coordinates
 

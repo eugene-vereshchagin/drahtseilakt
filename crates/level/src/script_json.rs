@@ -167,7 +167,9 @@ fn value_of(j: &J) -> Result<Value, String> {
             }
             let mut points = Vec::new();
             for p in pts {
-                let f = floats::<9>(&json!(p.as_array().and_then(|a| a.get(1..)).unwrap_or_default()))?;
+                let f = floats::<9>(&json!(
+                    p.as_array().and_then(|a| a.get(1..)).unwrap_or_default()
+                ))?;
                 let flags = p
                     .as_array()
                     .and_then(|a| a.first())
@@ -263,12 +265,23 @@ pub fn to_json(
             json!([s, owner])
         })
         .collect();
-    json!({"objects": objects, "nodes": nodes, "arrays": arrays, "scripts": scripts, "groups": g.groups, "attributes": g.attributes})
+    let waves: Vec<J> = g
+        .waves
+        .iter()
+        .map(|w| {
+            json!({"object": w.object, "file": w.file, "looped": w.looped, "gain": num(w.gain), "pan": num(w.pan),
+                "pitch": num(w.pitch)})
+        })
+        .collect();
+    json!({"objects": objects, "nodes": nodes, "arrays": arrays, "scripts": scripts, "groups": g.groups,
+        "attributes": g.attributes, "priorities": g.priorities, "start_off": g.start_off, "waves": waves})
 }
 
 /// The most objects and arrays a level's scripts may have (a map's own are a few thousand).
 const MAX_OBJECTS: usize = 1 << 18;
 const MAX_ARRAYS: usize = 1 << 12;
+/// The longest file name a wave sound keeps (a path as saved; only its last part is used).
+const MAX_WAVE_NAME: usize = 4096;
 
 /// The graphs from JSON. `counts` are how many entities, groups, meshes, materials and textures the level has: an
 /// object naming one beyond them is nothing the engine knows.
@@ -485,9 +498,75 @@ pub fn from_json(j: &J, counts: [usize; 5]) -> Result<Graph, String> {
             attributes.push((o, n, p));
         }
     }
+    // the objects' priorities, the scripts and objects the scene starts deactivated and the wave sounds: absent in
+    // files written before (every object then has priority 0, starts active, and no sound is known)
+    let mut priorities = Vec::new();
+    if let Some(list) = j.get("priorities").and_then(J::as_array) {
+        if list.len() > objs.len() {
+            return Err(too_many());
+        }
+        for p in list {
+            let t = p
+                .as_array()
+                .filter(|t| t.len() == 2)
+                .ok_or("script priority is malformed")?;
+            let o = index(t.first().ok_or("script priority is malformed")?)?;
+            let n = t
+                .get(1)
+                .and_then(J::as_i64)
+                .and_then(|n| i32::try_from(n).ok())
+                .ok_or("script priority is malformed")?;
+            if o >= objs.len() {
+                return Err("a script priority names an object that does not exist".into());
+            }
+            priorities.push((o, n));
+        }
+    }
+    let start_off = match j.get("start_off") {
+        Some(v) if !v.is_null() => {
+            let ids = indices(v)?;
+            if ids.len() > objs.len() || ids.iter().any(|&i| i >= objs.len()) {
+                return Err("a script started deactivated does not exist".into());
+            }
+            ids
+        }
+        _ => Vec::new(),
+    };
+    let mut waves = Vec::new();
+    if let Some(list) = j.get("waves").and_then(J::as_array) {
+        if list.len() > script::MAX_WAVES {
+            return Err(too_many());
+        }
+        for w in list {
+            let object = index(&w["object"])?;
+            if object >= objs.len() {
+                return Err("a script wave sound names an object that does not exist".into());
+            }
+            let file = w["file"].as_str().ok_or("script wave sound is malformed")?;
+            if file.len() > MAX_WAVE_NAME {
+                return Err("a script wave sound's file name is too long".into());
+            }
+            let f = |k: &str| -> Result<f32, String> {
+                Ok(w[k].as_f64().ok_or("script wave sound is malformed")? as f32)
+            };
+            waves.push(script::Wave {
+                object,
+                file: file.to_owned(),
+                looped: w["looped"]
+                    .as_bool()
+                    .ok_or("script wave sound is malformed")?,
+                gain: f("gain")?,
+                pan: f("pan")?,
+                pitch: f("pitch")?,
+            });
+        }
+    }
     let mut g = Graph::assemble(objects, nodes, arrays, scripts)?;
     g.groups = groups;
     g.attributes = attributes;
+    g.priorities = priorities;
+    g.start_off = start_off;
+    g.waves = waves;
     Ok(g)
 }
 
@@ -534,19 +613,21 @@ mod tests {
                     vec![Value::Rect([1.0, 2.0, 3.0, 4.0])],
                     vec![Value::Box([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])],
                     vec![Value::Objects(vec![Some(0), None])],
-                    vec![Value::Curve(std::sync::Arc::new(nmo::curve2d::Curve2d::new(vec![
-                        nmo::curve2d::Point {
-                            pos: [0.0, 0.0],
-                            flags: 3,
-                            tan_out: [1.0, 0.5],
-                            ..nmo::curve2d::Point::default()
-                        },
-                        nmo::curve2d::Point {
-                            pos: [1.0, 1.0],
-                            tension: 0.5,
-                            ..nmo::curve2d::Point::default()
-                        },
-                    ])))],
+                    vec![Value::Curve(std::sync::Arc::new(
+                        nmo::curve2d::Curve2d::new(vec![
+                            nmo::curve2d::Point {
+                                pos: [0.0, 0.0],
+                                flags: 3,
+                                tan_out: [1.0, 0.5],
+                                ..nmo::curve2d::Point::default()
+                            },
+                            nmo::curve2d::Point {
+                                pos: [1.0, 1.0],
+                                tension: 0.5,
+                                ..nmo::curve2d::Point::default()
+                            },
+                        ]),
+                    ))],
                 ],
                 key: Some(0),
             }],
@@ -560,13 +641,42 @@ mod tests {
         let mut g = graph();
         g.groups = vec![vec![0, 1], vec![]];
         g.attributes = vec![(0, 5, None), (1, 6, Some(0))];
+        g.priorities = vec![(1, -3), (0, 7)];
+        g.start_off = vec![0];
+        g.waves = vec![script::Wave {
+            object: 1,
+            file: "Sounds\\Hit.wav".into(),
+            looped: true,
+            gain: 0.5,
+            pan: -0.25,
+            pitch: 1.5,
+        }];
         let j = to_json(&g, &Some, &Some);
         let back = from_json(&j, [1, 0, 0, 0, 0]).expect("read");
         assert_eq!(back, g);
-        // a group naming an object that is not there refuses the graph
-        let mut bad = j.clone();
-        bad["groups"] = serde_json::json!([[4000000000u64]]);
-        assert!(from_json(&bad, [1, 0, 0, 0, 0]).is_err());
+        // a group, priority, deactivated script or sound naming an object that is not there refuses the graph
+        for (key, v) in [
+            ("groups", serde_json::json!([[4000000000u64]])),
+            ("priorities", serde_json::json!([[9, 1]])),
+            ("priorities", serde_json::json!([[0, 1u64 << 40]])),
+            ("start_off", serde_json::json!([9])),
+            (
+                "waves",
+                serde_json::json!([{"object": 9, "file": "", "looped": false, "gain": 1, "pan": 0, "pitch": 1}]),
+            ),
+            ("waves", serde_json::json!([{"object": 0, "file": 3}])),
+        ] {
+            let mut bad = j.clone();
+            bad[key] = v;
+            assert!(from_json(&bad, [1, 0, 0, 0, 0]).is_err(), "{key}");
+        }
+        // a file written before these were kept reads as before
+        let mut old = j.clone();
+        for key in ["priorities", "start_off", "waves"] {
+            old.as_object_mut().map(|o| o.remove(key));
+        }
+        let back = from_json(&old, [1, 0, 0, 0, 0]).expect("read");
+        assert!(back.priorities.is_empty() && back.start_off.is_empty() && back.waves.is_empty());
     }
 
     #[test]

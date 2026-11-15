@@ -21,6 +21,7 @@ mod autopilot;
 mod ballsound;
 mod clouds;
 mod collide;
+mod convert_audit;
 mod edges;
 mod endscreen;
 mod extra;
@@ -142,6 +143,10 @@ usage: drahtseilakt [options]
   --audit-report FILE|DIR
                       no window: check a map or a folder of them and write report.txt beside each level (what the
                       game does not support yet in it, read by the menu); prints a verdict per map (may be repeated)
+  --convert-audit FILE|DIR
+                      no window: convert each map to the open format (into --convert-out DIR, default the temp
+                      folder's convert-audit/), load it again and compare it with the map: contents, scripts, and
+                      --ticks N (default 3000) ticks played with the same keys; one line a map (may be repeated)
   --audit-csv FILE    with --audit: write one row per map, copy and kind of issue (with the names) to FILE
   --supports-check geometry|runs
                       where the swinging sacks get a support (the sack-supports mod) in the original levels and the
@@ -231,6 +236,10 @@ pub struct Options {
     /// No window: audit these maps (files or folders of them) for what is not drawn or not there (audit.rs).
     pub audit: Vec<PathBuf>,
     pub audit_csv: Option<PathBuf>,
+    /// No window: convert these maps to the open format and compare the copies (convert_audit.rs).
+    pub convert_audit: Vec<PathBuf>,
+    /// Where `--convert-audit` writes its exports (each removed after its comparison).
+    pub convert_out: Option<PathBuf>,
     /// No window: check these maps and write report.txt beside each (report.rs).
     pub audit_report: Vec<PathBuf>,
     /// Draw the floors, rails and stoppers a map hides as translucent markers.
@@ -288,6 +297,8 @@ pub(crate) fn default_options() -> Options {
         supports_check: None,
         audit: Vec::new(),
         audit_csv: None,
+        convert_audit: Vec::new(),
+        convert_out: None,
         audit_report: Vec::new(),
         show_colliders: false,
         dev_logs: false,
@@ -401,6 +412,8 @@ fn parse_args() -> Result<Options, String> {
             "--audit" => o.audit.push(value()?.into()),
             "--audit-report" => o.audit_report.push(value()?.into()),
             "--audit-csv" => o.audit_csv = Some(value()?.into()),
+            "--convert-audit" => o.convert_audit.push(value()?.into()),
+            "--convert-out" => o.convert_out = Some(value()?.into()),
             "--level-stats" => o.level_stats = Some(value()?.into()),
             "--supports-check" => {
                 o.supports_check = Some(match value()?.as_str() {
@@ -491,12 +504,17 @@ fn parse_args() -> Result<Options, String> {
         || o.screenshot.is_some()
         || !o.audit.is_empty()
         || !o.audit_report.is_empty()
+        || !o.convert_audit.is_empty()
         || o.export.is_some();
     o.debug = debug.unwrap_or(DEBUG_BY_DEFAULT && !unattended);
     o.dev_logs = unattended
         || debug == Some(true)
         || std::env::var_os("DRAHTSEILAKT_DEV_LOGS").is_some_and(|v| !v.is_empty() && v != "0")
         || gamedata::profile::setting("dev-logs").is_some_and(|v| matches!(v.trim(), "on" | "yes"));
+    // the converter's audit plays hundreds of maps with made-up keys: none of it belongs in the player's runs
+    if !o.convert_audit.is_empty() {
+        o.dev_logs = false;
+    }
     Ok(o)
 }
 
