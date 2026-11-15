@@ -340,14 +340,18 @@ geschrieben); Level 8 ebenso, 10:41.30. Mit den Hinweisen als Schub des Original
 `hints/Level_12-45.txt`: zwei Stellen vorsichtiger, die
 Rückkehr auf die obere Reihe von Sektor 6 bei z 694 und die Ecke auf die Schiene x 521.3 in Sektor 7 langsamer und
 weiter; Bremsen und Lenken sind dort diagonale Schübe, in dieser Ansicht schwächer). Level 11
-(`hints/Level_11-45.txt`: je zwei Rammstöße gegen die Kiste mehr in den ersten beiden Kanälen von Sektor 3) kommt bis
-zu den letzten Schienenpaaren von Sektor 6 und verliert dort seine Kugeln: das erste Paar hält mit dem Versatz 1.2
-statt 0.8, doch am Ende des zweiten kommt die Kugel zu langsam auf die Kreuzung des dritten (9.7 im Original, hier 7
-bis 8: das Anlehnen nimmt vom Schub entlang der Schiene) und sinkt zwischen sie; mehr oder weniger Anlehnen, andere
-Geschwindigkeiten, das Anlehnen zuerst unter den Pfeilen und der dort nachgefahrene Lauf des Originals brachten sie
-nicht hinüber. Level 13 (`Level_13-full.txt`) über Sektor 1 hinaus, verloren in Sektor 2: dem Lauf des Besitzers
-folgend bleibt die Steinkugel auf dem Holzstreifen bei (-872.5, -95.5, 721) stecken, die Kiste unter den Kreuzungen
-der Serpentine liegt woanders als in seinem Lauf. Level 11 und 13 noch nicht geschafft.
+geschafft, 14:44.20 mit 3 Leben (ebenso, `hints/Level_11-45.txt`: je zwei Rammstöße gegen die Kiste mehr in den
+ersten beiden Kanälen von Sektor 3; auf den letzten Schienenpaaren von Sektor 6 lehnt das erste Paar mit 1.2 statt
+0.8, und da die Kugel langsamer als im Original ans Ende des zweiten kommt, 7 bis 8 statt 9.7, weil das Anlehnen vom
+Schub entlang der Schiene nimmt, und zu kurz auf der Kreuzung des dritten landet, setzen sie 8 Ticks Schub nach Osten
+auf die Schienen des dritten, bevor sie zwischen sie zurückrollt). Level 13 (`hints/Level_13-45.txt`, 2026-11-16: `Level_13-full.txt`, Sektor 2 dort
+zerlegt, wo der Lauf des Besitzers in dieser Ansicht anders geht: das Brett bei z 686, das seine Kugel im Vorbeirollen
+umwirft, wird umgerammt; die Kugel hält an der Kreuzung der Serpentine bei z 721 2 Einheiten früher, so bleibt die
+Kiste darunter und Stein 18 rollt unberührt darüber; die Kiste wird geregelt unter die Kreuzungen z 713 und 705
+geschoben, jede Kreuzung abgewartet; auf dem Balken nach seinen Starttasten ein Schub nach Osten, damit die
+Papierkugel vor dem Stein im Fach des zweiten Ventilators ist) schafft die Sektoren 1 und 2 vom Start und bleibt in
+Sektor 3 an den Kisten des Kanals (-724.5, -219.4, -293.9) stecken, dort dem Lauf des Besitzers folgend. Level 13
+noch nicht geschafft.
 
 ## Der Speedrun-Stil
 
