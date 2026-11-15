@@ -13,12 +13,12 @@ CLASSIC
 - sector 2, rails and scenery: straight rails, rails turning, rails rising and falling; a wooden deck on
   columns; the lamp tower, mast, plinth, pillar, wall block with its lantern, garland and lighthouse;
 - sector 3, the parts: extra point, extra life, boxes (one stacked), the dome, the loose balls (wood, stone, paper,
-  sticky), the sack (P_Modul_26), the turning arms (P_Modul_17);
+  sticky);
 - sector 4, paper and wood on the way: the fan steps (P_Modul_18), the troughs (P_Modul_41), the seesaw (P_Modul_30),
   the plate bridge (P_Modul_29), the swing (P_Modul_08);
 - sector 5, stone and the puzzle modules on the way, each as the original's levels set it: the flap wheel
   (P_Modul_19), the board bridge (P_Modul_25), the drawbridge (P_Modul_37), the pushers (P_Modul_01), the crate under
-  its stone (P_Modul_34); the falling room (P_Modul_03) beside the way.
+  its stone (P_Modul_34), the lift (P_Modul_03), a row of sacks (P_Modul_26), the turning arms (P_Modul_17).
 Each element has `check` lines: checks.txt, run by crates/game/src/showcase.rs.
 THE GATE: an arch of brick over the way with "COMMUNITY" on it.
 COMMUNITY (synthetic_community.py: its description, commands and scripts): the materials community maps use, and our
