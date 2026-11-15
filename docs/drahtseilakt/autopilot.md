@@ -323,8 +323,16 @@ another way in this view: the plank at z 686 that his ball knocks over in passin
 units short at the serpentine's crossing z 721 so the crate stays under it and stone 18 rolls over untouched, the
 crate pressed under the crossings z 713 and 705 closed-loop with each crossing awaited, and on the beam a press
 east after his launch keys so the paper ball is in the second fan's slot before the stone) passes sectors 1 and 2
-from the start and gets stuck in sector 3 at the crates of the channel (-724.5, -219.4, -293.9), following the
-owner's run there. Level 13 is not finished yet.
+from the start. In sector 3 (2026-11-16) the crates of the channel are taken apart the same way: the first
+rammed west with the owner's run followed at gain 3 (his ram is a diagonal push, weaker in this view), the second
+and third rammed from a run-up (`goto`, `hold`, `press` at up to 10) and the third shoved on out of the paper ball's
+way back; and the ride down the channel is split in two `pass` steps (one was longer than the 20 s a run may stand
+without a step on). From sector 3's start the ball now gets through the channel, the swings and the stone puzzle to
+the queue of stones before CP3 (-648, -288, -1125), where it drops between the stones instead of rolling on top of
+them. Sectors 4 and 5 fail in this view when begun at their checkpoints: in sector 4 the owner's diagonal kick off
+the raft into the first fan (x -134) cannot be given here (an arrow along the view's axis is the most along a world
+diagonal), so the ball falls behind the raft and is shut in at x 51; in sector 5 the `round` up the helix (340,
+-614.5) is too weak (the original's push on average) and the ball falls off. Level 13 is not finished yet.
 
 ## The speedrun style
 
