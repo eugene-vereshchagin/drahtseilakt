@@ -13,12 +13,12 @@ CLASSIC
 - sector 2, rails and scenery: straight rails, rails turning, rails rising and falling; a wooden deck on
   columns; the lamp tower, mast, plinth, pillar, wall block with its lantern, garland and lighthouse;
 - sector 3, the parts: extra point, extra life, boxes (one stacked), the dome, the loose balls (wood, stone, paper,
-  sticky), the sack (P_Modul_26), the turning arms (P_Modul_17);
+  sticky);
 - sector 4, paper and wood on the way: the fan steps (P_Modul_18), the troughs (P_Modul_41), the seesaw (P_Modul_30),
   the plate bridge (P_Modul_29), the swing (P_Modul_08);
 - sector 5, stone and the puzzle modules on the way, each as the original's levels set it: the flap wheel
   (P_Modul_19), the board bridge (P_Modul_25), the drawbridge (P_Modul_37), the pushers (P_Modul_01), the crate under
-  its stone (P_Modul_34); the falling room (P_Modul_03) beside the way.
+  its stone (P_Modul_34), the lift (P_Modul_03), a row of sacks (P_Modul_26), the turning arms (P_Modul_17).
 Each element has `check` lines: checks.txt, run by crates/game/src/showcase.rs.
 THE GATE: an arch of brick over the way with "COMMUNITY" on it.
 COMMUNITY (synthetic_community.py: its description, commands and scripts): the materials community maps use, and our
@@ -35,6 +35,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import leveldsl as D  # noqa: E402
+import levelparts as P  # noqa: E402
 import levelkit as L  # noqa: E402
 import ownkit as K  # noqa: E402
 import synthetic_community as C  # noqa: E402
@@ -211,12 +212,6 @@ sign "P_Ball_Paper / P_Ball_Sticky"
 loose paper side 9 ahead 6
 loose sticky side -9 ahead 6
 floor 18
-sign "P_Modul_26: swinging sack"
-sack side 9 ahead 6
-floor 18
-sign "P_Modul_17: turning arms"
-arms side 8 ahead 6 nopilot
-floor 20
 floor 20
 checkpoint
 
@@ -242,6 +237,7 @@ rails 12.5
 fanpad 15
 # level 3: the next floor stands right at the platform's far edge, 14 up (a wall the updraft lifts the ball over)
 move 0 0 14
+block 8 14
 floor 16
 columns 60
 sign "P_Modul_41: troughs, paper only (level 7)"
@@ -268,7 +264,10 @@ platebridge
 floor 18
 sign "P_Modul_08: swing over a trench (level 8)"
 check swing : ball wood -8 0 0 ; wait 120 ; go 32 0 0 5 900 ; reach 32 0 0 3 ; kept
-plaza 32 15 up -6.2
+# level 8: the swing hangs over a trench 6.2 deep under the gap, its floor about as wide as the gap is long
+plaza 18 15 up -6.2
+block 15 8.7 width 3 side 10.5 top 0
+block 15 8.7 width 3 side -10.5 top 0
 pilot safe,collector : goto -8 0 0 ; wait 50 ; via 0 0 0 ; via 9 0 0
 pilot speed : via 0 0 0 ; via 9 0 0
 swingbridge nopilot
@@ -347,9 +346,11 @@ floor 8.4
 pusher right
 floor 16
 sign "P_Modul_34: crate under the stone, from below (level 1)"
-# level 1: a lane (5 wide there, 6 here: our narrowest way) over a broad floor 5 lower; the stone stands in a slot 5.3 long, on its crate on the floor below;
-# a stone ball rolling across that floor under the slot knocks the crate out and the stone sinks level with the lane
-check crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 26.65 -12 -5 4 600 ; go 26.65 7 -5 7 900 ; wait 60 ; go 26.65 12 -5 4 900 ; go 6 12 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; kept
+# level 1: a lane (5 wide there, 6 here: our narrowest way) over a broad floor 5 lower (34 along the lane, 42 across);
+# the stone stands in a slot 5.3 long, on its crate on the floor below; a stone ball rolling across that floor under
+# the slot knocks the crate out (it stays on the broad floor), the stone sinks level with the lane and shuts the
+# way back under it, and the ball goes up a ramp on the floor's far side
+check crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 26.65 -12 -5 4 600 ; go 26.65 7 -5 7 900 ; wait 60 ; go 36 12 -5 4 600 ; go 26.65 22 -5 4 600 ; go 6 22 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; lies P_Modul_34_01 P_Modul_34_Kiste 26.65 8 -5 18 ; kept
 check crate-block : ball stone 0 0 0 ; go 42 0 0 4 600 ; away 42 0 2 6
 floor 6
 mark crate
@@ -366,24 +367,56 @@ width 6
 floor 20.65 down 5
 corner left
 floor 2
-plaza 26 20
-# and back up on its far side (level 1: a ramp up beside the lane, the slot below being shut by the sunk stone)
+plaza 34 30
 back crate
 move 0 2.5 0
 turn 90
-floor 9.5
+floor 19.5
 corner right
 width 6
 floor 20.65 down 5
 corner right
 floor 2
 back past
-width 20
+width 6
 floor 10
-sign "P_Modul_03: falling room"
+sign "P_Trafo_Wood"
+trafo wood
+sign "P_Modul_03: lift, wood rams its walls off (levels 7-12)" ahead 8
+# levels 7, 9, 10, 12: a wood ball comes on a low floor 11.3 under the frame (its transformer 23 before the frame) into
+# the cage's gate, 11 from its middle; rammed off, the panels fall and the disc rises with the ball to the way on, 8.9
+# higher on the far side (level 9)
+check lift : ball wood 4 0 0 ; go 23 0 0 3 600 ; wait 60 ; go 34 0 0 6 60 ; go 23 0 0 3 300 ; wait 30 ; go 30 8 0 6 60 ; go 23 0 0 3 300 ; wait 30 ; go 30 -8 0 6 60 ; go 23 0 0 3 300 ; wait 30 ; go 23 11 0 6 60 ; go 23 0 0 3 300 ; wait 30 ; go 23 -11 0 6 60 ; go 23 0 0 3 300 ; wait 30 ; go 16 8 0 6 60 ; go 23 0 0 3 300 ; wait 30 ; go 16 -8 0 6 60 ; go 23 0 0 3 300 ; wait 30 ; wait 300 ; moved P_Modul_03_01 P_Modul_03_Wall01 20 ; moved P_Modul_03_01 P_Modul_03_Wall02 20 ; moved P_Modul_03_01 P_Modul_03_Wall03 20 ; moved P_Modul_03_01 P_Modul_03_Wall04 20 ; moved P_Modul_03_01 P_Modul_03_Wall05 20 ; moved P_Modul_03_01 P_Modul_03_Wall06 20 ; moved P_Modul_03_01 P_Modul_03_Wall07 20 ; moved P_Modul_03_01 P_Modul_03_Floor 5 ; go 46 0 8.9 4 600 ; reach 46 0 8.9 3 ; kept
+floor 12
+module P_Modul_03 ahead 11 up 11.3 turn 180
+width 11
+move 22 0 8.9
+floor 6
+width 6
+sign "P_Modul_26: sacks swing across the lane (levels 9-13)"
+# level 9 (on from its lift), 10, 12, 13: sacks in a row along a lane 5 wide (or rails), 10 apart, hung 2.8 over it
+check sacks : ball wood 0 0 0 ; go 54 0 0 4 900 ; reach 54 0 0 3 ; turned P_Modul_26_01 P_Modul_26_Sack 10 ; kept
+check sacks-paper : ball paper 19 0 0 ; go 21 0 0 2 100 ; wait 400 ; lost
+sack ahead 21
+sack ahead 31
+sack ahead 41
+floor 54
+sign "P_Modul_17: turning arms round a hub (levels 3, 7, 9, 13)"
+# level 9: the hub stands in a square loop of lanes 5 wide, 10 from it (the arms reach 11.6), the way going round
+# three of its sides; at rest the arms lie across the lanes either side of the hub
+check arms : ball wood 0 0 0 ; go 30 0 0 5 600 ; go 30 -20 0 4 600 ; go 18 -20 0 4 600 ; go 18 -34 0 4 600 ; reach 18 -34 0 3 ; turned P_Modul_17_01 Modul17_Dreharme 30 ; kept
+plaza 5 5 ahead 17.5 side -10 up 0.67
+module P_Modul_17 ahead 20 side -10 up 5 turn 90
 floor 30
-module P_Modul_03 ahead -15 side 20.5 up 8.6 turn -90
+corner right
+floor 20
+corner right
+floor 12
+corner left
+floor 14
+corner left
 width 12
+floor 8
 safety border
 floor 10
 sign "P_Trafo_Sticky (our fourth ball)"
@@ -426,6 +459,8 @@ class Show(C.Community, D.Track):
             self.sign(D.word(args, 0, line), opts)
         elif cmd == "gate":
             self.gate(D.word(args, 0, line))
+        elif cmd == "block":
+            self.block(D.num(args, 0, line), D.num(args, 1, line), opts)
         elif self.community_command(cmd, args, opts, line):
             pass
         else:
@@ -443,7 +478,7 @@ class Show(C.Community, D.Track):
         ticks), `arc F S U R A H N` (N points along a turn of radius R, A degrees to the left, H down, from F S U on
         the heading, rolled through at 4), `wait T`, and what must hold then: `reach F S U R` (the ball within R),
         `away F S U R` (not within R), `kind KIND`, `turned OBJECT PART DEG` (the module's part turned at least DEG
-        from its start), `still OBJECT PART DEG` (less), `moved OBJECT PART D`, `lost` (a ball was lost), `kept` (none
+        from its start), `still OBJECT PART DEG` (less), `moved OBJECT PART D`, `lies OBJECT PART F S U R` (the part within R of the point), `lost` (a ball was lost), `kept` (none
         was)."""
         text = " ".join(args)
         if ":" not in text:
@@ -481,9 +516,29 @@ class Show(C.Community, D.Track):
                 out.append(" ".join([v] + w))
             elif v in ("turned", "still", "moved"):
                 out.append(f"{v} {w[0]} {w[1]} {float(w[2]):g}")
+            elif v == "lies":
+                out.append(f"lies {w[0]} {w[1]} {D.fmt(P(w[2:5]))} {float(w[5]):g}")
             else:
                 raise D.LevelError(f"line {line}: unknown check step {v}")
         self.checks.append("\n".join(out))
+
+    # --- blocks ---------------------------------------------------------------------------------------------------
+
+    def block(self, length, height, opts):
+        """`block L H [width W] [ahead A] [side S] [top T]`: a solid of the floors' stone from the cursor (or A on, S to
+        the left) L along the heading, the way's width (or W) across, from under the floor's slab (or from T over the
+        cursor) H down: the wall a floor stands on where it rises straight from a lower one (level 3's floor 14 over
+        its second fan's platform), a trench's side."""
+        up = np.array([0.0, 1.0, 0.0])
+        f, lft = self.fwd(), self.left()
+        w = float(opts.get("width", self.width))
+        a = float(opts.get("ahead", 0.0))
+        top = float(opts["top"]) if "top" in opts else -L.DEPTH
+        c = self.at(a + length / 2, float(opts.get("side", 0.0)), top - height / 2)
+        m = K.Mesh("block")
+        mats = self.b.mat_ids
+        P.solid(m, mats["top"], mats["side"], c, (f, up, lft), (length / 2, height / 2, w / 2))
+        self.b.add(f"Block_{self.n('block'):02d}", m, groups=self.b._floor_groups("stone") + self.b.sector(self.sector))
 
     # --- signs ----------------------------------------------------------------------------------------------------
 

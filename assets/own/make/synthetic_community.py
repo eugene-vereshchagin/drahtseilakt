@@ -12,8 +12,12 @@ levels, each built for real with our own content and shown beside a plain floor 
 - over all of it, from the gate on: another sky, fog and light (TT Sky, Set Fog, Set Light Color), switched by the
   ball's distance, so the community part looks different from the classic one.
 
-`LINES` is its description (leveldsl.py's language with the commands of `Community` below); every exhibit stands
-beside the way or on a wide floor's side, so passing never depends on a script.
+`LINES` is its description (leveldsl.py's language with the commands of `Community` below). Of the 13 converted
+community maps, only a glass floor (map 10), the fan's grate (the classic fan's), portals (map 05) and crates (the
+classic P_Box) stand on their ways; none uses texgen, an unlit or additive material, a second pass, sprites, or
+Rotate, progressions, lifts, Text Display, Set Texture, blinking or the sky, fog and light blocks. So the glass floor,
+the scripted lift and the portal are on the way, each with its check (a ball rides the lift, the portal sends it over
+a gap); the rest stand beside it, shown, not used.
 """
 
 import math
@@ -64,6 +68,7 @@ sign "3D sprite (billboard)"
 exhibit sprite
 floor 14
 sign "Glass floor (alpha blend)" ahead 6
+check comm-glass : ball wood -6 0 0 ; go 18 0 0 4 600 ; reach 18 0 0 3 ; kept
 glassfloor 12
 floor 16
 checkpoint
@@ -77,9 +82,17 @@ floor 14
 sign "Script: progression, Set Position"
 exhibit shuttle
 floor 16
-sign "Script: lift (a moving floor)"
+sign "Script: lift in the way (a moving floor)"
+check comm-lift : ball wood 9 0 0 ; wait 200 ; go 20 0 7 4 300 ; reach 20 0 7 3 ; kept
+check comm-lift-down : ball wood 9 0 0 ; wait 470 ; go 20 0 7 4 300 ; away 20 0 7 4
+safety none
+width 6
+floor 6
 exhibit lift
-floor 16
+floor 8
+width 12
+floor 10
+safety border
 sign "Script: Text Display by proximity"
 exhibit text2d
 floor 16
@@ -95,11 +108,19 @@ floor 14
 sign "Script: Show / Hide, Set Diffuse"
 exhibit blink
 floor 14
-width 30
-floor 16
-sign "Script: portal (moves the ball)"
+width 12
+floor 12
+sign "Script: portal over a gap (moves the ball)"
+check comm-portal : ball wood -8 0 0 ; go 32 0 0 4 900 ; reach 32 0 0 3 ; kept
+safety none
+width 6
+floor 8
 exhibit portal
-floor 34
+gap 18
+floor 10
+width 30
+floor 12
+safety border
 sign "Script: Physicalize (push it)"
 exhibit crate
 floor 20
@@ -110,6 +131,9 @@ floor 16
 # How far beside the way's middle the exhibits stand (the way is 12 wide there), and their columns' radius.
 SIDE = 10.0
 COLUMN_R = 2.2
+# The scripted lift's rise and the gap the portal sends the ball over.
+LIFT_RISE = 7.0
+PORTAL_GAP = 18.0
 TEX = 256
 
 
@@ -473,19 +497,23 @@ class Community:
         self.ping_pong("Comm shuttle", self.graph.entity("Comm_Shuttle"), p0, p1, 2500.0)
 
     def ex_lift(self):
-        """A platform that is a real floor (Phys_Floors), moved up and down by a script beside the way: the game
-        moves its body with it."""
+        """A platform in the way that is a real floor (Phys_Floors), moved up 7 and down again by a script: the way ends
+        at its low place and goes on from its high one, so the ball rides it (none of the converted community maps
+        has a scripted lift; ours is put where it has a job). The game moves its body with it. The cursor goes over
+        it and up."""
         f, up, left = self.axes()
-        c = self.at(0.0, SIDE + 1.0, 0.0)
+        c = self.at(3.0)
         m = K.Mesh("guides")
         for s in (-1.0, 1.0):
-            K.cylinder(m, self.b.mat_ids["post"], tuple(c + f * s * 3.4 - up * 40.0), (0, 1, 0), 0.5, 49.0, seg=10)
+            K.cylinder(m, self.b.mat_ids["post"], tuple(c + left * s * 3.6 - up * 40.0), (0, 1, 0), 0.5, 49.0, seg=10)
         self.b.add("Comm_Lift_Guides", m)
         # the slab's mesh is in the level's coordinates (the kit's checks read floors so); Set Position moves the
         # object's origin, so the script's places are offsets
-        lo, hi = c + np.array([-2.8, -0.6, -2.8]), c + np.array([2.8, 0.0, 2.8])
-        self.b.slab("Comm_Lift", tuple(lo), tuple(hi), mat="plate", sector=self.sector)
-        self.ping_pong("Comm lift", self.graph.entity("Comm_Lift"), (0, 0, 0), (0, 7.0, 0), 4000.0)
+        a, b = self.at(0.0, -3.0, -0.6), self.at(6.0, 3.0, 0.0)
+        self.b.slab("Comm_Lift", tuple(np.minimum(a, b)), tuple(np.maximum(a, b)), mat="plate", sector=self.sector)
+        self.ping_pong("Comm lift", self.graph.entity("Comm_Lift"), (0, 0, 0), (0, LIFT_RISE, 0), 4000.0)
+        self.slot(6.0)
+        self.pos = self.pos + up * LIFT_RISE
 
     def ex_text2d(self):
         g = self.graph
@@ -620,12 +648,13 @@ class Community:
         self.b.add(name, m)
 
     def ex_portal(self):
-        """A portal on the wide floor's left side: the ball rolling through the first arch is set down under the
-        second, 20 further on. Box Box Intersection of the ball with an unseen box in the arch, tested every tick."""
+        """A portal at the end of the way: the ball rolling through the arch 3 before the floor's end is set down under
+        a second arch on the floor beyond a gap of 18 (map 05 See You Tomorrow, the one converted map with portals:
+        its trigger boxes stand on the way's floor, the ball set down on a floor far on). Box Box Intersection of the
+        ball with an unseen box in the arch, tested every tick."""
         g = self.graph
         f, up, left = self.axes()
-        side = 9.0
-        a, c = self.at(6.0, side, 0.0), self.at(26.0, side, 0.0)
+        a, c = self.at(-3.0), self.at(PORTAL_GAP + 3.0)
         def make():
             u, v = _grid()
             r = np.hypot(u - 0.5, v - 0.5) * 2

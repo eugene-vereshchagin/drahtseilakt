@@ -113,10 +113,10 @@ Community-Teil), nur aus eigenen Inhalten; das gebaute Level liegt nicht in git.
 - **Klassisch**, fünf Sektoren: Böden und Oberflächen (Rinne, Ziegelrand, Geländer, blanker Boden, Holz, Breiten,
   Rampe, runde Kurven, harte Ecken); Schienen (gerade, in Kurven, steigend, fallend) und Kulisse (Holzdeck auf
   Säulen, Lampenturm, Mast, Sockel, Pfeiler, Mauerblock, Girlande, Leuchtturm); die Teile (Extrapunkt und -leben,
-  Kisten, Kuppel, die vier losen Bälle, Sack, Drehkreuz); die Transformer und die Mechanik auf dem Weg
+  Kisten, Kuppel, die vier losen Bälle); die Transformer und die Mechanik auf dem Weg
   (Papier und der Ventilator, Wippe, Plattenbrücke, Schaukel, Stein schiebt Kisten, klebriger Ball, Holz); Stein
-  und die Rätselmodule auf dem Weg (Klappenrad, Brettbrücke, Zugbrücke, Schieber, Kiste unter ihrem Stein) und der
-  fallende Raum daneben.
+  und die Rätselmodule auf dem Weg (Klappenrad, Brettbrücke, Zugbrücke, Schieber, Kiste unter ihrem Stein,
+  Aufzug, eine Reihe Säcke, Drehkreuz).
 - **Das Tor** „COMMUNITY", hinter dem Himmel, Nebel und Licht wechseln (ein Skript).
 - **Community**, zwei Sektoren: die Materialien der Community-Karten (Alpha-Blending, Alpha-Test, additives
   Leuchten, Chrom- und Spiegel-Texturkoordinaten, ein doppelseitiges Blatt, unbeleuchtete Farbe, Normalmap mit
@@ -129,24 +129,37 @@ Community-Teil), nur aus eigenen Inhalten; das gebaute Level liegt nicht in git.
 
 Was das offene Format noch nicht trägt (beim Bauen gefunden): die Slots einer Textur (Movie Player, Set Current
 Slot), Wave-Klänge (Wave Player), eine eigene Textur des Levels für Skript-Partikel, ein zur Sicht gedrehtes
-3D-Sprite des Levels. Seit den Anmerkungen 10 des Besitzers (2026-11-16) stehen die klassischen Elemente so, wie die Level des Originals sie
-setzen (gemessen an den Leveln 1-13), der Weg führt durch jedes, aus unseren eigenen Teilen: zwei Ventilatorstufen
-(Level 3: ein Ventilator auf einer Plattform 15 x 15 hebt die Papierkugel auf Schienen 11 höher, die über eine Lücke
-von 10 zur nächsten Plattform führen, deren Ventilator sie auf einen Boden 14 höher an ihrem Rand hebt), sechs Mulden
-über der Leere (Level 7), die Wippe über einer Lücke von 12,9 (Level 2-9), die Plattenbrücke über 15,4 mit dem Rahmen
-6,9 vom nahen Rand (Level 2-10), die Schaukel über einer Lücke von 15 über einem 6,2 tiefen Graben (Level 8), das
-Klappenrad zwischen zwei Bahnen 15 auseinander, das eine Steinkugel kippt, die rollend auf seine stehende Klappe trifft
-(Level 9-11), die Brettbrücke über 9,1 (Level 2, 3, 5, 8), die Zugbrücke, die in die Lücke 7,6 einer Querbahn fällt
-(Level 5), zwei Schieber, von einem 2,5 tieferen Boden geschoben (Level 1), die Kiste unter ihrem Stein in einem 5,3
-langen Schlitz über einem breiten, 5 tieferen Boden, von einer unter dem Stein durchrollenden Steinkugel
-herausgestoßen, zurück nach oben über eine Rampe auf der fernen Seite (Level 1), und eine Schienenspirale mit zwei
-Windungen. Der fallende Raum (P_Modul_03), der Sack und das Drehkreuz stehen noch neben dem Weg, noch nicht vermessen.
-`crates/game/src/showcase.rs` prüft, dass jedes unserer Teile im Level steht und dass jedes Element in der Physik des
-Spiels seine Arbeit tut: die `checks.txt` des Levels (vom Generator aus seinen `check`-Zeilen geschrieben) rollt eine
-Kugel der richtigen und der falschen Art mit den Pfeiltasten durch jedes Element und prüft, wohin sie kommt und wie
-weit sich die Teile des Moduls drehen oder bewegen; jede Prüfung ist Pflicht. `SHOWCASE_COPY_PARTS=<Kopie>` führt
-dieselben Prüfungen mit den Teilen der Kopie statt unserer aus. Der Lauf des Testspielers wird für das Level nicht mehr
-aufbewahrt.
+3D-Sprite des Levels. Seit den Anmerkungen 10 des Besitzers (2026-11-16) steht jedes klassische Element so, wie die Level des Originals
+es setzen (gemessen an den Leveln 1-13), der Weg führt durch jedes, aus unseren eigenen Teilen: zwei Ventilatorstufen
+(Level 3: ein Ventilator auf einer 15 x 15 Plattform hebt den Papierball auf Schienen 11 höher, die über eine Lücke von
+10 zur nächsten Plattform führen, deren Ventilator ihn auf einen Boden 14 höher hebt, der auf einer Wand an ihrem Rand
+steht), sechs Mulden über der Leere (Level 7), die Wippe über einer Lücke von 12,9 (Level 2-9), die Plattenbrücke über
+15,4 mit ihrem Rahmen 6,9 vom nahen Rand (Level 2-10), die Schaukel über einer Lücke von 15 über einem 6,2 tiefen
+Graben zwischen zwei Wänden (Level 8), das Klappenrad zwischen zwei Bahnen im Abstand 15, gekippt von einem Steinball,
+der rollend auf seine stehende Klappe trifft (Level 9-11), die Brettbrücke über 9,1 (Level 2, 3, 5, 8), die
+Zugbrücke, die in eine Lücke von 7,6 einer Querbahn fällt (Level 5), zwei Schieber, geschoben von einem Boden 2,5
+tiefer (Level 1), die Kiste unter ihrem Stein in einem Schlitz von 5,3 über einem breiten Boden 5 tiefer (hier 34 x 30,
+in Level 1 34 x 42), vom unter dem Stein durchrollenden Steinball herausgestoßen und auf diesem Boden bleibend, zurück
+nach oben über eine Rampe auf der fernen Seite (Level 1); der Aufzug (P_Modul_03; Level 7, 9, 10, 12): ein Holzball von
+einem Transformer 23 davor kommt auf einem Boden 11,3 unter dem Rahmen ins Tor des Käfigs, rammt die sieben Wände ab
+und fährt auf der Scheibe zum weiteren Weg 8,9 höher (Level 9; die Scheibe steigt mit unserem Teil 16,5, mit dem der
+Kopie 13,8); drei Säcke im Abstand 10 über einer Bahn, 3 darüber gehängt (Level 9, 10, 12, 13): ein Holzball rollt
+durch, ein unter einem wartender Papierball wird hinuntergestoßen; das Drehkreuz auf einer Nabe in einer quadratischen
+Schleife von Bahnen 10 von ihr entfernt, der Weg um drei ihrer Seiten, die Arme in Ruhe quer über den Bahnen (Level
+9); und eine Schienenspirale mit zwei Windungen. Im Community-Teil liegen der Glasboden, unser Skript-Aufzug (der Weg
+endet an seiner unteren Stellung und geht 7 höher weiter) und das Portal (am Ende einer Bahn, sein zweiter Bogen hinter
+einer Lücke von 18) auf dem Weg. Von den 13 konvertierten Community-Karten stehen nur ein Glasboden (Karte 10), das
+Gitter des Ventilators, Portale (Karte 05: Trigger-Boxen auf dem Boden des Wegs) und P_Box-Kisten auf ihren Wegen;
+keine nutzt texgen, unbeleuchtete oder additive Materialien, einen zweiten Durchgang, Sprites, Rotate,
+Progressionen, Skript-Aufzüge, Text Display, Set Texture, Blinken oder die Himmel-, Nebel- und Lichtblöcke, daher
+stehen diese Exponate neben dem Weg, ohne Community-Umgebung zum Nachbilden. `crates/game/src/showcase.rs` prüft,
+dass jedes unserer Teile im Level steht und jedes Element in der Physik des Spiels seine Aufgabe erfüllt: die
+`checks.txt` des Levels (vom Generator aus seinen `check`-Zeilen geschrieben, 28 Prüfungen) rollt eine Kugel der
+richtigen und der falschen Art mit den Pfeiltasten durch jedes Element und prüft, wohin sie kommt, wie weit sich die
+Teile des Moduls drehen oder bewegen und wo ein herausgestoßenes Teil liegt; jede Prüfung ist Pflicht.
+`SHOWCASE_COPY_PARTS=<Kopie>` führt dieselben Prüfungen mit den Teilen der Kopie statt unserer aus,
+`SHOWCASE_ONLY=<Präfix>` nur die so benannten, `SHOWCASE_TRACE=<Prüfung>` gibt den Weg der Kugel aus. Der Lauf des
+Testspielers wird für das Level nicht mehr aufbewahrt.
 Ohne Kopie des Originals steht hinter dem Menü der erste mitgelieferte Level nach dem Schaulevel (order 0), damit das
 Menü nicht seine Schilder zeigt.
 
