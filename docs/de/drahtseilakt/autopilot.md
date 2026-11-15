@@ -308,7 +308,14 @@ Diagonale der Welt, und die Pfeile schieben entlang der Achsen der Kamera.
 
 Darum nimmt der Testspieler die Hinweise und Pläne des Originals, wie sie sind (ihre Orte und Richtungen sind die der
 Welt), und gibt eine Richtung der Welt als die Pfeile der Kamera, wie sie gerade steht, samt ihrem Versatz gegen ganze
-Vierteldrehungen: auf einer 45-Grad-Karte ist ein Schub entlang einer Weltachse zwei Pfeile. Ein Replay eines Spielers
+Vierteldrehungen: auf einer 45-Grad-Karte ist ein Schub entlang einer Weltachse zwei Pfeile. Zusammen gehaltene Pfeile addieren ihre
+Schübe, dort wäre ein Schub entlang einer Achse also 1,41-mal so stark wie im Original und einer diagonal 0,71-mal:
+die Schritte der Hinweise (Schübe, Anlehnen an Schienen, Anläufe und Rammstöße, ein Abschnitt `replay`) sind in der
+Ansicht des Originals abgestimmt, darum geben sie auf einer solchen Karte im Mittel den Schub des Originals: in jedem
+Tick die nächstliegenden Pfeile, plus was die Ticks davor übrig ließen (ein diagonaler Schub des Originals, 1,41, ist
+mehr, als ein Pfeil entlang dieser Diagonale gibt: dort ein Pfeil). `cross` (auf Kopien des Laufs in der Ansicht, wie
+sie ist, erprobt) und `trace` (mit eigenem Übertrag) bleiben, wie sie sind; auf den Originallevels ändert sich nichts.
+Ein Replay eines Spielers
 auf dem Originallevel (mit `--follow` und `--then` gefolgt oder als Abschnitt `replay` oder `trace` eines Hinweises)
 wird auf dem Originallevel angesehen, der Datei der Kopie selbst, wenn die Karte dessen Geometrie hat (dieselben
 Objekte an denselben Stellen, in beliebiger Reihenfolge); übernommen werden nur der Weg des Balls und seine Schübe in

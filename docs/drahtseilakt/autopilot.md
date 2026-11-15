@@ -285,7 +285,13 @@ the view looks along a diagonal of the world and the arrows push along the view'
 
 So the test player takes the original's hints and plans as they are (their places and directions are the world's),
 and gives a world direction as the arrows of the view as it is, its offset from whole quarters too: on a 45-degree
-map a push along an axis of the world is two arrows. A player's replay recorded on the original level (followed with
+map a push along an axis of the world is two arrows. Arrows held together add their pushes, so there an axis push
+would be 1.41 times as hard as on the original and a diagonal one 0.71 times: a hint's steps (pushes, rail leans,
+run-ups and rams, a `replay` stretch) were tuned in the original's view, so on such a map they give the original's
+push on average instead: each tick the arrow set nearest it plus what the ticks before left over (a diagonal push of
+the original, 1.41, is more than one arrow along that diagonal gives: one arrow there). A `cross` (tried on copies
+of the run in the view as it is) and a `trace` (its own carry) are left as they are; on the original levels nothing
+changes. A player's replay recorded on the original level (followed with
 `--follow` and `--then`, or a hint's `replay` or `trace` stretch) is seen on the original level, the copy's own file,
 when the map holds its geometry (the same objects at the same places, in any order); only the ball's way and its
 pushes in the world are taken over, and the player's keys are turned into the arrows of the map's view. A remake

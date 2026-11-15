@@ -802,6 +802,20 @@ impl Facing {
         }
     }
 
+    /// The view of whole quarters nearest this one: the original levels' view, whose arrows the hints were written
+    /// for (on a 45-degree map, either neighbour: an arrow of either pushes along an axis of the world).
+    pub fn straight(self) -> Facing {
+        if self.base == 0.0 {
+            return self;
+        }
+        let q = std::f32::consts::FRAC_PI_2;
+        let h = self.quarter as f32 * q + self.base;
+        Facing {
+            quarter: (h / q).round() as i32,
+            base: 0.0,
+        }
+    }
+
     /// A view of the original levels (no offset) at `quarter`.
     #[cfg(test)]
     pub fn quarter(quarter: i32) -> Facing {
@@ -894,6 +908,9 @@ struct Running {
     k: usize,
     residual: Vec3,
     lost_since: Option<u64>,
+    /// What the arrows given in a view off whole quarters left of the original's push, carried to the next tick
+    /// (`in_view`).
+    carry: Vec3,
 }
 
 /// A step ending with the ball this far below its point has lost it to a floor beneath (`Runner::off_course`).
@@ -1104,6 +1121,7 @@ impl Runner {
                 k: 0,
                 residual: Vec3::ZERO,
                 lost_since: None,
+                carry: Vec3::ZERO,
             });
             self.begin(sim);
         }
@@ -1116,6 +1134,7 @@ impl Runner {
             };
             let step = adjust(step, run.flowed, self.zone.cap);
             if let Some(i) = drive(&step, run, sim) {
+                let i = in_view(&step, i, run, sim);
                 // HINTS_TRACE: the ball every ten ticks while a hint drives, to write hints by
                 if std::env::var_os("HINTS_TRACE").is_some() && sim.tick.is_multiple_of(10) {
                     let (p, v) = (sim.ball.position, sim.ball.velocity);
@@ -1174,6 +1193,7 @@ impl Runner {
         run.k = 0;
         run.residual = Vec3::ZERO;
         run.lost_since = None;
+        run.carry = Vec3::ZERO;
         let step = self.hints.get(run.hint).and_then(|h| h.steps.get(run.step));
         if let Some(Step::Inputs(q, _)) = step {
             run.quarter = *q;
@@ -1345,7 +1365,8 @@ const MAX_SHOVE_ROUND: f32 = 10.0;
 /// The input of `step` for this tick, or None when it is done.
 fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     let t = sim.tick.saturating_sub(run.start);
-    let quarter = Facing::of(&sim.camera);
+    // (the arrows of the original's view: `in_view` gives their push in the view as it is)
+    let quarter = Facing::of(&sim.camera).straight();
     // (a chain of pass steps is a line; any other step between them breaks it)
     if !matches!(step, Step::Pass(..)) {
         run.passed = None;
@@ -1575,7 +1596,8 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 run.pushes = cross_plan(sim, *d, *p, *r);
             }
             let push = *run.pushes.get(usize::try_from(t).ok()?)?;
-            Some(arrows(push, quarter))
+            // (as its plan was tried: in the view as it is)
+            Some(arrows(push, Facing::of(&sim.camera)))
         }
         Step::Pass(p, speed, n) => {
             let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
@@ -1640,6 +1662,39 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             Some(arrows(world_push(bits, run.quarter), quarter) | (bits & input::LIFT))
         }
     }
+}
+
+/// The arrows `bits` a step gives in the original's view (`Facing::straight`) as the arrows of the view as it is. On a
+/// view off whole quarters (a 45-degree map) an arrow pushes along a diagonal of the world and two along an axis, so
+/// the same direction would push harder or softer than the hint was tuned for on the original (its pushes, rail
+/// leans and run-ups). There the original's push is given on average: each tick the arrow set nearest it plus what
+/// the ticks before left over. The original's view is unchanged. A step whose arrows are already the view's own (a
+/// view turn, a cross tried on copies of the run, a trace) is left as it is.
+fn in_view(step: &Step, bits: u8, run: &mut Running, sim: &Sim) -> u8 {
+    if matches!(step, Step::Turn(_) | Step::Cross(..) | Step::Track(_)) {
+        return bits;
+    }
+    straight_push(bits, Facing::of(&sim.camera), &mut run.carry)
+}
+
+/// The arrows of the view at `facing` that give the push of `bits` in its straight view (`Facing::straight`), on
+/// average, with `carry` what the ticks before left over (`in_view`).
+fn straight_push(bits: u8, facing: Facing, carry: &mut Vec3) -> u8 {
+    if facing.base == 0.0 {
+        return bits;
+    }
+    let lift = bits & input::LIFT;
+    let want = world_push(bits & !input::LIFT, facing.straight());
+    if want.length_squared() < 1e-6 {
+        *carry = Vec3::ZERO;
+        return lift;
+    }
+    let cam = view(facing);
+    let (b, left) = nearest_arrows(want + *carry, cam.push_forward(), cam.push_right());
+    // (a diagonal push of the original is more than this view gives along a diagonal: what it cannot give is not
+    // carried on and on)
+    *carry = left.clamp_length_max(0.75);
+    b | lift
 }
 
 /// A trace's input this tick: the recorded push where the ball is along the run, plus the pull back onto it, as the
@@ -2028,5 +2083,36 @@ mod tests {
         // a player's keys from the original level's view are turned, not given as pressed
         let straight = world_push(input::UP, Facing::quarter(0));
         assert_eq!(arrows(straight, diag), input::UP | input::LEFT);
+    }
+
+    #[test]
+    fn a_hints_push_on_a_45_degree_map_is_the_originals_on_average() {
+        // a hint's arrows were tuned in the original's view: on a 45-degree map two arrows would push along an axis
+        // 1.41 times as hard; the arrows given average the original's push (a diagonal one, 1.41, at the most the
+        // view gives along a diagonal: one arrow)
+        let diag = Facing {
+            quarter: 0,
+            base: std::f32::consts::FRAC_PI_4,
+        };
+        for bits in [
+            input::UP,
+            input::RIGHT,
+            input::DOWN | input::LEFT,
+            input::UP | input::RIGHT,
+        ] {
+            let want = world_push(bits, diag.straight()).clamp_length_max(1.0);
+            let mut carry = Vec3::ZERO;
+            let mut sum = Vec3::ZERO;
+            for _ in 0..600 {
+                sum += world_push(straight_push(bits, diag, &mut carry), diag);
+            }
+            assert!((sum / 600.0 - want).length() < 0.01, "{bits} {sum}");
+        }
+        // the original's view gives the arrows as they are
+        let mut carry = Vec3::ZERO;
+        assert_eq!(
+            straight_push(input::UP | input::LEFT, Facing::quarter(1), &mut carry),
+            input::UP | input::LEFT
+        );
     }
 }
