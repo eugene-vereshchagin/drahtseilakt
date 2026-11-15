@@ -335,11 +335,19 @@ geschafft (Level 1, 11, 12, 13 allein nach Plan und Hinweisen, 4 und 9 den Läuf
 gespeicherten Lauf des Originals folgend; Level 8 bisher nur als gespeicherter Lauf des Originals, auf der Karte
 abgespielt, `Level_08-original-run.replay`). Die 45-Grad-Karten: Level 1-7, 9 und 10 geschafft, dem gespeicherten
 Lauf des Originals ohne Hinweise folgend (die offenen Schritte der Hinweise sind für die Kamera des Originals
-geschrieben); Level 8 ebenso, 10:41.30. Mit den Hinweisen als Schub des Originals (oben), 2026-11-15: Level 11
+geschrieben); Level 8 ebenso, 10:41.30. Mit den Hinweisen als Schub des Originals
+(oben), 2026-11-15: Level 12 geschafft, 13:30.93 (`--follow` mit seinem gespeicherten Lauf, sein Plan und
+`hints/Level_12-45.txt`: zwei Stellen vorsichtiger, die
+Rückkehr auf die obere Reihe von Sektor 6 bei z 694 und die Ecke auf die Schiene x 521.3 in Sektor 7 langsamer und
+weiter; Bremsen und Lenken sind dort diagonale Schübe, in dieser Ansicht schwächer). Level 11
 (`hints/Level_11-45.txt`: je zwei Rammstöße gegen die Kiste mehr in den ersten beiden Kanälen von Sektor 3) kommt bis
-zu den letzten Schienenpaaren von Sektor 6 und verliert dort seine Kugeln (ein diagonales Anlehnen ist in dieser
-Ansicht schwächer); Level 12 (seine Hinweise) bis zu den gestoßenen Steinkugeln von Sektor 6; Level 13
-(`Level_13-full.txt`) über Sektor 1 hinaus, verloren in Sektor 2. Noch nicht geschafft.
+zu den letzten Schienenpaaren von Sektor 6 und verliert dort seine Kugeln: das erste Paar hält mit dem Versatz 1.2
+statt 0.8, doch am Ende des zweiten kommt die Kugel zu langsam auf die Kreuzung des dritten (9.7 im Original, hier 7
+bis 8: das Anlehnen nimmt vom Schub entlang der Schiene) und sinkt zwischen sie; mehr oder weniger Anlehnen, andere
+Geschwindigkeiten, das Anlehnen zuerst unter den Pfeilen und der dort nachgefahrene Lauf des Originals brachten sie
+nicht hinüber. Level 13 (`Level_13-full.txt`) über Sektor 1 hinaus, verloren in Sektor 2: dem Lauf des Besitzers
+folgend bleibt die Steinkugel auf dem Holzstreifen bei (-872.5, -95.5, 721) stecken, die Kiste unter den Kreuzungen
+der Serpentine liegt woanders als in seinem Lauf. Level 11 und 13 noch nicht geschafft.
 
 ## Der Speedrun-Stil
 

@@ -310,10 +310,17 @@ the test player (levels 1, 11, 12, 13 by the plan and hints alone, 4 and 9 follo
 the original's kept run; level 8 only as the original's kept run played on the map, `Level_08-original-run.replay`).
 The 45-degree maps, levels 1-7, 9 and 10 finished following the original's kept run with no hints (the hints' open
 steps were written for the original's view); level 8 the same way, 10:41.30. With the hints given as the original's
-push (above), 2026-11-15: level 11 (`hints/Level_11-45.txt`: two crate rams more in each of the first two channels of
-sector 3) gets to the last rail pairs of sector 6 and loses its balls there (a diagonal lean is weaker in this view);
-level 12 (its hints) to the shoved stone balls of sector 6; level 13 (`Level_13-full.txt`) past sector 1, lost in
-sector 2. Not finished yet.
+push (above), 2026-11-15: level 12 finished, 13:30.93 (`--follow` its kept run, its plan and `hints/Level_12-45.txt`:
+two places taken more carefully, the turn back onto the upper row of sector 6 at z 694 and the corner onto the rail x 521.3 of sector 7
+slower and wider; braking and steering there are diagonal pushes, weaker in this view). Level 11
+(`hints/Level_11-45.txt`: two crate rams more in each of the first two channels of sector 3) gets to the last rail
+pairs of sector 6 and loses its balls there: the first pair holds with the lean offset 1.2 instead of 0.8, but at
+the end of the second the ball comes onto the crossing of the third too slowly (9.7 on the original, 7 to 8 here: a
+lean takes from the push along the rail) and sinks between them; more or less lean, other speeds, the lean first
+among the arrows and the original's run traced there did not get it over. Level 13 (`Level_13-full.txt`) past
+sector 1, lost in sector 2: following the owner's run of the sector, the stone ball gets stuck on the wood strip at
+(-872.5, -95.5, 721), the crate under the serpentine's crossings lying elsewhere than in his run. Levels 11
+and 13 are not finished yet.
 
 ## The speedrun style
 
