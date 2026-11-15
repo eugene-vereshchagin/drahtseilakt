@@ -2848,6 +2848,9 @@ impl Pilot {
         } else if let Some(c) = self.zone.cap {
             zone += &format!("   [careful zone, at most {c}]");
         }
+        if self.zone.plain {
+            zone += "   [plain zone: no learned rule]";
+        }
         if let Some(why) = self.momentum {
             let what = if self.zone.cap.is_some() {
                 "limit"
@@ -2863,7 +2866,8 @@ impl Pilot {
     /// careful zone's speed limit.
     pub fn next(&mut self, sim: &Sim) -> u8 {
         self.zone = self.zones.at(sim.ball.position, sim.sector);
-        // the level's own zones first; elsewhere what was learned on any level, where the place is of its kind
+        // the level's own zones first (a plain zone too: there no learned rule holds); elsewhere what was learned on
+        // any level, where the place is of its kind
         self.learned_now = None;
         // a speedrun holds back nowhere: no careful zone or rule. Its pace is the progress along the way itself (a
         // flow zone's push for speed would rather roll back down a climb fast than up it slowly); a hint's stops go

@@ -5,13 +5,15 @@
 //   flow sector N r R : X Y Z ; X Y Z ; ...
 //   careful sector N r R [speed V] : X Y Z ; X Y Z ; ...
 //   calm sector N r R : X Y Z ; X Y Z ; ...
+//   plain sector N r R : X Y Z ; X Y Z ; ...
 //
 // The points are the ball's path through the stretch as it was marked (one point: a place); the zone is everything
 // within R of that path, in that sector. `flow`: don't dawdle here (no stops, waits or slowing down that are not
 // needed to keep the ball). `careful`: keep under the speed (CAREFUL_SPEED when not given) and on the middle of the
 // track, no corner cutting. `calm`: in the speedrun style (autopilot.rs, `Style`), ride the calm style here (a
-// puzzle the steady pace gets through and the speedrun's does not); no effect in the calm style. `#` begins a
-// comment.
+// puzzle the steady pace gets through and the speedrun's does not); no effect in the calm style. `plain`: no learned
+// rule here (learned.rs): the test player rides as it does by itself, where a rule learned on another level would
+// lose the ball. `#` begins a comment.
 //
 // The file is untrusted (it may be shared with the hints): its size, the number of zones and points and every number
 // are capped; a malformed line is left out with a note naming it (the others still count), a file too big, a link or
@@ -40,6 +42,7 @@ pub enum Kind {
     Flow,
     Careful,
     Calm,
+    Plain,
 }
 
 impl Kind {
@@ -48,6 +51,7 @@ impl Kind {
             Kind::Flow => "flow",
             Kind::Careful => "careful",
             Kind::Calm => "calm",
+            Kind::Plain => "plain",
         }
     }
 }
@@ -71,6 +75,8 @@ pub struct Effect {
     pub cap: Option<f32>,
     /// A speedrun rides the calm style here.
     pub calm: bool,
+    /// No learned rule holds here.
+    pub plain: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -148,6 +154,7 @@ impl Zones {
             }
             match (z.kind, z.cap()) {
                 (Kind::Calm, _) => e.calm = true,
+                (Kind::Plain, _) => e.plain = true,
                 (_, Some(c)) => e.cap = Some(e.cap.map_or(c, |o: f32| o.min(c))),
                 (_, None) => e.flow = true,
             }
@@ -182,6 +189,7 @@ fn zone(line: &str) -> Result<Zone, String> {
         Some("flow") => Kind::Flow,
         Some("careful") => Kind::Careful,
         Some("calm") => Kind::Calm,
+        Some("plain") => Kind::Plain,
         Some(k) => return Err(format!("unknown kind {k:.16}")),
         None => return Err("no kind".into()),
     };
@@ -486,6 +494,22 @@ mod tests {
         assert_eq!(z.at(Vec3::new(11.0, 0.0, 0.0), 0).cap, Some(3.0));
         assert_eq!(z.at(Vec3::new(11.0, 0.0, 0.0), 1).cap, Some(1.0));
         assert!(!z.at(Vec3::new(11.0, 0.0, 0.0), 1).flow);
+    }
+
+    #[test]
+    fn a_plain_zone_asks_only_that_no_learned_rule_holds() {
+        let (z, notes) = parse("plain sector 2 r 5 : 0 0 0 ; 10 0 0\n");
+        assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(z.zones[0].kind, Kind::Plain);
+        assert_eq!(z.zones[0].cap(), None);
+        let e = z.at(Vec3::new(5.0, 0.0, 2.0), 1);
+        assert!(e.plain && !e.flow && !e.calm && e.cap.is_none());
+        assert_eq!(z.at(Vec3::new(5.0, 0.0, 2.0), 0), Effect::default());
+        let (again, n) = parse(&z.zones[0].line());
+        assert!(n.is_empty());
+        assert_eq!(again.zones[0], z.zones[0]);
+        // a speed is only a careful zone's
+        assert!(parse("plain sector 1 r 4 speed 3 : 1 2 3").0.is_empty());
     }
 
     #[test]

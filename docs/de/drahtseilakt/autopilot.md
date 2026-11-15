@@ -259,6 +259,7 @@ Zonen) nimmt keine mehr, und der Bildschirm sagt es:
 ```
 flow sector 1 r 4 : X Y Z ; X Y Z ; ...
 careful sector 2 r 4 [speed V] : X Y Z ; ...
+plain sector 2 r 8 : X Y Z ; ...
 ```
 
 Die Punkte sind der Weg der Kugel durch die Strecke (ein Punkt: eine Stelle); die Zone ist alles innerhalb `r` von
@@ -285,6 +286,9 @@ diesem Weg in diesem Sektor.
   als das Limit: ein Anstieg, Schienen, ein Rammstoß; oder ein `pass` schneller als es bis 25 Einheiten davor: sein
   Anlauf). Die Statuszeile sagt es (`[limit let go: a gap to cross ahead]`). Eine gelernte careful-Regel bremst
   ebenso und wird an denselben Stellen losgelassen.
+- **plain** — hier keine gelernte Regel (von Hand geschrieben, `plain sector N r R : X Y Z ; ...`): der Testspieler
+  fährt, wie er es selbst tut, wo eine auf einem anderen Level gelernte Regel die Kugel verlieren würde (auf Level 6
+  schneidet „bend, wood: nicht trödeln“ das Warten auf einen Aufzug und das der Papierkugel an den Ventilatoren ab).
 
 Jede Markierung lehrt den Testspieler auch, was für eine Stelle es war, für jedes Level: eine Regel der gelernten
 Tabelle (`learned.txt` neben den Hinweisen; [autopilot-rules.md](autopilot-rules.md), „Die gelernte Tabelle“).
@@ -394,7 +398,12 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
 - Level 5: vom Start an geschafft in 12:39.77 (Hinweise für beide Kisten und den Schieber).
 - Level 6: vom Start an beendet in 8:01.22: Sektor 1 entlang der Linie des Inhabers, Sektoren 2–5 allein mit dem
   Plan und den Hinweisen nach dem Storyboard des Videos (`hints/Level_06.txt`: der wellige Stamm als Holz hin und als
-  Stein schnell zurück, die Kisten heruntergerammt, der Stamm nach dem Sturz in Sektor 5).
+  Stein schnell zurück, die Kisten heruntergerammt, der Stamm nach dem Sturz in Sektor 5). Dieser Lauf kam weder mit
+  der gelernten Tabelle (Spielende in Sektor 2) noch ohne sie (stecken in Sektor 5) wieder; 2026-11-15, mit
+  plain-Zonen, wo die auf Level 1 gelernten Regeln das Warten der Sektoren 2 und 3 abschneiden
+  (`hints/Level_06.zones`), und der Steinkugel in Sektor 5 von ihrem Umwandler auf die hängenden Platten geschoben
+  (allein rollte sie vom Turm auf die Schienen über dem Stamm): 9:01.60, 4 Leben, steht 17,2% der Ticks (vorher
+  16,5%), näher als 1 am Rand 5,3% (2,5%), Tempo 4,8 ± 4,5 (4,9 ± 4,4) (`hints/runs/Level_06.replay`).
 - Level 7: vom Start an geschafft in 12:04.28, dem geschafften Lauf des Inhabers folgend.
 - Level 8: vom Start an in 9:59.40 beendet, ganz ohne Lauf eines Spielers: allein durch den Plan aus dem Video
   (`hints/Level_08.plan`, mit Orten auf dem Weg) und die nach seinem Storyboard geschriebenen Hinweise

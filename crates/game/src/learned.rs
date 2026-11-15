@@ -247,7 +247,7 @@ fn rule(line: &str, evidence: &str) -> Result<Rule, String> {
                 "too plain: a careful rule names two features special to the place (it holds the ball back \
                  wherever it holds)"
             }
-            Kind::Flow | Kind::Calm => "too plain: a rule names two features or more, one special to the place",
+            Kind::Flow | Kind::Calm | Kind::Plain => "too plain: a rule names two features or more, one special to the place",
         }
         .into());
     }
