@@ -378,6 +378,29 @@ Für andere Versuche skaliert `AUTOPILOT_SPEEDRUN_PACE=F` das Tempo (0,3 bis 2),
 die Stillstände des Spielers, und `AUTOPILOT_SPEEDRUN_SKIP_ONLY=1` fährt das ruhige Tempo und überspringt nur sie. Die
 schnellsten Läufe liegen in `hints/runs/speedrun/`.
 
+Ein Level, dessen Speedrun Hinweise braucht, die der ruhige Lauf nicht nehmen darf, hat eine eigene Hinweisdatei (mit
+`--hints`): `hints/Level_03-speedrun.txt` ist `Level_03.txt` und ein Hinweis mehr (Sektor 4: die Holzkugel sofort auf
+die einzelne Schiene südlich des Kontrollpunkts geschickt, wo sie von selbst 8 s stand). Die Zonendatei bleibt die
+daneben (`hints/Level_03.zones`), ihre ruhigen Zonen gelten nur für den Speedrun. 2026-11-16, Level 3, 5, 9 und 13:
+
+- Level 3: 5:26.92, 5 Leben, keine Kugel verloren (ruhig 5:58.97), `--plan hints/Level_03.plan --hints
+  hints/Level_03-speedrun.txt`. Die Wartezeiten auf den Schienen von Sektor 2 (die Kugel kommt in den Mulden an ihrem
+  Fuß zur Ruhe) bleiben: kürzer fällt sie herunter. Kein Weg an den Verwandlern von Sektor 1 vorbei gefunden (Stein am
+  Eingang der Gabelplattform nimmt den Südarm zum Papierverwandler nicht).
+- Level 5: 11:29.95, 5 Leben, keine Kugel verloren (ruhig 12:39.77), `--follow hints/Level_05-owner.replay --hints
+  hints/Level_05.txt` mit einer ruhigen Zone über Sektor 5 (`hints/Level_05.zones`; im Tempo des Speedruns fiel die
+  Kugel dort bei (1113.7, -138, -47) bis zum Spielende herunter). Sektoren 1-4 im Speedrun-Tempo erreichen den letzten
+  Kontrollpunkt bei 8:25 (ruhig 9:35).
+- Level 9: noch kein schnellerer Lauf. Dem Lauf des Besitzers folgend liegt der Speedrun am dritten Kontrollpunkt 7 s
+  vorn, fällt dann in Sektor 4 (Steinkugel, Zielscheiben, Schienen um die Schleife) immer wieder bei (423, -109, 568)
+  herunter; eine ruhige Zone dort oder über den ganzen Sektor macht ihn langsamer als den ruhigen Lauf (16:55, zwei
+  Kugeln verloren).
+- Level 13: der Speedrun gleicht dem ruhigen Lauf (10:43.90): das Level fahren Hinweise und die nachverfolgten Läufe
+  des Besitzers, seine langen Halte gehören den Rätseln selbst (eine Kiste unter der Serpentine, 8 s; die Steine, die
+  die Papierkugel am Ende von Sektor 3 heben, 20 s).
+
+Die Läufe von Level 3 und 5 spielen auf den unsichtbaren Karten Tick für Tick gleich.
+
 ## Videos seiner Läufe
 
 `--video FILE` mit `--replay` zeichnet den Lauf ohne Fenster, ein Bild je Takt (60 pro Sekunde) in `--size`, als
