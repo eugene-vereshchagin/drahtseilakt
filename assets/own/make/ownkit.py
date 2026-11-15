@@ -149,6 +149,16 @@ class Mesh:
         # what is drawn instead of this mesh (another Mesh), when its shape is the physics' (open-format.md, a mesh's
         # finer look): the game draws the look and gives the physics and the rules this one
         self.look = None
+        # material channels (open-format.md): further passes over the whole mesh, each (material index, (source,
+        # destination) blend factor names, a texture coordinate per vertex), drawn over the parts
+        self.channels = []
+
+    def channel(self, mat, blend, uvs):
+        """One more pass over the whole mesh with material `mat`, blended by the pair of factor names `blend`, with
+        its own texture coordinates `uvs` (one per vertex, or a function of a vertex's (position, normal, uv))."""
+        if callable(uvs):
+            uvs = [uvs(np.asarray(p), np.asarray(n), uv) for p, n, uv in zip(self.p, self.n, self.uv)]
+        self.channels.append((mat, tuple(blend), [tuple(float(c) for c in uv) for uv in uvs]))
 
     def vertex(self, p, n, uv):
         self.p.append(tuple(float(c) for c in p))
@@ -459,16 +469,18 @@ GAME = "game:"
 
 def material(name, texture=None, diffuse=1.0, emissive=0.3, ambient=0.1, specular=0.0, power=0.0,
              double_sided=False, alpha="OPAQUE", cutoff=0.5, blend=None, texgen=None, unlit=False, z_write=None,
-             normal=None):
+             normal=None, parallax=None, alpha_cutoff=None):
     """A material's description for write_open: `texture` a file in the folder's textures/ (made with save_png), or
     `game:<name>` for the game's texture of that name (no file: the game takes it from the chosen texture pack, ours by
     default; docs/drahtseilakt/open-format.md),
     `normal` its relief (a normal map there, glTF's normalTexture, on the same texture coordinates), the
     colours scalars (grey) or rgb(a) lists, `alpha` OPAQUE, MASK (with `cutoff`) or BLEND (with `blend`, a pair of
-    the format's factor names), `texgen` reflect or chrome."""
+    the format's factor names; `alpha_cutoff`: an alpha test on top of the blend), `texgen` reflect or chrome,
+    `parallax` the relief's depth in texture coordinates (over 0, at most 0.25; the normal map's alpha is then the
+    height, 1 the top)."""
     return dict(name=name, texture=texture, diffuse=diffuse, emissive=emissive, ambient=ambient, specular=specular,
                 power=power, double_sided=double_sided, alpha=alpha, cutoff=cutoff, blend=blend, texgen=texgen,
-                unlit=unlit, z_write=z_write, normal=normal)
+                unlit=unlit, z_write=z_write, normal=normal, parallax=parallax, alpha_cutoff=alpha_cutoff)
 
 
 def node(name, mesh=None, matrix=None, visible=False, sprite=None):
@@ -488,11 +500,14 @@ def _colour(v, n):
 
 
 def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_ball=None, settings=None,
-               generator="drahtseilakt ownkit.py"):
+               generator="drahtseilakt ownkit.py", scripts=None):
     """Writes the level folder: level.gltf and level.bin (the textures are already in out_dir/textures/). `meshes`
     are Mesh objects (their parts keyed by material index, or None), `nodes` from node(), `materials` from
     material(), `groups` (name, [node indices]) pairs, `settings` the scene's settings (tutorial and last_level are
-    required by the reader; music, light, level_bonus optional)."""
+    required by the reader; music, light, level_bonus optional). `scripts`: the level's behaviour graphs (scriptkit.py's
+    Graph.json(); open-format.md, "Scripts"), whose objects may name what they are instead of giving its index: an
+    `entity` by its node's name, a `group`, `mesh` or `material` by name, a `texture` by its file's name as the
+    materials give it; None: the level has no scripts."""
     bin_ = bytearray()
     views, accessors = [], []
 
@@ -531,7 +546,18 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
             if mat is not None:
                 prim["material"] = mat
             prims.append(prim)
-        return {"name": m.name, "primitives": prims}
+        out = {"name": m.name, "primitives": prims}
+        if m.channels:
+            # each channel's coordinates are one more TEXCOORD set (attrs is shared by the primitives)
+            chans = []
+            for k, (mat, blend, uvs) in enumerate(m.channels, 1):
+                if len(uvs) != len(m.p):
+                    raise ValueError(f"mesh {m.name}: channel {k} has not a coordinate per vertex")
+                attrs[f"TEXCOORD_{k}"] = push(flat(uvs), 34962,
+                                              {"componentType": 5126, "count": len(uvs), "type": "VEC2"})
+                chans.append({"material": mat, "blend": list(blend), "texcoord": k})
+            out["extras"] = {"drahtseilakt": {"channels": chans}}
+        return out
 
     for m in meshes:
         gl_meshes.append(mesh_json(m))
@@ -539,7 +565,7 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
     for i, m in enumerate(meshes):
         if m.look is not None:
             gl_meshes.append(mesh_json(m.look))
-            gl_meshes[i]["extras"] = {"drahtseilakt": {"look": len(gl_meshes) - 1}}
+            gl_meshes[i].setdefault("extras", {}).setdefault("drahtseilakt", {})["look"] = len(gl_meshes) - 1
 
     images = list(dict.fromkeys([mt["texture"] for mt in materials if mt["texture"]]
                                 + [mt["normal"] for mt in materials if mt.get("normal")]))
@@ -556,8 +582,12 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
              "doubleSided": mt["double_sided"], "alphaMode": mt["alpha"]}
         if mt.get("normal"):
             v["normalTexture"] = {"index": image_ids[mt["normal"]]}
+            if mt.get("parallax"):
+                x["parallax"] = float(mt["parallax"])
         if mt["alpha"] == "BLEND":
             x["blend"] = list(mt["blend"] or ("src_alpha", "inv_src_alpha"))
+            if mt.get("alpha_cutoff") is not None:
+                x["alpha_cutoff"] = float(mt["alpha_cutoff"])
         if mt["alpha"] == "MASK":
             v["alphaCutoff"] = mt["cutoff"]
         if mt["texgen"]:
@@ -600,6 +630,21 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
         "bufferViews": views,
         "accessors": accessors,
     }
+    if scripts is not None:
+        # names to the indices the reader counts: nodes, groups, meshes, materials, images (crates/level/src/open.rs)
+        tables = {"entity": {nd["name"]: i for i, nd in enumerate(nodes)},
+                  "group": {g: i for i, (g, _) in enumerate(groups)},
+                  "mesh": {m.name: i for i, m in enumerate(meshes)},
+                  "material": {mt["name"]: i for i, mt in enumerate(materials)},
+                  "texture": image_ids}
+        objects = []
+        for name, cls, (kind, ref) in scripts["objects"]:
+            if isinstance(ref, str):
+                if ref not in tables.get(kind, {}):
+                    raise ValueError(f"scripts: object {name} names the {kind} {ref}, which the level has not")
+                ref = tables[kind][ref]
+            objects.append([name, cls, [kind, ref]])
+        doc["scenes"][0]["extras"]["drahtseilakt"]["scripts"] = dict(scripts, objects=objects)
     os.makedirs(out_dir, exist_ok=True)
     for n in images:
         if not n.startswith(GAME) and not os.path.isfile(os.path.join(out_dir, "textures", n)):

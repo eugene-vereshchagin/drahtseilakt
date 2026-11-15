@@ -5920,8 +5920,14 @@ mod tests {
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Custom);
         assert_eq!(m.title(Screen::Custom).as_deref(), Some("Included"));
-        assert_eq!(m.maps.len(), 13, "the thirteen shipped maps");
-        let orders: Vec<_> = m.maps.iter().map(|p| p.order).collect();
+        // the showcase level of our own (order 0, made by make_synthetic_level.py) comes first where it is built
+        let showcase = usize::from(m.maps.first().is_some_and(|p| p.order == Some(0)));
+        assert_eq!(
+            m.maps.len(),
+            13 + showcase,
+            "the thirteen shipped maps (after the showcase level)"
+        );
+        let orders: Vec<_> = m.maps.iter().skip(showcase).map(|p| p.order).collect();
         assert_eq!(
             orders,
             (1..=13).map(Some).collect::<Vec<_>>(),

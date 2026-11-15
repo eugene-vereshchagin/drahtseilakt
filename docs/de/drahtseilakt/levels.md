@@ -101,6 +101,37 @@ das erste, `Parts_Test`, einige hundert Einheiten Bahn mit jedem Teil darauf ode
 Sicherungsart, für die Tests; es ist durch `hidden = yes` in seiner level.txt aus der Liste der Spieler genommen und
 öffnet weiter mit `--open`), deren Ergebnisse im Repository liegen. Ihre Lizenz ist die des Spiels (GPL-3.0-only).
 
+### Das Schau-Level
+
+`00_Синтетический_уровень` („Synthetischer Level", das erste der mitgelieferten: `order = 0`, `difficulty = 1`)
+enthält jedes Element des Spiels auf einer Bahn von etwa 1900 Einheiten, jedes mit einem Schild daneben: in ein paar
+Minuten durchrollen und in jedem Look mit dem Auge prüfen, ob alles gezeichnet wird, mit den richtigen Texturen,
+klingt und sich verhält, wie es soll. Gebaut wird es von `assets/own/make/make_synthetic_level.py` (der klassische
+Teil, als Levelbeschreibung mit zwei eigenen Befehlen, `sign` und `gate`) und `synthetic_community.py` (der
+Community-Teil), nur aus eigenen Inhalten; das gebaute Level liegt nicht in git.
+
+- **Klassisch**, fünf Sektoren: Böden und Oberflächen (Rinne, Ziegelrand, Geländer, blanker Boden, Holz, Breiten,
+  Rampe, runde Kurven, harte Ecken); Schienen (gerade, in Kurven, steigend, fallend) und Kulisse (Holzdeck auf
+  Säulen, Lampenturm, Mast, Sockel, Pfeiler, Mauerblock, Girlande, Leuchtturm); die Teile (Extrapunkt und -leben,
+  Kisten, Kuppel, die vier losen Bälle, Sack, Drehkreuz, Klappenrad); die Transformer und die Mechanik auf dem Weg
+  (Papier und der Ventilator, Wippe, Plattenbrücke, Schaukel, Stein schiebt Kisten, klebriger Ball, Holz); die
+  Rätselmodule in Buchten neben einem breiten Boden (Schieber, Kiste unter ihrem Stein, Kippplatten, Plattenbrücke
+  und Zugbrücke zu Buchten, Klappbrücke, fallender Raum).
+- **Das Tor** „COMMUNITY", hinter dem Himmel, Nebel und Licht wechseln (ein Skript).
+- **Community**, zwei Sektoren: die Materialien der Community-Karten (Alpha-Blending, Alpha-Test, additives
+  Leuchten, Chrom- und Spiegel-Texturkoordinaten, ein doppelseitiges Blatt, unbeleuchtete Farbe, Normalmap mit
+  Parallaxe, ein zweiter Durchgang über ein Mesh, ein 3D-Sprite, ein Glasboden auf dem Weg), dann unsere eigenen
+  Verhaltensgraphen (`assets/own/make/scriptkit.py` schreibt sie in die `scripts` des Levels,
+  [open-format.md](open-format.md)): Rotate, ein Pendelwagen und ein Lift (Linear Progression, Interpolator, Set
+  Position), Text Display, solange der Ball nahe ist, 3D Text, ein Partikelbrunnen, ein Bildschirm mit wechselnden
+  Texturen (Set Texture), Show/Hide und Set Diffuse, ein Portal (Box Box Intersection, Set Position auf dem Ball),
+  eine Kiste, die Physicalize zum Körper macht.
+
+Was das offene Format noch nicht trägt (beim Bauen gefunden): die Slots einer Textur (Movie Player, Set Current
+Slot), Wave-Klänge (Wave Player), eine eigene Textur des Levels für Skript-Partikel, ein zur Sicht gedrehtes
+3D-Sprite des Levels. `crates/game/src/showcase.rs` prüft, dass jedes unserer Teile darin steht und dass sein Lauf
+(`hints/runs/Level_00-synthetic.replay`, vom Testspieler mit `hints/Level_00-synthetic.txt`) es schafft.
+
 ## Unsere Level und wie man sie bearbeitet
 
 *2026-11-03.* Zehn eigene Level, vom ersten Rollen bis zum Spießrutenlauf, kommen mit dem Spiel (das

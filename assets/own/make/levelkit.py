@@ -645,6 +645,8 @@ class LevelBuilder:
         self.intended = set()
         self.drops = []
         self.seed = seed
+        # the level's behaviour graphs (scriptkit.Graph.json(); open-format.md, "Scripts"); None: no scripts
+        self.scripts = None
         self._standard_materials()
 
     # --- materials ---------------------------------------------------------------------------------------------
@@ -1479,7 +1481,7 @@ class LevelBuilder:
                                "last_level": False, "parts": "own", **({"fog": fog} if fog else {}),
                                **({"clouds": sea} if sea else {}),
                                **({"sector_balls": list(sector_balls)} if sector_balls and any(sector_balls) else {})},
-                     generator=f"drahtseilakt levelkit.py {KIT_VERSION}")
+                     generator=f"drahtseilakt levelkit.py {KIT_VERSION}", scripts=self.scripts)
         with open(os.path.join(self.out, "level.txt"), "w") as f:
             f.write(f"title = {title}\nauthor = {author}\nversion = 1\n")
             if licence:

@@ -56,6 +56,29 @@ Pro Racing 赛季不属于这一类：它们是新的几何，归入 `community/
 
 我们自己的关卡随游戏放在其 `assets/levels/` 中，每个关卡一个开放格式的文件夹，只用我们自己的部件制作（assets/own，[resources.md](resources.md)），因此完全不需要原版的副本也能游玩。菜单把它们与 `levels/open/` 中的开放格式关卡一起显示：没有副本时在 Start 下（列表“Our levels”），在扩展模式的“Open format”下则始终显示。它们由 `assets/own/make/` 中的脚本生成（`levelkit.py` 用轨道块和部件的替身搭建关卡；`make_test_level.py` 生成第一个关卡 `Parts_Test`：几百个单位长的轨道，每个部件都在轨道上或旁边，另有每种防护各一段轨道，供测试使用；它的 level.txt 中的 `hidden = yes` 使它不出现在玩家的列表中，仍可用 `--open` 打开），生成结果已提交到仓库。它们的许可证与游戏相同（GPL-3.0-only）。
 
+### 展示关卡
+
+`00_Синтетический_уровень`（“合成关卡”，在随游戏附带的列表中排第一：`order = 0`、`difficulty = 1`）把游戏的每一种元素
+放在一条约 1900 个单位长的路上，每个元素旁边有一块标牌：几分钟滚一遍，在每种外观下用眼睛检查是否都能绘制、纹理正确、
+声音和行为正常。它由 `assets/own/make/make_synthetic_level.py`（经典部分，是一份带有两个自有命令 `sign` 和 `gate`
+的关卡描述）和 `synthetic_community.py`（社区部分）生成，只用我们自己的内容；生成的关卡不在 git 中。
+
+- **经典**，五个区段：地面与表面（槽形、砖砌挡边、护栏、裸地面、木板、宽度变化、坡道、圆弯、直角弯）；轨道（直、
+  转弯、上升、下降）与布景（柱上的木板路、灯塔楼、桅杆、基座、立柱、墙块、灯串、灯塔）；部件（加分与加命、箱子、
+  圆顶、四种散落的球、沙袋、旋转臂、翻板轮）；变换器与路上的机关（纸球与风扇、跷跷板、板桥、秋千、石球推箱子、
+  粘球、木球）；宽地面旁凹位里的谜题模块（推块、石头下的箱子、翻转板、通往凹位的板桥和吊桥、翻板桥、下落房间）。
+- **大门** “COMMUNITY”，过门之后天空、雾和光都会改变（一个脚本）。
+- **社区**，两个区段：社区地图使用的材质（alpha 混合、alpha 测试、加色发光、铬与反射纹理坐标、双面薄片、无光照
+  颜色、带视差的法线贴图、网格的第二遍绘制、3D 精灵、路上的玻璃地面），然后是我们自己的行为图
+  （`assets/own/make/scriptkit.py` 把它们写入关卡的 `scripts`，[open-format.md](open-format.md)）：Rotate、往返车与
+  升降台（Linear Progression、Interpolator、Set Position）、球靠近时的 Text Display、3D Text、粒子喷泉、循环切换
+  纹理的屏幕（Set Texture）、Show/Hide 与 Set Diffuse、传送门（Box Box Intersection、对球 Set Position）、由
+  Physicalize 变成刚体的箱子。
+
+制作过程中发现开放格式目前还不能承载：纹理的槽位（Movie Player、Set Current Slot）、波形声音（Wave Player）、
+脚本粒子使用关卡自己的纹理、朝向视线的关卡 3D 精灵。`crates/game/src/showcase.rs` 检查我们的每个部件都在其中，
+并且它的记录（`hints/runs/Level_00-synthetic.replay`，测试玩家用 `hints/Level_00-synthetic.txt` 跑出）能够通关。
+
 ## 我们的关卡及其编辑方法
 
 *2026-11-03。* 十个我们自己的关卡随游戏附带，从初次滚动到终极考验（roadmap.md 的发布标准）。每个都是新的：布局是我们的，只有机制来自原版。菜单按此顺序（level.txt 中的 `order`；它们的难度 `difficulty` 也随之从 1 到 10）列出它们，使用菜单语言中的名称：

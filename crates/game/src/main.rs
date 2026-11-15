@@ -50,6 +50,7 @@ mod music;
 mod options;
 mod ownlevels;
 mod partcheck;
+mod showcase;
 mod particles;
 mod physics;
 mod pieces;
