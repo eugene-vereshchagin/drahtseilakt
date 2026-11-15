@@ -203,6 +203,55 @@ fn malformed_or_too_many_frames_refuse_the_level() {
 }
 
 #[test]
+fn a_texture_keeps_its_slots_and_bad_slot_lists_are_refused() {
+    let named = |n: &str| level::Texture {
+        name: n.into(),
+        source: level::TextureSource::None,
+        color_key: None,
+    };
+    let mut l = level();
+    l.textures = vec![named("anim")];
+    let images = vec![named("anim"), named("anim_slot1"), named("anim_slot2")];
+    let d = dir("slots");
+    level::open::export_slots(&l, &d, &images, &[0], &[(0, vec![1, 2])]).unwrap();
+    let back = level::open::import(&d).unwrap();
+    assert_eq!(back.texture_slots.len(), 1);
+    assert_eq!(back.texture_slots[0].0, 0);
+    let files: Vec<String> = back.texture_slots[0]
+        .1
+        .iter()
+        .map(|s| match s {
+            level::TextureSource::LevelFile(p) => {
+                p.file_name().unwrap().to_string_lossy().into_owned()
+            }
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        files,
+        vec![
+            level::open::texture_file(1, "anim_slot1").replace("textures/", ""),
+            level::open::texture_file(2, "anim_slot2").replace("textures/", "")
+        ]
+    );
+    let file = d.join("level.gltf");
+    let good: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    for bad in [
+        serde_json::json!([0]),
+        serde_json::json!([3]),
+        serde_json::json!("1"),
+        serde_json::json!(vec![1; 64]),
+    ] {
+        let mut j = good.clone();
+        j["images"][0]["extras"]["drahtseilakt"]["slots"] = bad.clone();
+        std::fs::write(&file, serde_json::to_string(&j).unwrap()).unwrap();
+        assert!(level::open::import(&d).is_err(), "{bad}");
+    }
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
 fn a_mesh_of_points_survives_and_points_beside_triangles_are_refused() {
     let mut l = level();
     l.meshes.push(level::Mesh {

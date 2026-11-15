@@ -136,6 +136,9 @@ deren Kopf nicht besteht, wird übergangen und das PNG genommen; eine mit besch�
   (x, z je Sekunde). Nur `top` ist nötig; Werte außerhalb des Bereichs werden darauf begrenzt, ein fehlerhafter Wert
   weist das Level ab.
 
+- **Textur-Slots**: `extras.drahtseilakt.slots` eines Bildes nennt die Bilder, die seine weiteren Slots sind, der
+  Reihe nach (eine Textur aus mehreren Bildern: die Frames einer Animation, die ein Skript der Karte mit Set Current Slot
+  zeigt). Jedes ist ein anderes Bild des Levels; höchstens 63; alles andere lehnt das Level ab.
 - **Rahmen** `extras.drahtseilakt.frames` (die 2D-Rahmen einer konvertierten Karte: die Signatur des Autors in einer
   Ecke, ein Logo; nur gezeichnet): jeder mit `name`, `rect` (links, oben, rechts, unten in Pixeln eines Bildschirms von
   640 x 480), `uv` (der gezeigte Teil der Textur), `z_order` (niedriger zuerst gezeichnet), `material` (ein Index oder

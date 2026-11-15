@@ -134,6 +134,9 @@ level may carry the `.dtx` without the PNG.
   horizon's haze a unit of distance), `under` (0..1: how much of the world under it the haze there hides) and `wind`
   (x, z a second). Only `top` is needed; values out of range are held to it, a malformed one refuses the level.
 
+- **Texture slots**: an image's `extras.drahtseilakt.slots` lists the images that are its further slots, in order (a
+  texture of several pictures, an animation's frames a map's script shows with Set Current Slot). Each is another image
+  of the level; at most 63; anything else refuses the level.
 - **Frames** `extras.drahtseilakt.frames` (a converted map's 2D frames: an author's signature in a corner, a logo;
   only drawn): each its `name`, `rect` (left, top, right, bottom in pixels of a 640 x 480 screen), `uv` (the part of
   the texture shown), `z_order` (lower drawn first), `material` (an index or null) and `visible`. At most 64; a

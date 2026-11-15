@@ -1918,7 +1918,9 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<Vec<Str
     let mut seen: std::collections::HashMap<Key, Vec<usize>> = std::collections::HashMap::new();
     let mut by_name: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     let mut missing: Vec<String> = Vec::new();
-    for t in &level.textures {
+    for (ti, t) in level.textures.iter().enumerate() {
+        // a texture with further slots (an animation's frames) is an image of its own: its slots are its
+        let has_slots = level.texture_slots.iter().any(|s| s.0 == ti);
         // the game's texture by name stays a name (level.gltf says `game:<name>`): no file of the level's
         let named = match &t.source {
             level::TextureSource::Game(n) => Some(format!("game:{n}")),
@@ -1944,6 +1946,12 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<Vec<Str
             keep.len() - 1
         };
         let idx = match (named, found) {
+            (None, found) if has_slots => {
+                if found.is_none() {
+                    missing.push(t.name.clone());
+                }
+                add(&mut keep, &mut pictures, found)
+            }
             (Some(n), _) => match by_name.get(&n) {
                 Some(&k) => k,
                 None => {
@@ -1986,7 +1994,33 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<Vec<Str
         };
         to.push(idx);
     }
-    level::open::export_textures(level, dir, &keep, &to)?;
+    // each further slot of a texture is one more image, named in its first's extras
+    let mut slots: Vec<(usize, Vec<usize>)> = Vec::new();
+    for (t, more) in &level.texture_slots {
+        let (Some(&img), Some(own)) = (to.get(*t), level.textures.get(*t)) else {
+            continue;
+        };
+        let mut images = Vec::new();
+        for (k, source) in more.iter().enumerate().take(nmo::scene::MAX_SLOTS - 1) {
+            let slot = level::Texture {
+                name: format!("{}_slot{}", own.name, k.saturating_add(1)),
+                source: source.clone(),
+                color_key: own.color_key,
+            };
+            let pic = data.texture(&slot);
+            if pic.is_none() {
+                missing.push(slot.name.clone());
+            }
+            keep.push(level::Texture {
+                source: level::TextureSource::None,
+                ..slot
+            });
+            pictures.push(pic);
+            images.push(keep.len() - 1);
+        }
+        slots.push((img, images));
+    }
+    level::open::export_slots(level, dir, &keep, &to, &slots)?;
     // pictures of an earlier export into this folder (numbered as ours are) would stay as stale files: all are read
     // by now, so they go
     let old: Vec<PathBuf> = std::fs::read_dir(dir.join("textures"))

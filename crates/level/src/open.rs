@@ -142,6 +142,18 @@ pub fn export_textures(
     textures: &[Texture],
     remap: &[usize],
 ) -> Result<(), String> {
+    export_slots(level, dir, textures, remap, &[])
+}
+
+/// `export_textures` with the further slots of textures (an animation's frames): each `(image, slots)` names the
+/// images that are that image's slots after the first, in order (written in its extras).
+pub fn export_slots(
+    level: &Level,
+    dir: &Path,
+    textures: &[Texture],
+    remap: &[usize],
+    slots: &[(usize, Vec<usize>)],
+) -> Result<(), String> {
     let tex = |t: Option<usize>| t.and_then(|i| remap.get(i).copied());
     let mut bin: Vec<u8> = Vec::new();
     let mut views = Vec::new();
@@ -244,6 +256,9 @@ pub fn export_textures(
             let mut v = json!({"uri": uri, "name": t.name});
             if let Some(k) = t.color_key {
                 v["extras"] = json!({"drahtseilakt": {"color_key": k}});
+            }
+            if let Some((_, more)) = slots.iter().find(|s| s.0 == i) {
+                v["extras"]["drahtseilakt"]["slots"] = json!(more);
             }
             v
         })
@@ -1019,6 +1034,28 @@ fn import_from(
             source: TextureSource::LevelFile(dir.join(uri)),
             color_key: color_key_of(&img["extras"]["drahtseilakt"]["color_key"]),
         });
+    }
+    // a texture's further slots: other images of the level, at most MAX_SLOTS - 1 of them
+    for (i, img) in arr("images").iter().enumerate() {
+        let listed = &img["extras"]["drahtseilakt"]["slots"];
+        if listed.is_null() {
+            continue;
+        }
+        let bad = || format!("image {i}: its slots are not other images of the level");
+        let list = listed
+            .as_array()
+            .filter(|l| l.len() < nmo::scene::MAX_SLOTS)
+            .ok_or_else(bad)?;
+        let mut sources = Vec::with_capacity(list.len());
+        for k in list {
+            let k = k
+                .as_u64()
+                .and_then(|k| usize::try_from(k).ok())
+                .filter(|&k| k != i)
+                .ok_or_else(bad)?;
+            sources.push(level.textures.get(k).ok_or_else(bad)?.source.clone());
+        }
+        level.texture_slots.push((i, sources));
     }
     let tex_image: Vec<Option<usize>> = arr("textures")
         .iter()
