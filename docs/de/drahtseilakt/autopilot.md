@@ -126,7 +126,11 @@ Spielers. Drei Versuche gehen vom letzten Stand vor dem Fehlschlag aus, dann je 
 zurückliegenden (die Ursache kann früher liegen: ein zu langsamer Anlauf, eine schlechte Linie in eine Kurve). Nach 30
 Versuchen an einer Stelle (eine Stelle: 6 Wegpunkte weiter als die letzte) wird der Fehlschlag hingenommen: die Kugel
 geht verloren, oder der Lauf wird mit seinem Bericht aufgegeben (ein so hingenommener fremder Transformator: die Kugel
-fährt in einen, der die Art des Wegs macht, wie eine neue Kugel). Die Hinweise können nach dem Zurückgehen wieder
+fährt in einen, der die Art des Wegs macht, wie eine neue Kugel). Früher an einem Fleck: ist ein Versuch von dort so weit zurückgegangen, wie die Speicherstände
+reichen, wird das dritte weitere Stehenbleiben dort (innerhalb von 2 Einheiten) oder der sechste weitere Verlust der
+Kugel (innerhalb von 12) hingenommen (was dort scheitert, entschied sich früher, als ein Zurückgehen reicht); bis dahin
+gehen die Versuche weiter zurück, und ein hingenommener Fehlschlag löscht seinen Fleck (die nächste Kugel kommt mit
+eigener Vorgeschichte dorthin). Die Hinweise können nach dem Zurückgehen wieder
 auslösen, wie für eine neue Kugel. Ein Hinweis, dessen Kugel einen Schritt 3 oder mehr unter dessen Punkt beendet
 (auf einen Boden darunter gefallen), ist vom Kurs ab: seine weiteren Schritte zählen nicht als Vorankommen, also
 geht der Testspieler von dort zurück wie von einem Weg, der steht, statt den Hinweis vom falschen Boden zu Ende zu

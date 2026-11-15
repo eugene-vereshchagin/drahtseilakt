@@ -114,7 +114,10 @@ for some seconds, random additions to its choices' scores; from the third try on
 player's line. Three tries go from the last save before the failure, then three from each save twice as far back
 (the cause may lie earlier: a run-up too slow, a bad line into a bend). After 30 tries at one place (a place: 6 way
 points further than the last), the failure is taken as it comes: the ball is lost, or the run is given up with its
-report (a stray transformer taken so: the ball goes into one making the way's kind, as a new ball does). The hints may fire again after going back, as for a new ball. A hint whose ball ends a step 3 or more below
+report (a stray transformer taken so: the ball goes into one making the way's kind, as a new ball does). Sooner at one spot: once a try from a place has gone back as far as the saves reach, standing
+still there three times more (within 2 units), or losing the ball there six times more (within 12), is taken as it
+comes (what fails there was decided earlier than any going back reaches); until then the tries keep going back
+further, and a failure taken clears its spot (the next ball comes there with a history of its own). The hints may fire again after going back, as for a new ball. A hint whose ball ends a step 3 or more below
 the step's point (fallen to a floor beneath it) is off course: its further steps are no getting on, so it goes back
 from there as from a way that stands still, instead of playing the rest of the hint from the wrong floor. A ball lost as the player lost one there (within
 four seconds of keeping to the player's last seconds before a loss) is not gone back from, where the player's run got past that sector afterwards: what the

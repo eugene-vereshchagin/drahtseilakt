@@ -3264,12 +3264,15 @@ const SAVE_FROM: u64 = 300;
 /// further along the way (points) a failure must come to count as a new place.
 const TRIES_AT_PLACE: u32 = 30;
 const NEW_PLACE: usize = 6;
-/// Standing still at the same spot (within this many units) this many times is not tried again: the way is blocked
-/// there, and going back once more only shows the same wall.
+/// Standing still at the same spot (within this many units) this many times more, once a try from there has gone back
+/// as far as the saves reach (the oldest within `BACK_MOST`, or the first since the sector began), is not tried again:
+/// the way is blocked there, and going back once more only shows the same wall.
 const STUCK_SPOT: f32 = 2.0;
 const STUCKS_AT_SPOT: u32 = 3;
-/// Nor is losing the ball at the same spot this many times (going back twice as far once): what fails there was
-/// decided earlier than any going back reaches, and the ball is taken as lost (the sector again, from its start).
+/// Nor is losing the ball at the same spot this many times more, on the same condition: what fails there was decided
+/// earlier than any going back reaches, and the ball is taken as lost (the sector again, from its start). Before that
+/// the tries go back twice as far every third time, as at any place: a run-up two or four saves back is often what
+/// gets through (counting the tries alone gave up a level's hard stretch just before the try that passed it).
 const LOST_SPOT: f32 = 12.0;
 const LOSTS_AT_SPOT: u32 = 6;
 
@@ -3284,8 +3287,9 @@ pub struct Rewinds<T> {
     tries: u32,
     total: u32,
     max_total: u32,
-    /// Where the ball stood still or was lost before (and which), and how many times.
-    spots: Vec<(Vec3, bool, u32)>,
+    /// Where the ball stood still or was lost before (and which), how many times, and whether a try from there has
+    /// already gone back as far as the saves reach.
+    spots: Vec<(Vec3, bool, u32, bool)>,
 }
 
 impl<T: Clone> Rewinds<T> {
@@ -3338,8 +3342,9 @@ impl<T: Clone> Rewinds<T> {
     /// A failure at tick `at` (the ball lost then, or the way standing still since then) at `place` (sector, way
     /// point): the state to go back to and which try at this place it is, or None when the failure is to be taken.
     /// The saves after the one gone back to are dropped (they were on the failed course).
-    /// `spot`: where the ball stood still, or was lost (`lost`); the third standing still at one spot, or the sixth
-    /// loss, is taken as it comes.
+    /// `spot`: where the ball stood still, or was lost (`lost`); once a try from one spot has gone back as far as the
+    /// saves reach, the third standing still there after it, or the sixth loss, is taken as it comes. A failure taken
+    /// clears its spot: the next ball comes there from the sector's start, with a history of its own.
     pub fn back(
         &mut self,
         at: u64,
@@ -3352,21 +3357,25 @@ impl<T: Clone> Rewinds<T> {
         } else {
             (STUCK_SPOT, STUCKS_AT_SPOT)
         };
-        let n = match self
+        let i = match self
             .spots
-            .iter_mut()
-            .find(|s| s.1 == lost && s.0.distance(spot) <= near)
+            .iter()
+            .position(|s| s.1 == lost && s.0.distance(spot) <= near)
         {
-            Some(s) => {
-                s.2 += 1;
-                s.2
-            }
+            Some(i) => i,
             None => {
-                self.spots.push((spot, lost, 1));
-                1
+                self.spots.push((spot, lost, 0, false));
+                self.spots.len() - 1
             }
         };
-        if n >= most {
+        // (counted only once a try from there has gone back as far as the saves reach: before that, going back
+        // further is still to be tried)
+        if self.spots[i].3 {
+            self.spots[i].2 += 1;
+        }
+        let (n, deepest) = (self.spots[i].2, self.spots[i].3);
+        if n >= most && deepest {
+            self.spots.swap_remove(i);
             return None;
         }
         if place.0 > self.front.0 || (place.0 == self.front.0 && place.1 > self.front.1 + NEW_PLACE)
@@ -3395,6 +3404,9 @@ impl<T: Clone> Rewinds<T> {
             .unwrap_or(before)
             .min(before);
         let k = before.saturating_sub(back).max(oldest);
+        if k == oldest {
+            self.spots[i].3 = true;
+        }
         self.saves.truncate(k + 1);
         self.total += 1;
         self.saves.last().map(|s| (s.1.clone(), self.tries))
@@ -3412,21 +3424,53 @@ mod tests {
             r.save(300 + t * 120, t as u32);
         }
         let spot = Vec3::new(1.0, 2.0, 3.0);
-        assert!(r.back(1500, (1, 10), spot, false).is_some());
-        assert!(r.back(1500, (1, 10), spot + Vec3::X, false).is_some());
-        // (the third time there: taken as it comes)
-        assert!(r.back(1500, (1, 10), spot, false).is_none());
+        // (standing still there: three tries from the last save, then from further back)
+        for _ in 0..3 {
+            assert_eq!(r.back(1500, (1, 10), spot, false).map(|s| s.0), Some(9));
+        }
+        assert_eq!(
+            r.back(1500, (1, 10), spot + Vec3::X, false).map(|s| s.0),
+            Some(8)
+        );
+        // (with one save left, gone back to: three more standing still there, the third taken as it comes)
+        let mut one = Rewinds::<u32>::new(600);
+        one.save(300, 0);
+        assert!(one.back(1500, (1, 10), spot, false).is_some());
+        assert!(one.back(1500, (1, 10), spot + Vec3::X, false).is_some());
+        assert!(one.back(1500, (1, 10), spot, false).is_some());
+        assert!(one.back(1500, (1, 10), spot, false).is_none());
         // (elsewhere, and a lost ball, still go back)
         assert!(
-            r.back(1500, (1, 10), spot + Vec3::Z * 10.0, false)
+            one.back(1500, (1, 10), spot + Vec3::Z * 10.0, false)
                 .is_some()
         );
-        assert!(r.back(1500, (1, 10), spot, true).is_some());
-        // (lost there five times more, the last of them taken)
-        for _ in 0..4 {
-            assert!(r.back(1500, (1, 10), spot + Vec3::X * 5.0, true).is_some());
+        assert!(one.back(1500, (1, 10), spot, true).is_some());
+    }
+
+    #[test]
+    fn losses_at_one_spot_go_back_as_far_as_the_saves_reach_before_one_is_taken() {
+        let mut r = Rewinds::<u32>::new(600);
+        for t in 0..10 {
+            r.save(300 + t * 120, t as u32);
         }
-        assert!(r.back(1500, (1, 10), spot, true).is_none());
+        let spot = Vec3::new(1.0, 2.0, 3.0);
+        let mut gone_to = Vec::new();
+        while let Some((s, _)) = r.back(
+            1500,
+            (1, 10),
+            spot + Vec3::X * (gone_to.len() % 3) as f32,
+            true,
+        ) {
+            gone_to.push(s);
+            assert!(gone_to.len() < 30, "never taken");
+        }
+        // (more than six tries, going back further every third, the last ones from the oldest save)
+        assert!(gone_to.len() > 6, "{gone_to:?}");
+        assert_eq!(gone_to.last(), Some(&0), "{gone_to:?}");
+        assert!(gone_to.windows(2).all(|w| w[1] <= w[0]), "{gone_to:?}");
+        // (the loss taken clears the spot: the next ball lost there is gone back from again)
+        r.save(1600, 11);
+        assert!(r.back(1800, (2, 0), spot, true).is_some());
     }
 
     #[test]
