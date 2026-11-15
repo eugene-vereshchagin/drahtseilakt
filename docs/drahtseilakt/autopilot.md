@@ -358,6 +358,28 @@ For other tries at a level, `AUTOPILOT_SPEEDRUN_PACE=F` scales the pace (0.3 to 
 keeps the player's still stretches, and `AUTOPILOT_SPEEDRUN_SKIP_ONLY=1` rides the calm pace and only skips them.
 The fastest runs are kept in `hints/runs/speedrun/`.
 
+A level whose speedrun needs hints the calm run must not take has its own hint file, given with `--hints`:
+`hints/Level_03-speedrun.txt` is `Level_03.txt` and one hint more (sector 4: the wood ball sent along the single rail
+south of the checkpoint at once, where by itself it stood 8 s). The level's zones file stays the one beside it
+(`hints/Level_03.zones`), and its calm zones count for the speedrun only. 2026-11-16, levels 3, 5, 9 and 13:
+
+- Level 3: 5:26.92, 5 lives, no ball lost (calm 5:58.97), `--plan hints/Level_03.plan --hints
+  hints/Level_03-speedrun.txt`. The sector 2 rails' waits (the ball settling in the dips at their feet) stay: shorter,
+  it falls off. No way past the transformers of sector 1 was found (stone at the inlet of the forked platform cannot
+  take the south arm to the paper transformer).
+- Level 5: 11:29.95, 5 lives, no ball lost (calm 12:39.77), `--follow hints/Level_05-owner.replay --hints
+  hints/Level_05.txt` with a calm zone over sector 5 (`hints/Level_05.zones`; at the speedrun's pace the ball fell
+  off near (1113.7, -138, -47) there until game over). Sectors 1-4 at the speedrun's pace reach the last checkpoint
+  at 8:25 (calm 9:35).
+- Level 9: no faster run yet. Following the owner's run, the speedrun is 7 s ahead at the third checkpoint, then in
+  sector 4 (the stone ball, the targets and the rails round the loop) it goes off near (423, -109, 568) again and
+  again; a calm zone there, or over the whole sector, makes it slower than the calm run (16:55, two balls lost).
+- Level 13: the speedrun equals the calm run (10:43.90): the level is driven by hints and the owner's traced runs,
+  and its long stops are the puzzles' own (a crate awaited under the serpentine, 8 s; the stones that lift the paper
+  ball at the end of sector 3, 20 s).
+
+The runs of levels 3 and 5 play tick for tick the same on the invisible maps.
+
 ## Videos of its runs
 
 `--video FILE` with `--replay` draws the run without a window, one frame a tick (60 a second) at `--size`, as raw
