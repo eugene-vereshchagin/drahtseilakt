@@ -268,3 +268,28 @@ go 1597.93 16.40 56.23 4 600
 reach 1597.93 16.40 56.23 3
 turned P_Modul_17_01 Modul17_Dreharme 30
 kept
+
+check comm-glass
+ball wood 1823.93 16.40 56.23
+go 1847.93 16.40 56.23 4 600
+reach 1847.93 16.40 56.23 3
+kept
+
+check comm-lift
+ball wood 1908.93 16.40 56.23
+wait 200
+go 1919.93 23.40 56.23 4 300
+reach 1919.93 23.40 56.23 3
+kept
+
+check comm-lift-down
+ball wood 1908.93 16.40 56.23
+wait 470
+go 1919.93 23.40 56.23 4 300
+away 1919.93 23.40 56.23 4
+
+check comm-portal
+ball wood 2005.93 23.40 56.23
+go 2045.93 23.40 56.23 4 900
+reach 2045.93 23.40 56.23 3
+kept

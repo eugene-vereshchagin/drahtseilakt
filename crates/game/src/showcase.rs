@@ -211,6 +211,9 @@ mod tests {
                     for _ in 0..t {
                         let k = keys_toward(&sim, sim.ball.position, sim.ball.position, 1.0);
                         sim.step(k);
+                        if trace && sim.tick % 30 == 0 {
+                            println!("  {} wait: ball {:.1?}", sim.tick, sim.ball.position);
+                        }
                     }
                 }
                 "reach" | "away" => {
