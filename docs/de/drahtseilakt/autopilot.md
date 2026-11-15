@@ -352,11 +352,17 @@ geschoben, jede Kreuzung abgewartet; auf dem Balken nach seinen Starttasten ein 
 Papierkugel vor dem Stein im Fach des zweiten Ventilators ist) schafft die Sektoren 1 und 2 vom Start und bleibt in
 Sektor 3 an den Kisten des Kanals stecken. In Sektor 3 (2026-11-16) sind die Kisten des Kanals ebenso zerlegt: die
 erste nach Westen gerammt, dem Lauf des Besitzers mit Verstärkung 3 folgend (sein Rammstoß ist diagonal, in dieser
-Ansicht schwächer), die zweite und dritte aus einem Anlauf gerammt (`goto`, `hold`, `press` bis 10) und die dritte
-dann vom Rückweg der Papierkugel geschoben; die Fahrt den Kanal hinab ist in zwei `pass`-Schritte geteilt (einer war
-länger als die 20 s, die ein Lauf ohne nächsten Schritt stehen darf). Vom Start von Sektor 3 kommt die Kugel jetzt durch
-den Kanal, die Schaukeln und das Steinrätsel bis zur Schlange der Steine vor CP3 (-648, -288, -1125), wo sie zwischen
-die Steine fällt, statt auf ihnen zu rollen. Die Sektoren 4 und 5 scheitern in dieser Ansicht, von ihren Kontrollpunkten
+Ansicht schwächer), die zweite und dritte aus einem Anlauf gerammt (`goto`, `hold`, `press` bis 10), die dritte auf einer Linie etwas nördlich ihrer Mitte, sodass sie wie in seinem Lauf nach Südwesten in ihre Tasche
+geht (vorher wurde sie danach dorthin geschoben, 6 s länger); die Fahrt den Kanal hinab ist in zwei `pass`-Schritte geteilt (einer war
+länger als die 20 s, die ein Lauf ohne nächsten Schritt stehen darf). Vom Start von Sektor 3 kommt die Kugel durch den Kanal, die
+Schaukeln und das Steinrätsel, aber die Schlange vor CP3 (-648, -288, -1125) ist nicht vollständig: alle zehn
+Steinkugeln, die hinter der Kugel den Kanal hinabrollen, müssen sie erreichen, um den Boden zu bilden, über den die
+Kugel rollt. Im Lauf des Besitzers ist die Kugel um 0:55.5 im Kanal, knapp vor dem ersten Stein, bringt die vier
+schwingenden Säcke (z -822 bis -852) im Vorbeirollen zum Stehen und wartet am Ende des Kanals, wo jeder Stein, der auf
+sie trifft, nach Osten in die Schlange gelenkt wird. Hier kommt die Kugel 4.5 s zu spät in den Kanal, hinter drei
+Steinen: diese treffen die Säcke noch schwingend und fallen, die sieben hinter der Kugel halten die Säcke auf, die sie
+festgesetzt hat (vor dem neuen Rammstoß der dritten Kiste gingen alle zehn verloren: fünf an den Säcken, fünf am Ende
+des Kanals, wo keine Kugel sie umlenkte, und die Kugel fiel zwischen die Steine). Die Sektoren 4 und 5 scheitern in dieser Ansicht, von ihren Kontrollpunkten
 begonnen: in Sektor 4 ist der diagonale Stoß des Besitzers vom Floß in den ersten Ventilator (x -134) hier nicht zu
 geben (entlang einer Diagonale der Welt höchstens ein Pfeil), die Kugel fällt hinter das Floß und sitzt bei x 51 fest;
 in Sektor 5 ist `round` die Spirale (340, -614.5) hinauf zu schwach (der Schub des Originals im Mittel), die Kugel
