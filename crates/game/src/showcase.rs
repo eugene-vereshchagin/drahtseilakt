@@ -287,8 +287,14 @@ mod tests {
         let Some(dir) = built() else { return };
         let text = std::fs::read_to_string(dir.join("checks.txt")).expect("checks.txt");
         let source = Source::Open(dir);
-        let data = Data::new(None).for_source(&source);
-        let level = data.load(&source).expect("the showcase level loads").level;
+        // SHOWCASE_COPY_PARTS=<the player's copy>: the same checks with the copy's parts in place of ours, to tell what
+        // our part does differently from what the layout does
+        let copy = std::env::var_os("SHOWCASE_COPY_PARTS").map(PathBuf::from);
+        let data = Data::new(copy.clone()).for_source(&source);
+        let mut level = data.load(&source).expect("the showcase level loads").level;
+        if copy.is_some() {
+            level.settings.own_parts = false;
+        }
         let data = data.with_parts(&level);
         let modules = crate::scene::load_modules(&level, &data);
         let balls = data.part("3D Entities/Balls.nmo").expect("our balls");

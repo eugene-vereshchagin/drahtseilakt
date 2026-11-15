@@ -224,19 +224,25 @@ checkpoint
 floor 12
 sign "CLASSIC 4: paper, then wood" ahead -6
 sign "P_Trafo_Paper"
-check pending-fans : ball wood -8 0 0 ; go 0 0 0 3 400 ; wait 150 ; kind paper ; go 41.5 0 0 4 900 ; wait 200 ; go 66.5 0 11 10 900 ; wait 200 ; go 92 0 22 10 900 ; reach 92 0 24 3 ; kept
+check fans : ball wood -8 0 0 ; go 0 0 0 3 400 ; wait 150 ; kind paper ; go 41.5 0 0 4 900 ; wait 40 ; go 62 0 11 5 900 ; go 66.5 0 11 4 900 ; wait 10 ; go 82 0 25 6 900 ; reach 82 0 25 3 ; kept
+check fans-wood : ball wood 20 0 0 ; go 41.5 0 0 4 900 ; wait 120 ; go 62 0 11 5 900 ; away 62 0 11 4
 trafo paper
 floor 16
 safety none
 width 6
 floor 12
-sign "P_Modul_18: fans in blocks, up 11 (level 3)"
+sign "P_Modul_18: fans lift paper up 11, then 14 (level 3)"
 floor 6
+columns 0
 fanpad 15
-gap 10 up 11 nopilot
+# level 3: rails 11 up from just past the fan (3 there, 5 here: our headroom rule) over the 10 gap to the next platform
+move -2.5 0 11
+rails 12.5
 fanpad 15
-gap 10 up 11 nopilot
+# level 3: the next floor stands right at the platform's far edge, 14 up (a wall the updraft lifts the ball over)
+move 0 0 14
 floor 16
+columns 60
 sign "P_Modul_41: troughs, paper only (level 7)"
 check troughs-paper : ball paper 0 0 0 ; go 52 0 0 4 900 ; reach 52 0 2 3 ; kept
 check troughs-wood : ball wood 0 0 0 ; go 52 0 0 4 600 ; away 52 0 2 6 ; turned P_Modul_41_01 P_Modul_41 20
@@ -250,13 +256,18 @@ floor 6
 sign "P_Trafo_Wood"
 trafo wood
 floor 18
-sign "P_Modul_30: seesaw"
+sign "P_Modul_30: seesaw over a 12.9 gap (levels 2-9)"
+check seesaw : ball wood -12 0 0 ; go 28 0 0 6 900 ; reach 28 0 0 3 ; kept
 seesaw
 floor 18
-sign "P_Modul_29: plate bridge"
+sign "P_Modul_29: plate bridge over 15.4 (levels 2-10)"
+check plates : ball wood -12 0 0 ; go 30 0 0 5 900 ; reach 30 0 0 3 ; kept
+check plates-stone : ball stone -12 0 0 ; go 30 0 0 5 900 ; lost
 platebridge
 floor 18
-sign "P_Modul_08: swing"
+sign "P_Modul_08: swing over a trench (level 8)"
+check swing : ball wood -8 0 0 ; wait 120 ; go 32 0 0 5 900 ; reach 32 0 0 3 ; kept
+plaza 32 15 up -6.2
 pilot safe,collector : goto -8 0 0 ; wait 50 ; via 0 0 0 ; via 9 0 0
 pilot speed : via 0 0 0 ; via 9 0 0
 swingbridge nopilot
@@ -278,8 +289,9 @@ safety none
 width 6
 floor 10
 sign "P_Modul_19: flap wheel, stone tips it (levels 9-11)"
-check pending-flaps-stone : ball stone 0 0 0 ; go 24 0 0 4 900 ; go 34.8 0 0 4 600 ; go 34.8 15 0 4 600 ; go 0 15 0 5 900 ; reach 0 15 2 3 ; turned P_Modul_19_01 P_Modul_19_Flaps 60 ; kept
-check flaps-wood : ball wood 0 0 0 ; go 24 0 0 4 900 ; go 34.8 0 0 4 600 ; go 34.8 15 0 4 600 ; go 0 15 0 5 900 ; away 0 15 2 6
+# (levels 9-11: the stone ball comes at the standing flap rolling, 7 or more; from rest against it, it holds)
+check flaps-stone : ball stone 0 0 0 ; go 24 0 0 4 900 ; go 34.8 0 0 4 600 ; go 34.8 15 0 4 600 ; go 0 15 0 10 900 ; reach 0 15 2 3 ; turned P_Modul_19_01 P_Modul_19_Flaps 60 ; kept
+check flaps-wood : ball wood 0 0 0 ; go 24 0 0 4 900 ; go 34.8 0 0 4 600 ; go 34.8 15 0 4 600 ; go 0 15 0 10 900 ; away 0 15 2 6 ; still P_Modul_19_01 P_Modul_19_Flaps 30
 floor 10
 flaps
 floor 18.4
@@ -334,7 +346,9 @@ floor 8.4
 pusher right
 floor 16
 sign "P_Modul_34: crate under the stone, from below (level 1)"
-check pending-crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 27 -12 -5 4 600 ; go 27 11 -5 4 900 ; go 27 -12 -5 4 900 ; go 6 -12 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; kept
+# level 1: a lane (5 wide there, 6 here: our narrowest way) over a broad floor 5 lower; the stone stands in a slot 5.3 long, on its crate on the floor below;
+# a stone ball rolling across that floor under the slot knocks the crate out and the stone sinks level with the lane
+check crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 26.65 -12 -5 4 600 ; go 26.65 7 -5 7 900 ; wait 60 ; go 26.65 12 -5 4 900 ; go 6 12 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; kept
 check crate-block : ball stone 0 0 0 ; go 42 0 0 4 600 ; away 42 0 2 6
 floor 6
 mark crate
@@ -348,9 +362,20 @@ turn -90
 floor 9.5
 corner left
 width 6
-floor 21 down 5
+floor 20.65 down 5
 corner left
-floor 24
+floor 2
+plaza 26 20
+# and back up on its far side (level 1: a ramp up beside the lane, the slot below being shut by the sunk stone)
+back crate
+move 0 2.5 0
+turn 90
+floor 9.5
+corner right
+width 6
+floor 20.65 down 5
+corner right
+floor 2
 back past
 width 20
 floor 10

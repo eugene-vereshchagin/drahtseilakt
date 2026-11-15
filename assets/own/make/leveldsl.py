@@ -127,12 +127,12 @@ try:
     SPACING["speed"] = min(max(float(os.environ.get("LEVELDSL_SPEED_SPACING", SPACING["speed"])), 4.0), 60.0)
 except ValueError:
     pass
-# The slots the stone on the crate and a pusher stand in (crateblock, pusher): the stone is 5 on a side, the pusher's
-# beam 1.2 wide in its channel.
+# The slots the stone on the crate and a pusher stand in (crateblock, pusher): the stone is 5 on a side (its slot 5.3, as
+# level 1 has it), the pusher's beam 1.2 wide in its channel.
 # How far a floor's end may be from a checkpoint piece's edge and still join it (the path drifts by a few thousandths).
 JOIN_TOL = 0.02
 CORNER_RAIL = 8.0
-CRATE_SLOT = 6.0
+CRATE_SLOT = 5.3
 PUSHER_SLOT = 1.6
 # The flap wheel (P_Modul_19, flaps): the gap its flat flap lies over; its frame this far on from the gap's near edge
 # and this far to the left of the way's middle, so that the flat flap fills the gap (the part's measured pivots).
@@ -701,14 +701,16 @@ class Track:
         elif cmd == "seesaw":
             self.seesaw(line)
         elif cmd == "platebridge":
-            self.module_at("P_Modul_29", 6.6, 0.0, 0.0)
-            pts, _ = self.straight(14.8, 0.0)
+            # as every original level has it (levels 2-10): a gap of 15.4, the frame 6.9 on from its near edge
+            self.module_at("P_Modul_29", 6.9, 0.0, 0.0)
+            pts, _ = self.straight(15.4, 0.0)
             for p in pts[1:]:
                 self.pilot.way(p)
             self.move_along(pts)
         elif cmd == "swingbridge":
-            gap = float(opts.get("ahead", 5.0)) if "ahead" in opts else 5.0
-            self.module_at("P_Modul_08", gap / 2, 1.2, 0.0)
+            # as levels 8-10 have it: over a gap of 15, its frame in the middle, 1.2 under the floors' top
+            gap = float(opts.get("ahead", 15.0))
+            self.module_at("P_Modul_08", gap / 2, -1.2, 0.0)
             pts, _ = self.straight(gap, 0.0)
             if "nopilot" not in opts:
                 self.pilot.way(pts[-1], force=True)
@@ -954,9 +956,9 @@ class Track:
         self.pilot.step(STYLES, f"via {fmt(on)}", on)
 
     def seesaw(self, line):
-        """A seesaw (P_Modul_30) over a gap of its board's length: its frame half a unit under the floor, an unseen
-        stopper under the board, as the original sets it."""
-        board = 14.8
+        """A seesaw (P_Modul_30) over a gap of 12.9 (its board 14.8 long lying on both edges), its frame in the middle
+        half a unit under the floor, as every original level sets it (levels 2-9), an unseen stopper under the board."""
+        board = 12.9
         mid = self.at(board / 2, 0, -0.5)
         self.b.module("P_Modul_30", self.n("P_Modul_30"), K.pose(tuple(mid), tuple(self.fwd())), self.sector)
         corners = [self.at(0, -2.5, -1.0), self.at(board, 2.5, -0.5)]
