@@ -168,3 +168,8 @@ branch `own-level-1`, where levels.md describes each):
 - **a start and a finish, a title**, checkpoints on a heading the camera can take;
 - **it can be finished**: the test player plays every level in three styles, and a level without a finishing run is
   not shipped (`scripts/own-levels.sh`).
+
+A level may also be made by a script of its own on top of the kit: `assets/own/make/make_synthetic_level.py` builds
+the shipped showcase level ([levels.md](levels.md), "The showcase level") from a description held in the script, with
+commands of its own (signs, a gate, exhibits), materials the kit's floors do not use and behaviour graphs written by
+`scriptkit.py` into the level's `scripts`; the same checks apply.

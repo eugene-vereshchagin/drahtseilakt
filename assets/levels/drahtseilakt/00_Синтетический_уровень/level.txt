@@ -1,0 +1,16 @@
+# The showcase level: every element of the game on one way, to be checked by eye. First everything of classic
+# Ballance (floors, rails, parts, transformers, modules), then, past the COMMUNITY gate, what community maps bring
+# (materials, our own behaviour graphs). Made by assets/own/make/make_synthetic_level.py; our own content only.
+title = Synthetic level
+author = Drahtseilakt
+version = 1
+licence = GPL-3.0-only
+title.ru = Синтетический уровень
+title.de = Synthetischer Level
+title.zh = 合成关卡
+title.fr = Niveau synthétique
+title.es = Nivel sintético
+title.it = Livello sintetico
+order = 0
+difficulty = 1
+posted = 2026-11-15

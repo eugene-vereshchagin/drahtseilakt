@@ -104,7 +104,7 @@ import ownkit as K  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEVELS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "levels")
 STYLES = ("safe", "speed", "collector")
-LANGS = ("ru", "de", "zh")
+LANGS = ("ru", "de", "zh", "fr", "es", "it")
 BALLS = {"wood": "Wood", "stone": "Stone", "paper": "Paper", "sticky": "Sticky"}
 # The masses the game gives the balls, the loose balls and a box (crates/game/src/sim.rs): who can shove whom.
 BALL_MASS = {"wood": 1.9, "stone": 10.0, "paper": 0.2, "sticky": 4.0}
@@ -1244,18 +1244,22 @@ def parse_clouds(value, line):
     return out
 
 
-def compile_level(path, cuts=None):
+def compile_level(path, cuts=None, **kw):
     """Compiles a level; a plaza opening off the way's side asks for a gap in the way's railing at its mouth, which
-    is made on a second pass (the first one finds the openings)."""
-    found = _compile_level(path, cuts or [], dry=True)
-    _compile_level(path, found)
+    is made on a second pass (the first one finds the openings). For a level made by a script instead of a
+    `level.lvl` (make_synthetic_level.py): `lines` the description's lines (the file at `path` is then not read, only
+    its folder used), `track` a Track with commands of the script's own, `hook(track)` called before the level is
+    written (objects, materials and scripts added by hand), `extra` more level.txt lines (key: value)."""
+    found = _compile_level(path, cuts or [], dry=True, **kw)
+    _compile_level(path, found, **kw)
 
 
-def _compile_level(path, cuts, dry=False):
+def _compile_level(path, cuts, dry=False, lines=None, track=None, hook=None, extra=None):
     folder = os.path.dirname(os.path.abspath(path))
-    with open(path, encoding="utf-8") as f:
-        lines = f.read().splitlines()
-    t = Track(folder)
+    if lines is None:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    t = (track or Track)(folder)
     t.b.rail_cuts = list(cuts)
     for i, raw in enumerate(lines, 1):
         stripped = raw.strip()
@@ -1308,13 +1312,16 @@ def _compile_level(path, cuts, dry=False):
     titles = info["titles"]
     if "en" not in titles:
         raise LevelError(f"{path}: no title")
+    if hook is not None:
+        hook(t)
     try:
         t.b.write(titles["en"], info["author"], sky=info["sky"], start_ball=f"Ball_{BALLS[info['ball']]}",
                   music=info["music"], light=info["light"], bonus=info["bonus"], licence="GPL-3.0-only",
                   clouds=info.get("clouds"), sector_balls=t.sector_balls,
                   extra={**{f"title.{k}": v for k, v in titles.items() if k != "en"},
                          **({"order": info["order"]} if "order" in info else {}),
-                         **({"difficulty": info["difficulty"]} if "difficulty" in info else {})})
+                         **({"difficulty": info["difficulty"]} if "difficulty" in info else {}),
+                         **(extra or {})})
     except ValueError as e:
         raise LevelError(f"{path}: {e}") from None
     write_pilot(folder, t)

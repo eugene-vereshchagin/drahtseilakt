@@ -112,6 +112,35 @@ hidden from the players' list by `hidden = yes` in its level.txt and still opens
 committed. Their licence is the
 game's (GPL-3.0-only).
 
+### The showcase level
+
+`00_Синтетический_уровень` ("Synthetic level", first in the shipped list: `order = 0`, `difficulty = 1`) holds every
+element of the game on one way of about 1900 units, each with a sign beside it, to be rolled through in a few minutes
+and checked by eye in each look: does it draw, with the right textures, sound and behave as it should. It is made by
+`assets/own/make/make_synthetic_level.py` (the classic part, as a level description with two commands of its own,
+`sign` and `gate`) and `synthetic_community.py` (the community part), of our own content only; the built level is
+not in git.
+
+- **Classic**, five sectors: floors and surfaces (gutter, brick border, railings, bare, wood, widths, a ramp, round
+  turns, hard corners); rails (straight, turning, rising, falling) and scenery (wooden deck on columns, lamp tower,
+  mast, plinth, pillar, wall block, garland, lighthouse); the parts (extra point and life, boxes, dome, the four loose
+  balls, sack, turning arms, flap wheel); the transformers and the mechanics on the way (paper and the fan, seesaw,
+  plate bridge, swing, stone shoving boxes, sticky, wood); the puzzle modules in bays beside a wide floor (pusher,
+  crate under its stone, tipping plates, plate bridge and drawbridge to bays, flap bridge, falling room).
+- **The gate** "COMMUNITY", past which the sky, the fog and the light change (a script).
+- **Community**, two sectors: the materials community maps use (alpha blend, alpha test, additive glow, chrome and
+  reflect texture coordinates, a double-sided sheet, unlit colour, a normal map with parallax, a second pass over a
+  mesh, a 3D sprite, a glass floor on the way), then our own behaviour graphs (`assets/own/make/scriptkit.py` writes
+  them into the level's `scripts`, [open-format.md](open-format.md)): Rotate, a shuttle and a lift (Linear
+  Progression, Interpolator, Set Position), Text Display while the ball is near, 3D Text, a particle fountain, a
+  screen cycling textures (Set Texture), Show/Hide and Set Diffuse, a portal (Box Box Intersection, Set Position on
+  the ball), a crate made a body by Physicalize.
+
+What the open format cannot hold yet, found while making it: a texture's slots (Movie Player, Set Current Slot), wave
+sounds (Wave Player), a level's own texture for script particles, a level's 3D sprite turned to the view.
+`crates/game/src/showcase.rs` checks that every part of ours stands in it and that its run
+(`hints/runs/Level_00-synthetic.replay`, the test player's with `hints/Level_00-synthetic.txt`) finishes it.
+
 ## Our levels and how to edit them
 
 *2026-11-03.* Ten levels of our own, from a first roll to the gauntlet, ship with the game (the release criterion of

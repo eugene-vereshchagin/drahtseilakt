@@ -153,3 +153,7 @@ drahtseilakt-toolbox import-maps ~/Downloads/Maps --catalogue CustomMapList.md
 - **挡得住的边缘**：护栏、砖砌挡边和槽形地面把扔向它们的球留在轨道上（测试以每秒 12、25 和 40 个单位扔出每种球）；
 - **一个起点和一个终点、一个标题**，检查点的朝向是相机能够采用的；
 - **能够通关**：测试玩家以三种风格游玩每个关卡，没有通关记录的关卡不会随游戏发布（`scripts/own-levels.sh`）。
+
+关卡也可以由建立在工具之上的自有脚本生成：`assets/own/make/make_synthetic_level.py` 根据脚本内的描述生成随游戏附带的
+展示关卡（[levels.md](levels.md)，“展示关卡”），带有自己的命令（标牌、大门、展品）、工具的地面不使用的材质，以及由
+`scriptkit.py` 写入关卡 `scripts` 的行为图；检查相同。

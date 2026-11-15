@@ -178,3 +178,8 @@ Boden und der Nahttest kommen mit der Arbeit an Level 1, Zweig `own-level-1`, wo
 - **ein Start und ein Ziel, ein Titel**, Kontrollpunkte in einer Richtung, die die Kamera einnehmen kann;
 - **es lässt sich schaffen**: der Testspieler spielt jedes Level in drei Stilen, und ein Level ohne einen Lauf, der es
   schafft, wird nicht ausgeliefert (`scripts/own-levels.sh`).
+
+Ein Level kann auch von einem eigenen Skript auf dem Baukasten gebaut werden: `assets/own/make/make_synthetic_level.py`
+baut das mitgelieferte Schau-Level ([levels.md](levels.md), „Das Schau-Level") aus einer Beschreibung im Skript, mit
+eigenen Befehlen (Schilder, ein Tor, Ausstellungsstücke), Materialien, die die Böden des Baukastens nicht nutzen, und
+Verhaltensgraphen, die `scriptkit.py` in die `scripts` des Levels schreibt; es gelten dieselben Prüfungen.
