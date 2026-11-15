@@ -271,6 +271,26 @@ mod tests {
                         ));
                     }
                 }
+                "lies" => {
+                    // the part within R of a point (a crate knocked out that must stay on its floor)
+                    let Some(b) = part(&sim, level, args[0], args[1]) else {
+                        fails.push(format!("no part {} of {}", args[1], args[0]));
+                        continue;
+                    };
+                    let (Some(s), Some(p)) = (sim.world().state(b), point(&args[2..])) else {
+                        fails.push(format!("{} of {}: no state", args[1], args[0]));
+                        continue;
+                    };
+                    let r: f32 = args[5].parse().expect("a reach");
+                    let d = s.pos.distance(p);
+                    notes.push(format!("{} {}: lies {d:.1} from {p:.1?}", args[0], args[1]));
+                    if d > r {
+                        fails.push(format!(
+                            "lies {} {} within {r} of {p:.1?}: at {:.1?}",
+                            args[0], args[1], s.pos
+                        ));
+                    }
+                }
                 _ => fails.push(format!("unknown step {verb}")),
             }
         }
@@ -312,7 +332,12 @@ mod tests {
         }
         assert!(checks.len() >= 10, "{} checks", checks.len());
         let mut failed = Vec::new();
+        // SHOWCASE_ONLY=<prefix>: only the checks whose names begin so (while one element is being built)
+        let only = std::env::var("SHOWCASE_ONLY").ok();
         for (name, steps) in &checks {
+            if only.as_deref().is_some_and(|o| !name.starts_with(o)) {
+                continue;
+            }
             let (fails, notes) = run_check(&level, &modules, &balls.level, name, steps);
             println!(
                 "{name}: {} | {}",
