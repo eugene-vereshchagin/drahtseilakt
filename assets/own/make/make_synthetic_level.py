@@ -206,9 +206,12 @@ floor 18
 sign "P_Modul_17: turning arms"
 arms side 8 ahead 6 nopilot
 floor 20
-sign "P_Modul_19: flap wheel"
-flaps side 8 ahead 6
 floor 20
+width 7.5
+floor 14
+sign "P_Modul_19: flap wheel over a gap"
+flaps
+floor 12
 width 12
 floor 16
 floor 8

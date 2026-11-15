@@ -75,7 +75,10 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     platebridge              a plate bridge over a gap of 14.8 (a stone ball breaks it)
     swingbridge [ahead G]    a swing hanging in a gap of G (5) that it bridges as it swings across the way
     fan [ahead A] [side S]   a fan's updraft (a paper ball rises on it to about 17 over its floor)
-    sack, arms, flaps  [ahead A] [side S]   a swinging sack, turning arms, a flap wheel on the floor
+    sack, arms  [ahead A] [side S]   a swinging sack, turning arms on the floor
+    flaps                    the flap wheel (P_Modul_19) over a gap of a flap's length (6.4) in a way about 6 wide:
+                             one flap lies flat over the gap at the floor's top (the way goes on over it, the cursor
+                             too), the other stands up beside the way, 15 to the left
     module NAME [side S] [ahead A] [up U] [turn A] [tilt T]  any module, its frame at the cursor (x along the
                              heading, turned A to the left and tilted T up)
     pilot STYLES : STEP ; STEP    the test player's steps here (STYLES: safe,speed,collector or all), points as
@@ -131,6 +134,11 @@ JOIN_TOL = 0.02
 CORNER_RAIL = 8.0
 CRATE_SLOT = 6.0
 PUSHER_SLOT = 1.6
+# The flap wheel (P_Modul_19, flaps): the gap its flat flap lies over; its frame this far on from the gap's near edge
+# and this far to the left of the way's middle, so that the flat flap fills the gap (the part's measured pivots).
+FLAP_LEN = 6.4
+FLAP_BACK = 3.24
+FLAP_SIDE = 10.0
 # A hint's steps at most (hints.rs takes 64).
 HINT_STEPS = 60
 
@@ -715,7 +723,7 @@ class Track:
                     self.pilot.step([s], f"goto {fmt(self.at(ahead - 14))}", self.at(ahead - 14))
                 self.pilot.step(STYLES, f"via {fmt(self.at(ahead + 8))}", self.at(ahead + 8))
         elif cmd == "flaps":
-            self.module_at("P_Modul_19", float(opts.get("ahead", 0)), 0.5, 90.0, float(opts.get("side", 0)))
+            self.flaps()
         elif cmd in ("point", "life", "box", "dome", "trafo", "loose", "column", "module"):
             self.part(cmd, args, opts, line)
         elif cmd == "pilot":
@@ -933,6 +941,20 @@ class Track:
         # onto the board's raised end at some speed (a heavy ball from rest does not get up it)
         self.jump(pts[-1], {})
         self.move_along(pts)
+
+    def flaps(self):
+        """The flap wheel (P_Modul_19) as the original's levels set it (levels 9, 10 and 11): its frame at the floors'
+        top, its axle across the way at the near edge of a gap of a flap's length, one flap lying flat over the gap
+        (the way goes on over it) and the other standing up at the axle 15 to the left (in the original, over a second
+        lane's gap: the stone ball tips it flat, and the first rises), with an unseen stopper under the flat flap's
+        place, half a unit under the floor, that holds it level under the ball. The part's measured pivots: the flaps
+        are 6.4 long from the axle (local x -3.24 to 3.16, the axle at -2.93), 5 wide, the flat one at local z -12.5
+        to -7.5 (to the right of the frame), the standing one at 2.5 to 7.5."""
+        self.module_at("P_Modul_19", FLAP_BACK, 0.0, 0.0, FLAP_SIDE)
+        corners = [self.at(0.0, -2.5, -1.03), self.at(FLAP_LEN, 2.5, -0.53)]
+        lo, hi = np.minimum(*corners), np.maximum(*corners)
+        self.b.stopper(f"Stopper_{self.n('stopper'):03d}", tuple(lo), tuple(hi))
+        self.slot(FLAP_LEN)
 
     def place_columns(self, depth=L.COLUMN_DEPTH):
         """The columns under the floors, but none that would pass through a floor or rails below it."""

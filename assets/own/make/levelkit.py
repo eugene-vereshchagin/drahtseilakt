@@ -96,6 +96,8 @@ MIN_FREE = 5.5
 # A loose ball's reach to the physics: the wooden and stone ones are spheres of BALL_R, the paper one the hull of its
 # part's P_Ball_Paper_MF (2.04 from its middle at most, 2.03 below it), so it is rested as a sphere of this radius.
 LOOSE_R = {"Wood": BALL_R, "Stone": BALL_R, "Paper": 2.04}
+# The tile in the ball's texture under a transformer lies this much over the floor's top (drawn over it, not in it).
+TRAFO_TILE_LIFT = 0.01
 # How deep a loose body may start in the floors: the original puts its paper balls 0.031 into the floor (level 10; its
 # crumpled hull reaches lower than the stand-in's sphere), which does no harm; 1 and more deep, the game's physics
 # shoves the body out as its sector begins, and the player's ball touching it then is thrown away at hundreds of units
@@ -1184,13 +1186,38 @@ class LevelBuilder:
         return i
 
     def trafo(self, kind, n, at, sector):
-        """A transformer (P_Trafo_Wood, _Stone, _Paper): its pad lies on `at`."""
+        """A transformer (P_Trafo_Wood, _Stone, _Paper, _Sticky): its pad lies on `at`, on a tile of the floor in the
+        ball's own texture, as the original's levels have it (their floor under a transformer is a 5 x 5 tile of
+        material Floor_Trafo_<Kind>, Ball_<Kind>'s texture): the part is a ring, and what shows through it is the
+        floor (trafo_tile)."""
         x, y, z = at
         name = f"P_Trafo_{kind}"
         i = self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), K.pose((x, y + 0.1, z)),
                              (-2.5, -0.1, -2.5), (2.5, 2.4, 2.5))
         self.standing.append((i, 2.47, 0.1, f"{name}_{n:02d}"))
+        self.trafo_tile(kind, n, at)
         return i
+
+    def trafo_tile(self, kind, n, at):
+        """The tile in the ball's texture under a transformer: a square of 5 a hair over the floor's top, only drawn
+        (the floor under it is the physics'). Wood, stone and paper name the game's Ball_<Kind> texture (`game:`), so
+        a texture pack or the original's look draws the original's, as on its levels; the sticky ball is ours alone,
+        its skin copied into the level."""
+        mat = f"Floor_Trafo_{kind}"
+        if mat not in self.mat_ids:
+            if kind == "Sticky":
+                shutil.copyfile(os.path.join(OWN, "3D Entities", "Balls", "textures", "ball_sticky.png"),
+                                os.path.join(self.tex, "Ball_Sticky.png"))
+                tex = "Ball_Sticky.png"
+            else:
+                tex = K.GAME + f"Ball_{kind}"
+            self.mat(mat, tex, diffuse=1.0, emissive=0.2, specular=0.2, power=40)
+        x, y, z = at
+        h = y + TRAFO_TILE_LIFT
+        m = K.Mesh(f"Trafo_Tile_{kind}_{n:02d}")
+        m.face(self.mat_ids[mat], [(x - 2.5, h, z - 2.5), (x - 2.5, h, z + 2.5), (x + 2.5, h, z + 2.5),
+                                   (x + 2.5, h, z - 2.5)], uvs=[(0, 0), (0, 1), (1, 1), (1, 0)], normal=(0, 1, 0))
+        return self.add(f"Trafo_Tile_{kind}_{n:02d}", m, groups=["Shadow"])
 
     def extra_point(self, n, at, sector):
         x, y, z = at

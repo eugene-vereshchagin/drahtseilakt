@@ -62,7 +62,8 @@ most of the four), elasticity 0.05 (the least), damping 0.9 (as wood); the loose
 touches as the `sticky-ball` mod's `ball.stick 0.9` does, without a mod: at the mod's default 0.6 so heavy a ball only
 clings to a wall (lift 1.09 against its weight of 1.21), at 0.9 it climbs (1.63). With the mod on as well, the stronger
 hold counts. On a slope pushed from rest it climbs up to 43° and, steeper, clings without rolling back (the test
-player's table).
+player's table). Pushed away from a wall or a box it touches, it lets go of it (*2026-11-15*: before, the hold
+outweighed the push, so a sticky ball that rolled against a box on the floor could never leave it).
 
 ## God mode
 
