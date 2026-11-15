@@ -957,12 +957,14 @@ impl Route {
         self.floor_point(p).map_or(0.0, |q| q.coarse)
     }
 
-    /// The speed a steady player keeps at `p`: moderate on a rail or a narrow track, more on a wide floor.
-    pub fn cruise(&self, p: Vec3) -> f32 {
+    /// The speed a steady player keeps at `p`: moderate on a rail or a narrow track, more on a wide floor (a
+    /// speedrunner's pace in that style: `Pace`).
+    pub fn cruise(&self, p: Vec3, style: Style) -> f32 {
+        let pace = style.pace();
         match self.floor_point(p) {
-            Some(q) if q.rail => CRUISE_RAIL,
-            Some(q) => (CRUISE_BASE + CRUISE_PER_HALF * q.half).clamp(CRUISE_RAIL, CRUISE_WIDE),
-            None => CALM,
+            Some(q) if q.rail => pace.rail,
+            Some(q) => (pace.base + pace.per_half * q.half).clamp(pace.rail, pace.wide),
+            None => pace.calm,
         }
     }
 
@@ -1046,6 +1048,101 @@ fn reach(floor: Vec3, q: Vec3) -> f32 {
     let up = if dy > STEP { 4.0 * dy } else { dy };
     h.hypot(up)
 }
+
+/// How the test player rides where it finds the way by itself (`--style`): the calm style keeps a steady
+/// player's pace on the middle of the tracks; the speedrun style goes as fast as the physics lets it, along edges
+/// and round corners tight (no careful zone or learned rule holds it back), and does not stand where a player
+/// stood still in the run it follows (`idle_skip`). A failure is gone back from as in the calm style, so the risk it takes costs time on the tries, not in the run kept.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Style {
+    #[default]
+    Calm,
+    Speedrun,
+}
+
+/// A style's pace and line: the cruising speeds (`Route::cruise`), what speed above the pace costs, and what being
+/// off the middle and near an edge costs (`rollouts`).
+#[derive(Clone, Copy, Debug)]
+pub struct Pace {
+    calm: f32,
+    rail: f32,
+    wide: f32,
+    base: f32,
+    per_half: f32,
+    fast: f32,
+    slow: f32,
+    safe: f32,
+    edge: f32,
+    middle: f32,
+    switch: f32,
+}
+
+impl Style {
+    pub fn parse(s: &str) -> Option<Style> {
+        match s {
+            "calm" => Some(Style::Calm),
+            "speedrun" => Some(Style::Speedrun),
+            _ => None,
+        }
+    }
+
+    pub fn pace(self) -> Pace {
+        match self {
+            Style::Calm => Pace {
+                calm: CALM,
+                rail: CRUISE_RAIL,
+                wide: CRUISE_WIDE,
+                base: CRUISE_BASE,
+                per_half: CRUISE_PER_HALF,
+                fast: FAST,
+                slow: SLOW,
+                safe: SAFE,
+                edge: EDGE,
+                middle: MIDDLE,
+                switch: SWITCH,
+            },
+            // (a wide floor asks for about all the ball has; a rail for what it stays on through a bend; an edge
+            // is only shunned within a ball's width of it, and the middle of a track is no line of its own)
+            Style::Speedrun => Pace {
+                calm: SPEEDRUN_CALM * speedrun_scale(),
+                rail: SPEEDRUN_RAIL * speedrun_scale(),
+                wide: SPEEDRUN_WIDE * speedrun_scale(),
+                base: SPEEDRUN_BASE * speedrun_scale(),
+                per_half: SPEEDRUN_PER_HALF * speedrun_scale(),
+                fast: SPEEDRUN_FAST,
+                slow: SPEEDRUN_SLOW,
+                safe: SPEEDRUN_SAFE,
+                edge: SPEEDRUN_EDGE,
+                middle: 0.0,
+                switch: SPEEDRUN_SWITCH,
+            },
+        }
+    }
+}
+
+/// AUTOPILOT_SPEEDRUN_PACE scales the speedrun's pace (0.3 to 2; 1 when not set): another try at a level whose
+/// run at the full pace fails or is slower (the risk differs, and so does what fails).
+fn speedrun_scale() -> f32 {
+    static SCALE: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *SCALE.get_or_init(|| {
+        std::env::var("AUTOPILOT_SPEEDRUN_PACE")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+            .filter(|v| v.is_finite())
+            .map_or(1.0, |v| v.clamp(0.3, 2.0))
+    })
+}
+
+const SPEEDRUN_CALM: f32 = 16.0;
+const SPEEDRUN_RAIL: f32 = 11.0;
+const SPEEDRUN_WIDE: f32 = 22.0;
+const SPEEDRUN_BASE: f32 = 9.0;
+const SPEEDRUN_PER_HALF: f32 = 2.5;
+const SPEEDRUN_FAST: f32 = 1.0;
+const SPEEDRUN_SLOW: f32 = 0.15;
+const SPEEDRUN_SAFE: f32 = 0.8;
+const SPEEDRUN_EDGE: f32 = 2.0;
+const SPEEDRUN_SWITCH: f32 = 0.05;
 
 /// The arrow combinations the player may hold (the camera is not turned, so the pushes stay on the world axes).
 const CHOICES: [u8; 9] = [
@@ -1135,6 +1232,60 @@ pub struct DemoTick {
 #[derive(Clone, Debug, Default)]
 pub struct Demo {
     pub ticks: Vec<DemoTick>,
+}
+
+/// A speedrun does not stand where the player stood: a stretch of the followed run this long (ticks) or longer,
+/// the player's ball slower than `IDLE_SPEED` and within `IDLE_NEAR` of where it began, is skipped when the
+/// player's keys from its end, on a copy of the run, keep the ball on the player's line (within `TRACK_LOST`) for
+/// `IDLE_CHECK` ticks: a wait a moving part needs (a lift, a swing, a pusher) fails that, and is kept.
+const IDLE_MIN: usize = 30;
+const IDLE_SPEED: f32 = 0.8;
+const IDLE_NEAR: f32 = 1.5;
+const IDLE_CHECK: u64 = 300;
+
+/// The player's tick to go on from instead of `k`, past the still stretch beginning there (`IDLE_MIN`).
+fn idle_skip(d: &Demo, k: usize, sim: &Sim) -> Option<usize> {
+    let first = d.ticks.get(k)?;
+    if sim.ball.position.distance(first.pos) > DEMO_NEAR || sim.ball.velocity.length() > 2.0 * IDLE_SPEED {
+        return None;
+    }
+    let still = d
+        .ticks
+        .iter()
+        .skip(k)
+        .take_while(|t| {
+            t.alive
+                && t.sector == first.sector
+                && t.kind == first.kind
+                && t.vel.length() < IDLE_SPEED
+                && t.pos.distance(first.pos) < IDLE_NEAR
+        })
+        .count();
+    if still < IDLE_MIN {
+        return None;
+    }
+    let end = k + still;
+    let mut s = sim.clone();
+    let lives = s.lives;
+    for t in 0..IDLE_CHECK {
+        let j = end + t as usize;
+        let tick = d.ticks.get(j)?;
+        s.step(d.input(j, crate::hints::Facing::of(&s.camera)));
+        if s.lives < lives || s.is_dying() || s.game_over {
+            return None;
+        }
+        if s.finished {
+            return Some(end);
+        }
+        if !tick.alive || tick.sector != s.sector || tick.kind != s.ball.kind {
+            // (the player's own ball was lost or changed further on: judged up to there)
+            break;
+        }
+        if t % 10 == 9 && s.ball.position.distance(tick.pos) > TRACK_LOST {
+            return None;
+        }
+    }
+    Some(end)
 }
 
 /// A leap is tried with these run-ups (units back from the edge).
@@ -1331,6 +1482,11 @@ pub struct Pilot {
     momentum: Option<&'static str>,
     /// The level's modules (their stand-ins' places and module names), for the situation of a place.
     pub modules: std::sync::Arc<Vec<(Vec3, String)>>,
+    /// How it rides where it finds the way by itself (`Style`), and how it rides here (a speedrun rides the calm
+    /// style in a calm zone).
+    pub style: Style,
+    ride: Style,
+    in_calm: bool,
 }
 
 /// The situation of a place (learned.rs): the way ahead read this far (points) for its bend, its slope and what
@@ -1409,6 +1565,9 @@ impl Pilot {
             zone_said: String::new(),
             momentum: None,
             modules: std::sync::Arc::default(),
+            style: Style::Calm,
+            ride: Style::Calm,
+            in_calm: false,
         }
     }
 
@@ -1482,11 +1641,22 @@ impl Pilot {
             }
             None => d.find(sim, DEMO_NEAR, Some(DEMO_SPEED), self.demo_expected(sim)),
         };
-        let Some(k) = k else {
+        let Some(mut k) = k else {
             self.tracking = None;
             self.track_keys.clear();
             return None;
         };
+        // (AUTOPILOT_SPEEDRUN_NO_SKIP: the player's still stretches are kept, for a try without the skips)
+        if self.style == Style::Speedrun
+            && !self.in_calm
+            && std::env::var_os("AUTOPILOT_SPEEDRUN_NO_SKIP").is_none()
+            && let Some(skip) = idle_skip(&d, k, sim)
+        {
+            if std::env::var_os("AUTOPILOT_DEMO").is_some() {
+                eprintln!("speedrun: the player's still ticks {k}..{skip} skipped at t{}", sim.tick);
+            }
+            k = skip;
+        }
         if self.tracking.is_none() && std::env::var_os("AUTOPILOT_DEMO").is_some() {
             eprintln!("track from t{} (player's tick {k})", sim.tick);
         }
@@ -2695,7 +2865,20 @@ impl Pilot {
         self.zone = self.zones.at(sim.ball.position, sim.sector);
         // the level's own zones first; elsewhere what was learned on any level, where the place is of its kind
         self.learned_now = None;
-        if self.zone == crate::zones::Effect::default() && !self.learned.is_empty() {
+        // a speedrun holds back nowhere: no careful zone or rule. Its pace is the progress along the way itself (a
+        // flow zone's push for speed would rather roll back down a climb fast than up it slowly); a hint's stops go
+        // as the level's flow zones have them (a wait a puzzle needs stays: a copy of the run judges only the ball)
+        // (a calm zone asks the calm style of a speedrun, and nothing of the calm style)
+        // (AUTOPILOT_SPEEDRUN_SKIP_ONLY: a speedrun at the calm pace that still skips the followed player's still
+        // stretches, for a try at a level where the speedrun's pace fails)
+        self.in_calm = std::mem::take(&mut self.zone.calm) && self.style == Style::Speedrun;
+        self.ride = self.style;
+        if self.in_calm || std::env::var_os("AUTOPILOT_SPEEDRUN_SKIP_ONLY").is_some() {
+            self.ride = Style::Calm;
+        }
+        if self.ride == Style::Speedrun {
+            self.zone.cap = None;
+        } else if self.zone == crate::zones::Effect::default() && !self.learned.is_empty() {
             let here = self.situation(sim.ball.position, self.at, sim.ball.kind);
             if let Some((e, label)) = self.learned.at(&here) {
                 self.zone = e;
@@ -2992,7 +3175,8 @@ impl Pilot {
             .cap
             .and_then(|_| self.route.points.get(self.at.saturating_sub(2)..line_end))
             .filter(|l| l.len() >= 2);
-        let tried = rollouts(sim, &self.route, demo_k, &choices, hold, low, line);
+        let pace = self.ride.pace();
+        let tried = rollouts(sim, &self.route, demo_k, &choices, hold, low, line, pace);
         for (&c, (s, lost, edge)) in choices.iter().zip(tried) {
             let from_demo = c == DEMO_CHOICE;
             let lives = sim.lives;
@@ -3034,7 +3218,7 @@ impl Pilot {
                 let v = s.ball.velocity.length();
                 // (the pace for the floor, not above a careful zone's limit)
                 let cruise = |p: Vec3| {
-                    let c = self.route.cruise(p);
+                    let c = self.route.cruise(p, self.ride);
                     zone.cap.map_or(c, |cap| c.min(cap))
                 };
                 self.progress(s.ball.position)
@@ -3042,12 +3226,14 @@ impl Pilot {
                     - if uphill && zone.cap.is_none() {
                         0.0
                     } else {
-                        FAST * (v - if steady || zone.cap.is_some() { cruise(s.ball.position) } else { CALM }).max(0.0)
+                        pace.fast
+                            * (v - if steady || zone.cap.is_some() { cruise(s.ball.position) } else { pace.calm })
+                                .max(0.0)
                     }
                     // a careful zone: over its limit costs a lot more
                     - zone.cap.map_or(0.0, |cap| CAREFUL_FAST * (v - cap).max(0.0))
                     - if steady {
-                        SLOW * (0.5 * cruise(s.ball.position) - v).max(0.0)
+                        pace.slow * (0.5 * cruise(s.ball.position) - v).max(0.0)
                     } else {
                         0.0
                     }
@@ -3059,7 +3245,7 @@ impl Pilot {
                         0.0
                     }
                     - edge
-                    - if from_demo { 0.0 } else { SWITCH * ((c ^ self.choice) & ARROWS).count_ones() as f32 }
+                    - if from_demo { 0.0 } else { pace.switch * ((c ^ self.choice) & ARROWS).count_ones() as f32 }
                     // the player's own line, when as good, is taken: it knows what the search does not
                     + if from_demo { DEMO_BONUS } else { 0.0 }
                     + self.jitter(sim.tick)
@@ -3115,6 +3301,7 @@ fn rollouts(
     hold: u64,
     low: f32,
     line: Option<&[Vec3]>,
+    pace: Pace,
 ) -> Vec<(Sim, bool, f32)> {
     let one = |c: u8| {
         let mut s = sim.clone();
@@ -3144,7 +3331,8 @@ fn rollouts(
                 && let Some((o, n)) = route.off_middle(s.ball.position)
             {
                 off += o;
-                near += n;
+                // (`n` is how much nearer than `SAFE`; a style may shun the edge only nearer)
+                near += (n - (SAFE - pace.safe)).max(0.0);
                 samples += 1;
             }
             if s.lives < lives || s.is_dying() || s.game_over || s.ball.position.y < low {
@@ -3175,11 +3363,11 @@ fn rollouts(
             lost = true;
         }
         let middle = if line.is_some() {
-            MIDDLE * CAREFUL_MIDDLE
+            pace.middle * CAREFUL_MIDDLE
         } else {
-            MIDDLE
+            pace.middle
         };
-        let edge = (middle * off + EDGE * near) / samples.max(1) as f32
+        let edge = (middle * off + pace.edge * near) / samples.max(1) as f32
             + CAREFUL_LINE * astray / line_samples.max(1) as f32;
         (s, lost, edge)
     };
