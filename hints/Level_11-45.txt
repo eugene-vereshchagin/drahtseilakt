@@ -1,0 +1,104 @@
+# Level 11 — hints for the test player (docs/drahtseilakt/autopilot.md)
+# From the walkthrough video's storyboard (ref/video/frames/fast/level11), the rules in autopilot-rules.md.
+#
+# Sector 1: as stone (P_Trafo_Stone_01) along the wavy log south at speed (a stone ball stopped in a trough cannot
+# climb out), east along the second wavy log at z -135 the same way, off it north down onto the plateau, to the notch in its north edge at
+# x 114 and down the rails into the castle maze, onto the floor between the two drawbridges P_Modul_25_01/02. On the
+# plateau the loose stone ball P_Ball_Stone_03 is rammed north from a short run-up into the notch at x 123 (braking after): it rolls down the rails east and
+# round into the disc of the pusher P_Modul_01_01, whose block slides west and leaves the lane x 128 clear.
+at 61 7 -17 r 3.5 sector 1 kind stone : press 61 6 -126 0 0 12 900 ; pass 61.2 5.6 -133.5 3 ; press 115 -2.9 -135.3 0 0 12 900 ; pass 116.5 -2.9 -133 3 ; pass 116.5 -10.9 -124 5 ; pass 125.5 -10.9 -123 4 ; goto 124.4 -10.9 -115 ; press 124.4 -10.9 -104 0 0 5 150 ; push 0 -1 30 ; wait 8 ; pass 118 -10.9 -103 4 ; pass 114.3 -10.9 -101 4 ; pass 114.2 -11.5 -97 4 ; pass 112.4 -22.4 -84 6 ; pass 111.5 -28.4 -77 4
+# The castle maze: the planks standing at the floor's sides are rammed down (the west one falls west across the gap
+# to the maze's west part, the east one east), the ball braking after the hit; then north into the target of P_Modul_37_01 at speed
+# and pushing on (its bridge falls across the gap in the north row), east and down the step into the lane x 121,
+# north into the disc of the pusher P_Modul_01_02 (its block slides out of the north row), back south to z -56, east
+# and up the ramp along x 128 (the step back into the middle is too high), over the block of the pusher P_Modul_01_01
+# with a run-up (its rod lies across the way), onto the east plank and west over
+# both fallen planks to the maze's west part.
+at 111.5 -28.4 -77 r 3 sector 1 kind stone : goto 113.5 -28.4 -77.5 ; press 104 -28.4 -77.5 0 0 7 70 ; push 1 0 20 ; wait 12 ; pass 108.5 -28.4 -77.5 3 ; press 118 -28.4 -77.5 0 0 7 70 ; push -1 0 20 ; wait 12 ; pass 110.3 -28.4 -73 4 ; hold 108.7 -28.4 -70 15 ; press 108.7 -28.4 -58 0 0 8 120 ; push 0 1 40 ; wait 8 ; pass 112 -28.4 -65.8 5 ; pass 119.5 -29 -66 5 ; pass 121.2 -30.9 -63 4 ; press 121.2 -30.9 -45 0 0 7 150 ; push 0 1 30 ; wait 4 ; pass 121.2 -30.9 -56 5 ; pass 127 -30.9 -56.5 5 ; pass 128.6 -29.8 -62 5 ; press 128.8 -28.4 -75.5 0 0 7 150 ; pass 127.5 -28.4 -76.6 4 ; pass 120 -28.4 -76.8 5 ; pass 111 -28.4 -77 5 ; pass 104 -28.4 -76.5 5 ; pass 98 -28.4 -75.5 6 ; pass 91 -28.4 -72 5
+# Down the plank east of the maze (A01_Modul02) at speed: its end is a ramp over the gap to the platform at x 200.
+at 145 -33 -46.8 r 5 sector 1 kind stone : press 196 -50 -47.4 0 0 25 400 ; pass 212 -54 -47.6 10
+#
+# Sector 2: the maze as stone (P_Trafo_Stone_02). First east down the row along z -108.5 into the crate of
+# P_Modul_34_01 under the stone block in the row (where the lane x 443.5 crosses it), rammed east out from under
+# the block (which sinks level with the lane: the lane's way south), and back. North along x 386.5, east along z -68.5 over the flap of
+# P_Modul_19_01 that lies flat, north to the row along z -57.5 and east to x 420, where the drawbridge P_Modul_25_03
+# stands at the row's south edge: rammed south (it falls across half the gap), braking after the hit. Back the same
+# way, south to the row along z -83.5 and east along it: the stone ball tips the other flap of P_Modul_19_01 flat on
+# its way, and runs into the target of P_Modul_37_02 at the row's east end (its bridge falls across the gap in the
+# lane x 443.5). Back west to x 420, the drawbridge P_Modul_25_04 rammed north (the other half of the gap), north
+# over both planks, east along z -57.5 and south along the lane over the target's bridge.
+at 373 -48.8 -108.5 r 4 sector 2 kind stone : pass 380 -47.6 -108.5 5 ; pass 400 -50.2 -108.5 6 ; goto 430 -53.8 -108.5 ; press 445 -53.8 -108.5 0 0 6 120 ; push -1 0 25 ; wait 10 ; goto 430 -53.8 -108.5 ; press 445 -53.8 -108.5 0 0 6 120 ; push -1 0 25 ; wait 10 ; pass 430 -53.6 -108.5 5 ; pass 400 -50.2 -108.5 6 ; pass 389 -48.8 -108.5 5 ; pass 386.5 -48.8 -104 4 ; pass 386.5 -48.8 -72 6 ; pass 389 -48.8 -68.5 4 ; pass 404 -48.8 -68.5 5 ; pass 408.5 -48.8 -66 4 ; pass 408.5 -48.8 -60 4 ; pass 412 -48.8 -57.5 4 ; goto 420 -48.8 -56.5 ; hold 420 -48.8 -56.5 20 ; press 420 -48.8 -64 0 0 6 60 ; push 0 1 25 ; wait 40 ; pass 412 -48.8 -57.5 5 ; pass 408.5 -48.8 -60 4 ; pass 408.5 -48.8 -66 4 ; pass 404 -48.8 -68.5 5 ; pass 389 -48.8 -68.5 5 ; pass 386.5 -48.8 -72 4 ; pass 386.5 -48.8 -81 4 ; pass 389 -48.8 -83.5 4 ; press 412 -48.8 -83.5 0 0 6 400 ; hold 412 -48.8 -83.5 20 ; press 433 -48.8 -83.5 0 0 8 150 ; push 1 0 40 ; wait 8 ; pass 420 -48.8 -83.5 4 ; goto 420 -48.8 -85.3 ; hold 420 -48.8 -85.3 20 ; press 420 -48.8 -74 0 0 7 60 ; push 0 -1 25 ; wait 40 ; press 420 -48.8 -59 0 0 6 300 ; pass 422 -48.8 -57.5 5 ; pass 436 -48.8 -57.5 5 ; pass 442.5 -48.8 -57.8 2.5 ; press 443.5 -48.8 -95 0 0 6 400
+#
+# Sector 3: the grid of channels as stone. At the west end of each of the three channels (z -196.5, -212, -227,
+# sloping down east) a crate holds up a block of the column x 689.5 (P_Modul_34_02..04): pushed east out from under
+# it by rams from a run-up (braking after each; a slow push does not move it), the block sinks level with the column's top, and the crate and the channel's stone ball roll
+# down east and knock the crates out from under the blocks of the lane x 720 (P_Modul_34_05..07). The top and middle channels from the west column x 679.5; then round by
+# the rail loop onto the column's top x 689.5, south along it and down to the bottom row's west end (the paper
+# transformer stands in the west column between), the bottom channel, and north into the paper transformer.
+# (45-degree map: two rams more each, as the pushes there come out a little different and the crate may stay
+# short of freeing its block; split in two for the hint's step cap)
+at 672 -57.5 -197 r 4 sector 3 kind stone : pass 676 -57.5 -196.5 4 ; goto 677.5 -57.5 -196.5 ; press 700 -57.5 -196.5 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -196.5 ; press 700 -57.5 -196.5 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -196.5 ; press 700 -57.5 -196.5 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -196.5 ; press 700 -57.5 -196.5 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -196.5 ; press 700 -57.5 -196.5 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -196.5 ; press 700 -57.5 -196.5 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -196.5 ; press 700 -57.5 -196.5 0 0 8 70 ; push -1 0 15 ; wait 10 ; pass 680 -57.5 -197 4 ; pass 679.5 -57.5 -205 4 ; pass 679.5 -57.5 -210.5 3 ; pass 681.5 -57.5 -212 3
+at 681.5 -57.5 -212 r 2 sector 3 kind stone : goto 677.5 -57.5 -212 ; press 700 -57.5 -212 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -212 ; press 700 -57.5 -212 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -212 ; press 700 -57.5 -212 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -212 ; press 700 -57.5 -212 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -212 ; press 700 -57.5 -212 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -212 ; press 700 -57.5 -212 0 0 8 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -212 ; press 700 -57.5 -212 0 0 8 70 ; push -1 0 15 ; wait 10 ; pass 680 -57.5 -211 4 ; pass 679.5 -57.5 -201 4 ; pass 677 -57.5 -198 4 ; pass 671.7 -57.5 -197 4 ; pass 663.2 -58.4 -195.5 4 ; pass 659.5 -58.3 -189.5 4
+# Up the rail loop onto the column's top (its two northern blocks sunk now), south along it, down to the bottom
+# row's west end, the bottom channel's crate rammed out the same way, and north into the paper transformer.
+at 659.5 -58.3 -189.5 r 2 sector 3 kind stone : pass 660 -57.4 -184.3 4 ; pass 665.4 -56.2 -180.3 4 ; pass 679.3 -54 -180.2 5 ; pass 686 -53 -181.5 4 ; pass 689.5 -52.5 -186 4 ; pass 689.6 -52.5 -200 4 ; pass 689.6 -52.5 -217 4 ; pass 688.5 -52.5 -221.5 2 ; goto 684 -57.5 -227.2 200 ; goto 677.5 -57.5 -227 ; press 700 -57.5 -227 0 0 10 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -227 ; press 700 -57.5 -227 0 0 10 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -227 ; press 700 -57.5 -227 0 0 10 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -227 ; press 700 -57.5 -227 0 0 10 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -227 ; press 700 -57.5 -227 0 0 10 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -227 ; press 700 -57.5 -227 0 0 10 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -227 ; press 700 -57.5 -227 0 0 10 70 ; push -1 0 15 ; wait 10 ; goto 677.5 -57.5 -227 ; press 700 -57.5 -227 0 0 10 70 ; push -1 0 15 ; wait 10 ; pass 680 -57.5 -227 4 ; become paper
+# As paper: round by the rail loop again onto the column's top, south along it to its end, down the rails round to
+# the lane x 720 and north along it (clear now) into the wood transformer at its end.
+at 679.4 -57.5 -216.8 r 4 sector 3 kind paper : pass 679.4 -57.5 -206 5 ; pass 679.4 -57.5 -200 4 ; pass 671 -57.5 -197.3 4 ; pass 663.2 -58.4 -195.3 4 ; pass 659.5 -58.2 -189 4 ; pass 660.5 -57.3 -183.5 4 ; pass 666 -56.1 -180.3 5 ; pass 679 -54 -180.2 5 ; pass 686 -53 -181.5 4 ; pass 689.8 -52.5 -186 4 ; pass 689.9 -52.5 -210 5 ; pass 689.9 -52.5 -233 5 ; pass 690.3 -53 -236.5 4 ; pass 693 -56 -241.4 4 ; pass 699 -57.9 -243 4 ; pass 712.7 -59.4 -242.8 5 ; pass 719.8 -62 -234 5 ; press 719.4 -63 -180 0 0 9 600 ; become wood
+# As wood: onto the row z -156, south along x 759.5, west, south over the seesaw P_Modul_30_02 (the hanging plates
+# P_Modul_29_01 beside it would break under stone), into the stone transformer at the middle leg's end.
+at 719.4 -63 -172.3 r 4 sector 3 kind wood : pass 719.4 -63 -169 4 ; pass 722.5 -63.4 -158 5 ; pass 737 -62.5 -156 5 ; pass 755 -63.1 -156 5 ; pass 759.5 -63 -159 4 ; pass 759.5 -63 -168 4 ; pass 757 -63 -171.2 4 ; pass 749.5 -63 -171.5 4 ; press 749.3 -63.1 -199 0 0 3 500 ; pass 749.5 -63.1 -204.5 4 ; pass 753 -63 -205.7 4 ; pass 756 -63 -205.7 3 ; pass 759.4 -63 -202 3 ; become stone
+# As stone: back over the seesaw, north to the row z -156, and east along it pushing the loose stone ball
+# P_Ball_Stone_10 off its end onto the rail to the target of P_Modul_37_03 (its bridge falls into the lane x 876);
+# then south over the flaps P_Modul_19_03, round to the lane x 876, north along it and east to the checkpoint.
+at 759.4 -61.6 -196 r 4 sector 3 kind stone : pass 759.4 -63 -201 3 ; pass 758 -63 -205.3 3 ; pass 752 -63 -205.5 3 ; goto 749.3 -63 -205 200 ; press 749.2 -63 -172 0 0 7 400 ; pass 751.5 -63 -170.5 4 ; pass 757.6 -63 -170.8 4 ; pass 759.5 -63 -165 4 ; pass 759.7 -63 -157.5 4 ; pass 764 -62.8 -156 5 ; press 790 -62 -156 0 0 9 200 ; press 807 -60.7 -156 0 0 3 900 ; push -1 0 15 ; wait 30 ; pass 809.6 -60.6 -160 4 ; pass 809.5 -60.6 -178 5 ; pass 810 -60.1 -188 4 ; pass 809.5 -60.6 -199.5 4 ; pass 812 -60.5 -203 4 ; pass 823 -60.7 -202.8 4 ; pass 824.3 -60.7 -197 4 ; pass 824.2 -60.4 -186.5 5 ; pass 824.2 -60.4 -175.5 5 ; pass 825 -60.4 -170.3 4 ; pass 836 -63.4 -170.3 5 ; pass 849.3 -66.6 -171.5 4 ; pass 849.4 -69.9 -190 5 ; pass 850 -70.4 -197.3 4 ; pass 861 -72.7 -196.7 5 ; pass 875.5 -75 -196.9 4 ; press 876 -75.7 -110 0 0 8 600 ; pass 880 -75.8 -103.5 5 ; pass 916 -80 -103.5 6
+#
+#
+# Sector 4: on the lowest floor of the maze, west of the lane x 1093, two pockets each hold the disc of a pusher
+# (P_Modul_01_04 on z -113.6, P_Modul_01_03 on z -128.6), its pegs standing up in the lane. As wood, rammed east
+# into each disc six times from a run-up of 6 (each ram slides the bar about a unit; held against it, it does not
+# move): the pegs go out of the lane, for the paper ball later.
+at 1076.5 -108 -93 r 4 sector 4 kind wood : pass 1082 -108.3 -97 4 ; pass 1081 -108.3 -106 4 ; goto 1078.5 -108.3 -113.6 ; hold 1078.5 -108.3 -113.6 15 ; press 1092 -108.3 -113.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -113.6 ; press 1092 -108.3 -113.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -113.6 ; press 1092 -108.3 -113.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -113.6 ; press 1092 -108.3 -113.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -113.6 ; press 1092 -108.3 -113.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -113.6 ; press 1092 -108.3 -113.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -113.6 ; pass 1080.5 -108.3 -117 4 ; pass 1080.5 -108.3 -124 4 ; goto 1078.5 -108.3 -128.6 ; hold 1078.5 -108.3 -128.6 15 ; press 1092 -108.3 -128.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -128.6 ; press 1092 -108.3 -128.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -128.6 ; press 1092 -108.3 -128.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -128.6 ; press 1092 -108.3 -128.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -128.6 ; press 1092 -108.3 -128.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -128.6 ; press 1092 -108.3 -128.6 0 0 10 50 ; wait 12 ; goto 1078.5 -108.3 -128.6 ; pass 1080.5 -108.3 -124 4 ; pass 1080.5 -108.3 -117 4 ; pass 1081 -108.3 -106 4 ; pass 1082 -108.3 -97 4
+# From the row z -54 east along the rails, round their bend south and down onto the platform z -91: west at speed
+# into the target of P_Modul_37_04 at its west end and pushing on (slower than 14 it stays up), so that its bridge falls into the gap of the lane x 1093 (z -87..-95).
+at 1112 -100.7 -53.6 r 4 sector 4 kind wood : pass 1128 -101.1 -53.8 6 ; pass 1135 -101.1 -55.5 5 ; pass 1138.5 -101.3 -60 5 ; pass 1138.5 -105 -84 6 ; pass 1135 -105.3 -89.5 4 ; pass 1129 -105.1 -91 4 ; goto 1126 -105.1 -91 ; hold 1126 -105.1 -91 20 ; press 1100 -105.1 -91 0 0 14 150 ; push -1 0 70 ; wait 10 ; pass 1129 -105.1 -91 5 ; pass 1135 -105.3 -89.5 5 ; press 1138.5 -101.3 -60 0 0 12 300 ; pass 1135 -101.1 -55.5 5 ; pass 1125 -100.7 -53.7 6
+# The corridor x 998 south to its corner with the corridor z -38.5: the drawbridge P_Modul_25_07 stands at the
+# corner's west side. Rammed west from a run-up along z -38.5, braking after the hit, it falls across the gap to the
+# small square with the rails down to the paper transformer.
+at 998 -85.7 -30 r 4 sector 4 kind wood : pass 998.5 -85.7 -36 4 ; goto 1006 -83.6 -38.5 ; hold 1006 -83.6 -38.5 20 ; press 990 -85.7 -38.5 0 0 8 90 ; push 1 0 20 ; wait 40 ; pass 984 -85 -39 4
+# Out of the paper transformer along its rails (y -87.6) and east over the fallen plank, at once (it is a bridge now,
+# not a gap to leap), and north along the corridor x 998.
+at 958.3 -85 -27.6 r 3 sector 4 kind paper : pass 960 -85.6 -34 4 ; pass 965 -85.6 -38.5 5 ; pass 981 -85.1 -38.5 6 ; pass 991 -85.3 -38.5 6 ; pass 998.5 -85.7 -35 5 ; pass 998.5 -85.7 -26 6
+# As paper, back over the box row to the junction at z -54: east along the row, south down the pier x 1093, over the
+# bridge the target dropped, down the lane between the pushers' blocks (their pegs now out of it) and on to the fans.
+at 1078 -95.6 -48 r 4 sector 4 kind paper : pass 1078 -95.6 -53.8 4 ; pass 1088 -98.5 -53.8 5 ; pass 1093 -100.7 -55.5 4 ; pass 1093 -102.5 -62 5 ; pass 1093 -105.1 -75 5 ; pass 1093 -105.1 -91 4 ; pass 1093 -105.1 -105 5 ; pass 1093 -105.1 -121.5 5 ; pass 1093 -105.1 -140 5 ; pass 1100 -105.1 -143 5 ; pass 1113 -105.6 -145 4 ; pass 1113 -110 -160 4
+# The fans P_Modul_18_02..04 stand alone in a row south along x 1113.3, each lower than the last: the paper ball,
+# lifted over one, floats south straight along the row to the next, which catches it, and from the last down onto
+# the checkpoint's platform.
+at 1113.3 -110 -160 r 4 sector 4 kind paper : hold 1113.3 -110 -163.5 90 ; press 1113.3 -118 -193.5 0 0 20 300 ; hold 1113.3 -118 -193.5 60 ; press 1113.3 -128 -223.5 0 0 20 300 ; hold 1113.3 -128 -223.5 60 ; press 1113.3 -134.5 -250 0 0 14 400
+#
+#
+# Sector 5: the paper ball, lifted by the fan P_Modul_18_07 up the loop at the south end of the lower rail pair, rides
+# the upper pair north and round its hairpin (centre about x 1121.5, z -297.5) onto the pair along x 1129.5, south to
+# the loop over the fan P_Modul_18_08.
+at 1113.5 -121.6 -312 r 3 sector 5 kind paper : pass 1113.5 -121.6 -297 5 ; pass 1115.8 -121.6 -291.5 4 ; pass 1121.5 -121.6 -289.5 4 ; pass 1127.2 -121.6 -291.5 4 ; pass 1129.5 -121.6 -297 4 ; press 1129.5 -121.6 -322 0 0 9 400
+# Lifted up the loop at x 1129.5 by the fan P_Modul_18_08, the ball goes on over its top north along the top rail
+# pair (it rolls back into the loop otherwise) and round east toward the S of rails.
+at 1129.5 -105.6 -321.5 r 2.5 sector 5 kind paper : press 1129.8 -105.4 -314 0 0 4 150 ; pass 1133.5 -105.4 -311.6 3 ; pass 1137 -105.4 -311.2 3
+#
+#
+# Sector 6: on the stepped grid's top the stone ball knocks two of the loose stone balls down through its holes onto the
+# rail tracks under it, each hit east a little below its middle from column x 1563 and braking at once (the grid is full
+# of holes): P_Ball_Stone_12 into the band over the track along z -439.6, which takes it into the slot north of the
+# bridge, where it pushes the pusher P_Modul_01_05 south (its disc to the bridge's line); P_Ball_Stone_11 into the band
+# over the track along z -449.5, which takes it into the trapdoor P_Modul_19_04 of the west platform, so that the paper
+# ball later drops through it onto the rails to the fan P_Modul_18_12.
+at 1562.8 -155 -440 r 4 sector 6 kind stone : goto 1562.6 -155 -446.4 ; hold 1562.6 -155 -446.4 40 ; press 1567 -155 -446.4 0 0 6 60 ; push -1 0 30 ; wait 40 ; hold 1563 -155 -446 30 ; goto 1562.6 -155 -456.4 ; hold 1562.6 -155 -456.4 40 ; press 1567 -155 -456.4 0 0 6 60 ; push -1 0 30 ; wait 40 ; hold 1563 -155 -456 30
+# From the grid's south foot along the rails west and north, slowly into the block in the bridge's middle, against the
+# pusher's disc; there, east over the seesaw P_Modul_30_04.
+at 1530 -200 -499.8 r 4 sector 6 kind stone : pass 1526 -200 -497.5 3 ; pass 1523.6 -200 -492 3 ; press 1523.6 -200 -462 0 0 3 400 ; wait 60 ; hold 1523.6 -205 -459.6 60 ; press 1520 -205 -459.6 0 0 3 120 ; press 1546 -205 -459.6 0 0 8 400 ; pass 1550 -205 -459.6 5
+# The last rails down to the balloon: six pairs of rails one above the other in a zigzag (south along x 1460, east along
+# z -583, south along x 1476, west along z -606, south along x 1448, east along z -631.5), each crossing under the end
+# of the one before. The wooden ball rides each on its lower rail leaning on the upper one, comes onto the next fast
+# enough to carry over its end (a slow ball drops between them), then the platform and the balloon.
+at 1460 -211 -547 r 4 sector 6 kind wood : press 1459.1 -211.3 -583.5 0.8 0 12 400 ; press 1474.9 -211.5 -581.4 0 -0.8 10 300 ; press 1474.9 -211.5 -606.3 0.8 0 12 300 ; press 1447.7 -211.5 -604.4 0 -0.8 10 300 ; press 1449.2 -211.5 -631.9 -0.8 0 12 300 ; press 1485 -211.5 -630.0 0 -0.8 10 300 ; pass 1485 -228 -642 5
