@@ -140,6 +140,8 @@ What the open format cannot hold yet, found while making it: a texture's slots (
 sounds (Wave Player), a level's own texture for script particles, a level's 3D sprite turned to the view.
 `crates/game/src/showcase.rs` checks that every part of ours stands in it and that its run
 (`hints/runs/Level_00-synthetic.replay`, the test player's with `hints/Level_00-synthetic.txt`) finishes it.
+Without a copy of the original the level behind the menu is the first shipped level past the showcase (order 0),
+so the menu never shows its sign boards.
 
 ## Our levels and how to edit them
 

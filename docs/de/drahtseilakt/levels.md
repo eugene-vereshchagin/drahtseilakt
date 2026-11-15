@@ -131,6 +131,8 @@ Was das offene Format noch nicht trägt (beim Bauen gefunden): die Slots einer T
 Slot), Wave-Klänge (Wave Player), eine eigene Textur des Levels für Skript-Partikel, ein zur Sicht gedrehtes
 3D-Sprite des Levels. `crates/game/src/showcase.rs` prüft, dass jedes unserer Teile darin steht und dass sein Lauf
 (`hints/runs/Level_00-synthetic.replay`, vom Testspieler mit `hints/Level_00-synthetic.txt`) es schafft.
+Ohne Kopie des Originals steht hinter dem Menü der erste mitgelieferte Level nach dem Schaulevel (order 0), damit das
+Menü nicht seine Schilder zeigt.
 
 ## Unsere Level und wie man sie bearbeitet
 

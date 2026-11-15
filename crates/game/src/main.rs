@@ -576,8 +576,15 @@ fn main() -> ExitCode {
         };
         let mut o = o;
         if !data.has_copy() && !o.chosen {
-            // the level behind the menu at the start: our first own level
-            let first = levels::shipped().into_iter().next().ok_or(
+            // the level behind the menu at the start: our first own level, past the showcase (order 0, the check
+            // level with its sign boards, levels.md "The showcase level") unless it is the only one
+            let shipped = levels::shipped();
+            let first = shipped
+                .iter()
+                .find(|p| p.order != Some(0))
+                .or(shipped.first())
+                .cloned()
+                .ok_or(
                 "no copy of Ballance and no levels of the game's own (assets/levels): import your Ballance with \
                  --import DIR, or pass --data DIR",
             )?;

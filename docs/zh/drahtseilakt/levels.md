@@ -78,6 +78,7 @@ Pro Racing 赛季不属于这一类：它们是新的几何，归入 `community/
 制作过程中发现开放格式目前还不能承载：纹理的槽位（Movie Player、Set Current Slot）、波形声音（Wave Player）、
 脚本粒子使用关卡自己的纹理、朝向视线的关卡 3D 精灵。`crates/game/src/showcase.rs` 检查我们的每个部件都在其中，
 并且它的记录（`hints/runs/Level_00-synthetic.replay`，测试玩家用 `hints/Level_00-synthetic.txt` 跑出）能够通关。
+没有原版拷贝时，菜单背景是展示关卡（order 0）之后的第一个随附关卡，因此菜单里不会出现它的标牌。
 
 ## 我们的关卡及其编辑方法
 
