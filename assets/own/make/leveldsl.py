@@ -127,18 +127,29 @@ try:
     SPACING["speed"] = min(max(float(os.environ.get("LEVELDSL_SPEED_SPACING", SPACING["speed"])), 4.0), 60.0)
 except ValueError:
     pass
-# The slots the stone on the crate and a pusher stand in (crateblock, pusher): the stone is 5 on a side, the pusher's
-# beam 1.2 wide in its channel.
+# The slots the stone on the crate and a pusher stand in (crateblock, pusher): the stone is 5 on a side (its slot 5.3, as
+# level 1 has it), the pusher's beam 1.2 wide in its channel.
 # How far a floor's end may be from a checkpoint piece's edge and still join it (the path drifts by a few thousandths).
 JOIN_TOL = 0.02
 CORNER_RAIL = 8.0
-CRATE_SLOT = 6.0
+CRATE_SLOT = 5.3
 PUSHER_SLOT = 1.6
 # The flap wheel (P_Modul_19, flaps): the gap its flat flap lies over; its frame this far on from the gap's near edge
 # and this far to the left of the way's middle, so that the flat flap fills the gap (the part's measured pivots).
 FLAP_LEN = 6.4
 FLAP_BACK = 3.24
 FLAP_SIDE = 10.0
+# `flaps stand`: the standing flap on the way (the frame 5 to the right), the flat one on a lane 15 to the right
+FLAP_STAND_SIDE = -5.0
+# the fan's own block (levelkit.fan_block)
+FAN_BLOCK = 5.0
+# the troughs' row (P_Modul_41; the original's level 7: the first 4 past the floor's end, 6 apart, the floor on 3 past)
+TROUGH_FIRST, TROUGH_STEP, TROUGH_LAST = 4.0, 6.0, 3.0
+# the board bridge's gap (P_Modul_25; the far floor ends 9.1 from the frame in all of the original's levels)
+BOARD_GAP = 9.1
+# the drawbridge (P_Modul_37; the original's level 5): its frame 1.2 past the spur's end, the crossing lane's middle
+# 13.75 past the frame, its gap 7.6 long
+HINGE_BACK, HINGE_LANE, HINGE_GAP = 1.2, 13.75, 7.6
 # A hint's steps at most (hints.rs takes 64).
 HINT_STEPS = 60
 
@@ -690,14 +701,16 @@ class Track:
         elif cmd == "seesaw":
             self.seesaw(line)
         elif cmd == "platebridge":
-            self.module_at("P_Modul_29", 6.6, 0.0, 0.0)
-            pts, _ = self.straight(14.8, 0.0)
+            # as every original level has it (levels 2-10): a gap of 15.4, the frame 6.9 on from its near edge
+            self.module_at("P_Modul_29", 6.9, 0.0, 0.0)
+            pts, _ = self.straight(15.4, 0.0)
             for p in pts[1:]:
                 self.pilot.way(p)
             self.move_along(pts)
         elif cmd == "swingbridge":
-            gap = float(opts.get("ahead", 5.0)) if "ahead" in opts else 5.0
-            self.module_at("P_Modul_08", gap / 2, 1.2, 0.0)
+            # as levels 8-10 have it: over a gap of 15, its frame in the middle, 1.2 under the floors' top
+            gap = float(opts.get("ahead", 15.0))
+            self.module_at("P_Modul_08", gap / 2, -1.2, 0.0)
             pts, _ = self.straight(gap, 0.0)
             if "nopilot" not in opts:
                 self.pilot.way(pts[-1], force=True)
@@ -723,7 +736,21 @@ class Track:
                     self.pilot.step([s], f"goto {fmt(self.at(ahead - 14))}", self.at(ahead - 14))
                 self.pilot.step(STYLES, f"via {fmt(self.at(ahead + 8))}", self.at(ahead + 8))
         elif cmd == "flaps":
-            self.flaps()
+            self.flaps("stand" in args)
+        elif cmd == "flapslot":
+            # the flap wheel's second lane: its gap before the axle, a stopper under it for the flap that falls back
+            corners = [self.at(0.0, -2.5, -1.03), self.at(FLAP_LEN, 2.5, -0.53)]
+            lo, hi = np.minimum(*corners), np.maximum(*corners)
+            self.b.stopper(f"Stopper_{self.n('stopper'):03d}", tuple(lo), tuple(hi))
+            self.slot(FLAP_LEN)
+        elif cmd == "fanpad":
+            self.fanpad(num(args, 0, line))
+        elif cmd == "troughs":
+            self.troughs(int(num(args, 0, line)))
+        elif cmd == "boardbridge":
+            self.boardbridge()
+        elif cmd == "hingebridge":
+            self.hingebridge()
         elif cmd in ("point", "life", "box", "dome", "trafo", "loose", "column", "module"):
             self.part(cmd, args, opts, line)
         elif cmd == "pilot":
@@ -929,9 +956,9 @@ class Track:
         self.pilot.step(STYLES, f"via {fmt(on)}", on)
 
     def seesaw(self, line):
-        """A seesaw (P_Modul_30) over a gap of its board's length: its frame half a unit under the floor, an unseen
-        stopper under the board, as the original sets it."""
-        board = 14.8
+        """A seesaw (P_Modul_30) over a gap of 12.9 (its board 14.8 long lying on both edges), its frame in the middle
+        half a unit under the floor, as every original level sets it (levels 2-9), an unseen stopper under the board."""
+        board = 12.9
         mid = self.at(board / 2, 0, -0.5)
         self.b.module("P_Modul_30", self.n("P_Modul_30"), K.pose(tuple(mid), tuple(self.fwd())), self.sector)
         corners = [self.at(0, -2.5, -1.0), self.at(board, 2.5, -0.5)]
@@ -942,7 +969,66 @@ class Track:
         self.jump(pts[-1], {})
         self.move_along(pts)
 
-    def flaps(self):
+    def fanpad(self, size):
+        """A square platform `size` across from the cursor (the middle of its back edge), with a fan (P_Modul_18) in
+        its own block in the middle, as the original's level 3 has its fans (a 15 x 15 platform each, the next 25 on
+        and 11 higher): the fan's frame at the floor's top, sunk in the block under its grille (levelkit.fan_block).
+        The cursor goes to the platform's far edge."""
+        self.end_stretch()
+        f, lft = self.fwd(), self.left()
+        up = np.array([0.0, 1.0, 0.0])
+        mid = self.at(size / 2)
+        n = self.n("fanpad")
+        m = K.Mesh(f"Fan_Pad_{n:02d}")
+        top = mid - up * P.FLUSH
+        hb, rest = FAN_BLOCK / 2, (size - FAN_BLOCK) / 2
+        mats = self.b.mat_ids
+        for a, s, ha, hs in ((-(hb + rest / 2), 0.0, rest / 2, size / 2), ((hb + rest / 2), 0.0, rest / 2, size / 2),
+                             (0.0, hb + rest / 2, hb, rest / 2), (0.0, -(hb + rest / 2), hb, rest / 2)):
+            c = top + f * a + lft * s - up * L.DEPTH / 2
+            P.solid(m, mats["top"], mats["side"], c, (f, up, lft), (ha, L.DEPTH / 2, hs))
+        self.b.add(f"Fan_Pad_{n:02d}", m, groups=self.b._floor_groups("stone") + self.b.sector(self.sector))
+        self.b.fan_block(f"Fan_Block_{n:02d}", tuple(mid), tuple(f), self.sector)
+        k = self.n("P_Modul_18")
+        self.b.module("P_Modul_18", k, K.pose(tuple(mid), tuple(f)), self.sector, lift=0.0)
+        for a in np.linspace(0, size, max(2, int(size / 6) + 1)):
+            self.floor_points.append(self.at(a))
+            self.floor_reach.append(size / 2)
+            self.floor_along.append(self.along + a)
+            self.floor_rails.append(False)
+        pts, _ = self.straight(size, 0.0)
+        self.move_along(pts)
+
+    def troughs(self, count):
+        """A row of `count` tipping troughs (P_Modul_41) over the void where the way stops, as the original's levels
+        7 to 11 have them (five to eight in a row, 6 apart, the first 4 past the floor's end, the floor going on 3
+        past the last): each hangs level with the floor on its axle across the way and tips under a heavy ball; the
+        paper ball rolls over them. The cursor goes to where the floor goes on."""
+        self.end_stretch()
+        for i in range(count):
+            self.module_at("P_Modul_41", TROUGH_FIRST + TROUGH_STEP * i, 0.0, 0.0)
+        self.slot(TROUGH_FIRST + TROUGH_STEP * (count - 1) + TROUGH_LAST)
+
+    def boardbridge(self):
+        """The flap bridge's board (P_Modul_25) standing at the far side of the way's end, as the original's levels 2,
+        3, 5 and 8 set it: the way stops at the cursor, the board stands on its hinge at the cursor's edge of a gap
+        of BOARD_GAP (9.1, every one of theirs), the floor going on past it. The ball pushes the board over: it falls
+        across the gap (9.57 long from its hinge) onto the far floor. The module's x points back along the way; the
+        cursor goes on past the gap."""
+        self.end_stretch()
+        self.module_at("P_Modul_25", 0.0, 0.0, 180.0)
+        self.slot(BOARD_GAP)
+
+    def hingebridge(self):
+        """The drawbridge (P_Modul_37) at the end of a spur, as the original's levels 3, 5, 8 and 10 set it: the
+        spur's floor stops at the cursor, the module's frame HINGE_BACK on, its x back along the spur; standing up,
+        its deck (9 wide, 8.9 to 13.9 from its hinge) falls, when the ball tips it, into the gap of a lane that crosses
+        the spur's line HINGE_LANE past the frame (laid by the description: a lane 5 wide, its gap 7.6 long). The
+        cursor stays."""
+        self.end_stretch()
+        self.module_at("P_Modul_37", HINGE_BACK, 0.0, 180.0)
+
+    def flaps(self, stand=False):
         """The flap wheel (P_Modul_19) as the original's levels set it (levels 9, 10 and 11): its frame at the floors'
         top, its axle across the way at the near edge of a gap of a flap's length, one flap lying flat over the gap
         (the way goes on over it) and the other standing up at the axle 15 to the left (in the original, over a second
@@ -950,10 +1036,13 @@ class Track:
         place, half a unit under the floor, that holds it level under the ball. The part's measured pivots: the flaps
         are 6.4 long from the axle (local x -3.24 to 3.16, the axle at -2.93), 5 wide, the flat one at local z -12.5
         to -7.5 (to the right of the frame), the standing one at 2.5 to 7.5."""
-        self.module_at("P_Modul_19", FLAP_BACK, 0.0, 0.0, FLAP_SIDE)
-        corners = [self.at(0.0, -2.5, -1.03), self.at(FLAP_LEN, 2.5, -0.53)]
-        lo, hi = np.minimum(*corners), np.maximum(*corners)
-        self.b.stopper(f"Stopper_{self.n('stopper'):03d}", tuple(lo), tuple(hi))
+        side = FLAP_STAND_SIDE if stand else FLAP_SIDE
+        self.module_at("P_Modul_19", FLAP_BACK, 0.0, 0.0, side)
+        # the stoppers under the flat flaps' places: on the way, and (standing) under the flat one on the lane beside
+        for s in ((0.0, FLAP_STAND_SIDE - FLAP_SIDE) if stand else (0.0,)):
+            corners = [self.at(0.0, s - 2.5, -1.03), self.at(FLAP_LEN, s + 2.5, -0.53)]
+            lo, hi = np.minimum(*corners), np.maximum(*corners)
+            self.b.stopper(f"Stopper_{self.n('stopper'):03d}", tuple(lo), tuple(hi))
         self.slot(FLAP_LEN)
 
     def place_columns(self, depth=L.COLUMN_DEPTH):

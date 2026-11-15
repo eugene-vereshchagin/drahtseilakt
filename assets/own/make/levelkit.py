@@ -826,6 +826,67 @@ class LevelBuilder:
             K.box(m, self.mat_ids["rail"], (x + lo[0], y, z + lo[1]), (x + hi[0], y + 0.3, z + hi[1]))
         return self.add(name, m)
 
+    def fan_block(self, name, at, fwd, sector=0, half=2.5, hole=1.8, depth=3.1):
+        """The fan's own block, as the original's levels set every fan (their floor round a fan is a 5 x 5 tile of
+        material Modul18_Top with a round hole of radius 1.8 and a grille, Modul18_Gitter, over it at the floor's
+        top, the fan sunk 3 under it): a square tile with a round hole whose top is `at` (the middle), a steel
+        collar round the hole, a shaft down to a floor, and the grille over the hole, which the ball rolls over (it
+        is a floor) and the updraft blows through. Its sides are drawn (a block standing alone shows them). `fwd`:
+        the way's heading (the block's sides along it)."""
+        f = np.asarray(fwd, np.float64)
+        f = f / np.linalg.norm(f)
+        lft = np.array([-f[2], 0.0, f[0]])
+        c = np.asarray(at, np.float64)
+        up = np.array([0.0, 1.0, 0.0])
+        if "fan_grille" not in self.mat_ids:
+            n = 256
+            v, u = np.mgrid[0:n, 0:n] / n
+            # steel bars: a ring at the rim, two rings inside and bars across both ways, the rest open
+            r = np.hypot(u - 0.5, v - 0.5) * 2
+            bars = (np.abs(((u * 9) % 1) - 0.5) > 0.38) | (np.abs(((v * 9) % 1) - 0.5) > 0.38)
+            rings = (np.abs(r - 0.97) < 0.03) | (np.abs(r - 0.62) < 0.025) | (np.abs(r - 0.3) < 0.025)
+            hub = r < 0.1
+            solid = bars | rings | hub
+            shade = 0.55 + 0.25 * K.value_noise(n, n, (16, 16), 11)
+            rgb = np.stack([shade * 0.93, shade * 0.95, shade], -1)
+            K.save_png(self.tex, "Fan_Grille.png", rgb, solid.astype(np.float64))
+            self.mat("fan_grille", "Fan_Grille.png", diffuse=1.0, emissive=0.3, specular=0.6, power=30,
+                     alpha="MASK", cutoff=0.5, double_sided=True)
+        P = lambda a, s, h: c + f * a + lft * s + up * h  # noqa: E731
+        seg = 24
+        top = K.Mesh(name)
+        # the tile: from the hole's rim out to the square's edge, a quad a step (winding as the floors': up)
+        for k in range(seg):
+            a0, a1 = 2 * math.pi * k / seg, 2 * math.pi * (k + 1) / seg
+            pts = []
+            for a in (a0, a1):
+                d = np.array([math.cos(a), math.sin(a)])
+                pts.append((d * hole, d * (half / max(abs(d[0]), abs(d[1])))))
+            q = [P(*pts[0][0], 0), P(*pts[0][1], 0), P(*pts[1][1], 0), P(*pts[1][0], 0)]
+            uv = [((p - c) @ f / (2 * half) + 0.5, (p - c) @ lft / (2 * half) + 0.5) for p in q]
+            top.face(self.mat_ids["top"], q[::-1], uv[::-1], normal=(0, 1, 0))
+        # the grille over the hole: a floor too
+        for k in range(seg):
+            a0, a1 = 2 * math.pi * k / seg, 2 * math.pi * (k + 1) / seg
+            q = [c.copy(), P(math.cos(a1) * hole, math.sin(a1) * hole, 0), P(math.cos(a0) * hole, math.sin(a0) * hole, 0)]
+            uv = [(0.5 + (p - c) @ f / (2 * hole), 0.5 + (p - c) @ lft / (2 * hole)) for p in q]
+            top.face(self.mat_ids["fan_grille"], q, uv, normal=(0, 1, 0))
+        self.add(name, top, groups=self._floor_groups("metal") + self.sector(sector))
+        # only drawn: the collar, the shaft and its floor, the block's sides
+        m = K.Mesh(name + "_Shaft")
+        K.cylinder(m, self.mat_ids["rail"], tuple(c - up * 0.02), up, hole + 0.35, 0.2, seg=seg, r_top=hole + 0.2)
+        for k in range(seg):
+            a0, a1 = 2 * math.pi * k / seg, 2 * math.pi * (k + 1) / seg
+            p0 = P(math.cos(a0) * hole, math.sin(a0) * hole, 0)
+            p1 = P(math.cos(a1) * hole, math.sin(a1) * hole, 0)
+            m.face(self.mat_ids["side"], [p0, p1, p1 - up * depth, p0 - up * depth])
+        m.face(self.mat_ids["side"], [P(-hole, -hole, -depth), P(-hole, hole, -depth), P(hole, hole, -depth),
+                                      P(hole, -hole, -depth)], normal=(0, 1, 0))
+        for s0, s1 in (((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)), ((-1, 1), (-1, -1))):
+            a, b = P(s0[0] * half, s0[1] * half, 0), P(s1[0] * half, s1[1] * half, 0)
+            m.face(self.mat_ids["side"], [b, a, a - up * (depth + 0.4), b - up * (depth + 0.4)])
+        self.add(name + "_Shaft", m)
+
     def stopper(self, name, lo, hi):
         """An unseen floor stopper (Phys_FloorStopper): it holds boxes and modules' parts, the ball passes it."""
         m = K.Mesh(name)
@@ -1229,11 +1290,12 @@ class LevelBuilder:
         return self.placeholder(f"P_Extra_Life_{n:02d}", ["P_Extra_Life"] + self.sector(sector),
                                 K.pose((x, y + 2.56, z)), (-2.5, -2.56, -2.5), (2.5, 1.2, 2.5))
 
-    def module(self, name, n, matrix, sector, lo=(-2, -2, -2), hi=(2, 2, 2)):
-        """A module (P_Modul_NN) at `matrix`, the frame its part is made in."""
+    def module(self, name, n, matrix, sector, lo=(-2, -2, -2), hi=(2, 2, 2), lift=0.6):
+        """A module (P_Modul_NN) at `matrix`, the frame its part is made in (a fan's frame `lift` over the floor its
+        updraft starts from: 0 for one in its own block, fan_block)."""
         i = self.placeholder(f"{name}_{n:02d}", [name] + self.sector(sector), matrix, lo, hi)
         if name == "P_Modul_18":
-            self.lifting.append((i, 1.0, 0.6, f"{name}_{n:02d}"))
+            self.lifting.append((i, 1.0, lift, f"{name}_{n:02d}"))
         return i
 
     # --- writing -----------------------------------------------------------------------------------------------

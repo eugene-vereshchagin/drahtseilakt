@@ -13,12 +13,13 @@ CLASSIC
 - sector 2, rails and scenery: straight rails, rails turning, rails rising and falling; a wooden deck on
   columns; the lamp tower, mast, plinth, pillar, wall block with its lantern, garland and lighthouse;
 - sector 3, the parts: extra point, extra life, boxes (one stacked), the dome, the loose balls (wood, stone, paper,
-  sticky), the sack (P_Modul_26), the turning arms (P_Modul_17), the flap wheel (P_Modul_19);
-- sector 4, transformers and the mechanics on the way: paper and the fan (P_Modul_18) that lifts it, wood, the
-  seesaw (P_Modul_30), the plate bridge (P_Modul_29), the swing (P_Modul_08), stone shoving boxes, sticky, wood;
-- sector 5, the puzzle modules in bays beside a wide floor (none blocks the way): the pusher (P_Modul_01), the crate
-  under its stone (P_Modul_34), the tipping plates (P_Modul_41), a plate bridge and the drawbridge (P_Modul_25) to
-  bays over the void, the flap bridge (P_Modul_37), the falling room (P_Modul_03).
+  sticky), the sack (P_Modul_26), the turning arms (P_Modul_17);
+- sector 4, paper and wood on the way: the fan steps (P_Modul_18), the troughs (P_Modul_41), the seesaw (P_Modul_30),
+  the plate bridge (P_Modul_29), the swing (P_Modul_08);
+- sector 5, stone and the puzzle modules on the way, each as the original's levels set it: the flap wheel
+  (P_Modul_19), the board bridge (P_Modul_25), the drawbridge (P_Modul_37), the pushers (P_Modul_01), the crate under
+  its stone (P_Modul_34); the falling room (P_Modul_03) beside the way.
+Each element has `check` lines: checks.txt, run by crates/game/src/showcase.rs.
 THE GATE: an arch of brick over the way with "COMMUNITY" on it.
 COMMUNITY (synthetic_community.py: its description, commands and scripts): the materials community maps use, and our
 own behaviour graphs (the level's scripts, open-format.md) for what their Virtools scripts do; then the balloon.
@@ -45,6 +46,10 @@ OUT = os.path.join(ASSETS, "levels", "drahtseilakt", NAME)
 FONT = os.path.join(ASSETS, "fonts", "NotoSans-Bold.ttf")
 
 POSTED = "2026-11-15"
+CHECKS_HEADER = """# The showcase level's checks: each element does its job in the game's physics (crates/game/src/showcase.rs runs
+# them). Made by assets/own/make/make_synthetic_level.py from its `check` lines; points are world points.
+
+"""
 HEADER = """# The showcase level: every element of the game on one way, to be checked by eye. First everything of classic
 # Ballance (floors, rails, parts, transformers, modules), then, past the COMMUNITY gate, what community maps bring
 # (materials, our own behaviour graphs). Made by assets/own/make/make_synthetic_level.py; our own content only.
@@ -136,6 +141,12 @@ rails 24 up 3
 floor 14
 sign "Rails: falling 3"
 rails 24 down 3
+floor 14
+sign "Rails: spiral down, two turns (level 13)"
+check spiral : ball wood -6 0 0 ; go 9 0 0 4 300 ; arc 10 0 0 10 720 20 48 ; go 40 0 -20 4 400 ; reach 40 0 -18 2.5 ; kept
+rails 10
+rails-left 720 10 down 20
+rails 36
 floor 12
 surface wood
 safety none
@@ -207,86 +218,182 @@ sign "P_Modul_17: turning arms"
 arms side 8 ahead 6 nopilot
 floor 20
 floor 20
-width 7.5
-floor 14
-sign "P_Modul_19: flap wheel over a gap"
-flaps
-floor 12
-width 12
-floor 16
-floor 8
 checkpoint
 
-# ---- sector 4: transformers and the mechanics on the way ---------------------------------------------------------
+# ---- sector 4: paper (fans, troughs), then wood (seesaw, plates, swing) -------------------------------------------
+# each element as the original's levels set it, the way going through it (no way round)
 floor 12
-sign "CLASSIC 4: transformers, mechanics" ahead -6
+sign "CLASSIC 4: paper, then wood" ahead -6
 sign "P_Trafo_Paper"
+check fans : ball wood -8 0 0 ; go 0 0 0 3 400 ; wait 150 ; kind paper ; go 41.5 0 0 4 900 ; wait 40 ; go 62 0 11 5 900 ; go 66.5 0 11 4 900 ; wait 10 ; go 82 0 25 6 900 ; reach 82 0 25 3 ; kept
+check fans-wood : ball wood 20 0 0 ; go 41.5 0 0 4 900 ; wait 120 ; go 62 0 11 5 900 ; away 62 0 11 4
 trafo paper
-floor 18
-sign "P_Modul_18: fan lifts paper"
-fan ahead -5
-gap 4 up 12 nopilot
-floor 22
+floor 16
+safety none
+width 6
+floor 12
+sign "P_Modul_18: fans lift paper up 11, then 14 (level 3)"
+floor 6
+columns 0
+fanpad 15
+# level 3: rails 11 up from just past the fan (3 there, 5 here: our headroom rule) over the 10 gap to the next platform
+move -2.5 0 11
+rails 12.5
+fanpad 15
+# level 3: the next floor stands right at the platform's far edge, 14 up (a wall the updraft lifts the ball over)
+move 0 0 14
+floor 16
+columns 60
+sign "P_Modul_41: troughs, paper only (level 7)"
+check troughs-paper : ball paper 0 0 0 ; go 52 0 0 4 900 ; reach 52 0 2 3 ; kept
+check troughs-wood : ball wood 0 0 0 ; go 52 0 0 4 600 ; away 52 0 2 6 ; turned P_Modul_41_01 P_Modul_41 20
+floor 6
+troughs 6
+floor 14
+width 12
+floor 10
+safety border
+floor 6
 sign "P_Trafo_Wood"
 trafo wood
 floor 18
-sign "P_Modul_30: seesaw"
+sign "P_Modul_30: seesaw over a 12.9 gap (levels 2-9)"
+check seesaw : ball wood -12 0 0 ; go 28 0 0 6 900 ; reach 28 0 0 3 ; kept
 seesaw
 floor 18
-sign "P_Modul_29: plate bridge"
+sign "P_Modul_29: plate bridge over 15.4 (levels 2-10)"
+check plates : ball wood -12 0 0 ; go 30 0 0 5 900 ; reach 30 0 0 3 ; kept
+check plates-stone : ball stone -12 0 0 ; go 30 0 0 5 900 ; lost
 platebridge
 floor 18
-sign "P_Modul_08: swing"
+sign "P_Modul_08: swing over a trench (level 8)"
+check swing : ball wood -8 0 0 ; wait 120 ; go 32 0 0 5 900 ; reach 32 0 0 3 ; kept
+plaza 32 15 up -6.2
 pilot safe,collector : goto -8 0 0 ; wait 50 ; via 0 0 0 ; via 9 0 0
 pilot speed : via 0 0 0 ; via 9 0 0
 swingbridge nopilot
 floor 20
+checkpoint
+
+# ---- sector 5: stone and the puzzle modules, each in its own setting on the way -----------------------------------
+floor 12
+sign "CLASSIC 5: stone and the puzzles" ahead -6
 sign "P_Trafo_Stone: stone shoves boxes"
 trafo stone
 floor 16
 box ahead 4 side -2.4 shove
 box ahead 10 side 2.4 shove
 floor 20
+nopilot all
+columns 0
+safety none
+width 6
+floor 10
+sign "P_Modul_19: flap wheel, stone tips it (levels 9-11)"
+# (levels 9-11: the stone ball comes at the standing flap rolling, 7 or more; from rest against it, it holds)
+check flaps-stone : ball stone 0 0 0 ; go 24 0 0 4 900 ; go 34.8 0 0 4 600 ; go 34.8 15 0 4 600 ; go 0 15 0 10 900 ; reach 0 15 2 3 ; turned P_Modul_19_01 P_Modul_19_Flaps 60 ; kept
+check flaps-wood : ball wood 0 0 0 ; go 24 0 0 4 900 ; go 34.8 0 0 4 600 ; go 34.8 15 0 4 600 ; go 0 15 0 10 900 ; away 0 15 2 6 ; still P_Modul_19_01 P_Modul_19_Flaps 30
+floor 10
+flaps
+floor 18.4
+corner left
+floor 15
+corner left
+floor 24.49
+flapslot
+floor 8
+drop 10
+corner right
+floor 20
+corner right
+width 6
+sign "P_Modul_25: board over a 9.1 gap (level 3)"
+check board-stone : ball stone 0 0 0 ; go 32 0 0 4 900 ; reach 32 0 2 3 ; turned P_Modul_25_01 P_Modul_25_Bridge 60 ; kept
+check board-wood : ball wood 0 0 0 ; go 32 0 0 4 900 ; reach 32 0 2 3 ; turned P_Modul_25_01 P_Modul_25_Bridge 60 ; kept
+floor 14
+boardbridge
+floor 14
+sign "P_Modul_37: drawbridge into a lane (level 5)"
+check drawbridge-stone : ball stone 0 0 0 ; go 21 0 0 6 600 ; wait 120 ; turned P_Modul_37_01 P_Modul_37_Bridge 60 ; go 8 -2 0 4 600 ; go 8 -12 0 4 600 ; go 36.95 -12 0 4 900 ; go 36.95 12 0 7 900 ; reach 36.95 12 2 3 ; kept
+check drawbridge-wood : ball wood 0 0 0 ; go 21 0 0 6 600 ; wait 120 ; still P_Modul_37_01 P_Modul_37_Bridge 30
+floor 8
+mark spur
+floor 14
+hingebridge
+back spur
+move 0 -2.5 0
+turn -90
+floor 9.5
+corner left
+floor 28.95
+corner left
+floor 8.2
+gap 7.6 nopilot
+floor 8.2
+corner right
+floor 14
+sign "P_Modul_01: two pushers, from the low floor (level 1)"
+check pushers : ball stone 0 0 0 ; go 8 -8 0 4 400 ; go 24.8 -15 0 4 600 ; go 24.8 -2 0 5 300 ; go 24.8 -15 0 4 400 ; go 34.8 -15 0 4 400 ; go 34.8 -2 0 5 300 ; go 34.8 -15 0 4 400 ; go 6 -8 0 4 600 ; go 6 0 0 4 300 ; go 50 0 2.5 4 900 ; reach 50 0 4.5 3 ; moved P_Modul_01_01 P_Modul_01_Pusher 3 ; moved P_Modul_01_02 P_Modul_01_Pusher 3 ; kept
+check pushers-block : ball stone 0 0 0 ; go 50 0 2.5 4 600 ; away 50 0 4.5 8
+floor 10
+plaza 14 42 ahead -6 side -10
+move 0 -10 0
+drop 25
+move 0 10 0
+floor 10 up 2.5
+floor 4
+pusher right
+floor 8.4
+pusher right
+floor 16
+sign "P_Modul_34: crate under the stone, from below (level 1)"
+# level 1: a lane (5 wide there, 6 here: our narrowest way) over a broad floor 5 lower; the stone stands in a slot 5.3 long, on its crate on the floor below;
+# a stone ball rolling across that floor under the slot knocks the crate out and the stone sinks level with the lane
+check crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 26.65 -12 -5 4 600 ; go 26.65 7 -5 7 900 ; wait 60 ; go 26.65 12 -5 4 900 ; go 6 12 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; kept
+check crate-block : ball stone 0 0 0 ; go 42 0 0 4 600 ; away 42 0 2 6
+floor 6
+mark crate
+floor 18
+crateblock
+floor 16
+mark past
+back crate
+move 0 -2.5 0
+turn -90
+floor 9.5
+corner left
+width 6
+floor 20.65 down 5
+corner left
+floor 2
+plaza 26 20
+# and back up on its far side (level 1: a ramp up beside the lane, the slot below being shut by the sunk stone)
+back crate
+move 0 2.5 0
+turn 90
+floor 9.5
+corner right
+width 6
+floor 20.65 down 5
+corner right
+floor 2
+back past
+width 20
+floor 10
+sign "P_Modul_03: falling room"
+floor 30
+module P_Modul_03 ahead -15 side 20.5 up 8.6 turn -90
+width 12
+safety border
+floor 10
 sign "P_Trafo_Sticky (our fourth ball)"
 trafo sticky
 floor 20
 sign "P_Trafo_Wood"
 trafo wood
 floor 18
-checkpoint
-
-# ---- sector 5: the puzzle modules, in bays beside a wide floor ---------------------------------------------------
-floor 12
-sign "CLASSIC 5: puzzle modules in bays" ahead -6
-# no borders here: the bridges leave from the floor's edges
-safety none
-width 60
-floor 20
-mark bays
-plaza 13.2 14 ahead 18 side 51.4
-plaza 10.5 10 ahead 30 side -44.75
-plaza 11.5 12 ahead 59 side -52.25
-back bays keepwidth
-sign "P_Modul_01: pusher" side -34 ahead 0
-module P_Modul_01 ahead 6 side -14 up 2.4
-sign "P_Modul_34: crate under stone" side 34 ahead 0
-module P_Modul_34 ahead 6 side 14 up 4.6
-sign "P_Modul_29: plates to a bay" side 34 ahead 16
-module P_Modul_29 ahead 25 side 36.6 turn 90
-sign "P_Modul_25: drawbridge" side -34 ahead 26
-module P_Modul_25 ahead 35 side -29.34 turn 90
-sign "P_Modul_41: tipping plates" side 34 ahead 46
-module P_Modul_41 ahead 57 side 15 up 2
-sign "P_Modul_37: flap bridge" side -34 ahead 56
-module P_Modul_37 ahead 65 side -27.62 turn 90
-sign "P_Modul_03: falling room" side 34 ahead 76
-module P_Modul_03 ahead 87 side 40.5 up 8.6 turn -90
-point ahead 75
-floor 110
-width 12
-floor 20
-safety border
-floor 10
+autopilot all
+columns 60
 checkpoint
 """
 
@@ -310,9 +417,12 @@ class Show(C.Community, D.Track):
     def __init__(self, out_dir):
         super().__init__(out_dir)
         self.signs = []
+        self.checks = []
 
     def run_command(self, cmd, args, opts, flags, line):
-        if cmd == "sign":
+        if cmd == "check":
+            self.check(args, line)
+        elif cmd == "sign":
             self.sign(D.word(args, 0, line), opts)
         elif cmd == "gate":
             self.gate(D.word(args, 0, line))
@@ -323,6 +433,57 @@ class Show(C.Community, D.Track):
                 # its trim stands on its own shaft (a floor to the checks): no obstacle of the way's
                 self.b.intended.add(f"Lighthouse_{self.count.get('lighthouse', 0) + 1:02d}_Trim")
             super().run_command(cmd, args, opts, flags, line)
+
+    # --- checks ---------------------------------------------------------------------------------------------------
+
+    def check(self, args, line):
+        """`check NAME : STEP ; STEP ...`: a check that an element does its job in the game's physics, run by
+        crates/game/src/showcase.rs from the level's checks.txt (points about the cursor, as `F S U`, written as world
+        points): `ball KIND F S U` (begin there at rest), `go F S U V T` (roll to the point at up to V, at most T
+        ticks), `arc F S U R A H N` (N points along a turn of radius R, A degrees to the left, H down, from F S U on
+        the heading, rolled through at 4), `wait T`, and what must hold then: `reach F S U R` (the ball within R),
+        `away F S U R` (not within R), `kind KIND`, `turned OBJECT PART DEG` (the module's part turned at least DEG
+        from its start), `still OBJECT PART DEG` (less), `moved OBJECT PART D`, `lost` (a ball was lost), `kept` (none
+        was)."""
+        text = " ".join(args)
+        if ":" not in text:
+            raise D.LevelError(f"line {line}: check NAME : STEPS")
+        name, body = (x.strip() for x in text.split(":", 1))
+        out = [f"check {name}"]
+        P = lambda w: self.at(float(w[0]), float(w[1]), float(w[2]))  # noqa: E731
+        for st in (x.split() for x in body.split(";")):
+            if not st:
+                continue
+            v, w = st[0], st[1:]
+            if v == "ball":
+                out.append(f"ball {w[0]} {D.fmt(P(w[1:4]))}")
+            elif v in ("go",):
+                out.append(f"go {D.fmt(P(w[0:3]))} {float(w[3]):g} {int(w[4])}")
+            elif v in ("reach", "away"):
+                out.append(f"{v} {D.fmt(P(w[0:3]))} {float(w[3]):g}")
+            elif v == "arc":
+                f0, s0, u0, r, a, h, n = (float(x) for x in w)
+                f, lft = self.fwd(), self.left()
+                start = self.at(f0, s0, u0)
+                centre = start + lft * r * (1 if a > 0 else -1)
+                for k in range(1, int(n) + 1):
+                    t = math.radians(a) * k / n
+                    # the point turned t about the centre, dropping h * k / n
+                    if a > 0:
+                        p = centre - lft * r * math.cos(t) + f * r * math.sin(t)
+                    else:
+                        p = centre + lft * r * math.cos(t) + f * r * math.sin(-t)
+                    p = p - np.array([0.0, h * k / n, 0.0])
+                    out.append(f"go {D.fmt(p)} 4 600")
+            elif v in ("wait",):
+                out.append(f"wait {int(w[0])}")
+            elif v in ("kind", "lost", "kept"):
+                out.append(" ".join([v] + w))
+            elif v in ("turned", "still", "moved"):
+                out.append(f"{v} {w[0]} {w[1]} {float(w[2]):g}")
+            else:
+                raise D.LevelError(f"line {line}: unknown check step {v}")
+        self.checks.append("\n".join(out))
 
     # --- signs ----------------------------------------------------------------------------------------------------
 
@@ -407,6 +568,9 @@ def render_signs(t):
 def hook(t):
     t.community_finish()
     render_signs(t)
+    # the elements' checks (crates/game/src/showcase.rs), world points
+    with open(os.path.join(t.b.out, "checks.txt"), "w", encoding="utf-8") as f:
+        f.write(CHECKS_HEADER + "\n\n".join(t.checks) + "\n")
 
 
 def build(out=OUT):
