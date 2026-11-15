@@ -350,8 +350,17 @@ umwirft, wird umgerammt; die Kugel hält an der Kreuzung der Serpentine bei z 72
 Kiste darunter und Stein 18 rollt unberührt darüber; die Kiste wird geregelt unter die Kreuzungen z 713 und 705
 geschoben, jede Kreuzung abgewartet; auf dem Balken nach seinen Starttasten ein Schub nach Osten, damit die
 Papierkugel vor dem Stein im Fach des zweiten Ventilators ist) schafft die Sektoren 1 und 2 vom Start und bleibt in
-Sektor 3 an den Kisten des Kanals (-724.5, -219.4, -293.9) stecken, dort dem Lauf des Besitzers folgend. Level 13
-noch nicht geschafft.
+Sektor 3 an den Kisten des Kanals stecken. In Sektor 3 (2026-11-16) sind die Kisten des Kanals ebenso zerlegt: die
+erste nach Westen gerammt, dem Lauf des Besitzers mit Verstärkung 3 folgend (sein Rammstoß ist diagonal, in dieser
+Ansicht schwächer), die zweite und dritte aus einem Anlauf gerammt (`goto`, `hold`, `press` bis 10) und die dritte
+dann vom Rückweg der Papierkugel geschoben; die Fahrt den Kanal hinab ist in zwei `pass`-Schritte geteilt (einer war
+länger als die 20 s, die ein Lauf ohne nächsten Schritt stehen darf). Vom Start von Sektor 3 kommt die Kugel jetzt durch
+den Kanal, die Schaukeln und das Steinrätsel bis zur Schlange der Steine vor CP3 (-648, -288, -1125), wo sie zwischen
+die Steine fällt, statt auf ihnen zu rollen. Die Sektoren 4 und 5 scheitern in dieser Ansicht, von ihren Kontrollpunkten
+begonnen: in Sektor 4 ist der diagonale Stoß des Besitzers vom Floß in den ersten Ventilator (x -134) hier nicht zu
+geben (entlang einer Diagonale der Welt höchstens ein Pfeil), die Kugel fällt hinter das Floß und sitzt bei x 51 fest;
+in Sektor 5 ist `round` die Spirale (340, -614.5) hinauf zu schwach (der Schub des Originals im Mittel), die Kugel
+fällt ab. Level 13 noch nicht geschafft.
 
 ## Der Speedrun-Stil
 
