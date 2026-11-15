@@ -35,6 +35,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import leveldsl as D  # noqa: E402
+import levelparts as P  # noqa: E402
 import levelkit as L  # noqa: E402
 import ownkit as K  # noqa: E402
 import synthetic_community as C  # noqa: E402
@@ -236,6 +237,7 @@ rails 12.5
 fanpad 15
 # level 3: the next floor stands right at the platform's far edge, 14 up (a wall the updraft lifts the ball over)
 move 0 0 14
+block 8 14
 floor 16
 columns 60
 sign "P_Modul_41: troughs, paper only (level 7)"
@@ -262,7 +264,10 @@ platebridge
 floor 18
 sign "P_Modul_08: swing over a trench (level 8)"
 check swing : ball wood -8 0 0 ; wait 120 ; go 32 0 0 5 900 ; reach 32 0 0 3 ; kept
-plaza 32 15 up -6.2
+# level 8: the swing hangs over a trench 6.2 deep under the gap, its floor about as wide as the gap is long
+plaza 18 15 up -6.2
+block 15 8.7 width 3 side 10.5 top 0
+block 15 8.7 width 3 side -10.5 top 0
 pilot safe,collector : goto -8 0 0 ; wait 50 ; via 0 0 0 ; via 9 0 0
 pilot speed : via 0 0 0 ; via 9 0 0
 swingbridge nopilot
@@ -454,6 +459,8 @@ class Show(C.Community, D.Track):
             self.sign(D.word(args, 0, line), opts)
         elif cmd == "gate":
             self.gate(D.word(args, 0, line))
+        elif cmd == "block":
+            self.block(D.num(args, 0, line), D.num(args, 1, line), opts)
         elif self.community_command(cmd, args, opts, line):
             pass
         else:
@@ -514,6 +521,24 @@ class Show(C.Community, D.Track):
             else:
                 raise D.LevelError(f"line {line}: unknown check step {v}")
         self.checks.append("\n".join(out))
+
+    # --- blocks ---------------------------------------------------------------------------------------------------
+
+    def block(self, length, height, opts):
+        """`block L H [width W] [ahead A] [side S] [top T]`: a solid of the floors' stone from the cursor (or A on, S to
+        the left) L along the heading, the way's width (or W) across, from under the floor's slab (or from T over the
+        cursor) H down: the wall a floor stands on where it rises straight from a lower one (level 3's floor 14 over
+        its second fan's platform), a trench's side."""
+        up = np.array([0.0, 1.0, 0.0])
+        f, lft = self.fwd(), self.left()
+        w = float(opts.get("width", self.width))
+        a = float(opts.get("ahead", 0.0))
+        top = float(opts["top"]) if "top" in opts else -L.DEPTH
+        c = self.at(a + length / 2, float(opts.get("side", 0.0)), top - height / 2)
+        m = K.Mesh("block")
+        mats = self.b.mat_ids
+        P.solid(m, mats["top"], mats["side"], c, (f, up, lft), (length / 2, height / 2, w / 2))
+        self.b.add(f"Block_{self.n('block'):02d}", m, groups=self.b._floor_groups("stone") + self.b.sector(self.sector))
 
     # --- signs ----------------------------------------------------------------------------------------------------
 
