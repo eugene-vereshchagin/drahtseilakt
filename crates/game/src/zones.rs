@@ -4,11 +4,14 @@
 //
 //   flow sector N r R : X Y Z ; X Y Z ; ...
 //   careful sector N r R [speed V] : X Y Z ; X Y Z ; ...
+//   calm sector N r R : X Y Z ; X Y Z ; ...
 //
 // The points are the ball's path through the stretch as it was marked (one point: a place); the zone is everything
 // within R of that path, in that sector. `flow`: don't dawdle here (no stops, waits or slowing down that are not
 // needed to keep the ball). `careful`: keep under the speed (CAREFUL_SPEED when not given) and on the middle of the
-// track, no corner cutting. `#` begins a comment.
+// track, no corner cutting. `calm`: in the speedrun style (autopilot.rs, `Style`), ride the calm style here (a
+// puzzle the steady pace gets through and the speedrun's does not); no effect in the calm style. `#` begins a
+// comment.
 //
 // The file is untrusted (it may be shared with the hints): its size, the number of zones and points and every number
 // are capped; a malformed line is left out with a note naming it (the others still count), a file too big, a link or
@@ -36,6 +39,7 @@ pub const MARK_RADIUS: f32 = 4.0;
 pub enum Kind {
     Flow,
     Careful,
+    Calm,
 }
 
 impl Kind {
@@ -43,6 +47,7 @@ impl Kind {
         match self {
             Kind::Flow => "flow",
             Kind::Careful => "careful",
+            Kind::Calm => "calm",
         }
     }
 }
@@ -64,6 +69,8 @@ pub struct Effect {
     pub flow: bool,
     /// Careful: not faster than this, on the middle of the track.
     pub cap: Option<f32>,
+    /// A speedrun rides the calm style here.
+    pub calm: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -139,9 +146,10 @@ impl Zones {
             if z.distance(p) > z.radius {
                 continue;
             }
-            match z.cap() {
-                Some(c) => e.cap = Some(e.cap.map_or(c, |o: f32| o.min(c))),
-                None => e.flow = true,
+            match (z.kind, z.cap()) {
+                (Kind::Calm, _) => e.calm = true,
+                (_, Some(c)) => e.cap = Some(e.cap.map_or(c, |o: f32| o.min(c))),
+                (_, None) => e.flow = true,
             }
         }
         e
@@ -173,6 +181,7 @@ fn zone(line: &str) -> Result<Zone, String> {
     let kind = match w.next() {
         Some("flow") => Kind::Flow,
         Some("careful") => Kind::Careful,
+        Some("calm") => Kind::Calm,
         Some(k) => return Err(format!("unknown kind {k:.16}")),
         None => return Err("no kind".into()),
     };

@@ -1051,8 +1051,8 @@ fn reach(floor: Vec3, q: Vec3) -> f32 {
 
 /// How the test player rides where it finds the way by itself (`--style`): the calm style keeps a steady
 /// player's pace on the middle of the tracks; the speedrun style goes as fast as the physics lets it, along edges
-/// and round corners tight, and does not dawdle anywhere (every place a flow zone, no careful zone or rule). A
-/// failure is gone back from as in the calm style, so the risk it takes costs time on the tries, not in the run kept.
+/// and round corners tight (no careful zone or learned rule holds it back), and does not stand where a player
+/// stood still in the run it follows (`idle_skip`). A failure is gone back from as in the calm style, so the risk it takes costs time on the tries, not in the run kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Style {
     #[default]
@@ -1070,6 +1070,7 @@ pub struct Pace {
     base: f32,
     per_half: f32,
     fast: f32,
+    slow: f32,
     safe: f32,
     edge: f32,
     middle: f32,
@@ -1094,6 +1095,7 @@ impl Style {
                 base: CRUISE_BASE,
                 per_half: CRUISE_PER_HALF,
                 fast: FAST,
+                slow: SLOW,
                 safe: SAFE,
                 edge: EDGE,
                 middle: MIDDLE,
@@ -1102,12 +1104,13 @@ impl Style {
             // (a wide floor asks for about all the ball has; a rail for what it stays on through a bend; an edge
             // is only shunned within a ball's width of it, and the middle of a track is no line of its own)
             Style::Speedrun => Pace {
-                calm: SPEEDRUN_CALM,
-                rail: SPEEDRUN_RAIL,
-                wide: SPEEDRUN_WIDE,
-                base: SPEEDRUN_BASE,
-                per_half: SPEEDRUN_PER_HALF,
+                calm: SPEEDRUN_CALM * speedrun_scale(),
+                rail: SPEEDRUN_RAIL * speedrun_scale(),
+                wide: SPEEDRUN_WIDE * speedrun_scale(),
+                base: SPEEDRUN_BASE * speedrun_scale(),
+                per_half: SPEEDRUN_PER_HALF * speedrun_scale(),
                 fast: SPEEDRUN_FAST,
+                slow: SPEEDRUN_SLOW,
                 safe: SPEEDRUN_SAFE,
                 edge: SPEEDRUN_EDGE,
                 middle: 0.0,
@@ -1117,12 +1120,26 @@ impl Style {
     }
 }
 
+/// AUTOPILOT_SPEEDRUN_PACE scales the speedrun's pace (0.3 to 2; 1 when not set): another try at a level whose
+/// run at the full pace fails or is slower (the risk differs, and so does what fails).
+fn speedrun_scale() -> f32 {
+    static SCALE: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *SCALE.get_or_init(|| {
+        std::env::var("AUTOPILOT_SPEEDRUN_PACE")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+            .filter(|v| v.is_finite())
+            .map_or(1.0, |v| v.clamp(0.3, 2.0))
+    })
+}
+
 const SPEEDRUN_CALM: f32 = 16.0;
 const SPEEDRUN_RAIL: f32 = 11.0;
 const SPEEDRUN_WIDE: f32 = 22.0;
 const SPEEDRUN_BASE: f32 = 9.0;
 const SPEEDRUN_PER_HALF: f32 = 2.5;
 const SPEEDRUN_FAST: f32 = 1.0;
+const SPEEDRUN_SLOW: f32 = 0.15;
 const SPEEDRUN_SAFE: f32 = 0.8;
 const SPEEDRUN_EDGE: f32 = 2.0;
 const SPEEDRUN_SWITCH: f32 = 0.05;
@@ -1465,8 +1482,11 @@ pub struct Pilot {
     momentum: Option<&'static str>,
     /// The level's modules (their stand-ins' places and module names), for the situation of a place.
     pub modules: std::sync::Arc<Vec<(Vec3, String)>>,
-    /// How it rides where it finds the way by itself (`Style`).
+    /// How it rides where it finds the way by itself (`Style`), and how it rides here (a speedrun rides the calm
+    /// style in a calm zone).
     pub style: Style,
+    ride: Style,
+    in_calm: bool,
 }
 
 /// The situation of a place (learned.rs): the way ahead read this far (points) for its bend, its slope and what
@@ -1546,6 +1566,8 @@ impl Pilot {
             momentum: None,
             modules: std::sync::Arc::default(),
             style: Style::Calm,
+            ride: Style::Calm,
+            in_calm: false,
         }
     }
 
@@ -1624,7 +1646,10 @@ impl Pilot {
             self.track_keys.clear();
             return None;
         };
+        // (AUTOPILOT_SPEEDRUN_NO_SKIP: the player's still stretches are kept, for a try without the skips)
         if self.style == Style::Speedrun
+            && !self.in_calm
+            && std::env::var_os("AUTOPILOT_SPEEDRUN_NO_SKIP").is_none()
             && let Some(skip) = idle_skip(&d, k, sim)
         {
             if std::env::var_os("AUTOPILOT_DEMO").is_some() {
@@ -2840,19 +2865,19 @@ impl Pilot {
         self.zone = self.zones.at(sim.ball.position, sim.sector);
         // the level's own zones first; elsewhere what was learned on any level, where the place is of its kind
         self.learned_now = None;
-        // a speedrun holds back nowhere, and its steering dawdles nowhere: the whole level is a flow zone. A hint's
-        // stops stay as the level's zones have them (a wait a puzzle needs: a pusher to slide out, a part to come;
-        // a copy of the run judges only the ball, not the puzzle)
-        let mut hint_zone = None;
-        if self.style == Style::Speedrun {
-            hint_zone = Some(crate::zones::Effect {
-                flow: self.zone.flow,
-                cap: None,
-            });
-            self.zone = crate::zones::Effect {
-                flow: true,
-                cap: None,
-            };
+        // a speedrun holds back nowhere: no careful zone or rule. Its pace is the progress along the way itself (a
+        // flow zone's push for speed would rather roll back down a climb fast than up it slowly); a hint's stops go
+        // as the level's flow zones have them (a wait a puzzle needs stays: a copy of the run judges only the ball)
+        // (a calm zone asks the calm style of a speedrun, and nothing of the calm style)
+        // (AUTOPILOT_SPEEDRUN_SKIP_ONLY: a speedrun at the calm pace that still skips the followed player's still
+        // stretches, for a try at a level where the speedrun's pace fails)
+        self.in_calm = std::mem::take(&mut self.zone.calm) && self.style == Style::Speedrun;
+        self.ride = self.style;
+        if self.in_calm || std::env::var_os("AUTOPILOT_SPEEDRUN_SKIP_ONLY").is_some() {
+            self.ride = Style::Calm;
+        }
+        if self.ride == Style::Speedrun {
+            self.zone.cap = None;
         } else if self.zone == crate::zones::Effect::default() && !self.learned.is_empty() {
             let here = self.situation(sim.ball.position, self.at, sim.ball.kind);
             if let Some((e, label)) = self.learned.at(&here) {
@@ -2868,9 +2893,6 @@ impl Pilot {
             None
         };
         self.hints.zone = self.limit();
-        if let Some(z) = hint_zone {
-            self.hints.zone.flow &= z.flow;
-        }
         // AUTOPILOT_SITUATION: the place as the learned rules see it, every second, and each change of what the
         // zones and rules ask (which zone or rule, from which tick)
         if std::env::var_os("AUTOPILOT_SITUATION").is_some() {
@@ -3153,7 +3175,7 @@ impl Pilot {
             .cap
             .and_then(|_| self.route.points.get(self.at.saturating_sub(2)..line_end))
             .filter(|l| l.len() >= 2);
-        let pace = self.style.pace();
+        let pace = self.ride.pace();
         let tried = rollouts(sim, &self.route, demo_k, &choices, hold, low, line, pace);
         for (&c, (s, lost, edge)) in choices.iter().zip(tried) {
             let from_demo = c == DEMO_CHOICE;
@@ -3196,7 +3218,7 @@ impl Pilot {
                 let v = s.ball.velocity.length();
                 // (the pace for the floor, not above a careful zone's limit)
                 let cruise = |p: Vec3| {
-                    let c = self.route.cruise(p, self.style);
+                    let c = self.route.cruise(p, self.ride);
                     zone.cap.map_or(c, |cap| c.min(cap))
                 };
                 self.progress(s.ball.position)
@@ -3211,7 +3233,7 @@ impl Pilot {
                     // a careful zone: over its limit costs a lot more
                     - zone.cap.map_or(0.0, |cap| CAREFUL_FAST * (v - cap).max(0.0))
                     - if steady {
-                        SLOW * (0.5 * cruise(s.ball.position) - v).max(0.0)
+                        pace.slow * (0.5 * cruise(s.ball.position) - v).max(0.0)
                     } else {
                         0.0
                     }

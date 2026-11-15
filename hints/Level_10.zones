@@ -1,0 +1,5 @@
+# Speedrun (--style speedrun): sector 3 in the calm style and on the owner's line as he waited (at the speedrun's
+# pace, or skipping his waits, the ball is lost there; the calm run's path).
+calm sector 3 r 30 : 812.0 -23.4 -117.1 ; 889.9 -48.5 -106.0 ; 900.8 -34.7 -92.2 ; 900.4 -34.8 -137.2 ; 867.2 -35.4 -150.9 ; 853.4 -35.8 -194.9 ; 845.9 -31.5 -242.0 ; 856.4 -18.5 -231.1 ; 853.6 -14.3 -280.6 ; 848.7 -18.3 -261.2 ; 811.7 0.6 -261.6
+# And sector 4 (the speedrun's ball is stuck there off the owner's line).
+calm sector 4 r 30 : 798.1 -17.7 -373.8 ; 798.4 -17.1 -428.7 ; 814.3 -19.6 -438.4 ; 782.2 -17.1 -428.6 ; 776.0 -17.1 -427.8 ; 822.7 -17.1 -464.7 ; 820.3 -17.1 -493.0 ; 814.5 -17.1 -493.2 ; 746.8 -17.1 -463.1 ; 701.8 -18.0 -469.2 ; 740.6 -17.1 -479.0 ; 753.4 -17.1 -482.0 ; 753.8 -17.1 -483.1

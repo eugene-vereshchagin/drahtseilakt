@@ -4656,6 +4656,7 @@ impl PilotWatch {
         let color = |k: Kind, a: f32| match k {
             Kind::Flow => [0.2, 0.95, 0.45, a],
             Kind::Careful => [1.0, 0.55, 0.1, a],
+            Kind::Calm => [0.3, 0.55, 1.0, a],
         };
         let mut bead = |p: glam::Vec3, r: f32, c: [f32; 4]| {
             let m = glam::Mat4::from_scale_rotation_translation(

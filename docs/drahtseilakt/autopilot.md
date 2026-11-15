@@ -272,6 +272,30 @@ nothing holds), and why a limit is let go.
 A zones file is untrusted like a hint file: its size (64 KiB), the zones (256) and points (256 a zone) and every
 number are capped; a malformed line is left out with a note naming it, the other zones still count.
 
+## The speedrun style
+
+`--style speedrun` (with `--autopilot` or `--watch`) makes the test player ride as fast as it can, for speedrun
+videos; `--style calm`, the default, is everything above, and its runs are unchanged. Where it finds the way by
+itself, a speedrun keeps a far higher pace (11 on a rail, 9 and more on a floor, up to 22 on a wide one, 16 off the
+floors), shuns an edge only within 0.8 of it and keeps to no middle, so it rides along edges and cuts corners; no
+careful zone or learned rule holds it back. A flow zone's push for speed is not taken over: the steering's measure
+stays how far along the way a choice gets (pushed for speed, it would rather roll back down a climb fast than up it
+slowly). A hint's stops stay as written (a wait a puzzle needs: a copy of the run judges only the ball, not the
+puzzle), but for the level's flow zones as in the calm style. Following a player's run, it does not stand where
+the player stood: a stretch of 30 ticks or more with the player's ball slower than 0.8 and within 1.5 of where it
+began is skipped, when the player's keys from its end, on a copy of the run, keep the ball on the player's line
+for five seconds (a wait for a lift or a swing fails that and is kept). A failure is gone back from as in the calm
+style, so the risk it takes costs tries, not the run kept.
+
+A **calm zone** in a level's zones file (`calm sector N r R : X Y Z ; ...`, written by hand) asks a speedrun for the
+calm style there, and nothing of the calm style: a puzzle the steady pace gets through and the speedrun's does not
+(a paper ball to keep ahead of a stone one, a maze of pushers met at the player's phase). There the followed
+player's still stretches are not skipped either.
+
+For other tries at a level, `AUTOPILOT_SPEEDRUN_PACE=F` scales the pace (0.3 to 2), `AUTOPILOT_SPEEDRUN_NO_SKIP=1`
+keeps the player's still stretches, and `AUTOPILOT_SPEEDRUN_SKIP_ONLY=1` rides the calm pace and only skips them.
+The fastest runs are kept in `hints/runs/speedrun/`.
+
 ## Videos of its runs
 
 `--video FILE` with `--replay` draws the run without a window, one frame a tick (60 a second) at `--size`, as raw

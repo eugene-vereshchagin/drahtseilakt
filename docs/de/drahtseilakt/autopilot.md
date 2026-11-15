@@ -293,6 +293,31 @@ Eine Zonendatei ist nicht vertrauenswürdig wie eine Hinweisdatei: ihre Größe 
 (256 je Zone) und jede Zahl sind begrenzt; eine fehlerhafte Zeile wird mit einem Vermerk ausgelassen, die anderen
 Zonen gelten.
 
+## Der Speedrun-Stil
+
+`--style speedrun` (mit `--autopilot` oder `--watch`) lässt den Testspieler so schnell fahren, wie er kann, für
+Speedrun-Videos; `--style calm`, der Standard, ist alles oben Beschriebene, und seine Läufe bleiben unverändert. Wo er
+den Weg selbst findet, hält ein Speedrun ein weit höheres Tempo (11 auf einer Schiene, 9 und mehr auf einem Boden, bis
+22 auf einem breiten, 16 abseits der Böden), meidet einen Rand nur näher als 0,8 und hält keine Mitte: er fährt an
+Rändern entlang und schneidet Kurven; keine Vorsicht-Zone und keine gelernte Regel hält ihn zurück. Den Drang einer
+Fluss-Zone zur Geschwindigkeit übernimmt er nicht: Maß bleibt, wie weit eine Wahl auf dem Weg voranbringt (sonst rollte
+er lieber schnell einen Anstieg hinab als langsam hinauf). Die Halte eines Hinweises bleiben, wie sie geschrieben sind
+(ein Warten, das ein Rätsel braucht: eine Kopie des Laufs beurteilt nur die Kugel), außer in den Fluss-Zonen des
+Levels wie im ruhigen Stil. Folgt er dem Lauf eines Spielers, steht er nicht, wo der Spieler stand: ein Abschnitt von
+30 Ticks oder mehr, in dem die Kugel des Spielers langsamer als 0,8 und innerhalb 1,5 vom Anfang ist, wird
+übersprungen, wenn die Tasten des Spielers ab seinem Ende auf einer Kopie des Laufs die Kugel fünf Sekunden auf seiner
+Linie halten (ein Warten auf einen Aufzug oder eine Schaukel besteht das nicht und bleibt). Ein Fehlschlag wird wie im
+ruhigen Stil zurückgenommen: das Risiko kostet Versuche, nicht den behaltenen Lauf.
+
+Eine **ruhige Zone** in der Zonendatei eines Levels (`calm sector N r R : X Y Z ; ...`, von Hand geschrieben) verlangt
+dort vom Speedrun den ruhigen Stil und ändert am ruhigen Stil nichts: ein Rätsel, das das gleichmäßige Tempo schafft
+und das des Speedruns nicht (eine Papierkugel vor einer Steinkugel, ein Labyrinth von Schiebern in der Phase des
+Spielers). Dort werden auch die Stillstände des Spielers nicht übersprungen.
+
+Für andere Versuche skaliert `AUTOPILOT_SPEEDRUN_PACE=F` das Tempo (0,3 bis 2), `AUTOPILOT_SPEEDRUN_NO_SKIP=1` behält
+die Stillstände des Spielers, und `AUTOPILOT_SPEEDRUN_SKIP_ONLY=1` fährt das ruhige Tempo und überspringt nur sie. Die
+schnellsten Läufe liegen in `hints/runs/speedrun/`.
+
 ## Videos seiner Läufe
 
 `--video FILE` mit `--replay` zeichnet den Lauf ohne Fenster, ein Bild je Takt (60 pro Sekunde) in `--size`, als
