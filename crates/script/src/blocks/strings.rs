@@ -39,17 +39,28 @@ fn fmt_e(x: f64, prec: usize, upper: bool) -> String {
     let s = format!("{:.*e}", prec, x.abs());
     let (m, e) = s.split_once('e').unwrap_or((&s, "0"));
     let e: i32 = e.parse().unwrap_or(0);
-    let r = format!("{m}e{}{:02}", if e < 0 { '-' } else { '+' }, e.unsigned_abs());
+    let r = format!(
+        "{m}e{}{:02}",
+        if e < 0 { '-' } else { '+' },
+        e.unsigned_abs()
+    );
     if upper { r.to_uppercase() } else { r }
 }
 
 fn fmt_g_prec(x: f64, prec: usize, alt: bool, upper: bool) -> String {
     let p = if prec == 0 { 1 } else { prec };
     if x == 0.0 {
-        return if alt { format!("{:.*}", p.saturating_sub(1), 0.0) } else { "0".into() };
+        return if alt {
+            format!("{:.*}", p.saturating_sub(1), 0.0)
+        } else {
+            "0".into()
+        };
     }
     let probe = format!("{:.*e}", p.saturating_sub(1), x.abs());
-    let exp: i32 = probe.split_once('e').and_then(|(_, e)| e.parse().ok()).unwrap_or(0);
+    let exp: i32 = probe
+        .split_once('e')
+        .and_then(|(_, e)| e.parse().ok())
+        .unwrap_or(0);
     let strip = |s: String| -> String {
         if !alt && s.contains('.') {
             s.trim_end_matches('0').trim_end_matches('.').to_string()
@@ -62,8 +73,14 @@ fn fmt_g_prec(x: f64, prec: usize, alt: bool, upper: bool) -> String {
     let p_i = i32::try_from(p).unwrap_or(i32::MAX);
     if exp < -4 || exp >= p_i {
         let r = fmt_e(x.abs(), p.saturating_sub(1), upper);
-        let (m, e) = r.split_once(if upper { 'E' } else { 'e' }).unwrap_or((&r, ""));
-        format!("{}{}{e}", strip(m.to_string()), if upper { 'E' } else { 'e' })
+        let (m, e) = r
+            .split_once(if upper { 'E' } else { 'e' })
+            .unwrap_or((&r, ""));
+        format!(
+            "{}{}{e}",
+            strip(m.to_string()),
+            if upper { 'E' } else { 'e' }
+        )
     } else {
         let dec = usize::try_from(p_i.saturating_sub(1).saturating_sub(exp)).unwrap_or(0);
         strip(format!("{:.*}", dec, x.abs()))
@@ -93,7 +110,8 @@ pub fn format_one(fmt: &str, arg: Arg<'_>) -> String {
             continue;
         }
         i = i.saturating_add(1);
-        let (mut left, mut plus, mut space, mut alt, mut zero) = (false, false, false, false, false);
+        let (mut left, mut plus, mut space, mut alt, mut zero) =
+            (false, false, false, false, false);
         while let Some(&f) = bytes.get(i) {
             match f {
                 b'-' => left = true,
@@ -109,7 +127,10 @@ pub fn format_one(fmt: &str, arg: Arg<'_>) -> String {
             let start = *i;
             let mut n = 0usize;
             while let Some(d) = bytes.get(*i).filter(|d| d.is_ascii_digit()) {
-                n = n.saturating_mul(10).saturating_add(usize::from(d.saturating_sub(b'0'))).min(PART);
+                n = n
+                    .saturating_mul(10)
+                    .saturating_add(usize::from(d.saturating_sub(b'0')))
+                    .min(PART);
                 *i = i.saturating_add(1);
             }
             (*i > start).then_some(n)
@@ -128,7 +149,10 @@ pub fn format_one(fmt: &str, arg: Arg<'_>) -> String {
                 prec = Some(num(&mut i).unwrap_or(0));
             }
         }
-        while matches!(bytes.get(i), Some(b'h' | b'l' | b'L' | b'q' | b'j' | b'z' | b't')) {
+        while matches!(
+            bytes.get(i),
+            Some(b'h' | b'l' | b'L' | b'q' | b'j' | b'z' | b't')
+        ) {
             i = i.saturating_add(1);
         }
         let Some(&conv) = bytes.get(i) else { break };
@@ -160,7 +184,15 @@ pub fn format_one(fmt: &str, arg: Arg<'_>) -> String {
                     }
                     zero = false;
                 }
-                let sign = if as_i < 0 { "-" } else if plus { "+" } else if space { " " } else { "" };
+                let sign = if as_i < 0 {
+                    "-"
+                } else if plus {
+                    "+"
+                } else if space {
+                    " "
+                } else {
+                    ""
+                };
                 pad(format!("{sign}{digits}"), left, zero, width, sign.len())
             }
             b'u' | b'x' | b'X' | b'o' => {
@@ -193,7 +225,15 @@ pub fn format_one(fmt: &str, arg: Arg<'_>) -> String {
                 0,
             ),
             b'f' | b'F' | b'e' | b'E' | b'g' | b'G' | b'a' | b'A' => {
-                let sign = if as_f.is_sign_negative() && !as_f.is_nan() { "-" } else if plus { "+" } else if space { " " } else { "" };
+                let sign = if as_f.is_sign_negative() && !as_f.is_nan() {
+                    "-"
+                } else if plus {
+                    "+"
+                } else if space {
+                    " "
+                } else {
+                    ""
+                };
                 let upper = conv.is_ascii_uppercase();
                 let body = if as_f.is_nan() {
                     zero = false;
@@ -319,7 +359,9 @@ pub(crate) fn create_string(
         set_pout(rt, b, "Text", 0, Value::Str(text));
     } else if input(rt, b, 1) {
         out(rt, b, 1);
-        let prev = pout_value(rt, b, 0).map(|v| v.as_string()).unwrap_or_default();
+        let prev = pout_value(rt, b, 0)
+            .map(|v| v.as_string())
+            .unwrap_or_default();
         let mut r = String::new();
         push_capped(&mut r, &prev);
         if b.locals.is_empty() || !prev.is_empty() {
@@ -354,12 +396,18 @@ pub(crate) fn scan_string(
     out(rt, b, 0);
     let text = pin(rt, b, "Text", 0, host).as_string();
     let delim = pin(rt, b, "Delimiter", 1, host).as_string();
-    let delim = if delim.is_empty() { " ".to_string() } else { delim };
+    let delim = if delim.is_empty() {
+        " ".to_string()
+    } else {
+        delim
+    };
     let (text, dl) = (text.as_bytes(), delim.as_bytes());
     let mut count = 0usize;
     let mut cur = 0usize;
     let store = |rt: &mut Runtime, n: usize, piece: &[u8]| {
-        let Some(&p) = b.pouts.get(n) else { return false };
+        let Some(&p) = b.pouts.get(n) else {
+            return false;
+        };
         if !piece.is_empty() {
             let piece = piece.get(..piece.len().min(255)).unwrap_or_default();
             let guid = rt.graph.param(p).map_or(types::NONE, |q| q.guid);
@@ -387,7 +435,13 @@ pub(crate) fn scan_string(
             return Flow::Done;
         }
     }
-    set_pout(rt, b, "Elements Found", 0, Value::Int(i32::try_from(count).unwrap_or(i32::MAX)));
+    set_pout(
+        rt,
+        b,
+        "Elements Found",
+        0,
+        Value::Int(i32::try_from(count).unwrap_or(i32::MAX)),
+    );
     Flow::Done
 }
 
@@ -404,7 +458,10 @@ pub fn substring(s: &[u8], start: i32, len: i32) -> Vec<u8> {
         start = 0;
     }
     if len > 0 && start < n {
-        let (a, l) = (usize::try_from(start).unwrap_or(0), usize::try_from(len).unwrap_or(0));
+        let (a, l) = (
+            usize::try_from(start).unwrap_or(0),
+            usize::try_from(len).unwrap_or(0),
+        );
         let end = a.saturating_add(l).min(s.len());
         s.get(a..end).unwrap_or_default().to_vec()
     } else {

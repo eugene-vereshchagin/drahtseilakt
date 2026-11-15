@@ -1401,7 +1401,10 @@ mod tests {
         let t = texture(&chunk(&[(0x0001_0000, names)])).expect("texture");
         assert_eq!(t.slots.len(), MAX_SLOTS - 1);
         // the second name claims more bytes than are left
-        let cut = chunk(&[(0x0001_0000, [vec![5], string_words("a"), vec![400, 1]].concat())]);
+        let cut = chunk(&[(
+            0x0001_0000,
+            [vec![5], string_words("a"), vec![400, 1]].concat(),
+        )]);
         let t = texture(&cut).expect("texture");
         assert!(t.slots.is_empty());
         // pictures: a count of billions with one picture and a lying second one

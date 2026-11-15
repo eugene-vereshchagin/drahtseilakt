@@ -446,12 +446,8 @@ impl World {
             group: s.group,
             ..BodyDesc::default()
         };
-        self.physics.add_body(
-            desc,
-            s.shape.clone(),
-            vec3_f64(s.pos),
-            ivp_quat(s.rot),
-        )
+        self.physics
+            .add_body(desc, s.shape.clone(), vec3_f64(s.pos), ivp_quat(s.rot))
     }
 
     fn place_static(

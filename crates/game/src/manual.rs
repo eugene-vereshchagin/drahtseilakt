@@ -9,7 +9,11 @@ const LANGUAGES: [&str; 4] = ["en", "ru", "de", "zh"];
 
 /// The page file of the manual in `language` (`page` is `index`, `levels`, ...) under the assets folder `root`.
 pub fn page_path(root: &Path, language: &str, page: &str) -> PathBuf {
-    let lang = if LANGUAGES.contains(&language) { language } else { "en" };
+    let lang = if LANGUAGES.contains(&language) {
+        language
+    } else {
+        "en"
+    };
     root.join("manual").join(lang).join(format!("{page}.html"))
 }
 
@@ -22,7 +26,11 @@ pub fn open(strings: &crate::lang::Strings, page: &str) -> Result<(), String> {
             .ours("manual missing")
             .replace("{path}", &path.display().to_string()));
     }
-    spawn(&path).map_err(|e| strings.ours("manual failed").replace("{error}", &e.to_string()))
+    spawn(&path).map_err(|e| {
+        strings
+            .ours("manual failed")
+            .replace("{error}", &e.to_string())
+    })
 }
 
 #[cfg(target_os = "linux")]
@@ -44,10 +52,11 @@ fn command(path: &Path) -> std::process::Command {
     use std::os::windows::process::CommandExt;
     let mut c = std::process::Command::new("cmd");
     // the empty title keeps `start` from taking the path for it; no console window
-    c.args(["/c", "start", ""]).arg(path).creation_flags(0x0800_0000);
+    c.args(["/c", "start", ""])
+        .arg(path)
+        .creation_flags(0x0800_0000);
     c
 }
-
 
 fn spawn(path: &Path) -> std::io::Result<()> {
     let mut c = command(path);
@@ -69,8 +78,14 @@ mod tests {
     #[test]
     fn page_paths_fall_back_to_english() {
         let root = Path::new("/a");
-        assert_eq!(page_path(root, "ru", "levels"), Path::new("/a/manual/ru/levels.html"));
-        assert_eq!(page_path(root, "fr", "index"), Path::new("/a/manual/en/index.html"));
+        assert_eq!(
+            page_path(root, "ru", "levels"),
+            Path::new("/a/manual/ru/levels.html")
+        );
+        assert_eq!(
+            page_path(root, "fr", "index"),
+            Path::new("/a/manual/en/index.html")
+        );
     }
 
     /// The generator builds every page and no internal link is broken (skipped where python3 or `markdown` is missing).
@@ -97,7 +112,8 @@ mod tests {
         for lang in LANGUAGES {
             for p in pages {
                 let f = out.join(lang).join(format!("{p}.html"));
-                let html = std::fs::read_to_string(&f).unwrap_or_else(|e| panic!("{}: {e}", f.display()));
+                let html =
+                    std::fs::read_to_string(&f).unwrap_or_else(|e| panic!("{}: {e}", f.display()));
                 for href in hrefs(&html) {
                     if href.starts_with("http") || href.starts_with('#') {
                         continue;
@@ -108,7 +124,12 @@ mod tests {
                 }
             }
         }
-        for f in ["index.html", "style.css", "fonts/Tektur-Variable.ttf", "fonts/NotoSansSC-Regular.otf"] {
+        for f in [
+            "index.html",
+            "style.css",
+            "fonts/Tektur-Variable.ttf",
+            "fonts/NotoSansSC-Regular.otf",
+        ] {
             assert!(out.join(f).is_file(), "{f}");
         }
         let _ = std::fs::remove_dir_all(&out);

@@ -281,3 +281,30 @@ fn a_mesh_of_points_survives_and_points_beside_triangles_are_refused() {
     assert!(level::open::import(&d).is_err());
     let _ = std::fs::remove_dir_all(&d);
 }
+
+#[test]
+fn slots_over_the_total_cap_are_refused() {
+    // 70 images of 63 slots each: every list is within its own limit, the sum is over the level's
+    let r = edited("slots-total", |j| {
+        let img = j["images"][0].clone();
+        let n = 70usize;
+        j["images"] = serde_json::Value::Array(vec![img; n]);
+        for i in 0..n {
+            let list: Vec<usize> = (1..=63).map(|k| (i + k) % n).collect();
+            j["images"][i]["extras"] = serde_json::json!({"drahtseilakt": {"slots": list}});
+        }
+    });
+    assert!(r.is_err());
+}
+
+#[test]
+fn a_long_frame_name_survives_the_round_trip() {
+    // a `.nmo` name is up to 4096 raw bytes, each of which may turn into three after lossy UTF-8
+    let mut l = level();
+    l.frames[0].name = "\u{fffd}".repeat(4096);
+    let d = dir("frame-name");
+    level::open::export(&l, &d).unwrap();
+    let back = level::open::import(&d);
+    let _ = std::fs::remove_dir_all(&d);
+    assert_eq!(back.unwrap().frames[0].name.len(), 3 * 4096);
+}

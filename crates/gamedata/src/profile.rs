@@ -179,7 +179,9 @@ pub fn migrate_in(root: &Path, skip: impl Fn(Kind, &str) -> bool) -> Vec<String>
             }
             let shown = name.to_string_lossy();
             if std::fs::symlink_metadata(to.join(&name)).is_ok() {
-                log.push(format!("levels: {old}/{shown} stays, {new}/{shown} exists already"));
+                log.push(format!(
+                    "levels: {old}/{shown} stays, {new}/{shown} exists already"
+                ));
             } else {
                 match std::fs::rename(from.join(&name), to.join(&name)) {
                     Ok(()) => log.push(format!("levels: moved {old}/{shown} to {new}/")),
@@ -198,9 +200,18 @@ mod tests {
 
     #[test]
     fn earlier_folders_move_once_and_nothing_is_lost() {
-        let root = std::env::temp_dir().join(format!("drahtseilakt-migrate-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("drahtseilakt-migrate-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        for d in ["original", "remastered", "downloaded/A", "community/B", "community/A", "open/C", "modified"] {
+        for d in [
+            "original",
+            "remastered",
+            "downloaded/A",
+            "community/B",
+            "community/A",
+            "open/C",
+            "modified",
+        ] {
             std::fs::create_dir_all(root.join(d)).unwrap();
         }
         std::fs::write(root.join("original/base.cmo"), "x").unwrap();
@@ -208,12 +219,25 @@ mod tests {
         assert!(root.join("ballance-original/base.cmo").is_file());
         assert!(root.join("ballance-remaster").is_dir() && !root.join("original").exists());
         // downloaded became user-levels; community and open merged in; the clashing A stays in community
-        for d in ["user-levels/A", "user-levels/B", "user-levels/C", "community/A", "modified"] {
+        for d in [
+            "user-levels/A",
+            "user-levels/B",
+            "user-levels/C",
+            "community/A",
+            "modified",
+        ] {
             assert!(root.join(d).is_dir(), "{d}");
         }
-        assert!(log.iter().any(|l| l.contains("community/A stays")), "{log:?}");
+        assert!(
+            log.iter().any(|l| l.contains("community/A stays")),
+            "{log:?}"
+        );
         // a second run changes nothing
-        assert!(migrate_in(&root, |_, _| false).iter().all(|l| l.contains("stays")));
+        assert!(
+            migrate_in(&root, |_, _| false)
+                .iter()
+                .all(|l| l.contains("stays"))
+        );
         // a folder the settings place elsewhere is left
         std::fs::create_dir_all(root.join("original")).unwrap();
         std::fs::remove_dir_all(root.join("ballance-original")).unwrap();

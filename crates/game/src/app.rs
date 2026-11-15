@@ -121,6 +121,8 @@ struct Game {
     sound_ticks: std::sync::Arc<std::collections::HashMap<String, u64>>,
     /// The run was helped (slowed down, or taken back to a saved moment): it is kept, but never the best.
     assisted: bool,
+    /// Nothing of this game is written to the profile (Options::no_save).
+    no_save: bool,
     /// The mods that run on the run's side (modrt.rs), as each new run starts with them: a replay's own (its `mod`
     /// lines), else what the window sets (the mods switched on).
     mods: crate::modrt::SimMods,
@@ -392,6 +394,7 @@ impl Game {
             level_bonus,
             sound_ticks,
             assisted: false,
+            no_save: o.no_save,
             mods,
             last_level: level.level.settings.last_level,
             placeholder: empty,
@@ -402,7 +405,10 @@ impl Game {
                     runs_root(&o.source)
                 };
                 let stem = level.name.trim_end_matches(".NMO").trim_end_matches(".nmo");
-                match old.map(|old| move_runs(&old, &root, stem)) {
+                match old
+                    .filter(|_| !o.no_save)
+                    .map(|old| move_runs(&old, &root, stem))
+                {
                     Some(Ok(true)) => {
                         println!("runs of {} moved to {}", shown(stem), shown_path(&root))
                     }
@@ -666,7 +672,12 @@ impl Game {
     /// Saves a run that did not finish (restarted or closed before the end), so that the falls and the lifts of
     /// the level can be studied later. Named by the time it was saved; the folder is the level's.
     fn save_attempt(&self) {
-        if !dev_logs() || self.sim.finished || self.sim.tick == 0 || self.replay_in.is_some() {
+        if self.no_save
+            || !dev_logs()
+            || self.sim.finished
+            || self.sim.tick == 0
+            || self.replay_in.is_some()
+        {
             return;
         }
         let stem = self
@@ -796,7 +807,7 @@ impl Game {
     /// run when it is faster than the best so far (the replay of a perfect run for later rendering).
     fn save_run(&self) {
         // Replays recorded from a replay are not new runs.
-        if self.replay_in.is_some() && self.record.is_none() {
+        if self.no_save || (self.replay_in.is_some() && self.record.is_none()) {
             return;
         }
         let text = self.replay_out.to_text();
@@ -8406,6 +8417,35 @@ pub(crate) fn stats_run(
 #[allow(clippy::unwrap_used)]
 mod placeholder_tests {
     use super::*;
+
+    /// The converter's audit plays maps headless with made-up keys; a finished run of it must leave nothing in the
+    /// player's runs (best.replay, splits.txt, the run's own file), and no attempt either.
+    #[test]
+    fn a_finished_audit_run_writes_nothing() {
+        let root = std::env::temp_dir().join(format!("drahtseilakt-nosave-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let mut o = crate::default_options();
+        o.dev_logs = true;
+        let mut g = Game::placeholder(&o, &Data::new(None)).unwrap();
+        g.runs_root = root.clone();
+        g.sim.tick = 5;
+        g.sim.finished = true;
+        g.save_run();
+        g.save_attempt();
+        assert!(
+            root.exists(),
+            "a normal finished run is saved (the check is live)"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+        o.no_save = true;
+        let mut g = Game::placeholder(&o, &Data::new(None)).unwrap();
+        g.runs_root = root.clone();
+        g.sim.tick = 5;
+        g.sim.finished = true;
+        g.save_run();
+        g.save_attempt();
+        assert!(!root.exists(), "an audit run writes nothing");
+    }
 
     #[test]
     fn the_menu_game_holds_no_level_and_is_named_for_the_game() {

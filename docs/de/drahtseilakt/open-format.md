@@ -91,7 +91,7 @@ deren Kopf nicht besteht, wird übergangen und das PNG genommen; eine mit besch�
 - **Meshes**: eines je Mesh mit Vertices; ein Primitiv je Material, alle Primitive eines Meshes teilen sich
   dieselben Accessoren `POSITION`, `NORMAL` und `TEXCOORD_0` (Floats), `indices` als 32-Bit-Ganzzahlen. Ein Mesh
   aus Vertices ohne Flächen (die Punkte, aus denen die Partikel einer Karte kommen) ist ein Primitiv mit `mode` 0
-  (Punkte), ohne `indices` und `material`. Die
+  (Punkte), ohne `indices` und `material`. Das `mode` eines Primitivs ist 4 (Dreiecke) oder 0 (Punkte) oder fehlt (Dreiecke); jeder andere Wert lehnt das Level ab. Die
   Materialkanäle eines Meshes (Durchgänge über das ganze Mesh mit einem anderen Material) stehen in
   `extras.drahtseilakt.channels`: je Kanal `material`, `blend` (Namen von Quell- und Zielfaktor, wie unten) und
   `texcoord` k, der Satz `TEXCOORD_k` mit seinen Koordinaten; höchstens 16. Ein Mesh kann eine feinere Gestalt
@@ -138,11 +138,11 @@ deren Kopf nicht besteht, wird übergangen und das PNG genommen; eine mit besch�
 
 - **Textur-Slots**: `extras.drahtseilakt.slots` eines Bildes nennt die Bilder, die seine weiteren Slots sind, der
   Reihe nach (eine Textur aus mehreren Bildern: die Frames einer Animation, die ein Skript der Karte mit Set Current Slot
-  zeigt). Jedes ist ein anderes Bild des Levels; höchstens 63; alles andere lehnt das Level ab.
+  zeigt). Jedes ist ein anderes Bild des Levels; höchstens 63 je Bild und 4096 insgesamt; alles andere lehnt das Level ab.
 - **Rahmen** `extras.drahtseilakt.frames` (die 2D-Rahmen einer konvertierten Karte: die Signatur des Autors in einer
   Ecke, ein Logo; nur gezeichnet): jeder mit `name`, `rect` (links, oben, rechts, unten in Pixeln eines Bildschirms von
   640 x 480), `uv` (der gezeigte Teil der Textur), `z_order` (niedriger zuerst gezeichnet), `material` (ein Index oder
-  null) und `visible`. Höchstens 64; ein fehlerhafter lehnt das Level ab.
+  null) und `visible`. Höchstens 64; ein `name` hat höchstens 12288 Bytes (3 x die 4096 eines `.nmo`-Namens, da verlustbehaftetes UTF-8 ihn verdreifachen kann); ein fehlerhafter lehnt das Level ab.
 - **Skripte** `extras.drahtseilakt.scripts` (die eigenen Verhaltensgraphen einer konvertierten Community-Karte; `script_json.rs`): `objects` (Name, Klasse und was jedes für die Engine ist: Entität, Gruppe, Mesh, Material, Textur oder Tabelle per Index), `nodes` (Blöcke, Links, IOs, Parameter und Operationen per Objektindex), `arrays` (die Tabellen der Karte), `scripts` (die Graphen der obersten Ebene mit dem Objekt, an dem jeder hängt) und, wenn die Karte sie hat, `groups` (die Mitglieder, die sie jeder Gruppe gibt), `attributes`, `priorities` (Objekt und Priorität: eine höhere führt ihre Skripte zuerst aus), `start_off` (die Skripte und Objekte, die die Szene deaktiviert beginnt) und `waves` (ihre Klänge: Objekt, Datei, Schleife, Lautstärke, Panorama, Tonhöhe). Ein Level, das geschrieben wurde, bevor die letzten drei bewahrt wurden, wird ohne sie gelesen. Nur Daten, von unserer Laufzeit gefahren ([scripts.md](scripts.md)); die Rückverweise werden beim Lesen neu abgeleitet, jeder Index wird geprüft, ein fehlerhafter Eintrag lehnt das Level ab. Ohne das Feld hat das Level keine Skripte (die Flammen der Vorlage werden in jedem Fall aus den Emitter-Frames gezeichnet). Unser Level-Baukasten schreibt sie auch (`assets/own/make/scriptkit.py`: Graphen Block für Block gebaut, Objekte, Materialien und Texturen des Levels beim Namen genannt), so die eigenen Graphen des Schau-Levels ([levels.md](levels.md)).
 
 ## Koordinaten

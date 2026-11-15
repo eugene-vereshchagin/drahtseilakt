@@ -1159,7 +1159,13 @@ pub(crate) fn bezier_transform(
         None => t.clamp(0.0, 1.0),
     };
     let y = bottom + u * (top - bottom);
-    set_pout(rt, b, "Y", 0, Value::Float(if y.is_finite() { y } else { 0.0 }));
+    set_pout(
+        rt,
+        b,
+        "Y",
+        0,
+        Value::Float(if y.is_finite() { y } else { 0.0 }),
+    );
     out(rt, b, 0);
     Flow::Done
 }

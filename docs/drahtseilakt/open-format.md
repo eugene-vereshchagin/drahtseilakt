@@ -93,7 +93,7 @@ level may carry the `.dtx` without the PNG.
 - **Meshes**: one per mesh with vertices; one primitive per material, all primitives of a mesh sharing the
   same `POSITION`, `NORMAL` and `TEXCOORD_0` accessors (floats), `indices` as 32-bit integers. A mesh of vertices
   without faces (the points a map's particles come from) is one primitive of `mode` 0 (points) without `indices` or
-  `material`. A mesh's
+  `material`. A primitive's `mode` is 4 (triangles) or 0 (points) or absent (triangles); any other value refuses the level. A mesh's
   material channels (passes over the whole mesh with another material) are `extras.drahtseilakt.channels`:
   each its `material`, `blend` (source and destination factor names, as below) and `texcoord` k, the
   `TEXCOORD_k` set holding its coordinates; at most 16. A mesh may carry a finer look drawn in its place
@@ -136,10 +136,10 @@ level may carry the `.dtx` without the PNG.
 
 - **Texture slots**: an image's `extras.drahtseilakt.slots` lists the images that are its further slots, in order (a
   texture of several pictures, an animation's frames a map's script shows with Set Current Slot). Each is another image
-  of the level; at most 63; anything else refuses the level.
+  of the level; at most 63 each and 4096 in all; anything else refuses the level.
 - **Frames** `extras.drahtseilakt.frames` (a converted map's 2D frames: an author's signature in a corner, a logo;
   only drawn): each its `name`, `rect` (left, top, right, bottom in pixels of a 640 x 480 screen), `uv` (the part of
-  the texture shown), `z_order` (lower drawn first), `material` (an index or null) and `visible`. At most 64; a
+  the texture shown), `z_order` (lower drawn first), `material` (an index or null) and `visible`. At most 64; a `name` is at most 12288 bytes (3 x the 4096 a `.nmo` name holds, as lossy UTF-8 may triple it); a
   malformed one refuses the level.
 - **Scripts** `extras.drahtseilakt.scripts` (a converted community map's own behaviour graphs; `script_json.rs`): `objects` (name, class and what each is to the engine: an entity, group, mesh, material, texture or array by index), `nodes` (the blocks, links, IOs, parameters and operations by object index), `arrays` (the maps' tables), `scripts` (the top-level graphs with the object each is attached to), and, when the map has them, `groups` (the members it gives each group), `attributes`, `priorities` (object and priority: a higher one runs its scripts first), `start_off` (the scripts and objects the scene starts deactivated) and `waves` (its wave sounds: object, file, looped, gain, pan, pitch). A level written before the last three were kept reads without them. Data only, driven by our runtime ([scripts.md](scripts.md)); the back references are derived on reading, every index is checked, and a malformed entry refuses the level. A level without it has no scripts (the template's flames are drawn from the emitters' frames either way). Our level kit writes them too (`assets/own/make/scriptkit.py`: graphs built block by block, the level's objects, materials and textures named by name), as the showcase level's own graphs are ([levels.md](levels.md)).
 

@@ -160,9 +160,13 @@ impl Curve2d {
                 let h3 = (s - 2.0) * s + 1.0;
                 let h2 = 3.0 - (s + s);
                 let h1 = ((s + s) - 3.0) * s * s + 1.0;
-                let px = h1 * a.pos[0] + h2 * b.pos[0] * s * s + h3 * a.tan_out[0] * s
+                let px = h1 * a.pos[0]
+                    + h2 * b.pos[0] * s * s
+                    + h3 * a.tan_out[0] * s
                     + (s - 1.0) * b.tan_in[0] * s * s;
-                y = h1 * a.pos[1] + h2 * b.pos[1] * s * s + h3 * a.tan_out[1] * s
+                y = h1 * a.pos[1]
+                    + h2 * b.pos[1] * s * s
+                    + h3 * a.tan_out[1] * s
                     + (s - 1.0) * b.tan_in[1] * s * s;
                 s = (hi + lo) * 0.5;
                 if px < x {
@@ -193,7 +197,11 @@ fn rescale(t: &mut [f32; 2], x: f32) {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )]
     use super::*;
     use crate::behavior::{Saved, parameter};
 
@@ -240,8 +248,16 @@ mod tests {
     fn a_straight_segment_and_a_smoothstep_have_their_hand_computed_values() {
         // linear segment (0,0)-(1,1): y = x
         let c = Curve2d::new(vec![
-            Point { pos: [0.0, 0.0], flags: FLAG_LINEAR, ..Point::default() },
-            Point { pos: [1.0, 1.0], flags: FLAG_LINEAR, ..Point::default() },
+            Point {
+                pos: [0.0, 0.0],
+                flags: FLAG_LINEAR,
+                ..Point::default()
+            },
+            Point {
+                pos: [1.0, 1.0],
+                flags: FLAG_LINEAR,
+                ..Point::default()
+            },
         ]);
         assert_eq!(c.get_y(0.25), 0.25);
         assert_eq!(c.get_y(0.0), 0.0);
@@ -252,8 +268,20 @@ mod tests {
         assert_eq!(c.get_y(f32::NAN), 0.0);
         // user tangents (1, 0) on both ends: x(s) = s and y(s) = (3 - 2 s) s^2, the smoothstep
         let s = Curve2d::new(vec![
-            Point { pos: [0.0, 0.0], tan_out: [1.0, 0.0], tan_in: [1.0, 0.0], flags: FLAG_USER_TANGENTS, ..Point::default() },
-            Point { pos: [1.0, 1.0], tan_out: [1.0, 0.0], tan_in: [1.0, 0.0], flags: FLAG_USER_TANGENTS, ..Point::default() },
+            Point {
+                pos: [0.0, 0.0],
+                tan_out: [1.0, 0.0],
+                tan_in: [1.0, 0.0],
+                flags: FLAG_USER_TANGENTS,
+                ..Point::default()
+            },
+            Point {
+                pos: [1.0, 1.0],
+                tan_out: [1.0, 0.0],
+                tan_in: [1.0, 0.0],
+                flags: FLAG_USER_TANGENTS,
+                ..Point::default()
+            },
         ]);
         for (x, y) in [(0.25, 0.15625), (0.5, 0.5), (0.75, 0.84375)] {
             assert!((s.get_y(x) - y).abs() < 1e-4, "{x}: {}", s.get_y(x));
@@ -292,15 +320,24 @@ mod tests {
         assert!(Curve2d::read(&chunk_of(bad.clone(), 7)).is_err());
         bad = vec![0x100, 0, 3, 0, 0, 0, f(0.0), 0x1000_0000, f(0.0)];
         assert!(Curve2d::read(&chunk_of(bad, 7)).is_err());
-        assert_eq!(Curve2d::read(&chunk_of(vec![0x200, 0, 1], 7)).unwrap(), None);
+        assert_eq!(
+            Curve2d::read(&chunk_of(vec![0x200, 0, 1], 7)).unwrap(),
+            None
+        );
         let mut w = vec![0x40, 0, GUID.0, GUID.1, 0, 9999, 1, 2, 3];
         w.extend([0; 4]);
         let p = parameter(&chunk_of(w, 7)).unwrap();
         assert_eq!(p.value, Saved::SubChunk);
         // far-out coordinates never panic
         let c = Curve2d::new(vec![
-            Point { pos: [f32::NAN, 1.0], ..Point::default() },
-            Point { pos: [f32::INFINITY, f32::NAN], ..Point::default() },
+            Point {
+                pos: [f32::NAN, 1.0],
+                ..Point::default()
+            },
+            Point {
+                pos: [f32::INFINITY, f32::NAN],
+                ..Point::default()
+            },
         ]);
         let _ = c.get_y(0.5);
     }

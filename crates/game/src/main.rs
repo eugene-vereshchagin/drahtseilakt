@@ -51,7 +51,6 @@ mod music;
 mod options;
 mod ownlevels;
 mod partcheck;
-mod showcase;
 mod particles;
 mod physics;
 mod pieces;
@@ -67,6 +66,7 @@ mod script_text;
 mod script_text3d;
 mod scripting;
 mod scriptsky;
+mod showcase;
 mod sim;
 mod sky;
 mod splashpic;
@@ -249,6 +249,9 @@ pub struct Options {
     /// finished run's replay) are written: unattended runs, `--debug` given, DRAHTSEILAKT_DEV_LOGS set, or
     /// `dev-logs on` in the settings. A player's game writes none (their replays are the Replays setting's).
     pub dev_logs: bool,
+    /// Nothing is written to the player's profile: no runs, attempts or moved folders (the converter's audit plays
+    /// maps headless with made-up keys).
+    pub no_save: bool,
 }
 
 /// Until the release, a played game is a debug run unless `--no-debug` says otherwise (the owner's decision,
@@ -303,6 +306,7 @@ pub(crate) fn default_options() -> Options {
         audit_report: Vec::new(),
         show_colliders: false,
         dev_logs: false,
+        no_save: false,
     }
 }
 

@@ -2,14 +2,22 @@
 // toolbox made, rounding its meshes again gives the same looks. Skipped when that level is not on this machine
 // (levels are local only); set SMOOTH_LEVEL to a level folder to test another.
 
-#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::panic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing
+)]
 
 use std::path::PathBuf;
 
 #[test]
 fn rounding_again_gives_the_toolbox_looks() {
     let dir = std::env::var_os("SMOOTH_LEVEL").map_or_else(
-        || PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt/assets/levels/01-Map-260801"),
+        || {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../drahtseilakt/assets/levels/01-Map-260801")
+        },
         PathBuf::from,
     );
     let Ok((level, _)) = level::open::import_read(&dir) else {
@@ -19,7 +27,11 @@ fn rounding_again_gives_the_toolbox_looks() {
     let (mut same, mut with_look) = (0, 0);
     for m in &level.meshes {
         let Some(look) = m.look.as_deref() else {
-            assert!(level::smooth::mesh(m).is_none(), "{}: a look the toolbox left out", m.name);
+            assert!(
+                level::smooth::mesh(m).is_none(),
+                "{}: a look the toolbox left out",
+                m.name
+            );
             continue;
         };
         with_look += 1;
@@ -28,8 +40,15 @@ fn rounding_again_gives_the_toolbox_looks() {
         assert_eq!(again.normals, look.normals, "{}", m.name);
         assert_eq!(again.uvs, look.uvs, "{}", m.name);
         assert_eq!(
-            again.parts.iter().map(|p| (&p.indices, p.material)).collect::<Vec<_>>(),
-            look.parts.iter().map(|p| (&p.indices, p.material)).collect::<Vec<_>>()
+            again
+                .parts
+                .iter()
+                .map(|p| (&p.indices, p.material))
+                .collect::<Vec<_>>(),
+            look.parts
+                .iter()
+                .map(|p| (&p.indices, p.material))
+                .collect::<Vec<_>>()
         );
         same += 1;
     }
@@ -44,10 +63,17 @@ fn hostile_meshes_never_panic() {
     // indices out of range, nothing finite, one huge degenerate mesh
     l.meshes.push(Mesh {
         name: "bad".into(),
-        positions: vec![[f32::NAN, 0.0, 0.0], [f32::INFINITY, 1.0, 0.0], [0.0, 1e38, 1.0]],
+        positions: vec![
+            [f32::NAN, 0.0, 0.0],
+            [f32::INFINITY, 1.0, 0.0],
+            [0.0, 1e38, 1.0],
+        ],
         normals: vec![],
         uvs: vec![],
-        parts: vec![Part { material: None, indices: vec![0, 1, 2, 7, 8, 9, 0, 0, 0, 1] }],
+        parts: vec![Part {
+            material: None,
+            indices: vec![0, 1, 2, 7, 8, 9, 0, 0, 0, 1],
+        }],
         channels: vec![],
         look: None,
     });
@@ -56,7 +82,10 @@ fn hostile_meshes_never_panic() {
         positions: vec![[0.0; 3]; 3],
         normals: vec![],
         uvs: vec![],
-        parts: vec![Part { material: None, indices: vec![0, 1, 2].repeat(level::smooth::MAX_SOURCE_TRIANGLES + 1) }],
+        parts: vec![Part {
+            material: None,
+            indices: vec![0, 1, 2].repeat(level::smooth::MAX_SOURCE_TRIANGLES + 1),
+        }],
         channels: vec![],
         look: None,
     });

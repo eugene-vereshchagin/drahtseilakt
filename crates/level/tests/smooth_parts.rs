@@ -2,7 +2,12 @@
 // look that is only the part's own mesh again (`models original` puts the copy's meshes as looks), is rounded; a finer
 // look from a pack is kept.
 
-#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::panic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing
+)]
 
 use level::{Level, Mesh, Part};
 
@@ -11,16 +16,43 @@ fn flat_sphere(depth: u32) -> Mesh {
     use glam::Vec3;
     let t = (1.0 + 5f32.sqrt()) / 2.0;
     let mut v: Vec<Vec3> = [
-        (-1.0, t, 0.0), (1.0, t, 0.0), (-1.0, -t, 0.0), (1.0, -t, 0.0), (0.0, -1.0, t), (0.0, 1.0, t),
-        (0.0, -1.0, -t), (0.0, 1.0, -t), (t, 0.0, -1.0), (t, 0.0, 1.0), (-t, 0.0, -1.0), (-t, 0.0, 1.0),
+        (-1.0, t, 0.0),
+        (1.0, t, 0.0),
+        (-1.0, -t, 0.0),
+        (1.0, -t, 0.0),
+        (0.0, -1.0, t),
+        (0.0, 1.0, t),
+        (0.0, -1.0, -t),
+        (0.0, 1.0, -t),
+        (t, 0.0, -1.0),
+        (t, 0.0, 1.0),
+        (-t, 0.0, -1.0),
+        (-t, 0.0, 1.0),
     ]
     .iter()
     .map(|&(x, y, z)| Vec3::new(x, y, z).normalize())
     .collect();
     let mut tris: Vec<[usize; 3]> = vec![
-        [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6],
-        [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10],
-        [8, 6, 7], [9, 8, 1],
+        [0, 11, 5],
+        [0, 5, 1],
+        [0, 1, 7],
+        [0, 7, 10],
+        [0, 10, 11],
+        [1, 5, 9],
+        [5, 11, 4],
+        [11, 10, 2],
+        [10, 7, 6],
+        [7, 1, 8],
+        [3, 9, 4],
+        [3, 4, 2],
+        [3, 2, 6],
+        [3, 6, 8],
+        [3, 8, 9],
+        [4, 9, 5],
+        [2, 4, 11],
+        [6, 2, 10],
+        [8, 6, 7],
+        [9, 8, 1],
     ];
     for _ in 0..depth {
         let mut next = vec![];
@@ -45,11 +77,24 @@ fn flat_sphere(depth: u32) -> Mesh {
         }
         indices.extend([base, base + 1, base + 2]);
     }
-    Mesh { name: "Ball_Test_Mesh".into(), positions, normals, uvs, parts: vec![Part { material: None, indices }], ..Mesh::default() }
+    Mesh {
+        name: "Ball_Test_Mesh".into(),
+        positions,
+        normals,
+        uvs,
+        parts: vec![Part {
+            material: None,
+            indices,
+        }],
+        ..Mesh::default()
+    }
 }
 
 fn level_of(m: Mesh) -> Level {
-    Level { meshes: vec![m], ..Level::default() }
+    Level {
+        meshes: vec![m],
+        ..Level::default()
+    }
 }
 
 fn drawn_facets(l: &Level) -> f32 {
@@ -62,7 +107,11 @@ fn a_part_without_a_look_is_rounded() {
     let src = drawn_facets(&l);
     assert!(src > 20.0);
     assert_eq!(level::smooth::add_looks_cached(&mut l), 1);
-    assert!(drawn_facets(&l) < src / 2.0, "{} of {src}", drawn_facets(&l));
+    assert!(
+        drawn_facets(&l) < src / 2.0,
+        "{} of {src}",
+        drawn_facets(&l)
+    );
 }
 
 #[test]
@@ -74,7 +123,11 @@ fn a_look_no_finer_than_the_mesh_is_rounded_too() {
     let src = drawn_facets(&l);
     assert!(src > 20.0);
     assert_eq!(level::smooth::add_looks_cached(&mut l), 1);
-    assert!(drawn_facets(&l) < src / 2.0, "{} of {src}", drawn_facets(&l));
+    assert!(
+        drawn_facets(&l) < src / 2.0,
+        "{} of {src}",
+        drawn_facets(&l)
+    );
 }
 
 #[test]

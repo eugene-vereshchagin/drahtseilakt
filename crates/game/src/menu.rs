@@ -1936,7 +1936,11 @@ impl Menu {
         it.saved
             .as_deref()
             .map(|d| d.get(..10).unwrap_or(d).to_owned())
-            .or_else(|| it.path.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .or_else(|| {
+                it.path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+            })
             .unwrap_or_default()
     }
 
@@ -5465,7 +5469,17 @@ mod tests {
             .into_iter()
             .map(|l| m.label(l))
             .collect();
-        assert_eq!(labels, ["Start", "Highscore", "Replays", "Options", "Credits", "Exit"]);
+        assert_eq!(
+            labels,
+            [
+                "Start",
+                "Highscore",
+                "Replays",
+                "Options",
+                "Credits",
+                "Exit"
+            ]
+        );
         let mut m = menu(&[true], true);
         assert_eq!(m.enter(), Action::None);
         assert_eq!(
@@ -5509,7 +5523,11 @@ mod tests {
         m.replays.dirs = vec![std::env::temp_dir().join("drahtseilakt-no-such-replays-folder")];
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::ReplaySettings);
-        assert_eq!(m.lines(Screen::ReplaySettings).len(), 3, "settings only, no list");
+        assert_eq!(
+            m.lines(Screen::ReplaySettings).len(),
+            3,
+            "settings only, no list"
+        );
         // off at first; Enter and the arrows go round Off, Ask, Always
         assert_eq!(m.replays.mode, Mode::Off);
         assert_eq!(m.enter(), Action::SaveReplays(Mode::Ask));
@@ -5522,12 +5540,23 @@ mod tests {
         m.back();
         m.back();
         assert_eq!(m.screen(), Screen::Main);
-        let at = m.lines(Screen::Main).iter().position(|&l| l == Line::ReplayList);
+        let at = m
+            .lines(Screen::Main)
+            .iter()
+            .position(|&l| l == Line::ReplayList);
         m.set_chosen(at.unwrap());
         assert_eq!(m.enter(), Action::None);
         assert_eq!(m.screen(), Screen::Replays);
-        assert_eq!(m.lines(Screen::Replays), [Line::Back], "no replays: Back alone");
-        assert!(m.fields(Screen::Replays).iter().any(|f| f.0 == m.strings.ours("replays none")));
+        assert_eq!(
+            m.lines(Screen::Replays),
+            [Line::Back],
+            "no replays: Back alone"
+        );
+        assert!(
+            m.fields(Screen::Replays)
+                .iter()
+                .any(|f| f.0 == m.strings.ours("replays none"))
+        );
         let item = |name: &str, state| Item {
             path: PathBuf::from(name),
             level: "Level_03.NMO".into(),

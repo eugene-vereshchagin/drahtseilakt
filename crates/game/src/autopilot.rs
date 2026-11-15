@@ -1246,7 +1246,9 @@ const IDLE_CHECK: u64 = 300;
 /// The player's tick to go on from instead of `k`, past the still stretch beginning there (`IDLE_MIN`).
 fn idle_skip(d: &Demo, k: usize, sim: &Sim) -> Option<usize> {
     let first = d.ticks.get(k)?;
-    if sim.ball.position.distance(first.pos) > DEMO_NEAR || sim.ball.velocity.length() > 2.0 * IDLE_SPEED {
+    if sim.ball.position.distance(first.pos) > DEMO_NEAR
+        || sim.ball.velocity.length() > 2.0 * IDLE_SPEED
+    {
         return None;
     }
     let still = d
@@ -1653,7 +1655,10 @@ impl Pilot {
             && let Some(skip) = idle_skip(&d, k, sim)
         {
             if std::env::var_os("AUTOPILOT_DEMO").is_some() {
-                eprintln!("speedrun: the player's still ticks {k}..{skip} skipped at t{}", sim.tick);
+                eprintln!(
+                    "speedrun: the player's still ticks {k}..{skip} skipped at t{}",
+                    sim.tick
+                );
             }
             k = skip;
         }

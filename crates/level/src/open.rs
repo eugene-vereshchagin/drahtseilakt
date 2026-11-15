@@ -22,7 +22,8 @@ pub const MAX_PARALLAX: f64 = 0.25;
 const MAX_JSON: u64 = 64 * 1024 * 1024;
 const MAX_BIN: u64 = 1024 * 1024 * 1024;
 /// The longest name a 2D frame keeps.
-const MAX_NAME: usize = 1024;
+/// (a `.nmo` name is up to 4096 raw bytes, and each invalid byte becomes three in UTF-8.)
+const MAX_NAME: usize = 3 * 4096;
 const FLOAT: u64 = 5126;
 const UINT: u64 = 5125;
 /// glTF primitive modes: points (a mesh of vertices without faces) and triangles (the default).
@@ -619,7 +620,7 @@ pub fn written(m: &Mesh) -> bool {
     !m.positions.is_empty()
 }
 
-/// One mesh as glTF, its data pushed into the buffer; None for a mesh without faces.
+/// One mesh as glTF, its data pushed into the buffer; None for a mesh with no vertices (`written`).
 fn mesh_json(m: &Mesh, push: &mut impl FnMut(&[u8], u64, Value) -> usize) -> Option<Value> {
     let n = m.positions.len();
     if !written(m) {
@@ -1035,7 +1036,9 @@ fn import_from(
             color_key: color_key_of(&img["extras"]["drahtseilakt"]["color_key"]),
         });
     }
-    // a texture's further slots: other images of the level, at most MAX_SLOTS - 1 of them
+    // a texture's further slots: other images of the level, at most MAX_SLOTS - 1 of them each and
+    // MAX_SLOT_ENTRIES in all (each entry clones a source)
+    let mut slot_total = 0usize;
     for (i, img) in arr("images").iter().enumerate() {
         let listed = &img["extras"]["drahtseilakt"]["slots"];
         if listed.is_null() {
@@ -1046,6 +1049,10 @@ fn import_from(
             .as_array()
             .filter(|l| l.len() < nmo::scene::MAX_SLOTS)
             .ok_or_else(bad)?;
+        slot_total = slot_total
+            .checked_add(list.len())
+            .filter(|&t| t <= crate::MAX_SLOT_ENTRIES)
+            .ok_or_else(|| "too many texture slots in all".to_owned())?;
         let mut sources = Vec::with_capacity(list.len());
         for k in list {
             let k = k
@@ -1280,9 +1287,12 @@ fn import_from(
         let mut m = [[0.0f32; 4]; 4];
         // the whole matrix of the extras, when it has entries that are not finite; glTF's otherwise
         let whole = &n["extras"]["drahtseilakt"]["matrix"];
+        if !whole.is_null() && !whole.is_array() {
+            return Err("node matrix extra is not an array".into());
+        }
         let (flat, named) = match whole.as_array() {
-            Some(a) => (a, true),
-            None => (n["matrix"].as_array().ok_or("node without matrix")?, false),
+            Some(a) if a.iter().any(|v| v.as_f64().is_none()) => (a, true),
+            _ => (n["matrix"].as_array().ok_or("node without matrix")?, false),
         };
         if flat.len() != 16 {
             return Err("node matrix must have 16 numbers".into());

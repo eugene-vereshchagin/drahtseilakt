@@ -286,7 +286,11 @@ fn movie_slot(start: i32, end: i32, elapsed: f32, duration: f32) -> i32 {
         1.0
     };
     let step = ((count as f32 * progress).floor() as i64).min(count - 1);
-    let slot = if end >= start { start + step } else { start - step };
+    let slot = if end >= start {
+        start + step
+    } else {
+        start - step
+    };
     slot.clamp(start.min(end), start.max(end)) as i32
 }
 

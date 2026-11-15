@@ -65,6 +65,10 @@ pub struct Level {
     pub texture_slots: Vec<(usize, Vec<TextureSource>)>,
 }
 
+/// Slot entries a level keeps in all, over every texture: each one holds its own source, so the total is bounded, not
+/// only each texture's list (a map has a handful).
+pub const MAX_SLOT_ENTRIES: usize = 4096;
+
 /// Frames a level keeps (a map has one, rarely four).
 pub const MAX_FRAMES: usize = 64;
 

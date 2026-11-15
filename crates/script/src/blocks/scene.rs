@@ -103,7 +103,13 @@ pub(crate) fn attach_script(
 }
 
 /// The world place of an entity pin.
-fn place_of(rt: &mut Runtime, b: &Block, i: usize, name: &str, host: &mut dyn Host) -> Option<[f32; 3]> {
+fn place_of(
+    rt: &mut Runtime,
+    b: &Block,
+    i: usize,
+    name: &str,
+    host: &mut dyn Host,
+) -> Option<[f32; 3]> {
     let o = pin(rt, b, name, i, host).as_obj();
     let e = rt.ent(o)?;
     let m = host.matrix(e)?;

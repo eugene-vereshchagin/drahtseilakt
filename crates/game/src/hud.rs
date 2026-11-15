@@ -632,7 +632,10 @@ mod tests {
         assert_eq!(q.len(), 1);
         assert!((q[0].angle - 90.0).abs() < 1e-4);
         // a Hide over a shown frame, and a rotation that is not a number
-        let shown = LevelFrame { shown: true, ..hidden };
+        let shown = LevelFrame {
+            shown: true,
+            ..hidden
+        };
         let edit = script::Ent2d {
             rotation: Some(f32::NAN),
             shown: Some(false),

@@ -10,8 +10,8 @@
 // a crease (the same corners, different normals, such as a disc's top and its rim), the edge takes the normals that
 // bend it most, so a flat top follows its round side. Edges bent at one end only bend just a little (see `bend`).
 
-use glam::Vec3;
 use crate::{Level, Mesh, Part};
+use glam::Vec3;
 use std::collections::HashMap;
 
 /// The most a mesh's edges are cut into: enough for the original's 8- to 24-sided round shapes.
@@ -99,8 +99,14 @@ pub fn add_looks_cached(level: &mut Level) -> usize {
     // what each mesh is rounded from: itself, or its look when that is no finer than the mesh; None: keeps its look
     let source = |m: &Mesh| -> Option<Mesh> {
         match m.look.as_deref() {
-            None => Some(Mesh { look: None, ..m.clone() }),
-            Some(l) if triangles(l) <= triangles(m) => Some(Mesh { look: None, ..l.clone() }),
+            None => Some(Mesh {
+                look: None,
+                ..m.clone()
+            }),
+            Some(l) if triangles(l) <= triangles(m) => Some(Mesh {
+                look: None,
+                ..l.clone()
+            }),
             Some(_) => None,
         }
     };
@@ -109,7 +115,9 @@ pub fn add_looks_cached(level: &mut Level) -> usize {
     let wanted = |i: usize| sources[i].is_some();
     let missing: Vec<usize> = {
         let Ok(c) = cache.lock() else { return 0 };
-        (0..sigs.len()).filter(|&i| wanted(i) && !c.contains_key(&sigs[i])).collect()
+        (0..sigs.len())
+            .filter(|&i| wanted(i) && !c.contains_key(&sigs[i]))
+            .collect()
     };
     if !missing.is_empty() {
         let todo: Vec<Mesh> = missing.iter().filter_map(|&i| sources[i].clone()).collect();
@@ -147,10 +155,13 @@ pub fn looks_of(meshes: &[Mesh]) -> Vec<Option<Mesh>> {
         }
         std::panic::catch_unwind(|| mesh(m)).ok().flatten()
     };
-    let threads = std::thread::available_parallelism().map_or(1, usize::from).min(16);
+    let threads = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .min(16);
     let next = std::sync::atomic::AtomicUsize::new(0);
-    let slots: Vec<std::sync::Mutex<Option<Mesh>>> =
-        (0..meshes.len()).map(|_| std::sync::Mutex::new(None)).collect();
+    let slots: Vec<std::sync::Mutex<Option<Mesh>>> = (0..meshes.len())
+        .map(|_| std::sync::Mutex::new(None))
+        .collect();
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| {
@@ -167,7 +178,10 @@ pub fn looks_of(meshes: &[Mesh]) -> Vec<Option<Mesh>> {
             });
         }
     });
-    slots.into_iter().map(|s| s.into_inner().ok().flatten()).collect()
+    slots
+        .into_iter()
+        .map(|s| s.into_inner().ok().flatten())
+        .collect()
 }
 
 /// A position's key, to find the corners triangles share (their vertices may be split by normals or coordinates).
@@ -718,7 +732,13 @@ pub fn facets(m: &Mesh) -> f32 {
                 if a >= m.positions.len() || b >= m.positions.len() {
                     continue;
                 }
-                widest = widest.max(normal(a).normalize_or_zero().dot(normal(b).normalize_or_zero()).clamp(-1.0, 1.0).acos());
+                widest = widest.max(
+                    normal(a)
+                        .normalize_or_zero()
+                        .dot(normal(b).normalize_or_zero())
+                        .clamp(-1.0, 1.0)
+                        .acos(),
+                );
             }
             for &i in t {
                 if let Some(p) = m.positions.get(i as usize) {

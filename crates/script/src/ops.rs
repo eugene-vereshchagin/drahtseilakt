@@ -131,8 +131,7 @@ use Source::{C, Dll as D, Name as N};
 use t::{
     BEOBJECT, BOOL, BOX, COLOR, ENTITY, ENTITY2D, EULER, FLOAT, GROUP, INT, MATERIAL, MATRIX, MESH,
     NONE as NO, OBJECT, OBJECT_ARRAY, PERCENTAGE, QUATERNION, RECT, SCRIPT, STRING, TEXTURE, TIME,
-    VECTOR,
-    VECTOR2,
+    VECTOR, VECTOR2,
 };
 
 /// Every function the runtime has.
@@ -282,12 +281,54 @@ pub static TABLE: &[Row] = &[
         N,
     ),
     // Min, Max, Abs, Distance and the equality tests: named by their use in the maps (the C has none of them)
-    r(op::MIN, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int().min(b.as_int()))), D),
-    r(op::MIN, FLOAT, FLOAT, FLOAT, |_, _, _, a, b| Some(Value::Float(fmin(a.as_float(), b.as_float()))), D),
-    r(op::MAXIMUM, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int().max(b.as_int()))), D),
-    r(op::MAXIMUM, FLOAT, FLOAT, FLOAT, |_, _, _, a, b| Some(Value::Float(fmax(a.as_float(), b.as_float()))), D),
-    r(op::ABS, INT, INT, NO, |_, _, _, a, _| Some(Value::Int(a.as_int().wrapping_abs())), D),
-    r(op::ABS, FLOAT, FLOAT, NO, |_, _, _, a, _| Some(Value::Float(a.as_float().abs())), D),
+    r(
+        op::MIN,
+        INT,
+        INT,
+        INT,
+        |_, _, _, a, b| Some(Value::Int(a.as_int().min(b.as_int()))),
+        D,
+    ),
+    r(
+        op::MIN,
+        FLOAT,
+        FLOAT,
+        FLOAT,
+        |_, _, _, a, b| Some(Value::Float(fmin(a.as_float(), b.as_float()))),
+        D,
+    ),
+    r(
+        op::MAXIMUM,
+        INT,
+        INT,
+        INT,
+        |_, _, _, a, b| Some(Value::Int(a.as_int().max(b.as_int()))),
+        D,
+    ),
+    r(
+        op::MAXIMUM,
+        FLOAT,
+        FLOAT,
+        FLOAT,
+        |_, _, _, a, b| Some(Value::Float(fmax(a.as_float(), b.as_float()))),
+        D,
+    ),
+    r(
+        op::ABS,
+        INT,
+        INT,
+        NO,
+        |_, _, _, a, _| Some(Value::Int(a.as_int().wrapping_abs())),
+        D,
+    ),
+    r(
+        op::ABS,
+        FLOAT,
+        FLOAT,
+        NO,
+        |_, _, _, a, _| Some(Value::Float(a.as_float().abs())),
+        D,
+    ),
     r(
         op::DISTANCE,
         FLOAT,
@@ -307,15 +348,40 @@ pub static TABLE: &[Row] = &[
     ),
     // the rest of ParameterOperations.dll's table (`re/ops.txt`); the C has none of these
     r(op::CONTAIN_STRING, BOOL, STRING, STRING, contain_string, D),
-    r(op::IS_DERIVED_FROM, BOOL, OBJECT, OBJECT, is_derived_from, D),
-    r(op::EQUAL, BOOL, STRING, STRING, |_, _, _, a, b| Some(Value::Bool(equal_strings(a, b))), D),
-    r(op::EQUAL, BOOL, INT, INT, |_, _, _, a, b| Some(Value::Bool(a.as_int() == b.as_int())), D),
+    r(
+        op::IS_DERIVED_FROM,
+        BOOL,
+        OBJECT,
+        OBJECT,
+        is_derived_from,
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        STRING,
+        STRING,
+        |_, _, _, a, b| Some(Value::Bool(equal_strings(a, b))),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        INT,
+        INT,
+        |_, _, _, a, b| Some(Value::Bool(a.as_int() == b.as_int())),
+        D,
+    ),
     r(
         op::EQUAL,
         BOOL,
         FLOAT,
         FLOAT,
-        |_, _, _, a, b| Some(Value::Bool(a.as_float().to_bits() == b.as_float().to_bits())),
+        |_, _, _, a, b| {
+            Some(Value::Bool(
+                a.as_float().to_bits() == b.as_float().to_bits(),
+            ))
+        },
         D,
     ),
     r(
@@ -323,32 +389,148 @@ pub static TABLE: &[Row] = &[
         BOOL,
         INT,
         FLOAT,
-        |_, _, _, a, b| Some(Value::Bool(f64::from(a.as_int()) == f64::from(b.as_float()))),
+        |_, _, _, a, b| {
+            Some(Value::Bool(
+                f64::from(a.as_int()) == f64::from(b.as_float()),
+            ))
+        },
         D,
     ),
-    r(op::EQUAL, BOOL, BOOL, BOOL, |_, _, _, a, b| Some(Value::Bool(a.as_bool() == b.as_bool())), D),
-    r(op::EQUAL, BOOL, OBJECT, OBJECT, |_, _, _, a, b| Some(Value::Bool(a.as_obj() == b.as_obj())), D),
-    r(op::EQUAL, BOOL, VECTOR2, VECTOR2, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
-    r(op::EQUAL, BOOL, VECTOR, VECTOR, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
-    r(op::EQUAL, BOOL, EULER, EULER, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
-    r(op::EQUAL, BOOL, QUATERNION, QUATERNION, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
-    r(op::EQUAL, BOOL, RECT, RECT, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
-    r(op::EQUAL, BOOL, COLOR, COLOR, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
-    r(op::EQUAL, BOOL, MATRIX, MATRIX, |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))), D),
-    r(op::XOR, INT, INT, INT, |_, _, _, a, b| Some(Value::Int(a.as_int() ^ b.as_int())), D),
-    r(op::XOR, BOOL, BOOL, BOOL, |_, _, _, a, b| Some(Value::Bool(a.as_bool() != b.as_bool())), D),
+    r(
+        op::EQUAL,
+        BOOL,
+        BOOL,
+        BOOL,
+        |_, _, _, a, b| Some(Value::Bool(a.as_bool() == b.as_bool())),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        OBJECT,
+        OBJECT,
+        |_, _, _, a, b| Some(Value::Bool(a.as_obj() == b.as_obj())),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        VECTOR2,
+        VECTOR2,
+        |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        VECTOR,
+        VECTOR,
+        |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        EULER,
+        EULER,
+        |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        QUATERNION,
+        QUATERNION,
+        |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        RECT,
+        RECT,
+        |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        COLOR,
+        COLOR,
+        |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))),
+        D,
+    ),
+    r(
+        op::EQUAL,
+        BOOL,
+        MATRIX,
+        MATRIX,
+        |_, _, _, a, b| Some(Value::Bool(bits_equal(a, b))),
+        D,
+    ),
+    r(
+        op::XOR,
+        INT,
+        INT,
+        INT,
+        |_, _, _, a, b| Some(Value::Int(a.as_int() ^ b.as_int())),
+        D,
+    ),
+    r(
+        op::XOR,
+        BOOL,
+        BOOL,
+        BOOL,
+        |_, _, _, a, b| Some(Value::Bool(a.as_bool() != b.as_bool())),
+        D,
+    ),
     r(op::IS_VISIBLE, BOOL, ENTITY, NO, is_visible, D),
     r(op::IS_VISIBLE, BOOL, ENTITY2D, NO, is_visible, D),
     r(op::CHILDREN, OBJECT_ARRAY, ENTITY, NO, children, D),
     r(op::PARENT, ENTITY, ENTITY, NO, parent, D),
     r(op::PARENT, ENTITY2D, ENTITY2D, NO, parent, D),
-    r(op::WIDTH, INT, NO, NO, |_, h, _, _, _| h.screen_size().map(|s| Value::Int(s.0)), D),
-    r(op::HEIGHT, INT, NO, NO, |_, h, _, _, _| h.screen_size().map(|s| Value::Int(s.1)), D),
-    r(op::WIDTH, INT, TEXTURE, NO, |rt, h, _, a, _| texture_size(rt, h, a, false), D),
-    r(op::HEIGHT, INT, TEXTURE, NO, |rt, h, _, a, _| texture_size(rt, h, a, true), D),
+    r(
+        op::WIDTH,
+        INT,
+        NO,
+        NO,
+        |_, h, _, _, _| h.screen_size().map(|s| Value::Int(s.0)),
+        D,
+    ),
+    r(
+        op::HEIGHT,
+        INT,
+        NO,
+        NO,
+        |_, h, _, _, _| h.screen_size().map(|s| Value::Int(s.1)),
+        D,
+    ),
+    r(
+        op::WIDTH,
+        INT,
+        TEXTURE,
+        NO,
+        |rt, h, _, a, _| texture_size(rt, h, a, false),
+        D,
+    ),
+    r(
+        op::HEIGHT,
+        INT,
+        TEXTURE,
+        NO,
+        |rt, h, _, a, _| texture_size(rt, h, a, true),
+        D,
+    ),
     r(op::SET_ALPHA, COLOR, COLOR, FLOAT, set_alpha, D),
     r(op::MATERIAL, MATERIAL, t::SPRITE3D, NO, sprite_material, D),
-    r(op::DEG_TO_RAD, FLOAT, FLOAT, NO, |_, _, _, a, _| Some(Value::Float(a.as_float() * 0.017_453_292)), D),
+    r(
+        op::DEG_TO_RAD,
+        FLOAT,
+        FLOAT,
+        NO,
+        |_, _, _, a, _| Some(Value::Float(a.as_float() * 0.017_453_292)),
+        D,
+    ),
     r(op::DISTANCE, VECTOR, ENTITY, ENTITY, entity_offset, D),
     r(op::DIV, QUATERNION, QUATERNION, QUATERNION, quat_div, D),
     // vectors and quaternions (by name)
@@ -711,12 +893,22 @@ fn entity_distance(
     b: &Value,
 ) -> Option<Value> {
     let (ma, mb) = (world(rt, host, a)?, world(rt, host, b)?);
-    let d = [ma[3][0] - mb[3][0], ma[3][1] - mb[3][1], ma[3][2] - mb[3][2]];
+    let d = [
+        ma[3][0] - mb[3][0],
+        ma[3][1] - mb[3][1],
+        ma[3][2] - mb[3][2],
+    ];
     Some(Value::Float(length(d)))
 }
 
 /// Whether input 1 contains input 2 (strstr; a missing string gives false, an empty one is found at once).
-fn contain_string(_: &mut Runtime, _: &mut dyn Host, _: Guid, a: &Value, b: &Value) -> Option<Value> {
+fn contain_string(
+    _: &mut Runtime,
+    _: &mut dyn Host,
+    _: Guid,
+    a: &Value,
+    b: &Value,
+) -> Option<Value> {
     Some(Value::Bool(match (a, b) {
         (Value::Str(x), Value::Str(y)) => x.contains(y.as_str()),
         _ => false,
@@ -733,7 +925,9 @@ fn words(v: &Value) -> Vec<u32> {
     match v {
         Value::Vec2(x) => x.iter().map(|f| f.to_bits()).collect(),
         Value::Vec3(x) => x.iter().map(|f| f.to_bits()).collect(),
-        Value::Quat(x) | Value::Rect(x) | Value::Color(x) => x.iter().map(|f| f.to_bits()).collect(),
+        Value::Quat(x) | Value::Rect(x) | Value::Color(x) => {
+            x.iter().map(|f| f.to_bits()).collect()
+        }
         Value::Matrix(m) => m.iter().flatten().map(|f| f.to_bits()).collect(),
         _ => Vec::new(),
     }
@@ -747,17 +941,17 @@ fn bits_equal(a: &Value, b: &Value) -> bool {
 fn class_parent(c: u32) -> Option<u32> {
     Some(match c {
         // 2 / 3 / 4 / 6 / 8 / 9 (parameters, links, behaviours, ios), 10 scene, 16 render context, 20 ...: roots below Object
-        11 => 1,                         // scene object -> object
-        19 => 11,                        // be object -> scene object
+        11 => 1,  // scene object -> object
+        19 => 11, // be object -> scene object
         10 | 21 | 23 | 24 | 30 | 31 | 32 | 47 | 52 | 51 => 19,
-        25 | 26 => 24,                   // wave, midi sound -> sound
-        33 | 27 => 47,                   // 3D entity, 2D entity -> render object
+        25 | 26 => 24, // wave, midi sound -> sound
+        33 | 27 => 47, // 3D entity, 2D entity -> render object
         34 | 36 | 37 | 38 | 40 | 41 | 43 => 33,
-        35 => 34,                        // target camera -> camera
-        39 => 38,                        // target light -> light
-        42 => 41,                        // body part -> 3D object
-        28 => 27,                        // sprite -> 2D entity
-        29 => 28,                        // sprite text -> sprite
+        35 => 34, // target camera -> camera
+        39 => 38, // target light -> light
+        42 => 41, // body part -> 3D object
+        28 => 27, // sprite -> 2D entity
+        29 => 28, // sprite text -> sprite
         2..=9 | 12..=18 | 20 | 22 | 44..=46 | 48..=50 | 53.. => 1,
         _ => return None,
     })
@@ -785,12 +979,22 @@ fn is_derived_from(
     a: &Value,
     b: &Value,
 ) -> Option<Value> {
-    let class = |v: &Value| v.as_obj().and_then(|o| rt.graph.objects.get(o)).map(|o| o.class);
+    let class = |v: &Value| {
+        v.as_obj()
+            .and_then(|o| rt.graph.objects.get(o))
+            .map(|o| o.class)
+    };
     let (c1, c2) = (class(a)?, class(b)?);
     Some(Value::Bool(class_derives(c1, c2)))
 }
 
-fn is_visible(rt: &mut Runtime, host: &mut dyn Host, _: Guid, a: &Value, _: &Value) -> Option<Value> {
+fn is_visible(
+    rt: &mut Runtime,
+    host: &mut dyn Host,
+    _: Guid,
+    a: &Value,
+    _: &Value,
+) -> Option<Value> {
     let e = rt.ent(a.as_obj())?;
     host.is_visible(e).map(Value::Bool)
 }
@@ -823,9 +1027,13 @@ fn children(rt: &mut Runtime, host: &mut dyn Host, _: Guid, a: &Value, _: &Value
 
 fn texture_size(rt: &mut Runtime, host: &mut dyn Host, a: &Value, height: bool) -> Option<Value> {
     let o = rt.graph.objects.get(a.as_obj()?)?;
-    let ObjKind::Texture(t) = o.kind else { return None };
+    let ObjKind::Texture(t) = o.kind else {
+        return None;
+    };
     let info = host.texture_info(t)?;
-    Some(Value::Int(i32::try_from(if height { info.height } else { info.width }).unwrap_or(i32::MAX)))
+    Some(Value::Int(
+        i32::try_from(if height { info.height } else { info.width }).unwrap_or(i32::MAX),
+    ))
 }
 
 /// Set Alpha: the colour with its alpha set to the number, at most 1 (no lower bound).
@@ -844,11 +1052,21 @@ fn entity_offset(
     b: &Value,
 ) -> Option<Value> {
     let (ma, mb) = (world(rt, host, a)?, world(rt, host, b)?);
-    Some(Value::Vec3([mb[3][0] - ma[3][0], mb[3][1] - ma[3][1], mb[3][2] - ma[3][2]]))
+    Some(Value::Vec3([
+        mb[3][0] - ma[3][0],
+        mb[3][1] - ma[3][1],
+        mb[3][2] - ma[3][2],
+    ]))
 }
 
 /// Get Script with a name: the first script of the object whose name contains the string (nothing written if none).
-fn script_by_name(rt: &mut Runtime, _: &mut dyn Host, _: Guid, a: &Value, b: &Value) -> Option<Value> {
+fn script_by_name(
+    rt: &mut Runtime,
+    _: &mut dyn Host,
+    _: Guid,
+    a: &Value,
+    b: &Value,
+) -> Option<Value> {
     let key = b.as_string();
     let found = scripts(rt, a)
         .into_iter()
@@ -1299,7 +1517,13 @@ fn material_of(
 }
 
 /// Get Material of a 3D sprite: its mesh's first material (nothing written without one).
-fn sprite_material(rt: &mut Runtime, host: &mut dyn Host, _: Guid, a: &Value, _: &Value) -> Option<Value> {
+fn sprite_material(
+    rt: &mut Runtime,
+    host: &mut dyn Host,
+    _: Guid,
+    a: &Value,
+    _: &Value,
+) -> Option<Value> {
     let e = rt.ent(a.as_obj())?;
     let m = *host.mesh_materials(host.mesh_of(e)?).first()?;
     object_of(rt, ObjKind::Material(m)).map(|o| Value::Obj(Some(o)))
@@ -1617,27 +1841,70 @@ mod tests {
                 ])),
             ),
             (
-                run(op::INVERSE, MATRIX, MATRIX, NO, Value::Matrix([[0.0; 4]; 4]), n.clone()),
+                run(
+                    op::INVERSE,
+                    MATRIX,
+                    MATRIX,
+                    NO,
+                    Value::Matrix([[0.0; 4]; 4]),
+                    n.clone(),
+                ),
                 None,
             ),
             // Abs, Min, Max (the clamp of Landfill in the Clouds), Distance and the equality tests
-            (run(op::ABS, FLOAT, FLOAT, NO, f(-2.5), n.clone()), Some(f(2.5))),
-            (run(op::ABS, INT, INT, NO, i(-7), n.clone()), Some(i(7))),
-            (run(op::ABS, INT, INT, NO, i(i32::MIN), n.clone()), Some(i(i32::MIN))),
-            (run(op::MIN, FLOAT, FLOAT, FLOAT, f(3.0), f(-1.0)), Some(f(-1.0))),
-            (run(op::MIN, INT, INT, INT, i(3), i(9)), Some(i(3))),
-            (run(op::MAXIMUM, FLOAT, FLOAT, FLOAT, f(3.0), f(-1.0)), Some(f(3.0))),
-            (run(op::MAXIMUM, TIME, TIME, TIME, f(1.5), f(1000.0)), Some(f(1000.0))),
             (
-                run(op::DISTANCE, FLOAT, VECTOR, VECTOR, v([1.0, 2.0, 3.0]), v([4.0, 6.0, 3.0])),
+                run(op::ABS, FLOAT, FLOAT, NO, f(-2.5), n.clone()),
+                Some(f(2.5)),
+            ),
+            (run(op::ABS, INT, INT, NO, i(-7), n.clone()), Some(i(7))),
+            (
+                run(op::ABS, INT, INT, NO, i(i32::MIN), n.clone()),
+                Some(i(i32::MIN)),
+            ),
+            (
+                run(op::MIN, FLOAT, FLOAT, FLOAT, f(3.0), f(-1.0)),
+                Some(f(-1.0)),
+            ),
+            (run(op::MIN, INT, INT, INT, i(3), i(9)), Some(i(3))),
+            (
+                run(op::MAXIMUM, FLOAT, FLOAT, FLOAT, f(3.0), f(-1.0)),
+                Some(f(3.0)),
+            ),
+            (
+                run(op::MAXIMUM, TIME, TIME, TIME, f(1.5), f(1000.0)),
+                Some(f(1000.0)),
+            ),
+            (
+                run(
+                    op::DISTANCE,
+                    FLOAT,
+                    VECTOR,
+                    VECTOR,
+                    v([1.0, 2.0, 3.0]),
+                    v([4.0, 6.0, 3.0]),
+                ),
                 Some(f(5.0)),
             ),
             (
-                run(op::CONTAIN_STRING, BOOL, STRING, STRING, s("PE_Balloon_01"), s("Balloon")),
+                run(
+                    op::CONTAIN_STRING,
+                    BOOL,
+                    STRING,
+                    STRING,
+                    s("PE_Balloon_01"),
+                    s("Balloon"),
+                ),
                 Some(Value::Bool(true)),
             ),
             (
-                run(op::CONTAIN_STRING, BOOL, STRING, STRING, s("PE_Balloon"), s("balloon")),
+                run(
+                    op::CONTAIN_STRING,
+                    BOOL,
+                    STRING,
+                    STRING,
+                    s("PE_Balloon"),
+                    s("balloon"),
+                ),
                 Some(Value::Bool(false)),
             ),
             (
@@ -1645,35 +1912,93 @@ mod tests {
                 Some(Value::Bool(true)),
             ),
             (
-                run(op::EQUAL, BOOL, STRING, STRING, s("PE_Balloon"), s("PE_Balloon")),
+                run(
+                    op::EQUAL,
+                    BOOL,
+                    STRING,
+                    STRING,
+                    s("PE_Balloon"),
+                    s("PE_Balloon"),
+                ),
                 Some(Value::Bool(true)),
             ),
             (
-                run(op::EQUAL, BOOL, STRING, STRING, s("PE_Balloon"), s("pe_balloon")),
+                run(
+                    op::EQUAL,
+                    BOOL,
+                    STRING,
+                    STRING,
+                    s("PE_Balloon"),
+                    s("pe_balloon"),
+                ),
                 Some(Value::Bool(false)),
             ),
-            (run(op::EQUAL, BOOL, FLOAT, FLOAT, f(0.0), f(-0.0)), Some(Value::Bool(false))),
-            (run(op::EQUAL, BOOL, INT, FLOAT, i(3), f(3.0)), Some(Value::Bool(true))),
-            (run(op::EQUAL, BOOL, INT, INT, i(3), i(4)), Some(Value::Bool(false))),
             (
-                run(op::EQUAL, BOOL, VECTOR, VECTOR, v([1.0, 2.0, 3.0]), v([1.0, 2.0, 3.0])),
+                run(op::EQUAL, BOOL, FLOAT, FLOAT, f(0.0), f(-0.0)),
+                Some(Value::Bool(false)),
+            ),
+            (
+                run(op::EQUAL, BOOL, INT, FLOAT, i(3), f(3.0)),
                 Some(Value::Bool(true)),
             ),
             (
-                run(op::EQUAL, BOOL, OBJECT, OBJECT, Value::Obj(Some(3)), Value::Obj(None)),
+                run(op::EQUAL, BOOL, INT, INT, i(3), i(4)),
+                Some(Value::Bool(false)),
+            ),
+            (
+                run(
+                    op::EQUAL,
+                    BOOL,
+                    VECTOR,
+                    VECTOR,
+                    v([1.0, 2.0, 3.0]),
+                    v([1.0, 2.0, 3.0]),
+                ),
+                Some(Value::Bool(true)),
+            ),
+            (
+                run(
+                    op::EQUAL,
+                    BOOL,
+                    OBJECT,
+                    OBJECT,
+                    Value::Obj(Some(3)),
+                    Value::Obj(None),
+                ),
                 Some(Value::Bool(false)),
             ),
             (run(op::XOR, INT, INT, INT, i(6), i(3)), Some(i(5))),
             (
-                run(op::XOR, BOOL, BOOL, BOOL, Value::Bool(true), Value::Bool(true)),
+                run(
+                    op::XOR,
+                    BOOL,
+                    BOOL,
+                    BOOL,
+                    Value::Bool(true),
+                    Value::Bool(true),
+                ),
                 Some(Value::Bool(false)),
             ),
             (
-                run(op::SET_ALPHA, COLOR, COLOR, FLOAT, Value::Color([0.1, 0.2, 0.3, 0.4]), f(2.0)),
+                run(
+                    op::SET_ALPHA,
+                    COLOR,
+                    COLOR,
+                    FLOAT,
+                    Value::Color([0.1, 0.2, 0.3, 0.4]),
+                    f(2.0),
+                ),
                 Some(Value::Color([0.1, 0.2, 0.3, 1.0])),
             ),
             (
-                run(op::SET_ALPHA, COLOR, COLOR, FLOAT, Value::Color([0.1, 0.2, 0.3, 0.4]), f(-0.5)),
+                run(
+                    op::SET_ALPHA,
+                    COLOR,
+                    COLOR,
+                    FLOAT,
+                    Value::Color([0.1, 0.2, 0.3, 0.4]),
+                    f(-0.5),
+                ),
                 Some(Value::Color([0.1, 0.2, 0.3, -0.5])),
             ),
             (
@@ -1699,7 +2024,15 @@ mod tests {
         use crate::exec::Quiet;
         let mut rt = Runtime::new(std::sync::Arc::new(crate::Graph::default()));
         let got = super::run(
-            &mut rt, &mut Quiet, op::DEG_TO_RAD, FLOAT, FLOAT, NO, &Value::Float(180.0), &Value::None, false,
+            &mut rt,
+            &mut Quiet,
+            op::DEG_TO_RAD,
+            FLOAT,
+            FLOAT,
+            NO,
+            &Value::Float(180.0),
+            &Value::None,
+            false,
         );
         assert!((got.unwrap().as_float() - std::f32::consts::PI).abs() < 1e-5);
     }

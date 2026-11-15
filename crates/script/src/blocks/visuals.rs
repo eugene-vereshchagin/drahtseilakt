@@ -8,7 +8,10 @@ pub(crate) fn hide(rt: &mut Runtime, _id: Id, b: &Block, proto: Guid, host: &mut
         if let Some(e) = rt.ent(t) {
             host.set_visible(e, proto == proto::SHOW);
         } else if let Some(t) = t
-            && matches!(rt.graph.objects.get(t).map(|o| o.kind), Some(ObjKind::Other))
+            && matches!(
+                rt.graph.objects.get(t).map(|o| o.kind),
+                Some(ObjKind::Other)
+            )
             && let Some(e) = super::environment::ent2d_slot(rt, t)
         {
             // a 2D entity (the engine has no row for it): the run keeps the mark, the interface draws by it

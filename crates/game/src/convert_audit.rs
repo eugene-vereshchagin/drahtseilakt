@@ -388,6 +388,7 @@ pub fn check(
             o.headless = true;
             o.replay = None;
             o.record = None;
+            o.no_save = true;
             crate::app::states(&o, data, ticks, &keys)
         };
         let played = (run(src), run(osrc));

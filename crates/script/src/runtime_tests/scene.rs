@@ -93,14 +93,29 @@ fn object_create_makes_a_group_an_array_an_entity_and_an_object() {
         obj(&rt, so),
         obj(&rt, mo),
     );
-    assert_eq!(rt.graph.objects[gid].kind, ObjKind::Group(1), "after the level's group 0");
+    assert_eq!(
+        rt.graph.objects[gid].kind,
+        ObjKind::Group(1),
+        "after the level's group 0"
+    );
     assert_eq!(rt.graph.objects[gid].name, "Trafos");
     assert_eq!(rt.graph.objects[gid].class, 23);
     assert!(rt.group_ids(1, &host).is_empty(), "a new group is empty");
     assert_eq!(rt.graph.objects[aid].kind, ObjKind::Array(0));
-    assert!(rt.array(0).is_some_and(|a| a.rows.is_empty() && a.columns.is_empty()));
-    assert_eq!(rt.graph.objects[eid].kind, ObjKind::Entity(2), "a row of the host's table");
-    assert_eq!(rt.graph.objects[sid].kind, ObjKind::Entity(3), "a 3D sprite is an entity");
+    assert!(
+        rt.array(0)
+            .is_some_and(|a| a.rows.is_empty() && a.columns.is_empty())
+    );
+    assert_eq!(
+        rt.graph.objects[eid].kind,
+        ObjKind::Entity(2),
+        "a row of the host's table"
+    );
+    assert_eq!(
+        rt.graph.objects[sid].kind,
+        ObjKind::Entity(3),
+        "a 3D sprite is an entity"
+    );
     assert_eq!(rt.graph.objects[mid].kind, ObjKind::Other);
     assert_eq!(host.matrices.len(), 4, "two rows were made in the host");
 }
@@ -177,7 +192,11 @@ fn delete_dynamic_objects_deletes_the_dynamic_ones_only() {
     let dd = delete_dynamic(&mut b);
     chain(&mut b, &[d, k, ga, dd]);
     let (rt, host) = run(b, 2);
-    assert_eq!(host.deleted, vec![Ent::Object(2)], "only the dynamic entity is deleted");
+    assert_eq!(
+        host.deleted,
+        vec![Ent::Object(2)],
+        "only the dynamic entity is deleted"
+    );
     assert!(host.notes.iter().any(|n| n.contains("create Dyn")));
     let aid = obj(&rt, gao);
     assert!(!rt.awake(Some(aid)), "the made array is gone");
@@ -221,7 +240,16 @@ fn set_parent_links_unparents_and_refuses_itself() {
     let s3 = set_parent(&mut b, tb, me);
     let hide = {
         let hier = b.local("Hierarchy", types::BOOL, Value::Bool(false));
-        b.bb("Hide", proto::HIDE, &["In"], &["Out"], vec![hier], vec![], vec![], Some(tb))
+        b.bb(
+            "Hide",
+            proto::HIDE,
+            &["In"],
+            &["Out"],
+            vec![hier],
+            vec![],
+            vec![],
+            Some(tb),
+        )
     };
     chain(&mut b, &[s1, s2, s3, hide]);
     let (_, host) = run(b, 2);
@@ -233,7 +261,11 @@ fn set_parent_links_unparents_and_refuses_itself() {
         ],
         "itself is not asked of the table"
     );
-    assert_eq!(host.visible, vec![true, false], "Out came after the last one too");
+    assert_eq!(
+        host.visible,
+        vec![true, false],
+        "Out came after the last one too"
+    );
 }
 
 #[test]
@@ -251,14 +283,30 @@ fn set_parent_without_an_entity_target_does_nothing() {
 fn template(b: &mut Build) -> Id {
     let this = b.local("This", types::BEOBJECT, Value::Owner);
     let target = b.pin("Target", types::ENTITY, this);
-    let hide = b.bb("Hide", proto::HIDE, &["In"], &["Out"], vec![], vec![], vec![], Some(target));
+    let hide = b.bb(
+        "Hide",
+        proto::HIDE,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(target),
+    );
     let start = b.io("Start");
     let l = b.link(start, in_of(&b.g, hide, 0), 0);
     b.script("Template", Some(0), start, vec![hide], vec![l])
 }
 
 /// An Attach Script block: the script, on the target object, with the three flags; returns (block, Created Script).
-fn attach(b: &mut Build, script: Id, target: Id, dynamic: bool, activate: bool, reset: bool) -> (Id, Id) {
+fn attach(
+    b: &mut Build,
+    script: Id,
+    target: Id,
+    dynamic: bool,
+    activate: bool,
+    reset: bool,
+) -> (Id, Id) {
     let mk = |b: &mut Build, n: &str, v: bool| {
         let l = b.local(n, types::BOOL, Value::Bool(v));
         b.pin(n, types::BOOL, l)
@@ -297,9 +345,17 @@ fn attach_script_copies_the_script_to_the_target_and_starts_it() {
     rt.tick(&mut host);
     let created = obj(&rt, out);
     assert_ne!(created, t);
-    assert_eq!(rt.graph.block(created).unwrap().owner, Some(1), "bound to B");
+    assert_eq!(
+        rt.graph.block(created).unwrap().owner,
+        Some(1),
+        "bound to B"
+    );
     assert_eq!(g.nodes.len(), nodes, "the level's graph is untouched");
-    assert_eq!(host.visible, vec![false, true], "A's own template ran; B not yet (starts next tick)");
+    assert_eq!(
+        host.visible,
+        vec![false, true],
+        "A's own template ran; B not yet (starts next tick)"
+    );
     rt.tick(&mut host);
     assert_eq!(host.visible, vec![false, false], "the copy hid its owner B");
 }
@@ -313,7 +369,11 @@ fn attach_script_without_activation_waits_and_is_capped() {
     let (mut rt, mut host) = run(b, 3);
     let created = obj(&rt, out);
     assert!(!rt.is_active(created));
-    assert_eq!(host.visible, vec![false, true], "an inactive copy does nothing");
+    assert_eq!(
+        host.visible,
+        vec![false, true],
+        "an inactive copy does nothing"
+    );
     rt.activate(created, true, true, 0);
     rt.tick(&mut host);
     assert_eq!(host.visible, vec![false, false]);
@@ -332,7 +392,13 @@ fn attach_script_without_activation_waits_and_is_capped() {
         2 + crate::exec::MAX_ATTACHED,
         "the template, the maker and the cap"
     );
-    assert_eq!(host.notes.iter().filter(|n| n.contains("too many scripts")).count(), 1);
+    assert_eq!(
+        host.notes
+            .iter()
+            .filter(|n| n.contains("too many scripts"))
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -352,8 +418,26 @@ fn a_dynamic_attached_script_goes_with_delete_dynamic_objects() {
 fn set_ic_saves_the_state_and_restore_ic_puts_it_back() {
     let mut b = Build::new();
     let tb = b.local("Target", types::ENTITY, Value::Obj(Some(1)));
-    let set = b.bb("Set IC", proto::SET_IC, &["In"], &["Out"], vec![], vec![], vec![], Some(tb));
-    let restore = b.bb("Restore IC", proto::RESTORE_IC, &["In"], &["Out"], vec![], vec![], vec![], Some(tb));
+    let set = b.bb(
+        "Set IC",
+        proto::SET_IC,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(tb),
+    );
+    let restore = b.bb(
+        "Restore IC",
+        proto::RESTORE_IC,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(tb),
+    );
     chain(&mut b, &[set, restore]);
     let mut rt = Runtime::new(b.done());
     let mut host = Rec::new();
@@ -366,7 +450,13 @@ fn set_ic_saves_the_state_and_restore_ic_puts_it_back() {
 }
 
 /// A Set Physics Slider block.
-fn slider(b: &mut Build, target: Option<usize>, object2: Option<usize>, points: [Option<usize>; 2], limits: Option<(f32, f32)>) -> Id {
+fn slider(
+    b: &mut Build,
+    target: Option<usize>,
+    object2: Option<usize>,
+    points: [Option<usize>; 2],
+    limits: Option<(f32, f32)>,
+) -> Id {
     let ent = |b: &mut Build, n: &str, v: Option<usize>| {
         let l = b.local(n, types::ENTITY, Value::Obj(v));
         b.pin(n, types::ENTITY, l)
@@ -374,7 +464,11 @@ fn slider(b: &mut Build, target: Option<usize>, object2: Option<usize>, points: 
     let o2 = ent(b, "Object2", object2);
     let p0 = ent(b, "Axis first Point", points[0]);
     let p1 = ent(b, "Axis second Point", points[1]);
-    let lim = b.local("Limitations (meter)", types::BOOL, Value::Bool(limits.is_some()));
+    let lim = b.local(
+        "Limitations (meter)",
+        types::BOOL,
+        Value::Bool(limits.is_some()),
+    );
     let limp = b.pin("Limitations (meter)", types::BOOL, lim);
     let (lo, hi) = limits.unwrap_or((-1.0, 1.0));
     let lol = b.local("Lower Limit", types::FLOAT, Value::Float(lo));
@@ -397,7 +491,13 @@ fn slider(b: &mut Build, target: Option<usize>, object2: Option<usize>, points: 
 #[test]
 fn set_physics_slider_creates_with_the_axis_and_limits_and_destroys() {
     let mut b = Build::new();
-    let s = slider(&mut b, Some(0), Some(1), [Some(0), Some(1)], Some((-4.5, 4.5)));
+    let s = slider(
+        &mut b,
+        Some(0),
+        Some(1),
+        [Some(0), Some(1)],
+        Some((-4.5, 4.5)),
+    );
     let start = b.io("Start");
     let l1 = b.link(start, in_of(&b.g, s, 0), 0);
     let l2 = b.link(start, in_of(&b.g, s, 1), 2);
@@ -495,7 +595,11 @@ fn iterator_if_walks_the_rows_that_satisfy_the_test() {
             }
         }
     }
-    assert_eq!(seen, vec![(1, 5), (3, 7), (5, 9)], "rows with a value above 3, in order");
+    assert_eq!(
+        seen,
+        vec![(1, 5), (3, 7), (5, 9)],
+        "rows with a value above 3, in order"
+    );
     assert!(!rt.is_active(script), "Out after the last one");
 }
 
@@ -509,7 +613,16 @@ fn iterator_if_with_no_match_or_no_rows_goes_out_at_once() {
         let after = {
             let hier = b.local("Hierarchy", types::BOOL, Value::Bool(false));
             let t = b.local("Target", types::ENTITY, Value::Obj(Some(1)));
-            b.bb("Hide", proto::HIDE, &["In"], &["Out"], vec![hier], vec![], vec![], Some(t))
+            b.bb(
+                "Hide",
+                proto::HIDE,
+                &["In"],
+                &["Out"],
+                vec![hier],
+                vec![],
+                vec![],
+                Some(t),
+            )
         };
         let l2 = b.link(out_of(&b.g, it, 0), in_of(&b.g, after, 0), 0);
         b.script("S", None, start, vec![it, after], vec![l1, l2]);
@@ -529,7 +642,16 @@ fn shuffle_run(n: i32) -> Vec<i32> {
     });
     let arr = b.g.add_object("T", ObjKind::Array(0));
     let ap = b.local("Target (Array)", types::ARRAY, Value::Obj(Some(arr)));
-    let sh = b.bb("Shuffle Order", proto::SHUFFLE_ORDER, &["In"], &["Out"], vec![], vec![], vec![], Some(ap));
+    let sh = b.bb(
+        "Shuffle Order",
+        proto::SHUFFLE_ORDER,
+        &["In"],
+        &["Out"],
+        vec![],
+        vec![],
+        vec![],
+        Some(ap),
+    );
     chain(&mut b, &[sh]);
     let (rt, _) = run(b, 2);
     rt.rows(0).iter().map(|r| r[0].as_int()).collect()
@@ -540,9 +662,17 @@ fn shuffle_order_permutes_the_rows_the_same_way_every_run() {
     let a = shuffle_run(12);
     let mut sorted = a.clone();
     sorted.sort_unstable();
-    assert_eq!(sorted, (0..12).collect::<Vec<_>>(), "no row lost or doubled");
+    assert_eq!(
+        sorted,
+        (0..12).collect::<Vec<_>>(),
+        "no row lost or doubled"
+    );
     assert_ne!(a, (0..12).collect::<Vec<_>>(), "the order changed");
-    assert_eq!(a, shuffle_run(12), "the run's own generator: the same each time");
+    assert_eq!(
+        a,
+        shuffle_run(12),
+        "the run's own generator: the same each time"
+    );
     assert_eq!(shuffle_run(1), vec![0]);
     assert!(shuffle_run(0).is_empty());
 }

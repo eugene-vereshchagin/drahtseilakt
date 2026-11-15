@@ -180,6 +180,8 @@ fn unit(c: f32) -> f32 {
 
 impl MatState {
     pub fn new(level: &Level) -> MatState {
+        // the slot entries kept in all are bounded (each holds its own source)
+        let mut room = level::MAX_SLOT_ENTRIES;
         MatState {
             over: BTreeMap::new(),
             tex: BTreeMap::new(),
@@ -192,9 +194,11 @@ impl MatState {
                     .filter(|(t, _)| *t < level.textures.len())
                     .filter_map(|(t, more)| {
                         let own = level.textures.get(*t)?;
+                        let n = more.len().min(nmo::scene::MAX_SLOTS - 1).min(room);
+                        room -= n;
                         let bases = more
                             .iter()
-                            .take(nmo::scene::MAX_SLOTS - 1)
+                            .take(n)
                             .map(|source| {
                                 TexBase::of(&level::Texture {
                                     source: source.clone(),
@@ -616,7 +620,10 @@ mod tests {
         assert_eq!(s.texture_info(0).unwrap().slot, 2);
         let stamp = s.written[&0].stamp;
         s.apply_texture(0, TexChange::Slot(2));
-        assert_eq!(s.written[&0].stamp, stamp, "the same picture is not made again");
+        assert_eq!(
+            s.written[&0].stamp, stamp,
+            "the same picture is not made again"
+        );
         s.apply_texture(0, TexChange::Slot(1));
         assert_eq!(s.written[&0].pix.rgba[..4], [9, 9, 9, 255]);
         // a slot the texture does not have, or none (-1), leaves the picture

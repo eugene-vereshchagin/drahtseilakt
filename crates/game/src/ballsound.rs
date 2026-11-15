@@ -127,7 +127,13 @@ pub(crate) fn table(kind: BallKind) -> ([&'static str; 3], [&'static str; MATERI
     match kind {
         BallKind::Paper => (
             ["Roll_Paper"; 3],
-            ["Hit_Paper", "Hit_Paper", "Hit_Paper", "Hit_Paper", "Hit_Sack"],
+            [
+                "Hit_Paper",
+                "Hit_Paper",
+                "Hit_Paper",
+                "Hit_Paper",
+                "Hit_Sack",
+            ],
         ),
         // our sticky ball has no sounds of its own yet: rubber of the wooden ball's weight class sounds nearest the wood
         BallKind::Wood | BallKind::Sticky => (
@@ -295,7 +301,13 @@ mod tests {
         let mut last = roll(&out);
         for k in 0..60 {
             let speed = 0.3 + k as f32 * 0.2;
-            b.tick(&on, BallKind::Wood, speed, 0.6 + f64::from(k) * 0.015, &mut out);
+            b.tick(
+                &on,
+                BallKind::Wood,
+                speed,
+                0.6 + f64::from(k) * 0.015,
+                &mut out,
+            );
             let now = roll(&out);
             assert!(now.0 >= last.0 && now.1 >= last.1);
             assert!(now.0 - last.0 < 0.08, "a step of {}", now.0 - last.0);
@@ -304,7 +316,13 @@ mod tests {
         assert!(last.0 > 0.2);
         // and stops again
         for k in 0..60 {
-            b.tick(&on, BallKind::Wood, 0.0, 2.0 + f64::from(k) * 0.015, &mut out);
+            b.tick(
+                &on,
+                BallKind::Wood,
+                0.0,
+                2.0 + f64::from(k) * 0.015,
+                &mut out,
+            );
         }
         assert!(roll(&out).0 < 0.01);
     }
@@ -344,7 +362,13 @@ mod tests {
         assert!(v > 0.0 && v < 0.2 && (p - 0.595).abs() < 0.01, "{v} {p}");
         out.clear();
         for k in 0..40 {
-            b.tick(&on, BallKind::Stone, 10.0, 0.31 + f64::from(k) * 0.015, &mut out);
+            b.tick(
+                &on,
+                BallKind::Stone,
+                10.0,
+                0.31 + f64::from(k) * 0.015,
+                &mut out,
+            );
         }
         let Some(&SoundCmd::Roll(v, _)) = out.last() else {
             panic!()

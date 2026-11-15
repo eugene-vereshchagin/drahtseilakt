@@ -14,8 +14,8 @@ pub const MAX_EXPRESSION: usize = 511;
 
 /// The functions of one argument.
 pub const FUNCTIONS: &[&str] = &[
-    "abs", "sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log",
-    "floor", "ceil",
+    "abs", "sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp",
+    "ln", "log", "floor", "ceil",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -258,7 +258,9 @@ mod tests {
 
     #[test]
     fn syntax_errors_and_caps() {
-        for bad in ["", "1+", "(1", "1)", "1 2", "a", "foo(1)", "sin 1", "1+*2", "#", "sin()", "pi(1)"] {
+        for bad in [
+            "", "1+", "(1", "1)", "1 2", "a", "foo(1)", "sin 1", "1+*2", "#", "sin()", "pi(1)",
+        ] {
             assert_eq!(ev(bad, &[]), None, "{bad}");
         }
         // nesting beyond the cap

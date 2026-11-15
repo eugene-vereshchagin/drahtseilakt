@@ -1229,7 +1229,11 @@ fn a_bezier_progression_follows_its_curve_and_ends() {
         rt.tick(&mut host);
     }
     assert_eq!(rt.values[progress], Value::Float(1.0));
-    assert_eq!(rt.values[value], Value::Float(2.0), "it ends at A, the curve's 0");
+    assert_eq!(
+        rt.values[value],
+        Value::Float(2.0),
+        "it ends at A, the curve's 0"
+    );
     assert!(!rt.is_active(script), "Out fired and nothing looped back");
 }
 
@@ -1245,7 +1249,11 @@ fn a_bezier_transform_maps_x_through_the_curve_and_the_boundaries() {
         let rl = b.local("Boundaries", types::RECT, Value::Rect(rect));
         let rp = b.pin("Boundaries", types::RECT, rl);
         let y = b.pout("Y", types::FLOAT);
-        let local = b.local("Use 4 Floats As Boundaries", types::BOOL, Value::Bool(false));
+        let local = b.local(
+            "Use 4 Floats As Boundaries",
+            types::BOOL,
+            Value::Bool(false),
+        );
         let t = b.bb(
             "Bezier Transform",
             proto::BEZIER_TRANSFORM,
@@ -1264,13 +1272,25 @@ fn a_bezier_transform_maps_x_through_the_curve_and_the_boundaries() {
         rt.values[y].as_float()
     };
     // a straight curve: the boundaries alone
-    assert_eq!(run(60.0, line_curve(0.0, 1.0), [0.0, 120.0, 120.0, 0.0]), 60.0);
+    assert_eq!(
+        run(60.0, line_curve(0.0, 1.0), [0.0, 120.0, 120.0, 0.0]),
+        60.0
+    );
     assert_eq!(run(0.8, line_curve(0.0, 1.0), [0.0, 1.25, 1.0, 0.0]), 1.0);
     // a falling curve: Y = 120 * (1 - 0.25)
-    assert_eq!(run(30.0, line_curve(1.0, 0.0), [0.0, 120.0, 120.0, 0.0]), 90.0);
+    assert_eq!(
+        run(30.0, line_curve(1.0, 0.0), [0.0, 120.0, 120.0, 0.0]),
+        90.0
+    );
     // X outside the range is the curve's end value; a rectangle of no width reads the curve at 0
-    assert_eq!(run(500.0, line_curve(0.0, 1.0), [0.0, 10.0, 100.0, 0.0]), 10.0);
-    assert_eq!(run(-9.0, line_curve(0.0, 1.0), [0.0, 10.0, 100.0, 2.0]), 2.0);
+    assert_eq!(
+        run(500.0, line_curve(0.0, 1.0), [0.0, 10.0, 100.0, 0.0]),
+        10.0
+    );
+    assert_eq!(
+        run(-9.0, line_curve(0.0, 1.0), [0.0, 10.0, 100.0, 2.0]),
+        2.0
+    );
     assert_eq!(run(5.0, line_curve(0.0, 1.0), [3.0, 10.0, 3.0, 0.0]), 0.0);
     // no curve in the file: the identity shape
     assert_eq!(run(25.0, Value::None, [0.0, 1.0, 100.0, 0.0]), 0.25);
@@ -3090,7 +3110,10 @@ fn text_3d_sends_its_text_on_the_entity_and_takes_it_away() {
     assert_eq!(e, Ent::Object(7));
     assert_eq!(s.text, "one\ntwo");
     assert_eq!((s.scale, s.color), ([10.0, 8.0], [0.0, 1.0, 0.5, 1.0]));
-    assert_eq!((s.margins, s.offset, s.align), ([2.0, 3.0, 4.0, 5.0], [1.0, 1.0], 1));
+    assert_eq!(
+        (s.margins, s.offset, s.align),
+        ([2.0, 3.0, 4.0, 5.0], [1.0, 1.0], 1)
+    );
     let lc = rt.graph.block(blk).unwrap().pouts[1];
     assert_eq!(rt.values[lc], Value::Int(2));
 }
@@ -3234,7 +3257,11 @@ fn movie_player_steps_the_texture_through_its_slots() {
     let (mut rt, _, script, pout, _) = movie_rig(1000.0, false, 0, 3);
     let mut host = Rec::new();
     rt.tick(&mut host);
-    assert_eq!(host.texs, vec![(0, T::Slot(0))], "On shows the Starting Slot");
+    assert_eq!(
+        host.texs,
+        vec![(0, T::Slot(0))],
+        "On shows the Starting Slot"
+    );
     for _ in 0..70 {
         rt.tick(&mut host);
     }
@@ -3247,8 +3274,15 @@ fn movie_player_steps_the_texture_through_its_slots() {
         })
         .collect();
     assert_eq!(slots, vec![0, 1, 2, 3], "one change per slot, in order");
-    assert_eq!(rt.values[pout], Value::Int(3), "Current Slot ends on Ending Slot");
-    assert!(!rt.is_active(script), "one pass without Loop stops the block");
+    assert_eq!(
+        rt.values[pout],
+        Value::Int(3),
+        "Current Slot ends on Ending Slot"
+    );
+    assert!(
+        !rt.is_active(script),
+        "one pass without Loop stops the block"
+    );
 }
 
 #[test]
@@ -3263,7 +3297,10 @@ fn movie_player_fires_one_loop_played_and_loops() {
             rt.set_io(probe, false);
         }
     }
-    assert!(passes >= 5, "One Loop Played fires at the end of each pass, got {passes}");
+    assert!(
+        passes >= 5,
+        "One Loop Played fires at the end of each pass, got {passes}"
+    );
     assert!(rt.is_active(script), "Loop keeps the block running");
 }
 

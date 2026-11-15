@@ -832,9 +832,7 @@ pub(crate) fn iterator_if(
     let col = pin_int(rt, b, 0, 0, host);
     let op = pin_int(rt, b, 1, 1, host);
     let col = usize::try_from(col).ok();
-    let kind = col
-        .and_then(|c| column_kind_of(rt, a, c))
-        .unwrap_or(INT);
+    let kind = col.and_then(|c| column_kind_of(rt, a, c)).unwrap_or(INT);
     let key = key_from(rt, b, 2, kind, host);
     let found = col.and_then(|c| rt.array(a).and_then(|x| find_row(x, c, op, &key, start)));
     match found {
