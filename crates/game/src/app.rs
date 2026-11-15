@@ -243,8 +243,11 @@ impl Game {
                 let r = Replay::parse(&text).map_err(|e| format!("{}: {e}", p.display()))?;
                 // a replay plays on its level file, or on a level converted from that file (an open-format export
                 // records its source's hash): the same level, so the same run
+                // (or on the original level the map is a remake of, turned the same way and with the same objects:
+                // the invisible maps, whose physics is the original's, play the original's runs)
                 if r.level_hash != level.hash
                     && Some(r.level_hash) != level.level.settings.source_hash
+                    && remake_of(data, &level.level, &r, true).is_none()
                 {
                     return Err(format!(
                         "{}: recorded on another level file than {}",
@@ -2292,10 +2295,97 @@ fn way_on(game: &Game, o: &Options, w: &mut Watched) -> Result<(), String> {
     Ok(())
 }
 
+/// The options a player's replay `run` is watched with (followed, or read for a hint's stretch): on the chosen level,
+/// or, when it was recorded on the original level the chosen map is a remake of, on that original. A remake holding
+/// the original's geometry (the 45-degree and the invisible sets: the same objects at the same places, only the view
+/// or the looks changed) is followed by the original's runs; the run itself must be seen where it was played (its
+/// keys are in its own view), and only its ball's way and pushes in the world are taken over.
+fn watch_options(o: &Options, data: &Data, run: &Replay) -> Options {
+    let mut watch = o.clone();
+    if matches!(o.source, crate::assets::Source::Original(_)) {
+        return watch;
+    }
+    let Ok(chosen) = data.load(&o.source) else {
+        return watch;
+    };
+    if run.level_hash == chosen.hash || Some(run.level_hash) == chosen.level.settings.source_hash {
+        return watch;
+    }
+    if let Some((n, original)) = remake_of(data, &chosen.level, run, false) {
+        println!(
+            "{}: the original's run, seen on the original level {n} (the map holds its geometry)",
+            run.level_name
+        );
+        watch.source = original;
+    }
+    watch
+}
+
+/// The original level (its number and the copy's own file) a replay `run` was recorded on, when `chosen` is a remake
+/// holding its geometry: the same objects at the same places, and with `turns` also turned the same way (then the
+/// physics and the view are the original's and the run plays on the remake tick for tick: the invisible maps).
+fn remake_of(
+    data: &Data,
+    chosen: &level::Level,
+    run: &Replay,
+    turns: bool,
+) -> Option<(u32, crate::assets::Source)> {
+    let n = level_number(&run.level_name)?;
+    // (the copy's own file: the replays of the original levels are recorded on it)
+    let original = data
+        .original(n)
+        .filter(|s| matches!(s, crate::assets::Source::Nmo(_)))?;
+    let orig = data.load(&original).ok()?;
+    (orig.hash == run.level_hash && same_geometry(&orig.level, chosen, turns))
+        .then_some((n, original))
+}
+
+/// The original level a file name names (`Level_04.NMO`: 4), 1 to 13.
+fn level_number(name: &str) -> Option<u32> {
+    let stem = name.get(..name.find('.').unwrap_or(name.len()))?;
+    let digits = stem
+        .get(..6)
+        .filter(|p| p.eq_ignore_ascii_case("Level_"))
+        .and_then(|_| stem.get(6..))?;
+    let n: u32 = digits.parse().ok()?;
+    (1..=13).contains(&n).then_some(n)
+}
+
+/// Whether two levels hold the same geometry: the same objects (in any order) at the same places, with meshes of as
+/// many points (how they look and whether they are shown may differ; which way they face too, unless `turns`).
+fn same_geometry(a: &level::Level, b: &level::Level, turns: bool) -> bool {
+    // each object as its name, its place (or its whole matrix) on a grid of a ten-thousandth and its mesh's points,
+    // sorted
+    let key = |l: &level::Level| {
+        let mut k: Vec<(String, Vec<i64>, Option<usize>)> = l
+            .objects
+            .iter()
+            .map(|o| {
+                let cell = |v: f32| (f64::from(v) * 1e4).round() as i64;
+                let place: Vec<i64> = if turns {
+                    o.matrix.iter().flatten().map(|&v| cell(v)).collect()
+                } else {
+                    o.position().iter().map(|&v| cell(v)).collect()
+                };
+                (
+                    o.name.clone(),
+                    place,
+                    o.mesh
+                        .and_then(|m| l.meshes.get(m))
+                        .map(|m| m.positions.len()),
+                )
+            })
+            .collect();
+        k.sort();
+        k
+    };
+    a.objects.len() == b.objects.len() && key(a) == key(b)
+}
+
 /// Watches a player's run (`text`, read from `file`) to its end.
 fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watched, String> {
     let run = Replay::parse(text)?;
-    let mut watch = o.clone();
+    let mut watch = watch_options(o, data, &run);
     watch.replay = Some(file.to_path_buf());
     watch.follow = None;
     let mut seen = Game::new(&watch, data)?;
@@ -2316,9 +2406,12 @@ fn watch_run(o: &Options, data: &Data, file: &Path, text: &str) -> Result<Watche
             kind: s.ball.kind,
             sector: s.sector,
             alive: !s.is_dying() && !lost,
-            push: crate::hints::world_push(run.input_at(s.tick + 1), s.camera.quarter),
+            push: crate::hints::world_push(
+                run.input_at(s.tick + 1),
+                crate::hints::Facing::of(&s.camera),
+            ),
             bits: run.input_at(s.tick + 1),
-            quarter: s.camera.quarter,
+            quarter: crate::hints::Facing::of(&s.camera),
             doomed_in: None,
         });
         let before = seen.sim.events.len();
@@ -2800,7 +2893,7 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
             let text =
                 String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
             let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
-            let mut watch = o.clone();
+            let mut watch = watch_options(o, data, &run);
             watch.replay = Some(file.clone());
             watch.follow = None;
             watch.autopilot = false;
@@ -2821,7 +2914,7 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
                     inputs.push(input);
                 }
             }
-            *step = crate::hints::Step::Inputs(seen.sim.camera.quarter, inputs);
+            *step = crate::hints::Step::Inputs(crate::hints::Facing::of(&seen.sim.camera), inputs);
         }
     }
     if !hints.is_empty() {
@@ -2843,7 +2936,7 @@ fn load_track(
     let bytes = crate::hints::read_plain(file, crate::hints::MAX_REPLAY_FILE)?;
     let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
     let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
-    let mut watch = o.clone();
+    let mut watch = watch_options(o, data, &run);
     watch.replay = Some(file.to_path_buf());
     watch.follow = None;
     watch.autopilot = false;
@@ -7801,9 +7894,7 @@ const WHEEL_PIXELS: f64 = 40.0;
 impl App {
     /// Where the cursor is over the menu, as the menu lays its buttons out in this window.
     fn window_size(&self) -> Option<(u32, u32)> {
-        self.gpu
-            .as_ref()
-            .map(|g| (g.config.width, g.config.height))
+        self.gpu.as_ref().map(|g| (g.config.width, g.config.height))
     }
 
     /// A click on the prompt's Yes or No; true when it was one.

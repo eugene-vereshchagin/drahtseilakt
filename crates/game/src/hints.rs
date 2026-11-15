@@ -66,8 +66,8 @@ pub enum Step {
     Become(BallKind),
     /// As written: the replay's file (beside the hint file) and its ticks.
     Replay(PathBuf, u64, u64),
-    /// A replay stretch read: the view's quarter at its first tick and the inputs of its ticks.
-    Inputs(i32, Vec<u8>),
+    /// A replay stretch read: the view at its first tick and the inputs of its ticks.
+    Inputs(Facing, Vec<u8>),
     /// As written: a replay stretch to follow closed-loop, its file, ticks and correction gain.
     Trace(PathBuf, u64, u64, f32),
     /// A trace read: the recorded run's ball and pushes, a tick each.
@@ -783,12 +783,38 @@ pub fn read_text(path: &Path, cap: u64) -> Result<String, String> {
     String::from_utf8(read_plain(path, cap)?).map_err(|_| format!("{}: not UTF-8", path.display()))
 }
 
-/// A view at `quarter`, for the axes its arrows push along.
-fn view(quarter: i32) -> crate::sim::Camera {
+/// Where a view's arrows push: its heading in whole quarters and the offset from them its reset point gives (0 on
+/// the original levels; an eighth of a turn on the 45-degree maps, where "up" pushes along a diagonal of the
+/// world). Two views push alike only when both are the same: a player's keys from another view (a replay of the
+/// original level followed on its 45-degree remake) are turned into this view's arrows by their world push.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Facing {
+    pub quarter: i32,
+    pub base: f32,
+}
+
+impl Facing {
+    /// The view a camera pushes in now.
+    pub fn of(cam: &crate::sim::Camera) -> Facing {
+        Facing {
+            quarter: cam.quarter,
+            base: cam.base,
+        }
+    }
+
+    /// A view of the original levels (no offset) at `quarter`.
+    #[cfg(test)]
+    pub fn quarter(quarter: i32) -> Facing {
+        Facing { quarter, base: 0.0 }
+    }
+}
+
+/// A view at `facing`, for the axes its arrows push along.
+fn view(facing: Facing) -> crate::sim::Camera {
     crate::sim::Camera {
-        quarter,
+        quarter: facing.quarter,
         yaw: 0.0,
-        base: 0.0,
+        base: facing.base,
         lift: 0.0,
         position: Vec3::ZERO,
         step: Vec3::ZERO,
@@ -796,9 +822,9 @@ fn view(quarter: i32) -> crate::sim::Camera {
     }
 }
 
-/// The world push of arrows `bits` with the view at `quarter` (the sim's own rule: Left / Right only without Shift).
-pub fn world_push(bits: u8, quarter: i32) -> Vec3 {
-    let cam = view(quarter);
+/// The world push of arrows `bits` with the view at `facing` (the sim's own rule: Left / Right only without Shift).
+pub fn world_push(bits: u8, facing: Facing) -> Vec3 {
+    let cam = view(facing);
     let (f, r) = (cam.push_forward(), cam.push_right());
     let mut v = Vec3::ZERO;
     if bits & input::UP != 0 {
@@ -818,9 +844,9 @@ pub fn world_push(bits: u8, quarter: i32) -> Vec3 {
     v
 }
 
-/// The arrows that push along `v` (its larger parts) with the view at `quarter`.
-pub fn arrows(v: Vec3, quarter: i32) -> u8 {
-    let cam = view(quarter);
+/// The arrows that push along `v` (its larger parts) with the view at `facing`.
+pub fn arrows(v: Vec3, facing: Facing) -> u8 {
+    let cam = view(facing);
     let (f, r) = (v.dot(cam.push_forward()), v.dot(cam.push_right()));
     let big = f.abs().max(r.abs());
     if big < 1e-3 {
@@ -846,7 +872,7 @@ struct Running {
     hint: usize,
     step: usize,
     start: u64,
-    quarter: i32,
+    quarter: Facing,
     flown: bool,
     prev: u8,
     /// A via's nearest yet and when, and the tick its backing off for a run-up ends.
@@ -1064,7 +1090,7 @@ impl Runner {
                 hint: i,
                 step: 0,
                 start: sim.tick,
-                quarter: 0,
+                quarter: Facing::default(),
                 flown: false,
                 prev: 0,
                 nearest: f32::INFINITY,
@@ -1269,7 +1295,7 @@ const CROSS_SETTLE: u64 = 60;
 /// within `r` of `to`, on a floor and not lost; none found, none.
 fn cross_plan(sim: &Sim, dir: Vec3, to: Vec3, r: f32) -> Vec<Vec3> {
     let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
-    let quarter = sim.camera.quarter;
+    let quarter = Facing::of(&sim.camera);
     for wait in CROSS_WAITS.step_by(CROSS_WAIT_STEP) {
         // (the wait played once, shared by every push after it)
         let mut waited = sim.clone();
@@ -1319,7 +1345,7 @@ const MAX_SHOVE_ROUND: f32 = 10.0;
 /// The input of `step` for this tick, or None when it is done.
 fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     let t = sim.tick.saturating_sub(run.start);
-    let quarter = sim.camera.quarter;
+    let quarter = Facing::of(&sim.camera);
     // (a chain of pass steps is a line; any other step between them breaks it)
     if !matches!(step, Step::Pass(..)) {
         run.passed = None;
@@ -1605,10 +1631,10 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             run.prev = bits;
             if bits & input::SHIFT != 0 {
                 if pressed & input::LEFT != 0 {
-                    run.quarter -= 1;
+                    run.quarter.quarter -= 1;
                 }
                 if pressed & input::RIGHT != 0 {
-                    run.quarter += 1;
+                    run.quarter.quarter += 1;
                 }
             }
             Some(arrows(world_push(bits, run.quarter), quarter) | (bits & input::LIFT))
@@ -1966,11 +1992,41 @@ mod tests {
                 input::RIGHT,
                 input::UP | input::RIGHT,
             ] {
-                let w = world_push(bits, q);
+                let w = world_push(bits, Facing::quarter(q));
                 for mine in -4..4 {
-                    assert_eq!(world_push(arrows(w, mine), mine), w, "{bits} {q} {mine}");
+                    let mine = Facing::quarter(mine);
+                    assert_eq!(world_push(arrows(w, mine), mine), w, "{bits} {q} {mine:?}");
                 }
             }
         }
+    }
+
+    #[test]
+    fn arrows_push_along_the_diagonal_view_of_a_45_degree_map() {
+        // on a 45-degree map "up" pushes along a diagonal of the world: a world push is given by the arrows
+        // whose push in that view points the same way (an axis of the world: two arrows at once)
+        let diag = Facing {
+            quarter: 0,
+            base: std::f32::consts::FRAC_PI_4,
+        };
+        let up = world_push(input::UP, diag);
+        assert!((up - Vec3::new(1.0, 0.0, 1.0).normalize()).length() < 1e-5);
+        for (w, keys) in [
+            (up, input::UP),
+            (Vec3::Z, input::UP | input::LEFT),
+            (Vec3::X, input::UP | input::RIGHT),
+            (Vec3::NEG_Z, input::DOWN | input::RIGHT),
+        ] {
+            assert_eq!(arrows(w, diag), keys, "{w}");
+            assert!(
+                world_push(arrows(w, diag), diag)
+                    .normalize()
+                    .dot(w.normalize())
+                    > 0.999
+            );
+        }
+        // a player's keys from the original level's view are turned, not given as pressed
+        let straight = world_push(input::UP, Facing::quarter(0));
+        assert_eq!(arrows(straight, diag), input::UP | input::LEFT);
     }
 }

@@ -1120,7 +1120,7 @@ pub struct DemoTick {
     /// The keys as the player pressed them, and the view's quarter then: in the same view they are given as they
     /// were (turns of the view too, and pushes while the view turns, which no world direction gives exactly).
     pub bits: u8,
-    pub quarter: i32,
+    pub quarter: crate::hints::Facing,
     /// In the player's last seconds before losing a ball (not `alive`): how many ticks before the loss. The line is
     /// kept to there but for the last second: what the player did then may be what the level needs (a bridge
     /// knocked down as the ball fell with it).
@@ -1241,7 +1241,7 @@ impl Demo {
 
     /// The player's input of tick `k` for a view at `quarter`: the very keys when the view is the player's, else the
     /// push as arrows of this view.
-    fn input(&self, k: usize, quarter: i32) -> u8 {
+    fn input(&self, k: usize, quarter: crate::hints::Facing) -> u8 {
         self.ticks.get(k).map_or(0, |t| {
             if t.quarter == quarter {
                 t.bits
@@ -1495,10 +1495,10 @@ impl Pilot {
         if d.ticks.get(k).is_some_and(|t| t.doomed_in.is_some()) {
             self.doomed_at = Some(sim.tick);
         }
-        let q = sim.camera.quarter;
+        let q = crate::hints::Facing::of(&sim.camera);
         let lives = sim.lives;
         // the player's keys from tick `k + t`, in our view (as a copy's view turns with them, each tick's own)
-        let theirs = |s: &Sim, t: u64| d.input(k + t as usize, s.camera.quarter);
+        let theirs = |s: &Sim, t: u64| d.input(k + t as usize, crate::hints::Facing::of(&s.camera));
         let route = self.route.clone();
         let cost_of = |first: Option<u8>| -> (f32, Vec<u8>) {
             let mut s = sim.clone();
@@ -2090,7 +2090,7 @@ impl Pilot {
             for k in starts {
                 for len in DEMO_STRETCHES {
                     // as held choices, a tick each (the copy's view does not turn: the arrows are for this one)
-                    let q = sim.camera.quarter;
+                    let q = crate::hints::Facing::of(&sim.camera);
                     let mut plan: Vec<(u64, u8)> = Vec::new();
                     for i in 0..len {
                         let c = d.input(k + i as usize, q);
@@ -2803,7 +2803,7 @@ impl Pilot {
         if !sim.tick.is_multiple_of(PERIOD) {
             if let (Some((k, from)), Some(d)) = (self.demo_run, &self.demo) {
                 let t = usize::try_from(sim.tick.saturating_sub(from)).unwrap_or(usize::MAX);
-                return d.input(k.saturating_add(t), sim.camera.quarter);
+                return d.input(k.saturating_add(t), crate::hints::Facing::of(&sim.camera));
             }
             return self.choice;
         }
@@ -3095,7 +3095,7 @@ impl Pilot {
             return self
                 .demo
                 .as_ref()
-                .map_or(0, |d| d.input(k, sim.camera.quarter));
+                .map_or(0, |d| d.input(k, crate::hints::Facing::of(&sim.camera)));
         }
         self.choice = best.1;
         self.choice
@@ -3126,7 +3126,9 @@ fn rollouts(
         let (mut astray, mut line_samples) = (0.0, 0u32);
         for t in 0..hold + COAST {
             let input = match demo {
-                Some((k, d)) if c == DEMO_CHOICE => d.input(k + t as usize, s.camera.quarter),
+                Some((k, d)) if c == DEMO_CHOICE => {
+                    d.input(k + t as usize, crate::hints::Facing::of(&s.camera))
+                }
                 _ if t < hold => c,
                 _ => 0,
             };
@@ -3224,7 +3226,7 @@ fn under_cap(i: u8, sim: &Sim, cap: f32) -> u8 {
     if i & input::SHIFT != 0 || speed <= cap {
         return i;
     }
-    let q = sim.camera.quarter;
+    let q = crate::hints::Facing::of(&sim.camera);
     if speed > cap * CAREFUL_BRAKE {
         return (i & !ARROWS) | crate::hints::arrows(-v, q);
     }
@@ -3686,7 +3688,10 @@ mod tests {
             }
             let mut sim = Sim::new(&level, kind);
             for _ in 0..600 {
-                sim.step(crate::hints::arrows(Vec3::X, sim.camera.quarter));
+                sim.step(crate::hints::arrows(
+                    Vec3::X,
+                    crate::hints::Facing::of(&sim.camera),
+                ));
             }
             sim.ball.velocity.x
         };

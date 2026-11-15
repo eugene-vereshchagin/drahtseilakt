@@ -275,6 +275,32 @@ nothing holds), and why a limit is let go.
 A zones file is untrusted like a hint file: its size (64 KiB), the zones (256) and points (256 a zone) and every
 number are capped; a malformed line is left out with a note naming it, the other zones still count.
 
+## Modified originals
+
+The community remakes of the original levels (levels.md, "Modified originals") hold the original's geometry: the
+same objects at the same places. The **invisible maps** hide every object, the balloon's stand-in too (the game
+makes the balloon there all the same, as the original's init does); their physics is the original's tick for tick,
+so the original's runs play on them unchanged. The **45-degree maps** turn the reset points by an eighth of a turn:
+the view looks along a diagonal of the world and the arrows push along the view's axes.
+
+So the test player takes the original's hints and plans as they are (their places and directions are the world's),
+and gives a world direction as the arrows of the view as it is, its offset from whole quarters too: on a 45-degree
+map a push along an axis of the world is two arrows. A player's replay recorded on the original level (followed with
+`--follow` and `--then`, or a hint's `replay` or `trace` stretch) is seen on the original level, the copy's own file,
+when the map holds its geometry (the same objects at the same places, in any order); only the ball's way and its
+pushes in the world are taken over, and the player's keys are turned into the arrows of the map's view. A remake
+whose objects differ is no remake of it: such a replay is refused as before.
+
+A replay of the original level also plays with `--replay` on a remake whose objects are turned the same way
+too (an invisible map: the same physics and view, so the same run tick for tick; `--record` saves it as the map's).
+On a 45-degree map the keys would push another way, so there it is refused.
+
+Where it stands, 2026-11-15 (runs in `hints/runs/modified/`): the invisible maps, 12 of 13 finished from the start by
+the test player (levels 1, 11, 12, 13 by the plan and hints alone, 4 and 9 following the owner's runs, the others following
+the original's kept run; level 8 only as the original's kept run played on the map, `Level_08-original-run.replay`).
+The 45-degree maps, levels 1-7, 9 and 10 finished following the original's kept run with no hints (the hints' open
+steps were written for the original's view); 8, 11, 12 and 13 not yet.
+
 ## Videos of its runs
 
 `--video FILE` with `--replay` draws the run without a window, one frame a tick (60 a second) at `--size`, as raw
