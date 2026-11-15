@@ -11,6 +11,12 @@
 at 366 8.3 -714.3 r 4 sector 4 kind wood : pass 380 8.3 -714.5 6 ; pass 384 8.3 -721 6 ; press 384 3 -786 0 0 14 900 ; pass 386 3 -789 6 ; pass 400 3 -789 6 ; pass 404 3 -793 5 ; press 404 3 -846 0 0 14 900 ; pass 396 3 -852 6 ; pass 384 3 -853 6 ; pass 383.5 3 -858 5 ; press 383.7 3 -924 0 0 14 900 ; become stone
 at 383.5 3 -924 r 8 sector 4 kind stone : press 383 3 -853 0 0 30 900 ; pass 398 3 -852 7 ; pass 403.5 3 -851.5 4 ; press 404 3 -792 0 0 30 900 ; pass 400 3 -789 10 ; pass 386 3 -789 10 ; press 384 3 -720 0 0 30 900  ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; goto 380 8.3 -714.5 ; press 403 8.3 -714.5 0 0 9 150 ; push -1 0 70 ; wait 10 ; pass 409 8.3 -714.5 4 ; pass 411.3 8.3 -700 5
 #
-# Sector 5: after the stone ball drops with the broken plates onto the wavy log below, it keeps its speed along the
+# Sector 5: the stone ball let go by P_Trafo_Stone_03 on the tower is pushed south, off the transformer onto the hanging
+# plates (P_Modul_29) in the tower's middle: their ropes tear and it drops with them past the column top onto the log
+# below (left alone, the steering rolls it east off the tower's edge onto the rails above the log, whose end it
+# cannot climb over). The hint begins as the transformer lets the ball go (held, it is 1 unit higher).
+at 507.23 -4.53 -590.41 r 0.8 sector 5 kind stone : wait 30 ; push 0 -1 45 ; wait 120
+#
+# After the stone ball drops with the broken plates onto the wavy log below, it keeps its speed along the
 # log's middle (a stone ball stuck in a trough cannot climb out) to the wood transformer at its end.
 at 515.2 -32 -577 r 6 sector 5 kind stone : press 514.5 -38 -540 0 0 30 600 ; press 516.5 -38 -510 0 0 30 600 ; press 513.5 -38 -480 0 0 30 600 ; press 512 -38 -460 0 0 30 600 ; press 517.5 -38 -430 0 0 30 600 ; press 514 -38 -400 0 0 30 600 ; press 514 -38 -370 0 0 30 600 ; pass 515.2 -35 -346.8 8

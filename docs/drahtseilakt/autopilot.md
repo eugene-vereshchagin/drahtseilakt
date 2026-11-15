@@ -241,6 +241,7 @@ says so:
 ```
 flow sector 1 r 4 : X Y Z ; X Y Z ; ...
 careful sector 2 r 4 [speed V] : X Y Z ; ...
+plain sector 2 r 8 : X Y Z ; ...
 ```
 
 The points are the ball's path through the stretch (one point: a place); the zone is everything within `r` of that
@@ -264,6 +265,9 @@ path in that sector.
   speed (a `press`, `along` or `round` faster than the limit: a climb, rails, a ram; or a `pass` faster than it
   within 25 units before one: its run-up). The status line says so (`[limit let go: a gap to cross ahead]`). A careful learned rule holds
   back the same way, and is let go in the same places.
+- **plain** — no learned rule here (written by hand, `plain sector N r R : X Y Z ; ...`): the test player rides as
+  it does by itself, where a rule learned on another level would lose the ball (on level 6, "bend, wood: don't
+  dawdle" cuts the waits of a lift and of a paper ball in fans).
 
 Each mark also teaches the test player the kind of place it was, for every level: a rule of the learned table
 (`learned.txt` beside the hints; [autopilot-rules.md](autopilot-rules.md), "The learned table").
@@ -365,7 +369,12 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
 - Level 5: finished from the start in 12:39.77 (hints for both crates and the pusher).
 - Level 6: finished from the start in 8:01.22: sector 1 along the owner's line, sectors 2–5 by itself with the
   plan and the hints from the walkthrough's storyboard (`hints/Level_06.txt`: the wavy log there as wood and back
-  as stone at speed, the boxes rammed off, the log after the drop in sector 5).
+  as stone at speed, the boxes rammed off, the log after the drop in sector 5). That run no longer came again with
+  the learned table (game over in sector 2) nor without it (stuck in sector 5); 2026-11-15, with plain zones where
+  the rules learned on level 1 cut the waits of sectors 2 and 3 (`hints/Level_06.zones`) and the stone ball pushed
+  off its transformer onto the hanging plates in sector 5 (left alone it rolled off the tower onto the rails above
+  the log): 9:01.60, 4 lives, standing 17.2% of the ticks (16.5% before), within 1 of an edge 5.3% (2.5%), speed
+  4.8 ± 4.5 (4.9 ± 4.4) (`hints/runs/Level_06.replay`).
 - Level 7: finished from the start in 12:04.28, following the owner's finished run.
 - Level 8: finished from the start in 9:59.40 with no player's run at all: by itself through the walkthrough's
   plan (`hints/Level_08.plan`, with places on the way) and the hints written from its storyboard

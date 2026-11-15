@@ -2186,15 +2186,21 @@ fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
         w.gates
     );
     // the test player's own run begins where the followed one began
+    // (with --replay and --from: that run's keys up to the tick, then the test player, as without --follow)
     let mut own = o.clone();
-    own.replay = None;
+    if o.from.is_none() {
+        own.replay = None;
+    }
     own.follow = None;
     if let Some(st) = &w.run.start {
         own.sector = Some(st.sector);
         own.ball = st.ball.clone();
         own.at = st.at.map(|[x, y, z]| format!("{x},{y},{z}"));
     }
-    let game = Game::new(&own, data)?;
+    let mut game = Game::new(&own, data)?;
+    if let Some(tick) = own.from.filter(|_| own.replay.is_some()) {
+        game.fast_forward(tick);
+    }
     if !w.finished {
         way_on(&game, &own, &mut w)?;
     }
@@ -4750,6 +4756,7 @@ impl PilotWatch {
             Kind::Flow => [0.2, 0.95, 0.45, a],
             Kind::Careful => [1.0, 0.55, 0.1, a],
             Kind::Calm => [0.3, 0.55, 1.0, a],
+            Kind::Plain => [0.75, 0.75, 0.75, a],
         };
         let mut bead = |p: glam::Vec3, r: f32, c: [f32; 4]| {
             let m = glam::Mat4::from_scale_rotation_translation(
